@@ -66,8 +66,9 @@ import {
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '../utils/sha256.js';
-import { createMessageId } from './message-id.js';
 import { assertKiloModelAvailable } from '../model-validation.js';
+import { initialAdmissionFailure } from './admission-failure.js';
+import { createMessageId } from './message-id.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import type {
   AcceptedExecutionTurn,
@@ -167,15 +168,6 @@ export function executionTurnSubmissionFromAcceptedTurn(
         arguments: turn.arguments,
       };
 }
-
-type SessionEstablishmentFailure =
-  | { stage: 'sandbox_identity'; code: 'sandbox_id_derivation_failed' }
-  | { stage: 'registration'; code: 'do_registration_rejected' }
-  | {
-      stage: 'initial_admission';
-      code: 'initial_admission_rejected' | 'initial_queue_full' | 'invalid_initial_intent';
-    }
-  | { stage: 'transport'; code: 'do_rpc_outcome_unknown' };
 
 type NewSessionAllocation = SessionRegistrationResult & {
   reportingCreatedAt?: string;
@@ -410,18 +402,6 @@ function sessionCreateSettledOutboxEvent(params: {
       in_organization: params.inOrganization,
     },
   };
-}
-
-function initialAdmissionFailure(
-  result: Extract<SessionMessageAdmissionResult, { success: false }>
-): Extract<SessionEstablishmentFailure, { stage: 'initial_admission' }> {
-  if (result.code === 'PENDING_QUEUE_FULL') {
-    return { stage: 'initial_admission', code: 'initial_queue_full' };
-  }
-  if (result.code === 'BAD_REQUEST') {
-    return { stage: 'initial_admission', code: 'invalid_initial_intent' };
-  }
-  return { stage: 'initial_admission', code: 'initial_admission_rejected' };
 }
 
 async function recordPostSetupFailure(record: () => Promise<void>): Promise<void> {

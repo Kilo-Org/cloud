@@ -212,12 +212,13 @@ describe('adminCloudAgentNextRouter', () => {
       completedRuns: 1,
       failedRuns: 2,
       interruptedRuns: 1,
+      sessionsObserved: 4,
       setupFailures: 2,
       platformFailures: 1,
       userFailures: 2,
       unknownFailures: 1,
-      platformFailureRate: 0.5,
-      allFailureRate: 0.8,
+      runFailureRate: 2 / 3,
+      setupFailureRate: 2 / 4,
     });
     expect(health.topErrors).toEqual(
       expect.arrayContaining([
@@ -419,8 +420,8 @@ describe('adminCloudAgentNextRouter', () => {
       startDate: '2035-01-12T00:00:00.000Z',
       endDate: '2035-01-13T00:00:00.000Z',
     });
-    expect(health.summary.platformFailureRate).toBeNull();
-    expect(health.summary.allFailureRate).toBeNull();
+    expect(health.summary.runFailureRate).toBeNull();
+    expect(health.summary.setupFailureRate).toBeNull();
     expect(health.topErrors).toEqual([]);
     expect(health.errorTotals).toEqual({ events: 0, groups: 0 });
   });

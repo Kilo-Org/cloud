@@ -443,6 +443,22 @@ describe('handlePullRequest', () => {
         expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
         expect(mockCreateCodeReview).not.toHaveBeenCalled();
       });
+
+      it('does not reach the review pipeline when the kilo label is added to a closed PR (labeled action)', async () => {
+        const payload = pullRequestPayload({
+          action: 'labeled',
+          label: { name: 'kilo' },
+        });
+        payload.pull_request.state = 'closed';
+        payload.pull_request.labels = [{ name: 'kilo' }];
+
+        const response = await handlePullRequest(payload, platformIntegration());
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ message: 'Event received' });
+        expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
+        expect(mockCreateCodeReview).not.toHaveBeenCalled();
+      });
     });
   });
 

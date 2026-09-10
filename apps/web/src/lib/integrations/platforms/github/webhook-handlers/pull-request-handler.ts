@@ -694,7 +694,16 @@ export async function handlePullRequest(
       // repositories in 'on'/'off' mode. `unlabeled` needs no routing: removing the label doesn't
       // need to cancel anything in flight, it just stops *future* triggers, which falls out of
       // the Step 5b check re-evaluating the label on every later event.
-      if (payload.label?.name.trim().toLowerCase() !== MANUAL_REVIEW_TRIGGER_LABEL) {
+      //
+      // GitHub still fires `labeled` for PRs that are already closed/merged (e.g. post-merge
+      // triage labeling), and unlike opened/synchronize/reopened/ready_for_review this action can
+      // occur outside the "PR is open" window the other cases are implicitly scoped to. Skip those
+      // explicitly so a post-merge/close label doesn't kick off a review for a PR that's no longer
+      // actionable — `handlePullRequestCodeReview` itself has no PR-state check.
+      if (
+        payload.label?.name.trim().toLowerCase() !== MANUAL_REVIEW_TRIGGER_LABEL ||
+        payload.pull_request.state !== 'open'
+      ) {
         return NextResponse.json({ message: 'Event received' }, { status: 200 });
       }
       return handlePullRequestCodeReview(payload, integration);

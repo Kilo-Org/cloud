@@ -10,6 +10,10 @@ import {
   type Verbosity,
 } from '@kilocode/db/schema-types';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
+import {
+  gemma_4_26b_a4b_it_free_model,
+  GEMMA_4_26B_A4B_IT_ID,
+} from '@/lib/ai-gateway/providers/google';
 
 export type AutoModelPricing = {
   prompt: string;
@@ -158,6 +162,11 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   supports_pdf: false,
   opencode_settings: undefined,
 };
+
+export const AUTO_SMALL_TARGET_MODELS = {
+  paid: GEMMA_4_26B_A4B_IT_ID,
+  free: gemma_4_26b_a4b_it_free_model.public_id,
+} as const;
 
 export const KILO_AUTO_EFFICIENT_MODEL: AutoModel = {
   ...KILO_AUTO_BALANCED_MODEL,

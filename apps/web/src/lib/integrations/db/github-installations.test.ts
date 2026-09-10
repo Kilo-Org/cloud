@@ -517,6 +517,96 @@ describe('GitHub installation persistence', () => {
     await expect(attach).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
   });
 
+  test('serializes repository refresh behind terminal lifecycle without reviving projection', async () => {
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('773001')
+    );
+    if (!connected.ok) throw new Error('Expected canonical connection');
+    let release: (() => void) | undefined;
+    const barrier = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    let deleted: (() => void) | undefined;
+    const deletedBeforeCommit = new Promise<void>(resolve => {
+      deleted = resolve;
+    });
+    const lifecycle = db.transaction(async tx => {
+      await observeGitHubInstallationLifecycle(
+        { installationId: '773001', appType: 'standard', state: 'deleted' },
+        tx
+      );
+      deleted?.();
+      await barrier;
+    });
+    await deletedBeforeCommit;
+    const refresh = updateRepositoriesForIntegration(connected.integrationId, [
+      { id: 99, name: 'revived', full_name: 'acme/revived', private: true },
+    ]);
+    release?.();
+    await expect(Promise.all([lifecycle, refresh])).resolves.toBeDefined();
+
+    const [canonical] = await db
+      .select()
+      .from(github_app_installations)
+      .where(eq(github_app_installations.installation_id, '773001'));
+    const [association] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integrationId));
+    expect(canonical).toMatchObject({ lifecycle_state: 'deleted' });
+    expect(canonical?.repositories).toEqual([expect.objectContaining({ full_name: 'acme/repo' })]);
+    expect(association).toMatchObject({ integration_status: 'suspended' });
+    expect(association?.repositories).toEqual([
+      expect.objectContaining({ full_name: 'acme/repo' }),
+    ]);
+  });
+
+  test('keeps concurrent duplicate deletion cleanup idempotent with one completed receipt', async () => {
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('773002')
+    );
+    if (!connected.ok) throw new Error('Expected canonical connection');
+    const processDeletion = async () => {
+      await observeGitHubInstallationLifecycle({
+        installationId: '773002',
+        appType: 'standard',
+        state: 'deleted',
+      });
+      await recordCompletedGitHubInstallationDelivery({
+        installationId: '773002',
+        appType: 'standard',
+        deliveryId: 'concurrent-delete',
+        eventType: 'installation.deleted',
+      });
+    };
+
+    await Promise.all([processDeletion(), processDeletion()]);
+    await observeGitHubInstallationLifecycle({
+      installationId: '773002',
+      appType: 'standard',
+      state: 'active',
+    });
+
+    const [canonical] = await db
+      .select()
+      .from(github_app_installations)
+      .where(eq(github_app_installations.installation_id, '773002'));
+    const [association] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integrationId));
+    expect(canonical?.lifecycle_state).toBe('deleted');
+    expect(association?.integration_status).toBe('suspended');
+    await expect(
+      db
+        .select()
+        .from(github_installation_webhook_receipts)
+        .where(eq(github_installation_webhook_receipts.delivery_id, 'concurrent-delete'))
+    ).resolves.toHaveLength(1);
+  });
+
   test('maps bounded lock waits to a retryable connection conflict', async () => {
     const statements: string[] = [];
     const transaction = {

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one session state machine: start, stop, upload, abort, and recording cleanup share the session lifecycle. */
 import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
 
 import {
@@ -36,6 +37,13 @@ export type GatewayVoiceInputEngineDeps = {
   readModelId(): Promise<{ id: string; name: string } | null>;
   readAuthToken(): Promise<string | null>;
   readOrganizationId(): Promise<string | null>;
+  /**
+   * Best-effort delete of a recording file once the engine is done with it.
+   * `release()` frees the native object, not the file on disk. A failure must
+   * never change the session outcome. Declared as a property (not a method) so
+   * the engine can hold a detached reference.
+   */
+  deleteRecording: (uri: string) => Promise<void>;
   /**
    * Defaults to the real gateway client; tests inject a fake. Declared as a
    * property (not a method) so the engine can hold a detached reference.
@@ -80,17 +88,57 @@ function releaseRecorder(handle: RecorderHandle): void {
 }
 
 /**
- * Discard an aborted recording: end capture, then free the native object.
- * A recorder that refuses to stop (sync throw or rejection) still gets
- * released, exactly once.
+ * Delete a recording file, best-effort. A missing or undeletable file must
+ * never change the session outcome, so every failure is swallowed. A null or
+ * empty URI means the recorder never produced a file.
  */
-async function discardRecording(handle: RecorderHandle): Promise<void> {
+async function deleteRecordingFile(
+  deleteRecording: (uri: string) => Promise<void>,
+  uri: string | null
+): Promise<void> {
+  if (uri === null || uri === '') {
+    return;
+  }
+  try {
+    await deleteRecording(uri);
+  } catch {
+    // Cleanup is best-effort; the session outcome is already decided.
+  }
+}
+
+/**
+ * Free a recorder and delete its file once the engine stops owning it. The URI
+ * is read before `release()`: a released shared object refuses the read.
+ */
+async function releaseAndDeleteRecording(
+  handle: RecorderHandle,
+  deleteRecording: (uri: string) => Promise<void>
+): Promise<void> {
+  let uri: string | null = null;
+  try {
+    uri = handle.recorder.uri;
+  } catch {
+    // A recorder that refuses a URI read has no file to delete.
+  }
+  releaseRecorder(handle);
+  await deleteRecordingFile(deleteRecording, uri);
+}
+
+/**
+ * Discard an aborted recording: end capture, free the native object, then
+ * delete the file. A recorder that refuses to stop (sync throw or rejection)
+ * still gets released and its file deleted, exactly once.
+ */
+async function discardRecording(
+  handle: RecorderHandle,
+  deleteRecording: (uri: string) => Promise<void>
+): Promise<void> {
   try {
     await handle.recorder.stop();
   } catch {
-    // The session is already gone; the release below is what matters.
+    // The session is already gone; the cleanup below is what matters.
   }
-  releaseRecorder(handle);
+  await releaseAndDeleteRecording(handle, deleteRecording);
 }
 
 /**
@@ -107,6 +155,7 @@ async function discardRecording(handle: RecorderHandle): Promise<void> {
  */
 export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps): VoiceInputNative {
   const upload = deps.upload ?? transcribeRecording;
+  const { deleteRecording } = deps;
   const listeners = new Map<keyof VoiceInputNativeEvent, Set<AnyListener>>();
   let session: GatewaySession | null = null;
   let sessionSeq = 0;
@@ -150,14 +199,14 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
       try {
         await recorder.prepareToRecordAsync();
       } catch {
-        releaseRecorder(handle);
+        await releaseAndDeleteRecording(handle, deleteRecording);
         if (!stale(current)) {
           fail(current, 'client');
         }
         return;
       }
       if (stale(current)) {
-        releaseRecorder(handle);
+        await releaseAndDeleteRecording(handle, deleteRecording);
         return;
       }
       // Only hand the recorder to `stop()`/`abort()` once it can actually
@@ -177,8 +226,9 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
         return;
       }
       if (current.handle) {
-        releaseRecorder(current.handle);
+        const handle = current.handle;
         current.handle = null;
+        await releaseAndDeleteRecording(handle, deleteRecording);
       }
       fail(current, 'client');
     }
@@ -189,7 +239,7 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
     try {
       await recorder.stop();
     } catch {
-      releaseRecorder(handle);
+      await releaseAndDeleteRecording(handle, deleteRecording);
       if (!stale(current)) {
         fail(current, 'client');
       }
@@ -198,85 +248,92 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
     const uri = recorder.uri;
     releaseRecorder(handle);
     if (stale(current)) {
+      // A newer session owns the controller; delete the file without emitting.
+      await deleteRecordingFile(deleteRecording, uri);
       return;
     }
     if (uri === null || uri === '') {
       fail(current, 'client');
       return;
     }
-    const model = await deps.readModelId();
-    if (stale(current)) {
-      return;
-    }
-    if (model === null) {
-      fail(current, 'gateway-no-model');
-      return;
-    }
-    let authToken: string | null = null;
-    let organizationId: string | null = null;
     try {
-      authToken = await deps.readAuthToken();
-      organizationId = await deps.readOrganizationId();
-    } catch {
-      if (!stale(current)) {
-        fail(current, 'client');
-      }
-      return;
-    }
-    if (stale(current)) {
-      return;
-    }
-    if (authToken === null || authToken === '') {
-      // Without a token the gateway will answer 401; tell the user to sign in
-      // instead of burning an upload round-trip.
-      fail(current, 'gateway-auth');
-      return;
-    }
-    const controller = new AbortController();
-    current.uploadController = controller;
-    let result: TranscribeRecordingResult | undefined = undefined;
-    try {
-      result = await upload({
-        recordingUri: uri,
-        model,
-        language: current.languageTag,
-        organizationId,
-        authToken,
-        signal: controller.signal,
-      });
-    } catch {
-      if (controller.signal.aborted || stale(current)) {
+      const model = await deps.readModelId();
+      if (stale(current)) {
         return;
       }
-      fail(current, 'client');
-      return;
+      if (model === null) {
+        fail(current, 'gateway-no-model');
+        return;
+      }
+      let authToken: string | null = null;
+      let organizationId: string | null = null;
+      try {
+        authToken = await deps.readAuthToken();
+        organizationId = await deps.readOrganizationId();
+      } catch {
+        if (!stale(current)) {
+          fail(current, 'client');
+        }
+        return;
+      }
+      if (stale(current)) {
+        return;
+      }
+      if (authToken === null || authToken === '') {
+        // Without a token the gateway will answer 401; tell the user to sign in
+        // instead of burning an upload round-trip.
+        fail(current, 'gateway-auth');
+        return;
+      }
+      const controller = new AbortController();
+      current.uploadController = controller;
+      let result: TranscribeRecordingResult | undefined = undefined;
+      try {
+        result = await upload({
+          recordingUri: uri,
+          model,
+          language: current.languageTag,
+          organizationId,
+          authToken,
+          signal: controller.signal,
+        });
+      } catch {
+        if (controller.signal.aborted || stale(current)) {
+          return;
+        }
+        fail(current, 'client');
+        return;
+      }
+      if (controller.signal.aborted) {
+        // `abort()` cancelled the upload and already emitted `end`.
+        return;
+      }
+      if (stale(current)) {
+        return;
+      }
+      const classification = classifyTranscriptionFailure(result);
+      if (classification === 'success' && result.ok) {
+        emit('result', {
+          isFinal: true,
+          results: [{ transcript: result.text, confidence: 1, segments: [] }],
+        });
+        endSession(current);
+        return;
+      }
+      if (classification === 'no-speech') {
+        // Reuse the OS recognizer's empty-recording copy: same user-facing state.
+        fail(current, 'no-speech');
+        return;
+      }
+      // 'unreachable' | 'timeout' | 'model-unavailable' | 'auth' | 'server' |
+      // 'invalid-response' → 'gateway-unreachable' | 'gateway-timeout' |
+      // 'gateway-model-unavailable' | 'gateway-auth' | 'gateway-server' |
+      // 'gateway-invalid-response' — the codes voice-input-state classifies.
+      fail(current, `gateway-${classification}`);
+    } finally {
+      // The upload no longer needs the file; delete it on every terminal path.
+      await deleteRecordingFile(deleteRecording, uri);
     }
-    if (controller.signal.aborted) {
-      // `abort()` cancelled the upload and already emitted `end`.
-      return;
-    }
-    if (stale(current)) {
-      return;
-    }
-    const classification = classifyTranscriptionFailure(result);
-    if (classification === 'success' && result.ok) {
-      emit('result', {
-        isFinal: true,
-        results: [{ transcript: result.text, confidence: 1, segments: [] }],
-      });
-      endSession(current);
-      return;
-    }
-    if (classification === 'no-speech') {
-      // Reuse the OS recognizer's empty-recording copy: same user-facing state.
-      fail(current, 'no-speech');
-      return;
-    }
-    // 'unreachable' | 'timeout' | 'model-unavailable' | 'auth' | 'server' |
-    // 'invalid-response' → 'gateway-unreachable' | 'gateway-timeout' |
-    // 'gateway-model-unavailable' | 'gateway-auth' | 'gateway-server' |
-    // 'gateway-invalid-response' — the codes voice-input-state classifies.
-    fail(current, `gateway-${classification}`);
   };
 
   return {
@@ -351,8 +408,9 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
       const handle = current.handle;
       current.handle = null;
       if (handle) {
-        // Discard the recording: end capture, then free the native object.
-        void discardRecording(handle);
+        // Discard the recording: end capture, free the native object, delete
+        // the file.
+        void discardRecording(handle, deleteRecording);
       }
       emit('end', null);
     },

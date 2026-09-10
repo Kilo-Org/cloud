@@ -1,4 +1,5 @@
 import { AudioModule, AudioQuality, RecordingPresets, setAudioModeAsync } from 'expo-audio';
+import { deleteAsync } from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
 
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
@@ -15,7 +16,8 @@ const HIGH_QUALITY = RecordingPresets.HIGH_QUALITY;
 
 /** The organization scope the voice flow reads and uploads under; null is personal. */
 async function readStoredOrganizationId(): Promise<string | null> {
-  return await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
+  const value = await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
+  return value;
 }
 
 /**
@@ -110,4 +112,10 @@ export const gatewayVoiceInputNative = createGatewayVoiceInputEngine({
   readModelId: resolveGatewayTranscriptionModelId,
   readAuthToken: getAuthTokenForRequest,
   readOrganizationId: readStoredOrganizationId,
+  deleteRecording: async (uri: string) => {
+    // `release()` frees the native object, not the file: delete the recording
+    // so dictation does not accumulate audio on disk. `idempotent` maps a
+    // missing file to success.
+    await deleteAsync(uri, { idempotent: true });
+  },
 });

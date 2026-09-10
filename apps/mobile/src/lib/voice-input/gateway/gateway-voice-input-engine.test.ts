@@ -73,18 +73,21 @@ function buildEngine(overrides: Partial<GatewayVoiceInputEngineDeps> = {}): {
   events: RecordedEvent[];
   recorder: FakeRecorder;
   upload: UploadMock;
+  deleteRecording: Mock<(uri: string) => Promise<void>>;
 } {
   const recorder = makeRecorder();
   const events: RecordedEvent[] = [];
   const upload = vi.fn(
     async (): Promise<TranscribeRecordingResult> => ({ ok: true, text: 'hello world' })
   );
+  const deleteRecording = vi.fn(async (): Promise<void> => undefined);
   const deps: GatewayVoiceInputEngineDeps = {
     setAudioMode: vi.fn(async (): Promise<void> => undefined),
     createRecorder: vi.fn(() => recorder),
     readModelId: vi.fn(async () => ({ id: 'whisper-large-v3', name: 'Whisper Large v3' })),
     readAuthToken: vi.fn(async (): Promise<string | null> => 'token-1'),
     readOrganizationId: vi.fn(async (): Promise<string | null> => 'org-1'),
+    deleteRecording,
     upload,
     ...overrides,
   };
@@ -101,7 +104,7 @@ function buildEngine(overrides: Partial<GatewayVoiceInputEngineDeps> = {}): {
       events.push({ event, payload });
     });
   }
-  return { engine, events, recorder, upload };
+  return { engine, events, recorder, upload, deleteRecording };
 }
 
 async function startAndStop(
@@ -376,5 +379,72 @@ describe('createGatewayVoiceInputEngine', () => {
     await flush();
 
     expect(seen).toEqual([]);
+  });
+});
+
+describe('recording file cleanup', () => {
+  it('deletes the recording file after a successful upload', async () => {
+    const { engine, deleteRecording } = buildEngine();
+
+    await startAndStop(engine);
+    await flush();
+
+    expect(deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+  });
+
+  it('deletes the recording file after a classified upload failure', async () => {
+    const { engine, deleteRecording } = buildEngine({
+      upload: async (): Promise<TranscribeRecordingResult> => ({
+        ok: false,
+        status: 503,
+        isTimeout: false,
+        isNetworkError: false,
+      }),
+    });
+
+    await startAndStop(engine);
+    await flush();
+
+    expect(deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+  });
+
+  it('deletes the recording file on a model short-circuit', async () => {
+    const { engine, deleteRecording } = buildEngine({ readModelId: async () => null });
+
+    await startAndStop(engine);
+    await flush();
+
+    expect(deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+  });
+
+  it('deletes the recording file when an upload is aborted', async () => {
+    const uploadResolvers: ((value: TranscribeRecordingResult) => void)[] = [];
+    const { engine, deleteRecording } = buildEngine({
+      upload: async () =>
+        new Promise<TranscribeRecordingResult>(resolve => {
+          uploadResolvers.push(resolve);
+        }),
+    });
+
+    await startAndStop(engine);
+    await flush();
+    expect(deleteRecording).not.toHaveBeenCalled();
+
+    engine.abort();
+    uploadResolvers[0]?.({ ok: true, text: 'too late' });
+    await flush();
+
+    expect(deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+  });
+
+  it('deletes the recording file when recording is aborted before upload', async () => {
+    const { engine, deleteRecording } = buildEngine();
+
+    engine.start(START_OPTIONS);
+    await flush();
+    engine.abort();
+    await flush();
+
+    expect(deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
   });
 });

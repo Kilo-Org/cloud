@@ -12,6 +12,7 @@ vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
 vi.mock('expo-file-system/legacy', () => ({
   FileSystemUploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
   createUploadTask: vi.fn(),
+  deleteAsync: vi.fn(async (): Promise<void> => undefined),
 }));
 vi.mock('@/lib/auth/token-owner', () => ({
   getAuthTokenForRequest: vi.fn(async (): Promise<string | null> => 'token-1'),

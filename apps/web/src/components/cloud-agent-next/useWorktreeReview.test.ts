@@ -445,7 +445,9 @@ describe('useWorktreeReview hydration', () => {
   });
 
   it('does not send a subset when a comment cannot rebase onto the current capture', async () => {
-    const prepareReviewSubmission = jest.fn();
+    const prepareReviewSubmission = jest.fn(async (): Promise<WorktreeReviewSubmission> => {
+      throw new Error('must not prepare a partial review');
+    });
     mockLoad.mockResolvedValue({
       version: 1,
       comments: [{ id: 'saved', anchor, text: 'Saved feedback' }],
@@ -462,7 +464,7 @@ describe('useWorktreeReview hydration', () => {
       const mounted = mount({
         api: {
           prepareReviewSubmission,
-          submitReview: jest.fn(),
+          submitReview: async () => ({ status: 'rejected', error: 'must not submit' }),
         },
       });
       ({ cleanup } = mounted.dom);

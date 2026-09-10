@@ -205,6 +205,11 @@ const config: ExpoConfig = {
       },
     ],
     'expo-web-browser',
+    // Registered before @sentry/react-native/expo on purpose: config-plugin
+    // mods run in reverse registration order, so this one runs after Sentry has
+    // inserted RNSentrySDK.init(this) into MainApplication. It then adds the
+    // ignored-error filter for the broken-install DSO crash (KILO-APP-53).
+    './plugins/withAndroidSentryIgnoredInstallErrors',
     [
       '@sentry/react-native/expo',
       {

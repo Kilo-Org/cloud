@@ -20,7 +20,7 @@
     "check:unused": "node --env-file=.env node_modules/knip/bin/knip.js --no-config-hints",
     "check:i18n": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.i18n.json apps/mobile/src packages/app-shared/src && node ../../tools/i18n/check-catalogs.mjs",
     "check:classes": "node ../../tools/nativewind/check-classes.mjs",
-    "test": "node scripts/assert-theme-colors.mjs && vitest run",
+    "test": "node scripts/assert-theme-colors.mjs && node --test plugins/*.test.mjs && vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {

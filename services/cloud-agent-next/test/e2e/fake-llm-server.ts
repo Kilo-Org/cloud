@@ -114,7 +114,7 @@ const DIRECTIVE_PREFIX = '__fake__:';
  * remaining text (including any further colons) becomes a single trailing
  * argument. This keeps `echo:hello:world` → `{ scenario: 'echo', args: ['hello:world'] }`
  * so scenario payloads are free to contain colons. Scenarios that take a
- * fixed number of numeric args (e.g. `slow:<n>:<ms>`) split their trailing
+ * fixed number of numeric args (e.g. `slow:<n>:<ms>:<bytes>`) split their trailing
  * arg themselves if needed — the harness callers (`slow`) split on `:` and
  * take the first N.
  *
@@ -713,16 +713,23 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
   async slow(args, ctx) {
     const raw = args[0] ?? '';
     const parts = raw.split(':');
-    const n = Math.max(1, Number.parseInt(parts[0] ?? '1', 10) || 1);
+    const n = Math.min(200, Math.max(1, Number.parseInt(parts[0] ?? '1', 10) || 1));
     const delayMs = Math.max(0, Number.parseInt(parts[1] ?? '0', 10) || 0);
-    const payload = 'slow-response';
+    const chunkBytes = Math.min(2048, Math.max(0, Number.parseInt(parts[2] ?? '0', 10) || 0));
     writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { role: 'assistant', content: '' }));
     let totalContent = 0;
     for (let i = 0; i < n; i++) {
-      const piece = payload.slice(
-        Math.floor((i * payload.length) / n),
-        Math.floor(((i + 1) * payload.length) / n)
-      );
+      let piece: string;
+      if (chunkBytes > 0) {
+        const token = ` w${i} `;
+        piece = token.repeat(Math.ceil(chunkBytes / token.length)).slice(0, chunkBytes);
+      } else {
+        const payload = 'slow-response';
+        piece = payload.slice(
+          Math.floor((i * payload.length) / n),
+          Math.floor(((i + 1) * payload.length) / n)
+        );
+      }
       totalContent += piece.length;
       writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { content: piece }));
       if (i < n - 1 && delayMs > 0) await sleep(delayMs);

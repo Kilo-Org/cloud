@@ -450,6 +450,9 @@
       "acceptTerms": "Acceptă",
       "replyBadRequest": "Acest răspuns nu poate fi publicat. Este posibil ca firul de discuție să se fi modificat.",
       "replyForbidden": "Nu ai permisiunea să răspunzi la acest PR.",
+      "addCommentCta": "Comentează acest PR",
+      "commentBadRequest": "Acest comentariu nu poate fi publicat. Este posibil ca PR-ul să se fi modificat.",
+      "commentForbidden": "Nu ai permisiunea să comentezi acest PR.",
       "moderation": {
         "reportContent": {
           "terminal": "Acest comentariu nu poate fi raportat.",

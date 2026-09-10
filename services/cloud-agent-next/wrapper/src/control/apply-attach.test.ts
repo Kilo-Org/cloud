@@ -259,6 +259,52 @@ describe('applySessionAttach', () => {
       expect(await currentBranch()).toBe(branch);
     });
 
+    it('fetches synthetic review refs directly when no working branch mode is requested', async () => {
+      const branch = 'refs/pull/42/head';
+      expect((await runGit(['update-ref', branch, 'HEAD'], repository)).exitCode).toBe(0);
+
+      const result = await applySessionAttach(
+        { ...session, directory },
+        { ...payload, branch },
+        deps
+      );
+
+      expect(result).toEqual({ ok: true, result: { attached: true } });
+      expect(await currentBranch()).toBe(branch);
+    });
+
+    it('returns a non-retryable redacted failure when a synthetic review ref is missing', async () => {
+      const branch = 'refs/pull/404/head';
+      const token = 'review-token';
+      const result = await applySessionAttach(
+        { ...session, directory },
+        { ...payload, branch, git: { ...payload.git, token } },
+        {
+          ...deps,
+          runGit: async args =>
+            args[0] === 'fetch'
+              ? {
+                  stdout: '',
+                  stderr: `\u001b[31mfatal: couldn't find remote ref ${branch} ${token}\u001b[0m`,
+                  exitCode: 128,
+                }
+              : { stdout: '', stderr: '', exitCode: 0 },
+        }
+      );
+
+      expect(result).toMatchObject({
+        ok: false,
+        error: {
+          code: 'not_ready',
+          retryable: false,
+          message: expect.stringContaining(`couldn't find remote ref ${branch}`),
+        },
+      });
+      if (result.ok) throw new Error('Expected missing review ref failure');
+      expect(JSON.stringify(result)).not.toContain(token);
+      expect(JSON.stringify(result)).not.toContain('\u001b[');
+    });
+
     it.each(['main', 'feature/existing'])(
       'honors the explicitly requested branch %s',
       async branch => {
@@ -287,9 +333,13 @@ describe('applySessionAttach', () => {
           },
         }
       );
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         ok: false,
-        error: { code: 'not_ready', message: 'git checkout failed', retryable: true },
+        error: {
+          code: 'not_ready',
+          message: expect.stringContaining('git checkout failed'),
+          retryable: true,
+        },
       });
       expect(setupRan).toBe(false);
       expect(diagnostics).toContainEqual(
@@ -298,7 +348,7 @@ describe('applySessionAttach', () => {
           stage: 'git_setup',
           errorCode: 'not_ready',
           retryable: true,
-          detail: 'git checkout failed',
+          detail: expect.stringContaining('git checkout failed'),
         })
       );
     });
@@ -453,6 +503,44 @@ describe('applySessionAttach', () => {
     expect(process.env.KILOCODE_TOKEN).toBe(envBefore);
   });
 
+  it('includes redacted, ANSI-free Git diagnostics for clone failures', async () => {
+    const token = 'clone-auth-token';
+    const result = await applySessionAttach(
+      session,
+      {
+        kilo,
+        git: { url: 'https://github.com/acme/demo.git', token },
+      },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        ...noFs,
+        sessionExists: async () => true,
+        mkdir: async () => undefined,
+        hasGit: async () => false,
+        runGit: async args =>
+          args[0] === 'clone'
+            ? {
+                stdout: '',
+                stderr: `\u001b[31mfatal: Authentication failed for https://x-access-token:${token}@github.com/acme/demo.git\u001b[0m`,
+                exitCode: 128,
+              }
+            : { stdout: '', stderr: '', exitCode: 0 },
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        retryable: true,
+        message: expect.stringContaining('Authentication failed'),
+      },
+    });
+    if (result.ok) throw new Error('Expected clone failure');
+    expect(JSON.stringify(result.error.message)).not.toContain(token);
+    expect(JSON.stringify(result.error.message)).not.toContain('\u001b[');
+  });
+
   it('preserves generic repository authentication and checks out only the requested upstream branch', async () => {
     const gitCalls: string[][] = [];
     const repositoryUrl = 'https://git.example.com/acme/demo.git';
@@ -590,9 +678,13 @@ describe('applySessionAttach', () => {
 
     const failed = await applySessionAttach(session, payload, deps);
 
-    expect(failed).toEqual({
+    expect(failed).toMatchObject({
       ok: false,
-      error: { code: 'not_ready', message: 'git checkout failed', retryable: true },
+      error: {
+        code: 'not_ready',
+        message: expect.stringContaining('git checkout failed'),
+        retryable: true,
+      },
     });
     expect(gitExists).toBe(true);
     expect(setupCalls).toEqual([]);

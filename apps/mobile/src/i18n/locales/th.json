@@ -448,6 +448,9 @@
       "acceptTerms": "ยอมรับ",
       "replyBadRequest": "ไม่สามารถโพสต์การตอบกลับนี้ได้ เธรดอาจมีการเปลี่ยนแปลง",
       "replyForbidden": "คุณไม่มีสิทธิ์ตอบกลับใน PR นี้",
+      "addCommentCta": "แสดงความคิดเห็นใน PR นี้",
+      "commentBadRequest": "ไม่สามารถโพสต์ความคิดเห็นนี้ได้ PR อาจมีการเปลี่ยนแปลง",
+      "commentForbidden": "คุณไม่มีสิทธิ์แสดงความคิดเห็นใน PR นี้",
       "moderation": {
         "reportContent": {
           "terminal": "ไม่สามารถรายงานความคิดเห็นนี้ได้",

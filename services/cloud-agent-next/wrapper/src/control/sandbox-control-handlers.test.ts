@@ -188,7 +188,7 @@ function deps(
   });
 }
 
-function runtimeDeps(kiloClient: WrapperKiloClient) {
+function runtimeDeps(kiloClient: WrapperKiloClient, rootScope?: 'shared' | 'sole') {
   const abort = new AbortController();
   const events: SessionEventPayload[] = [];
   const retired: string[] = [];
@@ -196,6 +196,8 @@ function runtimeDeps(kiloClient: WrapperKiloClient) {
   const handlerDeps: HandlerDeps = createControlHandlerDeps({
     ...(() => {
       const base = deps({ kiloClient });
+      if (rootScope !== undefined && base.kiloRuntimes)
+        base.kiloRuntimes.rootRetirementScope = () => rootScope;
       return {
         kiloRuntimes: base.kiloRuntimes,
         worktreeCleanupClient: base.worktreeCleanupClient,
@@ -459,6 +461,22 @@ describe('handleControlRequest', () => {
       ok: false,
       error: { code: 'protocol_error', message: 'session identity is required', retryable: false },
     });
+  });
+
+  it('returns an unconfirmed result without starting late cleanup', async () => {
+    const handlerDeps = deps();
+    const result = await handleControlRequest(
+      'session.abort',
+      session,
+      {
+        messageId: 'late',
+        operationId: '11111111-1111-4111-8111-111111111111',
+        cleanupDeadlineAt: Date.now() - 1,
+      },
+      handlerDeps
+    );
+
+    expect(result).toEqual({ ok: true, result: { status: 'unconfirmed', quiescent: false } });
   });
 
   it('attaches by verifying the kilo session', async () => {
@@ -751,6 +769,137 @@ describe('handleControlRequest', () => {
     const result = await handleControlRequest('session.abort', session, {}, deps({ kiloClient }));
     expect(result).toEqual({ ok: true, result: { status: 'already_idle' } });
     expect(aborted).toEqual([]);
+  });
+
+  it('detaches the terminal only when abort cancels the current task', async () => {
+    const started = Promise.withResolvers<void>();
+    const running = Promise.withResolvers<Completion>();
+    const detached: unknown[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: async () => {
+          started.resolve();
+          return running.promise;
+        },
+        abortSession: async () => {
+          running.resolve(
+            completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+          );
+          return true;
+        },
+      }),
+      terminalRuntime: fakeTerminalRuntime({
+        detachSession: async identity => {
+          detached.push(identity);
+        },
+      }),
+    });
+
+    try {
+      expect(
+        await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+      ).toEqual({ ok: true, result: { messageId: 'msg_1', status: 'accepted' } });
+      await started.promise;
+
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          session,
+          { messageId: promptPayload.messageId, cleanupDeadlineAt: Date.now() - 1 },
+          handlerDeps
+        )
+      ).toEqual({ ok: true, result: { status: 'already_idle' } });
+      expect(detached).toEqual([]);
+
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          session,
+          { messageId: promptPayload.messageId },
+          handlerDeps
+        )
+      ).toEqual({ ok: true, result: { status: 'aborted' } });
+      expect(detached).toEqual([session]);
+
+      expect(await handleControlRequest('session.abort', session, {}, handlerDeps)).toEqual({
+        ok: true,
+        result: { status: 'already_idle' },
+      });
+      expect(detached).toEqual([session]);
+    } finally {
+      running.resolve(completion());
+      await waitForTasks(handlerDeps);
+    }
+  });
+
+  it('surfaces terminal cleanup failure from an active abort', async () => {
+    const started = Promise.withResolvers<void>();
+    const running = Promise.withResolvers<Completion>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: async () => {
+          started.resolve();
+          return running.promise;
+        },
+        abortSession: async () => {
+          running.resolve(
+            completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+          );
+          return true;
+        },
+      }),
+      terminalRuntime: fakeTerminalRuntime({
+        detachSession: async () => {
+          throw new ControlTerminalRuntimeError('not_ready', 'Terminal cleanup failed', true);
+        },
+      }),
+    });
+
+    try {
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+      await started.promise;
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          session,
+          { messageId: promptPayload.messageId },
+          handlerDeps
+        )
+      ).toEqual({
+        ok: false,
+        error: { code: 'not_ready', message: 'Terminal cleanup failed', retryable: true },
+      });
+    } finally {
+      running.resolve(completion());
+      await waitForTasks(handlerDeps);
+    }
+  });
+
+  it('does not detach an attachment for a stale native runtime abort', async () => {
+    const detached: unknown[] = [];
+    const result = await handleControlRequest(
+      'session.abort',
+      session,
+      { nativeRuntimeId: '11111111-1111-4111-8111-111111111111' },
+      deps({
+        terminalRuntime: fakeTerminalRuntime({
+          detachSession: async identity => {
+            detached.push(identity);
+          },
+        }),
+      })
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      result: {
+        status: 'aborted',
+        quiescent: true,
+        runtimeRetired: true,
+        nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+      },
+    });
+    expect(detached).toEqual([]);
   });
 
   it('routes independent roots and their children through the matching worktree client', async () => {
@@ -2497,6 +2646,491 @@ describe('owned control execution', () => {
     }
   });
 
+  it('keeps a shared user Stop root-scoped without a publication claim', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return running.promise;
+        },
+        abortSession: async () => {
+          running.resolve(
+            completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+          );
+          return true;
+        },
+      }),
+      'shared'
+    );
+    handlerDeps.scopedCleanupResult = true;
+    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory');
+    const promptRequest = handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps
+    );
+    try {
+      await started.promise;
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          session,
+          {
+            messageId: promptPayload.messageId,
+            operationId: '55555555-5555-4555-8555-555555555555',
+            cleanupDeadlineAt: Date.now() + 1_000,
+          },
+          handlerDeps
+        )
+      ).toEqual({
+        ok: true,
+        result: { status: 'aborted', quiescent: false, cleanupScope: 'root' },
+      });
+      expect(directoryRetirement).not.toHaveBeenCalled();
+      expect(retired).toEqual([]);
+    } finally {
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([promptRequest]);
+      await waitForTasks(handlerDeps);
+      directoryRetirement.mockRestore();
+    }
+  });
+
+  it('routes an early publication-scoped failed Stop through shared-root retirement without cancelling B', async () => {
+    const runningA = Promise.withResolvers<Completion>();
+    const runningB = Promise.withResolvers<Completion>();
+    const startedA = Promise.withResolvers<void>();
+    const startedB = Promise.withResolvers<void>();
+    const sibling = { ...session, sessionId: 'ses_b', kiloSessionId: 'kilo_b' };
+    rememberAttachedRoot(sibling.kiloSessionId, sibling.directory);
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: options => {
+          if (options.messageId === 'message_a') {
+            startedA.resolve();
+            return runningA.promise;
+          }
+          startedB.resolve();
+          return runningB.promise;
+        },
+        getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'idle' } }),
+        abortSession: async () => false,
+      })
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing worktree runtimes');
+    let scopedRetirementCalls = 0;
+    runtimes.retireRuntimeIfUnshared = async () => {
+      scopedRetirementCalls += 1;
+      return 'shared';
+    };
+    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory');
+    const operationId = '11111111-1111-4111-8111-111111111111';
+    const requestA = handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'message_a' },
+      handlerDeps
+    );
+    const requestB = handleControlRequest(
+      'session.prompt',
+      sibling,
+      { ...promptPayload, messageId: 'message_b' },
+      handlerDeps
+    );
+    try {
+      await startedA.promise;
+      await startedB.promise;
+      const taskA = handlerDeps.operations.active(session.kiloSessionId);
+      if (!taskA) throw new Error('Missing A operation');
+      taskA.markPublicationScoped('publication failure', Date.now() + 1_000);
+
+      const stopped = await handleControlRequest(
+        'session.abort',
+        session,
+        { messageId: 'message_a', operationId, cleanupDeadlineAt: Date.now() + 1_000 },
+        handlerDeps
+      );
+      expect(stopped).toMatchObject({
+        ok: true,
+        result: { status: 'unconfirmed', quiescent: false },
+      });
+      expect(scopedRetirementCalls).toBe(1);
+      expect(directoryRetirement).not.toHaveBeenCalled();
+      expect(retired).toEqual([]);
+      expect(handlerDeps.operations.active(sibling.kiloSessionId)?.signal.aborted).toBe(false);
+    } finally {
+      runningA.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      runningB.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([requestA, requestB]);
+      await waitForTasks(handlerDeps);
+      directoryRetirement.mockRestore();
+    }
+  });
+
+  it('detaches A before returning an early shared-root Stop result', async () => {
+    const runningA = Promise.withResolvers<Completion>();
+    const runningB = Promise.withResolvers<Completion>();
+    const startedA = Promise.withResolvers<void>();
+    const startedB = Promise.withResolvers<void>();
+    const detachStarted = Promise.withResolvers<void>();
+    const releaseDetach = Promise.withResolvers<void>();
+    const sibling = { ...session, sessionId: 'ses_b', kiloSessionId: 'kilo_b' };
+    rememberAttachedRoot(sibling.kiloSessionId, sibling.directory);
+    const detached: unknown[] = [];
+    const { handlerDeps } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: options => {
+          if (options.messageId === 'message_a') {
+            startedA.resolve();
+            return runningA.promise;
+          }
+          startedB.resolve();
+          return runningB.promise;
+        },
+      }),
+      'shared'
+    );
+    handlerDeps.scopedCleanupResult = true;
+    handlerDeps.terminalRuntime = fakeTerminalRuntime({
+      detachSession: async identity => {
+        detached.push(identity);
+        detachStarted.resolve();
+        await releaseDetach.promise;
+      },
+    });
+    const requestA = handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'message_a' },
+      handlerDeps
+    );
+    const requestB = handleControlRequest(
+      'session.prompt',
+      sibling,
+      { ...promptPayload, messageId: 'message_b' },
+      handlerDeps
+    );
+    try {
+      await startedA.promise;
+      await startedB.promise;
+      const taskA = handlerDeps.operations.active(session.kiloSessionId);
+      if (!taskA) throw new Error('Missing A operation');
+      taskA.markPublicationScoped('publication failure', Date.now() + 1_000);
+
+      const stopping = handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: 'message_a',
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        handlerDeps
+      );
+      await detachStarted.promise;
+      expect(detached).toEqual([session]);
+      expect(await Promise.race([stopping, Bun.sleep(20).then(() => 'pending' as const)])).toBe(
+        'pending'
+      );
+      expect(handlerDeps.operations.active(sibling.kiloSessionId)?.signal.aborted).toBe(false);
+
+      releaseDetach.resolve();
+      expect(await stopping).toMatchObject({
+        ok: true,
+        result: { status: 'unconfirmed', quiescent: false, cleanupScope: 'root' },
+      });
+    } finally {
+      releaseDetach.resolve();
+      runningA.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      runningB.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([requestA, requestB]);
+      await waitForTasks(handlerDeps);
+    }
+  });
+
+  it('rechecks a publication claim that arrives while Stop cleanup is awaiting native abort', async () => {
+    const runningA = Promise.withResolvers<Completion>();
+    const runningB = Promise.withResolvers<Completion>();
+    const abortPending = Promise.withResolvers<boolean>();
+    const abortStarted = Promise.withResolvers<void>();
+    const startedA = Promise.withResolvers<void>();
+    const startedB = Promise.withResolvers<void>();
+    let abortCalls = 0;
+    const sibling = { ...session, sessionId: 'ses_b', kiloSessionId: 'kilo_b' };
+    rememberAttachedRoot(sibling.kiloSessionId, sibling.directory);
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: options => {
+          if (options.messageId === 'message_a') {
+            startedA.resolve();
+            return runningA.promise;
+          }
+          startedB.resolve();
+          return runningB.promise;
+        },
+        getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'idle' } }),
+        abortSession: async () => {
+          abortCalls += 1;
+          if (abortCalls === 1) {
+            abortStarted.resolve();
+            return abortPending.promise;
+          }
+          return false;
+        },
+      })
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing worktree runtimes');
+    let scopedRetirementCalls = 0;
+    runtimes.retireRuntimeIfUnshared = async () => {
+      scopedRetirementCalls += 1;
+      return 'shared';
+    };
+    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory');
+    const requestA = handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'message_a' },
+      handlerDeps
+    );
+    const requestB = handleControlRequest(
+      'session.prompt',
+      sibling,
+      { ...promptPayload, messageId: 'message_b' },
+      handlerDeps
+    );
+    try {
+      await startedA.promise;
+      await startedB.promise;
+      const taskA = handlerDeps.operations.active(session.kiloSessionId);
+      if (!taskA) throw new Error('Missing A operation');
+      const stopping = handleControlRequest(
+        'session.abort',
+        session,
+        { messageId: 'message_a', operationId: '11111111-1111-4111-8111-111111111111' },
+        handlerDeps
+      );
+      await abortStarted.promise;
+      taskA.markPublicationScoped('publication failure during Stop', Date.now() + 1_000);
+      expect(taskA.publicationScope()).toBeDefined();
+      abortPending.resolve(false);
+      expect(await stopping).toMatchObject({
+        ok: true,
+        result: { status: 'unconfirmed', quiescent: false },
+      });
+      expect(scopedRetirementCalls).toBe(1);
+      expect(directoryRetirement).not.toHaveBeenCalled();
+      expect(retired).toEqual([]);
+      expect(handlerDeps.operations.active(sibling.kiloSessionId)?.signal.aborted).toBe(false);
+    } finally {
+      abortPending.resolve(false);
+      runningA.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      runningB.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([requestA, requestB]);
+      await waitForTasks(handlerDeps);
+      directoryRetirement.mockRestore();
+    }
+  });
+
+  it('does not install a shared-root retirement after scoped cleanup is confirmed', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const abortCalled = Promise.withResolvers<void>();
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return running.promise;
+        },
+        getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'idle' } }),
+        abortSession: async () => {
+          abortCalled.resolve();
+          return true;
+        },
+      })
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing worktree runtimes');
+    let scopedRetirementCalls = 0;
+    runtimes.retireRuntimeIfUnshared = async () => {
+      scopedRetirementCalls += 1;
+      return 'shared';
+    };
+    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory');
+    const promptRequest = handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps
+    );
+    try {
+      await started.promise;
+      const task = handlerDeps.operations.active(session.kiloSessionId);
+      if (!task) throw new Error('Missing operation record');
+      task.markPublicationScoped('publication cleanup confirmed', Date.now() + 1_000);
+      const stopping = handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: promptPayload.messageId,
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        handlerDeps
+      );
+      await abortCalled.promise;
+      await Promise.resolve();
+      expect(scopedRetirementCalls).toBe(0);
+      expect(directoryRetirement).not.toHaveBeenCalled();
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      expect(await stopping).toMatchObject({
+        ok: true,
+        result: { status: 'unconfirmed', quiescent: false },
+      });
+      expect(retired).toEqual([]);
+    } finally {
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([promptRequest]);
+      await waitForTasks(handlerDeps);
+      directoryRetirement.mockRestore();
+    }
+  });
+
+  it('acknowledges a shared root cleanup before a blocked root can settle', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const abortStarted = Promise.withResolvers<void>();
+    const abortPending = Promise.withResolvers<boolean>();
+    const { handlerDeps } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: async () => {
+          started.resolve();
+          return running.promise;
+        },
+        getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'active' } }),
+        abortSession: async () => {
+          abortStarted.resolve();
+          return abortPending.promise;
+        },
+      }),
+      'shared'
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing runtimes');
+    handlerDeps.scopedCleanupResult = true;
+    const prompt = handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+    try {
+      await started.promise;
+      const stopping = handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: promptPayload.messageId,
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        handlerDeps
+      );
+      await abortStarted.promise;
+      const task = handlerDeps.operations.active(session.kiloSessionId);
+      if (!task) throw new Error('Missing A operation');
+      const target = task.nativeTarget();
+      if (!target) throw new Error('Missing A native target');
+      handlerDeps.operations.escalateRootPublication({
+        directory: session.directory,
+        root: session.kiloSessionId,
+        nativeRuntimeId: target.runtimeId,
+        target,
+        reason: 'publication failure',
+        deadlineAt: Date.now() + 1_000,
+      });
+      const response = await Promise.race([
+        stopping,
+        Bun.sleep(100).then(() => 'timed_out' as const),
+      ]);
+      expect(response).not.toBe('timed_out');
+      expect(response).toMatchObject({
+        ok: true,
+        result: {
+          status: 'unconfirmed',
+          quiescent: false,
+          cleanupScope: 'root',
+        },
+      });
+    } finally {
+      abortPending.resolve(false);
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([prompt, waitForTasks(handlerDeps)]);
+    }
+  });
+
+  it('reports quiescence only after claimed Stop completes sole-root physical retirement', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return running.promise;
+        },
+        getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'idle' } }),
+        abortSession: async () => false,
+      })
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing worktree runtimes');
+    let scopedRetirementCalls = 0;
+    runtimes.retireRuntimeIfUnshared = async () => {
+      scopedRetirementCalls += 1;
+      return 'retired';
+    };
+    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory');
+    const promptRequest = handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps
+    );
+    try {
+      await started.promise;
+      const task = handlerDeps.operations.active(session.kiloSessionId);
+      if (!task) throw new Error('Missing operation record');
+      task.markPublicationScoped('publication cleanup failed', Date.now() + 1_000);
+      const stopping = handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: promptPayload.messageId,
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        handlerDeps
+      );
+      const stopped = await stopping;
+      expect(stopped).toMatchObject({
+        ok: true,
+        result: {
+          status: 'aborted',
+          quiescent: true,
+          runtimeRetired: true,
+          nativeRuntimeId: 'native_1',
+        },
+      });
+      expect(scopedRetirementCalls).toBe(1);
+      expect(directoryRetirement).not.toHaveBeenCalled();
+      expect(retired).toEqual([]);
+    } finally {
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([promptRequest]);
+      await waitForTasks(handlerDeps);
+      directoryRetirement.mockRestore();
+    }
+  });
+
   it('keeps a scoped Stop unconfirmed when preparation fails after cancellation', async () => {
     const started = Promise.withResolvers<void>();
     const handlerDeps = deps({
@@ -2648,6 +3282,7 @@ describe('owned control execution', () => {
 
   it('bounds a hanging abort and cannot revive the runtime when its acknowledgement arrives late', async () => {
     const timers = spyOn(globalThis, 'setTimeout');
+    setSystemTime(0);
     const running = Promise.withResolvers<Completion>();
     const abortStarted = Promise.withResolvers<AbortSignal>();
     const remoteStopped = Promise.withResolvers<boolean>();

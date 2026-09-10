@@ -448,6 +448,9 @@
       "acceptTerms": "Aqbal",
       "replyBadRequest": "Jawaabtan lama daabici karo. Waxaa laga yaabaa in dooddu isbeddeshay.",
       "replyForbidden": "Ma haysatid oggolaansho aad uga jawaabto codsigan isku-darka.",
+      "addCommentCta": "Faallo ku dari codsigan isku-darka",
+      "commentBadRequest": "Faalladan lama daabici karo. Waxaa laga yaabaa in codsiga isku-darku isbeddelay.",
+      "commentForbidden": "Ma haysatid oggolaansho aad faallo ku darto codsigan isku-darka.",
       "moderation": {
         "reportContent": {
           "terminal": "Faalladan lama soo sheegi karo.",

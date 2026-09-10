@@ -8159,7 +8159,7 @@ describe('SandboxSession worktree changes persistence', () => {
           fixture.session.getMessageResult('msg_failed_reattach')
         ).resolves.toMatchObject({
           type: 'found',
-          result: { status: retry === 'cancelled' ? 'interrupted' : 'queued' },
+          result: { status: retry === 'cancelled' ? 'interrupted' : 'failed' },
         });
         await expect(fixture.session.getWorktreeChanges()).resolves.toEqual(beforeCleanup);
         await expect(fixture.control.getStatus()).resolves.toMatchObject({

@@ -127,6 +127,7 @@ export type SandboxControlSocketHandler = {
   hasHandshakenSocket(): boolean;
   supportsOperationResults(): boolean;
   supportsScopedStopAbort(): boolean;
+  supportsScopedCleanupResult?(): boolean;
   supportsNativeRuntimeRetirement(): boolean;
   supportsWorkingBranches?(): boolean;
   supportsConnectionRecovery(): boolean;
@@ -365,6 +366,14 @@ export function createSandboxControlSocketHandler(
       const current = currentHandshakenSocket(state);
       return (
         current !== null && readAttachment(current.socket)?.capabilities?.scopedStopAbort === true
+      );
+    },
+
+    supportsScopedCleanupResult(): boolean {
+      const current = currentHandshakenSocket(state);
+      return (
+        current !== null &&
+        readAttachment(current.socket)?.capabilities?.scopedCleanupResult === true
       );
     },
 
@@ -611,6 +620,7 @@ export function createSandboxControlSocketHandler(
             helloResult({
               connectionRecovery: payload.capabilities?.connectionRecovery === true,
               eventReceipts: payload.capabilities?.eventReceipts === true,
+              scopedCleanupResult: payload.capabilities?.scopedCleanupResult === true,
             })
           )
         );

@@ -7,6 +7,12 @@ import { SheetHeader } from './sheet-header';
 import '@/i18n';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+// SheetHeader reads the landscape side insets; this suite mounts without a
+// device, so the hook gets portrait-zero insets (same pattern as
+// sheet-header.mounted.test.tsx).
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Share: 'Share' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

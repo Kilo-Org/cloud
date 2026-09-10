@@ -253,7 +253,49 @@ describe('control terminal PTY ownership', () => {
 
     rememberAttachedRoot(firstSession.kiloSessionId, '/workspace/different');
     expect(() => runtime.rememberAttachedSession(firstSession)).toThrow(
-      'Terminal session ownership mismatch'
+      'Terminal session belongs to another session'
+    );
+  });
+
+  it('names unavailable, replaced, and conflicting terminal attachment runtimes', () => {
+    const unavailable = createControlTerminalRuntime({
+      controlUrl: 'ws://127.0.0.1:1/sandbox-control/unavailable',
+      wrapperInstanceId,
+      getKiloRuntime: () => undefined,
+    });
+    activeRuntimes.add(unavailable);
+    rememberAttachedRoot(firstSession.kiloSessionId, firstSession.directory);
+    expect(() => unavailable.rememberAttachedSession(firstSession)).toThrow(
+      'Terminal session runtime unavailable'
+    );
+
+    const initial: WorktreeKiloRuntime = {
+      runtimeId: 'native_initial',
+      scopeId: firstSession.directory,
+      directory: firstSession.directory,
+      env: {},
+      kiloClient: fakeKilo(),
+      signal: new AbortController().signal,
+    };
+    let current = initial;
+    const replaced = createControlTerminalRuntime({
+      controlUrl: 'ws://127.0.0.1:1/sandbox-control/replaced',
+      wrapperInstanceId,
+      getKiloRuntime: () => current,
+    });
+    activeRuntimes.add(replaced);
+    rememberAttachedRoot(firstSession.kiloSessionId, firstSession.directory);
+    replaced.rememberAttachedSession(firstSession);
+    current = { ...initial, runtimeId: 'native_replacement' };
+    expect(() => replaced.rememberAttachedSession(firstSession)).toThrow(
+      'Terminal session runtime was replaced'
+    );
+
+    const otherSession = { ...firstSession, sessionId: 'workspace_other' };
+    const conflicting = createRuntime(fakeKilo());
+    attach(conflicting, firstSession);
+    expect(() => attach(conflicting, otherSession)).toThrow(
+      'Terminal session belongs to another session'
     );
   });
 
@@ -552,6 +594,7 @@ describe('control terminal PTY ownership', () => {
     const sibling = { ...secondSession, directory: firstSession.directory };
     const firstRuntime: WorktreeKiloRuntime = {
       identity: { ...firstSession },
+      isolation: 'per-session',
       runtimeId: 'native_first',
       directory: firstSession.directory,
       scopeId: firstSession.directory,

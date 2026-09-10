@@ -5,13 +5,17 @@ import path from 'node:path';
 import {
   buildWorktreeKiloEnvironment,
   createWorktreeKiloRuntimes,
+  isRetirementReportCurrent,
   startWorktreeKiloServer,
+  type RootRuntimeRetirement,
   type WorktreeKiloAuth,
   type WorktreeKiloRuntimes,
 } from './worktree-runtime';
+import type { NativeRetirement } from './session-operation-cleanup';
 import type { OwnedProcessScope } from './owned-processes';
 import {
   SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS,
+  SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS,
   SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
   sessionMessageOutcomeSchema,
   type SessionEventIdentity,
@@ -31,9 +35,11 @@ import {
 } from './terminal-runtime';
 import { applySessionAttach, type ApplyAttachDeps } from './apply-attach';
 import { childFromSessionCreated, eventKiloSessionId, sessionEventIdentity } from './feed';
+import { operationAuthorization } from './control-test-fixtures';
 import {
   directoryForSession,
   rememberChildSession,
+  rememberAttachedRoot,
   resetSessionDirectoryState,
   rootForSession,
 } from './session-directories';
@@ -112,7 +118,7 @@ function createKiloStub(
   const feeds = new Set<ReadableStreamDefaultController<Uint8Array>>();
   const encoder = new TextEncoder();
   let feedConnections = 0;
-  let heldPrompts: PromiseWithResolvers<void> | undefined;
+  const heldPrompts = new Map<string, PromiseWithResolvers<void>>();
   const server = Bun.serve({
     port: 0,
     hostname: '127.0.0.1',
@@ -162,10 +168,12 @@ function createKiloStub(
         return Response.json(true);
       }
       if (request.method === 'POST' && url.pathname.endsWith('/abort')) {
-        heldPrompts?.resolve();
+        const sessionId = decodeURIComponent(url.pathname.split('/')[2] ?? '');
+        heldPrompts.get(sessionId)?.resolve();
         return Response.json(true);
       }
       if (request.method === 'POST' && /\/session\/[^/]+\/(message|command)$/.test(url.pathname)) {
+        const sessionId = decodeURIComponent(url.pathname.split('/')[2] ?? '');
         const directory = requests.at(-1)?.directory ?? '';
         const completion: Awaited<ReturnType<WrapperKiloClient['sendPrompt']>> = {
           info: {
@@ -184,7 +192,7 @@ function createKiloStub(
           },
           parts: [],
         };
-        await heldPrompts?.promise;
+        await heldPrompts.get(sessionId)?.promise;
         return Response.json(completion);
       }
       if (request.method === 'GET' && url.pathname.startsWith('/session/')) {
@@ -218,11 +226,11 @@ function createKiloStub(
     emit(event: unknown) {
       for (const feed of feeds) feed.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
     },
-    holdPrompts() {
-      heldPrompts ??= Promise.withResolvers<void>();
+    holdPrompts(sessionId: string) {
+      heldPrompts.set(sessionId, Promise.withResolvers<void>());
     },
-    releasePrompts() {
-      heldPrompts?.resolve();
+    releasePrompts(sessionId: string) {
+      heldPrompts.get(sessionId)?.resolve();
     },
     endFeeds() {
       for (const feed of feeds) feed.close();
@@ -248,7 +256,10 @@ function proveOwnedProcesses(
   } as unknown as OwnedProcessScope);
 }
 
-function createRegistry(overrides: Partial<Parameters<typeof createWorktreeKiloRuntimes>[0]> = {}) {
+function createRegistry(
+  overrides: Partial<Parameters<typeof createWorktreeKiloRuntimes>[0]> = {},
+  isolation: 'per-session' | 'directory-shared' = 'per-session'
+) {
   const launches: Array<Parameters<typeof startWorktreeKiloServer>[0]> = [];
   let closes = 0;
   let unexpectedCloses = 0;
@@ -282,7 +293,7 @@ function createRegistry(overrides: Partial<Parameters<typeof createWorktreeKiloR
         env?: Record<string, string>,
         canRefreshCredentials?: () => boolean
       ) {
-        return registry.attach(identity, kilo, env, canRefreshCredentials, 'per-session');
+        return registry.attach(identity, kilo, env, canRefreshCredentials, isolation);
       },
       get kiloCliVersion() {
         return registry.kiloCliVersion;
@@ -293,7 +304,7 @@ function createRegistry(overrides: Partial<Parameters<typeof createWorktreeKiloR
           kilo,
           env,
           undefined,
-          'per-session'
+          isolation
         );
         try {
           const runtime = await attachment.ready;
@@ -315,6 +326,12 @@ function createRegistry(overrides: Partial<Parameters<typeof createWorktreeKiloR
   };
 }
 
+function createSharedRegistry(
+  overrides: Partial<Parameters<typeof createWorktreeKiloRuntimes>[0]> = {}
+) {
+  return createRegistry(overrides, 'directory-shared');
+}
+
 function createHandlerDeps(registry: WorktreeKiloRuntimes): HandlerDeps {
   const terminalRuntime = createControlTerminalRuntime({
     controlUrl: 'ws://127.0.0.1:1/sandbox-control/test',
@@ -331,6 +348,28 @@ function createHandlerDeps(registry: WorktreeKiloRuntimes): HandlerDeps {
     emitSessionEvent: () => {},
     retireRuntime: () => {},
   });
+}
+
+function createIntegratedRegistry(
+  overrides: Partial<Parameters<typeof createWorktreeKiloRuntimes>[0]> = {}
+) {
+  const context: { handlerDeps?: HandlerDeps } = {};
+  const settlements: RootRuntimeRetirement[] = [];
+  const harness = createSharedRegistry({
+    onRootRetirementStarted: attempt => {
+      context.handlerDeps?.operations.markRootRetirementStarted(attempt);
+    },
+    onRootRetirement: settlement => {
+      settlements.push(settlement);
+      context.handlerDeps?.operations.settleRootPublication(settlement);
+    },
+    onRootDisappeared: disappearance =>
+      context.handlerDeps?.operations.notifyRootDisappeared(disappearance),
+    ...overrides,
+  });
+  const dependencies = createHandlerDeps(harness.registry);
+  context.handlerDeps = dependencies;
+  return { ...harness, handlerDeps: dependencies, settlements };
 }
 
 beforeEach(() => {
@@ -425,6 +464,87 @@ describe('observed Kilo runtime version', () => {
       expect(registry.isHealthy()).toBe(true);
     }
   );
+});
+
+describe('retirement report ownership', () => {
+  it('only permits shutdown when the retired entry is still current', () => {
+    const retiredRuntimeId = 'retired-runtime';
+
+    expect(isRetirementReportCurrent(undefined, retiredRuntimeId)).toBe(true);
+    expect(isRetirementReportCurrent(retiredRuntimeId, retiredRuntimeId)).toBe(true);
+    expect(isRetirementReportCurrent('replacement-runtime', retiredRuntimeId)).toBe(false);
+  });
+
+  it('exposes a replacement entry while startup is pending', async () => {
+    const replacementStarted = Promise.withResolvers<void>();
+    const releaseReplacement = Promise.withResolvers<void>();
+    const retirements: RootRuntimeRetirement[] = [];
+    let launches = 0;
+    const harness = createSharedRegistry({
+      startServer: async options => {
+        launches += 1;
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({ stop: async () => true } as unknown as OwnedProcessScope);
+        if (launches === 2) {
+          replacementStarted.resolve();
+          await releaseReplacement.promise;
+        }
+        return { url: server.url, close: () => {} };
+      },
+      onRootRetirement: retirement => retirements.push(retirement),
+    });
+    const directory = path.join(tmpDir, 'retirement-report-replacement');
+    const firstIdentity = rootIdentity(directory, 'first');
+    const siblingIdentity = rootIdentity(directory, 'sibling');
+    const first = harness.registry.attach(firstIdentity, auth);
+    const runtime = await first.ready;
+    first.commit();
+    const sibling = harness.registry.attach(siblingIdentity, auth);
+    await sibling.ready;
+    sibling.commit();
+    const retiredRuntimeId = runtime.runtimeId;
+    try {
+      expect(
+        await harness.registry.retireRuntimeIfUnshared?.(
+          directory,
+          { runtimeId: retiredRuntimeId, client: runtime.kiloClient },
+          firstIdentity.kiloSessionId,
+          Date.now() + 1_000,
+          'event rejected'
+        )
+      ).toBe('shared');
+      expect(harness.registry.detach(siblingIdentity)).toBe(true);
+      await waitUntil(() => retirements.some(retirement => retirement.result === 'retired'));
+      expect(harness.registry.getEntryRuntimeId?.(directory)).toBeUndefined();
+
+      const replacement = harness.registry.attach(rootIdentity(directory, 'replacement'), auth);
+      await replacementStarted.promise;
+      const replacementRuntimeId = harness.registry.getEntryRuntimeId?.(directory);
+      expect(replacementRuntimeId).toBeDefined();
+      expect(replacementRuntimeId).not.toBe(retiredRuntimeId);
+      expect(harness.registry.get(directory)).toBeUndefined();
+      expect(isRetirementReportCurrent(replacementRuntimeId, retiredRuntimeId)).toBe(false);
+      expect(replacement.signal.aborted).toBe(false);
+
+      releaseReplacement.resolve();
+      const replacementRuntime = await replacement.ready;
+      replacement.commit();
+      replacement.release();
+      expect(harness.registry.getEntryRuntimeId?.(directory)).toBe(replacementRuntime.runtimeId);
+      expect(harness.registry.get(directory)).toBe(replacementRuntime);
+      expect(replacement.signal.aborted).toBe(false);
+      const completion = await replacementRuntime.kiloClient.sendPrompt({
+        sessionId: 'root_replacement',
+        messageId: 'replacement_message',
+        prompt: 'complete replacement work',
+      });
+      expect(completion.info.parentID).toBe('replacement_message');
+    } finally {
+      releaseReplacement.resolve();
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+  });
 });
 
 describe('worktree Kilo environments', () => {
@@ -1665,7 +1785,7 @@ describe('worktree Kilo runtime registry', () => {
       agent: { mode: 'code', model: 'test' },
     };
     server.sessionStatuses[identity.kiloSessionId] = { type: 'idle' };
-    server.holdPrompts();
+    server.holdPrompts(identity.kiloSessionId);
     server.permissions.push({
       id: 'permission_recovery',
       sessionID: identity.kiloSessionId,
@@ -1746,7 +1866,7 @@ describe('worktree Kilo runtime registry', () => {
       expect(runtime.kiloClient).toBe(client);
       expect(harness.unexpectedCloses).toBe(0);
     } finally {
-      server.releasePrompts();
+      server.releasePrompts(identity.kiloSessionId);
       timers.mockRestore();
     }
   });
@@ -2563,6 +2683,20 @@ setInterval(() => {}, 1000);
     expect(first.signal.aborted).toBe(false);
   });
 
+  it('keeps positive process-death proof authoritative after the cleanup deadline', async () => {
+    const harness = createSharedRegistry();
+    const directory = path.join(tmpDir, 'deadline');
+    const runtime = await harness.registry.ensure(directory, auth);
+
+    expect(
+      await harness.registry.retireRuntime?.(directory, Date.now() - 1, {
+        runtimeId: runtime.runtimeId,
+        client: runtime.kiloClient,
+      })
+    ).toBe('retired');
+    expect(harness.registry.get(directory)).toBeUndefined();
+  });
+
   it('retains failed native cleanup ownership without affecting another runtime', async () => {
     const unresolvedProcesses = { stop: async () => false } as unknown as OwnedProcessScope;
     const registry = createWorktreeKiloRuntimes({
@@ -2607,6 +2741,131 @@ setInterval(() => {}, 1000);
     );
   });
 
+  it('re-observes an unconfirmed runtime only for an authorized attach demand', async () => {
+    const absent = Promise.withResolvers<boolean>();
+    const exited = Promise.withResolvers<void>();
+    let launches = 0;
+    let observations = 0;
+    const harness = createSharedRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        const first = launches++ === 0;
+        options.onProcessScope?.({
+          stop: async () => false,
+          verify: async () => {
+            observations += 1;
+            return first ? absent.promise : true;
+          },
+        } as unknown as OwnedProcessScope);
+        return {
+          url: server.url,
+          close: () => {},
+          ...(first ? { exited: exited.promise } : {}),
+        };
+      },
+    });
+    const directory = path.join(tmpDir, 'demand-attach');
+    const runtime = await harness.registry.ensure(directory, auth);
+    exited.resolve();
+    await waitUntil(() => harness.registry.isHealthy() === false);
+
+    expect(() =>
+      harness.registry.attach(rootIdentity(directory, 'unauthorized'), {
+        ...auth,
+        token: 'wrong-token',
+      })
+    ).toThrow('Kilo worktree auth context mismatch');
+    expect(observations).toBe(0);
+
+    expect(() => harness.registry.attach(rootIdentity(directory, 'retry'), auth)).toThrow(
+      'Native runtime retirement is unconfirmed'
+    );
+    await waitUntil(() => observations === 1);
+    absent.resolve(true);
+    await waitUntil(() => harness.registry.getRetained?.(directory) === undefined);
+    expect(harness.registry.isHealthy()).toBe(true);
+
+    const replacement = harness.registry.attach(rootIdentity(directory, 'replacement'), auth);
+    expect(await replacement.ready).not.toBe(runtime);
+    replacement.commit();
+    replacement.release();
+  });
+
+  it('awaits the same bounded observation when deleting an unconfirmed runtime', async () => {
+    const absent = Promise.withResolvers<boolean>();
+    let observations = 0;
+    const harness = createSharedRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async () => false,
+          verify: async () => {
+            observations += 1;
+            return absent.promise;
+          },
+        } as unknown as OwnedProcessScope);
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'demand-delete');
+    const runtime = await harness.registry.ensure(directory, auth);
+    harness.registry.detach(rootIdentity(directory));
+    await waitUntil(() => harness.registry.getRetained?.(directory) === runtime);
+
+    let settled = false;
+    const deletion = harness.registry.deleteDirectory(directory).then(() => {
+      settled = true;
+    });
+    await waitUntil(() => observations === 1);
+    expect(settled).toBe(false);
+    absent.resolve(true);
+    await deletion;
+    expect(settled).toBe(true);
+    expect(harness.registry.getRetained?.(directory)).toBeUndefined();
+    expect(fs.existsSync(runtime.env.HOME)).toBe(false);
+  });
+
+  it('deletes homes after concurrent attach observation already proved death', async () => {
+    const absent = Promise.withResolvers<boolean>();
+    let observations = 0;
+    const harness = createSharedRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async () => false,
+          verify: async () => {
+            observations += 1;
+            return observations === 1 ? absent.promise : false;
+          },
+        } as unknown as OwnedProcessScope);
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'demand-delete-after-attach');
+    const runtime = await harness.registry.ensure(directory, auth);
+    expect(
+      await harness.registry.retireRuntime?.(directory, Date.now() + 1_000, {
+        runtimeId: runtime.runtimeId ?? '',
+        client: runtime.kiloClient,
+      })
+    ).toBe('unconfirmed');
+    expect(harness.registry.getRetained?.(directory)).toBe(runtime);
+
+    expect(() => harness.registry.attach(rootIdentity(directory, 'retry'), auth)).toThrow(
+      'Native runtime retirement is unconfirmed'
+    );
+    await waitUntil(() => observations === 1);
+
+    const deletion = harness.registry.deleteDirectory(directory);
+    absent.resolve(true);
+    await deletion;
+    expect(harness.registry.getRetained?.(directory)).toBeUndefined();
+    expect(fs.existsSync(runtime.env.HOME)).toBe(false);
+  });
+
   it('does not treat a stopped parent as native retirement proof without an owned scope', async () => {
     const stopped = Promise.withResolvers<void>();
     const registry = createWorktreeKiloRuntimes({
@@ -2633,5 +2892,1125 @@ setInterval(() => {}, 1000);
     ).toBe('unconfirmed');
     expect(attachment.signal.aborted).toBe(true);
     stopped.resolve();
+  });
+
+  it('defers failed-root retirement behind a pending sibling and uses a fresh deadline when it becomes sole', async () => {
+    const stopDeadlines: number[] = [];
+    const rootRetirements: string[] = [];
+    const registry = createWorktreeKiloRuntimes({
+      homeRoot: path.join(tmpDir, 'homes'),
+      inheritedEnv: inherited,
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async (deadlineAt: number) => {
+            stopDeadlines.push(deadlineAt);
+            return true;
+          },
+        } as unknown as OwnedProcessScope);
+        return { url: server.url, close: () => {} };
+      },
+      onRootRetirement: retirement => {
+        if (retirement.result === 'retired') rootRetirements.push(retirement.root);
+      },
+      onUnexpectedClose: () => {},
+    });
+    registries.push(registry);
+    const directory = path.join(tmpDir, 'shared');
+    const first = registry.attach(rootIdentity(directory, 'first'), auth);
+    const runtime = await first.ready;
+    first.commit();
+    first.release();
+    const pending = registry.attach(rootIdentity(directory, 'pending'), auth);
+    await pending.ready;
+
+    const originalDeadline = Date.now() - 1;
+    expect(
+      await registry.retireRuntimeIfUnshared?.(
+        directory,
+        { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+        'root_first',
+        originalDeadline,
+        'event rejected'
+      )
+    ).toBe('shared');
+    expect(registry.get(directory)).toBe(runtime);
+    expect(stopDeadlines).toEqual([]);
+
+    pending.release();
+    await waitUntil(() => rootRetirements.includes('root_first'));
+    expect(stopDeadlines[0]).toBeGreaterThan(originalDeadline);
+    expect(stopDeadlines[0]).toBeLessThanOrEqual(Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS);
+    expect(registry.get(directory)).toBeUndefined();
+  });
+
+  it('rejects a stale target without retiring the current runtime', async () => {
+    const harness = createSharedRegistry();
+    const { registry } = harness;
+    const directory = path.join(tmpDir, 'stale-target');
+    const attachment = registry.attach(rootIdentity(directory), auth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+
+    expect(
+      await registry.retireRuntimeIfUnshared?.(
+        directory,
+        { runtimeId: crypto.randomUUID(), client: runtime.kiloClient },
+        'root_stale-target',
+        Date.now() + 1_000,
+        'stale event'
+      )
+    ).toBe('stale');
+    expect(registry.get(directory)).toBe(runtime);
+    expect(harness.closes).toBe(0);
+  });
+
+  it('reports immediate root retirement with its captured incarnation even without a deferred intent', async () => {
+    const reports: string[] = [];
+    const attempts: string[] = [];
+    const harness = createSharedRegistry({
+      onRootRetirementStarted: retirement => attempts.push(retirement.retirementId),
+      onRootRetirement: retirement => {
+        reports.push(`${retirement.root}:${retirement.nativeRuntimeId}:${retirement.result}`);
+        expect(retirement.retirementId).toBe(attempts[0]);
+      },
+    });
+    const directory = path.join(tmpDir, 'immediate-root-retirement');
+    const attachment = harness.registry.attach(rootIdentity(directory), auth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+    const target = { runtimeId: runtime.runtimeId, client: runtime.kiloClient };
+
+    expect(
+      await harness.registry.retireRuntimeIfUnshared?.(
+        directory,
+        target,
+        'root_immediate-root-retirement',
+        Date.now() + 1_000,
+        'event rejected'
+      )
+    ).toBe('retired');
+    expect(reports).toEqual([`root_immediate-root-retirement:${runtime.runtimeId}:retired`]);
+    expect(attempts).toHaveLength(1);
+    expect(harness.closes).toBe(1);
+  });
+
+  it('does not settle a current N2 deferred failure from a stale N1 cleanup callback', async () => {
+    const harness = createSharedRegistry();
+    const { registry } = harness;
+    const directory = path.join(tmpDir, 'stale-deferred-target');
+    const first = registry.attach(rootIdentity(directory, 'first'), auth);
+    const sibling = registry.attach(rootIdentity(directory, 'sibling'), auth);
+    const runtime = await first.ready;
+    await sibling.ready;
+    first.commit();
+    sibling.commit();
+    first.release();
+    sibling.release();
+    const currentTarget = { runtimeId: runtime.runtimeId, client: runtime.kiloClient };
+    expect(
+      await registry.retireRuntimeIfUnshared?.(
+        directory,
+        currentTarget,
+        'root_first',
+        Date.now() + 1_000,
+        'N2 publication failure'
+      )
+    ).toBe('shared');
+    if (!registry.retireRuntime) throw new Error('Missing runtime retirement API');
+    expect(
+      await registry.retireRuntime(directory, Date.now() + 1_000, {
+        runtimeId: 'N1',
+        client: runtime.kiloClient,
+      })
+    ).toBe('stale');
+    expect(registry.get(directory)).toBe(runtime);
+
+    registry.detach(rootIdentity(directory, 'sibling'));
+    await waitUntil(() => registry.get(directory) === undefined);
+    expect(harness.closes).toBe(1);
+  });
+
+  it('does not report physical unconfirmed unregistration as explicit root disappearance', async () => {
+    const rootRetirements: NativeRetirement[] = [];
+    const disappearedRoots: string[] = [];
+    const server = createKiloStub();
+    servers.push(server);
+    const harness = createSharedRegistry({
+      startServer: async options => {
+        options.onProcessScope?.({
+          stop: async (_deadlineAt: number) => false,
+        } as unknown as OwnedProcessScope);
+        return { url: server.url, close: () => {} };
+      },
+      onRootRetirement: retirement => rootRetirements.push(retirement.result),
+      onRootDisappeared: disappearance => disappearedRoots.push(disappearance.root),
+    });
+    const directory = path.join(tmpDir, 'unconfirmed-unregistration');
+    const first = harness.registry.attach(rootIdentity(directory, 'first'), auth);
+    const sibling = harness.registry.attach(rootIdentity(directory, 'sibling'), auth);
+    const runtime = await first.ready;
+    await sibling.ready;
+    first.commit();
+    sibling.commit();
+    first.release();
+    sibling.release();
+    expect(
+      await harness.registry.retireRuntimeIfUnshared?.(
+        directory,
+        { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+        'root_first',
+        Date.now() + 1_000,
+        'event rejected'
+      )
+    ).toBe('shared');
+    harness.registry.detach(rootIdentity(directory, 'sibling'));
+    await waitUntil(() => rootRetirements.length > 0);
+    expect(rootRetirements).toEqual(['unconfirmed']);
+    expect(disappearedRoots).toEqual(['root_sibling']);
+  });
+
+  it('does not retire a healthy survivor when multiple failed roots disappear', async () => {
+    const harness = createSharedRegistry();
+    const { registry } = harness;
+    const directory = path.join(tmpDir, 'multiple-failures');
+    const roots = ['first', 'second', 'healthy'].map(name => rootIdentity(directory, name));
+    const attachments = roots.map(root => registry.attach(root, auth));
+    const runtime = await attachments[0]?.ready;
+    if (!runtime) throw new Error('Missing native runtime');
+    for (const attachment of attachments) {
+      attachment.commit();
+      attachment.release();
+    }
+    const target = { runtimeId: runtime.runtimeId, client: runtime.kiloClient };
+    expect(
+      await registry.retireRuntimeIfUnshared?.(
+        directory,
+        target,
+        roots[0]?.kiloSessionId ?? 'root_first',
+        Date.now() + 1_000,
+        'first event rejected'
+      )
+    ).toBe('shared');
+    expect(
+      await registry.retireRuntimeIfUnshared?.(
+        directory,
+        target,
+        roots[1]?.kiloSessionId ?? 'root_second',
+        Date.now() + 1_000,
+        'second event rejected'
+      )
+    ).toBe('shared');
+
+    registry.detach(roots[0]!);
+    await Promise.resolve();
+    expect(registry.get(directory)).toBe(runtime);
+    registry.detach(roots[1]!);
+    await Promise.resolve();
+    expect(registry.get(directory)).toBe(runtime);
+    expect(harness.closes).toBe(0);
+  });
+
+  it.each([{ order: ['first', 'second'] as const }, { order: ['second', 'first'] as const }])(
+    'retires either failed root when the other failed root detaches first',
+    async ({ order }) => {
+      const harness = createSharedRegistry();
+      const { registry } = harness;
+      const directory = path.join(tmpDir, `failed-order-${order[0]}`);
+      const first = registry.attach(rootIdentity(directory, 'first'), auth);
+      const second = registry.attach(rootIdentity(directory, 'second'), auth);
+      const runtime = await first.ready;
+      await second.ready;
+      first.commit();
+      second.commit();
+      first.release();
+      second.release();
+      const target = { runtimeId: runtime.runtimeId, client: runtime.kiloClient };
+      expect(
+        await registry.retireRuntimeIfUnshared?.(
+          directory,
+          target,
+          'root_first',
+          Date.now() + 1_000,
+          'first event rejected'
+        )
+      ).toBe('shared');
+      expect(
+        await registry.retireRuntimeIfUnshared?.(
+          directory,
+          target,
+          'root_second',
+          Date.now() + 1_000,
+          'second event rejected'
+        )
+      ).toBe('shared');
+
+      expect(registry.detach(rootIdentity(directory, order[0]))).toBe(true);
+      await waitUntil(() => registry.get(directory) === undefined);
+      expect(harness.closes).toBe(1);
+    }
+  );
+});
+
+describe('runtime-to-registry root settlement', () => {
+  it('observes and replaces only the failed isolated runtime and clears its stale publication failure', async () => {
+    let absent = false;
+    let observations = 0;
+    let launches = 0;
+    const harness = createRegistry({
+      startServer: async options => {
+        const first = launches++ === 0;
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async () => !first,
+          verify: async () => {
+            observations += 1;
+            return absent;
+          },
+        } as unknown as OwnedProcessScope);
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'isolated-observation');
+    const identityA = rootIdentity(directory, 'a');
+    const identityB = rootIdentity(directory, 'b');
+    const attachmentA = harness.registry.attach(identityA, auth);
+    const runtimeA = await attachmentA.ready;
+    attachmentA.commit();
+    const attachmentB = harness.registry.attach(identityB, auth);
+    const runtimeB = await attachmentB.ready;
+    attachmentB.commit();
+    const dependencies = createHandlerDeps(harness.registry);
+    const failure = {
+      directory,
+      root: identityA.kiloSessionId,
+      nativeRuntimeId: runtimeA.runtimeId,
+      target: { runtimeId: runtimeA.runtimeId, client: runtimeA.kiloClient },
+      reason: 'isolated publication failure',
+      deadlineAt: Date.now() + 1_000,
+    };
+    const originalCleanup = dependencies.operations.retireRootPublication(failure);
+    expect(await originalCleanup).toBe('unconfirmed');
+    expect(
+      harness.registry.rootRetirementScope?.(directory, failure.target, identityA.kiloSessionId)
+    ).toBe('sole');
+    expect(
+      await harness.registry.retireRuntimeIfUnshared?.(
+        directory,
+        failure.target,
+        identityA.kiloSessionId,
+        Date.now() + 1_000
+      )
+    ).toBe('unconfirmed');
+    dependencies.operations.prune();
+    expect(dependencies.operations.retireRootPublication(failure)).toBe(originalCleanup);
+    expect(harness.registry.get(identityB)).toBe(runtimeB);
+    expect(runtimeB.signal.aborted).toBe(false);
+    expect(() => harness.registry.attach(identityA, { ...auth, token: 'unauthorized' })).toThrow(
+      'Kilo worktree auth context mismatch'
+    );
+    expect(observations).toBe(0);
+    absent = true;
+    expect(() => harness.registry.attach(identityA, auth)).toThrow(
+      'Native runtime retirement is unconfirmed'
+    );
+    await waitUntil(
+      () => harness.registry.getRetained?.(directory, runtimeA.runtimeId) === undefined
+    );
+    const replacement = harness.registry.attach(identityA, auth);
+    const replacementRuntime = await replacement.ready;
+    replacement.commit();
+    expect(harness.registry.getEntryRuntimeId?.(directory, identityA.kiloSessionId)).toBe(
+      replacementRuntime.runtimeId
+    );
+    expect(harness.registry.getEntryRuntimeId?.(directory, identityB.kiloSessionId)).toBe(
+      runtimeB.runtimeId
+    );
+    dependencies.operations.prune();
+    // A repeated failure can no longer reuse the old runtime's retained claim.
+    expect(dependencies.operations.retireRootPublication(failure)).not.toBe(originalCleanup);
+    expect(dependencies.operations.admission('session.prompt', identityA, undefined).kind).toBe(
+      'continue'
+    );
+    expect(harness.registry.get(identityB)).toBe(runtimeB);
+    expect(runtimeB.signal.aborted).toBe(false);
+  });
+
+  it('allows A to reattach after a retained completed operation retires its runtime', async () => {
+    const harness = createSharedRegistry();
+    const handlerDeps = createHandlerDeps(harness.registry);
+    const identity = rootIdentity(path.join(tmpDir, 'retained-abort-reattach'), 'a');
+    const prompt = {
+      messageId: 'retained_abort_a1',
+      turn: { type: 'prompt' as const, prompt: 'completed A work' },
+      agent: { mode: 'code', model: 'test' },
+    };
+    const authorization = operationAuthorization('session.prompt', prompt.messageId, identity);
+
+    expect(
+      await handleControlRequest('session.attach', identity, { kilo: auth }, handlerDeps)
+    ).toEqual({ ok: true, result: { attached: true } });
+    const runtime = harness.registry.get(identity.directory);
+    if (!runtime) throw new Error('Missing attached runtime');
+
+    try {
+      expect(
+        await handleControlRequest('session.prompt', identity, prompt, handlerDeps, authorization)
+      ).toMatchObject({
+        ok: true,
+        result: { messageId: prompt.messageId, status: 'accepted' },
+      });
+      await waitUntil(() =>
+        handlerDeps.operations
+          .retained()
+          .some(operation => operation.messageId === prompt.messageId)
+      );
+      const task = handlerDeps.operations
+        .retained()
+        .find(operation => operation.messageId === prompt.messageId);
+      if (!task) throw new Error('Missing retained operation');
+      await task.done;
+      expect(task.locallyComplete).toBe(true);
+      expect(handlerDeps.operations.active(identity.kiloSessionId)).toBeUndefined();
+      task.markPublicationScoped('retained publication failure', Date.now() + 1_000);
+
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          identity,
+          {
+            messageId: prompt.messageId,
+            operationId: '33333333-3333-4333-8333-333333333333',
+            cleanupDeadlineAt: Date.now() + 1_000,
+          },
+          handlerDeps
+        )
+      ).toMatchObject({
+        ok: true,
+        result: {
+          status: 'aborted',
+          quiescent: true,
+          runtimeRetired: true,
+          nativeRuntimeId: runtime.runtimeId,
+        },
+      });
+      expect(harness.registry.get(identity.directory)).toBeUndefined();
+
+      expect(
+        await handleControlRequest('session.attach', identity, { kilo: auth }, handlerDeps)
+      ).toEqual({ ok: true, result: { attached: true } });
+      const replacement = harness.registry.get(identity.directory);
+      expect(replacement).toBeDefined();
+      expect(replacement).not.toBe(runtime);
+      expect(
+        (
+          await handleControlRequest(
+            'session.terminal.create',
+            identity,
+            { operationId: crypto.randomUUID() },
+            handlerDeps
+          )
+        ).ok
+      ).toBe(true);
+    } finally {
+      await Promise.allSettled(
+        handlerDeps.operations.activeOperations().map(operation => operation.done)
+      );
+    }
+  });
+
+  it('allows A to reattach after a sole active abort replaces its runtime', async () => {
+    const harness = createSharedRegistry();
+    const handlerDeps = createHandlerDeps(harness.registry);
+    const identity = rootIdentity(path.join(tmpDir, 'abort-reattach'), 'a');
+    expect(
+      await handleControlRequest('session.attach', identity, { kilo: auth }, handlerDeps)
+    ).toEqual({ ok: true, result: { attached: true } });
+    const runtime = harness.registry.get(identity.directory);
+    const server = servers.at(-1);
+    if (!runtime || !server) throw new Error('Missing attached runtime');
+    server.holdPrompts(identity.kiloSessionId);
+    const prompt = {
+      messageId: 'abort_reattach_a1',
+      turn: { type: 'prompt' as const, prompt: 'active A work' },
+      agent: { mode: 'code', model: 'test' },
+    };
+    const promptRequest = handleControlRequest('session.prompt', identity, prompt, handlerDeps);
+
+    try {
+      expect(await promptRequest).toEqual({
+        ok: true,
+        result: { messageId: prompt.messageId, status: 'accepted' },
+      });
+      await waitUntil(() =>
+        server.requests.some(
+          request => request.pathname === `/session/${identity.kiloSessionId}/message`
+        )
+      );
+      const task = handlerDeps.operations.active(identity.kiloSessionId);
+      if (!task) throw new Error('Missing active operation');
+      task.markPublicationScoped('sole publication failure', Date.now() + 1_000);
+
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          identity,
+          {
+            messageId: prompt.messageId,
+            operationId: '11111111-1111-4111-8111-111111111111',
+          },
+          handlerDeps
+        )
+      ).toMatchObject({
+        ok: true,
+        result: {
+          status: 'aborted',
+          quiescent: true,
+          runtimeRetired: true,
+          nativeRuntimeId: runtime.runtimeId,
+        },
+      });
+      expect(harness.registry.get(identity.directory)).toBeUndefined();
+
+      expect(
+        await handleControlRequest('session.attach', identity, { kilo: auth }, handlerDeps)
+      ).toEqual({ ok: true, result: { attached: true } });
+      const replacement = harness.registry.get(identity.directory);
+      expect(replacement).toBeDefined();
+      expect(replacement).not.toBe(runtime);
+      expect(
+        (
+          await handleControlRequest(
+            'session.terminal.create',
+            identity,
+            { operationId: crypto.randomUUID() },
+            handlerDeps
+          )
+        ).ok
+      ).toBe(true);
+    } finally {
+      server.releasePrompts(identity.kiloSessionId);
+      await Promise.allSettled([promptRequest]);
+    }
+  });
+
+  it('detaches A before returning a failed non-scoped abort so A can reattach', async () => {
+    const harness = createSharedRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async () => true,
+          verify: async () => true,
+        } as unknown as OwnedProcessScope);
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const handlerDeps = createHandlerDeps(harness.registry);
+    handlerDeps.emitSessionEvent = () => false;
+    const identity = rootIdentity(path.join(tmpDir, 'failed-abort-reattach'), 'a');
+    expect(
+      await handleControlRequest('session.attach', identity, { kilo: auth }, handlerDeps)
+    ).toEqual({ ok: true, result: { attached: true } });
+    const runtime = harness.registry.get(identity.directory);
+    const server = servers.at(-1);
+    if (!runtime || !server) throw new Error('Missing attached runtime');
+    server.holdPrompts(identity.kiloSessionId);
+    const prompt = {
+      messageId: 'failed_abort_a1',
+      turn: { type: 'prompt' as const, prompt: 'active A work' },
+      agent: { mode: 'code', model: 'test' },
+    };
+    const promptRequest = handleControlRequest('session.prompt', identity, prompt, handlerDeps);
+
+    try {
+      expect(await promptRequest).toEqual({
+        ok: true,
+        result: { messageId: prompt.messageId, status: 'accepted' },
+      });
+      await waitUntil(() =>
+        server.requests.some(
+          request => request.pathname === `/session/${identity.kiloSessionId}/message`
+        )
+      );
+
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          identity,
+          { messageId: prompt.messageId },
+          handlerDeps
+        )
+      ).toEqual({
+        ok: false,
+        error: { code: 'not_ready', message: 'Session outcome delivery failed', retryable: false },
+      });
+      expect(
+        server.requests.some(
+          request => request.pathname === `/session/${identity.kiloSessionId}/abort`
+        )
+      ).toBe(true);
+      expect(
+        await harness.registry.retireRuntime?.(identity.directory, Date.now() + 1_000, {
+          runtimeId: runtime.runtimeId,
+          client: runtime.kiloClient,
+        })
+      ).toBe('retired');
+      expect(harness.registry.get(identity.directory)).toBeUndefined();
+
+      expect(
+        await handleControlRequest('session.attach', identity, { kilo: auth }, handlerDeps)
+      ).toEqual({ ok: true, result: { attached: true } });
+      const replacement = harness.registry.get(identity.directory);
+      expect(replacement).toBeDefined();
+      expect(replacement).not.toBe(runtime);
+      expect(
+        (
+          await handleControlRequest(
+            'session.terminal.create',
+            identity,
+            { operationId: crypto.randomUUID() },
+            handlerDeps
+          )
+        ).ok
+      ).toBe(true);
+    } finally {
+      server.releasePrompts(identity.kiloSessionId);
+      await Promise.allSettled([promptRequest]);
+    }
+  });
+
+  it('keeps B attached while A aborts and reattaches on a shared runtime', async () => {
+    const harness = createSharedRegistry();
+    const handlerDeps = createHandlerDeps(harness.registry);
+    handlerDeps.scopedCleanupResult = true;
+    const directory = path.join(tmpDir, 'shared-abort-reattach');
+    const identityA = rootIdentity(directory, 'a');
+    const identityB = rootIdentity(directory, 'b');
+    for (const identity of [identityA, identityB]) {
+      expect(
+        await handleControlRequest('session.attach', identity, { kilo: auth }, handlerDeps)
+      ).toEqual({ ok: true, result: { attached: true } });
+    }
+    const runtime = harness.registry.get(directory);
+    const server = servers.at(-1);
+    if (!runtime || !server) throw new Error('Missing shared runtime');
+    server.holdPrompts(identityA.kiloSessionId);
+    const prompt = {
+      messageId: 'shared_abort_a1',
+      turn: { type: 'prompt' as const, prompt: 'active A work' },
+      agent: { mode: 'code', model: 'test' },
+    };
+    const promptRequest = handleControlRequest('session.prompt', identityA, prompt, handlerDeps);
+
+    try {
+      expect(await promptRequest).toEqual({
+        ok: true,
+        result: { messageId: prompt.messageId, status: 'accepted' },
+      });
+      await waitUntil(() =>
+        server.requests.some(
+          request => request.pathname === `/session/${identityA.kiloSessionId}/message`
+        )
+      );
+      const taskA = handlerDeps.operations.active(identityA.kiloSessionId);
+      if (!taskA) throw new Error('Missing A operation');
+      taskA.markPublicationScoped('shared publication failure', Date.now() + 1_000);
+
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          identityA,
+          {
+            messageId: prompt.messageId,
+            operationId: '22222222-2222-4222-8222-222222222222',
+            cleanupDeadlineAt: Date.now() + 1_000,
+          },
+          handlerDeps
+        )
+      ).toMatchObject({
+        ok: true,
+        result: { status: 'unconfirmed', quiescent: false, cleanupScope: 'root' },
+      });
+      expect(rootForSession(identityB.kiloSessionId, directory)).toBe(identityB.kiloSessionId);
+      expect(harness.registry.get(directory)).toBe(runtime);
+
+      await Promise.all(handlerDeps.operations.activeOperations().map(operation => operation.done));
+      expect(
+        (
+          await handleControlRequest(
+            'session.terminal.create',
+            identityB,
+            { operationId: crypto.randomUUID() },
+            handlerDeps
+          )
+        ).ok
+      ).toBe(true);
+      expect(
+        await handleControlRequest('session.attach', identityA, { kilo: auth }, handlerDeps)
+      ).toEqual({ ok: true, result: { attached: true } });
+      expect(harness.registry.get(directory)).toBe(runtime);
+      expect(
+        (
+          await handleControlRequest(
+            'session.terminal.create',
+            identityA,
+            { operationId: crypto.randomUUID() },
+            handlerDeps
+          )
+        ).ok
+      ).toBe(true);
+    } finally {
+      server.releasePrompts(identityA.kiloSessionId);
+      await Promise.allSettled([promptRequest]);
+      await Promise.allSettled(
+        handlerDeps.operations.activeOperations().map(operation => operation.done)
+      );
+    }
+  });
+
+  it('isolates a user Stop from B when both shared roots have active prompts', async () => {
+    const integrated = createIntegratedRegistry();
+    const directory = path.join(tmpDir, 'shared-user-stop');
+    const identityA = rootIdentity(directory, 'a');
+    const identityB = rootIdentity(directory, 'b');
+    for (const identity of [identityA, identityB]) {
+      expect(
+        await handleControlRequest(
+          'session.attach',
+          identity,
+          { kilo: auth },
+          integrated.handlerDeps
+        )
+      ).toEqual({ ok: true, result: { attached: true } });
+    }
+    const runtime = integrated.registry.get(directory);
+    const server = servers.at(-1);
+    if (!runtime || !server) throw new Error('Missing shared runtime');
+    for (const identity of [identityA, identityB]) {
+      expect(
+        (
+          await handleControlRequest(
+            'session.terminal.create',
+            identity,
+            { operationId: crypto.randomUUID() },
+            integrated.handlerDeps
+          )
+        ).ok
+      ).toBe(true);
+    }
+
+    integrated.handlerDeps.scopedCleanupResult = true;
+    server.holdPrompts(identityA.kiloSessionId);
+    server.holdPrompts(identityB.kiloSessionId);
+    server.sessionStatuses[identityA.kiloSessionId] = { type: 'busy' };
+    server.sessionStatuses[identityB.kiloSessionId] = { type: 'busy' };
+    const promptA = {
+      messageId: 'user_stop_a1',
+      turn: { type: 'prompt' as const, prompt: 'active A work' },
+      agent: { mode: 'code', model: 'test' },
+    };
+    const promptB = {
+      ...promptA,
+      messageId: 'user_stop_b1',
+      turn: { type: 'prompt' as const, prompt: 'active B work' },
+    };
+    const promptARequest = handleControlRequest(
+      'session.prompt',
+      identityA,
+      promptA,
+      integrated.handlerDeps
+    );
+    const promptBRequest = handleControlRequest(
+      'session.prompt',
+      identityB,
+      promptB,
+      integrated.handlerDeps
+    );
+    let taskA: ReturnType<typeof integrated.handlerDeps.operations.active>;
+    let taskB: ReturnType<typeof integrated.handlerDeps.operations.active>;
+    try {
+      expect(await promptARequest).toMatchObject({
+        ok: true,
+        result: { messageId: promptA.messageId, status: 'accepted' },
+      });
+      expect(await promptBRequest).toMatchObject({
+        ok: true,
+        result: { messageId: promptB.messageId, status: 'accepted' },
+      });
+      await waitUntil(
+        () =>
+          server.requests.some(
+            request => request.pathname === `/session/${identityA.kiloSessionId}/message`
+          ) &&
+          server.requests.some(
+            request => request.pathname === `/session/${identityB.kiloSessionId}/message`
+          )
+      );
+      taskA = integrated.handlerDeps.operations.active(identityA.kiloSessionId);
+      taskB = integrated.handlerDeps.operations.active(identityB.kiloSessionId);
+      if (!taskA || !taskB) throw new Error('Missing active shared-root operations');
+      expect(taskA.signal.aborted).toBe(false);
+      expect(taskB.signal.aborted).toBe(false);
+
+      const stopped = await handleControlRequest(
+        'session.abort',
+        identityA,
+        {
+          messageId: promptA.messageId,
+          operationId: '44444444-4444-4444-8444-444444444444',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        integrated.handlerDeps
+      );
+      await taskA.done;
+      expect(stopped).toMatchObject({
+        ok: true,
+        result: { status: 'unconfirmed', quiescent: false, cleanupScope: 'root' },
+      });
+      expect(stopped).not.toHaveProperty('result.runtimeRetired');
+      expect(taskA.cleanup).toBe('unconfirmed');
+      expect(taskB.signal.aborted).toBe(false);
+      expect(integrated.handlerDeps.operations.active(identityB.kiloSessionId)).toBe(taskB);
+      expect(taskB.snapshot().native.state).toBe('pending');
+      server.releasePrompts(identityB.kiloSessionId);
+      expect(await taskB.done).toMatchObject({ ok: true });
+      expect(rootForSession(identityB.kiloSessionId, directory)).toBe(identityB.kiloSessionId);
+      expect(integrated.registry.get(directory)).toBe(runtime);
+      expect(runtime.signal.aborted).toBe(false);
+      expect(integrated.settlements).toEqual([]);
+
+      expect(
+        await handleControlRequest(
+          'session.attach',
+          identityA,
+          { kilo: auth },
+          integrated.handlerDeps
+        )
+      ).toEqual({ ok: true, result: { attached: true } });
+      for (const identity of [identityB, identityA]) {
+        expect(
+          (
+            await handleControlRequest(
+              'session.terminal.create',
+              identity,
+              { operationId: crypto.randomUUID() },
+              integrated.handlerDeps
+            )
+          ).ok
+        ).toBe(true);
+      }
+      await Promise.resolve();
+      expect(integrated.settlements).toEqual([]);
+    } finally {
+      server.releasePrompts(identityA.kiloSessionId);
+      server.releasePrompts(identityB.kiloSessionId);
+      await Promise.allSettled([promptARequest, promptBRequest]);
+      if (taskA) await Promise.allSettled([taskA.done]);
+      if (taskB) await Promise.allSettled([taskB.done]);
+    }
+  });
+
+  it('does not detach a replacement attachment for a stale native runtime abort', async () => {
+    const harness = createSharedRegistry();
+    const handlerDeps = createHandlerDeps(harness.registry);
+    const identity = rootIdentity(path.join(tmpDir, 'stale-abort-attachment'), 'a');
+    expect(
+      await handleControlRequest('session.attach', identity, { kilo: auth }, handlerDeps)
+    ).toEqual({ ok: true, result: { attached: true } });
+    const initial = harness.registry.get(identity.directory);
+    if (!initial) throw new Error('Missing initial runtime');
+
+    expect(
+      await handleControlRequest(
+        'session.abort',
+        identity,
+        { nativeRuntimeId: initial.runtimeId },
+        handlerDeps
+      )
+    ).toMatchObject({
+      ok: true,
+      result: {
+        status: 'aborted',
+        quiescent: true,
+        runtimeRetired: true,
+        nativeRuntimeId: initial.runtimeId,
+      },
+    });
+    expect(
+      await handleControlRequest('session.attach', identity, { kilo: auth }, handlerDeps)
+    ).toEqual({ ok: true, result: { attached: true } });
+    const replacement = harness.registry.get(identity.directory);
+    if (!replacement) throw new Error('Missing replacement runtime');
+    expect(replacement).not.toBe(initial);
+
+    expect(
+      await handleControlRequest(
+        'session.abort',
+        identity,
+        { nativeRuntimeId: initial.runtimeId },
+        handlerDeps
+      )
+    ).toEqual({
+      ok: true,
+      result: {
+        status: 'aborted',
+        quiescent: true,
+        runtimeRetired: true,
+        nativeRuntimeId: initial.runtimeId,
+      },
+    });
+    expect(
+      (
+        await handleControlRequest(
+          'session.terminal.create',
+          identity,
+          { operationId: crypto.randomUUID() },
+          handlerDeps
+        )
+      ).ok
+    ).toBe(true);
+  });
+
+  it('keeps a shared runtime alive after confirmed A cleanup, fresh A work, and B detach', async () => {
+    const integrated = createIntegratedRegistry();
+    const directory = path.join(tmpDir, 'confirmed-shared-runtime');
+    const identityA = rootIdentity(directory, 'a');
+    const identityB = rootIdentity(directory, 'b');
+    expect(
+      await handleControlRequest(
+        'session.attach',
+        identityA,
+        { kilo: auth },
+        integrated.handlerDeps
+      )
+    ).toMatchObject({
+      ok: true,
+    });
+    expect(
+      await handleControlRequest(
+        'session.attach',
+        identityB,
+        { kilo: auth },
+        integrated.handlerDeps
+      )
+    ).toMatchObject({
+      ok: true,
+    });
+    const runtime = integrated.registry.get(directory);
+    const server = servers.at(-1);
+    if (!runtime || !server) throw new Error('Missing shared runtime');
+    server.holdPrompts(identityA.kiloSessionId);
+    const prompt = {
+      messageId: 'confirmed_a1',
+      turn: { type: 'prompt' as const, prompt: 'confirm root cleanup' },
+      agent: { mode: 'code', model: 'test' },
+    };
+    const promptRequest = handleControlRequest(
+      'session.prompt',
+      identityA,
+      prompt,
+      integrated.handlerDeps
+    );
+    const waitForTasks = () =>
+      Promise.all(integrated.handlerDeps.operations.activeOperations().map(task => task.done));
+    try {
+      await waitUntil(
+        () =>
+          integrated.handlerDeps.operations.active(identityA.kiloSessionId)?.snapshot().native
+            .state === 'pending'
+      );
+      const escalation = integrated.handlerDeps.operations.escalateRootPublication({
+        directory,
+        root: identityA.kiloSessionId,
+        nativeRuntimeId: runtime.runtimeId,
+        target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+        reason: 'confirmed publication cleanup',
+        deadlineAt: Date.now() + 1_000,
+      });
+      expect(await escalation.physical).toMatchObject({
+        scope: 'root',
+        status: 'aborted',
+        cleanup: 'confirmed',
+        physical: 'not_attempted',
+        quiescent: false,
+        runtimeRetired: false,
+      });
+      expect(integrated.registry.get(directory)).toBe(runtime);
+      await promptRequest;
+      await waitForTasks();
+
+      const freshPrompt = {
+        ...prompt,
+        messageId: 'confirmed_a2',
+        turn: { type: 'prompt' as const, prompt: 'fresh A work' },
+      };
+      expect(
+        await handleControlRequest('session.prompt', identityA, freshPrompt, integrated.handlerDeps)
+      ).toMatchObject({ ok: true, result: { status: 'accepted' } });
+      await waitForTasks();
+      expect(integrated.registry.get(directory)).toBe(runtime);
+
+      expect(integrated.registry.detach(identityB)).toBe(true);
+      expect(integrated.registry.get(directory)).toBe(runtime);
+      expect(runtime.signal.aborted).toBe(false);
+      expect(integrated.closes).toBe(0);
+    } finally {
+      server.releasePrompts(identityA.kiloSessionId);
+      await Promise.allSettled([promptRequest]);
+      await waitForTasks();
+    }
+  });
+
+  it('uses current membership when B attaches while sole-root cleanup is polling', async () => {
+    const integrated = createIntegratedRegistry();
+    const directory = path.join(tmpDir, 'membership-interleaving');
+    const identityA = rootIdentity(directory, 'a');
+    const identityB = rootIdentity(directory, 'b');
+    expect(
+      await handleControlRequest(
+        'session.attach',
+        identityA,
+        { kilo: auth },
+        integrated.handlerDeps
+      )
+    ).toMatchObject({ ok: true });
+    const runtime = integrated.registry.get(directory);
+    const server = servers.at(-1);
+    if (!runtime || !server) throw new Error('Missing sole runtime');
+    server.holdPrompts(identityA.kiloSessionId);
+    server.sessionStatuses[identityA.kiloSessionId] = { type: 'busy' };
+    const promptRequest = handleControlRequest(
+      'session.prompt',
+      identityA,
+      {
+        messageId: 'interleave_a',
+        turn: { type: 'prompt' as const, prompt: 'A cleanup' },
+        agent: { mode: 'code', model: 'test' },
+      },
+      integrated.handlerDeps
+    );
+    try {
+      await waitUntil(
+        () =>
+          integrated.handlerDeps.operations.active(identityA.kiloSessionId)?.snapshot().native
+            .state === 'pending'
+      );
+      const escalation = integrated.handlerDeps.operations.escalateRootPublication({
+        directory,
+        root: identityA.kiloSessionId,
+        nativeRuntimeId: runtime.runtimeId,
+        target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+        reason: 'interleaved publication failure',
+        deadlineAt: Date.now() + 1_000,
+      });
+      const attachmentB = integrated.registry.attach(identityB, auth);
+      await attachmentB.ready;
+      attachmentB.commit();
+      attachmentB.release();
+      server.sessionStatuses[identityA.kiloSessionId] = { type: 'idle' };
+
+      const disposition = await escalation.physical;
+      expect(disposition).toMatchObject({
+        scope: 'root',
+        physical: 'not_attempted',
+        runtimeRetired: false,
+        quiescent: false,
+      });
+      expect(integrated.registry.get(directory)).toBe(runtime);
+      expect(runtime.signal.aborted).toBe(false);
+    } finally {
+      server.releasePrompts(identityA.kiloSessionId);
+      await Promise.allSettled([promptRequest]);
+    }
+  });
+
+  it('settles a non-deferred scoped record when failRuntime retires the runtime', async () => {
+    const exited = Promise.withResolvers<void>();
+    const server = createKiloStub();
+    servers.push(server);
+    const integrated = createIntegratedRegistry({
+      startServer: async options => {
+        options.onProcessScope?.({ stop: async () => true } as unknown as OwnedProcessScope);
+        return { url: server.url, close: () => {}, exited: exited.promise };
+      },
+    });
+    const directory = path.join(tmpDir, 'settled-failure-record');
+    const attachment = integrated.registry.attach(rootIdentity(directory), auth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+    const input = {
+      directory,
+      root: `root_${path.basename(directory)}`,
+      nativeRuntimeId: runtime.runtimeId,
+      target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+      reason: 'event rejected',
+      deadlineAt: Date.now() + 1_000,
+    };
+    expect(await integrated.handlerDeps.operations.retireRootPublication(input)).toBe(
+      'unconfirmed'
+    );
+
+    exited.resolve();
+    await waitUntil(() =>
+      integrated.settlements.some(
+        settlement => settlement.root === input.root && settlement.result === 'retired'
+      )
+    );
+    expect(integrated.registry.get(directory)).toBeUndefined();
+    rememberAttachedRoot(input.root, directory);
+    expect(
+      integrated.handlerDeps.operations.admission(
+        'session.prompt',
+        rootIdentity(directory),
+        undefined
+      ).kind
+    ).toBe('continue');
+  });
+
+  it('preserves a non-deferred scoped record when failRuntime retirement is unconfirmed', async () => {
+    const exited = Promise.withResolvers<void>();
+    const server = createKiloStub();
+    servers.push(server);
+    const integrated = createIntegratedRegistry({
+      startServer: async options => {
+        options.onProcessScope?.({ stop: async () => false } as unknown as OwnedProcessScope);
+        return { url: server.url, close: () => {}, exited: exited.promise };
+      },
+    });
+    const directory = path.join(tmpDir, 'unconfirmed-failure-record');
+    const attachment = integrated.registry.attach(rootIdentity(directory), auth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+    const sessionA = rootIdentity(directory);
+    const input = {
+      directory,
+      root: sessionA.kiloSessionId,
+      nativeRuntimeId: runtime.runtimeId,
+      target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+      reason: 'event rejected',
+      deadlineAt: Date.now() + 1_000,
+    };
+    expect(await integrated.handlerDeps.operations.retireRootPublication(input)).toBe(
+      'unconfirmed'
+    );
+
+    exited.resolve();
+    await waitUntil(() =>
+      integrated.settlements.some(
+        settlement => settlement.root === input.root && settlement.result === 'unconfirmed'
+      )
+    );
+    integrated.handlerDeps.operations.prune();
+    rememberAttachedRoot(sessionA.kiloSessionId, directory);
+    expect(
+      integrated.handlerDeps.operations.admission('session.prompt', sessionA, undefined).kind
+    ).toBe('reply');
   });
 });

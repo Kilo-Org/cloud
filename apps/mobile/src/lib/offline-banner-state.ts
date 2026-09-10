@@ -74,7 +74,16 @@ export function createOfflineBannerStore(options: {
     }
     const status = connectivityStatus(sourceState);
     if (status === 'unknown') {
-      // Unknown cancels confirmation but preserves the last committed state.
+      // Unknown cancels confirmation but preserves the last committed state —
+      // except committed-offline with the radio back up (e.g. airplane mode
+      // switched to 3G while NetInfo's external reachability probe never
+      // answers). Preserving offline there leaves the banner stale forever,
+      // because no further event may ever arrive; the app's own probe (its
+      // backend, not an external URL) is the decider instead (uxs3 spot
+      // check, e6-after-net). A failed probe re-commits offline unchanged.
+      if (state === 'offline' && sourceState.isConnected === true) {
+        void confirmConnectivity(attempt);
+      }
       return;
     }
     if (status === 'online') {

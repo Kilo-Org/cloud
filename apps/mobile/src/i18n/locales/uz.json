@@ -448,6 +448,9 @@
       "acceptTerms": "Qabul qilish",
       "replyBadRequest": "Bu javobni joylab bo'lmaydi. Izohlar zanjiri o'zgargan bo'lishi mumkin.",
       "replyForbidden": "Bu PRga javob yozishga ruxsatingiz yo'q.",
+      "addCommentCta": "Bu PRga izoh yozish",
+      "commentBadRequest": "Bu izohni joylab bo'lmaydi. PR o'zgargan bo'lishi mumkin.",
+      "commentForbidden": "Bu PRga izoh yozishga ruxsatingiz yo'q.",
       "moderation": {
         "reportContent": {
           "terminal": "Bu izoh ustidan shikoyat qilib bo'lmaydi.",

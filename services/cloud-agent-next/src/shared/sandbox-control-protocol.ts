@@ -192,6 +192,7 @@ export const sandboxHelloPayloadSchema = z.object({
       eventReceipts: z.boolean().optional(),
       runtimeIsolation: z.literal(true).optional(),
       runtimeRecovery: z.literal(true).optional(),
+      scopedCleanupResult: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
     })
     .optional(),
@@ -210,6 +211,7 @@ export const sandboxHelloResultSchema = z.object({
       eventReceipts: z.boolean().optional(),
       runtimeIsolation: z.literal(true).optional(),
       runtimeRecovery: z.literal(true).optional(),
+      scopedCleanupResult: z.boolean().optional(),
     })
     .optional(),
 });
@@ -546,9 +548,33 @@ export const sessionAbortResultSchema = z
     quiescent: z.boolean().optional(),
     runtimeRetired: z.boolean().optional(),
     nativeRuntimeId: z.string().uuid().optional(),
+    cleanupScope: z.enum(['root', 'runtime']).optional(),
     delivery: z.lazy(() => sessionOperationDeliverySchema).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.cleanupScope === 'root' && value.nativeRuntimeId !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Root cleanup results cannot identify a retired runtime',
+        path: ['nativeRuntimeId'],
+      });
+    }
+    if (value.cleanupScope === 'root' && value.runtimeRetired === true) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Root cleanup cannot retire the runtime',
+        path: ['runtimeRetired'],
+      });
+    }
+    if (value.cleanupScope === 'root' && value.quiescent === true) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Root cleanup cannot prove physical quiescence',
+        path: ['quiescent'],
+      });
+    }
+  });
 
 export const sessionNativeRuntimeRetirementPayloadSchema = z
   .object({
@@ -933,6 +959,7 @@ export const sandboxControlSocketAttachmentSchema = z.object({
       scopedStopAbort: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
       connectionRecovery: z.boolean().optional(),
+      scopedCleanupResult: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
     })
     .optional(),

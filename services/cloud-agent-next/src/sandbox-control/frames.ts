@@ -188,6 +188,7 @@ export function errorResponse(
 export function helloResult(capabilities?: {
   connectionRecovery?: boolean;
   eventReceipts?: boolean;
+  scopedCleanupResult?: boolean;
 }): SandboxHelloResult {
   return {
     protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
@@ -199,6 +200,7 @@ export function helloResult(capabilities?: {
       nativeRuntimeRetirement: true,
       ...(capabilities?.connectionRecovery ? { connectionRecovery: true } : {}),
       ...(capabilities?.eventReceipts ? { eventReceipts: true } : {}),
+      ...(capabilities?.scopedCleanupResult ? { scopedCleanupResult: true } : {}),
     },
   };
 }

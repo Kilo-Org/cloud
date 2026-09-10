@@ -448,6 +448,9 @@
       "acceptTerms": "Whakaae",
       "replyBadRequest": "Kāore e taea te tuku i tēnei whakautu. Kua rerekē pea te aho kōrero.",
       "replyForbidden": "Kāore koe e whakaaetia kia whakautu ki tēnei tono kume.",
+      "addCommentCta": "Tāpiri kōrero ki tēnei tono kume",
+      "commentBadRequest": "Kāore e taea te tuku i tēnei kōrero. Kua rerekē pea te tono kume.",
+      "commentForbidden": "Kāore koe e whakaaetia kia tāpiri kōrero ki tēnei tono kume.",
       "moderation": {
         "reportContent": {
           "terminal": "Kāore e taea te pūrongo i tēnei kōrero.",

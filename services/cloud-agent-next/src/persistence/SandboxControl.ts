@@ -973,6 +973,31 @@ export class SandboxControl extends DurableObject<Env> {
         throw error;
       }
       const result = response.ok ? sessionAbortResultSchema.safeParse(response.result) : undefined;
+      if (response.ok && !result?.success) {
+        if (retirementAttempt) await this.nativeRuntimeRetirement.defer(retirementAttempt);
+        return errorResponse(
+          response.requestId,
+          'protocol_error',
+          'Invalid session abort result',
+          false
+        );
+      }
+      if (result?.success && result.data.cleanupScope === 'root') {
+        if (
+          !this.socketHandler.supportsScopedCleanupResult?.() ||
+          result.data.runtimeRetired === true
+        ) {
+          if (retirementAttempt) await this.nativeRuntimeRetirement.defer(retirementAttempt);
+          return errorResponse(
+            response.requestId,
+            'protocol_error',
+            'Invalid root-scoped session abort result',
+            false
+          );
+        }
+        if (retirementAttempt) await this.nativeRuntimeRetirement.release(retirementAttempt);
+        return response;
+      }
       if (
         result?.success &&
         result.data.runtimeRetired === true &&

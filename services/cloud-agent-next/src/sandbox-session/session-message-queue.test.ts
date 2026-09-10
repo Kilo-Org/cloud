@@ -18,6 +18,7 @@ import { createMemoryEventQueries, readStep } from '../session/preparation-test-
 import { getPreparationSnapshots, readPreparationAttempt } from '../session/preparation-history.js';
 import type { Env } from '../types.js';
 import type { UserId } from '../types/ids.js';
+import type { CallbackJob } from '../callbacks/types.js';
 import type { sandboxControlRpc } from './control-rpc.js';
 import type { SandboxControlOutboundRequest } from '../sandbox-control/socket.js';
 import {
@@ -39,6 +40,7 @@ import { createControlPlaneCredential } from '../sandbox-control/managed-credent
 import { logger } from '../logger.js';
 import { SESSION_DELIVERY_TIMEOUT_MS } from './control-dispatch.js';
 import { RUNTIME_AUTHORIZATION_KEY } from '../session/runtime-authorization-persistence.js';
+import { PENDING_SESSION_MESSAGE_LIMIT } from '../session/pending-messages.js';
 import { createControlStopRequest } from '../shared/control-plane-session.js';
 import type {
   AcceptedCommandTurn,
@@ -687,6 +689,27 @@ describe('failQueuedMessage', () => {
     expect(failQueuedMessage([msg('a', 'completed')], 'a')).toBeUndefined();
     expect(failQueuedMessage([msg('a', 'accepted')], 'a')).toBeUndefined();
   });
+
+  it('retains a bounded terminal detail for public projections', () => {
+    const failed = failQueuedMessage(
+      [msg('a', 'queued')],
+      'a',
+      'attach_exhausted',
+      'Repository checkout failed: output: requested review ref was not found'
+    );
+    expect(failed?.[0]).toMatchObject({
+      state: 'failed',
+      failedReason: 'attach_exhausted',
+      failedDetail: 'Repository checkout failed: output: requested review ref was not found',
+    });
+    expect(streamQueuedSnapshots(failed ?? [], 20)).toMatchObject([
+      {
+        terminalFailure: {
+          error: 'Repository checkout failed: output: requested review ref was not found',
+        },
+      },
+    ]);
+  });
 });
 
 describe('acceptQueuedMessage', () => {
@@ -1086,7 +1109,11 @@ function controlFailure(retryable: boolean, code = 'not_ready'): ResponseFrame {
   };
 }
 
-function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?: Control) {
+function sessionFixture(
+  overrides: Partial<SessionMetadata> = {},
+  sharedControl?: Control,
+  callbackQueue?: Pick<Queue<CallbackJob>, 'send'>
+) {
   const values = new Map<string, unknown>();
   let alarmAt: number | null = null;
   const errors: unknown[] = [];
@@ -1201,6 +1228,7 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
     SANDBOX_CONTROL: { getByName: () => sharedControl ?? control },
     WORKER_URL: 'https://worker.example.test',
     NEXTAUTH_SECRET: 'test-secret',
+    CALLBACK_QUEUE: callbackQueue,
     CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
     CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org_1',
     CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: 'user_1',
@@ -1344,6 +1372,106 @@ describe('SandboxSession orchestration', () => {
   });
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('persists and sends a terminal callback after a completed outcome', async () => {
+    const send = vi.fn(async (_job: CallbackJob) => ({}) as QueueSendResponse);
+    const fixture = sessionFixture(
+      { callback: { target: { url: 'https://example.com/callback' } } },
+      undefined,
+      { send }
+    );
+
+    await fixture.admit('callback_message');
+    await fixture.flush();
+    await fixture.outcome('callback_message', 'completed');
+    await fixture.flush();
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: { url: 'https://example.com/callback' },
+        payload: expect.objectContaining({
+          sessionId: SESSION_ID,
+          cloudAgentSessionId: SESSION_ID,
+          messageId: 'callback_message',
+          status: 'completed',
+          idempotencyKey: 'callback_message',
+        }),
+      })
+    );
+    expect(fixture.alarmAt()).toBe(Date.now());
+  });
+
+  it('counts callback-bearing outstanding messages against admission capacity', async () => {
+    const fixture = sessionFixture({
+      callback: { target: { url: 'https://example.com/callback' } },
+    });
+    fixture.storage.kv.put(
+      'session_messages',
+      Array.from({ length: PENDING_SESSION_MESSAGE_LIMIT }, (_, index) => ({
+        messageId: `existing_${index}`,
+        state: index === 0 ? ('accepted' as const) : ('queued' as const),
+      }))
+    );
+
+    await expect(fixture.admit('overflow')).resolves.toMatchObject({
+      success: false,
+      code: 'PENDING_QUEUE_FULL',
+    });
+    expect(fixture.values.get('session_messages')).toHaveLength(PENDING_SESSION_MESSAGE_LIMIT);
+  });
+
+  it('arms callback repair after the outer operation-result transaction', async () => {
+    const send = vi.fn(async (_job: CallbackJob) => ({}) as QueueSendResponse);
+    const fixture = sessionFixture(
+      { callback: { target: { url: 'https://example.com/callback' } } },
+      undefined,
+      { send }
+    );
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('receipted_callback');
+    await fixture.flush();
+    const authorization = fixture.record('receipted_callback')?.operations?.prompt?.authorization;
+    if (!authorization) throw new Error('Missing prompt operation authorization');
+    const event = receiptedEvent(1, {
+      type: 'session.status',
+      properties: { sessionID: 'kilo_root', status: { type: 'busy' } },
+    });
+
+    await expect(fixture.session.receiveSandboxControlEvent(event)).resolves.toEqual({
+      applied: true,
+    });
+    await expect(
+      fixture.session.receiveSandboxOperationResult({
+        session: authorization.session,
+        wrapperInstanceId: RUNTIME_ID,
+        delivery: {
+          version: 2,
+          authorization,
+          completedAt: Date.now(),
+          result: { ok: true, result: { messageId: 'receipted_callback', status: 'accepted' } },
+          outcome: { messageId: 'receipted_callback', status: 'completed' },
+          events: [],
+          preparing: [],
+        },
+      })
+    ).resolves.toMatchObject({ disposition: 'applied' });
+    await fixture.flush();
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          messageId: 'receipted_callback',
+          status: 'completed',
+        }),
+      })
+    );
+    expect(fixture.alarmAt()).toBe(Date.now());
   });
 
   it('reports the named runtime gate with incoming, expected, and fence identities', async () => {
@@ -3951,7 +4079,7 @@ describe('SandboxSession orchestration', () => {
         if (source === 'exception') first.reject(transient);
         else first.resolve(controlFailure(true));
         await fixture.flush();
-        if (operation === 'session.attach') {
+        if (operation === 'session.attach' && source === 'exception') {
           expect(fixture.record('a')?.state).toBe('queued');
           expect(fixture.record('a')?.attachFailures).toBeUndefined();
           expect(fixture.terminalEvents()).toHaveLength(0);
@@ -4030,7 +4158,12 @@ describe('SandboxSession orchestration', () => {
         );
       }
       await fixture.flush();
-      const expectedReason = operation === 'session.attach' ? 'environment_failed' : reason;
+      const expectedReason =
+        operation === 'session.attach'
+          ? failure === 'permanent response' || failure === 'unhealthy response'
+            ? 'attach_exhausted'
+            : 'environment_failed'
+          : reason;
       expect(fixture.record('a')).toMatchObject({ state: 'failed', failedReason: expectedReason });
       if (failure === 'permanent response') {
         expect(fixture.record('b')?.state).toBe('queued');
@@ -4261,18 +4394,18 @@ describe('SandboxSession orchestration', () => {
             sibling.reload();
             await sibling.fireAlarm();
           }
-          if (operation === 'session.attach' && retryable) {
-            expect(sibling.record('rejected')).toMatchObject({ state: 'queued' });
+          if (operation === 'session.attach') {
+            expect(sibling.record('rejected')).toMatchObject({
+              state: 'failed',
+              failedReason: 'attach_exhausted',
+            });
           } else {
             expect(sibling.record('rejected')).toMatchObject({
               state: 'failed',
-              failedReason:
-                operation === 'session.attach' ? 'environment_failed' : 'prompt_exhausted',
+              failedReason: 'prompt_exhausted',
             });
           }
-          expect(sibling.terminalEvents()).toHaveLength(
-            operation === 'session.attach' && retryable ? 0 : 1
-          );
+          expect(sibling.terminalEvents()).toHaveLength(1);
           expect(await sibling.session.isSandboxCleanupScheduled()).toBe(false);
           expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
           await writer.outcome('writer', 'completed');
@@ -4692,6 +4825,41 @@ describe('SandboxSession orchestration', () => {
       expect(serialized).not.toContain('test-secret');
     }
   );
+  it('fences admissions and snapshots callbacks before deletion waits on an interrupt', async () => {
+    const send = vi.fn(async (_job: CallbackJob) => ({}) as QueueSendResponse);
+    const fixture = sessionFixture(
+      { callback: { target: { url: 'https://example.com/callback' } } },
+      undefined,
+      { send }
+    );
+    const abort = deferred<ResponseFrame>();
+    delegateRequest(fixture, 'session.abort', () => abort.promise);
+
+    await fixture.admit('a');
+    await fixture.flush();
+    expect(fixture.record('a')?.state).toBe('accepted');
+
+    const deletion = fixture.session.deleteSession();
+    expect(fixture.control.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'session.abort',
+        payload: { messageId: 'a' },
+      })
+    );
+    await expect(fixture.admit('b')).resolves.toMatchObject({
+      success: false,
+      code: 'NOT_FOUND',
+    });
+
+    abort.resolve(controlResponse({ status: 'aborted' }));
+    await deletion;
+    await fixture.flush();
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ messageId: 'a', status: 'interrupted' }),
+      })
+    );
+  });
 
   it.each(['completed', 'failed', 'cancelled'] as const)(
     'settles an early %s outcome once without resurrecting work on acknowledgement',

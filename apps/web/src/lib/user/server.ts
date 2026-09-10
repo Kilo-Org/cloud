@@ -1226,7 +1226,12 @@ async function resolveUserFromAuth(
   if (headersList.get('Authorization')) {
     const rawAuthorization = headersList.get('Authorization');
     const bearer = rawAuthorization?.match(/^Bearer (.+)$/i)?.[1];
-    const decoded = bearer ? jwt.decode(bearer) : null;
+    let decoded: ReturnType<typeof jwt.decode>;
+    try {
+      decoded = bearer ? jwt.decode(bearer) : null;
+    } catch {
+      return authError(401, 'Invalid API token', '?');
+    }
     const decodedPayload = decoded !== null && typeof decoded !== 'string' ? decoded : null;
     const decodedRuntimeAuthorization = decodedPayload?.runtimeAuthorization;
     const runtimeAuthorization = CloudAgentNextRuntimeAuthorizationClaimSchema.safeParse(

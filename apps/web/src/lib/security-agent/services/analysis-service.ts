@@ -303,7 +303,10 @@ export async function startSecurityAnalysis(params: {
   const analysisStartTime = Date.now();
 
   try {
-    const workflowUser = await prepareCloudAgentWorkflowUser(user);
+    const workflowUser = await prepareCloudAgentWorkflowUser(user, [
+      'cloud-agent-next',
+      'workflow-gateway',
+    ]);
     const cloudAgentToken = generateCloudAgentWorkflowToken(workflowUser, {
       organizationId: findingOrganizationId,
       tokenSource: 'security-agent',

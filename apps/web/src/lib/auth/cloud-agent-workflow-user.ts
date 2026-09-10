@@ -2,10 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { kilocode_users, type User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { isResourceTokenIssuanceEnabled } from '@/lib/config.server';
+import { isResourceTokenIssuanceEnabled, type ResourceTokenFamily } from '@/lib/config.server';
 
-export async function prepareCloudAgentWorkflowUser(user: User): Promise<User> {
-  if (!isResourceTokenIssuanceEnabled('cloud-agent-next') || user.api_token_pepper !== null) {
+export async function prepareCloudAgentWorkflowUser(
+  user: User,
+  requiredFamilies: readonly ResourceTokenFamily[] = ['cloud-agent-next']
+): Promise<User> {
+  if (!requiredFamilies.some(isResourceTokenIssuanceEnabled) || user.api_token_pepper !== null) {
     return user;
   }
 

@@ -1,5 +1,8 @@
 import type { DORetryScope } from '@kilocode/worker-utils';
-import type { SandboxControlOutboundRequest } from '../sandbox-control/socket.js';
+import type {
+  SandboxControlConnectionIdentity,
+  SandboxControlOutboundRequest,
+} from '../sandbox-control/socket.js';
 import type { EventQueries } from '../session/queries/index.js';
 import type { StoredEvent } from '../websocket/types.js';
 import {
@@ -152,7 +155,11 @@ export async function reconcileSessionOperation(
 }
 
 export async function dispatchSessionOperation(
-  input: { authorization: SessionOperationAuthorization; payload: unknown },
+  input: {
+    authorization: SessionOperationAuthorization;
+    payload: unknown;
+    expectedConnection?: SandboxControlConnectionIdentity;
+  },
   messages: OperationMessages,
   effects: SessionOperationEffects & { isCurrent: () => boolean }
 ): Promise<SessionOperationDispatch> {
@@ -228,6 +235,7 @@ export async function dispatchSessionOperation(
               authorization,
               session: authorization.session,
               expectedWrapperInstanceId: authorization.wrapperInstanceId,
+              ...(input.expectedConnection ? { expectedConnection: input.expectedConnection } : {}),
               payload,
               timeoutMs,
               deadlineAt,

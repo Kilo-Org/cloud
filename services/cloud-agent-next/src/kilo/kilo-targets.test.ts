@@ -4,6 +4,52 @@ import {
   deriveKiloSandboxTargets,
   providerBaseUrlEncodedInToken,
 } from './kilo-targets.js';
+import {
+  inferRuntimeCredentialProxyRoute,
+  resolveRuntimeCredentialProxyRoute,
+} from './runtime-credential-proxy-routes.js';
+
+// Literal requests emitted by supported CLI versions exercise the production
+// facade resolver, without emulating CLI URL construction in this test.
+describe('CLI route compatibility', () => {
+  it.each([
+    ['https://worker.example.test/api/profile', 'GET', 'https://api.kilo.ai/api/profile'],
+    ['https://worker.example.test/api/defaults', 'GET', 'https://api.kilo.ai/api/defaults'],
+    [
+      'https://worker.example.test/api/openrouter/models',
+      'GET',
+      'https://api.kilo.ai/api/gateway/models',
+    ],
+    [
+      'https://worker.example.test/api/gateway/v1/chat/completions',
+      'POST',
+      'https://api.kilo.ai/api/gateway/v1/chat/completions',
+    ],
+    [
+      'https://worker.example.test/api/session',
+      'POST',
+      'https://ingest.kilosessions.ai/api/session',
+    ],
+  ])('routes CLI request %s (%s) to %s', (cliUrl, method, expectedUrl) => {
+    const derived = deriveKiloSandboxTargets({}, 'user-token');
+    if (!derived.success) throw new Error('Expected default targets');
+    const url = new URL(cliUrl);
+    const route = inferRuntimeCredentialProxyRoute(url.pathname);
+    if (!route) throw new Error('Expected a supported CLI route');
+    expect(
+      resolveRuntimeCredentialProxyRoute({
+        targets: derived.targets,
+        route,
+        method,
+        pathname: url.pathname,
+        search: url.search,
+        kiloSessionId: 'ses_cli_compatibility',
+        contentType: 'application/json',
+        bodyText: '{"sessionId":"ses_cli_compatibility"}',
+      })?.href
+    ).toBe(expectedUrl);
+  });
+});
 
 describe('providerBaseUrlEncodedInToken', () => {
   it('extracts and normalizes a provider base while preserving the full token separately', () => {

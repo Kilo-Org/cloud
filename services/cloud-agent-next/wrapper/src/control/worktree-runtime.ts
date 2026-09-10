@@ -21,7 +21,11 @@ import {
 } from '../kilo-api.js';
 import { withTimeoutAndAbort } from '../utils.js';
 import { isKiloServerProcess } from '../tool-cgroup.js';
-import { createOwnedProcessScope, type OwnedProcessScope } from './owned-processes.js';
+import {
+  createOwnedProcessScope,
+  OWNED_PROCESS_OBSERVATION_TIMEOUT_MS,
+  type OwnedProcessScope,
+} from './owned-processes.js';
 import type { NativeOperationTarget, NativeRetirement } from './session-operation-cleanup.js';
 import { retireWorktreeRuntime } from './worktree-runtime-cleanup.js';
 import { forgetAttachedRoot, rememberAttachedRoot } from './session-directories.js';
@@ -165,6 +169,7 @@ type RuntimeEntry = {
   stopped?: Promise<void>;
   retiring?: Promise<NativeRetirement>;
   retirementResult?: NativeRetirement;
+  observing?: Promise<boolean>;
   cleanupDeadlineAt?: number;
 };
 
@@ -697,6 +702,65 @@ export function createWorktreeKiloRuntimes(options: {
     return liveRoots(entry).some(root => root !== failedRoot) ? 'shared' : 'sole';
   }
 
+  function observeRetained(entry: RuntimeEntry): Promise<boolean> {
+    if (entry.observing) return entry.observing;
+    const runtimeId = entry.runtimeId;
+    const runtime = entry.runtime;
+    const deadlineAt = Date.now() + OWNED_PROCESS_OBSERVATION_TIMEOUT_MS;
+    const observation = Promise.resolve()
+      .then(() => {
+        const processes = entry.processes;
+        return processes && typeof processes.verify === 'function'
+          ? processes.verify(false, deadlineAt)
+          : false;
+      })
+      .catch(() => false)
+      .then(async proven => {
+        if (!proven || Date.now() >= deadlineAt) return false;
+        const starting = entry.starting;
+        if (starting !== undefined) {
+          try {
+            await withTimeoutAndAbort(
+              Promise.resolve(starting).catch(() => undefined),
+              {
+                timeoutMs: Math.max(1, deadlineAt - Date.now()),
+                timeoutMessage: 'Native runtime startup settlement expired',
+                abortMessage: 'Native runtime startup settlement cancelled',
+              }
+            );
+          } catch {
+            return false;
+          }
+        }
+        if (Date.now() >= deadlineAt) return false;
+        if (
+          entries.get(entry.directory) !== entry ||
+          entry.runtimeId !== runtimeId ||
+          entry.runtime !== runtime ||
+          entry.retirementResult !== 'unconfirmed' ||
+          !entry.abort.signal.aborted
+        )
+          return false;
+        entries.delete(entry.directory);
+        if (directoriesByScope.get(entry.kilo.scopeId) === entry.directory)
+          directoriesByScope.delete(entry.kilo.scopeId);
+        failedDirectories.delete(entry.directory);
+        return true;
+      })
+      .then(
+        proven => {
+          if (!proven && entry.observing === observation) entry.observing = undefined;
+          return proven;
+        },
+        error => {
+          if (entry.observing === observation) entry.observing = undefined;
+          throw error;
+        }
+      );
+    entry.observing = observation;
+    return observation;
+  }
+
   function removeRoot(root: RootAttachment): void {
     if (roots.get(root.identity.kiloSessionId) !== root) return;
     unregisterRoot(root);
@@ -968,23 +1032,25 @@ export function createWorktreeKiloRuntimes(options: {
       let root = findRoot(identity);
       const scopeDirectory = directoriesByScope.get(kilo.scopeId);
       const previous = entries.get(directory);
-      if (previous?.retirementResult === 'unconfirmed') {
-        throw new WorktreeKiloRuntimeError(
-          'not_ready',
-          'Native runtime retirement is unconfirmed',
-          true
-        );
-      }
       let entry = previous?.retiring ? undefined : previous;
       let cleanupRequired = false;
       if (
         (scopeDirectory && scopeDirectory !== directory) ||
-        (entry && !sameAuth(entry.kilo, kilo))
+        (entry && !sameAuth(entry.kilo, kilo)) ||
+        (previous?.retirementResult === 'unconfirmed' && !sameAuth(previous.kilo, kilo))
       ) {
         throw new WorktreeKiloRuntimeError(
           'unauthorized',
           'Kilo worktree auth context mismatch',
           false
+        );
+      }
+      if (previous?.retirementResult === 'unconfirmed') {
+        void observeRetained(previous);
+        throw new WorktreeKiloRuntimeError(
+          'not_ready',
+          'Native runtime retirement is unconfirmed',
+          true
         );
       }
       if (entry?.abort.signal.aborted) {
@@ -1133,11 +1199,15 @@ export function createWorktreeKiloRuntimes(options: {
         if (root.identity.directory === directory) removeRoot(root);
       }
       if (entry) {
-        const quiescent = await withTimeoutAndAbort(retire(entry), {
+        let quiescent = await withTimeoutAndAbort(retire(entry), {
           timeoutMs: KILO_STARTUP_TIMEOUT_MS,
           timeoutMessage: 'Kilo worktree retirement timed out',
           abortMessage: 'Kilo worktree retirement cancelled',
         });
+        if (quiescent !== 'retired' && entry.retirementResult === 'unconfirmed') {
+          if ((await observeRetained(entry)) || entries.get(directory) !== entry)
+            quiescent = 'retired';
+        }
         if (quiescent !== 'retired') throw new Error('Native worktree cleanup is unconfirmed');
       }
       for (const home of homesByDirectory.get(directory) ?? []) {
@@ -1193,13 +1263,7 @@ export function createWorktreeKiloRuntimes(options: {
       );
     },
     isHealthy() {
-      const healthy = [...entries.values()].some(
-        entry =>
-          entry.retiring === undefined &&
-          !entry.abort.signal.aborted &&
-          (entry.starting !== undefined || !entry.runtime || !entry.runtime.signal.aborted)
-      );
-      return !closed && failedDirectories.size === 0 && (entries.size === 0 || healthy);
+      return !closed && failedDirectories.size === 0;
     },
     shutdown() {
       if (closed) return;

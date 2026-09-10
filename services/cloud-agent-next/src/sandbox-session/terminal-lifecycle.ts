@@ -21,6 +21,7 @@ import {
 import { isTerminalSessionPlatform } from '../terminal/access.js';
 import type { sandboxControlRpc } from './control-rpc.js';
 import type { SandboxTerminalRecord } from './terminal-bridge.js';
+import { CALLBACK_OUTBOX_PREFIX } from './message-callbacks.js';
 
 export const SANDBOX_SESSION_METADATA_KEY = 'session_metadata';
 export const SANDBOX_SESSION_LIFECYCLE_KEY = 'session_lifecycle_fence';
@@ -819,7 +820,8 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     if (readFence()?.state !== 'deleted') return;
     const keys = Array.from(storage.kv.list<unknown>(), ([key]) => key);
     for (const key of keys) {
-      if (key !== SANDBOX_SESSION_LIFECYCLE_KEY) storage.kv.delete(key);
+      if (key !== SANDBOX_SESSION_LIFECYCLE_KEY && !key.startsWith(CALLBACK_OUTBOX_PREFIX))
+        storage.kv.delete(key);
     }
   }
 

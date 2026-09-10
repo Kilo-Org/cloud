@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock, setSystemTime, spyOn } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -28,7 +28,12 @@ import {
   type Completion,
 } from './control-test-fixtures';
 import { operationIntent } from './operation-intent';
-import { rememberAttachedRoot, resetSessionDirectoryState } from './session-directories';
+import {
+  rememberAttachedRoot,
+  rememberChildSession,
+  resetSessionDirectoryState,
+} from './session-directories';
+import { createOperationRegistry } from './operation-registry';
 import { resetDirectoryOperationState } from './worktree-operations';
 
 let homeRoot: string;
@@ -58,6 +63,575 @@ function onlyOperation(handlerDeps: HandlerDeps) {
 }
 
 describe('operation admission and lookup', () => {
+  it('scopes a confirmed publication failure to A and keeps B plus fresh A work live', async () => {
+    const pendingA = Promise.withResolvers<Completion>();
+    const pendingB = Promise.withResolvers<Completion>();
+    let statusCalls = 0;
+    let abortCalls = 0;
+    const retired = mock();
+    const client = fakeKilo({
+      sendPrompt: async options =>
+        options.messageId === 'message_a' ? pendingA.promise : pendingB.promise,
+      abortSession: async () => {
+        abortCalls += 1;
+        return true;
+      },
+      getSessionStatuses: async () => {
+        statusCalls += 1;
+        return { kilo_a: { type: 'idle' } };
+      },
+    });
+    const handlerDeps = deps({ kiloClient: client, retireRuntime: retired });
+    const sessionA = { ...session, sessionId: 'ses_a', kiloSessionId: 'kilo_a' };
+    const sessionB = { ...session, sessionId: 'ses_b', kiloSessionId: 'kilo_b' };
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    rememberAttachedRoot(sessionB.kiloSessionId, sessionB.directory);
+    const authorizationA = operationAuthorization('session.prompt', 'message_a', sessionA);
+    const requestA = handleControlRequest(
+      'session.prompt',
+      sessionA,
+      { ...promptPayload, messageId: 'message_a' },
+      handlerDeps,
+      authorizationA
+    );
+    const requestB = handleControlRequest(
+      'session.prompt',
+      sessionB,
+      { ...promptPayload, messageId: 'message_b' },
+      handlerDeps
+    );
+    try {
+      for (let index = 0; index < 10; index += 1) {
+        if (
+          handlerDeps.operations.active(sessionA.kiloSessionId)?.snapshot().native.state ===
+          'pending'
+        )
+          break;
+        await Promise.resolve();
+      }
+      for (let index = 0; index < 10; index += 1) {
+        if (
+          handlerDeps.operations.active(sessionB.kiloSessionId)?.snapshot().native.state ===
+          'pending'
+        )
+          break;
+        await Promise.resolve();
+      }
+      const runtime = handlerDeps.kiloRuntimes?.get(sessionA.directory);
+      if (!runtime) throw new Error('Missing native runtime');
+      const publicationCleanup = await handlerDeps.operations.retireRootPublication({
+        directory: sessionA.directory,
+        root: sessionA.kiloSessionId,
+        nativeRuntimeId: runtime.runtimeId,
+        target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+        reason: 'event rejected',
+        deadlineAt: Date.now() + 1_000,
+      });
+      expect(publicationCleanup).toBe('confirmed');
+      expect(abortCalls).toBe(1);
+      expect(statusCalls).toBe(1);
+      expect(handlerDeps.operations.active(sessionB.kiloSessionId)?.signal.aborted).toBe(false);
+      expect(retired).not.toHaveBeenCalled();
+
+      pendingA.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await requestA;
+      for (
+        let index = 0;
+        index < 10 && handlerDeps.operations.active(sessionA.kiloSessionId);
+        index += 1
+      )
+        await Promise.resolve();
+      expect(handlerDeps.operations.active(sessionB.kiloSessionId)?.signal.aborted).toBe(false);
+
+      pendingB.resolve(completion());
+      expect((await requestB).ok).toBe(true);
+      expect(await handleControlRequest('session.detach', sessionB, {}, handlerDeps)).toMatchObject(
+        {
+          ok: true,
+          result: { detached: true },
+        }
+      );
+      const fresh = await handleControlRequest(
+        'session.prompt',
+        sessionA,
+        { ...promptPayload, messageId: 'message_fresh' },
+        handlerDeps,
+        operationAuthorization('session.prompt', 'message_fresh', sessionA)
+      );
+      expect(fresh.ok).toBe(true);
+    } finally {
+      pendingA.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      pendingB.resolve(completion());
+    }
+  });
+
+  it('retains an unconfirmed root/incarnation failure and gates only fresh A work', async () => {
+    const handlerDeps = deps({
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    const sessionA = { ...session, sessionId: 'ses_a', kiloSessionId: 'kilo_a' };
+    const sessionB = { ...session, sessionId: 'ses_b', kiloSessionId: 'kilo_b' };
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    rememberAttachedRoot(sessionB.kiloSessionId, sessionB.directory);
+    const runtime = handlerDeps.kiloRuntimes?.get(sessionA.directory);
+    if (!runtime) throw new Error('Missing native runtime');
+    const input = {
+      directory: sessionA.directory,
+      root: sessionA.kiloSessionId,
+      nativeRuntimeId: runtime.runtimeId,
+      target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+      reason: 'event rejected',
+      deadlineAt: Date.now() + 1_000,
+    };
+    expect(await handlerDeps.operations.retireRootPublication(input)).toBe('unconfirmed');
+    expect(await handlerDeps.operations.retireRootPublication(input)).toBe('unconfirmed');
+
+    const authorizationA = operationAuthorization('session.prompt', 'message_a', sessionA);
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        sessionA,
+        { ...promptPayload, messageId: 'message_a' },
+        handlerDeps,
+        authorizationA
+      )
+    ).toMatchObject({ ok: false, error: { code: 'not_ready', retryable: true } });
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        sessionA,
+        { ...promptPayload, messageId: 'message_b' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: false, error: { code: 'not_ready', retryable: true } });
+    expect(
+      await handleControlRequest('session.operation.get', sessionA, authorizationA, handlerDeps)
+    ).toMatchObject({ ok: true, result: { state: 'missing' } });
+    expect(
+      await handleControlRequest('session.operation.ack', sessionA, {}, handlerDeps)
+    ).toMatchObject({ ok: false, error: { code: 'unauthorized' } });
+
+    const authorizationB = operationAuthorization('session.prompt', 'message_b', sessionB);
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        sessionB,
+        { ...promptPayload, messageId: 'message_b' },
+        handlerDeps,
+        authorizationB
+      )
+    ).toMatchObject({ ok: true, result: { status: 'accepted' } });
+    const bRecord = handlerDeps.operations
+      .retained()
+      .find(record => record.messageId === 'message_b');
+    if (!bRecord) throw new Error('Missing B operation record');
+    await bRecord.done;
+    await bRecord.waitForDelivery();
+    expect(
+      await handleControlRequest('session.operation.get', sessionB, authorizationB, handlerDeps)
+    ).toMatchObject({ ok: true, result: { state: 'completed' } });
+    const bDelivery = bRecord.deliveryResult();
+    if (!bDelivery) throw new Error('Missing B delivery');
+    expect(
+      await handleControlRequest(
+        'session.operation.ack',
+        sessionB,
+        await acknowledgeOperation(bDelivery),
+        handlerDeps
+      )
+    ).toMatchObject({ ok: true, result: { acknowledged: true } });
+  });
+
+  it('retains terminal unconfirmed state across routing loss until explicit root notification', async () => {
+    const handlerDeps = deps();
+    const sessionA = { ...session, sessionId: 'ses_a', kiloSessionId: 'kilo_a' };
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    const runtime = handlerDeps.kiloRuntimes?.get(sessionA.directory);
+    if (!runtime) throw new Error('Missing native runtime');
+    const input = {
+      directory: sessionA.directory,
+      root: sessionA.kiloSessionId,
+      nativeRuntimeId: runtime.runtimeId,
+      target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+      reason: 'event rejected',
+      deadlineAt: Date.now() + 1_000,
+    };
+    expect(await handlerDeps.operations.retireRootPublication(input)).toBe('unconfirmed');
+    handlerDeps.operations.settleRootPublication({ ...input, result: 'unconfirmed' });
+
+    expect(await handleControlRequest('session.detach', sessionA, {}, handlerDeps)).toMatchObject({
+      ok: true,
+      result: { detached: true },
+    });
+    handlerDeps.operations.prune();
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    expect(await handlerDeps.operations.retireRootPublication(input)).toBe('unconfirmed');
+    expect(handlerDeps.operations.admission('session.prompt', sessionA, undefined).kind).toBe(
+      'reply'
+    );
+
+    handlerDeps.operations.notifyRootDisappeared({
+      directory: sessionA.directory,
+      root: sessionA.kiloSessionId,
+      nativeRuntimeId: runtime.runtimeId,
+    });
+    expect(handlerDeps.operations.admission('session.prompt', sessionA, undefined).kind).toBe(
+      'continue'
+    );
+  });
+
+  it('retains an unconfirmed record after physical unregistration and later no-op failures', async () => {
+    const fixture = deps();
+    const runtime = fixture.kiloRuntimes?.get(session.directory);
+    if (!runtime) throw new Error('Missing native runtime');
+    const nativeRetirement = mock(async () => 'unconfirmed' as const);
+    const operations = createOperationRegistry({
+      native: {
+        get: () => runtime,
+        getRetained: () => runtime,
+        retireRuntime: nativeRetirement,
+        verifyQuiescence: async () => false,
+      },
+      onStarted: () => {},
+      onCompleted: () => {},
+      retireRuntime: () => {},
+    });
+    const sessionA = { ...session, kiloSessionId: 'kilo_a', sessionId: 'ses_a' };
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    const input = {
+      directory: sessionA.directory,
+      root: sessionA.kiloSessionId,
+      nativeRuntimeId: runtime.runtimeId,
+      target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+      reason: 'event rejected',
+      deadlineAt: Date.now() + 1_000,
+    };
+    expect(await operations.retireRootPublication(input)).toBe('unconfirmed');
+    expect(
+      await operations.retireDirectory(
+        sessionA.directory,
+        'physical',
+        input.deadlineAt,
+        input.target
+      )
+    ).toBe('unconfirmed');
+    expect(nativeRetirement).toHaveBeenCalledTimes(1);
+
+    expect(await handleControlRequest('session.detach', sessionA, {}, fixture)).toMatchObject({
+      ok: true,
+      result: { detached: true },
+    });
+    operations.prune();
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    expect(await operations.retireRootPublication(input)).toBe('unconfirmed');
+    expect(operations.admission('session.prompt', sessionA, undefined).kind).toBe('reply');
+
+    operations.notifyRootDisappeared({
+      directory: sessionA.directory,
+      root: sessionA.kiloSessionId,
+      nativeRuntimeId: runtime.runtimeId,
+    });
+    expect(operations.admission('session.prompt', sessionA, undefined).kind).toBe('continue');
+  });
+
+  it('clears a scoped record after successful targeted retirement without a deferred intent', async () => {
+    const fixture = deps();
+    const runtime = fixture.kiloRuntimes?.get(session.directory);
+    if (!runtime) throw new Error('Missing native runtime');
+    const nativeRetirement = mock(async () => 'retired' as const);
+    const operations = createOperationRegistry({
+      native: {
+        get: () => runtime,
+        getRetained: () => runtime,
+        retireRuntime: nativeRetirement,
+        verifyQuiescence: async () => true,
+      },
+      onStarted: () => {},
+      onCompleted: () => {},
+      retireRuntime: () => {},
+    });
+    const sessionA = { ...session, kiloSessionId: 'kilo_a', sessionId: 'ses_a' };
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    const target = { runtimeId: runtime.runtimeId, client: runtime.kiloClient };
+    const input = {
+      directory: sessionA.directory,
+      root: sessionA.kiloSessionId,
+      nativeRuntimeId: runtime.runtimeId,
+      target,
+      reason: 'targeted retirement',
+      deadlineAt: Date.now() + 1_000,
+    };
+    expect(await operations.retireRootPublication(input)).toBe('unconfirmed');
+    expect(
+      await operations.retireDirectory(sessionA.directory, 'targeted', input.deadlineAt, target)
+    ).toBe('retired');
+
+    expect(operations.admission('session.prompt', sessionA, undefined).kind).toBe('continue');
+  });
+
+  it('invalidates a pending escalation before an unchanged same-root reattach can join the runtime', async () => {
+    const handlerDeps = deps();
+    const sessionA = { ...session, kiloSessionId: 'kilo_a', sessionId: 'ses_a' };
+    const sessionB = { ...session, kiloSessionId: 'kilo_b', sessionId: 'ses_b' };
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    rememberAttachedRoot(sessionB.kiloSessionId, sessionB.directory);
+    const runtime = handlerDeps.kiloRuntimes?.get(sessionA.directory);
+    if (!runtime) throw new Error('Missing native runtime');
+    let gateCalls = 0;
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing worktree runtimes');
+    runtimes.retireRuntimeIfUnshared = async () => {
+      gateCalls += 1;
+      return 'shared';
+    };
+    const input = {
+      directory: sessionA.directory,
+      root: sessionA.kiloSessionId,
+      nativeRuntimeId: runtime.runtimeId,
+      target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+      reason: 'event rejected',
+      deadlineAt: Date.now() + 1_000,
+    };
+    const escalation = handlerDeps.operations.escalateRootPublication(input);
+    handlerDeps.operations.notifyRootDisappeared(input);
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    expect(await escalation.physical).toBe('stale');
+    expect(gateCalls).toBe(0);
+    expect(handlerDeps.operations.admission('session.prompt', sessionA, undefined).kind).toBe(
+      'continue'
+    );
+
+    handlerDeps.operations.notifyRootDisappeared({
+      directory: sessionB.directory,
+      root: sessionB.kiloSessionId,
+      nativeRuntimeId: runtime.runtimeId,
+    });
+    expect(gateCalls).toBe(0);
+  });
+
+  it('does not let a retained A1 Stop reselect fresh active A2 after root invalidation', async () => {
+    const runningA1 = Promise.withResolvers<Completion>();
+    const runningA2 = Promise.withResolvers<Completion>();
+    const runningB = Promise.withResolvers<Completion>();
+    const startedA1 = Promise.withResolvers<void>();
+    const startedA2 = Promise.withResolvers<void>();
+    const startedB = Promise.withResolvers<void>();
+    let status: 'busy' | 'idle' = 'busy';
+    let gateCalls = 0;
+    const client = fakeKilo({
+      sendPrompt: async options => {
+        if (options.messageId === 'message_a1') {
+          startedA1.resolve();
+          return runningA1.promise;
+        }
+        if (options.messageId === 'message_a2') {
+          startedA2.resolve();
+          return runningA2.promise;
+        }
+        startedB.resolve();
+        return runningB.promise;
+      },
+      getSessionStatuses: async () => ({ kilo_a: { type: status } }),
+      abortSession: async () => true,
+    });
+    const handlerDeps = deps({
+      kiloClient: client,
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    const sessionA = { ...session, sessionId: 'ses_a', kiloSessionId: 'kilo_a' };
+    const sessionB = { ...session, sessionId: 'ses_b', kiloSessionId: 'kilo_b' };
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    rememberAttachedRoot(sessionB.kiloSessionId, sessionB.directory);
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing worktree runtimes');
+    runtimes.retireRuntimeIfUnshared = async () => {
+      gateCalls += 1;
+      return 'shared';
+    };
+    const authorizationA1 = operationAuthorization('session.prompt', 'message_a1', sessionA);
+    const requestA1 = handleControlRequest(
+      'session.prompt',
+      sessionA,
+      { ...promptPayload, messageId: 'message_a1' },
+      handlerDeps,
+      authorizationA1
+    );
+    try {
+      await startedA1.promise;
+      const target = handlerDeps.kiloRuntimes?.get(sessionA.directory);
+      if (!target) throw new Error('Missing native runtime');
+      expect(
+        await handlerDeps.operations.retireRootPublication({
+          directory: sessionA.directory,
+          root: sessionA.kiloSessionId,
+          nativeRuntimeId: target.runtimeId,
+          target: { runtimeId: target.runtimeId, client: target.kiloClient },
+          reason: 'event rejected',
+          deadlineAt: Date.now() + 20,
+        })
+      ).toBe('unconfirmed');
+      runningA1.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      await requestA1;
+      const retainedA1 = handlerDeps.operations
+        .retained()
+        .find(record => record.messageId === 'message_a1');
+      if (!retainedA1) throw new Error('Missing retained A1 operation');
+      await retainedA1.done;
+      await retainedA1.waitForDelivery();
+
+      expect(await handleControlRequest('session.detach', sessionA, {}, handlerDeps)).toMatchObject(
+        {
+          ok: true,
+          result: { detached: true },
+        }
+      );
+      handlerDeps.operations.notifyRootDisappeared({
+        directory: sessionA.directory,
+        root: sessionA.kiloSessionId,
+        nativeRuntimeId: target.runtimeId,
+        target: { runtimeId: target.runtimeId, client: target.kiloClient },
+      });
+      const attachAuthorization = operationAuthorization('session.attach', undefined, sessionA);
+      expect(
+        await handleControlRequest(
+          'session.attach',
+          sessionA,
+          { kilo },
+          handlerDeps,
+          attachAuthorization
+        )
+      ).toMatchObject({ ok: true });
+
+      const requestB = handleControlRequest(
+        'session.prompt',
+        sessionB,
+        { ...promptPayload, messageId: 'message_b' },
+        handlerDeps
+      );
+      const requestA2 = handleControlRequest(
+        'session.prompt',
+        sessionA,
+        { ...promptPayload, messageId: 'message_a2' },
+        handlerDeps
+      );
+      await startedB.promise;
+      await startedA2.promise;
+      const a2 = handlerDeps.operations.active(sessionA.kiloSessionId);
+      const b = handlerDeps.operations.active(sessionB.kiloSessionId);
+      if (!a2 || !b) throw new Error('Missing fresh active operations');
+      const stopped = await handleControlRequest(
+        'session.abort',
+        sessionA,
+        { messageId: 'message_a1', operationId: '11111111-1111-4111-8111-111111111111' },
+        handlerDeps
+      );
+      expect(stopped).toMatchObject({ ok: true, result: { quiescent: false } });
+      expect(a2.signal.aborted).toBe(false);
+      expect(b.signal.aborted).toBe(false);
+      expect(gateCalls).toBe(0);
+
+      status = 'idle';
+      runningB.resolve(completion({ name: 'MessageAbortedError', data: { message: 'detached' } }));
+      await requestB;
+      expect(await handleControlRequest('session.detach', sessionB, {}, handlerDeps)).toMatchObject(
+        {
+          ok: true,
+          result: { detached: true },
+        }
+      );
+      expect(a2.signal.aborted).toBe(false);
+      expect(gateCalls).toBe(0);
+      runningA2.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      await requestA2;
+    } finally {
+      status = 'idle';
+      runningA1.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      runningA2.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      runningB.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([requestA1]);
+      for (const task of handlerDeps.operations.activeOperations()) await task.done;
+    }
+  });
+
+  it('coalesces authorized and unauthorized active operations under one root claim', async () => {
+    const pendingAuthorized = Promise.withResolvers<Completion>();
+    const pendingUnauthorized = Promise.withResolvers<Completion>();
+    const client = fakeKilo({
+      sendPrompt: async options =>
+        options.messageId === 'message_authorized'
+          ? pendingAuthorized.promise
+          : pendingUnauthorized.promise,
+      abortSession: async () => true,
+      getSessionStatuses: async () => ({ kilo_a: { type: 'idle' } }),
+    });
+    const handlerDeps = deps({ kiloClient: client });
+    const sessionA = { ...session, sessionId: 'ses_a', kiloSessionId: 'kilo_a' };
+    const child = { ...session, sessionId: 'ses_child', kiloSessionId: 'child_a' };
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    rememberChildSession({ childId: child.kiloSessionId, parentId: sessionA.kiloSessionId });
+    const runtime = handlerDeps.kiloRuntimes?.get(sessionA.directory);
+    if (!runtime) throw new Error('Missing native runtime');
+    const authorized = handlerDeps.operations.start(
+      sessionA,
+      operationAuthorization('session.prompt', 'message_authorized', sessionA),
+      {
+        operation: 'session.prompt',
+        payload: { ...promptPayload, messageId: 'message_authorized' },
+        runtime,
+      },
+      { emitSessionEvent: () => true }
+    );
+    const unauthorized = handlerDeps.operations.start(
+      child,
+      undefined,
+      {
+        operation: 'session.prompt',
+        payload: { ...promptPayload, messageId: 'message_unauthorized' },
+        runtime,
+      },
+      { emitSessionEvent: () => true }
+    );
+    try {
+      for (let index = 0; index < 10; index += 1) {
+        if (
+          authorized.snapshot().native.state === 'pending' &&
+          unauthorized.snapshot().native.state === 'pending'
+        )
+          break;
+        await Promise.resolve();
+      }
+      const input = {
+        directory: sessionA.directory,
+        root: sessionA.kiloSessionId,
+        nativeRuntimeId: runtime.runtimeId,
+        target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+        reason: 'coalesced publication failure',
+        deadlineAt: Date.now() + 1_000,
+      };
+      const first = handlerDeps.operations.retireRootPublication(input);
+      const duplicate = handlerDeps.operations.retireRootPublication(input);
+      expect(duplicate).toBe(first);
+      expect(await first).toBe('confirmed');
+      expect(authorized.publicationScope()?.claim).toBe(unauthorized.publicationScope()?.claim);
+    } finally {
+      pendingAuthorized.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      pendingUnauthorized.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      await Promise.all([authorized.done, unauthorized.done]);
+    }
+  });
+
   it('looks up the same operation during and after completion and rejects changed intent', async () => {
     const running = Promise.withResolvers<Completion>();
     const started = Promise.withResolvers<void>();

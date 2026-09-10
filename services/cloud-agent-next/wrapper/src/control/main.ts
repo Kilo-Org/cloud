@@ -2,9 +2,11 @@ import {
   heartbeatReasonFrom,
   sessionAttachResultSchema,
   type SandboxHeartbeatPayload,
+  type SessionEventIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
 import { logToFile } from '../utils.js';
+import { rootForSession } from './session-directories';
 import {
   KILO_CONTROL_REQUEST_TIMEOUT_MS,
   maybeStartSandboxControlClient,
@@ -19,7 +21,13 @@ import {
 } from './sandbox-control-handlers';
 import { eventKiloSessionId, sessionEventIdentity, updateSessionSnapshots } from './feed';
 import { createControlTerminalRuntime } from './terminal-runtime';
-import { createWorktreeKiloRuntimes } from './worktree-runtime';
+import {
+  createWorktreeKiloRuntimes,
+  type RootRuntimeDisappearance,
+  type RootRuntimeRetirement,
+  type WorktreeKiloRuntime,
+} from './worktree-runtime';
+import type { NativeRetirement, RootScopedCleanupResult } from './session-operation-cleanup';
 import { createControlDiagnostics, type ControlDiagnostics } from './diagnostics';
 import { createControlFileLogUploader, type ControlFileLogUploader } from './file-log-uploader';
 import {
@@ -29,6 +37,13 @@ import {
 } from '../../../src/shared/control-diagnostics.js';
 import { createWorktreeMutationNotifications } from './worktree-mutation-notifications';
 import { createControlEventFailureHandler } from './control-event-transport';
+
+type PublicationRetirementResult = RootScopedCleanupResult | NativeRetirement | 'shared';
+
+type PublicationFailureAttempt = {
+  cleanup: Promise<RootScopedCleanupResult>;
+  physical: Promise<PublicationRetirementResult>;
+};
 import type { ControlEventOutboxFailure } from './control-event-outbox';
 
 function main(
@@ -49,8 +64,16 @@ function main(
   let control: ReturnType<typeof maybeStartSandboxControlClient> = null;
   let shuttingDown = false;
   let heartbeatReason: SandboxHeartbeatPayload['kilo']['reason'];
+  const settleRootRetirement = (retirement: RootRuntimeRetirement): void => {
+    deps.operations.settleRootPublication(retirement);
+  };
+  const notifyRootDisappeared = (disappearance: RootRuntimeDisappearance): void => {
+    deps.operations.notifyRootDisappeared(disappearance);
+  };
   const kiloRuntimes = createWorktreeKiloRuntimes({
     onDiagnostic: diagnostics.onDiagnostic,
+    onRootDisappeared: notifyRootDisappeared,
+    onRootRetirement: settleRootRetirement,
     onEvent: async (runtime, event) => {
       mutationNotifications.observe(runtime, event);
       const identity = sessionEventIdentity({
@@ -66,20 +89,16 @@ function main(
         identity.rootKiloSessionId,
         event.properties
       );
-      if (
-        !control?.publishSessionEvent ||
-        !(await control.publishSessionEvent(
-          { type: event.type, properties: event.properties },
-          identity
-        ))
-      ) {
+      const published =
+        control?.publishSessionEvent === undefined
+          ? false
+          : await control.publishSessionEvent(
+              { type: event.type, properties: event.properties },
+              identity
+            );
+      if (!published) {
         try {
-          await deps.operations.retireDirectory(
-            runtime.directory,
-            'Session event delivery failed',
-            Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS,
-            { runtimeId: runtime.runtimeId, client: runtime.kiloClient }
-          );
+          await retirePublicationFailure(runtime, identity, 'Session event delivery failed');
         } catch {
           diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'failed' });
         }
@@ -138,21 +157,68 @@ function main(
         throw new Error('Sandbox control operation result delivery unavailable');
       return control.sendOperationResult(session, delivery, signal, deadlineAt);
     },
-    emitSessionEvent: (session, payload, options) =>
-      control?.sendEvent?.(
-        'session.event',
-        payload,
-        {
-          directory: session.directory,
-          kiloSessionId: session.kiloSessionId,
-          rootKiloSessionId: session.kiloSessionId,
-          ...(options?.nativeRuntimeId ? { nativeRuntimeId: options.nativeRuntimeId } : {}),
-        },
-        options?.retained ? { preserveConnectionOnFailure: true } : undefined
-      ) === true,
+    emitSessionEvent: (session, payload, options) => {
+      const identity = {
+        directory: session.directory,
+        kiloSessionId: session.kiloSessionId,
+        rootKiloSessionId:
+          rootForSession(session.kiloSessionId, session.directory) ?? session.kiloSessionId,
+        ...(options?.nativeRuntimeId ? { nativeRuntimeId: options.nativeRuntimeId } : {}),
+      };
+      const delivered =
+        control?.sendEvent?.(
+          'session.event',
+          payload,
+          identity,
+          options?.retained ? { preserveConnectionOnFailure: true } : undefined
+        ) === true;
+      if (!delivered) startPublicationFailure(identity, 'Session event delivery failed');
+      return delivered;
+    },
     retireRuntime: reason => shutdown(1, reason, heartbeatReasonFrom(reason)),
     onShutdown: () => shutdown(0, 'Sandbox shutting down'),
   });
+
+  function beginPublicationFailure(
+    runtime: WorktreeKiloRuntime,
+    identity: SessionEventIdentity,
+    reason: string
+  ): PublicationFailureAttempt | undefined {
+    const root = identity.rootKiloSessionId ?? identity.kiloSessionId;
+    if (!root || (identity.nativeRuntimeId && identity.nativeRuntimeId !== runtime.runtimeId))
+      return undefined;
+    const nativeRuntimeId = identity.nativeRuntimeId ?? runtime.runtimeId;
+    const target = { runtimeId: runtime.runtimeId, client: runtime.kiloClient };
+    const deadlineAt = Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS;
+    return deps.operations.escalateRootPublication({
+      directory: identity.directory,
+      root,
+      nativeRuntimeId,
+      target,
+      reason,
+      deadlineAt,
+    });
+  }
+
+  async function retirePublicationFailure(
+    runtime: WorktreeKiloRuntime,
+    identity: SessionEventIdentity,
+    reason: string
+  ): Promise<PublicationRetirementResult> {
+    const attempt = beginPublicationFailure(runtime, identity, reason);
+    if (!attempt) return 'stale';
+    return attempt.physical;
+  }
+
+  function startPublicationFailure(identity: SessionEventIdentity, reason: string): void {
+    const runtime = kiloRuntimes.get(identity.directory);
+    if (!runtime) return;
+    const attempt = beginPublicationFailure(runtime, identity, reason);
+    if (!attempt) return;
+    void attempt.physical.catch(() => {
+      diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'failed' });
+    });
+  }
 
   const mutationNotifications = createWorktreeMutationNotifications({
     sessions: deps.sessions,
@@ -338,20 +404,39 @@ function main(
       getRuntime: directory => kiloRuntimes.get(directory),
       onFailure: (failure, runtime) => {
         reportOutboxRetirement(failure, runtime.runtimeId, 'started');
-        void deps.operations
-          .retireDirectory(
-            failure.publication.session.directory,
-            `Session event delivery ${failure.reason}`,
-            Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS,
-            { runtimeId: runtime.runtimeId, client: runtime.kiloClient }
-          )
-          .then(() => {
-            reportOutboxRetirement(failure, runtime.runtimeId, 'retired', true);
-          })
-          .catch(() => {
+        const attempt = beginPublicationFailure(
+          runtime,
+          failure.publication.session,
+          `Session event delivery ${failure.reason}`
+        );
+        if (!attempt) return;
+        return attempt.cleanup.then(
+          cleanup => {
+            if (cleanup === 'confirmed') {
+              reportOutboxRetirement(failure, runtime.runtimeId, 'retired', true);
+              return;
+            }
+            void attempt.physical.then(
+              result => {
+                if (result === 'retired' || result === 'stale')
+                  reportOutboxRetirement(failure, runtime.runtimeId, 'retired', true);
+                else {
+                  reportOutboxRetirement(failure, runtime.runtimeId, 'failed', false);
+                  diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'failed' });
+                }
+              },
+              () => {
+                reportOutboxRetirement(failure, runtime.runtimeId, 'failed', false);
+                diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'failed' });
+              }
+            );
+          },
+          () => {
+            void attempt.physical.catch(() => undefined);
             reportOutboxRetirement(failure, runtime.runtimeId, 'failed', false);
             diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'failed' });
-          });
+          }
+        );
       },
     }),
     onDisconnected: () => shutdown(1, 'Sandbox control connection lost', 'control_disconnected'),

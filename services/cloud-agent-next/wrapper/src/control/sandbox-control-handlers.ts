@@ -340,6 +340,14 @@ export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>)
         retireRuntime: (directory, deadlineAt, target) =>
           input.kiloRuntimes?.retireRuntime?.(directory, deadlineAt, target) ??
           Promise.resolve('unconfirmed'),
+        retireRuntimeIfUnshared: (directory, target, retiringRoot, deadlineAt, reason) =>
+          input.kiloRuntimes?.retireRuntimeIfUnshared?.(
+            directory,
+            target,
+            retiringRoot,
+            deadlineAt,
+            reason
+          ) ?? Promise.resolve('unconfirmed'),
         verifyQuiescence: (directory, target, deadlineAt) =>
           input.kiloRuntimes?.verifyQuiescence?.(directory, target, deadlineAt) ??
           Promise.resolve(false),
@@ -989,10 +997,29 @@ async function handleAbort(
       parsed.data.cleanupDeadlineAt ?? Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS
     );
     let quiescent = await task.cleanupOwnedWork(deadlineAt);
+    const publicationScope = task.publicationScope();
+    const scopedCleanup = publicationScope ? await task.runRootScopedCleanup() : undefined;
+    if (publicationScope) quiescent = false;
     let runtimeRetired = false;
     let nativeRuntimeId: string | undefined;
     const target = task.nativeTarget();
-    if (!quiescent && target && Date.now() < deadlineAt) {
+    if (!quiescent && target && publicationScope && scopedCleanup === 'unconfirmed') {
+      const retiringRoot =
+        rootForSession(session.kiloSessionId, session.directory) ?? session.kiloSessionId;
+      const escalation = deps.operations.escalateRootPublication({
+        directory: session.directory,
+        root: retiringRoot,
+        nativeRuntimeId: target.runtimeId,
+        target,
+        reason: publicationScope.reason,
+        deadlineAt: publicationScope.deadlineAt,
+        ...(publicationScope.claim === undefined ? {} : { expectedClaim: publicationScope.claim }),
+      });
+      const retirement = await escalation.physical;
+      runtimeRetired = retirement === 'retired';
+      if (runtimeRetired) nativeRuntimeId = target.runtimeId;
+      quiescent = retirement === 'retired';
+    } else if (!quiescent && !publicationScope && target && Date.now() < deadlineAt) {
       const retirementReason = 'Native cancellation did not settle';
       const retirement = await deps.operations.retireDirectory(
         session.directory,
@@ -1004,7 +1031,7 @@ async function handleAbort(
       if (runtimeRetired) nativeRuntimeId = target.runtimeId;
       quiescent = task.confirmCleanup(retirement !== 'unconfirmed', deadlineAt);
       if (retirement === 'unconfirmed') deps.retireRuntime(retirementReason);
-    } else if (!quiescent) {
+    } else if (!quiescent && !publicationScope) {
       task.requestRetirement('Kilo cancellation failed', deadlineAt);
     }
     const result = await task.done;

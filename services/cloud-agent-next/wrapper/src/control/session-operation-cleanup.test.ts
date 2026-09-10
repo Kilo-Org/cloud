@@ -83,6 +83,92 @@ describe('SessionOperation cleanup', () => {
     await operation.done;
   });
 
+  it('confirms root-scoped cleanup from owned processes and root idleness without physical verification', async () => {
+    const pending = Promise.withResolvers<ReturnType<typeof completion>>();
+    const abort = jest.fn(async () => true);
+    const verify = jest.fn(async () => true);
+    const client = fakeKilo({
+      sendPrompt: () => pending.promise,
+      abortSession: abort,
+      getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'idle' } }),
+    });
+    const runtime: WorktreeKiloRuntime = {
+      scopeId: 'worktree_1',
+      runtimeId: 'native_1',
+      directory: session.directory,
+      env: {},
+      kiloClient: client,
+      signal: new AbortController().signal,
+    };
+    const operation = new SessionOperation(
+      session,
+      undefined,
+      { operation: 'session.prompt', payload: promptPayload, runtime },
+      {
+        isCurrent: () => true,
+        getRuntime: () => runtime,
+        verifyQuiescence: verify,
+        retireRuntime: () => {},
+        emitSessionEvent: () => {},
+        onLocalCompletion: () => {},
+        onCleanupConfirmed: () => {},
+      }
+    );
+    for (let index = 0; index < 5 && operation.snapshot().native.state !== 'pending'; index += 1)
+      await Promise.resolve();
+
+    operation.markPublicationScoped('event rejected', Date.now() + 1_000);
+    const first = operation.runRootScopedCleanup();
+    expect(operation.runRootScopedCleanup()).toBe(first);
+    expect(await first).toBe('confirmed');
+    expect(abort).toHaveBeenCalledTimes(1);
+    expect(verify).not.toHaveBeenCalled();
+
+    pending.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+    await operation.done;
+  });
+
+  it('keeps root-scoped cleanup unconfirmed when the root remains busy', async () => {
+    const pending = Promise.withResolvers<ReturnType<typeof completion>>();
+    const verify = jest.fn(async () => true);
+    const client = fakeKilo({
+      sendPrompt: () => pending.promise,
+      abortSession: async () => true,
+      getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'busy' } }),
+    });
+    const runtime: WorktreeKiloRuntime = {
+      scopeId: 'worktree_1',
+      runtimeId: 'native_1',
+      directory: session.directory,
+      env: {},
+      kiloClient: client,
+      signal: new AbortController().signal,
+    };
+    const operation = new SessionOperation(
+      session,
+      undefined,
+      { operation: 'session.prompt', payload: promptPayload, runtime },
+      {
+        isCurrent: () => true,
+        getRuntime: () => runtime,
+        verifyQuiescence: verify,
+        retireRuntime: () => {},
+        emitSessionEvent: () => {},
+        onLocalCompletion: () => {},
+        onCleanupConfirmed: () => {},
+      }
+    );
+    for (let index = 0; index < 5 && operation.snapshot().native.state !== 'pending'; index += 1)
+      await Promise.resolve();
+
+    operation.markPublicationScoped('event rejected', Date.now() + 20);
+    expect(await operation.runRootScopedCleanup()).toBe('unconfirmed');
+    expect(verify).not.toHaveBeenCalled();
+
+    pending.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+    await operation.done;
+  });
+
   it('does not accept an idle root while a scoped native child is active', async () => {
     const pending = Promise.withResolvers<ReturnType<typeof completion>>();
     let verified = 0;

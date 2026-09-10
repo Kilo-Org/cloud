@@ -1546,8 +1546,8 @@ function OperationsTabs({
               <AlertDescription>
                 API keys are encrypted after validation and are never returned or displayed. The
                 upstream identifier is retained for provider-side operations and appears in the
-                Pending Key Rotation queue. BytePlus usernames are used to verify the assigned seat
-                and are not displayed after upload.
+                Pending Key Rotation queue. For BytePlus, the assigned username is shown there so
+                staff can map the inventory item to the provider-side seat.
               </AlertDescription>
             </Alert>
             <Button

@@ -47,6 +47,8 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   [DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS]: 'deepseek/deepseek-v4-flash-0731',
   'mistralai/codestral-2508': 'mistral/codestral',
   'mistralai/devstral-2512': 'mistral/devstral-2',
+  'mistralai/mistral-embed-2312': 'mistral/mistral-embed',
+  'mistralai/codestral-embed-2505': 'mistral/codestral-embed',
   'mistralai/ministral-14b-2512': 'mistral/ministral-14b',
   'mistralai/ministral-3b-2512': 'mistral/ministral-3b',
   'mistralai/ministral-8b-2512': 'mistral/ministral-8b',

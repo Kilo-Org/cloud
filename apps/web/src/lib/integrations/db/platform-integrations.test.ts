@@ -1039,6 +1039,51 @@ describe('findGitHubBotLinkIntegrations', () => {
     ).resolves.toEqual([]);
     await expect(
       findGitHubBotLinkIntegrations({
+        installationId: 'different-installation',
+        appType: 'standard',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([]);
+
+    await db
+      .update(github_app_installations)
+      .set({ suspended_at: new Date().toISOString() })
+      .where(eq(github_app_installations.id, canonical.id));
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([]);
+    await db
+      .update(github_app_installations)
+      .set({ suspended_at: null, lifecycle_state: 'deleted' })
+      .where(eq(github_app_installations.id, canonical.id));
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([]);
+    await db
+      .update(github_app_installations)
+      .set({ lifecycle_state: 'active', auth_invalid_at: new Date().toISOString() })
+      .where(eq(github_app_installations.id, canonical.id));
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([]);
+    await db
+      .update(github_app_installations)
+      .set({ auth_invalid_at: null })
+      .where(eq(github_app_installations.id, canonical.id));
+    await expect(
+      findGitHubBotLinkIntegrations({
         installationId: '881122',
         appType: 'standard',
         platformIntegrationId: crypto.randomUUID(),
@@ -1081,6 +1126,13 @@ describe('findGitHubBotLinkIntegrations', () => {
     await expect(
       findGitHubBotLinkIntegrations({ installationId: '881123', appType: 'standard' })
     ).resolves.toEqual([expect.objectContaining({ id: legacy.id })]);
+    await db
+      .update(platform_integrations)
+      .set({ github_app_type: 'standard' })
+      .where(eq(platform_integrations.id, legacy.id));
+    await expect(
+      findGitHubBotLinkIntegrations({ installationId: '881123', appType: 'standard' })
+    ).resolves.toEqual([]);
   });
 });
 

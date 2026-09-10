@@ -103,7 +103,9 @@ export async function findGitHubBotLinkIntegrations(input: {
     ) {
       return [];
     }
-    if (!integration.github_installation_id) return canonicalIdentity ? [] : [integration];
+    if (!integration.github_installation_id) {
+      return !canonicalIdentity && integration.github_app_type === null ? [integration] : [];
+    }
     const canonicalUsable =
       canonical?.id === integration.github_installation_id &&
       canonical.installation_id === input.installationId &&

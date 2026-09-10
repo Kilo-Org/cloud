@@ -136,6 +136,7 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum.openai];
   }
   if (isClaudeModel(requestedModel) && !isFableModel(requestedModel)) {
+    // specifying this for fable breaks the opus fallback on vercel
     return [
       OpenRouterInferenceProviderIdSchema.enum['google-vertex'],
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],

@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import type { IngestEvent } from '../../src/shared/protocol.js';
+import { FULL_COMMIT_HASH, immutableGit, readCommitObject } from './commit-objects.js';
 import type { WrapperCommitCoAuthor } from '../../src/shared/wrapper-bootstrap.js';
 import type { WrapperKiloClient } from './kilo-api.js';
 import { git, getCurrentBranch, hasGitUpstream, logToFile as writeLog } from './utils.js';
@@ -11,6 +13,15 @@ const GIT_PUSH_TIMEOUT_MS = 60_000;
 /** Timeout for commit message generation API call */
 const COMMIT_MESSAGE_TIMEOUT_MS = 30_000;
 const worktreeAutoCommits = new Map<string, Promise<void>>();
+const COMMIT_EVIDENCE_TIMEOUT_MS = 5_000;
+
+type CommitEvidence = {
+  commitHash: string;
+  commitMessage?: string;
+  committedAt?: string;
+  commitMessageTruncated?: true;
+};
+type PushStatus = 'failed' | 'not_attempted' | 'unknown';
 
 function appendCommitCoAuthor(
   commitMessage: string,
@@ -42,6 +53,7 @@ export type AutoCommitOptions = {
   kiloClient: WrapperKiloClient;
   /** The assistant message ID this autocommit is associated with (for per-message UI rendering) */
   messageId?: string;
+  userMessageId?: string;
   /** If the user explicitly provided an upstream branch via API, pass it here to allow
    *  committing to that branch even if it is main/master. Protection is only bypassed
    *  when the current branch matches this value exactly. */
@@ -71,6 +83,10 @@ function emitCompleted(
     skipped?: boolean;
     commitHash?: string;
     commitMessage?: string;
+    committedAt?: string;
+    userMessageId?: string;
+    pushStatus?: PushStatus;
+    commitMessageTruncated?: true;
   },
   messageId?: string
 ): void {
@@ -82,7 +98,10 @@ function emitCompleted(
 }
 
 export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommitResult> {
-  const { workspacePath, onEvent, kiloClient, messageId, signal, env } = opts;
+  const { workspacePath, onEvent, kiloClient, messageId, userMessageId, signal, env } = opts;
+  let locallyCommitted = false;
+  let evidence: CommitEvidence | undefined;
+  let pushStatus: PushStatus = 'not_attempted';
   const redact = createSecretRedactor(process.env, env ?? {});
   const logToFile = (message: string): void => writeLog(redact(message));
   const released = Promise.withResolvers<void>();
@@ -96,6 +115,75 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
   worktreeAutoCommits.set(workspacePath, current);
 
   logToFile(`auto-commit: starting workspacePath=${workspacePath}`);
+
+  async function commit(args: string[]) {
+    const action = `kilo-autocommit-${randomUUID()}`;
+    try {
+      const result = await git(args, {
+        cwd: workspacePath,
+        env: { ...(env ?? process.env), GIT_REFLOG_ACTION: action },
+        inheritEnv: false,
+        timeoutMs: GIT_LOCAL_TIMEOUT_MS,
+        signal,
+      });
+      locallyCommitted ||= result.exitCode === 0;
+      return result;
+    } finally {
+      await captureEvidence(action);
+    }
+  }
+
+  async function captureEvidence(action: string): Promise<void> {
+    const deadline = Date.now() + COMMIT_EVIDENCE_TIMEOUT_MS;
+    try {
+      const result = await immutableGit(
+        workspacePath,
+        [
+          'reflog',
+          'show',
+          '--format=%H',
+          `--grep-reflog=^${action}: `,
+          '--max-count=2',
+          'HEAD',
+          '--',
+        ],
+        { timeoutMs: COMMIT_EVIDENCE_TIMEOUT_MS, maxOutputBytes: 256 }
+      );
+      const hashes = result.stdoutBytes?.toString('utf8').trim().split('\n');
+      if (
+        result.exitCode !== 0 ||
+        result.terminationReason ||
+        result.stdoutTruncated ||
+        hashes?.length !== 1 ||
+        !FULL_COMMIT_HASH.test(hashes[0])
+      )
+        return;
+      evidence = { commitHash: hashes[0] };
+      locallyCommitted = true;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) return;
+      const metadata = await readCommitObject(workspacePath, evidence.commitHash, {
+        timeoutMs: remaining,
+      });
+      evidence = {
+        ...evidence,
+        commitMessage: metadata.commitMessage,
+        committedAt: metadata.committedAt,
+        ...(metadata.commitMessageTruncated ? { commitMessageTruncated: true } : {}),
+      };
+    } catch {
+      logToFile('auto-commit: commit metadata unavailable');
+    }
+  }
+
+  function completeLocalCommit(message: string): AutoCommitResult {
+    emitCompleted(
+      onEvent,
+      { success: true, message, ...evidence, userMessageId, pushStatus },
+      messageId
+    );
+    return { success: true };
+  }
 
   try {
     signal?.throwIfAborted();
@@ -229,21 +317,11 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
 
     // Commit — retry with --no-verify if pre-commit hook fails
     logToFile('auto-commit: committing');
-    let commitResult = await git(['commit', '-m', commitMessage], {
-      cwd: workspacePath,
-      ...(env ? { env, inheritEnv: false } : {}),
-      timeoutMs: GIT_LOCAL_TIMEOUT_MS,
-      signal,
-    });
-    if (commitResult.exitCode !== 0) {
+    let commitResult = await commit(['commit', '-m', commitMessage]);
+    if (!locallyCommitted) {
       logToFile('auto-commit: commit failed, retrying with --no-verify');
-      commitResult = await git(['commit', '--no-verify', '-m', commitMessage], {
-        cwd: workspacePath,
-        ...(env ? { env, inheritEnv: false } : {}),
-        timeoutMs: GIT_LOCAL_TIMEOUT_MS,
-        signal,
-      });
-      if (commitResult.exitCode !== 0) {
+      commitResult = await commit(['commit', '--no-verify', '-m', commitMessage]);
+      if (!locallyCommitted) {
         const msg = `git commit failed: ${redact(commitResult.stderr.trim())}`;
         logToFile(`auto-commit: ${msg}`);
         emitCompleted(onEvent, { success: false, message: msg }, messageId);
@@ -252,27 +330,15 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     }
     logToFile(`auto-commit: commit succeeded: ${commitResult.stdout.trim()}`);
 
-    // Get commit hash for UI display
-    let commitHash: string | undefined;
-    try {
-      const hashResult = await git(['rev-parse', '--short', 'HEAD'], {
-        cwd: workspacePath,
-        ...(env ? { env, inheritEnv: false } : {}),
-        timeoutMs: GIT_LOCAL_TIMEOUT_MS,
-        signal,
-      });
-      if (hashResult.exitCode === 0 && hashResult.stdout.trim()) {
-        commitHash = hashResult.stdout.trim();
-        logToFile(`auto-commit: commit hash=${commitHash}`);
-      }
-    } catch {
-      logToFile('auto-commit: failed to get commit hash, continuing without it');
+    if (signal?.aborted || commitResult.terminationReason) {
+      return completeLocalCommit('Changes committed (push not attempted)');
     }
 
     // Push
     const pushArgs = trackingUpstream ? ['push'] : ['push', '-u', 'origin', branch];
     logToFile(`auto-commit: pushing with args: git ${pushArgs.join(' ')}`);
 
+    pushStatus = 'unknown';
     const pushResult = await git(pushArgs, {
       cwd: workspacePath,
       ...(env ? { env, inheritEnv: false } : {}),
@@ -284,35 +350,18 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
       const sanitizedPushError = redact(pushResult.stderr.trim());
       const msg = `git push failed: ${sanitizedPushError}`;
       logToFile(`auto-commit: ${msg}`);
-      emitCompleted(
-        onEvent,
-        {
-          success: true,
-          message: `Changes committed (push failed: ${sanitizedPushError})`,
-          commitHash,
-          commitMessage,
-        },
-        messageId
-      );
-      return { success: true };
+      pushStatus =
+        pushResult.terminationReason || pushResult.exitCode === 124 ? 'unknown' : 'failed';
+      return completeLocalCommit(`Changes committed (push failed: ${sanitizedPushError})`);
     }
 
-    logToFile('auto-commit: push succeeded');
+    logToFile('auto-commit: push command completed');
     logToFile('auto-commit: completed successfully');
-    emitCompleted(
-      onEvent,
-      {
-        success: true,
-        message: 'Changes committed and pushed',
-        commitHash,
-        commitMessage,
-      },
-      messageId
-    );
-    return { success: true };
+    return completeLocalCommit('Changes committed; push command completed');
   } catch (error) {
     const errorMsg = redact(error instanceof Error ? error.message : String(error));
     logToFile(`auto-commit: error - ${errorMsg}`);
+    if (locallyCommitted) return completeLocalCommit(`Changes committed (${errorMsg})`);
     emitCompleted(
       onEvent,
       { success: false, message: `Auto-commit failed: ${errorMsg}` },

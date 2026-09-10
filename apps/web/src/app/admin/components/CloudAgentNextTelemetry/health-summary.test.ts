@@ -9,15 +9,19 @@ import {
 import { CLOUD_AGENT_FAILURE_REASONS } from '@kilocode/worker-utils/cloud-agent-failure';
 
 describe('getOperationalFailureStats', () => {
-  it('calculates operational failure percentage without counting interruptions', () => {
-    expect(
-      getOperationalFailureStats({
-        completedRuns: 90,
-        failedRuns: 7,
-        setupFailures: 3,
-        interruptedRuns: 25,
-      })
-    ).toEqual({ failureEvents: 10, assessedOutcomes: 100, failureRatePercent: 10 });
+  it('reports run and setup failure rates over their own populations', () => {
+    const stats = getOperationalFailureStats({
+      completedRuns: 90,
+      failedRuns: 7,
+      setupFailures: 3,
+      interruptedRuns: 25,
+      sessionsObserved: 60,
+    });
+
+    expect(stats.runOutcomes).toBe(97);
+    expect(stats.runFailureRatePercent).toBeCloseTo((7 / 97) * 100);
+    expect(stats.sessionsObserved).toBe(60);
+    expect(stats.setupFailureRatePercent).toBeCloseTo((3 / 60) * 100);
   });
 
   it('does not report a percentage when no operational outcomes were assessed', () => {
@@ -27,8 +31,14 @@ describe('getOperationalFailureStats', () => {
         failedRuns: 0,
         setupFailures: 0,
         interruptedRuns: 4,
+        sessionsObserved: 0,
       })
-    ).toEqual({ failureEvents: 0, assessedOutcomes: 0, failureRatePercent: null });
+    ).toEqual({
+      runOutcomes: 0,
+      runFailureRatePercent: null,
+      sessionsObserved: 0,
+      setupFailureRatePercent: null,
+    });
   });
 });
 
@@ -43,6 +53,7 @@ describe('failure responsibility summary', () => {
       failedRuns: 17,
       setupFailures: 3,
       interruptedRuns: 2,
+      sessionsObserved: 20,
       platformFailures: 9,
       userFailures: 6,
       unknownFailures: 5,
@@ -72,6 +83,7 @@ describe('failure responsibility summary', () => {
       failedRuns: 0,
       setupFailures: 0,
       interruptedRuns: 0,
+      sessionsObserved: 0,
       platformFailures: 0,
       userFailures: 0,
       unknownFailures: 0,

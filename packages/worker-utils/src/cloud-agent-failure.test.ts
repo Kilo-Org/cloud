@@ -74,7 +74,7 @@ describe('classifyCloudAgentFailure', () => {
         code: 'workspace_setup_failed',
         workspaceSubtype: 'git_pack_corrupt',
       })
-    ).toEqual({ responsibility: 'unknown', reason: 'source_control_network' });
+    ).toEqual({ responsibility: 'unknown', reason: 'source_control_repository_corrupt' });
   });
 
   it.each([
@@ -181,6 +181,28 @@ describe('classifyCloudAgentFailure', () => {
     }
   );
 
+  it.each([
+    ['git_clone_timeout', 'unknown', 'source_control_clone_timeout'],
+    ['git_checkout_timeout', 'unknown', 'source_control_checkout_timeout'],
+    ['git_pack_corrupt', 'unknown', 'source_control_repository_corrupt'],
+    ['setup_command_timeout', 'user', 'setup_command_timeout'],
+    ['setup_command_failed', 'user', 'setup_command'],
+    ['kilo_import_timeout', 'unknown', 'session_import_timeout'],
+    ['kilo_import_failed', 'unknown', 'session_import_failed'],
+  ] as const)(
+    'splits collapsed workspace subtype %s into reason %s',
+    (workspaceSubtype, responsibility, reason) => {
+      expect(
+        classifyCloudAgentFailure({
+          source: 'run',
+          stage: 'pre_dispatch',
+          code: 'workspace_setup_failed',
+          workspaceSubtype,
+        })
+      ).toEqual({ responsibility, reason });
+    }
+  );
+
   it('classifies setup failures from structured stage and code only', () => {
     expect(
       classifyCloudAgentFailure({
@@ -196,6 +218,52 @@ describe('classifyCloudAgentFailure', () => {
         code: 'do_rpc_outcome_unknown',
       })
     ).toEqual({ responsibility: 'platform', reason: 'session_coordination' });
+  });
+
+  it('attributes the opaque initial admission rejection from its admission code', () => {
+    expect(
+      classifyCloudAgentFailure({
+        source: 'setup',
+        stage: 'initial_admission',
+        code: 'initial_admission_rejected',
+        admissionCode: 'INTERNAL',
+      })
+    ).toEqual({ responsibility: 'platform', reason: 'admission_internal' });
+    expect(
+      classifyCloudAgentFailure({
+        source: 'setup',
+        stage: 'initial_admission',
+        code: 'initial_admission_rejected',
+        admissionCode: 'SANDBOX_CONNECT_FAILED',
+      })
+    ).toEqual({ responsibility: 'platform', reason: 'sandbox_connectivity' });
+    expect(
+      classifyCloudAgentFailure({
+        source: 'setup',
+        stage: 'initial_admission',
+        code: 'initial_admission_rejected',
+        admissionCode: 'PAYMENT_REQUIRED',
+      })
+    ).toEqual({ responsibility: 'user', reason: 'insufficient_credits' });
+    expect(
+      classifyCloudAgentFailure({
+        source: 'setup',
+        stage: 'initial_admission',
+        code: 'initial_admission_rejected',
+        admissionCode: 'UNKNOWN',
+      })
+    ).toEqual({ responsibility: 'unknown', reason: 'initial_admission_unknown' });
+  });
+
+  it('classifies a full admission queue as platform capacity, not unknown', () => {
+    expect(
+      classifyCloudAgentFailure({
+        source: 'setup',
+        stage: 'initial_admission',
+        code: 'initial_queue_full',
+        admissionCode: 'PENDING_QUEUE_FULL',
+      })
+    ).toEqual({ responsibility: 'platform', reason: 'admission_capacity' });
   });
 });
 

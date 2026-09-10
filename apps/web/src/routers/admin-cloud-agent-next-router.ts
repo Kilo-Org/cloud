@@ -97,6 +97,10 @@ function failureRate(failures: number, completed: number): number | null {
   return denominator === 0 ? null : failures / denominator;
 }
 
+function ratio(part: number, total: number): number | null {
+  return total === 0 ? null : part / total;
+}
+
 export const adminCloudAgentNextRouter = createTRPCRouter({
   getHealthOverview: adminProcedure.input(HealthOverviewFilterSchema).query(async ({ input }) => {
     const sessionStage = sql<string>`COALESCE(${cloud_agent_sessions.failure_stage}, 'unclassified')`;
@@ -115,7 +119,7 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
       input.responsibility === 'all'
         ? undefined
         : sql`${runResponsibility} = ${input.responsibility}`;
-    const [summaryRows, setupRows, runErrorRows] = await Promise.all([
+    const [summaryRows, setupRows, runErrorRows, sessionCountRows] = await Promise.all([
       db
         .select({
           completed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_session_runs.status} = 'completed')`,
@@ -182,18 +186,29 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
           )
         )
         .groupBy(runStage, runCode, runResponsibility, runReason),
+      db
+        .select({ sessionsObserved: sql<number>`COUNT(*)` })
+        .from(cloud_agent_sessions)
+        .where(
+          and(
+            gte(cloud_agent_sessions.created_at, input.startDate),
+            lt(cloud_agent_sessions.created_at, input.endDate),
+            retainedSessionCondition()
+          )
+        ),
     ]);
     const row = summaryRows[0];
     const summary = {
       completedRuns: count(row?.completed),
       failedRuns: count(row?.failed),
       interruptedRuns: count(row?.interrupted),
+      sessionsObserved: count(sessionCountRows[0]?.sessionsObserved),
       setupFailures: 0,
       platformFailures: count(row?.platformFailures),
       userFailures: count(row?.userFailures),
       unknownFailures: count(row?.unknownFailures),
-      platformFailureRate: null as number | null,
-      allFailureRate: null as number | null,
+      runFailureRate: null as number | null,
+      setupFailureRate: null as number | null,
     };
     const setupErrors: HealthError[] = [];
     for (const setupRow of setupRows) {
@@ -246,11 +261,8 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
       groups: errors.length,
       events: errors.reduce((total, error) => total + error.count, 0),
     };
-    summary.platformFailureRate = failureRate(summary.platformFailures, summary.completedRuns);
-    summary.allFailureRate = failureRate(
-      summary.failedRuns + summary.setupFailures,
-      summary.completedRuns
-    );
+    summary.runFailureRate = failureRate(summary.failedRuns, summary.completedRuns);
+    summary.setupFailureRate = ratio(summary.setupFailures, summary.sessionsObserved);
     return { summary, topErrors, errorTotals };
   }),
 

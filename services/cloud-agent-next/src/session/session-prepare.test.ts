@@ -4077,24 +4077,37 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
   });
 
   it('allows isolated Standard allocation for enrolled non-interactive sessions', async () => {
+    const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     const sandboxId = `istd-${'a'.repeat(48)}` as const;
     generateSandboxRoutingTargetMock.mockResolvedValueOnce({ kind: 'isolated', sandboxId });
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
     ctx.env.CONTROL_PLANE_IDS = USER_ID;
+    ctx.env.SANDBOX_SELECTION_ORG_IDS = orgId;
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
+    );
+    admitOperationMock.mockResolvedValue({
+      admission: 'admitted',
+      row: makeLedgerRow({ organization_id: orgId }),
+    });
 
     await runCreate(
       ctx,
       makeRequest({
         runtime: { sandboxAllocation: 'isolated-standard' },
-        options: { operationKey: OPERATION_KEY, createdOnPlatform: 'slack' },
+        options: {
+          operationKey: OPERATION_KEY,
+          createdOnPlatform: 'slack',
+          kilocodeOrganizationId: orgId,
+        },
       })
     );
 
     expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID }),
+        identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID, orgId }),
         workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
       })
     );

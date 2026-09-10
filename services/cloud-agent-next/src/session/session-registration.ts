@@ -564,7 +564,7 @@ async function assertSandboxAllocationMembership(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext
 ): Promise<void> {
-  if (!isSelectableSandboxAllocation(input.runtime?.sandboxAllocation)) return;
+  if (input.runtime?.sandboxAllocation === undefined) return;
   const orgId = input.options?.kilocodeOrganizationId;
   if (!orgId) {
     throw new TRPCError({
@@ -584,7 +584,7 @@ async function allocateNewSession(
   await assertSandboxAllocationMembership(input, ctx);
   const sandboxAllocation = input.runtime?.sandboxAllocation;
   const orgId = input.options?.kilocodeOrganizationId;
-  if (isSelectableSandboxAllocation(sandboxAllocation)) {
+  if (sandboxAllocation !== undefined) {
     assertSandboxAllocationAvailable(ctx.env, { userId: ctx.userId, orgId }, sandboxAllocation);
   }
   const sessionService = new SessionService();
@@ -1535,7 +1535,7 @@ export async function createSessionWithLedger(
   await assertSandboxAllocationMembership(input, ctx);
   const db = getPgDb(ctx.env);
   const allocation = input.runtime?.sandboxAllocation;
-  if (isSelectableSandboxAllocation(allocation)) {
+  if (allocation !== undefined) {
     const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
     const available = isSandboxAllocationAvailable(
       getSandboxSelectionCapabilities(ctx.env, owner),

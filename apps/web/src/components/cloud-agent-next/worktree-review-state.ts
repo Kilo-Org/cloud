@@ -235,6 +235,7 @@ export function createWorktreeReviewStore(persistence?: WorktreeReviewPersistenc
   const listeners = new Set<() => void>();
   const hydration = new Map<string, WorktreeReviewHydrationStatus>();
   const hydrationGeneration = new Map<string, number>();
+  const persistGeneration = new Map<string, number>();
   const hydrationOverlays = new Map<string, WorktreeReviewHydrationOverlay>();
   const getHydrationOverlay = (key: string) =>
     hydrationOverlays.get(key) ?? {
@@ -257,15 +258,24 @@ export function createWorktreeReviewStore(persistence?: WorktreeReviewPersistenc
     return drafts.get(key) ?? createWorktreeReviewDraft(scope);
   };
 
+  const invalidatePersistedDraft = (key: string) => {
+    persistGeneration.set(key, (persistGeneration.get(key) ?? 0) + 1);
+  };
+
   const savePersistedDraft = (draft: WorktreeReviewDraft) => {
     if (!persistence || hydration.get(worktreeReviewScopeKey(draft.scope)) !== 'ready') return;
     const key = worktreeReviewScopeKey(draft.scope);
+    const generation = persistGeneration.get(key) ?? 0;
     const value = persistedDraft(draft);
     try {
       const operation = hasPersistedDraftContent(value)
         ? persistence.save(key, value)
         : persistence.clear(key);
-      void Promise.resolve(operation).catch(() => undefined);
+      void Promise.resolve(operation)
+        .then(() => {
+          if ((persistGeneration.get(key) ?? 0) !== generation) return persistence.clear(key);
+        })
+        .catch(() => undefined);
     } catch {
       // Persistence is best effort; the in-memory draft remains authoritative.
     }
@@ -432,6 +442,7 @@ export function createWorktreeReviewStore(persistence?: WorktreeReviewPersistenc
     },
     discardDraft(scope: WorktreeReviewScope) {
       if (getDraft(scope).delivery.phase !== 'idle') return false;
+      invalidatePersistedDraft(worktreeReviewScopeKey(scope));
       write(createWorktreeReviewDraft(scope));
       return true;
     },
@@ -513,16 +524,15 @@ export function createWorktreeReviewStore(persistence?: WorktreeReviewPersistenc
         };
       }
       if (outcome.status === 'accepted') {
+        const key = worktreeReviewScopeKey(scope);
+        invalidatePersistedDraft(key);
         if (persistence) {
           try {
-            await withTimeout(
-              Promise.resolve().then(() => persistence.clear(worktreeReviewScopeKey(scope)))
-            );
+            await withTimeout(Promise.resolve().then(() => persistence.clear(key)));
           } catch {
             // An IDB failure must not block an accepted review or leave its memory state locked.
           }
         }
-        const key = worktreeReviewScopeKey(scope);
         hydrationGeneration.set(key, (hydrationGeneration.get(key) ?? 0) + 1);
         hydration.set(key, 'ready');
         hydrationOverlays.delete(key);

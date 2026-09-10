@@ -443,4 +443,41 @@ describe('useWorktreeReview hydration', () => {
     expect(latest?.destinations.map(destination => destination.sessionId)).toEqual(['ses_other']);
     expect(latest?.draft?.destinationKiloSessionId).toBe(targetSession.session_id);
   });
+
+  it('does not send a subset when a comment cannot rebase onto the current capture', async () => {
+    const prepareReviewSubmission = jest.fn();
+    mockLoad.mockResolvedValue({
+      version: 1,
+      comments: [{ id: 'saved', anchor, text: 'Saved feedback' }],
+      editor: null,
+      overall: '',
+      destinationKiloSessionId: targetSession.session_id,
+      allowOlderCapture: false,
+    });
+    const originalRevision = snapshot.revision;
+    const originalFiles = snapshot.files;
+    snapshot.revision = 99;
+    snapshot.files = [{ path: 'src/example.ts', revision: 99 }];
+    try {
+      const mounted = mount({
+        api: {
+          prepareReviewSubmission,
+          submitReview: jest.fn(),
+        },
+      });
+      ({ cleanup } = mounted.dom);
+      root = mounted.root;
+      await flushAsyncWork();
+      await act(async () => {
+        await latest?.send();
+      });
+      expect(prepareReviewSubmission).not.toHaveBeenCalled();
+      expect(latest?.draft?.delivery.phase).toBe('idle');
+      expect(latest?.draft?.comments).toHaveLength(1);
+      expect(latest?.draft?.error).toMatch(/could not be applied to the current saved capture/);
+    } finally {
+      snapshot.revision = originalRevision;
+      snapshot.files = originalFiles;
+    }
+  });
 });

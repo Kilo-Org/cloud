@@ -444,6 +444,9 @@ export function rebaseWorktreeReviewCommentsForFile(
 ): WorktreeReviewComment[] {
   return comments.flatMap(comment => {
     if (comment.anchor.path !== file.path) return [comment];
+    if (comment.anchor.capture.sourceCloudAgentSessionId !== capture.sourceCloudAgentSessionId) {
+      return [comment];
+    }
     if (!diff) {
       return sameWorktreeReviewCapture(comment.anchor.capture, capture) ? [comment] : [];
     }

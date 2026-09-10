@@ -118,14 +118,14 @@ export function WorktreeReviewEditor({
     if (editor) setDraggedLines(null);
   }, [review.editor, editor]);
   useEffect(() => {
-    if (renderStatus === 'loading') return;
+    if (renderStatus !== 'ready') return;
     const replace = reviewRef.current.onReplacePathComments;
     if (!replace) return;
     const next = rebaseWorktreeReviewCommentsForFile(
       review.comments,
       stableCapture,
       file,
-      renderStatus === 'ready' && !unavailableReason ? diff : null
+      !unavailableReason ? diff : null
     ).filter(comment => comment.anchor.path === file.path);
     const current = review.comments.filter(comment => comment.anchor.path === file.path);
     if (
@@ -143,7 +143,8 @@ export function WorktreeReviewEditor({
   useEffect(() => {
     if (!editor || editor.anchor.path !== file.path) return;
     if (sameWorktreeReviewCapture(editor.anchor.capture, stableCapture)) return;
-    if (renderStatus !== 'ready' || !diff || unavailableReason) {
+    if (renderStatus !== 'ready') return;
+    if (!diff || unavailableReason) {
       reviewRef.current.onEditorChange(null);
       return;
     }

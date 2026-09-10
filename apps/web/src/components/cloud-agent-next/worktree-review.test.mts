@@ -29,6 +29,7 @@ const {
   createWorktreeReviewAnchor,
   normalizeWorktreeReviewRange,
   rebaseWorktreeReviewComment,
+  rebaseWorktreeReviewCommentsForFile,
   sameWorktreeReviewScope,
   sameWorktreeReviewCapture,
   getWorktreeReviewFreshness,
@@ -554,6 +555,49 @@ describe('worktree review rebase', () => {
       additionLines: source.diff.additionLines.map(() => 'different\n'),
     };
     assert.equal(rebaseWorktreeReviewComment(reviewed, nextCapture, nextFile, changed), null);
+  });
+
+  it('keeps comments from another source session when rebasing a file', () => {
+    const source = fixture();
+    const reviewed = comment();
+    const otherCapture = { ...capture, sourceCloudAgentSessionId: 'another-source' };
+    const other = comment('other', {
+      anchor: { ...reviewed.anchor, capture: otherCapture },
+    });
+    const nextCapture = { ...capture, revision: 4, capturedAt: '2026-09-01T11:00:00Z' };
+    const nextFile = { ...source.file, revision: 4 };
+    const next = rebaseWorktreeReviewCommentsForFile(
+      [reviewed, other],
+      nextCapture,
+      nextFile,
+      source.diff
+    );
+    assert.equal(
+      next.find(comment => comment.id === 'other')?.anchor.capture.sourceCloudAgentSessionId,
+      'another-source'
+    );
+    assert.equal(next.find(comment => comment.id === reviewed.id)?.anchor.capture.revision, 4);
+  });
+
+  it('does not drop another-source comments when the current file diff is missing', () => {
+    const source = fixture();
+    const reviewed = comment();
+    const otherCapture = { ...capture, sourceCloudAgentSessionId: 'another-source' };
+    const other = comment('other', {
+      anchor: { ...reviewed.anchor, capture: otherCapture },
+    });
+    const nextCapture = { ...capture, revision: 4, capturedAt: '2026-09-01T11:00:00Z' };
+    const next = rebaseWorktreeReviewCommentsForFile(
+      [reviewed, other],
+      nextCapture,
+      { ...source.file, revision: 4 },
+      null
+    );
+    assert.deepEqual(
+      next.map(comment => comment.id),
+      ['other']
+    );
+    assert.equal(next[0]?.anchor.capture.sourceCloudAgentSessionId, 'another-source');
   });
 });
 

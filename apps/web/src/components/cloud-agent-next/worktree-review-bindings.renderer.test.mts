@@ -903,4 +903,103 @@ describe('worktree review rendering readiness', () => {
     assert.equal(editor.anchor.capture.revision, capture.revision - 1);
     assert.equal(editor.text, 'Unsaved feedback');
   });
+
+  it('does not discard an unsaved editor while a newer capture is still loading', () => {
+    const editors: Array<WorktreeFileReviewBindings['editor']> = [];
+    const staleCapture = {
+      ...capture,
+      revision: capture.revision - 1,
+      capturedAt: '2026-09-01T09:00:00Z',
+    };
+    const saved = comment('open');
+    saved.anchor.capture = staleCapture;
+    const editor = { anchor: saved.anchor, text: 'Keep this feedback' };
+    const mounted = mountReview('loading', editor, next => editors.push(next));
+    assert.deepEqual(editors, []);
+    act(() => mounted.root.unmount());
+    mounted.dom.cleanup();
+  });
+
+  it('does not replace comments from another source chat when this file is ready', () => {
+    const replaced: Array<readonly WorktreeReviewComment[]> = [];
+    const own = comment('own');
+    const other = comment('other');
+    other.anchor.capture = { ...capture, sourceCloudAgentSessionId: 'workspace_other' };
+    const review: WorktreeFileReviewBindings = Object.freeze({
+      comments: Object.freeze([own, other]),
+      editor: null,
+      onEditorChange() {
+        assert.fail('Ready rebase must not change the editor.');
+      },
+      onSaveEditor() {
+        assert.fail('Ready rebase must not save comments.');
+      },
+      onRemoveComment() {
+        assert.fail('Ready rebase must not remove comments.');
+      },
+      onReplacePathComments(_path, comments) {
+        replaced.push(comments);
+      },
+    });
+    const dom = installDom();
+    const root: Root = createRoot(dom.container);
+    act(() => {
+      root.render(
+        createElement(WorktreeReviewEditor, {
+          file,
+          diff,
+          capture,
+          review,
+          renderStatus: 'ready',
+          children() {
+            return null;
+          },
+        })
+      );
+    });
+    assert.deepEqual(replaced, []);
+    act(() => root.unmount());
+    dom.cleanup();
+  });
+
+  it('does not drop comments when the highlighter fails', () => {
+    const replaced: Array<readonly WorktreeReviewComment[]> = [];
+    const stale = comment('stale');
+    stale.anchor.capture = { ...capture, revision: capture.revision - 1 };
+    const review: WorktreeFileReviewBindings = Object.freeze({
+      comments: Object.freeze([stale]),
+      editor: null,
+      onEditorChange() {
+        assert.fail('Highlighter failure must not change the editor.');
+      },
+      onSaveEditor() {
+        assert.fail('Highlighter failure must not save comments.');
+      },
+      onRemoveComment() {
+        assert.fail('Highlighter failure must not remove comments.');
+      },
+      onReplacePathComments(_path, comments) {
+        replaced.push(comments);
+      },
+    });
+    const dom = installDom();
+    const root: Root = createRoot(dom.container);
+    act(() => {
+      root.render(
+        createElement(WorktreeReviewEditor, {
+          file,
+          diff,
+          capture,
+          review,
+          renderStatus: 'error',
+          children() {
+            return null;
+          },
+        })
+      );
+    });
+    assert.deepEqual(replaced, []);
+    act(() => root.unmount());
+    dom.cleanup();
+  });
 });

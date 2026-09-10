@@ -553,6 +553,46 @@ describe('page-owned worktree review state', () => {
     assert.equal(store.getDraft(scope).comments.length, 0);
   });
 
+  it('does not resurrect an accepted review from a late persistence save', async () => {
+    const stored = new Map<string, PersistedWorktreeReviewDraft>();
+    const delayed: Array<() => void> = [];
+    const persistence = {
+      load: async (key: string) => stored.get(key) ?? null,
+      save: (key: string, value: PersistedWorktreeReviewDraft) =>
+        new Promise<void>(resolve => {
+          delayed.push(() => {
+            stored.set(key, structuredClone(value));
+            resolve();
+          });
+        }),
+      clear: async (key: string) => {
+        stored.delete(key);
+      },
+    };
+    const store = createWorktreeReviewStore(persistence);
+    store.getDraft(scope);
+    await flushPromises();
+    store.setEditor(scope, { anchor, text: 'Send this' });
+    store.saveEditor(scope, 'sent-comment');
+    store.setDestination(scope, 'ses_target');
+    const result = await store.send({
+      scope,
+      prepare: async () => ({ ok: true, value: submission() }),
+      submit: async () => ({ status: 'accepted', delivery: 'sent' }),
+      isScopeCurrent: () => true,
+      onAccepted: () => {},
+    });
+    assert.deepEqual(result, { status: 'accepted', delivery: 'sent' });
+    assert.equal(store.getDraft(scope).comments.length, 0);
+    while (delayed.length > 0) delayed.shift()?.();
+    await flushPromises();
+    assert.equal(stored.get(worktreeReviewScopeKey(scope)), undefined);
+    const restored = createWorktreeReviewStore(persistence);
+    restored.getDraft(scope);
+    await flushPromises();
+    assert.equal(restored.getDraft(scope).comments.length, 0);
+  });
+
   it('completes an accepted review when persistence clear hangs', async t => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     try {

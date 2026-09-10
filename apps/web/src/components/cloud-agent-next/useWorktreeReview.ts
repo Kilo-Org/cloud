@@ -372,13 +372,12 @@ export function useWorktreeReview({
           const next = rebaseWorktreeReviewComment(comment, capture, fileResult.file, diff);
           if (next) rebased.push(next);
         }
-        const paths = new Set(frozenDraft.comments.map(comment => comment.anchor.path));
-        for (const path of paths) {
-          store.replacePathComments(
-            scope,
-            path,
-            rebased.filter(comment => comment.anchor.path === path)
-          );
+        if (rebased.length !== frozenDraft.comments.length) {
+          return {
+            ok: false,
+            error:
+              'Some comments could not be applied to the current saved capture. Remove or update them before sending.',
+          };
         }
         const serialized = serializeWorktreeReview(rebased, {
           overall: frozenDraft.overall,

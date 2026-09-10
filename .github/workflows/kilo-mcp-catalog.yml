@@ -99,7 +99,11 @@ jobs:
         # requirement 6; a same-repo dump failure stays fatal.
         continue-on-error: ${{ github.event.pull_request.head.repo.fork == true }}
         env:
+          # Either a signed-in CLI auth store (KILO_AUTH_CONTENT) or a
+          # durable Kilo API key + org (KILO_API_KEY / KILO_ORG_ID).
           KILO_AUTH_CONTENT: ${{ secrets.MCP_CATALOG_KILO_AUTH }}
+          KILO_API_KEY: ${{ secrets.MCP_CATALOG_KILO_API_KEY }}
+          KILO_ORG_ID: ${{ secrets.MCP_CATALOG_KILO_ORG_ID }}
         run: pnpm --filter web script src/scripts/mcp-catalog/dump.ts
 
       # Requirement 6 when the dump itself cannot run: the drift-gated fork
@@ -236,7 +240,11 @@ jobs:
       # (requirement 8); keep-edit semantics leave author edits alone.
       - name: Regenerate catalog.json
         env:
+          # Either a signed-in CLI auth store (KILO_AUTH_CONTENT) or a
+          # durable Kilo API key + org (KILO_API_KEY / KILO_ORG_ID).
           KILO_AUTH_CONTENT: ${{ secrets.MCP_CATALOG_KILO_AUTH }}
+          KILO_API_KEY: ${{ secrets.MCP_CATALOG_KILO_API_KEY }}
+          KILO_ORG_ID: ${{ secrets.MCP_CATALOG_KILO_ORG_ID }}
         run: pnpm --filter web script src/scripts/mcp-catalog/dump.ts
 
       # Vectorize upsert (requirement 9). The index name and account id match

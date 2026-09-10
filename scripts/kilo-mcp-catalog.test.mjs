@@ -54,6 +54,16 @@ function validate(workflow) {
     '${{ secrets.MCP_CATALOG_KILO_AUTH }}',
     'PR dump exports the Kilo CLI credential from the repo secret'
   );
+  assert.equal(
+    prDump.env?.KILO_API_KEY,
+    '${{ secrets.MCP_CATALOG_KILO_API_KEY }}',
+    'PR dump accepts a durable Kilo API key'
+  );
+  assert.equal(
+    prDump.env?.KILO_ORG_ID,
+    '${{ secrets.MCP_CATALOG_KILO_ORG_ID }}',
+    'PR dump accepts the Kilo org for the API key'
+  );
   findStep(
     pr,
     step => step.run === kiloInstallCommand,
@@ -153,6 +163,11 @@ function validate(workflow) {
     mergeDump.env?.KILO_AUTH_CONTENT,
     '${{ secrets.MCP_CATALOG_KILO_AUTH }}',
     'merge dump exports the Kilo CLI credential'
+  );
+  assert.equal(
+    mergeDump.env?.KILO_API_KEY,
+    '${{ secrets.MCP_CATALOG_KILO_API_KEY }}',
+    'merge dump accepts a durable Kilo API key'
   );
   findStep(
     merge,

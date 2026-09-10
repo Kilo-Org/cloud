@@ -119,6 +119,22 @@ function sameSquashKey(left: SquashKey | undefined, right: SquashKey | undefined
   );
 }
 
+function serializedPublicationBytes(publication: ControlEventPublication): number {
+  const wire: ControlEventPublication & { bytes?: number; deadlineAt?: number } = {
+    ...publication,
+  };
+  delete wire.bytes;
+  delete wire.deadlineAt;
+  return Buffer.byteLength(
+    JSON.stringify({
+      type: 'request',
+      requestId: '00000000-0000-4000-8000-000000000000',
+      operation: 'sandbox.event.publish',
+      payload: wire,
+    })
+  );
+}
+
 function isRetryable(error: unknown): boolean {
   return (
     typeof error === 'object' && error !== null && 'retryable' in error && error.retryable === true
@@ -187,7 +203,10 @@ export function createControlEventOutbox(options: {
   ): boolean => {
     const entryCount = lane.entries.length - (replacement ? 1 : 0);
     const bytes = lane.bytes - (replacement?.bytes ?? 0);
-    if (entryCount >= MAX_EVENTS || bytes + publication.bytes > MAX_BYTES) return false;
+    const publicationBytes = replacement
+      ? serializedPublicationBytes({ ...replacement, payload: publication.payload })
+      : publication.bytes;
+    if (entryCount >= MAX_EVENTS || bytes + publicationBytes > MAX_BYTES) return false;
     const now = Date.now();
     for (const reserved of lane.spaceWaiters.keys()) {
       if (reserved.sequence < publication.sequence && now < reserved.deadlineAt) return false;
@@ -277,14 +296,7 @@ export function createControlEventOutbox(options: {
     const receiptId = crypto.randomUUID();
     nextSequence = sequence;
     const publication = { ...snapshot, sequence, receiptId };
-    const bytes = Buffer.byteLength(
-      JSON.stringify({
-        type: 'request',
-        requestId: '00000000-0000-4000-8000-000000000000',
-        operation: 'sandbox.event.publish',
-        payload: publication,
-      })
-    );
+    const bytes = serializedPublicationBytes(publication);
     if (bytes > MAX_SANDBOX_CONTROL_FRAME_BYTES)
       throw new Error('Control event exceeds the frame budget');
     return { ...publication, bytes, deadlineAt: Date.now() + 30_000 };
@@ -399,6 +411,7 @@ export function createControlEventOutbox(options: {
         }
         scheduleWakeup(lane);
         cleanupLane(lane);
+        signalCycle();
       });
     lane.pendingEntry = entry;
     lane.pending = pending;
@@ -423,12 +436,9 @@ export function createControlEventOutbox(options: {
           continue;
         }
 
-        const pending = [...lanes.values()]
-          .map(item => item.pending)
-          .filter((item): item is Promise<void> => item !== undefined);
-        if (pending.length > 0) {
+        if ([...lanes.values()].some(item => item.pending !== undefined)) {
           const wake = active.wake;
-          await Promise.race([...pending, wake]);
+          await wake;
           if (active.wake === wake) resetCycleWake(active);
           continue;
         }
@@ -477,12 +487,13 @@ export function createControlEventOutbox(options: {
       if (!hasSpaceFor(lane, publication, replacement)) return false;
       if (replacement) {
         const index = lane.entries.length - 1;
+        const bytes = serializedPublicationBytes({ ...replacement, payload: publication.payload });
         lane.entries[index] = {
           ...replacement,
           payload: publication.payload,
-          bytes: publication.bytes,
+          bytes,
         };
-        lane.bytes += publication.bytes - replacement.bytes;
+        lane.bytes += bytes - replacement.bytes;
       } else {
         lane.entries.push({ ...publication });
         lane.bytes += publication.bytes;
@@ -528,6 +539,7 @@ export function createControlEventOutbox(options: {
     pause() {
       paused = true;
       for (const lane of lanes.values()) scheduleWakeup(lane);
+      signalCycle();
     },
     resume() {
       paused = false;

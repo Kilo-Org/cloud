@@ -128,6 +128,12 @@ class ControlTaskCancellation extends Error {
   }
 }
 
+type PublicationScope = Readonly<{
+  reason: string;
+  deadlineAt: number;
+  claim?: symbol;
+}>;
+
 function fail(message: string, retryable: boolean): ControlHandlerResult {
   return { ok: false, error: { code: 'not_ready', message, retryable } };
 }
@@ -146,6 +152,7 @@ export class SessionOperation {
   readonly processes: OwnedProcessScope;
   private readonly controller = new AbortController();
   private readonly completion = Promise.withResolvers<ControlHandlerResult>();
+  private readonly publicationScopeChanged = Promise.withResolvers<PublicationScope>();
   private readonly intent: ReturnType<typeof operationIntent>;
   private readonly startedAt = Date.now();
   private readonly timeout: ReturnType<typeof setTimeout>;
@@ -161,11 +168,8 @@ export class SessionOperation {
   private delivery?: OperationResultDelivery;
   private readonly cleanupOwner: SessionOperationCleanup;
   private deadlineCleanup?: Promise<boolean>;
-  private publicationScoped?: Readonly<{
-    reason: string;
-    deadlineAt: number;
-    claim?: symbol;
-  }>;
+  private publicationScoped?: PublicationScope;
+  private publicationScopeNotified = false;
 
   constructor(
     session: SessionRequestIdentity,
@@ -293,10 +297,20 @@ export class SessionOperation {
             : { claim: claim ?? this.publicationScoped.claim }),
         }
       : { reason, deadlineAt: captured, ...(claim === undefined ? {} : { claim }) };
+    if (!this.publicationScopeNotified && this.publicationScoped) {
+      this.publicationScopeNotified = true;
+      this.publicationScopeChanged.resolve(this.publicationScoped);
+    }
   }
 
   publicationScope(): Readonly<{ reason: string; deadlineAt: number; claim?: symbol }> | undefined {
     return this.publicationScoped;
+  }
+
+  waitForPublicationScope(): Promise<PublicationScope> {
+    return this.publicationScoped
+      ? Promise.resolve(this.publicationScoped)
+      : this.publicationScopeChanged.promise;
   }
 
   runRootScopedCleanup(
@@ -312,6 +326,10 @@ export class SessionOperation {
       completionEvidence: this.cleanupEvidence(),
       cancel: () => this.cancel(scoped.reason, 'failed', scoped.deadlineAt),
     });
+  }
+
+  waitForRootScopedCleanup(): Promise<RootScopedCleanupResult> {
+    return this.cleanupOwner.waitForRootScopedCleanup();
   }
 
   snapshot() {

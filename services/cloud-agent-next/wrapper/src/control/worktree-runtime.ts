@@ -62,9 +62,30 @@ export type RootRuntimeRetirement = {
   nativeRuntimeId: string;
   target: NativeOperationTarget;
   result: NativeRetirement;
+  retirementId?: string;
+  reason?: string;
+  cleanupDeadlineAt?: number;
+  reportToService?: boolean;
 };
 
-export type RootRuntimeDisappearance = Omit<RootRuntimeRetirement, 'result'>;
+export type RootRuntimeRetirementStarted = {
+  directory: string;
+  root: string;
+  nativeRuntimeId: string;
+  target: NativeOperationTarget;
+  retirementId: string;
+  reason: string;
+  cleanupDeadlineAt: number;
+  reportToService?: boolean;
+};
+
+export type RootRuntimeDisappearance = {
+  directory: string;
+  root: string;
+  nativeRuntimeId: string;
+  target: NativeOperationTarget;
+};
+export type RootRetirementScope = 'shared' | 'sole' | 'stale';
 
 export type WorktreeKiloRuntimes = {
   readonly kiloCliVersion?: string | null;
@@ -90,12 +111,18 @@ export type WorktreeKiloRuntimes = {
     deadlineAt: number,
     reason?: string
   ): Promise<NativeRetirement | 'shared'>;
+  rootRetirementScope?(
+    directory: string,
+    target: NativeOperationTarget,
+    retiringRoot: string
+  ): RootRetirementScope;
   verifyQuiescence?(
     directory: string,
     target: NativeOperationTarget,
     deadlineAt: number
   ): Promise<boolean>;
   getRetained?(directory: string): WorktreeKiloRuntime | undefined;
+  getEntryRuntimeId?(directory: string): string | undefined;
   get(directory: string): WorktreeKiloRuntime | undefined;
   prepareForNewWork?(directory: string): boolean;
   isHealthy(): boolean;
@@ -174,6 +201,13 @@ export class WorktreeKiloRuntimeError extends Error {
     super(message);
     this.name = 'WorktreeKiloRuntimeError';
   }
+}
+
+export function isRetirementReportCurrent(
+  currentRuntimeId: string | undefined,
+  retiredRuntimeId: string
+): boolean {
+  return currentRuntimeId === undefined || currentRuntimeId === retiredRuntimeId;
 }
 
 export function buildWorktreeKiloEnvironment(
@@ -348,6 +382,7 @@ export function createWorktreeKiloRuntimes(options: {
   inheritedEnv?: NodeJS.ProcessEnv;
   startServer?: (options: ServerOptions) => Promise<WorktreeKiloServerHandle>;
   onEvent?: (runtime: WorktreeKiloRuntime, event: WorktreeKiloEvent) => unknown;
+  onRootRetirementStarted?: (retirement: RootRuntimeRetirementStarted) => void;
   onRootRetirement?: (retirement: RootRuntimeRetirement) => void;
   onRootDisappeared?: (disappearance: RootRuntimeDisappearance) => void;
   onDiagnostic?: ControlDiagnosticReporter;
@@ -421,12 +456,7 @@ export function createWorktreeKiloRuntimes(options: {
   }
 
   function reportRootRetirement(
-    intent: {
-      directory: string;
-      root: string;
-      nativeRuntimeId: string;
-      target: NativeOperationTarget;
-    },
+    intent: Omit<RootRuntimeRetirement, 'result'>,
     result: NativeRetirement
   ): void {
     options.onRootRetirement?.({ ...intent, result });
@@ -512,7 +542,11 @@ export function createWorktreeKiloRuntimes(options: {
           now >= intent.deadlineAt
             ? now + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS
             : Math.min(intent.deadlineAt, now + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS);
-        void retire(entry, physicalDeadlineAt, intent.target);
+        void retire(entry, physicalDeadlineAt, intent.target, {
+          reason: intent.reason,
+          cleanupDeadlineAt: physicalDeadlineAt,
+          reportToService: true,
+        });
       }
     } finally {
       evaluatingDeferredRetirements.delete(entry);
@@ -540,10 +574,30 @@ export function createWorktreeKiloRuntimes(options: {
   function retire(
     entry: RuntimeEntry,
     requested?: number,
-    target?: NativeOperationTarget
+    target?: NativeOperationTarget,
+    metadata: {
+      reason?: string;
+      cleanupDeadlineAt?: number;
+      reportToService?: boolean;
+    } = {}
   ): Promise<NativeRetirement> {
     const settlementTarget = target ?? { runtimeId: entry.runtimeId, client: entry.kiloClient };
     const affectedRoots = [...entry.roots].map(root => root.identity.kiloSessionId);
+    const retirementId = crypto.randomUUID();
+    const cleanupDeadlineAt =
+      metadata.cleanupDeadlineAt ?? requested ?? Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS;
+    const reason = metadata.reason ?? 'Native runtime retirement requested';
+    for (const root of affectedRoots)
+      options.onRootRetirementStarted?.({
+        directory: entry.directory,
+        root,
+        nativeRuntimeId: settlementTarget.runtimeId,
+        target: settlementTarget,
+        retirementId,
+        reason,
+        cleanupDeadlineAt,
+        ...(metadata.reportToService ? { reportToService: true } : {}),
+      });
     const retirement = retireWorktreeRuntime(entry, requested, target, {
       cleanupDeadline,
       unregisterRoot,
@@ -566,6 +620,10 @@ export function createWorktreeKiloRuntimes(options: {
               root,
               nativeRuntimeId: settlementTarget.runtimeId,
               target: settlementTarget,
+              retirementId,
+              reason,
+              cleanupDeadlineAt,
+              ...(metadata.reportToService ? { reportToService: true } : {}),
             },
             result
           );
@@ -619,7 +677,24 @@ export function createWorktreeKiloRuntimes(options: {
       return Promise.resolve('shared');
     }
     deferredRetirements.delete(deferredRetirementKey(retiringRoot, target.runtimeId));
-    return retire(entry, Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS, target);
+    const physicalDeadlineAt = Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS;
+    return retire(entry, physicalDeadlineAt, target, {
+      reason,
+      cleanupDeadlineAt: physicalDeadlineAt,
+      reportToService: true,
+    });
+  }
+
+  function rootRetirementScope(
+    directory: string,
+    target: NativeOperationTarget,
+    retiringRoot: string
+  ): RootRetirementScope {
+    const entry = entries.get(directory);
+    if (!entry || entry.retiring || !runtimeTargetMatches(entry, target)) return 'stale';
+    const failedRoot = [...entry.roots].find(root => root.identity.kiloSessionId === retiringRoot);
+    if (!failedRoot || !(failedRoot.attached || failedRoot.pending.size > 0)) return 'stale';
+    return liveRoots(entry).some(root => root !== failedRoot) ? 'shared' : 'sole';
   }
 
   function removeRoot(root: RootAttachment): void {
@@ -633,7 +708,10 @@ export function createWorktreeKiloRuntimes(options: {
     if (entry.abort.signal.aborted) return;
     const deadlineAt = cleanupDeadline(entry);
     const runtimeId = entry.runtimeId;
-    void retire(entry, deadlineAt).then(result => {
+    void retire(entry, deadlineAt, undefined, {
+      reason,
+      cleanupDeadlineAt: deadlineAt,
+    }).then(result => {
       if (result === 'unconfirmed') failedDirectories.add(entry.directory);
       options.onUnexpectedClose({
         retirementId: crypto.randomUUID(),
@@ -1075,6 +1153,7 @@ export function createWorktreeKiloRuntimes(options: {
     async retireRuntimeIfUnshared(directory, target, retiringRoot, deadlineAt, reason) {
       return retireRuntimeIfUnshared(directory, target, retiringRoot, deadlineAt, reason);
     },
+    rootRetirementScope,
     async verifyQuiescence(directory, target, deadlineAt) {
       const entry = entries.get(directory);
       if (
@@ -1096,6 +1175,9 @@ export function createWorktreeKiloRuntimes(options: {
     },
     getRetained(directory) {
       return entries.get(directory)?.runtime;
+    },
+    getEntryRuntimeId(directory) {
+      return entries.get(directory)?.runtimeId;
     },
     get(directory) {
       const entry = entries.get(directory);

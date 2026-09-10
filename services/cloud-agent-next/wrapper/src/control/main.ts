@@ -6,7 +6,7 @@ import {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
 import { logToFile } from '../utils.js';
-import { rootForSession } from './session-directories';
+import { ownerDirectoryForSession, rootForSession } from './session-directories';
 import {
   KILO_CONTROL_REQUEST_TIMEOUT_MS,
   maybeStartSandboxControlClient,
@@ -25,9 +25,12 @@ import {
   createWorktreeKiloRuntimes,
   type RootRuntimeDisappearance,
   type RootRuntimeRetirement,
+  type RootRuntimeRetirementStarted,
   type WorktreeKiloRuntime,
+  isRetirementReportCurrent,
 } from './worktree-runtime';
-import type { NativeRetirement, RootScopedCleanupResult } from './session-operation-cleanup';
+import type { RootScopedCleanupResult } from './session-operation-cleanup';
+import type { RootPublicationDisposition } from './operation-registry';
 import { createControlDiagnostics, type ControlDiagnostics } from './diagnostics';
 import { createControlFileLogUploader, type ControlFileLogUploader } from './file-log-uploader';
 import {
@@ -38,7 +41,7 @@ import {
 import { createWorktreeMutationNotifications } from './worktree-mutation-notifications';
 import { createControlEventFailureHandler } from './control-event-transport';
 
-type PublicationRetirementResult = RootScopedCleanupResult | NativeRetirement | 'shared';
+type PublicationRetirementResult = RootPublicationDisposition;
 
 type PublicationFailureAttempt = {
   cleanup: Promise<RootScopedCleanupResult>;
@@ -64,14 +67,67 @@ function main(
   let control: ReturnType<typeof maybeStartSandboxControlClient> = null;
   let shuttingDown = false;
   let heartbeatReason: SandboxHeartbeatPayload['kilo']['reason'];
+  const reportedRuntimeRetirements = new Set<string>();
   const settleRootRetirement = (retirement: RootRuntimeRetirement): void => {
     deps.operations.settleRootPublication(retirement);
+    if (!retirement.reportToService || retirement.result !== 'retired' || !retirement.retirementId)
+      return;
+    const current = kiloRuntimes.get(retirement.directory);
+    if (
+      !isRetirementReportCurrent(
+        kiloRuntimes.getEntryRuntimeId?.(retirement.directory),
+        retirement.nativeRuntimeId
+      ) ||
+      (current &&
+        (current.runtimeId !== retirement.nativeRuntimeId ||
+          (retirement.target.client !== undefined &&
+            current.kiloClient !== retirement.target.client)))
+    )
+      return;
+    if (reportedRuntimeRetirements.has(retirement.retirementId)) return;
+    const client = control;
+    if (!client?.reportNativeRuntimeRetirement) return;
+    reportedRuntimeRetirements.add(retirement.retirementId);
+    const reason = retirement.reason ?? 'Native runtime retirement completed';
+    void client
+      .reportNativeRuntimeRetirement({
+        retirementId: retirement.retirementId,
+        directory: retirement.directory,
+        nativeRuntimeId: retirement.nativeRuntimeId,
+        reason,
+        cleanupDeadlineAt: retirement.cleanupDeadlineAt ?? Date.now(),
+      })
+      .then(
+        reported => {
+          if (
+            !reported &&
+            isRetirementReportCurrent(
+              kiloRuntimes.getEntryRuntimeId?.(retirement.directory),
+              retirement.nativeRuntimeId
+            )
+          )
+            shutdown(1, reason);
+        },
+        () => {
+          if (
+            isRetirementReportCurrent(
+              kiloRuntimes.getEntryRuntimeId?.(retirement.directory),
+              retirement.nativeRuntimeId
+            )
+          )
+            shutdown(1, reason);
+        }
+      );
+  };
+  const markRootRetirementStarted = (retirement: RootRuntimeRetirementStarted): void => {
+    deps.operations.markRootRetirementStarted(retirement);
   };
   const notifyRootDisappeared = (disappearance: RootRuntimeDisappearance): void => {
     deps.operations.notifyRootDisappeared(disappearance);
   };
   const kiloRuntimes = createWorktreeKiloRuntimes({
     onDiagnostic: diagnostics.onDiagnostic,
+    onRootRetirementStarted: markRootRetirementStarted,
     onRootDisappeared: notifyRootDisappeared,
     onRootRetirement: settleRootRetirement,
     onEvent: (runtime, event) => {
@@ -155,6 +211,7 @@ function main(
     activity: createSessionActivityRegistry(),
     signal: abort.signal,
     ...(terminalRuntime ? { terminalRuntime } : {}),
+    scopedCleanupResult: () => control?.supportsScopedCleanupResult?.() === true,
     sendOperationResult: (session, delivery, signal, deadlineAt) => {
       if (!control?.sendOperationResult)
         throw new Error('Sandbox control operation result delivery unavailable');
@@ -188,13 +245,19 @@ function main(
     reason: string
   ): PublicationFailureAttempt | undefined {
     const root = identity.rootKiloSessionId ?? identity.kiloSessionId;
-    if (!root || (identity.nativeRuntimeId && identity.nativeRuntimeId !== runtime.runtimeId))
+    const ownerDirectory = ownerDirectoryForSession(identity);
+    if (
+      !root ||
+      !ownerDirectory ||
+      ownerDirectory !== runtime.directory ||
+      (identity.nativeRuntimeId && identity.nativeRuntimeId !== runtime.runtimeId)
+    )
       return undefined;
     const nativeRuntimeId = identity.nativeRuntimeId ?? runtime.runtimeId;
     const target = { runtimeId: runtime.runtimeId, client: runtime.kiloClient };
     const deadlineAt = Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS;
     return deps.operations.escalateRootPublication({
-      directory: identity.directory,
+      directory: ownerDirectory,
       root,
       nativeRuntimeId,
       target,
@@ -209,7 +272,16 @@ function main(
     reason: string
   ): Promise<PublicationRetirementResult> {
     const attempt = beginPublicationFailure(runtime, identity, reason);
-    if (!attempt) return 'stale';
+    if (!attempt)
+      return {
+        scope: 'runtime',
+        status: 'unconfirmed',
+        cleanup: 'unconfirmed',
+        physical: 'stale',
+        quiescent: false,
+        runtimeRetired: false,
+        physicalAttemptStarted: false,
+      };
     return attempt.physical;
   }
 
@@ -229,7 +301,9 @@ function main(
   }
 
   function startPublicationFailure(identity: SessionEventIdentity, reason: string): void {
-    const runtime = kiloRuntimes.get(identity.directory);
+    const ownerDirectory = ownerDirectoryForSession(identity);
+    if (!ownerDirectory) return;
+    const runtime = kiloRuntimes.get(ownerDirectory);
     if (!runtime) return;
     const attempt = beginPublicationFailure(runtime, identity, reason);
     if (!attempt) return;
@@ -436,8 +510,10 @@ function main(
             }
             void attempt.physical.then(
               result => {
-                if (result === 'retired' || result === 'stale')
+                if (result.runtimeRetired || result.physical === 'stale')
                   reportOutboxRetirement(failure, runtime.runtimeId, 'retired', true);
+                else if (result.scope === 'root')
+                  reportOutboxRetirement(failure, runtime.runtimeId, 'failed', false);
                 else {
                   reportOutboxRetirement(failure, runtime.runtimeId, 'failed', false);
                   diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'failed' });

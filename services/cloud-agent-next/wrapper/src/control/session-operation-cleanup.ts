@@ -25,7 +25,7 @@ export class SessionOperationCleanup {
   private state: CleanupState = 'not_requested';
   private pending?: Promise<boolean>;
   private rootScopedPending?: Promise<RootScopedCleanupResult>;
-  private rootScopedResult?: RootScopedCleanupResult;
+  private rootScopedFull?: Promise<RootScopedCleanupResult>;
   private processStop?: Promise<boolean>;
   private nativeAbort?: Promise<boolean>;
 
@@ -104,32 +104,17 @@ export class SessionOperationCleanup {
     completionEvidence: NativeCleanupEvidence;
     cancel: () => void;
   }): Promise<RootScopedCleanupResult> {
-    if (this.rootScopedResult) return Promise.resolve(this.rootScopedResult);
     if (this.rootScopedPending) return this.rootScopedPending;
 
     const deadlineAt = this.captureDeadline(input.deadlineAt);
-    const processes = this.stopProcesses(deadlineAt);
-    if (input.completionEvidence === 'unconfirmed') input.cancel();
-    this.rootScopedPending = (async () => {
-      if (!(await processes)) return 'unconfirmed';
-      const target = input.target;
-      const client = target?.client;
-      if (!target || !client)
-        return input.completionEvidence === 'unconfirmed' ? 'unconfirmed' : 'confirmed';
-      if (!this.rootCurrent(target, deadlineAt)) return 'unconfirmed';
-      if (
-        input.completionEvidence === 'unconfirmed' &&
-        !(await this.abortNative(target, deadlineAt))
-      )
-        return 'unconfirmed';
-      return (await this.observeRootIdle(target, client, deadlineAt)) ? 'confirmed' : 'unconfirmed';
-    })()
-      .catch(() => 'unconfirmed' as const)
-      .then(result => {
-        this.rootScopedResult = result;
-        return result;
-      });
+    const fullCleanup = this.performRootScopedCleanup(input, deadlineAt);
+    this.rootScopedFull = fullCleanup;
+    this.rootScopedPending = fullCleanup;
     return this.rootScopedPending;
+  }
+
+  waitForRootScopedCleanup(): Promise<RootScopedCleanupResult> {
+    return this.rootScopedFull ?? this.rootScopedPending ?? Promise.resolve('unconfirmed');
   }
 
   confirm(confirmed: boolean, deadlineAt: number): boolean {
@@ -234,11 +219,15 @@ export class SessionOperationCleanup {
             for (const [id, status] of Object.entries(statuses)) {
               if (status.type === 'idle') continue;
               const statusRoot = rootForSession(id, directory);
-              if (!statusRoot) return false;
-              if (statusRoot === root) idle = false;
+              if (!statusRoot || statusRoot === root) {
+                idle = false;
+                break;
+              }
             }
             if (idle) return current();
-            await delay(Math.min(25, Math.max(1, deadlineAt - Date.now())), undefined, { signal });
+            await delay(Math.min(25, Math.max(1, deadlineAt - Date.now())), undefined, {
+              signal,
+            });
           }
           return false;
         }, controller.signal),
@@ -250,6 +239,33 @@ export class SessionOperationCleanup {
       );
     } finally {
       controller.abort();
+    }
+  }
+
+  private async performRootScopedCleanup(
+    input: {
+      deadlineAt: number;
+      target?: NativeOperationTarget;
+      completionEvidence: NativeCleanupEvidence;
+      cancel: () => void;
+    },
+    deadlineAt: number
+  ): Promise<RootScopedCleanupResult> {
+    const processes = this.stopProcesses(deadlineAt);
+    if (input.completionEvidence === 'unconfirmed') input.cancel();
+    const target = input.target;
+    const client = target?.client;
+    const native =
+      target && client && input.completionEvidence === 'unconfirmed'
+        ? this.abortNative(target, deadlineAt)
+        : Promise.resolve(target && client ? true : false);
+    try {
+      const [processesStopped, nativeAccepted] = await Promise.all([processes, native]);
+      if (!processesStopped || !nativeAccepted || !target || !client) return 'unconfirmed';
+      if (!this.rootCurrent(target, deadlineAt)) return 'unconfirmed';
+      return (await this.observeRootIdle(target, client, deadlineAt)) ? 'confirmed' : 'unconfirmed';
+    } catch {
+      return 'unconfirmed';
     }
   }
 

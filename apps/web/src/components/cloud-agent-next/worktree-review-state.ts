@@ -262,20 +262,26 @@ export function createWorktreeReviewStore(persistence?: WorktreeReviewPersistenc
     persistGeneration.set(key, (persistGeneration.get(key) ?? 0) + 1);
   };
 
+  const persistSnapshot = (key: string, generation: number): Promise<void> => {
+    if (!persistence) return Promise.resolve();
+    const current = drafts.get(key);
+    const value = current ? persistedDraft(current) : null;
+    const operation =
+      value && hasPersistedDraftContent(value)
+        ? persistence.save(key, value)
+        : persistence.clear(key);
+    return Promise.resolve(operation).then(() => {
+      if ((persistGeneration.get(key) ?? 0) === generation) return;
+      return persistSnapshot(key, persistGeneration.get(key) ?? 0);
+    });
+  };
+
   const savePersistedDraft = (draft: WorktreeReviewDraft) => {
     if (!persistence || hydration.get(worktreeReviewScopeKey(draft.scope)) !== 'ready') return;
     const key = worktreeReviewScopeKey(draft.scope);
     const generation = persistGeneration.get(key) ?? 0;
-    const value = persistedDraft(draft);
     try {
-      const operation = hasPersistedDraftContent(value)
-        ? persistence.save(key, value)
-        : persistence.clear(key);
-      void Promise.resolve(operation)
-        .then(() => {
-          if ((persistGeneration.get(key) ?? 0) !== generation) return persistence.clear(key);
-        })
-        .catch(() => undefined);
+      void persistSnapshot(key, generation).catch(() => undefined);
     } catch {
       // Persistence is best effort; the in-memory draft remains authoritative.
     }

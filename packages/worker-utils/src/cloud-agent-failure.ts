@@ -115,13 +115,21 @@ export const CLOUD_AGENT_FAILURE_REASONS = [
   'managed_model_configuration',
   'provider_unavailable',
   'request_timeout',
-  'invalid_request',
-  'context_limit',
-  'output_limit',
-  'content_filter',
-  'structured_output',
+  'assistant_invalid_request',
+  'assistant_context_limit',
+  'assistant_output_limit',
+  'assistant_content_filter',
+  'assistant_structured_output',
+  'provider_ownership_unknown',
   'source_control_network',
   'assistant_unknown',
+  'wrapper_disconnected',
+  'wrapper_startup',
+  'wrapper_crash',
+  'assistant_no_reply',
+  'user_interrupt',
+  'container_shutdown',
+  'system_interrupt',
   'workspace_unknown',
   'session_import_timeout',
   'session_import_failed',
@@ -135,6 +143,14 @@ export const CLOUD_AGENT_FAILURE_REASONS = [
   'session_coordination',
   'initial_request_invalid',
   'initial_admission_unknown',
+  // Deprecated producer values: the classifier now emits the `assistant_*`
+  // reasons above. Retained so historical rows in the unconstrained text column
+  // still resolve to a label instead of rendering blank for the retention window.
+  'invalid_request',
+  'context_limit',
+  'output_limit',
+  'content_filter',
+  'structured_output',
   'unclassified',
 ] as const;
 export const CloudAgentFailureReasonSchema = z.enum(CLOUD_AGENT_FAILURE_REASONS);
@@ -216,17 +232,17 @@ function classifyWorkspaceFailure(
     case 'git_rate_limited':
       return classified('platform', 'rate_limited');
     case 'git_clone_timeout':
-      return classified('unknown', 'source_control_clone_timeout');
+      return classified('platform', 'source_control_clone_timeout');
     case 'git_checkout_timeout':
-      return classified('unknown', 'source_control_checkout_timeout');
+      return classified('platform', 'source_control_checkout_timeout');
     case 'git_network_failed':
-      return classified('unknown', 'source_control_network');
+      return classified('platform', 'source_control_network');
     case 'git_pack_corrupt':
-      return classified('unknown', 'source_control_repository_corrupt');
+      return classified('platform', 'source_control_repository_corrupt');
     case 'kilo_import_timeout':
-      return classified('unknown', 'session_import_timeout');
+      return classified('platform', 'session_import_timeout');
     case 'kilo_import_failed':
-      return classified('unknown', 'session_import_failed');
+      return classified('platform', 'session_import_failed');
     case 'workspace_setup_unknown':
     case undefined:
       return classified('unknown', 'workspace_unknown');
@@ -270,6 +286,17 @@ function classifyAdmissionFailure(
   }
 }
 
+/**
+ * Assistant limits whose responsibility depends on whose credential the model
+ * ran under: the user's own key makes the request shape/quota their problem,
+ * our managed key makes it ours, and an unknown owner stays unknown.
+ */
+const OWNERSHIP_DEPENDENT_ASSISTANT_LIMITS = {
+  invalid_request: 'assistant_invalid_request',
+  context_limit: 'assistant_context_limit',
+  output_limit: 'assistant_output_limit',
+} as const;
+
 function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClassification {
   if (input.code === 'payment_required' || input.assistantReason === 'insufficient_credits') {
     return classified('user', 'insufficient_credits');
@@ -287,27 +314,42 @@ function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClas
     if (input.providerOwnership === 'managed') {
       return classified('platform', 'managed_provider_authentication');
     }
-    return classified('unknown', 'provider_authentication');
+    return classified('unknown', 'provider_ownership_unknown');
   }
   if (input.assistantReason === 'timeout') {
-    return classified(
-      input.providerOwnership === 'managed' ? 'platform' : 'unknown',
-      'request_timeout'
-    );
+    if (input.providerOwnership === 'managed') {
+      return classified('platform', 'request_timeout');
+    }
+    return input.providerOwnership === 'byok'
+      ? classified('unknown', 'request_timeout')
+      : classified('unknown', 'provider_ownership_unknown');
   }
   if (input.assistantReason === 'provider_unavailable') {
-    return input.providerOwnership === 'managed'
-      ? classified('platform', 'managed_provider_unavailable')
-      : classified('unknown', 'provider_unavailable');
+    if (input.providerOwnership === 'managed') {
+      return classified('platform', 'managed_provider_unavailable');
+    }
+    return input.providerOwnership === 'byok'
+      ? classified('unknown', 'provider_unavailable')
+      : classified('unknown', 'provider_ownership_unknown');
   }
   if (
     input.assistantReason === 'invalid_request' ||
     input.assistantReason === 'context_limit' ||
-    input.assistantReason === 'output_limit' ||
-    input.assistantReason === 'content_filter' ||
-    input.assistantReason === 'structured_output'
+    input.assistantReason === 'output_limit'
   ) {
-    return classified('unknown', input.assistantReason);
+    const responsibility =
+      input.providerOwnership === 'byok'
+        ? 'user'
+        : input.providerOwnership === 'managed'
+          ? 'platform'
+          : 'unknown';
+    return classified(responsibility, OWNERSHIP_DEPENDENT_ASSISTANT_LIMITS[input.assistantReason]);
+  }
+  if (input.assistantReason === 'content_filter') {
+    return classified('user', 'assistant_content_filter');
+  }
+  if (input.assistantReason === 'structured_output') {
+    return classified('platform', 'assistant_structured_output');
   }
   return classified('unknown', 'assistant_unknown');
 }
@@ -349,12 +391,16 @@ export function classifyCloudAgentFailure(
     case 'delivery_failure_unknown':
       return classified('platform', 'delivery');
     case 'wrapper_disconnected':
+      return classified('platform', 'wrapper_disconnected');
     case 'wrapper_no_output':
     case 'wrapper_ping_timeout':
-    case 'wrapper_error_before_activity':
-    case 'wrapper_error_after_activity':
-    case 'missing_assistant_reply':
       return classified('platform', 'wrapper_liveness');
+    case 'wrapper_error_before_activity':
+      return classified('platform', 'wrapper_startup');
+    case 'wrapper_error_after_activity':
+      return classified('platform', 'wrapper_crash');
+    case 'missing_assistant_reply':
+      return classified('platform', 'assistant_no_reply');
     case 'assistant_error':
     case 'payment_required':
     case 'model_missing':
@@ -362,9 +408,11 @@ export function classifyCloudAgentFailure(
     case 'unclassified':
       return classified('unknown', 'unclassified');
     case 'user_interrupt':
+      return classified('user', 'user_interrupt');
     case 'container_shutdown':
+      return classified('platform', 'container_shutdown');
     case 'system_interrupt':
-      return classified('unknown', 'unclassified');
+      return classified('platform', 'system_interrupt');
   }
 }
 

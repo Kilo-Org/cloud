@@ -49,7 +49,7 @@ describe('classifyCloudAgentFailure', () => {
     });
   });
 
-  it('preserves ambiguous assistant and source-control failures as unknown', () => {
+  it('preserves ambiguous assistant failures as unknown', () => {
     expect(
       classifyCloudAgentFailure({
         source: 'run',
@@ -59,6 +59,9 @@ describe('classifyCloudAgentFailure', () => {
         providerOwnership: 'unknown',
       })
     ).toEqual({ responsibility: 'unknown', reason: 'assistant_unknown' });
+  });
+
+  it('attributes source-control infrastructure failures to the platform', () => {
     expect(
       classifyCloudAgentFailure({
         source: 'run',
@@ -66,7 +69,7 @@ describe('classifyCloudAgentFailure', () => {
         code: 'workspace_setup_failed',
         workspaceSubtype: 'git_network_failed',
       })
-    ).toEqual({ responsibility: 'unknown', reason: 'source_control_network' });
+    ).toEqual({ responsibility: 'platform', reason: 'source_control_network' });
     expect(
       classifyCloudAgentFailure({
         source: 'run',
@@ -74,18 +77,18 @@ describe('classifyCloudAgentFailure', () => {
         code: 'workspace_setup_failed',
         workspaceSubtype: 'git_pack_corrupt',
       })
-    ).toEqual({ responsibility: 'unknown', reason: 'source_control_repository_corrupt' });
+    ).toEqual({ responsibility: 'platform', reason: 'source_control_repository_corrupt' });
   });
 
   it.each([
     ['provider_authentication', 'byok', 'user', 'provider_authentication'],
     ['provider_authentication', 'managed', 'platform', 'managed_provider_authentication'],
-    ['provider_authentication', 'unknown', 'unknown', 'provider_authentication'],
-    ['provider_authentication', undefined, 'unknown', 'provider_authentication'],
+    ['provider_authentication', 'unknown', 'unknown', 'provider_ownership_unknown'],
+    ['provider_authentication', undefined, 'unknown', 'provider_ownership_unknown'],
     ['provider_unavailable', 'byok', 'unknown', 'provider_unavailable'],
     ['provider_unavailable', 'managed', 'platform', 'managed_provider_unavailable'],
-    ['provider_unavailable', 'unknown', 'unknown', 'provider_unavailable'],
-    ['provider_unavailable', undefined, 'unknown', 'provider_unavailable'],
+    ['provider_unavailable', 'unknown', 'unknown', 'provider_ownership_unknown'],
+    ['provider_unavailable', undefined, 'unknown', 'provider_ownership_unknown'],
   ] as const)(
     'classifies %s with %s ownership without losing the known cause',
     (assistantReason, providerOwnership, responsibility, reason) => {
@@ -102,41 +105,75 @@ describe('classifyCloudAgentFailure', () => {
   );
 
   it.each([
-    ['managed', 'platform'],
-    ['byok', 'unknown'],
-    ['unknown', 'unknown'],
-    [undefined, 'unknown'],
-  ] as const)('retains request_timeout with %s ownership', (providerOwnership, responsibility) => {
-    const failure = classifyCloudAgentFailure({
-      source: 'run',
-      stage: 'agent_activity',
-      code: 'assistant_error',
-      assistantReason: 'timeout',
-      providerOwnership,
-    });
-
-    expect(failure).toEqual({ responsibility, reason: 'request_timeout' });
-    expect(CloudAgentFailureReasonSchema.parse(failure.reason)).toBe('request_timeout');
-  });
-
-  it.each([
-    'context_limit',
-    'output_limit',
-    'content_filter',
-    'structured_output',
-    'invalid_request',
-  ] as const)('retains %s without inferring responsibility from ownership', assistantReason => {
-    for (const providerOwnership of [...CLOUD_AGENT_PROVIDER_OWNERSHIPS, undefined]) {
+    ['managed', 'platform', 'request_timeout'],
+    ['byok', 'unknown', 'request_timeout'],
+    ['unknown', 'unknown', 'provider_ownership_unknown'],
+    [undefined, 'unknown', 'provider_ownership_unknown'],
+  ] as const)(
+    'retains request_timeout with %s ownership',
+    (providerOwnership, responsibility, reason) => {
       const failure = classifyCloudAgentFailure({
         source: 'run',
         stage: 'agent_activity',
         code: 'assistant_error',
-        assistantReason,
+        assistantReason: 'timeout',
         providerOwnership,
       });
 
-      expect(failure).toEqual({ responsibility: 'unknown', reason: assistantReason });
-      expect(CloudAgentFailureReasonSchema.parse(failure.reason)).toBe(assistantReason);
+      expect(failure).toEqual({ responsibility, reason });
+      expect(CloudAgentFailureReasonSchema.parse(failure.reason)).toBe(reason);
+    }
+  );
+
+  it.each([
+    ['invalid_request', 'assistant_invalid_request'],
+    ['context_limit', 'assistant_context_limit'],
+    ['output_limit', 'assistant_output_limit'],
+  ] as const)(
+    'attributes %s by provider ownership without collapsing the cause',
+    (assistantReason, expectedReason) => {
+      const cases = [
+        ['byok', 'user'],
+        ['managed', 'platform'],
+        ['unknown', 'unknown'],
+        [undefined, 'unknown'],
+      ] as const;
+
+      for (const [providerOwnership, responsibility] of cases) {
+        const failure = classifyCloudAgentFailure({
+          source: 'run',
+          stage: 'agent_activity',
+          code: 'assistant_error',
+          assistantReason,
+          providerOwnership,
+        });
+
+        expect(failure).toEqual({ responsibility, reason: expectedReason });
+        expect(CloudAgentFailureReasonSchema.parse(failure.reason)).toBe(expectedReason);
+      }
+    }
+  );
+
+  it('attributes content filter to the user and structured output to the platform', () => {
+    for (const providerOwnership of [...CLOUD_AGENT_PROVIDER_OWNERSHIPS, undefined]) {
+      expect(
+        classifyCloudAgentFailure({
+          source: 'run',
+          stage: 'agent_activity',
+          code: 'assistant_error',
+          assistantReason: 'content_filter',
+          providerOwnership,
+        })
+      ).toEqual({ responsibility: 'user', reason: 'assistant_content_filter' });
+      expect(
+        classifyCloudAgentFailure({
+          source: 'run',
+          stage: 'agent_activity',
+          code: 'assistant_error',
+          assistantReason: 'structured_output',
+          providerOwnership,
+        })
+      ).toEqual({ responsibility: 'platform', reason: 'assistant_structured_output' });
     }
   });
 
@@ -182,13 +219,13 @@ describe('classifyCloudAgentFailure', () => {
   );
 
   it.each([
-    ['git_clone_timeout', 'unknown', 'source_control_clone_timeout'],
-    ['git_checkout_timeout', 'unknown', 'source_control_checkout_timeout'],
-    ['git_pack_corrupt', 'unknown', 'source_control_repository_corrupt'],
+    ['git_clone_timeout', 'platform', 'source_control_clone_timeout'],
+    ['git_checkout_timeout', 'platform', 'source_control_checkout_timeout'],
+    ['git_pack_corrupt', 'platform', 'source_control_repository_corrupt'],
     ['setup_command_timeout', 'user', 'setup_command_timeout'],
     ['setup_command_failed', 'user', 'setup_command'],
-    ['kilo_import_timeout', 'unknown', 'session_import_timeout'],
-    ['kilo_import_failed', 'unknown', 'session_import_failed'],
+    ['kilo_import_timeout', 'platform', 'session_import_timeout'],
+    ['kilo_import_failed', 'platform', 'session_import_failed'],
   ] as const)(
     'splits collapsed workspace subtype %s into reason %s',
     (workspaceSubtype, responsibility, reason) => {
@@ -202,6 +239,31 @@ describe('classifyCloudAgentFailure', () => {
       ).toEqual({ responsibility, reason });
     }
   );
+
+  it.each([
+    ['wrapper_disconnected', 'wrapper_disconnected'],
+    ['wrapper_no_output', 'wrapper_liveness'],
+    ['wrapper_ping_timeout', 'wrapper_liveness'],
+    ['wrapper_error_before_activity', 'wrapper_startup'],
+    ['wrapper_error_after_activity', 'wrapper_crash'],
+    ['missing_assistant_reply', 'assistant_no_reply'],
+  ] as const)('splits wrapper code %s into platform reason %s', (code, reason) => {
+    expect(classifyCloudAgentFailure({ source: 'run', stage: 'agent_activity', code })).toEqual({
+      responsibility: 'platform',
+      reason,
+    });
+  });
+
+  it.each([
+    ['user_interrupt', 'user', 'user_interrupt'],
+    ['container_shutdown', 'platform', 'container_shutdown'],
+    ['system_interrupt', 'platform', 'system_interrupt'],
+  ] as const)('attributes interruption code %s to %s/%s', (code, responsibility, reason) => {
+    expect(classifyCloudAgentFailure({ source: 'run', stage: 'interruption', code })).toEqual({
+      responsibility,
+      reason,
+    });
+  });
 
   it('classifies setup failures from structured stage and code only', () => {
     expect(

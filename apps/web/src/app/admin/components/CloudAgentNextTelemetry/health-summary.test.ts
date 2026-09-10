@@ -107,7 +107,19 @@ describe('failure responsibility summary', () => {
     ['content_filter', 'Content filter'],
     ['structured_output', 'Invalid structured output'],
     ['invalid_request', 'Model request rejected'],
-    ['request_timeout', 'Request timed out'],
+    ['assistant_invalid_request', 'Assistant invalid request'],
+    ['assistant_context_limit', 'Assistant context limit'],
+    ['assistant_output_limit', 'Assistant output limit'],
+    ['assistant_content_filter', 'Assistant content filter'],
+    ['assistant_structured_output', 'Assistant structured output'],
+    ['provider_ownership_unknown', 'Unknown provider ownership'],
+    ['user_interrupt', 'User interrupt'],
+    ['container_shutdown', 'Container shutdown'],
+    ['system_interrupt', 'System interrupt'],
+    ['wrapper_disconnected', 'Wrapper disconnected'],
+    ['wrapper_startup', 'Wrapper startup failure'],
+    ['wrapper_crash', 'Wrapper crash after activity'],
+    ['assistant_no_reply', 'Assistant no reply'],
   ] as const)('labels %s as %s', (reason, label) => {
     expect(failureReasonLabel(reason)).toBe(label);
   });

@@ -36,6 +36,7 @@
     "cost": "تێچوون",
     "discard": "وازهێنان",
     "findings": "دۆزینەوەکان",
+    "mergeRequest": "داواکاری تێکەڵکردن",
     "notConnected": "نەبەستراوەتەوە",
     "notifications": "ئاگادارکردنەوەکان",
     "pullRequest": "داواکاری یەکخستن",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "ڕیزی بەتاڵی جیاوازی"
     },
     "connectionExpired": "ماوەی پەیوەندی بە GitHub بەسەرچووە.",
+    "capabilities": {
+      "banner": {
+        "title": "لەم پێشکەشکارە بەردەست نییە",
+        "accessibility": "لەم پێشکەشکارە بەردەست نییە: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "یەکخستن",
       "mergeNow": "ئێستا تێکەڵ بکە",
       "mergePullRequest": "تێکەڵکردنی داواکاری ڕاکێشان",
+      "mergeTermTitle": "تێکەڵکردنی {{term}}",
       "enableAutoMerge": "تێکەڵکردنی ئۆتۆماتیکی چالاک بکە",
       "disableAutoMerge": "تێکەڵکردنی ئۆتۆماتیکی ناچالاک بکە",
       "autoMergeOn": "تێکەڵکردنی ئۆتۆماتیکی چالاکە",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "دوای تێکەڵکردن لقەکە بسڕەوە",
       "noEnabledMethods": "لە ئەم ڕێپۆیەدا هیچ شێوازێکی تێکەڵکردن چالاک نییە. لە بەڕێوەبەرێکی ڕێپۆکە داوا بکە تێکەڵکردنی ئاسایی، یەکخستنی کۆمیتەکان، یان گۆڕینی بنەما چالاک بکات.",
       "confirmTitle": "داواکارییەکەی ڕاکێشان تێکەڵ بکرێت؟",
+      "confirmTitleTerm": "{{term}} تێکەڵ بکرێت؟",
       "confirmMessage": "بەم کارە گۆڕانکارییەکانت لە لقە بنەڕەتییەکەدا تێکەڵ دەکرێن.",
       "enableAutoMergeConfirmTitle": "تێکەڵکردنی ئۆتۆماتیکی چالاک بکرێت؟",
       "enableAutoMergeConfirmMessage": "کاتێک هەموو پشکنینە پێویستەکان سەرکەوتوو بن، GitHub ئەم داواکارییەی ڕاکێشان بە ئۆتۆماتیکی تێکەڵ دەکات.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} بەشێوازی خۆکار تێکەڵ دەکرێت کاتێک پایپ‌لاینەکەی سەرکەوتوو دەبێت.",
+      "enableAutoMergeDescriptionTerm": "GitLab ئەم {{term}}ە بەشێوازی خۆکار تێکەڵ دەکات کاتێک پایپ‌لاینەکەی سەرکەوتوو دەبێت.",
       "forbidden": "مۆڵەتی تێکەڵکردنی ئەم داواکاری ڕاکێشانەت نییە.",
       "cannotMerge": "ناتوانرێت ئەم داواکارییەی ڕاکێشان بە دۆخی ئێستای تێکەڵ بکرێت.",
       "couldNotMerge": "نەتوانرا داواکاری ڕاکێشان تێکەڵ بکرێت.",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "پێشتر تێکەڵ کراوە",
-        "closed": "ئەم داواکاری ڕاکێشانە داخراوە"
+        "closed": "ئەم داواکاری ڕاکێشانە داخراوە",
+        "closedMergeRequest": "ئەم داواکاری تێکەڵکردنە داخراوە"
       },
       "partialSuccessBanner": {
         "body": "نەتوانرا لقەکە بسڕدرێتەوە: {{reason}}.",
@@ -400,6 +412,18 @@
         "behindDetail": "لقە سەرچاوەکە لە لقە بنەڕەتییەکە دوا کەوتووە. پێش تێکەڵکردن، بنەمای لقەکە بگۆڕە یان نوێی بکەرەوە.",
         "notMergeableTitle": "ئەم داواکاری ڕاکێشانە هێشتا ناتوانرێت تێکەڵ بکرێت",
         "notMergeableDetail": "GitHub دۆخی ئەگەری تێکەڵکردنی بە {{state}} ڕاگەیاندووە."
+      },
+      "restrictions": {
+        "title": "سنووردارکردنی تێکەڵکردن",
+        "approvalsRequired_one": "پێویست بە {{displayCount}} پەسەندکردنە",
+        "approvalsRequired_other": "پێویست بە {{displayCount}} پەسەندکردنە",
+        "pipelineMustSucceed": "پێویستە پایپ‌لاین پێش تێکەڵکردن سەرکەوتوو بێت."
+      },
+      "providerBlocked": {
+        "failingPipeline": "پایپ‌لاین لە دواین کۆمیتدا سەرکەوتوو نییە.",
+        "pendingPipeline": "پایپ‌لاین هێشتا لە دواین کۆمیتدا کار دەکات.",
+        "permission": "مۆڵەتی تێکەڵکردنی ئەم {{term}}ەت نییە.",
+        "draft": "پێش تێکەڵکردن، {{term}} وەک ئامادە بۆ پێداچوونەوە نیشان بکە."
       },
       "methodLabels": {
         "merge": "کۆمیتێکی تێکەڵکردن دروست بکە",
@@ -448,6 +472,7 @@
       "acceptTerms": "پەسند بکە",
       "replyBadRequest": "ناتوانرێت ئەم وەڵامە بڵاو بکرێتەوە. ڕەنگە زنجیرەی گفتوگۆکە گۆڕابێت.",
       "replyForbidden": "مۆڵەتی وەڵامدانەوەی ئەم داواکارییەی ڕاکێشانت نییە.",
+      "replyForbiddenTerm": "مۆڵەتی وەڵامدانەوەی ئەم {{term}}ەت نییە.",
       "moderation": {
         "reportContent": {
           "terminal": "ئەم بۆچوونە ناتوانرێت ڕاپۆرت بکرێت.",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "پێداچوونەوە بە داواکارییەکەی ڕاکێشان بکە",
     "headLine": "{{counts}} · دوایین کۆمیت {{sha}}",
     "entry": {
-      "eyebrow": "داواکارییەکی ڕاکێشان بە URL بکەرەوە.",
-      "pastePrLink": "بەستەری PR بلکێنە",
-      "noRecentPrs": "هیچ PR ـێک لە دوایینەکاندا نییە",
-      "noRecentPrsDescription": "بۆ دەستپێکردنی پێداچوونەوە بەستەری PR لە سەرەوە بلکێنە — جاری داهاتوو لێرە دەردەکەوێت.",
+      "eyebrow": "داواکارییەکی ڕاکێشان یان تێکەڵکردن بە URL بکەرەوە.",
+      "pastePrLink": "بەستەری داواکاری ڕاکێشان یان تێکەڵکردن بلکێنە",
+      "noRecentPrs": "هیچ پێداچوونەوەیەکی دوایین نییە",
+      "noRecentPrsDescription": "بۆ دەستپێکردنی پێداچوونەوە بەستەرێک لە سەرەوە بلکێنە — جاری داهاتوو لێرە دەردەکەوێت.",
       "couldNotLoad": "نەتوانرا بار بکرێت.",
       "removeFromRecentsTitle": "لە لیستی دوایینەکان لاببرێت؟",
-      "removeFromRecentsMessage": "ئەم داواکارییەی ڕاکێشان لە لیستی دوایینەکانت لادەبرێت.",
+      "removeFromRecentsMessage": "ئەم پێداچوونەوەیە لە لیستی دوایینەکانت لادەبرێت.",
       "removeRecentAccessibility": "{{repo}} لە لیستی دوایینەکان لاببە",
-      "urlAccessibility": "URL ـی داواکاری ڕاکێشانی GitHub",
-      "clearLink": "بەستەری داواکارییەکەی ڕاکێشان پاک بکەرەوە",
-      "pasteLink": "بەستەری داواکاری ڕاکێشان بلکێنە",
+      "urlAccessibility": "URLی داواکاری ڕاکێشان یان تێکەڵکردن بنووسە",
+      "urlPlaceholder": "URLی داواکاری ڕاکێشان یان داواکاری تێکەڵکردن",
+      "openAccessibility": "کردنەوەی داواکاری ڕاکێشان یان داواکاری تێکەڵکردن",
+      "clearLink": "بەستەر پاک بکەرەوە",
+      "pasteLink": "بەستەری داواکاری ڕاکێشان یان تێکەڵکردن بلکێنە",
       "open": "کراوە"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "نەتوانرا پەیوەندی بە GitHub بپشکنرێت.",
       "checkFailedMessage": "تا ئەمە بار نەکرێت، دۆخی چوونەژوورەوە بەردەست نییە.",
+      "checkFailedTitleGitLab": "نەتوانرا پەیوەندی بە GitLab بپشکنرێت.",
+      "checkFailedTitleBitbucket": "نەتوانرا پەیوەندی بە Bitbucket بپشکنرێت.",
+      "providerCheckFailedMessage": "دۆخی پەیوەندی تا بارکردن بەردەست نییە.",
       "reconnectTitle": "دووبارە بەستنەوەی GitHub",
       "reconnectDescription": "مۆڵەتی پەیوەندییەکەت بە GitHub هەڵوەشێنراوەتەوە. بۆ بەردەوامبوون لە پێداچوونەوە بە داواکارییەکانی ڕاکێشان لە مۆبایلدا، دووبارە بیبەستەوە.",
-      "description": "بۆ پێداچوونەوە بە داواکارییەکانی ڕاکێشان لە مۆبایلدا، هەژمارەکەت لە GitHub ببەستەوە."
+      "description": "بۆ پێداچوونەوە بە داواکارییەکانی ڕاکێشان لە مۆبایلدا، هەژمارەکەت لە GitHub ببەستەوە.",
+      "gitlabDescription": "هەژمارەی GitLabەکەت بچەلەاندن بۆ پێداچوونەوەی داواکارییەکانی تێکەڵکردن لە مۆبایلدا.",
+      "bitbucketDescription": "Bitbucket بەم ڕێکخراوە بچەلەێنە بۆ پێداچوونەوەی داواکارییەکانی ڕاکێشان لە مۆبایلدا.",
+      "bitbucketOrgOnlyDescription": "ڕێکخراوێک لە پرۆفایلەکەت هەڵبژێرە بۆ پێداچوونەوەی داواکارییەکانی ڕاکێشانی Bitbucketی."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "ماوەی پەیوەندی بە GitHub بەسەرچووە.",
-      "message": "پەیوەندییەکەت بە GitHub چیتر کار ناکات. دووبارە پەیوەندییەکەت بپشکنە — ئەگەر پێویست بێت، داوات لێ دەکرێت دووبارە بیبەستیتەوە."
+      "message": "پەیوەندییەکەت بە GitHub چیتر کار ناکات. دووبارە پەیوەندییەکەت بپشکنە — ئەگەر پێویست بێت، داوات لێ دەکرێت دووبارە بیبەستیتەوە.",
+      "gitlabTitle": "ماوەی پەیوەندی بە GitLab بەسەرچووە.",
+      "bitbucketTitle": "ماوەی پەیوەندی بە Bitbucket بەسەرچووە.",
+      "providerMessage": "پەیوەندییەکەت بە {{provider}} چیتر کار ناکات. دووبارە پەیوەندییەکەت بپشکنە — ئەگەر پێویست بێت، داوات لێ دەکرێت دووبارە بیبەستیتەوە."
     },
     "eventChips": {
       "comment": "بۆچوون",
@@ -643,6 +679,21 @@
       "files": "پەڕگە",
       "discussion": "گفتوگۆ"
     },
+    "terms": {
+      "pullRequest": "داواکاری یەکخستن",
+      "mergeRequest": "داواکاری تێکەڵکردن",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "داواکارییەکەی تێکەڵکردن هاوبەش بکە",
+      "viewOnProvider": "بینین لە {{provider}}",
+      "mergeRequestUnavailable": "داواکاری تێکەڵکردن بەردەست نییە",
+      "unavailableDescription": "لەوانەیە سڕابێتەوە، یان لەوانەیە مۆڵەتی بینینت نەبێت.",
+      "accessDeniedMergeRequest": "مۆڵەتی بینینی ئەم داواکاری تێکەڵکردنەت نییە.",
+      "couldNotLoadMergeRequest": "نەتوانرا داواکاری تێکەڵکردن بار بکرێت.",
+      "discussionAccessDenied": "مۆڵەتی بینینی گفتوگۆی ئەم داواکارییەی تێکەڵکردنەت نییە.",
+      "discussionUnavailableMessage": "ڕەنگە ئەم داواکاری تێکەڵکردنە لابرابێت.",
+      "noDiscussionDescription": "لەسەر ئەم داواکارییەی تێکەڵکردن هیچ زنجیرەی پێداچوونەوە یان بۆچوونێکی گفتوگۆ نییە.",
+      "noFilesChangedDescription": "لە ئەم داواکارییەی تێکەڵکردندا هیچ فایلێک نەگۆڕاوە."
+    },
     "fileStatus": {
       "modified": "گۆڕدراو",
       "renamed": "ناوگۆڕدراو",
@@ -659,7 +710,7 @@
       "emptyLine": "(بەتاڵ)"
     },
     "linkPasteClipboardEmpty": "کلیپبۆردەکە بەتاڵە.",
-    "linkPasteNotAPullRequest": "ئەمە بەستەری داواکاری ڕاکێشانی GitHub نییە.",
+    "linkPasteNotAPullRequest": "ئەمە بەستەری داواکاری ڕاکێشان یان تێکەڵکردن نییە.",
     "announce": {
       "commentPosted": "بۆچوون بڵاوکرایەوە",
       "reviewSubmitted": "پێداچوونەوە نێردرا",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "ئەم بۆچوونە ناتوانرێت بڵاو بکرێتەوە. ڕەنگە هێڵە هەڵبژێردراوەکە گۆڕابێت، یان PR نوێکرابێتەوە.",
       "reviewNotSubmitted": "ناتوانرێت ئەم پێداچوونەوەیە بە دۆخی ئێستای بنێردرێت. ڕەنگە PR گۆڕابێت، یان ناتوانیت پێداچوونەوە بە داواکاری ڕاکێشانی خۆت بکەیت.",
+      "reviewNotSubmittedTerm": "ئەم پێداچوونەوەیە بەم شێوەیە ناسپێردرێت. لەوانەیە {{term}} گۆڕابێت، یان ناتوانیت پێداچوونەوەی {{term}}ی خۆت بکەیت.",
       "couldNotPostComment": "نەتوانرا بۆچوون بڵاو بکرێتەوە.",
       "couldNotSubmitReview": "نەتوانرا پێداچوونەوە بنێردرێت. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە."
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "نەتوانرا وەڵام بدرێتەوە.",
       "couldNotCompleteAction": "نەتوانرا ئەم کردارە تەواو بکرێت.",
       "mergeResultDefaultError": "GitHub تێکەڵکردنەکەی تەواو نەکرد.",
+      "mergeResultNotCompleted": "{{term}} تێکەڵ نەکرا. دۆخی بپشکنە و دووبارە هەوڵ بدە.",
       "ambiguous": "نەتوانرا پشتڕاست بکرێتەوە — پێش هەوڵدانەوە، PR بپشکنە.",
       "persistenceFailed": "نەتوانرا ئەم کردارە تۆمار بکرێت. تکایە دواتر هەوڵ بدەوە.",
       "forbidden": "ئەم کارە ڕێگەپێدراو نییە."
@@ -1988,11 +2041,31 @@
       "retryConnection": "دووبارە هەوڵدان بۆ پەیوەندیکردن"
     },
     "newSession": {
+      "recentlyUsed": "تازە بەکارهاتووەکان",
+      "couldNotLoadGithubRepositories": "نەتوانرا کۆگاکانی GitHub بار بکرێن.",
+      "couldNotLoadGitlabRepositories": "نەتوانرا کۆگاکانی GitLab بار بکرێن.",
+      "couldNotLoadBitbucketRepositories": "نەتوانرا کۆگاکانی Bitbucket بار بکرێن.",
       "connectGithubDescription": "لە وێبگەڕەکەتدا هەژماری GitHub ببەستەرەوە، پاشان بگەڕێوە ئێرە و کۆگایەک هەڵبژێرە.",
+      "connectGitlabDescription": "لە وێبگەڕەکەتدا هەژماری GitLab ببەستەرەوە، پاشان بگەڕێوە ئێرە و کۆگایەک هەڵبژێرە.",
+      "connectBitbucketDescription": "لە وێبگەڕەکەتدا هەژماری Bitbucket ببەستەرەوە، پاشان بگەڕێوە ئێرە و کۆگایەک هەڵبژێرە.",
       "openGithub": "کردنەوەی GitHub",
+      "openGitlab": "کردنەوەی GitLab",
+      "openBitbucket": "کردنەوەی Bitbucket",
       "refreshRepositories": "نوێکردنەوەی کۆگاکان",
       "githubConnected": "GitHub بەستراوەتەوە",
+      "gitlabConnected": "GitLab بەستراوەتەوە",
       "noRepositoriesVisible": "هیچ کۆگایەک دیار نییە. مۆڵەتی دەستگەیشتنی ئەپی Kilo لە GitHub بە کۆگاکان بپشکنە، پاشان لیستەکە نوێ بکەرەوە.",
+      "noRepositoriesVisibleGitlab": "هیچ کۆگایەک دیار نییە. مۆڵەتی دەستگەیشتن بە کۆگاکانی GitLab بپشکنە، پاشان لیستەکە نوێ بکەرەوە.",
+      "noRepositoriesVisibleBitbucket": "هیچ کۆگایەک دیار نییە. مۆڵەتی دەستگەیشتن بە کۆگاکانی Bitbucket بپشکنە، پاشان لیستەکە نوێ بکەرەوە.",
+      "bitbucketOrganizationsOnly": "Bitbucket تەنها بۆ ڕێکخراوەکان بەردەستە.",
+      "branchPickerTitle": "هەڵبژاردنی لق",
+      "branchDefault": "بنەڕەتی",
+      "branchAccessibility": "لق: {{label}}",
+      "branchLoading": "لقەکان باردەکرێن",
+      "branchLoadError": "نەتوانرا لقەکان بار بکرێن",
+      "branchUnavailable": "لقەکان بۆ ئەم کۆگایە بەردەست نین. مۆڵەتەکانت لەگەڵ پێشکەشکار بپشکنە، پاشان کۆگایەکی تر هەڵبژێرە.",
+      "branchEmpty": "هیچ لقێک بەردەست نییە",
+      "branchPlaceholder": "لقێک هەڵبژێرە",
       "runOnWithTarget": "جێبەجێکردن لەسەر: {{target}}",
       "environment": "ژینگە",
       "couldNotLoadEnvironment": "نەتوانرا ژینگەکەت بار بکرێت.",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "نەتوانرا کۆگاکان نوێ بکرێنەوە. تکایە دووبارە هەوڵ بدەرەوە.",
       "discardDraftTitle": "سڕینەوەی ڕەشنووس؟",
       "discardDraftMessage": "داواکارییەکەت لەدەست دەچێت.",
+      "discardWithUploadsMessage": "داواکارییەکەت و ئەو پەڕگە بارکراوانەی هاوپێچی پەیامی نێردراو نەکراون دەسڕێنەوە.",
       "discardFailed": "نەتوانرا ڕەشنووسەکە بسڕدرێتەوە. تکایە دووبارە هەوڵ بدەرەوە.",
       "remoteHint": "بۆ کۆنترۆڵکردنی پرۆسەیەکی ناوخۆیی kilo، لە کۆمپیوتەرەکەتدا `kilo remote` جێبەجێ بکە، یان لە سێشنێکی کارای CLI دا `/remote` جێبەجێ بکە.",
-      "connectBitbucketDescription": "لە وێبگەڕەکەتدا هەژماری Bitbucket ببەستەرەوە، پاشان بگەڕێوە ئێرە و کۆگایەک هەڵبژێرە.",
-      "connectGitlabDescription": "لە وێبگەڕەکەتدا هەژماری GitLab ببەستەرەوە، پاشان بگەڕێوە ئێرە و کۆگایەک هەڵبژێرە.",
-      "couldNotLoadBitbucketRepositories": "نەتوانرا کۆگاکانی Bitbucket بار بکرێن.",
-      "couldNotLoadGithubRepositories": "نەتوانرا کۆگاکانی GitHub بار بکرێن.",
-      "couldNotLoadGitlabRepositories": "نەتوانرا کۆگاکانی GitLab بار بکرێن.",
-      "gitlabConnected": "GitLab بەستراوەتەوە",
-      "noRepositoriesVisibleBitbucket": "هیچ کۆگایەک دیار نییە. مۆڵەتی دەستگەیشتن بە کۆگاکانی Bitbucket بپشکنە، پاشان لیستەکە نوێ بکەرەوە.",
-      "noRepositoriesVisibleGitlab": "هیچ کۆگایەک دیار نییە. مۆڵەتی دەستگەیشتن بە کۆگاکانی GitLab بپشکنە، پاشان لیستەکە نوێ بکەرەوە.",
-      "openBitbucket": "کردنەوەی Bitbucket",
-      "openGitlab": "کردنەوەی GitLab",
-      "recentlyUsed": "تازە بەکارهاتووەکان",
       "continueFrom": "بەردەوام دەبین لە {{title}}.",
       "importingSession": "سێشنەکە هاوردە دەکرێت",
       "cliCannotContinue": "ئەم CLI ـیە ناتوانێت سێشنێک بەردەوام بکات. Cloud Agent یان CLI ـیەکی تر هەڵبژێرە.",
-      "importFailed": "نەتوانرا ئەم سێشنە هاوردە بکرێت.",
-      "discardWithUploadsMessage": "داواکارییەکەت و ئەو پەڕگە بارکراوانەی هاوپێچی پەیامی نێردراو نەکراون دەسڕێنەوە."
+      "importFailed": "نەتوانرا ئەم سێشنە هاوردە بکرێت."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} پەڕگە نوێ کرایەوە.",

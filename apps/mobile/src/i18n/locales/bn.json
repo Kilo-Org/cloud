@@ -36,6 +36,7 @@
     "cost": "খরচ",
     "discard": "বাতিল করুন",
     "findings": "শনাক্ত সমস্যা",
+    "mergeRequest": "মার্জ রিকোয়েস্ট",
     "notConnected": "সংযুক্ত নয়",
     "notifications": "বিজ্ঞপ্তি",
     "pullRequest": "পুল রিকোয়েস্ট",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "খালি ডিফ সারি"
     },
     "connectionExpired": "GitHub সংযোগের মেয়াদ শেষ হয়েছে।",
+    "capabilities": {
+      "banner": {
+        "title": "এই প্রোভাইডারে উপলব্ধ নয়",
+        "accessibility": "এই প্রোভাইডারে উপলব্ধ নয়: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "মার্জ",
       "mergeNow": "এখনই মার্জ করুন",
       "mergePullRequest": "পুল রিকোয়েস্ট মার্জ",
+      "mergeTermTitle": "{{term}} মার্জ",
       "enableAutoMerge": "অটো-মার্জ চালু করুন",
       "disableAutoMerge": "অটো-মার্জ বন্ধ করুন",
       "autoMergeOn": "অটো-মার্জ চালু আছে",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "মার্জের পর ব্রাঞ্চ মুছুন",
       "noEnabledMethods": "এই রিপোজিটরিতে মার্জ করার কোনো পদ্ধতি চালু নেই। রিপোজিটরির অ্যাডমিনকে মার্জ, স্কোয়াশ বা রিবেস পদ্ধতি চালু করতে বলুন।",
       "confirmTitle": "পুল রিকোয়েস্ট মার্জ করবেন?",
+      "confirmTitleTerm": "{{term}} মার্জ করবেন?",
       "confirmMessage": "এতে আপনার পরিবর্তনগুলো বেস ব্রাঞ্চে মার্জ হবে।",
       "enableAutoMergeConfirmTitle": "অটো-মার্জ চালু করবেন?",
       "enableAutoMergeConfirmMessage": "প্রয়োজনীয় সব চেক পাস করলে GitHub এই পুল রিকোয়েস্ট স্বয়ংক্রিয়ভাবে মার্জ করবে।",
+      "enableAutoMergeConfirmMessageTerm": "পাইপলাইন সফল হলে {{term}} স্বয়ংক্রিয়ভাবে মার্জ হবে।",
+      "enableAutoMergeDescriptionTerm": "পাইপলাইন সফল হলে GitLab এই {{term}} স্বয়ংক্রিয়ভাবে মার্জ করে।",
       "forbidden": "এই পুল রিকোয়েস্ট মার্জ করার অনুমতি আপনার নেই।",
       "cannotMerge": "এই পুল রিকোয়েস্ট বর্তমান অবস্থায় মার্জ করা যাবে না।",
       "couldNotMerge": "পুল রিকোয়েস্ট মার্জ করা যায়নি।",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "ইতিমধ্যে মার্জ হয়েছে",
-        "closed": "এই পুল রিকোয়েস্ট বন্ধ"
+        "closed": "এই পুল রিকোয়েস্ট বন্ধ",
+        "closedMergeRequest": "এই মার্জ রিকোয়েস্ট বন্ধ"
       },
       "partialSuccessBanner": {
         "body": "ব্রাঞ্চ মুছে ফেলা যায়নি: {{reason}}।",
@@ -400,6 +412,18 @@
         "behindDetail": "হেড ব্রাঞ্চটি বেস ব্রাঞ্চের চেয়ে পিছিয়ে আছে। মার্জ করার আগে ব্রাঞ্চটি রিবেস বা আপডেট করুন।",
         "notMergeableTitle": "এই পুল রিকোয়েস্ট এখনও মার্জ করা যাচ্ছে না",
         "notMergeableDetail": "GitHub-এর দেওয়া মার্জের অবস্থা: {{state}}।"
+      },
+      "restrictions": {
+        "title": "মার্জ সংক্রান্ত সীমাবদ্ধতা",
+        "approvalsRequired_one": "{{displayCount}}টি অনুমোদন প্রয়োজন",
+        "approvalsRequired_other": "{{displayCount}}টি অনুমোদন প্রয়োজন",
+        "pipelineMustSucceed": "মার্জ করার আগে পাইপলাইন সফল হতে হবে।"
+      },
+      "providerBlocked": {
+        "failingPipeline": "সর্বশেষ কমিটে পাইপলাইন ব্যর্থ হচ্ছে।",
+        "pendingPipeline": "সর্বশেষ কমিটে পাইপলাইন এখনও চলছে।",
+        "permission": "এই {{term}} মার্জ করার অনুমতি আপনার নেই।",
+        "draft": "মার্জ করার আগে {{term}}টিকে রিভিউয়ের জন্য প্রস্তুত হিসেবে চিহ্নিত করুন।"
       },
       "methodLabels": {
         "merge": "একটি মার্জ কমিট তৈরি করুন",
@@ -448,6 +472,7 @@
       "acceptTerms": "গ্রহণ করুন",
       "replyBadRequest": "এই উত্তরটি পোস্ট করা যাচ্ছে না। থ্রেডটি বদলে গিয়ে থাকতে পারে।",
       "replyForbidden": "এই পুল রিকোয়েস্টে উত্তর দেওয়ার অনুমতি আপনার নেই।",
+      "replyForbiddenTerm": "এই {{term}}ে উত্তর দেওয়ার অনুমতি আপনার নেই।",
       "moderation": {
         "reportContent": {
           "terminal": "এই মন্তব্যটি রিপোর্ট করা যাবে না।",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "পুল রিকোয়েস্ট রিভিউ করুন",
     "headLine": "{{counts}} · হেড {{sha}}",
     "entry": {
-      "eyebrow": "URL দিয়ে একটি পুল রিকোয়েস্ট খুলুন।",
-      "pastePrLink": "একটি PR লিংক পেস্ট করুন",
-      "noRecentPrs": "কোনো সাম্প্রতিক PR নেই",
-      "noRecentPrsDescription": "রিভিউ শুরু করতে উপরে একটি PR লিংক পেস্ট করুন — এটি পরের বার এখানে দেখা যাবে।",
+      "eyebrow": "URL দিয়ে পুল রিকোয়েস্ট বা মার্জ রিকোয়েস্ট খুলুন",
+      "pastePrLink": "পুল রিকোয়েস্ট বা মার্জ রিকোয়েস্টের লিংক পেস্ট করুন",
+      "noRecentPrs": "কোনও সাম্প্রতিক রিভিউ নেই",
+      "noRecentPrsDescription": "রিভিউ শুরু করতে উপরে একটি লিংক পেস্ট করুন — পরের বার এটি এখানে দেখা যাবে।",
       "couldNotLoad": "লোড করা যায়নি।",
       "removeFromRecentsTitle": "সাম্প্রতিক তালিকা থেকে সরাবেন?",
-      "removeFromRecentsMessage": "এই পুল রিকোয়েস্টটি আপনার সাম্প্রতিক তালিকা থেকে সরানো হবে।",
+      "removeFromRecentsMessage": "এই রিভিউটি আপনার সাম্প্রতিক তালিকা থেকে সরানো হবে।",
       "removeRecentAccessibility": "সাম্প্রতিক তালিকা থেকে {{repo}} সরান",
-      "urlAccessibility": "GitHub পুল রিকোয়েস্টের URL",
-      "clearLink": "পুল রিকোয়েস্টের লিংক মুছুন",
-      "pasteLink": "পুল রিকোয়েস্টের লিংক পেস্ট করুন",
+      "urlAccessibility": "পুল রিকোয়েস্ট বা মার্জ রিকোয়েস্টের URL লিখুন",
+      "urlPlaceholder": "পুল রিকোয়েস্ট বা মার্জ রিকোয়েস্টের URL",
+      "openAccessibility": "পুল রিকোয়েস্ট বা মার্জ রিকোয়েস্ট খুলুন",
+      "clearLink": "লিংক মুছুন",
+      "pasteLink": "পুল রিকোয়েস্ট বা মার্জ রিকোয়েস্টের লিংক পেস্ট করুন",
       "open": "খোলা"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "GitHub সংযোগ পরীক্ষা করা যায়নি।",
       "checkFailedMessage": "এটি লোড না হওয়া পর্যন্ত সাইন-ইন করা আছে কি না জানা যাবে না।",
+      "checkFailedTitleGitLab": "GitLab সংযোগ পরীক্ষা করা যায়নি।",
+      "checkFailedTitleBitbucket": "Bitbucket সংযোগ পরীক্ষা করা যায়নি।",
+      "providerCheckFailedMessage": "লোড হওয়া পর্যন্ত সংযোগের অবস্থা উপলব্ধ নয়।",
       "reconnectTitle": "GitHub-এর সঙ্গে আবার সংযোগ",
       "reconnectDescription": "আপনার GitHub সংযোগের অনুমতি বাতিল করা হয়েছে। মোবাইলে পুল রিকোয়েস্ট রিভিউ চালিয়ে যেতে আবার সংযোগ করুন।",
-      "description": "মোবাইলে পুল রিকোয়েস্ট রিভিউ করতে আপনার GitHub অ্যাকাউন্ট সংযুক্ত করুন।"
+      "description": "মোবাইলে পুল রিকোয়েস্ট রিভিউ করতে আপনার GitHub অ্যাকাউন্ট সংযুক্ত করুন।",
+      "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করতে আপনার GitLab অ্যাকাউন্ট সংযুক্ত করুন।",
+      "bitbucketDescription": "মোবাইলে পুল রিকোয়েস্ট রিভিউ করতে এই অর্গানাইজেশনটিকে Bitbucket-এর সঙ্গে সংযুক্ত করুন।",
+      "bitbucketOrgOnlyDescription": "আপনার প্রোফাইলে একটি অর্গানাইজেশন বেছে নিন যাতে তার Bitbucket পুল রিকোয়েস্টগুলো রিভিউ করা যায়।"
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub সংযোগের মেয়াদ শেষ হয়েছে।",
-      "message": "আপনার GitHub সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।"
+      "message": "আপনার GitHub সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।",
+      "gitlabTitle": "GitLab সংযোগের মেয়াদ শেষ হয়েছে।",
+      "bitbucketTitle": "Bitbucket সংযোগের মেয়াদ শেষ হয়েছে।",
+      "providerMessage": "আপনার {{provider}} সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।"
     },
     "eventChips": {
       "comment": "মন্তব্য",
@@ -643,6 +679,21 @@
       "files": "ফাইল",
       "discussion": "আলোচনা"
     },
+    "terms": {
+      "pullRequest": "পুল রিকোয়েস্ট",
+      "mergeRequest": "মার্জ রিকোয়েস্ট",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "মার্জ রিকোয়েস্ট শেয়ার করুন",
+      "viewOnProvider": "{{provider}}-এ দেখুন",
+      "mergeRequestUnavailable": "মার্জ রিকোয়েস্ট পাওয়া যাচ্ছে না",
+      "unavailableDescription": "সম্ভবত এটি মুছে ফেলা হয়েছে, অথবা আপনার এর অ্যাক্সেস নেই।",
+      "accessDeniedMergeRequest": "এই মার্জ রিকোয়েস্ট দেখার অনুমতি আপনার নেই।",
+      "couldNotLoadMergeRequest": "মার্জ রিকোয়েস্ট লোড করা যায়নি।",
+      "discussionAccessDenied": "এই মার্জ রিকোয়েস্ট-এর আলোচনা দেখার অনুমতি আপনার নেই।",
+      "discussionUnavailableMessage": "এই মার্জ রিকোয়েস্টটি সরিয়ে ফেলা হয়ে থাকতে পারে।",
+      "noDiscussionDescription": "এই মার্জ রিকোয়েস্টে এখনও কোনো রিভিউ থ্রেড বা আলোচনার মন্তব্য নেই।",
+      "noFilesChangedDescription": "এই মার্জ রিকোয়েস্টে কোনো ফাইলে পরিবর্তন করা হয়নি।"
+    },
     "fileStatus": {
       "modified": "পরিবর্তিত",
       "renamed": "নাম বদলানো হয়েছে",
@@ -659,7 +710,7 @@
       "emptyLine": "(খালি)"
     },
     "linkPasteClipboardEmpty": "ক্লিপবোর্ড খালি।",
-    "linkPasteNotAPullRequest": "এটি GitHub পুল রিকোয়েস্টের লিংক নয়।",
+    "linkPasteNotAPullRequest": "এটি পুল রিকোয়েস্ট বা মার্জ রিকোয়েস্টের লিংক নয়",
     "announce": {
       "commentPosted": "মন্তব্য পোস্ট হয়েছে",
       "reviewSubmitted": "রিভিউ জমা হয়েছে",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "এই মন্তব্যটি পোস্ট করা যাবে না। নির্বাচিত লাইনটি পরিবর্তিত হয়ে থাকতে পারে, বা PR আপডেট হয়ে থাকতে পারে।",
       "reviewNotSubmitted": "এই রিভিউটি বর্তমান অবস্থায় জমা দেওয়া যাবে না। PR বদলে গিয়ে থাকতে পারে অথবা এটি আপনার নিজের পুল রিকোয়েস্ট, যা আপনি রিভিউ করতে পারবেন না।",
+      "reviewNotSubmittedTerm": "এই রিভিউটি যেমন আছে তেমনই জমা দেওয়া যাবে না। সম্ভবত {{term}} বদলে গেছে, অথবা আপনি নিজের {{term}} রিভিউ করতে পারবেন না।",
       "couldNotPostComment": "মন্তব্য পোস্ট করা যায়নি।",
       "couldNotSubmitReview": "রিভিউ জমা দেওয়া যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।"
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "উত্তর দেওয়া যায়নি।",
       "couldNotCompleteAction": "এই কাজটি সম্পূর্ণ করা যায়নি।",
       "mergeResultDefaultError": "GitHub মার্জ সম্পূর্ণ করেনি।",
+      "mergeResultNotCompleted": "{{term}} মার্জ হয়নি। এর অবস্থা পরীক্ষা করে আবার চেষ্টা করুন।",
       "ambiguous": "নিশ্চিত করা যায়নি — আবার চেষ্টা করার আগে PR-টি পরীক্ষা করুন।",
       "persistenceFailed": "এই কাজের তথ্য সংরক্ষণ করা যায়নি। পরে আবার চেষ্টা করুন।",
       "forbidden": "এই কাজের অনুমতি নেই।"
@@ -1988,11 +2041,31 @@
       "retryConnection": "আবার সংযোগের চেষ্টা করুন"
     },
     "newSession": {
+      "recentlyUsed": "সম্প্রতি ব্যবহৃত",
+      "couldNotLoadGithubRepositories": "GitHub রিপোজিটরি লোড করা যায়নি।",
+      "couldNotLoadGitlabRepositories": "GitLab রিপোজিটরি লোড করা যায়নি।",
+      "couldNotLoadBitbucketRepositories": "Bitbucket রিপোজিটরি লোড করা যায়নি।",
       "connectGithubDescription": "আপনার ব্রাউজারে GitHub সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
+      "connectGitlabDescription": "আপনার ব্রাউজারে GitLab সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
+      "connectBitbucketDescription": "আপনার ব্রাউজারে Bitbucket সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
       "openGithub": "GitHub খুলুন",
+      "openGitlab": "GitLab খুলুন",
+      "openBitbucket": "Bitbucket খুলুন",
       "refreshRepositories": "রিপোজিটরি রিফ্রেশ করুন",
       "githubConnected": "GitHub সংযুক্ত",
+      "gitlabConnected": "GitLab সংযুক্ত",
       "noRepositoriesVisible": "কোনো রিপোজিটরি দেখা যাচ্ছে না। Kilo GitHub অ্যাপের রিপোজিটরি অ্যাক্সেসের অনুমতি পরীক্ষা করে রিফ্রেশ করুন।",
+      "noRepositoriesVisibleGitlab": "কোনো রিপোজিটরি দেখা যাচ্ছে না। GitLab-এর রিপোজিটরি অ্যাক্সেসের অনুমতি পরীক্ষা করে রিফ্রেশ করুন।",
+      "noRepositoriesVisibleBitbucket": "কোনো রিপোজিটরি দেখা যাচ্ছে না। Bitbucket-এর রিপোজিটরি অ্যাক্সেসের অনুমতি পরীক্ষা করে রিফ্রেশ করুন।",
+      "bitbucketOrganizationsOnly": "শুধু অর্গানাইজেশনের জন্য Bitbucket উপলব্ধ।",
+      "branchPickerTitle": "ব্রাঞ্চ বেছে নিন",
+      "branchDefault": "ডিফল্ট",
+      "branchAccessibility": "ব্রাঞ্চ: {{label}}",
+      "branchLoading": "ব্রাঞ্চ লোড হচ্ছে",
+      "branchLoadError": "ব্রাঞ্চ লোড করা যায়নি",
+      "branchUnavailable": "এই রিপোজিটরির জন্য ব্রাঞ্চ উপলব্ধ নয়। প্রোভাইডারে আপনার অ্যাক্সেস পরীক্ষা করুন, তারপর অন্য রিপোজিটরি বেছে নিন।",
+      "branchEmpty": "কোনও ব্রাঞ্চ উপলব্ধ নয়",
+      "branchPlaceholder": "একটি ব্রাঞ্চ বেছে নিন",
       "runOnWithTarget": "চলবে: {{target}}",
       "environment": "পরিবেশ",
       "couldNotLoadEnvironment": "আপনার পরিবেশ লোড করা যায়নি।",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "রিপোজিটরি রিফ্রেশ করা যায়নি। আবার চেষ্টা করুন।",
       "discardDraftTitle": "খসড়া বাতিল করবেন?",
       "discardDraftMessage": "আপনার প্রম্পট হারিয়ে যাবে।",
+      "discardWithUploadsMessage": "আপনার প্রম্পট এবং আপলোড করা কিন্তু কোনো বার্তায় ব্যবহার না করা ফাইলগুলো মুছে ফেলা হবে।",
       "discardFailed": "খসড়াটি বাতিল করা যায়নি। আবার চেষ্টা করুন।",
       "remoteHint": "আপনার কম্পিউটারে চলা kilo প্রক্রিয়া নিয়ন্ত্রণ করতে `kilo remote` চালান, অথবা চলমান CLI সেশনে `/remote` চালান।",
-      "connectBitbucketDescription": "আপনার ব্রাউজারে Bitbucket সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
-      "connectGitlabDescription": "আপনার ব্রাউজারে GitLab সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
-      "couldNotLoadBitbucketRepositories": "Bitbucket রিপোজিটরি লোড করা যায়নি।",
-      "couldNotLoadGithubRepositories": "GitHub রিপোজিটরি লোড করা যায়নি।",
-      "couldNotLoadGitlabRepositories": "GitLab রিপোজিটরি লোড করা যায়নি।",
-      "gitlabConnected": "GitLab সংযুক্ত",
-      "noRepositoriesVisibleBitbucket": "কোনো রিপোজিটরি দেখা যাচ্ছে না। Bitbucket-এর রিপোজিটরি অ্যাক্সেসের অনুমতি পরীক্ষা করে রিফ্রেশ করুন।",
-      "noRepositoriesVisibleGitlab": "কোনো রিপোজিটরি দেখা যাচ্ছে না। GitLab-এর রিপোজিটরি অ্যাক্সেসের অনুমতি পরীক্ষা করে রিফ্রেশ করুন।",
-      "openBitbucket": "Bitbucket খুলুন",
-      "openGitlab": "GitLab খুলুন",
-      "recentlyUsed": "সম্প্রতি ব্যবহৃত",
       "continueFrom": "{{title}} চালিয়ে যাওয়া হচ্ছে।",
       "importingSession": "সেশন ইমপোর্ট হচ্ছে",
       "cliCannotContinue": "এই CLI দিয়ে আগের সেশন চালিয়ে যাওয়া যায় না। Cloud Agent বা অন্য একটি CLI বেছে নিন।",
-      "importFailed": "এই সেশনটি ইমপোর্ট করা যায়নি।",
-      "discardWithUploadsMessage": "আপনার প্রম্পট এবং আপলোড করা কিন্তু কোনো বার্তায় ব্যবহার না করা ফাইলগুলো মুছে ফেলা হবে।"
+      "importFailed": "এই সেশনটি ইমপোর্ট করা যায়নি।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}টি ফাইল আপডেট হয়েছে।",

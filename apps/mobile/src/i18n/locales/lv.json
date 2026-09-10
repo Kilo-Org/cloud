@@ -36,6 +36,7 @@
     "cost": "Izmaksas",
     "discard": "Atmest",
     "findings": "Konstatējumi",
+    "mergeRequest": "merge request",
     "notConnected": "Nav pievienots",
     "notifications": "Paziņojumi",
     "pullRequest": "izmaiņu pieprasījums",
@@ -342,10 +343,17 @@
       "emptyDiffRow": "Tukša izmaiņu salīdzinājuma rinda"
     },
     "connectionExpired": "GitHub savienojuma derīguma termiņš ir beidzies.",
+    "capabilities": {
+      "banner": {
+        "title": "Nav pieejams šim pakalpojumam",
+        "accessibility": "Nav pieejams šim pakalpojumam: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Apvienošana",
       "mergeNow": "Apvienot tagad",
       "mergePullRequest": "Izmaiņu pieprasījuma apvienošana",
+      "mergeTermTitle": "Apvienot {{term}}",
       "enableAutoMerge": "Iespējot automātisko apvienošanu",
       "disableAutoMerge": "Atspējot automātisko apvienošanu",
       "autoMergeOn": "Automātiskā apvienošana ir ieslēgta",
@@ -364,9 +372,12 @@
       "deleteBranchAfterMerge": "Dzēst zaru pēc apvienošanas",
       "noEnabledMethods": "Šajā repozitorijā nav iespējota neviena apvienošanas metode. Lūdz repozitorija administratoram iespējot apvienošanu ar apvienošanas komitu, saspiešanu vai pārbāzēšanu.",
       "confirmTitle": "Apvienot izmaiņu pieprasījumu?",
+      "confirmTitleTerm": "Apvienot {{term}}?",
       "confirmMessage": "Tavas izmaiņas tiks apvienotas ar bāzes zaru.",
       "enableAutoMergeConfirmTitle": "Iespējot automātisko apvienošanu?",
       "enableAutoMergeConfirmMessage": "GitHub automātiski apvienos šo izmaiņu pieprasījumu, kad visas obligātās pārbaudes būs sekmīgas.",
+      "enableAutoMergeConfirmMessageTerm": "Pēc veiksmīgas izpildes {{term}} tiks apvienots automātiski.",
+      "enableAutoMergeDescriptionTerm": "GitLab automātiski apvienos {{term}}, kad pipeline izpildīsies veiksmīgi.",
       "forbidden": "Tev nav atļaujas apvienot šo izmaiņu pieprasījumu.",
       "cannotMerge": "Šo izmaiņu pieprasījumu pašreizējā stāvoklī nevar apvienot.",
       "couldNotMerge": "Neizdevās apvienot izmaiņu pieprasījumu.",
@@ -377,7 +388,8 @@
       },
       "terminal": {
         "alreadyMerged": "Jau apvienots",
-        "closed": "Izmaiņu pieprasījums ir slēgts"
+        "closed": "Izmaiņu pieprasījums ir slēgts",
+        "closedMergeRequest": "Šis merge request ir slēgts"
       },
       "partialSuccessBanner": {
         "body": "Neizdevās dzēst zaru: {{reason}}.",
@@ -402,6 +414,19 @@
         "behindDetail": "Avota zarā trūkst jaunāko bāzes zara izmaiņu. Pirms apvienošanas pārbāzē vai atjaunini avota zaru.",
         "notMergeableTitle": "Šo izmaiņu pieprasījumu vēl nevar apvienot",
         "notMergeableDetail": "GitHub ziņoja par apvienojamības stāvokli {{state}}."
+      },
+      "restrictions": {
+        "title": "Apvienošanas ierobežojumi",
+        "approvalsRequired_one": "Nepieciešams {{displayCount}} apstiprinājums",
+        "approvalsRequired_other": "Nepieciešami {{displayCount}} apstiprinājumi",
+        "pipelineMustSucceed": "Pirms apvienošanas pipeline ir jāizpildās veiksmīgi.",
+        "approvalsRequired_zero": "Apstiprinājumi nav nepieciešami"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline neizpildās pēdējajā commit.",
+        "pendingPipeline": "Pipeline joprojām tiek darbināts pēdējajā commit.",
+        "permission": "Tev nav atļaujas apvienot {{term}}.",
+        "draft": "Pirms apvienošanas atzīmē {{term}} kā gatavu pārskatīšanai."
       },
       "methodLabels": {
         "merge": "Izveidot apvienošanas komitu",
@@ -450,6 +475,7 @@
       "acceptTerms": "Pieņemt",
       "replyBadRequest": "Šo atbildi nevar publicēt. Pavediens, iespējams, ir mainījies.",
       "replyForbidden": "Tev nav atļaujas atbildēt šajā izmaiņu pieprasījumā.",
+      "replyForbiddenTerm": "Tev nav atļaujas atbildēt uz {{term}}.",
       "moderation": {
         "reportContent": {
           "terminal": "Par šo komentāru nevar ziņot.",
@@ -481,8 +507,6 @@
       "termsAcceptRequired": "Lai publicētu saturu, tev jāpieņem lietošanas noteikumi.",
       "termsOutdatedCopy": "Lietošanas noteikumi ir mainīti. Atver šo ekrānu vēlreiz, lai pieņemtu jaunāko versiju.",
       "termsCheckRetryCopy": "Neizdevās pārbaudīt lietošanas noteikumus. Pārbaudi savienojumu un mēģini vēlreiz.",
-      "comment_zero": "{{displayCount}} komentāru",
-      "reaction_zero": "reakciju",
       "reactions": {
         "thumbsUp": "Īkšķis uz augšu",
         "thumbsDown": "Īkšķis uz leju",
@@ -500,7 +524,9 @@
         "outdatedOnLines": "Novecojis: {{lines}}",
         "outdatedOnPath": "Novecojis: {{path}}"
       },
-      "deletedUser": "dzēsts lietotājs"
+      "deletedUser": "dzēsts lietotājs",
+      "comment_zero": "{{displayCount}} komentāru",
+      "reaction_zero": "reakciju"
     },
     "couldNotOpenGitHubAppSettings": "Neizdevās atvērt GitHub lietotnes iestatījumus.",
     "installKiloGitHubApp": "Instalēt Kilo GitHub lietotni",
@@ -512,17 +538,19 @@
     "reviewPullRequest": "Pārskatīt izmaiņu pieprasījumu",
     "headLine": "{{counts}} · jaunākais komits {{sha}}",
     "entry": {
-      "eyebrow": "Atver izmaiņu pieprasījumu, izmantojot URL.",
-      "pastePrLink": "Ielīmēt PR saiti",
-      "noRecentPrs": "Nav nesen atvērtu PR",
-      "noRecentPrsDescription": "Ielīmē PR saiti augstāk, lai sāktu pārskatīšanu — nākamreiz šis PR būs redzams šeit.",
+      "eyebrow": "Atver izmaiņu pieprasījumu vai merge request, izmantojot URL",
+      "pastePrLink": "Ielīmēt izmaiņu pieprasījuma vai merge request saiti",
+      "noRecentPrs": "Nav nesenu pārskatu",
+      "noRecentPrsDescription": "Ielīmē saiti augšā, lai sāktu pārskatīšanu — nākamreiz tā būs redzama šeit.",
       "couldNotLoad": "Neizdevās ielādēt.",
       "removeFromRecentsTitle": "Noņemt no nesen atvērtajiem?",
-      "removeFromRecentsMessage": "Šis izmaiņu pieprasījums tiks noņemts no tavu nesen atvērto pieprasījumu saraksta.",
+      "removeFromRecentsMessage": "Šī pārskatīšana tiks noņemta no nesenajiem vienumiem.",
       "removeRecentAccessibility": "Noņemt {{repo}} no nesen atvērtajiem",
-      "urlAccessibility": "GitHub izmaiņu pieprasījuma URL",
-      "clearLink": "Notīrīt izmaiņu pieprasījuma saiti",
-      "pasteLink": "Ielīmēt izmaiņu pieprasījuma saiti",
+      "urlAccessibility": "Ievadiet izmaiņu pieprasījuma vai merge request URL",
+      "urlPlaceholder": "Izmaiņu pieprasījuma vai merge request URL",
+      "openAccessibility": "Atvērt izmaiņu pieprasījumu vai merge request",
+      "clearLink": "Notīrīt saiti",
+      "pasteLink": "Ielīmēt izmaiņu pieprasījuma vai merge request saiti",
       "open": "Atvērt"
     },
     "checks": {
@@ -571,9 +599,15 @@
     "connect": {
       "checkFailedTitle": "Neizdevās pārbaudīt GitHub savienojumu.",
       "checkFailedMessage": "Pierakstīšanās statuss būs pieejams pēc ielādes.",
+      "checkFailedTitleGitLab": "Neizdevās pārbaudīt GitLab savienojumu.",
+      "checkFailedTitleBitbucket": "Neizdevās pārbaudīt Bitbucket savienojumu.",
+      "providerCheckFailedMessage": "Savienojuma statuss būs pieejams pēc ielādes.",
       "reconnectTitle": "Atkārtoti savienot GitHub",
       "reconnectDescription": "Tavam GitHub savienojumam ir atsaukta piekļuve. Izveido savienojumu no jauna, lai turpinātu pārskatīt izmaiņu pieprasījumus mobilajā ierīcē.",
-      "description": "Pievieno savu GitHub kontu, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē."
+      "description": "Pievieno savu GitHub kontu, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē.",
+      "gitlabDescription": "Pievieno savu GitLab kontu, lai pārskatītu merge requests mobilajā ierīcē.",
+      "bitbucketDescription": "Pievieno Bitbucket šai organizācijai, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē.",
+      "bitbucketOrgOnlyDescription": "Profilā izvēlies organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus."
     },
     "screen": {
       "title": "#{{number}}",
@@ -596,7 +630,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub savienojuma derīguma termiņš ir beidzies.",
-      "message": "Tavs GitHub savienojums vairs nav derīgs. Pārbaudi savienojumu vēlreiz — ja vajadzēs, lietotne aicinās izveidot savienojumu no jauna."
+      "message": "Tavs GitHub savienojums vairs nav derīgs. Pārbaudi savienojumu vēlreiz — ja vajadzēs, lietotne aicinās izveidot savienojumu no jauna.",
+      "gitlabTitle": "GitLab savienojuma derīguma termiņš ir beidzies.",
+      "bitbucketTitle": "Bitbucket savienojuma derīguma termiņš ir beidzies.",
+      "providerMessage": "Tavs {{provider}} savienojums vairs nav derīgs. Pārbaudi savienojumu vēlreiz — ja vajadzēs, lietotne aicinās izveidot savienojumu no jauna."
     },
     "eventChips": {
       "comment": "Komentēt",
@@ -650,6 +687,21 @@
       "files": "Faili",
       "discussion": "Diskusija"
     },
+    "terms": {
+      "pullRequest": "Izmaiņu pieprasījums",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Kopīgot merge request",
+      "viewOnProvider": "Skatīt {{provider}}",
+      "mergeRequestUnavailable": "Merge request nav pieejams",
+      "unavailableDescription": "Iespējams, tas ir dzēsts, vai arī tev nav tam pieejas.",
+      "accessDeniedMergeRequest": "Tev nav atļaujas skatīt šo merge request.",
+      "couldNotLoadMergeRequest": "Neizdevās ielādēt merge request.",
+      "discussionAccessDenied": "Tev nav atļaujas skatīt šī merge request diskusiju.",
+      "discussionUnavailableMessage": "Iespējams, šis merge request ir noņemts.",
+      "noDiscussionDescription": "Šajā merge request nav pārskatīšanas pavedienu vai diskusijas komentāru.",
+      "noFilesChangedDescription": "Šajā merge request nav failu izmaiņu."
+    },
     "fileStatus": {
       "modified": "Mainīts",
       "renamed": "Pārdēvēts",
@@ -666,7 +718,7 @@
       "emptyLine": "(tukšs)"
     },
     "linkPasteClipboardEmpty": "Starpliktuve ir tukša.",
-    "linkPasteNotAPullRequest": "Tā nav GitHub izmaiņu pieprasījuma saite.",
+    "linkPasteNotAPullRequest": "Šī nav izmaiņu pieprasījuma vai merge request saite",
     "announce": {
       "commentPosted": "Komentārs publicēts",
       "reviewSubmitted": "Vērtējums iesniegts",
@@ -675,6 +727,7 @@
     "mutationError": {
       "commentNotPosted": "Šo komentāru nevar publicēt. Atlasītā rinda, iespējams, ir mainījusies, vai PR ir atjaunināts.",
       "reviewNotSubmitted": "Šo vērtējumu pašreizējā veidā nevar iesniegt. Iespējams, PR ir mainījies vai arī tu mēģini vērtēt savu izmaiņu pieprasījumu.",
+      "reviewNotSubmittedTerm": "Šo vērtējumu pašreizējā veidā nevar iesniegt. Iespējams, {{term}} ir mainījies, vai arī tu nevar vērtēt savu {{term}}.",
       "couldNotPostComment": "Neizdevās publicēt komentāru.",
       "couldNotSubmitReview": "Neizdevās iesniegt vērtējumu. Pārbaudi savienojumu un mēģini vēlreiz."
     },
@@ -682,6 +735,7 @@
       "couldNotReply": "Neizdevās atbildēt.",
       "couldNotCompleteAction": "Neizdevās pabeigt šo darbību.",
       "mergeResultDefaultError": "GitHub nepabeidza apvienošanu.",
+      "mergeResultNotCompleted": "{{term}} netika apvienots. Pārbaudi tā statusu un mēģini vēlreiz.",
       "ambiguous": "Neizdevās apstiprināt rezultātu — pirms atkārtota mēģinājuma pārbaudi PR.",
       "persistenceFailed": "Neizdevās reģistrēt šo darbību. Mēģini vēlreiz vēlāk.",
       "forbidden": "Šī darbība nav atļauta."
@@ -2004,11 +2058,31 @@
       "retryConnection": "Izveidot savienojumu vēlreiz"
     },
     "newSession": {
+      "recentlyUsed": "Nesen lietotie",
+      "couldNotLoadGithubRepositories": "Neizdevās ielādēt GitHub repozitorijus.",
+      "couldNotLoadGitlabRepositories": "Neizdevās ielādēt GitLab repozitorijus.",
+      "couldNotLoadBitbucketRepositories": "Neizdevās ielādēt Bitbucket repozitorijus.",
       "connectGithubDescription": "Pievieno GitHub kontu pārlūkā, pēc tam atgriezies šeit, lai izvēlētos repozitoriju.",
+      "connectGitlabDescription": "Pievieno GitLab kontu pārlūkā, pēc tam atgriezies šeit, lai izvēlētos repozitoriju.",
+      "connectBitbucketDescription": "Pievieno Bitbucket kontu pārlūkā, pēc tam atgriezies šeit, lai izvēlētos repozitoriju.",
       "openGithub": "Atvērt GitHub",
+      "openGitlab": "Atvērt GitLab",
+      "openBitbucket": "Atvērt Bitbucket",
       "refreshRepositories": "Atsvaidzināt repozitorijus",
       "githubConnected": "GitHub konts pievienots",
+      "gitlabConnected": "GitLab konts pievienots",
       "noRepositoriesVisible": "Nav redzamu repozitoriju. Pārbaudi Kilo GitHub lietotnes piekļuvi repozitorijiem, pēc tam atsvaidzini sarakstu.",
+      "noRepositoriesVisibleGitlab": "Nav redzamu repozitoriju. Pārbaudi piekļuvi GitLab repozitorijiem, pēc tam atsvaidzini sarakstu.",
+      "noRepositoriesVisibleBitbucket": "Nav redzamu repozitoriju. Pārbaudi piekļuvi Bitbucket repozitorijiem, pēc tam atsvaidzini sarakstu.",
+      "bitbucketOrganizationsOnly": "Bitbucket ir pieejams tikai organizācijām.",
+      "branchPickerTitle": "Atlasīt atzaru",
+      "branchDefault": "Noklusējuma",
+      "branchAccessibility": "Atzars: {{label}}",
+      "branchLoading": "Notiek atzaru ielāde",
+      "branchLoadError": "Neizdevās ielādēt atzarus",
+      "branchUnavailable": "Šim repozitorijam atzari nav pieejami. Pārbaudi savas tiesības pie pakalpojumu sniedzēja un izvēlies citu repozitoriju.",
+      "branchEmpty": "Nav pieejamu atzaru",
+      "branchPlaceholder": "Izvēlēties atzaru",
       "runOnWithTarget": "Izpildes vide: {{target}}",
       "environment": "Vide",
       "couldNotLoadEnvironment": "Neizdevās ielādēt tavu vidi.",
@@ -2029,24 +2103,13 @@
       "couldNotRefreshRepositories": "Neizdevās atsvaidzināt repozitorijus. Lūdzu, mēģini vēlreiz.",
       "discardDraftTitle": "Atmest melnrakstu?",
       "discardDraftMessage": "Tava uzvedne tiks dzēsta.",
+      "discardWithUploadsMessage": "Tava uzvedne un augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti.",
       "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz.",
       "remoteHint": "Palaid `kilo remote` savā datorā vai `/remote` aktīvā CLI sesijā, lai vadītu lokālu kilo procesu.",
-      "connectBitbucketDescription": "Pievieno Bitbucket kontu pārlūkā, pēc tam atgriezies šeit, lai izvēlētos repozitoriju.",
-      "connectGitlabDescription": "Pievieno GitLab kontu pārlūkā, pēc tam atgriezies šeit, lai izvēlētos repozitoriju.",
-      "couldNotLoadBitbucketRepositories": "Neizdevās ielādēt Bitbucket repozitorijus.",
-      "couldNotLoadGithubRepositories": "Neizdevās ielādēt GitHub repozitorijus.",
-      "couldNotLoadGitlabRepositories": "Neizdevās ielādēt GitLab repozitorijus.",
-      "gitlabConnected": "GitLab konts pievienots",
-      "noRepositoriesVisibleBitbucket": "Nav redzamu repozitoriju. Pārbaudi piekļuvi Bitbucket repozitorijiem, pēc tam atsvaidzini sarakstu.",
-      "noRepositoriesVisibleGitlab": "Nav redzamu repozitoriju. Pārbaudi piekļuvi GitLab repozitorijiem, pēc tam atsvaidzini sarakstu.",
-      "openBitbucket": "Atvērt Bitbucket",
-      "openGitlab": "Atvērt GitLab",
-      "recentlyUsed": "Nesen lietotie",
       "continueFrom": "Tiek turpināta sesija: {{title}}.",
       "importingSession": "Importē sesiju…",
       "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlies Cloud Agent vai citu CLI.",
-      "importFailed": "Neizdevās importēt šo sesiju.",
-      "discardWithUploadsMessage": "Tava uzvedne un augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti."
+      "importFailed": "Neizdevās importēt šo sesiju."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails.",

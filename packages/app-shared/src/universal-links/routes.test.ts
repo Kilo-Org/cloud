@@ -11,7 +11,7 @@ import {
 
 const WEB = 'https://app.kilo.ai';
 
-/** Expected targets for the 16 table rows (concrete ids where wildcards). */
+/** Expected targets for the 18 table rows (concrete ids where wildcards). */
 const ROW_CASES = [
   {
     path: '/home',
@@ -74,14 +74,22 @@ const ROW_CASES = [
     app: '/(app)/(tabs)/(3_profile)/organization/org_123',
   },
   {
+    path: '/pr-review/gitlab/acme/api/42',
+    app: '/(app)/pr-review/gitlab/acme/api/42',
+  },
+  {
+    path: '/pr-review/bitbucket/acme/api/42',
+    app: '/(app)/pr-review/bitbucket/acme/api/42',
+  },
+  {
     path: '/pr-review/acme/api/42',
     app: '/(app)/pr-review/acme/api/42',
   },
 ] as const;
 
 describe('UNIVERSAL_LINK_ROUTES', () => {
-  it('has exactly 16 rows', () => {
-    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(16);
+  it('has exactly 18 rows', () => {
+    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(18);
   });
 });
 
@@ -168,6 +176,43 @@ describe('wildcard capture substitution', () => {
     );
     expect(resolveIncomingUrl('kiloapp:///organizations/org_1/code-reviews/<1>')).toBe(
       '/(app)/(tabs)/(3_profile)/code-reviewer/org_1/reviews/<1>'
+    );
+  });
+});
+
+describe('trailing ** rows (provider PR paths, s7)', () => {
+  it('joins a multi-segment GitLab project path into one capture', () => {
+    expect(resolveIncomingUrl(`${WEB}/pr-review/gitlab/group/sub/repo/123`)).toBe(
+      '/(app)/pr-review/gitlab/group/sub/repo/123'
+    );
+  });
+
+  it('matches the shortest tail — one segment', () => {
+    expect(resolveIncomingUrl(`${WEB}/pr-review/bitbucket/acme/42`)).toBe(
+      '/(app)/pr-review/bitbucket/acme/42'
+    );
+  });
+
+  it('beats the GitHub row on a same-length path — the literal platform wins', () => {
+    // `/pr-review/gitlab/x/123` has the GitHub row's segment count; it must
+    // NOT be read as owner "gitlab".
+    expect(resolveIncomingUrl(`${WEB}/pr-review/gitlab/x/123`)).toBe(
+      '/(app)/pr-review/gitlab/x/123'
+    );
+  });
+
+  it('requires one-or-more tail segments — a bare platform prefix maps to nothing', () => {
+    expect(resolveIncomingUrl(`${WEB}/pr-review/gitlab`)).toBeNull();
+    expect(webPathToAppPath('/pr-review/bitbucket')).toBeNull();
+  });
+
+  it('does not match other platform prefixes', () => {
+    expect(resolveIncomingUrl(`${WEB}/pr-review/gitlab.example/g/r/1`)).toBeNull();
+  });
+
+  it('inserts the joined tail literally — dollar patterns stay verbatim', () => {
+    expect(resolveIncomingUrl(`${WEB}/pr-review/gitlab/a$&b/c/1`)).toBe(
+      '/(app)/pr-review/gitlab/a$&b/c/1'
     );
   });
 });
@@ -293,8 +338,8 @@ describe('parseKiloWebPath', () => {
 });
 
 describe('aasaComponents', () => {
-  it('returns 18 entries (16 rows + 2 exclusions)', () => {
-    expect(aasaComponents()).toHaveLength(18);
+  it('returns 20 entries (18 rows + 2 exclusions)', () => {
+    expect(aasaComponents()).toHaveLength(20);
   });
 
   it('every entry has a "/" key', () => {
@@ -327,11 +372,15 @@ describe('aasaComponents', () => {
     expect(paths).toContain('/code-reviews/*');
     expect(paths).toContain('/organizations/*/code-reviews/*');
     expect(paths).toContain('/organizations/*/security-agent');
+    // '**' is two Apple globs — still a glob that crosses /, so the tail
+    // rows stay valid AASA output unchanged.
+    expect(paths).toContain('/pr-review/gitlab/**');
+    expect(paths).toContain('/pr-review/bitbucket/**');
   });
 });
 
 describe('androidPathPatterns', () => {
-  it('deep-equals the expected 16-string list', () => {
+  it('deep-equals the expected 18-string list', () => {
     expect(androidPathPatterns()).toEqual([
       '/home',
       '/profile',
@@ -348,6 +397,8 @@ describe('androidPathPatterns', () => {
       '/organizations/.*/code-reviews',
       '/organizations/.*/code-reviews/.*',
       '/organizations/.*/overview',
+      '/pr-review/gitlab/.*',
+      '/pr-review/bitbucket/.*',
       '/pr-review/.*/.*/.*',
     ]);
   });

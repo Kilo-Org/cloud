@@ -243,7 +243,7 @@ describe('SessionPrBadge mounted', () => {
     expect(mocks.openExternalUrl).not.toHaveBeenCalled();
   });
 
-  it('opens the browser for a GitLab PR on press', async () => {
+  it('opens the in-app merge request route for a GitLab MR on press', async () => {
     const renderer = await renderBadge({
       pr: pr({
         platform: 'gitlab',
@@ -255,11 +255,26 @@ describe('SessionPrBadge mounted', () => {
     const pressable = findHost(renderer.root, 'Pressable')[0];
     pressable?.props.onPress();
 
-    expect(mocks.openExternalUrl).toHaveBeenCalledWith(
-      'https://gitlab.com/octocat/hello-world/-/merge_requests/42',
-      { label: 'pull request' }
+    expect(mocks.push).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/octocat/hello-world/42?instance=https%3A%2F%2Fgitlab.com'
     );
-    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.openExternalUrl).not.toHaveBeenCalled();
+  });
+
+  it('opens the in-app pull request route for a Bitbucket PR on press', async () => {
+    const renderer = await renderBadge({
+      pr: pr({
+        platform: 'bitbucket',
+        url: 'https://bitbucket.org/acme/api/pull-requests/42',
+      }),
+      loading: false,
+    });
+
+    const pressable = findHost(renderer.root, 'Pressable')[0];
+    pressable?.props.onPress();
+
+    expect(mocks.push).toHaveBeenCalledWith('/(app)/pr-review/bitbucket/acme/api/42');
+    expect(mocks.openExternalUrl).not.toHaveBeenCalled();
   });
 
   it('opens the browser for a GitHub PR when the PR review flag is off', async () => {

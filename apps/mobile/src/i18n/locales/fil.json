@@ -36,6 +36,7 @@
     "cost": "Gastos",
     "discard": "Itapon",
     "findings": "Mga natukoy na isyu",
+    "mergeRequest": "merge request",
     "notConnected": "Hindi nakakonekta",
     "notifications": "Mga abiso",
     "pullRequest": "pR",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "Bakanteng hanay ng pagkakaiba"
     },
     "connectionExpired": "Nag-expire ang koneksyon sa GitHub.",
+    "capabilities": {
+      "banner": {
+        "title": "Hindi available sa provider na ito",
+        "accessibility": "Hindi available sa provider na ito: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Pagsasama",
       "mergeNow": "I-merge ngayon",
       "mergePullRequest": "Pag-merge ng pull request",
+      "mergeTermTitle": "Pag-merge ng {{term}}",
       "enableAutoMerge": "Paganahin ang awtomatikong pag-merge",
       "disableAutoMerge": "Huwag paganahin ang awtomatikong pag-merge",
       "autoMergeOn": "Aktibo ang awtomatikong pag-merge",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "Burahin ang branch pagkatapos i-merge",
       "noEnabledMethods": "Walang aktibong paraan ng pag-merge sa repository na ito. Hilingin sa admin ng repository na paganahin ang merge, squash, o rebase.",
       "confirmTitle": "I-merge ang pull request?",
+      "confirmTitleTerm": "I-merge ang {{term}}?",
       "confirmMessage": "Ime-merge nito ang mga pagbabago mo sa base branch.",
       "enableAutoMergeConfirmTitle": "Paganahin ang awtomatikong pag-merge?",
       "enableAutoMergeConfirmMessage": "Awtomatikong ime-merge ng GitHub ang pull request na ito kapag pumasa ang lahat ng kinakailangang pagsusuri.",
+      "enableAutoMergeConfirmMessageTerm": "Awtomatikong magme-merge ang {{term}} kapag tagumpay ang pipeline nito.",
+      "enableAutoMergeDescriptionTerm": "Awtomatikong mine-merge ng GitLab ang {{term}} na ito kapag tagumpay ang pipeline nito.",
       "forbidden": "Wala kang pahintulot na i-merge ang pull request na ito.",
       "cannotMerge": "Hindi ma-merge ang pull request na ito sa kasalukuyang kalagayan nito.",
       "couldNotMerge": "Hindi ma-merge ang pull request.",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Na-merge na",
-        "closed": "Nakasara ang pull request na ito"
+        "closed": "Nakasara ang pull request na ito",
+        "closedMergeRequest": "Nakasara ang merge request na ito"
       },
       "partialSuccessBanner": {
         "body": "Hindi mabura ang branch: {{reason}}.",
@@ -400,6 +412,18 @@
         "behindDetail": "Kulang ang head branch sa mga pagbabago mula sa base branch. Mag-rebase o i-update ang branch bago mag-merge.",
         "notMergeableTitle": "Hindi pa maaaring i-merge ang pull request na ito",
         "notMergeableDetail": "Iniulat ng GitHub ang {{state}} bilang status ng pag-merge."
+      },
+      "restrictions": {
+        "title": "Mga paghihigko sa pag-merge",
+        "approvalsRequired_one": "{{displayCount}} approval ang kailangan",
+        "approvalsRequired_other": "{{displayCount}} approval ang kailangan",
+        "pipelineMustSucceed": "Kailangang maging matagumpay ang pipeline bago mag-merge."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Nabibigo ang pipeline sa pinakabagong commit.",
+        "pendingPipeline": "Tumatakbo pa rin ang pipeline sa pinakabagong commit.",
+        "permission": "Wala kang pahintulot na i-merge ang {{term}} na ito.",
+        "draft": "Markahan ang {{term}} bilang handa nang suriin bago mag-merge."
       },
       "methodLabels": {
         "merge": "Gumawa ng merge commit",
@@ -448,6 +472,7 @@
       "acceptTerms": "Tanggapin",
       "replyBadRequest": "Hindi ma-post ang sagot na ito. Maaaring nagbago ang talakayan.",
       "replyForbidden": "Wala kang pahintulot na sumagot sa pull request na ito.",
+      "replyForbiddenTerm": "Wala kang pahintulot na sumagot sa {{term}} na ito.",
       "moderation": {
         "reportContent": {
           "terminal": "Hindi maiulat ang komentong ito.",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "Suriin ang pull request",
     "headLine": "{{counts}} · kasalukuyang commit {{sha}}",
     "entry": {
-      "eyebrow": "Buksan ang pull request gamit ang URL nito.",
-      "pastePrLink": "I-paste ang link ng PR",
-      "noRecentPrs": "Walang kamakailang binuksang PR",
-      "noRecentPrsDescription": "I-paste ang link ng PR sa itaas para magsimula ng pagsusuri — lalabas ito rito sa susunod.",
+      "eyebrow": "Buksan ang pull request o merge request gamit ang URL nito",
+      "pastePrLink": "I-paste ang link ng pull request o merge request",
+      "noRecentPrs": "Walang kamakailang pagsusuri",
+      "noRecentPrsDescription": "I-paste ang link sa itaas para magsimula ng pagsusuri — lalabas ito rito sa susunod.",
       "couldNotLoad": "Hindi ma-load.",
       "removeFromRecentsTitle": "Alisin sa mga kamakailang binuksan?",
-      "removeFromRecentsMessage": "Aalisin ang pull request na ito sa listahan ng mga kamakailan mong binuksan.",
+      "removeFromRecentsMessage": "Aalisin ang pagsusuring ito sa listahan ng mga kamakailan.",
       "removeRecentAccessibility": "Alisin ang {{repo}} sa mga kamakailang binuksan",
-      "urlAccessibility": "URL ng pull request sa GitHub",
-      "clearLink": "Alisin ang link ng pull request",
-      "pasteLink": "I-paste ang link ng pull request",
+      "urlAccessibility": "Ilagay ang URL ng pull request o merge request",
+      "urlPlaceholder": "URL ng pull request o merge request",
+      "openAccessibility": "Buksan ang pull request o merge request",
+      "clearLink": "Alisin ang link",
+      "pasteLink": "I-paste ang link ng pull request o merge request",
       "open": "Bukas"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "Hindi masuri ang koneksyon sa GitHub.",
       "checkFailedMessage": "Hindi makuha ang status ng pag-sign in hangga't hindi ito tapos mag-load.",
+      "checkFailedTitleGitLab": "Hindi masuri ang koneksyon sa GitLab.",
+      "checkFailedTitleBitbucket": "Hindi masuri ang koneksyon sa Bitbucket.",
+      "providerCheckFailedMessage": "Hindi available ang katayuan ng koneksyon hanggang sa ma-load ito.",
       "reconnectTitle": "Kumonekta muli sa GitHub",
       "reconnectDescription": "Binawi ang koneksyon mo sa GitHub. Kumonekta muli para patuloy na makapagsuri ng mga pull request sa mobile.",
-      "description": "Ikonekta ang GitHub account mo para makapagsuri ng mga pull request sa mobile."
+      "description": "Ikonekta ang GitHub account mo para makapagsuri ng mga pull request sa mobile.",
+      "gitlabDescription": "Ikonekta ang iyong GitLab account para suriin ang mga merge request sa mobile.",
+      "bitbucketDescription": "Ikonekta ang Bitbucket sa organizasyong ito para suriin ang mga pull request sa mobile.",
+      "bitbucketOrgOnlyDescription": "Pumili ng organisasyon sa iyong profile para suriin ang mga pull request nito sa Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "Nag-expire ang koneksyon sa GitHub.",
-      "message": "Wala nang bisa ang koneksyon mo sa GitHub. Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan."
+      "message": "Wala nang bisa ang koneksyon mo sa GitHub. Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan.",
+      "gitlabTitle": "Nag-expire ang koneksyon sa GitLab.",
+      "bitbucketTitle": "Nag-expire ang koneksyon sa Bitbucket.",
+      "providerMessage": "Wala nang bisa ang koneksyon mo sa {{provider}}. Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan."
     },
     "eventChips": {
       "comment": "Komento",
@@ -643,6 +679,21 @@
       "files": "Mga payl",
       "discussion": "Talakayan"
     },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Ibahagi ang merge request",
+      "viewOnProvider": "Tingnan sa {{provider}}",
+      "mergeRequestUnavailable": "Hindi mabuksan ang merge request",
+      "unavailableDescription": "Baka tinanggal na ito, o wala kang access dito.",
+      "accessDeniedMergeRequest": "Wala kang pahintulot na tingnan ang merge request na ito.",
+      "couldNotLoadMergeRequest": "Hindi ma-load ang merge request.",
+      "discussionAccessDenied": "Wala kang pahintulot na tingnan ang talakayan ng merge request na ito.",
+      "discussionUnavailableMessage": "Maaaring naalis ang merge request na ito.",
+      "noDiscussionDescription": "Walang talakayan sa pagsusuri o komento sa pag-uusap para sa merge request na ito.",
+      "noFilesChangedDescription": "Walang binagong file sa merge request na ito."
+    },
     "fileStatus": {
       "modified": "Binago",
       "renamed": "Pinalitan ng pangalan",
@@ -659,7 +710,7 @@
       "emptyLine": "(walang laman)"
     },
     "linkPasteClipboardEmpty": "Walang laman ang clipboard.",
-    "linkPasteNotAPullRequest": "Hindi ito link ng pull request sa GitHub.",
+    "linkPasteNotAPullRequest": "Hindi ito link ng pull request o merge request",
     "announce": {
       "commentPosted": "Na-post ang komento",
       "reviewSubmitted": "Naisumite ang pagsusuri",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "Hindi ma-post ang komentong ito. Maaaring nagbago ang napiling linya, o na-update na ang PR.",
       "reviewNotSubmitted": "Hindi maisumite ang pagsusuring ito sa kasalukuyang anyo nito. Maaaring nagbago ang PR, o hindi ka puwedeng magsuri ng sarili mong pull request.",
+      "reviewNotSubmittedTerm": "Hindi maisumite ang pagsusuring ito sa kasalukuyang anyo. Baka nagbago ang {{term}}, o hindi mo masusuri ang sarili mong {{term}}.",
       "couldNotPostComment": "Hindi ma-post ang komento.",
       "couldNotSubmitReview": "Hindi maisumite ang pagsusuri. Suriin ang koneksyon mo at subukan muli."
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "Hindi maipadala ang sagot.",
       "couldNotCompleteAction": "Hindi makumpleto ang aksiyong ito.",
       "mergeResultDefaultError": "Hindi nakumpleto ng GitHub ang pag-merge.",
+      "mergeResultNotCompleted": "Hindi na-merge ang {{term}}. Suriin ang katayuan nito at subukang muli.",
       "ambiguous": "Hindi makumpirma — suriin ang PR bago subukan muli.",
       "persistenceFailed": "Hindi namin maitala ang aksiyong ito. Pakisubukan muli mamaya.",
       "forbidden": "Hindi pinapayagan ang aksiyong ito."
@@ -1988,11 +2041,31 @@
       "retryConnection": "Subukang kumonekta muli"
     },
     "newSession": {
+      "recentlyUsed": "Mga ginamit kamakailan",
+      "couldNotLoadGithubRepositories": "Hindi ma-load ang mga imbakan ng code sa GitHub.",
+      "couldNotLoadGitlabRepositories": "Hindi ma-load ang mga imbakan ng code sa GitLab.",
+      "couldNotLoadBitbucketRepositories": "Hindi ma-load ang mga imbakan ng code sa Bitbucket.",
       "connectGithubDescription": "Ikonekta ang GitHub sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
+      "connectGitlabDescription": "Ikonekta ang GitLab sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
+      "connectBitbucketDescription": "Ikonekta ang Bitbucket sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
       "openGithub": "Buksan ang GitHub",
+      "openGitlab": "Buksan ang GitLab",
+      "openBitbucket": "Buksan ang Bitbucket",
       "refreshRepositories": "I-refresh ang mga imbakan ng code",
       "githubConnected": "Konektado ang GitHub",
+      "gitlabConnected": "Konektado ang GitLab",
       "noRepositoriesVisible": "Walang nakikitang imbakan ng code. Suriin kung may access ang Kilo GitHub App sa mga imbakan ng code, saka i-refresh.",
+      "noRepositoriesVisibleGitlab": "Walang nakikitang imbakan ng code. Suriin ang access sa mga imbakan ng code sa GitLab, saka i-refresh.",
+      "noRepositoriesVisibleBitbucket": "Walang nakikitang imbakan ng code. Suriin ang access sa mga imbakan ng code sa Bitbucket, saka i-refresh.",
+      "bitbucketOrganizationsOnly": "Available lang ang Bitbucket para sa mga organisasyon.",
+      "branchPickerTitle": "Pumili ng sangay",
+      "branchDefault": "Default",
+      "branchAccessibility": "Sangay: {{label}}",
+      "branchLoading": "Ini-load ang mga sangay",
+      "branchLoadError": "Hindi ma-load ang mga sangay",
+      "branchUnavailable": "Walang available na sangay para sa repositoryong ito. Suriin ang access mo sa provider, tapos pumili ng ibang repositoryo.",
+      "branchEmpty": "Walang available na sangay",
+      "branchPlaceholder": "Pumili ng sangay",
       "runOnWithTarget": "Patakbuhin sa: {{target}}",
       "environment": "Kapaligiran",
       "couldNotLoadEnvironment": "Hindi ma-load ang iyong kapaligiran.",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "Hindi ma-refresh ang mga imbakan ng code. Subukang muli.",
       "discardDraftTitle": "Burahin ang burador?",
       "discardDraftMessage": "Mawawala ang iyong prompt.",
+      "discardWithUploadsMessage": "Buburahin ang iyong prompt at mga na-upload na file na hindi pa nagagamit.",
       "discardFailed": "Hindi mabura ang burador. Subukang muli.",
       "remoteHint": "Patakbuhin ang `kilo remote` sa iyong computer, o ang `/remote` sa isang tumatakbong sesyon ng CLI, para kontrolin ang isang lokal na proseso ng kilo.",
-      "connectBitbucketDescription": "Ikonekta ang Bitbucket sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
-      "connectGitlabDescription": "Ikonekta ang GitLab sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
-      "couldNotLoadBitbucketRepositories": "Hindi ma-load ang mga imbakan ng code sa Bitbucket.",
-      "couldNotLoadGithubRepositories": "Hindi ma-load ang mga imbakan ng code sa GitHub.",
-      "couldNotLoadGitlabRepositories": "Hindi ma-load ang mga imbakan ng code sa GitLab.",
-      "gitlabConnected": "Konektado ang GitLab",
-      "noRepositoriesVisibleBitbucket": "Walang nakikitang imbakan ng code. Suriin ang access sa mga imbakan ng code sa Bitbucket, saka i-refresh.",
-      "noRepositoriesVisibleGitlab": "Walang nakikitang imbakan ng code. Suriin ang access sa mga imbakan ng code sa GitLab, saka i-refresh.",
-      "openBitbucket": "Buksan ang Bitbucket",
-      "openGitlab": "Buksan ang GitLab",
-      "recentlyUsed": "Mga ginamit kamakailan",
       "continueFrom": "Ipinagpapatuloy ang {{title}}.",
       "importingSession": "Ini-import ang sesyon",
       "cliCannotContinue": "Hindi kayang magpatuloy ng sesyon ang CLI na ito. Pumili ng Cloud Agent o ibang CLI.",
-      "importFailed": "Hindi ma-import ang sesyong ito.",
-      "discardWithUploadsMessage": "Buburahin ang iyong prompt at mga na-upload na file na hindi pa nagagamit."
+      "importFailed": "Hindi ma-import ang sesyong ito."
     },
     "partRenderer": {
       "updatedFileCount_one": "Na-update ang {{displayCount}} na file.",

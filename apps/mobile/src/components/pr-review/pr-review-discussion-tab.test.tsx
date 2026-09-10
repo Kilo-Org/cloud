@@ -3,6 +3,8 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+
 import { PrReviewDiscussionTab } from './pr-review-discussion-tab';
 
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
@@ -11,6 +13,7 @@ const discussionState = vi.hoisted(() => ({
   query: {
     isPending: false,
     isFetching: false,
+    isPaused: false,
     hasNextPage: false,
     isFetchingNextPage: false,
     fetchNextPage: vi.fn(),
@@ -56,10 +59,19 @@ const BASE_PROPS = {
   onRequestFiles: vi.fn(() => undefined),
 };
 
-function mountTab(): TestRenderer.ReactTestRenderer {
+/** Mounts the tab, optionally under a provider scope (no scope = GitHub). */
+function mountTab(scopeRef?: ProviderPrRef): TestRenderer.ReactTestRenderer {
+  const tab = createElement(PrReviewDiscussionTab, BASE_PROPS);
+  const tree = scopeRef ? (
+    <ProviderPrScopeProvider value={{ ref: scopeRef, organizationId: null }}>
+      {tab}
+    </ProviderPrScopeProvider>
+  ) : (
+    tab
+  );
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(PrReviewDiscussionTab, BASE_PROPS));
+    ref.current = TestRenderer.create(tree);
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -94,6 +106,7 @@ function expectSinglePadding(renderer: TestRenderer.ReactTestRenderer, expected:
 function resetState(): void {
   discussionState.query.isPending = false;
   discussionState.query.isFetching = false;
+  discussionState.query.isPaused = false;
   discussionState.query.hasNextPage = false;
   discussionState.query.isFetchingNextPage = false;
   discussionState.threads = [];
@@ -137,6 +150,23 @@ describe('PrReviewDiscussionTab full-body states', () => {
     expectSinglePadding(mountTab(), 32);
   });
 
+  it('escapes a stuck skeleton when the first page is paused, not in flight', () => {
+    // Spot check e7: the tab showed only skeleton cards — no comments, no
+    // empty state, no error. A pending page whose fetch is paused has no
+    // end, so the tab must render the retryable state with a working Retry
+    // CTA instead of the permanent skeleton.
+    discussionState.query.isPending = true;
+    discussionState.query.isPaused = true;
+    const renderer = mountTab();
+
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    act(() => {
+      (error.props.onRetry as () => void)();
+    });
+    expect(discussionState.query.refetch).toHaveBeenCalled();
+  });
+
   it('lets EmptyState own the empty body and keeps its Files action', () => {
     const renderer = mountTab();
     const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
@@ -166,6 +196,41 @@ describe('PrReviewDiscussionTab full-body states', () => {
     expect(
       renderer.root.findAll(node => String(node.type) === 'PrReviewDiscussionList')
     ).toHaveLength(0);
+  });
+
+  // Wording, not layout: the same three states below must never call a GitLab
+  // merge request a "pull request". Every other state's copy is already
+  // provider-neutral, so it stays on one key.
+  const GITLAB_REF: ProviderPrRef = {
+    platform: 'gitlab',
+    projectPath: 'group/sub/repo',
+    mrIid: 12,
+  };
+
+  function errorMessage(scopeRef?: ProviderPrRef): unknown {
+    return mountTab(scopeRef).root.find(node => String(node.type) === 'QueryError').props.message;
+  }
+
+  it.each(['permission', 'not-found'])('names a merge request in the %s copy', kind => {
+    discussionState.firstPageErrorState = { kind };
+    expect(errorMessage(GITLAB_REF)).toContain('merge request');
+    expect(errorMessage(GITLAB_REF)).not.toContain('pull request');
+  });
+
+  it.each(['permission', 'not-found'])(
+    'keeps the pull request copy on the %s state without a provider scope',
+    kind => {
+      discussionState.firstPageErrorState = { kind };
+      expect(errorMessage()).not.toContain('merge request');
+    }
+  );
+
+  it('names a merge request in the empty state description', () => {
+    const description = (scopeRef?: ProviderPrRef) =>
+      mountTab(scopeRef).root.find(node => String(node.type) === 'EmptyState').props
+        .description as string;
+    expect(description(GITLAB_REF)).toContain('merge request');
+    expect(description()).toContain('pull request');
   });
 
   it('renders the happy list without a chrome wrapper', () => {

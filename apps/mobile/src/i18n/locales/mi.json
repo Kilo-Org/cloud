@@ -36,6 +36,7 @@
     "cost": "Utu",
     "discard": "Whakarere",
     "findings": "Ngā kitenga",
+    "mergeRequest": "tono whakakotahi",
     "notConnected": "Kāore anō kia hono",
     "notifications": "Ngā whakamōhiotanga",
     "pullRequest": "tono kume",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "Rārangi rerekētanga pātea"
     },
     "connectionExpired": "Kua pau te wā o te hononga GitHub.",
+    "capabilities": {
+      "banner": {
+        "title": "Kāore e wātea ana i tēnei kaiwhakarato",
+        "accessibility": "Kāore e wātea ana i tēnei kaiwhakarato: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Whakakotahitanga",
       "mergeNow": "Whakakotahitia ināianei",
       "mergePullRequest": "Whakakotahi tono kume",
+      "mergeTermTitle": "Whakakotahi {{term}}",
       "enableAutoMerge": "Whakahohehia te whakakotahi aunoa",
       "disableAutoMerge": "Whakawetohia te whakakotahi aunoa",
       "autoMergeOn": "Kua whakahohea te whakakotahi aunoa",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "Mukua te peka i muri i te whakakotahitanga",
       "noEnabledMethods": "Kāore he tikanga whakakotahi kua whakahohea mō tēnei pātaka waehere. Tonoa tētahi kaiwhakahaere o te pātaka waehere kia whakahohe i te whakakotahi, te kōpeke, te whakapūtake anō rānei.",
       "confirmTitle": "Whakakotahitia te tono kume?",
+      "confirmTitleTerm": "Whakakotahitia te {{term}}?",
       "confirmMessage": "Ka whakakotahitia ō huringa ki te peka pūtake.",
       "enableAutoMergeConfirmTitle": "Whakahohehia te whakakotahi aunoa?",
       "enableAutoMergeConfirmMessage": "Ka whakakotahi aunoa a GitHub i tēnei tono kume ina tutuki ngā arowhai katoa e hiahiatia ana.",
+      "enableAutoMergeConfirmMessageTerm": "Ka whakakotahi aunoa te {{term}} ina angitu tōna pipeline.",
+      "enableAutoMergeDescriptionTerm": "Ka whakakotahi aunoa a GitLab i tēnei {{term}} ina angitu tōna pipeline.",
       "forbidden": "Kāore koe e whakaaetia kia whakakotahi i tēnei tono kume.",
       "cannotMerge": "Kāore e taea te whakakotahi i tēnei tono kume i tōna āhua o nāianei.",
       "couldNotMerge": "Kāore i taea te whakakotahi i te tono kume.",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Kua whakakotahitia kē",
-        "closed": "Kua katia tēnei tono kume"
+        "closed": "Kua katia tēnei tono kume",
+        "closedMergeRequest": "Kua katia tēnei tono whakakotahi"
       },
       "partialSuccessBanner": {
         "body": "Kāore i taea te muku i te peka: {{reason}}.",
@@ -400,6 +412,18 @@
         "behindDetail": "Kei muri te peka i takea mai ai ngā huringa i te peka pūtake. Whakapūtaketia anō, whakahoutia rānei te peka i mua i te whakakotahitanga.",
         "notMergeableTitle": "Kāore anō kia taea te whakakotahi i tēnei tono kume",
         "notMergeableDetail": "E ai ki tā GitHub pūrongo, ko {{state}} te tūnga mō te whakakotahitanga."
+      },
+      "restrictions": {
+        "title": "Here whakakotahi",
+        "approvalsRequired_one": "E hiahiatia ana he whakaaetanga {{displayCount}}",
+        "approvalsRequired_other": "E hiahiatia ana ngā whakaaetanga {{displayCount}}",
+        "pipelineMustSucceed": "Me angitu te pipeline i mua i te whakakotahitanga."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Kei te rahua te pipeline i te whakapūmautanga hou rawa.",
+        "pendingPipeline": "Kei te rere tonu te pipeline i te whakapūmautanga hou rawa.",
+        "permission": "Kāore koe e whakaaetia kia whakakotahi i tēnei {{term}}.",
+        "draft": "Tohua te {{term}} kua rite mō te arotake i mua i te whakakotahitanga."
       },
       "methodLabels": {
         "merge": "Waihangatia he tāpaetanga whakakotahi",
@@ -448,6 +472,7 @@
       "acceptTerms": "Whakaae",
       "replyBadRequest": "Kāore e taea te tuku i tēnei whakautu. Kua rerekē pea te aho kōrero.",
       "replyForbidden": "Kāore koe e whakaaetia kia whakautu ki tēnei tono kume.",
+      "replyForbiddenTerm": "Kāore koe e whakaaetia kia whakautu ki tēnei {{term}}.",
       "moderation": {
         "reportContent": {
           "terminal": "Kāore e taea te pūrongo i tēnei kōrero.",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "Arotakehia te tono kume",
     "headLine": "{{counts}} · tāpaetanga hou rawa {{sha}}",
     "entry": {
-      "eyebrow": "Whakatuwheratia he tono kume mā tōna URL.",
-      "pastePrLink": "Whakapirihia he hono PR",
-      "noRecentPrs": "Kāore he PR o nā tata nei",
-      "noRecentPrsDescription": "Whakapirihia he hono PR ki runga hei tīmata i te arotake — ka kitea i konei ā muri ake.",
+      "eyebrow": "Whakatuwheratia he tono kume, he tono whakakotahi rānei mā te URL",
+      "pastePrLink": "Whakapirihia he hono tono kume, tono whakakotahi rānei",
+      "noRecentPrs": "Kāore he arotake o nā tata nei",
+      "noRecentPrsDescription": "Whakapirihia he hono ki runga hei tīmata i te arotake — ka kitea i konei ā muri ake.",
       "couldNotLoad": "Kāore i taea te uta.",
       "removeFromRecentsTitle": "Tangohia i te rārangi o nā tata nei?",
-      "removeFromRecentsMessage": "Ka tangohia tēnei tono kume i tō rārangi o nā tata nei.",
+      "removeFromRecentsMessage": "Ka tangohia tēnei arotake i tō rārangi o nā tata nei.",
       "removeRecentAccessibility": "Tangohia {{repo}} i te rārangi o nā tata nei",
-      "urlAccessibility": "URL mō te tono kume GitHub",
-      "clearLink": "Ūkuia te hono tono kume",
-      "pasteLink": "Whakapirihia te hono tono kume",
+      "urlAccessibility": "Tuhia he URL tono kume, tono whakakotahi rānei",
+      "urlPlaceholder": "URL tono kume, tono whakakotahi rānei",
+      "openAccessibility": "Whakatuwhera i te tono kume, i te tono whakakotahi rānei",
+      "clearLink": "Ūkuia te hono",
+      "pasteLink": "Whakapirihia te hono tono kume, tono whakakotahi rānei",
       "open": "Tuwhera"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "Kāore i taea te tirotiro i te hononga GitHub.",
       "checkFailedMessage": "Kāore e wātea te tūnga takiuru kia utaina rā anō tēnei.",
+      "checkFailedTitleGitLab": "Kāore i taea te tirotiro i te hononga GitLab.",
+      "checkFailedTitleBitbucket": "Kāore i taea te tirotiro i te hononga Bitbucket.",
+      "providerCheckFailedMessage": "Kāore e wātea te tūnga hononga kia uta ra ano.",
       "reconnectTitle": "Hono anō ki GitHub",
       "reconnectDescription": "Kua whakakorea tō hononga GitHub. Hono anō kia arotake tonu ai koe i ngā tono kume i tō waea pūkoro.",
-      "description": "Honoa tō pūkete GitHub hei arotake i ngā tono kume i tō waea pūkoro."
+      "description": "Honoa tō pūkete GitHub hei arotake i ngā tono kume i tō waea pūkoro.",
+      "gitlabDescription": "Honoa tō pūkete GitLab kia arotakehia ngā tono whakakotahi i te waea pūkoro.",
+      "bitbucketDescription": "Honoa a Bitbucket ki tēnei whakahaere kia arotakehia ngā tono kume i te waea pūkoro.",
+      "bitbucketOrgOnlyDescription": "Kōwhiria he whakahaere i tō pūkoro kia arotakehia ōna tono kume Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "Kua pau te wā o te hononga GitHub.",
-      "message": "Kua kore tō hononga GitHub e whai mana. Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana."
+      "message": "Kua kore tō hononga GitHub e whai mana. Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana.",
+      "gitlabTitle": "Kua pau te wā o te hononga GitLab.",
+      "bitbucketTitle": "Kua pau te wā o te hononga Bitbucket.",
+      "providerMessage": "Kua kore tō hononga {{provider}} e whai mana. Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana."
     },
     "eventChips": {
       "comment": "Kōrero",
@@ -643,6 +679,21 @@
       "files": "Kōnae",
       "discussion": "Kōrerorero"
     },
+    "terms": {
+      "pullRequest": "Tono kume",
+      "mergeRequest": "Tono whakakotahi",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Tohaina te tono whakakotahi",
+      "viewOnProvider": "Tirohia i {{provider}}",
+      "mergeRequestUnavailable": "Kāore i te wātea te tono whakakotahi",
+      "unavailableDescription": "Tērā pea kua mukua, tērā pea kāore ō urunga.",
+      "accessDeniedMergeRequest": "Kāore koe e whakaaetia kia tiro i tēnei tono whakakotahi.",
+      "couldNotLoadMergeRequest": "Kāore i taea te uta i te tono whakakotahi.",
+      "discussionAccessDenied": "Kāore koe e whakaaetia kia tiro i te kōrerorero o tēnei tono whakakotahi.",
+      "discussionUnavailableMessage": "Kua tangohia pea tēnei tono whakakotahi.",
+      "noDiscussionDescription": "Kāore he aho arotake, he kōrero rānei mō tēnei tono whakakotahi.",
+      "noFilesChangedDescription": "Kāore he huringa kōnae i tēnei tono whakakotahi."
+    },
     "fileStatus": {
       "modified": "Kua whakarerekētia",
       "renamed": "Kua whakaingoatia anō",
@@ -659,7 +710,7 @@
       "emptyLine": "(pātea)"
     },
     "linkPasteClipboardEmpty": "Kei te pātea te papa tārua.",
-    "linkPasteNotAPullRequest": "Ehara tēnei i te hono tono kume GitHub.",
+    "linkPasteNotAPullRequest": "Ehara tēnei i te hono tono kume, tono whakakotahi rānei",
     "announce": {
       "commentPosted": "Kua tukuna te kōrero",
       "reviewSubmitted": "Kua tukuna te arotake",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "Kāore e taea te tuku i tēnei kōrero. Kua rerekē pea te rārangi i kōwhiria, kua whakahoutia rānei te PR.",
       "reviewNotSubmitted": "Kāore e taea te tuku i tēnei arotake i tōna āhua o nāianei. Kua rerekē pea te PR, kāore rānei koe e whakaaetia kia arotake i tō ake tono kume.",
+      "reviewNotSubmittedTerm": "Kāore e taea te tuku i tēnei arotake kia pēnei tonu. Tērā pea kua huri te {{term}}, kāore rānei e taea e koe te arotake i tō ake {{term}}.",
       "couldNotPostComment": "Kāore i taea te tuku i te kōrero.",
       "couldNotSubmitReview": "Kāore i taea te tuku i te arotake. Tirohia tō hononga, ka whakamātau anō."
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "Kāore i taea te whakautu.",
       "couldNotCompleteAction": "Kāore i taea te whakaoti i tēnei mahi.",
       "mergeResultDefaultError": "Kāore a GitHub i whakaoti i te whakakotahitanga.",
+      "mergeResultNotCompleted": "Kāore i whakakotahitia te {{term}}. Tirohia tōna tūnga, ka ngana anō.",
       "ambiguous": "Kāore i taea te whakaū — tirohia te PR i mua i te whakamātau anō.",
       "persistenceFailed": "Kāore i taea e mātou te tuhi i tēnei mahi. Whakamātau anō ā muri ake.",
       "forbidden": "Kāore e whakaaetia."
@@ -1988,11 +2041,31 @@
       "retryConnection": "Whakamātau ki te hono anō"
     },
     "newSession": {
+      "recentlyUsed": "Ngā mea i whakamahia tata nei",
+      "couldNotLoadGithubRepositories": "Kāore i taea te uta i ngā putunga waehere GitHub.",
+      "couldNotLoadGitlabRepositories": "Kāore i taea te uta i ngā putunga waehere GitLab.",
+      "couldNotLoadBitbucketRepositories": "Kāore i taea te uta i ngā putunga waehere Bitbucket.",
       "connectGithubDescription": "Honohia a GitHub mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere.",
+      "connectGitlabDescription": "Honohia a GitLab mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere.",
+      "connectBitbucketDescription": "Honohia a Bitbucket mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere.",
       "openGithub": "Whakatuwheratia a GitHub",
+      "openGitlab": "Whakatuwheratia a GitLab",
+      "openBitbucket": "Whakatuwheratia a Bitbucket",
       "refreshRepositories": "Whakahoutia ngā putunga waehere",
       "githubConnected": "Kua hono a GitHub",
+      "gitlabConnected": "Kua hono a GitLab",
       "noRepositoriesVisible": "Kāore he putunga waehere e kitea ana. Tirohia ngā whakaaetanga uru ki ngā putunga waehere mō te taupānga Kilo mō GitHub, kātahi ka whakahou anō.",
+      "noRepositoriesVisibleGitlab": "Kāore he putunga waehere e kitea ana. Tirohia ngā whakaaetanga uru ki ngā putunga waehere mō GitLab, kātahi ka whakahou anō.",
+      "noRepositoriesVisibleBitbucket": "Kāore he putunga waehere e kitea ana. Tirohia ngā whakaaetanga uru ki ngā putunga waehere mō Bitbucket, kātahi ka whakahou anō.",
+      "bitbucketOrganizationsOnly": "He wātea a Bitbucket mō ngā whakahaere anake.",
+      "branchPickerTitle": "Kōwhiri peka",
+      "branchDefault": "Taunoa",
+      "branchAccessibility": "Peka: {{label}}",
+      "branchLoading": "E uta ana i ngā peka",
+      "branchLoadError": "Kāore i taea te uta i ngā peka",
+      "branchUnavailable": "Kāore ngā peka e wātea ana mō tēnei pūranga waehere. Tirohia tō urunga ki te kaiwhakarato, kātahi ka kōwhiri i tētahi atu pūranga waehere.",
+      "branchEmpty": "Kāore he peka e wātea ana",
+      "branchPlaceholder": "Kōwhiria he peka",
       "runOnWithTarget": "Whakahaeretia ki: {{target}}",
       "environment": "Te taiao",
       "couldNotLoadEnvironment": "Kāore i taea te uta i tō taiao.",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "Kāore i taea te whakahou i ngā putunga waehere. Whakamātau anō.",
       "discardDraftTitle": "Mukua te hukihuki?",
       "discardDraftMessage": "Ka ngaro ō tohutohu.",
+      "discardWithUploadsMessage": "Ka mukua ō tohutohu me ngā kōnae kua tukuna ake kāore anō kia hono ki tētahi karere.",
       "discardFailed": "Kāore i taea te muku i te hukihuki. Whakamātau anō.",
       "remoteHint": "Whakahaeretia `kilo remote` ki tō rorohiko, `/remote` rānei ki tētahi wātū CLI e haere ana, hei whakahaere i tētahi tukanga kilo paetata.",
-      "connectBitbucketDescription": "Honohia a Bitbucket mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere.",
-      "connectGitlabDescription": "Honohia a GitLab mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere.",
-      "couldNotLoadBitbucketRepositories": "Kāore i taea te uta i ngā putunga waehere Bitbucket.",
-      "couldNotLoadGithubRepositories": "Kāore i taea te uta i ngā putunga waehere GitHub.",
-      "couldNotLoadGitlabRepositories": "Kāore i taea te uta i ngā putunga waehere GitLab.",
-      "gitlabConnected": "Kua hono a GitLab",
-      "noRepositoriesVisibleBitbucket": "Kāore he putunga waehere e kitea ana. Tirohia ngā whakaaetanga uru ki ngā putunga waehere mō Bitbucket, kātahi ka whakahou anō.",
-      "noRepositoriesVisibleGitlab": "Kāore he putunga waehere e kitea ana. Tirohia ngā whakaaetanga uru ki ngā putunga waehere mō GitLab, kātahi ka whakahou anō.",
-      "openBitbucket": "Whakatuwheratia a Bitbucket",
-      "openGitlab": "Whakatuwheratia a GitLab",
-      "recentlyUsed": "Ngā mea i whakamahia tata nei",
-      "cliCannotContinue": "Kāore e taea e tēnei CLI te haere tonu i tētahi wātū. Kōwhiria a Cloud Agent, tētahi atu CLI rānei.",
       "continueFrom": "Kei te haere tonu te wātū {{title}}.",
-      "importFailed": "Kāore i taea te kawemai i tēnei wātū.",
       "importingSession": "Kei te kawemai i te wātū",
-      "discardWithUploadsMessage": "Ka mukua ō tohutohu me ngā kōnae kua tukuna ake kāore anō kia hono ki tētahi karere."
+      "cliCannotContinue": "Kāore e taea e tēnei CLI te haere tonu i tētahi wātū. Kōwhiria a Cloud Agent, tētahi atu CLI rānei.",
+      "importFailed": "Kāore i taea te kawemai i tēnei wātū."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae.",

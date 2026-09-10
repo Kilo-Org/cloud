@@ -18,6 +18,7 @@ import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 import { PrDiffFloatingActions } from './pr-diff-floating-actions';
 import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
+import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { type SelectionState } from '@/lib/pr-review/diff-selection';
 
 vi.mock('react-i18next', async importOriginal => {
@@ -241,6 +242,66 @@ describe('PrDiffFloatingActions submit reachability (P1-F-46b)', () => {
   });
 });
 
+// ── Provider arms (s6) ───────────────────────────────────────────────
+//
+// The two sheets are route siblings on every provider, so a bar holding a
+// provider ref pushes the sheet inside the ref's own route (the provider
+// scope the layout publishes), never the GitHub sibling.
+
+const GITLAB_REF: ProviderPrRef = { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 };
+const BITBUCKET_REF: ProviderPrRef = {
+  platform: 'bitbucket',
+  workspace: 'acme',
+  repoSlug: 'api',
+  prId: 42,
+};
+
+describe('PrDiffFloatingActions provider routes (s6)', () => {
+  const selection: SelectionState = {
+    path: 'src/lib.ts',
+    side: 'RIGHT',
+    hunkKey: 'h1',
+    startLine: 3,
+    line: 5,
+    selectedText: 'x',
+  };
+
+  function pressButtonWith(prRef: ProviderPrRef | undefined, label: string): void {
+    routerPush.mockClear();
+    // eslint-disable-next-line new-cap
+    const element = PrDiffFloatingActions({ ...baseProps, prRef, selection });
+    const button = findElement({
+      node: element,
+      type: 'Button',
+      prop: 'accessibilityLabel',
+      value: label,
+    });
+    if (!button) {
+      throw new Error(`${label} button not found`);
+    }
+    (button.props as { onPress?: () => void }).onPress?.();
+  }
+
+  it('pushes the comment composer inside the GitLab ref route with the line params', () => {
+    pressButtonWith(GITLAB_REF, 'Comment on selected lines');
+
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/group/sub/repo/12/comment-composer?path=src%2Flib.ts&side=RIGHT&line=5&startLine=3'
+    );
+  });
+
+  it.each<[ProviderPrRef, string]>([
+    [GITLAB_REF, '/(app)/pr-review/gitlab/group/sub/repo/12/review-submit'],
+    [BITBUCKET_REF, '/(app)/pr-review/bitbucket/acme/api/42/review-submit'],
+  ])('pushes the review-submit sheet inside the %s ref route', (prRef, expectedHref) => {
+    pressButtonWith(prRef, 'Finish review');
+
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledWith(expectedHref);
+  });
+});
+
 describe('PrDiffFloatingActions bottom inset (plan §6)', () => {
   beforeEach(() => {
     insets.bottom = 0;
@@ -249,18 +310,13 @@ describe('PrDiffFloatingActions bottom inset (plan §6)', () => {
   function findRootBar(): React.ReactElement | null {
     // eslint-disable-next-line new-cap
     const element = PrDiffFloatingActions(baseProps);
-    return findElement({
-      node: element,
-      type: 'View',
-      prop: 'pointerEvents',
-      value: 'box-none',
-    });
+    return element;
   }
 
   function rootPaddingBottom(): number | undefined {
     const root = findRootBar();
     if (!root) {
-      throw new Error('floating action bar root not found');
+      throw new Error('footer action bar root not found');
     }
     return (root.props as { style?: { paddingBottom?: number } }).style?.paddingBottom;
   }
@@ -274,27 +330,17 @@ describe('PrDiffFloatingActions bottom inset (plan §6)', () => {
     expect(rootPaddingBottom()).toBe(58);
   });
 
-  it('reports the measured layout height through onHeightChange', () => {
-    const onHeightChange = vi.fn(() => undefined);
-    // eslint-disable-next-line new-cap
-    const element = PrDiffFloatingActions({ ...baseProps, onHeightChange });
-    const root = findElement({
-      node: element,
-      type: 'View',
-      prop: 'pointerEvents',
-      value: 'box-none',
-    });
+  it('renders in-flow, not as an overlay over the list', () => {
+    // Spot check e3: the bar used to sit `absolute inset-x-0 bottom-0` over
+    // the FlashList, so a partly-scrolled diff row was clipped at its top
+    // edge. As an in-flow footer the list ends above it at every scroll
+    // position.
+    const root = findRootBar();
     if (!root) {
-      throw new Error('floating action bar root not found');
+      throw new Error('footer action bar root not found');
     }
-    const onLayout = (
-      root.props as {
-        onLayout?: (event: { nativeEvent: { layout: { height: number } } }) => void;
-      }
-    ).onLayout;
-    onLayout?.({ nativeEvent: { layout: { height: 150 } } });
-
-    expect(onHeightChange).toHaveBeenCalledTimes(1);
-    expect(onHeightChange).toHaveBeenCalledWith(150);
+    const classes = ((root.props as { className?: string }).className ?? '').split(' ');
+    expect(classes).not.toContain('absolute');
+    expect(classes).toContain('w-full');
   });
 });

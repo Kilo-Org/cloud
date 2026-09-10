@@ -36,6 +36,7 @@
     "cost": "Ọnụ ahịa",
     "discard": "Tụfuo",
     "findings": "Ihe achọpụtara",
+    "mergeRequest": "arịrịọ njikọta",
     "notConnected": "Ejikọghị",
     "notifications": "Ọkwa",
     "pullRequest": "arịrịọ ijikọ koodu",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "Ahịrị ọdịiche tọgbọ chakoo"
     },
     "connectionExpired": "Oge njikọ GitHub agwụla.",
+    "capabilities": {
+      "banner": {
+        "title": "Ọ naghị adị n'aka onye na-enye ọrụ a",
+        "accessibility": "Ọ naghị adị n'aka onye na-enye ọrụ a: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Njikọta",
       "mergeNow": "Jikọta ugbu a",
       "mergePullRequest": "Njikọta arịrịọ",
+      "mergeTermTitle": "Jikọta {{term}}",
       "enableAutoMerge": "Gbanye njikọta akpaghị aka",
       "disableAutoMerge": "Gbanyụọ njikọta akpaghị aka",
       "autoMergeOn": "Njikọta akpaghị aka na-arụ ọrụ",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "Hichapụ alaka mgbe ejikọtachara",
       "noEnabledMethods": "Enweghị usoro njikọta agbanyere na ebe nchekwa a. Rịọ onye nchịkwa ebe nchekwa ka ọ gbanye njikọta, nchịkọta ndekọ mgbanwe, ma ọ bụ mgbanwe ntọala.",
       "confirmTitle": "Jikọta arịrịọ njikọta?",
+      "confirmTitleTerm": "Jikọta {{term}}?",
       "confirmMessage": "Nke a ga-ejikọta mgbanwe gị n'ime alaka isi.",
       "enableAutoMergeConfirmTitle": "Gbanye njikọta akpaghị aka?",
       "enableAutoMergeConfirmMessage": "GitHub ga-ejikọta arịrịọ njikọta a akpaghị aka mgbe nnwale niile achọrọ gafere.",
+      "enableAutoMergeConfirmMessageTerm": "A ga-ejikọta {{term}} na-akpaghị aka mgbe pipeline ya gara nke ọma.",
+      "enableAutoMergeDescriptionTerm": "GitLab ga-ejikọta {{term}} a na-akpaghị aka mgbe pipeline ya gara nke ọma.",
       "forbidden": "Ị nweghị ikike ijikọta arịrịọ njikọta a.",
       "cannotMerge": "Enweghị ike ijikọta arịrịọ njikọta a otú ọ dị ugbu a.",
       "couldNotMerge": "Enweghị ike ijikọta arịrịọ njikọta.",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Ejikọtala ya",
-        "closed": "Emechiela arịrịọ njikọta a"
+        "closed": "Emechiela arịrịọ njikọta a",
+        "closedMergeRequest": "Emechiela arịrịọ njikọta a"
       },
       "partialSuccessBanner": {
         "body": "Enweghị ike ihichapụ alaka ahụ: {{reason}}.",
@@ -400,6 +412,18 @@
         "behindDetail": "Alaka e si na ya ewepụta mgbanwe enweghị mmelite niile dị na alaka isi. Gbanwee ntọala ya ma ọ bụ melite ya tupu ijikọta.",
         "notMergeableTitle": "Enweghị ike ijikọta arịrịọ njikọta a ugbu a",
         "notMergeableDetail": "GitHub gosiri {{state}} dị ka ọnọdụ ikike njikọta."
+      },
+      "restrictions": {
+        "title": "Ihe mgbochi njikọta",
+        "approvalsRequired_one": "Achọrọ nkwenye {{displayCount}}",
+        "approvalsRequired_other": "Achọrọ nkwenye {{displayCount}}",
+        "pipelineMustSucceed": "Pipeline ga-aga nke ọma tupu ijikọta."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline na-ada ada na ndekọ mgbanwe ikpeazụ.",
+        "pendingPipeline": "Pipeline ka na-arụ ọrụ na ndekọ mgbanwe ikpeazụ.",
+        "permission": "Ị nweghị ikike ijikọta {{term}} a.",
+        "draft": "Kaa {{term}} ahụ ka nke dị njikere maka nyocha tupu ijikọta."
       },
       "methodLabels": {
         "merge": "Mepụta ndekọ njikọta",
@@ -448,6 +472,7 @@
       "acceptTerms": "Nakwere",
       "replyBadRequest": "Enweghị ike ibipụta azịza a. O nwere ike ịbụ na usoro mkparịta ụka ahụ agbanweela.",
       "replyForbidden": "Ị nweghị ikike ịzaghachi arịrịọ njikọta a.",
+      "replyForbiddenTerm": "Ị nweghị ikike ịzaghachi {{term}} a.",
       "moderation": {
         "reportContent": {
           "terminal": "Enweghị ike ikpesa okwu a.",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "Nyochaa arịrịọ njikọta",
     "headLine": "{{counts}} · ndekọ mgbanwe kacha ọhụrụ {{sha}}",
     "entry": {
-      "eyebrow": "Mepee arịrịọ njikọta site na URL.",
-      "pastePrLink": "Mado njikọ PR",
-      "noRecentPrs": "Enweghị PR elelere n'oge na-adịbeghị anya",
-      "noRecentPrsDescription": "Mado njikọ PR n'elu ka ị malite nyocha — ọ ga-apụta ebe a n'oge ọzọ.",
+      "eyebrow": "Meghe arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta site na URL",
+      "pastePrLink": "Mado njikọ arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta",
+      "noRecentPrs": "Enweghị nyocha ọhụrụ",
+      "noRecentPrsDescription": "Mado njikọ n'elu iji malite nyocha — ọ ga-apụta ebe a oge ọzọ.",
       "couldNotLoad": "Enweghị ike ibudata.",
       "removeFromRecentsTitle": "Wepụ na ndepụta ndị elelere nso nso a?",
-      "removeFromRecentsMessage": "A ga-ewepụ arịrịọ njikọta a na ndepụta ndị ị lere nso nso a.",
+      "removeFromRecentsMessage": "A ga-ewepụ nyocha a na nyocha ndị ị rụrụ n'oge na-adịbeghị anya.",
       "removeRecentAccessibility": "Wepụ {{repo}} na ndepụta ndị elelere nso nso a",
-      "urlAccessibility": "URL arịrịọ njikọta GitHub",
-      "clearLink": "Hichapụ njikọ arịrịọ njikọta",
-      "pasteLink": "Mado njikọ arịrịọ njikọta",
+      "urlAccessibility": "Nye URL arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta",
+      "urlPlaceholder": "URL arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta",
+      "openAccessibility": "Meghe arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta",
+      "clearLink": "Hichapụ njikọ",
+      "pasteLink": "Mado njikọ arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta",
       "open": "Meghe"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "Enweghị ike ịlele njikọ GitHub.",
       "checkFailedMessage": "Enweghị ike ịmata ọnọdụ nbanye ruo mgbe ebudatara nke a.",
+      "checkFailedTitleGitLab": "Enweghị ike ịlele njikọ GitLab.",
+      "checkFailedTitleBitbucket": "Enweghị ike ịlele njikọ Bitbucket.",
+      "providerCheckFailedMessage": "Ọnọdụ njikọ agaghị adị ruo mgbe nke a budatara.",
       "reconnectTitle": "Jikọtaghachi GitHub",
       "reconnectDescription": "Akagbuola njikọ GitHub gị. Jikọtaghachi ka ị gaa n'ihu na-enyocha arịrịọ njikọta na ekwentị.",
-      "description": "Jikọọ akaụntụ GitHub gị ka ị nyochaa arịrịọ njikọta na ekwentị."
+      "description": "Jikọọ akaụntụ GitHub gị ka ị nyochaa arịrịọ njikọta na ekwentị.",
+      "gitlabDescription": "Jikọọ akaụntụ GitLab gị iji nyochaa arịrịọ njikọta na ekwentị.",
+      "bitbucketDescription": "Jikọọ Bitbucket na òtù a iji nyochaa arịrịọ ijikọ koodu na ekwentị.",
+      "bitbucketOrgOnlyDescription": "Họrọ òtù na profaịlụ gị iji nyochaa arịrịọ ijikọ koodu Bitbucket ya."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "Oge njikọ GitHub agwụla.",
-      "message": "Njikọ GitHub gị adịkwaghị irè. Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa."
+      "message": "Njikọ GitHub gị adịkwaghị irè. Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa.",
+      "gitlabTitle": "Oge njikọ GitLab agwụla.",
+      "bitbucketTitle": "Oge njikọ Bitbucket agwụla.",
+      "providerMessage": "Njikọ {{provider}} gị adịkwaghị irè. Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa."
     },
     "eventChips": {
       "comment": "Nkwupụta",
@@ -643,6 +679,21 @@
       "files": "Faịlụ",
       "discussion": "Mkparịta ụka"
     },
+    "terms": {
+      "pullRequest": "Arịrịọ ijikọ koodu",
+      "mergeRequest": "Arịrịọ njikọta",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Kekọrịta arịrịọ njikọta",
+      "viewOnProvider": "Lelee na {{provider}}",
+      "mergeRequestUnavailable": "Arịrịọ njikọta adịghị",
+      "unavailableDescription": "Ọ nwere ike ịbụ na ehichapụrụ ya, ma ọ bụ ị nweghị ikike ịbanye ya.",
+      "accessDeniedMergeRequest": "Ị nweghị ikike ilele arịrịọ njikọta a.",
+      "couldNotLoadMergeRequest": "Enweghị ike ibudata arịrịọ njikọta.",
+      "discussionAccessDenied": "Ị nweghị ikike ilele mkparịta ụka arịrịọ njikọta a.",
+      "discussionUnavailableMessage": "O nwere ike ịbụ na ewepụla arịrịọ njikọta a.",
+      "noDiscussionDescription": "Enweghị usoro mkparịta ụka nyocha ma ọ bụ okwu mkparịta ụka na arịrịọ njikọta a.",
+      "noFilesChangedDescription": "Enweghị mgbanwe faịlụ na arịrịọ njikọta a."
+    },
     "fileStatus": {
       "modified": "Agbanwere",
       "renamed": "Agbanwere aha",
@@ -659,7 +710,7 @@
       "emptyLine": "(efu)"
     },
     "linkPasteClipboardEmpty": "Ebe nchekwa nwa oge tọgbọ chakoo.",
-    "linkPasteNotAPullRequest": "Nke a abụghị njikọ arịrịọ njikọta GitHub.",
+    "linkPasteNotAPullRequest": "Ọ bụghị njikọ arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta",
     "announce": {
       "commentPosted": "Ebipụtala okwu",
       "reviewSubmitted": "Ezigala nyocha",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "Enweghị ike ibipụta okwu a. O nwere ike ịbụ na ahịrị ahọpụtara agbanweela ma ọ bụ na emelitere PR ahụ.",
       "reviewNotSubmitted": "Enweghị ike iziga nyocha a otú ọ dị ugbu a. O nwere ike ịbụ na PR ahụ agbanweela, ma ọ bụ na ị nweghị ike inyocha arịrịọ njikọta nke gị.",
+      "reviewNotSubmittedTerm": "Enweghị ike izipu nyocha a ka ọ dị. Ọ nwere ike ịbụ na {{term}} agbanweela, ma ọ bụ ị gaghị enyocha {{term}} nke gị.",
       "couldNotPostComment": "Enweghị ike ibipụta okwu.",
       "couldNotSubmitReview": "Enweghị ike iziga nyocha. Lelee njikọ gị ma nwaa ọzọ."
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "Enweghị ike ịzaghachi.",
       "couldNotCompleteAction": "Enweghị ike imecha omume a.",
       "mergeResultDefaultError": "GitHub emechaghị njikọta ahụ.",
+      "mergeResultNotCompleted": "Ejighị {{term}} ọnụ. Lelee ọnọdụ ya ma gbalịa ọzọ.",
       "ambiguous": "Enweghị ike ịchọpụta ma emechara ya — lelee PR ahụ tupu ị nwaa ọzọ.",
       "persistenceFailed": "Anyị enweghị ike ịdekọ omume a. Biko nwaa ọzọ ma emechaa.",
       "forbidden": "A machibidoro nke a."
@@ -1988,11 +2041,31 @@
       "retryConnection": "Nwaa njikọ ọzọ"
     },
     "newSession": {
+      "recentlyUsed": "Ndị e ji mee ihe nso nso a",
+      "couldNotLoadGithubRepositories": "Enweghị ike ibudata ebe nchekwa koodu GitHub.",
+      "couldNotLoadGitlabRepositories": "Enweghị ike ibudata ebe nchekwa koodu GitLab.",
+      "couldNotLoadBitbucketRepositories": "Enweghị ike ibudata ebe nchekwa koodu Bitbucket.",
       "connectGithubDescription": "Jikọọ GitHub n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu.",
+      "connectGitlabDescription": "Jikọọ GitLab n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu.",
+      "connectBitbucketDescription": "Jikọọ Bitbucket n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu.",
       "openGithub": "Mepee GitHub",
+      "openGitlab": "Mepee GitLab",
+      "openBitbucket": "Mepee Bitbucket",
       "refreshRepositories": "Budata ebe nchekwa koodu ọzọ",
       "githubConnected": "Ejikọrọ GitHub",
+      "gitlabConnected": "Ejikọrọ GitLab",
       "noRepositoriesVisible": "Enweghị ebe nchekwa koodu a na-ahụ. Lelee ikike ngwa Kilo GitHub nwere ịbanye na ha, wee budata ọzọ.",
+      "noRepositoriesVisibleGitlab": "Enweghị ebe nchekwa koodu a na-ahụ. Lelee ikike ịbanye na ha na GitLab, wee budata ọzọ.",
+      "noRepositoriesVisibleBitbucket": "Enweghị ebe nchekwa koodu a na-ahụ. Lelee ikike ịbanye na ha na Bitbucket, wee budata ọzọ.",
+      "bitbucketOrganizationsOnly": "A na-enweta Bitbucket maka òtù naanị.",
+      "branchPickerTitle": "Họrọ alaka",
+      "branchDefault": "Ndabere",
+      "branchAccessibility": "Alaka: {{label}}",
+      "branchLoading": "Na-ebudata alaka",
+      "branchLoadError": "Enweghị ike ibudata alaka",
+      "branchUnavailable": "Alaka adịghị maka ebe nchekwa koodu a. Lelee ikike gị n'aka onye na-enye ọrụ, ma họrọ ebe nchekwa koodu ọzọ.",
+      "branchEmpty": "Enweghị alaka dị",
+      "branchPlaceholder": "Họrọ otu alaka",
       "runOnWithTarget": "Rụọ ọrụ na: {{target}}",
       "environment": "Ebe ọrụ",
       "couldNotLoadEnvironment": "Enweghị ike ibudata ebe ọrụ gị.",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "Enweghị ike ibudata ebe nchekwa koodu ọzọ. Biko nwaa ọzọ.",
       "discardDraftTitle": "Tụfuo ozi a na-ede?",
       "discardDraftMessage": "Ihe ị dere ga-efu.",
+      "discardWithUploadsMessage": "A ga-ehichapụ ihe ị dere na faịlụ ọ bụla ebugotere nke a na-ejikọtaghị na ozi ezigara.",
       "discardFailed": "Enweghị ike ịtụfu ozi a na-ede. Biko nwaa ọzọ.",
       "remoteHint": "Gbaa `kilo remote` na kọmputa gị, ma ọ bụ `/remote` n'ime nnọkọ CLI na-arụ ọrụ, iji chịkwaa usoro kilo dị na kọmputa gị.",
-      "connectBitbucketDescription": "Jikọọ Bitbucket n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu.",
-      "connectGitlabDescription": "Jikọọ GitLab n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu.",
-      "couldNotLoadBitbucketRepositories": "Enweghị ike ibudata ebe nchekwa koodu Bitbucket.",
-      "couldNotLoadGithubRepositories": "Enweghị ike ibudata ebe nchekwa koodu GitHub.",
-      "couldNotLoadGitlabRepositories": "Enweghị ike ibudata ebe nchekwa koodu GitLab.",
-      "gitlabConnected": "Ejikọrọ GitLab",
-      "noRepositoriesVisibleBitbucket": "Enweghị ebe nchekwa koodu a na-ahụ. Lelee ikike ịbanye na ha na Bitbucket, wee budata ọzọ.",
-      "noRepositoriesVisibleGitlab": "Enweghị ebe nchekwa koodu a na-ahụ. Lelee ikike ịbanye na ha na GitLab, wee budata ọzọ.",
-      "openBitbucket": "Mepee Bitbucket",
-      "openGitlab": "Mepee GitLab",
-      "recentlyUsed": "Ndị e ji mee ihe nso nso a",
-      "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",
       "continueFrom": "A na-aga n'ihu na {{title}}.",
-      "importFailed": "Enweghị ike ibubata nnọkọ a.",
       "importingSession": "Na-ebubata nnọkọ",
-      "discardWithUploadsMessage": "A ga-ehichapụ ihe ị dere na faịlụ ọ bụla ebugotere nke a na-ejikọtaghị na ozi ezigara."
+      "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",
+      "importFailed": "Enweghị ike ibubata nnọkọ a."
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere faịlụ {{displayCount}}.",

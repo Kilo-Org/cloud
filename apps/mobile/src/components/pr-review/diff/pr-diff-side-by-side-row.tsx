@@ -90,6 +90,9 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
   const gutterStyle: ViewStyle = {
     width: COLUMN_GUTTER_WIDTH,
     minHeight: metrics.rowMinHeight,
+    // Top-aligned with the code's first line (see DiffLine's gutter): a
+    // centered number drifts onto a later visual line when the code wraps.
+    paddingTop: VERTICAL_PADDING,
   };
   const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
   const codeBaseStyle: TextStyle = {
@@ -114,7 +117,7 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
       style={rowStyle}
     >
       <View
-        className="items-end justify-center"
+        className="items-end justify-start"
         style={{ ...gutterStyle, paddingRight: COLUMN_INNER_PADDING }}
       >
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme muted color */}

@@ -36,6 +36,7 @@
     "cost": "ღირებულება",
     "discard": "გაუქმება",
     "findings": "გამოვლენილი პრობლემები",
+    "mergeRequest": "შერწყმის მოთხოვნა",
     "notConnected": "არ არის დაკავშირებული",
     "notifications": "შეტყობინებები",
     "pullRequest": "PR",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "ცვლილებების ცარიელი სტრიქონი"
     },
     "connectionExpired": "GitHub-თან კავშირს ვადა გაუვიდა.",
+    "capabilities": {
+      "banner": {
+        "title": "ამ პროვაიდერისთვის მიუწვდომელია",
+        "accessibility": "ამ პროვაიდერისთვის მიუწვდომელია: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "შერწყმა",
       "mergeNow": "ახლავე შერწყმა",
       "mergePullRequest": "შერწყმის მოთხოვნის შერწყმა",
+      "mergeTermTitle": "{{term}}-ის შერწყმა",
       "enableAutoMerge": "ავტომატური შერწყმის ჩართვა",
       "disableAutoMerge": "ავტომატური შერწყმის გამორთვა",
       "autoMergeOn": "ავტომატური შერწყმა ჩართულია",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "განშტოების წაშლა შერწყმის შემდეგ",
       "noEnabledMethods": "ამ საცავში შერწყმის არცერთი მეთოდი არ არის ჩართული. სთხოვე საცავის ადმინისტრატორს, ჩართოს ჩვეულებრივი შერწყმა, შეკუმშვით შერწყმა ან ბაზის შეცვლით შერწყმა.",
       "confirmTitle": "შერწყმის მოთხოვნა შეირწყას?",
+      "confirmTitleTerm": "{{term}} შეირწყას?",
       "confirmMessage": "შენი ცვლილებები საბაზო განშტოებაში შეირწყმება.",
       "enableAutoMergeConfirmTitle": "ჩაირთოს ავტომატური შერწყმა?",
       "enableAutoMergeConfirmMessage": "GitHub ამ შერწყმის მოთხოვნას ავტომატურად შეარწყამს, როცა ყველა სავალდებულო შემოწმება წარმატებით დასრულდება.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} ავტომატურად გაერთიანდება, როდესაც მისი მილი წარმატებით დასრულდება.",
+      "enableAutoMergeDescriptionTerm": "GitLab ავტომატურად გააერთიანებს ამ {{term}}-ს, როდესაც მისი მილი წარმატებით დასრულდება.",
       "forbidden": "ამ შერწყმის მოთხოვნის შერწყმის უფლება არ გაქვს.",
       "cannotMerge": "ამ შერწყმის მოთხოვნის არსებული სახით შერწყმა შეუძლებელია.",
       "couldNotMerge": "შერწყმის მოთხოვნის შერწყმა ვერ მოხერხდა.",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "უკვე შერწყმულია",
-        "closed": "ეს შერწყმის მოთხოვნა დახურულია"
+        "closed": "ეს შერწყმის მოთხოვნა დახურულია",
+        "closedMergeRequest": "ეს შერწყმის მოთხოვნა დახურულია"
       },
       "partialSuccessBanner": {
         "body": "განშტოების წაშლა ვერ მოხერხდა: {{reason}}.",
@@ -400,6 +412,18 @@
         "behindDetail": "საწყისი განშტოება საბაზო განშტოებას ჩამორჩება. შერწყმამდე შეცვალე მისი ბაზა ან განაახლე განშტოება.",
         "notMergeableTitle": "ამ შერწყმის მოთხოვნის შერწყმა ჯერ შეუძლებელია",
         "notMergeableDetail": "GitHub-ის თანახმად, შერწყმის მდგომარეობაა: {{state}}."
+      },
+      "restrictions": {
+        "title": "შერწყმის შეზღუდვები",
+        "approvalsRequired_one": "საჭიროა {{displayCount}} დადასტურება",
+        "approvalsRequired_other": "საჭიროა {{displayCount}} დადასტურება",
+        "pipelineMustSucceed": "შერწყმამდე მილი წარმატებით უნდა დასრულდეს."
+      },
+      "providerBlocked": {
+        "failingPipeline": "მილი ვერ ასრულდება ბოლო კომიტზე.",
+        "pendingPipeline": "მილი ჯერ კიდევ მუშაობს ბოლო კომიტზე.",
+        "permission": "ამ {{term}}-ის შერწყმის უფლება არ გაქვს.",
+        "draft": "შერწყმამდე მონიშნე {{term}} განსახილველად მზადყოფნაში."
       },
       "methodLabels": {
         "merge": "შერწყმის კომიტის შექმნა",
@@ -448,6 +472,7 @@
       "acceptTerms": "თანხმობა",
       "replyBadRequest": "ამ პასუხის გამოქვეყნება შეუძლებელია. შესაძლოა, თემა შეიცვალა.",
       "replyForbidden": "ამ შერწყმის მოთხოვნაზე პასუხის გაცემის უფლება არ გაქვს.",
+      "replyForbiddenTerm": "ამ {{term}}-ზე პასუხის გაცემის უფლება არ გაქვს.",
       "moderation": {
         "reportContent": {
           "terminal": "ამ კომენტარის გასაჩივრება შეუძლებელია.",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "შერწყმის მოთხოვნის განხილვა",
     "headLine": "{{counts}} · ბოლო კომიტი {{sha}}",
     "entry": {
-      "eyebrow": "გახსენი შერწყმის მოთხოვნა URL-ით.",
-      "pastePrLink": "PR-ის ბმულის ჩასმა",
-      "noRecentPrs": "ბოლოს ნანახი PR-ები არ არის",
-      "noRecentPrsDescription": "განხილვის დასაწყებად ზემოთ ჩასვი PR-ის ბმული — შემდეგ ჯერზე ის აქ გამოჩნდება.",
+      "eyebrow": "გახსენით PR ან შერწყმის მოთხოვნა URL-ით",
+      "pastePrLink": "ჩასვით PR-ის ან შერწყმის მოთხოვნის ბმული",
+      "noRecentPrs": "ბოლოს განხილული არ არის",
+      "noRecentPrsDescription": "განხილვის დასაწყებად ზემოთ ჩასვით ბმული — შემდეგ ჯერზე ის აქ გამოჩნდება.",
       "couldNotLoad": "ჩატვირთვა ვერ მოხერხდა.",
       "removeFromRecentsTitle": "წაიშალოს ბოლოს ნანახების სიიდან?",
-      "removeFromRecentsMessage": "ეს შერწყმის მოთხოვნა ბოლოს ნანახების სიიდან წაიშლება.",
+      "removeFromRecentsMessage": "ეს მიმოხილვა ბოლო ნანახების სიიდან წაიშლება.",
       "removeRecentAccessibility": "{{repo}}-ის წაშლა ბოლოს ნანახების სიიდან",
-      "urlAccessibility": "GitHub-ის შერწყმის მოთხოვნის URL",
-      "clearLink": "შერწყმის მოთხოვნის ბმულის გასუფთავება",
-      "pasteLink": "შერწყმის მოთხოვნის ბმულის ჩასმა",
+      "urlAccessibility": "ჩაწერეთ PR-ის ან შერწყმის მოთხოვნის URL",
+      "urlPlaceholder": "PR-ის ან შერწყმის მოთხოვნის URL",
+      "openAccessibility": "PR-ის ან შერწყმის მოთხოვნის გახსნა",
+      "clearLink": "ბმულის გასუფთავება",
+      "pasteLink": "ჩასვით PR-ის ან შერწყმის მოთხოვნის ბმული",
       "open": "ღია"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "GitHub-თან კავშირის შემოწმება ვერ მოხერხდა.",
       "checkFailedMessage": "ჩატვირთვის დასრულებამდე შესვლის სტატუსი მიუწვდომელია.",
+      "checkFailedTitleGitLab": "GitLab-თან კავშირის შემოწმება ვერ მოხერხდა.",
+      "checkFailedTitleBitbucket": "Bitbucket-თან კავშირის შემოწმება ვერ მოხერხდა.",
+      "providerCheckFailedMessage": "კავშირის სტატუსი მიუწვდომელია ჩატვირთვამდე.",
       "reconnectTitle": "GitHub-თან ხელახლა დაკავშირება",
       "reconnectDescription": "GitHub-თან კავშირი გაუქმდა. მობილურზე შერწყმის მოთხოვნების განხილვის გასაგრძელებლად ხელახლა დაუკავშირდი.",
-      "description": "მობილურზე შერწყმის მოთხოვნების განსახილველად დააკავშირე შენი GitHub ანგარიში."
+      "description": "მობილურზე შერწყმის მოთხოვნების განსახილველად დააკავშირე შენი GitHub ანგარიში.",
+      "gitlabDescription": "დააკავშირეთ თქვენი GitLab ანგარიში, შერწყმის მოთხოვნების მობილურში განსახილველად.",
+      "bitbucketDescription": "დააკავშირეთ Bitbucket ამ ორგანიზაციას, PR-ების მობილურში განსახილველად.",
+      "bitbucketOrgOnlyDescription": "აირჩიეთ ორგანიზაცია თქვენს პროფილში, მისი Bitbucket PR-ების განსახილველად."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub-თან კავშირს ვადა გაუვიდა.",
-      "message": "GitHub-თან კავშირი აღარ მოქმედებს. ხელახლა შეამოწმე კავშირი — საჭიროების შემთხვევაში აპი ხელახლა დაკავშირებას მოგთხოვს."
+      "message": "GitHub-თან კავშირი აღარ მოქმედებს. ხელახლა შეამოწმე კავშირი — საჭიროების შემთხვევაში აპი ხელახლა დაკავშირებას მოგთხოვს.",
+      "gitlabTitle": "GitLab-თან კავშირს ვადა გაუვიდა.",
+      "bitbucketTitle": "Bitbucket-თან კავშირს ვადა გაუვიდა.",
+      "providerMessage": "{{provider}}-თან კავშირი აღარ მოქმედებს. ხელახლა შეამოწმე კავშირი — საჭიროების შემთხვევაში აპი ხელახლა დაკავშირებას მოგთხოვს."
     },
     "eventChips": {
       "comment": "კომენტარი",
@@ -643,6 +679,21 @@
       "files": "ფაილი",
       "discussion": "დისკუსია"
     },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Შერწყმის მოთხოვნა",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "შერწყმის მოთხოვნის გაზიარება",
+      "viewOnProvider": "ნახვა {{provider}}-ში",
+      "mergeRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",
+      "unavailableDescription": "შესაძლოა წაიშალა, ან შესაძლოა მასზე წვდომა არ გაქვთ.",
+      "accessDeniedMergeRequest": "ამ შერწყმის მოთხოვნის ნახვის უფლება არ გაქვს.",
+      "couldNotLoadMergeRequest": "შერწყმის მოთხოვნის ჩატვირთვა ვერ მოხერხდა.",
+      "discussionAccessDenied": "ამ შერწყმის მოთხოვნის დისკუსიის ნახვის უფლება არ გაქვს.",
+      "discussionUnavailableMessage": "შესაძლოა, ეს შერწყმის მოთხოვნა წაიშალა.",
+      "noDiscussionDescription": "ამ შერწყმის მოთხოვნაში ჯერ არც განხილვის თემებია და არც ზოგადი კომენტარები.",
+      "noFilesChangedDescription": "ამ შერწყმის მოთხოვნაში ფაილები არ შეცვლილა."
+    },
     "fileStatus": {
       "modified": "შეცვლილია",
       "renamed": "სახელი შეცვლილია",
@@ -659,7 +710,7 @@
       "emptyLine": "(ცარიელი)"
     },
     "linkPasteClipboardEmpty": "გაცვლის ბუფერი ცარიელია.",
-    "linkPasteNotAPullRequest": "ეს GitHub-ის შერწყმის მოთხოვნის ბმული არ არის.",
+    "linkPasteNotAPullRequest": "ეს PR-ის ან შერწყმის მოთხოვნის ბმული არ არის",
     "announce": {
       "commentPosted": "კომენტარი გამოქვეყნდა",
       "reviewSubmitted": "განხილვა გაიგზავნა",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "ამ კომენტარის გამოქვეყნება შეუძლებელია. შესაძლოა, მონიშნული სტრიქონი შეიცვალა ან PR განახლდა.",
       "reviewNotSubmitted": "ამ განხილვის არსებული სახით გაგზავნა შეუძლებელია. შესაძლოა, PR შეიცვალა ან საკუთარ შერწყმის მოთხოვნას განიხილავ, რაც დაუშვებელია.",
+      "reviewNotSubmittedTerm": "ეს მიმოხილვა უცვლელად ვერ გაიგზავნება. შესაძლოა {{term}} შეიცვალა, ან საკუთარ {{term}}-ს ვერ მიმოახილეთ.",
       "couldNotPostComment": "კომენტარის გამოქვეყნება ვერ მოხერხდა.",
       "couldNotSubmitReview": "განხილვის გაგზავნა ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე."
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "პასუხის გაგზავნა ვერ მოხერხდა.",
       "couldNotCompleteAction": "ამ მოქმედების დასრულება ვერ მოხერხდა.",
       "mergeResultDefaultError": "GitHub-მა შერწყმა ვერ დაასრულა.",
+      "mergeResultNotCompleted": "{{term}} არ გაერთიანდა. შეამოწმეთ მისი მდგომარეობა და სცადეთ თავიდან.",
       "ambiguous": "დადასტურება ვერ მოხერხდა — ხელახლა ცდამდე შეამოწმე PR.",
       "persistenceFailed": "ამ მოქმედების დაფიქსირება ვერ მოხერხდა. მოგვიანებით სცადე.",
       "forbidden": "ეს მოქმედება აკრძალულია."
@@ -1988,11 +2041,31 @@
       "retryConnection": "ხელახლა დაკავშირება"
     },
     "newSession": {
+      "recentlyUsed": "ბოლოს გამოყენებული",
+      "couldNotLoadGithubRepositories": "GitHub-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
+      "couldNotLoadGitlabRepositories": "GitLab-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
       "connectGithubDescription": "ბრაუზერში დააკავშირეთ GitHub-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
+      "connectGitlabDescription": "ბრაუზერში დააკავშირეთ GitLab-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
+      "connectBitbucketDescription": "ბრაუზერში დააკავშირეთ Bitbucket-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
       "openGithub": "GitHub-ის გახსნა",
+      "openGitlab": "GitLab-ის გახსნა",
+      "openBitbucket": "Bitbucket-ის გახსნა",
       "refreshRepositories": "რეპოზიტორიების განახლება",
       "githubConnected": "GitHub დაკავშირებულია",
+      "gitlabConnected": "GitLab დაკავშირებულია",
       "noRepositoriesVisible": "რეპოზიტორიები არ ჩანს. შეამოწმეთ, აქვს თუ არა Kilo-ს GitHub აპს რეპოზიტორიებზე წვდომა, შემდეგ განაახლეთ სია.",
+      "noRepositoriesVisibleGitlab": "რეპოზიტორიები არ ჩანს. შეამოწმეთ GitLab-ის რეპოზიტორიებზე წვდომა, შემდეგ განაახლეთ სია.",
+      "noRepositoriesVisibleBitbucket": "რეპოზიტორიები არ ჩანს. შეამოწმეთ Bitbucket-ის რეპოზიტორიებზე წვდომა, შემდეგ განაახლეთ სია.",
+      "bitbucketOrganizationsOnly": "Bitbucket მხოლოდ ორგანიზაციებისთვისაა ხელმისაწვდომი.",
+      "branchPickerTitle": "განშტოების არჩევა",
+      "branchDefault": "ნაგულისხმები",
+      "branchAccessibility": "განშტოება: {{label}}",
+      "branchLoading": "განშტოებების ჩატვირთვა",
+      "branchLoadError": "განშტოებების ჩატვირთვა ვერ მოხერხდა",
+      "branchUnavailable": "ამ რეპოზიტორიისთვის განშტოებები მიუწვდომელია. შეამოწმეთ წვდომა პროვაიდერთან, შემდეგ აირჩიეთ სხვა რეპოზიტორია.",
+      "branchEmpty": "განშტოებები მიუწვდომელია",
+      "branchPlaceholder": "აირჩიეთ განშტოება",
       "runOnWithTarget": "გაშვების გარემო: {{target}}",
       "environment": "გარემო",
       "couldNotLoadEnvironment": "თქვენი გარემოს ჩატვირთვა ვერ მოხერხდა.",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "რეპოზიტორიების განახლება ვერ მოხერხდა. სცადეთ ხელახლა.",
       "discardDraftTitle": "წაიშალოს მონახაზი?",
       "discardDraftMessage": "თქვენი მოთხოვნა დაიკარგება.",
+      "discardWithUploadsMessage": "თქვენი მოთხოვნა და ატვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება.",
       "discardFailed": "მონახაზის წაშლა ვერ მოხერხდა. სცადეთ ხელახლა.",
       "remoteHint": "ლოკალური kilo პროცესის სამართავად კომპიუტერზე გაუშვით `kilo remote`, ან მიმდინარე CLI სესიაში — `/remote`.",
-      "connectBitbucketDescription": "ბრაუზერში დააკავშირეთ Bitbucket-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
-      "connectGitlabDescription": "ბრაუზერში დააკავშირეთ GitLab-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
-      "couldNotLoadGithubRepositories": "GitHub-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
-      "couldNotLoadGitlabRepositories": "GitLab-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
-      "gitlabConnected": "GitLab დაკავშირებულია",
-      "noRepositoriesVisibleBitbucket": "რეპოზიტორიები არ ჩანს. შეამოწმეთ Bitbucket-ის რეპოზიტორიებზე წვდომა, შემდეგ განაახლეთ სია.",
-      "noRepositoriesVisibleGitlab": "რეპოზიტორიები არ ჩანს. შეამოწმეთ GitLab-ის რეპოზიტორიებზე წვდომა, შემდეგ განაახლეთ სია.",
-      "openBitbucket": "Bitbucket-ის გახსნა",
-      "openGitlab": "GitLab-ის გახსნა",
-      "recentlyUsed": "ბოლოს გამოყენებული",
-      "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
       "continueFrom": "გრძელდება სესია: {{title}}.",
-      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა.",
       "importingSession": "სესიის იმპორტი მიმდინარეობს…",
-      "discardWithUploadsMessage": "თქვენი მოთხოვნა და ატვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება."
+      "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
+      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა."
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი.",

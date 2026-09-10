@@ -1,4 +1,36 @@
+diff --git a/android/src/main/java/expo/modules/router/ExpoRouterModule.kt b/android/src/main/java/expo/modules/router/ExpoRouterModule.kt
+deleted file mode 100644
+index 369cd65886415cb894b858e38604dc59b5c6ba95..0000000000000000000000000000000000000000
+diff --git a/build/fork/getStateFromPath-forks.js b/build/fork/getStateFromPath-forks.js
+index 63374a73c024945b5b7dc9db410ebb248f1b67e1..1e31faa0cebd6b8a37801328f1c1841b3c816804 100644
+--- a/build/fork/getStateFromPath-forks.js
++++ b/build/fork/getStateFromPath-forks.js
+@@ -343,6 +343,23 @@ function getRouteConfigSorter(previousSegments = []) {
+                 return -1;
+             }
+         }
++        /*
++         * START FORK
++         * A catch-all index route and its static-suffix sibling (e.g.
++         * `*identity` + `merge`) tie on every comparison above: pushing
++         * 'index' into the index config's parts equalizes their lengths and
++         * static counts, and both regexes match the same paths. Without this
++         * tie-break the stable sort keeps the tree order, the index wins, and
++         * the static suffix is swallowed into the catch-all param. The static
++         * sibling consumes fewer catch-all segments, so it must rank first.
++         */
++        if (a.isIndex && !b.isIndex) {
++            return 1;
++        }
++        else if (!a.isIndex && b.isIndex) {
++            return -1;
++        }
++        // END FORK
+         /*
+          * Both configs are identical in specificity and segments count/type
+          * Try and sort by initial instead.
 diff --git a/build/fork/useLinking.native.js b/build/fork/useLinking.native.js
+index c080a5853fa71f2708c6ed0f15092b6f43231f76..5da1348eaa9d3530253b683f8427b3c5a33f717c 100644
 --- a/build/fork/useLinking.native.js
 +++ b/build/fork/useLinking.native.js
 @@ -114,20 +114,30 @@ function useLinking(ref, { enabled = true, prefixes, filter, config, getInitialU

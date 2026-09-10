@@ -36,6 +36,7 @@
     "cost": "लागत",
     "discard": "खारेज गर्नुहोस्",
     "findings": "भेटिएका समस्या",
+    "mergeRequest": "मर्ज रिक्वेस्ट",
     "notConnected": "जडान छैन",
     "notifications": "सूचनाहरू",
     "pullRequest": "पुल रिक्वेस्ट",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "परिवर्तन विवरणको खाली पङ्क्ति"
     },
     "connectionExpired": "GitHub जडानको म्याद सकियो।",
+    "capabilities": {
+      "banner": {
+        "title": "यस प्रदायकमा उपलब्ध छैन",
+        "accessibility": "यस प्रदायकमा उपलब्ध छैन: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "मर्ज",
       "mergeNow": "अहिले मर्ज गर्नुहोस्",
       "mergePullRequest": "पुल रिक्वेस्ट मर्ज",
+      "mergeTermTitle": "{{term}} मर्ज",
       "enableAutoMerge": "स्वचालित मर्ज चालू गर्नुहोस्",
       "disableAutoMerge": "स्वचालित मर्ज बन्द गर्नुहोस्",
       "autoMergeOn": "स्वचालित मर्ज चालू छ",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "मर्ज गरेपछि शाखा मेट्नुहोस्",
       "noEnabledMethods": "यो रिपोजिटरीमा मर्ज गर्ने कुनै विधि चालू छैन। रिपोजिटरीका प्रशासकलाई मर्ज, स्क्वाश वा रिबेस विधि चालू गर्न अनुरोध गर्नुहोस्।",
       "confirmTitle": "पुल रिक्वेस्ट मर्ज गर्ने?",
+      "confirmTitleTerm": "{{term}} मर्ज गर्ने?",
       "confirmMessage": "यसले तपाईंका परिवर्तनहरू आधार शाखामा मर्ज गर्नेछ।",
       "enableAutoMergeConfirmTitle": "स्वचालित मर्ज चालू गर्ने?",
       "enableAutoMergeConfirmMessage": "सबै आवश्यक जाँचहरू सफल भएपछि GitHub ले यो पुल रिक्वेस्ट स्वतः मर्ज गर्नेछ।",
+      "enableAutoMergeConfirmMessageTerm": "पाइपलाइन सफल भएपछि {{term}} स्वचालित रूपमा मर्ज हुनेछ।",
+      "enableAutoMergeDescriptionTerm": "पाइपलाइन सफल भएपछि GitLab ले यो {{term}} स्वचालित रूपमा मर्ज गर्छ।",
       "forbidden": "तपाईंसँग यो पुल रिक्वेस्ट मर्ज गर्ने अनुमति छैन।",
       "cannotMerge": "यो पुल रिक्वेस्ट हालको अवस्थामा मर्ज गर्न सकिँदैन।",
       "couldNotMerge": "पुल रिक्वेस्ट मर्ज गर्न सकिएन।",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "पहिले नै मर्ज भइसकेको",
-        "closed": "यो पुल रिक्वेस्ट बन्द छ"
+        "closed": "यो पुल रिक्वेस्ट बन्द छ",
+        "closedMergeRequest": "यो मर्ज रिक्वेस्ट बन्द छ"
       },
       "partialSuccessBanner": {
         "body": "शाखा मेट्न सकिएन: {{reason}}।",
@@ -400,6 +412,18 @@
         "behindDetail": "हेड शाखा आधार शाखाभन्दा पछाडि छ। मर्ज गर्नुअघि यो शाखा रिबेस वा अद्यावधिक गर्नुहोस्।",
         "notMergeableTitle": "यो पुल रिक्वेस्ट अझै मर्ज गर्न मिल्दैन",
         "notMergeableDetail": "GitHub ले मर्जसम्बन्धी अवस्था {{state}} रहेको जनाएको छ।"
+      },
+      "restrictions": {
+        "title": "मर्ज प्रतिबन्धहरू",
+        "approvalsRequired_one": "{{displayCount}} स्वीकृति आवश्यक",
+        "approvalsRequired_other": "{{displayCount}} स्वीकृतिहरू आवश्यक",
+        "pipelineMustSucceed": "मर्ज गर्नुअघि पाइपलाइन सफल हुनुपर्छ।"
+      },
+      "providerBlocked": {
+        "failingPipeline": "पछिल्लो कमिटमा पाइपलाइन असफल हुँदैछ।",
+        "pendingPipeline": "पछिल्लो कमिटमा पाइपलाइन अझै चलिरहेको छ।",
+        "permission": "तपाईंसँग यो {{term}} मर्ज गर्ने अनुमति छैन।",
+        "draft": "मर्ज गर्नुअघि {{term}}लाई समीक्षाका लागि तयार भनी चिन्ह लगाउनुहोस्।"
       },
       "methodLabels": {
         "merge": "मर्ज कमिट सिर्जना गर्नुहोस्",
@@ -448,6 +472,7 @@
       "acceptTerms": "स्वीकार गर्नुहोस्",
       "replyBadRequest": "यो जवाफ पोस्ट गर्न सकिँदैन। थ्रेड परिवर्तन भएको हुन सक्छ।",
       "replyForbidden": "तपाईंसँग यो पुल रिक्वेस्टमा जवाफ दिने अनुमति छैन।",
+      "replyForbiddenTerm": "तपाईंसँग यो {{term}}मा जवाफ दिने अनुमति छैन।",
       "moderation": {
         "reportContent": {
           "terminal": "यो टिप्पणी रिपोर्ट गर्न सकिँदैन।",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "पुल रिक्वेस्टको समीक्षा गर्नुहोस्",
     "headLine": "{{counts}} · हेड {{sha}}",
     "entry": {
-      "eyebrow": "URL बाट पुल रिक्वेस्ट खोल्नुहोस्।",
-      "pastePrLink": "PR लिङ्क टाँस्नुहोस्",
-      "noRecentPrs": "हालैका PR छैनन्",
-      "noRecentPrsDescription": "समीक्षा सुरु गर्न माथि PR लिङ्क टाँस्नुहोस् — यो अर्को पटक यहाँ देखिनेछ।",
+      "eyebrow": "URL बाट पुल रिक्वेस्ट वा मर्ज रिक्वेस्ट खोल्नुहोस्",
+      "pastePrLink": "पुल रिक्वेस्ट वा मर्ज रिक्वेस्टको लिङ्क टाँस्नुहोस्",
+      "noRecentPrs": "हालैका समीक्षाहरू छैनन्",
+      "noRecentPrsDescription": "समीक्षा सुरु गर्न माथि लिङ्क टाँस्नुहोस् — यो अर्को पटक यहाँ देखिनेछ।",
       "couldNotLoad": "लोड गर्न सकिएन।",
       "removeFromRecentsTitle": "हालैको सूचीबाट हटाउने?",
-      "removeFromRecentsMessage": "यो पुल रिक्वेस्ट तपाईंको हालैको सूचीबाट हटाइनेछ।",
+      "removeFromRecentsMessage": "यो समीक्षा तपाईंको हालैको सूचीबाट हटाइनेछ।",
       "removeRecentAccessibility": "{{repo}} लाई हालैको सूचीबाट हटाउनुहोस्",
-      "urlAccessibility": "GitHub पुल रिक्वेस्टको URL",
-      "clearLink": "पुल रिक्वेस्टको लिङ्क हटाउनुहोस्",
-      "pasteLink": "पुल रिक्वेस्टको लिङ्क टाँस्नुहोस्",
+      "urlAccessibility": "पुल रिक्वेस्ट वा मर्ज रिक्वेस्टको URL प्रविष्ट गर्नुहोस्",
+      "urlPlaceholder": "पुल रिक्वेस्ट वा मर्ज रिक्वेस्ट URL",
+      "openAccessibility": "पुल रिक्वेस्ट वा मर्ज रिक्वेस्ट खोल्नुहोस्",
+      "clearLink": "लिङ्क हटाउनुहोस्",
+      "pasteLink": "पुल रिक्वेस्ट वा मर्ज रिक्वेस्टको लिङ्क टाँस्नुहोस्",
       "open": "खुला"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "GitHub जडान जाँच्न सकिएन।",
       "checkFailedMessage": "यो लोड नभएसम्म साइन इनको अवस्था थाहा हुँदैन।",
+      "checkFailedTitleGitLab": "GitLab जडान जाँच्न सकिएन।",
+      "checkFailedTitleBitbucket": "Bitbucket जडान जाँच्न सकिएन।",
+      "providerCheckFailedMessage": "यो लोड नभएसम्म जडानको अवस्था उपलब्ध छैन।",
       "reconnectTitle": "GitHub मा पुनः जडान",
       "reconnectDescription": "तपाईंको GitHub जडानको अनुमति रद्द भएको छ। मोबाइलमा पुल रिक्वेस्टको समीक्षा जारी राख्न पुनः जडान गर्नुहोस्।",
-      "description": "मोबाइलमा पुल रिक्वेस्टको समीक्षा गर्न आफ्नो GitHub खाता जडान गर्नुहोस्।"
+      "description": "मोबाइलमा पुल रिक्वेस्टको समीक्षा गर्न आफ्नो GitHub खाता जडान गर्नुहोस्।",
+      "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरू समीक्षा गर्न आफ्नो GitLab खाता जडान गर्नुहोस्।",
+      "bitbucketDescription": "मोबाइलमा पुल रिक्वेस्टहरू समीक्षा गर्न यो संस्थालाई Bitbucket सँग जडान गर्नुहोस्।",
+      "bitbucketOrgOnlyDescription": "त्यसका Bitbucket पुल रिक्वेस्टहरू समीक्षा गर्न आफ्नो प्रोफाइलमा एउटा संस्था चयन गर्नुहोस्।"
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub जडानको म्याद सकियो।",
-      "message": "तपाईंको GitHub जडान अब मान्य छैन। तपाईंको जडान फेरि जाँच्नुहोस् — आवश्यक परेमा फेरि जडान गर्न भनिनेछ।"
+      "message": "तपाईंको GitHub जडान अब मान्य छैन। तपाईंको जडान फेरि जाँच्नुहोस् — आवश्यक परेमा फेरि जडान गर्न भनिनेछ।",
+      "gitlabTitle": "GitLab जडानको म्याद सकियो।",
+      "bitbucketTitle": "Bitbucket जडानको म्याद सकियो।",
+      "providerMessage": "तपाईंको {{provider}} जडान अब मान्य छैन। तपाईंको जडान फेरि जाँच्नुहोस् — आवश्यक परेमा फेरि जडान गर्न भनिनेछ।"
     },
     "eventChips": {
       "comment": "टिप्पणी",
@@ -643,6 +679,21 @@
       "files": "फाइलहरू",
       "discussion": "छलफल"
     },
+    "terms": {
+      "pullRequest": "पुल रिक्वेस्ट",
+      "mergeRequest": "मर्ज रिक्वेस्ट",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "मर्ज रिक्वेस्ट सेयर गर्नुहोस्",
+      "viewOnProvider": "{{provider}} मा हेर्नुहोस्",
+      "mergeRequestUnavailable": "मर्ज रिक्वेस्ट उपलब्ध छैन",
+      "unavailableDescription": "यो मेटिएको हुनसक्छ, वा तपाईंलाई यसको पहुँच नहुन सक्छ।",
+      "accessDeniedMergeRequest": "तपाईंसँग यो मर्ज रिक्वेस्ट हेर्ने अनुमति छैन।",
+      "couldNotLoadMergeRequest": "मर्ज रिक्वेस्ट लोड गर्न सकिएन।",
+      "discussionAccessDenied": "यो मर्ज रिक्वेस्ट को छलफल हेर्ने अनुमति तपाईंसँग छैन।",
+      "discussionUnavailableMessage": "यो मर्ज रिक्वेस्ट हटाइएको हुन सक्छ।",
+      "noDiscussionDescription": "यो मर्ज रिक्वेस्टमा समीक्षाका थ्रेड वा छलफलका टिप्पणीहरू छैनन्।",
+      "noFilesChangedDescription": "यो मर्ज रिक्वेस्टमा कुनै पनि फाइल परिवर्तन भएको छैन।"
+    },
     "fileStatus": {
       "modified": "परिमार्जित",
       "renamed": "नाम फेरिएको",
@@ -659,7 +710,7 @@
       "emptyLine": "(खाली)"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली छ।",
-    "linkPasteNotAPullRequest": "यो GitHub पुल रिक्वेस्टको लिङ्क होइन।",
+    "linkPasteNotAPullRequest": "यो पुल रिक्वेस्ट वा मर्ज रिक्वेस्टको लिङ्क होइन",
     "announce": {
       "commentPosted": "टिप्पणी पोस्ट गरियो",
       "reviewSubmitted": "समीक्षा पठाइयो",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "यो टिप्पणी पोस्ट गर्न सकिँदैन। चयन गरिएको पङ्क्ति परिवर्तन भएको वा PR अद्यावधिक भएको हुन सक्छ।",
       "reviewNotSubmitted": "यो समीक्षा हालको अवस्थामा पठाउन सकिँदैन। PR मा परिवर्तन भएको हुन सक्छ वा तपाईं आफ्नै पुल रिक्वेस्टको समीक्षा गर्दै हुनुहुन्छ।",
+      "reviewNotSubmittedTerm": "यो समीक्षा यथावत पेश गर्न सकिँदैन। {{term}} परिवर्तन भएको हुनसक्छ, वा तपाईंले आफ्नै {{term}} को समीक्षा गर्न सक्नुहुन्न।",
       "couldNotPostComment": "टिप्पणी पोस्ट गर्न सकिएन।",
       "couldNotSubmitReview": "समीक्षा पठाउन सकिएन। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।"
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "जवाफ दिन सकिएन।",
       "couldNotCompleteAction": "यो कार्य पूरा गर्न सकिएन।",
       "mergeResultDefaultError": "GitHub ले मर्ज पूरा गरेन।",
+      "mergeResultNotCompleted": "{{term}} मर्ज भएन। यसको अवस्था जाँच गर्नुहोस् र फेरि प्रयास गर्नुहोस्।",
       "ambiguous": "पुष्टि गर्न सकिएन — पुनः प्रयास गर्नुअघि PR जाँच्नुहोस्।",
       "persistenceFailed": "हामीले यो कार्यको अभिलेख राख्न सकेनौँ। कृपया पछि फेरि प्रयास गर्नुहोस्।",
       "forbidden": "अनुमति छैन।"
@@ -1988,11 +2041,31 @@
       "retryConnection": "जडान गर्न पुनः प्रयास गर्नुहोस्"
     },
     "newSession": {
+      "recentlyUsed": "हालै प्रयोग गरिएका",
+      "couldNotLoadGithubRepositories": "GitHub रिपोजिटरीहरू लोड गर्न सकिएन।",
+      "couldNotLoadGitlabRepositories": "GitLab रिपोजिटरीहरू लोड गर्न सकिएन।",
+      "couldNotLoadBitbucketRepositories": "Bitbucket रिपोजिटरीहरू लोड गर्न सकिएन।",
       "connectGithubDescription": "आफ्नो ब्राउजरमा GitHub जडान गर्नुहोस्। त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
+      "connectGitlabDescription": "आफ्नो ब्राउजरमा GitLab जडान गर्नुहोस्। त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
+      "connectBitbucketDescription": "आफ्नो ब्राउजरमा Bitbucket जडान गर्नुहोस्। त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
       "openGithub": "GitHub खोल्नुहोस्",
+      "openGitlab": "GitLab खोल्नुहोस्",
+      "openBitbucket": "Bitbucket खोल्नुहोस्",
       "refreshRepositories": "रिपोजिटरीहरूको सूची ताजा गर्नुहोस्",
       "githubConnected": "GitHub जडान भएको",
+      "gitlabConnected": "GitLab जडान भएको",
       "noRepositoriesVisible": "कुनै रिपोजिटरी देखिएको छैन। Kilo GitHub एपलाई रिपोजिटरीमा पहुँच छ कि छैन जाँचेर सूची ताजा गर्नुहोस्।",
+      "noRepositoriesVisibleGitlab": "कुनै रिपोजिटरी देखिएको छैन। GitLab मा रिपोजिटरीको पहुँच जाँचेर सूची ताजा गर्नुहोस्।",
+      "noRepositoriesVisibleBitbucket": "कुनै रिपोजिटरी देखिएको छैन। Bitbucket मा रिपोजिटरीको पहुँच जाँचेर सूची ताजा गर्नुहोस्।",
+      "bitbucketOrganizationsOnly": "Bitbucket संस्थाहरूका लागि मात्र उपलब्ध छ।",
+      "branchPickerTitle": "ब्रान्च चयन गर्नुहोस्",
+      "branchDefault": "पूर्वनिर्धारित",
+      "branchAccessibility": "ब्रान्च: {{label}}",
+      "branchLoading": "ब्रान्चहरू लोड हुँदैछन्",
+      "branchLoadError": "ब्रान्चहरू लोड गर्न सकिएन",
+      "branchUnavailable": "यस रिपोजिटरीका लागि ब्रान्चहरू उपलब्ध छैनन्। प्रदायकसँग तपाईंको पहुँच जाँच्नुहोस्, त्यसपछि अर्को रिपोजिटरी चयन गर्नुहोस्।",
+      "branchEmpty": "कुनै ब्रान्च उपलब्ध छैन",
+      "branchPlaceholder": "एउटा ब्रान्च चयन गर्नुहोस्",
       "runOnWithTarget": "{{target}} मा चलाउनुहोस्",
       "environment": "वातावरण",
       "couldNotLoadEnvironment": "तपाईंको वातावरण लोड गर्न सकिएन।",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "रिपोजिटरीहरूको सूची ताजा गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
       "discardDraftTitle": "मस्यौदा मेट्ने?",
       "discardDraftMessage": "तपाईंको प्रम्प्ट मेटिनेछ।",
+      "discardWithUploadsMessage": "तपाईंको प्रम्प्ट र कुनै सन्देशमा संलग्न नभएका अपलोड गरिएका फाइलहरू मेटिनेछन्।",
       "discardFailed": "मस्यौदा मेट्न सकिएन। फेरि प्रयास गर्नुहोस्।",
       "remoteHint": "स्थानीय kilo प्रक्रिया नियन्त्रण गर्न आफ्नो कम्प्युटरमा `kilo remote` वा चलिरहेको CLI सत्रमा `/remote` चलाउनुहोस्।",
-      "connectBitbucketDescription": "आफ्नो ब्राउजरमा Bitbucket जडान गर्नुहोस्। त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
-      "connectGitlabDescription": "आफ्नो ब्राउजरमा GitLab जडान गर्नुहोस्। त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
-      "couldNotLoadBitbucketRepositories": "Bitbucket रिपोजिटरीहरू लोड गर्न सकिएन।",
-      "couldNotLoadGithubRepositories": "GitHub रिपोजिटरीहरू लोड गर्न सकिएन।",
-      "couldNotLoadGitlabRepositories": "GitLab रिपोजिटरीहरू लोड गर्न सकिएन।",
-      "gitlabConnected": "GitLab जडान भएको",
-      "noRepositoriesVisibleBitbucket": "कुनै रिपोजिटरी देखिएको छैन। Bitbucket मा रिपोजिटरीको पहुँच जाँचेर सूची ताजा गर्नुहोस्।",
-      "noRepositoriesVisibleGitlab": "कुनै रिपोजिटरी देखिएको छैन। GitLab मा रिपोजिटरीको पहुँच जाँचेर सूची ताजा गर्नुहोस्।",
-      "openBitbucket": "Bitbucket खोल्नुहोस्",
-      "openGitlab": "GitLab खोल्नुहोस्",
-      "recentlyUsed": "हालै प्रयोग गरिएका",
       "continueFrom": "{{title}} जारी राखिँदैछ।",
       "importingSession": "सत्र आयात गर्दै",
       "cliCannotContinue": "यो CLI ले सत्र जारी राख्न सक्दैन। Cloud Agent वा अर्को CLI छान्नुहोस्।",
-      "importFailed": "यो सत्र आयात गर्न सकिएन।",
-      "discardWithUploadsMessage": "तपाईंको प्रम्प्ट र कुनै सन्देशमा संलग्न नभएका अपलोड गरिएका फाइलहरू मेटिनेछन्।"
+      "importFailed": "यो सत्र आयात गर्न सकिएन।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो।",

@@ -121,6 +121,11 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
   const gutterStyle: ViewStyle = {
     width: GUTTER_WIDTH,
     minHeight: metrics.rowMinHeight,
+    // Top-aligned with the code's first line: the code container pads both
+    // edges by VERTICAL_PADDING, so a wrapped code line makes the row two
+    // lines tall and a centered number would drift onto the later visual
+    // line instead of lining up with the row's start.
+    paddingTop: VERTICAL_PADDING,
   };
   const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
   const codeBaseStyle: TextStyle = {
@@ -146,7 +151,7 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
 
   const content = (
     <View className={cn('flex-row items-stretch', rowBackground, selectionClass)} style={rowStyle}>
-      <View className="items-end justify-center pr-2" style={gutterStyle}>
+      <View className="items-end justify-start pr-2" style={gutterStyle}>
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme color + mono font for gutter */}
         <RNText
           adjustsFontSizeToFit

@@ -36,6 +36,7 @@
     "cost": "Iye owó",
     "discard": "Jù sílẹ̀",
     "findings": "Àwọn àwárí",
+    "mergeRequest": "ìbéèrè ìṣọ̀kan",
     "notConnected": "Kò sopọ̀",
     "notifications": "Àwọn ìfitónilétí",
     "pullRequest": "ìbéèrè àkópọ̀",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "Ìlà ìyàtọ̀ tó ṣófo"
     },
     "connectionExpired": "Àkókò ìsopọ̀ GitHub ti parí.",
+    "capabilities": {
+      "banner": {
+        "title": "Kò sí lórí olùpèsè yìí",
+        "accessibility": "Kò sí lórí olùpèsè yìí: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Àkópọ̀",
       "mergeNow": "Dà pọ̀ báyìí",
       "mergePullRequest": "Ìdàpọ̀ ìbéèrè ìṣọ̀kan",
+      "mergeTermTitle": "Da {{term}} pọ̀",
       "enableAutoMerge": "Tan ìdàpọ̀ aládàáṣiṣẹ́",
       "disableAutoMerge": "Pa ìdàpọ̀ aládàáṣiṣẹ́",
       "autoMergeOn": "Ìdàpọ̀ aládàáṣiṣẹ́ ti wà ní títàn",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "Pa ẹ̀ka rẹ́ lẹ́yìn ìdàpọ̀",
       "noEnabledMethods": "Kò sí ọ̀nà ìdàpọ̀ tí a ti mú ṣiṣẹ́ nínú ibi ìpamọ́ yìí. Béèrè lọ́wọ́ alábòójútó ibi ìpamọ́ láti mú ìdàpọ̀, ìṣàkópọ̀ sí ọ̀kan, tàbí ìyípadà ìpìlẹ̀ ṣiṣẹ́.",
       "confirmTitle": "Da ìbéèrè ìṣọ̀kan pọ̀?",
+      "confirmTitleTerm": "Da {{term}} pọ̀?",
       "confirmMessage": "Èyí yóò da àwọn ìyípadà rẹ pọ̀ mọ́ ẹ̀ka ìpìlẹ̀.",
       "enableAutoMergeConfirmTitle": "Tan ìdàpọ̀ aládàáṣiṣẹ́?",
       "enableAutoMergeConfirmMessage": "GitHub yóò da ìbéèrè ìṣọ̀kan yìí pọ̀ fúnra rẹ̀ nígbà tí gbogbo àyẹ̀wò tí a nílò bá yọrí sí rere.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} yóò darapọ̀ fúnra rẹ̀ nígbà tí pipeline rẹ̀ bá ṣé.",
+      "enableAutoMergeDescriptionTerm": "GitLab yóò darapọ̀ {{term}} yìí fúnra rẹ̀ nígbà tí pipeline rẹ̀ bá ṣé.",
       "forbidden": "O kò ní àṣẹ láti da ìbéèrè ìṣọ̀kan yìí pọ̀.",
       "cannotMerge": "A kò lè da ìbéèrè ìṣọ̀kan yìí pọ̀ bí ó ṣe wà.",
       "couldNotMerge": "A kò lè da ìbéèrè ìṣọ̀kan pọ̀.",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "A ti dà á pọ̀ tẹ́lẹ̀",
-        "closed": "A ti ti ìbéèrè ìṣọ̀kan yìí pa"
+        "closed": "A ti ti ìbéèrè ìṣọ̀kan yìí pa",
+        "closedMergeRequest": "A ti ti ìbéèrè ìṣọ̀kan yìí pa"
       },
       "partialSuccessBanner": {
         "body": "A kò lè pa ẹ̀ka náà rẹ́: {{reason}}",
@@ -400,6 +412,18 @@
         "behindDetail": "Ẹ̀ka orísun kò tíì ní àwọn ìyípadà tuntun tó wà ní ẹ̀ka ìpìlẹ̀. Ṣe ìyípadà ìpìlẹ̀ tàbí ìmúdójúìwọ̀n ẹ̀ka kí o tó dà á pọ̀.",
         "notMergeableTitle": "A kò lè da ìbéèrè ìṣọ̀kan yìí pọ̀ síbẹ̀",
         "notMergeableDetail": "GitHub sọ pé ipò ìdàpọ̀ náà jẹ́ {{state}}."
+      },
+      "restrictions": {
+        "title": "Àwọn ìdènà ìdàpọ̀",
+        "approvalsRequired_one": "Ìfọwọ́sí {{displayCount}} ni a nílò",
+        "approvalsRequired_other": "Ìfọwọ́sí {{displayCount}} ni a nílò",
+        "pipelineMustSucceed": "Pipeline gbọ́dọ̀ ṣé kí ìdàpọ̀ tó wáyé."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline ń kùnà lórí ìfipamọ́ àyípadà tuntun jù.",
+        "pendingPipeline": "Pipeline ṣì ń ṣiṣẹ́ lórí ìfipamọ́ àyípadà tuntun jù.",
+        "permission": "O kò ní àṣẹ láti da {{term}} yìí pọ̀.",
+        "draft": "Sàmì sí {{term}} náà pé ó ti ṣe tán fún àtúnyẹ̀wò kí o tó dà á pọ̀."
       },
       "methodLabels": {
         "merge": "Ṣẹ̀dá àkọsílẹ̀ ìdàpọ̀",
@@ -448,6 +472,7 @@
       "acceptTerms": "Gba",
       "replyBadRequest": "A kò lè fi ìdáhùn yìí ránṣẹ́. Ọ̀wọ́ ìjíròrò náà lè ti yí padà.",
       "replyForbidden": "O kò ní àṣẹ láti dáhùn sí ìbéèrè ìṣọ̀kan yìí.",
+      "replyForbiddenTerm": "O kò ní àṣẹ láti dáhùn sí {{term}} yìí.",
       "moderation": {
         "reportContent": {
           "terminal": "A kò lè fi ẹ̀sùn àsọyé yìí hàn.",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "Ṣe àtúnyẹ̀wò ìbéèrè ìṣọ̀kan",
     "headLine": "{{counts}} · àkọsílẹ̀ ìyípadà tuntun {{sha}}",
     "entry": {
-      "eyebrow": "Ṣí ìbéèrè ìṣọ̀kan nípasẹ̀ URL.",
-      "pastePrLink": "Lẹ ọ̀nà àsopọ̀ PR mọ́",
-      "noRecentPrs": "Kò sí PR àìpẹ́",
-      "noRecentPrsDescription": "Lẹ ọ̀nà àsopọ̀ PR mọ́ lókè láti bẹ̀rẹ̀ àtúnyẹ̀wò — yóò hàn níbí nígbà tó kàn.",
+      "eyebrow": "Ṣí ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan nípa URL",
+      "pastePrLink": "Lẹ̀ mọ́ ọ̀nà àsopọ̀ ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan",
+      "noRecentPrs": "Kò sí àtúnyẹ̀wò àìpẹ́",
+      "noRecentPrsDescription": "Lẹ̀ mọ́ ọ̀nà àsopọ̀ lókè láti bẹ̀rẹ̀ àtúnyẹ̀wò — yóò fara hàn níbí nígbà mìíràn.",
       "couldNotLoad": "A kò lè ṣàkójọ rẹ̀.",
       "removeFromRecentsTitle": "Yọ kúrò nínú àkójọ àìpẹ́?",
-      "removeFromRecentsMessage": "A ó yọ ìbéèrè ìṣọ̀kan yìí kúrò nínú àkójọ àìpẹ́ rẹ.",
+      "removeFromRecentsMessage": "A ó yọ àtúnyẹ̀wò yìí kúrò nínú àwọn àìpẹ́ rẹ.",
       "removeRecentAccessibility": "Yọ {{repo}} kúrò nínú àkójọ àìpẹ́",
-      "urlAccessibility": "URL ìbéèrè ìṣọ̀kan GitHub",
-      "clearLink": "Nu ọ̀nà àsopọ̀ ìbéèrè ìṣọ̀kan kúrò",
-      "pasteLink": "Lẹ ọ̀nà àsopọ̀ ìbéèrè ìṣọ̀kan mọ́",
+      "urlAccessibility": "Ṣàfihàn URL ìbéèrè àkópọ̀ tàbí ìbérè ìṣọ̀kan",
+      "urlPlaceholder": "URL ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan",
+      "openAccessibility": "Ṣí ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan",
+      "clearLink": "Pa ọ̀nà àsopọ̀ rẹ́",
+      "pasteLink": "Lẹ̀ mọ́ ọ̀nà àsopọ̀ ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan",
       "open": "Ṣí"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "A kò lè ṣàyẹ̀wò àsopọ̀ GitHub.",
       "checkFailedMessage": "A kò lè fi ipò ìwọlé hàn títí èyí yóò fi ṣàkójọ tán.",
+      "checkFailedTitleGitLab": "A kò lè ṣàyẹ̀wò àsopọ̀ GitLab.",
+      "checkFailedTitleBitbucket": "A kò lè ṣàyẹ̀wò àsopọ̀ Bitbucket.",
+      "providerCheckFailedMessage": "Ipò ìsopọ̀ kò wà títí èyí yóò fi gbé wọlé.",
       "reconnectTitle": "Àtúnsopọ̀ GitHub",
       "reconnectDescription": "A ti fagilé àsopọ̀ GitHub rẹ. Tún sopọ̀ láti máa ṣe àtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fóònù.",
-      "description": "So àkọọ́lẹ̀ GitHub rẹ pọ̀ láti ṣe àtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fóònù."
+      "description": "So àkọọ́lẹ̀ GitHub rẹ pọ̀ láti ṣe àtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fóònù.",
+      "gitlabDescription": "So àkọọ́lẹ̀ GitLab rẹ pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè ìṣọ̀kan lórí fónù.",
+      "bitbucketDescription": "So Bitbucket pọ̀ mọ́ àjọ yìí láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ lórí fónù.",
+      "bitbucketOrgOnlyDescription": "Yan àjọ kan nínú àlàyé ara ẹni rẹ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket rẹ̀."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "Àkókò ìsopọ̀ GitHub ti parí.",
-      "message": "Àsopọ̀ GitHub rẹ kò wúlò mọ́. Tún ṣàyẹ̀wò àsopọ̀ rẹ — a ó ní kí o tún sopọ̀ bí ó bá yẹ."
+      "message": "Àsopọ̀ GitHub rẹ kò wúlò mọ́. Tún ṣàyẹ̀wò àsopọ̀ rẹ — a ó ní kí o tún sopọ̀ bí ó bá yẹ.",
+      "gitlabTitle": "Àkókò ìsopọ̀ GitLab ti parí.",
+      "bitbucketTitle": "Àkókò ìsopọ̀ Bitbucket ti parí.",
+      "providerMessage": "Àsopọ̀ {{provider}} rẹ kò wúlò mọ́. Tún ṣàyẹ̀wò àsopọ̀ rẹ — a ó ní kí o tún sopọ̀ bí ó bá yẹ."
     },
     "eventChips": {
       "comment": "Àsọyé",
@@ -643,6 +679,21 @@
       "files": "Fáìlì",
       "discussion": "Ìjíròrò"
     },
+    "terms": {
+      "pullRequest": "Ìbéèrè àkópọ̀",
+      "mergeRequest": "Ìbéèrè ìṣọ̀kan",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Pín ìbéèrè ìṣọ̀kan",
+      "viewOnProvider": "Wò ó lórí {{provider}}",
+      "mergeRequestUnavailable": "Ìbéèrè ìṣọ̀kan kò sí",
+      "unavailableDescription": "Ó lè jẹ́ pé a ti pa á rẹ́, tàbí kí o má ní àṣẹ rẹ̀.",
+      "accessDeniedMergeRequest": "O kò ní àṣẹ láti wo ìbéèrè ìṣọ̀kan yìí.",
+      "couldNotLoadMergeRequest": "A kò lè ṣàkójọ ìbéèrè ìṣọ̀kan.",
+      "discussionAccessDenied": "O kò ní àṣẹ láti wo ìjíròrò ìbéèrè ìṣọ̀kan yìí.",
+      "discussionUnavailableMessage": "Ó lè jẹ́ pé a ti yọ ìbéèrè ìṣọ̀kan yìí kúrò.",
+      "noDiscussionDescription": "Kò sí ọ̀wọ́ àtúnyẹ̀wò tàbí àsọyé ìjíròrò lórí ìbéèrè ìṣọ̀kan yìí.",
+      "noFilesChangedDescription": "Kò sí ìyípadà sí fáìlì kankan nínú ìbéèrè ìṣọ̀kan yìí."
+    },
     "fileStatus": {
       "modified": "A ti yí padà",
       "renamed": "A ti sọ lórúkọ tuntun",
@@ -659,7 +710,7 @@
       "emptyLine": "(ṣofo)"
     },
     "linkPasteClipboardEmpty": "Àtẹ àdàkọ ṣófo.",
-    "linkPasteNotAPullRequest": "Èyí kì í ṣe ọ̀nà àsopọ̀ ìbéèrè ìṣọ̀kan GitHub.",
+    "linkPasteNotAPullRequest": "Kì í ṣe ọ̀nà àsopọ̀ ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan",
     "announce": {
       "commentPosted": "A ti fi àsọyé ránṣẹ́",
       "reviewSubmitted": "A ti fi àtúnyẹ̀wò ránṣẹ́",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "A kò lè fi àsọyé yìí ránṣẹ́. Ìlà tí a yàn lè ti yí padà, tàbí a lè ti ṣe ìmúdójúìwọ̀n PR náà.",
       "reviewNotSubmitted": "A kò lè fi àtúnyẹ̀wò yìí ránṣẹ́ bí ó ṣe wà. PR náà lè ti yí padà, tàbí o kò lè ṣe àtúnyẹ̀wò ìbéèrè ìṣọ̀kan tìrẹ.",
+      "reviewNotSubmittedTerm": "Kò ṣeé fi àtúnyẹ̀wò yìí ránṣẹ́ gẹ́gẹ́ bí ó ṣe wà. Ó lè jẹ́ pé {{term}} ti yí padà, tàbí kò lè ṣàtúnyẹ̀wò {{term}} tirẹ.",
       "couldNotPostComment": "A kò lè fi àsọyé ránṣẹ́.",
       "couldNotSubmitReview": "A kò lè fi àtúnyẹ̀wò ránṣẹ́. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú."
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "A kò lè fi èsì ránṣẹ́.",
       "couldNotCompleteAction": "A kò lè parí ìgbésẹ̀ yìí.",
       "mergeResultDefaultError": "GitHub kò parí ìdàpọ̀ náà.",
+      "mergeResultNotCompleted": "A kò darapọ̀ {{term}}. Ṣàyẹ̀wò ipò rẹ̀, tún sì gbìyànjú.",
       "ambiguous": "A kò lè jẹ́rìí sí i — ṣàyẹ̀wò PR náà kí o tó tún gbìyànjú.",
       "persistenceFailed": "A kò lè ṣe àkọsílẹ̀ ìgbésẹ̀ yìí. Jọ̀wọ́ tún gbìyànjú nígbà mìíràn.",
       "forbidden": "A kò gbà á láàyè."
@@ -1988,11 +2041,31 @@
       "retryConnection": "Gbìyànjú láti tún sopọ̀"
     },
     "newSession": {
+      "recentlyUsed": "Tí a lò láìpẹ́",
+      "couldNotLoadGithubRepositories": "A kò lè gbé àwọn ibi ìpamọ́ kóòdù GitHub wọlé.",
+      "couldNotLoadGitlabRepositories": "A kò lè gbé àwọn ibi ìpamọ́ kóòdù GitLab wọlé.",
+      "couldNotLoadBitbucketRepositories": "A kò lè gbé àwọn ibi ìpamọ́ kóòdù Bitbucket wọlé.",
       "connectGithubDescription": "So GitHub pọ̀ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù.",
+      "connectGitlabDescription": "So GitLab pọ̀ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù.",
+      "connectBitbucketDescription": "So Bitbucket pọ̀ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù.",
       "openGithub": "Ṣí GitHub",
+      "openGitlab": "Ṣí GitLab",
+      "openBitbucket": "Ṣí Bitbucket",
       "refreshRepositories": "Tún àwọn ibi ìpamọ́ kóòdù gbé wọlé",
       "githubConnected": "GitHub ti sopọ̀",
+      "gitlabConnected": "GitLab ti sopọ̀",
       "noRepositoriesVisible": "Kò sí ibi ìpamọ́ kóòdù tó hàn. Ṣàyẹ̀wò àṣẹ ìwọlé sí ibi ìpamọ́ kóòdù fún ohun èlò Kilo lórí GitHub, lẹ́yìn náà tún àkójọ náà gbé wọlé.",
+      "noRepositoriesVisibleGitlab": "Kò sí ibi ìpamọ́ kóòdù tó hàn. Ṣàyẹ̀wò àṣẹ ìwọlé sí ibi ìpamọ́ kóòdù fún GitLab, lẹ́yìn náà tún àkójọ náà gbé wọlé.",
+      "noRepositoriesVisibleBitbucket": "Kò sí ibi ìpamọ́ kóòdù tó hàn. Ṣàyẹ̀wò àṣẹ ìwọlé sí ibi ìpamọ́ kóòdù fún Bitbucket, lẹ́yìn náà tún àkójọ náà gbé wọlé.",
+      "bitbucketOrganizationsOnly": "Bitbucket wà fún àwọn àjọ ṣoṣo.",
+      "branchPickerTitle": "Yan ẹ̀ka",
+      "branchDefault": "Ìpìlẹ̀",
+      "branchAccessibility": "Ẹ̀ka: {{label}}",
+      "branchLoading": "Ń gbé àwọn ẹ̀ka wọlé",
+      "branchLoadError": "A kò lè gbé àwọn ẹ̀ka wọlé",
+      "branchUnavailable": "Àwọn ẹ̀ka kò sí fún ibi ìpamọ́ kóòdù yìí. Ṣàyẹ̀wò àṣẹ rẹ pẹ̀lú olùpèsè, lẹ́yìn náà yan ibi ìpamọ́ kóòdù mìíràn.",
+      "branchEmpty": "Kò sí ẹ̀ka kankan",
+      "branchPlaceholder": "Yan ẹ̀ka kan",
       "runOnWithTarget": "Ṣiṣẹ́ lórí: {{target}}",
       "environment": "Àyíká iṣẹ́",
       "couldNotLoadEnvironment": "A kò lè gbé àyíká iṣẹ́ rẹ wọlé.",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "A kò lè tún àwọn ibi ìpamọ́ kóòdù gbé wọlé. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "discardDraftTitle": "Pa àkọ́kọ́ ìkọ̀wé rẹ́?",
       "discardDraftMessage": "Ọ̀rọ̀ ìtọ́ni rẹ yóò sọnù.",
+      "discardWithUploadsMessage": "A ó pa ọ̀rọ̀ ìtọ́ni rẹ àti àwọn fáìlì tí o ti gbé sókè tí kò tíì ní ìfiránṣẹ́ tí a so wọ́n mọ́ rẹ́.",
       "discardFailed": "A kò lè pa àkọ́kọ́ ìkọ̀wé náà rẹ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "remoteHint": "Ṣiṣẹ́ `kilo remote` lórí kọ̀ǹpútà rẹ, tàbí `/remote` nínú ìgbà iṣẹ́ CLI tó ń lọ, láti ṣàkóso ìṣiṣẹ́ kilo lórí kọ̀ǹpútà rẹ.",
-      "connectBitbucketDescription": "So Bitbucket pọ̀ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù.",
-      "connectGitlabDescription": "So GitLab pọ̀ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù.",
-      "couldNotLoadBitbucketRepositories": "A kò lè gbé àwọn ibi ìpamọ́ kóòdù Bitbucket wọlé.",
-      "couldNotLoadGithubRepositories": "A kò lè gbé àwọn ibi ìpamọ́ kóòdù GitHub wọlé.",
-      "couldNotLoadGitlabRepositories": "A kò lè gbé àwọn ibi ìpamọ́ kóòdù GitLab wọlé.",
-      "gitlabConnected": "GitLab ti sopọ̀",
-      "noRepositoriesVisibleBitbucket": "Kò sí ibi ìpamọ́ kóòdù tó hàn. Ṣàyẹ̀wò àṣẹ ìwọlé sí ibi ìpamọ́ kóòdù fún Bitbucket, lẹ́yìn náà tún àkójọ náà gbé wọlé.",
-      "noRepositoriesVisibleGitlab": "Kò sí ibi ìpamọ́ kóòdù tó hàn. Ṣàyẹ̀wò àṣẹ ìwọlé sí ibi ìpamọ́ kóòdù fún GitLab, lẹ́yìn náà tún àkójọ náà gbé wọlé.",
-      "openBitbucket": "Ṣí Bitbucket",
-      "openGitlab": "Ṣí GitLab",
-      "recentlyUsed": "Tí a lò láìpẹ́",
       "continueFrom": "A ń tẹ̀síwájú pẹ̀lú {{title}}.",
       "importingSession": "Ń gbé ìgbà iṣẹ́ wọlé",
       "cliCannotContinue": "CLI yìí kò lè tẹ̀síwájú pẹ̀lú ìgbà iṣẹ́ kan. Yan Cloud Agent tàbí CLI mìíràn.",
-      "importFailed": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
-      "discardWithUploadsMessage": "A ó pa ọ̀rọ̀ ìtọ́ni rẹ àti àwọn fáìlì tí o ti gbé sókè tí kò tíì ní ìfiránṣẹ́ tí a so wọ́n mọ́ rẹ́."
+      "importFailed": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé."
     },
     "partRenderer": {
       "updatedFileCount_one": "A ti ṣe ìmúdójúìwọ̀n fáìlì {{displayCount}}.",

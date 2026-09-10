@@ -4,9 +4,16 @@ import { type RefreshControlProps } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+
 import { PrReviewFileList } from './pr-diff-file-list';
 
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+
+// Records every (ref, headSha) the list hands to the viewed-files hook, so
+// the provider-scoped keying (s6, identity rule 17) is proven at the call
+// site rather than only in the store's unit tests.
+const viewedFilesCalls = vi.hoisted(() => [] as unknown[][]);
 
 const listQueryState = vi.hoisted(() => ({
   query: {
@@ -89,7 +96,10 @@ vi.mock('@/lib/pr-review/diff/use-pr-diff-context-loader', () => ({
 }));
 vi.mock('@/lib/pr-review/diff/pr-review-file-list-state', () => ({
   usePrReviewFileListQuery: () => listQueryState,
-  usePrReviewViewedFiles: () => ({ isViewed: () => false, toggle: vi.fn(), isLoading: false }),
+  usePrReviewViewedFiles: (...args: unknown[]) => {
+    viewedFilesCalls.push(args);
+    return { isViewed: () => false, toggle: vi.fn(), isLoading: false };
+  },
   useFetchToCompletion: () => ({
     run: vi.fn(),
     isRunning: false,
@@ -128,6 +138,29 @@ function mountList(changedFiles = BASE_PROPS.changedFiles): TestRenderer.ReactTe
     throw new Error('renderer was not created');
   }
   return renderer;
+}
+
+function mountListInScope(
+  ref: Parameters<typeof ProviderPrScopeProvider>[0]['value']['ref']
+): TestRenderer.ReactTestRenderer {
+  const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  act(() => {
+    holder.current = TestRenderer.create(
+      <ProviderPrScopeProvider value={{ ref, organizationId: null }}>
+        <PrReviewFileList {...BASE_PROPS} />
+      </ProviderPrScopeProvider>
+    );
+  });
+  const renderer = holder.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+function listBottomPadding(renderer: TestRenderer.ReactTestRenderer): number {
+  const list = renderer.root.find(node => String(node.type) === 'FlashList');
+  return (list.props.contentContainerStyle as { paddingBottom: number }).paddingBottom;
 }
 
 function bottomPaddedViews(
@@ -210,5 +243,87 @@ describe('PrReviewFileList full-body states', () => {
     const renderer = mountList();
     expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+  });
+});
+
+// The comment composer and the review-submit sheet are route siblings on
+// every provider (s6): the write bar renders on a GitLab MR / Bitbucket PR
+// too, and the bar carries the provider ref so it pushes the sheet inside
+// the ref's own route — never the GitHub sibling.
+describe('PrReviewFileList write affordances per provider', () => {
+  beforeEach(() => {
+    insetsState.bottom = 0;
+    resetState();
+    listQueryState.files = [{ path: 'src/file.ts' }];
+    viewedFilesCalls.length = 0;
+  });
+
+  it('keeps the write bar on a GitHub pull request', () => {
+    const renderer = mountList();
+    const bar = renderer.root.find(node => String(node.type) === 'PrDiffFloatingActions');
+    expect(bar.props.prRef).toBeUndefined();
+  });
+
+  // The viewed set must be keyed by the live provider ref (s6, identity
+  // rule 17): the store folds `providerPrRefKey` into the key only when the
+  // call site hands it a ref, so the bare triple would silently collide.
+  it('keys the viewed set by the live ref, never the bare triple', () => {
+    mountList();
+    expect(viewedFilesCalls[0]).toEqual([
+      { platform: 'github', owner: 'octocat', repo: 'hello-world', number: 7 },
+      'sha',
+    ]);
+    mountListInScope({ platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 });
+    expect(viewedFilesCalls[1]).toEqual([
+      { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 },
+      'sha',
+    ]);
+    mountListInScope({ platform: 'bitbucket', workspace: 'acme', repoSlug: 'api', prId: 42 });
+    expect(viewedFilesCalls[2]).toEqual([
+      { platform: 'bitbucket', workspace: 'acme', repoSlug: 'api', prId: 42 },
+      'sha',
+    ]);
+  });
+
+  it('keeps the write bar on a GitLab merge request, carrying the provider ref', () => {
+    const renderer = mountListInScope({
+      platform: 'gitlab',
+      projectPath: 'group/sub/repo',
+      mrIid: 12,
+    });
+    const bar = renderer.root.find(node => String(node.type) === 'PrDiffFloatingActions');
+    expect(bar.props.prRef).toEqual({
+      platform: 'gitlab',
+      projectPath: 'group/sub/repo',
+      mrIid: 12,
+    });
+  });
+
+  it('keeps the write bar on a Bitbucket pull request, carrying the provider ref', () => {
+    const renderer = mountListInScope({
+      platform: 'bitbucket',
+      workspace: 'acme',
+      repoSlug: 'api',
+      prId: 42,
+    });
+    const bar = renderer.root.find(node => String(node.type) === 'PrDiffFloatingActions');
+    expect(bar.props.prRef).toEqual({
+      platform: 'bitbucket',
+      workspace: 'acme',
+      repoSlug: 'api',
+      prId: 42,
+    });
+  });
+
+  it('keeps the small footer gap under a provider diff list too', () => {
+    const githubPadding = listBottomPadding(mountList());
+    const gitlabPadding = listBottomPadding(
+      mountListInScope({ platform: 'gitlab', projectPath: 'group/repo', mrIid: 12 })
+    );
+    // The bar is an in-flow footer below the list (spot check e3), so no
+    // row can ever scroll under it; the list only keeps a 12-point gap
+    // between its last row and the footer's top edge, on every provider.
+    expect(githubPadding).toBe(12);
+    expect(gitlabPadding).toBe(12);
   });
 });

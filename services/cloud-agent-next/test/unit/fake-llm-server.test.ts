@@ -489,6 +489,19 @@ describe('fake-llm-server HTTP', () => {
     expect(contentChunks.length).toBeGreaterThanOrEqual(3);
   });
 
+  it('slow:4:1:8 streams four 8-byte content chunks', async () => {
+    const h = await start();
+    const res = await postChat(h.url, '__fake__:slow:4:1:8');
+    const chunks = await readAllSse(res.body!);
+    const parsed = chunks.slice(0, -1).map(c => JSON.parse(c.data));
+    const pieces = parsed
+      .map(p => p.choices[0].delta.content)
+      .filter((c): c is string => typeof c === 'string' && c.length > 0);
+    expect(pieces).toHaveLength(4);
+    expect(pieces.every(piece => piece.length === 8)).toBe(true);
+    expect(pieces.join('').length).toBe(32);
+  });
+
   it('gate:<tag> blocks until POST /test/release?tag=<tag>', async () => {
     const h = await start();
     const chatPromise = postChat(h.url, '__fake__:gate:t1').then(async res => {

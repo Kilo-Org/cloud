@@ -1,6 +1,13 @@
 import { test, expect, describe } from '@jest/globals';
 import { preferredModels } from '@/lib/ai-gateway/models';
 import {
+  isKiloAutoModel,
+  KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
+  KILO_AUTO_FRONTIER_MODEL,
+} from '@/lib/ai-gateway/auto-model';
+import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
+import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
@@ -9,6 +16,10 @@ import {
   gpt_5_6_sol_discounted_model,
   gpt_6_astra_flex_model,
 } from '@/lib/ai-gateway/providers/openai-exclusive';
+import {
+  GEMMA_4_26B_A4B_IT_ID,
+  gemma_4_26b_a4b_it_free_model,
+} from '@/lib/ai-gateway/providers/google';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 
 describe('OpenRouter Models Config', () => {
@@ -22,6 +33,11 @@ describe('OpenRouter Models Config', () => {
 
     expectedModels.forEach(model => {
       expect(preferredModels).toContain(model);
+    });
+
+    const deemphasizedAutoModels = [KILO_AUTO_BALANCED_MODEL.id, KILO_AUTO_FRONTIER_MODEL.id];
+    deemphasizedAutoModels.forEach(model => {
+      expect(preferredModels).not.toContain(model);
     });
 
     const supersededModels = [
@@ -52,5 +68,12 @@ describe('OpenRouter Models Config', () => {
     } else {
       expect(preferredModels).not.toContain(gpt_6_astra_flex_model.public_id);
     }
+  });
+
+  test('monitors only concrete preferred models', () => {
+    expect(preferredModels).toContain(KILO_AUTO_EFFICIENT_MODEL.id);
+    expect(monitoredModels).toEqual(preferredModels.filter(model => !isKiloAutoModel(model)));
+    expect(monitoredModels).not.toContain(GEMMA_4_26B_A4B_IT_ID);
+    expect(monitoredModels).not.toContain(gemma_4_26b_a4b_it_free_model.public_id);
   });
 });

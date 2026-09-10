@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import { createWrapperKiloClient, type WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
+import { formatGitResultFailure } from '../../../wrapper/src/git-errors.js';
 import { applySessionAttach } from '../../../wrapper/src/control/apply-attach.js';
 import {
   createWorktreeKiloRuntimes,
@@ -883,6 +884,7 @@ describe('direct worktree credential refresh', () => {
 
   it('fails attach instead of accepting stale Git auth when origin refresh fails', async () => {
     const f = fixture();
+    const refreshed = { stdout: '', stderr: 'failed', exitCode: 1 };
     expect(
       await applySessionAttach(
         identity,
@@ -899,12 +901,15 @@ describe('direct worktree credential refresh', () => {
           kiloRuntimes: f.registry,
           canRefreshCredentials: () => true,
           hasBootstrapMarker: async () => true,
-          runGit: async () => ({ stdout: '', stderr: 'failed', exitCode: 1 }),
+          runGit: async () => refreshed,
         }
       )
     ).toMatchObject({
       ok: false,
-      error: { message: 'Worktree Git credential refresh failed', retryable: true },
+      error: {
+        message: formatGitResultFailure(refreshed, 'Worktree Git credential refresh failed'),
+        retryable: true,
+      },
     });
   });
 });

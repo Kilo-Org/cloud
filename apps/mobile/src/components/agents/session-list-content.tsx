@@ -3,7 +3,6 @@ import { useFocusEffect, useScrollToTop } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, SectionList, useWindowDimensions, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
@@ -312,7 +311,6 @@ export function AgentSessionListContent({
         renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
         extraData={attentionFocusRevision}
-        ListHeaderComponent={<RefreshProgress refreshControl={refreshControl} />}
         ListEmptyComponent={emptyComponent}
         ListFooterComponent={
           isFetchingNextPage ? (

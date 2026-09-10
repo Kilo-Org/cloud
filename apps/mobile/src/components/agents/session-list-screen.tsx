@@ -1,7 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, FlatList, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Bot, Plus } from '@/components/ui/icons';
@@ -237,7 +236,6 @@ export function AgentSessionListScreen() {
         keyExtractor={item => item.id}
         extraData={attentionFocusRevision}
         contentContainerStyle={listPadding}
-        ListHeaderComponent={<RefreshProgress refreshControl={refreshControl} />}
         refreshControl={refreshControl}
         maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }}
       />

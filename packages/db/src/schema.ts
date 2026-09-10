@@ -45,6 +45,7 @@ import {
   FeedbackFor,
   FeedbackSource,
   CliSessionSharedState,
+  WorkspaceFolderColor,
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
@@ -225,6 +226,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassOrgBonusMode,
   KiloPassOrgIssuanceKind,
   CliSessionSharedState,
+  WorkspaceFolderColor,
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
@@ -5852,6 +5854,9 @@ export const cloud_agent_code_review_attempts = pgTable(
       table.attempt_number
     ),
     index('idx_cloud_agent_code_review_attempts_code_review_id').on(table.code_review_id),
+    index('idx_cloud_agent_code_review_attempts_retry_of_attempt_id')
+      .on(table.retry_of_attempt_id)
+      .concurrently(),
     index('idx_cloud_agent_code_review_attempts_session_id').on(table.session_id),
     index('idx_cloud_agent_code_review_attempts_cli_session_id').on(table.cli_session_id),
     index('idx_cloud_agent_code_review_attempts_status').on(table.status),
@@ -6069,6 +6074,39 @@ export const sharedCliSessions = pgTable(
 
 export type SharedCliSession = typeof sharedCliSessions.$inferSelect;
 
+export const cloud_agent_workspace_folders = pgTable(
+  'cloud_agent_workspace_folders',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    color: text().$type<WorkspaceFolderColor>().notNull().default(WorkspaceFolderColor.Default),
+    position: integer().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_cloud_agent_workspace_folders_owner_scope_order').on(
+      table.kilo_user_id,
+      table.organization_id,
+      table.position,
+      table.id
+    ),
+    enumCheck('cloud_agent_workspace_folders_color_check', table.color, WorkspaceFolderColor),
+    check(
+      'cloud_agent_workspace_folders_name_check',
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 200 AND ${table.name} = btrim(${table.name})`
+    ),
+    check('cloud_agent_workspace_folders_position_check', sql`${table.position} >= 0`),
+  ]
+);
+
 export const cloud_agent_worktrees = pgTable(
   'cloud_agent_worktrees',
   {
@@ -6077,6 +6115,7 @@ export const cloud_agent_worktrees = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'restrict' }),
     organization_id: uuid().references(() => organizations.id, { onDelete: 'restrict' }),
+    folder_id: uuid().references(() => cloud_agent_workspace_folders.id, { onDelete: 'set null' }),
     name: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -6097,6 +6136,9 @@ export const cloud_agent_worktrees = pgTable(
   },
   table => [
     index('IDX_cloud_agent_worktrees_owner_scope').on(table.kilo_user_id, table.organization_id),
+    index('IDX_cloud_agent_worktrees_folder_id')
+      .on(table.folder_id)
+      .where(isNotNull(table.folder_id)),
     check(
       'cloud_agent_worktrees_deletion_check',
       sql`${table.deletion_completed_at} IS NULL OR (${table.deletion_started_at} IS NOT NULL AND ${table.name} IS NULL AND ${table.deletion_manifest} IS NULL AND ${table.runtime_locations} = '[]'::jsonb)`

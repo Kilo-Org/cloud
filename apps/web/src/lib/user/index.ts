@@ -23,6 +23,7 @@ import {
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   cloud_agent_webhook_triggers,
+  cloud_agent_workspace_folders,
   cloud_agent_worktrees,
   enrichment_data,
   source_embeddings,
@@ -1183,8 +1184,11 @@ export async function anonymizeCloudUserData(
   `);
   await tx.delete(user_data_exports).where(eq(user_data_exports.kilo_user_id, userId));
   await tx
+    .delete(cloud_agent_workspace_folders)
+    .where(eq(cloud_agent_workspace_folders.kilo_user_id, userId));
+  await tx
     .update(cloud_agent_worktrees)
-    .set({ name: null })
+    .set({ name: null, folder_id: null })
     .where(eq(cloud_agent_worktrees.kilo_user_id, userId));
   await tx.delete(enrichment_data).where(eq(enrichment_data.user_id, userId));
   await tx.delete(user_admin_notes).where(eq(user_admin_notes.kilo_user_id, userId));

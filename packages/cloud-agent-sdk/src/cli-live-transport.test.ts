@@ -312,6 +312,38 @@ describe('CliLiveTransport unified user web connection', () => {
     transport.destroy();
   });
 
+  it('publishes v1 when the CLI catalog uses interleaved.field=reasoning_text', async () => {
+    const catalog: RemoteModelCatalogWireV1 = structuredClone(WIRE_CATALOG);
+    catalog.all[0]!.models['claude-sonnet-4']!.capabilities.interleaved = {
+      field: 'reasoning_text',
+    };
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? catalog : { ok: true })
+      );
+    const states: RemoteModelState[] = [];
+    const { transport } = createTransportWithSinks({
+      connection,
+      onRemoteModelStateChange: state => states.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(states.at(-1)).toEqual({
+      ownerConnectionId: 'owner',
+      protocol: 'v1',
+      catalog: REMOTE_CATALOG,
+      refresh: 'idle',
+    });
+    expect(transport.canSend?.()).toBe(true);
+    transport.destroy();
+  });
+
   it('keeps protocol unknown and owner send capability after a malformed initial catalog', async () => {
     const connection = createConnection();
     jest.mocked(connection.sendCommand).mockResolvedValueOnce({

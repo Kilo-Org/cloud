@@ -182,6 +182,19 @@ export enum CliSessionSharedState {
   Organization = 'organization',
 }
 
+export const WorkspaceFolderColor = {
+  Default: 'default',
+  Red: 'red',
+  Orange: 'orange',
+  Yellow: 'yellow',
+  Green: 'green',
+  Teal: 'teal',
+  Blue: 'blue',
+  Purple: 'purple',
+} as const;
+
+export type WorkspaceFolderColor = (typeof WorkspaceFolderColor)[keyof typeof WorkspaceFolderColor];
+
 // --- SecurityAuditLogAction ---
 
 /**

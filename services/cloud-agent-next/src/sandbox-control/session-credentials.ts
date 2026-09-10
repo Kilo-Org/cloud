@@ -23,6 +23,8 @@ import {
   resolveManagedBitbucketToken,
 } from '../services/git-token-service-client.js';
 import { readProfileBundle } from '../session-profile.js';
+import { hasModernRuntimeAuthorization } from '../session/runtime-authorization-persistence.js';
+import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
 import { parseCanonicalBitbucketCloneUrl, sessionIdSchema, type Env } from '../types.js';
 import { createControlPlaneCredential, parseControlPlaneCredential } from './managed-credential.js';
@@ -69,6 +71,19 @@ const targetsSchema = z
     backendBaseUrl: z.string().url(),
     providerBaseUrl: z.string().url(),
     sessionIngestBaseUrl: z.string().url(),
+  })
+  .strict();
+const runtimeProxySchema = z
+  .object({
+    targets: targetsSchema,
+    /** Exact root capabilities substituted only by the Vercel policy. */
+    members: z
+      .array(
+        memberSchema.extend({
+          handle: tokenSchema.max(4096),
+        })
+      )
+      .default([]),
   })
   .strict();
 const capabilitySchema = z
@@ -175,6 +190,7 @@ export const sessionCredentialGrantSchema = z
         token: realTokenSchema,
         tokenSelectedAt: timestampSchema.optional(),
         targets: targetsSchema,
+        runtimeProxy: runtimeProxySchema.optional(),
         capabilities: z.record(z.string(), capabilitySchema),
       })
       .strict(),
@@ -198,7 +214,11 @@ export const sessionCredentialGrantSchema = z
       reject();
     }
     if (grant.containmentEnabled === false) {
-      if (grant.kilo.alias !== undefined || Object.keys(grant.kilo.capabilities).length > 0)
+      if (
+        grant.kilo.alias !== undefined ||
+        grant.kilo.runtimeProxy !== undefined ||
+        Object.keys(grant.kilo.capabilities).length > 0
+      )
         reject();
     } else {
       const kiloAlias = grant.kilo.alias && parseControlPlaneCredential(grant.kilo.alias);
@@ -260,6 +280,25 @@ export const sessionCredentialGrantSchema = z
       ) {
         reject();
       }
+      if (grant.kilo.runtimeProxy) {
+        const targets = deriveRuntimeProxyTargets(grant.kilo.runtimeProxy.targets);
+        const members = grant.kilo.runtimeProxy.members;
+        if (
+          !targets ||
+          new Set(members.map(member => member.sessionId)).size !== members.length ||
+          new Set(members.map(member => member.kiloSessionId)).size !== members.length ||
+          members.some(
+            member =>
+              !grant.members.some(
+                expected =>
+                  expected.sessionId === member.sessionId &&
+                  expected.kiloSessionId === member.kiloSessionId
+              )
+          )
+        ) {
+          reject();
+        }
+      }
     } else {
       const prefixes = { github: 'kgh2.', gitlab: 'kgl2.', bitbucket: 'kbb1.' };
       if (
@@ -294,7 +333,7 @@ export function isContainedSessionCredentialGrant(
 }
 
 type CredentialEnv = Parameters<typeof getOutboundContainerId>[0] &
-  Partial<Pick<Env, 'GIT_TOKEN_SERVICE' | 'NEXTAUTH_SECRET'>> &
+  Partial<Pick<Env, 'GIT_TOKEN_SERVICE' | 'NEXTAUTH_SECRET' | 'WORKER_URL'>> &
   KiloTargetEnv;
 
 type PreparedSessionAttachPayload = SessionAttachPayload & {
@@ -327,6 +366,48 @@ function safeUrl(value: string): URL | null {
   } catch {
     return null;
   }
+}
+
+function deriveRuntimeProxyTargets(targets: z.infer<typeof targetsSchema>): { facade: URL } | null {
+  const parsed = [
+    targets.backendBaseUrl,
+    targets.providerBaseUrl,
+    targets.sessionIngestBaseUrl,
+  ].map(safeUrl);
+  const [backend, provider, ingest] = parsed;
+  if (
+    !backend ||
+    !provider ||
+    !ingest ||
+    backend.protocol !== 'https:' ||
+    backend.port !== '' ||
+    provider.protocol !== 'https:' ||
+    provider.port !== '' ||
+    ingest.protocol !== 'https:' ||
+    ingest.port !== '' ||
+    backend.toString().replace(/\/+$/, '') !== provider.toString().replace(/\/+$/, '') ||
+    backend.toString().replace(/\/+$/, '') !== ingest.toString().replace(/\/+$/, '') ||
+    backend.search ||
+    provider.search ||
+    ingest.search ||
+    runtimeCredentialProxyFacadeBaseUrl(backend.toString()) !==
+      backend.toString().replace(/\/+$/, '')
+  ) {
+    return null;
+  }
+  return { facade: backend };
+}
+
+function runtimeProxyTargets(env: CredentialEnv): z.infer<typeof targetsSchema> | null {
+  if (!env.WORKER_URL) return null;
+  const base = runtimeCredentialProxyFacadeBaseUrl(env.WORKER_URL);
+  if (!base) return null;
+  const targets = {
+    backendBaseUrl: base,
+    providerBaseUrl: base,
+    sessionIngestBaseUrl: base,
+  };
+  return deriveRuntimeProxyTargets(targets) ? targets : null;
 }
 
 function canonicalRepositoryUrl(value: string, managed = false): string {
@@ -575,6 +656,14 @@ async function selectDirectKiloToken(
   existing: SessionCredentialGrant | undefined,
   now: number
 ): Promise<string> {
+  const decoded = jwt.decode(token);
+  if (decoded !== null && typeof decoded === 'object') {
+    if ('runtimeAdmission' in decoded) invalidCredentials();
+    if ('runtimeAuthorization' in decoded) invalidCredentials();
+    if ('aud' in decoded || 'tokenPurpose' in decoded || 'credentialExchange' in decoded) {
+      invalidCredentials();
+    }
+  }
   if (
     !existing ||
     existing.kilo.token === token ||
@@ -845,6 +934,18 @@ export async function prepareSessionCredentials(input: {
   ) {
     invalidCredentials();
   }
+  const modernRuntimeProxy =
+    provider === 'vercel' && containmentEnabled && hasModernRuntimeAuthorization(metadata)
+      ? runtimeProxyTargets(env)
+      : null;
+  if (
+    provider === 'vercel' &&
+    containmentEnabled &&
+    hasModernRuntimeAuthorization(metadata) &&
+    !modernRuntimeProxy
+  ) {
+    invalidCredentials();
+  }
   const kiloToken = containmentEnabled
     ? token.data
     : await selectDirectKiloToken(env, token.data, existing, now);
@@ -876,6 +977,14 @@ export async function prepareSessionCredentials(input: {
           }
         : {}),
       targets: targets.targets,
+      ...(modernRuntimeProxy
+        ? {
+            runtimeProxy: {
+              targets: modernRuntimeProxy,
+              members: existing?.kilo.runtimeProxy?.members ?? [],
+            },
+          }
+        : {}),
       capabilities: existing?.kilo.token === kiloToken ? existing.kilo.capabilities : {},
     },
     ...(existing?.scm ? { scm: existing.scm } : {}),
@@ -951,6 +1060,16 @@ export function removeSessionCredentialMembership(
           capabilities: Object.fromEntries(
             Object.entries(grant.kilo.capabilities).filter(([id]) => id !== sessionId)
           ),
+          ...(grant.kilo.runtimeProxy
+            ? {
+                runtimeProxy: {
+                  ...grant.kilo.runtimeProxy,
+                  members: grant.kilo.runtimeProxy.members.filter(
+                    member => member.sessionId !== sessionId
+                  ),
+                },
+              }
+            : {}),
         },
       },
     ];
@@ -976,6 +1095,7 @@ export function buildControlNetworkPolicy(
         targets: grant.kilo.targets,
         rootSessionIds: grant.members.map(member => member.kiloSessionId),
         organizationId: grant.orgId,
+        ...(grant.kilo.runtimeProxy ? { runtimeProxy: grant.kilo.runtimeProxy } : {}),
       },
       ...(grant.repository?.type === 'github' && grant.scm?.nativeToken
         ? {
@@ -996,7 +1116,10 @@ export function buildControlNetworkPolicy(
   const injectionRules = policies.flatMap(policy => policy.injectionRules);
   return {
     mode: 'custom',
-    allowedDomains: [...new Set(injectionRules.map(rule => rule.domain)), '*'],
+    allowedDomains: [
+      ...new Set(policies.flatMap(policy => policy.allowedDomains)),
+      ...(policies.length === 0 ? ['*'] : []),
+    ],
     injectionRules,
   };
 }

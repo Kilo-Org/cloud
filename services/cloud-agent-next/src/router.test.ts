@@ -2701,7 +2701,7 @@ describe('legacy V2 execution response compatibility', () => {
     preflightPreparedInitialPromptModelMock.mockResolvedValue(undefined);
   });
 
-  function createLegacyExecutionCaller() {
+  function createLegacyExecutionCaller(options?: { authToken?: string }) {
     const admitPreparedInitialMessage = vi.fn().mockResolvedValue({
       success: true,
       outcome: 'queued',
@@ -2716,10 +2716,11 @@ describe('legacy V2 execution response compatibility', () => {
     });
     const hasMessageAdmission = vi.fn().mockResolvedValue(false);
     const replayPreparedInitialMessage = vi.fn().mockResolvedValue(undefined);
+    const getRuntimeAuthorizationRecoveryState = vi.fn().mockResolvedValue({ state: 'active' });
     recordCloudAgentSessionFailureMock.mockReset().mockResolvedValue({});
     const context = {
       userId: 'test-user-123',
-      authToken: 'test-token',
+      authToken: options?.authToken ?? 'test-token',
       botId: undefined,
       request: new Request('https://cloud-agent-next.test/trpc'),
       env: {
@@ -2730,6 +2731,7 @@ describe('legacy V2 execution response compatibility', () => {
             admitSubmittedMessage,
             hasMessageAdmission,
             replayPreparedInitialMessage,
+            getRuntimeAuthorizationRecoveryState,
           })),
         },
         SESSION_INGEST: {},
@@ -2742,6 +2744,7 @@ describe('legacy V2 execution response compatibility', () => {
       admitSubmittedMessage,
       hasMessageAdmission,
       replayPreparedInitialMessage,
+      getRuntimeAuthorizationRecoveryState,
       recordCloudAgentSessionFailure: recordCloudAgentSessionFailureMock,
     };
   }
@@ -2845,7 +2848,10 @@ describe('legacy V2 execution response compatibility', () => {
   });
 
   it('returns an admitted prepared initial retry without repeating model preflight', async () => {
-    const { caller, replayPreparedInitialMessage } = createLegacyExecutionCaller();
+    const { caller, replayPreparedInitialMessage, getRuntimeAuthorizationRecoveryState } =
+      createLegacyExecutionCaller({
+        authToken: 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJraWxvIn0.signature',
+      });
     replayPreparedInitialMessage.mockResolvedValue({
       success: true,
       outcome: 'queued',
@@ -2862,7 +2868,36 @@ describe('legacy V2 execution response compatibility', () => {
 
     expect(result).toMatchObject({ executionId: acceptedMessageId, delivery: 'queued' });
     expect(replayPreparedInitialMessage).toHaveBeenCalledTimes(1);
+    expect(getRuntimeAuthorizationRecoveryState).not.toHaveBeenCalled();
     expect(preflightPreparedInitialPromptModelMock).not.toHaveBeenCalled();
+  });
+
+  it('runs prepared admission recovery before model preflight and admission', async () => {
+    const {
+      caller,
+      replayPreparedInitialMessage,
+      getRuntimeAuthorizationRecoveryState,
+      admitPreparedInitialMessage,
+    } = createLegacyExecutionCaller({
+      authToken: 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJraWxvIn0.signature',
+    });
+
+    await caller.initiateFromKilocodeSessionV2({ cloudAgentSessionId: validSessionId });
+
+    expect(replayPreparedInitialMessage).toHaveBeenCalledOnce();
+    expect(getRuntimeAuthorizationRecoveryState).toHaveBeenCalledOnce();
+    expect(preflightPreparedInitialPromptModelMock).toHaveBeenCalledOnce();
+    expect(admitPreparedInitialMessage).toHaveBeenCalledOnce();
+    expect(replayPreparedInitialMessage.mock.invocationCallOrder[0]).toBeLessThan(
+      getRuntimeAuthorizationRecoveryState.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
+    expect(getRuntimeAuthorizationRecoveryState.mock.invocationCallOrder[0]).toBeLessThan(
+      preflightPreparedInitialPromptModelMock.mock.invocationCallOrder[0] ??
+        Number.POSITIVE_INFINITY
+    );
+    expect(preflightPreparedInitialPromptModelMock.mock.invocationCallOrder[0]).toBeLessThan(
+      admitPreparedInitialMessage.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
   });
 
   it('sendMessageV2 preserves sent delivery when a runtime-accepted admission is replayed', async () => {

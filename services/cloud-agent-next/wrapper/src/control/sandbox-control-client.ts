@@ -524,6 +524,8 @@ export function createSandboxControlClient(
               nativeRuntimeRetirement: true,
               connectionRecovery: true,
               eventReceipts: true,
+              runtimeIsolation: true,
+              runtimeRecovery: true,
               scopedCleanupResult: true,
               workingBranches: true,
             },

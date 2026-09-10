@@ -7,7 +7,7 @@ import { TRPCError } from '@trpc/server';
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
-import { generateCloudAgentToken } from '@/lib/tokens';
+import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import { isMobileClient } from '@/lib/trpc/min-version';
 import { createCloudAgentNextClient, type CreateWorktreeChatOutput } from './cloud-agent-client';
 
@@ -151,8 +151,13 @@ export async function createWorktreeChat({
     });
   }
 
+  const { token } = await createControlTokenForRequest(user, 'cloud-agent-next', {
+    headers: headersList ?? new Headers(),
+    organizationId,
+    tokenSource: 'cloud-agent',
+  });
   try {
-    return await createCloudAgentNextClient(generateCloudAgentToken(user)).createWorktreeChat({
+    return await createCloudAgentNextClient(token).createWorktreeChat({
       sourceKiloSessionId,
       sourceCloudAgentSessionId: source.cloudAgentSessionId,
       operationKey,

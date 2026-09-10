@@ -816,6 +816,11 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     });
   },
 
+  'error-terminal'(args, ctx) {
+    const message = args[0] ?? 'simulated error';
+    writeJsonError(ctx.res, 400, message, 'invalid_request');
+  },
+
   error(args, ctx) {
     const message = args[0] ?? 'simulated error';
     writeJsonError(ctx.res, 402, message, 'insufficient_quota');

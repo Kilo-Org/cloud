@@ -496,6 +496,15 @@ describe('fake-llm-server HTTP', () => {
     expect(chunks[chunks.length - 1].data).toBe('[DONE]');
   });
 
+  it('error-terminal returns HTTP 400 with an OpenAI-shaped error', async () => {
+    const h = await start();
+    const res = await postChat(h.url, '__fake__:error-terminal:boom');
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: { message: 'boom', code: 400, type: 'invalid_request' },
+    });
+  });
+
   it('error scenario returns HTTP 402 with OpenAI-shaped error', async () => {
     const h = await start();
     const res = await postChat(h.url, '__fake__:error:too broke');
@@ -1186,6 +1195,7 @@ type ProcFixture = {
   port: number;
   inode: string;
   directory: string;
+  home: string;
   roots: string[];
   address?: string;
   state?: string;
@@ -1242,6 +1252,8 @@ function discoveryFixture(processes: ProcFixture[], log?: string) {
               entry.command ?? ['/usr/local/bin/kilo', 'serve', '--hostname=127.0.0.1', '--port=0']
             ).join('\0') + '\0'
           );
+        const environmentEntry = entries.find(item => filename === `/proc/${item.pid}/environ`);
+        if (environmentEntry) return `HOME=${environmentEntry.home}\0PATH=/usr/local/bin\0`;
         if (filename === '/tmp/kilocode-control-wrapper.log' && log !== undefined) return log;
         forbiddenReads.push(filename);
         throw new Error('Unexpected filesystem read');
@@ -1333,6 +1345,7 @@ function directoryProcesses(): ProcFixture[] {
       port: 41001,
       inode: '501',
       directory: '/workspace/worktrees/worktree-a',
+      home: '/tmp/kilo-worktrees/a1b2c3d4',
       roots: ['ses_a', 'ses_sibling'],
     },
     {
@@ -1340,6 +1353,7 @@ function directoryProcesses(): ProcFixture[] {
       port: 41002,
       inode: '502',
       directory: '/workspace/worktrees/worktree-b',
+      home: '/tmp/kilo-worktrees/e5f6a7b8',
       roots: ['ses_b'],
       address: '00000000000000000000000001000000',
     },
@@ -1357,13 +1371,19 @@ describe('per-directory Kilo discovery', () => {
       container: { id: 'owned' },
       processId: 101,
       directory: '/workspace/worktrees/worktree-a',
+      home: '/tmp/kilo-worktrees/a1b2c3d4',
       serverUrl: 'http://127.0.0.1:41001',
     });
-    expect(sibling).toMatchObject({ processId: first?.processId, directory: first?.directory });
+    expect(sibling).toMatchObject({
+      processId: first?.processId,
+      directory: first?.directory,
+      home: first?.home,
+    });
     expect(second).toMatchObject({
       container: { id: 'owned' },
       processId: 202,
       directory: '/workspace/worktrees/worktree-b',
+      home: '/tmp/kilo-worktrees/e5f6a7b8',
       serverUrl: 'http://[::1]:41002',
     });
     expect(first?.logPath).toBeUndefined();

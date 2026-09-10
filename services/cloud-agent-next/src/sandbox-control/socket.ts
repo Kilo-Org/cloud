@@ -62,6 +62,7 @@ export type SandboxControlOutboundRequest = {
   authorization?: SessionOperationAuthorization;
   timeoutMs?: number;
   expectedWrapperInstanceId?: string;
+  expectedConnection?: SandboxControlConnectionIdentity;
   deadlineAt?: number;
 };
 
@@ -70,6 +71,8 @@ export type SandboxControlConnectionIdentity = {
   providerInstanceId: string;
   wrapperInstanceId?: string;
   recoveryCapable?: boolean;
+  runtimeIsolation?: true;
+  runtimeRecovery?: true;
 };
 
 export type SandboxControlEventResult = { applied: boolean; retryable?: boolean };
@@ -227,6 +230,8 @@ function readConnectionIdentity(
     providerInstanceId: attachment.providerInstanceId,
     ...(attachment.recoveryCapable ? { recoveryCapable: true } : {}),
     ...(attachment.wrapperInstanceId ? { wrapperInstanceId: attachment.wrapperInstanceId } : {}),
+    ...(attachment.runtimeIsolation ? { runtimeIsolation: true } : {}),
+    ...(attachment.runtimeRecovery ? { runtimeRecovery: true } : {}),
   };
 }
 
@@ -550,6 +555,8 @@ export function createSandboxControlSocketHandler(
           providerInstanceId: payload.providerInstanceId,
           ...(payload.wrapperInstanceId ? { wrapperInstanceId: payload.wrapperInstanceId } : {}),
           ...(payload.capabilities?.connectionRecovery === true ? { recoveryCapable: true } : {}),
+          ...(payload.capabilities?.runtimeIsolation === true ? { runtimeIsolation: true } : {}),
+          ...(payload.capabilities?.runtimeRecovery === true ? { runtimeRecovery: true } : {}),
         };
         const completed: SandboxControlSocketAttachment = {
           handshakeComplete: true,
@@ -561,6 +568,8 @@ export function createSandboxControlSocketHandler(
           providerInstanceId: identity.providerInstanceId,
           ...(payload.capabilities ? { capabilities: payload.capabilities } : {}),
           ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
+          ...(identity.runtimeIsolation ? { runtimeIsolation: true } : {}),
+          ...(identity.runtimeRecovery ? { runtimeRecovery: true } : {}),
         };
         const superseded: WebSocket[] = [];
         let replaced = false;

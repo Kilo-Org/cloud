@@ -28,7 +28,10 @@ export function AppRootProviders({
   const { t } = useTranslation();
 
   return (
-    <GestureHandlerRootView className="flex-1">
+    // bg-background: the gesture root is the first opaque surface above the
+    // window — a rotation relayout gap behind any screen must show the app's
+    // own background, never the platform window default (foreign white/black).
+    <GestureHandlerRootView className="flex-1 bg-background">
       <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
           <QueryClientNativeLifecycle />

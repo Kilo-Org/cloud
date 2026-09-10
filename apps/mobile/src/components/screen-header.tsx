@@ -43,7 +43,9 @@ type ScreenHeaderProps = {
   backIcon?: 'back' | 'close';
   /**
    * Apply the status-bar safe-area inset. Form sheets already clear the
-   * grabber; passing false leaves vertical padding to `className`.
+   * grabber; passing false leaves vertical padding to `className`. The
+   * landscape side insets apply regardless, so every caller clears the
+   * sensor/cutout horizontally.
    */
   safeAreaTop?: boolean;
   /** Extra classes on the outer header container. Overrides the default `px-4` for screens that need a different horizontal inset. */
@@ -79,6 +81,27 @@ export function ScreenHeader({
 
   // iOS modals are presented as cards already inset from the status bar
   const paddingTop = modal && Platform.OS === 'ios' ? 32 : insets.top + 8;
+
+  // `paddingTop` stays conditional on `safeAreaTop`: a form sheet owns its
+  // vertical padding through `className`.
+  const safeAreaStyle = safeAreaTop ? { paddingTop } : undefined;
+
+  // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
+  // whole chrome off the sensor. They go on an inner wrapper so they ADD to the
+  // `px-4` gutter: an inline padding on the container would beat the className
+  // (inline style wins in React Native) and swallow the gutter, pulling the
+  // back control's `-ml-4` chevron back inside the sensor area. Zero insets
+  // collapse the wrapper style to `undefined`, so portrait geometry is
+  // byte-identical and a rotation never moves anything vertically. Side padding
+  // applies to every caller — a sheet with `safeAreaTop={false}` still runs
+  // edge-to-edge horizontally and must clear the cutout too.
+  const sideInsetStyle =
+    insets.left > 0 || insets.right > 0
+      ? {
+          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
+          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
+        }
+      : undefined;
 
   // When `backIcon` isn't specified, fall back to the historical behaviour
   // where iOS modals get a ChevronDown and everything else gets a ChevronLeft.
@@ -190,33 +213,32 @@ export function ScreenHeader({
     ) : null;
 
   return (
-    <View
-      className={cn('bg-background px-4 pb-3', className)}
-      style={safeAreaTop ? { paddingTop } : undefined}
-    >
-      {separateHeading ? (
-        <View className="min-h-11 flex-row items-center">
-          {backControl}
-          <View className="min-w-0 flex-1 flex-row items-center justify-center">{heading}</View>
-          {headerRight ? (
-            <View className="ms-3 max-w-[50%] min-w-0 shrink">{headerRight}</View>
-          ) : (
-            centeredControls
-          )}
-        </View>
-      ) : (
-        <View className="flex-row items-center">
-          <View className="min-w-0 flex-1 flex-row items-center gap-1">
+    <View className={cn('bg-background px-4 pb-3', className)} style={safeAreaStyle}>
+      <View style={sideInsetStyle}>
+        {separateHeading ? (
+          <View className="min-h-11 flex-row items-center">
             {backControl}
-            {heading}
+            <View className="min-w-0 flex-1 flex-row items-center justify-center">{heading}</View>
+            {headerRight ? (
+              <View className="ms-3 max-w-[50%] min-w-0 shrink">{headerRight}</View>
+            ) : (
+              centeredControls
+            )}
           </View>
-          {headerRight ? (
-            <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} min-w-0 max-w-[50%] shrink`}>
-              {headerRight}
+        ) : (
+          <View className="flex-row items-center">
+            <View className="min-w-0 flex-1 flex-row items-center gap-1">
+              {backControl}
+              {heading}
             </View>
-          ) : null}
-        </View>
-      )}
+            {headerRight ? (
+              <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} min-w-0 max-w-[50%] shrink`}>
+                {headerRight}
+              </View>
+            ) : null}
+          </View>
+        )}
+      </View>
     </View>
   );
 }

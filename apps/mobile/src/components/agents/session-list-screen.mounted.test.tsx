@@ -19,6 +19,8 @@ const state = vi.hoisted(() => ({
   focused: true,
   fontScale: 1,
   topInset: 0,
+  leftInset: 0,
+  rightInset: 0,
   tabBarHeight: 60,
   focusCallbacks: new Set<() => void>(),
   listeners: new Set<(state: string) => void>(),
@@ -102,7 +104,12 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: 'LinearTransition',
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: state.topInset, bottom: 0 }),
+  useSafeAreaInsets: () => ({
+    top: state.topInset,
+    bottom: 0,
+    left: state.leftInset,
+    right: state.rightInset,
+  }),
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => state.focused }),
@@ -328,6 +335,8 @@ beforeEach(() => {
   state.focused = true;
   state.fontScale = 1;
   state.topInset = 0;
+  state.leftInset = 0;
+  state.rightInset = 0;
   state.tabBarHeight = 60;
   state.focusCallbacks.clear();
   state.destination = '';
@@ -752,6 +761,54 @@ describe('AgentSessionListScreen live presentation', () => {
     state.live.activeSessions = [row];
     await renderScreen();
     expect(typeof nodes('FlatList')[0]?.props.extraData).toBe('number');
+  });
+
+  it('offsets the FAB by the landscape right inset and keeps its vertical position', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const fab = () =>
+      nodes('Pressable').find(node => node.props.testID === 'agents-new-session-fab');
+    expect(fab()?.props.style).toEqual({
+      bottom: state.tabBarHeight + 16,
+      right: 20,
+      width: 48,
+      height: 48,
+    });
+
+    // Rotation must not move or resize the FAB vertically; only the side offset
+    // grows by the right inset.
+    state.rightInset = 59;
+    await renderScreen();
+    expect(fab()?.props.style).toEqual({
+      bottom: state.tabBarHeight + 16,
+      right: 79,
+      width: 48,
+      height: 48,
+    });
+  });
+
+  it('pads the live list content by the landscape side insets', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const contentContainerStyle = () =>
+      nodes('FlatList')[0]?.props.contentContainerStyle as Record<string, number>;
+    expect(contentContainerStyle()).toEqual({
+      paddingTop: 0,
+      paddingBottom: state.tabBarHeight + 64,
+      paddingLeft: 0,
+      paddingRight: 0,
+    });
+
+    // Rotation pads only the sides; the vertical geometry is unchanged.
+    state.leftInset = 47;
+    state.rightInset = 59;
+    await renderScreen();
+    expect(contentContainerStyle()).toEqual({
+      paddingTop: 0,
+      paddingBottom: state.tabBarHeight + 64,
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
   });
 
   it('renders no history list, animated wrappers, or active-now section and keeps one history label without a plus icon', async () => {

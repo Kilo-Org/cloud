@@ -598,6 +598,22 @@ describe('session detail status placement', () => {
   );
 });
 
+describe('session detail bottom strip', () => {
+  it('keeps the home-indicator strip full-bleed (pure background, no side padding)', async () => {
+    const { renderer } = await mountDetails([]);
+    const strips = renderer.root.findAll(node => Object.is(node.type, 'BlurBar'));
+    expect(strips).toHaveLength(1);
+    // The spacer pads only the bottom inset: it hosts no controls, so it
+    // stays full-bleed in landscape while the composer content carries the
+    // sensor side insets.
+    const spacer = strips[0]?.findAll(node => Object.is(node.type, 'View'))[0];
+    expect(spacer).toBeDefined();
+    const spacerStyle = spacer?.props.style as { height: number } | undefined;
+    expect(spacerStyle).toEqual({ height: 16 });
+    expect(Object.keys(spacerStyle ?? {})).toEqual(['height']);
+  });
+});
+
 describe.each([true, false])('session detail return with history=%s', hasHistory => {
   beforeEach(() => {
     if (hasHistory) {

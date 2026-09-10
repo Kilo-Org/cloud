@@ -54,6 +54,7 @@ import { type Href, useIsFocused, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
 import { PrCommentCta } from '@/components/pr-review/discussion/pr-comment-cta';
@@ -141,6 +142,11 @@ export function PrReviewDiscussionTab({
   // Bottom clearance for the non-list chrome (loading, empty, and every
   // first-page error state) so the last control clears the system bar.
   const bottomPadding = useDetailScreenBottomPadding();
+  // Landscape: side insets keep the loading skeleton cards clear of the
+  // sensor housing. Spread only when nonzero: the skeleton wrapper's `px-4`
+  // className gutter must survive portrait untouched (inline style wins over
+  // className). Same treatment as the diff floating-actions bar.
+  const insets = useSafeAreaInsets();
 
   // Single write path: the ref is the tap-time source of truth (render-closure
   // state can lag a queued update on rapid taps).
@@ -305,7 +311,11 @@ export function PrReviewDiscussionTab({
       <View
         accessibilityLabel={t('prReview.discussion.loading')}
         className="flex-1 gap-3 px-4 pt-3"
-        style={{ paddingBottom: bottomPadding }}
+        style={{
+          paddingBottom: bottomPadding,
+          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
+          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
+        }}
       >
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id

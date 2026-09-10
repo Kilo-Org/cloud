@@ -17,10 +17,10 @@ import { getUserFromAuth } from '@/lib/user/server';
  * extracting kiloUserId from the payload. Sandbox ownership is verified
  * server-side by the kilo-chat worker via Hyperdrive.
  */
-export async function POST() {
+export async function POST(request: Request) {
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse) return authFailedResponse;
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  return NextResponse.json(createKiloChatTokenResponse(user));
+  return NextResponse.json(await createKiloChatTokenResponse(user, request.headers));
 }

@@ -1,6 +1,5 @@
-/* eslint-disable max-lines -- sign-out teardown ordering, stale sign-in fencing, and the consent-outcome clear are kept together with the provider mount */
 import * as SecureStore from 'expo-secure-store';
-import { z } from 'zod';
+import { type NativeTokenPair } from '@kilocode/app-shared/native-auth';
 import {
   createContext,
   type ReactNode,
@@ -27,22 +26,22 @@ import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { runLogoutCleanup, unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
 import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
-import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 import { bumpAuthEpoch, currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { readUserIdFromToken } from '@/lib/auth/auth-user-id';
+import { useAuthBootstrap } from '@/lib/auth/use-auth-bootstrap';
+import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import {
   IOS_BEARER_SECURE_STORE_OPTIONS,
   performRefresh,
-  persistSignInCredentialsAtEpoch,
   REFRESH_MARGIN_MS,
+  setCredentials,
   writeCredentials,
 } from '@/lib/auth/credentials';
 import {
   clearActiveToken,
-  getActiveToken,
-  setActiveToken,
+  getActiveTokenSnapshot,
   setSignOutTeardownActive,
 } from '@/lib/auth/token-owner';
-import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
@@ -68,6 +67,7 @@ import {
   AUTH_TOKEN_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
   LIVE_SESSION_FILTERS_KEY,
+  NATIVE_CREDENTIAL_BUNDLE_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
   ORGANIZATION_STORAGE_KEY,
   PENDING_DEEP_LINK_KEY,
@@ -82,52 +82,7 @@ import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
 import { AppState } from 'react-native';
 import { beginAuthenticatedOwner } from '@/lib/context-scope';
 
-// Pre-load tokens at module level so they're available before React mounts
-export const preloadedAuthToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-const preloadedRefreshToken = SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-// A keychain failure at process start rejects these before any consumer can
-// await them, and the runtime would report that as an unhandled rejection
-// before AuthProvider even mounts. Observe it here; the bootstrap read below
-// still awaits the same promise as its first attempt, and it — not this
-// observer — decides whether the session can be restored.
-async function observePreloadRejection(preload: Promise<string | null>): Promise<void> {
-  try {
-    await preload;
-  } catch {
-    // Observed only. The bootstrap read owns the outcome.
-  }
-}
-void observePreloadRejection(preloadedAuthToken);
-void observePreloadRejection(preloadedRefreshToken);
-
-const jwtPayloadSchema = z.object({ kiloUserId: z.string().optional() });
-
-/**
- * Best-effort read of the signed-in user id from a Kilo bearer token. The
- * token is a JWT whose payload carries `kiloUserId` (see `generateApiToken`
- * in apps/web/src/lib/tokens.ts). Decode-only: the server already accepted
- * the token, so the id is read without verifying the signature (the app has
- * no signing secret). Returns null for a non-JWT or malformed token so a
- * decode failure can never break sign-in.
- */
-function readUserIdFromToken(token: string): string | null {
-  try {
-    const segments = token.split('.');
-    if (segments.length !== 3) {
-      return null;
-    }
-    const payloadSegment = segments[1];
-    if (payloadSegment === undefined) {
-      return null;
-    }
-    const base64 = payloadSegment.replaceAll('-', '+').replaceAll('_', '/');
-    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
-    const parsed = jwtPayloadSchema.safeParse(JSON.parse(atob(padded)));
-    return parsed.success && parsed.data.kiloUserId ? parsed.data.kiloUserId : null;
-  } catch {
-    return null;
-  }
-}
+export { preloadedAuthToken } from '@/lib/auth/use-auth-bootstrap';
 
 type AuthContextValue = {
   token: string | undefined;
@@ -141,14 +96,9 @@ type AuthContextValue = {
    *  publication succeeds. The read-cache mount refuses to subscribe while it
    *  is set, and the persister fence reads the same flag at write time. */
   isSigningOut: boolean;
-  /** True when every retried startup credential read still failed. The stored
-   *  session is NOT known to be gone, so bootstrap shows a retryable error
-   *  surface instead of presenting the person as signed out. */
   restoreFailed: boolean;
-  /** Re-runs the startup credential read, holding the restore-error surface
-   *  until the fresh reads resolve. */
   retryRestore: () => void;
-  signIn: (token: string, refreshToken?: string, expiresIn?: number) => Promise<void>;
+  signIn: (pair: NativeTokenPair) => Promise<boolean>;
   signOut: (ended?: boolean) => Promise<void>;
 };
 
@@ -172,183 +122,67 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const isSigningOut = useSyncExternalStore(subscribeSignOutActive, isSignOutActive);
   const isSignedOutReference = useRef(false);
 
-  // Declared outside the mount effect so the restore-error screen's Retry can
-  // re-run the exact same bootstrap. `preload` is passed only on the first
-  // run: a retry must never reuse the module-scope promise that already
-  // rejected, and re-awaiting a resolved one would answer from a stale read.
-  const load = useCallback(
-    async (preload?: {
-      readonly token: Promise<string | null>;
-      readonly refresh: Promise<string | null>;
-    }) => {
-      // Capture the epoch before any asynchronous read: every later check —
-      // including the catch below — fences against this moment, so a sign-out
-      // or newer sign-in during bootstrap can never be followed by the
-      // preloaded token being restored into React state or the token owner.
+  const { retryRestore } = useAuthBootstrap({ setToken, setIsLoading, setRestoreFailed });
+
+  // The ENTIRE sign-in body runs inside the FIFO auth-transition queue, so a
+  // sign-in queued behind an in-flight sign-out lands only after the full
+  // teardown, and a sign-out queued behind a sign-in signs that new session
+  // out (documented, correct FIFO semantics).
+  const signIn = useCallback(async (pair: NativeTokenPair) => {
+    const persisted = await chainSave('auth-transition', async () => {
+      // Close admission before publishing the pending generation or writing credentials.
+      setSignOutTeardownActive(true);
+      setSignOutActive(true);
+      bumpAuthEpoch();
+      beginAuthenticatedOwner();
+      // Blank the prior account's glanceable surface before any credential
+      // persist, so a direct account switch never shows the previous account.
+      writeSignedOutSnapshotAndEnd();
+      // Unregister the prior account's activity tokens (Live Activity /
+      // push-to-start) BEFORE persisting the new credentials, so the
+      // unregister runs under the old token owner's auth. This never revokes
+      // the device session or unregisters the Expo push token (logout-only).
+      await unregisterActivityTokensAndTombstone();
+      setAuthEpoch(currentAuthEpoch());
+      setToken(undefined);
+      clearActiveToken();
+      // Bind the pending deep-link slot to the new user id at the same
+      // place the auth epoch advances, so a destination captured while this
+      // account is signed in restores only for this account.
+      setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
       const epoch = currentAuthEpoch();
-      try {
-        const stored = await readStoredValueWithRetry(AUTH_TOKEN_KEY, undefined, preload?.token);
-        const storedRefresh = await readStoredValueWithRetry(
-          REFRESH_TOKEN_KEY,
-          undefined,
-          preload?.refresh
-        );
-        // The credential state is now known — a stored session restores below,
-        // or genuinely none exists and login is the correct destination. Clear
-        // a settled restore error here, not in `retryRestore`: a retry holds
-        // the error surface until this point (success moves past it, failure
-        // re-settles it in the catch), so the surface never blanks mid-retry.
-        setRestoreFailed(false);
-
-        if (stored) {
-          // Legacy exchange: if we have a token but no refresh token, upgrade once.
-          if (!storedRefresh) {
-            const pair = await exchangeLegacyToken();
-            // The same teardown window the fence below covers: a sign-out that
-            // began while the exchange was in flight has not bumped the epoch
-            // yet, so the exchange's own epoch checks pass — the sign-out flag
-            // must stop this publish, exactly like the one below.
-            if (pair && isCurrentAuthEpoch(epoch) && !isSignedOutReference.current) {
-              setToken(pair.token);
-              setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
-              setIsLoading(false);
-              return;
-            }
-          }
-
-          // The session moved while the preload or legacy exchange was in
-          // flight: never resurrect the preloaded token.
-          if (!isCurrentAuthEpoch(epoch)) {
-            return;
-          }
-
-          const expiresAtStr = await readStoredValueWithRetry(TOKEN_EXPIRES_AT_KEY);
-
-          // Fence the asynchronous expiry read: a sign-out or newer sign-in
-          // during the reads owns the session, so the stale snapshot must not
-          // be republished and nothing may be surfaced for the torn-down
-          // session.
-          const currentStored = await readStoredValueWithRetry(AUTH_TOKEN_KEY);
-          // A sign-out teardown closes the epoch fence only at its bump, which
-          // waits for the remote cleanup — so inside the teardown window the
-          // epoch is still current while the sign-out flag is already set. The
-          // flag is the fence for that window, exactly as in the catch below:
-          // without it a success landing mid-teardown republishes the stored
-          // credentials (owner, React state, deep-link binding) that sign-out
-          // is tearing down.
-          if (!isCurrentAuthEpoch(epoch) || isSignedOutReference.current) {
-            return;
-          }
-          // A same-session refresh replaced the stored pair while the reads
-          // were in flight. The preloaded snapshot is stale, but the session
-          // is alive: publish the winner the refresh already put in the owner,
-          // or the provider ends bootstrap with no token and sends a
-          // signed-in user to the login screen.
-          if (currentStored !== stored) {
-            const published = getActiveToken()?.token ?? currentStored ?? undefined;
-            setToken(published);
-            setCurrentDeepLinkUserId(published ? readUserIdFromToken(published) : null);
-            return;
-          }
-          setActiveToken(stored, expiresAtStr ? Number(expiresAtStr) : null);
-          setToken(stored);
-          setCurrentDeepLinkUserId(readUserIdFromToken(stored));
-        }
-      } catch {
-        // Every read exhausted its retries. The session is not known to be
-        // gone, so NEVER fall through to the signed-out path and never set a
-        // token here: surface a retryable error and let the person retry or
-        // sign out explicitly.
-        // But never resurrect the surface over a transition that began while
-        // this load was in flight. A sign-out's escape hatch already cleared
-        // it synchronously (and the dedupe makes a second sign-out a no-op,
-        // so a resurrected flag would dead-end the hatch on the login route);
-        // a newer sign-in moved the epoch and owns the tree.
-        if (!isSignedOutReference.current && isCurrentAuthEpoch(epoch)) {
-          setRestoreFailed(true);
-        }
-      } finally {
-        setIsLoading(false);
+      const published = await setCredentials(pair);
+      // A sign-in superseded by a newer sign-in or sign-out while its
+      // credential write was fenced must not clear the signed-out guard,
+      // update React auth state, or run login side effects.
+      if (!published || !isCurrentAuthEpoch(epoch)) {
+        return false;
       }
-    },
-    []
-  );
-
-  useEffect(() => {
-    void load({ token: preloadedAuthToken, refresh: preloadedRefreshToken });
-  }, [load]);
-
-  const retryRestore = useCallback(() => {
-    // Hold the settled error surface for the whole retry: `restoreFailed`
-    // stays true until `load()`'s primary reads resolve, so this surface
-    // stays mounted instead of blanking behind the loading gate (the native
-    // splash never returns once startup finished).
-    setIsLoading(true);
-    void load();
-  }, [load]);
-
-  const signIn = useCallback(
-    async (tokenValue: string, refreshTokenValue?: string, expiresIn?: number) => {
-      // The ENTIRE sign-in body runs inside the FIFO auth-transition queue, so
-      // a sign-in queued behind an in-flight sign-out lands only after the
-      // full teardown, and a sign-out queued behind a sign-in signs that new
-      // session out (documented, correct FIFO semantics).
-      await chainSave('auth-transition', async () => {
-        // Close admission before publishing the pending generation or writing credentials.
-        setSignOutTeardownActive(true);
-        setSignOutActive(true);
-        bumpAuthEpoch();
-        beginAuthenticatedOwner();
-        // Blank the prior account's glanceable surface before any credential
-        // persist, so a direct account switch never shows the previous account.
-        writeSignedOutSnapshotAndEnd();
-        // Unregister the prior account's activity tokens (Live Activity /
-        // push-to-start) BEFORE persisting the new credentials, so the
-        // unregister runs under the old token owner's auth. This never revokes
-        // the device session or unregisters the Expo push token (logout-only).
-        await unregisterActivityTokensAndTombstone();
-        setAuthEpoch(currentAuthEpoch());
-        setToken(undefined);
-        clearActiveToken();
-        // Bind the pending deep-link slot to the new user id at the same
-        // place the auth epoch advances, so a destination captured while this
-        // account is signed in restores only for this account.
-        setCurrentDeepLinkUserId(readUserIdFromToken(tokenValue));
-        const epoch = currentAuthEpoch();
-        const published = await persistSignInCredentialsAtEpoch(tokenValue, refreshTokenValue, {
-          expiresIn,
-        });
-        // A sign-in superseded by a newer sign-in or sign-out while its
-        // credential write was fenced must not clear the signed-out guard,
-        // update React auth state, or run login side effects.
-        if (!published || !isCurrentAuthEpoch(epoch)) {
-          return;
-        }
-        // Clear the guard so a later refused refresh can sign out again.
-        isSignedOutReference.current = false;
-        // Credentials published on the winning epoch: the teardown window
-        // ends, so refresh may rotate the new session and request-token cold
-        // reads may warm the owner again.
-        setSignOutTeardownActive(false);
-        setSessionEnded(false);
-        // Credentials published on the winning epoch: the sign-out fence opens
-        // so the read-cache mount can subscribe for the new session, and the
-        // reactive `isSigningOut` follows the same flag.
-        setSignOutActive(false);
-        trackEvent('login');
-        resetPurchaseErrorToastDedup();
-        // A direct account switch must not keep the prior account's query
-        // cache: the org list is keyed account-independently, so a stale list
-        // would otherwise drive a false lost-org blank in the org fence.
-        queryClient.clear();
-        setToken(tokenValue);
-        // A direct account switch must not keep the prior account's session
-        // state: trusted hosts, image confirms, media caches, temp copies.
-        clearSessionScopedState();
-      });
-    },
-    []
-  );
+      // Clear the guard so a later refused refresh can sign out again.
+      isSignedOutReference.current = false;
+      // Credentials published on the winning epoch: the teardown window
+      // ends, so refresh may rotate the new session and request-token cold
+      // reads may warm the owner again.
+      setSignOutTeardownActive(false);
+      setSessionEnded(false);
+      // Credentials published on the winning epoch: the sign-out fence opens
+      // so the read-cache mount can subscribe for the new session, and the
+      // reactive `isSigningOut` follows the same flag.
+      setSignOutActive(false);
+      trackEvent('login');
+      resetPurchaseErrorToastDedup();
+      // A direct account switch must not keep the prior account's query
+      // cache: the org list is keyed account-independently, so a stale list
+      // would otherwise drive a false lost-org blank in the org fence.
+      queryClient.clear();
+      setToken(pair.token);
+      // A direct account switch must not keep the prior account's session
+      // state: trusted hosts, image confirms, media caches, temp copies.
+      clearSessionScopedState();
+      return true;
+    });
+    return persisted;
+  }, []);
 
   const signOut = useCallback(async (ended = false) => {
     // The ENTIRE sign-out body runs inside the FIFO auth-transition queue.
@@ -452,6 +286,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
                 TOKEN_EXPIRES_AT_KEY,
                 IOS_BEARER_SECURE_STORE_OPTIONS
               );
+              await SecureStore.deleteItemAsync(
+                NATIVE_CREDENTIAL_BUNDLE_KEY,
+                IOS_BEARER_SECURE_STORE_OPTIONS
+              );
               await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);
             }),
             deleteAccountMetadata(ACTIVE_USER_ID_KEY),
@@ -532,19 +370,22 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
       void (async () => {
         try {
-          const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
-          if (!expiresAtStr) {
-            return;
+          let expiresAt = getActiveTokenSnapshot()?.expiresAtMs;
+          if (expiresAt === null || expiresAt === undefined) {
+            const expiresAtStr = await readStoredValueWithRetry(TOKEN_EXPIRES_AT_KEY);
+            if (!expiresAtStr) {
+              return;
+            }
+            expiresAt = Number(expiresAtStr);
           }
 
-          const expiresAt = Number(expiresAtStr);
           if (Date.now() <= expiresAt - REFRESH_MARGIN_MS) {
             return;
           }
 
           // The epoch moved while the expiry read was in flight: the event is
           // stale, so do not initiate a refresh for the old session.
-          if (!isCurrentAuthEpoch(epoch)) {
+          if (!isCurrentAuthEpoch(epoch) || isSignOutActive()) {
             return;
           }
 

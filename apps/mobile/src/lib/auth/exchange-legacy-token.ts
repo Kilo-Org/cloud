@@ -1,21 +1,22 @@
 import * as SecureStore from 'expo-secure-store';
+import { type NativeSessionCredentials } from '@kilocode/app-shared/native-auth';
 
 import { API_BASE_URL } from '@/lib/config';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
-import { persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
-import { parseTokenPair } from '@/lib/auth/native-auth-contract';
+import { isSignOutTeardownActive } from '@/lib/auth/token-owner';
+import { persistSignInCredentialsAtEpoch, writeCredentials } from '@/lib/auth/credentials';
+import { API_GATEWAY_CREDENTIAL_FORMAT, parseTokenPair } from '@/lib/auth/native-auth-contract';
 import { AUTH_TOKEN_KEY, LEGACY_EXCHANGE_DONE_KEY } from '@/lib/storage-keys';
 
-export async function exchangeLegacyToken(): Promise<{
-  token: string;
-  refreshToken: string;
-  expiresIn: number;
-} | null> {
+export async function exchangeLegacyToken(): Promise<NativeSessionCredentials | null> {
   try {
     // Capture the epoch before any asynchronous read: every later epoch check
     // fences against this moment, so an exchange that started before a
     // sign-out can never send the stale token or persist its result.
     const epoch = currentAuthEpoch();
+    if (isSignOutTeardownActive()) {
+      return null;
+    }
 
     // Guard: run at most once. If the marker is already set the exchange succeeded
     // (or was deliberately skipped) in a past launch.
@@ -33,7 +34,7 @@ export async function exchangeLegacyToken(): Promise<{
 
     // The session moved while the marker and legacy token were read: the token
     // may belong to a signed-out account. Discard before sending it.
-    if (!isCurrentAuthEpoch(epoch)) {
+    if (!isCurrentAuthEpoch(epoch) || isSignOutTeardownActive()) {
       return null;
     }
 
@@ -43,6 +44,9 @@ export async function exchangeLegacyToken(): Promise<{
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
+      body: JSON.stringify({
+        credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT,
+      }),
     });
 
     if (!response.ok) {
@@ -59,7 +63,7 @@ export async function exchangeLegacyToken(): Promise<{
       return null;
     }
 
-    if (!isCurrentAuthEpoch(epoch)) {
+    if (!isCurrentAuthEpoch(epoch) || isSignOutTeardownActive()) {
       // The session moved while the exchange was in flight: discard the
       // result so it can never land after a sign-out.
       return null;
@@ -72,24 +76,43 @@ export async function exchangeLegacyToken(): Promise<{
     const published = await persistSignInCredentialsAtEpoch(parsed.token, parsed.refreshToken, {
       expiresIn: parsed.expiresIn,
       expectedEpoch: epoch,
+      bundle: getBundleMetadata(parsed),
+      allowDuringTeardown: false,
     });
     if (!published) {
       // The session moved while the exchange write was fenced: stop before
       // the completion marker and the success result.
       return null;
     }
-    if (!isCurrentAuthEpoch(epoch)) {
-      return null;
-    }
-    // Persist the marker so we never exchange again.
-    await SecureStore.setItemAsync(LEGACY_EXCHANGE_DONE_KEY, '1');
-    if (!isCurrentAuthEpoch(epoch)) {
-      await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);
+    if (!(await persistExchangeCompletionMarker(epoch))) {
       return null;
     }
 
-    return { token: parsed.token, refreshToken: parsed.refreshToken, expiresIn: parsed.expiresIn };
+    return parsed;
   } catch {
     return null;
   }
+}
+
+async function persistExchangeCompletionMarker(epoch: number): Promise<boolean> {
+  let completed = false;
+  await writeCredentials(async () => {
+    if (!isCurrentAuthEpoch(epoch) || isSignOutTeardownActive()) {
+      return;
+    }
+    await SecureStore.setItemAsync(LEGACY_EXCHANGE_DONE_KEY, '1');
+    if (!isCurrentAuthEpoch(epoch) || isSignOutTeardownActive()) {
+      await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);
+      return;
+    }
+    completed = true;
+  });
+  return completed;
+}
+
+function getBundleMetadata(value: ReturnType<typeof parseTokenPair>) {
+  if (!value || !('metadata' in value) || !value.metadata) {
+    return undefined;
+  }
+  return value.metadata;
 }

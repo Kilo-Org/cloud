@@ -2,6 +2,7 @@
 /* oxlint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom) */
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable max-lines -- one cohesive auth-context suite: sign-out teardown ordering and stale sign-in fencing share the provider mount and the SecureStore mock */
+import { type NativeTokenPair } from '@kilocode/app-shared/native-auth';
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
@@ -21,29 +22,39 @@ vi.setConfig({ testTimeout: 30_000 });
 
 const hoisted = vi.hoisted(() => {
   const callOrder: string[] = [];
+  const secureStoreValues = new Map<string, string>();
 
   const secureStore = {
-    getItem: vi.fn().mockReturnValue(null),
-    getItemAsync: vi.fn().mockResolvedValue(null),
-    setItem: vi.fn().mockReturnValue(undefined),
-    setItemAsync: vi.fn().mockResolvedValue(undefined),
-    // eslint-disable-next-line require-await -- mock returning a resolved promise
+    getItem: vi.fn((key: string) => secureStoreValues.get(key) ?? null),
+    getItemAsync: vi.fn(async (key: string) => {
+      await Promise.resolve();
+      return secureStoreValues.get(key) ?? null;
+    }),
+    setItem: vi.fn((key: string, value: string) => {
+      secureStoreValues.set(key, value);
+    }),
+    setItemAsync: vi.fn(async (key: string, value: string) => {
+      await Promise.resolve();
+      secureStoreValues.set(key, value);
+    }),
     deleteItemAsync: vi.fn().mockImplementation(async (_key: string) => {
+      await Promise.resolve();
       // Track the call in callOrder for ordering checks.
       callOrder.push('SecureStore.deleteItemAsync');
+      secureStoreValues.delete(_key);
     }),
   };
 
   const posthog = {
-    // eslint-disable-next-line require-await -- mock returning a resolved promise
     discardPostHog: vi.fn().mockImplementation(async () => {
+      await Promise.resolve();
       callOrder.push('discardPostHog');
     }),
     captureEvent: vi.fn().mockImplementation(() => {
       callOrder.push('captureEvent');
     }),
-    // eslint-disable-next-line require-await -- mock returning a resolved promise
     flushLastPostHogEvent: vi.fn().mockImplementation(async () => {
+      await Promise.resolve();
       callOrder.push('flushLastPostHogEvent');
     }),
   };
@@ -95,6 +106,7 @@ const hoisted = vi.hoisted(() => {
 
   return {
     callOrder,
+    secureStoreValues,
     secureStore,
     posthog,
     appsflyer,
@@ -305,6 +317,7 @@ vi.mock('@/lib/storage-keys', () => ({
   PICKER_LAUNCH_CONTEXT_KEY: 'picker-launch-context',
   REFRESH_TOKEN_KEY: 'refresh-token',
   LIVE_SESSION_FILTERS_KEY: 'live-session-filters',
+  NATIVE_CREDENTIAL_BUNDLE_KEY: 'native-credential-bundle',
   SESSION_FILTERS_KEY: 'session-filters',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
 }));
@@ -331,7 +344,7 @@ type AuthContextValue = {
   isSigningOut: boolean;
   restoreFailed: boolean;
   retryRestore: () => void;
-  signIn: (token: string) => Promise<void>;
+  signIn: (pair: NativeTokenPair) => Promise<boolean>;
   signOut: (ended?: boolean) => Promise<void>;
 };
 
@@ -343,6 +356,17 @@ function base64url(input: string): string {
 
 function makeToken(payload: Record<string, unknown>): string {
   return `${base64url('{"alg":"none"}')}.${base64url(JSON.stringify(payload))}.signature`;
+}
+
+function tokenPair(token: string): NativeTokenPair {
+  return { token };
+}
+
+function useSecureStoreMap(): void {
+  hoisted.secureStore.getItemAsync.mockImplementation(async key => {
+    await Promise.resolve();
+    return hoisted.secureStoreValues.get(key) ?? null;
+  });
 }
 
 /** Load the auth-context module from a fresh module registry so
@@ -436,7 +460,8 @@ describe('sign-out teardown ordering', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.callOrder.length = 0;
-    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+    hoisted.secureStoreValues.clear();
+    useSecureStoreMap();
   });
 
   it('orders capture, cleanup, flush, clearTelemetryDecision, then Sentry.setUser', async () => {
@@ -584,7 +609,7 @@ describe('sign-out teardown ordering', () => {
     const { ctx, unmount } = await mountAndGetContext();
 
     await act(async () => {
-      await ctx.signIn(makeToken({ kiloUserId: 'user-1' }));
+      await ctx.signIn(tokenPair(makeToken({ kiloUserId: 'user-1' })));
     });
 
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenCalledWith('user-1');
@@ -596,7 +621,7 @@ describe('sign-out teardown ordering', () => {
     const { ctx, unmount } = await mountAndGetContext();
 
     await act(async () => {
-      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+      await ctx.signIn(tokenPair(makeToken({ kiloUserId: 'user-2' })));
     });
 
     // The switch unregisters the prior scope's activity tokens (tombstone on
@@ -614,7 +639,7 @@ describe('sign-out teardown ordering', () => {
     const imageConfirm = await import('@/components/agents/markdown-image-confirm');
 
     await act(async () => {
-      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+      await ctx.signIn(tokenPair(makeToken({ kiloUserId: 'user-2' })));
     });
 
     expect(trustedHosts.clearTrustedHosts).toHaveBeenCalled();
@@ -754,7 +779,8 @@ describe('stale sign-in continuation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.callOrder.length = 0;
-    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+    hoisted.secureStoreValues.clear();
+    useSecureStoreMap();
   });
 
   /** Mount the provider with a consumer that re-captures the context on
@@ -807,7 +833,7 @@ describe('stale sign-in continuation', () => {
     // Whole-body FIFO: the sign-in completes first (its credentials publish
     // and its login side effects run), then the sign-out runs the full
     // teardown of that new session.
-    const signInPromise = getCtx().signIn('stale-token');
+    const signInPromise = getCtx().signIn(tokenPair('stale-token'));
     const signOutPromise = getCtx().signOut(true);
 
     await act(async () => {
@@ -836,8 +862,8 @@ describe('stale sign-in continuation', () => {
     // FIFO serialization means the first sign-in is NOT fenced by the second:
     // both publish and run their login side effects in queue order, and the
     // newer sign-in owns the final token.
-    const firstSignIn = getCtx().signIn('first-token');
-    const secondSignIn = getCtx().signIn('second-token');
+    const firstSignIn = getCtx().signIn(tokenPair('first-token'));
+    const secondSignIn = getCtx().signIn(tokenPair('second-token'));
 
     await act(async () => {
       await Promise.all([firstSignIn, secondSignIn]);
@@ -881,7 +907,7 @@ describe('stale sign-in continuation', () => {
       await getCtx().signOut();
     });
     await act(async () => {
-      await getCtx().signIn('new-token');
+      await getCtx().signIn(tokenPair('new-token'));
     });
     expect(getCtx().isSigningOut).toBe(false);
     const { isSignOutActive } = await import('@/lib/auth/sign-out-state');
@@ -890,7 +916,7 @@ describe('stale sign-in continuation', () => {
     // FIFO: the sign-in runs its whole body (the fence opens), then the
     // sign-out queued behind it runs the full teardown and closes the fence
     // again — the final state is signed out.
-    const signInPromise = getCtx().signIn('stale-token');
+    const signInPromise = getCtx().signIn(tokenPair('stale-token'));
     const signOutPromise = getCtx().signOut(true);
     await act(async () => {
       await Promise.all([signInPromise, signOutPromise]);
@@ -914,7 +940,7 @@ describe('stale sign-in continuation', () => {
     expect(isSignOutTeardownActive()).toBe(true);
 
     await act(async () => {
-      await getCtx().signIn('new-token');
+      await getCtx().signIn(tokenPair('new-token'));
     });
     // The published sign-in ends the teardown window: refresh may rotate the
     // new session again.
@@ -928,13 +954,12 @@ describe('bootstrap and foreground race fencing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.callOrder.length = 0;
-    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+    hoisted.secureStoreValues.clear();
+    useSecureStoreMap();
   });
 
-  /** Reset the module registry and mount the provider so the bootstrap load
-   *  runs against the caller-installed SecureStore mock queue. The queue is
-   *  consumed in this order: preloadedToken, preloadedRefreshToken, the
-   *  bootstrap expiry read, then the bootstrap credential re-read. */
+  /** Reset the module registry and mount the provider against the caller's
+   *  key-addressed SecureStore fixture. */
   async function mountProvider(): Promise<{
     getCtx: () => AuthContextValue;
     unmount: () => void;
@@ -977,25 +1002,199 @@ describe('bootstrap and foreground race fencing', () => {
     };
   }
 
+  const modernCredentialBundle = {
+    token: 'api-owner-token',
+    refreshToken: 'refresh-token',
+    expiresIn: 3600,
+    metadata: {
+      credentialFormat: 'api-gateway-v1',
+      gatewayToken: 'gateway-request-token',
+      expiresAt: '2030-01-01T00:00:00.000Z',
+    },
+  } satisfies NativeTokenPair;
+
+  it('restores an API/gateway bundle ahead of stale legacy keys and does not restore it after sign-out', async () => {
+    hoisted.secureStoreValues.clear();
+    hoisted.secureStoreValues.set(
+      'native-credential-bundle',
+      JSON.stringify(modernCredentialBundle)
+    );
+    // A process killed after the modern bundle write but before the legacy
+    // deletes leaves these stale values behind. The bundle remains authoritative.
+    hoisted.secureStoreValues.set('auth-token', 'stale-legacy-api-token');
+    hoisted.secureStoreValues.set('refresh-token', 'stale-legacy-refresh-token');
+    hoisted.secureStoreValues.set('token-expires-at', '9999999999999');
+
+    const firstMount = await mountProvider();
+    const firstTokenOwner = await import('@/lib/auth/token-owner');
+    const { getGatewayAuthTokenForRequest } = await import('@/lib/auth/credentials');
+
+    expect(firstMount.getCtx().token).toBe(modernCredentialBundle.token);
+    await expect(firstTokenOwner.getAuthTokenForRequest()).resolves.toBe(
+      modernCredentialBundle.token
+    );
+    await expect(getGatewayAuthTokenForRequest()).resolves.toBe(
+      modernCredentialBundle.metadata.gatewayToken
+    );
+
+    await act(async () => {
+      await firstMount.getCtx().signOut();
+    });
+    firstMount.unmount();
+
+    // A relaunch gets a new module-level preload. The deleted bundle must not
+    // be recreated from stale legacy-key fixtures or from the prior owner.
+    const remount = await mountProvider();
+    const remountedTokenOwner = await import('@/lib/auth/token-owner');
+    expect(remount.getCtx().token).toBeUndefined();
+    await expect(remountedTokenOwner.getAuthTokenForRequest()).resolves.toBeNull();
+    expect(hoisted.secureStoreValues.has('native-credential-bundle')).toBe(false);
+
+    remount.unmount();
+  });
+
+  it('restores a modern bundle when the legacy refresh-key preload rejects', async () => {
+    hoisted.secureStoreValues.set(
+      'native-credential-bundle',
+      JSON.stringify(modernCredentialBundle)
+    );
+    hoisted.secureStore.getItemAsync.mockImplementation(async key => {
+      await Promise.resolve();
+      if (key === 'refresh-token') {
+        throw new Error('keychain unavailable');
+      }
+      return hoisted.secureStoreValues.get(key) ?? null;
+    });
+
+    const { getCtx, unmount } = await mountProvider();
+    const tokenOwner = await import('@/lib/auth/token-owner');
+
+    expect(getCtx().token).toBe(modernCredentialBundle.token);
+    expect(getCtx().restoreFailed).toBe(false);
+    await expect(tokenOwner.getAuthTokenForRequest('gateway')).resolves.toBe(
+      modernCredentialBundle.metadata.gatewayToken
+    );
+    expect(
+      hoisted.secureStore.getItemAsync.mock.calls.filter(([key]) => key === 'refresh-token')
+    ).toHaveLength(1);
+
+    unmount();
+  });
+
+  it.each([
+    ['invalid JSON', '{not-json'],
+    [
+      'an unknown credential format',
+      JSON.stringify({
+        ...modernCredentialBundle,
+        metadata: { ...modernCredentialBundle.metadata, credentialFormat: 'unknown-v1' },
+      }),
+    ],
+    [
+      'incomplete metadata',
+      JSON.stringify({
+        ...modernCredentialBundle,
+        metadata: { credentialFormat: 'api-gateway-v1', expiresAt: '2030-01-01T00:00:00.000Z' },
+      }),
+    ],
+  ])(
+    'fails closed for a versioned bundle with %s even when legacy keys remain',
+    async (_case, rawBundle) => {
+      hoisted.secureStoreValues.set('native-credential-bundle', rawBundle);
+      hoisted.secureStoreValues.set('auth-token', 'legacy-api-token');
+      hoisted.secureStoreValues.set('refresh-token', 'legacy-refresh-token');
+      const fetch = vi.spyOn(globalThis, 'fetch');
+
+      const { getCtx, unmount } = await mountProvider();
+      const tokenOwner = await import('@/lib/auth/token-owner');
+
+      expect(getCtx().token).toBeUndefined();
+      expect(tokenOwner.getActiveToken()).toBeNull();
+      await expect(tokenOwner.getAuthTokenForRequest()).resolves.toBeNull();
+      expect(tokenOwner.getActiveToken()).toBeNull();
+      expect(fetch).not.toHaveBeenCalled();
+
+      fetch.mockRestore();
+      unmount();
+    }
+  );
+
+  it('does not publish an old modern API credential when sign-out and an account switch win a delayed bundle read', async () => {
+    hoisted.secureStoreValues.clear();
+    const oldBundle = {
+      ...modernCredentialBundle,
+      token: 'old-api-token',
+      metadata: { ...modernCredentialBundle.metadata, gatewayToken: 'old-gateway-token' },
+    } satisfies NativeTokenPair;
+    const replacementBundle = {
+      ...modernCredentialBundle,
+      token: 'new-api-token',
+      metadata: { ...modernCredentialBundle.metadata, gatewayToken: 'new-gateway-token' },
+    } satisfies NativeTokenPair;
+    hoisted.secureStoreValues.set('native-credential-bundle', JSON.stringify(oldBundle));
+
+    const bundleRead = Promise.withResolvers<undefined>();
+    let delayedReadStarted = false;
+    hoisted.secureStore.getItemAsync.mockImplementation(async key => {
+      const snapshot = hoisted.secureStoreValues.get(key) ?? null;
+      if (key === 'native-credential-bundle' && !delayedReadStarted) {
+        delayedReadStarted = true;
+        await bundleRead.promise;
+      }
+      return snapshot;
+    });
+
+    const { getCtx, unmount } = await mountProvider();
+    await vi.waitFor(() => {
+      expect(delayedReadStarted).toBe(true);
+    });
+
+    // The delayed bootstrap owns the old bundle snapshot. Its completion comes
+    // after both teardown and a different account's modern credential publish.
+    await act(async () => {
+      await getCtx().signOut();
+      await getCtx().signIn(replacementBundle);
+    });
+    bundleRead.resolve(undefined);
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    const tokenOwner = await import('@/lib/auth/token-owner');
+    const { getGatewayAuthTokenForRequest } = await import('@/lib/auth/credentials');
+    expect(getCtx().token).toBe(replacementBundle.token);
+    await expect(tokenOwner.getAuthTokenForRequest()).resolves.toBe(replacementBundle.token);
+    await expect(getGatewayAuthTokenForRequest()).resolves.toBe(
+      replacementBundle.metadata.gatewayToken
+    );
+    expect(getCtx().token).not.toBe(oldBundle.token);
+
+    unmount();
+  });
+
   it('regression: sign-out during bootstrap does not restore the preloaded token into React state or the owner', async () => {
     let releaseRead: (() => void) | undefined = undefined;
     const readGate = new Promise<void>(resolve => {
       releaseRead = resolve;
     });
-    // Mock queue consumed by the bootstrap load: preloadedToken,
-    // preloadedRefreshToken, then the expiry read (held), then the
-    // credential re-read (unchanged, so only the epoch fence can stop it).
-    hoisted.secureStore.getItemAsync
-      .mockResolvedValueOnce('stored-token')
-      .mockResolvedValueOnce('stored-refresh')
-      .mockImplementationOnce(async () => {
-        // Bootstrap expiry read: hold open so a sign-out can land mid-read.
+    hoisted.secureStoreValues.set('auth-token', 'stored-token');
+    hoisted.secureStoreValues.set('refresh-token', 'stored-refresh');
+    let expiryReadStarted = false;
+    hoisted.secureStore.getItemAsync.mockImplementation(async key => {
+      if (key === 'token-expires-at') {
+        expiryReadStarted = true;
         await readGate;
         return '9999999999999';
-      })
-      .mockResolvedValueOnce('stored-token');
+      }
+      return hoisted.secureStoreValues.get(key) ?? null;
+    });
 
     const { getCtx, unmount } = await mountProvider();
+    await vi.waitFor(() => {
+      expect(expiryReadStarted).toBe(true);
+    });
 
     // Sign out while the bootstrap expiry read is in flight.
     await act(async () => {
@@ -1026,20 +1225,28 @@ describe('bootstrap and foreground race fencing', () => {
       releaseRead = resolve;
     });
     const storedToken = makeToken({ kiloUserId: 'user-1' });
-    // Mock queue consumed by the bootstrap load: preloadedToken,
-    // preloadedRefreshToken, then the expiry read (held), then the
-    // credential re-read (unchanged, so only a fence can stop the publish).
-    hoisted.secureStore.getItemAsync
-      .mockResolvedValueOnce(storedToken)
-      .mockResolvedValueOnce('stored-refresh')
-      .mockImplementationOnce(async () => {
+    hoisted.secureStore.getItemAsync.mockImplementation(async key => {
+      if (key === 'native-credential-bundle') {
+        return null;
+      }
+      if (key === 'auth-token') {
+        return storedToken;
+      }
+      if (key === 'refresh-token') {
+        return 'stored-refresh';
+      }
+      if (key === 'token-expires-at') {
         // Bootstrap expiry read: hold open so a sign-out can land mid-read.
         await readGate;
         return '9999999999999';
-      })
-      .mockResolvedValueOnce(storedToken);
+      }
+      return null;
+    });
 
     const { getCtx, unmount } = await mountProvider();
+    const tokenOwner = await import('@/lib/auth/token-owner');
+    const ownerBeforeSignOut = tokenOwner.getActiveToken();
+    expect(ownerBeforeSignOut).toEqual({ token: storedToken, expiresAtMs: null });
 
     // Hold the sign-out's remote cleanup open: the teardown is mid-flight and
     // its epoch bump (which waits for the cleanup) has not happened when the
@@ -1065,10 +1272,9 @@ describe('bootstrap and foreground race fencing', () => {
       });
     });
 
-    // The success path must not republish what sign-out is tearing down: no
-    // owner token, no React token, no deep-link binding for the old account.
-    const tokenOwner = await import('@/lib/auth/token-owner');
-    expect(tokenOwner.getActiveToken()).toBeNull();
+    // The success path must not republish what sign-out is tearing down. The
+    // preloaded owner remains available only for the in-flight logout cleanup.
+    expect(tokenOwner.getActiveToken()).toEqual(ownerBeforeSignOut);
     expect(getCtx().token).toBeUndefined();
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).not.toHaveBeenCalledWith('user-1');
 
@@ -1077,6 +1283,7 @@ describe('bootstrap and foreground race fencing', () => {
     await act(async () => {
       await signOutPromise;
     });
+    expect(tokenOwner.getActiveToken()).toBeNull();
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().sessionEnded).toBe(true);
 
@@ -1090,15 +1297,19 @@ describe('bootstrap and foreground race fencing', () => {
     });
     const storedToken = makeToken({ kiloUserId: 'user-1' });
     // No stored refresh token: bootstrap takes the legacy-exchange branch.
-    // Mock queue consumed by the bootstrap load: preloadedToken,
-    // preloadedRefreshToken (null), then — after the fenced exchange publish
-    // is refused and the main restore path continues — the expiry read and
-    // the credential re-read.
-    hoisted.secureStore.getItemAsync
-      .mockResolvedValueOnce(storedToken)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce('9999999999999')
-      .mockResolvedValueOnce(storedToken);
+    hoisted.secureStore.getItemAsync.mockImplementation(async key => {
+      await Promise.resolve();
+      if (key === 'native-credential-bundle') {
+        return null;
+      }
+      if (key === 'auth-token') {
+        return storedToken;
+      }
+      if (key === 'token-expires-at') {
+        return '9999999999999';
+      }
+      return null;
+    });
     hoisted.exchange.exchangeLegacyToken.mockImplementationOnce(async () => {
       await exchangeGate;
       return { token: 'exchanged-token', refreshToken: 'exchanged-refresh', expiresIn: 3600 };
@@ -1152,21 +1363,22 @@ describe('bootstrap and foreground race fencing', () => {
     const readGate = new Promise<void>(resolve => {
       releaseRead = resolve;
     });
-    // Mock queue consumed by the bootstrap load: preloadedToken,
-    // preloadedRefreshToken, then the expiry read (held). The credential
-    // re-read falls back to the null base mock, so it reports the preloaded
-    // snapshot no longer matches the stored session.
-    hoisted.secureStore.getItemAsync
-      .mockResolvedValueOnce('stored-token')
-      .mockResolvedValueOnce('stored-refresh')
-      .mockImplementationOnce(async () => {
-        // Bootstrap expiry read: hold open while a same-session credential
-        // write replaces the stored pair.
+    hoisted.secureStoreValues.set('auth-token', 'stored-token');
+    hoisted.secureStoreValues.set('refresh-token', 'stored-refresh');
+    let expiryReadStarted = false;
+    hoisted.secureStore.getItemAsync.mockImplementation(async key => {
+      if (key === 'token-expires-at') {
+        expiryReadStarted = true;
         await readGate;
         return '9999999999999';
-      });
+      }
+      return hoisted.secureStoreValues.get(key) ?? null;
+    });
 
     const { getCtx, unmount } = await mountProvider();
+    await vi.waitFor(() => {
+      expect(expiryReadStarted).toBe(true);
+    });
 
     // A same-session refresh replaces the stored pair and publishes the owner
     // while the bootstrap expiry read is in flight.
@@ -1198,24 +1410,72 @@ describe('bootstrap and foreground race fencing', () => {
     unmount();
   });
 
+  it('forwards modern bundle metadata through sign-in credential persistence', async () => {
+    const { getCtx, unmount } = await mountProvider();
+    const credentials = await import('@/lib/auth/credentials');
+    const setCredentials = vi.spyOn(credentials, 'setCredentials');
+    const bundle = {
+      credentialFormat: 'api-gateway-v1' as const,
+      gatewayToken: 'gateway-token',
+      expiresAt: '2026-01-01T01:00:00.000Z',
+    };
+
+    await act(async () => {
+      await getCtx().signIn({
+        token: 'api-token',
+        refreshToken: 'refresh-token',
+        expiresIn: 3600,
+        metadata: bundle,
+      });
+    });
+
+    expect(setCredentials).toHaveBeenCalledWith({
+      token: 'api-token',
+      refreshToken: 'refresh-token',
+      expiresIn: 3600,
+      metadata: bundle,
+    });
+    unmount();
+  });
+
+  it('returns false without publishing React auth state when credential persistence is fenced', async () => {
+    const { getCtx, unmount } = await mountProvider();
+    const credentials = await import('@/lib/auth/credentials');
+    const setCredentials = vi.spyOn(credentials, 'setCredentials').mockResolvedValueOnce(false);
+
+    let persisted = true;
+    await act(async () => {
+      persisted = await getCtx().signIn(tokenPair('unpublished-token'));
+    });
+
+    expect(persisted).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+    expect(hoisted.appsflyer.trackEvent).not.toHaveBeenCalled();
+    setCredentials.mockRestore();
+    unmount();
+  });
+
   it('regression: sign-out during bootstrap wins over changed stored credentials', async () => {
     let releaseRead: (() => void) | undefined = undefined;
     const readGate = new Promise<void>(resolve => {
       releaseRead = resolve;
     });
-    // Mock queue consumed by the bootstrap load: preloadedToken,
-    // preloadedRefreshToken, then the expiry read (held). The credential
-    // re-read falls back to the null base mock, so the stored pair no longer
-    // matches the preloaded snapshot — the sign-out deleted it.
-    hoisted.secureStore.getItemAsync
-      .mockResolvedValueOnce('stored-token')
-      .mockResolvedValueOnce('stored-refresh')
-      .mockImplementationOnce(async () => {
+    hoisted.secureStoreValues.set('auth-token', 'stored-token');
+    hoisted.secureStoreValues.set('refresh-token', 'stored-refresh');
+    let expiryReadStarted = false;
+    hoisted.secureStore.getItemAsync.mockImplementation(async key => {
+      if (key === 'token-expires-at') {
+        expiryReadStarted = true;
         await readGate;
         return '9999999999999';
-      });
+      }
+      return hoisted.secureStoreValues.get(key) ?? null;
+    });
 
     const { getCtx, unmount } = await mountProvider();
+    await vi.waitFor(() => {
+      expect(expiryReadStarted).toBe(true);
+    });
 
     // Sign out while the bootstrap expiry read is in flight.
     await act(async () => {
@@ -1242,14 +1502,9 @@ describe('bootstrap and foreground race fencing', () => {
 
   it('binds the deep-link user id from the restored session during bootstrap', async () => {
     const storedToken = makeToken({ kiloUserId: 'user-1' });
-    // Mock queue consumed by the bootstrap load: preloadedToken,
-    // preloadedRefreshToken, the bootstrap expiry read, then the bootstrap
-    // credential re-read (unchanged, so the main restore publishes the token).
-    hoisted.secureStore.getItemAsync
-      .mockResolvedValueOnce(storedToken)
-      .mockResolvedValueOnce('stored-refresh')
-      .mockResolvedValueOnce('9999999999999')
-      .mockResolvedValueOnce(storedToken);
+    hoisted.secureStoreValues.set('auth-token', storedToken);
+    hoisted.secureStoreValues.set('refresh-token', 'stored-refresh');
+    hoisted.secureStoreValues.set('token-expires-at', '9999999999999');
 
     const { getCtx, unmount } = await mountProvider();
 
@@ -1262,12 +1517,87 @@ describe('bootstrap and foreground race fencing', () => {
     unmount();
   });
 
+  it('refreshes a near-expiry modern bundle when the app enters the foreground', async () => {
+    const { getCtx, unmount } = await mountProvider();
+    const initial = {
+      ...modernCredentialBundle,
+      metadata: {
+        ...modernCredentialBundle.metadata,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    } satisfies NativeTokenPair;
+    const refreshed = {
+      ...initial,
+      token: 'refreshed-api-token',
+      refreshToken: 'refreshed-refresh-token',
+      metadata: {
+        ...initial.metadata,
+        gatewayToken: 'refreshed-gateway-token',
+        expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+      },
+    } satisfies NativeTokenPair;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(refreshed));
+
+    await act(async () => {
+      await getCtx().signIn(initial);
+    });
+
+    expect(hoisted.secureStoreValues.has('token-expires-at')).toBe(false);
+    const eventListener = hoisted.appState.addEventListener.mock.calls.at(-1)?.[1];
+
+    await act(async () => {
+      eventListener?.('active');
+      await vi.waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    expect(getCtx().token).toBe(refreshed.token);
+    const tokenOwner = await import('@/lib/auth/token-owner');
+    expect(tokenOwner.getActiveToken()?.token).toBe(refreshed.token);
+
+    fetchSpy.mockRestore();
+    unmount();
+  });
+
+  it('refreshes a near-expiry legacy credential pair from the persisted expiry fallback', async () => {
+    const { getCtx, unmount } = await mountProvider();
+    const initial = {
+      token: 'legacy-api-token',
+      refreshToken: 'legacy-refresh-token',
+      expiresIn: 60,
+    } satisfies NativeTokenPair;
+    const refreshed = {
+      token: 'refreshed-api-token',
+      refreshToken: 'refreshed-refresh-token',
+      expiresIn: 3600,
+    } satisfies NativeTokenPair;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(refreshed));
+
+    await act(async () => {
+      await getCtx().signIn(initial);
+    });
+
+    expect(hoisted.secureStoreValues.has('token-expires-at')).toBe(true);
+    const eventListener = hoisted.appState.addEventListener.mock.calls.at(-1)?.[1];
+    await act(async () => {
+      eventListener?.('active');
+      await vi.waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    expect(getCtx().token).toBe(refreshed.token);
+    fetchSpy.mockRestore();
+    unmount();
+  });
+
   it('regression: a foreground event from a stale epoch does not refresh or publish a token after sign-out', async () => {
     const { getCtx, unmount } = await mountProvider();
 
     // Sign in so the foreground effect re-subscribes with a token in scope.
     await act(async () => {
-      await getCtx().signIn('active-token');
+      await getCtx().signIn(tokenPair('active-token'));
     });
 
     // Grab the listener registered by the token-bearing foreground effect.
@@ -1279,7 +1609,9 @@ describe('bootstrap and foreground race fencing', () => {
     const readGate = new Promise<void>(resolve => {
       releaseRead = resolve;
     });
+    let expiryReadStarted = false;
     hoisted.secureStore.getItemAsync.mockImplementationOnce(async () => {
+      expiryReadStarted = true;
       await readGate;
       // An expiry inside the refresh margin: without the epoch fence the
       // handler would proceed to refresh.
@@ -1291,6 +1623,9 @@ describe('bootstrap and foreground race fencing', () => {
     await act(async () => {
       eventListener?.('active');
       await Promise.resolve();
+    });
+    await vi.waitFor(() => {
+      expect(expiryReadStarted).toBe(true);
     });
 
     // Sign out while the foreground event's expiry read is in flight.
@@ -1320,7 +1655,8 @@ describe('reactive auth epoch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.callOrder.length = 0;
-    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+    hoisted.secureStoreValues.clear();
+    useSecureStoreMap();
   });
 
   /** Mount the provider with a consumer that re-captures the context on every
@@ -1384,7 +1720,7 @@ describe('reactive auth epoch', () => {
     const scope: typeof ContextScopeModule = await import('../context-scope');
     const tokens: typeof TokenOwnerModule = await import('./token-owner');
     await act(async () => {
-      await getCtx().signIn('account-a-token');
+      await getCtx().signIn(tokenPair('account-a-token'));
     });
     await act(async () => {
       await requestOwnerTicket();
@@ -1392,7 +1728,7 @@ describe('reactive auth epoch', () => {
     const previous = scope.getAuthenticatedOwner();
     expect(previous.userId).toBe('user-a');
     // The old credentials remain readable on disk while the replacement write is held.
-    hoisted.secureStore.getItemAsync.mockResolvedValue('account-a-token');
+    hoisted.secureStoreValues.set('auth-token', 'account-a-token');
 
     const published: { userId: string | null; token: string | null }[] = [];
     const unsubscribe = scope.subscribeAuthenticatedOwner(() => {
@@ -1411,7 +1747,7 @@ describe('reactive auth epoch', () => {
     });
     const transition: { promise?: Promise<void> } = {};
     await act(async () => {
-      transition.promise = getCtx().signIn('account-b-token');
+      transition.promise = getCtx().signIn(tokenPair('account-b-token'));
       await Promise.resolve();
     });
 
@@ -1446,11 +1782,9 @@ describe('reactive auth epoch', () => {
 
   it('confirms a restored account from getMe rather than the decoded token hint', async () => {
     const token = makeToken({ kiloUserId: 'unconfirmed-hint' });
-    hoisted.secureStore.getItemAsync
-      .mockResolvedValueOnce(token)
-      .mockResolvedValueOnce('stored-refresh')
-      .mockResolvedValueOnce('9999999999999')
-      .mockResolvedValueOnce(token);
+    hoisted.secureStoreValues.set('auth-token', token);
+    hoisted.secureStoreValues.set('refresh-token', 'stored-refresh');
+    hoisted.secureStoreValues.set('token-expires-at', '9999999999999');
     const { unmount } = await mountEpochTest(true);
     onTestFinished(() => act(unmount));
     const scope: typeof ContextScopeModule = await import('../context-scope');
@@ -1468,7 +1802,7 @@ describe('reactive auth epoch', () => {
     const { getCtx, unmount } = await mountEpochTest(true);
     onTestFinished(() => act(unmount));
     await act(async () => {
-      await getCtx().signIn('account-a-token');
+      await getCtx().signIn(tokenPair('account-a-token'));
     });
     const identity = Promise.withResolvers<{ id: string }>();
     ownerProducer.getMe.mockReturnValueOnce(identity.promise);
@@ -1476,7 +1810,7 @@ describe('reactive auth epoch', () => {
     const rejection = expect(stale).rejects.toThrow('Authenticated owner changed');
 
     await act(async () => {
-      await getCtx().signIn('account-b-token');
+      await getCtx().signIn(tokenPair('account-b-token'));
     });
     ownerProducer.getMe.mockResolvedValueOnce({ id: 'user-b' });
     await act(async () => {
@@ -1494,7 +1828,7 @@ describe('reactive auth epoch', () => {
     const { getCtx, unmount } = await mountEpochTest(true);
     onTestFinished(() => act(unmount));
     await act(async () => {
-      await getCtx().signIn('account-a-token');
+      await getCtx().signIn(tokenPair('account-a-token'));
     });
     await act(async () => {
       await requestOwnerTicket();
@@ -1529,7 +1863,7 @@ describe('reactive auth epoch', () => {
     const { getCtx, unmount } = await mountEpochTest(true);
     onTestFinished(() => act(unmount));
     await act(async () => {
-      await getCtx().signIn('account-a-token');
+      await getCtx().signIn(tokenPair('account-a-token'));
     });
     await act(async () => {
       await requestOwnerTicket();
@@ -1538,12 +1872,19 @@ describe('reactive auth epoch', () => {
     const owner = scope.getAuthenticatedOwner();
     const { performRefresh } = await import('@/lib/auth/credentials');
     const tokens: typeof TokenOwnerModule = await import('./token-owner');
-    hoisted.secureStore.getItemAsync.mockResolvedValueOnce('refresh-a');
-    const fetch = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(
-        Response.json({ token: 'refreshed-token', refreshToken: 'refreshed-pair', expiresIn: 3600 })
-      );
+    hoisted.secureStoreValues.set('refresh-token', 'refresh-a');
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      Response.json({
+        token: 'refreshed-token',
+        refreshToken: 'refreshed-pair',
+        expiresIn: 3600,
+        metadata: {
+          credentialFormat: 'api-gateway-v1',
+          gatewayToken: 'refreshed-gateway-token',
+          expiresAt: '2026-01-01T01:00:00.000Z',
+        },
+      })
+    );
     onTestFinished(() => {
       fetch.mockRestore();
     });
@@ -1571,7 +1912,7 @@ describe('reactive auth epoch', () => {
     const before = getCtx().authEpoch;
 
     await act(async () => {
-      await getCtx().signIn('new-token');
+      await getCtx().signIn(tokenPair('new-token'));
     });
 
     expect(getCtx().authEpoch).toBeGreaterThan(before);
@@ -1600,7 +1941,8 @@ describe('auth-transition queue and sign-out failure matrix', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.callOrder.length = 0;
-    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+    hoisted.secureStoreValues.clear();
+    useSecureStoreMap();
   });
 
   async function mountQueueTest(): Promise<{
@@ -1663,7 +2005,7 @@ describe('auth-transition queue and sign-out failure matrix', () => {
 
     // The sign-in is queued behind the sign-out: while the cleanup is held it
     // must not run its credential write or any login side effect.
-    const signInPromise = getCtx().signIn('queued-token');
+    const signInPromise = getCtx().signIn(tokenPair('queued-token'));
     await act(async () => {
       await new Promise<void>(resolve => {
         void setTimeout(resolve, 0);

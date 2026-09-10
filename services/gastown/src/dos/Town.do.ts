@@ -39,6 +39,8 @@ import {
 import * as scm from './town/town-scm';
 import * as reconciler from './town/reconciler';
 import * as wasteland from './town/wasteland';
+import * as unattendedTokenRenewal from './town/unattended-token-renewal';
+import * as runtimeAuthorization from './town/runtime-authorization';
 import { pickCanonicalBead, type ReporterBead } from './town/wasteland-reporter';
 import { applyAction } from './town/actions';
 import type { Action, ApplyActionContext } from './town/actions';
@@ -67,10 +69,6 @@ import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerDoId, getTownContainerStub } from './TownContainer.do';
 
-import { kiloTokenPayload } from '@kilocode/worker-utils';
-import { jwtVerify } from 'jose';
-import { generateKiloApiToken } from '../util/kilo-token.util';
-import { resolveSecret } from '../util/secret.util';
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
 import { logger, withLogTags } from '../util/log.util';
 import {
@@ -110,6 +108,7 @@ import type {
 } from '../types';
 
 const TOWN_LOG = '[Town.do]';
+type TownIdentity = runtimeAuthorization.TownIdentity;
 
 /** Format a bead_events row into a human-readable message for the status feed. */
 function formatEventMessage(row: Record<string, unknown>): string {
@@ -271,6 +270,18 @@ export class TownDO extends DurableObject<Env> {
       delivery: 'internal',
       userId: this._ownerUserId,
     });
+  }
+
+  private get runtimeAuthorizationCtx(): Parameters<
+    typeof runtimeAuthorization.createRuntimeAuthorization
+  >[0] {
+    return {
+      storage: this.ctx.storage,
+      env: this.env,
+      townId: this.townId,
+      hasActiveWork: () => this.hasActiveWork(),
+      updateTownConfig: update => this.updateTownConfig(update),
+    };
   }
 
   /** Build the context object used by the scheduling sub-module. */
@@ -956,6 +967,63 @@ export class TownDO extends DurableObject<Env> {
     return result;
   }
 
+  async initializePrivateTownIdentity(identity: TownIdentity): Promise<void> {
+    await runtimeAuthorization.initializePrivateTownIdentity(this.ctx.storage, identity);
+  }
+
+  async initializeTownIdentityAndRuntimeAuthorization(
+    identity: TownIdentity,
+    controlToken: string
+  ): Promise<{ runtimeToken?: string; modernControl: boolean }> {
+    return runtimeAuthorization.initializeTownIdentityAndRuntimeAuthorization(
+      this.runtimeAuthorizationCtx,
+      identity,
+      controlToken
+    );
+  }
+
+  async getPrivateTownIdentity(): Promise<TownIdentity | null> {
+    return runtimeAuthorization.getPrivateTownIdentity(this.ctx.storage, this.townId);
+  }
+
+  async getTownIdentityState(): Promise<runtimeAuthorization.TownIdentityState> {
+    return runtimeAuthorization.getTownIdentityState(this.ctx.storage, this.townId);
+  }
+
+  async createRuntimeAuthorization(
+    controlToken: string,
+    userId: string,
+    organizationId?: string
+  ): Promise<string | undefined> {
+    const token = await runtimeAuthorization.createRuntimeAuthorization(
+      this.runtimeAuthorizationCtx,
+      controlToken,
+      userId,
+      organizationId
+    );
+    if (token) this._ownerUserId = (await this.getTownConfig()).owner_user_id;
+    return token;
+  }
+
+  async reauthorizeRuntime(
+    controlToken: string,
+    userId: string,
+    organizationId?: string
+  ): Promise<boolean> {
+    const authorized = await runtimeAuthorization.reauthorizeRuntime(
+      this.runtimeAuthorizationCtx,
+      controlToken,
+      userId,
+      organizationId
+    );
+    if (authorized) this._ownerUserId = (await this.getTownConfig()).owner_user_id;
+    return authorized;
+  }
+
+  private async renewRuntimeAuthorization(): Promise<string | undefined> {
+    return runtimeAuthorization.renewRuntimeAuthorization(this.runtimeAuthorizationCtx);
+  }
+
   async getBillingStatus(): Promise<GastownBillingStatus> {
     try {
       if (isContainerUsageMeteringEnabled(this.env)) await this.prepareContainerBilling();
@@ -1118,6 +1186,25 @@ export class TownDO extends DurableObject<Env> {
     const userId = townConfig.owner_user_id ?? townId;
     await dispatch.forceRefreshContainerToken(this.env, townId, userId);
     await this.ctx.storage.put('container:lastTokenRefreshAt', Date.now());
+  }
+
+  async refreshRuntimeAuthorizationForManualRefresh(): Promise<
+    'legacy' | 'renewed' | 'revoked' | 'unavailable'
+  > {
+    if (!(await runtimeAuthorization.requiresRuntimeAuthorization(this.ctx.storage, this.townId)))
+      return 'legacy';
+    const token = await this.renewRuntimeAuthorization();
+    if (token) {
+      await this.syncConfigToContainer();
+      return 'renewed';
+    }
+    return (await runtimeAuthorization.getRuntimeAuthorizationState(this.ctx.storage)) === 'revoked'
+      ? 'revoked'
+      : 'unavailable';
+  }
+
+  async requiresRuntimeAuthorization(): Promise<boolean> {
+    return runtimeAuthorization.requiresRuntimeAuthorization(this.ctx.storage, this.townId);
   }
 
   /**
@@ -1319,9 +1406,24 @@ export class TownDO extends DurableObject<Env> {
   private async _configureRig(rigConfig: RigConfig): Promise<void> {
     logger.setTags({ rigId: rigConfig.rigId, userId: rigConfig.userId });
     logger.info('configureRig: start', { hasKilocodeToken: !!rigConfig.kilocodeToken });
-    await this.ctx.storage.put(`rig:${rigConfig.rigId}:config`, rigConfig);
+    const requiresRuntimeAuthorization = await runtimeAuthorization.requiresRuntimeAuthorization(
+      this.ctx.storage,
+      this.townId
+    );
+    // A town which has ever adopted runtime authorization must not be
+    // downgraded by a caller carrying an old KILOCODE_TOKEN.
+    const storedRigConfig = requiresRuntimeAuthorization
+      ? { ...rigConfig, kilocodeToken: undefined }
+      : rigConfig;
+    const token = requiresRuntimeAuthorization
+      ? await this.renewRuntimeAuthorization()
+      : (rigConfig.kilocodeToken ?? (await this.resolveKilocodeToken()));
+    if (requiresRuntimeAuthorization && !token) {
+      throw new Error('Town runtime authorization is unavailable');
+    }
+    await this.ctx.storage.put(`rig:${rigConfig.rigId}:config`, storedRigConfig);
 
-    if (rigConfig.kilocodeToken) {
+    if (!requiresRuntimeAuthorization && rigConfig.kilocodeToken) {
       const townConfig = await this.getTownConfig();
       if (!townConfig.kilocode_token || townConfig.kilocode_token !== rigConfig.kilocodeToken) {
         logger.info('configureRig: propagating kilocodeToken to town config');
@@ -1331,7 +1433,6 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
-    const token = rigConfig.kilocodeToken ?? (await this.resolveKilocodeToken());
     if (token) {
       try {
         const container = getTownContainerStub(this.env, this.townId);
@@ -1356,7 +1457,7 @@ export class TownDO extends DurableObject<Env> {
     // Proactively clone the rig's repo and create a browse worktree so
     // the mayor has immediate access to the codebase without waiting for
     // the first agent dispatch.
-    this.setupRigRepoInContainer(rigConfig).catch(err =>
+    this.setupRigRepoInContainer({ ...storedRigConfig, kilocodeToken: token }).catch(err =>
       logger.warn('configureRig: background repo setup failed', {
         error: err instanceof Error ? err.message : String(err),
       })
@@ -3416,6 +3517,14 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private async resolveKilocodeToken(): Promise<string | undefined> {
+    const runtimeToken = await this.renewRuntimeAuthorization();
+    if (runtimeToken) return runtimeToken;
+    if (
+      (await runtimeAuthorization.getTownIdentityState(this.ctx.storage, this.townId)).type !==
+      'legacy'
+    ) {
+      return undefined;
+    }
     const townConfig = await this.getTownConfig();
     if (townConfig.kilocode_token) return townConfig.kilocode_token;
 
@@ -4843,70 +4952,26 @@ export class TownDO extends DurableObject<Env> {
   private lastKilocodeTokenCheckAt = 0;
   private async refreshKilocodeTokenIfExpiring(): Promise<void> {
     const CHECK_INTERVAL_MS = 24 * 60 * 60_000; // once per day
-    const REFRESH_WINDOW_SECONDS = 7 * 24 * 60 * 60; // 7 days
     const now = Date.now();
     if (now - this.lastKilocodeTokenCheckAt < CHECK_INTERVAL_MS) return;
     this.lastKilocodeTokenCheckAt = now;
-
-    const townConfig = await this.getTownConfig();
-    const token = townConfig.kilocode_token;
-    if (!token) return;
-
-    if (!this.env.NEXTAUTH_SECRET) {
-      logger.warn('refreshKilocodeTokenIfExpiring: NEXTAUTH_SECRET not configured');
-      return;
-    }
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) {
-      logger.warn('refreshKilocodeTokenIfExpiring: failed to resolve NEXTAUTH_SECRET');
-      return;
-    }
-
-    // Verify the existing token's signature before trusting its claims.
-    // This prevents a forged token from being re-signed with real credentials.
-    // Use a very large clockTolerance so that already-expired (but validly
-    // signed) tokens are still accepted — this alarm is the recovery path
-    // for expired tokens, so rejecting them on exp would leave the town
-    // permanently stuck if it missed the 7-day refresh window.
-    let payload: { kiloUserId: string; apiTokenPepper?: string | null; exp?: number };
     try {
-      const TEN_YEARS_SECONDS = 10 * 365 * 24 * 60 * 60;
-      const { payload: raw } = await jwtVerify(token, new TextEncoder().encode(secret), {
-        algorithms: ['HS256'],
-        clockTolerance: TEN_YEARS_SECONDS,
-      });
-      const parsed = kiloTokenPayload.safeParse(raw);
-      if (!parsed.success) {
-        logger.warn('refreshKilocodeTokenIfExpiring: token payload failed schema validation');
-        return;
+      if (
+        await unattendedTokenRenewal.renewUnattendedLegacyTownToken(
+          this.ctx.storage,
+          this.env,
+          this.townId
+        )
+      ) {
+        this._ownerUserId = (await this.getTownConfig()).owner_user_id;
+        await this.syncConfigToContainer();
+        logger.info('refreshKilocodeTokenIfExpiring: reminted KILOCODE_TOKEN proactively');
       }
-      payload = parsed.data;
     } catch {
-      // Signature invalid or token malformed — don't remint from untrusted claims.
-      logger.warn('refreshKilocodeTokenIfExpiring: existing token failed signature verification');
-      return;
+      // Retry on the next alarm after a transient registry/database failure.
+      this.lastKilocodeTokenCheckAt = 0;
+      logger.warn('refreshKilocodeTokenIfExpiring: renewal unavailable');
     }
-
-    const exp = payload.exp;
-    if (!exp) return;
-
-    const nowSeconds = Math.floor(now / 1000);
-    if (exp - nowSeconds > REFRESH_WINDOW_SECONDS) return;
-
-    // Token expires within 7 days — remint it
-    const userId = payload.kiloUserId;
-    if (!userId) return;
-
-    const newToken = await generateKiloApiToken(
-      { id: userId, api_token_pepper: payload.apiTokenPepper ?? null },
-      secret
-    );
-    await this.updateTownConfig({ kilocode_token: newToken });
-    await this.syncConfigToContainer();
-    logger.info('refreshKilocodeTokenIfExpiring: reminted KILOCODE_TOKEN proactively', {
-      userId,
-      oldExp: new Date(exp * 1000).toISOString(),
-    });
   }
 
   private hasActiveWork(): boolean {

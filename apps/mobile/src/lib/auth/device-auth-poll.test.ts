@@ -89,4 +89,46 @@ describe('startDeviceAuthPoll', () => {
     expect(cleanup).toHaveBeenCalled();
     expect(setState).toHaveBeenCalled();
   });
+
+  it('propagates modern credential metadata with an approved result', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json(
+        {
+          status: 'approved',
+          token: 'api-token',
+          refreshToken: 'refresh-token',
+          expiresIn: 3600,
+          metadata: {
+            credentialFormat: 'api-gateway-v1',
+            gatewayToken: 'gateway-token',
+            expiresAt: '2026-01-01T01:00:00.000Z',
+          },
+        },
+        { status: 200 }
+      )
+    );
+    const { setState } = makePoll();
+
+    await vi.advanceTimersByTimeAsync(3000);
+
+    const updater = setState.mock.calls[0]?.[0];
+    expect(
+      updater?.({
+        status: 'pending',
+        code: 'UC',
+        credentials: undefined,
+        error: undefined,
+        verificationUrl: 'https://example.test',
+      }).credentials
+    ).toEqual({
+      token: 'api-token',
+      refreshToken: 'refresh-token',
+      expiresIn: 3600,
+      metadata: {
+        credentialFormat: 'api-gateway-v1',
+        gatewayToken: 'gateway-token',
+        expiresAt: '2026-01-01T01:00:00.000Z',
+      },
+    });
+  });
 });

@@ -567,7 +567,13 @@ export async function getAnalysisActorById(
       is_admin: kilocode_users.is_admin,
     })
     .from(kilocode_users)
-    .where(and(eq(kilocode_users.id, userId), isNull(kilocode_users.blocked_reason)))
+    .where(
+      and(
+        eq(kilocode_users.id, userId),
+        isNull(kilocode_users.blocked_at),
+        isNull(kilocode_users.blocked_reason)
+      )
+    )
     .limit(1);
   return rows[0] ?? null;
 }
@@ -585,7 +591,13 @@ export async function resolveAutoAnalysisActor(
         api_token_pepper: kilocode_users.api_token_pepper,
       })
       .from(kilocode_users)
-      .where(and(eq(kilocode_users.id, owner.id), isNull(kilocode_users.blocked_reason)))
+      .where(
+        and(
+          eq(kilocode_users.id, owner.id),
+          isNull(kilocode_users.blocked_at),
+          isNull(kilocode_users.blocked_reason)
+        )
+      )
       .limit(1);
 
     const user = rows[0];
@@ -604,6 +616,7 @@ export async function resolveAutoAnalysisActor(
       and(
         eq(organization_memberships.organization_id, owner.id),
         eq(organization_memberships.role, 'owner'),
+        isNull(kilocode_users.blocked_at),
         isNull(kilocode_users.blocked_reason)
       )
     )
@@ -627,6 +640,7 @@ export async function resolveAutoAnalysisActor(
       and(
         eq(organization_memberships.organization_id, owner.id),
         eq(organization_memberships.role, 'member'),
+        isNull(kilocode_users.blocked_at),
         isNull(kilocode_users.blocked_reason)
       )
     )

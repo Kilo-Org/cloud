@@ -11,6 +11,13 @@ import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { type MarkdownPalette } from './markdown-palette';
 import { type MarkdownRenderer } from './markdown-renderer';
 
+// The first createRenderer() pays the full react-native-marked import, and the
+// empty-fence suite re-imports that graph after vi.resetModules(). On a loaded
+// machine (the full gate saturates every core) either import can stretch past
+// the 5 s vitest default and fail a healthy test. The file-wide timeout leaves
+// that headroom; a genuinely hung import still fails, only later.
+vi.setConfig({ testTimeout: 30_000 });
+
 // react-native-marked is externalized by vitest, so vi.mock('react-native') does
 // not intercept its nested requires. Patch Module._load before loading the
 // library so the real Renderer (and github-slugger) can construct under node.

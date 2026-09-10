@@ -1,8 +1,4 @@
 import type { FeatureValue } from '@/lib/feature-detection';
-import {
-  gemma_4_26b_a4b_it_free_model,
-  GEMMA_4_26B_A4B_IT_ID,
-} from '@/lib/ai-gateway/providers/google';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
@@ -15,6 +11,7 @@ import type {
 } from '@/lib/organizations/organization-types';
 import { isVirtualAutoModelId, type AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import {
+  AUTO_SMALL_TARGET_MODELS,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_SMALL_MODEL,
   KILO_AUTO_BALANCED_MODEL,
@@ -314,8 +311,8 @@ export async function resolveAutoModel(
       resolved: {
         model:
           (await balancePromise) > 0
-            ? GEMMA_4_26B_A4B_IT_ID
-            : gemma_4_26b_a4b_it_free_model.public_id,
+            ? AUTO_SMALL_TARGET_MODELS.paid
+            : AUTO_SMALL_TARGET_MODELS.free,
       },
     };
   }

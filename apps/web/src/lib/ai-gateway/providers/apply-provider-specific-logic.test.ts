@@ -4,6 +4,7 @@ import {
   applyAnthropicThinkingDefault,
   applyGatewayModelsFallback,
   applyPreferredProvider,
+  applyProviderSpecificLogic,
   applyReasoningDetailsTransform,
   removeUnsupportedRequestServiceTier,
 } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
@@ -19,6 +20,7 @@ import {
   gpt_5_6_sol_discounted_model,
   gpt_6_astra_flex_model,
 } from '@/lib/ai-gateway/providers/openai-exclusive';
+import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 
 function makeRequest(model: string, models?: string[]): GatewayRequest {
   return {
@@ -28,6 +30,19 @@ function makeRequest(model: string, models?: string[]): GatewayRequest {
       models,
       messages: [{ role: 'user', content: 'hello' }],
     },
+  };
+}
+
+function makeProvider(responseTransforms: Provider['responseTransforms']): Provider {
+  return {
+    id: 'perplexity',
+    apiUrl: 'https://example.com/v1',
+    apiUrlOverrides: {},
+    apiKey: 'test-key',
+    apiKeyHeader: null,
+    supportedChatApis: ['chat_completions'],
+    responseTransforms,
+    async transformRequest() {},
   };
 }
 
@@ -140,20 +155,44 @@ describe('removeUnsupportedRequestServiceTier', () => {
   });
 });
 
-describe('applyReasoningDetailsTransform', () => {
-  function makeProvider(responseTransforms: Provider['responseTransforms']): Provider {
-    return {
-      id: 'perplexity',
-      apiUrl: 'https://example.com/v1',
-      apiUrlOverrides: {},
-      apiKey: 'test-key',
-      apiKeyHeader: null,
-      supportedChatApis: ['chat_completions'],
-      responseTransforms,
-      async transformRequest() {},
-    };
+describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
+  async function applyToToolResult(model: string, content: string) {
+    const request = makeRequest(model);
+    request.body.messages = [{ role: 'tool', tool_call_id: 'call-1', content }];
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null
+    );
+
+    return request.body.messages[0].content;
   }
 
+  it('sanitizes JSON ref fields for Gemini models', async () => {
+    const content = await applyToToolResult(
+      'google/gemini-3.1-pro-preview:free',
+      '{"$ref":"#/$defs/result"}'
+    );
+
+    expect(content).toBe('{"_ref":"#/$defs/result"}');
+  });
+
+  it('preserves JSON ref fields for non-Gemini models', async () => {
+    const content = await applyToToolResult('vendor/model:free', '{"$ref":"#/$defs/result"}');
+
+    expect(content).toBe('{"$ref":"#/$defs/result"}');
+  });
+});
+
+describe('applyReasoningDetailsTransform', () => {
   function makeReasoningRequest(): Extract<GatewayRequest, { kind: 'chat_completions' }> {
     return {
       kind: 'chat_completions',

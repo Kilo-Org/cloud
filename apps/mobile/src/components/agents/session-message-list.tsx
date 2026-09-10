@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
@@ -100,6 +101,7 @@ export function SessionMessageList<T>({
   });
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { left, right } = useSafeAreaInsets();
 
   // Coalesce the trigger: only fire `onLoadOlderMessages` while there is
   // actually a cursor, we are not already loading, and we are not in a
@@ -202,17 +204,25 @@ export function SessionMessageList<T>({
     olderArrivalNewestKeyRef.current = nextNewestKey;
   }, [items, keyExtractor]);
 
-  // When the optional `contentBottomInset` is omitted we return the
-  // original module-level `listContentContainerStyle` reference so the
-  // default-prop path is behavior-identical (no allocation, no value
-  // change). When provided we extend the bottom padding to clear safe
-  // areas such as the home indicator on curved-bottom iPhones.
+  // When the optional `contentBottomInset` is omitted and the landscape side
+  // insets are 0 (portrait) we return the original module-level
+  // `listContentContainerStyle` reference so the default-prop path is
+  // behavior-identical (no allocation, no value change). When provided we
+  // extend the bottom padding to clear safe areas such as the home indicator
+  // on curved-bottom iPhones, and the side padding keeps transcript text clear
+  // of the landscape sensor housing; portrait insets are 0, keeping the
+  // geometry unchanged.
   const resolvedContentContainerStyle = useMemo<ViewStyle>(
     () =>
-      contentBottomInset
-        ? { paddingTop: 8, paddingBottom: 8 + contentBottomInset }
-        : listContentContainerStyle,
-    [contentBottomInset]
+      !contentBottomInset && left === 0 && right === 0
+        ? listContentContainerStyle
+        : {
+            paddingTop: 8,
+            paddingBottom: 8 + (contentBottomInset ?? 0),
+            paddingLeft: left,
+            paddingRight: right,
+          },
+    [contentBottomInset, left, right]
   );
 
   return (
@@ -272,6 +282,10 @@ export function SessionMessageList<T>({
           exiting={FadeOut.duration(150)}
           pointerEvents="box-none"
           className="absolute bottom-4 right-4"
+          // The fixed 16pt (right-4) offset gains the landscape right inset so
+          // the control clears the sensor area; portrait insets are 0, keeping
+          // the geometry unchanged (16 == right-4).
+          style={{ right: 16 + right }}
         >
           <Pressable
             accessibilityRole="button"

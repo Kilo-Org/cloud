@@ -26,7 +26,7 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, type ViewStyle } from 'react-native';
+import { View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 
 import { QueryError } from '@/components/query-error';
@@ -45,7 +45,6 @@ import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
 import { EmptyFilesView, TabStateMessage } from '@/components/pr-review/diff/pr-diff-rows';
 import { buildFileItems, buildPaginationItem } from '@/lib/pr-review/diff/pr-diff-list-builder';
-import { prDiffListBottomPadding } from '@/lib/pr-review/diff/pr-diff-list-bottom-padding';
 import { itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { stickyFileHeaderIndices } from '@/lib/pr-review/diff/sticky-file-headers';
 import { usePrDiffContextLoader } from '@/lib/pr-review/diff/use-pr-diff-context-loader';
@@ -55,6 +54,7 @@ import {
   usePrReviewViewedFiles,
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { usePrDiffListScroll } from '@/lib/pr-review/diff/use-pr-diff-list-scroll';
+import { usePrDiffListContentPadding } from '@/lib/pr-review/diff/use-pr-diff-list-content-padding';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { CenteredState } from '@/components/centered-state';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
@@ -135,10 +135,7 @@ export function PrReviewFileList({
     });
   }, []);
 
-  const contentContainerStyle = useMemo<ViewStyle>(
-    () => ({ paddingBottom: prDiffListBottomPadding(barHeight) }),
-    [barHeight]
-  );
+  const contentContainerStyle = usePrDiffListContentPadding(barHeight);
 
   const viewedCount = useMemo(() => {
     let count = 0;

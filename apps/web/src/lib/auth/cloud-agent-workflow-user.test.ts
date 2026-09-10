@@ -16,14 +16,11 @@ beforeEach(() => {
   issuance.enabled = true;
 });
 
-test('initializes a null pepper and issues modern review admission with the persisted value', async () => {
+test('preserves a null pepper and issues modern review admission with the persisted value', async () => {
   const user = await insertTestUser({ api_token_pepper: null });
-  expect(() =>
-    generateCloudAgentWorkflowToken(user, { tokenSource: 'code-review', expiresIn: 3600 })
-  ).toThrow('current user pepper');
   const prepared = await prepareCloudAgentWorkflowUser(user);
   const [persisted] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, user.id));
-  expect(prepared.api_token_pepper).toEqual(expect.any(String));
+  expect(prepared.api_token_pepper).toBeNull();
   expect(prepared.api_token_pepper).toBe(persisted.api_token_pepper);
   const claims = jwt.decode(
     generateCloudAgentWorkflowToken(prepared, { tokenSource: 'code-review', expiresIn: 3600 })
@@ -41,13 +38,13 @@ test('initializes a null pepper and issues modern review admission with the pers
   });
 });
 
-test('concurrent initializers return the same persisted pepper', async () => {
+test('concurrent preparations preserve the persisted null pepper', async () => {
   const user = await insertTestUser({ api_token_pepper: null });
   const results = await Promise.all(
     Array.from({ length: 8 }, () => prepareCloudAgentWorkflowUser(user))
   );
   expect(new Set(results.map(result => result.api_token_pepper)).size).toBe(1);
-  expect(results[0].api_token_pepper).toEqual(expect.any(String));
+  expect(results[0].api_token_pepper).toBeNull();
 });
 
 test('preserves a pepper assigned after the user snapshot was loaded', async () => {

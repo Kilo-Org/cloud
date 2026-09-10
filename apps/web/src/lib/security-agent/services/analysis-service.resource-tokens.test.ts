@@ -4,7 +4,6 @@ import { db } from '@/lib/drizzle';
 import { kilocode_users, type SecurityFinding } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { generateWorkflowGatewayToken } from '@/lib/tokens';
 import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 import { getSecurityFindingById } from '../db/security-findings';
 import { triageSecurityFinding } from './triage-service';
@@ -58,17 +57,13 @@ it.each([
   [false, true],
   [false, false],
   [true, false],
+  [true, true],
 ])(
   'starts security analysis with cloud=%s gateway=%s and a null pepper',
   async (cloud, gateway) => {
     process.env.CLOUD_AGENT_RESOURCE_TOKENS_ENABLED = String(cloud);
     process.env.WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED = String(gateway);
     const user = await insertTestUser({ api_token_pepper: null });
-    if (gateway) {
-      expect(() => generateWorkflowGatewayToken(user, { tokenSource: 'security-agent' })).toThrow(
-        'Workflow gateway tokens require a current user pepper'
-      );
-    }
     jest.mocked(getSecurityFindingById).mockResolvedValue({
       id: 'finding',
       owned_by_user_id: user.id,
@@ -127,7 +122,7 @@ it.each([
       .select()
       .from(kilocode_users)
       .where(eq(kilocode_users.id, user.id));
-    expect(persisted.api_token_pepper).toEqual(cloud || gateway ? expect.any(String) : null);
+    expect(persisted.api_token_pepper).toBeNull();
     const gatewayClaims = jwt.verify(
       jest.mocked(triageSecurityFinding).mock.calls[0][0].authToken,
       NEXTAUTH_SECRET

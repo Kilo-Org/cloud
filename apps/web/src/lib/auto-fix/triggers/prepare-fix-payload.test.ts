@@ -1,16 +1,14 @@
 const mockGetFixTicketById = jest.fn();
 
-jest.mock('@/lib/drizzle', () => ({
-  db: {
-    select: () => ({
-      from: () => ({
-        where: () => ({
-          limit: () => [{ id: 'user-1', api_token_pepper: 'pepper' }],
-        }),
-      }),
-    }),
-  },
+jest.mock('@/lib/config.server', () => ({
+  ...jest.requireActual('@/lib/config.server'),
+  isResourceTokenIssuanceEnabled: () => true,
 }));
+
+import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@/lib/drizzle';
+import { kilocode_users } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 
 jest.mock('@/lib/tokens', () => ({
   generateCloudAgentWorkflowToken: jest.fn(() => 'workflow-token'),
@@ -30,7 +28,12 @@ const mockGenerateCloudAgentWorkflowToken = jest.mocked(generateCloudAgentWorkfl
 
 const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
-beforeEach(() => {
+afterEach(async () => {
+  await db.delete(kilocode_users).where(eq(kilocode_users.id, 'user-1'));
+});
+
+beforeEach(async () => {
+  await insertTestUser({ id: 'user-1', api_token_pepper: null });
   jest.clearAllMocks();
   mockGetFixTicketById.mockResolvedValue({
     repo_full_name: 'kilo/repo',
@@ -56,8 +59,13 @@ describe('prepareFixPayload workflow token ownership', () => {
         },
       });
 
+      const [persisted] = await db
+        .select()
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, 'user-1'));
+      expect(persisted.api_token_pepper).toEqual(expect.any(String));
       expect(mockGenerateCloudAgentWorkflowToken).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'user-1' }),
+        expect.objectContaining({ id: 'user-1', api_token_pepper: persisted.api_token_pepper }),
         expect.objectContaining({ organizationId: expectedOrganizationId })
       );
     }

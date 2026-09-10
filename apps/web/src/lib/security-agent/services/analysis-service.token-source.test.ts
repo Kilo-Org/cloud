@@ -1,3 +1,6 @@
+import { db } from '@/lib/drizzle';
+import { kilocode_users } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import jwt from 'jsonwebtoken';
 import type { SecurityFinding, User } from '@kilocode/db/schema';
@@ -161,59 +164,76 @@ describe('startSecurityAnalysis token source', () => {
     });
   });
 
-  it('uses separate modern gateway and sandbox security-agent credentials', async () => {
-    const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
-    const organizationId = crypto.randomUUID();
-    const finding = {
-      ...createFinding(user),
-      owned_by_organization_id: organizationId,
-      owned_by_user_id: null,
-    };
-    mockGetSecurityFindingById.mockResolvedValue(finding);
+  it.each([null, 'existing-pepper'])(
+    'uses persisted pepper %s for modern gateway and sandbox credentials',
+    async api_token_pepper => {
+      const user = await insertTestUser({ api_token_pepper });
+      const organizationId = crypto.randomUUID();
+      const finding = {
+        ...createFinding(user),
+        owned_by_organization_id: organizationId,
+        owned_by_user_id: null,
+      };
+      mockGetSecurityFindingById.mockResolvedValue(finding);
 
-    const result = await startSecurityAnalysis({
-      findingId: finding.id,
-      user,
-      githubRepo: finding.repo_full_name,
-      githubToken: 'github-token',
-      organizationId,
-    });
+      const result = await startSecurityAnalysis({
+        findingId: finding.id,
+        user,
+        githubRepo: finding.repo_full_name,
+        githubToken: 'github-token',
+        organizationId,
+      });
 
-    expect(result).toEqual({ started: true, triageOnly: false });
-    const triageInput = mockTriageSecurityFinding.mock.calls[0]?.[0];
-    const cloudAgentToken = mockCreateCloudAgentNextClient.mock.calls[0]?.[0];
-    if (!triageInput) throw new Error('Expected triage to receive an input');
-    expect(triageInput.authToken).toEqual(expect.any(String));
-    const gatewayClaims = jwt.verify(triageInput.authToken, tokenSecret) as jwt.JwtPayload;
-    const cloudAgentClaims = jwt.decode(cloudAgentToken);
-    if (!cloudAgentClaims || typeof cloudAgentClaims === 'string') {
-      throw new Error('Expected sandbox JWT claims');
+      expect(result).toEqual({ started: true, triageOnly: false });
+      const [persisted] = await db
+        .select()
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, user.id));
+      expect(persisted.api_token_pepper).toEqual(expect.any(String));
+      if (api_token_pepper !== null) expect(persisted.api_token_pepper).toBe(api_token_pepper);
+      const triageInput = mockTriageSecurityFinding.mock.calls[0]?.[0];
+      const cloudAgentToken = mockCreateCloudAgentNextClient.mock.calls[0]?.[0];
+      if (!triageInput) throw new Error('Expected triage to receive an input');
+      expect(triageInput.authToken).toEqual(expect.any(String));
+      const gatewayClaims = jwt.verify(triageInput.authToken, tokenSecret) as jwt.JwtPayload;
+      const cloudAgentClaims = jwt.decode(cloudAgentToken);
+      if (!cloudAgentClaims || typeof cloudAgentClaims === 'string') {
+        throw new Error('Expected sandbox JWT claims');
+      }
+      expect(gatewayClaims).toMatchObject({
+        aud: 'kilo-gateway',
+        apiTokenPepper: persisted.api_token_pepper,
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+        organizationId,
+        tokenSource: 'security-agent',
+      });
+      expect(gatewayClaims.exp! - gatewayClaims.iat!).toBeLessThanOrEqual(60 * 60);
+      expect(cloudAgentClaims).toMatchObject({
+        aud: 'cloud-agent-next',
+        apiTokenPepper: persisted.api_token_pepper,
+        runtimeAdmission: {
+          authorizationUserId: user.id,
+          authorizationPepper: persisted.api_token_pepper,
+        },
+        tokenPurpose: 'internal-service',
+        credentialExchange: false,
+        organizationId,
+      });
+      expect(cloudAgentToken).not.toBe(triageInput.authToken);
+      const tokenPolicy = await verifyKiloTokenForPolicy(triageInput.authToken, tokenSecret, {
+        audience: 'kilo-gateway',
+        mode: 'required',
+      });
+      expect(isKiloCredentialExchangeEligible(tokenPolicy, { legacy: 'five-year-api' })).toBe(
+        false
+      );
+      expect(mockPrepareSession).toHaveBeenCalledTimes(1);
+      expect(mockInitiateFromPreparedSession).toHaveBeenCalledWith({
+        cloudAgentSessionId: 'agent-session-123',
+      });
     }
-    expect(gatewayClaims).toMatchObject({
-      aud: 'kilo-gateway',
-      tokenPurpose: 'delegated-workload',
-      credentialExchange: false,
-      organizationId,
-      tokenSource: 'security-agent',
-    });
-    expect(gatewayClaims.exp! - gatewayClaims.iat!).toBeLessThanOrEqual(60 * 60);
-    expect(cloudAgentClaims).toMatchObject({
-      aud: 'cloud-agent-next',
-      tokenPurpose: 'internal-service',
-      credentialExchange: false,
-      organizationId,
-    });
-    expect(cloudAgentToken).not.toBe(triageInput.authToken);
-    const tokenPolicy = await verifyKiloTokenForPolicy(triageInput.authToken, tokenSecret, {
-      audience: 'kilo-gateway',
-      mode: 'required',
-    });
-    expect(isKiloCredentialExchangeEligible(tokenPolicy, { legacy: 'five-year-api' })).toBe(false);
-    expect(mockPrepareSession).toHaveBeenCalledTimes(1);
-    expect(mockInitiateFromPreparedSession).toHaveBeenCalledWith({
-      cloudAgentSessionId: 'agent-session-123',
-    });
-  });
+  );
 
   it('preserves the legacy gateway token shape when shared issuance is disabled', async () => {
     shared.enabled = false;

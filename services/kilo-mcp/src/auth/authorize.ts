@@ -15,6 +15,7 @@ import { base64UrlEncode, isValidCodeChallenge } from './pkce';
 import { mcpResourceUrl } from './metadata';
 import { MCP_SCOPE, errorPage, redirectToClientError } from './http';
 import { consentPage } from '../oauth-pages/authorize-page';
+import type { McpAnalytics } from '../analytics';
 import type { OAuthStoreApi, StoredClient } from '../store/oauth-store';
 
 export type AuthorizeDeps = {
@@ -23,6 +24,8 @@ export type AuthorizeDeps = {
   webBaseUrl: string;
   fetchImpl?: typeof fetch;
   now?: () => Date;
+  /** Best-effort sign-in analytics; never awaited and never allowed to throw. */
+  analytics?: McpAnalytics;
 };
 
 /** Pairing records are short-lived: 10 minutes to complete sign-in. */
@@ -215,10 +218,25 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   try {
     validated = await validateAuthorizeRequest(url, deps.store, issuer);
   } catch (error) {
+    // A rejected request never produced an identity; report the OAuth error
+    // code and the client_id only when the request actually carried one.
+    const clientId = url.searchParams.get('client_id');
     if (error instanceof AuthorizePageError) {
+      deps.analytics?.oauthSignIn({
+        phase: 'failed',
+        identity: null,
+        ...(clientId !== null ? { clientId } : {}),
+        reason: 'invalid_request',
+      });
       return errorPage('invalid_request', error.message);
     }
     if (error instanceof AuthorizeRedirectError) {
+      deps.analytics?.oauthSignIn({
+        phase: 'failed',
+        identity: null,
+        ...(clientId !== null ? { clientId } : {}),
+        reason: error.error,
+      });
       return redirectToClientError(error.redirectUri, error.error, error.description, error.state);
     }
     throw error;
@@ -228,6 +246,12 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   if (!pairing.ok) {
     // Retryable unhappy path: nothing was created; tell the user exactly what
     // to do (wait vs check connection) and send them back to the client.
+    deps.analytics?.oauthSignIn({
+      phase: 'failed',
+      identity: null,
+      clientId: validated.client.clientId,
+      reason: pairing.kind,
+    });
     const description =
       pairing.kind === 'rate_limited'
         ? 'Too many pending Kilo sign-in requests from your network right now. Wait a few minutes, then retry from your MCP client.'
@@ -248,6 +272,13 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
     deviceAuthCode: pairing.pairingCode,
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + CODE_TTL_SECONDS * 1000).toISOString(),
+  });
+
+  // The user has not signed in yet: this pre-auth start event is anonymous.
+  deps.analytics?.oauthSignIn({
+    phase: 'started',
+    identity: null,
+    clientId: validated.client.clientId,
   });
 
   return consentPage({

@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { handleToken, ACCESS_TOKEN_TTL_SECONDS } from './token';
 import { decodeJwt } from './jwt';
 import { codeChallengeFromVerifier, generateCodeVerifier } from './pkce';
+import type { McpAnalytics, OAuthSignInInput } from '../analytics';
 import type {
   NewRefreshToken,
   NewOAuthCode,
@@ -209,12 +210,47 @@ function tokenRequest(form: Record<string, string>): Request {
   });
 }
 
-function handle(form: Record<string, string>, store: OAuthStoreApi) {
+/**
+ * Fake emitter cast to the production `McpAnalytics` interface: the tests
+ * assert exactly what the worker hands it, so a new field cannot slip past.
+ */
+function fakeAnalytics(): { analytics: McpAnalytics; calls: OAuthSignInInput[] } {
+  const calls: OAuthSignInInput[] = [];
+  const analytics = {
+    oauthSignIn: vi.fn((input: OAuthSignInInput) => {
+      calls.push(input);
+    }),
+  } as unknown as McpAnalytics;
+  return { analytics, calls };
+}
+
+const OAUTH_EVENT_FIELDS = ['clientId', 'identity', 'phase', 'reason'];
+const IDENTITY_FIELDS = ['kiloUserId', 'organizationId'];
+
+/**
+ * The sign-in events must carry no token, authorization code, PKCE verifier,
+ * or state: every recorded event exposes only the documented fields.
+ */
+function expectNoCredentialLeak(calls: OAuthSignInInput[]): void {
+  for (const call of calls) {
+    for (const key of Object.keys(call)) {
+      expect(OAUTH_EVENT_FIELDS).toContain(key);
+    }
+    if (call.identity) {
+      for (const key of Object.keys(call.identity)) {
+        expect(IDENTITY_FIELDS).toContain(key);
+      }
+    }
+  }
+}
+
+function handle(form: Record<string, string>, store: OAuthStoreApi, analytics?: McpAnalytics) {
   return handleToken(tokenRequest(form), {
     store,
     tokenSecret: SECRET,
     issuer: ISSUER,
     now: () => NOW,
+    analytics,
   });
 }
 
@@ -688,6 +724,111 @@ describe('POST /token refresh_token (rotation)', () => {
       store
     );
     expect(((await response.json()) as TokenBody).error).toBe('invalid_target');
+  });
+});
+
+describe('POST /token analytics (s3)', () => {
+  it('emits succeeded bound to the kilo user and organization for a completed exchange', async () => {
+    const store = storeWithClient();
+    const code = await seedApprovedCode(store);
+    const { analytics, calls } = fakeAnalytics();
+    const response = await handle(
+      {
+        grant_type: 'authorization_code',
+        code,
+        client_id: CLIENT_ID,
+        redirect_uri: REDIRECT,
+        code_verifier: verifier,
+      },
+      store,
+      analytics
+    );
+    expect(response.status).toBe(200);
+    expect(calls).toEqual([
+      {
+        phase: 'succeeded',
+        identity: { kiloUserId: 'kilo-user-1', organizationId: 'org-1' },
+        clientId: CLIENT_ID,
+      },
+    ]);
+    expectNoCredentialLeak(calls);
+  });
+
+  it('emits failed/invalid_grant and leaves the error body readable for the client', async () => {
+    const store = storeWithClient();
+    const code = await seedApprovedCode(store, { status: 'used' });
+    const { analytics, calls } = fakeAnalytics();
+    const response = await handle(
+      {
+        grant_type: 'authorization_code',
+        code,
+        client_id: CLIENT_ID,
+        redirect_uri: REDIRECT,
+        code_verifier: verifier,
+      },
+      store,
+      analytics
+    );
+    expect(response.status).toBe(400);
+    // The analytics read used a clone, so the client still gets the body.
+    await expect(response.json()).resolves.toMatchObject({ error: 'invalid_grant' });
+    expect(calls).toEqual([
+      { phase: 'failed', identity: null, clientId: CLIENT_ID, reason: 'invalid_grant' },
+    ]);
+    expectNoCredentialLeak(calls);
+  });
+
+  it('emits failed/invalid_client for an unknown client', async () => {
+    const store = storeWithClient();
+    const code = await seedApprovedCode(store);
+    const { analytics, calls } = fakeAnalytics();
+    const response = await handle(
+      {
+        grant_type: 'authorization_code',
+        code,
+        client_id: 'ghost',
+        redirect_uri: REDIRECT,
+        code_verifier: verifier,
+      },
+      store,
+      analytics
+    );
+    expect(response.status).toBe(400);
+    expect(calls).toEqual([
+      { phase: 'failed', identity: null, clientId: 'ghost', reason: 'invalid_client' },
+    ]);
+  });
+
+  it('emits nothing for refresh_token outcomes (success or failure)', async () => {
+    const store = storeWithClient();
+    const { analytics, calls } = fakeAnalytics();
+    const refreshToken = 'opaque-refresh-token-value-0000000000000000000000000000';
+    await store.saveRefreshToken({
+      id: 'rt-analytics',
+      tokenHash: await sha256HexTest(refreshToken),
+      clientId: CLIENT_ID,
+      kiloUserId: 'kilo-user-1',
+      organizationId: 'org-1',
+      kiloToken: 'kilo-token-1',
+      resource: RESOURCE,
+      scope: 'mcp',
+      createdAt: NOW.toISOString(),
+      expiresAt: new Date(NOW.getTime() + 30 * 24 * 3600_000).toISOString(),
+    });
+    const rotated = await handle(
+      { grant_type: 'refresh_token', refresh_token: refreshToken, client_id: CLIENT_ID },
+      store,
+      analytics
+    );
+    expect(rotated.status).toBe(200);
+    // Replaying the rotated-away token is an invalid_grant, not a sign-in.
+    const replay = await handle(
+      { grant_type: 'refresh_token', refresh_token: refreshToken, client_id: CLIENT_ID },
+      store,
+      analytics
+    );
+    expect(replay.status).toBe(400);
+    expect(calls).toEqual([]);
   });
 });
 

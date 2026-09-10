@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { consentPage, handlePairingStatus, pollKiloPairing } from './authorize-page';
+import type { McpAnalytics, OAuthSignInInput } from '../analytics';
 import type {
   NewOAuthCode,
   OAuthCodeRecord,
@@ -132,6 +133,40 @@ function statusRequest(code: string): Request {
 /** apps/web poll response factory (statuses per codes/[code]/route.ts). */
 function upstreamFetch(handler: (url: string) => Response | Promise<Response>): typeof fetch {
   return vi.fn(async (input: string | URL) => handler(String(input))) as unknown as typeof fetch;
+}
+
+/**
+ * Fake emitter cast to the production `McpAnalytics` interface: the tests
+ * assert exactly what the worker hands it, so a new field cannot slip past.
+ */
+function fakeAnalytics(): { analytics: McpAnalytics; calls: OAuthSignInInput[] } {
+  const calls: OAuthSignInInput[] = [];
+  const analytics = {
+    oauthSignIn: vi.fn((input: OAuthSignInInput) => {
+      calls.push(input);
+    }),
+  } as unknown as McpAnalytics;
+  return { analytics, calls };
+}
+
+const OAUTH_EVENT_FIELDS = ['clientId', 'identity', 'phase', 'reason'];
+const IDENTITY_FIELDS = ['kiloUserId', 'organizationId'];
+
+/**
+ * The sign-in events must carry no token, authorization code, PKCE verifier,
+ * or state: every recorded event exposes only the documented fields.
+ */
+function expectNoCredentialLeak(calls: OAuthSignInInput[]): void {
+  for (const call of calls) {
+    for (const key of Object.keys(call)) {
+      expect(OAUTH_EVENT_FIELDS).toContain(key);
+    }
+    if (call.identity) {
+      for (const key of Object.keys(call.identity)) {
+        expect(IDENTITY_FIELDS).toContain(key);
+      }
+    }
+  }
 }
 
 describe('pollKiloPairing (apps/web relay)', () => {
@@ -367,5 +402,101 @@ describe('consentPage (s6 contract)', () => {
     expect(html).toMatch(/class="cta"[^>]*target="_blank"/);
     // The shell carries the Kilo Cloud brand primary, not the old blue CTA.
     expect(html).toContain('--primary:#f7f586');
+  });
+});
+
+describe('GET /authorize/status analytics (s3)', () => {
+  it('records a denial as failed/denied with the client id when upstream reports it', async () => {
+    const store = createFakeOAuthStore();
+    const record = seedPendingCode(store);
+    const fetchImpl = upstreamFetch(() => Response.json({ status: 'denied' }, { status: 403 }));
+    const { analytics, calls } = fakeAnalytics();
+    await handlePairingStatus(statusRequest(record.code), {
+      store,
+      webBaseUrl: WEB,
+      fetchImpl,
+      analytics,
+    });
+    expect(calls).toEqual([
+      { phase: 'failed', identity: null, clientId: 'client-abc', reason: 'denied' },
+    ]);
+    expectNoCredentialLeak(calls);
+  });
+
+  it('emits a denial exactly once across repeated polls of the terminal record', async () => {
+    const store = createFakeOAuthStore();
+    const record = seedPendingCode(store);
+    const fetchImpl = upstreamFetch(() => Response.json({ status: 'denied' }, { status: 403 }));
+    const { analytics, calls } = fakeAnalytics();
+    const deps = { store, webBaseUrl: WEB, fetchImpl, analytics };
+    await expect(
+      handlePairingStatus(statusRequest(record.code), deps).then(r => r.json())
+    ).resolves.toEqual({ status: 'denied' });
+    // The record is now terminal `denied`; every later poll must answer the
+    // same way WITHOUT re-emitting (the failure was already recorded at the
+    // transition) and without asking apps/web again.
+    for (let poll = 0; poll < 3; poll += 1) {
+      await expect(
+        handlePairingStatus(statusRequest(record.code), deps).then(r => r.json())
+      ).resolves.toEqual({ status: 'denied' });
+    }
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual([
+      { phase: 'failed', identity: null, clientId: 'client-abc', reason: 'denied' },
+    ]);
+    expectNoCredentialLeak(calls);
+  });
+
+  it('an already-denied record answers denied without emitting or polling upstream', async () => {
+    const store = createFakeOAuthStore();
+    const record = seedPendingCode(store);
+    store.codes.set(record.code, { ...store.codes.get(record.code)!, status: 'denied' });
+    const { analytics, calls } = fakeAnalytics();
+    const fetchImpl = upstreamFetch(() => Promise.reject(new Error('must not poll')));
+    const response = await handlePairingStatus(statusRequest(record.code), {
+      store,
+      webBaseUrl: WEB,
+      fetchImpl,
+      analytics,
+    });
+    await expect(response.json()).resolves.toEqual({ status: 'denied' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(calls).toEqual([]);
+  });
+
+  it('records an expired pairing as failed/expired', async () => {
+    const store = createFakeOAuthStore();
+    const record = seedPendingCode(store);
+    const fetchImpl = upstreamFetch(() => Response.json({ status: 'expired' }, { status: 410 }));
+    const { analytics, calls } = fakeAnalytics();
+    await handlePairingStatus(statusRequest(record.code), {
+      store,
+      webBaseUrl: WEB,
+      fetchImpl,
+      analytics,
+    });
+    expect(calls).toEqual([
+      { phase: 'failed', identity: null, clientId: 'client-abc', reason: 'expired' },
+    ]);
+    expectNoCredentialLeak(calls);
+  });
+
+  it('records nothing while the pairing is pending or unreachable', async () => {
+    const store = createFakeOAuthStore();
+    const record = seedPendingCode(store);
+    const { analytics, calls } = fakeAnalytics();
+    await handlePairingStatus(statusRequest(record.code), {
+      store,
+      webBaseUrl: WEB,
+      fetchImpl: upstreamFetch(() => Response.json({ status: 'pending' }, { status: 202 })),
+      analytics,
+    });
+    await handlePairingStatus(statusRequest(record.code), {
+      store,
+      webBaseUrl: WEB,
+      fetchImpl: upstreamFetch(() => Promise.reject(new Error('network'))),
+      analytics,
+    });
+    expect(calls).toEqual([]);
   });
 });

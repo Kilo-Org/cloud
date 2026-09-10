@@ -527,8 +527,8 @@ describe('GitHub installation persistence', () => {
     const barrier = new Promise<void>(resolve => {
       release = resolve;
     });
-    let deleted: (() => void) | undefined;
-    const deletedBeforeCommit = new Promise<void>(resolve => {
+    let deleted: ((pid: number) => void) | undefined;
+    const deletedBeforeCommit = new Promise<number>(resolve => {
       deleted = resolve;
     });
     const lifecycle = db.transaction(async tx => {
@@ -536,15 +536,35 @@ describe('GitHub installation persistence', () => {
         { installationId: '773001', appType: 'standard', state: 'deleted' },
         tx
       );
-      deleted?.();
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      deleted?.(backend.rows[0]!.pid);
       await barrier;
     });
-    await deletedBeforeCommit;
-    const refresh = updateRepositoriesForIntegration(connected.integrationId, [
-      { id: 99, name: 'revived', full_name: 'acme/revived', private: true },
+    let refresh: ReturnType<typeof updateRepositoriesForIntegration> | undefined;
+    let observationError: unknown;
+    try {
+      const holderPid = await githubTestTimeout(deletedBeforeCommit, 'lifecycle holder readiness');
+      refresh = updateRepositoriesForIntegration(connected.integrationId, [
+        { id: 99, name: 'revived', full_name: 'acme/revived', private: true },
+      ]);
+      await githubTestTimeout(
+        waitForBlockedGitHubOwnerLock(holderPid),
+        'repository refresh lock observation'
+      );
+    } catch (error) {
+      observationError = error;
+    } finally {
+      release?.();
+    }
+    const results = await Promise.allSettled([
+      lifecycle,
+      refresh ?? Promise.reject(new Error('Repository refresh did not start')),
     ]);
-    release?.();
-    await expect(Promise.all([lifecycle, refresh])).resolves.toBeDefined();
+    if (observationError) throw observationError;
+    expect(results).toEqual([
+      { status: 'fulfilled', value: undefined },
+      { status: 'fulfilled', value: undefined },
+    ]);
 
     const [canonical] = await db
       .select()
@@ -582,7 +602,55 @@ describe('GitHub installation persistence', () => {
       });
     };
 
-    await Promise.all([processDeletion(), processDeletion()]);
+    let release: (() => void) | undefined;
+    const barrier = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    let held: ((pid: number) => void) | undefined;
+    const holderReady = new Promise<number>(resolve => {
+      held = resolve;
+    });
+    const first = db
+      .transaction(async tx => {
+        await observeGitHubInstallationLifecycle(
+          { installationId: '773002', appType: 'standard', state: 'deleted' },
+          tx
+        );
+        const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+        held?.(backend.rows[0]!.pid);
+        await barrier;
+      })
+      .then(() =>
+        recordCompletedGitHubInstallationDelivery({
+          installationId: '773002',
+          appType: 'standard',
+          deliveryId: 'concurrent-delete',
+          eventType: 'installation.deleted',
+        })
+      );
+    let second: ReturnType<typeof processDeletion> | undefined;
+    let observationError: unknown;
+    try {
+      const holderPid = await githubTestTimeout(holderReady, 'duplicate deletion holder readiness');
+      second = processDeletion();
+      await githubTestTimeout(
+        waitForBlockedGitHubOwnerLock(holderPid),
+        'duplicate deletion lock observation'
+      );
+    } catch (error) {
+      observationError = error;
+    } finally {
+      release?.();
+    }
+    const deletionResults = await Promise.allSettled([
+      first,
+      second ?? Promise.reject(new Error('Second deletion did not start')),
+    ]);
+    if (observationError) throw observationError;
+    expect(deletionResults).toEqual([
+      { status: 'fulfilled', value: undefined },
+      { status: 'fulfilled', value: undefined },
+    ]);
     await observeGitHubInstallationLifecycle({
       installationId: '773002',
       appType: 'standard',

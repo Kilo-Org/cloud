@@ -27,6 +27,11 @@ import {
   handleControlRequest,
   type HandlerDeps,
 } from './sandbox-control-handlers';
+import {
+  controlLogBatchSchema,
+  createControlDiagnosticRecord,
+  type ControlDiagnosticFields,
+} from '../../../src/shared/control-diagnostics';
 import type { WrapperKiloClient } from '../kilo-api';
 import {
   ControlTerminalRuntimeError,
@@ -506,7 +511,7 @@ describe('retirement report ownership', () => {
     const retiredRuntimeId = runtime.runtimeId;
     try {
       expect(
-        await harness.registry.retireRuntimeIfUnshared?.(
+        await harness.registry.deferRuntimeRetirementIfShared?.(
           directory,
           { runtimeId: retiredRuntimeId, client: runtime.kiloClient },
           firstIdentity.kiloSessionId,
@@ -988,6 +993,117 @@ describe('worktree Kilo runtime registry', () => {
     expect(harness.registry.isHealthy()).toBe(true);
     expect(harness.registry.get(identity)).toBe(refreshed);
     expect(harness.unexpectedCloses).toBe(0);
+  });
+
+  it('closes retained root publication counters under the old native runtime on credential refresh', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        const stopped = Promise.withResolvers<void>();
+        proveOwnedProcesses(options, stopped.promise);
+        return {
+          url: server.url,
+          stopped: stopped.promise,
+          close: () => {
+            server.endFeeds();
+            stopped.resolve();
+          },
+        };
+      },
+      onDiagnostic: (_event, fields) => {
+        diagnostics.push(fields);
+      },
+    });
+    const directAuth = { ...auth, containmentEnabled: false };
+    const identity = rootIdentity(path.join(tmpDir, 'publication-refresh'));
+    const attachment = harness.registry.attach(identity, directAuth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+
+    const firstRuntimeId = runtime.runtimeId;
+    const firstReceiptId = 'receipt_n1';
+    const firstRequestId = 'request_n1';
+    const firstSentAt = Date.now();
+    const firstPreparedAt = firstSentAt;
+    expect(
+      harness.registry.recordRootPublicationDiagnostic?.(
+        {
+          directory: identity.directory,
+          kiloSessionId: identity.kiloSessionId,
+          rootKiloSessionId: identity.kiloSessionId,
+          nativeRuntimeId: firstRuntimeId,
+        },
+        {
+          phase: 'publication_failed',
+          failureReason: 'rejected',
+          outcome: 'rejected',
+          receiptId: firstReceiptId,
+          requestId: firstRequestId,
+          sequence: 1,
+          sentAt: firstSentAt,
+          preparedAt: firstPreparedAt,
+        }
+      )
+    ).toBe(true);
+
+    const refresh = harness.registry.attach(
+      identity,
+      { ...directAuth, token: 'rotated-token' },
+      undefined,
+      () => true
+    );
+    const refreshed = await refresh.ready;
+    expect(refreshed).toBe(runtime);
+    const secondRuntimeId = refreshed.runtimeId;
+    expect(secondRuntimeId).not.toBe(firstRuntimeId);
+    refresh.commit();
+    refresh.release();
+
+    expect(
+      harness.registry.recordRootPublicationDiagnostic?.(
+        {
+          directory: identity.directory,
+          kiloSessionId: identity.kiloSessionId,
+          rootKiloSessionId: identity.kiloSessionId,
+          nativeRuntimeId: secondRuntimeId,
+        },
+        {
+          phase: 'publication_receipt',
+          outcome: 'timed_out',
+          receiptId: 'receipt_n2',
+          requestId: 'request_n2',
+          sequence: 2,
+        }
+      )
+    ).toBe(true);
+
+    harness.registry.snapshotRootPublicationDiagnostics?.();
+    const summaries = diagnostics.filter(entry => entry.phase === 'publication_summary');
+    const secondSummary = summaries.find(entry => entry.nativeRuntimeId === secondRuntimeId);
+    expect(secondSummary).toMatchObject({
+      phase: 'publication_summary',
+      nativeRuntimeId: secondRuntimeId,
+      timeoutCount: 1,
+    });
+    expect(secondSummary?.receiptId).not.toBe(firstReceiptId);
+    expect(secondSummary?.requestId).not.toBe(firstRequestId);
+    expect(secondSummary?.sequence).not.toBe(1);
+    expect(secondSummary?.sentAt).not.toBe(firstSentAt);
+    expect(secondSummary?.preparedAt).not.toBe(firstPreparedAt);
+    const firstSummary = summaries.find(entry => entry.nativeRuntimeId === firstRuntimeId);
+    expect(firstSummary).toMatchObject({
+      phase: 'publication_summary',
+      nativeRuntimeId: firstRuntimeId,
+      failureCount: 1,
+      receiptId: firstReceiptId,
+      requestId: firstRequestId,
+      sequence: 1,
+      sentAt: firstSentAt,
+      preparedAt: firstPreparedAt,
+    });
   });
 
   it('isolates different worktrees with separate servers, homes, auth files, and event clients', async () => {
@@ -1869,6 +1985,222 @@ describe('worktree Kilo runtime registry', () => {
       server.releasePrompts(identity.kiloSessionId);
       timers.mockRestore();
     }
+  });
+
+  it('retains the first root publication failure and reports accurate burst totals', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => {
+        diagnostics.push(fields);
+      },
+    });
+    const directory = path.join(tmpDir, 'publication-burst');
+    const attachment = harness.registry.attach(rootIdentity(directory, 'root'), auth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+    const identity = {
+      directory,
+      kiloSessionId: 'root_root',
+      rootKiloSessionId: 'root_root',
+      nativeRuntimeId: runtime.runtimeId,
+    };
+    const failure = (sequence: number, receiptId: string) => ({
+      phase: 'publication_failed' as const,
+      failureReason: 'rejected',
+      outcome: 'rejected',
+      receiptId,
+      sequence,
+    });
+    const firstReceiptId = crypto.randomUUID();
+    expect(
+      harness.registry.recordRootPublicationDiagnostic?.(identity, failure(1, firstReceiptId))
+    ).toBe(true);
+    for (let index = 2; index <= 5; index += 1)
+      harness.registry.recordRootPublicationDiagnostic?.(identity, {
+        phase: 'publication_receipt',
+        outcome: 'rejected',
+        receiptId: `receipt_${index}`,
+        sequence: index,
+      });
+    for (let index = 0; index < 3; index += 1)
+      harness.registry.recordRootPublicationDiagnostic?.(identity, {
+        phase: 'publication_receipt',
+        outcome: 'acknowledged',
+        receiptId: `ack_${index}`,
+        sequence: 100 + index,
+      });
+
+    const failures = diagnostics.filter(entry => entry.receiptId === firstReceiptId);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatchObject({ receiptId: firstReceiptId, sequence: 1 });
+
+    const firstRecord = createControlDiagnosticRecord('control.event', failures[0]!, 1_000);
+    if (!firstRecord) throw new Error('First failure did not serialize');
+    expect(firstRecord.fields).toMatchObject({
+      phase: 'publication_failed',
+      failureReason: 'rejected',
+      receiptId: firstReceiptId,
+      sequence: 1,
+    });
+    expect(
+      controlLogBatchSchema.safeParse({
+        version: 1,
+        sequence: 0,
+        droppedRecords: 0,
+        records: [firstRecord],
+      }).success
+    ).toBe(true);
+
+    harness.registry.snapshotRootPublicationDiagnostics?.();
+    const summaries = diagnostics.filter(entry => entry.phase === 'publication_summary');
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).toMatchObject({
+      phase: 'publication_summary',
+      failureCount: 1,
+      rejectedCount: 4,
+      acknowledgedCount: 3,
+      receiptId: firstReceiptId,
+      sequence: 1,
+    });
+    const summaryRecord = createControlDiagnosticRecord('control.event', summaries[0]!, 1_000);
+    if (!summaryRecord) throw new Error('Publication summary did not serialize');
+    expect(summaryRecord.fields).toMatchObject({
+      phase: 'publication_summary',
+      failureCount: 1,
+      receiptId: firstReceiptId,
+      sequence: 1,
+    });
+    expect(
+      controlLogBatchSchema.safeParse({
+        version: 1,
+        sequence: 1,
+        droppedRecords: 0,
+        records: [summaryRecord],
+      }).success
+    ).toBe(true);
+  });
+
+  it('keeps outbox depth and ACK-tracking size distinct in the root publication summary', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => {
+        diagnostics.push(fields);
+      },
+    });
+    const directory = path.join(tmpDir, 'publication-pending');
+    const attachment = harness.registry.attach(rootIdentity(directory, 'root'), auth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+    const identity = {
+      directory,
+      kiloSessionId: 'root_root',
+      rootKiloSessionId: 'root_root',
+      nativeRuntimeId: runtime.runtimeId,
+    };
+    harness.registry.recordRootPublicationDiagnostic?.(identity, {
+      phase: 'publication_failed',
+      failureReason: 'socket_overflow',
+      pendingCount: 3,
+      pendingBytes: 300,
+    });
+    harness.registry.recordRootPublicationDiagnostic?.(identity, {
+      phase: 'publication_receipt',
+      outcome: 'acknowledged',
+      pendingCount: 7,
+      pendingBytes: 700,
+      outstandingEventAcks: 7,
+    });
+
+    harness.registry.snapshotRootPublicationDiagnostics?.();
+    const summary = diagnostics.filter(entry => entry.phase === 'publication_summary').at(-1);
+    expect(summary).toMatchObject({
+      phase: 'publication_summary',
+      pendingCount: 3,
+      pendingBytes: 300,
+      outstandingEventAcks: 7,
+    });
+  });
+
+  it('attributes a cross-directory child publication to its attached root and rejects an unresolved child', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => {
+        diagnostics.push(fields);
+      },
+    });
+    const rootDirectory = path.join(tmpDir, 'attribution-root');
+    const childDirectory = path.join(tmpDir, 'attribution-child');
+    const attachment = harness.registry.attach(rootIdentity(rootDirectory, 'root'), auth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+    rememberChildSession({
+      childId: 'child_child',
+      parentId: 'root_root',
+      directory: childDirectory,
+    });
+
+    expect(
+      harness.registry.recordRootPublicationDiagnostic?.(
+        {
+          directory: childDirectory,
+          kiloSessionId: 'child_unresolved',
+          rootKiloSessionId: 'root_root',
+          nativeRuntimeId: runtime.runtimeId,
+        },
+        {
+          phase: 'publication_failed',
+          failureReason: 'rejected',
+          outcome: 'rejected',
+          receiptId: 'receipt_unresolved',
+          sequence: 99,
+        }
+      )
+    ).toBe(false);
+
+    const receiptId = crypto.randomUUID();
+    expect(
+      harness.registry.recordRootPublicationDiagnostic?.(
+        {
+          directory: childDirectory,
+          kiloSessionId: 'child_child',
+          rootKiloSessionId: 'root_root',
+          nativeRuntimeId: runtime.runtimeId,
+        },
+        {
+          phase: 'publication_failed',
+          failureReason: 'rejected',
+          outcome: 'rejected',
+          receiptId,
+          sequence: 1,
+        }
+      )
+    ).toBe(true);
+
+    const failure = diagnostics.find(entry => entry.receiptId === receiptId);
+    if (!failure) throw new Error('Cross-directory child failure was not reported');
+    const record = createControlDiagnosticRecord('control.event', failure, 1_000);
+    if (!record) throw new Error('Cross-directory child failure did not serialize');
+    expect(
+      controlLogBatchSchema.safeParse({
+        version: 1,
+        sequence: 0,
+        droppedRecords: 0,
+        records: [record],
+      }).success
+    ).toBe(true);
+
+    harness.registry.snapshotRootPublicationDiagnostics?.();
+    expect(diagnostics.filter(entry => entry.phase === 'publication_summary')).toEqual([
+      expect.objectContaining({
+        phase: 'publication_summary',
+        failureCount: 1,
+        receiptId,
+        sequence: 1,
+      }),
+    ]);
   });
 });
 
@@ -2927,7 +3259,7 @@ setInterval(() => {}, 1000);
 
     const originalDeadline = Date.now() - 1;
     expect(
-      await registry.retireRuntimeIfUnshared?.(
+      await registry.deferRuntimeRetirementIfShared?.(
         directory,
         { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
         'root_first',
@@ -3012,7 +3344,7 @@ setInterval(() => {}, 1000);
     sibling.release();
     const currentTarget = { runtimeId: runtime.runtimeId, client: runtime.kiloClient };
     expect(
-      await registry.retireRuntimeIfUnshared?.(
+      await registry.deferRuntimeRetirementIfShared?.(
         directory,
         currentTarget,
         'root_first',
@@ -3059,7 +3391,7 @@ setInterval(() => {}, 1000);
     first.release();
     sibling.release();
     expect(
-      await harness.registry.retireRuntimeIfUnshared?.(
+      await harness.registry.deferRuntimeRetirementIfShared?.(
         directory,
         { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
         'root_first',
@@ -3130,7 +3462,7 @@ setInterval(() => {}, 1000);
       second.release();
       const target = { runtimeId: runtime.runtimeId, client: runtime.kiloClient };
       expect(
-        await registry.retireRuntimeIfUnshared?.(
+        await registry.deferRuntimeRetirementIfShared?.(
           directory,
           target,
           'root_first',
@@ -3139,7 +3471,7 @@ setInterval(() => {}, 1000);
         )
       ).toBe('shared');
       expect(
-        await registry.retireRuntimeIfUnshared?.(
+        await registry.deferRuntimeRetirementIfShared?.(
           directory,
           target,
           'root_second',
@@ -3398,7 +3730,7 @@ describe('runtime-to-registry root settlement', () => {
     }
   });
 
-  it('detaches A before returning a failed non-scoped abort so A can reattach', async () => {
+  it('does not let a publication failure block a non-scoped abort so A can reattach', async () => {
     const harness = createSharedRegistry({
       startServer: async options => {
         const server = createKiloStub();
@@ -3446,8 +3778,8 @@ describe('runtime-to-registry root settlement', () => {
           handlerDeps
         )
       ).toEqual({
-        ok: false,
-        error: { code: 'not_ready', message: 'Session outcome delivery failed', retryable: false },
+        ok: true,
+        result: { status: 'aborted' },
       });
       expect(
         server.requests.some(
@@ -3973,7 +4305,7 @@ describe('runtime-to-registry root settlement', () => {
     ).toBe('continue');
   });
 
-  it('preserves a non-deferred scoped record when failRuntime retirement is unconfirmed', async () => {
+  it('admits fresh work after an unconfirmed publication retirement', async () => {
     const exited = Promise.withResolvers<void>();
     const server = createKiloStub();
     servers.push(server);
@@ -4011,6 +4343,6 @@ describe('runtime-to-registry root settlement', () => {
     rememberAttachedRoot(sessionA.kiloSessionId, directory);
     expect(
       integrated.handlerDeps.operations.admission('session.prompt', sessionA, undefined).kind
-    ).toBe('reply');
+    ).toBe('continue');
   });
 });

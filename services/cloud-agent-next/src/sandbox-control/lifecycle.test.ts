@@ -179,6 +179,18 @@ async function harness(
   let transactionTail: Promise<unknown> = Promise.resolve();
   let transactionActive = false;
   const storage = {
+    kv: {
+      get: <T = unknown>(key: string): T | undefined =>
+        structuredClone(records.get(key)) as T | undefined,
+      put: <T>(key: string, value: T): void => {
+        records.set(key, structuredClone(value));
+      },
+      delete: (key: string): boolean => records.delete(key),
+      list: <T = unknown>(options?: SyncKvListOptions): Iterable<[string, T]> =>
+        [...records.entries()]
+          .filter(([key]) => key.startsWith(options?.prefix ?? ''))
+          .map(([key, value]) => [key, structuredClone(value) as T]),
+    },
     async get<T>(key: string): Promise<T | undefined> {
       return structuredClone(records.get(key)) as T | undefined;
     },
@@ -4553,7 +4565,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     );
   });
 
-  it('forwards raw events and preparation with the runtime fence, then quarantines an exhausted delivery', async () => {
+  it('forwards raw events and preparation with the runtime fence, then keeps the runtime usable after a failed delivery', async () => {
     const h = await harness();
     await h.create();
     const connection = await h.ready();
@@ -4589,11 +4601,171 @@ describe('SandboxControl lifecycle boundaries', () => {
     h.session.receiveSandboxControlEvent.mockRejectedValue(new Error('session offline'));
     await h.hooks.onSessionEvent?.(identity, payload, connection);
     await h.flush();
-    expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-      'session_delivery_failed',
-      connection.wrapperInstanceId
+    expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+    expect(h.runtime(connection.providerInstanceId)?.state.running).toBe(true);
+    expect(h.socket.getConnectionIdentity()).toEqual(connection);
+  });
+
+  it('serializes forwarding for one canonical destination across session aliases', async () => {
+    const pending = deferred<{ applied: boolean }>();
+    const h = await harness();
+    await h.create();
+    const connection = await h.ready();
+    h.session.receiveSandboxControlEvent.mockReturnValueOnce(pending.promise);
+    const payload = {
+      type: 'session.message.outcome',
+      properties: { messageId: 'msg_1', status: 'completed' },
+    };
+    const directoryOnly = { directory: ROUTE.directory };
+    const identified = { directory: ROUTE.directory, kiloSessionId: ROUTE.kiloSessionId };
+    await h.hooks.onSessionEvent?.(directoryOnly, payload, connection);
+    await h.hooks.onSessionEvent?.(identified, payload, connection);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+    pending.resolve({ applied: true });
+    await h.flush();
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(2);
+    expect(h.session.receiveSandboxControlEvent.mock.calls[0]?.[0]).toMatchObject({
+      identity: directoryOnly,
+    });
+    expect(h.session.receiveSandboxControlEvent.mock.calls[1]?.[0]).toMatchObject({
+      identity: identified,
+    });
+  });
+
+  it('drops a queued publication whose canonical destination changed before forwarding', async () => {
+    const pending = deferred<{ applied: boolean }>();
+    const h = await harness();
+    await h.create();
+    const connection = await h.ready();
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.session.receiveSandboxControlEvent.mockReturnValueOnce(pending.promise);
+    const payload = {
+      type: 'session.message.outcome',
+      properties: { messageId: 'msg_1', status: 'completed' },
+    };
+    const first = h.hooks.onSessionEvent?.(
+      { directory: route.directory, kiloSessionId: route.kiloSessionId },
+      payload,
+      connection,
+      '33333333-3333-4333-8333-333333333333',
+      1
     );
-    expect(h.runtime(connection.providerInstanceId)?.state.running).toBe(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+    const queued = h.hooks.onSessionEvent?.(
+      { directory: route.directory },
+      payload,
+      connection,
+      '44444444-4444-4444-8444-444444444444',
+      2
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+
+    h.records.set('session_routes', [
+      {
+        ...route,
+        sessionId: 'workspace_22222222-2222-4222-8222-222222222222',
+        kiloSessionId: 'ses_22222222222222222222222222',
+        nativeRuntimeId,
+      },
+    ]);
+    pending.resolve({ applied: true });
+    await expect(queued).resolves.toEqual({ applied: false });
+    await expect(first).resolves.toMatchObject({ applied: false });
+    await h.flush();
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('withholds a late publication until settlement, then reports delivered-late evidence and releases the lane', async () => {
+    const h = await harness();
+    await h.create();
+    const connection = await h.ready();
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    const late = deferred<{ applied: boolean }>();
+    const queued = deferred<{ applied: boolean }>();
+    h.session.receiveSandboxControlEvent
+      .mockReturnValueOnce(late.promise)
+      .mockReturnValueOnce(queued.promise);
+    const payload = {
+      type: 'session.message.outcome',
+      properties: { messageId: 'msg_1', status: 'completed' },
+    };
+    const identity = {
+      directory: route.directory,
+      kiloSessionId: route.kiloSessionId,
+      nativeRuntimeId,
+    };
+    try {
+      const first = h.hooks.onSessionEvent?.(
+        identity,
+        payload,
+        connection,
+        '33333333-3333-4333-8333-333333333333',
+        1
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+      let settled = false;
+      void Promise.resolve(first).then(() => {
+        settled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt + 1);
+      expect(settled).toBe(false);
+      expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+      expect(withFields).toHaveBeenCalledWith(
+        expect.objectContaining({
+          diagnosticEvent: 'forward_response_timeout',
+          operation: 'receiveSandboxControlEvent',
+        })
+      );
+
+      const second = h.hooks.onSessionEvent?.(
+        identity,
+        payload,
+        connection,
+        '44444444-4444-4444-8444-444444444444',
+        2
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+
+      expect(withFields).not.toHaveBeenCalledWith(
+        expect.objectContaining({ diagnosticEvent: 'forward_result' })
+      );
+      expect(withFields).not.toHaveBeenCalledWith(
+        expect.objectContaining({ diagnosticEvent: 'forward_settled' })
+      );
+
+      late.resolve({ applied: true });
+      await expect(first).resolves.toEqual({ applied: false, retryable: true });
+      expect(withFields).toHaveBeenCalledWith(
+        expect.objectContaining({
+          diagnosticEvent: 'forward_result',
+          result: 'delivered_late',
+          applied: true,
+        })
+      );
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(2);
+      queued.resolve({ applied: true });
+      await expect(second).resolves.toEqual({ applied: true });
+      await h.flush();
+    } finally {
+      late.resolve({ applied: true });
+      queued.resolve({ applied: true });
+      withFields.mockRestore();
+    }
   });
 
   it('does not quarantine a route detached while its forwarding acknowledgement was pending', async () => {

@@ -8,7 +8,12 @@ import { prepareIngestFrame } from '../../../src/shared/ingest-frame.js';
 import type { IngestEvent } from '../../../src/shared/protocol.js';
 import { withTimeoutAndAbort } from '../utils.js';
 import { createControlEventTransport } from './control-event-transport.js';
-import type { ControlEventOutboxFailure } from './control-event-outbox.js';
+import type { LegacySendResult } from './control-event-transport.js';
+import {
+  MAX_CONTROL_EVENT_OUTBOX_BYTES,
+  type ControlEventOutboxFailure,
+  type ControlEventPublicationFailureReason,
+} from './control-event-outbox.js';
 import {
   CONTROL_OPERATIONS,
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
@@ -45,6 +50,43 @@ type WebSocketCtor = new (
   options?: { headers?: Record<string, string> } | string | string[]
 ) => WebSocket;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export type EventPublicationObservation = {
+  outcome:
+    | 'acknowledged'
+    | 'rejected'
+    | 'timed_out'
+    | 'connection_closed'
+    | 'late_reply'
+    | 'tracking_evicted';
+  requestId?: string;
+  receiptId?: string;
+  sequence?: number;
+  event?: 'session.event' | 'session.preparing';
+  eventType?: string;
+  directory?: string;
+  kiloSessionId?: string;
+  rootKiloSessionId?: string;
+  nativeRuntimeId?: string;
+  connectionState?: string;
+  connectionId?: string;
+  sentAt?: number;
+  preparedAt?: number;
+  queueWaitMs?: number;
+  responseAt?: number;
+  waitMs?: number;
+  attemptCount?: number;
+  pendingCount: number;
+  pendingBytes: number;
+  socketBufferedBytes?: number;
+  neverSent?: boolean;
+  sentWithoutResponse?: boolean;
+  reason?: string;
+};
+
 export type SandboxControlRequestHandler = (
   operation: string,
   session: SessionRequestIdentity | undefined,
@@ -65,6 +107,7 @@ export type SandboxControlClientOptions = {
   onReconnectExhausted?: () => void;
   onConnected?: () => void;
   onEventReceiptFailure?: (failure: ControlEventOutboxFailure) => void;
+  onEventPublication?: (observation: EventPublicationObservation) => void;
   onReconcile?: (phase: 'drain' | 'ready' | 'commit', deadlineAt: number) => Promise<void> | void;
   log?: (message: string) => void;
   onDiagnostic?: ControlDiagnosticReporter;
@@ -74,7 +117,15 @@ export type SandboxControlClientOptions = {
 export class ControlDeliveryError extends Error {
   constructor(
     message: string,
-    readonly retryable: boolean
+    readonly retryable: boolean,
+    readonly publicationReason?: Extract<
+      ControlEventPublicationFailureReason,
+      'socket_overflow' | 'disconnected' | 'send_failed'
+    >,
+    readonly socketBufferedBytes?: number,
+    readonly requestId?: string,
+    readonly connectionState?: string,
+    readonly connectionId?: string
   ) {
     super(message);
   }
@@ -111,6 +162,7 @@ export type SandboxControlClient = {
     cleanupDeadlineAt: number;
   }): Promise<boolean>;
   supportsScopedCleanupResult?(): boolean;
+  snapshotEventDiagnostics?(): void;
 };
 
 type ClientState =
@@ -119,6 +171,7 @@ type ClientState =
   | {
       kind: 'ready';
       socket: WebSocket;
+      connectionId: string;
       dispose: () => void;
       kiloVersionHeartbeat: boolean;
       connectionRecovery: boolean;
@@ -225,12 +278,193 @@ export function createSandboxControlClient(
   let eventSequence = 0;
   let eventReceipts = false;
   const nativeRetirementReports = new Map<string, Promise<boolean>>();
+  const eventReceiptMetadata = new Map<string, EventReceiptMetadata>();
+  let eventReceiptBytes = 0;
+  const eventReceiptTotals = {
+    acknowledged: 0,
+    rejected: 0,
+    timedOut: 0,
+    connectionClosed: 0,
+    trackingEvicted: 0,
+    lateReplies: 0,
+    publicationFailures: 0,
+    neverSentFailures: 0,
+    sentWithoutResponseFailures: 0,
+  };
   const pendingRequests = new Map<
     string,
     { resolve: (frame: ResponseFrame) => void; reject: (reason: unknown) => void }
   >();
 
+  type EventReceiptMetadata = {
+    requestId: string;
+    sentAt: number;
+    preparedAt?: number;
+    queueWaitMs: number;
+    timeout: ReturnType<typeof setTimeout>;
+    bytes: number;
+    publication: {
+      event: 'session.event' | 'session.preparing';
+      eventType?: string;
+      receiptId: string;
+      sequence: number;
+      session: SessionEventIdentity;
+    };
+  };
+
+  const eventReceiptStats = (): { pendingCount: number; pendingBytes: number } => ({
+    pendingCount: eventReceiptMetadata.size,
+    pendingBytes: eventReceiptBytes,
+  });
+
+  const publicationEventType = (payload: unknown): string | undefined => {
+    if (!isRecord(payload) || typeof payload.type !== 'string') return undefined;
+    return payload.type.slice(0, 128);
+  };
+
+  const observeEventPublication = (
+    metadata: EventReceiptMetadata | undefined,
+    outcome: EventPublicationObservation['outcome'],
+    reason?: string,
+    responseAt = Date.now()
+  ): void => {
+    if (!metadata) {
+      eventReceiptTotals.lateReplies = Math.min(
+        Number.MAX_SAFE_INTEGER,
+        eventReceiptTotals.lateReplies + 1
+      );
+      try {
+        options.onEventPublication?.({
+          outcome: 'late_reply',
+          ...eventReceiptStats(),
+          reason,
+        });
+      } catch {
+        // Observation callbacks are best-effort.
+      }
+      return;
+    }
+    clearTimeout(metadata.timeout);
+    eventReceiptMetadata.delete(metadata.requestId);
+    eventReceiptBytes = Math.max(0, eventReceiptBytes - metadata.bytes);
+    if (outcome === 'acknowledged')
+      eventReceiptTotals.acknowledged = Math.min(
+        Number.MAX_SAFE_INTEGER,
+        eventReceiptTotals.acknowledged + 1
+      );
+    else if (outcome === 'rejected')
+      eventReceiptTotals.rejected = Math.min(
+        Number.MAX_SAFE_INTEGER,
+        eventReceiptTotals.rejected + 1
+      );
+    else if (outcome === 'timed_out')
+      eventReceiptTotals.timedOut = Math.min(
+        Number.MAX_SAFE_INTEGER,
+        eventReceiptTotals.timedOut + 1
+      );
+    else if (outcome === 'connection_closed')
+      eventReceiptTotals.connectionClosed = Math.min(
+        Number.MAX_SAFE_INTEGER,
+        eventReceiptTotals.connectionClosed + 1
+      );
+    else if (outcome === 'tracking_evicted')
+      eventReceiptTotals.trackingEvicted = Math.min(
+        Number.MAX_SAFE_INTEGER,
+        eventReceiptTotals.trackingEvicted + 1
+      );
+    try {
+      options.onEventPublication?.({
+        outcome,
+        requestId: metadata.requestId,
+        receiptId: metadata.publication.receiptId,
+        sequence: metadata.publication.sequence,
+        event: metadata.publication.event,
+        eventType: metadata.publication.eventType,
+        directory: metadata.publication.session.directory,
+        kiloSessionId: metadata.publication.session.kiloSessionId,
+        rootKiloSessionId: metadata.publication.session.rootKiloSessionId,
+        nativeRuntimeId: metadata.publication.session.nativeRuntimeId,
+        connectionState: state.kind,
+        connectionId: state.kind === 'ready' ? state.connectionId : undefined,
+        sentAt: metadata.sentAt,
+        ...(metadata.preparedAt === undefined ? {} : { preparedAt: metadata.preparedAt }),
+        queueWaitMs: metadata.queueWaitMs,
+        responseAt,
+        waitMs: Math.max(0, responseAt - metadata.sentAt),
+        attemptCount: 1,
+        ...eventReceiptStats(),
+        ...(reason ? { reason } : {}),
+      });
+    } catch {
+      // Observation callbacks are best-effort.
+    }
+  };
+
+  const clearEventReceiptTracking = (reason: string): void => {
+    for (const metadata of [...eventReceiptMetadata.values()])
+      observeEventPublication(metadata, 'connection_closed', reason);
+    eventReceiptMetadata.clear();
+    eventReceiptBytes = 0;
+  };
+
+  const reportUntrackedPublicationFailure = (
+    event: 'session.event' | 'session.preparing',
+    session: SessionEventIdentity,
+    reason: string,
+    payload?: unknown
+  ): void => {
+    eventReceiptTotals.publicationFailures = Math.min(
+      Number.MAX_SAFE_INTEGER,
+      eventReceiptTotals.publicationFailures + 1
+    );
+    eventReceiptTotals.neverSentFailures = Math.min(
+      Number.MAX_SAFE_INTEGER,
+      eventReceiptTotals.neverSentFailures + 1
+    );
+    try {
+      options.onEventPublication?.({
+        outcome: 'rejected',
+        event,
+        eventType: publicationEventType(payload),
+        sequence: eventSequence,
+        directory: session.directory,
+        kiloSessionId: session.kiloSessionId,
+        rootKiloSessionId: session.rootKiloSessionId,
+        nativeRuntimeId: session.nativeRuntimeId,
+        connectionState: state.kind,
+        connectionId: state.kind === 'ready' ? state.connectionId : undefined,
+        ...eventReceiptStats(),
+        socketBufferedBytes: state.kind === 'ready' ? state.socket.bufferedAmount : undefined,
+        neverSent: true,
+        sentWithoutResponse: false,
+        reason,
+      });
+    } catch {
+      // Observation callbacks are best-effort.
+    }
+  };
+
   function settleResponse(frame: ResponseFrame): void {
+    const eventMetadata = eventReceiptMetadata.get(frame.requestId);
+    if (eventMetadata) {
+      const acknowledgement = frame.ok
+        ? sandboxEventPublicationResultSchema.safeParse(frame.result)
+        : undefined;
+      const acknowledged =
+        acknowledgement?.success === true &&
+        acknowledgement.data.receiptId === eventMetadata.publication.receiptId;
+      const reason = acknowledged
+        ? undefined
+        : frame.ok
+          ? 'event_receipt_invalid'
+          : (frame.error?.code ?? 'event_rejected');
+      observeEventPublication(eventMetadata, acknowledged ? 'acknowledged' : 'rejected', reason);
+      return;
+    }
+    if (frame.requestId.startsWith('event_')) {
+      observeEventPublication(undefined, 'late_reply', 'event_receipt_unknown');
+      return;
+    }
     const waiter = pendingRequests.get(frame.requestId);
     if (!waiter) return;
     pendingRequests.delete(frame.requestId);
@@ -255,6 +489,7 @@ export function createSandboxControlClient(
     const current = state;
     diagnostic('retired', ws);
     rejectPendingRequests('Sandbox control connection closed');
+    clearEventReceiptTracking('connection_closed');
     state = { kind: 'idle' };
     readiness = Promise.withResolvers<void>();
     current.dispose();
@@ -457,6 +692,7 @@ export function createSandboxControlClient(
     return new Promise((resolve, reject) => {
       diagnostic('opening');
       const ws = (options.openWebSocket ?? defaultOpenWebSocket)(options.url, options.credential);
+      const connectionId = crypto.randomUUID();
       const signal = starting.abort.signal;
       const requestId = crypto.randomUUID();
       let phase: 'opening' | 'hello' | 'status' | 'finished' = 'opening';
@@ -620,6 +856,7 @@ export function createSandboxControlClient(
         state = {
           kind: 'ready',
           socket: ws,
+          connectionId,
           kiloVersionHeartbeat,
           connectionRecovery,
           eventReceipts: negotiatedEventReceipts,
@@ -634,7 +871,7 @@ export function createSandboxControlClient(
         resolve();
         readiness.resolve();
         options.onConnected?.();
-        void eventTransport.resume();
+        void eventTransport.resume().catch(() => undefined);
       }
 
       signal.addEventListener('abort', fail, { once: true });
@@ -754,17 +991,26 @@ export function createSandboxControlClient(
       session: SessionEventIdentity;
       payload: unknown;
     },
-    deadlineAt: number
+    deadlineAt: number,
+    preparedAt?: number
   ): Promise<void> {
+    const requestId = `event_${crypto.randomUUID()}`;
     if (
       state.kind !== 'ready' ||
       !state.eventReceipts ||
       state.socket.readyState !== 1 ||
       Date.now() >= deadlineAt
     )
-      throw new ControlDeliveryError('Control event transport is unavailable', true);
+      throw new ControlDeliveryError(
+        'Control event transport is unavailable',
+        true,
+        'disconnected',
+        undefined,
+        requestId,
+        state.kind,
+        state.kind === 'ready' ? state.connectionId : undefined
+      );
     const socket = state.socket;
-    const requestId = crypto.randomUUID();
     const frame: RequestFrame = {
       type: 'request',
       requestId,
@@ -773,64 +1019,100 @@ export function createSandboxControlClient(
     };
     const serialized = JSON.stringify(frame);
     if (Buffer.byteLength(serialized) > MAX_SANDBOX_CONTROL_FRAME_BYTES)
-      throw new ControlDeliveryError('Control event exceeds the frame budget', false);
-    const response = await new Promise<ResponseFrame>((resolve, reject) => {
-      const timeout = setTimeout(
-        () => {
-          pendingRequests.delete(requestId);
-          reject(new ControlDeliveryError('Control event receipt timed out', true));
-        },
-        Math.max(1, Math.min(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS, deadlineAt - Date.now()))
-      );
-      timeout.unref();
-      pendingRequests.set(requestId, {
-        resolve: frame => {
-          clearTimeout(timeout);
-          resolve(frame);
-        },
-        reject: reason => {
-          clearTimeout(timeout);
-          reject(reason);
-        },
-      });
-      try {
-        socket.send(serialized);
-      } catch {
-        pendingRequests.delete(requestId);
-        clearTimeout(timeout);
-        reject(new ControlDeliveryError('Control event publication failed', true));
-      }
-    });
-    if (
-      state.kind !== 'ready' ||
-      state.socket !== socket ||
-      socket.readyState !== 1 ||
-      Date.now() >= deadlineAt
-    )
-      throw new ControlDeliveryError('Control event acknowledgement is stale', true);
-    if (!response.ok)
       throw new ControlDeliveryError(
-        'Control event was not acknowledged',
-        response.error?.retryable === true && !PERMANENT_CONTROL_ERRORS.has(response.error.code)
+        'Control event exceeds the frame budget',
+        false,
+        'send_failed',
+        undefined,
+        requestId,
+        state.kind,
+        state.kind === 'ready' ? state.connectionId : undefined
       );
-    const acknowledgement = sandboxEventPublicationResultSchema.safeParse(response.result);
-    if (!acknowledgement.success || acknowledgement.data.receiptId !== publication.receiptId)
-      throw new ControlDeliveryError('Control event acknowledgement is invalid', false);
+    const bytes = Buffer.byteLength(serialized);
+    const bufferedBytes = socket.bufferedAmount;
+    if (bufferedBytes + bytes > MAX_CONTROL_EVENT_OUTBOX_BYTES)
+      throw new ControlDeliveryError(
+        'Control event socket capacity is unavailable',
+        true,
+        'socket_overflow',
+        bufferedBytes,
+        requestId,
+        state.kind,
+        state.kind === 'ready' ? state.connectionId : undefined
+      );
+    const metadataBytes = Buffer.byteLength(
+      JSON.stringify({
+        requestId,
+        receiptId: publication.receiptId,
+        sequence: publication.sequence,
+        session: publication.session,
+      })
+    );
+    while (
+      eventReceiptMetadata.size >= 256 ||
+      eventReceiptBytes + metadataBytes > MAX_CONTROL_EVENT_OUTBOX_BYTES
+    ) {
+      const oldest = eventReceiptMetadata.values().next().value;
+      if (!oldest) break;
+      observeEventPublication(oldest, 'tracking_evicted', 'event_ack_tracking_evicted');
+    }
+    const sentAt = Date.now();
+    const timeout = setTimeout(() => {
+      const current = eventReceiptMetadata.get(requestId);
+      if (current) observeEventPublication(current, 'timed_out', 'event_receipt_timeout');
+    }, 30_000);
+    timeout.unref();
+    const metadata: EventReceiptMetadata = {
+      requestId,
+      sentAt,
+      ...(preparedAt === undefined ? {} : { preparedAt }),
+      queueWaitMs: Math.max(0, sentAt - (preparedAt ?? sentAt)),
+      timeout,
+      bytes: metadataBytes,
+      publication: {
+        event: publication.event,
+        eventType: publicationEventType(publication.payload),
+        receiptId: publication.receiptId,
+        sequence: publication.sequence,
+        session: publication.session,
+      },
+    };
+    eventReceiptMetadata.set(requestId, metadata);
+    eventReceiptBytes += metadataBytes;
+    try {
+      socket.send(serialized);
+    } catch {
+      clearTimeout(metadata.timeout);
+      eventReceiptMetadata.delete(metadata.requestId);
+      eventReceiptBytes = Math.max(0, eventReceiptBytes - metadata.bytes);
+      throw new ControlDeliveryError(
+        'Control event publication failed',
+        false,
+        'send_failed',
+        socket.bufferedAmount,
+        requestId,
+        state.kind,
+        state.kind === 'ready' ? state.connectionId : undefined
+      );
+    }
   }
 
-  function sendLegacySessionEvent(payload: unknown, session: SessionEventIdentity): boolean {
-    if (state.kind !== 'ready') return false;
+  function sendLegacySessionEvent(
+    event: 'session.event' | 'session.preparing',
+    payload: unknown,
+    session: SessionEventIdentity
+  ): LegacySendResult {
+    if (state.kind !== 'ready') return { sent: false, reason: 'disconnected' };
     const { socket } = state;
-    if (socket.readyState !== 1) {
-      retireConnection(socket);
-      return false;
-    }
+    if (socket.readyState !== 1) return { sent: false, reason: 'disconnected' };
     try {
-      socket.send(serializeEvent('session.event', payload, session));
-      return true;
+      const serialized = serializeEvent(event, payload, session);
+      if (socket.bufferedAmount + Buffer.byteLength(serialized) > MAX_CONTROL_EVENT_OUTBOX_BYTES)
+        return { sent: false, reason: 'socket_overflow' };
+      socket.send(serialized);
+      return { sent: true };
     } catch {
-      retireConnection(socket);
-      return false;
+      return { sent: false, reason: 'send_failed' };
     }
   }
 
@@ -845,12 +1127,57 @@ export function createSandboxControlClient(
             payload: prepareSessionEvent(sessionEventPayloadSchema.parse(payload)),
           }
         : { event, session, payload: sessionPreparingPayloadSchema.parse(payload) },
-    sendLegacy: (payload, session) => sendLegacySessionEvent(payload, session),
+    sendLegacy: (event, payload, session) => sendLegacySessionEvent(event, payload, session),
     onFailure: failure => {
-      options.log?.(`sandbox control event publication ${failure.reason}`);
+      eventReceiptTotals.publicationFailures = Math.min(
+        Number.MAX_SAFE_INTEGER,
+        eventReceiptTotals.publicationFailures + 1
+      );
+      if (failure.sent)
+        eventReceiptTotals.sentWithoutResponseFailures = Math.min(
+          Number.MAX_SAFE_INTEGER,
+          eventReceiptTotals.sentWithoutResponseFailures + 1
+        );
+      else
+        eventReceiptTotals.neverSentFailures = Math.min(
+          Number.MAX_SAFE_INTEGER,
+          eventReceiptTotals.neverSentFailures + 1
+        );
       options.onEventReceiptFailure?.(failure);
     },
+    onAdmissionFailure: ({ event, session, reason }) =>
+      reportUntrackedPublicationFailure(event, session, reason),
   });
+
+  function snapshotEventDiagnostics(): void {
+    if (
+      eventReceiptTotals.acknowledged === 0 &&
+      eventReceiptTotals.rejected === 0 &&
+      eventReceiptTotals.timedOut === 0 &&
+      eventReceiptTotals.connectionClosed === 0 &&
+      eventReceiptTotals.trackingEvicted === 0 &&
+      eventReceiptTotals.lateReplies === 0 &&
+      eventReceiptTotals.publicationFailures === 0 &&
+      eventReceiptMetadata.size === 0
+    )
+      return;
+    emitControlDiagnostic(options.onDiagnostic, 'control.event', {
+      phase: 'publication_summary',
+      category: 'session_event',
+      acknowledgedCount: eventReceiptTotals.acknowledged,
+      rejectedCount: eventReceiptTotals.rejected,
+      timeoutCount: eventReceiptTotals.timedOut,
+      connectionClosedCount: eventReceiptTotals.connectionClosed,
+      trackingEvictionCount: eventReceiptTotals.trackingEvicted,
+      lateReplyCount: eventReceiptTotals.lateReplies,
+      failureCount: eventReceiptTotals.publicationFailures,
+      neverSentCount: eventReceiptTotals.neverSentFailures,
+      sentWithoutResponseCount: eventReceiptTotals.sentWithoutResponseFailures,
+      outstandingEventAcks: eventReceiptMetadata.size,
+      outstandingEventAckBytes: eventReceiptBytes,
+      socketBufferedBytes: state.kind === 'ready' ? state.socket.bufferedAmount : undefined,
+    });
+  }
 
   async function sendNativeRuntimeRetirement(
     payload: ReturnType<typeof sessionNativeRuntimeRetirementPayloadSchema.parse>,
@@ -936,6 +1263,7 @@ export function createSandboxControlClient(
       const current = state;
       diagnostic('closed', current.kind === 'ready' ? current.socket : undefined);
       rejectPendingRequests('Sandbox control client closed');
+      clearEventReceiptTracking('client_closed');
       eventTransport.close();
       state = { kind: 'closed' };
       readiness.resolve();
@@ -1055,6 +1383,8 @@ export function createSandboxControlClient(
       return state.kind === 'ready' && state.scopedCleanupResult;
     },
 
+    snapshotEventDiagnostics,
+
     async publishSessionEvent(payload, session): Promise<boolean> {
       return eventTransport.publishSessionEvent(payload, session);
     },
@@ -1090,23 +1420,22 @@ export function createSandboxControlClient(
           bytes,
           bufferedBytes: state.kind === 'ready' ? state.socket.bufferedAmount : undefined,
         });
-      if (
-        eventReceipts &&
-        session &&
-        (event === 'session.event' || event === 'session.preparing')
-      ) {
-        try {
-          const accepted = eventTransport.enqueue(event, payload, session);
-          if (!accepted) eventDiagnostic('outbox_rejected');
-          else {
-            void eventTransport.resume();
-            eventDiagnostic('outbox_enqueued');
+      const sessionPublication =
+        session !== undefined && (event === 'session.event' || event === 'session.preparing');
+      if (sessionPublication) {
+        if (eventReceipts) {
+          try {
+            const accepted = eventTransport.enqueue(event, payload, session);
+            if (accepted) void eventTransport.resume().catch(() => undefined);
+            return accepted;
+          } catch {
+            reportUntrackedPublicationFailure(event, session, 'send_failed', payload);
+            return false;
           }
-          return accepted;
-        } catch {
-          eventDiagnostic('outbox_rejected');
-          return false;
         }
+        const result = sendLegacySessionEvent(event, payload, session);
+        if (!result.sent) reportUntrackedPublicationFailure(event, session, result.reason, payload);
+        return result.sent;
       }
       if (state.kind !== 'ready') {
         eventDiagnostic('skipped');
@@ -1124,11 +1453,12 @@ export function createSandboxControlClient(
         if (heartbeat && !state.kiloVersionHeartbeat) delete heartbeat.kilo.version;
         const serialized = serializeEvent(event, heartbeat ?? payload, session);
         socket.send(serialized);
-        eventDiagnostic('sent', Buffer.byteLength(serialized));
+        if (category !== 'outcome') eventDiagnostic('sent', Buffer.byteLength(serialized));
         return true;
       } catch {
         eventDiagnostic('send_failed');
-        if (!deliveryOptions?.preserveConnectionOnFailure) retireConnection(socket);
+        if (category !== 'outcome' && !deliveryOptions?.preserveConnectionOnFailure)
+          retireConnection(socket);
         return false;
       }
     },

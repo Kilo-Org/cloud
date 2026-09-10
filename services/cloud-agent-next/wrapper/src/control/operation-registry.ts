@@ -40,6 +40,13 @@ type OperationRegistryDependencies = {
       deadlineAt: number,
       reason?: string
     ): Promise<NativeRetirement | 'shared'>;
+    deferRuntimeRetirementIfShared?(
+      directory: string,
+      target: NativeOperationTarget,
+      retiringRoot: string,
+      deadlineAt: number,
+      reason?: string
+    ): Promise<NativeRetirement | 'shared'>;
     rootRetirementScope?(
       directory: string,
       target: NativeOperationTarget,
@@ -609,24 +616,6 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
     }
   }
 
-  function publicationFailureBlocks(operation: string, session: SessionRequestIdentity): boolean {
-    if (!ROOT_SCOPED_WORK.has(operation)) return false;
-    clearStaleScopedFailures();
-    const root = rootForSession(session.kiloSessionId, session.directory);
-    if (!root) return false;
-    const runtime = deps.native.get(session);
-    for (const failure of scopedFailures.values()) {
-      if (
-        failure.directory === session.directory &&
-        failure.root === root &&
-        failure.result !== 'confirmed' &&
-        (runtime === undefined || runtime.runtimeId === failure.nativeRuntimeId)
-      )
-        return true;
-    }
-    return false;
-  }
-
   function prune(now = Date.now()): void {
     for (const [id, operation] of retained) {
       if (!operation.canPrune(now)) continue;
@@ -658,11 +647,6 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
   ): Admission {
     clearStaleScopedFailures();
     if (operation !== 'session.operation.get' && !authorization) {
-      if (publicationFailureBlocks(operation, session))
-        return {
-          kind: 'reply',
-          result: rejectBeforeAdmission('not_ready', 'Native runtime cleanup is unconfirmed', true),
-        };
       return { kind: 'continue' };
     }
     const reply = (result: ControlHandlerResult | Promise<ControlHandlerResult>): Admission => ({
@@ -727,10 +711,6 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
       );
     }
     if (operation === 'session.operation.get') return reply(ok({ state: 'missing' }));
-    if (publicationFailureBlocks(operation, session))
-      return reply(
-        rejectBeforeAdmission('not_ready', 'Native runtime cleanup is unconfirmed', true)
-      );
     if (Date.now() >= target.dispatchDeadlineAt)
       return reply(
         rejectBeforeAdmission('not_ready', 'Operation dispatch authorization expired', false)
@@ -803,17 +783,26 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
         }
         const retiringRoot =
           rootForSession(identity.kiloSessionId, identity.directory) ?? identity.kiloSessionId;
-        const retirement = deps.native.retireRuntimeIfUnshared
-          ? deps.native.retireRuntimeIfUnshared(
+        const retirement = deps.native.deferRuntimeRetirementIfShared
+          ? deps.native.deferRuntimeRetirementIfShared(
               identity.directory,
               target,
               retiringRoot,
               deadlineAt,
               reason
             )
-          : deps.native.rootRetirementScope?.(identity.directory, target, retiringRoot) === 'shared'
-            ? Promise.resolve<'shared'>('shared')
-            : retireDirectory(identity.directory, reason, deadlineAt, target);
+          : deps.native.retireRuntimeIfUnshared
+            ? deps.native.retireRuntimeIfUnshared(
+                identity.directory,
+                target,
+                retiringRoot,
+                deadlineAt,
+                reason
+              )
+            : deps.native.rootRetirementScope?.(identity.directory, target, retiringRoot) ===
+                'shared'
+              ? Promise.resolve<'shared'>('shared')
+              : retireDirectory(identity.directory, reason, deadlineAt, target);
         void retirement.then(retirement => {
           if (retirement === 'unconfirmed') deps.retireRuntime(reason);
         });

@@ -1,4 +1,4 @@
-import { describe, expect, it, mock, spyOn } from 'bun:test';
+import { describe, expect, it, mock, setSystemTime, spyOn } from 'bun:test';
 import { z } from 'zod';
 import { helloResult } from '../../../src/sandbox-control/frames';
 import { buildHeartbeatPayload, createControlHandlerDeps } from './sandbox-control-handlers';
@@ -15,6 +15,10 @@ import { unfilteredKiloEvents } from './feed';
 import { acknowledgeOperation, operationAuthorization } from './control-test-fixtures';
 import { createControlEventFailureHandler } from './control-event-transport';
 import {
+  MAX_CONTROL_EVENT_OUTBOX_BYTES,
+  type ControlEventOutboxFailure,
+} from './control-event-outbox';
+import {
   MAX_WORKTREE_FILE_BYTES,
   MAX_WORKTREE_SNAPSHOT_BYTES,
   sessionGitSnapshotResultSchema,
@@ -28,6 +32,7 @@ import {
 class FakeWebSocket {
   readyState = 0;
   sent: string[] = [];
+  bufferedAmount = 0;
   private listeners = new Map<string, Set<(event: MessageEvent | Event) => void>>();
 
   addEventListener(type: string, listener: (event: MessageEvent | Event) => void): void {
@@ -1223,12 +1228,10 @@ describe('createSandboxControlClient', () => {
     'false-ack',
     'wrong-receipt',
   ] as const)(
-    'preserves N1 before N2 ordering through publication disposition: %s',
+    'preserves N1 before N2 order through publication disposition: %s without resending',
     async disposition => {
-      const failure = mock(() => {});
       const logs: string[] = [];
       const { client, sockets, onDisconnected } = createClientFixture({
-        onEventReceiptFailure: failure,
         log: message => logs.push(message),
       });
       const hello = {
@@ -1243,25 +1246,10 @@ describe('createSandboxControlClient', () => {
       try {
         const connecting = client.connect();
         await Promise.resolve();
-        await handshake(sockets[0], hello);
+        const socket = sockets[0];
+        if (!socket) throw new Error('Missing socket');
+        await handshake(socket, hello);
         await connecting;
-        sockets[0]?.close();
-        for (const nativeRuntimeId of nativeIds)
-          expect(
-            client.sendEvent?.(
-              'session.event',
-              { type: 'session.status', properties: { status: { type: 'idle' } } },
-              {
-                directory: '/workspace',
-                kiloSessionId: 'ses_1',
-                rootKiloSessionId: 'ses_1',
-                nativeRuntimeId,
-              }
-            )
-          ).toBe(true);
-        await waitForReconnect();
-        const socket = sockets[1];
-        if (!socket) throw new Error('Missing replacement socket');
         socket.send = data => {
           socket.sent.push(data);
           const frame = JSON.parse(data) as {
@@ -1301,41 +1289,27 @@ describe('createSandboxControlClient', () => {
             JSON.stringify({ type: 'response', requestId: frame.requestId, ...response })
           );
         };
-        await handshake(socket, hello);
+        for (const nativeRuntimeId of nativeIds)
+          expect(
+            client.sendEvent?.(
+              'session.event',
+              { type: 'session.status', properties: { status: { type: 'idle' } } },
+              {
+                directory: '/workspace',
+                kiloSessionId: 'ses_1',
+                rootKiloSessionId: 'ses_1',
+                nativeRuntimeId,
+              }
+            )
+          ).toBe(true);
         await firstPublished.promise;
+        await replacementPublished.promise;
         await waitForReconnect();
-        if (disposition === 'retryable-rejection' || disposition === 'transport-error') {
-          expect(published.map(item => item.session.nativeRuntimeId)).toEqual(
-            nativeIds.slice(0, 1)
-          );
-          await replacementPublished.promise;
-          await waitForReconnect();
-          expect(published.map(item => item.session.nativeRuntimeId)).toEqual([
-            nativeIds[0],
-            ...nativeIds,
-          ]);
-          expect(published.map(item => item.sequence)).toEqual([1, 1, 2]);
-          expect(published[1]).toEqual(published[0]);
-          expect(failure).not.toHaveBeenCalled();
-          expect(logs).not.toContain('sandbox control event publication rejected');
-        } else {
-          expect(published.map(item => item.session.nativeRuntimeId)).toEqual(nativeIds);
-          expect(published.map(item => item.sequence)).toEqual([1, 2]);
-          expect(failure).toHaveBeenCalledTimes(1);
-          expect(failure).toHaveBeenCalledWith({
-            reason: 'rejected',
-            publication: expect.objectContaining(published[0]),
-          });
-          expect(logs).toContain('sandbox control event publication rejected');
-        }
-        expect(socket.readyState).toBe(1);
-        expect(sockets).toHaveLength(2);
-        socket.close();
-        await waitForReconnect();
-        await handshake(sockets[2], hello);
-        await waitForReconnect();
-        expect(sockets[2]?.sent.some(data => data.includes('sandbox.event.publish'))).toBe(false);
+        expect(published.map(item => item.session.nativeRuntimeId)).toEqual(nativeIds);
+        expect(published.map(item => item.sequence)).toEqual([1, 2]);
+        expect(logs).not.toContain('sandbox control event publication rejected');
         expect(onDisconnected).not.toHaveBeenCalled();
+        expect(socket.readyState).toBe(1);
         expect(logs.join('\n')).not.toContain('private rejected input');
       } finally {
         client.close();
@@ -1343,13 +1317,60 @@ describe('createSandboxControlClient', () => {
     }
   );
 
-  it('keeps reconnect readiness, attach, maintenance and sealed results independent of expiring N1 events', async () => {
+  it('releases the lane at local handoff while an earlier event response is withheld', async () => {
+    const { client, sockets } = createClientFixture({});
+    const hello = {
+      protocolVersion: 1,
+      handshakeComplete: true,
+      capabilities: { connectionRecovery: true, eventReceipts: true },
+    };
+    const connecting = client.connect();
+    await Promise.resolve();
+    const socket = sockets[0];
+    if (!socket) throw new Error('Missing socket');
+    await handshake(socket, hello);
+    await connecting;
+    const frames: Array<{ requestId: string; sequence: number; receiptId: string }> = [];
+    socket.send = data => {
+      socket.sent.push(data);
+      const frame = JSON.parse(data) as { operation?: string; requestId: string; payload: unknown };
+      if (frame.operation !== 'sandbox.event.publish') return;
+      const publication = sandboxEventPublicationPayloadSchema.parse(frame.payload);
+      frames.push({
+        requestId: frame.requestId,
+        sequence: publication.sequence,
+        receiptId: publication.receiptId,
+      });
+    };
+    const identity = {
+      directory: '/workspace',
+      kiloSessionId: 'ses_1',
+      rootKiloSessionId: 'ses_1',
+      nativeRuntimeId: crypto.randomUUID(),
+    };
+    try {
+      expect(
+        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, identity)
+      ).toBe(true);
+      expect(
+        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, identity)
+      ).toBe(true);
+      await Promise.resolve();
+      await new Promise(resolve => setTimeout(resolve, 10));
+      expect(frames.map(frame => frame.sequence)).toEqual([1, 2]);
+      expect(frames[0]?.requestId).not.toBe(frames[1]?.requestId);
+      expect(frames[0]?.receiptId).not.toBe(frames[1]?.receiptId);
+      expect(socket.readyState).toBe(1);
+    } finally {
+      client.close();
+    }
+  });
+
+  it('keeps reconnect readiness, attach, maintenance and sealed results independent of a failed event publication', async () => {
     const startedAt = Date.now();
-    const clock = spyOn(Date, 'now').mockReturnValue(startedAt);
-    const timers = spyOn(globalThis, 'setTimeout');
     const failure = mock();
     const retire = mock();
-    let currentRuntime = { runtimeId: crypto.randomUUID() };
+    const currentRuntime = { runtimeId: crypto.randomUUID() };
     const handleFailure = createControlEventFailureHandler({
       getRuntime: () => currentRuntime,
       onFailure: retire,
@@ -1393,9 +1414,6 @@ describe('createSandboxControlClient', () => {
       await handshake(sockets[0], hello);
       await connecting;
       sockets[0]?.close();
-      expect(
-        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, identity)
-      ).toBe(true);
       const result = client
         .sendOperationResult?.(
           delivery.authorization.session,
@@ -1412,20 +1430,29 @@ describe('createSandboxControlClient', () => {
         cleanupDeadlineAt: startedAt + 60_000,
       });
       await waitForReconnect();
-      clock.mockReturnValue(startedAt + 250);
       const socket = sockets[1];
       if (!socket) throw new Error('Missing replacement socket');
-      const reconnectTimers = timers.mock.calls.length;
+      const send = socket.send.bind(socket);
+      socket.send = data => {
+        const frame = JSON.parse(data) as { operation?: string };
+        if (frame.operation === 'sandbox.event.publish') throw new Error('send failed');
+        send(data);
+      };
       await handshake(socket, hello);
       await waitForReconnect();
+      expect(
+        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, identity)
+      ).toBe(true);
+      await waitForReconnect();
       const frames = socket.sent.map(data => JSON.parse(data));
-      const eventFrame = frames.find(frame => frame.operation === 'sandbox.event.publish');
       const resultFrame = frames.find(frame => frame.operation === 'session.operation.result');
       const retirementFrame = frames.find(frame => frame.operation === 'session.runtime.retired');
       expect(connected).toHaveBeenCalledTimes(2);
-      expect(eventFrame?.payload.session.nativeRuntimeId).toBe(identity.nativeRuntimeId);
       expect(resultFrame?.payload).toEqual(delivery);
       expect(retirementFrame).toBeDefined();
+      expect(failure).toHaveBeenCalledTimes(1);
+      expect(failure.mock.calls[0]?.[0]).toMatchObject({ reason: 'send_failed' });
+      expect(retire).not.toHaveBeenCalled();
       socket.respond(
         JSON.stringify({
           type: 'request',
@@ -1453,39 +1480,6 @@ describe('createSandboxControlClient', () => {
         })
       );
       expect(await retirement).toBe(true);
-      clock.mockReturnValue(startedAt + 29_000);
-      const replacement = { ...identity, nativeRuntimeId: crypto.randomUUID() };
-      currentRuntime = { runtimeId: replacement.nativeRuntimeId };
-      expect(
-        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, replacement)
-      ).toBe(true);
-      clock.mockReturnValue(startedAt + 30_000);
-      for (let index = reconnectTimers; index < timers.mock.calls.length; index += 1) {
-        const [expire, ms] = timers.mock.calls[index] ?? [];
-        if (ms !== 29_750 || typeof expire !== 'function') continue;
-        clearTimeout(
-          timers.mock.results[index]?.value as ReturnType<typeof setTimeout> | undefined
-        );
-        expire();
-      }
-      await waitForReconnect();
-      expect(logs).toContain('sandbox control event publication expired');
-      expect(failure).toHaveBeenCalledTimes(1);
-      expect(failure).toHaveBeenCalledWith({
-        reason: 'expired',
-        publication: expect.objectContaining(eventFrame.payload),
-      });
-      expect(retire).not.toHaveBeenCalled();
-      expect(onDisconnected).not.toHaveBeenCalled();
-      expect(socket.readyState).toBe(1);
-      const replacementFrame = socket.sent
-        .map(data => JSON.parse(data))
-        .find(
-          frame =>
-            frame.operation === 'sandbox.event.publish' &&
-            frame.payload.session.nativeRuntimeId === replacement.nativeRuntimeId
-        );
-      expect(replacementFrame).toBeDefined();
       socket.respond(
         JSON.stringify({
           type: 'response',
@@ -1495,22 +1489,14 @@ describe('createSandboxControlClient', () => {
         })
       );
       expect(await result).toEqual(acknowledgement);
-      socket.respond(
-        JSON.stringify({
-          type: 'response',
-          requestId: replacementFrame.requestId,
-          ok: true,
-          result: { receiptId: replacementFrame.payload.receiptId, applied: true },
-        })
-      );
-      await waitForReconnect();
       expect(failure).toHaveBeenCalledTimes(1);
       expect(retire).not.toHaveBeenCalled();
+      expect(onDisconnected).not.toHaveBeenCalled();
+      expect(socket.readyState).toBe(1);
       expect(sockets).toHaveLength(2);
+      expect(logs.join('\n')).not.toContain('private');
     } finally {
       client.close();
-      timers.mockRestore();
-      clock.mockRestore();
     }
   });
 
@@ -2121,9 +2107,9 @@ describe('createSandboxControlClient', () => {
           )
         ).toBe(false);
       }
-      await waitForReconnect();
       socket.error();
       socket.close();
+      await waitForReconnect();
       expect(onDisconnected).toHaveBeenCalledTimes(0);
       expect(openWebSocket).toHaveBeenCalledTimes(2);
       expect(client.sendEvent?.('sandbox.ready', { kiloReady: true })).toBe(false);
@@ -2240,6 +2226,276 @@ describe('createSandboxControlClient', () => {
     expect(joined).not.toContain('Authorization');
     expect(joined).toContain('sandbox control connect failed');
     client.close();
+  });
+});
+
+describe('event receipt tracking bounds and reporting', () => {
+  const receiptHello = {
+    protocolVersion: 1,
+    handshakeComplete: true,
+    capabilities: { connectionRecovery: true, eventReceipts: true },
+  } as const;
+
+  const identity = () => ({
+    directory: '/workspace',
+    kiloSessionId: 'ses_1',
+    rootKiloSessionId: 'ses_1',
+    nativeRuntimeId: crypto.randomUUID(),
+  });
+
+  it('evicts the oldest tracked receipt at the cap, accepts out-of-order and late replies, and tears down on close', async () => {
+    const observations: Array<Record<string, unknown>> = [];
+    const diagnostics: Array<Record<string, unknown>> = [];
+    const ackTimers: unknown[] = [];
+    const timers = spyOn(globalThis, 'setTimeout');
+    const cleared = spyOn(globalThis, 'clearTimeout');
+    const { client, sockets } = createClientFixture({
+      onEventPublication: observation => {
+        observations.push(observation as unknown as Record<string, unknown>);
+      },
+      onDiagnostic: (_event, fields) => {
+        diagnostics.push(fields as Record<string, unknown>);
+      },
+    });
+    const frames: Array<{ requestId: string; receiptId: string; sequence: number }> = [];
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      const socket = sockets[0];
+      if (!socket) throw new Error('Missing socket');
+      await handshake(socket, receiptHello);
+      await connecting;
+      socket.send = data => {
+        socket.sent.push(data);
+        const frame = JSON.parse(data) as {
+          operation?: string;
+          requestId: string;
+          payload: unknown;
+        };
+        if (frame.operation !== 'sandbox.event.publish') return;
+        const publication = sandboxEventPublicationPayloadSchema.parse(frame.payload);
+        frames.push({
+          requestId: frame.requestId,
+          receiptId: publication.receiptId,
+          sequence: publication.sequence,
+        });
+        ackTimers.push(timers.mock.results.at(-1)?.value);
+      };
+      const session = identity();
+      for (let index = 0; index < 257; index += 1) {
+        expect(
+          client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, session)
+        ).toBe(true);
+        await waitForReconnect();
+      }
+
+      expect(frames).toHaveLength(257);
+      const evictions = observations.filter(entry => entry.outcome === 'tracking_evicted');
+      expect(evictions).toHaveLength(1);
+      expect(evictions[0]).toMatchObject({
+        outcome: 'tracking_evicted',
+        sequence: 1,
+        reason: 'event_ack_tracking_evicted',
+      });
+      expect(
+        Math.max(...observations.map(entry => entry.pendingCount as number))
+      ).toBeLessThanOrEqual(256);
+
+      const acknowledged = (frame: (typeof frames)[number]) => {
+        socket.respond(
+          JSON.stringify({
+            type: 'response',
+            requestId: frame.requestId,
+            ok: true,
+            result: { receiptId: frame.receiptId, applied: true },
+          })
+        );
+      };
+      const [first, second, third] = frames;
+      if (!first || !second || !third) throw new Error('Missing frames');
+      acknowledged(third);
+      acknowledged(second);
+      socket.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: first.requestId,
+          ok: true,
+          result: { receiptId: first.receiptId, applied: true },
+        })
+      );
+      expect(
+        observations.filter(entry => entry.outcome === 'acknowledged').map(entry => entry.sequence)
+      ).toEqual([3, 2]);
+      expect(observations.filter(entry => entry.outcome === 'late_reply')).toHaveLength(1);
+
+      client.close();
+      expect(observations.filter(entry => entry.outcome === 'connection_closed')).toHaveLength(254);
+
+      expect(ackTimers).toHaveLength(257);
+      for (const timer of ackTimers) expect(cleared).toHaveBeenCalledWith(timer);
+
+      client.snapshotEventDiagnostics?.();
+      expect(
+        diagnostics.filter(entry => entry.phase === 'publication_summary').at(-1)
+      ).toMatchObject({
+        phase: 'publication_summary',
+        acknowledgedCount: 2,
+        trackingEvictionCount: 1,
+        lateReplyCount: 1,
+        connectionClosedCount: 254,
+        failureCount: 0,
+        outstandingEventAcks: 0,
+        outstandingEventAckBytes: 0,
+      });
+    } finally {
+      client.close();
+      timers.mockRestore();
+      cleared.mockRestore();
+    }
+  });
+
+  it('counts a socket-pressure rejection once at the client owner and resumes when capacity returns', async () => {
+    const failures: ControlEventOutboxFailure[] = [];
+    const diagnostics: Array<Record<string, unknown>> = [];
+    const { client, sockets } = createClientFixture({
+      onEventReceiptFailure: failure => {
+        failures.push(failure);
+      },
+      onDiagnostic: (_event, fields) => {
+        diagnostics.push(fields as Record<string, unknown>);
+      },
+    });
+    const sent: string[] = [];
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      const socket = sockets[0];
+      if (!socket) throw new Error('Missing socket');
+      await handshake(socket, receiptHello);
+      await connecting;
+      socket.send = data => {
+        sent.push(data);
+      };
+      const session = identity();
+      socket.bufferedAmount = MAX_CONTROL_EVENT_OUTBOX_BYTES + 1;
+      expect(
+        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, session)
+      ).toBe(true);
+      await waitForReconnect();
+      expect(sent).toHaveLength(0);
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({ reason: 'socket_overflow', sent: false });
+
+      socket.bufferedAmount = 0;
+      expect(
+        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, session)
+      ).toBe(true);
+      await waitForReconnect();
+      expect(sent).toHaveLength(1);
+
+      client.snapshotEventDiagnostics?.();
+      expect(
+        diagnostics.filter(entry => entry.phase === 'publication_summary').at(-1)
+      ).toMatchObject({
+        failureCount: 1,
+        neverSentCount: 1,
+        sentWithoutResponseCount: 0,
+        outstandingEventAcks: 1,
+      });
+    } finally {
+      client.close();
+    }
+  });
+
+  it('counts a legacy admission drop as never-sent rather than a receiver rejection', async () => {
+    const diagnostics: Array<Record<string, unknown>> = [];
+    const { client, sockets } = createClientFixture({
+      onDiagnostic: (_event, fields) => {
+        diagnostics.push(fields as Record<string, unknown>);
+      },
+    });
+    const sent: string[] = [];
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      const socket = sockets[0];
+      if (!socket) throw new Error('Missing socket');
+      await handshake(socket);
+      await connecting;
+      socket.send = data => {
+        sent.push(data);
+      };
+      const session = identity();
+      socket.bufferedAmount = MAX_CONTROL_EVENT_OUTBOX_BYTES + 1;
+      expect(
+        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, session)
+      ).toBe(false);
+      expect(sent).toHaveLength(0);
+
+      client.snapshotEventDiagnostics?.();
+      expect(
+        diagnostics.filter(entry => entry.phase === 'publication_summary').at(-1)
+      ).toMatchObject({
+        failureCount: 1,
+        neverSentCount: 1,
+        sentWithoutResponseCount: 0,
+        rejectedCount: 0,
+      });
+    } finally {
+      client.close();
+    }
+  });
+
+  it('carries producer queue wait into a sent-then-rejected publication observation', async () => {
+    const observations: Array<Record<string, unknown>> = [];
+    const { client, sockets } = createClientFixture({
+      onEventPublication: observation => {
+        observations.push(observation as unknown as Record<string, unknown>);
+      },
+    });
+    const session = identity();
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      const socket = sockets[0];
+      if (!socket) throw new Error('Missing socket');
+      await handshake(socket, receiptHello);
+      await connecting;
+      socket.send = data => {
+        socket.sent.push(data);
+        const frame = JSON.parse(data) as {
+          operation?: string;
+          requestId: string;
+          payload: unknown;
+        };
+        if (frame.operation !== 'sandbox.event.publish') return;
+        const publication = sandboxEventPublicationPayloadSchema.parse(frame.payload);
+        socket.respond(
+          JSON.stringify({
+            type: 'response',
+            requestId: frame.requestId,
+            ok: false,
+            error: { code: 'event_rejected', retryable: false, message: 'rejected' },
+          })
+        );
+        void publication;
+      };
+      const preparedAt = Date.now();
+      expect(
+        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, session)
+      ).toBe(true);
+      setSystemTime(preparedAt + 25);
+      await waitForReconnect();
+
+      const rejected = observations.find(entry => entry.outcome === 'rejected');
+      expect(rejected).toBeDefined();
+      expect(rejected).toMatchObject({ outcome: 'rejected', reason: 'event_rejected' });
+      expect(rejected?.preparedAt).toBe(preparedAt);
+      expect(rejected?.queueWaitMs).toBe(25);
+    } finally {
+      setSystemTime();
+      client.close();
+    }
   });
 });
 

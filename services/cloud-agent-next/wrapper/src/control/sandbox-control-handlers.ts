@@ -409,6 +409,24 @@ export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>)
             return Promise.resolve<'shared'>('shared');
           return Promise.resolve<'unconfirmed'>('unconfirmed');
         },
+        ...(input.kiloRuntimes?.deferRuntimeRetirementIfShared
+          ? {
+              deferRuntimeRetirementIfShared: (
+                directory: string,
+                target: NativeOperationTarget,
+                retiringRoot: string,
+                deadlineAt: number,
+                reason?: string
+              ) =>
+                input.kiloRuntimes?.deferRuntimeRetirementIfShared?.(
+                  directory,
+                  target,
+                  retiringRoot,
+                  deadlineAt,
+                  reason
+                ) ?? Promise.resolve<'unconfirmed'>('unconfirmed'),
+            }
+          : {}),
         ...(rootRetirementScope ? { rootRetirementScope } : {}),
         verifyQuiescence: (directory, target, deadlineAt) =>
           input.kiloRuntimes?.verifyQuiescence?.(directory, target, deadlineAt) ??

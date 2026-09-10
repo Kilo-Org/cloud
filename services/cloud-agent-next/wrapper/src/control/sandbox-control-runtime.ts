@@ -28,6 +28,7 @@ type StartOptions = {
   onConnected?: (client: SandboxControlClient) => void;
   onDisconnected?: () => void;
   onEventReceiptFailure?: () => void;
+  onEventPublication?: SandboxControlClientOptions['onEventPublication'];
   onReconcile?: (phase: 'drain' | 'ready' | 'commit', deadlineAt: number) => Promise<void> | void;
   getHeartbeatPayload?: () => SandboxHeartbeatPayload;
   sampleHeartbeat?: (signal: AbortSignal) => Promise<void>;
@@ -460,6 +461,7 @@ export function maybeStartSandboxControlClient(
     ...(options.onEventReceiptFailure
       ? { onEventReceiptFailure: options.onEventReceiptFailure }
       : {}),
+    ...(options.onEventPublication ? { onEventPublication: options.onEventPublication } : {}),
     onConnected: () => {
       connectedThroughCallback = true;
       handleConnected(client);

@@ -5,13 +5,17 @@ import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk';
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
-import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
+import type {
+  ControlDiagnosticFields,
+  ControlDiagnosticReporter,
+} from '../../../src/shared/control-diagnostics.js';
 import { safeSandboxRuntimeVersion } from '../../../src/shared/sandbox-status.js';
 import {
   SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS,
   type ControlErrorCode,
   type SessionAttachPayload,
   type SessionRequestIdentity,
+  type SessionEventIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
 import {
@@ -28,7 +32,11 @@ import {
 } from './owned-processes.js';
 import type { NativeOperationTarget, NativeRetirement } from './session-operation-cleanup.js';
 import { retireWorktreeRuntime } from './worktree-runtime-cleanup.js';
-import { forgetAttachedRoot, rememberAttachedRoot } from './session-directories.js';
+import {
+  forgetAttachedRoot,
+  ownerDirectoryForSession,
+  rememberAttachedRoot,
+} from './session-directories.js';
 import { withKiloRequestDeadline, type KiloEventFeedError } from './sandbox-control-runtime.js';
 import { createWorktreeFeed, type KiloFeedEvent, type WorktreeFeed } from './worktree-feed.js';
 
@@ -126,6 +134,13 @@ export type WorktreeKiloRuntimes = {
     deadlineAt: number,
     reason?: string
   ): Promise<NativeRetirement | 'shared'>;
+  deferRuntimeRetirementIfShared?(
+    directory: string,
+    target: NativeOperationTarget,
+    retiringRoot: string,
+    deadlineAt: number,
+    reason?: string
+  ): Promise<NativeRetirement | 'shared'>;
   rootRetirementScope?(
     directory: string,
     target: NativeOperationTarget,
@@ -142,6 +157,11 @@ export type WorktreeKiloRuntimes = {
   isCurrent?(runtime: WorktreeKiloRuntime): boolean;
   getEntryRuntimeId?(directory: string, root?: string): string | undefined;
   prepareForNewWork?(directory: string): boolean;
+  recordRootPublicationDiagnostic?(
+    identity: SessionEventIdentity,
+    fields: ControlDiagnosticFields
+  ): boolean;
+  snapshotRootPublicationDiagnostics?(): void;
   isHealthy(): boolean;
   shutdown(): void;
 };
@@ -189,11 +209,31 @@ type RuntimeEntry = {
 };
 
 type RootAttachment = {
+  createdAt: number;
   identity: SessionRequestIdentity;
   entry: RuntimeEntry;
   abort: AbortController;
   attached: boolean;
   pending: Set<symbol>;
+  publication: RootPublicationCounters;
+};
+
+type RootPublicationCounters = {
+  failures: number;
+  acknowledged: number;
+  rejected: number;
+  timedOut: number;
+  connectionClosed: number;
+  trackingEvicted: number;
+  expired: number;
+  queueOverflow: number;
+  socketOverflow: number;
+  pendingCount: number;
+  pendingBytes: number;
+  socketBufferedBytes: number;
+  outstandingEventAcks: number;
+  dirty: boolean;
+  firstFailure?: ControlDiagnosticFields;
 };
 
 const KILO_STARTUP_TIMEOUT_MS = 30_000;
@@ -432,6 +472,168 @@ export function createWorktreeKiloRuntimes(options: {
   let observedVersion: string | null | undefined;
   let closed = false;
 
+  const emptyPublicationCounters = (): RootPublicationCounters => ({
+    failures: 0,
+    acknowledged: 0,
+    rejected: 0,
+    timedOut: 0,
+    connectionClosed: 0,
+    trackingEvicted: 0,
+    expired: 0,
+    queueOverflow: 0,
+    socketOverflow: 0,
+    pendingCount: 0,
+    pendingBytes: 0,
+    socketBufferedBytes: 0,
+    outstandingEventAcks: 0,
+    dirty: false,
+  });
+
+  function publicationRoot(identity: SessionEventIdentity): RootAttachment | undefined {
+    const rootId = identity.rootKiloSessionId ?? identity.kiloSessionId;
+    if (!rootId) return undefined;
+    const ownerDirectory = ownerDirectoryForSession(identity);
+    const root = [...roots.values()].find(
+      candidate =>
+        candidate.identity.kiloSessionId === rootId &&
+        candidate.identity.directory === ownerDirectory
+    );
+    if (!root) return undefined;
+    if (identity.nativeRuntimeId !== undefined && identity.nativeRuntimeId !== root.entry.runtimeId)
+      return undefined;
+    return root;
+  }
+
+  function recordRootPublicationDiagnostic(
+    identity: SessionEventIdentity,
+    fields: ControlDiagnosticFields
+  ): boolean {
+    const root = publicationRoot(identity);
+    if (!root) return false;
+    if (
+      (typeof fields.sentAt === 'number' && fields.sentAt < root.createdAt) ||
+      (typeof fields.preparedAt === 'number' && fields.preparedAt < root.createdAt)
+    )
+      return false;
+    const counters = root.publication;
+    counters.dirty = true;
+    const outcome = fields.outcome;
+    const failure =
+      fields.phase === 'publication_failed' ||
+      (typeof outcome === 'string' && outcome !== 'acknowledged');
+    const firstFailure = failure && counters.firstFailure === undefined;
+    if (fields.phase === 'publication_failed') {
+      counters.failures = Math.min(Number.MAX_SAFE_INTEGER, counters.failures + 1);
+      if (fields.failureReason === 'expired')
+        counters.expired = Math.min(Number.MAX_SAFE_INTEGER, counters.expired + 1);
+      if (fields.failureReason === 'queue_overflow')
+        counters.queueOverflow = Math.min(Number.MAX_SAFE_INTEGER, counters.queueOverflow + 1);
+      if (fields.failureReason === 'socket_overflow')
+        counters.socketOverflow = Math.min(Number.MAX_SAFE_INTEGER, counters.socketOverflow + 1);
+    } else if (outcome === 'acknowledged') {
+      counters.acknowledged = Math.min(Number.MAX_SAFE_INTEGER, counters.acknowledged + 1);
+    } else if (outcome === 'rejected') {
+      if (fields.neverSent === true)
+        counters.failures = Math.min(Number.MAX_SAFE_INTEGER, counters.failures + 1);
+      else counters.rejected = Math.min(Number.MAX_SAFE_INTEGER, counters.rejected + 1);
+    } else if (outcome === 'timed_out') {
+      counters.timedOut = Math.min(Number.MAX_SAFE_INTEGER, counters.timedOut + 1);
+    } else if (outcome === 'connection_closed') {
+      counters.connectionClosed = Math.min(Number.MAX_SAFE_INTEGER, counters.connectionClosed + 1);
+    } else if (outcome === 'tracking_evicted') {
+      counters.trackingEvicted = Math.min(Number.MAX_SAFE_INTEGER, counters.trackingEvicted + 1);
+    }
+    if (fields.phase === 'publication_failed') {
+      if (typeof fields.pendingCount === 'number') counters.pendingCount = fields.pendingCount;
+      if (typeof fields.pendingBytes === 'number') counters.pendingBytes = fields.pendingBytes;
+    }
+    if (typeof fields.socketBufferedBytes === 'number')
+      counters.socketBufferedBytes = fields.socketBufferedBytes;
+    if (typeof fields.outstandingEventAcks === 'number')
+      counters.outstandingEventAcks = fields.outstandingEventAcks;
+    if (firstFailure) {
+      counters.firstFailure = { ...fields };
+      options.onDiagnostic?.('control.event', fields);
+    }
+    return true;
+  }
+
+  function emitRootPublicationSummary(root: RootAttachment): void {
+    const counters = root.publication;
+    if (!counters.dirty) return;
+    options.onDiagnostic?.('control.event', {
+      phase: 'publication_summary',
+      category: 'session_event',
+      kiloSessionId: root.identity.kiloSessionId,
+      rootKiloSessionId: root.identity.kiloSessionId,
+      nativeRuntimeId: root.entry.runtimeId,
+      failureCount: counters.failures,
+      acknowledgedCount: counters.acknowledged,
+      rejectedCount: counters.rejected,
+      timeoutCount: counters.timedOut,
+      connectionClosedCount: counters.connectionClosed,
+      trackingEvictionCount: counters.trackingEvicted,
+      expiredCount: counters.expired,
+      queueOverflowCount: counters.queueOverflow,
+      socketOverflowCount: counters.socketOverflow,
+      pendingCount: counters.pendingCount,
+      pendingBytes: counters.pendingBytes,
+      socketBufferedBytes: counters.socketBufferedBytes,
+      outstandingEventAcks: counters.outstandingEventAcks,
+      ...(counters.firstFailure?.failureReason
+        ? { failureReason: counters.firstFailure.failureReason }
+        : {}),
+      ...(counters.firstFailure?.outcome ? { outcome: counters.firstFailure.outcome } : {}),
+      ...(counters.firstFailure?.reason ? { reason: counters.firstFailure.reason } : {}),
+      ...(counters.firstFailure?.requestId ? { requestId: counters.firstFailure.requestId } : {}),
+      ...(counters.firstFailure?.receiptId ? { receiptId: counters.firstFailure.receiptId } : {}),
+      ...(counters.firstFailure?.sequence !== undefined
+        ? { sequence: counters.firstFailure.sequence }
+        : {}),
+      ...(counters.firstFailure?.sentAt !== undefined
+        ? { sentAt: counters.firstFailure.sentAt }
+        : {}),
+      ...(counters.firstFailure?.preparedAt !== undefined
+        ? { preparedAt: counters.firstFailure.preparedAt }
+        : {}),
+      ...(counters.firstFailure?.eventType ? { eventType: counters.firstFailure.eventType } : {}),
+      ...(counters.firstFailure?.detail ? { detail: counters.firstFailure.detail } : {}),
+      ...(counters.firstFailure?.queueWaitMs !== undefined
+        ? { queueWaitMs: counters.firstFailure.queueWaitMs }
+        : {}),
+      ...(counters.firstFailure?.requestWaitMs !== undefined
+        ? { requestWaitMs: counters.firstFailure.requestWaitMs }
+        : {}),
+      ...(counters.firstFailure?.connectionState
+        ? { connectionState: counters.firstFailure.connectionState }
+        : {}),
+      ...(counters.firstFailure?.connectionId
+        ? { connectionId: counters.firstFailure.connectionId }
+        : {}),
+      ...(counters.firstFailure?.wrapperInstanceId
+        ? { wrapperInstanceId: counters.firstFailure.wrapperInstanceId }
+        : {}),
+      ...(counters.firstFailure?.neverSent !== undefined
+        ? { neverSent: counters.firstFailure.neverSent }
+        : {}),
+      ...(counters.firstFailure?.sentWithoutResponse !== undefined
+        ? { sentWithoutResponse: counters.firstFailure.sentWithoutResponse }
+        : {}),
+    });
+    counters.dirty = false;
+  }
+
+  function snapshotRootPublicationDiagnostics(): void {
+    for (const root of roots.values()) emitRootPublicationSummary(root);
+  }
+
+  function resetRootPublicationCountersForRuntimeRotation(entry: RuntimeEntry): void {
+    for (const root of entry.roots) {
+      emitRootPublicationSummary(root);
+      root.publication = emptyPublicationCounters();
+    }
+  }
+
   function recordVersion(value: unknown): void {
     const version = safeSandboxRuntimeVersion(value);
     observedVersion = observedVersion === undefined || observedVersion === version ? version : null;
@@ -454,10 +656,6 @@ export function createWorktreeKiloRuntimes(options: {
       requested ?? entry.cleanupDeadlineAt
     );
     return entry.cleanupDeadlineAt;
-  }
-
-  function deferredRetirementKey(root: string, nativeRuntimeId: string): string {
-    return JSON.stringify([root, nativeRuntimeId]);
   }
 
   function runtimeTargetMatches(entry: RuntimeEntry, target: NativeOperationTarget): boolean {
@@ -485,6 +683,14 @@ export function createWorktreeKiloRuntimes(options: {
   ): Promise<NativeRetirement> {
     void retirement.then(result => reportRootRetirement(intent, result));
     return retirement;
+  }
+
+  function liveRoots(entry: RuntimeEntry): RootAttachment[] {
+    return [...entry.roots].filter(root => root.attached || root.pending.size > 0);
+  }
+
+  function deferredRetirementKey(root: string, nativeRuntimeId: string): string {
+    return JSON.stringify([root, nativeRuntimeId]);
   }
 
   function settleDeferredRetirement(
@@ -522,10 +728,6 @@ export function createWorktreeKiloRuntimes(options: {
       settleDeferredRetirement(intent, result);
     }
     return settled;
-  }
-
-  function liveRoots(entry: RuntimeEntry): RootAttachment[] {
-    return [...entry.roots].filter(root => root.attached || root.pending.size > 0);
   }
 
   function evaluateDeferredRetirements(entry: RuntimeEntry): void {
@@ -566,6 +768,7 @@ export function createWorktreeKiloRuntimes(options: {
   }
 
   function unregisterRoot(root: RootAttachment): void {
+    emitRootPublicationSummary(root);
     root.entry.roots.delete(root);
     root.attached = false;
     root.pending.clear();
@@ -624,21 +827,20 @@ export function createWorktreeKiloRuntimes(options: {
     void retirement.then(result => {
       const settled = settleEntryDeferredRetirements(entry, target, result);
       for (const root of affectedRoots) {
-        const id = deferredRetirementKey(root, settlementTarget.runtimeId);
-        if (!settled.has(id))
-          reportRootRetirement(
-            {
-              directory: entry.directory,
-              root,
-              nativeRuntimeId: settlementTarget.runtimeId,
-              target: settlementTarget,
-              retirementId,
-              reason,
-              cleanupDeadlineAt,
-              ...(metadata.reportToService ? { reportToService: true } : {}),
-            },
-            result
-          );
+        if (settled.has(deferredRetirementKey(root, settlementTarget.runtimeId))) continue;
+        reportRootRetirement(
+          {
+            directory: entry.directory,
+            root,
+            nativeRuntimeId: settlementTarget.runtimeId,
+            target: settlementTarget,
+            retirementId,
+            reason,
+            cleanupDeadlineAt,
+            ...(metadata.reportToService ? { reportToService: true } : {}),
+          },
+          result
+        );
       }
     });
     return retirement;
@@ -649,28 +851,23 @@ export function createWorktreeKiloRuntimes(options: {
     target: NativeOperationTarget,
     retiringRoot: string,
     deadlineAt: number,
-    reason = 'Native runtime retirement requested'
+    reason = 'Native runtime retirement requested',
+    defer = false
   ): Promise<NativeRetirement | 'shared'> {
     const entry = [...entries.values()].find(
       entry => entry.directory === directory && runtimeTargetMatches(entry, target)
     );
-    if (!entry || !runtimeTargetMatches(entry, target)) {
-      const intent = {
-        directory,
-        root: retiringRoot,
-        nativeRuntimeId: target.runtimeId,
-        target,
-      };
-      settleDeferredRetirement(intent, 'stale');
-      return reportRuntimeRetirement(intent, Promise.resolve('stale'));
-    }
-    const live = liveRoots(entry);
     const intent = {
       directory,
       root: retiringRoot,
       nativeRuntimeId: target.runtimeId,
       target,
     };
+    if (!entry || !runtimeTargetMatches(entry, target)) {
+      settleDeferredRetirement(intent, 'stale');
+      return reportRuntimeRetirement(intent, Promise.resolve('stale'));
+    }
+    const live = liveRoots(entry);
     if (entry.retiring) return entry.retiring;
     const failedRoot = [...entry.roots].find(root => root.identity.kiloSessionId === retiringRoot);
     if (!failedRoot || !(failedRoot.attached || failedRoot.pending.size > 0)) {
@@ -678,16 +875,13 @@ export function createWorktreeKiloRuntimes(options: {
       return reportRuntimeRetirement(intent, Promise.resolve('stale'));
     }
     if (live.some(root => root !== failedRoot)) {
-      const id = deferredRetirementKey(retiringRoot, target.runtimeId);
-      deferredRetirements.set(id, {
-        directory,
-        root: retiringRoot,
-        nativeRuntimeId: target.runtimeId,
-        entry,
-        target,
-        reason,
-        deadlineAt,
-      });
+      if (defer)
+        deferredRetirements.set(deferredRetirementKey(retiringRoot, target.runtimeId), {
+          ...intent,
+          entry,
+          reason,
+          deadlineAt,
+        });
       return Promise.resolve('shared');
     }
     deferredRetirements.delete(deferredRetirementKey(retiringRoot, target.runtimeId));
@@ -697,6 +891,16 @@ export function createWorktreeKiloRuntimes(options: {
       cleanupDeadlineAt: physicalDeadlineAt,
       reportToService: true,
     });
+  }
+
+  function deferRuntimeRetirementIfShared(
+    directory: string,
+    target: NativeOperationTarget,
+    retiringRoot: string,
+    deadlineAt: number,
+    reason?: string
+  ): Promise<NativeRetirement | 'shared'> {
+    return retireRuntimeIfUnshared(directory, target, retiringRoot, deadlineAt, reason, true);
   }
 
   function rootRetirementScope(
@@ -1016,6 +1220,7 @@ export function createWorktreeKiloRuntimes(options: {
       entry.env = env;
       entry.cleanupDeadlineAt = undefined;
       entry.kiloClient = undefined;
+      resetRootPublicationCountersForRuntimeRotation(entry);
       entry.runtimeId = crypto.randomUUID();
       return await start(entry, undefined, beforeMutation);
     } catch {
@@ -1174,11 +1379,13 @@ export function createWorktreeKiloRuntimes(options: {
       }
       if (!root) {
         root = {
+          createdAt: Date.now(),
           identity: { ...identity },
           entry,
           abort: new AbortController(),
           attached: false,
           pending: new Set(),
+          publication: emptyPublicationCounters(),
         };
         roots.set(identityKey(identity), root);
         entry.roots.add(root);
@@ -1328,6 +1535,9 @@ export function createWorktreeKiloRuntimes(options: {
     async retireRuntimeIfUnshared(directory, target, retiringRoot, deadlineAt, reason) {
       return retireRuntimeIfUnshared(directory, target, retiringRoot, deadlineAt, reason);
     },
+    async deferRuntimeRetirementIfShared(directory, target, retiringRoot, deadlineAt, reason) {
+      return deferRuntimeRetirementIfShared(directory, target, retiringRoot, deadlineAt, reason);
+    },
     rootRetirementScope,
     async verifyQuiescence(directory, target, deadlineAt) {
       const entry = [...entries.values()].find(
@@ -1403,6 +1613,8 @@ export function createWorktreeKiloRuntimes(options: {
         !runtime.signal.aborted
       );
     },
+    recordRootPublicationDiagnostic,
+    snapshotRootPublicationDiagnostics,
     isHealthy() {
       return !closed && failedDirectories.size === 0;
     },

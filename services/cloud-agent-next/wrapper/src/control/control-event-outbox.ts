@@ -5,9 +5,9 @@ import {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import type { SessionEventIdentity } from '../../../src/shared/sandbox-control-protocol.js';
 
-const MAX_EVENTS = 256;
-const MAX_BYTES = 4 * MAX_SANDBOX_CONTROL_FRAME_BYTES;
-const RETRY_DELAY_MS = 250;
+const MAX_CONTROL_EVENT_OUTBOX_EVENTS = 256;
+export const MAX_CONTROL_EVENT_OUTBOX_BYTES = 4 * MAX_SANDBOX_CONTROL_FRAME_BYTES;
+const PUBLICATION_DEADLINE_MS = 30_000;
 
 export type ControlEventPublication = {
   event: 'session.event' | 'session.preparing';
@@ -20,11 +20,36 @@ export type ControlEventPublication = {
 export type PreparedControlEventPublication = ControlEventPublication & {
   bytes: number;
   readonly deadlineAt: number;
+  readonly preparedAt?: number;
 };
 
+export type ControlEventPublicationFailureReason =
+  | 'expired'
+  | 'rejected'
+  | 'queue_overflow'
+  | 'socket_overflow'
+  | 'disconnected'
+  | 'send_failed';
+
 export type ControlEventOutboxFailure = {
-  reason: 'expired' | 'rejected';
+  reason: ControlEventPublicationFailureReason;
   publication: ControlEventPublication;
+  sent?: boolean;
+  queueAgeMs?: number;
+  attempts?: number;
+  pendingCount?: number;
+  pendingBytes?: number;
+  requestId?: string;
+  connectionState?: string;
+  connectionId?: string;
+  preparedAt?: number;
+  socketBufferedBytes?: number;
+  detail?: string;
+};
+
+export type ControlEventOutboxStats = {
+  pendingCount: number;
+  pendingBytes: number;
 };
 
 export type ControlEventOutbox = {
@@ -32,7 +57,6 @@ export type ControlEventOutbox = {
     input: Omit<ControlEventPublication, 'receiptId' | 'sequence'>
   ): PreparedControlEventPublication;
   enqueue(publication: PreparedControlEventPublication): boolean;
-  waitForSpace(publication: PreparedControlEventPublication): Promise<boolean>;
   pause(): void;
   resume(): Promise<boolean>;
   close(): void;
@@ -46,23 +70,11 @@ type SquashKey = {
   nativeRuntimeId: string | undefined;
 };
 
-type SpaceWaiter = {
-  promise: Promise<boolean>;
-  ready: boolean;
-  resolve: (available: boolean) => void;
-  timeout: ReturnType<typeof setTimeout>;
-};
-
 type Lane = {
   root: RootKey;
   entries: PreparedControlEventPublication[];
-  spaceWaiters: Map<PreparedControlEventPublication, SpaceWaiter>;
-  waitingBytes: number;
-  bytes: number;
   pending?: Promise<void>;
   pendingEntry?: PreparedControlEventPublication;
-  expirePending?: () => void;
-  retryAt?: number;
   wakeup?: ReturnType<typeof setTimeout>;
 };
 
@@ -120,29 +132,56 @@ function sameSquashKey(left: SquashKey | undefined, right: SquashKey | undefined
 }
 
 function serializedPublicationBytes(publication: ControlEventPublication): number {
-  const wire: ControlEventPublication & { bytes?: number; deadlineAt?: number } = {
-    ...publication,
-  };
+  const wire: ControlEventPublication & {
+    bytes?: number;
+    deadlineAt?: number;
+    preparedAt?: number;
+  } = { ...publication };
   delete wire.bytes;
   delete wire.deadlineAt;
+  delete wire.preparedAt;
   return Buffer.byteLength(
     JSON.stringify({
       type: 'request',
-      requestId: '00000000-0000-4000-8000-000000000000',
+      requestId: 'event_00000000-0000-4000-8000-000000000000',
       operation: 'sandbox.event.publish',
       payload: wire,
     })
   );
 }
 
-function isRetryable(error: unknown): boolean {
-  return (
-    typeof error === 'object' && error !== null && 'retryable' in error && error.retryable === true
-  );
+function copyPublication(
+  publication: PreparedControlEventPublication
+): PreparedControlEventPublication {
+  const copy = { ...publication };
+  if (publication.preparedAt !== undefined)
+    Object.defineProperty(copy, 'preparedAt', {
+      value: publication.preparedAt,
+      enumerable: false,
+    });
+  return copy;
+}
+
+function publicationFailureReason(error: unknown): ControlEventPublicationFailureReason {
+  if (isRecord(error) && typeof error.publicationReason === 'string') {
+    const reason = error.publicationReason;
+    if (reason === 'socket_overflow' || reason === 'disconnected' || reason === 'send_failed')
+      return reason;
+  }
+  return 'rejected';
+}
+
+function publicationFailureDetail(error: unknown): string | undefined {
+  if (error instanceof Error) return error.message.slice(0, 128);
+  return undefined;
 }
 
 export function createControlEventOutbox(options: {
-  publish: (publication: ControlEventPublication, deadlineAt: number) => Promise<void>;
+  publish: (
+    publication: ControlEventPublication,
+    deadlineAt: number,
+    preparedAt?: number
+  ) => Promise<void>;
   onFailure: (failure: ControlEventOutboxFailure) => void;
 }): ControlEventOutbox {
   const lanes = new Map<RootKey, Lane>();
@@ -151,30 +190,66 @@ export function createControlEventOutbox(options: {
   let cycle: PumpCycle | undefined;
   let nextSequence = 0;
   let lastScheduledLane: Lane | undefined;
+  let pendingCount = 0;
+  let pendingBytes = 0;
 
   const getLane = (root: RootKey): Lane => {
     const existing = lanes.get(root);
     if (existing) return existing;
-    const lane: Lane = {
-      root,
-      entries: [],
-      spaceWaiters: new Map(),
-      waitingBytes: 0,
-      bytes: 0,
-    };
+    const lane: Lane = { root, entries: [] };
     lanes.set(root, lane);
     return lane;
   };
 
   const clearWakeup = (lane: Lane): void => {
-    clearTimeout(lane.wakeup);
+    if (lane.wakeup) clearTimeout(lane.wakeup);
     lane.wakeup = undefined;
   };
 
   const cleanupLane = (lane: Lane): void => {
-    if (lane.pending || lane.entries.length > 0 || lane.spaceWaiters.size > 0) return;
+    if (lane.pending || lane.entries.length > 0) return;
     clearWakeup(lane);
     if (lanes.get(lane.root) === lane) lanes.delete(lane.root);
+  };
+
+  const stats = (): ControlEventOutboxStats => ({
+    pendingCount,
+    pendingBytes,
+  });
+
+  const reportFailure = (
+    publication: PreparedControlEventPublication,
+    reason: ControlEventPublicationFailureReason,
+    sent: boolean,
+    attempts = 1,
+    error?: unknown
+  ): void => {
+    try {
+      options.onFailure({
+        reason,
+        publication,
+        sent,
+        queueAgeMs: Math.max(0, Date.now() - (publication.preparedAt ?? Date.now())),
+        attempts,
+        ...stats(),
+        ...(isRecord(error) && typeof error.socketBufferedBytes === 'number'
+          ? { socketBufferedBytes: error.socketBufferedBytes }
+          : {}),
+        ...(isRecord(error) && typeof error.requestId === 'string'
+          ? { requestId: error.requestId }
+          : {}),
+        ...(isRecord(error) && typeof error.connectionState === 'string'
+          ? { connectionState: error.connectionState }
+          : {}),
+        ...(isRecord(error) && typeof error.connectionId === 'string'
+          ? { connectionId: error.connectionId }
+          : {}),
+        preparedAt: publication.preparedAt,
+        ...(publicationFailureDetail(error) ? { detail: publicationFailureDetail(error) } : {}),
+      });
+    } catch {
+      return;
+    }
   };
 
   const squashTarget = (
@@ -182,18 +257,8 @@ export function createControlEventOutbox(options: {
     publication: PreparedControlEventPublication
   ): PreparedControlEventPublication | undefined => {
     const previous = lane.entries.at(-1);
-    if (!previous) return undefined;
-    if (previous === lane.pendingEntry) return undefined;
-    if (previous === lane.entries[0] && lane.retryAt !== undefined) return undefined;
+    if (!previous || previous === lane.pendingEntry) return undefined;
     return sameSquashKey(squashKeyFor(previous), squashKeyFor(publication)) ? previous : undefined;
-  };
-
-  const reportFailure = (failure: ControlEventOutboxFailure): void => {
-    try {
-      options.onFailure(failure);
-    } catch {
-      // Failure reporting must not strand the other root lanes.
-    }
   };
 
   const hasSpaceFor = (
@@ -201,52 +266,22 @@ export function createControlEventOutbox(options: {
     publication: PreparedControlEventPublication,
     replacement = squashTarget(lane, publication)
   ): boolean => {
-    const entryCount = lane.entries.length - (replacement ? 1 : 0);
-    const bytes = lane.bytes - (replacement?.bytes ?? 0);
+    const count = pendingCount - (replacement ? 1 : 0);
+    const bytes = pendingBytes - (replacement?.bytes ?? 0);
     const publicationBytes = replacement
       ? serializedPublicationBytes({ ...replacement, payload: publication.payload })
       : publication.bytes;
-    if (entryCount >= MAX_EVENTS || bytes + publicationBytes > MAX_BYTES) return false;
-    const now = Date.now();
-    for (const reserved of lane.spaceWaiters.keys()) {
-      if (reserved.sequence < publication.sequence && now < reserved.deadlineAt) return false;
-    }
-    return true;
-  };
-
-  const releaseSpaceWaiter = (
-    lane: Lane,
-    publication: PreparedControlEventPublication
-  ): SpaceWaiter | undefined => {
-    const waiter = lane.spaceWaiters.get(publication);
-    if (!waiter) return undefined;
-    clearTimeout(waiter.timeout);
-    lane.spaceWaiters.delete(publication);
-    lane.waitingBytes -= publication.bytes;
-    cleanupLane(lane);
-    return waiter;
-  };
-
-  const notifySpace = (lane: Lane, available: boolean): void => {
-    const now = Date.now();
-    for (const [publication, waiter] of lane.spaceWaiters) {
-      if (!available || now >= publication.deadlineAt) {
-        const released = releaseSpaceWaiter(lane, publication);
-        released?.resolve(available ? true : false);
-      } else if (hasSpaceFor(lane, publication)) {
-        waiter.ready = true;
-        waiter.resolve(true);
-      }
-    }
-    cleanupLane(lane);
+    return (
+      count < MAX_CONTROL_EVENT_OUTBOX_EVENTS &&
+      bytes + publicationBytes <= MAX_CONTROL_EVENT_OUTBOX_BYTES
+    );
   };
 
   const removeHead = (lane: Lane, entry: PreparedControlEventPublication): boolean => {
     if (lane.entries[0] !== entry) return false;
     lane.entries.shift();
-    lane.bytes -= entry.bytes;
-    lane.retryAt = undefined;
-    notifySpace(lane, true);
+    pendingCount = Math.max(0, pendingCount - 1);
+    pendingBytes = Math.max(0, pendingBytes - entry.bytes);
     scheduleWakeup(lane);
     cleanupLane(lane);
     return true;
@@ -257,7 +292,7 @@ export function createControlEventOutbox(options: {
     while (lane.entries[0] && Date.now() >= lane.entries[0].deadlineAt) {
       const entry = lane.entries[0];
       if (!entry || !removeHead(lane, entry)) return;
-      reportFailure({ reason: 'expired', publication: entry });
+      reportFailure(entry, 'expired', false, 0);
     }
     scheduleWakeup(lane);
   };
@@ -269,8 +304,6 @@ export function createControlEventOutbox(options: {
       cleanupLane(lane);
       return;
     }
-    const now = Date.now();
-    const nextAt = paused ? entry.deadlineAt : Math.min(lane.retryAt ?? now, entry.deadlineAt);
     lane.wakeup = setTimeout(
       () => {
         lane.wakeup = undefined;
@@ -278,7 +311,7 @@ export function createControlEventOutbox(options: {
         if (!paused) void pump();
         else scheduleWakeup(lane);
       },
-      Math.max(1, nextAt - now)
+      Math.max(1, entry.deadlineAt - Date.now())
     );
     lane.wakeup.unref();
   };
@@ -294,12 +327,20 @@ export function createControlEventOutbox(options: {
     ) as Omit<ControlEventPublication, 'receiptId' | 'sequence'>;
     const sequence = nextSequence + 1;
     const receiptId = crypto.randomUUID();
+    const preparedAt = Date.now();
     nextSequence = sequence;
     const publication = { ...snapshot, sequence, receiptId };
     const bytes = serializedPublicationBytes(publication);
     if (bytes > MAX_SANDBOX_CONTROL_FRAME_BYTES)
       throw new Error('Control event exceeds the frame budget');
-    return { ...publication, bytes, deadlineAt: Date.now() + 30_000 };
+    const prepared = {
+      ...publication,
+      bytes,
+      preparedAt,
+      deadlineAt: preparedAt + PUBLICATION_DEADLINE_MS,
+    };
+    Object.defineProperty(prepared, 'preparedAt', { value: preparedAt, enumerable: false });
+    return prepared;
   };
 
   const nextRunnableLane = (): Lane | undefined => {
@@ -307,15 +348,10 @@ export function createControlEventOutbox(options: {
     const available = [...lanes.values()];
     const previousIndex = available.findIndex(lane => lane === lastScheduledLane);
     const start = previousIndex === -1 ? 0 : (previousIndex + 1) % available.length;
-    const now = Date.now();
     for (let offset = 0; offset < available.length; offset += 1) {
       const lane = available[(start + offset) % available.length];
       if (!lane || lane.pending || !lane.entries[0]) continue;
-      if (lane.retryAt !== undefined) {
-        if (now < lane.retryAt) continue;
-        lane.retryAt = undefined;
-      }
-      if (now >= lane.entries[0].deadlineAt) expireHead(lane);
+      expireHead(lane);
       const entry = lane.entries[0];
       if (!entry || lane.pending || Date.now() >= entry.deadlineAt) continue;
       lastScheduledLane = lane;
@@ -324,10 +360,7 @@ export function createControlEventOutbox(options: {
     return undefined;
   };
 
-  const queuedEntries = (): boolean => {
-    for (const lane of lanes.values()) if (lane.entries.length > 0) return true;
-    return false;
-  };
+  const queuedEntries = (): boolean => [...lanes.values()].some(lane => lane.entries.length > 0);
 
   const signalCycle = (active: PumpCycle | undefined = cycle): void => {
     if (!active || active.wakeSignaled) return;
@@ -345,8 +378,11 @@ export function createControlEventOutbox(options: {
 
   const runAttempt = async (lane: Lane, entry: PreparedControlEventPublication): Promise<void> => {
     if (closed || paused || lane.entries[0] !== entry) return;
+    if (Date.now() >= entry.deadlineAt) {
+      if (removeHead(lane, entry)) reportFailure(entry, 'expired', false, 0);
+      return;
+    }
     const expired = Promise.withResolvers<void>();
-    lane.expirePending = expired.resolve;
     const timeout = setTimeout(expired.resolve, Math.max(1, entry.deadlineAt - Date.now()));
     timeout.unref();
     let published: Promise<void>;
@@ -360,38 +396,34 @@ export function createControlEventOutbox(options: {
             session: entry.session,
             payload: entry.payload,
           },
-          entry.deadlineAt
+          entry.deadlineAt,
+          entry.preparedAt
         )
       );
     } catch (error) {
       published = Promise.reject(error);
     }
     try {
-      try {
-        await Promise.race([published, expired.promise]);
-      } catch (error) {
-        if (closed || Date.now() >= entry.deadlineAt) {
-          void published.catch(() => undefined);
-          return;
-        }
-        if (isRetryable(error)) {
-          lane.retryAt = Date.now() + RETRY_DELAY_MS;
-          return;
-        }
-        if (removeHead(lane, entry)) reportFailure({ reason: 'rejected', publication: entry });
-        return;
-      }
-
-      if (closed || Date.now() >= entry.deadlineAt) {
+      const result = await Promise.race([
+        published.then(
+          () => 'published' as const,
+          (error: unknown) => ({ error })
+        ),
+        expired.promise.then(() => 'expired' as const),
+      ]);
+      if (result === 'expired') {
         void published.catch(() => undefined);
-        if (!closed && removeHead(lane, entry))
-          reportFailure({ reason: 'expired', publication: entry });
+        if (removeHead(lane, entry)) reportFailure(entry, 'expired', false, 0);
         return;
       }
-      removeHead(lane, entry);
+      if (result === 'published') {
+        removeHead(lane, entry);
+        return;
+      }
+      if (removeHead(lane, entry))
+        reportFailure(entry, publicationFailureReason(result.error), false, 1, result.error);
     } finally {
       clearTimeout(timeout);
-      if (lane.expirePending === expired.resolve) lane.expirePending = undefined;
     }
   };
 
@@ -400,9 +432,9 @@ export function createControlEventOutbox(options: {
     if (!entry || lane.pending) return;
     const pending = Promise.resolve()
       .then(() => runAttempt(lane, entry))
-      .catch(() => {
+      .catch(error => {
         if (closed || !removeHead(lane, entry)) return;
-        reportFailure({ reason: 'rejected', publication: entry });
+        reportFailure(entry, publicationFailureReason(error), false, 1, error);
       })
       .then(() => {
         if (lane.pending === pending) {
@@ -429,13 +461,11 @@ export function createControlEventOutbox(options: {
           active.resolve(!queuedEntries());
           return;
         }
-
         const lane = nextRunnableLane();
         if (lane) {
           startAttempt(lane);
           continue;
         }
-
         if ([...lanes.values()].some(item => item.pending !== undefined)) {
           const wake = active.wake;
           await wake;
@@ -474,67 +504,40 @@ export function createControlEventOutbox(options: {
   return {
     prepare,
     enqueue(publication) {
-      if (closed) return false;
       const lane = getLane(rootFor(publication));
+      if (closed) {
+        reportFailure(publication, 'disconnected', false, 0);
+        return false;
+      }
       if (Date.now() >= publication.deadlineAt) {
-        releaseSpaceWaiter(lane, publication)?.resolve(true);
-        notifySpace(lane, true);
-        reportFailure({ reason: 'expired', publication });
+        reportFailure(publication, 'expired', false, 0);
         cleanupLane(lane);
-        return true;
+        return false;
       }
       const replacement = squashTarget(lane, publication);
-      if (!hasSpaceFor(lane, publication, replacement)) return false;
+      if (!hasSpaceFor(lane, publication, replacement)) {
+        reportFailure(publication, 'queue_overflow', false, 0);
+        return false;
+      }
       if (replacement) {
         const index = lane.entries.length - 1;
         const bytes = serializedPublicationBytes({ ...replacement, payload: publication.payload });
-        lane.entries[index] = {
-          ...replacement,
-          payload: publication.payload,
-          bytes,
-        };
-        lane.bytes += bytes - replacement.bytes;
+        pendingBytes += bytes - replacement.bytes;
+        const replaced = { ...replacement, payload: publication.payload, bytes };
+        if (replacement.preparedAt !== undefined)
+          Object.defineProperty(replaced, 'preparedAt', {
+            value: replacement.preparedAt,
+            enumerable: false,
+          });
+        lane.entries[index] = replaced;
       } else {
-        lane.entries.push({ ...publication });
-        lane.bytes += publication.bytes;
+        lane.entries.push(copyPublication(publication));
+        pendingCount++;
+        pendingBytes += publication.bytes;
       }
-      releaseSpaceWaiter(lane, publication)?.resolve(true);
-      notifySpace(lane, true);
       if (!paused) void pump();
       else scheduleWakeup(lane);
       return true;
-    },
-    waitForSpace(publication) {
-      if (closed) return Promise.resolve(false);
-      const lane = getLane(rootFor(publication));
-      if (Date.now() >= publication.deadlineAt) return Promise.resolve(true);
-      const existing = lane.spaceWaiters.get(publication);
-      if (existing) {
-        if (existing.ready && !hasSpaceFor(lane, publication)) {
-          const { promise, resolve } = Promise.withResolvers<boolean>();
-          existing.promise = promise;
-          existing.resolve = resolve;
-          existing.ready = false;
-        }
-        return existing.promise;
-      }
-      if (lane.spaceWaiters.size >= MAX_EVENTS || lane.waitingBytes + publication.bytes > MAX_BYTES)
-        return Promise.resolve(false);
-      const { promise, resolve } = Promise.withResolvers<boolean>();
-      const timeout = setTimeout(
-        () => {
-          const released = releaseSpaceWaiter(lane, publication);
-          released?.resolve(true);
-          notifySpace(lane, true);
-        },
-        Math.max(1, publication.deadlineAt - Date.now())
-      );
-      timeout.unref();
-      const ready = hasSpaceFor(lane, publication);
-      lane.spaceWaiters.set(publication, { promise, resolve, timeout, ready });
-      lane.waitingBytes += publication.bytes;
-      if (ready) resolve(true);
-      return promise;
     },
     pause() {
       paused = true;
@@ -551,13 +554,13 @@ export function createControlEventOutbox(options: {
       signalCycle();
       for (const lane of lanes.values()) {
         clearWakeup(lane);
-        lane.expirePending?.();
-        lane.pendingEntry = undefined;
+        for (const entry of lane.entries) reportFailure(entry, 'disconnected', false, 0);
         lane.entries.length = 0;
-        lane.bytes = 0;
-        notifySpace(lane, false);
+        lane.pendingEntry = undefined;
         cleanupLane(lane);
       }
+      pendingCount = 0;
+      pendingBytes = 0;
     },
   };
 }

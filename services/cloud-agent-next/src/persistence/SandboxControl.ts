@@ -145,6 +145,7 @@ import {
   loadRuntimeMetadata,
   saveRuntimeMetadata,
   loadRouteTable,
+  loadRouteTableSync,
   loadTransitionLog,
   readSandboxControlState,
   saveDeadlines,
@@ -3739,7 +3740,7 @@ export class SandboxControl extends DurableObject<Env> {
       payload.type,
       connection,
       { identity, payload, ...(receiptId ? { receiptId, sequence } : {}) },
-      (route, fields, physical) =>
+      (route, fields, physical, deadlineAt) =>
         this.forwardSessionFrame(
           route,
           physical,
@@ -3753,7 +3754,8 @@ export class SandboxControl extends DurableObject<Env> {
               wrapperInstanceId: connection.wrapperInstanceId,
               ...(receiptId ? { receiptId, sequence } : {}),
             }),
-          receiptId !== undefined
+          receiptId !== undefined,
+          deadlineAt
         )
     );
     if (!receiptId) {
@@ -3787,7 +3789,7 @@ export class SandboxControl extends DurableObject<Env> {
       'session.preparing',
       connection,
       { identity, payload, ...(receiptId ? { receiptId, sequence } : {}) },
-      (route, fields, physical) =>
+      (route, fields, physical, deadlineAt) =>
         this.forwardSessionFrame(
           route,
           physical,
@@ -3801,7 +3803,8 @@ export class SandboxControl extends DurableObject<Env> {
               wrapperInstanceId: connection.wrapperInstanceId,
               ...(receiptId ? { receiptId, sequence } : {}),
             }),
-          receiptId !== undefined
+          receiptId !== undefined,
+          deadlineAt
         )
     );
     if (!receiptId) {
@@ -4016,6 +4019,17 @@ export class SandboxControl extends DurableObject<Env> {
     return delivered;
   }
 
+  private resolveForwardingAdmission(
+    identity: SessionEventIdentity
+  ): { sessionId: string; nativeRuntimeId?: string } | undefined {
+    const route = resolveSessionEventRoute(loadRouteTableSync(this.ctx.storage.kv), identity);
+    if (!route) return undefined;
+    return {
+      sessionId: route.sessionId,
+      ...(route.nativeRuntimeId !== undefined ? { nativeRuntimeId: route.nativeRuntimeId } : {}),
+    };
+  }
+
   private async forwardRoutedSessionFrame(
     identity: SessionEventIdentity,
     eventType: string,
@@ -4024,34 +4038,14 @@ export class SandboxControl extends DurableObject<Env> {
     forward: (
       route: SessionRoute,
       diagnostic: ControlDiagnosticFields,
-      physical: PhysicalRecord
+      physical: PhysicalRecord,
+      deadlineAt: number
     ) => Promise<SandboxControlEventResult>
   ): Promise<SandboxControlEventResult> {
     const diagnostic = {
       ...diagnosticConnection(connection),
       eventType: diagnosticEventType(eventType),
     };
-    const table = await loadRouteTable(this.ctx.storage);
-    if (!this.isCurrentConnection(connection)) {
-      this.recordForwardDrop('stale_before_enqueue', diagnostic);
-      return { applied: false };
-    }
-    const route = resolveSessionEventRoute(table, identity);
-    if (!route) {
-      this.recordForwardDrop('unroutable', { ...diagnostic, routeCount: table.size });
-      return { applied: false };
-    }
-    const physical = await loadPhysicalRecord(this.ctx.storage);
-    if (
-      physical.state !== 'running' ||
-      physical.stopTombstone ||
-      physical.providerRef !== connection.providerInstanceId ||
-      !this.matchesWorktreeContainment(physical) ||
-      !this.isCurrentConnection(connection)
-    ) {
-      this.recordForwardDrop('runtime_not_current', diagnostic);
-      return { applied: false };
-    }
     let frameBytes: number;
     try {
       frameBytes = sessionForwardFrameBytes(frame);
@@ -4060,18 +4054,23 @@ export class SandboxControl extends DurableObject<Env> {
       return { applied: false };
     }
     const queuedAt = Date.now();
+    const forwardDeadlineAt = queuedAt + DEADLINE_MS.stopAttempt;
+    const admission = this.resolveForwardingAdmission(identity);
+    if (!admission) {
+      this.recordForwardDrop('unroutable', diagnostic);
+      return { applied: false };
+    }
     this.forwarding.enqueued++;
     const fields = {
       ...diagnostic,
-      sessionId: route.sessionId,
       forwardSequence: this.forwarding.enqueued,
       queuedAt,
     };
     this.logDiagnostic('forward_enqueued', { ...fields, ...this.forwarding });
     const next = this.sessionForwarding.enqueueFenced({
-      sessionId: route.sessionId,
+      sessionId: admission.sessionId,
       bytes: frameBytes,
-      deadlineAt: Date.now() + DEADLINE_MS.stopAttempt,
+      deadlineAt: forwardDeadlineAt,
       fence: async () => this.isCurrentConnection(connection),
       forward: async () => {
         const queueWaitMs = Date.now() - queuedAt;
@@ -4082,9 +4081,54 @@ export class SandboxControl extends DurableObject<Env> {
           ...this.forwarding,
         });
         try {
-          if (this.isCurrentConnection(connection)) return forward(route, fields, physical);
-          this.recordForwardDrop('stale_before_send', fields);
-          return { applied: false, retryable: true };
+          const table = await loadRouteTable(this.ctx.storage);
+          if (!this.isCurrentConnection(connection)) {
+            this.recordForwardDrop('stale_before_enqueue', fields);
+            return { applied: false };
+          }
+          const route = resolveSessionEventRoute(table, identity);
+          if (!route) {
+            this.recordForwardDrop('unroutable', { ...fields, routeCount: table.size });
+            return { applied: false };
+          }
+          if (route.sessionId !== admission.sessionId) {
+            this.recordForwardDrop('admission_route_changed', {
+              ...fields,
+              sessionId: route.sessionId,
+              admittedSessionId: admission.sessionId,
+            });
+            return { applied: false };
+          }
+          if (
+            admission.nativeRuntimeId !== undefined &&
+            route.nativeRuntimeId !== admission.nativeRuntimeId
+          ) {
+            this.recordForwardDrop('runtime_not_current', {
+              ...fields,
+              sessionId: route.sessionId,
+            });
+            return { applied: false, retryable: true };
+          }
+          const physical = await loadPhysicalRecord(this.ctx.storage);
+          if (
+            physical.state !== 'running' ||
+            physical.stopTombstone ||
+            physical.providerRef !== connection.providerInstanceId ||
+            !this.matchesWorktreeContainment(physical) ||
+            !this.isCurrentConnection(connection)
+          ) {
+            this.recordForwardDrop('runtime_not_current', {
+              ...fields,
+              sessionId: route.sessionId,
+            });
+            return { applied: false };
+          }
+          return await forward(
+            route,
+            { ...fields, sessionId: route.sessionId },
+            physical,
+            forwardDeadlineAt
+          );
         } finally {
           this.forwarding.settled++;
           const totalForwardMs = Date.now() - queuedAt;
@@ -4156,7 +4200,8 @@ export class SandboxControl extends DurableObject<Env> {
     send: (
       stub: ReturnType<typeof getSandboxSessionStub>
     ) => Promise<{ applied: boolean; retryable?: boolean }>,
-    requireApplied: boolean
+    requireApplied: boolean,
+    forwardDeadlineAt: number
   ): Promise<SandboxControlEventResult> {
     if (!(await this.isCurrentSessionForward(route, connection, physical))) {
       this.recordForwardDrop('stale_before_send', diagnostic);
@@ -4166,35 +4211,71 @@ export class SandboxControl extends DurableObject<Env> {
     let timedOut = false;
     let skipped = false;
     let attempts = 0;
-    const delivered = await withTimeout(
-      withDORetry(
-        () => getSandboxSessionStub(this.env, route.ownerId, route.sessionId),
-        async (stub): Promise<{ applied: boolean; retryable?: boolean }> => {
-          skipped = !(await this.isCurrentSessionForward(route, connection, physical));
-          if (skipped) {
-            this.recordForwardDrop('stale_retry', diagnostic);
-            return Promise.resolve({ applied: true });
-          }
-          attempts++;
-          const result = await send(stub);
-          if (!(await this.isCurrentSessionForward(route, connection, physical))) {
-            skipped = true;
-            this.recordForwardDrop('stale_after_send', diagnostic);
-            return { applied: false };
-          }
-          return result;
-        },
-        operation
-      ),
-      DEADLINE_MS.stopAttempt,
-      operation === 'receiveSandboxControlEvent'
-        ? 'Sandbox event forwarding timed out'
-        : 'Sandbox preparation forwarding timed out',
+    const timeout = setTimeout(
       () => {
         timedOut = true;
-      }
+        this.logDiagnostic('forward_response_timeout', {
+          ...diagnostic,
+          operation,
+          attempts,
+        });
+      },
+      Math.max(1, forwardDeadlineAt - Date.now())
+    );
+    timeout.unref();
+    const delivered = await withDORetry(
+      () => {
+        if (Date.now() >= forwardDeadlineAt)
+          throw new SandboxControlConnectionError('Forwarding deadline expired', false);
+        return getSandboxSessionStub(this.env, route.ownerId, route.sessionId);
+      },
+      async (stub): Promise<{ applied: boolean; retryable?: boolean }> => {
+        if (Date.now() >= forwardDeadlineAt)
+          throw new SandboxControlConnectionError('Forwarding deadline expired', false);
+        let currentSession: boolean;
+        try {
+          currentSession = await this.isCurrentSessionForward(route, connection, physical);
+        } catch (error) {
+          if (Date.now() >= forwardDeadlineAt)
+            throw new SandboxControlConnectionError('Forwarding deadline expired', false);
+          throw error;
+        }
+        skipped = !currentSession;
+        if (skipped) {
+          this.recordForwardDrop('stale_retry', diagnostic);
+          return { applied: true };
+        }
+        if (Date.now() >= forwardDeadlineAt)
+          throw new SandboxControlConnectionError('Forwarding deadline expired', false);
+        attempts++;
+        let result: { applied: boolean; retryable?: boolean };
+        try {
+          result = await send(stub);
+        } catch (error) {
+          if (Date.now() >= forwardDeadlineAt)
+            throw new SandboxControlConnectionError('Forwarding deadline expired', false);
+          throw error;
+        }
+        let stillCurrent: boolean;
+        try {
+          stillCurrent = await this.isCurrentSessionForward(route, connection, physical);
+        } catch (error) {
+          if (Date.now() >= forwardDeadlineAt)
+            throw new SandboxControlConnectionError('Forwarding deadline expired', false);
+          throw error;
+        }
+        if (!stillCurrent) {
+          skipped = true;
+          this.recordForwardDrop('stale_after_send', diagnostic);
+          return { applied: false };
+        }
+        return result;
+      },
+      operation,
+      DEFAULT_DO_RETRY_CONFIG
     ).then(
       result => {
+        clearTimeout(timeout);
         const rpcWaitMs = Date.now() - startedAt;
         this.forwarding.maxRpcWaitMs = Math.max(this.forwarding.maxRpcWaitMs, rpcWaitMs);
         if (!skipped && result?.applied === false) this.forwarding.notApplied++;
@@ -4202,7 +4283,7 @@ export class SandboxControl extends DurableObject<Env> {
           ...diagnostic,
           operation,
           attempts,
-          result: skipped ? 'skipped' : 'delivered',
+          result: skipped ? 'skipped' : timedOut ? 'delivered_late' : 'delivered',
           applied: skipped ? undefined : result?.applied,
           rpcWaitMs,
           ...this.forwarding,
@@ -4215,6 +4296,7 @@ export class SandboxControl extends DurableObject<Env> {
         };
       },
       async () => {
+        clearTimeout(timeout);
         const rpcWaitMs = Date.now() - startedAt;
         this.forwarding.maxRpcWaitMs = Math.max(this.forwarding.maxRpcWaitMs, rpcWaitMs);
         this.forwarding.failed++;
@@ -4230,34 +4312,10 @@ export class SandboxControl extends DurableObject<Env> {
           },
           'warn'
         );
-        if (!requireApplied) await this.quarantineForwardingFailure(route, connection);
         return { applied: false, retryable: true };
       }
     );
     return delivered;
-  }
-
-  private async quarantineForwardingFailure(
-    route: SessionRoute,
-    connection: SandboxControlConnectionIdentity
-  ): Promise<void> {
-    const table = await loadRouteTable(this.ctx.storage);
-    const current = table.get(route.sessionId);
-    if (
-      !this.isCurrentConnection(connection) ||
-      !current ||
-      current.ownerId !== route.ownerId ||
-      current.directory !== route.directory ||
-      current.kiloSessionId !== route.kiloSessionId ||
-      current.nativeRuntimeId !== route.nativeRuntimeId
-    ) {
-      this.logDiagnostic('forward_quarantine_skipped', {
-        sessionId: route.sessionId,
-        ...diagnosticConnection(connection),
-      });
-      return;
-    }
-    await this.quarantineConnection(connection, 'session_delivery_failed');
   }
 
   private async onSocketClosed(

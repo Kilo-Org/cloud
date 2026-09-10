@@ -4,12 +4,14 @@
  * Enumerates every procedure from the live `rootRouter` (never a hand-written
  * list), shapes deterministic catalog rows, preserves author-edited summaries
  * from the committed `services/kilo-mcp/catalog.json`, and generates missing
- * summaries via an LLM (OpenRouter or Anthropic, plain fetch). Summaries are
- * never generated at MCP runtime: the committed catalog is the only runtime
+ * summaries with the Kilo CLI (`kilo run`, pinned model + variant). Summaries
+ * are never generated at MCP runtime: the committed catalog is the only runtime
  * artifact, and authors edit its summaries by hand. See dump.ts for the CLI
  * entry point.
  */
+import { spawnSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 
@@ -44,11 +46,15 @@ export const SUMMARY_INSTRUCTION =
 
 const CONTEXT_CHAR_LIMIT = 4_000;
 const FILE_CONTEXT_CHAR_LIMIT = 60_000;
-const SUMMARY_COMPLETION_TOKENS = 8_192;
-const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages';
-const OPENROUTER_MODEL = 'anthropic/claude-sonnet-4.5';
-const ANTHROPIC_MODEL = 'claude-sonnet-4-5';
+
+/**
+ * Pinned summarizer: the same model and reasoning effort for every generated
+ * summary, so catalog text stays consistent across runs and authors.
+ */
+export const SUMMARY_MODEL = 'kilo/deepseek/deepseek-v4.1-flash';
+export const SUMMARY_VARIANT = 'max';
+/** `kilo run` invocation timeout: a whole batch (file source included) must fit. */
+const SUMMARY_RUN_TIMEOUT_MS = 10 * 60 * 1000;
 
 export type CatalogLeaf = {
   path: string;
@@ -474,9 +480,14 @@ function capContext(text: string, limit: number): string {
   return text.length <= limit ? text : `${text.slice(0, limit)}\n// … truncated`;
 }
 
-// ── LLM summary generation ──────────────────────────────────────────────────
+// ── Summary generation ──────────────────────────────────────────────────────
 
-type LlmProvider = { name: 'openrouter' | 'anthropic'; apiKey: string; model: string };
+/**
+ * One completion function: given a prompt and the batch label used in error
+ * messages, return the raw model text. Injectable so tests do not spawn the
+ * CLI. The default is {@link runKiloCompletion}.
+ */
+export type SummaryCompleter = (prompt: string, batchLabel: string) => string;
 
 type SummaryBatch = {
   file: string;
@@ -487,12 +498,87 @@ type SummaryBatch = {
   wholeFile?: string;
 };
 
-function resolveLlmProvider(): LlmProvider | null {
-  const openrouterKey = process.env.OPENROUTER_API_KEY;
-  if (openrouterKey) return { name: 'openrouter', apiKey: openrouterKey, model: OPENROUTER_MODEL };
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey) return { name: 'anthropic', apiKey: anthropicKey, model: ANTHROPIC_MODEL };
-  return null;
+/** Auth/CLI failures that a retry cannot fix must not be retried. */
+function isNonRetryableCliFailure(detail: string): boolean {
+  return /sign in|not logged in|unauthor|api key|401|403/i.test(detail);
+}
+
+/**
+ * Run one summary completion through the Kilo CLI:
+ * `kilo run --model <pinned> --variant <pinned> --format json`.
+ *
+ * The prompt arrives on stdin, so batch size is never bounded by `ARGV_MAX`.
+ * The CLI runs in the OS temp directory so it does not load this repo's
+ * project config or agent instructions. Its JSON event stream is reduced to
+ * the concatenated assistant text parts.
+ *
+ * Never logs credentials: stdout is the model reply, stderr is only surfaced
+ * (truncated) inside error messages.
+ */
+export function runKiloCompletion(prompt: string, batchLabel: string): string {
+  const result = spawnSync(
+    process.env.KILO_BIN ?? 'kilo',
+    ['run', '--model', SUMMARY_MODEL, '--variant', SUMMARY_VARIANT, '--format', 'json'],
+    {
+      input: prompt,
+      encoding: 'utf8',
+      cwd: tmpdir(),
+      timeout: SUMMARY_RUN_TIMEOUT_MS,
+      maxBuffer: 16 * 1024 * 1024,
+    }
+  );
+
+  const stderr = (result.stderr ?? '').trim();
+  const detail = stderr.slice(-300);
+  if (result.error) {
+    const code = (result.error as NodeJS.ErrnoException).code;
+    throw new CatalogSummaryError(
+      code === 'ENOENT'
+        ? 'The Kilo CLI ("kilo") was not found on PATH. Install it with ' +
+            '`npm install -g @kilocode/cli` and sign in with `kilo auth login`, ' +
+            'or hand-write a summary for each new path in services/kilo-mcp/catalog.json ' +
+            '— committed summaries are kept by the dump.'
+        : `Kilo CLI failed for ${batchLabel}: ${result.error.message}`,
+      { retryable: code !== 'ENOENT' }
+    );
+  }
+  if (result.status !== 0) {
+    throw new CatalogSummaryError(
+      `Kilo CLI exited with ${result.status ?? 'no status'} for ${batchLabel}` +
+        `${detail ? ` — ${detail}` : ''}. If the CLI is not signed in, run ` +
+        '`kilo auth login`, or hand-write a summary for each new path in ' +
+        'services/kilo-mcp/catalog.json — committed summaries are kept by the dump.',
+      { retryable: !isNonRetryableCliFailure(detail) }
+    );
+  }
+
+  const texts: string[] = [];
+  for (const line of (result.stdout ?? '').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{')) continue;
+    let event: unknown;
+    try {
+      event = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    const part = (event as { part?: { type?: unknown; text?: unknown } }).part;
+    if (
+      (event as { type?: unknown }).type === 'text' &&
+      part?.type === 'text' &&
+      typeof part.text === 'string'
+    ) {
+      texts.push(part.text);
+    }
+  }
+  const content = texts.join('');
+  if (content.trim() === '') {
+    throw new CatalogSummaryError(
+      `Kilo CLI returned no summary completion for ${batchLabel}${detail ? ` — ${detail}` : ''}`,
+      { retryable: !isNonRetryableCliFailure(detail) }
+    );
+  }
+  return content;
 }
 
 function buildSummaryBatch(
@@ -546,72 +632,6 @@ function buildSummaryPrompt(batch: SummaryBatch): string {
   return lines.join('\n');
 }
 
-async function requestSummaryCompletion(
-  provider: LlmProvider,
-  prompt: string,
-  batchLabel: string,
-  fetchImpl: typeof fetch
-): Promise<string> {
-  const isAnthropic = provider.name === 'anthropic';
-  const headers: Record<string, string> = isAnthropic
-    ? {
-        'content-type': 'application/json',
-        'x-api-key': provider.apiKey,
-        'anthropic-version': '2023-06-01',
-      }
-    : {
-        'content-type': 'application/json',
-        authorization: `Bearer ${provider.apiKey}`,
-      };
-  const messages = [{ role: 'user', content: prompt }];
-  const body = isAnthropic
-    ? { model: provider.model, max_tokens: SUMMARY_COMPLETION_TOKENS, temperature: 0, messages }
-    : { model: provider.model, max_tokens: SUMMARY_COMPLETION_TOKENS, temperature: 0, messages };
-
-  let response: Response;
-  try {
-    response = await fetchImpl(
-      isAnthropic ? ANTHROPIC_MESSAGES_URL : OPENROUTER_CHAT_COMPLETIONS_URL,
-      {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      }
-    );
-  } catch (error) {
-    throw new CatalogSummaryError(
-      `LLM request for ${batchLabel} failed: ${error instanceof Error ? error.message : String(error)}`,
-      { retryable: true }
-    );
-  }
-  if (!response.ok) {
-    const detail = (await response.text().catch(() => '')).slice(0, 300);
-    throw new CatalogSummaryError(
-      `Summary generation failed for ${batchLabel}: HTTP ${response.status}${detail ? ` — ${detail}` : ''}`,
-      // A rejected key will never succeed on retry; transient statuses might.
-      { retryable: response.status !== 401 && response.status !== 403 }
-    );
-  }
-  const payload = (await response.json().catch(() => null)) as {
-    choices?: Array<{ message?: { content?: string } }>;
-    content?: Array<{ text?: string }>;
-  } | null;
-  if (!payload) {
-    throw new CatalogSummaryError(`LLM response for ${batchLabel} is not valid JSON`, {
-      retryable: true,
-    });
-  }
-  const content = isAnthropic
-    ? (payload.content ?? []).map(part => part.text ?? '').join('')
-    : (payload.choices?.[0]?.message?.content ?? '');
-  if (!content.trim()) {
-    throw new CatalogSummaryError(`LLM returned an empty completion for ${batchLabel}`, {
-      retryable: true,
-    });
-  }
-  return content;
-}
-
 function parseSummaries(
   content: string,
   requestedPaths: string[],
@@ -655,26 +675,19 @@ function parseSummaries(
 }
 
 /**
- * Generates summaries for the given leaves, one chat completion per router
- * file with all of that file's missing summaries batched into it. Calls
- * `log` with a progress line naming each router-file batch as it starts, so
- * a long generation shows where it is instead of going silent. Throws
+ * Generates summaries for the given leaves, one Kilo CLI completion per router
+ * file with all of that file's missing summaries batched into it. Calls `log`
+ * with a progress line naming each router-file batch as it starts, so a long
+ * generation shows where it is instead of going silent. Throws
  * `CatalogSummaryError` (with `retryable` set) when a batch fails. Never logs
  * credentials.
  */
 export async function generateMissingSummaries(
   missing: CatalogLeaf[],
-  fetchImpl: typeof fetch = fetch,
+  complete: SummaryCompleter = runKiloCompletion,
   log: (message: string) => void = () => {}
 ): Promise<Map<string, string>> {
   if (missing.length === 0) return new Map();
-  const provider = resolveLlmProvider();
-  if (!provider) {
-    throw new CatalogSummaryError(
-      'No LLM credentials configured: set OPENROUTER_API_KEY (or ANTHROPIC_API_KEY) so the missing summaries can be generated, or hand-write a summary for each new path in services/kilo-mcp/catalog.json — committed summaries are kept by the dump. Summaries are never generated at MCP runtime, and an incomplete catalog is never written.',
-      { retryable: false }
-    );
-  }
   const topLevelFiles = extractTopLevelRouterFiles();
   const bySegment = new Map<string, CatalogLeaf[]>();
   for (const leaf of missing) {
@@ -691,7 +704,7 @@ export async function generateMissingSummaries(
       `  batch ${batchIndex + 1}/${batches.length} ${batch.label}: generating ${leaves.length} ${leaves.length === 1 ? 'summary' : 'summaries'}…`
     );
     const prompt = buildSummaryPrompt(batch);
-    const content = await requestSummaryCompletion(provider, prompt, batch.label, fetchImpl);
+    const content = complete(prompt, batch.label);
     const summaries = parseSummaries(
       content,
       leaves.map(leaf => leaf.path),

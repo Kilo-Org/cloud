@@ -6,10 +6,10 @@ name: Kilo MCP catalog
 #   the refreshed catalog.json committed back to the PR branch (requirement 5);
 #   fork PRs cannot be pushed to, so the diff ships as a `catalog.patch`
 #   artifact, a one-line PR comment points at it, and the job fails
-#   (requirement 6). A fork PR also gets no LLM secret (GitHub withholds
-#   secrets from fork events), so when the dump itself cannot run, a dedicated
-#   step posts the credential-free recovery — hand-written summaries in
-#   catalog.json, which the keep-edit rule preserves — and fails the job, so
+#   (requirement 6). A fork PR also gets no Kilo CLI credential (GitHub
+#   withholds secrets from fork events), so when the dump itself cannot run, a
+#   dedicated step posts the credential-free recovery — hand-written summaries
+#   in catalog.json, which the keep-edit rule preserves — and fails the job, so
 #   requirement 6 holds on that path too. The PR job never touches Vectorize or
 #   the embed script
 #   (requirement 10) and never generates summaries at runtime — only the dump
@@ -69,6 +69,10 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      # The dump shells out to `kilo run` to generate missing summaries.
+      - name: Install Kilo CLI
+        run: npm install -g @kilocode/cli
+
       - name: Install root dependencies
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
@@ -88,14 +92,14 @@ jobs:
 
       - name: Regenerate catalog.json
         id: dump
-        # Fork PRs never receive MCP_CATALOG_LLM_API_KEY (GitHub withholds
+        # Fork PRs never receive MCP_CATALOG_KILO_AUTH (GitHub withholds
         # secrets from fork pull_request events), so a fork PR that adds a
         # query without committed summaries always fails the dump here.
         # Tolerate that on forks so the guidance step below can still honour
         # requirement 6; a same-repo dump failure stays fatal.
         continue-on-error: ${{ github.event.pull_request.head.repo.fork == true }}
         env:
-          OPENROUTER_API_KEY: ${{ secrets.MCP_CATALOG_LLM_API_KEY }}
+          KILO_AUTH_CONTENT: ${{ secrets.MCP_CATALOG_KILO_AUTH }}
         run: pnpm --filter web script src/scripts/mcp-catalog/dump.ts
 
       # Requirement 6 when the dump itself cannot run: the drift-gated fork
@@ -110,18 +114,18 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           COMMENT_BODY: >-
             The MCP catalog dump failed on this fork PR. Fork PRs never get
-            CI's LLM credentials (GitHub withholds secrets from fork events),
-            so summaries for new query paths cannot be generated here. To
-            recover, hand-write a summary for each new path in
+            CI's Kilo CLI credentials (GitHub withholds secrets from fork
+            events), so summaries for new query paths cannot be generated here.
+            To recover, hand-write a summary for each new path in
             `services/kilo-mcp/catalog.json` (committed summaries are kept by
             the dump), or run
             `pnpm --filter web script src/scripts/mcp-catalog/dump.ts`
-            locally with your own `OPENROUTER_API_KEY` and push. If the log
-            shows a different error than missing credentials, fix that and
-            push.
+            locally with your own signed-in Kilo CLI (`kilo auth login`) and
+            push. If the log shows a different error than missing credentials,
+            fix that and push.
         run: |
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$COMMENT_BODY" || true
-          echo "::error::The MCP catalog dump failed on this fork PR (fork PRs get no LLM credentials). Hand-write a summary for each new path in services/kilo-mcp/catalog.json — the dump keeps committed summaries — or run the dump locally with OPENROUTER_API_KEY and push."
+          echo "::error::The MCP catalog dump failed on this fork PR (fork PRs get no Kilo CLI credentials). Hand-write a summary for each new path in services/kilo-mcp/catalog.json — the dump keeps committed summaries — or run the dump locally with a signed-in Kilo CLI and push."
           exit 1
 
       - name: Detect catalog drift
@@ -217,6 +221,10 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      # The dump shells out to `kilo run` to fill any straggler summaries.
+      - name: Install Kilo CLI
+        run: npm install -g @kilocode/cli
+
       - name: Install web dependencies
         run: pnpm install --frozen-lockfile --filter web...
 
@@ -228,7 +236,7 @@ jobs:
       # (requirement 8); keep-edit semantics leave author edits alone.
       - name: Regenerate catalog.json
         env:
-          OPENROUTER_API_KEY: ${{ secrets.MCP_CATALOG_LLM_API_KEY }}
+          KILO_AUTH_CONTENT: ${{ secrets.MCP_CATALOG_KILO_AUTH }}
         run: pnpm --filter web script src/scripts/mcp-catalog/dump.ts
 
       # Vectorize upsert (requirement 9). The index name and account id match

@@ -24,6 +24,7 @@ import {
   collectCatalogLeaves,
   generateMissingSummaries,
   readCommittedSummaries,
+  runKiloCompletion,
 } from './catalog';
 
 // The dump imports the whole router graph, so it needs the app's import-time
@@ -98,8 +99,8 @@ async function main(): Promise<void> {
   }
 
   if (missing.length > 0) {
-    console.log(`🧠 Generating ${missing.length} missing summaries via LLM…`);
-    const generated = await generateMissingSummaries(missing, fetch, message =>
+    console.log(`🧠 Generating ${missing.length} missing summaries via the Kilo CLI…`);
+    const generated = await generateMissingSummaries(missing, runKiloCompletion, message =>
       console.log(message)
     );
     // Rebuild from the full leaf set so every row carries its final summary.

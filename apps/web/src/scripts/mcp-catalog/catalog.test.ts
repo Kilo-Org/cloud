@@ -21,6 +21,7 @@ import {
   collectCatalogLeaves,
   generateMissingSummaries,
   readCommittedSummaries,
+  runKiloCompletion,
   type CatalogLeaf,
 } from './catalog';
 
@@ -210,158 +211,167 @@ describe('mcp-catalog catalog', () => {
   });
 
   describe('generateMissingSummaries', () => {
-    const ENV_KEYS = ['OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY'] as const;
-    let savedEnv: Record<string, string | undefined>;
-
-    beforeEach(() => {
-      savedEnv = Object.fromEntries(ENV_KEYS.map(key => [key, process.env[key]]));
+    const failingComplete = jest.fn(() => {
+      throw new Error('the summary completer must not be called');
     });
 
-    afterEach(() => {
-      for (const [key, value] of Object.entries(savedEnv)) {
-        if (value === undefined) delete process.env[key];
-        else process.env[key] = value;
+    it('resolves immediately when nothing is missing', async () => {
+      await expect(generateMissingSummaries([], failingComplete)).resolves.toEqual(new Map());
+      expect(failingComplete).not.toHaveBeenCalled();
+    });
+
+    it('fails without retry when the Kilo CLI is not installed, naming the self-service path', () => {
+      const previous = process.env.KILO_BIN;
+      process.env.KILO_BIN = 'kilo-does-not-exist-xyz';
+      try {
+        expect(() => runKiloCompletion('prompt', 'usage-analytics-router.ts')).toThrow(
+          /not found on PATH/
+        );
+        try {
+          runKiloCompletion('prompt', 'usage-analytics-router.ts');
+        } catch (error) {
+          // Fork PRs never get CI credentials, so the error must also name the
+          // credential-free self-service path (requirement 6's guidance).
+          expect(error).toMatchObject({ retryable: false });
+          expect((error as Error).message).toMatch(
+            /hand-write a summary for each new path in services\/kilo-mcp\/catalog\.json/
+          );
+        }
+      } finally {
+        if (previous === undefined) delete process.env.KILO_BIN;
+        else process.env.KILO_BIN = previous;
       }
     });
 
-    const failingFetch = jest.fn(async () => {
-      throw new Error('network must not be reached');
-    }) as unknown as typeof fetch;
-
-    it('resolves immediately when nothing is missing', async () => {
-      await expect(generateMissingSummaries([], failingFetch)).resolves.toEqual(new Map());
-      expect(failingFetch).not.toHaveBeenCalled();
-    });
-
-    it('fails without retry when no LLM key is configured', async () => {
-      delete process.env.OPENROUTER_API_KEY;
-      delete process.env.ANTHROPIC_API_KEY;
-      const attempt = generateMissingSummaries([queryLeaf('usageAnalytics.probe')], failingFetch);
-      await expect(attempt).rejects.toThrow(/OPENROUTER_API_KEY|ANTHROPIC_API_KEY/);
-      // Fork PRs never get the CI key, so the error must also name the
-      // credential-free self-service path (requirement 6's guidance).
-      await expect(attempt).rejects.toThrow(
-        /hand-write a summary for each new path in services\/kilo-mcp\/catalog\.json/
+    it('parses the assistant text out of the Kilo CLI JSON event stream', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'kilo-summary-'));
+      const bin = join(dir, 'fake-kilo');
+      writeFileSync(
+        bin,
+        `#!/bin/sh\ncat > /dev/null\nprintf '%s\\n' '{"type":"step_start","part":{"type":"step-start"}}' '{"type":"text","part":{"type":"text","text":"{\\"usageAnalytics.probe\\":\\"ok\\"}"}}'\n`,
+        { mode: 0o755 }
       );
-      expect(failingFetch).not.toHaveBeenCalled();
+      const previous = process.env.KILO_BIN;
+      process.env.KILO_BIN = bin;
+      try {
+        expect(runKiloCompletion('prompt', 'usage-analytics-router.ts')).toBe(
+          '{"usageAnalytics.probe":"ok"}'
+        );
+      } finally {
+        if (previous === undefined) delete process.env.KILO_BIN;
+        else process.env.KILO_BIN = previous;
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
 
-    it('marks provider outages as retryable and names the failed batch', async () => {
-      process.env.OPENROUTER_API_KEY = 'test-key';
-      delete process.env.ANTHROPIC_API_KEY;
-      const fetchImpl = jest.fn(async () => ({
-        ok: false,
-        status: 503,
-        text: async () => 'upstream unavailable',
-        json: async () => ({}),
-      })) as unknown as typeof fetch;
-
-      await expect(
-        generateMissingSummaries([queryLeaf('usageAnalytics.probe')], fetchImpl)
-      ).rejects.toMatchObject({
-        retryable: true,
-        message: expect.stringMatching(/usage-analytics-router\.ts/),
-      });
+    it('marks a non-zero Kilo CLI exit as retryable and names the failed batch', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'kilo-summary-'));
+      const bin = join(dir, 'fake-kilo');
+      writeFileSync(
+        bin,
+        `#!/bin/sh\ncat > /dev/null\nprintf 'upstream unavailable\\n' >&2\nexit 1\n`,
+        {
+          mode: 0o755,
+        }
+      );
+      const previous = process.env.KILO_BIN;
+      process.env.KILO_BIN = bin;
+      try {
+        expect(() => runKiloCompletion('prompt', 'usage-analytics-router.ts')).toThrow(
+          /usage-analytics-router\.ts/
+        );
+        try {
+          runKiloCompletion('prompt', 'usage-analytics-router.ts');
+        } catch (error) {
+          expect(error).toMatchObject({ retryable: true });
+        }
+      } finally {
+        if (previous === undefined) delete process.env.KILO_BIN;
+        else process.env.KILO_BIN = previous;
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
 
-    it('marks provider auth rejections as non-retryable', async () => {
-      process.env.OPENROUTER_API_KEY = 'test-key';
-      delete process.env.ANTHROPIC_API_KEY;
-      const fetchImpl = jest.fn(async () => ({
-        ok: false,
-        status: 401,
-        text: async () => 'invalid key',
-        json: async () => ({}),
-      })) as unknown as typeof fetch;
-
-      await expect(
-        generateMissingSummaries([queryLeaf('usageAnalytics.probe')], fetchImpl)
-      ).rejects.toMatchObject({
-        retryable: false,
-      });
+    it('marks a signed-out Kilo CLI as non-retryable', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'kilo-summary-'));
+      const bin = join(dir, 'fake-kilo');
+      writeFileSync(
+        bin,
+        `#!/bin/sh\ncat > /dev/null\nprintf 'Error: You need to sign in\\n' >&2\nexit 1\n`,
+        {
+          mode: 0o755,
+        }
+      );
+      const previous = process.env.KILO_BIN;
+      process.env.KILO_BIN = bin;
+      try {
+        try {
+          runKiloCompletion('prompt', 'usage-analytics-router.ts');
+          throw new Error('expected runKiloCompletion to throw');
+        } catch (error) {
+          expect(error).toMatchObject({ retryable: false });
+        }
+      } finally {
+        if (previous === undefined) delete process.env.KILO_BIN;
+        else process.env.KILO_BIN = previous;
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
 
-    it('batches one request per router file and parses the summaries', async () => {
-      process.env.OPENROUTER_API_KEY = 'test-key';
-      delete process.env.ANTHROPIC_API_KEY;
-      const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
-      const fetchImpl = jest.fn(async (url: unknown, init?: { body?: string }) => {
-        const body = JSON.parse(init?.body ?? '{}') as Record<string, unknown>;
-        calls.push({ url: String(url), body });
-        const content =
-          (body as { messages?: Array<{ content?: string }> }).messages?.[0]?.content ?? '';
+    it('batches one completion per router file and parses the summaries', async () => {
+      const calls: Array<{ label: string; prompt: string }> = [];
+      const complete = jest.fn((prompt: string, label: string) => {
+        calls.push({ label, prompt });
         // Echo one summary per procedure the batch requested.
         const out: Record<string, string> = {};
-        for (const match of content.matchAll(/^- ([A-Za-z0-9_.]+)$/gm))
+        for (const match of prompt.matchAll(/^- ([A-Za-z0-9_.]+)$/gm))
           out[match[1]!] = `Summary for ${match[1]}.`;
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({ choices: [{ message: { content: JSON.stringify(out) } }] }),
-        };
-      }) as unknown as typeof fetch;
+        return JSON.stringify(out);
+      });
 
       const summaries = await generateMissingSummaries(
         [queryLeaf('usageAnalytics.probe'), queryLeaf('kiloChat.probe')],
-        fetchImpl
+        complete
       );
       expect(summaries.get('usageAnalytics.probe')).toBe('Summary for usageAnalytics.probe.');
       expect(summaries.get('kiloChat.probe')).toBe('Summary for kiloChat.probe.');
       expect(calls).toHaveLength(2); // one per router file, batched
-      const prompt = JSON.stringify(calls[0]?.body);
-      expect(prompt).toContain(SUMMARY_INSTRUCTION);
-      expect(prompt).toContain('usageAnalytics.probe');
+      expect(calls[0]?.prompt).toContain(SUMMARY_INSTRUCTION);
+      expect(calls[0]?.prompt).toContain('usageAnalytics.probe');
     });
 
     it('logs a progress line naming each router-file batch as it starts', async () => {
-      process.env.OPENROUTER_API_KEY = 'test-key';
-      delete process.env.ANTHROPIC_API_KEY;
       const events: string[] = [];
-      const fetchImpl = jest.fn(async (_url: unknown, init?: { body?: string }) => {
-        events.push('fetch');
-        const body = JSON.parse(init?.body ?? '{}') as {
-          messages?: Array<{ content?: string }>;
-        };
+      const complete = jest.fn((prompt: string) => {
+        events.push('complete');
         const out: Record<string, string> = {};
-        for (const match of (body.messages?.[0]?.content ?? '').matchAll(/^- ([A-Za-z0-9_.]+)$/gm))
+        for (const match of prompt.matchAll(/^- ([A-Za-z0-9_.]+)$/gm))
           out[match[1]!] = `Summary for ${match[1]}.`;
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({ choices: [{ message: { content: JSON.stringify(out) } }] }),
-        };
-      }) as unknown as typeof fetch;
+        return JSON.stringify(out);
+      });
 
       await generateMissingSummaries(
         [queryLeaf('usageAnalytics.probe'), queryLeaf('kiloChat.probe')],
-        fetchImpl,
+        complete,
         message => events.push(message)
       );
       // Each batch is named (router file + count) before its request starts.
       expect(events).toEqual([
         expect.stringContaining('usage-analytics-router.ts'),
-        'fetch',
+        'complete',
         expect.stringContaining('kilo-chat-router.ts'),
-        'fetch',
+        'complete',
       ]);
       expect(events[0]).toContain('1/2');
       expect(events[0]).toContain('1 summary');
       expect(events[2]).toContain('2/2');
     });
 
-    it('rejects unusable LLM output as non-retryable', async () => {
-      process.env.OPENROUTER_API_KEY = 'test-key';
-      delete process.env.ANTHROPIC_API_KEY;
-      const fetchImpl = jest.fn(async () => ({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          choices: [{ message: { content: '{"some.other.path": "wrong key"}' } }],
-        }),
-      })) as unknown as typeof fetch;
+    it('rejects unusable model output as non-retryable', async () => {
+      const complete = jest.fn(() => '{"some.other.path": "wrong key"}');
 
       await expect(
-        generateMissingSummaries([queryLeaf('usageAnalytics.probe')], fetchImpl)
+        generateMissingSummaries([queryLeaf('usageAnalytics.probe')], complete)
       ).rejects.toMatchObject({
         retryable: false,
         message: expect.stringContaining('usageAnalytics.probe'),
@@ -369,31 +379,16 @@ describe('mcp-catalog catalog', () => {
     });
 
     it('extracts the enclosing handler source for a real procedure', async () => {
-      process.env.OPENROUTER_API_KEY = 'test-key';
-      delete process.env.ANTHROPIC_API_KEY;
-      const bodies: string[] = [];
-      const fetchImpl = jest.fn(async (_url: unknown, init?: { body?: string }) => {
-        bodies.push(init?.body ?? '');
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    'usageAnalytics.getSummary': 'Returns aggregate usage KPI metrics.',
-                  }),
-                },
-              },
-            ],
-          }),
-        };
-      }) as unknown as typeof fetch;
+      const prompts: string[] = [];
+      const complete = jest.fn((prompt: string) => {
+        prompts.push(prompt);
+        return JSON.stringify({
+          'usageAnalytics.getSummary': 'Returns aggregate usage KPI metrics.',
+        });
+      });
 
-      await generateMissingSummaries([queryLeaf('usageAnalytics.getSummary')], fetchImpl);
-      const parsed = JSON.parse(bodies[0] ?? '{}') as { messages: Array<{ content: string }> };
-      const content = parsed.messages[0]?.content ?? '';
+      await generateMissingSummaries([queryLeaf('usageAnalytics.getSummary')], complete);
+      const content = prompts[0] ?? '';
       // The extracted block should include the real handler, not just the path.
       expect(content).toMatch(/getSummary/);
       expect(content.length).toBeGreaterThan(200);

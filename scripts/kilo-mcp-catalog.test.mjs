@@ -10,6 +10,7 @@ const prJobName = 'catalog-pr';
 const mergeJobName = 'catalog-merge';
 const dumpCommand = 'pnpm --filter web script src/scripts/mcp-catalog/dump.ts';
 const embedCommand = 'node services/kilo-mcp/scripts/embed-catalog.ts upsert';
+const kiloInstallCommand = 'npm install -g @kilocode/cli';
 const mergeGate = "github.event_name == 'push' && github.ref == 'refs/heads/main'";
 const forkCondition = 'github.event.pull_request.head.repo.fork == true';
 const sameRepoCondition = 'github.event.pull_request.head.repo.fork == false';
@@ -44,19 +45,24 @@ function validate(workflow) {
   );
   assert.deepEqual(workflow.on.push.branches, ['main'], 'push stays main-only');
 
-  // The PR job runs the real dump script with the LLM key so missing
+  // The PR job runs the real dump script with Kilo CLI credentials so missing
   // summaries get filled (requirement 2), and keeps author edits through the
   // dump's own keep-edit rule (requirement 5).
   const prDump = findStep(pr, step => step.run === dumpCommand, 'PR job runs the real dump script');
   assert.equal(
-    prDump.env?.OPENROUTER_API_KEY,
-    '${{ secrets.MCP_CATALOG_LLM_API_KEY }}',
-    'PR dump exports the LLM key from the repo secret'
+    prDump.env?.KILO_AUTH_CONTENT,
+    '${{ secrets.MCP_CATALOG_KILO_AUTH }}',
+    'PR dump exports the Kilo CLI credential from the repo secret'
+  );
+  findStep(
+    pr,
+    step => step.run === kiloInstallCommand,
+    'PR job installs the Kilo CLI the dump shells out to'
   );
 
-  // Fork PRs never receive the LLM secret (GitHub withholds secrets from fork
-  // pull_request events), so a fork that adds a query cannot run the dump at
-  // all. Requirement 6 must still fire: the dump is continue-on-error on
+  // Fork PRs never receive the Kilo credential (GitHub withholds secrets from
+  // fork pull_request events), so a fork that adds a query cannot run the dump
+  // at all. Requirement 6 must still fire: the dump is continue-on-error on
   // forks only, and a fork-conditioned follow-up step posts the self-service
   // guidance and fails the job before drift detection could silently pass.
   assert.equal(prDump.id, 'dump', 'PR dump exposes its outcome to later steps');
@@ -144,9 +150,14 @@ function validate(workflow) {
   // upserts Vectorize with the Cloudflare credentials (requirement 9).
   const mergeDump = findStep(merge, step => step.run === dumpCommand, 'merge job runs the dump');
   assert.equal(
-    mergeDump.env?.OPENROUTER_API_KEY,
-    '${{ secrets.MCP_CATALOG_LLM_API_KEY }}',
-    'merge dump exports the LLM key'
+    mergeDump.env?.KILO_AUTH_CONTENT,
+    '${{ secrets.MCP_CATALOG_KILO_AUTH }}',
+    'merge dump exports the Kilo CLI credential'
+  );
+  findStep(
+    merge,
+    step => step.run === kiloInstallCommand,
+    'merge job installs the Kilo CLI the dump shells out to'
   );
   const upsert = findStep(merge, step => step.run === embedCommand, 'merge job upserts Vectorize');
   assert.equal(
@@ -177,6 +188,14 @@ for (const [name, defect] of [
   [
     'dump step removed',
     workflow => dropStep(workflow, prJobName, step => step.run === dumpCommand),
+  ],
+  [
+    'Kilo CLI install removed from the PR job',
+    workflow => dropStep(workflow, prJobName, step => step.run === kiloInstallCommand),
+  ],
+  [
+    'Kilo CLI install removed from the merge job',
+    workflow => dropStep(workflow, mergeJobName, step => step.run === kiloInstallCommand),
   ],
   [
     'embed script referenced from a PR step',

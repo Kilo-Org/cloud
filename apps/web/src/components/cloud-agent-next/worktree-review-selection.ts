@@ -1,5 +1,9 @@
 import type { SelectedLineRange } from '@pierre/diffs';
-import { normalizeWorktreeReviewRange, type WorktreeReviewResult } from './worktree-review';
+import {
+  getSelectionError,
+  MAX_WORKTREE_REVIEW_SELECTION_LINES,
+  type WorktreeReviewResult,
+} from './worktree-review';
 
 const rowSelector = '[data-code][data-unified] > [data-content] > [data-line]';
 const controlSelector =
@@ -35,41 +39,68 @@ function rangeForRows(rows: HTMLElement[], start: number, end: number): Selectio
   const first = selected[0];
   const last = selected.at(-1);
   if (start < 0 || end < 0 || !first || !last) return { ok: true, value: null };
-  const side = rowSide(first);
-  const startLine = Number(first.getAttribute('data-line'));
-  for (const [index, row] of selected.entries()) {
-    if (rowSide(row) !== side) {
-      return { ok: false, error: 'Select only old lines or only new lines, not both.' };
+  if (selected.length > MAX_WORKTREE_REVIEW_SELECTION_LINES) {
+    return {
+      ok: false,
+      error: `Select no more than ${MAX_WORKTREE_REVIEW_SELECTION_LINES} lines per comment.`,
+    };
+  }
+  const lineNumbers: number[] = [];
+  const unifiedIndexes: number[] = [];
+  for (const row of selected) {
+    const lineNumber = Number(row.getAttribute('data-line'));
+    const unifiedIndexValue = row.getAttribute('data-line-index');
+    const unifiedIndexPart = unifiedIndexValue?.split(',')[0]?.trim();
+    const unifiedIndex = unifiedIndexPart ? Number(unifiedIndexPart) : Number.NaN;
+    if (!Number.isSafeInteger(lineNumber) || lineNumber <= 0) {
+      return { ok: false, error: 'Select lines in the displayed saved diff.' };
     }
-    if (Number(row.getAttribute('data-line')) !== startLine + index) {
+    if (!Number.isSafeInteger(unifiedIndex)) {
+      return {
+        ok: false,
+        error: 'The selection crosses hidden lines. Expand them before commenting.',
+      };
+    }
+    lineNumbers.push(lineNumber);
+    unifiedIndexes.push(unifiedIndex);
+  }
+  for (let index = 1; index < unifiedIndexes.length; index += 1) {
+    if (unifiedIndexes[index] !== unifiedIndexes[index - 1] + 1) {
       return {
         ok: false,
         error: 'The selection crosses hidden lines. Expand them before commenting.',
       };
     }
   }
+  const side = rowSide(first);
+  const startLine = lineNumbers[0];
+  const endLine = lineNumbers.at(-1);
+  if (startLine === undefined || endLine === undefined) {
+    return { ok: true, value: null };
+  }
   const value: SelectedLineRange = {
     side,
     start: startLine,
-    end: Number(last.getAttribute('data-line')),
+    end: endLine,
+    ...(rowSide(last) === side ? {} : { endSide: rowSide(last) }),
   };
-  const normalized = normalizeWorktreeReviewRange(value);
-  return normalized.ok ? { ok: true, value } : normalized;
+  return { ok: true, value };
 }
 
 export function validateWorktreeReviewRenderedRange(
   root: ShadowRoot,
   selection: SelectedLineRange
 ): SelectionResult {
-  const normalized = normalizeWorktreeReviewRange(selection);
-  if (!normalized.ok) return normalized;
+  const selectionError = getSelectionError(selection);
+  if (selectionError) return { ok: false, error: selectionError };
   const rows = codeRows(root);
-  const { side, startLine, endLine } = normalized.value;
   const start = rows.findIndex(
-    row => rowSide(row) === side && Number(row.getAttribute('data-line')) === startLine
+    row =>
+      rowSide(row) === selection.side && Number(row.getAttribute('data-line')) === selection.start
   );
+  const endSide = selection.endSide ?? selection.side;
   const end = rows.findIndex(
-    row => rowSide(row) === side && Number(row.getAttribute('data-line')) === endLine
+    row => rowSide(row) === endSide && Number(row.getAttribute('data-line')) === selection.end
   );
   if (start < 0 || end < 0) {
     return { ok: false, error: 'Select lines in the displayed saved diff.' };

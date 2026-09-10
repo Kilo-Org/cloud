@@ -18,7 +18,6 @@ import { WorktreeReviewCommentForm } from './WorktreeReviewCommentForm';
 import {
   createWorktreeReviewAnchor,
   MAX_WORKTREE_REVIEW_COMMENTS,
-  normalizeWorktreeReviewRange,
   rebaseWorktreeReviewComment,
   rebaseWorktreeReviewCommentsForFile,
   sameWorktreeReviewCapture,
@@ -192,16 +191,11 @@ export function WorktreeReviewEditor({
         applySelection(rendered);
         return;
       }
-      const range = normalizeWorktreeReviewRange(rendered.value);
-      if (!range.ok) {
-        setSelectionError(range.error);
-        return;
-      }
       const anchor = createWorktreeReviewAnchor({
         capture: stableCapture,
         file,
         diff,
-        range: range.value,
+        selection: rendered.value,
       });
       if (!anchor.ok) {
         setSelectionError(anchor.error);

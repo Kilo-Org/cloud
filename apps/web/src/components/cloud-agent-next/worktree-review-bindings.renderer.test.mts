@@ -202,7 +202,7 @@ class TestRoot extends TestNode {
 }
 
 function renderedRows(
-  lines: Array<[number, string]> = [
+  lines: Array<[number, string, string?]> = [
     [41, 'context'],
     [42, 'change-addition'],
     [43, 'change-addition'],
@@ -213,11 +213,11 @@ function renderedRows(
   const content = new TestElement('div', { 'data-content': '' });
   root.append(code);
   code.append(content);
-  const rows = lines.map(([line, type], index) => {
+  const rows = lines.map(([line, type, lineIndex], index) => {
     const row = new TestElement('div', {
       'data-line': String(line),
       'data-line-type': type,
-      'data-line-index': `${index},${index}`,
+      'data-line-index': lineIndex ?? `${index},${index}`,
     });
     const token = new TestElement('span');
     token.append(new TestNode('source\n'));
@@ -307,7 +307,10 @@ describe('worktree review renderer annotations', () => {
   it('keeps old and new sides at the same line in distinct annotation slots', () => {
     const added = comment('added');
     const deleted = comment('deleted');
-    deleted.anchor.range.side = 'deletions';
+    deleted.anchor.quote.lines = deleted.anchor.quote.lines.map(line => ({
+      ...line,
+      kind: 'deletion',
+    }));
     const annotations = getWorktreeReviewAnnotations([added, deleted], capture, added.anchor.path);
     assert.deepEqual(
       annotations.map(({ side, lineNumber }) => ({ side, lineNumber })),
@@ -366,6 +369,50 @@ describe('worktree review renderer annotations', () => {
     assert.match(
       worktreeReviewRangeHighlightCSS([saved], capture, saved.anchor.path),
       /data-line="4"/
+    );
+  });
+
+  it('highlights every row in a mixed quote, including its deletion row', () => {
+    const mixed = comment('mixed');
+    mixed.anchor.quote.lines = [
+      { lineNumber: 1, kind: 'context', text: 'context\n' },
+      { lineNumber: 2, kind: 'deletion', text: 'old\n' },
+      { lineNumber: 2, kind: 'addition', text: 'new\n' },
+    ];
+    const css = worktreeReviewRangeHighlightCSS([mixed], capture, mixed.anchor.path);
+    assert.match(css, /data-line-type="change-deletion"\]\[data-line="2"\]/);
+    assert.match(css, /data-line="1"\]:not\(\[data-line-type="change-deletion"\]\)/);
+    assert.match(css, /data-line="2"\]:not\(\[data-line-type="change-deletion"\]\)/);
+  });
+
+  it('attaches annotations to the side and line of the final quote row', () => {
+    const saved = comment('last-deletion');
+    saved.anchor.quote.lines = [
+      { lineNumber: 4, kind: 'context', text: 'context\n' },
+      { lineNumber: 7, kind: 'deletion', text: 'old' },
+    ];
+    assert.deepEqual(getWorktreeReviewAnnotations([saved], capture, saved.anchor.path), [
+      {
+        side: 'deletions',
+        lineNumber: 7,
+        metadata: [{ kind: 'comment', comment: saved }],
+      },
+    ]);
+  });
+
+  it('derives selected lines from the mixed editor quote, including endSide', () => {
+    const saved = comment('mixed-selection');
+    saved.anchor.quote.lines = [
+      { lineNumber: 1, kind: 'context', text: 'context\n' },
+      { lineNumber: 2, kind: 'addition', text: 'new\n' },
+      { lineNumber: 2, kind: 'deletion', text: 'old' },
+    ];
+    assert.deepEqual(
+      getWorktreeReviewSelectedLines(capture, saved.anchor.path, {
+        anchor: saved.anchor,
+        text: 'Draft feedback',
+      }),
+      { side: 'additions', start: 1, end: 2, endSide: 'deletions' }
     );
   });
 
@@ -439,18 +486,21 @@ describe('worktree review rendered selection', () => {
     });
   });
 
-  it('rejects mixed interior sides even when both endpoints are new lines', () => {
+  it('accepts mixed sides and reports an endpoint side when it differs', () => {
     const { root, rows, select } = renderedRows([
       [1, 'context'],
       [2, 'change-deletion'],
       [2, 'change-addition'],
     ]);
     const result = select(rows[0], rows[2]);
-    assert.equal(result.ok, false);
-    if (!result.ok) assert.match(result.error, /not both/);
-    assert.equal(
-      validateWorktreeReviewRenderedRange(root.dom, { side: 'additions', start: 1, end: 2 }).ok,
-      false
+    assert.deepEqual(result, { ok: true, value: { side: 'additions', start: 1, end: 2 } });
+    assert.deepEqual(select(rows[0], rows[1]), {
+      ok: true,
+      value: { side: 'additions', start: 1, end: 2, endSide: 'deletions' },
+    });
+    assert.deepEqual(
+      validateWorktreeReviewRenderedRange(root.dom, { side: 'additions', start: 1, end: 2 }),
+      { ok: true, value: { side: 'additions', start: 1, end: 2 } }
     );
     assert.deepEqual(
       validateWorktreeReviewRenderedRange(root.dom, { side: 'deletions', start: 2, end: 2 }),
@@ -463,8 +513,8 @@ describe('worktree review rendered selection', () => {
 
   it('rejects hidden gaps, unavailable endpoints, invalid coordinates, and oversized ranges', () => {
     const { root, rows, select } = renderedRows([
-      [4, 'context'],
-      [9, 'context'],
+      [4, 'context', '0,0'],
+      [9, 'context', '5,5'],
     ]);
     assert.equal(select(rows[0], rows[1]).ok, false);
     assert.equal(
@@ -475,6 +525,17 @@ describe('worktree review rendered selection', () => {
       validateWorktreeReviewRenderedRange(root.dom, { side: 'additions', start: 0, end: 9 }).ok,
       false
     );
+    const missing = renderedRows([
+      [4, 'context', '0,0'],
+      [5, 'context'],
+    ]);
+    missing.rows[1]?.removeAttribute('data-line-index');
+    assert.equal(missing.select(missing.rows[0], missing.rows[1]).ok, false);
+    const malformed = renderedRows([
+      [4, 'context', '0,0'],
+      [5, 'context', 'not-a-number,1'],
+    ]);
+    assert.equal(malformed.select(malformed.rows[0], malformed.rows[1]).ok, false);
     const large = renderedRows(Array.from({ length: 101 }, (_, index) => [index + 1, 'context']));
     assert.equal(large.select(large.rows[0], large.rows[100]).ok, false);
   });
@@ -584,7 +645,7 @@ describe('worktree review rendered selection', () => {
     assert.equal(comments.length, 1);
   });
 
-  it('does not turn invalid keyboard extensions into a single-line comment', () => {
+  it('comments mixed keyboard extensions with the mixed range', () => {
     const { root, rows } = renderedRows([
       [1, 'context'],
       [2, 'change-deletion'],
@@ -599,7 +660,7 @@ describe('worktree review rendered selection', () => {
     root.events.emit('keydown', new TestKeyEvent(rows[0], 'ArrowDown', true));
     root.events.emit('keydown', new TestKeyEvent(rows[1], 'ArrowDown', true));
     root.events.emit('keydown', new TestKeyEvent(rows[2], 'Enter'));
-    assert.deepEqual(comments, []);
+    assert.deepEqual(comments, [{ side: 'additions', start: 1, end: 2 }]);
     cleanup();
   });
 });

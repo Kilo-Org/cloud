@@ -34,10 +34,24 @@ export function formatWorktreeReviewRange(range: WorktreeReviewRange): string {
     : `Lines ${range.startLine}–${range.endLine}`;
 }
 
-export function selectedLinesFromWorktreeReviewRange(
-  range: WorktreeReviewRange
-): SelectedLineRange {
-  return { side: range.side, start: range.startLine, end: range.endLine };
+function sideOf(line: WorktreeReviewAnchor['quote']['lines'][number]) {
+  return line.kind === 'deletion' ? 'deletions' : 'additions';
+}
+
+export function selectedLinesFromWorktreeReviewQuote(
+  lines: WorktreeReviewAnchor['quote']['lines']
+): SelectedLineRange | null {
+  const first = lines[0];
+  const last = lines.at(-1);
+  if (!first || !last) return null;
+  const side = sideOf(first);
+  const endSide = sideOf(last);
+  return {
+    side,
+    start: first.lineNumber,
+    end: last.lineNumber,
+    ...(endSide === side ? {} : { endSide }),
+  };
 }
 
 export function getWorktreeReviewSelectedLines(
@@ -51,7 +65,7 @@ export function getWorktreeReviewSelectedLines(
     editor.anchor.path === path &&
     sameWorktreeReviewCapture(editor.anchor.capture, capture)
   ) {
-    return selectedLinesFromWorktreeReviewRange(editor.anchor.range);
+    return selectedLinesFromWorktreeReviewQuote(editor.anchor.quote.lines);
   }
   return dragged ?? null;
 }
@@ -69,12 +83,11 @@ export function worktreeReviewRangeHighlightCSS(
     ) {
       continue;
     }
-    const { side, startLine, endLine } = comment.anchor.range;
-    for (let line = startLine; line <= endLine; line += 1) {
+    for (const line of comment.anchor.quote.lines) {
       selectors.push(
-        side === 'deletions'
-          ? `[data-line-type="change-deletion"][data-line="${line}"]`
-          : `[data-line="${line}"]:not([data-line-type="change-deletion"])`
+        line.kind === 'deletion'
+          ? `[data-line-type="change-deletion"][data-line="${line.lineNumber}"]`
+          : `[data-line="${line.lineNumber}"]:not([data-line-type="change-deletion"])`
       );
     }
   }
@@ -93,7 +106,12 @@ export function worktreeReviewEditorSlot(
     !sameWorktreeReviewCapture(editor.anchor.capture, capture)
   )
     return undefined;
-  return `${editor.anchor.range.side}:${editor.anchor.range.endLine}`;
+  return quoteSlotKey(editor.anchor.quote.lines);
+}
+
+function quoteSlotKey(lines: WorktreeReviewAnchor['quote']['lines']): string | undefined {
+  const last = lines.at(-1);
+  return last ? `${sideOf(last)}:${last.lineNumber}` : undefined;
 }
 
 export function getWorktreeReviewAnnotations(
@@ -111,19 +129,26 @@ export function getWorktreeReviewAnnotations(
     ) {
       continue;
     }
-    const { side, endLine } = comment.anchor.range;
-    const key = `${side}:${endLine}`;
+    const last = comment.anchor.quote.lines.at(-1);
+    const key = quoteSlotKey(comment.anchor.quote.lines);
+    if (!last || !key) continue;
     const group = groups.get(key);
     const item: WorktreeReviewAnnotationItem = { kind: 'comment', comment };
     if (group) group.metadata.push(item);
-    else groups.set(key, { side, lineNumber: endLine, metadata: [item] });
+    else groups.set(key, { side: sideOf(last), lineNumber: last.lineNumber, metadata: [item] });
   }
   const editorSlot = worktreeReviewEditorSlot(editor, path, capture);
   if (editor && editorSlot) {
-    const { side, endLine } = editor.anchor.range;
+    const last = editor.anchor.quote.lines.at(-1);
+    if (!last) return [...groups.values()];
     const group = groups.get(editorSlot);
     if (group) group.metadata.push({ kind: 'editor' });
-    else groups.set(editorSlot, { side, lineNumber: endLine, metadata: [{ kind: 'editor' }] });
+    else
+      groups.set(editorSlot, {
+        side: sideOf(last),
+        lineNumber: last.lineNumber,
+        metadata: [{ kind: 'editor' }],
+      });
   }
   return [...groups.values()];
 }

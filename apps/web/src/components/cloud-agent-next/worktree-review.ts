@@ -33,6 +33,15 @@ export type WorktreeReviewRange = {
   endLine: number;
 };
 
+type UnifiedRow = {
+  lineNumber: number;
+  kind: 'addition' | 'deletion' | 'context';
+  text: string;
+  unifiedIndex: number;
+  deletionLineNumber?: number;
+  additionLineNumber?: number;
+};
+
 export type WorktreeReviewAnchor = {
   capture: WorktreeReviewCapture;
   path: string;
@@ -175,10 +184,181 @@ function getRangeError(range: WorktreeReviewRange): string | undefined {
   ) {
     return 'Select a valid line range on one side of the diff.';
   }
-  if (range.endLine - range.startLine + 1 > MAX_WORKTREE_REVIEW_SELECTION_LINES) {
-    return `Select no more than ${MAX_WORKTREE_REVIEW_SELECTION_LINES} lines per comment.`;
+  return undefined;
+}
+
+export function getSelectionError(selection: SelectedLineRange): string | undefined {
+  if (
+    (selection.side !== 'deletions' && selection.side !== 'additions') ||
+    (selection.endSide !== undefined &&
+      selection.endSide !== 'deletions' &&
+      selection.endSide !== 'additions')
+  ) {
+    return 'Select lines on one explicit side of the diff.';
+  }
+  if (
+    !Number.isSafeInteger(selection.start) ||
+    !Number.isSafeInteger(selection.end) ||
+    selection.start <= 0 ||
+    selection.end <= 0
+  ) {
+    return 'Select a valid line range on one side of the diff.';
   }
   return undefined;
+}
+
+function getDiffLineText(lines: string[], lineIndex: number): string {
+  if (!Number.isSafeInteger(lineIndex) || lineIndex < 0) {
+    throw new Error('Invalid diff line index');
+  }
+  const text = lines[lineIndex];
+  if (text === undefined) throw new Error('Missing diff line text');
+  return text;
+}
+
+function collectUnifiedRows(diff: FileDiffMetadata): UnifiedRow[] {
+  const rows: UnifiedRow[] = [];
+  iterateOverDiff({
+    diff,
+    diffStyle: 'unified',
+    expandedHunks: true,
+    callback(row) {
+      if (row.type === 'change') {
+        if (row.deletionLine) {
+          rows.push({
+            lineNumber: row.deletionLine.lineNumber,
+            kind: 'deletion',
+            text: getDiffLineText(diff.deletionLines, row.deletionLine.lineIndex),
+            unifiedIndex: row.deletionLine.unifiedLineIndex,
+            deletionLineNumber: row.deletionLine.lineNumber,
+          });
+        }
+        if (row.additionLine) {
+          rows.push({
+            lineNumber: row.additionLine.lineNumber,
+            kind: 'addition',
+            text: getDiffLineText(diff.additionLines, row.additionLine.lineIndex),
+            unifiedIndex: row.additionLine.unifiedLineIndex,
+            additionLineNumber: row.additionLine.lineNumber,
+          });
+        }
+        return false;
+      }
+      rows.push({
+        lineNumber: row.additionLine.lineNumber,
+        kind: 'context',
+        text: getDiffLineText(diff.additionLines, row.additionLine.lineIndex),
+        unifiedIndex: row.additionLine.unifiedLineIndex,
+        deletionLineNumber: row.deletionLine.lineNumber,
+        additionLineNumber: row.additionLine.lineNumber,
+      });
+      return false;
+    },
+  });
+  return rows;
+}
+
+export function deriveWorktreeReviewRange(
+  lines: WorktreeReviewAnchor['quote']['lines']
+): WorktreeReviewRange | undefined {
+  if (lines.length === 0) return undefined;
+  const additions = lines.filter(line => line.kind !== 'deletion');
+  const selected = additions.length > 0 ? additions : lines;
+  return {
+    side: additions.length > 0 ? 'additions' : 'deletions',
+    startLine: Math.min(...selected.map(line => line.lineNumber)),
+    endLine: Math.max(...selected.map(line => line.lineNumber)),
+  };
+}
+
+function unifiedRowsAreAdjacent(rows: readonly UnifiedRow[]): boolean {
+  return rows.every((row, index) => {
+    if (!Number.isSafeInteger(row.unifiedIndex)) return false;
+    const previous = rows[index - 1];
+    return (
+      previous === undefined ||
+      (Number.isSafeInteger(previous.unifiedIndex) &&
+        row.unifiedIndex === previous.unifiedIndex + 1)
+    );
+  });
+}
+
+function quoteSourceForDiff(diff: FileDiffMetadata): WorktreeReviewAnchor['quote']['source'] {
+  return diff.isPartial || diff.type === 'new' || diff.type === 'deleted'
+    ? 'saved-patch'
+    : 'validated-expanded-diff';
+}
+
+function fileDiffError(
+  capture: WorktreeReviewCapture,
+  file: WorktreeFileRecord,
+  diff: FileDiffMetadata
+): string | undefined {
+  if (
+    file.revision !== capture.revision ||
+    diff.name !== file.path ||
+    diff.prevName !== undefined ||
+    !worktreeChangesFileSchema.shape.path.safeParse(file.path).success
+  ) {
+    return 'The saved file does not match this review capture.';
+  }
+  if (
+    file.diff.status !== 'available' ||
+    (file.content.status === 'unavailable' && file.content.reason === 'binary') ||
+    !['change', 'new', 'deleted'].includes(diff.type) ||
+    diff.hunks.length === 0
+  ) {
+    return 'This saved file has no reviewable diff lines.';
+  }
+  return undefined;
+}
+
+function sliceCoversLossyEOF(
+  rows: readonly UnifiedRow[],
+  file: WorktreeFileRecord,
+  diff: FileDiffMetadata
+): boolean {
+  if (file.diff.status !== 'available') return false;
+  const patch = file.diff.patch;
+  const checkSide = (
+    side: 'deletions' | 'additions',
+    pattern: RegExp,
+    hasLine: (row: UnifiedRow) => boolean,
+    getLine: (hunk: FileDiffMetadata['hunks'][number]) => number
+  ): boolean => {
+    if (!pattern.test(patch) || !rows.some(hasLine)) return false;
+    const eofHunk = diff.hunks.findLast(hunk =>
+      side === 'deletions' ? hunk.deletionCount > 0 : hunk.additionCount > 0
+    );
+    const eofLine = eofHunk === undefined ? undefined : getLine(eofHunk);
+    if (
+      eofLine === undefined ||
+      !Number.isSafeInteger(eofLine) ||
+      eofLine <= 0 ||
+      rows.some(row =>
+        side === 'deletions'
+          ? row.deletionLineNumber === eofLine
+          : row.additionLineNumber === eofLine
+      )
+    ) {
+      return true;
+    }
+    return false;
+  };
+  return (
+    checkSide(
+      'deletions',
+      /\n[- ][^\n]*\r\n\\ No newline at end of file\n/,
+      row => row.kind === 'deletion',
+      hunk => hunk.deletionStart + hunk.deletionCount - 1
+    ) ||
+    checkSide(
+      'additions',
+      /\n[+ ][^\n]*\r\n\\ No newline at end of file\n/,
+      row => row.kind !== 'deletion',
+      hunk => hunk.additionStart + hunk.additionCount - 1
+    )
+  );
 }
 
 function getAnchorError(anchor: WorktreeReviewAnchor): string | undefined {
@@ -189,7 +369,8 @@ function getAnchorError(anchor: WorktreeReviewAnchor): string | undefined {
   }
   if (
     (anchor.quote.source !== 'saved-patch' && anchor.quote.source !== 'validated-expanded-diff') ||
-    anchor.quote.lines.length !== anchor.range.endLine - anchor.range.startLine + 1
+    anchor.quote.lines.length < 1 ||
+    anchor.quote.lines.length > MAX_WORKTREE_REVIEW_SELECTION_LINES
   ) {
     return 'The selected lines are not fully available in this saved diff.';
   }
@@ -198,9 +379,9 @@ function getAnchorError(anchor: WorktreeReviewAnchor): string | undefined {
   for (const [index, line] of anchor.quote.lines.entries()) {
     const newline = line.text.indexOf('\n');
     if (
-      line.lineNumber !== anchor.range.startLine + index ||
-      (line.kind !== 'context' &&
-        line.kind !== (anchor.range.side === 'additions' ? 'addition' : 'deletion')) ||
+      !Number.isSafeInteger(line.lineNumber) ||
+      line.lineNumber <= 0 ||
+      (line.kind !== 'context' && line.kind !== 'addition' && line.kind !== 'deletion') ||
       line.text.length === 0 ||
       (newline !== -1 && newline !== line.text.length - 1) ||
       (index < anchor.quote.lines.length - 1 && newline === -1)
@@ -211,6 +392,15 @@ function getAnchorError(anchor: WorktreeReviewAnchor): string | undefined {
     if (bytes > MAX_WORKTREE_REVIEW_QUOTE_BYTES) {
       return `The selected text exceeds the ${MAX_WORKTREE_REVIEW_QUOTE_BYTES}-byte review limit.`;
     }
+  }
+  const range = deriveWorktreeReviewRange(anchor.quote.lines);
+  if (
+    !range ||
+    range.side !== anchor.range.side ||
+    range.startLine !== anchor.range.startLine ||
+    range.endLine !== anchor.range.endLine
+  ) {
+    return 'The selected lines are not fully available in this saved diff.';
   }
   return undefined;
 }
@@ -228,128 +418,74 @@ function cloneAnchor(anchor: WorktreeReviewAnchor): WorktreeReviewAnchor {
   };
 }
 
-export function normalizeWorktreeReviewRange(
-  selected: SelectedLineRange
-): WorktreeReviewResult<WorktreeReviewRange> {
-  if (
-    selected.side === undefined ||
-    (selected.endSide !== undefined && selected.endSide !== selected.side)
-  ) {
-    return { ok: false, error: 'Select lines on one explicit side of the diff.' };
-  }
-  const range: WorktreeReviewRange = {
-    side: selected.side,
-    startLine: Math.min(selected.start, selected.end),
-    endLine: Math.max(selected.start, selected.end),
-  };
-  const error = getRangeError(range);
-  return error ? { ok: false, error } : { ok: true, value: range };
-}
-
 export function createWorktreeReviewAnchor({
   capture,
   file,
   diff,
-  range,
+  selection,
 }: {
   capture: WorktreeReviewCapture;
   file: WorktreeFileRecord;
   diff: FileDiffMetadata;
-  range: WorktreeReviewRange;
+  selection: SelectedLineRange;
 }): WorktreeReviewResult<WorktreeReviewAnchor> {
-  const error = getCaptureError(capture) ?? getRangeError(range);
+  const error = getCaptureError(capture) ?? getSelectionError(selection);
   if (error) return { ok: false, error };
-  if (
-    file.revision !== capture.revision ||
-    diff.name !== file.path ||
-    diff.prevName !== undefined ||
-    !worktreeChangesFileSchema.shape.path.safeParse(file.path).success
-  ) {
-    return { ok: false, error: 'The saved file does not match this review capture.' };
-  }
-  if (
-    file.diff.status !== 'available' ||
-    (file.content.status === 'unavailable' && file.content.reason === 'binary') ||
-    !['change', 'new', 'deleted'].includes(diff.type) ||
-    diff.hunks.length === 0
-  ) {
-    return { ok: false, error: 'This saved file has no reviewable diff lines.' };
-  }
-  const lossyEOF =
-    range.side === 'deletions'
-      ? /\n[- ][^\n]*\r\n\\ No newline at end of file\n/.test(file.diff.patch)
-      : /\n[+ ][^\n]*\r\n\\ No newline at end of file\n/.test(file.diff.patch);
-  if (lossyEOF) {
-    const eofHunk = diff.hunks.findLast(hunk =>
-      range.side === 'deletions' ? hunk.deletionCount > 0 : hunk.additionCount > 0
-    );
-    const eofLine =
-      eofHunk === undefined
-        ? undefined
-        : range.side === 'deletions'
-          ? eofHunk.deletionStart + eofHunk.deletionCount - 1
-          : eofHunk.additionStart + eofHunk.additionCount - 1;
-    if (
-      eofLine === undefined ||
-      !Number.isSafeInteger(eofLine) ||
-      eofLine <= 0 ||
-      (range.startLine <= eofLine && range.endLine >= eofLine)
-    ) {
-      return {
-        ok: false,
-        error: 'The selected lines cannot be quoted exactly from this saved diff.',
-      };
-    }
-  }
-  const lines: WorktreeReviewAnchor['quote']['lines'] = [];
-  let mappingError: string | undefined;
+  const fileError = fileDiffError(capture, file, diff);
+  if (fileError) return { ok: false, error: fileError };
+  let rows: UnifiedRow[];
   try {
-    iterateOverDiff({
-      diff,
-      diffStyle: 'unified',
-      expandedHunks: true,
-      callback(row) {
-        const line = range.side === 'deletions' ? row.deletionLine : row.additionLine;
-        if (!line || line.lineNumber < range.startLine || line.lineNumber > range.endLine)
-          return false;
-        const text = (range.side === 'deletions' ? diff.deletionLines : diff.additionLines)[
-          line.lineIndex
-        ];
-        if (
-          !Number.isSafeInteger(line.lineIndex) ||
-          line.lineIndex < 0 ||
-          line.lineNumber !== range.startLine + lines.length ||
-          text === undefined
-        ) {
-          mappingError = 'The selected lines cannot be quoted exactly from this saved diff.';
-          return true;
-        }
-        lines.push({
-          lineNumber: line.lineNumber,
-          kind:
-            row.type === 'change'
-              ? range.side === 'deletions'
-                ? 'deletion'
-                : 'addition'
-              : 'context',
-          text,
-        });
-        return false;
-      },
-    });
+    rows = collectUnifiedRows(diff);
   } catch {
     return { ok: false, error: 'The selected lines cannot be read from this saved diff.' };
   }
-  if (mappingError) return { ok: false, error: mappingError };
+  const startIndex = rows.findIndex(
+    row =>
+      (selection.side === 'deletions' ? row.deletionLineNumber : row.additionLineNumber) ===
+      selection.start
+  );
+  const endSide = selection.endSide ?? selection.side;
+  const endIndex = rows.findIndex(
+    row =>
+      (endSide === 'deletions' ? row.deletionLineNumber : row.additionLineNumber) === selection.end
+  );
+  if (startIndex < 0 || endIndex < 0) {
+    return {
+      ok: false,
+      error: 'The selected lines are not fully available in this saved diff.',
+    };
+  }
+  const selectedRows = rows.slice(
+    Math.min(startIndex, endIndex),
+    Math.max(startIndex, endIndex) + 1
+  );
+  if (!unifiedRowsAreAdjacent(selectedRows)) {
+    return {
+      ok: false,
+      error: 'The selected lines are not fully available in this saved diff.',
+    };
+  }
+  if (sliceCoversLossyEOF(selectedRows, file, diff)) {
+    return {
+      ok: false,
+      error: 'The selected lines cannot be quoted exactly from this saved diff.',
+    };
+  }
+  const lines: WorktreeReviewAnchor['quote']['lines'] = selectedRows.map(row => ({
+    lineNumber: row.lineNumber,
+    kind: row.kind,
+    text: row.text,
+  }));
+  const range = deriveWorktreeReviewRange(lines);
+  if (!range) {
+    return { ok: false, error: 'The selected lines are not fully available in this saved diff.' };
+  }
   const anchor: WorktreeReviewAnchor = {
     capture,
     path: file.path,
     range,
     quote: {
-      source:
-        diff.isPartial || diff.type === 'new' || diff.type === 'deleted'
-          ? 'saved-patch'
-          : 'validated-expanded-diff',
+      source: quoteSourceForDiff(diff),
       lines,
     },
   };
@@ -402,20 +538,6 @@ function normalizeReviewQuoteText(text: string): string {
   return text.replace(/\s+/g, '');
 }
 
-function sameReviewQuoteLines(
-  left: WorktreeReviewAnchor['quote']['lines'],
-  right: WorktreeReviewAnchor['quote']['lines']
-): boolean {
-  if (left.length !== right.length) return false;
-  return left.every((line, index) => {
-    const other = right[index];
-    return (
-      other !== undefined &&
-      normalizeReviewQuoteText(line.text) === normalizeReviewQuoteText(other.text)
-    );
-  });
-}
-
 export function rebaseWorktreeReviewComment(
   comment: WorktreeReviewComment,
   capture: WorktreeReviewCapture,
@@ -424,16 +546,50 @@ export function rebaseWorktreeReviewComment(
 ): WorktreeReviewComment | null {
   if (comment.anchor.path !== file.path) return comment;
   if (sameWorktreeReviewCapture(comment.anchor.capture, capture)) return comment;
-  const next = createWorktreeReviewAnchor({
-    capture,
-    file,
-    diff,
-    range: comment.anchor.range,
-  });
-  if (!next.ok || !sameReviewQuoteLines(comment.anchor.quote.lines, next.value.quote.lines)) {
+  if (getCaptureError(capture)) return null;
+  const fileError = fileDiffError(capture, file, diff);
+  if (fileError) return null;
+  let rows: UnifiedRow[];
+  try {
+    rows = collectUnifiedRows(diff);
+  } catch {
     return null;
   }
-  return { ...comment, anchor: next.value };
+  const savedLines = comment.anchor.quote.lines;
+  let matchStart = -1;
+  let matchCount = 0;
+  for (let start = 0; start <= rows.length - savedLines.length; start += 1) {
+    const candidate = rows.slice(start, start + savedLines.length);
+    if (
+      candidate.every(
+        (row, index) =>
+          normalizeReviewQuoteText(row.text) ===
+          normalizeReviewQuoteText(savedLines[index]?.text ?? '')
+      )
+    ) {
+      matchStart = start;
+      matchCount += 1;
+    }
+  }
+  if (matchCount !== 1) return null;
+  const matchedRows = rows.slice(matchStart, matchStart + savedLines.length);
+  if (!unifiedRowsAreAdjacent(matchedRows)) return null;
+  const lines: WorktreeReviewAnchor['quote']['lines'] = matchedRows.map((row, index) => ({
+    lineNumber: row.lineNumber,
+    kind: row.kind,
+    // Keep the captured text so rebase cannot reintroduce renderer lossiness.
+    text: savedLines[index]?.text ?? '',
+  }));
+  const range = deriveWorktreeReviewRange(lines);
+  if (!range) return null;
+  const anchor: WorktreeReviewAnchor = {
+    capture,
+    path: file.path,
+    range,
+    quote: { source: quoteSourceForDiff(diff), lines },
+  };
+  if (getAnchorError(anchor)) return null;
+  return { ...comment, anchor: cloneAnchor(anchor) };
 }
 
 export function rebaseWorktreeReviewCommentsForFile(

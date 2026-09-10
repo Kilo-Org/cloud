@@ -27,7 +27,7 @@ const {
   MAX_WORKTREE_REVIEW_QUOTE_BYTES,
   MAX_WORKTREE_REVIEW_PROMPT_LENGTH,
   createWorktreeReviewAnchor,
-  normalizeWorktreeReviewRange,
+  getWorktreeReviewAnchorError,
   rebaseWorktreeReviewComment,
   rebaseWorktreeReviewCommentsForFile,
   sameWorktreeReviewScope,
@@ -133,7 +133,13 @@ function anchor(
   source = fixture(),
   reviewedCapture = capture
 ): WorktreeReviewAnchor {
-  return value(createWorktreeReviewAnchor({ capture: reviewedCapture, ...source, range }));
+  return value(
+    createWorktreeReviewAnchor({
+      capture: reviewedCapture,
+      ...source,
+      selection: { side: range.side, start: range.startLine, end: range.endLine },
+    })
+  );
 }
 
 function comment(
@@ -175,8 +181,15 @@ describe('saved worktree review anchors', () => {
     assert.deepEqual(anchor({ side: 'deletions', startLine: 20, endLine: 22 }).quote.lines, [
       { lineNumber: 20, kind: 'context', text: 'lead\n' },
       { lineNumber: 21, kind: 'deletion', text: 'old\n' },
-      { lineNumber: 22, kind: 'context', text: 'tail\n' },
+      { lineNumber: 21, kind: 'addition', text: 'new\n' },
+      { lineNumber: 22, kind: 'addition', text: 'extra\n' },
+      { lineNumber: 23, kind: 'context', text: 'tail\n' },
     ]);
+    assert.deepEqual(anchor({ side: 'deletions', startLine: 20, endLine: 22 }).range, {
+      side: 'additions',
+      startLine: 20,
+      endLine: 23,
+    });
     assert.deepEqual(anchor({ side: 'additions', startLine: 23, endLine: 23 }).quote.lines, [
       { lineNumber: 23, kind: 'context', text: 'tail\n' },
     ]);
@@ -193,7 +206,7 @@ describe('saved worktree review anchors', () => {
         createWorktreeReviewAnchor({
           capture,
           ...fixture(),
-          range: { side: 'additions', startLine, endLine },
+          selection: { side: 'additions', start: startLine, end: endLine },
         }).ok,
         false
       );
@@ -218,10 +231,10 @@ describe('saved worktree review anchors', () => {
         createWorktreeReviewAnchor({
           capture,
           ...source,
-          range: {
+          selection: {
             side: side === 'additions' ? 'deletions' : 'additions',
-            startLine: 1,
-            endLine: 1,
+            start: 1,
+            end: 1,
           },
         }).ok,
         false
@@ -243,7 +256,7 @@ describe('saved worktree review anchors', () => {
       createWorktreeReviewAnchor({
         capture,
         ...source,
-        range: { side: 'additions', startLine: 1, endLine: 12 },
+        selection: { side: 'additions', start: 1, end: 12 },
       }).ok,
       false
     );
@@ -256,29 +269,86 @@ describe('saved worktree review anchors', () => {
       assert.equal(reviewed.quote.source, 'validated-expanded-diff');
       assert.equal(
         reviewed.quote.lines.map(line => line.text).join(''),
-        (side === 'additions' ? current : before).join('')
+        [
+          'line 1\n',
+          'line 2\n',
+          'line 3\n',
+          'line 4\n',
+          'new four\n',
+          'line 5\n',
+          'line 6\n',
+          'line 7\n',
+          'line 8\n',
+          'line 9\n',
+          'new nine\n',
+          'line 10\n',
+          'line 11\n',
+          'line 12\n',
+        ].join('')
       );
+      assert.equal(reviewed.quote.lines.length, 14);
       assert.equal(reviewed.quote.lines[0]?.kind, 'context');
-      assert.equal(reviewed.quote.lines[11]?.kind, 'context');
+      assert.equal(reviewed.quote.lines.at(-1)?.kind, 'context');
     }
   });
 
   it('preserves zero-count hunk boundaries when saved context is expanded', () => {
     for (const scenario of [
-      { hunk: '@@ -0,0 +1 @@\n+inserted\n', before: 'one\ntwo\n', current: 'inserted\none\ntwo\n' },
-      { hunk: '@@ -1,0 +2 @@\n+inserted\n', before: 'one\ntwo\n', current: 'one\ninserted\ntwo\n' },
-      { hunk: '@@ -2,0 +3 @@\n+inserted\n', before: 'one\ntwo\n', current: 'one\ntwo\ninserted\n' },
-      { hunk: '@@ -1 +0,0 @@\n-removed\n', before: 'removed\none\ntwo\n', current: 'one\ntwo\n' },
-      { hunk: '@@ -2 +1,0 @@\n-removed\n', before: 'one\nremoved\ntwo\n', current: 'one\ntwo\n' },
-      { hunk: '@@ -3 +2,0 @@\n-removed\n', before: 'one\ntwo\nremoved\n', current: 'one\ntwo\n' },
+      {
+        hunk: '@@ -0,0 +1 @@\n+inserted\n',
+        before: 'one\ntwo\n',
+        current: 'inserted\none\ntwo\n',
+        deletions: 'one\ntwo\n',
+        additions: 'inserted\none\ntwo\n',
+      },
+      {
+        hunk: '@@ -1,0 +2 @@\n+inserted\n',
+        before: 'one\ntwo\n',
+        current: 'one\ninserted\ntwo\n',
+        deletions: 'one\ninserted\ntwo\n',
+        additions: 'one\ninserted\ntwo\n',
+      },
+      {
+        hunk: '@@ -2,0 +3 @@\n+inserted\n',
+        before: 'one\ntwo\n',
+        current: 'one\ntwo\ninserted\n',
+        deletions: 'one\ntwo\n',
+        additions: 'one\ntwo\ninserted\n',
+      },
+      {
+        hunk: '@@ -1 +0,0 @@\n-removed\n',
+        before: 'removed\none\ntwo\n',
+        current: 'one\ntwo\n',
+        deletions: 'removed\none\ntwo\n',
+        additions: 'one\ntwo\n',
+      },
+      {
+        hunk: '@@ -2 +1,0 @@\n-removed\n',
+        before: 'one\nremoved\ntwo\n',
+        current: 'one\ntwo\n',
+        deletions: 'one\nremoved\ntwo\n',
+        additions: 'one\nremoved\ntwo\n',
+      },
+      {
+        hunk: '@@ -3 +2,0 @@\n-removed\n',
+        before: 'one\ntwo\nremoved\n',
+        current: 'one\ntwo\n',
+        deletions: 'one\ntwo\nremoved\n',
+        additions: 'one\ntwo\n',
+      },
     ]) {
       const source = fixture(`${patchHeader}${scenario.hunk}`, 'file.txt', scenario.current);
       const expansion = getWorktreeDiffExpansion(source.file, source.diff);
       if (expansion.status !== 'available') assert.fail('Expected validated expansion');
       for (const side of ['additions', 'deletions'] as const) {
-        const text = side === 'additions' ? scenario.current : scenario.before;
+        const text = side === 'additions' ? scenario.additions : scenario.deletions;
         const reviewed = anchor(
-          { side, startLine: 1, endLine: text.split('\n').length - 1 },
+          {
+            side,
+            startLine: 1,
+            endLine:
+              (side === 'additions' ? scenario.current : scenario.before).split('\n').length - 1,
+          },
           { file: source.file, diff: expansion.diff }
         );
         assert.equal(reviewed.quote.lines.map(line => line.text).join(''), text);
@@ -290,12 +360,14 @@ describe('saved worktree review anchors', () => {
     const source = fixture(
       `${patchHeader}@@ -1,3 +1,3 @@\n \r\n-\t old  \r\n+\t new  \r\n ending\n\\ No newline at end of file\n`
     );
+    const expected = [
+      { lineNumber: 1, kind: 'context', text: '\r\n' },
+      { lineNumber: 2, kind: 'deletion', text: '\t old  \r\n' },
+      { lineNumber: 2, kind: 'addition', text: '\t new  \r\n' },
+      { lineNumber: 3, kind: 'context', text: 'ending' },
+    ];
     for (const side of ['additions', 'deletions'] as const) {
-      const reviewed = anchor({ side, startLine: 1, endLine: 3 }, source);
-      assert.deepEqual(
-        reviewed.quote.lines.map(line => line.text),
-        ['\r\n', `\t ${side === 'additions' ? 'new' : 'old'}  \r\n`, 'ending']
-      );
+      assert.deepEqual(anchor({ side, startLine: 1, endLine: 3 }, source).quote.lines, expected);
     }
   });
 
@@ -307,7 +379,7 @@ describe('saved worktree review anchors', () => {
       createWorktreeReviewAnchor({
         capture,
         ...source,
-        range: { side: 'deletions', startLine: 2, endLine: 2 },
+        selection: { side: 'deletions', start: 2, end: 2 },
       }).ok,
       false
     );
@@ -330,17 +402,21 @@ describe('saved worktree review anchors', () => {
       const result = createWorktreeReviewAnchor({
         capture,
         ...source,
-        range: { side: scenario.side, startLine: 1, endLine: 1 },
+        selection: { side: scenario.side, start: 1, end: 1 },
       });
       assert.equal(result.ok, false, 'The selected lone-CR line must not lose its carriage return');
       const safeSide = scenario.side === 'deletions' ? 'additions' : 'deletions';
-      const reviewed = anchor({ side: safeSide, startLine: 1, endLine: 3 }, source);
+      const safeRange: WorktreeReviewRange =
+        scenario.side === 'deletions'
+          ? { side: safeSide, startLine: 2, endLine: 3 }
+          : { side: safeSide, startLine: 1, endLine: 1 };
+      const reviewed = anchor(safeRange, source);
       const serialized = value(serialize([comment('safe', { anchor: reviewed })]));
       assert.equal(
         payload(serialized)
           .comments[0]?.anchor.quote.lines.map(line => line.text)
           .join(''),
-        'x\nhello\nz\n'
+        scenario.side === 'deletions' ? 'hello\nz\n' : 'x\n'
       );
       const prefix = Array.from({ length: 30 }, (_, index) => `unchanged ${index + 1}\n`).join('');
       const shifted = gitFixture(t, prefix + scenario.before, prefix + scenario.current);
@@ -349,7 +425,7 @@ describe('saved worktree review anchors', () => {
           createWorktreeReviewAnchor({
             capture,
             ...shifted,
-            range: { side: scenario.side, startLine, endLine: 31 },
+            selection: { side: scenario.side, start: startLine, end: 31 },
           }).ok,
           false
         );
@@ -366,7 +442,7 @@ describe('saved worktree review anchors', () => {
     const options = {
       capture,
       ...source,
-      range: { side: 'additions', startLine: 21, endLine: 21 } as const,
+      selection: { side: 'additions', start: 21, end: 21 } as const,
     };
     for (const changes of [
       { file: { ...source.file, revision: 4 } },
@@ -390,30 +466,55 @@ describe('saved worktree review anchors', () => {
     }
   });
 
-  it('normalizes reversed selections but rejects mixed, missing, and invalid sides or numbers', () => {
-    assert.deepEqual(value(normalizeWorktreeReviewRange({ side: 'deletions', start: 8, end: 3 })), {
-      side: 'deletions',
-      startLine: 3,
-      endLine: 8,
+  it('validates selections and extracts mixed unified rows between their endpoints', () => {
+    const reversed = createWorktreeReviewAnchor({
+      capture,
+      ...fixture(),
+      selection: { side: 'additions', start: 22, end: 21 },
     });
-    assert.deepEqual(
-      value(
-        normalizeWorktreeReviewRange({ side: 'additions', endSide: 'additions', start: 3, end: 3 })
-      ),
-      { side: 'additions', startLine: 3, endLine: 3 }
-    );
+    assert.equal(reversed.ok, true);
+    if (reversed.ok) {
+      assert.deepEqual(reversed.value.range, { side: 'additions', startLine: 21, endLine: 22 });
+    }
+    const mixed = createWorktreeReviewAnchor({
+      capture,
+      ...fixture(),
+      selection: { side: 'deletions', start: 21, endSide: 'additions', end: 21 },
+    });
+    assert.equal(mixed.ok, true);
+    if (mixed.ok) {
+      assert.deepEqual(mixed.value.quote.lines, [
+        { lineNumber: 21, kind: 'deletion', text: 'old\n' },
+        { lineNumber: 21, kind: 'addition', text: 'new\n' },
+      ]);
+      assert.deepEqual(mixed.value.range, { side: 'additions', startLine: 21, endLine: 21 });
+    }
+    const github = createWorktreeReviewAnchor({
+      capture,
+      ...fixture(),
+      selection: { side: 'additions', start: 20, end: 21 },
+    });
+    assert.equal(github.ok, true);
+    if (github.ok) {
+      assert.deepEqual(github.value.quote.lines, [
+        { lineNumber: 20, kind: 'context', text: 'lead\n' },
+        { lineNumber: 21, kind: 'deletion', text: 'old\n' },
+        { lineNumber: 21, kind: 'addition', text: 'new\n' },
+      ]);
+    }
     for (const selected of [
       { start: 1, end: 1 },
-      { side: 'deletions', endSide: 'additions', start: 1, end: 2 },
       { side: 'additions', start: 0, end: 1 },
       { side: 'additions', start: -1, end: 1 },
       { side: 'additions', start: 1.5, end: 2 },
       { side: 'additions', start: NaN, end: 2 },
       { side: 'additions', start: 1, end: Infinity },
       { side: 'additions', start: 1, end: Number.MAX_SAFE_INTEGER + 1 },
-      { side: 'additions', start: 1, end: MAX_WORKTREE_REVIEW_SELECTION_LINES + 1 },
     ] satisfies SelectedLineRange[]) {
-      assert.equal(normalizeWorktreeReviewRange(selected).ok, false);
+      assert.equal(
+        createWorktreeReviewAnchor({ capture, ...fixture(), selection: selected }).ok,
+        false
+      );
     }
   });
 
@@ -436,10 +537,10 @@ describe('saved worktree review anchors', () => {
       createWorktreeReviewAnchor({
         capture,
         ...source,
-        range: {
+        selection: {
           side: 'additions',
-          startLine: 1,
-          endLine: MAX_WORKTREE_REVIEW_SELECTION_LINES + 1,
+          start: 1,
+          end: MAX_WORKTREE_REVIEW_SELECTION_LINES + 1,
         },
       }).ok,
       false
@@ -453,11 +554,65 @@ describe('saved worktree review anchors', () => {
         createWorktreeReviewAnchor({
           capture,
           ...fixture(`${patchHeader}@@ -1 +1 @@\n-old\n+${text}\n`),
-          range: { side: 'additions', startLine: 1, endLine: 1 },
+          selection: { side: 'additions', start: 1, end: 1 },
         }).ok,
         ok
       );
     }
+  });
+
+  it('counts mixed visual rows rather than the derived numeric span', () => {
+    const replacementPatch = (count: number, trailingContext = false) =>
+      `${patchHeader}@@ -1,${count + (trailingContext ? 1 : 0)} +1,${count + (trailingContext ? 1 : 0)} @@\n${Array.from(
+        { length: count },
+        (_, index) => `-old ${index + 1}\n+new ${index + 1}\n`
+      ).join('')}${trailingContext ? ' trailing\n' : ''}`;
+    const accepted = createWorktreeReviewAnchor({
+      capture,
+      ...fixture(replacementPatch(MAX_WORKTREE_REVIEW_SELECTION_LINES / 2)),
+      selection: {
+        side: 'deletions',
+        start: 1,
+        endSide: 'additions',
+        end: MAX_WORKTREE_REVIEW_SELECTION_LINES / 2,
+      },
+    });
+    assert.equal(accepted.ok, true);
+    const rejected = createWorktreeReviewAnchor({
+      capture,
+      ...fixture(replacementPatch(MAX_WORKTREE_REVIEW_SELECTION_LINES / 2, true)),
+      selection: {
+        side: 'deletions',
+        start: 1,
+        endSide: 'additions',
+        end: MAX_WORKTREE_REVIEW_SELECTION_LINES / 2 + 1,
+      },
+    });
+    assert.equal(rejected.ok, false);
+  });
+
+  it('accepts a valid mixed quote whose derived range spans more than the row limit', () => {
+    const wideAnchor: WorktreeReviewAnchor = {
+      ...anchor(),
+      range: { side: 'additions', startLine: 1, endLine: 150 },
+      quote: {
+        source: 'saved-patch',
+        lines: [
+          { lineNumber: 1, kind: 'context', text: 'a\n' },
+          { lineNumber: 1, kind: 'deletion', text: 'b\n' },
+          { lineNumber: 150, kind: 'addition', text: 'c' },
+        ],
+      },
+    };
+    assert.equal(getWorktreeReviewAnchorError(wideAnchor), undefined);
+    assert.equal(
+      addWorktreeReviewComment([], {
+        id: 'wide',
+        anchor: wideAnchor,
+        text: 'Please simplify this.',
+      }).ok,
+      true
+    );
   });
 
   it('copies capture metadata, range, and source independently of live diff state', () => {
@@ -543,6 +698,10 @@ describe('worktree review rebase', () => {
     assert.equal(kept.id, reviewed.id);
     assert.equal(kept.anchor.capture.revision, 4);
     assert.deepEqual(kept.anchor.range, reviewed.anchor.range);
+    assert.deepEqual(
+      kept.anchor.quote.lines.map(line => line.text),
+      ['new\n', 'extra\n']
+    );
   });
 
   it('drops a comment when the range text changed', () => {
@@ -555,6 +714,62 @@ describe('worktree review rebase', () => {
       additionLines: source.diff.additionLines.map(() => 'different\n'),
     };
     assert.equal(rebaseWorktreeReviewComment(reviewed, nextCapture, nextFile, changed), null);
+  });
+
+  it('rebases a unique quote to shifted line numbers', t => {
+    const source = gitFixture(t, 'lead\nold\n', 'lead\nnew\n');
+    const reviewed = comment('shifted', {
+      anchor: anchor({ side: 'additions', startLine: 2, endLine: 2 }, source),
+    });
+    const nextCapture = { ...capture, revision: 4, capturedAt: '2026-09-01T11:00:00Z' };
+    const next = rebaseWorktreeReviewComment(
+      reviewed,
+      nextCapture,
+      { ...source.file, revision: 4 },
+      gitFixture(t, 'prefix\nlead\nold\n', 'prefix\nlead\nnew\n').diff
+    );
+    assert.ok(next);
+    assert.deepEqual(next.anchor.quote.lines, [{ lineNumber: 3, kind: 'addition', text: 'new\n' }]);
+    assert.deepEqual(next.anchor.range, { side: 'additions', startLine: 3, endLine: 3 });
+  });
+
+  it('drops a rebase when the quote text has multiple matches', () => {
+    const source = fixture(`${patchHeader}@@ -1 +1 @@\n-old\n+same\n`);
+    const reviewed = comment('ambiguous', {
+      anchor: anchor({ side: 'additions', startLine: 1, endLine: 1 }, source),
+    });
+    const nextPatch = `${patchHeader}@@ -1 +1 @@\n-old\n+same\n@@ -3 +3 @@\n-old\n+same\n`;
+    const next = rebaseWorktreeReviewComment(
+      reviewed,
+      { ...capture, revision: 4 },
+      { ...source.file, revision: 4, diff: { status: 'available', patch: nextPatch } },
+      fixture(nextPatch).diff
+    );
+    assert.equal(next, null);
+  });
+
+  it('keeps a mixed quote across a capture bump', () => {
+    const source = fixture();
+    const reviewed = comment('mixed', {
+      anchor: anchor({ side: 'deletions', startLine: 20, endLine: 22 }, source),
+    });
+    const next = rebaseWorktreeReviewComment(
+      reviewed,
+      { ...capture, revision: 4 },
+      { ...source.file, revision: 4 },
+      source.diff
+    );
+    assert.ok(next);
+    assert.deepEqual(
+      next.anchor.quote.lines.map(({ lineNumber, kind, text }) => ({ lineNumber, kind, text })),
+      [
+        { lineNumber: 20, kind: 'context', text: 'lead\n' },
+        { lineNumber: 21, kind: 'deletion', text: 'old\n' },
+        { lineNumber: 21, kind: 'addition', text: 'new\n' },
+        { lineNumber: 22, kind: 'addition', text: 'extra\n' },
+        { lineNumber: 23, kind: 'context', text: 'tail\n' },
+      ]
+    );
   });
 
   it('keeps comments from another source session when rebasing a file', () => {
@@ -663,6 +878,7 @@ describe('worktree review draft operations', () => {
     for (const changed of [
       { ...first.anchor, path: '/absolute' },
       { ...first.anchor, range: { ...first.anchor.range, startLine: 0 } },
+      { ...first.anchor, range: { ...first.anchor.range, endLine: 21 } },
       { ...first.anchor, quote: { ...first.anchor.quote, lines: [] } },
       {
         ...first.anchor,
@@ -695,6 +911,26 @@ describe('worktree review draft operations', () => {
       assert.equal(addWorktreeReviewComment([], { ...first, anchor: changed }).ok, false);
       assert.equal(serialize([{ ...first, anchor: changed }]).ok, false);
     }
+    const mixed: WorktreeReviewAnchor = {
+      capture,
+      path: 'src/example.ts',
+      range: { side: 'additions', startLine: 20, endLine: 23 },
+      quote: {
+        source: 'saved-patch',
+        lines: [
+          { lineNumber: 20, kind: 'context', text: 'lead\n' },
+          { lineNumber: 21, kind: 'deletion', text: 'old\n' },
+          { lineNumber: 21, kind: 'addition', text: 'new\n' },
+          { lineNumber: 22, kind: 'addition', text: 'extra\n' },
+          { lineNumber: 23, kind: 'context', text: 'tail\n' },
+        ],
+      },
+    };
+    assert.equal(
+      addWorktreeReviewComment([], { id: 'mixed', anchor: mixed, text: 'Keep both sides.' }).ok,
+      true
+    );
+    assert.equal(serialize([comment('mixed', { anchor: mixed })]).ok, true);
   });
 });
 

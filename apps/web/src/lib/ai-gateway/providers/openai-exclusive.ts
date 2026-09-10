@@ -42,7 +42,7 @@ export const gpt_6_astra_flex_model: KiloExclusiveModel = {
   display_name: 'OpenAI: GPT-6 Astra Flex',
   description:
     'GPT-6 Astra with OpenAI Flex processing, offering lower costs in exchange for slower response times and occasional resource unavailability.',
-  status: 'public',
+  status: 'disabled',
   context_length: 1_050_000,
   max_completion_tokens: 128_000,
   gateway: 'vercel',

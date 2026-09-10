@@ -152,9 +152,10 @@ describe('isFreeModel', () => {
       ]);
     });
 
-    test('registers the GPT-6 Astra OpenAI Flex endpoint', async () => {
-      expect(findKiloExclusiveModel(gpt_6_astra_flex_model.public_id)).toBe(gpt_6_astra_flex_model);
+    test('keeps the GPT-6 Astra OpenAI Flex endpoint disabled', async () => {
+      expect(findKiloExclusiveModel(gpt_6_astra_flex_model.public_id)).toBeNull();
       expect(gpt_6_astra_flex_model).toMatchObject({
+        status: 'disabled',
         internal_id: 'openai/gpt-6-astra',
         gateway: 'vercel',
         flags: ['reasoning', 'vision', 'flex'],

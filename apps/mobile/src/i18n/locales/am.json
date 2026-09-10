@@ -2617,7 +2617,7 @@
     "legalConnectorPrivacy": " እና የሚከተለውን ፖሊሲ እንዳነበቡ ያረጋግጣሉ፦ ",
     "manageFailed": "የApp Store ምዝገባ አስተዳደር መክፈት አልተሳካም።",
     "kiloPassSetup": "የKilo Pass ማዋቀር",
-    "subscriptionHeaderDescription": "ወርሃዊ ምዝገባ በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ ክሬዲት የሚያክል.",
+    "subscriptionHeaderDescription": "ወርሃዊ ምዝገባ በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ ክሬዲት የሚያክል።",
     "tierDescription": "ለKilo App አጠቃቀም በየወሩ የ{{price}} የተከፈለበት ክሬዲት ይጨመራል።",
     "subscribe": "ይመዝገቡ",
     "subscribeDescription": "ጉርሻ ለማግኘት የሚያቀርብ ወርሃዊ ክሬዲት",
@@ -2928,14 +2928,6 @@
     "revoke": "{{host}}ን ከታመኑ አስተናጋጆች ያስወግዱ",
     "backToPreferences": "ወደ ምርጫዎች ይመለሱ"
   },
-  "quickChat": {
-    "empty": {
-      "title": "ውይይት ይጀምሩ",
-      "description": "ከሞዴል ጋር ለመወያየት መልዕክት ይላኩ።"
-    },
-    "historyRetry": "የውይይት ታሪኩን መጫን አልተቻለም።",
-    "sendError": "መልዕክቱን መላክ አልተቻለም። እንደገና ይሞክሩ።"
-  },
   "glanceable": {
     "waiting": "ወኪሎችን በማዘመን ላይ",
     "empty": "በሂደት ላይ ያለ ስራ የለም",
@@ -2947,5 +2939,18 @@
     "needsInput": "ምላሽ ይፈልጋል",
     "channelName": "ንቁ ወኪሎች",
     "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "ውይይት ጀምር",
+      "description": "ከሞዴል ጋር ለመወያየት መልእክት ይላኩ።"
+    },
+    "list": {
+      "loadFailed": "የውይይት ታሪክ መጫን አልተቻለም።",
+      "new": "አዲስ ውይይት",
+      "openHint": "ውይይቱን ይከፍታል። ለመሰረዝ ተጭነው ይያዙ።",
+      "deleteTitle": "ይህ ውይይት ይሰረዝ?"
+    },
+    "beta": "ቤታ"
   }
 }

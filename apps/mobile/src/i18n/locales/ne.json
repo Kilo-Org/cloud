@@ -2617,7 +2617,7 @@
     "legalConnectorPrivacy": " मा सहमत हुनुहुन्छ र ",
     "manageFailed": "App Store को सदस्यता व्यवस्थापन खोल्न सकिएन।",
     "kiloPassSetup": "Kilo Pass सेटअप",
-    "subscriptionHeaderDescription": "Kilo App मा AI कोडिङ सत्रहरू।",
+    "subscriptionHeaderDescription": "यो मासिक सदस्यताले Kilo App मा AI कोडिङ सत्रहरू चलाउन तपाईंको Kilo मौज्दातमा क्रेडिट थप्छ।",
     "tierDescription": "Kilo App प्रयोग गर्न हरेक महिना {{price}} बराबरको खरिद गरिएको क्रेडिट थपिन्छ।",
     "subscribe": "सदस्यता लिनुहोस्",
     "subscribeDescription": "मासिक क्रेडिट र बोनसतर्फको प्रगति",
@@ -2928,14 +2928,6 @@
     "revoke": "{{host}} को विश्वसनीयता हटाउनुहोस्",
     "backToPreferences": "प्राथमिकताहरूमा फर्कनुहोस्"
   },
-  "quickChat": {
-    "empty": {
-      "title": "कुराकानी सुरु गर्नुहोस्",
-      "description": "मोडेलसँग कुरा गर्न सन्देश पठाउनुहोस्।"
-    },
-    "historyRetry": "कुराकानीको इतिहास लोड गर्न सकिएन।",
-    "sendError": "सन्देश पठाउन सकिएन। फेरि प्रयास गर्नुहोस्।"
-  },
   "glanceable": {
     "waiting": "एजेन्टहरूको जानकारी अद्यावधिक गर्दै",
     "empty": "कुनै काम चलिरहेको छैन",
@@ -2947,5 +2939,18 @@
     "needsInput": "जवाफ चाहिन्छ",
     "channelName": "सक्रिय एजेन्टहरू",
     "activityKitDisabledBody": "लक स्क्रिनमा सक्रिय एजेन्टहरू हेर्न सेटिङ्समा प्रत्यक्ष गतिविधिहरू चालू गर्नुहोस्।"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "कुराकानी सुरु गर्नुहोस्",
+      "description": "मोडेलसँग कुरा गर्न सन्देश पठाउनुहोस्।"
+    },
+    "list": {
+      "loadFailed": "कुराकानी इतिहास लोड गर्न सकिएन।",
+      "new": "नयाँ च्याट",
+      "openHint": "च्याट खोल्छ। मेट्न लामो थिच्नुहोस्।",
+      "deleteTitle": "यो च्याट मेट्ने?"
+    },
+    "beta": "बिटा"
   }
 }

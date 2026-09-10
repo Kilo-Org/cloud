@@ -17,6 +17,15 @@ export default defineProject({
   test: {
     name: 'mobile-pure',
     environment: 'node',
+    // The mobile-app gate runs `vitest related` over the branch's changed files
+    // (170+ suites) beside Metro, the simulator, and the local services. On that
+    // loaded machine the first transform/import of a heavy dependency
+    // (react-native-render-html, react-native-marked) can exceed the 5 s default
+    // and fail a test that passes in isolation. The slow suite moves between
+    // files from run to run, so the headroom belongs at the project level, not
+    // in a single test file.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     include: [
       'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',
@@ -24,6 +33,7 @@ export default defineProject({
       'src/lib/agent-attachments/**/*.test.ts',
       'src/lib/analytics/**/*.test.ts',
       'src/lib/auth/**/*.test.ts',
+      'src/lib/chat/**/*.test.ts',
       'src/lib/auth/**/*.test.tsx',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',

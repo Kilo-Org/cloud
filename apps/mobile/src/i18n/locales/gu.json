@@ -2617,7 +2617,7 @@
     "legalConnectorPrivacy": " અને આનો સ્વીકાર કરો છો: ",
     "manageFailed": "App Store માં સબસ્ક્રિપ્શનનું સંચાલન ખોલી શકાયું નહીં.",
     "kiloPassSetup": "Kilo Pass નું સેટઅપ",
-    "subscriptionHeaderDescription": "એક માસિક સબસ્ક્રિપ્શન જે Kilo એપમાં AI કોડિંગ સત્રો.",
+    "subscriptionHeaderDescription": "આ માસિક સબસ્ક્રિપ્શન તમારા Kilo બેલેન્સમાં ક્રેડિટ ઉમેરે છે, જેથી તમે Kilo App માં AI કોડિંગ સત્રો ચલાવી શકો.",
     "tierDescription": "Kilo App વાપરવા માટે દર મહિને {{price}} ના ખરીદેલા ક્રેડિટ ઉમેરાય છે.",
     "subscribe": "સબસ્ક્રાઇબ કરો",
     "subscribeDescription": "બોનસ તરફની પ્રગતિ સાથે માસિક ક્રેડિટ",
@@ -2928,14 +2928,6 @@
     "revoke": "{{host}} માટેની મંજૂરી રદ કરો",
     "backToPreferences": "પસંદગીઓ પર પાછા જાઓ"
   },
-  "quickChat": {
-    "empty": {
-      "title": "વાતચીત શરૂ કરો",
-      "description": "મોડલ સાથે વાત કરવા સંદેશ મોકલો."
-    },
-    "historyRetry": "વાતચીતનો ઇતિહાસ લોડ કરી શકાયો નહીં.",
-    "sendError": "સંદેશ મોકલી શકાયો નહીં. ફરી પ્રયાસ કરો."
-  },
   "glanceable": {
     "waiting": "એજન્ટોની માહિતી અપડેટ થઈ રહી છે",
     "empty": "કોઈ કાર્ય ચાલુ નથી",
@@ -2947,5 +2939,18 @@
     "needsInput": "જવાબ જરૂરી",
     "channelName": "સક્રિય એજન્ટો",
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "વાતચીત શરૂ કરો",
+      "description": "મોડેલ સાથે વાત કરવા સંદેશ મોકલો."
+    },
+    "list": {
+      "loadFailed": "વાતચીત ઇતિહાસ લોડ કરી શકાયો નહીં.",
+      "new": "નવી ચેટ",
+      "openHint": "ચેટ ખોલે છે. કાઢી નાખવા માટે લાંબું દબાવો.",
+      "deleteTitle": "આ ચેટ કાઢી નાખવી?"
+    },
+    "beta": "બીટા"
   }
 }

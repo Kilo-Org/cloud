@@ -9,6 +9,13 @@ import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
 import type * as TokenOwnerModule from './token-owner';
 
+// The mobile-app gate runs `vitest related` over ~170 files concurrently with
+// the device stack, so every real timer in this file stretches several-fold.
+// Give each test room for the load-aware settle budget below instead of the
+// 5 s default (the sibling intl-cache Hermes test carries the same node-load
+// budget for the same reason).
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
+
 // ---- hoisted mocks ----
 
 const hoisted = vi.hoisted(() => {
@@ -277,6 +284,11 @@ vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));
 
+vi.mock('@/lib/chat/sign-out', () => ({
+  clearChatsForSignOut: vi.fn().mockResolvedValue(undefined),
+  releaseChatsForAccountSwitch: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/pr-review/recent-prs', () => ({
   clearRecentPrs: vi.fn().mockResolvedValue(undefined),
 }));
@@ -398,12 +410,21 @@ async function mountAndGetContext(): Promise<{
 }
 
 /** Flush act passes on real timers until bootstrap stops loading, bounded so a
- *  stuck provider fails as a timeout rather than hanging the suite. */
+ *  stuck provider fails as a timeout rather than hanging the suite.
+ *
+ *  The budget is a count of act passes, not wall-clock milliseconds: the gate
+ *  runs this file beside ~170 others and the device stack, so each 20 ms pass
+ *  can stretch several-fold while the bootstrap's own backoff timers stretch
+ *  with it. Counting passes keeps the two in step — a wall-clock deadline
+ *  would expire early on exactly the loaded machine this guards against.
+ *  1250 passes is far more than the ~90 the 1.75 s backoff needs, so a
+ *  healthy bootstrap still returns on its first pass. The whole file carries a
+ *  30 s per-test timeout (see the `vi.setConfig` at the top), above this. */
 async function settleBootstrap(
   read: () => AuthContextValue | undefined,
-  budgetMs = 4000
+  budgetPasses = 1250
 ): Promise<void> {
-  for (let elapsed = 0; elapsed <= budgetMs; elapsed += 20) {
+  for (let pass = 0; pass < budgetPasses; pass += 1) {
     // eslint-disable-next-line no-await-in-loop -- polling must flush and re-check sequentially between act cycles
     await act(async () => {
       await new Promise<void>(resolve => {
@@ -595,6 +616,25 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
+  it('ends the prior account chats on sign-in, and signs in even when that fails', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const { releaseChatsForAccountSwitch } = await import('@/lib/chat/sign-out');
+    const { queryClient: queryClientMock } = await import('@/lib/query-client');
+    const release = vi.mocked(releaseChatsForAccountSwitch);
+    release.mockRejectedValueOnce(new Error('the store is locked'));
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    expect(release).toHaveBeenCalledTimes(1);
+    // The rest of the switch ran: a chat that would not close cannot stop the
+    // prior account's cache being cleared.
+    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalled();
+
+    unmount();
+  });
+
   it('clears the trusted hosts and image confirmations on sign-in', async () => {
     const { ctx, unmount } = await mountAndGetContext();
     const trustedHosts = await import('@/lib/hooks/use-trusted-hosts');
@@ -707,6 +747,22 @@ describe('sign-out teardown ordering', () => {
     expect(deleteIndex).toBeGreaterThanOrEqual(0);
     const deleteOrder = secureStore.deleteItemAsync.mock.invocationCallOrder[deleteIndex];
     expect(deleteOrder).toBeGreaterThan(secureStore.setItemAsync.mock.invocationCallOrder[0]);
+
+    unmount();
+  });
+
+  it("takes the account's chats off the device, and survives a wipe that fails", async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const { clearChatsForSignOut } = await import('@/lib/chat/sign-out');
+    const wipe = vi.mocked(clearChatsForSignOut);
+    wipe.mockRejectedValueOnce(new Error('database locked'));
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    expect(wipe).toHaveBeenCalledWith(null);
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
 
     unmount();
   });
@@ -1882,7 +1938,7 @@ describe('startup credential read failure', () => {
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).not.toHaveBeenCalled();
 
     unmount();
-  }, 15_000);
+  }, 30_000);
 
   it('restores the session when retryRestore runs after the storage recovers', async () => {
     // Every attempt of the first bootstrap fails; the retry's reads succeed.
@@ -1907,7 +1963,7 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBe('stored-token');
 
     unmount();
-  }, 15_000);
+  }, 30_000);
 
   it('a failed retry settles back onto the restore error surface', async () => {
     // Four reads for the first bootstrap, four for the retry: every attempt
@@ -1933,7 +1989,7 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBeUndefined();
 
     unmount();
-  }, 15_000);
+  }, 30_000);
 
   it('sends the person to login when the retry finds no stored session', async () => {
     // Every attempt of the first bootstrap fails; the retry's reads resolve
@@ -1958,7 +2014,7 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBeUndefined();
 
     unmount();
-  }, 15_000);
+  }, 30_000);
 
   it('does not resurrect the restore error surface when signOut lands mid-retry', async () => {
     // Four reads for the first bootstrap, four for the in-flight retry: the
@@ -2005,7 +2061,7 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBeUndefined();
 
     unmount();
-  }, 15_000);
+  }, 30_000);
 
   it('clears the restore failure when signOut is used as the escape hatch', async () => {
     failTokenReads(4);
@@ -2023,5 +2079,5 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBeUndefined();
 
     unmount();
-  }, 15_000);
+  }, 30_000);
 });

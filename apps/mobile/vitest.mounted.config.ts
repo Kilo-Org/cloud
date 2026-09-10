@@ -18,6 +18,11 @@ export default defineProject({
   test: {
     name: 'mobile-mounted',
     environment: 'node',
+    // Mounted suites pay the same loaded-machine import cost as `mobile-pure`
+    // when the gate runs them beside Metro, the simulator, and the local
+    // services; keep one budget for both projects (see vitest.pure.config.ts).
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     include: ['src/**/*.mounted.test.tsx'],
   },
 });

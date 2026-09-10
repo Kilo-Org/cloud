@@ -110,3 +110,15 @@ The app follows https://github.com/Kilo-Org/kilo-design/ in general, except wher
 ## Debugging
 
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.
+
+## Chat tab
+
+The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds the registry (the conversations that are running), the layers (the plugins they run on) and the store (the list and its CRUD). The SDK saves one conversation; this app owns the list, the ordering, the titles, the deleting and the scoping.
+
+**A conversation can move, and the screen follows the state rather than a return value.** Switching models clones the conversation onto a new session, and the mover is not always the screen: a question typed on another model while an answer was arriving moves the chat from inside the registry. So the chat that was left points at the one it became, and `useChat` follows that.
+
+A chat is opened with the SDK's `time` tool and no other. A model has no clock, so it answers a dated question from its training date, confidently and wrong. The other three tools the SDK ships stay off: the composer is already how a person is asked something, a subagent costs a second session, and a to-do list is working memory for a run a chat does not have.
+
+**Prove a chat change against the same eleven models the SDK's live runs use.** The list is in `packages/harness-sdk/e2e/setup.ts`, and `pnpm --filter @kilocode/harness-sdk test:e2e:time full` is the sweep across all of them. Take one of those models through the app itself on the simulator as well: the sweep proves what the models do, the simulator proves this app's wiring, and neither proves the other. Both cost real money, so run the sweep when the tool set or the system prompt changes, not for a change to a screen.
+
+Reading the model picker's accessibility tree in full takes WebDriverAgent down, and the Appium server with it. Drive it by XPath, never `getPageSource`, and cap the snapshot with `driver.updateSettings({ snapshotMaxDepth: 50 })`.

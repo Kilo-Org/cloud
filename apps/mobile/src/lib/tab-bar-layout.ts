@@ -79,12 +79,23 @@ export function shouldShowTabLabel(fontScale = 1): boolean {
   return fontScale < TAB_ICON_FORWARD_FONT_SCALE;
 }
 
-export function shouldHideTabBar(pathname: string): boolean {
+/**
+ * The route group of the Chat tab, and the one screen in it that is not the
+ * list. A conversation puts its composer where the tab bar sits, so the bar
+ * goes while one is open. The group is read from the segments rather than the
+ * path, because a conversation's path is the session id and nothing else.
+ */
+const CHAT_TAB_GROUP = '(4_chat)';
+const CHAT_CONVERSATION = '[id]';
+
+export function shouldHideTabBar(pathname: string, segments: readonly string[]): boolean {
   const parts = pathname.split('/').filter(Boolean);
   const isKiloClawInstancePicker = parts[0] === 'chat' && parts.length === 3;
   const isSecurityFindingFilter =
     parts[0] === 'security-agent' && parts.length === 3 && parts[2] === 'filter';
-  return isKiloClawInstancePicker || isSecurityFindingFilter;
+  const isChatConversation =
+    segments.includes(CHAT_TAB_GROUP) && segments.at(-1) === CHAT_CONVERSATION;
+  return isKiloClawInstancePicker || isSecurityFindingFilter || isChatConversation;
 }
 
 /** One tab bar entry, in render order. */
@@ -93,15 +104,15 @@ export type TabBarTab = 'home' | 'kiloclaw' | 'agents' | 'chat' | 'profile';
 /** Flag state that changes which tabs render. */
 export type TabBarTabFlags = {
   showKiloClaw: boolean;
-  showQuickChat: boolean;
+  showChat: boolean;
 };
 
 /**
  * Number of rendered tabs. Base three (Home, Agents, Profile) plus the two
  * flagged tabs when shown.
  */
-export function visibleTabCount(showKiloClaw: boolean, showQuickChat: boolean): number {
-  return 3 + Number(showKiloClaw) + Number(showQuickChat);
+export function visibleTabCount(showKiloClaw: boolean, showChat: boolean): number {
+  return 3 + Number(showKiloClaw) + Number(showChat);
 }
 
 /**
@@ -121,10 +132,10 @@ export function tabBarPosition(tab: TabBarTab, flags: TabBarTabFlags): number | 
       return 2 + Number(flags.showKiloClaw);
     }
     case 'chat': {
-      return flags.showQuickChat ? 3 + Number(flags.showKiloClaw) : null;
+      return flags.showChat ? 3 + Number(flags.showKiloClaw) : null;
     }
     case 'profile': {
-      return visibleTabCount(flags.showKiloClaw, flags.showQuickChat);
+      return visibleTabCount(flags.showKiloClaw, flags.showChat);
     }
     default: {
       // `TabBarTab` is a closed union; this branch is unreachable but keeps

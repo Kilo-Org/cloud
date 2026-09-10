@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
-import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
+import { FEATURE_FLAG_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
 import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
@@ -71,7 +71,7 @@ export default function TabsLayout() {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
-  const hideTabs = shouldHideTabBar(pathname);
+  const hideTabs = shouldHideTabBar(pathname, segments);
   const showTabLabel = shouldShowTabLabel(fontScale);
   const tabBarHeight = getEffectiveTabBarHeight({
     bottomInset: bottom,
@@ -80,9 +80,9 @@ export default function TabsLayout() {
   });
   const tabIconSize = getTabBarIconSize(fontScale);
   const showKiloClawTab = useKiloClawTabVisible();
-  const showQuickChatTab = useFeatureFlag(FEATURE_FLAG_QUICK_CHAT, false);
-  const tabFlags = { showKiloClaw: showKiloClawTab, showQuickChat: showQuickChatTab };
-  const tabCount = visibleTabCount(showKiloClawTab, showQuickChatTab);
+  const showChatTab = useFeatureFlag(FEATURE_FLAG_CHAT, false);
+  const tabFlags = { showKiloClaw: showKiloClawTab, showChat: showChatTab };
+  const tabCount = visibleTabCount(showKiloClawTab, showChatTab);
   const { t } = useTranslation();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const { activeSessions, isLoading, isError } = useLiveAgentSessions({
@@ -109,13 +109,13 @@ export default function TabsLayout() {
     orgLoaded && !isLoading && !isError && needsInputCount > 0 ? needsInputCount : undefined;
 
   // If the flag flips off while the Chat tab is focused, its `href` becomes
-  // null but the route is still mounted — move to Home instead.
+  // null but the route is still mounted, so move to Home instead.
   const onChatTab = segments.some(segment => segment === '(4_chat)');
   useEffect(() => {
-    if (!showQuickChatTab && onChatTab) {
+    if (!showChatTab && onChatTab) {
       router.replace('/(app)/(tabs)/(0_home)' as Href);
     }
-  }, [showQuickChatTab, onChatTab, router]);
+  }, [showChatTab, onChatTab, router]);
 
   return (
     <StateSurfaceInsets bottomInset={hideTabs ? 0 : tabBarHeight + 16}>
@@ -218,7 +218,7 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="(4_chat)"
           options={{
-            href: showQuickChatTab ? undefined : null,
+            href: showChatTab ? undefined : null,
             title: t('common.chat'),
             tabBarAccessibilityLabel: tabAccessibilityLabel(
               t('common.chat'),

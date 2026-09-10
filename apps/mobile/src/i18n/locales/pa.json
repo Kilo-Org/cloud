@@ -2617,7 +2617,7 @@
     "legalConnectorPrivacy": " ਅਤੇ ਇਸ ਨੂੰ ਪੜ੍ਹਨ ਦੀ ਪੁਸ਼ਟੀ ਕਰਦੇ ਹੋ: ",
     "manageFailed": "App Store ਵਿੱਚ ਗਾਹਕੀ ਦੇ ਪ੍ਰਬੰਧ ਵਾਲਾ ਪੰਨਾ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕਿਆ।",
     "kiloPassSetup": "Kilo Pass ਦਾ ਸੈੱਟਅੱਪ",
-    "subscriptionHeaderDescription": "ਇੱਕ ਮਾਸਿਕ ਗਾਹਕੀ ਜੋ Kilo ਐਪ ਵਿੱਚ AI ਕੋਡਿੰਗ ਸੈਸ਼ਨ ਚਲਾਉਣ ਲਈ।",
+    "subscriptionHeaderDescription": "ਇੱਕ ਮਹੀਨਾਵਾਰ ਗਾਹਕੀ ਜੋ Kilo App ਵਿੱਚ AI ਕੋਡਿੰਗ ਸੈਸ਼ਨ ਚਲਾਉਣ ਲਈ ਤੁਹਾਡੇ Kilo ਬੈਲੰਸ ਵਿੱਚ ਕ੍ਰੈਡਿਟ ਜੋੜਦੀ ਹੈ।",
     "tierDescription": "Kilo App ਦੀ ਵਰਤੋਂ ਲਈ ਹਰ ਮਹੀਨੇ {{price}} ਦੇ ਖਰੀਦੇ ਹੋਏ ਕ੍ਰੈਡਿਟ ਜੋੜੇ ਜਾਂਦੇ ਹਨ।",
     "subscribe": "ਗਾਹਕੀ ਲਓ",
     "subscribeDescription": "ਹਰ ਮਹੀਨੇ ਕ੍ਰੈਡਿਟ ਅਤੇ ਬੋਨਸ ਵੱਲ ਪ੍ਰਗਤੀ",
@@ -2928,14 +2928,6 @@
     "revoke": "{{host}} ਨੂੰ ਭਰੋਸੇਯੋਗ ਹੋਸਟਾਂ ਤੋਂ ਹਟਾਓ",
     "backToPreferences": "ਤਰਜੀਹਾਂ 'ਤੇ ਵਾਪਸ ਜਾਓ"
   },
-  "quickChat": {
-    "empty": {
-      "title": "ਚੈਟ ਸ਼ੁਰੂ ਕਰੋ",
-      "description": "ਕਿਸੇ ਮਾਡਲ ਨਾਲ ਗੱਲ ਕਰਨ ਲਈ ਸੁਨੇਹਾ ਭੇਜੋ।"
-    },
-    "historyRetry": "ਚੈਟ ਦਾ ਇਤਿਹਾਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
-    "sendError": "ਸੁਨੇਹਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
-  },
   "glanceable": {
     "waiting": "ਏਜੰਟਾਂ ਦੀ ਜਾਣਕਾਰੀ ਅੱਪਡੇਟ ਹੋ ਰਹੀ ਹੈ",
     "empty": "ਕੋਈ ਕੰਮ ਜਾਰੀ ਨਹੀਂ",
@@ -2947,5 +2939,18 @@
     "needsInput": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
     "channelName": "ਸਰਗਰਮ ਏਜੰਟ",
     "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "ਚੈਟ ਸ਼ੁਰੂ ਕਰੋ",
+      "description": "ਕਿਸੇ ਮਾਡਲ ਨਾਲ ਗੱਲ ਕਰਨ ਲਈ ਸੁਨੇਹਾ ਭੇਜੋ।"
+    },
+    "list": {
+      "loadFailed": "ਚੈਟ ਇਤਿਹਾਸ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+      "new": "ਨਵੀਂ ਚੈਟ",
+      "openHint": "ਚੈਟ ਖੋਲ੍ਹਦਾ ਹੈ। ਮਿਟਾਉਣ ਲਈ ਲੰਮਾ ਦਬਾਓ।",
+      "deleteTitle": "ਇਹ ਚੈਟ ਮਿਟਾਉਣੀ ਹੈ?"
+    },
+    "beta": "ਬੀਟਾ"
   }
 }

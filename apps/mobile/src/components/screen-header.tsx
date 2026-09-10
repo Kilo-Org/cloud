@@ -154,16 +154,13 @@ export function ScreenHeader({
       {context}
     </View>
   );
-  const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
-
   return (
     <View
       className={cn('bg-background px-4 pb-3', className)}
       style={safeAreaTop ? { paddingTop } : undefined}
     >
-      {separateHeading && <View className="min-h-11 flex-row items-center">{heading}</View>}
       <View className="flex-row items-center">
-        <View className="min-w-0 flex-1 flex-row items-center gap-1">
+        <View className="min-h-11 min-w-0 flex-1 flex-row items-center gap-1">
           {canGoBack && (
             <Pressable
               onPress={() => {
@@ -188,7 +185,11 @@ export function ScreenHeader({
               )}
             </Pressable>
           )}
-          {!separateHeading && heading}
+          {heading}
+          {/* A centered title must stay optically centered, so the trailing
+              spacer mirrors the back control's width instead of stacking the
+              control on its own row below the title. */}
+          {centerTitle && canGoBack ? <View className="h-11 w-11 shrink-0" /> : null}
         </View>
         {headerRight ? (
           <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} min-w-0 max-w-[50%] shrink`}>

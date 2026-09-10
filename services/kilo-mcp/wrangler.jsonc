@@ -6,15 +6,15 @@
   "compatibility_date": "2025-09-01",
   "compatibility_flags": ["nodejs_compat"],
   // Production is reached only through its custom domain, so the OAuth issuer
-  // in the metadata is always https://kilo-mcp.kilosessions.ai (the issuer is
-  // derived from the request URL — src/auth/metadata.ts). The workers.dev URL
-  // stays disabled in prod; the `dev` env below keeps its own workers.dev URL.
+  // in the metadata is always https://mcp.kiloapps.io (the issuer is derived
+  // from the request URL — src/auth/metadata.ts). The workers.dev URL stays
+  // disabled in prod; the `dev` env below keeps its own workers.dev URL.
   "workers_dev": false,
   "preview_urls": false,
   "routes": [
     {
-      "pattern": "kilo-mcp.kilosessions.ai",
-      "zone_name": "kilosessions.ai",
+      "pattern": "mcp.kiloapps.io",
+      "zone_name": "kiloapps.io",
       "custom_domain": true,
     },
   ],

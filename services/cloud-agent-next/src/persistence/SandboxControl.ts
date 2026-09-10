@@ -69,8 +69,12 @@ import {
   sessionAbortResultSchema,
   sessionNativeRuntimeRetirementPayloadSchema,
   sessionRequestIdentitySchema,
+  sameSessionEventIdentity,
   wrapperInstanceIdSchema,
   type ResponseFrame,
+  type SandboxEventBatchItemOutcome,
+  type SandboxEventBatchPayload,
+  type SandboxEventBatchResult,
   type SessionAttachPayload,
   type SessionOperationAck,
   type SessionOperationAuthorization,
@@ -307,6 +311,20 @@ function sessionForwardFrameBytes(frame: unknown): number {
   return new TextEncoder().encode(JSON.stringify(frame)).byteLength;
 }
 
+function batchOutcomes(
+  payload: SandboxEventBatchPayload,
+  status: SandboxEventBatchItemOutcome['status'],
+  retryable?: boolean
+): SandboxEventBatchResult {
+  return {
+    outcomes: payload.items.map(item => ({
+      receiptId: item.receiptId,
+      status,
+      ...(retryable === undefined ? {} : { retryable }),
+    })),
+  };
+}
+
 export type AttachSessionInput = AttachRouteInput;
 
 export type SandboxControlStatus = {
@@ -424,6 +442,7 @@ export class SandboxControl extends DurableObject<Env> {
         this.onSessionEvent(sessionIdentity, payload, identity, receiptId, sequence),
       onSessionPreparing: (sessionIdentity, payload, identity, receiptId, sequence) =>
         this.onSessionPreparing(sessionIdentity, payload, identity, receiptId, sequence),
+      onSessionEventBatch: (payload, identity) => this.onSessionEventBatch(payload, identity),
       onOperationResult: (session, delivery, identity) =>
         this.onOperationResult(session, delivery, identity),
       onNativeRuntimeRetired: (payload, identity) => this.onNativeRuntimeRetired(payload, identity),
@@ -3814,6 +3833,61 @@ export class SandboxControl extends DurableObject<Env> {
     return forwarded;
   }
 
+  private async onSessionEventBatch(
+    payload: SandboxEventBatchPayload,
+    connection: SandboxControlConnectionIdentity
+  ): Promise<SandboxEventBatchResult> {
+    const diagnostic = {
+      ...diagnosticConnection(connection),
+      eventType: 'session.event.batch',
+    };
+    if (!this.isCurrentConnection(connection)) {
+      this.recordForwardDrop('stale_before_enqueue', diagnostic);
+      return batchOutcomes(payload, 'unattempted', true);
+    }
+    const identity = payload.items[0]?.session;
+    if (
+      !identity ||
+      !payload.items.every(item => sameSessionEventIdentity(item.session, identity))
+    ) {
+      return batchOutcomes(payload, 'rejected', false);
+    }
+    if (!connection.wrapperInstanceId) {
+      this.recordForwardDrop('missing_wrapper_identity', diagnostic);
+      return batchOutcomes(payload, 'rejected', false);
+    }
+    const wrapperInstanceId = connection.wrapperInstanceId;
+    let outcomes: SandboxEventBatchItemOutcome[] | undefined;
+    let attempted = false;
+    await this.forwardRoutedSessionFrame(
+      identity,
+      'session.event.batch',
+      connection,
+      { items: payload.items },
+      (route, fields, physical, deadlineAt) =>
+        this.forwardSessionFrame(
+          route,
+          physical,
+          connection,
+          fields,
+          'receiveSandboxControlEventBatch',
+          async stub => {
+            attempted = true;
+            const result = await stub.receiveSandboxControlEventBatch({
+              items: payload.items,
+              wrapperInstanceId,
+            });
+            outcomes = result.outcomes;
+            return { applied: outcomes.every(outcome => outcome.status === 'applied') };
+          },
+          true,
+          deadlineAt
+        )
+    );
+    if (outcomes) return { outcomes };
+    return batchOutcomes(payload, attempted ? 'unknown' : 'unattempted', true);
+  }
+
   private async onNativeRuntimeRetired(
     input: unknown,
     connection: SandboxControlConnectionIdentity
@@ -4196,7 +4270,10 @@ export class SandboxControl extends DurableObject<Env> {
     physical: PhysicalRecord,
     connection: SandboxControlConnectionIdentity,
     diagnostic: ControlDiagnosticFields,
-    operation: 'receiveSandboxControlEvent' | 'receiveSandboxControlPreparing',
+    operation:
+      | 'receiveSandboxControlEvent'
+      | 'receiveSandboxControlPreparing'
+      | 'receiveSandboxControlEventBatch',
     send: (
       stub: ReturnType<typeof getSandboxSessionStub>
     ) => Promise<{ applied: boolean; retryable?: boolean }>,

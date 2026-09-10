@@ -2085,6 +2085,167 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.terminalEvents()).toHaveLength(1);
   });
 
+  it('applies a batch in order and reports per-item outcomes', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('batch_a');
+    await fixture.flush();
+    const first = receiptedEvent(1, {
+      type: 'session.status',
+      properties: { sessionID: 'kilo_root', status: { type: 'busy' } },
+    });
+    const rejected = receiptedEvent(2, {
+      type: 'session.status',
+      properties: { sessionID: 'kilo_root', status: { type: 'idle' } },
+    });
+    const last = receiptedEvent(3, {
+      type: 'session.updated',
+      properties: { info: { id: 'kilo_root' } },
+    });
+    const items = [
+      {
+        event: 'session.event' as const,
+        session: first.identity,
+        payload: first.payload,
+        receiptId: first.receiptId,
+        sequence: first.sequence,
+      },
+      {
+        event: 'session.event' as const,
+        session: { ...rejected.identity, directory: '/workspace/other' },
+        payload: rejected.payload,
+        receiptId: rejected.receiptId,
+        sequence: rejected.sequence,
+      },
+      {
+        event: 'session.event' as const,
+        session: last.identity,
+        payload: last.payload,
+        receiptId: last.receiptId,
+        sequence: last.sequence,
+      },
+    ];
+
+    await expect(
+      fixture.session.receiveSandboxControlEventBatch({ items, wrapperInstanceId: RUNTIME_ID })
+    ).resolves.toEqual({
+      outcomes: [
+        { receiptId: first.receiptId, status: 'applied' },
+        { receiptId: rejected.receiptId, status: 'rejected' },
+        { receiptId: last.receiptId, status: 'applied' },
+      ],
+    });
+  });
+
+  it('applies interleaved snapshot, delta, interaction, and completion items in order', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    fixture.storage.kv.put('session_messages', [
+      { messageId: 'mixed', state: 'queued', wrapperInstanceId: RUNTIME_ID },
+    ]);
+    const items = [
+      receiptedEvent(1, {
+        type: 'session.updated',
+        properties: { info: { id: 'kilo_root' } },
+      }),
+      receiptedEvent(2, {
+        type: 'message.updated',
+        properties: { info: { id: 'msg_assistant', sessionID: 'kilo_root', role: 'assistant' } },
+      }),
+      receiptedEvent(3, {
+        type: 'message.part.updated',
+        properties: {
+          part: { id: 'part_1', messageID: 'msg_assistant', sessionID: 'kilo_root', type: 'text' },
+        },
+      }),
+      receiptedEvent(4, {
+        type: 'question.asked',
+        properties: { id: 'question_1', sessionID: 'kilo_root', questions: [] },
+      }),
+      receiptedEvent(5, {
+        type: 'session.message.outcome',
+        properties: { messageId: 'mixed', status: 'completed' },
+      }),
+    ].map(item => ({
+      event: 'session.event' as const,
+      session: item.identity,
+      payload: item.payload,
+      receiptId: item.receiptId,
+      sequence: item.sequence,
+    }));
+
+    await expect(
+      fixture.session.receiveSandboxControlEventBatch({ items, wrapperInstanceId: RUNTIME_ID })
+    ).resolves.toEqual({
+      outcomes: items.map(item => ({ receiptId: item.receiptId, status: 'applied' })),
+    });
+    expect(fixture.record('mixed')?.state).toBe('completed');
+  });
+
+  it('marks the current item unknown and the remainder unattempted after an exception', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('batch_b');
+    await fixture.flush();
+    const first = receiptedEvent(1, {
+      type: 'session.status',
+      properties: { sessionID: 'kilo_root', status: { type: 'busy' } },
+    });
+    const failing = receiptedEvent(2, {
+      type: 'session.updated',
+      properties: { info: { id: 'kilo_root' } },
+    });
+    const remaining = receiptedEvent(3, {
+      type: 'session.updated',
+      properties: { info: { id: 'kilo_root' } },
+    });
+    const items = [first, failing, remaining].map(item => ({
+      event: 'session.event' as const,
+      session: item.identity,
+      payload: item.payload,
+      receiptId: item.receiptId,
+      sequence: item.sequence,
+    }));
+    const internal = fixture.session as unknown as {
+      applySandboxControlEvent: (input: unknown) => Promise<{ applied: boolean }>;
+    };
+    const original = internal.applySandboxControlEvent.bind(fixture.session);
+    const spy = vi.spyOn(internal, 'applySandboxControlEvent');
+    spy.mockImplementationOnce(original);
+    spy.mockImplementationOnce(async () => {
+      throw new Error('forced application failure');
+    });
+    try {
+      await expect(
+        fixture.session.receiveSandboxControlEventBatch({ items, wrapperInstanceId: RUNTIME_ID })
+      ).resolves.toEqual({
+        outcomes: [
+          { receiptId: first.receiptId, status: 'applied' },
+          { receiptId: failing.receiptId, status: 'unknown' },
+          { receiptId: remaining.receiptId, status: 'unattempted' },
+        ],
+      });
+      expect(spy).toHaveBeenCalledTimes(2);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it.each([
     { type: 'session.status', properties: { sessionID: 'kilo_root', status: { type: 'busy' } } },
     {

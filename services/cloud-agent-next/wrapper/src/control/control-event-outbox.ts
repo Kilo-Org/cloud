@@ -1,6 +1,8 @@
 import { canonicalControlEventJson } from '../../../src/shared/control-event-canonical.js';
 import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
+  SANDBOX_EVENT_BATCH_MAX_ITEMS,
+  sameSessionEventIdentity,
   sessionEventIdentitySchema,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import type { SessionEventIdentity } from '../../../src/shared/sandbox-control-protocol.js';
@@ -8,6 +10,28 @@ import type { SessionEventIdentity } from '../../../src/shared/sandbox-control-p
 const MAX_CONTROL_EVENT_OUTBOX_EVENTS = 256;
 export const MAX_CONTROL_EVENT_OUTBOX_BYTES = 4 * MAX_SANDBOX_CONTROL_FRAME_BYTES;
 const PUBLICATION_DEADLINE_MS = 30_000;
+export const CONTROL_EVENT_BATCH_WINDOW_MS = 25;
+
+const URGENT_EVENT_TYPES = new Set([
+  'question.asked',
+  'question.replied',
+  'question.rejected',
+  'permission.asked',
+  'permission.replied',
+  'session.idle',
+  'session.error',
+  'session.turn.close',
+  'session.message.outcome',
+]);
+
+const BATCH_FRAME_ENVELOPE_BYTES = Buffer.byteLength(
+  JSON.stringify({
+    type: 'request',
+    requestId: 'event_00000000-0000-4000-8000-000000000000',
+    operation: 'sandbox.event.publishBatch',
+    payload: { items: [] },
+  })
+);
 
 export type ControlEventPublication = {
   event: 'session.event' | 'session.preparing';
@@ -16,6 +40,8 @@ export type ControlEventPublication = {
   session: SessionEventIdentity;
   payload: unknown;
 };
+
+export type BatchControlEventPublication = ControlEventPublication & { preparedAt?: number };
 
 export type PreparedControlEventPublication = ControlEventPublication & {
   bytes: number;
@@ -66,8 +92,13 @@ type RootKey = string | undefined;
 
 type SquashKey = {
   entityId: string;
-  root: RootKey;
-  nativeRuntimeId: string | undefined;
+  identity: SessionEventIdentity;
+};
+
+type BatchSelection = {
+  items: PreparedControlEventPublication[];
+  byteFull: boolean;
+  urgentBoundary: boolean;
 };
 
 type Lane = {
@@ -75,6 +106,7 @@ type Lane = {
   entries: PreparedControlEventPublication[];
   pending?: Promise<void>;
   pendingEntry?: PreparedControlEventPublication;
+  pendingBatch?: PreparedControlEventPublication[];
   wakeup?: ReturnType<typeof setTimeout>;
 };
 
@@ -110,15 +142,33 @@ function entityIdFor(payload: unknown): string | undefined {
   return undefined;
 }
 
+function isUrgentPublication(publication: PreparedControlEventPublication): boolean {
+  if (publication.event !== 'session.event') return false;
+  if (!isRecord(publication.payload) || typeof publication.payload.type !== 'string') return false;
+  return URGENT_EVENT_TYPES.has(publication.payload.type);
+}
+
+export function controlEventPublicationWireItem(
+  publication: ControlEventPublication
+): ControlEventPublication {
+  return {
+    event: publication.event,
+    receiptId: publication.receiptId,
+    sequence: publication.sequence,
+    session: publication.session,
+    payload: publication.payload,
+  };
+}
+
+function publicationWireBytes(publication: PreparedControlEventPublication): number {
+  return Buffer.byteLength(JSON.stringify(controlEventPublicationWireItem(publication)));
+}
+
 function squashKeyFor(publication: PreparedControlEventPublication): SquashKey | undefined {
   if (publication.event !== 'session.event') return undefined;
   const entityId = entityIdFor(publication.payload);
   if (!entityId) return undefined;
-  return {
-    entityId,
-    root: rootFor(publication),
-    nativeRuntimeId: publication.session.nativeRuntimeId,
-  };
+  return { entityId, identity: publication.session };
 }
 
 function sameSquashKey(left: SquashKey | undefined, right: SquashKey | undefined): boolean {
@@ -126,8 +176,7 @@ function sameSquashKey(left: SquashKey | undefined, right: SquashKey | undefined
     left !== undefined &&
     right !== undefined &&
     left.entityId === right.entityId &&
-    left.root === right.root &&
-    left.nativeRuntimeId === right.nativeRuntimeId
+    sameSessionEventIdentity(left.identity, right.identity)
   );
 }
 
@@ -182,8 +231,15 @@ export function createControlEventOutbox(options: {
     deadlineAt: number,
     preparedAt?: number
   ) => Promise<void>;
+  publishBatch?: (
+    publications: BatchControlEventPublication[],
+    deadlineAt: number
+  ) => Promise<void>;
+  supportsBatches?: () => boolean;
   onFailure: (failure: ControlEventOutboxFailure) => void;
 }): ControlEventOutbox {
+  const supportsBatches = options.supportsBatches ?? (() => false);
+  const publishBatch = options.publishBatch ?? (() => Promise.resolve());
   const lanes = new Map<RootKey, Lane>();
   let paused = true;
   let closed = false;
@@ -258,6 +314,7 @@ export function createControlEventOutbox(options: {
   ): PreparedControlEventPublication | undefined => {
     const previous = lane.entries.at(-1);
     if (!previous || previous === lane.pendingEntry) return undefined;
+    if (lane.pendingBatch?.includes(previous)) return undefined;
     return sameSquashKey(squashKeyFor(previous), squashKeyFor(publication)) ? previous : undefined;
   };
 
@@ -343,21 +400,82 @@ export function createControlEventOutbox(options: {
     return prepared;
   };
 
-  const nextRunnableLane = (): Lane | undefined => {
-    if (lanes.size === 0) return undefined;
+  const selectBatch = (lane: Lane): BatchSelection => {
+    const head = lane.entries[0];
+    if (!head) return { items: [], byteFull: false, urgentBoundary: false };
+    const items: PreparedControlEventPublication[] = [];
+    let addedBytes = 0;
+    let byteFull = false;
+    let urgentBoundary = false;
+    for (const entry of lane.entries) {
+      if (items.length > 0 && !sameSessionEventIdentity(entry.session, head.session)) {
+        urgentBoundary = isUrgentPublication(entry);
+        break;
+      }
+      if (items.length >= SANDBOX_EVENT_BATCH_MAX_ITEMS) break;
+      const entryBytes = publicationWireBytes(entry);
+      if (
+        BATCH_FRAME_ENVELOPE_BYTES + addedBytes + entryBytes + 1 >
+        MAX_SANDBOX_CONTROL_FRAME_BYTES
+      ) {
+        byteFull = true;
+        break;
+      }
+      items.push(entry);
+      addedBytes += entryBytes + 1;
+      if (isUrgentPublication(entry)) break;
+    }
+    return { items, byteFull, urgentBoundary };
+  };
+
+  const batchSelectionReady = (selection: BatchSelection): boolean => {
+    const { items, byteFull } = selection;
+    const head = items[0];
+    if (!head) return true;
+    if (items.length >= SANDBOX_EVENT_BATCH_MAX_ITEMS) return true;
+    if (byteFull) return true;
+    if (selection.urgentBoundary) return true;
+    const last = items[items.length - 1];
+    if (last && isUrgentPublication(last)) return true;
+    return Date.now() >= (head.preparedAt ?? Date.now()) + CONTROL_EVENT_BATCH_WINDOW_MS;
+  };
+
+  type LaneSchedule =
+    | { kind: 'runnable'; selection: BatchSelection }
+    | { kind: 'wait'; at: number };
+
+  const scheduleLane = (lane: Lane): LaneSchedule => {
+    if (!supportsBatches())
+      return { kind: 'runnable', selection: { items: [], byteFull: false, urgentBoundary: false } };
+    const selection = selectBatch(lane);
+    if (batchSelectionReady(selection)) return { kind: 'runnable', selection };
+    const head = selection.items[0];
+    return {
+      kind: 'wait',
+      at: (head?.preparedAt ?? Date.now()) + CONTROL_EVENT_BATCH_WINDOW_MS,
+    };
+  };
+
+  const nextSchedule = (): { lane?: Lane; selection?: BatchSelection; waitAt?: number } => {
+    if (lanes.size === 0) return {};
     const available = [...lanes.values()];
     const previousIndex = available.findIndex(lane => lane === lastScheduledLane);
     const start = previousIndex === -1 ? 0 : (previousIndex + 1) % available.length;
+    let waitAt: number | undefined;
     for (let offset = 0; offset < available.length; offset += 1) {
       const lane = available[(start + offset) % available.length];
-      if (!lane || lane.pending || !lane.entries[0]) continue;
+      if (!lane || lane.pending) continue;
       expireHead(lane);
       const entry = lane.entries[0];
       if (!entry || lane.pending || Date.now() >= entry.deadlineAt) continue;
-      lastScheduledLane = lane;
-      return lane;
+      const schedule = scheduleLane(lane);
+      if (schedule.kind === 'runnable') {
+        lastScheduledLane = lane;
+        return { lane, selection: schedule.selection };
+      }
+      waitAt = waitAt === undefined ? schedule.at : Math.min(waitAt, schedule.at);
     }
-    return undefined;
+    return { waitAt };
   };
 
   const queuedEntries = (): boolean => [...lanes.values()].some(lane => lane.entries.length > 0);
@@ -427,25 +545,76 @@ export function createControlEventOutbox(options: {
     }
   };
 
-  const startAttempt = (lane: Lane): void => {
+  const runBatchAttempt = async (
+    lane: Lane,
+    batch: PreparedControlEventPublication[]
+  ): Promise<void> => {
+    if (closed || paused) return;
+    const head = batch[0];
+    if (!head || lane.entries[0] !== head) return;
+    if (Date.now() >= head.deadlineAt) {
+      if (removeHead(lane, head)) reportFailure(head, 'expired', false, 0);
+      return;
+    }
+    let published: Promise<void>;
+    try {
+      published = Promise.resolve(
+        publishBatch(
+          batch.map(entry => ({
+            ...controlEventPublicationWireItem(entry),
+            ...(entry.preparedAt === undefined ? {} : { preparedAt: entry.preparedAt }),
+          })),
+          head.deadlineAt
+        )
+      );
+    } catch (error) {
+      published = Promise.reject(error);
+    }
+    try {
+      await published;
+      for (const entry of batch) removeHead(lane, entry);
+    } catch (error) {
+      const reason = publicationFailureReason(error);
+      for (const entry of batch) {
+        if (removeHead(lane, entry)) reportFailure(entry, reason, false, 1, error);
+      }
+    } finally {
+      lane.pendingBatch = undefined;
+    }
+  };
+
+  const startAttempt = (lane: Lane, selection: BatchSelection): void => {
     const entry = lane.entries[0];
     if (!entry || lane.pending) return;
+    const batch = selection.items;
+    const useBatch = batch.length > 0;
     const pending = Promise.resolve()
-      .then(() => runAttempt(lane, entry))
+      .then(() => (useBatch ? runBatchAttempt(lane, batch) : runAttempt(lane, entry)))
       .catch(error => {
-        if (closed || !removeHead(lane, entry)) return;
+        if (closed) return;
+        if (useBatch && lane.pendingBatch) {
+          const reason = publicationFailureReason(error);
+          for (const item of lane.pendingBatch) {
+            if (removeHead(lane, item)) reportFailure(item, reason, false, 1, error);
+          }
+          lane.pendingBatch = undefined;
+          return;
+        }
+        if (!removeHead(lane, entry)) return;
         reportFailure(entry, publicationFailureReason(error), false, 1, error);
       })
       .then(() => {
         if (lane.pending === pending) {
           lane.pending = undefined;
           lane.pendingEntry = undefined;
+          lane.pendingBatch = undefined;
         }
         scheduleWakeup(lane);
         cleanupLane(lane);
         signalCycle();
       });
     lane.pendingEntry = entry;
+    lane.pendingBatch = useBatch ? batch : undefined;
     lane.pending = pending;
   };
 
@@ -461,14 +630,28 @@ export function createControlEventOutbox(options: {
           active.resolve(!queuedEntries());
           return;
         }
-        const lane = nextRunnableLane();
-        if (lane) {
-          startAttempt(lane);
+        const scheduled = nextSchedule();
+        if (scheduled.lane && scheduled.selection) {
+          startAttempt(scheduled.lane, scheduled.selection);
           continue;
         }
         if ([...lanes.values()].some(item => item.pending !== undefined)) {
           const wake = active.wake;
           await wake;
+          if (active.wake === wake) resetCycleWake(active);
+          continue;
+        }
+        if (scheduled.waitAt !== undefined) {
+          if (scheduled.waitAt <= Date.now()) continue;
+          const wake = active.wake;
+          const timer = Promise.withResolvers<void>();
+          const handle = setTimeout(timer.resolve, Math.max(1, scheduled.waitAt - Date.now()));
+          handle.unref();
+          try {
+            await Promise.race([timer.promise, wake]);
+          } finally {
+            clearTimeout(handle);
+          }
           if (active.wake === wake) resetCycleWake(active);
           continue;
         }
@@ -557,6 +740,7 @@ export function createControlEventOutbox(options: {
         for (const entry of lane.entries) reportFailure(entry, 'disconnected', false, 0);
         lane.entries.length = 0;
         lane.pendingEntry = undefined;
+        lane.pendingBatch = undefined;
         cleanupLane(lane);
       }
       pendingCount = 0;

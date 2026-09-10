@@ -329,6 +329,7 @@ async function harness(
     ),
     getControlState: vi.fn().mockResolvedValue(null),
     receiveSandboxControlEvent: vi.fn().mockResolvedValue({ applied: true }),
+    receiveSandboxControlEventBatch: vi.fn().mockResolvedValue({ outcomes: [] }),
     receiveSandboxControlPreparing: vi.fn().mockResolvedValue({ applied: true }),
     failWaitingMessages: vi.fn().mockResolvedValue(undefined),
     invalidateTerminalRuntime: vi.fn().mockResolvedValue(undefined),
@@ -4028,6 +4029,187 @@ describe('SandboxControl lifecycle boundaries', () => {
     });
     expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
     expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+  });
+
+  describe('event batch forwarding', () => {
+    const batchSession = {
+      directory: ROUTE.directory,
+      kiloSessionId: ROUTE.kiloSessionId,
+      rootKiloSessionId: ROUTE.kiloSessionId,
+      nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+    };
+
+    function batchItems() {
+      return [1, 2].map(sequence => ({
+        event: 'session.event' as const,
+        session: batchSession,
+        payload: {
+          type: 'session.updated',
+          properties: { info: { id: ROUTE.kiloSessionId, title: `batch ${sequence}` } },
+        },
+        receiptId: crypto.randomUUID(),
+        sequence,
+      }));
+    }
+
+    it('forwards one batch as a single session call and returns per-item outcomes', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const items = batchItems();
+      const outcomes = items.map((item, index) =>
+        index === 0
+          ? { receiptId: item.receiptId, status: 'applied' }
+          : { receiptId: item.receiptId, status: 'rejected', retryable: true }
+      );
+      h.session.receiveSandboxControlEventBatch.mockResolvedValueOnce({ outcomes });
+
+      await expect(h.hooks.onSessionEventBatch?.({ items }, connection)).resolves.toEqual({
+        outcomes,
+      });
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledExactlyOnceWith({
+        items,
+        wrapperInstanceId: connection.wrapperInstanceId,
+      });
+    });
+
+    it('rejects a batch that crosses root or native identity boundaries without forwarding', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const [first] = batchItems();
+      const items = [
+        first,
+        {
+          ...first,
+          receiptId: crypto.randomUUID(),
+          sequence: 2,
+          session: { ...batchSession, nativeRuntimeId: '22222222-2222-4222-8222-222222222222' },
+        },
+      ];
+
+      const result = await h.hooks.onSessionEventBatch?.(
+        { items } as Parameters<NonNullable<typeof h.hooks.onSessionEventBatch>>[0],
+        connection
+      );
+      expect(result?.outcomes.map(outcome => outcome.status)).toEqual(['rejected', 'rejected']);
+      expect(h.session.receiveSandboxControlEventBatch).not.toHaveBeenCalled();
+    });
+
+    it('reports unknown outcomes when the session batch RPC is attempted but fails', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const items = batchItems();
+      const forwarding = deferred<{ outcomes: never[] }>();
+      h.session.receiveSandboxControlEventBatch.mockReturnValue(forwarding.promise);
+
+      const pending = h.hooks.onSessionEventBatch?.(
+        { items } as Parameters<NonNullable<typeof h.hooks.onSessionEventBatch>>[0],
+        connection
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledOnce();
+      forwarding.reject(new Error('Session transport failed'));
+
+      await expect(pending).resolves.toEqual({
+        outcomes: items.map(item => ({
+          receiptId: item.receiptId,
+          status: 'unknown',
+          retryable: true,
+        })),
+      });
+    });
+
+    it('reports unattempted when the batch is rejected before the RPC', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const items = batchItems();
+
+      const result = await h.hooks.onSessionEventBatch?.(
+        { items } as Parameters<NonNullable<typeof h.hooks.onSessionEventBatch>>[0],
+        { ...connection, connectionId: 'stale_connection' }
+      );
+
+      expect(result?.outcomes.map(outcome => outcome.status)).toEqual([
+        'unattempted',
+        'unattempted',
+      ]);
+      expect(h.session.receiveSandboxControlEventBatch).not.toHaveBeenCalled();
+    });
+
+    it('does not report an aggregate applied result for an entirely rejected batch', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const items = batchItems();
+      h.session.receiveSandboxControlEventBatch.mockResolvedValueOnce({
+        outcomes: items.map(item => ({
+          receiptId: item.receiptId,
+          status: 'rejected',
+          retryable: true,
+        })),
+      });
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.hooks.onSessionEventBatch?.(
+          { items } as Parameters<NonNullable<typeof h.hooks.onSessionEventBatch>>[0],
+          connection
+        );
+        expect(withFields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'forward_result',
+            operation: 'receiveSandboxControlEventBatch',
+            result: 'delivered',
+            applied: false,
+          })
+        );
+      } finally {
+        withFields.mockRestore();
+      }
+    });
+
+    it('serializes a later batch behind an unsettled earlier batch RPC', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const firstItems = batchItems();
+      const secondItems = batchItems().map((item, index) => ({ ...item, sequence: 3 + index }));
+      const first = deferred<{ outcomes: Array<{ receiptId: string; status: string }> }>();
+      const second = deferred<{ outcomes: Array<{ receiptId: string; status: string }> }>();
+      h.session.receiveSandboxControlEventBatch
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValueOnce(second.promise);
+      const applied = (items: typeof firstItems) => ({
+        outcomes: items.map(item => ({ receiptId: item.receiptId, status: 'applied' })),
+      });
+
+      const pendingFirst = h.hooks.onSessionEventBatch?.(
+        { items: firstItems } as Parameters<NonNullable<typeof h.hooks.onSessionEventBatch>>[0],
+        connection
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledTimes(1);
+
+      const pendingSecond = h.hooks.onSessionEventBatch?.(
+        { items: secondItems } as Parameters<NonNullable<typeof h.hooks.onSessionEventBatch>>[0],
+        connection
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledTimes(1);
+
+      first.resolve(applied(firstItems));
+      await expect(pendingFirst).resolves.toEqual(applied(firstItems));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledTimes(2);
+      expect(h.session.receiveSandboxControlEventBatch.mock.calls[1]?.[0]).toMatchObject({
+        items: secondItems,
+      });
+
+      second.resolve(applied(secondItems));
+      await expect(pendingSecond).resolves.toEqual(applied(secondItems));
+    });
   });
 
   describe('receipt-backed session forwarding', () => {

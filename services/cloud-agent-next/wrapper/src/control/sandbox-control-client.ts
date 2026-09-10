@@ -11,6 +11,8 @@ import { createControlEventTransport } from './control-event-transport.js';
 import type { LegacySendResult } from './control-event-transport.js';
 import {
   MAX_CONTROL_EVENT_OUTBOX_BYTES,
+  controlEventPublicationWireItem,
+  type BatchControlEventPublication,
   type ControlEventOutboxFailure,
   type ControlEventPublicationFailureReason,
 } from './control-event-outbox.js';
@@ -26,6 +28,7 @@ import {
   sandboxHelloResultSchema,
   sandboxHeartbeatPayloadSchema,
   sandboxEventPublicationResultSchema,
+  sandboxEventBatchResultSchema,
   sandboxReconcilePayloadSchema,
   sessionEventPayloadSchema,
   sessionPreparingPayloadSchema,
@@ -176,6 +179,7 @@ type ClientState =
       kiloVersionHeartbeat: boolean;
       connectionRecovery: boolean;
       eventReceipts: boolean;
+      eventBatches: boolean;
       scopedCleanupResult: boolean;
     }
   | { kind: 'closed' };
@@ -185,6 +189,8 @@ const HELLO_TIMEOUT_MS = 10_000;
 const KEEPALIVE_INTERVAL_MS = 20_000;
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
+const MAX_EVENT_RECEIPT_TRACKING = 256;
+const EVENT_RECEIPT_TIMEOUT_MS = 30_000;
 
 const preparedEventSchema = z.object({
   streamEventType: z.string(),
@@ -277,6 +283,7 @@ export function createSandboxControlClient(
   let reconnecting = false;
   let eventSequence = 0;
   let eventReceipts = false;
+  let eventBatches = false;
   const nativeRetirementReports = new Map<string, Promise<boolean>>();
   const eventReceiptMetadata = new Map<string, EventReceiptMetadata>();
   let eventReceiptBytes = 0;
@@ -297,6 +304,7 @@ export function createSandboxControlClient(
   >();
 
   type EventReceiptMetadata = {
+    key: string;
     requestId: string;
     sentAt: number;
     preparedAt?: number;
@@ -345,7 +353,7 @@ export function createSandboxControlClient(
       return;
     }
     clearTimeout(metadata.timeout);
-    eventReceiptMetadata.delete(metadata.requestId);
+    eventReceiptMetadata.delete(metadata.key);
     eventReceiptBytes = Math.max(0, eventReceiptBytes - metadata.bytes);
     if (outcome === 'acknowledged')
       eventReceiptTotals.acknowledged = Math.min(
@@ -407,6 +415,23 @@ export function createSandboxControlClient(
     eventReceiptBytes = 0;
   };
 
+  const evictEventReceiptMetadata = (incomingBytes: number, incomingCount: number): void => {
+    while (
+      eventReceiptMetadata.size + incomingCount > MAX_EVENT_RECEIPT_TRACKING ||
+      eventReceiptBytes + incomingBytes > MAX_CONTROL_EVENT_OUTBOX_BYTES
+    ) {
+      const oldest = eventReceiptMetadata.values().next().value;
+      if (!oldest) break;
+      observeEventPublication(oldest, 'tracking_evicted', 'event_ack_tracking_evicted');
+    }
+  };
+
+  const discardEventReceiptMetadata = (metadata: EventReceiptMetadata): void => {
+    clearTimeout(metadata.timeout);
+    eventReceiptMetadata.delete(metadata.key);
+    eventReceiptBytes = Math.max(0, eventReceiptBytes - metadata.bytes);
+  };
+
   const reportUntrackedPublicationFailure = (
     event: 'session.event' | 'session.preparing',
     session: SessionEventIdentity,
@@ -461,7 +486,32 @@ export function createSandboxControlClient(
       observeEventPublication(eventMetadata, acknowledged ? 'acknowledged' : 'rejected', reason);
       return;
     }
-    if (frame.requestId.startsWith('event_')) {
+    const batchItems = [...eventReceiptMetadata.values()].filter(
+      metadata => metadata.requestId === frame.requestId
+    );
+    if (batchItems.length > 0) {
+      const acknowledgement = frame.ok
+        ? sandboxEventBatchResultSchema.safeParse(frame.result)
+        : undefined;
+      const byReceipt = new Map<string, { status: string }>();
+      if (acknowledgement?.success)
+        for (const outcome of acknowledgement.data.outcomes)
+          byReceipt.set(outcome.receiptId, outcome);
+      for (const metadata of batchItems) {
+        const outcome = byReceipt.get(metadata.publication.receiptId);
+        const acknowledged = outcome?.status === 'applied';
+        const reason = acknowledged
+          ? undefined
+          : outcome
+            ? `event_batch_${outcome.status}`
+            : frame.ok
+              ? 'event_batch_receipt_invalid'
+              : (frame.error?.code ?? 'event_batch_rejected');
+        observeEventPublication(metadata, acknowledged ? 'acknowledged' : 'rejected', reason);
+      }
+      return;
+    }
+    if (frame.requestId.startsWith('event_') || frame.requestId.startsWith('batch_')) {
       observeEventPublication(undefined, 'late_reply', 'event_receipt_unknown');
       return;
     }
@@ -699,6 +749,7 @@ export function createSandboxControlClient(
       let kiloVersionHeartbeat = false;
       let connectionRecovery = false;
       let negotiatedEventReceipts = false;
+      let negotiatedEventBatches = false;
       let negotiatedScopedCleanupResult = false;
       let timeout = setTimeout(fail, Math.min(CONNECT_TIMEOUT_MS, deadlineAt - Date.now()));
 
@@ -762,6 +813,7 @@ export function createSandboxControlClient(
               eventReceipts: true,
               runtimeIsolation: true,
               runtimeRecovery: true,
+              eventBatches: true,
               scopedCleanupResult: true,
               workingBranches: true,
             },
@@ -814,6 +866,7 @@ export function createSandboxControlClient(
           kiloVersionHeartbeat = hello.data.capabilities?.kiloVersionHeartbeat === true;
           connectionRecovery = hello.data.capabilities?.connectionRecovery === true;
           negotiatedEventReceipts = hello.data.capabilities?.eventReceipts === true;
+          negotiatedEventBatches = hello.data.capabilities?.eventBatches === true;
           negotiatedScopedCleanupResult = hello.data.capabilities?.scopedCleanupResult === true;
           phase = 'status';
           diagnostic('hello_accepted', ws);
@@ -860,6 +913,7 @@ export function createSandboxControlClient(
           kiloVersionHeartbeat,
           connectionRecovery,
           eventReceipts: negotiatedEventReceipts,
+          eventBatches: negotiatedEventReceipts && negotiatedEventBatches,
           scopedCleanupResult: negotiatedScopedCleanupResult,
           dispose: () => {
             clearInterval(keepalive);
@@ -868,6 +922,7 @@ export function createSandboxControlClient(
         };
         diagnostic('ready', ws);
         eventReceipts = negotiatedEventReceipts;
+        eventBatches = negotiatedEventReceipts && negotiatedEventBatches;
         resolve();
         readiness.resolve();
         options.onConnected?.();
@@ -1048,21 +1103,15 @@ export function createSandboxControlClient(
         session: publication.session,
       })
     );
-    while (
-      eventReceiptMetadata.size >= 256 ||
-      eventReceiptBytes + metadataBytes > MAX_CONTROL_EVENT_OUTBOX_BYTES
-    ) {
-      const oldest = eventReceiptMetadata.values().next().value;
-      if (!oldest) break;
-      observeEventPublication(oldest, 'tracking_evicted', 'event_ack_tracking_evicted');
-    }
+    evictEventReceiptMetadata(metadataBytes, 1);
     const sentAt = Date.now();
     const timeout = setTimeout(() => {
       const current = eventReceiptMetadata.get(requestId);
       if (current) observeEventPublication(current, 'timed_out', 'event_receipt_timeout');
-    }, 30_000);
+    }, EVENT_RECEIPT_TIMEOUT_MS);
     timeout.unref();
     const metadata: EventReceiptMetadata = {
+      key: requestId,
       requestId,
       sentAt,
       ...(preparedAt === undefined ? {} : { preparedAt }),
@@ -1082,9 +1131,7 @@ export function createSandboxControlClient(
     try {
       socket.send(serialized);
     } catch {
-      clearTimeout(metadata.timeout);
-      eventReceiptMetadata.delete(metadata.requestId);
-      eventReceiptBytes = Math.max(0, eventReceiptBytes - metadata.bytes);
+      discardEventReceiptMetadata(metadata);
       throw new ControlDeliveryError(
         'Control event publication failed',
         false,
@@ -1095,6 +1142,117 @@ export function createSandboxControlClient(
         state.kind === 'ready' ? state.connectionId : undefined
       );
     }
+  }
+
+  function publishEventBatch(
+    publications: BatchControlEventPublication[],
+    deadlineAt: number
+  ): Promise<void> {
+    const requestId = `batch_${crypto.randomUUID()}`;
+    if (
+      state.kind !== 'ready' ||
+      !state.eventBatches ||
+      state.socket.readyState !== 1 ||
+      Date.now() >= deadlineAt ||
+      publications.length === 0
+    )
+      throw new ControlDeliveryError(
+        'Control event batch transport is unavailable',
+        true,
+        'disconnected',
+        undefined,
+        requestId,
+        state.kind,
+        state.kind === 'ready' ? state.connectionId : undefined
+      );
+    const socket = state.socket;
+    const frame: RequestFrame = {
+      type: 'request',
+      requestId,
+      operation: 'sandbox.event.publishBatch',
+      payload: {
+        items: publications.map(controlEventPublicationWireItem),
+      },
+    };
+    const serialized = JSON.stringify(frame);
+    const bytes = Buffer.byteLength(serialized);
+    if (bytes > MAX_SANDBOX_CONTROL_FRAME_BYTES)
+      throw new ControlDeliveryError(
+        'Control event batch exceeds the frame budget',
+        false,
+        'send_failed',
+        undefined,
+        requestId,
+        state.kind,
+        state.kind === 'ready' ? state.connectionId : undefined
+      );
+    const bufferedBytes = socket.bufferedAmount;
+    if (bufferedBytes + bytes > MAX_CONTROL_EVENT_OUTBOX_BYTES)
+      throw new ControlDeliveryError(
+        'Control event batch socket capacity is unavailable',
+        true,
+        'socket_overflow',
+        bufferedBytes,
+        requestId,
+        state.kind,
+        state.kind === 'ready' ? state.connectionId : undefined
+      );
+    const sentAt = Date.now();
+    const metadatas: EventReceiptMetadata[] = [];
+    let metadataBytes = 0;
+    for (const [index, publication] of publications.entries()) {
+      const key = `${requestId}#${index}`;
+      const itemBytes = Buffer.byteLength(
+        JSON.stringify({
+          requestId,
+          receiptId: publication.receiptId,
+          sequence: publication.sequence,
+          session: publication.session,
+        })
+      );
+      const timeout = setTimeout(() => {
+        const current = eventReceiptMetadata.get(key);
+        if (current) observeEventPublication(current, 'timed_out', 'event_receipt_timeout');
+      }, EVENT_RECEIPT_TIMEOUT_MS);
+      timeout.unref();
+      metadatas.push({
+        key,
+        requestId,
+        sentAt,
+        ...(publication.preparedAt === undefined ? {} : { preparedAt: publication.preparedAt }),
+        queueWaitMs: Math.max(0, sentAt - (publication.preparedAt ?? sentAt)),
+        timeout,
+        bytes: itemBytes,
+        publication: {
+          event: publication.event,
+          eventType: publicationEventType(publication.payload),
+          receiptId: publication.receiptId,
+          sequence: publication.sequence,
+          session: publication.session,
+        },
+      });
+      metadataBytes += itemBytes;
+    }
+    evictEventReceiptMetadata(metadataBytes, metadatas.length);
+    for (const metadata of metadatas) {
+      eventReceiptMetadata.set(metadata.key, metadata);
+      eventReceiptBytes += metadata.bytes;
+    }
+    try {
+      socket.send(serialized);
+    } catch {
+      for (const metadata of metadatas) discardEventReceiptMetadata(metadata);
+      throw new ControlDeliveryError(
+        'Control event batch publication failed',
+        false,
+        'send_failed',
+        socket.bufferedAmount,
+        requestId,
+        state.kind,
+        state.kind === 'ready' ? state.connectionId : undefined
+      );
+    }
+    return Promise.resolve();
   }
 
   function sendLegacySessionEvent(
@@ -1118,7 +1276,9 @@ export function createSandboxControlClient(
 
   const eventTransport = createControlEventTransport({
     supportsReceipts: () => eventReceipts,
+    supportsBatches: () => eventBatches,
     publish: publishEvent,
+    publishBatch: publishEventBatch,
     prepare: ({ event, payload, session }) =>
       event === 'session.event'
         ? {

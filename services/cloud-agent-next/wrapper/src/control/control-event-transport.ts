@@ -1,6 +1,7 @@
 import type { SessionEventIdentity } from '../../../src/shared/sandbox-control-protocol.js';
 import {
   createControlEventOutbox,
+  type BatchControlEventPublication,
   type ControlEventOutboxFailure,
   type ControlEventPublication,
 } from './control-event-outbox.js';
@@ -39,10 +40,15 @@ export function createControlEventFailureHandler<Runtime extends { runtimeId: st
 
 export function createControlEventTransport(options: {
   supportsReceipts: () => boolean;
+  supportsBatches?: () => boolean;
   publish: (
     publication: ControlEventPublication,
     deadlineAt: number,
     preparedAt?: number
+  ) => Promise<void>;
+  publishBatch?: (
+    publications: BatchControlEventPublication[],
+    deadlineAt: number
   ) => Promise<void>;
   prepare: (input: {
     event: EventKind;
@@ -63,6 +69,8 @@ export function createControlEventTransport(options: {
 }) {
   const outbox = createControlEventOutbox({
     publish: options.publish,
+    publishBatch: options.publishBatch,
+    supportsBatches: () => options.supportsReceipts() && (options.supportsBatches?.() ?? false),
     onFailure: options.onFailure,
   });
 

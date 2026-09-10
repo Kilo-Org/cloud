@@ -164,6 +164,9 @@ import {
   type SessionOperationAuthorization,
   type SessionRequestIdentity,
   type SessionSyncResult,
+  type SandboxEventBatchItemOutcome,
+  type SandboxEventBatchResult,
+  type SandboxEventPublicationPayload,
   type SessionEventIdentity,
   type SessionPreparingPayload,
 } from '../shared/sandbox-control-protocol.js';
@@ -879,6 +882,65 @@ export class SandboxSession extends DurableObject<Env> {
     }
     const applied = this.terminalLifecycle.isCurrent(epoch);
     return result(applied, applied ? 'applied' : 'epoch_changed');
+  }
+
+  receiveSandboxControlEventBatch(input: {
+    items: SandboxEventPublicationPayload[];
+    wrapperInstanceId?: string;
+  }): Promise<SandboxEventBatchResult> {
+    return this.trackOperation(this.applySandboxControlEventBatch(input));
+  }
+
+  private async applySandboxControlEventBatch(input: {
+    items: SandboxEventPublicationPayload[];
+    wrapperInstanceId?: string;
+  }): Promise<SandboxEventBatchResult> {
+    const outcomes: SandboxEventBatchItemOutcome[] = [];
+    let halted = false;
+    for (const item of input.items) {
+      if (halted) {
+        outcomes.push({ receiptId: item.receiptId, status: 'unattempted' });
+        continue;
+      }
+      try {
+        let applied = false;
+        let retryable: boolean | undefined;
+        if (item.event === 'session.event') {
+          const result = await this.applySandboxControlEvent({
+            identity: item.session,
+            payload: item.payload,
+            receiptId: item.receiptId,
+            sequence: item.sequence,
+            wrapperInstanceId: input.wrapperInstanceId,
+          });
+          applied = result.applied;
+          retryable = result.retryable;
+        } else {
+          applied = (
+            await this.receiveSandboxControlPreparing({
+              identity: item.session,
+              payload: item.payload,
+              wrapperInstanceId: input.wrapperInstanceId,
+              receiptId: item.receiptId,
+              sequence: item.sequence,
+            })
+          ).applied;
+        }
+        outcomes.push(
+          applied
+            ? { receiptId: item.receiptId, status: 'applied' }
+            : {
+                receiptId: item.receiptId,
+                status: 'rejected',
+                ...(retryable === true ? { retryable: true } : {}),
+              }
+        );
+      } catch {
+        outcomes.push({ receiptId: item.receiptId, status: 'unknown' });
+        halted = true;
+      }
+    }
+    return { outcomes };
   }
 
   async receiveSandboxControlPreparing(input: {

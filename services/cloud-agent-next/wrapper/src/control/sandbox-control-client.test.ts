@@ -395,6 +395,7 @@ describe('createSandboxControlClient', () => {
           eventReceipts?: boolean;
           runtimeIsolation?: boolean;
           runtimeRecovery?: boolean;
+          eventBatches?: boolean;
           scopedCleanupResult?: boolean;
           workingBranches?: boolean;
         };
@@ -413,6 +414,7 @@ describe('createSandboxControlClient', () => {
         eventReceipts: true,
         runtimeIsolation: true,
         runtimeRecovery: true,
+        eventBatches: true,
         scopedCleanupResult: true,
         workingBranches: true,
       },
@@ -2495,6 +2497,348 @@ describe('event receipt tracking bounds and reporting', () => {
     } finally {
       setSystemTime();
       client.close();
+    }
+  });
+});
+
+describe('sandbox control event batching', () => {
+  const identity = {
+    directory: '/workspace',
+    kiloSessionId: 'ses_1',
+    rootKiloSessionId: 'ses_1',
+    nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+  };
+
+  function batchFrames(socket: FakeWebSocket) {
+    return socket.sent
+      .map(data => JSON.parse(data) as { operation?: string; requestId: string; payload?: unknown })
+      .filter(frame => frame.operation === 'sandbox.event.publishBatch') as Array<{
+      operation: string;
+      requestId: string;
+      payload: { items: SandboxEventPublicationPayload[] };
+    }>;
+  }
+
+  async function waitFor(condition: () => boolean, attempts = 2000): Promise<void> {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      if (condition()) return;
+      await Bun.sleep(1);
+    }
+    throw new Error('Timed out waiting for batch publication');
+  }
+
+  it('sends one ordered batch frame when both ends negotiate eventBatches', async () => {
+    const { client, sockets } = createClientFixture({});
+    const connecting = client.connect();
+    await Promise.resolve();
+    const socket = sockets[0];
+    if (!socket) throw new Error('Missing socket');
+    await handshake(
+      socket,
+      helloResult({ connectionRecovery: true, eventReceipts: true, eventBatches: true })
+    );
+    await connecting;
+    try {
+      for (let index = 0; index < 3; index += 1)
+        expect(
+          client.sendEvent?.(
+            'session.event',
+            { type: 'session.updated', properties: { marker: `m_${index}` } },
+            identity
+          )
+        ).toBe(true);
+      await waitFor(() => batchFrames(socket).length === 1);
+      const [frame] = batchFrames(socket);
+      expect(frame?.payload.items.map(item => item.sequence)).toEqual([1, 2, 3]);
+      expect(
+        socket.sent
+          .map(data => JSON.parse(data) as { operation?: string })
+          .filter(candidate => candidate.operation === 'sandbox.event.publish')
+      ).toEqual([]);
+    } finally {
+      client.close();
+    }
+  });
+
+  it('uses single publication when the Worker does not advertise batching', async () => {
+    const { client, sockets } = createClientFixture({});
+    const connecting = client.connect();
+    await Promise.resolve();
+    const socket = sockets[0];
+    if (!socket) throw new Error('Missing socket');
+    await handshake(socket, helloResult({ connectionRecovery: true, eventReceipts: true }));
+    await connecting;
+    try {
+      expect(
+        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, identity)
+      ).toBe(true);
+      await waitFor(() =>
+        socket.sent
+          .map(data => JSON.parse(data) as { operation?: string })
+          .some(candidate => candidate.operation === 'sandbox.event.publish')
+      );
+      expect(batchFrames(socket)).toEqual([]);
+    } finally {
+      client.close();
+    }
+  });
+
+  it('sends B and C while batch A is withheld, then accepts out-of-order replies', async () => {
+    const observations: Array<{ outcome: string; requestId?: string }> = [];
+    const { client, sockets } = createClientFixture({
+      onEventPublication: observation =>
+        observations.push({ outcome: observation.outcome, requestId: observation.requestId }),
+    });
+    const connecting = client.connect();
+    await Promise.resolve();
+    const socket = sockets[0];
+    if (!socket) throw new Error('Missing socket');
+    await handshake(
+      socket,
+      helloResult({ connectionRecovery: true, eventReceipts: true, eventBatches: true })
+    );
+    await connecting;
+    socket.send = data => {
+      socket.sent.push(data);
+    };
+    try {
+      for (let index = 0; index < 2; index += 1)
+        client.sendEvent?.(
+          'session.event',
+          { type: 'session.updated', properties: { index } },
+          identity
+        );
+      await waitFor(() => batchFrames(socket).length === 1);
+      for (let index = 2; index < 4; index += 1)
+        client.sendEvent?.(
+          'session.event',
+          { type: 'session.updated', properties: { index } },
+          identity
+        );
+      await waitFor(() => batchFrames(socket).length === 2);
+      for (let index = 4; index < 6; index += 1)
+        client.sendEvent?.(
+          'session.event',
+          { type: 'session.updated', properties: { index } },
+          identity
+        );
+      await waitFor(() => batchFrames(socket).length === 3);
+      const [first, second, third] = batchFrames(socket);
+      expect(first?.payload.items.map(item => item.sequence)).toEqual([1, 2]);
+      expect(second?.payload.items.map(item => item.sequence)).toEqual([3, 4]);
+      expect(third?.payload.items.map(item => item.sequence)).toEqual([5, 6]);
+      for (const frame of [third, first, second]) {
+        if (!frame) throw new Error('Missing batch frame');
+        socket.respond(
+          JSON.stringify({
+            type: 'response',
+            requestId: frame.requestId,
+            ok: true,
+            result: {
+              outcomes: frame.payload.items.map(item => ({
+                receiptId: item.receiptId,
+                status: 'applied',
+              })),
+            },
+          })
+        );
+      }
+      await waitFor(
+        () =>
+          observations.filter(observation => observation.outcome === 'acknowledged').length === 6
+      );
+      expect(observations.filter(observation => observation.outcome === 'rejected')).toEqual([]);
+    } finally {
+      client.close();
+    }
+  });
+
+  it('reports per-item batch outcomes and treats a repeated reply as late', async () => {
+    const observations: Array<{ outcome: string; reason?: string }> = [];
+    const { client, sockets } = createClientFixture({
+      onEventPublication: observation =>
+        observations.push({ outcome: observation.outcome, reason: observation.reason }),
+    });
+    const connecting = client.connect();
+    await Promise.resolve();
+    const socket = sockets[0];
+    if (!socket) throw new Error('Missing socket');
+    await handshake(
+      socket,
+      helloResult({ connectionRecovery: true, eventReceipts: true, eventBatches: true })
+    );
+    await connecting;
+    socket.send = data => {
+      socket.sent.push(data);
+    };
+    try {
+      client.sendEvent?.(
+        'session.event',
+        { type: 'session.updated', properties: { marker: 'a' } },
+        identity
+      );
+      client.sendEvent?.(
+        'session.event',
+        { type: 'session.updated', properties: { marker: 'b' } },
+        identity
+      );
+      await waitFor(() => batchFrames(socket).length === 1);
+      const frame = batchFrames(socket)[0];
+      if (!frame) throw new Error('Missing batch frame');
+      socket.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: frame.requestId,
+          ok: true,
+          result: {
+            outcomes: [
+              { receiptId: frame.payload.items[0]?.receiptId, status: 'applied' },
+              { receiptId: frame.payload.items[1]?.receiptId, status: 'rejected' },
+            ],
+          },
+        })
+      );
+      await waitFor(
+        () => observations.filter(observation => observation.outcome === 'rejected').length === 1
+      );
+      expect(observations[observations.length - 1]?.reason).toBe('event_batch_rejected');
+      socket.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: frame.requestId,
+          ok: true,
+          result: {
+            outcomes: frame.payload.items.map(item => ({
+              receiptId: item.receiptId,
+              status: 'applied',
+            })),
+          },
+        })
+      );
+      await waitFor(
+        () => observations.filter(observation => observation.outcome === 'late_reply').length === 1
+      );
+    } finally {
+      client.close();
+    }
+  });
+
+  it('drops a batch on bounded socket pressure without cancelling the connection', async () => {
+    const failures: ControlEventOutboxFailure[] = [];
+    const { client, sockets } = createClientFixture({
+      onEventReceiptFailure: failure => failures.push(failure),
+    });
+    const connecting = client.connect();
+    await Promise.resolve();
+    const socket = sockets[0];
+    if (!socket) throw new Error('Missing socket');
+    await handshake(
+      socket,
+      helloResult({ connectionRecovery: true, eventReceipts: true, eventBatches: true })
+    );
+    await connecting;
+    socket.send = data => {
+      socket.sent.push(data);
+    };
+    socket.bufferedAmount = MAX_CONTROL_EVENT_OUTBOX_BYTES;
+    try {
+      for (let index = 0; index < 2; index += 1)
+        client.sendEvent?.(
+          'session.event',
+          { type: 'session.updated', properties: { index } },
+          identity
+        );
+      await waitFor(() => failures.length === 2);
+      expect(
+        failures.every(failure => failure.reason === 'socket_overflow' && failure.sent === false)
+      ).toBe(true);
+      expect(batchFrames(socket)).toEqual([]);
+      expect(socket.readyState).toBe(1);
+    } finally {
+      client.close();
+    }
+  });
+
+  it('evicts an older batch item without clearing newer batch tracking or timers', async () => {
+    const observations: Array<{ outcome: string; sequence?: number }> = [];
+    const timers = spyOn(globalThis, 'setTimeout');
+    const cleared = spyOn(globalThis, 'clearTimeout');
+    const { client, sockets } = createClientFixture({
+      onEventPublication: observation =>
+        observations.push({ outcome: observation.outcome, sequence: observation.sequence }),
+    });
+    const connecting = client.connect();
+    await Promise.resolve();
+    const socket = sockets[0];
+    if (!socket) throw new Error('Missing socket');
+    await handshake(
+      socket,
+      helloResult({ connectionRecovery: true, eventReceipts: true, eventBatches: true })
+    );
+    await connecting;
+    let batchTimers: Array<ReturnType<typeof setTimeout>> = [];
+    socket.send = data => {
+      socket.sent.push(data);
+      if (
+        batchTimers.length === 0 &&
+        (JSON.parse(data) as { operation?: string }).operation === 'sandbox.event.publishBatch'
+      )
+        batchTimers = timers.mock.results
+          .slice(-2)
+          .map(result => result.value as ReturnType<typeof setTimeout>);
+    };
+    try {
+      for (let index = 0; index < 2; index += 1)
+        client.sendEvent?.(
+          'session.event',
+          { type: 'session.updated', properties: { index } },
+          identity
+        );
+      await waitFor(() => batchFrames(socket).length === 1);
+      const batchFrame = batchFrames(socket)[0];
+      if (!batchFrame) throw new Error('Missing batch frame');
+      const [firstItem, secondItem] = batchFrame.payload.items;
+      for (let index = 0; index < 255; index += 1) {
+        client.sendEvent?.(
+          'session.event',
+          { type: 'session.updated', properties: { index } },
+          { ...identity, kiloSessionId: `ses_${index}`, rootKiloSessionId: `ses_${index}` }
+        );
+        await waitForReconnect();
+      }
+      await waitFor(() =>
+        observations.some(
+          observation =>
+            observation.outcome === 'tracking_evicted' &&
+            observation.sequence === firstItem?.sequence
+        )
+      );
+      const clearedHandles = cleared.mock.calls.map(call => call[0]);
+      expect(clearedHandles.includes(batchTimers[0])).toBe(true);
+      expect(clearedHandles.includes(batchTimers[1])).toBe(false);
+      socket.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: batchFrame.requestId,
+          ok: true,
+          result: {
+            outcomes: batchFrame.payload.items.map(item => ({
+              receiptId: item.receiptId,
+              status: 'applied',
+            })),
+          },
+        })
+      );
+      await waitFor(() =>
+        observations.some(
+          observation =>
+            observation.outcome === 'acknowledged' && observation.sequence === secondItem?.sequence
+        )
+      );
+    } finally {
+      client.close();
+      timers.mockRestore();
+      cleared.mockRestore();
     }
   });
 });

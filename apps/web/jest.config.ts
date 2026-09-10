@@ -48,7 +48,9 @@ const config: Config = {
     '<rootDir>/../../services/kiloclaw/',
     '<rootDir>/../../packages/encryption/',
     '<rootDir>/../../packages/worker-utils/',
-    '<rootDir>/src/scripts/',
+    // Script tests are DB-backed and run via `pnpm script`, not jest — except
+    // the mcp-catalog unit tests, which only exercise pure library code.
+    '<rootDir>/src/scripts/(?!mcp-catalog/)',
     '<rootDir>/../../.worktrees/',
   ],
   modulePathIgnorePatterns: ['<rootDir>/../../.worktrees/'],

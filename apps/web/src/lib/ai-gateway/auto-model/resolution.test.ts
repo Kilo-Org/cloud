@@ -6,7 +6,6 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
 
 import { resolveAutoModel } from './resolution';
 import {
-  BALANCED_FALLBACK_MODEL,
   FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
@@ -27,7 +26,7 @@ const baseParams = {
 
 const nullUserPromise = Promise.resolve(null);
 const zeroBalancePromise = Promise.resolve(0);
-const efficientFallback = { model: PRIMARY_DEFAULT_MODEL };
+const primaryDefaultFallback = { model: PRIMARY_DEFAULT_MODEL };
 
 const sampleDecision: AutoRoutingDecision = {
   model: 'anthropic/claude-haiku-4',
@@ -109,7 +108,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
   it('falls back to PRIMARY_DEFAULT_MODEL when no thunk is provided and apiKind=messages', async () => {
@@ -119,7 +118,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
   it('falls back to PRIMARY_DEFAULT_MODEL when no thunk is provided and apiKind=chat_completions', async () => {
@@ -129,15 +128,12 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
-  it.each([
-    [KILO_AUTO_BALANCED_MODEL.id, BALANCED_FALLBACK_MODEL],
-    [KILO_AUTO_EFFICIENT_MODEL.id, efficientFallback],
-  ])(
-    'uses the configured fallback for %s when the worker returns no decision',
-    async (model, fallback) => {
+  it.each([KILO_AUTO_BALANCED_MODEL.id, KILO_AUTO_EFFICIENT_MODEL.id])(
+    'falls back to PRIMARY_DEFAULT_MODEL for %s when the worker returns no decision',
+    async model => {
       const result = await resolveAutoModel(
         {
           ...baseParams,
@@ -149,7 +145,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
         zeroBalancePromise
       );
 
-      expect(result).toEqual({ kind: 'ok', resolved: fallback });
+      expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
     }
   );
 
@@ -167,7 +163,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
   it('does not call the thunk more than once', async () => {
@@ -277,7 +273,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
   it('falls back to PRIMARY_DEFAULT_MODEL when the model exposes no variants but decision has a variant', async () => {
@@ -295,7 +291,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
   it('applies exact thinking and instant variant settings', async () => {
@@ -405,7 +401,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 });
 
@@ -653,7 +649,7 @@ describe('resolveAutoModel — Organization Auto branch', () => {
 
     expect(result).toEqual({
       kind: 'ok',
-      resolved: BALANCED_FALLBACK_MODEL,
+      resolved: primaryDefaultFallback,
       routingTarget: 'kilo-auto/balanced',
     });
   });

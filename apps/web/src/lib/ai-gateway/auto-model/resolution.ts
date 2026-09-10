@@ -20,7 +20,6 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   modeSchema,
-  BALANCED_FALLBACK_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
@@ -321,10 +320,7 @@ export async function resolveAutoModel(
     };
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
-    const fallbackModel =
-      model === KILO_AUTO_EFFICIENT_MODEL.id
-        ? { model: PRIMARY_DEFAULT_MODEL }
-        : BALANCED_FALLBACK_MODEL;
+    const fallbackModel = { model: PRIMARY_DEFAULT_MODEL };
     const decision = params.efficientDecision ? await params.efficientDecision() : null;
     if (decision && !isVirtualAutoModelId(decision.model)) {
       const resolvedFromDecision = await resolveEfficientDecisionModel(decision);

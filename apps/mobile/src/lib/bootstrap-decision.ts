@@ -11,6 +11,7 @@ type BootstrapDecisionTag =
   | 'redirect-force-update'
   | 'settle-force-update'
   | 'exit-force-update'
+  | 'settle-restore-error'
   | 'settle-login'
   | 'redirect-login'
   | 'settle-user-error'
@@ -35,6 +36,9 @@ export type BootstrapDecisionInput = {
   onConsentRoute: boolean;
   onConsentReviewRoute: boolean;
   languageReloadFailed: boolean;
+  /** Every retried startup credential read failed: the stored session could
+   *  not be read, so it is not known to be gone. */
+  restoreFailed: boolean;
 };
 
 export type BootstrapDecision = {
@@ -42,6 +46,7 @@ export type BootstrapDecision = {
   hasUserBootstrapError: boolean;
   hasConsentBootstrapError: boolean;
   hasLanguageReloadError: boolean;
+  hasRestoreError: boolean;
   hasBootstrapError: boolean;
   hidden: boolean;
 };
@@ -59,6 +64,12 @@ function resolveBootstrapTag(input: BootstrapDecisionInput): BootstrapDecisionTa
   }
   if (input.inForceUpdate) {
     return 'exit-force-update';
+  }
+  // Ahead of the login branch on purpose: a failed credential read leaves
+  // `hasToken` false, so `redirect-login` must not fire under the error
+  // screen and route a still-signed-in person to login.
+  if (input.restoreFailed) {
+    return 'settle-restore-error';
   }
   if (!input.hasToken) {
     return input.inAuthGroup ? 'settle-login' : 'redirect-login';
@@ -85,8 +96,9 @@ export function resolveBootstrapDecision(input: BootstrapDecisionInput): Bootstr
   const hasUserBootstrapError = input.hasToken && input.userIdError;
   const hasConsentBootstrapError = input.hasToken && input.consentCheckError;
   const hasLanguageReloadError = input.languageReloadFailed;
+  const hasRestoreError = input.restoreFailed;
   const hasBootstrapError =
-    hasUserBootstrapError || hasConsentBootstrapError || hasLanguageReloadError;
+    hasUserBootstrapError || hasConsentBootstrapError || hasLanguageReloadError || hasRestoreError;
   const consentLoading =
     input.hasToken &&
     !input.consentChecked &&
@@ -104,6 +116,7 @@ export function resolveBootstrapDecision(input: BootstrapDecisionInput): Bootstr
       (!showingForceUpdate && (needsAuth || needsAppRedirect || needsConsentRedirect)));
   const hidden =
     !hasLanguageReloadError &&
+    !hasRestoreError &&
     !hasUserBootstrapError &&
     !hasConsentBootstrapError &&
     (input.isLoading || needsRedirect || consentLoading);
@@ -113,6 +126,7 @@ export function resolveBootstrapDecision(input: BootstrapDecisionInput): Bootstr
     hasUserBootstrapError,
     hasConsentBootstrapError,
     hasLanguageReloadError,
+    hasRestoreError,
     hasBootstrapError,
     hidden,
   };

@@ -22,6 +22,8 @@ import {
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
   USER_DATA_EXPORT_AUDIENCE,
   SESSION_INGEST_USER_DELETION_AUDIENCE,
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
 } from './internal-service-token-audiences.js';
 
 const SECRET = 'synthetic-policy-test-secret-at-least-32-chars';
@@ -855,7 +857,7 @@ describe('buildModernKiloTokenPayload and compatibility', () => {
   };
   type ExpectedReadonlyOrganizationMemberships = readonly {
     readonly orgId: string;
-    readonly role: 'owner' | 'member' | 'billing_manager';
+    readonly role: 'owner' | 'admin' | 'member' | 'billing_manager';
   }[];
 
   expectTypeOf<DeviceAccessModernKiloTokenClaims['credentialExchange']>().toEqualTypeOf<false>();
@@ -881,8 +883,52 @@ describe('buildModernKiloTokenPayload and compatibility', () => {
     ).resolves.toMatchObject({ userId: 'synthetic-user' });
   });
 
+  it('supports unique audience arrays only for non-exchangeable modern tokens', () => {
+    expect(
+      buildModernKiloTokenPayload({
+        userId: 'synthetic-user',
+        audience: ['kilo-api', 'kilo-gateway'],
+        issuedAt: NOW_SECONDS,
+        expiresAt: NOW_SECONDS + 60,
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+      }).aud
+    ).toEqual(['kilo-api', 'kilo-gateway']);
+    expect(() =>
+      buildModernKiloTokenPayload({
+        userId: 'synthetic-user',
+        pepper: 'synthetic-pepper',
+        audience: ['kilo-api', 'kilo-gateway'],
+        issuedAt: NOW_SECONDS,
+        expiresAt: NOW_SECONDS + 60,
+        tokenPurpose: 'human-api',
+        credentialExchange: true,
+      })
+    ).toThrow();
+  });
+
+  it('preserves the ordered API and gateway audience set for delegated workloads', () => {
+    const payload = buildModernKiloTokenPayload({
+      userId: 'synthetic-user',
+      pepper: 'synthetic-pepper',
+      audience: [KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE],
+      issuedAt: NOW_SECONDS,
+      expiresAt: NOW_SECONDS + 60,
+      tokenPurpose: 'delegated-workload',
+      credentialExchange: false,
+    });
+
+    expect(payload.aud).toEqual([KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE]);
+    expect(isKiloResourceAudienceAllowed(payload.aud, API_POLICY)).toBe(true);
+    expect(
+      isKiloResourceAudienceAllowed(payload.aud, {
+        audience: 'unrelated-audience',
+        mode: 'required',
+      })
+    ).toBe(false);
+  });
+
   it.each([
-    { audience: ['kilo-api'] },
     { issuedAt: -1 },
     { expiresAt: NOW_SECONDS },
     { tokenPurpose: 'device-access', credentialExchange: true },

@@ -76,6 +76,7 @@ const orgLoaded = vi.hoisted(() => ({ value: true }));
 const organizationId = vi.hoisted(() => ({ value: null as string | null }));
 const authEpoch = vi.hoisted(() => ({ value: 0 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',
@@ -420,7 +421,7 @@ describe('QuickChatScreen composer', () => {
     expect(latestComposer()?.disabled).toBeUndefined();
     const error = queryErrors.list[0];
     expect(error?.variant).toBe('server');
-    expect(error?.title).toBe(i18n.t('quickChat.catalogRetry'));
+    expect(error?.title).toBe(i18n.t('common.couldNotLoadModels'));
     expect(error?.onRetry).toBeDefined();
     expect(emptyStateRenders.list).toHaveLength(0);
   });

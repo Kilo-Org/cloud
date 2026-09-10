@@ -6,7 +6,8 @@ import { ChevronDown, ChevronUp, MapPin } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { Button } from '@/components/ui/button';
@@ -472,7 +473,7 @@ export function IdentityStep({
           <ActivityIndicator size="small" color={colors.primaryForeground} />
         ) : (
           <>
-            <Text className="text-base">{t('kiloclaw.onboarding.identity.continue')}</Text>
+            <Text className="text-base">{t('common.continue')}</Text>
             <DirectionalChevronRight size={16} color={colors.primaryForeground} />
           </>
         )}

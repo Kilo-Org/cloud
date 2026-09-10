@@ -68,7 +68,7 @@ export function MessageReactionPickerSheet({
       >
         <Pressable
           className="flex-1"
-          accessibilityLabel={t('chat.reactions.close')}
+          accessibilityLabel={t('common.closeReactions')}
           onPress={onClose}
         />
         <Animated.View
@@ -84,11 +84,13 @@ export function MessageReactionPickerSheet({
               accessibilityRole="header"
               className="min-w-0 flex-1 text-center text-base font-semibold text-foreground"
             >
-              {t('chat.reactions.title')}
+              {/* i18n-dup-ok: prReview.discussion.reaction* is a numeral count label
+                  ('3 reactions'); this key is the picker's title — cs/pl/uk differ. */}
+              {t('common.reactions')}
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t('chat.reactions.close')}
+              accessibilityLabel={t('common.closeReactions')}
               className="size-11 shrink-0 items-center justify-center rounded-full active:bg-muted"
               onPress={onClose}
             >
@@ -96,11 +98,7 @@ export function MessageReactionPickerSheet({
             </Pressable>
           </View>
           {recent.length > 0 ? (
-            <ReactionGrid
-              title={t('chat.reactions.recent')}
-              reactions={recent}
-              onSelect={onSelect}
-            />
+            <ReactionGrid title={t('common.recent')} reactions={recent} onSelect={onSelect} />
           ) : null}
           <ReactionGrid
             title={t('chat.reactions.common')}

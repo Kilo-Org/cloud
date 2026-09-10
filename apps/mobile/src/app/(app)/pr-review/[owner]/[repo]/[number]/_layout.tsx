@@ -69,7 +69,12 @@ export default function PrReviewNumberLayout() {
         draftEntityKey={draftEntityKey}
       >
         <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
+          {/* Register the overview first: unregistered routes sort after
+              registered siblings, so without this the initial screen is the
+              comment-composer formSheet instead of the PR overview. */}
+          <Stack.Screen name="index" />
           <Stack.Screen name="comment-composer" options={sheetOptions} />
+          <Stack.Screen name="conversation-comment" options={sheetOptions} />
           <Stack.Screen name="review-submit" options={sheetOptions} />
           <Stack.Screen name="merge" options={sheetOptions} />
           <Stack.Screen name="file-navigator" options={sheetOptions} />

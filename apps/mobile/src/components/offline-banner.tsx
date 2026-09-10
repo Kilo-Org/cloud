@@ -11,8 +11,20 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 
 /**
+ * Fixed height of the banner row. The banner is an absolute overlay pinned at
+ * `top: insets.top`, so a surface whose header starts at the safe-area top
+ * must reserve this height while the banner is visible or the overlay covers
+ * the header title (uxs2 spot check, e6-offline-hang). The banner renders at
+ * exactly this height (no vertical padding) so the constant cannot drift from
+ * the painted row.
+ */
+export const OFFLINE_BANNER_HEIGHT = 36;
+
+/**
  * App-wide offline banner. Absolute overlay, so app content keeps its layout
  * position; `pointerEvents="none"` passes every touch to the header below.
+ * Surfaces with a pinned top header reserve `OFFLINE_BANNER_HEIGHT` above the
+ * header while the banner is visible so it never covers the title.
  */
 export function OfflineBanner() {
   const isOffline = useOfflineBannerState();
@@ -46,7 +58,8 @@ export function OfflineBanner() {
         accessible
         accessibilityRole="alert"
         accessibilityLabel={t('offline.noInternet')}
-        className="flex-row items-center justify-center gap-2 bg-warn px-4 py-2"
+        className="flex-row items-center justify-center gap-2 bg-warn px-4"
+        style={{ height: OFFLINE_BANNER_HEIGHT }}
       >
         <WifiOff size={14} color={colors.warnForeground} />
         <Text className="text-sm font-medium text-warn-foreground">{t('offline.noInternet')}</Text>

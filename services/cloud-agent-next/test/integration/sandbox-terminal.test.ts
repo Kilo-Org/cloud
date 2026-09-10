@@ -297,6 +297,14 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
       return browser;
     },
     dispose: async () => {
+      // Terminalize the fixture's admitted message and clear its retry alarm. A
+      // message left active keeps session DO supervision running after this file
+      // closes, and its finalization commit log races the vitest worker shutdown
+      // as a pending onUserConsoleLog rejection (EnvironmentTeardownError).
+      await runInDurableObject(sessionStub, async (instance, state) => {
+        await instance.interruptExecution();
+        await state.storage.deleteAlarm();
+      });
       for (const browser of fixture.browsers) {
         if (browser.socket.readyState === 1) browser.socket.close(1000, 'test cleanup');
       }
@@ -1082,5 +1090,20 @@ describe('SandboxSession terminal bridge in the Workers runtime', () => {
     await expect(browser.closed).resolves.toMatchObject({ code: 1009 });
     await expect(wrapper.closed).resolves.toMatchObject({ code: 1009 });
     expect(fixture.errors).toEqual([]);
+  });
+
+  it('leaves no active session work or retry alarm after the fixture is disposed', async () => {
+    const fixture = await createFixture();
+    await fixture.dispose();
+    const session = getSandboxSessionStub(env, fixture.ownerId, fixture.sessionId);
+    await runInDurableObject(session, async (_instance, state) => {
+      const messages = (await state.storage.get('session_messages')) as
+        | { state: string }[]
+        | undefined;
+      expect(
+        messages?.every(message => message.state !== 'accepted' && message.state !== 'queued')
+      ).toBe(true);
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
   });
 });

@@ -1,7 +1,9 @@
+/* eslint-disable max-lines -- one cohesive native-adapter suite sharing the ActivityKit mock harness */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
+  GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
@@ -76,6 +78,35 @@ const native = vi.hoisted(() => {
   return { records, ignoredUpdates, snapshots, failures, add, wrap };
 });
 
+// The sink and its ending helpers read the foreground state and watch for the
+// app leaving active while an idle-end debounce is pending.
+const appState = vi.hoisted(() => ({
+  currentState: 'active' as string,
+  listeners: new Set<(state: string) => void>(),
+  emit(next: string) {
+    this.currentState = next;
+    for (const listener of this.listeners) {
+      listener(next);
+    }
+  },
+  reset() {
+    this.currentState = 'active';
+    this.listeners.clear();
+  },
+}));
+
+vi.mock('react-native', () => ({
+  AppState: {
+    get currentState() {
+      return appState.currentState;
+    },
+    addEventListener: (_name: string, listener: (state: string) => void) => {
+      appState.listeners.add(listener);
+      return { remove: () => appState.listeners.delete(listener) };
+    },
+  },
+}));
+
 vi.mock('expo-widgets', async () => {
   const { after } = await import('expo-widgets/src/Widgets');
   return { after, widgetsDirectory: 'file:///app-group/ExpoWidgets/' };
@@ -101,6 +132,7 @@ vi.mock('expo-widgets/src/ExpoWidgets', () => ({
 vi.mock('./active-agents-live-activity', async () => {
   const { LiveActivityFactory } = await import('expo-widgets/src/Widgets');
   return {
+    OPEN_AGENTS_URL: 'kiloapp:///cloud/sessions',
     ActiveAgentsLiveActivity: new LiveActivityFactory('ActiveAgentsLiveActivity', () => ({
       banner: null,
     })),
@@ -150,12 +182,16 @@ beforeEach(() => {
   vi.resetModules();
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
+  appState.reset();
   native.records.length = 0;
   native.ignoredUpdates.length = 0;
   native.snapshots.length = 0;
   native.failures.info = false;
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
+});
 
 describe('native adapter recovery', () => {
   it.each(['publish then start', 'start only'])(
@@ -169,7 +205,8 @@ describe('native adapter recovery', () => {
         sink.publish(fresh);
       }
       sink.startOrUpdate(fresh, CTX);
-      await Promise.resolve();
+      // The replacement waits on the remotely ended card's dismissal.
+      await sink.waitForNativeTerminal?.();
 
       expect(native.records.filter(record => record.state === 'active')).toMatchObject([
         {
@@ -295,5 +332,79 @@ describe('native adapter terminal privacy', () => {
       { props: { needsInput: 1, running: 0 } },
     ]);
     expect(native.records).toHaveLength(2);
+  });
+});
+
+describe('native adapter single card', () => {
+  it('ends every activity it did not adopt, including one a push-to-start created', async () => {
+    const sink = await loadSink();
+    sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
+    // A remote push-to-start that raced the local start, and a card left behind
+    // by an earlier organization scope. Neither is known to this sink.
+    native.add(JSON.stringify({ running: 2 }));
+    native.add(JSON.stringify({ idle: 5 }));
+    const fresh = snapshot([{ status: 'busy' }, { status: 'question' }], 1);
+    sink.publish(fresh);
+    sink.startOrUpdate(fresh, CTX);
+    await sink.waitForNativeTerminal?.();
+
+    expect(native.records.filter(record => record.state === 'active')).toMatchObject([
+      { props: { running: 1, needsInput: 1 } },
+    ]);
+    expect(native.records).toHaveLength(3);
+    expect(native.ignoredUpdates).toEqual([]);
+  });
+});
+
+describe('native adapter idle window', () => {
+  it('never raises a card for idle-only work', async () => {
+    const sink = await loadSink();
+    const idle = snapshot([{ status: 'idle' }, { status: 'idle' }]);
+    sink.publish(idle);
+    sink.startOrUpdate(idle, CTX);
+    await Promise.resolve();
+
+    expect(native.records).toEqual([]);
+  });
+
+  it('keeps the same card when every agent goes idle', async () => {
+    const sink = await loadSink();
+    sink.startOrUpdate(snapshot([{ status: 'busy' }, { status: 'idle' }]), CTX);
+    sink.publish(snapshot([{ status: 'idle' }], 1));
+    await sink.waitForNativeTerminal?.();
+
+    expect(native.records).toHaveLength(1);
+    expect(firstActivity()).toMatchObject({
+      state: 'active',
+      dismissAt: null,
+      props: { running: 0, idle: 1 },
+    });
+  });
+
+  it('updates the same card when work resumes after idle', async () => {
+    const sink = await loadSink();
+    sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
+    sink.publish(snapshot([{ status: 'idle' }], 1));
+    const resumed = snapshot([{ status: 'busy' }], 2);
+    sink.publish(resumed);
+    sink.startOrUpdate(resumed, CTX);
+    await sink.waitForNativeTerminal?.();
+
+    expect(native.records).toHaveLength(1);
+    expect(firstActivity()).toMatchObject({
+      state: 'active',
+      props: { running: 1, idle: 0 },
+    });
+  });
+
+  it('applies the terminal window once idle work goes empty', async () => {
+    const sink = await loadSink();
+    sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
+    sink.publish(snapshot([{ status: 'idle' }], 1));
+    await sink.waitForNativeTerminal?.();
+
+    sink.publish(snapshot([], 2));
+    await sink.waitForNativeTerminal?.();
+    expect(firstActivity().dismissAt).toBe(NOW + GLANCEABLE_TERMINAL_MS);
   });
 });

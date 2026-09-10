@@ -12,7 +12,7 @@ import { UsageContent } from '@/app/admin/gateway/UsageContent';
 import { ModelExperimentsContent } from '@/app/admin/model-experiments/ModelExperimentsContent';
 import { ModelExperimentRequestsContent } from '@/app/admin/model-experiments/ModelExperimentRequestsContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
-import RequestLoggingOptInsPage from '@/app/admin/request-logging-opt-ins/page';
+import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
 const VALID_TABS: readonly string[] = [
   'sync-providers',
@@ -22,7 +22,6 @@ const VALID_TABS: readonly string[] = [
   'model-experiments',
   'experiment-requests',
   'api-request-log',
-  'request-logging-opt-ins',
 ];
 type Tab =
   | 'sync-providers'
@@ -31,8 +30,7 @@ type Tab =
   | 'monthly-usage'
   | 'model-experiments'
   | 'experiment-requests'
-  | 'api-request-log'
-  | 'request-logging-opt-ins';
+  | 'api-request-log';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -101,9 +99,6 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
             </TabsTrigger>
-            <TabsTrigger value="request-logging-opt-ins" className={tabTriggerClass}>
-              Request Logging Opt-ins
-            </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
             <SyncProvidersContent />
@@ -128,12 +123,9 @@ export default function AdminGatewayPage() {
             className="mt-4 [&>div]:mx-0 [&>div]:py-0 [&>header]:hidden"
           >
             <ApiRequestLogPage />
-          </TabsContent>
-          <TabsContent
-            value="request-logging-opt-ins"
-            className="mt-4 [&>div]:mx-0 [&>div]:py-0 [&>header]:hidden"
-          >
-            <RequestLoggingOptInsPage />
+            <div className="mt-8">
+              <RequestLoggingOptInsContent />
+            </div>
           </TabsContent>
         </Tabs>
       </div>

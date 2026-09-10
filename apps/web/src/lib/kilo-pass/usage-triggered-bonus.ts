@@ -1,6 +1,7 @@
 import 'server-only';
 
 import {
+  credit_transactions,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
   kilo_pass_subscriptions,
@@ -33,7 +34,7 @@ import {
   getKiloPassWelcomePromoPolicy,
   type KiloPassWelcomePromoPolicy,
 } from '@/lib/kilo-pass/welcome-promo-context';
-import { and, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, like, ne } from 'drizzle-orm';
 
 type Db = typeof defaultDb;
 type Tx = Parameters<Db['transaction']>[0] extends (tx: infer T) => unknown ? T : never;
@@ -214,7 +215,7 @@ async function maybeIssueBonusFromUsageThreshold(
   }
 
   const baseItem = await tx.query.kilo_pass_issuance_items.findFirst({
-    columns: { id: true },
+    columns: { id: true, credit_transaction_id: true },
     where: and(
       eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.issuanceId),
       eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
@@ -223,6 +224,23 @@ async function maybeIssueBonusFromUsageThreshold(
   if (!baseItem) {
     await clearKiloPassThreshold(tx, { kiloUserId });
     return;
+  }
+
+  if (subscription.paymentProvider === KiloPassPaymentProvider.GooglePlay) {
+    const refund = await tx.query.credit_transactions.findFirst({
+      columns: { id: true },
+      where: and(
+        eq(credit_transactions.kilo_user_id, kiloUserId),
+        like(
+          credit_transactions.credit_category,
+          `kilo-pass-store-refund:google_play:%:base:${baseItem.credit_transaction_id}`
+        )
+      ),
+    });
+    if (refund) {
+      await clearKiloPassThreshold(tx, { kiloUserId });
+      return;
+    }
   }
 
   const alreadyIssuedItem = await tx.query.kilo_pass_issuance_items.findFirst({

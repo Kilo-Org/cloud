@@ -3,6 +3,7 @@ import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { ReasoningDetailUnion } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import type {
+  AzureCredentials,
   BedrockCredentials,
   VertexCredentials,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -27,6 +28,7 @@ export function isOpenRouterProviderConfig(value: unknown): value is OpenRouterP
 
 export type VercelInferenceProviderConfig =
   | { apiKey: string; baseURL?: string }
+  | AzureCredentials
   | BedrockCredentials
   | VertexCredentials;
 

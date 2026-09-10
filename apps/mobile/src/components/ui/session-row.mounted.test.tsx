@@ -15,7 +15,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
-vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
+vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedSoft: '#777777' }),
@@ -81,15 +81,31 @@ describe('SessionRow mounted layout', () => {
     expect(text.props.maxFontSizeMultiplier).toBeUndefined();
     expect(text.children).toEqual([meta]);
 
+    // The eyebrow label yields before the timestamp: flex-1 basis 0 sizes
+    // the right cluster at its full natural width first, so a long agent
+    // label truncates instead of ellipsizing the relative time (SPOT-DEFECT:
+    // rows clipped "1 HOUR AGO" to "1 HOUR A...").
+    const label = textNode(root, content.agentLabel);
+    expect(label.props.numberOfLines).toBe(1);
+    expect((label.props.className as string).split(' ')).toEqual(
+      expect.arrayContaining(['min-w-0', 'flex-1'])
+    );
+
     if (live) {
-      const cluster = root.findByProps({ tone: 'good' }).parent;
+      const cluster = root.findByProps({ kind: 'running' }).parent;
       expect((cluster?.props.className as string | undefined)?.split(' ')).toEqual(
         expect.arrayContaining(['shrink', 'min-w-0'])
       );
     }
     if (icon) {
-      const cluster = root.findByProps({ testID: 'platform-icon' }).parent;
-      expect((cluster?.props.className as string | undefined)?.split(' ')).toContain('shrink');
+      if (live) {
+        // The live status glyph owns the eyebrow cluster; the platform mark
+        // is suppressed rather than drawn beside it.
+        expect(root.findAllByProps({ testID: 'platform-icon' })).toHaveLength(0);
+      } else {
+        const cluster = root.findByProps({ testID: 'platform-icon' }).parent;
+        expect((cluster?.props.className as string | undefined)?.split(' ')).toContain('shrink');
+      }
     }
   });
 
@@ -98,7 +114,7 @@ describe('SessionRow mounted layout', () => {
     props: Partial<Props>;
     visibleMeta: boolean;
     needsInput: boolean;
-    tone: 'good' | 'warn' | null;
+    kind: 'needsInput' | 'running' | 'idle' | null;
     icon: boolean;
   }>([
     {
@@ -106,7 +122,7 @@ describe('SessionRow mounted layout', () => {
       props: { live: true, needsInput: true, meta, metaWhileLive: true, platformIcon },
       visibleMeta: false,
       needsInput: true,
-      tone: 'warn',
+      kind: 'needsInput',
       icon: false,
     },
     {
@@ -114,7 +130,7 @@ describe('SessionRow mounted layout', () => {
       props: { needsInput: true },
       visibleMeta: false,
       needsInput: true,
-      tone: 'warn',
+      kind: 'needsInput',
       icon: false,
     },
     {
@@ -122,23 +138,31 @@ describe('SessionRow mounted layout', () => {
       props: { live: true, meta, metaWhileLive: true, platformIcon },
       visibleMeta: true,
       needsInput: false,
-      tone: 'good',
-      icon: true,
+      kind: 'running',
+      icon: false,
     },
     {
       name: 'live without metadata opt-in',
       props: { live: true, meta, platformIcon },
       visibleMeta: false,
       needsInput: false,
-      tone: 'good',
-      icon: true,
+      kind: 'running',
+      icon: false,
     },
     {
       name: 'live without metadata',
       props: { live: true, metaWhileLive: true },
       visibleMeta: false,
       needsInput: false,
-      tone: 'good',
+      kind: 'running',
+      icon: false,
+    },
+    {
+      name: 'live but idle',
+      props: { live: true, statusKind: 'idle', meta, metaWhileLive: true },
+      visibleMeta: true,
+      needsInput: false,
+      kind: 'idle',
       icon: false,
     },
     {
@@ -146,7 +170,7 @@ describe('SessionRow mounted layout', () => {
       props: { meta },
       visibleMeta: true,
       needsInput: false,
-      tone: null,
+      kind: null,
       icon: false,
     },
     {
@@ -154,7 +178,7 @@ describe('SessionRow mounted layout', () => {
       props: { meta, platformIcon },
       visibleMeta: true,
       needsInput: false,
-      tone: null,
+      kind: null,
       icon: true,
     },
     {
@@ -162,7 +186,7 @@ describe('SessionRow mounted layout', () => {
       props: { platformIcon },
       visibleMeta: false,
       needsInput: false,
-      tone: null,
+      kind: null,
       icon: true,
     },
     {
@@ -170,7 +194,7 @@ describe('SessionRow mounted layout', () => {
       props: {},
       visibleMeta: false,
       needsInput: false,
-      tone: null,
+      kind: null,
       icon: false,
     },
   ])('preserves $name', test => {
@@ -179,10 +203,8 @@ describe('SessionRow mounted layout', () => {
     expect(texts.some(node => node.children.includes(meta))).toBe(test.visibleMeta);
     expect(texts.some(node => node.children.includes('NEEDS INPUT'))).toBe(test.needsInput);
     expect(root.findAllByProps({ testID: 'platform-icon' })).toHaveLength(test.icon ? 1 : 0);
-    const dots = root.findAll(node => Object.is(node.type, 'StatusDot'));
-    expect(dots.map(dot => ({ tone: dot.props.tone, pulse: Boolean(dot.props.pulse) }))).toEqual(
-      test.tone ? [{ tone: test.tone, pulse: test.needsInput }] : []
-    );
+    const glyphs = root.findAll(node => Object.is(node.type, 'SessionStatusIcon'));
+    expect(glyphs.map(glyph => glyph.props.kind)).toEqual(test.kind ? [test.kind] : []);
     expect(root.findAll(node => Object.is(node.type, 'Pressable'))).toHaveLength(0);
   });
 

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { ENV_KEYS } from '../src/lib/env-keys.js';
 
 // Contract values mirrored from app.config.ts (bundle id, package, scheme,
-// associated domain, blocked permissions, and Sentry plugin). ENV_KEYS is
+// orientation, associated domain, blocked permissions, and Sentry plugin). ENV_KEYS is
 // imported live from src/lib/env-keys.js. The script runs the full evaluated
 // config, so these must match the resolved build-time output, not the raw
 // app.config.ts source.
@@ -19,6 +19,7 @@ const BLOCKED_PERMISSIONS = [
   'android.permission.READ_MEDIA_AUDIO',
 ];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
+const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
 
 const mobileDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -57,6 +58,15 @@ check(
 check(config.android?.package === ANDROID_PACKAGE, `android.package must be "${ANDROID_PACKAGE}"`);
 check(config.scheme === SCHEME, `scheme must be "${SCHEME}"`);
 
+// Rotation contract: all device orientations enabled (portrait + both
+// landscapes on iOS, all orientations on Android), while iPad multitasking
+// stays off — requireFullScreen keeps Split View/Slide Over out of scope.
+check(config.orientation === 'default', `orientation must be "default"`);
+check(
+  config.ios?.requireFullScreen === true,
+  'ios.requireFullScreen must be true (iPad Split View/Slide Over stays out of scope)'
+);
+
 const associatedDomains = config.ios?.associatedDomains ?? [];
 check(
   associatedDomains.includes(ASSOCIATED_DOMAIN),
@@ -76,6 +86,13 @@ const pluginNames = (config.plugins ?? []).map(plugin =>
   Array.isArray(plugin) ? plugin[0] : plugin
 );
 check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGIN}"`);
+// The rotation surface plugin pins the Android window background to the theme
+// background; without it a rotation paints the AppCompat DayNight default
+// until React's first frame lands in the new orientation.
+check(
+  pluginNames.includes(ROTATION_SURFACE_PLUGIN),
+  `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
+);
 
 const extra = config.extra ?? {};
 for (const key of Object.keys(ENV_KEYS)) {

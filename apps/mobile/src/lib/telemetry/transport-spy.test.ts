@@ -46,9 +46,12 @@ const hoisted = vi.hoisted(() => {
 
   const platform = { OS: 'ios' };
 
-  const sentryHolder: { initOptions?: Record<string, unknown> } = {};
+  const sentryHolder: { initOptions?: Record<string, unknown> } = { initOptions: undefined };
   const mobileReplayIntegration = vi.fn();
   const deeplinkIntegration = vi.fn();
+  // Mirrors the real factory's return shape: `{ name: 'HermesProfiling' }` —
+  // so tests can prove sentry-init renames the instance per consented init.
+  const hermesProfilingIntegration = vi.fn(() => ({ name: 'HermesProfiling' }));
   const expoRouterIntegration = vi.fn(() => ({ name: 'expo-router-integration' }));
 
   const storage = {
@@ -71,6 +74,7 @@ const hoisted = vi.hoisted(() => {
     sentryHolder,
     mobileReplayIntegration,
     deeplinkIntegration,
+    hermesProfilingIntegration,
     expoRouterIntegration,
     storage,
   };
@@ -153,6 +157,7 @@ vi.mock('@sentry/react-native', () => ({
   }),
   mobileReplayIntegration: hoisted.mobileReplayIntegration,
   deeplinkIntegration: hoisted.deeplinkIntegration,
+  hermesProfilingIntegration: hoisted.hermesProfilingIntegration,
   expoRouterIntegration: hoisted.expoRouterIntegration,
   setUser: vi.fn(),
   setTag: vi.fn(),
@@ -354,6 +359,29 @@ describe('AppsFlyer transport spy', () => {
   });
 });
 
+type IntegrationLike = { name?: string };
+
+// The integrations option is core's function form (see lib/sentry-init.ts):
+// it receives the SDK's default integrations and returns the final merged set.
+// Resolve it against a fake default list carrying the HermesProfiling
+// instance the real default list pushes whenever `profilesSampleRate` is a
+// number (0 included) plus one unrelated default to prove the rest survive.
+// The mocked deeplink/replay factories return undefined, so the result holds
+// sparse entries; filter them out.
+function resolveIntegrations(initOptions: Record<string, unknown> | undefined): IntegrationLike[] {
+  const integrations = initOptions?.integrations as
+    | ((defaults: IntegrationLike[]) => (IntegrationLike | undefined)[])
+    | undefined;
+  const merged = integrations?.([{ name: 'HermesProfiling' }, { name: 'DeviceContext' }]);
+  return merged?.filter((integration): integration is IntegrationLike => integration != null) ?? [];
+}
+
+function profilerNames(initOptions: Record<string, unknown> | undefined): string[] {
+  return resolveIntegrations(initOptions)
+    .map(integration => integration.name)
+    .filter((name): name is string => name?.startsWith('HermesProfiling') ?? false);
+}
+
 // ---- Sentry transport ----
 
 describe('Sentry transport spy', () => {
@@ -374,6 +402,12 @@ describe('Sentry transport spy', () => {
       maskAllImages: true,
       maskAllVectors: true,
     });
+    expect(hoisted.sentryHolder.initOptions?.profilesSampleRate).toBe(0.1);
+    expect(hoisted.hermesProfilingIntegration).toHaveBeenCalledTimes(1);
+    // The default HermesProfiling instance is filtered out of the merge and
+    // replaced by the uniquely named consented instance (lifecycle note in
+    // lib/sentry-init.ts).
+    expect(profilerNames(hoisted.sentryHolder.initOptions)).toEqual(['HermesProfiling#1']);
   });
 
   it('registers no replay and disables screenshots when optional consent is false', async () => {
@@ -383,5 +417,30 @@ describe('Sentry transport spy', () => {
 
     expect(hoisted.mobileReplayIntegration).not.toHaveBeenCalled();
     expect(hoisted.sentryHolder.initOptions?.attachScreenshot).toBe(false);
+    expect(hoisted.sentryHolder.initOptions?.profilesSampleRate).toBe(0);
+    expect(hoisted.hermesProfilingIntegration).not.toHaveBeenCalled();
+    // The declined init must not consume the once-only 'HermesProfiling'
+    // setupOnce slot: the default instance is filtered out of the merge, so
+    // the consented re-init's profiler still attaches to the new client.
+    expect(profilerNames(hoisted.sentryHolder.initOptions)).toEqual([]);
+    expect(resolveIntegrations(hoisted.sentryHolder.initOptions).map(i => i.name)).toContain(
+      'DeviceContext'
+    );
+  });
+
+  it('accept → revoke → re-accept re-registers the profiler under a fresh name per consented client', async () => {
+    const { initSentry } = await loadSentryInit();
+
+    // The consent lifecycle of a session: module-scope declined init
+    // (_layout.tsx), accept, revoke, re-accept.
+    initSentry(false);
+    initSentry(true);
+    const accepted = profilerNames(hoisted.sentryHolder.initOptions);
+    initSentry(false);
+    initSentry(true);
+
+    expect(accepted).toEqual(['HermesProfiling#1']);
+    expect(profilerNames(hoisted.sentryHolder.initOptions)).toEqual(['HermesProfiling#2']);
+    expect(hoisted.hermesProfilingIntegration).toHaveBeenCalledTimes(2);
   });
 });

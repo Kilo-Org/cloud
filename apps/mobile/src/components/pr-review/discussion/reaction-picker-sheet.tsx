@@ -10,7 +10,7 @@
 // trigger. Every close path here routes through `onClose` or `onPick`.
 
 import { X } from '@/components/ui/icons';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, type Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,7 +18,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/text';
 import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 import { REACTION_EMOJI, reactionLabel } from '@/lib/pr-review/discussion/reaction-pills';
 import {
   REVIEW_REACTION_CONTENTS,
@@ -48,10 +47,6 @@ export function ReactionPickerSheet({
   const { t } = useTranslation();
   const titleRef = useRef<RNText | null>(null);
 
-  // Close when the privacy cover fires (app backgrounds on a covered route):
-  // a native Modal renders above the overlay, so it must close itself.
-  useEffect(() => subscribePrivacyCover(onClose), [onClose]);
-
   const reacted = new Set<string>();
   for (const r of reactions) {
     if (r.viewerHasReacted) {
@@ -74,7 +69,7 @@ export function ReactionPickerSheet({
       <View className="flex-1 justify-end bg-[#00000066]">
         <Pressable
           className="flex-1"
-          accessibilityLabel={t('prReview.discussion.closeReactions')}
+          accessibilityLabel={t('common.closeReactions')}
           onPress={onClose}
         />
         <View
@@ -89,11 +84,13 @@ export function ReactionPickerSheet({
               accessibilityRole="header"
               className="min-w-0 flex-1 text-center text-base font-semibold text-foreground"
             >
-              {t('prReview.discussion.reactionsTitle')}
+              {/* i18n-dup-ok: prReview.discussion.reaction* is a numeral count label
+                  ('3 reactions'); this key is the picker's title — cs/pl/uk differ. */}
+              {t('common.reactions')}
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t('prReview.discussion.closeReactions')}
+              accessibilityLabel={t('common.closeReactions')}
               className="size-11 shrink-0 items-center justify-center rounded-full active:bg-muted"
               onPress={onClose}
             >

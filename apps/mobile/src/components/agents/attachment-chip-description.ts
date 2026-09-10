@@ -74,7 +74,7 @@ export function describeAttachmentChip(state: ChipStateInput): ChipDescription {
   if (isErrored) {
     message = isRetryable
       ? i18n.t('agentChat.attachmentPreview.uploadFailedRetry')
-      : i18n.t('agentChat.attachmentPreview.uploadFailedTerminal');
+      : i18n.t('chat.attachment.cantUpload');
   }
 
   let progressText = '';

@@ -13,7 +13,7 @@ import { classifyAbuse } from '@/lib/ai-gateway/abuse-service';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import {
-  getOpenRouterModelsFromRedis,
+  getOpenRouterModelsFromDatabase,
   isValidOpenRouterModelId,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
@@ -138,7 +138,7 @@ const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedClassifyAbuse = jest.mocked(classifyAbuse);
 const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
-const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromRedis);
+const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
@@ -784,16 +784,21 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('rejects the disabled LongCat free model before upstream', async () => {
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeBody('meituan/longcat-2.0-free')) as never);
+  it.each(['google/gemma-4-26b-a4b-it:free', 'google/gemma-4-31b-it:free'])(
+    'rejects the unavailable free model %s before upstream',
+    async modelId => {
+      mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: true, requestCount: 0 });
 
-    expect(response.status).toBe(404);
-    expect(await response.json()).toMatchObject({
-      error_type: 'unavailable_model',
-    });
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest(makeBody(modelId)) as never);
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({
+        error_type: 'unavailable_model',
+      });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    }
+  );
 
   it('rate limits rules-engine rate-limit actions before upstream', async () => {
     mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('rate-limit'));
@@ -1402,7 +1407,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(stats.cost_mUsd).toBe(1000); // toMicrodollars(0.001)
   });
 
-  it('guides teams that block every pool model to configure a custom Efficient pool', async () => {
+  it('reports an auto-routing selection failure when a group blocks every pool model', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
         id: 'user-123',
@@ -1426,15 +1431,15 @@ describe('kilo-auto/efficient classifier billing', () => {
     const { POST } = await import('./route');
     const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
       error_type: 'model_not_allowed',
-      message: expect.stringContaining('custom Efficient model pool'),
+      message: expect.stringContaining('Auto-routing could not select an eligible model'),
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('guides enterprise teams whose baseline blocks every pool model to configure a custom Efficient pool', async () => {
+  it('reports an auto-routing selection failure when an organization blocks every pool model', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
         id: 'user-123',
@@ -1459,10 +1464,10 @@ describe('kilo-auto/efficient classifier billing', () => {
     const { POST } = await import('./route');
     const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
       error_type: 'model_not_allowed',
-      message: expect.stringContaining('custom Efficient model pool'),
+      message: expect.stringContaining('Auto-routing could not select an eligible model'),
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });

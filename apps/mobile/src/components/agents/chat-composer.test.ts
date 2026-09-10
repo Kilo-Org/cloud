@@ -11,6 +11,7 @@ import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits'
 import { type ChatComposer } from './chat-composer';
 
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
+const safeAreaInsets = vi.hoisted(() => ({ bottom: 0, left: 0, right: 0, top: 0 }));
 const TEXT_DIRECTIONS = [
   { direction: 'LTR', isRTL: false, style: undefined },
   { direction: 'RTL', isRTL: true, style: [{ writingDirection: 'rtl' }, undefined] },
@@ -95,7 +96,7 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+  useSafeAreaInsets: () => safeAreaInsets,
 }));
 
 vi.mock('react-native-gesture-handler', () => ({
@@ -131,7 +132,14 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
-  useReducedMotion: () => reducedMotionOn.value,
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  selectReducedMotionEntrance: <T>(reduced: boolean, entrance: T) =>
+    reduced ? undefined : entrance,
+  useMotionPolicy: () => ({
+    reducedMotion: reducedMotionOn.value,
+    scrollAnimated: !reducedMotionOn.value,
+  }),
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -216,9 +224,11 @@ vi.mock('@/components/agents/chat-composer-input-state', () => ({
   },
 }));
 
-vi.mock('@/components/ui/blur-bar', () => ({
-  BlurBar: () => null,
-}));
+// The composer's root element; located by identity, never by a __testMarker
+// (findInputRowProps treats any marked function as the input row).
+const MockBlurBar = () => null;
+
+vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: MockBlurBar }));
 
 vi.mock('@/components/voice-input-control', () => ({
   VoiceInputStatus: () => null,
@@ -371,6 +381,27 @@ function findStripProps(node: Node): Record<string, unknown> | null {
   return null;
 }
 
+// The composer pads the content inside its root BlurBar with the landscape
+// sensor side insets. The container is the only View in the returned tree
+// carrying a style prop, so it is located by that style shape.
+function findComposerInsetContainer(render: React.ReactElement): {
+  type: unknown;
+  props: Record<string, unknown>;
+} {
+  const container = findNode(
+    render,
+    (type, props) =>
+      type === 'View' &&
+      typeof props.style === 'object' &&
+      props.style !== null &&
+      'paddingLeft' in props.style
+  );
+  if (container === null) {
+    throw new Error('composer side-inset container not found in the BlurBar content');
+  }
+  return container;
+}
+
 function requireInputRowOnSubmit(render: React.ReactElement): () => void {
   const rowProps = findInputRowProps(render);
   const onSubmit = rowProps?.onSubmit as (() => void) | undefined;
@@ -445,6 +476,10 @@ beforeEach(() => {
   returnSendsPref.returnSendsMessage = false;
   reducedMotionOn.value = false;
   layoutDirection.isRTL = false;
+  safeAreaInsets.bottom = 0;
+  safeAreaInsets.left = 0;
+  safeAreaInsets.right = 0;
+  safeAreaInsets.top = 0;
 });
 
 // The restore contract has one axis: whether the host resolved a draft. Both
@@ -648,5 +683,32 @@ describe('ChatComposer attachment strip wiring', () => {
     }
     expect(stripProps.onMove).toBe(uploadMoveAttachmentMock);
     expect(stripProps.onReorder).toBe(uploadReorderAttachmentsMock);
+  });
+});
+
+describe('ChatComposer landscape side insets', () => {
+  it('keeps portrait geometry with zero side padding', async () => {
+    safeAreaInsets.left = 0;
+    safeAreaInsets.right = 0;
+    const render = await mount(makeProps({}));
+
+    const container = findComposerInsetContainer(render);
+    expect(container.props.style).toEqual({ paddingLeft: 0, paddingRight: 0 });
+    // The unpadded container still hosts the whole composer content.
+    expect(findNode(container, type => type === MockInputRow)).not.toBeNull();
+  });
+
+  it('pads the composer content by the landscape sensor insets', async () => {
+    // iPhone sensor notch in landscape: a wider left inset than right.
+    safeAreaInsets.left = 59;
+    safeAreaInsets.right = 47;
+    const render = await mount(makeProps({}));
+
+    const container = findComposerInsetContainer(render);
+    expect(container.props.style).toEqual({ paddingLeft: 59, paddingRight: 47 });
+    // Toolbar, input row, and send control all clear the sensor area because
+    // they live inside the padded container.
+    expect(findNode(container, type => type === MockChatToolbar)).not.toBeNull();
+    expect(findNode(container, type => type === MockInputRow)).not.toBeNull();
   });
 });

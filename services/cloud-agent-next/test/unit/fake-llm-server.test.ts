@@ -406,6 +406,15 @@ describe('fake-llm-server HTTP', () => {
     expect(chunks[chunks.length - 1].data).toBe('[DONE]');
   });
 
+  it('error-terminal returns HTTP 400 with an OpenAI-shaped error', async () => {
+    const h = await start();
+    const res = await postChat(h.url, '__fake__:error-terminal:boom');
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: { message: 'boom', code: 400, type: 'invalid_request' },
+    });
+  });
+
   it('error scenario returns HTTP 402 with OpenAI-shaped error', async () => {
     const h = await start();
     const res = await postChat(h.url, '__fake__:error:too broke');
@@ -487,6 +496,19 @@ describe('fake-llm-server HTTP', () => {
     // 1 role-only opener + 3 content pieces + 1 stop = 5
     const contentChunks = parsed.filter(p => typeof p.choices[0].delta.content === 'string');
     expect(contentChunks.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('slow:4:1:8 streams four 8-byte content chunks', async () => {
+    const h = await start();
+    const res = await postChat(h.url, '__fake__:slow:4:1:8');
+    const chunks = await readAllSse(res.body!);
+    const parsed = chunks.slice(0, -1).map(c => JSON.parse(c.data));
+    const pieces = parsed
+      .map(p => p.choices[0].delta.content)
+      .filter((c): c is string => typeof c === 'string' && c.length > 0);
+    expect(pieces).toHaveLength(4);
+    expect(pieces.every(piece => piece.length === 8)).toBe(true);
+    expect(pieces.join('').length).toBe(32);
   });
 
   it('gate:<tag> blocks until POST /test/release?tag=<tag>', async () => {
@@ -1083,6 +1105,7 @@ type ProcFixture = {
   port: number;
   inode: string;
   directory: string;
+  home: string;
   roots: string[];
   address?: string;
   state?: string;
@@ -1139,6 +1162,8 @@ function discoveryFixture(processes: ProcFixture[], log?: string) {
               entry.command ?? ['/usr/local/bin/kilo', 'serve', '--hostname=127.0.0.1', '--port=0']
             ).join('\0') + '\0'
           );
+        const environmentEntry = entries.find(item => filename === `/proc/${item.pid}/environ`);
+        if (environmentEntry) return `HOME=${environmentEntry.home}\0PATH=/usr/local/bin\0`;
         if (filename === '/tmp/kilocode-control-wrapper.log' && log !== undefined) return log;
         forbiddenReads.push(filename);
         throw new Error('Unexpected filesystem read');
@@ -1230,6 +1255,7 @@ function directoryProcesses(): ProcFixture[] {
       port: 41001,
       inode: '501',
       directory: '/workspace/worktrees/worktree-a',
+      home: '/tmp/kilo-worktrees/a1b2c3d4',
       roots: ['ses_a', 'ses_sibling'],
     },
     {
@@ -1237,6 +1263,7 @@ function directoryProcesses(): ProcFixture[] {
       port: 41002,
       inode: '502',
       directory: '/workspace/worktrees/worktree-b',
+      home: '/tmp/kilo-worktrees/e5f6a7b8',
       roots: ['ses_b'],
       address: '00000000000000000000000001000000',
     },
@@ -1254,13 +1281,19 @@ describe('per-directory Kilo discovery', () => {
       container: { id: 'owned' },
       processId: 101,
       directory: '/workspace/worktrees/worktree-a',
+      home: '/tmp/kilo-worktrees/a1b2c3d4',
       serverUrl: 'http://127.0.0.1:41001',
     });
-    expect(sibling).toMatchObject({ processId: first?.processId, directory: first?.directory });
+    expect(sibling).toMatchObject({
+      processId: first?.processId,
+      directory: first?.directory,
+      home: first?.home,
+    });
     expect(second).toMatchObject({
       container: { id: 'owned' },
       processId: 202,
       directory: '/workspace/worktrees/worktree-b',
+      home: '/tmp/kilo-worktrees/e5f6a7b8',
       serverUrl: 'http://[::1]:41002',
     });
     expect(first?.logPath).toBeUndefined();

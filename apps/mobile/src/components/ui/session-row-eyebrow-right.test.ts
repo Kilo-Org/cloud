@@ -147,7 +147,7 @@ describe('selectSessionRowEyebrowRight', () => {
       ).toEqual({ kind: 'needs-input', showPlatformIcon: false });
     });
 
-    it('live-and-meta shows the icon iff hasPlatformIcon', () => {
+    it('live-and-meta suppresses the icon: the status glyph owns the cluster', () => {
       expect(
         selectSessionRowEyebrowRight({
           needsInput: false,
@@ -155,20 +155,11 @@ describe('selectSessionRowEyebrowRight', () => {
           hasMeta: true,
           metaWhileLive: true,
           hasPlatformIcon: true,
-        })
-      ).toEqual({ kind: 'live-and-meta', showPlatformIcon: true });
-      expect(
-        selectSessionRowEyebrowRight({
-          needsInput: false,
-          live: true,
-          hasMeta: true,
-          metaWhileLive: true,
-          hasPlatformIcon: false,
         })
       ).toEqual({ kind: 'live-and-meta', showPlatformIcon: false });
     });
 
-    it('live shows the icon iff hasPlatformIcon', () => {
+    it('live suppresses the icon: the status glyph owns the cluster', () => {
       expect(
         selectSessionRowEyebrowRight({
           needsInput: false,
@@ -176,14 +167,6 @@ describe('selectSessionRowEyebrowRight', () => {
           hasMeta: false,
           metaWhileLive: false,
           hasPlatformIcon: true,
-        })
-      ).toEqual({ kind: 'live', showPlatformIcon: true });
-      expect(
-        selectSessionRowEyebrowRight({
-          needsInput: false,
-          live: true,
-          hasMeta: false,
-          metaWhileLive: false,
         })
       ).toEqual({ kind: 'live', showPlatformIcon: false });
     });

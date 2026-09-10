@@ -1,30 +1,20 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import {
-  AppState,
-  FlatList,
-  Platform,
-  Pressable,
-  RefreshControl,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { AppState, FlatList, Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Bot, Plus } from '@/components/ui/icons';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
-import {
-  liveSessionContent,
-  LiveSessionFeedback,
-  useLiveSessionContext,
-} from '@/components/home/agent-sessions-section';
+import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
+import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
 import { LiveSessionListEmptyState } from '@/components/agents/live-session-list-empty-state';
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
+import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
@@ -45,10 +35,9 @@ const SKELETON_ROW_COUNT = 8;
 export function AgentSessionListScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const { bottom, left, right } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
 
   const tabBarHeight = useMemo(
@@ -72,10 +61,40 @@ export function AgentSessionListScreen() {
   useEffect(() => {
     refetchRef.current = refetch;
   }, [refetch]);
+
+  // The wrapped live refetch resolves `false` when the refresh did not land an
+  // accepted result; the context path reports through its own error state.
+  const refetchRequest = useCallback(async () => {
+    if (isContextError) {
+      await refetchContext();
+      return true;
+    }
+    return refetch();
+  }, [isContextError, refetchContext, refetch]);
+  // The pull owns only gesture feedback: past the budget the spinner stops and
+  // the reserved status line carries "Couldn't refresh" + Retry, so a hung
+  // fetch cannot pin the spinner with no next action.
+  const pull = usePullRefresh(refetchRequest);
+  const handleRefresh = pull.startPull;
+  const { markSettled } = pull;
+  const refreshControl = <RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />;
+
+  // Focus return and app-foreground refreshes run outside the pull lifecycle.
+  // A failed pull leaves the reserved line on "Couldn't refresh" + Retry; when
+  // one of these refreshes lands an accepted result the list is up to date, so
+  // the stale failure line retires exactly as the query-driven error did.
+  const runForegroundRefresh = useCallback(() => {
+    void (async () => {
+      const accepted = await refetchRef.current();
+      if (accepted) {
+        markSettled();
+      }
+    })();
+  }, [markSettled]);
   useFocusEffect(
     useCallback(() => {
-      void refetchRef.current();
-    }, [])
+      runForegroundRefresh();
+    }, [runForegroundRefresh])
   );
 
   const listRef = useRef<FlatList<ActiveSession>>(null);
@@ -95,18 +114,17 @@ export function AgentSessionListScreen() {
     }, [])
   );
 
-  // Preserve the focused foreground refresh and the active-sessions tray invalidation.
+  // Refresh the focused list through the live-sync owner.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
       if (nextState === 'active' && navigation.isFocused()) {
-        void refetchRef.current();
-        void queryClient.invalidateQueries({ queryKey: [['activeSessions']] });
+        runForegroundRefresh();
       }
     });
     return () => {
       subscription.remove();
     };
-  }, [queryClient, navigation]);
+  }, [navigation, runForegroundRefresh]);
 
   const navigateToSession = useAgentSessionNavigator();
 
@@ -140,19 +158,6 @@ export function AgentSessionListScreen() {
     </View>
   );
 
-  const [refreshing, setRefreshing] = useState(false);
-  const handleRefresh = useCallback(() => {
-    void (async () => {
-      setRefreshing(true);
-      try {
-        // LiveSessionFeedback retains and announces failures without a duplicate toast.
-        await (isContextError ? refetchContext() : refetch());
-      } finally {
-        setRefreshing(false);
-      }
-    })();
-  }, [isContextError, refetchContext, refetch]);
-
   const renderItem = useCallback(
     ({ item }: { item: ActiveSession }) => (
       <RemoteSessionRow
@@ -167,23 +172,37 @@ export function AgentSessionListScreen() {
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it. The FAB adds its own inset when it shows so the last row
-  // scrolls clear of the button too.
+  // scrolls clear of the button too. The landscape side insets keep row text
+  // clear of the sensor housing; portrait insets are 0, keeping the geometry
+  // unchanged.
   const listPadding = useMemo(
     () => ({
       paddingTop: 0,
       paddingBottom: tabBarHeight + (hasLiveRows ? FAB_SIZE + FAB_MARGIN : 0),
+      paddingLeft: left,
+      paddingRight: right,
     }),
-    [tabBarHeight, hasLiveRows]
+    [tabBarHeight, hasLiveRows, left, right]
   );
 
+  // The fixed 20pt margin gains the landscape right inset so the FAB clears the
+  // sensor area; portrait insets are 0, keeping the geometry unchanged.
   const fabStyle = useMemo(
     () => ({
       bottom: tabBarHeight + FAB_MARGIN,
-      right: 20,
+      right: 20 + right,
       width: FAB_SIZE,
       height: FAB_SIZE,
     }),
-    [tabBarHeight]
+    [tabBarHeight, right]
+  );
+
+  // The fixed 22px margins on the skeleton rows and the status wrapper gain
+  // the landscape side insets so they clear the sensor housing too; portrait
+  // insets are 0, keeping the geometry unchanged.
+  const sidePadding = useMemo(
+    () => ({ paddingLeft: 22 + left, paddingRight: 22 + right }),
+    [left, right]
   );
 
   let body: ReactNode = null;
@@ -191,8 +210,8 @@ export function AgentSessionListScreen() {
     body = (
       <View className="pt-[18px]">
         {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
-          <View key={i} className="py-1.5">
-            <Skeleton className="mx-[22px] h-[76px] rounded-none" />
+          <View key={i} className="py-1.5" style={sidePadding}>
+            <Skeleton className="h-[76px] rounded-none" />
           </View>
         ))}
       </View>
@@ -202,7 +221,7 @@ export function AgentSessionListScreen() {
       <EmptyState
         icon={Bot}
         title={t('agents.sessionList.noMatches')}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={refreshControl}
         description={
           isSearching
             ? t('agents.sessionList.tryDifferentSearch')
@@ -213,19 +232,14 @@ export function AgentSessionListScreen() {
             variant="outline"
             onPress={isSearching ? query.handleClearSearch : query.handleClearFilters}
           >
-            <Text>
-              {isSearching ? t('agents.search.clearSearch') : t('agents.search.clearFilters')}
-            </Text>
+            <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
           </Button>
         }
       />
     );
   } else if (content === 'empty') {
     body = (
-      <LiveSessionListEmptyState
-        organizationId={organizationId}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-      />
+      <LiveSessionListEmptyState organizationId={organizationId} refreshControl={refreshControl} />
     );
   } else if (hasLiveRows) {
     body = (
@@ -236,7 +250,7 @@ export function AgentSessionListScreen() {
         keyExtractor={item => item.id}
         extraData={attentionFocusRevision}
         contentContainerStyle={listPadding}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={refreshControl}
         maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }}
       />
     );
@@ -246,7 +260,7 @@ export function AgentSessionListScreen() {
     <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
       <View className="flex-1 bg-background">
         <ScreenHeader
-          title={t('tabs.agents')}
+          title={t('common.agents')}
           eyebrow={
             !sessions.isLoading && !sessions.isError && (hasLiveRows || content === 'empty')
               ? t('agents.liveCount', { count: activeSessions.length })
@@ -263,18 +277,25 @@ export function AgentSessionListScreen() {
             inputRef={query.searchInputRef}
             hasText={query.searchQuery.length > 0}
             showSearchBusy={false}
-            showInlineError={false}
             onChangeText={query.handleSearchChange}
             onClearSearch={query.handleClearSearch}
           />
         ) : null}
-        <View className={query.hasLoaded && content === 'error' ? 'flex-1' : 'px-[22px]'}>
+        <View
+          className={query.hasLoaded && content === 'error' ? 'flex-1' : undefined}
+          style={query.hasLoaded && content === 'error' ? undefined : sidePadding}
+        >
           <LiveSessionFeedback
             context={context}
             sessions={sessions}
             failureLabel={t('agents.sessionList.couldNotLoadActive')}
             centered={query.hasLoaded && content === 'error'}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+            refresh={{
+              busy: pull.refreshing || pull.busy,
+              failed: pull.failed,
+              onRetry: pull.startRetry,
+            }}
+            refreshControl={refreshControl}
           />
         </View>
         {body}
@@ -282,7 +303,7 @@ export function AgentSessionListScreen() {
         {showFab && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t('agentChat.newSession.title')}
+            accessibilityLabel={t('common.newSession')}
             testID="agents-new-session-fab"
             onPress={() => {
               router.push(getNewAgentSessionPath(organizationId) as Href);

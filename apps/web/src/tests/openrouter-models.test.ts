@@ -282,6 +282,36 @@ describe('GET /api/openrouter/models', () => {
     expect(Array.isArray(responseData.data)).toBe(true);
   });
 
+  test('excludes unavailable free Gemma models advertised upstream while retaining paid Gemma', async () => {
+    const original = mockOpenRouterModels.data.find(model => model.id === 'some-other-model');
+    if (!original) throw new Error('Expected catalog fixture');
+    const upstream = {
+      data: [
+        ...mockOpenRouterModels.data,
+        { ...original, id: 'google/gemma-4-31b-it', name: 'Google: Gemma 4 31B IT' },
+        ...['google/gemma-4-26b-a4b-it:free', 'google/gemma-4-31b-it:free'].map(id => ({
+          ...original,
+          id,
+          name: id,
+          pricing: { ...original.pricing, prompt: '0', completion: '0' },
+        })),
+      ],
+    };
+    global.fetch = jest
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+      .mockResolvedValue(createMockResponse({ jsonData: upstream }));
+
+    const response = await GET(createTestRequest('/api/openrouter/models'));
+    const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
+    const modelIds = responseData.data.map(model => model.id);
+
+    expect(captureException).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(modelIds).not.toContain('google/gemma-4-26b-a4b-it:free');
+    expect(modelIds).not.toContain('google/gemma-4-31b-it:free');
+    expect(modelIds).toContain('google/gemma-4-31b-it');
+  });
+
   test('should include publishable Terminal Bench summaries for canonical models', async () => {
     const request = createTestRequest('/api/openrouter/models');
 

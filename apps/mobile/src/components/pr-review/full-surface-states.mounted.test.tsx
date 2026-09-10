@@ -1,6 +1,6 @@
 import type * as ReactQuery from '@tanstack/react-query';
 import { createElement } from 'react';
-import { RefreshControl } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -76,6 +76,10 @@ vi.mock('@/components/pr-review/pr-review-overview-parts', () => ({
   PrStateChip: 'PrStateChip',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/activity-indicator', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+}));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   CheckCheck: 'CheckCheck',

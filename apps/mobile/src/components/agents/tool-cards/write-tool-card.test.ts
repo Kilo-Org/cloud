@@ -299,7 +299,7 @@ describe('WriteToolCardBody — smart render routing', () => {
     if (!text) {
       throw new Error('text not found');
     }
-    expect((text.props as { children?: unknown }).children).toBe('agentChat.toolCard.fileEmpty');
+    expect((text.props as { children?: unknown }).children).toBe('agentChat.filePart.fileEmpty');
     expect(findByType(root, 'CodeBlock')).toHaveLength(0);
     expect(findByType(root, 'ReadMarkdownBody')).toHaveLength(0);
   });

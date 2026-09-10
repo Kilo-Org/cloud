@@ -5,6 +5,7 @@ import {
   buildOpaqueScopeKey,
   countGlanceableSessions,
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
+  glanceableStatusKind,
   isEligibleGlanceableWork,
   oldestNeedsInputSince,
   shouldDiscardGlanceableRevision,
@@ -23,9 +24,6 @@ describe('countGlanceableSessions', () => {
       { status: 'retry' },
       { status: 'idle' },
       { status: 'idle' },
-      { status: 'completed' },
-      { status: 'failed' },
-      { status: 'mystery' },
     ]);
     expect(counts).toEqual({ running: 2, needsInput: 4, idle: 2 });
   });
@@ -48,10 +46,36 @@ describe('countGlanceableSessions', () => {
     });
   });
 
-  it('ignores a completed or unknown status entirely', () => {
+  it('counts completed, failed, unknown, and empty statuses as running', () => {
     expect(
-      countGlanceableSessions([{ status: 'completed' }, { status: 'failed' }, { status: 'nope' }])
-    ).toEqual({ running: 0, needsInput: 0, idle: 0 });
+      countGlanceableSessions([
+        { status: 'completed' },
+        { status: 'failed' },
+        { status: 'mystery' },
+        { status: '' },
+      ])
+    ).toEqual({ running: 4, needsInput: 0, idle: 0 });
+  });
+});
+
+describe('glanceableStatusKind', () => {
+  // The one matrix every glanceable sink reads — the platform-specific sinks
+  // (iOS Live Activity, Android widget) all consume these counts and kinds.
+  it('maps busy, starting, unknown, and empty to running', () => {
+    expect(glanceableStatusKind('busy')).toBe('running');
+    expect(glanceableStatusKind('starting')).toBe('running');
+    expect(glanceableStatusKind('mystery')).toBe('running');
+    expect(glanceableStatusKind('')).toBe('running');
+  });
+
+  it('maps question/permission/retry to needsInput', () => {
+    expect(glanceableStatusKind('question')).toBe('needsInput');
+    expect(glanceableStatusKind('permission')).toBe('needsInput');
+    expect(glanceableStatusKind('retry')).toBe('needsInput');
+  });
+
+  it('maps idle to idle', () => {
+    expect(glanceableStatusKind('idle')).toBe('idle');
   });
 });
 
@@ -117,7 +141,10 @@ describe('buildGlanceableSnapshot', () => {
 
   it('clears needsInputSince when no session is connected', () => {
     const snapshot = buildGlanceableSnapshot({
-      sessions: [{ status: 'completed' }],
+      // No rows at all: with the total status map every row counts as
+      // something (unknown counts as running), so only an empty list is
+      // "nothing connected".
+      sessions: [],
       userId: 'u1',
       organizationId: null,
       now: NOW,

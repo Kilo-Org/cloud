@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { Writable } from 'node:stream';
@@ -665,18 +666,108 @@ async function runGitApply(
   return { exitCode, stderr: stderr.trim() };
 }
 
+function describePatch(patch: string): string {
+  const eofMarkers = patch.match(/^\\ No newline at end of file(?:\r?\n|$)/gm)?.length ?? 0;
+  const absoluteHeaders =
+    (patch.match(/^(?:Index: |--- |\+\+\+ )\//gm)?.length ?? 0) +
+    (patch.match(/^diff --git \//gm)?.length ?? 0);
+
+  return [
+    `sha256=${createHash('sha256').update(patch).digest('hex')}`,
+    `bytes=${Buffer.byteLength(patch, 'utf8')}`,
+    `finalNewline=${patch.endsWith('\n')}`,
+    `eofMarkers=${eofMarkers}`,
+    `hunkHeaders=${patch.match(/^@@ /gm)?.length ?? 0}`,
+    `absoluteHeaders=${absoluteHeaders}`,
+  ].join(' ');
+}
+
+function logPatchMetadata(file: string, phase: 'raw' | 'normalized', patch: string): void {
+  log(`patch metadata file=${file} phase=${phase} ${describePatch(patch)}`);
+}
+
+function resolveWorkspaceRelativePath(workspacePath: string, file: string): string | null {
+  const resolvedWorkspace = path.resolve(workspacePath);
+  const resolvedFile = path.resolve(resolvedWorkspace, file);
+  const relativeFile = path.relative(resolvedWorkspace, resolvedFile);
+  const normalizedFile = relativeFile.split(path.sep).join('/');
+
+  if (
+    normalizedFile.length === 0 ||
+    normalizedFile === '..' ||
+    normalizedFile.startsWith('../') ||
+    path.isAbsolute(relativeFile)
+  ) {
+    return null;
+  }
+
+  return normalizedFile;
+}
+
+function normalizePatchForWorkspace(workspacePath: string, diff: SnapshotDiff): string | null {
+  if (!diff.patch) return null;
+
+  const relativeFile = resolveWorkspaceRelativePath(workspacePath, diff.file);
+  if (!relativeFile) {
+    log(`skipping patch outside workspace file=${diff.file}`);
+    return null;
+  }
+
+  logPatchMetadata(relativeFile, 'raw', diff.patch);
+
+  // Kilo's session.diff patches use absolute sandbox paths. Git treats those
+  // as patch pathnames, not filesystem paths, so rewrite every patch header to
+  // the workspace-relative file before applying it.
+  const normalizedPatch = diff.patch
+    .replace(/^diff --git [^\r\n]*$/m, `diff --git a/${relativeFile} b/${relativeFile}`)
+    .replace(/^Index: [^\r\n]*$/m, `Index: ${relativeFile}`)
+    .replace(/^--- [^\r\n]*$/m, `--- a/${relativeFile}`)
+    .replace(/^\+\+\+ [^\r\n]*$/m, `+++ b/${relativeFile}`);
+
+  if (normalizedPatch !== diff.patch) {
+    log(`normalized patch paths file=${relativeFile}`);
+    logPatchMetadata(relativeFile, 'normalized', normalizedPatch);
+  }
+
+  return normalizedPatch;
+}
+
+async function logGitPatchDiagnostics(
+  workspacePath: string,
+  patchFile: string,
+  file: string,
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
+): Promise<void> {
+  const checks: Array<{ mode: string; args: string[] }> = [
+    { mode: 'stat', args: ['--stat'] },
+    { mode: 'recount-stat', args: ['--recount', '--stat'] },
+    { mode: 'check', args: ['--check'] },
+    { mode: 'recount-check', args: ['--recount', '--check'] },
+  ];
+
+  for (const check of checks) {
+    const result = await runGitApply(workspacePath, patchFile, check.args, signal, env);
+    const stderr = result.stderr.replace(/\s+/g, ' ').slice(0, 512);
+    log(
+      `git patch diagnostic file=${file} mode=${check.mode} exitCode=${result.exitCode}${stderr ? ` stderr=${stderr}` : ''}`
+    );
+  }
+}
+
 async function applyPatch(
   workspacePath: string,
   diff: SnapshotDiff,
   signal?: AbortSignal,
   env?: NodeJS.ProcessEnv
 ): Promise<boolean> {
-  if (!diff.patch) return false;
+  const normalizedPatch = normalizePatchForWorkspace(workspacePath, diff);
+  if (!normalizedPatch) return false;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-session-diff-'));
   const file = path.join(dir, 'change.patch');
   try {
     signal?.throwIfAborted();
-    fs.writeFileSync(file, diff.patch);
+    fs.writeFileSync(file, normalizedPatch);
     const threeWay = await runGitApply(workspacePath, file, ['--3way'], signal, env);
     signal?.throwIfAborted();
     if (threeWay.exitCode === 0) return true;
@@ -702,6 +793,8 @@ async function applyPatch(
       );
       return false;
     }
+
+    await logGitPatchDiagnostics(workspacePath, file, diff.file, signal, env);
 
     const plain = await runGitApply(workspacePath, file, [], signal, env);
     signal?.throwIfAborted();

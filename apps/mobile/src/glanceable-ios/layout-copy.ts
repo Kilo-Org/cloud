@@ -54,12 +54,35 @@ export function glanceableLayoutCopy() {
     signed_out: i18n.t(GLANCEABLE_STATUS_COPY_KEY.signed_out),
     privacy: i18n.t(GLANCEABLE_STATUS_COPY_KEY.privacy),
     needsInput: i18n.t('glanceable.needsInput'),
-    running: i18n.t('glanceable.running'),
-    idle: i18n.t('glanceable.idle'),
+    running: i18n.t('common.working'),
+    idle: i18n.t('common.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
-    locale: i18n.language.replace('-', '_'),
+    locale: resolveGlanceableLocale(i18n.language),
     digits: glanceableDigits(),
   };
+}
+
+/**
+ * App languages whose catalog script differs from the script a bare language
+ * tag makes SwiftUI pick. Serbian ships a Latin catalog here, but a bare `sr`
+ * tag formats the relative wait in Cyrillic ("мин"), beside Latin labels. The
+ * override names the script; `resolveGlanceableLocale` normalizes it.
+ */
+function glanceableLocaleScriptOverride(language: string): string | undefined {
+  if (language === 'sr') {
+    return 'sr-Latn';
+  }
+  return undefined;
+}
+
+/**
+ * The SwiftUI locale tag for an app language, in the underscore form the
+ * `@expo/ui` locale modifier accepts (see the note on `glanceableLayoutCopy`).
+ * Languages that write a non-default script for their tag are mapped so the
+ * relative wait uses the same script as the baked labels.
+ */
+export function resolveGlanceableLocale(language: string): string {
+  return (glanceableLocaleScriptOverride(language) ?? language).replace('-', '_');
 }
 
 /**

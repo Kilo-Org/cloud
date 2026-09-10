@@ -6,8 +6,16 @@ import {
   getIntegrationForOrganization,
   getIntegrationForOwner,
   getPrimaryGitHubIntegrationForOrganization,
+  upsertRepositoryCustomization,
 } from '@/lib/integrations/db/platform-integrations';
-import { getInstallation, isInstallationGoneError, updateModel } from './github-apps-service';
+import {
+  getInstallation,
+  getRepositoryCustomizations,
+  isInstallationGoneError,
+  updateInstallationSettings,
+  updateModel,
+  updateRepositorySettings,
+} from './github-apps-service';
 
 describe('getInstallation', () => {
   it('prefers a healthy installation when the owner has multiple GitHub rows', async () => {
@@ -190,6 +198,222 @@ describe('updateModel', () => {
         { type: 'org', id: organization.id },
         'anthropic/claude-sonnet-5',
         crypto.randomUUID()
+      );
+
+      expect(result).toEqual({ success: false, error: 'No GitHub App installation found' });
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+});
+
+async function createGitHubIntegrationWithRepositories() {
+  const [organization] = await db
+    .insert(organizations)
+    .values({ name: `GitHub repo settings ${crypto.randomUUID()}` })
+    .returning();
+  const [integration] = await db
+    .insert(platform_integrations)
+    .values({
+      owned_by_organization_id: organization.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: crypto.randomUUID(),
+      integration_status: 'active',
+      repository_access: 'all',
+      platform_account_login: 'acme',
+      metadata: { model_slug: 'model-a', pr_review_mode: 'on' },
+      repositories: [
+        { id: 1, name: 'repo-one', full_name: 'acme/repo-one', private: false },
+        { id: 2, name: 'repo-two', full_name: 'acme/repo-two', private: true },
+      ],
+    })
+    .returning();
+
+  return { organization, integration };
+}
+
+describe('getRepositoryCustomizations', () => {
+  it('returns installation defaults and null overrides for every accessible repository', async () => {
+    const { organization, integration } = await createGitHubIntegrationWithRepositories();
+
+    try {
+      const result = await getRepositoryCustomizations(
+        { type: 'org', id: organization.id },
+        integration.id
+      );
+
+      expect(result.defaultModel).toBe('model-a');
+      expect(result.defaultPrReviews).toBe('on');
+      expect(result.repositories).toEqual([
+        { id: 1, name: 'acme/repo-one', private: false, model: null, prReviews: null },
+        { id: 2, name: 'acme/repo-two', private: true, model: null, prReviews: null },
+      ]);
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+
+  it('returns the raw (unresolved) override for a repository with a customization row', async () => {
+    const { organization, integration } = await createGitHubIntegrationWithRepositories();
+
+    try {
+      await upsertRepositoryCustomization(integration.id, '2', {
+        bot_mention_model_slug: 'model-b',
+        pr_review_mode: 'off',
+      });
+
+      const result = await getRepositoryCustomizations(
+        { type: 'org', id: organization.id },
+        integration.id
+      );
+      const repoTwo = result.repositories.find(repository => repository.id === 2);
+
+      expect(repoTwo).toEqual({
+        id: 2,
+        name: 'acme/repo-two',
+        private: true,
+        model: 'model-b',
+        prReviews: 'off',
+      });
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+
+  it('throws NOT_FOUND for an integration the owner does not own', async () => {
+    const { organization, integration } = await createGitHubIntegrationWithRepositories();
+
+    try {
+      await expect(
+        getRepositoryCustomizations({ type: 'org', id: crypto.randomUUID() }, integration.id)
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+});
+
+describe('updateInstallationSettings', () => {
+  it('atomically merges only the supplied fields, preserving unrelated metadata', async () => {
+    const { organization, integration } = await createGitHubIntegrationWithRepositories();
+
+    try {
+      const result = await updateInstallationSettings(
+        { type: 'org', id: organization.id },
+        integration.id,
+        { prReviewMode: 'off' }
+      );
+
+      expect(result).toEqual({ success: true });
+
+      const [updated] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integration.id));
+
+      expect(updated?.metadata).toMatchObject({ model_slug: 'model-a', pr_review_mode: 'off' });
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+
+  it('returns an error when no installation matches the owner and integrationId', async () => {
+    const { organization, integration } = await createGitHubIntegrationWithRepositories();
+
+    try {
+      const result = await updateInstallationSettings(
+        { type: 'org', id: crypto.randomUUID() },
+        integration.id,
+        { prReviewMode: 'off' }
+      );
+
+      expect(result).toEqual({ success: false, error: 'No GitHub App installation found' });
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+});
+
+describe('updateRepositorySettings', () => {
+  it('sets a repository override, then clears it back to inheriting with null', async () => {
+    const { organization, integration } = await createGitHubIntegrationWithRepositories();
+
+    try {
+      const setResult = await updateRepositorySettings(
+        { type: 'org', id: organization.id },
+        integration.id,
+        1,
+        { modelSlug: 'model-b', prReviewMode: 'off' }
+      );
+      expect(setResult).toEqual({ success: true });
+
+      const afterSet = await getRepositoryCustomizations(
+        { type: 'org', id: organization.id },
+        integration.id
+      );
+      expect(afterSet.repositories.find(repository => repository.id === 1)).toEqual({
+        id: 1,
+        name: 'acme/repo-one',
+        private: false,
+        model: 'model-b',
+        prReviews: 'off',
+      });
+
+      const clearResult = await updateRepositorySettings(
+        { type: 'org', id: organization.id },
+        integration.id,
+        1,
+        { modelSlug: null }
+      );
+      expect(clearResult).toEqual({ success: true });
+
+      const afterClear = await getRepositoryCustomizations(
+        { type: 'org', id: organization.id },
+        integration.id
+      );
+      // Clearing modelSlug alone leaves prReviewMode untouched.
+      expect(afterClear.repositories.find(repository => repository.id === 1)).toEqual({
+        id: 1,
+        name: 'acme/repo-one',
+        private: false,
+        model: null,
+        prReviews: 'off',
+      });
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+
+  it('rejects a repository the installation does not currently have access to', async () => {
+    const { organization, integration } = await createGitHubIntegrationWithRepositories();
+
+    try {
+      const result = await updateRepositorySettings(
+        { type: 'org', id: organization.id },
+        integration.id,
+        999,
+        { prReviewMode: 'off' }
+      );
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Repository is not accessible to this installation',
+      });
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+
+  it('returns an error when no installation matches the owner and integrationId', async () => {
+    const { organization, integration } = await createGitHubIntegrationWithRepositories();
+
+    try {
+      const result = await updateRepositorySettings(
+        { type: 'org', id: crypto.randomUUID() },
+        integration.id,
+        1,
+        { prReviewMode: 'off' }
       );
 
       expect(result).toEqual({ success: false, error: 'No GitHub App installation found' });

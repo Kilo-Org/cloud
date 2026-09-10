@@ -163,6 +163,32 @@ describe('effective organization model access', () => {
     expect((await getEffectiveModelDecision(policy, 'openai/o3:free')).allowed).toBe(false);
   });
 
+  it('judges each model variant on the providers that serve that variant', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: { provider_allow_list: ['deepinfra'], model_deny_list: [] },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+    const variantAwareLookup = async (modelId: string) =>
+      new Set(
+        {
+          'nvidia/nemotron': ['deepinfra', 'coreweave'],
+          'nvidia/nemotron:free': ['nvidia'],
+        }[modelId] ?? []
+      );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'nvidia/nemotron', variantAwareLookup)
+    ).resolves.toEqual({ allowed: true, eligibleProviderRoutes: new Set(['deepinfra']) });
+    await expect(
+      getEffectiveModelDecision(policy, 'nvidia/nemotron:free', variantAwareLookup)
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+  });
+
   it('requires an explicit none policy to grant no models', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(context());
     expect((await getEffectiveModelDecision(policy, 'anthropic/claude')).allowed).toBe(false);

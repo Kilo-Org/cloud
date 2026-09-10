@@ -190,7 +190,7 @@ export function materializePreparationEvent(
       : undefined;
 
   if (data.action === 'attempt_started') {
-    if (attempt && attempt.revision >= data.revision) return false;
+    if (attempt && (isTerminal(attempt.status) || attempt.revision >= data.revision)) return false;
     const handoff = attempt?.status === 'running';
     attempt = {
       id: attemptId,
@@ -213,9 +213,10 @@ export function materializePreparationEvent(
     return true;
   }
 
-  if (!attempt || data.revision <= attempt.revision || isTerminal(attempt.status)) return false;
+  if (!attempt || data.revision <= attempt.revision) return false;
 
   if (data.action === 'attempt_completed' || data.action === 'attempt_failed') {
+    if (isTerminal(attempt.status)) return false;
     attempt = {
       ...attempt,
       status: data.action === 'attempt_completed' ? 'completed' : 'failed',
@@ -464,28 +465,17 @@ export function reconcileStalePreparationAttempts(
 
 /**
  * Map a 'preparing' stream event to the `cloud.status` broadcast that should
- * accompany it, or null when none should be sent. Stale v2 events (ones the
- * materializer rejected) must not regress a ready session back to
- * 'preparing' — that strands the chat input in its disabled state.
+ * accompany legacy preparation, or null when none should be sent. V2 status
+ * comes from the materialized attempt in the SDK.
  */
 export function cloudStatusForPreparingEvent(
   data: unknown,
-  applied: boolean
+  _applied: boolean
 ): CloudStatusData['cloudStatus'] | null {
   if (!isRecord(data)) return null;
+  if (data.version === 2) return null;
   const step = typeof data.step === 'string' ? { step: data.step } : {};
   const message = typeof data.message === 'string' ? { message: data.message } : {};
-  if (data.version === 2) {
-    if (!applied) return null;
-    if (data.action === 'attempt_completed') return { type: 'ready' };
-    if (data.action === 'attempt_failed') {
-      return {
-        type: 'error',
-        ...(typeof data.safeError === 'string' ? { message: data.safeError } : message),
-      };
-    }
-    return { type: 'preparing', ...step, ...message };
-  }
   if (data.step === 'ready') return { type: 'ready' };
   if (data.step === 'failed') return { type: 'error', ...message };
   return { type: 'preparing', ...step, ...message };

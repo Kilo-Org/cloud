@@ -270,7 +270,7 @@ describe('resolveContinueStartDisabled', () => {
       resolveContinueStartDisabled(
         continueInput({
           isRemoteTargetSelected: true,
-          cloneImportFailureKey: 'agentChat.session.notFound',
+          cloneImportFailureKey: 'common.notFound',
         })
       )
     ).toBe(true);

@@ -1,5 +1,6 @@
 import { Fragment, type ReactElement } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink, RefreshCw } from '@/components/ui/icons';
 
@@ -29,7 +30,7 @@ type NewSessionRepositorySectionProps = {
 
 const PROVIDER_COPY = {
   github: {
-    connectTitle: 'agentChat.newSession.connectGithub',
+    connectTitle: 'common.connectGithub',
     connectDescription: 'agentChat.newSession.connectGithubDescription',
     openLabel: 'agentChat.newSession.openGithub',
     connectedTitle: 'agentChat.newSession.githubConnected',
@@ -37,7 +38,7 @@ const PROVIDER_COPY = {
     emptyDescription: 'agentChat.newSession.noRepositoriesVisible',
   },
   gitlab: {
-    connectTitle: 'agentChat.newSession.connectGitlab',
+    connectTitle: 'common.connectGitlab',
     connectDescription: 'agentChat.newSession.connectGitlabDescription',
     openLabel: 'agentChat.newSession.openGitlab',
     connectedTitle: 'agentChat.newSession.gitlabConnected',
@@ -45,10 +46,10 @@ const PROVIDER_COPY = {
     emptyDescription: 'agentChat.newSession.noRepositoriesVisibleGitlab',
   },
   bitbucket: {
-    connectTitle: 'agentChat.newSession.connectBitbucket',
+    connectTitle: 'common.connectBitbucket',
     connectDescription: 'agentChat.newSession.connectBitbucketDescription',
     openLabel: 'agentChat.newSession.openBitbucket',
-    connectedTitle: 'agentChat.newSession.bitbucketConnected',
+    connectedTitle: 'common.bitbucketConnected',
     errorTitle: 'agentChat.newSession.couldNotLoadBitbucketRepositories',
     emptyDescription: 'agentChat.newSession.noRepositoriesVisibleBitbucket',
   },
@@ -89,7 +90,7 @@ export function NewSessionRepositorySection({
   return (
     <View className="mt-5">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('agentChat.newSession.repository')}
+        {t('common.repository')}
       </Text>
 
       {(hasRepos || anyLoading) && (
@@ -127,7 +128,7 @@ export function NewSessionRepositorySection({
               placement="top"
               variant="server"
               title={t(PROVIDER_COPY[platform].errorTitle)}
-              message={t('agentChat.instancePicker.couldNotLoadDescription')}
+              message={t('organization.boundary.loadErrorMessage')}
               onRetry={onRefreshRepos}
               isRetrying={isRetrying}
             />

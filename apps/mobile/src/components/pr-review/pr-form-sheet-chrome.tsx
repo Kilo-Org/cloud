@@ -8,9 +8,10 @@
 // OUTSIDE the ScrollView so keyboard focus does not scroll the title off-screen.
 //
 // collapsable={false}: keep a stable native subview at index 0 (SheetHeader
-// pattern). No `modal` top inset: the formSheet grabber already clears the
-// top edge; the modal 32pt pad left a transparent band content showed through
-// (that band + parent PR "Go back" is the stray ‹ root cause).
+// pattern). No `modal` top inset and no `centerTitle`: the formSheet grabber
+// already clears the top edge, and the close caret stays on the title row.
+// `safeAreaTop={false}` leaves vertical padding to `pt-5` (eight extra
+// logical pixels over the old `pt-3`, per PR 5972 owner feedback).
 //
 // Keyboard: ScrollView uses automaticallyAdjustKeyboardInsets. Footers must
 // NOT re-apply the full keyboard height (AppAwareKeyboardPaddingView double-
@@ -51,10 +52,11 @@ export function PrFormSheetHeader(props: { title: string; eyebrow: string; onBac
       <ScreenHeader
         title={props.title}
         eyebrow={props.eyebrow}
-        centerTitle
         onBack={props.onBack}
         backIcon="close"
-        className="pt-3"
+        showBackButton
+        safeAreaTop={false}
+        className="pt-5"
       />
     </View>
   );
@@ -64,14 +66,19 @@ export function PrFormSheetHeader(props: { title: string; eyebrow: string; onBac
  * Trailing ScrollView footer for formSheets. No keyboard-height padding —
  * parent ScrollView automaticallyAdjustKeyboardInsets owns that. On Android
  * the footer sits on the bottom edge, so it adds the system bottom inset.
+ * The px-6 gutter is widened by the side insets so the footer CTAs clear the
+ * landscape safe area when the sheet runs edge-to-edge (portrait insets are
+ * zero, so the gutter stays 24).
  */
 export function PrFormSheetFooter(props: { children: ReactNode }) {
-  const { bottom } = useSafeAreaInsets();
+  const { bottom, left, right } = useSafeAreaInsets();
   const paddingBottom = Platform.OS === 'android' ? 16 + bottom : 16;
+  const paddingLeft = 24 + left;
+  const paddingRight = 24 + right;
   return (
     <View
-      className="mt-0.5 border-t-[0.5px] border-hair-soft bg-background px-6 pt-3"
-      style={{ paddingBottom }}
+      className="mt-0.5 border-t-[0.5px] border-hair-soft bg-background pt-3"
+      style={{ paddingBottom, paddingLeft, paddingRight }}
     >
       {props.children}
     </View>

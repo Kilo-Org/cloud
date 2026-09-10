@@ -30,7 +30,7 @@ import {
   getVercelModelsMetadataFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { AISDKError, createGateway, generateText } from 'ai';
+import { createGateway, generateText } from 'ai';
 import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
 import { decryptByokRow } from '@/lib/ai-gateway/byok';
@@ -484,7 +484,7 @@ export const byokRouter = createTRPCRouter({
           message: `API key test success. Provider: ${metadata?.finalProvider ?? finalProvider}. Model: ${metadata?.originalModelId ?? model.modelId}.`,
         };
       } catch (e) {
-        const message = AISDKError.isInstance(e) ? e.message : undefined;
+        const message = e instanceof Error ? e.message : undefined;
         logByokWarning('BYOK key test request failed', {
           providerId: decryptedKey.providerId,
           message,

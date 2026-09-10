@@ -5,6 +5,8 @@ import { Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
+
 import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
@@ -175,13 +177,16 @@ export function StoredSessionRow({
         });
   const spokenPrNumber = variant === 'card' ? null : (session.associatedPr?.number ?? null);
 
-  // Platform icon only on the Agents list variant. Home cards stay
-  // byte-identical (platformIcon defaults to undefined).
+  // Platform icon only on the Agents list variant, and only while the
+  // eyebrow draws no live status glyph (a glyph beside the status mark
+  // reads as a stray second mark). Home cards stay byte-identical
+  // (platformIcon defaults to undefined).
   const { iconKind: platformIconKind, spokenPlatform: a11yPlatform } =
     selectRowPlatformPresentation({
       platform: session.created_on_platform,
       variant,
       needsInput,
+      statusGlyph: live,
       gitUrl: session.git_url,
     });
   const platformIcon =
@@ -219,6 +224,7 @@ export function StoredSessionRow({
           subtitle={subtitle}
           meta={visibleMeta}
           live={live}
+          statusKind={session.status === null ? null : glanceableStatusKind(session.status)}
           metaWhileLive={metaWhileLive}
           needsInput={needsInput}
           platformIcon={platformIcon}

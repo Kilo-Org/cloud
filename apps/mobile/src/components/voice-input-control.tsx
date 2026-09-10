@@ -1,6 +1,7 @@
 import { Mic, Square } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable } from 'react-native';
+import { Pressable } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';

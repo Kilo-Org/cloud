@@ -68,6 +68,8 @@ type DiscussionThreadProps = {
   readonly onToggleExpand: () => void;
   /** The viewer's GitHub login, passed to comment rows for self-target gating. */
   readonly viewerLogin?: string | null;
+  /** Invoked when the inline reply field gains focus (see useReplyFocusScroll). */
+  readonly onReplyFocus?: () => void;
 };
 
 export function DiscussionThread({
@@ -78,6 +80,7 @@ export function DiscussionThread({
   expanded,
   onToggleExpand,
   viewerLogin = null,
+  onReplyFocus,
 }: Readonly<DiscussionThreadProps>) {
   const resolve = useResolveThreadMutation();
   const unresolve = useUnresolveThreadMutation();
@@ -164,6 +167,7 @@ export function DiscussionThread({
             number={number}
             commentId={firstComment.commentId}
             reply={reply}
+            onInputFocus={onReplyFocus}
           />
         ) : null}
       </View>
@@ -244,9 +248,9 @@ function ThreadHeader({
           <Badge tone="good" icon={CheckCheck} label={t('prReview.discussion.resolved')} />
         ) : null}
         {outdated ? <Badge tone="muted" label={t('prReview.discussion.outdated')} /> : null}
-        {fileLevel && !resolved ? (
-          <Badge tone="muted" label={t('prReview.discussion.file')} />
-        ) : null}
+        {/* i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'), which
+            languages inflect by number; this key is the standalone noun label. */}
+        {fileLevel && !resolved ? <Badge tone="muted" label={t('common.file')} /> : null}
         <Text variant="muted" className="text-xs">
           {t('prReview.discussion.comment', {
             count: commentCount,

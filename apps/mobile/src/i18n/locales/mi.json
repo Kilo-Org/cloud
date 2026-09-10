@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Tuhi ā-reo mā Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Tuhia te tāuru reo mā tētahi tauira Kilo Gateway, kau mā te mōhio kōrero o te pūrere. Ka tukuna tō pūreko ki te Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Whakamahia hei matua",
-    "gatewayTranscriptionPrimarySubtitle": "Ko te tauira Gateway te arataki i te tuhi ā-reo, ā, ki te pūrere ina kore e wātea.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "He roa rawa te tuhi ā-reo. Whakamātau anō.",
     "gatewayModelUnavailable": "Kāore e wātea ana tēnei tauira tuhi ā-reo. Kōwhiria tētahi atu i Ngā manakohanga.",
     "gatewaySignInRequired": "Takiuru kia taea te tuhi ā-reo mā Kilo Gateway.",
-    "gatewayNoModel": "Tuatahi, kōwhiria he tauira tuhi ā-reo i Ngā manakohanga.",
-    "enginesFailed": "I rahua te tuhi ā-reo i runga i te Kilo Gateway me tēnei pūrere. Tirohia tō hononga, ka whakarerekē rānei i ngā tautuhinga tuhi ā-reo i Ngā manakohanga, kātahi whakamātau anō.",
-    "engineFellBackToDevice": "Kāore te tuhi ā-reo mā te Gateway e wātea — ko te tautuhi o tō pūrere kei te whakamahia. Me kōrero anō koe, koa.",
-    "engineFellBackToGateway": "I rahua te tautuhi o te pūrere — ko te Kilo Gateway kei te whakamahia. Me kōrero anō koe, koa."
+    "gatewayNoModel": "Tuatahi, kōwhiria he tauira tuhi ā-reo i Ngā manakohanga."
   },
   "share": {
     "title": "Tohatoha ki Kilo",

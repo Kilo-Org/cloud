@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway द्वारे लिप्यंतरण",
     "gatewayTranscriptionSubtitle": "उपकरणाच्या स्पीच रेकग्निशनऐवजी Kilo Gateway मॉडेल वापरून व्हॉइस इनपुटचे लिप्यंतरण करा. तुमचे रेकॉर्डिंग Kilo Gateway कडे पाठवले जाते.",
-    "gatewayTranscriptionPrimary": "प्राथमिक म्हणून वापरा",
-    "gatewayTranscriptionPrimarySubtitle": "लिप्यंतरणाचे काम Gateway मॉडेल प्रथम करते आणि उपलब्ध नसल्यास उपकरणाकडे जाते.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "लिप्यंतरणास खूप वेळ लागला. पुन्हा प्रयत्न करा.",
     "gatewayModelUnavailable": "हे लिप्यंतरण मॉडेल उपलब्ध नाही. प्राधान्यांमध्ये दुसरे निवडा.",
     "gatewaySignInRequired": "Kilo Gateway लिप्यंतरण वापरण्यासाठी साइन इन करा.",
-    "gatewayNoModel": "प्राधान्यांमध्ये आधी लिप्यंतरण मॉडेल निवडा.",
-    "enginesFailed": "लिप्यंतरण Kilo Gateway वर आणि या उपकरणावर अयशस्वी झाले. तुमचे कनेक्शन तपासा किंवा प्राधान्यांमध्ये लिप्यंतरण सेटिंग्ज बदला आणि पुन्हा प्रयत्न करा.",
-    "engineFellBackToDevice": "गेटवे द्वारे लिप्यंतरण उपलब्ध नाही — तुमच्या उपकरणावरील ओळखणारा वापरला जात आहे. कृपया पुन्हा सांगा.",
-    "engineFellBackToGateway": "उपकरणावरील ओळख अयशस्वी झाली — Kilo Gateway वापरला जात आहे. कृपया पुन्हा सांगा."
+    "gatewayNoModel": "प्राधान्यांमध्ये आधी लिप्यंतरण मॉडेल निवडा."
   },
   "share": {
     "title": "Kilo वर शेअर करा",

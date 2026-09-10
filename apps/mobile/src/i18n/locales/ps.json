@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "د Kilo Gateway له لارې د غږ متن ته بدلول",
     "gatewayTranscriptionSubtitle": "غږیز لیکل د وسیلې د ویې پېژندنې پر ځای د Kilo Gateway ماډل سره متن ته واړوئ. غږیز ریکارډ مو د Kilo Gateway ته لیږل کېږي.",
-    "gatewayTranscriptionPrimary": "د اصلي په توګه وکاروئ",
-    "gatewayTranscriptionPrimarySubtitle": "د غږ بدلول لومړی د Gateway ماډل سره کیږي او کله چې شتون ونلري، وسیله کارول کیږي.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "د غږ بدلول ډېر وخت ونیو. بیا هڅه وکړئ.",
     "gatewayModelUnavailable": "دا ماډل شتون نلري. په غوره توبونو کې بل وټاکئ.",
     "gatewaySignInRequired": "د Kilo Gateway بدلولو کارولو لپاره ننوځئ.",
-    "gatewayNoModel": "لومړی په غوره توبونو کې یو ماډل وټاکئ.",
-    "enginesFailed": "د غږ بدلول د Kilo Gateway او دې وسیلې دواړو کې ناکام شو. خپله اړیکه وګورئ یا په غوره توبونو کې د بدلون امستنې بدلې کړئ، بیا هڅه وکړئ.",
-    "engineFellBackToDevice": "د Gateway له لارې د غږ بدلول شتون نلري — ستاسو د وسیلې پیژندنه کارول کیږي. مهرباني وکړئ بیا یې ووایاست.",
-    "engineFellBackToGateway": "د وسیلې پیژندل ناکام شو — Kilo Gateway کارول کیږي. مهرباني وکړئ بیا یې ووایاست."
+    "gatewayNoModel": "لومړی په غوره توبونو کې یو ماډل وټاکئ."
   },
   "share": {
     "title": "له Kilo سره شریکول",

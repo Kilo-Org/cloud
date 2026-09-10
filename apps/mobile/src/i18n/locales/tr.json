@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ile sesi metne dönüştürme",
     "gatewayTranscriptionSubtitle": "Sesli girişi cihazın konuşma tanıması yerine bir Kilo Gateway modeliyle metne dönüştürün. Kaydınız Kilo Gateway'e gönderilir.",
-    "gatewayTranscriptionPrimary": "Birincil olarak kullan",
-    "gatewayTranscriptionPrimarySubtitle": "Metne dönüştürmeye önce Gateway modeli öncülük eder, kullanılamadığında cihaza geçilir.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
@@ -2145,10 +2143,7 @@
     "gatewayTimeout": "Metne dönüştürme çok uzun sürdü. Tekrar dene.",
     "gatewayModelUnavailable": "Bu metne dönüştürme modeli kullanılamıyor. Tercihler'den başkasını seç.",
     "gatewaySignInRequired": "Kilo Gateway ile dönüştürmeyi kullanmak için oturum açın.",
-    "gatewayNoModel": "Önce Tercihler'den bir metne dönüştürme modeli seçin.",
-    "enginesFailed": "Metne dönüştürme hem Kilo Gateway'de hem de bu cihazda başarısız oldu. Bağlantını kontrol et veya Tercihler'den dönüştürme ayarlarını değiştir, ardından tekrar dene.",
-    "engineFellBackToDevice": "Gateway üzerinden metne dönüştürme kullanılamıyor — cihazındaki tanıyıcı kullanılıyor. Lütfen tekrar söyle.",
-    "engineFellBackToGateway": "Cihazdaki tanıma başarısız oldu — Kilo Gateway kullanılıyor. Lütfen tekrar söyle."
+    "gatewayNoModel": "Önce Tercihler'den bir metne dönüştürme modeli seçin."
   },
   "share": {
     "title": "Kilo ile paylaş",

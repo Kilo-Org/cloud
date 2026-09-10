@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripcija putem Kilo Gatewaya",
     "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gatewaya umjesto prepoznavanja govora na uređaju. Snimka se šalje na Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Koristi kao primarni",
-    "gatewayTranscriptionPrimarySubtitle": "Transkripciju vodi model Gatewaya, a kada nije dostupan, prebacuje se na uređaj.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2600,10 +2598,7 @@
     "gatewayTimeout": "Transkripcija je predugo trajala. Pokušaj ponovo.",
     "gatewayModelUnavailable": "Ovaj model za transkripciju nije dostupan. Odaberi drugi u Postavkama.",
     "gatewaySignInRequired": "Prijavi se da koristiš transkripciju putem Kilo Gatewaya.",
-    "gatewayNoModel": "Prvo odaberi model za transkripciju u Postavkama.",
-    "enginesFailed": "Transkripcija nije uspjela ni na Kilo Gatewayu ni na ovom uređaju. Provjeri vezu ili promijeni postavke transkripcije u Postavkama, pa pokušaj ponovo.",
-    "engineFellBackToDevice": "Transkripcija putem Gatewaya nije dostupna — koristi se prepoznavanje na tvom uređaju. Molim te, reci to ponovo.",
-    "engineFellBackToGateway": "Prepoznavanje na uređaju nije uspjelo — koristi se Kilo Gateway. Molim te, reci to ponovo."
+    "gatewayNoModel": "Prvo odaberi model za transkripciju u Postavkama."
   },
   "share": {
     "title": "Podijeli s aplikacijom Kilo",

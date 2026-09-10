@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Puheentunnistus Kilo Gatewayn kautta",
     "gatewayTranscriptionSubtitle": "Muodosta äänisyötteestä teksti Kilo Gateway -mallilla laitteen puheentunnistuksen sijaan. Äänitteesi lähetetään Kilo Gatewayhin.",
-    "gatewayTranscriptionPrimary": "Käytä ensisijaisena",
-    "gatewayTranscriptionPrimarySubtitle": "Puheentunnistus tehdään ensisijaisesti Gateway-mallilla ja laitteen avulla, kun malli ei ole käytettävissä.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Puheentunnistus kesti liian kauan. Yritä uudelleen.",
     "gatewayModelUnavailable": "Tätä puheentunnistusmallia ei ole käytettävissä. Valitse toinen Asetuksissa.",
     "gatewaySignInRequired": "Kirjaudu sisään käyttääksesi Kilo Gatewayn puheentunnistusta.",
-    "gatewayNoModel": "Valitse ensin puheentunnistusmalli Asetuksissa.",
-    "enginesFailed": "Puheentunnistus epäonnistui sekä Kilo Gatewayssä että tällä laitteella. Tarkista yhteys tai muuta puheentunnistuksen asetuksia Asetuksissa ja yritä uudelleen.",
-    "engineFellBackToDevice": "Puheentunnistus Gatewayn kautta ei ole käytettävissä — käytetään laitteesi tunnistinta. Sano se uudelleen, kiitos.",
-    "engineFellBackToGateway": "Laitteen tunnistus epäonnistui — käytetään Kilo Gatewaytä. Sano se uudelleen, kiitos."
+    "gatewayNoModel": "Valitse ensin puheentunnistusmalli Asetuksissa."
   },
   "share": {
     "title": "Jaa Kiloon",

@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcripció amb Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcriu el dictat amb un model de Kilo Gateway en lloc del reconeixement de veu del dispositiu. Enviarem la teva gravació a Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Utilitza com a principal",
-    "gatewayTranscriptionPrimarySubtitle": "La transcripció comença amb el model de la Gateway i, si no està disponible, passa al dispositiu.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2600,10 +2598,7 @@
     "gatewayTimeout": "La transcripció ha trigat massa. Torna-ho a provar.",
     "gatewayModelUnavailable": "Aquest model de transcripció no està disponible. Tria'n un altre a les Preferències.",
     "gatewaySignInRequired": "Inicia la sessió per utilitzar la transcripció amb Kilo Gateway.",
-    "gatewayNoModel": "Primer tria un model de transcripció a les Preferències.",
-    "enginesFailed": "La transcripció ha fallat a Kilo Gateway i en aquest dispositiu. Comprova la connexió, o canvia la configuració de transcripció a les Preferències, i torna-ho a provar.",
-    "engineFellBackToDevice": "La transcripció mitjançant el Gateway no està disponible — s'està utilitzant el reconeixedor del teu dispositiu. Torna-ho a dir, si us plau.",
-    "engineFellBackToGateway": "El reconeixement del dispositiu ha fallat — s'està utilitzant Kilo Gateway. Torna-ho a dir, si us plau."
+    "gatewayNoModel": "Primer tria un model de transcripció a les Preferències."
   },
   "share": {
     "title": "Compartir amb Kilo",

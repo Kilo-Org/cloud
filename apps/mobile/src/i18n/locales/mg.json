@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Fanovana feo ho soratra amin'ny Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Aova ho soratra amin'ny modely Kilo Gateway ny fampidirana amin'ny feo fa tsy ny famantarana ny feon'ny fitaovana. Alefa amin'ny Kilo Gateway ny rakitra nosoronanao.",
-    "gatewayTranscriptionPrimary": "Ampiasao ho voalohany",
-    "gatewayTranscriptionPrimarySubtitle": "Ny fanovana feo ho soratra no tarihin'ny modely Gateway, ary miverina amin'ny fitaovana rehefa tsy misy izy io.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Nihoatra ny elanelany ny fanovana feo ho soratra. Andramo indray.",
     "gatewayModelUnavailable": "Tsy azo ampiasaina ity modely fanovana feo ho soratra ity. Safidio ny hafa ao amin'ny Safidy.",
     "gatewaySignInRequired": "Midira mba hampiasa ny fanovana feo ho soratra amin'ny Kilo Gateway.",
-    "gatewayNoModel": "Safidio aloha ny modely fanovana feo ho soratra ao amin'ny Safidy.",
-    "enginesFailed": "Nisy olana ny fanovana feo ho soratra teo amin'ny Kilo Gateway sy amin'ity fitaovana ity. Hamarino ny fifandraisanao, na ovay ny settings fanovana feo ho soratra ao amin'ny Safidy, avy eo andramo indray.",
-    "engineFellBackToDevice": "Tsy azo ampiasaina ny fanovana feo ho soratra amin'ny gateway — ny fantarana ao amin'ny fitaovanao no ampiasaina. Azafady, lazao indray.",
-    "engineFellBackToGateway": "Nisy olana ny fantarina ao amin'ny fitaovana — ny Kilo Gateway no ampiasaina. Azafady, lazao indray."
+    "gatewayNoModel": "Safidio aloha ny modely fanovana feo ho soratra ao amin'ny Safidy."
   },
   "share": {
     "title": "Fizarana amin'ny Kilo",

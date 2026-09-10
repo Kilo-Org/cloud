@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway से आवाज़ को टेक्स्ट में बदलना",
     "gatewayTranscriptionSubtitle": "डिवाइस की स्पीच रिकग्निशन के बजाय Kilo Gateway मॉडल से वॉइस इनपुट को टेक्स्ट में बदलें। आपकी रिकॉर्डिंग Kilo Gateway भेजी जाती है।",
-    "gatewayTranscriptionPrimary": "प्राथमिक के रूप में उपयोग करें",
-    "gatewayTranscriptionPrimarySubtitle": "आवाज़ को टेक्स्ट में बदलने का काम Gateway मॉडल से शुरू होता है, और उपलब्ध न होने पर डिवाइस का उपयोग होता है.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
@@ -2145,10 +2143,7 @@
     "gatewayTimeout": "आवाज़ को टेक्स्ट में बदलने में बहुत समय लगा। फिर से कोशिश करें।",
     "gatewayModelUnavailable": "आवाज़ को टेक्स्ट में बदलने का यह मॉडल उपलब्ध नहीं है। पसंद में दूसरा चुनें।",
     "gatewaySignInRequired": "Kilo Gateway से आवाज़ को टेक्स्ट में बदलने के लिए साइन इन करें।",
-    "gatewayNoModel": "पहले पसंद में आवाज़ को टेक्स्ट में बदलने का मॉडल चुनें।",
-    "enginesFailed": "आवाज़ को टेक्स्ट में बदलना Kilo Gateway और इस डिवाइस पर विफल रहा। अपना कनेक्शन जांचें, या पसंद में आवाज़-टेक्स्ट सेटिंग बदलें, फिर से कोशिश करें।",
-    "engineFellBackToDevice": "Gateway से आवाज़ को टेक्स्ट में बदलना उपलब्ध नहीं है — आपके डिवाइस का पहचानकर्ता इस्तेमाल हो रहा है। कृपया दोबारा बोलें।",
-    "engineFellBackToGateway": "डिवाइस की पहचान विफल रही — Kilo Gateway इस्तेमाल हो रहा है। कृपया दोबारा बोलें।"
+    "gatewayNoModel": "पहले पसंद में आवाज़ को टेक्स्ट में बदलने का मॉडल चुनें।"
   },
   "share": {
     "title": "Kilo पर साझा करें",

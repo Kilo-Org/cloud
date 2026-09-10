@@ -20,9 +20,7 @@ import {
   resolveVoiceInputStartLanguageTag,
   voiceInputLanguageDisplayName,
 } from './voice-input-language';
-import { resolveVoiceInputEngineMode } from './voice-input-engine-mode';
 import {
-  classifyVoiceInputError,
   shouldAbortVoiceInput,
   type VoiceInputFeedback,
   type VoiceInputLifecycleInput,
@@ -31,11 +29,7 @@ import {
 import { resolveVoiceInputRecognitionMode } from './voice-input-recognition-mode';
 import { readVoiceNetworkConsent, writeVoiceNetworkConsent } from './voice-network-consent';
 import { resolveOwnerVoiceInputView } from './voice-input-view-state';
-import {
-  isGatewayTranscriptionEnabled,
-  isGatewayTranscriptionPrimary,
-  readGatewayTranscriptionModel,
-} from './gateway/gateway-transcription-preference';
+import { isGatewayTranscriptionEnabled } from './gateway/gateway-transcription-preference';
 
 type VoiceInputControllerLike = {
   abort: (owner?: string) => Promise<boolean>;
@@ -85,14 +79,11 @@ export function runVoiceInputListeningFeedback(
 
 /**
  * One stable toast id for every voice-input message. sonner-native updates a
- * visible toast in place when a new toast carries the same id, so a hand-off
- * notice followed by an error — or two errors in a row — never renders as two
- * stacked toasts whose copy overlaps. A dismiss-then-add pair would animate
- * both at once (the outgoing toast still on screen as the new one lands),
- * which is why the replacement rides the id, not a dismiss. On a device where
- * the fallback recogniser starts and then dies immediately (the iOS simulator
- * has no speech-recognition audio input), the user reads exactly one message:
- * the latest one.
+ * visible toast in place when a new toast carries the same id, so two errors
+ * in a row never render as two stacked toasts whose copy overlaps. A
+ * dismiss-then-add pair would animate both at once (the outgoing toast still
+ * on screen as the new one lands), which is why the replacement rides the id,
+ * not a dismiss.
  */
 const VOICE_INPUT_TOAST_ID = 'voice-input-feedback';
 
@@ -119,15 +110,8 @@ export function showFeedback(feedback: VoiceInputFeedback): void {
     ]);
     return;
   }
-  if (presentation.tone === 'info') {
-    // The mid-session engine hand-off: the session continues on the other
-    // engine, so it renders without the error icon the failure toasts carry.
-    toast.info(presentation.message, { id: VOICE_INPUT_TOAST_ID });
-    return;
-  }
-  // A terminal failure replaces any hand-off notice still on screen in one
-  // commit: the session ended, so the "say it again" ask is spent, and two
-  // messages would read as two separate problems.
+  // One stable toast id so a later message replaces an earlier one in place:
+  // the user reads exactly one voice-input message at a time.
   toast.error(presentation.message, { id: VOICE_INPUT_TOAST_ID });
 }
 
@@ -192,28 +176,17 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
       await controller.start(startOptions);
     };
 
-    if (
-      resolveVoiceInputEngineMode(
-        isGatewayTranscriptionEnabled(),
-        isGatewayTranscriptionPrimary()
-      ) === 'gateway-primary'
-    ) {
-      // Gateway leads: no OS recognizer consent is needed for the gateway
-      // itself (the switch is the consent), and the engine dispatcher falls
-      // back to the device recogniser if the gateway attempt fails. A chosen
-      // model is a precondition for starting; without one the user is sent
-      // to the picker instead of into a session that can only fail.
-      if (readGatewayTranscriptionModel() === null) {
-        showFeedback(classifyVoiceInputError('gateway-no-model'));
-        return;
-      }
+    if (isGatewayTranscriptionEnabled()) {
+      // Gateway mode: the switch itself is the consent to send the recording
+      // to the Kilo gateway, so no OS network-recognition disclosure applies.
+      // The chosen model is resolved by the engine (the stored choice, else
+      // the first model the gateway catalogue offers).
       await startWith(false);
       return;
     }
 
-    // Device-only (gateway switch off) and device-primary (gateway is only
-    // the fallback) both start on the OS recogniser, so the consent flow
-    // below decides the recognition mode either way.
+    // Device mode: the OS recogniser runs, so the consent flow below decides
+    // the recognition mode.
     const supportsOnDeviceByService = controller.supportsOnDevice();
     const userId = getUserId();
     const consent = userId ? await readVoiceNetworkConsent(userId) : 'unset';

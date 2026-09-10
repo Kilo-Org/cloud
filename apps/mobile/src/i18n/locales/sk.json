@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Prepis cez Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Prepisujte hlasový vstup modelom Kilo Gateway namiesto rozpoznávania reči v zariadení. Nahrávka sa odošle do Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Použiť ako primárny",
-    "gatewayTranscriptionPrimarySubtitle": "Prepis vedie model Gateway; ak nie je dostupný, prepne sa na zariadenie.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2621,10 +2619,7 @@
     "gatewayTimeout": "Prepis trval príliš dlho. Skús to znova.",
     "gatewayModelUnavailable": "Tento model prepisu nie je dostupný. Vyberte iný v Predvoľbách.",
     "gatewaySignInRequired": "Prihláste sa, aby ste mohli používať prepis cez Kilo Gateway.",
-    "gatewayNoModel": "Najprv vyberte model prepisu v Predvoľbách.",
-    "enginesFailed": "Prepis zlyhal na Kilo Gateway aj v tomto zariadení. Skontroluj pripojenie alebo zmeň nastavenia prepisu v Predvoľbách a skús to znova.",
-    "engineFellBackToDevice": "Prepis cez Gateway nie je dostupný — používa sa rozpoznávanie vo tvojom zariadení. Povedz to prosím znova.",
-    "engineFellBackToGateway": "Rozpoznávanie v zariadení zlyhalo — používa sa Kilo Gateway. Povedz to prosím znova."
+    "gatewayNoModel": "Najprv vyberte model prepisu v Predvoľbách."
   },
   "share": {
     "title": "Zdieľanie do aplikácie Kilo",

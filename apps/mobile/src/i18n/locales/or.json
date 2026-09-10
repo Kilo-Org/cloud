@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ମାଧ୍ୟମରେ କଥାକୁ ଲେଖାରେ ବଦଳାଇବା",
     "gatewayTranscriptionSubtitle": "ଡିଭାଇସ୍‌ର ସ୍ପିଚ୍ ରେକଗ୍ନିସନ୍ ପରିବର୍ତ୍ତେ Kilo Gateway ମଡେଲ୍ ବ୍ୟବହାର କରି କହି ଲେଖିବାକୁ ଲେଖାରେ ବଦଳାନ୍ତୁ। ଆପଣଙ୍କ ରେକର୍ଡିଂ Kilo Gateway ପଠାଯାଏ।",
-    "gatewayTranscriptionPrimary": "ମୁଖ୍ୟ ଭାବରେ ବ୍ୟବହାର କରନ୍ତୁ",
-    "gatewayTranscriptionPrimarySubtitle": "କହି ଲେଖିବାକୁ ଲେଖାରେ ବଦଳାଇବା କାମ Gateway ମଡେଲ୍ ପ୍ରଥମେ କରେ ଏବଂ ଉପଲବ୍ଧ ନଥିଲେ ଡିଭାଇସ୍ ବ୍ୟବହାର ହୁଏ।",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାରେ ଅଧିକ ସମୟ ଲାଗିଲା। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "gatewayModelUnavailable": "ଏହି ଲେଖା ବଦଳ ମଡେଲ୍ ଉପଲବ୍ଧ ନୁହେଁ। ପସନ୍ଦରେ ଅନ୍ୟ ଏକ ମଡେଲ୍ ବାଛନ୍ତୁ।",
     "gatewaySignInRequired": "Kilo Gateway ଲେଖା ବଦଳ ବ୍ୟବହାର ପାଇଁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
-    "gatewayNoModel": "ପ୍ରଥମେ ପସନ୍ଦରେ ଏକ ଲେଖା ବଦଳ ମଡେଲ୍ ବାଛନ୍ତୁ।",
-    "enginesFailed": "କହି ଲେଖିବାକୁ ଲେଖାରେ ବଦଳାଇବା Kilo Gateway ଏବଂ ଏହି ଡିଭାଇସ୍‌ରେ ବିଫଳ ହେଲା। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରନ୍ତୁ କିମ୍ବା ପସନ୍ଦରେ ଲେଖା ବଦଳ ସେଟିଂ ବଦଳାନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-    "engineFellBackToDevice": "ଗେଟ୍‌ୱେ ମାଧ୍ୟମରେ ଲେଖାରେ ବଦଳ ଉପଲବ୍ଧ ନାହିଁ — ଆପଣଙ୍କ ଡିଭାଇସ୍‌ର ଚିହ୍ନଟକାରୀ ବ୍ୟବହାର ହେଉଛି। ଦୟାକରି ପୁଣି କୁହନ୍ତୁ।",
-    "engineFellBackToGateway": "ଡିଭାଇସ୍‌ରେ ଚିହ୍ନଟ ବିଫଳ ହେଲା — Kilo Gateway ବ୍ୟବହାର ହେଉଛି। ଦୟାକରି ପୁଣି କୁହନ୍ତୁ।"
+    "gatewayNoModel": "ପ୍ରଥମେ ପସନ୍ଦରେ ଏକ ଲେଖା ବଦଳ ମଡେଲ୍ ବାଛନ୍ତୁ।"
   },
   "share": {
     "title": "Kilo କୁ ସେୟାର",

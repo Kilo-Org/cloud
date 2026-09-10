@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "በKilo Gateway ድምጽን ወደ ጽሑፍ መቀየር",
     "gatewayTranscriptionSubtitle": "የድምፅ ግብዓትን በመሣሪያው የንግግር ማውቂያ ምትክ በKilo Gateway ሞዴል ወደ ጽሑፍ ቀይሩ። ቀረጻዎ ወደ Kilo Gateway ይላካል።",
-    "gatewayTranscriptionPrimary": "እንደ ዋና ይጠቀሙ",
-    "gatewayTranscriptionPrimarySubtitle": "የድምጽ ወደ ጽሑፍ ስራውን Gateway ሞዴል ይመሩ፤ ሞዴሉ ሳይገኝ ወደ መሣሪያው ይቀየሩ።",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "ድምጽን ወደ ጽሑፍ መቀየር ረጅም ጊዜ አስፈልጎታል። እንደገና ይሞክሩ።",
     "gatewayModelUnavailable": "ይህ የድምጽ ወደ ጽሑፍ ሞዴል አይገኝም። በምርጫዎች ውስጥ ሌላ ይምረጡ።",
     "gatewaySignInRequired": "በKilo Gateway ለመቀየር ይግቡ።",
-    "gatewayNoModel": "በምርጫዎች ውስጥ መጀመሪያ የድምጽ ወደ ጽሑፍ ሞዴል ይምረጡ።",
-    "enginesFailed": "የድምጽ ወደ ጽሑፍ ስራ በKilo Gateway እና በዚህ መሣሪያ አልተሳካም። ግንኙነትዎን ያረጋግጡ፣ ወይም በምርጫዎች ውስጥ የድምጽ ወደ ጽሑፍ ቅንብሮችን ይቀይሩ፤ ከዚያ እንደገና ይሞክሩ።",
-    "engineFellBackToDevice": "በGateway ላይ የድምጽ ወደ ጽሑፍ ስራ አይገኝም — የመሣሪያዎ ማወቂያ ጥቅም ላይ ይውላል። እባክዎ እንደገና ይናገሩ።",
-    "engineFellBackToGateway": "የመሣሪያ ማወቂያ አልተሳካም — Kilo Gateway ጥቅም ላይ ይውላል። እባክዎ እንደገና ይናገሩ።"
+    "gatewayNoModel": "በምርጫዎች ውስጥ መጀመሪያ የድምጽ ወደ ጽሑፍ ሞዴል ይምረጡ።"
   },
   "share": {
     "title": "ወደ Kilo ማጋራት",

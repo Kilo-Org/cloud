@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway 음성 텍스트 변환",
     "gatewayTranscriptionSubtitle": "기기의 음성 인식 대신 Kilo Gateway 모델로 음성 입력을 텍스트로 변환합니다. 녹음 내용은 Kilo Gateway로 전송됩니다.",
-    "gatewayTranscriptionPrimary": "기본으로 사용",
-    "gatewayTranscriptionPrimarySubtitle": "음성 텍스트 변환은 Gateway 모델이 먼저 처리하며, 사용할 수 없을 때는 기기로 전환합니다.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
@@ -2145,10 +2143,7 @@
     "gatewayTimeout": "변환에 시간이 너무 오래 걸렸습니다. 다시 시도하세요.",
     "gatewayModelUnavailable": "이 음성 텍스트 변환 모델은 사용할 수 없습니다. 환경설정에서 다른 모델을 선택하세요.",
     "gatewaySignInRequired": "Kilo Gateway 변환을 사용하려면 로그인하세요.",
-    "gatewayNoModel": "먼저 환경설정에서 음성 텍스트 변환 모델을 선택하세요.",
-    "enginesFailed": "음성 텍스트 변환이 Kilo Gateway와 이 기기 모두에서 실패했습니다. 연결을 확인하거나 환경설정에서 변환 설정을 변경한 후 다시 시도하세요.",
-    "engineFellBackToDevice": "Gateway를 통한 음성 텍스트 변환을 사용할 수 없습니다 — 기기의 음성 인식을 사용하고 있습니다. 다시 말씀해 주세요.",
-    "engineFellBackToGateway": "기기의 음성 인식에 실패했습니다 — Kilo Gateway를 사용하고 있습니다. 다시 말씀해 주세요."
+    "gatewayNoModel": "먼저 환경설정에서 음성 텍스트 변환 모델을 선택하세요."
   },
   "share": {
     "title": "Kilo로 공유",

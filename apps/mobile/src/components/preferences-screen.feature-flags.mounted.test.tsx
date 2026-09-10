@@ -61,7 +61,6 @@ vi.mock('@/components/ui/icons', () => ({
   Brain: 'Brain',
   CornerDownLeft: 'CornerDownLeft',
   Cpu: 'Cpu',
-  Gauge: 'Gauge',
   Globe: 'Globe',
   MessageSquare: 'MessageSquare',
   Mic: 'Mic',
@@ -124,11 +123,6 @@ vi.mock('@/lib/voice-input/gateway/gateway-transcription-preference', () => ({
     setGatewayTranscriptionEnabled: vi.fn(),
   }),
   useGatewayTranscriptionModel: () => null,
-  useGatewayTranscriptionPrimaryPreference: () => ({
-    gatewayTranscriptionPrimary: true,
-    hasLoaded: true,
-    setGatewayTranscriptionPrimary: vi.fn(),
-  }),
 }));
 vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
   useReturnSendsMessagePreference: () => ({

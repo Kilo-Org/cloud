@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway દ્વારા અવાજને લખાણમાં ફેરવવું",
     "gatewayTranscriptionSubtitle": "ઉપકરણની સ્પીચ રિકગ્નિશનને બદલે Kilo Gateway મોડેલ વડે વૉઇસ ઇનપુટને લખાણમાં ફેરવો. તમારું રેકોર્ડિંગ Kilo Gateway પર મોકલાય છે.",
-    "gatewayTranscriptionPrimary": "મુખ્ય તરીકે વાપરો",
-    "gatewayTranscriptionPrimarySubtitle": "અવાજને લખાણમાં ફેરવવું Gateway મોડેલ દ્વારા થાય છે, ઉપલબ્ધ ન હોય ત્યારે ઉપકરણ પર પાછા ફરવામાં આવે છે.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "અવાજને લખાણમાં ફેરવવામાં બહુ સમય લાગ્યો. ફરી પ્રયાસ કરો.",
     "gatewayModelUnavailable": "અવાજને લખાણમાં ફેરવતું આ મોડેલ ઉપલબ્ધ નથી. પસંદગીઓમાં બીજું પસંદ કરો.",
     "gatewaySignInRequired": "Kilo Gateway દ્વારા લખાણ વાપરવા સાઇન ઇન કરો.",
-    "gatewayNoModel": "પહેલા પસંદગીઓમાં અવાજને લખાણમાં ફેરવતું મોડેલ પસંદ કરો.",
-    "enginesFailed": "અવાજને લખાણમાં ફેરવવું Kilo Gateway અને આ ઉપકરણ પર નિષ્ફળ ગયું. તમારું કનેક્શન તપાસો, અથવા પસંદગીઓમાં અવાજ-લખાણ સેટિંગ્સ બદલો, પછી ફરી પ્રયાસ કરો.",
-    "engineFellBackToDevice": "ગેટવે દ્વારા અવાજને લખાણમાં ફેરવવું ઉપલબ્ધ નથી — તમારા ઉપકરણનું ઓળખનાર વપરાય છે. કૃપા કરીને ફરી કહો.",
-    "engineFellBackToGateway": "ઉપકરણની ઓળખ નિષ્ફળ ગયું — Kilo Gateway વપરાય છે. કૃપા કરીને ફરી કહો."
+    "gatewayNoModel": "પહેલા પસંદગીઓમાં અવાજને લખાણમાં ફેરવતું મોડેલ પસંદ કરો."
   },
   "share": {
     "title": "Kilo પર શેર",

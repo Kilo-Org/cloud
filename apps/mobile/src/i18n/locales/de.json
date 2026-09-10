@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Gateway-Transkription",
     "gatewayTranscriptionSubtitle": "Transkribiere die Spracheingabe mit einem Kilo-Gateway-Modell statt mit der Spracherkennung des Geräts. Deine Aufnahme wird an das Kilo Gateway gesendet.",
-    "gatewayTranscriptionPrimary": "Als primär verwenden",
-    "gatewayTranscriptionPrimarySubtitle": "Transkribiere zuerst mit dem Gateway-Modell und greife auf das Gerät zurück, wenn es nicht verfügbar ist.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
@@ -2145,10 +2143,7 @@
     "gatewayTimeout": "Die Transkription hat zu lange gedauert. Versuche es erneut.",
     "gatewayModelUnavailable": "Dieses Transkriptionsmodell ist nicht verfügbar. Wähle ein anderes in den Einstellungen.",
     "gatewaySignInRequired": "Melde dich an, um die Gateway-Transkription zu nutzen.",
-    "gatewayNoModel": "Wähle zuerst in den Einstellungen ein Transkriptionsmodell.",
-    "enginesFailed": "Die Sprachtranskription ist über das Kilo Gateway und auf diesem Gerät fehlgeschlagen. Prüfe deine Verbindung oder ändere die Transkriptionseinstellungen in den Einstellungen, und versuche es erneut.",
-    "engineFellBackToDevice": "Die Transkription über das Gateway ist nicht verfügbar — die Erkennung auf deinem Gerät wird verwendet. Sag es bitte noch einmal.",
-    "engineFellBackToGateway": "Die Erkennung auf dem Gerät ist fehlgeschlagen — das Kilo Gateway wird verwendet. Sag es bitte noch einmal."
+    "gatewayNoModel": "Wähle zuerst in den Einstellungen ein Transkriptionsmodell."
   },
   "share": {
     "title": "Mit Kilo teilen",

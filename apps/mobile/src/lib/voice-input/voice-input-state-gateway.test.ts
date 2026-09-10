@@ -65,14 +65,4 @@ describe('classifyVoiceInputError - gateway codes', () => {
       retryable: true,
     });
   });
-
-  it('maps voice-engines-failed to one retryable message naming both engines and the remedy', () => {
-    expect(classifyVoiceInputError('voice-engines-failed')).toEqual({
-      action: 'none',
-      availability: 'available',
-      message:
-        'Voice transcription failed on the Kilo gateway and on this device. Check your connection, or change your transcription settings in Preferences, then try again.',
-      retryable: true,
-    });
-  });
 });

@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ਰਾਹੀਂ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣਾ",
     "gatewayTranscriptionSubtitle": "ਡਿਵਾਈਸ ਦੀ ਸਪੀਚ ਰੈਕਗਨੀਸ਼ਨ ਦੀ ਥਾਂ Kilo Gateway ਮਾਡਲ ਨਾਲ ਵੌਇਸ ਇਨਪੁਟ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲੋ। ਤੁਹਾਡੀ ਰਿਕਾਰਡਿੰਗ Kilo Gateway ਨੂੰ ਭੇਜੀ ਜਾਂਦੀ ਹੈ।",
-    "gatewayTranscriptionPrimary": "ਮੁੱਖ ਵਜੋਂ ਵਰਤੋ",
-    "gatewayTranscriptionPrimarySubtitle": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਦਾ ਕੰਮ ਪਹਿਲਾਂ Gateway ਮਾਡਲ ਕਰਦਾ ਹੈ ਅਤੇ ਉਪਲਬਧ ਨਾ ਹੋਵੇ ਤਾਂ ਡਿਵਾਈਸ ਵਰਤਿਆ ਜਾਂਦਾ ਹੈ।",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਿੱਚ ਬਹੁਤ ਸਮਾਂ ਲੱਗਾ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "gatewayModelUnavailable": "ਇਹ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਤਰਜੀਹਾਂ ਵਿੱਚ ਕੋਈ ਹੋਰ ਚੁਣੋ।",
     "gatewaySignInRequired": "Kilo Gateway ਬਦਲੀ ਵਰਤਣ ਲਈ ਸਾਈਨ ਇਨ ਕਰੋ।",
-    "gatewayNoModel": "ਪਹਿਲਾਂ ਤਰਜੀਹਾਂ ਵਿੱਚ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਚੁਣੋ।",
-    "enginesFailed": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣਾ Kilo Gateway ਅਤੇ ਇਸ ਡਿਵਾਈਸ 'ਤੇ ਅਸਫਲ ਰਿਹਾ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਚੈੱਕ ਕਰੋ ਜਾਂ ਤਰਜੀਹਾਂ ਵਿੱਚ ਬਦਲਣ ਸੈਟਿੰਗਾਂ ਬਦਲੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-    "engineFellBackToDevice": "ਗੇਟਵੇ ਰਾਹੀਂ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣਾ ਉਪਲਬਧ ਨਹੀਂ ਹੈ — ਤੁਹਾਡੇ ਡਿਵਾਈਸ ਦਾ ਪਛਾਣਕਰਤਾ ਵਰਤਿਆ ਜਾ ਰਿਹਾ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕਹੋ।",
-    "engineFellBackToGateway": "ਡਿਵਾਈਸ ਦੀ ਪਛਾਣ ਅਸਫਲ ਰਹੀ — Kilo Gateway ਵਰਤਿਆ ਜਾ ਰਿਹਾ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕਹੋ।"
+    "gatewayNoModel": "ਪਹਿਲਾਂ ਤਰਜੀਹਾਂ ਵਿੱਚ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਚੁਣੋ।"
   },
   "share": {
     "title": "Kilo ਵਿੱਚ ਸਾਂਝਾ ਕਰਨਾ",

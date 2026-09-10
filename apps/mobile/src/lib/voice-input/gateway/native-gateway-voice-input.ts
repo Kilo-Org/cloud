@@ -2,12 +2,35 @@ import { AudioModule, AudioQuality, RecordingPresets, setAudioModeAsync } from '
 import * as SecureStore from 'expo-secure-store';
 
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
+import { fetchTranscriptionModels } from '@/lib/hooks/use-transcription-models';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 import { createGatewayVoiceInputEngine, type GatewayRecorder } from './gateway-voice-input-engine';
-import { readGatewayTranscriptionModel } from './gateway-transcription-preference';
+import {
+  type GatewayTranscriptionModel,
+  readGatewayTranscriptionModel,
+} from './gateway-transcription-preference';
 
 const HIGH_QUALITY = RecordingPresets.HIGH_QUALITY;
+
+/**
+ * The model the gateway engine transcribes with: the stored choice, else the
+ * first model the gateway catalogue offers, else null. A catalogue that
+ * cannot be reached reads as "no model", which surfaces the actionable picker
+ * message on the first dictation instead of an upload that must fail.
+ */
+export async function resolveGatewayTranscriptionModelId(): Promise<GatewayTranscriptionModel | null> {
+  const stored = readGatewayTranscriptionModel();
+  if (stored !== null) {
+    return stored;
+  }
+  try {
+    const models = await fetchTranscriptionModels();
+    return models[0] ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * The recorder is constructed with the preset's common keys only and receives
@@ -75,7 +98,7 @@ export const gatewayVoiceInputNative = createGatewayVoiceInputEngine({
       },
     };
   },
-  readModelId: readGatewayTranscriptionModel,
+  readModelId: resolveGatewayTranscriptionModelId,
   readAuthToken: getAuthTokenForRequest,
   readOrganizationId: async () => {
     const value = await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);

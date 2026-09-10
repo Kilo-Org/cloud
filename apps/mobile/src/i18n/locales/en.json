@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Gateway transcription",
     "gatewayTranscriptionSubtitle": "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway.",
-    "gatewayTranscriptionPrimary": "Use as primary",
-    "gatewayTranscriptionPrimarySubtitle": "Lead voice transcription with the gateway model, falling back to the device when it is unavailable.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2595,10 +2593,7 @@
     "gatewayTimeout": "Transcription took too long. Try again.",
     "gatewayModelUnavailable": "This transcription model isn't available. Pick another one in Preferences.",
     "gatewaySignInRequired": "Sign in to use gateway transcription.",
-    "gatewayNoModel": "Choose a transcription model in Preferences first.",
-    "enginesFailed": "Voice transcription failed on the Kilo gateway and on this device. Check your connection, or change your transcription settings in Preferences, then try again.",
-    "engineFellBackToDevice": "Gateway transcription unavailable — using your device's recogniser. Please say it again.",
-    "engineFellBackToGateway": "Device recognition failed — using the Kilo gateway. Please say it again."
+    "gatewayNoModel": "Choose a transcription model in Preferences first."
   },
   "share": {
     "title": "Share to Kilo",

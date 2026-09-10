@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "التفريغ الصوتي عبر Kilo Gateway",
     "gatewayTranscriptionSubtitle": "حوّل الإدخال الصوتي إلى نص باستخدام أحد نماذج Kilo Gateway بدلاً من التعرف على الكلام في جهازك. يُرسل تسجيلك إلى Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "استخدمه كأساسي",
-    "gatewayTranscriptionPrimarySubtitle": "ابدأ التفريغ الصوتي بنموذج البوابة، مع الرجوع إلى الجهاز عندما يكون غير متاح.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
@@ -2201,10 +2199,7 @@
     "gatewayTimeout": "استغرق التفريغ وقتًا طويلًا. حاول مرة أخرى.",
     "gatewayModelUnavailable": "نموذج التفريغ الصوتي هذا غير متاح. اختر نموذجًا آخر من التفضيلات.",
     "gatewaySignInRequired": "سجّل الدخول لاستخدام التفريغ الصوتي عبر Kilo Gateway.",
-    "gatewayNoModel": "اختر نموذج التفريغ الصوتي في التفضيلات أولًا.",
-    "enginesFailed": "فشل التفريغ الصوتي على Kilo Gateway وعلى هذا الجهاز. تحقق من اتصالك، أو غيّر إعدادات التفريغ الصوتي في التفضيلات، ثم حاول مرة أخرى.",
-    "engineFellBackToDevice": "التفريغ عبر Kilo Gateway غير متاح — يتم استخدام أداة التعرّف على جهازك. يُرجى قول ذلك مرة أخرى.",
-    "engineFellBackToGateway": "فشل التعرّف على الجهاز — يتم استخدام Kilo Gateway. يُرجى قول ذلك مرة أخرى."
+    "gatewayNoModel": "اختر نموذج التفريغ الصوتي في التفضيلات أولًا."
   },
   "share": {
     "title": "المشاركة مع Kilo",

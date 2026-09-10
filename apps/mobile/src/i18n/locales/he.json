@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "תמלול דרך Kilo Gateway",
     "gatewayTranscriptionSubtitle": "תמלל את ההכתבה בעזרת מודל של Kilo Gateway במקום זיהוי הדיבור של המכשיר. ההקלטה נשלחת ל־Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "השתמש כראשי",
-    "gatewayTranscriptionPrimarySubtitle": "התמלול מתחיל במודל ה-Gateway, וכשהוא לא זמין עובר למכשיר.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
@@ -2159,10 +2157,7 @@
     "gatewayTimeout": "התמלול ארך יותר מדי. נסה שוב.",
     "gatewayModelUnavailable": "מודל התמלול הזה אינו זמין. בחר מודל אחר בהעדפות.",
     "gatewaySignInRequired": "היכנס כדי להשתמש בתמלול דרך Kilo Gateway.",
-    "gatewayNoModel": "בחר קודם מודל תמלול בהעדפות.",
-    "enginesFailed": "התמלול נכשל ב-Kilo Gateway וגם במכשיר הזה. בדוק את החיבור שלך, או שנה את הגדרות התמלול בהעדפות, ואז נסה שוב.",
-    "engineFellBackToDevice": "תמלול דרך ה-Gateway אינו זמין — נעשה שימוש בזיהוי הדיבור שבמכשיר שלך. נסה לומר שוב.",
-    "engineFellBackToGateway": "זיהוי המכשיר נכשל — נעשה שימוש ב-Kilo Gateway. נסה לומר שוב."
+    "gatewayNoModel": "בחר קודם מודל תמלול בהעדפות."
   },
   "share": {
     "title": "שיתוף עם Kilo",

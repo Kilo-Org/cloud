@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Átírás Kilo Gateway-n keresztül",
     "gatewayTranscriptionSubtitle": "Írd át a hangbevitelt egy Kilo Gateway-modell segítségével az eszköz beszédfelismerése helyett. A felvételt elküldjük a Kilo Gateway-nek.",
-    "gatewayTranscriptionPrimary": "Elsődlegesként használ",
-    "gatewayTranscriptionPrimarySubtitle": "Az átírást a Gateway-modell vezeti, és ha nem érhető el, az eszközre vált.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Túl sokáig tartott az átírás. Próbáld újra.",
     "gatewayModelUnavailable": "Ez az átírási modell nem érhető el. Válassz egy másikat a Beállításokban.",
     "gatewaySignInRequired": "Jelentkezz be a Kilo Gateway-es átírás használatához.",
-    "gatewayNoModel": "Először válassz egy átírási modellt a Beállításokban.",
-    "enginesFailed": "Az átírás a Kilo Gatewayen és ezen az eszközön is meghiúsult. Ellenőrizd a kapcsolatot, vagy módosítsd az átírási beállításokat a Beállításokban, majd próbáld újra.",
-    "engineFellBackToDevice": "Az átírás a Gatewayen keresztül nem érhető el — az eszközöd felismerője van használatban. Kérlek, mondd el újra.",
-    "engineFellBackToGateway": "Az eszköz felismerése meghiúsult — a Kilo Gateway van használatban. Kérlek, mondd el újra."
+    "gatewayNoModel": "Először válassz egy átírási modellt a Beállításokban."
   },
   "share": {
     "title": "Megosztás a Kilo alkalmazással",

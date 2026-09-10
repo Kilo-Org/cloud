@@ -42,8 +42,6 @@ export const RETURN_SENDS_MESSAGE_KEY = 'return-sends-message';
 export const GATEWAY_TRANSCRIPTION_ENABLED_KEY = 'gateway-transcription-enabled';
 /** Persisted `{ id, name }` of the chosen gateway transcription model (null = none chosen). */
 export const GATEWAY_TRANSCRIPTION_MODEL_KEY = 'gateway-transcription-model';
-/** Whether the gateway leads voice transcription when enabled (default on). */
-export const GATEWAY_TRANSCRIPTION_PRIMARY_KEY = 'gateway-transcription-primary';
 /** Revocable per-host list of markdown link hosts that open without an Alert. */
 export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';

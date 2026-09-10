@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Trawsgrifio drwy Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Trawsgrifiwch fewnbwn llais â model Kilo Gateway yn lle adnabod lleferydd y ddyfais. Anfonir eich recordiad i Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Defnyddio fel prif",
-    "gatewayTranscriptionPrimarySubtitle": "Mae trawsgrifio yn cael ei arwain gan y model Gateway, gan ddychwelyd i'r ddyfais pan nad yw ar gael.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2663,10 +2661,7 @@
     "gatewayTimeout": "Cymrodd y trawsgrifio rhy lawer o amser. Ceisiwch eto.",
     "gatewayModelUnavailable": "Nid yw'r model trawsgrifio hwn ar gael. Dewiswch un arall yn y Dewisiadau.",
     "gatewaySignInRequired": "Mewngofnodwch i ddefnyddio trawsgrifio drwy Kilo Gateway.",
-    "gatewayNoModel": "Dewiswch fodel trawsgrifio yn y Dewisiadau yn gyntaf.",
-    "enginesFailed": "Methodd y trawsgrifio ar Kilo Gateway ac ar y ddyfais hon. Gwiriwch eich cysylltiad, neu newidiwch osodiadau trawsgrifio yn y Dewisiadau, wedyn ceisiwch eto.",
-    "engineFellBackToDevice": "Nid yw trawsgrifio drwy'r Gateway ar gael — mae adnabod ar eich dyfais yn cael ei ddefnyddio. Dywedwch hynny eto, os gwelwch yn dda.",
-    "engineFellBackToGateway": "Methodd adnabod y dyfais — mae Kilo Gateway yn cael ei ddefnyddio. Dywedwch hynny eto, os gwelwch yn dda."
+    "gatewayNoModel": "Dewiswch fodel trawsgrifio yn y Dewisiadau yn gyntaf."
   },
   "share": {
     "title": "Rhannu â Kilo",

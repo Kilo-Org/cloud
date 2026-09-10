@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcriere cu Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcrie dictarea cu un model Kilo Gateway în loc de recunoașterea vocală a dispozitivului. Înregistrarea este trimisă către Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Folosește ca principal",
-    "gatewayTranscriptionPrimarySubtitle": "Transcrierea este condusă de modelul Gateway, revenind la dispozitiv când acesta nu este disponibil.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2600,10 +2598,7 @@
     "gatewayTimeout": "Transcrierea a durat prea mult. Încearcă din nou.",
     "gatewayModelUnavailable": "Acest model de transcriere nu este disponibil. Alege altul în Preferințe.",
     "gatewaySignInRequired": "Autentifică-te pentru a folosi transcrierea cu Kilo Gateway.",
-    "gatewayNoModel": "Alege mai întâi un model de transcriere în Preferințe.",
-    "enginesFailed": "Transcrierea a eșuat atât pe Kilo Gateway, cât și pe acest dispozitiv. Verifică conexiunea sau schimbă setările de transcriere în Preferințe, apoi încearcă din nou.",
-    "engineFellBackToDevice": "Transcrierea prin gateway nu este disponibilă — se folosește recunoscătorul dispozitivului tău. Spune-o din nou, te rugăm.",
-    "engineFellBackToGateway": "Recunoașterea pe dispozitiv a eșuat — se folosește Kilo Gateway. Spune-o din nou, te rugăm."
+    "gatewayNoModel": "Alege mai întâi un model de transcriere în Preferințe."
   },
   "share": {
     "title": "Distribuire către Kilo",

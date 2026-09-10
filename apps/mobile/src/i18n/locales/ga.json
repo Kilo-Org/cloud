@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Tras-scríobh tríd an Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Déan an t-ionchur gutha a thras-scríobh le samhail Kilo Gateway in ionad aithint cainte an ghléis. Seoltar do thaifeadadh chuig an Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Úsáid mar phríomhrogha",
-    "gatewayTranscriptionPrimarySubtitle": "Treoraíonn samhail an gheata an tras-scríobh, agus úsáidtear an gléas nuair nach bhfuil sí ar fáil.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2642,10 +2640,7 @@
     "gatewayTimeout": "Thóg an tras-scríobh rófhada. Bain triail as arís.",
     "gatewayModelUnavailable": "Níl an samhail tras-scríobh seo ar fáil. Roghnaigh ceann eile sna Roghanna.",
     "gatewaySignInRequired": "Sínigh isteach chun tras-scríobh tríd an Kilo Gateway a úsáid.",
-    "gatewayNoModel": "Roghnaigh samhail tras-scríobh sna Roghanna ar dtús.",
-    "enginesFailed": "Theip ar an tras-scríobh ar an Kilo Gateway agus ar an ngléas seo. Seiceáil do cheangal, nó athraigh socruithe an tras-scríobha sna Roghanna, agus bain triail as arís.",
-    "engineFellBackToDevice": "Níl an tras-scríobh trí Gateway ar fáil — úsáidtear aithinteoir do ghléis. Abair é arís, le do thoil.",
-    "engineFellBackToGateway": "Theip ar aithint ar an ngléas — úsáidtear Kilo Gateway. Abair é arís, le do thoil."
+    "gatewayNoModel": "Roghnaigh samhail tras-scríobh sna Roghanna ar dtús."
   },
   "share": {
     "title": "Comhroinnt le Kilo",

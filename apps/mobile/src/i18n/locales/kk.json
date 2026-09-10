@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway арқылы дауысты мәтінге айналдыру",
     "gatewayTranscriptionSubtitle": "Дауыстық енгізуді құрылғының сөзді тануының орнына Kilo Gateway моделі арқылы мәтінге айналдырыңыз. Жазбаңыз Kilo Gateway-ге жіберіледі.",
-    "gatewayTranscriptionPrimary": "Негізгі ретінде пайдалану",
-    "gatewayTranscriptionPrimarySubtitle": "Дауысты мәтінге айналдыруды Gateway моделі басқарады, ол қолжетімсіз болғанда құрылғыға ауысады.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Дауысты мәтінге айналдыру тым ұзақ созылды. Қайталап көріңіз.",
     "gatewayModelUnavailable": "Бұл дауысты мәтінге айналдыру моделі қолжетімсіз. Параметрлерден басқасын таңдаңыз.",
     "gatewaySignInRequired": "Kilo Gateway арқылы айналдыруды қолдану үшін жүйеге кіріңіз.",
-    "gatewayNoModel": "Алдымен Параметрлерден дауысты мәтінге айналдыру моделін таңдаңыз.",
-    "enginesFailed": "Дауысты мәтінге айналдыру Kilo Gateway-де де, осы құрылғыда да сәтсіз аяқталды. Байланысты тексеріңіз немесе Параметрлерде дауысты мәтінге айналдыру параметрлерін өзгертіп, қайталап көріңіз.",
-    "engineFellBackToDevice": "Gateway арқылы мәтінге айналдыру қолжетімсіз — құрылғыңыздағы тану жүйесі пайдаланылуда. Қайталап айтыңыз.",
-    "engineFellBackToGateway": "Құрылғыдағы тану сәтсіз аяқталды — Kilo Gateway пайдаланылуда. Қайталап айтыңыз."
+    "gatewayNoModel": "Алдымен Параметрлерден дауысты мәтінге айналдыру моделін таңдаңыз."
   },
   "share": {
     "title": "Kilo-ға жіберу",

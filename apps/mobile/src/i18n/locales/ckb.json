@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "گۆڕینی دەنگ بۆ دەق بە Kilo Gateway",
     "gatewayTranscriptionSubtitle": "دەنگەکانت بە مۆدێلێکی Kilo Gateway بگۆڕە بۆ دەق، نەک بە ناسینەوەی قسەکردنی ئامێرەکەت. تۆمارەکەت بۆ Kilo Gateway دەنێردرێت.",
-    "gatewayTranscriptionPrimary": "وەک سەرەکی بەکاری بهێنە",
-    "gatewayTranscriptionPrimarySubtitle": "گۆڕینی دەنگ بۆ دەق بە مۆدێلی Gateway دەست پێدەکات، ئەگەر بەردەست نەبوو دەگەڕێتەوە بۆ ئامێرەکە.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "گۆڕینی دەنگ بۆ دەق زۆر درێژەی خایاند. دووبارە هەوڵ بدە.",
     "gatewayModelUnavailable": "ئەم مۆدێلەی گۆڕینی دەنگ بۆ دەق بەردەست نییە. لە ڕێکخستنە کەسییەکان یەکی تر هەڵبژێرە.",
     "gatewaySignInRequired": "بچۆ ژوورەوە بۆ بەکارهێنانی گۆڕینی دەنگ بە Kilo Gateway.",
-    "gatewayNoModel": "سەرەتا لە ڕێکخستنە کەسییەکان مۆدێلێکی گۆڕینی دەنگ بۆ دەق هەڵبژێرە.",
-    "enginesFailed": "گۆڕینی دەنگ بۆ دەق لە Kilo Gateway و لەم ئامێرەدا سەرکەوتوو نەبوو. پەیوەندیت بپشکنە یان لە ڕێکخستنە کەسییەکان ڕێکخستنەکانی گۆڕینی دەنگ بۆ دەق بگۆڕە، پاشان دووبارە هەوڵ بدە.",
-    "engineFellBackToDevice": "گۆڕینی دەنگ بۆ دەق بە Gateway بەردەست نییە — ناسێنەری ئامێرەکەت بەکاردەهێنرێت. تکایە دووبارە بڵێ.",
-    "engineFellBackToGateway": "ناسینەوەی ئامێر سەرکەوتوو نەبوو — Kilo Gateway بەکاردەهێنرێت. تکایە دووبارە بڵێ."
+    "gatewayNoModel": "سەرەتا لە ڕێکخستنە کەسییەکان مۆدێلێکی گۆڕینی دەنگ بۆ دەق هەڵبژێرە."
   },
   "share": {
     "title": "هاوبەشکردن بۆ Kilo",

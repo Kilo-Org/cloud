@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "使用 Kilo Gateway 转写",
     "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型转写语音输入，而不使用设备上的语音识别。您的录音将发送至 Kilo Gateway。",
-    "gatewayTranscriptionPrimary": "设为主要",
-    "gatewayTranscriptionPrimarySubtitle": "优先使用 Gateway 模型进行转写，模型不可用时改用设备。",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
@@ -2145,10 +2143,7 @@
     "gatewayTimeout": "转写耗时过长。请重试。",
     "gatewayModelUnavailable": "此转写模型不可用。请在偏好设置中选择其他模型。",
     "gatewaySignInRequired": "登录后可使用 Kilo Gateway 转写。",
-    "gatewayNoModel": "请先在偏好设置中选择转写模型。",
-    "enginesFailed": "在 Kilo Gateway 和此设备上转写均失败。请检查网络连接，或在偏好设置中更改转写设置，然后重试。",
-    "engineFellBackToDevice": "Gateway 转写不可用，正在使用设备自带的识别功能。请再说一遍。",
-    "engineFellBackToGateway": "设备识别失败，正在使用 Kilo Gateway。请再说一遍。"
+    "gatewayNoModel": "请先在偏好设置中选择转写模型。"
   },
   "share": {
     "title": "分享到 Kilo",

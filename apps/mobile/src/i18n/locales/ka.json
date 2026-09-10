@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "ტრანსკრიფცია Kilo Gateway-ით",
     "gatewayTranscriptionSubtitle": "ხმოვანი შეყვანა აქციეთ ტექსტად Kilo Gateway-ის მოდელით, მოწყობილობის მეტყველების ამოცნობის ნაცვლად. თქვენი ჩანაწერი იგზავნება Kilo Gateway-ში.",
-    "gatewayTranscriptionPrimary": "გამოიყენე ძირითადად",
-    "gatewayTranscriptionPrimarySubtitle": "ტრანსკრიფციას ხელმძღვანელობს Gateway-ის მოდელი, ხოლო მისი მიუწვდომლობის შემთხვევაში გამოიყენება მოწყობილობა.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "ტრანსკრიფციამ ძალიან ბევრი დრო დაისვა. სცადე ხელახლა.",
     "gatewayModelUnavailable": "ტრანსკრიფციის ეს მოდელი მიუწვდომელია. აირჩიეთ სხვა პარამეტრებში.",
     "gatewaySignInRequired": "შედით, რომ გამოიყენოთ ტრანსკრიფცია Kilo Gateway-ით.",
-    "gatewayNoModel": "ჯერ აირჩიეთ ტრანსკრიფციის მოდელი პარამეტრებში.",
-    "enginesFailed": "ტრანსკრიფცია ჩავარდა როგორც Kilo Gateway-ზე, ისე ამ მოწყობილობაზე. შეამოწმე კავშირი ან შეცვალე ტრანსკრიფციის პარამეტრები პარამეტრებში, შემდეგ სცადე ხელახლა.",
-    "engineFellBackToDevice": "Gateway-ით ტრანსკრიფცია ხელმისაწვდომი არ არის — გამოიყენება თქვენი მოწყობილობის ამომცნობი. გთხოვთ, ხელახლა თქვით.",
-    "engineFellBackToGateway": "მოწყობილობის ამოცნობა ჩავარდა — გამოიყენება Kilo Gateway. გთხოვთ, ხელახლა თქვით."
+    "gatewayNoModel": "ჯერ აირჩიეთ ტრანსკრიფციის მოდელი პარამეტრებში."
   },
   "share": {
     "title": "Kilo-ში გაზიარება",

@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Розпізнавання мовлення через Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Розпізнайте голосове введення за допомогою моделі Kilo Gateway замість розпізнавання мовлення на пристрої. Запис надсилається до Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Використовувати як основний",
-    "gatewayTranscriptionPrimarySubtitle": "Розпізнавання мовлення спочатку виконує модель Gateway, а коли вона недоступна — пристрій.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
@@ -2173,10 +2171,7 @@
     "gatewayTimeout": "Розпізнавання тривало задовго. Спробуйте ще раз.",
     "gatewayModelUnavailable": "Ця модель розпізнавання мовлення недоступна. Виберіть іншу в Налаштуваннях.",
     "gatewaySignInRequired": "Увійдіть, щоб використовувати розпізнавання через Kilo Gateway.",
-    "gatewayNoModel": "Спершу виберіть модель розпізнавання мовлення в Налаштуваннях.",
-    "enginesFailed": "Розпізнавання мовлення не вдалося ані через Kilo Gateway, ані на цьому пристрої. Перевірте з'єднання або змініть параметри розпізнавання мовлення в Налаштуваннях, потім спробуйте ще раз.",
-    "engineFellBackToDevice": "Розпізнавання через Gateway недоступне — використовується розпізнавач на вашому пристрої. Повторіть, будь ласка.",
-    "engineFellBackToGateway": "Розпізнавання на пристрої не вдалося — використовується Kilo Gateway. Повторіть, будь ласка."
+    "gatewayNoModel": "Спершу виберіть модель розпізнавання мовлення в Налаштуваннях."
   },
   "share": {
     "title": "Надсилання в Kilo",

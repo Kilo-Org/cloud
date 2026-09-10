@@ -7,13 +7,11 @@ import {
 
 import {
   isGatewayTranscriptionEnabled,
-  isGatewayTranscriptionPrimary,
   subscribeToGatewayTranscriptionEnabled,
-  subscribeToGatewayTranscriptionPrimary,
 } from './gateway/gateway-transcription-preference';
 import { gatewayVoiceInputNative } from './gateway/native-gateway-voice-input';
-import { createDispatchingVoiceInputNative } from './voice-input-engine-dispatch';
-import { resolveVoiceInputEngineMode } from './voice-input-engine-mode';
+import { createSelectingVoiceInputNative } from './voice-input-engine-select';
+import { resolveVoiceInputEngineName } from './voice-input-engine-mode';
 import {
   createVoiceInputController,
   type VoiceInputNative,
@@ -75,13 +73,7 @@ function bindListener<K extends keyof VoiceInputNativeEvent>(
   }
   if (event === 'transcribing') {
     // The OS recognizer has no transcribing phase; only the gateway engine
-    // emits it, and the dispatcher registers every listener on both.
-    return { remove: (): void => undefined };
-  }
-  if (event === 'engine-fell-back') {
-    // The dispatcher synthesises this event itself; the OS recognizer never
-    // emits it. Without this branch the fall-through below would misbind
-    // the listener to the native `end` event.
+    // emits it, and the selector registers listeners on the chosen engine.
     return { remove: (): void => undefined };
   }
   return module.addListener('end', listener as (event: null) => void);
@@ -119,25 +111,19 @@ const native: VoiceInputNative = {
   },
 };
 
-// The two engines are primary/fallback, chosen by the live switch + mode
-// preferences: the gateway switch off means device-only with the gateway
-// never called at all; on, 'Use as primary' decides which engine leads and
-// which one backs it up. The OS binding above is the `os` half of the
-// dispatcher.
-const dispatchingNative = createDispatchingVoiceInputNative(native, gatewayVoiceInputNative, () =>
-  resolveVoiceInputEngineMode(isGatewayTranscriptionEnabled(), isGatewayTranscriptionPrimary())
+// Exactly one engine runs per session, chosen by the live gateway switch:
+// off sends every dictation to the OS recogniser, on sends every dictation
+// to the Kilo gateway. The OS binding above is the `os` half of the selector.
+const selectingNative = createSelectingVoiceInputNative(
+  { os: native, gateway: gatewayVoiceInputNative },
+  () => resolveVoiceInputEngineName(isGatewayTranscriptionEnabled())
 );
 
-export const voiceInputController = createVoiceInputController(dispatchingNative);
+export const voiceInputController = createVoiceInputController(selectingNative);
 
 // Availability is captured once at controller construction, so a gateway
 // toggle must recompute it: on an OS-unavailable device, enabling gateway
-// transcription has to surface the mic button without an app restart. The
-// primary mode flips availability the same way (device-only tracks the OS
-// recogniser alone, either primary mode tracks whichever engine leads).
+// transcription has to surface the mic button without an app restart.
 subscribeToGatewayTranscriptionEnabled(() => {
-  voiceInputController.refreshAvailability();
-});
-subscribeToGatewayTranscriptionPrimary(() => {
   voiceInputController.refreshAvailability();
 });

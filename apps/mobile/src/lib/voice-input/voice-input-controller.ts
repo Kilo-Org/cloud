@@ -23,7 +23,6 @@ import {
   type PendingVoiceInputStart,
   waitForTerminal,
 } from './voice-input-controller-helpers';
-import { type VoiceInputEngineName } from './voice-input-engine-mode';
 
 export type VoiceInputNativeEvent = {
   start: null;
@@ -33,12 +32,6 @@ export type VoiceInputNativeEvent = {
   nomatch: null;
   error: { code?: number; error: string; message: string };
   end: null;
-  /**
-   * Emitted once when the dispatcher hands a live session to the fallback
-   * engine: the lead failed mid-session, so the utterance recorded so far is
-   * gone and the user must say it again.
-   */
-  'engine-fell-back': { from: VoiceInputEngineName; to: VoiceInputEngineName };
 };
 
 export type VoiceInputNativePermission = {

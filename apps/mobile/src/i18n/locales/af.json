@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Gateway-transkripsie",
     "gatewayTranscriptionSubtitle": "Transkribeer steminvoer met 'n Kilo Gateway-model in plaas van die toestel se spraakherkenning. Jou opname word na die Kilo Gateway gestuur.",
-    "gatewayTranscriptionPrimary": "Gebruik as primêr",
-    "gatewayTranscriptionPrimarySubtitle": "Laat stemtranskripsie met die Gateway-model begin en val terug op die toestel as dit nie beskikbaar is nie.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Die transkripsie het te lank geneem. Probeer weer.",
     "gatewayModelUnavailable": "Hierdie transkripsiemodel is nie beskikbaar nie. Kies 'n ander een in Voorkeure.",
     "gatewaySignInRequired": "Teken in om gateway-transkripsie te gebruik.",
-    "gatewayNoModel": "Kies eers 'n transkripsiemodel in Voorkeure.",
-    "enginesFailed": "Stemtranskripsie het op die Kilo Gateway en op hierdie toestel misluk. Gaan jou verbinding na, of verander jou transkripsie-instellings in Voorkeure, en probeer weer.",
-    "engineFellBackToDevice": "Gateway-transkripsie is nie beskikbaar nie — die herkenner op jou toestel word gebruik. Sê dit asseblief weer.",
-    "engineFellBackToGateway": "Die herkenning op die toestel het misluk — die Kilo Gateway word gebruik. Sê dit asseblief weer."
+    "gatewayNoModel": "Kies eers 'n transkripsiemodel in Voorkeure."
   },
   "share": {
     "title": "Deel met Kilo",

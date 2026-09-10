@@ -2054,8 +2054,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Trascrizione con Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Trascrivi la dettatura con un modello Kilo Gateway anziché con il riconoscimento vocale del dispositivo. La registrazione viene inviata a Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Usa come principale",
-    "gatewayTranscriptionPrimarySubtitle": "La trascrizione è guidata dal modello del Gateway e, se non è disponibile, passa al dispositivo.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "addCredits": {
@@ -2159,10 +2157,7 @@
     "gatewayTimeout": "La trascrizione ha richiesto troppo tempo. Riprova.",
     "gatewayModelUnavailable": "Questo modello di trascrizione non è disponibile. Scegline un altro in Preferenze.",
     "gatewaySignInRequired": "Accedi per usare la trascrizione con Kilo Gateway.",
-    "gatewayNoModel": "Scegli prima un modello di trascrizione in Preferenze.",
-    "enginesFailed": "La trascrizione non è riuscita su Kilo Gateway e su questo dispositivo. Controlla la connessione, o modifica le impostazioni di trascrizione in Preferenze, poi riprova.",
-    "engineFellBackToDevice": "La trascrizione tramite gateway non è disponibile — viene usato il riconoscimento del tuo dispositivo. Ripeti, per favore.",
-    "engineFellBackToGateway": "Il riconoscimento del dispositivo non è riuscito — viene usato Kilo Gateway. Ripeti, per favore."
+    "gatewayNoModel": "Scegli prima un modello di trascrizione in Preferenze."
   },
   "share": {
     "title": "Condivisione su Kilo",

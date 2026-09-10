@@ -1,7 +1,5 @@
 import { i18n } from '@/i18n';
 
-import { type VoiceInputEngineName } from './voice-input-engine-mode';
-
 export type VoiceInputStatus = 'idle' | 'starting' | 'listening' | 'transcribing' | 'stopping';
 export type VoiceInputAvailability = 'available' | 'unavailable';
 
@@ -10,13 +8,6 @@ export type VoiceInputFeedback = {
   availability: VoiceInputAvailability;
   message: string;
   retryable: boolean;
-  /**
-   * Render tone for a toast presentation. Default (absent) is the error
-   * tone. The mid-session engine hand-off is a transition notice, not a
-   * failure — rendering it with the error icon tells the user something
-   * broke when the session in fact continues on the other engine.
-   */
-  tone?: 'error' | 'info';
 };
 
 export type VoiceTranscriptState = {
@@ -187,16 +178,6 @@ export function classifyVoiceInputError(code: string): VoiceInputFeedback {
         retryable: true,
       };
     }
-    case 'voice-engines-failed': {
-      // The primary engine failed and the fallback failed too. One message
-      // naming both and what the user can do — never two bare errors.
-      return {
-        action: 'none',
-        availability: 'available',
-        message: i18n.t('voiceInput.enginesFailed'),
-        retryable: true,
-      };
-    }
     case 'busy': {
       return {
         action: 'none',
@@ -251,29 +232,6 @@ export function classifyVoiceInputError(code: string): VoiceInputFeedback {
       };
     }
   }
-}
-
-/**
- * The one feedback for a mid-session engine hand-off: the lead engine failed
- * after the session went live, so the take the user just recorded is gone
- * and the fallback engine is already listening for a repeat. The message
- * names what failed and what took over — direction-aware, one toast, and an
- * informational tone: the session is live, not broken.
- */
-export function classifyVoiceInputEngineFallback(fallback: {
-  from: VoiceInputEngineName;
-  to: VoiceInputEngineName;
-}): VoiceInputFeedback {
-  return {
-    action: 'none',
-    availability: 'available',
-    message:
-      fallback.from === 'gateway'
-        ? i18n.t('voiceInput.engineFellBackToDevice')
-        : i18n.t('voiceInput.engineFellBackToGateway'),
-    retryable: true,
-    tone: 'info',
-  };
 }
 
 export function shouldAbortVoiceInput(input: VoiceInputLifecycleInput): boolean {

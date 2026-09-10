@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ಮೂಲಕ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವಿಕೆ",
     "gatewayTranscriptionSubtitle": "ಸಾಧನದ ಮಾತು ಗುರುತಿಸುವಿಕೆಗೆ ಬದಲಾಗಿ Kilo Gateway ಮಾದರಿಯನ್ನು ಬಳಸಿ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಅನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಿ. ನಿಮ್ಮ ಧ್ವನಿಮುದ್ರಣ Kilo Gateway ಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ.",
-    "gatewayTranscriptionPrimary": "ಪ್ರಾಥಮಿಕವಾಗಿ ಬಳಸಿ",
-    "gatewayTranscriptionPrimarySubtitle": "ಧ್ವನಿಯನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಕೆಲಸವನ್ನು Gateway ಮಾದರಿ ಮುನ್ನಡೆಸುತ್ತದೆ; ಲಭ್ಯವಿಲ್ಲದಿದ್ದಾಗ ಸಾಧನವನ್ನು ಬಳಸಲಾಗುತ್ತದೆ.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಲು ತುಂಬಾ ಸಮಯ ತೆಗೆದುಕೊಂಡಿತು. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "gatewayModelUnavailable": "ಈ ಪರಿವರ್ತನಾ ಮಾದರಿ ಲಭ್ಯವಿಲ್ಲ. ಆದ್ಯತೆಗಳಲ್ಲಿ ಇನ್ನೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
     "gatewaySignInRequired": "Kilo Gateway ಪರಿವರ್ತನೆಯನ್ನು ಬಳಸಲು ಸೈನ್ ಇನ್ ಮಾಡಿ.",
-    "gatewayNoModel": "ಮೊದಲು ಆದ್ಯತೆಗಳಲ್ಲಿ ಪರಿವರ್ತನಾ ಮಾದರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
-    "enginesFailed": "ಧ್ವನಿಯನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವಿಕೆ Kilo Gateway ನಲ್ಲಿ ಮತ್ತು ಈ ಸಾಧನದಲ್ಲಿ ವಿಫಲವಾಗಿದೆ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಅಥವಾ ಆದ್ಯತೆಗಳಲ್ಲಿ ಪರಿವರ್ತನಾ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಬದಲಾಯಿಸಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-    "engineFellBackToDevice": "ಗೇಟ್‌ವೇ ಮೂಲಕ ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತನೆ ಲಭ್ಯವಿಲ್ಲ — ನಿಮ್ಮ ಸಾಧನದ ಗುರುತಿಸುವಿಕೆ ಬಳಸಲಾಗುತ್ತಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳಿ.",
-    "engineFellBackToGateway": "ಸಾಧನದ ಗುರುತಿಸುವಿಕೆ ವಿಫಲವಾಗಿದೆ — Kilo Gateway ಬಳಸಲಾಗುತ್ತಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳಿ."
+    "gatewayNoModel": "ಮೊದಲು ಆದ್ಯತೆಗಳಲ್ಲಿ ಪರಿವರ್ತನಾ ಮಾದರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ."
   },
   "share": {
     "title": "Kiloಗೆ ಹಂಚಿಕೆ",

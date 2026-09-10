@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "ການຖອດສຽງເປັນຂໍ້ຄວາມຜ່ານ Kilo Gateway",
     "gatewayTranscriptionSubtitle": "ຖອດການປ້ອນຂໍ້ຄວາມດ້ວຍສຽງເປັນຂໍ້ຄວາມດ້ວຍໂມເດວ Kilo Gateway ແທນການຈຳລາສຽງພາຍໃນອຸປະກອນ. ໄຟລ໌ບັນທຶກສຽງຂອງທ່ານຈະຖືກສົ່ງໄປ Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "ໃຊ້ເປັນຫຼັກ",
-    "gatewayTranscriptionPrimarySubtitle": "ການຖອດສຽງນຳພາໂດຍໂມເດວ Gateway ແລະ ໃຊ້ອຸປະກອນເມື່ອໂມເດວບໍ່ສາມາດໃຊ້ໄດ້.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "ການຖອດສຽງໃຊ້ເວລາດົນເກີນໄປ. ລອງອີກຄັ້ງ.",
     "gatewayModelUnavailable": "ໂມເດວຖອດສຽງນີ້ບໍ່ມີໃຫ້ໃຊ້. ເລືອກໂມເດວອື່ນໃນການຕັ້ງຄ່າສ່ວນຕົວ.",
     "gatewaySignInRequired": "ເຂົ້າສູ່ລະບົບເພື່ອໃຊ້ການຖອດສຽງຜ່ານ Kilo Gateway.",
-    "gatewayNoModel": "ເລືອກໂມເດວຖອດສຽງໃນການຕັ້ງຄ່າສ່ວນຕົວກ່ອນ.",
-    "enginesFailed": "ການຖອດສຽງລົ້ມເຫຼວທັງໃນ Kilo Gateway ແລະ ໃນອຸປະກອນນີ້. ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ຫຼື ປ່ຽນການຕັ້ງຄ່າການຖອດສຽງໃນການຕັ້ງຄ່າສ່ວນຕົວ ແລ້ວລອງອີກຄັ້ງ.",
-    "engineFellBackToDevice": "ການຖອດສຽງຜ່ານ Gateway ບໍ່ສາມາດໃຊ້ໄດ້ — ກຳລັງໃຊ້ຕົວຈຳແນກໃນອຸປະກອນຂອງທ່ານ. ກະລຸນາເວົ້າຄືນ.",
-    "engineFellBackToGateway": "ການຈຳແນກໃນອຸປະກອນລົ້ມເຫຼວ — ກຳລັງໃຊ້ Kilo Gateway. ກະລຸນາເວົ້າຄືນ."
+    "gatewayNoModel": "ເລືອກໂມເດວຖອດສຽງໃນການຕັ້ງຄ່າສ່ວນຕົວກ່ອນ."
   },
   "share": {
     "title": "ແບ່ງປັນໄປທີ່ Kilo",

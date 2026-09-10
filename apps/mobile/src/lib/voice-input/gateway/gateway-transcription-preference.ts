@@ -5,7 +5,6 @@ import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference
 import {
   GATEWAY_TRANSCRIPTION_ENABLED_KEY,
   GATEWAY_TRANSCRIPTION_MODEL_KEY,
-  GATEWAY_TRANSCRIPTION_PRIMARY_KEY,
 } from '@/lib/storage-keys';
 
 /**
@@ -48,22 +47,10 @@ const modelStore = createSecureStorePreference<GatewayTranscriptionModel | null>
   serialize: value => JSON.stringify(value),
 });
 
-/**
- * Default-on mode: the user who enables the gateway means it to lead voice
- * transcription, so only the exact stored string 'false' demotes it.
- */
-const primaryStore = createSecureStorePreference<boolean>({
-  key: GATEWAY_TRANSCRIPTION_PRIMARY_KEY,
-  defaultValue: true,
-  parse: raw => raw !== 'false',
-  serialize: value => (value ? 'true' : 'false'),
-});
-
 // Warm both disk reads at module scope so the settings row and the first
 // toggle see the persisted value without waiting for a React mount.
 enabledStore.preload();
 modelStore.preload();
-primaryStore.preload();
 
 export function isGatewayTranscriptionEnabled(): boolean {
   return enabledStore.get();
@@ -84,20 +71,6 @@ export function readGatewayTranscriptionModel(): GatewayTranscriptionModel | nul
 
 export function writeGatewayTranscriptionModel(model: GatewayTranscriptionModel | null): void {
   modelStore.set(model);
-}
-
-/** Whether the gateway leads transcription when the switch is on (default true). */
-export function isGatewayTranscriptionPrimary(): boolean {
-  return primaryStore.get();
-}
-
-/** Non-React subscription for module-scope consumers (e.g. the engine dispatch). */
-export function subscribeToGatewayTranscriptionPrimary(listener: () => void): () => void {
-  return primaryStore.subscribe(listener);
-}
-
-export function setGatewayTranscriptionPrimary(value: boolean): void {
-  primaryStore.set(value);
 }
 
 /** Settings UI binding for the gateway-transcription switch. */
@@ -123,14 +96,4 @@ export function useGatewayTranscriptionModel(): GatewayTranscriptionModel | null
  */
 export function useGatewayTranscriptionModelLoaded(): boolean {
   return useSyncExternalStore(modelStore.subscribe, modelStore.getHasLoaded);
-}
-
-/** Settings UI binding for the gateway "use as primary" mode toggle. */
-export function useGatewayTranscriptionPrimaryPreference() {
-  const gatewayTranscriptionPrimary = useSyncExternalStore(
-    primaryStore.subscribe,
-    primaryStore.get
-  );
-  const hasLoaded = useSyncExternalStore(primaryStore.subscribe, primaryStore.getHasLoaded);
-  return { gatewayTranscriptionPrimary, hasLoaded, setGatewayTranscriptionPrimary };
 }

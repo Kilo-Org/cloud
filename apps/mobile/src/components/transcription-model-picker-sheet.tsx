@@ -50,6 +50,9 @@ export function TranscriptionModelPickerSheet() {
   const insets = useSafeAreaInsets();
   const { models, isLoading, isError, refetch } = useTranscriptionModels();
   const storedModel = useGatewayTranscriptionModel();
+  // With no explicit choice the gateway's first catalogue model is the
+  // default, so the check mark lands on the row the engine will run.
+  const selectedModelId = storedModel?.id ?? models[0]?.id;
   // The SecureStore read resolves after mount; until it does the stored-model
   // comparison would report "no choice" and draw every row unchecked. Hold
   // the skeleton state until both sources settle so the rows render once,
@@ -86,7 +89,7 @@ export function TranscriptionModelPickerSheet() {
             label={item.name}
             description={item.id}
             className={index < models.length - 1 ? 'border-b-[0.5px] border-hair-soft' : undefined}
-            selected={storedModel?.id === item.id}
+            selected={selectedModelId === item.id}
             onPress={() => {
               writeGatewayTranscriptionModel({ id: item.id, name: item.name });
               router.back();

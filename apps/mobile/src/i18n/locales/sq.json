@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkriptim me Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripto diktimin me një model Kilo Gateway në vend të njohjes së të folurit të pajisjes. Regjistrimi yt dërgohet te Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Përdor si kryesor",
-    "gatewayTranscriptionPrimarySubtitle": "Transkriptimin e drejton fillimisht modeli i Gateway dhe kur ai nuk është i disponueshëm, përdoret pajisja.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Transkriptimi zgjati tepër. Provo përsëri.",
     "gatewayModelUnavailable": "Ky model transkriptimi nuk është i disponueshëm. Zgjidh një tjetër te Preferencat.",
     "gatewaySignInRequired": "Hyr për të përdorur transkriptimin me Kilo Gateway.",
-    "gatewayNoModel": "Së pari zgjidh një model transkriptimi te Preferencat.",
-    "enginesFailed": "Transkriptimi dështoi si në Kilo Gateway ashtu edhe në këtë pajisje. Kontrollo lidhjen tënde ose ndrysho rregullimet e transkriptimit te Preferencat, pastaj provo përsëri.",
-    "engineFellBackToDevice": "Transkriptimi përmes gateway nuk është i disponueshëm — po përdoret njohësi në pajisjen tënde. Thuaje përsëri, të lutem.",
-    "engineFellBackToGateway": "Njohja në pajisje dështoi — po përdoret Kilo Gateway. Thuaje përsëri, të lutem."
+    "gatewayNoModel": "Së pari zgjidh një model transkriptimi te Preferencat."
   },
   "share": {
     "title": "Ndarja në Kilo",

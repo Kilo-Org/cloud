@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway bidezko transkripzioa",
     "gatewayTranscriptionSubtitle": "Transkribatu ahots-sarrera gailuaren hitz-sorgailuaren ordez Kilo Gateway eredu batekin. Zure grabaketa Kilo Gatewayra bidaltzen da.",
-    "gatewayTranscriptionPrimary": "Erabili nagusi gisa",
-    "gatewayTranscriptionPrimarySubtitle": "Transkripzioa Gateway ereduarekin egiten da lehenik, eta erabilgarri ez dagoenean gailura pasatzen da.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Transkripzioak gehiegi iraun du. Saiatu berriro.",
     "gatewayModelUnavailable": "Transkripzio-eredu hau ez dago erabilgarri. Hautatu besteren bat Hobespenetan.",
     "gatewaySignInRequired": "Hasi saioa Kilo Gateway bidezko transkripzioa erabiltzeko.",
-    "gatewayNoModel": "Hautatu lehenik transkripzio-eredu bat Hobespenetan.",
-    "enginesFailed": "Transkripzioak huts egin du Kilo Gatewayn eta gailu honetan. Egiaztatu konexioa edo aldatu transkripzio-ezarpenak Hobespenetan, eta saiatu berriro.",
-    "engineFellBackToDevice": "Gateway bidezko transkripzioa ez dago erabilgarri — zure gailuaren ezagutzailea erabiltzen da. Esan mesedez berriro.",
-    "engineFellBackToGateway": "Gailuaren ezagutzaileak huts egin du — Kilo Gateway erabiltzen da. Esan mesedez berriro."
+    "gatewayNoModel": "Hautatu lehenik transkripzio-eredu bat Hobespenetan."
   },
   "share": {
     "title": "Partekatu Kilo-n",

@@ -29,8 +29,11 @@ export type GatewayRecorder = {
 export type GatewayVoiceInputEngineDeps = {
   setAudioMode(mode: { allowsRecording: true }): Promise<void>;
   createRecorder(): GatewayRecorder;
-  /** The chosen transcription model, or null when none has been picked. */
-  readModelId(): { id: string; name: string } | null;
+  /**
+   * The transcription model to use: the stored choice, else the first model
+   * the gateway catalogue offers, else null when none can be resolved.
+   */
+  readModelId(): Promise<{ id: string; name: string } | null>;
   readAuthToken(): Promise<string | null>;
   readOrganizationId(): Promise<string | null>;
   /**
@@ -201,7 +204,10 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
       fail(current, 'client');
       return;
     }
-    const model = deps.readModelId();
+    const model = await deps.readModelId();
+    if (stale(current)) {
+      return;
+    }
     if (model === null) {
       fail(current, 'gateway-no-model');
       return;

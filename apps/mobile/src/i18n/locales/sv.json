@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkribering via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribera röstinmatningen med en Kilo Gateway-modell i stället för enhetens taligenkänning. Din inspelning skickas till Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Använd som primär",
-    "gatewayTranscriptionPrimarySubtitle": "Transkriberingen leds av Gateway-modellen och faller tillbaka på enheten när den inte är tillgänglig.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Transkriberingen tog för lång tid. Försök igen.",
     "gatewayModelUnavailable": "Den här transkriberingsmodellen är inte tillgänglig. Välj en annan i Inställningar.",
     "gatewaySignInRequired": "Logga in för att använda transkribering via Kilo Gateway.",
-    "gatewayNoModel": "Välj först en transkriberingsmodell i Inställningar.",
-    "enginesFailed": "Transkriberingen misslyckades på Kilo Gateway och på den här enheten. Kontrollera din anslutning eller ändra transkriberingsinställningarna i Inställningar och försök igen.",
-    "engineFellBackToDevice": "Transkribering via gateway är inte tillgänglig — enhetens igenkänning används. Vänligen säg om.",
-    "engineFellBackToGateway": "Enhetens igenkänning misslyckades — Kilo Gateway används. Vänligen säg om."
+    "gatewayNoModel": "Välj först en transkriberingsmodell i Inställningar."
   },
   "share": {
     "title": "Dela till Kilo",

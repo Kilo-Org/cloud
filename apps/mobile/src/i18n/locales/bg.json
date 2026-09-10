@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Транскрипция през Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Преобразувай гласовото въвеждане с модел на Kilo Gateway вместо разпознаването на реч на устройството. Записът ти се изпраща до Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Използвай като основен",
-    "gatewayTranscriptionPrimarySubtitle": "Транскрипцията се извършва първо с модела на Gateway, а при недостъпност се използва устройството.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Транскрипцията отне твърде много време. Опитай отново.",
     "gatewayModelUnavailable": "Този модел за транскрипция не е наличен. Избери друг в Предпочитания.",
     "gatewaySignInRequired": "Влез, за да използваш транскрипция през Kilo Gateway.",
-    "gatewayNoModel": "Първо избери модел за транскрипция в Предпочитания.",
-    "enginesFailed": "Транскрипцията се провали и на Kilo Gateway, и на това устройство. Провери връзката си или промени настройките за транскрипция в Предпочитания, после опитай отново.",
-    "engineFellBackToDevice": "Транскрипцията през Gateway не е налична — използва се разпознавателят на устройството. Моля, кажи го отново.",
-    "engineFellBackToGateway": "Разпознаването на устройството се провали — използва се Kilo Gateway. Моля, кажи го отново."
+    "gatewayNoModel": "Първо избери модел за транскрипция в Предпочитания."
   },
   "share": {
     "title": "Споделяне в Kilo",

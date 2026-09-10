@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Səsin Kilo Gateway ilə mətnə çevrilməsi",
     "gatewayTranscriptionSubtitle": "Səslə daxiletməni cihazın nitq tanımasının əvəzinə Kilo Gateway modeli ilə mətnə çevirin. Səs yazınız Kilo Gateway-e göndərilir.",
-    "gatewayTranscriptionPrimary": "Əsas kimi istifadə edin",
-    "gatewayTranscriptionPrimarySubtitle": "Səsin mətnə çevrilməsini Gateway modeli ilə aparın, əlçatan olmadıqda cihaza keçin.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Səsin mətnə çevrilməsi çox vaxt apardı. Yenidən cəhd edin.",
     "gatewayModelUnavailable": "Bu səsin mətnə çevrilməsi modeli əlçatan deyil. Seçimlərdə başqasını seçin.",
     "gatewaySignInRequired": "Kilo Gateway ilə mətnə çevirməkdən istifadə etmək üçün hesabınıza daxil olun.",
-    "gatewayNoModel": "Əvvəlcə Seçimlərdə bir səsin mətnə çevrilməsi modeli seçin.",
-    "enginesFailed": "Səsin mətnə çevrilməsi Kilo Gateway-də və bu cihazda uğursuz oldu. Bağlantınızı yoxlayın və ya Seçimlərdə səsin mətnə çevrilməsi parametrlərini dəyişin, sonra yenidən cəhd edin.",
-    "engineFellBackToDevice": "Gateway üzərindən mətnə çevrilmə əlçatan deyil — cihazınızın tanıyıcısı istifadə olunur. Zəhmət olmasa, yenidən deyin.",
-    "engineFellBackToGateway": "Cihazın tanıması baş tutmadı — Kilo Gateway istifadə olunur. Zəhmət olmasa, yenidən deyin."
+    "gatewayNoModel": "Əvvəlcə Seçimlərdə bir səsin mətnə çevrilməsi modeli seçin."
   },
   "share": {
     "title": "Kilo-ya göndər",

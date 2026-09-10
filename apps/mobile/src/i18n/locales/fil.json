@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Pagsasalin ng boses sa teksto gamit ang Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Gamitin ang modelong Kilo Gateway sa pagsasalin ng boses sa teksto imbes na ang pagkilala sa tinig ng device. Ipinapadala sa Kilo Gateway ang iyong recording.",
-    "gatewayTranscriptionPrimary": "Gamitin bilang pangunahin",
-    "gatewayTranscriptionPrimarySubtitle": "Pinangungunahan ng modelong Gateway ang pagsasalin ng boses sa teksto, at kapag hindi ito magagamit, babalik sa device.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Nagtagal ang pagsasalin ng boses sa teksto. Subukang muli.",
     "gatewayModelUnavailable": "Hindi magagamit ang modelong ito para sa pagsasalin ng boses sa teksto. Pumili ng iba sa Mga kagustuhan.",
     "gatewaySignInRequired": "Mag-sign in para gamitin ang pagsasalin ng boses sa teksto gamit ang Kilo Gateway.",
-    "gatewayNoModel": "Pumili muna ng modelo para sa pagsasalin ng boses sa teksto sa Mga kagustuhan.",
-    "enginesFailed": "Nabigo ang pagsasalin ng boses sa teksto sa Kilo Gateway at sa device na ito. Suriin ang iyong koneksyon, o palitan ang mga setting ng pagsasalin ng boses sa teksto sa Mga kagustuhan, pagkatapos ay subukang muli.",
-    "engineFellBackToDevice": "Hindi magagamit ang pagsasalin ng boses sa teksto sa gateway — ginagamit ang tagakilala ng iyong device. Pakisabi muli.",
-    "engineFellBackToGateway": "Nabigo ang pagkilala sa device — ginagamit ang Kilo Gateway. Pakisabi muli."
+    "gatewayNoModel": "Pumili muna ng modelo para sa pagsasalin ng boses sa teksto sa Mga kagustuhan."
   },
   "share": {
     "title": "Pagbabahagi sa Kilo",

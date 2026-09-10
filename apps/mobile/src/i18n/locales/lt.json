@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkribavimas per Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribuok balso įvestį Kilo Gateway modeliu vietoj įrenginio kalbos atpažinimo. Įrašas siunčiamas į Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Naudoti kaip pagrindinį",
-    "gatewayTranscriptionPrimarySubtitle": "Transkribavimą pirma atlieka Gateway modelis, o kai jis nepasiekiamas, naudojamas įrenginys.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2621,10 +2619,7 @@
     "gatewayTimeout": "Transkribavimas užtruko per ilgai. Bandyk dar kartą.",
     "gatewayModelUnavailable": "Šis transkribavimo modelis nepasiekiamas. Pasirinkite kitą Nuostatose.",
     "gatewaySignInRequired": "Prisijunkite, kad naudotumėte transkribavimą per Kilo Gateway.",
-    "gatewayNoModel": "Pirmiausia pasirinkite transkribavimo modelį Nuostatose.",
-    "enginesFailed": "Transkribavimas nepavyko nei Kilo Gateway, nei šiame įrenginyje. Patikrinkite ryšį arba pakeiskite transkribavimo nustatymus Nuostatose ir bandykite dar kartą.",
-    "engineFellBackToDevice": "Transkribavimas per Gateway nepasiekiamas — naudojamas jūsų įrenginio atpažinimas. Pakartokite, prašome.",
-    "engineFellBackToGateway": "Įrenginio atpažinimas nepavyko — naudojamas Kilo Gateway. Pakartokite, prašome."
+    "gatewayNoModel": "Pirmiausia pasirinkite transkribavimo modelį Nuostatose."
   },
   "share": {
     "title": "Bendrinimas su Kilo",

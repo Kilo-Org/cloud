@@ -19,10 +19,7 @@ const gatewayTranscription = vi.hoisted(() => ({
   enabled: false,
   hasLoaded: true,
   model: null as { id: string; name: string } | null,
-  primary: true,
-  primaryLoaded: true,
   setEnabled: vi.fn(),
-  setPrimary: vi.fn(),
 }));
 // The screen mounts the feature-flag debug surface, which reads PostHog flag
 // statuses; seed an empty registry so the section stays out of these tests'
@@ -77,7 +74,6 @@ vi.mock('@/components/ui/icons', () => ({
   Brain: 'Brain',
   CornerDownLeft: 'CornerDownLeft',
   Cpu: 'Cpu',
-  Gauge: 'Gauge',
   Globe: 'Globe',
   MessageSquare: 'MessageSquare',
   Mic: 'Mic',
@@ -144,11 +140,6 @@ vi.mock('@/lib/voice-input/gateway/gateway-transcription-preference', () => ({
     setGatewayTranscriptionEnabled: gatewayTranscription.setEnabled,
   }),
   useGatewayTranscriptionModel: () => gatewayTranscription.model,
-  useGatewayTranscriptionPrimaryPreference: () => ({
-    gatewayTranscriptionPrimary: gatewayTranscription.primary,
-    hasLoaded: gatewayTranscription.primaryLoaded,
-    setGatewayTranscriptionPrimary: gatewayTranscription.setPrimary,
-  }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ secondaryForeground: '#000000', mutedForeground: '#000000' }),
@@ -182,8 +173,6 @@ beforeEach(() => {
   gatewayTranscription.enabled = false;
   gatewayTranscription.hasLoaded = true;
   gatewayTranscription.model = null;
-  gatewayTranscription.primary = true;
-  gatewayTranscription.primaryLoaded = true;
   posthog.statuses = [];
   storage.setItemAsync.mockImplementation(async (_key: string, value: string) => {
     await Promise.resolve();
@@ -288,13 +277,6 @@ function findGatewaySwitch(renderer: ReactTestRenderer) {
   return foundSwitch;
 }
 
-function findPrimarySwitch(renderer: ReactTestRenderer) {
-  const found = renderer.root.findAll(
-    node => typeof node.type === 'string' && (node.type as string) === 'Switch'
-  );
-  return found.find(sw => sw.props.accessibilityLabel === 'Use as primary');
-}
-
 describe('PreferencesScreen Gateway transcription', () => {
   it('renders the gateway transcription switch and the model row showing no choice yet', async () => {
     const renderer = await mountPreferences();
@@ -320,9 +302,6 @@ describe('PreferencesScreen Gateway transcription', () => {
     const modelRow = findConfigureRow(renderer, 'Transcription model');
     expect(modelRow.props).toMatchObject({ icon: 'Cpu', subtitle: 'None chosen', disabled: true });
 
-    // The mode row is hidden while the switch is off, not just disabled.
-    expect(findPrimarySwitch(renderer)).toBeUndefined();
-
     renderer.unmount();
   });
 
@@ -339,9 +318,9 @@ describe('PreferencesScreen Gateway transcription', () => {
 
   it('shows the empty caption while the switch is off even when a model is stored', async () => {
     // A stale stored choice must not promise a model that the off switch
-    // never applies: with the switch off no gateway model transcribes, so
-    // the row reads the empty caption and stays disabled (reduced opacity,
-    // no chevron — ConfigureRow's disabled rendering).
+    // never applies: with the switch off the OS recogniser runs, so the row
+    // reads the empty caption and stays disabled (reduced opacity, no
+    // chevron — ConfigureRow's disabled rendering).
     gatewayTranscription.enabled = false;
     gatewayTranscription.model = { id: 'fake-transcribe', name: 'Fake Transcribe' };
     const renderer = await mountPreferences();
@@ -392,60 +371,6 @@ describe('PreferencesScreen Gateway transcription', () => {
     });
 
     expect(gatewayTranscription.setEnabled).toHaveBeenCalledWith(false);
-
-    renderer.unmount();
-  });
-
-  it('shows the use-as-primary toggle on by default when the switch is on', async () => {
-    gatewayTranscription.enabled = true;
-    const renderer = await mountPreferences();
-
-    const primarySwitch = findPrimarySwitch(renderer);
-    expect(primarySwitch).toBeDefined();
-    expect(primarySwitch?.props).toMatchObject({ value: true, disabled: false });
-
-    const texts = renderer.root.findAll(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'Text' &&
-        typeof node.props.children === 'string'
-    );
-    expect(texts.some(node => node.props.children === 'Use as primary')).toBe(true);
-    expect(
-      texts.some(
-        node =>
-          node.props.children ===
-          'Lead voice transcription with the gateway model, falling back to the device when it is unavailable.'
-      )
-    ).toBe(true);
-
-    renderer.unmount();
-  });
-
-  it('keeps the use-as-primary toggle disabled until its preference has loaded', async () => {
-    gatewayTranscription.enabled = true;
-    gatewayTranscription.primaryLoaded = false;
-    const renderer = await mountPreferences();
-
-    expect(findPrimarySwitch(renderer)?.props.disabled).toBe(true);
-
-    renderer.unmount();
-  });
-
-  it('toggling the use-as-primary switch writes the store', async () => {
-    gatewayTranscription.enabled = true;
-    const renderer = await mountPreferences();
-
-    const primarySwitch = findPrimarySwitch(renderer);
-    if (!primarySwitch) {
-      throw new Error('Use as primary switch not found');
-    }
-    await flush(() => {
-      (primarySwitch.props.onValueChange as (next: boolean) => void)(false);
-    });
-
-    expect(gatewayTranscription.setPrimary).toHaveBeenCalledTimes(1);
-    expect(gatewayTranscription.setPrimary).toHaveBeenCalledWith(false);
 
     renderer.unmount();
   });

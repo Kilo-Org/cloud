@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Unukuzi wa sauti kupitia Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Badilisha uingizaji wa sauti kuwa maandishi kwa modeli ya Kilo Gateway badala ya utambuzi wa sauti wa kifaa. Rekodi yako imetumwa kwa Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Tumia kama kuu",
-    "gatewayTranscriptionPrimarySubtitle": "Unukuzi hufanywa kwanza na modeli ya Gateway, na kutumia kifaa ikiwa haipatikani.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Unukuzi umechukua muda mrefu sana. Jaribu tena.",
     "gatewayModelUnavailable": "Modeli hii ya unukuzi haipatikani. Chagua nyingine katika Mapendeleo.",
     "gatewaySignInRequired": "Ingia ili utumie unukuzi wa Kilo Gateway.",
-    "gatewayNoModel": "Kwanza chagua modeli ya unukuzi katika Mapendeleo.",
-    "enginesFailed": "Unukuzi umeshindikana katika Kilo Gateway na pia kwenye kifaa hiki. Angalia muunganisho wako au badilisha mipangilio ya unukuzi katika Mapendeleo, kisha jaribu tena.",
-    "engineFellBackToDevice": "Unukuzi kupitia gateway haupatikani — kitambuzi cha kifaa chako kinatumika. Tafadhali sema tena.",
-    "engineFellBackToGateway": "Ugunduzi wa kifaa umeshindikana — Kilo Gateway inatumika. Tafadhali sema tena."
+    "gatewayNoModel": "Kwanza chagua modeli ya unukuzi katika Mapendeleo."
   },
   "share": {
     "title": "Kushiriki kwenye Kilo",

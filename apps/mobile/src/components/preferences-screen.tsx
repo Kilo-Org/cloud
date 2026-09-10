@@ -4,7 +4,6 @@ import {
   Brain,
   CornerDownLeft,
   Cpu,
-  Gauge,
   Globe,
   MessageSquare,
   Mic,
@@ -36,7 +35,6 @@ import { setLanguagePickerBridge } from '@/lib/picker-bridge';
 import {
   useGatewayTranscriptionModel,
   useGatewayTranscriptionPreference,
-  useGatewayTranscriptionPrimaryPreference,
 } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import {
   setThemePreference,
@@ -71,11 +69,6 @@ export function PreferencesScreen() {
     hasLoaded: gatewayTranscriptionLoaded,
     setGatewayTranscriptionEnabled,
   } = useGatewayTranscriptionPreference();
-  const {
-    gatewayTranscriptionPrimary,
-    hasLoaded: gatewayTranscriptionPrimaryLoaded,
-    setGatewayTranscriptionPrimary,
-  } = useGatewayTranscriptionPrimaryPreference();
   const storedTranscriptionModel = useGatewayTranscriptionModel();
   const { t } = useTranslation();
   const { userId } = useCurrentUserId();
@@ -147,23 +140,12 @@ export function PreferencesScreen() {
           disabled={!gatewayTranscriptionLoaded}
           onValueChange={setGatewayTranscriptionEnabled}
         />
-        {/* The mode only matters while the gateway is on, so the row is hidden
-            — not just disabled — when the switch is off. */}
-        {gatewayTranscriptionEnabled ? (
-          <PreferenceRow
-            icon={Gauge}
-            title={t('preferences.gatewayTranscriptionPrimary')}
-            subtitle={t('preferences.gatewayTranscriptionPrimarySubtitle')}
-            value={gatewayTranscriptionPrimary}
-            disabled={!gatewayTranscriptionPrimaryLoaded}
-            onValueChange={setGatewayTranscriptionPrimary}
-          />
-        ) : null}
         {/* Model choice only matters while gateway transcription is on, so the
             row stays disabled — and its chevron hidden — when the switch is
             off. The caption follows the same rule: with the switch off no
             gateway model applies, so the row shows the empty caption even
-            when a model is still stored for when the switch turns on. */}
+            when a model is still stored for when the switch turns on. With no
+            stored choice the gateway's first catalogue model is the default. */}
         <ConfigureRow
           icon={Cpu}
           title={t('preferences.transcriptionModel')}

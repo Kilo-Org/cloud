@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway-р яриаг бичвэр болгох",
     "gatewayTranscriptionSubtitle": "Төхөөрөмжийн яриа танихын оронд Kilo Gateway загвар ашиглан дуугаар оруулж буй зүйлээ бичвэр болгоно уу. Таны бичлэг Kilo Gateway руу илгээгдэнэ.",
-    "gatewayTranscriptionPrimary": "Үндсэн болгон ашиглах",
-    "gatewayTranscriptionPrimarySubtitle": "Яриаг бичвэр болгох ажлыг Gateway загвар эхэлж хийж, боломжгүй үед төхөөрөмж ашиглана.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Яриаг бичвэр болгох хэт удаан үргэлжиллээ. Дахин оролдоно уу.",
     "gatewayModelUnavailable": "Энэ яриаг бичвэр болгох загвар боломжгүй. Тохиргооноос өөр загвар сонгоно уу.",
     "gatewaySignInRequired": "Kilo Gateway-р бичвэр болгохыг ашиглахын тулд нэвтэрнэ үү.",
-    "gatewayNoModel": "Эхлээд Тохиргооноос яриаг бичвэр болгох загвар сонгоно уу.",
-    "enginesFailed": "Яриаг бичвэр болгох ажил Kilo Gateway болон энэ төхөөрөмж дээр амжилтгүй боллоо. Холболтоо шалгах эсвэл Тохиргооноос бичвэр болгох тохиргоог өөрчилж, дахин оролдоно уу.",
-    "engineFellBackToDevice": "Gateway-ээр яриаг бичвэр болгох боломжгүй — таны төхөөрөмжийн таньдагч ашиглаж байна. Дахин хэлээрэй.",
-    "engineFellBackToGateway": "Төхөөрөмжийн танилт амжилтгүй боллоо — Kilo Gateway ашиглаж байна. Дахин хэлээрэй."
+    "gatewayNoModel": "Эхлээд Тохиргооноос яриаг бичвэр болгох загвар сонгоно уу."
   },
   "share": {
     "title": "Kilo руу хуваалцах",

@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Խոսքի տեքստի վերածում Kilo Gateway-ով",
     "gatewayTranscriptionSubtitle": "Ձայնային մուտքագրումը տեքստի վերածեք Kilo Gateway-ի մոդելով՝ սարքի խոսքի ճանաչման փոխարեն։ Ձեր ձայնագրությունը ուղարկվում է Kilo Gateway։",
-    "gatewayTranscriptionPrimary": "Օգտագործել որպես հիմնական",
-    "gatewayTranscriptionPrimarySubtitle": "Տեքստի վերածումը սկսվում է Gateway մոդելով, իսկ երբ այն հասանելի չէ, անցնում է սարքին։",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Տեքստի վերածումը չափազանց երկար տևեց։ Կրկին փորձեք։",
     "gatewayModelUnavailable": "Այս տեքստի վերածման մոդելը հասանելի չէ։ Ընտրեք մեկ այլ՝ Նախապատվություններում։",
     "gatewaySignInRequired": "Մուտք գործեք՝ Kilo Gateway-ի վերածումն օգտագործելու համար։",
-    "gatewayNoModel": "Նախ ընտրեք տեքստի վերածման մոդել՝ Նախապատվություններում։",
-    "enginesFailed": "Տեքստի վերածումը ձախողվեց թե՛ Kilo Gateway-ում, թե՛ այս սարքում։ Ստուգեք ձեր կապակցումը կամ փոխեք տեքստի վերածման կարգավորումները Նախապատվություններում, ապա կրկին փորձեք։",
-    "engineFellBackToDevice": "Տեքստի վերածումը Gateway-ով հասանելի չէ — օգտագործվում է ձեր սարքի ճանաչիչը։ Խնդրում ենք կրկին ասել։",
-    "engineFellBackToGateway": "Սարքի ճանաչումը ձախողվեց — օգտագործվում է Kilo Gateway-ը։ Խնդրում ենք կրկին ասել։"
+    "gatewayNoModel": "Նախ ընտրեք տեքստի վերածման մոդել՝ Նախապատվություններում։"
   },
   "share": {
     "title": "Ուղարկում Kilo-ին",

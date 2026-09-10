@@ -1,7 +1,6 @@
 import {
   appendVoiceTranscript,
   applyVoiceRecognitionResult,
-  classifyVoiceInputEngineFallback,
   classifyVoiceInputError,
   type VoiceInputFeedback,
   type VoiceInputStatus,
@@ -101,17 +100,6 @@ export function installVoiceInputListeners(
     controller.reportFeedback(classifyVoiceInputError(event.error), current.onFeedback);
   };
 
-  const onEngineFellBack: (event: VoiceInputNativeEvent['engine-fell-back']) => void = event => {
-    const current = controller.getSession();
-    // The hand-off toast belongs to a live session only: a terminalized or
-    // already-failed session has had its message, and an expected abort was
-    // the user's own decision.
-    if (!current || current.terminalized || current.expectedAbort || current.failed) {
-      return;
-    }
-    controller.reportFeedback(classifyVoiceInputEngineFallback(event), current.onFeedback);
-  };
-
   const onEnd: (event: VoiceInputNativeEvent['end']) => void = () => {
     const current = controller.getSession();
     if (!current || current.terminalized) {
@@ -126,7 +114,6 @@ export function installVoiceInputListeners(
     native.addListener('result', onResult),
     native.addListener('nomatch', onNomatch),
     native.addListener('error', onError),
-    native.addListener('engine-fell-back', onEngineFellBack),
     native.addListener('end', onEnd),
   ];
 }

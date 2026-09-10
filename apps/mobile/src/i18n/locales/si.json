@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway හරහා හඬ පෙළට හැරවීම",
     "gatewayTranscriptionSubtitle": "උපාංගයේ කථන හඳුනාගැනීම වෙනුවට Kilo Gateway ආකෘතියක් භාවිතයෙන් හඬ ආදානය පෙළ බවට හරින්න. ඔබේ පටිගත කිරීම Kilo Gateway වෙත යවනු ලැබේ.",
-    "gatewayTranscriptionPrimary": "ප්‍රධාන ලෙස භාවිත කරන්න",
-    "gatewayTranscriptionPrimarySubtitle": "හඬ පෙළට හැරවීම Gateway ආකෘතියෙන් පළමුව සිදු වන අතර, එය නොමැති විට උපාංගය භාවිත වේ.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "හඬ පෙළට හැරවීමට වැඩි වේලාවක් ගත විය. නැවත උත්සාහ කරන්න.",
     "gatewayModelUnavailable": "මෙම හඬ පෙළට හැරවීමේ ආකෘතිය ලබා ගත නොහැක. මනාප වලින් තවත් එකක් තෝරන්න.",
     "gatewaySignInRequired": "Kilo Gateway හඬ පෙළට හැරවීම භාවිත කිරීමට පුරනය වන්න.",
-    "gatewayNoModel": "පළමුව මනාප වලින් හඬ පෙළට හැරවීමේ ආකෘතියක් තෝරන්න.",
-    "enginesFailed": "හඬ පෙළට හැරවීම Kilo Gateway හි සහ මෙම උපාංගයේ අසාර්ථක විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කරන්න හෝ මනාප වලින් හඬ-පෙළ සැකසුම් වෙනස් කරන්න, ඉන්පසු නැවත උත්සාහ කරන්න.",
-    "engineFellBackToDevice": "ගේට්වේ හරහා හඬ පෙළට හැරවීම ලබා ගත නොහැක — ඔබේ උපාංගයේ හඳුනාගැනීම භාවිතා වේ. කරුණාකර නැවත කියන්න.",
-    "engineFellBackToGateway": "උපාංගයේ හඳුනාගැනීම අසාර්ථක විය — Kilo Gateway භාවිතා වේ. කරුණාකර නැවත කියන්න."
+    "gatewayNoModel": "පළමුව මනාප වලින් හඬ පෙළට හැරවීමේ ආකෘතියක් තෝරන්න."
   },
   "share": {
     "title": "Kilo වෙත බෙදාගැනීම",

@@ -26,7 +26,6 @@ vi.mock('sonner-native', () => ({ toast: { error: toastError } }));
 
 const ENABLED_KEY = 'gateway-transcription-enabled';
 const MODEL_KEY = 'gateway-transcription-model';
-const PRIMARY_KEY = 'gateway-transcription-primary';
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
 function flushPreferences(): Promise<void> {
@@ -150,43 +149,5 @@ describe('gateway transcription model', () => {
 
     expect(mod.readGatewayTranscriptionModel()).toBeNull();
     expect(store.get(MODEL_KEY)).toBe('null');
-  });
-});
-
-describe('gateway transcription primary mode', () => {
-  it('reads true by default when nothing is persisted', async () => {
-    const mod = await importPreferenceModule();
-    await flushPreferences();
-
-    expect(mod.isGatewayTranscriptionPrimary()).toBe(true);
-  });
-
-  it('round-trips through SecureStore across a module reload', async () => {
-    const mod = await importPreferenceModule();
-    await flushPreferences();
-
-    mod.setGatewayTranscriptionPrimary(false);
-    expect(mod.isGatewayTranscriptionPrimary()).toBe(false);
-    await flushPreferences();
-    expect(store.get(PRIMARY_KEY)).toBe('false');
-
-    // A fresh module (next launch) reads the persisted mode.
-    vi.resetModules();
-    const reloaded = await importPreferenceModule();
-    await flushPreferences();
-    expect(reloaded.isGatewayTranscriptionPrimary()).toBe(false);
-  });
-
-  it('persists true when re-enabled after being demoted', async () => {
-    store.set(PRIMARY_KEY, 'false');
-    const mod = await importPreferenceModule();
-    await flushPreferences();
-    expect(mod.isGatewayTranscriptionPrimary()).toBe(false);
-
-    mod.setGatewayTranscriptionPrimary(true);
-    await flushPreferences();
-
-    expect(mod.isGatewayTranscriptionPrimary()).toBe(true);
-    expect(store.get(PRIMARY_KEY)).toBe('true');
   });
 });

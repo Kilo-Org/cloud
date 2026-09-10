@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Přepis přes Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Přepisujte diktování pomocí modelu Kilo Gateway místo rozpoznávání řeči ve vašem zařízení. Nahraný zvuk se odešle do Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Použít jako primární",
-    "gatewayTranscriptionPrimarySubtitle": "Přepis vede model Gateway; pokud není dostupný, přepne se na zařízení.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2621,10 +2619,7 @@
     "gatewayTimeout": "Přepis trval příliš dlouho. Zkuste to znovu.",
     "gatewayModelUnavailable": "Tento model přepisu není dostupný. Vyberte jiný v Předvolbách.",
     "gatewaySignInRequired": "Pro použití přepisu přes Kilo Gateway se přihlaste.",
-    "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách.",
-    "enginesFailed": "Přepis selhal na Kilo Gateway i v tomto zařízení. Zkontrolujte připojení nebo změňte nastavení přepisu v Předvolbách a zkuste to znovu.",
-    "engineFellBackToDevice": "Přepis přes Gateway není dostupný — používá se rozpoznávání ve vašem zařízení. Řekněte to prosím znovu.",
-    "engineFellBackToGateway": "Rozpoznávání v zařízení selhalo — používá se Kilo Gateway. Řekněte to prosím znovu."
+    "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách."
   },
   "share": {
     "title": "Sdílení do Kilo",

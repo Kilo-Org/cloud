@@ -2,7 +2,10 @@
 import { setAudioModeAsync } from 'expo-audio';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { gatewayVoiceInputNative } from './native-gateway-voice-input';
+import {
+  gatewayVoiceInputNative,
+  resolveGatewayTranscriptionModelId,
+} from './native-gateway-voice-input';
 
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
 vi.mock('expo-file-system/legacy', () => ({
@@ -17,11 +20,17 @@ vi.mock('expo-secure-store', () => ({
   setItemAsync: vi.fn(async (): Promise<void> => undefined),
   deleteItemAsync: vi.fn(async (): Promise<void> => undefined),
 }));
+const storedModel = vi.hoisted(() => ({
+  current: null as { id: string; name: string } | null,
+}));
 vi.mock('./gateway-transcription-preference', () => ({
-  readGatewayTranscriptionModel: vi.fn(() => ({
-    id: 'whisper-large-v3',
-    name: 'Whisper Large v3',
-  })),
+  readGatewayTranscriptionModel: vi.fn(() => storedModel.current),
+}));
+const transcriptionModels = vi.hoisted(() => ({
+  fetchTranscriptionModels: vi.fn(async (): Promise<{ id: string; name: string }[]> => []),
+}));
+vi.mock('@/lib/hooks/use-transcription-models', () => ({
+  fetchTranscriptionModels: transcriptionModels.fetchTranscriptionModels,
 }));
 
 const platformMock = vi.hoisted(() => ({ OS: 'ios' as string }));
@@ -176,4 +185,45 @@ describe('gatewayVoiceInputNative recorder construction', () => {
       expect(recorderBox.instances[0]?.preparedWith).toBe(HIGH_QUALITY);
     }
   );
+});
+
+describe('resolveGatewayTranscriptionModelId', () => {
+  beforeEach(() => {
+    storedModel.current = null;
+    transcriptionModels.fetchTranscriptionModels.mockReset();
+  });
+
+  it('returns the stored model without reading the catalogue', async () => {
+    storedModel.current = { id: 'stored-model', name: 'Stored Model' };
+
+    await expect(resolveGatewayTranscriptionModelId()).resolves.toEqual({
+      id: 'stored-model',
+      name: 'Stored Model',
+    });
+    expect(transcriptionModels.fetchTranscriptionModels).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the first catalogue entry when none is stored', async () => {
+    transcriptionModels.fetchTranscriptionModels.mockResolvedValue([
+      { id: 'first-model', name: 'First Model' },
+      { id: 'second-model', name: 'Second Model' },
+    ]);
+
+    await expect(resolveGatewayTranscriptionModelId()).resolves.toEqual({
+      id: 'first-model',
+      name: 'First Model',
+    });
+  });
+
+  it('reads an empty catalogue as no model', async () => {
+    transcriptionModels.fetchTranscriptionModels.mockResolvedValue([]);
+
+    await expect(resolveGatewayTranscriptionModelId()).resolves.toBeNull();
+  });
+
+  it('reads an unreachable catalogue as no model', async () => {
+    transcriptionModels.fetchTranscriptionModels.mockRejectedValue(new Error('offline'));
+
+    await expect(resolveGatewayTranscriptionModelId()).resolves.toBeNull();
+  });
 });

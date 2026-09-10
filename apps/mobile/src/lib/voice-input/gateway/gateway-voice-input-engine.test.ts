@@ -82,7 +82,7 @@ function buildEngine(overrides: Partial<GatewayVoiceInputEngineDeps> = {}): {
   const deps: GatewayVoiceInputEngineDeps = {
     setAudioMode: vi.fn(async (): Promise<void> => undefined),
     createRecorder: vi.fn(() => recorder),
-    readModelId: vi.fn(() => ({ id: 'whisper-large-v3', name: 'Whisper Large v3' })),
+    readModelId: vi.fn(async () => ({ id: 'whisper-large-v3', name: 'Whisper Large v3' })),
     readAuthToken: vi.fn(async (): Promise<string | null> => 'token-1'),
     readOrganizationId: vi.fn(async (): Promise<string | null> => 'org-1'),
     upload,
@@ -200,7 +200,7 @@ describe('createGatewayVoiceInputEngine', () => {
   });
 
   it('emits gateway-no-model without uploading when no model is chosen', async () => {
-    const { engine, events, upload } = buildEngine({ readModelId: () => null });
+    const { engine, events, upload } = buildEngine({ readModelId: async () => null });
 
     await startAndStop(engine);
     await flush();

@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "使用 Kilo Gateway 轉錄",
     "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型將語音輸入轉錄成文字，而不使用裝置上的語音辨識。您的錄音將傳送至 Kilo Gateway。",
-    "gatewayTranscriptionPrimary": "設為主要",
-    "gatewayTranscriptionPrimarySubtitle": "優先使用 Gateway 模型進行轉錄，模型無法使用時改用裝置。",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
@@ -2145,10 +2143,7 @@
     "gatewayTimeout": "轉錄花費太長時間。請再試一次。",
     "gatewayModelUnavailable": "這個轉錄模型無法使用。請在偏好設定中選擇其他模型。",
     "gatewaySignInRequired": "登入後即可使用 Kilo Gateway 轉錄。",
-    "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。",
-    "enginesFailed": "在 Kilo Gateway 和此裝置上轉錄皆失敗。請檢查網路連線，或在偏好設定中變更轉錄設定，然後再試一次。",
-    "engineFellBackToDevice": "Gateway 轉錄無法使用，正在使用裝置的辨識功能。請再說一次。",
-    "engineFellBackToGateway": "裝置辨識失敗，正在使用 Kilo Gateway。請再說一次。"
+    "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。"
   },
   "share": {
     "title": "分享到 Kilo",

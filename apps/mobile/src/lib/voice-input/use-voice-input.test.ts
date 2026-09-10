@@ -58,7 +58,6 @@ const routerMock = vi.hoisted(() => ({
 
 const gatewayPreferenceMock = vi.hoisted(() => ({
   isGatewayTranscriptionEnabled: vi.fn<() => boolean>(() => false),
-  isGatewayTranscriptionPrimary: vi.fn<() => boolean>(() => true),
   readGatewayTranscriptionModel: vi.fn<() => { id: string; name: string } | null>(() => null),
 }));
 
@@ -200,7 +199,6 @@ describe('useVoiceInput integration', () => {
       installedLocales: ['en-US'],
     });
     gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(false);
-    gatewayPreferenceMock.isGatewayTranscriptionPrimary.mockReturnValue(true);
     gatewayPreferenceMock.readGatewayTranscriptionModel.mockReturnValue(null);
     __resetVoiceInputLanguageTagCacheForTests();
   });
@@ -304,41 +302,17 @@ describe('useVoiceInput integration', () => {
         expect(mockController.start).not.toHaveBeenCalled();
       });
 
-      it('gateway primary + no model: shows the picker alert and never starts a session', async () => {
+      it('gateway mode: starts without the consent disclosure and ignores any stored model', async () => {
         const { actions } = buildActions({ userId: 'user-1' });
         mockController.setSnapshot(idleSnapshot());
         gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
-        gatewayPreferenceMock.isGatewayTranscriptionPrimary.mockReturnValue(true);
-        gatewayPreferenceMock.readGatewayTranscriptionModel.mockReturnValue(null);
-
-        await actions.toggle();
-
-        expect(mockController.start).not.toHaveBeenCalled();
-        expect(alertMock.alert).toHaveBeenCalledTimes(1);
-        const [title, message, buttons] = alertMock.alert.mock.calls[0] as [
-          string,
-          string,
-          { text: string; style?: string; onPress?: () => void }[],
-        ];
-        expect(title).toBe('Transcription model');
-        expect(message).toBe('Choose a transcription model in Preferences first.');
-        expect(buttons.map(button => button.text)).toEqual(['Cancel', 'Transcription model']);
-        expect(toastMock.error).not.toHaveBeenCalled();
-      });
-
-      it('gateway primary + model chosen: starts without the consent disclosure', async () => {
-        const { actions } = buildActions({ userId: 'user-1' });
-        mockController.setSnapshot(idleSnapshot());
-        gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
-        gatewayPreferenceMock.isGatewayTranscriptionPrimary.mockReturnValue(true);
-        gatewayPreferenceMock.readGatewayTranscriptionModel.mockReturnValue({
-          id: 'whisper-large-v3',
-          name: 'Whisper Large v3',
-        });
         voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
 
         await actions.toggle();
 
+        // The gateway engine resolves the model itself (the stored choice,
+        // else the first catalogue entry), so the action layer starts the
+        // session without a model precondition.
         expect(mockController.start).toHaveBeenCalledTimes(1);
         expect(mockController.start.mock.calls[0]?.[0]?.requiresOnDeviceRecognition).toBe(false);
         expect(alertMock.alert).not.toHaveBeenCalled();
@@ -346,26 +320,7 @@ describe('useVoiceInput integration', () => {
         expect(voiceNetworkConsentMock.readVoiceNetworkConsent).not.toHaveBeenCalled();
       });
 
-      it('gateway enabled but not primary + no model: runs the OS consent flow, the gateway is only the fallback', async () => {
-        const { actions } = buildActions({ userId: 'user-1' });
-        mockController.setSnapshot(idleSnapshot());
-        gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
-        gatewayPreferenceMock.isGatewayTranscriptionPrimary.mockReturnValue(false);
-        gatewayPreferenceMock.readGatewayTranscriptionModel.mockReturnValue(null);
-        mockController.supportsOnDevice.mockReturnValue(false);
-        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('granted');
-
-        await actions.toggle();
-
-        // The device recogniser leads via the normal consent flow; the model
-        // is only required when the gateway leads, and the engine dispatcher
-        // adds the gateway fallback behind this call.
-        expect(mockController.start).toHaveBeenCalledTimes(1);
-        expect(mockController.start.mock.calls[0]?.[0]?.requiresOnDeviceRecognition).toBe(false);
-        expect(alertMock.alert).not.toHaveBeenCalled();
-      });
-
-      it('gateway enabled while listening: stops the session through the controller', async () => {
+      it('gateway mode while listening: stops the session through the controller', async () => {
         const { actions, owner } = buildActions();
         mockController.setSnapshot(activeSnapshot(owner, 'listening'));
         gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
@@ -377,7 +332,7 @@ describe('useVoiceInput integration', () => {
         expect(mockController.start).not.toHaveBeenCalled();
       });
 
-      it('gateway enabled while transcribing: aborts the hung upload instead of starting', async () => {
+      it('gateway mode while transcribing: aborts the hung upload instead of starting', async () => {
         const { actions, owner } = buildActions();
         mockController.setSnapshot(activeSnapshot(owner, 'transcribing'));
         gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
@@ -389,7 +344,7 @@ describe('useVoiceInput integration', () => {
         expect(mockController.stop).not.toHaveBeenCalled();
       });
 
-      it('gateway disabled: keeps the OS consent flow', async () => {
+      it('device mode: keeps the OS consent flow', async () => {
         const { actions } = buildActions({ userId: 'user-1' });
         mockController.setSnapshot(idleSnapshot());
         mockController.supportsOnDevice.mockReturnValue(false);

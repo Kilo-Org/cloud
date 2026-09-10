@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ద్వారా మాటలను వచనంగా మార్చడం",
     "gatewayTranscriptionSubtitle": "పరికరం యొక్క మాటల గుర్తింపుకు బదులు Kilo Gateway మోడల్‌తో వాయిస్ ఇన్‌పుట్‌ను వచనంగా మార్చండి. మీ రికార్డింగ్ Kilo Gatewayకు పంపబడుతుంది.",
-    "gatewayTranscriptionPrimary": "ప్రాథమికంగా ఉపయోగించండి",
-    "gatewayTranscriptionPrimarySubtitle": "వచనంగా మార్చే పనిని మొదట Gateway మోడల్ చేస్తుంది; అందుబాటులో లేనప్పుడు పరికరం వాడబడుతుంది.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "వచనంగా మార్చడానికి చాలా సమయం పట్టింది. మళ్లీ ప్రయత్నించండి.",
     "gatewayModelUnavailable": "ఈ వచన మార్పిడి మోడల్ అందుబాటులో లేదు. ప్రాధాన్యతలలో మరొకదాన్ని ఎంచుకోండి.",
     "gatewaySignInRequired": "Kilo Gateway మార్పిడిని ఉపయోగించడానికి సైన్ ఇన్ చేయండి.",
-    "gatewayNoModel": "ముందుగా ప్రాధాన్యతలలో వచనంగా మార్చే మోడల్‌ను ఎంచుకోండి.",
-    "enginesFailed": "వాయిస్‌ను వచనంగా మార్చడం Kilo Gateway మరియు ఈ పరికరంలో విఫలమైంది. మీ కనెక్షన్‌ను తనిఖీ చేయండి లేదా ప్రాధాన్యతలలో వచనంగా మార్పిడి సెట్టింగ్‌లను మార్చండి, ఆపై మళ్లీ ప్రయత్నించండి.",
-    "engineFellBackToDevice": "గేట్‌వే ద్వారా వచనంగా మార్పిడి అందుబాటులో లేదు — మీ పరికరంలోని గుర్తింపు వాడబడుతోంది. దయచేసి మళ్లీ చెప్పండి.",
-    "engineFellBackToGateway": "పరికరంలోని గుర్తింపు విఫలమైంది — Kilo Gateway వాడబడుతోంది. దయచేసి మళ్లీ చెప్పండి."
+    "gatewayNoModel": "ముందుగా ప్రాధాన్యతలలో వచనంగా మార్చే మోడల్‌ను ఎంచుకోండి."
   },
   "share": {
     "title": "Kiloలో పంచుకోవడం",

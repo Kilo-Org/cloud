@@ -10,7 +10,7 @@ export type VoiceInputFeedbackPresentation =
       /** Where the alert's action button leads. */
       destination: 'system-settings' | 'transcription-model-picker';
     }
-  | { kind: 'toast'; message: string; tone?: 'error' | 'info' };
+  | { kind: 'toast'; message: string };
 
 /**
  * Pure projection of a `VoiceInputFeedback` into the surface that should
@@ -42,7 +42,7 @@ export function resolveVoiceInputFeedbackPresentation(
       destination: 'system-settings',
     };
   }
-  return { kind: 'toast', message: feedback.message, tone: feedback.tone };
+  return { kind: 'toast', message: feedback.message };
 }
 
 /**

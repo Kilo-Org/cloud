@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Απομαγνητοφώνηση μέσω Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Η φωνητική πληκτρολόγηση μετατρέπεται σε κείμενο με ένα μοντέλο του Kilo Gateway αντί για την αναγνώριση ομιλίας της συσκευής. Η ηχογράφηση αποστέλλεται στο Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Χρήση ως κύρια",
-    "gatewayTranscriptionPrimarySubtitle": "Η απομαγνητοφώνηση ξεκινά με το μοντέλο του Gateway και σε περίπτωση μη διαθεσιμότητας επιστρέφει στη συσκευή.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Η απομαγνητοφώνηση πήρε υπερβολικό χρόνο. Δοκίμασε ξανά.",
     "gatewayModelUnavailable": "Αυτό το μοντέλο απομαγνητοφώνησης δεν είναι διαθέσιμο. Διάλεξε άλλο στις Προτιμήσεις.",
     "gatewaySignInRequired": "Συνδέσου για να χρησιμοποιήσεις την απομαγνητοφώνηση μέσω Kilo Gateway.",
-    "gatewayNoModel": "Διάλεξε πρώτα ένα μοντέλο απομαγνητοφώνησης στις Προτιμήσεις.",
-    "enginesFailed": "Η απομαγνητοφώνηση απέτυχε στο Kilo Gateway και σε αυτή τη συσκευή. Έλεγξε τη σύνδεσή σου ή άλλαξε τις ρυθμίσεις απομαγνητοφώνησης στις Προτιμήσεις, και δοκίμασε ξανά.",
-    "engineFellBackToDevice": "Η απομαγνητοφώνηση μέσω Gateway δεν είναι διαθέσιμη — χρησιμοποιείται η αναγνώριση της συσκευής σου. Πες το ξανά, σε παρακαλώ.",
-    "engineFellBackToGateway": "Η αναγνώριση στη συσκευή απέτυχε — χρησιμοποιείται το Kilo Gateway. Πες το ξανά, σε παρακαλώ."
+    "gatewayNoModel": "Διάλεξε πρώτα ένα μοντέλο απομαγνητοφώνησης στις Προτιμήσεις."
   },
   "share": {
     "title": "Κοινοποίηση στο Kilo",

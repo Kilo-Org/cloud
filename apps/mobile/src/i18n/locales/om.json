@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Sagalee interneetiin barreeffamatti jijjiiruu Kilo Gateway'n",
     "gatewayTranscriptionSubtitle": "Sagalee galchuu mallattoo sagalee meeshaa irraa haa ta'u moodeela Kilo Gateway'ttiin barreeffamatti jijjiiri. Sagaleen kee Kilo Gateway'tti ergama.",
-    "gatewayTranscriptionPrimary": "Akkā ijatti fayyadami",
-    "gatewayTranscriptionPrimarySubtitle": "Sagalee barreeffamatti jijjiiruun jalqaba Gateway moodeelaan gaggeeffama; yeroo hin jiru immoo meeshaan fayyadama.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Sagalee barreeffamatti jijjiiruun yeroo dheeraa fudhate. Irra deebi'ii yaali.",
     "gatewayModelUnavailable": "Moodeeli sagalee jijjiiru kun hin jiru. Filannoowwan keessaa kan biroo filadhu.",
     "gatewaySignInRequired": "Jijjiirraa sagalee Kilo Gateway'tti fayyadamuuf seeni.",
-    "gatewayNoModel": "Dursee Filannoowwan keessatti moodeela sagalee jijjiiru filadhu.",
-    "enginesFailed": "Sagalee barreeffamatti jijjiiruun Kilo Gateway irratti fi meeshaa kana irratti hin milkoofne. Walitti qabamu kee mirkaneessi ykn Filannoowwan keessatti qindaa'ina sagalee barreeffamatti jijjiiruu jijjiiri, booda irra deebi'ii yaali.",
-    "engineFellBackToDevice": "Sagalee barreeffamatti jijjiiruun gateway irratti hin jiru — meeshaan kee beekumsa isaa fayyadamaa jira. Maaloo irra deebi'ii jedhi.",
-    "engineFellBackToGateway": "Beekumsi meeshaa kanaa hin milkoofne — Kilo Gateway fayyadamaa jira. Maaloo irra deebi'ii jedhi."
+    "gatewayNoModel": "Dursee Filannoowwan keessatti moodeela sagalee jijjiiru filadhu."
   },
   "share": {
     "title": "Gara Kilo qoodi",

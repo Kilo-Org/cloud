@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripsi dengan Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripsikan masukan suara dengan model Kilo Gateway alih-alih pengenalan bicara perangkat. Rekaman Anda dikirim ke Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Gunakan sebagai utama",
-    "gatewayTranscriptionPrimarySubtitle": "Transkripsi dipimpin oleh model Gateway dan beralih ke perangkat saat model tidak tersedia.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
@@ -2145,10 +2143,7 @@
     "gatewayTimeout": "Transkripsi terlalu lama. Coba lagi.",
     "gatewayModelUnavailable": "Model transkripsi ini tidak tersedia. Pilih yang lain di Preferensi.",
     "gatewaySignInRequired": "Masuk untuk menggunakan transkripsi Kilo Gateway.",
-    "gatewayNoModel": "Pilih model transkripsi di Preferensi terlebih dahulu.",
-    "enginesFailed": "Transkripsi gagal di Kilo Gateway dan di perangkat ini. Periksa koneksi Anda, atau ubah setelan transkripsi di Preferensi, lalu coba lagi.",
-    "engineFellBackToDevice": "Transkripsi melalui gateway tidak tersedia — pengenal pada perangkat Anda yang digunakan. Silakan ucapkan lagi.",
-    "engineFellBackToGateway": "Pengenalan perangkat gagal — Kilo Gateway yang digunakan. Silakan ucapkan lagi."
+    "gatewayNoModel": "Pilih model transkripsi di Preferensi terlebih dahulu."
   },
   "share": {
     "title": "Bagikan ke Kilo",

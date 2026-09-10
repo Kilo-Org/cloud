@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Ukuguqulwa kwenkulumo ibe umbhalo nge-Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Guqula ukufaka ngezwi kube umbhalo usebenzisa imodeli ye-Kilo Gateway kunokubona inkulumo kwedivayisi. Ukuqopha kwakho kuthunyelwa ku-Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Sebenzisa njengokuyinhloko",
-    "gatewayTranscriptionPrimarySubtitle": "Ukuguqula inkulumo kube umbhalo kungqalwa yimodeli ye-Gateway, futhi kusebenzisa idivayisi uma ingatholakali.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Ukuguqula inkulumo kuthathe isikhathi eside kakhulu. Zama futhi.",
     "gatewayModelUnavailable": "Le modeli yokuguqula inkulumo ayitholakali. Khetha enye Ku-Okuncamelayo.",
     "gatewaySignInRequired": "Ngena ngemvume ukuze usebenzise ukuguqula inkulumo nge-Kilo Gateway.",
-    "gatewayNoModel": "Okokuqala, khetha imodeli yokuguqula inkulumo Ku-Okuncamelayo.",
-    "enginesFailed": "Ukuguqula inkulumo kuhluleke kokubili ku-Kilo Gateway nakule divayisi. Hlola uxhumano lwakho noma ushintshe izilungiselelo zokuguqula ku-Okuncamelayo, bese zama futhi.",
-    "engineFellBackToDevice": "Ukuguqula nge-Gateway akutholakali — kusetshenziswa uhlelo lokuhlonza lwedivayisi yakho. Sicela uphinde uthi.",
-    "engineFellBackToGateway": "Ukuhlonza kwedivayisi kuhlulekile — kusetshenziswa i-Kilo Gateway. Sicela uphinde uthi."
+    "gatewayNoModel": "Okokuqala, khetha imodeli yokuguqula inkulumo Ku-Okuncamelayo."
   },
   "share": {
     "title": "Yabelana ku-Kilo",

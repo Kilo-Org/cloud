@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Qoraal u beddelidda codka ee Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Codka ku beddel qoraal moodeelka Kilo Gateway adigoo aan isticmaalayn aqoonsiga hadalka ee qalabka. Duubistaada waxaa loo diraa Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Isticmaal koowaad",
-    "gatewayTranscriptionPrimarySubtitle": "Qoraal u beddelidda waxaa hoggaamiya moodeelka Gateway, markaas hadduu maqnaado waa la beddelaa qalabka.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Qoraal u beddelidda waxay qaadatay waqti aad u dheer. Mar kale isku day.",
     "gatewayModelUnavailable": "Moodeelkan qoraal u beddelidda lagama heli karo. Mid kale ka dooro Dookhyada.",
     "gatewaySignInRequired": "Soo gal si aad u isticmaasho qoraal u beddelidda Kilo Gateway.",
-    "gatewayNoModel": "Marka hore moodeel qoraal u beddelidda ka dooro Dookhyada.",
-    "enginesFailed": "Qoraal u beddelidda wuu fashilmay Kilo Gateway iyo qalabkan labadaba. Hubi xiriirkaaga ama beddel goobaha qoraal u beddelidda ee Dookhyada, ka dib mar kale isku day.",
-    "engineFellBackToDevice": "Qoraal u beddelidda gateway lama heli karo — aqoonsiga qalabkaaga ayaa la isticmaalayaa. Fadlan mar kale sheeg.",
-    "engineFellBackToGateway": "Aqoonsiga qalabka wuu fashilmay — Kilo Gateway ayaa la isticmaalayaa. Fadlan mar kale sheeg."
+    "gatewayNoModel": "Marka hore moodeel qoraal u beddelidda ka dooro Dookhyada."
   },
   "share": {
     "title": "U wadaag Kilo",

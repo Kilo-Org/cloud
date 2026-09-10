@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "تبدیل گفتار به متن با Kilo Gateway",
     "gatewayTranscriptionSubtitle": "ورودی صوتی را به‌جای تشخیص گفتار دستگاه، با یک مدل Kilo Gateway به متن تبدیل کنید. صدای ضبط‌شده شما به Kilo Gateway فرستاده می‌شود.",
-    "gatewayTranscriptionPrimary": "استفاده به‌عنوان اصلی",
-    "gatewayTranscriptionPrimarySubtitle": "تبدیل گفتار به متن ابتدا با مدل Gateway انجام می‌شود و اگر در دسترس نباشد، از دستگاه استفاده می‌شود.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "تبدیل گفتار به متن بیش از حد طول کشید. دوباره تلاش کنید.",
     "gatewayModelUnavailable": "این مدل تبدیل گفتار به متن در دسترس نیست. در تنظیمات دلخواه مدل دیگری انتخاب کنید.",
     "gatewaySignInRequired": "برای استفاده از تبدیل گفتار به متن با Kilo Gateway وارد شوید.",
-    "gatewayNoModel": "ابتدا در تنظیمات دلخواه یک مدل تبدیل گفتار به متن انتخاب کنید.",
-    "enginesFailed": "تبدیل گفتار به متن روی Kilo Gateway و روی این دستگاه شکست خورد. اتصال خود را بررسی کنید یا در تنظیمات دلخواه تنظیمات تبدیل گفتار به متن را تغییر دهید، سپس دوباره تلاش کنید.",
-    "engineFellBackToDevice": "تبدیل گفتار به متن از طریق Gateway در دسترس نیست — از تشخیص‌دهنده دستگاه شما استفاده می‌شود. لطفاً دوباره بگویید.",
-    "engineFellBackToGateway": "تشخیص دستگاه شکست خورد — از Kilo Gateway استفاده می‌شود. لطفاً دوباره بگویید."
+    "gatewayNoModel": "ابتدا در تنظیمات دلخواه یک مدل تبدیل گفتار به متن انتخاب کنید."
   },
   "share": {
     "title": "اشتراک‌گذاری با Kilo",

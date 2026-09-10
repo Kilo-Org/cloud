@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "การถอดเสียงผ่าน Kilo Gateway",
     "gatewayTranscriptionSubtitle": "ถอดเสียงจากการพิมพ์ด้วยเสียงด้วยโมเดลของ Kilo Gateway แทนการรู้จำเสียงของอุปกรณ์ ระบบจะส่งการบันทึกเสียงของคุณไปยัง Kilo Gateway",
-    "gatewayTranscriptionPrimary": "ใช้เป็นหลัก",
-    "gatewayTranscriptionPrimarySubtitle": "การถอดเสียงจะเริ่มด้วยโมเดลของ Gateway ก่อน และใช้อุปกรณ์เมื่อโมเดลใช้ไม่ได้",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "การถอดเสียงใช้เวลานานเกินไป ลองอีกครั้ง",
     "gatewayModelUnavailable": "โมเดลถอดเสียงนี้ไม่พร้อมใช้งาน เลือกโมเดลอื่นในการตั้งค่า",
     "gatewaySignInRequired": "เข้าสู่ระบบเพื่อใช้การถอดเสียงผ่าน Kilo Gateway",
-    "gatewayNoModel": "เลือกโมเดลถอดเสียงในการตั้งค่าก่อน",
-    "enginesFailed": "การถอดเสียงล้มเหลวทั้งบน Kilo Gateway และบนอุปกรณ์นี้ ตรวจสอบการเชื่อมต่อ หรือเปลี่ยนการตั้งค่าการถอดเสียงในการตั้งค่า แล้วลองอีกครั้ง",
-    "engineFellBackToDevice": "การถอดเสียงผ่าน Gateway ใช้งานไม่ได้ — กำลังใช้การจดจำเสียงบนอุปกรณ์ของคุณ โปรดพูดอีกครั้ง",
-    "engineFellBackToGateway": "การจดจำเสียงบนอุปกรณ์ล้มเหลว — กำลังใช้ Kilo Gateway โปรดพูดอีกครั้ง"
+    "gatewayNoModel": "เลือกโมเดลถอดเสียงในการตั้งค่าก่อน"
   },
   "share": {
     "title": "แชร์ไปยัง Kilo",

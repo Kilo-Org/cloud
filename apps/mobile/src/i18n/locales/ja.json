@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gatewayによる文字起こし",
     "gatewayTranscriptionSubtitle": "デバイスの音声認識の代わりにKilo Gatewayのモデルで音声入力を文字起こしします。録音はKilo Gatewayに送信されます。",
-    "gatewayTranscriptionPrimary": "メインとして使用",
-    "gatewayTranscriptionPrimarySubtitle": "文字起こしはGatewayモデルが先に行い、利用できない場合はデバイスに切り替えます。",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
@@ -2145,10 +2143,7 @@
     "gatewayTimeout": "文字起こしに時間がかかりすぎました。もう一度お試しください。",
     "gatewayModelUnavailable": "この文字起こしモデルは利用できません。設定で別のモデルを選択してください。",
     "gatewaySignInRequired": "Kilo Gatewayの文字起こしを使うにはサインインしてください。",
-    "gatewayNoModel": "まず設定で文字起こしモデルを選択してください。",
-    "enginesFailed": "Kilo Gatewayとこのデバイスの両方で文字起こしが失敗しました。接続を確認するか、設定で文字起こしの設定を変更してから、もう一度お試しください。",
-    "engineFellBackToDevice": "Gatewayでの文字起こしを利用できません — デバイス側の音声認識を使用しています。もう一度お話しください。",
-    "engineFellBackToGateway": "デバイス側の音声認識に失敗しました — Kilo Gatewayを使用しています。もう一度お話しください。"
+    "gatewayNoModel": "まず設定で文字起こしモデルを選択してください。"
   },
   "share": {
     "title": "Kiloに共有",

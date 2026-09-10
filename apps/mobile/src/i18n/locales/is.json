@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Umritun í gegnum Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Umritið raddinnsláttinn með Kilo Gateway líkani í stað talaþekkingar tækisins. Upptakan er send í Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Nota sem aðalval",
-    "gatewayTranscriptionPrimarySubtitle": "Umritunin er stýrt af Gateway líkaninu, en tækið er notað ef það er ekki tiltækt.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Umritunin tók of langan tíma. Reyndu aftur.",
     "gatewayModelUnavailable": "Þetta umritunarlíkan er ekki í boði. Veldu annað í Kjörstillingum.",
     "gatewaySignInRequired": "Skráðu þig inn til að nota umritun í gegnum Kilo Gateway.",
-    "gatewayNoModel": "Veldu fyrst umritunarlíkan í Kjörstillingum.",
-    "enginesFailed": "Umritun mistókst á Kilo Gateway og á þessu tæki. Athugaðu nettenginguna þína eða breyttu umritunarstillingum í Kjörstillingum og reyndu aftur.",
-    "engineFellBackToDevice": "Umritun um Gateway er ekki tiltæk — talgreinirinn á tækinu þínu er notaður. Segðu þetta aftur.",
-    "engineFellBackToGateway": "Talgreiningin á tækinu brást — Kilo Gateway er notaður. Segðu þetta aftur."
+    "gatewayNoModel": "Veldu fyrst umritunarlíkan í Kjörstillingum."
   },
   "share": {
     "title": "Deila með Kilo",

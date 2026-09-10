@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Ịtụgharị olu ka ọ bụrụ ederede site na Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Ejila njirimaka okwu nke ngwaọrụ ahụ; jiri ihe nlereanya Kilo Gateway tụgharịa ntinye olu ka ọ bụrụ ederede. A na-eziga ndekọ gị na Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Jiri dị ka isi",
-    "gatewayTranscriptionPrimarySubtitle": "Ọ bụ ihe nlereanya Gateway na-edu ịtụgharị okwu; mgbe ọ nọghị, a na-eji ngwaọrụ ahụ.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Ịtụgharị okwu were oge karịrị akarị. Nwaa ọzọ.",
     "gatewayModelUnavailable": "Ihe nlereanya a maka ịtụgharị okwu adịghị. Họrọ ọzọ na Mmasị.",
     "gatewaySignInRequired": "Banye ka i jiri ịtụgharị okwu site na Kilo Gateway.",
-    "gatewayNoModel": "Họrọ ihe nlereanya maka ịtụgharị okwu na Mmasị ụzọ.",
-    "enginesFailed": "Ịtụgharị okwu dara na Kilo Gateway na na ngwaọrụ a. Lelee njikọ gị, ma ọ bụ gbanwee ntọala ịtụgharị okwu na Mmasị ụzọ, mgbe ahụ nwaa ọzọ.",
-    "engineFellBackToDevice": "Ịtụgharị okwu site na gateway adịghị — a na-eji ihe na-amata okwu dị na ngwaọrụ gị. Biko kwuo ya ọzọ.",
-    "engineFellBackToGateway": "Ihe na-amata okwu na ngwaọrụ dara — a na-eji Kilo Gateway. Biko kwuo ya ọzọ."
+    "gatewayNoModel": "Họrọ ihe nlereanya maka ịtụgharị okwu na Mmasị ụzọ."
   },
   "share": {
     "title": "Kekọrịta na Kilo",

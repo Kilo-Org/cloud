@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripcija, izmantojot Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribē balss ievadi, izmantojot Kilo Gateway modeli, nevis ierīces runas atpazīšanu. Ieraksts tiek nosūtīts uz Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Izmantot kā primāro",
-    "gatewayTranscriptionPrimarySubtitle": "Transkripciju vada Gateway modelis, un, ja tas nav pieejams, tiek izmantota ierīce.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2600,10 +2598,7 @@
     "gatewayTimeout": "Transkripcija aizņēma par daudz laika. Mēģini vēlreiz.",
     "gatewayModelUnavailable": "Šis transkripcijas modelis nav pieejams. Izvēlies citu Lietotāja iestatījumos.",
     "gatewaySignInRequired": "Pieraksties, lai izmantotu transkripciju, izmantojot Kilo Gateway.",
-    "gatewayNoModel": "Vispirms izvēlies transkripcijas modeli Lietotāja iestatījumos.",
-    "enginesFailed": "Transkripcija neizdevās ne Kilo Gateway, ne šajā ierīcē. Pārbaudi savienojumu vai maini transkripcijas iestatījumus Lietotāja iestatījumos un mēģini vēlreiz.",
-    "engineFellBackToDevice": "Transkripcija caur Gateway nav pieejama — tiek izmantots ierīces atpazītājs. Lūdzu, pasaki vēlreiz.",
-    "engineFellBackToGateway": "Ierīces atpazīšana neizdevās — tiek izmantots Kilo Gateway. Lūdzu, pasaki vēlreiz."
+    "gatewayNoModel": "Vispirms izvēlies transkripcijas modeli Lietotāja iestatījumos."
   },
   "share": {
     "title": "Kopīgošana lietotnē Kilo",

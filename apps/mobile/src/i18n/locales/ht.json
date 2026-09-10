@@ -250,8 +250,6 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripsyon ak Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripte dikte a ak yon modèl Kilo Gateway olye rekonesans vokal aparèy la. Yo voye anrejistrman ou a bay Kilo Gateway.",
-    "gatewayTranscriptionPrimary": "Sèvi kòm prensipal",
-    "gatewayTranscriptionPrimarySubtitle": "Transkripsyon an kòmanse ak modèl Gateway la, epi lè li pa disponib, li retounen sou aparèy la.",
     "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
@@ -2579,10 +2577,7 @@
     "gatewayTimeout": "Transkripsyon an te pran twòp tan. Eseye ankò.",
     "gatewayModelUnavailable": "Modèl transkripsyon sa a pa disponib. Chwazi yon lòt nan Preferans yo.",
     "gatewaySignInRequired": "Konekte pou sèvi ak transkripsyon Kilo Gateway.",
-    "gatewayNoModel": "Chwazi yon modèl transkripsyon nan Preferans yo an premye.",
-    "enginesFailed": "Transkripsyon an echwe sou Kilo Gateway ak sou aparèy sa a. Verifye koneksyon ou, oswa chanje paramèt transkripsyon yo nan Preferans yo, apre sa eseye ankò.",
-    "engineFellBackToDevice": "Transkripsyon via Gateway la pa disponib — n ap itilize rekonesans aparèy ou a. Tanpri di l ankò.",
-    "engineFellBackToGateway": "Rekonesans nan aparèy la echwe — n ap itilize Kilo Gateway. Tanpri di l ankò."
+    "gatewayNoModel": "Chwazi yon modèl transkripsyon nan Preferans yo an premye."
   },
   "share": {
     "title": "Pataj nan Kilo",

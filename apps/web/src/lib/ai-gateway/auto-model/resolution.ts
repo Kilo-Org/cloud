@@ -17,7 +17,6 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   modeSchema,
-  BALANCED_FALLBACK_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
@@ -27,6 +26,7 @@ import {
   autoFreeModels,
   findKiloExclusiveModel,
   isKiloExclusiveFreeModel,
+  PRIMARY_DEFAULT_MODEL,
   selectAutoFreeCandidate,
 } from '@/lib/ai-gateway/models';
 import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
@@ -317,6 +317,7 @@ export async function resolveAutoModel(
     };
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
+    const fallbackModel = { model: PRIMARY_DEFAULT_MODEL };
     const decision = params.efficientDecision ? await params.efficientDecision() : null;
     if (decision && !isVirtualAutoModelId(decision.model)) {
       const resolvedFromDecision = await resolveEfficientDecisionModel(decision);
@@ -324,11 +325,11 @@ export async function resolveAutoModel(
         return { kind: 'ok', resolved: resolvedFromDecision };
       }
       // Exact catalog variant missing or removed: never serve the chosen model
-      // with implicit defaults — same balanced fallback as the no-decision path.
-      return { kind: 'ok', resolved: BALANCED_FALLBACK_MODEL };
+      // with implicit defaults — use the same fallback as the no-decision path.
+      return { kind: 'ok', resolved: fallbackModel };
     }
     // Static fallback when the worker is slow or unavailable.
-    return { kind: 'ok', resolved: BALANCED_FALLBACK_MODEL };
+    return { kind: 'ok', resolved: fallbackModel };
   }
   const mode = resolveMode(modeHeader, featureHeader);
   return {

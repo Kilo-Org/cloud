@@ -8,9 +8,9 @@ import {
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
-  CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
@@ -25,12 +25,12 @@ import {
   gpt_5_6_sol_discounted_model,
   gpt_6_astra_flex_model,
 } from '@/lib/ai-gateway/providers/openai-exclusive';
-import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
+import { GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import { type ProviderId } from '@/lib/ai-gateway/providers/types';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 
-export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
+export const PRIMARY_DEFAULT_MODEL = GLM_FLASH_CURRENT_MODEL_ID;
 
 export type AutoFreeModel = {
   model: string;
@@ -92,14 +92,14 @@ export const preferredModels = [
 
   ...autoFreeModels.map(({ model }) => model),
 
-  CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   GPT_CURRENT_MODEL_ID,
   ...(gpt_5_6_sol_discounted_model.status === 'public'
     ? [gpt_5_6_sol_discounted_model.public_id]
     : []),
   ...(gpt_6_astra_flex_model.status === 'public' ? [gpt_6_astra_flex_model.public_id] : []),
-  GLM_CURRENT_MODEL_ID,
+  DEEPSEEK_V4_1_FLASH_MODEL_ID,
+  GLM_FLASH_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,
 ];

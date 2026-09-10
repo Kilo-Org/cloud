@@ -9,7 +9,7 @@ import { ownerDirectoryForSession } from './session-directories.js';
 type EventKind = 'session.event' | 'session.preparing';
 
 export function createControlEventFailureHandler<Runtime extends { runtimeId: string }>(options: {
-  getRuntime: (directory: string) => Runtime | undefined;
+  getRuntime: (directory: string, nativeRuntimeId: string) => Runtime | undefined;
   onFailure: (failure: ControlEventOutboxFailure, runtime: Runtime) => unknown;
 }) {
   const inFlight = new WeakMap<Runtime, Set<string>>();
@@ -22,7 +22,7 @@ export function createControlEventFailureHandler<Runtime extends { runtimeId: st
     if (!nativeRuntimeId || !root) return;
     const ownerDirectory = ownerDirectoryForSession(failure.publication.session);
     if (!ownerDirectory) return;
-    const runtime = options.getRuntime(ownerDirectory);
+    const runtime = options.getRuntime(ownerDirectory, nativeRuntimeId);
     if (runtime?.runtimeId !== nativeRuntimeId) return;
     const key = JSON.stringify([nativeRuntimeId, root]);
     const keys = inFlight.get(runtime) ?? new Set<string>();

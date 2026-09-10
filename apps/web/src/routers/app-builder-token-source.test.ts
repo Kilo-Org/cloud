@@ -6,6 +6,12 @@ const appBuilderServiceMocks = {
   sendMessage: jest.fn(),
 };
 
+const mockCreateControlTokenForRequest = jest.fn();
+
+jest.mock('@/lib/auth/resource-delegation', () => ({
+  createControlTokenForRequest: (...args: unknown[]) => mockCreateControlTokenForRequest(...args),
+}));
+
 jest.mock('@/lib/redis', () => ({
   redisClient: { get: jest.fn(async () => null) },
 }));
@@ -23,11 +29,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
 import { organizations, organization_memberships } from '@kilocode/db/schema';
-import { expectNonExchangeableSystemToken } from '@/tests/helpers/system-token.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { User } from '@kilocode/db/schema';
 
@@ -114,11 +116,17 @@ describe('App Builder system tokens', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockCreateControlTokenForRequest.mockImplementation(
+      async (currentUser: User, _resource: string, options?: { organizationId?: string }) => ({
+        token: `app-builder-token-${options?.organizationId ?? 'personal'}`,
+        user: currentUser,
+      })
+    );
     mockAppBuilderService();
     user = await insertTestUser({ api_token_pepper: 'app-builder-token-source-pepper' });
   });
 
-  it('forwards non-exchangeable app-builder tokens for personal and organization operations', async () => {
+  it('forwards verified request-derived app-builder tokens for personal and organization operations', async () => {
     const [organization] = await db
       .insert(organizations)
       .values({
@@ -156,14 +164,22 @@ describe('App Builder system tokens', () => {
       { type: 'org', id: organization.id },
     ]);
 
-    for (const { token } of tokens) {
-      await expectNonExchangeableSystemToken(token, user, 'app-builder');
-      await expect(
-        verifyKiloTokenForResource(token, NEXTAUTH_SECRET, {
-          audience: CLOUD_AGENT_NEXT_AUDIENCE,
-          mode: 'allow-legacy',
-        })
-      ).resolves.toMatchObject({ kiloUserId: user.id, tokenSource: 'app-builder' });
+    expect(tokens.map(({ token }) => token)).toEqual([
+      'app-builder-token-personal',
+      `app-builder-token-${organization.id}`,
+      'app-builder-token-personal',
+      `app-builder-token-${organization.id}`,
+      'app-builder-token-personal',
+      `app-builder-token-${organization.id}`,
+      'app-builder-token-personal',
+      `app-builder-token-${organization.id}`,
+      'app-builder-token-personal',
+      `app-builder-token-${organization.id}`,
+    ]);
+    expect(mockCreateControlTokenForRequest).toHaveBeenCalledTimes(10);
+    for (const [, resource, options] of mockCreateControlTokenForRequest.mock.calls) {
+      expect(resource).toBe('cloud-agent-next');
+      expect(options).toMatchObject({ tokenSource: 'app-builder' });
     }
   });
 });

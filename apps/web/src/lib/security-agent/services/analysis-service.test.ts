@@ -22,6 +22,12 @@ const mockTriageSecurityFinding = jest.fn() as jest.MockedFunction<
   typeof triageModule.triageSecurityFinding
 >;
 const mockGenerateApiToken = jest.fn() as jest.MockedFunction<typeof tokensModule.generateApiToken>;
+const mockGenerateCloudAgentWorkflowToken = jest.fn() as jest.MockedFunction<
+  typeof tokensModule.generateCloudAgentWorkflowToken
+>;
+const mockGenerateWorkflowGatewayToken = jest.fn() as jest.MockedFunction<
+  typeof tokensModule.generateWorkflowGatewayToken
+>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockPrepareSession = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,6 +63,9 @@ jest.mock('./triage-service', () => ({
 
 jest.mock('@/lib/tokens', () => ({
   generateApiToken: mockGenerateApiToken,
+  generateCloudAgentWorkflowToken: mockGenerateCloudAgentWorkflowToken,
+  generateWorkflowGatewayToken: mockGenerateWorkflowGatewayToken,
+  TOKEN_EXPIRY: { default: 157_680_000 },
 }));
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
@@ -99,6 +108,8 @@ describe('analysis-service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockTryAcquireAnalysisStartLease.mockResolvedValue(true);
+    mockGenerateCloudAgentWorkflowToken.mockReturnValue('cloud-agent-token');
+    mockGenerateWorkflowGatewayToken.mockReturnValue('gateway-token');
   });
 
   it('does not start when start lease cannot be acquired', async () => {
@@ -160,6 +171,8 @@ describe('analysis-service', () => {
 
     const mockFinding = {
       id: findingId,
+      owned_by_organization_id: organizationId,
+      owned_by_user_id: null,
       source: 'dependabot',
       source_id: '42',
       status: 'open',
@@ -254,6 +267,30 @@ describe('analysis-service', () => {
     expect(mockInitiateFromPreparedSession).toHaveBeenCalledWith({
       cloudAgentSessionId: 'ses-agent-123',
     });
+  });
+
+  it('rejects a personal finding owned by another user before minting credentials', async () => {
+    const user = { id: 'user-1', google_user_email: 'test@example.com' } as User;
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: 'finding-other-user',
+      owned_by_organization_id: null,
+      owned_by_user_id: 'user-2',
+      status: 'open',
+    } as Awaited<ReturnType<typeof mockGetSecurityFindingById>>);
+
+    await expect(
+      startSecurityAnalysis({
+        findingId: 'finding-other-user',
+        user,
+        githubRepo: 'acme/repo',
+        githubToken: 'gh-token',
+      })
+    ).resolves.toEqual({
+      started: false,
+      error: 'Analysis organization does not match the finding owner',
+    });
+    expect(mockGenerateCloudAgentWorkflowToken).not.toHaveBeenCalled();
+    expect(mockGenerateWorkflowGatewayToken).not.toHaveBeenCalled();
   });
 
   it('uses triageModel for triage and analysisModel for sandbox session', async () => {

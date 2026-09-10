@@ -1,0 +1,631 @@
+import { env, listDurableObjectIds, runInDurableObject } from 'cloudflare:test';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import jwt from 'jsonwebtoken';
+import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
+import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
+import { RUNTIME_PROXY_GRANT_KEY } from '../../src/runtime-credential-proxy.js';
+import {
+  RUNTIME_AUTHORIZATION_KEY,
+  RUNTIME_AUTHORIZATION_RECOVERY_KEY,
+  RUNTIME_AUTHORIZATION_RECOVERY_DIAGNOSTICS_KEY,
+  RUNTIME_AUTHORIZATION_RECOVERY_WARNING_MS,
+} from '../../src/session/runtime-authorization-persistence.js';
+import {
+  allocateWrapperRuntimeState,
+  getWrapperRuntimeState,
+} from '../../src/session/wrapper-runtime-state.js';
+import { logger } from '../../src/logger.js';
+import { registerReadySession } from '../helpers/session-setup.js';
+
+const organizationId = '11111111-1111-4111-8111-111111111111';
+
+function authorization(input: {
+  id: string;
+  sessionId: string;
+  userId: string;
+  expiresAt: string;
+  issuedAt?: string;
+  state?: 'active' | 'revoked';
+}): RuntimeAuthorization {
+  return {
+    version: 1,
+    id: input.id,
+    resourceKind: 'cloud-agent-next',
+    resourceId: input.sessionId,
+    userId: input.userId,
+    authorizationUserId: input.userId,
+    organizationId,
+    issuedAt: input.issuedAt ?? new Date(Date.now() - 60_000).toISOString(),
+    delegationExpiresAt: input.expiresAt,
+    state: input.state ?? 'active',
+    bindings: {
+      userPepperDigest: 'a'.repeat(64),
+      authorizationPepperDigest: 'b'.repeat(64),
+      userMembershipId: 'membership_1',
+      authorizationUserMembershipId: 'membership_1',
+    },
+    source: { admissionSource: 'user' },
+  };
+}
+
+async function secret() {
+  return typeof env.NEXTAUTH_SECRET === 'string' ? env.NEXTAUTH_SECRET : env.NEXTAUTH_SECRET.get();
+}
+
+async function seal(value: RuntimeAuthorization) {
+  return sealRuntimeAuthorization(value, await secret());
+}
+
+async function runtimeToken(value: RuntimeAuthorization) {
+  return jwt.sign({ runtimeAuthorization: { id: value.id } }, await secret(), {
+    algorithm: 'HS256',
+    expiresIn: '30 minutes',
+  });
+}
+
+beforeEach(async () => {
+  const namespaces = [env.CLOUD_AGENT_SESSION, env.SANDBOX_SESSION];
+  await Promise.all(
+    namespaces.flatMap(async namespace => {
+      const ids = await listDurableObjectIds(namespace);
+      return Promise.all(
+        ids.map(id =>
+          runInDurableObject(namespace.get(id), instance => instance.ctx.storage.deleteAll())
+        )
+      );
+    })
+  );
+});
+
+describe('runtime authorization recovery', () => {
+  it('rejects prepared and ordinary admission while a recovery lock is held', async () => {
+    const userId = 'user_cloud_recovery_lock';
+    const sessionId = 'agent_cloud_recovery_lock';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaab',
+        prompt: 'initial',
+        mode: 'code',
+        model: 'test-model',
+        initialMessageId: 'msg_018f1e2d3c4bRecoveryLockAb',
+      });
+      await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_RECOVERY_KEY, {
+        expectedOldId: '00000000-0000-4000-8000-000000000001',
+        recoveryId: '00000000-0000-4000-8000-000000000002',
+      });
+      return {
+        ordinary: await instance.admitSubmittedMessage({
+          userId,
+          turn: { type: 'prompt', id: 'msg_018f1e2d3c4bRecoveryBusyAb', prompt: 'follow up' },
+        }),
+        prepared: await instance.admitPreparedInitialMessage({ userId }),
+      };
+    });
+
+    expect(result.ordinary).toEqual({
+      success: false,
+      code: 'COMPUTE_STOPPING',
+      error: 'Runtime authorization recovery is in progress',
+    });
+    expect(result.prepared).toEqual(result.ordinary);
+  });
+
+  it('logs missing configuration and thrown recovery failures without credential or error data', async () => {
+    const userId = 'user_recovery_diagnostics';
+    const sessionId = 'agent_recovery_diagnostics';
+    const stub = env.CLOUD_AGENT_SESSION.getByName(`${userId}:${sessionId}`);
+    await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        orgId: organizationId,
+        prompt: 'initial',
+        mode: 'code',
+        model: 'test-model',
+      });
+      const old = authorization({
+        id: '00000000-0000-4000-8000-000000000401',
+        sessionId,
+        userId,
+        expiresAt: new Date(Date.now() - 60_000).toISOString(),
+        issuedAt: new Date(Date.now() - 120_000).toISOString(),
+      });
+      const fresh = authorization({
+        id: '00000000-0000-4000-8000-000000000402',
+        sessionId,
+        userId,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      });
+      await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, old);
+      const input = {
+        ownerId: userId,
+        expectedOldId: old.id,
+        recoveryId: '00000000-0000-4000-8000-000000000403',
+        runtimeAuthorizationSeal: await seal(fresh),
+        runtimeToken: 'private-bearer',
+      };
+      const originalSecret = instance['env'].NEXTAUTH_SECRET;
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const error = vi.spyOn(logger, 'error').mockImplementation(() => {});
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        instance['env'].NEXTAUTH_SECRET = '';
+        expect(await instance.recoverExpiredRuntimeAuthorization(input)).toEqual({
+          status: 'denied',
+        });
+        expect(fields).toHaveBeenLastCalledWith({ sessionId, reason: 'missing_secret' });
+        expect(error).toHaveBeenCalledWith('Runtime authorization recovery denied');
+        expect(await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)).toBeUndefined();
+        instance['env'].NEXTAUTH_SECRET = originalSecret;
+        instance['physicalWrapperObserver'] = async () => {
+          throw new Error('private-error-with-bearer');
+        };
+        expect(await instance.recoverExpiredRuntimeAuthorization(input)).toEqual({
+          status: 'retry',
+        });
+        expect(fields).toHaveBeenLastCalledWith({
+          sessionId,
+          expectedOldId: old.id,
+          recoveryId: input.recoveryId,
+          reason: 'physical_inspection_failed',
+        });
+        expect(warn).toHaveBeenCalledWith('Runtime authorization recovery incomplete');
+        expect(await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)).toEqual({
+          expectedOldId: old.id,
+          recoveryId: input.recoveryId,
+        });
+        expect(await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY)).toEqual(old);
+        expect(
+          JSON.stringify([fields.mock.calls, error.mock.calls, warn.mock.calls])
+        ).not.toContain('private-');
+      } finally {
+        instance['env'].NEXTAUTH_SECRET = originalSecret;
+        vi.restoreAllMocks();
+      }
+    });
+  });
+
+  it('recovers an expired CloudAgentSession authorization only after confirmed idle retirement', async () => {
+    const userId = 'user_cloud_recovery';
+    const sessionId = 'agent_cloud_recovery';
+    const old = authorization({
+      id: '00000000-0000-4000-8000-000000000101',
+      sessionId,
+      userId,
+      expiresAt: new Date(Date.now() - 24 * 60 * 60_000).toISOString(),
+      issuedAt: new Date(Date.now() - 26 * 60 * 60_000).toISOString(),
+    });
+    const fresh = authorization({
+      id: '00000000-0000-4000-8000-000000000102',
+      sessionId,
+      userId,
+      expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+    });
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        orgId: organizationId,
+        kiloSessionId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+        prompt: 'initial',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'expired-token',
+        initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      });
+      const previousRuntime = await allocateWrapperRuntimeState(instance.ctx.storage);
+      await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, old);
+      await instance.ctx.storage.put(RUNTIME_PROXY_GRANT_KEY, { cached: 'old-grant' });
+      const stops: string[] = [];
+      instance['getTerminalClient'] = async () =>
+        ({ success: true, data: { client: { listTerminals: async () => [] } } }) as never;
+      instance['physicalWrapperStopper'] = async request => {
+        stops.push(request.reason);
+        return { status: 'absent' };
+      };
+      let observations = 0;
+      instance['physicalWrapperObserver'] = async () =>
+        ++observations === 1 ? { status: 'present' } : { status: 'absent' };
+
+      const outcome = await instance.recoverExpiredRuntimeAuthorization({
+        ownerId: userId,
+        expectedOldId: old.id,
+        recoveryId: '00000000-0000-4000-8000-000000000103',
+        runtimeAuthorizationSeal: await seal(fresh),
+        runtimeToken: 'fresh-token',
+      });
+      const preparedAdmission = await instance.admitPreparedInitialMessage({ userId });
+      return {
+        outcome,
+        preparedAdmission,
+        stops,
+        metadata: await instance.getMetadata(),
+        authorization: await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY),
+        grant: await instance.ctx.storage.get(RUNTIME_PROXY_GRANT_KEY),
+        recovery: await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY),
+        runtime: await getWrapperRuntimeState(instance.ctx.storage),
+        previousRuntime: previousRuntime.state,
+      };
+    });
+
+    expect(result.outcome).toEqual({ status: 'recovered' });
+    expect(result.preparedAdmission).toMatchObject({
+      success: true,
+      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+    });
+    expect(result.stops).toEqual(['idle-timeout']);
+    expect(result.metadata).toMatchObject({
+      identity: { userId, sessionId, orgId: organizationId },
+      auth: { kilocodeToken: 'fresh-token' },
+    });
+    expect(result.authorization).toMatchObject({ id: fresh.id, state: 'active' });
+    expect(result.grant).toBeUndefined();
+    expect(result.recovery).toBeUndefined();
+    expect(result.runtime).toEqual({
+      wrapperGeneration: result.previousRuntime.wrapperGeneration + 1,
+    });
+  });
+
+  it('denies invalid recovery, preserves active PTYs, and fences terminal mutations while locked', async () => {
+    const userId = 'user_cloud_recovery_guards';
+    const sessionId = 'agent_cloud_recovery_guards';
+    const old = authorization({
+      id: '00000000-0000-4000-8000-000000000201',
+      sessionId,
+      userId,
+      expiresAt: new Date(Date.now() - 60_000).toISOString(),
+      issuedAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString(),
+    });
+    const fresh = authorization({
+      id: '00000000-0000-4000-8000-000000000202',
+      sessionId,
+      userId,
+      expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+    });
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const outcomes = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        orgId: organizationId,
+        prompt: 'initial',
+        mode: 'code',
+        model: 'test-model',
+      });
+      await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, old);
+      const input = {
+        ownerId: userId,
+        expectedOldId: old.id,
+        recoveryId: '00000000-0000-4000-8000-000000000203',
+        runtimeAuthorizationSeal: await seal(fresh),
+        runtimeToken: 'fresh-token',
+      };
+      const foreign = await instance.recoverExpiredRuntimeAuthorization({
+        ...input,
+        ownerId: 'other',
+      });
+      const revoked = await instance.recoverExpiredRuntimeAuthorization({
+        ...input,
+        runtimeAuthorizationSeal: await seal({ ...fresh, state: 'revoked' }),
+      });
+      await instance.admitSubmittedMessage({
+        userId,
+        turn: { type: 'prompt', id: 'msg_018f1e2d3c4bBusyRecoveryAb', prompt: 'queued' },
+      });
+      const busy = await instance.recoverExpiredRuntimeAuthorization(input);
+      return { foreign, revoked, busy };
+    });
+
+    expect(outcomes).toEqual({
+      foreign: { status: 'denied' },
+      revoked: { status: 'denied' },
+      busy: { status: 'busy' },
+    });
+
+    {
+      const userId = 'user_cloud_recovery_pty';
+      const sessionId = 'agent_cloud_recovery_pty';
+      const old = authorization({
+        id: '00000000-0000-4000-8000-000000000251',
+        sessionId,
+        userId,
+        expiresAt: new Date(Date.now() - 60_000).toISOString(),
+        issuedAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString(),
+      });
+      const fresh = authorization({
+        id: '00000000-0000-4000-8000-000000000252',
+        sessionId,
+        userId,
+        expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+      const stub = env.CLOUD_AGENT_SESSION.get(
+        env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+      );
+
+      const result = await runInDurableObject(stub, async instance => {
+        await registerReadySession(instance, {
+          sessionId,
+          userId,
+          orgId: organizationId,
+          prompt: 'initial',
+          mode: 'code',
+          model: 'test-model',
+          kilocodeToken: 'expired-token',
+        });
+        await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, old);
+        await instance.ctx.storage.put(RUNTIME_PROXY_GRANT_KEY, { cached: 'old-grant' });
+        const createTerminal = () => {
+          throw new Error('creation must be blocked by the recovery lock');
+        };
+        const resizeTerminal = () => {
+          throw new Error('reconnection must be blocked by the recovery lock');
+        };
+        const closeTerminal = async () => ({ success: true });
+        instance['getTerminalClient'] = async () =>
+          ({
+            success: true,
+            data: {
+              client: {
+                listTerminals: async () => [{ id: 'pty_active' }],
+                createTerminal,
+                resizeTerminal,
+                closeTerminal,
+              },
+            },
+          }) as never;
+        instance['physicalWrapperObserver'] = async () => ({ status: 'present' });
+        let stops = 0;
+        instance['physicalWrapperStopper'] = async () => {
+          stops += 1;
+          return { status: 'absent' };
+        };
+        const lock = {
+          expectedOldId: old.id,
+          recoveryId: '00000000-0000-4000-8000-000000000253',
+        };
+        // Legacy lock first observation must keep the exact old-reader contract.
+        await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_RECOVERY_KEY, lock);
+        await instance.getRuntimeAuthorizationRecoveryState();
+        expect(await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)).toEqual(lock);
+        const startedAt = Date.now() - RUNTIME_AUTHORIZATION_RECOVERY_WARNING_MS - 1;
+        await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_RECOVERY_DIAGNOSTICS_KEY, {
+          ...lock,
+          startedAt,
+        });
+        const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+        const warning = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+        const recovery = await instance.recoverExpiredRuntimeAuthorization({
+          ownerId: userId,
+          expectedOldId: old.id,
+          recoveryId: '00000000-0000-4000-8000-000000000253',
+          runtimeAuthorizationSeal: await seal(fresh),
+          runtimeToken: 'fresh-token',
+        });
+        await instance.getRuntimeAuthorizationRecoveryState();
+        await instance.isRuntimeAuthorizationRecoveryInProgress();
+        expect(
+          warning.mock.calls.filter(
+            ([message]) => message === 'Runtime authorization recovery requires attention'
+          )
+        ).toHaveLength(1);
+        expect(fields).toHaveBeenCalledWith({
+          sessionId,
+          expectedOldId: old.id,
+          recoveryId: lock.recoveryId,
+          reason: 'prolonged_recovery_lock',
+          lockAgeMs: expect.any(Number),
+        });
+        warning.mockRestore();
+        fields.mockRestore();
+        expect(await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)).toEqual(lock);
+        expect(
+          await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_DIAGNOSTICS_KEY)
+        ).toMatchObject({ ...lock, startedAt, lastWarningAt: expect.any(Number) });
+        return {
+          recovery,
+          stops,
+          authorization: await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY),
+          grant: await instance.ctx.storage.get(RUNTIME_PROXY_GRANT_KEY),
+          locked: await instance.isRuntimeAuthorizationRecoveryInProgress(),
+          create: await instance.createTerminal({}),
+          resize: await instance.resizeTerminal({ ptyId: 'pty_active', cols: 80, rows: 24 }),
+          close: await instance.closeTerminal({ ptyId: 'pty_active' }),
+        };
+      });
+
+      expect(result.recovery).toEqual({ status: 'busy' });
+      expect(result.stops).toBe(0);
+      expect(result.authorization).toMatchObject({ id: old.id });
+      expect(result.grant).toEqual({ cached: 'old-grant' });
+      expect(result.locked).toBe(true);
+      expect(result.create).toEqual({
+        success: false,
+        error: 'Runtime authorization recovery is in progress',
+      });
+      expect(result.resize).toEqual({
+        success: false,
+        error: 'Runtime authorization recovery is in progress',
+      });
+      expect(result.close).toEqual({ success: true, data: { success: true } });
+    }
+  });
+
+  it('retires an idle SandboxSession runtime, clears its attachment fence, and reattaches on dispatch', async () => {
+    const userId = 'user_sandbox_recovery';
+    const sessionId = 'workspace_sandbox_recovery';
+    const sandboxId = 'ses-11111111111141118111111111111111';
+    const wrapperInstanceId = '22222222-2222-4222-8222-222222222222';
+    const old = authorization({
+      id: '00000000-0000-4000-8000-000000000301',
+      sessionId,
+      userId,
+      expiresAt: new Date(Date.now() - 60_000).toISOString(),
+      issuedAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString(),
+    });
+    const fresh = authorization({
+      id: '00000000-0000-4000-8000-000000000302',
+      sessionId,
+      userId,
+      expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+    });
+    const stub = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
+
+    const result = await runInDurableObject(stub, async instance => {
+      const requests: string[] = [];
+      let retirementAttempts = 0;
+      const control = {
+        getStatus: async () => ({
+          physical: 'running' as const,
+          connection: 'ready' as const,
+          work: 'idle' as const,
+          wrapperInstanceId,
+          runtimeRecovery: true as const,
+        }),
+        getRuntimeCredentialProxyFence: async () => ({
+          allocationId: 'allocation_1',
+          plane: 'control' as const,
+          providerInstanceId: 'provider_1',
+          connectionId: 'connection_1',
+          wrapperInstanceId,
+        }),
+        request: async (request: { operation: string; payload?: unknown }) => {
+          requests.push(request.operation);
+          if (request.operation === 'session.runtime.retire') {
+            retirementAttempts += 1;
+            if (retirementAttempts === 1) throw new Error('retirement acknowledgement lost');
+            return {
+              type: 'response' as const,
+              requestId: 'retire',
+              ok: true as const,
+              result: {
+                retired: true,
+                recoveryId: (request.payload as { recoveryId: string }).recoveryId,
+              },
+            };
+          }
+          if (request.operation === 'session.attach') {
+            return {
+              type: 'response' as const,
+              requestId: 'attach',
+              ok: true as const,
+              result: { attached: true },
+            };
+          }
+          return {
+            type: 'response' as const,
+            requestId: 'prompt',
+            ok: true as const,
+            result: { messageId: 'msg_018f1e2d3c4bFreshDispatchAb', status: 'accepted' },
+          };
+        },
+        ensureReady: async () => ({
+          physical: 'running' as const,
+          connection: 'ready' as const,
+          wrapperInstanceId,
+          attachment: {
+            directory: '/workspace/recovery',
+            env: { KILOCODE_TOKEN: 'control-token' },
+            kilo: {
+              scopeId: sessionId,
+              token: 'control-token',
+              targets: {
+                backendBaseUrl: 'https://backend.example.test',
+                providerBaseUrl: 'https://provider.example.test',
+                sessionIngestBaseUrl: 'https://ingest.example.test',
+              },
+            },
+          },
+        }),
+        attachSession: async () => ({}),
+      };
+      instance['env'].SANDBOX_CONTROL = { getByName: () => control } as never;
+      instance['env'].WORKER_URL = 'https://worker.example.test';
+      expect(
+        await instance.registerSession({
+          identity: { sessionId, userId, orgId: organizationId },
+          auth: {
+            kiloSessionId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+            kilocodeToken: 'expired-token',
+          },
+          runtimeAuthorizationSeal: await seal(old),
+          agent: { mode: 'code', model: 'test-model' },
+          workspace: { sandboxId, workspacePath: '/workspace/recovery' },
+        })
+      ).toEqual({ success: true });
+      instance['terminalLifecycle'].recordAttachment({
+        metadata: (await instance.getMetadata())!,
+        sandboxId,
+        wrapperInstanceId,
+        epoch: 0,
+      });
+      instance.ctx.storage.kv.put(RUNTIME_PROXY_GRANT_KEY, { cached: 'old-grant' });
+      const recoveryInput = {
+        ownerId: userId,
+        expectedOldId: old.id,
+        recoveryId: '00000000-0000-4000-8000-000000000303',
+        runtimeAuthorizationSeal: await seal(fresh),
+        runtimeToken: await runtimeToken(fresh),
+      };
+      const lostAcknowledgement = await instance.recoverExpiredRuntimeAuthorization(recoveryInput);
+      const retainedRecovery = instance.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY);
+      const recovered = await instance.recoverExpiredRuntimeAuthorization(recoveryInput);
+      const afterRecovery = {
+        metadata: await instance.getMetadata(),
+        authorization: instance.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_KEY),
+        grant: instance.ctx.storage.kv.get(RUNTIME_PROXY_GRANT_KEY),
+        attachment: instance['terminalLifecycle'].getAttachedWrapperInstanceId(),
+      };
+      const admitted = await instance.admitSubmittedMessage({
+        userId,
+        turn: {
+          type: 'command',
+          id: 'msg_018f1e2d3c4bFreshDispatchAb',
+          command: 'status',
+          arguments: '',
+        },
+      });
+      await instance['dispatchQueued']('msg_018f1e2d3c4bFreshDispatchAb', { allowCreate: true });
+      return {
+        lostAcknowledgement,
+        retainedRecovery,
+        recovered,
+        afterRecovery,
+        admitted,
+        requests,
+      };
+    });
+
+    expect(result.lostAcknowledgement).toEqual({ status: 'retry' });
+    expect(result.retainedRecovery).toEqual({
+      expectedOldId: old.id,
+      recoveryId: '00000000-0000-4000-8000-000000000303',
+    });
+    expect(result.recovered).toEqual({ status: 'recovered' });
+    expect(result.afterRecovery).toMatchObject({
+      metadata: { identity: { userId, sessionId, orgId: organizationId } },
+      authorization: { id: fresh.id },
+    });
+    expect(result.afterRecovery.grant).toBeUndefined();
+    expect(result.afterRecovery.attachment).toBeUndefined();
+    expect(result.admitted).toMatchObject({ success: true, outcome: 'queued' });
+    expect(result.requests).toEqual([
+      'session.runtime.retire',
+      'session.runtime.retire',
+      'session.attach',
+      'session.prompt',
+    ]);
+  });
+});

@@ -45,7 +45,7 @@ export function isAssistantInterrupt(source: unknown): boolean {
     if (source.name === 'MessageAbortedError') return true;
   }
   return /messageabortederror|user[_ -]?interrupt|interrupted by the user/.test(
-    extractErrorMessage(source).toLocaleLowerCase()
+    assistantFailureText(source).toLocaleLowerCase()
   );
 }
 
@@ -53,7 +53,7 @@ export function classifyAssistantFailure(
   source: unknown,
   defaultProviderOwnership: CloudAgentProviderOwnership = 'unknown'
 ): AssistantFailureClassification {
-  const message = extractErrorMessage(source).toLocaleLowerCase();
+  const message = assistantFailureText(source).toLocaleLowerCase();
   const providerOwnership = /\[byok\]/i.test(message) ? 'byok' : defaultProviderOwnership;
   const messageReason = classifyAssistantFailureText(message);
   const specificMessageReason =
@@ -162,14 +162,23 @@ export function classifyAssistantFailureMessage(source: unknown): string {
   return classifyAssistantFailure(source).safeMessage;
 }
 
-function extractErrorMessage(source: unknown): string {
+function assistantFailureText(source: unknown): string {
+  return recognizedAssistantErrorMessage(source) ?? '';
+}
+
+function recognizedAssistantErrorMessage(source: unknown): string | undefined {
   if (typeof source === 'string') return source;
-  if (typeof source !== 'object' || source === null) return '';
+  if (typeof source !== 'object' || source === null) return undefined;
   if ('data' in source && typeof source.data === 'object' && source.data !== null) {
     if ('message' in source.data && typeof source.data.message === 'string') {
       return source.data.message;
     }
   }
   if ('message' in source && typeof source.message === 'string') return source.message;
-  return '';
+  return undefined;
+}
+
+export function assistantErrorDetail(source: unknown): string | undefined {
+  if (source === undefined || source === null) return undefined;
+  return recognizedAssistantErrorMessage(source) ?? 'Assistant message failed';
 }

@@ -85,6 +85,9 @@ jobs:
               - 'pnpm-lock.yaml'
             cloud_agent_next:
               - 'services/cloud-agent-next/**'
+              - '.github/workflows/ci.yml'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
       - name: Detect changes (retry)
         id: filter_retry
         # Keep the filters byte-identical to the attempt above:
@@ -115,6 +118,9 @@ jobs:
               - 'pnpm-lock.yaml'
             cloud_agent_next:
               - 'services/cloud-agent-next/**'
+              - '.github/workflows/ci.yml'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
       - name: Detect changed workspaces with tests
         id: workspaces
         run: |
@@ -390,6 +396,12 @@ jobs:
       - name: Build wrapper bundle
         working-directory: services/cloud-agent-next/wrapper
         run: bun run build.ts
+
+      - name: Test cloud-agent-next checkers
+        run: pnpm --filter cloud-agent-next test:checkers
+
+      - name: Check cloud-agent-next duplication
+        run: pnpm --filter cloud-agent-next check:duplication
 
       - name: Run cloud-agent-next tests
         run: pnpm --filter cloud-agent-next test:all

@@ -1775,6 +1775,116 @@ describe('SessionService.prepareWorkspace', () => {
     expect(restoreCommand).not.toContain('KILOCODE_TOKEN=');
   });
 
+  it('cleans up the restore token when devcontainer restore execution fails', async () => {
+    const session = createSession(false);
+    session.exec.mockImplementation(async (command: string) => {
+      if (command.includes('kilo-restore-session.js')) {
+        throw new Error('devcontainer restore execution failed');
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const sandbox = createSandbox(session);
+    const metadata = {
+      ...createMetadata({ preparedAt: 1 }),
+      workspace: {
+        sandboxId: 'dind-abcdef' as const,
+        devcontainerRequested: true,
+      },
+    } satisfies CloudAgentSessionState;
+    const devcontainerHandle = {
+      containerId: 'container-dev',
+      innerWorkspaceFolder: '/workspaces/repo',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      agentSessionId: 'agent_test',
+      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
+      teardown: vi.fn().mockResolvedValue(undefined),
+    };
+    devcontainerMocks.detectDevContainer.mockResolvedValue({
+      configPath: '.devcontainer/devcontainer.json',
+    });
+    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
+
+    await expect(
+      new SessionService().prepareWorkspace({
+        sandbox,
+        sandboxId: 'dind-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env: createEnv(),
+        metadata,
+        kilocodeModel: 'test-model',
+      })
+    ).rejects.toThrow('devcontainer restore execution failed');
+
+    expect(
+      session.exec.mock.calls.some(
+        ([command]) =>
+          typeof command === 'string' &&
+          command.includes('rm -f') &&
+          command.includes('/home/agent_test/.local/share/kilo/session-restore-token')
+      )
+    ).toBe(true);
+  });
+
+  it('cleans up the restore token and preserves a chmod failure after writing it', async () => {
+    const session = createSession(false);
+    session.exec.mockImplementation(async (command: string) => {
+      if (command.includes('chmod 600')) {
+        throw new Error('restore token chmod failed');
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const writeFile = vi.fn().mockResolvedValue(undefined);
+    const sandbox = createSandbox(session, false, writeFile);
+    const metadata = {
+      ...createMetadata({ preparedAt: 1 }),
+      workspace: {
+        sandboxId: 'dind-abcdef' as const,
+        devcontainerRequested: true,
+      },
+    } satisfies CloudAgentSessionState;
+    const devcontainerHandle = {
+      containerId: 'container-dev',
+      innerWorkspaceFolder: '/workspaces/repo',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      agentSessionId: 'agent_test',
+      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
+      teardown: vi.fn().mockResolvedValue(undefined),
+    };
+    devcontainerMocks.detectDevContainer.mockResolvedValue({
+      configPath: '.devcontainer/devcontainer.json',
+    });
+    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
+
+    await expect(
+      new SessionService().prepareWorkspace({
+        sandbox,
+        sandboxId: 'dind-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env: createEnv(),
+        metadata,
+        kilocodeModel: 'test-model',
+      })
+    ).rejects.toThrow('restore token chmod failed');
+
+    expect(writeFile).toHaveBeenCalledWith(
+      '/home/agent_test/.local/share/kilo/session-restore-token',
+      expect.any(String)
+    );
+    const chmodCall = session.exec.mock.calls.findIndex(
+      ([command]) => typeof command === 'string' && command.includes('chmod 600')
+    );
+    const cleanupCall = session.exec.mock.calls.findIndex(
+      ([command]) => typeof command === 'string' && command.includes('rm -f')
+    );
+    expect(chmodCall).toBeGreaterThanOrEqual(0);
+    expect(cleanupCall).toBeGreaterThan(chmodCall);
+    expect(session.exec.mock.calls[cleanupCall]?.[0]).toContain(
+      '/home/agent_test/.local/share/kilo/session-restore-token'
+    );
+  });
+
   it('replaces a warm Bitbucket review origin with the credential-free canonical URL', async () => {
     const session = createSession(true);
     const sandbox = createSandbox(session, true);

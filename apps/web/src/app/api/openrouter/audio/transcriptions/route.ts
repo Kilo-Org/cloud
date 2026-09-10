@@ -100,7 +100,16 @@ type ParsedTranscriptionRequest =
 async function parseMultipartTranscriptionRequest(
   request: NextRequest
 ): Promise<ParsedTranscriptionRequest | null> {
-  const formData = await request.formData();
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch (error) {
+    // A malformed body or a missing boundary rejects instead of returning form
+    // data. Treat it as an invalid request so POST answers the controlled 400
+    // rather than surfacing an unhandled 500. Never log the body: it is audio.
+    captureException(error, { tags: { source: 'transcription-proxy' } });
+    return null;
+  }
   const modelField = formData.get('model');
   if (typeof modelField !== 'string' || modelField.trim().length === 0) return null;
   const filePart = formData.get('file');

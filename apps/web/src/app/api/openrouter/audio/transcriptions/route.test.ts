@@ -362,6 +362,26 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
+  it('rejects a malformed multipart body with a controlled 400', async () => {
+    setUserAuth();
+
+    const { POST } = await import('./route');
+    // The content type claims multipart/form-data, but the boundary cannot be
+    // parsed. `request.formData()` rejects; the route must still answer 400.
+    const request = new Request('http://localhost:3000/api/gateway/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'x-forwarded-for': '127.0.0.1',
+      },
+      body: 'not a multipart body',
+    });
+    const response = await POST(request as never);
+
+    expect(response.status).toBe(400);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
   it('passes an upstream 404 through for multipart requests', async () => {
     setUserAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse({ error: 'model not found' }, 404));

@@ -5,6 +5,7 @@
  * Returns complete payload ready for cloud agent
  */
 
+import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
@@ -51,7 +52,7 @@ export async function prepareFixPayload(params: PreparePayloadParams): Promise<D
     }
 
     // 3. Generate auth token for cloud agent with bot identifier
-    const authToken = generateCloudAgentWorkflowToken(user, {
+    const authToken = generateCloudAgentWorkflowToken(await prepareCloudAgentWorkflowUser(user), {
       organizationId: owner.type === 'org' ? owner.id : undefined,
       tokenSource: 'auto-fix',
       botId: 'auto-fix',

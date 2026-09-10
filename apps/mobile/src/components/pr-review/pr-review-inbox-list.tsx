@@ -141,7 +141,10 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
         router.push(providerPrRoutePath(item.ref));
       }}
       accessibilityRole="button"
-      accessibilityLabel={rowLabel}
+      // No accessibilityLabel: the row announces its children as one button,
+      // the same aggregate the home and profile rows get (ConfigureRow). An
+      // explicit label would replace them and drop the request title — the
+      // row's primary content — from what a screen reader says.
       className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-6 py-3 active:opacity-70"
     >
       <View className="flex-1 gap-1">

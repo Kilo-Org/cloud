@@ -312,15 +312,19 @@ During testing, container restarts generate many of these. Bulk-close via admin 
 
 ## 7. Auto-Merge with Workers AI Thread Classification
 
-The auto-merge flow uses Workers AI (Gemma 4 26B) to classify unresolved PR review threads as blocking vs non-blocking. This prevents informational bot comments (status reports, code review summaries) from blocking auto-merge.
+The auto-merge flow classifies unresolved PR review threads as blocking vs non-blocking. This prevents informational bot comments (status reports, code review summaries) from blocking auto-merge.
 
 ### How It Works
 
 1. `poll_pr` runs every ~60s for MR beads with a `pr_url`
 2. `checkPRFeedback` fetches review threads via GitHub GraphQL (including comment bodies)
-3. If unresolved threads exist, `areThreadsBlocking()` sends them to Workers AI
+3. If unresolved threads exist, `areThreadsBlocking()` classifies them:
+   - Direct-BYOK towns (configured model's provider prefix is a direct BYOK provider, e.g. `neuralwatt/...`) call the Kilo gateway at `/api/openrouter/chat/completions` on `role_models.refinery ?? default_model`, billing the user's own provider key
+   - Everyone else uses Workers AI (Gemma 4 26B)
 4. The model classifies threads as BLOCKING (requires code changes, bugs, security) or NON-BLOCKING (informational, nits, bot status reports)
 5. Only truly blocking threads prevent auto-merge
+
+A rejected BYOK gateway call blocks auto-merge (`blocking=true`) rather than falling back to the Kilo-billed Workers AI path.
 
 ### Config Required
 

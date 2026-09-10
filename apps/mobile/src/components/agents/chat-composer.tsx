@@ -58,6 +58,7 @@ import {
 } from '@/components/agents/composer-paste-text';
 import {
   COMPOSER_CHROME_HEIGHT,
+  COMPOSER_INPUT_MAX_HEIGHT,
   COMPOSER_INPUT_PADDING_HORIZONTAL,
   resolveComposerMaxHeight,
   resolveComposerTextContentWidth,
@@ -373,6 +374,7 @@ export function ChatComposer({
     sessionHeaderHeight: SESSION_HEADER_HEIGHT * fontScale,
     composerChromeHeight: COMPOSER_CHROME_HEIGHT * fontScale,
     minHeight: inputMinHeight,
+    absoluteMaxHeight: COMPOSER_INPUT_MAX_HEIGHT * fontScale,
   });
 
   // Track the keyboard's reported height so the remaining-space cap follows it.

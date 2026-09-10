@@ -358,8 +358,9 @@ describe('ScreenHeader mounted', () => {
       }
       if (props.modal || props.centerTitle) {
         expect(title.props.className).toContain('text-center');
-        expect(title.parent?.parent).not.toBe(back.parent);
-        expect(title.parent?.parent?.parent).toBe(back.parent?.parent?.parent);
+        // The centered title shares one row with the leading control, so the
+        // control lines up with the title instead of drawing on its own row.
+        expect(title.parent?.parent?.parent).toBe(back.parent);
       }
     }
   });

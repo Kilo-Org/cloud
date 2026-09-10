@@ -41,6 +41,9 @@ REAPER_INTERVAL_MS=300000
 # Comma-separated list of org IDs that use per-session Cloudflare sandboxes, or `*` for all orgs
 PER_SESSION_SANDBOX_ORG_IDS=
 
+# Control-plane and worktree enrollment (optional)
+# Comma-separated user or org IDs, or `*` for all including personal accounts.
+# Local wrangler `dev` also defaults these to `*` in wrangler.jsonc.
 CONTROL_PLANE_IDS=*
 WORKTREE_CREATION_ENABLED_IDS=*
 

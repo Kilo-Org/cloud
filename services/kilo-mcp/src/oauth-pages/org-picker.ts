@@ -49,14 +49,14 @@ export const PERSONAL_ORG_ID = 'personal';
 /** The catalog query used to list the caller's orgs (read-only, in the dump). */
 export const ORG_LIST_QUERY_PATH = 'organizations.list';
 
+// The picker needs a radio-list layout the shared shell does not carry. Colors
+// and the submit CTA come from the shell's Kilo Cloud palette (auth/http.ts).
 const PICKER_STYLE =
   '.org{display:flex;align-items:center;gap:10px;padding:12px 14px;margin:8px 0;' +
-  'border:1px solid #262a34;border-radius:10px;cursor:pointer}' +
-  '.org input{accent-color:#5b5bd6}' +
-  // the shared shell styles a.cta only; the submit button gets the same CTA look.
-  'button.cta{display:inline-block;margin-top:16px;padding:12px 20px;border-radius:8px;' +
-  'background:#5b5bd6;color:#fff;font-weight:600;border:0;cursor:pointer}' +
-  '.err{color:#f87171}';
+  'border:1px solid var(--border);border-radius:10px;cursor:pointer;background:var(--input)}' +
+  '.org:hover{border-color:var(--border-strong);background:var(--hover)}' +
+  '.org input{accent-color:var(--primary);margin:0}' +
+  '.err{color:var(--danger)}';
 
 /**
  * Fetch the Kilo identity's organizations by calling the catalog tRPC query

@@ -180,7 +180,7 @@ describe('GET /authorize (happy)', () => {
     expect(html).toContain('Requested access');
     expect(html).toContain('mcp');
     const restart = new URL(
-      html.match(/<a id="restart" class="cta" href="([^"]+)"/)![1]!.replace(/&amp;/g, '&')
+      html.match(/<a id="restart" class="secondary" href="([^"]+)"/)![1]!.replace(/&amp;/g, '&')
     );
     expect(restart.pathname).toBe('/authorize');
     expect(restart.searchParams.get('client_id')).toBe(CLIENT_ID);

@@ -79,19 +79,47 @@ export function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
+// Kilo Cloud palette, copied from apps/web/src/app/globals.css: near-black
+// canvas, raised charcoal card, brand-primary CTA. Dark-only, like the product.
 const PAGE_STYLE =
-  'body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;' +
-  'background:#0b0d12;color:#e6e8ee;display:flex;justify-content:center;padding:48px 16px}' +
-  '.card{max-width:480px;width:100%}h1{font-size:20px;margin:0 0 12px}p{line-height:1.5;color:#aeb4c2}' +
-  'code{background:#171a21;padding:2px 6px;border-radius:4px}' +
-  'a.cta{display:inline-block;margin-top:16px;padding:12px 20px;border-radius:8px;' +
-  'background:#5b5bd6;color:#fff;text-decoration:none;font-weight:600}' +
+  ':root{color-scheme:dark;--background:#151515;--card:#202020;--overlay:#333333;' +
+  '--hover:#3a3a3a;--foreground:#fafafa;--muted:#a3a3a3;--primary:#f7f586;' +
+  '--primary-hover:#e6e475;--primary-foreground:#1f1f1f;--border:#ffffff1a;' +
+  '--border-strong:#ffffff2e;--input:#ffffff0a;--ring:#f7f58659;--danger:#ef4444}' +
+  '*{box-sizing:border-box}' +
+  'body{margin:0;background:var(--background);color:var(--foreground);' +
+  'font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;' +
+  'font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;' +
+  'display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:48px 16px}' +
+  '.card{width:100%;max-width:440px;background:var(--card);border:1px solid var(--border);' +
+  'border-radius:12px;padding:28px}' +
+  '.brand{display:flex;align-items:center;gap:8px;margin-bottom:20px;color:var(--muted);' +
+  'font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}' +
+  '.brand-dot{width:8px;height:8px;border-radius:2px;background:var(--primary)}' +
+  'h1{font-size:18px;line-height:1.3;margin:0 0 8px;font-weight:600;letter-spacing:-.01em}' +
+  'p{margin:0 0 12px;color:var(--muted);line-height:1.55}' +
+  'strong{color:var(--foreground);font-weight:600}' +
+  'code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;' +
+  'background:var(--input);border:1px solid var(--border);padding:2px 6px;border-radius:6px;' +
+  'color:var(--foreground)}' +
+  'a.cta,button.cta{display:flex;align-items:center;justify-content:center;width:100%;' +
+  'margin-top:20px;padding:11px 16px;border-radius:8px;background:var(--primary);' +
+  'color:var(--primary-foreground);text-decoration:none;font-weight:600;font-size:14px;' +
+  'border:0;cursor:pointer}' +
+  'a.cta:hover,button.cta:hover{background:var(--primary-hover)}' +
+  'a.cta:focus-visible,button.cta:focus-visible{outline:2px solid var(--ring);outline-offset:2px}' +
+  'a.secondary{display:inline-block;margin-top:14px;color:var(--muted);text-decoration:none;' +
+  'font-size:13px}' +
+  'a.secondary:hover{color:var(--foreground)}' +
+  '#status{margin:16px 0 0;color:var(--muted);font-size:13px}' +
   // an author display rule beats the UA [hidden] rule; keep hidden actually hidden.
   '[hidden]{display:none !important}';
 
 /**
  * Minimal standalone page shell (the worker has no shared UI kit). `bodyHtml`
- * must already be escaped; only static markup is interpolated here.
+ * must already be escaped; only static markup is interpolated here. The brand
+ * row and palette mirror the Kilo Cloud web app so connecting an MCP client
+ * reads as a Kilo surface, not a generic OAuth page.
  */
 export function authPage(title: string, bodyHtml: string): string {
   return (
@@ -99,7 +127,8 @@ export function authPage(title: string, bodyHtml: string): string {
     `<meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<meta name="robots" content="noindex">` +
     `<title>${escapeHtml(title)}</title><style>${PAGE_STYLE}</style></head>` +
-    `<body><div class="card">${bodyHtml}</div></body></html>`
+    `<body><div class="card"><div class="brand"><span class="brand-dot"></span>Kilo</div>` +
+    `${bodyHtml}</div></body></html>`
   );
 }
 

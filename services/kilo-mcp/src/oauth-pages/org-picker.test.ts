@@ -269,7 +269,7 @@ describe('GET /authorize/org (picker render)', () => {
     });
     expect(response.status).toBe(200);
     const html = await response.text();
-    expect(html).toContain('Sign in to Kilo MCP');
+    expect(html).toContain('Connect to Kilo MCP');
     expect(html).toContain(`${WEB}/device-auth?code=${record.deviceAuthCode}`);
   });
 

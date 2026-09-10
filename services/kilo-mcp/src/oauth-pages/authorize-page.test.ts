@@ -362,5 +362,10 @@ describe('consentPage (s6 contract)', () => {
     // beats the UA [hidden] rule — see PAGE_STYLE).
     expect(html).toMatch(/id="restart"[^>]*\shidden/);
     expect(html).toContain('[hidden]{display:none !important}');
+    // The sign-in link opens in a new tab so the pairing poll in THIS tab
+    // survives the trip to apps/web (the old same-tab bug).
+    expect(html).toMatch(/class="cta"[^>]*target="_blank"/);
+    // The shell carries the Kilo Cloud brand primary, not the old blue CTA.
+    expect(html).toContain('--primary:#f7f586');
   });
 });

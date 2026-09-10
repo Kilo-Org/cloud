@@ -37,7 +37,15 @@ export type PairingStatusDeps = {
   now?: () => Date;
 };
 
-/** The consent HTML: sign-in link + status polling until the flow resolves. */
+/**
+ * The consent HTML: sign-in link + status polling until the flow resolves.
+ *
+ * The sign-in link opens in a NEW TAB on purpose: the pairing-status poll runs
+ * in this tab, so sending the user to apps/web in the same tab killed the poll
+ * (the page had to be reopened from the MCP client). A background tab keeps
+ * polling; the browser may throttle it while hidden, and it catches up when
+ * this tab regains focus.
+ */
 export function consentPage(input: {
   clientName: string;
   scope: string;
@@ -47,13 +55,15 @@ export function consentPage(input: {
   restartUrl: string;
 }): Response {
   const body =
-    `<h1>Sign in to Kilo MCP</h1>` +
+    `<h1>Connect to Kilo MCP</h1>` +
     `<p><strong>${escapeHtml(input.clientName)}</strong> is asking to connect to Kilo MCP ` +
     `with your Kilo account.</p>` +
     `<p>Requested access: <code>${escapeHtml(input.scope)}</code></p>` +
-    `<p><a class="cta" href="${escapeHtml(input.webSignInUrl)}">Continue with Kilo sign-in</a></p>` +
+    `<a class="cta" href="${escapeHtml(input.webSignInUrl)}" target="_blank" ` +
+    `rel="noopener noreferrer">Continue with Kilo sign-in</a>` +
     `<p id="status" role="status">Waiting for you to finish sign-in&hellip;</p>` +
-    `<p><a id="restart" class="cta" href="${escapeHtml(input.restartUrl)}" hidden>Start sign-in again</a></p>` +
+    `<a id="restart" class="secondary" href="${escapeHtml(input.restartUrl)}" hidden>` +
+    `Start sign-in again</a>` +
     `<script>(function(){var u=${JSON.stringify(input.statusUrl)};var el=document.getElementById('status');` +
     `var restart=document.getElementById('restart');` +
     `function fail(msg){el.textContent=msg;restart.hidden=false;}` +
@@ -64,7 +74,7 @@ export function consentPage(input: {
     `if(j.status==='expired'){fail('The Kilo sign-in request expired. Start sign-in again to try once more.');return;}` +
     `if(j.status==='unknown'){fail('This request is no longer valid. Start sign-in again, or close this tab and retry from your MCP client.');return;}}` +
     `catch(e){}setTimeout(poll,${PAIRING_POLL_INTERVAL_MS});}poll();})();</script>`;
-  return htmlResponse(authPage('Sign in to Kilo MCP', body));
+  return htmlResponse(authPage('Connect to Kilo MCP', body));
 }
 
 export type KiloPollOutcome =

@@ -39,17 +39,6 @@ vi.mock('expo-crypto', () => {
   };
 });
 
-vi.mock('expo-file-system/legacy', () => ({
-  cacheDirectory: 'file:///cache/',
-  copyAsync: vi.fn(async () => {
-    await Promise.resolve();
-  }),
-  deleteAsync: vi.fn(async () => {
-    await Promise.resolve();
-  }),
-  getInfoAsync: vi.fn(async () => ({ exists: true, isDirectory: false })),
-}));
-
 // The drafts module (lazy-required by share-payload) imports the native
 // encrypted-kv chain; the fake below mirrors the real upsert/list semantics
 // (same harness as drafts.test.ts).
@@ -437,7 +426,7 @@ describe('share payload durable persistence', () => {
     });
     await persistSharePayloadsNow();
     __resetSharePayloadStoreForTests();
-    __setCheckFileExistsForTests(async uri => uri.includes('present'));
+    __setCheckFileExistsForTests(uri => uri.includes('present'));
     await restoreSharePayloads('u1');
     const restored = peekSharePayload(id);
     expect(restored?.files.map(file => file.name)).toEqual(['present.jpg']);

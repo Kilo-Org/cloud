@@ -2,6 +2,7 @@ import type { Env } from '../types.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { getPgDb } from '../db/pg.js';
 import { CLOUD_AGENT_REPORT_RETENTION_DAYS, createCloudAgentReportStore } from './report-store.js';
+import type { CloudAgentAdmissionFailureCode } from '@kilocode/worker-utils/cloud-agent-failure';
 
 export type CloudAgentSessionFailure =
   | { stage: 'sandbox_identity'; code: 'sandbox_id_derivation_failed' }
@@ -9,6 +10,7 @@ export type CloudAgentSessionFailure =
   | {
       stage: 'initial_admission';
       code: 'initial_admission_rejected' | 'initial_queue_full' | 'invalid_initial_intent';
+      admissionCode: CloudAgentAdmissionFailureCode;
     }
   | { stage: 'transport'; code: 'do_rpc_outcome_unknown' };
 

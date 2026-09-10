@@ -306,7 +306,7 @@ export function generateCloudAgentWorkflowToken(
       { expiresIn: options.expiresIn }
     );
   }
-  if (!user.api_token_pepper) {
+  if (user.api_token_pepper !== null && !user.api_token_pepper) {
     throw new Error('Workflow control tokens require a current user pepper');
   }
   const expiresIn = Math.min(options.expiresIn, 60 * 60);
@@ -314,7 +314,7 @@ export function generateCloudAgentWorkflowToken(
     throw new Error('Workflow control token expiry must be positive');
   }
   const authorizationUser = options.authorizationUser ?? user;
-  if (!authorizationUser.api_token_pepper) {
+  if (authorizationUser.api_token_pepper !== null && !authorizationUser.api_token_pepper) {
     throw new Error('Workflow control tokens require a current authorization pepper');
   }
   const issuedAt = Math.floor(Date.now() / 1000);
@@ -359,7 +359,7 @@ export function generateWorkflowGatewayToken(
   if (!isResourceTokenIssuanceEnabled('workflow-gateway')) {
     return generateApiToken(user, { tokenSource: options.tokenSource });
   }
-  if (!user.api_token_pepper) {
+  if (user.api_token_pepper !== null && !user.api_token_pepper) {
     throw new Error('Workflow gateway tokens require a current user pepper');
   }
   const expiresIn = Math.min(options.expiresIn ?? ONE_HOUR_IN_SECONDS, ONE_HOUR_IN_SECONDS);

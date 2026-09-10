@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkriptim me Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkripto diktimin me një model Kilo Gateway në vend të njohjes së të folurit të pajisjes. Regjistrimi yt dërgohet te Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa për bashkim nuk është e disponueshme",
@@ -2568,7 +2571,13 @@
     "languageNotInstalledMessage": "Skedarët e të folurit jashtë interneti për {{language}} nuk janë të instaluar në këtë telefon. Shkarkoji dhe pastaj provo diktimin përsëri.",
     "downloadOfflineModel": "Shkarko",
     "offlineModelDownloadScheduled": "Skedarët e të folurit jashtë interneti do të shkarkohen në sfond. Provo diktimin përsëri më vonë.",
-    "listeningStopped": "Dëgjimi u ndal."
+    "listeningStopped": "Dëgjimi u ndal.",
+    "transcribing": "Duke transkriptuar...",
+    "gatewayUnreachable": "Kilo Gateway nuk u arrit dot. Kontrollo lidhjen dhe provo përsëri.",
+    "gatewayTimeout": "Transkriptimi zgjati tepër. Provo përsëri.",
+    "gatewayModelUnavailable": "Ky model transkriptimi nuk është i disponueshëm. Zgjidh një tjetër te Preferencat.",
+    "gatewaySignInRequired": "Hyr për të përdorur transkriptimin me Kilo Gateway.",
+    "gatewayNoModel": "Së pari zgjidh një model transkriptimi te Preferencat."
   },
   "share": {
     "title": "Ndarja në Kilo",
@@ -2950,5 +2959,12 @@
     "needsInput": "Pret përgjigje",
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
+  },
+  "transcriptionModel": {
+    "title": "Modeli i transkriptimit",
+    "noneChosen": "Asgjë nuk u zgjodh",
+    "emptyTitle": "Nuk ka modele transkriptimi",
+    "emptyDescription": "Kilo Gateway nuk ofron tani asnjë model transkriptimi.",
+    "loadFailed": "Modelet e transkriptimit nuk u ngarkuan."
   }
 }

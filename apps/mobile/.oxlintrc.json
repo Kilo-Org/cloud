@@ -64,6 +64,10 @@
           {
             "name": "lucide-react-native",
             "message": "Import icons and Lucide types from @/components/ui/icons."
+          },
+          {
+            "name": "expo-file-system/legacy",
+            "message": "Use the modern expo-file-system API (File, Directory, Paths, UploadType). The legacy module is deprecated."
           }
         ]
       }

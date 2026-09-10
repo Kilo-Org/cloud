@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway کے ذریعے آواز کو متن میں بدلنا",
+    "gatewayTranscriptionSubtitle": "ڈیوائس کی آواز کی پہچان کے بجائے Kilo Gateway ماڈل کے ذریعے آواز سے لکھنے کو متن میں بدلیں۔ آپ کی ریکارڈنگ Kilo Gateway کو بھیجی جاتی ہے۔",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
@@ -2568,7 +2571,13 @@
     "languageNotInstalledMessage": "{{language}} کی آف لائن تقریر کی فائلیں اس فون پر انسٹال نہیں ہیں۔ انہیں ڈاؤن لوڈ کریں، پھر آواز سے لکھنا دوبارہ آزمانے کی کوشش کریں۔",
     "downloadOfflineModel": "ڈاؤن لوڈ",
     "offlineModelDownloadScheduled": "آف لائن تقریر کی فائلیں پس منظر میں ڈاؤن لوڈ ہوں گی۔ بعد میں آواز سے لکھنا دوبارہ آزمانے کی کوشش کریں۔",
-    "listeningStopped": "سننے کا عمل رک گیا۔"
+    "listeningStopped": "سننے کا عمل رک گیا۔",
+    "transcribing": "متن میں بدلا جا رہا ہے...",
+    "gatewayUnreachable": "Kilo Gateway سے رابطہ نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+    "gatewayTimeout": "متن میں بدلنے میں بہت وقت لگ گیا۔ دوبارہ کوشش کریں۔",
+    "gatewayModelUnavailable": "یہ ماڈل دستیاب نہیں ہے۔ ترجیحات میں دوسرا منتخب کریں۔",
+    "gatewaySignInRequired": "Kilo Gateway کی تبدیلی استعمال کرنے کے لیے سائن ان کریں۔",
+    "gatewayNoModel": "پہلے ترجیحات میں متن میں بدلنے کا ماڈل منتخب کریں۔"
   },
   "share": {
     "title": "Kilo پر شیئر کریں",
@@ -2950,5 +2959,12 @@
     "needsInput": "ان پٹ درکار",
     "channelName": "فعال ایجنٹس",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔"
+  },
+  "transcriptionModel": {
+    "title": "متن میں بدلنے کا ماڈل",
+    "noneChosen": "کوئی نہیں چنا گیا",
+    "emptyTitle": "متن میں بدلنے کا کوئی ماڈل موجود نہیں",
+    "emptyDescription": "Kilo Gateway فی الحال متن میں بدلنے کا کوئی ماڈل نہیں دیتا۔",
+    "loadFailed": "متن میں بدلنے والے ماڈلز لوڈ نہیں ہو سکے۔"
   }
 }

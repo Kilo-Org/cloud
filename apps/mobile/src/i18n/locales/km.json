@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "ការបម្លែងសំឡេងជាអត្ថបទតាម Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "បម្លែងការបញ្ចូលដោយសំឡេងទៅជាអត្ថបទដោយប្រើម៉ូដែល Kilo Gateway ជំនួសឱ្យការចាប់សម្ដីរបស់ឧបករណ៍។ ការថតរបស់អ្នកត្រូវបានផ្ញើទៅ Kilo Gateway។",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "មិនអាចបើកសំណើបញ្ចូលកូដបាន",
@@ -2568,7 +2571,13 @@
     "languageNotInstalledMessage": "ឯកសារសំឡេងក្រៅបណ្តាញសម្រាប់{{language}}មិនទាន់ដំឡើងនៅលើទូរស័ព្ទនេះទេ។ សូមទាញយកវាមុន បន្ទាប់មកសូមព្យាយាមការបញ្ចូលដោយសំឡេងម្តងទៀត។",
     "downloadOfflineModel": "ទាញយក",
     "offlineModelDownloadScheduled": "ឯកសារសំឡេងក្រៅបណ្តាញនឹងត្រូវបានទាញយកនៅផ្ទៃខាងក្រោយ។ សូមព្យាយាមការបញ្ចូលដោយសំឡេងម្តងទៀតពេលក្រោយ។",
-    "listeningStopped": "បានបញ្ឈប់ការស្តាប់។"
+    "listeningStopped": "បានបញ្ឈប់ការស្តាប់។",
+    "transcribing": "កំពុងបម្លែងជាអត្ថបទ...",
+    "gatewayUnreachable": "មិនអាចទំនាក់ទំនងទៅ Kilo Gateway បានទេ។ សូមពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្ដងទៀត។",
+    "gatewayTimeout": "ការបម្លែងសំឡេងជាអត្ថបទចំណាយពេលយូរពេក។ សូមព្យាយាមម្ដងទៀត។",
+    "gatewayModelUnavailable": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទនេះមិនមានទេ។ សូមជ្រើសរើសម៉ូដែលផ្សេងទៀតក្នុងចំណូលចិត្ត។",
+    "gatewaySignInRequired": "ចូលគណនីដើម្បីប្រើការបម្លែងសំឡេងជាអត្ថបទតាម Kilo Gateway។",
+    "gatewayNoModel": "សូមជ្រើសរើសម៉ូដែលបម្លែងសំឡេងជាអត្ថបទក្នុងចំណូលចិត្តជាមុនសិន។"
   },
   "share": {
     "title": "ចែករំលែកទៅ Kilo",
@@ -2950,5 +2959,12 @@
     "needsInput": "ត្រូវការការឆ្លើយតប",
     "channelName": "ភ្នាក់ងារសកម្ម",
     "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។"
+  },
+  "transcriptionModel": {
+    "title": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទ",
+    "noneChosen": "មិនទាន់ជ្រើសរើសទេ",
+    "emptyTitle": "គ្មានម៉ូដែលបម្លែងសំឡេងជាអត្ថបទ",
+    "emptyDescription": "Kilo Gateway មិនផ្ដល់ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទនៅពេលនេះទេ។",
+    "loadFailed": "មិនអាចផ្ទុកម៉ូដែលបម្លែងសំឡេងជាអត្ថបទបានទេ។"
   }
 }

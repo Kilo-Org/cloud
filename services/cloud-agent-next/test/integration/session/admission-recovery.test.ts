@@ -337,6 +337,7 @@ describe('forward-only clone reporting admission', () => {
     async failFirstWrite => {
       const input = cloneRegistrationInput(new Date().toISOString());
       const release = Promise.withResolvers<void>();
+      const ownAnchorMetadata: unknown[] = [];
       let shouldFail = failFirstWrite;
       let anchorAttempts = 0;
       vi.mocked(sessionReports.ensureCloneSessionReport).mockImplementation(async metadata => {
@@ -347,6 +348,7 @@ describe('forward-only clone reporting admission', () => {
         // Only this session's anchor attempts may gate the slow-write simulation or
         // count toward the anchor budget.
         if (metadata?.identity.sessionId !== input.identity.sessionId) return;
+        ownAnchorMetadata.push(metadata);
         anchorAttempts += 1;
         await release.promise;
         if (shouldFail) {
@@ -389,13 +391,12 @@ describe('forward-only clone reporting admission', () => {
           await progress;
           expect(reports).toEqual([]);
           expect(await listPendingSessionMessages(instance.ctx.storage)).toEqual([]);
-          expect(sessionReports.ensureCloneSessionReport).toHaveBeenCalledWith(
+          expect(ownAnchorMetadata[0]).toEqual(
             expect.objectContaining({
               auth: expect.objectContaining({ kiloSessionId: destinationKiloSessionId }),
               clone: input.clone,
               initialMessage: { id: firstMessageId },
-            }),
-            expect.anything()
+            })
           );
           release.resolve();
           await vi.waitFor(() => expect(reports).toHaveLength(2));

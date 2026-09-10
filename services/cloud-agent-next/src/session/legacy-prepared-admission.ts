@@ -11,6 +11,7 @@ import type { SessionId } from '../types/ids.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { projectAdmissionToPublicAck, throwAdmissionError } from './queue-message.js';
+import { initialAdmissionFailure } from './admission-failure.js';
 
 export type LegacyPreparedInitialAdmissionInput = {
   cloudAgentSessionId: string;
@@ -37,18 +38,6 @@ export async function replayLegacyPreparedInitialMessageIfAlreadyAdmitted(
   if (!result) return undefined;
   if (!result.success) throwAdmissionError(result);
   return projectAdmissionToPublicAck(sessionId, result);
-}
-
-function legacyInitialAdmissionFailure(
-  result: Extract<SessionMessageAdmissionResult, { success: false }>
-) {
-  if (result.code === 'PENDING_QUEUE_FULL') {
-    return { stage: 'initial_admission', code: 'initial_queue_full' } as const;
-  }
-  if (result.code === 'BAD_REQUEST') {
-    return { stage: 'initial_admission', code: 'invalid_initial_intent' } as const;
-  }
-  return { stage: 'initial_admission', code: 'initial_admission_rejected' } as const;
 }
 
 async function recordSetupFailure(record: () => Promise<void>): Promise<void> {
@@ -93,7 +82,7 @@ export async function admitLegacyPreparedInitialMessage(
       recordCloudAgentSessionFailure(
         {
           cloudAgentSessionId: input.cloudAgentSessionId,
-          failure: legacyInitialAdmissionFailure(result),
+          failure: initialAdmissionFailure(result),
         },
         ctx.env
       )

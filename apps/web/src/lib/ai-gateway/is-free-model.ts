@@ -4,6 +4,7 @@ import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership'
 import {
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
+  isLocalFakeTranscriptionModel,
 } from '@/lib/ai-gateway/local-fake-llm';
 
 /**
@@ -18,7 +19,8 @@ import {
  */
 export async function isFreeModel(model: string): Promise<boolean> {
   return (
-    (isLocalFakeDeterministicModel(model) && isLocalFakeLlmEnabled()) ||
+    ((isLocalFakeDeterministicModel(model) || isLocalFakeTranscriptionModel(model)) &&
+      isLocalFakeLlmEnabled()) ||
     isKiloExclusiveFreeModel(model) ||
     model === KILO_AUTO_FREE_MODEL.id ||
     (model ?? '').endsWith(':free') ||

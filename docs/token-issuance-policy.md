@@ -183,6 +183,8 @@ Gastown/Wasteland control issuers are deferred with their delegation adapters: c
 
 This PR does not retire legacy native exchange, shorten user credentials, change global pepper/session semantics, or remove ordinary legacy resource access.
 
+Workflow issuance reads the existing primary user pepper, including explicit `null`, without initializing or rotating it. Modern workflow tokens retain their audience, purpose, exchange restrictions, and bounded lifetime. This requires no migration and must not reset already initialized peppers; genuine pepper rotation continues to revoke previously issued credentials.
+
 ## Phase 5.2 merge, automatic deployment, and activation
 
 ### Deployment model and implementation status

@@ -6,17 +6,9 @@ import {
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
 import { applyVercelSettings } from '@/lib/ai-gateway/providers/vercel';
+import { OPENROUTER } from './openrouter-definition';
 
-export const OPENROUTER = {
-  id: 'openrouter',
-  apiUrl: 'https://openrouter.ai/api/v1',
-  apiUrlOverrides: {},
-  apiKey: getEnvVariable('OPENROUTER_API_KEY'),
-  apiKeyHeader: null,
-  supportedChatApis: ['chat_completions', 'messages', 'responses'],
-  responseTransforms: null,
-  async transformRequest() {},
-} as const satisfies Provider;
+export { OPENROUTER };
 
 export const ALIBABA = {
   id: 'alibaba',

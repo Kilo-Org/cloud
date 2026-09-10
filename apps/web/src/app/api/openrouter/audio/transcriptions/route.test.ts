@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import type { User } from '@kilocode/db/schema';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
@@ -17,6 +18,9 @@ jest.mock('@/lib/organizations/organization-usage');
 jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
 }));
+jest.mock('@/lib/ai-gateway/is-free-model', () => ({
+  isFreeModel: jest.fn(),
+}));
 jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
   const actual = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
   return {
@@ -27,6 +31,7 @@ jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
+const mockedIsFreeModel = jest.mocked(isFreeModel);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
@@ -40,6 +45,22 @@ function makeRequest(body: unknown, headers: Record<string, string> = {}) {
       ...headers,
     },
     body: JSON.stringify(body),
+  });
+}
+
+function makeMultipartRequest(
+  fields: Record<string, string>,
+  file: { blob: Blob; filename: string } | null
+) {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    form.append(key, value);
+  }
+  if (file) form.append('file', file.blob, file.filename);
+  return new Request('http://localhost:3000/api/gateway/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'x-forwarded-for': '127.0.0.1' },
+    body: form,
   });
 }
 
@@ -187,5 +208,193 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
     expect(response.status).toBe(401);
     expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('lets a zero balance through for a free model', async () => {
+    setUserAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 0,
+      settings: undefined,
+      plan: undefined,
+    });
+    mockedIsFreeModel.mockResolvedValue(true);
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest({
+        model: 'fake-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedIsFreeModel).toHaveBeenCalledWith('fake-transcribe');
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks a zero balance for a paid model before proxying', async () => {
+    setUserAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 0,
+      settings: undefined,
+      plan: undefined,
+    });
+    mockedIsFreeModel.mockResolvedValue(false);
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(402);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('proxies multipart transcription requests with the model and file fields', async () => {
+    setUserAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeMultipartRequest(
+        { model: 'openai/gpt-4o-mini-transcribe', language: 'en' },
+        { blob: new Blob(['UklGRiQA'], { type: 'audio/wav' }), filename: 'speech.wav' }
+      ) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ text: 'hello world' });
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const headers = init?.headers as Headers;
+    expect(headers.get('Authorization')).toMatch(/^Bearer /);
+    expect(headers.get('HTTP-Referer')).toBe('https://kilocode.ai');
+    // No explicit Content-Type: fetch sets multipart/form-data with the boundary.
+    expect(headers.get('Content-Type')).toBeNull();
+
+    const upstreamForm = init?.body as FormData;
+    expect(upstreamForm).toBeInstanceOf(FormData);
+    expect(upstreamForm.get('model')).toBe('openai/gpt-4o-mini-transcribe');
+    expect(upstreamForm.get('language')).toBe('en');
+    const upstreamFile = upstreamForm.get('file') as File;
+    expect(upstreamFile.name).toBe('speech.wav');
+    expect(upstreamFile.size).toBe(8);
+  });
+
+  it('forwards the organization provider policy on multipart requests', async () => {
+    setUserAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {
+        provider_allow_list: ['openai'],
+        model_deny_list: [],
+        data_collection: 'deny',
+      } satisfies OrganizationSettings,
+      plan: 'enterprise',
+    });
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeMultipartRequest(
+        { model: 'openai/gpt-4o-mini-transcribe' },
+        { blob: new Blob(['UklGRiQA'], { type: 'audio/wav' }), filename: 'speech.wav' }
+      ) as never
+    );
+
+    expect(response.status).toBe(200);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const upstreamForm = init?.body as FormData;
+    expect(JSON.parse(upstreamForm.get('provider') as string)).toEqual({
+      only: ['openai'],
+      data_collection: 'deny',
+    });
+  });
+
+  it('attaches the safety identifier to multipart upstream requests', async () => {
+    setUserAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeMultipartRequest(
+        { model: 'openai/gpt-4o-mini-transcribe' },
+        { blob: new Blob(['UklGRiQA'], { type: 'audio/wav' }), filename: 'speech.wav' }
+      ) as never
+    );
+
+    expect(response.status).toBe(200);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const upstreamForm = init?.body as FormData;
+    const safetyIdentifier = upstreamForm.get('safety_identifier');
+    expect(safetyIdentifier).toBeTruthy();
+    expect(upstreamForm.get('user')).toBe(safetyIdentifier);
+  });
+
+  it('rejects multipart requests without a model field', async () => {
+    setUserAuth();
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeMultipartRequest({}, { blob: new Blob(['UklGRiQA']), filename: 'speech.wav' }) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects multipart requests without a file part', async () => {
+    setUserAuth();
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeMultipartRequest({ model: 'openai/gpt-4o-mini-transcribe' }, null) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed multipart body with a controlled 400', async () => {
+    setUserAuth();
+
+    const { POST } = await import('./route');
+    // The content type claims multipart/form-data, but the boundary cannot be
+    // parsed. `request.formData()` rejects; the route must still answer 400.
+    const request = new Request('http://localhost:3000/api/gateway/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'x-forwarded-for': '127.0.0.1',
+      },
+      body: 'not a multipart body',
+    });
+    const response = await POST(request as never);
+
+    expect(response.status).toBe(400);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('passes an upstream 404 through for multipart requests', async () => {
+    setUserAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ error: 'model not found' }, 404));
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeMultipartRequest(
+        { model: 'openai/gpt-4o-mini-transcribe' },
+        { blob: new Blob(['UklGRiQA']), filename: 'speech.wav' }
+      ) as never
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'model not found' });
   });
 });

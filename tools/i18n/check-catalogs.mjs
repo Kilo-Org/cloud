@@ -109,9 +109,11 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'agentChat.prBadge.label',
   'share.reviewPrSubtitle',
   // Format-only strings with no translatable words: a placeholder-only screen
-  // title and a placeholder-plus-UTC time-range label.
+  // title, a placeholder-plus-UTC time-range label, and a pure $t() reference
+  // that names the transcription-model section title.
   'prReview.screen.title',
   'securityAgent.auditReport.periodUtc',
+  'preferences.transcriptionModel',
 ]);
 
 /** The supported tags, read from the one source of truth. */

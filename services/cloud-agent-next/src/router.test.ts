@@ -2788,7 +2788,11 @@ describe('legacy V2 execution response compatibility', () => {
 
     expect(recordCloudAgentSessionFailure).toHaveBeenCalledWith(
       expect.objectContaining({
-        failure: { stage: 'initial_admission', code: 'initial_queue_full' },
+        failure: {
+          stage: 'initial_admission',
+          code: 'initial_queue_full',
+          admissionCode: 'PENDING_QUEUE_FULL',
+        },
       })
     );
   });

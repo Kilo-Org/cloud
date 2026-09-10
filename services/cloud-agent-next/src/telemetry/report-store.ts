@@ -6,7 +6,10 @@ import type {
   CloudAgentRunStateReport,
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/schema';
-import { classifyCloudAgentFailure } from '@kilocode/worker-utils/cloud-agent-failure';
+import {
+  classifyCloudAgentFailure,
+  CloudAgentAdmissionFailureCodeSchema,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 import { SESSION_ID_RE } from '../shared/protocol.js';
 
 export const CLOUD_AGENT_REPORT_RETENTION_DAYS = 90;
@@ -29,6 +32,7 @@ const sessionFailureSchema = z.discriminatedUnion('stage', [
   z.object({
     stage: z.literal('initial_admission'),
     code: z.enum(['initial_admission_rejected', 'initial_queue_full', 'invalid_initial_intent']),
+    admissionCode: CloudAgentAdmissionFailureCodeSchema,
   }),
   z.object({ stage: z.literal('transport'), code: z.literal('do_rpc_outcome_unknown') }),
 ]);
@@ -404,6 +408,9 @@ export function createCloudAgentReportStore(db: WorkerDb) {
         source: 'setup',
         stage: input.failure.stage,
         code: input.failure.code,
+        ...(input.failure.stage === 'initial_admission'
+          ? { admissionCode: input.failure.admissionCode }
+          : {}),
       });
       let applied = false;
       const result = await withReportingSessionLock(db, input.cloudAgentSessionId, async tx => {

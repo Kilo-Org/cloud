@@ -94,6 +94,7 @@ vi.mock('react-native-reanimated', () => ({
   useSharedValue: (value: number) => ({ value }),
   useAnimatedStyle: (build: () => unknown) => build(),
 }));
+vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({
   NativeStateSurface: ({ children }: { children: ReactElement }) => children,
@@ -105,11 +106,13 @@ vi.mock('@/components/ui/icons', () => ({
   Brain: 'Icon',
   CheckCircle2: 'Icon',
   CornerDownLeft: 'Icon',
+  Cpu: 'Icon',
   Gauge: 'Icon',
   Globe: 'Icon',
   Info: 'Icon',
   Loader: 'Icon',
   MessageSquare: 'Icon',
+  Mic: 'Icon',
   Shield: 'Icon',
   Smartphone: 'Icon',
   TriangleAlert: 'Icon',

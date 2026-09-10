@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "تبدیل گفتار به متن با Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "ورودی صوتی را به‌جای تشخیص گفتار دستگاه، با یک مدل Kilo Gateway به متن تبدیل کنید. صدای ضبط‌شده شما به Kilo Gateway فرستاده می‌شود.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست ادغام در دسترس نیست",
@@ -2568,7 +2571,13 @@
     "languageNotInstalledMessage": "فایل‌های گفتار آفلاین برای {{language}} روی این گوشی نصب نشده‌اند. آن‌ها را دانلود کنید، سپس دوباره ورودی صوتی را امتحان کنید.",
     "downloadOfflineModel": "دانلود",
     "offlineModelDownloadScheduled": "فایل‌های گفتار آفلاین در پس‌زمینه دانلود می‌شوند. بعداً دوباره ورودی صوتی را امتحان کنید.",
-    "listeningStopped": "گوش دادن متوقف شد."
+    "listeningStopped": "گوش دادن متوقف شد.",
+    "transcribing": "در حال تبدیل به متن...",
+    "gatewayUnreachable": "اتصال به Kilo Gateway ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+    "gatewayTimeout": "تبدیل گفتار به متن بیش از حد طول کشید. دوباره تلاش کنید.",
+    "gatewayModelUnavailable": "این مدل تبدیل گفتار به متن در دسترس نیست. در تنظیمات دلخواه مدل دیگری انتخاب کنید.",
+    "gatewaySignInRequired": "برای استفاده از تبدیل گفتار به متن با Kilo Gateway وارد شوید.",
+    "gatewayNoModel": "ابتدا در تنظیمات دلخواه یک مدل تبدیل گفتار به متن انتخاب کنید."
   },
   "share": {
     "title": "اشتراک‌گذاری با Kilo",
@@ -2950,5 +2959,12 @@
     "needsInput": "در انتظار ورودی",
     "channelName": "عامل‌های فعال",
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید."
+  },
+  "transcriptionModel": {
+    "title": "مدل تبدیل گفتار به متن",
+    "noneChosen": "هیچ‌کدام انتخاب نشده",
+    "emptyTitle": "مدل تبدیل گفتار به متن وجود ندارد",
+    "emptyDescription": "Kilo Gateway در حال حاضر مدلی برای تبدیل گفتار به متن ارائه نمی‌دهد.",
+    "loadFailed": "بارگذاری مدل‌های تبدیل گفتار به متن ناموفق بود."
   }
 }

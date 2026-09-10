@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Prepisovanje prek Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Glasovni vnos prepiši z modelom Kilo Gateway namesto prepoznavanja govora naprave. Posnetje se pošlje v Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtevek za združitev ni na voljo",
@@ -2610,7 +2613,13 @@
     "languageNotInstalledMessage": "Datoteke govora za delo brez povezave za {{language}} niso nameščene na tem telefonu. Prenesi jih, nato poskusi glasovni vnos znova.",
     "downloadOfflineModel": "Prenesi",
     "offlineModelDownloadScheduled": "Datoteke govora za delo brez povezave bodo prenesene v ozadju. Poskusi glasovni vnos znova pozneje.",
-    "listeningStopped": "Poslušanje je ustavljeno."
+    "listeningStopped": "Poslušanje je ustavljeno.",
+    "transcribing": "Prepisovanje...",
+    "gatewayUnreachable": "Kilo Gateway ni dosegljiv. Preveri povezavo in poskusi znova.",
+    "gatewayTimeout": "Prepisovanje je predolgo trajalo. Poskusi znova.",
+    "gatewayModelUnavailable": "Ta model za prepisovanje ni na voljo. Izberite drugega v Nastavitvah.",
+    "gatewaySignInRequired": "Prijavite se za uporabo prepisovanja prek Kilo Gateway.",
+    "gatewayNoModel": "Najprej izberite model za prepisovanje v Nastavitvah."
   },
   "share": {
     "title": "Deljenje v Kilo",
@@ -2994,5 +3003,12 @@
     "needsInput": "Čaka na vnos",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu."
+  },
+  "transcriptionModel": {
+    "title": "Model za prepisovanje",
+    "noneChosen": "Ni izbran",
+    "emptyTitle": "Ni modelov za prepisovanje",
+    "emptyDescription": "Kilo Gateway trenutno ne ponuja modelov za prepisovanje.",
+    "loadFailed": "Modelov za prepisovanje ni bilo mogoče naložiti."
   }
 }

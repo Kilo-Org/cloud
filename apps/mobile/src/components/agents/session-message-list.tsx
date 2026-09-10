@@ -240,6 +240,8 @@ export function SessionMessageList<T>({
         // space until the rows mount. Four screens of lookahead hides that.
         drawDistance={DRAW_DISTANCE}
         // Android Fabric can race clipped-view reattachment with rapid transcript updates.
+        // Kept explicit: flash-list ≥ 2.3.2 defaults this to false (PR #2202); the pin
+        // is asserted in src/lib/flash-list-contract.test.ts.
         removeClippedSubviews={false}
         onScroll={handleScroll}
         onScrollBeginDrag={handleScrollBeginDrag}

@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transcripción con Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transcribe el dictado con un modelo de Kilo Gateway en lugar del reconocimiento de voz del dispositivo. Tu grabación se envía a Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "channel": {
@@ -2148,7 +2151,13 @@
     "languageNotInstalledMessage": "Los archivos de voz sin conexión de {{language}} no están instalados en este teléfono. Descárgalos y vuelve a intentar el dictado.",
     "downloadOfflineModel": "Descargar",
     "offlineModelDownloadScheduled": "Los archivos de voz sin conexión se descargarán en segundo plano. Vuelve a probar el dictado más tarde.",
-    "listeningStopped": "Se ha detenido la escucha."
+    "listeningStopped": "Se ha detenido la escucha.",
+    "transcribing": "Transcribiendo...",
+    "gatewayUnreachable": "No se pudo conectar con Kilo Gateway. Comprueba tu conexión e inténtalo de nuevo.",
+    "gatewayTimeout": "La transcripción tardó demasiado. Inténtalo de nuevo.",
+    "gatewayModelUnavailable": "Este modelo de transcripción no está disponible. Elige otro en Preferencias.",
+    "gatewaySignInRequired": "Inicia sesión para usar la transcripción con Kilo Gateway.",
+    "gatewayNoModel": "Elige primero un modelo de transcripción en Preferencias."
   },
   "share": {
     "title": "Compartir en Kilo",
@@ -2972,5 +2981,12 @@
     "needsInput": "En espera de respuesta",
     "channelName": "Agentes activos",
     "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo."
+  },
+  "transcriptionModel": {
+    "title": "Modelo de transcripción",
+    "noneChosen": "Ninguno seleccionado",
+    "emptyTitle": "No hay modelos de transcripción",
+    "emptyDescription": "Kilo Gateway no ofrece modelos de transcripción en este momento.",
+    "loadFailed": "No se pudieron cargar los modelos de transcripción."
   }
 }

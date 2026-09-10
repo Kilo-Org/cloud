@@ -123,6 +123,94 @@ describe('runtime authorization', () => {
     });
   });
 
+  it.each([
+    { userId: 'user', rotatedUserId: 'user' },
+    { userId: 'bot', rotatedUserId: 'bot' },
+    { userId: 'bot', rotatedUserId: 'user' },
+  ])(
+    'preserves explicit null automation peppers for $userId and revokes after $rotatedUserId rotates',
+    async ({ userId, rotatedUserId }) => {
+      for (const id of ['user', 'bot']) {
+        principals.set(id, {
+          id,
+          apiTokenPepper: null,
+          blockedAt: null,
+          blockedReason: null,
+          isBot: id === 'bot',
+        });
+      }
+      const control = await signModernKiloToken({
+        userId,
+        pepper: null,
+        secret,
+        expiresInSeconds: 300,
+        audience: 'cloud-agent-next',
+        tokenPurpose: 'internal-service',
+        credentialExchange: false,
+        extra: {
+          organizationId: 'org',
+          runtimeAdmission: {
+            source: 'automation',
+            authorizationUserId: 'user',
+            authorizationPepper: null,
+          },
+        },
+      });
+      expect(decodeJwt(control.token)).toMatchObject({
+        apiTokenPepper: null,
+        tokenPurpose: 'internal-service',
+        runtimeAdmission: { source: 'automation', authorizationPepper: null },
+      });
+      const common = {
+        secret,
+        connectionString: 'postgres://unused',
+        adapters: adapters(),
+      };
+      const creation = {
+        ...common,
+        token: control.token,
+        resourceKind: 'cloud-agent-next' as const,
+        resourceId: 'session',
+        organizationId: 'org',
+      };
+      const created = await createRuntimeAuthorization(creation);
+      expect(created.authorization).toMatchObject({
+        userId,
+        authorizationUserId: 'user',
+        bindings: { userPepperDigest: 'null', authorizationPepperDigest: 'null' },
+        source: { admissionSource: 'automation' },
+      });
+      const persisted = await unsealRuntimeAuthorization(
+        await sealRuntimeAuthorization(created.authorization, secret),
+        secret,
+        { resourceKind: 'cloud-agent-next', resourceId: 'session', userId, organizationId: 'org' }
+      );
+      expect(persisted).toEqual(created.authorization);
+      const renewed = await renewRuntimeAuthorization({ ...common, authorization: persisted });
+      for (const token of [created.token, renewed.token]) {
+        expect(decodeJwt(token)).toMatchObject({
+          apiTokenPepper: null,
+          tokenPurpose: 'delegated-workload',
+          runtimeAuthorization: { id: persisted.id, resourceId: 'session' },
+        });
+      }
+
+      principals.set(rotatedUserId, {
+        id: rotatedUserId,
+        apiTokenPepper: 'rotated-pepper',
+        blockedAt: null,
+        blockedReason: null,
+        isBot: rotatedUserId === 'bot',
+      });
+      await expect(createRuntimeAuthorization(creation)).rejects.toThrow(
+        'Invalid runtime admission'
+      );
+      await expect(
+        renewRuntimeAuthorization({ ...common, authorization: persisted })
+      ).rejects.toBeInstanceOf(RuntimeAuthorizationRevokedError);
+    }
+  );
+
   it('sets a fixed resource-specific delegation deadline independently of control expiry', async () => {
     vi.useFakeTimers();
     const now = new Date('2026-01-01T00:00:00.000Z');

@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Транскрипция през Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Преобразувай гласовото въвеждане с модел на Kilo Gateway вместо разпознаването на реч на устройството. Записът ти се изпраща до Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Недостъпна заявка за обединяване",
@@ -2568,7 +2571,13 @@
     "languageNotInstalledMessage": "Файловете с офлайн реч за {{language}} не са инсталирани на този телефон. Изтегли ги, след което опитай гласовото въвеждане отново.",
     "downloadOfflineModel": "Изтегляне",
     "offlineModelDownloadScheduled": "Файловете с офлайн реч ще се изтеглят на заден план. Опитай гласовото въвеждане отново по-късно.",
-    "listeningStopped": "Слушането е спряно."
+    "listeningStopped": "Слушането е спряно.",
+    "transcribing": "Транскрибирам…",
+    "gatewayUnreachable": "Kilo Gateway не може да бъде достигнат. Провери връзката си и опитай отново.",
+    "gatewayTimeout": "Транскрипцията отне твърде много време. Опитай отново.",
+    "gatewayModelUnavailable": "Този модел за транскрипция не е наличен. Избери друг в Предпочитания.",
+    "gatewaySignInRequired": "Влез, за да използваш транскрипция през Kilo Gateway.",
+    "gatewayNoModel": "Първо избери модел за транскрипция в Предпочитания."
   },
   "share": {
     "title": "Споделяне в Kilo",
@@ -2950,5 +2959,12 @@
     "needsInput": "Нужен е отговор",
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран."
+  },
+  "transcriptionModel": {
+    "title": "Модел за транскрипция",
+    "noneChosen": "Не е избран",
+    "emptyTitle": "Няма модели за транскрипция",
+    "emptyDescription": "Kilo Gateway в момента не предлага модели за транскрипция.",
+    "loadFailed": "Моделите за транскрипция не се заредиха."
   }
 }

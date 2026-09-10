@@ -350,4 +350,16 @@ describe('OpenRouter transcription model fetcher', () => {
       expect.any(Object)
     );
   });
+
+  it('never caches the transcription catalogue so an unreachable gateway surfaces as a failure', async () => {
+    // The Data Cache would keep serving a stale catalogue while the gateway
+    // is down, and the mobile picker would list dead models instead of its
+    // load-failed retry state.
+    await getOpenRouterTranscriptionModels();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ cache: 'no-store' })
+    );
+  });
 });

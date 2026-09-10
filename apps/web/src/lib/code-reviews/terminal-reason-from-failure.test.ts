@@ -83,13 +83,13 @@ describe('terminalReasonFromCloudAgentFailure', () => {
   );
 
   it.each([
-    ['context_limit', 'assistant_failed'],
-    ['output_limit', 'assistant_failed'],
-    ['content_filter', 'assistant_failed'],
-    ['structured_output', 'assistant_failed'],
+    ['context_limit', 'assistant_context_limit'],
+    ['output_limit', 'assistant_output_limit'],
+    ['content_filter', 'assistant_content_filter'],
+    ['structured_output', 'assistant_structured_output'],
     ['timeout', 'assistant_timeout'],
     ['invalid_request', 'assistant_invalid_request'],
-  ] as const)('keeps %s mapped to the existing %s category', (assistantReason, expected) => {
+  ] as const)('maps assistant reason %s to %s', (assistantReason, expected) => {
     expect(
       terminalReasonFromCloudAgentFailure({
         code: 'assistant_error',

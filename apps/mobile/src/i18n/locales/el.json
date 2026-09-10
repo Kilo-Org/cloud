@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Απομαγνητοφώνηση μέσω Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Η φωνητική πληκτρολόγηση μετατρέπεται σε κείμενο με ένα μοντέλο του Kilo Gateway αντί για την αναγνώριση ομιλίας της συσκευής. Η ηχογράφηση αποστέλλεται στο Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Μη διαθέσιμο αίτημα ενσωμάτωσης",
@@ -2568,7 +2571,13 @@
     "languageNotInstalledMessage": "Τα αρχεία ομιλίας εκτός σύνδεσης για {{language}} δεν είναι εγκατεστημένα σε αυτό το τηλέφωνο. Κάνε λήψη τους και μετά δοκίμασε ξανά τη φωνητική πληκτρολόγηση.",
     "downloadOfflineModel": "Λήψη",
     "offlineModelDownloadScheduled": "Η λήψη των αρχείων ομιλίας εκτός σύνδεσης θα γίνει στο παρασκήνιο. Δοκίμασε ξανά τη φωνητική πληκτρολόγηση αργότερα.",
-    "listeningStopped": "Η ακρόαση σταμάτησε."
+    "listeningStopped": "Η ακρόαση σταμάτησε.",
+    "transcribing": "Απομαγνητοφώνηση...",
+    "gatewayUnreachable": "Δεν ήταν δυνατή η επικοινωνία με το Kilo Gateway. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
+    "gatewayTimeout": "Η απομαγνητοφώνηση πήρε υπερβολικό χρόνο. Δοκίμασε ξανά.",
+    "gatewayModelUnavailable": "Αυτό το μοντέλο απομαγνητοφώνησης δεν είναι διαθέσιμο. Διάλεξε άλλο στις Προτιμήσεις.",
+    "gatewaySignInRequired": "Συνδέσου για να χρησιμοποιήσεις την απομαγνητοφώνηση μέσω Kilo Gateway.",
+    "gatewayNoModel": "Διάλεξε πρώτα ένα μοντέλο απομαγνητοφώνησης στις Προτιμήσεις."
   },
   "share": {
     "title": "Κοινοποίηση στο Kilo",
@@ -2950,5 +2959,12 @@
     "needsInput": "Αναμονή απάντησης",
     "channelName": "Ενεργοί πράκτορες",
     "activityKitDisabledBody": "Ενεργοποίησε τις ζωντανές δραστηριότητες στις ρυθμίσεις για να βλέπεις τους ενεργούς πράκτορες στην οθόνη κλειδώματος."
+  },
+  "transcriptionModel": {
+    "title": "Μοντέλο απομαγνητοφώνησης",
+    "noneChosen": "Δεν έχει επιλεγεί",
+    "emptyTitle": "Δεν υπάρχουν μοντέλα απομαγνητοφώνησης",
+    "emptyDescription": "Το Kilo Gateway δεν προσφέρει αυτή τη στιγμή μοντέλα απομαγνητοφώνησης.",
+    "loadFailed": "Δεν ήταν δυνατή η φόρτωση των μοντέλων απομαγνητοφώνησης."
   }
 }

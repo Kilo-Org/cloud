@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { streamEventSchema } from '../e2e/client.js';
 import {
   extractLastUserMessageText,
+  extractMultipartField,
   parseDirective,
   startFakeLlmServer,
   stripKiloPromptWrapping,
@@ -132,6 +133,30 @@ describe('stripKiloPromptWrapping', () => {
         'hello world\n\n<environment_details>\nCurrent time: 2026-05-05T10:17:23+00:00\n</environment_details>'
       )
     ).toBe('hello world');
+  });
+});
+
+describe('extractMultipartField', () => {
+  const boundary = '----kilo-fake-llm-form';
+
+  function multipart(parts: string[]): string {
+    return parts.map(part => `--${boundary}\r\n${part}\r\n`).join('') + `--${boundary}--\r\n`;
+  }
+
+  it('extracts the model field from a record with model and file parts', () => {
+    const body = multipart([
+      'Content-Disposition: form-data; name="model"\r\n\r\nfake-transcribe',
+      'Content-Disposition: form-data; name="file"; filename="audio.wav"\r\nContent-Type: audio/wav\r\n\r\nRIFFbinary-audio-bytes',
+    ]);
+    expect(extractMultipartField(body, boundary, 'model')).toBe('fake-transcribe');
+    expect(extractMultipartField(body, boundary, 'file')).toBe('RIFFbinary-audio-bytes');
+  });
+
+  it('returns null when the model part is missing', () => {
+    const body = multipart([
+      'Content-Disposition: form-data; name="file"; filename="audio.wav"\r\n\r\nRIFF',
+    ]);
+    expect(extractMultipartField(body, boundary, 'model')).toBeNull();
   });
 });
 
@@ -338,16 +363,81 @@ describe('fake-llm-server HTTP', () => {
     await expect(organizationAvailable.json()).resolves.toEqual({ valid: true });
   });
 
-  it('reports chat completion request counts for fail-fast assertions', async () => {
+  it('reports chat completion and transcription request counts for fail-fast assertions', async () => {
     const h = await start();
     const before = await fetch(`${h.url}/test/requests`);
-    await expect(before.json()).resolves.toEqual({ chatCompletions: 0 });
+    await expect(before.json()).resolves.toEqual({ chatCompletions: 0, transcriptions: 0 });
 
     const response = await postChat(h.url, '__fake__:echo:hello');
     expect(response.status).toBe(200);
 
     const after = await fetch(`${h.url}/test/requests`);
-    await expect(after.json()).resolves.toEqual({ chatCompletions: 1 });
+    await expect(after.json()).resolves.toEqual({ chatCompletions: 1, transcriptions: 0 });
+  });
+
+  it('serves the transcription catalogue when output_modalities=transcription', async () => {
+    const h = await start();
+    const res = await fetch(`${h.url}/api/openrouter/models?output_modalities=transcription`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{
+        id: string;
+        name: string;
+        context_length: number;
+        pricing: { prompt: string; completion: string };
+      }>;
+    };
+    expect(body.data.map(m => m.id)).toEqual(['fake-transcribe', 'fake-transcribe-broken']);
+    expect(body.data[0]).toMatchObject({
+      name: 'Fake Transcribe',
+      context_length: 128000,
+      pricing: { prompt: '0', completion: '0' },
+    });
+
+    // Without the query the chat catalogue is unchanged.
+    const plain = await fetch(`${h.url}/api/openrouter/models`);
+    const plainBody = (await plain.json()) as { data: Array<{ id: string }> };
+    expect(plainBody.data.some(m => m.id === 'fake-deterministic')).toBe(true);
+    expect(plainBody.data.some(m => m.id === 'fake-transcribe')).toBe(false);
+  });
+
+  async function postMultipartTranscription(url: string, model: string): Promise<Response> {
+    const form = new FormData();
+    form.set('model', model);
+    form.set('file', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'audio/wav' }), 'clip.wav');
+    return fetch(`${url}/api/openrouter/audio/transcriptions`, { method: 'POST', body: form });
+  }
+
+  it('transcribes multipart audio with the happy-path model', async () => {
+    const h = await start();
+    const res = await postMultipartTranscription(h.url, 'fake-transcribe');
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ text: 'Gateway transcription online' });
+    const counts = await fetch(`${h.url}/test/requests`);
+    await expect(counts.json()).resolves.toEqual({ chatCompletions: 0, transcriptions: 1 });
+  });
+
+  it('returns 404 for the broken transcription model', async () => {
+    const h = await start();
+    const res = await postMultipartTranscription(h.url, 'fake-transcribe-broken');
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: { message: string; code: number } };
+    expect(body.error.message).toBe('model not found: fake-transcribe-broken');
+    expect(body.error.code).toBe(404);
+  });
+
+  it('transcribes JSON input_audio bodies forwarded by the web proxy', async () => {
+    const h = await start();
+    const res = await fetch(`${h.url}/api/openrouter/audio/transcriptions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'fake-transcribe',
+        input_audio: { data: 'aGVsbG8=', format: 'wav' },
+      }),
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ text: 'Gateway transcription online' });
   });
 
   it('returns HTTP 404 for routes outside the fake gateway contract', async () => {

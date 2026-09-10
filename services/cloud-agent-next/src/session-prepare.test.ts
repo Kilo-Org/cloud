@@ -1858,7 +1858,11 @@ describe('start endpoint', () => {
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
     expect(recordSessionFailureMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        failure: { stage: 'initial_admission', code: 'initial_admission_rejected' },
+        failure: {
+          stage: 'initial_admission',
+          code: 'initial_admission_rejected',
+          admissionCode: 'INTERNAL',
+        },
       }),
       expect.any(Object)
     );
@@ -1884,7 +1888,11 @@ describe('start endpoint', () => {
 
     expect(recordSessionFailureMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        failure: { stage: 'initial_admission', code: 'initial_admission_rejected' },
+        failure: {
+          stage: 'initial_admission',
+          code: 'initial_admission_rejected',
+          admissionCode: 'INTERNAL',
+        },
       }),
       expect.any(Object)
     );

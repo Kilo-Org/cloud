@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway ಮೂಲಕ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವಿಕೆ",
+    "gatewayTranscriptionSubtitle": "ಸಾಧನದ ಮಾತು ಗುರುತಿಸುವಿಕೆಗೆ ಬದಲಾಗಿ Kilo Gateway ಮಾದರಿಯನ್ನು ಬಳಸಿ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಅನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಿ. ನಿಮ್ಮ ಧ್ವನಿಮುದ್ರಣ Kilo Gateway ಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
@@ -2568,7 +2571,13 @@
     "languageNotInstalledMessage": "{{language}} ಭಾಷೆಯ ಆಫ್‌ಲೈನ್ ಮಾತು ಫೈಲ್‌ಗಳು ಈ ಫೋನ್‌ನಲ್ಲಿ ಸ್ಥಾಪಿಸಲಾಗಿಲ್ಲ. ಅವುಗಳನ್ನು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ, ನಂತರ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಅನ್ನು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "downloadOfflineModel": "ಡೌನ್‌ಲೋಡ್",
     "offlineModelDownloadScheduled": "ಆಫ್‌ಲೈನ್ ಮಾತು ಫೈಲ್‌ಗಳು ಹಿನ್ನೆಲೆಯಲ್ಲಿ ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತವೆ. ನಂತರ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಅನ್ನು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-    "listeningStopped": "ಆಲಿಸುವುದು ನಿಂತಿದೆ."
+    "listeningStopped": "ಆಲಿಸುವುದು ನಿಂತಿದೆ.",
+    "transcribing": "ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಲಾಗುತ್ತಿದೆ...",
+    "gatewayUnreachable": "Kilo Gateway ಅನ್ನು ತಲುಪಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "gatewayTimeout": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಲು ತುಂಬಾ ಸಮಯ ತೆಗೆದುಕೊಂಡಿತು. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "gatewayModelUnavailable": "ಈ ಪರಿವರ್ತನಾ ಮಾದರಿ ಲಭ್ಯವಿಲ್ಲ. ಆದ್ಯತೆಗಳಲ್ಲಿ ಇನ್ನೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+    "gatewaySignInRequired": "Kilo Gateway ಪರಿವರ್ತನೆಯನ್ನು ಬಳಸಲು ಸೈನ್ ಇನ್ ಮಾಡಿ.",
+    "gatewayNoModel": "ಮೊದಲು ಆದ್ಯತೆಗಳಲ್ಲಿ ಪರಿವರ್ತನಾ ಮಾದರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ."
   },
   "share": {
     "title": "Kiloಗೆ ಹಂಚಿಕೆ",
@@ -2950,5 +2959,12 @@
     "needsInput": "ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಅಗತ್ಯ",
     "channelName": "ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳು",
     "activityKitDisabledBody": "ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳನ್ನು ನೋಡಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಲೈವ್ ಚಟುವಟಿಕೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ."
+  },
+  "transcriptionModel": {
+    "title": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಮಾದರಿ",
+    "noneChosen": "ಯಾವುದನ್ನೂ ಆಯ್ಕೆ ಮಾಡಿಲ್ಲ",
+    "emptyTitle": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಯಾವುದೇ ಮಾದರಿಗಳಿಲ್ಲ",
+    "emptyDescription": "Kilo Gateway ಪ್ರಸ್ತುತ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಯಾವುದೇ ಮಾದರಿಗಳನ್ನು ಒದಗಿಸುತ್ತಿಲ್ಲ.",
+    "loadFailed": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
   }
 }

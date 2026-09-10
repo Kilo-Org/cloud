@@ -5,6 +5,7 @@ import { GET as gatewayV1ModelsGET } from '../app/api/gateway/v1/models/route';
 import { GET as transcriptionModelsGET } from '../app/api/gateway/transcription-models/route';
 import {
   getEnhancedOpenRouterModels,
+  getOpenRouterTranscriptionModels,
   getRawOpenRouterModels,
 } from '@/lib/ai-gateway/providers/openrouter';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
@@ -942,6 +943,47 @@ describe('final Enkrypt serialization boundaries', () => {
       expect(mockRows).toHaveBeenCalledTimes(1);
     }
   );
+});
+
+describe('getOpenRouterTranscriptionModels', () => {
+  function mockTranscriptionFetch() {
+    const fetchMock = jest
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+    return fetchMock;
+  }
+
+  test('hits the local fake LLM models URL in local fake mode', async () => {
+    const nextEnv = {
+      ...process.env,
+      NODE_ENV: 'development',
+      FAKE_LLM_URL: 'http://localhost:8811',
+    };
+    const env = jest.replaceProperty(process, 'env', nextEnv as NodeJS.ProcessEnv);
+    const fetchMock = mockTranscriptionFetch();
+
+    const result = await getOpenRouterTranscriptionModels();
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'http://localhost:8811/api/openrouter/models?output_modalities=transcription'
+    );
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer local-fake-llm');
+    expect(result.data).toBeDefined();
+    env.restore();
+  });
+
+  test('hits OpenRouter outside local fake mode', async () => {
+    const fetchMock = mockTranscriptionFetch();
+
+    const result = await getOpenRouterTranscriptionModels();
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'https://openrouter.ai/api/v1/models?output_modalities=transcription'
+    );
+    expect(result.data).toBeDefined();
+  });
 });
 
 afterEach(() => {

@@ -16,7 +16,18 @@ import {
   getKiloPassSubscriptionCardContentState,
 } from '@/lib/kilo-pass/subscription-card-state';
 
-export function KiloPassSubscriptionCard() {
+export function KiloPassSubscriptionCard({
+  hideLoadingSkeleton = false,
+}: Readonly<{
+  /**
+   * Render no loading shimmer while the card's queries are still in flight:
+   * the credits section already shows its one loading indicator (the balance
+   * skeleton), and stacking a second skeleton card reads as two loaders at
+   * once. The slot keeps the card's final height so the swap in and out of
+   * this state never moves the sections below.
+   */
+  hideLoadingSkeleton?: boolean;
+}>) {
   const colors = useThemeColors();
   const router = useRouter();
   const trpc = useTRPC();
@@ -138,7 +149,14 @@ export function KiloPassSubscriptionCard() {
 
   return (
     <View className="gap-2">
-      {contentState.kind === 'loading' ? (
+      {contentState.kind === 'loading' && hideLoadingSkeleton ? (
+        // p-3 (24) + the h-10 icon row (40) + the 1px borders (2): the
+        // exact height every card state below renders at, so the swap to
+        // content or to the shimmering skeleton never moves layout.
+        <View className="h-[66px]" />
+      ) : null}
+
+      {contentState.kind === 'loading' && !hideLoadingSkeleton ? (
         <View
           accessibilityLabel={t('kiloPass.subscriptionLoading')}
           accessibilityState={{ busy: true }}

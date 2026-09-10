@@ -1,4 +1,5 @@
 import 'server-only';
+import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 import { randomUUID } from 'crypto';
 import {
   createCloudAgentNextClient,
@@ -302,12 +303,16 @@ export async function startSecurityAnalysis(params: {
   const analysisStartTime = Date.now();
 
   try {
-    const cloudAgentToken = generateCloudAgentWorkflowToken(user, {
+    const workflowUser = await prepareCloudAgentWorkflowUser(user, [
+      'cloud-agent-next',
+      'workflow-gateway',
+    ]);
+    const cloudAgentToken = generateCloudAgentWorkflowToken(workflowUser, {
       organizationId: findingOrganizationId,
       tokenSource: 'security-agent',
       expiresIn: TOKEN_EXPIRY.default,
     });
-    const gatewayToken = generateWorkflowGatewayToken(user, {
+    const gatewayToken = generateWorkflowGatewayToken(workflowUser, {
       organizationId: findingOrganizationId,
       tokenSource: 'security-agent',
     });

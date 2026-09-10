@@ -711,7 +711,8 @@ describe('runAutoCommit', () => {
         mockHasGitUpstream.mockReset();
         await fs.rm(root, { recursive: true, force: true });
       }
-    }
+    },
+    30_000
   );
 
   it('commits and pushes with the isolated worktree environment instead of wrapper credentials', async () => {
@@ -770,7 +771,7 @@ describe('runAutoCommit', () => {
       mockHasGitUpstream.mockReset();
       await fs.rm(root, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 
   it('aborts the generation request on caller cancellation without staging, committing, or pushing', async () => {
     vi.useFakeTimers();

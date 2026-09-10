@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this -- the File mock mirrors the instance-only native File surface. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { trpcClient } from '@/lib/trpc';
@@ -17,16 +18,15 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 
-vi.mock('expo-file-system/legacy', () => ({
-  createUploadTask: vi.fn(() => ({
-    uploadAsync: vi.fn().mockResolvedValue({ status: 200 }),
-  })),
-  FileSystemUploadType: { BINARY_CONTENT: 'binary-content' },
-  getInfoAsync: vi.fn().mockResolvedValue({
-    exists: true,
-    isDirectory: false,
-    size: 100,
-  }),
+const createUploadTaskMock = vi.fn((..._args: unknown[]) => ({
+  uploadAsync: vi.fn().mockResolvedValue({ status: 200, body: '', headers: {} }),
+  cancel: vi.fn(),
+}));
+vi.mock('expo-file-system', () => ({
+  UploadType: { BINARY_CONTENT: 'binary-content', MULTIPART: 'multipart' },
+  File: class {
+    createUploadTask = (...args: unknown[]): unknown => createUploadTaskMock(...args);
+  },
 }));
 
 describe('uploadOne', () => {
@@ -96,8 +96,6 @@ describe('uploadOne', () => {
   });
 
   it('does not create an upload task when cancelled after the presign', async () => {
-    const { createUploadTask } = await import('expo-file-system/legacy');
-
     await expect(
       uploadOne({
         attachmentId: 'att-3',
@@ -111,6 +109,6 @@ describe('uploadOne', () => {
       })
     ).rejects.toThrow('Upload cancelled');
 
-    expect(createUploadTask).not.toHaveBeenCalled();
+    expect(createUploadTaskMock).not.toHaveBeenCalled();
   });
 });

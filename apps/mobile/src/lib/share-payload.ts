@@ -1,6 +1,6 @@
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import * as Crypto from 'expo-crypto';
-import { cacheDirectory, copyAsync, deleteAsync, getInfoAsync } from 'expo-file-system/legacy';
+import { File, Paths } from 'expo-file-system';
 import { type ShareIntent } from 'expo-share-intent';
 
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
@@ -38,7 +38,7 @@ type ShareIntentLike = Pick<ShareIntent, 'text' | 'webUrl' | 'meta' | 'files'>;
 
 type CopyToCache = (args: { from: string; fileName: string }) => Promise<string>;
 
-type DeleteCachedFile = (uri: string) => Promise<void>;
+type DeleteCachedFile = (uri: string) => void | Promise<void>;
 
 const payloads = new Map<ShareId, SharePayload>();
 const insertionOrder: ShareId[] = [];
@@ -59,9 +59,13 @@ export function getSharePersistUserId(): string | null {
   return sharePersistUserId;
 }
 
-async function defaultDeleteCachedFile(uri: string): Promise<void> {
+function defaultDeleteCachedFile(uri: string): void {
   try {
-    await deleteAsync(uri, { idempotent: true });
+    // The modern File API deletes synchronously; a missing file is a no-op.
+    const file = new File(uri);
+    if (file.exists) {
+      file.delete();
+    }
   } catch {
     // Best-effort hygiene; ignore delete failures.
   }
@@ -69,12 +73,13 @@ async function defaultDeleteCachedFile(uri: string): Promise<void> {
 
 let deleteCachedFile: DeleteCachedFile = defaultDeleteCachedFile;
 
-type FileExists = (uri: string) => Promise<boolean>;
+type FileExists = (uri: string) => boolean;
 
-async function defaultFileExists(uri: string): Promise<boolean> {
+function defaultFileExists(uri: string): boolean {
   try {
-    const info = await getInfoAsync(uri);
-    return info.exists && !info.isDirectory;
+    // `File.exists` is false for a directory path, so the `!isDirectory` guard
+    // the legacy `getInfoAsync` needed is implicit.
+    return new File(uri).exists;
   } catch {
     return false;
   }
@@ -253,29 +258,21 @@ export async function restoreSharePayloads(userId: string): Promise<void> {
   }
 
   // Then reconcile each file against the filesystem.
-  await Promise.all(
-    [...payloads.values()].map(async payload => {
-      const kept: AgentAttachmentCandidate[] = [];
-      const failed = [...payload.failedFiles];
-      const checks = await Promise.all(
-        payload.files.map(async file => {
-          const exists = await checkFileExists(file.uri);
-          return { file, exists };
-        })
-      );
-      for (const { file, exists } of checks) {
-        if (exists) {
-          kept.push(file);
-        } else {
-          failed.push(file.name);
-        }
+  for (const payload of payloads.values()) {
+    const kept: AgentAttachmentCandidate[] = [];
+    const failed = [...payload.failedFiles];
+    for (const file of payload.files) {
+      if (checkFileExists(file.uri)) {
+        kept.push(file);
+      } else {
+        failed.push(file.name);
       }
-      payload.files.length = 0;
-      payload.files.push(...kept);
-      payload.failedFiles.length = 0;
-      payload.failedFiles.push(...failed);
-    })
-  );
+    }
+    payload.files.length = 0;
+    payload.files.push(...kept);
+    payload.failedFiles.length = 0;
+    payload.failedFiles.push(...failed);
+  }
 }
 
 /** Test-only: wipe the module store between cases. */
@@ -313,15 +310,11 @@ export function composeShareText(shareIntent: ShareIntentLike): string {
 }
 
 async function defaultCopyToCache(args: { from: string; fileName: string }): Promise<string> {
-  const root = cacheDirectory;
-  if (!root) {
-    throw new Error('cacheDirectory is unavailable');
-  }
   const safeName = args.fileName.replaceAll(/[/\\]/g, '_') || 'shared-file';
-  const destination = `${root}share-${Crypto.randomUUID()}-${safeName}`;
-  await copyAsync({ from: args.from, to: destination });
-  registerTempFile(destination);
-  return destination;
+  const destination = new File(Paths.cache, `share-${Crypto.randomUUID()}-${safeName}`);
+  await new File(args.from).copy(destination);
+  registerTempFile(destination.uri);
+  return destination.uri;
 }
 
 export async function normalizeShareIntent(

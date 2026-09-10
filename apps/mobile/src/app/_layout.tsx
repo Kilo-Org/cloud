@@ -7,8 +7,9 @@ import '../global.css';
 import '@/lib/cloud-agent-runtime';
 // Enter the local module's JS in the main process on both platforms. Its
 // Android branch stays a no-op until slice `and` lands; iOS runs the
-// registered glanceable sink below.
-import 'active-agents-live-update';
+// registered glanceable sink below. Imported by path: the module is
+// autolinked from modules/ and intentionally absent from dependencies.
+import '../../modules/active-agents-live-update/src';
 // Registers the iOS Live Activity and widget sink with the glanceable publisher.
 import '@/glanceable-ios/register';
 

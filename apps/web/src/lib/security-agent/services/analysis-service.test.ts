@@ -55,6 +55,7 @@ jest.mock('@/lib/security-agent/db/security-analysis', () => ({
 
 jest.mock('@/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
+  isResourceTokenIssuanceEnabled: () => false,
 }));
 
 jest.mock('./triage-service', () => ({

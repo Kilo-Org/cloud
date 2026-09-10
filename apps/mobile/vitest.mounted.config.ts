@@ -19,5 +19,11 @@ export default defineProject({
     name: 'mobile-mounted',
     environment: 'node',
     include: ['src/**/*.mounted.test.tsx'],
+    // Project configs do not inherit the root test options, and this suite
+    // runs both projects in parallel: on a loaded host (dev stack, simulator,
+    // Appium) workers starve and real-timer mounted renders exceed the 5s
+    // default. Bounded pollers still fail on their own budget, so this only
+    // absorbs starvation.
+    testTimeout: 15_000,
   },
 });

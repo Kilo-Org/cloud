@@ -1,5 +1,5 @@
 import { test, expect, describe } from '@jest/globals';
-import { preferredModels } from '@/lib/ai-gateway/models';
+import { preferredModels, PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
@@ -26,6 +26,8 @@ import { GLM_CURRENT_MODEL_ID, GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gatew
 
 describe('OpenRouter Models Config', () => {
   test('preferred models should contain expected models', () => {
+    expect(PRIMARY_DEFAULT_MODEL).toBe(GLM_FLASH_CURRENT_MODEL_ID);
+
     const expectedModels = [
       CLAUDE_OPUS_CURRENT_MODEL_ID,
       GPT_CURRENT_MODEL_ID,

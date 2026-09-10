@@ -81,7 +81,7 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   code: SONNET_FRONTIER,
 };
 
-// INVARIANT: the efficient static fallback must remain image-capable.
+// INVARIANT: the balanced static fallback must remain image-capable.
 // The capability-aware routing filter relies on this guarantee to make
 // image requests succeed even when no benchmark candidate is capable.
 // Whoever changes this model constant must re-verify image support

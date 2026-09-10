@@ -14,6 +14,7 @@ import {
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
+import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 
 const baseParams = {
   model: KILO_AUTO_EFFICIENT_MODEL.id,
@@ -26,6 +27,7 @@ const baseParams = {
 
 const nullUserPromise = Promise.resolve(null);
 const zeroBalancePromise = Promise.resolve(0);
+const efficientFallback = { model: PRIMARY_DEFAULT_MODEL };
 
 const sampleDecision: AutoRoutingDecision = {
   model: 'anthropic/claude-haiku-4',
@@ -100,39 +102,42 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(result).toEqual({ kind: 'ok', resolved: { model: 'anthropic/claude-haiku-4' } });
   });
 
-  it('falls back to BALANCED_FALLBACK_MODEL when no thunk is provided and apiKind=responses', async () => {
+  it('falls back to PRIMARY_DEFAULT_MODEL when no thunk is provided and apiKind=responses', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'responses' },
       nullUserPromise,
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
   });
 
-  it('falls back to BALANCED_FALLBACK_MODEL when no thunk is provided and apiKind=messages', async () => {
+  it('falls back to PRIMARY_DEFAULT_MODEL when no thunk is provided and apiKind=messages', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'messages' },
       nullUserPromise,
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
   });
 
-  it('falls back to BALANCED_FALLBACK_MODEL when no thunk is provided and apiKind=chat_completions', async () => {
+  it('falls back to PRIMARY_DEFAULT_MODEL when no thunk is provided and apiKind=chat_completions', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'chat_completions' },
       nullUserPromise,
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
   });
 
-  it.each([KILO_AUTO_BALANCED_MODEL.id, KILO_AUTO_EFFICIENT_MODEL.id])(
-    'falls back to Kimi K3 with reasoning for %s when the worker returns no decision',
-    async model => {
+  it.each([
+    [KILO_AUTO_BALANCED_MODEL.id, BALANCED_FALLBACK_MODEL],
+    [KILO_AUTO_EFFICIENT_MODEL.id, efficientFallback],
+  ])(
+    'uses the configured fallback for %s when the worker returns no decision',
+    async (model, fallback) => {
       const result = await resolveAutoModel(
         {
           ...baseParams,
@@ -144,14 +149,11 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
         zeroBalancePromise
       );
 
-      expect(result).toEqual({
-        kind: 'ok',
-        resolved: { model: 'moonshotai/kimi-k3', reasoning: { enabled: true } },
-      });
+      expect(result).toEqual({ kind: 'ok', resolved: fallback });
     }
   );
 
-  it('falls back to BALANCED_FALLBACK_MODEL when the worker returns a virtual auto model', async () => {
+  it('falls back to PRIMARY_DEFAULT_MODEL when the worker returns a virtual auto model', async () => {
     const result = await resolveAutoModel(
       {
         ...baseParams,
@@ -165,7 +167,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
   });
 
   it('does not call the thunk more than once', async () => {
@@ -259,7 +261,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     });
   });
 
-  it('falls back to BALANCED_FALLBACK_MODEL when variant is absent from the model catalog', async () => {
+  it('falls back to PRIMARY_DEFAULT_MODEL when variant is absent from the model catalog', async () => {
     // Claude has no "thinking" key — only none/low/medium/high/xhigh/max
     const result = await resolveAutoModel(
       {
@@ -275,10 +277,10 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
   });
 
-  it('falls back to BALANCED_FALLBACK_MODEL when the model exposes no variants but decision has a variant', async () => {
+  it('falls back to PRIMARY_DEFAULT_MODEL when the model exposes no variants but decision has a variant', async () => {
     const result = await resolveAutoModel(
       {
         ...baseParams,
@@ -293,7 +295,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
   });
 
   it('applies exact thinking and instant variant settings', async () => {
@@ -403,7 +405,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: efficientFallback });
   });
 });
 

@@ -3241,6 +3241,7 @@ describe('owned control execution', () => {
 
   it('bounds a hanging abort and cannot revive the runtime when its acknowledgement arrives late', async () => {
     const timers = spyOn(globalThis, 'setTimeout');
+    setSystemTime(0);
     const running = Promise.withResolvers<Completion>();
     const abortStarted = Promise.withResolvers<AbortSignal>();
     const remoteStopped = Promise.withResolvers<boolean>();

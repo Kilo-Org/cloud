@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Yíyí ohùn sí ọ̀rọ̀ pẹ̀lú Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Yí títẹ ọ̀rọ̀ pẹ̀lú ohùn sí ọ̀rọ̀-kíkọ pẹ̀lú àwòṣe Kilo Gateway dípò mímọ̀ ọ̀rọ̀ ẹ̀rọ náà. A ó fi àkọsílẹ̀ rẹ ránṣẹ́ sí Kilo Gateway.",
+    "gatewayTranscriptionPrimary": "Lo gẹ́gẹ́ bí àkọ́kọ́",
+    "gatewayTranscriptionPrimarySubtitle": "Ìyípadà ohùn sí ọ̀rọ̀ bẹ̀rẹ̀ pẹ̀lú àwòṣe Gateway, ó sì tún máa ń lo ẹ̀rọ náà nígbà tí àwòṣe yìí bá kò wà.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Ìbéèrè ìṣọ̀kan kò sí",
@@ -2568,7 +2573,16 @@
     "languageNotInstalledMessage": "Àwọn fáìlù ọ̀rọ̀ tí kì í ṣiṣẹ́ pẹ̀lú ayélujára fún {{language}} kò tíì sí lórí fónù yìí. Gbà wọ́n sílẹ̀, lẹ́yìn náà tún gbìyànjú títẹ ọ̀rọ̀ pẹ̀lú ohùn.",
     "downloadOfflineModel": "Gbà sílẹ̀",
     "offlineModelDownloadScheduled": "Àwọn fáìlù ọ̀rọ̀ tí kì í ṣiṣẹ́ pẹ̀lú ayélujára yóò gbà sílẹ̀ ní ẹ̀yẹ. Tún gbìyànjú títẹ ọ̀rọ̀ pẹ̀lú ohùn lẹ́yìn ìgbà díẹ̀.",
-    "listeningStopped": "A ti dá fífetí sílẹ̀ dúró."
+    "listeningStopped": "A ti dá fífetí sílẹ̀ dúró.",
+    "transcribing": "Ń yí padà sí ọ̀rọ̀...",
+    "gatewayUnreachable": "A kò lè dé ọ̀dọ̀ Kilo Gateway. Ṣàyẹ̀wò àsopọ̀ rẹ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
+    "gatewayTimeout": "Ìyípadà ohùn sí ọ̀rọ̀ gba àkókò jù. Gbìyànjú lẹ́ẹ̀kan sí i.",
+    "gatewayModelUnavailable": "Àwòṣe ìyípadà yìí kò sí. Yan òmíràn nínú Àwọn ààyò.",
+    "gatewaySignInRequired": "Wọlé láti lo ìyípadà ohùn sí ọ̀rọ̀ pẹ̀lú Kilo Gateway.",
+    "gatewayNoModel": "Ní àkọ́kọ́, yan àwòṣe ìyípadà ohùn sí ọ̀rọ̀ nínú Àwọn ààyò.",
+    "enginesFailed": "Ìyípadà ohùn sí ọ̀rọ̀ kọ̀ lórí Kilo Gateway àti lórí ẹ̀rọ yìí. Ṣe àyẹ̀wò ìjápọ̀ rẹ tàbí yí ààyò ìyípadà ohùn sí ọ̀rọ̀ padà nínú Àwọn ààyò, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i.",
+    "engineFellBackToDevice": "Ìyípadà ohùn sí ọ̀rọ̀ ní gateway kò wà — a ń lo ìdámọ̀ tí ó wà nínú ẹ̀rọ rẹ. Jọ̀wọ́, sọ ọ́ lẹ́ẹ̀kan sí i.",
+    "engineFellBackToGateway": "Ìdámọ̀ lórí ẹ̀rọ kọ̀ — a ń lo Kilo Gateway. Jọ̀wọ́, sọ ọ́ lẹ́ẹ̀kan sí i."
   },
   "share": {
     "title": "Pín sí Kilo",
@@ -2950,5 +2964,12 @@
     "needsInput": "Nílò èsì rẹ",
     "channelName": "Àwọn aṣojú tó ń ṣiṣẹ́",
     "activityKitDisabledBody": "Tan àwọn ìgbòkègbodò ìsinsìnyí nínú àwọn ètò láti rí àwọn aṣojú tó ń ṣiṣẹ́ lórí ojú ìwé títìpa."
+  },
+  "transcriptionModel": {
+    "title": "Àwòṣe ìyípadà ohùn sí ọ̀rọ̀",
+    "noneChosen": "Kò sí tí a yan",
+    "emptyTitle": "Kò sí àwòṣe ìyípadà ohùn sí ọ̀rọ̀",
+    "emptyDescription": "Kilo Gateway kò pèsè àwòṣe ìyípadà ohùn sí ọ̀rọ̀ ní báyìí.",
+    "loadFailed": "A kò lè gbé àwòṣe ìyípadà ohùn sí ọ̀rọ̀ wọlé."
   }
 }

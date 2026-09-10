@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transcriptie via Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Zet spraakinvoer om met een Kilo Gateway-model in plaats van de spraakherkenning van het apparaat. Je opname wordt naar Kilo Gateway verzonden.",
+    "gatewayTranscriptionPrimary": "Als primair gebruiken",
+    "gatewayTranscriptionPrimarySubtitle": "De transcriptie wordt geleid door het Gateway-model en valt terug op het apparaat wanneer het niet beschikbaar is.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "channel": {
@@ -2134,7 +2139,16 @@
     "languageNotInstalledMessage": "De offline spraakbestanden voor {{language}} zijn niet op deze telefoon geïnstalleerd. Download ze en probeer spraakinvoer opnieuw.",
     "downloadOfflineModel": "Downloaden",
     "offlineModelDownloadScheduled": "De offline spraakbestanden worden op de achtergrond gedownload. Probeer spraakinvoer later opnieuw.",
-    "listeningStopped": "Het luisteren is gestopt."
+    "listeningStopped": "Het luisteren is gestopt.",
+    "transcribing": "Transcriberen...",
+    "gatewayUnreachable": "Kilo Gateway kon niet worden bereikt. Controleer je verbinding en probeer het opnieuw.",
+    "gatewayTimeout": "De transcriptie duurde te lang. Probeer het opnieuw.",
+    "gatewayModelUnavailable": "Dit transcriptiemodel is niet beschikbaar. Kies een ander model bij Voorkeuren.",
+    "gatewaySignInRequired": "Meld je aan om transcriptie via Kilo Gateway te gebruiken.",
+    "gatewayNoModel": "Kies eerst een transcriptiemodel bij Voorkeuren.",
+    "enginesFailed": "De transcriptie is mislukt op Kilo Gateway en op dit apparaat. Controleer je verbinding, of pas de transcriptie-instellingen aan bij Voorkeuren, en probeer het opnieuw.",
+    "engineFellBackToDevice": "Transcriptie via de gateway is niet beschikbaar — de herkenner op je apparaat wordt gebruikt. Zeg het alsjeblieft opnieuw.",
+    "engineFellBackToGateway": "Herkenning op het apparaat is mislukt — Kilo Gateway wordt gebruikt. Zeg het alsjeblieft opnieuw."
   },
   "share": {
     "title": "Delen met Kilo",
@@ -2950,5 +2964,12 @@
     "needsInput": "Invoer nodig",
     "channelName": "Actieve agents",
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien."
+  },
+  "transcriptionModel": {
+    "title": "Transcriptiemodel",
+    "noneChosen": "Geen gekozen",
+    "emptyTitle": "Geen transcriptiemodellen",
+    "emptyDescription": "Kilo Gateway biedt op dit moment geen transcriptiemodellen.",
+    "loadFailed": "De transcriptiemodellen konden niet worden geladen."
   }
 }

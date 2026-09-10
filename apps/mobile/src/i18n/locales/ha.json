@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Mayar da magana zuwa rubutu ta Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Mayar da shigar da murya zuwa rubutu da samfurin Kilo Gateway maimakon gane magana na na'urar. Ana aika rikodinka zuwa Kilo Gateway.",
+    "gatewayTranscriptionPrimary": "Yi amfani azaman na farko",
+    "gatewayTranscriptionPrimarySubtitle": "Mayar da magana zuwa rubutu na farawa da samfurin Gateway, kuma idan ba a samu ba sai na'ura.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
@@ -2568,7 +2573,16 @@
     "languageNotInstalledMessage": "Fayilolin magana na offline na {{language}} ba a shigar da su a wayar ba. Sauke su, sannan sake gwada shigar da rubutu ta murya.",
     "downloadOfflineModel": "Sauke",
     "offlineModelDownloadScheduled": "Za a sauke fayilolin magana na offline a bango. Gwada shigar da rubutu ta murya daga baya.",
-    "listeningStopped": "An dakatar da sauraro."
+    "listeningStopped": "An dakatar da sauraro.",
+    "transcribing": "Ana mayar da magana rubutu...",
+    "gatewayUnreachable": "An kasa samun Kilo Gateway. Duba haɗinka ka sake gwadawa.",
+    "gatewayTimeout": "Mayar da magana zuwa rubutu ta ɗauki lokaci mai tsawo. Sake gwadawa.",
+    "gatewayModelUnavailable": "Wannan samfurin mayar da magana zuwa rubutu ba ya nan. Zaɓi wani a Zaɓuɓɓuka.",
+    "gatewaySignInRequired": "Shiga don amfani da mayar da magana ta Kilo Gateway.",
+    "gatewayNoModel": "Da farko zaɓi samfurin mayar da magana zuwa rubutu a Zaɓuɓɓuka.",
+    "enginesFailed": "Mayar da magana zuwa rubutu ta gaza a Kilo Gateway da kuma a wannan na'urar. Duba haɗin ka, ko canza saitunan mayar da magana zuwa rubutu a Zaɓuɓɓuka, sannan sake gwadawa.",
+    "engineFellBackToDevice": "Mayar da magana zuwa rubutu ta gateway ba ta nan — ana amfani da mai gane magana a na'urarka. Da fatan za a sake faɗi.",
+    "engineFellBackToGateway": "Gane magana a na'ura ya gaza — ana amfani da Kilo Gateway. Da fatan za a sake faɗi."
   },
   "share": {
     "title": "Raba zuwa Kilo",
@@ -2950,5 +2964,12 @@
     "needsInput": "Ana buƙatar bayani",
     "channelName": "Wakilai da ke aiki",
     "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle."
+  },
+  "transcriptionModel": {
+    "title": "Samfurin mayar da magana zuwa rubutu",
+    "noneChosen": "Ba a zaɓi ba",
+    "emptyTitle": "Babu samfuran mayar da magana zuwa rubutu",
+    "emptyDescription": "Kilo Gateway bai ba da samfuran mayar da magana zuwa rubutu a halin yanzu.",
+    "loadFailed": "An kasa loda samfuran mayar da magana zuwa rubutu."
   }
 }

@@ -6,6 +6,15 @@ import {
 } from 'expo-speech-recognition';
 
 import {
+  isGatewayTranscriptionEnabled,
+  isGatewayTranscriptionPrimary,
+  subscribeToGatewayTranscriptionEnabled,
+  subscribeToGatewayTranscriptionPrimary,
+} from './gateway/gateway-transcription-preference';
+import { gatewayVoiceInputNative } from './gateway/native-gateway-voice-input';
+import { createDispatchingVoiceInputNative } from './voice-input-engine-dispatch';
+import { resolveVoiceInputEngineMode } from './voice-input-engine-mode';
+import {
   createVoiceInputController,
   type VoiceInputNative,
   type VoiceInputNativeEvent,
@@ -39,7 +48,7 @@ function bindListener<K extends keyof VoiceInputNativeEvent>(
   module: ExpoSpeechRecognitionModuleType,
   event: K,
   listener: (event: VoiceInputNativeEvent[K]) => void
-): { remove(): void } {
+) {
   // The native module's addListener is generic over its full event map, so
   // when called with our narrower event union the listener parameter is
   // widened to an intersection of every native listener type. Per-event
@@ -63,6 +72,17 @@ function bindListener<K extends keyof VoiceInputNativeEvent>(
       'error',
       listener as (event: ExpoSpeechRecognitionErrorEvent) => void
     );
+  }
+  if (event === 'transcribing') {
+    // The OS recognizer has no transcribing phase; only the gateway engine
+    // emits it, and the dispatcher registers every listener on both.
+    return { remove: (): void => undefined };
+  }
+  if (event === 'engine-fell-back') {
+    // The dispatcher synthesises this event itself; the OS recognizer never
+    // emits it. Without this branch the fall-through below would misbind
+    // the listener to the native `end` event.
+    return { remove: (): void => undefined };
   }
   return module.addListener('end', listener as (event: null) => void);
 }
@@ -99,4 +119,25 @@ const native: VoiceInputNative = {
   },
 };
 
-export const voiceInputController = createVoiceInputController(native);
+// The two engines are primary/fallback, chosen by the live switch + mode
+// preferences: the gateway switch off means device-only with the gateway
+// never called at all; on, 'Use as primary' decides which engine leads and
+// which one backs it up. The OS binding above is the `os` half of the
+// dispatcher.
+const dispatchingNative = createDispatchingVoiceInputNative(native, gatewayVoiceInputNative, () =>
+  resolveVoiceInputEngineMode(isGatewayTranscriptionEnabled(), isGatewayTranscriptionPrimary())
+);
+
+export const voiceInputController = createVoiceInputController(dispatchingNative);
+
+// Availability is captured once at controller construction, so a gateway
+// toggle must recompute it: on an OS-unavailable device, enabling gateway
+// transcription has to surface the mic button without an app restart. The
+// primary mode flips availability the same way (device-only tracks the OS
+// recogniser alone, either primary mode tracks whichever engine leads).
+subscribeToGatewayTranscriptionEnabled(() => {
+  voiceInputController.refreshAvailability();
+});
+subscribeToGatewayTranscriptionPrimary(() => {
+  voiceInputController.refreshAvailability();
+});

@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Chuyển giọng nói thành văn bản qua Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Sử dụng mô hình Kilo Gateway để chuyển nội dung nhập bằng giọng nói thành văn bản thay vì nhận dạng giọng nói của thiết bị. Bản ghi của bạn được gửi tới Kilo Gateway.",
+    "gatewayTranscriptionPrimary": "Dùng làm chính",
+    "gatewayTranscriptionPrimarySubtitle": "Việc chuyển giọng nói thành văn bản do mô hình Gateway thực hiện trước, và chuyển sang thiết bị khi không khả dụng.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Hoạt động trực tiếp",
@@ -2134,7 +2139,16 @@
     "languageNotInstalledMessage": "Các tệp giọng nói ngoại tuyến cho {{language}} chưa được cài đặt trên điện thoại này. Hãy tải các tệp đó xuống, rồi thử nhập bằng giọng nói lại.",
     "downloadOfflineModel": "Tải xuống",
     "offlineModelDownloadScheduled": "Các tệp giọng nói ngoại tuyến sẽ được tải xuống trong nền. Hãy thử nhập bằng giọng nói lại sau.",
-    "listeningStopped": "Đã dừng nghe."
+    "listeningStopped": "Đã dừng nghe.",
+    "transcribing": "Đang chuyển thành văn bản...",
+    "gatewayUnreachable": "Không thể kết nối tới Kilo Gateway. Hãy kiểm tra kết nối và thử lại.",
+    "gatewayTimeout": "Việc chuyển giọng nói thành văn bản mất quá nhiều thời gian. Hãy thử lại.",
+    "gatewayModelUnavailable": "Mô hình này hiện không khả dụng. Hãy chọn mô hình khác trong Tùy chọn.",
+    "gatewaySignInRequired": "Đăng nhập để dùng tính năng chuyển giọng nói qua Kilo Gateway.",
+    "gatewayNoModel": "Trước tiên, hãy chọn một mô hình chuyển giọng nói trong Tùy chọn.",
+    "enginesFailed": "Chuyển giọng nói thành văn bản đã thất bại cả trên Kilo Gateway lẫn trên thiết bị này. Hãy kiểm tra kết nối của bạn hoặc thay đổi cài đặt chuyển giọng nói trong Tùy chọn, rồi thử lại.",
+    "engineFellBackToDevice": "Chuyển giọng nói thành văn bản qua gateway hiện không khả dụng — đang dùng bộ nhận diện trên thiết bị của bạn. Vui lòng nói lại.",
+    "engineFellBackToGateway": "Nhận diện trên thiết bị đã thất bại — đang dùng Kilo Gateway. Vui lòng nói lại."
   },
   "share": {
     "title": "Chia sẻ đến Kilo",
@@ -2950,5 +2964,12 @@
     "needsInput": "Cần phản hồi",
     "channelName": "Tác nhân đang hoạt động",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
+  },
+  "transcriptionModel": {
+    "title": "Mô hình chuyển giọng nói thành văn bản",
+    "noneChosen": "Chưa chọn",
+    "emptyTitle": "Không có mô hình chuyển giọng nói thành văn bản",
+    "emptyDescription": "Hiện Kilo Gateway không cung cấp mô hình chuyển giọng nói thành văn bản.",
+    "loadFailed": "Không thể tải các mô hình chuyển giọng nói thành văn bản."
   }
 }

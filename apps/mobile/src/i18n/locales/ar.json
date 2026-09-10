@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "التفريغ الصوتي عبر Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "حوّل الإدخال الصوتي إلى نص باستخدام أحد نماذج Kilo Gateway بدلاً من التعرف على الكلام في جهازك. يُرسل تسجيلك إلى Kilo Gateway.",
+    "gatewayTranscriptionPrimary": "استخدمه كأساسي",
+    "gatewayTranscriptionPrimarySubtitle": "ابدأ التفريغ الصوتي بنموذج البوابة، مع الرجوع إلى الجهاز عندما يكون غير متاح.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "الأنشطة المباشرة",
@@ -2190,7 +2195,16 @@
     "languageNotInstalledMessage": "ملفات الكلام دون اتصال للغة {{language}} غير مثبّتة على هذا الهاتف. نزّلها، ثم حاول استخدام الإدخال الصوتي مرة أخرى.",
     "downloadOfflineModel": "تنزيل",
     "offlineModelDownloadScheduled": "ستُنزَّل ملفات الكلام دون اتصال في الخلفية. حاول استخدام الإدخال الصوتي مرة أخرى لاحقًا.",
-    "listeningStopped": "توقف الاستماع."
+    "listeningStopped": "توقف الاستماع.",
+    "transcribing": "جارٍ التفريغ...",
+    "gatewayUnreachable": "تعذّر الوصول إلى Kilo Gateway. تحقق من اتصالك وحاول مرة أخرى.",
+    "gatewayTimeout": "استغرق التفريغ وقتًا طويلًا. حاول مرة أخرى.",
+    "gatewayModelUnavailable": "نموذج التفريغ الصوتي هذا غير متاح. اختر نموذجًا آخر من التفضيلات.",
+    "gatewaySignInRequired": "سجّل الدخول لاستخدام التفريغ الصوتي عبر Kilo Gateway.",
+    "gatewayNoModel": "اختر نموذج التفريغ الصوتي في التفضيلات أولًا.",
+    "enginesFailed": "فشل التفريغ الصوتي على Kilo Gateway وعلى هذا الجهاز. تحقق من اتصالك، أو غيّر إعدادات التفريغ الصوتي في التفضيلات، ثم حاول مرة أخرى.",
+    "engineFellBackToDevice": "التفريغ عبر Kilo Gateway غير متاح — يتم استخدام أداة التعرّف على جهازك. يُرجى قول ذلك مرة أخرى.",
+    "engineFellBackToGateway": "فشل التعرّف على الجهاز — يتم استخدام Kilo Gateway. يُرجى قول ذلك مرة أخرى."
   },
   "share": {
     "title": "المشاركة مع Kilo",
@@ -3038,5 +3052,12 @@
     "needsInput": "بانتظار تدخلك",
     "channelName": "الوكلاء النشطون",
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل."
+  },
+  "transcriptionModel": {
+    "title": "نموذج التفريغ الصوتي",
+    "noneChosen": "لا يوجد اختيار",
+    "emptyTitle": "لا توجد نماذج تفريغ صوتي",
+    "emptyDescription": "لا يقدّم Kilo Gateway أي نماذج تفريغ صوتي في الوقت الحالي.",
+    "loadFailed": "تعذّر تحميل نماذج التفريغ الصوتي."
   }
 }

@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Traskrizzjoni permezz ta' Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Ittraskrivi d-dħul bil-vuċi b'mudell ta' Kilo Gateway minflok ir-rikonoxximent tal-vuċi tal-apparat. Ir-reġistrazzjoni tiegħek tintbagħat lil Kilo Gateway.",
+    "gatewayTranscriptionPrimary": "Uża bħala primarju",
+    "gatewayTranscriptionPrimarySubtitle": "It-traskrizzjoni tmexxiha l-ewwel mill-mudell tal-Gateway, u jekk ma jkunx disponibbli, tintuża l-apparat.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "It-talba għall-għaqda mhix disponibbli",
@@ -2631,7 +2636,16 @@
     "languageNotInstalledMessage": "Il-fajls tad-diskors offline għal {{language}} mhumiex installati fuq dan it-telefon. Niżżelhom, imbagħad erġa' pprova d-dħul bil-vuċi.",
     "downloadOfflineModel": "Niżżel",
     "offlineModelDownloadScheduled": "Il-fajls tad-diskors offline se jinżżlu fl-isfond. Erġa' pprova d-dħul bil-vuċi iktar 'il quddiem.",
-    "listeningStopped": "Is-smigħ waqaf."
+    "listeningStopped": "Is-smigħ waqaf.",
+    "transcribing": "Qed nitraskrivi…",
+    "gatewayUnreachable": "Ma setgħetx tasal għal Kilo Gateway. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+    "gatewayTimeout": "It-traskrizzjoni ħadet wisq ħin. Erġa' pprova.",
+    "gatewayModelUnavailable": "Dan il-mudell ta' traskrizzjoni mhux disponibbli. Agħżel ieħor fil-Preferenzi.",
+    "gatewaySignInRequired": "Idħol biex tuża t-traskrizzjoni permezz ta' Kilo Gateway.",
+    "gatewayNoModel": "L-ewwel agħżel mudell ta' traskrizzjoni fil-Preferenzi.",
+    "enginesFailed": "It-traskrizzjoni naqset fuq Kilo Gateway u fuq dan l-apparat. Iċċekkja l-konnessjoni tiegħek, jew ibdel is-settings tat-traskrizzjoni fil-Preferenzi, imbagħad erġa' pprova.",
+    "engineFellBackToDevice": "It-traskrizzjoni permezz ta' Gateway mhix disponibbli — jintuża r-rikonoxxitur fuq l-apparat tiegħek. Erġa' għidha, jekk jogħġbok.",
+    "engineFellBackToGateway": "Ir-rikonoxximent fuq l-apparat naqas — jintuża Kilo Gateway. Erġa' għidha, jekk jogħġbok."
   },
   "share": {
     "title": "Aqsam ma' Kilo",
@@ -3016,5 +3030,12 @@
     "needsInput": "Jistenna tweġiba",
     "channelName": "Aġenti attivi",
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar."
+  },
+  "transcriptionModel": {
+    "title": "Mudell ta' traskrizzjoni",
+    "noneChosen": "Xejn magħżul",
+    "emptyTitle": "L-ebda mudell ta' traskrizzjoni",
+    "emptyDescription": "Kilo Gateway bħalissa ma joffri l-ebda mudell ta' traskrizzjoni.",
+    "loadFailed": "Ma setgħetx titgħabba l-mudelli ta' traskrizzjoni."
   }
 }

@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkrypcja przez Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkrybuj dyktowanie modelem Kilo Gateway zamiast rozpoznawania mowy na urządzeniu. Twoje nagranie zostanie wysłane do Kilo Gateway.",
+    "gatewayTranscriptionPrimary": "Użyj jako głównego",
+    "gatewayTranscriptionPrimarySubtitle": "Transkrypcją kieruje najpierw model Gateway, a gdy jest niedostępny, używane jest urządzenie.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Aktywności na żywo",
@@ -2162,7 +2167,16 @@
     "languageNotInstalledMessage": "Pliki mowy offline dla języka {{language}} nie są zainstalowane na tym telefonie. Pobierz je, a następnie ponownie spróbuj dyktowania.",
     "downloadOfflineModel": "Pobierz",
     "offlineModelDownloadScheduled": "Pliki mowy offline zostaną pobrane w tle. Spróbuj dyktowania ponownie później.",
-    "listeningStopped": "Nasłuchiwanie zostało zatrzymane."
+    "listeningStopped": "Nasłuchiwanie zostało zatrzymane.",
+    "transcribing": "Transkrypcja...",
+    "gatewayUnreachable": "Nie udało się połączyć z Kilo Gateway. Sprawdź połączenie i spróbuj ponownie.",
+    "gatewayTimeout": "Transkrypcja trwała zbyt długo. Spróbuj ponownie.",
+    "gatewayModelUnavailable": "Ten model transkrypcji jest niedostępny. Wybierz inny w Preferencjach.",
+    "gatewaySignInRequired": "Zaloguj się, aby korzystać z transkrypcji przez Kilo Gateway.",
+    "gatewayNoModel": "Najpierw wybierz model transkrypcji w Preferencjach.",
+    "enginesFailed": "Transkrypcja nie powiodła się ani na Kilo Gateway, ani na tym urządzeniu. Sprawdź połączenie lub zmień ustawienia transkrypcji w Preferencjach, a następnie spróbuj ponownie.",
+    "engineFellBackToDevice": "Transkrypcja przez gateway jest niedostępna — używane jest rozpoznawanie na Twoim urządzeniu. Powtórz to, proszę.",
+    "engineFellBackToGateway": "Rozpoznawanie na urządzeniu nie powiodło się — używany jest Kilo Gateway. Powtórz to, proszę."
   },
   "share": {
     "title": "Udostępnianie w Kilo",
@@ -2994,5 +3008,12 @@
     "needsInput": "Czeka na odpowiedź",
     "channelName": "Aktywni agenci",
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
+  },
+  "transcriptionModel": {
+    "title": "Model transkrypcji",
+    "noneChosen": "Nie wybrano",
+    "emptyTitle": "Brak modeli transkrypcji",
+    "emptyDescription": "Kilo Gateway nie oferuje teraz żadnych modeli transkrypcji.",
+    "loadFailed": "Nie udało się wczytać modeli transkrypcji."
   }
 }

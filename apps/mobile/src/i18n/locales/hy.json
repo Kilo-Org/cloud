@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Խոսքի տեքստի վերածում Kilo Gateway-ով",
+    "gatewayTranscriptionSubtitle": "Ձայնային մուտքագրումը տեքստի վերածեք Kilo Gateway-ի մոդելով՝ սարքի խոսքի ճանաչման փոխարեն։ Ձեր ձայնագրությունը ուղարկվում է Kilo Gateway։",
+    "gatewayTranscriptionPrimary": "Օգտագործել որպես հիմնական",
+    "gatewayTranscriptionPrimarySubtitle": "Տեքստի վերածումը սկսվում է Gateway մոդելով, իսկ երբ այն հասանելի չէ, անցնում է սարքին։",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Միավորման հարցումը հասանելի չէ",
@@ -2568,7 +2573,16 @@
     "languageNotInstalledMessage": "{{language}} լեզվի օֆլայն խոսքի ֆայլերը տեղադրված չեն այս հեռախոսում։ Ներբեռնիր դրանք, ապա կրկին փորձիր ձայնային մուտքագրումը։",
     "downloadOfflineModel": "Ներբեռնել",
     "offlineModelDownloadScheduled": "Օֆլայն խոսքի ֆայլերը կներբեռնվեն ֆոնային ռեժիմում։ Փորձիր ձայնային մուտքագրումը ավելի ուշ։",
-    "listeningStopped": "Լսումը դադարեցվել է։"
+    "listeningStopped": "Լսումը դադարեցվել է։",
+    "transcribing": "Վերածում ենք տեքստի...",
+    "gatewayUnreachable": "Հնարավոր չեղավ կապ հաստատել Kilo Gateway-ի հետ։ Ստուգեք կապը և կրկին փորձեք։",
+    "gatewayTimeout": "Տեքստի վերածումը չափազանց երկար տևեց։ Կրկին փորձեք։",
+    "gatewayModelUnavailable": "Այս տեքստի վերածման մոդելը հասանելի չէ։ Ընտրեք մեկ այլ՝ Նախապատվություններում։",
+    "gatewaySignInRequired": "Մուտք գործեք՝ Kilo Gateway-ի վերածումն օգտագործելու համար։",
+    "gatewayNoModel": "Նախ ընտրեք տեքստի վերածման մոդել՝ Նախապատվություններում։",
+    "enginesFailed": "Տեքստի վերածումը ձախողվեց թե՛ Kilo Gateway-ում, թե՛ այս սարքում։ Ստուգեք ձեր կապակցումը կամ փոխեք տեքստի վերածման կարգավորումները Նախապատվություններում, ապա կրկին փորձեք։",
+    "engineFellBackToDevice": "Տեքստի վերածումը Gateway-ով հասանելի չէ — օգտագործվում է ձեր սարքի ճանաչիչը։ Խնդրում ենք կրկին ասել։",
+    "engineFellBackToGateway": "Սարքի ճանաչումը ձախողվեց — օգտագործվում է Kilo Gateway-ը։ Խնդրում ենք կրկին ասել։"
   },
   "share": {
     "title": "Ուղարկում Kilo-ին",
@@ -2950,5 +2964,12 @@
     "needsInput": "Սպասում է պատասխանի",
     "channelName": "Ակտիվ գործակալներ",
     "activityKitDisabledBody": "Կարգավորումներում միացրու ընթացիկ գործողությունների ցուցադրումը՝ ակտիվ գործակալներին կողպման էկրանին տեսնելու համար։"
+  },
+  "transcriptionModel": {
+    "title": "Տեքստի վերածման մոդել",
+    "noneChosen": "Ոչինչ չի ընտրվել",
+    "emptyTitle": "Տեքստի վերածման մոդելներ չկան",
+    "emptyDescription": "Kilo Gateway-ը հիմա տեքստի վերածման մոդելներ չի առաջարկում։",
+    "loadFailed": "Չհաջողվեց բեռնել տեքստի վերածման մոդելները։"
   }
 }

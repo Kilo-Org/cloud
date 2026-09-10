@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Транскрипција преку Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Транскрибирај го гласовниот внес со модел на Kilo Gateway наместо со препознавањето на говор на уредот. Снимката се испраќа до Kilo Gateway.",
+    "gatewayTranscriptionPrimary": "Користи како примарен",
+    "gatewayTranscriptionPrimarySubtitle": "Транскрипцијата ја води моделот на Gateway, а кога не е достапен се користи уредот.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Барањето за спојување е недостапно",
@@ -2568,7 +2573,16 @@
     "languageNotInstalledMessage": "Офлајн датотеките со говор за {{language}} не се инсталирани на овој телефон. Преземи ги, а потоа обиди се повторно со гласовниот внес.",
     "downloadOfflineModel": "Преземи",
     "offlineModelDownloadScheduled": "Офлајн датотеките со говор ќе се преземат во позадина. Обиди се повторно со гласовниот внес подоцна.",
-    "listeningStopped": "Слушањето е запрено."
+    "listeningStopped": "Слушањето е запрено.",
+    "transcribing": "Се транскрибира...",
+    "gatewayUnreachable": "Не може да се достигне Kilo Gateway. Провери ја врската и обиди се повторно.",
+    "gatewayTimeout": "Транскрипцијата трае предолго. Обиди се повторно.",
+    "gatewayModelUnavailable": "Овој модел за транскрипција не е достапен. Одбери друг во Лични поставки.",
+    "gatewaySignInRequired": "Најави се за да користиш транскрипција преку Kilo Gateway.",
+    "gatewayNoModel": "Прво одбери модел за транскрипција во Лични поставки.",
+    "enginesFailed": "Транскрипцијата не успеа ни на Kilo Gateway, ни на овој уред. Провери ја врската или смени ги поставките за транскрипција во Лични поставки, па обиди се повторно.",
+    "engineFellBackToDevice": "Транскрипцијата преку Gateway не е достапна — се користи препознавачот на твојот уред. Кажи го повторно, ве молам.",
+    "engineFellBackToGateway": "Препознавањето на уредот не успеа — се користи Kilo Gateway. Кажи го повторно, ве молам."
   },
   "share": {
     "title": "Споделување во Kilo",
@@ -2950,5 +2964,12 @@
     "needsInput": "Чека внес",
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран."
+  },
+  "transcriptionModel": {
+    "title": "Модел за транскрипција",
+    "noneChosen": "Не е избран",
+    "emptyTitle": "Нема модели за транскрипција",
+    "emptyDescription": "Kilo Gateway моментално не нуди модели за транскрипција.",
+    "loadFailed": "Моделите за транскрипција не се вчитаа."
   }
 }

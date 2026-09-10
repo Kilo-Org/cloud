@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkribering via Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkribera röstinmatningen med en Kilo Gateway-modell i stället för enhetens taligenkänning. Din inspelning skickas till Kilo Gateway.",
+    "gatewayTranscriptionPrimary": "Använd som primär",
+    "gatewayTranscriptionPrimarySubtitle": "Transkriberingen leds av Gateway-modellen och faller tillbaka på enheten när den inte är tillgänglig.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "PR:en är inte tillgänglig",
@@ -2568,7 +2573,16 @@
     "languageNotInstalledMessage": "De offlinebaserade talfilerna för {{language}} är inte installerade på den här telefonen. Ladda ned dem och prova röstinmatning igen.",
     "downloadOfflineModel": "Ladda ned",
     "offlineModelDownloadScheduled": "De offlinebaserade talfilerna laddas ned i bakgrunden. Prova röstinmatning igen senare.",
-    "listeningStopped": "Lyssningen stoppades."
+    "listeningStopped": "Lyssningen stoppades.",
+    "transcribing": "Transkriberar…",
+    "gatewayUnreachable": "Det gick inte att nå Kilo Gateway. Kontrollera anslutningen och försök igen.",
+    "gatewayTimeout": "Transkriberingen tog för lång tid. Försök igen.",
+    "gatewayModelUnavailable": "Den här transkriberingsmodellen är inte tillgänglig. Välj en annan i Inställningar.",
+    "gatewaySignInRequired": "Logga in för att använda transkribering via Kilo Gateway.",
+    "gatewayNoModel": "Välj först en transkriberingsmodell i Inställningar.",
+    "enginesFailed": "Transkriberingen misslyckades på Kilo Gateway och på den här enheten. Kontrollera din anslutning eller ändra transkriberingsinställningarna i Inställningar och försök igen.",
+    "engineFellBackToDevice": "Transkribering via gateway är inte tillgänglig — enhetens igenkänning används. Vänligen säg om.",
+    "engineFellBackToGateway": "Enhetens igenkänning misslyckades — Kilo Gateway används. Vänligen säg om."
   },
   "share": {
     "title": "Dela till Kilo",
@@ -2950,5 +2964,12 @@
     "needsInput": "Väntar på svar",
     "channelName": "Aktiva agenter",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen."
+  },
+  "transcriptionModel": {
+    "title": "Transkriberingsmodell",
+    "noneChosen": "Ingen vald",
+    "emptyTitle": "Inga transkriberingsmodeller",
+    "emptyDescription": "Kilo Gateway erbjuder inga transkriberingsmodeller just nu.",
+    "loadFailed": "Det gick inte att läsa in transkriberingsmodellerna."
   }
 }

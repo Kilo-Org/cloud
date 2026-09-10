@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "使用 Kilo Gateway 转写",
+    "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型转写语音输入，而不使用设备上的语音识别。您的录音将发送至 Kilo Gateway。",
+    "gatewayTranscriptionPrimary": "设为主要",
+    "gatewayTranscriptionPrimarySubtitle": "优先使用 Gateway 模型进行转写，模型不可用时改用设备。",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "实时活动",
@@ -2134,7 +2139,16 @@
     "languageNotInstalledMessage": "此手机尚未安装 {{language}} 的离线语音文件。请下载这些文件，然后重试语音输入。",
     "downloadOfflineModel": "下载",
     "offlineModelDownloadScheduled": "离线语音文件将在后台下载。稍后请重试语音输入。",
-    "listeningStopped": "已停止收听。"
+    "listeningStopped": "已停止收听。",
+    "transcribing": "正在转写…",
+    "gatewayUnreachable": "无法连接到 Kilo Gateway。请检查网络连接后重试。",
+    "gatewayTimeout": "转写耗时过长。请重试。",
+    "gatewayModelUnavailable": "此转写模型不可用。请在偏好设置中选择其他模型。",
+    "gatewaySignInRequired": "登录后可使用 Kilo Gateway 转写。",
+    "gatewayNoModel": "请先在偏好设置中选择转写模型。",
+    "enginesFailed": "在 Kilo Gateway 和此设备上转写均失败。请检查网络连接，或在偏好设置中更改转写设置，然后重试。",
+    "engineFellBackToDevice": "Gateway 转写不可用，正在使用设备自带的识别功能。请再说一遍。",
+    "engineFellBackToGateway": "设备识别失败，正在使用 Kilo Gateway。请再说一遍。"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2950,5 +2964,12 @@
     "needsInput": "等待输入",
     "channelName": "运行中的智能体",
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。"
+  },
+  "transcriptionModel": {
+    "title": "转写模型",
+    "noneChosen": "未选择",
+    "emptyTitle": "没有转写模型",
+    "emptyDescription": "Kilo Gateway 当前没有提供转写模型。",
+    "loadFailed": "无法加载转写模型。"
   }
 }

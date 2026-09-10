@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkripsyon ak Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkripte dikte a ak yon modèl Kilo Gateway olye rekonesans vokal aparèy la. Yo voye anrejistrman ou a bay Kilo Gateway.",
+    "gatewayTranscriptionPrimary": "Sèvi kòm prensipal",
+    "gatewayTranscriptionPrimarySubtitle": "Transkripsyon an kòmanse ak modèl Gateway la, epi lè li pa disponib, li retounen sou aparèy la.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Demann fizyon an pa disponib",
@@ -2568,7 +2573,16 @@
     "languageNotInstalledMessage": "Fichye lapawòl offline pou {{language}} pa enstale sou telefòn sa a. Telechaje yo, epi eseye dikte ankò.",
     "downloadOfflineModel": "Telechaje",
     "offlineModelDownloadScheduled": "Fichye lapawòl offline yo ap telechaje nan background la. Eseye dikte ankò pita.",
-    "listeningStopped": "Sistèm nan sispann koute."
+    "listeningStopped": "Sistèm nan sispann koute.",
+    "transcribing": "Ap transkripte...",
+    "gatewayUnreachable": "Nou pa t ka rive nan Kilo Gateway. Tcheke koneksyon ou a epi eseye ankò.",
+    "gatewayTimeout": "Transkripsyon an te pran twòp tan. Eseye ankò.",
+    "gatewayModelUnavailable": "Modèl transkripsyon sa a pa disponib. Chwazi yon lòt nan Preferans yo.",
+    "gatewaySignInRequired": "Konekte pou sèvi ak transkripsyon Kilo Gateway.",
+    "gatewayNoModel": "Chwazi yon modèl transkripsyon nan Preferans yo an premye.",
+    "enginesFailed": "Transkripsyon an echwe sou Kilo Gateway ak sou aparèy sa a. Verifye koneksyon ou, oswa chanje paramèt transkripsyon yo nan Preferans yo, apre sa eseye ankò.",
+    "engineFellBackToDevice": "Transkripsyon via Gateway la pa disponib — n ap itilize rekonesans aparèy ou a. Tanpri di l ankò.",
+    "engineFellBackToGateway": "Rekonesans nan aparèy la echwe — n ap itilize Kilo Gateway. Tanpri di l ankò."
   },
   "share": {
     "title": "Pataj nan Kilo",
@@ -2950,5 +2964,12 @@
     "needsInput": "Bezwen repons",
     "channelName": "Ajan aktif",
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an."
+  },
+  "transcriptionModel": {
+    "title": "Modèl transkripsyon",
+    "noneChosen": "Okenn pa chwazi",
+    "emptyTitle": "Pa gen modèl transkripsyon",
+    "emptyDescription": "Kilo Gateway pa ofri okenn modèl transkripsyon kounye a.",
+    "loadFailed": "Nou pa t kapab chaje modèl transkripsyon yo."
   }
 }

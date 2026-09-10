@@ -23,13 +23,22 @@ import {
   type PendingVoiceInputStart,
   waitForTerminal,
 } from './voice-input-controller-helpers';
+import { type VoiceInputEngineName } from './voice-input-engine-mode';
 
 export type VoiceInputNativeEvent = {
   start: null;
+  /** Emitted when the recording stopped and the upload/processing phase began. */
+  transcribing: null;
   result: ExpoSpeechRecognitionResultEvent;
   nomatch: null;
   error: { code?: number; error: string; message: string };
   end: null;
+  /**
+   * Emitted once when the dispatcher hands a live session to the fallback
+   * engine: the lead failed mid-session, so the utterance recorded so far is
+   * gone and the user must say it again.
+   */
+  'engine-fell-back': { from: VoiceInputEngineName; to: VoiceInputEngineName };
 };
 
 export type VoiceInputNativePermission = {
@@ -101,6 +110,23 @@ export function createVoiceInputController(native: VoiceInputNative) {
     snapshot = next;
     for (const subscriber of subscribers) {
       subscriber(snapshot);
+    }
+  };
+
+  /**
+   * Recompute `availability` from the current native binding and notify on
+   * change. The initial value is captured once at construction, so a change
+   * of the native binding's answer (e.g. gateway transcription mode toggled
+   * on for a device whose OS recognizer is unavailable) is invisible until
+   * this runs.
+   */
+  const refreshAvailability = (): void => {
+    const next: VoiceInputAvailability = native.isRecognitionAvailable()
+      ? 'available'
+      : 'unavailable';
+    if (next !== availability) {
+      availability = next;
+      notify();
     }
   };
 
@@ -326,6 +352,7 @@ export function createVoiceInputController(native: VoiceInputNative) {
     abort,
     dispose,
     getSnapshot: () => snapshot,
+    refreshAvailability,
     start,
     stop,
     subscribe,

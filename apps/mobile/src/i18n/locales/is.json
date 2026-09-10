@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Umritun í gegnum Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Umritið raddinnsláttinn með Kilo Gateway líkani í stað talaþekkingar tækisins. Upptakan er send í Kilo Gateway.",
+    "gatewayTranscriptionPrimary": "Nota sem aðalval",
+    "gatewayTranscriptionPrimarySubtitle": "Umritunin er stýrt af Gateway líkaninu, en tækið er notað ef það er ekki tiltækt.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Sameiningarbeiðni ekki tiltæk",
@@ -2568,7 +2573,16 @@
     "languageNotInstalledMessage": "Ónettengdu talgagnaskrárnar fyrir {{language}} eru ekki uppsettar á þessum síma. Hladdu þeim niður og reyndu raddinnslátt aftur.",
     "downloadOfflineModel": "Hlaða niður",
     "offlineModelDownloadScheduled": "Ónettengdu talgagnaskrárnar verða hlaðnar niður í bakgrunni. Reyndu raddinnslátt aftur síðar.",
-    "listeningStopped": "Hlustun stöðvuð."
+    "listeningStopped": "Hlustun stöðvuð.",
+    "transcribing": "Umriti…",
+    "gatewayUnreachable": "Ekki tókst að ná sambandi við Kilo Gateway. Athugaðu tenginguna og reyndu aftur.",
+    "gatewayTimeout": "Umritunin tók of langan tíma. Reyndu aftur.",
+    "gatewayModelUnavailable": "Þetta umritunarlíkan er ekki í boði. Veldu annað í Kjörstillingum.",
+    "gatewaySignInRequired": "Skráðu þig inn til að nota umritun í gegnum Kilo Gateway.",
+    "gatewayNoModel": "Veldu fyrst umritunarlíkan í Kjörstillingum.",
+    "enginesFailed": "Umritun mistókst á Kilo Gateway og á þessu tæki. Athugaðu nettenginguna þína eða breyttu umritunarstillingum í Kjörstillingum og reyndu aftur.",
+    "engineFellBackToDevice": "Umritun um Gateway er ekki tiltæk — talgreinirinn á tækinu þínu er notaður. Segðu þetta aftur.",
+    "engineFellBackToGateway": "Talgreiningin á tækinu brást — Kilo Gateway er notaður. Segðu þetta aftur."
   },
   "share": {
     "title": "Deila með Kilo",
@@ -2950,5 +2964,12 @@
     "needsInput": "Bíður eftir svari",
     "channelName": "Virkir fulltrúar",
     "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum."
+  },
+  "transcriptionModel": {
+    "title": "Umritunarlíkan",
+    "noneChosen": "Ekkert valið",
+    "emptyTitle": "Engin umritunarlíkan",
+    "emptyDescription": "Kilo Gateway býður ekki upp á umritunarlíkan um þessar mundir.",
+    "loadFailed": "Ekki tókst að sækja umritunarlíkin."
   }
 }

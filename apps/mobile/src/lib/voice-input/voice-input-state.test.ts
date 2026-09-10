@@ -4,6 +4,7 @@ import { type ExpoSpeechRecognitionErrorCode } from 'expo-speech-recognition';
 import {
   appendVoiceTranscript,
   applyVoiceRecognitionResult,
+  classifyVoiceInputEngineFallback,
   classifyVoiceInputError,
   classifyVoiceInputPermission,
   createVoiceTranscriptState,
@@ -254,6 +255,29 @@ describe('classifyVoiceInputError', () => {
       availability: 'available',
       message: 'Voice input stopped. Tap the microphone to try again.',
       retryable: true,
+    });
+  });
+});
+
+describe('classifyVoiceInputEngineFallback', () => {
+  it('names the failed gateway, the device recogniser taking over, and the ask to repeat', () => {
+    expect(classifyVoiceInputEngineFallback({ from: 'gateway', to: 'os' })).toEqual({
+      action: 'none',
+      availability: 'available',
+      message:
+        "Gateway transcription unavailable — using your device's recogniser. Please say it again.",
+      retryable: true,
+      tone: 'info',
+    });
+  });
+
+  it('names the failed device recogniser, the Kilo gateway taking over, and the ask to repeat', () => {
+    expect(classifyVoiceInputEngineFallback({ from: 'os', to: 'gateway' })).toEqual({
+      action: 'none',
+      availability: 'available',
+      message: 'Device recognition failed — using the Kilo gateway. Please say it again.',
+      retryable: true,
+      tone: 'info',
     });
   });
 });

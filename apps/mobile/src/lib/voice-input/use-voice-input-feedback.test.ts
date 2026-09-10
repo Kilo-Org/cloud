@@ -6,7 +6,11 @@ const hapticsMock = vi.hoisted(() => ({ impactAsync: vi.fn().mockResolvedValue(u
 const accessibilityMock = vi.hoisted(() => ({ announceForAccessibility: vi.fn() }));
 const alertMock = vi.hoisted(() => ({ alert: vi.fn() }));
 const linkingMock = vi.hoisted(() => ({ openSettings: vi.fn() }));
-const toastMock = vi.hoisted(() => ({ error: vi.fn() }));
+const toastMock = vi.hoisted(() => ({
+  error: vi.fn(),
+  info: vi.fn(),
+  dismiss: vi.fn(),
+}));
 
 vi.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
@@ -20,6 +24,12 @@ vi.mock('expo-speech-recognition', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: toastMock }));
 vi.mock('expo-secure-store', () => ({}));
+vi.mock('expo-router', () => ({ router: { push: vi.fn() } }));
+vi.mock('./gateway/gateway-transcription-preference', () => ({
+  isGatewayTranscriptionEnabled: () => false,
+  isGatewayTranscriptionPrimary: () => true,
+  readGatewayTranscriptionModel: () => null,
+}));
 vi.mock('react-native', () => ({
   AccessibilityInfo: accessibilityMock,
   Alert: alertMock,
@@ -64,7 +74,46 @@ describe('voice input feedback side effects', () => {
 
     expect(alertMock.alert).not.toHaveBeenCalled();
     expect(toastMock.error).toHaveBeenCalledWith(
-      'No speech detected. Tap the microphone to try again.'
+      'No speech detected. Tap the microphone to try again.',
+      { id: 'voice-input-feedback' }
+    );
+  });
+
+  it('presents an informational hand-off notice as an info toast, not an error', () => {
+    // The mid-session engine hand-off continues the session on the other
+    // engine: the error icon would tell the user something broke.
+    showFeedback({
+      action: 'none',
+      availability: 'available',
+      message: "Gateway transcription unavailable — using your device's recogniser.",
+      retryable: true,
+      tone: 'info',
+    });
+
+    expect(alertMock.alert).not.toHaveBeenCalled();
+    expect(toastMock.error).not.toHaveBeenCalled();
+    expect(toastMock.info).toHaveBeenCalledWith(
+      "Gateway transcription unavailable — using your device's recogniser.",
+      { id: 'voice-input-feedback' }
+    );
+  });
+
+  it('replaces a pending hand-off notice when a terminal failure arrives', () => {
+    // One message on the surface: the combined error reuses the voice toast
+    // id, so sonner-native swaps the "say it again" notice in place instead
+    // of animating a dismiss and an add at once (which renders as two
+    // overlapping toasts).
+    showFeedback({
+      action: 'none',
+      availability: 'available',
+      message: 'Voice transcription failed on the Kilo gateway and on this device.',
+      retryable: true,
+    });
+
+    expect(toastMock.dismiss).not.toHaveBeenCalled();
+    expect(toastMock.error).toHaveBeenCalledWith(
+      'Voice transcription failed on the Kilo gateway and on this device.',
+      { id: 'voice-input-feedback' }
     );
   });
 

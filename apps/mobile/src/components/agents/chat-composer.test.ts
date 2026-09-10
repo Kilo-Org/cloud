@@ -298,18 +298,27 @@ vi.mock('@/lib/share-prefill', () => ({
   useSharePrefill: vi.fn(),
 }));
 
-vi.mock('@/lib/voice-input/use-voice-input', () => ({
-  useVoiceInput: () => ({
-    available: false,
-    isActive: false,
-    settleBeforeSubmit: vi.fn(async () => true),
-    status: 'idle',
-    toggle: vi.fn(),
-  }),
+// The voice hook options (getDraft/onDraftChange) are captured so a test can
+// drive the transcript-into-draft path through the composer's wiring; the
+// draft module stays unmocked (pure logic) so the real splice runs.
+const voiceHookOptions = vi.hoisted(() => ({
+  current: null as {
+    getDraft: () => string;
+    onDraftChange: (draft: string) => void;
+  } | null,
 }));
 
-vi.mock('@/lib/voice-input/voice-input-draft', () => ({
-  applyVoiceDraftToInput: vi.fn(),
+vi.mock('@/lib/voice-input/use-voice-input', () => ({
+  useVoiceInput: (options: { getDraft: () => string; onDraftChange: (draft: string) => void }) => {
+    voiceHookOptions.current = options;
+    return {
+      available: false,
+      isActive: false,
+      settleBeforeSubmit: vi.fn(async () => true),
+      status: 'idle',
+      toggle: vi.fn(),
+    };
+  },
 }));
 
 vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
@@ -532,7 +541,49 @@ describe('ChatComposer draft restore', () => {
       onOptimisticSend: expect.any(Function),
     });
   });
+
+  // The gateway transcript lands after the Stop tap (the upload resolves
+  // post-stop). The remounted input row must show it: a stop-time snapshot
+  // restored the empty pre-transcript text while the live ref and the durable
+  // draft kept the transcript, so the next dictation appended to the hidden
+  // text and the draft showed the same transcript twice (spot check e12-back).
+  it('restores a transcript that lands after the Stop tap onto the remounted row', async () => {
+    const setNativeProps = vi.fn();
+    const props = makeProps({ draftKey: 'agent-composer:sess-1' });
+    const render = await mount(props);
+    // The first useRef slot is textRef; the second is the TextInput ref.
+    const inputRefSlot = refSlots.slots[1];
+    if (inputRefSlot === undefined) {
+      throw new Error('TextInput ref slot was not mounted');
+    }
+    inputRefSlot.current = { setNativeProps };
+    const voice = voiceHookOptions.current;
+    if (voice === null) {
+      throw new Error('useVoiceInput options were not captured');
+    }
+    voice.getDraft();
+    const onStop = findInputRowProps(render)?.onStop as (() => void) | undefined;
+    if (onStop === undefined) {
+      throw new Error('ChatComposerInputRow element did not carry an onStop handler');
+    }
+
+    onStop();
+    await settle();
+    voice.onDraftChange('Gateway transcription online');
+    expect(setNativeProps).toHaveBeenCalledTimes(1);
+
+    // The first re-render lets the stop-remount machine bump `inputEpoch`
+    // and lets the restore effect write the live text into the (new) row;
+    // the second re-render proves the restore is a one-shot.
+    await rerender(props);
+    await rerender(props);
+
+    expect(setNativeProps).toHaveBeenCalledTimes(2);
+    const restoreCall = setNativeProps.mock.calls[1]?.[0] as { text?: string };
+    expect(restoreCall.text).toBe('Gateway transcription online');
+  });
 });
+
 describe('ChatComposer return-sends wiring', () => {
   it('wires the return-sends preference and an insert-newline handler to the input row', async () => {
     returnSendsPref.returnSendsMessage = true;

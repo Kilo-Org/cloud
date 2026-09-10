@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Puheentunnistus Kilo Gatewayn kautta",
+    "gatewayTranscriptionSubtitle": "Muodosta äänisyötteestä teksti Kilo Gateway -mallilla laitteen puheentunnistuksen sijaan. Äänitteesi lähetetään Kilo Gatewayhin.",
+    "gatewayTranscriptionPrimary": "Käytä ensisijaisena",
+    "gatewayTranscriptionPrimarySubtitle": "Puheentunnistus tehdään ensisijaisesti Gateway-mallilla ja laitteen avulla, kun malli ei ole käytettävissä.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Muutospyyntö ei ole käytettävissä",
@@ -2568,7 +2573,16 @@
     "languageNotInstalledMessage": "Kielen {{language}} offline-puhetiedostoja ei ole asennettu tähän puhelimeen. Lataa ne ja kokeile puheentunnistusta uudelleen.",
     "downloadOfflineModel": "Lataa",
     "offlineModelDownloadScheduled": "Offline-puhetiedostot ladataan taustalla. Kokeile puheentunnistusta myöhemmin uudelleen.",
-    "listeningStopped": "Kuuntelu lopetettiin."
+    "listeningStopped": "Kuuntelu lopetettiin.",
+    "transcribing": "Muunnetaan tekstiksi…",
+    "gatewayUnreachable": "Kilo Gatewayhin ei saatu yhteyttä. Tarkista yhteys ja yritä uudelleen.",
+    "gatewayTimeout": "Puheentunnistus kesti liian kauan. Yritä uudelleen.",
+    "gatewayModelUnavailable": "Tätä puheentunnistusmallia ei ole käytettävissä. Valitse toinen Asetuksissa.",
+    "gatewaySignInRequired": "Kirjaudu sisään käyttääksesi Kilo Gatewayn puheentunnistusta.",
+    "gatewayNoModel": "Valitse ensin puheentunnistusmalli Asetuksissa.",
+    "enginesFailed": "Puheentunnistus epäonnistui sekä Kilo Gatewayssä että tällä laitteella. Tarkista yhteys tai muuta puheentunnistuksen asetuksia Asetuksissa ja yritä uudelleen.",
+    "engineFellBackToDevice": "Puheentunnistus Gatewayn kautta ei ole käytettävissä — käytetään laitteesi tunnistinta. Sano se uudelleen, kiitos.",
+    "engineFellBackToGateway": "Laitteen tunnistus epäonnistui — käytetään Kilo Gatewaytä. Sano se uudelleen, kiitos."
   },
   "share": {
     "title": "Jaa Kiloon",
@@ -2950,5 +2964,12 @@
     "needsInput": "Odottaa vastausta",
     "channelName": "Aktiiviset agentit",
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä."
+  },
+  "transcriptionModel": {
+    "title": "Puheentunnistusmalli",
+    "noneChosen": "Ei valintaa",
+    "emptyTitle": "Ei puheentunnistusmalleja",
+    "emptyDescription": "Kilo Gateway ei juuri nyt tarjoa puheentunnistusmalleja.",
+    "loadFailed": "Puheentunnistusmallien lataaminen epäonnistui."
   }
 }

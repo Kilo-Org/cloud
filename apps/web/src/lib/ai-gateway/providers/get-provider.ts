@@ -35,6 +35,7 @@ import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import {
   getLocalFakeLlmProvider,
+  getLocalFakeTranscriptionProvider,
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
 } from '@/lib/ai-gateway/local-fake-llm';
@@ -350,5 +351,11 @@ export async function getTranscriptionProvider(): Promise<{
   provider: Provider;
   userByok: BYOKResult[] | null;
 }> {
+  if (isLocalFakeLlmEnabled()) {
+    const localFakeProvider = getLocalFakeTranscriptionProvider();
+    if (localFakeProvider) {
+      return { provider: localFakeProvider, userByok: null };
+    }
+  }
   return { provider: OPENROUTER, userByok: null };
 }

@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway-এ কথা থেকে লেখা",
+    "gatewayTranscriptionSubtitle": "ডিভাইসের স্পিচ রিকগনিশনের বদলে Kilo Gateway মডেল ব্যবহার করে ভয়েস ইনপুট থেকে লেখা তৈরি করুন। আপনার রেকর্ডিং Kilo Gateway-এ পাঠানো হবে।",
+    "gatewayTranscriptionPrimary": "প্রধান হিসেবে ব্যবহার করুন",
+    "gatewayTranscriptionPrimarySubtitle": "Gateway মডেল দিয়ে কথা থেকে লেখা শুরু হবে, মডেলটি পাওয়া না গেলে ডিভাইসে ফিরে যাবে।",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট পাওয়া যাচ্ছে না",
@@ -2568,7 +2573,16 @@
     "languageNotInstalledMessage": "{{language}}-এর অফলাইন স্পিচ ফাইলগুলি এই ফোনে ইনস্টল করা নেই। সেগুলি ডাউনলোড করুন, তারপর আবার ভয়েস ইনপুট ব্যবহার করুন।",
     "downloadOfflineModel": "ডাউনলোড",
     "offlineModelDownloadScheduled": "অফলাইন স্পিচ ফাইলগুলি ব্যাকগ্রাউন্ডে ডাউনলোড হবে। পরে আবার ভয়েস ইনপুট চেষ্টা করুন।",
-    "listeningStopped": "শোনা বন্ধ হয়েছে।"
+    "listeningStopped": "শোনা বন্ধ হয়েছে।",
+    "transcribing": "কথা থেকে লেখা হচ্ছে...",
+    "gatewayUnreachable": "Kilo Gateway-এর সঙ্গে যোগাযোগ করা যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
+    "gatewayTimeout": "কথা থেকে লেখতে অনেক সময় লেগেছে। আবার চেষ্টা করুন।",
+    "gatewayModelUnavailable": "কথা থেকে লেখার এই মডেলটি পাওয়া যাচ্ছে না। পছন্দের সেটিংস থেকে আরেকটি বেছে নিন।",
+    "gatewaySignInRequired": "Kilo Gateway দিয়ে কথা থেকে লেখা ব্যবহার করতে সাইন ইন করুন।",
+    "gatewayNoModel": "প্রথমে পছন্দের সেটিংস থেকে কথা থেকে লেখার একটি মডেল বেছে নিন।",
+    "enginesFailed": "Kilo Gateway-এ এবং এই ডিভাইসে কথা থেকে লেখার কাজ ব্যর্থ হয়েছে। আপনার সংযোগ পরীক্ষা করুন, অথবা পছন্দের সেটিংস থেকে কথা থেকে লেখার সেটিংস বদলান, তারপর আবার চেষ্টা করুন।",
+    "engineFellBackToDevice": "Gateway-এর মাধ্যমে কথা থেকে লেখা পাওয়া যাচ্ছে না — আপনার ডিভাইসের শনাক্তকারী ব্যবহার করা হচ্ছে। অনুগ্রহ করে আবার বলুন।",
+    "engineFellBackToGateway": "ডিভাইসের শনাক্তকরণ ব্যর্থ হয়েছে — Kilo Gateway ব্যবহার করা হচ্ছে। অনুগ্রহ করে আবার বলুন।"
   },
   "share": {
     "title": "Kilo-তে শেয়ার",
@@ -2950,5 +2964,12 @@
     "needsInput": "ইনপুট প্রয়োজন",
     "channelName": "সক্রিয় এজেন্ট",
     "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।"
+  },
+  "transcriptionModel": {
+    "title": "কথা থেকে লেখার মডেল",
+    "noneChosen": "কোনোটিই নির্বাচন করা হয়নি",
+    "emptyTitle": "কথা থেকে লেখার কোনো মডেল নেই",
+    "emptyDescription": "Kilo Gateway এই মুহূর্তে কথা থেকে লেখার কোনো মডেল দিচ্ছে না।",
+    "loadFailed": "কথা থেকে লেখার মডেল লোড করা যায়নি।"
   }
 }

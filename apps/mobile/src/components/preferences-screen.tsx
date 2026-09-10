@@ -3,14 +3,15 @@ import {
   Bell,
   Brain,
   CornerDownLeft,
+  Cpu,
+  Gauge,
   Globe,
-  type LucideIcon,
   MessageSquare,
+  Mic,
   Shield,
   Smartphone,
 } from '@/components/ui/icons';
-import { Switch, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppUnlockFeedback } from '@/components/app-unlock-screen';
@@ -18,6 +19,7 @@ import { FeatureFlagsSection } from '@/components/feature-flags-section';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { PreferenceRow } from '@/components/ui/preference-row';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { useAppUnlock } from '@/lib/app-unlock-context';
@@ -29,64 +31,18 @@ import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-pr
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
 import { useTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
-import { cn } from '@/lib/utils';
 import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
+import {
+  useGatewayTranscriptionModel,
+  useGatewayTranscriptionPreference,
+  useGatewayTranscriptionPrimaryPreference,
+} from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import {
   setThemePreference,
   type ThemePreference,
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
-
-type PreferenceRowProps = Readonly<{
-  icon: LucideIcon;
-  title: string;
-  subtitle: string;
-  value: boolean;
-  disabled: boolean;
-  busy?: boolean;
-  onValueChange: (next: boolean) => void;
-}>;
-
-/** Switch row shaped like the Notifications category row. */
-function PreferenceRow({
-  icon: Icon,
-  title,
-  subtitle,
-  value,
-  disabled,
-  busy = false,
-  onValueChange,
-}: PreferenceRowProps) {
-  const colors = useThemeColors();
-  return (
-    <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      {busy ? (
-        <ActivityIndicator size="small" color={colors.mutedForeground} />
-      ) : (
-        <Icon size={18} color={colors.secondaryForeground} />
-      )}
-      <View className="flex-1">
-        {/* Disabled cue is the muted title, not row opacity — see the same
-            pattern in notifications-screen's CategoryRow. */}
-        <Text className={cn('text-sm font-medium', disabled && 'text-muted-foreground')}>
-          {title}
-        </Text>
-        <Text variant="muted" className="mt-0.5 text-xs">
-          {subtitle}
-        </Text>
-      </View>
-      <Switch
-        value={value}
-        disabled={disabled}
-        accessibilityLabel={title}
-        accessibilityState={{ disabled, busy }}
-        onValueChange={onValueChange}
-      />
-    </View>
-  );
-}
 
 export function PreferencesScreen() {
   const router = useRouter();
@@ -110,6 +66,17 @@ export function PreferencesScreen() {
   } = usePrReviewFooterPreference();
   const { returnSendsMessage, hasLoaded, setReturnSendsMessage } =
     useReturnSendsMessagePreference();
+  const {
+    gatewayTranscriptionEnabled,
+    hasLoaded: gatewayTranscriptionLoaded,
+    setGatewayTranscriptionEnabled,
+  } = useGatewayTranscriptionPreference();
+  const {
+    gatewayTranscriptionPrimary,
+    hasLoaded: gatewayTranscriptionPrimaryLoaded,
+    setGatewayTranscriptionPrimary,
+  } = useGatewayTranscriptionPrimaryPreference();
+  const storedTranscriptionModel = useGatewayTranscriptionModel();
   const { t } = useTranslation();
   const { userId } = useCurrentUserId();
   const { preference: languagePreference } = useLanguagePreference();
@@ -171,6 +138,44 @@ export function PreferencesScreen() {
           value={returnSendsMessage}
           disabled={!hasLoaded}
           onValueChange={setReturnSendsMessage}
+        />
+        <PreferenceRow
+          icon={Mic}
+          title={t('preferences.gatewayTranscription')}
+          subtitle={t('preferences.gatewayTranscriptionSubtitle')}
+          value={gatewayTranscriptionEnabled}
+          disabled={!gatewayTranscriptionLoaded}
+          onValueChange={setGatewayTranscriptionEnabled}
+        />
+        {/* The mode only matters while the gateway is on, so the row is hidden
+            — not just disabled — when the switch is off. */}
+        {gatewayTranscriptionEnabled ? (
+          <PreferenceRow
+            icon={Gauge}
+            title={t('preferences.gatewayTranscriptionPrimary')}
+            subtitle={t('preferences.gatewayTranscriptionPrimarySubtitle')}
+            value={gatewayTranscriptionPrimary}
+            disabled={!gatewayTranscriptionPrimaryLoaded}
+            onValueChange={setGatewayTranscriptionPrimary}
+          />
+        ) : null}
+        {/* Model choice only matters while gateway transcription is on, so the
+            row stays disabled — and its chevron hidden — when the switch is
+            off. The caption follows the same rule: with the switch off no
+            gateway model applies, so the row shows the empty caption even
+            when a model is still stored for when the switch turns on. */}
+        <ConfigureRow
+          icon={Cpu}
+          title={t('preferences.transcriptionModel')}
+          subtitle={
+            (gatewayTranscriptionEnabled ? storedTranscriptionModel?.name : null) ??
+            t('transcriptionModel.noneChosen')
+          }
+          className="rounded-lg bg-secondary px-3"
+          disabled={!gatewayTranscriptionEnabled}
+          onPress={() => {
+            router.push('/(app)/transcription-model-picker' as Href);
+          }}
         />
 
         {/* Appearance */}

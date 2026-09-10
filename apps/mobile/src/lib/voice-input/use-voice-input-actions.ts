@@ -1,5 +1,6 @@
 import { AccessibilityInfo, Alert, Linking, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import { toast } from 'sonner-native';
 
@@ -19,7 +20,9 @@ import {
   resolveVoiceInputStartLanguageTag,
   voiceInputLanguageDisplayName,
 } from './voice-input-language';
+import { resolveVoiceInputEngineMode } from './voice-input-engine-mode';
 import {
+  classifyVoiceInputError,
   shouldAbortVoiceInput,
   type VoiceInputFeedback,
   type VoiceInputLifecycleInput,
@@ -28,6 +31,11 @@ import {
 import { resolveVoiceInputRecognitionMode } from './voice-input-recognition-mode';
 import { readVoiceNetworkConsent, writeVoiceNetworkConsent } from './voice-network-consent';
 import { resolveOwnerVoiceInputView } from './voice-input-view-state';
+import {
+  isGatewayTranscriptionEnabled,
+  isGatewayTranscriptionPrimary,
+  readGatewayTranscriptionModel,
+} from './gateway/gateway-transcription-preference';
 
 type VoiceInputControllerLike = {
   abort: (owner?: string) => Promise<boolean>;
@@ -75,16 +83,52 @@ export function runVoiceInputListeningFeedback(
   }
 }
 
+/**
+ * One stable toast id for every voice-input message. sonner-native updates a
+ * visible toast in place when a new toast carries the same id, so a hand-off
+ * notice followed by an error — or two errors in a row — never renders as two
+ * stacked toasts whose copy overlaps. A dismiss-then-add pair would animate
+ * both at once (the outgoing toast still on screen as the new one lands),
+ * which is why the replacement rides the id, not a dismiss. On a device where
+ * the fallback recogniser starts and then dies immediately (the iOS simulator
+ * has no speech-recognition audio input), the user reads exactly one message:
+ * the latest one.
+ */
+const VOICE_INPUT_TOAST_ID = 'voice-input-feedback';
+
 export function showFeedback(feedback: VoiceInputFeedback): void {
   const presentation = resolveVoiceInputFeedbackPresentation(feedback);
   if (presentation.kind === 'alert') {
+    // The alert is the message now; clear the toast channel with it.
+    toast.dismiss(VOICE_INPUT_TOAST_ID);
+    if (presentation.destination === 'transcription-model-picker') {
+      Alert.alert(presentation.title, presentation.message, [
+        { text: i18n.t('common.cancel'), style: 'cancel' },
+        {
+          text: i18n.t('transcriptionModel.title'),
+          onPress: () => {
+            router.push('/(app)/transcription-model-picker');
+          },
+        },
+      ]);
+      return;
+    }
     Alert.alert(presentation.title, presentation.message, [
       { text: i18n.t('common.cancel'), style: 'cancel' },
       { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
     ]);
     return;
   }
-  toast.error(presentation.message);
+  if (presentation.tone === 'info') {
+    // The mid-session engine hand-off: the session continues on the other
+    // engine, so it renders without the error icon the failure toasts carry.
+    toast.info(presentation.message, { id: VOICE_INPUT_TOAST_ID });
+    return;
+  }
+  // A terminal failure replaces any hand-off notice still on screen in one
+  // commit: the session ended, so the "say it again" ask is spent, and two
+  // messages would read as two separate problems.
+  toast.error(presentation.message, { id: VOICE_INPUT_TOAST_ID });
 }
 
 export function shouldAbortVoiceInputForOwner(
@@ -118,6 +162,12 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     const snapshot = controller.getSnapshot();
     const view = resolveOwnerVoiceInputView(snapshot, owner);
 
+    if (view.isActive && snapshot.status === 'transcribing') {
+      // The upload can hang; the tap cancels it instead of starting a new one.
+      await controller.abort(owner);
+      return;
+    }
+
     if (view.isActive && snapshot.status === 'listening') {
       void fireHaptic(Haptics.ImpactFeedbackStyle.Medium);
       await controller.stop(owner);
@@ -128,18 +178,7 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
       return;
     }
 
-    const supportsOnDeviceByService = controller.supportsOnDevice();
-    const userId = getUserId();
-    const consent = userId ? await readVoiceNetworkConsent(userId) : 'unset';
     const languageTag = await resolveVoiceInputStartLanguageTag(i18n.language);
-    // The service-level check alone is not enough: on-device recognition also
-    // needs the offline model for the resolved language. `requiresOnDeviceRecognition`
-    // without it fails on every attempt (`language-not-supported`) — that is
-    // the German-locale bug — so the mode gate refines the service check with
-    // the per-language installation state.
-    const supportsOnDevice =
-      supportsOnDeviceByService && (await isVoiceInputLanguageInstalledOnDevice(languageTag));
-    const mode = resolveVoiceInputRecognitionMode(supportsOnDevice, consent);
 
     const startWith = async (requiresOnDeviceRecognition: boolean): Promise<void> => {
       const startOptions: VoiceInputStartOptions = {
@@ -152,6 +191,40 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
       };
       await controller.start(startOptions);
     };
+
+    if (
+      resolveVoiceInputEngineMode(
+        isGatewayTranscriptionEnabled(),
+        isGatewayTranscriptionPrimary()
+      ) === 'gateway-primary'
+    ) {
+      // Gateway leads: no OS recognizer consent is needed for the gateway
+      // itself (the switch is the consent), and the engine dispatcher falls
+      // back to the device recogniser if the gateway attempt fails. A chosen
+      // model is a precondition for starting; without one the user is sent
+      // to the picker instead of into a session that can only fail.
+      if (readGatewayTranscriptionModel() === null) {
+        showFeedback(classifyVoiceInputError('gateway-no-model'));
+        return;
+      }
+      await startWith(false);
+      return;
+    }
+
+    // Device-only (gateway switch off) and device-primary (gateway is only
+    // the fallback) both start on the OS recogniser, so the consent flow
+    // below decides the recognition mode either way.
+    const supportsOnDeviceByService = controller.supportsOnDevice();
+    const userId = getUserId();
+    const consent = userId ? await readVoiceNetworkConsent(userId) : 'unset';
+    // The service-level check alone is not enough: on-device recognition also
+    // needs the offline model for the resolved language. `requiresOnDeviceRecognition`
+    // without it fails on every attempt (`language-not-supported`) — that is
+    // the German-locale bug — so the mode gate refines the service check with
+    // the per-language installation state.
+    const supportsOnDevice =
+      supportsOnDeviceByService && (await isVoiceInputLanguageInstalledOnDevice(languageTag));
+    const mode = resolveVoiceInputRecognitionMode(supportsOnDevice, consent);
 
     if (mode === 'on-device') {
       await startWith(true);

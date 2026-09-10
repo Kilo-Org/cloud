@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "การถอดเสียงผ่าน Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "ถอดเสียงจากการพิมพ์ด้วยเสียงด้วยโมเดลของ Kilo Gateway แทนการรู้จำเสียงของอุปกรณ์ ระบบจะส่งการบันทึกเสียงของคุณไปยัง Kilo Gateway",
+    "gatewayTranscriptionPrimary": "ใช้เป็นหลัก",
+    "gatewayTranscriptionPrimarySubtitle": "การถอดเสียงจะเริ่มด้วยโมเดลของ Gateway ก่อน และใช้อุปกรณ์เมื่อโมเดลใช้ไม่ได้",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "เปิด PR ไม่ได้",
@@ -2568,7 +2573,16 @@
     "languageNotInstalledMessage": "ไฟล์เสียงพูดออฟไลน์สำหรับ{{language}}ยังไม่ได้ติดตั้งในโทรศัพท์เครื่องนี้ ดาวน์โหลดไฟล์ก่อน แล้วลองใช้การพิมพ์ด้วยเสียงอีกครั้ง",
     "downloadOfflineModel": "ดาวน์โหลด",
     "offlineModelDownloadScheduled": "ไฟล์เสียงพูดออฟไลน์จะดาวน์โหลดในเบื้องหลัง ลองใช้การพิมพ์ด้วยเสียงอีกครั้งในภายหลัง",
-    "listeningStopped": "หยุดฟังแล้ว"
+    "listeningStopped": "หยุดฟังแล้ว",
+    "transcribing": "กำลังถอดเสียง...",
+    "gatewayUnreachable": "ไม่สามารถเชื่อมต่อ Kilo Gateway ได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
+    "gatewayTimeout": "การถอดเสียงใช้เวลานานเกินไป ลองอีกครั้ง",
+    "gatewayModelUnavailable": "โมเดลถอดเสียงนี้ไม่พร้อมใช้งาน เลือกโมเดลอื่นในการตั้งค่า",
+    "gatewaySignInRequired": "เข้าสู่ระบบเพื่อใช้การถอดเสียงผ่าน Kilo Gateway",
+    "gatewayNoModel": "เลือกโมเดลถอดเสียงในการตั้งค่าก่อน",
+    "enginesFailed": "การถอดเสียงล้มเหลวทั้งบน Kilo Gateway และบนอุปกรณ์นี้ ตรวจสอบการเชื่อมต่อ หรือเปลี่ยนการตั้งค่าการถอดเสียงในการตั้งค่า แล้วลองอีกครั้ง",
+    "engineFellBackToDevice": "การถอดเสียงผ่าน Gateway ใช้งานไม่ได้ — กำลังใช้การจดจำเสียงบนอุปกรณ์ของคุณ โปรดพูดอีกครั้ง",
+    "engineFellBackToGateway": "การจดจำเสียงบนอุปกรณ์ล้มเหลว — กำลังใช้ Kilo Gateway โปรดพูดอีกครั้ง"
   },
   "share": {
     "title": "แชร์ไปยัง Kilo",
@@ -2950,5 +2964,12 @@
     "needsInput": "รอข้อมูลจากคุณ",
     "channelName": "เอเจนต์ที่กำลังทำงาน",
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก"
+  },
+  "transcriptionModel": {
+    "title": "โมเดลถอดเสียง",
+    "noneChosen": "ยังไม่ได้เลือก",
+    "emptyTitle": "ไม่มีโมเดลถอดเสียง",
+    "emptyDescription": "ขณะนี้ Kilo Gateway ไม่มีโมเดลถอดเสียงให้บริการ",
+    "loadFailed": "ไม่สามารถโหลดโมเดลถอดเสียงได้"
   }
 }

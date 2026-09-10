@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Nutqni Kilo Gateway orqali matnga aylantirish",
+    "gatewayTranscriptionSubtitle": "Qurilmaning nutqni tanishining o'rniga Kilo Gateway modeli yordamida ovozli kiritishni matnga aylantiring. Yozuvingiz Kilo Gatewayga yuboriladi.",
+    "gatewayTranscriptionPrimary": "Asosiy sifatida ishlatish",
+    "gatewayTranscriptionPrimarySubtitle": "Matnga aylantirishni avval Gateway modeli bajaradi, mavjud bo'lmaganda qurilma ishlatiladi.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "PR mavjud emas",
@@ -2568,7 +2573,16 @@
     "languageNotInstalledMessage": "{{language}} tilining oflayn nutq fayllari bu telefonda o'rnatilmagan. Ularni yuklab oling, so'ngra ovozli kiritishni qayta sinab ko'ring.",
     "downloadOfflineModel": "Yuklab olish",
     "offlineModelDownloadScheduled": "Oflayn nutq fayllari fonda yuklab olinadi. Ovozli kiritishni keyinroq qayta sinab ko'ring.",
-    "listeningStopped": "Tinglash to'xtatildi."
+    "listeningStopped": "Tinglash to'xtatildi.",
+    "transcribing": "Matnga aylantirilmoqda...",
+    "gatewayUnreachable": "Kilo Gatewayga ulanib bo'lmadi. Ulanishni tekshiring va qayta urinib ko'ring.",
+    "gatewayTimeout": "Matnga aylantirish juda uzoq davom etdi. Qayta urinib ko'ring.",
+    "gatewayModelUnavailable": "Ushbu matnga aylantirish modeli mavjud emas. Shaxsiy sozlamalardan boshqasini tanlang.",
+    "gatewaySignInRequired": "Kilo Gateway orqali aylantirishdan foydalanish uchun tizimga kiring.",
+    "gatewayNoModel": "Avval Shaxsiy sozlamalardan matnga aylantirish modelini tanlang.",
+    "enginesFailed": "Ovozni matnga aylantirish ham Kilo Gateway'da, ham bu qurilmada muvaffaqiyatsiz bo'ldi. Ulanishingizni tekshiring yoki Shaxsiy sozlamalardan aylantirish sozlamalarini o'zgartirib, qayta urinib ko'ring.",
+    "engineFellBackToDevice": "Gateway orqali matnga aylantirish mavjud emas — qurilmangizdagi aniqlagich ishlatilmoqda. Iltimos, yana ayting.",
+    "engineFellBackToGateway": "Qurilmadagi aniqlash muvaffaqiyatsiz bo'ldi — Kilo Gateway ishlatilmoqda. Iltimos, yana ayting."
   },
   "share": {
     "title": "Kiloga yuborish",
@@ -2950,5 +2964,12 @@
     "needsInput": "Javob kutilmoqda",
     "channelName": "Faol agentlar",
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing."
+  },
+  "transcriptionModel": {
+    "title": "Matnga aylantirish modeli",
+    "noneChosen": "Hech narsa tanlanmagan",
+    "emptyTitle": "Matnga aylantirish modellari yo'q",
+    "emptyDescription": "Kilo Gateway hozircha matnga aylantirish modellarini taklif qilmayapti.",
+    "loadFailed": "Matnga aylantirish modellarini yuklab bo'lmadi."
   }
 }

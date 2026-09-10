@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Распознавание речи через Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Распознавайте голосовой ввод с помощью модели Kilo Gateway вместо распознавания речи на устройстве. Запись отправляется в Kilo Gateway.",
+    "gatewayTranscriptionPrimary": "Использовать как основной",
+    "gatewayTranscriptionPrimarySubtitle": "Распознавание речи сначала выполняет модель Gateway, а при её недоступности — устройство.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Эфир активности",
@@ -2162,7 +2167,16 @@
     "languageNotInstalledMessage": "Офлайн-файлы распознавания речи для {{language}} не установлены на этом телефоне. Скачайте их, а затем снова попробуйте голосовой ввод.",
     "downloadOfflineModel": "Скачать",
     "offlineModelDownloadScheduled": "Офлайн-файлы распознавания речи будут скачаны в фоновом режиме. Попробуйте голосовой ввод позже.",
-    "listeningStopped": "Запись речи остановлена."
+    "listeningStopped": "Запись речи остановлена.",
+    "transcribing": "Распознавание…",
+    "gatewayUnreachable": "Не удалось связаться с Kilo Gateway. Проверьте подключение и попробуйте снова.",
+    "gatewayTimeout": "Распознавание заняло слишком много времени. Попробуйте снова.",
+    "gatewayModelUnavailable": "Эта модель распознавания речи недоступна. Выберите другую в настройках.",
+    "gatewaySignInRequired": "Войдите, чтобы использовать распознавание речи через Kilo Gateway.",
+    "gatewayNoModel": "Сначала выберите модель распознавания речи в настройках.",
+    "enginesFailed": "Распознавание речи не удалось ни через Kilo Gateway, ни на этом устройстве. Проверьте подключение или измените параметры распознавания речи в настройках, затем попробуйте снова.",
+    "engineFellBackToDevice": "Распознавание через Gateway недоступно — используется распознаватель на вашем устройстве. Повторите, пожалуйста.",
+    "engineFellBackToGateway": "Распознавание на устройстве не удалось — используется Kilo Gateway. Повторите, пожалуйста."
   },
   "share": {
     "title": "Отправка в Kilo",
@@ -2994,5 +3008,12 @@
     "needsInput": "Ожидание ввода",
     "channelName": "Активные агенты",
     "activityKitDisabledBody": "Включите «Эфир активности» в настройках, чтобы видеть активных агентов на экране блокировки."
+  },
+  "transcriptionModel": {
+    "title": "Модель распознавания речи",
+    "noneChosen": "Не выбрано",
+    "emptyTitle": "Нет моделей распознавания речи",
+    "emptyDescription": "Сейчас Kilo Gateway не предлагает моделей распознавания речи.",
+    "loadFailed": "Не удалось загрузить модели распознавания речи."
   }
 }

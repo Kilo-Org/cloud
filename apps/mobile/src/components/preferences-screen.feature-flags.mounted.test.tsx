@@ -60,9 +60,11 @@ vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   Brain: 'Brain',
   CornerDownLeft: 'CornerDownLeft',
+  Cpu: 'Cpu',
   Gauge: 'Gauge',
   Globe: 'Globe',
   MessageSquare: 'MessageSquare',
+  Mic: 'Mic',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
 }));
@@ -111,6 +113,22 @@ vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
 vi.mock('@/lib/hooks/use-theme-preference', () => ({
   setThemePreference: vi.fn(),
   useThemePreference: () => ({ preference: 'system' }),
+}));
+// The gateway preference store loads Sentry at module scope; the real RN CJS
+// it transitively requires cannot resolve under vitest (see
+// preferences-screen.mounted.test.tsx for the same mock).
+vi.mock('@/lib/voice-input/gateway/gateway-transcription-preference', () => ({
+  useGatewayTranscriptionPreference: () => ({
+    gatewayTranscriptionEnabled: false,
+    hasLoaded: true,
+    setGatewayTranscriptionEnabled: vi.fn(),
+  }),
+  useGatewayTranscriptionModel: () => null,
+  useGatewayTranscriptionPrimaryPreference: () => ({
+    gatewayTranscriptionPrimary: true,
+    hasLoaded: true,
+    setGatewayTranscriptionPrimary: vi.fn(),
+  }),
 }));
 vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
   useReturnSendsMessagePreference: () => ({

@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kõnetuvastus Kilo Gateway kaudu",
+    "gatewayTranscriptionSubtitle": "Kasuta häälsisestuse tekstiks teisendamiseks seadme kõnetuvastuse asemel Kilo Gateway mudelit. Sinu salvestus saadetakse Kilo Gateway'sse.",
+    "gatewayTranscriptionPrimary": "Kasuta peamisena",
+    "gatewayTranscriptionPrimarySubtitle": "Kõnetuvastust juhib Gateway mudel; kui see pole saadaval, kasutatakse seadet.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Tõmbetaotlus pole saadaval",
@@ -2568,7 +2573,16 @@
     "languageNotInstalledMessage": "Keele {{language}} võrguühenduseta kõnefailid pole selles telefonis installitud. Laadi need alla ja proovi häälsisestust uuesti.",
     "downloadOfflineModel": "Laadi alla",
     "offlineModelDownloadScheduled": "Võrguühenduseta kõnefailid laaditakse taustal alla. Proovi häälsisestust hiljem uuesti.",
-    "listeningStopped": "Kuulamine peatus."
+    "listeningStopped": "Kuulamine peatus.",
+    "transcribing": "Kõnetuvastus...",
+    "gatewayUnreachable": "Ühendust Kilo Gatewayga ei õnnestunud saada. Kontrolli ühendust ja proovi uuesti.",
+    "gatewayTimeout": "Kõnetuvastus võttis liiga palju aega. Proovi uuesti.",
+    "gatewayModelUnavailable": "Seda kõnetuvastuse mudelit pole saadaval. Vali Eelistustes mõni teine.",
+    "gatewaySignInRequired": "Logi sisse, et kasutada Kilo Gateway kõnetuvastust.",
+    "gatewayNoModel": "Vali kõigepealt Eelistustes kõnetuvastuse mudel.",
+    "enginesFailed": "Kõnetuvastus ebaõnnestus nii Kilo Gateway'is kui ka selles seadmes. Kontrolli ühendust või muuda Eelistustes kõnetuvastuse seadeid ja proovi uuesti.",
+    "engineFellBackToDevice": "Kõnetuvastus Gateway' kaudu pole saadaval — kasutatakse sinu seadme tuvastajat. Ütle palun uuesti.",
+    "engineFellBackToGateway": "Seadme tuvastus ebaõnnestus — kasutatakse Kilo Gateway't. Ütle palun uuesti."
   },
   "share": {
     "title": "Kilosse jagamine",
@@ -2950,5 +2964,12 @@
     "needsInput": "Vajab sisendit",
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente."
+  },
+  "transcriptionModel": {
+    "title": "Kõnetuvastuse mudel",
+    "noneChosen": "Pole valitud",
+    "emptyTitle": "Kõnetuvastuse mudelid puuduvad",
+    "emptyDescription": "Kilo Gateway ei paku praegu ühtegi kõnetuvastuse mudelit.",
+    "loadFailed": "Kõnetuvastuse mudeleid ei õnnestunud laadida."
   }
 }

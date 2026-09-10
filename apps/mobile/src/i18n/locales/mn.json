@@ -247,7 +247,12 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway-р яриаг бичвэр болгох",
+    "gatewayTranscriptionSubtitle": "Төхөөрөмжийн яриа танихын оронд Kilo Gateway загвар ашиглан дуугаар оруулж буй зүйлээ бичвэр болгоно уу. Таны бичлэг Kilo Gateway руу илгээгдэнэ.",
+    "gatewayTranscriptionPrimary": "Үндсэн болгон ашиглах",
+    "gatewayTranscriptionPrimarySubtitle": "Яриаг бичвэр болгох ажлыг Gateway загвар эхэлж хийж, боломжгүй үед төхөөрөмж ашиглана.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Нэгтгэх хүсэлтийг нээх боломжгүй",
@@ -2568,7 +2573,16 @@
     "languageNotInstalledMessage": "{{language}} хэлний офлайн ярианы файлууд энэ утсанд суулгагдаагүй байна. Файлуудыг татаж аваад, дуугаар оруулахыг дахин турна уу.",
     "downloadOfflineModel": "Татах",
     "offlineModelDownloadScheduled": "Офлайн ярианы файлууд дэвсгэрт татагдана. Дуугаар оруулахыг дараа дахин турна уу.",
-    "listeningStopped": "Сонсох ажиллагаа зогссон."
+    "listeningStopped": "Сонсох ажиллагаа зогссон.",
+    "transcribing": "Бичвэр болгож байна...",
+    "gatewayUnreachable": "Kilo Gateway-д холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
+    "gatewayTimeout": "Яриаг бичвэр болгох хэт удаан үргэлжиллээ. Дахин оролдоно уу.",
+    "gatewayModelUnavailable": "Энэ яриаг бичвэр болгох загвар боломжгүй. Тохиргооноос өөр загвар сонгоно уу.",
+    "gatewaySignInRequired": "Kilo Gateway-р бичвэр болгохыг ашиглахын тулд нэвтэрнэ үү.",
+    "gatewayNoModel": "Эхлээд Тохиргооноос яриаг бичвэр болгох загвар сонгоно уу.",
+    "enginesFailed": "Яриаг бичвэр болгох ажил Kilo Gateway болон энэ төхөөрөмж дээр амжилтгүй боллоо. Холболтоо шалгах эсвэл Тохиргооноос бичвэр болгох тохиргоог өөрчилж, дахин оролдоно уу.",
+    "engineFellBackToDevice": "Gateway-ээр яриаг бичвэр болгох боломжгүй — таны төхөөрөмжийн таньдагч ашиглаж байна. Дахин хэлээрэй.",
+    "engineFellBackToGateway": "Төхөөрөмжийн танилт амжилтгүй боллоо — Kilo Gateway ашиглаж байна. Дахин хэлээрэй."
   },
   "share": {
     "title": "Kilo руу хуваалцах",
@@ -2950,5 +2964,12 @@
     "needsInput": "Хариу хүлээж байна",
     "channelName": "Идэвхтэй агентууд",
     "activityKitDisabledBody": "Түгжээтэй дэлгэц дээр идэвхтэй агентуудыг харахын тулд тохиргооноос шууд үйл ажиллагааг идэвхжүүлнэ үү."
+  },
+  "transcriptionModel": {
+    "title": "Яриаг бичвэр болгох загвар",
+    "noneChosen": "Сонгоогүй",
+    "emptyTitle": "Яриаг бичвэр болгох загвар байхгүй",
+    "emptyDescription": "Kilo Gateway одоогоор яриаг бичвэр болгох загвар санал болгохгүй байна.",
+    "loadFailed": "Яриаг бичвэр болгох загваруудыг ачаалж чадсангүй."
   }
 }

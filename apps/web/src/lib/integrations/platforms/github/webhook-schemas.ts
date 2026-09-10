@@ -183,6 +183,11 @@ export const PullRequestPayloadSchema = z.object({
     id: z.number(),
   }),
   sender: GitHubSenderSchema.optional(),
+  // Present only on `labeled`/`unlabeled` actions: the single label that was just added/removed.
+  // Used to scope the manual PR-review trigger (see `hasManualReviewTriggerLabel` in the
+  // pull-request webhook handler) to the `labeled` events that actually add the trigger label,
+  // rather than reacting to every unrelated label change.
+  label: z.object({ name: z.string() }).optional(),
 });
 
 // issues webhook payload

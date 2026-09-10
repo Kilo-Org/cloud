@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { createCallerFactory } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import type { PlatformIntegration, User } from '@kilocode/db/schema';
+import type { RepositoryReviewMode } from '@kilocode/db/schema-types';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import type { UpsertPlatformIntegrationResult } from '@/lib/integrations/db/platform-integrations';
@@ -72,13 +73,13 @@ const mockGetRepositoryCustomizations = jest.fn<
     account: string | null;
     access: string | null;
     defaultModel: string;
-    defaultPrReviews: 'on' | 'off';
+    defaultPrReviews: RepositoryReviewMode;
     repositories: Array<{
       id: number;
       name: string;
       private: boolean;
       model: string | null;
-      prReviews: 'on' | 'off' | null;
+      prReviews: RepositoryReviewMode | null;
     }>;
   }>
 >();
@@ -87,7 +88,7 @@ const mockUpdateInstallationSettings =
     (
       owner: Owner,
       integrationId: string,
-      settings: { modelSlug?: string; prReviewMode?: 'on' | 'off' }
+      settings: { modelSlug?: string; prReviewMode?: RepositoryReviewMode }
     ) => Promise<{ success: boolean; error?: string }>
   >();
 const mockUpdateRepositorySettings =
@@ -96,7 +97,7 @@ const mockUpdateRepositorySettings =
       owner: Owner,
       integrationId: string,
       repositoryId: number,
-      settings: { modelSlug?: string | null; prReviewMode?: 'on' | 'off' | null }
+      settings: { modelSlug?: string | null; prReviewMode?: RepositoryReviewMode | null }
     ) => Promise<{ success: boolean; error?: string }>
   >();
 
@@ -203,25 +204,25 @@ let createCaller: (ctx: { user: User }) => {
     account: string | null;
     access: string | null;
     defaultModel: string;
-    defaultPrReviews: 'on' | 'off';
+    defaultPrReviews: RepositoryReviewMode;
     repositories: Array<{
       id: number;
       name: string;
       private: boolean;
       model: string | null;
-      prReviews: 'on' | 'off' | null;
+      prReviews: RepositoryReviewMode | null;
     }>;
   }>;
   updateInstallationSettings: (input: {
     organizationId?: string;
     integrationId: string;
-    settings: { modelSlug?: string; prReviewMode?: 'on' | 'off' };
+    settings: { modelSlug?: string; prReviewMode?: RepositoryReviewMode };
   }) => Promise<{ success: boolean; error?: string }>;
   updateRepositorySettings: (input: {
     organizationId?: string;
     integrationId: string;
     repositoryId: number;
-    settings: { modelSlug?: string | null; prReviewMode?: 'on' | 'off' | null };
+    settings: { modelSlug?: string | null; prReviewMode?: RepositoryReviewMode | null };
   }) => Promise<{ success: boolean; error?: string }>;
 };
 

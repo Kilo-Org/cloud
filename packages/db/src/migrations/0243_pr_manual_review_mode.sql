@@ -1,0 +1,2 @@
+ALTER TABLE "repository_customizations" DROP CONSTRAINT "repository_customizations_pr_review_mode_check";--> statement-breakpoint
+ALTER TABLE "repository_customizations" ADD CONSTRAINT "repository_customizations_pr_review_mode_check" CHECK ("repository_customizations"."pr_review_mode" IN ('on', 'off', 'manual'));

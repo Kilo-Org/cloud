@@ -42,7 +42,19 @@ import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-requ
 
 /**
  * GitHub Pull Request Event Handler
- * Handles: opened, synchronize, reopened
+ * Handles: opened, synchronize, reopened, ready_for_review, labeled
+ */
+
+// The label a repository in `RepositoryReviewMode.Manual` must carry for automatic PR reviews to
+// run, matched case-insensitively. Kilo only ever reads this label off the webhook payload; it
+// never adds or removes it.
+const MANUAL_REVIEW_TRIGGER_LABEL = 'kilo';
+
+function hasManualReviewTriggerLabel(labels: PullRequestPayload['pull_request']['labels']) {
+  return (labels ?? []).some(
+    label => label.name.trim().toLowerCase() === MANUAL_REVIEW_TRIGGER_LABEL
+  );
+}
 
 /**
  * Handles pull request events that trigger code review
@@ -308,13 +320,25 @@ export async function handlePullRequestCodeReview(
     // Runs AFTER supersession (step 5) so an in-flight review is still cancelled and its
     // check run resolved even if the setting was toggled off after the review started;
     // otherwise the check run would stay open on the PR until the stale-review reaper runs.
+    //
+    // 'manual' mode reuses the same on/off gate below: it resolves to 'on' only while the PR
+    // currently carries the `kilo` label, and 'off' otherwise. The label is read straight off
+    // this webhook's `pull_request.labels` (already present on every `pull_request` delivery,
+    // including this one), so re-evaluating it on each event is free — no extra GitHub request,
+    // and no separate opt-in state to track. Kilo never adds or removes this label itself.
     const repositoryCustomization = await getRepositoryCustomization(
       integration.id,
       String(repository.id)
     );
     const { prReviewMode } = resolveRepositorySettings(integration, repositoryCustomization);
+    const effectivePrReviewMode =
+      prReviewMode === 'manual'
+        ? hasManualReviewTriggerLabel(pull_request.labels)
+          ? 'on'
+          : 'off'
+        : prReviewMode;
 
-    if (prReviewMode === 'off') {
+    if (effectivePrReviewMode === 'off') {
       logExceptInTest(
         `PR reviews disabled for repository ${repository.full_name} (ID: ${repository.id})`
       );
@@ -660,6 +684,19 @@ export async function handlePullRequest(
     case GITHUB_ACTION.SYNCHRONIZE:
     case GITHUB_ACTION.REOPENED:
     case GITHUB_ACTION.READY_FOR_REVIEW:
+      return handlePullRequestCodeReview(payload, integration);
+    case GITHUB_ACTION.LABELED:
+      // A repository in 'manual' review mode only reviews PRs carrying the `kilo` label (see
+      // `hasManualReviewTriggerLabel`). Routing this specific label here lets adding it to an
+      // already-open PR trigger a review immediately, instead of waiting for the next push.
+      // Scoped to the trigger label itself (via the top-level `label` field GitHub sends on
+      // `labeled` events) so adding an unrelated label never reaches the review pipeline for
+      // repositories in 'on'/'off' mode. `unlabeled` needs no routing: removing the label doesn't
+      // need to cancel anything in flight, it just stops *future* triggers, which falls out of
+      // the Step 5b check re-evaluating the label on every later event.
+      if (payload.label?.name.trim().toLowerCase() !== MANUAL_REVIEW_TRIGGER_LABEL) {
+        return NextResponse.json({ message: 'Event received' }, { status: 200 });
+      }
       return handlePullRequestCodeReview(payload, integration);
     default:
       return NextResponse.json({ message: 'Event received' }, { status: 200 });

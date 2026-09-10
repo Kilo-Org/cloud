@@ -50,10 +50,16 @@ describe('resolveRepositorySettings', () => {
 
   it('defaults to on when the installation has no recognized review mode', () => {
     expect(resolveRepositorySettings({ metadata: {} }).prReviewMode).toBe('on');
-    expect(resolveRepositorySettings({ metadata: { pr_review_mode: 'manual' } }).prReviewMode).toBe(
-      'on'
-    );
+    expect(
+      resolveRepositorySettings({ metadata: { pr_review_mode: 'not-a-real-mode' } }).prReviewMode
+    ).toBe('on');
     expect(resolveRepositorySettings({ metadata: null }).prReviewMode).toBe('on');
+  });
+
+  it('passes through the manual review mode from the installation default', () => {
+    expect(resolveRepositorySettings({ metadata: { pr_review_mode: 'manual' } }).prReviewMode).toBe(
+      'manual'
+    );
   });
 
   it('treats a JSON literal null metadata the same as SQL null', () => {

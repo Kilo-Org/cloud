@@ -362,6 +362,88 @@ describe('handlePullRequest', () => {
       expect(response.status).toBe(202);
       expect(mockCreateCodeReview).toHaveBeenCalled();
     });
+
+    describe('manual mode (label-gated)', () => {
+      beforeEach(() => {
+        mockGetBotUserId.mockResolvedValue('bot-user-1');
+        mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+        mockGetRepositoryCustomization.mockResolvedValue({
+          bot_mention_model_slug: null,
+          pr_review_mode: 'manual',
+        });
+      });
+
+      it('reviews the PR when it carries the kilo label', async () => {
+        const payload = pullRequestPayload();
+        payload.pull_request.labels = [{ name: 'kilo' }];
+
+        const response = await handlePullRequest(payload, platformIntegration());
+
+        expect(response.status).toBe(202);
+        expect(mockCreateCodeReview).toHaveBeenCalled();
+      });
+
+      it('matches the kilo label case-insensitively', async () => {
+        const payload = pullRequestPayload();
+        payload.pull_request.labels = [{ name: 'Kilo' }];
+
+        const response = await handlePullRequest(payload, platformIntegration());
+
+        expect(response.status).toBe(202);
+        expect(mockCreateCodeReview).toHaveBeenCalled();
+      });
+
+      it('skips the review when the PR has no labels', async () => {
+        const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+          message: 'PR reviews disabled for this repository',
+        });
+        expect(mockCreateCodeReview).not.toHaveBeenCalled();
+      });
+
+      it('skips the review when the PR carries only unrelated labels', async () => {
+        const payload = pullRequestPayload();
+        payload.pull_request.labels = [{ name: 'bug' }];
+
+        const response = await handlePullRequest(payload, platformIntegration());
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+          message: 'PR reviews disabled for this repository',
+        });
+        expect(mockCreateCodeReview).not.toHaveBeenCalled();
+      });
+
+      it('triggers a review when the kilo label is added to an already-open PR (labeled action)', async () => {
+        const payload = pullRequestPayload({
+          action: 'labeled',
+          label: { name: 'kilo' },
+        });
+        payload.pull_request.labels = [{ name: 'kilo' }];
+
+        const response = await handlePullRequest(payload, platformIntegration());
+
+        expect(response.status).toBe(202);
+        expect(mockCreateCodeReview).toHaveBeenCalled();
+      });
+
+      it('does not reach the review pipeline when an unrelated label is added (labeled action)', async () => {
+        const payload = pullRequestPayload({
+          action: 'labeled',
+          label: { name: 'bug' },
+        });
+        payload.pull_request.labels = [{ name: 'bug' }];
+
+        const response = await handlePullRequest(payload, platformIntegration());
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ message: 'Event received' });
+        expect(mockGetAgentConfigForOwner).not.toHaveBeenCalled();
+        expect(mockCreateCodeReview).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('automated council review type', () => {

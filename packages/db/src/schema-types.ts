@@ -941,12 +941,18 @@ export type ContributorChampionTier =
 
 // --- Repository customization enums ---
 
-// Per-repository override of automatic PR review dispatch. Manual/@mention
-// review triggers are a separate, later change; for now this only gates
-// automatic reviews on `pull_request` webhook events.
+// Per-repository override of automatic PR review dispatch.
+// - 'on': review automatically on `pull_request` webhook events.
+// - 'off': never review automatically.
+// - 'manual': treated as 'on' only while the PR carries the `kilo` label
+//   (case-insensitive), otherwise treated as 'off'. The label is read
+//   straight off the `pull_request` webhook payload — Kilo never creates or
+//   removes it. See `hasManualReviewTriggerLabel` in the GitHub pull-request
+//   webhook handler.
 export const RepositoryReviewMode = {
   On: 'on',
   Off: 'off',
+  Manual: 'manual',
 } as const;
 
 export type RepositoryReviewMode = (typeof RepositoryReviewMode)[keyof typeof RepositoryReviewMode];

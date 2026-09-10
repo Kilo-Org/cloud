@@ -146,7 +146,7 @@ type RepositoryCustomization = {
   name: string;
   private: boolean;
   model: string | null;
-  prReviews: 'on' | 'off' | null;
+  prReviews: 'on' | 'off' | 'manual' | null;
 };
 
 type RepositoryCustomizationsData = {
@@ -154,7 +154,7 @@ type RepositoryCustomizationsData = {
   account: string | null;
   access: 'all' | 'selected';
   defaultModel: string;
-  defaultPrReviews: 'on' | 'off';
+  defaultPrReviews: 'on' | 'off' | 'manual';
   repositories: RepositoryCustomization[];
 };
 
@@ -438,6 +438,22 @@ describe('GitHubRepositoryCustomizations (live)', () => {
       settings: { modelSlug: 'model-b', prReviewMode: null },
     });
     expect(row(container, 'first/repo-0').textContent).toContain('Model: Model B');
+  });
+
+  it('saves a repository override of manual review mode', async () => {
+    const { container } = render();
+    await click(button(container, 'Edit first/repo-0'));
+    const editor = find<HTMLElement>(container, '[role="dialog"]');
+    await select(editor, '4-reviews', 'manual');
+    await click(button(editor, 'Save changes'));
+
+    expect(mockUpdateRepositorySettingsMutateAsync).toHaveBeenCalledWith({
+      organizationId: undefined,
+      integrationId: 'first',
+      repositoryId: 4,
+      settings: { modelSlug: null, prReviewMode: 'manual' },
+    });
+    expect(row(container, 'first/repo-0').textContent).toContain('On Demand');
   });
 
   it('disables the default model control while saving and reverts it if the save fails', async () => {

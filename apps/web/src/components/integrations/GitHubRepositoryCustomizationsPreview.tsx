@@ -45,13 +45,16 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
-// Automatic PR review dispatch only, for now — see github-repository-settings.ts.
-// Manual/@mention-triggered reviews are a separate, later change.
-type PreviewReviewMode = 'on' | 'off';
+// Mirrors `RepositoryReviewMode` (packages/db/src/schema-types.ts) — kept as a local
+// union rather than importing the db package into this client component.
+// 'manual' only reviews PRs that carry the `kilo` label; see
+// github-repository-settings.ts and the GitHub pull-request webhook handler.
+type PreviewReviewMode = 'on' | 'off' | 'manual';
 
 const reviewModes: { value: PreviewReviewMode; label: string }[] = [
   { value: 'on', label: 'On' },
   { value: 'off', label: 'Off' },
+  { value: 'manual', label: 'On Demand' },
 ];
 
 function reviewModeName(value: PreviewReviewMode) {
@@ -346,8 +349,8 @@ export function InstallationCustomizations({
                   Default pull request reviews
                 </Label>
                 <p className="max-w-lg text-sm text-muted-foreground">
-                  Review pull requests automatically on new pull requests, or turn reviews off
-                  entirely. Repository overrides are unaffected.
+                  Review pull requests automatically, only when the <code>kilo</code> label is
+                  attached to a PR, or entirely off. Overridable per-repository.
                 </p>
               </div>
               <ReviewModeSelect
@@ -752,8 +755,8 @@ function RepositorySettingsEditor({
         <div className="space-y-3 border-t border-border pt-6">
           <Label htmlFor={`${repository.id}-reviews`}>Pull request reviews</Label>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            On reviews pull requests automatically. Off disables automatic reviews for this
-            repository.
+            Review pull requests automatically (on), only when the <code>kilo</code> label is
+            attached to a PR (On Demand), or disabled (off).
           </p>
           <ReviewModeSelect
             id={`${repository.id}-reviews`}

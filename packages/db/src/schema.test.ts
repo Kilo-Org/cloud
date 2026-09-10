@@ -1054,7 +1054,7 @@ describe('database schema', () => {
       MCPGatewayAuthorizationRequestStatus: ['pending', 'completed', 'error'],
       MCPGatewayPendingProviderAuthorizationStatus: ['pending', 'completed', 'error'],
       MCPGatewayAuditOutcome: ['success', 'failure', 'blocked'],
-      RepositoryReviewMode: ['on', 'off'],
+      RepositoryReviewMode: ['on', 'off', 'manual'],
       SecurityFindingNotificationKind: ['new_finding', 'sla_warning', 'sla_breach'],
       SecurityFindingNotificationStatus: [
         'staged',
@@ -1951,7 +1951,7 @@ describe('database schema', () => {
       });
     });
 
-    it('rejects a pr_review_mode outside the on/off CHECK constraint', async () => {
+    it('accepts the manual pr_review_mode value', async () => {
       await withPlatformAccessTokenTestData(async ({ organizationId }) => {
         const integration = await insertGitHubIntegration(
           organizationId,
@@ -1963,6 +1963,23 @@ describe('database schema', () => {
             INSERT INTO repository_customizations
               (platform_integration_id, repository_id, pr_review_mode)
             VALUES (${integration.id}, '789', 'manual')
+          `)
+        ).resolves.not.toThrow();
+      });
+    });
+
+    it('rejects a pr_review_mode outside the on/off/manual CHECK constraint', async () => {
+      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
+        const integration = await insertGitHubIntegration(
+          organizationId,
+          `schema-repo-custom-${crypto.randomUUID()}`
+        );
+
+        await expect(
+          schemaTestDb.db.execute(sql`
+            INSERT INTO repository_customizations
+              (platform_integration_id, repository_id, pr_review_mode)
+            VALUES (${integration.id}, '789', 'invalid')
           `)
         ).rejects.toMatchObject({
           cause: {

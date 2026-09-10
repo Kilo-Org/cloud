@@ -65,6 +65,23 @@ describe('addAutoRoutingModels', () => {
     ]);
   });
 
+  test('annotates the frontier auto model with its visible targets', async () => {
+    const frontierModel = makeModel('kilo-auto/frontier');
+    const opusModel = makeModel('anthropic/claude-opus-5');
+    const sonnetModel = makeModel('anthropic/claude-sonnet-5');
+
+    const result = await addAutoRoutingModels([frontierModel, sonnetModel, opusModel]);
+
+    expect(result).toEqual([
+      {
+        ...frontierModel,
+        autoRouting: { models: ['anthropic/claude-opus-5', 'anthropic/claude-sonnet-5'] },
+      },
+      sonnetModel,
+      opusModel,
+    ]);
+  });
+
   test('excludes virtual auto ids and dedupes and sorts candidates', async () => {
     const efficientModel = makeModel('kilo-auto/efficient');
     const balancedModel = makeModel('kilo-auto/balanced');

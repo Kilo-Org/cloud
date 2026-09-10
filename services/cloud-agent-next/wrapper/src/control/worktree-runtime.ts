@@ -28,10 +28,15 @@ import { isKiloServerProcess } from '../tool-cgroup.js';
 import {
   createOwnedProcessScope,
   OWNED_PROCESS_OBSERVATION_TIMEOUT_MS,
+  type DirectProcessObserver,
   type OwnedProcessScope,
 } from './owned-processes.js';
 import type { NativeOperationTarget, NativeRetirement } from './session-operation-cleanup.js';
-import { retireWorktreeRuntime } from './worktree-runtime-cleanup.js';
+import {
+  retireWorktreeRuntime,
+  settleNativeCleanup,
+  stopWithinCleanupBudget,
+} from './worktree-runtime-cleanup.js';
 import {
   forgetAttachedRoot,
   ownerDirectoryForSession,
@@ -174,6 +179,7 @@ type ServerOptions = {
   signal: AbortSignal;
   timeoutMs?: number;
   onProcessScope?: (scope: OwnedProcessScope) => void;
+  onProcessObserver?: (observer: DirectProcessObserver) => void;
   claimCleanupDeadline?: (deadlineAt?: number) => number;
 };
 
@@ -182,6 +188,7 @@ type WorktreeKiloServerHandle = Omit<KiloServerHandle, 'close'> & {
   stopped?: Promise<void>;
   exited?: Promise<void>;
   processes?: OwnedProcessScope;
+  processObserver?: DirectProcessObserver;
 };
 
 type RuntimeEntry = {
@@ -196,6 +203,8 @@ type RuntimeEntry = {
   kiloClient?: WrapperKiloClient;
   processAbort?: AbortController;
   processes?: OwnedProcessScope;
+  processObserver?: DirectProcessObserver;
+  descendantsUnverified?: boolean;
   processIssued?: boolean;
   runtimeId: string;
   pendingPtys: number;
@@ -344,6 +353,8 @@ export async function startWorktreeKiloServer(
     cwd: options.directory,
     env: options.env,
   });
+  const processObserver = processes.observeChild(proc);
+  if (processObserver) options.onProcessObserver?.(processObserver);
   proc.stderr.resume();
   const stopped = new Promise<void>(resolve => {
     proc.once('close', () => resolve());
@@ -411,10 +422,10 @@ export async function startWorktreeKiloServer(
     proc.once('exit', close);
     await processes.captureBaseline(isKiloServerProcess);
     options.signal.throwIfAborted();
-    return { url, close: closeAt, stopped, exited, processes };
+    return { url, close: closeAt, stopped, exited, processes, processObserver };
   } catch {
     const deadlineAt = claimCleanupDeadline();
-    const cleanup = processes.stop(deadlineAt);
+    const cleanup = stopWithinCleanupBudget(processes, true, deadlineAt);
     closeAt(deadlineAt);
     await withTimeoutAndAbort(cleanup, {
       timeoutMs: Math.max(1, deadlineAt - Date.now()),
@@ -450,7 +461,6 @@ export function createWorktreeKiloRuntimes(options: {
 }): WorktreeKiloRuntimes {
   const entries = new Map<string, RuntimeEntry>();
   const directoriesByScope = new Map<string, string>();
-  const failedDirectories = new Set<string>();
   const roots = new Map<string, RootAttachment>();
   const recoveryGates = new Map<string, Promise<void>>();
   const recoveryAcknowledgements = new Map<string, Map<string, Promise<RecoveryRetirement>>>();
@@ -816,6 +826,7 @@ export function createWorktreeKiloRuntimes(options: {
     const retirement = retireWorktreeRuntime(entry, requested, target, {
       cleanupDeadline,
       unregisterRoot,
+      unverifiedCleanup: directProcessAbsent,
       removeEntry: retiring => {
         if (entries.get(entryKey(retiring.identity, retiring.isolation)) === retiring) {
           entries.delete(entryKey(retiring.identity, retiring.isolation));
@@ -917,18 +928,56 @@ export function createWorktreeKiloRuntimes(options: {
     return liveRoots(entry).some(root => root !== failedRoot) ? 'shared' : 'sole';
   }
 
+  // Mutates the entry and reports diagnostics: releases abandoned streams when recovery is allowed.
+  async function directProcessAbsent(entry: RuntimeEntry, deadlineAt: number): Promise<boolean> {
+    const observer = entry.processObserver;
+    if (!observer) {
+      const absent = (await entry.processes?.verify(false, deadlineAt)) === true;
+      if (!absent) {
+        options.onDiagnostic?.('wrapper.lifecycle', {
+          phase: 'stopped',
+          stage: 'process_cleanup',
+          ok: false,
+          detail: 'direct process observation unavailable',
+          nativeRuntimeId: entry.runtimeId,
+        });
+      }
+      return absent;
+    }
+    const observation = await observer.observe(deadlineAt).catch(() => 'unknown' as const);
+    if (observation !== 'absent' && observation !== 'reused') {
+      options.onDiagnostic?.('wrapper.lifecycle', {
+        phase: 'stopped',
+        stage: 'process_cleanup',
+        ok: false,
+        detail:
+          observation === 'alive'
+            ? 'direct process is still alive'
+            : 'direct process identity unavailable',
+        nativeRuntimeId: entry.runtimeId,
+      });
+      return false;
+    }
+    entry.processes?.releaseAbandoned?.();
+    entry.descendantsUnverified = true;
+    options.onDiagnostic?.('wrapper.lifecycle', {
+      phase: 'stopped',
+      stage: 'process_cleanup',
+      ok: true,
+      detail: 'direct process absent; descendants unverified',
+      nativeRuntimeId: entry.runtimeId,
+      ...(observation === 'reused' ? { reason: 'pid_identity_reused' } : {}),
+    });
+    return true;
+  }
+
   function observeRetained(entry: RuntimeEntry): Promise<boolean> {
     if (entry.observing) return entry.observing;
     const runtimeId = entry.runtimeId;
     const runtime = entry.runtime;
     const deadlineAt = Date.now() + OWNED_PROCESS_OBSERVATION_TIMEOUT_MS;
     const observation = Promise.resolve()
-      .then(() => {
-        const processes = entry.processes;
-        return processes && typeof processes.verify === 'function'
-          ? processes.verify(false, deadlineAt)
-          : false;
-      })
+      .then(() => directProcessAbsent(entry, deadlineAt))
       .catch(() => false)
       .then(async proven => {
         if (!proven || Date.now() >= deadlineAt) return false;
@@ -959,7 +1008,6 @@ export function createWorktreeKiloRuntimes(options: {
         entries.delete(entryKey(entry.identity, entry.isolation));
         if (directoriesByScope.get(entry.kilo.scopeId) === entry.directory)
           directoriesByScope.delete(entry.kilo.scopeId);
-        failedDirectories.delete(entry.directory);
         return true;
       })
       .then(
@@ -991,14 +1039,14 @@ export function createWorktreeKiloRuntimes(options: {
       reason,
       cleanupDeadlineAt: deadlineAt,
     }).then(result => {
-      if (result === 'unconfirmed') failedDirectories.add(entry.directory);
       options.onUnexpectedClose({
         identity: entry.identity,
         retirementId: crypto.randomUUID(),
         directory: entry.directory,
         reason,
         runtimeId,
-        cleanup: result === 'unconfirmed' ? 'unconfirmed' : 'confirmed',
+        cleanup:
+          result === 'unconfirmed' || entry.descendantsUnverified ? 'unconfirmed' : 'confirmed',
         cleanupDeadlineAt: deadlineAt,
       });
     });
@@ -1013,6 +1061,8 @@ export function createWorktreeKiloRuntimes(options: {
     entry.feed?.close();
     entry.feed = undefined;
     entry.processes = undefined;
+    entry.processObserver = undefined;
+    entry.descendantsUnverified = undefined;
     entry.processIssued = false;
     entry.stopped = undefined;
     entry.processAbort = abort;
@@ -1059,10 +1109,14 @@ export function createWorktreeKiloRuntimes(options: {
           entry.processIssued = true;
           if (entry.cleanupDeadlineAt !== undefined) void processes.stop(entry.cleanupDeadlineAt);
         },
+        onProcessObserver: observer => {
+          entry.processObserver = observer;
+        },
         claimCleanupDeadline: deadlineAt =>
           entry.processAbort === abort ? cleanupDeadline(entry, deadlineAt) : (deadlineAt ?? 0),
       });
       entry.processes = server.processes ?? entry.processes;
+      entry.processObserver = server.processObserver ?? entry.processObserver;
       entry.processIssued = true;
       entry.stopped = server.stopped;
       void (server.exited ?? server.stopped)?.then(() => {
@@ -1202,17 +1256,18 @@ export function createWorktreeKiloRuntimes(options: {
     }
     const deadlineAt = cleanupDeadline(entry);
     onDestructiveRefresh?.();
-    const stopped =
-      entry.processes?.stop(deadlineAt) ?? Promise.resolve(entry.processIssued !== true);
     entry.processAbort.abort();
     try {
-      await withTimeoutAndAbort(entry.stopped, {
-        signal: entry.abort.signal,
-        timeoutMs: Math.max(1, deadlineAt - Date.now()),
-        timeoutMessage: 'Kilo worktree credential refresh timed out',
-        abortMessage: 'Kilo worktree credential refresh cancelled',
+      const settled = await settleNativeCleanup({
+        processes: entry.processes,
+        processIssued: entry.processIssued === true,
+        deadlineAt,
+        observeDirect: innerDeadlineAt => directProcessAbsent(entry, innerDeadlineAt),
       });
-      if (!(await stopped) || Date.now() >= deadlineAt) {
+      if (!settled) {
+        throw new Error('Original native execution is not contained');
+      }
+      if (Date.now() >= deadlineAt) {
         throw new Error('Original native execution is not contained');
       }
       settleEntryDeferredRetirements(entry, undefined, 'stale');
@@ -1374,7 +1429,6 @@ export function createWorktreeKiloRuntimes(options: {
         homesByDirectory.set(directory, homes);
         entries.set(key, entry);
         cleanupRequired = true;
-        failedDirectories.delete(directory);
         if (isolation === 'directory-shared') directoriesByScope.set(kilo.scopeId, directory);
       }
       if (!root) {
@@ -1616,7 +1670,7 @@ export function createWorktreeKiloRuntimes(options: {
     recordRootPublicationDiagnostic,
     snapshotRootPublicationDiagnostics,
     isHealthy() {
-      return !closed && failedDirectories.size === 0;
+      return !closed;
     },
     shutdown() {
       if (closed) return;

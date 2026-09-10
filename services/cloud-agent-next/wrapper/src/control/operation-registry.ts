@@ -13,6 +13,7 @@ import type { WorktreeKiloRuntime, WorktreeKiloRuntimes } from './worktree-runti
 import type {
   NativeOperationTarget,
   NativeRetirement,
+  RetireDirectoryResult,
   RootScopedCleanupResult,
 } from './session-operation-cleanup.js';
 import {
@@ -742,7 +743,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
     reason: string,
     deadlineAt: number,
     target?: NativeOperationTarget
-  ): Promise<NativeRetirement> {
+  ): Promise<RetireDirectoryResult> {
     const matching = [...active.values()].filter(operation => {
       if (operation.session.directory !== directory) return false;
       const operationTarget = operation.nativeTarget();
@@ -754,7 +755,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
         Boolean
       )
     )
-      return 'unconfirmed';
+      return 'operation_process_stop_unconfirmed';
     const retirement = await deps.native.retireRuntime(directory, deadlineAt, target);
     for (const operation of matching)
       operation.confirmCleanup(retirement === 'retired' || retirement === 'stale', deadlineAt);
@@ -803,9 +804,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
                 'shared'
               ? Promise.resolve<'shared'>('shared')
               : retireDirectory(identity.directory, reason, deadlineAt, target);
-        void retirement.then(retirement => {
-          if (retirement === 'unconfirmed') deps.retireRuntime(reason);
-        });
+        void retirement;
       },
       onLocalCompletion: retain => {
         if (active.get(identity.kiloSessionId) === operation) {

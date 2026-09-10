@@ -16,7 +16,7 @@ import type {
   SessionOperationAck,
   SessionOperationDelivery,
 } from '../../../src/shared/sandbox-control-protocol';
-import type { NativeRetirement } from './session-operation-cleanup';
+import type { NativeRetirement, RetireDirectoryResult } from './session-operation-cleanup';
 
 const session = {
   directory: '/workspace',
@@ -287,7 +287,7 @@ describe('native-scoped control event failures', () => {
     );
     await operation.done;
     const sealed = await sending.promise;
-    let retirement: Promise<NativeRetirement> | undefined;
+    let retirement: Promise<RetireDirectoryResult> | undefined;
     const transport = createControlEventTransport({
       supportsReceipts: () => true,
       prepare: input => input,

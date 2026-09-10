@@ -23,12 +23,20 @@ import path from 'node:path';
 import { Writable } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 
+export type DirectProcessState = 'absent' | 'reused' | 'alive' | 'unknown';
+
+export type DirectProcessObserver = {
+  observe(deadlineAt?: number): Promise<DirectProcessState>;
+};
+
 export type OwnedProcessScope = {
   spawn(
     command: string,
     args: string[],
     options: SpawnOptionsWithoutStdio
   ): ChildProcessWithoutNullStreams;
+  observeChild(process: ChildProcessWithoutNullStreams): DirectProcessObserver | undefined;
+  releaseAbandoned(): void;
   run<T>(operation: () => T): T;
   seal(): void;
   dispose(): boolean;
@@ -49,6 +57,7 @@ type OwnedChild = {
   process: ChildProcessWithoutNullStreams;
   identity?: string;
   exited: boolean;
+  gate?: Writable;
 };
 type Cgroup = {
   directory: string;
@@ -170,12 +179,55 @@ function isLiveProcessState(state: string): boolean {
   return state !== 'Z' && state !== 'X' && state !== 'x';
 }
 
+export function classifyDirectProcessState(input: {
+  exited: boolean;
+  pid: number | undefined;
+  platform: NodeJS.Platform;
+  storedIdentity: string | undefined;
+  statText?: string;
+  probeError?: NodeJS.ErrnoException;
+}): DirectProcessState {
+  if (input.exited || input.pid === undefined) return 'absent';
+  if (input.platform !== 'linux') {
+    if (!input.probeError) return 'alive';
+    return input.probeError.code === 'ESRCH' ? 'absent' : 'unknown';
+  }
+  if (input.probeError) {
+    return input.probeError.code === 'ENOENT' ? 'absent' : 'unknown';
+  }
+  try {
+    const fresh = processIdentity(input.pid, input.statText ?? '');
+    if (!isLiveProcessState(fresh.state)) return 'absent';
+    if (!input.storedIdentity) return 'unknown';
+    return fresh.identity === input.storedIdentity ? 'alive' : 'reused';
+  } catch {
+    return 'unknown';
+  }
+}
+
 function closeDescriptors(descriptors: number[]): void {
   for (const descriptor of descriptors.splice(0)) {
     try {
       closeSync(descriptor);
     } catch {
       console.warn('Owned process descriptor close failed; continuing descriptor cleanup');
+    }
+  }
+}
+
+function releaseChildStreams(child: OwnedChild): void {
+  for (const stream of [child.process.stdin, child.process.stdout, child.process.stderr]) {
+    try {
+      stream.destroy();
+    } catch {
+      console.warn('Owned process child stream release failed; continuing stream cleanup');
+    }
+  }
+  if (child.gate) {
+    try {
+      child.gate.destroy();
+    } catch {
+      console.warn('Owned process child stream release failed; continuing stream cleanup');
     }
   }
 }
@@ -396,6 +448,7 @@ export function createOwnedProcessScope(): OwnedProcessScope {
   let stopResult: boolean | undefined;
   let stopDeadline: Deadline | undefined;
   let stopped = false;
+  let abandoned = false;
   let cgroupRemoval: Promise<boolean> | undefined;
   const children = new Set<OwnedChild>();
   const baseline = new Set<string>();
@@ -510,6 +563,7 @@ export function createOwnedProcessScope(): OwnedProcessScope {
       }
       if (gated) {
         const gate = child.stdio[3];
+        if (gate instanceof Writable) record.gate = gate;
         try {
           if (
             !(gate instanceof Writable) ||
@@ -555,6 +609,67 @@ export function createOwnedProcessScope(): OwnedProcessScope {
       }
       return child;
     },
+    observeChild(child) {
+      const record = [...children].find(candidate => candidate.process === child);
+      if (!record) return undefined;
+      return {
+        observe(deadlineAt = Date.now() + OBSERVATION_TIMEOUT_MS) {
+          const deadline = createDeadline(deadlineAt);
+          observations.add(deadline);
+          return (async (): Promise<DirectProcessState> => {
+            if (record.exited || record.process.pid === undefined) return 'absent';
+            const pid = record.process.pid;
+            if (process.platform !== 'linux') {
+              try {
+                process.kill(pid, 0);
+                return classifyDirectProcessState({
+                  exited: false,
+                  pid,
+                  platform: process.platform,
+                  storedIdentity: record.identity,
+                });
+              } catch (error) {
+                return classifyDirectProcessState({
+                  exited: false,
+                  pid,
+                  platform: process.platform,
+                  storedIdentity: record.identity,
+                  probeError: error as NodeJS.ErrnoException,
+                });
+              }
+            }
+            try {
+              const text = await readText(`/proc/${pid}/stat`, deadline);
+              return classifyDirectProcessState({
+                exited: false,
+                pid,
+                platform: process.platform,
+                storedIdentity: record.identity,
+                statText: text,
+              });
+            } catch (error) {
+              return classifyDirectProcessState({
+                exited: false,
+                pid,
+                platform: process.platform,
+                storedIdentity: record.identity,
+                probeError: error as NodeJS.ErrnoException,
+              });
+            }
+          })().finally(() => {
+            observations.delete(deadline);
+            deadline.close();
+          });
+        },
+      };
+    },
+    // Call only after stop() has settled; it releases streams for an unproven scope.
+    releaseAbandoned() {
+      if (stopped || removed || abandoned) return;
+      abandoned = true;
+      for (const child of children) releaseChildStreams(child);
+      if (group) closeDescriptors(group.descriptors);
+    },
     run: operation => current.run(scope, operation),
     observesOccupancy: occupancyObservable,
     seal() {
@@ -564,6 +679,7 @@ export function createOwnedProcessScope(): OwnedProcessScope {
       sealed = true;
       if (removed) return true;
       if (stopped) return true;
+      if (abandoned) return false;
       if (used && (!occupancyObservable() || [...children].some(live))) return false;
       if (
         group &&

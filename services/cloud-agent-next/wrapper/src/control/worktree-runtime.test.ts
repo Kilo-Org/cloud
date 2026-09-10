@@ -12,7 +12,7 @@ import {
   type WorktreeKiloRuntimes,
 } from './worktree-runtime';
 import type { NativeRetirement } from './session-operation-cleanup';
-import type { OwnedProcessScope } from './owned-processes';
+import { classifyDirectProcessState, type OwnedProcessScope } from './owned-processes';
 import {
   SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS,
   SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS,
@@ -3074,7 +3074,6 @@ setInterval(() => {}, 1000);
   });
 
   it('re-observes an unconfirmed runtime only for an authorized attach demand', async () => {
-    const absent = Promise.withResolvers<boolean>();
     const exited = Promise.withResolvers<void>();
     let launches = 0;
     let observations = 0;
@@ -3083,13 +3082,14 @@ setInterval(() => {}, 1000);
         const server = createKiloStub();
         servers.push(server);
         const first = launches++ === 0;
-        options.onProcessScope?.({
-          stop: async () => false,
-          verify: async () => {
-            observations += 1;
-            return first ? absent.promise : true;
-          },
-        } as unknown as OwnedProcessScope);
+        options.onProcessScope?.({ stop: async () => false } as unknown as OwnedProcessScope);
+        if (first)
+          options.onProcessObserver?.({
+            observe: async () => {
+              observations += 1;
+              return observations === 1 ? ('alive' as const) : ('absent' as const);
+            },
+          });
         return {
           url: server.url,
           close: () => {},
@@ -3100,7 +3100,7 @@ setInterval(() => {}, 1000);
     const directory = path.join(tmpDir, 'demand-attach');
     const runtime = await harness.registry.ensure(directory, auth);
     exited.resolve();
-    await waitUntil(() => harness.registry.isHealthy() === false);
+    await waitUntil(() => observations === 1);
 
     expect(() =>
       harness.registry.attach(rootIdentity(directory, 'unauthorized'), {
@@ -3108,20 +3108,246 @@ setInterval(() => {}, 1000);
         token: 'wrong-token',
       })
     ).toThrow('Kilo worktree auth context mismatch');
-    expect(observations).toBe(0);
+    expect(observations).toBe(1);
+    expect(harness.registry.getRetained?.(directory)).toBe(runtime);
 
     expect(() => harness.registry.attach(rootIdentity(directory, 'retry'), auth)).toThrow(
       'Native runtime retirement is unconfirmed'
     );
-    await waitUntil(() => observations === 1);
-    absent.resolve(true);
+    await waitUntil(() => observations === 2);
     await waitUntil(() => harness.registry.getRetained?.(directory) === undefined);
-    expect(harness.registry.isHealthy()).toBe(true);
 
     const replacement = harness.registry.attach(rootIdentity(directory, 'replacement'), auth);
     expect(await replacement.ready).not.toBe(runtime);
     replacement.commit();
     replacement.release();
+  });
+
+  it('reports unavailable direct observation when no observer can prove safety', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => diagnostics.push(fields),
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async () => false,
+          verify: async () => false,
+        } as unknown as OwnedProcessScope);
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'unavailable-observation');
+    const runtime = await harness.registry.ensure(directory, auth);
+
+    expect(
+      await harness.registry.retireRuntime?.(directory, Date.now() + 1_000, {
+        runtimeId: runtime.runtimeId,
+        client: runtime.kiloClient,
+      })
+    ).toBe('unconfirmed');
+    expect(harness.registry.getRetained?.(directory)).toBe(runtime);
+    expect(
+      diagnostics.some(fields => fields.detail === 'direct process observation unavailable')
+    ).toBe(true);
+    expect(diagnostics.some(fields => fields.detail === 'direct process is still alive')).toBe(
+      false
+    );
+  });
+
+  it('replaces a native runtime on direct process absence without descendant proof', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => diagnostics.push(fields),
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({ stop: async () => false } as unknown as OwnedProcessScope);
+        options.onProcessObserver?.({ observe: async () => 'absent' as const });
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'relaxed-replacement');
+    const runtime = await harness.registry.ensure(directory, auth);
+
+    expect(
+      await harness.registry.retireRuntime?.(directory, Date.now() + 1_000, {
+        runtimeId: runtime.runtimeId,
+        client: runtime.kiloClient,
+      })
+    ).toBe('retired');
+    expect(harness.registry.get(directory)).toBeUndefined();
+    expect(
+      diagnostics.some(fields => fields.detail === 'direct process absent; descendants unverified')
+    ).toBe(true);
+  });
+
+  it('keeps a directory fenced when direct process identity is unknown', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => diagnostics.push(fields),
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({ stop: async () => false } as unknown as OwnedProcessScope);
+        options.onProcessObserver?.({ observe: async () => 'unknown' as const });
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'unknown-identity');
+    const runtime = await harness.registry.ensure(directory, auth);
+
+    expect(
+      await harness.registry.retireRuntime?.(directory, Date.now() + 1_000, {
+        runtimeId: runtime.runtimeId,
+        client: runtime.kiloClient,
+      })
+    ).toBe('unconfirmed');
+    expect(harness.registry.getRetained?.(directory)).toBe(runtime);
+    expect(
+      diagnostics.some(fields => fields.detail === 'direct process identity unavailable')
+    ).toBe(true);
+  });
+
+  it('replaces a native runtime when the stored PID start identity changed', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const storedIdentity = '4321:111';
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => diagnostics.push(fields),
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({ stop: async () => false } as unknown as OwnedProcessScope);
+        options.onProcessObserver?.({
+          observe: async () =>
+            classifyDirectProcessState({
+              exited: false,
+              pid: 4321,
+              platform: 'linux',
+              storedIdentity,
+              statText: '4321 (kilo) S 1 4321 4321 0 -1 4194304 100 0 0 0 1 2 0 0 20 0 1 0 222 0 0',
+            }),
+        });
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'reused-identity');
+    const runtime = await harness.registry.ensure(directory, auth);
+
+    expect(
+      await harness.registry.retireRuntime?.(directory, Date.now() + 1_000, {
+        runtimeId: runtime.runtimeId,
+        client: runtime.kiloClient,
+      })
+    ).toBe('retired');
+    expect(
+      diagnostics.some(
+        fields =>
+          fields.detail === 'direct process absent; descendants unverified' &&
+          fields.reason === 'pid_identity_reused'
+      )
+    ).toBe(true);
+  });
+
+  it('reports incomplete physical cleanup when replacement follows direct process absence', async () => {
+    const exits = Promise.withResolvers<void>();
+    const failures: unknown[] = [];
+    const harness = createRegistry({
+      onUnexpectedClose: failure => {
+        failures.push(failure);
+      },
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({ stop: async () => false } as unknown as OwnedProcessScope);
+        options.onProcessObserver?.({ observe: async () => 'absent' as const });
+        return { url: server.url, close: () => {}, exited: exits.promise };
+      },
+    });
+    const directory = path.join(tmpDir, 'unverified-cleanup-report');
+    await harness.registry.ensure(directory, auth);
+    exits.resolve();
+    await waitUntil(() => failures.length === 1);
+    expect(failures[0]).toMatchObject({
+      directory,
+      reason: 'process_exited',
+      cleanup: 'unconfirmed',
+    });
+  });
+
+  it('refreshes credentials without waiting for the old child close', async () => {
+    const harness = createRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({ stop: async () => true } as unknown as OwnedProcessScope);
+        return { url: server.url, stopped: new Promise<void>(() => {}), close: () => {} };
+      },
+    });
+    const directAuth = { ...auth, containmentEnabled: false };
+    const identity = rootIdentity(path.join(tmpDir, 'refresh-without-close'));
+    const attachment = harness.registry.attach(identity, directAuth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+    const runtimeId = runtime.runtimeId;
+
+    const refresh = harness.registry.attach(
+      identity,
+      { ...directAuth, token: 'rotated-token' },
+      undefined,
+      () => true
+    );
+    const refreshed = await refresh.ready;
+    expect(refreshed).toBe(runtime);
+    expect(refreshed.runtimeId).not.toBe(runtimeId);
+    refresh.commit();
+    refresh.release();
+  });
+
+  it('reserves direct-observation time when the bounded tree stop does not settle', async () => {
+    let stopDeadlineAt = 0;
+    let observeDeadlineAt = 0;
+    const harness = createRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async (deadlineAt: number) => {
+            stopDeadlineAt = deadlineAt;
+            return false;
+          },
+        } as unknown as OwnedProcessScope);
+        options.onProcessObserver?.({
+          observe: async (deadlineAt = 0) => {
+            observeDeadlineAt = deadlineAt;
+            return deadlineAt > stopDeadlineAt ? ('absent' as const) : ('unknown' as const);
+          },
+        });
+        return { url: server.url, stopped: new Promise<void>(() => {}), close: () => {} };
+      },
+    });
+    const directAuth = { ...auth, containmentEnabled: false };
+    const identity = rootIdentity(path.join(tmpDir, 'refresh-observation-budget'));
+    const attachment = harness.registry.attach(identity, directAuth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+    const runtimeId = runtime.runtimeId;
+
+    const refresh = harness.registry.attach(
+      identity,
+      { ...directAuth, token: 'rotated-token' },
+      undefined,
+      () => true
+    );
+    const refreshed = await refresh.ready;
+    expect(refreshed).toBe(runtime);
+    expect(refreshed.runtimeId).not.toBe(runtimeId);
+    expect(stopDeadlineAt).toBeGreaterThan(0);
+    expect(observeDeadlineAt).toBeGreaterThan(stopDeadlineAt);
+    refresh.commit();
+    refresh.release();
   });
 
   it('awaits the same bounded observation when deleting an unconfirmed runtime', async () => {

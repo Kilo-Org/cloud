@@ -157,7 +157,7 @@ function main(
         const current = kiloRuntimes.get(failure.identity);
         return current === undefined || current.runtimeId === failure.runtimeId;
       };
-      if (failure.cleanup === 'unconfirmed' || !control?.reportNativeRuntimeRetirement) {
+      if (!control?.reportNativeRuntimeRetirement) {
         if (stillCurrent()) shutdown(1, failure.reason, heartbeatReasonFrom(failure.reason));
         return;
       }

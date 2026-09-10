@@ -60,6 +60,10 @@ export const MISTRAL_API_KEY = getEnvVariable('MISTRAL_API_KEY');
 export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
+// Shared secret with the MCP catalog CI job
+// (.github/workflows/kilo-mcp-catalog.yml). It authenticates only the mint in
+// app/api/internal/mcp-catalog/token; it is never accepted as a Kilo credential.
+export const MCP_CATALOG_TOKEN_SECRET = getEnvVariable('MCP_CATALOG_TOKEN_SECRET');
 export function isBoundedInternalServiceTokenIssuanceEnabled(): boolean {
   return getEnvVariable('BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED') === 'true';
 }

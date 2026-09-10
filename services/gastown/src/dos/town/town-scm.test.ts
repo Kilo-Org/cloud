@@ -56,7 +56,11 @@ describe('areThreadsBlocking', () => {
     expect(init.method).toBe('POST');
     expect(init.headers.Authorization).toBe('Bearer kilo-token');
     expect(init.headers['X-KiloCode-Feature']).toBe('gastown');
-    expect(JSON.parse(init.body).model).toBe('neuralwatt/glm-5.2-short');
+    const body = JSON.parse(init.body);
+    expect(body.model).toBe('neuralwatt/glm-5.2-short');
+    // Reasoning must be disabled or the model can spend the token budget on a
+    // thinking trace and return no JSON content.
+    expect(body.reasoning).toEqual({ enabled: false, effort: 'none' });
   });
 
   it('prefers the refinery role model over the town default', async () => {
@@ -110,6 +114,22 @@ describe('areThreadsBlocking', () => {
     expect(aiRun).toHaveBeenCalledWith('@cf/google/gemma-4-26b-a4b-it', expect.anything());
   });
 
+  it('uses Workers AI when a managed refinery model overrides a BYOK default', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { ctx, aiRun } = makeCtx({
+      default_model: 'neuralwatt/glm-5.2-short',
+      role_models: { refinery: 'anthropic/claude-sonnet-4.6' },
+      kilocode_token: 'kilo-token',
+    });
+    aiRun.mockResolvedValue({ response: '{"blocking": false}' });
+
+    expect(await areThreadsBlocking(ctx, THREADS)).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(aiRun).toHaveBeenCalled();
+  });
+
   it('falls back to Workers AI when no Kilo token is configured', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
@@ -124,6 +144,19 @@ describe('areThreadsBlocking', () => {
 
   it('blocks without falling back to Workers AI when the gateway rejects the call', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('payment required', { status: 402 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { ctx, aiRun } = makeCtx({
+      default_model: 'neuralwatt/glm-5.2-short',
+      kilocode_token: 'kilo-token',
+    });
+
+    expect(await areThreadsBlocking(ctx, THREADS)).toBe(true);
+    expect(aiRun).not.toHaveBeenCalled();
+  });
+
+  it('blocks without falling back when the gateway request throws', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('network down'));
     vi.stubGlobal('fetch', fetchMock);
 
     const { ctx, aiRun } = makeCtx({

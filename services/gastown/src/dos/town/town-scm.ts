@@ -305,8 +305,8 @@ export async function checkPRStatus(ctx: SCMContext, prUrl: string): Promise<PRS
  * Send the review-thread classification to the Kilo LLM gateway on the town's
  * configured model. Only used when that model is a direct BYOK model, so the
  * call bills the user's own provider key instead of Kilo credits (#4268).
- * A rejected call throws so the caller blocks auto-merge instead of falling
- * back to a Kilo-billed path.
+ * A rejected call throws so the caller blocks auto-merge rather than silently
+ * substituting a different model.
  */
 async function classifyThreadsViaKiloGateway(
   ctx: SCMContext,
@@ -333,6 +333,10 @@ async function classifyThreadsViaKiloGateway(
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 256,
       temperature: 0,
+      // Reasoning-tagged BYOK models (e.g. zai-coding) otherwise spend the
+      // 256-token budget on a thinking trace, leaving no JSON content to parse.
+      // `effort: 'none'` is how the gateway signals thinking disabled.
+      reasoning: { enabled: false, effort: 'none' },
     }),
     signal: AbortSignal.timeout(45_000),
   });
@@ -381,7 +385,9 @@ Respond with ONLY a JSON object (no markdown, no explanation): { "blocking": tru
 
     const townConfig = await ctx.getTownConfig();
     // The refinery role owns the review flow, so its model is the one the user
-    // configured for reviews; fall back to the town default.
+    // configured for reviews; fall back to the town default. Town-level only,
+    // matching the rest of the auto-merge path — rig-level model overrides are
+    // not applied to this auxiliary classification.
     const configuredModel = townConfig.role_models?.refinery ?? townConfig.default_model;
     const byokModel =
       townConfig.kilocode_token && isDirectByokModelId(configuredModel) ? configuredModel : null;

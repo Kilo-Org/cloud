@@ -135,7 +135,7 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isOpenAiModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.openai];
   }
-  if (isClaudeModel(requestedModel)) {
+  if (isClaudeModel(requestedModel) && !isFableModel(requestedModel)) {
     return [
       OpenRouterInferenceProviderIdSchema.enum['google-vertex'],
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],

@@ -367,14 +367,12 @@ describe('applyPreferredProvider', () => {
     expect(request.body.provider).toBeUndefined();
   });
 
-  it('prefers Vertex for Fable', () => {
+  it('does not set a provider order for Fable', () => {
     const request = makeRequest('anthropic/claude-fable-5');
 
     applyPreferredProvider('anthropic/claude-fable-5', request.body);
 
-    expect(request.body.provider).toEqual({
-      order: ['google-vertex', 'amazon-bedrock', 'anthropic'],
-    });
+    expect(request.body.provider).toBeUndefined();
   });
 
   it('preserves valid provider options when adding order', () => {

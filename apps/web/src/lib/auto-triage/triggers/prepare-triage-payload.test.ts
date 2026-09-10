@@ -62,7 +62,7 @@ describe('prepareTriagePayload workflow token ownership', () => {
         .select()
         .from(kilocode_users)
         .where(eq(kilocode_users.id, 'user-1'));
-      expect(persisted.api_token_pepper).toEqual(expect.any(String));
+      expect(persisted.api_token_pepper).toBe(null);
       expect(mockGenerateCloudAgentWorkflowToken).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'user-1', api_token_pepper: persisted.api_token_pepper }),
         expect.objectContaining({ organizationId: expectedOrganizationId })

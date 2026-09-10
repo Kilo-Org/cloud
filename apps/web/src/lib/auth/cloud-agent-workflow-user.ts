@@ -1,5 +1,4 @@
-import { randomUUID } from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { kilocode_users, type User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { isResourceTokenIssuanceEnabled, type ResourceTokenFamily } from '@/lib/config.server';
@@ -12,13 +11,12 @@ export async function prepareCloudAgentWorkflowUser(
     return user;
   }
 
-  // Use the primary's persisted value: another issuer or revocation may have
-  // assigned a pepper since this user was loaded. Never overwrite that value.
+  // Reload null snapshots from the primary without revoking existing credentials.
+  // Another issuer or revocation may have assigned a pepper since this user was loaded.
   const [currentUser] = await db
-    .update(kilocode_users)
-    .set({ api_token_pepper: sql`COALESCE(${kilocode_users.api_token_pepper}, ${randomUUID()})` })
-    .where(eq(kilocode_users.id, user.id))
-    .returning();
+    .select()
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, user.id));
   if (!currentUser) throw new Error(`User ${user.id} not found`);
   return currentUser;
 }

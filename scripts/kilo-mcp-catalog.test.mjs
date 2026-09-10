@@ -11,10 +11,21 @@ const mergeJobName = 'catalog-merge';
 const dumpCommand = 'pnpm --filter web script src/scripts/mcp-catalog/dump.ts';
 const embedCommand = 'node services/kilo-mcp/scripts/embed-catalog.ts upsert';
 const kiloInstallCommand = 'npm install -g @kilocode/cli';
+const mintCommand = 'api/internal/mcp-catalog/token';
+const mintSecretEnv = '${{ secrets.MCP_CATALOG_TOKEN_SECRET }}';
 const mergeGate = "github.event_name == 'push' && github.ref == 'refs/heads/main'";
 const forkCondition = 'github.event.pull_request.head.repo.fork == true';
 const sameRepoCondition = 'github.event.pull_request.head.repo.fork == false';
-const prPaths = ['apps/web/src/**', 'services/kilo-mcp/**', workflowPath, testPath];
+const changeGate = "steps.catalog_changes.outputs.catalog == 'true'";
+// The paths the change-detection step must recognise. The workflow-path
+// entries tolerate the grep escaping (`\.yml`, `\.test\.mjs`) so the required
+// check keeps running the dump whenever the catalog can actually change.
+const catalogPathFragments = [
+  /apps\/web\/src\//,
+  /services\/kilo-mcp\//,
+  /kilo-mcp-catalog\\?\.yml/,
+  /kilo-mcp-catalog\\?\.test\\?\.mjs/,
+];
 
 function readWorkflow() {
   return load(readFileSync(new URL(`../${workflowPath}`, import.meta.url), 'utf8'));
@@ -35,34 +46,46 @@ function validate(workflow) {
   const pr = workflow.jobs[prJobName];
   const merge = workflow.jobs[mergeJobName];
 
-  // Triggers: PRs on the catalog's source paths; pushes on main only.
+  // Triggers: PRs on every branch head (the check is required and must always
+  // report); pushes on main only.
   assert.equal(pr.if, "github.event_name == 'pull_request'", `${prJobName}: PR-event only`);
   assert.equal(merge.if, mergeGate, `${mergeJobName}: gated to main pushes only (requirement 10)`);
-  assert.deepEqual(
-    workflow.on.pull_request.paths,
-    prPaths,
-    'pull_request admits the catalog paths'
+  assert.ok(
+    !workflow.on.pull_request?.paths,
+    'pull_request must not filter by path: a skipped required check blocks unrelated PRs'
   );
   assert.deepEqual(workflow.on.push.branches, ['main'], 'push stays main-only');
 
-  // The PR job runs the real dump script with Kilo CLI credentials so missing
-  // summaries get filled (requirement 2), and keeps author edits through the
-  // dump's own keep-edit rule (requirement 5).
+  // The job always reports, but only catalog-relevant changes pay for the dump.
+  const gate = findStep(pr, step => step.id === 'catalog_changes', 'change-detection step');
+  for (const fragment of catalogPathFragments) {
+    assert.match(gate.run ?? '', fragment, `change-detection step must recognise ${fragment}`);
+  }
+  const gateIndex = pr.steps.indexOf(gate);
+  for (const step of pr.steps.slice(gateIndex + 1)) {
+    assert.match(
+      step.if ?? '',
+      new RegExp(changeGate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      `${step.name ?? step.uses}: every post-detection step must be gated on catalog-relevant changes`
+    );
+  }
+
+  // The PR job runs the real dump script with a short-lived benchmarking
+  // token mint (requirement 2), never a maintainer's personal credential, and
+  // keeps author edits through the dump's own keep-edit rule (requirement 5).
   const prDump = findStep(pr, step => step.run === dumpCommand, 'PR job runs the real dump script');
+  const prMint = findStep(pr, step => step.id === 'mint', 'PR job mints a catalog token');
   assert.equal(
-    prDump.env?.KILO_AUTH_CONTENT,
-    '${{ secrets.MCP_CATALOG_KILO_AUTH }}',
-    'PR dump exports the Kilo CLI credential from the repo secret'
+    prMint.env?.MCP_CATALOG_TOKEN_SECRET,
+    mintSecretEnv,
+    'PR mint reads the shared mint secret from the repo secret'
   );
-  assert.equal(
-    prDump.env?.KILO_API_KEY,
-    '${{ secrets.MCP_CATALOG_KILO_API_KEY }}',
-    'PR dump accepts a durable Kilo API key'
-  );
-  assert.equal(
-    prDump.env?.KILO_ORG_ID,
-    '${{ secrets.MCP_CATALOG_KILO_ORG_ID }}',
-    'PR dump accepts the Kilo org for the API key'
+  assert.match(prMint.run ?? '', new RegExp(mintCommand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(prMint.run ?? '', /KILO_API_KEY/, 'PR mint exports the short-lived Kilo API key');
+  assert.doesNotMatch(
+    JSON.stringify(prDump.env ?? {}),
+    /MCP_CATALOG_KILO_AUTH|KILO_AUTH_CONTENT/,
+    'PR dump must not use the personal CLI credential'
   );
   findStep(
     pr,
@@ -70,7 +93,7 @@ function validate(workflow) {
     'PR job installs the Kilo CLI the dump shells out to'
   );
 
-  // Fork PRs never receive the Kilo credential (GitHub withholds secrets from
+  // Fork PRs never receive the mint secret (GitHub withholds secrets from
   // fork pull_request events), so a fork that adds a query cannot run the dump
   // at all. Requirement 6 must still fire: the dump is continue-on-error on
   // forks only, and a fork-conditioned follow-up step posts the self-service
@@ -159,15 +182,16 @@ function validate(workflow) {
   // Merge job: dump fills stragglers (requirement 8), then the embed script
   // upserts Vectorize with the Cloudflare credentials (requirement 9).
   const mergeDump = findStep(merge, step => step.run === dumpCommand, 'merge job runs the dump');
+  const mergeMint = findStep(merge, step => step.id === 'mint', 'merge job mints a catalog token');
   assert.equal(
-    mergeDump.env?.KILO_AUTH_CONTENT,
-    '${{ secrets.MCP_CATALOG_KILO_AUTH }}',
-    'merge dump exports the Kilo CLI credential'
+    mergeMint.env?.MCP_CATALOG_TOKEN_SECRET,
+    mintSecretEnv,
+    'merge mint reads the shared mint secret from the repo secret'
   );
-  assert.equal(
-    mergeDump.env?.KILO_API_KEY,
-    '${{ secrets.MCP_CATALOG_KILO_API_KEY }}',
-    'merge dump accepts a durable Kilo API key'
+  assert.doesNotMatch(
+    JSON.stringify(mergeDump.env ?? {}),
+    /MCP_CATALOG_KILO_AUTH|KILO_AUTH_CONTENT/,
+    'merge dump must not use the personal CLI credential'
   );
   findStep(
     merge,
@@ -316,6 +340,38 @@ for (const [name, defect] of [
   [
     'merge upsert removed',
     workflow => dropStep(workflow, mergeJobName, step => step.run === embedCommand),
+  ],
+  [
+    'PR dump reverted to the personal credential',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item => item.run === dumpCommand);
+      step.env = { KILO_AUTH_CONTENT: '${{ secrets.MCP_CATALOG_KILO_AUTH }}' };
+    },
+  ],
+  [
+    'PR mint secret changed',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item => item.id === 'mint');
+      step.env.MCP_CATALOG_TOKEN_SECRET = '${{ secrets.SOMETHING_ELSE }}';
+    },
+  ],
+  [
+    'change-detection gate removed',
+    workflow => dropStep(workflow, prJobName, step => step.id === 'catalog_changes'),
+  ],
+  [
+    'change-detection drops a catalog path',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item => item.id === 'catalog_changes');
+      step.run = step.run.replace('^services/kilo-mcp/', '^services/other/');
+    },
+  ],
+  [
+    'a post-detection step escapes the gate',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item => item.run === dumpCommand);
+      delete step.if;
+    },
   ],
 ]) {
   test(`wiring check rejects: ${name}`, () => {

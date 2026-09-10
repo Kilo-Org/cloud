@@ -6,31 +6,37 @@ name: Kilo MCP catalog
 #   the refreshed catalog.json committed back to the PR branch (requirement 5);
 #   fork PRs cannot be pushed to, so the diff ships as a `catalog.patch`
 #   artifact, a one-line PR comment points at it, and the job fails
-#   (requirement 6). A fork PR also gets no Kilo CLI credential (GitHub
-#   withholds secrets from fork events), so when the dump itself cannot run, a
-#   dedicated step posts the credential-free recovery — hand-written summaries
-#   in catalog.json, which the keep-edit rule preserves — and fails the job, so
+#   (requirement 6). A fork PR also gets no catalog credential (GitHub withholds
+#   secrets from fork events), so when the dump itself cannot run, a dedicated
+#   step posts the credential-free recovery — hand-written summaries in
+#   catalog.json, which the keep-edit rule preserves — and fails the job, so
 #   requirement 6 holds on that path too. The PR job never touches Vectorize or
-#   the embed script
-#   (requirement 10) and never generates summaries at runtime — only the dump
-#   does, and it preserves author-edited summaries (requirement 2, s1 keep-edit
-#   rule).
+#   the embed script (requirement 10) and never generates summaries at runtime —
+#   only the dump does, and it preserves author-edited summaries (requirement 2,
+#   s1 keep-edit rule).
+#   `catalog (PR)` is a REQUIRED check on main, so this workflow runs on every
+#   PR (no pull_request path filter). The job is always reported; the
+#   change-detection step gates the heavy work on the catalog's source paths so
+#   an unrelated PR still gets a fast, green check instead of "Expected".
 # - Merge job: gated to main pushes only, so PRs structurally cannot reach it
 #   (requirement 10). Re-runs the dump to fill any summaries that slipped
 #   through (requirement 8), then upserts the Vectorize index (requirement 9).
 #   Production deploys from main, so the committed bundled catalog and the
 #   upserted index stay in lockstep (requirement 22).
 #
+# The dump's `kilo run` never uses a maintainer's personal credential: both jobs
+# mint a short-lived benchmarking-service-account token from apps/web
+# (POST /api/internal/mcp-catalog/token) using MCP_CATALOG_TOKEN_SECRET, a
+# shared secret whose only purpose is that mint.
+#
 # The CI wiring of this file is asserted by scripts/kilo-mcp-catalog.test.mjs
 # (same pattern as scripts/stacked-ci.test.mjs in .github/workflows/ci.yml).
 
 on:
+  # No paths filter: `catalog (PR)` is a required status check, and a
+  # path-filtered workflow leaves that check "Expected" (blocking) on every PR
+  # it skips. The job gates its own work instead.
   pull_request:
-    paths:
-      - 'apps/web/src/**'
-      - 'services/kilo-mcp/**'
-      - '.github/workflows/kilo-mcp-catalog.yml'
-      - 'scripts/kilo-mcp-catalog.test.mjs'
   push:
     branches: [main]
     paths:
@@ -58,12 +64,40 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      # Full history so the change-detection step below can diff against the
+      # PR's base sha.
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          fetch-depth: 0
+
+      # The job always reports (required check); only the catalog's own paths
+      # justify the expensive dump. Keep the patterns in sync with the `push`
+      # filter and with scripts/kilo-mcp-catalog.test.mjs.
+      - name: Detect catalog-relevant changes
+        id: catalog_changes
+        run: |
+          set -euo pipefail
+          # If the base object is unavailable, run the catalog work rather than
+          # skip it: a false "no changes" would break the required check's
+          # promise, while a redundant dump is harmless.
+          base="${{ github.event.pull_request.base.sha }}"
+          if ! git rev-parse --verify "${base}^{commit}" > /dev/null 2>&1; then
+            echo "catalog=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$base" HEAD \
+            | grep -Eq '^apps/web/src/|^services/kilo-mcp/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
+            echo "catalog=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "catalog=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Setup pnpm
+        if: steps.catalog_changes.outputs.catalog == 'true'
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Setup Node
+        if: steps.catalog_changes.outputs.catalog == 'true'
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
@@ -71,39 +105,67 @@ jobs:
 
       # The dump shells out to `kilo run` to generate missing summaries.
       - name: Install Kilo CLI
+        if: steps.catalog_changes.outputs.catalog == 'true'
         run: npm install -g @kilocode/cli
 
       - name: Install root dependencies
+        if: steps.catalog_changes.outputs.catalog == 'true'
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
       - name: Check catalog workflow wiring
+        if: steps.catalog_changes.outputs.catalog == 'true'
         run: node --test scripts/kilo-mcp-catalog.test.mjs
 
       - name: Install web dependencies
+        if: steps.catalog_changes.outputs.catalog == 'true'
         run: pnpm install --frozen-lockfile --filter web...
 
       # Same dummies the jest suite already tolerates (ci.yml does the same for
       # the production build). The dump itself layers apps/web/.env.test under
-      # any real env, and dotenv never overrides exported values, so the LLM
-      # key below always wins over the .env.test placeholder.
+      # any real env, and dotenv never overrides exported values, so the minted
+      # token below always wins over any placeholder.
       - name: Setup dummy env
+        if: steps.catalog_changes.outputs.catalog == 'true'
         working-directory: apps/web
         run: cp .env.test .env
 
+      # Mint a short-lived token for the benchmarking service account so the
+      # dump's `kilo run` never uses a maintainer's personal credential. The
+      # mint endpoint ships with the PR that adds this step, so before that
+      # merge the endpoint 404s; the dump only needs the credential when
+      # summaries are missing, and it still fails loudly if it does.
+      - name: Mint catalog token
+        id: mint
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        continue-on-error: true
+        env:
+          MCP_CATALOG_TOKEN_SECRET: ${{ secrets.MCP_CATALOG_TOKEN_SECRET }}
+          WEB_API_BASE_URL: https://app.kilo.ai
+        run: |
+          set -euo pipefail
+          response="$(curl -fsS -X POST "$WEB_API_BASE_URL/api/internal/mcp-catalog/token" \
+            -H "Authorization: Bearer $MCP_CATALOG_TOKEN_SECRET" \
+            -H 'content-type: application/json' \
+            -d '{}')"
+          token="$(printf '%s' "$response" | jq -r '.token')"
+          org="$(printf '%s' "$response" | jq -r '.organizationId')"
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "::error::The catalog token mint returned no token"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "KILO_API_KEY=$token" >> "$GITHUB_ENV"
+          echo "KILO_ORG_ID=$org" >> "$GITHUB_ENV"
+
       - name: Regenerate catalog.json
         id: dump
-        # Fork PRs never receive MCP_CATALOG_KILO_AUTH (GitHub withholds
+        if: steps.catalog_changes.outputs.catalog == 'true'
+        # Fork PRs never receive MCP_CATALOG_TOKEN_SECRET (GitHub withholds
         # secrets from fork pull_request events), so a fork PR that adds a
         # query without committed summaries always fails the dump here.
         # Tolerate that on forks so the guidance step below can still honour
         # requirement 6; a same-repo dump failure stays fatal.
         continue-on-error: ${{ github.event.pull_request.head.repo.fork == true }}
-        env:
-          # Either a signed-in CLI auth store (KILO_AUTH_CONTENT) or a
-          # durable Kilo API key + org (KILO_API_KEY / KILO_ORG_ID).
-          KILO_AUTH_CONTENT: ${{ secrets.MCP_CATALOG_KILO_AUTH }}
-          KILO_API_KEY: ${{ secrets.MCP_CATALOG_KILO_API_KEY }}
-          KILO_ORG_ID: ${{ secrets.MCP_CATALOG_KILO_ORG_ID }}
         run: pnpm --filter web script src/scripts/mcp-catalog/dump.ts
 
       # Requirement 6 when the dump itself cannot run: the drift-gated fork
@@ -112,13 +174,16 @@ jobs:
       # keep-edit rule preserves hand-written summaries in the committed
       # catalog — and fails the job. Must run before drift detection.
       - name: Guide fork PR past an un-runnable catalog dump
-        if: steps.dump.outcome == 'failure' && github.event.pull_request.head.repo.fork == true
+        if: >-
+          steps.catalog_changes.outputs.catalog == 'true' &&
+          steps.dump.outcome == 'failure' &&
+          github.event.pull_request.head.repo.fork == true
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           COMMENT_BODY: >-
             The MCP catalog dump failed on this fork PR. Fork PRs never get
-            CI's Kilo CLI credentials (GitHub withholds secrets from fork
+            CI's catalog credentials (GitHub withholds secrets from fork
             events), so summaries for new query paths cannot be generated here.
             To recover, hand-write a summary for each new path in
             `services/kilo-mcp/catalog.json` (committed summaries are kept by
@@ -129,11 +194,12 @@ jobs:
             fix that and push.
         run: |
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$COMMENT_BODY" || true
-          echo "::error::The MCP catalog dump failed on this fork PR (fork PRs get no Kilo CLI credentials). Hand-write a summary for each new path in services/kilo-mcp/catalog.json — the dump keeps committed summaries — or run the dump locally with a signed-in Kilo CLI and push."
+          echo "::error::The MCP catalog dump failed on this fork PR (fork PRs get no catalog credentials). Hand-write a summary for each new path in services/kilo-mcp/catalog.json — the dump keeps committed summaries — or run the dump locally with a signed-in Kilo CLI and push."
           exit 1
 
       - name: Detect catalog drift
         id: drift
+        if: steps.catalog_changes.outputs.catalog == 'true'
         run: |
           if git diff --exit-code -- services/kilo-mcp/catalog.json > /dev/null; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -146,7 +212,10 @@ jobs:
       # an author-edited summary in the committed file survives the regen, so
       # this push never reverts a human edit.
       - name: Commit catalog to PR branch
-        if: steps.drift.outputs.changed == 'true' && github.event.pull_request.head.repo.fork == false
+        if: >-
+          steps.catalog_changes.outputs.catalog == 'true' &&
+          steps.drift.outputs.changed == 'true' &&
+          github.event.pull_request.head.repo.fork == false
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_BRANCH: ${{ github.head_ref }}
@@ -169,11 +238,17 @@ jobs:
       # patch and fail loudly instead of silently leaving the catalog stale
       # (requirement 6).
       - name: Export catalog patch (fork PRs)
-        if: steps.drift.outputs.changed == 'true' && github.event.pull_request.head.repo.fork == true
+        if: >-
+          steps.catalog_changes.outputs.catalog == 'true' &&
+          steps.drift.outputs.changed == 'true' &&
+          github.event.pull_request.head.repo.fork == true
         run: git diff -- services/kilo-mcp/catalog.json > catalog.patch
 
       - name: Upload catalog patch artifact
-        if: steps.drift.outputs.changed == 'true' && github.event.pull_request.head.repo.fork == true
+        if: >-
+          steps.catalog_changes.outputs.catalog == 'true' &&
+          steps.drift.outputs.changed == 'true' &&
+          github.event.pull_request.head.repo.fork == true
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: catalog.patch
@@ -184,7 +259,10 @@ jobs:
       # keeps the job failing with the deliberate ::error annotation below rather
       # than with a raw comment-permission failure.
       - name: Comment on fork PR
-        if: steps.drift.outputs.changed == 'true' && github.event.pull_request.head.repo.fork == true
+        if: >-
+          steps.catalog_changes.outputs.catalog == 'true' &&
+          steps.drift.outputs.changed == 'true' &&
+          github.event.pull_request.head.repo.fork == true
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -199,7 +277,10 @@ jobs:
         run: gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$COMMENT_BODY"
 
       - name: Fail fork PR with stale catalog
-        if: steps.drift.outputs.changed == 'true' && github.event.pull_request.head.repo.fork == true
+        if: >-
+          steps.catalog_changes.outputs.catalog == 'true' &&
+          steps.drift.outputs.changed == 'true' &&
+          github.event.pull_request.head.repo.fork == true
         run: |
           echo "::error::services/kilo-mcp/catalog.json is stale and cannot be committed from a fork PR. Apply the catalog.patch artifact attached to this run, or run the dump locally and push."
           exit 1
@@ -236,15 +317,34 @@ jobs:
         working-directory: apps/web
         run: cp .env.test .env
 
+      # The first main run after this workflow lands may race the apps/web
+      # deploy that adds the mint endpoint; the dump only needs the credential
+      # when summaries are missing, so a failed mint is tolerated here too.
+      - name: Mint catalog token
+        id: mint
+        continue-on-error: true
+        env:
+          MCP_CATALOG_TOKEN_SECRET: ${{ secrets.MCP_CATALOG_TOKEN_SECRET }}
+          WEB_API_BASE_URL: https://app.kilo.ai
+        run: |
+          set -euo pipefail
+          response="$(curl -fsS -X POST "$WEB_API_BASE_URL/api/internal/mcp-catalog/token" \
+            -H "Authorization: Bearer $MCP_CATALOG_TOKEN_SECRET" \
+            -H 'content-type: application/json' \
+            -d '{}')"
+          token="$(printf '%s' "$response" | jq -r '.token')"
+          org="$(printf '%s' "$response" | jq -r '.organizationId')"
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "::error::The catalog token mint returned no token"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "KILO_API_KEY=$token" >> "$GITHUB_ENV"
+          echo "KILO_ORG_ID=$org" >> "$GITHUB_ENV"
+
       # Fill any summaries that slipped through before the index is updated
       # (requirement 8); keep-edit semantics leave author edits alone.
       - name: Regenerate catalog.json
-        env:
-          # Either a signed-in CLI auth store (KILO_AUTH_CONTENT) or a
-          # durable Kilo API key + org (KILO_API_KEY / KILO_ORG_ID).
-          KILO_AUTH_CONTENT: ${{ secrets.MCP_CATALOG_KILO_AUTH }}
-          KILO_API_KEY: ${{ secrets.MCP_CATALOG_KILO_API_KEY }}
-          KILO_ORG_ID: ${{ secrets.MCP_CATALOG_KILO_ORG_ID }}
         run: pnpm --filter web script src/scripts/mcp-catalog/dump.ts
 
       # Vectorize upsert (requirement 9). The index name and account id match

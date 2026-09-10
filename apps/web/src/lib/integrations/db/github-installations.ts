@@ -812,141 +812,65 @@ export async function materializeGitHubInstallationIdentity(input: {
   });
 }
 
-export async function recordSharedGitHubInstallationDelivery(input: {
+export async function getGitHubInstallationDeliveryStatus(input: {
+  installationId: string;
+  appType: 'standard' | 'lite';
+  deliveryId: string;
+}): Promise<'completed' | 'not_completed' | 'missing_canonical'> {
+  const [installation] = await db
+    .select({ id: github_app_installations.id })
+    .from(github_app_installations)
+    .where(
+      and(
+        eq(github_app_installations.github_app_type, input.appType),
+        eq(github_app_installations.installation_id, input.installationId)
+      )
+    )
+    .limit(1);
+  if (!installation) return 'missing_canonical';
+  const [receipt] = await db
+    .select({ id: github_installation_webhook_receipts.id })
+    .from(github_installation_webhook_receipts)
+    .where(
+      and(
+        eq(github_installation_webhook_receipts.github_installation_id, installation.id),
+        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId)
+      )
+    )
+    .limit(1);
+  return receipt ? 'completed' : 'not_completed';
+}
+
+export async function recordCompletedGitHubInstallationDelivery(input: {
   installationId: string;
   appType: 'standard' | 'lite';
   deliveryId: string;
   eventType: string;
-}): Promise<
-  | { status: 'claimed'; attemptCount: number }
-  | { status: 'duplicate' }
-  | { status: 'in_progress'; retryAfterSeconds: number }
-  | { status: 'missing_canonical' }
-> {
-  return db.transaction(async tx => {
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtext(${`${input.appType}:${input.installationId}`}))`
-    );
-    const [installation] = await tx
-      .select({ id: github_app_installations.id })
-      .from(github_app_installations)
-      .where(
-        and(
-          eq(github_app_installations.github_app_type, input.appType),
-          eq(github_app_installations.installation_id, input.installationId)
-        )
-      )
-      .for('update');
-    if (!installation) {
-      return { status: 'missing_canonical' };
-    }
-    const inserted = await tx
-      .insert(github_installation_webhook_receipts)
-      .values({
-        github_installation_id: installation.id,
-        delivery_id: input.deliveryId,
-        event_type: input.eventType,
-        lease_expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
-      })
-      .onConflictDoNothing({
-        target: [
-          github_installation_webhook_receipts.github_installation_id,
-          github_installation_webhook_receipts.delivery_id,
-        ],
-      })
-      .returning({ attemptCount: github_installation_webhook_receipts.attempt_count });
-    if (inserted[0]) return { status: 'claimed', attemptCount: inserted[0].attemptCount };
-    const [receipt] = await tx
-      .select()
-      .from(github_installation_webhook_receipts)
-      .where(
-        and(
-          eq(github_installation_webhook_receipts.github_installation_id, installation.id),
-          eq(github_installation_webhook_receipts.delivery_id, input.deliveryId)
-        )
-      )
-      .for('update');
-    if (!receipt || receipt.status === 'completed') return { status: 'duplicate' };
-    const leaseExpiresAt = new Date(receipt.lease_expires_at).getTime();
-    if (leaseExpiresAt > Date.now()) {
-      return {
-        status: 'in_progress',
-        retryAfterSeconds: Math.max(1, Math.ceil((leaseExpiresAt - Date.now()) / 1000)),
-      };
-    }
-    const [reclaimed] = await tx
-      .update(github_installation_webhook_receipts)
-      .set({
-        lease_expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
-        attempt_count: sql`${github_installation_webhook_receipts.attempt_count} + 1`,
-      })
-      .where(eq(github_installation_webhook_receipts.id, receipt.id))
-      .returning({ attemptCount: github_installation_webhook_receipts.attempt_count });
-    if (!reclaimed) throw new Error('Shared GitHub delivery reclaim failed');
-    return { status: 'claimed', attemptCount: reclaimed.attemptCount };
-  });
-}
-
-export async function deleteSharedGitHubInstallationDelivery(input: {
-  installationId: string;
-  appType: 'standard' | 'lite';
-  deliveryId: string;
-  attemptCount: number;
 }): Promise<void> {
-  await db
-    .update(github_installation_webhook_receipts)
-    .set({
-      lease_expires_at: new Date(0).toISOString(),
-    })
+  const [installation] = await db
+    .select({ id: github_app_installations.id })
+    .from(github_app_installations)
     .where(
       and(
-        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId),
-        eq(github_installation_webhook_receipts.attempt_count, input.attemptCount),
-        eq(
-          github_installation_webhook_receipts.github_installation_id,
-          db
-            .select({ id: github_app_installations.id })
-            .from(github_app_installations)
-            .where(
-              and(
-                eq(github_app_installations.github_app_type, input.appType),
-                eq(github_app_installations.installation_id, input.installationId)
-              )
-            )
-        )
-      )
-    );
-}
-
-export async function completeSharedGitHubInstallationDelivery(input: {
-  installationId: string;
-  appType: 'standard' | 'lite';
-  deliveryId: string;
-  attemptCount: number;
-}): Promise<void> {
-  const completed = await db
-    .update(github_installation_webhook_receipts)
-    .set({ status: 'completed', completed_at: new Date().toISOString() })
-    .where(
-      and(
-        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId),
-        eq(github_installation_webhook_receipts.attempt_count, input.attemptCount),
-        eq(
-          github_installation_webhook_receipts.github_installation_id,
-          db
-            .select({ id: github_app_installations.id })
-            .from(github_app_installations)
-            .where(
-              and(
-                eq(github_app_installations.github_app_type, input.appType),
-                eq(github_app_installations.installation_id, input.installationId)
-              )
-            )
-        )
+        eq(github_app_installations.github_app_type, input.appType),
+        eq(github_app_installations.installation_id, input.installationId)
       )
     )
-    .returning({ id: github_installation_webhook_receipts.id });
-  if (completed.length !== 1) throw new Error('Shared GitHub delivery completion failed');
+    .limit(1);
+  if (!installation) throw new Error('Canonical GitHub installation not found for delivery');
+  await db
+    .insert(github_installation_webhook_receipts)
+    .values({
+      github_installation_id: installation.id,
+      delivery_id: input.deliveryId,
+      event_type: input.eventType,
+    })
+    .onConflictDoNothing({
+      target: [
+        github_installation_webhook_receipts.github_installation_id,
+        github_installation_webhook_receipts.delivery_id,
+      ],
+    });
 }
 
 export async function bindGitHubIntegrationToCanonicalInstallation(input: {

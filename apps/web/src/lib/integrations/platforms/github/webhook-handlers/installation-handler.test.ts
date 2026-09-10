@@ -346,14 +346,26 @@ describe('handleInstallationDeleted', () => {
     expect(mockDeleteGitHubInstallationRecords).toHaveBeenCalledWith('98765', 'standard');
   });
 
-  it('propagates bot identity infrastructure failure before acknowledging deletion', async () => {
+  it('keeps completed database cleanup when bot identity unlink fails', async () => {
     mockUnlinkTeamKiloUsers.mockRejectedValue(new Error('identity store unavailable'));
 
-    await expect(handleInstallationDeleted(deletedPayload, 'standard')).rejects.toThrow(
-      'identity store unavailable'
-    );
+    await expect(handleInstallationDeleted(deletedPayload, 'standard')).resolves.toBeDefined();
     expect(mockCaptureException).toHaveBeenCalled();
-    expect(mockObserveGitHubInstallationLifecycle).not.toHaveBeenCalled();
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({ state: 'deleted' })
+    );
+    expect(mockObserveGitHubInstallationLifecycle.mock.invocationCallOrder[0]).toBeLessThan(
+      mockUnlinkTeamKiloUsers.mock.invocationCallOrder[0]!
+    );
+  });
+
+  it('fails before bot unlink when required database cleanup fails', async () => {
+    mockObserveGitHubInstallationLifecycle.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(handleInstallationDeleted(deletedPayload, 'standard')).rejects.toThrow(
+      'database unavailable'
+    );
+    expect(mockUnlinkTeamKiloUsers).not.toHaveBeenCalled();
   });
 
   it('lite app deletion does not unlink bot identities and passes the app type', async () => {

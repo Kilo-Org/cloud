@@ -175,6 +175,15 @@ export async function handleInstallationDeleted(
 ) {
   const installationIdStr = payload.installation.id.toString();
 
+  await observeGitHubInstallationLifecycle({
+    installationId: installationIdStr,
+    appType,
+    state: 'deleted',
+  });
+  if (!isGitHubConnectionManagementEnabled()) {
+    await deleteGitHubInstallationRecords(installationIdStr, appType);
+  }
+
   try {
     // The bot identity store has no app-type dimension and the lite app has no
     // bot-link flow, so only the standard app unlinks team bot identities.
@@ -187,16 +196,6 @@ export async function handleInstallationDeleted(
       tags: { component: 'kilo-bot', op: 'github-installation-deleted-unlink' },
       extra: { installationId: installationIdStr },
     });
-    throw error;
-  }
-
-  await observeGitHubInstallationLifecycle({
-    installationId: installationIdStr,
-    appType,
-    state: 'deleted',
-  });
-  if (!isGitHubConnectionManagementEnabled()) {
-    await deleteGitHubInstallationRecords(installationIdStr, appType);
   }
 
   return NextResponse.json({ message: 'Installation removed' }, { status: 200 });

@@ -13,11 +13,11 @@ import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { assertGitHubAutomationCanBeEnabled } from '../github/sharing-compatibility';
 import {
   connectVerifiedGitHubInstallation,
-  completeSharedGitHubInstallationDelivery,
+  getGitHubInstallationDeliveryStatus,
   materializeGitHubInstallationIdentity,
   disconnectGitHubInstallation,
   observeGitHubInstallationLifecycle,
-  recordSharedGitHubInstallationDelivery,
+  recordCompletedGitHubInstallationDelivery,
   uninstallExclusiveGitHubInstallation,
   updateGitHubInstallationRepositories,
   updateGitHubInstallationAccountIdentity,
@@ -121,47 +121,25 @@ describe('GitHub installation persistence', () => {
       assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationB.id })
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
     await expect(
-      recordSharedGitHubInstallationDelivery({
+      getGitHubInstallationDeliveryStatus({
         installationId: '123456',
         appType: 'standard',
         deliveryId: 'delivery-1',
-        eventType: 'installation.deleted',
       })
-    ).resolves.toEqual({ status: 'claimed', attemptCount: 1 });
-    await expect(
-      recordSharedGitHubInstallationDelivery({
-        installationId: '123456',
-        appType: 'standard',
-        deliveryId: 'delivery-1',
-        eventType: 'installation.deleted',
-      })
-    ).resolves.toEqual({ status: 'in_progress', retryAfterSeconds: expect.any(Number) });
-    await db
-      .update(github_installation_webhook_receipts)
-      .set({ lease_expires_at: '2020-01-01T00:00:00.000Z' })
-      .where(eq(github_installation_webhook_receipts.delivery_id, 'delivery-1'));
-    await expect(
-      recordSharedGitHubInstallationDelivery({
-        installationId: '123456',
-        appType: 'standard',
-        deliveryId: 'delivery-1',
-        eventType: 'installation.deleted',
-      })
-    ).resolves.toEqual({ status: 'claimed', attemptCount: 2 });
-    await completeSharedGitHubInstallationDelivery({
+    ).resolves.toBe('not_completed');
+    await recordCompletedGitHubInstallationDelivery({
       installationId: '123456',
       appType: 'standard',
       deliveryId: 'delivery-1',
-      attemptCount: 2,
+      eventType: 'installation.deleted',
     });
     await expect(
-      recordSharedGitHubInstallationDelivery({
+      getGitHubInstallationDeliveryStatus({
         installationId: '123456',
         appType: 'standard',
         deliveryId: 'delivery-1',
-        eventType: 'installation.deleted',
       })
-    ).resolves.toEqual({ status: 'duplicate' });
+    ).resolves.toBe('completed');
     await expect(db.select().from(github_installation_webhook_receipts)).resolves.toHaveLength(1);
   });
 
@@ -395,18 +373,17 @@ describe('GitHub installation persistence', () => {
       assertGitHubInstallationRuntimeAuthorized('123456', 'standard')
     ).resolves.toBeUndefined();
     await expect(
-      recordSharedGitHubInstallationDelivery({
+      getGitHubInstallationDeliveryStatus({
         installationId: '123456',
         appType: 'standard',
         deliveryId: 'delivery-after-demotion',
-        eventType: 'installation.deleted',
       })
-    ).resolves.toEqual({ status: 'claimed', attemptCount: 1 });
-    await completeSharedGitHubInstallationDelivery({
+    ).resolves.toBe('not_completed');
+    await recordCompletedGitHubInstallationDelivery({
       installationId: '123456',
       appType: 'standard',
       deliveryId: 'delivery-after-demotion',
-      attemptCount: 1,
+      eventType: 'installation.deleted',
     });
     await expect(
       assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationB.id })
@@ -667,27 +644,25 @@ describe('GitHub installation persistence', () => {
     ).resolves.toBeUndefined();
     await materializeGitHubInstallationIdentity({ installationId: '654321', appType: 'standard' });
     await expect(
-      recordSharedGitHubInstallationDelivery({
+      getGitHubInstallationDeliveryStatus({
         installationId: '654321',
         appType: 'standard',
         deliveryId: 'legacy-delete',
-        eventType: 'installation.deleted',
       })
-    ).resolves.toEqual({ status: 'claimed', attemptCount: 1 });
-    await completeSharedGitHubInstallationDelivery({
+    ).resolves.toBe('not_completed');
+    await recordCompletedGitHubInstallationDelivery({
       installationId: '654321',
       appType: 'standard',
       deliveryId: 'legacy-delete',
-      attemptCount: 1,
+      eventType: 'installation.deleted',
     });
     await expect(
-      recordSharedGitHubInstallationDelivery({
+      getGitHubInstallationDeliveryStatus({
         installationId: '654321',
         appType: 'standard',
         deliveryId: 'legacy-delete',
-        eventType: 'installation.deleted',
       })
-    ).resolves.toEqual({ status: 'duplicate' });
+    ).resolves.toBe('completed');
   });
 
   test('ignores an unbound shadow when canonical identity already exists', async () => {

@@ -47,11 +47,10 @@ import {
   GitHubRuntimeAuthorizationError,
 } from '@/lib/integrations/github/runtime-authorization';
 import {
-  completeSharedGitHubInstallationDelivery,
-  deleteSharedGitHubInstallationDelivery,
+  getGitHubInstallationDeliveryStatus,
   isSharedGitHubInstallation,
   materializeGitHubInstallationIdentity,
-  recordSharedGitHubInstallationDelivery,
+  recordCompletedGitHubInstallationDelivery,
 } from '@/lib/integrations/db/github-installations';
 
 async function isAvailableForDeferredGitHubDispatch(integration: {
@@ -173,49 +172,24 @@ export async function handleGitHubWebhook(
       action: string,
       dispatch: () => Promise<Response>
     ): Promise<Response> => {
-      const receipt = await recordSharedGitHubInstallationDelivery({
+      const receipt = await getGitHubInstallationDeliveryStatus({
         installationId,
         appType,
         deliveryId: eventSignature,
-        eventType: `${eventType}.${action}`,
       });
-      if (receipt.status === 'missing_canonical') return dispatch();
-      if (receipt.status === 'duplicate') {
+      if (receipt === 'completed') {
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
       }
-      if (receipt.status === 'in_progress') {
-        return NextResponse.json(
-          { message: 'Event is still processing' },
-          {
-            status: 503,
-            headers: { 'Retry-After': receipt.retryAfterSeconds.toString() },
-          }
-        );
-      }
-      try {
-        const response = await dispatch();
-        await completeSharedGitHubInstallationDelivery({
+      const response = await dispatch();
+      if (receipt !== 'missing_canonical') {
+        await recordCompletedGitHubInstallationDelivery({
           installationId,
           appType,
           deliveryId: eventSignature,
-          attemptCount: receipt.attemptCount,
+          eventType: `${eventType}.${action}`,
         });
-        return response;
-      } catch (error) {
-        try {
-          await deleteSharedGitHubInstallationDelivery({
-            installationId,
-            appType,
-            deliveryId: eventSignature,
-            attemptCount: receipt.attemptCount,
-          });
-        } catch (releaseError) {
-          captureException(releaseError, {
-            tags: { source: 'shared_github_delivery_release' },
-          });
-        }
-        throw error;
       }
+      return response;
     };
 
     // 5. Route based on event type with type-safe Zod parsing

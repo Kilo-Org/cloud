@@ -3,12 +3,7 @@ CREATE TABLE "github_installation_webhook_receipts" (
 	"github_installation_id" uuid NOT NULL,
 	"delivery_id" text NOT NULL,
 	"event_type" text NOT NULL,
-	"status" text DEFAULT 'pending' NOT NULL,
-	"lease_expires_at" timestamp with time zone NOT NULL,
-	"attempt_count" integer DEFAULT 1 NOT NULL,
-	"completed_at" timestamp with time zone,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "github_installation_webhook_receipts_status_check" CHECK ("github_installation_webhook_receipts"."status" IN ('pending', 'completed'))
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "provider_oauth_attempts" (

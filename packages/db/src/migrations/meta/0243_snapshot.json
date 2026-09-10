@@ -1,5 +1,5 @@
 {
-  "id": "478a4add-6f77-4381-8b56-753204fa4c38",
+  "id": "e00b62f1-939f-4d71-bf8f-4a5e9e304016",
   "prevId": "ec12e5ab-51c0-4f29-ad88-bfe14f7f38c2",
   "version": "7",
   "dialect": "postgresql",
@@ -13095,32 +13095,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "lease_expires_at": {
-          "name": "lease_expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "attempt_count": {
-          "name": "attempt_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -13170,12 +13144,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "github_installation_webhook_receipts_status_check": {
-          "name": "github_installation_webhook_receipts_status_check",
-          "value": "\"github_installation_webhook_receipts\".\"status\" IN ('pending', 'completed')"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.http_ip": {

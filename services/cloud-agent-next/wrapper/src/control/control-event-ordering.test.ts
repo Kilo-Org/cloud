@@ -162,7 +162,7 @@ describe('control event publication ordering', () => {
     }
   );
 
-  it('re-arms a woken reservation if another Session consumes the available bytes', async () => {
+  it('keeps a woken reservation isolated from another root lane', async () => {
     const outbox = createControlEventOutbox({ publish: async () => {}, onFailure: mock() });
     try {
       for (let index = 0; index < 8; index += 1)
@@ -182,18 +182,7 @@ describe('control event publication ordering', () => {
             outbox.prepare({ event: 'session.event', session: other, payload: medium })
           )
         ).toBe(true);
-      expect(outbox.enqueue(older)).toBe(false);
-      const waitingAgain = outbox.waitForSpace(older);
-      expect(waitingAgain).not.toBe(waiting);
-      expect(outbox.waitForSpace(older)).toBe(waitingAgain);
-      let settled = false;
-      void waitingAgain.then(() => {
-        settled = true;
-      });
-      await Promise.resolve();
-      expect(settled).toBe(false);
-      outbox.close();
-      expect(await waitingAgain).toBe(false);
+      expect(outbox.enqueue(older)).toBe(true);
     } finally {
       outbox.close();
     }

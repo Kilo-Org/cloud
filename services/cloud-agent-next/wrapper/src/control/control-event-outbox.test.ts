@@ -12,7 +12,356 @@ const session = {
   rootKiloSessionId: 'ses_root',
 };
 
+async function waitFor(condition: () => boolean, attempts = 100): Promise<void> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (condition()) return;
+    await Bun.sleep(1);
+  }
+  throw new Error('Timed out waiting for outbox publication');
+}
+
 describe('control event outbox', () => {
+  it('does not let a retryable root A head delay root B', async () => {
+    const published: ControlEventPublication[] = [];
+    let attemptsA = 0;
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+        const root = publication.session.rootKiloSessionId ?? publication.session.kiloSessionId;
+        if (root === 'root_a' && attemptsA++ === 0)
+          throw new ControlDeliveryError('root A is not attached', true);
+      },
+      onFailure: mock(),
+    });
+    try {
+      outbox.enqueue(
+        outbox.prepare({
+          event: 'session.event',
+          session: { ...session, kiloSessionId: 'root_a', rootKiloSessionId: 'root_a' },
+          payload: { type: 'session.idle', properties: {} },
+        })
+      );
+      outbox.enqueue(
+        outbox.prepare({
+          event: 'session.event',
+          session: { ...session, kiloSessionId: 'root_b', rootKiloSessionId: 'root_b' },
+          payload: { type: 'session.idle', properties: {} },
+        })
+      );
+
+      expect(await outbox.resume()).toBe(false);
+      expect(
+        published.map(item => item.session.rootKiloSessionId ?? item.session.kiloSessionId)
+      ).toEqual(['root_a', 'root_b']);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('wakes an active cycle when a new root is admitted during a pending receipt', async () => {
+    const startedA = Promise.withResolvers<void>();
+    const releaseA = Promise.withResolvers<void>();
+    const rootA = { ...session, kiloSessionId: 'root_a', rootKiloSessionId: 'root_a' };
+    const rootB = { ...session, kiloSessionId: 'root_b', rootKiloSessionId: 'root_b' };
+    let releasedA = false;
+    let startedB = false;
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        const root = publication.session.rootKiloSessionId ?? publication.session.kiloSessionId;
+        if (root === 'root_a') {
+          startedA.resolve();
+          await releaseA.promise;
+        } else {
+          startedB = true;
+        }
+      },
+      onFailure: mock(),
+    });
+    try {
+      outbox.enqueue(
+        outbox.prepare({
+          event: 'session.event',
+          session: rootA,
+          payload: { type: 'session.idle' },
+        })
+      );
+      const draining = outbox.resume();
+      await startedA.promise;
+      expect(
+        outbox.enqueue(
+          outbox.prepare({
+            event: 'session.event',
+            session: rootB,
+            payload: { type: 'session.idle' },
+          })
+        )
+      ).toBe(true);
+      await waitFor(() => startedB);
+      expect(releasedA).toBe(false);
+      releasedA = true;
+      releaseA.resolve();
+      expect(await draining).toBe(true);
+    } finally {
+      releaseA.resolve();
+      outbox.close();
+    }
+  });
+
+  it('wakes a retry-ready root while another root receipt remains pending', async () => {
+    const releaseB = Promise.withResolvers<void>();
+    const rootA = { ...session, kiloSessionId: 'root_a', rootKiloSessionId: 'root_a' };
+    const rootB = { ...session, kiloSessionId: 'root_b', rootKiloSessionId: 'root_b' };
+    let attemptsA = 0;
+    let startedB = false;
+    let retriedA = false;
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        const root = publication.session.rootKiloSessionId ?? publication.session.kiloSessionId;
+        if (root === 'root_a') {
+          attemptsA += 1;
+          if (attemptsA === 1) throw new ControlDeliveryError('root A is not attached', true);
+          retriedA = true;
+          return;
+        }
+        startedB = true;
+        await releaseB.promise;
+      },
+      onFailure: mock(),
+    });
+    try {
+      outbox.enqueue(
+        outbox.prepare({
+          event: 'session.event',
+          session: rootA,
+          payload: { type: 'session.idle' },
+        })
+      );
+      outbox.enqueue(
+        outbox.prepare({
+          event: 'session.event',
+          session: rootB,
+          payload: { type: 'session.idle' },
+        })
+      );
+      const draining = outbox.resume();
+      await waitFor(() => startedB);
+      await waitFor(() => retriedA, 500);
+      releaseB.resolve();
+      expect(await draining).toBe(true);
+    } finally {
+      releaseB.resolve();
+      outbox.close();
+    }
+  });
+
+  it('keeps entry, byte, and waiter limits independent per root', async () => {
+    const outbox = createControlEventOutbox({ publish: async () => {}, onFailure: mock() });
+    const rootA = { ...session, kiloSessionId: 'root_a', rootKiloSessionId: 'root_a' };
+    const rootB = { ...session, kiloSessionId: 'root_b', rootKiloSessionId: 'root_b' };
+    const small = { type: 'session.idle', properties: {} };
+    try {
+      for (let index = 0; index < 256; index += 1)
+        expect(
+          outbox.enqueue(outbox.prepare({ event: 'session.event', session: rootA, payload: small }))
+        ).toBe(true);
+      expect(
+        outbox.enqueue(outbox.prepare({ event: 'session.event', session: rootA, payload: small }))
+      ).toBe(false);
+      expect(
+        outbox.enqueue(outbox.prepare({ event: 'session.event', session: rootB, payload: small }))
+      ).toBe(true);
+
+      outbox.pause();
+      outbox.close();
+      const bytesOutbox = createControlEventOutbox({ publish: async () => {}, onFailure: mock() });
+      try {
+        const medium = {
+          type: 'message.updated',
+          properties: { text: 'm'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.45)) },
+        };
+        for (let index = 0; index < 256; index += 1) {
+          if (
+            !bytesOutbox.enqueue(
+              bytesOutbox.prepare({ event: 'session.event', session: rootA, payload: medium })
+            )
+          )
+            break;
+        }
+        expect(
+          bytesOutbox.enqueue(
+            bytesOutbox.prepare({ event: 'session.event', session: rootA, payload: medium })
+          )
+        ).toBe(false);
+        expect(
+          bytesOutbox.enqueue(
+            bytesOutbox.prepare({ event: 'session.event', session: rootB, payload: medium })
+          )
+        ).toBe(true);
+      } finally {
+        bytesOutbox.close();
+      }
+
+      const waiterOutbox = createControlEventOutbox({ publish: async () => {}, onFailure: mock() });
+      try {
+        for (let index = 0; index < 256; index += 1)
+          expect(
+            waiterOutbox.enqueue(
+              waiterOutbox.prepare({ event: 'session.event', session: rootA, payload: small })
+            )
+          ).toBe(true);
+        const rootWaiters: Array<Promise<boolean>> = [];
+        for (let index = 0; index < 256; index += 1) {
+          const publication = waiterOutbox.prepare({
+            event: 'session.event',
+            session: rootA,
+            payload: small,
+          });
+          expect(waiterOutbox.enqueue(publication)).toBe(false);
+          rootWaiters.push(waiterOutbox.waitForSpace(publication));
+        }
+        for (let index = 0; index < 256; index += 1)
+          expect(
+            waiterOutbox.enqueue(
+              waiterOutbox.prepare({ event: 'session.event', session: rootB, payload: small })
+            )
+          ).toBe(true);
+        const rootBPublication = waiterOutbox.prepare({
+          event: 'session.event',
+          session: rootB,
+          payload: small,
+        });
+        expect(waiterOutbox.enqueue(rootBPublication)).toBe(false);
+        const rootBWaiter = waiterOutbox.waitForSpace(rootBPublication);
+        let settled = false;
+        void rootBWaiter.then(() => {
+          settled = true;
+        });
+        await Promise.resolve();
+        expect(settled).toBe(false);
+        waiterOutbox.close();
+        expect(await rootBWaiter).toBe(false);
+        expect(await Promise.all(rootWaiters)).toEqual(Array.from({ length: 256 }, () => false));
+      } finally {
+        waiterOutbox.close();
+      }
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('sends roots fairly while keeping one publication in flight per root', async () => {
+    const started: ControlEventPublication[] = [];
+    const active = new Map<string, number>();
+    const maximum = new Map<string, number>();
+    const releases = new Map<string, PromiseWithResolvers<void>>();
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        const root = publication.session.rootKiloSessionId ?? publication.session.kiloSessionId;
+        if (!root) throw new Error('Missing root');
+        const count = (active.get(root) ?? 0) + 1;
+        active.set(root, count);
+        maximum.set(root, Math.max(maximum.get(root) ?? 0, count));
+        started.push(publication);
+        const release = Promise.withResolvers<void>();
+        releases.set(`${root}:${publication.sequence}`, release);
+        await release.promise;
+        active.set(root, count - 1);
+      },
+      onFailure: mock(),
+    });
+    const rootA = { ...session, kiloSessionId: 'root_a', rootKiloSessionId: 'root_a' };
+    const rootB = { ...session, kiloSessionId: 'root_b', rootKiloSessionId: 'root_b' };
+    try {
+      for (const [root, count] of [
+        [rootA, 2],
+        [rootB, 2],
+      ] as const)
+        for (let index = 0; index < count; index += 1)
+          outbox.enqueue(
+            outbox.prepare({
+              event: 'session.event',
+              session: root,
+              payload: { type: 'session.idle', properties: {} },
+            })
+          );
+
+      const draining = outbox.resume();
+      await waitFor(() => started.length === 2);
+      expect(started.map(item => item.session.rootKiloSessionId)).toEqual(['root_a', 'root_b']);
+      expect(maximum).toEqual(
+        new Map([
+          ['root_a', 1],
+          ['root_b', 1],
+        ])
+      );
+
+      releases.get('root_a:1')?.resolve();
+      await waitFor(() => started.length === 3);
+      expect(started[2]?.session.rootKiloSessionId).toBe('root_a');
+      expect(maximum.get('root_a')).toBe(1);
+      expect(maximum.get('root_b')).toBe(1);
+
+      releases.get('root_b:3')?.resolve();
+      await waitFor(() => started.length === 4);
+      expect(started[3]?.session.rootKiloSessionId).toBe('root_b');
+      releases.get('root_a:2')?.resolve();
+      releases.get('root_b:4')?.resolve();
+      expect(await draining).toBe(true);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('keeps root and child publications in one FIFO lane', async () => {
+    const published: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+      },
+      onFailure: mock(),
+    });
+    try {
+      const child = { ...session, kiloSessionId: 'ses_child' };
+      const sibling = {
+        ...session,
+        kiloSessionId: 'ses_sibling',
+        rootKiloSessionId: 'ses_sibling',
+      };
+      outbox.enqueue(
+        outbox.prepare({
+          event: 'session.event',
+          session: session,
+          payload: { type: 'session.idle', properties: {} },
+        })
+      );
+      outbox.enqueue(
+        outbox.prepare({
+          event: 'session.preparing',
+          session: child,
+          payload: { action: 'step_started' },
+        })
+      );
+      outbox.enqueue(
+        outbox.prepare({
+          event: 'session.event',
+          session: sibling,
+          payload: { type: 'session.idle', properties: {} },
+        })
+      );
+      expect(await outbox.resume()).toBe(true);
+      const rootPublished = published.filter(
+        item => (item.session.rootKiloSessionId ?? item.session.kiloSessionId) === 'ses_root'
+      );
+      expect(rootPublished.map(item => item.session.kiloSessionId)).toEqual([
+        'ses_root',
+        'ses_child',
+      ]);
+      expect(rootPublished.map(item => item.sequence)).toEqual([1, 2]);
+    } finally {
+      outbox.close();
+    }
+  });
+
   it('snapshots native lifetime before replacement', async () => {
     const published: ControlEventPublication[] = [];
     const outbox = createControlEventOutbox({
@@ -170,6 +519,36 @@ describe('control event outbox', () => {
       );
       expect(await outbox.resume()).toBe(true);
       expect(published).toEqual([1, 2]);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('does not publish a deferred attempt after immediate close', async () => {
+    const published = mock(async () => {});
+    const outbox = createControlEventOutbox({ publish: published, onFailure: mock() });
+    outbox.enqueue(
+      outbox.prepare({ event: 'session.event', session, payload: { type: 'session.idle' } })
+    );
+    const draining = outbox.resume();
+    outbox.close();
+    expect(await draining).toBe(false);
+    expect(published).not.toHaveBeenCalled();
+  });
+
+  it('does not publish a deferred attempt after immediate pause', async () => {
+    const published = mock(async () => {});
+    const outbox = createControlEventOutbox({ publish: published, onFailure: mock() });
+    try {
+      outbox.enqueue(
+        outbox.prepare({ event: 'session.event', session, payload: { type: 'session.idle' } })
+      );
+      const pumping = outbox.resume();
+      outbox.pause();
+      expect(await pumping).toBe(false);
+      expect(published).not.toHaveBeenCalled();
+      expect(await outbox.resume()).toBe(true);
+      expect(published).toHaveBeenCalledTimes(1);
     } finally {
       outbox.close();
     }

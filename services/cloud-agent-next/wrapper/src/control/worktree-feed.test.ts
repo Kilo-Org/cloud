@@ -55,7 +55,7 @@ function nativeFeed(options: FeedOptions) {
   };
 }
 
-function fixture(rejectReconnections = false) {
+function fixture(rejectReconnections = false, onEvent?: (event: KiloFeedEvent) => unknown) {
   const source = {
     scopeId: 'worktree_a',
     runtimeId: crypto.randomUUID(),
@@ -79,7 +79,7 @@ function fixture(rejectReconnections = false) {
     source,
     isCurrent: (runtimeId, kiloClient) =>
       runtimeId === source.runtimeId && kiloClient === source.kiloClient,
-    onEvent: event => events.push(event),
+    onEvent: onEvent ?? (event => events.push(event)),
     onFailure: reason => failures.push(reason),
     onDiagnostic: (_event, fields) =>
       diagnostics.push({
@@ -97,6 +97,37 @@ afterEach(() => {
 });
 
 describe('createWorktreeFeed', () => {
+  it('does not let a slow event callback delay the next feed callback', async () => {
+    const firstEntered = Promise.withResolvers<void>();
+    const releaseFirst = Promise.withResolvers<void>();
+    const received: string[] = [];
+    const h = fixture(false, async event => {
+      received.push(String(event.properties.id));
+      if (received.length === 1) {
+        firstEntered.resolve();
+        await releaseFirst.promise;
+      }
+    });
+    cleanups.push(() => {
+      h.feed.close();
+      h.start.mockRestore();
+    });
+    await h.feed.open();
+    const first = h.attempts[0];
+    if (!first) throw new Error('Missing native feed');
+    await first.emit({
+      directory: h.source.directory,
+      payload: { type: 'message.updated', properties: { id: 'first' } },
+    });
+    await firstEntered.promise;
+    await first.emit({
+      directory: h.source.directory,
+      payload: { type: 'message.updated', properties: { id: 'second' } },
+    });
+    expect(received).toEqual(['first', 'second']);
+    releaseFirst.resolve();
+  });
+
   it.each([true, false])(
     'preserves producer lifetime with event receipts=%s',
     async eventReceipts => {

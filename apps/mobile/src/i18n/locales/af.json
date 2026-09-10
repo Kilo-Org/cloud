@@ -448,6 +448,9 @@
       "acceptTerms": "Aanvaar",
       "replyBadRequest": "Hierdie antwoord kan nie geplaas word nie. Die draad het dalk verander.",
       "replyForbidden": "Jy het nie toestemming om op hierdie trekversoek te antwoord nie.",
+      "addCommentCta": "Kommenteer op hierdie trekversoek",
+      "commentBadRequest": "Hierdie kommentaar kan nie geplaas word nie. Die trekversoek het dalk verander.",
+      "commentForbidden": "Jy het nie toestemming om op hierdie trekversoek kommentaar te lewer nie.",
       "moderation": {
         "reportContent": {
           "terminal": "Hierdie kommentaar kan nie gerapporteer word nie.",

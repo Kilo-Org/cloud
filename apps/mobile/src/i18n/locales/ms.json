@@ -448,6 +448,9 @@
       "acceptTerms": "Terima",
       "replyBadRequest": "Balasan ini tidak dapat disiarkan. Rantaian perbincangan ini mungkin telah berubah.",
       "replyForbidden": "Anda tidak mempunyai kebenaran untuk membalas permintaan tarik ini.",
+      "addCommentCta": "Beri komen pada permintaan tarik ini",
+      "commentBadRequest": "Komen ini tidak dapat disiarkan. Permintaan tarik ini mungkin telah berubah.",
+      "commentForbidden": "Anda tidak mempunyai kebenaran untuk memberi komen pada permintaan tarik ini.",
       "moderation": {
         "reportContent": {
           "terminal": "Komen ini tidak boleh dilaporkan.",

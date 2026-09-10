@@ -452,6 +452,9 @@
       "acceptTerms": "Sprejmi",
       "replyBadRequest": "Tega odgovora ni mogoče objaviti. Nit se je morda spremenila.",
       "replyForbidden": "Nimaš dovoljenja za odgovarjanje na ta zahtevek za združitev.",
+      "addCommentCta": "Komentiraj ta zahtevek za združitev",
+      "commentBadRequest": "Tega komentarja ni mogoče objaviti. Zahtevek za združitev se je morda spremenil.",
+      "commentForbidden": "Nimaš dovoljenja za komentiranje tega zahtevka za združitev.",
       "moderation": {
         "reportContent": {
           "terminal": "Tega komentarja ni mogoče prijaviti.",

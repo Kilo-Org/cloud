@@ -448,6 +448,9 @@
       "acceptTerms": "Tanggapin",
       "replyBadRequest": "Hindi ma-post ang sagot na ito. Maaaring nagbago ang talakayan.",
       "replyForbidden": "Wala kang pahintulot na sumagot sa pull request na ito.",
+      "addCommentCta": "Magkomento sa pull request na ito",
+      "commentBadRequest": "Hindi ma-post ang komentong ito. Maaaring nagbago ang pull request.",
+      "commentForbidden": "Wala kang pahintulot na magkomento sa pull request na ito.",
       "moderation": {
         "reportContent": {
           "terminal": "Hindi maiulat ang komentong ito.",

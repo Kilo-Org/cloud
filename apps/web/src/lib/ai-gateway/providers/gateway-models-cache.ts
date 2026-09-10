@@ -125,8 +125,6 @@ const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
   'minimax-m2.5',
   'minimax-m3',
   'minimax/minimax-m2.5-20260211',
-  'openai/gpt-4o-mini-transcribe',
-  'openai/gpt-4o-transcribe',
   'step-3.5-flash',
 ]);
 

@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import {
   REMOTE_MODEL_CATALOG_MAX_SERIALIZED_BYTES,
   REMOTE_MODEL_IDENTITY_MAX_LENGTH,
@@ -9,9 +11,19 @@ import {
   modelRefsEqual,
   remoteModelCatalogV1Schema,
   remoteModelCatalogWireV1Schema,
+  type RemoteModelCatalogWireV1,
 } from './remote-model-catalog';
 
-function createSdkModel(providerID: string, id: string, variants: string[] = [], name = id) {
+// SdkModelFixture mirrors the wire schema's model shape, so interleaved keeps
+// the boolean | { field } union the schema accepts.
+type SdkModelFixture = RemoteModelCatalogWireV1['all'][number]['models'][string];
+
+function createSdkModel(
+  providerID: string,
+  id: string,
+  variants: string[] = [],
+  name = id
+): SdkModelFixture {
   return {
     id,
     providerID,
@@ -35,13 +47,6 @@ function createSdkModel(providerID: string, id: string, variants: string[] = [],
     variants: Object.fromEntries(variants.map(variant => [variant, {}])),
   };
 }
-
-type SdkModelFixture = ReturnType<typeof createSdkModel> & {
-  recommendedIndex?: number;
-  isFree?: boolean;
-  mayTrainOnYourPrompts?: boolean;
-  hasUserByokAvailable?: boolean;
-};
 
 function createSdkProvider(
   id: string,
@@ -146,6 +151,33 @@ function createUtf8OversizedCatalog() {
 }
 
 describe('remoteModelCatalogV1Schema', () => {
+  it('reproduces the old interleaved enum rejecting CLI catalogs', () => {
+    const oldInterleaved = z.union([
+      z.boolean(),
+      z.object({ field: z.enum(['reasoning_content', 'reasoning_details']) }).strict(),
+    ]);
+
+    expect(oldInterleaved.safeParse({ field: 'reasoning_text' }).success).toBe(false);
+    expect(oldInterleaved.safeParse({ field: 'reasoning' }).success).toBe(false);
+  });
+
+  it('accepts CLI interleaved field names the picker does not use', () => {
+    const fields = ['reasoning', 'reasoning_content', 'reasoning_details', 'reasoning_text'];
+
+    for (const field of fields) {
+      const model = createSdkModel('kilo', 'muse-spark-1.3-contributor');
+      model.capabilities = { ...model.capabilities, interleaved: { field } };
+      const parsed = remoteModelCatalogV1Schema.safeParse(
+        createWireCatalog([createSdkProvider('kilo', [model])])
+      );
+
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.providers[0]?.models[0]?.id).toBe('muse-spark-1.3-contributor');
+      }
+    }
+  });
+
   it('normalizes the SDK ProviderListResponse shape without rewriting model identities', () => {
     const model: SdkModelFixture = createSdkModel(
       'custom/provider:v1',

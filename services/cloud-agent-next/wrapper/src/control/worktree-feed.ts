@@ -135,7 +135,7 @@ export function createWorktreeFeed(options: {
       consume: async stream => {
         for await (const event of unfilteredKiloEvents(stream)) {
           if (!isCurrentAttempt(attempt)) return;
-          await options.onEvent?.({ ...event, nativeRuntimeId: runtimeId });
+          void options.onEvent?.({ ...event, nativeRuntimeId: runtimeId });
         }
       },
       onUnexpectedClose: error => {

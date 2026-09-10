@@ -405,25 +405,37 @@ export function createControlTerminalRuntime(options: {
   return {
     rememberAttachedSession(identity) {
       const kiloRuntime = options.getKiloRuntime(identity.directory);
+      if (shutDown || !kiloRuntime) {
+        throw new ControlTerminalRuntimeError(
+          'unauthorized',
+          'Terminal session runtime unavailable',
+          false
+        );
+      }
       if (
-        shutDown ||
-        !kiloRuntime ||
         directoryForSession(identity.kiloSessionId) !== identity.directory ||
         rootForSession(identity.kiloSessionId) !== identity.kiloSessionId
       ) {
         throw new ControlTerminalRuntimeError(
           'unauthorized',
-          'Terminal session ownership mismatch',
+          'Terminal session belongs to another session',
           false
         );
       }
 
       const existing = attachedSessions.get(identity.sessionId);
       if (existing) {
-        if (!sameSession(existing, identity) || existing.kiloRuntime !== kiloRuntime) {
+        if (!sameSession(existing, identity)) {
           throw new ControlTerminalRuntimeError(
             'unauthorized',
-            'Terminal session ownership mismatch',
+            'Terminal session belongs to another session',
+            false
+          );
+        }
+        if (existing.kiloRuntime !== kiloRuntime) {
+          throw new ControlTerminalRuntimeError(
+            'unauthorized',
+            'Terminal session runtime was replaced',
             false
           );
         }
@@ -434,7 +446,7 @@ export function createControlTerminalRuntime(options: {
         if (attached.kiloSessionId === identity.kiloSessionId) {
           throw new ControlTerminalRuntimeError(
             'unauthorized',
-            'Terminal session ownership mismatch',
+            'Terminal session belongs to another session',
             false
           );
         }

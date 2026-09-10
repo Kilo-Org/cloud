@@ -448,6 +448,9 @@
       "acceptTerms": "Aksepte",
       "replyBadRequest": "Pa ka pibliye repons sa a. Petèt fil diskisyon an chanje.",
       "replyForbidden": "Ou pa gen pèmisyon pou reponn demann fizyon sa a.",
+      "addCommentCta": "Fè yon kòmantè sou demann fizyon sa a",
+      "commentBadRequest": "Pa ka pibliye kòmantè sa a. Petèt demann fizyon an chanje.",
+      "commentForbidden": "Ou pa gen pèmisyon pou fè yon kòmantè sou demann fizyon sa a.",
       "moderation": {
         "reportContent": {
           "terminal": "Pa ka rapòte kòmantè sa a.",

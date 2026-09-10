@@ -448,6 +448,9 @@
       "acceptTerms": "Nõustu",
       "replyBadRequest": "Seda vastust ei saa postitada. Lõim võis muutuda.",
       "replyForbidden": "Sul pole õigust sellele tõmbetaotlusele vastata.",
+      "addCommentCta": "Kommenteeri seda tõmbetaotlust",
+      "commentBadRequest": "Seda kommentaari ei saa postitada. Tõmbetaotlus võis muutuda.",
+      "commentForbidden": "Sul pole õigust seda tõmbetaotlust kommenteerida.",
       "moderation": {
         "reportContent": {
           "terminal": "Sellest kommentaarist ei saa teatada.",

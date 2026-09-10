@@ -448,6 +448,9 @@
       "acceptTerms": "Samþykkja",
       "replyBadRequest": "Ekki er hægt að birta þetta svar. Þráðurinn gæti hafa breyst.",
       "replyForbidden": "Þú hefur ekki heimild til að svara þessari sameiningarbeiðni.",
+      "addCommentCta": "Gera athugasemd við þessa sameiningarbeiðni",
+      "commentBadRequest": "Ekki er hægt að birta þessa athugasemd. Sameiningarbeiðnin gæti hafa breyst.",
+      "commentForbidden": "Þú hefur ekki heimild til að gera athugasemd við þessa sameiningarbeiðni.",
       "moderation": {
         "reportContent": {
           "terminal": "Ekki er hægt að tilkynna þessa athugasemd.",

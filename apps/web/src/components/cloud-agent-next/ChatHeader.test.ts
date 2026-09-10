@@ -86,65 +86,65 @@ describe('SessionInfoDialog session costs', () => {
     });
 
     expect(markup).toContain('Token Usage');
-    expect(markup).toContain('$1.2346');
+    expect(markup).toContain('$1.23');
     expect(markup).toContain('Root session');
-    expect(markup).toContain('$0.6543');
+    expect(markup).toContain('$0.65');
     expect(markup).toContain('Subagents');
-    expect(markup).toContain('$0.3457');
+    expect(markup).toContain('$0.35');
     expect(markup).toContain('Older activity');
-    expect(markup).toContain('$0.2346');
+    expect(markup).toContain('$0.23');
     expect(markup).not.toContain('Model cost');
   });
 
-  it('formats boundary total, root, and older-activity costs using integer microdollars', () => {
+  it('formats boundary total, root, and older-activity costs using integer cents', () => {
     const markup = renderSessionInfo({
-      totalCostUsd: 0.05005,
-      rootCostUsd: 0.05,
+      totalCostUsd: 5.005,
+      rootCostUsd: 5,
       subagentCostUsd: 0,
-      olderActivityCostUsd: 0.00005,
+      olderActivityCostUsd: 0.005,
     });
 
     expect(markup).toContain('Token Usage');
-    expect(markup).toContain('$0.0501');
+    expect(markup).toContain('$5.01');
     expect(markup).toContain('Root session');
-    expect(markup).toContain('$0.0500');
+    expect(markup).toContain('$5.00');
     expect(markup).toContain('Older activity');
-    expect(markup).toContain('$0.0001');
+    expect(markup).toContain('$0.01');
     expect(markup).not.toContain('Subagents');
   });
 
-  it('renders a computed 50-microdollar subagent residual without floating-point loss', () => {
+  it('renders a computed half-cent subagent residual without floating-point loss', () => {
     const markup = renderSessionInfo({
-      totalCostUsd: 0.10005,
+      totalCostUsd: 0.105,
       rootCostUsd: 0.1,
-      subagentCostUsd: 0.10005 - 0.1,
+      subagentCostUsd: 0.105 - 0.1,
       olderActivityCostUsd: 0,
     });
 
     expect(markup).toContain('Token Usage');
-    expect(markup).toContain('$0.1001');
+    expect(markup).toContain('$0.11');
     expect(markup).toContain('Root session');
-    expect(markup).toContain('$0.1000');
+    expect(markup).toContain('$0.10');
     expect(markup).toContain('Subagents');
-    expect(markup).toContain('$0.0001');
+    expect(markup).toContain('$0.01');
     expect(markup).not.toContain('Older activity');
   });
 
   it('keeps rounded component rows reconciled to the displayed model cost', () => {
     const markup = renderSessionInfo({
-      totalCostUsd: 0.0001,
-      rootCostUsd: 0.00005,
-      subagentCostUsd: 0.00005,
+      totalCostUsd: 0.01,
+      rootCostUsd: 0.005,
+      subagentCostUsd: 0.005,
       olderActivityCostUsd: 0,
     });
 
     expect(markup).toContain('Token Usage');
     expect(markup).toContain('Root session');
     expect(markup).toContain('Subagents');
-    expect([...markup.matchAll(/\$(\d+\.\d{4})/g)].map(match => match[1])).toEqual([
-      '0.0001',
-      '0.0000',
-      '0.0001',
+    expect([...markup.matchAll(/\$(\d+\.\d{2})/g)].map(match => match[1])).toEqual([
+      '0.01',
+      '0.00',
+      '0.01',
     ]);
   });
 
@@ -157,16 +157,16 @@ describe('SessionInfoDialog session costs', () => {
     });
 
     expect(markup).toContain('Root session');
-    expect(markup).toContain('$0.2500');
+    expect(markup).toContain('$0.25');
     expect(markup).not.toContain('Subagents');
     expect(markup).not.toContain('Older activity');
   });
 
   it.each([
-    { microdollars: 49, shouldRender: false },
-    { microdollars: 50, shouldRender: true },
+    { microdollars: 4_999, shouldRender: false },
+    { microdollars: 5_000, shouldRender: true },
   ])(
-    'applies the four-decimal display threshold to a $microdollars-microdollar subagent residual',
+    'applies the two-decimal display threshold to a $microdollars-microdollar subagent residual',
     ({ microdollars, shouldRender }) => {
       const subagentCostUsd = microdollars / 1_000_000;
       const markup = renderSessionInfo({
@@ -180,19 +180,19 @@ describe('SessionInfoDialog session costs', () => {
 
       if (shouldRender) {
         expect(markup).toContain('Subagents');
-        expect(markup).toContain('$0.0001');
+        expect(markup).toContain('$0.01');
       } else {
         expect(markup).not.toContain('Subagents');
-        expect(markup).not.toContain('$0.0000');
+        expect(markup).not.toContain('$0.00');
       }
     }
   );
 
   it.each([
-    { microdollars: 49, shouldRender: false },
-    { microdollars: 50, shouldRender: true },
+    { microdollars: 4_999, shouldRender: false },
+    { microdollars: 5_000, shouldRender: true },
   ])(
-    'applies the four-decimal display threshold to a $microdollars-microdollar older-activity residual',
+    'applies the two-decimal display threshold to a $microdollars-microdollar older-activity residual',
     ({ microdollars, shouldRender }) => {
       const olderActivityCostUsd = microdollars / 1_000_000;
       const markup = renderSessionInfo({
@@ -206,52 +206,52 @@ describe('SessionInfoDialog session costs', () => {
 
       if (shouldRender) {
         expect(markup).toContain('Older activity');
-        expect(markup).toContain('$0.0001');
+        expect(markup).toContain('$0.01');
       } else {
         expect(markup).not.toContain('Older activity');
-        expect(markup).not.toContain('$0.0000');
+        expect(markup).not.toContain('$0.00');
       }
     }
   );
 
   it('keeps a root-only reconciliation visible when the total reaches display precision', () => {
     const markup = renderSessionInfo({
-      totalCostUsd: 0.00005,
-      rootCostUsd: 0.00005,
+      totalCostUsd: 0.005,
+      rootCostUsd: 0.005,
       subagentCostUsd: 0,
       olderActivityCostUsd: 0,
     });
 
     expect(markup).toContain('Root session');
-    expect(markup).toContain('$0.0001');
+    expect(markup).toContain('$0.01');
     expect(markup).not.toContain('Subagents');
     expect(markup).not.toContain('Older activity');
   });
 
   it.each([
     {
-      totalCostUsd: 0.000049,
-      rootCostUsd: 0.000049,
+      totalCostUsd: 0.004999,
+      rootCostUsd: 0.004999,
       subagentCostUsd: 0,
       olderActivityCostUsd: 0,
     },
     {
-      totalCostUsd: 0.000049,
+      totalCostUsd: 0.004999,
       rootCostUsd: 0,
-      subagentCostUsd: 0.000049,
+      subagentCostUsd: 0.004999,
       olderActivityCostUsd: 0,
     },
     {
-      totalCostUsd: 0.000049,
+      totalCostUsd: 0.004999,
       rootCostUsd: 0,
       subagentCostUsd: 0,
-      olderActivityCostUsd: 0.000049,
+      olderActivityCostUsd: 0.004999,
     },
   ])('omits the total-cost section for totals below display precision', sessionCostBreakdown => {
     const markup = renderSessionInfo(sessionCostBreakdown);
 
     expect(markup).not.toContain('Token Usage');
-    expect(markup).not.toContain('$0.0000');
+    expect(markup).not.toContain('$0.00');
     expect(markup).not.toContain('Root session');
     expect(markup).not.toContain('Subagents');
     expect(markup).not.toContain('Older activity');
@@ -267,7 +267,7 @@ describe('SessionInfoDialog session costs', () => {
     });
 
     expect(markup).toContain('Root session');
-    expect(markup).toContain('$0.0000');
+    expect(markup).toContain('$0.00');
     expect(markup).toContain('Subagents');
     expect(markup).not.toContain('Older activity');
   });
@@ -318,7 +318,7 @@ describe('SessionInfoDialog session costs', () => {
     });
 
     expect(markup).toContain('Token Usage');
-    expect(markup).toContain('$0.2500');
+    expect(markup).toContain('$0.25');
     expect(markup).not.toContain('Root session');
     expect(markup).not.toContain('Subagents');
     expect(markup).not.toContain('Older activity');

@@ -492,6 +492,22 @@ describe('SandboxSession terminal lifecycle', () => {
     expect(fixture.closeTerminalBridge).not.toHaveBeenCalled();
   });
 
+  it('retains callback outbox jobs while purging deleted session state', () => {
+    const fixture = createFixture();
+    fixture.lifecycle.beginDeletion(fixture.metadata);
+    fixture.values.set('callback_outbox:message_1', { pending: true });
+    fixture.values.set('transient_state', true);
+
+    fixture.lifecycle.purgeDeletedState();
+
+    expect(fixture.values.has('callback_outbox:message_1')).toBe(true);
+    expect(fixture.values.has('transient_state')).toBe(false);
+    expect([...fixture.values.keys()]).toEqual([
+      SANDBOX_SESSION_LIFECYCLE_KEY,
+      'callback_outbox:message_1',
+    ]);
+  });
+
   it('invalidates only confirmed terminals belonging to the requested runtime', async () => {
     const fixture = createFixture();
     await fixture.lifecycle.createTerminal({ operationId: FIRST_OPERATION_ID });

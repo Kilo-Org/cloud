@@ -76,6 +76,34 @@ describe('isValidOpenRouterModelId', () => {
     mockLimit.mockReset();
   });
 
+  it('accepts retained legacy aliases without consulting the database', async () => {
+    const { isValidOpenRouterModelId } = await loadValidator();
+
+    await expect(isValidOpenRouterModelId('gpt-4o')).resolves.toBe(true);
+    expect(mockLimit).not.toHaveBeenCalled();
+  });
+
+  it.each(['openai/gpt-4o-mini-transcribe', 'openai/gpt-4o-transcribe'])(
+    'rejects removed transcription alias %s',
+    async modelId => {
+      const { isValidOpenRouterModelId } = await loadValidator();
+      mockLimit.mockResolvedValue([
+        { models: { 'openai/gpt-4o': storedModel({ id: 'openai/gpt-4o' }) } },
+      ]);
+
+      await expect(isValidOpenRouterModelId(modelId)).resolves.toBe(false);
+    }
+  );
+
+  it('rejects other legacy aliases that are not retained', async () => {
+    const { isValidOpenRouterModelId } = await loadValidator();
+    mockLimit.mockResolvedValue([
+      { models: { 'openai/gpt-4o': storedModel({ id: 'openai/gpt-4o' }) } },
+    ]);
+
+    await expect(isValidOpenRouterModelId('gpt-4o-2024-08-06')).resolves.toBe(false);
+  });
+
   it('accepts ids present in the database catalog', async () => {
     const { isValidOpenRouterModelId } = await loadValidator();
     mockLimit.mockResolvedValue([

@@ -74,6 +74,7 @@ export default function PrReviewNumberLayout() {
               comment-composer formSheet instead of the PR overview. */}
           <Stack.Screen name="index" />
           <Stack.Screen name="comment-composer" options={sheetOptions} />
+          <Stack.Screen name="conversation-comment" options={sheetOptions} />
           <Stack.Screen name="review-submit" options={sheetOptions} />
           <Stack.Screen name="merge" options={sheetOptions} />
           <Stack.Screen name="file-navigator" options={sheetOptions} />

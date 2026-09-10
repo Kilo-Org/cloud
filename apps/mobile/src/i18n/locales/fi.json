@@ -448,6 +448,9 @@
       "acceptTerms": "Hyväksy",
       "replyBadRequest": "Tätä vastausta ei voi julkaista. Ketju on voinut muuttua.",
       "replyForbidden": "Sinulla ei ole oikeutta vastata tähän muutospyyntöön.",
+      "addCommentCta": "Kommentoi tätä muutospyyntöä",
+      "commentBadRequest": "Tätä kommenttia ei voi julkaista. Muutospyyntö on voinut muuttua.",
+      "commentForbidden": "Sinulla ei ole oikeutta kommentoida tätä muutospyyntöä.",
       "moderation": {
         "reportContent": {
           "terminal": "Tätä kommenttia ei voi ilmiantaa.",

@@ -456,6 +456,9 @@
       "acceptTerms": "Derbyn",
       "replyBadRequest": "Ni ellir postio'r ateb hwn. Efallai fod yr edefyn wedi newid.",
       "replyForbidden": "Nid oes gennych ganiatâd i ateb y cais tynnu hwn.",
+      "addCommentCta": "Sylwadu ar y cais tynnu hwn",
+      "commentBadRequest": "Ni ellir postio'r sylw hwn. Efallai fod y cais tynnu wedi newid.",
+      "commentForbidden": "Nid oes gennych ganiatâd i sylwadu ar y cais tynnu hwn.",
       "moderation": {
         "reportContent": {
           "terminal": "Ni ellir adrodd am y sylw hwn.",

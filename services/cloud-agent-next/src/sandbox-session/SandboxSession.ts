@@ -175,6 +175,7 @@ import {
   freezeLegacyQueuedMessages,
   hasAcceptedMessage,
   incrementDeliveryFailure,
+  markSessionOperationRejection,
   matchesSessionMessageReplay,
   nextQueuedMessageId,
   recordAcceptedMessageActivity,
@@ -186,6 +187,7 @@ import {
   type ControlSessionMessageInput,
   type SessionMessageRecord,
 } from './session-message-queue.js';
+import { createMessageCallbacks, type MessageCallbacks } from './message-callbacks.js';
 import { PENDING_SESSION_MESSAGE_LIMIT } from '../session/pending-messages.js';
 import {
   commitSessionOperationResult,
@@ -235,6 +237,15 @@ const pendingRuntimeCleanupSchema = z.object({
 
 type MessageRecord = SessionMessageRecord;
 type DispatchPhase = 'preparing' | 'attach' | 'prompt';
+
+const MAX_TERMINAL_DETAIL_LENGTH = 4_096;
+
+function confirmedControlRejectionDetail(error: unknown): string | undefined {
+  if (!(error instanceof ControlRequestError) || !error.rejectionReceived) return undefined;
+  const detail = error.message.trim().slice(0, MAX_TERMINAL_DETAIL_LENGTH);
+  return detail || undefined;
+}
+
 type ControlEventDisposition =
   | 'apply'
   | 'duplicate'
@@ -280,6 +291,7 @@ type SandboxSessionInitialAdmissionInput = Omit<SandboxSessionRegistrationInput,
 export class SandboxSession extends DurableObject<Env> {
   private readonly sessionId: SessionId | undefined;
   private readonly eventQueries: EventQueries;
+  private readonly messageCallbacks: MessageCallbacks;
   private readonly terminalLifecycle: ReturnType<typeof createSandboxTerminalLifecycle>;
   private readonly terminalBridge: ReturnType<typeof createSandboxTerminalBridge>;
   private readonly dispatches = new Map<string, Promise<void>>();
@@ -291,6 +303,7 @@ export class SandboxSession extends DurableObject<Env> {
   private deletionCompletion: Promise<void> | undefined;
   private readonly worktreeChanges: ReturnType<typeof createWorktreeChanges>;
   private readonly interactionRefresh: InteractionRefresh;
+  private callbackRepairRequired = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -323,6 +336,17 @@ export class SandboxSession extends DurableObject<Env> {
     });
     const db = drizzle(ctx.storage, { logger: false });
     this.eventQueries = createEventQueries(db, ctx.storage.sql);
+    this.messageCallbacks = createMessageCallbacks({
+      storage: ctx.storage,
+      getMetadata: () => this.terminalLifecycle.getStoredMetadata(),
+      getCallbackQueue: () => env.CALLBACK_QUEUE,
+      getAssistantMessageForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
+        this.eventQueries.getAssistantMessageForUserMessage(
+          sessionId,
+          kiloSessionId,
+          parentMessageId
+        ),
+    });
     this.worktreeChanges = createWorktreeChanges({
       storage: ctx.storage,
       saveSnapshotEvent: snapshot => {
@@ -945,6 +969,7 @@ export class SandboxSession extends DurableObject<Env> {
       eventQueries: this.eventQueries,
       notifications,
     });
+    this.scheduleCallbackRepairIfRequired();
     if (!ack) return undefined;
     if (authorization.operation === 'session.attach') {
       const attached = delivery.result.ok
@@ -1632,24 +1657,21 @@ export class SandboxSession extends DurableObject<Env> {
     if (
       this.deletedWorktreeId === worktreeId &&
       (await this.ctx.storage.get(DELETION_COMPLETED_KEY))
-    )
+    ) {
+      if (this.messageCallbacks.pendingCallbackCount() > 0) this.scheduleCallbackRepair();
       return null;
+    }
     this.worktreeChanges.suppress();
     this.ctx.storage.transactionSync(() => {
       this.ctx.storage.kv.put(DELETED_WORKTREE_KEY, worktreeId);
       this.terminalLifecycle.beginDeletion(metadata);
       this.worktreeChanges.purge();
-      const messages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
-      const cancelled = messages.map(message =>
-        message.state === 'queued' || message.state === 'accepted'
-          ? { ...message, state: 'cancelled' as const }
-          : message
-      );
-      this.ctx.storage.kv.put(MESSAGES_KEY, cancelled);
+      this.snapshotDeletedMessages(metadata);
     });
+    if (this.messageCallbacks.pendingCallbackCount() > 0) this.scheduleCallbackRepair();
     this.deletedWorktreeId = worktreeId;
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
-    await this.ctx.storage.deleteAlarm();
+    if (this.messageCallbacks.pendingCallbackCount() === 0) await this.ctx.storage.deleteAlarm();
     if (!metadata) return null;
     return cloudAgentWorktreeLocationSchema.parse({
       sandboxId: metadata.workspace?.sandboxId,
@@ -1715,9 +1737,13 @@ export class SandboxSession extends DurableObject<Env> {
       await Promise.allSettled([...this.activeOperations]);
     }
     await this.ingestPublicationChain.catch(() => undefined);
-    if (await this.ctx.storage.get(DELETION_COMPLETED_KEY)) return;
+    if (await this.ctx.storage.get(DELETION_COMPLETED_KEY)) {
+      if (this.messageCallbacks.pendingCallbackCount() > 0) this.scheduleCallbackRepair();
+      return;
+    }
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
-    await this.ctx.storage.deleteAlarm();
+    const callbacksPending = this.messageCallbacks.pendingCallbackCount() > 0;
+    if (!callbacksPending) await this.ctx.storage.deleteAlarm();
     const db = drizzle(this.ctx.storage, { logger: false });
     this.ctx.storage.transactionSync(() => {
       db.delete(events).where(eq(events.session_id, this.requireSessionId())).run();
@@ -1727,6 +1753,9 @@ export class SandboxSession extends DurableObject<Env> {
       this.ctx.storage.kv.put(DELETED_WORKTREE_KEY, worktreeId);
       this.ctx.storage.kv.put(DELETION_COMPLETED_KEY, true);
     });
+    if (callbacksPending) {
+      await this.armQueueRetry(this.messageCallbacks.nextCallbackDueAt() ?? Date.now());
+    }
   }
 
   private trackOperation<T>(operation: Promise<T>): Promise<T> {
@@ -1734,24 +1763,75 @@ export class SandboxSession extends DurableObject<Env> {
     return operation.finally(() => this.activeOperations.delete(operation));
   }
 
+  private snapshotDeletedMessages(metadata: SessionMetadata | null): void {
+    const messages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
+    const cancelled = messages.map(message => {
+      if (message.state !== 'queued' && message.state !== 'accepted') return message;
+      const next = { ...message, state: 'cancelled' as const };
+      this.messageCallbacks.persistTerminalCallback(next, metadata);
+      return next;
+    });
+    this.ctx.storage.kv.put(MESSAGES_KEY, cancelled);
+  }
+
+  private async interruptDeletedMessage(
+    metadata: SessionMetadata | null,
+    message: MessageRecord | undefined
+  ): Promise<void> {
+    const sandboxId = metadata?.workspace?.sandboxId;
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    if (!message || message.state !== 'accepted' || !metadata || !sandboxId || !kiloSessionId)
+      return;
+    try {
+      const response = await withTimeout(
+        sandboxControlRpc(this.env, sandboxId).request({
+          operation: 'session.abort',
+          session: {
+            sessionId: metadata.identity.sessionId,
+            kiloSessionId,
+            directory: this.directory(metadata),
+          },
+          payload: { messageId: message.messageId },
+        }),
+        SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+        'Session abort timed out'
+      );
+      if (response.ok) sessionAbortResultSchema.parse(response.result);
+    } catch {
+      // Deletion cleanup remains authoritative when abort cannot be confirmed.
+    }
+  }
+
   async deleteSession(): Promise<void> {
     if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     this.worktreeChanges.suppress();
-    await this.interruptExecution();
-    if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     const metadata = this.terminalLifecycle.getStoredMetadata();
+    const active = (this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? []).filter(
+      message => message.state === 'queued' || message.state === 'accepted'
+    );
+    const accepted = active.find(message => message.state === 'accepted');
+    const preparing = accepted ? undefined : active[0];
     const records = this.ctx.storage.transactionSync(() => {
+      if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const records = this.terminalLifecycle.beginDeletion(metadata);
       this.worktreeChanges.purge();
+      if (preparing?.wrapperInstanceId && preparing.deliveryRetryScope !== 'message' && metadata) {
+        this.retainRuntimeCleanup(metadata, preparing.wrapperInstanceId, 'preparation_interrupted');
+      }
+      this.snapshotDeletedMessages(metadata);
       return records;
     });
+    if (this.messageCallbacks.pendingCallbackCount() > 0) this.scheduleCallbackRepair();
     for (const ws of this.ctx.getWebSockets('stream')) {
       ws.close(1000, 'session access revoked');
     }
+    if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
+    else await this.interruptDeletedMessage(metadata, accepted);
     await this.terminalLifecycle.cleanupSession(metadata, records);
     await this.ingestPublicationChain.catch(() => undefined);
     if (this.deletedWorktreeId) throw new Error('worktree_deleting');
-    await this.ctx.storage.deleteAlarm();
+    const callbacksPending = this.messageCallbacks.pendingCallbackCount() > 0;
+    if (!callbacksPending) await this.ctx.storage.deleteAlarm();
     this.ctx.storage.transactionSync(() => {
       if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const pendingCleanup = this.pendingRuntimeCleanup();
@@ -1760,6 +1840,8 @@ export class SandboxSession extends DurableObject<Env> {
       if (pendingCleanup) this.ctx.storage.kv.put(PENDING_RUNTIME_CLEANUP_KEY, pendingCleanup);
     });
     if (this.pendingRuntimeCleanup()) await this.armQueueRetry();
+    else if (callbacksPending)
+      await this.armQueueRetry(this.messageCallbacks.nextCallbackDueAt() ?? Date.now());
   }
 
   async registerSession(input: SandboxSessionRegistrationInput): Promise<OperationResult> {
@@ -2080,6 +2162,9 @@ export class SandboxSession extends DurableObject<Env> {
     if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
     for (const stop of this.stopLifecycle.pending())
       void this.scheduleStopProgress(stop.request.operationId);
+    await this.messageCallbacks.repair();
+    const callbackDueAt = this.messageCallbacks.nextCallbackDueAt();
+    if (callbackDueAt !== undefined) await this.armQueueRetry(callbackDueAt);
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null || this.deletedWorktreeId) return;
     const now = Date.now();
@@ -2281,10 +2366,16 @@ export class SandboxSession extends DurableObject<Env> {
       }
       if (validationFailure) return validationFailure;
       if (!intent) return { success: false, code: 'NOT_FOUND', error: 'Message not found' };
-      if (
-        latestMessages.filter(message => message.state === 'queued').length >=
-        PENDING_SESSION_MESSAGE_LIMIT
-      ) {
+      const pendingCallbackCount = this.messageCallbacks.pendingCallbackCount();
+      const callbackFlow =
+        latestMetadata.callback?.target !== undefined || pendingCallbackCount > 0;
+      const outstandingMessages = latestMessages.filter(
+        message => message.state === 'queued' || message.state === 'accepted'
+      ).length;
+      const pendingCount = callbackFlow
+        ? outstandingMessages + pendingCallbackCount
+        : latestMessages.filter(message => message.state === 'queued').length;
+      if (pendingCount >= PENDING_SESSION_MESSAGE_LIMIT) {
         return {
           success: false,
           code: 'PENDING_QUEUE_FULL',
@@ -2610,6 +2701,7 @@ export class SandboxSession extends DurableObject<Env> {
       return;
     }
     let phase: DispatchPhase = 'preparing';
+    let attachInPreparation = false;
     let credentialsPrepared = false;
     const preparationGeneration = this.worktreeChanges.beginPreparation();
     try {
@@ -2712,13 +2804,14 @@ export class SandboxSession extends DurableObject<Env> {
         if (needsPreparation) recorder.onProgress('workspace_setup', 'Setting up workspace…');
         if (!status.attachment?.kilo)
           throw new Error('Contained session attachment is unavailable');
+        attachInPreparation = needsPreparation;
         const attachPayload = {
           ...status.attachment,
           ...(needsPreparation
             ? { preparation: { attemptId: recorder.attemptId, triggerMessageId: messageId } }
             : {}),
         };
-        phase = needsPreparation ? 'preparing' : 'attach';
+        phase = 'preparing';
         await wait(() =>
           control.attachSession({
             ...(metadata.workspace?.worktreeId
@@ -2735,6 +2828,7 @@ export class SandboxSession extends DurableObject<Env> {
             await this.compensateSessionAttachment(metadata);
           return;
         }
+        phase = 'attach';
         if (operationResults) {
           if ((await dispatchAuthorized('session.attach', attachPayload)).state === 'running') {
             await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
@@ -2759,6 +2853,7 @@ export class SandboxSession extends DurableObject<Env> {
             )
           );
         }
+        phase = 'preparing';
         if (!isCurrent()) {
           if (!this.terminalLifecycle.isCurrent(epoch))
             await this.compensateSessionAttachment(metadata);
@@ -2850,6 +2945,7 @@ export class SandboxSession extends DurableObject<Env> {
         wrapperInstanceId,
         deadlineAt,
         error,
+        attachInPreparation,
       });
     } finally {
       this.worktreeChanges.finishPreparation(preparationGeneration);
@@ -2887,41 +2983,55 @@ export class SandboxSession extends DurableObject<Env> {
     messageId: string;
     epoch: number;
     phase: DispatchPhase;
+    attachInPreparation: boolean;
     wrapperInstanceId?: string;
     deadlineAt: number;
     error: unknown;
   }): Promise<void> {
-    const { messageId, epoch, phase, wrapperInstanceId, deadlineAt, error } = input;
+    const { messageId, epoch, phase, wrapperInstanceId, deadlineAt, error, attachInPreparation } =
+      input;
     const message = this.queuedMessage(messageId, epoch, wrapperInstanceId);
     if (!message) return;
-    const rejection = error instanceof ControlRequestError && error.code !== 'runtime_unhealthy';
+    const rejection = error instanceof ControlRequestError && error.rejectionReceived === true;
+    const retryableRejection =
+      rejection && error instanceof ControlRequestError && error.code !== 'runtime_unhealthy';
+    const detail = confirmedControlRejectionDetail(error);
+    const attachProof = message.operations?.attach;
+    const attachRejectionAlreadyCounted = attachProof?.rejectionReceived === true;
+    const countAttachRejection = phase === 'attach' && rejection && !attachRejectionAlreadyCounted;
     const completedAttachFailure =
       message.operations?.attach?.dispatched === true &&
       message.operations.attach.result?.ok === false;
     const retryableCompletedAttach =
-      phase !== 'prompt' && rejection && isRetryableDeliveryError(error) && completedAttachFailure;
-    const scope =
+      phase !== 'prompt' &&
+      retryableRejection &&
+      isRetryableDeliveryError(error) &&
+      completedAttachFailure;
+    const messageRetryScope =
       phase === 'attach'
-        ? retryableCompletedAttach
-          ? 'message'
-          : 'runtime'
-        : rejection && !message.unresolvedDispatch
-          ? 'message'
-          : 'runtime';
+        ? (attachInPreparation && retryableRejection && !message.unresolvedDispatch) ||
+          retryableCompletedAttach
+        : retryableRejection && !message.unresolvedDispatch;
+    const scope: 'message' | 'runtime' = messageRetryScope ? 'message' : 'runtime';
     if (Date.now() >= deadlineAt) {
-      await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId, scope);
+      await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId, scope, detail);
       return;
     }
-    const busy = rejection && error.code === 'session_busy';
+    const busy = retryableRejection && error.code === 'session_busy';
     const retryNotBefore = Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS);
     const released = retryableCompletedAttach
       ? releaseCompletedRetryableAttach(this.loadMessages(), messageId, retryNotBefore)
       : this.loadMessages();
+    const marked =
+      countAttachRejection && attachProof
+        ? markSessionOperationRejection(released, attachProof.authorization)
+        : released;
+    const nextMessages = marked ?? released;
     const updated =
-      phase === 'preparing' || busy
+      busy || (phase !== 'prompt' && !countAttachRejection)
         ? undefined
-        : incrementDeliveryFailure(released, messageId, phase);
-    const messages = (updated?.messages ?? released).map(
+        : incrementDeliveryFailure(nextMessages, messageId, phase);
+    const messages = (updated?.messages ?? nextMessages).map(
       (message): MessageRecord =>
         message.messageId === messageId ? { ...message, deliveryRetryScope: scope } : message
     );
@@ -2938,11 +3048,12 @@ export class SandboxSession extends DurableObject<Env> {
       messageId,
       phase === 'prompt'
         ? 'prompt_exhausted'
-        : phase === 'attach'
+        : phase === 'attach' && rejection
           ? 'attach_exhausted'
           : 'environment_failed',
       wrapperInstanceId,
-      scope
+      scope,
+      detail
     );
   }
 
@@ -3058,7 +3169,8 @@ export class SandboxSession extends DurableObject<Env> {
     messageId: string,
     reason: string,
     wrapperInstanceId?: string,
-    scope: 'message' | 'runtime' = 'runtime'
+    scope: 'message' | 'runtime' = 'runtime',
+    detail?: string
   ): Promise<void> {
     const epoch = this.terminalLifecycle.captureEpoch();
     const metadata = this.terminalLifecycle.getStoredMetadata();
@@ -3072,13 +3184,13 @@ export class SandboxSession extends DurableObject<Env> {
     )
       return;
     if (scope === 'message') {
-      const messages = failQueuedMessage(this.loadMessages(), messageId, reason);
+      const messages = failQueuedMessage(this.loadMessages(), messageId, reason, detail);
       if (!messages || !this.saveMessages(messages, epoch)) return;
       if (nextQueuedMessageId(messages)) await this.armQueueRetry();
       return;
     }
     if (wrapperInstanceId) this.retainRuntimeCleanup(metadata, wrapperInstanceId, reason);
-    await this.failDeliveryWaitingMessages(reason, wrapperInstanceId);
+    await this.failDeliveryWaitingMessages(reason, wrapperInstanceId, detail, messageId);
     if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
   }
 
@@ -3124,7 +3236,9 @@ export class SandboxSession extends DurableObject<Env> {
 
   private async failDeliveryWaitingMessages(
     reason: string,
-    wrapperInstanceId?: string
+    wrapperInstanceId?: string,
+    detail?: string,
+    detailMessageId?: string
   ): Promise<void> {
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null) return;
@@ -3136,7 +3250,15 @@ export class SandboxSession extends DurableObject<Env> {
       wrapperInstanceId,
       false
     );
-    if (failedIds.length === 0 || !this.saveMessages(messages, epoch)) return;
+    const messagesWithDetail =
+      detail && detailMessageId
+        ? messages.map(message =>
+            message.messageId === detailMessageId && failedIds.includes(message.messageId)
+              ? { ...message, failedDetail: detail }
+              : message
+          )
+        : messages;
+    if (failedIds.length === 0 || !this.saveMessages(messagesWithDetail, epoch)) return;
     if (this.pendingRuntimeCleanup() || nextQueuedMessageId(this.loadMessages()))
       await this.armQueueRetry();
   }
@@ -3147,18 +3269,34 @@ export class SandboxSession extends DurableObject<Env> {
     createStreamHandler(this.ctx, this.eventQueries, sessionId).broadcastEvent(event);
   }
 
+  private scheduleCallbackRepair(): void {
+    this.ctx.waitUntil(this.ctx.storage.setAlarm(Date.now()));
+    this.ctx.waitUntil(this.messageCallbacks.repair());
+  }
+
+  private scheduleCallbackRepairIfRequired(): void {
+    if (!this.callbackRepairRequired) return;
+    this.callbackRepairRequired = false;
+    this.scheduleCallbackRepair();
+  }
+
   private async armQueueRetry(when = Date.now() + QUEUE_RETRY_MS): Promise<void> {
     const epoch = this.terminalLifecycle.captureEpoch();
     const hasPendingStop = this.stopLifecycle.pending().length > 0;
-    if (epoch === null && !this.pendingRuntimeCleanup() && !hasPendingStop) return;
+    const callbackDueAt = this.messageCallbacks.nextCallbackDueAt();
+    const hasPendingCallbacks = callbackDueAt !== undefined;
+    if (epoch === null && !this.pendingRuntimeCleanup() && !hasPendingStop && !hasPendingCallbacks)
+      return;
     const existing = await this.ctx.storage.getAlarm();
     if (
       (epoch === null || !this.terminalLifecycle.isCurrent(epoch)) &&
       !this.pendingRuntimeCleanup() &&
-      !hasPendingStop
+      !hasPendingStop &&
+      !hasPendingCallbacks
     )
       return;
-    if (existing === null || existing > when) await this.ctx.storage.setAlarm(when);
+    const requested = Math.min(when, callbackDueAt ?? Number.MAX_SAFE_INTEGER);
+    if (existing === null || existing > requested) await this.ctx.storage.setAlarm(requested);
   }
 
   private readPendingInteractions(): PendingInteractions | undefined {
@@ -3803,7 +3941,8 @@ export class SandboxSession extends DurableObject<Env> {
         deferredNotifications,
         undefined,
         undefined,
-        write => write()
+        write => write(),
+        false
       ) === true
     );
   }
@@ -3815,7 +3954,8 @@ export class SandboxSession extends DurableObject<Env> {
     deferredNotifications: StoredEvent[] | undefined,
     onPersist: (() => void) | undefined,
     beforePersist: (() => ControlEventDisposition) | undefined,
-    enclose: (write: () => void) => void
+    enclose: (write: () => void) => void,
+    scheduleCallbackRepair = true
   ): boolean | ControlEventDisposition {
     const returnsControlEventDisposition = beforePersist !== undefined;
     const currentEpoch = epoch ?? this.terminalLifecycle.captureEpoch();
@@ -3827,6 +3967,7 @@ export class SandboxSession extends DurableObject<Env> {
       return returnsControlEventDisposition ? 'epoch_changed' : false;
     const events: StoredEvent[] = [];
     const committed: ControlDiagnosticFields[] = [];
+    let callbackPersisted = false;
     let persisted = false;
     let disposition: ControlEventDisposition = 'epoch_changed';
     const write = () => {
@@ -3873,6 +4014,7 @@ export class SandboxSession extends DurableObject<Env> {
         }
         const event = this.persistMessageLifecycleEvent(terminal);
         if (event) events.push(event);
+        if (this.messageCallbacks.persistTerminalCallback(terminal)) callbackPersisted = true;
         committed.push({
           messageId: terminal.messageId,
           wrapperInstanceId: terminal.wrapperInstanceId,
@@ -3894,7 +4036,8 @@ export class SandboxSession extends DurableObject<Env> {
                     safeError:
                       terminal.state === 'cancelled'
                         ? 'The message was interrupted'
-                        : safeErrorFromQueueReason(terminal.failedReason ?? 'environment_failed'),
+                        : (terminal.failedDetail ??
+                          safeErrorFromQueueReason(terminal.failedReason ?? 'environment_failed')),
                     timestamp: terminal.terminalAt,
                   }
             )
@@ -3908,6 +4051,10 @@ export class SandboxSession extends DurableObject<Env> {
     };
     enclose(write);
     if (!persisted) return returnsControlEventDisposition ? disposition : false;
+    if (callbackPersisted) {
+      if (scheduleCallbackRepair) this.scheduleCallbackRepair();
+      else this.callbackRepairRequired = true;
+    }
     for (const fields of committed) {
       logControlDiagnostic('session_message_committed', {
         sessionId: this.sessionId,

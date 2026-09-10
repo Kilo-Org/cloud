@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
 import {
   applyCustomPricingToPricing,
   applyCustomPricingToModel,
@@ -45,6 +46,27 @@ const makeUsage = (overrides: Partial<Parameters<typeof calculateCustomCost_mUsd
 });
 
 describe('custom model pricing', () => {
+  test('replaces upstream Gemini 3.8 Flash pricing with the promotional rates', () => {
+    const model = applyCustomPricingToModel({
+      ...makeModel(GEMINI_FLASH_CURRENT_MODEL_ID),
+      name: 'Google: Gemini 3.8 Flash',
+    });
+
+    expect(model.name).toBe('Google: Gemini 3.8 Flash (50% off)');
+    expect(model.pricing).toEqual({
+      prompt: '0.000000750000',
+      completion: '0.000003750000',
+      input_cache_read: '0.000000075000',
+      input_cache_write: '0.000000041667',
+    });
+    expect(
+      calculateCustomCost_mUsd(
+        GEMINI_FLASH_CURRENT_MODEL_ID,
+        makeUsage({ inputTokens: 100, cost_mUsd: 999 })
+      )
+    ).toBe(Math.round(100 * 0.75));
+  });
+
   test('replaces upstream Qwen3.7 Max pricing in the model list', () => {
     const model = applyCustomPricingToModel(makeModel(QWEN37_MAX_MODEL_ID));
 

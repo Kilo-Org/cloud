@@ -448,6 +448,9 @@
       "acceptTerms": "Acceptér",
       "replyBadRequest": "Dette svar kan ikke sendes. Tråden kan have ændret sig.",
       "replyForbidden": "Du har ikke tilladelse til at svare på denne pull request.",
+      "addCommentCta": "Kommenter på denne pull request",
+      "commentBadRequest": "Denne kommentar kan ikke sendes. Pull requesten kan have ændret sig.",
+      "commentForbidden": "Du har ikke tilladelse til at kommentere på denne pull request.",
       "moderation": {
         "reportContent": {
           "terminal": "Denne kommentar kan ikke anmeldes.",

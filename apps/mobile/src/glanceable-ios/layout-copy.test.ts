@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { glanceableLayoutCopy, withGlanceableCopy } from './layout-copy';
+import { glanceableLayoutCopy, resolveGlanceableLocale, withGlanceableCopy } from './layout-copy';
 
 const PLACEHOLDER = '__KILO_GLANCEABLE_COPY__';
 const LAYOUT_FILES = ['active-agents-live-activity.tsx', 'active-agents-widget.tsx'];
@@ -61,6 +61,14 @@ describe('withGlanceableCopy', () => {
     // contains the value, and that list writes `zh_Hans`, not `zh-Hans`. A
     // hyphen there silently left the wait in the device language.
     expect(glanceableLayoutCopy().locale).not.toContain('-');
+  });
+
+  it('names the script when the catalog script differs from the bare tag', () => {
+    // Serbian ships a Latin catalog, but a bare `sr` tag makes SwiftUI format
+    // the relative wait in Cyrillic. The script override keeps the wait Latin.
+    expect(resolveGlanceableLocale('sr')).toBe('sr_Latn');
+    expect(resolveGlanceableLocale('zh-Hant')).toBe('zh_Hant');
+    expect(resolveGlanceableLocale('en')).toBe('en');
   });
 
   it('covers every status the layouts render, plus the language tag', () => {

@@ -171,15 +171,12 @@ export function ModelSelector({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: effectivelyDisabled }}
       className={cn(
-        'max-w-[240px] min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70',
+        'min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70',
         effectivelyDisabled && 'opacity-50'
       )}
     >
       <View className="min-w-0 shrink flex-row items-center gap-1.5">
-        <Text
-          className="max-w-[170px] shrink text-sm font-medium text-foreground"
-          numberOfLines={1}
-        >
+        <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
           {label}
         </Text>
         {byok ? (

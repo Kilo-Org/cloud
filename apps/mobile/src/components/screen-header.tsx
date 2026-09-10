@@ -154,48 +154,69 @@ export function ScreenHeader({
       {context}
     </View>
   );
+  // A centered title shares its row with the leading and trailing controls.
+  // A spacer opposite the back control keeps the title centered on the full
+  // width without placing either control out of flow.
   const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
+
+  const backControl = canGoBack ? (
+    <Pressable
+      onPress={() => {
+        if (onBack) {
+          onBack();
+        } else if (backFallback !== undefined && !router.canGoBack()) {
+          router.replace(backFallback);
+        } else {
+          router.back();
+        }
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')}
+      className={cn(
+        'h-11 w-11 shrink-0 items-center justify-center active:opacity-70',
+        !separateHeading && (I18nManager.isRTL ? '-mr-4' : '-ml-4')
+      )}
+    >
+      {resolvedBackIcon === 'close' ? (
+        <ChevronDown size={24} color={colors.foreground} />
+      ) : (
+        <DirectionalChevronLeft size={24} color={colors.foreground} />
+      )}
+    </Pressable>
+  ) : null;
+  const centeredControls =
+    separateHeading && backControl && !headerRight ? (
+      <View className="h-11 w-11 shrink-0" accessibilityElementsHidden pointerEvents="none" />
+    ) : null;
 
   return (
     <View
       className={cn('bg-background px-4 pb-3', className)}
       style={safeAreaTop ? { paddingTop } : undefined}
     >
-      {separateHeading && <View className="min-h-11 flex-row items-center">{heading}</View>}
-      <View className="flex-row items-center">
-        <View className="min-w-0 flex-1 flex-row items-center gap-1">
-          {canGoBack && (
-            <Pressable
-              onPress={() => {
-                if (onBack) {
-                  onBack();
-                } else if (backFallback !== undefined && !router.canGoBack()) {
-                  router.replace(backFallback);
-                } else {
-                  router.back();
-                }
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={
-                resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')
-              }
-              className={`${I18nManager.isRTL ? '-mr-4' : '-ml-4'} h-11 w-11 shrink-0 items-center justify-center active:opacity-70`}
-            >
-              {resolvedBackIcon === 'close' ? (
-                <ChevronDown size={24} color={colors.foreground} />
-              ) : (
-                <DirectionalChevronLeft size={24} color={colors.foreground} />
-              )}
-            </Pressable>
+      {separateHeading ? (
+        <View className="min-h-11 flex-row items-center">
+          {backControl}
+          <View className="min-w-0 flex-1 flex-row items-center justify-center">{heading}</View>
+          {headerRight ? (
+            <View className="ms-3 max-w-[50%] min-w-0 shrink">{headerRight}</View>
+          ) : (
+            centeredControls
           )}
-          {!separateHeading && heading}
         </View>
-        {headerRight ? (
-          <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} min-w-0 max-w-[50%] shrink`}>
-            {headerRight}
+      ) : (
+        <View className="flex-row items-center">
+          <View className="min-w-0 flex-1 flex-row items-center gap-1">
+            {backControl}
+            {heading}
           </View>
-        ) : null}
-      </View>
+          {headerRight ? (
+            <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} min-w-0 max-w-[50%] shrink`}>
+              {headerRight}
+            </View>
+          ) : null}
+        </View>
+      )}
     </View>
   );
 }

@@ -161,7 +161,20 @@ describe('removeUnsupportedRequestServiceTier', () => {
 describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
   async function applyToToolResult(model: string, content: string) {
     const request = makeRequest(model);
-    request.body.messages = [{ role: 'tool', tool_call_id: 'call-1', content }];
+    request.body.messages = [
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: { name: 'lookup', arguments: '{}' },
+          },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'call-1', content },
+    ];
 
     await applyProviderSpecificLogic(
       makeProvider(null),
@@ -176,7 +189,7 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
       null
     );
 
-    return request.body.messages[0].content;
+    return request.body.messages.find(message => message.role === 'tool')?.content;
   }
 
   it('sanitizes JSON ref fields for Gemini models', async () => {

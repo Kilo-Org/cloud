@@ -22,7 +22,10 @@ import {
 } from '@/lib/ai-gateway/providers/openai-exclusive';
 import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 
-function makeRequest(model: string, models?: string[]): GatewayRequest {
+function makeRequest(
+  model: string,
+  models?: string[]
+): Extract<GatewayRequest, { kind: 'chat_completions' }> {
   return {
     kind: 'chat_completions',
     body: {

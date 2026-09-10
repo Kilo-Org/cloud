@@ -432,6 +432,75 @@ describe('session metadata boundary', () => {
     ).toThrow();
   });
 
+  it.each(['cloudflare-single', 'cloudflare-shared', 'vercel-small', 'vercel-large'] as const)(
+    'round-trips the immutable %s preset and rejects inconsistent allocations',
+    sandboxAllocation => {
+      const sandboxId = `${sandboxAllocation === 'cloudflare-shared' ? 'org' : 'ses'}-${'a'.repeat(48)}`;
+      const current = {
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_preset', userId: 'oauth/user', orgId: 'org-id' },
+        auth: {},
+        workspace: {
+          sandboxId,
+          sandboxAllocation,
+          sandboxProvider: sandboxAllocation.startsWith('vercel-') ? 'vercel' : 'cloudflare',
+          ...(sandboxAllocation === 'cloudflare-shared'
+            ? { sandboxRoute: { kind: 'shared', routeKey: sandboxId } }
+            : {}),
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      };
+      expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
+      const vercel = sandboxAllocation.startsWith('vercel-');
+      for (const workspace of [
+        { ...current.workspace, sandboxId: `dind-${'a'.repeat(48)}` },
+        {
+          ...current.workspace,
+          sandboxProvider: current.workspace.sandboxProvider === 'vercel' ? 'cloudflare' : 'vercel',
+        },
+        { ...current.workspace, devcontainerRequested: true },
+        // `istd-` is the only identity Isolated Standard accepts.
+        { ...current.workspace, sandboxAllocation: 'isolated-standard' },
+        { ...current.workspace, sandboxAllocation: 'custom' },
+        ...(vercel ? [{ ...current.workspace, sandboxProvider: undefined }] : []),
+      ]) {
+        expect(() => parseSessionMetadata({ ...current, workspace })).toThrow();
+      }
+      if (!vercel) {
+        // Metadata written before the explicit provider field defaults to Cloudflare.
+        const implicit = {
+          ...current,
+          workspace: { ...current.workspace, sandboxProvider: undefined },
+        };
+        expect(parseSessionMetadata(implicit).workspace?.sandboxAllocation).toBe(sandboxAllocation);
+      }
+      for (const identity of [
+        { ...current.identity, orgId: undefined },
+        { ...current.identity, billingOrigin: 'code-review' },
+      ]) {
+        expect(() => parseSessionMetadata({ ...current, identity })).toThrow();
+      }
+      // Cloudflare presets keep the owner's plane; Vercel presets exist only on control.
+      const legacy = { ...current, identity: { ...current.identity, sessionId: 'agent_legacy' } };
+      if (sandboxAllocation.startsWith('vercel-')) {
+        expect(() => parseSessionMetadata(legacy)).toThrow('control-plane session');
+      } else {
+        expect(serializeSessionMetadata(parseSessionMetadata(legacy))).toEqual(legacy);
+      }
+      expect(() =>
+        parseSessionMetadata({
+          ...current,
+          devcontainer: {
+            workspacePath: '/repo',
+            innerWorkspaceFolder: '/repo',
+            wrapperPort: 3000,
+            configPath: '/repo/devcontainer.json',
+          },
+        })
+      ).toThrow();
+    }
+  );
+
   it('accepts legacy current metadata without an explicit sandbox provider as Cloudflare', () => {
     const current = {
       metadataSchemaVersion: 2 as const,

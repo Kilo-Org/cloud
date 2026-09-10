@@ -123,6 +123,27 @@ describe('vercel provider adapter', () => {
     });
   });
 
+  it.each([
+    { vcpus: 2, memory: 4096 },
+    { vcpus: 4, memory: 8192 },
+  ] as const)(
+    'propagates $vcpus vCPU resources for creation and uncertain-create inspection',
+    async resources => {
+      const createSandbox = vi.fn().mockRejectedValue(new Error('response lost'));
+      const inspectByName = vi.fn(fakeClient().inspectByName);
+      const provider = createVercelProviderAdapter({
+        sandboxName: intent.allocationName,
+        config: { ...config, resources },
+        restClient: fakeClient({ createSandbox, inspectByName }),
+      });
+      await expect(provider.create(intent)).rejects.toThrow('response lost');
+      await expect(provider.observe(null, intent)).resolves.toMatchObject({ status: 'active' });
+      expect(createSandbox).toHaveBeenCalledWith(expect.objectContaining({ resources }));
+      expect(inspectByName).toHaveBeenCalledWith(expect.objectContaining({ resources }));
+      expect(createSandbox).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('installs the creation policy before launching the control wrapper', async () => {
     const createSandbox = vi.fn(fakeClient().createSandbox);
     const executeCommand = vi.fn(fakeClient().executeCommand);

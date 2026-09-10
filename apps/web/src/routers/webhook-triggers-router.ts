@@ -1,4 +1,6 @@
 import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
+import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { generateCloudAgentToken } from '@/lib/tokens';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -8,6 +10,7 @@ import {
   cloud_agent_webhook_triggers,
   agent_environment_profiles,
   kiloclaw_instances,
+  type User,
 } from '@kilocode/db/schema';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
 import { triggerIdSchema, triggerIdCreateSchema } from '@/lib/webhook-trigger-validation';
@@ -276,6 +279,14 @@ async function assertProfileOwnership(
   }
 }
 
+async function canSetSandboxAllocation(user: User, organizationId?: string): Promise<boolean> {
+  if (!organizationId) return false;
+  const capabilities = await createCloudAgentNextClient(
+    generateCloudAgentToken(user)
+  ).getSandboxSelectionOptions({ kilocodeOrganizationId: organizationId });
+  return capabilities.enabled;
+}
+
 export const webhookTriggersRouter = createTRPCRouter({
   capabilities: baseProcedure
     .input(z.object({ organizationId: z.string().uuid().optional() }))
@@ -283,7 +294,9 @@ export const webhookTriggersRouter = createTRPCRouter({
       if (input.organizationId) {
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
-      return { canSetSandboxAllocation: ctx.user.is_admin };
+      return {
+        canSetSandboxAllocation: await canSetSandboxAllocation(ctx.user, input.organizationId),
+      };
     }),
 
   /**
@@ -424,10 +437,13 @@ export const webhookTriggersRouter = createTRPCRouter({
       await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
     }
 
-    if (input.sandboxAllocation === 'isolated-standard' && !ctx.user.is_admin) {
+    if (
+      input.sandboxAllocation &&
+      !(await canSetSandboxAllocation(ctx.user, input.organizationId))
+    ) {
       throw new TRPCError({
         code: 'FORBIDDEN',
-        message: 'Kilo admin access is required to select Dedicated Standard',
+        message: 'Sandbox selection requires an enabled organization',
       });
     }
 
@@ -609,10 +625,13 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    if (input.sandboxAllocation === 'isolated-standard' && !ctx.user.is_admin) {
+    if (
+      input.sandboxAllocation &&
+      !(await canSetSandboxAllocation(ctx.user, input.organizationId))
+    ) {
       throw new TRPCError({
         code: 'FORBIDDEN',
-        message: 'Kilo admin access is required to select Dedicated Standard',
+        message: 'Sandbox selection requires an enabled organization',
       });
     }
 

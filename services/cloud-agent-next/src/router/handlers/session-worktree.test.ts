@@ -2,9 +2,13 @@ import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
 import type { OperationLedgerRow } from '@kilocode/db/schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  SELECTABLE_SANDBOX_ALLOCATIONS,
+  type SandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
 
 import { t } from '../auth.js';
-import type { SessionMetadata } from '../../persistence/session-metadata.js';
+import { parseSessionMetadata, type SessionMetadata } from '../../persistence/session-metadata.js';
 import type * as SessionPlane from '../../session-plane.js';
 import type { TRPCContext } from '../../types.js';
 import { sha256Hex } from '../../utils/sha256.js';
@@ -143,6 +147,33 @@ function sourceMetadata(options?: {
       credentialContainment: { github: true, gitlab: false, kilocode: true },
     },
     lifecycle: { version: 1, timestamp: 1 },
+  };
+}
+
+function sourceMetadataWithPreset(sandboxAllocation: SandboxAllocation): SessionMetadata {
+  const metadata = sourceMetadata({ organizationId: ORGANIZATION_ID });
+  const sandboxId =
+    sandboxAllocation === 'cloudflare-shared'
+      ? 'org-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      : 'ses-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const sandboxProvider = sandboxAllocation.startsWith('vercel-') ? 'vercel' : 'cloudflare';
+  return {
+    ...metadata,
+    workspace: {
+      ...metadata.workspace,
+      sandboxId,
+      sandboxProvider,
+      sandboxAllocation,
+      sandboxRoute:
+        sandboxAllocation === 'cloudflare-shared'
+          ? { kind: 'shared', routeKey: sandboxId }
+          : undefined,
+      providerRuntime:
+        sandboxProvider === 'vercel'
+          ? { provider: 'vercel', sessionId: 'vercel-runtime' }
+          : undefined,
+      credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: false },
+    },
   };
 }
 
@@ -512,11 +543,166 @@ describe('createWorktreeChat request validation and authorization', () => {
     expect(admitOperationMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a grouped owner that is no longer enrolled in the control plane', async () => {
+  it('creates a sibling for a grouped owner no longer enrolled in the control plane', async () => {
     const { caller, input } = fixture({ controlPlaneIds: 'another-owner' });
 
-    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(caller.createWorktreeChat(input)).resolves.toEqual({
+      cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
+      kiloSessionId: DESTINATION_KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
+    });
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+  });
+});
+
+describe('createWorktreeChat sandbox preset inheritance', () => {
+  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
+    'inherits %s after control-plane and selection rollouts are disabled',
+    async sandboxAllocation => {
+      const metadata = sourceMetadataWithPreset(sandboxAllocation);
+      const { caller, context, input, destinationStub, sandboxControlNamespace } = fixture({
+        metadata,
+        organizationId: ORGANIZATION_ID,
+      });
+      context.env.SANDBOX_SELECTION_ORG_IDS = '';
+      context.env.CONTROL_PLANE_IDS = '';
+      context.env.PER_SESSION_SANDBOX_ORG_IDS =
+        sandboxAllocation === 'cloudflare-shared' ? '*' : '';
+      context.env.VERCEL_SANDBOX_ORG_IDS = sandboxAllocation.startsWith('vercel-') ? '' : '*';
+      context.env.CREDENTIAL_CONTAINMENT_ENABLED = 'true';
+      await caller.createWorktreeChat(input);
+      const registration = destinationStub.registerSession.mock.calls[0]?.[0];
+      const registered = parseSessionMetadata({
+        ...registration,
+        metadataSchemaVersion: 2,
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+      expect(registered.identity.sessionId).toBe(DESTINATION_WORKSPACE_ID);
+      expect(registered.workspace).toEqual({ ...metadata.workspace, providerRuntime: undefined });
+      expect(registered.workspace?.worktreeId).toBe(WORKTREE_ID);
+      expect(registered.workspace?.sandboxAllocation).toBe(sandboxAllocation);
+      expect(registered.workspace).not.toHaveProperty('resources');
+      expect(recordOperationProgressMock).toHaveBeenCalledWith(
+        expect.anything(),
+        LEDGER_ROW_ID,
+        expect.objectContaining({ sandboxAllocation })
+      );
+      expect(sandboxControlNamespace.get).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { sandboxAllocation: 'vercel-large' },
+    { runtime: { sandboxAllocation: 'vercel-large' } },
+    { workspace: { sandboxAllocation: 'vercel-large' } },
+    { sandboxProvider: 'vercel' },
+    { resources: { vcpus: 4, memory: 8192 } },
+  ])('rejects direct sibling allocation overrides before side effects: %j', async override => {
+    const { caller, input, destinationStub } = fixture({
+      metadata: sourceMetadataWithPreset('cloudflare-single'),
+      organizationId: ORGANIZATION_ID,
+    });
+    await expect(caller.createWorktreeChat({ ...input, ...override })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(assertOrganizationMembershipMock).not.toHaveBeenCalled();
     expect(admitOperationMock).not.toHaveBeenCalled();
+    expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+    expect(destinationStub.registerSession).not.toHaveBeenCalled();
+  });
+
+  it.each(['vercel-large', undefined] as const)(
+    'rejects same-key replay if the source preset changes to %s',
+    async sandboxAllocation => {
+      const metadata = sourceMetadataWithPreset('vercel-small');
+      const source = ownershipRow({ organizationId: ORGANIZATION_ID });
+      const { caller, input, destinationStub } = fixture({
+        metadata,
+        organizationId: ORGANIZATION_ID,
+        ownershipResults: [[source], [source]],
+      });
+      await caller.createWorktreeChat(input);
+      const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+      metadata.workspace = { ...metadata.workspace, sandboxAllocation };
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: ledgerRow({
+          organization_id: ORGANIZATION_ID,
+          status: 'completed',
+          canonical_result: progress,
+        }),
+      });
+      await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'operation_key_reuse_mismatch',
+      });
+      expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
+      expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
+      expect(destinationStub.getMetadata).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects recovered sibling metadata with a different size on the same provider', async () => {
+    const metadata = sourceMetadataWithPreset('vercel-small');
+    const source = ownershipRow({ organizationId: ORGANIZATION_ID });
+    const { caller, input, destinationStub } = fixture({
+      metadata,
+      organizationId: ORGANIZATION_ID,
+      ownershipResults: [[source], [source]],
+    });
+    destinationStub.registerSession.mockRejectedValueOnce(new Error('registration response lost'));
+    await expect(caller.createWorktreeChat(input)).rejects.toThrow('registration response lost');
+    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    const registered = destinationMetadata(metadata);
+    registered.workspace = { ...registered.workspace, sandboxAllocation: 'vercel-large' };
+    destinationStub.getMetadata.mockResolvedValueOnce(registered);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({
+        organization_id: ORGANIZATION_ID,
+        status: 'reconcile_pending',
+        canonical_result: progress,
+      }),
+    });
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+    expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
+    expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
+    expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('replays the inherited preset after rollouts are disabled without re-registering', async () => {
+    const metadata = sourceMetadataWithPreset('vercel-large');
+    const source = ownershipRow({ organizationId: ORGANIZATION_ID });
+    const { caller, context, input, destinationStub } = fixture({
+      metadata,
+      organizationId: ORGANIZATION_ID,
+      ownershipResults: [[source], [source]],
+    });
+    await caller.createWorktreeChat(input);
+    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    context.env.SANDBOX_SELECTION_ORG_IDS = '';
+    context.env.CONTROL_PLANE_IDS = '';
+    context.env.VERCEL_TOKEN = '';
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: ledgerRow({
+        organization_id: ORGANIZATION_ID,
+        status: 'completed',
+        canonical_result: progress,
+      }),
+    });
+    await expect(caller.createWorktreeChat(input)).resolves.toMatchObject({
+      cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
+      kiloSessionId: DESTINATION_KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
+      replayed: true,
+    });
+    expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
+    expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
+    expect(assertOrganizationMembershipMock).toHaveBeenCalledTimes(2);
   });
 });
 

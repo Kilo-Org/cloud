@@ -1,3 +1,4 @@
+import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { CredentialContainmentRequirements } from '../sandbox-control/physical-lifecycle.js';
 import {
@@ -30,6 +31,7 @@ type SandboxControlRpc = {
     ownerId: string;
     sessionId: string;
     provider?: 'cloudflare' | 'vercel';
+    resources?: VercelSandboxResources;
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;
     billing?: SandboxBillingInput;

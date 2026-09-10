@@ -2,16 +2,18 @@ import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { DeployPageClient } from './DeployPageClient';
 import { notFound } from 'next/navigation';
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
+import { isDeployFeatureEnabled } from '@/lib/user-deployments/is-deploy-feature-enabled';
 
 export default async function OrganizationDeployPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await getUserFromAuthOrRedirect('/users/sign_in');
+  const user = await getUserFromAuthOrRedirect('/users/sign_in');
+  const { id } = await params;
+  const organizationId = decodeURIComponent(id);
 
-  if (!ENABLE_DEPLOY_FEATURE) {
+  if (!(await isDeployFeatureEnabled(user.id, { type: 'org', id: organizationId }))) {
     return notFound();
   }
 

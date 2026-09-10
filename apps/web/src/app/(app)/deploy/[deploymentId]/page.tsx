@@ -1,16 +1,16 @@
 import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { DeployPageClient } from '../DeployPageClient';
 import { notFound } from 'next/navigation';
-import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
+import { isDeployFeatureEnabled } from '@/lib/user-deployments/is-deploy-feature-enabled';
 
 export default async function DeploymentDetailPage({
   params,
 }: {
   params: Promise<{ deploymentId: string }>;
 }) {
-  await getUserFromAuthOrRedirect();
+  const user = await getUserFromAuthOrRedirect();
 
-  if (!ENABLE_DEPLOY_FEATURE) {
+  if (!(await isDeployFeatureEnabled(user.id, { type: 'user', id: user.id }))) {
     return notFound();
   }
 

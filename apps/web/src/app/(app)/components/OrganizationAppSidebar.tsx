@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import HeaderLogo from '@/components/HeaderLogo';
@@ -39,8 +40,13 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { useOrgKiloClawNavState } from '@/hooks/useOrgKiloClaw';
 import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
-import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { useTRPC } from '@/lib/trpc/utils';
+import {
+  DEPLOY_FEATURE_FLAG,
+  DEPLOY_FEATURE_QUERY_STALE_TIME_MS,
+  shouldShowDeployFeature,
+} from '@/lib/user-deployments/feature-access';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 
 type OrganizationAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
@@ -51,6 +57,7 @@ export default function OrganizationAppSidebar({
   organizationId,
   ...props
 }: OrganizationAppSidebarProps) {
+  const trpc = useTRPC();
   const { data: user, isLoading } = useUser();
   const pathname = usePathname();
   const { assumedRole, setAssumedRole, setOriginalRole } = useRoleTesting();
@@ -61,7 +68,22 @@ export default function OrganizationAppSidebar({
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
+  const isDeployFlagEnabled = useFeatureFlagEnabled(DEPLOY_FEATURE_FLAG);
   const isDevelopment = process.env.NODE_ENV === 'development';
+  const { data: hasExistingDeployments } = useQuery(
+    trpc.organizations.deployments.hasExistingDeployments.queryOptions(
+      { organizationId },
+      {
+        enabled: !isDevelopment && isDeployFlagEnabled !== true,
+        staleTime: DEPLOY_FEATURE_QUERY_STALE_TIME_MS,
+      }
+    )
+  );
+  const isDeployEnabled = shouldShowDeployFeature({
+    isDevelopment,
+    isFlagEnabled: isDeployFlagEnabled,
+    hasExistingDeployments,
+  });
 
   // Get current organization role and data
   const currentOrg = organizationData;
@@ -233,7 +255,7 @@ export default function OrganizationAppSidebar({
           { title: 'Auto Fix', icon: Wrench, url: `/organizations/${organizationId}/auto-fix` },
         ]
       : []),
-    ...(ENABLE_DEPLOY_FEATURE
+    ...(isDeployEnabled
       ? [
           {
             title: 'Deploy',
@@ -287,15 +309,11 @@ export default function OrganizationAppSidebar({
           },
         ]
       : []),
-    ...(ENABLE_DEPLOY_FEATURE
-      ? [
-          {
-            title: 'Integrations',
-            icon: Cable,
-            url: `/organizations/${organizationId}/integrations`,
-          },
-        ]
-      : []),
+    {
+      title: 'Integrations',
+      icon: Cable,
+      url: `/organizations/${organizationId}/integrations`,
+    },
     ...(hasOwnerLevelAccess && currentOrg?.plan === 'enterprise'
       ? [
           {

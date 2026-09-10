@@ -124,6 +124,21 @@ export async function listDeployments(owner: Owner) {
   };
 }
 
+export async function hasExistingDeployments(owner: Owner): Promise<boolean> {
+  const ownershipCondition =
+    owner.type === 'user'
+      ? eq(deployments.owned_by_user_id, owner.id)
+      : eq(deployments.owned_by_organization_id, owner.id);
+
+  const [row] = await db
+    .select({ id: deployments.id })
+    .from(deployments)
+    .where(and(ownershipCondition, eq(deployments.created_from, 'deploy')))
+    .limit(1);
+
+  return row !== undefined;
+}
+
 /**
  * Get a single deployment with its latest build
  */

@@ -236,6 +236,7 @@ describe('isFreeModel', () => {
         'nvidia/nemotron-3-ultra-550b-a55b:free': { enabled: true, effort: 'high' },
         'dots-studio/dots-3-note-preview:free': { enabled: true, effort: 'high' },
         'nex-agi/nex-n2.5-pro:free': { enabled: true, effort: 'high' },
+        'inclusionai/ling-3.0-flash-vl:free': { enabled: true, effort: 'high' },
       });
     });
 
@@ -249,6 +250,7 @@ describe('isFreeModel', () => {
         'nvidia/nemotron-3-ultra-550b-a55b:free': 1,
         'dots-studio/dots-3-note-preview:free': 1,
         'nex-agi/nex-n2.5-pro:free': 1,
+        'inclusionai/ling-3.0-flash-vl:free': 1,
       });
     });
 

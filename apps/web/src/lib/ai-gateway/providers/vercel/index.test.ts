@@ -306,7 +306,6 @@ describe('shouldRouteToVercel', () => {
         vercelPaid: 100,
         vercelFree: 100,
         vercelOptOutModels: new Set(options?.optOut ? ['anthropic/claude-sonnet-4.5'] : []),
-        perplexity: 0,
       })),
     }));
     jest.doMock('@/lib/ai-gateway/is-free-model', () => ({

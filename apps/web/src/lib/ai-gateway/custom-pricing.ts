@@ -3,7 +3,6 @@ import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@/lib/ai-gateway/processUsage.types';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
 import { QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
-import { partnerPricingByModelId } from '@/lib/ai-gateway/providers/partner/pricing';
 import {
   calculateCost_mUsd,
   type Pricing,
@@ -19,8 +18,6 @@ export type CustomPricing = {
   pricing: PricingTiers;
   /** Human-readable discount shown in the model name; never used in calculations. */
   discountPercentage?: number;
-  /** Only use this pricing when the upstream response does not report a market cost. */
-  fallbackOnly?: boolean;
 };
 
 export const customPricingByModelId: Record<string, CustomPricing> = {
@@ -76,7 +73,6 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
       },
     ],
   },
-  ...partnerPricingByModelId,
 };
 
 export function getCustomPricing(modelId: string): CustomPricing | undefined {
@@ -109,9 +105,7 @@ export function applyCustomPricingToPricing(
   pricing: OpenRouterModel['pricing']
 ): OpenRouterModel['pricing'] {
   const customPricing = getCustomPricing(modelId);
-  return customPricing && !customPricing.fallbackOnly
-    ? applyPricing(pricing, customPricing.pricing[0].pricing)
-    : pricing;
+  return customPricing ? applyPricing(pricing, customPricing.pricing[0].pricing) : pricing;
 }
 
 export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterModel {
@@ -135,7 +129,7 @@ export function calculateCustomCost_mUsd(
   usage: JustTheCostsUsageStats
 ): number | undefined {
   const customPricing = getCustomPricing(modelId);
-  if (!customPricing || (customPricing.fallbackOnly && usage.cost_mUsd > 0)) return undefined;
+  if (!customPricing) return undefined;
 
   const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
   if (uncachedInputTokens < 0) {

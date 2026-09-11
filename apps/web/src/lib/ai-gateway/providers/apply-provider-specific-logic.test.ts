@@ -14,8 +14,8 @@ import {
   type Provider,
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import { QWEN37_MAX_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
+import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import {
   gpt_5_6_sol_discounted_model,
   gpt_6_astra_flex_model,
@@ -38,7 +38,7 @@ function makeRequest(
 
 function makeProvider(responseTransforms: Provider['responseTransforms']): Provider {
   return {
-    id: 'perplexity',
+    id: 'openrouter',
     apiUrl: 'https://example.com/v1',
     apiUrlOverrides: {},
     apiKey: 'test-key',
@@ -67,7 +67,7 @@ function makeMessagesRequest(
 }
 
 describe('applyAnthropicThinkingDefault', () => {
-  it.each(['z-ai/glm-5.2', PERPLEXITY_KIMI_PUBLIC_ID, 'minimax/minimax-m3'])(
+  it.each(['z-ai/glm-5.2', KIMI_CURRENT_MODEL_ID, 'minimax/minimax-m3'])(
     'disables implicit thinking for %s',
     model => {
       const request = makeMessagesRequest(model);
@@ -114,7 +114,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
     {
       model: QWEN37_MAX_MODEL_ID,
       kiloExclusiveModel: null,
-      reason: 'non-fallback custom pricing',
+      reason: 'custom pricing',
     },
     {
       model: gpt_5_6_sol_discounted_model.public_id,
@@ -145,7 +145,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
   );
 
   it.each([
-    [PERPLEXITY_KIMI_PUBLIC_ID, null],
+    [KIMI_CURRENT_MODEL_ID, null],
     [gpt_6_astra_flex_model.public_id, gpt_6_astra_flex_model],
     ['vendor/standard-model', null],
   ] as const)('preserves the request-level tier for %s', (model, kiloExclusiveModel) => {

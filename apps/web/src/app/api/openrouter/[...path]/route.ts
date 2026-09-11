@@ -15,10 +15,7 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  getProvider,
-  type GetProviderProviderResult,
-} from '@/lib/ai-gateway/providers/get-provider';
+import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
@@ -65,7 +62,6 @@ import {
   rewriteModelResponse,
   logUnrewrittenResponse,
 } from '@/lib/ai-gateway/rewriteModelResponse';
-import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner/routing';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -112,7 +108,7 @@ import {
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@/lib/utils.server';
 import { readDb } from '@/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
 import {
@@ -899,29 +895,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  const partnerProvider = await getPercentageRoutedPartnerProvider({
-    requestedModel: effectiveModelIdLowerCased,
-    request: requestBodyParsed,
-    randomSeed: taskId || user.id,
-    sourceProviderId: effectiveProviderContext.provider.id,
-    hasUserByok: effectiveProviderContext.userByok !== null,
-  });
-  let partnerFallback:
-    | { providerContext: GetProviderProviderResult; request: GatewayRequest }
-    | undefined;
-  if (partnerProvider) {
-    partnerFallback = {
-      providerContext: effectiveProviderContext,
-      request: structuredClone(requestBodyParsed),
-    };
-    effectiveProviderContext = {
-      kind: 'provider',
-      provider: partnerProvider,
-      userByok: null,
-      bypassAccessCheck: false,
-    };
-  }
-
   console.debug(`Routing request to ${effectiveProviderContext.provider.id}`);
 
   // Extract properties for usage context after final provider selection.
@@ -1003,7 +976,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     signal: request.signal,
     vercelRequestId,
   };
-  let attempt = await sendUpstreamAttempt({
+  const attempt = await sendUpstreamAttempt({
     ...upstreamAttemptOptions,
     providerContext: effectiveProviderContext,
     request: requestBodyParsed,
@@ -1013,51 +986,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
   }
   if (attempt.type === 'error') return attempt.response;
-
-  if (partnerFallback && attempt.response.status >= 400) {
-    const partnerFailureLog = {
-      partner_provider: effectiveProviderContext.provider.id,
-      fallback_provider: partnerFallback.providerContext.provider.id,
-      status_code: attempt.response.status,
-    };
-    const responseForLogging = attempt.response.clone();
-    after(
-      (async () => {
-        try {
-          warnExceptInTest('Partner request failed before managed fallback', {
-            ...partnerFailureLog,
-            body: await responseForLogging.text(),
-          });
-        } catch (error) {
-          warnExceptInTest('Partner request failed before managed fallback', {
-            ...partnerFailureLog,
-            response_body_read_error: String(error),
-          });
-        }
-      })()
-    );
-    try {
-      await attempt.response.body?.cancel();
-    } catch {
-      warnExceptInTest('Failed to cancel discarded partner response body');
-    }
-
-    effectiveProviderContext = partnerFallback.providerContext;
-    requestBodyParsed = partnerFallback.request;
-    usageContext.provider = effectiveProviderContext.provider.id;
-    usageContext.user_byok = !!effectiveProviderContext.userByok;
-
-    attempt = await sendUpstreamAttempt({
-      ...upstreamAttemptOptions,
-      providerContext: effectiveProviderContext,
-      request: requestBodyParsed,
-      delayMs: 0,
-    });
-    if (attempt.type === 'invalid-openrouter-model') {
-      return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
-    }
-    if (attempt.type === 'error') return attempt.response;
-  }
 
   const { response, toolsAvailable, toolsUsed, experimentPromptCapture } = attempt;
   if (experimentPromptCapture) usageContext.experimentPromptCapture = experimentPromptCapture;

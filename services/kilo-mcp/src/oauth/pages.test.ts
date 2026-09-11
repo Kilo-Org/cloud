@@ -38,6 +38,10 @@ describe('consentPage', () => {
     expect(html).toContain("j.status==='expired'");
     expect(html).toContain("j.status==='unknown'");
     expect(html).toContain('location.replace(j.picker_url)');
+    // /authorize/org owns the post-consent client redirect; a status poll can
+    // never answer 'approved', so the page carries no approved branch.
+    expect(html).not.toContain("j.status==='approved'");
+    expect(html).not.toContain('redirect_url');
   });
 
   it('keeps the restart CTA hidden until the poll fails and opens sign-in in a new tab', async () => {

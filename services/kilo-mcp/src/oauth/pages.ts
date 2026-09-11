@@ -52,7 +52,6 @@ export function consentPage(input: {
     `var restart=document.getElementById('restart');` +
     `function fail(msg){el.textContent=msg;restart.hidden=false;}` +
     `async function poll(){try{var r=await fetch(u,{credentials:'omit'});var j=await r.json();` +
-    `if(j.status==='approved'){location.replace(j.redirect_url);return;}` +
     `if(j.status==='needs_org'){location.replace(j.picker_url);return;}` +
     `if(j.status==='denied'){fail('Kilo sign-in was denied. Start sign-in again to retry, or close this tab.');return;}` +
     `if(j.status==='expired'){fail('The Kilo sign-in request expired. Start sign-in again to try once more.');return;}` +

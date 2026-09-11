@@ -401,6 +401,15 @@ async function handleOrgPicker(
       },
     });
     await deps.store.completePendingAuthorization(id, nowIso);
+    // The library owns the token endpoint, so its tokenExchangeCallback hook
+    // runs without deps and cannot see this per-request emitter (index.ts wires
+    // it with no ProviderHookDeps). Emit the one sign-in success here, after the
+    // approved guard, so a repeated submit neither completes nor emits again.
+    deps.analytics?.oauthSignIn({
+      phase: 'succeeded',
+      identity: { kiloUserId: record.kiloUserId, organizationId },
+      clientId: record.authRequest.clientId,
+    });
     // Plain 302 (not Response.redirect) so withAuthCors can extend the headers.
     return withAuthCors(new Response(null, { status: 302, headers: { Location: redirectTo } }));
   };

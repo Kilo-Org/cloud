@@ -661,6 +661,58 @@ describe('GET/POST /authorize/org', () => {
     expect(store.pending.get(id)?.status).toBe('completed');
   });
 
+  it('emits exactly one succeeded event bound to the chosen member organization', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const { helpers } = fakeHelpers({ client: clientInfo() });
+    const { analytics, calls } = fakeAnalytics();
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch(), { analytics })),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(302);
+    const succeeded = calls.filter(call => call.phase === 'succeeded');
+    expect(succeeded).toHaveLength(1);
+    expect(succeeded[0]).toEqual({
+      phase: 'succeeded',
+      identity: { kiloUserId: 'u-1', organizationId: 'org-2' },
+      clientId: CLIENT_ID,
+    });
+    expectNoCredentialLeak(calls);
+  });
+
+  it('emits exactly one succeeded event with a null organization for the personal context', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const { helpers } = fakeHelpers({ client: clientInfo() });
+    const { analytics, calls } = fakeAnalytics();
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('membership must not be read for personal');
+    }) as unknown as typeof fetch;
+    const response = await run(
+      createDefaultHandler(deps(store, fetchImpl, { analytics })),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'personal' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(302);
+    const succeeded = calls.filter(call => call.phase === 'succeeded');
+    expect(succeeded).toHaveLength(1);
+    expect(succeeded[0]).toEqual({
+      phase: 'succeeded',
+      identity: { kiloUserId: 'u-1', organizationId: null },
+      clientId: CLIENT_ID,
+    });
+  });
+
   it('the personal context completes with a null organization and no membership read', async () => {
     const store = createFakeStore();
     const id = await seedPaired(store);
@@ -705,7 +757,8 @@ describe('GET/POST /authorize/org', () => {
     const store = createFakeStore();
     const id = await seedPaired(store);
     const { helpers, completes } = fakeHelpers({ client: clientInfo() });
-    const handler = createDefaultHandler(deps(store, flowFetch()));
+    const { analytics, calls } = fakeAnalytics();
+    const handler = createDefaultHandler(deps(store, flowFetch(), { analytics }));
     const env = envWith(helpers);
     const post = () =>
       run(
@@ -723,6 +776,9 @@ describe('GET/POST /authorize/org', () => {
     expect(second.status).toBe(400);
     expect(completes).toHaveLength(1);
     expect(store.pending.get(id)?.status).toBe('completed');
+    // The success event fires once, after the approved guard: the lost second
+    // submit emits nothing.
+    expect(calls.filter(call => call.phase === 'succeeded')).toHaveLength(1);
   });
 
   it('rejects unknown/expired/denied records with an error page', async () => {

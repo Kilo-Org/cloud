@@ -68,6 +68,11 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
     weight: 1,
     reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,
+  {
+    model: 'inclusionai/ling-3.0-flash-vl:free',
+    weight: 1,
+    reasoning: { enabled: true, effort: 'high' },
+  } satisfies AutoFreeModel,
 ];
 
 export function selectAutoFreeCandidate(

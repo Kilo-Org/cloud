@@ -95,8 +95,6 @@ describe('organizations settings trpc router', () => {
       return provider ? new Set([provider]) : new Set();
     });
     mockedGetEnhancedOpenRouterModels.mockReset();
-    mockedIsPublicIdExperimented.mockReset();
-    mockedIsPublicIdExperimented.mockResolvedValue(false);
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({
       data: [
         makeTestOpenRouterModel('gpt-4'),

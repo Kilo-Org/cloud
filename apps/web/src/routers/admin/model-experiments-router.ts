@@ -481,10 +481,6 @@ export const adminModelExperimentsRouter = createTRPCRouter({
       }
       notFound('Experiment');
     }
-    // Only routing-relevant edits touch the experimented-public-id cache;
-    // cosmetic name/description-only changes don't refresh it.
-    if (existing.public_model_id !== updated.public_model_id) {
-    }
     return updated;
   }),
 

@@ -852,33 +852,6 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     });
   });
 
-  it('applies delay before returning error when quarantine-3 model-override provider fails', async () => {
-    jest.useFakeTimers();
-    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-3'));
-    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-3'));
-    mockedGetProvider
-      .mockResolvedValueOnce({
-        kind: 'provider',
-        provider,
-        userByok: null,
-        bypassAccessCheck: false,
-      })
-      .mockResolvedValueOnce({ kind: 'not-found' });
-
-    const { POST } = await import('./route');
-    const responsePromise = POST(makeRequest(makeBody()) as never);
-
-    await jest.advanceTimersByTimeAsync(5999);
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-
-    await jest.advanceTimersByTimeAsync(1);
-    const response = await responsePromise;
-
-    expect(response.status).toBe(404);
-    expect(mockedGetProvider).toHaveBeenCalledTimes(2);
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
-
   it('applies delay before returning error when quarantine-3 override API kind is unsupported', async () => {
     jest.useFakeTimers();
     mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-3'));

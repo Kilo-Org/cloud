@@ -1,7 +1,9 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  getOpenRouterModelsFromDatabase: jest.fn(async () => new Set<string>()),
+  getOpenRouterModelsFromDatabase: jest.fn(
+    async () => new Set<string>(['poolside/laguna-s-2.1:free'])
+  ),
 }));
 
 import { resolveAutoModel } from './resolution';
@@ -408,7 +410,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
 describe('resolveAutoModel — kilo-auto/free branch', () => {
   it('excludes candidates denied by the effective organization policy', async () => {
     const isAutoFreeCandidateAllowed = jest.fn(
-      async (modelId: string) => modelId === 'stepfun/step-3.7-flash:free'
+      async (modelId: string) => modelId === 'poolside/laguna-s-2.1:free'
     );
 
     const result = await resolveAutoModel(
@@ -425,11 +427,11 @@ describe('resolveAutoModel — kilo-auto/free branch', () => {
     expect(result).toEqual({
       kind: 'ok',
       resolved: {
-        model: 'stepfun/step-3.7-flash:free',
+        model: 'poolside/laguna-s-2.1:free',
         reasoning: { enabled: true, effort: 'high' },
       },
     });
-    expect(isAutoFreeCandidateAllowed).toHaveBeenCalledWith('stepfun/step-3.7-flash:free');
+    expect(isAutoFreeCandidateAllowed).toHaveBeenCalledWith('poolside/laguna-s-2.1:free');
   });
 
   it('reports no free models when organization policy denies every candidate', async () => {

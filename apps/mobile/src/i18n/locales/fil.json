@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO para sa negosyo"
   },
   "preferences": {
+    "general": "Pangkalahatan",
+    "voiceInput": "Pag-input ng boses",
     "autoExpandThinking": "Awtomatikong ipakita ang buong pag-iisip",
     "autoExpandThinkingSubtitle": "Ipakita nang buo ang pag-iisip ng ahente kapag natapos ito.",
     "keepScreenOn": "Panatilihing bukas ang screen sa pahina ng sesyon",
@@ -237,6 +239,7 @@
     "appearanceLight": "Maliwanag",
     "appearanceDark": "Madilim",
     "account": "Akawnt",
+    "accountSubtitle": "Wika, mga pinagkakatiwalaang host, at mga sesyon sa aparato",
     "prReviewAttribution": "Banggitin ang app sa mga pagsusuri ng PR",
     "prReviewAttributionSubtitle": "Idagdag ang Sinuri gamit ang Kilo sa ibaba ng isinumite mong pagsusuri.",
     "returnSendsMessage": "Nagpapadala ng mensahe ang teklang Return",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Hindi maabot ang Kilo Gateway. Suriin ang iyong koneksyon at subukang muli.",
     "gatewayTimeout": "Nagtagal ang pagsasalin ng boses sa teksto. Subukang muli.",
     "gatewayModelUnavailable": "Hindi magagamit ang modelong ito para sa pagsasalin ng boses sa teksto. Pumili ng iba sa Mga kagustuhan.",
+    "gatewayModelUnavailableNotice": "Hindi na inaalok ang modelong ito. I-tap ang $t(transcriptionModel.title) para pumili ng iba.",
     "gatewaySignInRequired": "Mag-sign in para gamitin ang pagsasalin ng boses sa teksto gamit ang Kilo Gateway.",
     "gatewayNoModel": "Pumili muna ng modelo para sa pagsasalin ng boses sa teksto sa Mga kagustuhan."
   },

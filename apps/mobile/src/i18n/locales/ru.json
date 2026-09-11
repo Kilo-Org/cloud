@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Корпоративный SSO"
   },
   "preferences": {
+    "general": "Общие",
+    "voiceInput": "Голосовой ввод",
     "autoExpandThinking": "Автоматически раскрывать рассуждения",
     "autoExpandThinkingSubtitle": "Показывать рассуждения агента целиком, когда он закончит обдумывание.",
     "keepScreenOn": "Не выключать экран на странице сеанса",
@@ -237,6 +239,7 @@
     "appearanceLight": "Светлая",
     "appearanceDark": "Тёмная",
     "account": "Аккаунт",
+    "accountSubtitle": "Язык, доверенные сайты и сеансы на устройствах",
     "prReviewAttribution": "Указывать приложение в проверках PR",
     "prReviewAttributionSubtitle": "Добавлять подпись «Проверено с помощью Kilo» в конце проверки при её отправке.",
     "returnSendsMessage": "Отправлять сообщение клавишей ввода",
@@ -2170,6 +2173,7 @@
     "gatewayUnreachable": "Не удалось связаться с Kilo Gateway. Проверьте подключение и попробуйте снова.",
     "gatewayTimeout": "Распознавание заняло слишком много времени. Попробуйте снова.",
     "gatewayModelUnavailable": "Эта модель распознавания речи недоступна. Выберите другую в настройках.",
+    "gatewayModelUnavailableNotice": "Эта модель больше не предлагается. Нажмите $t(transcriptionModel.title), чтобы выбрать другую.",
     "gatewaySignInRequired": "Войдите, чтобы использовать распознавание речи через Kilo Gateway.",
     "gatewayNoModel": "Сначала выберите модель распознавания речи в настройках."
   },

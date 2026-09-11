@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "ව්‍යවසාය SSO"
   },
   "preferences": {
+    "general": "සාමාන්‍ය",
+    "voiceInput": "හඬ ආදානය",
     "autoExpandThinking": "සිතීමේ විස්තර ස්වයංක්‍රීයව විහිදුවන්න",
     "autoExpandThinkingSubtitle": "නියෝජිතයා සිතීම අවසන් කළ විට එහි විස්තර විහිදුවා පෙන්වන්න.",
     "keepScreenOn": "සැසි පිටුවේ සිටින විට තිරය දැල්වී තබන්න",
@@ -237,6 +239,7 @@
     "appearanceLight": "ලා පැහැති",
     "appearanceDark": "අඳුරු",
     "account": "ගිණුම",
+    "accountSubtitle": "භාෂාව, විශ්වාස කළ ධාරක සහ උපාංග සැසි",
     "prReviewAttribution": "PR සමාලෝචනවල යෙදුම සඳහන් කරන්න",
     "prReviewAttributionSubtitle": "සමාලෝචනයක් යවන විට එය Kilo හරහා කළ බව දැක්වෙන පාද සටහනක් එක් කරන්න.",
     "returnSendsMessage": "එන්ටර් යතුරෙන් පණිවිඩය යවයි",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway වෙත ළඟා විය නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
     "gatewayTimeout": "හඬ පෙළට හැරවීමට වැඩි වේලාවක් ගත විය. නැවත උත්සාහ කරන්න.",
     "gatewayModelUnavailable": "මෙම හඬ පෙළට හැරවීමේ ආකෘතිය ලබා ගත නොහැක. මනාප වලින් තවත් එකක් තෝරන්න.",
+    "gatewayModelUnavailableNotice": "මෙම ආකෘතිය තවදුරටත් ලබා දෙන්නේ නැත. තවත් එකක් තෝරන්න $t(transcriptionModel.title) තට්ටු කරන්න.",
     "gatewaySignInRequired": "Kilo Gateway හඬ පෙළට හැරවීම භාවිත කිරීමට පුරනය වන්න.",
     "gatewayNoModel": "පළමුව මනාප වලින් හඬ පෙළට හැරවීමේ ආකෘතියක් තෝරන්න."
   },

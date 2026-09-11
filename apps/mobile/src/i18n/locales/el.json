@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Εταιρική ενιαία σύνδεση (SSO)"
   },
   "preferences": {
+    "general": "Γενικά",
+    "voiceInput": "Φωνητική εισαγωγή",
     "autoExpandThinking": "Αυτόματη ανάπτυξη σκέψης",
     "autoExpandThinkingSubtitle": "Εμφανίζει ολόκληρη τη σκέψη του πράκτορα μόλις ολοκληρωθεί.",
     "keepScreenOn": "Διατήρηση ενεργής οθόνης στη σελίδα συνεδρίας",
@@ -237,6 +239,7 @@
     "appearanceLight": "Ανοιχτό",
     "appearanceDark": "Σκούρο",
     "account": "Λογαριασμός",
+    "accountSubtitle": "Γλώσσα, αξιόπιστοι ιστότοποι και συνεδρίες συσκευών",
     "prReviewAttribution": "Προσθήκη αναφοράς της εφαρμογής στους ελέγχους PR",
     "prReviewAttributionSubtitle": "Προσθέτει την υποσημείωση «Έλεγχος μέσω Kilo» όταν υποβάλλεις έναν έλεγχο.",
     "returnSendsMessage": "Αποστολή μηνύματος με το πλήκτρο Enter",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Δεν ήταν δυνατή η επικοινωνία με το Kilo Gateway. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
     "gatewayTimeout": "Η απομαγνητοφώνηση πήρε υπερβολικό χρόνο. Δοκίμασε ξανά.",
     "gatewayModelUnavailable": "Αυτό το μοντέλο απομαγνητοφώνησης δεν είναι διαθέσιμο. Διάλεξε άλλο στις Προτιμήσεις.",
+    "gatewayModelUnavailableNotice": "Αυτό το μοντέλο δεν προσφέρεται πλέον. Πατήστε $t(transcriptionModel.title) για να διαλέξετε άλλο.",
     "gatewaySignInRequired": "Συνδέσου για να χρησιμοποιήσεις την απομαγνητοφώνηση μέσω Kilo Gateway.",
     "gatewayNoModel": "Διάλεξε πρώτα ένα μοντέλο απομαγνητοφώνησης στις Προτιμήσεις."
   },

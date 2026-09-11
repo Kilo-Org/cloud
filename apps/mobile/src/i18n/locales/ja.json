@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "エンタープライズSSO"
   },
   "preferences": {
+    "general": "一般",
+    "voiceInput": "音声入力",
     "autoExpandThinking": "思考を自動展開",
     "autoExpandThinkingSubtitle": "エージェントの思考が終了したときに展開して表示します。",
     "keepScreenOn": "セッション画面で画面を常時オン",
@@ -237,6 +239,7 @@
     "appearanceLight": "ライト",
     "appearanceDark": "ダーク",
     "account": "アカウント",
+    "accountSubtitle": "言語、信頼済みホスト、デバイスのセッション",
     "prReviewAttribution": "PRレビューに使用アプリ名を追加",
     "prReviewAttributionSubtitle": "レビューを送信すると、末尾にKiloでレビューしたことを示す文言を追加します。",
     "returnSendsMessage": "リターンキーでメッセージを送信",
@@ -2142,6 +2145,7 @@
     "gatewayUnreachable": "Kilo Gatewayに接続できませんでした。接続を確認して、もう一度お試しください。",
     "gatewayTimeout": "文字起こしに時間がかかりすぎました。もう一度お試しください。",
     "gatewayModelUnavailable": "この文字起こしモデルは利用できません。設定で別のモデルを選択してください。",
+    "gatewayModelUnavailableNotice": "このモデルは提供が終了しました。別のモデルを選ぶには$t(transcriptionModel.title)をタップしてください。",
     "gatewaySignInRequired": "Kilo Gatewayの文字起こしを使うにはサインインしてください。",
     "gatewayNoModel": "まず設定で文字起こしモデルを選択してください。"
   },

@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "ਐਂਟਰਪ੍ਰਾਈਜ਼ SSO"
   },
   "preferences": {
+    "general": "ਆਮ",
+    "voiceInput": "ਵੌਇਸ ਇਨਪੁਟ",
     "autoExpandThinking": "ਸੋਚ ਦਾ ਵੇਰਵਾ ਆਪਣੇ ਆਪ ਖੋਲ੍ਹੋ",
     "autoExpandThinkingSubtitle": "ਏਜੰਟ ਦੇ ਸੋਚਣ ਤੋਂ ਬਾਅਦ ਉਸ ਦੀ ਸੋਚ ਦਾ ਪੂਰਾ ਵੇਰਵਾ ਦਿਖਾਓ।",
     "keepScreenOn": "ਸੈਸ਼ਨ ਪੰਨੇ 'ਤੇ ਸਕ੍ਰੀਨ ਚਾਲੂ ਰੱਖੋ",
@@ -237,6 +239,7 @@
     "appearanceLight": "ਚਾਨਣੀ",
     "appearanceDark": "ਹਨੇਰੀ",
     "account": "ਖਾਤਾ",
+    "accountSubtitle": "ਭਾਸ਼ਾ, ਭਰੋਸੇਯੋਗ ਹੋਸਟ ਅਤੇ ਡਿਵਾਈਸਾਂ ਦੇ ਸੈਸ਼ਨ",
     "prReviewAttribution": "PR ਸਮੀਖਿਆਵਾਂ ਵਿੱਚ ਐਪ ਦਾ ਜ਼ਿਕਰ ਜੋੜੋ",
     "prReviewAttributionSubtitle": "ਸਮੀਖਿਆ ਭੇਜਣ ਵੇਲੇ ਅੰਤ ਵਿੱਚ ‘Kilo ਰਾਹੀਂ ਸਮੀਖਿਆ ਕੀਤੀ ਗਈ’ ਜੋੜੋ।",
     "returnSendsMessage": "ਰਿਟਰਨ ਕੁੰਜੀ ਸੁਨੇਹਾ ਭੇਜਦੀ ਹੈ",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway ਨਾਲ ਸੰਪਰਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਚੈੱਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "gatewayTimeout": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਿੱਚ ਬਹੁਤ ਸਮਾਂ ਲੱਗਾ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "gatewayModelUnavailable": "ਇਹ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਤਰਜੀਹਾਂ ਵਿੱਚ ਕੋਈ ਹੋਰ ਚੁਣੋ।",
+    "gatewayModelUnavailableNotice": "ਇਹ ਮਾਡਲ ਹੁਣ ਪੇਸ਼ ਨਹੀਂ ਕੀਤਾ ਜਾਂਦਾ। ਹੋਰ ਚੁਣਨ ਲਈ $t(transcriptionModel.title) 'ਤੇ ਟੈਪ ਕਰੋ।",
     "gatewaySignInRequired": "Kilo Gateway ਬਦਲੀ ਵਰਤਣ ਲਈ ਸਾਈਨ ਇਨ ਕਰੋ।",
     "gatewayNoModel": "ਪਹਿਲਾਂ ਤਰਜੀਹਾਂ ਵਿੱਚ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਚੁਣੋ।"
   },

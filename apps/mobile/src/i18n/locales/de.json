@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Unternehmens-SSO"
   },
   "preferences": {
+    "general": "Allgemein",
+    "voiceInput": "Spracheingabe",
     "autoExpandThinking": "Denkprozess automatisch aufklappen",
     "autoExpandThinkingSubtitle": "Den Denkprozess des Agenten nach Abschluss aufgeklappt anzeigen.",
     "keepScreenOn": "Bildschirm in der Sitzungsansicht eingeschaltet lassen",
@@ -237,6 +239,7 @@
     "appearanceLight": "Hell",
     "appearanceDark": "Dunkel",
     "account": "Konto",
+    "accountSubtitle": "Sprache, vertrauenswürdige Hosts und Gerätesitzungen",
     "prReviewAttribution": "App-Hinweis zu PR-Prüfungen hinzufügen",
     "prReviewAttributionSubtitle": "Beim Einreichen einer Prüfung die Fußzeile „Mit Kilo geprüft“ hinzufügen.",
     "returnSendsMessage": "Eingabetaste sendet Nachricht",
@@ -2142,6 +2145,7 @@
     "gatewayUnreachable": "Das Kilo Gateway konnte nicht erreicht werden. Prüfe deine Verbindung und versuche es erneut.",
     "gatewayTimeout": "Die Transkription hat zu lange gedauert. Versuche es erneut.",
     "gatewayModelUnavailable": "Dieses Transkriptionsmodell ist nicht verfügbar. Wähle ein anderes in den Einstellungen.",
+    "gatewayModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(transcriptionModel.title), um ein anderes zu wählen.",
     "gatewaySignInRequired": "Melde dich an, um die Gateway-Transkription zu nutzen.",
     "gatewayNoModel": "Wähle zuerst in den Einstellungen ein Transkriptionsmodell."
   },

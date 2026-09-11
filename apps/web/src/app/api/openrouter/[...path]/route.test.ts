@@ -870,12 +870,8 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 
     expect(response.status).toBe(200);
     expect(mockedGetProvider).toHaveBeenCalledTimes(2);
-    expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe(
-      'poolside/laguna-s-2.1:free'
-    );
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(
-      'poolside/laguna-s-2.1:free'
-    );
+    expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe('poolside/laguna-s-2.1:free');
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('poolside/laguna-s-2.1:free');
     expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
       abuse_delay: 6000,
       abuse_downgraded_from: 'openai/gpt-4o',

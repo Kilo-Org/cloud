@@ -23,6 +23,13 @@ let failNextProbe = false;
 let failEveryProbe = false;
 let failNextPragma = false;
 let failEveryPragma = false;
+// `PRAGMA journal_mode = WAL` returns the mode the connection switched to.
+// node:sqlite's `:memory:` database cannot use WAL, so the fake answers with
+// this seam and the test can force a rejected switch.
+let journalMode = 'wal';
+// Simulates a native handle that will not close. A leaked handle must not be
+// replaced by a second connection to the same file.
+let failClose = false;
 // Simulates a native build without SQLCipher: `PRAGMA cipher_version` returns
 // no row, exactly as plain SQLite does for an unrecognized pragma.
 let hasSQLCipher = true;
@@ -124,6 +131,9 @@ function createFakeDatabase(): FakeDatabase {
         cipherProbedAtSqlCount = sqlLog.length - 1;
         return hasSQLCipher ? { cipher_version: '4.5.5 community' } : null;
       }
+      if (source.startsWith('PRAGMA journal_mode')) {
+        return { journal_mode: journalMode };
+      }
       return native.prepare(source).get() ?? null;
     },
     // PRAGMA failure seam: the key call can fail after the handle opened.
@@ -141,6 +151,9 @@ function createFakeDatabase(): FakeDatabase {
     },
     closeAsync: async () => {
       closeCallCount += 1;
+      if (failClose) {
+        throw new Error('handle is stuck open');
+      }
       native.close();
     },
   };
@@ -198,6 +211,8 @@ beforeEach(() => {
   failEveryProbe = false;
   failNextPragma = false;
   failEveryPragma = false;
+  journalMode = 'wal';
+  failClose = false;
   hasSQLCipher = true;
   cipherProbedAtSqlCount = -1;
   closeCallCount = 0;
@@ -348,6 +363,35 @@ describe('single-flight open contract', () => {
   });
 });
 
+describe('connection configuration', () => {
+  it('configures busy_timeout and WAL after the key and before the first schema read', async () => {
+    await setItem('s', 'a', 'x');
+    const cipherIndex = sqlLog.findIndex(source => source.startsWith('PRAGMA cipher_version'));
+    const keyIndex = sqlLog.findIndex(source => source.startsWith('PRAGMA key'));
+    const busyIndex = sqlLog.findIndex(source => source.startsWith('PRAGMA busy_timeout'));
+    const walIndex = sqlLog.findIndex(source => source.startsWith('PRAGMA journal_mode'));
+    const probeIndex = sqlLog.findIndex(source => source.includes('sqlite_master'));
+
+    // The full SQL order: cipher_version, key, busy_timeout, WAL, then the probe.
+    expect(cipherIndex).toBe(0);
+    expect(keyIndex).toBeGreaterThan(cipherIndex);
+    expect(busyIndex).toBeGreaterThan(keyIndex);
+    expect(walIndex).toBeGreaterThan(busyIndex);
+    expect(probeIndex).toBeGreaterThan(walIndex);
+  });
+
+  it('sets a non-zero busy timeout value on the connection', async () => {
+    await setItem('s', 'a', 'x');
+    const busy = sqlLog.find(source => source.startsWith('PRAGMA busy_timeout'));
+    expect(busy).toBe('PRAGMA busy_timeout = 5000');
+  });
+
+  it('fails the open when journal_mode does not switch to WAL', async () => {
+    journalMode = 'delete';
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow(/journal_mode did not switch to WAL/);
+  });
+});
+
 describe('open failure recovery', () => {
   it.each([
     {
@@ -435,6 +479,36 @@ describe('open failure recovery', () => {
       await expect(setItem('s', 'a', 'x')).resolves.toBeUndefined();
     }
   );
+
+  it('aborts the reset without opening a second connection when the previous handle does not close', async () => {
+    failNextProbe = true;
+    failClose = true;
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow('file is not a database');
+
+    // The probed handle never closed, so recovery must not delete the file or
+    // open a second connection to it.
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    // The original open error is reported under the existing subsystem tag.
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+  });
+
+  it('aborts the reset when the failed open could not close its handle', async () => {
+    failNextPragma = true;
+    failClose = true;
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow('PRAGMA key failed');
+
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+  });
 });
 
 describe('database key validation', () => {

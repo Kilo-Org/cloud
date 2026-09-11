@@ -36,6 +36,12 @@ import { kv } from './schema';
 const DATABASE_NAME = 'kilo-persist.db';
 const KEY_BYTE_COUNT = 32;
 
+// How long a statement waits for another connection's lock before it fails
+// with SQLITE_BUSY. Without it, SQLite's default rollback-journal behaviour
+// fails a synchronous write the moment a lock is held, which is the reported
+// `database is locked` rejection (KILO-APP-7K / KILO-APP-5J / KILO-APP-5H).
+const BUSY_TIMEOUT_MS = 5000;
+
 // SQLCipher key format: exactly 64 lowercase hex chars (32 bytes). A stored
 // key that does not match is treated as tampered: it must never reach PRAGMA
 // interpolation, and the open is routed into delete-and-recreate recovery.
@@ -128,12 +134,42 @@ function assertSQLCipher(client: SQLite.SQLiteDatabase): void {
   }
 }
 
-/** Closes the native handle, best-effort: a failed close must not mask the cause. */
-async function closeQuietly(client: SQLite.SQLiteDatabase): Promise<void> {
+/**
+ * Open failures whose native handle could not be closed. Delete-and-recreate
+ * must not run over such a handle, so recovery reports the cause and rethrows
+ * it instead of opening a second connection to the same file. The error
+ * identity is the signal, so no wrapper type is needed.
+ */
+const unclosedOpenErrors = new WeakSet<Error>();
+
+/** Closes the native handle, best-effort. The return value is load-bearing: a
+ * handle that did not close must not be replaced by a second connection to the
+ * same file, because that is the `old connection still open` shape behind the
+ * reported `database is locked` rejection. */
+async function closeQuietly(client: SQLite.SQLiteDatabase): Promise<boolean> {
   try {
     await client.closeAsync();
+    return true;
   } catch {
-    // Close is best-effort; the delete in the recovery path removes the file.
+    // Close is best-effort here; the caller decides whether it can proceed.
+    return false;
+  }
+}
+
+/**
+ * Configures the single connection to wait out a lock and to use WAL. Both
+ * pragmas must run after `PRAGMA key` and before any statement reads the
+ * schema, so a concurrent writer waits instead of failing immediately.
+ * SQLCipher supports WAL, and `PRAGMA journal_mode = WAL` returns the mode it
+ * switched to, so the switch is verified, not assumed.
+ */
+function configureConnection(client: SQLite.SQLiteDatabase): void {
+  client.execSync(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`);
+  const row = client.getFirstSync<{ journal_mode?: string }>('PRAGMA journal_mode = WAL');
+  if (row?.journal_mode?.toLowerCase() !== 'wal') {
+    throw new Error(
+      `encrypted-kv: journal_mode did not switch to WAL (got ${String(row?.journal_mode)})`
+    );
   }
 }
 
@@ -153,11 +189,15 @@ async function openWithKey(key: string): Promise<KVDatabase> {
   try {
     assertSQLCipher(client);
     client.execSync(`PRAGMA key = "x'${key}'"`);
+    configureConnection(client);
     return drizzle(client);
   } catch (error) {
-    // The PRAGMA failed after the handle opened. Close it before rethrowing
-    // so the delete-and-recreate recovery never runs with an open handle.
-    await closeQuietly(client);
+    // The setup failed after the handle opened. Close it before rethrowing so
+    // the delete-and-recreate recovery never runs with an open handle. If the
+    // handle will not close, mark the error: recovery must not replace it.
+    if (!(await closeQuietly(client)) && error instanceof Error) {
+      unclosedOpenErrors.add(error);
+    }
     throw error;
   }
 }
@@ -168,6 +208,18 @@ async function probeAndMigrate(db: KVDatabase): Promise<void> {
   // Drizzle owns the schema; a recreated (deleted) file has no
   // `__drizzle_migrations` table, so the migrations run again on it.
   await migrate(db, migrations);
+}
+
+/**
+ * Reports an open failure that could not be recovered, because the previous
+ * handle is still open, then rethrows the original error.
+ */
+function reportAbortedReset(cause: unknown): never {
+  Sentry.captureException(cause, {
+    level: 'error',
+    tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+  });
+  throw cause;
 }
 
 async function openEncryptedDatabase(): Promise<KVDatabase> {
@@ -192,7 +244,15 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
     // recoverable losses. Close, delete the file, regenerate the key, and
     // reopen (DEC-01 step 4).
     if (db) {
-      await closeQuietly(db.$client);
+      // The probe or migration failed after the handle opened. A handle that
+      // will not close must not be replaced by a second connection to the same
+      // file: abort the reset and report the original open error instead.
+      if (!(await closeQuietly(db.$client))) {
+        reportAbortedReset(openError);
+      }
+    } else if (openError instanceof Error && unclosedOpenErrors.has(openError)) {
+      // The failed open never returned a handle, and its handle is still open.
+      reportAbortedReset(openError);
     }
     let reopened: KVDatabase | undefined = undefined;
     try {

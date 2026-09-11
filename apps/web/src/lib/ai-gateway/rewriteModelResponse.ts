@@ -77,9 +77,6 @@ async function isLoggingEnabledForUser(
   user: User | null,
   organizationId: string | null
 ): Promise<boolean> {
-  // Hardcoded opt-ins mainly for local testing
-  if (user?.google_user_email.endsWith('@anaconda.com')) return true;
-  if (user?.google_user_email.endsWith('@kilocode.ai')) return true;
   return isDynamicallyOptedIntoRequestLogging({
     accountId: user?.id ?? null,
     organizationId,

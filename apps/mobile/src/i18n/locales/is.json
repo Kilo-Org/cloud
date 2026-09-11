@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO fyrir fyrirtæki"
   },
   "preferences": {
+    "general": "Almennt",
+    "voiceInput": "Raddinntak",
     "autoExpandThinking": "Opna hugsunarferlið sjálfkrafa",
     "autoExpandThinkingSubtitle": "Sýna allt hugsunarferli fulltrúans þegar því er lokið.",
     "keepScreenOn": "Halda skjánum kveiktum á lotusíðunni",
@@ -237,6 +239,7 @@
     "appearanceLight": "Ljóst",
     "appearanceDark": "Dökkt",
     "account": "Reikningur",
+    "accountSubtitle": "Tungumál, traustir vefþjónar og innskráningar í tækjum",
     "prReviewAttribution": "Merkja PR-yfirferðir með heiti forritsins",
     "prReviewAttributionSubtitle": "Bæta við textanum „Yfirfarið með Kilo“ neðst þegar þú sendir inn yfirferð.",
     "returnSendsMessage": "Færsluhnappur sendir skilaboð",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Ekki tókst að ná sambandi við Kilo Gateway. Athugaðu tenginguna og reyndu aftur.",
     "gatewayTimeout": "Umritunin tók of langan tíma. Reyndu aftur.",
     "gatewayModelUnavailable": "Þetta umritunarlíkan er ekki í boði. Veldu annað í Kjörstillingum.",
+    "gatewayModelUnavailableNotice": "Þetta líkan er ekki lengur í boði. Ýttu á $t(transcriptionModel.title) til að velja annað.",
     "gatewaySignInRequired": "Skráðu þig inn til að nota umritun í gegnum Kilo Gateway.",
     "gatewayNoModel": "Veldu fyrst umritunarlíkan í Kjörstillingum."
   },

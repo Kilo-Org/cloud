@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "سازماني SSO"
   },
   "preferences": {
+    "general": "عمومي",
+    "voiceInput": "غږیز ننوتل",
     "autoExpandThinking": "د فکر برخه په اوتومات ډول پرانیزئ",
     "autoExpandThinkingSubtitle": "کله چې د ایجنټ فکر بشپړ شي، د فکر برخه پرانیستې وښیئ.",
     "keepScreenOn": "د ناستې پر پاڼه سکرین روښانه وساتئ",
@@ -237,6 +239,7 @@
     "appearanceLight": "روښانه",
     "appearanceDark": "تیاره",
     "account": "حساب",
+    "accountSubtitle": "ژبه، باوري کوربه‌ګان او د وسیلو ناستې",
     "prReviewAttribution": "د PR په بیاکتنو کې د اپلیکیشن نوم زیات کړئ",
     "prReviewAttributionSubtitle": "کله چې بیاکتنه لېږئ، په پای کې یې «د Kilo له لارې بیاکتل شوی» ورزیات کړئ.",
     "returnSendsMessage": "د انټر کیلي پیغام لېږي",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "له Kilo Gateway سره اړیکه نشو ټینګېدلی. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
     "gatewayTimeout": "د غږ بدلول ډېر وخت ونیو. بیا هڅه وکړئ.",
     "gatewayModelUnavailable": "دا ماډل شتون نلري. په غوره توبونو کې بل وټاکئ.",
+    "gatewayModelUnavailableNotice": "دا ماډل نور وړاندې نه کېږي. د بل غوره کولو لپاره $t(transcriptionModel.title) ته ټک ووهئ.",
     "gatewaySignInRequired": "د Kilo Gateway بدلولو کارولو لپاره ننوځئ.",
     "gatewayNoModel": "لومړی په غوره توبونو کې یو ماډل وټاکئ."
   },

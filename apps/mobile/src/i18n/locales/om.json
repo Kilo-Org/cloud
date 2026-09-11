@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO dhaabbataa"
   },
   "preferences": {
+    "general": "Waliigalaa",
+    "voiceInput": "Galtee sagalee",
     "autoExpandThinking": "Xiinxala ofumaan bal'isi",
     "autoExpandThinkingSubtitle": "Yeroo ergamaan xiinxala isaa xumuru, bal'isiitii agarsiisi.",
     "keepScreenOn": "Fuula turtii irra yeroo jirtu iskiriiniin akka hin dhaamne godhi",
@@ -237,6 +239,7 @@
     "appearanceLight": "Ifa",
     "appearanceDark": "Dukkana",
     "account": "Herrega",
+    "accountSubtitle": "Afaan, keessummeessitoota amanaman fi turtiiwwan meeshaalee",
     "prReviewAttribution": "Maqaa appilikeeshinii sakatta'iinsa PR irratti dabali",
     "prReviewAttributionSubtitle": "Yeroo sakatta'iinsa ergitu, barruu jalaa Kilo dhaan sakatta'ame jedhu dabali.",
     "returnSendsMessage": "Furtuun galchii ergaa ergiti",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway'tti quhamuun hin danda'amne. Walqabannaa kee ilaaliitii deebi'ii yaali.",
     "gatewayTimeout": "Sagalee barreeffamatti jijjiiruun yeroo dheeraa fudhate. Irra deebi'ii yaali.",
     "gatewayModelUnavailable": "Moodeeli sagalee jijjiiru kun hin jiru. Filannoowwan keessaa kan biroo filadhu.",
+    "gatewayModelUnavailableNotice": "Moodeeli kun hin dhiyaatu. Kan biraa filachuuf $t(transcriptionModel.title) tuqi.",
     "gatewaySignInRequired": "Jijjiirraa sagalee Kilo Gateway'tti fayyadamuuf seeni.",
     "gatewayNoModel": "Dursee Filannoowwan keessatti moodeela sagalee jijjiiru filadhu."
   },

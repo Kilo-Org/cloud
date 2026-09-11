@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO សម្រាប់សហគ្រាស"
   },
   "preferences": {
+    "general": "ទូទៅ",
+    "voiceInput": "ការបញ្ចូលសំឡេង",
     "autoExpandThinking": "ពង្រីកការគិតដោយស្វ័យប្រវត្តិ",
     "autoExpandThinkingSubtitle": "បង្ហាញខ្លឹមសារនៃការគិតរបស់ភ្នាក់ងារទាំងមូល នៅពេលវាគិតរួច។",
     "keepScreenOn": "ទុកអេក្រង់ឱ្យបើកពេលនៅលើទំព័រវគ្គ",
@@ -237,6 +239,7 @@
     "appearanceLight": "ភ្លឺ",
     "appearanceDark": "ងងឹត",
     "account": "គណនី",
+    "accountSubtitle": "ភាសា ដែនគេហទំព័រដែលជឿទុកចិត្ត និងវគ្គប្រើប្រាស់លើឧបករណ៍",
     "prReviewAttribution": "បន្ថែមឈ្មោះកម្មវិធីក្នុងការពិនិត្យ PR",
     "prReviewAttributionSubtitle": "បន្ថែមអត្ថបទនៅខាងក្រោមថាបានពិនិត្យតាម Kilo នៅពេលអ្នកដាក់ស្នើការពិនិត្យ។",
     "returnSendsMessage": "គ្រាប់ចុចបញ្ចូលប្រើសម្រាប់ផ្ញើសារ",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "មិនអាចទំនាក់ទំនងទៅ Kilo Gateway បានទេ។ សូមពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្ដងទៀត។",
     "gatewayTimeout": "ការបម្លែងសំឡេងជាអត្ថបទចំណាយពេលយូរពេក។ សូមព្យាយាមម្ដងទៀត។",
     "gatewayModelUnavailable": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទនេះមិនមានទេ។ សូមជ្រើសរើសម៉ូដែលផ្សេងទៀតក្នុងចំណូលចិត្ត។",
+    "gatewayModelUnavailableNotice": "ម៉ូដែលនេះលែងផ្តល់ជូនទៀតទេ។ ចុច $t(transcriptionModel.title) ដើម្បីជ្រើសរើសមួយផ្សេងទៀត។",
     "gatewaySignInRequired": "ចូលគណនីដើម្បីប្រើការបម្លែងសំឡេងជាអត្ថបទតាម Kilo Gateway។",
     "gatewayNoModel": "សូមជ្រើសរើសម៉ូដែលបម្លែងសំឡេងជាអត្ថបទក្នុងចំណូលចិត្តជាមុនសិន។"
   },

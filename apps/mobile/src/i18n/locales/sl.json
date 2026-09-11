@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO za podjetja"
   },
   "preferences": {
+    "general": "Splošno",
+    "voiceInput": "Glasovni vnos",
     "autoExpandThinking": "Samodejno razširi razmišljanje",
     "autoExpandThinkingSubtitle": "Ko agent konča razmišljanje, prikaži njegovo celotno vsebino.",
     "keepScreenOn": "Ohrani zaslon vklopljen med ogledom seje",
@@ -237,6 +239,7 @@
     "appearanceLight": "Svetlo",
     "appearanceDark": "Temno",
     "account": "Račun",
+    "accountSubtitle": "Jezik, zaupanja vredni gostitelji in seje v napravah",
     "prReviewAttribution": "Dodaj navedbo aplikacije k pregledom PR",
     "prReviewAttributionSubtitle": "Ob oddaji pregleda dodaj vrstico »Pregledano prek aplikacije Kilo«.",
     "returnSendsMessage": "Tipka Enter pošlje sporočilo",
@@ -2618,6 +2621,7 @@
     "gatewayUnreachable": "Kilo Gateway ni dosegljiv. Preveri povezavo in poskusi znova.",
     "gatewayTimeout": "Prepisovanje je predolgo trajalo. Poskusi znova.",
     "gatewayModelUnavailable": "Ta model za prepisovanje ni na voljo. Izberite drugega v Nastavitvah.",
+    "gatewayModelUnavailableNotice": "Ta model se ne ponuja več. Dotaknite se $t(transcriptionModel.title) in izberite drugega.",
     "gatewaySignInRequired": "Prijavite se za uporabo prepisovanja prek Kilo Gateway.",
     "gatewayNoModel": "Najprej izberite model za prepisovanje v Nastavitvah."
   },

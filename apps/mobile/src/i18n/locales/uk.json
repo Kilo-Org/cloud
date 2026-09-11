@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Корпоративний SSO"
   },
   "preferences": {
+    "general": "Загальні",
+    "voiceInput": "Голосове введення",
     "autoExpandThinking": "Автоматично розгортати міркування",
     "autoExpandThinkingSubtitle": "Показувати міркування агента в розгорнутому вигляді після їх завершення.",
     "keepScreenOn": "Не вимикати екран на сторінці сеансу",
@@ -237,6 +239,7 @@
     "appearanceLight": "Світла",
     "appearanceDark": "Темна",
     "account": "Обліковий запис",
+    "accountSubtitle": "Мова, довірені хости та сеанси на пристроях",
     "prReviewAttribution": "Додавати згадку про застосунок до перевірок PR",
     "prReviewAttributionSubtitle": "Додавати підпис «Перевірено через Kilo» в кінці перевірки під час надсилання.",
     "returnSendsMessage": "Клавіша вводу надсилає повідомлення",
@@ -2170,6 +2173,7 @@
     "gatewayUnreachable": "Не вдалося зв'язатися з Kilo Gateway. Перевірте з'єднання та спробуйте ще раз.",
     "gatewayTimeout": "Розпізнавання тривало задовго. Спробуйте ще раз.",
     "gatewayModelUnavailable": "Ця модель розпізнавання мовлення недоступна. Виберіть іншу в Налаштуваннях.",
+    "gatewayModelUnavailableNotice": "Ця модель більше не пропонується. Натисніть $t(transcriptionModel.title), щоб вибрати іншу.",
     "gatewaySignInRequired": "Увійдіть, щоб використовувати розпізнавання через Kilo Gateway.",
     "gatewayNoModel": "Спершу виберіть модель розпізнавання мовлення в Налаштуваннях."
   },

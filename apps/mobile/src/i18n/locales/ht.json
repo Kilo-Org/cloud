@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO antrepriz"
   },
   "preferences": {
+    "general": "Jeneral",
+    "voiceInput": "Antre vwa",
     "autoExpandThinking": "Montre refleksyon yo otomatikman",
     "autoExpandThinkingSubtitle": "Montre tout refleksyon ajan an lè li fin reflechi.",
     "keepScreenOn": "Kenbe ekran an limen sou paj sesyon an",
@@ -237,6 +239,7 @@
     "appearanceLight": "Klè",
     "appearanceDark": "Fonse",
     "account": "Kont",
+    "accountSubtitle": "Lang, domèn ou fè konfyans ak sesyon aparèy",
     "prReviewAttribution": "Mansyone aplikasyon an nan revizyon PR yo",
     "prReviewAttributionSubtitle": "Ajoute mansyon Revize atravè Kilo nan pye chak revizyon ou soumèt.",
     "returnSendsMessage": "Bouton retou a voye mesaj",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Nou pa t ka rive nan Kilo Gateway. Tcheke koneksyon ou a epi eseye ankò.",
     "gatewayTimeout": "Transkripsyon an te pran twòp tan. Eseye ankò.",
     "gatewayModelUnavailable": "Modèl transkripsyon sa a pa disponib. Chwazi yon lòt nan Preferans yo.",
+    "gatewayModelUnavailableNotice": "Modèl sa a pa ofri ankò. Tape sou $t(transcriptionModel.title) pou chwazi yon lòt.",
     "gatewaySignInRequired": "Konekte pou sèvi ak transkripsyon Kilo Gateway.",
     "gatewayNoModel": "Chwazi yon modèl transkripsyon nan Preferans yo an premye."
   },

@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "تسجيل الدخول الموحّد للمؤسسات"
   },
   "preferences": {
+    "general": "عام",
+    "voiceInput": "إدخال صوتي",
     "autoExpandThinking": "عرض تفاصيل التفكير تلقائيًا",
     "autoExpandThinkingSubtitle": "عرض تفاصيل تفكير الوكيل عند انتهائه.",
     "keepScreenOn": "إبقاء الشاشة مضاءة في صفحة الجلسة",
@@ -237,6 +239,7 @@
     "appearanceLight": "فاتح",
     "appearanceDark": "داكن",
     "account": "الحساب",
+    "accountSubtitle": "اللغة والمضيفون الموثوقون وجلسات الأجهزة",
     "prReviewAttribution": "ذكر التطبيق في مراجعات PR",
     "prReviewAttributionSubtitle": "إضافة تذييل «تمت المراجعة عبر Kilo» عند إرسال مراجعة.",
     "returnSendsMessage": "مفتاح الإدخال يرسل الرسالة",
@@ -2198,6 +2201,7 @@
     "gatewayUnreachable": "تعذّر الوصول إلى Kilo Gateway. تحقق من اتصالك وحاول مرة أخرى.",
     "gatewayTimeout": "استغرق التفريغ وقتًا طويلًا. حاول مرة أخرى.",
     "gatewayModelUnavailable": "نموذج التفريغ الصوتي هذا غير متاح. اختر نموذجًا آخر من التفضيلات.",
+    "gatewayModelUnavailableNotice": "لم يعد هذا النموذج معروضًا. اضغط على $t(transcriptionModel.title) لاختيار نموذج آخر.",
     "gatewaySignInRequired": "سجّل الدخول لاستخدام التفريغ الصوتي عبر Kilo Gateway.",
     "gatewayNoModel": "اختر نموذج التفريغ الصوتي في التفضيلات أولًا."
   },

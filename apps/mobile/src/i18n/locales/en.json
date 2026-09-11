@@ -238,7 +238,10 @@
     "appearanceSystem": "System",
     "appearanceLight": "Light",
     "appearanceDark": "Dark",
+    "general": "General",
     "account": "Account",
+    "accountSubtitle": "Language, trusted hosts, and device sessions",
+    "voiceInput": "Voice input",
     "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "returnSendsMessage": "Return key sends message",
@@ -2592,6 +2595,7 @@
     "gatewayUnreachable": "Couldn't reach the Kilo gateway. Check your connection and try again.",
     "gatewayTimeout": "Transcription took too long. Try again.",
     "gatewayModelUnavailable": "This transcription model isn't available. Pick another one in Preferences.",
+    "gatewayModelUnavailableNotice": "This model is no longer offered. Tap $t(transcriptionModel.title) to choose another.",
     "gatewaySignInRequired": "Sign in to use gateway transcription.",
     "gatewayNoModel": "Choose a transcription model in Preferences first."
   },

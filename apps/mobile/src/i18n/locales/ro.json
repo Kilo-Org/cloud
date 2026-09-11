@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO pentru companii"
   },
   "preferences": {
+    "general": "General",
+    "voiceInput": "Introducere vocală",
     "autoExpandThinking": "Extindere automată a raționamentului",
     "autoExpandThinkingSubtitle": "Afișează raționamentul agentului în formă extinsă după finalizarea lui.",
     "keepScreenOn": "Menține ecranul aprins pe pagina sesiunii",
@@ -237,6 +239,7 @@
     "appearanceLight": "Deschis",
     "appearanceDark": "Închis",
     "account": "Cont",
+    "accountSubtitle": "Limbă, gazde de încredere și sesiuni pe dispozitive",
     "prReviewAttribution": "Menționează aplicația în revizuirile PR",
     "prReviewAttributionSubtitle": "Adaugă mențiunea „Revizuit prin Kilo” la finalul fiecărei revizuiri trimise.",
     "returnSendsMessage": "Tasta Enter trimite mesajul",
@@ -2597,6 +2600,7 @@
     "gatewayUnreachable": "Nu s-a putut contacta Kilo Gateway. Verifică conexiunea și încearcă din nou.",
     "gatewayTimeout": "Transcrierea a durat prea mult. Încearcă din nou.",
     "gatewayModelUnavailable": "Acest model de transcriere nu este disponibil. Alege altul în Preferințe.",
+    "gatewayModelUnavailableNotice": "Acest model nu mai este oferit. Atinge $t(transcriptionModel.title) pentru a alege altul.",
     "gatewaySignInRequired": "Autentifică-te pentru a folosi transcrierea cu Kilo Gateway.",
     "gatewayNoModel": "Alege mai întâi un model de transcriere în Preferințe."
   },

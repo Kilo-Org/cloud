@@ -18,7 +18,7 @@ import {
   text,
   unmountUnlock,
 } from '@/components/app-unlock-screen.test-helpers';
-import { PreferencesScreen } from '@/components/preferences-screen';
+import { GeneralSettingsScreen } from '@/components/general-settings-screen';
 import { type ElementType } from 'react';
 import { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -252,7 +252,7 @@ describe.each(['ios', 'android'])('%s shared unlock announcements', os => {
   });
 
   it.each([false, true])('announces setting feedback once with locked=%s', async locked => {
-    await mount(nestedUnlockScenes(<PreferencesScreen />));
+    await mount(nestedUnlockScenes(<GeneralSettingsScreen />));
     const preference = root().findByProps({ accessibilityLabel: 'Unlock with biometrics' });
     const save = Promise.withResolvers<undefined>();
     storage.setItemAsync.mockReturnValueOnce(save.promise);

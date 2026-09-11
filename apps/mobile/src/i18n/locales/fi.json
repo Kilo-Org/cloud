@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Yrityksen SSO"
   },
   "preferences": {
+    "general": "Yleiset",
+    "voiceInput": "Äänisyöte",
     "autoExpandThinking": "Avaa päättely automaattisesti",
     "autoExpandThinkingSubtitle": "Näytä agentin päättely kokonaan, kun päättely valmistuu.",
     "keepScreenOn": "Pidä näyttö päällä istuntosivulla",
@@ -237,6 +239,7 @@
     "appearanceLight": "Vaalea",
     "appearanceDark": "Tumma",
     "account": "Tili",
+    "accountSubtitle": "Kieli, luotetut verkkotunnukset ja laiteistunnot",
     "prReviewAttribution": "Lisää maininta sovelluksesta PR-katselmointeihin",
     "prReviewAttributionSubtitle": "Lisää lähetettävän katselmoinnin loppuun maininta, että katselmointi tehtiin Kilolla.",
     "returnSendsMessage": "Enter-näppäin lähettää viestin",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gatewayhin ei saatu yhteyttä. Tarkista yhteys ja yritä uudelleen.",
     "gatewayTimeout": "Puheentunnistus kesti liian kauan. Yritä uudelleen.",
     "gatewayModelUnavailable": "Tätä puheentunnistusmallia ei ole käytettävissä. Valitse toinen Asetuksissa.",
+    "gatewayModelUnavailableNotice": "Tätä mallia ei enää tarjota. Valitse toinen napauttamalla $t(transcriptionModel.title).",
     "gatewaySignInRequired": "Kirjaudu sisään käyttääksesi Kilo Gatewayn puheentunnistusta.",
     "gatewayNoModel": "Valitse ensin puheentunnistusmalli Asetuksissa."
   },

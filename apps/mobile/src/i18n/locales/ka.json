@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "კორპორაციული SSO"
   },
   "preferences": {
+    "general": "ზოგადი",
+    "voiceInput": "ხმოვანი შეყვანა",
     "autoExpandThinking": "მსჯელობის ავტომატურად გაშლა",
     "autoExpandThinkingSubtitle": "აგენტის მსჯელობა დასრულებისთანავე გაშლილად გამოჩნდება.",
     "keepScreenOn": "სესიის გვერდზე ეკრანის ჩართულად დატოვება",
@@ -237,6 +239,7 @@
     "appearanceLight": "ღია",
     "appearanceDark": "მუქი",
     "account": "ანგარიში",
+    "accountSubtitle": "ენა, სანდო ჰოსტები და მოწყობილობების სესიები",
     "prReviewAttribution": "PR-ის შემოწმებისას აპის მითითება",
     "prReviewAttributionSubtitle": "შემოწმების გაგზავნისას ბოლოში დაემატება წარწერა „შემოწმებულია Kilo-ს მეშვეობით“.",
     "returnSendsMessage": "შეყვანის კლავიშით შეტყობინების გაგზავნა",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway-ზე წვდომა ვერ მოხერხდა. შეამოწმეთ კავშირი და სცადეთ ხელახლა.",
     "gatewayTimeout": "ტრანსკრიფციამ ძალიან ბევრი დრო დაისვა. სცადე ხელახლა.",
     "gatewayModelUnavailable": "ტრანსკრიფციის ეს მოდელი მიუწვდომელია. აირჩიეთ სხვა პარამეტრებში.",
+    "gatewayModelUnavailableNotice": "ეს მოდელი აღარ არის ხელმისაწვდომი. სხვის ასარჩევად შეეხეთ $t(transcriptionModel.title)-ს.",
     "gatewaySignInRequired": "შედით, რომ გამოიყენოთ ტრანსკრიფცია Kilo Gateway-ით.",
     "gatewayNoModel": "ჯერ აირჩიეთ ტრანსკრიფციის მოდელი პარამეტრებში."
   },

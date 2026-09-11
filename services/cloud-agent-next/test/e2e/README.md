@@ -121,8 +121,12 @@ It stops owned sandbox families and releases any fake-LLM gate in cleanup.
 Focused lifecycle scenario:
 
 ```bash
-tsx services/cloud-agent-next/test/e2e/run.ts [--api=unified|legacy] <lifecycle> <conversation>
+tsx services/cloud-agent-next/test/e2e/run.ts [--api=unified|legacy] [--timeout-ms=<n>] <lifecycle> <conversation>
 ```
+
+`--timeout-ms=<n>` sets one finite, positive overall deadline for the selected
+`long-session`, `cold-resume`, or `multi-session-collab` scenario (not a
+per-operation timeout). The flag is rejected for all other scenarios.
 
 Examples:
 
@@ -163,6 +167,14 @@ tsx services/cloud-agent-next/test/e2e/run.ts --api=legacy callback-interrupt _
 # Legacy API (prepareSession + initiateFromKilocodeSessionV2 / sendMessageV2).
 tsx services/cloud-agent-next/test/e2e/run.ts --api=legacy cold-hot echo:legacy
 ```
+
+Long-running scenarios (`long-session`, `cold-resume`, and
+`multi-session-collab`) are not included in `smoke.ts`'s `DEFAULT_MATRIX`.
+They take 15–40 minutes and require the funded seeded user
+(`E2E_USER_EMAIL=evgeny@kilocode.ai`), the offset-prefixed `WORKER_URL` and
+`FAKE_LLM_URL`, and `E2E_MODEL=kilo/fake-deterministic`; the new scenarios reject
+other models. They use the unified API and require control-plane/worktree
+enrollment.
 
 Matrix (runs the default regression suite):
 
@@ -245,6 +257,7 @@ source of directive truth is `test/e2e/fake-llm-server.ts`.
 | `error-terminal:<msg>` | HTTP 400 with OpenAI-shaped error body carrying `<msg>`. Exercises nonretryable provider-error propagation through the gateway. |
 | `error:<msg>` | HTTP 402 with OpenAI-shaped error body carrying `<msg>`. The non-BYOK gateway converts this to retryable HTTP 503. |
 | `gate:<tag>` | Opens the SSE stream, emits no chunks, blocks until the driver calls `POST /test/release?tag=<tag>`. On release, emits `"done"` + stop + `[DONE]`. |
+| `read-then-write:<tag>:<srcPath>:<destPath>:<prefix>` | Issues a real `read` for `srcPath`, then writes `prefix` plus a newline plus the cleaned read body to `destPath`, and gates until release. The prefix may contain colons; line-number wrappers and prompt context are removed from the carried body. |
 
 Unknown `__fake__:<name>` directives produce HTTP 402 with
 `unknown fake scenario: <name>` — easy to spot in fake-LLM logs.
@@ -277,6 +290,9 @@ These are wrapped by `releaseGate()`, `waitForGateEngaged()`,
 | `followup` | Same as `hot` today; kept distinct for future resume-path splits. |
 | `cold-hot` | One cold turn plus `echo:hot`, `slow:3:50`, and `echo:followup` hot turns on the same session/sandbox. |
 | `worktree-shared` | Creates a new worktree and a sibling chat; verifies idempotent creation, a shared dirty checkout, and chat isolation. Requires both `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS` enrollment and `--api=unified`; pass `_` as the conversation placeholder. |
+| `long-session` | Runs 11 sequential real file turns (writes plus read/edit turns) in one sandbox, asserting exact dirty file state and this root's checkpoint identity after every turn. Requires the seeded enrolled user and `kilo/fake-deterministic`. |
+| `cold-resume` | Waits for the control plane's automatic idle stop, then resumes the same session on a new container and proves exact sentinel bytes plus two-sided history preservation before releasing a gate-only turn. Requires the seeded enrolled user and `kilo/fake-deterministic`. |
+| `multi-session-collab` | Runs planner, implementer, and reviewer chats serially in one worktree; each real file artifact carries the previous token and all three files are asserted on disk. Requires the seeded enrolled user and `kilo/fake-deterministic`. |
 | `external-kill` | Warmup, `docker kill` the sandbox, send another prompt, verify recovery/failure. |
 | `kill-mid-flight` | Cold `hang`, kill while pending, verify DO surfaces disconnect/error. |
 | `queue-while-busy` | Block on `gate:<tag>`, enqueue two echoes, release the gate, assert FIFO delivery through `cloud.message.*` events. |

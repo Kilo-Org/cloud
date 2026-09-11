@@ -230,7 +230,9 @@ function stripPromptContext(value: string): string {
 function directiveTag(directive: Directive | null): string | undefined {
   if (
     directive === null ||
-    !['gate', 'write-then-gate', 'read-edit-then-gate', 'question'].includes(directive.scenario)
+    !['gate', 'write-then-gate', 'read-edit-then-gate', 'read-then-write', 'question'].includes(
+      directive.scenario
+    )
   ) {
     return undefined;
   }
@@ -939,6 +941,45 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
         return;
       }
       runToolScenario(ctx, tag, 'edit', { path, contents, replacement });
+      return;
+    }
+    parkGate(ctx, tag, `done-${tag}`);
+  },
+
+  'read-then-write'(args, ctx) {
+    const parsed = stripPromptContext(args[0] ?? '').match(
+      /^([A-Za-z0-9_-]+):([^:]+):([^:]+):([\s\S]+)$/
+    );
+    if (!parsed?.[1] || !parsed[2] || !parsed[3] || parsed[4] === undefined) {
+      writeJsonError(
+        ctx.res,
+        402,
+        'read-then-write directive requires tag, srcPath, destPath, and prefix',
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag, srcPath, destPath, prefix] = parsed;
+    if (ctx.tools.length === 0) {
+      writeAssistantResponse(ctx, `done-${tag}`);
+      return;
+    }
+    const results = toolResults(ctx.body, tag, ctx.state);
+    const readResult = results.find(result => result.id === toolCallId(tag, 'read'));
+    if (!readResult) {
+      runToolScenario(ctx, tag, 'read', { path: srcPath });
+      return;
+    }
+    if (!results.some(result => result.id === toolCallId(tag, 'write'))) {
+      const contents = stripPromptContext(readFileContents(readResult.content));
+      if (!contents) {
+        writeJsonError(ctx.res, 422, 'read tool returned no file contents', 'invalid_tool_result');
+        return;
+      }
+      runToolScenario(ctx, tag, 'write', {
+        path: destPath,
+        contents: `${prefix}\n${contents}`,
+      });
       return;
     }
     parkGate(ctx, tag, `done-${tag}`);

@@ -86,6 +86,7 @@ type ControlPlaneKiloOperation = {
   gateTag?: string;
   model?: string;
   expectedText?: string;
+  userMessageId?: string;
   filePath?: string;
   questionId?: string;
 };
@@ -96,6 +97,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const request = JSON.parse(process.argv[1] ?? '{}');
+
+const KILO_SERVER_BASENAMES = new Set(['kilo', '.kilo']);
+
+/**
+ * Rosetta re-execs the CLI as: node --no-opt -r /proc/.reset <kilo> serve, so
+ * /proc/<pid>/exe resolves to the Rosetta loader and the Kilo entrypoint may
+ * not be argv[0]. Match a Kilo-named argv element with serve immediately
+ * after it, scanning all argv. getRoot remains the authoritative ownership
+ * proof: the socket must have a single owner and the session must report this
+ * exact directory.
+ */
+function isKiloServeArgv(argv) {
+  return argv.some(
+    (arg, index) =>
+      KILO_SERVER_BASENAMES.has(path.basename(arg)) && argv[index + 1] === 'serve'
+  );
+}
 
 function kiloListeners() {
   const sockets = new Map();
@@ -139,17 +157,15 @@ function kiloListeners() {
     if (owners.size !== 1) continue;
     const [processId] = owners;
     try {
-      if (path.basename(fs.readlinkSync('/proc/' + processId + '/exe')) !== 'kilo') continue;
       const argv = fs.readFileSync('/proc/' + processId + '/cmdline', 'utf8').split('\0');
-      if (path.basename(argv[0]) !== 'kilo' || argv[1] !== 'serve') continue;
+      if (!isKiloServeArgv(argv)) continue;
       const cwd = fs.readlinkSync('/proc/' + processId + '/cwd');
       const directory = fs.realpathSync(cwd);
       if (!path.isAbsolute(cwd) || cwd !== directory) continue;
-      if (!fs.existsSync(path.join(directory, '.kilo-bootstrap-complete'))) continue;
-       const environment = fs.readFileSync('/proc/' + processId + '/environ', 'utf8');
-       const home = environment.split('\0').find(value => value.startsWith('HOME='))?.slice(5);
-       if (!home || !path.isAbsolute(home) || fs.realpathSync(home) !== home) continue;
-       listeners.push({ serverUrl, processId, directory, home });
+      const environment = fs.readFileSync('/proc/' + processId + '/environ', 'utf8');
+      const home = environment.split('\0').find(value => value.startsWith('HOME='))?.slice(5);
+      if (!home || !path.isAbsolute(home) || fs.realpathSync(home) !== home) continue;
+      listeners.push({ serverUrl, processId, directory, home });
     } catch {
       continue;
     }
@@ -393,7 +409,19 @@ async function run() {
           .join('')
       : '';
     const assistant = assistants.find(entry => assistantText(entry).includes(expectedText)) ?? assistants.at(-1);
-    if (!assistant) return { ok: true, found: false };
+    if (!assistant)
+      return { ok: true, found: false, userEntryFound: false, assistantEntryFound: false };
+    const userEntry = entries.find(
+      entry =>
+        entry?.info?.role === 'user' &&
+        entry.info.id === (request.userMessageId ?? request.messageId) &&
+        entry.info.sessionID === request.kiloSessionId
+    );
+    const assistantEntryFound =
+      assistant.info.sessionID === request.kiloSessionId &&
+      assistant.info.parentID === request.messageId &&
+      typeof assistant.info.time?.completed === 'number' &&
+      assistantText(assistant).includes(expectedText);
     return {
       ok: true,
       found: true,
@@ -403,6 +431,8 @@ async function run() {
       completed: typeof assistant.info.time?.completed === 'number',
       failed: assistant.info.error !== undefined,
       expectedText: assistantText(assistant).includes(expectedText),
+      userEntryFound: userEntry !== undefined,
+      assistantEntryFound,
     };
   }
 
@@ -757,6 +787,49 @@ export async function waitForControlPlaneKiloCompletion(
   throw new Error(`Kilo root ${input.kiloSessionId} did not complete within ${input.timeoutMs}ms`);
 }
 
+export type ControlPlaneHistoryInspection = {
+  ok: boolean;
+  found: boolean;
+  userEntryFound: boolean;
+  assistantEntryFound: boolean;
+};
+
+/**
+ * Inspect both sides of a completed user turn in the live Kilo history. The
+ * completion operation retains the existing assistant lookup used by
+ * waitForControlPlaneKiloCompletion and additionally reports exact user-entry
+ * and completed-assistant matches for this test-only oracle.
+ */
+export async function inspectControlPlaneHistory(
+  runtime: ControlPlaneKiloRuntime,
+  input: { kiloSessionId: string; userMessageId: string; assistantMarker: string }
+): Promise<ControlPlaneHistoryInspection> {
+  const result = await runControlPlaneKiloOperation(runtime.container.id, {
+    action: 'completion',
+    kiloSessionId: input.kiloSessionId,
+    serverUrl: runtime.serverUrl,
+    directory: runtime.directory,
+    processId: runtime.processId,
+    ownerKiloSessionId: runtime.kiloSessionId,
+    messageId: input.userMessageId,
+    userMessageId: input.userMessageId,
+    expectedText: input.assistantMarker,
+  });
+  if (
+    typeof result.found !== 'boolean' ||
+    typeof result.userEntryFound !== 'boolean' ||
+    typeof result.assistantEntryFound !== 'boolean'
+  ) {
+    throw new Error('Kilo history inspection returned invalid entry matches');
+  }
+  return {
+    ok: result.ok === true,
+    found: result.found,
+    userEntryFound: result.userEntryFound,
+    assistantEntryFound: result.assistantEntryFound,
+  };
+}
+
 /**
  * List running sandbox containers. Returns proxy containers separately so
  * callers can kill them together with their primary.
@@ -913,6 +986,34 @@ export async function waitForSandboxFamilyGone(
   while (Date.now() < deadline) {
     const containers = await listSandboxContainers();
     if (!containers.some(container => familyNames.has(container.name))) return true;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return false;
+}
+
+/**
+ * True when the owned primary container is absent. Proxy sidecars are ignored:
+ * the cold-resume absence predicate only requires the primary sandbox to be
+ * gone, and a `-proxy` sibling may outlive it.
+ */
+export function isSandboxPrimaryGone(containers: SandboxContainer[], primaryId: string): boolean {
+  return !containers.some(container => container.id === primaryId);
+}
+
+/**
+ * Block until the owned primary sandbox is gone. Unlike
+ * `waitForSandboxFamilyGone`, a lingering `-proxy` sidecar does not keep the
+ * primary alive.
+ */
+export async function waitForSandboxPrimaryGone(
+  sandbox: SandboxContainer,
+  timeoutMs: number,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const containers = await listSandboxContainers(executeDocker);
+    if (isSandboxPrimaryGone(containers, sandbox.id)) return true;
     await new Promise(r => setTimeout(r, 500));
   }
   return false;

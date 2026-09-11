@@ -848,6 +848,142 @@ describe('fake-llm-server HTTP', () => {
     ]);
   });
 
+  it('reads a source, writes a cleaned body to a destination, then gates', async () => {
+    const h = await start();
+    const prompt = '__fake__:read-then-write:carrier:plan.md:impl.ts:impl-token';
+    const readCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(readCall).toMatchObject({ name: 'read', arguments: { filePath: 'plan.md' } });
+
+    const readHistory = [
+      { role: 'assistant', tool_calls: [{ id: readCall.id }] },
+      {
+        role: 'tool',
+        tool_call_id: readCall.id,
+        content:
+          '<path>/private/plan.md</path>\n<content>\n1: plan-token\n\n(End of file - total 1 lines)\n</content>',
+      },
+    ];
+    const writeCall = extractToolCall(
+      await parseSse(await postToolChat(h.url, prompt, readHistory))
+    );
+    expect(writeCall).toMatchObject({
+      name: 'write',
+      arguments: { filePath: 'impl.ts', content: 'impl-token\nplan-token' },
+    });
+
+    const gated = await postToolChat(h.url, prompt, [
+      ...readHistory,
+      { role: 'assistant', tool_calls: [{ id: writeCall.id }] },
+      { role: 'tool', tool_call_id: writeCall.id, content: 'File written successfully' },
+    ]);
+    const status = await fetch(`${h.url}/test/scenario-status?tag=carrier`);
+    await expect(status.json()).resolves.toEqual({
+      tag: 'carrier',
+      requests: 3,
+      toolCalls: { write: 1, read: 1, edit: 0, question: 0 },
+      toolResults: { write: 1, read: 1, edit: 0, question: 0 },
+      unsupportedToolSchema: false,
+    });
+    const gate = await fetch(`${h.url}/test/gate-status?tag=carrier`);
+    await expect(gate.json()).resolves.toEqual({ tag: 'carrier', engaged: true });
+    expect((await fetch(`${h.url}/test/release?tag=carrier`, { method: 'POST' })).status).toBe(204);
+    const completed = await parseSse(gated);
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-carrier' } }),
+    ]);
+  });
+
+  it('keeps colons in the read-then-write prefix', async () => {
+    const h = await start();
+    const prompt = '__fake__:read-then-write:colon:plan.md:impl.ts:prefix:with:colons';
+    const readCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const writeCall = extractToolCall(
+      await parseSse(
+        await postToolChat(h.url, prompt, [
+          { role: 'assistant', tool_calls: [{ id: readCall.id }] },
+          { role: 'tool', tool_call_id: readCall.id, content: 'plan-token' },
+        ])
+      )
+    );
+    expect(writeCall.arguments).toMatchObject({
+      filePath: 'impl.ts',
+      content: 'prefix:with:colons\nplan-token',
+    });
+  });
+
+  it('strips an appended environment_details block from an unwrapped read result', async () => {
+    const h = await start();
+    const prompt = '__fake__:read-then-write:context:plan.md:impl.ts:impl-token';
+    const readCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const writeCall = extractToolCall(
+      await parseSse(
+        await postToolChat(h.url, prompt, [
+          { role: 'assistant', tool_calls: [{ id: readCall.id }] },
+          {
+            role: 'tool',
+            tool_call_id: readCall.id,
+            content: 'plan-token\n<environment_details>\nprivate context\n</environment_details>',
+          },
+        ])
+      )
+    );
+    expect(writeCall.arguments).toMatchObject({
+      filePath: 'impl.ts',
+      content: 'impl-token\nplan-token',
+    });
+  });
+
+  it('rejoins multiline line-numbered read output before writing', async () => {
+    const h = await start();
+    const prompt = '__fake__:read-then-write:multiline:plan.md:impl.ts:impl-token';
+    const readCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const writeCall = extractToolCall(
+      await parseSse(
+        await postToolChat(h.url, prompt, [
+          { role: 'assistant', tool_calls: [{ id: readCall.id }] },
+          {
+            role: 'tool',
+            tool_call_id: readCall.id,
+            content:
+              '<content>\n1: first line\n2: second line\n(End of file - total 2 lines)\n</content>',
+          },
+        ])
+      )
+    );
+    expect(writeCall.arguments).toMatchObject({
+      filePath: 'impl.ts',
+      content: 'impl-token\nfirst line\nsecond line',
+    });
+  });
+
+  it('finishes read-then-write title-model requests without tool calls', async () => {
+    const h = await start();
+    const chunks = await parseSse(
+      await postChat(h.url, '__fake__:read-then-write:title:plan.md:impl.ts:secret')
+    );
+    expect(chunks[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-title' } }),
+    ]);
+    const status = await fetch(`${h.url}/test/scenario-status?tag=title`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { write: 0, read: 0, edit: 0, question: 0 },
+      toolResults: { write: 0, read: 0, edit: 0, question: 0 },
+      unsupportedToolSchema: false,
+    });
+  });
+
+  it('rejects malformed read-then-write directives', async () => {
+    const h = await start();
+    const response = await postChat(h.url, '__fake__:read-then-write:tag:only-two-parts');
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        message: 'read-then-write directive requires tag, srcPath, destPath, and prefix',
+        type: 'invalid_request',
+      },
+    });
+  });
+
   it('streams a real question and finishes only after its answered tool result', async () => {
     const h = await start();
     const prompt = '__fake__:question:asker:Choose a safe option: now';
@@ -1489,10 +1625,8 @@ describe('per-directory Kilo discovery', () => {
     { label: 'wrong inode', fdInode: '999' },
     { label: 'non-listening socket', state: '01' },
     { label: 'public listener', address: '00000000' },
-    { label: 'other executable', executable: '/usr/bin/node' },
     { label: 'wrong command', command: ['/usr/bin/node', 'serve'] },
     { label: 'not Kilo serve', command: ['/usr/local/bin/kilo', 'run'] },
-    { label: 'unprepared directory', bootstrapped: false },
   ])(
     'rejects $label instead of claiming container ownership',
     async ({ label: _label, ...override }) => {
@@ -1501,6 +1635,41 @@ describe('per-directory Kilo discovery', () => {
       const owner = vi.fn();
       expect(await findControlPlaneKiloRuntime('ses_a', fixture.execute, owner)).toBeNull();
       expect(owner).not.toHaveBeenCalled();
+      expect(fixture.forbiddenReads).toEqual([]);
+    }
+  );
+
+  it.each([
+    {
+      label: 'a Rosetta-prefixed argv and a non-Kilo exe',
+      executable: '/run/rosetta/rosetta',
+      command: [
+        'node',
+        '--no-opt',
+        '-r',
+        '/proc/.reset',
+        '/usr/local/bin/kilo',
+        'serve',
+        '--hostname=127.0.0.1',
+        '--port=0',
+      ],
+    },
+    {
+      label: 'a re-executed .kilo entrypoint and a non-Kilo exe',
+      executable: '/run/rosetta/rosetta',
+      command: ['/usr/local/lib/node_modules/@kilocode/cli/bin/.kilo', 'serve'],
+    },
+  ])(
+    'discovers a Kilo serve listener from argv alone for $label without a bootstrap marker',
+    async ({ label: _label, ...override }) => {
+      const entry = { ...directoryProcesses()[0], ...override, bootstrapped: false };
+      const fixture = discoveryFixture([entry]);
+      expect(await findControlPlaneKiloRuntime('ses_a', fixture.execute)).toMatchObject({
+        container: { id: 'owned' },
+        processId: 101,
+        directory: '/workspace/worktrees/worktree-a',
+        serverUrl: 'http://127.0.0.1:41001',
+      });
       expect(fixture.forbiddenReads).toEqual([]);
     }
   );

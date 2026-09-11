@@ -8,14 +8,6 @@
 import { execFile } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
-import {
-  and,
-  cli_sessions_v2,
-  computeDatabaseUrl,
-  createDrizzleClient,
-  eq,
-  inArray,
-} from '@kilocode/db';
 import { createKiloClient, type Message, type Part } from '@kilocode/sdk/v2';
 import {
   answerQuestion,
@@ -43,6 +35,18 @@ import {
 } from './client.js';
 import { mintApiToken } from './auth.js';
 import { startCallbackServer, type CallbackServerHandle } from './callback-server.js';
+import {
+  openConnectedStream,
+  readWorktreeOwnership,
+  requireWorktreeSessionIdentity,
+  requireWorktreeGate,
+  waitForOwnedCompletion,
+} from './worktree-support.js';
+import {
+  lifecycleColdResume,
+  lifecycleLongSession,
+  lifecycleMultiSessionCollab,
+} from './lifecycle-file-state.js';
 import { createMessageId } from '../../src/session/message-id.js';
 import { generateKiloSessionId } from '../../src/utils/kilo-session-id.js';
 import {
@@ -64,7 +68,6 @@ import {
   waitForControlPlaneKiloRuntime,
   waitForNewSandboxPresent,
   waitForSandboxFamilyGone,
-  type ControlPlaneKiloRuntime,
   type SandboxContainer,
 } from './sandbox-control.js';
 
@@ -121,16 +124,6 @@ function hasPreparationForMessage(events: StreamEvent[], messageId: string): boo
   return events.some(
     event => event.streamEventType === 'preparing' && event.data.triggerMessageId === messageId
   );
-}
-
-async function openConnectedStream(config: DriverConfig, sessionId: string, replay = true) {
-  const stream = openStream(config, sessionId, { replay });
-  const connected = await stream.waitFor(event => event.streamEventType === 'connected', 10_000);
-  if (!connected) {
-    stream.close();
-    throw new Error(`Stream did not connect for ${sessionId}`);
-  }
-  return stream;
 }
 
 async function sandboxOwnsSession(containerId: string, sessionId: string): Promise<boolean> {
@@ -421,96 +414,9 @@ export async function lifecycleGateZero(args: LifecycleArgs): Promise<LifecycleR
   }
 }
 
-type WorktreeOwnershipRow = {
-  sessionId: string;
-  userId: string;
-  organizationId: string | null;
-  parentSessionId: string | null;
-  cloudAgentSessionId: string | null;
-  cloudAgentSessionScopeId: string | null;
-  worktreeId: string | null;
-};
-
 type PublicTranscriptEntry = { info: Message; parts: Part[] };
 
 type PublicKiloClient = ReturnType<typeof createKiloClient>;
-
-async function readWorktreeOwnership(
-  config: DriverConfig,
-  kiloSessionIds: string[]
-): Promise<WorktreeOwnershipRow[]> {
-  const driver = createDrizzleClient({
-    connectionString: process.env.DATABASE_URL ?? computeDatabaseUrl(),
-    poolConfig: { application_name: 'cloud-agent-next-worktree-e2e', max: 1 },
-  });
-  try {
-    return await driver.db
-      .select({
-        sessionId: cli_sessions_v2.session_id,
-        userId: cli_sessions_v2.kilo_user_id,
-        organizationId: cli_sessions_v2.organization_id,
-        parentSessionId: cli_sessions_v2.parent_session_id,
-        cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
-        cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
-        worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
-      })
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.kilo_user_id, config.user.id),
-          inArray(cli_sessions_v2.session_id, kiloSessionIds)
-        )
-      );
-  } finally {
-    await driver.pool.end();
-  }
-}
-
-function requireWorktreeSessionIdentity(session: WorktreeSessionResult, label: string): void {
-  if (!/^workspace_[0-9a-f-]{36}$/i.test(session.cloudAgentSessionId)) {
-    throw new Error(`${label} did not receive a control-plane workspace_* identity`);
-  }
-  if (!/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/.test(session.kiloSessionId)) {
-    throw new Error(`${label} did not receive a valid root ses_* identity`);
-  }
-}
-
-async function requireWorktreeGate(
-  config: DriverConfig,
-  tag: string,
-  timeoutMs: number,
-  stream?: StreamConnection
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  const firstEvent = stream?.events.length ?? 0;
-  while (Date.now() < deadline) {
-    const [engaged, status] = await Promise.all([
-      waitForGateEngaged(config, tag, 200, 50),
-      fetchFakeScenarioStatus(config.fakeLlmUrl, tag),
-    ]);
-    if (status.unsupportedToolSchema) {
-      throw new Error(`unsupported real Kilo tool schema for fake directive ${tag}`);
-    }
-    if (engaged) return;
-    const failure = stream?.events
-      .slice(firstEvent)
-      .find(event =>
-        ['error', 'interrupted', 'cloud.message.failed'].includes(event.streamEventType)
-      );
-    if (failure) {
-      throw new Error(
-        `fake directive ${tag} terminated as ${failure.streamEventType} before gating`
-      );
-    }
-  }
-  const status = await fetchFakeScenarioStatus(config.fakeLlmUrl, tag);
-  if (status.requests > 0 && Object.values(status.toolCalls).every(count => count === 0)) {
-    throw new Error(`required real Kilo tool schema was not advertised for fake directive ${tag}`);
-  }
-  throw new Error(
-    `fake directive ${tag} did not engage within ${timeoutMs}ms; requests=${status.requests}; toolCalls=${JSON.stringify(status.toolCalls)}; toolResults=${JSON.stringify(status.toolResults)}`
-  );
-}
 
 async function requirePublicSessionProjection(
   client: PublicKiloClient,
@@ -607,21 +513,6 @@ async function waitForWorktreeQuestion(
   const status = await fetchFakeScenarioStatus(config.fakeLlmUrl, tag);
   if (status.toolCalls.question === 0) return 'unsupported';
   throw new Error(`root-scoped question ${tag} did not reach its owning stream`);
-}
-
-async function waitForOwnedCompletion(
-  runtime: ControlPlaneKiloRuntime,
-  session: WorktreeSessionResult,
-  messageId: string,
-  marker: string,
-  timeoutMs = 15_000
-): Promise<void> {
-  await waitForControlPlaneKiloCompletion(runtime, {
-    kiloSessionId: session.kiloSessionId,
-    messageId,
-    expectedText: marker,
-    timeoutMs,
-  });
 }
 
 export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<LifecycleResult> {
@@ -3120,6 +3011,9 @@ export const LIFECYCLE_SCENARIOS: Record<
 > = {
   'gate-0': lifecycleGateZero,
   'worktree-shared': lifecycleWorktreeShared,
+  'long-session': lifecycleLongSession,
+  'cold-resume': lifecycleColdResume,
+  'multi-session-collab': lifecycleMultiSessionCollab,
   cold: lifecycleCold,
   hot: lifecycleHot,
   followup: lifecycleFollowup,

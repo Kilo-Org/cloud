@@ -283,6 +283,10 @@ These are wrapped by `releaseGate()`, `waitForGateEngaged()`,
 
 ## Lifecycle scenarios
 
+For the session-continuity contract (long-lived, recoverable chats) and the
+reusable catalog of planned and existing scenarios, see
+[`SESSION-CONTINUITY.md`](./SESSION-CONTINUITY.md).
+
 | Lifecycle | What it does |
 |---|---|
 | `cold` | Fresh session; verify a new per-session sandbox appears and the conversation completes. |

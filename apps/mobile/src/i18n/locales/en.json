@@ -2970,5 +2970,32 @@
     "emptyTitle": "No transcription models",
     "emptyDescription": "The gateway offers no transcription models right now.",
     "loadFailed": "Couldn't load transcription models."
+  },
+  "tour": {
+    "forkTitle": "Where would you like to run Kilo?",
+    "forkSubtitle": "Pick where Kilo runs for your first session.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Run Kilo in a sandboxed cloud environment with nothing to install.",
+    "remoteOptionTitle": "Your computer",
+    "remoteOptionBody": "Run Kilo on your own machine through the `kilo remote` CLI.",
+    "skip": "Skip tour",
+    "done": "$t(common.done)",
+    "cloudTitle": "Start your first cloud session",
+    "cloudBody": "Create a new session and Kilo runs it in the cloud.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Waiting for your cloud session to start…",
+    "cloudCheck": "Your first cloud session is running.",
+    "remoteTitle": "Start your first remote session",
+    "remoteBody": "Connect your computer, then start the session from here.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Start a session on your computer",
+    "remoteWaiting": "Waiting for your computer to start the session…",
+    "remoteCheck": "Your first remote session is running.",
+    "remoteEmptyTitle": "No computer connected yet",
+    "remoteEmptyBody": "Run `kilo remote` on your computer to connect it.",
+    "remoteFound": "Computer connected",
+    "checkAgain": "Check again",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

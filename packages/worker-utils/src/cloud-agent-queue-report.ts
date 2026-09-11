@@ -68,9 +68,11 @@ const CloudAgentQueueSessionIdentitySchema = z
   })
   .strict()
   .superRefine((session, ctx) => {
-    const present = [session.kiloSessionId, session.initialMessageId, session.reportingCreatedAt].filter(
-      value => value !== undefined
-    ).length;
+    const present = [
+      session.kiloSessionId,
+      session.initialMessageId,
+      session.reportingCreatedAt,
+    ].filter(value => value !== undefined).length;
     if (present !== 0 && present !== 3) {
       ctx.addIssue({
         code: 'custom',

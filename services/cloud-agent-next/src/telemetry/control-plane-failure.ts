@@ -68,11 +68,11 @@ export function classifyControlPlaneFailure(
         ? POST_DISPATCH_WRAPPER_DISCONNECTED
         : PRE_DISPATCH_SANDBOX_CONNECT;
     case 'provider_unknown':
-      return PRE_DISPATCH_SANDBOX_CONNECT;
-    case 'runtime_unhealthy':
       return dispatchState === 'accepted'
         ? POST_DISPATCH_WRAPPER_DISCONNECTED
-        : PRE_DISPATCH;
+        : PRE_DISPATCH_SANDBOX_CONNECT;
+    case 'runtime_unhealthy':
+      return dispatchState === 'accepted' ? POST_DISPATCH_WRAPPER_DISCONNECTED : PRE_DISPATCH;
     case 'accepted_overdue':
       return { stage: 'post_dispatch_no_activity', code: 'wrapper_no_output' };
     case 'invalid_model':

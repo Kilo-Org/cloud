@@ -64,9 +64,11 @@ function failedReport(messageId: string): CloudAgentQueueReport {
   };
 }
 
-function createHarness(options: {
-  queue?: { send: (report: CloudAgentQueueReport) => Promise<unknown> };
-} = {}) {
+function createHarness(
+  options: {
+    queue?: { send: (report: CloudAgentQueueReport) => Promise<unknown> };
+  } = {}
+) {
   const kv = memoryKv();
   const outbox = createReportOutbox({
     storage: { kv } as never,
@@ -115,7 +117,9 @@ describe('createReportOutbox', () => {
       },
     });
     outbox.record(queuedReport('msg_one'));
-    const sentObligationId = parsePendingRunReport(kv.get(reportOutboxKey('msg_one')))?.obligationId;
+    const sentObligationId = parsePendingRunReport(
+      kv.get(reportOutboxKey('msg_one'))
+    )?.obligationId;
 
     await outbox.repair();
 

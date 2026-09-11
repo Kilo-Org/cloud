@@ -1130,9 +1130,7 @@ describe('worktree deletion in Durable Objects', () => {
         expect([
           ...state.storage.kv.list<unknown>({ prefix: CALLBACK_OUTBOX_PREFIX }),
         ]).toHaveLength(0);
-        const reportEntries = [
-          ...state.storage.kv.list<unknown>({ prefix: REPORT_OUTBOX_PREFIX }),
-        ];
+        const reportEntries = [...state.storage.kv.list<unknown>({ prefix: REPORT_OUTBOX_PREFIX })];
         expect(reportEntries).toHaveLength(1);
         expect(parsePendingRunReport(reportEntries[0]?.[1])?.report.run.status).toBe('interrupted');
         expect(await state.storage.getAlarm()).not.toBeNull();

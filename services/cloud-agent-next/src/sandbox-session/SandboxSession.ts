@@ -201,10 +201,7 @@ import {
   type CloudAgentQueueReport,
   type CloudAgentRunStateReport,
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
-import {
-  buildRunStateReport,
-  FAILED_RUN_DIAGNOSTIC_MESSAGES,
-} from '../telemetry/queue-reports.js';
+import { buildRunStateReport, FAILED_RUN_DIAGNOSTIC_MESSAGES } from '../telemetry/queue-reports.js';
 import { classifyControlPlaneFailure } from '../telemetry/control-plane-failure.js';
 import { classifyCloudAgentFailure } from '@kilocode/worker-utils/cloud-agent-failure';
 import { PENDING_SESSION_MESSAGE_LIMIT } from '../session/pending-messages.js';
@@ -1697,7 +1694,10 @@ export class SandboxSession extends DurableObject<Env> {
     if (this.reportOutbox.pendingCount() > 0) this.scheduleReportRepair();
     this.deletedWorktreeId = worktreeId;
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
-    if (this.messageCallbacks.pendingCallbackCount() === 0 && this.reportOutbox.pendingCount() === 0)
+    if (
+      this.messageCallbacks.pendingCallbackCount() === 0 &&
+      this.reportOutbox.pendingCount() === 0
+    )
       await this.ctx.storage.deleteAlarm();
     if (!metadata) return null;
     return cloudAgentWorktreeLocationSchema.parse({
@@ -1817,7 +1817,11 @@ export class SandboxSession extends DurableObject<Env> {
       initialMessageId: firstMessageId,
       createdAt,
     };
-    writeReportAnchor(this.ctx.storage, { kiloSessionId, initialMessageId: firstMessageId, createdAt });
+    writeReportAnchor(this.ctx.storage, {
+      kiloSessionId,
+      initialMessageId: firstMessageId,
+      createdAt,
+    });
     return anchor;
   }
 
@@ -1875,9 +1879,7 @@ export class SandboxSession extends DurableObject<Env> {
             errorMessageRedacted:
               FAILED_RUN_DIAGNOSTIC_MESSAGES[classification.code] ??
               'Run failed without a classified cause',
-            errorExpiresAt: new Date(
-              message.terminalAt + DIAGNOSTIC_RETENTION_MS
-            ).toISOString(),
+            errorExpiresAt: new Date(message.terminalAt + DIAGNOSTIC_RETENTION_MS).toISOString(),
           };
         }
       }

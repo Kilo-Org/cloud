@@ -46,8 +46,7 @@ function injectReportQueue(instance: SandboxSession, captured: CloudAgentQueueRe
 }
 
 function suppressDispatch(instance: SandboxSession): void {
-  (instance as unknown as Record<string, unknown>)['deliverQueuedMessage'] = async () =>
-    undefined;
+  (instance as unknown as Record<string, unknown>)['deliverQueuedMessage'] = async () => undefined;
 }
 
 function readMessages(state: DurableObjectState): SessionMessageRecord[] {
@@ -191,7 +190,6 @@ describe('control-plane run-state reporting', () => {
     });
 
     expect(result.succeeded).toBe(false);
-    expect(result.threw || !result.succeeded).toBe(true);
     expect(result.messages.some(message => message.messageId === messageId)).toBe(false);
   });
 
@@ -282,37 +280,40 @@ describe('control-plane run-state reporting', () => {
     });
   });
 
-  it('classifies post-acceptance failure without losing observed acceptance', async () => {
-    const id = sessionId();
-    const messageId = 'msg_018f1e2d3c4bPostAcceptAB';
-    const captured: CloudAgentQueueReport[] = [];
-    const acceptedAt = Date.now();
+  it.each(['runtime_unhealthy', 'provider_unknown'] as const)(
+    'classifies post-acceptance failure without losing observed acceptance for %s',
+    async reason => {
+      const id = sessionId();
+      const messageId = 'msg_018f1e2d3c4bPostAcceptAB';
+      const captured: CloudAgentQueueReport[] = [];
+      const acceptedAt = Date.now();
 
-    await runInDurableObject(sessionStub(id), async (instance, state) => {
-      injectReportQueue(instance, captured);
-      suppressDispatch(instance);
-      await register(instance, id);
-      await admit(instance, messageId);
-      instance['saveMessages'](
-        readMessages(state).map(message =>
-          message.messageId === messageId
-            ? { ...message, state: 'accepted' as const, acceptedAt }
-            : message
-        )
-      );
-      await instance.failWaitingMessages('runtime_unhealthy');
-      await instance.alarm();
-    });
+      await runInDurableObject(sessionStub(id), async (instance, state) => {
+        injectReportQueue(instance, captured);
+        suppressDispatch(instance);
+        await register(instance, id);
+        await admit(instance, messageId);
+        instance['saveMessages'](
+          readMessages(state).map(message =>
+            message.messageId === messageId
+              ? { ...message, state: 'accepted' as const, acceptedAt }
+              : message
+          )
+        );
+        await instance.failWaitingMessages(reason);
+        await instance.alarm();
+      });
 
-    const failed = captured.find(report => report.run.status === 'failed');
-    expect(failed?.run).toMatchObject({
-      messageId,
-      status: 'failed',
-      dispatchAcceptedAt: new Date(acceptedAt).toISOString(),
-      failureStage: 'post_dispatch_no_activity',
-      failureCode: 'wrapper_disconnected',
-    });
-  });
+      const failed = captured.find(report => report.run.status === 'failed');
+      expect(failed?.run).toMatchObject({
+        messageId,
+        status: 'failed',
+        dispatchAcceptedAt: new Date(acceptedAt).toISOString(),
+        failureStage: 'post_dispatch_no_activity',
+        failureCode: 'wrapper_disconnected',
+      });
+    }
+  );
 
   it.each(['wrapper_outcome', 'operation_result'] as const)(
     'does not treat an inferred acceptedAt as observed acceptance for a %s terminal-before-ACK',
@@ -339,9 +340,9 @@ describe('control-plane run-state reporting', () => {
           terminalSource
         );
         expect(updated).toBeDefined();
-        expect(
-          updated?.find(message => message.messageId === messageId)?.acceptedAt
-        ).toEqual(expect.any(Number));
+        expect(updated?.find(message => message.messageId === messageId)?.acceptedAt).toEqual(
+          expect.any(Number)
+        );
         state.storage.kv.put('session_messages', messages);
         instance['saveMessages'](updated as SessionMessageRecord[]);
         await instance.alarm();

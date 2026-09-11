@@ -1,12 +1,11 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  getOpenRouterModelsFromDatabase: jest.fn(
-    async () => new Set<string>(['poolside/laguna-s-2.1:free'])
-  ),
+  getOpenRouterModelsFromDatabase: jest.fn(),
 }));
 
 import { resolveAutoModel } from './resolution';
+import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import {
   FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
@@ -29,6 +28,7 @@ const baseParams = {
 const nullUserPromise = Promise.resolve(null);
 const zeroBalancePromise = Promise.resolve(0);
 const primaryDefaultFallback = { model: PRIMARY_DEFAULT_MODEL };
+const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
 
 const sampleDecision: AutoRoutingDecision = {
   model: 'anthropic/claude-haiku-4',
@@ -408,6 +408,10 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
 });
 
 describe('resolveAutoModel — kilo-auto/free branch', () => {
+  beforeEach(() => {
+    mockedGetOpenRouterModels.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
+  });
+
   it('excludes candidates denied by the effective organization policy', async () => {
     const isAutoFreeCandidateAllowed = jest.fn(
       async (modelId: string) => modelId === 'poolside/laguna-s-2.1:free'

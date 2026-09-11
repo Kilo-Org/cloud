@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO umanga"
   },
   "preferences": {
+    "general": "Whānui",
+    "voiceInput": "Tāuru reo",
     "autoExpandThinking": "Whakawhānuitia aunoa te whakaaro",
     "autoExpandThinkingSubtitle": "Whakaaturia katoatia ngā whakaaro o te māngai ina oti tana whakaaro.",
     "keepScreenOn": "Whakakā tonutia te mata i te whārangi wātū",
@@ -237,6 +239,7 @@
     "appearanceLight": "Mārama",
     "appearanceDark": "Pōuri",
     "account": "Pūkete",
+    "accountSubtitle": "Reo, ngā paetukutuku whirinaki me ngā wātū pūrere",
     "prReviewAttribution": "Tāpirihia te ingoa taupānga ki ngā arotake PR",
     "prReviewAttributionSubtitle": "Tāpirihia he hiku e mea ana 'Kua arotakengia mā Kilo' ina tuku koe i tētahi arotake.",
     "returnSendsMessage": "Ka tukuna te karere mā te pātuhi tāuru",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kāore i taea te tae ki te Kilo Gateway. Tirohia tō hononga, kātahi ka whakamātau anō.",
     "gatewayTimeout": "He roa rawa te tuhi ā-reo. Whakamātau anō.",
     "gatewayModelUnavailable": "Kāore e wātea ana tēnei tauira tuhi ā-reo. Kōwhiria tētahi atu i Ngā manakohanga.",
+    "gatewayModelUnavailableNotice": "Kāore tēnei tauira e tukuna ana ināianei. Pāwhiritia $t(transcriptionModel.title) ki te kōwhiri i tētahi atu.",
     "gatewaySignInRequired": "Takiuru kia taea te tuhi ā-reo mā Kilo Gateway.",
     "gatewayNoModel": "Tuatahi, kōwhiria he tauira tuhi ā-reo i Ngā manakohanga."
   },

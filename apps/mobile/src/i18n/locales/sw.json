@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO ya biashara"
   },
   "preferences": {
+    "general": "Jumla",
+    "voiceInput": "Uingizaji wa sauti",
     "autoExpandThinking": "Panua mawazo kiotomatiki",
     "autoExpandThinkingSubtitle": "Onyesha mawazo ya wakala yakiwa yamepanuliwa anapomaliza kufikiri.",
     "keepScreenOn": "Acha skrini iwake ukiwa kwenye ukurasa wa kikao",
@@ -237,6 +239,7 @@
     "appearanceLight": "Angavu",
     "appearanceDark": "Giza",
     "account": "Akaunti",
+    "accountSubtitle": "Lugha, tovuti zinazoaminika na vikao vya vifaa",
     "prReviewAttribution": "Ongeza jina la programu kwenye ukaguzi wa PR",
     "prReviewAttributionSubtitle": "Ongeza maelezo chini ya ukaguzi yanayoonyesha kuwa umetumia Kilo unapowasilisha ukaguzi.",
     "returnSendsMessage": "Kitufe cha kuingiza hutuma ujumbe",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway haikupatikana. Angalia muunganisho wako na ujaribu tena.",
     "gatewayTimeout": "Unukuzi umechukua muda mrefu sana. Jaribu tena.",
     "gatewayModelUnavailable": "Modeli hii ya unukuzi haipatikani. Chagua nyingine katika Mapendeleo.",
+    "gatewayModelUnavailableNotice": "Modeli hii haitolewi tena. Gusa $t(transcriptionModel.title) kuchagua nyingine.",
     "gatewaySignInRequired": "Ingia ili utumie unukuzi wa Kilo Gateway.",
     "gatewayNoModel": "Kwanza chagua modeli ya unukuzi katika Mapendeleo."
   },

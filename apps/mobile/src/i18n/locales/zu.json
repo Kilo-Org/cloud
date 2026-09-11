@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO yebhizinisi"
   },
   "preferences": {
+    "general": "Okujwayelekile",
+    "voiceInput": "Ukufaka ngezwi",
     "autoExpandThinking": "Nweba ukucabanga ngokuzenzakalelayo",
     "autoExpandThinkingSubtitle": "Bonisa ukucabanga komenzeli kunwetshiwe uma eseqedile ukucabanga.",
     "keepScreenOn": "Gcina isikrini sivuliwe ngenkathi usekhasini leseshini",
@@ -237,6 +239,7 @@
     "appearanceLight": "Okukhanyayo",
     "appearanceDark": "Okumnyama",
     "account": "I-akhawunti",
+    "accountSubtitle": "Ulimi, abasingathi abathenjwayo namaseshini edivayisi",
     "prReviewAttribution": "Veza uhlelo lokusebenza ekuhlolweni kwe-PR",
     "prReviewAttributionSubtitle": "Faka umbhalo ongezansi othi kuhlolwe nge-Kilo uma uthumela ukuhlolwa.",
     "returnSendsMessage": "Inkinobho yokubuyela ithumela umlayezo",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "I-Kilo Gateway ayifinyelelwanga. Hlola ukuxhumana kwakho bese uzama futhi.",
     "gatewayTimeout": "Ukuguqula inkulumo kuthathe isikhathi eside kakhulu. Zama futhi.",
     "gatewayModelUnavailable": "Le modeli yokuguqula inkulumo ayitholakali. Khetha enye Ku-Okuncamelayo.",
+    "gatewayModelUnavailableNotice": "Le modeli ayisanikezwa. Thepha $t(transcriptionModel.title) ukukhetha enye.",
     "gatewaySignInRequired": "Ngena ngemvume ukuze usebenzise ukuguqula inkulumo nge-Kilo Gateway.",
     "gatewayNoModel": "Okokuqala, khetha imodeli yokuguqula inkulumo Ku-Okuncamelayo."
   },

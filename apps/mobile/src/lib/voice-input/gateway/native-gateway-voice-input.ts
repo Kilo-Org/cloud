@@ -7,6 +7,7 @@ import { fetchTranscriptionModels } from '@/lib/hooks/use-transcription-models';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 import { createGatewayVoiceInputEngine, type GatewayRecorder } from './gateway-voice-input-engine';
+import { persistFirstTranscriptionModel } from './gateway-transcription-model-selection';
 import {
   type GatewayTranscriptionModel,
   readGatewayTranscriptionModel,
@@ -22,9 +23,10 @@ async function readStoredOrganizationId(): Promise<string | null> {
 
 /**
  * The model the gateway engine transcribes with: the stored choice, else the
- * first model the gateway catalogue offers, else null. A catalogue that
- * cannot be reached reads as "no model", which surfaces the actionable picker
- * message on the first dictation instead of an upload that must fail.
+ * first model the gateway catalogue offers (persisted so it survives launches
+ * even when the user never opens the settings page), else null. A catalogue
+ * that cannot be reached reads as "no model", which surfaces the actionable
+ * picker message on the first dictation instead of an upload that must fail.
  */
 export async function resolveGatewayTranscriptionModelId(): Promise<GatewayTranscriptionModel | null> {
   const stored = readGatewayTranscriptionModel();
@@ -37,7 +39,7 @@ export async function resolveGatewayTranscriptionModelId(): Promise<GatewayTrans
     // could pick a model the scoped upload then rejects.
     const organizationId = await readStoredOrganizationId();
     const models = await fetchTranscriptionModels(organizationId ?? undefined);
-    return models[0] ?? null;
+    return persistFirstTranscriptionModel(models);
   } catch {
     return null;
   }

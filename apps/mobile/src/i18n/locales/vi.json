@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO doanh nghiệp"
   },
   "preferences": {
+    "general": "Chung",
+    "voiceInput": "Nhập bằng giọng nói",
     "autoExpandThinking": "Tự động mở phần suy luận",
     "autoExpandThinkingSubtitle": "Hiển thị toàn bộ nội dung suy luận của tác nhân sau khi suy luận xong.",
     "keepScreenOn": "Giữ màn hình sáng khi xem phiên",
@@ -237,6 +239,7 @@
     "appearanceLight": "Sáng",
     "appearanceDark": "Tối",
     "account": "Tài khoản",
+    "accountSubtitle": "Ngôn ngữ, máy chủ được tin cậy và phiên đăng nhập trên thiết bị",
     "prReviewAttribution": "Ghi tên ứng dụng trong bản rà soát PR",
     "prReviewAttributionSubtitle": "Thêm dòng Đã rà soát qua Kilo ở cuối mỗi bản rà soát bạn gửi.",
     "returnSendsMessage": "Phím xuống dòng gửi tin nhắn",
@@ -2142,6 +2145,7 @@
     "gatewayUnreachable": "Không thể kết nối tới Kilo Gateway. Hãy kiểm tra kết nối và thử lại.",
     "gatewayTimeout": "Việc chuyển giọng nói thành văn bản mất quá nhiều thời gian. Hãy thử lại.",
     "gatewayModelUnavailable": "Mô hình này hiện không khả dụng. Hãy chọn mô hình khác trong Tùy chọn.",
+    "gatewayModelUnavailableNotice": "Mô hình này không còn được cung cấp nữa. Nhấn $t(transcriptionModel.title) để chọn mô hình khác.",
     "gatewaySignInRequired": "Đăng nhập để dùng tính năng chuyển giọng nói qua Kilo Gateway.",
     "gatewayNoModel": "Trước tiên, hãy chọn một mô hình chuyển giọng nói trong Tùy chọn."
   },

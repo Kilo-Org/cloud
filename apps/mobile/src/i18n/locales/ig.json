@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO ụlọ ọrụ"
   },
   "preferences": {
+    "general": "Izugbe",
+    "voiceInput": "Ntinye olu",
     "autoExpandThinking": "Gbasaa echiche na-akpaghị aka",
     "autoExpandThinkingSubtitle": "Gosi echiche onye nnọchi anya n'ụzọ zuru ezu mgbe ọ mechara iche echiche.",
     "keepScreenOn": "Hapụ ihuenyo ka ọ na-enwu n'ibe nnọkọ",
@@ -237,6 +239,7 @@
     "appearanceLight": "Ìhè",
     "appearanceDark": "Ọchịchịrị",
     "account": "Akaụntụ",
+    "accountSubtitle": "Asụsụ, saịtị a tụkwasịrị obi na nnọkọ ngwaọrụ",
     "prReviewAttribution": "Tinye aha ngwa na nyocha PR",
     "prReviewAttributionSubtitle": "Tinye ahịrị E nyochara site na Kilo n'ala mgbe ị zigara nyocha.",
     "returnSendsMessage": "Igodo nloghachi na-eziga ozi",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Enweghị ike iru Kilo Gateway. Lelee njikọ gị ma nwaa ọzọ.",
     "gatewayTimeout": "Ịtụgharị okwu were oge karịrị akarị. Nwaa ọzọ.",
     "gatewayModelUnavailable": "Ihe nlereanya a maka ịtụgharị okwu adịghị. Họrọ ọzọ na Mmasị.",
+    "gatewayModelUnavailableNotice": "A naghịzi enye ihe nlereanya a. Pịa $t(transcriptionModel.title) iji họrọ ọzọ.",
     "gatewaySignInRequired": "Banye ka i jiri ịtụgharị okwu site na Kilo Gateway.",
     "gatewayNoModel": "Họrọ ihe nlereanya maka ịtụgharị okwu na Mmasị ụzọ."
   },

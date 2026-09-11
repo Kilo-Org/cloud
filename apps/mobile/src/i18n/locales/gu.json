@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "એન્ટરપ્રાઇઝ SSO"
   },
   "preferences": {
+    "general": "સામાન્ય",
+    "voiceInput": "વૉઇસ ઇનપુટ",
     "autoExpandThinking": "વિચારપ્રક્રિયા આપમેળે ખોલો",
     "autoExpandThinkingSubtitle": "એજન્ટની વિચારપ્રક્રિયા પૂરી થાય ત્યારે તેની વિગતો ખોલીને બતાવો.",
     "keepScreenOn": "સત્ર પૃષ્ઠ પર હોય ત્યારે સ્ક્રીન ચાલુ રાખો",
@@ -237,6 +239,7 @@
     "appearanceLight": "લાઇટ",
     "appearanceDark": "ડાર્ક",
     "account": "એકાઉન્ટ",
+    "accountSubtitle": "ભાષા, વિશ્વસનીય હોસ્ટ અને ઉપકરણનાં સત્રો",
     "prReviewAttribution": "PR સમીક્ષાઓમાં એપનો ઉલ્લેખ ઉમેરો",
     "prReviewAttributionSubtitle": "સમીક્ષા મોકલો ત્યારે અંતે “Kilo દ્વારા સમીક્ષા કરેલી” લખાણ ઉમેરો.",
     "returnSendsMessage": "રિટર્ન કી સંદેશ મોકલે છે",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway સાથે સંપર્ક થઈ શક્યો નથી. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
     "gatewayTimeout": "અવાજને લખાણમાં ફેરવવામાં બહુ સમય લાગ્યો. ફરી પ્રયાસ કરો.",
     "gatewayModelUnavailable": "અવાજને લખાણમાં ફેરવતું આ મોડેલ ઉપલબ્ધ નથી. પસંદગીઓમાં બીજું પસંદ કરો.",
+    "gatewayModelUnavailableNotice": "આ મોડેલ હવે ઑફર કરવામાં આવતું નથી. બીજું પસંદ કરવા $t(transcriptionModel.title) પર ટૅપ કરો.",
     "gatewaySignInRequired": "Kilo Gateway દ્વારા લખાણ વાપરવા સાઇન ઇન કરો.",
     "gatewayNoModel": "પહેલા પસંદગીઓમાં અવાજને લખાણમાં ફેરવતું મોડેલ પસંદ કરો."
   },

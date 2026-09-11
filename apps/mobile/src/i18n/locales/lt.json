@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Įmonės SSO"
   },
   "preferences": {
+    "general": "Bendra",
+    "voiceInput": "Balso įvestis",
     "autoExpandThinking": "Automatiškai išskleisti mąstymą",
     "autoExpandThinkingSubtitle": "Baigus mąstyti, automatiškai išskleisti agento mąstymo tekstą.",
     "keepScreenOn": "Neišjungti ekrano sesijos puslapyje",
@@ -237,6 +239,7 @@
     "appearanceLight": "Šviesi",
     "appearanceDark": "Tamsi",
     "account": "Paskyra",
+    "accountSubtitle": "Kalba, patikimos svetainės ir įrenginių sesijos",
     "prReviewAttribution": "PR peržiūrose nurodyti programėlę",
     "prReviewAttributionSubtitle": "Pateikiant peržiūrą pridėti poraštę, nurodančią, kad peržiūrėta naudojant Kilo.",
     "returnSendsMessage": "Įvesties klavišas siunčia žinutę",
@@ -2618,6 +2621,7 @@
     "gatewayUnreachable": "Nepavyko pasiekti Kilo Gateway. Patikrinkite ryšį ir bandykite dar kartą.",
     "gatewayTimeout": "Transkribavimas užtruko per ilgai. Bandyk dar kartą.",
     "gatewayModelUnavailable": "Šis transkribavimo modelis nepasiekiamas. Pasirinkite kitą Nuostatose.",
+    "gatewayModelUnavailableNotice": "Šis modelis nebeteikiamas. Palieskite $t(transcriptionModel.title), kad pasirinktumėte kitą.",
     "gatewaySignInRequired": "Prisijunkite, kad naudotumėte transkribavimą per Kilo Gateway.",
     "gatewayNoModel": "Pirmiausia pasirinkite transkribavimo modelį Nuostatose."
   },

@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "ಸಾಂಸ್ಥಿಕ SSO"
   },
   "preferences": {
+    "general": "ಸಾಮಾನ್ಯ",
+    "voiceInput": "ಧ್ವನಿ ಇನ್ಪುಟ್",
     "autoExpandThinking": "ಯೋಚನೆಯನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ವಿಸ್ತರಿಸಿ",
     "autoExpandThinkingSubtitle": "ಏಜೆಂಟ್ ಯೋಚಿಸುವುದನ್ನು ಮುಗಿಸಿದಾಗ ಅದರ ಯೋಚನೆಯನ್ನು ವಿಸ್ತರಿಸಿ ತೋರಿಸಿ.",
     "keepScreenOn": "ಸೆಶನ್ ಪುಟದಲ್ಲಿರುವಾಗ ಪರದೆಯನ್ನು ಆನ್ ಆಗಿರಿಸಿ",
@@ -237,6 +239,7 @@
     "appearanceLight": "ತಿಳಿ",
     "appearanceDark": "ಗಾಢ",
     "account": "ಖಾತೆ",
+    "accountSubtitle": "ಭಾಷೆ, ವಿಶ್ವಾಸಾರ್ಹ ಹೋಸ್ಟ್‌ಗಳು ಮತ್ತು ಸಾಧನ ಸೆಷನ್‌ಗಳು",
     "prReviewAttribution": "PR ಪರಿಶೀಲನೆಗಳಿಗೆ ಅಪ್ಲಿಕೇಶನ್ ಉಲ್ಲೇಖ ಸೇರಿಸಿ",
     "prReviewAttributionSubtitle": "ನೀವು ಪರಿಶೀಲನೆಯನ್ನು ಸಲ್ಲಿಸಿದಾಗ ಕೊನೆಯಲ್ಲಿ Kilo ಮೂಲಕ ಪರಿಶೀಲಿಸಲಾಗಿದೆ ಎಂಬ ಸಾಲನ್ನು ಸೇರಿಸಿ.",
     "returnSendsMessage": "ರಿಟರ್ನ್ ಕೀಲಿಯು ಸಂದೇಶ ಕಳುಹಿಸುತ್ತದೆ",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway ಅನ್ನು ತಲುಪಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "gatewayTimeout": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಲು ತುಂಬಾ ಸಮಯ ತೆಗೆದುಕೊಂಡಿತು. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "gatewayModelUnavailable": "ಈ ಪರಿವರ್ತನಾ ಮಾದರಿ ಲಭ್ಯವಿಲ್ಲ. ಆದ್ಯತೆಗಳಲ್ಲಿ ಇನ್ನೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+    "gatewayModelUnavailableNotice": "ಈ ಮಾದರಿಯನ್ನು ಇನ್ನು ಮುಂದೆ ನೀಡಲಾಗುವುದಿಲ್ಲ. ಇನ್ನೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಲು $t(transcriptionModel.title) ಅನ್ನು ಟ್ಯಾಪ್ ಮಾಡಿ.",
     "gatewaySignInRequired": "Kilo Gateway ಪರಿವರ್ತನೆಯನ್ನು ಬಳಸಲು ಸೈನ್ ಇನ್ ಮಾಡಿ.",
     "gatewayNoModel": "ಮೊದಲು ಆದ್ಯತೆಗಳಲ್ಲಿ ಪರಿವರ್ತನಾ ಮಾದರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ."
   },

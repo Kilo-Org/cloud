@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "ఎంటర్‌ప్రైజ్ SSO"
   },
   "preferences": {
+    "general": "సాధారణం",
+    "voiceInput": "వాయిస్ ఇన్‌పుట్",
     "autoExpandThinking": "ఆలోచనను స్వయంచాలకంగా విస్తరించండి",
     "autoExpandThinkingSubtitle": "ఏజెంట్ ఆలోచించడం పూర్తయినప్పుడు ఆ వివరాలను విస్తరించి చూపించండి.",
     "keepScreenOn": "సెషన్ పేజీలో ఉన్నంతసేపు స్క్రీన్ ఆన్‌లో ఉంచండి",
@@ -237,6 +239,7 @@
     "appearanceLight": "లైట్",
     "appearanceDark": "డార్క్",
     "account": "ఖాతా",
+    "accountSubtitle": "భాష, విశ్వసించిన హోస్ట్‌లు, పరికర సెషన్‌లు",
     "prReviewAttribution": "PR సమీక్షల్లో యాప్ పేరును చేర్చండి",
     "prReviewAttributionSubtitle": "సమీక్షను సమర్పించినప్పుడు చివరలో ‘Kilo ద్వారా సమీక్షించబడింది’ అని జోడించండి.",
     "returnSendsMessage": "రిటర్న్ కీ సందేశాన్ని పంపుతుంది",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gatewayను చేరుకోలేకపోయాం. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
     "gatewayTimeout": "వచనంగా మార్చడానికి చాలా సమయం పట్టింది. మళ్లీ ప్రయత్నించండి.",
     "gatewayModelUnavailable": "ఈ వచన మార్పిడి మోడల్ అందుబాటులో లేదు. ప్రాధాన్యతలలో మరొకదాన్ని ఎంచుకోండి.",
+    "gatewayModelUnavailableNotice": "ఈ మోడల్ ఇకపై అందించబడదు. మరొకదాన్ని ఎంచుకోవడానికి $t(transcriptionModel.title) ని నొక్కండి.",
     "gatewaySignInRequired": "Kilo Gateway మార్పిడిని ఉపయోగించడానికి సైన్ ఇన్ చేయండి.",
     "gatewayNoModel": "ముందుగా ప్రాధాన్యతలలో వచనంగా మార్చే మోడల్‌ను ఎంచుకోండి."
   },

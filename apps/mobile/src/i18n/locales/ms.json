@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO perusahaan"
   },
   "preferences": {
+    "general": "Umum",
+    "voiceInput": "Input suara",
     "autoExpandThinking": "Kembangkan pemikiran secara automatik",
     "autoExpandThinkingSubtitle": "Paparkan pemikiran ejen sepenuhnya setelah ejen selesai berfikir.",
     "keepScreenOn": "Kekalkan skrin hidup pada halaman sesi",
@@ -237,6 +239,7 @@
     "appearanceLight": "Cerah",
     "appearanceDark": "Gelap",
     "account": "Akaun",
+    "accountSubtitle": "Bahasa, hos yang dipercayai dan sesi peranti",
     "prReviewAttribution": "Nyatakan apl dalam semakan PR",
     "prReviewAttributionSubtitle": "Tambahkan pengaki Disemak melalui Kilo apabila anda menghantar semakan.",
     "returnSendsMessage": "Kekunci baris baharu menghantar mesej",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Tidak dapat menghubungi Kilo Gateway. Semak sambungan anda dan cuba semula.",
     "gatewayTimeout": "Transkripsi mengambil masa terlalu lama. Cuba lagi.",
     "gatewayModelUnavailable": "Model transkripsi ini tidak tersedia. Pilih yang lain dalam Keutamaan.",
+    "gatewayModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketik $t(transcriptionModel.title) untuk memilih yang lain.",
     "gatewaySignInRequired": "Log masuk untuk menggunakan transkripsi Kilo Gateway.",
     "gatewayNoModel": "Pilih model transkripsi dalam Keutamaan terlebih dahulu."
   },

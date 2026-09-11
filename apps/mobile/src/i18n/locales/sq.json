@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO për ndërmarrje"
   },
   "preferences": {
+    "general": "Të përgjithshme",
+    "voiceInput": "Hyrje me zë",
     "autoExpandThinking": "Zgjero automatikisht arsyetimin",
     "autoExpandThinkingSubtitle": "Shfaq arsyetimin e plotë të agjentit pasi të përfundojë.",
     "keepScreenOn": "Mbaje ekranin ndezur në faqen e seancës",
@@ -237,6 +239,7 @@
     "appearanceLight": "E çelët",
     "appearanceDark": "E errët",
     "account": "Llogaria",
+    "accountSubtitle": "Gjuha, serverët e besuar dhe sesionet në pajisje",
     "prReviewAttribution": "Përmend aplikacionin në rishikimet e PR",
     "prReviewAttributionSubtitle": "Shto shënimin «Rishikuar përmes Kilo» në fund kur dërgon një rishikim.",
     "returnSendsMessage": "Tasti Enter dërgon mesazhin",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway nuk u arrit dot. Kontrollo lidhjen dhe provo përsëri.",
     "gatewayTimeout": "Transkriptimi zgjati tepër. Provo përsëri.",
     "gatewayModelUnavailable": "Ky model transkriptimi nuk është i disponueshëm. Zgjidh një tjetër te Preferencat.",
+    "gatewayModelUnavailableNotice": "Ky model nuk ofrohet më. Trokit $t(transcriptionModel.title) për të zgjedhur një tjetër.",
     "gatewaySignInRequired": "Hyr për të përdorur transkriptimin me Kilo Gateway.",
     "gatewayNoModel": "Së pari zgjidh një model transkriptimi te Preferencat."
   },

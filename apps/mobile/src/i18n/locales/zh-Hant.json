@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "企業 SSO"
   },
   "preferences": {
+    "general": "一般",
+    "voiceInput": "語音輸入",
     "autoExpandThinking": "自動展開思考內容",
     "autoExpandThinkingSubtitle": "智慧代理完成思考後，自動展開思考內容。",
     "keepScreenOn": "在工作階段頁面保持螢幕亮起",
@@ -237,6 +239,7 @@
     "appearanceLight": "淺色",
     "appearanceDark": "深色",
     "account": "帳戶",
+    "accountSubtitle": "語言、信任的主機和裝置工作階段",
     "prReviewAttribution": "在 PR 審查中註明使用的應用程式",
     "prReviewAttributionSubtitle": "送出審查時，在結尾註明透過 Kilo 審查。",
     "returnSendsMessage": "按換行鍵傳送訊息",
@@ -2142,6 +2145,7 @@
     "gatewayUnreachable": "無法連線至 Kilo Gateway。請檢查連線後再試一次。",
     "gatewayTimeout": "轉錄花費太長時間。請再試一次。",
     "gatewayModelUnavailable": "這個轉錄模型無法使用。請在偏好設定中選擇其他模型。",
+    "gatewayModelUnavailableNotice": "這個模型已不再提供。點一下$t(transcriptionModel.title)選擇另一個。",
     "gatewaySignInRequired": "登入後即可使用 Kilo Gateway 轉錄。",
     "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。"
   },

@@ -1966,6 +1966,8 @@
     "retryLoadingPrivacy": "Réessayer de charger les préférences de confidentialité"
   },
   "preferences": {
+    "general": "Général",
+    "voiceInput": "Saisie vocale",
     "autoExpandThinking": "Développer automatiquement la réflexion",
     "autoExpandThinkingSubtitle": "Afficher le détail de la réflexion de l'agent une fois celle-ci terminée.",
     "keepScreenOn": "Garder l'écran allumé sur la page de la session",
@@ -1976,6 +1978,7 @@
     "appearanceLight": "Clair",
     "appearanceDark": "Sombre",
     "account": "Compte",
+    "accountSubtitle": "Langue, sites de confiance et sessions sur les appareils",
     "prReviewAttribution": "Mentionner l'application dans les revues de PR",
     "prReviewAttributionSubtitle": "Ajouter la mention « Revue via Kilo » au bas de chaque revue envoyée.",
     "returnSendsMessage": "La touche Entrée envoie le message",
@@ -2087,6 +2090,7 @@
     "gatewayUnreachable": "Impossible de joindre Kilo Gateway. Vérifiez votre connexion et réessayez.",
     "gatewayTimeout": "La transcription a pris trop de temps. Réessayez.",
     "gatewayModelUnavailable": "Ce modèle de transcription n'est pas disponible. Choisissez-en un autre dans les Préférences.",
+    "gatewayModelUnavailableNotice": "Ce modèle n'est plus proposé. Touchez $t(transcriptionModel.title) pour en choisir un autre.",
     "gatewaySignInRequired": "Connectez-vous pour utiliser la transcription via Kilo Gateway.",
     "gatewayNoModel": "Choisissez d'abord un modèle de transcription dans les Préférences."
   },

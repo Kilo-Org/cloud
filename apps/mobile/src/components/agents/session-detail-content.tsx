@@ -1305,25 +1305,23 @@ export function SessionDetailContent({
   );
 
   // Goal controls ride the same `manager.send()` command pipeline as the
-  // composer's slash commands. Pause, resume, and remove surface a toast on a
-  // false return; edit throws instead so the RenameModal shows the failure
-  // inline and the user can correct the objective. One helper keeps the
-  // `/goal` payload shape in one place.
+  // composer's slash commands. The manager is the sole transport-toast owner,
+  // so a failed send surfaces exactly one error toast from `onSendFailed` and
+  // this helper never adds a second. Edit throws instead, so the RenameModal
+  // shows the failure inline and the user can correct the objective. One
+  // helper keeps the `/goal` payload shape in one place.
   const sendGoalAction = useCallback(
-    async (action: GoalAction, options?: { objective?: string; toastOnFailure?: boolean }) => {
+    async (action: GoalAction, objective = ''): Promise<boolean> => {
       const sent = await manager.send({
         payload: {
           type: 'command',
           command: 'goal',
-          arguments: goalCommandArguments(action, options?.objective ?? ''),
+          arguments: goalCommandArguments(action, objective),
         },
       });
-      if (!sent && options?.toastOnFailure !== false) {
-        toast.error(t('agentChat.goal.updateFailed'));
-      }
       return sent;
     },
-    [manager, t]
+    [manager]
   );
 
   const handleOpenGoalActions = useCallback(() => {
@@ -1377,7 +1375,7 @@ export function SessionDetailContent({
 
   const handleGoalEditSave = useCallback(
     async (objective: string) => {
-      const sent = await sendGoalAction('edit', { objective, toastOnFailure: false });
+      const sent = await sendGoalAction('edit', objective);
       if (!sent) {
         throw new Error(t('agentChat.goal.updateFailed'));
       }

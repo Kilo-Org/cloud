@@ -49,6 +49,7 @@ import {
   createMobileSlashCommandList,
   getSlashCommandCandidate,
   getSlashCommandSuggestions,
+  isGoalCommandDraft,
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
@@ -281,6 +282,10 @@ export function ChatComposer({
   const [characterCount, setCharacterCount] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
+  // True after a bare `/goal` submission: the composer is collecting the goal
+  // objective. Keeps the `/goal ` draft and surfaces the objective hint so the
+  // next step is explicit instead of the send silently doing nothing.
+  const [goalComposeActive, setGoalComposeActive] = useState(false);
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -457,6 +462,9 @@ export function ChatComposer({
     setHasText(draft.trim().length > 0);
     setCharacterCount(draft.length);
     setSlashCommandInput(getSlashCommandCandidate(draft));
+    if (!isGoalCommandDraft(draft)) {
+      setGoalComposeActive(false);
+    }
     measureRef.current.setText(draft);
   }, []);
 
@@ -532,6 +540,9 @@ export function ChatComposer({
     setHasText(value.trim().length > 0);
     setCharacterCount(value.length);
     setSlashCommandInput(null);
+    if (!isGoalCommandDraft(value)) {
+      setGoalComposeActive(false);
+    }
     inputRef.current?.setNativeProps({
       text: value,
       selection: { start: value.length, end: value.length },
@@ -574,6 +585,12 @@ export function ChatComposer({
 
   function handleChangeText(value: string) {
     textRef.current = value;
+    // A draft that is no longer the `/goal` command ends goal compose mode, so
+    // the objective hint never outlives the text it describes. A no-op when the
+    // mode is already off.
+    if (!isGoalCommandDraft(value)) {
+      setGoalComposeActive(false);
+    }
     // Derived state (measure node, hasText, slash command) is coalesced to one
     // publication per frame; the live submit-time ref and the debounced draft
     // write stay synchronous so neither can lag a keystroke.
@@ -860,6 +877,7 @@ export function ChatComposer({
     setHasText(false);
     setCharacterCount(0);
     setSlashCommandInput(null);
+    setGoalComposeActive(false);
     measure.reset();
     inputRef.current?.clear();
     // Clear the persisted draft only on successful send / explicit clear,
@@ -905,10 +923,20 @@ export function ChatComposer({
       return;
     }
     if (submission.type === 'goal-compose') {
-      // Bare `/goal` is a compose mode: keep the draft and send nothing. The
-      // user adds an objective (or pause/resume/clear) and submits again.
+      // Bare `/goal` is a compose mode: keep the draft, mark the composer so the
+      // objective hint appears, and focus the input so the user can type the
+      // objective. Normalize the retained draft to `/goal ` first — a bare
+      // `/goal` with no separator would put the next keystroke directly after
+      // `goal` (`/goalShip it`), which is no longer a goal command and would be
+      // sent as an ordinary prompt. `applyComposerText` moves the caret to the
+      // end and focuses the input. The next send parses as `/goal <objective>`
+      // and forwards to the CLI.
+      setGoalComposeActive(true);
+      applyComposerText(`${trimmed} `);
       return;
     }
+    // Any other submission leaves goal compose mode.
+    setGoalComposeActive(false);
 
     // The admission lock is owned by `settleVoiceInputBeforeSubmit` for the
     // full settle + submit sequence, so `handleSend` performs validation and
@@ -1220,6 +1248,14 @@ export function ChatComposer({
         >
           <VoiceInputStatus status={voiceInput.status} />
         </View>
+
+        {goalComposeActive ? (
+          <AccessibleStatus
+            message={i18n.t('agentChat.goal.editPlaceholder')}
+            tone="status"
+            className="px-4 pb-1 text-xs"
+          />
+        ) : null}
 
         {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount <= COMPOSER_COUNTER_VISIBLE_REMAINING ? (
           <View className="flex-row justify-end px-4 pb-1">

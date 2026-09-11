@@ -142,6 +142,16 @@ export function getSlashCommandCandidate(input: string): string | null {
 }
 
 /**
+ * True while `input` is still the `/goal` compose draft (bare `/goal` or
+ * `/goal <objective>`). The composer uses this to keep its goal compose mode
+ * alive as the user types the objective and to drop it the moment the draft is
+ * no longer about the goal command.
+ */
+export function isGoalCommandDraft(input: string): boolean {
+  return /^\/goal(?:\s|$)/.test(input);
+}
+
+/**
  * Return the catalog entries whose name starts with the prefix in `input`.
  * Returns `[]` for anything that is not still a slash-name candidate.
  */

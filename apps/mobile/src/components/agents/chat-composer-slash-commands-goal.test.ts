@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 
-import { parseChatComposerSubmission } from '@/components/agents/chat-composer-slash-commands';
+import {
+  isGoalCommandDraft,
+  parseChatComposerSubmission,
+} from '@/components/agents/chat-composer-slash-commands';
 
 const COMPACT: SlashCommandInfo = { name: 'compact', description: 'Compact', hints: [] };
 const GOAL: SlashCommandInfo = { name: 'goal', description: 'Goal', hints: [] };
@@ -89,6 +92,22 @@ describe('parseChatComposerSubmission — /goal compose mode', () => {
       })
     ).toEqual({ type: 'attachment-error' });
   });
+});
+
+describe('isGoalCommandDraft', () => {
+  it.each(['/goal', '/goal ', '/goal Ship it', '/goal   Ship it'])(
+    'keeps compose mode for the goal draft %j',
+    draft => {
+      expect(isGoalCommandDraft(draft)).toBe(true);
+    }
+  );
+
+  it.each(['', '/go', '/goalx', 'hello', '/ goals'])(
+    'drops compose mode for the non-goal draft %j',
+    draft => {
+      expect(isGoalCommandDraft(draft)).toBe(false);
+    }
+  );
 });
 
 describe('parseChatComposerSubmission — /goal fail-closed', () => {

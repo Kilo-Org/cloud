@@ -172,7 +172,13 @@ export function createSlackWebhookHandler(chat: Chat, slackAdapter: SlackAdapter
     const teamId = getSlackTeamId(payload);
     if (teamId) {
       await adoptLegacySlackInstallationByTeamId(teamId);
-      await completePendingSlackDeletion(teamId, id => slackAdapter.deleteInstallation(id));
+      await completePendingSlackDeletion(
+        teamId,
+        id => slackAdapter.deleteInstallation(id),
+        async id => {
+          await unlinkTeamKiloUsers(chat.getState(), PLATFORM.SLACK, id);
+        }
+      );
       await recoverSlackInstallation(teamId, (id, installation) =>
         slackAdapter.setInstallation(id, installation)
       );

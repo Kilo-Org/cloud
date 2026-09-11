@@ -1096,7 +1096,12 @@ export async function markOrganizationAsDeleted(
       .where(eq(provider_installation_reservations.owned_by_organization_id, organizationId))
       .for('update');
     const slackIntegrations = await tx
-      .select({ id: platform_integrations.id, status: platform_integrations.integration_status })
+      .select({
+        id: platform_integrations.id,
+        status: platform_integrations.integration_status,
+        installationId: platform_integrations.platform_installation_id,
+        accountId: platform_integrations.platform_account_id,
+      })
       .from(platform_integrations)
       .where(
         and(
@@ -1109,6 +1114,34 @@ export async function markOrganizationAsDeleted(
       if (integration.status === 'pending') {
         await tx.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
         continue;
+      }
+      const teamId = integration.installationId ?? integration.accountId;
+      if (teamId) {
+        await tx
+          .insert(provider_installation_reservations)
+          .values({
+            provider: 'slack',
+            provider_installation_id: teamId,
+            owned_by_organization_id: organizationId,
+            platform_integration_id: integration.id,
+            generation: 1,
+            status: 'deleting',
+            cleanup_requires_revoke: true,
+            expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
+          })
+          .onConflictDoUpdate({
+            target: [
+              provider_installation_reservations.provider,
+              provider_installation_reservations.provider_installation_id,
+            ],
+            set: {
+              status: 'deleting',
+              active_generation: null,
+              oauth_attempt_id: null,
+              cleanup_requires_revoke: true,
+              updated_at: new Date().toISOString(),
+            },
+          });
       }
       await tx
         .update(provider_installation_reservations)

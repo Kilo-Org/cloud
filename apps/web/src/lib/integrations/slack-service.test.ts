@@ -157,7 +157,7 @@ describe('slack-service uninstallApp', () => {
     ).resolves.toEqual({ success: true });
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T123');
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to the platform account ID for older rows without an installation ID', async () => {

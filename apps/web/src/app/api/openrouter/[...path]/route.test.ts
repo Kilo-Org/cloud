@@ -784,21 +784,22 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it.each(['google/gemma-4-26b-a4b-it:free', 'google/gemma-4-31b-it:free'])(
-    'rejects the unavailable free model %s before upstream',
-    async modelId => {
-      mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: true, requestCount: 0 });
+  it.each([
+    'google/gemma-4-26b-a4b-it:free',
+    'google/gemma-4-31b-it:free',
+    'thinkingmachines/inkling:free',
+  ])('rejects the unavailable free model %s before upstream', async modelId => {
+    mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: true, requestCount: 0 });
 
-      const { POST } = await import('./route');
-      const response = await POST(makeRequest(makeBody(modelId)) as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody(modelId)) as never);
 
-      expect(response.status).toBe(404);
-      expect(await response.json()).toMatchObject({
-        error_type: 'unavailable_model',
-      });
-      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-    }
-  );
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({
+      error_type: 'unavailable_model',
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
 
   it('rate limits rules-engine rate-limit actions before upstream', async () => {
     mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('rate-limit'));

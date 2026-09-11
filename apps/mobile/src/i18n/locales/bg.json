@@ -1993,6 +1993,22 @@
       "connectionLost": "Прекъсната връзка",
       "retryConnection": "Опитай да се свържеш отново"
     },
+    "goal": {
+      "title": "Цел",
+      "statusActive": "Активна цел",
+      "statusPaused": "Цел на пауза",
+      "statusComplete": "Целта е изпълнена",
+      "statusBlocked": "Целта е блокирана",
+      "edit": "Редактиране на целта",
+      "remove": "Премахване на целта",
+      "pause": "Пауза на целта",
+      "resume": "Продължаване на целта",
+      "editPlaceholder": "Опишете целта",
+      "removeConfirmTitle": "Премахване на целта?",
+      "removeConfirmMessage": "CLI изчиства целта на тази сесия.",
+      "updateFailed": "Целта не можа да се обнови.",
+      "sectionAccessibility": "{{status}}. Цел: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Свържи GitHub в браузъра си, след което се върни тук, за да избереш хранилище.",
       "openGithub": "Отвори GitHub",

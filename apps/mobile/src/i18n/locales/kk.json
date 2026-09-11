@@ -1993,6 +1993,22 @@
       "connectionLost": "Қосылым үзілді",
       "retryConnection": "Қайта қосылу"
     },
+    "goal": {
+      "title": "Мақсат",
+      "statusActive": "Белсенді мақсат",
+      "statusPaused": "Тоқтатылған мақсат",
+      "statusComplete": "Мақсат орындалды",
+      "statusBlocked": "Мақсат бұғатталды",
+      "edit": "Мақсатты өңдеу",
+      "remove": "Мақсатты жою",
+      "pause": "Мақсатты тоқтату",
+      "resume": "Мақсатты жалғастыру",
+      "editPlaceholder": "Мақсатты сипаттаңыз",
+      "removeConfirmTitle": "Мақсат жойылсын ба?",
+      "removeConfirmMessage": "CLI осы сеанстың мақсатын тазалайды.",
+      "updateFailed": "Мақсатты жаңарту мүмкін болмады.",
+      "sectionAccessibility": "{{status}}. Мақсат: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Браузерде GitHub тіркелгісін байланыстырып, репозиторий таңдау үшін осында оралыңыз.",
       "openGithub": "GitHub-ты ашу",

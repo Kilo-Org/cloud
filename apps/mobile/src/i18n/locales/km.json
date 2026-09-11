@@ -1993,6 +1993,22 @@
       "connectionLost": "ដាច់ការតភ្ជាប់",
       "retryConnection": "ព្យាយាមភ្ជាប់ម្តងទៀត"
     },
+    "goal": {
+      "title": "គោលដៅ",
+      "statusActive": "គោលដៅសកម្ម",
+      "statusPaused": "គោលដៅផ្អាក",
+      "statusComplete": "គោលដៅបានបញ្ចប់",
+      "statusBlocked": "គោលដៅត្រូវបានទប់ស្កាត់",
+      "edit": "កែសម្រួលគោលដៅ",
+      "remove": "ដកគោលដៅចេញ",
+      "pause": "ផ្អាកគោលដៅ",
+      "resume": "បន្តគោលដៅ",
+      "editPlaceholder": "ពិពណ៌នាគោលដៅ",
+      "removeConfirmTitle": "ដកគោលដៅចេញ?",
+      "removeConfirmMessage": "CLI សម្អាតគោលដៅរបស់វគ្គនេះ។",
+      "updateFailed": "មិនអាចធ្វើបច្ចុប្បន្នភាពគោលដៅបានទេ។",
+      "sectionAccessibility": "{{status}}។ គោលដៅ៖ {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ភ្ជាប់ GitHub ក្នុងកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ។",
       "openGithub": "បើក GitHub",

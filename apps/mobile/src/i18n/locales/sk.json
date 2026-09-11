@@ -2025,6 +2025,22 @@
       "connectionLost": "Pripojenie sa prerušilo",
       "retryConnection": "Znova sa pripojiť"
     },
+    "goal": {
+      "title": "Cieľ",
+      "statusActive": "Aktívny cieľ",
+      "statusPaused": "Pozastavený cieľ",
+      "statusComplete": "Cieľ dokončený",
+      "statusBlocked": "Cieľ zablokovaný",
+      "edit": "Upraviť cieľ",
+      "remove": "Odstrániť cieľ",
+      "pause": "Pozastaviť cieľ",
+      "resume": "Obnoviť cieľ",
+      "editPlaceholder": "Opíšte cieľ",
+      "removeConfirmTitle": "Odstrániť cieľ?",
+      "removeConfirmMessage": "CLI vymaže cieľ tejto relácie.",
+      "updateFailed": "Cieľ sa nepodarilo aktualizovať.",
+      "sectionAccessibility": "{{status}}. Cieľ: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Pripoj GitHub v prehliadači, potom sa sem vráť a vyber repozitár.",
       "openGithub": "Otvoriť GitHub",

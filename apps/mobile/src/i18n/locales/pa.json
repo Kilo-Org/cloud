@@ -1993,6 +1993,22 @@
       "connectionLost": "ਕਨੈਕਸ਼ਨ ਟੁੱਟ ਗਿਆ",
       "retryConnection": "ਮੁੜ ਕਨੈਕਟ ਕਰਨ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ"
     },
+    "goal": {
+      "title": "ਟੀਚਾ",
+      "statusActive": "ਸਰਗਰਮ ਟੀਚਾ",
+      "statusPaused": "ਰੋਕਿਆ ਟੀਚਾ",
+      "statusComplete": "ਟੀਚਾ ਪੂਰਾ ਹੋਇਆ",
+      "statusBlocked": "ਟੀਚਾ ਰੋਕਿਆ ਗਿਆ",
+      "edit": "ਟੀਚਾ ਸੰਪਾਦਿਤ ਕਰੋ",
+      "remove": "ਟੀਚਾ ਹਟਾਓ",
+      "pause": "ਟੀਚਾ ਰੋਕੋ",
+      "resume": "ਟੀਚਾ ਮੁੜ ਸ਼ੁਰੂ ਕਰੋ",
+      "editPlaceholder": "ਟੀਚੇ ਦਾ ਵਰਣਨ ਕਰੋ",
+      "removeConfirmTitle": "ਟੀਚਾ ਹਟਾਉਣਾ?",
+      "removeConfirmMessage": "CLI ਇਸ ਸੈਸ਼ਨ ਦਾ ਟੀਚਾ ਮਿਟਾਉਂਦਾ ਹੈ।",
+      "updateFailed": "ਟੀਚਾ ਅੱਪਡੇਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+      "sectionAccessibility": "{{status}}। ਟੀਚਾ: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ GitHub ਨੂੰ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
       "openGithub": "GitHub ਖੋਲ੍ਹੋ",

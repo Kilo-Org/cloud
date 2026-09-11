@@ -1595,6 +1595,22 @@
       "connectionLost": "انقطع الاتصال",
       "retryConnection": "إعادة محاولة الاتصال"
     },
+    "goal": {
+      "title": "الهدف",
+      "statusActive": "هدف نشط",
+      "statusPaused": "هدف متوقف مؤقتًا",
+      "statusComplete": "اكتمل الهدف",
+      "statusBlocked": "الهدف محظور",
+      "edit": "تعديل الهدف",
+      "remove": "إزالة الهدف",
+      "pause": "إيقاف الهدف مؤقتًا",
+      "resume": "استئناف الهدف",
+      "editPlaceholder": "صف الهدف",
+      "removeConfirmTitle": "إزالة الهدف؟",
+      "removeConfirmMessage": "يمسح CLI هدف هذه الجلسة.",
+      "updateFailed": "تعذّر تحديث الهدف.",
+      "sectionAccessibility": "{{status}}. الهدف: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "اربط حسابك على GitHub من المتصفح، ثم عد إلى هنا لاختيار مستودع.",
       "openGithub": "فتح GitHub",

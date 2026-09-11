@@ -1993,6 +1993,22 @@
       "connectionLost": "კავშირი გაწყდა",
       "retryConnection": "ხელახლა დაკავშირება"
     },
+    "goal": {
+      "title": "მიზანი",
+      "statusActive": "აქტიური მიზანი",
+      "statusPaused": "შეჩერებული მიზანი",
+      "statusComplete": "მიზანი დასრულებულია",
+      "statusBlocked": "მიზანი დაბლოკილია",
+      "edit": "მიზნის რედაქტირება",
+      "remove": "მიზნის წაშლა",
+      "pause": "მიზნის შეჩერება",
+      "resume": "მიზნის გაგრძელება",
+      "editPlaceholder": "აღწერეთ მიზანი",
+      "removeConfirmTitle": "წავშალოთ მიზანი?",
+      "removeConfirmMessage": "CLI ასუფთავებს ამ სესიის მიზანს.",
+      "updateFailed": "მიზნის განახლება ვერ მოხერხდა.",
+      "sectionAccessibility": "{{status}}. მიზანი: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ბრაუზერში დააკავშირეთ GitHub-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
       "openGithub": "GitHub-ის გახსნა",

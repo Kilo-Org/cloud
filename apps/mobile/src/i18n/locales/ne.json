@@ -1993,6 +1993,22 @@
       "connectionLost": "जडान टुट्यो",
       "retryConnection": "जडान गर्न पुनः प्रयास गर्नुहोस्"
     },
+    "goal": {
+      "title": "लक्ष्य",
+      "statusActive": "सक्रिय लक्ष्य",
+      "statusPaused": "रोकिएको लक्ष्य",
+      "statusComplete": "लक्ष्य पूरा भयो",
+      "statusBlocked": "लक्ष्य अवरुद्ध",
+      "edit": "लक्ष्य सम्पादन गर्नुहोस्",
+      "remove": "लक्ष्य हटाउनुहोस्",
+      "pause": "लक्ष्य रोक्नुहोस्",
+      "resume": "लक्ष्य पुनः सुरु गर्नुहोस्",
+      "editPlaceholder": "लक्ष्य वर्णन गर्नुहोस्",
+      "removeConfirmTitle": "लक्ष्य हटाउने?",
+      "removeConfirmMessage": "CLI ले यो सत्रको लक्ष्य हटाउँछ।",
+      "updateFailed": "लक्ष्य अद्यावधिक गर्न सकिएन।",
+      "sectionAccessibility": "{{status}}। लक्ष्य: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "आफ्नो ब्राउजरमा GitHub जडान गर्नुहोस्। त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
       "openGithub": "GitHub खोल्नुहोस्",

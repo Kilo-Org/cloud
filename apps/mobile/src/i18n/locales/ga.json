@@ -2041,6 +2041,22 @@
       "connectionLost": "Cailleadh an nasc",
       "retryConnection": "Bain triail eile as nascadh"
     },
+    "goal": {
+      "title": "Sprioc",
+      "statusActive": "Sprioc ghníomhach",
+      "statusPaused": "Sprioc curtha ar sos",
+      "statusComplete": "Sprioc curtha i gcrích",
+      "statusBlocked": "Sprioc blocáilte",
+      "edit": "Cuir an sprioc in eagar",
+      "remove": "Bain an sprioc",
+      "pause": "Cuir an sprioc ar sos",
+      "resume": "Atosaigh an sprioc",
+      "editPlaceholder": "Déan cur síos ar an sprioc",
+      "removeConfirmTitle": "Bain an sprioc?",
+      "removeConfirmMessage": "Glanann an CLI sprioc an tseisiúin seo.",
+      "updateFailed": "Níorbh fhéidir an sprioc a nuashonrú.",
+      "sectionAccessibility": "{{status}}. Sprioc: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Ceangail GitHub i do bhrabhsálaí, ansin fill anseo chun stór a roghnú.",
       "openGithub": "Oscail GitHub",

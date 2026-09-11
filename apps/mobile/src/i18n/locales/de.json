@@ -1559,6 +1559,22 @@
       "connectionLost": "Verbindung unterbrochen",
       "retryConnection": "Erneut verbinden"
     },
+    "goal": {
+      "title": "Ziel",
+      "statusActive": "Aktives Ziel",
+      "statusPaused": "Pausiertes Ziel",
+      "statusComplete": "Ziel abgeschlossen",
+      "statusBlocked": "Ziel blockiert",
+      "edit": "Ziel bearbeiten",
+      "remove": "Ziel entfernen",
+      "pause": "Ziel pausieren",
+      "resume": "Ziel fortsetzen",
+      "editPlaceholder": "Ziel beschreiben",
+      "removeConfirmTitle": "Ziel entfernen?",
+      "removeConfirmMessage": "Die CLI löscht das Ziel dieser Sitzung.",
+      "updateFailed": "Das Ziel konnte nicht aktualisiert werden.",
+      "sectionAccessibility": "{{status}}. Ziel: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Verbinde GitHub in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
       "openGithub": "GitHub öffnen",

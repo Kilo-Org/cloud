@@ -1993,6 +1993,22 @@
       "connectionLost": "اتصال قطع شد",
       "retryConnection": "تلاش دوباره برای اتصال"
     },
+    "goal": {
+      "title": "هدف",
+      "statusActive": "هدف فعال",
+      "statusPaused": "هدف متوقفشده",
+      "statusComplete": "هدف تکمیل شد",
+      "statusBlocked": "هدف مسدود شد",
+      "edit": "ویرایش هدف",
+      "remove": "حذف هدف",
+      "pause": "توقف هدف",
+      "resume": "ادامه هدف",
+      "editPlaceholder": "هدف را توصیف کنید",
+      "removeConfirmTitle": "هدف حذف شود؟",
+      "removeConfirmMessage": "CLI هدف این جلسه را پاک میکند.",
+      "updateFailed": "هدف بهروزرسانی نشد.",
+      "sectionAccessibility": "{{status}}. هدف: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "حساب GitHub خود را از طریق مرورگر متصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",
       "openGithub": "باز کردن GitHub",

@@ -1577,6 +1577,22 @@
       "connectionLost": "Соединение прервано",
       "retryConnection": "Повторить подключение"
     },
+    "goal": {
+      "title": "Цель",
+      "statusActive": "Активная цель",
+      "statusPaused": "Цель на паузе",
+      "statusComplete": "Цель достигнута",
+      "statusBlocked": "Цель заблокирована",
+      "edit": "Изменить цель",
+      "remove": "Удалить цель",
+      "pause": "Приостановить цель",
+      "resume": "Возобновить цель",
+      "editPlaceholder": "Опишите цель",
+      "removeConfirmTitle": "Удалить цель?",
+      "removeConfirmMessage": "CLI очищает цель этой сессии.",
+      "updateFailed": "Не удалось обновить цель.",
+      "sectionAccessibility": "{{status}}. Цель: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Подключите GitHub в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
       "openGithub": "Открыть GitHub",

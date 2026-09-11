@@ -2041,6 +2041,22 @@
       "connectionLost": "Il-konnessjoni ntilfet",
       "retryConnection": "Erġa' pprova taqbad"
     },
+    "goal": {
+      "title": "Għan",
+      "statusActive": "Għan attiv",
+      "statusPaused": "Għan imwaqqaf",
+      "statusComplete": "Għan komplut",
+      "statusBlocked": "Għan imblukkat",
+      "edit": "Editja l-għan",
+      "remove": "Neħħi l-għan",
+      "pause": "Waqqaf l-għan",
+      "resume": "Ibda l-għan mill-ġdid",
+      "editPlaceholder": "Iddeskrivi l-għan",
+      "removeConfirmTitle": "Neħħi l-għan?",
+      "removeConfirmMessage": "Il-CLI iħassar l-għan ta' din is-sessjoni.",
+      "updateFailed": "Ma setax jiġi aġġornat l-għan.",
+      "sectionAccessibility": "{{status}}. Għan: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Qabbad GitHub fil-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju.",
       "openGithub": "Iftaħ GitHub",

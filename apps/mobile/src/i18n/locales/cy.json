@@ -2057,6 +2057,22 @@
       "connectionLost": "Cysylltiad wedi'i golli",
       "retryConnection": "Ceisio cysylltu eto"
     },
+    "goal": {
+      "title": "Nod",
+      "statusActive": "Nod gweithredol",
+      "statusPaused": "Nod wedi'i phasio",
+      "statusComplete": "Nod wedi'i chwblhau",
+      "statusBlocked": "Nod wedi'i blocio",
+      "edit": "Golygu'r nod",
+      "remove": "Tynnu'r nod",
+      "pause": "Oedi'r nod",
+      "resume": "Ailddechrau'r nod",
+      "editPlaceholder": "Disgrifiwch y nod",
+      "removeConfirmTitle": "Tynnu'r nod?",
+      "removeConfirmMessage": "Mae'r CLI yn clirio nod y sesiwn hon.",
+      "updateFailed": "Methwyd diweddaru'r nod.",
+      "sectionAccessibility": "{{status}}. Nod: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Cysylltwch â GitHub yn eich porwr, yna dewch yn ôl yma i ddewis ystorfa.",
       "openGithub": "Agor GitHub",

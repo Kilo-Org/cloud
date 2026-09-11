@@ -1993,6 +1993,22 @@
       "connectionLost": "کنکشن ٹوٹ گیا",
       "retryConnection": "کنکشن دوبارہ قائم کرنے کی کوشش کریں"
     },
+    "goal": {
+      "title": "ہدف",
+      "statusActive": "فعال ہدف",
+      "statusPaused": "روکا گیا ہدف",
+      "statusComplete": "ہدف مکمل ہو گیا",
+      "statusBlocked": "ہدف مسدود ہے",
+      "edit": "ہدف میں ترمیم کریں",
+      "remove": "ہدف ہٹائیں",
+      "pause": "ہدف روکیں",
+      "resume": "ہدف دوبارہ شروع کریں",
+      "editPlaceholder": "ہدف بیان کریں",
+      "removeConfirmTitle": "ہدف ہٹائیں؟",
+      "removeConfirmMessage": "CLI اس سیشن کا ہدف صاف کر دیتا ہے۔",
+      "updateFailed": "ہدف اپ ڈیٹ نہیں ہو سکا۔",
+      "sectionAccessibility": "{{status}}. ہدف: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "اپنے براؤزر میں GitHub کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
       "openGithub": "GitHub کھولیں",

@@ -1993,6 +1993,22 @@
       "connectionLost": "કનેક્શન તૂટી ગયું",
       "retryConnection": "કનેક્ટ કરવા ફરી પ્રયાસ કરો"
     },
+    "goal": {
+      "title": "ધ્યેય",
+      "statusActive": "સક્રિય ધ્યેય",
+      "statusPaused": "થોભેલું ધ્યેય",
+      "statusComplete": "ધ્યેય પૂર્ણ",
+      "statusBlocked": "ધ્યેય અવરોધિત",
+      "edit": "ધ્યેય સંપાદિત કરો",
+      "remove": "ધ્યેય દૂર કરો",
+      "pause": "ધ્યેય થોભાવો",
+      "resume": "ધ્યેય ફરી શરૂ કરો",
+      "editPlaceholder": "ધ્યેયનું વર્ણન કરો",
+      "removeConfirmTitle": "ધ્યેય દૂર કરવું?",
+      "removeConfirmMessage": "CLI આ સત્રનું ધ્યેય સાફ કરે છે.",
+      "updateFailed": "ધ્યેય અપડેટ કરી શકાયું નહીં.",
+      "sectionAccessibility": "{{status}}. ધ્યેય: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "તમારા બ્રાઉઝરમાં GitHub કનેક્ટ કરો, પછી રિપોઝિટરી પસંદ કરવા અહીં પાછા આવો.",
       "openGithub": "GitHub ખોલો",

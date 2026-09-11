@@ -1559,6 +1559,22 @@
       "connectionLost": "Bağlantı koptu",
       "retryConnection": "Yeniden bağlanmayı dene"
     },
+    "goal": {
+      "title": "Hedef",
+      "statusActive": "Etkin hedef",
+      "statusPaused": "Duraklatılmış hedef",
+      "statusComplete": "Hedef tamamlandı",
+      "statusBlocked": "Hedef engellendi",
+      "edit": "Hedefi düzenle",
+      "remove": "Hedefi kaldır",
+      "pause": "Hedefi duraklat",
+      "resume": "Hedefe devam et",
+      "editPlaceholder": "Hedefi açıklayın",
+      "removeConfirmTitle": "Hedef kaldırılsın mı?",
+      "removeConfirmMessage": "CLI bu oturumun hedefini temizler.",
+      "updateFailed": "Hedef güncellenemedi.",
+      "sectionAccessibility": "{{status}}. Hedef: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Tarayıcında GitHub hesabını bağla, ardından bir depo seçmek için buraya dön.",
       "openGithub": "GitHub'ı aç",

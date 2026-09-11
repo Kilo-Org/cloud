@@ -1993,6 +1993,22 @@
       "connectionLost": "Walqabannaan citeera",
       "retryConnection": "Deebi'ii walqabsiisuuf yaali"
     },
+    "goal": {
+      "title": "Kaayyoo",
+      "statusActive": "Kaayyoo socho'aa",
+      "statusPaused": "Kaayyoo dhaabbate",
+      "statusComplete": "Kaayyoon xumurame",
+      "statusBlocked": "Kaayyoon cufame",
+      "edit": "Kaayyoo gulaali",
+      "remove": "Kaayyoo haqi",
+      "pause": "Kaayyoo dhaabi",
+      "resume": "Kaayyoo itti fufi",
+      "editPlaceholder": "Kaayyoo ibsi",
+      "removeConfirmTitle": "Kaayyoo haquu?",
+      "removeConfirmMessage": "CLI kaayyoo seesshinii kanaa haqa.",
+      "updateFailed": "Kaayyoo haaromsuun hin danda'amne.",
+      "sectionAccessibility": "{{status}}. Kaayyoo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "GitHub biraawzarii kee keessatti walqabsiisi, sana booda kuusaa koodii filachuuf asitti deebi'i.",
       "openGithub": "GitHub bani",

@@ -1559,6 +1559,22 @@
       "connectionLost": "Koneksi terputus",
       "retryConnection": "Coba sambungkan kembali"
     },
+    "goal": {
+      "title": "Tujuan",
+      "statusActive": "Tujuan aktif",
+      "statusPaused": "Tujuan dijeda",
+      "statusComplete": "Tujuan selesai",
+      "statusBlocked": "Tujuan diblokir",
+      "edit": "Edit tujuan",
+      "remove": "Hapus tujuan",
+      "pause": "Jeda tujuan",
+      "resume": "Lanjutkan tujuan",
+      "editPlaceholder": "Jelaskan tujuan",
+      "removeConfirmTitle": "Hapus tujuan?",
+      "removeConfirmMessage": "CLI menghapus tujuan sesi ini.",
+      "updateFailed": "Tujuan tidak dapat diperbarui.",
+      "sectionAccessibility": "{{status}}. Tujuan: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Hubungkan GitHub melalui peramban, lalu kembali ke sini untuk memilih repositori.",
       "openGithub": "Buka GitHub",

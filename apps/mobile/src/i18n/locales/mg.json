@@ -1993,6 +1993,22 @@
       "connectionLost": "Tapaka ny fifandraisana",
       "retryConnection": "Andramo mifandray indray"
     },
+    "goal": {
+      "title": "Tanjona",
+      "statusActive": "Tanjona mavitrika",
+      "statusPaused": "Tanjona mihajanona",
+      "statusComplete": "Tanjona vita",
+      "statusBlocked": "Tanjona voasakana",
+      "edit": "Ovay ny tanjona",
+      "remove": "Esory ny tanjona",
+      "pause": "Ajanony ny tanjona",
+      "resume": "Tohizo ny tanjona",
+      "editPlaceholder": "Farano ny tanjona",
+      "removeConfirmTitle": "Esorina ny tanjona?",
+      "removeConfirmMessage": "Mamafa ny tanjon'ity session ity ny CLI.",
+      "updateFailed": "Tsy afaka nanavao ny tanjona.",
+      "sectionAccessibility": "{{status}}. Tanjona: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Ampifandraiso ny GitHub ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody.",
       "openGithub": "Sokafy ny GitHub",

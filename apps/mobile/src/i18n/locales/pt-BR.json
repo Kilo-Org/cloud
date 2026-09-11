@@ -1542,6 +1542,22 @@
       "connectionLost": "Conexão perdida",
       "retryConnection": "Tentar reconectar"
     },
+    "goal": {
+      "title": "Meta",
+      "statusActive": "Meta ativa",
+      "statusPaused": "Meta pausada",
+      "statusComplete": "Meta concluída",
+      "statusBlocked": "Meta bloqueada",
+      "edit": "Editar meta",
+      "remove": "Remover meta",
+      "pause": "Pausar meta",
+      "resume": "Retomar meta",
+      "editPlaceholder": "Descreva a meta",
+      "removeConfirmTitle": "Remover meta?",
+      "removeConfirmMessage": "A CLI limpa a meta desta sessão.",
+      "updateFailed": "Não foi possível atualizar a meta.",
+      "sectionAccessibility": "{{status}}. Meta: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Conecte o GitHub no seu navegador e volte aqui para escolher um repositório.",
       "openGithub": "Abrir GitHub",

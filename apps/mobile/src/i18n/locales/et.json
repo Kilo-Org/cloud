@@ -1993,6 +1993,22 @@
       "connectionLost": "Ühendus katkes",
       "retryConnection": "Proovi uuesti ühenduda"
     },
+    "goal": {
+      "title": "Eesmärk",
+      "statusActive": "Aktiivne eesmärk",
+      "statusPaused": "Peatatud eesmärk",
+      "statusComplete": "Eesmärk täidetud",
+      "statusBlocked": "Eesmärk blokeeritud",
+      "edit": "Muuda eesmärki",
+      "remove": "Eemalda eesmärk",
+      "pause": "Peata eesmärk",
+      "resume": "Jätka eesmärki",
+      "editPlaceholder": "Kirjelda eesmärki",
+      "removeConfirmTitle": "Eemaldada eesmärk?",
+      "removeConfirmMessage": "CLI tühjendab selle seansi eesmärgi.",
+      "updateFailed": "Eesmärki ei saanud värskendada.",
+      "sectionAccessibility": "{{status}}. Eesmärk: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Ühenda GitHub brauseris ja naase siia, et valida hoidla.",
       "openGithub": "Ava GitHub",

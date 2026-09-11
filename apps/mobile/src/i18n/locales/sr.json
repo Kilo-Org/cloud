@@ -2009,6 +2009,22 @@
       "connectionLost": "Veza je izgubljena",
       "retryConnection": "Pokušaj ponovo da se povežeš"
     },
+    "goal": {
+      "title": "Cilj",
+      "statusActive": "Aktivan cilj",
+      "statusPaused": "Pauziran cilj",
+      "statusComplete": "Cilj završen",
+      "statusBlocked": "Cilj blokiran",
+      "edit": "Uredi cilj",
+      "remove": "Ukloni cilj",
+      "pause": "Pauziraj cilj",
+      "resume": "Nastavi cilj",
+      "editPlaceholder": "Opišite cilj",
+      "removeConfirmTitle": "Ukloniti cilj?",
+      "removeConfirmMessage": "CLI briše cilj ove sesije.",
+      "updateFailed": "Cilj nije moguće ažurirati.",
+      "sectionAccessibility": "{{status}}. Cilj: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Poveži GitHub u pregledaču, a zatim se vrati ovde da izabereš repozitorijum.",
       "openGithub": "Otvori GitHub",

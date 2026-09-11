@@ -1993,6 +1993,22 @@
       "connectionLost": "ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದೆ",
       "retryConnection": "ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಪ್ರಯತ್ನಿಸಿ"
     },
+    "goal": {
+      "title": "ಗುರಿ",
+      "statusActive": "ಸಕ್ರಿಯ ಗುರಿ",
+      "statusPaused": "ವಿರಾಮಗೊಳಿಸಿದ ಗುರಿ",
+      "statusComplete": "ಗುರಿ ಪೂರ್ಣಗೊಂಡಿದೆ",
+      "statusBlocked": "ಗುರಿ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",
+      "edit": "ಗುರಿ ಸಂಪಾದಿಸಿ",
+      "remove": "ಗುರಿ ತೆಗೆದುಹಾಕಿ",
+      "pause": "ಗುರಿ ವಿರಾಮಗೊಳಿಸಿ",
+      "resume": "ಗುರಿ ಪುನರಾರಂಭಿಸಿ",
+      "editPlaceholder": "ಗುರಿಯನ್ನು ವಿವರಿಸಿ",
+      "removeConfirmTitle": "ಗುರಿ ತೆಗೆದುಹಾಕಬೇಕೆ?",
+      "removeConfirmMessage": "CLI ಈ ಅಧಿವೇಶನದ ಗುರಿಯನ್ನು ಅಳಿಸುತ್ತದೆ.",
+      "updateFailed": "ಗುರಿಯನ್ನು ನವೀಕರಿಸಲಾಗಲಿಲ್ಲ.",
+      "sectionAccessibility": "{{status}}. ಗುರಿ: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ GitHub ಸಂಪರ್ಕಿಸಿ. ನಂತರ ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",
       "openGithub": "GitHub ತೆರೆಯಿರಿ",

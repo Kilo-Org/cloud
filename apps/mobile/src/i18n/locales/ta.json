@@ -1993,6 +1993,22 @@
       "connectionLost": "இணைப்பு துண்டிக்கப்பட்டது",
       "retryConnection": "மீண்டும் இணைக்க முயற்சிக்கவும்"
     },
+    "goal": {
+      "title": "இலக்கு",
+      "statusActive": "செயலில் உள்ள இலக்கு",
+      "statusPaused": "இடைநிறுத்தப்பட்ட இலக்கு",
+      "statusComplete": "இலக்கு நிறைவடைந்தது",
+      "statusBlocked": "இலக்கு தடுக்கப்பட்டது",
+      "edit": "இலக்கைத் திருத்து",
+      "remove": "இலக்கை அகற்று",
+      "pause": "இலக்கை இடைநிறுத்து",
+      "resume": "இலக்கை மீண்டும் தொடங்கு",
+      "editPlaceholder": "இலக்கை விவரிக்கவும்",
+      "removeConfirmTitle": "இலக்கை அகற்றவா?",
+      "removeConfirmMessage": "இந்த அமர்வின் இலக்கை CLI அழிக்கிறது.",
+      "updateFailed": "இலக்கைப் புதுப்பிக்க முடியவில்லை.",
+      "sectionAccessibility": "{{status}}. இலக்கு: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "உலாவியில் GitHub-ஐ இணைக்கவும். பின்னர் களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
       "openGithub": "GitHub-ஐத் திறக்கவும்",

@@ -1993,6 +1993,22 @@
       "connectionLost": "Xiriirku wuu go'ay",
       "retryConnection": "Mar kale isku day inaad ku xirmato"
     },
+    "goal": {
+      "title": "Hadaf",
+      "statusActive": "Hadaf firfircoon",
+      "statusPaused": "Hadaf la hakiyay",
+      "statusComplete": "Hadafka waa dhammaaday",
+      "statusBlocked": "Hadafka waa la xiray",
+      "edit": "Tafatir hadafka",
+      "remove": "Ka saar hadafka",
+      "pause": "Hakiso hadafka",
+      "resume": "Sii wad hadafka",
+      "editPlaceholder": "Sharax hadafka",
+      "removeConfirmTitle": "Ka saar hadafka?",
+      "removeConfirmMessage": "CLI wuxuu tirtiraa hadafka kulankan.",
+      "updateFailed": "Hadafka lama cusboonaysiin karin.",
+      "sectionAccessibility": "{{status}}. Hadaf: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "GitHub ku xiriiri biraawsarkaaga, ka dibna halkan ku soo noqo si aad kayd u doorato.",
       "openGithub": "Fur GitHub",

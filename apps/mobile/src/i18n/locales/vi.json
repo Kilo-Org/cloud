@@ -1559,6 +1559,22 @@
       "connectionLost": "Mất kết nối",
       "retryConnection": "Thử kết nối lại"
     },
+    "goal": {
+      "title": "Mục tiêu",
+      "statusActive": "Mục tiêu đang hoạt động",
+      "statusPaused": "Mục tiêu tạm dừng",
+      "statusComplete": "Mục tiêu đã hoàn thành",
+      "statusBlocked": "Mục tiêu bị chặn",
+      "edit": "Chỉnh sửa mục tiêu",
+      "remove": "Xóa mục tiêu",
+      "pause": "Tạm dừng mục tiêu",
+      "resume": "Tiếp tục mục tiêu",
+      "editPlaceholder": "Mô tả mục tiêu",
+      "removeConfirmTitle": "Xóa mục tiêu?",
+      "removeConfirmMessage": "CLI xóa mục tiêu của phiên này.",
+      "updateFailed": "Không thể cập nhật mục tiêu.",
+      "sectionAccessibility": "{{status}}. Mục tiêu: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Kết nối GitHub trong trình duyệt, rồi quay lại đây để chọn kho mã.",
       "openGithub": "Mở GitHub",

@@ -1559,6 +1559,22 @@
       "connectionLost": "연결 끊김",
       "retryConnection": "연결 다시 시도"
     },
+    "goal": {
+      "title": "목표",
+      "statusActive": "활성 목표",
+      "statusPaused": "일시 중지된 목표",
+      "statusComplete": "목표 완료",
+      "statusBlocked": "목표 차단됨",
+      "edit": "목표 편집",
+      "remove": "목표 제거",
+      "pause": "목표 일시 중지",
+      "resume": "목표 재개",
+      "editPlaceholder": "목표 설명",
+      "removeConfirmTitle": "목표를 제거할까요?",
+      "removeConfirmMessage": "CLI가 이 세션의 목표를 지웁니다.",
+      "updateFailed": "목표를 업데이트할 수 없습니다.",
+      "sectionAccessibility": "{{status}}. 목표: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "브라우저에서 GitHub를 연결한 후 여기로 돌아와 저장소를 선택하세요.",
       "openGithub": "GitHub 열기",

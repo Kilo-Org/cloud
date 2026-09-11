@@ -1993,6 +1993,22 @@
       "connectionLost": "ချိတ်ဆက်မှု ပျက်သွားသည်",
       "retryConnection": "ထပ်ချိတ်ဆက်ကြည့်ပါ"
     },
+    "goal": {
+      "title": "ပန်းတိုင်",
+      "statusActive": "အသုံးပြုနေသော ပန်းတိုင်",
+      "statusPaused": "ရပ်ဆိုင်းထားသော ပန်းတိုင်",
+      "statusComplete": "ပန်းတိုင် ပြီးမြောက်ပါပြီ",
+      "statusBlocked": "ပန်းတိုင် ပိတ်ဆို့ထားသည်",
+      "edit": "ပန်းတိုင် တည်းဖြတ်ရန်",
+      "remove": "ပန်းတိုင် ဖယ်ရှားရန်",
+      "pause": "ပန်းတိုင် ရပ်ဆိုင်းရန်",
+      "resume": "ပန်းတိုင် ပြန်လည်စတင်ရန်",
+      "editPlaceholder": "ပန်းတိုင်ကို ဖော်ပြပါ",
+      "removeConfirmTitle": "ပန်းတိုင် ဖယ်ရှားမလား?",
+      "removeConfirmMessage": "CLI သည် ဤစက်ရှင်၏ ပန်းတိုင်ကို ရှင်းလင်းသည်။",
+      "updateFailed": "ပန်းတိုင်ကို အပ်ဒိတ်လုပ်နိုင်ခြင်း မရှိပါ။",
+      "sectionAccessibility": "{{status}}။ ပန်းတိုင်: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ဘရောက်ဆာတွင် GitHub ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
       "openGithub": "GitHub ဖွင့်ပါ",

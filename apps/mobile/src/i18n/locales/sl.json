@@ -2025,6 +2025,22 @@
       "connectionLost": "Povezava prekinjena",
       "retryConnection": "Znova vzpostavi povezavo"
     },
+    "goal": {
+      "title": "Cilj",
+      "statusActive": "Aktivni cilj",
+      "statusPaused": "Zaustavljeni cilj",
+      "statusComplete": "Cilj dokončan",
+      "statusBlocked": "Cilj blokiran",
+      "edit": "Uredi cilj",
+      "remove": "Odstrani cilj",
+      "pause": "Zaustavi cilj",
+      "resume": "Nadaljuj cilj",
+      "editPlaceholder": "Opišite cilj",
+      "removeConfirmTitle": "Odstranim cilj?",
+      "removeConfirmMessage": "CLI izbriše cilj te seje.",
+      "updateFailed": "Cilja ni bilo mogoče posodobiti.",
+      "sectionAccessibility": "{{status}}. Cilj: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Poveži GitHub v brskalniku, nato se vrni sem in izberi skladišče.",
       "openGithub": "Odpri GitHub",

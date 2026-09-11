@@ -1993,6 +1993,22 @@
       "connectionLost": "కనెక్షన్ తెగిపోయింది",
       "retryConnection": "కనెక్ట్ చేయడానికి మళ్లీ ప్రయత్నించండి"
     },
+    "goal": {
+      "title": "లక్ష్యం",
+      "statusActive": "క్రియాశీల లక్ష్యం",
+      "statusPaused": "నిలిపివేసిన లక్ష్యం",
+      "statusComplete": "లక్ష్యం పూర్తయింది",
+      "statusBlocked": "లక్ష్యం నిరోధించబడింది",
+      "edit": "లక్ష్యాన్ని సవరించండి",
+      "remove": "లక్ష్యాన్ని తీసివేయండి",
+      "pause": "లక్ష్యాన్ని నిలిపివేయండి",
+      "resume": "లక్ష్యాన్ని కొనసాగించండి",
+      "editPlaceholder": "లక్ష్యాన్ని వివరించండి",
+      "removeConfirmTitle": "లక్ష్యాన్ని తీసివేయాలా?",
+      "removeConfirmMessage": "ఈ సెషన్ లక్ష్యాన్ని CLI క్లియర్ చేస్తుంది.",
+      "updateFailed": "లక్ష్యాన్ని నవీకరించలేకపోయాము.",
+      "sectionAccessibility": "{{status}}. లక్ష్యం: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "మీ బ్రౌజర్‌లో GitHubను కనెక్ట్ చేయండి. తర్వాత రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడికి తిరిగి రండి.",
       "openGithub": "GitHub తెరవండి",

@@ -1993,6 +1993,22 @@
       "connectionLost": "پەیوەندییەکە پچڕا",
       "retryConnection": "دووبارە هەوڵدان بۆ پەیوەندیکردن"
     },
+    "goal": {
+      "title": "ئامانج",
+      "statusActive": "ئامانجی چالاک",
+      "statusPaused": "ئامانجی وەستاو",
+      "statusComplete": "ئامانج تەواو بوو",
+      "statusBlocked": "ئامانج بلۆک کراوە",
+      "edit": "دەستکاری ئامانج بکە",
+      "remove": "ئامانج لابەرە",
+      "pause": "ئامانج ڕابگرە",
+      "resume": "ئامانج بەردەوام بکە",
+      "editPlaceholder": "ئامانجەکە باس بکە",
+      "removeConfirmTitle": "ئامانج لاببرێت؟",
+      "removeConfirmMessage": "CLI ئامانجی ئەم دانیشتنە دەسڕێتەوە.",
+      "updateFailed": "نەتوانرا ئامانج نوێ بکرێتەوە.",
+      "sectionAccessibility": "{{status}}. ئامانج: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "لە وێبگەڕەکەتدا هەژماری GitHub ببەستەرەوە، پاشان بگەڕێوە ئێرە و کۆگایەک هەڵبژێرە.",
       "openGithub": "کردنەوەی GitHub",

@@ -1993,6 +1993,22 @@
       "connectionLost": "Bağlantı kəsildi",
       "retryConnection": "Yenidən qoşul"
     },
+    "goal": {
+      "title": "Məqsəd",
+      "statusActive": "Aktiv məqsəd",
+      "statusPaused": "Dayandırılmış məqsəd",
+      "statusComplete": "Məqsəd tamamlandı",
+      "statusBlocked": "Məqsəd bloklandı",
+      "edit": "Məqsədi redaktə et",
+      "remove": "Məqsədi sil",
+      "pause": "Məqsədi dayandır",
+      "resume": "Məqsədə davam et",
+      "editPlaceholder": "Məqsədi təsvir edin",
+      "removeConfirmTitle": "Məqsəd silinsin?",
+      "removeConfirmMessage": "CLI bu sessiyanın məqsədini təmizləyir.",
+      "updateFailed": "Məqsəd yenilənə bilmədi.",
+      "sectionAccessibility": "{{status}}. Məqsəd: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "GitHub hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
       "openGithub": "GitHub-u aç",

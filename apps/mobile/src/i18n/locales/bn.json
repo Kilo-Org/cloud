@@ -1993,6 +1993,22 @@
       "connectionLost": "সংযোগ বিচ্ছিন্ন",
       "retryConnection": "আবার সংযোগের চেষ্টা করুন"
     },
+    "goal": {
+      "title": "লক্ষ্য",
+      "statusActive": "সক্রিয় লক্ষ্য",
+      "statusPaused": "বিরত থাকা লক্ষ্য",
+      "statusComplete": "লক্ষ্য সম্পন্ন",
+      "statusBlocked": "লক্ষ্য অবরুদ্ধ",
+      "edit": "লক্ষ্য সম্পাদনা করুন",
+      "remove": "লক্ষ্য সরান",
+      "pause": "লক্ষ্য বিরত করুন",
+      "resume": "লক্ষ্য পুনরায় শুরু করুন",
+      "editPlaceholder": "লক্ষ্য বর্ণনা করুন",
+      "removeConfirmTitle": "লক্ষ্য সরাবেন?",
+      "removeConfirmMessage": "CLI এই সেশনের লক্ষ্য মুছে দেবে।",
+      "updateFailed": "লক্ষ্য আপডেট করা যায়নি।",
+      "sectionAccessibility": "{{status}}। লক্ষ্য: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "আপনার ব্রাউজারে GitHub সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
       "openGithub": "GitHub খুলুন",

@@ -1542,6 +1542,22 @@
       "connectionLost": "Connessione persa",
       "retryConnection": "Riprova a connetterti"
     },
+    "goal": {
+      "title": "Obiettivo",
+      "statusActive": "Obiettivo attivo",
+      "statusPaused": "Obiettivo in pausa",
+      "statusComplete": "Obiettivo completato",
+      "statusBlocked": "Obiettivo bloccato",
+      "edit": "Modifica obiettivo",
+      "remove": "Rimuovi obiettivo",
+      "pause": "Metti in pausa l'obiettivo",
+      "resume": "Riprendi l'obiettivo",
+      "editPlaceholder": "Descrivi l'obiettivo",
+      "removeConfirmTitle": "Rimuovere l'obiettivo?",
+      "removeConfirmMessage": "Il CLI cancella l'obiettivo di questa sessione.",
+      "updateFailed": "Impossibile aggiornare l'obiettivo.",
+      "sectionAccessibility": "{{status}}. Obiettivo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Collega GitHub nel browser, poi torna qui per scegliere un repository.",
       "openGithub": "Apri GitHub",

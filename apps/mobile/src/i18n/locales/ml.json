@@ -1993,6 +1993,22 @@
       "connectionLost": "കണക്ഷൻ നഷ്ടപ്പെട്ടു",
       "retryConnection": "വീണ്ടും കണക്റ്റ് ചെയ്യാൻ ശ്രമിക്കുക"
     },
+    "goal": {
+      "title": "ലക്ഷ്യം",
+      "statusActive": "സജീവ ലക്ഷ്യം",
+      "statusPaused": "താൽക്കാലികമായി നിർത്തിയ ലക്ഷ്യം",
+      "statusComplete": "ലക്ഷ്യം പൂർത്തിയായി",
+      "statusBlocked": "ലക്ഷ്യം തടഞ്ഞു",
+      "edit": "ലക്ഷ്യം എഡിറ്റ് ചെയ്യുക",
+      "remove": "ലക്ഷ്യം നീക്കുക",
+      "pause": "ലക്ഷ്യം താൽക്കാലികമായി നിർത്തുക",
+      "resume": "ലക്ഷ്യം തുടരുക",
+      "editPlaceholder": "ലക്ഷ്യം വിവരിക്കുക",
+      "removeConfirmTitle": "ലക്ഷ്യം നീക്കണോ?",
+      "removeConfirmMessage": "ഈ സെഷന്റെ ലക്ഷ്യം CLI മായ്ക്കുന്നു.",
+      "updateFailed": "ലക്ഷ്യം അപ്ഡേറ്റ് ചെയ്യാനായില്ല.",
+      "sectionAccessibility": "{{status}}. ലക്ഷ്യം: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ബ്രൗസറിൽ GitHub കണക്റ്റ് ചെയ്യുക. തുടർന്ന് ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കാൻ ഇവിടെ മടങ്ങിയെത്തുക.",
       "openGithub": "GitHub തുറക്കുക",

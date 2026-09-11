@@ -1993,6 +1993,22 @@
       "connectionLost": "ግንኙነቱ ተቋርጧል",
       "retryConnection": "እንደገና ለመገናኘት ይሞክሩ"
     },
+    "goal": {
+      "title": "ግብ",
+      "statusActive": "ንቁ ግብ",
+      "statusPaused": "የቆመ ግብ",
+      "statusComplete": "ግብ ተጠናቅቋል",
+      "statusBlocked": "ግብ ተዘግቷል",
+      "edit": "ግብን አርትዕ",
+      "remove": "ግብን አስወግድ",
+      "pause": "ግብን አቁም",
+      "resume": "ግብን ቀጥል",
+      "editPlaceholder": "ግቡን ይግለጹ",
+      "removeConfirmTitle": "ግብ ይወገድ?",
+      "removeConfirmMessage": "CLI የዚህን ክፍለ ጊዜ ግብ ያጸዳል።",
+      "updateFailed": "ግቡን ማዘመን አልተቻለም።",
+      "sectionAccessibility": "{{status}}። ግብ፦ {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "GitHubን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
       "openGithub": "GitHubን ይክፈቱ",

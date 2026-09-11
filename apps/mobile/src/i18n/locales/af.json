@@ -1993,6 +1993,22 @@
       "connectionLost": "Verbinding verloor",
       "retryConnection": "Probeer weer koppel"
     },
+    "goal": {
+      "title": "Doel",
+      "statusActive": "Aktiewe doel",
+      "statusPaused": "Doel opgeskort",
+      "statusComplete": "Doel voltooi",
+      "statusBlocked": "Doel geblokkeer",
+      "edit": "Doel wysig",
+      "remove": "Doel verwyder",
+      "pause": "Doel onderbreek",
+      "resume": "Doel hervat",
+      "editPlaceholder": "Beskryf die doel",
+      "removeConfirmTitle": "Doel verwyder?",
+      "removeConfirmMessage": "Die CLI verwyder hierdie sessie se doel.",
+      "updateFailed": "Kon nie die doel bywerk nie.",
+      "sectionAccessibility": "{{status}}. Doel: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Koppel GitHub in jou blaaier en kom dan hierheen terug om 'n bewaarplek te kies.",
       "openGithub": "Maak GitHub oop",

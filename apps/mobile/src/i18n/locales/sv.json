@@ -1993,6 +1993,22 @@
       "connectionLost": "Anslutningen bröts",
       "retryConnection": "Försök ansluta igen"
     },
+    "goal": {
+      "title": "Mål",
+      "statusActive": "Aktivt mål",
+      "statusPaused": "Pausat mål",
+      "statusComplete": "Mål slutfört",
+      "statusBlocked": "Mål blockerat",
+      "edit": "Redigera mål",
+      "remove": "Ta bort mål",
+      "pause": "Pausa mål",
+      "resume": "Återuppta mål",
+      "editPlaceholder": "Beskriv målet",
+      "removeConfirmTitle": "Ta bort mål?",
+      "removeConfirmMessage": "CLI rensar den här sessionens mål.",
+      "updateFailed": "Målet kunde inte uppdateras.",
+      "sectionAccessibility": "{{status}}. Mål: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Anslut GitHub i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
       "openGithub": "Öppna GitHub",

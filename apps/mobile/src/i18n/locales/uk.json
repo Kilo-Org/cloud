@@ -1577,6 +1577,22 @@
       "connectionLost": "З'єднання втрачено",
       "retryConnection": "Повторити підключення"
     },
+    "goal": {
+      "title": "Ціль",
+      "statusActive": "Активна ціль",
+      "statusPaused": "Призупинена ціль",
+      "statusComplete": "Ціль досягнуто",
+      "statusBlocked": "Ціль заблоковано",
+      "edit": "Редагувати ціль",
+      "remove": "Видалити ціль",
+      "pause": "Призупинити ціль",
+      "resume": "Відновити ціль",
+      "editPlaceholder": "Опишіть ціль",
+      "removeConfirmTitle": "Видалити ціль?",
+      "removeConfirmMessage": "CLI очищає ціль цього сеансу.",
+      "updateFailed": "Не вдалося оновити ціль.",
+      "sectionAccessibility": "{{status}}. Ціль: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Підключіть GitHub у браузері, а потім поверніться сюди, щоб вибрати репозиторій.",
       "openGithub": "Відкрити GitHub",

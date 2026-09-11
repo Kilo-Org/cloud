@@ -1993,6 +1993,22 @@
       "connectionLost": "Lidhja u humb",
       "retryConnection": "Provo të lidhesh përsëri"
     },
+    "goal": {
+      "title": "Qëllimi",
+      "statusActive": "Qëllim aktiv",
+      "statusPaused": "Qëllim i ndalur",
+      "statusComplete": "Qëllimi u përfundua",
+      "statusBlocked": "Qëllimi u bllokua",
+      "edit": "Redakto qëllimin",
+      "remove": "Hiq qëllimin",
+      "pause": "Ndalo qëllimin",
+      "resume": "Vazhdo qëllimin",
+      "editPlaceholder": "Përshkruaj qëllimin",
+      "removeConfirmTitle": "Të hiqet qëllimi?",
+      "removeConfirmMessage": "CLI fshin qëllimin e këtij sesioni.",
+      "updateFailed": "Qëllimi nuk mund të përditësohej.",
+      "sectionAccessibility": "{{status}}. Qëllim: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Lidh llogarinë e GitHub në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
       "openGithub": "Hap GitHub",

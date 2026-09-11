@@ -1993,6 +1993,22 @@
       "connectionLost": "कनेक्शन तुटले",
       "retryConnection": "पुन्हा कनेक्ट करण्याचा प्रयत्न करा"
     },
+    "goal": {
+      "title": "ध्येय",
+      "statusActive": "सक्रिय ध्येय",
+      "statusPaused": "थांबवलेले ध्येय",
+      "statusComplete": "ध्येय पूर्ण",
+      "statusBlocked": "ध्येय अवरोधित",
+      "edit": "ध्येय संपादित करा",
+      "remove": "ध्येय काढा",
+      "pause": "ध्येय थांबवा",
+      "resume": "ध्येय पुन्हा सुरू करा",
+      "editPlaceholder": "ध्येयाचे वर्णन करा",
+      "removeConfirmTitle": "ध्येय काढायचे?",
+      "removeConfirmMessage": "CLI या सत्राचे ध्येय साफ करते.",
+      "updateFailed": "ध्येय अपडेट करता आले नाही.",
+      "sectionAccessibility": "{{status}}. ध्येय: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "तुमच्या ब्राउझरमध्ये GitHub कनेक्ट करा, नंतर रिपॉझिटरी निवडण्यासाठी येथे परत या.",
       "openGithub": "GitHub उघडा",

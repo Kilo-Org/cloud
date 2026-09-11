@@ -1993,6 +1993,22 @@
       "connectionLost": "اړیکه پرې شوه",
       "retryConnection": "بیا د نښلېدو هڅه وکړئ"
     },
+    "goal": {
+      "title": "هدف",
+      "statusActive": "فعال هدف",
+      "statusPaused": "ځنډول شوی هدف",
+      "statusComplete": "هدف بشپړ شو",
+      "statusBlocked": "هدف بند شو",
+      "edit": "هدف سمول",
+      "remove": "هدف لرې کول",
+      "pause": "هدف ځنډول",
+      "resume": "هدف بیا پیلول",
+      "editPlaceholder": "هدف تشریح کړئ",
+      "removeConfirmTitle": "هدف لرې کړو؟",
+      "removeConfirmMessage": "CLI د دې غونډې هدف پاکوي.",
+      "updateFailed": "هدف نشو کولای تازه شي.",
+      "sectionAccessibility": "{{status}}. هدف: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "په خپل براوزر کې GitHub ونښلوئ، بیا دلته راشئ او یو زېرمتون غوره کړئ.",
       "openGithub": "GitHub پرانیزئ",

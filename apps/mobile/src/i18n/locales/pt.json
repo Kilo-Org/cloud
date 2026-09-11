@@ -2009,6 +2009,22 @@
       "connectionLost": "Ligação perdida",
       "retryConnection": "Tentar ligar novamente"
     },
+    "goal": {
+      "title": "Objetivo",
+      "statusActive": "Objetivo ativo",
+      "statusPaused": "Objetivo em pausa",
+      "statusComplete": "Objetivo concluído",
+      "statusBlocked": "Objetivo bloqueado",
+      "edit": "Editar objetivo",
+      "remove": "Remover objetivo",
+      "pause": "Colocar objetivo em pausa",
+      "resume": "Retomar objetivo",
+      "editPlaceholder": "Descreva o objetivo",
+      "removeConfirmTitle": "Remover objetivo?",
+      "removeConfirmMessage": "O CLI limpa o objetivo desta sessão.",
+      "updateFailed": "Não foi possível atualizar o objetivo.",
+      "sectionAccessibility": "{{status}}. Objetivo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Ligue a sua conta do GitHub no navegador e volte aqui para escolher um repositório.",
       "openGithub": "Abrir o GitHub",

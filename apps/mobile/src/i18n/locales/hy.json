@@ -1993,6 +1993,22 @@
       "connectionLost": "Կապը կորել է",
       "retryConnection": "Կրկին փորձել միանալ"
     },
+    "goal": {
+      "title": "Նպատակ",
+      "statusActive": "Ակտիվ նպատակ",
+      "statusPaused": "Դադարեցված նպատակ",
+      "statusComplete": "Նպատակն ավարտված է",
+      "statusBlocked": "Նպատակն արգելափակված է",
+      "edit": "Խմբագրել նպատակը",
+      "remove": "Հեռացնել նպատակը",
+      "pause": "Դադարեցնել նպատակը",
+      "resume": "Շարունակել նպատակը",
+      "editPlaceholder": "Նկարագրեք նպատակը",
+      "removeConfirmTitle": "Հեռացնե՞լ նպատակը",
+      "removeConfirmMessage": "CLI-ն մաքրում է այս նստաշրջանի նպատակը։",
+      "updateFailed": "Չհաջողվեց թարմացնել նպատակը։",
+      "sectionAccessibility": "{{status}}։ Նպատակ՝ {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Միացրեք GitHub-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
       "openGithub": "Բացել GitHub-ը",

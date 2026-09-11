@@ -1993,6 +1993,22 @@
       "connectionLost": "Megszakadt a kapcsolat",
       "retryConnection": "Csatlakozás újrapróbálása"
     },
+    "goal": {
+      "title": "Cél",
+      "statusActive": "Aktív cél",
+      "statusPaused": "Szüneteltetett cél",
+      "statusComplete": "Cél teljesítve",
+      "statusBlocked": "Cél blokkolva",
+      "edit": "Cél szerkesztése",
+      "remove": "Cél eltávolítása",
+      "pause": "Cél szüneteltetése",
+      "resume": "Cél folytatása",
+      "editPlaceholder": "Írja le a célt",
+      "removeConfirmTitle": "Eltávolítja a célt?",
+      "removeConfirmMessage": "A CLI törli a munkamenet célját.",
+      "updateFailed": "A célt nem sikerült frissíteni.",
+      "sectionAccessibility": "{{status}}. Cél: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Kapcsold össze a GitHub-fiókodat a böngészőben, majd térj vissza ide, és válassz egy tárolót.",
       "openGithub": "GitHub megnyitása",

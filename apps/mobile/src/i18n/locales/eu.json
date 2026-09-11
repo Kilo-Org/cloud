@@ -1993,6 +1993,22 @@
       "connectionLost": "Konexioa galdu da",
       "retryConnection": "Saiatu berriro konektatzen"
     },
+    "goal": {
+      "title": "Helburua",
+      "statusActive": "Helburu aktiboa",
+      "statusPaused": "Gelditutako helburua",
+      "statusComplete": "Helburua osatuta",
+      "statusBlocked": "Helburua blokeatuta",
+      "edit": "Editatu helburua",
+      "remove": "Kendu helburua",
+      "pause": "Eten helburua",
+      "resume": "Berrekin helburuari",
+      "editPlaceholder": "Deskribatu helburua",
+      "removeConfirmTitle": "Helburua kendu?",
+      "removeConfirmMessage": "CLI-k saio honen helburua ezabatzen du.",
+      "updateFailed": "Ezin izan da helburua eguneratu.",
+      "sectionAccessibility": "{{status}}. Helburua: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Konektatu GitHub zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
       "openGithub": "Ireki GitHub",

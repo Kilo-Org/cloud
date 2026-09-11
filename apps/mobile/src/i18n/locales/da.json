@@ -1993,6 +1993,22 @@
       "connectionLost": "Forbindelsen er afbrudt",
       "retryConnection": "Prøv at oprette forbindelse igen"
     },
+    "goal": {
+      "title": "Mål",
+      "statusActive": "Aktivt mål",
+      "statusPaused": "Mål sat på pause",
+      "statusComplete": "Mål fuldført",
+      "statusBlocked": "Mål blokeret",
+      "edit": "Rediger mål",
+      "remove": "Fjern mål",
+      "pause": "Sæt mål på pause",
+      "resume": "Genoptag mål",
+      "editPlaceholder": "Beskriv målet",
+      "removeConfirmTitle": "Fjern mål?",
+      "removeConfirmMessage": "CLI rydder dette sessions mål.",
+      "updateFailed": "Målet kunne ikke opdateres.",
+      "sectionAccessibility": "{{status}}. Mål: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Tilknyt GitHub i din browser og vend tilbage hertil for at vælge et kodelager.",
       "openGithub": "Åbn GitHub",

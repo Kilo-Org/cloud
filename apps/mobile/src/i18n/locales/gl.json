@@ -1993,6 +1993,22 @@
       "connectionLost": "Perdeuse a conexión",
       "retryConnection": "Volver tentar a conexión"
     },
+    "goal": {
+      "title": "Obxectivo",
+      "statusActive": "Obxectivo activo",
+      "statusPaused": "Obxectivo en pausa",
+      "statusComplete": "Obxectivo completado",
+      "statusBlocked": "Obxectivo bloqueado",
+      "edit": "Editar o obxectivo",
+      "remove": "Eliminar o obxectivo",
+      "pause": "Pausar o obxectivo",
+      "resume": "Retomar o obxectivo",
+      "editPlaceholder": "Describe o obxectivo",
+      "removeConfirmTitle": "Eliminar o obxectivo?",
+      "removeConfirmMessage": "O CLI borra o obxectivo desta sesión.",
+      "updateFailed": "Non se puido actualizar o obxectivo.",
+      "sectionAccessibility": "{{status}}. Obxectivo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Conecta GitHub no teu navegador e despois volve aquí para escoller un repositorio.",
       "openGithub": "Abrir GitHub",

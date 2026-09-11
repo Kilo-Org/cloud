@@ -2009,6 +2009,22 @@
       "connectionLost": "Connexió perduda",
       "retryConnection": "Torna a provar la connexió"
     },
+    "goal": {
+      "title": "Objectiu",
+      "statusActive": "Objectiu actiu",
+      "statusPaused": "Objectiu en pausa",
+      "statusComplete": "Objectiu completat",
+      "statusBlocked": "Objectiu bloquejat",
+      "edit": "Edita l'objectiu",
+      "remove": "Elimina l'objectiu",
+      "pause": "Posa en pausa l'objectiu",
+      "resume": "Reprèn l'objectiu",
+      "editPlaceholder": "Descriu l'objectiu",
+      "removeConfirmTitle": "Eliminar l'objectiu?",
+      "removeConfirmMessage": "El CLI esborra l'objectiu d'aquesta sessió.",
+      "updateFailed": "No s'ha pogut actualitzar l'objectiu.",
+      "sectionAccessibility": "{{status}}. Objectiu: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Connecta GitHub al navegador i torna aquí per triar un repositori.",
       "openGithub": "Obre GitHub",

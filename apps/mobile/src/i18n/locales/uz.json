@@ -1993,6 +1993,22 @@
       "connectionLost": "Ulanish uzildi",
       "retryConnection": "Qayta ulanish"
     },
+    "goal": {
+      "title": "Maqsad",
+      "statusActive": "Faol maqsad",
+      "statusPaused": "To'xtatilgan maqsad",
+      "statusComplete": "Maqsad bajarildi",
+      "statusBlocked": "Maqsad bloklandi",
+      "edit": "Maqsadni tahrirlash",
+      "remove": "Maqsadni olib tashlash",
+      "pause": "Maqsadni to'xtatish",
+      "resume": "Maqsadni davom ettirish",
+      "editPlaceholder": "Maqsadni tavsiflang",
+      "removeConfirmTitle": "Maqsad olib tashlansinmi?",
+      "removeConfirmMessage": "CLI bu seansning maqsadini tozalaydi.",
+      "updateFailed": "Maqsadni yangilab bo'lmadi.",
+      "sectionAccessibility": "{{status}}. Maqsad: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Brauzerda GitHub hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
       "openGithub": "GitHub saytini ochish",

@@ -1993,6 +1993,22 @@
       "connectionLost": "Sambungan terputus",
       "retryConnection": "Cuba sambung semula"
     },
+    "goal": {
+      "title": "Matlamat",
+      "statusActive": "Matlamat aktif",
+      "statusPaused": "Matlamat dijeda",
+      "statusComplete": "Matlamat selesai",
+      "statusBlocked": "Matlamat disekat",
+      "edit": "Edit matlamat",
+      "remove": "Buang matlamat",
+      "pause": "Jeda matlamat",
+      "resume": "Sambung matlamat",
+      "editPlaceholder": "Terangkan matlamat",
+      "removeConfirmTitle": "Buang matlamat?",
+      "removeConfirmMessage": "CLI menghapuskan matlamat sesi ini.",
+      "updateFailed": "Matlamat tidak dapat dikemas kini.",
+      "sectionAccessibility": "{{status}}. Matlamat: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Sambungkan GitHub dalam pelayar anda, kemudian kembali ke sini untuk memilih repositori.",
       "openGithub": "Buka GitHub",

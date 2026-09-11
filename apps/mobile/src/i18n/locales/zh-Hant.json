@@ -1559,6 +1559,22 @@
       "connectionLost": "連線中斷",
       "retryConnection": "重新連線"
     },
+    "goal": {
+      "title": "目標",
+      "statusActive": "進行中的目標",
+      "statusPaused": "已暫停的目標",
+      "statusComplete": "目標已完成",
+      "statusBlocked": "目標已封鎖",
+      "edit": "編輯目標",
+      "remove": "移除目標",
+      "pause": "暫停目標",
+      "resume": "繼續目標",
+      "editPlaceholder": "描述目標",
+      "removeConfirmTitle": "移除目標？",
+      "removeConfirmMessage": "CLI 會清除此工作階段的目標。",
+      "updateFailed": "無法更新目標。",
+      "sectionAccessibility": "{{status}}。目標：{{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "請在瀏覽器中連結 GitHub，再回到這裡選取儲存庫。",
       "openGithub": "開啟 GitHub",

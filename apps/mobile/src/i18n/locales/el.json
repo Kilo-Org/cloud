@@ -1993,6 +1993,22 @@
       "connectionLost": "Χάθηκε η σύνδεση",
       "retryConnection": "Επανάληψη σύνδεσης"
     },
+    "goal": {
+      "title": "Στόχος",
+      "statusActive": "Ενεργός στόχος",
+      "statusPaused": "Στόχος σε παύση",
+      "statusComplete": "Ο στόχος ολοκληρώθηκε",
+      "statusBlocked": "Ο στόχος μπλοκαρίστηκε",
+      "edit": "Επεξεργασία στόχου",
+      "remove": "Αφαίρεση στόχου",
+      "pause": "Παύση στόχου",
+      "resume": "Συνέχιση στόχου",
+      "editPlaceholder": "Περιγράψτε τον στόχο",
+      "removeConfirmTitle": "Αφαίρεση στόχου;",
+      "removeConfirmMessage": "Το CLI καθαρίζει τον στόχο αυτής της συνεδρίας.",
+      "updateFailed": "Δεν ήταν δυνατή η ενημέρωση του στόχου.",
+      "sectionAccessibility": "{{status}}. Στόχος: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Σύνδεσε το GitHub από το πρόγραμμα περιήγησης και μετά επέστρεψε εδώ για να επιλέξεις ένα αποθετήριο.",
       "openGithub": "Άνοιγμα GitHub",

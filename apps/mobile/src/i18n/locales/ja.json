@@ -1559,6 +1559,22 @@
       "connectionLost": "接続切断",
       "retryConnection": "接続を再試行"
     },
+    "goal": {
+      "title": "ゴール",
+      "statusActive": "アクティブなゴール",
+      "statusPaused": "一時停止中のゴール",
+      "statusComplete": "ゴール完了",
+      "statusBlocked": "ゴールがブロックされました",
+      "edit": "ゴールを編集",
+      "remove": "ゴールを削除",
+      "pause": "ゴールを一時停止",
+      "resume": "ゴールを再開",
+      "editPlaceholder": "ゴールを説明",
+      "removeConfirmTitle": "ゴールを削除しますか？",
+      "removeConfirmMessage": "CLI がこのセッションのゴールを消去します。",
+      "updateFailed": "ゴールを更新できませんでした。",
+      "sectionAccessibility": "{{status}}。ゴール: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ブラウザーでGitHubと連携し、この画面に戻ってリポジトリを選択してください。",
       "openGithub": "GitHubを開く",

@@ -1993,6 +1993,22 @@
       "connectionLost": "Njikọ akwụsịla",
       "retryConnection": "Nwaa njikọ ọzọ"
     },
+    "goal": {
+      "title": "Ebumnuche",
+      "statusActive": "Ebumnuche na-arụ ọrụ",
+      "statusPaused": "Ebumnuche a kwụsịrị",
+      "statusComplete": "Ebumnuche zuru ezu",
+      "statusBlocked": "Ebumnuche egbochiri",
+      "edit": "Dezie ebumnuche",
+      "remove": "Wepu ebumnuche",
+      "pause": "Kwụsị ebumnuche",
+      "resume": "Maliteghachi ebumnuche",
+      "editPlaceholder": "Kọwaa ebumnuche",
+      "removeConfirmTitle": "Wepu ebumnuche?",
+      "removeConfirmMessage": "CLI na-ehichapụ ebumnuche nke nnọkọ a.",
+      "updateFailed": "Enweghị ike imelite ebumnuche.",
+      "sectionAccessibility": "{{status}}. Ebumnuche: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Jikọọ GitHub n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu.",
       "openGithub": "Mepee GitHub",

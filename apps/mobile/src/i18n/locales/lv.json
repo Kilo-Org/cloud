@@ -2009,6 +2009,22 @@
       "connectionLost": "Savienojums pārtrūcis",
       "retryConnection": "Izveidot savienojumu vēlreiz"
     },
+    "goal": {
+      "title": "Mērķis",
+      "statusActive": "Aktīvs mērķis",
+      "statusPaused": "Apturēts mērķis",
+      "statusComplete": "Mērķis izpildīts",
+      "statusBlocked": "Mērķis bloķēts",
+      "edit": "Rediģēt mērķi",
+      "remove": "Noņemt mērķi",
+      "pause": "Apturēt mērķi",
+      "resume": "Turpināt mērķi",
+      "editPlaceholder": "Aprakstiet mērķi",
+      "removeConfirmTitle": "Noņemt mērķi?",
+      "removeConfirmMessage": "CLI notīra šīs sesijas mērķi.",
+      "updateFailed": "Mērķi neizdevās atjaunināt.",
+      "sectionAccessibility": "{{status}}. Mērķis: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Pievieno GitHub kontu pārlūkā, pēc tam atgriezies šeit, lai izvēlētos repozitoriju.",
       "openGithub": "Atvērt GitHub",

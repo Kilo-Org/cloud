@@ -1993,6 +1993,22 @@
       "connectionLost": "Haɗi ya katse",
       "retryConnection": "Sake gwada haɗi"
     },
+    "goal": {
+      "title": "Manufa",
+      "statusActive": "Manufa mai aiki",
+      "statusPaused": "Manufar da aka dakatar",
+      "statusComplete": "An kammala manufa",
+      "statusBlocked": "An toshe manufa",
+      "edit": "Gyara manufa",
+      "remove": "Cire manufa",
+      "pause": "Dakatar da manufa",
+      "resume": "Ci gaba da manufa",
+      "editPlaceholder": "Bayyana manufa",
+      "removeConfirmTitle": "Cire manufa?",
+      "removeConfirmMessage": "CLI yana share manufar wannan zaman.",
+      "updateFailed": "Ba a iya sabunta manufar ba.",
+      "sectionAccessibility": "{{status}}. Manufa: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Haɗa GitHub a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
       "openGithub": "Buɗe GitHub",

@@ -1993,6 +1993,22 @@
       "connectionLost": "Nawala ang koneksyon",
       "retryConnection": "Subukang kumonekta muli"
     },
+    "goal": {
+      "title": "Layunin",
+      "statusActive": "Aktibong layunin",
+      "statusPaused": "Nakapausang layunin",
+      "statusComplete": "Kumpleto ang layunin",
+      "statusBlocked": "Naharang ang layunin",
+      "edit": "I-edit ang layunin",
+      "remove": "Alisin ang layunin",
+      "pause": "I-pause ang layunin",
+      "resume": "Ipagpatuloy ang layunin",
+      "editPlaceholder": "Ilarawan ang layunin",
+      "removeConfirmTitle": "Alisin ang layunin?",
+      "removeConfirmMessage": "Kinaklaro ng CLI ang layunin ng session na ito.",
+      "updateFailed": "Hindi na-update ang layunin.",
+      "sectionAccessibility": "{{status}}. Layunin: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Ikonekta ang GitHub sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
       "openGithub": "Buksan ang GitHub",

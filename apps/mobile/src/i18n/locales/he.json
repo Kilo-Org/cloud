@@ -1568,6 +1568,22 @@
       "connectionLost": "החיבור נותק",
       "retryConnection": "ניסיון התחברות נוסף"
     },
+    "goal": {
+      "title": "מטרה",
+      "statusActive": "מטרה פעילה",
+      "statusPaused": "מטרה מושהית",
+      "statusComplete": "המטרה הושלמה",
+      "statusBlocked": "המטרה חסומה",
+      "edit": "ערוך מטרה",
+      "remove": "הסר מטרה",
+      "pause": "השהה מטרה",
+      "resume": "המשך מטרה",
+      "editPlaceholder": "תאר את המטרה",
+      "removeConfirmTitle": "להסיר את המטרה?",
+      "removeConfirmMessage": "ה-CLI מנקה את מטרת ההפעלה הזו.",
+      "updateFailed": "לא ניתן היה לעדכן את המטרה.",
+      "sectionAccessibility": "{{status}}. מטרה: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "חבר את חשבון GitHub דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר.",
       "openGithub": "פתיחת GitHub",

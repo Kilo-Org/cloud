@@ -2025,6 +2025,22 @@
       "connectionLost": "Сувязь страчана",
       "retryConnection": "Паўтарыць падключэнне"
     },
+    "goal": {
+      "title": "Мэта",
+      "statusActive": "Актыўная мэта",
+      "statusPaused": "Прыпыненая мэта",
+      "statusComplete": "Мэта выканана",
+      "statusBlocked": "Мэта заблакавана",
+      "edit": "Рэдагаваць мэту",
+      "remove": "Выдаліць мэту",
+      "pause": "Прыпыніць мэту",
+      "resume": "Працягнуць мэту",
+      "editPlaceholder": "Апішыце мэту",
+      "removeConfirmTitle": "Выдаліць мэту?",
+      "removeConfirmMessage": "CLI ачышчае мэту гэтага сеансу.",
+      "updateFailed": "Не ўдалося абнавіць мэту.",
+      "sectionAccessibility": "{{status}}. Мэта: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Падключыце GitHub у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
       "openGithub": "Адкрыць GitHub",

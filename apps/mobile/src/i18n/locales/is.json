@@ -1993,6 +1993,22 @@
       "connectionLost": "Tenging rofnaði",
       "retryConnection": "Reyna að tengjast aftur"
     },
+    "goal": {
+      "title": "Markmið",
+      "statusActive": "Virkt markmið",
+      "statusPaused": "Markmið í bið",
+      "statusComplete": "Markmiði lokið",
+      "statusBlocked": "Markmið læst",
+      "edit": "Breyta markmiði",
+      "remove": "Fjarlægja markmið",
+      "pause": "Setja markmið í bið",
+      "resume": "Halda markmiði áfram",
+      "editPlaceholder": "Lýstu markmiðinu",
+      "removeConfirmTitle": "Fjarlægja markmið?",
+      "removeConfirmMessage": "CLI hreinsar markmið þessarar lotu.",
+      "updateFailed": "Ekki tókst að uppfæra markmiðið.",
+      "sectionAccessibility": "{{status}}. Markmið: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Tengdu GitHub í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn.",
       "openGithub": "Opna GitHub",

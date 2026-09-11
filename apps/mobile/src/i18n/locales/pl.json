@@ -1577,6 +1577,22 @@
       "connectionLost": "Utracono połączenie",
       "retryConnection": "Połącz ponownie"
     },
+    "goal": {
+      "title": "Cel",
+      "statusActive": "Aktywny cel",
+      "statusPaused": "Wstrzymany cel",
+      "statusComplete": "Cel ukończony",
+      "statusBlocked": "Cel zablokowany",
+      "edit": "Edytuj cel",
+      "remove": "Usuń cel",
+      "pause": "Wstrzymaj cel",
+      "resume": "Wznów cel",
+      "editPlaceholder": "Opisz cel",
+      "removeConfirmTitle": "Usunąć cel?",
+      "removeConfirmMessage": "CLI czyści cel tej sesji.",
+      "updateFailed": "Nie udało się zaktualizować celu.",
+      "sectionAccessibility": "{{status}}. Cel: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Połącz konto GitHub w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
       "openGithub": "Otwórz GitHub",

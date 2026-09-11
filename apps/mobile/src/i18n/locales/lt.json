@@ -2025,6 +2025,22 @@
       "connectionLost": "Ryšys nutrūko",
       "retryConnection": "Bandyti prisijungti iš naujo"
     },
+    "goal": {
+      "title": "Tikslas",
+      "statusActive": "Aktyvus tikslas",
+      "statusPaused": "Pristabdytas tikslas",
+      "statusComplete": "Tikslas įvykdytas",
+      "statusBlocked": "Tikslas užblokuotas",
+      "edit": "Redaguoti tikslą",
+      "remove": "Pašalinti tikslą",
+      "pause": "Pristabdyti tikslą",
+      "resume": "Tęsti tikslą",
+      "editPlaceholder": "Aprašykite tikslą",
+      "removeConfirmTitle": "Pašalinti tikslą?",
+      "removeConfirmMessage": "CLI išvalo šios sesijos tikslą.",
+      "updateFailed": "Nepavyko atnaujinti tikslo.",
+      "sectionAccessibility": "{{status}}. Tikslas: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Naršyklėje susiekite GitHub paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
       "openGithub": "Atidaryti GitHub",

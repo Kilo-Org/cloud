@@ -1993,6 +1993,22 @@
       "connectionLost": "Холболт тасарсан",
       "retryConnection": "Дахин холбогдох"
     },
+    "goal": {
+      "title": "Зорилго",
+      "statusActive": "Идэвхтэй зорилго",
+      "statusPaused": "Түр зогссон зорилго",
+      "statusComplete": "Зорилго биелэв",
+      "statusBlocked": "Зорилго хаагдсан",
+      "edit": "Зорилгыг засах",
+      "remove": "Зорилгыг устгах",
+      "pause": "Зорилгыг түр зогсоох",
+      "resume": "Зорилгыг үргэлжлүүлэх",
+      "editPlaceholder": "Зорилгыг тайлбарлана уу",
+      "removeConfirmTitle": "Зорилгыг устгах уу?",
+      "removeConfirmMessage": "CLI энэ сессийн зорилгыг арилгана.",
+      "updateFailed": "Зорилгыг шинэчлэх боломжгүй.",
+      "sectionAccessibility": "{{status}}. Зорилго: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Хөтөч дээрээ GitHub-ыг холбоод, энд буцаж ирж кодын сангаа сонгоно уу.",
       "openGithub": "GitHub-ыг нээх",

@@ -1993,6 +1993,22 @@
       "connectionLost": "การเชื่อมต่อขาดหาย",
       "retryConnection": "ลองเชื่อมต่อใหม่"
     },
+    "goal": {
+      "title": "เป้าหมาย",
+      "statusActive": "เป้าหมายที่ใช้งานอยู่",
+      "statusPaused": "เป้าหมายที่หยุดชั่วคราว",
+      "statusComplete": "เป้าหมายเสร็จสมบูรณ์",
+      "statusBlocked": "เป้าหมายถูกบล็อก",
+      "edit": "แก้ไขเป้าหมาย",
+      "remove": "ลบเป้าหมาย",
+      "pause": "หยุดเป้าหมายชั่วคราว",
+      "resume": "ดำเนินการเป้าหมายต่อ",
+      "editPlaceholder": "อธิบายเป้าหมาย",
+      "removeConfirmTitle": "ลบเป้าหมายหรือไม่",
+      "removeConfirmMessage": "CLI จะล้างเป้าหมายของเซสชันนี้",
+      "updateFailed": "ไม่สามารถอัปเดตเป้าหมายได้",
+      "sectionAccessibility": "{{status}} เป้าหมาย: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "เชื่อมต่อ GitHub ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
       "openGithub": "เปิด GitHub",

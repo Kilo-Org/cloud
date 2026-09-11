@@ -1993,6 +1993,22 @@
       "connectionLost": "ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ",
       "retryConnection": "ପୁଣି ସଂଯୋଗ କରନ୍ତୁ"
     },
+    "goal": {
+      "title": "ଲକ୍ଷ୍ୟ",
+      "statusActive": "ସକ୍ରିୟ ଲକ୍ଷ୍ୟ",
+      "statusPaused": "ବିରତ ଲକ୍ଷ୍ୟ",
+      "statusComplete": "ଲକ୍ଷ୍ୟ ସମ୍ପୂର୍ଣ୍ଣ",
+      "statusBlocked": "ଲକ୍ଷ୍ୟ ଅବରୋଧିତ",
+      "edit": "ଲକ୍ଷ୍ୟ ସମ୍ପାଦନ କରନ୍ତୁ",
+      "remove": "ଲକ୍ଷ୍ୟ ହଟାନ୍ତୁ",
+      "pause": "ଲକ୍ଷ୍ୟ ବିରତ କରନ୍ତୁ",
+      "resume": "ଲକ୍ଷ୍ୟ ପୁନଃ ଆରମ୍ଭ କରନ୍ତୁ",
+      "editPlaceholder": "ଲକ୍ଷ୍ୟ ବର୍ଣ୍ଣନା କରନ୍ତୁ",
+      "removeConfirmTitle": "ଲକ୍ଷ୍ୟ ହଟାଇବେ?",
+      "removeConfirmMessage": "CLI ଏହି ସେସନର ଲକ୍ଷ୍ୟ ଲିଭାଇଦିଏ।",
+      "updateFailed": "ଲକ୍ଷ୍ୟ ଅପଡେଟ୍ କରାଯାଇପାରିଲା ନାହିଁ।",
+      "sectionAccessibility": "{{status}}। ଲକ୍ଷ୍ୟ: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitHub ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
       "openGithub": "GitHub ଖୋଲନ୍ତୁ",

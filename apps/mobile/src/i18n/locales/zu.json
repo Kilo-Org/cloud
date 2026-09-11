@@ -1993,6 +1993,22 @@
       "connectionLost": "Ukuxhumana kunqamukile",
       "retryConnection": "Zama ukuxhuma futhi"
     },
+    "goal": {
+      "title": "Umgomo",
+      "statusActive": "Umgomo osebenzayo",
+      "statusPaused": "Umgomo omisiwe",
+      "statusComplete": "Umgomo uqediwe",
+      "statusBlocked": "Umgomo uvinjiwe",
+      "edit": "Hlela umgomo",
+      "remove": "Susa umgomo",
+      "pause": "Misa umgomo",
+      "resume": "Qhubeka nomgomo",
+      "editPlaceholder": "Chaza umgomo",
+      "removeConfirmTitle": "Susa umgomo?",
+      "removeConfirmMessage": "I-CLI isusa umgomo wale seshini.",
+      "updateFailed": "Ayikwazanga ukubuyekeza umgomo.",
+      "sectionAccessibility": "{{status}}. Umgomo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Xhuma i-GitHub esipheqululini sakho, bese ubuyela lapha ukuze ukhethe inqolobane yekhodi.",
       "openGithub": "Vula i-GitHub",

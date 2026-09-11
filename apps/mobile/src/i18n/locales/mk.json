@@ -1993,6 +1993,22 @@
       "connectionLost": "Прекината врска",
       "retryConnection": "Поврзи се повторно"
     },
+    "goal": {
+      "title": "Цел",
+      "statusActive": "Активна цел",
+      "statusPaused": "Паузирана цел",
+      "statusComplete": "Целта е завршена",
+      "statusBlocked": "Целта е блокирана",
+      "edit": "Уреди цел",
+      "remove": "Отстрани цел",
+      "pause": "Паузирај цел",
+      "resume": "Продолжи цел",
+      "editPlaceholder": "Опишете ја целта",
+      "removeConfirmTitle": "Да се отстрани целта?",
+      "removeConfirmMessage": "CLI ја брише целта на оваа сесија.",
+      "updateFailed": "Целта не можеше да се ажурира.",
+      "sectionAccessibility": "{{status}}. Цел: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Поврзи го GitHub преку прелистувачот, па врати се тука за да избереш репозиториум.",
       "openGithub": "Отвори GitHub",

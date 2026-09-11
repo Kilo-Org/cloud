@@ -1993,6 +1993,22 @@
       "connectionLost": "Yhteys katkesi",
       "retryConnection": "Yhdistä uudelleen"
     },
+    "goal": {
+      "title": "Tavoite",
+      "statusActive": "Aktiivinen tavoite",
+      "statusPaused": "Keskeytetty tavoite",
+      "statusComplete": "Tavoite valmis",
+      "statusBlocked": "Tavoite estetty",
+      "edit": "Muokkaa tavoitetta",
+      "remove": "Poista tavoite",
+      "pause": "Keskeytä tavoite",
+      "resume": "Jatka tavoitetta",
+      "editPlaceholder": "Kuvaile tavoite",
+      "removeConfirmTitle": "Poistetaanko tavoite?",
+      "removeConfirmMessage": "CLI tyhjentää tämän istunnon tavoitteen.",
+      "updateFailed": "Tavoitetta ei voitu päivittää.",
+      "sectionAccessibility": "{{status}}. Tavoite: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Yhdistä GitHub selaimessa ja palaa sitten tänne valitsemaan repositorio.",
       "openGithub": "Avaa GitHub",

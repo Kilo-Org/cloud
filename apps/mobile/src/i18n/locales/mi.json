@@ -1993,6 +1993,22 @@
       "connectionLost": "Kua motu te hononga",
       "retryConnection": "Whakamātau ki te hono anō"
     },
+    "goal": {
+      "title": "Whāinga",
+      "statusActive": "Whāinga hohe",
+      "statusPaused": "Whāinga kua whakatārewa",
+      "statusComplete": "Kua oti te whāinga",
+      "statusBlocked": "Kua āraia te whāinga",
+      "edit": "Whakatika whāinga",
+      "remove": "Tango whāinga",
+      "pause": "Whakatārewa whāinga",
+      "resume": "Haere tonu te whāinga",
+      "editPlaceholder": "Whakamārama te whāinga",
+      "removeConfirmTitle": "Tango whāinga?",
+      "removeConfirmMessage": "Ka muru te CLI i te whāinga o tēnei wātū.",
+      "updateFailed": "Kāore i taea te whakahōu te whāinga.",
+      "sectionAccessibility": "{{status}}. Whāinga: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Honohia a GitHub mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere.",
       "openGithub": "Whakatuwheratia a GitHub",

@@ -1993,6 +1993,22 @@
       "connectionLost": "Àsopọ̀ ti já",
       "retryConnection": "Gbìyànjú láti tún sopọ̀"
     },
+    "goal": {
+      "title": "Àfojúsùn",
+      "statusActive": "Àfojúsùn tí ń ṣiṣẹ́",
+      "statusPaused": "Àfojúsùn tí a dá dúró",
+      "statusComplete": "Àfojúsùn ti parí",
+      "statusBlocked": "Àfojúsùn ti dí",
+      "edit": "Ṣàtúnṣe àfojúsùn",
+      "remove": "Yọ àfojúsùn kuro",
+      "pause": "Dá àfojúsùn dúró",
+      "resume": "Tẹ̀síwájú àfojúsùn",
+      "editPlaceholder": "Ṣàpèjúwe àfojúsùn",
+      "removeConfirmTitle": "Yọ àfojúsùn kuro?",
+      "removeConfirmMessage": "CLI ń pa àfojúsùn ìpàdé yìí rẹ́.",
+      "updateFailed": "A kò lè ṣàtúnṣe àfojúsùn.",
+      "sectionAccessibility": "{{status}}. Àfojúsùn: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "So GitHub pọ̀ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù.",
       "openGithub": "Ṣí GitHub",

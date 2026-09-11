@@ -11,6 +11,7 @@ import { persistFirstTranscriptionModel } from './gateway-transcription-model-se
 import {
   type GatewayTranscriptionModel,
   readGatewayTranscriptionModel,
+  whenGatewayTranscriptionModelLoaded,
 } from './gateway-transcription-preference';
 
 const HIGH_QUALITY = RecordingPresets.HIGH_QUALITY;
@@ -29,6 +30,10 @@ async function readStoredOrganizationId(): Promise<string | null> {
  * picker message on the first dictation instead of an upload that must fail.
  */
 export async function resolveGatewayTranscriptionModelId(): Promise<GatewayTranscriptionModel | null> {
+  // Wait for the persisted-model read before treating null as "never chose
+  // one": a cold start reports null until SecureStore settles, and persisting
+  // the fallback first would mark the store dirty and discard the choice.
+  await whenGatewayTranscriptionModelLoaded();
   const stored = readGatewayTranscriptionModel();
   if (stored !== null) {
     return stored;

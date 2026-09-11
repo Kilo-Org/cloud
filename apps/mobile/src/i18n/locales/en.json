@@ -2001,6 +2001,22 @@
       "connectionLost": "Connection lost",
       "retryConnection": "Retry connection"
     },
+    "goal": {
+      "title": "Goal",
+      "statusActive": "Active goal",
+      "statusPaused": "Paused goal",
+      "statusComplete": "Goal complete",
+      "statusBlocked": "Goal blocked",
+      "edit": "Edit goal",
+      "remove": "Remove goal",
+      "pause": "Pause goal",
+      "resume": "Resume goal",
+      "editPlaceholder": "Describe the goal",
+      "removeConfirmTitle": "Remove goal?",
+      "removeConfirmMessage": "The CLI clears this session's goal.",
+      "updateFailed": "Could not update the goal.",
+      "sectionAccessibility": "{{status}}. Goal: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Recently used",
       "couldNotLoadGithubRepositories": "Couldn't load GitHub repositories",

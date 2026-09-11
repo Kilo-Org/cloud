@@ -6,7 +6,10 @@ import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 
 function isAvailableForBot(integration: PlatformIntegration): boolean {
-  return integration.platform !== 'github' || isPlatformIntegrationHealthy(integration);
+  return (
+    integration.integration_status === 'active' &&
+    (integration.platform !== 'github' || isPlatformIntegrationHealthy(integration))
+  );
 }
 
 export class PlatformIntegrationUnavailableError extends Error {
@@ -35,6 +38,9 @@ export async function getPlatformIntegration(identity: PlatformIdentity) {
       and(
         eq(platform_integrations.platform, identity.platform),
         eq(platform_integrations.platform_installation_id, identity.teamId),
+        identity.platform === 'slack'
+          ? sql`EXISTS (SELECT 1 FROM provider_installation_reservations reservation WHERE reservation.platform_integration_id = ${platform_integrations.id} AND reservation.provider = 'slack' AND (reservation.status = 'active' OR reservation.active_generation IS NOT NULL) AND reservation.provider_installation_id = ${identity.teamId})`
+          : undefined,
         identity.platform === 'github'
           ? identity.githubAppType === 'lite'
             ? eq(platform_integrations.github_app_type, 'lite')
@@ -69,7 +75,12 @@ export async function getPlatformIntegrationById(platformIntegrationId: string) 
   const [integration] = await db
     .select()
     .from(platform_integrations)
-    .where(eq(platform_integrations.id, platformIntegrationId))
+    .where(
+      and(
+        eq(platform_integrations.id, platformIntegrationId),
+        sql`${platform_integrations.platform} <> 'slack' OR EXISTS (SELECT 1 FROM provider_installation_reservations reservation WHERE reservation.platform_integration_id = ${platform_integrations.id} AND reservation.provider = 'slack' AND (reservation.status = 'active' OR reservation.active_generation IS NOT NULL))`
+      )
+    )
     .limit(1);
 
   if (!integration) {

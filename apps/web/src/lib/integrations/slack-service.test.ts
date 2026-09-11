@@ -10,27 +10,23 @@ const mockInsertValues = jest.fn();
 const mockInsertReturning = jest.fn();
 const mockAuthRevoke = jest.fn();
 const mockAuthTest = jest.fn();
-
-jest.mock('@/lib/drizzle', () => ({
-  db: {
+const mockFor = jest.fn();
+jest.mock('@/lib/drizzle', () => {
+  const db = {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
-        where: jest.fn(() => ({
-          limit: mockLimit,
-        })),
+        where: jest.fn(() => ({ limit: mockLimit, for: mockFor })),
       })),
     })),
-    delete: jest.fn(() => ({
-      where: mockDeleteWhere,
-    })),
-    update: jest.fn(() => ({
-      set: mockUpdateSet,
-    })),
-    insert: jest.fn(() => ({
-      values: mockInsertValues,
-    })),
-  },
-}));
+    delete: jest.fn(() => ({ where: mockDeleteWhere })),
+    update: jest.fn(() => ({ set: mockUpdateSet })),
+    insert: jest.fn(() => ({ values: mockInsertValues })),
+    execute: jest.fn(async () => ({ rows: [] })),
+    transaction: jest.fn(),
+  };
+  db.transaction.mockImplementation((callback: (tx: typeof db) => unknown) => callback(db));
+  return { db };
+});
 
 jest.mock('@slack/web-api', () => ({
   WebClient: jest.fn(() => ({
@@ -44,6 +40,16 @@ jest.mock('@slack/web-api', () => ({
 const mockWriteSlackCredential = jest.fn();
 jest.mock('@/lib/integrations/platforms/slack/credential-store', () => ({
   writeSlackCredential: (...args: unknown[]) => mockWriteSlackCredential(...args),
+  getSlackCredentialByIntegrationId: jest.fn(async () => null),
+  decryptSlackBotToken: jest.fn(() => 'xoxb-token'),
+}));
+
+jest.mock('@/lib/integrations/provider-installation-reservations', () => ({
+  expireSlackReservations: jest.fn(async () => undefined),
+  getRecoverableSlackReservation: jest.fn(async () => null),
+  lockSlackReservation: jest.fn(),
+  activateSlackReservation: jest.fn(),
+  adoptLegacySlackReservation: jest.fn(async () => undefined),
 }));
 
 const mockCaptureException = jest.fn();
@@ -86,12 +92,14 @@ describe('slack-service uninstallApp', () => {
     mockUpdateWhere.mockReset();
     mockUpdateReturning.mockReset();
     mockDeleteWhere.mockReset();
+    mockFor.mockReset();
     mockAuthRevoke.mockReset();
     mockAuthRevoke.mockResolvedValue({ ok: true });
     mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
     mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
     mockUpdateReturning.mockResolvedValue([buildSlackIntegration()]);
     mockDeleteWhere.mockResolvedValue(undefined);
+    mockFor.mockImplementation(() => mockLimit());
   });
 
   it('deletes Chat SDK Slack state before removing the platform integration row', async () => {
@@ -107,7 +115,7 @@ describe('slack-service uninstallApp', () => {
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T123');
     expect(deleteChatSdkIdentityCache).toHaveBeenCalledWith('T123');
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
     expect(deleteChatSdkInstallation.mock.invocationCallOrder[0]).toBeLessThan(
       deleteChatSdkIdentityCache.mock.invocationCallOrder[0]
     );
@@ -153,7 +161,7 @@ describe('slack-service uninstallApp', () => {
     await uninstallApp(owner, { deleteChatSdkInstallation });
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T456');
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
   });
 
   it('disconnects suspended integrations without deleting shared Slack installation state', async () => {
@@ -174,7 +182,7 @@ describe('slack-service uninstallApp', () => {
     expect(mockAuthRevoke).not.toHaveBeenCalled();
     expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
     expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -193,7 +201,7 @@ describe('slack-service deleteInstallationByTeamId', () => {
       deleted: true,
     });
 
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -305,7 +313,6 @@ describe('upsertSlackInstallation', () => {
     expect(mockUpdateSet).toHaveBeenCalledWith(
       expect.objectContaining({
         metadata: expect.objectContaining({
-          access_token: 'xoxb-new-token',
           bot_user_id: 'U_NEW_BOT',
           incoming_webhook: { channel: '#general', channelId: 'C123', url: 'https://example.com' },
           model_slug: 'anthropic/claude-sonnet-4.5',
@@ -329,7 +336,6 @@ describe('upsertSlackInstallation', () => {
     expect(mockInsertValues).toHaveBeenCalledWith(
       expect.objectContaining({
         metadata: expect.objectContaining({
-          access_token: 'xoxb-new-token',
           bot_user_id: 'U_NEW_BOT',
           model_slug: DEFAULT_BOT_MODEL,
         }),
@@ -409,10 +415,7 @@ describe('upsertSlackInstallation', () => {
     );
   });
 
-  // The encrypted store is write-only until reads move onto it, so a failure there
-  // must not take down Slack installs. This expectation flips in the step that
-  // repoints the read paths.
-  it('still completes the install when the credential store write fails', async () => {
+  it('fails the install when encrypted credential persistence fails', async () => {
     mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     mockWriteSlackCredential.mockRejectedValue(new Error('encryption not configured'));
 
@@ -422,12 +425,10 @@ describe('upsertSlackInstallation', () => {
       teamName: 'Kilo Team',
     } satisfies SlackInstallation;
 
-    await expect(
-      upsertSlackInstallation({ owner, teamId: 'T123', installation })
-    ).resolves.toMatchObject({ id: 'integration-1' });
+    await expect(upsertSlackInstallation({ owner, teamId: 'T123', installation })).rejects.toThrow(
+      'encryption not configured'
+    );
 
-    expect(mockCaptureException).toHaveBeenCalledTimes(1);
-    // The report must not carry token material.
-    expect(JSON.stringify(mockCaptureException.mock.calls[0])).not.toContain('xoxb-new-token');
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 });

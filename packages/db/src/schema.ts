@@ -4433,7 +4433,15 @@ export const provider_oauth_attempts = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
     owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    status: text().$type<'pending' | 'consumed' | 'expired'>().notNull().default('pending'),
+    status: text()
+      .$type<'pending' | 'captured' | 'consumed' | 'expired'>()
+      .notNull()
+      .default('pending'),
+    provider_installation_id: text(),
+    generation: integer(),
+    completed_integration_id: uuid().references(() => platform_integrations.id, {
+      onDelete: 'set null',
+    }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -4445,7 +4453,7 @@ export const provider_oauth_attempts = pgTable(
     ),
     check(
       'provider_oauth_attempts_status_check',
-      sql`${table.status} IN ('pending', 'consumed', 'expired')`
+      sql`${table.status} IN ('pending', 'captured', 'consumed', 'expired')`
     ),
     check('provider_oauth_attempts_purpose_check', sql`${table.purpose} = 'provider_install'`),
     check(
@@ -4459,6 +4467,60 @@ export const provider_oauth_attempts = pgTable(
       .on(table.owned_by_organization_id, table.provider)
       .where(sql`${table.status} = 'pending' AND ${table.owned_by_organization_id} IS NOT NULL`),
     index('IDX_provider_oauth_attempts_expires_at').on(table.expires_at),
+    index('IDX_provider_oauth_attempts_provider_installation').on(
+      table.provider,
+      table.provider_installation_id
+    ),
+  ]
+);
+
+export const provider_installation_reservations = pgTable(
+  'provider_installation_reservations',
+  {
+    id: idPrimaryKeyColumn,
+    provider: text().$type<'slack'>().notNull(),
+    provider_installation_id: text().notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    platform_integration_id: uuid().references(() => platform_integrations.id, {
+      onDelete: 'cascade',
+    }),
+    oauth_attempt_id: uuid().references(() => provider_oauth_attempts.id, {
+      onDelete: 'set null',
+    }),
+    generation: integer().notNull().default(1),
+    active_generation: integer(),
+    status: text().$type<'pending' | 'active'>().notNull().default('pending'),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_provider_installation_reservations_identity').on(
+      table.provider,
+      table.provider_installation_id
+    ),
+    check(
+      'provider_installation_reservations_owner_check',
+      sql`num_nonnulls(${table.owned_by_user_id}, ${table.owned_by_organization_id}) = 1`
+    ),
+    check('provider_installation_reservations_provider_check', sql`${table.provider} = 'slack'`),
+    check(
+      'provider_installation_reservations_status_check',
+      sql`${table.status} IN ('pending', 'active')`
+    ),
+    check('provider_installation_reservations_generation_check', sql`${table.generation} > 0`),
+    check(
+      'provider_installation_reservations_active_generation_check',
+      sql`${table.active_generation} IS NULL OR ${table.active_generation} > 0`
+    ),
+    index('IDX_provider_installation_reservations_owner_user').on(table.owned_by_user_id),
+    index('IDX_provider_installation_reservations_owner_org').on(table.owned_by_organization_id),
+    index('IDX_provider_installation_reservations_integration').on(table.platform_integration_id),
+    index('IDX_provider_installation_reservations_expires').on(table.expires_at),
   ]
 );
 

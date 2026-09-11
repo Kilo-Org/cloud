@@ -1,8 +1,13 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
-import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import {
+  platform_integrations,
+  provider_installation_reservations,
+  provider_oauth_attempts,
+  slack_oauth_credentials,
+} from '@kilocode/db/schema';
+import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -13,8 +18,23 @@ import type { SlackInstallation } from '@chat-adapter/slack';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
-import { writeSlackCredential } from '@/lib/integrations/platforms/slack/credential-store';
+import {
+  writeSlackCredential,
+  writeSlackCredentialInTransaction,
+  decryptSlackBotToken,
+  getSlackCredentialByIntegrationId,
+} from '@/lib/integrations/platforms/slack/credential-store';
 import { captureException } from '@sentry/nextjs';
+import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-attempts';
+import {
+  activateSlackReservation,
+  adoptLegacySlackReservation,
+  expireSlackReservations,
+  expireStaleSlackReservation,
+  getRecoverableSlackReservation,
+  lockSlackReservation,
+  type SlackReservationClaim,
+} from '@/lib/integrations/provider-installation-reservations';
 
 export class SlackWorkspaceAlreadyConnectedError extends Error {
   constructor(teamName: string) {
@@ -103,6 +123,29 @@ export async function revokeSlackToken(accessToken: string): Promise<boolean> {
   }
 }
 
+async function getSlackAccessToken(integration: PlatformIntegration): Promise<string | null> {
+  const owner = getOwnerFromInstallation(integration);
+  if (!owner) return null;
+  const credential = await getSlackCredentialByIntegrationId(integration.id);
+  if (credential) {
+    const token = decryptSlackBotToken(credential, owner);
+    if (token) {
+      await db
+        .update(platform_integrations)
+        .set({ metadata: sql`${platform_integrations.metadata} - 'access_token'` })
+        .where(
+          and(
+            eq(platform_integrations.id, integration.id),
+            sql`${platform_integrations.metadata} ? 'access_token'`
+          )
+        );
+    }
+    return token;
+  }
+  const metadata = integration.metadata as { access_token?: string } | null;
+  return metadata?.access_token ?? null;
+}
+
 /**
  * Get Slack installation for an owner
  * For user-owned integrations, we explicitly check that owned_by_organization_id is null
@@ -117,6 +160,12 @@ export async function getInstallation(owner: Owner): Promise<PlatformIntegration
     )
     .limit(1);
 
+  if (
+    integration?.integration_status === INTEGRATION_STATUS.ACTIVE &&
+    integration.platform_installation_id
+  ) {
+    await adoptLegacySlackReservation(owner, integration.id, integration.platform_installation_id);
+  }
   return integration || null;
 }
 
@@ -201,7 +250,7 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
  * paths onto the store, at which point this write becomes required and must move
  * inside the same transaction as the `platform_integrations` write.
  */
-async function mirrorSlackCredential({
+async function persistSlackCredential({
   integration,
   owner,
   teamId,
@@ -212,21 +261,13 @@ async function mirrorSlackCredential({
   teamId: string;
   installation: SlackInstallation;
 }): Promise<void> {
-  try {
-    await writeSlackCredential({
-      integrationId: integration.id,
-      slackTeamId: teamId,
-      owner,
-      botToken: installation.botToken,
-      botUserId: installation.botUserId ?? null,
-    });
-  } catch (error) {
-    captureException(error, {
-      level: 'error',
-      tags: { component: 'slack-service', op: 'mirror-slack-credential' },
-      extra: { integrationId: integration.id, teamId },
-    });
-  }
+  await writeSlackCredential({
+    integrationId: integration.id,
+    slackTeamId: teamId,
+    owner,
+    botToken: installation.botToken,
+    botUserId: installation.botUserId ?? null,
+  });
 }
 
 /**
@@ -256,9 +297,14 @@ export async function upsertSlackInstallation({
       ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
       : DEFAULT_BOT_MODEL;
 
+  const existingMetadata =
+    existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {};
+  const { access_token: _legacyToken, ...safeMetadata } = existingMetadata as Record<
+    string,
+    unknown
+  >;
   const metadata = {
-    ...(existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
-    access_token: installation.botToken,
+    ...safeMetadata,
     bot_user_id: installation.botUserId,
     model_slug:
       existing?.metadata &&
@@ -285,7 +331,10 @@ export async function upsertSlackInstallation({
         .where(eq(platform_integrations.id, existing.id))
         .returning();
 
-      await mirrorSlackCredential({ integration: updated, owner, teamId, installation });
+      await persistSlackCredential({ integration: updated, owner, teamId, installation });
+      if (existing.platform_installation_id && existing.platform_installation_id !== teamId) {
+        await expireSlackReservations({ teamId: existing.platform_installation_id });
+      }
 
       return updated;
     } catch (error) {
@@ -314,7 +363,7 @@ export async function upsertSlackInstallation({
       })
       .returning();
 
-    await mirrorSlackCredential({ integration: created, owner, teamId, installation });
+    await persistSlackCredential({ integration: created, owner, teamId, installation });
 
     return created;
   } catch (error) {
@@ -325,63 +374,339 @@ export async function upsertSlackInstallation({
   }
 }
 
+export async function activateReservedSlackInstallation(input: {
+  owner: Owner;
+  teamId: string;
+  installation: SlackInstallation;
+  grantedScopes: string[] | null;
+  claim: SlackReservationClaim;
+  setChatSdkInstallation: (teamId: string, installation: SlackInstallation) => Promise<void>;
+  deleteChatSdkInstallation?: (teamId: string) => Promise<void>;
+  writeCredential?: typeof writeSlackCredentialInTransaction;
+}): Promise<PlatformIntegration> {
+  const defaultModel =
+    input.owner.type === 'org'
+      ? await getDefaultAllowedModel(input.owner.id, DEFAULT_BOT_MODEL)
+      : DEFAULT_BOT_MODEL;
+  const teamName = input.installation.teamName || 'Unknown Team';
+
+  try {
+    return await db.transaction(async tx => {
+      await lockProviderOAuthOwnerRow(tx, input.owner);
+      const reservation = await lockSlackReservation(tx, input.claim, input.owner, input.teamId);
+      if (!reservation) throw new Error('Slack installation reservation is stale or expired');
+
+      const ownerRows = await tx
+        .select()
+        .from(platform_integrations)
+        .where(
+          and(
+            ...getOwnershipConditions(input.owner),
+            eq(platform_integrations.platform, PLATFORM.SLACK)
+          )
+        )
+        .for('update');
+      if (ownerRows.length > 1) throw new Error('Slack owner has ambiguous integrations');
+      const existing = ownerRows[0];
+      const previousTeamId = existing?.platform_installation_id;
+
+      if (previousTeamId && previousTeamId !== input.teamId) {
+        const [previousReservation] = await tx
+          .select({ id: provider_installation_reservations.id })
+          .from(provider_installation_reservations)
+          .where(
+            and(
+              eq(provider_installation_reservations.provider, 'slack'),
+              eq(provider_installation_reservations.provider_installation_id, previousTeamId),
+              eq(provider_installation_reservations.platform_integration_id, existing.id)
+            )
+          )
+          .for('update');
+        if (previousReservation) {
+          await tx
+            .delete(provider_installation_reservations)
+            .where(eq(provider_installation_reservations.id, previousReservation.id));
+        }
+      }
+
+      const workspaceRows = await tx
+        .select()
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.SLACK),
+            eq(platform_integrations.platform_installation_id, input.teamId)
+          )
+        )
+        .for('update');
+      if (workspaceRows.some(integration => !isOwnedBy(integration, input.owner))) {
+        throw new SlackWorkspaceAlreadyConnectedError(teamName);
+      }
+
+      const existingMetadata =
+        existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {};
+      const { access_token: _legacyToken, ...safeMetadata } = existingMetadata as Record<
+        string,
+        unknown
+      >;
+      const metadata = {
+        ...safeMetadata,
+        bot_user_id: input.installation.botUserId,
+        model_slug:
+          typeof safeMetadata.model_slug === 'string' ? safeMetadata.model_slug : defaultModel,
+      };
+      const values = {
+        platform_installation_id: input.teamId,
+        platform_account_id: input.teamId,
+        platform_account_login: teamName,
+        scopes: input.grantedScopes ?? SLACK_SCOPES,
+        integration_status: INTEGRATION_STATUS.PENDING,
+        metadata,
+        updated_at: new Date().toISOString(),
+      };
+      const [integration] = existing
+        ? await tx
+            .update(platform_integrations)
+            .set(values)
+            .where(eq(platform_integrations.id, existing.id))
+            .returning()
+        : await tx
+            .insert(platform_integrations)
+            .values({
+              owned_by_user_id: input.owner.type === 'user' ? input.owner.id : null,
+              owned_by_organization_id: input.owner.type === 'org' ? input.owner.id : null,
+              platform: PLATFORM.SLACK,
+              integration_type: 'oauth',
+              installed_at: new Date().toISOString(),
+              ...values,
+            })
+            .returning();
+
+      await (input.writeCredential ?? writeSlackCredentialInTransaction)(tx, {
+        integrationId: integration.id,
+        slackTeamId: input.teamId,
+        owner: input.owner,
+        botToken: input.installation.botToken,
+        botUserId: input.installation.botUserId ?? null,
+        slackEnterpriseId: input.installation.enterpriseId ?? null,
+        isEnterpriseInstall: input.installation.isEnterpriseInstall ?? false,
+        grantedScopes: input.grantedScopes,
+      });
+
+      await input.setChatSdkInstallation(input.teamId, input.installation);
+      if (previousTeamId && previousTeamId !== input.teamId) {
+        await input.deleteChatSdkInstallation?.(previousTeamId);
+      }
+
+      const active = await tx
+        .update(platform_integrations)
+        .set({
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          updated_at: new Date().toISOString(),
+        })
+        .where(
+          and(
+            eq(platform_integrations.id, integration.id),
+            eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING)
+          )
+        )
+        .returning();
+      if (
+        active.length !== 1 ||
+        !(await activateSlackReservation(tx, input.claim, integration.id))
+      ) {
+        throw new Error('Slack installation reservation changed during activation');
+      }
+      return active[0];
+    });
+  } catch (error) {
+    if (isSlackWorkspaceUniqueViolation(error)) {
+      throw new SlackWorkspaceAlreadyConnectedError(teamName);
+    }
+    throw error;
+  }
+}
+
+export async function recoverSlackInstallation(
+  teamId: string,
+  getChatSdkInstallation: (teamId: string) => Promise<SlackInstallation | null>,
+  setChatSdkInstallation: (teamId: string, installation: SlackInstallation) => Promise<void>
+): Promise<boolean> {
+  const recoverable = await getRecoverableSlackReservation(teamId);
+  if (!recoverable) {
+    await expireStaleSlackReservation(teamId);
+    return false;
+  }
+  const installation = await getChatSdkInstallation(teamId);
+  if (!installation) return false;
+  await activateReservedSlackInstallation({
+    owner: recoverable.owner,
+    teamId,
+    installation,
+    grantedScopes: null,
+    claim: recoverable.claim,
+    setChatSdkInstallation,
+  });
+  return true;
+}
+
+export async function adoptLegacySlackInstallationByTeamId(teamId: string): Promise<void> {
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.SLACK),
+        eq(platform_integrations.platform_installation_id, teamId),
+        eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE)
+      )
+    )
+    .limit(1);
+  if (!integration) return;
+  const owner = getOwnerFromInstallation(integration);
+  if (!owner) return;
+  await adoptLegacySlackReservation(owner, integration.id, teamId);
+}
+
 /**
  * Uninstall Slack integration for an owner
  */
 export async function uninstallApp(owner: Owner, options: SlackUninstallOptions = {}) {
-  const integration = await getInstallation(owner);
-
-  if (!integration) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Slack installation not found',
-    });
-  }
-
-  const shouldDeleteSlackInstallation =
-    integration.integration_status === INTEGRATION_STATUS.ACTIVE;
-
-  // Revoke the token if we have one
-  const metadata = integration.metadata as { access_token?: string } | null;
-  if (shouldDeleteSlackInstallation && metadata?.access_token) {
-    try {
-      await revokeSlackToken(metadata.access_token);
-    } catch (error) {
-      console.error('Failed to revoke Slack token:', error);
+  return db.transaction(async tx => {
+    await lockProviderOAuthOwnerRow(tx, owner);
+    const [integration] = await tx
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(...getOwnershipConditions(owner), eq(platform_integrations.platform, PLATFORM.SLACK))
+      )
+      .for('update');
+    if (!integration) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Slack installation not found' });
     }
-  }
 
-  const teamId = integration.platform_installation_id ?? integration.platform_account_id;
-  if (
-    shouldDeleteSlackInstallation &&
-    (options.deleteChatSdkInstallation || options.deleteChatSdkIdentityCache)
-  ) {
-    if (!teamId) {
+    const shouldDeleteSlackInstallation =
+      integration.integration_status === INTEGRATION_STATUS.ACTIVE;
+    const teamId = integration.platform_installation_id ?? integration.platform_account_id;
+    if (
+      shouldDeleteSlackInstallation &&
+      (options.deleteChatSdkInstallation || options.deleteChatSdkIdentityCache) &&
+      !teamId
+    ) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Slack installation is missing a team ID',
       });
     }
 
-    await options.deleteChatSdkInstallation?.(teamId);
-    await options.deleteChatSdkIdentityCache?.(teamId);
-  }
+    const [credential] = await tx
+      .select()
+      .from(slack_oauth_credentials)
+      .where(eq(slack_oauth_credentials.platform_integration_id, integration.id))
+      .for('update');
+    const ownerForCredential = getOwnerFromInstallation(integration);
+    const legacyMetadata = integration.metadata as { access_token?: string } | null;
+    const accessToken =
+      credential && ownerForCredential
+        ? decryptSlackBotToken(credential, ownerForCredential)
+        : (legacyMetadata?.access_token ?? null);
+    if (shouldDeleteSlackInstallation && accessToken) {
+      try {
+        await revokeSlackToken(accessToken);
+      } catch (error) {
+        captureException(error, {
+          tags: { component: 'slack-service', op: 'revoke-on-uninstall' },
+          extra: { integrationId: integration.id },
+        });
+      }
+    }
+    if (shouldDeleteSlackInstallation && teamId) {
+      await options.deleteChatSdkInstallation?.(teamId);
+      await options.deleteChatSdkIdentityCache?.(teamId);
+    }
 
-  await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
-
-  return { success: true };
+    await tx
+      .update(provider_oauth_attempts)
+      .set({ status: 'expired' })
+      .where(
+        and(
+          owner.type === 'org'
+            ? eq(provider_oauth_attempts.owned_by_organization_id, owner.id)
+            : eq(provider_oauth_attempts.owned_by_user_id, owner.id),
+          eq(provider_oauth_attempts.provider, 'slack'),
+          or(
+            eq(provider_oauth_attempts.status, 'pending'),
+            eq(provider_oauth_attempts.status, 'captured')
+          )
+        )
+      );
+    await tx
+      .delete(provider_installation_reservations)
+      .where(
+        and(
+          eq(provider_installation_reservations.provider, 'slack'),
+          owner.type === 'org'
+            ? eq(provider_installation_reservations.owned_by_organization_id, owner.id)
+            : eq(provider_installation_reservations.owned_by_user_id, owner.id)
+        )
+      );
+    await tx.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
+    return { success: true };
+  });
 }
 
-export async function deleteInstallationByTeamId(teamId: string) {
-  const integration = await getInstallationByTeamId(teamId);
+export async function deleteInstallationByTeamId(
+  teamId: string,
+  options: {
+    eventTime?: number;
+    deleteChatSdkInstallation?: (teamId: string) => Promise<void>;
+  } = {}
+) {
+  const candidate = await getInstallationByTeamId(teamId);
+  if (!candidate) return { success: true, deleted: false };
+  const owner = getOwnerFromInstallation(candidate);
+  if (!owner) return { success: true, deleted: false };
 
-  if (!integration) {
-    return { success: true, deleted: false };
-  }
+  return db.transaction(async tx => {
+    await lockProviderOAuthOwnerRow(tx, owner);
+    const [reservation] = await tx
+      .select()
+      .from(provider_installation_reservations)
+      .where(
+        and(
+          eq(provider_installation_reservations.provider, 'slack'),
+          eq(provider_installation_reservations.provider_installation_id, teamId)
+        )
+      )
+      .for('update');
+    const [integration] = await tx
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.id, candidate.id),
+          eq(platform_integrations.platform_installation_id, teamId)
+        )
+      )
+      .for('update');
+    if (!integration) return { success: true, deleted: false };
+    if (
+      reservation &&
+      options.eventTime !== undefined &&
+      options.eventTime * 1000 < new Date(reservation.updated_at).getTime()
+    ) {
+      return { success: true, deleted: false };
+    }
 
-  await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
-
-  return { success: true, deleted: true };
+    await options.deleteChatSdkInstallation?.(teamId);
+    if (reservation) {
+      await tx
+        .delete(provider_installation_reservations)
+        .where(eq(provider_installation_reservations.id, reservation.id));
+    }
+    await tx.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
+    return { success: true, deleted: true };
+  });
 }
 
 /**
@@ -414,14 +739,13 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
     return { success: false, error: 'No Slack installation found' };
   }
 
-  const metadata = integration.metadata as { access_token?: string } | null;
-
-  if (!metadata?.access_token) {
+  const accessToken = await getSlackAccessToken(integration);
+  if (!accessToken) {
     return { success: false, error: 'No access token found' };
   }
 
   try {
-    const client = new WebClient(metadata.access_token);
+    const client = new WebClient(accessToken);
     const result = await client.auth.test();
 
     if (!result.ok) {
@@ -449,14 +773,13 @@ export async function sendMessage(
     return { success: false, error: 'No Slack installation found' };
   }
 
-  const metadata = integration.metadata as { access_token?: string } | null;
-
-  if (!metadata?.access_token) {
+  const accessToken = await getSlackAccessToken(integration);
+  if (!accessToken) {
     return { success: false, error: 'No access token found' };
   }
 
   try {
-    const client = new WebClient(metadata.access_token);
+    const client = new WebClient(accessToken);
     const result = await client.chat.postMessage({
       channel,
       text,
@@ -546,11 +869,10 @@ export type SlackPostMessageResponse = {
 /**
  * Extract access token from installation metadata
  */
-export function getAccessTokenFromInstallation(
+export async function getAccessTokenFromInstallation(
   integration: PlatformIntegration
-): string | undefined {
-  const metadata = integration.metadata as { access_token?: string } | null;
-  return metadata?.access_token;
+): Promise<string | null> {
+  return getSlackAccessToken(integration);
 }
 
 /**

@@ -1,5 +1,9 @@
 import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { organizations, provider_oauth_attempts } from '@kilocode/db/schema';
+import {
+  organizations,
+  provider_installation_reservations,
+  provider_oauth_attempts,
+} from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
@@ -11,6 +15,10 @@ import {
 import { connectVerifiedGitHubInstallation } from './db/github-installations';
 import { anonymizeCloudUserData } from '@/lib/user';
 import { markOrganizationAsDeleted } from '@/lib/organizations/organizations';
+import {
+  claimSlackProviderInstallation,
+  lockSlackReservation,
+} from './provider-installation-reservations';
 
 describe('provider OAuth attempts', () => {
   afterEach(cleanupDbForTest);
@@ -90,7 +98,7 @@ describe('provider OAuth attempts', () => {
     ).resolves.toBe(false);
   });
 
-  it('serializes provider start before shared GitHub attach', async () => {
+  it('allows a live Slack attempt to transition into shared GitHub support', async () => {
     const incumbent = await insertTestUser();
     const destinationUser = await insertTestUser();
     const organizationA = await createTestOrganization('Reservation A', incumbent.id, 0);
@@ -124,7 +132,7 @@ describe('provider OAuth attempts', () => {
         { type: 'org', id: organizationB.id },
         { ...github, kiloUserId: destinationUser.id }
       )
-    ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+    ).resolves.toMatchObject({ ok: true });
   });
 
   it('blocks provider start after shared GitHub attach', async () => {
@@ -160,6 +168,50 @@ describe('provider OAuth attempts', () => {
         state: 'state-blocked',
       })
     ).rejects.toThrow('not available for shared GitHub installations');
+  });
+
+  it('captures a Slack workspace with a generation and fences stale callbacks', async () => {
+    const actor = await insertTestUser();
+    const owner = { type: 'user' as const, id: actor.id };
+    await beginProviderOAuthAttempt({
+      actorUserId: actor.id,
+      owner,
+      provider: 'slack',
+      state: 'generation-1',
+    });
+    const first = await claimSlackProviderInstallation({
+      actorUserId: actor.id,
+      owner,
+      state: 'generation-1',
+      teamId: 'T_GENERATION',
+    });
+    expect(first).toMatchObject({ generation: 1 });
+    await beginProviderOAuthAttempt({
+      actorUserId: actor.id,
+      owner,
+      provider: 'slack',
+      state: 'generation-2',
+    });
+    const second = await claimSlackProviderInstallation({
+      actorUserId: actor.id,
+      owner,
+      state: 'generation-2',
+      teamId: 'T_GENERATION',
+    });
+    expect(second).toMatchObject({ generation: 2 });
+
+    await expect(
+      db.transaction(tx => lockSlackReservation(tx, first!, owner, 'T_GENERATION'))
+    ).resolves.toBeNull();
+    await expect(
+      db.transaction(tx => lockSlackReservation(tx, second!, owner, 'T_GENERATION'))
+    ).resolves.toMatchObject({ generation: 2, status: 'pending' });
+    await expect(
+      db
+        .select()
+        .from(provider_installation_reservations)
+        .where(eq(provider_installation_reservations.provider_installation_id, 'T_GENERATION'))
+    ).resolves.toHaveLength(1);
   });
 
   it('explicitly removes personal and organization attempts during soft deletion', async () => {
@@ -339,10 +391,7 @@ describe('provider OAuth attempts', () => {
     ]);
     if (observationError) throw observationError;
     expect(reservationResult.status).toBe('fulfilled');
-    expect(attachResult).toEqual({
-      status: 'fulfilled',
-      value: { ok: false, reason: 'incompatible_workflow' },
-    });
+    expect(attachResult).toMatchObject({ status: 'fulfilled', value: { ok: true } });
   });
 
   it('blocks reservation on the attach owner row until sharing commits', async () => {

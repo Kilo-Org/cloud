@@ -36,6 +36,7 @@ describe('platform helpers', () => {
     const integration = {
       id: 'pi_slack',
       platform: PLATFORM.SLACK,
+      integration_status: 'active',
       platform_installation_id: 'T123',
     };
     mockLimit.mockResolvedValue([integration]);
@@ -65,6 +66,7 @@ describe('platform helpers', () => {
     const integration = {
       id: 'pi_slack',
       platform: PLATFORM.SLACK,
+      integration_status: 'active',
       platform_installation_id: 'T123',
     };
     mockLimit.mockResolvedValue([integration]);
@@ -86,6 +88,7 @@ describe('platform helpers', () => {
     const integration = {
       id: 'pi_slack',
       platform: PLATFORM.SLACK,
+      integration_status: 'active',
       metadata: { bot_user_id: 'U_BOT' },
     };
     mockLimit.mockResolvedValue([integration]);

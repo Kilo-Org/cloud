@@ -134,6 +134,7 @@ const BottomBar = memo(function BottomBar({
                 'h-9 cursor-help border border-amber-500/50 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 hover:text-amber-400',
                 !isLanding && 'w-9'
               )}
+              aria-label={isLanding ? undefined : 'Submit with warning'}
             >
               <AlertTriangle className="h-4 w-4" />
               {isLanding && <span>Submit</span>}
@@ -162,6 +163,7 @@ const BottomBar = memo(function BottomBar({
           onClick={onInterrupt}
           disabled={isInterrupting}
           className="h-9 w-9"
+          aria-label={isInterrupting ? 'Stopping' : 'Stop generating'}
         >
           <Square className="h-4 w-4" />
         </Button>
@@ -173,6 +175,7 @@ const BottomBar = memo(function BottomBar({
           onClick={onSubmit}
           disabled={isSubmitDisabled}
           className="h-9 w-9"
+          aria-label="Send message"
         >
           <Send className="h-4 w-4" />
         </Button>

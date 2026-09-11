@@ -273,10 +273,12 @@ export function InviteMemberDialog({
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
+                        id="role"
                         variant="outline"
                         size="sm"
                         className="flex h-10 items-center justify-between gap-2 px-3"
                         disabled={inviteMemberMutation.isPending}
+                        aria-label={`Role: ${ROLE_LABELS[role]}`}
                       >
                         {ROLE_LABELS[role]}
                         <ChevronDown className="h-3 w-3" />

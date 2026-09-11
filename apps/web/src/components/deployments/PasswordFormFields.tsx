@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+// React must be in scope for the classic JSX runtime used by the jest transform.
+import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';

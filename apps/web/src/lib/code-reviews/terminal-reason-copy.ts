@@ -53,6 +53,23 @@ const KILO_REVIEW_MARKER = '<!-- kilo-review -->';
  */
 const COPY_BY_TERMINAL_REASON = new Map<CodeReviewTerminalReason, CodeReviewTerminalReasonCopy>([
   [
+    'assistant_no_reply',
+    {
+      label: 'No review produced',
+      message: 'The review session ended without producing a review summary or comments.',
+      checkTitle: 'Kilo Code Review produced no review',
+      checkSummary:
+        'The review session ended without producing a review summary or comments. The model likely exhausted its output limit before writing the review.',
+      summaryBody: `${KILO_REVIEW_MARKER}
+## Code Review Summary
+
+**This review produced no output.** The model session finished without
+generating a review summary or inline comments — usually because it exhausted
+its output limit while reasoning. Re-run the review (for example by pushing a
+new commit) to try again.`,
+    },
+  ],
+  [
     'assistant_rate_limited_byok',
     {
       label: 'Rate limited',

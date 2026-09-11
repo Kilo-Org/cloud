@@ -292,6 +292,36 @@ function captureRuntimeModelNotFoundDiagnostics(params: {
 }
 
 /**
+ * True when a code-review completion callback carries no assistant output.
+ *
+ * The code review contract requires the review summary (and, when analytics is
+ * enrolled, the analytics marker) to live in the assistant's final text
+ * response, so a `completed` callback with no retained assistant text means the
+ * model finished without producing a review — the classic output-limit
+ * exhaustion during reasoning, where the SDK yields an empty response — yet the
+ * session still idles out and reports `completed`.
+ *
+ * Queue-size omission is a separate signal: when the payload text was dropped
+ * to fit the callback queue, `lastAssistantMessageTextTruncation` carries
+ * `retainedUtf8ByteLength: 0`, which means the text existed but was stripped.
+ * That must not count as "no output".
+ */
+export function completedWithoutReviewOutput(
+  payload: Pick<
+    StatusUpdatePayload,
+    'lastAssistantMessageText' | 'lastAssistantMessageTextTruncation'
+  >
+): boolean {
+  const assistantTextPresent =
+    typeof payload.lastAssistantMessageText === 'string' &&
+    payload.lastAssistantMessageText.trim().length > 0;
+  const assistantTextWasOmitted =
+    payload.lastAssistantMessageText === undefined &&
+    payload.lastAssistantMessageTextTruncation?.retainedUtf8ByteLength === 0;
+  return !assistantTextPresent && !assistantTextWasOmitted;
+}
+
+/**
  * Normalize a payload from either the orchestrator or cloud-agent-next callback
  * into the common format expected by the update logic.
  */
@@ -1111,10 +1141,27 @@ export async function POST(
 
     const rawPayload = parsedPayload.data;
     const attemptId = callbackAttemptId || undefined;
-    const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult, failure } =
-      normalizePayload(rawPayload);
+    const normalizedPayload = normalizePayload(rawPayload);
+    const { sessionId, cliSessionId, gateResult, failure } = normalizedPayload;
+    let { status, errorMessage, terminalReason } = normalizedPayload;
     const executionId = rawPayload.executionId;
     const validGateResult = gateResult;
+
+    // A 'completed' callback with no assistant output is a failure, not a
+    // success. Reporting success here is what lets a model that exhausts its
+    // output limit while reasoning leave a green check run with no review on
+    // the PR. Downgrade so the run gets a failure conclusion, a confused
+    // reaction, an authored failure notice on the PR thread, and an attributed
+    // terminal reason instead of silently passing.
+    if (status === 'completed' && completedWithoutReviewOutput(rawPayload)) {
+      logExceptInTest(
+        '[code-review-status] Completed callback carried no review output; downgrading to failed',
+        { reviewId, attemptId, sessionId, cliSessionId }
+      );
+      status = 'failed';
+      terminalReason = 'assistant_no_reply';
+      errorMessage = 'The review session completed without producing a review summary or comments.';
+    }
 
     const loggableErrorMessage = getLoggableStatusErrorMessage(errorMessage, terminalReason);
     logExceptInTest('[code-review-status] Received status update', {

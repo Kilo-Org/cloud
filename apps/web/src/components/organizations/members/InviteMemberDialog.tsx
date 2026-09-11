@@ -268,12 +268,11 @@ export function InviteMemberDialog({
               </div>
 
               <div className="w-32 space-y-2">
-                <Label htmlFor="role">Role</Label>
+                <span className="text-sm leading-none font-medium">Role</span>
                 <div className="flex min-h-[60px] flex-col justify-start">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
-                        id="role"
                         variant="outline"
                         size="sm"
                         className="flex h-10 items-center justify-between gap-2 px-3"

@@ -610,7 +610,12 @@ export async function handleControlRequest(
     (operation === 'session.prompt' || operation === 'session.terminal.create') &&
     deps.kiloRuntimes?.prepareForNewWork?.(session.directory) === false
   ) {
-    return rejectBeforeAdmission('not_ready', 'Native feed recovery is in progress', true);
+    // A prompt must not count against the worker's prompt-failure budget while the
+    // native feed recovers: the worker retries `session_busy` without counting until
+    // the head deadline. Terminal creation keeps its non-retry-counted `not_ready`.
+    return operation === 'session.prompt'
+      ? rejectBeforeAdmission('session_busy', 'Native feed recovery is in progress', true)
+      : rejectBeforeAdmission('not_ready', 'Native feed recovery is in progress', true);
   }
   if (
     (deps.signal?.aborted ||

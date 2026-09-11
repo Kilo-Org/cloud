@@ -30,6 +30,7 @@ import {
   sessionOperationResultHash,
   sessionPromptPayloadSchema,
   sessionGitSnapshotPayloadSchema,
+  type ControlError,
   type ResponseFrame,
   type SessionAttachPayload,
   type SessionMessageOutcome,
@@ -50,6 +51,7 @@ import type {
   AgentSelectionOverride,
 } from '../execution/types.js';
 import {
+  PROMPT_FAILURE_LIMIT,
   acceptQueuedMessage,
   applySessionOperationResult,
   applyMessageOutcome,
@@ -1189,12 +1191,21 @@ function unreceiptedPreparing(...input: Parameters<typeof receiptedPreparing>) {
   };
 }
 
-function controlFailure(retryable: boolean, code = 'not_ready'): ResponseFrame {
+function controlFailure(
+  retryable: boolean,
+  code = 'not_ready',
+  admission?: ControlError['admission']
+): ResponseFrame {
   return {
     type: 'response',
     requestId: 'request',
     ok: false,
-    error: { code, message: 'Control request failed', retryable },
+    error: {
+      code,
+      message: 'Control request failed',
+      retryable,
+      ...(admission ? { admission } : {}),
+    },
   };
 }
 
@@ -4777,6 +4788,79 @@ describe('SandboxSession orchestration', () => {
         ).toHaveLength(1);
       }
     );
+  });
+
+  describe('feed-recovery prompt rejection policy', () => {
+    it('does not count a not-admitted session_busy rejection and re-arms until the head deadline', async () => {
+      const fixture = sessionFixture();
+      let requests = 0;
+      delegateRequest(fixture, 'session.prompt', async () => {
+        requests += 1;
+        return controlFailure(true, 'session_busy', 'not-admitted');
+      });
+      await fixture.admit('a');
+      await fixture.flush();
+      const deadlineAt = fixture.acquisition('a').deadlineAt;
+      expect(fixture.record('a')).toMatchObject({
+        state: 'queued',
+        deliveryRetryScope: 'message',
+        deliveryDeadlineAt: deadlineAt,
+      });
+      expect(fixture.record('a')?.promptFailures).toBeUndefined();
+      expect(fixture.terminalEvents()).toHaveLength(0);
+
+      for (let attempt = 0; attempt < 6; attempt++) {
+        fixture.reload();
+        const retryAt = fixture.alarmAt();
+        if (retryAt === null) throw new Error('Missing queue retry alarm');
+        vi.setSystemTime(retryAt);
+        await fixture.fireAlarm();
+        expect(fixture.record('a')).toMatchObject({
+          state: 'queued',
+          deliveryRetryScope: 'message',
+          deliveryDeadlineAt: deadlineAt,
+        });
+        expect(fixture.record('a')?.promptFailures).toBeUndefined();
+      }
+      expect(requests).toBe(7);
+      expect(fixture.terminalEvents()).toHaveLength(0);
+
+      fixture.reload();
+      vi.setSystemTime(deadlineAt);
+      await fixture.fireAlarm();
+      expect(fixture.record('a')).toMatchObject({
+        state: 'failed',
+        failedReason: 'preparation_timeout',
+        deliveryDeadlineAt: deadlineAt,
+      });
+      expect(fixture.terminalEvents()).toHaveLength(1);
+    });
+
+    it('still exhausts a not-admitted not_ready rejection at the prompt failure limit', async () => {
+      const fixture = sessionFixture();
+      delegateRequest(fixture, 'session.prompt', async () =>
+        controlFailure(true, 'not_ready', 'not-admitted')
+      );
+      await fixture.admit('a');
+      await fixture.flush();
+      expect(fixture.record('a')?.promptFailures).toBe(1);
+      for (let attempt = 2; attempt <= PROMPT_FAILURE_LIMIT; attempt++) {
+        fixture.reload();
+        const retryAt = fixture.alarmAt();
+        if (retryAt === null) throw new Error('Missing queue retry alarm');
+        vi.setSystemTime(retryAt);
+        await fixture.fireAlarm();
+        if (attempt < PROMPT_FAILURE_LIMIT)
+          expect(fixture.record('a')?.promptFailures).toBe(attempt);
+      }
+      expect(fixture.record('a')).toMatchObject({
+        state: 'failed',
+        failedReason: 'prompt_exhausted',
+        promptFailures: PROMPT_FAILURE_LIMIT,
+      });
+      expect(fixture.terminalEvents()).toHaveLength(1);
+      expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+    });
   });
 
   describe.each(['session.attach', 'session.prompt'] as const)(

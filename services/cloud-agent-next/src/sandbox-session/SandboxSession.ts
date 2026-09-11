@@ -3004,7 +3004,11 @@ export class SandboxSession extends DurableObject<Env> {
       return;
     }
     const headId = nextQueuedMessageId(messages);
-    if (headId) await this.dispatchQueued(headId, { allowCreate: false });
+    // A queued head is durable demand: the alarm may realize it by creating a
+    // replacement once the allocation is confirmed `stopped` (Vercel has no
+    // acquisition path). Cloudflare keeps its acquisition-driven create, and
+    // `nextEnsureReadyStep` still refuses to create from running/stopping.
+    if (headId) await this.dispatchQueued(headId, { allowCreate: true });
   }
 
   private async queueAndDispatch(
@@ -3648,6 +3652,14 @@ export class SandboxSession extends DurableObject<Env> {
         );
         if (!isCurrent()) return;
         if (!observed) {
+          // The observation slice is capped by the startup deadline so one alarm
+          // cannot hold the delivery for the whole head budget, but the head's
+          // own deadline may still have budget. Preserve the queued head and let
+          // the normal retry observe again; fail only once that deadline is gone.
+          if (Date.now() < deadlineAt) {
+            await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
+            return;
+          }
           await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId);
           return;
         }

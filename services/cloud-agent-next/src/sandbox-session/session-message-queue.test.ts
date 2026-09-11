@@ -4257,7 +4257,7 @@ describe('SandboxSession orchestration', () => {
     );
   });
 
-  it('keeps Vercel alarm recovery observation-only', async () => {
+  it('realizes a queued Vercel head from stopped while still observing the allocation', async () => {
     const fixture = sessionFixture({
       workspace: { sandboxId: SANDBOX_ID, workspacePath: DIRECTORY, sandboxProvider: 'vercel' },
     });
@@ -4269,23 +4269,75 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.control.ensureReady).toHaveBeenLastCalledWith(
       expect.objectContaining({ provider: 'vercel', allowCreate: true })
     );
-    fixture.setStatus({ physical: 'stopping', connection: 'disconnected' });
-    await fixture.fireAlarm();
+    // The alarm observes a stopping allocation rather than creating from it; a
+    // Cloudflare acquisition would instead keep its acquisition path.
+    const stopping = { physical: 'stopping', connection: 'disconnected' } satisfies ControlStatus;
+    const stopped = { physical: 'stopped', connection: 'disconnected' } satisfies ControlStatus;
+    fixture.control.ensureReady
+      .mockResolvedValueOnce({ ...stopping, attachment: ATTACHMENT })
+      .mockResolvedValue({ ...stopped, attachment: ATTACHMENT });
+    fixture.control.getStatus.mockResolvedValue({ ...stopped });
+    const alarm = fixture.fireAlarm();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await alarm;
     expect(fixture.record('a')?.state).toBe('queued');
+    expect(fixture.record('a')?.failedReason).toBeUndefined();
     expect(fixture.control.ensureReady).toHaveBeenLastCalledWith(
-      expect.objectContaining({ provider: 'vercel', allowCreate: false })
+      expect.objectContaining({ provider: 'vercel', allowCreate: true })
     );
     expect(
       fixture.control.ensureReady.mock.calls.every(([input]) => input.acquisition === undefined)
     ).toBe(true);
-    fixture.setStatus({ physical: 'stopped', connection: 'disconnected' });
-    await fixture.fireAlarm();
-    // Chunk 1: a stopped allocation is recoverable (a replacement may still be
-    // created), so the queued head waits instead of failing. Alarm create is
-    // chunk 2.
-    expect(fixture.record('a')?.state).toBe('queued');
     expect(fixture.alarmAt()).not.toBeNull();
     expect(fixture.control.request).not.toHaveBeenCalled();
+  });
+
+  it('keeps a stopping Vercel head queued when the startup observation slice expires', async () => {
+    const fixture = sessionFixture({
+      workspace: { sandboxId: SANDBOX_ID, workspacePath: DIRECTORY, sandboxProvider: 'vercel' },
+    });
+    fixture.control.ensureReady.mockRejectedValueOnce(
+      Object.assign(new Error('Transient admission failure'), { retryable: true })
+    );
+    await fixture.admit('a');
+    await fixture.flush();
+    const deadlineAt = fixture.record('a')?.deliveryDeadlineAt;
+    if (deadlineAt === undefined) throw new Error('Missing head delivery deadline');
+    // The allocation stays stopping for longer than the startup observation
+    // slice while the head still has its full delivery budget. The slice is a
+    // bound on one alarm, not the head deadline, so the head must stay queued.
+    fixture.setStatus({ physical: 'stopping', connection: 'disconnected' });
+    const alarm = fixture.fireAlarm();
+    await vi.advanceTimersByTimeAsync(DEADLINE_MS.startup + 5_000);
+    await alarm;
+    expect(fixture.record('a')).toMatchObject({ state: 'queued', deliveryDeadlineAt: deadlineAt });
+    expect(fixture.record('a')?.failedReason).toBeUndefined();
+    expect(fixture.alarmAt()).not.toBeNull();
+    expect(fixture.control.request).not.toHaveBeenCalled();
+  });
+
+  it('fails the stopping Vercel head once the delivery deadline expires', async () => {
+    const fixture = sessionFixture({
+      workspace: { sandboxId: SANDBOX_ID, workspacePath: DIRECTORY, sandboxProvider: 'vercel' },
+    });
+    fixture.control.ensureReady.mockRejectedValueOnce(
+      Object.assign(new Error('Transient admission failure'), { retryable: true })
+    );
+    await fixture.admit('a');
+    await fixture.flush();
+    const deadlineAt = fixture.record('a')?.deliveryDeadlineAt;
+    if (deadlineAt === undefined) throw new Error('Missing head delivery deadline');
+    fixture.setStatus({ physical: 'stopping', connection: 'disconnected' });
+    // Start one startup slice before the head deadline so the observation ends
+    // exactly when the head budget is gone.
+    vi.setSystemTime(deadlineAt - DEADLINE_MS.startup);
+    const alarm = fixture.fireAlarm();
+    await vi.advanceTimersByTimeAsync(DEADLINE_MS.startup);
+    await alarm;
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      failedReason: 'preparation_timeout',
+    });
   });
 
   describe.each([

@@ -175,6 +175,7 @@ import {
 } from '../sandbox-control/recovery-cleanup.js';
 import {
   createNativeRuntimeRetirementWorkflow,
+  holdsNativeRuntimeRetirementFence,
   matchesNativeRuntimeRetirementAllocation,
   releaseNativeRuntimeRetirement,
   sameNativeRuntimeRetirement,
@@ -1657,18 +1658,33 @@ export class SandboxControl extends DurableObject<Env> {
     let physical: PhysicalRecord;
     let creating = false;
     if (acquisition) {
-      let selected = await this.acquirePhysical(acquisition, requiredContainment, worktreeId);
+      let selected = await this.acquirePhysical(
+        acquisition,
+        requiredContainment,
+        worktreeId,
+        input.sessionId
+      );
       if (selected.action === 'wait') {
         const step = nextEnsureReadyStep(selected.physical.state, true);
         if (step === 'release-failed') {
           await this.releaseIfAuthoritativelyDead(selected.physical);
-          selected = await this.acquirePhysical(acquisition, requiredContainment, worktreeId);
+          selected = await this.acquirePhysical(
+            acquisition,
+            requiredContainment,
+            worktreeId,
+            input.sessionId
+          );
         } else if (step === 'observe-unknown') {
           await this.observeCurrentProvider(selected.physical);
-          selected = await this.acquirePhysical(acquisition, requiredContainment, worktreeId);
+          selected = await this.acquirePhysical(
+            acquisition,
+            requiredContainment,
+            worktreeId,
+            input.sessionId
+          );
         }
       }
-      if (selected.action === 'wait') return this.statusForPhysical(selected.physical);
+      if (selected.action === 'wait') return this.waitingAcquisitionStatus(selected.physical);
       physical = selected.physical;
       creating = selected.action === 'create';
     } else {
@@ -1699,7 +1715,9 @@ export class SandboxControl extends DurableObject<Env> {
       }
     }
     const currentStatus = () =>
-      acquisition ? this.acquisitionStatus(acquisition, physical) : this.getStatus();
+      acquisition
+        ? this.acquisitionStatus(acquisition, physical, input.sessionId)
+        : this.getStatus();
     if (creating) this.provider = this.createProviderAdapter(this.providerKind, physical);
     if (physical.stopTombstone || (physical.state !== 'creating' && physical.state !== 'running')) {
       return currentStatus();
@@ -1895,7 +1913,7 @@ export class SandboxControl extends DurableObject<Env> {
       if (
         allocationChanged ||
         providerChanged ||
-        (acquisition && !(await this.bindAcquisition(acquisition, current)))
+        (acquisition && !(await this.bindAcquisition(acquisition, current, input.sessionId)))
       ) {
         const error = 'Sandbox allocation changed during readiness';
         if (acquisition && (allocationChanged || providerChanged))
@@ -1910,7 +1928,8 @@ export class SandboxControl extends DurableObject<Env> {
   private async acquirePhysical(
     acquisition: SandboxAcquisition,
     requiredContainment: CredentialContainmentRequirements,
-    worktreeId?: string
+    worktreeId?: string,
+    sessionId?: string
   ): Promise<{
     physical: PhysicalRecord;
     action: 'create' | 'reuse' | 'wait';
@@ -1926,20 +1945,22 @@ export class SandboxControl extends DurableObject<Env> {
       ) {
         throw new Error('Sandbox containment mode conflicts with the session');
       }
-      if (await this.bindAcquisition(acquisition, physical)) return { physical, action: 'reuse' };
+      if (await this.bindAcquisition(acquisition, physical, sessionId))
+        return { physical, action: 'reuse' };
       if (physical.state !== 'stopped' || physical.stopTombstone) {
         return { physical, action: 'wait' };
       }
       const next = claimCreate(physical, intentId, Date.now(), allocationName, requiredContainment);
       await this.persistPhysicalState(physical, next, 'demand');
-      await this.bindAcquisition(acquisition, next);
+      await this.bindAcquisition(acquisition, next, sessionId);
       return { physical: next, action: 'create' };
     });
   }
 
   private async bindAcquisition(
     acquisition: SandboxAcquisition,
-    physical: PhysicalRecord
+    physical: PhysicalRecord,
+    sessionId?: string
   ): Promise<boolean> {
     const raw = await this.ctx.storage.get<unknown>(ACQUISITION_RECEIPTS_KEY);
     const stored = raw === undefined ? [] : acquisitionReceiptsSchema.parse(raw);
@@ -1959,6 +1980,18 @@ export class SandboxControl extends DurableObject<Env> {
         throw new SandboxAcquisitionLostError();
       }
     }
+    // A directory-native retirement keeps the physical allocation alive while
+    // the session's route is still fenced to the retired native. Until that
+    // receipt is delivered or released, the allocation must not be bound: the
+    // wrapper creates a new native only after the containment fence clears.
+    // Completed+delivered (or released) receipts no longer fence, so a healthy
+    // running allocation is reused rather than refused forever.
+    if (
+      sessionId !== undefined &&
+      (await this.hasNativeRetirementFenceForSession(sessionId, physical))
+    ) {
+      return false;
+    }
     const available =
       !physical.stopTombstone && (physical.state === 'creating' || physical.state === 'running');
     if (!receipt && available) {
@@ -1973,13 +2006,14 @@ export class SandboxControl extends DurableObject<Env> {
 
   private async acquisitionStatus(
     acquisition: SandboxAcquisition,
-    expected: PhysicalRecord
+    expected: PhysicalRecord,
+    sessionId?: string
   ): Promise<SandboxControlStatus> {
     return this.ctx.storage.transaction(async () => {
       const current = await loadPhysicalRecord(this.ctx.storage);
       if (
         !sameAllocation(expected, current) ||
-        !(await this.bindAcquisition(acquisition, current))
+        !(await this.bindAcquisition(acquisition, current, sessionId))
       ) {
         throw new SandboxAcquisitionLostError();
       }
@@ -2651,6 +2685,26 @@ export class SandboxControl extends DurableObject<Env> {
         ? { operationResults: true as const }
         : {}),
       ...(runtime?.runtimeRecovery ? { runtimeRecovery: true as const } : {}),
+    };
+  }
+
+  /**
+   * An acquisition that could not bind is not sendable even when the shared
+   * wrapper is healthy. The physical projection stays intact, but the ready
+   * connection and wrapper identity are withheld from this acquisition result
+   * so the caller takes its bounded wait path instead of dispatching against an
+   * allocation this session is still fenced from. The wrapper itself stays
+   * healthy: only this result is downgraded.
+   */
+  private async waitingAcquisitionStatus(physical: PhysicalRecord): Promise<SandboxControlStatus> {
+    const status = await this.statusForPhysical(physical);
+    if (status.connection !== 'ready') return status;
+    const connection = 'connected' as const;
+    const { wrapperInstanceId: _withheld, ...rest } = status;
+    return {
+      ...rest,
+      connection,
+      reported: projectReportedStatus({ physical: status.physical, connection, work: status.work }),
     };
   }
 
@@ -4827,6 +4881,42 @@ export class SandboxControl extends DurableObject<Env> {
       providerInstanceId: connection.providerInstanceId,
       wrapperInstanceId: connection.wrapperInstanceId,
     };
+  }
+
+  /**
+   * True while a directory-native retirement for `sessionId` still fences the
+   * current physical allocation and wrapper lifetime.
+   *
+   * A retirement keeps the physical allocation running so a healthy wrapper can
+   * create a new native in place. The session must not bind that allocation
+   * until the receipt is delivered (or released): a completed+delivered receipt
+   * releases the session route fence and must be reused rather than refused,
+   * and a pruned receipt leaves no fence at all. Pending, unconfirmed, and
+   * completed-but-undelivered receipts mean notifications have not reached the
+   * recipients yet, so the containment fence still holds.
+   *
+   * Matching the active wrapper lifetime keeps a receipt from an older wrapper
+   * incarnation from fencing a new wrapper on the same allocation.
+   */
+  private async hasNativeRetirementFenceForSession(
+    sessionId: string,
+    physical: PhysicalRecord
+  ): Promise<boolean> {
+    const receipts = await loadNativeRuntimeRetirements(this.ctx.storage);
+    if (receipts.length === 0) return false;
+    const connection = this.activeConnection ?? this.socketHandler.getConnectionIdentity();
+    return receipts.some(receipt => {
+      if (!receipt.recipients.some(recipient => recipient.sessionId === sessionId)) return false;
+      if (!matchesNativeRuntimeRetirementAllocation(receipt, physical)) return false;
+      if (
+        connection?.wrapperInstanceId !== undefined &&
+        (connection.wrapperInstanceId !== receipt.connection.wrapperInstanceId ||
+          connection.providerInstanceId !== receipt.connection.providerInstanceId)
+      ) {
+        return false;
+      }
+      return holdsNativeRuntimeRetirementFence(receipt);
+    });
   }
 
   private async abortNativeRuntime(input: {

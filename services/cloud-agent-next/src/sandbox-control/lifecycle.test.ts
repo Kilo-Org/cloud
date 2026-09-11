@@ -8,7 +8,10 @@ import {
   type VercelSandboxResources,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { SandboxControl, type SandboxAcquisition } from '../persistence/SandboxControl.js';
-import { SESSION_DELIVERY_TIMEOUT_MS } from '../sandbox-session/control-dispatch.js';
+import {
+  SESSION_DELIVERY_TIMEOUT_MS,
+  controlDispatchDisposition,
+} from '../sandbox-session/control-dispatch.js';
 import {
   parseSandboxBillingInput,
   SANDBOX_USAGE_SKUS,
@@ -1490,6 +1493,241 @@ describe('SandboxControl lifecycle boundaries', () => {
     h.records.set('acquisition_receipts', [{ id: 'attempt_a', deadlineAt: Date.now() + 1_000 }]);
     await expect(h.acquire({ id: 'attempt_a', deadlineAt: Date.now() + 1_000 })).rejects.toThrow();
     expect(h.allocations.size).toBe(0);
+  });
+
+  describe('directory-native retirement acquisition fence', () => {
+    const retiredNativeRuntimeId = 'aaaaaaaa-1111-4111-8111-111111111111';
+
+    async function retire({
+      state,
+      notificationState,
+      replayUntil,
+      releasedRouteFence,
+      connectionOverride,
+    }: {
+      state: 'pending' | 'unconfirmed' | 'completed' | 'released';
+      notificationState: 'pending' | 'delivered' | 'exhausted';
+      replayUntil: number;
+      releasedRouteFence: boolean;
+      connectionOverride?: { wrapperInstanceId?: string; providerInstanceId?: string };
+    }) {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const physical = await h.control.getPhysicalRecord();
+      const [route] = await h.control.listRoutes();
+      if (!route || !physical.providerRef) throw new Error('Missing allocation');
+      h.records.set('session_routes', [
+        {
+          ...route,
+          nativeRuntimeId: retiredNativeRuntimeId,
+          ...(releasedRouteFence ? {} : { retiringNativeRuntimeId: retiredNativeRuntimeId }),
+        },
+      ]);
+      h.records.set('native_runtime_retirements', [
+        {
+          directory: route.directory,
+          nativeRuntimeId: retiredNativeRuntimeId,
+          allocation: {
+            providerRef: physical.providerRef,
+            ...(physical.createIntent ? { createIntentId: physical.createIntent.intentId } : {}),
+          },
+          connection: {
+            connectionId: identity.connectionId,
+            providerInstanceId:
+              connectionOverride?.providerInstanceId ?? identity.providerInstanceId,
+            wrapperInstanceId: connectionOverride?.wrapperInstanceId ?? identity.wrapperInstanceId,
+          },
+          recipients: [
+            {
+              sessionId: route.sessionId,
+              kiloSessionId: route.kiloSessionId,
+              directory: route.directory,
+              ownerId: route.ownerId,
+              nativeRuntimeId: retiredNativeRuntimeId,
+            },
+          ],
+          reason: 'process_exited',
+          cleanupDeadlineAt: Date.now() + DEADLINE_MS.stopAttempt,
+          replayUntil,
+          attempts: 0,
+          notificationAttempts: 0,
+          notificationState,
+          state,
+          disposition: state === 'completed' ? 'retired' : 'pending',
+        },
+      ]);
+      return { h, identity, physical, route };
+    }
+
+    function acquisition() {
+      return { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
+    }
+
+    it('binds a healthy running allocation after a delivered directory-native retirement', async () => {
+      // A completed+delivered receipt is past the containment fence: the route
+      // native has been cleared and the physical allocation is reusable, even
+      // after `replayUntil` allows the receipt to be pruned.
+      const { h, physical } = await retire({
+        state: 'completed',
+        notificationState: 'delivered',
+        replayUntil: Date.now() - 1,
+        releasedRouteFence: true,
+      });
+      const status = await h.acquire(acquisition());
+      expect(status).toMatchObject({ physical: 'running', connection: 'ready' });
+      expect(controlDispatchDisposition(status)).toEqual({ action: 'send' });
+      expect(h.records.get('acquisition_receipts')).toEqual([
+        {
+          ...acquisition(),
+          allocation: { kind: 'intent', id: physical.createIntent?.intentId },
+        },
+      ]);
+    });
+
+    it.each(['pending', 'unconfirmed'] as const)(
+      'does not bind the acquisition while a %s retirement still fences the allocation',
+      async state => {
+        const { h } = await retire({
+          state,
+          notificationState: 'pending',
+          replayUntil: Date.now() - 1,
+          releasedRouteFence: false,
+        });
+        const status = await h.acquire(acquisition());
+        // The allocation stays allocated but is not bound as sendable. The
+        // shared wrapper is healthy, yet this acquisition must read as a wait
+        // so the caller takes its bounded retry path.
+        expect(status).toMatchObject({ physical: 'running' });
+        expect(status.connection).not.toBe('ready');
+        expect(status.wrapperInstanceId).toBeUndefined();
+        expect(controlDispatchDisposition(status)).toEqual({ action: 'wait' });
+        expect(h.records.has('acquisition_receipts')).toBe(false);
+      }
+    );
+
+    it('keeps fencing a completed retirement until its notification is delivered', async () => {
+      const { h } = await retire({
+        state: 'completed',
+        notificationState: 'pending',
+        replayUntil: Date.now() - 1,
+        releasedRouteFence: false,
+      });
+      const status = await h.acquire(acquisition());
+      expect(status).toMatchObject({ physical: 'running' });
+      expect(status.connection).not.toBe('ready');
+      expect(controlDispatchDisposition(status)).toEqual({ action: 'wait' });
+      expect(h.records.has('acquisition_receipts')).toBe(false);
+    });
+
+    it('still fences when there is no active wrapper connection to compare', async () => {
+      // No handshake: `activeConnection` never exists, so the retirement's
+      // wrapper lifetime cannot be shown to be stale and must keep fencing.
+      const h = await harness();
+      await h.create();
+      const physical = await h.control.getPhysicalRecord();
+      if (!physical.providerRef) throw new Error('Missing allocation');
+      h.records.set('native_runtime_retirements', [
+        {
+          directory: ROUTE.directory,
+          nativeRuntimeId: retiredNativeRuntimeId,
+          allocation: {
+            providerRef: physical.providerRef,
+            ...(physical.createIntent ? { createIntentId: physical.createIntent.intentId } : {}),
+          },
+          connection: {
+            connectionId: crypto.randomUUID(),
+            providerInstanceId: physical.providerRef,
+            wrapperInstanceId: crypto.randomUUID(),
+          },
+          recipients: [
+            {
+              sessionId: ROUTE.sessionId,
+              kiloSessionId: ROUTE.kiloSessionId,
+              directory: ROUTE.directory,
+              ownerId: OWNER,
+              nativeRuntimeId: retiredNativeRuntimeId,
+            },
+          ],
+          reason: 'process_exited',
+          cleanupDeadlineAt: Date.now() + DEADLINE_MS.stopAttempt,
+          replayUntil: Date.now() - 1,
+          attempts: 0,
+          notificationAttempts: 0,
+          notificationState: 'pending',
+          state: 'pending',
+          disposition: 'pending',
+        },
+      ]);
+      const status = await h.acquire(acquisition());
+      expect(status).toMatchObject({ physical: 'running' });
+      expect(status.connection).not.toBe('ready');
+      expect(controlDispatchDisposition(status)).toEqual({ action: 'wait' });
+      expect(h.records.has('acquisition_receipts')).toBe(false);
+    });
+
+    it.each([
+      { field: 'wrapperInstanceId', override: { wrapperInstanceId: crypto.randomUUID() } },
+      { field: 'providerInstanceId', override: { providerInstanceId: crypto.randomUUID() } },
+    ])('does not fence a retirement from a different $field lifetime', async ({ override }) => {
+      const { h, physical } = await retire({
+        state: 'pending',
+        notificationState: 'pending',
+        replayUntil: Date.now() - 1,
+        releasedRouteFence: false,
+        connectionOverride: override,
+      });
+      const status = await h.acquire(acquisition());
+      expect(status).toMatchObject({ physical: 'running', connection: 'ready' });
+      expect(controlDispatchDisposition(status)).toEqual({ action: 'send' });
+      expect(h.records.get('acquisition_receipts')).toEqual([
+        {
+          ...acquisition(),
+          allocation: { kind: 'intent', id: physical.createIntent?.intentId },
+        },
+      ]);
+    });
+
+    it('does not create a replacement over a tombstoned allocation', async () => {
+      const h = await harness();
+      await h.create();
+      await h.ready();
+      await h.control.beginStop('execution_failed');
+      const before = await h.control.getPhysicalRecord();
+      expect(before.state).toBe('stopping');
+      expect(before.stopTombstone).not.toBeNull();
+      await expect(h.acquire(acquisition())).resolves.toMatchObject({ physical: 'stopping' });
+      expect(h.records.has('acquisition_receipts')).toBe(false);
+      expect(mocks.providerCreate).toHaveBeenCalledOnce();
+      expect(h.allocations.size).toBe(1);
+    });
+
+    it('does not send the retired native runtime as the current attach identity', async () => {
+      const { h, identity, route } = await retire({
+        state: 'completed',
+        notificationState: 'delivered',
+        replayUntil: Date.now() + 60_000,
+        releasedRouteFence: true,
+      });
+      await h.acquire(acquisition());
+      await h.control.request({
+        operation: 'session.attach',
+        session: {
+          sessionId: route.sessionId,
+          kiloSessionId: route.kiloSessionId,
+          directory: route.directory,
+        },
+        payload: { directory: route.directory },
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      });
+      const [outbound] = h.sendRequest.mock.calls.at(-1) ?? [];
+      expect(outbound).toBeDefined();
+      // The delivered retirement cleared the route's current native, so the new
+      // attachment neither carries nor requires the retired runtime identity.
+      const [attachedRoute] = await h.control.listRoutes();
+      expect(attachedRoute).not.toHaveProperty('retiringNativeRuntimeId');
+      expect(JSON.stringify(outbound)).not.toContain(retiredNativeRuntimeId);
+    });
   });
 
   it('rolls back a create claim when its startup alarm cannot be persisted', async () => {

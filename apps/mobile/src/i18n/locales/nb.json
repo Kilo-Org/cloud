@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO for bedrifter"
   },
   "preferences": {
+    "general": "Generelt",
+    "voiceInput": "Taleinndata",
     "autoExpandThinking": "Vis resonnering automatisk",
     "autoExpandThinkingSubtitle": "Vis hele agentens resonnement når det er ferdig.",
     "keepScreenOn": "Hold skjermen på i øktvisningen",
@@ -237,6 +239,7 @@
     "appearanceLight": "Lys",
     "appearanceDark": "Mørk",
     "account": "Konto",
+    "accountSubtitle": "Språk, godkjente verter og enhetsøkter",
     "prReviewAttribution": "Oppgi appen i PR-gjennomganger",
     "prReviewAttributionSubtitle": "Legg til bunnteksten «Gjennomgått via Kilo» når du sender inn en kodegjennomgang.",
     "returnSendsMessage": "Returtasten sender meldingen",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kunne ikke nå Kilo Gateway. Sjekk tilkoblingen og prøv igjen.",
     "gatewayTimeout": "Transkripsjonen tok for lang tid. Prøv igjen.",
     "gatewayModelUnavailable": "Denne transkripsjonsmodellen er ikke tilgjengelig. Velg en annen under Innstillinger.",
+    "gatewayModelUnavailableNotice": "Denne modellen tilbys ikke lenger. Trykk på $t(transcriptionModel.title) for å velge en annen.",
     "gatewaySignInRequired": "Logg inn for å bruke transkripsjon via Kilo Gateway.",
     "gatewayNoModel": "Velg en transkripsjonsmodell under Innstillinger først."
   },

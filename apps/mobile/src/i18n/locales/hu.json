@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Vállalati SSO"
   },
   "preferences": {
+    "general": "Általános",
+    "voiceInput": "Hangbevitel",
     "autoExpandThinking": "Gondolkodás automatikus kibontása",
     "autoExpandThinkingSubtitle": "Az ügynök gondolatmenete automatikusan megjelenik kibontva, amint elkészül.",
     "keepScreenOn": "Képernyő bekapcsolva tartása a munkamenet oldalán",
@@ -237,6 +239,7 @@
     "appearanceLight": "Világos",
     "appearanceDark": "Sötét",
     "account": "Fiók",
+    "accountSubtitle": "Nyelv, megbízható webhelyek és eszközök munkamenetei",
     "prReviewAttribution": "Az alkalmazás feltüntetése a PR-ellenőrzésekben",
     "prReviewAttributionSubtitle": "Az elküldött ellenőrzés végére bekerül az „Ellenőrizve a Kilo alkalmazással” lábléc.",
     "returnSendsMessage": "Az Enter billentyű elküldi az üzenetet",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Nem sikerült elérni a Kilo Gateway-t. Ellenőrizd a kapcsolatot, és próbáld újra.",
     "gatewayTimeout": "Túl sokáig tartott az átírás. Próbáld újra.",
     "gatewayModelUnavailable": "Ez az átírási modell nem érhető el. Válassz egy másikat a Beállításokban.",
+    "gatewayModelUnavailableNotice": "Ez a modell már nem elérhető. Koppints a $t(transcriptionModel.title) elemre egy másik kiválasztásához.",
     "gatewaySignInRequired": "Jelentkezz be a Kilo Gateway-es átírás használatához.",
     "gatewayNoModel": "Először válassz egy átírási modellt a Beállításokban."
   },

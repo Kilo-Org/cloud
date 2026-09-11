@@ -30,14 +30,23 @@ vi.mock('expo-secure-store', () => ({
 const storedModel = vi.hoisted(() => ({
   current: null as { id: string; name: string } | null,
 }));
+const writeTranscriptionModel = vi.hoisted(() =>
+  vi.fn<(model: { id: string; name: string } | null) => void>()
+);
+const modelLoad = vi.hoisted(() => ({
+  whenLoaded: vi.fn(async (): Promise<void> => undefined),
+}));
 vi.mock('./gateway-transcription-preference', () => ({
   readGatewayTranscriptionModel: vi.fn(() => storedModel.current),
+  writeGatewayTranscriptionModel: writeTranscriptionModel,
+  whenGatewayTranscriptionModelLoaded: modelLoad.whenLoaded,
 }));
 const transcriptionModels = vi.hoisted(() => ({
   fetchTranscriptionModels: vi.fn(async (): Promise<{ id: string; name: string }[]> => []),
 }));
 vi.mock('@/lib/hooks/use-transcription-models', () => ({
   fetchTranscriptionModels: transcriptionModels.fetchTranscriptionModels,
+  useTranscriptionModels: vi.fn(),
 }));
 
 const platformMock = vi.hoisted(() => ({ OS: 'ios' as string }));
@@ -126,6 +135,19 @@ async function flush(): Promise<void> {
   }
 }
 
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let storedResolve: (() => void) | undefined = undefined;
+  const promise = new Promise<void>(resolve => {
+    storedResolve = resolve;
+  });
+  return {
+    promise,
+    resolve: () => {
+      storedResolve?.();
+    },
+  };
+}
+
 describe('gatewayVoiceInputNative recorder construction', () => {
   beforeEach(() => {
     recorderBox.calls.length = 0;
@@ -198,6 +220,9 @@ describe('resolveGatewayTranscriptionModelId', () => {
   beforeEach(() => {
     storedModel.current = null;
     transcriptionModels.fetchTranscriptionModels.mockReset();
+    writeTranscriptionModel.mockReset();
+    modelLoad.whenLoaded.mockReset();
+    modelLoad.whenLoaded.mockImplementation(async () => undefined);
     vi.mocked(SecureStore.getItemAsync).mockResolvedValue(null);
   });
 
@@ -209,6 +234,7 @@ describe('resolveGatewayTranscriptionModelId', () => {
       name: 'Stored Model',
     });
     expect(transcriptionModels.fetchTranscriptionModels).not.toHaveBeenCalled();
+    expect(writeTranscriptionModel).not.toHaveBeenCalled();
   });
 
   it('scopes the catalogue read to the stored organization', async () => {
@@ -224,7 +250,7 @@ describe('resolveGatewayTranscriptionModelId', () => {
     expect(transcriptionModels.fetchTranscriptionModels).toHaveBeenCalledWith('org-42');
   });
 
-  it('falls back to the first catalogue entry when none is stored', async () => {
+  it('falls back to the first catalogue entry and persists it when none is stored', async () => {
     transcriptionModels.fetchTranscriptionModels.mockResolvedValue([
       { id: 'first-model', name: 'First Model' },
       { id: 'second-model', name: 'Second Model' },
@@ -234,17 +260,53 @@ describe('resolveGatewayTranscriptionModelId', () => {
       id: 'first-model',
       name: 'First Model',
     });
+    // Persisted so the auto-picked model survives launches even if the user
+    // never opens the settings page.
+    expect(writeTranscriptionModel).toHaveBeenCalledWith({
+      id: 'first-model',
+      name: 'First Model',
+    });
   });
 
-  it('reads an empty catalogue as no model', async () => {
+  it('does not overwrite an existing stored model', async () => {
+    storedModel.current = { id: 'stored-model', name: 'Stored Model' };
+
+    await resolveGatewayTranscriptionModelId();
+
+    expect(writeTranscriptionModel).not.toHaveBeenCalled();
+  });
+
+  it('awaits the stored-model read before falling back, so a cold start cannot overwrite an existing choice', async () => {
+    const load = deferred();
+    modelLoad.whenLoaded.mockReturnValueOnce(load.promise);
+    transcriptionModels.fetchTranscriptionModels.mockResolvedValue([
+      { id: 'first-model', name: 'First Model' },
+    ]);
+    storedModel.current = null;
+
+    const pending = resolveGatewayTranscriptionModelId();
+
+    // The disk read lands with the user's existing choice, then the store load
+    // settles. The resolver must keep that choice, not persist the fallback.
+    storedModel.current = { id: 'stored-model', name: 'Stored Model' };
+    load.resolve();
+
+    await expect(pending).resolves.toEqual({ id: 'stored-model', name: 'Stored Model' });
+    expect(transcriptionModels.fetchTranscriptionModels).not.toHaveBeenCalled();
+    expect(writeTranscriptionModel).not.toHaveBeenCalled();
+  });
+
+  it('reads an empty catalogue as no model and writes nothing', async () => {
     transcriptionModels.fetchTranscriptionModels.mockResolvedValue([]);
 
     await expect(resolveGatewayTranscriptionModelId()).resolves.toBeNull();
+    expect(writeTranscriptionModel).not.toHaveBeenCalled();
   });
 
-  it('reads an unreachable catalogue as no model', async () => {
+  it('reads an unreachable catalogue as no model and writes nothing', async () => {
     transcriptionModels.fetchTranscriptionModels.mockRejectedValue(new Error('offline'));
 
     await expect(resolveGatewayTranscriptionModelId()).resolves.toBeNull();
+    expect(writeTranscriptionModel).not.toHaveBeenCalled();
   });
 });

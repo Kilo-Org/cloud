@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Կորպորատիվ SSO"
   },
   "preferences": {
+    "general": "Ընդհանուր",
+    "voiceInput": "Ձայնային մուտք",
     "autoExpandThinking": "Ինքնաշխատ բացել մտածման բաժինը",
     "autoExpandThinkingSubtitle": "Մտածումն ավարտվելուց հետո բացել գործակալի մտածման բաժինը։",
     "keepScreenOn": "Նիստի էջում էկրանը միացված պահել",
@@ -237,6 +239,7 @@
     "appearanceLight": "Բաց",
     "appearanceDark": "Մուգ",
     "account": "Հաշիվ",
+    "accountSubtitle": "Լեզու, վստահելի կայքեր և սարքերի աշխատաշրջաններ",
     "prReviewAttribution": "PR ստուգումներում նշել հավելվածը",
     "prReviewAttributionSubtitle": "Ստուգումն ուղարկելիս վերջում ավելացնել «Ստուգվել է Kilo-ի միջոցով» նշումը։",
     "returnSendsMessage": "Մուտքի ստեղնն ուղարկում է հաղորդագրությունը",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Հնարավոր չեղավ կապ հաստատել Kilo Gateway-ի հետ։ Ստուգեք կապը և կրկին փորձեք։",
     "gatewayTimeout": "Տեքստի վերածումը չափազանց երկար տևեց։ Կրկին փորձեք։",
     "gatewayModelUnavailable": "Այս տեքստի վերածման մոդելը հասանելի չէ։ Ընտրեք մեկ այլ՝ Նախապատվություններում։",
+    "gatewayModelUnavailableNotice": "Այս մոդելը այլևս չի առաջարկվում։ Մեկ այլ ընտրելու համար հպեք $t(transcriptionModel.title)։",
     "gatewaySignInRequired": "Մուտք գործեք՝ Kilo Gateway-ի վերածումն օգտագործելու համար։",
     "gatewayNoModel": "Նախ ընտրեք տեքստի վերածման մոդել՝ Նախապատվություններում։"
   },

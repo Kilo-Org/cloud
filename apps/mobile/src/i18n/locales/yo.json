@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO ilé iṣẹ́"
   },
   "preferences": {
+    "general": "Gbogbogbo",
+    "voiceInput": "Ìwọlé ohùn",
     "autoExpandThinking": "Ṣí ìrònú sílẹ̀ láìfọwọ́yí",
     "autoExpandThinkingSubtitle": "Fi ìrònú aṣojú hàn ní kíkún nígbà tí ó bá parí.",
     "keepScreenOn": "Jẹ́ kí iboju máa tàn ní ojú ìwé ìgbà iṣẹ́",
@@ -237,6 +239,7 @@
     "appearanceLight": "Ìmọ́lẹ̀",
     "appearanceDark": "Òkùnkùn",
     "account": "Àkọọ́lẹ̀",
+    "accountSubtitle": "Èdè, àwọn ojúlé tí a gbẹ́kẹ̀ lé àti àwọn ìgbà iṣẹ́ ẹ̀rọ",
     "prReviewAttribution": "Fi orúkọ ohun èlò kún àwọn àtúnyẹ̀wò PR",
     "prReviewAttributionSubtitle": "Fi àkọsílẹ̀ pé a ṣe àtúnyẹ̀wò nípasẹ̀ Kilo sí ìsàlẹ̀ nígbà tí o bá fi àtúnyẹ̀wò ránṣẹ́.",
     "returnSendsMessage": "Bọ́tìnì ìpadàbọ̀ ń fi ìfiránṣẹ́ ránṣẹ́",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "A kò lè dé ọ̀dọ̀ Kilo Gateway. Ṣàyẹ̀wò àsopọ̀ rẹ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
     "gatewayTimeout": "Ìyípadà ohùn sí ọ̀rọ̀ gba àkókò jù. Gbìyànjú lẹ́ẹ̀kan sí i.",
     "gatewayModelUnavailable": "Àwòṣe ìyípadà yìí kò sí. Yan òmíràn nínú Àwọn ààyò.",
+    "gatewayModelUnavailableNotice": "A kìí ṣe àwòṣe yìí mọ́. Tẹ $t(transcriptionModel.title) láti yan òmíràn.",
     "gatewaySignInRequired": "Wọlé láti lo ìyípadà ohùn sí ọ̀rọ̀ pẹ̀lú Kilo Gateway.",
     "gatewayNoModel": "Ní àkọ́kọ́, yan àwòṣe ìyípadà ohùn sí ọ̀rọ̀ nínú Àwọn ààyò."
   },

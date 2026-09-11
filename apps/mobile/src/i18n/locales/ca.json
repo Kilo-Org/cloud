@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO d'empresa"
   },
   "preferences": {
+    "general": "General",
+    "voiceInput": "Entrada de veu",
     "autoExpandThinking": "Desplega automàticament el raonament",
     "autoExpandThinkingSubtitle": "Mostra el raonament de l'agent desplegat quan acaba de raonar.",
     "keepScreenOn": "Mantén la pantalla encesa mentre vegis la sessió",
@@ -237,6 +239,7 @@
     "appearanceLight": "Clar",
     "appearanceDark": "Fosc",
     "account": "Compte",
+    "accountSubtitle": "Idioma, servidors de confiança i sessions als dispositius",
     "prReviewAttribution": "Afegeix l'atribució de l'aplicació a les revisions de PR",
     "prReviewAttributionSubtitle": "Afegeix un peu amb el text «Revisat amb Kilo» quan enviïs una revisió.",
     "returnSendsMessage": "La tecla de retorn envia el missatge",
@@ -2597,6 +2600,7 @@
     "gatewayUnreachable": "No s'ha pogut contactar amb Kilo Gateway. Comprova la connexió i torna-ho a provar.",
     "gatewayTimeout": "La transcripció ha trigat massa. Torna-ho a provar.",
     "gatewayModelUnavailable": "Aquest model de transcripció no està disponible. Tria'n un altre a les Preferències.",
+    "gatewayModelUnavailableNotice": "Aquest model ja no s'ofereix. Toca $t(transcriptionModel.title) per triar-ne un altre.",
     "gatewaySignInRequired": "Inicia la sessió per utilitzar la transcripció amb Kilo Gateway.",
     "gatewayNoModel": "Primer tria un model de transcripció a les Preferències."
   },

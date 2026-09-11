@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Ettevõtte SSO"
   },
   "preferences": {
+    "general": "Üldine",
+    "voiceInput": "Häälsisestus",
     "autoExpandThinking": "Ava mõttekäik automaatselt",
     "autoExpandThinkingSubtitle": "Näita agendi mõttekäiku avatuna, kui mõtlemine lõpeb.",
     "keepScreenOn": "Hoia ekraan seansi lehel sisselülitatuna",
@@ -237,6 +239,7 @@
     "appearanceLight": "Hele",
     "appearanceDark": "Tume",
     "account": "Konto",
+    "accountSubtitle": "Keel, usaldatud hostid ja seadmete seansid",
     "prReviewAttribution": "Lisa PR-ülevaatustele rakenduse viide",
     "prReviewAttributionSubtitle": "Lisa ülevaatuse esitamisel jalusesse märge „Üle vaadatud Kilo kaudu“.",
     "returnSendsMessage": "Sisestusklahv saadab sõnumi",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Ühendust Kilo Gatewayga ei õnnestunud saada. Kontrolli ühendust ja proovi uuesti.",
     "gatewayTimeout": "Kõnetuvastus võttis liiga palju aega. Proovi uuesti.",
     "gatewayModelUnavailable": "Seda kõnetuvastuse mudelit pole saadaval. Vali Eelistustes mõni teine.",
+    "gatewayModelUnavailableNotice": "Seda mudelit enam ei pakuta. Puuduta $t(transcriptionModel.title), et valida teine.",
     "gatewaySignInRequired": "Logi sisse, et kasutada Kilo Gateway kõnetuvastust.",
     "gatewayNoModel": "Vali kõigepealt Eelistustes kõnetuvastuse mudel."
   },

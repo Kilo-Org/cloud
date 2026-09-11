@@ -51,6 +51,7 @@ export const DIAGNOSTIC_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 const IsoTimestampSchema = z.string().datetime({ offset: true });
 const OperationalIdentifierSchema = z.string().min(1).max(MAX_OPERATIONAL_IDENTIFIER_LENGTH);
+const kiloSessionIdSchema = z.string().startsWith('ses_').length(30);
 const WrapperRunIdentifierSchema = OperationalIdentifierSchema.regex(/^wr_[A-Za-z0-9_-]+$/);
 const validFailureClassifications = new Set(
   CloudAgentRunFailureClassifications.map(
@@ -59,8 +60,25 @@ const validFailureClassifications = new Set(
 );
 
 const CloudAgentQueueSessionIdentitySchema = z
-  .object({ cloudAgentSessionId: OperationalIdentifierSchema })
-  .strict();
+  .object({
+    cloudAgentSessionId: OperationalIdentifierSchema,
+    kiloSessionId: kiloSessionIdSchema.optional(),
+    initialMessageId: OperationalIdentifierSchema.optional(),
+    reportingCreatedAt: IsoTimestampSchema.optional(),
+  })
+  .strict()
+  .superRefine((session, ctx) => {
+    const present = [session.kiloSessionId, session.initialMessageId, session.reportingCreatedAt].filter(
+      value => value !== undefined
+    ).length;
+    if (present !== 0 && present !== 3) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Reporting anchor fields must be provided together',
+        path: ['kiloSessionId'],
+      });
+    }
+  });
 
 const CloudAgentFailedRunDiagnosticSchema = z
   .object({

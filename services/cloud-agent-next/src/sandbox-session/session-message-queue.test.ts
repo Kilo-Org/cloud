@@ -1209,6 +1209,7 @@ function sessionFixture(
   const env = {
     SANDBOX_CONTROL: { getByName: () => sharedControl ?? control },
     CALLBACK_QUEUE: callbackQueue,
+    CLOUD_AGENT_REPORT_QUEUE: { send: async () => undefined },
     CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
     CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org_1',
     CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: 'user_1',

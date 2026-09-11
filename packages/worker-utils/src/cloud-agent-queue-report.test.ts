@@ -242,4 +242,51 @@ describe('CloudAgentQueueReportSchema', () => {
       ).success
     ).toBe(false);
   });
+
+  it('round-trips a complete reporting anchor for a session without an initial turn', () => {
+    const parsed = CloudAgentQueueReportSchema.parse({
+      ...reportWithRun({ status: 'queued', queuedAt: '2026-05-26T08:01:00.000Z' }),
+      session: {
+        cloudAgentSessionId: 'agent_reporting_session',
+        kiloSessionId: 'ses_12345678901234567890123456',
+        initialMessageId: 'msg_anchor_first',
+        reportingCreatedAt: '2026-05-26T07:59:00.000Z',
+      },
+    });
+
+    expect(parsed.session).toEqual({
+      cloudAgentSessionId: 'agent_reporting_session',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      initialMessageId: 'msg_anchor_first',
+      reportingCreatedAt: '2026-05-26T07:59:00.000Z',
+    });
+  });
+
+  it('keeps the legacy anchor-free session shape valid', () => {
+    expect(
+      CloudAgentQueueReportSchema.safeParse({
+        ...reportWithRun({ status: 'queued' }),
+        session: { cloudAgentSessionId: 'agent_reporting_session' },
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects a partial reporting anchor', () => {
+    for (const partial of [
+      { kiloSessionId: 'ses_12345678901234567890123456' },
+      { initialMessageId: 'msg_anchor_first' },
+      { reportingCreatedAt: '2026-05-26T07:59:00.000Z' },
+      {
+        kiloSessionId: 'ses_12345678901234567890123456',
+        initialMessageId: 'msg_anchor_first',
+      },
+    ]) {
+      expect(
+        CloudAgentQueueReportSchema.safeParse({
+          ...reportWithRun({ status: 'queued' }),
+          session: { cloudAgentSessionId: 'agent_reporting_session', ...partial },
+        }).success
+      ).toBe(false);
+    }
+  });
 });

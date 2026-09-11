@@ -292,6 +292,113 @@ describe('cloud agent reporting store', () => {
     expect(fake.inserts).toHaveLength(0);
   });
 
+  const anchor = {
+    kiloSessionId: 'ses_12345678901234567890123456',
+    initialMessageId: 'msg_anchor_initial',
+    reportingCreatedAt: occurredAt,
+  };
+  const anchoredReport = {
+    version: 1,
+    type: 'run.state',
+    occurredAt,
+    session: { cloudAgentSessionId, ...anchor },
+    run: { messageId: 'msg_anchor_run', status: 'queued', queuedAt: occurredAt },
+  } satisfies CloudAgentRunStateReport;
+
+  it('creates a retention-eligible parent from a trusted anchor then applies the run', async () => {
+    const fake = makeDb([
+      [],
+      [
+        {
+          createdAt: occurredAt,
+          kiloSessionId: anchor.kiloSessionId,
+          initialMessageId: anchor.initialMessageId,
+        },
+      ],
+      [],
+    ]);
+    const store = createCloudAgentReportStore(fake.db as never);
+
+    expect(await store.saveReport(anchoredReport, occurredAt)).toEqual({ outcome: 'applied' });
+    expect(fake.inserts.find(call => call.table === cloud_agent_sessions)?.values).toEqual({
+      cloud_agent_session_id: cloudAgentSessionId,
+      kilo_session_id: anchor.kiloSessionId,
+      initial_message_id: anchor.initialMessageId,
+      created_at: anchor.reportingCreatedAt,
+    });
+    expect(
+      fake.inserts.find(call => call.table === cloud_agent_session_runs)?.values
+    ).toMatchObject({
+      cloud_agent_session_id: cloudAgentSessionId,
+      message_id: 'msg_anchor_run',
+      status: 'queued',
+    });
+  });
+
+  it('refuses to resurrect a parent for an anchor older than the retention cutoff', async () => {
+    const fake = makeDb([[]]);
+    const store = createCloudAgentReportStore(fake.db as never);
+    const expiredAnchor = {
+      ...anchoredReport,
+      session: {
+        cloudAgentSessionId,
+        ...anchor,
+        reportingCreatedAt: new Date(
+          Date.parse(occurredAt) - 91 * 24 * 60 * 60 * 1000
+        ).toISOString(),
+      },
+    } satisfies CloudAgentRunStateReport;
+
+    expect(await store.saveReport(expiredAnchor, occurredAt)).toEqual({
+      outcome: 'missing_parent',
+    });
+    expect(fake.inserts).toHaveLength(0);
+  });
+
+  it('reports missing_parent when a concurrent parent still cannot be read back', async () => {
+    const fake = makeDb([[], [], []]);
+    const store = createCloudAgentReportStore(fake.db as never);
+
+    expect(await store.saveReport(anchoredReport, occurredAt)).toEqual({
+      outcome: 'missing_parent',
+    });
+    expect(fake.inserts.some(call => call.table === cloud_agent_sessions)).toBe(true);
+    expect(fake.inserts.some(call => call.table === cloud_agent_session_runs)).toBe(false);
+  });
+
+  it('leaves an existing parent untouched when applying an anchored report', async () => {
+    const fake = makeDb([
+      [
+        {
+          createdAt: occurredAt,
+          kiloSessionId: anchor.kiloSessionId,
+          initialMessageId: anchor.initialMessageId,
+        },
+      ],
+      [],
+    ]);
+    const store = createCloudAgentReportStore(fake.db as never);
+
+    expect(await store.saveReport(anchoredReport, occurredAt)).toEqual({ outcome: 'applied' });
+    expect(fake.inserts.some(call => call.table === cloud_agent_sessions)).toBe(false);
+  });
+
+  it('refuses an anchored report whose parent identity conflicts', async () => {
+    const fake = makeDb([
+      [
+        {
+          createdAt: occurredAt,
+          kiloSessionId: 'ses_zzzzzzzzzzzzzzzzzzzzzzzzzz',
+          initialMessageId: 'msg_other_initial',
+        },
+      ],
+    ]);
+    const store = createCloudAgentReportStore(fake.db as never);
+
+    expect(await store.saveReport(anchoredReport, occurredAt)).toEqual({ outcome: 'conflict' });
+    expect(fake.inserts).toHaveLength(0);
+  });
+
   it('persists run milestones, typed failure and sanitized detail by natural composite key', async () => {
     const fake = makeDb([[{ createdAt: occurredAt }], []]);
     const store = createCloudAgentReportStore(fake.db as never);

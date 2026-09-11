@@ -111,6 +111,28 @@ describe('Cloud Agent report consumer', () => {
     }
   );
 
+  it('acks a report whose parent identity conflicts without retrying', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const saveReport = vi.fn().mockResolvedValueOnce({ outcome: 'conflict' });
+    vi.mocked(createCloudAgentReportStore).mockReturnValue({ saveReport } as never);
+    const message = makeMessage(report);
+
+    await consumeCloudAgentReportBatch(
+      { messages: [message] } as unknown as MessageBatch<unknown>,
+      env
+    );
+
+    expect(error).toHaveBeenCalledWith(
+      'Dropping Cloud Agent run report with conflicting session parent identity',
+      {
+        cloudAgentSessionId: report.session.cloudAgentSessionId,
+        messageId: report.run.messageId,
+      }
+    );
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
   it('continues the batch after a missing parent and acknowledges a later successful redelivery', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const saveReport = vi

@@ -68,7 +68,12 @@ const recordSessionFailureSchema = z
 
 type DatabaseTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 type MutationResult = { applied?: boolean };
-type SaveReportResult = { outcome: 'applied' | 'expired' | 'missing_parent' };
+type SaveReportResult = { outcome: 'applied' | 'expired' | 'missing_parent' | 'conflict' };
+type ReportingParent = {
+  createdAt: string;
+  kiloSessionId: string | null;
+  initialMessageId: string | null;
+};
 type StoredRunRow = {
   status: 'queued' | 'accepted' | 'completed' | 'failed' | 'interrupted';
   wrapperRunId: string | null;
@@ -88,6 +93,76 @@ function retentionCutoff(now: string): string {
   const cutoff = new Date(now);
   cutoff.setUTCDate(cutoff.getUTCDate() - CLOUD_AGENT_REPORT_RETENTION_DAYS);
   return cutoff.toISOString();
+}
+
+async function readReportingParent(
+  tx: DatabaseTransaction,
+  cloudAgentSessionId: string
+): Promise<ReportingParent | undefined> {
+  const rows = await tx
+    .select({
+      createdAt: cloud_agent_sessions.created_at,
+      kiloSessionId: cloud_agent_sessions.kilo_session_id,
+      initialMessageId: cloud_agent_sessions.initial_message_id,
+    })
+    .from(cloud_agent_sessions)
+    .where(eq(cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId))
+    .limit(1);
+  return rows[0];
+}
+
+function parentConflictsWithAnchor(
+  parent: ReportingParent,
+  report: CloudAgentRunStateReport
+): boolean {
+  const { kiloSessionId, initialMessageId } = report.session;
+  if (kiloSessionId === undefined || initialMessageId === undefined) return false;
+  return (
+    (parent.kiloSessionId != null && parent.kiloSessionId !== kiloSessionId) ||
+    (parent.initialMessageId != null && parent.initialMessageId !== initialMessageId)
+  );
+}
+
+/**
+ * Ensures a reporting parent for a control-plane session that never had an
+ * initial turn (worktree and empty chats). The trusted anchor is written at
+ * admission; the parent is inserted only inside the retention window and is
+ * never updated or refreshed. A concurrent writer may already have created it,
+ * so the insert tolerates conflicts and the caller re-reads.
+ */
+async function ensureReportingParent(
+  tx: DatabaseTransaction,
+  report: CloudAgentRunStateReport,
+  now: string
+): Promise<ReportingParent | undefined> {
+  const { kiloSessionId, initialMessageId, reportingCreatedAt } = report.session;
+  if (
+    kiloSessionId === undefined ||
+    initialMessageId === undefined ||
+    reportingCreatedAt === undefined
+  ) {
+    return undefined;
+  }
+  if (Date.parse(reportingCreatedAt) <= Date.parse(retentionCutoff(now))) return undefined;
+
+  await tx
+    .insert(cloud_agent_sessions)
+    .values({
+      cloud_agent_session_id: report.session.cloudAgentSessionId,
+      kilo_session_id: kiloSessionId,
+      initial_message_id: initialMessageId,
+      created_at: reportingCreatedAt,
+    })
+    .onConflictDoNothing();
+
+  const ensured = await readReportingParent(tx, report.session.cloudAgentSessionId);
+  if (!ensured) {
+    console.error('Cloud Agent report could not ensure its session parent', {
+      cloudAgentSessionId: report.session.cloudAgentSessionId,
+    });
+    return undefined;
+  }
+  return ensured;
 }
 
 async function lockReportingSession(
@@ -145,13 +220,18 @@ export function createCloudAgentReportStore(db: WorkerDb) {
     now: string
   ): Promise<SaveReportResult> {
     const cloudAgentSessionId = report.session.cloudAgentSessionId;
-    const parentRows = await tx
-      .select({ createdAt: cloud_agent_sessions.created_at })
-      .from(cloud_agent_sessions)
-      .where(eq(cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId))
-      .limit(1);
-    const parent = parentRows[0];
-    if (!parent) return { outcome: 'missing_parent' };
+    let parent = await readReportingParent(tx, cloudAgentSessionId);
+    if (!parent) {
+      parent = await ensureReportingParent(tx, report, now);
+      if (!parent) return { outcome: 'missing_parent' };
+    }
+    if (parentConflictsWithAnchor(parent, report)) {
+      console.error('Cloud Agent report anchor conflicts with existing session parent', {
+        cloudAgentSessionId,
+        messageId: report.run.messageId,
+      });
+      return { outcome: 'conflict' };
+    }
     if (Date.parse(parent.createdAt) <= Date.parse(retentionCutoff(now))) {
       return { outcome: 'expired' };
     }

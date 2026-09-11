@@ -712,20 +712,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
     beforeEach(() => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
-      // A no-output session usually burned enough tokens that the auto-retry
-      // token guard declines a fresh run, so the terminal failure path runs.
-      mockGetSessionUsageFromBilling.mockResolvedValue({
-        model: 'anthropic/claude-sonnet-4.6',
-        totalTokensIn: 60_000,
-        totalTokensOut: 60_000,
-        tokensIn: 0,
-        tokensOut: 0,
-        cachedTokens: 0,
-        totalCostMusd: 100,
-      });
     });
 
-    it('marks the review failed with the assistant_no_reply reason', async () => {
+    it('marks the review failed with the assistant_empty_completion reason', async () => {
       const response = await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
 
       expect(response.status).toBe(200);
@@ -733,13 +722,34 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         expect.objectContaining({
           codeReviewId: REVIEW_ID,
           status: 'failed',
-          terminalReason: 'assistant_no_reply',
+          terminalReason: 'assistant_empty_completion',
         })
       );
       expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
-        expect.objectContaining({ terminalReason: 'assistant_no_reply' })
+        expect.objectContaining({ terminalReason: 'assistant_empty_completion' })
+      );
+    });
+
+    it('does not auto-retry a no-output completion', async () => {
+      await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
+
+      // A fresh run with the same model and configuration is likely to repeat
+      // the empty completion, so the failure is terminal and the customer sees
+      // the failed check instead of a silent retry.
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+    });
+
+    it('reports the downgrade to Sentry for observability', async () => {
+      await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
+
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        'Code review completed without producing output',
+        expect.objectContaining({
+          level: 'warning',
+          tags: expect.objectContaining({ source: 'code-review-status-no-output' }),
+        })
       );
     });
 
@@ -1519,7 +1529,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
     it('handles missing terminalReason gracefully', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
-
+      // The assistant text is present, so this is a legitimate completion and
+      // it must stay 'completed' even though no terminal reason is sent.
       await POST(
         makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
         makeParams(REVIEW_ID)

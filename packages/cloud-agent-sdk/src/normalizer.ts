@@ -7,6 +7,8 @@ import { z } from 'zod';
 import type { Part, SessionStatus, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
 import type {
   SessionInfo,
+  SessionGoal,
+  SessionGoalStatus,
   CloudStatus,
   SuggestionAction,
   SlashCommandInfo,
@@ -241,6 +243,52 @@ const sessionModelSchema = z.object({
   variant: z.string().optional(),
 });
 
+const SESSION_GOAL_STATUSES = new Set<SessionGoalStatus>([
+  'active',
+  'complete',
+  'blocked',
+  'paused',
+]);
+
+/** Validate a candidate `kilo.goal` value. Returns undefined when malformed. */
+function parseSessionGoal(raw: unknown): SessionGoal | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const goal = raw as Record<string, unknown>;
+  const text = goal['text'];
+  if (typeof text !== 'string' || text.length === 0) return undefined;
+  const status = goal['status'];
+  if (typeof status !== 'string' || !SESSION_GOAL_STATUSES.has(status as SessionGoalStatus)) {
+    return undefined;
+  }
+  const reasonRaw = goal['reason'];
+  const reason = typeof reasonRaw === 'string' && reasonRaw.length > 0 ? reasonRaw : undefined;
+  return {
+    text,
+    status: status as SessionGoalStatus,
+    ...(reason === undefined ? {} : { reason }),
+  };
+}
+
+/**
+ * Project the CLI session goal from `session.info.metadata`. The CLI stores it
+ * under the dotted key `kilo.goal`; accept a nested `kilo.goal` object too.
+ * Malformed metadata drops the goal without throwing.
+ */
+function projectSessionGoal(rawMetadata: unknown): SessionGoal | undefined {
+  if (typeof rawMetadata !== 'object' || rawMetadata === null) return undefined;
+  const metadata = rawMetadata as Record<string, unknown>;
+  const candidates: unknown[] = [metadata['kilo.goal']];
+  const kilo = metadata['kilo'];
+  if (typeof kilo === 'object' && kilo !== null) {
+    candidates.push((kilo as Record<string, unknown>)['goal']);
+  }
+  for (const candidate of candidates) {
+    const goal = parseSessionGoal(candidate);
+    if (goal) return goal;
+  }
+  return undefined;
+}
+
 const connectedServiceDataSchema = connectedDataSchema.extend({
   activeMessageId: z.string().nullable().optional().catch(undefined),
 });
@@ -255,10 +303,12 @@ const cloudMessageCanceledDataSchema = z
 
 function normalizeSessionInfo(rawInfo: { id: string; [key: string]: unknown }): SessionInfo {
   const model = sessionModelSchema.safeParse(rawInfo['model']);
+  const goal = projectSessionGoal(rawInfo['metadata']);
   return {
     id: rawInfo.id,
     parentID: rawInfo['parentID'] != null ? String(rawInfo['parentID']) : undefined,
     ...(model.success ? { model: model.data } : {}),
+    ...(goal === undefined ? {} : { goal }),
   };
 }
 

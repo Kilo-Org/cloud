@@ -167,6 +167,8 @@ export type {
   PreparationStepStatus,
   ServiceStateSnapshot,
   SessionInfo,
+  SessionGoal,
+  SessionGoalStatus,
   KiloSessionId,
   CloudAgentSessionId,
   ResolvedSession,

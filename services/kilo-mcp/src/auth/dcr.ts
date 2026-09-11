@@ -11,7 +11,7 @@
  * without any usable `redirect_uris` gets its own explicit error message.
  */
 import { base64UrlEncode } from './pkce';
-import { MCP_SCOPE, oauthErrorResponse, authJsonResponse } from './http';
+import { MCP_SCOPE, oauthErrorResponse, authJsonResponse, onlyMcpScope, scopeTokens } from './http';
 import type { OAuthStoreApi } from '../store/oauth-store';
 
 export type DcrDeps = {
@@ -198,8 +198,9 @@ export function parseRegistration(
 }
 
 function validScopeString(scope: string): boolean {
-  const tokens = scope.split(' ').filter(t => t.length > 0);
-  return tokens.length > 0 && tokens.every(t => t === MCP_SCOPE);
+  // DCR rejects an empty scope; an omitted scope is defaulted by the caller.
+  const tokens = scopeTokens(scope);
+  return tokens.length > 0 && onlyMcpScope(tokens);
 }
 
 /** POST /register — RFC 7591. 201 with a client_id and no client_secret. */
@@ -233,12 +234,20 @@ export async function handleRegistration(request: Request, deps: DcrDeps): Promi
 
   const now = deps.now?.() ?? new Date();
   const clientId = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
-  await deps.store.registerClient({
+  const stored = await deps.store.registerClient({
     clientId,
     redirectUris: parsed.client.redirectUris,
     clientName: parsed.client.clientName,
     createdAt: now.toISOString(),
   });
+  if (!stored) {
+    // The registry is capped so unauthenticated DCR cannot fill it.
+    return oauthErrorResponse(
+      429,
+      'temporarily_unavailable',
+      'The client registry is at capacity. Retry later.'
+    );
+  }
 
   return authJsonResponse(
     {

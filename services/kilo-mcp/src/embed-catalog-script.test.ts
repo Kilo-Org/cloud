@@ -7,6 +7,7 @@ import {
   embedAndUpsert,
   ensureIndex,
   loadCatalog,
+  parseCatalog,
 } from '../scripts/embed-catalog.ts';
 
 const ENV = {
@@ -191,5 +192,16 @@ describe('loadCatalog', () => {
       expect(typeof row.searchBlob).toBe('string');
       expect(row.searchBlob.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('parseCatalog', () => {
+  it('accepts a well-formed catalog and rejects malformed shapes', () => {
+    const catalog = catalogOf(1);
+    expect(parseCatalog(catalog)).toEqual(catalog);
+    expect(() => parseCatalog(null)).toThrow(/JSON object/);
+    expect(() => parseCatalog([])).toThrow(/JSON object/);
+    expect(() => parseCatalog({ 'proc0.list': { path: 'proc0.list' } })).toThrow(/not a valid/);
+    expect(() => parseCatalog({ wrong: catalog['proc0.list'] })).toThrow(/not a valid/);
   });
 });

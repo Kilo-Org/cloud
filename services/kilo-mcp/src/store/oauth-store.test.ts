@@ -17,7 +17,7 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-const { KiloMcpOAuthStore } = await import('./oauth-store');
+const { KiloMcpOAuthStore, MAX_REGISTERED_CLIENTS } = await import('./oauth-store');
 
 // Test support, inlined: a fake `DurableObjectStorage` whose `sql.exec`
 // delegates to a real `node:sqlite` database, so these tests run the REAL
@@ -142,6 +142,28 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
           createdAt: NOW,
         })
       ).rejects.toThrow();
+    });
+
+    it('refuses a new registration once the registry is full, without inserting', async () => {
+      db.prepare(
+        `WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < ?)
+         INSERT INTO oauth_clients (client_id, redirect_uris, client_name, created_at)
+         SELECT 'bulk-' || n, '["https://a.test/cb"]', 'bulk', ? FROM seq`
+      ).run(MAX_REGISTERED_CLIENTS, NOW);
+      const before = db.prepare('SELECT COUNT(*) AS n FROM oauth_clients').get() as { n: number };
+      expect(before.n).toBeGreaterThanOrEqual(MAX_REGISTERED_CLIENTS);
+      expect(
+        await store.registerClient({
+          clientId: 'over-cap',
+          redirectUris: ['https://a.test/cb'],
+          clientName: 'no room',
+          createdAt: NOW,
+        })
+      ).toBe(false);
+      expect(await store.getClient('over-cap')).toBeNull();
+      const after = db.prepare('SELECT COUNT(*) AS n FROM oauth_clients').get() as { n: number };
+      expect(after.n).toBe(before.n);
+      db.prepare("DELETE FROM oauth_clients WHERE client_id LIKE 'bulk-%'").run();
     });
   });
 
@@ -399,20 +421,33 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         { ...tokenInput, id: 'rt-2', tokenHash: 'b'.repeat(64) },
         NOW
       );
-      expect(rotated).toBe(true);
+      expect(rotated).toBe('rotated');
       expect((await store.getRefreshTokenByHash('a'.repeat(64)))?.revokedAt).toBe(NOW);
       expect((await store.getRefreshTokenByHash('b'.repeat(64)))?.revokedAt).toBeNull();
     });
 
-    it('refuses to rotate an already-revoked token', async () => {
+    it('a replay of a rotated-away token loses and revokes the winner replacement', async () => {
       expect(
         await store.rotateRefreshToken(
           'rt-1',
           { ...tokenInput, id: 'rt-3', tokenHash: 'c'.repeat(64) },
           NOW
         )
-      ).toBe(false);
+      ).toBe('replayed');
       expect(await store.getRefreshTokenByHash('c'.repeat(64))).toBeNull();
+      // The winning rotation (rt-2) dies with the replay, in the same call.
+      expect((await store.getRefreshTokenByHash('b'.repeat(64)))?.revokedAt).toBe(NOW);
+      expect(
+        await store.getKiloToken(
+          {
+            kiloUserId: 'u-1',
+            clientId: 'c-1',
+            organizationId: 'o-1',
+            resource: 'https://mcp.test/mcp',
+          },
+          NOW
+        )
+      ).toBeNull();
     });
 
     it('refuses to rotate an expired token', async () => {
@@ -428,7 +463,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
           { ...tokenInput, id: 'rt-4', tokenHash: 'e'.repeat(64) },
           NOW
         )
-      ).toBe(false);
+      ).toBe('missing');
     });
 
     it('enforces the unique token hash', async () => {
@@ -526,6 +561,39 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       expect(deleted).toBeGreaterThanOrEqual(1);
       expect(await store.getCode('purge-me')).toBeNull();
       expect((await store.getCode('code-1'))?.code).toBe('code-1');
+    });
+
+    it('drops an aged client with no live grant but keeps one with a live grant', async () => {
+      const aged = '2026-01-01T00:00:00.000Z';
+      await store.registerClient({
+        clientId: 'stale-client',
+        redirectUris: ['https://a.test/cb'],
+        clientName: 'stale',
+        createdAt: aged,
+      });
+      await store.registerClient({
+        clientId: 'live-client',
+        redirectUris: ['https://a.test/cb'],
+        clientName: 'live',
+        createdAt: aged,
+      });
+      await store.saveRefreshToken({
+        id: 'live-grant',
+        tokenHash: '9'.repeat(64),
+        clientId: 'live-client',
+        kiloUserId: 'u-live',
+        organizationId: null,
+        kiloToken: 'kilo-live',
+        resource: 'https://mcp.test/mcp',
+        scope: 'mcp',
+        createdAt: NOW,
+        expiresAt: '2099-01-01T00:00:00.000Z',
+      });
+
+      await store.purgeExpired(NOW);
+
+      expect(await store.getClient('stale-client')).toBeNull();
+      expect(await store.getClient('live-client')).not.toBeNull();
     });
   });
 });

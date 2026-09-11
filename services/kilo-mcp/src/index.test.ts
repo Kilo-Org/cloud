@@ -252,6 +252,44 @@ describe('tools/call search', () => {
     expect((json as { error: { code: number } }).error.code).toBe(-32602);
   });
 
+  it('rejects limit values outside the published 1..50 range', async () => {
+    for (const limit of [0, -1, 51, 1.5, Number.NaN]) {
+      const { json } = await rpcResult({
+        jsonrpc: '2.0',
+        id: 20,
+        method: 'tools/call',
+        params: { name: 'search', arguments: { query: 'organizations', limit } },
+      });
+      expect((json as { error: { code: number } }).error.code).toBe(-32602);
+    }
+  });
+
+  it('accepts the boundary limits 1 and 50', async () => {
+    for (const limit of [1, 50]) {
+      const { json } = await rpcResult({
+        jsonrpc: '2.0',
+        id: 21,
+        method: 'tools/call',
+        params: { name: 'search', arguments: { query: 'organizations', limit } },
+      });
+      expect('result' in (json as Record<string, unknown>)).toBe(true);
+    }
+  });
+
+  it('rejects non-object arguments at the JSON-RPC boundary', async () => {
+    for (const args of [[], 5, 'nope']) {
+      const { json } = await rpcResult({
+        jsonrpc: '2.0',
+        id: 22,
+        method: 'tools/call',
+        params: { name: 'search', arguments: args },
+      });
+      expect((json as { error: { code: number } }).error.code).toBe(-32602);
+    }
+    const { json } = await rpcResult({ jsonrpc: '2.0', id: 23, method: 'tools/call' });
+    expect((json as { error: { code: number } }).error.code).toBe(-32602);
+  });
+
   it('unknown tool names are rejected', async () => {
     const { json } = await rpcResult({
       jsonrpc: '2.0',
@@ -450,6 +488,7 @@ describe('auth endpoint routing (s5)', () => {
       refreshTokens,
       async registerClient(input) {
         clients.set(input.clientId, { ...input, redirectUris: [...input.redirectUris] });
+        return true;
       },
       async getClient(clientId) {
         const client = clients.get(clientId);
@@ -533,10 +572,12 @@ describe('auth endpoint routing (s5)', () => {
       },
       async rotateRefreshToken(oldId, input, nowIso) {
         const old = refreshTokens.get(oldId);
-        if (!old || old.revokedAt !== null || old.expiresAt <= nowIso) return false;
+        if (!old) return 'missing';
+        if (old.revokedAt !== null) return 'replayed';
+        if (old.expiresAt <= nowIso) return 'missing';
         refreshTokens.set(oldId, { ...old, revokedAt: nowIso });
         refreshTokens.set(input.id, { ...input, revokedAt: null });
-        return true;
+        return 'rotated';
       },
       async getKiloToken(identity) {
         for (const grant of [...refreshTokens.values()].reverse()) {

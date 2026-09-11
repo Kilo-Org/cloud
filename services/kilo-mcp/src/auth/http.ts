@@ -7,6 +7,21 @@
 /** The only scope this MCP issues; PKCE + DCR + resource indicator ride on it (requirement 16). */
 export const MCP_SCOPE = 'mcp';
 
+/** Split a space-separated scope string into its non-empty tokens. */
+export function scopeTokens(scope: string): string[] {
+  return scope.split(' ').filter(token => token.length > 0);
+}
+
+/** True when every token is the single MCP scope; an empty token set passes. */
+export function onlyMcpScope(tokens: string[]): boolean {
+  return tokens.every(token => token === MCP_SCOPE);
+}
+
+/** Deduplicate scope tokens, preserving order. */
+export function normalizeScope(scope: string): string {
+  return [...new Set(scopeTokens(scope))].join(' ');
+}
+
 /** Routes served by the auth endpoints, shared by index.ts routing and metadata. */
 export const AUTH_PATHS = {
   authorize: '/authorize',

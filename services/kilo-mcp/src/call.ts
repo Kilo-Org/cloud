@@ -82,6 +82,19 @@ type TrpcErrorBody = {
   };
 };
 
+/** A well-formed tRPC success body: `{ result: { data } }`. */
+type TrpcSuccessBody = { result: { data: unknown } };
+
+function isTrpcSuccessBody(body: unknown): body is TrpcSuccessBody {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return false;
+  const result = (body as { result?: unknown }).result;
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    Object.prototype.hasOwnProperty.call(result, 'data')
+  );
+}
+
 function toTrpcFailure(status: number, body: TrpcErrorBody | null, path: string): JsonRpcFailure {
   const json = body?.error ?? {};
   const data = json.data ?? {};
@@ -195,8 +208,8 @@ export async function callCatalogEndpoint(options: {
     throw toTrpcFailure(response.status, body as TrpcErrorBody, path);
   }
 
-  const result = (body as { result?: { data?: unknown } } | null)?.result;
-  if (!result || !Object.prototype.hasOwnProperty.call(result, 'data')) {
+  const result = isTrpcSuccessBody(body) ? body.result : null;
+  if (!result) {
     throw new JsonRpcFailure(
       INTERNAL_ERROR,
       `The Kilo API replied to "${path}" without a tRPC result body.`,

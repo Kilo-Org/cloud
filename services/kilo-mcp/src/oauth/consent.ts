@@ -397,6 +397,7 @@ async function handleOrgPicker(
         kiloUserId: record.kiloUserId,
         organizationId,
         kiloToken: record.kiloToken,
+        clientId: record.authRequest.clientId,
       },
     });
     await deps.store.completePendingAuthorization(id, nowIso);

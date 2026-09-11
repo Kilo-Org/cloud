@@ -18,30 +18,37 @@ export type CatalogRow = {
 /** The whole catalog: keyed by procedure path. */
 export type Catalog = Record<string, CatalogRow>;
 
-/** Credentials forwarded to apps/web; apps/web resolves identity and org membership. */
+/**
+ * The per-grant props the OAuth provider library decrypts into `ctx.props` for
+ * a verified MCP access token. `completeAuthorization` stores
+ * `{ kiloUserId, organizationId, kiloToken }` (src/oauth/consent.ts) and the
+ * client id is added alongside them, so the API handler can forward the Kilo
+ * credential without re-verifying anything.
+ */
+export type GrantProps = {
+  kiloUserId: string;
+  organizationId: string | null;
+  kiloToken: string;
+  clientId: string;
+};
+
+/**
+ * Credentials forwarded to apps/web; derived entirely from the verified grant
+ * props. apps/web resolves identity and org membership.
+ */
 export type ForwardedAuth = {
   /**
-   * The raw `Authorization` header value to pass through. With s6
-   * enforcement this is the Kilo API token behind the verified MCP token
-   * (apps/web cannot verify the worker's own JWT); only the unconfigured-
-   * worker passthrough and tests carry a caller-supplied bearer.
+   * The raw `Authorization` header value to pass through: the Kilo API token
+   * bound to the verified grant. A caller-supplied bearer is never consulted —
+   * the library authenticated the request before the API handler runs.
    */
   authorization: string;
-  /**
-   * Value of the organization header. With a verified MCP token this is the
-   * token's org claim — a caller-supplied header is never consulted.
-   */
+  /** Organization from the grant props (never a caller-supplied header). */
   organizationId?: string;
-  /**
-   * Set when the bearer was verified as an MCP access token issued by this
-   * worker: the identity the token is bound to (s6).
-   */
-  mcpIdentity?: {
-    kiloUserId: string;
-    organizationId: string | null;
-    clientId: string;
-    expiresAt: number;
-  };
+  /** The Kilo user the grant is bound to (analytics identity). */
+  kiloUserId: string;
+  /** OAuth client the grant was issued to. */
+  clientId: string;
 };
 
 /** A search hit returned by the search tool. */

@@ -113,10 +113,10 @@ function toTrpcFailure(status: number, body: TrpcErrorBody | null, path: string)
  * Validate `input` against the endpoint's published schema and forward the
  * call to apps/web over its public tRPC GET transport:
  * `{WEB_BASE_URL}/api/trpc/{path}?input=<urlencoded JSON>`. apps/web resolves
- * identity from the forwarded bearer and the organization header — with the
- * s6 flow both come from the verified MCP token: the bearer is the Kilo
- * credential bound to the token's identity, and the organization header is
- * set from the token's org claim (never from a caller-supplied header).
+ * identity from the forwarded bearer and the organization header — both come
+ * from the verified grant props (see `forwardedAuthFromProps`): the bearer is
+ * the Kilo credential bound to the grant, and the organization header is the
+ * grant's organization (never a caller-supplied header).
  *
  * Every rejection that can be decided locally (unknown path, schema-invalid
  * input) throws a JsonRpcFailure BEFORE any upstream request is made.

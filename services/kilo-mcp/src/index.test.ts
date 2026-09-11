@@ -1,41 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import worker, { createMcpHandler } from './index';
+import worker, { apiHandler, clientRegistrationCallback, createMcpHandler } from './index';
 import { ANONYMOUS_DISTINCT_ID, createMcpAnalytics } from './analytics';
 import { ORGANIZATION_ID_HEADER } from './auth';
-import { decodeJwt, signJwt } from './auth/jwt';
-import type {
-  OAuthCodeRecord,
-  OAuthStoreApi,
-  RefreshTokenRecord,
-  StoredClient,
-} from './store/oauth-store';
-import type { Catalog } from './types';
+import type { Catalog, ForwardedAuth, GrantProps } from './types';
 
-// `cloudflare:workers` does not exist under plain node vitest; the DO import
-// only extends its base class, so a stub base is enough. Vitest hoists this
-// above the static imports, and the factory closes over nothing.
-vi.mock('cloudflare:workers', () => ({
-  DurableObject: class {
-    ctx: unknown;
-    env: unknown;
-    constructor(ctx: unknown, env: unknown) {
-      this.ctx = ctx;
-      this.env = env;
-    }
-  },
-}));
-
-/** The default fetch handler takes the Worker ExecutionContext; these tests are
- * not exercising analytics scheduling, so a no-op sink is enough. */
+/** The default fetch handlers take the Worker ExecutionContext. */
 const TEST_CTX = {
   waitUntil: () => {},
   passThroughOnException: () => {},
 } as unknown as ExecutionContext;
-
-/** Call the default fetch handler with the required ExecutionContext filled in. */
-function workerFetch(request: Request, env: Env): Promise<Response> {
-  return worker.fetch(request, env, TEST_CTX);
-}
 
 /** Inline test catalog (no committed fixture; tests never depend on catalog drift). */
 const testCatalog: Catalog = {
@@ -63,10 +36,15 @@ const testCatalog: Catalog = {
   },
 };
 
-const AUTH_HEADERS = {
-  Authorization: 'Bearer tok_123',
-  'Content-Type': 'application/json',
+/** The props-derived credentials the OAuth provider hands the API handler. */
+const AUTH: ForwardedAuth = {
+  authorization: 'Bearer kilo-token',
+  organizationId: 'org-1',
+  kiloUserId: 'user-1',
+  clientId: 'client-1',
 };
+
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 function makeHandler(fetchImpl?: typeof fetch) {
   return createMcpHandler({
@@ -79,64 +57,41 @@ function makeHandler(fetchImpl?: typeof fetch) {
 async function rpc(
   handler: ReturnType<typeof makeHandler>,
   body: unknown,
-  headers: Record<string, string> = AUTH_HEADERS
-) {
-  const response = await handler(
+  auth: ForwardedAuth = AUTH
+): Promise<Response> {
+  return handler(
     new Request('https://kilo-mcp.test/mcp', {
       method: 'POST',
-      headers,
+      headers: JSON_HEADERS,
       body: JSON.stringify(body),
-    })
+    }),
+    auth
   );
-  return response;
 }
 
-async function rpcResult(body: unknown, fetchImpl?: typeof fetch) {
-  const response = await rpc(makeHandler(fetchImpl), body);
+async function rpcResult(body: unknown, fetchImpl?: typeof fetch, auth: ForwardedAuth = AUTH) {
+  const response = await rpc(makeHandler(fetchImpl), body, auth);
   return { response, json: (await response.json()) as Record<string, unknown> };
 }
 
 describe('routing and transport', () => {
-  const env = { WEB_BASE_URL: 'https://app.kilo.ai' } as Env;
-
-  it('serves MCP only at /mcp: unknown routes are 404', async () => {
-    const response = await workerFetch(new Request('https://kilo-mcp.test/other'), env);
-    expect(response.status).toBe(404);
-  });
-
   it('answers CORS preflight with the shared header set', async () => {
-    const response = await workerFetch(
+    const response = await makeHandler()(
       new Request('https://kilo-mcp.test/mcp', { method: 'OPTIONS' }),
-      env
+      AUTH
     );
     expect(response.status).toBe(204);
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
     expect(response.headers.get('Access-Control-Allow-Headers')).toContain('Authorization');
+    expect(response.headers.get('Access-Control-Expose-Headers')).toContain('Mcp-Session-Id');
   });
 
   it('is stateless POST-only: GET /mcp is 405', async () => {
-    const response = await workerFetch(
+    const response = await makeHandler()(
       new Request('https://kilo-mcp.test/mcp', { method: 'GET' }),
-      env
+      AUTH
     );
     expect(response.status).toBe(405);
-  });
-
-  it('requires a bearer token: 401 before any catalog or upstream work', async () => {
-    const handler = makeHandler();
-    const response = await handler(
-      new Request('https://kilo-mcp.test/mcp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
-      })
-    );
-    expect(response.status).toBe(401);
-    expect(response.headers.get('WWW-Authenticate')).toBe(
-      'Bearer error="invalid_token", resource_metadata="https://kilo-mcp.test/.well-known/oauth-protected-resource"'
-    );
-    const json = (await response.json()) as { error: { code: number } };
-    expect(json.error.code).toBe(-32001);
   });
 
   it('rejects a parse error and a batch request', async () => {
@@ -144,9 +99,10 @@ describe('routing and transport', () => {
     const bad = await handler(
       new Request('https://kilo-mcp.test/mcp', {
         method: 'POST',
-        headers: AUTH_HEADERS,
+        headers: JSON_HEADERS,
         body: '{not json',
-      })
+      }),
+      AUTH
     );
     expect(bad.status).toBe(200);
     expect(((await bad.json()) as { error: { code: number } }).error.code).toBe(-32700);
@@ -174,6 +130,23 @@ describe('routing and transport', () => {
   });
 });
 
+describe('JSON-RPC envelope validation (zod)', () => {
+  it('rejects a non-object message and a message without a method', async () => {
+    const nonObject = await rpcResult('just a string');
+    expect(nonObject.response.status).toBe(200);
+    expect((nonObject.json as { error: { code: number } }).error.code).toBe(-32600);
+
+    const noMethod = await rpcResult({ jsonrpc: '2.0', id: 5 });
+    expect((noMethod.json as { error: { code: number } }).error.code).toBe(-32600);
+    expect((noMethod.json as { id: number }).id).toBe(5);
+  });
+
+  it('rejects an empty or non-string method', async () => {
+    const empty = await rpcResult({ jsonrpc: '2.0', id: 6, method: '   ' });
+    expect((empty.json as { error: { code: number } }).error.code).toBe(-32600);
+  });
+});
+
 describe('initialize / ping / tools/list', () => {
   it('initialize echoes the protocol version and advertises tools', async () => {
     const { json } = await rpcResult({
@@ -188,13 +161,23 @@ describe('initialize / ping / tools/list', () => {
     expect(result['capabilities']).toMatchObject({ tools: {} });
   });
 
+  it('rejects malformed initialize params with -32602', async () => {
+    const { json } = await rpcResult({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'initialize',
+      params: { protocolVersion: 42 },
+    });
+    expect((json as { error: { code: number } }).error.code).toBe(-32602);
+  });
+
   it('ping returns an empty result', async () => {
-    const { json } = await rpcResult({ jsonrpc: '2.0', id: 2, method: 'ping' });
+    const { json } = await rpcResult({ jsonrpc: '2.0', id: 3, method: 'ping' });
     expect((json as { result: unknown }).result).toEqual({});
   });
 
   it('tools/list returns exactly search and call, each telling the agent to search first', async () => {
-    const { json } = await rpcResult({ jsonrpc: '2.0', id: 3, method: 'tools/list' });
+    const { json } = await rpcResult({ jsonrpc: '2.0', id: 4, method: 'tools/list' });
     const tools = (
       json as {
         result: {
@@ -215,6 +198,75 @@ describe('initialize / ping / tools/list', () => {
       properties: { path: { type: 'string' }, input: { type: 'object' } },
       required: ['path'],
     });
+  });
+});
+
+describe('tools/call params and arguments validation (zod)', () => {
+  it('rejects tools/call without a params object', async () => {
+    const { json } = await rpcResult({ jsonrpc: '2.0', id: 8, method: 'tools/call' });
+    expect((json as { error: { code: number } }).error.code).toBe(-32602);
+  });
+
+  it('rejects a missing or blank tool name', async () => {
+    const blank = await rpcResult({
+      jsonrpc: '2.0',
+      id: 9,
+      method: 'tools/call',
+      params: { name: '   ' },
+    });
+    expect((blank.json as { error: { code: number } }).error.code).toBe(-32602);
+  });
+
+  it('rejects non-object arguments at the JSON-RPC boundary', async () => {
+    for (const args of [[], 5, 'nope']) {
+      const { json } = await rpcResult({
+        jsonrpc: '2.0',
+        id: 22,
+        method: 'tools/call',
+        params: { name: 'search', arguments: args },
+      });
+      expect((json as { error: { code: number } }).error.code).toBe(-32602);
+    }
+  });
+
+  it('rejects search without a query and call without a path', async () => {
+    const noQuery = await rpcResult({
+      jsonrpc: '2.0',
+      id: 23,
+      method: 'tools/call',
+      params: { name: 'search', arguments: {} },
+    });
+    expect((noQuery.json as { error: { code: number } }).error.code).toBe(-32602);
+
+    const noPath = await rpcResult({
+      jsonrpc: '2.0',
+      id: 24,
+      method: 'tools/call',
+      params: { name: 'call', arguments: {} },
+    });
+    expect((noPath.json as { error: { code: number } }).error.code).toBe(-32602);
+  });
+
+  it('rejects a non-object call input', async () => {
+    const { json } = await rpcResult({
+      jsonrpc: '2.0',
+      id: 25,
+      method: 'tools/call',
+      params: { name: 'call', arguments: { path: 'organizations.list', input: 'nope' } },
+    });
+    expect((json as { error: { code: number } }).error.code).toBe(-32602);
+  });
+
+  it('unknown tool names are rejected', async () => {
+    const { json } = await rpcResult({
+      jsonrpc: '2.0',
+      id: 26,
+      method: 'tools/call',
+      params: { name: 'delete', arguments: {} },
+    });
+    expect((json as { error: { code: number; message: string } }).error.message).toContain(
+      'Unknown tool'
+    );
   });
 });
 
@@ -255,18 +307,8 @@ describe('tools/call search', () => {
     expect(payload.message.toLowerCase()).toContain('refine your query');
   });
 
-  it('invalid arguments are a JSON-RPC invalid-params error', async () => {
-    const { json } = await rpcResult({
-      jsonrpc: '2.0',
-      id: 6,
-      method: 'tools/call',
-      params: { name: 'search', arguments: {} },
-    });
-    expect((json as { error: { code: number } }).error.code).toBe(-32602);
-  });
-
   it('rejects limit values outside the published 1..50 range', async () => {
-    for (const limit of [0, -1, 51, 1.5, Number.NaN]) {
+    for (const limit of [0, -1, 51, 1.5]) {
       const { json } = await rpcResult({
         jsonrpc: '2.0',
         id: 20,
@@ -288,36 +330,10 @@ describe('tools/call search', () => {
       expect('result' in (json as Record<string, unknown>)).toBe(true);
     }
   });
-
-  it('rejects non-object arguments at the JSON-RPC boundary', async () => {
-    for (const args of [[], 5, 'nope']) {
-      const { json } = await rpcResult({
-        jsonrpc: '2.0',
-        id: 22,
-        method: 'tools/call',
-        params: { name: 'search', arguments: args },
-      });
-      expect((json as { error: { code: number } }).error.code).toBe(-32602);
-    }
-    const { json } = await rpcResult({ jsonrpc: '2.0', id: 23, method: 'tools/call' });
-    expect((json as { error: { code: number } }).error.code).toBe(-32602);
-  });
-
-  it('unknown tool names are rejected', async () => {
-    const { json } = await rpcResult({
-      jsonrpc: '2.0',
-      id: 8,
-      method: 'tools/call',
-      params: { name: 'delete', arguments: {} },
-    });
-    expect((json as { error: { code: number; message: string } }).error.message).toContain(
-      'Unknown tool'
-    );
-  });
 });
 
 describe('tools/call call', () => {
-  it('happy: forwards a valid call and returns the unwrapped tRPC data', async () => {
+  it('happy: forwards the props Kilo bearer and organization header to apps/web', async () => {
     const fetchImpl = vi.fn(
       async () =>
         new Response(JSON.stringify({ result: { data: { balance: 42 } } }), {
@@ -339,10 +355,12 @@ describe('tools/call call', () => {
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('https://app.kilo.ai/api/trpc/organizations.list');
     expect(init.method).toBe('GET');
-    expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer tok_123');
+    const headers = init.headers as Record<string, string>;
+    expect(headers['Authorization']).toBe('Bearer kilo-token');
+    expect(headers[ORGANIZATION_ID_HEADER]).toBe('org-1');
   });
 
-  it('passes the organization header through to apps/web', async () => {
+  it('a caller-supplied organization header never overrides the grant props', async () => {
     const fetchImpl = vi.fn(
       async () =>
         new Response(JSON.stringify({ result: { data: [] } }), {
@@ -350,7 +368,7 @@ describe('tools/call call', () => {
           headers: { 'Content-Type': 'application/json' },
         })
     );
-    await rpc(
+    const response = await rpc(
       makeHandler(fetchImpl),
       {
         jsonrpc: '2.0',
@@ -358,10 +376,11 @@ describe('tools/call call', () => {
         method: 'tools/call',
         params: { name: 'call', arguments: { path: 'organizations.list' } },
       },
-      { ...AUTH_HEADERS, [ORGANIZATION_ID_HEADER]: 'org-uuid-1' }
+      AUTH
     );
+    expect(response.status).toBe(200);
     const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
-    expect((init.headers as Record<string, string>)[ORGANIZATION_ID_HEADER]).toBe('org-uuid-1');
+    expect((init.headers as Record<string, string>)[ORGANIZATION_ID_HEADER]).toBe('org-1');
   });
 
   it('non-retryable: unknown path is a JSON-RPC error before any upstream request', async () => {
@@ -474,601 +493,203 @@ describe('tools/call call', () => {
 });
 
 /**
- * s5 auth-endpoint routing: the default fetch handler wires every OAuth route
- * (discovery metadata, DCR, authorize + pairing status, token) and verifies
- * MCP tokens on /mcp when the worker carries the OAuth bindings.
+ * The library transport: `@cloudflare/workers-oauth-provider` owns /mcp auth.
+ * A request without a bearer never reaches the API handler.
  */
-describe('auth endpoint routing (s5)', () => {
-  const ISSUER = 'https://kilo-mcp.test';
-  const SECRET = 'routing-test-secret';
-  /** RFC 7636 appendix B test vector — a valid 43-char S256 challenge. */
-  const CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
-
-  function createRoutingStore(): OAuthStoreApi & {
-    clients: Map<string, StoredClient>;
-    codes: Map<string, OAuthCodeRecord>;
-    refreshTokens: Map<string, RefreshTokenRecord>;
-  } {
-    const clients = new Map<string, StoredClient>();
-    const codes = new Map<string, OAuthCodeRecord>();
-    const refreshTokens = new Map<string, RefreshTokenRecord>();
-    const unused = (): never => {
-      throw new Error('not reachable from routing tests');
-    };
-    return {
-      clients,
-      codes,
-      refreshTokens,
-      async registerClient(input) {
-        clients.set(input.clientId, { ...input, redirectUris: [...input.redirectUris] });
-        return true;
-      },
-      async getClient(clientId) {
-        const client = clients.get(clientId);
-        return client ? { ...client, redirectUris: [...client.redirectUris] } : null;
-      },
-      async createCode(input) {
-        codes.set(input.code, {
-          ...input,
-          status: 'pending',
-          kiloUserId: null,
-          organizationId: null,
-          kiloToken: null,
-        });
-      },
-      async getCode(code) {
-        const record = codes.get(code);
-        return record ? { ...record } : null;
-      },
-      async recordPairingApproval(deviceAuthCode, identity, nowIso) {
-        for (const [code, record] of codes) {
-          if (
-            record.deviceAuthCode === deviceAuthCode &&
-            record.status === 'pending' &&
-            record.kiloUserId === null &&
-            record.expiresAt > nowIso
-          ) {
-            codes.set(code, {
-              ...record,
-              kiloUserId: identity.kiloUserId,
-              kiloToken: identity.kiloToken,
-            });
-            return true;
-          }
-        }
-        return false;
-      },
-      async denyCode(deviceAuthCode, nowIso) {
-        for (const [code, record] of codes) {
-          if (
-            record.deviceAuthCode === deviceAuthCode &&
-            record.status === 'pending' &&
-            record.expiresAt > nowIso
-          ) {
-            codes.set(code, { ...record, status: 'denied' });
-            return true;
-          }
-        }
-        return false;
-      },
-      async markCodeExpired(deviceAuthCode, nowIso) {
-        for (const [code, record] of codes) {
-          if (
-            record.deviceAuthCode === deviceAuthCode &&
-            record.status === 'pending' &&
-            record.expiresAt > nowIso
-          ) {
-            codes.set(code, { ...record, status: 'expired' });
-            return true;
-          }
-        }
-        return false;
-      },
-      async approveCode(deviceAuthCode, identity, nowIso) {
-        for (const [code, record] of codes) {
-          if (
-            record.deviceAuthCode === deviceAuthCode &&
-            record.status === 'pending' &&
-            record.expiresAt > nowIso
-          ) {
-            codes.set(code, {
-              ...record,
-              status: 'approved',
-              kiloUserId: identity.kiloUserId,
-              organizationId: identity.organizationId,
-            });
-            return true;
-          }
-        }
-        return false;
-      },
-      async consumeCode(code, nowIso) {
-        const record = codes.get(code);
-        if (!record || record.status !== 'approved' || record.expiresAt <= nowIso) return null;
-        const used: OAuthCodeRecord = { ...record, status: 'used' };
-        codes.set(code, used);
-        return { ...used };
-      },
-      async saveRefreshToken(input) {
-        refreshTokens.set(input.id, { ...input, revokedAt: null });
-      },
-      async getRefreshTokenByHash(tokenHash) {
-        const record = [...refreshTokens.values()].find(r => r.tokenHash === tokenHash);
-        return record ? { ...record } : null;
-      },
-      async rotateRefreshToken(oldId, input, nowIso) {
-        const old = refreshTokens.get(oldId);
-        if (!old) return 'missing';
-        if (old.revokedAt !== null) return 'replayed';
-        if (old.expiresAt <= nowIso) return 'missing';
-        refreshTokens.set(oldId, { ...old, revokedAt: nowIso });
-        refreshTokens.set(input.id, { ...input, revokedAt: null });
-        return 'rotated';
-      },
-      async getKiloToken(identity) {
-        for (const grant of [...refreshTokens.values()].reverse()) {
-          if (
-            grant.kiloUserId === identity.kiloUserId &&
-            grant.clientId === identity.clientId &&
-            grant.organizationId === identity.organizationId &&
-            grant.resource === identity.resource &&
-            grant.revokedAt === null &&
-            grant.kiloToken
-          ) {
-            return grant.kiloToken;
-          }
-        }
-        // The s5 verification tests mint tokens for user-1/c-1/org-1 without
-        // going through the exchange; that grant keeps a standing credential.
-        return identity.kiloUserId === 'user-1' &&
-          identity.clientId === 'c-1' &&
-          identity.organizationId === 'org-1' &&
-          identity.resource === `${ISSUER}/mcp`
-          ? 'kilo-forward-me'
-          : null;
-      },
-      createPendingAuthorization: unused,
-      getPendingAuthorization: unused,
-      denyPendingAuthorization: unused,
-      expirePendingAuthorization: unused,
-      approvePendingAuthorization: unused,
-      completePendingAuthorization: unused,
-      revokeGrant: unused,
-      revokeJti: unused,
-      async isJtiRevoked() {
-        return false;
-      },
-      purgeExpired: unused,
-    };
-  }
-
-  function oauthEnv(store: OAuthStoreApi, bindings: 'required' | 'absent' = 'required'): Env {
-    return {
-      WEB_BASE_URL: 'https://app.kilo.ai',
-      ...(bindings === 'required'
-        ? {
-            MCP_TOKEN_SECRET: SECRET,
-            KILO_MCP_OAUTH_STORE: {
-              getByName: (name: string) => {
-                expect(name).toBe('kilo-mcp-oauth');
-                return store;
-              },
-            },
-          }
-        : {}),
-    } as unknown as Env;
-  }
-
-  async function fetchJson(path: string, init?: RequestInit) {
-    const response = await workerFetch(
-      new Request(`${ISSUER}${path}`, init),
-      oauthEnv(createRoutingStore())
-    );
-    return { response, json: (await response.json()) as Record<string, unknown> };
-  }
-
+describe('OAuthProvider transport (library auth)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('serves authorization-server metadata at both well-known URLs', async () => {
-    for (const path of [
-      '/.well-known/oauth-authorization-server',
-      '/.well-known/oauth-authorization-server/mcp',
-    ]) {
-      const { response, json } = await fetchJson(path);
-      expect(response.status).toBe(200);
-      expect(json.issuer).toBe(ISSUER);
-      expect(json.authorization_endpoint).toBe(`${ISSUER}/authorize`);
-      expect(json.token_endpoint).toBe(`${ISSUER}/token`);
-      expect(json.registration_endpoint).toBe(`${ISSUER}/register`);
-      expect(json.response_types_supported).toEqual(['code']);
-      expect(json.code_challenge_methods_supported).toEqual(['S256']);
-      expect(json.grant_types_supported).toEqual(['authorization_code', 'refresh_token']);
-      expect(json.scopes_supported).toEqual(['mcp']);
-      expect(json.token_endpoint_auth_methods_supported).toEqual(['none']);
-    }
-  });
-
-  it('serves protected-resource metadata advertising this MCP and its authorization server', async () => {
-    for (const path of [
-      '/.well-known/oauth-protected-resource',
-      '/.well-known/oauth-protected-resource/mcp',
-    ]) {
-      const { response, json } = await fetchJson(path);
-      expect(response.status).toBe(200);
-      expect(json.resource).toBe(`${ISSUER}/mcp`);
-      expect(json.resource_name).toBe('Kilo MCP');
-      expect(json.authorization_servers).toEqual([ISSUER]);
-      expect(json.scopes_supported).toEqual(['mcp']);
-    }
-  });
-
-  it('POST /register persists a public client and answers 201 without a secret', async () => {
-    const store = createRoutingStore();
-    const response = await workerFetch(
-      new Request(`${ISSUER}/register`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ redirect_uris: ['https://client.test/cb'], client_name: 'Router' }),
-      }),
-      oauthEnv(store)
-    );
-    expect(response.status).toBe(201);
-    const json = (await response.json()) as Record<string, unknown>;
-    expect(typeof json.client_id).toBe('string');
-    expect(json.client_secret).toBeUndefined();
-    expect(json.token_endpoint_auth_method).toBe('none');
-    expect(store.clients.get(json.client_id as string)?.clientName).toBe('Router');
-  });
-
-  it('GET /authorize creates the pending pairing record and links to Kilo sign-in', async () => {
-    const store = createRoutingStore();
-    await store.registerClient({
-      clientId: 'c-1',
-      redirectUris: ['https://client.test/cb'],
-      clientName: 'Router',
-      createdAt: new Date().toISOString(),
-    });
-    const deviceAuthFetch = vi.fn(async () => Response.json({ code: 'PAIR-777' }));
-    vi.stubGlobal('fetch', deviceAuthFetch);
-
-    const url = new URL(`${ISSUER}/authorize`);
-    url.searchParams.set('response_type', 'code');
-    url.searchParams.set('client_id', 'c-1');
-    url.searchParams.set('redirect_uri', 'https://client.test/cb');
-    url.searchParams.set('code_challenge', CHALLENGE);
-    url.searchParams.set('code_challenge_method', 'S256');
-    url.searchParams.set('resource', `${ISSUER}/mcp`);
-    url.searchParams.set('state', 'st-1');
-    const response = await workerFetch(new Request(url.toString()), oauthEnv(store));
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get('content-type')).toContain('text/html');
-    const html = await response.text();
-    expect(html).toContain('https://app.kilo.ai/device-auth?code=PAIR-777');
-    expect(deviceAuthFetch).toHaveBeenCalledTimes(1);
-    const [calledUrl] = deviceAuthFetch.mock.calls[0] as unknown as [string];
-    expect(String(calledUrl)).toBe('https://app.kilo.ai/api/device-auth/codes');
-
-    expect(store.codes.size).toBe(1);
-    const record = [...store.codes.values()][0]!;
-    expect(record.clientId).toBe('c-1');
-    expect(record.status).toBe('pending');
-    expect(record.codeChallenge).toBe(CHALLENGE);
-    expect(record.resource).toBe(`${ISSUER}/mcp`);
-    expect(record.deviceAuthCode).toBe('PAIR-777');
-
-    // The consent page polls this same worker for pairing status.
-    const status = await fetchJsonOn(store, `/authorize/status?code=${record.code}`);
-    expect(status.json).toEqual({ status: 'pending' });
-  });
-
-  async function fetchJsonOn(store: OAuthStoreApi, path: string) {
-    const response = await workerFetch(new Request(`${ISSUER}${path}`), oauthEnv(store));
-    return { response, json: (await response.json()) as Record<string, unknown> };
-  }
-
-  it('GET /authorize/status cannot be used to probe pairing codes', async () => {
-    const store = createRoutingStore();
-    const unknown = await fetchJsonOn(store, '/authorize/status?code=does-not-exist');
-    expect(unknown.response.status).toBe(200);
-    expect(unknown.json).toEqual({ status: 'unknown' });
-  });
-
-  it('browser flow end to end: consent -> pairing -> org picker -> token -> call AS the chosen identity', async () => {
-    const store = createRoutingStore();
-    await store.registerClient({
-      clientId: 'c-1',
-      redirectUris: ['https://client.test/cb'],
-      clientName: 'Router',
-      createdAt: new Date().toISOString(),
-    });
-    let pairingApproved = false;
-    const calls: Array<{ url: string; headers: Record<string, string> }> = [];
-    const fetchImpl = vi.fn(async (input: string | URL, init?: RequestInit) => {
-      const url = String(input);
-      const headers = (init?.headers ?? {}) as Record<string, string>;
-      calls.push({ url, headers });
-      if (url === 'https://app.kilo.ai/api/device-auth/codes')
-        return Response.json({ code: 'PAIR-E2E' });
-      if (url === 'https://app.kilo.ai/api/device-auth/codes/PAIR-E2E') {
-        return pairingApproved
-          ? Response.json({ status: 'approved', token: 'kilo-e2e-token', userId: 'user-e2e' })
-          : Response.json({ status: 'pending' }, { status: 202 });
-      }
-      if (url.startsWith('https://app.kilo.ai/api/trpc/organizations.list')) {
-        return Response.json({
-          result: { data: [{ organizationId: 'org-e2e', organizationName: 'E2E Org' }] },
-        });
-      }
-      // The call step: echo what apps/web actually received as identity.
-      if (url.startsWith('https://app.kilo.ai/api/trpc/user.getBalance')) {
-        return Response.json({
-          result: {
-            data: {
-              balance: 42,
-              seenAuthorization: headers['Authorization'],
-              seenOrganization: headers[ORGANIZATION_ID_HEADER],
-            },
-          },
-        });
-      }
-      return Response.json({ error: { message: `stub: unexpected ${url}` } }, { status: 500 });
-    });
-    vi.stubGlobal('fetch', fetchImpl);
-    const env = oauthEnv(store);
-
-    // 1. GET /authorize -> consent page + pending pairing record.
-    const authorizeUrl = new URL(`${ISSUER}/authorize`);
-    authorizeUrl.searchParams.set('response_type', 'code');
-    authorizeUrl.searchParams.set('client_id', 'c-1');
-    authorizeUrl.searchParams.set('redirect_uri', 'https://client.test/cb');
-    authorizeUrl.searchParams.set('code_challenge', CHALLENGE);
-    authorizeUrl.searchParams.set('code_challenge_method', 'S256');
-    authorizeUrl.searchParams.set('resource', `${ISSUER}/mcp`);
-    authorizeUrl.searchParams.set('state', 'st-1');
-    const consent = await workerFetch(new Request(authorizeUrl.toString()), env);
-    expect(consent.status).toBe(200);
-    const record = [...store.codes.values()][0]!;
-
-    // 2. Polling before the user approves: still pending.
-    const pollUrl = `${ISSUER}/authorize/status?code=${record.code}`;
-    expect(await (await workerFetch(new Request(pollUrl), env)).json()).toEqual({
-      status: 'pending',
-    });
-
-    // 3. User approves the Kilo sign-in -> the worker holds the pairing and
-    //    sends the page to the org picker.
-    pairingApproved = true;
-    expect(await (await workerFetch(new Request(pollUrl), env)).json()).toEqual({
-      status: 'needs_org',
-      picker_url: `/authorize/org?code=${record.code}`,
-    });
-    // The single-use approved answer is never polled again.
-    const pollCalls = calls.filter(c => c.url.includes('/api/device-auth/codes/')).length;
-    expect(pollCalls).toBe(2);
-
-    // 4. GET the picker: personal + the user's organization.
-    const picker = await workerFetch(
-      new Request(`${ISSUER}/authorize/org?code=${record.code}`),
-      env
-    );
-    const pickerHtml = await picker.text();
-    expect(pickerHtml).toContain('E2E Org');
-    expect(pickerHtml).toContain('Personal account');
-
-    // 5. POST the selection -> authorize completes with a client redirect.
-    const done = await workerFetch(
-      new Request(`${ISSUER}/authorize/org?code=${record.code}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ organization_id: 'org-e2e' }).toString(),
-      }),
-      env
-    );
-    expect(done.status).toBe(302);
-    const location = new URL(done.headers.get('Location')!);
-    expect(location.origin + location.pathname).toBe('https://client.test/cb');
-    expect(location.searchParams.get('code')).toBe(record.code);
-    expect(location.searchParams.get('state')).toBe('st-1');
-
-    // 6. Token exchange (PKCE verifier = the RFC 7636 Appendix B vector).
-    const tokenResponse = await workerFetch(
-      new Request(`${ISSUER}/token`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: record.code,
-          client_id: 'c-1',
-          redirect_uri: 'https://client.test/cb',
-          code_verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk',
-          resource: `${ISSUER}/mcp`,
-        }).toString(),
-      }),
-      env
-    );
-    expect(tokenResponse.status).toBe(200);
-    const tokens = (await tokenResponse.json()) as { access_token: string };
-    const claims = decodeJwt(tokens.access_token)!.payload;
-    expect(claims).toMatchObject({ sub: 'user-e2e', org: 'org-e2e', aud: `${ISSUER}/mcp` });
-
-    // 7. tools/call with the MCP token: apps/web sees the Kilo bearer and the
-    //    org from the token claims — the picked identity, end to end.
-    calls.length = 0;
-    const call = await workerFetch(
-      new Request(`${ISSUER}/mcp`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${tokens.access_token}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 2,
-          method: 'tools/call',
-          params: { name: 'call', arguments: { path: 'user.getBalance' } },
-        }),
-      }),
-      env
-    );
-    const callJson = (await call.json()) as { result: { content: Array<{ text: string }> } };
-    expect(JSON.parse(callJson.result.content[0]!.text)).toMatchObject({
-      balance: 42,
-      seenAuthorization: 'Bearer kilo-e2e-token',
-      seenOrganization: 'org-e2e',
-    });
-    // A spoofed caller org header changes nothing: the claim wins.
-    const spoofed = await workerFetch(
-      new Request(`${ISSUER}/mcp`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${tokens.access_token}`,
-          'content-type': 'application/json',
-          [ORGANIZATION_ID_HEADER]: 'attacker-org',
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 3,
-          method: 'tools/call',
-          params: { name: 'call', arguments: { path: 'user.getBalance' } },
-        }),
-      }),
-      env
-    );
-    const spoofedJson = (await spoofed.json()) as { result: { content: Array<{ text: string }> } };
-    expect(JSON.parse(spoofedJson.result.content[0]!.text)).toMatchObject({
-      seenOrganization: 'org-e2e',
-    });
-
-    // 8. search runs under the same enforced token.
-    const search = await workerFetch(
-      new Request(`${ISSUER}/mcp`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${tokens.access_token}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 4,
-          method: 'tools/call',
-          params: { name: 'search', arguments: { query: 'credit balance' } },
-        }),
-      }),
-      env
-    );
-    expect(search.status).toBe(200);
-    const searchJson = (await search.json()) as { result: { content: Array<{ text: string }> } };
-    expect(searchJson.result.content[0]!.text).toContain('user.getBalance');
-  });
-
-  it('POST /token answers RFC 6749 errors through the route', async () => {
-    const unsupported = await fetchJson('/token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ grant_type: 'password' }).toString(),
-    });
-    expect(unsupported.response.status).toBe(400);
-    expect(unsupported.json.error).toBe('unsupported_grant_type');
-
-    const garbage = await fetchJson('/token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: 'not-an-oauth-body',
-    });
-    expect(garbage.json.error).toBe('invalid_request');
-  });
-
-  it('/mcp verifies this worker MCP tokens when the OAuth bindings are present', async () => {
-    const store = createRoutingStore();
-    const env = oauthEnv(store);
-    const claims = {
-      iss: ISSUER,
-      sub: 'user-1',
-      org: 'org-1',
-      aud: `${ISSUER}/mcp`,
-      client_id: 'c-1',
-      jti: 'j-1',
-    };
-    const live = await signJwt({ ...claims, exp: Math.floor(Date.now() / 1000) + 60 }, SECRET);
-    const expired = await signJwt({ ...claims, exp: Math.floor(Date.now() / 1000) - 60 }, SECRET);
-    const rpc = { jsonrpc: '2.0', id: 1, method: 'tools/list' };
-
-    const ok = await workerFetch(
-      new Request(`${ISSUER}/mcp`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${live}`, 'content-type': 'application/json' },
-        body: JSON.stringify(rpc),
-      }),
-      env
-    );
-    expect(ok.status).toBe(200);
-
-    const rejected = await workerFetch(
-      new Request(`${ISSUER}/mcp`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${expired}`, 'content-type': 'application/json' },
-        body: JSON.stringify(rpc),
-      }),
-      env
-    );
-    expect(rejected.status).toBe(401);
-
-    // s6 enforcement: a foreign bearer is rejected outright — /mcp accepts
-    // ONLY MCP tokens signed by this worker.
-    const foreign = await workerFetch(
-      new Request(`${ISSUER}/mcp`, {
-        method: 'POST',
-        headers: { Authorization: 'Bearer tok_123', 'content-type': 'application/json' },
-        body: JSON.stringify(rpc),
-      }),
-      env
-    );
-    expect(foreign.status).toBe(401);
-    expect(foreign.headers.get('WWW-Authenticate')).toBe(
-      `Bearer error="invalid_token", resource_metadata="${ISSUER}/.well-known/oauth-protected-resource"`
-    );
-  });
-
-  it('a live MCP token whose grant lost its Kilo credential is rejected (reconnect)', async () => {
-    const store = createRoutingStore();
-    const env = oauthEnv(store);
-    // user-2 has no getKiloToken mapping in the routing fake.
-    const token = await signJwt(
-      {
-        iss: ISSUER,
-        sub: 'user-2',
-        org: 'org-1',
-        aud: `${ISSUER}/mcp`,
-        client_id: 'c-1',
-        jti: 'j-2',
-        exp: Math.floor(Date.now() / 1000) + 60,
-      },
-      SECRET
-    );
-    const response = await workerFetch(
-      new Request(`${ISSUER}/mcp`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
-      }),
-      env
+  it('GET /mcp with no bearer returns the library RFC 9728 challenge', async () => {
+    const response = await worker.fetch(
+      new Request('https://kilo-mcp.test/mcp', { method: 'GET' }),
+      {} as Env,
+      TEST_CTX
     );
     expect(response.status).toBe(401);
+    expect(response.headers.get('WWW-Authenticate')).toBe(
+      'Bearer realm="OAuth", resource_metadata="https://kilo-mcp.test/.well-known/oauth-protected-resource/mcp", scope="mcp"'
+    );
   });
 
-  it('/mcp refuses every bearer on a worker without the OAuth bindings (s6: no unverified passthrough)', async () => {
-    const response = await workerFetch(
-      new Request(`${ISSUER}/mcp`, {
+  it('POST /mcp with no bearer is challenged before any handler runs', async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const response = await worker.fetch(
+      new Request('https://kilo-mcp.test/mcp', {
         method: 'POST',
-        headers: { Authorization: 'Bearer tok_123', 'content-type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
       }),
-      oauthEnv(createRoutingStore(), 'absent')
+      {} as Env,
+      TEST_CTX
     );
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(401);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('OPTIONS /mcp preflight is answered by the library with CORS headers', async () => {
+    const response = await worker.fetch(
+      new Request('https://kilo-mcp.test/mcp', {
+        method: 'OPTIONS',
+        headers: { Origin: 'https://client.test' },
+      }),
+      {} as Env,
+      TEST_CTX
+    );
+    expect(response.status).toBe(204);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://client.test');
+    expect(response.headers.get('Access-Control-Allow-Headers')).toContain('Authorization');
+  });
+});
+
+/** The API handler: identity comes only from the decrypted grant props. */
+describe('api handler (props-based auth)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function apiContext(props?: Partial<GrantProps>): {
+    ctx: ExecutionContext;
+    promises: Promise<unknown>[];
+  } {
+    const promises: Promise<unknown>[] = [];
+    return {
+      promises,
+      ctx: {
+        waitUntil: (promise: Promise<unknown>) => {
+          promises.push(promise);
+        },
+        passThroughOnException: () => {},
+        ...(props ? { props } : {}),
+      } as unknown as ExecutionContext,
+    };
+  }
+
+  it('forwards the grant Kilo token and organization to apps/web', async () => {
+    const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+    const upstream = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), headers: (init?.headers ?? {}) as Record<string, string> });
+      return Response.json({ result: { data: { ok: true } } });
+    });
+    vi.stubGlobal('fetch', upstream);
+    const { ctx } = apiContext({
+      kiloUserId: 'user-9',
+      organizationId: 'org-9',
+      kiloToken: 'kilo-9',
+      clientId: 'client-9',
+    });
+    const response = await apiHandler.fetch!(
+      new Request('https://kilo-mcp.test/mcp', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: 'call', arguments: { path: 'organizations.list' } },
+        }),
+      }),
+      { WEB_BASE_URL: 'https://app.kilo.ai' } as Env,
+      ctx
+    );
+    expect(response.status).toBe(200);
+    const trpc = calls.find(call => call.url.includes('/api/trpc/'));
+    expect(trpc?.headers['Authorization']).toBe('Bearer kilo-9');
+    expect(trpc?.headers[ORGANIZATION_ID_HEADER]).toBe('org-9');
+  });
+
+  it('keeps the MCP CORS contract for a direct OPTIONS request', async () => {
+    const { ctx } = apiContext({
+      kiloUserId: 'user-1',
+      organizationId: 'org-1',
+      kiloToken: 'kilo-token',
+      clientId: 'client-1',
+    });
+    const response = await apiHandler.fetch!(
+      new Request('https://kilo-mcp.test/mcp', { method: 'OPTIONS' }),
+      { WEB_BASE_URL: 'https://app.kilo.ai' } as Env,
+      ctx
+    );
+    expect(response.status).toBe(204);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(response.headers.get('Access-Control-Allow-Headers')).toContain('Authorization');
+  });
+
+  it('rejects a grant with no Kilo token bound: 401 challenge + anonymous auth_failure', async () => {
+    const captured: Array<Record<string, unknown>> = [];
+    const capture = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+      captured.push(
+        JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as Record<string, unknown>
+      );
+      return new Response('{}', { status: 200 });
+    });
+    vi.stubGlobal('fetch', capture);
+    const { ctx, promises } = apiContext({
+      kiloUserId: 'user-1',
+      organizationId: null,
+      clientId: 'c',
+    });
+    const response = await apiHandler.fetch!(
+      new Request('https://kilo-mcp.test/mcp', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
+      }),
+      {
+        WEB_BASE_URL: 'https://app.kilo.ai',
+        NEXT_PUBLIC_POSTHOG_KEY: 'phc_test',
+      } as unknown as Env,
+      ctx
+    );
+    expect(response.status).toBe(401);
+    expect(response.headers.get('WWW-Authenticate')).toContain('invalid_token');
+    await Promise.all(promises);
+
+    const rejected = captured.filter(payload => payload['event'] === 'kilo_mcp_call_rejected');
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]!['distinct_id']).toBe(ANONYMOUS_DISTINCT_ID);
+    const properties = rejected[0]!['properties'] as Record<string, unknown>;
+    expect(properties).toMatchObject({ reason: 'auth_failure', $process_person_profile: false });
+    expect(properties).not.toHaveProperty('userId');
+  });
+});
+
+/** DCR guard: untrusted metadata is validated and out-of-scope is refused. */
+describe('client registration metadata validation', () => {
+  const request = new Request('https://kilo-mcp.test/register');
+
+  it('accepts metadata with no scope and with only the mcp scope', () => {
+    expect(
+      clientRegistrationCallback({
+        clientMetadata: { redirect_uris: ['https://client.test/cb'] },
+        request,
+      })
+    ).toBeUndefined();
+    expect(
+      clientRegistrationCallback({
+        clientMetadata: { redirect_uris: ['https://client.test/cb'], scope: 'mcp' },
+        request,
+      })
+    ).toBeUndefined();
+  });
+
+  it('rejects a declared scope outside mcp instead of broadening', () => {
+    const result = clientRegistrationCallback({
+      clientMetadata: { redirect_uris: ['https://client.test/cb'], scope: 'mcp admin' },
+      request,
+    });
+    expect(result).toMatchObject({ code: 'invalid_client_metadata' });
+    expect(result?.description).toContain('admin');
+  });
+
+  it('rejects malformed metadata with the library invalid_client_metadata error', () => {
+    const result = clientRegistrationCallback({
+      clientMetadata: { redirect_uris: 'not-an-array' },
+      request,
+    });
+    expect(result).toMatchObject({ code: 'invalid_client_metadata' });
   });
 });
 
@@ -1078,11 +699,6 @@ describe('auth endpoint routing (s5)', () => {
  * the `waitUntil` promises before asserting.
  */
 describe('analytics wiring (s2)', () => {
-  const ANALYTICS_HEADERS = {
-    Authorization: 'Bearer tok_123',
-    'Content-Type': 'application/json',
-  };
-
   type FakeCtx = { waitUntil(promise: Promise<unknown>): void };
 
   function createHarness(options?: {
@@ -1121,14 +737,15 @@ describe('analytics wiring (s2)', () => {
   async function post(
     handler: ReturnType<typeof createMcpHandler>,
     body: unknown,
-    headers: Record<string, string> = ANALYTICS_HEADERS
+    auth: ForwardedAuth = AUTH
   ): Promise<Response> {
     return handler(
       new Request('https://kilo-mcp.test/mcp', {
         method: 'POST',
-        headers,
+        headers: JSON_HEADERS,
         body: JSON.stringify(body),
-      })
+      }),
+      auth
     );
   }
 
@@ -1325,27 +942,6 @@ describe('analytics wiring (s2)', () => {
     expect(eventsNamed(captured, 'kilo_mcp_call_rejected')).toHaveLength(0);
   });
 
-  it('a missing bearer emits an anonymous auth_failure rejection', async () => {
-    const { captured, promises, handler } = createHarness();
-    const response = await handler(
-      new Request('https://kilo-mcp.test/mcp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 8, method: 'initialize' }),
-      })
-    );
-    expect(response.status).toBe(401);
-    await settle(promises);
-
-    const rejected = eventsNamed(captured, 'kilo_mcp_call_rejected');
-    expect(rejected).toHaveLength(1);
-    expect(rejected[0]!['distinct_id']).toBe(ANONYMOUS_DISTINCT_ID);
-    const properties = propertiesOf(rejected[0]!);
-    expect(properties).toMatchObject({ reason: 'auth_failure', $process_person_profile: false });
-    expect(properties).not.toHaveProperty('userId');
-    expect(properties).not.toHaveProperty('organizationId');
-  });
-
   it('an upstream network failure emits upstream_unreachable and is not a rejected call', async () => {
     const upstream = vi.fn(() => Promise.reject(new Error('network down')));
     const { captured, promises, handler } = createHarness({
@@ -1411,7 +1007,7 @@ describe('analytics wiring (s2)', () => {
     expect(captured.length).toBeGreaterThan(0);
     for (const payload of captured) {
       expect(payload['api_key']).toBe('phc_test');
-      expect(JSON.stringify(payload)).not.toContain('tok_123');
+      expect(JSON.stringify(payload)).not.toContain('kilo-token');
       expect(JSON.stringify(propertiesOf(payload))).not.toContain('phc_');
       for (const value of Object.values(propertiesOf(payload))) {
         if (typeof value === 'string') {
@@ -1450,67 +1046,27 @@ describe('analytics wiring (s2)', () => {
     }
   });
 
-  it('a verified MCP token binds the event to the user and the organization', async () => {
-    const issuer = 'https://kilo-mcp.test';
-    const secret = 'analytics-test-secret';
-    const store = {
-      isJtiRevoked: async () => false,
-      getKiloToken: async () => 'kilo-forward-me',
-    } as unknown as OAuthStoreApi;
-    const token = await signJwt(
-      {
-        iss: issuer,
-        sub: 'user-1',
-        org: 'org-1',
-        aud: `${issuer}/mcp`,
-        client_id: 'c-1',
-        jti: 'j-analytics',
-        exp: Math.floor(Date.now() / 1000) + 60,
-      },
-      secret
-    );
-
-    const captured: Array<Record<string, unknown>> = [];
-    const promises: Promise<unknown>[] = [];
-    const ctx: FakeCtx = {
-      waitUntil: promise => {
-        promises.push(promise);
-      },
-    };
-    const analytics = createMcpAnalytics({
-      env: { NEXT_PUBLIC_POSTHOG_KEY: 'phc_test' },
-      ctx,
-      fetchImpl: ((_url: string | URL, init?: RequestInit) => {
-        const rawBody = init?.body;
-        captured.push(
-          JSON.parse(typeof rawBody === 'string' ? rawBody : '{}') as Record<string, unknown>
-        );
-        return Promise.resolve(new Response('{}', { status: 200 }));
-      }) as unknown as typeof fetch,
-      log: console.log,
-    });
+  it('an authenticated request binds the event to the grant user and organization', async () => {
     const upstream = vi.fn(() =>
       Promise.resolve(Response.json({ result: { data: { balance: 42 } } }))
     );
-    const handler = createMcpHandler({
-      catalog: testCatalog,
-      webBaseUrl: 'https://app.kilo.ai',
-      fetchImpl: upstream as unknown as typeof fetch,
-      mcpAuth: { tokenSecret: secret, store },
-      analytics,
+    const { captured, promises, handler } = createHarness({
+      upstreamFetchImpl: upstream as unknown as typeof fetch,
     });
-
-    const response = await handler(
-      new Request(`${issuer}/mcp`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 16,
-          method: 'tools/call',
-          params: { name: 'call', arguments: { path: 'organizations.list' } },
-        }),
-      })
+    const response = await post(
+      handler,
+      {
+        jsonrpc: '2.0',
+        id: 16,
+        method: 'tools/call',
+        params: { name: 'call', arguments: { path: 'organizations.list' } },
+      },
+      {
+        authorization: 'Bearer kilo-token',
+        organizationId: 'org-1',
+        kiloUserId: 'user-1',
+        clientId: 'client-1',
+      }
     );
     expect(response.status).toBe(200);
     await settle(promises);

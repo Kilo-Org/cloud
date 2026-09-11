@@ -1127,6 +1127,7 @@ export async function markOrganizationAsDeleted(
             generation: 1,
             status: 'deleting',
             cleanup_requires_revoke: true,
+            cleanup_stage: 'revoke',
             expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
           })
           .onConflictDoUpdate({
@@ -1139,6 +1140,7 @@ export async function markOrganizationAsDeleted(
               active_generation: null,
               oauth_attempt_id: null,
               cleanup_requires_revoke: true,
+              cleanup_stage: sql`CASE WHEN ${provider_installation_reservations.status} = 'deleting' THEN ${provider_installation_reservations.cleanup_stage} ELSE 'revoke' END`,
               updated_at: new Date().toISOString(),
             },
           });
@@ -1150,6 +1152,7 @@ export async function markOrganizationAsDeleted(
           active_generation: null,
           oauth_attempt_id: null,
           cleanup_requires_revoke: true,
+          cleanup_stage: sql`CASE WHEN ${provider_installation_reservations.status} = 'deleting' THEN ${provider_installation_reservations.cleanup_stage} ELSE 'revoke' END`,
           expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
           updated_at: new Date().toISOString(),
         })

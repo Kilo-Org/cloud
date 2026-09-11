@@ -127,7 +127,7 @@ describe('slack-service uninstallApp', () => {
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T123');
     expect(deleteChatSdkIdentityCache).toHaveBeenCalledWith('T123');
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(3);
     expect(deleteChatSdkInstallation.mock.invocationCallOrder[0]).toBeLessThan(
       deleteChatSdkIdentityCache.mock.invocationCallOrder[0]
     );
@@ -171,7 +171,7 @@ describe('slack-service uninstallApp', () => {
     await uninstallApp(owner, { deleteChatSdkInstallation });
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T456');
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
   });
 
   it('disconnects suspended integrations without deleting shared Slack installation state', async () => {

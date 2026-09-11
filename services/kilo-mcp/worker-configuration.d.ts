@@ -5,7 +5,6 @@ interface __BaseEnv_Env {
 	VECTORIZE: VectorizeIndex;
 	AI: Ai;
 	WEB_BASE_URL: "http://localhost:3000" | "https://app.kilo.ai";
-	MCP_TOKEN_SECRET: string;
 	KILO_MCP_OAUTH_STORE: DurableObjectNamespace<import("./src/index").KiloMcpOAuthStore>;
 	NEXT_PUBLIC_POSTHOG_KEY?: "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z";
 	OAUTH_KV: KVNamespace;
@@ -20,7 +19,6 @@ declare namespace Cloudflare {
 		VECTORIZE: VectorizeIndex;
 		AI: Ai;
 		WEB_BASE_URL: "http://localhost:3000";
-		MCP_TOKEN_SECRET: string;
 		KILO_MCP_OAUTH_STORE: DurableObjectNamespace<import("./src/index").KiloMcpOAuthStore>;
 		OAUTH_KV: KVNamespace;
 		OAUTH_PROVIDER: import('@cloudflare/workers-oauth-provider').OAuthHelpers;
@@ -32,7 +30,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "WEB_BASE_URL" | "MCP_TOKEN_SECRET" | "NEXT_PUBLIC_POSTHOG_KEY">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "WEB_BASE_URL" | "NEXT_PUBLIC_POSTHOG_KEY">> {}
 }
 
 // Begin runtime types

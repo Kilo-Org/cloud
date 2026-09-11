@@ -74,10 +74,6 @@ function createFakeStore(): OAuthStoreApi & { pending: Map<string, PendingAuthor
   };
   return {
     pending,
-    registerClient: unused,
-    getClient: unused,
-    createCode: unused,
-    getCode: unused,
     recordPairingApproval: async (deviceAuthCode, identity, nowIso) => {
       for (const [id, record] of pending) {
         if (
@@ -96,10 +92,6 @@ function createFakeStore(): OAuthStoreApi & { pending: Map<string, PendingAuthor
       }
       return false;
     },
-    denyCode: unused,
-    markCodeExpired: unused,
-    approveCode: unused,
-    consumeCode: unused,
     createPendingAuthorization: async (input: NewPendingAuthorization) => {
       pending.set(input.id, {
         id: input.id,
@@ -167,13 +159,6 @@ function createFakeStore(): OAuthStoreApi & { pending: Map<string, PendingAuthor
       pending.set(id, { ...record, status: 'completed' });
       return true;
     },
-    saveRefreshToken: unused,
-    getRefreshTokenByHash: unused,
-    rotateRefreshToken: unused,
-    getKiloToken: unused,
-    revokeGrant: unused,
-    revokeJti: unused,
-    isJtiRevoked: async () => false,
     purgeExpired: unused,
   };
 }

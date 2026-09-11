@@ -398,8 +398,8 @@ export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>)
                 input.kiloRuntimes?.getEntryRuntimeId?.(directory, root),
             }
           : {}),
-        getRetained: (directory, runtimeId) =>
-          input.kiloRuntimes?.getRetained?.(directory, runtimeId),
+        getRetained: (identity, runtimeId) =>
+          input.kiloRuntimes?.getRetained?.(identity, runtimeId),
         prepareForNewWork: directory => input.kiloRuntimes?.prepareForNewWork?.(directory) ?? true,
         retireRuntime: (directory, deadlineAt, target) =>
           input.kiloRuntimes?.retireRuntime?.(directory, deadlineAt, target) ??
@@ -764,7 +764,7 @@ function currentRuntimeMatchesTarget(
 ): boolean {
   if (!target) return false;
   const runtime =
-    deps.kiloRuntimes?.getRetained?.(session.directory, target.runtimeId) ??
+    deps.kiloRuntimes?.getRetained?.(session, target.runtimeId) ??
     deps.kiloRuntimes?.get(session);
   return (
     runtime !== undefined &&
@@ -1125,7 +1125,7 @@ async function handleAbort(
   const scopedCleanupResultGranted = supportsScopedCleanupResult(deps);
   if (parsed.data.nativeRuntimeId) {
     const runtime = deps.kiloRuntimes?.getRetained?.(
-      session.directory,
+      session,
       parsed.data.nativeRuntimeId
     );
     if (!runtime || runtime.runtimeId !== parsed.data.nativeRuntimeId) {

@@ -3313,6 +3313,8 @@ setInterval(() => {}, 1000);
           captureBaseline: async () => {},
           stop: async () => true,
           verify: async () => true,
+          observeChild: () => undefined,
+          releaseAbandoned: () => {},
         });
         return { url: server.url, close: () => {} };
       },

@@ -27,7 +27,7 @@ type OperationRegistryDependencies = {
   native: {
     get(identity: SessionRequestIdentity): ReturnType<WorktreeKiloRuntimes['get']>;
     getEntryRuntimeId?(directory: string, root: string): string | undefined;
-    getRetained(directory: string, runtimeId?: string): WorktreeKiloRuntime | undefined;
+    getRetained(identity: SessionRequestIdentity | string, runtimeId?: string): WorktreeKiloRuntime | undefined;
     prepareForNewWork?(directory: string): boolean;
     retireRuntime(
       directory: string,

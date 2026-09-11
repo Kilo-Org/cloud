@@ -1104,7 +1104,8 @@ describe('handleControlRequest', () => {
         detach: () => true,
         retireForRecovery: async () => 'retired',
         deleteDirectory: async () => {},
-        getRetained: directory => runtimes.get(directory),
+        getRetained: identity =>
+          runtimes.get(typeof identity === 'string' ? identity : identity.directory),
         retireRuntime: async (directory, _deadlineAt, target) => {
           const runtime = runtimes.get(directory);
           return runtime &&

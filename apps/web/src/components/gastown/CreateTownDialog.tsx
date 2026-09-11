@@ -66,7 +66,6 @@ export function CreateTownDialog({ isOpen, onClose }: CreateTownDialogProps) {
               placeholder="My Town"
               autoFocus
               required
-              aria-required="true"
               className="border-white/10 bg-black/25"
             />
           </div>

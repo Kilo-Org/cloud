@@ -710,7 +710,6 @@ function IntentStep({
               <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
                 <SelectTrigger
                   className="w-full"
-                  aria-label="Organization"
                   aria-invalid={Boolean(orgError)}
                   aria-describedby={orgError ? 'wasteland-org-error' : undefined}
                 >
@@ -1108,7 +1107,10 @@ function PreviewStep({
       </div>
 
       {error && (
-        <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
+        <div
+          role="alert"
+          className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3"
+        >
           <p className="text-sm font-medium text-destructive">We couldn&apos;t finish the setup.</p>
           <p className="text-xs text-destructive/90">{error}</p>
           <p className="text-xs text-muted-foreground">

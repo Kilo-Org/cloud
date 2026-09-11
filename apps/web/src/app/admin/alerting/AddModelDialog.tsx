@@ -46,6 +46,7 @@ export function AddModelDialog({
         <div className="flex flex-col gap-3">
           <Input
             placeholder="Search models..."
+            aria-label="Search models"
             value={searchTerm}
             onChange={e => onSearchChange(e.target.value)}
           />

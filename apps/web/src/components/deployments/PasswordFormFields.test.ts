@@ -12,18 +12,20 @@ function render(enabled: boolean) {
   );
 }
 
-function firstVisibilityToggle(html: string): string {
-  return html.match(/<button type="button" aria-label="Show password"[^>]*>/)?.[0] ?? '';
+function visibilityToggles(html: string): string[] {
+  return html.match(/<button type="button" aria-label="Show password"[^>]*>/g) ?? [];
 }
 
 describe('PasswordProtection accessibility', () => {
-  it('keeps the password visibility toggle keyboard reachable and state-labeled', () => {
-    const toggle = firstVisibilityToggle(render(true));
+  it('keeps every password visibility toggle keyboard reachable and state-labeled', () => {
+    const toggles = visibilityToggles(render(true));
 
-    expect(toggle).not.toBe('');
-    expect(toggle).not.toContain('tabindex="-1"');
-    expect(toggle).toContain('aria-pressed="false"');
-    expect(toggle).toContain('aria-controls="password confirm-password"');
+    expect(toggles).toHaveLength(2);
+    for (const toggle of toggles) {
+      expect(toggle).not.toContain('tabindex="-1"');
+      expect(toggle).toContain('aria-pressed="false"');
+      expect(toggle).toContain('aria-controls="password confirm-password"');
+    }
   });
 
   it('associates the password requirements hint with the password input', () => {

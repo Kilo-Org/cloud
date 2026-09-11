@@ -4,11 +4,9 @@ import * as React from 'react';
 import { Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type RadioGroupProps = {
+type RadioGroupProps = React.ComponentProps<'div'> & {
   value?: string;
   onValueChange?: (value: string) => void;
-  className?: string;
-  children: React.ReactNode;
 };
 
 const RadioGroupContext = React.createContext<{
@@ -16,10 +14,18 @@ const RadioGroupContext = React.createContext<{
   onValueChange?: (value: string) => void;
 }>({});
 
-export function RadioGroup({ value, onValueChange, className, children }: RadioGroupProps) {
+export function RadioGroup({
+  value,
+  onValueChange,
+  className,
+  children,
+  ...props
+}: RadioGroupProps) {
   return (
     <RadioGroupContext.Provider value={{ value, onValueChange }}>
-      <div className={cn('grid gap-2', className)}>{children}</div>
+      <div role="radiogroup" className={cn('grid gap-2', className)} {...props}>
+        {children}
+      </div>
     </RadioGroupContext.Provider>
   );
 }

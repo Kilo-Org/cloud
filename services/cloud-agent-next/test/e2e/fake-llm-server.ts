@@ -496,6 +496,7 @@ type ToolCallDelta = {
 type ChunkDelta = {
   role?: string;
   content?: string;
+  reasoning?: string;
   tool_calls?: ToolCallDelta[];
 };
 
@@ -624,6 +625,30 @@ function emitEcho(ctx: ScenarioContext, text: string): void {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export const MAX_REALISTIC_CHARS = 4000;
+export const MAX_REALISTIC_PIECES = 512;
+
+export function buildRealisticReasoning(text: string): string[] {
+  const fingerprint = createHash('sha256').update(text).digest('hex').slice(0, 16);
+  const reasoningSeed = `input=${fingerprint} chars=${text.length}`;
+  return [
+    `Analyzing ${reasoningSeed}.`,
+    `Planning ${reasoningSeed}.`,
+    `Preparing ${reasoningSeed}.`,
+  ];
+}
+
+export function splitRealisticContent(text: string): string[] {
+  const cappedText = text.slice(0, MAX_REALISTIC_CHARS);
+  const splitPieces = cappedText.split(/(\s+)/).filter(piece => piece.length > 0);
+  if (splitPieces.length <= MAX_REALISTIC_PIECES) return splitPieces;
+  // Keep the full capped text while bounding the number of streamed chunks.
+  return [
+    ...splitPieces.slice(0, MAX_REALISTIC_PIECES - 1),
+    splitPieces.slice(MAX_REALISTIC_PIECES - 1).join(''),
+  ];
 }
 
 function writeAssistantResponse(ctx: ScenarioContext, content: string): void {
@@ -765,6 +790,24 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     const rawArg = args[0] ?? '';
     const text = rawArg.match(/^([A-Za-z0-9_-]*)/)?.[1] ?? '';
     emitEcho(ctx, text);
+  },
+
+  async realistic(args, ctx) {
+    const text = stripPromptContext(args[0] ?? '');
+    const contentPieces = splitRealisticContent(text);
+    const reasoningPieces = buildRealisticReasoning(text);
+
+    writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { role: 'assistant' }));
+    for (const [index, reasoning] of reasoningPieces.entries()) {
+      if (index > 0) await sleep(120);
+      writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { reasoning }));
+    }
+    for (const [index, piece] of contentPieces.entries()) {
+      if (index > 0) await sleep(80);
+      writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { content: piece }));
+    }
+    writeFinish(ctx.res, ctx.id, ctx.model, contentPieces.join('').length);
+    ctx.res.end();
   },
 
   async slow(args, ctx) {

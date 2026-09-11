@@ -239,6 +239,7 @@ source of directive truth is `test/e2e/fake-llm-server.ts`.
 |---|---|
 | *(no `__fake__:` directive)* | Echo the last user message after stripping kilo `<environment_details>`. |
 | `slow:<n>:<ms>` | `n` content chunks `<ms>` apart, then stop + `[DONE]`. Used for pacing/timing probes. |
+| `realistic:<text>` | Role delta, 3 deterministic reasoning deltas, then content deltas with whitespace separators as their own deltas, then stop + [DONE] with usage; text is capped at 4000 characters and 512 pieces to emulate a real provider stream. |
 | `idle` | One empty-delta chunk, then stop + `[DONE]`. |
 | `hang` | Opens the SSE stream but emits nothing and never closes. Drives abort/timeout paths. |
 | `error-terminal:<msg>` | HTTP 400 with OpenAI-shaped error body carrying `<msg>`. Exercises nonretryable provider-error propagation through the gateway. |

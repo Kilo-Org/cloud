@@ -12,10 +12,14 @@ import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { streamEventSchema } from '../e2e/client.js';
 import {
+  buildRealisticReasoning,
   extractLastUserMessageText,
   extractMultipartField,
+  MAX_REALISTIC_CHARS,
+  MAX_REALISTIC_PIECES,
   parseDirective,
   startFakeLlmServer,
+  splitRealisticContent,
   stripKiloPromptWrapping,
   type FakeLlmServerHandle,
 } from '../e2e/fake-llm-server.js';
@@ -473,6 +477,74 @@ describe('fake-llm-server HTTP', () => {
     const chunks = await readAllSse(res.body!);
     const parsed = chunks.slice(0, -1).map(c => JSON.parse(c.data));
     expect(parsed[0].choices[0].delta.content).toBe('hello');
+  });
+
+  it('builds deterministic reasoning and bounded separator-preserving content pieces', () => {
+    const reasoning = buildRealisticReasoning('alpha beta');
+    expect(reasoning).toHaveLength(3);
+    expect(buildRealisticReasoning('alpha beta')).toEqual(reasoning);
+    expect(buildRealisticReasoning('different input')).not.toEqual(reasoning);
+
+    expect(splitRealisticContent('alpha  beta:gamma\n delta')).toEqual([
+      'alpha',
+      '  ',
+      'beta:gamma',
+      '\n ',
+      'delta',
+    ]);
+
+    const whitespaceRich = 'x '.repeat(MAX_REALISTIC_CHARS / 2);
+    const whitespacePieces = splitRealisticContent(whitespaceRich);
+    expect(whitespacePieces).toHaveLength(MAX_REALISTIC_PIECES);
+    expect(whitespacePieces.join('')).toBe(whitespaceRich.slice(0, MAX_REALISTIC_CHARS));
+
+    const overflow = 'z'.repeat(MAX_REALISTIC_CHARS + 5);
+    expect(splitRealisticContent(overflow).join('')).toBe('z'.repeat(MAX_REALISTIC_CHARS));
+  });
+
+  it('realistic streams deterministic reasoning and capped content', async () => {
+    const h = await start();
+    const text = ' alpha beta:gamma path:to delta ';
+    const prompt = `__fake__:realistic:${text}<environment_details>\nprivate context\n</environment_details>`;
+    const expectedText = text.trimEnd();
+
+    const readRealistic = async (): Promise<Array<Record<string, unknown>>> => {
+      const response = await postChat(h.url, prompt);
+      expect(response.status).toBe(200);
+      const events = await readAllSse(response.body!);
+      expect(events.at(-1)?.data).toBe('[DONE]');
+      return events.slice(0, -1).map(event => JSON.parse(event.data));
+    };
+
+    const first = await readRealistic();
+    const firstDelta = first[0]?.choices?.[0]?.delta;
+    expect(firstDelta).toEqual({ role: 'assistant' });
+
+    const reasoningChunks = first.filter(
+      chunk => typeof chunk.choices?.[0]?.delta?.reasoning === 'string'
+    );
+    expect(reasoningChunks).toHaveLength(3);
+    expect(reasoningChunks.every(chunk => chunk.choices[0].delta.content === undefined)).toBe(true);
+
+    const contentPieces = first
+      .map(chunk => chunk.choices?.[0]?.delta?.content)
+      .filter((piece): piece is string => typeof piece === 'string');
+    expect(contentPieces.join('')).toBe(expectedText);
+    expect(contentPieces.join('')[0]).toBe(' ');
+
+    const finish = first.at(-1);
+    expect(finish?.choices?.[0]?.finish_reason).toBe('stop');
+    expect(finish?.usage?.completion_tokens).toBeGreaterThan(0);
+
+    const second = await readRealistic();
+    const normalize = (chunks: Array<Record<string, unknown>>) =>
+      chunks.map(chunk => {
+        const normalized = { ...chunk };
+        delete normalized.id;
+        delete normalized.created;
+        return normalized;
+      });
+    expect(normalize(second)).toEqual(normalize(first));
   });
 
   it('idle scenario emits empty delta, stop, [DONE]', async () => {

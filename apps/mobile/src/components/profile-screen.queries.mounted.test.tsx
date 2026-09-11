@@ -213,11 +213,12 @@ describe('ProfileScreen deferred queries', () => {
 
     const { renderer, unmount } = await mountProfile();
 
-    // Before the flush: neither query fired, the skeleton shows, and the agent
-    // rows are held disabled (refreshing argument is true).
+    // Before the flush: neither query fired, the content-shaped skeleton
+    // (icon tile + two text bars) shows, and the agent rows are held
+    // disabled (refreshing argument is true).
     expect(providersQueryFn).not.toHaveBeenCalled();
     expect(organizationsQueryFn).not.toHaveBeenCalled();
-    expect(nodeCount(renderer.root, 'Skeleton')).toBe(1);
+    expect(nodeCount(renderer.root, 'Skeleton')).toBe(3);
     expect(getProfileAgentScopeMock.mock.calls.at(-1)?.[2]).toBe(true);
 
     flushInteractions();

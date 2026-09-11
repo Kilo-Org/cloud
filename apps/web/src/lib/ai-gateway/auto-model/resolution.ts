@@ -1,8 +1,4 @@
 import type { FeatureValue } from '@/lib/feature-detection';
-import {
-  gemma_4_26b_a4b_it_free_model,
-  GEMMA_4_26B_A4B_IT_ID,
-} from '@/lib/ai-gateway/providers/google';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
@@ -15,12 +11,12 @@ import type {
 } from '@/lib/organizations/organization-types';
 import { isVirtualAutoModelId, type AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import {
+  AUTO_SMALL_TARGET_MODELS,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_SMALL_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   modeSchema,
-  BALANCED_FALLBACK_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
@@ -30,9 +26,10 @@ import {
   autoFreeModels,
   findKiloExclusiveModel,
   isKiloExclusiveFreeModel,
+  PRIMARY_DEFAULT_MODEL,
   selectAutoFreeCandidate,
 } from '@/lib/ai-gateway/models';
-import { getOpenRouterModelsFromRedis } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { tryGetProviderById } from '@/lib/ai-gateway/providers/provider-definitions';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import {
@@ -78,7 +75,7 @@ function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | nu
 export async function getAutoFreeCandidates(
   apiKind: GatewayRequest['kind'] | null
 ): Promise<ReadonlyArray<string>> {
-  const openRouterModels = await getOpenRouterModelsFromRedis();
+  const openRouterModels = await getOpenRouterModelsFromDatabase();
   const candidates = new Set<string>();
   for (const { model } of autoFreeModels) {
     if (isKiloExclusiveFreeModel(model)) {
@@ -314,12 +311,13 @@ export async function resolveAutoModel(
       resolved: {
         model:
           (await balancePromise) > 0
-            ? GEMMA_4_26B_A4B_IT_ID
-            : gemma_4_26b_a4b_it_free_model.public_id,
+            ? AUTO_SMALL_TARGET_MODELS.paid
+            : AUTO_SMALL_TARGET_MODELS.free,
       },
     };
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
+    const fallbackModel = { model: PRIMARY_DEFAULT_MODEL };
     const decision = params.efficientDecision ? await params.efficientDecision() : null;
     if (decision && !isVirtualAutoModelId(decision.model)) {
       const resolvedFromDecision = await resolveEfficientDecisionModel(decision);
@@ -327,11 +325,11 @@ export async function resolveAutoModel(
         return { kind: 'ok', resolved: resolvedFromDecision };
       }
       // Exact catalog variant missing or removed: never serve the chosen model
-      // with implicit defaults — same balanced fallback as the no-decision path.
-      return { kind: 'ok', resolved: BALANCED_FALLBACK_MODEL };
+      // with implicit defaults — use the same fallback as the no-decision path.
+      return { kind: 'ok', resolved: fallbackModel };
     }
     // Static fallback when the worker is slow or unavailable.
-    return { kind: 'ok', resolved: BALANCED_FALLBACK_MODEL };
+    return { kind: 'ok', resolved: fallbackModel };
   }
   const mode = resolveMode(modeHeader, featureHeader);
   return {

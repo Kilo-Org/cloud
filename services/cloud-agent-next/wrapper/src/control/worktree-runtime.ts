@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -6,15 +5,13 @@ import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk';
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
-import {
-  emitControlDiagnostic,
-  type ControlDiagnosticReporter,
-} from '../../../src/shared/control-diagnostics.js';
+import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
 import { safeSandboxRuntimeVersion } from '../../../src/shared/sandbox-status.js';
-import type {
-  ControlErrorCode,
-  SessionAttachPayload,
-  SessionRequestIdentity,
+import {
+  SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS,
+  type ControlErrorCode,
+  type SessionAttachPayload,
+  type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
 import {
@@ -23,23 +20,36 @@ import {
   type WrapperKiloClient,
 } from '../kilo-api.js';
 import { withTimeoutAndAbort } from '../utils.js';
-import { unfilteredKiloEvents } from './feed.js';
-import { forgetAttachedRoot, rememberAttachedRoot } from './session-directories.js';
+import { isKiloServerProcess } from '../tool-cgroup.js';
 import {
-  KiloEventFeedError,
-  startSandboxControlEventFeed,
-  withKiloRequestDeadline,
-} from './sandbox-control-runtime.js';
+  createOwnedProcessScope,
+  OWNED_PROCESS_OBSERVATION_TIMEOUT_MS,
+  type OwnedProcessScope,
+} from './owned-processes.js';
+import type { NativeOperationTarget, NativeRetirement } from './session-operation-cleanup.js';
+import { retireWorktreeRuntime } from './worktree-runtime-cleanup.js';
+import { forgetAttachedRoot, rememberAttachedRoot } from './session-directories.js';
+import { withKiloRequestDeadline, type KiloEventFeedError } from './sandbox-control-runtime.js';
+import { createWorktreeFeed, type KiloFeedEvent, type WorktreeFeed } from './worktree-feed.js';
 
 export type WorktreeKiloAuth = NonNullable<SessionAttachPayload['kilo']>;
+type RuntimeIsolation = 'directory-shared' | 'per-session';
 
 type WorktreeKiloFailure = {
+  identity: SessionRequestIdentity;
+  retirementId: string;
   directory: string;
   reason: KiloEventFeedError['reason'] | 'process_exited' | 'credential_refresh_failed';
+  runtimeId: string;
+  cleanup: 'confirmed' | 'unconfirmed';
+  cleanupDeadlineAt: number;
 };
 
 export type WorktreeKiloRuntime = {
+  readonly identity?: SessionRequestIdentity;
+  readonly isolation?: RuntimeIsolation;
   readonly scopeId: string;
+  readonly runtimeId: string;
   readonly directory: string;
   readonly env: Record<string, string>;
   readonly kiloClient: WrapperKiloClient;
@@ -49,9 +59,42 @@ export type WorktreeKiloRuntime = {
 export type WorktreeKiloAttachment = {
   ready: Promise<WorktreeKiloRuntime>;
   signal: AbortSignal;
+  cleanup?(deadlineAt: number): Promise<NativeRetirement>;
   commit(): void;
   release(): void;
 };
+
+type RecoveryRetirement = 'retired' | 'absent' | 'acknowledged';
+export type RootRuntimeRetirement = {
+  directory: string;
+  root: string;
+  nativeRuntimeId: string;
+  target: NativeOperationTarget;
+  result: NativeRetirement;
+  retirementId?: string;
+  reason?: string;
+  cleanupDeadlineAt?: number;
+  reportToService?: boolean;
+};
+
+export type RootRuntimeRetirementStarted = {
+  directory: string;
+  root: string;
+  nativeRuntimeId: string;
+  target: NativeOperationTarget;
+  retirementId: string;
+  reason: string;
+  cleanupDeadlineAt: number;
+  reportToService?: boolean;
+};
+
+export type RootRuntimeDisappearance = {
+  directory: string;
+  root: string;
+  nativeRuntimeId: string;
+  target: NativeOperationTarget;
+};
+export type RootRetirementScope = 'shared' | 'sole' | 'stale';
 
 export type WorktreeKiloRuntimes = {
   readonly kiloCliVersion?: string | null;
@@ -59,31 +102,71 @@ export type WorktreeKiloRuntimes = {
     identity: SessionRequestIdentity,
     kilo: WorktreeKiloAuth,
     env?: Record<string, string>,
-    canRefreshCredentials?: () => boolean
+    canRefreshCredentials?: () => boolean,
+    runtimeIsolation?: RuntimeIsolation,
+    beforeMutation?: () => void,
+    onCleanupTarget?: (cleanup: (deadlineAt: number) => Promise<NativeRetirement>) => void
   ): WorktreeKiloAttachment;
   detach(identity: SessionRequestIdentity): boolean;
+  retireForRecovery(
+    identity: SessionRequestIdentity,
+    recoveryId: string,
+    assertIdle: () => void
+  ): Promise<RecoveryRetirement>;
   deleteDirectory(directory: string): Promise<void>;
-  get(directory: string): WorktreeKiloRuntime | undefined;
+  retireRuntime?(
+    directory: string,
+    deadlineAt: number,
+    target?: NativeOperationTarget
+  ): Promise<NativeRetirement>;
+  retireRuntimeIfUnshared?(
+    directory: string,
+    target: NativeOperationTarget,
+    retiringRoot: string,
+    deadlineAt: number,
+    reason?: string
+  ): Promise<NativeRetirement | 'shared'>;
+  rootRetirementScope?(
+    directory: string,
+    target: NativeOperationTarget,
+    retiringRoot: string
+  ): RootRetirementScope;
+  verifyQuiescence?(
+    directory: string,
+    target: NativeOperationTarget,
+    deadlineAt: number
+  ): Promise<boolean>;
+  getRetained?(directory: string, runtimeId?: string): WorktreeKiloRuntime | undefined;
+  get(identity: SessionRequestIdentity | string): WorktreeKiloRuntime | undefined;
+  getAll?(directory: string): WorktreeKiloRuntime[];
+  isCurrent?(runtime: WorktreeKiloRuntime): boolean;
+  getEntryRuntimeId?(directory: string, root?: string): string | undefined;
+  prepareForNewWork?(directory: string): boolean;
   isHealthy(): boolean;
   shutdown(): void;
 };
 
-type WorktreeKiloEvent = {
-  type: string;
-  properties: Record<string, unknown>;
-  directory?: string;
-};
+type WorktreeKiloEvent = KiloFeedEvent;
 
 type ServerOptions = {
   directory: string;
   env: Record<string, string>;
   signal: AbortSignal;
   timeoutMs?: number;
+  onProcessScope?: (scope: OwnedProcessScope) => void;
+  claimCleanupDeadline?: (deadlineAt?: number) => number;
 };
 
-type WorktreeKiloServerHandle = KiloServerHandle & { stopped?: Promise<void> };
+type WorktreeKiloServerHandle = Omit<KiloServerHandle, 'close'> & {
+  close(deadlineAt?: number): void;
+  stopped?: Promise<void>;
+  exited?: Promise<void>;
+  processes?: OwnedProcessScope;
+};
 
 type RuntimeEntry = {
+  identity: SessionRequestIdentity;
+  isolation: RuntimeIsolation;
   kilo: WorktreeKiloAuth;
   directory: string;
   env: Record<string, string>;
@@ -92,11 +175,17 @@ type RuntimeEntry = {
   runtime?: WorktreeKiloRuntime;
   kiloClient?: WrapperKiloClient;
   processAbort?: AbortController;
+  processes?: OwnedProcessScope;
+  processIssued?: boolean;
+  runtimeId: string;
   pendingPtys: number;
-  feed?: Awaited<ReturnType<typeof startSandboxControlEventFeed>>;
+  feed?: WorktreeFeed;
   starting?: Promise<WorktreeKiloRuntime>;
   stopped?: Promise<void>;
-  retiring?: Promise<void>;
+  retiring?: Promise<NativeRetirement>;
+  retirementResult?: NativeRetirement;
+  observing?: Promise<boolean>;
+  cleanupDeadlineAt?: number;
 };
 
 type RootAttachment = {
@@ -132,6 +221,13 @@ export class WorktreeKiloRuntimeError extends Error {
     super(message);
     this.name = 'WorktreeKiloRuntimeError';
   }
+}
+
+export function isRetirementReportCurrent(
+  currentRuntimeId: string | undefined,
+  retiredRuntimeId: string
+): boolean {
+  return currentRuntimeId === undefined || currentRuntimeId === retiredRuntimeId;
 }
 
 export function buildWorktreeKiloEnvironment(
@@ -202,21 +298,41 @@ export async function startWorktreeKiloServer(
   options: ServerOptions
 ): Promise<WorktreeKiloServerHandle & { stopped: Promise<void> }> {
   options.signal.throwIfAborted();
-  const proc = spawn('kilo', ['serve', '--hostname=127.0.0.1', '--port=0'], {
+  const processes = createOwnedProcessScope();
+  options.onProcessScope?.(processes);
+  const proc = processes.spawn('kilo', ['serve', '--hostname=127.0.0.1', '--port=0'], {
     cwd: options.directory,
     env: options.env,
-    stdio: ['ignore', 'pipe', 'ignore'],
   });
+  proc.stderr.resume();
   const stopped = new Promise<void>(resolve => {
     proc.once('close', () => resolve());
   });
+  const exited = new Promise<void>(resolve => {
+    proc.once('exit', () => resolve());
+    proc.once('error', () => {
+      if (proc.pid === undefined) resolve();
+    });
+  });
+  let cleanupDeadlineAt: number | undefined;
+  const claimCleanupDeadline = (requested?: number): number => {
+    const owned = options.claimCleanupDeadline?.(requested) ?? requested;
+    cleanupDeadlineAt ??= owned ?? Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS;
+    cleanupDeadlineAt = Math.min(cleanupDeadlineAt, owned ?? cleanupDeadlineAt);
+    return cleanupDeadlineAt;
+  };
   let closed = false;
-  const close = (): void => {
+  const closeAt = (deadlineAt?: number): void => {
     if (closed) return;
     closed = true;
     options.signal.removeEventListener('abort', close);
-    if (proc.exitCode === null && proc.signalCode === null) proc.kill();
+    if (deadlineAt === undefined) {
+      if (proc.exitCode === null && proc.signalCode === null) proc.kill('SIGTERM');
+      return;
+    }
+    void processes.stop(claimCleanupDeadline(deadlineAt));
   };
+  const close = (): void => closeAt();
   options.signal.addEventListener('abort', close, { once: true });
 
   try {
@@ -253,10 +369,18 @@ export async function startWorktreeKiloServer(
     });
     proc.stdout.resume();
     proc.once('exit', close);
-    return { url, close, stopped };
+    await processes.captureBaseline(isKiloServerProcess);
+    options.signal.throwIfAborted();
+    return { url, close: closeAt, stopped, exited, processes };
   } catch {
-    close();
-    await stopped;
+    const deadlineAt = claimCleanupDeadline();
+    const cleanup = processes.stop(deadlineAt);
+    closeAt(deadlineAt);
+    await withTimeoutAndAbort(cleanup, {
+      timeoutMs: Math.max(1, deadlineAt - Date.now()),
+      timeoutMessage: 'Kilo startup cleanup expired',
+      abortMessage: 'Kilo startup cleanup cancelled',
+    }).catch(() => false);
     throw new Error('Kilo server failed to start');
   }
 }
@@ -277,15 +401,34 @@ export function createWorktreeKiloRuntimes(options: {
   homeRoot?: string;
   inheritedEnv?: NodeJS.ProcessEnv;
   startServer?: (options: ServerOptions) => Promise<WorktreeKiloServerHandle>;
-  onEvent?: (runtime: WorktreeKiloRuntime, event: WorktreeKiloEvent) => void;
+  onEvent?: (runtime: WorktreeKiloRuntime, event: WorktreeKiloEvent) => unknown;
+  onRootRetirementStarted?: (retirement: RootRuntimeRetirementStarted) => void;
+  onRootRetirement?: (retirement: RootRuntimeRetirement) => void;
+  onRootDisappeared?: (disappearance: RootRuntimeDisappearance) => void;
   onDiagnostic?: ControlDiagnosticReporter;
   onUnexpectedClose: (failure: WorktreeKiloFailure) => void;
 }): WorktreeKiloRuntimes {
   const entries = new Map<string, RuntimeEntry>();
   const directoriesByScope = new Map<string, string>();
+  const failedDirectories = new Set<string>();
   const roots = new Map<string, RootAttachment>();
+  const recoveryGates = new Map<string, Promise<void>>();
+  const recoveryAcknowledgements = new Map<string, Map<string, Promise<RecoveryRetirement>>>();
   const homesByDirectory = new Map<string, Set<string>>();
   const deletedDirectories = new Set<string>();
+  const deferredRetirements = new Map<
+    string,
+    {
+      directory: string;
+      root: string;
+      nativeRuntimeId: string;
+      entry: RuntimeEntry;
+      target: NativeOperationTarget;
+      reason: string;
+      deadlineAt: number;
+    }
+  >();
+  const evaluatingDeferredRetirements = new Set<RuntimeEntry>();
   let observedVersion: string | null | undefined;
   let closed = false;
 
@@ -294,67 +437,385 @@ export function createWorktreeKiloRuntimes(options: {
     observedVersion = observedVersion === undefined || observedVersion === version ? version : null;
   }
 
+  const identityKey = (identity: SessionRequestIdentity): string =>
+    `${identity.sessionId}\0${identity.kiloSessionId}\0${identity.directory}`;
+
+  const entryKey = (identity: SessionRequestIdentity, isolation: RuntimeIsolation): string =>
+    isolation === 'per-session' ? identityKey(identity) : identity.directory;
+
   function findRoot(identity: SessionRequestIdentity): RootAttachment | undefined {
-    for (const root of roots.values()) {
-      if (
-        root.identity.kiloSessionId !== identity.kiloSessionId &&
-        root.identity.sessionId !== identity.sessionId
-      ) {
-        continue;
-      }
-      if (
-        root.identity.sessionId !== identity.sessionId ||
-        root.identity.kiloSessionId !== identity.kiloSessionId ||
-        root.identity.directory !== identity.directory
-      ) {
-        throw new WorktreeKiloRuntimeError('unauthorized', 'Session identity mismatch', false);
-      }
-      return root;
-    }
-    return undefined;
+    return roots.get(identityKey(identity));
   }
 
-  function retire(entry: RuntimeEntry): Promise<void> {
-    if (entry.retiring) return entry.retiring;
-    entry.retiring = Promise.resolve(entry.starting)
-      .catch(() => undefined)
-      .then(() => entry.stopped)
-      .then(() => {
-        if (entries.get(entry.directory) === entry) entries.delete(entry.directory);
-      });
-    void entry.retiring.catch(() => {});
-    if (
-      entries.get(entry.directory) === entry &&
-      directoriesByScope.get(entry.kilo.scopeId) === entry.directory
-    ) {
-      directoriesByScope.delete(entry.kilo.scopeId);
+  function cleanupDeadline(entry: RuntimeEntry, requested?: number): number {
+    entry.cleanupDeadlineAt ??= requested ?? Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS;
+    entry.cleanupDeadlineAt = Math.min(
+      entry.cleanupDeadlineAt,
+      requested ?? entry.cleanupDeadlineAt
+    );
+    return entry.cleanupDeadlineAt;
+  }
+
+  function deferredRetirementKey(root: string, nativeRuntimeId: string): string {
+    return JSON.stringify([root, nativeRuntimeId]);
+  }
+
+  function runtimeTargetMatches(entry: RuntimeEntry, target: NativeOperationTarget): boolean {
+    return (
+      entry.runtimeId === target.runtimeId &&
+      (target.client === undefined || target.client === entry.kiloClient)
+    );
+  }
+
+  function reportRootRetirement(
+    intent: Omit<RootRuntimeRetirement, 'result'>,
+    result: NativeRetirement
+  ): void {
+    options.onRootRetirement?.({ ...intent, result });
+  }
+
+  function reportRuntimeRetirement(
+    intent: {
+      directory: string;
+      root: string;
+      nativeRuntimeId: string;
+      target: NativeOperationTarget;
+    },
+    retirement: Promise<NativeRetirement>
+  ): Promise<NativeRetirement> {
+    void retirement.then(result => reportRootRetirement(intent, result));
+    return retirement;
+  }
+
+  function settleDeferredRetirement(
+    intent: {
+      directory: string;
+      root: string;
+      nativeRuntimeId: string;
+    },
+    result: NativeRetirement
+  ): void {
+    const id = deferredRetirementKey(intent.root, intent.nativeRuntimeId);
+    const current = deferredRetirements.get(id);
+    if (!current || current.directory !== intent.directory) return;
+    deferredRetirements.delete(id);
+    reportRootRetirement({ ...intent, target: current.target }, result);
+  }
+
+  function settleEntryDeferredRetirements(
+    entry: RuntimeEntry,
+    target: NativeOperationTarget | undefined,
+    result: NativeRetirement
+  ): Set<string> {
+    const settled = new Set<string>();
+    for (const intent of [...deferredRetirements.values()]) {
+      if (intent.entry !== entry) continue;
+      if (
+        target &&
+        (target.runtimeId !== intent.nativeRuntimeId ||
+          (target.client !== undefined &&
+            intent.target.client !== undefined &&
+            target.client !== intent.target.client))
+      )
+        continue;
+      settled.add(deferredRetirementKey(intent.root, intent.nativeRuntimeId));
+      settleDeferredRetirement(intent, result);
     }
-    entry.abort.abort();
-    return entry.retiring;
+    return settled;
+  }
+
+  function liveRoots(entry: RuntimeEntry): RootAttachment[] {
+    return [...entry.roots].filter(root => root.attached || root.pending.size > 0);
+  }
+
+  function evaluateDeferredRetirements(entry: RuntimeEntry): void {
+    if (entry.retiring || evaluatingDeferredRetirements.has(entry)) return;
+    const live = liveRoots(entry);
+    evaluatingDeferredRetirements.add(entry);
+    try {
+      for (const intent of [...deferredRetirements.values()]) {
+        if (intent.entry !== entry) continue;
+        const failedRoot = [...entry.roots].find(
+          root => root.identity.kiloSessionId === intent.root
+        );
+        if (!failedRoot || !live.includes(failedRoot)) {
+          settleDeferredRetirement(intent, 'stale');
+          continue;
+        }
+        if (!runtimeTargetMatches(entry, intent.target)) {
+          settleDeferredRetirement(intent, 'stale');
+          continue;
+        }
+        if (live.some(root => root !== failedRoot)) continue;
+
+        deferredRetirements.delete(deferredRetirementKey(intent.root, intent.nativeRuntimeId));
+        const now = Date.now();
+        const physicalDeadlineAt =
+          now >= intent.deadlineAt
+            ? now + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS
+            : Math.min(intent.deadlineAt, now + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS);
+        void retire(entry, physicalDeadlineAt, intent.target, {
+          reason: intent.reason,
+          cleanupDeadlineAt: physicalDeadlineAt,
+          reportToService: true,
+        });
+      }
+    } finally {
+      evaluatingDeferredRetirements.delete(entry);
+    }
+  }
+
+  function unregisterRoot(root: RootAttachment): void {
+    root.entry.roots.delete(root);
+    root.attached = false;
+    root.pending.clear();
+    if (roots.get(identityKey(root.identity)) === root) {
+      roots.delete(identityKey(root.identity));
+      forgetAttachedRoot(root.identity.kiloSessionId, root.identity.directory);
+      if (!root.entry.retiring)
+        options.onRootDisappeared?.({
+          directory: root.entry.directory,
+          root: root.identity.kiloSessionId,
+          nativeRuntimeId: root.entry.runtimeId,
+          target: { runtimeId: root.entry.runtimeId, client: root.entry.kiloClient },
+        });
+    }
+    evaluateDeferredRetirements(root.entry);
+  }
+
+  function retire(
+    entry: RuntimeEntry,
+    requested?: number,
+    target?: NativeOperationTarget,
+    metadata: {
+      reason?: string;
+      cleanupDeadlineAt?: number;
+      reportToService?: boolean;
+    } = {}
+  ): Promise<NativeRetirement> {
+    const settlementTarget = target ?? { runtimeId: entry.runtimeId, client: entry.kiloClient };
+    const affectedRoots = [...entry.roots].map(root => root.identity.kiloSessionId);
+    const retirementId = crypto.randomUUID();
+    const cleanupDeadlineAt =
+      metadata.cleanupDeadlineAt ?? requested ?? Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS;
+    const reason = metadata.reason ?? 'Native runtime retirement requested';
+    for (const root of affectedRoots)
+      options.onRootRetirementStarted?.({
+        directory: entry.directory,
+        root,
+        nativeRuntimeId: settlementTarget.runtimeId,
+        target: settlementTarget,
+        retirementId,
+        reason,
+        cleanupDeadlineAt,
+        ...(metadata.reportToService ? { reportToService: true } : {}),
+      });
+    const retirement = retireWorktreeRuntime(entry, requested, target, {
+      cleanupDeadline,
+      unregisterRoot,
+      removeEntry: retiring => {
+        if (entries.get(entryKey(retiring.identity, retiring.isolation)) === retiring) {
+          entries.delete(entryKey(retiring.identity, retiring.isolation));
+          if (directoriesByScope.get(retiring.kilo.scopeId) === retiring.directory)
+            directoriesByScope.delete(retiring.kilo.scopeId);
+        }
+      },
+    });
+    void retirement.then(result => {
+      const settled = settleEntryDeferredRetirements(entry, target, result);
+      for (const root of affectedRoots) {
+        const id = deferredRetirementKey(root, settlementTarget.runtimeId);
+        if (!settled.has(id))
+          reportRootRetirement(
+            {
+              directory: entry.directory,
+              root,
+              nativeRuntimeId: settlementTarget.runtimeId,
+              target: settlementTarget,
+              retirementId,
+              reason,
+              cleanupDeadlineAt,
+              ...(metadata.reportToService ? { reportToService: true } : {}),
+            },
+            result
+          );
+      }
+    });
+    return retirement;
+  }
+
+  function retireRuntimeIfUnshared(
+    directory: string,
+    target: NativeOperationTarget,
+    retiringRoot: string,
+    deadlineAt: number,
+    reason = 'Native runtime retirement requested'
+  ): Promise<NativeRetirement | 'shared'> {
+    const entry = [...entries.values()].find(
+      entry => entry.directory === directory && runtimeTargetMatches(entry, target)
+    );
+    if (!entry || !runtimeTargetMatches(entry, target)) {
+      const intent = {
+        directory,
+        root: retiringRoot,
+        nativeRuntimeId: target.runtimeId,
+        target,
+      };
+      settleDeferredRetirement(intent, 'stale');
+      return reportRuntimeRetirement(intent, Promise.resolve('stale'));
+    }
+    const live = liveRoots(entry);
+    const intent = {
+      directory,
+      root: retiringRoot,
+      nativeRuntimeId: target.runtimeId,
+      target,
+    };
+    if (entry.retiring) return entry.retiring;
+    const failedRoot = [...entry.roots].find(root => root.identity.kiloSessionId === retiringRoot);
+    if (!failedRoot || !(failedRoot.attached || failedRoot.pending.size > 0)) {
+      settleDeferredRetirement(intent, 'stale');
+      return reportRuntimeRetirement(intent, Promise.resolve('stale'));
+    }
+    if (live.some(root => root !== failedRoot)) {
+      const id = deferredRetirementKey(retiringRoot, target.runtimeId);
+      deferredRetirements.set(id, {
+        directory,
+        root: retiringRoot,
+        nativeRuntimeId: target.runtimeId,
+        entry,
+        target,
+        reason,
+        deadlineAt,
+      });
+      return Promise.resolve('shared');
+    }
+    deferredRetirements.delete(deferredRetirementKey(retiringRoot, target.runtimeId));
+    const physicalDeadlineAt = Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS;
+    return retire(entry, physicalDeadlineAt, target, {
+      reason,
+      cleanupDeadlineAt: physicalDeadlineAt,
+      reportToService: true,
+    });
+  }
+
+  function rootRetirementScope(
+    directory: string,
+    target: NativeOperationTarget,
+    retiringRoot: string
+  ): RootRetirementScope {
+    const entry = [...entries.values()].find(
+      entry => entry.directory === directory && runtimeTargetMatches(entry, target)
+    );
+    if (!entry || entry.retiring || !runtimeTargetMatches(entry, target)) return 'stale';
+    const failedRoot = [...entry.roots].find(root => root.identity.kiloSessionId === retiringRoot);
+    if (!failedRoot || !(failedRoot.attached || failedRoot.pending.size > 0)) return 'stale';
+    return liveRoots(entry).some(root => root !== failedRoot) ? 'shared' : 'sole';
+  }
+
+  function observeRetained(entry: RuntimeEntry): Promise<boolean> {
+    if (entry.observing) return entry.observing;
+    const runtimeId = entry.runtimeId;
+    const runtime = entry.runtime;
+    const deadlineAt = Date.now() + OWNED_PROCESS_OBSERVATION_TIMEOUT_MS;
+    const observation = Promise.resolve()
+      .then(() => {
+        const processes = entry.processes;
+        return processes && typeof processes.verify === 'function'
+          ? processes.verify(false, deadlineAt)
+          : false;
+      })
+      .catch(() => false)
+      .then(async proven => {
+        if (!proven || Date.now() >= deadlineAt) return false;
+        const starting = entry.starting;
+        if (starting !== undefined) {
+          try {
+            await withTimeoutAndAbort(
+              Promise.resolve(starting).catch(() => undefined),
+              {
+                timeoutMs: Math.max(1, deadlineAt - Date.now()),
+                timeoutMessage: 'Native runtime startup settlement expired',
+                abortMessage: 'Native runtime startup settlement cancelled',
+              }
+            );
+          } catch {
+            return false;
+          }
+        }
+        if (Date.now() >= deadlineAt) return false;
+        if (
+          entries.get(entryKey(entry.identity, entry.isolation)) !== entry ||
+          entry.runtimeId !== runtimeId ||
+          entry.runtime !== runtime ||
+          entry.retirementResult !== 'unconfirmed' ||
+          !entry.abort.signal.aborted
+        )
+          return false;
+        entries.delete(entryKey(entry.identity, entry.isolation));
+        if (directoriesByScope.get(entry.kilo.scopeId) === entry.directory)
+          directoriesByScope.delete(entry.kilo.scopeId);
+        failedDirectories.delete(entry.directory);
+        return true;
+      })
+      .then(
+        proven => {
+          if (!proven && entry.observing === observation) entry.observing = undefined;
+          return proven;
+        },
+        error => {
+          if (entry.observing === observation) entry.observing = undefined;
+          throw error;
+        }
+      );
+    entry.observing = observation;
+    return observation;
   }
 
   function removeRoot(root: RootAttachment): void {
-    if (roots.get(root.identity.kiloSessionId) !== root) return;
-    roots.delete(root.identity.kiloSessionId);
-    root.entry.roots.delete(root);
-    forgetAttachedRoot(root.identity.kiloSessionId, root.identity.directory);
+    if (roots.get(identityKey(root.identity)) !== root) return;
+    unregisterRoot(root);
     root.abort.abort();
     if (root.entry.roots.size === 0) void retire(root.entry);
   }
 
   function failRuntime(entry: RuntimeEntry, reason: WorktreeKiloFailure['reason']): void {
     if (entry.abort.signal.aborted) return;
-    entry.abort.abort();
-    options.onUnexpectedClose({ directory: entry.directory, reason });
+    const deadlineAt = cleanupDeadline(entry);
+    const runtimeId = entry.runtimeId;
+    void retire(entry, deadlineAt, undefined, {
+      reason,
+      cleanupDeadlineAt: deadlineAt,
+    }).then(result => {
+      if (result === 'unconfirmed') failedDirectories.add(entry.directory);
+      options.onUnexpectedClose({
+        identity: entry.identity,
+        retirementId: crypto.randomUUID(),
+        directory: entry.directory,
+        reason,
+        runtimeId,
+        cleanup: result === 'unconfirmed' ? 'unconfirmed' : 'confirmed',
+        cleanupDeadlineAt: deadlineAt,
+      });
+    });
   }
 
   async function start(
     entry: RuntimeEntry,
-    retiring: Promise<void> | undefined
+    retiring: Promise<NativeRetirement> | undefined,
+    beforeMutation?: () => void
   ): Promise<WorktreeKiloRuntime> {
     const abort = new AbortController();
+    entry.feed?.close();
+    entry.feed = undefined;
+    entry.processes = undefined;
+    entry.processIssued = false;
+    entry.stopped = undefined;
     entry.processAbort = abort;
-    const stopProcess = () => abort.abort();
+    const stopProcess = () => {
+      void entry.processes?.stop(cleanupDeadline(entry));
+      abort.abort();
+    };
     entry.abort.signal.addEventListener('abort', stopProcess, { once: true });
     abort.signal.addEventListener(
       'abort',
@@ -367,12 +828,16 @@ export function createWorktreeKiloRuntimes(options: {
     const closeServer = (): void => {
       if (!server || serverClosed) return;
       serverClosed = true;
-      server.close();
+      const deadlineAt = cleanupDeadline(entry);
+      void server.processes?.stop(deadlineAt);
+      server.close(deadlineAt);
     };
     abort.signal.addEventListener('abort', closeServer, { once: true });
     try {
-      if (retiring) await retiring;
+      if (retiring && (await retiring) !== 'retired')
+        throw new Error('Predecessor native runtime is not contained');
       abort.signal.throwIfAborted();
+      beforeMutation?.();
       const authDirectory = path.join(entry.env.XDG_DATA_HOME, 'kilo');
       await fs.mkdir(authDirectory, { recursive: true, mode: 0o700 });
       await fs.mkdir(entry.env.XDG_RUNTIME_DIR, { recursive: true, mode: 0o700 });
@@ -385,15 +850,24 @@ export function createWorktreeKiloRuntimes(options: {
         directory: entry.directory,
         env: entry.env,
         signal: abort.signal,
+        onProcessScope: processes => {
+          entry.processes = processes;
+          entry.processIssued = true;
+          if (entry.cleanupDeadlineAt !== undefined) void processes.stop(entry.cleanupDeadlineAt);
+        },
+        claimCleanupDeadline: deadlineAt =>
+          entry.processAbort === abort ? cleanupDeadline(entry, deadlineAt) : (deadlineAt ?? 0),
       });
+      entry.processes = server.processes ?? entry.processes;
+      entry.processIssued = true;
       entry.stopped = server.stopped;
-      void server.stopped?.then(() => {
+      void (server.exited ?? server.stopped)?.then(() => {
         if (!abort.signal.aborted) failRuntime(entry, 'process_exited');
       });
       abort.signal.throwIfAborted();
       const client = createKiloClient({ baseUrl: server.url, directory: entry.directory });
       const kiloClient = createWrapperKiloClient(client, server.url, entry.directory);
-      entry.kiloClient = {
+      const runtimeKiloClient: WrapperKiloClient = {
         ...kiloClient,
         async createPty(options) {
           if (entry.starting) {
@@ -411,62 +885,55 @@ export function createWorktreeKiloRuntimes(options: {
           }
         },
       };
+      entry.kiloClient = runtimeKiloClient;
       const runtime: WorktreeKiloRuntime = entry.runtime ?? {
+        identity: { ...entry.identity },
+        isolation: entry.isolation,
         scopeId: entry.kilo.scopeId,
+        get runtimeId() {
+          return entry.runtimeId;
+        },
         directory: entry.directory,
         get env() {
           return entry.env;
         },
         get kiloClient() {
-          if (!entry.kiloClient) {
+          if (!entry.kiloClient)
             throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktree is not ready', true);
-          }
           return entry.kiloClient;
         },
         signal: entry.abort.signal,
       };
+      const feed = createWorktreeFeed({
+        source: {
+          scopeId: entry.kilo.scopeId,
+          runtimeId: entry.runtimeId,
+          directory: entry.directory,
+          kiloClient: runtimeKiloClient,
+          signal: abort.signal,
+        },
+        isCurrent: (runtimeId, client) =>
+          entries.get(entryKey(entry.identity, entry.isolation)) === entry &&
+          entry.runtimeId === runtimeId &&
+          entry.kiloClient === client &&
+          entry.processAbort === abort,
+        onEvent: event => options.onEvent?.(runtime, event),
+        onFailure: reason => failRuntime(entry, reason),
+        onDiagnostic: options.onDiagnostic,
+      });
+      entry.feed = feed;
+      await withTimeoutAndAbort(feed.open(), {
+        timeoutMs: KILO_STARTUP_TIMEOUT_MS,
+        timeoutMessage: 'Kilo event feed startup timed out',
+        signal: abort.signal,
+        abortMessage: 'Kilo worktree closed',
+      });
+      abort.signal.throwIfAborted();
+      entry.runtime = runtime;
       const eventClient = createKiloEventClient({
         baseUrl: server.url,
         directory: entry.directory,
       });
-      entry.feed = await withTimeoutAndAbort(
-        startSandboxControlEventFeed({
-          signal: abort.signal,
-          onDiagnostic: (event, fields) =>
-            emitControlDiagnostic(options.onDiagnostic, event, {
-              ...fields,
-              scopeId: entry.kilo.scopeId,
-            }),
-          open: signal =>
-            eventClient.global.event({
-              signal,
-              sseMaxRetryAttempts: 1,
-              onSseError: () => {
-                if (!signal.aborted) {
-                  throw new KiloEventFeedError('feed_failed', 'Kilo global event feed failed');
-                }
-              },
-            }),
-          consume: async stream => {
-            for await (const event of unfilteredKiloEvents(stream)) {
-              if (abort.signal.aborted) return;
-              options.onEvent?.(runtime, event);
-            }
-          },
-          onUnexpectedClose: error => {
-            if (abort.signal.aborted) return;
-            failRuntime(entry, error instanceof KiloEventFeedError ? error.reason : 'feed_failed');
-          },
-        }),
-        {
-          timeoutMs: KILO_STARTUP_TIMEOUT_MS,
-          timeoutMessage: 'Kilo event feed startup timed out',
-          signal: abort.signal,
-          abortMessage: 'Kilo worktree closed',
-        }
-      );
-      abort.signal.throwIfAborted();
-      entry.runtime = runtime;
       void withKiloRequestDeadline(
         signal => eventClient.global.health({ signal }),
         abort.signal
@@ -483,8 +950,9 @@ export function createWorktreeKiloRuntimes(options: {
       );
       return runtime;
     } catch {
+      if (!server) entry.processIssued = false;
       if (entry.runtime) failRuntime(entry, 'credential_refresh_failed');
-      else entry.abort.abort();
+      else void retire(entry);
       closeServer();
       throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktree failed to start', true);
     } finally {
@@ -496,7 +964,9 @@ export function createWorktreeKiloRuntimes(options: {
     entry: RuntimeEntry,
     kilo: WorktreeKiloAuth,
     env: Record<string, string>,
-    canRefreshCredentials: () => boolean
+    canRefreshCredentials: () => boolean,
+    beforeMutation?: () => void,
+    onDestructiveRefresh?: () => void
   ): Promise<WorktreeKiloRuntime> {
     const retry = () =>
       new WorktreeKiloRuntimeError(
@@ -526,17 +996,28 @@ export function createWorktreeKiloRuntimes(options: {
       if (error instanceof WorktreeKiloRuntimeError) throw error;
       throw new WorktreeKiloRuntimeError('not_ready', 'Worktree idle probe failed', true);
     }
+    const deadlineAt = cleanupDeadline(entry);
+    onDestructiveRefresh?.();
+    const stopped =
+      entry.processes?.stop(deadlineAt) ?? Promise.resolve(entry.processIssued !== true);
     entry.processAbort.abort();
     try {
       await withTimeoutAndAbort(entry.stopped, {
         signal: entry.abort.signal,
-        timeoutMs: KILO_STARTUP_TIMEOUT_MS,
+        timeoutMs: Math.max(1, deadlineAt - Date.now()),
         timeoutMessage: 'Kilo worktree credential refresh timed out',
         abortMessage: 'Kilo worktree credential refresh cancelled',
       });
+      if (!(await stopped) || Date.now() >= deadlineAt) {
+        throw new Error('Original native execution is not contained');
+      }
+      settleEntryDeferredRetirements(entry, undefined, 'stale');
       entry.kilo = { ...kilo, targets: { ...kilo.targets } };
       entry.env = env;
-      return await start(entry, undefined);
+      entry.cleanupDeadlineAt = undefined;
+      entry.kiloClient = undefined;
+      entry.runtimeId = crypto.randomUUID();
+      return await start(entry, undefined, beforeMutation);
     } catch {
       failRuntime(entry, 'credential_refresh_failed');
       throw new WorktreeKiloRuntimeError(
@@ -551,11 +1032,24 @@ export function createWorktreeKiloRuntimes(options: {
     get kiloCliVersion() {
       return observedVersion ?? null;
     },
-    attach(identity, kilo, environment, canRefreshCredentials) {
+    attach(
+      identity,
+      kilo,
+      environment,
+      canRefreshCredentials,
+      runtimeIsolation,
+      beforeMutation,
+      onCleanupTarget
+    ) {
       if (closed) {
         throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktrees are closed', false);
       }
       const { directory } = identity;
+      const isolation = runtimeIsolation ?? 'directory-shared';
+      const key = entryKey(identity, isolation);
+      if (recoveryGates.has(identityKey(identity))) {
+        throw new WorktreeKiloRuntimeError('session_busy', 'Kilo runtime is retiring', true);
+      }
       if (!path.isAbsolute(directory) || path.resolve(directory) !== directory) {
         throw new WorktreeKiloRuntimeError('protocol_error', 'Invalid worktree directory', false);
       }
@@ -563,17 +1057,28 @@ export function createWorktreeKiloRuntimes(options: {
         throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktree is deleted', false);
       }
       let root = findRoot(identity);
-      const scopeDirectory = directoriesByScope.get(kilo.scopeId);
-      const previous = entries.get(directory);
+      const scopeDirectory =
+        isolation === 'directory-shared' ? directoriesByScope.get(kilo.scopeId) : undefined;
+      const previous = entries.get(key);
       let entry = previous?.retiring ? undefined : previous;
+      let cleanupRequired = false;
       if (
         (scopeDirectory && scopeDirectory !== directory) ||
-        (entry && !sameAuth(entry.kilo, kilo))
+        (entry && !sameAuth(entry.kilo, kilo)) ||
+        (previous?.retirementResult === 'unconfirmed' && !sameAuth(previous.kilo, kilo))
       ) {
         throw new WorktreeKiloRuntimeError(
           'unauthorized',
           'Kilo worktree auth context mismatch',
           false
+        );
+      }
+      if (previous?.retirementResult === 'unconfirmed') {
+        void observeRetained(previous);
+        throw new WorktreeKiloRuntimeError(
+          'not_ready',
+          'Native runtime retirement is unconfirmed',
+          true
         );
       }
       if (entry?.abort.signal.aborted) {
@@ -614,15 +1119,27 @@ export function createWorktreeKiloRuntimes(options: {
           }
           const refreshing = entry;
           entry.starting = Promise.resolve()
-            .then(() => refreshCredentials(refreshing, kilo, env, canRefreshCredentials))
+            .then(() =>
+              refreshCredentials(
+                refreshing,
+                kilo,
+                env,
+                canRefreshCredentials,
+                beforeMutation,
+                () => {
+                  cleanupRequired = true;
+                }
+              )
+            )
             .finally(() => {
               refreshing.starting = undefined;
             });
         }
       }
       if (!entry) {
+        if (previous) settleEntryDeferredRetirements(previous, undefined, 'stale');
         const homeId = createHash('sha256')
-          .update(kilo.scopeId)
+          .update(isolation === 'per-session' ? key : kilo.scopeId)
           .update('\0')
           .update(directory)
           .digest('hex');
@@ -631,6 +1148,8 @@ export function createWorktreeKiloRuntimes(options: {
           homeId
         );
         entry = {
+          identity: { ...identity },
+          isolation,
           kilo: { ...kilo, targets: { ...kilo.targets } },
           directory,
           env: buildWorktreeKiloEnvironment(
@@ -642,13 +1161,16 @@ export function createWorktreeKiloRuntimes(options: {
           ),
           abort: new AbortController(),
           roots: new Set(),
+          runtimeId: crypto.randomUUID(),
           pendingPtys: 0,
         };
         const homes = homesByDirectory.get(directory) ?? new Set<string>();
         homes.add(home);
         homesByDirectory.set(directory, homes);
-        entries.set(directory, entry);
-        directoriesByScope.set(kilo.scopeId, directory);
+        entries.set(key, entry);
+        cleanupRequired = true;
+        failedDirectories.delete(directory);
+        if (isolation === 'directory-shared') directoriesByScope.set(kilo.scopeId, directory);
       }
       if (!root) {
         root = {
@@ -658,11 +1180,15 @@ export function createWorktreeKiloRuntimes(options: {
           attached: false,
           pending: new Set(),
         };
-        roots.set(identity.kiloSessionId, root);
+        roots.set(identityKey(identity), root);
         entry.roots.add(root);
         rememberAttachedRoot(identity.kiloSessionId, directory);
       }
       const attachedRoot = root;
+      const cleanupTarget = Object.freeze({ runtimeId: entry.runtimeId });
+      onCleanupTarget?.(deadlineAt =>
+        cleanupRequired ? retire(entry, deadlineAt, cleanupTarget) : Promise.resolve('stale')
+      );
       const attempt = Symbol();
       attachedRoot.pending.add(attempt);
       const signal = AbortSignal.any([attachedRoot.abort.signal, entry.abort.signal]);
@@ -670,10 +1196,15 @@ export function createWorktreeKiloRuntimes(options: {
         entry.starting ??
         (entry.runtime
           ? Promise.resolve(entry.runtime)
-          : (entry.starting = start(entry, previous?.retiring)));
+          : (entry.starting = start(entry, previous?.retiring, beforeMutation)));
       return {
         ready,
         signal,
+        cleanup(deadlineAt) {
+          return cleanupRequired
+            ? retire(entry, deadlineAt, cleanupTarget)
+            : Promise.resolve('stale');
+        },
         commit() {
           signal.throwIfAborted();
           if (!attachedRoot.pending.delete(attempt)) return;
@@ -691,47 +1222,197 @@ export function createWorktreeKiloRuntimes(options: {
       removeRoot(root);
       return true;
     },
+    async retireForRecovery(identity, recoveryId, assertIdle) {
+      const key = identityKey(identity);
+      const acknowledgements = recoveryAcknowledgements.get(key);
+      const acknowledged = acknowledgements?.get(recoveryId);
+      if (acknowledged) {
+        await acknowledged;
+        return 'acknowledged';
+      }
+      if (recoveryGates.has(key)) {
+        throw new WorktreeKiloRuntimeError('session_busy', 'Kilo runtime is retiring', true);
+      }
+      const root = findRoot(identity);
+      if (!root) {
+        assertIdle();
+        if (entries.has(entryKey(identity, 'per-session'))) {
+          throw new WorktreeKiloRuntimeError(
+            'not_ready',
+            'Session runtime is not recoverable',
+            false
+          );
+        }
+        const absent = Promise.resolve<RecoveryRetirement>('absent');
+        const byRecovery = acknowledgements ?? new Map<string, Promise<RecoveryRetirement>>();
+        if (!acknowledgements) recoveryAcknowledgements.set(key, byRecovery);
+        byRecovery.set(recoveryId, absent);
+        return absent;
+      }
+      if (!root.attached) {
+        throw new WorktreeKiloRuntimeError('session_busy', 'Session runtime is attaching', true);
+      }
+      if (root.entry.isolation !== 'per-session') {
+        throw new WorktreeKiloRuntimeError(
+          'not_ready',
+          'Session runtime is not recoverable',
+          false
+        );
+      }
+      const entry = root.entry;
+      if (!entry.runtime || !entry.kiloClient || !entry.stopped || entry.starting) {
+        throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktree is not ready', true);
+      }
+      let releaseGate: () => void = () => {};
+      const gate = new Promise<void>(resolve => {
+        releaseGate = resolve;
+      });
+      recoveryGates.set(key, gate);
+      const retirement = (async (): Promise<RecoveryRetirement> => {
+        try {
+          assertIdle();
+          removeRoot(root);
+          await retire(entry);
+          return 'retired';
+        } finally {
+          recoveryGates.delete(key);
+          releaseGate();
+        }
+      })();
+      const byRecovery = acknowledgements ?? new Map<string, Promise<RecoveryRetirement>>();
+      if (!acknowledgements) recoveryAcknowledgements.set(key, byRecovery);
+      byRecovery.set(recoveryId, retirement);
+      try {
+        return await retirement;
+      } catch (error) {
+        if (byRecovery.get(recoveryId) === retirement) byRecovery.delete(recoveryId);
+        throw error;
+      }
+    },
     async deleteDirectory(directory) {
       deletedDirectories.add(directory);
-      const entry = entries.get(directory);
       for (const root of roots.values()) {
         if (root.identity.directory === directory) removeRoot(root);
       }
-      if (entry) {
-        await withTimeoutAndAbort(retire(entry), {
+      for (const entry of [...entries.values()]) {
+        if (entry.directory !== directory) continue;
+        let quiescent = await withTimeoutAndAbort(retire(entry), {
           timeoutMs: KILO_STARTUP_TIMEOUT_MS,
           timeoutMessage: 'Kilo worktree retirement timed out',
           abortMessage: 'Kilo worktree retirement cancelled',
         });
+        if (quiescent !== 'retired' && entry.retirementResult === 'unconfirmed') {
+          if (
+            (await observeRetained(entry)) ||
+            entries.get(entryKey(entry.identity, entry.isolation)) !== entry
+          )
+            quiescent = 'retired';
+        }
+        if (quiescent !== 'retired') throw new Error('Native worktree cleanup is unconfirmed');
       }
       for (const home of homesByDirectory.get(directory) ?? []) {
         await fs.rm(home, { recursive: true, force: true });
       }
       homesByDirectory.delete(directory);
     },
-    get(directory) {
-      const entry = entries.get(directory);
-      const runtime = entry?.starting ? undefined : entry?.runtime;
-      return !closed && runtime && !runtime.signal.aborted && entry?.feed?.isFresh()
-        ? runtime
-        : undefined;
+    async retireRuntime(directory, deadlineAt, target) {
+      const entry = target
+        ? [...entries.values()].find(
+            entry => entry.directory === directory && entry.runtimeId === target.runtimeId
+          )
+        : (entries.get(directory) ??
+          [...entries.values()].find(entry => entry.directory === directory));
+      if (!entry) return 'stale';
+      return retire(entry, deadlineAt, target);
     },
-    isHealthy() {
+    async retireRuntimeIfUnshared(directory, target, retiringRoot, deadlineAt, reason) {
+      return retireRuntimeIfUnshared(directory, target, retiringRoot, deadlineAt, reason);
+    },
+    rootRetirementScope,
+    async verifyQuiescence(directory, target, deadlineAt) {
+      const entry = [...entries.values()].find(
+        entry => entry.directory === directory && entry.runtimeId === target.runtimeId
+      );
+      if (
+        !entry ||
+        entry.runtimeId !== target.runtimeId ||
+        entry.kiloClient !== target.client ||
+        Date.now() >= deadlineAt
+      )
+        return false;
+      const verified = await (entry.processes?.verify(true, deadlineAt) ?? Promise.resolve(false));
+      return (
+        verified &&
+        Date.now() < deadlineAt &&
+        entries.get(entryKey(entry.identity, entry.isolation)) === entry &&
+        entry.runtimeId === target.runtimeId &&
+        entry.kiloClient === target.client &&
+        !entry.abort.signal.aborted
+      );
+    },
+    getRetained(directory, runtimeId) {
+      if (runtimeId === undefined) return entries.get(directory)?.runtime;
+      return [...entries.values()].find(
+        entry => entry.directory === directory && entry.runtimeId === runtimeId
+      )?.runtime;
+    },
+    getEntryRuntimeId(directory, root) {
+      const entry =
+        [...entries.values()].find(
+          entry =>
+            entry.directory === directory &&
+            entry.isolation === 'per-session' &&
+            (root === undefined || entry.identity.kiloSessionId === root)
+        ) ?? entries.get(directory);
+      return entry?.runtimeId;
+    },
+    get(identity) {
+      const entry =
+        typeof identity === 'string'
+          ? (entries.get(identity) ??
+            [...entries.values()].find(entry => entry.directory === identity))
+          : (entries.get(entryKey(identity, 'per-session')) ?? entries.get(identity.directory));
+      const runtime = entry?.starting ? undefined : entry?.runtime;
+      return !closed && runtime && !runtime.signal.aborted ? runtime : undefined;
+    },
+    prepareForNewWork(directory) {
+      return [...entries.values()]
+        .filter(entry => entry.directory === directory)
+        .every(
+          entry =>
+            !entry.abort.signal.aborted &&
+            (entry.runtime === undefined || entry.feed?.prepareForNewWork() === true)
+        );
+    },
+    getAll(directory) {
+      return [...entries.values()]
+        .flatMap(entry => {
+          const runtime = entry.starting ? undefined : entry.runtime;
+          return !closed && runtime && !runtime.signal.aborted && entry.feed?.isFresh()
+            ? [runtime]
+            : [];
+        })
+        .filter(runtime => runtime.directory === directory);
+    },
+    isCurrent(runtime) {
       return (
         !closed &&
-        [...entries.values()].every(
-          entry =>
-            entry.retiring !== undefined ||
-            (!entry.abort.signal.aborted &&
-              (entry.starting !== undefined || !entry.runtime || entry.feed?.isFresh() === true))
-        )
+        runtime.identity !== undefined &&
+        entries.get(entryKey(runtime.identity, runtime.isolation ?? 'directory-shared'))
+          ?.runtime === runtime &&
+        !runtime.signal.aborted
       );
+    },
+    isHealthy() {
+      return !closed && failedDirectories.size === 0;
     },
     shutdown() {
       if (closed) return;
       closed = true;
       for (const root of roots.values()) removeRoot(root);
       for (const entry of entries.values()) void retire(entry);
+      for (const intent of [...deferredRetirements.values()])
+        settleDeferredRetirement(intent, 'stale');
       directoriesByScope.clear();
     },
   };

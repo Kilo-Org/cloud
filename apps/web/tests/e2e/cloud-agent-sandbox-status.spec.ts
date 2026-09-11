@@ -1,11 +1,22 @@
-import { test, expect, type Locator, type Page, type WebSocketRoute } from '@playwright/test';
+import {
+  test,
+  expect,
+  type JSHandle,
+  type Locator,
+  type Page,
+  type WebSocketRoute,
+} from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { createDrizzleClient } from '@kilocode/db/client';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { SandboxStatusSnapshot } from '@/routers/cloud-agent-next-schemas';
-import type { WorktreeChangesSnapshot } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import type {
+  GetWorktreeFileOutput,
+  WorktreeChangesSnapshot,
+  WorktreeFileRecord,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
 const firstId = 'ses_sandbox_status_first';
 const secondId = 'ses_sandbox_status_second';
@@ -39,6 +50,7 @@ type SessionFixture = {
 };
 type StatusRequest = { cloudAgentSessionId: string; organizationId?: string; at: number };
 type WorktreeChangesRequest = { cloudAgentSessionId: string; organizationId?: string };
+type WorktreeFileRequest = WorktreeChangesRequest & { path: string; expectedRevision: number };
 type RpcResult =
   | { result: { data: unknown } }
   | { error: { message: string; code: number; data: { code: string; httpStatus: number } } };
@@ -67,7 +79,7 @@ function deferred<T>() {
 
 function worktreeSnapshot(revision: number): WorktreeChangesSnapshot {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision,
     capturedAt: new Date(baseTime + revision).toISOString(),
     comparison: {
@@ -78,6 +90,7 @@ function worktreeSnapshot(revision: number): WorktreeChangesSnapshot {
     files: [
       {
         path: `src/revision-${revision}.ts`,
+        revision,
         status: 'modified',
         additions: revision,
         deletions: 0,
@@ -103,6 +116,7 @@ async function mountFixtures(
   await page.clock.install({ time: new Date(baseTime) });
   const statusRequests: StatusRequest[] = [];
   const worktreeRequests: WorktreeChangesRequest[] = [];
+  const worktreeFileRequests: WorktreeFileRequest[] = [];
   const procedures: string[] = [];
   const sockets = new Map<string, WebSocketRoute>();
   const replayedReadyRevisions = new Map<string, number[]>();
@@ -117,6 +131,8 @@ async function mountFixtures(
       snapshot:
         savedChanges.get(worktreeKey(request.cloudAgentSessionId, request.organizationId)) ?? null,
     });
+  let worktreeFileReply: (request: WorktreeFileRequest) => RpcResult | Promise<RpcResult> = () =>
+    failure('NOT_FOUND');
   let eventId = 0;
 
   function snapshot(overrides: Partial<SandboxStatusSnapshot> = {}): SandboxStatusSnapshot {
@@ -262,6 +278,16 @@ async function mountFixtures(
             savedChanges.get(worktreeKey(args.cloudAgentSessionId, args.organizationId)) ?? null;
           return success({ status: snapshot ? 'refreshed' : 'offline', snapshot });
         }
+        if (procedure.endsWith('.getWorktreeFile')) {
+          const worktreeFileRequest: WorktreeFileRequest = {
+            cloudAgentSessionId: args.cloudAgentSessionId,
+            organizationId: args.organizationId,
+            path: args.path,
+            expectedRevision: args.expectedRevision,
+          };
+          worktreeFileRequests.push(worktreeFileRequest);
+          return worktreeFileReply(worktreeFileRequest);
+        }
         if (procedure.endsWith('.getComputeBillingStatus'))
           return success({ phase: 'unavailable' });
         if (procedure.endsWith('.sendMessage'))
@@ -285,6 +311,7 @@ async function mountFixtures(
   return {
     statusRequests,
     worktreeRequests,
+    worktreeFileRequests,
     procedures,
     snapshot,
     setReply(handler: typeof reply) {
@@ -292,6 +319,9 @@ async function mountFixtures(
     },
     setWorktreeReply(handler: typeof worktreeReply) {
       worktreeReply = handler;
+    },
+    setWorktreeFileReply(handler: typeof worktreeFileReply) {
+      worktreeFileReply = handler;
     },
     setWorktreeChanges(
       snapshot: WorktreeChangesSnapshot,
@@ -515,6 +545,15 @@ async function expectSafe(page: Page) {
   await expect(page.locator('body')).not.toContainText(/sandbox[_-]instance|runtime[_-]id/);
 }
 
+async function shadowHost(control: Locator) {
+  return control.evaluateHandle<HTMLElement>(element => {
+    const root = element.getRootNode();
+    if (!(root instanceof ShadowRoot) || !(root.host instanceof HTMLElement))
+      throw new Error('Expected the individual expansion control in an HTMLElement shadow root');
+    return root.host;
+  });
+}
+
 test.describe('control-plane sandbox header', () => {
   test.afterEach(async ({ page }) => {
     await page.unrouteAll({ behavior: 'ignoreErrors' });
@@ -684,6 +723,236 @@ test.describe('control-plane sandbox header', () => {
       else await run();
     });
   }
+
+  test('preserves open A for B-only updates and reloads A after its same-count payload changes', async ({
+    page,
+  }, testInfo) => {
+    const fixture = await mountFixtures(page);
+    const lines = Array.from({ length: 80 }, (_, index) => `line_${index + 1}\n`);
+    const aRecord = (revision: number, replacement: string): WorktreeFileRecord => {
+      const content = [...lines];
+      content[39] = replacement;
+      return {
+        schemaVersion: 1,
+        revision,
+        path: 'a.ts',
+        diff: {
+          status: 'available',
+          patch:
+            'diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -39,3 +39,3 @@\n line_39\n-line_40\n+' +
+            replacement +
+            ' line_41\n',
+        },
+        content: { status: 'available', source: 'current', text: content.join('') },
+      };
+    };
+    const bRecord = (revision: number, text: string): WorktreeFileRecord => ({
+      schemaVersion: 1,
+      revision,
+      path: 'b.ts',
+      diff: { status: 'available', patch: `diff --git a/b.ts b/b.ts\n-old\n+${text}` },
+      content: { status: 'available', source: 'current', text },
+    });
+    const snapshot = (
+      revision: number,
+      aRevision: number,
+      bRevision: number,
+      bAdditions: number
+    ): WorktreeChangesSnapshot => ({
+      schemaVersion: 2,
+      revision,
+      capturedAt: new Date(baseTime + revision).toISOString(),
+      comparison: {
+        baseRef: 'refs/remotes/origin/main',
+        mergeBase: 'a'.repeat(40),
+        head: 'b'.repeat(40),
+      },
+      files: [
+        {
+          path: 'a.ts',
+          revision: aRevision,
+          status: 'modified',
+          additions: 1,
+          deletions: 1,
+          tracked: true,
+          binary: false,
+          countsComplete: true,
+        },
+        {
+          path: 'b.ts',
+          revision: bRevision,
+          status: 'modified',
+          additions: bAdditions,
+          deletions: 1,
+          tracked: true,
+          binary: false,
+          countsComplete: true,
+        },
+      ],
+      truncated: false,
+    });
+    const records = new Map<string, WorktreeFileRecord>([
+      ['a.ts:1', aRecord(1, 'a1\n')],
+      ['b.ts:1', bRecord(1, 'b1\n')],
+      ['b.ts:2', bRecord(2, 'b2\n')],
+      ['a.ts:3', aRecord(3, 'a3\n')],
+    ]);
+    let current = snapshot(1, 1, 1, 1);
+    fixture.setWorktreeChanges(current);
+    fixture.setWorktreeFileReply(request => {
+      const listed = current.files.find(file => file.path === request.path);
+      if (!listed)
+        return success({ status: 'no_longer_listed', currentRevision: current.revision });
+      if (request.expectedRevision !== listed.revision)
+        return success({ status: 'stale', currentRevision: listed.revision });
+      const file = records.get(`${request.path}:${listed.revision}`);
+      if (!file) return success({ status: 'not_captured' });
+      if (file.diff.status === 'available') {
+        return success({
+          status: 'available',
+          file,
+          capturedAt: current.capturedAt,
+          comparison: current.comparison,
+        } satisfies GetWorktreeFileOutput);
+      }
+      return success({
+        status: 'omitted',
+        file,
+        capturedAt: current.capturedAt,
+        comparison: current.comparison,
+      } satisfies GetWorktreeFileOutput);
+    });
+
+    await fixture.open();
+    const changes = page.getByRole('button', { name: 'Changes', exact: true });
+    await changes.click();
+    const drawer = page.getByRole('dialog', { name: 'Changes', exact: true });
+    await drawer.getByRole('button', { name: /a\.ts/ }).click();
+    const individualExpansion = page
+      .getByRole('button', { name: 'Show more unchanged lines', exact: true })
+      .and(page.locator('[data-expand-button]:not([data-expand-all-button])'))
+      .first();
+    await expect(individualExpansion).toBeVisible();
+    await expect(page.getByText('a1', { exact: true })).toBeVisible();
+    const originalHost = await shadowHost(individualExpansion);
+    let refreshedHost: JSHandle<HTMLElement> | undefined;
+    try {
+      await individualExpansion.click();
+      await expect
+        .poll(() =>
+          originalHost.evaluate(element =>
+            [
+              ...(element.shadowRoot?.querySelectorAll<HTMLElement>(
+                '[data-line-type="context-expanded"]'
+              ) ?? []),
+            ].some(line => line.getClientRects().length > 0)
+          )
+        )
+        .toBe(true);
+      const scrollTop = await originalHost.evaluate(element => {
+        for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+          if (parent.scrollHeight > parent.clientHeight) {
+            parent.scrollTop = 80;
+            return parent.scrollTop;
+          }
+        }
+        return 0;
+      });
+      expect(scrollTop).toBeGreaterThan(0);
+
+      const initialSummaryRequests = fixture.worktreeRequests.length;
+      current = snapshot(2, 1, 2, 2);
+      fixture.setWorktreeChanges(current);
+      await fixture.worktreeReady(firstWorkspace, 2);
+      await expect.poll(() => fixture.worktreeRequests.length).toBe(initialSummaryRequests + 1);
+      await expect(changes).toHaveAttribute(
+        'aria-description',
+        '2 changed files, 3 additions, 2 deletions'
+      );
+      await expect
+        .poll(() => fixture.worktreeFileRequests)
+        .toEqual([
+          {
+            cloudAgentSessionId: firstWorkspace,
+            organizationId: undefined,
+            path: 'a.ts',
+            expectedRevision: 1,
+          },
+        ]);
+      const retainedHost = await shadowHost(individualExpansion);
+      try {
+        expect(
+          await retainedHost.evaluate(
+            (element, original) => element === original && element.isConnected,
+            originalHost
+          )
+        ).toBe(true);
+      } finally {
+        await retainedHost.dispose();
+      }
+      expect(
+        await originalHost.evaluate(element =>
+          [
+            ...(element.shadowRoot?.querySelectorAll<HTMLElement>(
+              '[data-line-type="context-expanded"]'
+            ) ?? []),
+          ].some(line => line.getClientRects().length > 0)
+        )
+      ).toBe(true);
+      expect(
+        await originalHost.evaluate(element => {
+          for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+            if (parent.scrollHeight > parent.clientHeight) return parent.scrollTop;
+          }
+          return 0;
+        })
+      ).toBe(scrollTop);
+      await page.screenshot({ path: testInfo.outputPath('worktree-a-preserved.png') });
+
+      current = snapshot(3, 3, 2, 2);
+      fixture.setWorktreeChanges(current);
+      await fixture.worktreeReady(firstWorkspace, 3);
+      await expect(page.getByText('a3', { exact: true })).toBeVisible();
+      await expect
+        .poll(() => fixture.worktreeFileRequests)
+        .toEqual([
+          {
+            cloudAgentSessionId: firstWorkspace,
+            organizationId: undefined,
+            path: 'a.ts',
+            expectedRevision: 1,
+          },
+          {
+            cloudAgentSessionId: firstWorkspace,
+            organizationId: undefined,
+            path: 'a.ts',
+            expectedRevision: 3,
+          },
+        ]);
+      await expect(individualExpansion).toBeVisible();
+      refreshedHost = await shadowHost(individualExpansion);
+      expect(
+        await refreshedHost.evaluate(
+          (element, original) => element !== original && element.isConnected,
+          originalHost
+        )
+      ).toBe(true);
+      await page.screenshot({ path: testInfo.outputPath('worktree-a-refreshed.png') });
+    } finally {
+      try {
+        await testInfo.attach('worktree-file-request-ledger', {
+          body: JSON.stringify({ requests: fixture.worktreeFileRequests, snapshots: [1, 2, 3] }),
+          contentType: 'application/json',
+        });
+      } finally {
+        try {
+          await refreshedHost?.dispose();
+        } finally {
+          await originalHost.dispose();
+        }
+      }
+    }
+  });
 
   test('retries a transient final saved read without another ready notification', async ({
     page,

@@ -2,7 +2,8 @@ import { type Href, useRouter } from 'expo-router';
 import { Building2 } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -89,7 +90,7 @@ export function OrganizationBoundary({
       content = (
         <EmptyState
           icon={Building2}
-          title={t('organization.boundary.accessDeniedTitle')}
+          title={t('common.accessDenied')}
           description={t('organization.boundary.accessDeniedDescription')}
           action={backToProfileAction}
         />

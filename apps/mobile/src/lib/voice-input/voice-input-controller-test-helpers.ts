@@ -8,6 +8,7 @@ import {
   type VoiceInputNativeStartOptions,
   type VoiceInputStartOptions,
 } from './voice-input-controller';
+import { type VoiceInputFeedback } from './voice-input-state';
 
 type AnyListener = (event: VoiceInputNativeEvent[keyof VoiceInputNativeEvent]) => void;
 
@@ -173,25 +174,10 @@ export function makeStartOptions(
 }
 
 export function recordFeedback(): {
-  feedback: {
-    action: 'none' | 'open-settings';
-    availability: 'available' | 'unavailable';
-    message: string;
-    retryable: boolean;
-  }[];
-  onFeedback: (fb: {
-    action: 'none' | 'open-settings';
-    availability: 'available' | 'unavailable';
-    message: string;
-    retryable: boolean;
-  }) => void;
+  feedback: VoiceInputFeedback[];
+  onFeedback: (fb: VoiceInputFeedback) => void;
 } {
-  const feedback: {
-    action: 'none' | 'open-settings';
-    availability: 'available' | 'unavailable';
-    message: string;
-    retryable: boolean;
-  }[] = [];
+  const feedback: VoiceInputFeedback[] = [];
   return {
     feedback,
     onFeedback: (fb): void => {

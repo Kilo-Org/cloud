@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { parseLanguagePreference } from '@/lib/hooks/use-language-preference';
-import { resolveLanguageTag } from './resolve-language';
+import { resolveLanguageTag, resolveSupportedLanguageTag } from './resolve-language';
 
 const { getItemAsync, setItemAsync, deleteItemAsync } = vi.hoisted(() => ({
   getItemAsync: vi.fn(),
@@ -70,6 +70,17 @@ describe('resolveLanguageTag', () => {
 
   it('resolves zh to zh-Hans', () => {
     expect(resolveLanguageTag([{ languageTag: 'zh' }])).toBe('zh-Hans');
+  });
+});
+
+describe('resolveSupportedLanguageTag', () => {
+  it('returns null where resolveLanguageTag falls back to en', () => {
+    expect(resolveSupportedLanguageTag([])).toBeNull();
+    expect(resolveSupportedLanguageTag([{ languageTag: 'xx-YY' }])).toBeNull();
+  });
+
+  it('matches the whole tag, so pt-BR stays the Brazilian variant', () => {
+    expect(resolveSupportedLanguageTag([{ languageTag: 'pt-BR' }])).toBe('pt-BR');
   });
 });
 

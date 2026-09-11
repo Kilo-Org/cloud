@@ -10,6 +10,10 @@ import {
   SESSION_INGEST_AUDIENCE,
   SESSION_INGEST_USER_DELETION_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
+import {
+  issueRuntimeProxyAttestation,
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
 
 import { kiloJwtAuthMiddleware, type KiloJwtAuthVariables } from './kilo-jwt-auth';
 
@@ -149,6 +153,26 @@ async function signModernInternalToken(audience: string): Promise<string> {
   return token;
 }
 
+async function signCloudAgentRuntimeToken(): Promise<string> {
+  const { token } = await signModernKiloToken({
+    userId: 'usr_123',
+    pepper: 'pepper-current',
+    secret: TEST_JWT_SECRET,
+    expiresInSeconds: 3600,
+    audience: SESSION_INGEST_AUDIENCE,
+    tokenPurpose: 'delegated-workload',
+    credentialExchange: false,
+    extra: {
+      runtimeAuthorization: {
+        id: '11111111-1111-4111-8111-111111111111',
+        resourceKind: 'cloud-agent-next',
+        resourceId: 'agent_123',
+      },
+    },
+  });
+  return token;
+}
+
 async function signClaims(
   claims: Record<string, unknown>,
   secret = TEST_JWT_SECRET
@@ -183,17 +207,26 @@ function request(
     query?: string;
     ticketStore?: TicketStore;
     secret?: string | null;
+    runtimeProxyAttestation?: string;
+    env?: TestEnv;
   } = {}
 ) {
   const app = makeApp();
   const url = `http://local${options.path ?? '/api/me'}${options.query ?? ''}`;
   const headers = new Headers();
   if (token !== null) headers.set('Authorization', `Bearer ${token}`);
+  if (options.runtimeProxyAttestation) {
+    headers.set(RUNTIME_PROXY_ATTESTATION_HEADER, options.runtimeProxyAttestation);
+  }
   if (options.websocket) headers.set('Upgrade', 'websocket');
   return {
     response: app.fetch(
       new Request(url, { method: options.method, headers }),
-      makeEnv('secret' in options ? (options.secret ?? null) : TEST_JWT_SECRET, options.ticketStore)
+      options.env ??
+        makeEnv(
+          'secret' in options ? (options.secret ?? null) : TEST_JWT_SECRET,
+          options.ticketStore
+        )
     ),
   };
 }
@@ -254,6 +287,59 @@ describe('kiloJwtAuthMiddleware', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ user_id: 'usr_123' });
   });
+
+  it('requires a proxy attestation for a cloud-agent-next runtime bearer after pepper validation', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signCloudAgentRuntimeToken();
+
+    const missingProof = await request(token).response;
+    expect(missingProof.status).toBe(401);
+    await expect(missingProof.json()).resolves.toEqual({
+      success: false,
+      error: 'Invalid runtime proxy attestation',
+    });
+    const proof = await issueRuntimeProxyAttestation({
+      secret: TEST_JWT_SECRET,
+      audience: SESSION_INGEST_AUDIENCE,
+      userId: 'usr_123',
+      authorizationId: '11111111-1111-4111-8111-111111111111',
+      resourceId: 'agent_123',
+      bearer: token,
+    });
+    expect((await request(token, { runtimeProxyAttestation: proof }).response).status).toBe(200);
+  });
+
+  it.each([
+    [
+      'rejects',
+      async (env: TestEnv) => {
+        env.NEXTAUTH_SECRET_PROD.get = async () => {
+          throw new Error('secrets store unavailable');
+        };
+      },
+    ],
+    [
+      'returns no secret',
+      async (env: TestEnv) => {
+        env.NEXTAUTH_SECRET_PROD.get = async () => null;
+      },
+    ],
+  ])(
+    'returns sanitized retryable 503 when the runtime attestation secret lookup %s',
+    async (_name, alter) => {
+      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+      const env = makeEnv(TEST_JWT_SECRET);
+      await alter(env);
+
+      const response = await request(await signCloudAgentRuntimeToken(), { env }).response;
+
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toEqual({
+        success: false,
+        error: 'Service temporarily unavailable',
+      });
+    }
+  );
 
   it('rejects a stale pepper even when the user exists', async () => {
     userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });

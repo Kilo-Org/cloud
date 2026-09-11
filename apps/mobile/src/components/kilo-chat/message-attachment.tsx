@@ -2,7 +2,8 @@ import { useAttachmentUrl } from '@kilocode/kilo-chat-hooks';
 import { type AttachmentBlock, type KiloChatClient } from '@kilocode/kilo-chat';
 import { AlertCircle, File as FileIcon } from '@/components/ui/icons';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
@@ -108,9 +109,7 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
     return (
       <View className="aspect-[4/3] w-full items-center justify-center gap-2">
         <AlertCircle size={18} color={colors.mutedForeground} />
-        <Text className="text-xs text-muted-foreground">
-          {t('chat.attachment.imageUnavailable')}
-        </Text>
+        <Text className="text-xs text-muted-foreground">{t('common.imageUnavailable')}</Text>
       </View>
     );
   }

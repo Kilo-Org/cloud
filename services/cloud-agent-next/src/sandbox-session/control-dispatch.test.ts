@@ -46,9 +46,10 @@ describe('controlRequestResult', () => {
       failure = error;
     }
     expect(failure).toBeInstanceOf(ControlRequestError);
-    expect(failure).toMatchObject(error);
+    expect(failure).toMatchObject({ ...error, rejectionReceived: true });
     expect(isRetryableDeliveryError(failure)).toBe(true);
     expect(Object.assign(new Error(error.message), error)).not.toBeInstanceOf(ControlRequestError);
+    expect(new ControlRequestError(error).rejectionReceived).toBeUndefined();
   });
 
   it.each([undefined, { retryable: true }, { code: '', message: 'Invalid', retryable: true }])(
@@ -74,10 +75,10 @@ describe('controlRequestResult', () => {
 
 describe('deliveryErrorLogFields', () => {
   it.each(['session_busy', 'not_ready', 'runtime_unhealthy'])(
-    'logs only the allowlisted %s code and retry classification',
+    'logs the public message with the allowlisted %s code and retry classification',
     code => {
       const error = Object.assign(
-        new ControlRequestError({ code, message: 'sensitive-message', retryable: true }),
+        new ControlRequestError({ code, message: 'Public control error', retryable: true }),
         {
           cause: 'sensitive-cause',
           stack: 'sensitive-stack',
@@ -85,7 +86,11 @@ describe('deliveryErrorLogFields', () => {
           env: 'sensitive-env',
         }
       );
-      expect(deliveryErrorLogFields(error)).toEqual({ errorCode: code, retryable: true });
+      expect(deliveryErrorLogFields(error)).toEqual({
+        errorCode: code,
+        errorMessage: 'Public control error',
+        retryable: true,
+      });
     }
   );
 
@@ -94,11 +99,15 @@ describe('deliveryErrorLogFields', () => {
       deliveryErrorLogFields(
         new ControlRequestError({
           code: 'sensitive-untrusted-code',
-          message: 'sensitive-message',
+          message: 'Public control error',
           retryable: false,
         })
       )
-    ).toEqual({ errorCode: 'unknown_control_error', retryable: false });
+    ).toEqual({
+      errorCode: 'unknown_control_error',
+      errorMessage: 'Public control error',
+      retryable: false,
+    });
   });
 
   it.each([false, true])(

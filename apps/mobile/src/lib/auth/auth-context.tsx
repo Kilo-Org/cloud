@@ -42,8 +42,10 @@ import {
   setActiveToken,
   setSignOutTeardownActive,
 } from '@/lib/auth/token-owner';
+import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
+import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
@@ -83,6 +85,20 @@ import { beginAuthenticatedOwner } from '@/lib/context-scope';
 // Pre-load tokens at module level so they're available before React mounts
 export const preloadedAuthToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
 const preloadedRefreshToken = SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+// A keychain failure at process start rejects these before any consumer can
+// await them, and the runtime would report that as an unhandled rejection
+// before AuthProvider even mounts. Observe it here; the bootstrap read below
+// still awaits the same promise as its first attempt, and it — not this
+// observer — decides whether the session can be restored.
+async function observePreloadRejection(preload: Promise<string | null>): Promise<void> {
+  try {
+    await preload;
+  } catch {
+    // Observed only. The bootstrap read owns the outcome.
+  }
+}
+void observePreloadRejection(preloadedAuthToken);
+void observePreloadRejection(preloadedRefreshToken);
 
 const jwtPayloadSchema = z.object({ kiloUserId: z.string().optional() });
 
@@ -125,6 +141,13 @@ type AuthContextValue = {
    *  publication succeeds. The read-cache mount refuses to subscribe while it
    *  is set, and the persister fence reads the same flag at write time. */
   isSigningOut: boolean;
+  /** True when every retried startup credential read still failed. The stored
+   *  session is NOT known to be gone, so bootstrap shows a retryable error
+   *  surface instead of presenting the person as signed out. */
+  restoreFailed: boolean;
+  /** Re-runs the startup credential read, holding the restore-error surface
+   *  until the fresh reads resolve. */
+  retryRestore: () => void;
   signIn: (token: string, refreshToken?: string, expiresIn?: number) => Promise<void>;
   signOut: (ended?: boolean) => Promise<void>;
 };
@@ -135,6 +158,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const [token, setToken] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(true);
   const [sessionEnded, setSessionEnded] = useState(false);
+  // Set only when the bounded retry read gave up: the credentials could not be
+  // read, which is not the same as there being none.
+  const [restoreFailed, setRestoreFailed] = useState(false);
   // Reactive snapshot of the module auth epoch, advanced synchronously at the
   // start of sign-in and sign-out so a subscriber can resubscribe on the bump.
   const [authEpoch, setAuthEpoch] = useState(() => currentAuthEpoch());
@@ -146,22 +172,43 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const isSigningOut = useSyncExternalStore(subscribeSignOutActive, isSignOutActive);
   const isSignedOutReference = useRef(false);
 
-  useEffect(() => {
-    const load = async () => {
+  // Declared outside the mount effect so the restore-error screen's Retry can
+  // re-run the exact same bootstrap. `preload` is passed only on the first
+  // run: a retry must never reuse the module-scope promise that already
+  // rejected, and re-awaiting a resolved one would answer from a stale read.
+  const load = useCallback(
+    async (preload?: {
+      readonly token: Promise<string | null>;
+      readonly refresh: Promise<string | null>;
+    }) => {
+      // Capture the epoch before any asynchronous read: every later check —
+      // including the catch below — fences against this moment, so a sign-out
+      // or newer sign-in during bootstrap can never be followed by the
+      // preloaded token being restored into React state or the token owner.
+      const epoch = currentAuthEpoch();
       try {
-        // Capture the epoch before any asynchronous read: every later check
-        // fences against this moment, so a sign-out or newer sign-in during
-        // bootstrap can never be followed by the preloaded token being
-        // restored into React state or the token owner.
-        const epoch = currentAuthEpoch();
-        const stored = await preloadedAuthToken;
-        const storedRefresh = await preloadedRefreshToken;
+        const stored = await readStoredValueWithRetry(AUTH_TOKEN_KEY, undefined, preload?.token);
+        const storedRefresh = await readStoredValueWithRetry(
+          REFRESH_TOKEN_KEY,
+          undefined,
+          preload?.refresh
+        );
+        // The credential state is now known — a stored session restores below,
+        // or genuinely none exists and login is the correct destination. Clear
+        // a settled restore error here, not in `retryRestore`: a retry holds
+        // the error surface until this point (success moves past it, failure
+        // re-settles it in the catch), so the surface never blanks mid-retry.
+        setRestoreFailed(false);
 
         if (stored) {
           // Legacy exchange: if we have a token but no refresh token, upgrade once.
           if (!storedRefresh) {
             const pair = await exchangeLegacyToken();
-            if (pair) {
+            // The same teardown window the fence below covers: a sign-out that
+            // began while the exchange was in flight has not bumped the epoch
+            // yet, so the exchange's own epoch checks pass — the sign-out flag
+            // must stop this publish, exactly like the one below.
+            if (pair && isCurrentAuthEpoch(epoch) && !isSignedOutReference.current) {
               setToken(pair.token);
               setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
               setIsLoading(false);
@@ -175,14 +222,21 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             return;
           }
 
-          const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+          const expiresAtStr = await readStoredValueWithRetry(TOKEN_EXPIRES_AT_KEY);
 
           // Fence the asynchronous expiry read: a sign-out or newer sign-in
           // during the reads owns the session, so the stale snapshot must not
           // be republished and nothing may be surfaced for the torn-down
           // session.
-          const currentStored = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-          if (!isCurrentAuthEpoch(epoch)) {
+          const currentStored = await readStoredValueWithRetry(AUTH_TOKEN_KEY);
+          // A sign-out teardown closes the epoch fence only at its bump, which
+          // waits for the remote cleanup — so inside the teardown window the
+          // epoch is still current while the sign-out flag is already set. The
+          // flag is the fence for that window, exactly as in the catch below:
+          // without it a success landing mid-teardown republishes the stored
+          // credentials (owner, React state, deep-link binding) that sign-out
+          // is tearing down.
+          if (!isCurrentAuthEpoch(epoch) || isSignedOutReference.current) {
             return;
           }
           // A same-session refresh replaced the stored pair while the reads
@@ -200,12 +254,38 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           setToken(stored);
           setCurrentDeepLinkUserId(readUserIdFromToken(stored));
         }
+      } catch {
+        // Every read exhausted its retries. The session is not known to be
+        // gone, so NEVER fall through to the signed-out path and never set a
+        // token here: surface a retryable error and let the person retry or
+        // sign out explicitly.
+        // But never resurrect the surface over a transition that began while
+        // this load was in flight. A sign-out's escape hatch already cleared
+        // it synchronously (and the dedupe makes a second sign-out a no-op,
+        // so a resurrected flag would dead-end the hatch on the login route);
+        // a newer sign-in moved the epoch and owns the tree.
+        if (!isSignedOutReference.current && isCurrentAuthEpoch(epoch)) {
+          setRestoreFailed(true);
+        }
       } finally {
         setIsLoading(false);
       }
-    };
+    },
+    []
+  );
+
+  useEffect(() => {
+    void load({ token: preloadedAuthToken, refresh: preloadedRefreshToken });
+  }, [load]);
+
+  const retryRestore = useCallback(() => {
+    // Hold the settled error surface for the whole retry: `restoreFailed`
+    // stays true until `load()`'s primary reads resolve, so this surface
+    // stays mounted instead of blanking behind the loading gate (the native
+    // splash never returns once startup finished).
+    setIsLoading(true);
     void load();
-  }, []);
+  }, [load]);
 
   const signIn = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresIn?: number) => {
@@ -280,6 +360,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         return;
       }
       isSignedOutReference.current = true;
+      // A sign-out from the restore-error surface is the explicit escape
+      // hatch: clear the restore flag and the loading flag before the first
+      // await so the tree leaves the error screen for the login route
+      // immediately — even when a retry load is still in flight — instead of
+      // holding the settled surface (or a hidden blank) until teardown
+      // finishes.
+      setRestoreFailed(false);
+      setIsLoading(false);
       // Close the teardown guard synchronously, before the first await: a
       // refresh or request-token cold read must not touch the old credentials
       // while the remote cleanup runs and the deletion batch is queued. The
@@ -389,6 +477,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // Synchronous preference clears (best-effort) so nothing leaks to
           // the next signed-in account.
           clearAgentModelPreference();
+          clearRunOnDestinationPreference();
           clearReasoningPreference();
           clearKeepScreenOnPreference();
           clearLiveActivityPreference();
@@ -442,29 +531,36 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       const epoch = currentAuthEpoch();
 
       void (async () => {
-        const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
-        if (!expiresAtStr) {
-          return;
-        }
+        try {
+          const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+          if (!expiresAtStr) {
+            return;
+          }
 
-        const expiresAt = Number(expiresAtStr);
-        if (Date.now() <= expiresAt - REFRESH_MARGIN_MS) {
-          return;
-        }
+          const expiresAt = Number(expiresAtStr);
+          if (Date.now() <= expiresAt - REFRESH_MARGIN_MS) {
+            return;
+          }
 
-        // The epoch moved while the expiry read was in flight: the event is
-        // stale, so do not initiate a refresh for the old session.
-        if (!isCurrentAuthEpoch(epoch)) {
-          return;
-        }
+          // The epoch moved while the expiry read was in flight: the event is
+          // stale, so do not initiate a refresh for the old session.
+          if (!isCurrentAuthEpoch(epoch)) {
+            return;
+          }
 
-        const outcome = await performRefresh();
+          const outcome = await performRefresh();
 
-        if (outcome.ok && isCurrentAuthEpoch(outcome.sessionVersion)) {
-          setToken(outcome.token);
+          if (outcome.ok && isCurrentAuthEpoch(outcome.sessionVersion)) {
+            setToken(outcome.token);
+          }
+          // Transient or refused: do not sign out — the user did not trigger
+          // an authenticated request. Let the next real 401 handle it.
+        } catch {
+          // A rejected expiry read (or refresh) must not escape as an
+          // unhandled rejection. Return silently, exactly as the null-expiry
+          // branch above does: the active token stands and the next real 401
+          // drives the refresh.
         }
-        // Transient or refused: do not sign out — the user did not trigger
-        // an authenticated request. Let the next real 401 handle it.
       })();
     });
     return () => {
@@ -473,8 +569,28 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   }, [token]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ token, isLoading, sessionEnded, authEpoch, isSigningOut, signIn, signOut }),
-    [token, isLoading, sessionEnded, authEpoch, isSigningOut, signIn, signOut]
+    () => ({
+      token,
+      isLoading,
+      sessionEnded,
+      authEpoch,
+      isSigningOut,
+      restoreFailed,
+      retryRestore,
+      signIn,
+      signOut,
+    }),
+    [
+      token,
+      isLoading,
+      sessionEnded,
+      authEpoch,
+      isSigningOut,
+      restoreFailed,
+      retryRestore,
+      signIn,
+      signOut,
+    ]
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

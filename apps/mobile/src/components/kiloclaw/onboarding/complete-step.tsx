@@ -75,7 +75,7 @@ export function CompleteStep({ botIdentity, onOpen }: Readonly<CompleteStepProps
         <View className="flex-row items-center gap-2">
           <StatusDot tone="good" />
           <Text variant="eyebrow" className="text-xs">
-            {t('kiloclaw.onboarding.complete.online')}
+            {t('common.online')}
           </Text>
         </View>
         <Text className="text-center text-2xl font-semibold">

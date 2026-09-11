@@ -23,6 +23,7 @@ import type { WrapperCommand } from '../shared/protocol.js';
 import type { Env as WorkerEnv } from '../types.js';
 import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
+import { RUNTIME_AUTHORIZATION_RECOVERY_KEY } from './runtime-authorization-persistence.js';
 import {
   allocateWrapperRuntimeState,
   clearAllocatedWrapperRuntimeState,
@@ -318,6 +319,13 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
     plan: MessageDeliveryRequest,
     hooks: AgentRuntimeSendHooks = {}
   ): Promise<MessageDeliveryResult> {
+    if (await storage.get<string>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return {
+        success: false,
+        code: 'WRAPPER_FINALIZING',
+        error: 'Runtime authorization recovery is in progress',
+      };
+    }
     if (canUseSandboxRuntime && !(await canUseSandboxRuntime())) {
       return { success: false, code: 'INTERNAL', error: 'Session deletion is in progress' };
     }
@@ -366,8 +374,10 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
       })
       .info('AgentRuntime delivering pending message to wrapper');
 
+    const deliveryPlan = { ...plan };
+    if (!allocatedPhysicalInstance) delete deliveryPlan.preparation;
     const fencedPlan: FencedWrapperDispatchRequest = {
-      ...plan,
+      ...deliveryPlan,
       wrapper: {
         ...plan.wrapper,
         fence: {
@@ -382,7 +392,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
     try {
       await getOrchestrator().execute(fencedPlan, {
         ...(leasedInstance ? { leasedInstance } : {}),
-        onProgress: hooks.onProgress,
+        ...(allocatedPhysicalInstance && hooks.onProgress ? { onProgress: hooks.onProgress } : {}),
         onWorkspaceReady: async ready => {
           const readyAt = Date.now();
           const readyDeadlineAt = readyAt + READY_ONLY_IDLE_MS;

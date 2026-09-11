@@ -1,36 +1,30 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts React/RN trees without a DOM */
-import { type ReactElement, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import { type MobileRouter } from '@kilocode/trpc/mobile';
-import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createTRPCClient, httpLink } from '@trpc/client';
-import TestRenderer, { act } from 'react-test-renderer';
+import { onlineManager, QueryClient } from '@tanstack/react-query';
+import { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { type ConnectivityState, isOnline } from '@/lib/connectivity-online';
+import { type ConnectivityState } from '@/lib/connectivity-online';
 import { createOfflineBannerStore, type OfflineBannerStore } from '@/lib/offline-banner-state';
-import { TRPCProvider } from '@/lib/trpc';
-import { OfflineBanner } from './offline-banner';
+import { OFFLINE_BANNER_HEIGHT } from './offline-banner';
 import { SettingsOverviewScreen } from './security-agent/settings-overview-screen';
+import {
+  advanceBy,
+  emit,
+  findHost,
+  harness,
+  mountTree,
+  settingsResponse,
+  transport,
+} from './offline-banner.mounted.test-helpers';
 
 const state = vi.hoisted(() => ({ store: undefined as OfflineBannerStore | undefined }));
 const announceForA11y = vi.hoisted(() => vi.fn());
-const transport = vi.fn<typeof fetch>();
-const settingsData = {
-  isEnabled: false,
-  repositorySelectionMode: 'all',
-  selectedRepositoryIds: [],
-  analysisMode: 'auto',
-};
-const trpcClient = createTRPCClient<MobileRouter>({
-  links: [httpLink({ url: 'https://settings.test/api/trpc', fetch: transport })],
-});
 const offlineState: ConnectivityState = { isConnected: true, isInternetReachable: false };
 const onlineState: ConnectivityState = { isConnected: true, isInternetReachable: true };
 const probe = vi.fn<() => Promise<boolean>>();
-const renderers: TestRenderer.ReactTestRenderer[] = [];
-let sourceListener: ((value: ConnectivityState) => void) | undefined = undefined;
-let queryClient = new QueryClient();
 let previousOnline = true;
 let responseGate: Promise<undefined> | undefined = undefined;
 
@@ -98,69 +92,30 @@ vi.mock('@/components/tab-screen', () => ({
   useTabBarBottomPadding: () => 0,
 }));
 
-async function mountTree(element: ReactElement = <OfflineBanner />) {
-  await act(() => {
-    renderers.push(
-      TestRenderer.create(
-        <QueryClientProvider client={queryClient}>
-          <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
-            {element}
-          </TRPCProvider>
-        </QueryClientProvider>
-      )
-    );
-  });
-  const renderer = renderers.at(-1);
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
-
-function findHost(root: TestRenderer.ReactTestInstance, type: string) {
-  return root.findAll(node => node.type === type);
-}
-
-function emit(value: ConnectivityState) {
-  act(() => {
-    onlineManager.setOnline(isOnline(value));
-    sourceListener?.(value);
-  });
-}
-
-async function advanceBy(ms: number) {
-  await act(async () => {
-    await vi.advanceTimersByTimeAsync(ms);
-  });
-}
-
 describe('OfflineBanner mounted with confirmed connectivity', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     vi.useFakeTimers();
     previousOnline = onlineManager.isOnline();
     onlineManager.setOnline(false);
-    queryClient = new QueryClient({ defaultOptions: { queries: { retry: 3, gcTime: Infinity } } });
+    harness.queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: 3, gcTime: Infinity } },
+    });
     responseGate = undefined;
     transport.mockReset().mockImplementation(async input => {
       await responseGate;
       const procedure =
         new URL(input instanceof Request ? input.url : input).pathname.split('.').at(-1) ?? '';
-      const data: Record<string, unknown> = {
-        getConfig: settingsData,
-        getRepositories: [{ id: 1, full_name: 'kilo/repo' }],
-        list: [{ organizationId: 'org_123', role: 'owner' }],
-      };
-      return Response.json({ result: { data: data[procedure] } });
+      return Response.json(settingsResponse(procedure));
     });
     probe.mockReset().mockResolvedValue(false);
     announceForA11y.mockClear();
     state.store = createOfflineBannerStore({
       source: {
         subscribe: listener => {
-          sourceListener = listener;
+          harness.sourceListener = listener;
           return () => {
-            sourceListener = undefined;
+            harness.sourceListener = undefined;
           };
         },
       },
@@ -179,11 +134,11 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
   });
   afterEach(() => {
     act(() => {
-      for (const renderer of renderers.splice(0)) {
+      for (const renderer of harness.renderers.splice(0)) {
         renderer.unmount();
       }
     });
-    queryClient.clear();
+    harness.queryClient.clear();
     onlineManager.setOnline(previousOnline);
     state.store?.destroy();
     state.store = undefined;
@@ -227,6 +182,10 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
     const alert = findHost(renderer.root, 'Animated.View')[0];
     expect(alert?.props.accessibilityRole).toBe('alert');
     expect(alert?.props.accessibilityLabel).toBe('No internet connection');
+    // The painted row is exactly OFFLINE_BANNER_HEIGHT tall: surfaces reserve
+    // that constant above their pinned headers so the overlay never covers a
+    // title (uxs2 spot check). Keep the height style in sync with the export.
+    expect(alert?.props.style).toEqual({ height: OFFLINE_BANNER_HEIGHT });
     expect(findHost(renderer.root, 'WifiOff')).toHaveLength(1);
     expect(announceForA11y).toHaveBeenCalledExactlyOnceWith('No internet connection');
   });
@@ -274,6 +233,42 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
     expect(announceForA11y).not.toHaveBeenCalled();
   });
 
+  it('clears a stale banner on radio-back-without-reachability via the immediate app probe', async () => {
+    // e6-after-net (uxs3 spot check): airplane mode → 3G. NetInfo reports the
+    // connection back but its external reachability probe never answers, so
+    // the event is `unknown` — the banner used to stay painted forever. The
+    // committed-offline + radio-up combination now fires the app's own probe
+    // at once; a reachable answer clears the mounted banner without any
+    // further NetInfo event or timer wait.
+    const renderer = await mountTree();
+    emit(offlineState);
+    await advanceBy(5000);
+    expect(findHost(renderer.root, 'Animated.View')).toHaveLength(1);
+
+    probe.mockResolvedValue(true);
+    emit({ isConnected: true, isInternetReachable: null });
+    // No five-second wait: the recovery probe is immediate. advanceBy(0) only
+    // flushes the probe's microtasks under act — no timer fires.
+    await advanceBy(0);
+    expect(renderer.toJSON()).toBeNull();
+    expect(announceForA11y).toHaveBeenCalledWith('Internet connection restored');
+  });
+
+  it('keeps the mounted banner when the immediate radio-up probe fails', async () => {
+    // The same event with a still-unreachable backend must NOT clear the
+    // banner or announce a restoration that did not happen.
+    const renderer = await mountTree();
+    emit(offlineState);
+    await advanceBy(5000);
+    announceForA11y.mockClear();
+
+    probe.mockResolvedValue(false);
+    emit({ isConnected: true, isInternetReachable: null });
+    await advanceBy(0);
+    expect(findHost(renderer.root, 'Animated.View')).toHaveLength(1);
+    expect(announceForA11y).not.toHaveBeenCalled();
+  });
+
   it.each(['personal', 'org_123'])(
     'retrieves complete %s settings after a successful probe without another NetInfo event',
     async scope => {
@@ -282,7 +277,7 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
       probe.mockResolvedValue(true);
       const banner = await mountTree();
       const screen = await mountTree(<SettingsOverviewScreen scope={scope} />);
-      const activeQueries = queryClient.getQueryCache().findAll({ type: 'active' });
+      const activeQueries = harness.queryClient.getQueryCache().findAll({ type: 'active' });
       expect(activeQueries).toHaveLength(scope === 'personal' ? 2 : 3);
       expect(activeQueries.every(query => query.state.fetchStatus === 'paused')).toBe(true);
       expect(activeQueries.every(query => query.state.data === undefined)).toBe(true);
@@ -296,7 +291,7 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
       const onRetry = findHost(screen.root, 'Button')[0]?.props.onPress as () => void;
       act(onRetry);
       await advanceBy(10);
-      expect(queryClient.isFetching()).toBe(activeQueries.length);
+      expect(harness.queryClient.isFetching()).toBe(activeQueries.length);
       expect(findHost(screen.root, 'Button')[0]?.props.loading).toBe(true);
       await act(() => {
         response.resolve(undefined);

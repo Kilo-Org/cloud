@@ -1,10 +1,11 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import { CLAUDE_OPUS_FALLBACK_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
   applyAnthropicThinkingDefault,
   applyGatewayModelsFallback,
   applyPreferredProvider,
   applyReasoningDetailsTransform,
+  removeUnsupportedRequestServiceTier,
 } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -13,6 +14,11 @@ import {
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
 import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
+import { QWEN37_MAX_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
+import {
+  gpt_5_6_sol_discounted_model,
+  gpt_6_astra_flex_model,
+} from '@/lib/ai-gateway/providers/openai-exclusive';
 
 function makeRequest(model: string, models?: string[]): GatewayRequest {
   return {
@@ -83,6 +89,55 @@ describe('applyAnthropicThinkingDefault', () => {
       expect(request.body.thinking).toBeUndefined();
     }
   );
+});
+
+describe('removeUnsupportedRequestServiceTier', () => {
+  it.each([
+    {
+      model: QWEN37_MAX_MODEL_ID,
+      kiloExclusiveModel: null,
+      reason: 'non-fallback custom pricing',
+    },
+    {
+      model: gpt_5_6_sol_discounted_model.public_id,
+      kiloExclusiveModel: gpt_5_6_sol_discounted_model,
+      reason: 'non-Flex Kilo-exclusive model',
+    },
+  ])(
+    'removes and logs the request-level tier for $reason',
+    ({ model, kiloExclusiveModel, reason }) => {
+      const request = makeRequest(model);
+      request.body.service_tier = 'priority';
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel);
+
+      expect(request.body.service_tier).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed unsupported request-level service tier',
+        {
+          model,
+          requestKind: 'chat_completions',
+          serviceTier: 'priority',
+          reason,
+        }
+      );
+      warn.mockRestore();
+    }
+  );
+
+  it.each([
+    [PERPLEXITY_KIMI_PUBLIC_ID, null],
+    [gpt_6_astra_flex_model.public_id, gpt_6_astra_flex_model],
+    ['vendor/standard-model', null],
+  ] as const)('preserves the request-level tier for %s', (model, kiloExclusiveModel) => {
+    const request = makeRequest(model);
+    request.body.service_tier = 'priority';
+
+    removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel);
+
+    expect(request.body.service_tier).toBe('priority');
+  });
 });
 
 describe('applyReasoningDetailsTransform', () => {
@@ -328,7 +383,7 @@ describe('applyPreferredProvider', () => {
 
     expect(request.body.provider).toEqual({
       zdr: true,
-      order: ['amazon-bedrock', 'anthropic'],
+      order: ['google-vertex', 'amazon-bedrock', 'anthropic'],
     });
   });
 
@@ -354,6 +409,8 @@ describe('applyPreferredProvider', () => {
 
     applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body);
 
-    expect(request.body.provider).toEqual({ order: ['amazon-bedrock', 'anthropic'] });
+    expect(request.body.provider).toEqual({
+      order: ['google-vertex', 'amazon-bedrock', 'anthropic'],
+    });
   });
 });

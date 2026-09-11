@@ -1,11 +1,12 @@
 import 'server-only';
 
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { verifyAndDeleteGitHubOrganizationInstallation } from '@/lib/integrations/platforms/github/adapter';
+import { observeGitHubInstallationLifecycle } from '@/lib/integrations/db/github-installations';
 import { kilocode_users, platform_integrations, user_admin_notes } from '@kilocode/db/schema';
 import type { GitHubInstallationUninstallInput } from './github-installation-uninstall-input';
 
@@ -180,6 +181,9 @@ export async function uninstallGitHubOrganizationInstallation(params: {
   try {
     // These transaction-scoped locks auto-release, but intentionally span the bounded remote call to prevent actor revocation or target reassignment.
     await db.transaction(async tx => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext(${`${params.input.appType}:${params.input.installationId}`}))`
+      );
       await requireFreshActiveAdmin(tx, params.actor.id);
       const locked = await lockRecord(tx, params.input);
       await rejectEffectiveDuplicates(tx, locked);
@@ -189,23 +193,10 @@ export async function uninstallGitHubOrganizationInstallation(params: {
         appType: locked.appType,
       });
       upstreamDeleted = true;
-      const deleted = await tx
-        .delete(platform_integrations)
-        .where(
-          and(
-            eq(platform_integrations.id, locked.id),
-            eq(platform_integrations.platform, 'github'),
-            eq(platform_integrations.platform_installation_id, locked.installationId),
-            eq(platform_integrations.platform_account_id, locked.accountId),
-            locked.appType === 'standard'
-              ? or(
-                  eq(platform_integrations.github_app_type, 'standard'),
-                  isNull(platform_integrations.github_app_type)
-                )
-              : eq(platform_integrations.github_app_type, 'lite')
-          )
-        );
-      if ((deleted.rowCount ?? 0) !== 1) throw uninstallError();
+      await observeGitHubInstallationLifecycle(
+        { installationId: locked.installationId, appType: locked.appType, state: 'deleted' },
+        tx
+      );
       await writeAudit(tx, params.actor, locked, 'confirmed');
     });
     return { status: 'uninstalled', localCleanup: 'complete' };

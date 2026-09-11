@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as composer-paste-button.mounted.test.tsx) */
+/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as composer-paste-button.mounted.test.tsx) */
 import { type ComponentProps, createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +12,7 @@ const routerState = vi.hoisted(() => ({
   canGoBack: vi.fn(() => true),
 }));
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => routerState,
@@ -23,7 +24,7 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
+  useSafeAreaInsets: () => safeArea,
 }));
 vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
@@ -74,6 +75,29 @@ function findIcon(back: TestInstance, type: string): TestInstance {
   return icon;
 }
 
+function findOuterContainer(root: TestInstance): TestInstance {
+  return root.find(node => typeof node.type === 'string' && (node.type as string) === 'View');
+}
+
+/**
+ * The header body sits in an inner wrapper that carries only the landscape side
+ * insets, so they add to the outer container's `px-4` gutter instead of
+ * overriding it. It is the only View in the tree without a className.
+ */
+function findSideInsetWrapper(root: TestInstance): TestInstance {
+  const wrappers = root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      node.props.className === undefined
+  );
+  const wrapper = wrappers[0];
+  if (!wrapper) {
+    throw new Error('side-inset wrapper not found');
+  }
+  return wrapper;
+}
+
 function deriveTitleFontSize(className: string): number {
   const arbitrary = /text-\[(\d+)px\]/.exec(className);
   if (arbitrary) {
@@ -108,6 +132,7 @@ describe('ScreenHeader mounted', () => {
     });
     routerState.canGoBack.mockReset().mockImplementation(() => routerState.routes.length > 1);
     i18nManager.isRTL = false;
+    Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
   });
 
   it('gives the back control a 44-point target and no hit slop', () => {
@@ -313,7 +338,7 @@ describe('ScreenHeader mounted', () => {
       { title: 'Sessions', modal: true },
       { title: 'A long sheet title', centerTitle: true },
       { title: 'Sessions', eyebrow: 'Agents' },
-      { title: 'Sessions', headerRight: 'RIGHT' },
+      { title: 'Sessions', headerRight: 'RIGHT', reserveTitleSpace: true },
       { title: longTitle, titleNumberOfLines: 1, headerRight: 'METRICS' },
       { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
     ];
@@ -321,21 +346,93 @@ describe('ScreenHeader mounted', () => {
     for (const props of variants) {
       const renderer = renderHeader(props);
       const back = findBackPressable(renderer.root);
-      expect(back.props.className).toContain('h-11 w-11');
-      expect(back.props.className).toContain('items-center');
-      expect(back.props.className).toContain('justify-center');
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
       expect(title.props.numberOfLines).toBe(props.titleNumberOfLines ?? 2);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);
+      if (props.reserveTitleSpace) {
+        expect(title.parent?.props.className).toContain('min-h-14 justify-center');
+      }
       if (props.context) {
         expect(title.parent?.children).toEqual([title, props.context]);
       }
       if (props.modal || props.centerTitle) {
         expect(title.props.className).toContain('text-center');
-        expect(title.parent?.parent).not.toBe(back.parent);
-        expect(title.parent?.parent?.parent).toBe(back.parent?.parent?.parent);
+        // The centered title shares one row with the leading control, so the
+        // control lines up with the title instead of drawing on its own row.
+        expect(title.parent?.parent?.parent).toBe(back.parent);
       }
     }
+  });
+
+  it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {
+    const renderer = renderHeader({
+      title: 'Submit review',
+      eyebrow: 'KILO-ORG/CLOUD#5058',
+      onBack: () => undefined,
+      backIcon: 'close',
+      showBackButton: true,
+      safeAreaTop: false,
+      className: 'pt-3',
+    });
+    const back = findBackPressable(renderer.root);
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.parent).toBe(back.parent);
+    expect(renderer.root.props.style).toBeUndefined();
+    expect(renderer.root.props.className).toContain('pt-3');
+  });
+
+  it('pads the sheet header by the landscape side insets even when it skips the safe-area top', () => {
+    safeArea.left = 47;
+    safeArea.right = 59;
+    const renderer = renderHeader({
+      title: 'Submit review',
+      onBack: () => undefined,
+      backIcon: 'close',
+      showBackButton: true,
+      safeAreaTop: false,
+      className: 'pt-3',
+    });
+
+    // No paddingTop key on the outer container (the sheet owns vertical padding
+    // via its className), but the side insets still apply on the inner wrapper
+    // so the close control and title clear the sensor area; with zero insets the
+    // wrapper style collapses to undefined.
+    expect(findOuterContainer(renderer.root).props.style).toBeUndefined();
+    expect(findSideInsetWrapper(renderer.root).props.style).toEqual({
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
+    expect(renderer.root.props.className).toContain('pt-3');
+  });
+
+  it('pads the container by the landscape side insets while keeping the gutter and back pull', () => {
+    safeArea.left = 47;
+    safeArea.right = 59;
+    const renderer = renderHeader({ title: 'Sessions', headerRight: 'RIGHT' });
+
+    // The outer container keeps only its top inset and the `px-4` gutter class;
+    // the side insets land on the inner wrapper so they ADD to the gutter (an
+    // inline padding on the container would override the class and pull the
+    // back control's `-ml-4` chevron back into the sensor area).
+    const container = findOuterContainer(renderer.root);
+    expect(container.props.style).toEqual({ paddingTop: 8 });
+    expect(container.props.className).toContain('px-4');
+    expect(findSideInsetWrapper(renderer.root).props.style).toEqual({
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
+    expect(findBackPressable(renderer.root).props.className).toContain('-ml-4');
+  });
+
+  it('keeps the container style a portrait no-op with zero side insets', () => {
+    const renderer = renderHeader({ title: 'Sessions' });
+
+    // No paddingLeft/paddingRight keys at zero: an inline 0 would override the
+    // `px-4` className gutter and change the portrait geometry. The wrapper
+    // stays styleless so portrait pixels are byte-identical to an inset-free
+    // header.
+    expect(findOuterContainer(renderer.root).props.style).toEqual({ paddingTop: 8 });
+    expect(findSideInsetWrapper(renderer.root).props.style).toBeUndefined();
   });
 });

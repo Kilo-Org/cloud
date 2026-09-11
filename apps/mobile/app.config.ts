@@ -65,13 +65,14 @@ const config: ExpoConfig = {
   name: 'Kilo',
   owner: 'kilocode',
   slug: 'kilo-app',
-  version: '1.0.7',
-  // Portrait-only is an accepted, documented product deviation from WCAG 1.3.4
-  // (Orientation). Landscape layouts and iPad split-view/multitasking are out
-  // of scope; `ios.requireFullScreen` below enforces that. This is not claimed
-  // as a WCAG "essential" exception, which requires functionality to
-  // fundamentally change with orientation.
-  orientation: 'portrait',
+  version: '1.0.10',
+  // Rotation is supported on iOS and Android: `default` resolves to portrait +
+  // both landscapes in UISupportedInterfaceOrientations on iOS and all
+  // orientations in the Android manifest, satisfying WCAG 1.3.4 (Orientation)
+  // without claiming an "essential" exception. `ios.requireFullScreen` below
+  // STAYS true so iPad split-view/multitasking remains out of scope:
+  // full-screen rotation yes, Split View/Slide Over no.
+  orientation: 'default',
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
   userInterfaceStyle: 'automatic',
@@ -262,6 +263,9 @@ const config: ExpoConfig = {
       },
     ],
     './plugins/withAndroidManifestFix',
+    // Window background follows the app theme (values-night aware) so the
+    // rotation surface resize never paints a foreign blank frame.
+    './plugins/withAndroidRotationSurface',
     './plugins/withAndroidExpoModuleRepos',
     // Declares the app's languages on the widget extension, which expo-widgets
     // leaves English-only. This must be registered BEFORE 'expo-widgets':

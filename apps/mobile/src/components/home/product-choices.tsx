@@ -32,7 +32,7 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
           <>
             <ConfigureRow
               icon={GitPullRequest}
-              title={t('profile.codeReviewer')}
+              title={t('common.codeReviewer')}
               subtitle={t('profile.codeReviewerSubtitle')}
               className="rounded-lg bg-secondary px-3"
               onPress={() => {
@@ -41,7 +41,7 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
             />
             <ConfigureRow
               icon={ShieldCheck}
-              title={t('profile.securityAgent')}
+              title={t('common.securityAgent')}
               subtitle={t('profile.securityAgentSubtitle')}
               className="rounded-lg bg-secondary px-3"
               last={!prReviewEnabled}
@@ -54,7 +54,7 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
         {prReviewEnabled ? (
           <ConfigureRow
             icon={GitMerge}
-            title={t('profile.prReview')}
+            title={t('common.prReview')}
             subtitle={t('profile.prReviewSubtitle')}
             className="rounded-lg bg-secondary px-3"
             last

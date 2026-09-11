@@ -13,14 +13,48 @@ import {
   registerReadySession,
 } from '../../helpers/session-setup.js';
 
+// Registered sessions leave dispatch and alarm work in the session DO. Interrupt
+// every session a test touched and clear its alarm, or that work wakes after
+// this file closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        // Fire-and-forget run-state publications continue past the test body;
+        // drain the chained tail so no facade RPC is pending when the worker
+        // closes (EnvironmentTeardownError).
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('partial admission callback snapshot recovery', () => {
   it('retains the admission-time callback target when delivery accepts before state repair', async () => {
     const userId = 'user_partial_callback_repair';
     const sessionId = 'agent_partial_callback_repair';
     const messageId = 'msg_018f1e2d3c4bPartCbAbCdEfGh';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const captured: CallbackJob[] = [];
@@ -125,9 +159,7 @@ function cloneRegistrationInput(
 }
 
 function cloneStub(input: ReturnType<typeof cloneRegistrationInput>) {
-  return env.CLOUD_AGENT_SESSION.get(
-    env.CLOUD_AGENT_SESSION.idFromName(`${input.identity.userId}:${input.identity.sessionId}`)
-  );
+  return sessionStub(input.identity.userId, input.identity.sessionId);
 }
 
 describe('forward-only clone reporting admission', () => {
@@ -305,8 +337,19 @@ describe('forward-only clone reporting admission', () => {
     async failFirstWrite => {
       const input = cloneRegistrationInput(new Date().toISOString());
       const release = Promise.withResolvers<void>();
+      const ownAnchorMetadata: unknown[] = [];
       let shouldFail = failFirstWrite;
-      vi.mocked(sessionReports.ensureCloneSessionReport).mockImplementation(async () => {
+      let anchorAttempts = 0;
+      vi.mocked(sessionReports.ensureCloneSessionReport).mockImplementation(async metadata => {
+        // Earlier tests in this file leave sessions with undrained pending messages and
+        // armed drain alarms. When the alarm loop wakes one of those sessions while this
+        // test runs, its queued-state report reaches the same module-level mock through
+        // the prototype `reportRunState`, invisible to this session's instance stubs.
+        // Only this session's anchor attempts may gate the slow-write simulation or
+        // count toward the anchor budget.
+        if (metadata?.identity.sessionId !== input.identity.sessionId) return;
+        ownAnchorMetadata.push(metadata);
+        anchorAttempts += 1;
         await release.promise;
         if (shouldFail) {
           shouldFail = false;
@@ -348,13 +391,12 @@ describe('forward-only clone reporting admission', () => {
           await progress;
           expect(reports).toEqual([]);
           expect(await listPendingSessionMessages(instance.ctx.storage)).toEqual([]);
-          expect(sessionReports.ensureCloneSessionReport).toHaveBeenCalledWith(
+          expect(ownAnchorMetadata[0]).toEqual(
             expect.objectContaining({
               auth: expect.objectContaining({ kiloSessionId: destinationKiloSessionId }),
               clone: input.clone,
               initialMessage: { id: firstMessageId },
-            }),
-            expect.anything()
+            })
           );
           release.resolve();
           await vi.waitFor(() => expect(reports).toHaveLength(2));
@@ -362,7 +404,7 @@ describe('forward-only clone reporting admission', () => {
           if (!state) throw new Error('Expected persisted first message');
           await instance['reportRunState'](state);
           expect(reports).toHaveLength(3);
-          expect(sessionReports.ensureCloneSessionReport).toHaveBeenCalledTimes(3);
+          expect(anchorAttempts).toBe(3);
         } finally {
           release.resolve();
           await progress;
@@ -375,6 +417,13 @@ describe('forward-only clone reporting admission', () => {
     'does not anchor from cached identity when live metadata is %s',
     async missingState => {
       const input = cloneRegistrationInput(new Date().toISOString());
+      const anchorMetadata: unknown[] = [];
+      vi.mocked(sessionReports.ensureCloneSessionReport).mockImplementation(async metadata => {
+        // Alarm-driven reports from other sessions (see the anchor-writes test) reach
+        // the same module-level mock; only this session's attempts are meaningful here.
+        if (metadata && metadata.identity.sessionId !== input.identity.sessionId) return;
+        anchorMetadata.push(metadata);
+      });
       await runInDurableObject(cloneStub(input), async instance => {
         expect(await instance.registerSession(input)).toEqual({ success: true });
         expect(
@@ -397,10 +446,8 @@ describe('forward-only clone reporting admission', () => {
           });
         }
         await instance['reportRunState'](state);
-        expect(sessionReports.ensureCloneSessionReport).toHaveBeenLastCalledWith(
-          null,
-          expect.anything()
-        );
+        expect(anchorMetadata.length).toBeGreaterThan(0);
+        expect(anchorMetadata.at(-1)).toBeNull();
         expect(await instance.getMetadata()).toBeNull();
       });
     }

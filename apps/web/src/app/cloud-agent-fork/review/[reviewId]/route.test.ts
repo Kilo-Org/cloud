@@ -53,7 +53,13 @@ type IntegrationFixture = {
   owned_by_user_id: string | null;
   owned_by_organization_id: string | null;
   metadata: unknown;
+  repositories?: { id: number; name: string; full_name: string; private: boolean }[];
 };
+
+type RepositoryCustomizationFixture = {
+  bot_mention_model_slug: string | null;
+  pr_review_mode: string | null;
+} | null;
 
 type RouteContext = {
   params: Promise<{ reviewId: string }>;
@@ -65,6 +71,10 @@ const mockCreateTRPCContext = jest.fn<() => Promise<TrpcContextFixture>>();
 const mockCodeReviewsGet = jest.fn<(input: { reviewId: string }) => Promise<ReviewResult>>();
 const mockGetIntegrationById =
   jest.fn<(integrationId: string) => Promise<IntegrationFixture | null>>();
+const mockGetRepositoryCustomization =
+  jest.fn<
+    (integrationId: string, repositoryId: string) => Promise<RepositoryCustomizationFixture>
+  >();
 const mockPersonalPrepareSession =
   jest.fn<(input: PrepareSessionInput) => Promise<PrepareSessionOutput>>();
 const mockOrganizationPrepareSession =
@@ -99,6 +109,7 @@ jest.mock('@/routers/root-router', () => ({
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getIntegrationById: mockGetIntegrationById,
+  getRepositoryCustomization: mockGetRepositoryCustomization,
 }));
 
 let getRoute: RouteGet;
@@ -186,6 +197,7 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     mockCreateTRPCContext.mockResolvedValue({ user: { id: USER_ID } });
     mockSuccessfulReview();
     mockGetIntegrationById.mockResolvedValue(makeIntegration());
+    mockGetRepositoryCustomization.mockResolvedValue(null);
     mockPersonalPrepareSession.mockResolvedValue({
       kiloSessionId: PERSONAL_KILO_SESSION_ID,
       cloudAgentSessionId: 'agent_personal',
@@ -244,6 +256,52 @@ describe('GET /cloud-agent-fork/review/[reviewId]', () => {
     expect(`${redirectUrl.pathname}${redirectUrl.search}`).toBe(
       `/cloud/chat?sessionId=${PERSONAL_KILO_SESSION_ID}`
     );
+  });
+
+  it('uses the repository-level model override when the review repo has a customization', async () => {
+    mockGetIntegrationById.mockResolvedValue(
+      makeIntegration({
+        repositories: [{ id: 42, name: 'repo', full_name: 'owner/repo', private: false }],
+      })
+    );
+    mockGetRepositoryCustomization.mockResolvedValue({
+      bot_mention_model_slug: 'repo-override-model',
+      pr_review_mode: null,
+    });
+
+    const response = await requestReview();
+
+    expect(mockGetRepositoryCustomization).toHaveBeenCalledWith(REVIEW_INTEGRATION_ID, '42');
+    expect(mockPersonalPrepareSession).toHaveBeenCalledWith({
+      githubRepo: 'owner/repo',
+      prompt: buildFixReviewPrompt(PR_URL),
+      mode: DEFAULT_CODE_REVIEW_MODE,
+      model: 'repo-override-model',
+      autoInitiate: true,
+      autoCommit: false,
+    });
+    expect(response.status).toBe(303);
+  });
+
+  it('falls back to the installation default model when the review repo is not in the cached list', async () => {
+    mockGetIntegrationById.mockResolvedValue(
+      makeIntegration({
+        repositories: [{ id: 99, name: 'other', full_name: 'owner/other-repo', private: false }],
+      })
+    );
+
+    const response = await requestReview();
+
+    expect(mockGetRepositoryCustomization).not.toHaveBeenCalled();
+    expect(mockPersonalPrepareSession).toHaveBeenCalledWith({
+      githubRepo: 'owner/repo',
+      prompt: buildFixReviewPrompt(PR_URL),
+      mode: DEFAULT_CODE_REVIEW_MODE,
+      model: CONFIGURED_BOT_MODEL,
+      autoInitiate: true,
+      autoCommit: false,
+    });
+    expect(response.status).toBe(303);
   });
 
   it('starts organization review fix sessions with the exact linked integration bot model', async () => {

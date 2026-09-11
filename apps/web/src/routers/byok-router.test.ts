@@ -24,6 +24,11 @@ const VERTEX_CREDENTIALS = JSON.stringify({
   },
 });
 
+const AZURE_CREDENTIALS = JSON.stringify({
+  apiKey: 'azure-api-key',
+  resourceName: 'example-resource',
+});
+
 const BEDROCK_IAM_CREDENTIALS = {
   accessKeyId: 'AKIAEXAMPLE',
   secretAccessKey: 'bedrock-test-secret',
@@ -201,6 +206,30 @@ describe('BYOK Router', () => {
       });
 
       expect(result.provider_id).toBe('vertex');
+    });
+
+    test('should create an Azure BYOK credential', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const result = await caller.byok.create({
+        organizationId: organizationA.id,
+        provider_id: 'azure',
+        api_key: AZURE_CREDENTIALS,
+      });
+
+      expect(result.provider_id).toBe('azure');
+    });
+
+    test('should reject malformed Azure credentials', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'azure',
+          api_key: '{"apiKey":"secret"}',
+        })
+      ).rejects.toThrow('Invalid credentials for provider: azure');
     });
 
     test('should reject malformed Vertex credentials', async () => {

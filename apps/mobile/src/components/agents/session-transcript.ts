@@ -1,5 +1,9 @@
 import { isNoOpCompletedPreparationAttempt } from '@kilocode/cloud-agent-sdk/preparation-attempts';
-import { type PreparationAttempt, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import {
+  type MessageDeliveryState,
+  type PreparationAttempt,
+  type StoredMessage,
+} from '@kilocode/cloud-agent-sdk';
 
 import { isSameLocalDay, isValidTranscriptTime } from './message-time-label';
 import { messageRendersContent } from './message-visibility';
@@ -34,7 +38,8 @@ export function getSessionTranscriptItemType(item: SessionTranscriptItem): strin
 
 export function mergeSessionTranscript(
   messages: readonly StoredMessage[],
-  preparationAttempts: readonly PreparationAttempt[]
+  preparationAttempts: readonly PreparationAttempt[],
+  deliveryStates?: ReadonlyMap<string, MessageDeliveryState>
 ): SessionTranscriptItem[] {
   // `ensureWrapper` records a completed attempt for every message delivery,
   // even warm reuse. Drop no-op completed attempts so "Environment prepared"
@@ -55,7 +60,10 @@ export function mergeSessionTranscript(
   let previousCreated: number | undefined = undefined;
   for (const message of messages) {
     messageIds.add(message.info.id);
-    if (messageRendersContent(message)) {
+    if (
+      messageRendersContent(message) ||
+      deliveryStates?.get(message.info.id)?.status === 'failed'
+    ) {
       const created = message.info.time.created;
       // One validity rule, shared with the marker component: a timestamp the label
       // cannot format must never produce a marker row.

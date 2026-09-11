@@ -61,6 +61,23 @@ const missingIntegrationResponse = (message: string): GitHubRepositoriesResult =
   errorMessage: message,
 });
 
+/**
+ * A repository can be reachable from more than one installation. Keep the
+ * first occurrence: integrations arrive oldest-first, matching the primary
+ * installation a session resolves by default.
+ */
+const dedupeRepositories = (
+  repositories: GitHubRepositoriesResult['repositories']
+): GitHubRepositoriesResult['repositories'] => {
+  const seen = new Set<string>();
+  return repositories.filter(repo => {
+    const key = repo.fullName.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 export async function getGitHubTokenForOrganization(
   organizationId: string
 ): Promise<string | undefined> {
@@ -89,7 +106,7 @@ export async function getGitHubTokenForOrganization(
 export async function getGitHubTokenForUser(userId: string): Promise<string | undefined> {
   const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITHUB);
 
-  if (!integration?.platform_installation_id) {
+  if (!isPlatformIntegrationHealthy(integration) || !integration.platform_installation_id) {
     return undefined;
   }
 
@@ -126,7 +143,9 @@ export async function getGitHubInstallationIdForOrganization(
  */
 export async function getGitHubInstallationIdForUser(userId: string): Promise<string | undefined> {
   const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITHUB);
-  return integration?.platform_installation_id ?? undefined;
+  return isPlatformIntegrationHealthy(integration)
+    ? (integration.platform_installation_id ?? undefined)
+    : undefined;
 }
 
 /**
@@ -235,7 +254,7 @@ async function fetchRepositoriesForIntegrations(
     }
     return {
       integrationInstalled: true,
-      repositories: results.flatMap(result => result.repositories),
+      repositories: dedupeRepositories(results.flatMap(result => result.repositories)),
       syncedAt: results
         .map(result => result.syncedAt)
         .filter((value): value is string => value !== null)
@@ -260,8 +279,21 @@ export async function fetchGitHubRepositoriesForUser(
     return missingIntegrationResponse('No GitHub integration found for this user');
   }
 
-  if (isPlatformIntegrationSuspended(integration)) {
-    return missingIntegrationResponse('GitHub integration is suspended');
+  if (!isPlatformIntegrationHealthy(integration)) {
+    if (integration.github_disconnected_at) {
+      return missingIntegrationResponse('GitHub integration is disconnected');
+    }
+
+    if (isPlatformIntegrationSuspended(integration)) {
+      return missingIntegrationResponse('GitHub integration is suspended');
+    }
+    if (integration.github_disconnected_at) {
+      return missingIntegrationResponse('GitHub integration is disconnected');
+    }
+    if (integration.auth_invalid_at) {
+      return missingIntegrationResponse('GitHub integration requires reauthorization');
+    }
+    return missingIntegrationResponse('GitHub integration is not properly configured');
   }
 
   if (!integration.platform_installation_id) {
@@ -348,7 +380,7 @@ export async function checkDemoRepositoryFork(
 ): Promise<{ exists: boolean; forkedRepo: string | null; githubUsername: string | null }> {
   const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITHUB);
 
-  if (!integration?.platform_installation_id) {
+  if (!isPlatformIntegrationHealthy(integration) || !integration?.platform_installation_id) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
       message: 'GitHub integration required to check demo repository',

@@ -83,6 +83,21 @@ function userMessageAt(id: string, created: number) {
   return base;
 }
 
+function userMessageWithText(id: string, text: string) {
+  return {
+    ...message(id),
+    parts: [
+      {
+        id: `${id}:text`,
+        sessionID: 'ses_12345678901234567890123456',
+        messageID: id,
+        type: 'text' as const,
+        text,
+      },
+    ],
+  };
+}
+
 function assistantMessageWithTextAt(id: string, created: number) {
   return {
     info: {
@@ -292,6 +307,18 @@ describe('session transcript', () => {
       'msg_vis_b',
     ]);
     expect(keysOf(withInvisible)).toEqual(keysOf(withoutInvisible));
+  });
+
+  it('keeps a sanitized-empty user message when its delivery failed', () => {
+    const failedMessage = userMessageWithText('msg_failed', '<script>hidden</script>');
+
+    const transcript = mergeSessionTranscript(
+      [failedMessage],
+      [],
+      new Map([[failedMessage.info.id, { status: 'failed', error: 'nope', reason: 'exhausted' }]])
+    );
+
+    expect(keysOf(transcript)).toEqual(['time:msg_failed', 'msg_failed']);
   });
 
   it('keeps an invalid-timestamp message visible without a marker and without resetting the run', () => {

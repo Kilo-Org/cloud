@@ -1,4 +1,6 @@
+/* eslint-disable max-lines -- Biometric cases share one mounted harness with the feature-flag mock. */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as image-viewer-modal.mounted.test.tsx) */
+/* eslint-disable max-lines -- the preference suites share one mock harness in this file */
 import { type ElementType } from 'react';
 import { act, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,8 +10,27 @@ import { PreferencesScreen } from '@/components/preferences-screen';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
 import { renderWithProviders } from '@/test/render-with-providers';
 
+vi.hoisted(() => {
+  vi.stubGlobal('__DEV__', false);
+});
 const push = vi.hoisted(() => vi.fn());
 const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
+const gatewayTranscription = vi.hoisted(() => ({
+  enabled: false,
+  hasLoaded: true,
+  model: null as { id: string; name: string } | null,
+  setEnabled: vi.fn(),
+}));
+// The screen mounts the feature-flag debug surface, which reads PostHog flag
+// statuses; seed an empty registry so the section stays out of these tests'
+// snapshots. The debug surface itself is covered in
+// preferences-screen.feature-flags.mounted.test.tsx.
+const posthog = vi.hoisted(() => ({
+  statuses: [] as Record<string, unknown>[],
+}));
+vi.mock('@/lib/analytics/posthog', () => ({
+  useFeatureFlagStatuses: () => posthog.statuses,
+}));
 const native = vi.hoisted(() => ({
   hasHardwareAsync: vi.fn(),
   isEnrolledAsync: vi.fn(),
@@ -24,6 +45,9 @@ const storage = vi.hoisted(() => ({
 }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
+// The E2E fault hook stays closed: rejected reads come from the SecureStore
+// mock, not the bundle-time fault window.
+vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -33,6 +57,7 @@ vi.mock('@/components/centered-state-surface', () => ({
   StateSurface: 'StateSurface',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   Switch: 'Switch',
   View: 'View',
@@ -48,9 +73,10 @@ vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   Brain: 'Brain',
   CornerDownLeft: 'CornerDownLeft',
-  Gauge: 'Gauge',
+  Cpu: 'Cpu',
   Globe: 'Globe',
   MessageSquare: 'MessageSquare',
+  Mic: 'Mic',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
 }));
@@ -107,6 +133,14 @@ vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
     setReturnSendsMessage: vi.fn(),
   }),
 }));
+vi.mock('@/lib/voice-input/gateway/gateway-transcription-preference', () => ({
+  useGatewayTranscriptionPreference: () => ({
+    gatewayTranscriptionEnabled: gatewayTranscription.enabled,
+    hasLoaded: gatewayTranscription.hasLoaded,
+    setGatewayTranscriptionEnabled: gatewayTranscription.setEnabled,
+  }),
+  useGatewayTranscriptionModel: () => gatewayTranscription.model,
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ secondaryForeground: '#000000', mutedForeground: '#000000' }),
 }));
@@ -134,7 +168,12 @@ async function mountPreferences(raw: string | null = null): Promise<ReactTestRen
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('__DEV__', false);
   vi.resetAllMocks();
+  gatewayTranscription.enabled = false;
+  gatewayTranscription.hasLoaded = true;
+  gatewayTranscription.model = null;
+  posthog.statuses = [];
   storage.setItemAsync.mockImplementation(async (_key: string, value: string) => {
     await Promise.resolve();
     storage.value = value;
@@ -213,6 +252,127 @@ describe('PreferencesScreen Return-sends switch', () => {
     expect(
       texts.some(t => t.props.children === 'When off, Return inserts a newline in agent composers.')
     ).toBe(true);
+  });
+});
+
+function findConfigureRow(renderer: ReactTestRenderer, title: string) {
+  const rows = renderer.root.findAll(
+    node => typeof node.type === 'string' && (node.type as string) === 'ConfigureRow'
+  );
+  const row = rows.find(item => item.props.title === title);
+  if (!row) {
+    throw new Error(`ConfigureRow for ${title} not found`);
+  }
+  return row;
+}
+
+function findGatewaySwitch(renderer: ReactTestRenderer) {
+  const found = renderer.root.findAll(
+    node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+  );
+  const foundSwitch = found.find(sw => sw.props.accessibilityLabel === 'Gateway transcription');
+  if (!foundSwitch) {
+    throw new Error('Gateway transcription switch not found');
+  }
+  return foundSwitch;
+}
+
+describe('PreferencesScreen Gateway transcription', () => {
+  it('renders the gateway transcription switch and the model row showing no choice yet', async () => {
+    const renderer = await mountPreferences();
+
+    const gatewaySwitch = findGatewaySwitch(renderer);
+    expect(gatewaySwitch.props).toMatchObject({ value: false, disabled: false });
+
+    const texts = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        typeof node.props.children === 'string'
+    );
+    expect(texts.some(node => node.props.children === 'Gateway transcription')).toBe(true);
+    expect(
+      texts.some(
+        node =>
+          node.props.children ===
+          "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway."
+      )
+    ).toBe(true);
+
+    const modelRow = findConfigureRow(renderer, 'Transcription model');
+    expect(modelRow.props).toMatchObject({ icon: 'Cpu', subtitle: 'None chosen', disabled: true });
+
+    renderer.unmount();
+  });
+
+  it('shows the stored model name in the model row subtitle', async () => {
+    gatewayTranscription.enabled = true;
+    gatewayTranscription.model = { id: 'kilo/whisper-large-v3', name: 'Whisper Large v3' };
+    const renderer = await mountPreferences();
+
+    const modelRow = findConfigureRow(renderer, 'Transcription model');
+    expect(modelRow.props).toMatchObject({ subtitle: 'Whisper Large v3', disabled: false });
+
+    renderer.unmount();
+  });
+
+  it('shows the empty caption while the switch is off even when a model is stored', async () => {
+    // A stale stored choice must not promise a model that the off switch
+    // never applies: with the switch off the OS recogniser runs, so the row
+    // reads the empty caption and stays disabled (reduced opacity, no
+    // chevron — ConfigureRow's disabled rendering).
+    gatewayTranscription.enabled = false;
+    gatewayTranscription.model = { id: 'fake-transcribe', name: 'Fake Transcribe' };
+    const renderer = await mountPreferences();
+
+    const modelRow = findConfigureRow(renderer, 'Transcription model');
+    expect(modelRow.props).toMatchObject({
+      subtitle: 'None chosen',
+      disabled: true,
+    });
+
+    renderer.unmount();
+  });
+
+  it('opens the transcription model picker from the model row', async () => {
+    gatewayTranscription.enabled = true;
+    const renderer = await mountPreferences();
+
+    act(() => {
+      (findConfigureRow(renderer, 'Transcription model').props.onPress as () => void)();
+    });
+
+    expect(push).toHaveBeenCalledWith('/(app)/transcription-model-picker');
+
+    renderer.unmount();
+  });
+
+  it('keeps the switch disabled until the preference has loaded', async () => {
+    gatewayTranscription.hasLoaded = false;
+    const renderer = await mountPreferences();
+
+    expect(findGatewaySwitch(renderer).props.disabled).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('toggling the switch writes the store', async () => {
+    const renderer = await mountPreferences();
+
+    await flush(() => {
+      (findGatewaySwitch(renderer).props.onValueChange as (next: boolean) => void)(true);
+    });
+
+    expect(gatewayTranscription.setEnabled).toHaveBeenCalledTimes(1);
+    expect(gatewayTranscription.setEnabled).toHaveBeenCalledWith(true);
+
+    await flush(() => {
+      (findGatewaySwitch(renderer).props.onValueChange as (next: boolean) => void)(false);
+    });
+
+    expect(gatewayTranscription.setEnabled).toHaveBeenCalledWith(false);
+
+    renderer.unmount();
   });
 });
 

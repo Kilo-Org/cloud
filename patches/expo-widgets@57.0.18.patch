@@ -1,0 +1,583 @@
+diff --git a/build/ExpoWidgets.d.ts b/build/ExpoWidgets.d.ts
+index 7f139d2..500bdd5 100644
+--- a/build/ExpoWidgets.d.ts
++++ b/build/ExpoWidgets.d.ts
+@@ -3,6 +3,7 @@ import type { ExpoWidgetsEvents, NativeLiveActivity, NativeLiveActivityFactory,
+ declare const ExpoWidgetsModule: {
+     widgetsDirectory: string;
+     reloadAllWidgets(): void;
++    areLiveActivitiesEnabled(): boolean;
+     Widget: typeof NativeWidgetObject;
+     LiveActivityFactory: typeof NativeLiveActivityFactory;
+     LiveActivity: typeof NativeLiveActivity;
+diff --git a/build/ExpoWidgets.ios.d.ts b/build/ExpoWidgets.ios.d.ts
+index 7df2b6c..17dacae 100644
+--- a/build/ExpoWidgets.ios.d.ts
++++ b/build/ExpoWidgets.ios.d.ts
+@@ -3,6 +3,7 @@ import type { ExpoWidgetsEvents, NativeLiveActivity, NativeLiveActivityFactory,
+ declare class ExpoWidgetsModule extends NativeModule<ExpoWidgetsEvents> {
+     widgetsDirectory: string;
+     reloadAllWidgets(): void;
++    areLiveActivitiesEnabled(): boolean;
+     readonly Widget: typeof NativeWidgetObject;
+     readonly LiveActivityFactory: typeof NativeLiveActivityFactory;
+     readonly LiveActivity: typeof NativeLiveActivity;
+diff --git a/build/ExpoWidgets.js b/build/ExpoWidgets.js
+index aabbb41..735541f 100644
+--- a/build/ExpoWidgets.js
++++ b/build/ExpoWidgets.js
+@@ -12,7 +12,10 @@ class LiveActivityStub {
+     getId() {
+         return '';
+     }
+-    async update(_props) { }
++    getInfo() {
++        return { id: '', state: 'dismissed' };
++    }
++    async update(_props, _staleDate) { }
+     async end(_dismissalPolicy, _afterDate, _state, _contentDate) { }
+     async getPushToken() {
+         return null;
+@@ -23,17 +26,18 @@ class LiveActivityStub {
+ }
+ class LiveActivityFactoryStub {
+     // eslint-disable-next-line @typescript-eslint/no-useless-constructor
+-    constructor(_name, _layout) { }
+-    start(_props, _url) {
++    constructor(_name, _layout, _url) { }
++    start(_props, _url, _staleDate) {
+         return new LiveActivityStub();
+     }
+-    getInstances() {
++    getInstances(_includeEnded) {
+         return [];
+     }
+ }
+ const ExpoWidgetsModule = {
+     widgetsDirectory: '',
+     reloadAllWidgets() { },
++    areLiveActivitiesEnabled() { return false; },
+     Widget: WidgetStub,
+     LiveActivityFactory: LiveActivityFactoryStub,
+     LiveActivity: LiveActivityStub,
+diff --git a/build/Widgets.d.ts b/build/Widgets.d.ts
+index d4b5aac..038f4c2 100644
+--- a/build/Widgets.d.ts
++++ b/build/Widgets.d.ts
+@@ -37,12 +37,17 @@ export declare class LiveActivity<T extends object = object> {
+      * Returns the stable ActivityKit identifier for this Live Activity.
+      */
+     getId(): string;
++    /** Native identity and current state, including an external end. */
++    getInfo(): {
++        id: string;
++        state: 'active' | 'stale' | 'ended' | 'dismissed';
++    };
+     /**
+      * Updates the Live Activity's content. The UI reflects the new properties immediately.
+      * @param props The updated content properties.
+-     * @param staleDate When set, the system may de-emphasize the activity after this date if content has not been refreshed.
++     * @param staleAfterSeconds Seconds until ActivityKit marks the content stale. Omit to never mark it.
+      */
+-    update(props: T, staleDate?: Date): Promise<void>;
++    update(props: T, staleAfterSeconds?: number): Promise<void>;
+     /**
+      * Ends the Live Activity.
+      * @param dismissalPolicy Controls when the Live Activity is removed from the Lock Screen after ending.
+@@ -70,19 +75,20 @@ export declare class LiveActivity<T extends object = object> {
+ export declare class LiveActivityFactory<T extends object = object> {
+     /** @hidden */
+     private nativeLiveActivityFactory;
+-    constructor(name: string, layout: LiveActivityComponent<T>);
++    constructor(name: string, layout: LiveActivityComponent<T>, url?: string);
+     /**
+      * Starts a new Live Activity with the given properties.
+      * @param props The initial content properties for the Live Activity.
+      * @param url An optional URL to associate with the Live Activity, used for deep linking.
+-     * @param staleDate When set, the system may de-emphasize the activity after this date if content has not been refreshed.
++     * @param staleAfterSeconds Seconds until ActivityKit marks the content stale. Omit to never mark it.
+      * @returns The new Live Activity instance.
+      */
+-    start(props: T, url?: string, staleDate?: Date): LiveActivity<T>;
++    start(props: T, url?: string, staleAfterSeconds?: number): LiveActivity<T>;
+     /**
+      * Returns all currently active instances of this Live Activity type.
++     * Set includeEnded for privacy dismissal of native-retained terminal instances.
+      */
+-    getInstances(): LiveActivity<T>[];
++    getInstances(includeEnded?: boolean): LiveActivity<T>[];
+ }
+ /**
+  * Creates a dismissal policy that removes the Live Activity at the specified time within a four-hour window.
+@@ -103,7 +109,7 @@ export declare function createWidget<PropsType extends object = object, Configur
+  * @param name The Live Activity name. Must match the `'name'` field in your widget configuration in the app config.
+  * @param liveActivity The Live Activity component, marked with the `'widget'` directive.
+  */
+-export declare function createLiveActivity<T extends object = object>(name: string, liveActivity: LiveActivityComponent<T>): LiveActivityFactory<T>;
++export declare function createLiveActivity<T extends object = object>(name: string, liveActivity: LiveActivityComponent<T>, url?: string): LiveActivityFactory<T>;
+ /**
+  * Adds a listener for widget interaction events (for example, button taps).
+  * @param listener Callback function to handle user interaction events.
+@@ -122,4 +128,9 @@ export declare function addPushToStartTokenListener(listener: ExpoWidgetsEvents[
+  * The contents of this directory are accessible by both the main app and widgets.
+  */
+ export declare const widgetsDirectory: string;
++/**
++ * Whether the per-app "Live Activities" switch in Settings is on. False on
++ * every platform and OS version that cannot run one.
++ */
++export declare function areLiveActivitiesEnabled(): boolean;
+ //# sourceMappingURL=Widgets.d.ts.map
+\ No newline at end of file
+diff --git a/build/Widgets.js b/build/Widgets.js
+index 9099a1b..789689a 100644
+--- a/build/Widgets.js
++++ b/build/Widgets.js
+@@ -53,13 +53,17 @@ export class LiveActivity {
+     getId() {
+         return this.nativeLiveActivity.getId();
+     }
++    /** Native identity and current state, including an external end. */
++    getInfo() {
++        return this.nativeLiveActivity.getInfo();
++    }
+     /**
+      * Updates the Live Activity's content. The UI reflects the new properties immediately.
+      * @param props The updated content properties.
+-     * @param staleDate When set, the system may de-emphasize the activity after this date if content has not been refreshed.
++     * @param staleAfterSeconds Seconds until ActivityKit marks the content stale. Omit to never mark it.
+      */
+-    update(props, staleDate) {
+-        return this.nativeLiveActivity.update(JSON.stringify(props), staleDate?.getTime());
++    update(props, staleAfterSeconds) {
++        return this.nativeLiveActivity.update(JSON.stringify(props), staleAfterSeconds === undefined ? undefined : Date.now() + staleAfterSeconds * 1000);
+     }
+     /**
+      * Ends the Live Activity.
+@@ -100,25 +104,26 @@ export class LiveActivity {
+ export class LiveActivityFactory {
+     /** @hidden */
+     nativeLiveActivityFactory;
+-    constructor(name, layout) {
+-        this.nativeLiveActivityFactory = new ExpoWidgetsModule.LiveActivityFactory(name, layout);
++    constructor(name, layout, url) {
++        this.nativeLiveActivityFactory = new ExpoWidgetsModule.LiveActivityFactory(name, layout, url);
+     }
+     /**
+      * Starts a new Live Activity with the given properties.
+      * @param props The initial content properties for the Live Activity.
+      * @param url An optional URL to associate with the Live Activity, used for deep linking.
+-     * @param staleDate When set, the system may de-emphasize the activity after this date if content has not been refreshed.
++     * @param staleAfterSeconds Seconds until ActivityKit marks the content stale. Omit to never mark it.
+      * @returns The new Live Activity instance.
+      */
+-    start(props, url, staleDate) {
+-        return new LiveActivity(this.nativeLiveActivityFactory.start(JSON.stringify(props), url, staleDate?.getTime()));
++    start(props, url, staleAfterSeconds) {
++        return new LiveActivity(this.nativeLiveActivityFactory.start(JSON.stringify(props), url, staleAfterSeconds === undefined ? undefined : Date.now() + staleAfterSeconds * 1000));
+     }
+     /**
+      * Returns all currently active instances of this Live Activity type.
++     * Set includeEnded for privacy dismissal of native-retained terminal instances.
+      */
+-    getInstances() {
++    getInstances(includeEnded = false) {
+         return this.nativeLiveActivityFactory
+-            .getInstances()
++            .getInstances(includeEnded)
+             .map((instance) => new LiveActivity(instance));
+     }
+ }
+@@ -143,8 +148,8 @@ export function createWidget(name, widget) {
+  * @param name The Live Activity name. Must match the `'name'` field in your widget configuration in the app config.
+  * @param liveActivity The Live Activity component, marked with the `'widget'` directive.
+  */
+-export function createLiveActivity(name, liveActivity) {
+-    return new LiveActivityFactory(name, liveActivity);
++export function createLiveActivity(name, liveActivity, url) {
++    return new LiveActivityFactory(name, liveActivity, url);
+ }
+ /**
+  * Adds a listener for widget interaction events (for example, button taps).
+@@ -168,4 +173,11 @@ export function addPushToStartTokenListener(listener) {
+  * The contents of this directory are accessible by both the main app and widgets.
+  */
+ export const widgetsDirectory = ExpoWidgetsModule.widgetsDirectory;
++/**
++ * Whether the per-app "Live Activities" switch in Settings is on. False on
++ * every platform and OS version that cannot run one.
++ */
++export function areLiveActivitiesEnabled() {
++    return ExpoWidgetsModule.areLiveActivitiesEnabled();
++}
+ //# sourceMappingURL=Widgets.js.map
+\ No newline at end of file
+diff --git a/build/Widgets.types.d.ts b/build/Widgets.types.d.ts
+index 15e0268..0903ad4 100644
+--- a/build/Widgets.types.d.ts
++++ b/build/Widgets.types.d.ts
+@@ -260,12 +260,16 @@ export declare class NativeWidgetObject extends SharedObject {
+     getTimeline(): Promise<ExpoTimelineEntry[]>;
+ }
+ export declare class NativeLiveActivityFactory extends SharedObject {
+-    constructor(name: string, layout: string);
++    constructor(name: string, layout: string, url?: string);
+     start(props: string, url?: string, staleDate?: number): NativeLiveActivity;
+-    getInstances(): NativeLiveActivity[];
++    getInstances(includeEnded?: boolean): NativeLiveActivity[];
+ }
+ export declare class NativeLiveActivity extends SharedObject<LiveActivityEvents> {
+     getId(): string;
++    getInfo(): {
++        id: string;
++        state: 'active' | 'stale' | 'ended' | 'dismissed';
++    };
+     update(props: string, staleDate?: number): Promise<void>;
+     end(dismissalPolicy?: string, afterDate?: number, state?: string, contentDate?: number): Promise<void>;
+     getPushToken(): Promise<string | null>;
+diff --git a/ios/LiveActivity.swift b/ios/LiveActivity.swift
+index 5f34eb2..b775244 100644
+--- a/ios/LiveActivity.swift
++++ b/ios/LiveActivity.swift
+@@ -12,6 +12,24 @@ final class LiveActivity: SharedObject {
+     super.init()
+   }
+ 
++  /// Native identity and current state, including an external end. An activity
++  /// ActivityKit no longer lists (dismissed, or ended and pruned) reads as
++  /// `dismissed` instead of throwing, so JavaScript can settle its records.
++  func getInfo() throws -> [String: String] {
++    guard #available(iOS 16.1, *) else { throw LiveActivitiesNotSupportedException() }
++    let state = Activity<LiveActivityAttributes>.activities
++      .first(where: { $0.id == id })?.activityState ?? .dismissed
++    let value: String
++    switch state {
++    case .active: value = "active"
++    case .stale: value = "stale"
++    case .ended: value = "ended"
++    case .dismissed: value = "dismissed"
++    @unknown default: value = "dismissed"
++    }
++    return ["id": id, "state": value]
++  }
++
+   func update(props: String, staleDate: Date?) async throws {
+     guard #available(iOS 16.2, *) else { throw LiveActivitiesNotSupportedException() }
+ 
+diff --git a/ios/LiveActivityFactory.swift b/ios/LiveActivityFactory.swift
+index 4b8a632..7f4524c 100644
+--- a/ios/LiveActivityFactory.swift
++++ b/ios/LiveActivityFactory.swift
+@@ -9,9 +9,16 @@ final class LiveActivityFactory: SharedObject {
+     Bundle.main.object(forInfoDictionaryKey: pushNotificationsEnabledKey) as? Bool ?? false
+   }
+ 
+-  init(name: String, layout: String) {
++  init(name: String, layout: String, url: String?) {
+     self.name = name
+     WidgetsStorage.set(layout, forKey: "__expo_widgets_live_activity_\(name)_layout")
++    // Persist the tap destination at registration, not only in `start`. A
++    // push-to-start creates the activity with no JavaScript running, so an
++    // app whose first activity arrives by push would otherwise render a Live
++    // Activity with no widgetURL at all.
++    if let url {
++      WidgetsStorage.set(url, forKey: "__expo_widgets_live_activity_\(name)_url")
++    }
+   }
+ 
+   func start(props: String, url: URL?, staleDate: Date?) throws -> LiveActivity {
+@@ -37,15 +44,27 @@ final class LiveActivityFactory: SharedObject {
+     }
+   }
+ 
+-  func getInstances() throws -> [LiveActivity] {
++  func getInstances(includeEnded: Bool) throws -> [LiveActivity] {
+     guard #available(iOS 16.2, *) else { throw LiveActivitiesNotSupportedException() }
+ 
+     let activities = Activity<LiveActivityAttributes>.activities
+       // Filter LiveActivity instances for activities that don't match the factory's name.
+       .filter { $0.content.state.name == name }
+-      // A stale activity is still visible and updatable; only ended/dismissed ones are gone.
+-      .filter { $0.activityState == .active || $0.activityState == .stale }
+-      
++      // A stale activity is still visible and updatable. Ended ones stay
++      // terminal until the system prunes them; `includeEnded` lets privacy
++      // dismissal read them instead of losing track.
++      .filter { activity in
++        switch activity.activityState {
++        case .active, .stale:
++          return true
++        case .ended:
++          return includeEnded
++        case .dismissed:
++          return false
++        @unknown default:
++          return false
++        }
++      }
+     let activeIDs = Set(activities.map(\.id))
+     instances = instances.filter { activeIDs.contains($0.key) }
+ 
+diff --git a/ios/Widgets/Utils.swift b/ios/Widgets/Utils.swift
+index 2b4c044..e5a0b1e 100644
+--- a/ios/Widgets/Utils.swift
++++ b/ios/Widgets/Utils.swift
+@@ -56,6 +56,16 @@ func getLiveActivityNodes(forName name: String, props: String = "{}", environmen
+   }
+ }
+ 
++/// The tap destination registered on the Live Activity factory, persisted in
++/// the app group so a push-to-start activity (created with no JavaScript)
++/// still deep links.
++func getLiveActivityUrl(forName name: String) -> URL? {
++  guard let urlString = WidgetsStorage.getString(forKey: "__expo_widgets_live_activity_\(name)_url") else {
++    return nil
++  }
++  return URL(string: urlString)
++}
++
+ public func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
+   var env: [String: Any] = [
+     "showsContainerBackground": environment.showsWidgetContainerBackground,
+diff --git a/ios/Widgets/WidgetLiveActivity.swift b/ios/Widgets/WidgetLiveActivity.swift
+index 24d4571..adc15b9 100644
+--- a/ios/Widgets/WidgetLiveActivity.swift
++++ b/ios/Widgets/WidgetLiveActivity.swift
+@@ -35,9 +35,11 @@ public struct WidgetLiveActivity: Widget {
+       )
+       // Only apply widgetURL when the activity has one: a hierarchy with more than one
+       // widgetURL modifier is undefined behavior, and layouts can set their own through
+-      // the widgetURL modifier from @expo/ui.
++      // the widgetURL modifier from @expo/ui. A push-to-start creates the
++      // activity with no JavaScript, so its attributes carry no url and the
++      // destination registered on the factory is read from storage instead.
+       let banner = LiveActivityBannerView(context: context, nodes: nodes)
+-      if let url = context.attributes.url.flatMap(URL.init(string:)) {
++      if let url = context.attributes.url.flatMap(URL.init(string:)) ?? getLiveActivityUrl(forName: context.state.name) {
+         banner.widgetURL(url)
+       } else {
+         banner
+@@ -68,7 +70,7 @@ public struct WidgetLiveActivity: Widget {
+       } minimal: {
+         LiveActivitySectionView(context: context, nodes: nodes, sectionName: "minimal")
+       }
+-      if let url = context.attributes.url.flatMap(URL.init(string:)) {
++      if let url = context.attributes.url.flatMap(URL.init(string:)) ?? getLiveActivityUrl(forName: context.state.name) {
+         return island.widgetURL(url)
+       }
+       return island
+diff --git a/ios/WidgetsModule.swift b/ios/WidgetsModule.swift
+index b1b4295..70e6235 100644
+--- a/ios/WidgetsModule.swift
++++ b/ios/WidgetsModule.swift
+@@ -63,6 +63,14 @@ public final class WidgetsModule: Module {
+       WidgetCenter.shared.reloadAllTimelines()
+     }
+ 
++    // The per-app "Live Activities" switch in Settings. `start` already refuses
++    // when it is off; this lets JavaScript show the state instead of inferring
++    // it from a failed start.
++    Function("areLiveActivitiesEnabled") { () -> Bool in
++      guard #available(iOS 16.2, *) else { return false }
++      return ActivityAuthorizationInfo().areActivitiesEnabled
++    }
++
+     Class("Widget", WidgetObject.self) {
+       Constructor { (name: String, layout: String) in
+         WidgetObject(name: name, layout: layout)
+@@ -82,16 +90,16 @@ public final class WidgetsModule: Module {
+     }
+ 
+     Class("LiveActivityFactory", LiveActivityFactory.self) {
+-      Constructor { (name: String, layout: String) in
+-        LiveActivityFactory(name: name, layout: layout)
++      Constructor { (name: String, layout: String, url: String?) in
++        LiveActivityFactory(name: name, layout: layout, url: url)
+       }
+ 
+       Function("start") { (liveActivity: LiveActivityFactory, props: String, url: URL?, staleDate: Date?) in
+         return try liveActivity.start(props: props, url: url, staleDate: staleDate)
+       }
+ 
+-      Function("getInstances") { (liveActivity: LiveActivityFactory) in
+-        try liveActivity.getInstances()
++      Function("getInstances") { (liveActivity: LiveActivityFactory, includeEnded: Bool?) in
++        try liveActivity.getInstances(includeEnded: includeEnded ?? false)
+       }
+     }
+ 
+@@ -100,6 +108,10 @@ public final class WidgetsModule: Module {
+         instance.id
+       }
+ 
++      Function("getInfo") { (instance: LiveActivity) in
++        try instance.getInfo()
++      }
++
+       AsyncFunction("update") { (instance: LiveActivity, props: String, staleDate: Date?) in
+         try await instance.update(props: props, staleDate: staleDate)
+       }
+diff --git a/src/ExpoWidgets.ts b/src/ExpoWidgets.ts
+index b118f91..5395c5f 100644
+--- a/src/ExpoWidgets.ts
++++ b/src/ExpoWidgets.ts
+@@ -24,7 +24,10 @@ class LiveActivityStub {
+   getId(): string {
+     return '';
+   }
+-  async update(_props: string): Promise<void> {}
++  getInfo(): { id: string; state: 'active' | 'stale' | 'ended' | 'dismissed' } {
++    return { id: '', state: 'dismissed' };
++  }
++  async update(_props: string, _staleDate?: number): Promise<void> {}
+   async end(
+     _dismissalPolicy?: string,
+     _afterDate?: number,
+@@ -41,11 +44,11 @@ class LiveActivityStub {
+ 
+ class LiveActivityFactoryStub {
+   // eslint-disable-next-line @typescript-eslint/no-useless-constructor
+-  constructor(_name: string, _layout: string) {}
+-  start(_props: string, _url?: string): NativeLiveActivity {
++  constructor(_name: string, _layout: string, _url?: string) {}
++  start(_props: string, _url?: string, _staleDate?: number): NativeLiveActivity {
+     return new LiveActivityStub() as NativeLiveActivity;
+   }
+-  getInstances(): NativeLiveActivity[] {
++  getInstances(_includeEnded?: boolean): NativeLiveActivity[] {
+     return [];
+   }
+ }
+@@ -53,6 +56,9 @@ class LiveActivityFactoryStub {
+ const ExpoWidgetsModule = {
+   widgetsDirectory: '',
+   reloadAllWidgets(): void {},
++  areLiveActivitiesEnabled(): boolean {
++    return false;
++  },
+   Widget: WidgetStub as typeof NativeWidgetObject,
+   LiveActivityFactory: LiveActivityFactoryStub as typeof NativeLiveActivityFactory,
+   LiveActivity: LiveActivityStub as typeof NativeLiveActivity,
+diff --git a/src/Widgets.ts b/src/Widgets.ts
+index 51ea140..cc9a812 100644
+--- a/src/Widgets.ts
++++ b/src/Widgets.ts
+@@ -85,13 +85,23 @@ export class LiveActivity<T extends object = object> {
+     return this.nativeLiveActivity.getId();
+   }
+ 
++  /**
++   * Native identity and current state, including an external end.
++   */
++  getInfo(): { id: string; state: 'active' | 'stale' | 'ended' | 'dismissed' } {
++    return this.nativeLiveActivity.getInfo();
++  }
++
+   /**
+    * Updates the Live Activity's content. The UI reflects the new properties immediately.
+    * @param props The updated content properties.
+-   * @param staleDate When set, the system may de-emphasize the activity after this date if content has not been refreshed.
++   * @param staleAfterSeconds Seconds until ActivityKit marks the content stale. Omit to never mark it.
+    */
+-  update(props: T, staleDate?: Date): Promise<void> {
+-    return this.nativeLiveActivity.update(JSON.stringify(props), staleDate?.getTime());
++  update(props: T, staleAfterSeconds?: number): Promise<void> {
++    return this.nativeLiveActivity.update(
++      JSON.stringify(props),
++      staleAfterSeconds === undefined ? undefined : Date.now() + staleAfterSeconds * 1000
++    );
+   }
+ 
+   /**
+@@ -148,10 +158,11 @@ export class LiveActivity<T extends object = object> {
+ export class LiveActivityFactory<T extends object = object> {
+   /** @hidden */
+   private nativeLiveActivityFactory: NativeLiveActivityFactory;
+-  constructor(name: string, layout: LiveActivityComponent<T>) {
++  constructor(name: string, layout: LiveActivityComponent<T>, url?: string) {
+     this.nativeLiveActivityFactory = new ExpoWidgetsModule.LiveActivityFactory(
+       name,
+-      layout as unknown as string
++      layout as unknown as string,
++      url
+     );
+   }
+ 
+@@ -159,21 +170,26 @@ export class LiveActivityFactory<T extends object = object> {
+    * Starts a new Live Activity with the given properties.
+    * @param props The initial content properties for the Live Activity.
+    * @param url An optional URL to associate with the Live Activity, used for deep linking.
+-   * @param staleDate When set, the system may de-emphasize the activity after this date if content has not been refreshed.
++   * @param staleAfterSeconds Seconds until ActivityKit marks the content stale. Omit to never mark it.
+    * @returns The new Live Activity instance.
+    */
+-  start(props: T, url?: string, staleDate?: Date) {
++  start(props: T, url?: string, staleAfterSeconds?: number) {
+     return new LiveActivity<T>(
+-      this.nativeLiveActivityFactory.start(JSON.stringify(props), url, staleDate?.getTime())
++      this.nativeLiveActivityFactory.start(
++        JSON.stringify(props),
++        url,
++        staleAfterSeconds === undefined ? undefined : Date.now() + staleAfterSeconds * 1000
++      )
+     );
+   }
+ 
+   /**
+    * Returns all currently active instances of this Live Activity type.
++   * Set includeEnded for privacy dismissal of native-retained terminal instances.
+    */
+-  getInstances() {
++  getInstances(includeEnded = false) {
+     return this.nativeLiveActivityFactory
+-      .getInstances()
++      .getInstances(includeEnded)
+       .map((instance) => new LiveActivity<T>(instance));
+   }
+ }
+@@ -209,9 +225,10 @@ export function createWidget<
+  */
+ export function createLiveActivity<T extends object = object>(
+   name: string,
+-  liveActivity: LiveActivityComponent<T>
++  liveActivity: LiveActivityComponent<T>,
++  url?: string
+ ): LiveActivityFactory<T> {
+-  return new LiveActivityFactory<T>(name, liveActivity);
++  return new LiveActivityFactory<T>(name, liveActivity, url);
+ }
+ 
+ /**
+@@ -242,3 +259,11 @@ export function addPushToStartTokenListener(
+  * The contents of this directory are accessible by both the main app and widgets.
+  */
+ export const widgetsDirectory = ExpoWidgetsModule.widgetsDirectory;
++
++/**
++ * Whether the per-app "Live Activities" switch in Settings is on. False on
++ * every platform and OS version that cannot run one.
++ */
++export function areLiveActivitiesEnabled(): boolean {
++  return ExpoWidgetsModule.areLiveActivitiesEnabled();
++}
+diff --git a/src/Widgets.types.ts b/src/Widgets.types.ts
+index fee5c74..22afeb2 100644
+--- a/src/Widgets.types.ts
++++ b/src/Widgets.types.ts
+@@ -289,13 +289,14 @@ export declare class NativeWidgetObject extends SharedObject {
+ }
+ 
+ export declare class NativeLiveActivityFactory extends SharedObject {
+-  constructor(name: string, layout: string);
++  constructor(name: string, layout: string, url?: string);
+   start(props: string, url?: string, staleDate?: number): NativeLiveActivity;
+-  getInstances(): NativeLiveActivity[];
++  getInstances(includeEnded?: boolean): NativeLiveActivity[];
+ }
+ 
+ export declare class NativeLiveActivity extends SharedObject<LiveActivityEvents> {
+   getId(): string;
++  getInfo(): { id: string; state: 'active' | 'stale' | 'ended' | 'dismissed' };
+   update(props: string, staleDate?: number): Promise<void>;
+   end(
+     dismissalPolicy?: string,

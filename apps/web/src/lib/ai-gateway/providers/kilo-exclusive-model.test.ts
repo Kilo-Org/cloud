@@ -8,7 +8,9 @@ import {
   type PricingTiers,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type {
+  GatewayMessagesRequest,
   GatewayRequest,
+  GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
   OpenRouterProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
@@ -155,6 +157,28 @@ describe('applyKiloExclusiveModelSettings', () => {
     const req = makeRequest(undefined, 'kilo/test-model');
     applyKiloExclusiveModelSettings(req, makeModel({ internal_id: 'vendor/real-model' }));
     expect(req.body.model).toBe('vendor/real-model');
+  });
+
+  it.each([
+    {
+      kind: 'chat_completions' as const,
+      body: { model: 'kilo/test-model', messages: [] } as OpenRouterChatCompletionRequest,
+    },
+    {
+      kind: 'responses' as const,
+      body: { model: 'kilo/test-model', input: '' } as GatewayResponsesRequest,
+    },
+    {
+      kind: 'messages' as const,
+      body: { model: 'kilo/test-model', max_tokens: 1, messages: [] } as GatewayMessagesRequest,
+    },
+  ])('sets the Flex service tier for $kind requests', request => {
+    applyKiloExclusiveModelSettings(
+      request,
+      makeModel({ internal_id: 'vendor/real-model', flags: ['flex'] })
+    );
+
+    expect(request.body.service_tier).toBe('flex');
   });
 
   it('leaves provider untouched when there is no restriction', () => {

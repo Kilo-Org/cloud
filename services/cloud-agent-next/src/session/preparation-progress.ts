@@ -73,8 +73,10 @@ export function createPreparationProgressRecorder(options: {
   }
 
   function onProgress(step: string, message: string): boolean {
+    const existing = readPreparationAttempt(eventQueries, attemptId);
+    if (existing?.status === 'completed' || existing?.status === 'failed') return false;
     const key = step as PreparingStep;
-    if (!readPreparationAttempt(eventQueries, attemptId)) {
+    if (!existing) {
       emit('workspace_setup', 'Preparing environment', { action: 'attempt_started' });
     }
     const stepId = `phase:${key}`;

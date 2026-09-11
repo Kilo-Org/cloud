@@ -131,7 +131,7 @@ export default function RepoPickerScreen() {
           }
           description={
             search.trim()
-              ? t('agentChat.repoPicker.tryDifferentSearch')
+              ? t('agents.sessionList.tryDifferentSearch')
               : t('agentChat.repoPicker.noRepositoriesDescription')
           }
         />

@@ -6,15 +6,19 @@ import {
   SANDBOX_CONTROL_PROTOCOL_VERSION,
   controlFrameSchema,
   sandboxHeartbeatPayloadSchema,
+  sandboxEventPublicationPayloadSchema,
   sandboxHelloPayloadSchema,
+  sandboxReconcilePayloadSchema,
   sandboxReadyPayloadSchema,
   sandboxShutdownPayloadSchema,
   sandboxStatusPayloadSchema,
   sessionAbortPayloadSchema,
   sessionAttachPayloadSchema,
   sessionDetachPayloadSchema,
+  sessionRuntimeRetirePayloadSchema,
   sessionEventPayloadSchema,
   sessionGitSummaryPayloadSchema,
+  sessionGitSnapshotPayloadSchema,
   sessionPreparingPayloadSchema,
   sessionPermissionResolvePayloadSchema,
   sessionPromptPayloadSchema,
@@ -24,6 +28,8 @@ import {
   sessionTerminalConnectPayloadSchema,
   sessionTerminalCreatePayloadSchema,
   sessionTerminalResizePayloadSchema,
+  sessionOperationAuthorizationSchema,
+  sessionOperationAckSchema,
   worktreeDeletePayloadSchema,
   type ControlError,
   type ControlErrorCode,
@@ -42,6 +48,8 @@ const CONTROL_EVENT_SET = new Set<string>(CONTROL_EVENTS);
 const REQUEST_PAYLOAD_SCHEMAS: Record<ControlOperation, z.ZodType> = {
   'sandbox.hello': sandboxHelloPayloadSchema,
   'sandbox.status': sandboxStatusPayloadSchema,
+  'sandbox.reconcile': sandboxReconcilePayloadSchema,
+  'sandbox.event.publish': sandboxEventPublicationPayloadSchema,
   'sandbox.shutdown': sandboxShutdownPayloadSchema,
   'worktree.prepareDeletion': worktreeDeletePayloadSchema,
   'worktree.delete': worktreeDeletePayloadSchema,
@@ -52,11 +60,15 @@ const REQUEST_PAYLOAD_SCHEMAS: Record<ControlOperation, z.ZodType> = {
   'session.abort': sessionAbortPayloadSchema,
   'session.sync': sessionSyncPayloadSchema,
   'session.git.summary': sessionGitSummaryPayloadSchema,
+  'session.git.snapshot': sessionGitSnapshotPayloadSchema,
   'session.detach': sessionDetachPayloadSchema,
+  'session.runtime.retire': sessionRuntimeRetirePayloadSchema,
   'session.terminal.create': sessionTerminalCreatePayloadSchema,
   'session.terminal.resize': sessionTerminalResizePayloadSchema,
   'session.terminal.close': sessionTerminalClosePayloadSchema,
   'session.terminal.connect': sessionTerminalConnectPayloadSchema,
+  'session.operation.get': sessionOperationAuthorizationSchema,
+  'session.operation.ack': sessionOperationAckSchema,
 };
 
 const EVENT_PAYLOAD_SCHEMAS: Record<ControlEvent, z.ZodType> = {
@@ -127,7 +139,7 @@ export function parseControlFrame(message: string | ArrayBuffer): FrameParseResu
   if (bytes > MAX_SANDBOX_CONTROL_FRAME_BYTES) {
     return {
       ok: false,
-      error: { code: 'payload_too_large', message: 'Frame exceeds 1 MiB limit' },
+      error: { code: 'payload_too_large', message: 'Frame exceeds 12 MiB limit' },
     };
   }
 
@@ -173,10 +185,22 @@ export function errorResponse(
   return { type: 'response', requestId, ok: false, error };
 }
 
-export function helloResult(): SandboxHelloResult {
+export function helloResult(capabilities?: {
+  connectionRecovery?: boolean;
+  eventReceipts?: boolean;
+  scopedCleanupResult?: boolean;
+}): SandboxHelloResult {
   return {
     protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
     handshakeComplete: true,
-    capabilities: { kiloVersionHeartbeat: true },
+    capabilities: {
+      kiloVersionHeartbeat: true,
+      sessionOperationResults: true,
+      scopedStopAbort: true,
+      nativeRuntimeRetirement: true,
+      ...(capabilities?.connectionRecovery ? { connectionRecovery: true } : {}),
+      ...(capabilities?.eventReceipts ? { eventReceipts: true } : {}),
+      ...(capabilities?.scopedCleanupResult ? { scopedCleanupResult: true } : {}),
+    },
   };
 }

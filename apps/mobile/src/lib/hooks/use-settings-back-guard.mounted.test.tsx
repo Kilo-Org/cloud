@@ -132,7 +132,7 @@ describe('useSettingsBackGuard', () => {
     });
   });
 
-  it('shows Save / Discard / Keep Editing for a dirty-valid screen', () => {
+  it('shows Save / Discard / Keep editing for a dirty-valid screen', () => {
     const { renderer } = mountGuard(true, true, noOpSave);
 
     triggerPreventRemove();
@@ -141,7 +141,7 @@ describe('useSettingsBackGuard', () => {
     expect(lastAlertButtons()?.map(button => button.text)).toEqual([
       'Save changes',
       'Discard',
-      'Keep Editing',
+      'Keep editing',
     ]);
 
     act(() => {
@@ -149,12 +149,12 @@ describe('useSettingsBackGuard', () => {
     });
   });
 
-  it('shows Discard / Keep Editing for a dirty-invalid screen', () => {
+  it('shows Discard / Keep editing for a dirty-invalid screen', () => {
     const { renderer } = mountGuard(true, false, noOpSave);
 
     triggerPreventRemove();
     expect(alertMock).toHaveBeenCalledTimes(1);
-    expect(lastAlertButtons()?.map(button => button.text)).toEqual(['Discard', 'Keep Editing']);
+    expect(lastAlertButtons()?.map(button => button.text)).toEqual(['Discard', 'Keep editing']);
 
     act(() => {
       renderer.unmount();
@@ -233,14 +233,14 @@ describe('useSettingsBackGuard', () => {
     });
   });
 
-  it('Keep Editing leaves the screen untouched', () => {
+  it('Keep editing leaves the screen untouched', () => {
     const onSave = vi.fn(async () => {
       await Promise.resolve();
     });
     const { renderer } = mountGuard(true, true, onSave);
     triggerPreventRemove();
 
-    const keep = lastAlertButtons()?.find(button => button.text === 'Keep Editing');
+    const keep = lastAlertButtons()?.find(button => button.text === 'Keep editing');
     // The cancel button carries no handler: dismissing it must not save or leave.
     expect(keep?.onPress).toBeUndefined();
     expect(onSave).not.toHaveBeenCalled();

@@ -1,13 +1,14 @@
 import {
   credit_transactions,
   kilo_pass_issuance_items,
+  kilo_pass_store_events,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   kilocode_users,
   type OperationLedgerRow,
   type User,
 } from '@kilocode/db/schema';
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 
@@ -55,9 +56,15 @@ export type ValidatedStoreKiloPassPurchase = {
   purchaseToken: string | null;
   environment: string;
   purchasedAtIso: string;
+  subscriptionStartedAtIso?: string;
   expiresAtIso: string | null;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
+  googlePlayReplacement?: {
+    linkedPurchaseToken: string;
+    deferred: boolean;
+    orderPurchaseToken: string;
+  };
   rawPayload: Record<string, unknown>;
 };
 
@@ -456,6 +463,7 @@ const OPERATION_KEY_REUSE_MISMATCH_MESSAGE = 'operation_key_reuse_mismatch';
 
 /** Provider/user mismatch messages that settle `failed` and never retry. */
 const STORE_PURCHASE_MISMATCH_MESSAGES = [
+  'Store purchase has been refunded',
   'Store transaction already belongs to another user',
   'Store subscription already belongs to another user',
   'You already have an active Kilo Pass subscription',
@@ -518,6 +526,84 @@ export async function completeStoreKiloPassPurchase(params: {
   purchase: ValidatedStoreKiloPassPurchase;
 }): Promise<CompleteStoreKiloPassPurchaseResult> {
   const { user, purchase } = params;
+  if (
+    purchase.paymentProvider === KiloPassPaymentProvider.GooglePlay &&
+    purchase.googlePlayReplacement
+  ) {
+    const replacement = purchase.googlePlayReplacement;
+    const transfer = async (
+      tx: DrizzleTransaction
+    ): Promise<CompleteStoreKiloPassPurchaseResult | null> => {
+      await lockUserForStoreCompletion(tx, user.id);
+      const subscriptions = await tx
+        .select()
+        .from(kilo_pass_subscriptions)
+        .where(
+          and(
+            eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.GooglePlay),
+            or(
+              eq(kilo_pass_subscriptions.provider_subscription_id, replacement.linkedPurchaseToken),
+              eq(kilo_pass_subscriptions.provider_subscription_id, purchase.providerSubscriptionId)
+            )
+          )
+        )
+        .for('update');
+      if (subscriptions.length !== 1)
+        throw new Error('Google Play replacement has no current subscription');
+      const subscription = subscriptions[0];
+      if (subscription.kilo_user_id !== user.id)
+        throw new Error('Store subscription already belongs to another user');
+      const otherActive = await tx.query.kilo_pass_subscriptions.findFirst({
+        where: and(
+          eq(kilo_pass_subscriptions.kilo_user_id, user.id),
+          isNull(kilo_pass_subscriptions.ended_at),
+          sql`${kilo_pass_subscriptions.id} <> ${subscription.id}`
+        ),
+      });
+      if (otherActive && !isStripeSubscriptionEnded(otherActive.status)) {
+        throw new Error('You already have an active Kilo Pass subscription');
+      }
+      if (replacement.deferred) {
+        const receipt = await tx.query.kilo_pass_store_purchases.findFirst({
+          where: eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscription.id),
+          orderBy: desc(kilo_pass_store_purchases.purchased_at),
+        });
+        if (
+          !receipt ||
+          receipt.kilo_pass_subscription_id !== subscription.id ||
+          replacement.orderPurchaseToken !== purchase.purchaseToken ||
+          receipt.product_id !== purchase.productId
+        ) {
+          throw new Error('Google Play replacement does not match the paid receipt');
+        }
+        const refund = await tx.query.kilo_pass_store_events.findFirst({
+          columns: { id: true },
+          where: and(
+            eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
+            eq(kilo_pass_store_events.provider_transaction_id, receipt.provider_transaction_id),
+            sql`(${kilo_pass_store_events.payload_json}->>'notificationType') IN ('12', 'voided_purchase')`
+          ),
+        });
+        if (refund) throw new Error('Store purchase has been refunded');
+      }
+      await tx
+        .update(kilo_pass_subscriptions)
+        .set({ provider_subscription_id: purchase.providerSubscriptionId })
+        .where(eq(kilo_pass_subscriptions.id, subscription.id));
+      return replacement.deferred
+        ? {
+            subscriptionId: subscription.id,
+            tier: purchase.tier,
+            cadence: purchase.cadence,
+            alreadyProcessed: true,
+          }
+        : null;
+    };
+    const transferred = params.dbOrTx
+      ? await transfer(params.dbOrTx)
+      : await db.transaction(transfer);
+    if (transferred) return transferred;
+  }
   const ledgerHandle = params.dbOrTx ?? db;
   const startedAt = Date.now();
   const resourceKey = `${purchase.paymentProvider}:${purchase.providerTransactionId}`;
@@ -553,6 +639,18 @@ export async function completeStoreKiloPassPurchase(params: {
 
   const run = async (tx: DrizzleTransaction): Promise<CompleteStoreKiloPassPurchaseResult> => {
     await lockUserForStoreCompletion(tx, user.id);
+
+    if (purchase.paymentProvider === KiloPassPaymentProvider.GooglePlay) {
+      const refund = await tx.query.kilo_pass_store_events.findFirst({
+        columns: { id: true },
+        where: and(
+          eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
+          eq(kilo_pass_store_events.provider_transaction_id, purchase.providerTransactionId),
+          sql`(${kilo_pass_store_events.payload_json}->>'notificationType') IN ('12', 'voided_purchase')`
+        ),
+      });
+      if (refund) throw new Error('Store purchase has been refunded');
+    }
 
     const existingPurchase = await findStorePurchaseByProviderTransaction(tx, purchase);
 
@@ -590,7 +688,31 @@ export async function completeStoreKiloPassPurchase(params: {
       !isStripeSubscriptionEnded(activeSubscription.status) &&
       activeSubscription.provider_subscription_id !== purchase.providerSubscriptionId
     ) {
-      throw new Error('You already have an active Kilo Pass subscription');
+      const previous =
+        activeSubscription.payment_provider === KiloPassPaymentProvider.Stripe
+          ? undefined
+          : await tx.query.kilo_pass_store_purchases.findFirst({
+              where: eq(kilo_pass_store_purchases.kilo_pass_subscription_id, activeSubscription.id),
+              orderBy: desc(kilo_pass_store_purchases.purchased_at),
+            });
+      const previousExpiry = previous?.expires_at ? dayjs(previous.expires_at).valueOf() : NaN;
+      if (
+        !Number.isFinite(previousExpiry) ||
+        previousExpiry > Date.now() ||
+        previousExpiry > Date.parse(purchase.purchasedAtIso)
+      ) {
+        throw new Error('You already have an active Kilo Pass subscription');
+      }
+      // State reads already treat this receipt as expired. Reconcile it here
+      // when a new paid subscription arrives before the expiry notification.
+      await tx
+        .update(kilo_pass_subscriptions)
+        .set({
+          status: 'canceled',
+          cancel_at_period_end: false,
+          ended_at: new Date(previousExpiry).toISOString(),
+        })
+        .where(eq(kilo_pass_subscriptions.id, activeSubscription.id));
     }
 
     const previousStorePurchase =
@@ -624,7 +746,7 @@ export async function completeStoreKiloPassPurchase(params: {
         cadence: purchase.cadence,
         status: 'active',
         cancel_at_period_end: false,
-        started_at: purchase.purchasedAtIso,
+        started_at: purchase.subscriptionStartedAtIso ?? purchase.purchasedAtIso,
         ended_at: null,
         current_streak_months: 1,
         next_yearly_issue_at: nextYearlyIssueAt,

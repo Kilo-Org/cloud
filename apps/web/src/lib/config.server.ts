@@ -63,6 +63,34 @@ export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
 export function isBoundedInternalServiceTokenIssuanceEnabled(): boolean {
   return getEnvVariable('BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED') === 'true';
 }
+export function isNativeResourceCredentialIssuanceEnabled(): boolean {
+  return (
+    getEnvVariable('NATIVE_RESOURCE_TOKENS_ENABLED') === 'true' &&
+    isSharedResourceTokenIssuanceEnabled()
+  );
+}
+export function isSharedResourceTokenIssuanceEnabled(): boolean {
+  return getEnvVariable('SHARED_RESOURCE_TOKENS_ENABLED') === 'true';
+}
+const resourceTokenFamilyFlags = {
+  'cloud-agent-next': 'CLOUD_AGENT_RESOURCE_TOKENS_ENABLED',
+  gastown: 'GASTOWN_RESOURCE_TOKENS_ENABLED',
+  wasteland: 'WASTELAND_RESOURCE_TOKENS_ENABLED',
+  chat: 'CHAT_RESOURCE_TOKENS_ENABLED',
+  'delegated-resource': 'DELEGATED_RESOURCE_TOKENS_ENABLED',
+  'workflow-gateway': 'WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED',
+  benchmark: 'BENCHMARK_RESOURCE_TOKENS_ENABLED',
+} as const;
+
+export type ResourceTokenFamily = keyof typeof resourceTokenFamilyFlags;
+
+export function isResourceTokenIssuanceEnabled(family: ResourceTokenFamily): boolean {
+  return (
+    isSharedResourceTokenIssuanceEnabled() &&
+    getEnvVariable(resourceTokenFamilyFlags[family]) === 'true'
+  );
+}
+
 export const USER_DATA_EXPORT_WORKER_URL =
   getEnvVariable('USER_DATA_EXPORT_WORKER_URL') ||
   (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8818' : '');
@@ -82,6 +110,13 @@ export const IMPACT_ADVOCATE_API_BASE_URL =
   getEnvVariable('IMPACT_ADVOCATE_API_BASE_URL') || 'https://app.referralsaasquatch.com';
 export const IMPACT_ADVOCATE_DEBUG_LOGGING =
   getEnvVariable('IMPACT_ADVOCATE_DEBUG_LOGGING') === 'true';
+
+// Gates the "Repository Customizations" GitHub UI (per-installation default AI
+// model / PR review mode, plus per-repository overrides) on the GitHub
+// integration settings pages for both personal accounts and organizations.
+// Hidden by default so the feature can ship dark; set PER_REPO_SETTINGS=true
+// to reveal it.
+export const PER_REPO_SETTINGS_ENABLED = getEnvVariable('PER_REPO_SETTINGS') === 'true';
 
 // Gates the Coding Plans UI on the /subscriptions route. Hidden by default so
 // the feature can ship dark; set CODING_PLANS_PURCHASE_ENABLED=true to reveal it.

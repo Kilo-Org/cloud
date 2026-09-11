@@ -1,10 +1,29 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { HonoContext } from '../hono-context.js';
 import type { Env } from '../types.js';
-import { CONTROL_LOG_MAX_BATCH_BYTES } from '../shared/control-diagnostics.js';
+import {
+  CONTROL_LOG_ARCHIVE_NAME,
+  CONTROL_LOG_MAX_ARCHIVE_BYTES,
+  CONTROL_LOG_MAX_BATCH_BYTES,
+  OWNED_PROCESS_CLEANUP_UNREAPED,
+} from '../shared/control-diagnostics.js';
 import { mintControlLogUploadGrant } from './log-upload-grant.js';
 import { registerControlLogRoutes } from './log-routes.js';
+
+const logging = vi.hoisted(() => {
+  const logger = {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    withFields: vi.fn(),
+  };
+  logger.withFields.mockReturnValue(logger);
+  return { logger };
+});
+
+vi.mock('../logger.js', () => ({ logger: logging.logger }));
 
 const secret = 'test-log-signing-secret';
 const identity = {
@@ -22,13 +41,24 @@ const batch = {
 };
 
 function fixture() {
-  const objects = new Map<string, { body: string }>();
-  const put = vi.fn(async (key: string, body: string, options: R2PutOptions) => {
-    expect(options.onlyIf).toEqual({ etagDoesNotMatch: '*' });
-    if (objects.has(key)) return null;
-    objects.set(key, { body });
-    return { key };
-  });
+  const objects = new Map<string, { body: string | Uint8Array; options?: R2PutOptions }>();
+  const put = vi.fn(
+    async (key: string, body: string | ArrayBuffer | Uint8Array, options?: R2PutOptions) => {
+      const stored =
+        typeof body === 'string' ? body : body instanceof Uint8Array ? body : new Uint8Array(body);
+      const condition = options?.onlyIf;
+      if (
+        condition &&
+        'etagDoesNotMatch' in condition &&
+        condition.etagDoesNotMatch === '*' &&
+        objects.has(key)
+      ) {
+        return null;
+      }
+      objects.set(key, { body: stored, options });
+      return { key };
+    }
+  );
   const env = { NEXTAUTH_SECRET: secret, R2_BUCKET: { put } } as unknown as Env;
   const app = new Hono<HonoContext>();
   registerControlLogRoutes(app);
@@ -44,17 +74,74 @@ function fixture() {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-  return { request, upload, objects, put };
+  const archivePath = `${identity.sandboxId}/${identity.allocationId}/${identity.wrapperInstanceId}/${CONTROL_LOG_ARCHIVE_NAME}`;
+  const uploadArchive = (
+    body: Uint8Array,
+    path = archivePath,
+    token = mintControlLogUploadGrant(identity, secret),
+    contentType = 'application/gzip'
+  ) =>
+    request(`/sandbox-logs/${path}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': contentType,
+        'Content-Length': String(body.byteLength),
+      },
+      body,
+    });
+  return { request, upload, uploadArchive, archivePath, objects, put };
 }
 
 describe('control log routes', () => {
+  beforeEach(() => {
+    logging.logger.error.mockClear();
+    logging.logger.withFields.mockClear();
+    logging.logger.withFields.mockReturnValue(logging.logger);
+  });
+
   it('stores validated immutable batches without any provider or DO binding', async () => {
     const f = fixture();
     expect((await f.upload()).status).toBe(204);
     const key = `logs/control/${suffix}.json`;
-    expect(JSON.parse(f.objects.get(key)!.body)).toEqual(batch);
+    const stored = f.objects.get(key)!;
+    expect(stored.options?.onlyIf).toEqual({ etagDoesNotMatch: '*' });
+    expect(JSON.parse(stored.body as string)).toEqual(batch);
     expect((await f.upload({ ...batch, sequence: 42 })).status).toBe(204);
-    expect(JSON.parse(f.objects.get(key)!.body).sequence).toBe(0);
+    expect(JSON.parse(f.objects.get(key)!.body as string).sequence).toBe(0);
+    expect(logging.logger.error).not.toHaveBeenCalled();
+  });
+
+  it('logs unreaped owned-process cleanup once when a new batch is stored', async () => {
+    const f = fixture();
+    const unreaped = {
+      ...batch,
+      records: [
+        {
+          timestamp: 100,
+          event: 'session.task',
+          fields: {
+            phase: 'failed',
+            stage: 'process_cleanup',
+            ok: false,
+            sessionId: 'workspace_test',
+            kiloSessionId: 'ses_test',
+            messageId: 'msg_test',
+            kind: 'execution',
+            detail: 'owned_process_unreaped populated=1 /workspace/test',
+          },
+        },
+      ],
+    };
+    expect((await f.upload(unreaped)).status).toBe(204);
+    expect((await f.upload({ ...unreaped, sequence: 42 })).status).toBe(204);
+    expect(logging.logger.withFields).toHaveBeenCalledWith({
+      logTag: 'owned_process_unreaped',
+      sessionId: 'workspace_test',
+      sandboxId: identity.sandboxId,
+    });
+    expect(logging.logger.error).toHaveBeenCalledTimes(1);
+    expect(logging.logger.error).toHaveBeenCalledWith(OWNED_PROCESS_CLEANUP_UNREAPED);
   });
 
   it('rejects cross-allocation, cross-wrapper and cross-sandbox writes', async () => {
@@ -184,5 +271,59 @@ describe('control log routes', () => {
     const response = await f.upload();
     expect(response.status).toBe(503);
     expect(await response.text()).not.toContain('private-secret');
+  });
+
+  it('stores one overwriteable gzip archive per wrapper incarnation', async () => {
+    const f = fixture();
+    const first = new Uint8Array([0x1f, 0x8b, 1, 2, 3]);
+    const second = new Uint8Array([0x1f, 0x8b, 4, 5, 6]);
+    expect((await f.uploadArchive(first)).status).toBe(204);
+    expect((await f.uploadArchive(second)).status).toBe(204);
+    const key = `logs/control/${f.archivePath}`;
+    expect(f.objects.size).toBe(1);
+    expect(f.put).toHaveBeenCalledTimes(2);
+    expect(f.objects.get(key)?.options?.onlyIf).toBeUndefined();
+    expect(f.objects.get(key)?.body).toEqual(second);
+  });
+
+  it('rejects json on the gzip archive route and gzip on the json route', async () => {
+    const f = fixture();
+    expect(
+      (
+        await f.uploadArchive(
+          new Uint8Array([1, 2, 3]),
+          f.archivePath,
+          mintControlLogUploadGrant(identity, secret),
+          'application/json'
+        )
+      ).status
+    ).toBe(415);
+    expect(
+      (
+        await f.request(`/sandbox-logs/${suffix}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${mintControlLogUploadGrant(identity, secret)}`,
+            'Content-Type': 'application/gzip',
+          },
+          body: new Uint8Array([1, 2, 3]),
+        })
+      ).status
+    ).toBe(415);
+    expect(f.put).not.toHaveBeenCalled();
+  });
+
+  it('rejects an oversized gzip archive before writing it', async () => {
+    const f = fixture();
+    const response = await f.request(`/sandbox-logs/${f.archivePath}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${mintControlLogUploadGrant(identity, secret)}`,
+        'Content-Type': 'application/gzip',
+        'Content-Length': String(CONTROL_LOG_MAX_ARCHIVE_BYTES + 1),
+      },
+    });
+    expect(response.status).toBe(413);
+    expect(f.put).not.toHaveBeenCalled();
   });
 });

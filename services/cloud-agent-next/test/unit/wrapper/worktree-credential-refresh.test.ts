@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import { createWrapperKiloClient, type WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
+import { formatGitResultFailure } from '../../../wrapper/src/git-errors.js';
 import { applySessionAttach } from '../../../wrapper/src/control/apply-attach.js';
 import {
   createWorktreeKiloRuntimes,
@@ -13,23 +14,34 @@ import {
 } from '../../../wrapper/src/control/session-directories.js';
 import { resetDirectoryOperationState } from '../../../wrapper/src/control/worktree-operations.js';
 import {
+  createControlHandlerDeps,
   createSessionActivityRegistry,
   handleControlRequest,
   refreshHeartbeatPayload,
+  type ControlHandlerResult,
   type HandlerDeps,
 } from '../../../wrapper/src/control/sandbox-control-handlers.js';
 import { startSandboxControlEventFeed } from '../../../wrapper/src/control/sandbox-control-runtime.js';
 import type * as ControlRuntimeModule from '../../../wrapper/src/control/sandbox-control-runtime.js';
+import type * as KiloApiModule from '../../../wrapper/src/kilo-api.js';
 import type * as UtilsModule from '../../../wrapper/src/utils.js';
 
 vi.mock('node:fs/promises', () => ({
   default: { mkdir: vi.fn(async () => undefined), writeFile: vi.fn(async () => undefined) },
 }));
 vi.mock('@kilocode/sdk', () => ({ createKiloClient: vi.fn(() => ({})) }));
-vi.mock('../../../wrapper/src/kilo-api.js', () => ({ createWrapperKiloClient: vi.fn() }));
+vi.mock('../../../wrapper/src/kilo-api.js', async importOriginal => ({
+  ...(await importOriginal<typeof KiloApiModule>()),
+  createWrapperKiloClient: vi.fn(),
+}));
 vi.mock('../../../wrapper/src/control/sandbox-control-runtime.js', async importOriginal => ({
   ...(await importOriginal<typeof ControlRuntimeModule>()),
-  startSandboxControlEventFeed: vi.fn(async () => ({ isFresh: () => true })),
+  startSandboxControlEventFeed: vi.fn(async () => ({
+    isFresh: () => true,
+    usable: Promise.resolve(true),
+    close: () => {},
+    settled: Promise.resolve(),
+  })),
 }));
 vi.mock('../../../wrapper/src/restore-session.js', () => ({
   seedSessionIngestRegistration: vi.fn(async () => undefined),
@@ -80,8 +92,15 @@ function fixture() {
   const close = vi.fn();
   const startServer = vi.fn<
     NonNullable<Parameters<typeof createWorktreeKiloRuntimes>[0]['startServer']>
-  >(async () => {
+  >(async options => {
     const stopped = Promise.withResolvers<void>();
+    options.onProcessScope?.({
+      stop: async () => {
+        stopped.resolve();
+        return true;
+      },
+      verify: async () => true,
+    } as never);
     return {
       url: `http://127.0.0.1:${10000 + clients.length}`,
       stopped: stopped.promise,
@@ -267,14 +286,14 @@ describe('direct worktree credential refresh', () => {
     const activity = createSessionActivityRegistry();
     activity.attach(identity.kiloSessionId);
     activity.attach(sibling.kiloSessionId);
-    const deps: HandlerDeps = {
+    const emitSessionEvent = vi.fn();
+    const deps: HandlerDeps = createControlHandlerDeps({
       kiloRuntimes: f.registry,
       version: 'test',
       kiloReady: true,
       sessions: [],
-      tasks: new Map(),
       activity,
-      emitSessionEvent: vi.fn(),
+      emitSessionEvent,
       retireRuntime: vi.fn(),
       applyAttach: (session, payload, options) =>
         applySessionAttach(session, payload, {
@@ -282,7 +301,7 @@ describe('direct worktree credential refresh', () => {
           hasBootstrapMarker: async () => true,
           sessionExists: async () => true,
         }),
-    };
+    });
     const refreshing = handleControlRequest(
       'session.attach',
       identity,
@@ -305,8 +324,8 @@ describe('direct worktree credential refresh', () => {
           deps
         )
       ).toMatchObject({ ok: false, error: { code: 'session_busy', retryable: true } });
-      expect(deps.tasks.has(sibling.kiloSessionId)).toBe(false);
-      expect(deps.emitSessionEvent).not.toHaveBeenCalled();
+      expect(deps.operations.hasActive(sibling.kiloSessionId)).toBe(false);
+      expect(emitSessionEvent).not.toHaveBeenCalled();
       expect(runtime.signal.aborted).toBe(false);
     } finally {
       release.resolve({});
@@ -324,35 +343,77 @@ describe('direct worktree credential refresh', () => {
     async condition => {
       const f = fixture();
       let fresh = true;
-      vi.mocked(startSandboxControlEventFeed).mockResolvedValueOnce({ isFresh: () => fresh });
+      vi.mocked(startSandboxControlEventFeed).mockResolvedValueOnce({
+        isFresh: () => fresh,
+        usable: Promise.resolve(true),
+        close: () => {},
+        settled: Promise.resolve(),
+      });
       await f.attach();
       await f.attach(auth, originalEnv, sibling);
       if (condition === 'stale') fresh = false;
       else vi.spyOn(f.registry, 'get').mockReturnValue(undefined);
       if (condition === 'unattached') f.registry.detach(sibling);
-      const controller = new AbortController();
-      if (condition === 'aborted') controller.abort();
-      const deps: HandlerDeps = {
+      const emitSessionEvent = vi.fn();
+      const retireRuntime = vi.fn();
+      const deps: HandlerDeps = createControlHandlerDeps({
         kiloRuntimes: f.registry,
         version: 'test',
         kiloReady: true,
         sessions: [],
-        tasks: new Map(),
-        emitSessionEvent: vi.fn(),
-        retireRuntime: vi.fn(),
-      };
+        emitSessionEvent,
+        retireRuntime,
+      });
+      const held = Promise.withResolvers<ControlHandlerResult>();
+      let operation:
+        | { cancel: (r: string, s: 'cancelled') => void; done: Promise<unknown> }
+        | undefined;
       if (condition !== 'no-task') {
-        deps.tasks.set(identity.kiloSessionId, {
-          kind: condition === 'execution' ? 'execution' : 'preparation',
-          messageId: 'other-message',
-          session: {
-            ...identity,
-            directory: condition === 'other-directory' ? '/workspace/other' : identity.directory,
-          },
-          controller,
-          signal: controller.signal,
-          done: Promise.resolve({ ok: true, result: {} }),
-        });
+        const taskSession = {
+          ...identity,
+          directory: condition === 'other-directory' ? '/workspace/other' : identity.directory,
+        };
+        if (condition === 'execution') {
+          const runtimeLifetime = new AbortController();
+          const fakeRuntime = {
+            directory: taskSession.directory,
+            scopeId: 'fake',
+            env: {},
+            kiloClient: {
+              sendPrompt: () => held.promise,
+              abortSession: async () => true,
+              getSessionDetails: async (id: string) => ({ id }),
+            },
+            signal: runtimeLifetime.signal,
+          };
+          operation = deps.operations.start(
+            taskSession,
+            undefined,
+            {
+              operation: 'session.prompt',
+              payload: {
+                messageId: 'other-message',
+                turn: { type: 'prompt', prompt: 'block' },
+                agent: { mode: 'code', model: 'kilo/test' },
+              },
+              runtime: fakeRuntime as any,
+            },
+            { emitSessionEvent: () => {} }
+          );
+        } else {
+          operation = deps.operations.start(
+            taskSession,
+            undefined,
+            {
+              operation: 'session.attach',
+              payload: {} as any,
+              apply: () => held.promise,
+              onAttached: () => {},
+            },
+            { emitSessionEvent: () => {} }
+          );
+        }
+        if (condition === 'aborted') operation.cancel('test-abort', 'cancelled');
       }
       expect(
         await handleControlRequest(
@@ -366,20 +427,22 @@ describe('direct worktree credential refresh', () => {
           deps
         )
       ).toMatchObject({ ok: false, error: { code: 'not_ready', retryable: true } });
-      expect(deps.tasks.has(sibling.kiloSessionId)).toBe(false);
-      expect(deps.emitSessionEvent).not.toHaveBeenCalled();
-      expect(deps.retireRuntime).not.toHaveBeenCalled();
+      expect(deps.operations.hasActive(sibling.kiloSessionId)).toBe(false);
+      expect(emitSessionEvent).not.toHaveBeenCalled();
+      expect(retireRuntime).not.toHaveBeenCalled();
+      // Clean up held operations
+      held.resolve({ ok: true, result: {} });
+      if (operation) await operation.done.catch(() => {});
     }
   );
 
   it('waits for confirmed old process exit before launching the refreshed process', async () => {
     const f = fixture();
     const stopped = Promise.withResolvers<void>();
-    f.startServer.mockImplementationOnce(async () => ({
-      url: 'http://127.0.0.1:10000',
-      close: f.close,
-      stopped: stopped.promise,
-    }));
+    f.startServer.mockImplementationOnce(async options => {
+      options.onProcessScope?.({ stop: async () => true, verify: async () => true } as never);
+      return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+    });
     const runtime = await f.attach();
     const attachment = f.registry.attach(
       identity,
@@ -403,11 +466,10 @@ describe('direct worktree credential refresh', () => {
       const f = fixture();
       const stopped = Promise.withResolvers<void>();
       if (failure === 'process-stop-timeout') {
-        f.startServer.mockImplementationOnce(async () => ({
-          url: 'http://127.0.0.1:10000',
-          close: f.close,
-          stopped: stopped.promise,
-        }));
+        f.startServer.mockImplementationOnce(async options => {
+          options.onProcessScope?.({ stop: async () => false, verify: async () => false } as never);
+          return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+        });
       }
       const runtime = await f.attach();
       await f.attach(auth, originalEnv, sibling);
@@ -428,10 +490,13 @@ describe('direct worktree credential refresh', () => {
       expect(await outcome).toMatchObject({ code: 'runtime_unhealthy', retryable: true });
       expect(runtime.signal.aborted).toBe(true);
       expect(f.registry.get(identity.directory)).toBeUndefined();
-      expect(f.registry.isHealthy()).toBe(false);
-      expect(f.onUnexpectedClose.mock.calls).toEqual([
-        [{ directory: identity.directory, reason: 'credential_refresh_failed' }],
-      ]);
+      await vi.waitFor(() => expect(f.onUnexpectedClose).toHaveBeenCalledTimes(1));
+      expect(f.registry.isHealthy()).toBe(failure !== 'process-stop-timeout');
+      expect(f.onUnexpectedClose.mock.calls[0]?.[0]).toMatchObject({
+        directory: identity.directory,
+        reason: 'credential_refresh_failed',
+        cleanup: failure === 'process-stop-timeout' ? 'unconfirmed' : 'confirmed',
+      });
       expect(f.startServer).toHaveBeenCalledTimes(failure === 'process-stop-timeout' ? 1 : 2);
       stopped.resolve();
       f.registry.shutdown();
@@ -446,11 +511,10 @@ describe('direct worktree credential refresh', () => {
   it('does not report intentional shutdown during a pending destructive refresh as unexpected', async () => {
     const f = fixture();
     const stopped = Promise.withResolvers<void>();
-    f.startServer.mockImplementationOnce(async () => ({
-      url: 'http://127.0.0.1:10000',
-      close: f.close,
-      stopped: stopped.promise,
-    }));
+    f.startServer.mockImplementationOnce(async options => {
+      options.onProcessScope?.({ stop: async () => true, verify: async () => true } as never);
+      return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+    });
     await f.attach();
     const outcome = f
       .attach(auth, { ...originalEnv, GH_TOKEN: 'github-renewed' })
@@ -476,24 +540,26 @@ describe('direct worktree credential refresh', () => {
   it('reports confirmed process exit immediately even if the feed still appears fresh', async () => {
     const f = fixture();
     const stopped = Promise.withResolvers<void>();
-    f.startServer.mockImplementationOnce(async () => ({
-      url: 'http://127.0.0.1:10000',
-      close: f.close,
-      stopped: stopped.promise,
-    }));
+    f.startServer.mockImplementationOnce(async options => {
+      options.onProcessScope?.({ stop: async () => true, verify: async () => true } as never);
+      return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+    });
     const runtime = await f.attach();
     stopped.resolve();
     await stopped.promise;
     expect(runtime.signal.aborted).toBe(true);
     expect(f.registry.get(identity.directory)).toBeUndefined();
-    expect(f.registry.isHealthy()).toBe(false);
-    expect(f.onUnexpectedClose.mock.calls).toEqual([
-      [{ directory: identity.directory, reason: 'process_exited' }],
-    ]);
+    await vi.waitFor(() => expect(f.onUnexpectedClose).toHaveBeenCalledTimes(1));
+    expect(f.registry.isHealthy()).toBe(true);
+    expect(f.onUnexpectedClose.mock.calls[0]?.[0]).toMatchObject({
+      directory: identity.directory,
+      reason: 'process_exited',
+      cleanup: 'confirmed',
+    });
   });
 
   it.each(['connection', 'http'] as const)(
-    'classifies real SDK SSE startup %s errors without retaining private data',
+    'recovers from real SDK SSE startup %s errors without retaining private data',
     async failure => {
       vi.mocked(fetch).mockImplementation(async request => {
         const url = request instanceof Request ? request.url : String(request);
@@ -527,14 +593,15 @@ describe('direct worktree credential refresh', () => {
       ).toHaveLength(1);
       expect(runtime.signal.aborted).toBe(false);
       feed.onUnexpectedClose(error);
-      expect(f.onUnexpectedClose.mock.calls).toEqual([
-        [{ directory: identity.directory, reason: 'feed_failed' }],
-      ]);
-      expect(runtime.signal.aborted).toBe(true);
+      await vi.waitFor(() =>
+        expect(vi.mocked(startSandboxControlEventFeed)).toHaveBeenCalledTimes(2)
+      );
+      expect(f.onUnexpectedClose).not.toHaveBeenCalled();
+      expect(runtime.signal.aborted).toBe(false);
     }
   );
 
-  it('ignores retired process feed failures but reports current feed errors without private data', async () => {
+  it('ignores retired process feed failures and recovers current feed errors', async () => {
     const f = fixture();
     const runtime = await f.attach();
     const oldFeed = vi.mocked(startSandboxControlEventFeed).mock.calls[0]?.[0];
@@ -548,20 +615,27 @@ describe('direct worktree credential refresh', () => {
     expect(currentFeed).toBeDefined();
     currentFeed?.onUnexpectedClose(new Error('private-current-feed-credential'));
     currentFeed?.onUnexpectedClose(new Error('private-duplicate-feed-credential'));
-    expect(f.onUnexpectedClose.mock.calls).toEqual([
-      [{ directory: identity.directory, reason: 'feed_failed' }],
-    ]);
-    expect(runtime.signal.aborted).toBe(true);
+    await vi.waitFor(() =>
+      expect(vi.mocked(startSandboxControlEventFeed)).toHaveBeenCalledTimes(3)
+    );
+    expect(f.onUnexpectedClose).not.toHaveBeenCalled();
+    expect(runtime.signal.aborted).toBe(false);
   });
 
-  it('does not expose a stale runtime before its watchdog fires', async () => {
+  it('keeps a stale runtime while its feed recovery begins', async () => {
     const f = fixture();
     let fresh = true;
-    vi.mocked(startSandboxControlEventFeed).mockResolvedValueOnce({ isFresh: () => fresh });
-    await f.attach();
+    vi.mocked(startSandboxControlEventFeed).mockResolvedValueOnce({
+      isFresh: () => fresh,
+      usable: Promise.resolve(true),
+      close: () => {},
+      settled: Promise.resolve(),
+    });
+    const runtime = await f.attach();
     fresh = false;
-    expect(f.registry.get(identity.directory)).toBeUndefined();
-    expect(f.registry.isHealthy()).toBe(false);
+    expect(f.registry.prepareForNewWork?.(identity.directory)).toBe(false);
+    expect(f.registry.get(identity.directory)).toBe(runtime);
+    expect(f.registry.isHealthy()).toBe(true);
   });
 
   it('discards heartbeat statuses from a replaced process with the same logical runtime', async () => {
@@ -572,16 +646,15 @@ describe('direct worktree credential refresh', () => {
     f.statuses.mockReturnValueOnce(status.promise);
     const activity = createSessionActivityRegistry();
     activity.attach(identity.kiloSessionId);
-    const deps: HandlerDeps = {
+    const deps: HandlerDeps = createControlHandlerDeps({
       kiloRuntimes: f.registry,
       version: 'test',
       kiloReady: true,
       sessions: [],
-      tasks: new Map(),
       activity,
       emitSessionEvent: vi.fn(),
       retireRuntime: vi.fn(),
-    };
+    });
     const heartbeat = refreshHeartbeatPayload(deps);
     const oldClient = runtime.kiloClient;
     await f.attach(auth, { ...originalEnv, GH_TOKEN: 'github-renewed' });
@@ -733,12 +806,11 @@ describe('direct worktree credential refresh', () => {
     activity.attach(identity.kiloSessionId);
     activity.attach(sibling.kiloSessionId);
     activity.markActive(sibling.kiloSessionId);
-    const deps: HandlerDeps = {
+    const deps: HandlerDeps = createControlHandlerDeps({
       kiloRuntimes: f.registry,
       version: 'test',
       kiloReady: true,
       sessions: [],
-      tasks: new Map(),
       activity,
       emitSessionEvent: vi.fn(),
       retireRuntime: vi.fn(),
@@ -748,25 +820,55 @@ describe('direct worktree credential refresh', () => {
           hasBootstrapMarker: async () => true,
           sessionExists: async () => true,
         }),
-    };
-    const controller = new AbortController();
-    deps.tasks.set(sibling.kiloSessionId, {
-      kind: 'execution',
-      messageId: 'active-sibling-message',
-      session: sibling,
-      controller,
-      signal: controller.signal,
-      done: Promise.resolve({ ok: true, result: {} }),
     });
+    const held = Promise.withResolvers<ControlHandlerResult>();
+    const runtimeLifetime = new AbortController();
+    const fakeRuntime = {
+      directory: sibling.directory,
+      scopeId: 'fake',
+      env: {},
+      kiloClient: {
+        sendPrompt: () => held.promise,
+        abortSession: async () => true,
+        getSessionDetails: async (id: string) => ({ id }),
+      },
+      signal: runtimeLifetime.signal,
+    };
+    const getRuntime = f.registry.get.bind(f.registry);
+    f.registry.get = request =>
+      (typeof request === 'string' ? request : request.directory) === sibling.directory
+        ? (fakeRuntime as typeof runtime)
+        : getRuntime(request);
+    const siblingOp = deps.operations.start(
+      sibling,
+      undefined,
+      {
+        operation: 'session.prompt',
+        payload: {
+          messageId: 'active-sibling-message',
+          turn: { type: 'prompt', prompt: 'block' },
+          agent: { mode: 'code', model: 'kilo/test' },
+        },
+        runtime: fakeRuntime as any,
+      },
+      { emitSessionEvent: () => {} }
+    );
     const payload = { kilo: auth, env: { ...originalEnv, GH_TOKEN: 'github-renewed' } };
     expect(await handleControlRequest('session.attach', identity, payload, deps)).toMatchObject({
       ok: false,
       error: { code: 'session_busy', retryable: true },
     });
-    expect(controller.signal.aborted).toBe(false);
+    expect(siblingOp.signal.aborted).toBe(false);
     expect(runtime.signal.aborted).toBe(false);
     expect(f.close).not.toHaveBeenCalled();
-    deps.tasks.delete(sibling.kiloSessionId);
+    // Remove the sibling operation (equivalent to old deps.tasks.delete)
+    siblingOp.cancel('test-cleanup', 'cancelled');
+    held.resolve({ ok: true, result: {} });
+    await siblingOp.done.catch(() => {});
+    f.registry.get = getRuntime;
+    // Operation completion reconciles activity to idle; restore active state
+    // to match the original test which only removed the task without touching activity
+    activity.markActive(sibling.kiloSessionId);
     expect(await handleControlRequest('session.attach', identity, payload, deps)).toMatchObject({
       ok: false,
       error: { code: 'session_busy', retryable: true },
@@ -779,11 +881,12 @@ describe('direct worktree credential refresh', () => {
     });
     expect(f.close).toHaveBeenCalledTimes(1);
     expect(runtime.env.GH_TOKEN).toBe('github-renewed');
-    expect(deps.retireRuntime).not.toHaveBeenCalled();
+    runtimeLifetime.abort();
   });
 
   it('fails attach instead of accepting stale Git auth when origin refresh fails', async () => {
     const f = fixture();
+    const refreshed = { stdout: '', stderr: 'failed', exitCode: 1 };
     expect(
       await applySessionAttach(
         identity,
@@ -800,12 +903,15 @@ describe('direct worktree credential refresh', () => {
           kiloRuntimes: f.registry,
           canRefreshCredentials: () => true,
           hasBootstrapMarker: async () => true,
-          runGit: async () => ({ stdout: '', stderr: 'failed', exitCode: 1 }),
+          runGit: async () => refreshed,
         }
       )
     ).toMatchObject({
       ok: false,
-      error: { message: 'Worktree Git credential refresh failed', retryable: true },
+      error: {
+        message: formatGitResultFailure(refreshed, 'Worktree Git credential refresh failed'),
+        retryable: true,
+      },
     });
   });
 });

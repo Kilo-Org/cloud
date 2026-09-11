@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import { eq, and, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { eq, and, asc, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import {
   recordSecurityAgentRepositorySyncAttempt,
   recordSecurityAgentRepositorySyncFailure,
@@ -365,6 +365,7 @@ type EnabledOwnerConfig = {
   notificationPolicy: SecurityNotificationPolicy | null;
   autoAnalysisEnabledAt: string | null;
   authInvalidAt: string | null;
+  githubAppType: 'standard' | 'lite';
   /** Number of selected_repository_ids that are no longer accessible via the installation.
    *  Non-zero means the app lost access to a configured repo — freshness must not advance. */
   missingSelectedRepoCount: number;
@@ -405,15 +406,21 @@ export async function getOwnerConfig(
       permissions: platform_integrations.permissions,
       repositories: platform_integrations.repositories,
       authInvalidAt: platform_integrations.auth_invalid_at,
+      githubAppType: platform_integrations.github_app_type,
     })
     .from(platform_integrations)
     .where(
       and(
         integrationOwnerFilter(owner),
         eq(platform_integrations.platform, 'github'),
+        eq(platform_integrations.integration_type, 'app'),
+        eq(platform_integrations.integration_status, 'active'),
+        isNull(platform_integrations.suspended_at),
+        isNull(platform_integrations.github_disconnected_at),
         isNotNull(platform_integrations.platform_installation_id)
       )
     )
+    .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id))
     .limit(1);
 
   if (integrations.length === 0) return null;
@@ -498,6 +505,7 @@ export async function getOwnerConfig(
     notificationPolicy,
     autoAnalysisEnabledAt: ownerStates[0]?.autoAnalysisEnabledAt ?? null,
     authInvalidAt: integration.authInvalidAt,
+    githubAppType: integration.githubAppType ?? 'standard',
     missingSelectedRepoCount,
     runtimeState:
       agentConfig.runtime_state && typeof agentConfig.runtime_state === 'object'
@@ -1788,6 +1796,7 @@ export async function syncOwner(params: {
         db: database,
         gitTokenService,
         installationId: config.installationId,
+        githubAppType: config.githubAppType,
         owner,
         runId,
         platformIntegrationId: config.platformIntegrationId,
@@ -1981,6 +1990,7 @@ async function syncRepo(params: {
   db: WorkerDb;
   gitTokenService: GitTokenService;
   installationId: string;
+  githubAppType: 'standard' | 'lite';
   owner: SecurityReviewOwner;
   runId: string;
   platformIntegrationId: string;
@@ -1994,6 +2004,7 @@ async function syncRepo(params: {
     db: database,
     gitTokenService,
     installationId,
+    githubAppType,
     owner,
     runId,
     platformIntegrationId,
@@ -2004,7 +2015,12 @@ async function syncRepo(params: {
   } = params;
   const commandOwner = toSecurityAgentCommandOwner(owner);
   await recordSecurityAgentRepositorySyncAttempt(database, { owner: commandOwner, repoFullName });
-  const token = await gitTokenService.getToken(installationId);
+  const token = await gitTokenService.getToken(
+    installationId,
+    githubAppType,
+    platformIntegrationId,
+    true
+  );
   const result = createEmptySyncResult();
 
   const [repoOwner, repoName] = repoFullName.split('/');

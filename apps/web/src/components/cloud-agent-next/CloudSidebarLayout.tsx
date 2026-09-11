@@ -61,6 +61,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useClosedWorktreeChatTabs } from './hooks/useClosedWorktreeChatTabs';
+import { useWorkspaceFolders } from './hooks/useWorkspaceFolders';
 import {
   getClosedWorktreeChatTabsStorageKey,
   getClosedWorktreeChatSessionIds,
@@ -160,6 +161,7 @@ export function CloudSidebarLayout({
   const searchParams = useSearchParams();
   const currentSessionId = searchParams.get('sessionId') ?? undefined;
   const worktreeIdFromParams = searchParams.get('worktreeId');
+  const workspaceFolders = useWorkspaceFolders(currentUserId, organizationId);
   const {
     closedSessionIds,
     sessionOrderByWorktree,
@@ -381,6 +383,7 @@ export function CloudSidebarLayout({
           deleteSessionFromStore,
         });
         toast('Session deleted successfully');
+        await queryClient.invalidateQueries(trpc.workspaceFolders.list.pathFilter());
         await invalidateSessionQueries({ queryClient, trpc });
       },
       onError: error => {
@@ -641,6 +644,7 @@ export function CloudSidebarLayout({
         router.push(organizationId ? `/organizations/${organizationId}/cloud` : '/cloud');
       }
       void invalidateSessionQueries({ queryClient, trpc });
+      void queryClient.invalidateQueries(trpc.workspaceFolders.list.pathFilter());
       toast.success('Worktree deleted');
     } catch (error) {
       toast.error('Failed to delete worktree', { description: formatSessionError(error) });
@@ -690,6 +694,8 @@ export function CloudSidebarLayout({
               <SheetTitle>Sessions</SheetTitle>
             </SheetHeader>
             <ChatSidebar
+              key={`mobile:${currentUserId}:${organizationId ?? 'personal'}`}
+              workspaceFolders={workspaceFolders}
               sessions={sidebarSessions}
               currentSessionId={currentSessionId}
               selectedWorktreeId={selectedWorktreeId}
@@ -722,6 +728,8 @@ export function CloudSidebarLayout({
         {/* Desktop Sidebar */}
         <div className="hidden w-80 shrink-0 border-r lg:block">
           <ChatSidebar
+            key={`desktop:${currentUserId}:${organizationId ?? 'personal'}`}
+            workspaceFolders={workspaceFolders}
             sessions={sidebarSessions}
             currentSessionId={currentSessionId}
             selectedWorktreeId={selectedWorktreeId}

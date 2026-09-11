@@ -7,11 +7,12 @@
  * (including `connectionId`) come from the latest WS payload, so session
  * ownership can transfer between CLI connections. Once a row has been
  * through a tRPC fetch the cached DB title is sticky too — heartbeats
- * never carry a cloud rename. `capabilities` is the hybrid exception: the
- * WS value wins when present (upgrade or downgrade), and the cached value
- * is preserved only when the WS row omits the field. The functions here
- * never touch React, the network, or a QueryClient — they are pure and
- * exhaustively unit-tested alongside this file.
+ * never carry a cloud rename. `session.updated` (ingest title write) does
+ * apply. `capabilities` is the hybrid exception: the WS value wins when
+ * present (upgrade or downgrade), and the cached value is preserved only
+ * when the WS row omits the field. The functions here never touch React,
+ * the network, or a QueryClient — they are pure and exhaustively
+ * unit-tested alongside this file.
  *
  * Status resolution for live rows: CLI heartbeats/snapshots often report
  * only idle/busy while `cli_sessions_v2` holds question/permission. A
@@ -24,6 +25,7 @@ import {
   cliConnectionDataSchema,
   type HeartbeatData,
   heartbeatDataSchema,
+  sessionRowEventPayloadSchema,
   type SessionsListData,
   sessionsListDataSchema,
   type SessionStatusUpdatedPayload,
@@ -403,7 +405,9 @@ type LiveSystemEventAction =
 
 /**
  * Pure routing for ActiveSessionsLiveSync system events. session.status.updated
- * is included here so the owner can handle it via onSystemEvent only.
+ * and session.updated are included here so the owner can handle them via
+ * onSystemEvent only. Blank `session.updated` titles are ignored so a
+ * heartbeat-sticky row is never blanked.
  */
 export function planLiveSystemEventActions(event: {
   event: string;
@@ -443,6 +447,19 @@ export function planLiveSystemEventActions(event: {
       {
         type: 'write',
         updater: current => applySessionStatusUpdated(current, payload.sessionId, payload.status),
+      },
+    ];
+  }
+  if (event.event === 'session.updated') {
+    const parsed = sessionRowEventPayloadSchema.safeParse(event.data);
+    const title = parsed.success ? parsed.data.session.title : null;
+    if (!parsed.success || title == null || title.trim().length === 0) {
+      return [];
+    }
+    return [
+      {
+        type: 'write',
+        updater: current => applyActiveSessionTitle(current, parsed.data.session.sessionId, title),
       },
     ];
   }

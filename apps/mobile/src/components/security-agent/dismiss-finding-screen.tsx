@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
+import { ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -292,7 +293,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           {dismissFinding.isPending ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : null}
-          <Text className="text-primary-foreground">{t('securityAgent.dismiss.submit')}</Text>
+          <Text className="text-primary-foreground">{t('securityAgent.dismiss.title')}</Text>
         </Button>
       </ScrollView>
     </View>

@@ -413,7 +413,14 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
           : step
       );
     if (event.action === 'attempt_started') {
-      if (existing && existing.revision >= event.revision) return null;
+      if (
+        existing &&
+        (existing.revision >= event.revision ||
+          existing.status === 'completed' ||
+          existing.status === 'failed')
+      ) {
+        return null;
+      }
       const handedOff = existing?.status === 'running' ? existing : undefined;
       const attempt: PreparationAttempt = {
         id: event.attemptId,

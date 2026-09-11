@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { generateApiToken } from '@/lib/tokens';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import {
   generateGitHubInstallationToken,
   findKiloReviewComment,
@@ -78,6 +78,7 @@ import {
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
 import { getManualCodeReviewConfig } from '../manual-config';
+import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 
 const BitbucketWorkspaceSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9_.-]*$/);
 const BitbucketRepositorySlugSchema = z.string().regex(/^[A-Za-z0-9_.-]+$/);
@@ -304,7 +305,15 @@ export async function prepareReviewPayload(
             expectedHeadSha: expectedHeadSha.data,
           }
         );
-        const authToken = generateApiToken(user, { botId: 'reviewer' });
+        const authToken = generateCloudAgentWorkflowToken(
+          await prepareCloudAgentWorkflowUser(user),
+          {
+            organizationId: owner.type === 'org' ? owner.id : undefined,
+            tokenSource: 'code-review',
+            botId: 'reviewer',
+            expiresIn: TOKEN_EXPIRY.default,
+          }
+        );
         // Single source for the standard reviewer's model so the session input and the
         // forward-shaped `reviewAgents[0]` can never drift apart.
         const standardModel = config.model_slug || DEFAULT_CODE_REVIEW_MODEL;
@@ -720,7 +729,12 @@ export async function prepareReviewPayload(
     ]);
 
     // 5. Generate auth token for cloud agent with bot identifier
-    const authToken = generateApiToken(user, { botId: 'reviewer' });
+    const authToken = generateCloudAgentWorkflowToken(await prepareCloudAgentWorkflowUser(user), {
+      organizationId: owner.type === 'org' ? owner.id : undefined,
+      tokenSource: 'code-review',
+      botId: 'reviewer',
+      expiresIn: TOKEN_EXPIRY.default,
+    });
 
     // A council run replaces the standard sub-agent sharding policy with a coordinator
     // contract (one sub-agent per specialist, no self-review), so the base prompt must OMIT

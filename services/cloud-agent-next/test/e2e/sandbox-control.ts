@@ -34,6 +34,7 @@ export type ControlPlaneKiloRuntime = {
   kiloSessionId: string;
   serverUrl: string;
   directory: string;
+  home: string;
   processId: number;
   logPath?: string;
 };
@@ -41,6 +42,7 @@ export type ControlPlaneKiloRuntime = {
 export type ControlPlaneKiloRoot = {
   id: string;
   directory: string;
+  home: string;
   processId: number;
 };
 
@@ -76,6 +78,7 @@ type ControlPlaneKiloOperation = {
   kiloSessionId: string;
   serverUrl?: string;
   directory?: string;
+  home?: string;
   processId?: number;
   ownerKiloSessionId?: string;
   sourceKiloSessionId?: string;
@@ -143,7 +146,10 @@ function kiloListeners() {
       const directory = fs.realpathSync(cwd);
       if (!path.isAbsolute(cwd) || cwd !== directory) continue;
       if (!fs.existsSync(path.join(directory, '.kilo-bootstrap-complete'))) continue;
-      listeners.push({ serverUrl, processId, directory });
+       const environment = fs.readFileSync('/proc/' + processId + '/environ', 'utf8');
+       const home = environment.split('\0').find(value => value.startsWith('HOME='))?.slice(5);
+       if (!home || !path.isAbsolute(home) || fs.realpathSync(home) !== home) continue;
+       listeners.push({ serverUrl, processId, directory, home });
     } catch {
       continue;
     }
@@ -179,7 +185,7 @@ function rootResult(root, serverUrl) {
   if (matches.length !== 1 || serverUrl !== request.serverUrl || root.directory !== request.directory) {
     return { ok: false, reason: 'Kilo listener identity changed' };
   }
-  return { ok: true, id: root.id, directory: root.directory, processId: request.processId };
+  return { ok: true, id: root.id, directory: root.directory, home: request.home, processId: request.processId };
 }
 
 async function run() {
@@ -219,7 +225,11 @@ async function run() {
   }
 
   const listeners = kiloListeners().filter(listener => sameListener(listener, request));
-  if (listeners.length !== 1 || !(await getRoot(request.serverUrl, request.ownerKiloSessionId))) {
+  if (
+    listeners.length !== 1 ||
+    listeners[0].home !== request.home ||
+    !(await getRoot(request.serverUrl, request.ownerKiloSessionId))
+  ) {
     return { ok: false, reason: 'Owned Kilo listener identity did not match' };
   }
 
@@ -447,6 +457,7 @@ function requireControlPlaneKiloRoot(
   if (
     result.id !== kiloSessionId ||
     typeof result.directory !== 'string' ||
+    typeof result.home !== 'string' ||
     typeof result.processId !== 'number' ||
     !Number.isSafeInteger(result.processId) ||
     result.processId <= 0
@@ -456,6 +467,7 @@ function requireControlPlaneKiloRoot(
   return {
     id: result.id,
     directory: result.directory,
+    home: result.home,
     processId: result.processId,
   };
 }
@@ -488,6 +500,8 @@ export async function findControlPlaneKiloRuntime(
       !/^http:\/\/(?:127\.0\.0\.1|\[::1\]):\d+$/.test(result.serverUrl) ||
       typeof result.directory !== 'string' ||
       !result.directory.startsWith('/') ||
+      typeof result.home !== 'string' ||
+      !result.home.startsWith('/') ||
       typeof result.processId !== 'number' ||
       !Number.isSafeInteger(result.processId) ||
       result.processId <= 0 ||
@@ -500,6 +514,7 @@ export async function findControlPlaneKiloRuntime(
       kiloSessionId,
       serverUrl: result.serverUrl,
       directory: result.directory,
+      home: result.home,
       processId: result.processId,
       ...(typeof result.logPath === 'string' ? { logPath: result.logPath } : {}),
     });
@@ -528,6 +543,7 @@ export async function stopOwnedControlPlaneSandbox(
       ownerKiloSessionId: kiloSessionId,
       serverUrl: runtime.serverUrl,
       directory: runtime.directory,
+      home: runtime.home,
       processId: runtime.processId,
     },
     executeDocker
@@ -564,6 +580,7 @@ export async function inspectControlPlaneKiloRoot(
     kiloSessionId,
     serverUrl: runtime.serverUrl,
     directory: runtime.directory,
+    home: runtime.home,
     processId: runtime.processId,
     ownerKiloSessionId: runtime.kiloSessionId,
   });
@@ -579,6 +596,7 @@ export async function controlPlaneKiloRootExists(
     kiloSessionId,
     serverUrl: runtime.serverUrl,
     directory: runtime.directory,
+    home: runtime.home,
     processId: runtime.processId,
     ownerKiloSessionId: runtime.kiloSessionId,
   });
@@ -597,6 +615,7 @@ export async function inspectControlPlaneWorkspaceFile(
     kiloSessionId: input.kiloSessionId,
     serverUrl: runtime.serverUrl,
     directory: runtime.directory,
+    home: runtime.home,
     processId: runtime.processId,
     ownerKiloSessionId: runtime.kiloSessionId,
     filePath: input.filePath,
@@ -627,6 +646,7 @@ export async function inspectControlPlaneQuestions(
     questionId: input.questionId,
     serverUrl: runtime.serverUrl,
     directory: runtime.directory,
+    home: runtime.home,
     processId: runtime.processId,
     ownerKiloSessionId: runtime.kiloSessionId,
   });
@@ -667,6 +687,7 @@ export async function importControlPlaneKiloRoot(
     sourceKiloSessionId: runtime.kiloSessionId,
     serverUrl: runtime.serverUrl,
     directory: runtime.directory,
+    home: runtime.home,
     processId: runtime.processId,
     ownerKiloSessionId: runtime.kiloSessionId,
   });
@@ -683,6 +704,7 @@ export async function promptControlPlaneKiloRoot(
     sourceKiloSessionId: runtime.kiloSessionId,
     serverUrl: runtime.serverUrl,
     directory: runtime.directory,
+    home: runtime.home,
     processId: runtime.processId,
     ownerKiloSessionId: runtime.kiloSessionId,
     messageId: input.messageId,
@@ -705,6 +727,7 @@ export async function waitForControlPlaneKiloCompletion(
       kiloSessionId: input.kiloSessionId,
       serverUrl: runtime.serverUrl,
       directory: runtime.directory,
+      home: runtime.home,
       processId: runtime.processId,
       ownerKiloSessionId: runtime.kiloSessionId,
       messageId: input.messageId,

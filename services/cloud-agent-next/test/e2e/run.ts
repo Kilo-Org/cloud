@@ -23,7 +23,13 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ensureTestUser, loadDevVars, loadRepoEnvFiles, DRIVER_USER_EMAIL_SUFFIX } from './auth.js';
+import {
+  ensureTestUser,
+  loadDevVars,
+  loadExistingUserByEmail,
+  loadRepoEnvFiles,
+  DRIVER_USER_EMAIL_SUFFIX,
+} from './auth.js';
 import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
 import { isControlPlaneOwner, isWorktreeOwner } from '../../src/session-plane.js';
 import { LIFECYCLE_SCENARIOS, type LifecycleResult } from './lifecycle.js';
@@ -148,13 +154,17 @@ async function main(): Promise<void> {
 
   loadRepoEnvFiles(SERVICE_PACKAGE_DIR);
   const devVars = loadDevVars(SERVICE_PACKAGE_DIR);
+  const seededEmail = process.env.E2E_USER_EMAIL?.trim();
   const email =
     lifecycle === 'worktree-shared'
       ? `kilo-worktree-e2e-${randomUUID()}${DRIVER_USER_EMAIL_SUFFIX}`
-      : (process.env.E2E_USER_EMAIL ?? `kilo-e2e-driver-${Date.now()}${DRIVER_USER_EMAIL_SUFFIX}`);
-  const user = await ensureTestUser(process.env.DATABASE_URL, email, {
-    funded: process.env.E2E_FUNDED === '1',
-  });
+      : (seededEmail ?? `kilo-e2e-driver-${Date.now()}${DRIVER_USER_EMAIL_SUFFIX}`);
+  const user =
+    lifecycle !== 'worktree-shared' && seededEmail
+      ? await loadExistingUserByEmail(process.env.DATABASE_URL, seededEmail)
+      : await ensureTestUser(process.env.DATABASE_URL, email, {
+          funded: process.env.E2E_FUNDED === '1',
+        });
   const expectControlPlane = Boolean(devVars.CONTROL_PLANE_IDS?.trim());
   if (
     lifecycle === 'worktree-shared' &&
@@ -182,6 +192,8 @@ async function main(): Promise<void> {
     fakeLlmUrl: process.env.FAKE_LLM_URL ?? DEFAULT_CONFIG.fakeLlmUrl,
     expectControlPlane,
     gitUrl: process.env.E2E_GIT_URL ?? DEFAULT_CONFIG.gitUrl,
+    ...(process.env.E2E_GITHUB_REPO ? { githubRepo: process.env.E2E_GITHUB_REPO } : {}),
+    ...(process.env.E2E_BRANCH ? { branch: process.env.E2E_BRANCH } : {}),
     model: process.env.E2E_MODEL ?? DEFAULT_CONFIG.model,
   };
 

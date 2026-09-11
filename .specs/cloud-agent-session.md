@@ -69,15 +69,19 @@ repository.
    commands.
 3. Preparation that only acquired and booted an environment -- warm reuse, no
    real provisioning -- MUST NOT leave a completed preparation row.
-4. Running and failed preparation MUST always be visible. Failed preparation
-   MUST show an error and a way to open details.
+4. Running and failed preparation MUST always be visible. Failed preparation,
+   its triggering failed message, and its safe error MUST remain visible, with
+   a way to open details.
 5. Setup commands MUST run on the first prepare and again on every rebuild. A
    failing or timed-out setup command MUST fail preparation and the turn.
 6. Follow-up turns MUST NOT show preparation unless the environment was
    rebuilt.
 7. Preparation output MUST NOT reveal tokens or secret values.
-8. The composer MUST stay disabled until the environment is ready, and MUST say
-   which state it is waiting on.
+8. The composer MUST stay disabled while preparation or finalization runs, and
+   MUST say which state it is waiting on. After preparation failure settles the
+   turn, the composer MUST be restored when the session is writable and its
+   transport permits sending. A later submission MUST use fresh message and
+   preparation-attempt identities.
 
 ### Turn
 

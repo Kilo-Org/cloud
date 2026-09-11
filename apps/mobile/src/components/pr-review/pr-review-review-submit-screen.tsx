@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { CenteredState } from '@/components/centered-state';
 
@@ -28,7 +28,7 @@ export function PrReviewReviewSubmitScreen() {
   const repo = parseParam(params.repo) ?? '';
   const rawNumber = parseParam(params.number) ?? '';
   const number = Number.parseInt(rawNumber, 10);
-  const title = t('prReview.submit.title');
+  const title = t('prReview.submit.submitReview');
   const eyebrow = `${owner}/${repo}#${rawNumber}`;
   const dismiss = () => {
     router.back();

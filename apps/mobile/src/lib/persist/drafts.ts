@@ -98,6 +98,11 @@ export function prReplyDraftKey(
   return `pr-reply:${owner}/${repo}#${number}:${commentId}`;
 }
 
+/** Regular PR conversation (issue) comment draft entity key, unique per pull request. */
+export function prConversationCommentDraftKey(owner: string, repo: string, number: number): string {
+  return `pr-conversation-comment:${owner}/${repo}#${number}`;
+}
+
 /** Inline review-comment draft entity key, unique per diff position. */
 // eslint-disable-next-line eslint/max-params -- the key encodes the full diff position
 export function prCommentDraftKey(
@@ -165,6 +170,12 @@ export function securityDismissDraftKey(scope: string, findingId: string): strin
  * intent); an empty or absent prefill falls back to the stored draft. The
  * caller resolves both before mounting the input, so a draft never renders
  * first and gets replaced by a late prefill.
+ *
+ * A value with no visible content never seeds the input: the uncontrolled
+ * prompt hides its placeholder for any non-empty `defaultValue`, so seeding
+ * it with whitespace would show a blank field with no placeholder (b911
+ * spot check p7-nav.png — a whitespace-only draft restored after the
+ * consent sign-out/sign-in round-trip).
  */
 export function resolvePrefillOverDraft(
   prefillText: string | null | undefined,
@@ -173,7 +184,10 @@ export function resolvePrefillOverDraft(
   if (prefillText !== undefined && prefillText !== null && prefillText.trim().length > 0) {
     return prefillText;
   }
-  return draftText ?? undefined;
+  if (draftText === undefined || draftText === null || draftText.trim().length === 0) {
+    return undefined;
+  }
+  return draftText;
 }
 
 /** The epoch-fenced write payload for one draft write. */

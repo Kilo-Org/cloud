@@ -81,6 +81,7 @@ export const PR_INTENTS = [
   'submit_review',
   'create_review_comment',
   'reply_comment',
+  'add_pr_comment',
 ] as const;
 export const SECURITY_INTENTS = [
   'manual_sync',

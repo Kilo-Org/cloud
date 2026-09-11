@@ -189,6 +189,10 @@ patchedDependencies:
   # includeEnded instance reads, factory-registered push-to-start URL.
   expo-router@57.0.20: patches/expo-router@57.0.20.patch
   expo-server-sdk: patches/expo-server-sdk.patch
+  # Null-guard the headless app loader in TaskService.executeTask. Without it a
+  # data-only FCM wake during cold start dereferences a null loader and fatally
+  # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).
+  expo-task-manager@57.0.16: patches/expo-task-manager@57.0.16.patch
   expo-widgets@57.0.18: patches/expo-widgets@57.0.18.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
 publicHoistPattern:

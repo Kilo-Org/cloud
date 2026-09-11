@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Распазнаванне маўлення праз Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Пераўтварайце галасавы ўвод у тэкст з дапамогай мадэлі Kilo Gateway замест распазнавання маўлення на самой прыладзе. Ваш запіс адпраўляецца ў Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Запыт на зліццё недаступны",
@@ -2610,7 +2613,13 @@
     "languageNotInstalledMessage": "Афлайн-файлы маўлення для {{language}} не ўсталяваны на гэтым тэлефоне. Спампуйце іх, а затым паспрабуйце галасавы ўвод яшчэ раз.",
     "downloadOfflineModel": "Спампаваць",
     "offlineModelDownloadScheduled": "Афлайн-файлы маўлення будуць спампаваны ў фонавым рэжыме. Паспрабуйце галасавы ўвод пазней.",
-    "listeningStopped": "Праслухоўванне спынена."
+    "listeningStopped": "Праслухоўванне спынена.",
+    "transcribing": "Распазнаванне маўлення…",
+    "gatewayUnreachable": "Не атрымалася падключыцца да Kilo Gateway. Праверце падключэнне і паспрабуйце яшчэ раз.",
+    "gatewayTimeout": "Распазнаванне маўлення занадта доўга доўжылася. Паспрабуйце яшчэ раз.",
+    "gatewayModelUnavailable": "Гэта мадэль распазнавання маўлення недаступная. Абярыце іншую ў наладах.",
+    "gatewaySignInRequired": "Увайдзіце, каб карыстацца распазнаваннем маўлення праз Kilo Gateway.",
+    "gatewayNoModel": "Спачатку абярыце мадэль распазнавання маўлення ў наладах."
   },
   "share": {
     "title": "Адпраўка ў Kilo",
@@ -2994,5 +3003,12 @@
     "needsInput": "Чакае адказу",
     "channelName": "Актыўныя агенты",
     "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі."
+  },
+  "transcriptionModel": {
+    "title": "Мадэль распазнавання маўлення",
+    "noneChosen": "Не выбрана",
+    "emptyTitle": "Няма мадэляў распазнавання маўлення",
+    "emptyDescription": "Зараз Kilo Gateway не прапануе мадэляў распазнавання маўлення.",
+    "loadFailed": "Не атрымалася загрузіць мадэлі распазнавання маўлення."
   }
 }

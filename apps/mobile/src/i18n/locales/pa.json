@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway ਰਾਹੀਂ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣਾ",
+    "gatewayTranscriptionSubtitle": "ਡਿਵਾਈਸ ਦੀ ਸਪੀਚ ਰੈਕਗਨੀਸ਼ਨ ਦੀ ਥਾਂ Kilo Gateway ਮਾਡਲ ਨਾਲ ਵੌਇਸ ਇਨਪੁਟ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲੋ। ਤੁਹਾਡੀ ਰਿਕਾਰਡਿੰਗ Kilo Gateway ਨੂੰ ਭੇਜੀ ਜਾਂਦੀ ਹੈ।",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
@@ -2568,7 +2571,13 @@
     "languageNotInstalledMessage": "{{language}} ਦੀਆਂ ਆਫ਼ਲਾਈਨ ਸਪੀਚ ਫ਼ਾਈਲਾਂ ਇਸ ਫ਼ੋਨ 'ਤੇ ਇੰਸਟਾਲ ਨਹੀਂ ਹਨ। ਉਨ੍ਹਾਂ ਨੂੰ ਡਾਊਨਲੋਡ ਕਰੋ, ਫਿਰ ਵੌਇਸ ਇਨਪੁਟ ਦੁਬਾਰਾ ਵਰਤੋ।",
     "downloadOfflineModel": "ਡਾਊਨਲੋਡ",
     "offlineModelDownloadScheduled": "ਆਫ਼ਲਾਈਨ ਸਪੀਚ ਫ਼ਾਈਲਾਂ ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ ਡਾਊਨਲੋਡ ਹੋਣਗੀਆਂ। ਬਾਅਦ ਵਿੱਚ ਵੌਇਸ ਇਨਪੁਟ ਦੁਬਾਰਾ ਵਰਤੋ।",
-    "listeningStopped": "ਸੁਣਨਾ ਰੁਕ ਗਿਆ।"
+    "listeningStopped": "ਸੁਣਨਾ ਰੁਕ ਗਿਆ।",
+    "transcribing": "ਲਿਖਤ ਵਿੱਚ ਬਦਲਿਆ ਜਾ ਰਿਹਾ ਹੈ...",
+    "gatewayUnreachable": "Kilo Gateway ਨਾਲ ਸੰਪਰਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਚੈੱਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "gatewayTimeout": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਿੱਚ ਬਹੁਤ ਸਮਾਂ ਲੱਗਾ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "gatewayModelUnavailable": "ਇਹ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਤਰਜੀਹਾਂ ਵਿੱਚ ਕੋਈ ਹੋਰ ਚੁਣੋ।",
+    "gatewaySignInRequired": "Kilo Gateway ਬਦਲੀ ਵਰਤਣ ਲਈ ਸਾਈਨ ਇਨ ਕਰੋ।",
+    "gatewayNoModel": "ਪਹਿਲਾਂ ਤਰਜੀਹਾਂ ਵਿੱਚ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਚੁਣੋ।"
   },
   "share": {
     "title": "Kilo ਵਿੱਚ ਸਾਂਝਾ ਕਰਨਾ",
@@ -2950,5 +2959,12 @@
     "needsInput": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
     "channelName": "ਸਰਗਰਮ ਏਜੰਟ",
     "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।"
+  },
+  "transcriptionModel": {
+    "title": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਦਾ ਮਾਡਲ",
+    "noneChosen": "ਕੋਈ ਨਹੀਂ ਚੁਣਿਆ",
+    "emptyTitle": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਲਈ ਕੋਈ ਮਾਡਲ ਨਹੀਂ",
+    "emptyDescription": "Kilo Gateway ਹੁਣ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਲਈ ਕੋਈ ਮਾਡਲ ਨਹੀਂ ਦੇ ਰਿਹਾ।",
+    "loadFailed": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲੇ ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।"
   }
 }

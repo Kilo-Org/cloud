@@ -38,6 +38,10 @@ export const HIDE_BALANCE_KEY = 'hide-balance';
 export const LIVE_ACTIVITY_KEY = 'live-activity-enabled';
 /** Return key in the agent composer sends/start instead of inserting a newline. */
 export const RETURN_SENDS_MESSAGE_KEY = 'return-sends-message';
+/** Master switch for gateway transcription of voice input (off = device speech recognition). */
+export const GATEWAY_TRANSCRIPTION_ENABLED_KEY = 'gateway-transcription-enabled';
+/** Persisted `{ id, name }` of the chosen gateway transcription model (null = none chosen). */
+export const GATEWAY_TRANSCRIPTION_MODEL_KEY = 'gateway-transcription-model';
 /** Revocable per-host list of markdown link hosts that open without an Alert. */
 export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';

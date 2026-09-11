@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkripcija, izmantojot Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkribē balss ievadi, izmantojot Kilo Gateway modeli, nevis ierīces runas atpazīšanu. Ieraksts tiek nosūtīts uz Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Izmaiņu pieprasījums nav pieejams",
@@ -2589,7 +2592,13 @@
     "languageNotInstalledMessage": "{{language}} valodas bezsauses runas faili šajā tālrunī nav instalēti. Lejupielādē tos un pēc tam mēģini balss ievadi vēlreiz.",
     "downloadOfflineModel": "Lejupielādēt",
     "offlineModelDownloadScheduled": "Bezsauses runas faili tiks lejupielādēti fonā. Vēlāk mēģini balss ievadi vēlreiz.",
-    "listeningStopped": "Klausīšanās apturēta."
+    "listeningStopped": "Klausīšanās apturēta.",
+    "transcribing": "Transkribē…",
+    "gatewayUnreachable": "Neizdevās sasniegt Kilo Gateway. Pārbaudi savienojumu un mēģini vēlreiz.",
+    "gatewayTimeout": "Transkripcija aizņēma par daudz laika. Mēģini vēlreiz.",
+    "gatewayModelUnavailable": "Šis transkripcijas modelis nav pieejams. Izvēlies citu Lietotāja iestatījumos.",
+    "gatewaySignInRequired": "Pieraksties, lai izmantotu transkripciju, izmantojot Kilo Gateway.",
+    "gatewayNoModel": "Vispirms izvēlies transkripcijas modeli Lietotāja iestatījumos."
   },
   "share": {
     "title": "Kopīgošana lietotnē Kilo",
@@ -2972,5 +2981,12 @@
     "needsInput": "Gaida ievadi",
     "channelName": "Aktīvie aģenti",
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus."
+  },
+  "transcriptionModel": {
+    "title": "Transkripcijas modelis",
+    "noneChosen": "Nav izvēlēts",
+    "emptyTitle": "Nav transkripcijas modeļu",
+    "emptyDescription": "Pašlaik Kilo Gateway nepiedāvā nevienu transkripcijas modeli.",
+    "loadFailed": "Neizdevās ielādēt transkripcijas modeļus."
   }
 }

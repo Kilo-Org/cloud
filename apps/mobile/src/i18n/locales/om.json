@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Sagalee interneetiin barreeffamatti jijjiiruu Kilo Gateway'n",
+    "gatewayTranscriptionSubtitle": "Sagalee galchuu mallattoo sagalee meeshaa irraa haa ta'u moodeela Kilo Gateway'ttiin barreeffamatti jijjiiri. Sagaleen kee Kilo Gateway'tti ergama.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Gaaffiin walitti makuu hin argamu",
@@ -2568,7 +2571,13 @@
     "languageNotInstalledMessage": "Faayiloota sagalee offlaayinii afaan {{language}} tiif bilbilaa kana irratti hin dhaabbatamin. Isaan buufadhu, ergasii sagaleen galchuu irra deebi'ii yaali.",
     "downloadOfflineModel": "Buufadhu",
     "offlineModelDownloadScheduled": "Faayiloota sagalee offlaayinii duubatti buufamu. Sagaleen galchuu booda irra deebi'ii yaali.",
-    "listeningStopped": "Dhaggeeffachuun dhaabbateera."
+    "listeningStopped": "Dhaggeeffachuun dhaabbateera.",
+    "transcribing": "Barreeffamatti jijjiiraa jira...",
+    "gatewayUnreachable": "Kilo Gateway'tti quhamuun hin danda'amne. Walqabannaa kee ilaaliitii deebi'ii yaali.",
+    "gatewayTimeout": "Sagalee barreeffamatti jijjiiruun yeroo dheeraa fudhate. Irra deebi'ii yaali.",
+    "gatewayModelUnavailable": "Moodeeli sagalee jijjiiru kun hin jiru. Filannoowwan keessaa kan biroo filadhu.",
+    "gatewaySignInRequired": "Jijjiirraa sagalee Kilo Gateway'tti fayyadamuuf seeni.",
+    "gatewayNoModel": "Dursee Filannoowwan keessatti moodeela sagalee jijjiiru filadhu."
   },
   "share": {
     "title": "Gara Kilo qoodi",
@@ -2950,5 +2959,12 @@
     "needsInput": "Deebii barbaada",
     "channelName": "Eejentoota hojii irra jiran",
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi."
+  },
+  "transcriptionModel": {
+    "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",
+    "noneChosen": "Homni hin filatamne",
+    "emptyTitle": "Moodeeli sagalee jijjiiru hin jiru",
+    "emptyDescription": "Kilo Gateway amma moodeela sagalee gara barreeffamaatti jijjiiru hin dhiyeessu.",
+    "loadFailed": "Moodeelota sagalee jijjiiru fe'uun hin danda'amne."
   }
 }

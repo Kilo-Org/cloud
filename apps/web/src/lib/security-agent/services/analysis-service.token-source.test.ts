@@ -189,8 +189,7 @@ describe('startSecurityAnalysis token source', () => {
         .select()
         .from(kilocode_users)
         .where(eq(kilocode_users.id, user.id));
-      expect(persisted.api_token_pepper).toEqual(expect.any(String));
-      if (api_token_pepper !== null) expect(persisted.api_token_pepper).toBe(api_token_pepper);
+      expect(persisted.api_token_pepper).toBe(api_token_pepper);
       const triageInput = mockTriageSecurityFinding.mock.calls[0]?.[0];
       const cloudAgentToken = mockCreateCloudAgentNextClient.mock.calls[0]?.[0];
       if (!triageInput) throw new Error('Expected triage to receive an input');

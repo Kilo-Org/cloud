@@ -33,9 +33,13 @@ const storedModel = vi.hoisted(() => ({
 const writeTranscriptionModel = vi.hoisted(() =>
   vi.fn<(model: { id: string; name: string } | null) => void>()
 );
+const modelLoad = vi.hoisted(() => ({
+  whenLoaded: vi.fn(async (): Promise<void> => undefined),
+}));
 vi.mock('./gateway-transcription-preference', () => ({
   readGatewayTranscriptionModel: vi.fn(() => storedModel.current),
   writeGatewayTranscriptionModel: writeTranscriptionModel,
+  whenGatewayTranscriptionModelLoaded: modelLoad.whenLoaded,
 }));
 const transcriptionModels = vi.hoisted(() => ({
   fetchTranscriptionModels: vi.fn(async (): Promise<{ id: string; name: string }[]> => []),
@@ -131,6 +135,19 @@ async function flush(): Promise<void> {
   }
 }
 
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let storedResolve: (() => void) | undefined = undefined;
+  const promise = new Promise<void>(resolve => {
+    storedResolve = resolve;
+  });
+  return {
+    promise,
+    resolve: () => {
+      storedResolve?.();
+    },
+  };
+}
+
 describe('gatewayVoiceInputNative recorder construction', () => {
   beforeEach(() => {
     recorderBox.calls.length = 0;
@@ -204,6 +221,8 @@ describe('resolveGatewayTranscriptionModelId', () => {
     storedModel.current = null;
     transcriptionModels.fetchTranscriptionModels.mockReset();
     writeTranscriptionModel.mockReset();
+    modelLoad.whenLoaded.mockReset();
+    modelLoad.whenLoaded.mockImplementation(async () => undefined);
     vi.mocked(SecureStore.getItemAsync).mockResolvedValue(null);
   });
 
@@ -254,6 +273,26 @@ describe('resolveGatewayTranscriptionModelId', () => {
 
     await resolveGatewayTranscriptionModelId();
 
+    expect(writeTranscriptionModel).not.toHaveBeenCalled();
+  });
+
+  it('awaits the stored-model read before falling back, so a cold start cannot overwrite an existing choice', async () => {
+    const load = deferred();
+    modelLoad.whenLoaded.mockReturnValueOnce(load.promise);
+    transcriptionModels.fetchTranscriptionModels.mockResolvedValue([
+      { id: 'first-model', name: 'First Model' },
+    ]);
+    storedModel.current = null;
+
+    const pending = resolveGatewayTranscriptionModelId();
+
+    // The disk read lands with the user's existing choice, then the store load
+    // settles. The resolver must keep that choice, not persist the fallback.
+    storedModel.current = { id: 'stored-model', name: 'Stored Model' };
+    load.resolve();
+
+    await expect(pending).resolves.toEqual({ id: 'stored-model', name: 'Stored Model' });
+    expect(transcriptionModels.fetchTranscriptionModels).not.toHaveBeenCalled();
     expect(writeTranscriptionModel).not.toHaveBeenCalled();
   });
 

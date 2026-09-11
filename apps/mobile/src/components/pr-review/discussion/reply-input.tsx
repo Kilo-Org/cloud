@@ -15,13 +15,17 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearDraft, prReplyDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
-import { isPrOperationPersistenceFailed } from '@/lib/pr-review/merge/pr-operation-ledger';
+import {
+  isPrOperationAmbiguous,
+  isPrOperationPersistenceFailed,
+} from '@/lib/pr-review/merge/pr-operation-ledger';
 import { trpcClient } from '@/lib/trpc';
 
 /**
@@ -139,9 +143,22 @@ type ReplyInputProps = {
   readonly number: number;
   readonly commentId: number;
   readonly reply: ReturnType<typeof useReplyToCommentMutation>;
+  /**
+   * Invoked when the reply field gains focus. The discussion tab uses it to
+   * scroll the focused thread row above the keyboard-lifted bottom CTA bar
+   * (see useReplyFocusScroll); optional because not every host scrolls.
+   */
+  readonly onInputFocus?: () => void;
 };
 
-export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<ReplyInputProps>) {
+export function ReplyInput({
+  owner,
+  repo,
+  number,
+  commentId,
+  reply,
+  onInputFocus,
+}: Readonly<ReplyInputProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const bodyRef = useRef<string>('');
@@ -184,6 +201,13 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
         return;
       }
       const classification = classifyPrReviewMutationError(reply.error);
+      if (isPrOperationAmbiguous(reply.error)) {
+        // The effect may have committed: tell the user to verify the PR
+        // instead of showing the generic retryable copy. Retry stays enabled.
+        setInlineError(i18n.t('prReview.operation.ambiguous'));
+        setInlineErrorKind('retryable');
+        return;
+      }
       if (classification.kind === 'terms-required') {
         void (async () => {
           const outcome = await ensureTermsAcceptedOutcome();
@@ -211,11 +235,11 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
         setInlineError(t('prReview.connectionExpired'));
         setInlineErrorKind('reconnect');
       } else {
-        const message =
-          reply.error instanceof Error
-            ? reply.error.message
-            : t('prReview.operation.couldNotReply');
-        setInlineError(message);
+        // A generic/transient failure shows the specified retryable copy,
+        // never the raw provider error (uxs3 spot check, e6-offline-banner:
+        // the same leak as the composer). The draft stays intact and the
+        // Reply button stays enabled for the retry.
+        setInlineError(t('prReview.operation.couldNotReply'));
         setInlineErrorKind('retryable');
       }
     }
@@ -228,6 +252,15 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
     }
     setInlineError(null);
     setInlineErrorKind(null);
+    // Confirmed offline: fail the submit at once with the retryable copy
+    // instead of starting a request that hangs on the UI deadline behind a
+    // spinner (uxs3 spot check, e6-offline-hang). The draft stays intact,
+    // nothing is pending, and the same tap retries once the banner clears.
+    if (getCommittedConnectivityStatus() === 'offline') {
+      setInlineError(t('prReview.operation.couldNotReply'));
+      setInlineErrorKind('retryable');
+      return;
+    }
     const outcome = await ensureTermsAcceptedOutcome();
     if (outcome.kind === 'outdated') {
       setInlineError(t('prReview.discussion.termsOutdatedCopy'));
@@ -262,6 +295,7 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
           placeholder={t('prReview.discussion.replyPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           accessibilityLabel={t('prReview.discussion.replyBody')}
+          onFocus={onInputFocus}
           onChangeText={value => {
             bodyRef.current = value;
             if (userId) {

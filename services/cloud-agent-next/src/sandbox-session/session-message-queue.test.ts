@@ -1,3 +1,10 @@
+import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
+import {
+  verifyRuntimeProxyAttestation,
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
+import { assertKiloModelAvailable } from '../model-validation.js';
+import jwt from 'jsonwebtoken';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { normalizeCliEvent } from '../../../../packages/cloud-agent-sdk/src/normalizer';
 import { createServiceState } from '../../../../packages/cloud-agent-sdk/src/service-state';
@@ -11,6 +18,7 @@ import { createMemoryEventQueries, readStep } from '../session/preparation-test-
 import { getPreparationSnapshots, readPreparationAttempt } from '../session/preparation-history.js';
 import type { Env } from '../types.js';
 import type { UserId } from '../types/ids.js';
+import type { CallbackJob } from '../callbacks/types.js';
 import type { sandboxControlRpc } from './control-rpc.js';
 import type { SandboxControlOutboundRequest } from '../sandbox-control/socket.js';
 import {
@@ -31,6 +39,8 @@ import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import { logger } from '../logger.js';
 import { SESSION_DELIVERY_TIMEOUT_MS } from './control-dispatch.js';
+import { RUNTIME_AUTHORIZATION_KEY } from '../session/runtime-authorization-persistence.js';
+import { PENDING_SESSION_MESSAGE_LIMIT } from '../session/pending-messages.js';
 import { createControlStopRequest } from '../shared/control-plane-session.js';
 import type {
   AcceptedCommandTurn,
@@ -679,6 +689,27 @@ describe('failQueuedMessage', () => {
     expect(failQueuedMessage([msg('a', 'completed')], 'a')).toBeUndefined();
     expect(failQueuedMessage([msg('a', 'accepted')], 'a')).toBeUndefined();
   });
+
+  it('retains a bounded terminal detail for public projections', () => {
+    const failed = failQueuedMessage(
+      [msg('a', 'queued')],
+      'a',
+      'attach_exhausted',
+      'Repository checkout failed: output: requested review ref was not found'
+    );
+    expect(failed?.[0]).toMatchObject({
+      state: 'failed',
+      failedReason: 'attach_exhausted',
+      failedDetail: 'Repository checkout failed: output: requested review ref was not found',
+    });
+    expect(streamQueuedSnapshots(failed ?? [], 20)).toMatchObject([
+      {
+        terminalFailure: {
+          error: 'Repository checkout failed: output: requested review ref was not found',
+        },
+      },
+    ]);
+  });
 });
 
 describe('acceptQueuedMessage', () => {
@@ -1078,10 +1109,15 @@ function controlFailure(retryable: boolean, code = 'not_ready'): ResponseFrame {
   };
 }
 
-function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?: Control) {
+function sessionFixture(
+  overrides: Partial<SessionMetadata> = {},
+  sharedControl?: Control,
+  callbackQueue?: Pick<Queue<CallbackJob>, 'send'>
+) {
   const values = new Map<string, unknown>();
   let alarmAt: number | null = null;
   const errors: unknown[] = [];
+  const background: Promise<unknown>[] = [];
   const kv: SyncKvStorage = {
     get: <T>(key: string): T | undefined => structuredClone(values.get(key)) as T | undefined,
     put: <T>(key: string, value: T) => {
@@ -1134,6 +1170,7 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
     blockConcurrencyWhile: async (callback: () => Promise<void>) => callback(),
     getWebSockets: () => [],
     waitUntil: (promise: Promise<unknown>) => {
+      background.push(promise);
       void promise.catch(error => {
         errors.push(error);
       });
@@ -1157,6 +1194,13 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
   });
   const control = {
     getStatus: vi.fn(async (): Promise<ControlStatus> => ({ ...status })),
+    getRuntimeCredentialProxyFence: vi.fn(async () => ({
+      plane: 'control' as const,
+      allocationId: 'allocation_1',
+      providerInstanceId: 'provider_1',
+      connectionId: 'connection_1',
+      wrapperInstanceId: RUNTIME_ID,
+    })),
     ensureReady: vi.fn(
       async (_input: Parameters<Control['ensureReady']>[0]): Promise<ControlStatus> => ({
         ...status,
@@ -1164,6 +1208,7 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
       })
     ),
     attachSession: vi.fn(async () => ({})),
+    bindRuntimeCredentialProxyHandle: vi.fn(async () => ({ bound: true as const })),
     detachSession: vi.fn(async () => ({ existed: true })),
     quarantineRuntime: vi.fn(
       async (
@@ -1181,6 +1226,9 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
   } satisfies Control;
   const env = {
     SANDBOX_CONTROL: { getByName: () => sharedControl ?? control },
+    WORKER_URL: 'https://worker.example.test',
+    NEXTAUTH_SECRET: 'test-secret',
+    CALLBACK_QUEUE: callbackQueue,
     CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
     CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org_1',
     CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: 'user_1',
@@ -1191,6 +1239,8 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
       return session;
     },
     control,
+    env,
+    settleBackground: () => Promise.all(background),
     metadata,
     storage,
     values,
@@ -1270,6 +1320,38 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
   };
 }
 
+function installModernRuntimeAuthorization(fixture: ReturnType<typeof sessionFixture>) {
+  const authorizationId = '44444444-4444-4444-8444-444444444444';
+  const token = jwt.sign(
+    {
+      runtimeAuthorization: { id: authorizationId },
+      exp: Math.floor(Date.now() / 1000) + 60 * 60,
+    },
+    'test-secret'
+  );
+  fixture.storage.kv.put(
+    'session_metadata',
+    serializeSessionMetadata({
+      ...fixture.metadata,
+      auth: { ...fixture.metadata.auth, kilocodeToken: token },
+    })
+  );
+  fixture.storage.kv.put(RUNTIME_AUTHORIZATION_KEY, {
+    version: 1,
+    id: authorizationId,
+    resourceKind: 'cloud-agent-next',
+    resourceId: SESSION_ID,
+    userId: 'user_1',
+    authorizationUserId: 'user_1',
+    issuedAt: '2026-01-01T00:00:00.000Z',
+    delegationExpiresAt: '2026-01-02T00:00:00.000Z',
+    state: 'active',
+    bindings: { userPepperDigest: 'a'.repeat(64), authorizationPepperDigest: 'b'.repeat(64) },
+    source: { admissionSource: 'user' },
+  });
+  return token;
+}
+
 function delegateRequest(
   fixture: ReturnType<typeof sessionFixture>,
   operation: SandboxControlOutboundRequest['operation'],
@@ -1290,6 +1372,106 @@ describe('SandboxSession orchestration', () => {
   });
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('persists and sends a terminal callback after a completed outcome', async () => {
+    const send = vi.fn(async (_job: CallbackJob) => ({}) as QueueSendResponse);
+    const fixture = sessionFixture(
+      { callback: { target: { url: 'https://example.com/callback' } } },
+      undefined,
+      { send }
+    );
+
+    await fixture.admit('callback_message');
+    await fixture.flush();
+    await fixture.outcome('callback_message', 'completed');
+    await fixture.flush();
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: { url: 'https://example.com/callback' },
+        payload: expect.objectContaining({
+          sessionId: SESSION_ID,
+          cloudAgentSessionId: SESSION_ID,
+          messageId: 'callback_message',
+          status: 'completed',
+          idempotencyKey: 'callback_message',
+        }),
+      })
+    );
+    expect(fixture.alarmAt()).toBe(Date.now());
+  });
+
+  it('counts callback-bearing outstanding messages against admission capacity', async () => {
+    const fixture = sessionFixture({
+      callback: { target: { url: 'https://example.com/callback' } },
+    });
+    fixture.storage.kv.put(
+      'session_messages',
+      Array.from({ length: PENDING_SESSION_MESSAGE_LIMIT }, (_, index) => ({
+        messageId: `existing_${index}`,
+        state: index === 0 ? ('accepted' as const) : ('queued' as const),
+      }))
+    );
+
+    await expect(fixture.admit('overflow')).resolves.toMatchObject({
+      success: false,
+      code: 'PENDING_QUEUE_FULL',
+    });
+    expect(fixture.values.get('session_messages')).toHaveLength(PENDING_SESSION_MESSAGE_LIMIT);
+  });
+
+  it('arms callback repair after the outer operation-result transaction', async () => {
+    const send = vi.fn(async (_job: CallbackJob) => ({}) as QueueSendResponse);
+    const fixture = sessionFixture(
+      { callback: { target: { url: 'https://example.com/callback' } } },
+      undefined,
+      { send }
+    );
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('receipted_callback');
+    await fixture.flush();
+    const authorization = fixture.record('receipted_callback')?.operations?.prompt?.authorization;
+    if (!authorization) throw new Error('Missing prompt operation authorization');
+    const event = receiptedEvent(1, {
+      type: 'session.status',
+      properties: { sessionID: 'kilo_root', status: { type: 'busy' } },
+    });
+
+    await expect(fixture.session.receiveSandboxControlEvent(event)).resolves.toEqual({
+      applied: true,
+    });
+    await expect(
+      fixture.session.receiveSandboxOperationResult({
+        session: authorization.session,
+        wrapperInstanceId: RUNTIME_ID,
+        delivery: {
+          version: 2,
+          authorization,
+          completedAt: Date.now(),
+          result: { ok: true, result: { messageId: 'receipted_callback', status: 'accepted' } },
+          outcome: { messageId: 'receipted_callback', status: 'completed' },
+          events: [],
+          preparing: [],
+        },
+      })
+    ).resolves.toMatchObject({ disposition: 'applied' });
+    await fixture.flush();
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          messageId: 'receipted_callback',
+          status: 'completed',
+        }),
+      })
+    );
+    expect(fixture.alarmAt()).toBe(Date.now());
   });
 
   it('reports the named runtime gate with incoming, expected, and fence identities', async () => {
@@ -1708,6 +1890,119 @@ describe('SandboxSession orchestration', () => {
     await fixture.flush();
     expect(fixture.record('b')?.state).toBe('accepted');
     expect(fixture.record('b')?.deliveryDeadlineAt).toBe(Date.now() + SESSION_DELIVERY_TIMEOUT_MS);
+  });
+
+  it.each(['modern', 'legacy'] as const)(
+    'wires %s control events through the production bridge',
+    async mode => {
+      vi.setSystemTime(new Date('2026-01-01T12:00:00.000Z'));
+      const fixture = sessionFixture();
+      await fixture.admit('bridge');
+      await fixture.flush();
+      const requests: Request[] = [];
+      fixture.env.SESSION_INGEST = {
+        fetch: async (request: Request) => {
+          requests.push(request);
+          return Response.json({ success: true });
+        },
+      } as Env['SESSION_INGEST'];
+      let token = fixture.metadata.auth.kilocodeToken;
+      if (mode === 'modern') {
+        installModernRuntimeAuthorization(fixture);
+        const signed = await signModernKiloToken({
+          secret: 'test-secret',
+          userId: 'user_1',
+          pepper: null,
+          audience: ['kilo-api', 'kilo-gateway', 'session-ingest'],
+          tokenPurpose: 'delegated-workload',
+          credentialExchange: false,
+          expiresInSeconds: 3600,
+          extra: {
+            runtimeAuthorization: {
+              id: '44444444-4444-4444-8444-444444444444',
+              resourceKind: 'cloud-agent-next',
+              resourceId: SESSION_ID,
+            },
+          },
+        });
+        token = signed.token;
+        fixture.storage.kv.put(
+          'session_metadata',
+          serializeSessionMetadata({
+            ...fixture.metadata,
+            auth: { ...fixture.metadata.auth, kilocodeToken: token },
+          })
+        );
+      } else {
+        fixture.env.NEXTAUTH_SECRET = '';
+      }
+      await expect(
+        fixture.session.receiveSandboxControlEvent(
+          receiptedEvent(1, {
+            type: 'message.updated',
+            properties: { info: { id: 'msg_bridge', sessionID: 'kilo_root', role: 'user' } },
+          })
+        )
+      ).resolves.toEqual({ applied: true });
+      await fixture.flush();
+      await fixture.settleBackground();
+      expect(requests).toHaveLength(1);
+      expect(requests[0].headers.get('Authorization')).toBe(`Bearer ${token}`);
+      if (mode === 'modern') {
+        expect(
+          await verifyRuntimeProxyAttestation({
+            value: requests[0].headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+            secret: 'test-secret',
+            audience: 'session-ingest',
+            userId: 'user_1',
+            authorizationId: '44444444-4444-4444-8444-444444444444',
+            resourceId: SESSION_ID,
+            bearer: token ?? '',
+          })
+        ).toBe(true);
+      } else expect(requests[0].headers.has(RUNTIME_PROXY_ATTESTATION_HEADER)).toBe(false);
+    }
+  );
+
+  it('refreshes the modern followup model-validation credential and preserves the legacy path', async () => {
+    const fixture = sessionFixture();
+    const runtimeToken = vi
+      .spyOn(fixture.session, 'getRuntimeToken')
+      .mockResolvedValue('refreshed-token');
+    await fixture.admit('legacy-preflight');
+    expect(runtimeToken).not.toHaveBeenCalled();
+    installModernRuntimeAuthorization(fixture);
+    await fixture.admit('modern-preflight');
+    expect(runtimeToken).toHaveBeenCalled();
+    expect(assertKiloModelAvailable).toHaveBeenLastCalledWith(
+      expect.objectContaining({ originalToken: 'refreshed-token' })
+    );
+  });
+
+  it('maps modern credential infrastructure failure to retryable model-validation failure', async () => {
+    const fixture = sessionFixture();
+    installModernRuntimeAuthorization(fixture);
+    vi.spyOn(fixture.session, 'getRuntimeToken').mockRejectedValue(new Error('unavailable'));
+    await expect(fixture.admit('unavailable')).resolves.toMatchObject({
+      success: false,
+      code: 'MODEL_VALIDATION_UNAVAILABLE',
+    });
+    expect(fixture.record('unavailable')).toBeUndefined();
+  });
+
+  it('does not admit when recovery starts during model validation', async () => {
+    const fixture = sessionFixture();
+    vi.mocked(assertKiloModelAvailable).mockImplementationOnce(async () => {
+      fixture.storage.kv.put('runtime_authorization_recovery', {
+        expectedOldId: 'old',
+        recoveryId: 'new',
+      });
+    });
+    await expect(fixture.admit('recovering')).resolves.toMatchObject({
+      success: false,
+      code: 'COMPUTE_STOPPING',
+    });
+    expect(fixture.record('recovering')).toBeUndefined();
   });
 
   it('commits one canonical outcome with its receipt and replays it after a lost response', async () => {
@@ -3784,7 +4079,7 @@ describe('SandboxSession orchestration', () => {
         if (source === 'exception') first.reject(transient);
         else first.resolve(controlFailure(true));
         await fixture.flush();
-        if (operation === 'session.attach') {
+        if (operation === 'session.attach' && source === 'exception') {
           expect(fixture.record('a')?.state).toBe('queued');
           expect(fixture.record('a')?.attachFailures).toBeUndefined();
           expect(fixture.terminalEvents()).toHaveLength(0);
@@ -3863,7 +4158,12 @@ describe('SandboxSession orchestration', () => {
         );
       }
       await fixture.flush();
-      const expectedReason = operation === 'session.attach' ? 'environment_failed' : reason;
+      const expectedReason =
+        operation === 'session.attach'
+          ? failure === 'permanent response' || failure === 'unhealthy response'
+            ? 'attach_exhausted'
+            : 'environment_failed'
+          : reason;
       expect(fixture.record('a')).toMatchObject({ state: 'failed', failedReason: expectedReason });
       if (failure === 'permanent response') {
         expect(fixture.record('b')?.state).toBe('queued');
@@ -4094,18 +4394,18 @@ describe('SandboxSession orchestration', () => {
             sibling.reload();
             await sibling.fireAlarm();
           }
-          if (operation === 'session.attach' && retryable) {
-            expect(sibling.record('rejected')).toMatchObject({ state: 'queued' });
+          if (operation === 'session.attach') {
+            expect(sibling.record('rejected')).toMatchObject({
+              state: 'failed',
+              failedReason: 'attach_exhausted',
+            });
           } else {
             expect(sibling.record('rejected')).toMatchObject({
               state: 'failed',
-              failedReason:
-                operation === 'session.attach' ? 'environment_failed' : 'prompt_exhausted',
+              failedReason: 'prompt_exhausted',
             });
           }
-          expect(sibling.terminalEvents()).toHaveLength(
-            operation === 'session.attach' && retryable ? 0 : 1
-          );
+          expect(sibling.terminalEvents()).toHaveLength(1);
           expect(await sibling.session.isSandboxCleanupScheduled()).toBe(false);
           expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
           await writer.outcome('writer', 'completed');
@@ -4428,6 +4728,138 @@ describe('SandboxSession orchestration', () => {
       });
     }
   );
+
+  it.each(['revoked', 'deleted'] as const)(
+    'immediately denies runtime proxy issue and resolution after terminal lifecycle is %s despite pending or failed detach',
+    async lifecycle => {
+      const fixture = sessionFixture({
+        identity: {
+          sessionId: SESSION_ID,
+          userId: 'user_1',
+          orgId: 'org_1',
+          billingOrigin: 'cloud-agent-web',
+        },
+      });
+      installModernRuntimeAuthorization(fixture);
+      const handle = await fixture.session.issueRuntimeCredentialProxyGrant({
+        wrapperRunId: 'ignored',
+        wrapperGeneration: 0,
+        wrapperConnectionId: 'ignored',
+      });
+      expect(handle).toEqual(expect.any(String));
+
+      const detach = deferred<{ existed: boolean }>();
+      fixture.control.detachSession.mockImplementationOnce(() => detach.promise);
+      const blocked =
+        lifecycle === 'revoked'
+          ? fixture.session.closeOrgStreams('org_1')
+          : fixture.session.deleteSession();
+
+      await expect(
+        fixture.session.issueRuntimeCredentialProxyGrant({
+          wrapperRunId: 'ignored',
+          wrapperGeneration: 0,
+          wrapperConnectionId: 'ignored',
+        })
+      ).resolves.toBeNull();
+      await expect(fixture.session.resolveRuntimeCredentialProxyGrant(handle!)).resolves.toBeNull();
+
+      detach.reject(new Error('detach failed'));
+      await expect(blocked).rejects.toThrow('detach failed');
+      await expect(fixture.session.resolveRuntimeCredentialProxyGrant(handle!)).resolves.toBeNull();
+    }
+  );
+
+  it.each([false, true])(
+    'sends modern attach credentials through a fenced proxy grant with operation results %s',
+    async operationResults => {
+      const fixture = sessionFixture();
+      const backingToken = installModernRuntimeAuthorization(fixture);
+
+      const nativeRuntimeId = '44444444-4444-4444-8444-444444444444';
+      fixture.setStatus({
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: RUNTIME_ID,
+        ...(operationResults ? { operationResults: true as const } : {}),
+      });
+      delegateRequest(fixture, 'session.attach', async () =>
+        controlResponse({ attached: true, nativeRuntimeId })
+      );
+
+      await fixture.admit('modern-proxy');
+      await fixture.flush();
+
+      const attach = fixture.control.request.mock.calls.find(
+        ([input]) => input.operation === 'session.attach'
+      )?.[0];
+      expect(attach).toMatchObject({
+        expectedConnection: {
+          providerInstanceId: 'provider_1',
+          connectionId: 'connection_1',
+          wrapperInstanceId: RUNTIME_ID,
+        },
+        payload: {
+          kilo: {
+            scopeId: SESSION_ID,
+            token: expect.stringMatching(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/),
+            targets: {
+              backendBaseUrl: 'https://worker.example.test',
+              providerBaseUrl: 'https://worker.example.test',
+              sessionIngestBaseUrl: 'https://worker.example.test',
+            },
+          },
+        },
+      });
+      if (operationResults) {
+        expect(fixture.values.get('native_runtime_fence')).toMatchObject({
+          sandboxId: SANDBOX_ID,
+          wrapperInstanceId: RUNTIME_ID,
+          nativeRuntimeId,
+          authorization: attach?.authorization,
+        });
+      }
+      const serialized = JSON.stringify(attach?.payload);
+      expect(serialized).not.toContain(KILO_CREDENTIAL);
+      expect(serialized).not.toContain(backingToken);
+      expect(serialized).not.toContain('test-secret');
+    }
+  );
+  it('fences admissions and snapshots callbacks before deletion waits on an interrupt', async () => {
+    const send = vi.fn(async (_job: CallbackJob) => ({}) as QueueSendResponse);
+    const fixture = sessionFixture(
+      { callback: { target: { url: 'https://example.com/callback' } } },
+      undefined,
+      { send }
+    );
+    const abort = deferred<ResponseFrame>();
+    delegateRequest(fixture, 'session.abort', () => abort.promise);
+
+    await fixture.admit('a');
+    await fixture.flush();
+    expect(fixture.record('a')?.state).toBe('accepted');
+
+    const deletion = fixture.session.deleteSession();
+    expect(fixture.control.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'session.abort',
+        payload: { messageId: 'a' },
+      })
+    );
+    await expect(fixture.admit('b')).resolves.toMatchObject({
+      success: false,
+      code: 'NOT_FOUND',
+    });
+
+    abort.resolve(controlResponse({ status: 'aborted' }));
+    await deletion;
+    await fixture.flush();
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ messageId: 'a', status: 'interrupted' }),
+      })
+    );
+  });
 
   it.each(['completed', 'failed', 'cancelled'] as const)(
     'settles an early %s outcome once without resurrecting work on acknowledgement',
@@ -5659,6 +6091,22 @@ describe('SandboxSession orchestration', () => {
       expect.objectContaining({ stream_event_type: 'preparing' })
     );
     expect(await fixture.snapshot()).toMatchObject({ preparationSnapshots: coldPreparation });
+  });
+
+  it('keeps a persisted modern attachment isolated after the rollout flag is disabled', async () => {
+    const fixture = sessionFixture();
+    installModernRuntimeAuthorization(fixture);
+    fixture.env.RUNTIME_ISOLATION_ENABLED = 'false';
+
+    await fixture.admit('modern');
+    await fixture.flush();
+
+    expect(fixture.control.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'session.attach',
+        payload: expect.objectContaining({ runtimeIsolation: 'per-session' }),
+      })
+    );
   });
 
   it.each(['cloudflare', 'vercel'] as const)(

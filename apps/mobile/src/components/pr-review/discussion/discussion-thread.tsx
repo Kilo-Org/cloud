@@ -68,6 +68,8 @@ type DiscussionThreadProps = {
   readonly onToggleExpand: () => void;
   /** The viewer's GitHub login, passed to comment rows for self-target gating. */
   readonly viewerLogin?: string | null;
+  /** Invoked when the inline reply field gains focus (see useReplyFocusScroll). */
+  readonly onReplyFocus?: () => void;
 };
 
 export function DiscussionThread({
@@ -78,6 +80,7 @@ export function DiscussionThread({
   expanded,
   onToggleExpand,
   viewerLogin = null,
+  onReplyFocus,
 }: Readonly<DiscussionThreadProps>) {
   const resolve = useResolveThreadMutation();
   const unresolve = useUnresolveThreadMutation();
@@ -164,6 +167,7 @@ export function DiscussionThread({
             number={number}
             commentId={firstComment.commentId}
             reply={reply}
+            onInputFocus={onReplyFocus}
           />
         ) : null}
       </View>

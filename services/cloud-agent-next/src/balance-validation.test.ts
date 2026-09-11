@@ -1,3 +1,5 @@
+import jwt from 'jsonwebtoken';
+import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   validateBalanceOnly,
@@ -47,6 +49,68 @@ describe('balance-validation', () => {
   });
 
   describe('validateBalanceOnly', () => {
+    it('fails closed if bearer classification throws', async () => {
+      const decode = vi.spyOn(jwt, 'decode').mockImplementationOnce(() => {
+        throw new Error('Malformed token');
+      });
+      try {
+        await expect(validateBalanceOnly('malformed', undefined, mockEnv)).resolves.toEqual({
+          success: false,
+          status: 500,
+          message: 'Failed to verify balance',
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+      } finally {
+        decode.mockRestore();
+      }
+    });
+
+    it.each(['human-api', 'device-access'])(
+      'checks balance with a %s control token without forwarding it to the API audience',
+      async tokenPurpose => {
+        const token = jwt.sign(
+          {
+            version: 3,
+            kiloUserId: 'user_123',
+            apiTokenPepper: 'current-pepper',
+            env: 'test',
+            aud: 'cloud-agent-next',
+            tokenPurpose,
+            credentialExchange: false,
+            ...(tokenPurpose === 'device-access' ? { deviceSessionId: 'device_123' } : {}),
+          },
+          'test-secret',
+          { expiresIn: 60 }
+        );
+        fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+          const headers = new Headers(init.headers);
+          const bearer = headers.get('Authorization')?.slice('Bearer '.length) ?? '';
+          try {
+            await verifyKiloTokenForPolicy(bearer, 'test-secret', {
+              audience: url.endsWith('/api/cloud-agent-next/balance')
+                ? 'cloud-agent-next'
+                : 'kilo-api',
+              mode: 'required',
+            });
+            return Response.json({ balance: 10, isDepleted: false });
+          } catch {
+            return new Response('Unauthorized', { status: 401 });
+          }
+        });
+
+        await expect(validateBalanceOnly(token, 'org_123', mockEnv)).resolves.toEqual({
+          success: true,
+        });
+        expect(fetchMock).toHaveBeenCalledWith(
+          'https://app.kilo.ai/api/cloud-agent-next/balance',
+          expect.objectContaining({ method: 'GET' })
+        );
+        const headers = new Headers(fetchMock.mock.calls[0][1].headers);
+        expect(headers.get('Authorization')).toBe(`Bearer ${token}`);
+        expect(headers.get('X-KiloCode-OrganizationId')).toBe('org_123');
+      }
+    );
+
     describe('balance validation', () => {
       it('returns 402 when balance is depleted', async () => {
         fetchMock.mockResolvedValue({

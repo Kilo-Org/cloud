@@ -67,7 +67,8 @@ export function VoiceInputButton({
 }: Readonly<VoiceInputButtonProps>): React.ReactElement {
   const colors = useThemeColors();
   const control = resolveVoiceInputControlState(status, disabled);
-  const isListeningOrStopping = status === 'listening' || status === 'stopping';
+  const isListeningOrStopping =
+    status === 'listening' || status === 'stopping' || status === 'transcribing';
   const showSpinner = control.busy;
   const iconColor = isListeningOrStopping ? colors.destructiveForeground : colors.foreground;
   const restingBg = isListeningOrStopping ? LISTENING_BG : RESTING_BG;
@@ -115,8 +116,15 @@ export function VoiceInputStatus({
   status,
 }: Readonly<VoiceInputStatusProps>): React.ReactElement | null {
   const { t } = useTranslation();
-  if (status !== 'listening') {
-    return null;
+  if (status === 'listening') {
+    return (
+      <AccessibleStatus message={t('voiceInput.listening')} tone="status" className="text-xs" />
+    );
   }
-  return <AccessibleStatus message={t('voiceInput.listening')} tone="status" className="text-xs" />;
+  if (status === 'transcribing') {
+    return (
+      <AccessibleStatus message={t('voiceInput.transcribing')} tone="status" className="text-xs" />
+    );
+  }
+  return null;
 }

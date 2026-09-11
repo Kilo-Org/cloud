@@ -64,7 +64,13 @@ function helloFrame(
   providerInstanceId: string,
   wrapperInstanceId?: string,
   requestId = 'req_hello',
-  capabilities?: { nativeRuntimeRetirement?: boolean; workingBranches?: boolean }
+  capabilities?: {
+    nativeRuntimeRetirement?: boolean;
+    runtimeIsolation?: true;
+    runtimeRecovery?: true;
+    scopedCleanupResult?: boolean;
+    workingBranches?: boolean;
+  }
 ): string {
   return JSON.stringify({
     type: 'request',
@@ -100,6 +106,29 @@ describe('sandbox control socket handler', () => {
       expect(parsed.kilo.version).toBeUndefined();
       expect(JSON.stringify(parsed)).not.toContain('private');
     }
+  });
+  it('retains runtime isolation and recovery alongside scoped cleanup negotiation', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_isolation', {
+        runtimeIsolation: true,
+        runtimeRecovery: true,
+        scopedCleanupResult: true,
+      })
+    );
+
+    expect(handler.getConnectionIdentity()).toMatchObject({
+      providerInstanceId: 'inst_1',
+      runtimeIsolation: true,
+      runtimeRecovery: true,
+    });
+    expect(handler.supportsScopedCleanupResult?.()).toBe(true);
+    expect(incoming.send).toHaveBeenCalledWith(
+      expect.stringContaining('"scopedCleanupResult":true')
+    );
   });
   it.each([
     ['2.4.0', '2.4.0'],
@@ -394,6 +423,23 @@ describe('sandbox control socket handler', () => {
     );
 
     expect(handler.supportsWorkingBranches?.()).toBe(true);
+  });
+
+  it('grants scoped cleanup results only to a reader that offers the capability', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_scoped_cleanup', {
+        scopedCleanupResult: true,
+      })
+    );
+
+    expect(handler.supportsScopedCleanupResult?.()).toBe(true);
+    expect(incoming.send).toHaveBeenCalledWith(
+      expect.stringContaining('"scopedCleanupResult":true')
+    );
   });
 
   it('rejects duplicate hellos without replacing the current connection', async () => {

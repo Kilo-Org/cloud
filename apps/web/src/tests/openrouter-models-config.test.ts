@@ -1,5 +1,5 @@
 import { test, expect, describe } from '@jest/globals';
-import { preferredModels } from '@/lib/ai-gateway/models';
+import { preferredModels, PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
@@ -11,21 +11,28 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
 import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
-import { gpt_5_6_sol_discounted_model } from '@/lib/ai-gateway/providers/openai-exclusive';
+import {
+  gpt_5_6_sol_discounted_model,
+  gpt_6_astra_flex_model,
+} from '@/lib/ai-gateway/providers/openai-exclusive';
 import {
   GEMMA_4_26B_A4B_IT_ID,
   gemma_4_26b_a4b_it_free_model,
 } from '@/lib/ai-gateway/providers/google';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
+import { GLM_CURRENT_MODEL_ID, GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 
 describe('OpenRouter Models Config', () => {
   test('preferred models should contain expected models', () => {
+    expect(PRIMARY_DEFAULT_MODEL).toBe(GLM_FLASH_CURRENT_MODEL_ID);
+
     const expectedModels = [
-      CLAUDE_SONNET_CURRENT_MODEL_ID,
       CLAUDE_OPUS_CURRENT_MODEL_ID,
       GPT_CURRENT_MODEL_ID,
-      'z-ai/glm-5.3',
+      DEEPSEEK_V4_1_FLASH_MODEL_ID,
+      GLM_FLASH_CURRENT_MODEL_ID,
     ];
 
     expectedModels.forEach(model => {
@@ -43,6 +50,8 @@ describe('OpenRouter Models Config', () => {
       'stealth/qwen3.6-plus',
       QWEN37_PLUS_MODEL_ID,
       'deepseek/deepseek-v4-pro',
+      CLAUDE_SONNET_CURRENT_MODEL_ID,
+      GLM_CURRENT_MODEL_ID,
       'tencent/hy3:free',
       'meituan/longcat-2.0-free',
     ];
@@ -51,6 +60,10 @@ describe('OpenRouter Models Config', () => {
       expect(preferredModels).not.toContain(model);
     });
 
+    expect(preferredModels.indexOf(DEEPSEEK_V4_1_FLASH_MODEL_ID)).toBeLessThan(
+      preferredModels.indexOf(GLM_FLASH_CURRENT_MODEL_ID)
+    );
+
     if (gpt_5_6_sol_discounted_model.status === 'public') {
       expect(preferredModels).toContain(gpt_5_6_sol_discounted_model.public_id);
       expect(preferredModels.indexOf(GPT_CURRENT_MODEL_ID)).toBeLessThan(
@@ -58,6 +71,12 @@ describe('OpenRouter Models Config', () => {
       );
     } else {
       expect(preferredModels).not.toContain(gpt_5_6_sol_discounted_model.public_id);
+    }
+
+    if (gpt_6_astra_flex_model.status === 'public') {
+      expect(preferredModels).toContain(gpt_6_astra_flex_model.public_id);
+    } else {
+      expect(preferredModels).not.toContain(gpt_6_astra_flex_model.public_id);
     }
   });
 

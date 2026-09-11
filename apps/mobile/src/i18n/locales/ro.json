@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transcriere cu Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transcrie dictarea cu un model Kilo Gateway în loc de recunoașterea vocală a dispozitivului. Înregistrarea este trimisă către Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "PR indisponibil",
@@ -450,6 +453,9 @@
       "acceptTerms": "Acceptă",
       "replyBadRequest": "Acest răspuns nu poate fi publicat. Este posibil ca firul de discuție să se fi modificat.",
       "replyForbidden": "Nu ai permisiunea să răspunzi la acest PR.",
+      "addCommentCta": "Comentează acest PR",
+      "commentBadRequest": "Acest comentariu nu poate fi publicat. Este posibil ca PR-ul să se fi modificat.",
+      "commentForbidden": "Nu ai permisiunea să comentezi acest PR.",
       "moderation": {
         "reportContent": {
           "terminal": "Acest comentariu nu poate fi raportat.",
@@ -2586,7 +2592,13 @@
     "languageNotInstalledMessage": "Fișierele vocale offline pentru {{language}} nu sunt instalate pe acest telefon. Descarcă-le, apoi încearcă dictarea din nou.",
     "downloadOfflineModel": "Descarcă",
     "offlineModelDownloadScheduled": "Fișierele vocale offline se vor descărca în fundal. Încearcă dictarea din nou mai târziu.",
-    "listeningStopped": "Ascultarea s-a oprit."
+    "listeningStopped": "Ascultarea s-a oprit.",
+    "transcribing": "Se transcrie…",
+    "gatewayUnreachable": "Nu s-a putut contacta Kilo Gateway. Verifică conexiunea și încearcă din nou.",
+    "gatewayTimeout": "Transcrierea a durat prea mult. Încearcă din nou.",
+    "gatewayModelUnavailable": "Acest model de transcriere nu este disponibil. Alege altul în Preferințe.",
+    "gatewaySignInRequired": "Autentifică-te pentru a folosi transcrierea cu Kilo Gateway.",
+    "gatewayNoModel": "Alege mai întâi un model de transcriere în Preferințe."
   },
   "share": {
     "title": "Distribuire către Kilo",
@@ -2969,5 +2981,12 @@
     "needsInput": "Așteaptă un răspuns",
     "channelName": "Agenți activi",
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare."
+  },
+  "transcriptionModel": {
+    "title": "Model de transcriere",
+    "noneChosen": "Niciunul selectat",
+    "emptyTitle": "Nu există modele de transcriere",
+    "emptyDescription": "Kilo Gateway nu oferă modele de transcriere în acest moment.",
+    "loadFailed": "Nu s-au putut încărca modelele de transcriere."
   }
 }

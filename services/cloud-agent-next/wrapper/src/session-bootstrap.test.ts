@@ -21,6 +21,7 @@ import type {
 } from '../../src/shared/wrapper-bootstrap';
 import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-environment.js';
+import { isWrapperSessionReadyRequest } from '../../src/shared/wrapper-bootstrap.js';
 
 function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyRequest> = {}) {
   const request: WrapperSessionReadyRequest = {
@@ -1031,9 +1032,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       subtype: 'git_checkout_timeout',
       retryable: true,
       message: 'Repository checkout timed out',
-      detail: 'termination hard_timeout',
+      detail: 'termination hard_timeout, output: exec hard timeout reached',
     });
-    expect(JSON.stringify(caughtError)).not.toContain('exec hard timeout reached');
+    expect(JSON.stringify(caughtError)).toContain('exec hard timeout reached');
     expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
     expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
   });
@@ -2770,6 +2771,81 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
   });
 
+  it('wraps retryable synthetic-ref checkout conflicts as restored reconciliation failures', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.branchName = 'refs/pull/123/head';
+    request.workspace.strictBranch = true;
+    request.workspace.restoredFromBackup = true;
+    request.materialized.setupCommands = [];
+    await createCompleteGitWorkspace(request.workspace.workspacePath);
+
+    let reconciliationError: unknown;
+    try {
+      await prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async args => {
+          if (args[0] === 'checkout') {
+            return {
+              stdout: '',
+              stderr: 'error: local changes would be overwritten by checkout',
+              exitCode: 1,
+            };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+      });
+    } catch (error) {
+      reconciliationError = error;
+    }
+
+    expect(reconciliationError).toBeInstanceOf(RestoredWorkspaceReconciliationError);
+    expect(workspaceBootstrapErrorCode(reconciliationError)).toBe(
+      'WORKSPACE_RECONCILIATION_FAILED'
+    );
+    expect(reconciliationError).toMatchObject({
+      cause: {
+        subtype: 'git_checkout_conflict',
+        retryable: true,
+      },
+    });
+    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
+    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
+  });
+
+  it('keeps an explicit missing synthetic ref non-retryable without reconciliation wrapping', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.branchName = 'refs/pull/404/head';
+    request.workspace.strictBranch = true;
+    request.workspace.restoredFromBackup = true;
+    request.materialized.setupCommands = [];
+    await createCompleteGitWorkspace(request.workspace.workspacePath);
+
+    let missingRefError: unknown;
+    try {
+      await prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async args =>
+          args[0] === 'fetch'
+            ? {
+                stdout: '',
+                stderr: "fatal: couldn't find remote ref refs/pull/404/head",
+                exitCode: 128,
+              }
+            : { stdout: '', stderr: '', exitCode: 0 },
+      });
+    } catch (error) {
+      missingRefError = error;
+    }
+
+    expect(missingRefError).not.toBeInstanceOf(RestoredWorkspaceReconciliationError);
+    expect(missingRefError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'git_branch_missing',
+      retryable: false,
+    });
+    expect(workspaceBootstrapErrorCode(missingRefError)).toBe('WORKSPACE_SETUP_FAILED');
+    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
+    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
+  });
+
   it('appends downloaded attachments to existing prompt parts', async () => {
     const prompt: WrapperPromptRequest = {
       message: {
@@ -3433,5 +3509,55 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
     ]);
     expect(await fsp.readFile(localPath, 'utf8')).toBe('zip-payload');
+  });
+});
+
+describe('runtime credential proxy ready request validation', () => {
+  it('accepts only a stable handle and Worker proxy targets', () => {
+    const request = makeRequest(fs.mkdtempSync(path.join(os.tmpdir(), 'wrapper-proxy-request-')));
+    request.runtimeCredentialProxy = {
+      handle: 'stable-proxy-handle',
+      targets: {
+        backendBaseUrl: 'https://worker.example.com',
+        providerBaseUrl: 'https://worker.example.com',
+        sessionIngestBaseUrl: 'https://worker.example.com',
+      },
+    };
+    expect(isWrapperSessionReadyRequest(request)).toBe(true);
+    expect(
+      isWrapperSessionReadyRequest({
+        ...request,
+        runtimeCredentialProxy: { ...request.runtimeCredentialProxy, credential: 'backing-token' },
+      })
+    ).toBe(false);
+    for (const [requiredKey, wrongKey] of [
+      ['backendBaseUrl', 'backendUrl'],
+      ['providerBaseUrl', 'providerUrl'],
+      ['sessionIngestBaseUrl', 'ingestUrl'],
+    ]) {
+      expect(
+        isWrapperSessionReadyRequest({
+          ...request,
+          runtimeCredentialProxy: {
+            handle: 'stable-proxy-handle',
+            targets: Object.fromEntries(
+              Object.entries(request.runtimeCredentialProxy.targets).map(([key, value]) => [
+                key === requiredKey ? wrongKey : key,
+                value,
+              ])
+            ),
+          },
+        })
+      ).toBe(false);
+    }
+    expect(
+      isWrapperSessionReadyRequest({
+        ...request,
+        runtimeCredentialProxy: {
+          handle: 'stable-proxy-handle',
+          targets: { backendBaseUrl: 'not-a-url' },
+        },
+      })
+    ).toBe(false);
   });
 });

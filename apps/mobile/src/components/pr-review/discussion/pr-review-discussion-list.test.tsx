@@ -78,6 +78,38 @@ function footerView(renderer: TestRenderer.ReactTestRenderer): TestRenderer.Reac
   return footer;
 }
 
+describe('PrReviewDiscussionList side insets (landscape)', () => {
+  beforeEach(() => {
+    insetsState.bottom = 0;
+    insetsState.left = 0;
+    insetsState.right = 0;
+    flashListProps.current = null;
+  });
+
+  it('carries explicit zero side insets at portrait', () => {
+    mountList();
+
+    expect(flashListProps.current?.contentContainerStyle).toEqual({
+      paddingTop: 12,
+      paddingLeft: 0,
+      paddingRight: 0,
+    });
+  });
+
+  it('clears the sensor housing with the landscape side insets', () => {
+    insetsState.left = 47;
+    insetsState.right = 59;
+
+    mountList();
+
+    expect(flashListProps.current?.contentContainerStyle).toEqual({
+      paddingTop: 12,
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
+  });
+});
+
 describe('PrReviewDiscussionList footer bottom inset (plan §6)', () => {
   beforeEach(() => {
     insetsState.bottom = 0;

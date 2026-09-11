@@ -178,6 +178,7 @@ export function convertProviderOptions(
     );
   })();
 
+  const serviceTier = requestToMutate.body.service_tier;
   return {
     gateway: {
       only,
@@ -186,6 +187,7 @@ export function convertProviderOptions(
       zeroDataRetention: provider?.zdr,
       disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
       models: requestToMutate.body.models,
+      serviceTier: serviceTier === 'flex' || serviceTier === 'priority' ? serviceTier : undefined,
     },
   };
 }

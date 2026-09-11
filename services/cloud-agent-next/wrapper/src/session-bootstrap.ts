@@ -26,6 +26,8 @@ import { createOutputRedactor, createSecretRedactor, redactSecrets } from './red
 import { restoreSession } from './restore-session.js';
 import { stripAnsi } from './event-parser.js';
 import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-error.js';
+import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from './git-review-ref.js';
+import { boundedUtf8Tail, cleanTerminalOutput, gitOperationError } from './git-errors.js';
 
 const LONG_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
 const LONG_COMMAND_HARD_TIMEOUT_MS = 300_000;
@@ -47,34 +49,6 @@ const MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS = 3;
 // Backoff before each retry attempt, keyed by attempt number: attempt 2 waits
 // 250ms and attempt 3 waits 750ms.
 const ATTACHMENT_RETRY_BACKOFF_MS: Record<number, number> = { 1: 250, 2: 750 };
-
-function cleanTerminalOutput(text: string): string {
-  return stripAnsi(text)
-    .replace(/\r\n/g, '\n')
-    .split('\n')
-    .map(line => line.split('\r').at(-1) ?? '')
-    .map(line =>
-      Array.from(line)
-        .filter(character => {
-          const codePoint = character.codePointAt(0) ?? 0;
-          return (
-            codePoint === 9 ||
-            (codePoint >= 32 && codePoint !== 127 && (codePoint < 128 || codePoint > 159))
-          );
-        })
-        .join('')
-    )
-    .join('\n');
-}
-
-function boundedUtf8Tail(text: string, maxBytes: number): string {
-  const bytes = Buffer.from(text);
-  if (bytes.length <= maxBytes) return text;
-  return bytes
-    .subarray(bytes.length - maxBytes)
-    .toString('utf8')
-    .replace(/^\uFFFD/, '');
-}
 
 /**
  * True for MIME classes that the prompt must surface as a `file://` part. Any
@@ -162,56 +136,6 @@ export type WrapperBootstrapDeps = {
   beforeFailureCleanup?: () => Promise<void>;
   workspacePreparationTimeoutMs?: number;
 };
-
-const GIT_FAILURE_PATTERNS = [
-  { subtype: 'sandbox_storage_full', pattern: /no space left on device|disk quota exceeded/i },
-  {
-    subtype: 'git_authentication_failed',
-    pattern: /authentication failed|could not read username|http 401|http 403/i,
-  },
-  {
-    subtype: 'git_rate_limited',
-    // Anchor 429 to an HTTP-error context: clones run with --progress, so a bare
-    // 429 also matches object counts (e.g. "remote: Total 429 (delta 12)").
-    pattern: /(?:error|http|status(?:\s+code)?)\s*:?\s*429\b|too many requests|rate limit(?:ed)?/i,
-  },
-  {
-    subtype: 'git_network_failed',
-    pattern:
-      /remote end hung up|connection (?:reset|timed out)|could not resolve host|failed to connect/i,
-  },
-  {
-    subtype: 'git_pack_corrupt',
-    pattern: /bad object|pack.*corrupt|invalid index-pack output|early eof/i,
-  },
-] as const;
-
-function classifyGitFailure(result: ExecResult, operation: 'clone' | 'checkout') {
-  if (isTimeoutTermination(result)) {
-    return operation === 'clone' ? 'git_clone_timeout' : 'git_checkout_timeout';
-  }
-  const output = `${result.stderr}\n${result.stdout}`;
-  if (
-    operation === 'checkout' &&
-    /would be overwritten|index\.lock.*exists|unable to create.*index\.lock/i.test(output)
-  ) {
-    return 'git_checkout_conflict';
-  }
-  return (
-    GIT_FAILURE_PATTERNS.find(entry => entry.pattern.test(output))?.subtype ??
-    'workspace_setup_unknown'
-  );
-}
-
-function gitOperationError(
-  result: ExecResult,
-  operation: 'clone' | 'checkout'
-): WrapperBootstrapError {
-  const label = operation === 'clone' ? 'Repository clone' : 'Repository checkout';
-  const subtype = classifyGitFailure(result, operation);
-  const message = isTimeoutTermination(result) ? `${label} timed out` : `${label} failed`;
-  return workspaceBootstrapError(subtype, message, createSafeProcessDiagnostic(result));
-}
 
 const GIT_PROGRESS_PATTERN =
   /\b(Receiving objects|Resolving deltas|Updating files|Checking out files|Compressing objects):\s+(\d+)%/g;
@@ -617,44 +541,30 @@ async function branchExists(
   return false;
 }
 
-const GITHUB_PULL_REF_PATTERN = /^refs\/pull\/\d+\/head$/;
-const GITLAB_MR_REF_PATTERN = /^refs\/merge-requests\/\d+\/head$/;
-
-function isSyntheticReviewRef(branchName: string): boolean {
-  return GITHUB_PULL_REF_PATTERN.test(branchName) || GITLAB_MR_REF_PATTERN.test(branchName);
-}
-
-async function fetchSyntheticReviewRef(
-  runGit: GitRunner,
-  workspacePath: string,
-  branchName: string,
-  progress: BootstrapProgress | undefined
-): Promise<void> {
-  const fetchResult = await runGit(
-    ['fetch', '--progress', 'origin', branchName],
-    longGitOptions(progress, 'branch', 'Fetching review branch...', workspacePath)
-  );
-  if (fetchResult.exitCode !== 0) {
-    throw gitOperationError(fetchResult, 'checkout');
-  }
-
-  const checkoutResult = await runGit(
-    ['checkout', '--progress', '-B', branchName, 'FETCH_HEAD'],
-    longGitOptions(progress, 'branch', 'Checking out review branch...', workspacePath)
-  );
-  if (checkoutResult.exitCode !== 0) {
-    throw gitOperationError(checkoutResult, 'checkout');
-  }
+function gitOutputRedactor(request: WrapperSessionReadyRequest): (text: string) => string {
+  return createSecretRedactor(process.env, request.materialized.env, {
+    ...(request.repo?.kind === 'git' && request.repo.token
+      ? { GIT_TOKEN: request.repo.token }
+      : {}),
+  });
 }
 
 async function prepareBranch(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner,
-  progress: BootstrapProgress | undefined
+  progress: BootstrapProgress | undefined,
+  signal?: AbortSignal
 ): Promise<void> {
   const { workspacePath, branchName, strictBranch } = request.workspace;
   if (strictBranch && isSyntheticReviewRef(branchName)) {
-    await fetchSyntheticReviewRef(runGit, workspacePath, branchName, progress);
+    await checkoutSyntheticReviewRef({
+      runGit,
+      workspacePath,
+      branchName,
+      ...(signal ? { signal } : {}),
+      onProgress: message => progress?.('branch', message),
+      redact: gitOutputRedactor(request),
+    });
     return;
   }
 
@@ -897,11 +807,19 @@ async function restoreOrBootstrapKiloSession(
 async function reconcileRestoredWorkspace(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner,
-  progress: BootstrapProgress | undefined
+  progress: BootstrapProgress | undefined,
+  signal?: AbortSignal
 ): Promise<void> {
   const { workspacePath, branchName, upstreamBranch, strictBranch } = request.workspace;
   if (strictBranch && isSyntheticReviewRef(branchName)) {
-    await fetchSyntheticReviewRef(runGit, workspacePath, branchName, progress);
+    await checkoutSyntheticReviewRef({
+      runGit,
+      workspacePath,
+      branchName,
+      ...(signal ? { signal } : {}),
+      onProgress: message => progress?.('branch', message),
+      redact: gitOutputRedactor(request),
+    });
     return;
   }
 
@@ -1389,13 +1307,18 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       );
       if (restoredFromBackup) {
         try {
-          await reconcileRestoredWorkspace(request, runGit, progress);
+          await reconcileRestoredWorkspace(request, runGit, progress, signal);
         } catch (error) {
+          // A missing synthetic ref is an explicit, non-retryable request
+          // failure. Other typed Git failures are transient workspace
+          // reconciliation failures so the caller can fall back to a clean
+          // workspace before retrying.
+          if (error instanceof WrapperBootstrapError && !error.retryable) throw error;
           const message = error instanceof Error ? error.message : String(error);
           throw new RestoredWorkspaceReconciliationError(message, { cause: error });
         }
       } else {
-        await prepareBranch(request, runGit, progress);
+        await prepareBranch(request, runGit, progress, signal);
       }
       logToFile(
         `bootstrap branch preparation ready kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName}`

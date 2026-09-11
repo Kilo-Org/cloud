@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Gateway-transkripsie",
+    "gatewayTranscriptionSubtitle": "Transkribeer steminvoer met 'n Kilo Gateway-model in plaas van die toestel se spraakherkenning. Jou opname word na die Kilo Gateway gestuur.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
@@ -448,6 +451,9 @@
       "acceptTerms": "Aanvaar",
       "replyBadRequest": "Hierdie antwoord kan nie geplaas word nie. Die draad het dalk verander.",
       "replyForbidden": "Jy het nie toestemming om op hierdie trekversoek te antwoord nie.",
+      "addCommentCta": "Kommenteer op hierdie trekversoek",
+      "commentBadRequest": "Hierdie kommentaar kan nie geplaas word nie. Die trekversoek het dalk verander.",
+      "commentForbidden": "Jy het nie toestemming om op hierdie trekversoek kommentaar te lewer nie.",
       "moderation": {
         "reportContent": {
           "terminal": "Hierdie kommentaar kan nie gerapporteer word nie.",
@@ -2565,7 +2571,13 @@
     "languageNotInstalledMessage": "Die vanlyn-spraaklêers vir {{language}} is nie op hierdie foon geïnstalleer nie. Laai hulle af en probeer steminvoer weer.",
     "downloadOfflineModel": "Laai af",
     "offlineModelDownloadScheduled": "Die vanlyn-spraaklêers sal op die agtergrond afgelaai word. Probeer steminvoer later weer.",
-    "listeningStopped": "Die toestel luister nie meer nie."
+    "listeningStopped": "Die toestel luister nie meer nie.",
+    "transcribing": "Transkribeer...",
+    "gatewayUnreachable": "Die Kilo Gateway kon nie bereik word nie. Gaan jou verbinding na en probeer weer.",
+    "gatewayTimeout": "Die transkripsie het te lank geneem. Probeer weer.",
+    "gatewayModelUnavailable": "Hierdie transkripsiemodel is nie beskikbaar nie. Kies 'n ander een in Voorkeure.",
+    "gatewaySignInRequired": "Teken in om gateway-transkripsie te gebruik.",
+    "gatewayNoModel": "Kies eers 'n transkripsiemodel in Voorkeure."
   },
   "share": {
     "title": "Deel met Kilo",
@@ -2947,5 +2959,12 @@
     "needsInput": "Wag op invoer",
     "channelName": "Aktiewe agente",
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien."
+  },
+  "transcriptionModel": {
+    "title": "Transkripsiemodel",
+    "noneChosen": "Geen gekies nie",
+    "emptyTitle": "Geen transkripsiemodelle nie",
+    "emptyDescription": "Die Kilo Gateway bied tans geen transkripsiemodelle nie.",
+    "loadFailed": "Die transkripsiemodelle kon nie gelaai word nie."
   }
 }

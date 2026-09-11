@@ -11,6 +11,7 @@ import {
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   sessionSyncResultSchema,
   type SessionEventPayload,
+  type SessionRequestIdentity,
   type SessionGitSummaryResult,
 } from '../../../src/shared/sandbox-control-protocol';
 import { createWrapperKiloClient, type WrapperKiloClient, type WrapperPty } from '../kilo-api';
@@ -123,6 +124,7 @@ function deps(
   const client = Object.hasOwn(overrides, 'kiloClient') ? kiloClient : fakeKilo();
   const runtime: WorktreeKiloRuntime | undefined = client
     ? {
+        identity: { ...identity },
         scopeId: kilo.scopeId,
         runtimeId: 'native_1',
         directory: identity.directory,
@@ -148,6 +150,7 @@ function deps(
             release: () => {},
           }),
           detach: () => true,
+          retireForRecovery: async () => 'retired',
           deleteDirectory: async () => {},
           getRetained: directory => (directory === runtime.directory ? runtime : undefined),
           retireRuntime: async (directory, _deadlineAt, target) =>
@@ -160,7 +163,16 @@ function deps(
             directory === runtime.directory &&
             target.runtimeId === runtime.runtimeId &&
             target.client === runtime.kiloClient,
-          get: directory => (directory === runtime.directory ? runtime : undefined),
+          get: request =>
+            (
+              typeof request === 'string'
+                ? request === runtime.directory
+                : request.directory === runtime.directory
+            )
+              ? runtime
+              : undefined,
+          getAll: directory => (directory === runtime.directory ? [runtime] : []),
+          isCurrent: candidate => candidate === runtime,
           isHealthy: () => true,
           shutdown: () => {},
         } as NonNullable<HandlerDeps['kiloRuntimes']>)
@@ -176,7 +188,7 @@ function deps(
   });
 }
 
-function runtimeDeps(kiloClient: WrapperKiloClient) {
+function runtimeDeps(kiloClient: WrapperKiloClient, rootScope?: 'shared' | 'sole') {
   const abort = new AbortController();
   const events: SessionEventPayload[] = [];
   const retired: string[] = [];
@@ -184,6 +196,8 @@ function runtimeDeps(kiloClient: WrapperKiloClient) {
   const handlerDeps: HandlerDeps = createControlHandlerDeps({
     ...(() => {
       const base = deps({ kiloClient });
+      if (rootScope !== undefined && base.kiloRuntimes)
+        base.kiloRuntimes.rootRetirementScope = () => rootScope;
       return {
         kiloRuntimes: base.kiloRuntimes,
         worktreeCleanupClient: base.worktreeCleanupClient,
@@ -256,6 +270,9 @@ function fakeTerminalRuntime(
     rememberAttachedSession: () => {},
     detachSession: async () => {},
     detachDirectory: async () => {},
+    hasActivePty: () => false,
+    beginRecoveryRetirement: () => {},
+    endRecoveryRetirement: () => {},
     create: async () => ({ pty }),
     resize: async () => ({ pty }),
     close: async () => ({ success: true }),
@@ -444,6 +461,22 @@ describe('handleControlRequest', () => {
       ok: false,
       error: { code: 'protocol_error', message: 'session identity is required', retryable: false },
     });
+  });
+
+  it('returns an unconfirmed result without starting late cleanup', async () => {
+    const handlerDeps = deps();
+    const result = await handleControlRequest(
+      'session.abort',
+      session,
+      {
+        messageId: 'late',
+        operationId: '11111111-1111-4111-8111-111111111111',
+        cleanupDeadlineAt: Date.now() - 1,
+      },
+      handlerDeps
+    );
+
+    expect(result).toEqual({ ok: true, result: { status: 'unconfirmed', quiescent: false } });
   });
 
   it('attaches by verifying the kilo session', async () => {
@@ -738,6 +771,137 @@ describe('handleControlRequest', () => {
     expect(aborted).toEqual([]);
   });
 
+  it('detaches the terminal only when abort cancels the current task', async () => {
+    const started = Promise.withResolvers<void>();
+    const running = Promise.withResolvers<Completion>();
+    const detached: unknown[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: async () => {
+          started.resolve();
+          return running.promise;
+        },
+        abortSession: async () => {
+          running.resolve(
+            completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+          );
+          return true;
+        },
+      }),
+      terminalRuntime: fakeTerminalRuntime({
+        detachSession: async identity => {
+          detached.push(identity);
+        },
+      }),
+    });
+
+    try {
+      expect(
+        await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+      ).toEqual({ ok: true, result: { messageId: 'msg_1', status: 'accepted' } });
+      await started.promise;
+
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          session,
+          { messageId: promptPayload.messageId, cleanupDeadlineAt: Date.now() - 1 },
+          handlerDeps
+        )
+      ).toEqual({ ok: true, result: { status: 'already_idle' } });
+      expect(detached).toEqual([]);
+
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          session,
+          { messageId: promptPayload.messageId },
+          handlerDeps
+        )
+      ).toEqual({ ok: true, result: { status: 'aborted' } });
+      expect(detached).toEqual([session]);
+
+      expect(await handleControlRequest('session.abort', session, {}, handlerDeps)).toEqual({
+        ok: true,
+        result: { status: 'already_idle' },
+      });
+      expect(detached).toEqual([session]);
+    } finally {
+      running.resolve(completion());
+      await waitForTasks(handlerDeps);
+    }
+  });
+
+  it('surfaces terminal cleanup failure from an active abort', async () => {
+    const started = Promise.withResolvers<void>();
+    const running = Promise.withResolvers<Completion>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: async () => {
+          started.resolve();
+          return running.promise;
+        },
+        abortSession: async () => {
+          running.resolve(
+            completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+          );
+          return true;
+        },
+      }),
+      terminalRuntime: fakeTerminalRuntime({
+        detachSession: async () => {
+          throw new ControlTerminalRuntimeError('not_ready', 'Terminal cleanup failed', true);
+        },
+      }),
+    });
+
+    try {
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+      await started.promise;
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          session,
+          { messageId: promptPayload.messageId },
+          handlerDeps
+        )
+      ).toEqual({
+        ok: false,
+        error: { code: 'not_ready', message: 'Terminal cleanup failed', retryable: true },
+      });
+    } finally {
+      running.resolve(completion());
+      await waitForTasks(handlerDeps);
+    }
+  });
+
+  it('does not detach an attachment for a stale native runtime abort', async () => {
+    const detached: unknown[] = [];
+    const result = await handleControlRequest(
+      'session.abort',
+      session,
+      { nativeRuntimeId: '11111111-1111-4111-8111-111111111111' },
+      deps({
+        terminalRuntime: fakeTerminalRuntime({
+          detachSession: async identity => {
+            detached.push(identity);
+          },
+        }),
+      })
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      result: {
+        status: 'aborted',
+        quiescent: true,
+        runtimeRetired: true,
+        nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+      },
+    });
+    expect(detached).toEqual([]);
+  });
+
   it('routes independent roots and their children through the matching worktree client', async () => {
     const sibling = { ...session, sessionId: 'ses_2', kiloSessionId: 'kilo_2' };
     const other = { sessionId: 'ses_3', kiloSessionId: 'kilo_3', directory: '/workspace/other' };
@@ -818,6 +982,7 @@ describe('handleControlRequest', () => {
         },
       });
       runtimes.set(directory, {
+        identity: { ...session },
         directory,
         scopeId: directory,
         runtimeId: crypto.randomUUID(),
@@ -838,6 +1003,7 @@ describe('handleControlRequest', () => {
           throw new Error('Unexpected startup');
         },
         detach: () => true,
+        retireForRecovery: async () => 'retired',
         deleteDirectory: async () => {},
         getRetained: directory => runtimes.get(directory),
         retireRuntime: async (directory, _deadlineAt, target) => {
@@ -857,7 +1023,12 @@ describe('handleControlRequest', () => {
             target.client === runtime.kiloClient
           );
         },
-        get: directory => runtimes.get(directory),
+        get: identity => runtimes.get(typeof identity === 'string' ? identity : identity.directory),
+        getAll: directory => {
+          const runtime = runtimes.get(directory);
+          return runtime ? [runtime] : [];
+        },
+        isCurrent: runtime => [...runtimes.values()].includes(runtime),
         isHealthy: () => true,
         shutdown: () => {},
       } as NonNullable<HandlerDeps['kiloRuntimes']>,
@@ -1113,7 +1284,7 @@ describe('handleControlRequest', () => {
     });
     expect(rootForSession(session.kiloSessionId)).toBe(session.kiloSessionId);
     expect(rootForSession(sibling.kiloSessionId)).toBe(sibling.kiloSessionId);
-    expect(handlerDeps.kiloRuntimes?.get(session.directory)).toBe(runtime);
+    expect(handlerDeps.kiloRuntimes?.get(session)).toBe(runtime);
     confirmed = true;
     expect(await handleControlRequest('session.detach', session, {}, handlerDeps)).toEqual({
       ok: true,
@@ -1220,7 +1391,11 @@ describe('handleControlRequest', () => {
     runtimes.shutdown = () => {
       shutdowns += 1;
     };
-    const runtime = runtimes.get(session.directory);
+    const runtime = runtimes.get(session);
+    expect(await handleControlRequest('session.attach', sibling, { kilo }, handlerDeps)).toEqual({
+      ok: true,
+      result: { attached: true },
+    });
     expect(
       await handleControlRequest('session.prompt', sibling, promptPayload, handlerDeps)
     ).toEqual({
@@ -1233,7 +1408,7 @@ describe('handleControlRequest', () => {
       result: { detached: true },
     });
     expect(shutdowns).toBe(0);
-    expect(runtimes.get(session.directory)).toBe(runtime);
+    expect(runtimes.getRetained?.(session.directory)).toBe(runtime);
     expect(handlerDeps.operations.active(sibling.kiloSessionId)?.signal.aborted).toBe(false);
     expect(events).toEqual([]);
     expect(aborted).toEqual([session.kiloSessionId]);
@@ -1644,10 +1819,12 @@ describe('production worktree deletion routes', () => {
       const calls: string[] = [];
       const handlerDeps = deps({
         kiloRuntimes: {
-          get: dir => {
-            calls.push(`get:${dir}`);
+          get: identity => {
+            calls.push(`get:${typeof identity === 'string' ? identity : identity.directory}`);
             return undefined;
           },
+          getAll: () => [],
+          isCurrent: () => false,
           attach: () => {
             calls.push('attach');
             throw new Error('Unexpected runtime startup');
@@ -1656,6 +1833,7 @@ describe('production worktree deletion routes', () => {
             calls.push('detach');
             return true;
           },
+          retireForRecovery: async () => 'retired',
           deleteDirectory: async dir => {
             calls.push(`delete:${dir}`);
           },
@@ -1757,7 +1935,7 @@ describe('production worktree deletion routes', () => {
     );
     const aborted: string[] = [];
     const outcomes: Array<{ id: string; event: SessionEventPayload }> = [];
-    const lookups: string[] = [];
+    const lookups: Array<string | SessionRequestIdentity> = [];
     const handlerDeps = deps(
       {
         kiloClient: fakeKilo({
@@ -1779,7 +1957,7 @@ describe('production worktree deletion routes', () => {
       first
     );
     const runtimes = handlerDeps.kiloRuntimes;
-    const selected = runtimes?.get(directory);
+    const selected = runtimes?.get(first);
     if (!runtimes || !selected) throw new Error('Expected selected worktree runtime');
     const otherRuntime = {
       ...selected,
@@ -1797,9 +1975,14 @@ describe('production worktree deletion routes', () => {
         },
       }),
     };
-    runtimes.get = dir => {
-      lookups.push(dir);
-      return dir === directory ? selected : dir === siblingDirectory ? otherRuntime : undefined;
+    runtimes.get = identity => {
+      const worktree = typeof identity === 'string' ? identity : identity.directory;
+      lookups.push(identity);
+      return worktree === directory
+        ? selected
+        : worktree === siblingDirectory
+          ? otherRuntime
+          : undefined;
     };
     const attach = spyOn(runtimes, 'attach');
     let preparation: ReturnType<typeof handleControlRequest> | undefined;
@@ -1887,7 +2070,9 @@ describe('production worktree deletion routes', () => {
         )
       ).toBe(true);
       expect(lookups.length).toBeGreaterThan(0);
-      expect(lookups.every(value => value === directory)).toBe(true);
+      expect(
+        lookups.every(value => typeof value !== 'string' && value.directory === directory)
+      ).toBe(true);
       expect(http.requests.every(request => request.directory === directory)).toBe(true);
       expect(http.requests).toContainEqual({
         method: 'POST',
@@ -1946,11 +2131,12 @@ describe('production worktree deletion routes', () => {
       first
     );
     const runtimes = handlerDeps.kiloRuntimes;
-    const selected = runtimes?.get(directory);
+    const selected = runtimes?.get(first);
     if (!runtimes || !selected) throw new Error('Expected selected worktree runtime');
-    runtimes.get = dir => {
-      lookups.push(dir);
-      return dir === directory ? selected : undefined;
+    runtimes.get = identity => {
+      const worktree = typeof identity === 'string' ? identity : identity.directory;
+      lookups.push(worktree);
+      return worktree === directory ? selected : undefined;
     };
     runtimes.deleteDirectory = async dir => {
       retirements.push(dir);
@@ -1982,7 +2168,7 @@ describe('production worktree deletion routes', () => {
         ok: true,
         result: { deleted: true, sessionIds: [sessionId(1), sessionId(2), sessionId(3)] },
       });
-      expect(lookups).toEqual([directory]);
+      expect(lookups).toEqual([]);
       expect(retirements).toEqual([directory]);
       expect(filesystem.remove.mock.calls).toEqual([[directory, { recursive: true, force: true }]]);
       expect(handlerDeps.sessions).toEqual([
@@ -2041,12 +2227,15 @@ describe('production worktree deletion routes', () => {
           lastActivityAt: 100,
         })),
         kiloRuntimes: {
-          get: dir => {
-            lookups.push(dir);
-            if (dir === directory) return undefined;
+          get: identity => {
+            const worktree = typeof identity === 'string' ? identity : identity.directory;
+            lookups.push(worktree);
+            if (worktree === directory) return undefined;
             forbidden.push('unscoped lookup');
             return siblingRuntime;
           },
+          getAll: directory => (directory === siblingDirectory ? [siblingRuntime] : []),
+          isCurrent: runtime => runtime === siblingRuntime,
           attach: () => {
             forbidden.push('startup');
             throw new Error('Cleanup must not start a runtime');
@@ -2055,6 +2244,7 @@ describe('production worktree deletion routes', () => {
             forbidden.push('detach');
             return false;
           },
+          retireForRecovery: async () => 'retired',
           deleteDirectory: async dir => {
             retirements.push(dir);
           },
@@ -2081,7 +2271,7 @@ describe('production worktree deletion routes', () => {
           await handleControlRequest('worktree.delete', undefined, input, handlerDeps)
         ).toEqual({ ok: true, result: { deleted: true, sessionIds: input.sessionIds } });
       }
-      expect(lookups).toEqual([directory, directory, directory, directory]);
+      expect(lookups).toEqual([]);
       expect(retirements).toEqual([directory, directory]);
       expect(detached).toEqual([directory, directory]);
       expect(filesystem.remove.mock.calls).toEqual([
@@ -2456,6 +2646,491 @@ describe('owned control execution', () => {
     }
   });
 
+  it('keeps a shared user Stop root-scoped without a publication claim', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return running.promise;
+        },
+        abortSession: async () => {
+          running.resolve(
+            completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+          );
+          return true;
+        },
+      }),
+      'shared'
+    );
+    handlerDeps.scopedCleanupResult = true;
+    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory');
+    const promptRequest = handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps
+    );
+    try {
+      await started.promise;
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          session,
+          {
+            messageId: promptPayload.messageId,
+            operationId: '55555555-5555-4555-8555-555555555555',
+            cleanupDeadlineAt: Date.now() + 1_000,
+          },
+          handlerDeps
+        )
+      ).toEqual({
+        ok: true,
+        result: { status: 'aborted', quiescent: false, cleanupScope: 'root' },
+      });
+      expect(directoryRetirement).not.toHaveBeenCalled();
+      expect(retired).toEqual([]);
+    } finally {
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([promptRequest]);
+      await waitForTasks(handlerDeps);
+      directoryRetirement.mockRestore();
+    }
+  });
+
+  it('routes an early publication-scoped failed Stop through shared-root retirement without cancelling B', async () => {
+    const runningA = Promise.withResolvers<Completion>();
+    const runningB = Promise.withResolvers<Completion>();
+    const startedA = Promise.withResolvers<void>();
+    const startedB = Promise.withResolvers<void>();
+    const sibling = { ...session, sessionId: 'ses_b', kiloSessionId: 'kilo_b' };
+    rememberAttachedRoot(sibling.kiloSessionId, sibling.directory);
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: options => {
+          if (options.messageId === 'message_a') {
+            startedA.resolve();
+            return runningA.promise;
+          }
+          startedB.resolve();
+          return runningB.promise;
+        },
+        getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'idle' } }),
+        abortSession: async () => false,
+      })
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing worktree runtimes');
+    let scopedRetirementCalls = 0;
+    runtimes.retireRuntimeIfUnshared = async () => {
+      scopedRetirementCalls += 1;
+      return 'shared';
+    };
+    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory');
+    const operationId = '11111111-1111-4111-8111-111111111111';
+    const requestA = handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'message_a' },
+      handlerDeps
+    );
+    const requestB = handleControlRequest(
+      'session.prompt',
+      sibling,
+      { ...promptPayload, messageId: 'message_b' },
+      handlerDeps
+    );
+    try {
+      await startedA.promise;
+      await startedB.promise;
+      const taskA = handlerDeps.operations.active(session.kiloSessionId);
+      if (!taskA) throw new Error('Missing A operation');
+      taskA.markPublicationScoped('publication failure', Date.now() + 1_000);
+
+      const stopped = await handleControlRequest(
+        'session.abort',
+        session,
+        { messageId: 'message_a', operationId, cleanupDeadlineAt: Date.now() + 1_000 },
+        handlerDeps
+      );
+      expect(stopped).toMatchObject({
+        ok: true,
+        result: { status: 'unconfirmed', quiescent: false },
+      });
+      expect(scopedRetirementCalls).toBe(1);
+      expect(directoryRetirement).not.toHaveBeenCalled();
+      expect(retired).toEqual([]);
+      expect(handlerDeps.operations.active(sibling.kiloSessionId)?.signal.aborted).toBe(false);
+    } finally {
+      runningA.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      runningB.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([requestA, requestB]);
+      await waitForTasks(handlerDeps);
+      directoryRetirement.mockRestore();
+    }
+  });
+
+  it('detaches A before returning an early shared-root Stop result', async () => {
+    const runningA = Promise.withResolvers<Completion>();
+    const runningB = Promise.withResolvers<Completion>();
+    const startedA = Promise.withResolvers<void>();
+    const startedB = Promise.withResolvers<void>();
+    const detachStarted = Promise.withResolvers<void>();
+    const releaseDetach = Promise.withResolvers<void>();
+    const sibling = { ...session, sessionId: 'ses_b', kiloSessionId: 'kilo_b' };
+    rememberAttachedRoot(sibling.kiloSessionId, sibling.directory);
+    const detached: unknown[] = [];
+    const { handlerDeps } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: options => {
+          if (options.messageId === 'message_a') {
+            startedA.resolve();
+            return runningA.promise;
+          }
+          startedB.resolve();
+          return runningB.promise;
+        },
+      }),
+      'shared'
+    );
+    handlerDeps.scopedCleanupResult = true;
+    handlerDeps.terminalRuntime = fakeTerminalRuntime({
+      detachSession: async identity => {
+        detached.push(identity);
+        detachStarted.resolve();
+        await releaseDetach.promise;
+      },
+    });
+    const requestA = handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'message_a' },
+      handlerDeps
+    );
+    const requestB = handleControlRequest(
+      'session.prompt',
+      sibling,
+      { ...promptPayload, messageId: 'message_b' },
+      handlerDeps
+    );
+    try {
+      await startedA.promise;
+      await startedB.promise;
+      const taskA = handlerDeps.operations.active(session.kiloSessionId);
+      if (!taskA) throw new Error('Missing A operation');
+      taskA.markPublicationScoped('publication failure', Date.now() + 1_000);
+
+      const stopping = handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: 'message_a',
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        handlerDeps
+      );
+      await detachStarted.promise;
+      expect(detached).toEqual([session]);
+      expect(await Promise.race([stopping, Bun.sleep(20).then(() => 'pending' as const)])).toBe(
+        'pending'
+      );
+      expect(handlerDeps.operations.active(sibling.kiloSessionId)?.signal.aborted).toBe(false);
+
+      releaseDetach.resolve();
+      expect(await stopping).toMatchObject({
+        ok: true,
+        result: { status: 'unconfirmed', quiescent: false, cleanupScope: 'root' },
+      });
+    } finally {
+      releaseDetach.resolve();
+      runningA.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      runningB.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([requestA, requestB]);
+      await waitForTasks(handlerDeps);
+    }
+  });
+
+  it('rechecks a publication claim that arrives while Stop cleanup is awaiting native abort', async () => {
+    const runningA = Promise.withResolvers<Completion>();
+    const runningB = Promise.withResolvers<Completion>();
+    const abortPending = Promise.withResolvers<boolean>();
+    const abortStarted = Promise.withResolvers<void>();
+    const startedA = Promise.withResolvers<void>();
+    const startedB = Promise.withResolvers<void>();
+    let abortCalls = 0;
+    const sibling = { ...session, sessionId: 'ses_b', kiloSessionId: 'kilo_b' };
+    rememberAttachedRoot(sibling.kiloSessionId, sibling.directory);
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: options => {
+          if (options.messageId === 'message_a') {
+            startedA.resolve();
+            return runningA.promise;
+          }
+          startedB.resolve();
+          return runningB.promise;
+        },
+        getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'idle' } }),
+        abortSession: async () => {
+          abortCalls += 1;
+          if (abortCalls === 1) {
+            abortStarted.resolve();
+            return abortPending.promise;
+          }
+          return false;
+        },
+      })
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing worktree runtimes');
+    let scopedRetirementCalls = 0;
+    runtimes.retireRuntimeIfUnshared = async () => {
+      scopedRetirementCalls += 1;
+      return 'shared';
+    };
+    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory');
+    const requestA = handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'message_a' },
+      handlerDeps
+    );
+    const requestB = handleControlRequest(
+      'session.prompt',
+      sibling,
+      { ...promptPayload, messageId: 'message_b' },
+      handlerDeps
+    );
+    try {
+      await startedA.promise;
+      await startedB.promise;
+      const taskA = handlerDeps.operations.active(session.kiloSessionId);
+      if (!taskA) throw new Error('Missing A operation');
+      const stopping = handleControlRequest(
+        'session.abort',
+        session,
+        { messageId: 'message_a', operationId: '11111111-1111-4111-8111-111111111111' },
+        handlerDeps
+      );
+      await abortStarted.promise;
+      taskA.markPublicationScoped('publication failure during Stop', Date.now() + 1_000);
+      expect(taskA.publicationScope()).toBeDefined();
+      abortPending.resolve(false);
+      expect(await stopping).toMatchObject({
+        ok: true,
+        result: { status: 'unconfirmed', quiescent: false },
+      });
+      expect(scopedRetirementCalls).toBe(1);
+      expect(directoryRetirement).not.toHaveBeenCalled();
+      expect(retired).toEqual([]);
+      expect(handlerDeps.operations.active(sibling.kiloSessionId)?.signal.aborted).toBe(false);
+    } finally {
+      abortPending.resolve(false);
+      runningA.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      runningB.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([requestA, requestB]);
+      await waitForTasks(handlerDeps);
+      directoryRetirement.mockRestore();
+    }
+  });
+
+  it('does not install a shared-root retirement after scoped cleanup is confirmed', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const abortCalled = Promise.withResolvers<void>();
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return running.promise;
+        },
+        getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'idle' } }),
+        abortSession: async () => {
+          abortCalled.resolve();
+          return true;
+        },
+      })
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing worktree runtimes');
+    let scopedRetirementCalls = 0;
+    runtimes.retireRuntimeIfUnshared = async () => {
+      scopedRetirementCalls += 1;
+      return 'shared';
+    };
+    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory');
+    const promptRequest = handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps
+    );
+    try {
+      await started.promise;
+      const task = handlerDeps.operations.active(session.kiloSessionId);
+      if (!task) throw new Error('Missing operation record');
+      task.markPublicationScoped('publication cleanup confirmed', Date.now() + 1_000);
+      const stopping = handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: promptPayload.messageId,
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        handlerDeps
+      );
+      await abortCalled.promise;
+      await Promise.resolve();
+      expect(scopedRetirementCalls).toBe(0);
+      expect(directoryRetirement).not.toHaveBeenCalled();
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      expect(await stopping).toMatchObject({
+        ok: true,
+        result: { status: 'unconfirmed', quiescent: false },
+      });
+      expect(retired).toEqual([]);
+    } finally {
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([promptRequest]);
+      await waitForTasks(handlerDeps);
+      directoryRetirement.mockRestore();
+    }
+  });
+
+  it('acknowledges a shared root cleanup before a blocked root can settle', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const abortStarted = Promise.withResolvers<void>();
+    const abortPending = Promise.withResolvers<boolean>();
+    const { handlerDeps } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: async () => {
+          started.resolve();
+          return running.promise;
+        },
+        getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'active' } }),
+        abortSession: async () => {
+          abortStarted.resolve();
+          return abortPending.promise;
+        },
+      }),
+      'shared'
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing runtimes');
+    handlerDeps.scopedCleanupResult = true;
+    const prompt = handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+    try {
+      await started.promise;
+      const stopping = handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: promptPayload.messageId,
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        handlerDeps
+      );
+      await abortStarted.promise;
+      const task = handlerDeps.operations.active(session.kiloSessionId);
+      if (!task) throw new Error('Missing A operation');
+      const target = task.nativeTarget();
+      if (!target) throw new Error('Missing A native target');
+      handlerDeps.operations.escalateRootPublication({
+        directory: session.directory,
+        root: session.kiloSessionId,
+        nativeRuntimeId: target.runtimeId,
+        target,
+        reason: 'publication failure',
+        deadlineAt: Date.now() + 1_000,
+      });
+      const response = await Promise.race([
+        stopping,
+        Bun.sleep(100).then(() => 'timed_out' as const),
+      ]);
+      expect(response).not.toBe('timed_out');
+      expect(response).toMatchObject({
+        ok: true,
+        result: {
+          status: 'unconfirmed',
+          quiescent: false,
+          cleanupScope: 'root',
+        },
+      });
+    } finally {
+      abortPending.resolve(false);
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([prompt, waitForTasks(handlerDeps)]);
+    }
+  });
+
+  it('reports quiescence only after claimed Stop completes sole-root physical retirement', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return running.promise;
+        },
+        getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'idle' } }),
+        abortSession: async () => false,
+      })
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing worktree runtimes');
+    let scopedRetirementCalls = 0;
+    runtimes.retireRuntimeIfUnshared = async () => {
+      scopedRetirementCalls += 1;
+      return 'retired';
+    };
+    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory');
+    const promptRequest = handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps
+    );
+    try {
+      await started.promise;
+      const task = handlerDeps.operations.active(session.kiloSessionId);
+      if (!task) throw new Error('Missing operation record');
+      task.markPublicationScoped('publication cleanup failed', Date.now() + 1_000);
+      const stopping = handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: promptPayload.messageId,
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        handlerDeps
+      );
+      const stopped = await stopping;
+      expect(stopped).toMatchObject({
+        ok: true,
+        result: {
+          status: 'aborted',
+          quiescent: true,
+          runtimeRetired: true,
+          nativeRuntimeId: 'native_1',
+        },
+      });
+      expect(scopedRetirementCalls).toBe(1);
+      expect(directoryRetirement).not.toHaveBeenCalled();
+      expect(retired).toEqual([]);
+    } finally {
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await Promise.allSettled([promptRequest]);
+      await waitForTasks(handlerDeps);
+      directoryRetirement.mockRestore();
+    }
+  });
+
   it('keeps a scoped Stop unconfirmed when preparation fails after cancellation', async () => {
     const started = Promise.withResolvers<void>();
     const handlerDeps = deps({
@@ -2607,6 +3282,7 @@ describe('owned control execution', () => {
 
   it('bounds a hanging abort and cannot revive the runtime when its acknowledgement arrives late', async () => {
     const timers = spyOn(globalThis, 'setTimeout');
+    setSystemTime(0);
     const running = Promise.withResolvers<Completion>();
     const abortStarted = Promise.withResolvers<AbortSignal>();
     const remoteStopped = Promise.withResolvers<boolean>();
@@ -3343,7 +4019,7 @@ describe('control cancellation and attachments', () => {
       }),
     });
     const runtimes = handlerDeps.kiloRuntimes;
-    const firstRuntime = runtimes?.get(session.directory);
+    const firstRuntime = runtimes?.get(session);
     if (!runtimes || !firstRuntime) throw new Error('Expected preparation runtime');
     const secondDeps = deps(
       {
@@ -3368,12 +4044,20 @@ describe('control cancellation and attachments', () => {
       ok: true,
       result: { attached: true },
     });
-    const secondRuntime = secondDeps.kiloRuntimes?.get(secondSession.directory);
+    const secondRuntime = secondDeps.kiloRuntimes?.get(secondSession);
     if (!secondRuntime) throw new Error('Expected execution runtime');
-    runtimes.get = directory =>
-      directory === session.directory
+    runtimes.get = identity =>
+      (
+        typeof identity === 'string'
+          ? identity === session.directory
+          : identity.kiloSessionId === session.kiloSessionId
+      )
         ? firstRuntime
-        : directory === secondSession.directory
+        : (
+              typeof identity === 'string'
+                ? identity === secondSession.directory
+                : identity.kiloSessionId === secondSession.kiloSessionId
+            )
           ? secondRuntime
           : undefined;
     const attaching = handleControlRequest('session.attach', session, { kilo }, handlerDeps);
@@ -3562,6 +4246,12 @@ describe('control cancellation and attachments', () => {
       }),
     });
     try {
+      expect(await handleControlRequest('session.attach', identity, { kilo }, handlerDeps)).toEqual(
+        {
+          ok: true,
+          result: { attached: true },
+        }
+      );
       const accepted = await handleControlRequest(
         'session.prompt',
         identity,
@@ -3638,6 +4328,12 @@ describe('control cancellation and attachments', () => {
       emitSessionEvent: (_session, event) => events.push(event),
     });
     try {
+      expect(await handleControlRequest('session.attach', identity, { kilo }, handlerDeps)).toEqual(
+        {
+          ok: true,
+          result: { attached: true },
+        }
+      );
       await handleControlRequest(
         'session.prompt',
         identity,
@@ -4200,7 +4896,7 @@ describe('control interactions and sync', () => {
       ok: true,
       result: { status: { type: 'busy' }, questions: [], permissions: [] },
     });
-    const runtime = handlerDeps.kiloRuntimes?.get(session.directory);
+    const runtime = handlerDeps.kiloRuntimes?.get(session);
     if (!runtime) throw new Error('Expected worktree runtime');
     (runtime as { kiloClient: WrapperKiloClient }).kiloClient = fakeKilo({
       getQuestions: async () => {
@@ -4674,7 +5370,7 @@ describe('refreshHeartbeatPayload', () => {
         }
       );
     }
-    const runtime = handlerDeps.kiloRuntimes?.get(session.directory);
+    const runtime = handlerDeps.kiloRuntimes?.get(session);
     expect(runtime).toBeDefined();
     const refresh = refreshHeartbeatPayload(handlerDeps);
     try {
@@ -4688,7 +5384,7 @@ describe('refreshHeartbeatPayload', () => {
         result: { attached: true },
       });
       activity.attach(sibling.kiloSessionId);
-      expect(handlerDeps.kiloRuntimes?.get(session.directory)).toBe(runtime);
+      expect(handlerDeps.kiloRuntimes?.get(session)).toBe(runtime);
       statuses.resolve({ kilo_1: { type: 'busy' }, kilo_2: { type: 'busy', waitingOn: 'tool' } });
       expect(await refresh).toEqual({
         state: 'active',
@@ -4795,16 +5491,30 @@ describe('refreshHeartbeatPayload', () => {
       true
     );
     const runtimes = handlerDeps.kiloRuntimes;
-    const firstRuntime = runtimes?.get(first.directory);
-    const secondRuntime = otherDeps.kiloRuntimes?.get(second.directory);
+    const firstRuntime = runtimes?.get(first);
+    const secondRuntime = otherDeps.kiloRuntimes?.get(second);
     if (!runtimes || !firstRuntime || !secondRuntime)
       throw new Error('Expected directory runtimes');
-    runtimes.get = directory =>
-      directory === first.directory
+    runtimes.get = identity =>
+      (
+        typeof identity === 'string'
+          ? identity === first.directory
+          : identity.kiloSessionId === first.kiloSessionId
+      )
         ? firstRuntime
-        : directory === second.directory
+        : (
+              typeof identity === 'string'
+                ? identity === second.directory
+                : identity.kiloSessionId === second.kiloSessionId
+            )
           ? secondRuntime
           : undefined;
+    runtimes.getAll = directory =>
+      directory === first.directory
+        ? [firstRuntime]
+        : directory === second.directory
+          ? [secondRuntime]
+          : [];
     now = 150;
 
     const payload = await refreshHeartbeatPayload(handlerDeps);
@@ -4904,16 +5614,22 @@ describe('refreshHeartbeatPayload', () => {
       true
     );
     const runtimes = handlerDeps.kiloRuntimes;
-    const firstRuntime = runtimes?.get(first.directory);
-    const secondRuntime = otherDeps.kiloRuntimes?.get(second.directory);
+    const firstRuntime = runtimes?.get(first);
+    const secondRuntime = otherDeps.kiloRuntimes?.get(second);
     if (!runtimes || !firstRuntime || !secondRuntime)
       throw new Error('Expected directory runtimes');
-    runtimes.get = directory =>
-      directory === first.directory
+    runtimes.get = identity =>
+      (typeof identity === 'string' ? identity : identity.directory) === first.directory
         ? firstRuntime
-        : directory === second.directory
+        : (typeof identity === 'string' ? identity : identity.directory) === second.directory
           ? secondRuntime
           : undefined;
+    runtimes.getAll = directory =>
+      directory === first.directory
+        ? [firstRuntime]
+        : directory === second.directory
+          ? [secondRuntime]
+          : [];
     expect((await refreshHeartbeatPayload(handlerDeps)).sessions).toEqual([
       { kiloSessionId: 'kilo_1', state: 'active', idleForMs: 0, waitingOn: 'tool' },
       { kiloSessionId: 'kilo_2', state: 'finalizing', idleForMs: 0, waitingOn: 'finalizing' },
@@ -5007,16 +5723,30 @@ describe('refreshHeartbeatPayload', () => {
         other
       );
       const runtimes = handlerDeps.kiloRuntimes;
-      const firstRuntime = runtimes?.get(session.directory);
-      const otherRuntime = otherDeps.kiloRuntimes?.get(other.directory);
+      const firstRuntime = runtimes?.get(session);
+      const otherRuntime = otherDeps.kiloRuntimes?.get(other);
       if (!runtimes || !firstRuntime || !otherRuntime)
         throw new Error('Expected directory runtimes');
-      runtimes.get = directory =>
-        directory === session.directory
+      runtimes.get = identity =>
+        (
+          typeof identity === 'string'
+            ? identity === session.directory
+            : identity.kiloSessionId === session.kiloSessionId
+        )
           ? firstRuntime
-          : directory === other.directory
+          : (
+                typeof identity === 'string'
+                  ? identity === other.directory
+                  : identity.kiloSessionId === other.kiloSessionId
+              )
             ? otherRuntime
             : undefined;
+      runtimes.getAll = directory =>
+        directory === session.directory
+          ? [firstRuntime]
+          : directory === other.directory
+            ? [otherRuntime]
+            : [];
 
       const payload = await refreshHeartbeatPayload(handlerDeps);
       expect(reads).toHaveLength(2);

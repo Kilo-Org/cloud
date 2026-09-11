@@ -26,6 +26,8 @@ import type { Owner } from '@/lib/code-reviews/core';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/adapter';
+import { resolveRepositorySettings } from '@/lib/integrations/github-repository-settings';
+import { getRepositoryCustomization } from '@/lib/integrations/db/platform-integrations';
 import {
   addReactionToPR,
   createCheckRun,
@@ -141,7 +143,7 @@ export async function handlePullRequestCodeReview(
     // 3. Check if repository is in allowed list (when using selected repositories mode)
     const config = agentConfig.config as CodeReviewAgentConfig;
 
-    // Bot PRs are skipped by default (enforced at step 5b). Compute the decision up front so the
+    // Bot PRs are skipped by default (enforced at step 5c). Compute the decision up front so the
     // merge-commit path (step 4) also defers to it: otherwise a bot PR whose head is a merge commit
     // would be re-pointed to a new SHA with a fresh check run, keeping alive a review the guardrail
     // is meant to skip. When true, the PR falls through to cancellation + skip instead.
@@ -297,10 +299,35 @@ export async function handlePullRequestCodeReview(
       );
     }
 
-    // 5b. Feature-level guardrail: by default, skip automated reviews of bot-authored PRs
+    // 5b. Check the repository-level PR review toggle. This is the same
+    // `repository_customizations.pr_review_mode` setting (with installation-level
+    // default fallback) already resolved for the bot-mention model override —
+    // see `resolveRepositorySettings`/`resolveModelForGitHubRepository` in
+    // github-repository-settings.ts. Reusing it here keeps "reviews on/off" a
+    // single per-repo setting rather than a second, code-review-specific flag.
+    // Runs AFTER supersession (step 5) so an in-flight review is still cancelled and its
+    // check run resolved even if the setting was toggled off after the review started;
+    // otherwise the check run would stay open on the PR until the stale-review reaper runs.
+    const repositoryCustomization = await getRepositoryCustomization(
+      integration.id,
+      String(repository.id)
+    );
+    const { prReviewMode } = resolveRepositorySettings(integration, repositoryCustomization);
+
+    if (prReviewMode === 'off') {
+      logExceptInTest(
+        `PR reviews disabled for repository ${repository.full_name} (ID: ${repository.id})`
+      );
+      return NextResponse.json(
+        { message: 'PR reviews disabled for this repository' },
+        { status: 200 }
+      );
+    }
+
+    // 5c. Feature-level guardrail: by default, skip automated reviews of bot-authored PRs
     // (dependabot/renovate/etc.) — high-volume, low-value dependency bumps otherwise consume review
     // compute and clutter the PR. Configurable per org via `skip_bot_pull_requests` (see the
-    // decision computed before step 4). Applies to standard and council reviews; manual reviews
+    // decision computed before step 3). Applies to standard and council reviews; manual reviews
     // never reach this handler. Runs AFTER supersession (step 5) so a bot push still cancels any
     // stale in-flight review and resolves its check run, instead of leaving it stuck.
     if (isBotPullRequestSkip) {

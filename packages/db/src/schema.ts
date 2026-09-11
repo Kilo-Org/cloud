@@ -5854,6 +5854,9 @@ export const cloud_agent_code_review_attempts = pgTable(
       table.attempt_number
     ),
     index('idx_cloud_agent_code_review_attempts_code_review_id').on(table.code_review_id),
+    index('idx_cloud_agent_code_review_attempts_retry_of_attempt_id')
+      .on(table.retry_of_attempt_id)
+      .concurrently(),
     index('idx_cloud_agent_code_review_attempts_session_id').on(table.session_id),
     index('idx_cloud_agent_code_review_attempts_cli_session_id').on(table.cli_session_id),
     index('idx_cloud_agent_code_review_attempts_status').on(table.status),
@@ -6238,6 +6241,9 @@ export type CloudAgentFailureReason =
   | 'setup_command'
   | 'source_control_authentication'
   | 'source_control_configuration'
+  | 'source_control_clone_timeout'
+  | 'source_control_checkout_timeout'
+  | 'source_control_repository_corrupt'
   | 'sandbox_capacity'
   | 'sandbox_connectivity'
   | 'runtime_startup'
@@ -6248,17 +6254,41 @@ export type CloudAgentFailureReason =
   | 'managed_model_configuration'
   | 'provider_unavailable'
   | 'request_timeout'
+  | 'assistant_invalid_request'
+  | 'assistant_context_limit'
+  | 'assistant_output_limit'
+  | 'assistant_content_filter'
+  | 'assistant_structured_output'
+  | 'provider_ownership_unknown'
+  | 'source_control_network'
+  | 'assistant_unknown'
+  | 'wrapper_disconnected'
+  | 'wrapper_startup'
+  | 'wrapper_crash'
+  | 'assistant_no_reply'
+  | 'user_interrupt'
+  | 'container_shutdown'
+  | 'system_interrupt'
+  | 'workspace_unknown'
+  | 'session_import_timeout'
+  | 'session_import_failed'
+  | 'setup_command_timeout'
+  | 'admission_capacity'
+  | 'admission_not_found'
+  | 'admission_internal'
+  | 'admission_compute_stopping'
+  | 'admission_billing_unavailable'
+  | 'admission_forbidden'
+  | 'session_coordination'
+  | 'initial_request_invalid'
+  | 'initial_admission_unknown'
+  // Deprecated producer values retained so historical text rows still resolve to
+  // a label. Keep in sync with @kilocode/worker-utils/cloud-agent-failure.
   | 'invalid_request'
   | 'context_limit'
   | 'output_limit'
   | 'content_filter'
   | 'structured_output'
-  | 'source_control_network'
-  | 'assistant_unknown'
-  | 'workspace_unknown'
-  | 'session_coordination'
-  | 'initial_request_invalid'
-  | 'initial_admission_unknown'
   | 'unclassified';
 
 export const cloud_agent_sessions = pgTable(

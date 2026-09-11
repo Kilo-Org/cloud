@@ -1,10 +1,16 @@
 import { createMiddleware } from 'hono/factory';
-import { extractBearerToken } from '@kilocode/worker-utils';
+import { extractBearerToken, getCachedSecret } from '@kilocode/worker-utils';
 import {
   SESSION_INGEST_AUDIENCE,
   SESSION_INGEST_USER_DELETION_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
+import {
+  CloudAgentNextRuntimeAuthorizationClaimSchema,
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+  verifyRuntimeProxyAttestation,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
+import { decodeJwt } from 'jose';
 
 import type { Env } from '../env';
 
@@ -92,6 +98,35 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
 
   if (!auth) {
     return c.json({ success: false, error: 'Invalid or expired token' }, 401);
+  }
+
+  const runtimeAuthorization = CloudAgentNextRuntimeAuthorizationClaimSchema.safeParse(
+    decodeJwt(token).runtimeAuthorization
+  );
+  if (runtimeAuthorization.success) {
+    let attested: boolean;
+    try {
+      const secret = await getCachedSecret(c.env.NEXTAUTH_SECRET_PROD, 'NEXTAUTH_SECRET');
+      attested = await verifyRuntimeProxyAttestation({
+        value: c.req.header(RUNTIME_PROXY_ATTESTATION_HEADER),
+        secret,
+        audience: SESSION_INGEST_AUDIENCE,
+        userId: auth.userId,
+        authorizationId: runtimeAuthorization.data.id,
+        resourceId: runtimeAuthorization.data.resourceId,
+        bearer: token,
+      });
+    } catch (error) {
+      console.error('Auth infrastructure failure', {
+        operation: 'runtime-proxy-attestation-verify',
+        errorClass: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
+    }
+    if (!attested) {
+      return c.json({ success: false, error: 'Invalid runtime proxy attestation' }, 401);
+    }
   }
 
   c.set('user_id', auth.userId);

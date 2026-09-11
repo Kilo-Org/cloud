@@ -9,7 +9,10 @@ import {
   SlackWorkspaceAlreadyConnectedError,
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
-import { ownerHasSharedGitHubInstallation } from '@/lib/integrations/provider-oauth-attempts';
+import {
+  consumeProviderOAuthAttempt,
+  ownerHasSharedGitHubInstallation,
+} from '@/lib/integrations/provider-oauth-attempts';
 import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
@@ -23,10 +26,7 @@ import {
   parseOAuthStateOwner,
   cancelMissingCodeProviderOAuthAttempt,
 } from '@/lib/integrations/oauth/common';
-import {
-  claimLegacySlackProviderInstallation,
-  claimSlackProviderInstallation,
-} from '@/lib/integrations/provider-installation-reservations';
+import { claimSlackProviderInstallation } from '@/lib/integrations/provider-installation-reservations';
 import { exchangeSlackOAuthCode } from '@/lib/integrations/platforms/slack/oauth-exchange';
 
 const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
@@ -135,6 +135,21 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
+    const sharedGitHubOwner = await ownerHasSharedGitHubInstallation(owner);
+    if (
+      !sharedGitHubOwner &&
+      verified.purpose === 'provider_install' &&
+      !(await consumeProviderOAuthAttempt({
+        actorUserId: user.id,
+        owner,
+        provider: 'slack',
+        state,
+        purpose: 'provider_install',
+      }))
+    ) {
+      throw new Error('Slack OAuth attempt is invalid, expired, or already used');
+    }
+
     // 7. Exchange with Slack before writing provider installation state.
     await bot.initialize();
     const slackAdapter = bot.getAdapter('slack');
@@ -142,16 +157,16 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       code,
       SLACK_REDIRECT_URI
     );
-    if (installation.isEnterpriseInstall) {
-      if (await ownerHasSharedGitHubInstallation(owner)) {
-        throw new Error('Enterprise Grid is not supported for shared GitHub Slack workflows');
-      }
-      await slackAdapter.setInstallation(teamId, installation);
+    if (!sharedGitHubOwner) {
       await upsertSlackInstallation({ owner, teamId, installation });
+      await slackAdapter.setInstallation(teamId, installation);
       const successPath = verified.returnTo
         ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=slack_installed')
         : buildIntegrationOAuthRedirectPath(PLATFORM.SLACK, owner, 'success=installed');
       return NextResponse.redirect(new URL(successPath, APP_URL));
+    }
+    if (installation.isEnterpriseInstall) {
+      throw new Error('Enterprise Grid is not supported for shared GitHub Slack workflows');
     }
     await completePendingSlackDeletion(
       teamId,
@@ -163,34 +178,21 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
 
     // 8. Store installation in database and activate Chat SDK state for the winning generation.
     try {
-      if (verified.purpose === 'provider_install') {
-        const claim = await claimSlackProviderInstallation({
-          actorUserId: user.id,
-          owner,
-          state,
-          teamId,
-        });
-        if (!claim) throw new Error('Slack OAuth attempt is invalid, expired, or already used');
-        await activateReservedSlackInstallation({
-          owner,
-          teamId,
-          installation,
-          grantedScopes,
-          claim,
-          setChatSdkInstallation: (id, value) => slackAdapter.setInstallation(id, value),
-        });
-      } else {
-        const claim = await claimLegacySlackProviderInstallation(owner, teamId);
-        if (!claim) throw new SlackWorkspaceAlreadyConnectedError(installation.teamName ?? teamId);
-        await activateReservedSlackInstallation({
-          owner,
-          teamId,
-          installation,
-          grantedScopes,
-          claim,
-          setChatSdkInstallation: (id, value) => slackAdapter.setInstallation(id, value),
-        });
-      }
+      const claim = await claimSlackProviderInstallation({
+        actorUserId: user.id,
+        owner,
+        state,
+        teamId,
+      });
+      if (!claim) throw new Error('Slack OAuth attempt is invalid, expired, or already used');
+      await activateReservedSlackInstallation({
+        owner,
+        teamId,
+        installation,
+        grantedScopes,
+        claim,
+        setChatSdkInstallation: (id, value) => slackAdapter.setInstallation(id, value),
+      });
     } catch (error) {
       if (error instanceof SlackWorkspaceAlreadyConnectedError) {
         return NextResponse.redirect(

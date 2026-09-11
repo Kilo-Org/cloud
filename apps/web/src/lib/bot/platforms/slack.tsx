@@ -16,7 +16,6 @@ import { APP_URL } from '@/lib/constants';
 import {
   getAccessTokenFromInstallation,
   getActiveSlackInstallationForRuntime,
-  getUnsharedEnterpriseSlackInstallation,
   withSlackSdkTimeout,
 } from '@/lib/integrations/slack-service';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -286,9 +285,9 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
         throw new Error(`No Slack account id for platform integration ${platformIntegration.id}`);
       }
 
-      const installation =
-        (await withSlackSdkTimeout(getActiveSlackInstallationForRuntime(platformAccountId))) ??
-        (await getUnsharedEnterpriseSlackInstallation(platformIntegration));
+      const installation = await withSlackSdkTimeout(
+        getActiveSlackInstallationForRuntime(platformAccountId)
+      );
       if (!installation) {
         throw new Error(`No Slack installation for platform integration ${platformIntegration.id}`);
       }

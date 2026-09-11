@@ -143,71 +143,6 @@ export async function claimSlackProviderInstallation(input: {
   }
 }
 
-export async function claimLegacySlackProviderInstallation(
-  owner: Owner,
-  teamId: string
-): Promise<SlackReservationClaim | null> {
-  await expireStaleSlackReservation(teamId);
-  try {
-    return await db.transaction(async tx => {
-      await lockProviderOAuthOwnerRow(tx, owner);
-      const now = new Date().toISOString();
-      const [reservation] = await tx
-        .select()
-        .from(provider_installation_reservations)
-        .where(
-          and(
-            eq(provider_installation_reservations.provider, 'slack'),
-            eq(provider_installation_reservations.provider_installation_id, teamId)
-          )
-        )
-        .for('update');
-      if (reservation && !matchesOwner(reservation, owner)) return null;
-      if (reservation?.status === 'deleting') return null;
-      const generation = (reservation?.generation ?? 0) + 1;
-      const activeGeneration =
-        reservation?.status === 'active'
-          ? reservation.generation
-          : (reservation?.active_generation ?? null);
-      const values = {
-        owned_by_user_id: owner.type === 'user' ? owner.id : null,
-        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-        platform_integration_id:
-          reservation?.status === 'active' || reservation?.active_generation
-            ? reservation.platform_integration_id
-            : null,
-        oauth_attempt_id: null,
-        generation,
-        active_generation: activeGeneration,
-        status: 'pending' as const,
-        expires_at: new Date(Date.now() + RESERVATION_TTL_MS).toISOString(),
-        updated_at: now,
-      };
-      const [claimed] = reservation
-        ? await tx
-            .update(provider_installation_reservations)
-            .set(values)
-            .where(eq(provider_installation_reservations.id, reservation.id))
-            .returning({ id: provider_installation_reservations.id })
-        : await tx
-            .insert(provider_installation_reservations)
-            .values({ provider: 'slack', provider_installation_id: teamId, ...values })
-            .returning({ id: provider_installation_reservations.id });
-      return { reservationId: claimed.id, attemptId: null, generation };
-    });
-  } catch (error) {
-    if (
-      error &&
-      typeof error === 'object' &&
-      'constraint' in error &&
-      error.constraint === 'UQ_provider_installation_reservations_identity'
-    ) {
-      return null;
-    }
-    throw error;
-  }
-}
-
 function matchesOwner(
   reservation: typeof provider_installation_reservations.$inferSelect,
   owner: Owner
@@ -288,53 +223,6 @@ export async function activateSlackReservation(
     )
     .returning({ id: provider_oauth_attempts.id });
   return completed.length === 1;
-}
-
-export async function adoptLegacySlackReservation(
-  owner: Owner,
-  integrationId: string,
-  teamId: string
-): Promise<void> {
-  const [existing] = await db
-    .select({ id: provider_installation_reservations.id })
-    .from(provider_installation_reservations)
-    .where(
-      and(
-        eq(provider_installation_reservations.provider, 'slack'),
-        eq(provider_installation_reservations.provider_installation_id, teamId)
-      )
-    )
-    .limit(1);
-  if (existing) return;
-  await db.transaction(async tx => {
-    await lockProviderOAuthOwnerRow(tx, owner);
-    const [integration] = await tx
-      .select({ id: platform_integrations.id })
-      .from(platform_integrations)
-      .where(
-        and(
-          eq(platform_integrations.id, integrationId),
-          eq(platform_integrations.platform, 'slack'),
-          eq(platform_integrations.integration_status, 'active')
-        )
-      )
-      .for('update');
-    if (!integration) return;
-    await tx
-      .insert(provider_installation_reservations)
-      .values({
-        provider: 'slack',
-        provider_installation_id: teamId,
-        owned_by_user_id: owner.type === 'user' ? owner.id : null,
-        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-        platform_integration_id: integrationId,
-        generation: 1,
-        active_generation: 1,
-        status: 'active',
-        expires_at: '9999-12-31T23:59:59.999Z',
-      })
-      .onConflictDoNothing();
-  });
 }
 
 export async function expireSlackReservations(input: {

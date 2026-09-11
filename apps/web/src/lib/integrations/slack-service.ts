@@ -26,10 +26,12 @@ import {
   getSlackCredentialByIntegrationId,
 } from '@/lib/integrations/platforms/slack/credential-store';
 import { captureException } from '@sentry/nextjs';
-import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-attempts';
+import {
+  lockProviderOAuthOwnerRow,
+  ownerHasSharedGitHubInstallation,
+} from '@/lib/integrations/provider-oauth-attempts';
 import {
   activateSlackReservation,
-  adoptLegacySlackReservation,
   expireSlackReservations,
   expireStaleSlackReservation,
   getRecoverableSlackReservation,
@@ -152,12 +154,6 @@ export async function getInstallation(owner: Owner): Promise<PlatformIntegration
     )
     .limit(1);
 
-  if (
-    integration?.integration_status === INTEGRATION_STATUS.ACTIVE &&
-    integration.platform_installation_id
-  ) {
-    await adoptLegacySlackReservation(owner, integration.id, integration.platform_installation_id);
-  }
   return integration || null;
 }
 
@@ -209,7 +205,14 @@ export async function getActiveSlackInstallationForRuntime(
       )
     )
     .limit(1);
-  if (!row) return null;
+  if (!row) {
+    const legacy = await getInstallationByTeamId(teamId);
+    const owner = legacy ? getOwnerFromInstallation(legacy) : null;
+    if (!legacy || !owner || (await ownerHasSharedGitHubInstallation(owner))) return null;
+    const botToken = await getSlackAccessToken(legacy);
+    if (!botToken) return null;
+    return { botToken };
+  }
   const owner = getOwnerFromInstallation(row.integration);
   if (!owner) return null;
   const credential = await getSlackCredentialByIntegrationId(row.integration.id);
@@ -727,24 +730,6 @@ export async function recoverSlackInstallation(
   return true;
 }
 
-export async function adoptLegacySlackInstallationByTeamId(teamId: string): Promise<void> {
-  const [integration] = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.SLACK),
-        eq(platform_integrations.platform_installation_id, teamId),
-        eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE)
-      )
-    )
-    .limit(1);
-  if (!integration) return;
-  const owner = getOwnerFromInstallation(integration);
-  if (!owner) return;
-  await adoptLegacySlackReservation(owner, integration.id, teamId);
-}
-
 /**
  * Uninstall Slack integration for an owner
  */
@@ -1001,8 +986,6 @@ export async function deleteInstallationByTeamId(
   if (!candidate) return { success: true, deleted: false };
   const owner = getOwnerFromInstallation(candidate);
   if (!owner) return { success: true, deleted: false };
-  await adoptLegacySlackReservation(owner, candidate.id, teamId);
-
   const deactivated = await deactivateSlackInstallation(owner, teamId, options.eventTime, false);
   if (!deactivated) return { success: true, deleted: false };
   const completed = await cleanupDeactivatedSlackInstallation(deactivated, {
@@ -1215,30 +1198,10 @@ export type SlackPostMessageResponse = {
   error?: string;
 };
 
-/**
- * Extract access token from installation metadata
- */
 export async function getAccessTokenFromInstallation(
   integration: PlatformIntegration
 ): Promise<string | null> {
   return getSlackAccessToken(integration);
-}
-
-export async function getUnsharedEnterpriseSlackInstallation(
-  integration: PlatformIntegration
-): Promise<SlackInstallation | null> {
-  const owner = getOwnerFromInstallation(integration);
-  if (!owner) return null;
-  const credential = await getSlackCredentialByIntegrationId(integration.id);
-  if (!credential?.is_enterprise_install) return null;
-  const botToken = decryptSlackBotToken(credential, owner);
-  if (!botToken) return null;
-  return {
-    botToken,
-    isEnterpriseInstall: true,
-    ...(credential.bot_user_id ? { botUserId: credential.bot_user_id } : {}),
-    ...(credential.slack_enterprise_id ? { enterpriseId: credential.slack_enterprise_id } : {}),
-  };
 }
 
 /**

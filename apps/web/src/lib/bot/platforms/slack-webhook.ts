@@ -30,6 +30,7 @@ export function getSlackTeamId(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null;
   const envelope = payload as {
     team_id?: unknown;
+    team?: unknown;
     enterprise_id?: unknown;
     is_enterprise_install?: unknown;
     authorizations?: unknown;
@@ -57,6 +58,15 @@ export function getSlackTeamId(payload: unknown): string | null {
   if ('team_id' in payload && typeof payload.team_id === 'string') return payload.team_id;
   if ('team_id' in payload && payload.team_id === null && 'enterprise_id' in payload) {
     return typeof payload.enterprise_id === 'string' ? payload.enterprise_id : null;
+  }
+  if (typeof envelope.team === 'string') return envelope.team;
+  if (
+    envelope.team &&
+    typeof envelope.team === 'object' &&
+    'id' in envelope.team &&
+    typeof envelope.team.id === 'string'
+  ) {
+    return envelope.team.id;
   }
   return null;
 }
@@ -112,9 +122,11 @@ async function handleSlackAppUninstalled(
     const result = await deleteInstallationByTeamId(teamId, {
       eventTime,
       deleteChatSdkInstallation: id => slackAdapter.deleteInstallation(id),
+      deleteChatSdkIdentityCache: async id => {
+        await unlinkTeamKiloUsers(chat.getState(), PLATFORM.SLACK, id);
+      },
     });
     if (!result.deleted) return;
-    await unlinkTeamKiloUsers(chat.getState(), PLATFORM.SLACK, teamId);
   } catch (error) {
     captureException(error, {
       level: 'error',

@@ -957,6 +957,7 @@ export async function deleteInstallationByTeamId(
   options: {
     eventTime?: number;
     deleteChatSdkInstallation?: (teamId: string) => Promise<void>;
+    deleteChatSdkIdentityCache?: (teamId: string) => Promise<void>;
   } = {}
 ) {
   const candidate = await getInstallationByTeamId(teamId);
@@ -967,10 +968,11 @@ export async function deleteInstallationByTeamId(
 
   const deactivated = await deactivateSlackInstallation(owner, teamId, options.eventTime, false);
   if (!deactivated) return { success: true, deleted: false };
-  await cleanupDeactivatedSlackInstallation(deactivated, {
+  const completed = await cleanupDeactivatedSlackInstallation(deactivated, {
     deleteChatSdkInstallation: options.deleteChatSdkInstallation,
+    deleteChatSdkIdentityCache: options.deleteChatSdkIdentityCache,
   });
-  return { success: true, deleted: true };
+  return { success: true, deleted: completed };
 }
 
 export async function completePendingSlackDeletion(

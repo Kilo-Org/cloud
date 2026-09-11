@@ -1,0 +1,1 @@
+ALTER TABLE "provider_installation_aliases" ADD COLUMN "event_time" bigint NOT NULL;

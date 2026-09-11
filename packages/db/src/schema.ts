@@ -4566,6 +4566,7 @@ export const provider_installation_aliases = pgTable(
       .notNull()
       .references(() => provider_installation_reservations.id, { onDelete: 'cascade' }),
     generation: integer().notNull(),
+    event_time: bigint({ mode: 'number' }).notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

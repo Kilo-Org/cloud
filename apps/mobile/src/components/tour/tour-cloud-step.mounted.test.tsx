@@ -18,13 +18,16 @@ const liveSync = vi.hoisted(() => {
     isFetching: boolean;
     refetch: () => Promise<boolean>;
   };
-  const initial = (): Snapshot => ({
+  const initialSnapshot: Snapshot = {
     data: undefined,
     isError: false,
     isFetching: false,
-    refetch: () => Promise.resolve(true),
-  });
-  let snapshot = initial();
+    refetch: async () => {
+      await Promise.resolve();
+      return true;
+    },
+  };
+  let snapshot = initialSnapshot;
   const listeners = new Set<() => void>();
   return {
     get: () => snapshot,
@@ -41,7 +44,7 @@ const liveSync = vi.hoisted(() => {
       };
     },
     reset: () => {
-      snapshot = initial();
+      snapshot = initialSnapshot;
       listeners.clear();
     },
   };
@@ -118,6 +121,7 @@ describe('TourCloudStep', () => {
     expect(onCompletedChange).toHaveBeenLastCalledWith(false);
 
     await act(async () => {
+      await Promise.resolve();
       liveSync.set({
         data: {
           sessions: [
@@ -135,7 +139,10 @@ describe('TourCloudStep', () => {
 
   it('shows a working retry for a retryable network failure without completing', async () => {
     const onCompletedChange = vi.fn<(completed: boolean) => void>();
-    const refetch = vi.fn(async () => true);
+    const refetch = vi.fn(async () => {
+      await Promise.resolve();
+      return true;
+    });
     liveSync.set({ data: undefined, isError: true, refetch });
 
     const { renderer, unmount } = await renderWithProviders(
@@ -147,6 +154,7 @@ describe('TourCloudStep', () => {
     expect(onCompletedChange).toHaveBeenLastCalledWith(false);
 
     await act(async () => {
+      await Promise.resolve();
       press(renderer.root.findByType('Button' as ElementType));
     });
 
@@ -164,6 +172,7 @@ describe('TourCloudStep', () => {
     );
 
     await act(async () => {
+      await Promise.resolve();
       press(renderer.root.findByType('Button' as ElementType));
     });
     expect(clearRunOnDestinationPreference).toHaveBeenCalledTimes(1);
@@ -171,6 +180,7 @@ describe('TourCloudStep', () => {
 
     // The live service refused the create, so no cloud row ever appears.
     await act(async () => {
+      await Promise.resolve();
       liveSync.set({ data: { sessions: [] } });
     });
     await waitFor(() => hasText(renderer, 'tour.cloudWaiting'));
@@ -192,6 +202,7 @@ describe('TourCloudStep', () => {
     expect(onCompletedChange).toHaveBeenLastCalledWith(false);
 
     await act(async () => {
+      await Promise.resolve();
       press(renderer.root.findByType('Button' as ElementType));
     });
     await waitFor(() => hasText(renderer, 'tour.cloudWaiting'));

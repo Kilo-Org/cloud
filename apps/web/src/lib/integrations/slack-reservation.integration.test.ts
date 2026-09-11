@@ -20,6 +20,8 @@ import {
   claimSlackProviderInstallation,
   claimLegacySlackProviderInstallation,
   expireStaleSlackReservation,
+  recordSlackInstallationAlias,
+  resolveSlackInstallationAlias,
 } from './provider-installation-reservations';
 import {
   activateReservedSlackInstallation,
@@ -642,5 +644,50 @@ describe('Slack provider installation activation', () => {
         teamId: 'T_DELETING',
       })
     ).resolves.toMatchObject({ generation: 1 });
+  });
+
+  it('maps multiple Enterprise Grid workspaces to the active installation generation', async () => {
+    const actor = await insertTestUser();
+    const owner = { type: 'user' as const, id: actor.id };
+    await beginProviderOAuthAttempt({
+      actorUserId: actor.id,
+      owner,
+      provider: 'slack',
+      state: 'grid',
+    });
+    const claim = await claimSlackProviderInstallation({
+      actorUserId: actor.id,
+      owner,
+      state: 'grid',
+      teamId: 'E_GRID',
+    });
+    if (!claim) throw new Error('Expected Grid claim');
+    await activateReservedSlackInstallation({
+      owner,
+      teamId: 'E_GRID',
+      installation: {
+        botToken: 'xoxb-grid',
+        enterpriseId: 'E_GRID',
+        isEnterpriseInstall: true,
+      },
+      grantedScopes: null,
+      claim,
+      ...pendingCodec,
+      writeCredential: writeCredential as never,
+      setChatSdkInstallation: async () => undefined,
+    });
+    const eventTime = Math.floor(Date.now() / 1000) + 10;
+    await recordSlackInstallationAlias({
+      workspaceId: 'T_ONE',
+      installationId: 'E_GRID',
+      eventTime,
+    });
+    await recordSlackInstallationAlias({
+      workspaceId: 'T_TWO',
+      installationId: 'E_GRID',
+      eventTime,
+    });
+    await expect(resolveSlackInstallationAlias('T_ONE')).resolves.toBe('E_GRID');
+    await expect(resolveSlackInstallationAlias('T_TWO')).resolves.toBe('E_GRID');
   });
 });

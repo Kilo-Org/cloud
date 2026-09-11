@@ -4558,6 +4558,26 @@ export const provider_installation_pending_credentials = pgTable(
   ]
 );
 
+export const provider_installation_aliases = pgTable(
+  'provider_installation_aliases',
+  {
+    workspace_id: text().primaryKey(),
+    reservation_id: uuid()
+      .notNull()
+      .references(() => provider_installation_reservations.id, { onDelete: 'cascade' }),
+    generation: integer().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check('provider_installation_aliases_generation_check', sql`${table.generation} > 0`),
+    index('IDX_provider_installation_aliases_reservation').on(table.reservation_id),
+  ]
+);
+
 export const github_connection_attempts = pgTable(
   'github_connection_attempts',
   {
@@ -4800,8 +4820,8 @@ export const slack_oauth_credentials = pgTable(
     platform_integration_id: uuid()
       .notNull()
       .references(() => platform_integrations.id, { onDelete: 'cascade' }),
-    // Slack workspace ID (`T...`). Mirrors platform_integrations.platform_installation_id
-    // and is part of the encryption AAD, so it must not be updated in place.
+    // Slack installation identity (`T...` workspace or `E...` Enterprise Grid ID).
+    // It is part of the encryption AAD, so it must not be updated in place.
     slack_team_id: text().notNull(),
     slack_enterprise_id: text(),
     is_enterprise_install: boolean().notNull().default(false),

@@ -904,6 +904,11 @@ export function ChatComposer({
       toast.error(submission.message);
       return;
     }
+    if (submission.type === 'goal-compose') {
+      // Bare `/goal` is a compose mode: keep the draft and send nothing. The
+      // user adds an objective (or pause/resume/clear) and submits again.
+      return;
+    }
 
     // The admission lock is owned by `settleVoiceInputBeforeSubmit` for the
     // full settle + submit sequence, so `handleSend` performs validation and

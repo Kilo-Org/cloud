@@ -264,11 +264,11 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 ### AI Providers
 
-- `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
+- `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/definitions/openrouter.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
 - `OPENAI_API_KEY` - OpenAI API key supplied as a managed BYOK credential when managed inference requests route through the Vercel AI Gateway and permit the OpenAI provider. `[SECRET]`
 - `MISTRAL_API_KEY` - Mistral API key; used in `apps/web/src/lib/ai-gateway/embeddings/embedding-providers.ts` for `codestral-embed-2505` and `mistral-embed` embeddings, in the FIM completions proxy at `apps/web/src/app/api/fim/completions/route.ts` (routes Mistral Codestral vs. La Plateforme keys), and as a provider config in `apps/web/src/lib/config.server.ts`. `[SECRET]`
-- `LONGCAT_API_KEY` - LongCat API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
-- `STREAMLAKE_API_KEY` - StreamLake API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
+- `LONGCAT_API_KEY` - LongCat API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/definitions/longcat.ts`. `[SECRET]`
+- `STREAMLAKE_API_KEY` - StreamLake API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/definitions/streamlake.ts`. `[SECRET]`
 - `PERPLEXITY_API_KEY` - Perplexity API key for percentage-routed Kimi K3 inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/partner/providers.ts`. `[SECRET]`
 - `INCEPTION_API_KEY` - Inception Labs API key; used in `apps/web/src/app/api/fim/completions/route.ts` and `apps/web/src/app/api/edit/completions/route.ts` as a fill-in-the-middle (FIM) provider, with endpoint `https://api.inceptionlabs.ai/v1/fim/completions`. Defined in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `AI_ATTRIBUTION_ADMIN_SECRET` - Admin secret for the AI Attribution service (`apps/web/src/lib/ai-attribution-service.ts`); sent as `X-Admin-Secret` header. `[SECRET]`

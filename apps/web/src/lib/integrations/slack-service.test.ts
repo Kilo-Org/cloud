@@ -93,7 +93,7 @@ function mockUninstallRows(integration: ReturnType<typeof buildSlackIntegration>
     .mockResolvedValueOnce([integration])
     .mockResolvedValueOnce([integration])
     .mockResolvedValueOnce([integration])
-    .mockResolvedValueOnce([]);
+    .mockResolvedValueOnce([integration]);
 }
 
 describe('slack-service uninstallApp', () => {
@@ -142,7 +142,7 @@ describe('slack-service uninstallApp', () => {
       success: true,
     });
 
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
   });
 
   it('finishes local uninstall when Chat SDK identity cleanup fails', async () => {

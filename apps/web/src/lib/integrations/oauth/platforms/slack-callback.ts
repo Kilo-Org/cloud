@@ -5,6 +5,7 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
   activateReservedSlackInstallation,
+  completePendingSlackDeletion,
   SlackWorkspaceAlreadyConnectedError,
 } from '@/lib/integrations/slack-service';
 import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
@@ -138,6 +139,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       code,
       SLACK_REDIRECT_URI
     );
+    await completePendingSlackDeletion(teamId, id => slackAdapter.deleteInstallation(id));
 
     // 8. Store installation in database and activate Chat SDK state for the winning generation.
     try {

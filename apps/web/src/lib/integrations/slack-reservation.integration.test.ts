@@ -23,6 +23,7 @@ import {
 } from './provider-installation-reservations';
 import {
   activateReservedSlackInstallation,
+  completePendingSlackDeletion,
   deleteInstallationByTeamId,
   recoverSlackInstallation,
 } from './slack-service';
@@ -268,7 +269,75 @@ describe('Slack provider installation activation', () => {
     ).resolves.toEqual([
       expect.objectContaining({ status: 'active', generation: 1, active_generation: 1 }),
     ]);
+    await expect(
+      db
+        .select()
+        .from(provider_installation_pending_credentials)
+        .where(eq(provider_installation_pending_credentials.reservation_id, second.reservationId))
+    ).resolves.toHaveLength(0);
   });
+
+  it.each(['same-owner', 'other-owner'])(
+    'releases an expired failed first install for %s retry',
+    async retryKind => {
+      const actor = await insertTestUser();
+      const retryActor = retryKind === 'same-owner' ? actor : await insertTestUser();
+      const owner = { type: 'user' as const, id: actor.id };
+      await beginProviderOAuthAttempt({
+        actorUserId: actor.id,
+        owner,
+        provider: 'slack',
+        state: 'orphaned',
+      });
+      const claim = await claimSlackProviderInstallation({
+        actorUserId: actor.id,
+        owner,
+        state: 'orphaned',
+        teamId: 'T_ORPHANED',
+      });
+      if (!claim) throw new Error('Expected first claim');
+      await expect(
+        activateReservedSlackInstallation({
+          owner,
+          teamId: 'T_ORPHANED',
+          installation: { botToken: 'xoxb-orphaned', teamName: 'Workspace' },
+          grantedScopes: null,
+          claim,
+          ...pendingCodec,
+          writeCredential: writeCredential as never,
+          setChatSdkInstallation: async () => {
+            throw new Error('state unavailable');
+          },
+        })
+      ).rejects.toThrow('state unavailable');
+      await db
+        .update(provider_installation_reservations)
+        .set({ expires_at: '2020-01-01T00:00:00.000Z' })
+        .where(eq(provider_installation_reservations.id, claim.reservationId));
+      await expireStaleSlackReservation('T_ORPHANED');
+      await expect(
+        db
+          .select()
+          .from(platform_integrations)
+          .where(eq(platform_integrations.platform_installation_id, 'T_ORPHANED'))
+      ).resolves.toHaveLength(0);
+
+      const retryOwner = { type: 'user' as const, id: retryActor.id };
+      await beginProviderOAuthAttempt({
+        actorUserId: retryActor.id,
+        owner: retryOwner,
+        provider: 'slack',
+        state: 'retry',
+      });
+      const retry = await claimSlackProviderInstallation({
+        actorUserId: retryActor.id,
+        owner: retryOwner,
+        state: 'retry',
+        teamId: 'T_ORPHANED',
+      });
+      expect(retry).toMatchObject({ generation: 1 });
+    }
+  );
 
   it('releases reservation locks after an SDK timeout and permits recovery', async () => {
     const actor = await insertTestUser();
@@ -492,5 +561,73 @@ describe('Slack provider installation activation', () => {
     await expect(
       db.select().from(platform_integrations).where(eq(platform_integrations.id, integration.id))
     ).resolves.toHaveLength(1);
+  });
+
+  it('retains a deletion tombstone until lazy SDK cleanup succeeds', async () => {
+    const actor = await insertTestUser();
+    const other = await insertTestUser();
+    const owner = { type: 'user' as const, id: actor.id };
+    await beginProviderOAuthAttempt({
+      actorUserId: actor.id,
+      owner,
+      provider: 'slack',
+      state: 'delete-seed',
+    });
+    const seed = await claimSlackProviderInstallation({
+      actorUserId: actor.id,
+      owner,
+      state: 'delete-seed',
+      teamId: 'T_DELETING',
+    });
+    if (!seed) throw new Error('Expected seed claim');
+    await activateReservedSlackInstallation({
+      owner,
+      teamId: 'T_DELETING',
+      installation: { botToken: 'xoxb-current', teamName: 'Workspace' },
+      grantedScopes: null,
+      claim: seed,
+      ...pendingCodec,
+      writeCredential: writeCredential as never,
+      setChatSdkInstallation: async () => undefined,
+    });
+    await deleteInstallationByTeamId('T_DELETING', {
+      deleteChatSdkInstallation: async () => {
+        throw new Error('state unavailable');
+      },
+    });
+    await expect(
+      db
+        .select()
+        .from(provider_installation_reservations)
+        .where(eq(provider_installation_reservations.provider_installation_id, 'T_DELETING'))
+    ).resolves.toEqual([expect.objectContaining({ status: 'deleting' })]);
+
+    const retryOwner = { type: 'user' as const, id: other.id };
+    await beginProviderOAuthAttempt({
+      actorUserId: other.id,
+      owner: retryOwner,
+      provider: 'slack',
+      state: 'delete-retry',
+    });
+    await expect(
+      claimSlackProviderInstallation({
+        actorUserId: other.id,
+        owner: retryOwner,
+        state: 'delete-retry',
+        teamId: 'T_DELETING',
+      })
+    ).resolves.toBeNull();
+
+    await expect(completePendingSlackDeletion('T_DELETING', async () => undefined)).resolves.toBe(
+      true
+    );
+    await expect(
+      claimSlackProviderInstallation({
+        actorUserId: other.id,
+        owner: retryOwner,
+        state: 'delete-retry',
+        teamId: 'T_DELETING',
+      })
+    ).resolves.toMatchObject({ generation: 1 });
   });
 });

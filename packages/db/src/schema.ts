@@ -4490,7 +4490,7 @@ export const provider_installation_reservations = pgTable(
     }),
     generation: integer().notNull().default(1),
     active_generation: integer(),
-    status: text().$type<'pending' | 'active'>().notNull().default('pending'),
+    status: text().$type<'pending' | 'active' | 'deleting'>().notNull().default('pending'),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -4510,7 +4510,7 @@ export const provider_installation_reservations = pgTable(
     check('provider_installation_reservations_provider_check', sql`${table.provider} = 'slack'`),
     check(
       'provider_installation_reservations_status_check',
-      sql`${table.status} IN ('pending', 'active')`
+      sql`${table.status} IN ('pending', 'active', 'deleting')`
     ),
     check('provider_installation_reservations_generation_check', sql`${table.generation} > 0`),
     check(

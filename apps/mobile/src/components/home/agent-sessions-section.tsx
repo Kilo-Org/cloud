@@ -6,8 +6,14 @@ import { Platform, type ScrollViewProps, View } from 'react-native';
 import { CenteredState } from '@/components/centered-state';
 
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
+import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import {
+  liveSessionContent,
+  type LiveSessionContext,
+  type LiveSessions,
+} from '@/components/home/live-session-state';
 import { SectionHeader } from '@/components/home/section-header';
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -15,12 +21,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
-import { useAuth } from '@/lib/auth/auth-context';
-import { type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
-import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
-import { useOrganization } from '@/lib/organization-context';
 import { createSubmitLock } from '@/lib/submit-lock';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
@@ -28,59 +30,17 @@ import { cn } from '@/lib/utils';
 // The trailing slash pins the index route.
 const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
 const MAX_ROWS = 3;
-type LiveSessions = ReturnType<typeof useLiveAgentSessions>;
-type LiveSessionContext = Omit<ReturnType<typeof useLiveSessionContext>, 'accountReady'>;
-
-/** Both live surfaces use the same admission rules, independent of session queries. */
-export function useLiveSessionContext() {
-  const { t } = useTranslation();
-  const { token, isLoading, isSigningOut } = useAuth();
-  const { organizationId, isLoaded } = useOrganization();
-  const boundary = useOrgBoundary();
-  const accountReady = Boolean(token) && !isLoading && !isSigningOut;
-  const isError = accountReady && isLoaded && organizationId !== null && boundary.isError;
-  const isResolving =
-    isLoading ||
-    !isLoaded ||
-    (accountReady &&
-      organizationId !== null &&
-      !boundary.isError &&
-      (boundary.isResolving || boundary.orgs === undefined));
-  const isReady =
-    accountReady &&
-    !isResolving &&
-    (organizationId === null || (!isError && boundary.org?.organizationId === organizationId));
-  const contextLabel =
-    organizationId === null ? t('profile.personal') : boundary.org?.organizationName;
-  const label = isReady ? contextLabel : undefined;
-  return {
-    organizationId,
-    accountReady,
-    isReady,
-    isResolving,
-    isError,
-    label,
-    refetch: boundary.refetch,
-  };
-}
-
-export function liveSessionContent(context: LiveSessionContext, sessions: LiveSessions) {
-  if (context.isResolving) {
-    return 'pending';
-  }
-  if (!context.isReady || sessions.terminalError?.kind === 'non-retryable') {
-    return 'error';
-  }
-  if (sessions.activeSessions.length > 0) {
-    return 'rows';
-  }
-  if (sessions.terminalError) {
-    return 'error';
-  }
-  return sessions.hasAcceptedSuccess ? 'empty' : 'pending';
-}
 
 type LiveSessionProps = Readonly<{ context: LiveSessionContext; sessions: LiveSessions }>;
+
+/** Pull/retry feedback for the live Agents tab's reserved status line. */
+export type LiveSessionRefreshState = Readonly<{
+  /** A pull or retry is in flight. */
+  busy: boolean;
+  /** The last pull/retry failed or ran past the feedback budget. */
+  failed: boolean;
+  onRetry: () => void;
+}>;
 
 /** Notices stay outside the rows so refresh and connection changes cannot remount them. */
 export function LiveSessionFeedback({
@@ -89,10 +49,12 @@ export function LiveSessionFeedback({
   failureLabel,
   centered = false,
   refreshControl,
+  refresh,
 }: LiveSessionProps & {
   failureLabel: string;
   centered?: boolean;
   refreshControl?: ScrollViewProps['refreshControl'];
+  refresh?: LiveSessionRefreshState;
 }) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -105,6 +67,9 @@ export function LiveSessionFeedback({
   }, [isConnected]);
   const retryLock = useMemo(createSubmitLock, []);
   const [retrying, setRetrying] = useState(false);
+  const handleRefreshRetry = () => {
+    refresh?.onRetry();
+  };
   const handleRetry = () => {
     if (!retryLock.acquire()) {
       return;
@@ -120,8 +85,13 @@ export function LiveSessionFeedback({
     })();
   };
   const content = liveSessionContent(context, sessions);
+  // One message speaks while the refresh-status line owns the rows-state
+  // failure: the line announces its own copy instead of a second label.
+  const statusLineOwnsFailure = content === 'rows' && refresh && (refresh.busy || refresh.failed);
   useStatusAnnouncement(
-    context.isReady && sessions.terminalError?.kind === 'retryable' ? failureLabel : null
+    context.isReady && sessions.terminalError?.kind === 'retryable' && !statusLineOwnsFailure
+      ? failureLabel
+      : null
   );
   const denied = context.isReady && sessions.terminalError?.kind === 'non-retryable';
   const unavailable = !context.isResolving && !context.isReady && !context.isError;
@@ -172,7 +142,14 @@ export function LiveSessionFeedback({
         </Button>
       </>
     );
-  } else if (context.isReady && sessions.terminalError) {
+  } else if (
+    context.isReady &&
+    sessions.terminalError &&
+    // While the live tab's refresh-status line owns the rows-state failure
+    // (in flight or pull failed), one line speaks; a background-only terminal
+    // error still shows the load-failure label.
+    !statusLineOwnsFailure
+  ) {
     const compact = content === 'rows';
     failure = (
       <View className="gap-1">
@@ -240,17 +217,28 @@ export function LiveSessionFeedback({
         )}
       </View>
       <AccessibleStatus
-        message={content === 'pending' ? t('agentChat.instancePicker.loading') : null}
+        message={content === 'pending' ? t('common.loading') : null}
         tone="status"
         className="absolute size-px overflow-hidden"
       />
-      {content === 'rows' && sessions.isFetching && !sessions.isPaused && (
+      {content === 'rows' && sessions.isFetching && !sessions.isPaused && !refresh?.busy && (
         <AccessibleStatus
           message={t('agents.sessionList.updating')}
           tone="status"
           className="absolute size-px overflow-hidden"
         />
       )}
+      {/* The live tab's reserved status line: screen-reader Updating while
+          the pull is in flight, visible "Couldn't refresh" + Retry when it
+          failed. Home passes no refresh state and keeps its a11y-only
+          announcement. */}
+      {refresh && content === 'rows' ? (
+        <SessionListRefreshStatus
+          busy={refresh.busy}
+          failed={refresh.failed}
+          onRetry={handleRefreshRetry}
+        />
+      ) : null}
       {failure}
     </View>
   );

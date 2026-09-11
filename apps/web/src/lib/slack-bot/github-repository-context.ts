@@ -5,6 +5,7 @@ import {
 } from '@/lib/integrations/core/types';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 
 export type GitHubRepositoryContext = {
   accountLogin: string | null;
@@ -19,7 +20,7 @@ export type GitHubRepositoryContext = {
  */
 export async function getGitHubRepositoryContext(owner: Owner): Promise<GitHubRepositoryContext> {
   const integration = await getIntegrationForOwner(owner, PLATFORM.GITHUB);
-  if (!integration) {
+  if (!isPlatformIntegrationHealthy(integration) || integration.integration_status !== 'active') {
     return {
       accountLogin: null,
       repositoryAccess: null,

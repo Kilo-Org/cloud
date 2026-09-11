@@ -18,6 +18,24 @@ export const GLANCEABLE_SNAPSHOT_EXPIRY_MS = 28_800_000;
 export const GLANCEABLE_COALESCE_MS = 1000;
 /** Terminal empty lasts at most this long before the activity ends. */
 export const GLANCEABLE_TERMINAL_MS = 8000;
+/**
+ * Idle-only work holds the Live Activity for at most this long. A connected
+ * agent that is doing nothing is worth a glance for a few minutes, not for the
+ * whole 8 hour lifetime, so the surface retires itself. The widget keeps
+ * showing idle work: placing one is the user asking for exactly that.
+ */
+export const GLANCEABLE_IDLE_ONLY_MS = 600_000;
+/**
+ * Delay before an idle-only Live Activity is handed to ActivityKit. Brief
+ * idle↔busy flips must update the same card, not end it and start another.
+ */
+export const GLANCEABLE_IDLE_END_DEBOUNCE_MS = 5_000;
+/**
+ * A Live Activity that has taken no update for this long reads as unknown, not
+ * as current: ActivityKit dims stale content. Every real transition pushes an
+ * update well inside the window, and an idle card is already gone by then.
+ */
+export const GLANCEABLE_STALE_MS = 1_800_000;
 
 export type GlanceableAgentsSnapshotStatus =
   | 'waiting'
@@ -79,10 +97,31 @@ export type GlanceableSessionRow = {
 /** Statuses that mean the agent waits on the user and cannot go on alone. */
 const NEEDS_INPUT_STATUSES = new Set(['question', 'permission', 'retry']);
 
+/** What a session's status means to a user: the one vocabulary every surface reads. */
+export type GlanceableStatusKind = 'needsInput' | 'running' | 'idle';
+
+/**
+ * Map one session status to the kind the glanceable surfaces and the session
+ * lists both show. Total on strings: needs-input statuses → `needsInput`,
+ * `idle` → `idle`, everything else → `running` (starting, empty, unknown
+ * included). A session is idle only when the agent is not working and not
+ * waiting on the user, so a working session can never render idle and a row
+ * can never disagree with the widget beside it. Callers pass null only when
+ * a row has no status at all.
+ */
+export function glanceableStatusKind(status: string): GlanceableStatusKind {
+  if (NEEDS_INPUT_STATUSES.has(status)) {
+    return 'needsInput';
+  }
+  return status === 'idle' ? 'idle' : 'running';
+}
+
 /**
  * Map session rows to the three glanceable counts. `busy` → running,
- * `question`/`permission`/`retry` → needs-input, `idle` → idle, and any
- * unknown status is ignored. Do not call `isCompletedStatus` here.
+ * `question`/`permission`/`retry` → needs-input, `idle` → idle, and any other
+ * status (starting, empty, unknown, completed) counts as running: a session
+ * is idle only when the agent says so, and no row is dropped from the count
+ * its list row shows.
  *
  * `retry` folds into needs-input because it means one thing to the user: the
  * agent is waiting and cannot go on alone. Session-ingest writes it when a CLI
@@ -92,28 +131,11 @@ const NEEDS_INPUT_STATUSES = new Set(['question', 'permission', 'retry']);
 export function countGlanceableSessions(
   sessions: readonly GlanceableSessionRow[]
 ): GlanceableCounts {
-  let running = 0;
-  let needsInput = 0;
-  let idle = 0;
+  const counts = { running: 0, needsInput: 0, idle: 0 };
   for (const session of sessions) {
-    switch (session.status) {
-      case 'busy':
-        running += 1;
-        break;
-      case 'question':
-      case 'permission':
-      case 'retry':
-        needsInput += 1;
-        break;
-      case 'idle':
-        idle += 1;
-        break;
-      default:
-        // An unknown status contributes nothing.
-        break;
-    }
+    counts[glanceableStatusKind(session.status)] += 1;
   }
-  return { running, needsInput, idle };
+  return counts;
 }
 
 /**
@@ -217,6 +239,21 @@ export function buildGlanceableSnapshot(
 /** True when any agent is connected, whether working, waiting, or idle. */
 export function isEligibleGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
   return snapshot.running + snapshot.needsInput + snapshot.idle > 0;
+}
+
+/**
+ * True when an agent is working or waiting on the user. Only this may raise a
+ * Live Activity: idle work is worth keeping one alive, never worth interrupting
+ * the Lock Screen for. The client sink and the APNs push-to-start share the
+ * rule, so neither can resurrect a surface the other retired.
+ */
+export function isStartableGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
+  return snapshot.running + snapshot.needsInput > 0;
+}
+
+/** True when every connected agent is idle: eligible work, but nothing happening. */
+export function isIdleOnlyGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
+  return isEligibleGlanceableWork(snapshot) && !isStartableGlanceableWork(snapshot);
 }
 
 /**

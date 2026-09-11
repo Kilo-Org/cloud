@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
+  GLANCEABLE_STALE_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
@@ -21,6 +22,7 @@ import {
 
 import {
   _resetIosSinkForTests,
+  adoptNativeActivity,
   clearActivityKitDeniedIfAvailable,
   getActivityKitDenied,
   iosSink,
@@ -50,7 +52,31 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   frame: () => ({}),
   widgetURL: () => ({}),
 }));
-vi.mock('react-native', () => ({ PlatformColor: (name: string) => name }));
+// The sink used to watch AppState for idle-end debounce. Keep the mock so
+// leftover listeners in this suite still resolve.
+const mockAppState = vi.hoisted(() => ({
+  currentState: 'active' as string,
+  listeners: new Set<(state: string) => void>(),
+  leaveActive(next: string) {
+    this.currentState = next;
+    for (const listener of this.listeners) {
+      listener(next);
+    }
+  },
+}));
+
+vi.mock('react-native', () => ({
+  PlatformColor: (name: string) => name,
+  AppState: {
+    get currentState() {
+      return mockAppState.currentState;
+    },
+    addEventListener: (_type: string, listener: (state: string) => void) => {
+      mockAppState.listeners.add(listener);
+      return { remove: () => mockAppState.listeners.delete(listener) };
+    },
+  },
+}));
 
 const mockState = vi.hoisted(() => ({
   startError: null as { code: string; message: string } | null,
@@ -172,6 +198,8 @@ function snapshotFor(
 beforeEach(() => {
   _resetLiveActivitySwitchForTests();
   _resetIosSinkForTests();
+  mockAppState.currentState = 'active';
+  mockAppState.listeners.clear();
   subscriptions.clear();
   mockState.startError = null;
   mockState.instancesError = null;
@@ -462,9 +490,11 @@ describe('iosSink end', () => {
       expect(mockState.started[0]?.ended).toBe(true);
     });
 
+    // The replacement waits behind the older card's dismissal, so it opens on
+    // the newest counts instead of raising the stale ones and updating after.
     expect(mockState.started).toMatchObject([
       { ended: true, props: { status: 'empty', running: 0, needsInput: 0 } },
-      { ended: false, props: { status: 'happy', running: 0, needsInput: 1 } },
+      { ended: false, props: { status: 'happy', running: 0, needsInput: 2 } },
     ]);
 
     // The older end must not reset the new revision or forget its pending update.
@@ -656,6 +686,41 @@ describe('iosSink end', () => {
     }
   );
 
+  it('registers the update token of a card this process did not start', async () => {
+    const ended: string[] = [];
+    // Two cards a server that could never reach the first one raised by push.
+    for (const name of ['first', 'second']) {
+      mockState.instances.push({
+        getPushToken: vi.fn().mockResolvedValue(`${name}-token`),
+        end: () => ended.push(name),
+      });
+    }
+
+    adoptNativeActivity(snapshotFor([{ status: 'busy' }]), CTX);
+    await iosSink.waitForNativeTerminal?.();
+
+    expect(delivery.registerTokens).toHaveBeenCalledTimes(1);
+    expect(subscriptions).toContain('activity');
+    // Whichever one survives, the Lock Screen is left holding exactly one card.
+    expect(ended).toHaveLength(1);
+  });
+
+  it('registers nothing when no card is on screen', () => {
+    adoptNativeActivity(snapshotFor([{ status: 'busy' }]), CTX);
+
+    expect(delivery.registerTokens).not.toHaveBeenCalled();
+    expect(mockState.started).toEqual([]);
+  });
+
+  it('leaves a card alone while the in-app switch is off', () => {
+    setLiveActivityEnabledValue(false);
+    mockState.instances.push({ getPushToken: vi.fn().mockResolvedValue('token'), end: vi.fn() });
+
+    adoptNativeActivity(snapshotFor([{ status: 'busy' }]), CTX);
+
+    expect(delivery.registerTokens).not.toHaveBeenCalled();
+  });
+
   it('supersedes a pending terminal intent without ending new-scope work', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -726,12 +791,11 @@ describe('iosSink widget publish', () => {
       iosSink.publish(snapshot);
 
       expect(mockState.snapshots.length).toBe(1);
-      expect(mockState.timeline).toHaveLength(2);
       expect(mockState.timeline[0]?.props).toMatchObject({
         primaryCount: 1,
         primaryKind: 'running',
       });
-      const expired = mockState.timeline[1];
+      const expired = mockState.timeline.at(-1);
       expect(expired?.date.getTime()).toBe(Date.parse(snapshot.expiresAt));
 
       const expiredProps = expired?.props as GlanceableViewProps;
@@ -742,6 +806,37 @@ describe('iosSink widget publish', () => {
       expect(expiredProps.primaryKind).toBeUndefined();
     }
   );
+
+  it('stops calling happy counts current once a stale window passes with no refresh', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const snapshot = snapshotFor([{ status: 'busy' }]);
+
+    iosSink.publish(snapshot);
+
+    // WidgetKit owns this clock: the app may be force quit, and then no
+    // background wake ever arrives to correct the frame it is showing.
+    expect(mockState.timeline.map(entry => entry.date.getTime())).toEqual([
+      NOW,
+      NOW + GLANCEABLE_STALE_MS,
+      Date.parse(snapshot.expiresAt),
+    ]);
+    expect(mockState.timeline[1]?.props).toMatchObject({
+      statusLine: "Can't update now",
+      primaryCount: 1,
+      primaryKind: 'running',
+    });
+  });
+
+  it('retracts nothing on a surface that asserts no counts', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+
+    iosSink.publish(snapshotFor([]));
+
+    expect(mockState.timeline).toHaveLength(2);
+    expect(mockState.timeline[0]?.props).toMatchObject({ statusLine: 'No work in progress' });
+  });
 
   it.each([
     ['signed_out', 'Sign in to see agents'],
@@ -878,6 +973,37 @@ describe('iosSink Live Activity content-state', () => {
   });
 });
 
+describe('iosSink idle updates', () => {
+  it('keeps the same card when every agent goes idle', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    iosSink.publish(snapshotFor([{ status: 'idle' }], 1));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(mockState.started).toHaveLength(1);
+    expect(mockState.started[0]).toMatchObject({
+      ended: false,
+      props: { status: 'happy', running: 0, idle: 1 },
+    });
+    expect(mockState.ended).toEqual([]);
+  });
+
+  it('updates the same card when work resumes after idle', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    iosSink.publish(snapshotFor([{ status: 'idle' }], 1));
+    const resumed = snapshotFor([{ status: 'busy' }], 2);
+    iosSink.publish(resumed);
+    iosSink.startOrUpdate(resumed, CTX);
+
+    expect(mockState.started).toHaveLength(1);
+    expect(mockState.started[0]).toMatchObject({ ended: false, props: { running: 1, idle: 0 } });
+    expect(mockState.ended).toEqual([]);
+  });
+});
+
 describe('clearActivityKitDeniedIfAvailable', () => {
   it('returns false when the surface was never denied', () => {
     expect(clearActivityKitDeniedIfAvailable()).toBe(false);
@@ -928,8 +1054,8 @@ describe('buildGlanceableViewProps', () => {
     expect(props.primaryCount).toBe(1);
     expect(props.countLines.map(line => line.label)).toEqual([
       'glanceable.needsInput',
-      'glanceable.running',
-      'glanceable.idle',
+      'common.working',
+      'common.idle',
     ]);
   });
 
@@ -991,11 +1117,11 @@ describe('buildGlanceableViewProps', () => {
       key => key
     );
     expect(stale.accessibilityLabel).toBe(
-      'glanceable.stale, 1 glanceable.needsInput, 2 glanceable.running, glanceable.openAgents'
+      'glanceable.stale, 1 glanceable.needsInput, 2 common.working, glanceable.openAgents'
     );
 
     const happy = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
-    expect(happy.accessibilityLabel).toBe('1 glanceable.running, glanceable.openAgents');
+    expect(happy.accessibilityLabel).toBe('1 common.working, glanceable.openAgents');
 
     const empty = buildGlanceableViewProps(snapshotFor([], 1, 'empty'), {}, key => key);
     expect(empty.accessibilityLabel).toBe('glanceable.empty, glanceable.openAgents');

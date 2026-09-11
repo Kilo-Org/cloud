@@ -41,6 +41,8 @@ const spawnMock = vi.hoisted(() =>
     })
   )
 );
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 const toastError = vi.hoisted(() => vi.fn());
 const routerBack = vi.hoisted(() => vi.fn());
 const refetchInstancesMock = vi.hoisted(() => vi.fn(() => undefined));
@@ -131,15 +133,10 @@ vi.mock('expo-crypto', () => {
     },
   };
 });
-vi.mock('expo-file-system/legacy', () => ({
-  cacheDirectory: null,
-  copyAsync: vi.fn().mockResolvedValue('/tmp/copy'),
-  deleteAsync: vi.fn().mockResolvedValue(undefined),
-}));
 // The real `share-payload.ts` pulls `registerTempFile` from
-// `@/lib/temp-file-registry`, which imports the new `expo-file-system` API.
-// Mock the main entry (not only `expo-file-system/legacy`) so the
-// `importOriginal()` chain in the `@/lib/share-payload` mock stays harmless.
+// `@/lib/temp-file-registry`, which imports the modern `expo-file-system` API.
+// Mock the main entry so the `importOriginal()` chain in the
+// `@/lib/share-payload` mock stays harmless.
 vi.mock('expo-file-system', () => {
   const File = vi.fn(function FileMock(_base: unknown, ..._rest: unknown[]) {
     return {

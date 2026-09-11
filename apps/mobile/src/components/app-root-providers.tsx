@@ -28,7 +28,10 @@ export function AppRootProviders({
   const { t } = useTranslation();
 
   return (
-    <GestureHandlerRootView className="flex-1">
+    // bg-background: the gesture root is the first opaque surface above the
+    // window — a rotation relayout gap behind any screen must show the app's
+    // own background, never the platform window default (foreign white/black).
+    <GestureHandlerRootView className="flex-1 bg-background">
       <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
           <QueryClientNativeLifecycle />
@@ -50,8 +53,13 @@ export function AppRootProviders({
                       toasts render BEHIND Expo formSheets despite FullWindowOverlay; this reordering
                       addresses Portal overlays only — sheets/modals still need inline errors (P2);
                       re-verification scheduled in the final device pass.
+                      bottom-center: sonner-native's default top-center placement renders a toast
+                      over the screen header, hiding the back control for the toast's whole
+                      lifetime (spot check e4-end). Bottom is the transient-message convention:
+                      a toast may cover the composer briefly, never the navigation.
                     */}
                     <Toaster
+                      position="bottom-center"
                       icons={{
                         success: <CheckCircle2 size={20} color={colors.good} />,
                         error: <XCircle size={20} color={colors.destructive} />,

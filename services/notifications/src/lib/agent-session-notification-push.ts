@@ -19,7 +19,11 @@ import {
   type SendAgentSessionNotificationResult,
 } from '@kilocode/notifications';
 
-import { sanitizeTitle, type UserNotificationPreferences } from './cloud-agent-session-push';
+import {
+  DEFAULT_USER_NOTIFICATION_PREFERENCES,
+  sanitizeTitle,
+  type UserNotificationPreferences,
+} from './cloud-agent-session-push';
 
 export type { SendAgentSessionNotificationParams } from '@kilocode/notifications';
 
@@ -46,16 +50,6 @@ export function buildAgentSessionNotificationContent(
     body: params.message,
   };
 }
-
-const DEFAULT_PREFERENCES: UserNotificationPreferences = {
-  agentPushEnabled: true,
-  chatMessagesEnabled: true,
-  agentAttentionEnabled: true,
-  sessionStatusEnabled: true,
-  kiloclawActivityEnabled: true,
-  balanceAlertsEnabled: true,
-  securityFindingsEnabled: true,
-};
 
 export type DispatchAgentSessionNotificationPushDeps = {
   getSession: (userId: string, cliSessionId: string) => Promise<AgentNotificationSession | null>;
@@ -145,7 +139,7 @@ export async function dispatchAgentSessionNotificationPush(
   let prefs: UserNotificationPreferences;
   try {
     const row = await deps.readPreferences(parsed.userId);
-    prefs = row ?? DEFAULT_PREFERENCES;
+    prefs = row ?? DEFAULT_USER_NOTIFICATION_PREFERENCES;
   } catch {
     return { dispatched: false, reason: 'failed' };
   }

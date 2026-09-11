@@ -10,7 +10,7 @@
  */
 
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import {
   storePendingSessionMessage,
   type PendingSessionMessage,
@@ -39,12 +39,44 @@ const MSG_INITIATED = 'msg_018f1e2d3c4bVvWwXxYyZz0011';
 
 const userId = 'user_queued_derive';
 
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('deriveQueuedMessages (/stream connect catch-up)', () => {
   it('does not synthesize metadata fallback while lazy prep is pending', async () => {
     const sessionId = 'agent_queued_derive_1';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const snapshots = await runInDurableObject(stub, async instance => {
       const result = await instance.registerSession(
@@ -67,9 +99,7 @@ describe('deriveQueuedMessages (/stream connect catch-up)', () => {
 
   it('returns every entry in the pending_message:* queue', async () => {
     const sessionId = 'agent_queued_derive_2';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const message: PendingSessionMessage = {
       messageId: MSG_FOLLOWUP,
@@ -95,9 +125,7 @@ describe('deriveQueuedMessages (/stream connect catch-up)', () => {
 
   it('deduplicates the metadata entry when pending_message already has it', async () => {
     const sessionId = 'agent_queued_derive_3';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const snapshots = await runInDurableObject(stub, async instance => {
       await instance.registerSession(
@@ -126,9 +154,7 @@ describe('deriveQueuedMessages (/stream connect catch-up)', () => {
 
   it('suppresses the metadata entry once initiation has begun', async () => {
     const sessionId = 'agent_queued_derive_4';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const snapshots = await runInDurableObject(stub, async instance => {
       await instance.registerSession(
@@ -166,9 +192,7 @@ describe('deriveQueuedMessages (/stream connect catch-up)', () => {
 
   it('returns nothing for a brand-new DO with no metadata or queue', async () => {
     const sessionId = 'agent_queued_derive_5';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const snapshots = await runInDurableObject(stub, async instance =>
       asDerivingInstance(instance).deriveQueuedMessages()
@@ -179,9 +203,7 @@ describe('deriveQueuedMessages (/stream connect catch-up)', () => {
 
   it('rehydrates never-accepted exhausted prompts with queued then failed catch-up data', async () => {
     const sessionId = 'agent_queued_derive_exhausted';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const snapshots = await runInDurableObject(stub, async instance => {
       await putSessionMessageState(instance.ctx.storage, {
@@ -223,9 +245,7 @@ describe('deriveQueuedMessages (/stream connect catch-up)', () => {
 
   it('returns new-path pending message without executionId', async () => {
     const sessionId = 'agent_queued_derive_6';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const message: PendingSessionMessage = {
       messageId: MSG_FOLLOWUP,

@@ -49,10 +49,10 @@ const PROVIDER_LABEL_KEYS = {
   anaconda: 'profile.providerAnaconda',
   apple: 'profile.providerApple',
   discord: 'profile.providerDiscord',
-  email: 'profile.providerEmail',
+  email: 'common.email',
   'fake-login': 'profile.providerTestAccount',
-  github: 'profile.providerGithub',
-  gitlab: 'profile.providerGitlab',
+  github: 'common.github',
+  gitlab: 'common.gitlab',
   google: 'profile.providerGoogle',
   linkedin: 'profile.providerLinkedin',
   workos: 'profile.providerEnterpriseSso',
@@ -131,7 +131,7 @@ export function ProfileScreen() {
     Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
-        text: t('profile.signOutConfirm'),
+        text: t('common.signOut'),
         style: 'destructive',
         onPress: () => {
           void signOut();
@@ -146,7 +146,7 @@ export function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.title')} size="large" showBackButton={false} />
+      <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 pt-4"
@@ -158,11 +158,11 @@ export function ProfileScreen() {
         {/* Code Reviewer */}
         <View className="mt-6 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('profile.agents')}
+            {t('common.agents')}
           </Text>
           <ConfigureRow
             icon={GitPullRequest}
-            title={t('profile.codeReviewer')}
+            title={t('common.codeReviewer')}
             subtitle={t('profile.codeReviewerSubtitle')}
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
@@ -174,7 +174,7 @@ export function ProfileScreen() {
           />
           <ConfigureRow
             icon={ShieldCheck}
-            title={t('profile.securityAgent')}
+            title={t('common.securityAgent')}
             subtitle={t('profile.securityAgentSubtitle')}
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
@@ -195,7 +195,7 @@ export function ProfileScreen() {
             </Text>
             <ConfigureRow
               icon={GitMerge}
-              title={t('profile.prReview')}
+              title={t('common.prReview')}
               subtitle={t('profile.prReviewSubtitle')}
               className="rounded-lg bg-secondary px-3"
               last
@@ -210,7 +210,7 @@ export function ProfileScreen() {
         {organizationId != null && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('profile.organization')}
+              {t('common.organization')}
             </Text>
             {organizationsError ? (
               <QueryError
@@ -241,6 +241,23 @@ export function ProfileScreen() {
           </View>
         )}
 
+        {/* App */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('profile.app')}
+          </Text>
+          <ConfigureRow
+            icon={SlidersHorizontal}
+            title={t('common.preferences')}
+            subtitle={t('profile.preferencesSubtitle')}
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+            }}
+          />
+        </View>
+
         {/* Linked accounts — hide the whole section when there are no linked
             providers (and we're not loading/erroring) so the header never dangles. */}
         {/* No layout animation on this section: siblings above mount/resize
@@ -257,7 +274,21 @@ export function ProfileScreen() {
 
             {(isLoading || !afterInteractions) && !data && !providersError && (
               <Animated.View exiting={FadeOut.duration(150)}>
-                <Skeleton className="h-12 w-full rounded-lg" />
+                {/* Content-shaped skeleton (icon tile + two text bars in the
+                    row's own bg-secondary card): a plain block read as an
+                    empty box in the e5 spot check (2026-09-07). Heights sum to
+                    the ConfigureRow row (py-3 + 38 text block) so the swap to
+                    real rows does not shift the sections below. Bars are
+                    bg-muted-soft: the theme's bg-muted equals bg-secondary,
+                    so default-tone bars were invisible here (b911 e2 spot
+                    check). */}
+                <View className="flex-row items-center gap-3 rounded-lg bg-secondary px-3 py-3">
+                  <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg bg-muted-soft" />
+                  <View className="flex-1 gap-0.5">
+                    <Skeleton className="h-5 w-32 rounded bg-muted-soft" />
+                    <Skeleton className="h-4 w-48 rounded bg-muted-soft" />
+                  </View>
+                </View>
               </Animated.View>
             )}
 
@@ -285,23 +316,6 @@ export function ProfileScreen() {
           </View>
         )}
 
-        {/* App */}
-        <View className="mt-6 gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('profile.app')}
-          </Text>
-          <ConfigureRow
-            icon={SlidersHorizontal}
-            title={t('profile.preferences')}
-            subtitle={t('profile.preferencesSubtitle')}
-            className="rounded-lg bg-secondary px-3"
-            last
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
-            }}
-          />
-        </View>
-
         {/* Actions — stacked full-width tiles so labels never clip side-by-side at max Dynamic Type */}
         <View className="mt-6 gap-3">
           <ActionTile
@@ -320,7 +334,7 @@ export function ProfileScreen() {
           />
           <ActionTile
             icon={LogOut}
-            label={t('profile.signOut')}
+            label={t('common.signOut')}
             color={colors.mutedForeground}
             onPress={confirmSignOut}
           />

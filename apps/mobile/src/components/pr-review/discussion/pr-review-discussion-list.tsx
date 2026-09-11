@@ -6,7 +6,8 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { type RefObject, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
 import { DiscussionThread } from '@/components/pr-review/discussion/discussion-thread';
@@ -20,7 +21,6 @@ import { expandedForThread } from '@/lib/pr-review/discussion/thread-expansion';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 
-const DISCUSSION_LIST_CONTENT_STYLE = { paddingTop: 12 };
 const noopReactionToggle = () => {
   // Conversation comments are read-only (A2.3): no reaction mutations.
 };
@@ -40,6 +40,19 @@ type PrReviewDiscussionListProps = {
   readonly laterPageError: boolean;
   readonly onLoadMore: () => void;
   readonly onRetryLoadMore: () => void;
+  /**
+   * Invoked when a thread row's inline reply field gains focus, with the
+   * row's index. The tab scrolls the row above the keyboard-lifted bottom
+   * CTA bar (useReplyFocusScroll). Optional; absent = no scroll handling.
+   */
+  readonly onReplyInputFocus?: (index: number) => void;
+  /**
+   * Invoked with the list viewport's height on every layout commit. The tab
+   * anchors the keyboard-open reply scroll on the COMMITTED viewport — the
+   * CTA bar's keyboard lift lands asynchronously and shrinks this frame
+   * (useReplyFocusScroll). Optional; absent = no viewport reporting.
+   */
+  readonly onViewportLayout?: (height: number) => void;
 };
 
 export function PrReviewDiscussionList({
@@ -57,6 +70,8 @@ export function PrReviewDiscussionList({
   laterPageError,
   onLoadMore,
   onRetryLoadMore,
+  onReplyInputFocus,
+  onViewportLayout,
 }: Readonly<PrReviewDiscussionListProps>) {
   const trpc = useTRPC();
   // Account-local hidden users (blocked + muted GitHub logins) filter rows.
@@ -99,6 +114,16 @@ export function PrReviewDiscussionList({
     return result;
   }, [listItems, hiddenLogins]);
 
+  // Landscape: side insets keep comment/thread cards clear of the sensor
+  // housing (rows keep their px-4 gutter, so the insets add to it); portrait
+  // insets are zero, so the style carries explicit zeros and nothing else
+  // changes.
+  const insets = useSafeAreaInsets();
+  const contentContainerStyle = useMemo<ViewStyle>(
+    () => ({ paddingTop: 12, paddingLeft: insets.left, paddingRight: insets.right }),
+    [insets.left, insets.right]
+  );
+
   return (
     <FlashList
       ref={listRef}
@@ -138,13 +163,19 @@ export function PrReviewDiscussionList({
               onToggleExpand={() => {
                 onToggleExpand(thread, index);
               }}
+              onReplyFocus={() => {
+                onReplyInputFocus?.(index);
+              }}
             />
           </View>
         );
       }}
-      contentContainerStyle={DISCUSSION_LIST_CONTENT_STYLE}
+      contentContainerStyle={contentContainerStyle}
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
+      onLayout={event => {
+        onViewportLayout?.(event.nativeEvent.layout.height);
+      }}
       ListFooterComponent={
         <ListFooter
           hasNextPage={hasNextPage}
@@ -213,7 +244,7 @@ function ListFooter({
         onPress={onLoadMore}
         accessibilityLabel={t('prReview.discussion.loadMoreComments')}
       >
-        <Text>{t('prReview.discussion.loadMore')}</Text>
+        <Text>{t('common.loadMore')}</Text>
       </Button>
     </View>
   );

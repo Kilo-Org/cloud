@@ -1,6 +1,7 @@
 import { getReasoningHeader, getReasoningPresentation } from './reasoning-presentation';
 
 it.each([
+  [undefined, undefined, false, 'Thought'],
   [undefined, { start: 0 }, true, 'Thinking'],
   ['Inspect the parser', { start: 0 }, true, 'Thinking: Inspect the parser'],
   [undefined, { start: 0 }, false, 'Thought'],

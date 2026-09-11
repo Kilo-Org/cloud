@@ -169,16 +169,20 @@ export function isReasoningPart(part: Part): part is ReasoningPart {
   return part.type === 'reasoning';
 }
 
-/** Whether the reasoning expander has content worth showing. */
-export function shouldRenderReasoningPart(part: Part): boolean {
+function hasVisibleReasoningText(text: string | undefined): boolean {
+  if (text == null) return false;
   return (
-    isReasoningPart(part) &&
-    part.text
+    text
       .replaceAll('[REDACTED]', '')
       .replace(/<!--[\s\S]*?-->/g, '')
       .replace('<!--', '')
       .trim() !== ''
   );
+}
+
+/** Whether the reasoning expander has content worth showing. */
+export function shouldRenderReasoningPart(part: Part): boolean {
+  return isReasoningPart(part) && hasVisibleReasoningText(part.text);
 }
 
 /** Check if a part is a StepStartPart */
@@ -221,13 +225,8 @@ export function isAssistantMessage(message: OpenCodeMessage): message is OpenCod
  * V2 streaming detection: absence of time.end indicates streaming.
  */
 export function isPartStreaming(part: Part): boolean {
-  // TextPart has optional time
-  if (isTextPart(part)) {
+  if (isTextPart(part) || isReasoningPart(part)) {
     return part.time !== undefined && part.time.end === undefined;
-  }
-  // ReasoningPart has required time
-  if (isReasoningPart(part)) {
-    return part.time.end === undefined;
   }
   // ToolPart - check state
   if (isToolPart(part)) {

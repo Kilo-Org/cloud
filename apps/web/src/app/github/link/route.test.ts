@@ -128,7 +128,12 @@ describe('GET /github/link', () => {
     expect(redirectUrl.searchParams.get('state')).toBe('signed-state');
     expect(redirectUrl.searchParams.get('scope')).toBe('read:user');
     expect(mockedGetPlatformIntegrationById).toHaveBeenCalledWith(PLATFORM_INTEGRATION_ID);
-    expect(mockedCreateGitHubBotLinkState).toHaveBeenCalledWith(USER_ID, INSTALLATION_ID);
+    expect(mockedCreateGitHubBotLinkState).toHaveBeenCalledWith(
+      USER_ID,
+      INSTALLATION_ID,
+      '/github/link',
+      'standard'
+    );
     expect(mockedGetGitHubAppCredentials).toHaveBeenCalledWith('standard');
   });
 

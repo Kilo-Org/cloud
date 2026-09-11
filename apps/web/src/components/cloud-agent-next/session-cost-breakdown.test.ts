@@ -64,8 +64,8 @@ function createTaskToolPart(): Part {
 }
 
 describe('isRenderableSessionCost', () => {
-  it.each([0.0000495, 0.00004999999999999, 0.00005, 0.00005000000000001, 0.01])(
-    'accepts finite costs that round to at least 50 microdollars: %s',
+  it.each([0.0049995, 0.004999999999999, 0.005, 0.005000000000001, 0.01])(
+    'accepts finite costs that round to at least half a cent: %s',
     costUsd => {
       expect(isRenderableSessionCost(costUsd)).toBe(true);
     }
@@ -75,10 +75,10 @@ describe('isRenderableSessionCost', () => {
     Number.NaN,
     Number.POSITIVE_INFINITY,
     Number.NEGATIVE_INFINITY,
-    -0.00005,
+    -0.005,
     0,
-    0.0000494,
-    0.00004949999999999,
+    0.0049994,
+    0.004999499999999,
   ])('rejects non-finite or subthreshold costs: %s', costUsd => {
     expect(isRenderableSessionCost(costUsd)).toBe(false);
   });
@@ -86,22 +86,22 @@ describe('isRenderableSessionCost', () => {
 
 describe('formatSessionCost', () => {
   it.each([
-    [0, '$0.0000'],
-    [0.0000494, '$0.0000'],
-    [0.0000495, '$0.0001'],
-    [0.00005, '$0.0001'],
-    [0.050049, '$0.0500'],
-    [0.05005, '$0.0501'],
-    [0.10005, '$0.1001'],
-    [1.23455, '$1.2346'],
-  ])('formats %s USD as %s using integer-microdollar half-up rounding', (costUsd, expected) => {
+    [0, '$0.00'],
+    [0.00494, '$0.00'],
+    [0.00495, '$0.00'],
+    [0.005, '$0.01'],
+    [0.0149, '$0.01'],
+    [0.015, '$0.02'],
+    [1.234, '$1.23'],
+    [1.235, '$1.24'],
+  ])('formats %s USD as %s using integer-cent half-up rounding', (costUsd, expected) => {
     expect(formatSessionCost(costUsd)).toBe(expected);
   });
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -0.01])(
     'formats invalid or negative costs as zero: %s',
     costUsd => {
-      expect(formatSessionCost(costUsd)).toBe('$0.0000');
+      expect(formatSessionCost(costUsd)).toBe('$0.00');
     }
   );
 });
@@ -110,15 +110,15 @@ describe('getDisplayedSessionCostBreakdown', () => {
   it('keeps half-unit root and subagent costs reconciled to the displayed total', () => {
     expect(
       getDisplayedSessionCostBreakdown({
-        totalCostUsd: 0.0001,
-        rootCostUsd: 0.00005,
-        subagentCostUsd: 0.00005,
+        totalCostUsd: 0.01,
+        rootCostUsd: 0.005,
+        subagentCostUsd: 0.005,
         olderActivityCostUsd: 0,
       })
     ).toEqual({
-      totalCostUsd: 0.0001,
+      totalCostUsd: 0.01,
       rootCostUsd: 0,
-      subagentCostUsd: 0.0001,
+      subagentCostUsd: 0.01,
       olderActivityCostUsd: 0,
     });
   });
@@ -126,15 +126,15 @@ describe('getDisplayedSessionCostBreakdown', () => {
   it('limits rounded residual rows to the displayed total', () => {
     expect(
       getDisplayedSessionCostBreakdown({
-        totalCostUsd: 0.0001,
+        totalCostUsd: 0.01,
         rootCostUsd: 0,
-        subagentCostUsd: 0.00005,
-        olderActivityCostUsd: 0.00005,
+        subagentCostUsd: 0.005,
+        olderActivityCostUsd: 0.005,
       })
     ).toEqual({
-      totalCostUsd: 0.0001,
+      totalCostUsd: 0.01,
       rootCostUsd: 0,
-      subagentCostUsd: 0.0001,
+      subagentCostUsd: 0.01,
       olderActivityCostUsd: 0,
     });
   });
@@ -148,10 +148,10 @@ describe('getDisplayedSessionCostBreakdown', () => {
     });
 
     expect(displayed).toEqual({
-      totalCostUsd: 1.2346,
-      rootCostUsd: 0.6543,
-      subagentCostUsd: 0.3457,
-      olderActivityCostUsd: 0.2346,
+      totalCostUsd: 1.23,
+      rootCostUsd: 0.65,
+      subagentCostUsd: 0.35,
+      olderActivityCostUsd: 0.23,
     });
     expect(
       displayed.rootCostUsd + displayed.subagentCostUsd + displayed.olderActivityCostUsd
@@ -230,17 +230,17 @@ describe('getSessionCostBreakdown', () => {
     expect(result.subagentCostUsd).toBeCloseTo(0.3, 12);
   });
 
-  it('keeps an exact 50-microdollar folded subagent residual renderable', () => {
+  it('keeps an exact half-cent folded subagent residual renderable', () => {
     const result = getSessionCostBreakdown(
-      [createAssistantMessage(0.10005, [createStepFinishPart(0.1)])],
+      [createAssistantMessage(0.105, [createStepFinishPart(0.1)])],
       null,
-      0.10005
+      0.105
     );
 
-    expect(result.subagentCostUsd).toBeLessThan(0.00005);
-    expect(result.subagentCostUsd).toBeCloseTo(0.00005, 12);
+    expect(result.subagentCostUsd).toBeLessThan(0.005);
+    expect(result.subagentCostUsd).toBeCloseTo(0.005, 12);
     expect(isRenderableSessionCost(result.subagentCostUsd)).toBe(true);
-    expect(formatSessionCost(result.subagentCostUsd)).toBe('$0.0001');
+    expect(formatSessionCost(result.subagentCostUsd)).toBe('$0.01');
   });
 
   it('combines multiple assistant messages and multiple root steps', () => {
@@ -455,39 +455,39 @@ describe('getSessionCostBreakdown', () => {
     expect(getSessionCostBreakdown(messages, null, 0.2).subagentCostUsd).toBe(0);
   });
 
-  it.each([0.5, 1, 2, 49])(
-    'suppresses older activity below the four-decimal rendering threshold: %s microdollars',
+  it.each([50, 100, 200, 4_999])(
+    'suppresses older activity below the two-decimal rendering threshold: %s microdollars',
     persistedMicrodollars => {
       expect(getSessionCostBreakdown([], persistedMicrodollars, 0).olderActivityCostUsd).toBe(0);
     }
   );
 
-  it('retains older activity at the four-decimal rendering threshold', () => {
-    const result = getSessionCostBreakdown([], 50, 0);
+  it('retains older activity at the two-decimal rendering threshold', () => {
+    const result = getSessionCostBreakdown([], 5_000, 0);
 
-    expect(result.totalCostUsd).toBe(0.00005);
-    expect(result.olderActivityCostUsd).toBe(0.00005);
+    expect(result.totalCostUsd).toBe(0.005);
+    expect(result.olderActivityCostUsd).toBe(0.005);
   });
 
-  it('retains an exact 50-microdollar older-activity residual with nonzero live cost', () => {
-    const result = getSessionCostBreakdown([createAssistantMessage(0.1)], 100_050, 0.1);
+  it('retains an exact half-cent older-activity residual with nonzero live cost', () => {
+    const result = getSessionCostBreakdown([createAssistantMessage(0.1)], 105_000, 0.1);
 
-    expect(result.totalCostUsd).toBe(0.10005);
-    expect(result.olderActivityCostUsd).toBe(0.00005);
+    expect(result.totalCostUsd).toBe(0.105);
+    expect(result.olderActivityCostUsd).toBe(0.005);
   });
 
-  it('suppresses a 49-microdollar older-activity residual with nonzero live cost', () => {
-    const result = getSessionCostBreakdown([createAssistantMessage(0.1)], 100_049, 0.1);
+  it('suppresses a 4999-microdollar older-activity residual with nonzero live cost', () => {
+    const result = getSessionCostBreakdown([createAssistantMessage(0.1)], 104_999, 0.1);
 
-    expect(result.totalCostUsd).toBe(0.100049);
+    expect(result.totalCostUsd).toBe(0.104999);
     expect(result.olderActivityCostUsd).toBe(0);
   });
 
-  it('retains older activity above the four-decimal rendering threshold', () => {
-    const result = getSessionCostBreakdown([createAssistantMessage(0.05)], 50_200, 0.05);
+  it('retains older activity above the two-decimal rendering threshold', () => {
+    const result = getSessionCostBreakdown([createAssistantMessage(0.05)], 70_000, 0.05);
 
-    expect(result.totalCostUsd).toBe(0.0502);
-    expect(result.olderActivityCostUsd).toBeCloseTo(0.0002, 12);
+    expect(result.totalCostUsd).toBe(0.07);
+    expect(result.olderActivityCostUsd).toBeCloseTo(0.02, 12);
   });
 
   it('excludes user messages even when their parts contain step-finish costs', () => {

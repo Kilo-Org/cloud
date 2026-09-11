@@ -21,6 +21,7 @@ import {
 import { isTerminalSessionPlatform } from '../terminal/access.js';
 import type { sandboxControlRpc } from './control-rpc.js';
 import type { SandboxTerminalRecord } from './terminal-bridge.js';
+import { CALLBACK_OUTBOX_PREFIX } from './message-callbacks.js';
 
 export const SANDBOX_SESSION_METADATA_KEY = 'session_metadata';
 export const SANDBOX_SESSION_LIFECYCLE_KEY = 'session_lifecycle_fence';
@@ -815,17 +816,36 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     }
   }
 
+  function clearAttachedWrapperAfterRecovery(wrapperInstanceId: string): boolean {
+    const attached = readAttachedSession();
+    if (!attached || attached.wrapperInstanceId !== wrapperInstanceId) return false;
+    for (const [, raw] of storage.kv.list<unknown>({ prefix: TERMINAL_PREFIX })) {
+      const terminal = terminalRecordSchema.safeParse(raw);
+      if (
+        terminal.success &&
+        terminal.data.state === 'running' &&
+        terminal.data.wrapperInstanceId === wrapperInstanceId
+      ) {
+        return false;
+      }
+    }
+    storage.kv.delete(ATTACHED_SESSION_KEY);
+    return true;
+  }
+
   function purgeDeletedState(): void {
     if (readFence()?.state !== 'deleted') return;
     const keys = Array.from(storage.kv.list<unknown>(), ([key]) => key);
     for (const key of keys) {
-      if (key !== SANDBOX_SESSION_LIFECYCLE_KEY) storage.kv.delete(key);
+      if (key !== SANDBOX_SESSION_LIFECYCLE_KEY && !key.startsWith(CALLBACK_OUTBOX_PREFIX))
+        storage.kv.delete(key);
     }
   }
 
   return {
     beginDeletion,
     beginRevocation,
+    clearAttachedWrapperAfterRecovery,
     captureEpoch: () => snapshot()?.epoch ?? null,
     cleanupSession,
     closeTerminal,

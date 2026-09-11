@@ -62,6 +62,7 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'cli',
         variant: 'list',
         needsInput: false,
+        statusGlyph: false,
         gitUrl: repoGitUrl,
       })
     ).toEqual({ iconKind: 'terminal', spokenPlatform: 'cli' });
@@ -73,6 +74,21 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'cli',
         variant: 'card',
         needsInput: false,
+        statusGlyph: false,
+        gitUrl: repoGitUrl,
+      })
+    ).toEqual({ iconKind: null, spokenPlatform: undefined });
+  });
+
+  it('suppresses the icon and speech when the eyebrow draws the status glyph', () => {
+    // Live rows: the status mark is the one glyph in the cluster; a platform
+    // glyph beside it reads as a stray second mark.
+    expect(
+      selectRowPlatformPresentation({
+        platform: 'cli',
+        variant: 'list',
+        needsInput: false,
+        statusGlyph: true,
         gitUrl: repoGitUrl,
       })
     ).toEqual({ iconKind: null, spokenPlatform: undefined });
@@ -84,6 +100,7 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'cli',
         variant: 'list',
         needsInput: true,
+        statusGlyph: false,
         gitUrl: repoGitUrl,
       })
     ).toEqual({ iconKind: 'terminal', spokenPlatform: undefined });
@@ -95,6 +112,7 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'cli',
         variant: 'list',
         needsInput: false,
+        statusGlyph: false,
         gitUrl: null,
       })
     ).toEqual({ iconKind: 'terminal', spokenPlatform: undefined });
@@ -104,6 +122,7 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'cli',
         variant: 'list',
         needsInput: false,
+        statusGlyph: false,
         gitUrl: undefined,
       })
     ).toEqual({ iconKind: 'terminal', spokenPlatform: undefined });
@@ -113,6 +132,7 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'cli',
         variant: 'list',
         needsInput: false,
+        statusGlyph: false,
         gitUrl: '',
       })
     ).toEqual({ iconKind: 'terminal', spokenPlatform: undefined });
@@ -125,6 +145,7 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'cloud-agent',
         variant: 'list',
         needsInput: false,
+        statusGlyph: false,
         gitUrl: 'https://github.com/org/stored-repo.git',
       })
     ).toEqual({ iconKind: 'cloud', spokenPlatform: 'cloud-agent' });
@@ -137,6 +158,7 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'cli',
         variant: 'list',
         needsInput: false,
+        statusGlyph: false,
         gitUrl: 'git@github.com:org/live-repo.git',
       })
     ).toEqual({ iconKind: 'terminal', spokenPlatform: 'cli' });
@@ -148,6 +170,7 @@ describe('selectRowPlatformPresentation', () => {
         platform: 'linear',
         variant: 'list',
         needsInput: false,
+        statusGlyph: false,
         gitUrl: repoGitUrl,
       })
     ).toEqual({ iconKind: null, spokenPlatform: undefined });

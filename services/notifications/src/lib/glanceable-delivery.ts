@@ -38,16 +38,21 @@ export type ExpoPushToken = { token: string; locale: string | null };
  * Update eligible activities or end zero-count activities. Never start empty work.
  * A push-to-start token is used only when no activity target remains, avoiding
  * duplicate activities while allowing fresh work after terminal target retirement.
+ *
+ * `startable` is the narrower rule the iOS sink starts on: an agent working or
+ * waiting on the user. Idle work keeps a card alive but must never raise one,
+ * or a push-to-start resurrects the card the sink just retired for idleness.
  */
 export function apnsSendsForTokens(
   tokens: readonly IosActivityToken[],
-  eligible: boolean
+  eligible: boolean,
+  startable: boolean
 ): { token: string; event: LiveActivityEvent }[] {
   const activityTokens = tokens.filter(token => token.kind === 'ios_activity');
   if (activityTokens.length > 0) {
     return activityTokens.map(({ token }) => ({ token, event: eligible ? 'update' : 'end' }));
   }
-  return eligible
+  return startable
     ? tokens
         .filter(token => token.kind === 'ios_push_to_start')
         .map(({ token }) => ({ token, event: 'start' }))
@@ -118,7 +123,8 @@ export type GlanceableDeliveryDeps = {
     timestampSeconds: number,
     isCurrent?: () => Promise<boolean>,
     beforeEnd?: (token: string) => Promise<boolean>,
-    onEndRejected?: (token: string) => Promise<void>
+    onEndRejected?: (token: string) => Promise<void>,
+    onStarted?: (token: string) => Promise<void>
   ) => Promise<void>;
   /** Reserved before reading; do not assign a new timestamp after a delayed send. */
   apnsTimestampSeconds?: number;
@@ -128,6 +134,8 @@ export type GlanceableDeliveryDeps = {
   beforeIosEnd?: (token: string) => Promise<boolean>;
   /** Release the current attempt only after an explicit transport rejection. */
   onIosEndRejected?: (token: string) => Promise<void>;
+  /** Record an accepted push-to-start so the same token cannot raise a second card. */
+  onIosStarted?: (token: string) => Promise<void>;
   listIosExpoTokens: (userId: string, organizationId: string | null) => Promise<ExpoPushToken[]>;
   listAndroidExpoTokens: (
     userId: string,
@@ -156,7 +164,11 @@ export async function deliverGlanceableSnapshot(
   const iosTokens = await deps.listIosActivityTokens(params.userId, params.organizationId);
   if (deps.isCurrent && !(await deps.isCurrent())) return;
   const eligible = snapshot.running + snapshot.needsInput + snapshot.idle > 0;
-  const iosSends = apnsSendsForTokens(iosTokens, eligible);
+  const iosSends = apnsSendsForTokens(
+    iosTokens,
+    eligible,
+    snapshot.running + snapshot.needsInput > 0
+  );
   if (iosSends.length > 0) {
     await deps.sendIosLiveActivity(
       iosSends,
@@ -173,7 +185,8 @@ export async function deliverGlanceableSnapshot(
       deps.apnsTimestampSeconds ?? Math.floor(Date.parse(snapshot.updatedAt) / 1000),
       deps.isCurrent,
       deps.beforeIosEnd,
-      deps.onIosEndRejected
+      deps.onIosEndRejected,
+      deps.onIosStarted
     );
   }
 

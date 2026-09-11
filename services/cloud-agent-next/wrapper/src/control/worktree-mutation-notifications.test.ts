@@ -14,8 +14,8 @@ import type { WrapperKiloClient } from '../kilo-api';
 import { eventKiloSessionId, sessionEventIdentity, unfilteredKiloEvents } from './feed';
 import {
   buildHeartbeatPayload,
+  createControlHandlerDeps,
   createSessionActivityRegistry,
-  type HandlerDeps,
   type HandlerSessionSnapshot,
 } from './sandbox-control-handlers';
 import {
@@ -244,19 +244,33 @@ const disposers: Array<() => void> = [];
 function setup(deliver?: SendEvent, signal?: AbortSignal) {
   const sessions: HandlerSessionSnapshot[] = [];
   const runtimes = new Map<string, WorktreeKiloRuntime>();
+  const key = (identity: { sessionId: string; kiloSessionId: string; directory: string }) =>
+    `${identity.sessionId}\0${identity.kiloSessionId}\0${identity.directory}`;
   const abort = new AbortController();
   const sendEvent = mock(deliver ?? (() => true));
   const notifications = createWorktreeMutationNotifications({
     sessions,
-    kiloRuntimes: { get: directory => runtimes.get(directory) },
+    kiloRuntimes: {
+      get: identity =>
+        typeof identity === 'string'
+          ? [...runtimes.values()].find(runtime => runtime.directory === identity)
+          : runtimes.get(key(identity)),
+      isCurrent: runtime =>
+        runtime.identity !== undefined && runtimes.get(key(runtime.identity)) === runtime,
+    },
     signal: signal ?? abort.signal,
     sendEvent,
   });
   disposers.push(notifications.dispose);
-  function addRuntime(directory: string) {
+  function addRuntime(
+    directory: string,
+    identity = { sessionId: 'workspace_root', kiloSessionId: 'root', directory }
+  ) {
     const controller = new AbortController();
     let client = {} as WrapperKiloClient;
     const runtime: WorktreeKiloRuntime = {
+      identity,
+      runtimeId: crypto.randomUUID(),
       directory,
       scopeId: directory,
       env: {},
@@ -265,7 +279,7 @@ function setup(deliver?: SendEvent, signal?: AbortSignal) {
         return client;
       },
     };
-    runtimes.set(directory, runtime);
+    runtimes.set(key(identity), runtime);
     return {
       runtime,
       controller,
@@ -299,7 +313,12 @@ function expectedHint(kiloSessionId = 'root', worktree = directory): Parameters<
   return [
     'session.event',
     { type: WORKTREE_CHANGED_EVENT, properties: {} },
-    { directory: worktree, kiloSessionId, rootKiloSessionId: kiloSessionId },
+    {
+      directory: worktree,
+      kiloSessionId,
+      rootKiloSessionId: kiloSessionId,
+      nativeRuntimeId: expect.any(String),
+    },
   ];
 }
 
@@ -590,18 +609,36 @@ describe('worktree mutation notifications', () => {
     expect(h.sendEvent.mock.calls).toEqual([expectedHint(), expectedHint('sibling')]);
   });
 
+  it('fans a same-directory mutation from an isolated sibling runtime to both roots', () => {
+    const h = setup();
+    const siblingIdentity = {
+      sessionId: 'workspace_sibling',
+      kiloSessionId: 'sibling',
+      directory,
+    };
+    const siblingRuntime = h.addRuntime(directory, siblingIdentity).runtime;
+    h.attach('sibling');
+
+    h.notifications.observe(siblingRuntime, { ...fileEdited, directory });
+    jest.advanceTimersByTime(5_000);
+
+    expect(h.sendEvent.mock.calls).toEqual([expectedHint(), expectedHint('sibling')]);
+  });
+
   it('observes ambiguous sessionless feed events before routing without modifying original events or activity', async () => {
     const h = setup();
     h.attach('sibling');
     const activity = createSessionActivityRegistry();
     activity.attach('root');
     activity.attach('sibling');
-    const deps = {
+    const deps = createControlHandlerDeps({
       sessions: h.sessions,
-      tasks: new Map(),
       activity,
+      version: 'test',
       kiloReady: true,
-    } as HandlerDeps;
+      emitSessionEvent: () => {},
+      retireRuntime: () => {},
+    });
     const snapshots = structuredClone(h.sessions);
     const heartbeat = buildHeartbeatPayload(deps);
     const routed = [];
@@ -860,6 +897,7 @@ describe('worktree mutation notifications', () => {
     h.notifications.observe(replacement.runtime, { ...fileEdited, directory });
     jest.advanceTimersByTime(5_000);
     expect(h.sendEvent.mock.calls).toEqual([expectedHint()]);
+    expect(h.sendEvent.mock.calls[0]?.[2].nativeRuntimeId).toBe(replacement.runtime.runtimeId);
   });
 
   it('never queues while aborted, disposed, deleting, or without an attached snapshot', async () => {

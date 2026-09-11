@@ -1,6 +1,8 @@
 /* eslint-disable max-lines -- the toggle consent-gating suite shares the createVoiceInputActions harness. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import {
   type VoiceInputControllerSnapshot,
   type VoiceInputStartOptions,
@@ -28,8 +30,15 @@ const linkingMock = vi.hoisted(() => ({
   openSettings: vi.fn(),
 }));
 
+// Mutable so tests can pin the platform: one implementation serves both, and
+// these tests pin the same behavior on each.
+const platformMock = vi.hoisted(() => ({ OS: 'ios' }));
+
 const toastMock = vi.hoisted(() => ({
   error: vi.fn(),
+  info: vi.fn(),
+  dismiss: vi.fn(),
+  success: vi.fn(),
 }));
 
 const localizationMock = vi.hoisted(() => ({
@@ -39,8 +48,23 @@ const localizationMock = vi.hoisted(() => ({
 const getSupportedLocalesMock = vi.hoisted(() =>
   vi.fn<() => Promise<{ locales: string[]; installedLocales: string[] }>>().mockResolvedValue({
     locales: ['en-US', 'nl-NL'],
-    installedLocales: [],
+    installedLocales: ['en-US'],
   })
+);
+
+const routerMock = vi.hoisted(() => ({
+  push: vi.fn(),
+}));
+
+const gatewayPreferenceMock = vi.hoisted(() => ({
+  isGatewayTranscriptionEnabled: vi.fn<() => boolean>(() => false),
+  readGatewayTranscriptionModel: vi.fn<() => { id: string; name: string } | null>(() => null),
+}));
+
+const triggerOfflineModelDownloadMock = vi.hoisted(() =>
+  vi
+    .fn<(options: { locale: string }) => Promise<{ status: string; message: string }>>()
+    .mockResolvedValue({ status: 'download_success', message: '' })
 );
 
 vi.mock('expo-haptics', () => ({
@@ -52,9 +76,16 @@ vi.mock('expo-localization', () => ({
   getLocales: localizationMock.getLocales,
 }));
 
+vi.mock('expo-router', () => ({
+  router: routerMock,
+}));
+
+vi.mock('./gateway/gateway-transcription-preference', () => gatewayPreferenceMock);
+
 vi.mock('expo-speech-recognition', () => ({
   ExpoSpeechRecognitionModule: {
     getSupportedLocales: getSupportedLocalesMock,
+    androidTriggerOfflineModelDownload: triggerOfflineModelDownloadMock,
   },
 }));
 
@@ -67,7 +98,7 @@ vi.mock('react-native', () => ({
   Alert: alertMock,
   AppState: { addEventListener: vi.fn() },
   Linking: linkingMock,
-  Platform: { OS: 'ios' },
+  Platform: platformMock,
 }));
 
 const mockController = vi.hoisted(() => {
@@ -165,12 +196,16 @@ describe('useVoiceInput integration', () => {
     localizationMock.getLocales.mockReturnValue([{ languageTag: 'en-US' }]);
     getSupportedLocalesMock.mockResolvedValue({
       locales: ['en-US', 'nl-NL'],
-      installedLocales: [],
+      installedLocales: ['en-US'],
     });
+    gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(false);
+    gatewayPreferenceMock.readGatewayTranscriptionModel.mockReturnValue(null);
     __resetVoiceInputLanguageTagCacheForTests();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+    platformMock.OS = 'ios';
     vi.clearAllMocks();
   });
 
@@ -225,7 +260,7 @@ describe('useVoiceInput integration', () => {
         localizationMock.getLocales.mockReturnValue([{ languageTag: 'en-DE' }]);
         getSupportedLocalesMock.mockResolvedValue({
           locales: ['en-AU', 'en-US'],
-          installedLocales: [],
+          installedLocales: ['en-US'],
         });
 
         await actions.toggle();
@@ -265,6 +300,60 @@ describe('useVoiceInput integration', () => {
         await actions.toggle();
 
         expect(mockController.start).not.toHaveBeenCalled();
+      });
+
+      it('gateway mode: starts without the consent disclosure and ignores any stored model', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+
+        await actions.toggle();
+
+        // The gateway engine resolves the model itself (the stored choice,
+        // else the first catalogue entry), so the action layer starts the
+        // session without a model precondition.
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.requiresOnDeviceRecognition).toBe(false);
+        expect(alertMock.alert).not.toHaveBeenCalled();
+        expect(toastMock.error).not.toHaveBeenCalled();
+        expect(voiceNetworkConsentMock.readVoiceNetworkConsent).not.toHaveBeenCalled();
+      });
+
+      it('gateway mode while listening: stops the session through the controller', async () => {
+        const { actions, owner } = buildActions();
+        mockController.setSnapshot(activeSnapshot(owner, 'listening'));
+        gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
+
+        await actions.toggle();
+
+        expect(hapticsMock.impactAsync).toHaveBeenCalledWith('medium');
+        expect(mockController.stop).toHaveBeenCalledWith(owner);
+        expect(mockController.start).not.toHaveBeenCalled();
+      });
+
+      it('gateway mode while transcribing: aborts the hung upload instead of starting', async () => {
+        const { actions, owner } = buildActions();
+        mockController.setSnapshot(activeSnapshot(owner, 'transcribing'));
+        gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
+
+        await actions.toggle();
+
+        expect(mockController.abort).toHaveBeenCalledWith(owner);
+        expect(mockController.start).not.toHaveBeenCalled();
+        expect(mockController.stop).not.toHaveBeenCalled();
+      });
+
+      it('device mode: keeps the OS consent flow', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(false);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+
+        await actions.toggle();
+
+        expect(mockController.start).not.toHaveBeenCalled();
+        expect(alertMock.alert).toHaveBeenCalledTimes(1);
       });
 
       it('starts with on-device recognition when on-device is supported regardless of consent', async () => {
@@ -371,6 +460,266 @@ describe('useVoiceInput integration', () => {
           'declined'
         );
         expect(mockController.start).not.toHaveBeenCalled();
+      });
+
+      it('falls back to network recognition in the device language when German has no on-device model', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('granted');
+        localizationMock.getLocales.mockReturnValue([{ languageTag: 'de-DE' }]);
+        getSupportedLocalesMock.mockResolvedValue({
+          locales: ['de-DE', 'en-US'],
+          installedLocales: ['en-US'],
+        });
+        await i18n.changeLanguage('de');
+
+        await actions.toggle();
+
+        const startOptions = mockController.start.mock.calls[0]?.[0];
+        if (!startOptions) {
+          throw new Error('controller.start was not called');
+        }
+        expect(startOptions.languageTag).toBe('de-DE');
+        expect(startOptions.requiresOnDeviceRecognition).toBe(false);
+      });
+
+      it('raises the network disclosure when German has no on-device model and consent is unset, then starts network on Allow', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+        localizationMock.getLocales.mockReturnValue([{ languageTag: 'de-DE' }]);
+        getSupportedLocalesMock.mockResolvedValue({
+          locales: ['de-DE', 'en-US'],
+          installedLocales: ['en-US'],
+        });
+        await i18n.changeLanguage('de');
+
+        await actions.toggle();
+
+        expect(mockController.start).not.toHaveBeenCalled();
+        expect(alertMock.alert).toHaveBeenCalledWith(
+          i18n.t('voiceInput.onlineTitle'),
+          i18n.t('voiceInput.onlineMessage', { provider: 'Apple' }),
+          expect.any(Array)
+        );
+
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const allow = buttons?.find(button => button.text === i18n.t('voiceInput.allow'));
+        allow?.onPress?.();
+        await new Promise<void>(resolve => {
+          setImmediate(resolve);
+        });
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        const startOptions = mockController.start.mock.calls[0]?.[0];
+        expect(startOptions?.languageTag).toBe('de-DE');
+        expect(startOptions?.requiresOnDeviceRecognition).toBe(false);
+      });
+
+      it('offers the offline model download when German has no on-device model and consent is declined', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('declined');
+        platformMock.OS = 'android';
+        localizationMock.getLocales.mockReturnValue([{ languageTag: 'de-DE' }]);
+        getSupportedLocalesMock.mockResolvedValue({
+          locales: ['de-DE', 'en-US'],
+          installedLocales: ['en-US'],
+        });
+        await i18n.changeLanguage('de');
+
+        await actions.toggle();
+
+        expect(mockController.start).not.toHaveBeenCalled();
+        expect(toastMock.error).not.toHaveBeenCalled();
+        expect(alertMock.alert).toHaveBeenCalledWith(
+          i18n.t('voiceInput.languageNotInstalledTitle', { language: 'Deutsch' }),
+          i18n.t('voiceInput.languageNotInstalledMessage', { language: 'Deutsch' }),
+          expect.any(Array)
+        );
+
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const download = buttons?.find(
+          button => button.text === i18n.t('voiceInput.downloadOfflineModel')
+        );
+        download?.onPress?.();
+        await new Promise<void>(resolve => {
+          setImmediate(resolve);
+        });
+
+        expect(triggerOfflineModelDownloadMock).toHaveBeenCalledWith({ locale: 'de-DE' });
+        expect(mockController.start).not.toHaveBeenCalled();
+      });
+
+      it('offers the same download remediation on iOS as on Android when the offline model is missing', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('declined');
+        platformMock.OS = 'ios';
+        localizationMock.getLocales.mockReturnValue([{ languageTag: 'de-DE' }]);
+        getSupportedLocalesMock.mockResolvedValue({
+          locales: ['de-DE', 'en-US'],
+          installedLocales: ['en-US'],
+        });
+        await i18n.changeLanguage('de');
+
+        await actions.toggle();
+
+        expect(mockController.start).not.toHaveBeenCalled();
+        expect(toastMock.error).not.toHaveBeenCalled();
+        expect(alertMock.alert).toHaveBeenCalledWith(
+          i18n.t('voiceInput.languageNotInstalledTitle', { language: 'Deutsch' }),
+          i18n.t('voiceInput.languageNotInstalledMessage', { language: 'Deutsch' }),
+          expect.any(Array)
+        );
+
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const download = buttons?.find(
+          button => button.text === i18n.t('voiceInput.downloadOfflineModel')
+        );
+        download?.onPress?.();
+        await new Promise<void>(resolve => {
+          setImmediate(resolve);
+        });
+
+        expect(triggerOfflineModelDownloadMock).toHaveBeenCalledWith({ locale: 'de-DE' });
+        expect(mockController.start).not.toHaveBeenCalled();
+      });
+
+      it('tells the user the download is queued when the system schedules the offline model download', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('declined');
+        platformMock.OS = 'android';
+        localizationMock.getLocales.mockReturnValue([{ languageTag: 'de-DE' }]);
+        getSupportedLocalesMock.mockResolvedValue({
+          locales: ['de-DE', 'en-US'],
+          installedLocales: ['en-US'],
+        });
+        await i18n.changeLanguage('de');
+        triggerOfflineModelDownloadMock.mockResolvedValueOnce({
+          status: 'download_scheduled',
+          message: '',
+        });
+
+        await actions.toggle();
+
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const download = buttons?.find(
+          button => button.text === i18n.t('voiceInput.downloadOfflineModel')
+        );
+        download?.onPress?.();
+        await new Promise<void>(resolve => {
+          setImmediate(resolve);
+        });
+
+        expect(toastMock.success).toHaveBeenCalledWith(
+          i18n.t('voiceInput.offlineModelDownloadScheduled')
+        );
+        expect(mockController.start).not.toHaveBeenCalled();
+      });
+
+      it('reaches on-device recognition on the next tap after a completed model download', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('declined');
+        platformMock.OS = 'android';
+        localizationMock.getLocales.mockReturnValue([{ languageTag: 'de-DE' }]);
+        getSupportedLocalesMock.mockResolvedValueOnce({
+          locales: ['de-DE', 'en-US'],
+          installedLocales: ['en-US'],
+        });
+        await i18n.changeLanguage('de');
+        triggerOfflineModelDownloadMock.mockResolvedValueOnce({
+          status: 'download_success',
+          message: '',
+        });
+
+        await actions.toggle();
+
+        const firstAlert = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const download = firstAlert?.find(
+          button => button.text === i18n.t('voiceInput.downloadOfflineModel')
+        );
+        download?.onPress?.();
+        await new Promise<void>(resolve => {
+          setImmediate(resolve);
+        });
+
+        // The model is installed now; the gate must re-query the service
+        // instead of trusting the memoized pre-download list.
+        getSupportedLocalesMock.mockResolvedValueOnce({
+          locales: ['de-DE', 'en-US'],
+          installedLocales: ['de-DE', 'en-US'],
+        });
+        alertMock.alert.mockClear();
+
+        await actions.toggle();
+
+        expect(alertMock.alert).not.toHaveBeenCalled();
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.requiresOnDeviceRecognition).toBe(true);
+        expect(mockController.start.mock.calls[0]?.[0]?.languageTag).toBe('de-DE');
+      });
+
+      it('falls back to an actionable toast when the offline model download trigger fails', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('declined');
+        platformMock.OS = 'android';
+        localizationMock.getLocales.mockReturnValue([{ languageTag: 'de-DE' }]);
+        getSupportedLocalesMock.mockResolvedValue({
+          locales: ['de-DE', 'en-US'],
+          installedLocales: ['en-US'],
+        });
+        await i18n.changeLanguage('de');
+        triggerOfflineModelDownloadMock.mockRejectedValueOnce(new Error('download failed'));
+
+        await actions.toggle();
+
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const download = buttons?.find(
+          button => button.text === i18n.t('voiceInput.downloadOfflineModel')
+        );
+        download?.onPress?.();
+        await new Promise<void>(resolve => {
+          setImmediate(resolve);
+        });
+
+        expect(toastMock.error).toHaveBeenCalledWith(i18n.t('voiceInput.unavailableLanguage'));
+      });
+
+      it('keeps on-device recognition when the service exposes no per-language data', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('declined');
+        getSupportedLocalesMock.mockRejectedValueOnce(new Error('not supported'));
+        await i18n.changeLanguage('de');
+
+        await actions.toggle();
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.requiresOnDeviceRecognition).toBe(true);
       });
     });
 

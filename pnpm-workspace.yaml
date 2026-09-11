@@ -48,6 +48,20 @@ catalog:
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx
+  # Expo SDK 57 alignment: the 2026-09-08 patch releases `expo install --check`
+  # expects, plus the exact transitive versions that aligned graph resolves to.
+  # Each entry exempts exactly the listed package@version required by that
+  # alignment; any other or future version of these packages stays age-gated.
+  - expo@57.0.21
+  - '@expo/ui@57.0.17'
+  - expo-router@57.0.20
+  - expo-widgets@57.0.18
+  - babel-preset-expo@57.0.11
+  - expo-modules-core@57.0.17
+  - expo-modules-jsi@57.1.0
+  - '@expo/cli@57.0.23'
+  - '@expo/metro-file-map@57.0.3'
+  - expo-glass-effect@57.0.2
   - expo-dev-client
   - expo-dev-launcher
   - expo-dev-menu
@@ -84,17 +98,23 @@ overrides:
   storybook: 10.4.6
   next: 16.3.3
   preact: 10.28.4
+  adm-zip: 0.6.0
+  browserslist: 4.28.7
+  decode-uri-component: 0.5.0
   glob: '>=13.0.1'
+  google-auth-library: 10.6.2
   esbuild: '>=0.28.1'
   lodash: '>=4.18.1'
   diff: '>=8.0.3'
   fast-xml-parser: '>=5.7.3'
+  fflate@^0.4.8: 0.4.9
+  fflate@^0.8.2: 0.8.3
   vite: '>=8.0.16 <8.1.0'
   form-data: 4.0.6
   ws@^7: 7.5.11
   ws@^8: 8.21.0
   tmp: 0.2.7
-  dompurify: 3.4.12
+  dompurify: 3.4.13
   handlebars: 4.7.9
   brace-expansion: 5.0.9
   node-forge: 1.4.0
@@ -109,8 +129,8 @@ overrides:
   image-size@^2: npm:image-size-next@2.1.1
   drizzle-orm: 0.45.2
   lodash-es: '>=4.18.1'
-  '@xmldom/xmldom': 0.8.13
-  qs: 6.15.2
+  '@xmldom/xmldom': 0.8.15
+  qs: 6.16.0
   smol-toml: 1.6.1
   uuid@<11.1.1: 11.1.1
   serialize-javascript: '>=7.0.3'
@@ -123,7 +143,10 @@ overrides:
   # https://github.com/parcel-bundler/lightningcss/issues/1081
   lightningcss: 1.30.1
   axios: 1.18.0
-  fast-uri: 3.1.4
+  fast-uri: 3.1.6
+  joi: 17.13.4
+  postcss-selector-parser@^7.0.0: 7.1.3
+  toml: 4.2.0
   '@opentelemetry/core': 2.8.0
   body-parser: 2.3.0
   js-yaml: 4.3.1
@@ -138,9 +161,9 @@ overrides:
   # and constructs its own WebClient, so the versions must agree. 7.x is the
   # ceiling until @chat-adapter/slack moves to @slack/web-api 8.
   '@slack/web-api': 7.19.0
-  # Direct `@expo/ui@57.0.12` (expo-widgets peer) and expo-router's `^57.0.9`
+  # Direct `@expo/ui@57.0.17` (expo-widgets peer) and expo-router's `^57.0.9`
   # otherwise resolve to two native-module copies. Force one version.
-  '@expo/ui': 57.0.12
+  '@expo/ui': 57.0.17
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false).
@@ -158,9 +181,19 @@ packageExtensions:
     dependencies:
       '@expo/config-plugins': '*'
 patchedDependencies:
-  expo-router@57.0.15: patches/expo-router@57.0.15.patch
+  # query-string 7 requires this dependency as CommonJS. Keep the 0.5.0 security fix.
+  decode-uri-component@0.5.0: patches/decode-uri-component@0.5.0.patch
+  # Repo-local features the SDK lacks, carried onto each SDK patch release:
+  # router — unhandled deep links when getInitialURL resolves later;
+  # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,
+  # includeEnded instance reads, factory-registered push-to-start URL.
+  expo-router@57.0.20: patches/expo-router@57.0.20.patch
   expo-server-sdk: patches/expo-server-sdk.patch
-  expo-widgets@57.0.11: patches/expo-widgets@57.0.11.patch
+  # Null-guard the headless app loader in TaskService.executeTask. Without it a
+  # data-only FCM wake during cold start dereferences a null loader and fatally
+  # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).
+  expo-task-manager@57.0.16: patches/expo-task-manager@57.0.16.patch
+  expo-widgets@57.0.18: patches/expo-widgets@57.0.18.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
 publicHoistPattern:
   - '@types/*'

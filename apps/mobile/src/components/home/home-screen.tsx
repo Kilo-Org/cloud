@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshControl, View } from 'react-native';
+import { View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import logo from '@/../assets/images/logo.png';
@@ -8,10 +9,9 @@ import { Image } from '@/components/ui/image';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   AgentSessionsSection,
-  liveSessionContent,
   LiveSessionFeedback,
-  useLiveSessionContext,
 } from '@/components/home/agent-sessions-section';
+import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
 import { ProductChoices } from '@/components/home/product-choices';
@@ -61,7 +61,7 @@ export function HomeScreen() {
         }
         size="large"
         showBackButton={false}
-        className="px-[22px]"
+        className="px-[22px] pb-1"
       />
       {centerFeedback ? (
         <LiveSessionFeedback

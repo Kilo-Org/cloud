@@ -13,6 +13,7 @@ const mockCancelReview = jest.fn();
 const mockAddReactionToPR = jest.fn();
 const mockIsMergeCommit = jest.fn();
 const mockIsCouncilEntitledForOwner = jest.fn();
+const mockGetRepositoryCustomization = jest.fn();
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
   getBotUserId: (organizationId: string, botType: string) =>
@@ -53,6 +54,10 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   createCheckRun: (...args: unknown[]) => mockCreateCheckRun(...args),
   isMergeCommit: (...args: unknown[]) => mockIsMergeCommit(...args),
   updateCheckRun: (...args: unknown[]) => mockUpdateCheckRun(...args),
+}));
+
+jest.mock('@/lib/integrations/db/platform-integrations', () => ({
+  getRepositoryCustomization: (...args: unknown[]) => mockGetRepositoryCustomization(...args),
 }));
 
 import {
@@ -123,6 +128,7 @@ beforeEach(() => {
   mockAddReactionToPR.mockResolvedValue(undefined);
   mockIsMergeCommit.mockResolvedValue(false);
   mockIsCouncilEntitledForOwner.mockResolvedValue(false);
+  mockGetRepositoryCustomization.mockResolvedValue(null);
 });
 
 describe('resolvePullRequestCheckoutRef', () => {
@@ -291,6 +297,71 @@ describe('handlePullRequest', () => {
       { status: 'completed', conclusion: 'cancelled' },
       'standard'
     );
+  });
+
+  describe('repository PR review toggle', () => {
+    it('skips the review when the repository has an explicit pr_review_mode override of off', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+      mockGetRepositoryCustomization.mockResolvedValue({
+        bot_mention_model_slug: null,
+        pr_review_mode: 'off',
+      });
+
+      const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ message: 'PR reviews disabled for this repository' });
+      expect(mockGetRepositoryCustomization).toHaveBeenCalledWith(
+        '8b2ff443-8396-4b07-99ae-7015789da7dd',
+        '123'
+      );
+      expect(mockCreateCodeReview).not.toHaveBeenCalled();
+      expect(mockCreateCheckRun).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it('skips the review when the installation default pr_review_mode is off and the repo has no override', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+      mockGetRepositoryCustomization.mockResolvedValue(null);
+
+      const response = await handlePullRequest(
+        pullRequestPayload(),
+        platformIntegration({ metadata: { pr_review_mode: 'off' } })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ message: 'PR reviews disabled for this repository' });
+      expect(mockCreateCodeReview).not.toHaveBeenCalled();
+    });
+
+    it('reviews the PR when the repository override of on takes precedence over an off installation default', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+      mockGetRepositoryCustomization.mockResolvedValue({
+        bot_mention_model_slug: null,
+        pr_review_mode: 'on',
+      });
+
+      const response = await handlePullRequest(
+        pullRequestPayload(),
+        platformIntegration({ metadata: { pr_review_mode: 'off' } })
+      );
+
+      expect(response.status).toBe(202);
+      expect(mockCreateCodeReview).toHaveBeenCalled();
+    });
+
+    it('reviews the PR when neither the repository nor the installation has an explicit mode (defaults to on)', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+
+      const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+      expect(response.status).toBe(202);
+      expect(mockCreateCodeReview).toHaveBeenCalled();
+    });
   });
 
   describe('automated council review type', () => {

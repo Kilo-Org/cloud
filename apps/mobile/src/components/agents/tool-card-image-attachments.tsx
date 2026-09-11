@@ -66,7 +66,7 @@ function ToolCardImageAttachment({
   }
 
   if (failed) {
-    return <UnavailableRow icon={AlertCircle} message={t('agentChat.filePart.imageUnavailable')} />;
+    return <UnavailableRow icon={AlertCircle} message={t('common.imageUnavailable')} />;
   }
 
   return (

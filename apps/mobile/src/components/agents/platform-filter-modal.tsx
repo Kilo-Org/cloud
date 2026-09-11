@@ -1,5 +1,5 @@
 import { Check } from '@/components/ui/icons';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -14,7 +14,6 @@ import { Text } from '@/components/ui/text';
 import { type AgentSessionFilters } from '@/lib/agent-session-filters';
 import { platformLabel } from '@/lib/platform-label';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 import { cn } from '@/lib/utils';
 
 export { type ProjectFilterOption };
@@ -50,7 +49,7 @@ function platformFilterLabel(p: string): string {
       return i18n.t('agentChat.sessionFilter.platformSlack');
     }
     case 'github': {
-      return i18n.t('agentChat.sessionFilter.platformGithub');
+      return i18n.t('common.github');
     }
     case 'linear': {
       return i18n.t('agentChat.sessionFilter.platformLinear');
@@ -120,9 +119,6 @@ export function SessionFilterModal({
     );
   };
 
-  // Close when the privacy cover fires (app backgrounds on a covered route).
-  useEffect(() => subscribePrivacyCover(onClose), [onClose]);
-
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable
@@ -151,7 +147,7 @@ export function SessionFilterModal({
             <View className="gap-4">
               <View className="gap-1">
                 <Text variant="eyebrow" className="px-3">
-                  {t('agentChat.sessionFilter.platform')}
+                  {t('common.platform')}
                 </Text>
                 {platforms.map(platform => (
                   <FilterCheckboxRow

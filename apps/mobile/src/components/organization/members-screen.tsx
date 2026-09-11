@@ -117,9 +117,7 @@ export function OrganizationMembersScreen() {
               router.push('/(app)/(tabs)/(3_profile)/organization/invite-member' as Href);
             }}
           >
-            <Text className="text-primary-foreground">
-              {t('organization.members.inviteMember')}
-            </Text>
+            <Text className="text-primary-foreground">{t('organization.inviteMember.title')}</Text>
           </Button>
         ) : undefined
       }
@@ -209,7 +207,7 @@ export function OrganizationMembersScreen() {
               }}
               hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel={t('organization.members.inviteMember')}
+              accessibilityLabel={t('organization.inviteMember.title')}
               className="active:opacity-70"
             >
               <UserPlus size={22} color={colors.foreground} />

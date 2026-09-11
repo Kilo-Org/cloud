@@ -10,6 +10,10 @@ type BootstrapErrorScreenProps = {
   readonly primaryLabel: string;
   readonly primaryAccessibilityLabel: string;
   readonly onPrimaryPress: () => void;
+  /** Shows the primary button's inline spinner and disables it while the
+   *  primary action is in flight. The secondary button stays enabled in all
+   *  states: it is the escape hatch. */
+  readonly primaryLoading?: boolean;
   readonly secondaryLabel: string;
   readonly secondaryAccessibilityLabel: string;
   readonly onSecondaryPress: () => void;
@@ -21,6 +25,7 @@ export function BootstrapErrorScreen({
   primaryLabel,
   primaryAccessibilityLabel,
   onPrimaryPress,
+  primaryLoading,
   secondaryLabel,
   secondaryAccessibilityLabel,
   onSecondaryPress,
@@ -33,7 +38,12 @@ export function BootstrapErrorScreen({
           <Text className="text-center text-sm text-muted-foreground">{description}</Text>
         </View>
         <View className="w-full gap-3">
-          <Button size="lg" onPress={onPrimaryPress} accessibilityLabel={primaryAccessibilityLabel}>
+          <Button
+            size="lg"
+            loading={primaryLoading}
+            onPress={onPrimaryPress}
+            accessibilityLabel={primaryAccessibilityLabel}
+          >
             <Text>{primaryLabel}</Text>
           </Button>
           <Button

@@ -13,6 +13,7 @@ type KiloEvent = {
 };
 
 type NotificationIdentity = {
+  nativeRuntimeId: string;
   directory: string;
   kiloSessionId: string;
   rootKiloSessionId: string;
@@ -26,6 +27,7 @@ type Target = {
 
 type Pending = {
   runtime: WorktreeKiloRuntime;
+  nativeRuntimeId: string;
   kiloClient: WorktreeKiloRuntime['kiloClient'];
   targets: Map<HandlerSessionSnapshot, Target>;
   quietTimer?: ReturnType<typeof setTimeout>;
@@ -156,7 +158,9 @@ function mutationSessionId({ type, properties }: KiloEvent): string | undefined 
 
 export function createWorktreeMutationNotifications(options: {
   sessions: readonly HandlerSessionSnapshot[];
-  kiloRuntimes: Pick<WorktreeKiloRuntimes, 'get'>;
+  kiloRuntimes: Pick<WorktreeKiloRuntimes, 'get'> & {
+    isCurrent(runtime: WorktreeKiloRuntime): boolean;
+  };
   signal: AbortSignal;
   sendEvent: (
     event: 'session.event',
@@ -173,7 +177,7 @@ export function createWorktreeMutationNotifications(options: {
       !disposed &&
       !options.signal.aborted &&
       !runtime.signal.aborted &&
-      options.kiloRuntimes.get(runtime.directory) === runtime
+      options.kiloRuntimes.isCurrent(runtime)
     );
   }
 
@@ -205,6 +209,7 @@ export function createWorktreeMutationNotifications(options: {
             { type: WORKTREE_CHANGED_EVENT, properties: {} },
             {
               directory: entry.runtime.directory,
+              nativeRuntimeId: entry.nativeRuntimeId,
               kiloSessionId: target.kiloSessionId,
               rootKiloSessionId: target.kiloSessionId,
             }
@@ -271,6 +276,7 @@ export function createWorktreeMutationNotifications(options: {
         if (!entry) {
           const created: Pending = {
             runtime,
+            nativeRuntimeId: runtime.runtimeId,
             kiloClient: runtime.kiloClient,
             targets,
             onAbort: () => remove(created),

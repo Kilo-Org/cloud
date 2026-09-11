@@ -73,11 +73,7 @@ export function ChatToolbar({
 
   return (
     <View
-      className={cn(
-        'flex-row flex-wrap items-center gap-2 px-3 py-2.5',
-        disabled && 'opacity-50',
-        className
-      )}
+      className={cn('flex-row items-center gap-2 px-3 py-2.5', disabled && 'opacity-50', className)}
     >
       {order === 'model-first' ? modelSelector : modeSelector}
       {order === 'model-first' ? modeSelector : modelSelector}
@@ -86,7 +82,7 @@ export function ChatToolbar({
           size="sm"
           onPress={onPaste}
           disabled={pasteDisabled}
-          className="ml-auto"
+          className="ml-auto shrink-0"
         />
       ) : null}
     </View>

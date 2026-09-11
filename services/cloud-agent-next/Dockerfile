@@ -1,4 +1,4 @@
-FROM docker.io/cloudflare/sandbox:0.12.1
+FROM docker.io/cloudflare/sandbox:0.12.9
 
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""
@@ -31,7 +31,9 @@ RUN set -eux; \
 		git-lfs \
 		gh \
 		jq \
-		openssh-client; \
+		libatomic1 \
+		openssh-client \
+		ripgrep; \
 	git lfs install --system --skip-repo; \
 	apt-get clean; \
 	rm -rf /var/lib/apt/lists/*

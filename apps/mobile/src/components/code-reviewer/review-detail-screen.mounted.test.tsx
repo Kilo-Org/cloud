@@ -10,8 +10,6 @@ import { createElement, type ReactNode } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { emitPrivacyCover } from '@/lib/privacy-cover-events';
-
 import { ReviewDetailScreen } from './review-detail-screen';
 
 const detail = vi.hoisted(() => ({
@@ -56,6 +54,10 @@ const spectatorQueries = vi.hoisted(() => ({
     data: null as unknown,
     refetch: vi.fn(),
   },
+  sessionMessagesQuery: null as {
+    enabled?: boolean;
+    refetchInterval?: unknown;
+  } | null,
 }));
 const statusHelpers = vi.hoisted(() => ({
   cancellable: false,
@@ -172,11 +174,13 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: (options: { queryKey?: unknown[] }) => {
+  useQuery: (options: { queryKey?: unknown[]; enabled?: boolean; refetchInterval?: unknown }) => {
     const key = options.queryKey?.[0];
-    return key === 'codeReviews.getReviewStreamInfo'
-      ? spectatorQueries.streamInfo
-      : spectatorQueries.sessionMessages;
+    if (key === 'codeReviews.getReviewStreamInfo') {
+      return spectatorQueries.streamInfo;
+    }
+    spectatorQueries.sessionMessagesQuery = options;
+    return spectatorQueries.sessionMessages;
   },
 }));
 vi.mock('@/components/code-reviewer/review-spectator-stream', () => ({
@@ -309,6 +313,7 @@ beforeEach(() => {
   spectatorQueries.sessionMessages.isError = false;
   spectatorQueries.sessionMessages.data = { success: true, entries: [] };
   spectatorQueries.sessionMessages.refetch.mockClear();
+  spectatorQueries.sessionMessagesQuery = null;
   spectatorStream.createReviewSpectatorStream.mockReset();
   spectatorStream.createReviewSpectatorStream.mockResolvedValue({
     connect: vi.fn(),
@@ -362,6 +367,33 @@ describe('ReviewDetailScreen outcome-first order', () => {
 
     expect(texts).toContain('review crashed');
     expect(texts.indexOf('Completed')).toBeLessThan(texts.indexOf('review crashed'));
+  });
+
+  it('clamps a multi-kilobyte failure dump so the retry action stays mounted', () => {
+    // A failed admission stores the raw upstream error (a serialized TRPC
+    // stack) in `error_message`. Rendered unclamped it filled the screen and
+    // pushed "Retry review" below the fold (e1-review-status.png), leaving no
+    // visible way out. The failure block must keep a bounded height.
+    statusHelpers.retriggerable = true;
+    const dump = `Dispatch failed: ${'at Object.<anonymous> (worker.js:1:1234)\n'.repeat(60)}`;
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed', error_message: dump }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const renderer = mountScreen();
+    const texts = collectText(renderer.toJSON());
+    expect(texts).toContain('Retry review');
+
+    const errorNode = renderer.root.findAll(
+      node =>
+        (node.type as string) === 'Text' &&
+        collectText([node.props.children]).some(text => text.includes('Dispatch failed:'))
+    )[0];
+    expect(errorNode).toBeDefined();
+    expect(typeof errorNode?.props.numberOfLines).toBe('number');
+    expect(errorNode?.props.numberOfLines).toBeLessThanOrEqual(4);
   });
 });
 
@@ -561,20 +593,6 @@ describe('ReviewDetailScreen transcript sheet', () => {
     }
   );
 
-  it('closes the transcript and destroys the stream when the privacy cover activates', async () => {
-    const connection = { connect: vi.fn(), destroy: vi.fn() };
-    spectatorStream.createReviewSpectatorStream.mockResolvedValue(connection);
-    mountScreen(true);
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    act(emitPrivacyCover);
-
-    expect(modalRenders.list.at(-1)?.visible).toBe(false);
-    expect(connection.destroy).toHaveBeenCalledTimes(1);
-  });
-
   it('destroys a pending stream connection if the sheet closes before it arrives', async () => {
     const connection = { connect: vi.fn(), destroy: vi.fn() };
     let resolveConnection: ((value: typeof connection) => void) | undefined = undefined;
@@ -655,6 +673,57 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(texts).toContain('Waiting for the review transcript.');
   });
 
+  it('polls session messages for an in-progress org review and does not open a websocket', () => {
+    spectatorQueries.streamInfo.data = makeStreamInfo({
+      status: 'running',
+      cloudAgentSessionId: 'agent-1',
+      organizationId: 'org-1',
+    });
+    spectatorQueries.sessionMessages.data = {
+      success: true,
+      entries: [{ timestamp: 't1', message: 'Tool: read', eventType: 'tool' }],
+    };
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'running' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen(true);
+
+    expect(spectatorStream.createReviewSpectatorStream).not.toHaveBeenCalled();
+    expect(spectatorQueries.sessionMessagesQuery?.enabled).toBe(true);
+    expect(spectatorQueries.sessionMessagesQuery?.refetchInterval).toBe(2000);
+    const items = sessionListRenders.list.at(-1)?.items as { message?: string }[] | undefined;
+    expect(items?.map(item => item.message)).toEqual(['Tool: read']);
+  });
+
+  it('keeps org poll rows when a later snapshot is empty', () => {
+    spectatorQueries.streamInfo.data = makeStreamInfo({
+      status: 'running',
+      cloudAgentSessionId: 'agent-1',
+      organizationId: 'org-1',
+    });
+    spectatorQueries.sessionMessages.data = {
+      success: true,
+      entries: [{ timestamp: 't1', message: 'Tool: read', eventType: 'tool' }],
+    };
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'running' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const renderer = mountScreen(true);
+    spectatorQueries.sessionMessages.data = { success: true, entries: [] };
+    act(() => {
+      renderer.update(createElement(ReviewDetailScreen, { scope: 'personal', reviewId: 'rev-1' }));
+    });
+
+    const items = sessionListRenders.list.at(-1)?.items as { message?: string }[] | undefined;
+    expect(items?.map(item => item.message)).toEqual(['Tool: read']);
+  });
+
   it('shows empty copy for a completed review without a session', () => {
     spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'completed' });
     detail.data = {
@@ -666,6 +735,23 @@ describe('ReviewDetailScreen spectator transcript', () => {
     const texts = renderScreen(true);
 
     expect(texts).toContain('No transcript for this review.');
+  });
+
+  it('shows empty copy, not waiting copy, for a failed review without a session', () => {
+    // The dispatch worker refused the review: the server failed it. The sheet
+    // must leave the "Waiting for the review transcript" state once the status
+    // is terminal, or the user is stranded on an eternal spinner copy.
+    spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'failed' });
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen(true);
+
+    expect(texts).toContain('No transcript for this review.');
+    expect(texts).not.toContain('Waiting for the review transcript.');
   });
 
   it('shows empty copy when a completed non-v2 review has stale stream info', () => {
@@ -837,6 +923,61 @@ describe('ReviewDetailScreen spectator transcript', () => {
     const afterDrop = sessionListRenders.list.at(-1);
     const afterDropItems = afterDrop?.items as { message?: string }[] | undefined;
     expect(afterDropItems?.[0]?.message).toBe('Execution started');
+  });
+
+  it('renders streamed assistant text while the review is running', async () => {
+    const captured: { onEvent?: (event: unknown) => void } = {};
+    spectatorStream.createReviewSpectatorStream.mockImplementation(
+      (input: { onEvent: (event: unknown) => void }) => {
+        captured.onEvent = input.onEvent;
+        return {
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+          retryReconnect: vi.fn(),
+          destroy: vi.fn(),
+        };
+      }
+    );
+    spectatorQueries.streamInfo.data = makeStreamInfo({
+      status: 'running',
+      cloudAgentSessionId: 'agent-1',
+    });
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'running' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen(true);
+
+    expect(captured.onEvent).toBeDefined();
+    await act(async () => {
+      captured.onEvent?.({
+        eventId: 1,
+        sessionId: 'agent-1',
+        streamEventType: 'kilocode',
+        timestamp: 't1',
+        data: {
+          type: 'message.part.updated',
+          properties: {
+            part: {
+              id: 'prt_text',
+              sessionID: 'agent-1',
+              messageID: 'msg-1',
+              type: 'text',
+              text: 'Looking at the diff now.',
+              time: { start: 1_787_054_400_000 },
+            },
+          },
+        },
+      });
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+
+    const items = sessionListRenders.list.at(-1)?.items as { message?: string }[] | undefined;
+    expect(items?.map(item => item.message)).toContain('Looking at the diff now.');
   });
 
   it('keeps a streamed row when the review turns terminal (no skeleton or empty copy)', async () => {

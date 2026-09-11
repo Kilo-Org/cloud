@@ -583,7 +583,11 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       const reason: 'interrupted' | 'exhausted' | 'execution' =
         rawReason === 'interrupted' ? 'interrupted' : attempts != null ? 'exhausted' : 'execution';
       const error =
-        r.data.error !== undefined ? extractErrorMessage(r.data.error) : 'Message delivery failed';
+        r.data.error !== undefined
+          ? extractErrorMessage(r.data.error)
+          : rawReason === 'attach_exhausted'
+            ? rawReason
+            : 'Message delivery failed';
       return {
         type: 'cloud.message.failed',
         messageId,

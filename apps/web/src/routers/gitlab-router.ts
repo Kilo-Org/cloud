@@ -247,10 +247,14 @@ export const gitlabRouter = createTRPCRouter({
     // No Kilo-managed webhooks → skip the network round-trip and just
     // persist + return the new secret for manual reconfiguration.
     if (Object.keys(configuredWebhooks).length === 0) {
-      await updateIntegrationMetadataForOwner(owner, 'gitlab', {
-        ...existingMetadata,
-        webhook_secret: newSecret,
-      });
+      await updateIntegrationMetadataForOwner(
+        owner,
+        'gitlab',
+        {
+          webhook_secret: newSecret,
+        },
+        integration.id
+      );
       return {
         webhookSecret: newSecret,
         webhookSync: {
@@ -321,11 +325,15 @@ export const gitlabRouter = createTRPCRouter({
       };
     }
 
-    await updateIntegrationMetadataForOwner(owner, 'gitlab', {
-      ...existingMetadata,
-      webhook_secret: newSecret,
-      configured_webhooks: updatedWebhooks,
-    });
+    await updateIntegrationMetadataForOwner(
+      owner,
+      'gitlab',
+      {
+        webhook_secret: newSecret,
+        configured_webhooks: updatedWebhooks,
+      },
+      integration.id
+    );
 
     return {
       webhookSecret: newSecret,

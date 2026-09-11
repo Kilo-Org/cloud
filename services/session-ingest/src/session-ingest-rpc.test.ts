@@ -2014,6 +2014,87 @@ describe('SessionIngestRPC.getCloudAgentRootSessionMessages', () => {
     });
   });
 
+  it('normalizes a persisted textless reasoning part instead of failing the whole history', async () => {
+    // Mirrors the e1 device fixture: message 2 carries a reasoning part with
+    // NO text field. Before the read-seam normalization the strict part schema
+    // rejected it and the whole page degraded to invalid_data, so the agent
+    // chat screen never rendered the transcript.
+    const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
+    const assistantInfo = {
+      id: 'msg_asst_01',
+      sessionID: sdkSessionInfoFixture.id,
+      role: 'assistant' as const,
+      time: { created: 2, completed: 3 },
+      parentID: sdkUserMessageFixture.id,
+      modelID: 'claude',
+      providerID: 'anthropic',
+      mode: 'code',
+      agent: 'build',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: {
+        input: 0,
+        output: 0,
+        reasoning: 0,
+        cache: { read: 0, write: 0 },
+      },
+    };
+    const textlessReasoningPart = {
+      id: 'prt_r_bad',
+      sessionID: sdkSessionInfoFixture.id,
+      messageID: assistantInfo.id,
+      type: 'reasoning' as const,
+      time: { start: 1, end: 2 },
+    };
+    const whitespaceReasoningPart = {
+      ...textlessReasoningPart,
+      id: 'prt_r_ws',
+      time: { start: 2, end: 3 },
+      text: '   \n\t  ',
+    };
+    const answerPart = {
+      id: 'prt_t_ok',
+      sessionID: sdkSessionInfoFixture.id,
+      messageID: assistantInfo.id,
+      type: 'text' as const,
+      text: 'Release ships on Tuesday',
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => ({
+        messages: [
+          { info: sdkUserMessageFixture, parts: [sdkTextPartFixture] },
+          {
+            info: assistantInfo,
+            parts: [textlessReasoningPart, whitespaceReasoningPart, answerPart],
+          },
+        ],
+        nextCursor: null,
+        omittedItemCount: 0,
+      })),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      history: {
+        messages: [
+          sdkStoredMessageFixture,
+          {
+            info: assistantInfo,
+            parts: [{ ...textlessReasoningPart, text: '' }, whitespaceReasoningPart, answerPart],
+          },
+        ],
+        nextCursor: null,
+        omittedItemCount: 0,
+      },
+    });
+  });
+
   it('strips additive fields from recognized persisted parts', async () => {
     const { db } = makeDbFakes([{ cloudAgentSessionId: 'agent_owned_root' }]);
     vi.mocked(getSessionIngestDO).mockReturnValue({

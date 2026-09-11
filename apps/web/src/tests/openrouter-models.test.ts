@@ -5,6 +5,7 @@ import { GET as gatewayV1ModelsGET } from '../app/api/gateway/v1/models/route';
 import { GET as transcriptionModelsGET } from '../app/api/gateway/transcription-models/route';
 import {
   getEnhancedOpenRouterModels,
+  getOpenRouterTranscriptionModels,
   getRawOpenRouterModels,
 } from '@/lib/ai-gateway/providers/openrouter';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
@@ -280,6 +281,41 @@ describe('GET /api/openrouter/models', () => {
     expect(response.status).toBe(200);
     expect(responseData.data).toBeDefined();
     expect(Array.isArray(responseData.data)).toBe(true);
+  });
+
+  test('excludes unavailable free models advertised upstream while retaining paid Gemma', async () => {
+    const original = mockOpenRouterModels.data.find(model => model.id === 'some-other-model');
+    if (!original) throw new Error('Expected catalog fixture');
+    const upstream = {
+      data: [
+        ...mockOpenRouterModels.data,
+        { ...original, id: 'google/gemma-4-31b-it', name: 'Google: Gemma 4 31B IT' },
+        ...[
+          'google/gemma-4-26b-a4b-it:free',
+          'google/gemma-4-31b-it:free',
+          'thinkingmachines/inkling:free',
+        ].map(id => ({
+          ...original,
+          id,
+          name: id,
+          pricing: { ...original.pricing, prompt: '0', completion: '0' },
+        })),
+      ],
+    };
+    global.fetch = jest
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+      .mockResolvedValue(createMockResponse({ jsonData: upstream }));
+
+    const response = await GET(createTestRequest('/api/openrouter/models'));
+    const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
+    const modelIds = responseData.data.map(model => model.id);
+
+    expect(captureException).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(modelIds).not.toContain('google/gemma-4-26b-a4b-it:free');
+    expect(modelIds).not.toContain('google/gemma-4-31b-it:free');
+    expect(modelIds).not.toContain('thinkingmachines/inkling:free');
+    expect(modelIds).toContain('google/gemma-4-31b-it');
   });
 
   test('should include publishable Terminal Bench summaries for canonical models', async () => {
@@ -912,6 +948,47 @@ describe('final Enkrypt serialization boundaries', () => {
       expect(mockRows).toHaveBeenCalledTimes(1);
     }
   );
+});
+
+describe('getOpenRouterTranscriptionModels', () => {
+  function mockTranscriptionFetch() {
+    const fetchMock = jest
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+    return fetchMock;
+  }
+
+  test('hits the local fake LLM models URL in local fake mode', async () => {
+    const nextEnv = {
+      ...process.env,
+      NODE_ENV: 'development',
+      FAKE_LLM_URL: 'http://localhost:8811',
+    };
+    const env = jest.replaceProperty(process, 'env', nextEnv as NodeJS.ProcessEnv);
+    const fetchMock = mockTranscriptionFetch();
+
+    const result = await getOpenRouterTranscriptionModels();
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'http://localhost:8811/api/openrouter/models?output_modalities=transcription'
+    );
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer local-fake-llm');
+    expect(result.data).toBeDefined();
+    env.restore();
+  });
+
+  test('hits OpenRouter outside local fake mode', async () => {
+    const fetchMock = mockTranscriptionFetch();
+
+    const result = await getOpenRouterTranscriptionModels();
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'https://openrouter.ai/api/v1/models?output_modalities=transcription'
+    );
+    expect(result.data).toBeDefined();
+  });
 });
 
 afterEach(() => {

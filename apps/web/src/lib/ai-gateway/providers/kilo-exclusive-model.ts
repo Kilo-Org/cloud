@@ -11,6 +11,7 @@ import {
 export type KiloExclusiveModelFlag =
   | 'reasoning'
   | 'vision'
+  | 'flex'
   | 'stealth'
   | 'vercel-routing'
   | 'rate-limited'
@@ -169,6 +170,9 @@ export function applyKiloExclusiveModelSettings(
 ) {
   requestToMutate.body.model = kiloExclusiveModel.internal_id;
   removeNonSensicalMaxTokens(requestToMutate, kiloExclusiveModel);
+  if (kiloExclusiveModel.flags.includes('flex')) {
+    requestToMutate.body.service_tier = 'flex';
+  }
   const restriction = kiloExclusiveModel.inference_provider_restriction;
   if (restriction.length === 0) {
     return;

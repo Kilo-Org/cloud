@@ -85,6 +85,24 @@ describe('ChatToolbar', () => {
     expect(props.disabled).toBe(false);
   });
 
+  it('keeps mode, model, and paste on one row', () => {
+    const onPaste = vi.fn(() => undefined);
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({ ...defaultProps(), onPaste }) as Node;
+
+    const className =
+      element !== null &&
+      typeof element === 'object' &&
+      typeof element.props?.className === 'string'
+        ? element.props.className
+        : '';
+    expect(className).toContain('flex-row');
+    expect(className).not.toContain('flex-wrap');
+
+    const pasteButtonProps = findElementByType(element, 'ComposerPasteButton') ?? {};
+    expect(pasteButtonProps.className).toContain('shrink-0');
+  });
+
   it('locks only the model picker when modelLocked is true', () => {
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = ChatToolbar({

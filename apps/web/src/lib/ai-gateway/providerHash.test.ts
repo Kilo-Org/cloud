@@ -1,4 +1,5 @@
-import { OPENROUTER, VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
   applyTrackingIds,

@@ -9,7 +9,6 @@ import { i18n } from '@/i18n';
 import { applyLanguagePreference } from '@/i18n/apply-language';
 import type * as ApplyLanguageModule from '@/i18n/apply-language';
 import { LanguagePickerSheet } from '@/components/language-picker-sheet';
-import { emitPrivacyCover } from '@/lib/privacy-cover-events';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -48,6 +47,7 @@ const flatListMock = vi.hoisted(
       return createElement('FlatList', null, ListHeaderComponent, ...rows, empty);
     }
 );
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   FlatList: flatListMock,
@@ -318,41 +318,6 @@ describe('LanguagePickerSheet apply', () => {
       expect(reloadAppAsync).not.toHaveBeenCalled();
     }
   );
-
-  it('closes once when privacy coverage interrupts a language change', async () => {
-    const pendingWrite = Promise.withResolvers<boolean>();
-    setLanguagePreferenceAsync.mockReturnValueOnce(pendingWrite.promise);
-    const onClose = vi.fn<() => void>();
-    const renderer = await mountSheet(onClose);
-
-    act(() => {
-      (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
-    });
-    const sheet = findByType(renderer.root, 'PickerSheet')[0];
-    if (!sheet) {
-      throw new Error('PickerSheet not found');
-    }
-    await act(async () => {
-      (sheet.props.onDone as () => void)();
-      await Promise.resolve();
-    });
-    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es', 'en');
-    expect(onClose).not.toHaveBeenCalled();
-
-    act(() => {
-      emitPrivacyCover();
-      emitPrivacyCover();
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      pendingWrite.resolve(true);
-      await pendingWrite.promise;
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
-
-    renderer.unmount();
-  });
 
   it('keeps the current language and direction when the persist write fails', async () => {
     setLanguagePreferenceAsync.mockResolvedValue(false);

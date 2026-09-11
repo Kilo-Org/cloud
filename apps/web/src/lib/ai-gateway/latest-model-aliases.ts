@@ -4,11 +4,16 @@ export const CLAUDE_SONNET_LATEST_MODEL_ALIAS = '~anthropic/claude-sonnet-latest
 export const CLAUDE_HAIKU_LATEST_MODEL_ALIAS = '~anthropic/claude-haiku-latest';
 export const GPT_LATEST_MODEL_ALIAS = '~openai/gpt-latest';
 export const GPT_MINI_LATEST_MODEL_ALIAS = '~openai/gpt-mini-latest';
+export const GPT_ASTRA_LATEST_MODEL_ALIAS = '~openai/gpt-astra-latest';
+export const GPT_LUNA_LATEST_MODEL_ALIAS = '~openai/gpt-luna-latest';
+export const GPT_SOL_LATEST_MODEL_ALIAS = '~openai/gpt-sol-latest';
+export const GPT_TERRA_LATEST_MODEL_ALIAS = '~openai/gpt-terra-latest';
 export const KIMI_LATEST_MODEL_ALIAS = '~moonshotai/kimi-latest';
 export const GEMINI_PRO_LATEST_MODEL_ALIAS = '~google/gemini-pro-latest';
 export const GEMINI_FLASH_LATEST_MODEL_ALIAS = '~google/gemini-flash-latest';
 export const GROK_LATEST_MODEL_ALIAS = '~x-ai/grok-latest';
 export const GLM_LATEST_MODEL_ALIAS = '~z-ai/glm-latest';
+export const GLM_FLASH_LATEST_MODEL_ALIAS = '~z-ai/glm-flash-latest';
 export const DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS = '~deepseek/deepseek-v4-flash-latest';
 
 export const LATEST_MODEL_ALIASES = [
@@ -18,10 +23,15 @@ export const LATEST_MODEL_ALIASES = [
   CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
   GPT_LATEST_MODEL_ALIAS,
   GPT_MINI_LATEST_MODEL_ALIAS,
+  GPT_ASTRA_LATEST_MODEL_ALIAS,
+  GPT_LUNA_LATEST_MODEL_ALIAS,
+  GPT_SOL_LATEST_MODEL_ALIAS,
+  GPT_TERRA_LATEST_MODEL_ALIAS,
   KIMI_LATEST_MODEL_ALIAS,
   GEMINI_PRO_LATEST_MODEL_ALIAS,
   GEMINI_FLASH_LATEST_MODEL_ALIAS,
   GROK_LATEST_MODEL_ALIAS,
   GLM_LATEST_MODEL_ALIAS,
+  GLM_FLASH_LATEST_MODEL_ALIAS,
   DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
 ] as const;

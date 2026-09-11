@@ -1,12 +1,15 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  getOpenRouterModelsFromRedis: jest.fn(async () => new Set<string>()),
+  ...jest.requireActual<typeof GatewayModelsCache>(
+    '@/lib/ai-gateway/providers/gateway-models-cache'
+  ),
+  getOpenRouterModelsFromDatabase: jest.fn(),
 }));
 
-import { resolveAutoModel } from './resolution';
+import type * as AutoModelResolution from './resolution';
 import {
-  BALANCED_FALLBACK_MODEL,
   FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
@@ -14,6 +17,9 @@ import {
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
+import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+
+const { resolveAutoModel } = jest.requireActual<typeof AutoModelResolution>('./resolution');
 
 const baseParams = {
   model: KILO_AUTO_EFFICIENT_MODEL.id,
@@ -26,6 +32,10 @@ const baseParams = {
 
 const nullUserPromise = Promise.resolve(null);
 const zeroBalancePromise = Promise.resolve(0);
+const primaryDefaultFallback = { model: PRIMARY_DEFAULT_MODEL };
+const { getOpenRouterModelsFromDatabase: mockedGetOpenRouterModels } = jest.requireMock<
+  jest.Mocked<typeof GatewayModelsCache>
+>('@/lib/ai-gateway/providers/gateway-models-cache');
 
 const sampleDecision: AutoRoutingDecision = {
   model: 'anthropic/claude-haiku-4',
@@ -100,38 +110,38 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(result).toEqual({ kind: 'ok', resolved: { model: 'anthropic/claude-haiku-4' } });
   });
 
-  it('falls back to BALANCED_FALLBACK_MODEL when no thunk is provided and apiKind=responses', async () => {
+  it('falls back to PRIMARY_DEFAULT_MODEL when no thunk is provided and apiKind=responses', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'responses' },
       nullUserPromise,
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
-  it('falls back to BALANCED_FALLBACK_MODEL when no thunk is provided and apiKind=messages', async () => {
+  it('falls back to PRIMARY_DEFAULT_MODEL when no thunk is provided and apiKind=messages', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'messages' },
       nullUserPromise,
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
-  it('falls back to BALANCED_FALLBACK_MODEL when no thunk is provided and apiKind=chat_completions', async () => {
+  it('falls back to PRIMARY_DEFAULT_MODEL when no thunk is provided and apiKind=chat_completions', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'chat_completions' },
       nullUserPromise,
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
   it.each([KILO_AUTO_BALANCED_MODEL.id, KILO_AUTO_EFFICIENT_MODEL.id])(
-    'falls back to Kimi K3 with reasoning for %s when the worker returns no decision',
+    'falls back to PRIMARY_DEFAULT_MODEL for %s when the worker returns no decision',
     async model => {
       const result = await resolveAutoModel(
         {
@@ -144,14 +154,11 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
         zeroBalancePromise
       );
 
-      expect(result).toEqual({
-        kind: 'ok',
-        resolved: { model: 'moonshotai/kimi-k3', reasoning: { enabled: true } },
-      });
+      expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
     }
   );
 
-  it('falls back to BALANCED_FALLBACK_MODEL when the worker returns a virtual auto model', async () => {
+  it('falls back to PRIMARY_DEFAULT_MODEL when the worker returns a virtual auto model', async () => {
     const result = await resolveAutoModel(
       {
         ...baseParams,
@@ -165,7 +172,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
   it('does not call the thunk more than once', async () => {
@@ -259,7 +266,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     });
   });
 
-  it('falls back to BALANCED_FALLBACK_MODEL when variant is absent from the model catalog', async () => {
+  it('falls back to PRIMARY_DEFAULT_MODEL when variant is absent from the model catalog', async () => {
     // Claude has no "thinking" key — only none/low/medium/high/xhigh/max
     const result = await resolveAutoModel(
       {
@@ -275,10 +282,10 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
-  it('falls back to BALANCED_FALLBACK_MODEL when the model exposes no variants but decision has a variant', async () => {
+  it('falls back to PRIMARY_DEFAULT_MODEL when the model exposes no variants but decision has a variant', async () => {
     const result = await resolveAutoModel(
       {
         ...baseParams,
@@ -293,7 +300,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
   it('applies exact thinking and instant variant settings', async () => {
@@ -403,14 +410,18 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       zeroBalancePromise
     );
 
-    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
+    expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 });
 
 describe('resolveAutoModel — kilo-auto/free branch', () => {
+  beforeEach(() => {
+    mockedGetOpenRouterModels.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
+  });
+
   it('excludes candidates denied by the effective organization policy', async () => {
     const isAutoFreeCandidateAllowed = jest.fn(
-      async (modelId: string) => modelId === 'stepfun/step-3.7-flash:free'
+      async (modelId: string) => modelId === 'poolside/laguna-s-2.1:free'
     );
 
     const result = await resolveAutoModel(
@@ -427,11 +438,11 @@ describe('resolveAutoModel — kilo-auto/free branch', () => {
     expect(result).toEqual({
       kind: 'ok',
       resolved: {
-        model: 'stepfun/step-3.7-flash:free',
+        model: 'poolside/laguna-s-2.1:free',
         reasoning: { enabled: true, effort: 'high' },
       },
     });
-    expect(isAutoFreeCandidateAllowed).toHaveBeenCalledWith('stepfun/step-3.7-flash:free');
+    expect(isAutoFreeCandidateAllowed).toHaveBeenCalledWith('poolside/laguna-s-2.1:free');
   });
 
   it('reports no free models when organization policy denies every candidate', async () => {
@@ -651,7 +662,7 @@ describe('resolveAutoModel — Organization Auto branch', () => {
 
     expect(result).toEqual({
       kind: 'ok',
-      resolved: BALANCED_FALLBACK_MODEL,
+      resolved: primaryDefaultFallback,
       routingTarget: 'kilo-auto/balanced',
     });
   });

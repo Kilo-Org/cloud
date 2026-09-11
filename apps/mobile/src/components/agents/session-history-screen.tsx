@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useNavigation } from 'expo-router';
 
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
-import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
 import { selectShowSearchBusy } from '@/components/agents/session-list-search-busy';
@@ -108,10 +107,21 @@ export function SessionHistoryScreen() {
   useEffect(() => {
     handleRefetchRef.current = handleRefetch;
   }, [handleRefetch]);
+  // Focus return and app-foreground refreshes run outside the pull lifecycle
+  // (the pull state lives inside the content). Count each settlement so the
+  // content can retire a stale pull-failure line once a later refresh lands;
+  // persistent failures keep surfacing through the query error state.
+  const [nonPullRefreshes, setNonPullRefreshes] = useState(0);
+  const refetchOutsidePull = useCallback(() => {
+    void (async () => {
+      await handleRefetchRef.current();
+      setNonPullRefreshes(count => count + 1);
+    })();
+  }, []);
   useFocusEffect(
     useCallback(() => {
-      void handleRefetchRef.current();
-    }, [])
+      refetchOutsidePull();
+    }, [refetchOutsidePull])
   );
 
   // App-foreground refresh for stored history. `navigation.isFocused()` is
@@ -120,13 +130,13 @@ export function SessionHistoryScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
       if (nextState === 'active' && navigation.isFocused()) {
-        void handleRefetchRef.current();
+        refetchOutsidePull();
       }
     });
     return () => {
       subscription.remove();
     };
-  }, [navigation]);
+  }, [navigation, refetchOutsidePull]);
 
   const navigateToSession = useAgentSessionNavigator();
 
@@ -140,18 +150,6 @@ export function SessionHistoryScreen() {
   // History has no live tray, so "any sessions" means stored rows or an active
   // query — never the active set.
   const hasAnySessions = storedSessions.length > 0 || hasActiveQuery;
-
-  // The inline error line only reflects content errors.
-  const showInlineError = useMemo(
-    () =>
-      selectSessionListBodyModel({
-        hasHistoryContent: sections.length > 0,
-        hasActiveQuery,
-        isSearching,
-        isError: contentIsError,
-      }).showInlineError,
-    [contentIsError, hasActiveQuery, isSearching, sections]
-  );
 
   // The empty-state CTA reads "Clear search" or "Clear filters" depending on
   // isSearching, so it must clear exactly that. Clearing both under a label
@@ -171,7 +169,7 @@ export function SessionHistoryScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('tabs.agents')}
+        title={t('common.agents')}
         className="pb-2"
         showBackButton
         headerRight={
@@ -190,7 +188,6 @@ export function SessionHistoryScreen() {
           inputRef={searchInputRef}
           hasText={hasText}
           showSearchBusy={showSearchBusy}
-          showInlineError={showInlineError}
           onChangeText={handleSearchInputChange}
           onClearSearch={handleClearSearchInput}
           defaultValue={searchDefaultValue}
@@ -210,6 +207,7 @@ export function SessionHistoryScreen() {
           onRetry={handleRetry}
           onEndReached={handleEndReached}
           onSessionPress={navigateToSession}
+          nonPullRefreshes={nonPullRefreshes}
           hasActiveQuery={hasActiveQuery}
           isSearching={isSearching}
           searchQuery={searchQuery}

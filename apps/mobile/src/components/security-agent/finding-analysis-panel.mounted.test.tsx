@@ -37,6 +37,7 @@ const kvRows = vi.hoisted(() => ({
   labels: [] as string[],
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',

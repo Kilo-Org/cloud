@@ -4,10 +4,12 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { AgentSessionListContent } from './session-list-content';
 import { type SessionSection } from './session-list-helpers';
 import { type StoredSessionRow } from './session-row';
+import { PULL_FEEDBACK_BUDGET_MS } from './use-pull-refresh';
 
 type RowProps = Parameters<typeof StoredSessionRow>[0];
 type CellProps = {
@@ -27,6 +29,8 @@ const controls = vi.hoisted(() => ({
   scrollResets: 0,
   deleteSession: vi.fn(),
   renameSession: vi.fn(),
+  leftInset: 0,
+  rightInset: 0,
 }));
 
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
@@ -39,6 +43,7 @@ vi.mock('react-native', async () => {
   });
   return {
     View: 'View',
+    Pressable: 'Pressable',
     ActivityIndicator: 'ActivityIndicator',
     RefreshControl: 'RefreshControl',
     Platform: { OS: 'ios' },
@@ -90,7 +95,13 @@ vi.mock('react-native-reanimated', () => ({
   FadeIn: { duration: () => undefined },
   FadeOut: { duration: () => undefined },
 }));
-vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({
+    bottom: 0,
+    left: controls.leftInset,
+    right: controls.rightInset,
+  }),
+}));
 vi.mock('@/components/agents/session-row', () => ({ StoredSessionRow: 'StoredSessionRow' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
   SessionListSectionHeader: 'SessionListSectionHeader',
@@ -98,6 +109,10 @@ vi.mock('@/components/agents/session-list-section-header', () => ({
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/activity-indicator', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+}));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/icons', () => ({
   History: 'History',
@@ -149,6 +164,7 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     onRetry: () => undefined,
     onEndReached: () => undefined,
     onSessionPress: () => undefined,
+    nonPullRefreshes: 0,
     hasActiveQuery: false,
     isSearching: false,
     searchQuery: '',
@@ -279,7 +295,7 @@ describe('AgentSessionListContent liveness', () => {
       })
     );
     expect(hosts(renderer, 'AccessibleStatus').map(node => node.props.message)).toContain(
-      i18n.t(isSearching ? 'agents.sessionList.couldNotSearch' : 'agents.sessionList.couldNotLoad')
+      i18n.t(isSearching ? 'agents.sessionList.couldNotSearch' : 'common.couldNotLoadSessions')
     );
     const retry = renderer.root.find(
       node => isHost(node, 'Button') && node.props.accessibilityLabel === 'Retry'
@@ -328,7 +344,71 @@ describe('AgentSessionListContent liveness', () => {
       })
     );
     expect(rows(renderer)).toEqual([{ id: 'cached', live: true, metaWhileLive: true }]);
-    expect(hosts(renderer, 'AccessibleStatus')).toHaveLength(0);
+    // The reserved status line carries the failure: one inline
+    // "Couldn't refresh" with a Retry action beside the kept rows.
+    const statuses = hosts(renderer, 'AccessibleStatus');
+    expect(statuses).toHaveLength(1);
+    const [statusLine] = statuses;
+    if (!statusLine) {
+      throw new Error('no refresh status line rendered');
+    }
+    expect((statusLine.props as { message: string }).message).toBe("Couldn't refresh");
+    const retry = hosts(renderer, 'Pressable').find(
+      node => (node.props as { accessibilityLabel?: string }).accessibilityLabel === 'Retry'
+    );
+    expect(retry).toBeDefined();
+  });
+
+  it('retires a stale pull failure when the screen settles a later non-pull refresh', () => {
+    const hang = vi.fn<ContentProps['refetch']>(async () => {
+      await new Promise<void>(() => {
+        /* The hung-request shape: never settles on its own. */
+      });
+    });
+    vi.useFakeTimers();
+    try {
+      const props = contentProps({
+        sections: [{ title: 'Today', data: [session('cached')] }],
+        refetch: hang,
+      });
+      const renderer = mount(props);
+      // The pull hangs past the feedback budget: the reserved line fails over
+      // to "Couldn't refresh" with Retry.
+      const refreshControl = hosts(renderer, 'SectionList')[0]?.props.refreshControl as
+        | { props: { onRefresh: () => void } }
+        | undefined;
+      act(() => {
+        refreshControl?.props.onRefresh();
+      });
+      act(() => {
+        vi.advanceTimersByTime(PULL_FEEDBACK_BUDGET_MS);
+      });
+      expect(hosts(renderer, 'AccessibleStatus').map(node => node.props.message)).toContain(
+        "Couldn't refresh"
+      );
+      expect(
+        hosts(renderer, 'Pressable').some(
+          node => (node.props as { accessibilityLabel?: string }).accessibilityLabel === 'Retry'
+        )
+      ).toBe(true);
+
+      // The screen settles a refresh outside the pull lifecycle (focus return,
+      // app foreground) afterwards: the stale gesture failure retires from an
+      // up-to-date list even though the hung pull never settles.
+      act(() => {
+        renderer.update(createElement(AgentSessionListContent, { ...props, nonPullRefreshes: 1 }));
+      });
+      expect(hosts(renderer, 'AccessibleStatus').map(node => node.props.message)).not.toContain(
+        "Couldn't refresh"
+      );
+      expect(
+        hosts(renderer, 'Pressable').filter(
+          node => (node.props as { accessibilityLabel?: string }).accessibilityLabel === 'Retry'
+        )
+      ).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each([
@@ -357,5 +437,30 @@ describe('AgentSessionListContent liveness', () => {
     expect(hosts(renderer, 'Skeleton')).toHaveLength(8);
     expect(hosts(renderer, 'Button')).toHaveLength(0);
     expect(rows(renderer)).toEqual([]);
+  });
+
+  it('pads the SectionList content by the landscape side insets', () => {
+    const sections = [{ title: 'Today', data: [session('padded')] }];
+    const renderer = mount(contentProps({ sections }));
+    const style = () =>
+      (
+        renderer.root.find(node => isHost(node, 'SectionList')).props as {
+          contentContainerStyle: Record<string, number>;
+        }
+      ).contentContainerStyle;
+    const tabClearance = getEffectiveTabBarHeight({
+      bottomInset: 0,
+      platform: 'ios',
+      fontScale: 1,
+    });
+    expect(style()).toEqual({ paddingBottom: tabClearance, paddingLeft: 0, paddingRight: 0 });
+
+    // Rotation pads only the sides; the tab-bar clearance is unchanged.
+    controls.leftInset = 47;
+    controls.rightInset = 59;
+    act(() => {
+      renderer.update(createElement(AgentSessionListContent, contentProps({ sections })));
+    });
+    expect(style()).toEqual({ paddingBottom: tabClearance, paddingLeft: 47, paddingRight: 59 });
   });
 });

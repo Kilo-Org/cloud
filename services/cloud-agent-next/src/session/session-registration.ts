@@ -33,6 +33,11 @@ import {
   type CloudAgentWorktreeId,
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
+import {
+  createRuntimeAuthorization,
+  sealRuntimeAuthorization,
+} from '@kilocode/worker-utils/runtime-authorization';
+import jwt from 'jsonwebtoken';
 
 import type { Env, SandboxId } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
@@ -46,7 +51,7 @@ import { withDORetry } from '../utils/do-retry.js';
 import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { getPgDb } from '../db/pg.js';
 import { generateSessionId, SessionService } from '../session-service.js';
-import { isWorktreeOwner, sessionPlaneForNewOwner } from '../session-plane.js';
+import { isWorktreeOwner, sessionPlaneForNewOwner, type SessionPlane } from '../session-plane.js';
 import { getWorktreeWorkspacePath } from '../workspace.js';
 import {
   createCloudAgentSessionReport,
@@ -61,6 +66,8 @@ import {
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '../utils/sha256.js';
+import { assertKiloModelAvailable } from '../model-validation.js';
+import { initialAdmissionFailure } from './admission-failure.js';
 import { createMessageId } from './message-id.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import type {
@@ -93,10 +100,7 @@ function assertSupportedSandboxAllocation(
   }
   if (
     input.runtime?.sandboxAllocation === 'isolated-standard' &&
-    sessionPlaneForNewOwner(ctx.env, {
-      userId: ctx.userId,
-      orgId: input.options?.kilocodeOrganizationId,
-    }) === 'control'
+    sessionPlaneForCreate(input, ctx) === 'control'
   ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -165,20 +169,12 @@ export function executionTurnSubmissionFromAcceptedTurn(
       };
 }
 
-type SessionEstablishmentFailure =
-  | { stage: 'sandbox_identity'; code: 'sandbox_id_derivation_failed' }
-  | { stage: 'registration'; code: 'do_registration_rejected' }
-  | {
-      stage: 'initial_admission';
-      code: 'initial_admission_rejected' | 'initial_queue_full' | 'invalid_initial_intent';
-    }
-  | { stage: 'transport'; code: 'do_rpc_outcome_unknown' };
-
 type NewSessionAllocation = SessionRegistrationResult & {
   reportingCreatedAt?: string;
   credentialContainment: CredentialContainment;
   sessionService: SessionService;
   rollbackCliSession: () => Promise<void>;
+  runtimeAuthorization?: { token: string; seal: string };
 };
 
 // ----- operation-ledger boundary (P1-A-08b) -----------------------------------
@@ -408,18 +404,6 @@ function sessionCreateSettledOutboxEvent(params: {
   };
 }
 
-function initialAdmissionFailure(
-  result: Extract<SessionMessageAdmissionResult, { success: false }>
-): Extract<SessionEstablishmentFailure, { stage: 'initial_admission' }> {
-  if (result.code === 'PENDING_QUEUE_FULL') {
-    return { stage: 'initial_admission', code: 'initial_queue_full' };
-  }
-  if (result.code === 'BAD_REQUEST') {
-    return { stage: 'initial_admission', code: 'invalid_initial_intent' };
-  }
-  return { stage: 'initial_admission', code: 'initial_admission_rejected' };
-}
-
 async function recordPostSetupFailure(record: () => Promise<void>): Promise<void> {
   try {
     await record();
@@ -499,7 +483,23 @@ function worktreeEnabledForCreate(
   if (recordedIds) return recordedIds.cloudAgentSessionId.startsWith('workspace_');
 
   const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
-  return sessionPlaneForNewOwner(ctx.env, owner) === 'control' && isWorktreeOwner(ctx.env, owner);
+  return sessionPlaneForCreate(input, ctx) === 'control' && isWorktreeOwner(ctx.env, owner);
+}
+
+function sessionPlaneForCreate(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext
+): SessionPlane {
+  return sessionPlaneForNewOwner(
+    ctx.env,
+    { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId },
+    { createdOnPlatform: input.options?.createdOnPlatform }
+  );
+}
+
+export function assertRuntimeIsolationAdmission(env: Pick<Env, 'RUNTIME_ISOLATION_ENABLED'>): void {
+  if (env.RUNTIME_ISOLATION_ENABLED === 'true') return;
+  throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'runtime_isolation_unavailable' });
 }
 
 function finalizationVersionForCreate(row: OperationLedgerRow): 1 | 2 {
@@ -523,6 +523,55 @@ function effectiveSessionRegistrationInput(
   };
 }
 
+async function issueSessionRuntimeAuthorization(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  cloudAgentSessionId: string,
+  initialTurn: AcceptedExecutionTurn | undefined
+): Promise<NewSessionAllocation['runtimeAuthorization']> {
+  const orgId = input.options?.kilocodeOrganizationId;
+  let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
+  // authMiddleware has verified this bearer (including legacy tokens) against
+  // its audience and current pepper. Decode only selects the compatibility path;
+  // createRuntimeAuthorization re-verifies modern claims and runtime admission.
+  const claims = jwt.decode(ctx.authToken);
+  const isPolicyBearing =
+    claims !== null &&
+    typeof claims === 'object' &&
+    ('aud' in claims || 'tokenPurpose' in claims || 'credentialExchange' in claims);
+  if (isPolicyBearing) {
+    if (cloudAgentSessionId.startsWith('workspace_')) assertRuntimeIsolationAdmission(ctx.env);
+    const secret = ctx.env.NEXTAUTH_SECRET;
+    const nextAuthSecret = typeof secret === 'string' ? secret : await secret.get();
+    if (!nextAuthSecret)
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
+    const created = await createRuntimeAuthorization({
+      token: ctx.authToken,
+      secret: nextAuthSecret,
+      connectionString: ctx.env.HYPERDRIVE.connectionString,
+      resourceKind: 'cloud-agent-next',
+      resourceId: cloudAgentSessionId,
+      ...(orgId ? { organizationId: orgId } : {}),
+    });
+    runtimeAuthorization = {
+      token: created.token,
+      seal: await sealRuntimeAuthorization(created.authorization, nextAuthSecret),
+    };
+    if (initialTurn?.type === 'prompt') {
+      await assertKiloModelAvailable({
+        env: ctx.env,
+        submittedModel: input.agent.model,
+        originalToken: runtimeAuthorization.token,
+        originalOrganizationId: orgId,
+        createdOnPlatform: input.options?.createdOnPlatform,
+        procedure: 'runtime_authorized_session_create',
+      });
+    }
+  }
+
+  return runtimeAuthorization;
+}
+
 async function allocateNewSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
@@ -532,9 +581,7 @@ async function allocateNewSession(
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
   const orgId = input.options?.kilocodeOrganizationId;
-  const cloudAgentSessionId = generateSessionId(
-    sessionPlaneForNewOwner(ctx.env, { userId: ctx.userId, orgId })
-  );
+  const cloudAgentSessionId = generateSessionId(sessionPlaneForCreate(input, ctx));
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =
     input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
@@ -547,6 +594,12 @@ async function allocateNewSession(
         )
       : undefined;
   const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
+  const runtimeAuthorization = await issueSessionRuntimeAuthorization(
+    input,
+    ctx,
+    cloudAgentSessionId,
+    initialTurn
+  );
 
   try {
     if (ledger) {
@@ -773,6 +826,7 @@ async function allocateNewSession(
           .error('Failed to rollback cli_sessions_v2 record');
       }
     },
+    ...(runtimeAuthorization ? { runtimeAuthorization } : {}),
   };
 }
 
@@ -908,8 +962,11 @@ function buildSessionRegistrationCommand(
     },
     auth: {
       kiloSessionId: allocation.kiloSessionId,
-      kilocodeToken: ctx.authToken,
+      kilocodeToken: allocation.runtimeAuthorization?.token ?? ctx.authToken,
     },
+    ...(allocation.runtimeAuthorization
+      ? { runtimeAuthorizationSeal: allocation.runtimeAuthorization.seal }
+      : {}),
     clone: input.clone
       ? {
           cloneFromKiloSessionId: input.clone.cloneFromKiloSessionId,
@@ -1748,6 +1805,12 @@ async function resumeCloneCreate(
   // `ready` continues.
 
   const allocation = rebuildRecordedSessionAllocation(input, ctx, row);
+  allocation.runtimeAuthorization = await issueSessionRuntimeAuthorization(
+    input,
+    ctx,
+    allocation.cloudAgentSessionId,
+    allocation.initialTurn
+  );
   const billingOrigin = { billingOrigin: options.billingOrigin };
   const result =
     input.initialTurn === undefined
@@ -1815,6 +1878,12 @@ async function resumeFirstWorktreeCreate(
     }
   }
 
+  allocation.runtimeAuthorization = await issueSessionRuntimeAuthorization(
+    input,
+    ctx,
+    allocation.cloudAgentSessionId,
+    allocation.initialTurn
+  );
   const result = await registerAndAdmitInitialTurn(
     input,
     ctx,

@@ -5,10 +5,13 @@ import {
   worktreeDeletePayloadSchema,
 } from './sandbox-control-protocol.js';
 
+export const OWNED_PROCESS_CLEANUP_UNREAPED = 'Owned process cleanup unreaped';
 export const CONTROL_LOG_MAX_BATCH_BYTES = 256 * 1024;
 export const CONTROL_LOG_MAX_BATCH_RECORDS = 128;
 export const CONTROL_LOG_MAX_BUFFER_RECORDS = 512;
 export const CONTROL_LOG_MAX_RECORD_BYTES = 4096;
+export const CONTROL_LOG_MAX_ARCHIVE_BYTES = 8 * 1024 * 1024;
+export const CONTROL_LOG_ARCHIVE_NAME = 'files.tar.gz';
 export const CONTROL_LOG_GRANT_SECONDS = 4 * 60 * 60;
 export const controlLogUploadResults = [
   'accepted',
@@ -161,6 +164,7 @@ export const controlDiagnosticFieldsSchema = z
       .optional(),
     errorCode: z.enum([...controlErrorCodes, 'other']).optional(),
     retryable: z.boolean().optional(),
+    detail: z.string().min(1).max(128).optional(),
     scopeId: identifier.optional(),
     worktreeId: worktreeDeletePayloadSchema.shape.worktreeId.optional(),
     sessionId: identifier.optional(),
@@ -218,6 +222,47 @@ export const controlDiagnosticRecordSchema = z
   .strict();
 
 export type ControlDiagnosticRecord = z.infer<typeof controlDiagnosticRecordSchema>;
+export type RetirementCause = NonNullable<ControlDiagnosticRecord['fields']['retirementCause']>;
+
+const retirementCauseByReason = new Map<string, RetirementCause>([
+  ['Kilo event feed is no longer healthy', 'event_feed_unhealthy'],
+  ['feed_stale', 'event_feed_unhealthy'],
+  ['feed_reconnected', 'event_feed_unhealthy'],
+  ['feed_ended', 'event_feed_unhealthy'],
+  ['feed_failed', 'event_feed_unhealthy'],
+  ['process_exited', 'process_exited'],
+  ['credential_refresh_failed', 'credential_refresh_failed'],
+  ['Sandbox control connection lost', 'control_disconnected'],
+  ['control_disconnected', 'control_disconnected'],
+  ['Preparation event delivery failed', 'preparation_delivery_failed'],
+  ['Sandbox shutting down', 'requested_shutdown'],
+  ['Wrapper received SIGTERM', 'sigterm'],
+  ['Wrapper received SIGINT', 'sigint'],
+  ['Wrapper uncaught exception', 'uncaught_exception'],
+  ['Wrapper unhandled rejection', 'unhandled_rejection'],
+  ['Kilo cancellation failed', 'cancellation_failed'],
+  ['Kilo cancellation was not confirmed', 'cancellation_failed'],
+  ['Native cancellation did not settle', 'cancellation_failed'],
+  ['Session outcome delivery failed', 'outcome_delivery_failed'],
+  ['Session event delivery failed', 'outcome_delivery_failed'],
+  ['Execution exceeded the 60 minute limit', 'execution_deadline'],
+  ['Session preparation timed out', 'preparation_deadline'],
+]);
+
+export function diagnosticDetail(value: string): string | undefined {
+  const detail = value.trim().slice(0, 128);
+  return detail === '' ? undefined : detail;
+}
+
+export function classifyRetirementCause(...reasons: string[]): RetirementCause {
+  for (const reason of reasons) {
+    const mapped = retirementCauseByReason.get(reason);
+    if (mapped) return mapped;
+    if (reason.startsWith('feed_')) return 'event_feed_unhealthy';
+    if (reason.startsWith('Session event delivery')) return 'outcome_delivery_failed';
+  }
+  return 'unknown';
+}
 
 export const controlLogIdentitySchema = z
   .object({
@@ -244,6 +289,15 @@ export type ControlLogBatch = z.infer<typeof controlLogBatchSchema>;
 export function diagnosticSyncStatus(value: unknown): z.infer<typeof syncStatusSchema> {
   const parsed = syncStatusSchema.safeParse(value);
   return parsed.success ? parsed.data : 'other';
+}
+
+export function isUnreapedOwnedProcessDiagnostic(record: ControlDiagnosticRecord): boolean {
+  return (
+    record.event === 'session.task' &&
+    record.fields.stage === 'process_cleanup' &&
+    record.fields.phase === 'failed' &&
+    record.fields.ok === false
+  );
 }
 
 export function emitControlDiagnostic(

@@ -10,7 +10,7 @@
  */
 
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
@@ -108,13 +108,46 @@ async function prepareSessionWithCallback(
   expect(prepareResult.success).toBe(true);
 }
 
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('Callback notification with latest assistant message', () => {
   it('includes lastAssistantMessageText on completed callbacks', async () => {
     const userId = 'user_cb_1';
     const sessionId = 'agent_cb_1';
     const executionId = 'exec_cb_completed' as ExecutionId;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const queue = createCapturedQueue();
 
@@ -152,8 +185,7 @@ describe('Callback notification with latest assistant message', () => {
     const userId = 'user_cb_oversized';
     const sessionId = 'agent_cb_oversized';
     const executionId = 'exec_cb_oversized' as ExecutionId;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
     const assistantText = '😀"\\\n'.repeat(CALLBACK_QUEUE_MAX_SERIALIZED_BYTES);
     const queue = createCapturedQueue();
 
@@ -191,8 +223,7 @@ describe('Callback notification with latest assistant message', () => {
     const userId = 'user_cb_oversized_fixed';
     const sessionId = 'agent_cb_oversized_fixed';
     const executionId = 'exec_cb_oversized_fixed' as ExecutionId;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
     const queue = createCapturedQueue();
 
     await runInDurableObject(stub, async (instance: CloudAgentSession) => {
@@ -223,8 +254,7 @@ describe('Callback notification with latest assistant message', () => {
     const userId = 'user_cb_enqueue_failure';
     const sessionId = 'agent_cb_enqueue_failure';
     const executionId = 'exec_cb_enqueue_failure' as ExecutionId;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     await runInDurableObject(stub, async (instance: CloudAgentSession) => {
       injectCallbackQueue(instance, {
@@ -251,8 +281,7 @@ describe('Callback notification with latest assistant message', () => {
     const userId = 'user_cb_2';
     const sessionId = 'agent_cb_2';
     const executionId = 'exec_cb_failed' as ExecutionId;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const queue = createCapturedQueue();
 
@@ -289,8 +318,7 @@ describe('Callback notification with latest assistant message', () => {
     const userId = 'user_cb_3';
     const sessionId = 'agent_cb_3';
     const executionId = 'exec_cb_interrupted' as ExecutionId;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const queue = createCapturedQueue();
 
@@ -322,8 +350,7 @@ describe('Callback notification with latest assistant message', () => {
     const userId = 'user_cb_4';
     const sessionId = 'agent_cb_4';
     const executionId = 'exec_cb_toolonly' as ExecutionId;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const queue = createCapturedQueue();
 

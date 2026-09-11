@@ -164,7 +164,7 @@ export function ModelPickerContent() {
           <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
             <Search size={18} color={colors.mutedForeground} />
             <TextInput
-              placeholder={t('agentChat.modelPicker.searchPlaceholder')}
+              placeholder={t('common.searchModels')}
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"
               autoCorrect={false}
@@ -187,13 +187,11 @@ export function ModelPickerContent() {
         <EmptyState
           icon={search.trim() ? SearchX : Info}
           title={
-            search.trim()
-              ? t('agentChat.repoPicker.noMatches')
-              : t('agentChat.modelPicker.noModels')
+            search.trim() ? t('agentChat.repoPicker.noMatches') : t('common.noModelsAvailable')
           }
           description={
             search.trim()
-              ? t('agentChat.repoPicker.tryDifferentSearch')
+              ? t('agents.sessionList.tryDifferentSearch')
               : t('agentChat.modelPicker.noModelsDescription')
           }
         />

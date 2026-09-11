@@ -3,7 +3,7 @@ import { createElement, type RefObject } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useNewSessionDiscardGuard } from '../use-new-session-discard-guard';
+import { useNewSessionDiscardGuard } from '@/components/agents/use-new-session-discard-guard';
 
 const alertMock = vi.hoisted(() => vi.fn());
 const dispatchMock = vi.hoisted(() => vi.fn());
@@ -196,6 +196,28 @@ describe('useNewSessionDiscardGuard', () => {
       renderer.unmount();
     });
   });
+
+  it.each(['PUSH', 'NAVIGATE', 'JUMP_TO'])(
+    'replays a forward %s removal unconfirmed — the durable draft survives it',
+    actionType => {
+      const { renderer } = mountGuard(true, noOpDiscard);
+
+      // Tapping another screen (e.g. Preferences from the tab bar) can remove
+      // this screen as a side effect; that is forward navigation, not an
+      // abandon, so the discard confirm must not hijack it (spot check
+      // e12-tap-prefs: the dialog blocked the Preferences screen from opening).
+      const action = { type: actionType };
+      usePreventRemoveHolder.callback?.({ data: { action } });
+
+      expect(alertMock).not.toHaveBeenCalled();
+      expect(dispatchMock).toHaveBeenCalledTimes(1);
+      expect(dispatchMock).toHaveBeenCalledWith(action);
+
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  );
 
   it('Discard runs onDiscard before dispatching the captured action', async () => {
     const order: string[] = [];

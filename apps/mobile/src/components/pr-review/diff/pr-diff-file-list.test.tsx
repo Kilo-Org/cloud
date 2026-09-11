@@ -5,6 +5,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrReviewFileList } from './pr-diff-file-list';
+import { prDiffListBottomPadding } from '@/lib/pr-review/diff/pr-diff-list-bottom-padding';
 
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
@@ -22,6 +23,7 @@ const listQueryState = vi.hoisted(() => ({
   firstPageErrorState: null as { kind: string } | null,
 }));
 
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   View: 'View',
   RefreshControl: 'RefreshControl',
@@ -152,9 +154,19 @@ function resetState(): void {
   listQueryState.firstPageErrorState = null;
 }
 
+function flashListProps(renderer: TestRenderer.ReactTestRenderer): {
+  contentContainerStyle?: Record<string, number | undefined>;
+} {
+  return renderer.root.find(node => String(node.type) === 'FlashList').props as {
+    contentContainerStyle?: Record<string, number | undefined>;
+  };
+}
+
 describe('PrReviewFileList full-body states', () => {
   beforeEach(() => {
     insetsState.bottom = 0;
+    insetsState.left = 0;
+    insetsState.right = 0;
     resetState();
   });
 
@@ -209,5 +221,37 @@ describe('PrReviewFileList full-body states', () => {
     const renderer = mountList();
     expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+  });
+});
+
+describe('PrReviewFileList content container side insets (landscape)', () => {
+  beforeEach(() => {
+    insetsState.bottom = 0;
+    insetsState.left = 0;
+    insetsState.right = 0;
+    resetState();
+    listQueryState.files = [{ path: 'src/file.ts' }];
+  });
+
+  it('keeps the current content container style at zero portrait insets', () => {
+    const renderer = mountList();
+
+    expect(flashListProps(renderer).contentContainerStyle).toEqual({
+      paddingBottom: prDiffListBottomPadding(null),
+      paddingLeft: 0,
+      paddingRight: 0,
+    });
+  });
+
+  it('adds the landscape side insets to the content container style', () => {
+    insetsState.left = 47;
+    insetsState.right = 59;
+    const renderer = mountList();
+
+    expect(flashListProps(renderer).contentContainerStyle).toEqual({
+      paddingBottom: prDiffListBottomPadding(null),
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
   });
 });

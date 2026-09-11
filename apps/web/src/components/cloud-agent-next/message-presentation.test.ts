@@ -381,6 +381,14 @@ describe('getVisibleAssistantParts', () => {
     ]);
   });
 
+  it('hides a reasoning part with no text and keeps the rest of the message', () => {
+    const slim = reasoningPart('slim-reasoning');
+    delete (slim as { text?: unknown }).text;
+    const answer = textPart('answer');
+
+    expect(getVisibleAssistantParts([slim, answer])).toEqual([answer]);
+  });
+
   it('preserves visible part identity without changing frozen parts or their input array', () => {
     const visible = [reasoningPart('reasoning-1'), toolPart('read-1'), textPart('answer')];
     const parts = [reasoningPart('hidden', '[REDACTED]'), ...visible];

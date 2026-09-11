@@ -22,10 +22,10 @@ export function getInviteSuccessMessage(): string {
 export function emailStatusLabel(emailStatus: InvitedOrgMember['emailStatus']): string | null {
   switch (emailStatus) {
     case 'pending': {
-      return i18n.t('organization.members.emailStatusPending');
+      return i18n.t('common.pending');
     }
     case 'sending': {
-      return i18n.t('organization.members.emailStatusPending');
+      return i18n.t('common.pending');
     }
     case 'failed': {
       return i18n.t('organization.members.emailStatusFailed');

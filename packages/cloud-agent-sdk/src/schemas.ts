@@ -152,10 +152,7 @@ const remoteSdkModelSchema = z
         toolcall: z.boolean(),
         input: remoteModelModalitiesSchema,
         output: remoteModelModalitiesSchema,
-        interleaved: z.union([
-          z.boolean(),
-          z.object({ field: z.enum(['reasoning_content', 'reasoning_details']) }).strict(),
-        ]),
+        interleaved: z.union([z.boolean(), z.object({ field: z.string().min(1) }).passthrough()]),
       })
       .strict(),
     cost: z

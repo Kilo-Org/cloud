@@ -1,13 +1,17 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts the real stored row and its native presentation without a DOM. */
+/* eslint-disable max-lines, typescript-eslint/no-deprecated -- one cohesive mounted suite: stored row, share list, and remote row share the mock harness; react-test-renderer mounts the real rows and their native presentation without a DOM. */
 import { createElement, type ReactElement } from 'react';
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { makeCached } from '@/lib/active-sessions-live-sync.test-helpers';
 import { ShareDestinationList } from '@/components/share/share-destination-list';
 import { type ShareDestinationRow } from '@/components/share/share-destinations';
+import { createKiloAppQueryClient } from '@/lib/query-client';
 import { i18n } from '@/i18n';
-import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
+import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { __resetSessionAttentionForTests } from '@/lib/session-attention';
+import { RemoteSessionRow } from './remote-session-row';
 import { StoredSessionRow } from './session-row';
 
 vi.mock('react-native', async () => {
@@ -62,7 +66,7 @@ vi.mock('@/components/icons/slack-icon', () => ({ SlackIcon: 'SlackIcon' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'Chevron' }));
 vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
-vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
+vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
@@ -79,6 +83,31 @@ vi.mock('./session-row-actions', () => ({
   showDeleteConfirm: vi.fn(),
   showRenamePrompt: vi.fn(),
   showSessionActionMenu: vi.fn(),
+}));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: null, isLoaded: true }),
+}));
+vi.mock('@/lib/trpc', () => {
+  const trpc = {
+    activeSessions: {
+      list: {
+        queryKey: (input: unknown) => [['activeSessions', 'list'], { input, type: 'query' }],
+      },
+    },
+  };
+  return { useTRPC: () => trpc };
+});
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  useUserWebConnection: () => ({ sendCommand: vi.fn() }),
+}));
+vi.mock('@/lib/hooks/use-session-mutations', () => ({
+  useSessionMutations: () => ({ renameSession: vi.fn() }),
+}));
+vi.mock('./exit-remote-session-from-list', () => ({
+  exitRemoteSessionFromList: vi.fn(),
+}));
+vi.mock('./remote-session-exit-alert', () => ({
+  showRemoteSessionExitConfirmation: vi.fn().mockResolvedValue(true),
 }));
 
 const session: StoredSession = {
@@ -159,7 +188,7 @@ describe('StoredSessionRow live speech', () => {
     const nonliveLabel =
       'Fix login bug, feature/live, pull request 42, CLI, and cost 12 cents, 5 minutes ago';
     expect(button?.props.accessibilityLabel).toBe(nonliveLabel);
-    expect(hosts(renderer, 'StatusDot')).toHaveLength(0);
+    expect(hosts(renderer, 'SessionStatusIcon')).toHaveLength(0);
     expect(texts(renderer)).toContain('$0.12 · 5 MINUTES AGO');
 
     act(() => {
@@ -169,7 +198,9 @@ describe('StoredSessionRow live speech', () => {
     expect(button?.props.accessibilityLabel).toBe(
       'Fix login bug, LIVE, feature/live, pull request 42, CLI, and cost 12 cents, 5 minutes ago'
     );
-    expect(hosts(renderer, 'StatusDot').map(dot => dot.props)).toEqual([{ tone: 'good' }]);
+    expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+      { kind: 'running' },
+    ]);
     expect(texts(renderer)).toContain('$0.12 · 5 MINUTES AGO');
     expect(texts(renderer)).toContain('feature/live · #42');
 
@@ -177,7 +208,31 @@ describe('StoredSessionRow live speech', () => {
       renderer.update(row({ ...props, live: false }));
     });
     expect(button?.props.accessibilityLabel).toBe(nonliveLabel);
-    expect(hosts(renderer, 'StatusDot')).toHaveLength(0);
+    expect(hosts(renderer, 'SessionStatusIcon')).toHaveLength(0);
+  });
+
+  it('keeps the live eyebrow to the status glyph alone (no platform mark beside it)', () => {
+    // A platform glyph beside the status mark reads as a stray second mark
+    // crowding the meta, so a live row draws the status glyph only. The
+    // stored (non-live) row keeps its platform mark.
+    const withRepo = { ...session, git_url: 'git@github.com:org/my-repo.git' };
+    const liveRenderer = mount(row({ session: withRepo, live: true, metaWhileLive: true }));
+    expect(liveRenderer.root.findAllByProps({ testID: 'platform-icon-terminal' })).toHaveLength(0);
+    expect(hosts(liveRenderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+      { kind: 'running' },
+    ]);
+    expect(hosts(liveRenderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Fix login bug, LIVE, feature/live, MY-REPO, and cost 12 cents, 5 minutes ago'
+    );
+
+    const storedRenderer = mount(row({ session: withRepo, live: false }));
+    expect(storedRenderer.root.findAllByProps({ testID: 'platform-icon-terminal' })).toHaveLength(
+      1
+    );
+    expect(hosts(storedRenderer, 'SessionStatusIcon')).toHaveLength(0);
+    expect(hosts(storedRenderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Fix login bug, feature/live, MY-REPO, cost 12 cents, 5 minutes ago, and from CLI'
+    );
   });
 
   it('updates an existing live row to localized speech and locale-aware list composition', async () => {
@@ -192,10 +247,10 @@ describe('StoredSessionRow live speech', () => {
       await i18n.changeLanguage('es');
     });
     expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
-      'Fix login bug, EN VIVO, CLI y hace 5 minutos'
+      'Fix login bug, EN DIRECTO, CLI y hace 5 minutos'
     );
     expect(texts(renderer)).toContain('HACE 5 MINUTOS');
-    expect(hosts(renderer, 'StatusDot')).toHaveLength(1);
+    expect(hosts(renderer, 'SessionStatusIcon')).toHaveLength(1);
   });
 
   it.each(['question', 'permission'])(
@@ -207,8 +262,8 @@ describe('StoredSessionRow live speech', () => {
       expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
         'Fix login bug, needs input, feature/live, and CLI'
       );
-      expect(hosts(renderer, 'StatusDot').map(dot => dot.props)).toEqual([
-        { tone: 'warn', pulse: true },
+      expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+        { kind: 'needsInput' },
       ]);
       expect(texts(renderer)).toContain('NEEDS INPUT');
       expect(texts(renderer)).not.toContain('$0.12 · 5 MINUTES AGO');
@@ -261,11 +316,119 @@ describe('StoredSessionRow live speech', () => {
         'Fix login bug, LIVE, feature/live, CLI, and cost 12 cents, 5 minutes ago'
       );
       expect(texts(renderer)).toContain('$0.12 · 5 MINUTES AGO');
-      expect(hosts(renderer, 'StatusDot').map(dot => dot.props)).toEqual([{ tone: 'good' }]);
+      expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+        { kind: 'running' },
+      ]);
       expect(button.props.onLongPress).toBeUndefined();
       const { onPress } = button.props as Pick<Parameters<typeof StoredSessionRow>[0], 'onPress'>;
       act(onPress);
       expect(selectedId).toBe(destinationsDisabled ? null : 'stored-1');
     }
   );
+});
+
+describe('RemoteSessionRow live speech', () => {
+  let client: QueryClient = createKiloAppQueryClient();
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    __resetSessionAttentionForTests();
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-28T12:00:00.000Z'));
+    client = createKiloAppQueryClient();
+    client.setDefaultOptions({ queries: { retry: false, gcTime: Infinity } });
+  });
+  afterEach(async () => {
+    act(() => {
+      for (const renderer of mounted) {
+        renderer.unmount();
+      }
+    });
+    mounted.length = 0;
+    vi.restoreAllMocks();
+    await i18n.changeLanguage('en');
+  });
+
+  function mountRemote(overrides: Partial<ActiveSession> = {}) {
+    return mount(
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(RemoteSessionRow, {
+          session: {
+            ...makeCached({
+              id: 'remote-1',
+              status: 'busy',
+              title: 'Live work',
+              createdOnPlatform: 'cli',
+              gitBranch: 'feature/live',
+              updatedAt: '2026-08-28T11:55:00.000Z',
+            }),
+            ...overrides,
+          },
+          onPress: () => undefined,
+        })
+      )
+    );
+  }
+
+  it('speaks Working for a working row, drawn and spoken from one derivation', () => {
+    const renderer = mountRemote();
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Live work, Working, feature/live, CLI, and 5 minutes ago'
+    );
+    expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+      { kind: 'running' },
+    ]);
+    expect(texts(renderer)).toContain('5 MINUTES AGO');
+    expect(texts(renderer)).toContain('feature/live');
+  });
+
+  it('speaks Idle once the agent stops working', () => {
+    const renderer = mountRemote({ status: 'idle' });
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Live work, Idle, feature/live, CLI, and 5 minutes ago'
+    );
+    expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+      { kind: 'idle' },
+    ]);
+  });
+
+  it('keeps the needs-input speech above the state word', () => {
+    const renderer = mountRemote({ status: 'question' });
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Live work, needs input, feature/live, and CLI'
+    );
+    expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+      { kind: 'needsInput' },
+    ]);
+    expect(texts(renderer)).toContain('NEEDS INPUT');
+  });
+
+  it('speaks Working for an unrecognized status, agreeing with the drawn glyph', () => {
+    const renderer = mountRemote({ status: 'mystery' });
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Live work, Working, feature/live, CLI, and 5 minutes ago'
+    );
+    expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+      { kind: 'running' },
+    ]);
+  });
+
+  it('draws the idle tray row with the status glyph alone (no platform mark)', () => {
+    // SPOT-DEFECT (e1): the finished row's status cluster showed a stray
+    // second mark beside the idle circle — the platform glyph. The tray row
+    // always draws the status glyph, so the platform glyph is withheld.
+    const renderer = mountRemote({
+      status: 'idle',
+      createdOnPlatform: 'cli',
+      gitUrl: 'git@github.com:org/live-repo.git',
+    });
+    expect(renderer.root.findAllByProps({ testID: 'platform-icon-terminal' })).toHaveLength(0);
+    expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+      { kind: 'idle' },
+    ]);
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Live work, Idle, feature/live, LIVE-REPO, and 5 minutes ago'
+    );
+  });
 });

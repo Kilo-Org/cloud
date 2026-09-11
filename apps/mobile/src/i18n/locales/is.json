@@ -194,6 +194,8 @@
     "linkedAccounts": "Tengdir reikningar",
     "couldNotLoadAccounts": "Ekki tókst að hlaða reikningum.",
     "app": "Forrit",
+    "tutorial": "Kennsla",
+    "tutorialSubtitle": "Spila kynninguna aftur",
     "preferencesSubtitle": "Útlit, tilkynningar, hugsun og skjástillingar",
     "deviceSessionsSubtitle": "Skoða önnur tæki og skrá þau út",
     "feedback": "Ábendingar",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "Þetta CLI getur ekki birt möppur. Ýttu á Lokið til að halda ræsimöppunni. Næsta lota hefst þar.",
       "unsupportedTitle": "Ekki er hægt að birta möppur"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Sleppa kynningu",
+    "chooseTitle": "Hvar viltu keyra Kilo?",
+    "chooseBody": "Báðar leiðir enda með lotu í gangi. Veldu hvar þú vilt byrja.",
+    "computerOption": "Þín eigin tölva",
+    "computerOptionDescription": "Tengdu með `kilo remote` og keyrðu lotur á tölvunni þinni.",
+    "cloudTitle": "Búðu til fyrstu skýjasetuna þína",
+    "cloudBody": "Skýjafulltrúi þinn keyrir í ský Kilo — ekkert til að setja upp. Veldu geymslu, lýstu verkefninu og smelltu á Byrja lotu, komdu svo aftur hingað til að sjá hana í keyrslu.",
+    "cloudSessionCreated": "Fyrsta skýjasetan þín er í keyrslu.",
+    "cliTitle": "Tengdu tölvuna þína",
+    "waitingForComputer": "Bíð eftir að tölvan þín tengist…",
+    "computerConnected": "{{name}} er tengdur",
+    "startOnYourComputer": "Hefju lotu á tölvunni þinni og komdu svo hingað aftur",
+    "cliSessionCreated": "Fyrsta fjarsetan þín er í keyrslu."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Ekki tókst að hlaða reikningnum þínum.",

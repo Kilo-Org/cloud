@@ -1,18 +1,23 @@
 import { WifiOff } from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { type LayoutChangeEvent, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
 import { announceForA11y } from '@/lib/a11y/announce';
+import { setOfflineBannerHeight } from '@/lib/offline-banner-layout';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 
 /**
- * App-wide offline banner. Absolute overlay, so app content keeps its layout
- * position; `pointerEvents="none"` passes every touch to the header below.
+ * App-wide offline banner. Absolute overlay, so app content below the header
+ * keeps its layout position; `pointerEvents="none"` passes every touch to the
+ * header below. The header is the one thing the overlay would otherwise
+ * paint over (SPOT-DEFECT e6: the bar clipped the "New session" title), so
+ * the banner reports its rendered height through `setOfflineBannerHeight` and
+ * `ScreenHeader` reserves exactly that space while it is visible.
  */
 export function OfflineBanner() {
   const isOffline = useOfflineBannerState();
@@ -32,6 +37,19 @@ export function OfflineBanner() {
     prevRef.current = isOffline;
   }, [isOffline, t]);
 
+  // Headers reserve the space this overlay paints into. Clear the shared
+  // reservation whenever the bar is hidden or unmounts; while it is shown,
+  // `onLayout` reports the rendered height, so the reservation matches the
+  // real bar at any font scale instead of guessing a constant.
+  useEffect(() => {
+    if (!isOffline) {
+      setOfflineBannerHeight(0);
+    }
+    return () => {
+      setOfflineBannerHeight(0);
+    };
+  }, [isOffline]);
+
   if (!isOffline) {
     return null;
   }
@@ -46,6 +64,9 @@ export function OfflineBanner() {
         accessible
         accessibilityRole="alert"
         accessibilityLabel={t('offline.noInternet')}
+        onLayout={(event: LayoutChangeEvent) => {
+          setOfflineBannerHeight(event.nativeEvent.layout.height);
+        }}
         className="flex-row items-center justify-center gap-2 bg-warn px-4 py-2"
       >
         <WifiOff size={14} color={colors.warnForeground} />

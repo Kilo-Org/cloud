@@ -194,6 +194,8 @@
     "linkedAccounts": "Gekoppelde accounts",
     "couldNotLoadAccounts": "De accounts konden niet worden geladen.",
     "app": "Applicatie",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "Bekijk de rondleiding opnieuw",
     "preferencesSubtitle": "Weergave, meldingen, gedachtegang en schermgedrag",
     "deviceSessionsSubtitle": "Andere apparaten bekijken en afmelden",
     "feedback": "Feedback geven",
@@ -2025,6 +2027,21 @@
       "unsupportedDescription": "Deze CLI kan geen mappen weergeven. Tik op Klaar om de startmap te behouden. Met Sessie starten begin je de sessie in die map.",
       "unsupportedTitle": "Mappen weergeven niet mogelijk"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Rondleiding overslaan",
+    "chooseTitle": "Waar wil je Kilo uitvoeren?",
+    "chooseBody": "Beide paden eindigen met een actieve sessie. Kies waar je wilt beginnen.",
+    "computerOption": "Je eigen computer",
+    "computerOptionDescription": "Maak verbinding met `kilo remote` en voer sessies uit op je computer.",
+    "cloudTitle": "Maak je eerste cloudsessie aan",
+    "cloudBody": "Je cloudagent draait in de cloud van Kilo — er is niets te installeren. Kies een repository, beschrijf de taak en tik op Sessie starten, en kom dan hier terug om te zien hoe die draait.",
+    "cloudSessionCreated": "Je eerste cloudsessie is gestart.",
+    "cliTitle": "Verbind je computer",
+    "waitingForComputer": "Wachten tot je computer verbinding maakt…",
+    "computerConnected": "{{name}} is verbonden",
+    "startOnYourComputer": "Start een sessie op je computer en kom dan hier terug",
+    "cliSessionCreated": "Je eerste externe sessie is gestart."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Je account kon niet worden geladen.",

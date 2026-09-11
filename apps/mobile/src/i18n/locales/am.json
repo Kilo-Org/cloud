@@ -194,6 +194,8 @@
     "linkedAccounts": "የተገናኙ መለያዎች",
     "couldNotLoadAccounts": "መለያዎችን መጫን አልተቻለም።",
     "app": "መተግበሪያ",
+    "tutorial": "አጋዥ ስልጠና",
+    "tutorialSubtitle": "የተመራውን ቱር እንደገና ያጫውቱ",
     "preferencesSubtitle": "መልክ፣ ማሳወቂያዎች፣ አስተሳሰብና የማያ ገጽ አሠራር",
     "deviceSessionsSubtitle": "ሌሎች መሣሪያዎችን ይመልከቱና ከመለያዎ ያስወጡ",
     "feedback": "ግብረ-መልስ",
@@ -2456,6 +2458,21 @@
       "unsupportedTitle": "አቃፊዎችን መዘርዘር አይቻልም",
       "unsupportedDescription": "ይህ CLI አቃፊዎችን መዘርዘር አይችልም። «ተከናውኗል»ን ሲነኩ የመነሻ አቃፊው እንዳለ ይቆያል። «ክፍለ ጊዜውን ያስጀምሩ»ን ሲነኩ ክፍለ ጊዜው በዚያው ይጀምራል።"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "ቱር ዝለሉ",
+    "chooseTitle": "Kilo ን የት ማሄድ ይፈልጋሉ?",
+    "chooseBody": "ሁለቱም መንገዶች በሚሠራ ክፍለ ጊዜ ይጠናቀቃሉ። የሚጀምሩበትን ይምረጡ።",
+    "computerOption": "የራስዎ ኮምፒውተር",
+    "computerOptionDescription": "በ`kilo remote` ያገናኙ እና ክፍለ ጊዜዎችን በኮምፒውተርዎ ላይ ያሂዱ።",
+    "cloudTitle": "የመጀመሪያውን የደዎቭ ክፍለ ጊዜ ይፍጠሩ",
+    "cloudBody": "የደዎቭ ወኪልዎ በኪሎ ደዎቭ ውስጥ ይሰራል — ማስገጣት የሚገባዎ ነገር የለም። ማከማቻ ይምረጡ፣ ተግባሩን ይግለጹ፣ ክፍለ ጊዜውን ያስጀምሩ ብለው ይንኩ፣ ከዚያም እየሰራ መሆኑን ለማየት ወደዚህ ይመለሱ።",
+    "cloudSessionCreated": "የመጀመሪያው የደዎቭ ክፍለ ጊዜዎ እየሰራ ነው።",
+    "cliTitle": "ኮምፒውተርዎን ያገናኙ",
+    "waitingForComputer": "ኮምፒውተርዎ እስኪገናኝ ድረስ በመጠበቅ ላይ…",
+    "computerConnected": "{{name}} ተገናኝቷል",
+    "startOnYourComputer": "በኮምፒውተርዎ ላይ ክፍለ ጊዜ ያስጀምሩ፣ ከዚያ ወደዚህ ይመለሱ",
+    "cliSessionCreated": "የመጀመሪያው ሩቅ ክፍለ ጊዜዎ እየሰራ ነው።"
   },
   "bootstrap": {
     "couldNotLoadAccount": "መለያህን መጫን አልተቻለም።",

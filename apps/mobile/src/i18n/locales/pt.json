@@ -194,6 +194,8 @@
     "linkedAccounts": "Contas ligadas",
     "couldNotLoadAccounts": "Não foi possível carregar as contas.",
     "app": "Aplicação",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "Reproduzir novamente a visita guiada",
     "preferencesSubtitle": "Aparência, notificações, raciocínio e comportamento do ecrã",
     "deviceSessionsSubtitle": "Consultar outros dispositivos e terminar as respetivas sessões",
     "feedback": "Enviar comentários",
@@ -2477,6 +2479,21 @@
       "unsupportedDescription": "Esta CLI não permite listar pastas. Ao concluir, mantém a pasta de arranque. A sessão será iniciada nessa pasta.",
       "unsupportedTitle": "Não é possível listar as pastas"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Saltar o tour",
+    "chooseTitle": "Onde quer executar o Kilo?",
+    "chooseBody": "Ambos os caminhos terminam com uma sessão em execução. Escolha onde quer começar.",
+    "computerOption": "O seu próprio computador",
+    "computerOptionDescription": "Ligue-se com `kilo remote` e execute sessões na sua máquina.",
+    "cloudTitle": "Crie a sua primeira sessão na nuvem",
+    "cloudBody": "O seu agente na nuvem é executado na nuvem da Kilo — nada para instalar. Escolha um repositório, descreva a tarefa e toque em Iniciar sessão, depois volte aqui para a ver em execução.",
+    "cloudSessionCreated": "A sua primeira sessão na nuvem está em execução.",
+    "cliTitle": "Ligue o seu computador",
+    "waitingForComputer": "A aguardar a ligação do seu computador…",
+    "computerConnected": "{{name}} está ligado",
+    "startOnYourComputer": "Inicie uma sessão no seu computador e depois volte aqui",
+    "cliSessionCreated": "A sua primeira sessão remota está em execução."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Não foi possível carregar a tua conta.",

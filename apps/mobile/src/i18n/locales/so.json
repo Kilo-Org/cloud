@@ -194,6 +194,8 @@
     "linkedAccounts": "Akoonnada ku xiran",
     "couldNotLoadAccounts": "Akoonnada lama soo shubi karin.",
     "app": "Barnaamijka",
+    "tutorial": "Tababar",
+    "tutorialSubtitle": "Dib u ciyaar socdaalka la hagayo",
     "preferencesSubtitle": "Muuqaalka, ogeysiisyada, fikirka iyo hab-dhaqanka shaashadda",
     "deviceSessionsSubtitle": "Dib u eeg aaladaha kale oo ka saar akoonka",
     "feedback": "Jawaab-celin",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "CLI-kan ma soo bandhigi karo liiska gallada. Dhammay wuxuu hayaa galkii laga bilaabay. Bilow kalfadhiga wuxuu halkaas ka bilaabaa kalfadhiga.",
       "unsupportedTitle": "Liiska gallada lama soo bandhigi karo"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Dhaaf safarka",
+    "chooseTitle": "Xaggee ayaad rabtaa inaad Kilo ku socodsiiiso?",
+    "chooseBody": "Labada waddo waxay ku dhammaadaan fadhi socda. Dooro halka aad rabto inaad ka bilowdo.",
+    "computerOption": "Kombiyuutarkaaga gaarka ah",
+    "computerOptionDescription": "Ku xidh `kilo remote` oo fadhiyada ku socodsii mishiinkaaga.",
+    "cloudTitle": "Abuur fadhigaaga daruuriga ah ee kowaad",
+    "cloudBody": "Wakiilkaaga daruuriga ah wuxuu ka shaqeeyaa daruuriga Kilo — wax la rakibo majiraan. Dooro kayd, sharax hawsha, oo riix Bilow kalfadhiga, kadibna halkan ku noqo si aad u aragto iyada oo socota.",
+    "cloudSessionCreated": "Fadhigaaga daruuriga ah ee kowaad wuu socdaa.",
+    "cliTitle": "Xiriir kombiyuutarkaaga",
+    "waitingForComputer": "Waan sugayaa in kombiyuutarkaagu xiriiro…",
+    "computerConnected": "{{name}} waa la xiriiriyay",
+    "startOnYourComputer": "Bilow fadhi kombiyuutarkaaga, kadibna halkan ku noqo",
+    "cliSessionCreated": "Fadhigaaga fog ee kowaad wuu socdaa."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Akoonkaaga lama soo rari karin.",

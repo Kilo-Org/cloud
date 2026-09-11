@@ -194,6 +194,8 @@
     "linkedAccounts": "חשבונות מקושרים",
     "couldNotLoadAccounts": "לא ניתן היה לטעון את החשבונות.",
     "app": "אפליקציה",
+    "tutorial": "מדריך",
+    "tutorialSubtitle": "הפעל מחדש את הסיור המודרך",
     "preferencesSubtitle": "מראה, התראות, חשיבה והתנהגות המסך",
     "deviceSessionsSubtitle": "צפייה במכשירים אחרים וניתוקם מהחשבון",
     "feedback": "משוב",
@@ -2039,6 +2041,21 @@
       "unsupportedDescription": "ה-CLI הזה אינו יכול להציג רשימת תיקיות. לחיצה על סיום תשמור את תיקיית ההפעלה. לחיצה על התחלת סשן תתחיל את הסשן בתיקייה הזו.",
       "unsupportedTitle": "לא ניתן להציג את התיקיות"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "דלג על הסיור",
+    "chooseTitle": "היכן תרצו להריץ את Kilo?",
+    "chooseBody": "שני המסלולים מסתיימים בהפעלה פעילה. בחרו היכן להתחיל.",
+    "computerOption": "המחשב שלכם",
+    "computerOptionDescription": "התחברו עם `kilo remote` והריצו הפעלות במחשב שלכם.",
+    "cloudTitle": "צרו את הסשן הראשון בענן",
+    "cloudBody": "סוכן הענן שלכם פועל בענן של Kilo — אין מה להתקין. בחרו מאגר, תארו את המשימה והקישו על התחלת סשן, ואז חזרו לכאן כדי לראות אותו פועל.",
+    "cloudSessionCreated": "הסשן הראשון בענן שלכם פועל.",
+    "cliTitle": "חברו את המחשב שלכם",
+    "waitingForComputer": "ממתין לחיבור המחשב שלכם…",
+    "computerConnected": "{{name}} מחובר",
+    "startOnYourComputer": "הפעילו סשן במחשב שלכם, ואז חזרו לכאן",
+    "cliSessionCreated": "הסשן המרוחק הראשון שלכם פועל."
   },
   "bootstrap": {
     "couldNotLoadAccount": "לא ניתן היה לטעון את החשבון שלך.",

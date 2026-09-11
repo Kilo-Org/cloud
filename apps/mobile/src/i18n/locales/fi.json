@@ -194,6 +194,8 @@
     "linkedAccounts": "Linkitetyt tilit",
     "couldNotLoadAccounts": "Tilien lataus epäonnistui.",
     "app": "Sovellus",
+    "tutorial": "Opastus",
+    "tutorialSubtitle": "Toista opastettu kierros",
     "preferencesSubtitle": "Ulkoasu, ilmoitukset, päättely ja näytön toiminta",
     "deviceSessionsSubtitle": "Tarkastele muita laitteita ja kirjaa ne ulos",
     "feedback": "Palaute",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "Tämä CLI ei tue kansioiden luettelointia. Valmis-painike säilyttää käynnistyskansion. Aloita istunto -painike käynnistää istunnon siinä.",
       "unsupportedTitle": "Kansioluetteloa ei voi näyttää"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Ohita kierros",
+    "chooseTitle": "Missä haluat suorittaa Kilon?",
+    "chooseBody": "Molemmat polut päättyvät käynnissä olevaan istuntoon. Valitse, mistä haluat aloittaa.",
+    "computerOption": "Oma tietokoneesi",
+    "computerOptionDescription": "Yhdistä `kilo remote` -komennolla ja suorita istuntoja koneellasi.",
+    "cloudTitle": "Luo ensimmäinen pilvi-istuntosi",
+    "cloudBody": "Pilviagenttisi toimii Kilon pilvessä — mitään ei tarvitse asentaa. Valitse repository, kuvaa tehtävä ja napauta Aloita istunto, palaa sitten tähän nähdäksesi, kun se on käynnissä.",
+    "cloudSessionCreated": "Ensimmäinen pilvi-istuntosi on käynnissä.",
+    "cliTitle": "Yhdistä tietokoneesi",
+    "waitingForComputer": "Odotetaan tietokoneesi yhdistämistä…",
+    "computerConnected": "{{name}} on yhdistetty",
+    "startOnYourComputer": "Käynnistä istunto tietokoneellasi ja palaa sitten tähän",
+    "cliSessionCreated": "Ensimmäinen etäistuntosi on käynnissä."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Tiliäsi ei voitu ladata.",

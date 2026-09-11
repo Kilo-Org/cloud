@@ -194,6 +194,8 @@
     "linkedAccounts": "Contas vinculadas",
     "couldNotLoadAccounts": "Non se puideron cargar as contas.",
     "app": "Aplicación",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "Reproducir de novo a visita guiada",
     "preferencesSubtitle": "Aparencia, notificacións, razoamento e comportamento da pantalla",
     "deviceSessionsSubtitle": "Revisar e pechar as sesións doutros dispositivos",
     "feedback": "Comentarios",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "Este CLI non pode listar cartafoles. Ao tocar Feito, mantense o cartafol de inicio. Ao tocar Iniciar sesión, a sesión comeza nese cartafol.",
       "unsupportedTitle": "Non se poden listar os cartafoles"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Omitir a visita",
+    "chooseTitle": "Onde queres executar Kilo?",
+    "chooseBody": "Os dous camiños rematan cunha sesión en execución. Escolle onde queres comezar.",
+    "computerOption": "O teu propio ordenador",
+    "computerOptionDescription": "Conecta con `kilo remote` e executa sesións na túa máquina.",
+    "cloudTitle": "Crea a túa primeira sesión na nube",
+    "cloudBody": "O teu axente na nube execútase na nube de Kilo — nada que instalar. Escolla un repositorio, describa a tarefa e toque Iniciar sesión, despois volva aquí para vela en execución.",
+    "cloudSessionCreated": "A túa primeira sesión na nube está a executarse.",
+    "cliTitle": "Conecta o teu ordenador",
+    "waitingForComputer": "Esperando a que o teu ordenador se conecte…",
+    "computerConnected": "{{name}} está conectado",
+    "startOnYourComputer": "Inicia unha sesión no teu ordenador e despois volve aquí",
+    "cliSessionCreated": "A túa primeira sesión remota está a executarse."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Non se puido cargar a túa conta.",

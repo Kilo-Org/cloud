@@ -194,6 +194,8 @@
     "linkedAccounts": "已关联账户",
     "couldNotLoadAccounts": "无法加载账户。",
     "app": "应用",
+    "tutorial": "教程",
+    "tutorialSubtitle": "重新播放引导",
     "preferencesSubtitle": "外观、通知、思考过程及屏幕设置",
     "deviceSessionsSubtitle": "查看其他设备并退出其登录",
     "feedback": "反馈",
@@ -2025,6 +2027,21 @@
       "unsupportedDescription": "此 CLI 无法列出文件夹。点击“完成”可保留启动时的文件夹，再点击“开始会话”即可在该文件夹中启动会话。",
       "unsupportedTitle": "无法列出文件夹"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "跳过引导",
+    "chooseTitle": "你想在哪里运行 Kilo？",
+    "chooseBody": "两条路径都以一个运行中的会话结束。选择你想从哪里开始。",
+    "computerOption": "你自己的电脑",
+    "computerOptionDescription": "使用 `kilo remote` 连接，并在你的电脑上运行会话。",
+    "cloudTitle": "创建你的第一个云端会话",
+    "cloudBody": "你的云端代理在 Kilo 的云端运行——无需安装任何东西。选择一个仓库，描述任务，然后点按开始会话，再回到这里查看它运行。",
+    "cloudSessionCreated": "你的第一个云端会话正在运行。",
+    "cliTitle": "连接你的电脑",
+    "waitingForComputer": "正在等待你的电脑连接…",
+    "computerConnected": "{{name}} 已连接",
+    "startOnYourComputer": "在你的电脑上启动一个会话，然后回到这里",
+    "cliSessionCreated": "你的第一个远程会话正在运行。"
   },
   "bootstrap": {
     "couldNotLoadAccount": "无法加载账号信息。",

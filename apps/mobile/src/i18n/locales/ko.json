@@ -194,6 +194,8 @@
     "linkedAccounts": "연결된 계정",
     "couldNotLoadAccounts": "계정을 불러올 수 없습니다.",
     "app": "앱",
+    "tutorial": "튜토리얼",
+    "tutorialSubtitle": "가이드 투어 다시 보기",
     "preferencesSubtitle": "화면 스타일, 알림, 추론 및 화면 동작",
     "deviceSessionsSubtitle": "다른 기기의 로그인 확인 및 로그아웃",
     "feedback": "피드백",
@@ -2025,6 +2027,21 @@
       "unsupportedDescription": "이 CLI에서는 폴더 목록을 표시할 수 없습니다. 완료를 누르면 CLI를 실행한 폴더가 유지됩니다. 세션 시작을 누르면 해당 폴더에서 세션이 시작됩니다.",
       "unsupportedTitle": "폴더 목록을 표시할 수 없습니다"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "투어 건너뛰기",
+    "chooseTitle": "Kilo를 어디에서 실행하시겠어요?",
+    "chooseBody": "두 경로 모두 실행 중인 세션으로 끝납니다. 어디에서 시작할지 선택하세요.",
+    "computerOption": "내 컴퓨터",
+    "computerOptionDescription": "`kilo remote`로 연결하고 내 컴퓨터에서 세션을 실행하세요.",
+    "cloudTitle": "첫 클라우드 세션 만들기",
+    "cloudBody": "클라우드 에이전트는 Kilo 클라우드에서 실행되므로 설치할 것이 없습니다. 저장소를 선택하고 작업을 설명한 뒤 세션 시작을 탭한 다음, 여기로 돌아와 실행 중인 모습을 확인하세요.",
+    "cloudSessionCreated": "첫 클라우드 세션이 실행 중입니다.",
+    "cliTitle": "컴퓨터 연결하기",
+    "waitingForComputer": "컴퓨터가 연결될 때까지 기다리는 중…",
+    "computerConnected": "{{name}}이(가) 연결되었습니다",
+    "startOnYourComputer": "컴퓨터에서 세션을 시작한 다음 여기로 돌아오세요",
+    "cliSessionCreated": "첫 원격 세션이 실행 중입니다."
   },
   "bootstrap": {
     "couldNotLoadAccount": "계정 정보를 불러오지 못했습니다.",

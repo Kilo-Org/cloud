@@ -194,6 +194,8 @@
     "linkedAccounts": "Ama-akhawunti axhunyiwe",
     "couldNotLoadAccounts": "Asikwazanga ukulayisha ama-akhawunti.",
     "app": "Uhlelo lokusebenza",
+    "tutorial": "Isifundo",
+    "tutorialSubtitle": "Dlala kabusha uhambo oluqondisiwe",
     "preferencesSubtitle": "Ukubukeka, izaziso, ukucabanga nokusebenza kwesikrini",
     "deviceSessionsSubtitle": "Hlola amanye amadivayisi bese uwakhipha ku-akhawunti",
     "feedback": "Thumela impendulo",
@@ -2456,6 +2458,21 @@
       "unsupportedTitle": "Uhlu lwamafolda alukwazi ukuboniswa",
       "unsupportedDescription": "Le CLI ayikwazi ukubonisa uhlu lwamafolda. Uma uqeda ukukhetha, kugcinwa ifolda yokuqalisa. Iseshini izoqala kuleyo folda."
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Qeda uhambo",
+    "chooseTitle": "Ufuna ukusebenzisa i-Kilo kuphi?",
+    "chooseBody": "Zombili izindlela ziphetha ngeseshini esebenzayo. Khetha lapho ufuna ukuqala khona.",
+    "computerOption": "Ikhompuyutha yakho",
+    "computerOptionDescription": "Xhuma nge-`kilo remote` bese usebenzisa amaseshini kukhompuyutha yakho.",
+    "cloudTitle": "Dala iseshini yakho yokuqala yefu",
+    "cloudBody": "I-ejenti yakho yefu isebenza efuleni likaKilo — akukho okufakelwayo. Khetha indawo yokugcina, chaza umsebenzi, bese uchofoza Qala iseshini, bese ubuyela lapha ukuyibona isebenza.",
+    "cloudSessionCreated": "Iseshini yakho yokuqala yefu iyaqhuba.",
+    "cliTitle": "Xhuma ikhompuyutha yakho",
+    "waitingForComputer": "Kulindelwe ukuxhunywa kwekhompuyutha yakho…",
+    "computerConnected": "I-{{name}} ixhunyiwe",
+    "startOnYourComputer": "Qala iseshini ekhompuyutheni yakho, bese ubuyela lapha",
+    "cliSessionCreated": "Iseshini yakho yokuqala ekude iyaqhuba."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Asikwazanga ukulayisha i-akhawunti yakho.",

@@ -194,6 +194,8 @@
     "linkedAccounts": "Propojené účty",
     "couldNotLoadAccounts": "Účty se nepodařilo načíst.",
     "app": "Aplikace",
+    "tutorial": "Návod",
+    "tutorialSubtitle": "Přehrát znovu komentovanou prohlídku",
     "preferencesSubtitle": "Vzhled, oznámení, uvažování a chování obrazovky",
     "deviceSessionsSubtitle": "Zkontrolovat a odhlásit ostatní zařízení",
     "feedback": "Zpětná vazba",
@@ -2498,6 +2500,21 @@
       "unsupportedDescription": "Toto CLI neumí zobrazit seznam složek. Tlačítkem Hotovo ponecháte složku, ze které bylo CLI spuštěno. Relace se spustí v této složce.",
       "unsupportedTitle": "Složky nelze zobrazit"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Přeskočit prohlídku",
+    "chooseTitle": "Kde chcete spustit Kilo?",
+    "chooseBody": "Obě cesty končí běžící relací. Vyberte, odkud chcete začít.",
+    "computerOption": "Váš vlastní počítač",
+    "computerOptionDescription": "Připojte se pomocí `kilo remote` a spouštějte relace na svém počítači.",
+    "cloudTitle": "Vytvořte první cloudovou relaci",
+    "cloudBody": "Váš cloudový agent běží v cloudu Kilo — nic se neinstaluje. Vyberte repozitář, popište úkol a klepněte na Spustit relaci, pak se vraťte sem a podívejte se, jak běží.",
+    "cloudSessionCreated": "Vaše první cloudová relace běží.",
+    "cliTitle": "Připojte svůj počítač",
+    "waitingForComputer": "Čekáme na připojení vašeho počítače…",
+    "computerConnected": "{{name}} je připojen",
+    "startOnYourComputer": "Spusťte relaci ve svém počítači a vraťte se sem",
+    "cliSessionCreated": "Vaše první vzdálená relace běží."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Tvůj účet se nepodařilo načíst.",

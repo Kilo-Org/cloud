@@ -194,6 +194,8 @@
     "linkedAccounts": "Conturi asociate",
     "couldNotLoadAccounts": "Nu s-au putut încărca conturile.",
     "app": "Aplicație",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "Redă din nou turul ghidat",
     "preferencesSubtitle": "Aspect, notificări, raționament și comportamentul ecranului",
     "deviceSessionsSubtitle": "Verifică și deconectează alte dispozitive",
     "feedback": "Trimite păreri",
@@ -2477,6 +2479,21 @@
       "unsupportedDescription": "Acest CLI nu poate afișa dosarele. Atinge „Gata” pentru a păstra dosarul de pornire, apoi „Începe sesiunea” pentru a porni sesiunea în acel dosar.",
       "unsupportedTitle": "Dosarele nu pot fi afișate"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Omite turul",
+    "chooseTitle": "Unde vrei să rulezi Kilo?",
+    "chooseBody": "Ambele căi se termină cu o sesiune activă. Alege de unde vrei să începi.",
+    "computerOption": "Propriul tău computer",
+    "computerOptionDescription": "Conectează-te cu `kilo remote` și rulează sesiuni pe calculatorul tău.",
+    "cloudTitle": "Creează prima ta sesiune în cloud",
+    "cloudBody": "Agentul tău din cloud rulează în cloudul Kilo — nimic de instalat. Alege un repozitoriu, descrie sarcina și atingi Începe sesiunea, apoi revino aici ca să o vezi cum rulează.",
+    "cloudSessionCreated": "Prima ta sesiune în cloud rulează.",
+    "cliTitle": "Conectează calculatorul",
+    "waitingForComputer": "Se așteaptă conectarea calculatorului tău…",
+    "computerConnected": "{{name}} este conectat",
+    "startOnYourComputer": "Pornește o sesiune pe calculatorul tău, apoi revino aici",
+    "cliSessionCreated": "Prima ta sesiune de la distanță rulează."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Nu s-a putut încărca contul tău.",

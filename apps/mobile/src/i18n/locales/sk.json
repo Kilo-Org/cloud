@@ -194,6 +194,8 @@
     "linkedAccounts": "Prepojené účty",
     "couldNotLoadAccounts": "Účty sa nepodarilo načítať.",
     "app": "Aplikácia",
+    "tutorial": "Návod",
+    "tutorialSubtitle": "Prehrať znova sprievodcu",
     "preferencesSubtitle": "Vzhľad, upozornenia, uvažovanie a správanie obrazovky",
     "deviceSessionsSubtitle": "Skontrolovať a odhlásiť iné zariadenia",
     "feedback": "Spätná väzba",
@@ -2498,6 +2500,21 @@
       "unsupportedDescription": "Táto verzia CLI nedokáže zobraziť priečinky. Klepnutím na Hotovo ponecháš priečinok spustenia. Klepnutím na Spustiť reláciu v ňom spustíš reláciu.",
       "unsupportedTitle": "Priečinky sa nedajú zobraziť"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Preskočiť prehliadku",
+    "chooseTitle": "Kde chcete spustiť Kilo?",
+    "chooseBody": "Obe cesty sa končia bežiacou reláciou. Vyberte, kde chcete začať.",
+    "computerOption": "Váš vlastný počítač",
+    "computerOptionDescription": "Pripojte sa pomocou `kilo remote` a spúšťajte relácie na svojom počítači.",
+    "cloudTitle": "Vytvorte svoju prvú cloudovú reláciu",
+    "cloudBody": "Váš cloudový agent beží v cloude Kilo — nič sa neinštaluje. Vyberte repozitár, opíšte úlohu a ťuknite na Spustiť reláciu, potom sa vráťte sem a pozrite sa, ako beží.",
+    "cloudSessionCreated": "Vaša prvá cloudová relácia beží.",
+    "cliTitle": "Pripojte svoj počítač",
+    "waitingForComputer": "Čaká sa na pripojenie vášho počítača…",
+    "computerConnected": "{{name}} je pripojený",
+    "startOnYourComputer": "Spustite reláciu vo svojom počítači a potom sa vráťte sem",
+    "cliSessionCreated": "Vaša prvá vzdialená relácia beží."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Tvoj účet sa nepodarilo načítať.",

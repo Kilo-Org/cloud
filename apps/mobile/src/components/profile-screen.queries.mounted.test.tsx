@@ -135,6 +135,7 @@ vi.mock('@/components/ui/icons', () => ({
   ShieldCheck: 'ShieldCheck',
   SlidersHorizontal: 'SlidersHorizontal',
   Smartphone: 'Smartphone',
+  Sparkles: 'Sparkles',
   Trash2: 'Trash2',
 }));
 
@@ -343,6 +344,21 @@ describe('ProfileScreen deferred queries', () => {
 
     expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
     expect(nodeCountWithChildren(renderer.root, 'Text', 'Linked accounts')).toBe(0);
+
+    unmount();
+  });
+
+  it('shows the Tutorial row and opens the tour', async () => {
+    const { renderer, unmount } = await mountProfile();
+
+    const tutorialRows = findConfigureRows(renderer.root, 'Tutorial');
+    expect(tutorialRows.length).toBe(1);
+    act(() => {
+      tutorialRows[0]?.props.onPress();
+    });
+    // The entry pushes the modal route directly, so the tour opens even when
+    // the per-account auto-open decision is already recorded.
+    expect(routerPush).toHaveBeenCalledWith('/(app)/first-run-tour');
 
     unmount();
   });

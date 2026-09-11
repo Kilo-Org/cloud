@@ -194,6 +194,8 @@
     "linkedAccounts": "Mga naka-link na akawnt",
     "couldNotLoadAccounts": "Hindi ma-load ang mga akawnt.",
     "app": "Aplikasyon",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "I-play muli ang gabay na paglilibot",
     "preferencesSubtitle": "Hitsura, notipikasyon, pag-iisip, at gawi ng screen",
     "deviceSessionsSubtitle": "Suriin at i-sign out ang ibang mga device",
     "feedback": "Magbigay ng puna",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "Hindi kayang maglista ng mga direktoryo ang CLI na ito. I-tap ang Tapos para panatilihin ang panimulang direktoryo, saka ang Simulan ang sesyon para magsimula roon.",
       "unsupportedTitle": "Hindi mailista ang mga direktoryo"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Laktawan ang paglilibot",
+    "chooseTitle": "Saan mo gustong patakbuhin ang Kilo?",
+    "chooseBody": "Parehong nagtatapos ang dalawang landas sa tumatakbong sesyon. Piliin kung saan ka magsisimula.",
+    "computerOption": "Ang sarili mong computer",
+    "computerOptionDescription": "Kumonekta gamit ang `kilo remote` at magpatakbo ng mga sesyon sa iyong computer.",
+    "cloudTitle": "Gumawa ng iyong unang cloud session",
+    "cloudBody": "Tumatakbo ang iyong cloud agent sa cloud ng Kilo — walang dapat i-install. Pumili ng repository, ilarawan ang gawain, at pindutin ang Simulan ang sesyon, pagkatapos bumalik dito para makita itong tumatakbo.",
+    "cloudSessionCreated": "Tumatakbo na ang iyong unang cloud session.",
+    "cliTitle": "Ikonekta ang iyong computer",
+    "waitingForComputer": "Hinihintay ang koneksyon ng iyong computer…",
+    "computerConnected": "Nakakonekta ang {{name}}",
+    "startOnYourComputer": "Magsimula ng sesyon sa iyong computer, pagkatapos bumalik dito",
+    "cliSessionCreated": "Tumatakbo na ang iyong unang remote session."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Hindi ma-load ang account mo.",

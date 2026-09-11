@@ -18,6 +18,7 @@ import { type EffectiveAgentProfile } from '@/components/agents/use-effective-ag
 import { type ModeOption } from '@/components/agents/mode-normalize';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from '@/components/ui/icons';
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { Text } from '@/components/ui/text';
@@ -259,9 +260,11 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      <Text className="mt-2 text-xs text-muted-foreground">
+      {/* The hint carries a `/remote` inline-code span; the shared renderer
+          styles it as code instead of leaking the backticks. */}
+      <InlineCodeText className="mt-2 text-xs text-muted-foreground">
         {t('agentChat.newSession.remoteHint')}
-      </Text>
+      </InlineCodeText>
 
       {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
 

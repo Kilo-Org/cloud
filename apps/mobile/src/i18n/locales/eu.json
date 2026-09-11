@@ -194,6 +194,8 @@
     "linkedAccounts": "Estekatutako kontuak",
     "couldNotLoadAccounts": "Ezin izan dira kontuak kargatu.",
     "app": "Aplikazioa",
+    "tutorial": "Tutoriala",
+    "tutorialSubtitle": "Erreproduzitu gidatutako bisita",
     "preferencesSubtitle": "Itxura, jakinarazpenak, pentsamendua eta pantailaren jokabidea",
     "deviceSessionsSubtitle": "Berrikusi beste gailuetako saioak eta itxi",
     "feedback": "Bidali iritzia",
@@ -2456,6 +2458,21 @@
       "unsupportedTitle": "Karpetak ezin dira zerrendatu",
       "unsupportedDescription": "CLI honek ezin ditu karpetak zerrendatu. Eginda sakatuz gero, hasierako karpeta mantenduko da. Hasi saioa sakatuz gero, saioa karpeta horretan hasiko da."
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Utzi bisita",
+    "chooseTitle": "Non exekutatu nahi duzu Kilo?",
+    "chooseBody": "Bi bideek martxan den saio batekin amaitzen dute. Aukeratu non hasi nahi duzun.",
+    "computerOption": "Zure ordenagailua",
+    "computerOptionDescription": "Konektatu `kilo remote` erabiliz eta exekutatu saioak zure ordenagailuan.",
+    "cloudTitle": "Sortu zure lehenengo hodei-saioa",
+    "cloudBody": "Zure hodeiko agentzia Kilo-ren hodeian exekutatzen da — ez dago ezer instalatzekorik. Aukeratu biltegi bat, deskribatu zeregina eta ukitu Hasi saioa, eta itzuli hona exekutatzen ari dela ikusteko.",
+    "cloudSessionCreated": "Zure lehenengo hodei-saioa exekutatzen ari da.",
+    "cliTitle": "Konektatu zure ordenagailua",
+    "waitingForComputer": "Zure ordenagailua konektatzearen zain…",
+    "computerConnected": "{{name}} konektatuta dago",
+    "startOnYourComputer": "Hasi saio bat zure ordenagailuan eta itzuli hona",
+    "cliSessionCreated": "Zure lehenengo urruneko saioa exekutatzen ari da."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Ezin izan da zure kontua kargatu.",

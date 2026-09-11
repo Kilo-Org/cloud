@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
+import { useOfflineBannerHeight } from '@/lib/hooks/use-offline-banner-layout';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -67,9 +68,14 @@ export function ScreenHeader({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const canGoBack = showBackButton ?? (router.canGoBack() || backFallback !== undefined);
+  // Height the app-wide OfflineBanner has measured for itself (0 while it is
+  // hidden). The banner is an absolute overlay at the safe-area top, exactly
+  // where this header starts; reserving its height keeps the title clear
+  // (SPOT-DEFECT e6: the bar clipped the "New session" title).
+  const offlineBannerHeight = useOfflineBannerHeight();
 
   // iOS modals are presented as cards already inset from the status bar
-  const paddingTop = modal && Platform.OS === 'ios' ? 32 : insets.top + 8;
+  const paddingTop = modal && Platform.OS === 'ios' ? 32 : insets.top + 8 + offlineBannerHeight;
 
   // When `backIcon` isn't specified, fall back to the historical behaviour
   // where iOS modals get a ChevronDown and everything else gets a ChevronLeft.
@@ -139,10 +145,26 @@ export function ScreenHeader({
     </View>
   );
   const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
+  // The split row below the centered heading is the controls bar: Back on the
+  // leading edge and the trailing action on its right. When there is no Back
+  // control, a lone trailing action stranded on that second row reads as a
+  // stray line under the title, so it shares the heading's bar instead.
+  const actionOnHeadingRow = separateHeading && headerRight != null && !canGoBack;
+
+  const headerRightBlock = headerRight ? (
+    <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} min-w-0 max-w-[50%] shrink`}>
+      {headerRight}
+    </View>
+  ) : null;
 
   return (
     <View className={cn('bg-background px-4 pb-3', className)} style={{ paddingTop }}>
-      {separateHeading && <View className="min-h-11 flex-row items-center">{heading}</View>}
+      {separateHeading && (
+        <View className="min-h-11 flex-row items-center">
+          {heading}
+          {actionOnHeadingRow ? headerRightBlock : null}
+        </View>
+      )}
       <View className="flex-row items-center">
         <View className="min-w-0 flex-1 flex-row items-center gap-1">
           {canGoBack && (
@@ -171,11 +193,7 @@ export function ScreenHeader({
           )}
           {!separateHeading && heading}
         </View>
-        {headerRight ? (
-          <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} min-w-0 max-w-[50%] shrink`}>
-            {headerRight}
-          </View>
-        ) : null}
+        {!actionOnHeadingRow ? headerRightBlock : null}
       </View>
     </View>
   );

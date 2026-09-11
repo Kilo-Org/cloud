@@ -194,6 +194,8 @@
     "linkedAccounts": "Akaunti zilizounganishwa",
     "couldNotLoadAccounts": "Imeshindikana kupakia akaunti.",
     "app": "Programu",
+    "tutorial": "Mafunzo",
+    "tutorialSubtitle": "Cheza tena ziara ya mwongozo",
     "preferencesSubtitle": "Mwonekano, arifa, kufikiri na utendaji wa skrini",
     "deviceSessionsSubtitle": "Kagua vifaa vingine na uondoke kwenye akaunti kwenye vifaa hivyo",
     "feedback": "Maoni",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "CLI hii haiwezi kuorodhesha folda. Ukigusa Maliza, folda ya kuanzia itahifadhiwa. Ukigusa Anza kikao, kikao kitaanza hapo.",
       "unsupportedTitle": "Haiwezekani kuorodhesha folda"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Ruka ziara",
+    "chooseTitle": "Unataka kuendesha Kilo wapi?",
+    "chooseBody": "Njia zote mbili huisha na kipindi kinachoendesha. Chagua pa kuanzia.",
+    "computerOption": "Kompyuta yako mwenyewe",
+    "computerOptionDescription": "Unganisha na `kilo remote` na uendeshe vipindi kwenye mashine yako.",
+    "cloudTitle": "Unda kipindi chako cha kwanza cha wingu",
+    "cloudBody": "Wakala wako wa wingu anaendeshwa kwenye wingu la Kilo — hakuna cha kusanikisha. Chagua hifadhi, eleza kazi, na gonga Anza kikao, kisha rudi hapa kuona kinaendelea.",
+    "cloudSessionCreated": "Kipindi chako cha kwanza cha wingu kinaendelea.",
+    "cliTitle": "Ungiza kompyuta yako",
+    "waitingForComputer": "Inasubiri kompyuta yako kuunganishwa…",
+    "computerConnected": "{{name}} imeunganishwa",
+    "startOnYourComputer": "Anza kipindi kwenye kompyuta yako, kisha rudi hapa",
+    "cliSessionCreated": "Kipindi chako cha kwanza cha mbali kinaendelea."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Imeshindikana kupakia akaunti yako.",

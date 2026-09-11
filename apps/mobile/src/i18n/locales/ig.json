@@ -194,6 +194,8 @@
     "linkedAccounts": "Akaụntụ ejikọrọ",
     "couldNotLoadAccounts": "Enweghị ike ibudata akaụntụ.",
     "app": "Ngwa",
+    "tutorial": "Nkuzi",
+    "tutorialSubtitle": "Kpọghachi njem nduzi ahụ",
     "preferencesSubtitle": "Ọdịdị, ọkwa, iche echiche, na omume ihuenyo",
     "deviceSessionsSubtitle": "Nyochaa ma pụọ na ngwaọrụ ndị ọzọ",
     "feedback": "Nzaghachi",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "CLI a enweghị ike ịdepụta fọlda. Pịa Emechaala iji debe fọlda mmalite. Malite nnọkọ ga-amalite ya n'ebe ahụ.",
       "unsupportedTitle": "Enweghị ike ịdepụta fọlda"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Wụgahụ njem ahụ",
+    "chooseTitle": "Ebee ka ị chọrọ ịgba Kilo?",
+    "chooseBody": "Ụzọ abụọ ahụ na-ejedebe na nnọkọ na-agba. Họrọ ebe ị chọrọ ibido.",
+    "computerOption": "Kọmputa gị nkeonwe",
+    "computerOptionDescription": "Jikọọ na `kilo remote` ma gbaa nnọkọ na igwe gị.",
+    "cloudTitle": "Mepụta nnọkọ igwe ojii gị nke mbụ",
+    "cloudBody": "Onye ọrụ igwe ojii gị na-arụ ọrụ n'igwe ojii Kilo — ọ dịghị ihe a ga-etinye. Họrọ nchekwa, kọwaa ọrụ ahụ, wee pịa Malite nnọkọ, wee laghachi ebe a iji hụ ka ọ na-arụ ọrụ.",
+    "cloudSessionCreated": "Nnọkọ igwe ojii gị nke mbụ na-arụ ọrụ.",
+    "cliTitle": "Jikọta kọmputa gị",
+    "waitingForComputer": "Na-eche ka kọmputa gị jikọta…",
+    "computerConnected": "{{name}} ejikọla",
+    "startOnYourComputer": "Malite nnọkọ na kọmputa gị, wee laghachi ebe a",
+    "cliSessionCreated": "Nnọkọ anya gị nke mbụ na-arụ ọrụ."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Enweghị ike ibudata akaụntụ gị.",

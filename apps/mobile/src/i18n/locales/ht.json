@@ -194,6 +194,8 @@
     "linkedAccounts": "Kont ki lye yo",
     "couldNotLoadAccounts": "Nou pa t ka chaje kont yo.",
     "app": "Aplikasyon",
+    "tutorial": "Titoryèl",
+    "tutorialSubtitle": "Relanse vizit gide a",
     "preferencesSubtitle": "Aparans, notifikasyon, refleksyon ak konpòtman ekran an",
     "deviceSessionsSubtitle": "Egzamine lòt aparèy yo epi dekonekte yo",
     "feedback": "Kòmantè",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "CLI sa a pa ka afiche lis katab yo. Peze Fèt pou kenbe katab lansman an, epi peze Kòmanse sesyon an pou kòmanse ladan l.",
       "unsupportedTitle": "Nou pa ka afiche lis katab yo"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Sote vizit la",
+    "chooseTitle": "Kote ou vle kouri Kilo?",
+    "chooseBody": "De chemen yo fini ak yon sesyon k ap kouri. Chwazi kote ou vle kòmanse.",
+    "computerOption": "Pwòp òdinatè ou",
+    "computerOptionDescription": "Konekte ak `kilo remote` epi kouri sesyon sou machin ou.",
+    "cloudTitle": "Kreye premye sesyon nwaj ou a",
+    "cloudBody": "Ajan nwaj ou a ap kouri nan nwaj Kilo a — anyen pou enstale. Chwazi yon depo, dekri tach la, epi tape Kòmanse sesyon an, epi tounen isit la pou wè l ap kouri.",
+    "cloudSessionCreated": "Premye sesyon nwaj ou a ap kouri.",
+    "cliTitle": "Konekte òdinatè ou a",
+    "waitingForComputer": "N ap tann òdinatè ou a konekte…",
+    "computerConnected": "{{name}} konekte",
+    "startOnYourComputer": "Kòmanse yon sesyon sou òdinatè ou a, epi tounen isit la",
+    "cliSessionCreated": "Premye sesyon remote ou a ap kouri."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Pa t ka chaje kont ou a.",

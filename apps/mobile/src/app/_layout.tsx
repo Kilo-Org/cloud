@@ -64,6 +64,7 @@ import { prefetchCurrentUser } from '@/lib/startup-prefetch';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { FirstRunTourGate } from '@/lib/first-run-tour/gate';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
 import {
@@ -561,6 +562,11 @@ function RootLayoutNav({
   // only after the account's consent decision has loaded without error.
   const bootstrapSettled = token != null && consentChecked && !needsConsent && !consentCheckError;
   useScreenTracking(bootstrapSettled);
+  // The first-run tour auto-opens only on the settled app tree: firing
+  // earlier races the bootstrap `redirect-app`/`redirect-consent` replaces
+  // (lib/bootstrap-decision), which would replace the pushed tour away
+  // before the user sees it.
+  const tourGateEnabled = bootstrapSettled && !inAuthGroup && !inForceUpdate && !onConsentRoute;
 
   useEffect(() => {
     if (shareIntentError) {
@@ -921,6 +927,7 @@ function RootLayoutNav({
     >
       <Slot />
       <PrivacyCoverOverlay segments={segments} />
+      <FirstRunTourGate enabled={tourGateEnabled} />
     </View>
   );
 }

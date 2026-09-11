@@ -194,6 +194,8 @@
     "linkedAccounts": "Account collegati",
     "couldNotLoadAccounts": "Impossibile caricare gli account.",
     "app": "Applicazione",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "Rivedi il tour guidato",
     "preferencesSubtitle": "Aspetto, notifiche, ragionamento e comportamento dello schermo",
     "deviceSessionsSubtitle": "Controlla e disconnetti gli altri dispositivi",
     "feedback": "Invia un feedback",
@@ -2021,6 +2023,21 @@
       "unsupportedDescription": "Questa CLI non può elencare le cartelle. Tocca Fatto per mantenere la cartella di avvio, poi Avvia sessione per avviare la sessione in quella cartella.",
       "unsupportedTitle": "Impossibile elencare le cartelle"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Salta il tour",
+    "chooseTitle": "Dove vuoi eseguire Kilo?",
+    "chooseBody": "Entrambi i percorsi terminano con una sessione in esecuzione. Scegli da dove iniziare.",
+    "computerOption": "Il tuo computer",
+    "computerOptionDescription": "Connettiti con `kilo remote` ed esegui sessioni sulla tua macchina.",
+    "cloudTitle": "Crea la tua prima sessione cloud",
+    "cloudBody": "Il tuo agente cloud viene eseguito nel cloud di Kilo — niente da installare. Scegli un repository, descrivi l'attività e tocca Avvia sessione, poi torna qui per vederla in esecuzione.",
+    "cloudSessionCreated": "La tua prima sessione cloud è in esecuzione.",
+    "cliTitle": "Collega il tuo computer",
+    "waitingForComputer": "In attesa che il tuo computer si connetta…",
+    "computerConnected": "{{name}} è connesso",
+    "startOnYourComputer": "Avvia una sessione sul tuo computer, poi torna qui",
+    "cliSessionCreated": "La tua prima sessione remota è in esecuzione."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Impossibile caricare il tuo account.",

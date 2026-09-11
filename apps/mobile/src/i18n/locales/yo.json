@@ -194,6 +194,8 @@
     "linkedAccounts": "Àwọn àkọọ́lẹ̀ tí a sopọ̀",
     "couldNotLoadAccounts": "A kò lè gbé àwọn àkọọ́lẹ̀ wọlé.",
     "app": "Ohun èlò",
+    "tutorial": "Ẹ̀kọ́",
+    "tutorialSubtitle": "Tun ìrìn tó ní ìtọ́sọ́nà ṣe",
     "preferencesSubtitle": "Ìrísí, ìfitónilétí, ìrònú àti ìhùwàsí iboju",
     "deviceSessionsSubtitle": "Ṣe àyẹ̀wò àwọn ẹ̀rọ mìíràn kí o sì mú wọn jáde",
     "feedback": "Fi èrò ránṣẹ́",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "CLI yìí kò lè ṣe àkójọ àwọn fódà. Tí o bá tẹ Parí, fódà ìbẹ̀rẹ̀ ni a ó lò. Tí o bá tẹ Bẹ̀rẹ̀ ìgbà iṣẹ́, ibẹ̀ ni iṣẹ́ yóò ti bẹ̀rẹ̀.",
       "unsupportedTitle": "Àkójọ àwọn fódà kò ṣeé fihàn"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Fo ìrìn kọ̀",
+    "chooseTitle": "Níbo ni o fẹ́ ṣe Kilo?",
+    "chooseBody": "Àwọn ọ̀nà méjèèjì parí pẹ̀lú ìgbà tí ń ṣiṣẹ́. Yan ibi tí o fẹ́ bẹ̀rẹ̀.",
+    "computerOption": "Kọ̀mpútà tìẹ fúnra rẹ",
+    "computerOptionDescription": "So mọ́ `kilo remote` kí o sì ṣe àwọn ìgbà lórí ẹ̀rọ rẹ.",
+    "cloudTitle": "Ṣẹ̀dá ìgbà iṣẹ́ sango àkọ́kọ́ rẹ",
+    "cloudBody": "Aṣojú sango rẹ ń ṣiṣẹ́ nínú sango Kilo — kò sí ohunkóhun láti fi sórí ẹrọ. Yan ìpamọ́, ṣàpèjúwe iṣẹ́ náà, sì tẹ Bẹ̀rẹ̀ ìgbà iṣẹ́, lẹ́yìn náà padà síbí láti rí i tí ń lọ.",
+    "cloudSessionCreated": "Ìgbà iṣẹ́ sango àkọ́kọ́ rẹ ń lọ.",
+    "cliTitle": "So kọ̀mpútà rẹ pọ̀",
+    "waitingForComputer": "Ń dúró fún ìsopọ̀ kọ̀mpútà rẹ…",
+    "computerConnected": "{{name}} ti so pọ̀",
+    "startOnYourComputer": "Bẹ̀rẹ̀ ìgbà iṣẹ́ lórí kọ̀mpútà rẹ, lẹ́yìn náà padà síbí",
+    "cliSessionCreated": "Ìgbà iṣẹ́ ìjìnnà àkọ́kọ́ rẹ ń lọ."
   },
   "bootstrap": {
     "couldNotLoadAccount": "A kò lè ṣàkójọ àkọọ́lẹ̀ rẹ.",

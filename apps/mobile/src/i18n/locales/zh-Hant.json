@@ -194,6 +194,8 @@
     "linkedAccounts": "已連結的帳戶",
     "couldNotLoadAccounts": "無法載入帳戶。",
     "app": "應用程式",
+    "tutorial": "教學",
+    "tutorialSubtitle": "重新播放導覽",
     "preferencesSubtitle": "外觀、通知、思考內容與螢幕設定",
     "deviceSessionsSubtitle": "檢視並登出其他裝置",
     "feedback": "意見回饋",
@@ -2025,6 +2027,21 @@
       "unsupportedDescription": "此 CLI 無法列出資料夾。點一下「完成」會保留啟動時的資料夾，再點一下「開始工作階段」即可從該資料夾開始。",
       "unsupportedTitle": "無法列出資料夾"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "跳過導覽",
+    "chooseTitle": "你想在哪裡執行 Kilo？",
+    "chooseBody": "兩條路徑都以執行中的工作階段結束。選擇你想從哪裡開始。",
+    "computerOption": "你自己的電腦",
+    "computerOptionDescription": "使用 `kilo remote` 連接，並在你的電腦上執行工作階段。",
+    "cloudTitle": "建立你的第一個雲端工作階段",
+    "cloudBody": "你的雲端代理在 Kilo 的雲端執行——無需安裝任何東西。選擇一個存放庫，描述工作，然後點按開始工作階段，再回到這裡查看它的執行情況。",
+    "cloudSessionCreated": "你的第一個雲端工作階段正在執行。",
+    "cliTitle": "連接你的電腦",
+    "waitingForComputer": "正在等待你的電腦連線…",
+    "computerConnected": "{{name}} 已連線",
+    "startOnYourComputer": "在你的電腦上啟動一個工作階段，然後回到這裡",
+    "cliSessionCreated": "你的第一個遠端工作階段正在執行。"
   },
   "bootstrap": {
     "couldNotLoadAccount": "無法載入你的帳戶。",

@@ -194,6 +194,8 @@
     "linkedAccounts": "Verknüpfte Konten",
     "couldNotLoadAccounts": "Die Konten konnten nicht geladen werden.",
     "app": "App",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "Den geführten Rundgang erneut ansehen",
     "preferencesSubtitle": "Erscheinungsbild, Benachrichtigungen, Denkprozesse und Bildschirmverhalten",
     "deviceSessionsSubtitle": "Andere Geräte prüfen und abmelden",
     "feedback": "Feedback geben",
@@ -2025,6 +2027,21 @@
       "unsupportedTitle": "Ordner können nicht aufgelistet werden",
       "unsupportedDescription": "Diese CLI kann keine Ordner auflisten. Mit „Fertig“ behältst du den Startordner bei. Mit „Sitzung starten“ beginnt die Sitzung in diesem Ordner."
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Rundgang überspringen",
+    "chooseTitle": "Wo möchtest du Kilo ausführen?",
+    "chooseBody": "Beide Wege enden mit einer laufenden Sitzung. Wähle, wo du beginnen möchtest.",
+    "computerOption": "Dein eigener Computer",
+    "computerOptionDescription": "Verbinde dich mit `kilo remote` und führe Sitzungen auf deinem Rechner aus.",
+    "cloudTitle": "Erstelle deine erste Cloud-Sitzung",
+    "cloudBody": "Dein Cloud-Agent läuft in Kilos Cloud — nichts zu installieren. Wähle ein Repository, beschreibe die Aufgabe und tippe auf Sitzung starten, dann komm hierher zurück, um zu sehen, wie sie läuft.",
+    "cloudSessionCreated": "Deine erste Cloud-Sitzung läuft.",
+    "cliTitle": "Verbinde deinen Computer",
+    "waitingForComputer": "Es wird gewartet, bis dein Computer sich verbindet…",
+    "computerConnected": "{{name}} ist verbunden",
+    "startOnYourComputer": "Starte eine Sitzung auf deinem Computer und komm dann hierher zurück",
+    "cliSessionCreated": "Deine erste Remote-Sitzung läuft."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Dein Konto konnte nicht geladen werden.",

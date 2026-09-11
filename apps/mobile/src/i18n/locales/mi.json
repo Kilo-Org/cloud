@@ -194,6 +194,8 @@
     "linkedAccounts": "Ngā pūkete hono",
     "couldNotLoadAccounts": "Kāore i taea te uta i ngā pūkete.",
     "app": "Taupānga",
+    "tutorial": "Akonga",
+    "tutorialSubtitle": "Purei anō i te haerenga ārahina",
     "preferencesSubtitle": "Te āhua, ngā pānui, te whakaaro me te whanonga o te mata",
     "deviceSessionsSubtitle": "Arotakengia ngā wātū o ētahi atu pūrere, ka takiputa ai",
     "feedback": "Urupare",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "Kāore e taea e tēnei CLI te whakarārangi i ngā kōpaki. Ina whakaū koe, ka puritia te kōpaki whakarewa. Ka tīmata te wātū ki reira.",
       "unsupportedTitle": "Kāore e taea te whakarārangi i ngā kōpaki"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Waiho te haerenga",
+    "chooseTitle": "Kei hea koe e hiahia ana ki te whakahaere i a Kilo?",
+    "chooseBody": "Ka mutu ngā ara e rua ki tētahi wāhanga e rere ana. Kōwhiria te wāhi hei tīmatanga.",
+    "computerOption": "Tō ake rorohiko",
+    "computerOptionDescription": "Honoa mā te `kilo remote` ka whakahaere wāhanga ki tō rorohiko.",
+    "cloudTitle": "Waihangaia tō wāhanga kapua tuatahi",
+    "cloudBody": "Kei te whakahaere tō kaihoko kapua i te kapua o Kilo — kāore he mea hei tāuta. Kōwhiria he pūtea rokiroki, whakaahuatia te mahi, ka pāwhiri Tīmataria te wātū, kātahi hoki mai ki konei ki te mātakitaki i a ia e whakahaere ana.",
+    "cloudSessionCreated": "E whakahaere ana tō wāhanga kapua tuatahi.",
+    "cliTitle": "Honoa tō rorohiko",
+    "waitingForComputer": "E tatari ana kia hono tō rorohiko…",
+    "computerConnected": "Kua hono te {{name}}",
+    "startOnYourComputer": "Tīmatahia he wāhanga ki tō rorohiko, kātahi hoki mai ki konei",
+    "cliSessionCreated": "E whakahaere ana tō wāhanga mamao tuatahi."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Kāore i taea te uta i tō pūkete.",

@@ -194,6 +194,8 @@
     "linkedAccounts": "Bog'langan hisoblar",
     "couldNotLoadAccounts": "Hisoblarni yuklab bo'lmadi.",
     "app": "Ilova",
+    "tutorial": "Qo'llanma",
+    "tutorialSubtitle": "Yo'l-yo'riq turini qayta o'ynash",
     "preferencesSubtitle": "Ko'rinish, bildirishnomalar, fikrlash va ekran sozlamalari",
     "deviceSessionsSubtitle": "Boshqa qurilmalarni ko'rish va ulardagi sessiyalarni tugatish",
     "feedback": "Fikr-mulohaza",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "Bu CLI jildlar ro'yxatini ko'rsata olmaydi. Tayyor tugmasi boshlang'ich jildni saqlaydi. Sessiyani boshlash tugmasi sessiyani shu jildda boshlaydi.",
       "unsupportedTitle": "Jildlar ro'yxatini ko'rsatib bo'lmaydi"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Sayohatni o'tkazib yuborish",
+    "chooseTitle": "Kiloni qayerda ishga tushirmoqchisiz?",
+    "chooseBody": "Ikkala yo'l ham ishlab turgan sessiya bilan tugaydi. Qayerdan boshlashni tanlang.",
+    "computerOption": "O'zingizning kompyuteringiz",
+    "computerOptionDescription": "`kilo remote` bilan ulanib, sessiyalarni kompyuteringizda ishga tushiring.",
+    "cloudTitle": "Birinchi bulutli sessiyangizni yarating",
+    "cloudBody": "Bulutli agentingiz Kilo bulutida ishlaydi — o'rnatish uchun hech narsa yo'q. Repozitoriyni tanlang, vazifani tavsiflang va Sessiyani boshlash tugmasini bosing, so'ng uning ishlayotganini ko'rish uchun shu yerga qayting.",
+    "cloudSessionCreated": "Birinchi bulutli sessiyangiz ishga tushdi.",
+    "cliTitle": "Kompyuteringizni ulang",
+    "waitingForComputer": "Kompyuteringiz ulanishi kutilmoqda…",
+    "computerConnected": "{{name}} ulandi",
+    "startOnYourComputer": "Kompyuteringizda sessiyani ishga tushiring, so'ng shu yerga qayting",
+    "cliSessionCreated": "Birinchi masofaviy sessiyangiz ishga tushdi."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Hisobingizni yuklab bo'lmadi.",

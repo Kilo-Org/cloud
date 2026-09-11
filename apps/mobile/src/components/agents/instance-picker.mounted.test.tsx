@@ -39,6 +39,8 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  // InlineCodeText renders its marked code runs as bare react-native Text.
+  Text: 'Text',
   View: 'View',
 }));
 vi.mock('expo-router', () => ({

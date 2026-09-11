@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as composer-paste-button.mounted.test.tsx) */
+/* eslint-disable max-lines -- one cohesive ScreenHeader suite: every layout variant (back, RTL, centered heading, trailing action) mounts through the same harness. */
 import { type ComponentProps, createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -63,6 +64,20 @@ function findTitlePressable(root: TestInstance): TestInstance {
       node.props.accessibilityLabel !== 'Go back' &&
       node.props.accessibilityLabel !== 'Close'
   );
+}
+
+function findHeaderRightView(root: TestInstance): TestInstance {
+  const view = root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      node.props.className.includes('max-w-[50%]')
+  )[0];
+  if (!view) {
+    throw new Error('headerRight view not found');
+  }
+  return view;
 }
 
 function findIcon(back: TestInstance, type: string): TestInstance {
@@ -337,5 +352,40 @@ describe('ScreenHeader mounted', () => {
         expect(title.parent?.parent?.parent).toBe(back.parent?.parent?.parent);
       }
     }
+  });
+
+  it('shares the centered heading row with the trailing action when no back control exists', () => {
+    const renderer = renderHeader({
+      title: 'Welcome to Kilo',
+      modal: true,
+      showBackButton: false,
+      headerRight: 'RIGHT',
+    });
+
+    // The action must sit on the heading's own bar, not strand a lone row
+    // below the centered title (the spot-check defect on the tour welcome).
+    const headerRight = findHeaderRightView(renderer.root);
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(headerRight.parent).toBe(title.parent?.parent);
+    expect(headerRight.parent?.props.className).toContain('min-h-11');
+    expect(backPressableCount(renderer.root)).toBe(0);
+  });
+
+  it('keeps the trailing action on the controls row beside the back control', () => {
+    const renderer = renderHeader({
+      title: 'Create your first cloud session',
+      eyebrow: '1 OF 2',
+      modal: true,
+      showBackButton: true,
+      headerRight: 'RIGHT',
+    });
+
+    const back = findBackPressable(renderer.root);
+    const headerRight = findHeaderRightView(renderer.root);
+    // The action stays on the controls bar (the row holding Back), never on
+    // the heading's own row, when a back control exists to share it.
+    expect(headerRight.parent).toBe(back.parent?.parent);
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.parent).not.toBe(back.parent?.parent);
   });
 });

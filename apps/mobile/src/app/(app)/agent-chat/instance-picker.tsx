@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Button } from '@/components/ui/button';
 import { radioItemA11y } from '@/components/ui/radio-group';
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { formatList } from '@/lib/format';
@@ -314,7 +315,12 @@ export default function InstancePickerScreen() {
               icon={Server}
               placement="top"
               title={t('agentChat.instancePicker.noCliInstances')}
-              description={t('agentChat.instancePicker.noCliInstancesDescription')}
+              description={
+                // Same `kilo remote` inline-code copy as the tour's CLI step.
+                <InlineCodeText variant="muted" className="text-center">
+                  {t('agentChat.instancePicker.noCliInstancesDescription')}
+                </InlineCodeText>
+              }
               action={
                 <Button
                   variant="outline"

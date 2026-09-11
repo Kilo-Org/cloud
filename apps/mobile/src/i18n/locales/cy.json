@@ -194,6 +194,8 @@
     "linkedAccounts": "Cyfrifon cysylltiedig",
     "couldNotLoadAccounts": "Methu llwytho'r cyfrifon.",
     "app": "Ap",
+    "tutorial": "Tiwtorial",
+    "tutorialSubtitle": "Ailchwarae'r daith dywysedig",
     "preferencesSubtitle": "Ymddangosiad, hysbysiadau, meddwl ac ymddygiad y sgrin",
     "deviceSessionsSubtitle": "Adolygu dyfeisiau eraill a'u hallgofnodi",
     "feedback": "Adborth",
@@ -2540,6 +2542,21 @@
       "unsupportedDescription": "Ni all y CLI hwn restru ffolderi. Mae Wedi'i wneud yn cadw'r ffolder cychwyn. Mae Dechrau sesiwn yn dechrau'r sesiwn yno.",
       "unsupportedTitle": "Ni ellir rhestru ffolderi"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Hepgor y daith",
+    "chooseTitle": "Ble hoffech chi redeg Kilo?",
+    "chooseBody": "Mae'r ddau lwybr yn gorffen gyda sesiwn yn rhedeg. Dewiswch ble i ddechrau.",
+    "computerOption": "Eich cyfrifiadur eich hun",
+    "computerOptionDescription": "Cysylltwch gyda `kilo remote` a rhedwch sesiynau ar eich peiriant.",
+    "cloudTitle": "Creu eich sesiwn cwmwl gyntaf",
+    "cloudBody": "Mae eich asiant cwmwl yn rhedeg yng nghwmwl Kilo — dim byd i'w osod. Dewiswch storfa, disgrifiwch y dasg, a thapio Dechrau sesiwn, yna dychwelwch yma i'w weld yn rhedeg.",
+    "cloudSessionCreated": "Mae eich sesiwn cwmwl gyntaf yn rhedeg.",
+    "cliTitle": "Cysylltu eich cyfrifiadur",
+    "waitingForComputer": "Yn aros i'ch cyfrifiadur gysylltu…",
+    "computerConnected": "Mae {{name}} wedi cysylltu",
+    "startOnYourComputer": "Dechreuwch sesiwn ar eich cyfrifiadur, yna dychwelwch yma",
+    "cliSessionCreated": "Mae eich sesiwn hudolol gyntaf yn rhedeg."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Ni lwyddwyd i lwytho'ch cyfrif.",

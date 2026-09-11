@@ -194,6 +194,8 @@
     "linkedAccounts": "Asusun da aka haɗa",
     "couldNotLoadAccounts": "An kasa loda asusu.",
     "app": "Manhaja",
+    "tutorial": "Koyarwa",
+    "tutorialSubtitle": "Sake kunna zagayen jagora",
     "preferencesSubtitle": "Kamanni, sanarwa, tunani, da yadda allo ke aiki",
     "deviceSessionsSubtitle": "Duba sauran na'urori ka fitar da su",
     "feedback": "Ra'ayi",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "Wannan CLI ba zai iya jera jakuna ba. Danna An gama don riƙe jakar da aka fara daga gare ta. Danna Fara zama don farawa a can.",
       "unsupportedTitle": "Ba za a iya jera jakuna ba"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Tsallake zagayen",
+    "chooseTitle": "A ina kake son gudanar da Kilo?",
+    "chooseBody": "Duk hanyoyin biyu suna ƙarewa da aiki mai gudana. Zaɓi inda kake son farawa.",
+    "computerOption": "Kwamfutarka ka",
+    "computerOptionDescription": "Haɗa da `kilo remote` sannan ka gudanar da ayyuka a kan injinka.",
+    "cloudTitle": "Kirgi farkon aikin gajimare naka",
+    "cloudBody": "Wakilin gajimare ɗinka yana aiki a gajimaren Kilo — babu abin da za a saka. Zaɓi adana bayanai, bayyana aiki, sannan ka danna Fara zama, sannan ka koma nan don ganin yana gudana.",
+    "cloudSessionCreated": "Farkon aikin gajimare ɗinka yana gudana.",
+    "cliTitle": "Haɗa kwamfutarka",
+    "waitingForComputer": "Ana jiran kwamfutarka ya haɗu…",
+    "computerConnected": "An haɗa {{name}}",
+    "startOnYourComputer": "Fara aiki a kan kwamfutarka, sannan ka koma nan",
+    "cliSessionCreated": "Farkon aikin nesa ɗinka yana gudana."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Ba a iya loda asusunka ba.",

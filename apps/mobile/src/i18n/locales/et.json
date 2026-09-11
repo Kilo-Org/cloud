@@ -194,6 +194,8 @@
     "linkedAccounts": "Seotud kontod",
     "couldNotLoadAccounts": "Kontosid ei õnnestunud laadida.",
     "app": "Rakendus",
+    "tutorial": "Õpetus",
+    "tutorialSubtitle": "Esita juhendatud tutvustus uuesti",
     "preferencesSubtitle": "Välimus, teavitused, mõttekäigud ja ekraani käitumine",
     "deviceSessionsSubtitle": "Vaata teised seadmed üle ja logi neist välja",
     "feedback": "Anna tagasisidet",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "See CLI ei saa kaustu loetleda. Nupp „Valmis“ jätab valituks käivituskausta ja nupp „Alusta seanssi“ käivitab seansi selles kaustas.",
       "unsupportedTitle": "Kaustu ei saa loetleda"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Jäta tutvustus vahele",
+    "chooseTitle": "Kus soovid Kilot käivitada?",
+    "chooseBody": "Mõlemad teed lõpevad töötava seansiga. Vali, kust soovid alustada.",
+    "computerOption": "Sinu oma arvuti",
+    "computerOptionDescription": "Ühenda `kilo remote` abil ja käivita seansse oma arvutis.",
+    "cloudTitle": "Loo oma esimene pilveseanss",
+    "cloudBody": "Sinu pilveagent töötab Kilo pilves — midagi ei pea installima. Vali hoidla, kirjelda ülesanne ja puuduta Alusta seanssi, seejärel tule tagasi siia, et näha, kuidas see töötab.",
+    "cloudSessionCreated": "Sinu esimene pilveseanss on käivitatud.",
+    "cliTitle": "Ühenda oma arvuti",
+    "waitingForComputer": "Ootame sinu arvuti ühendumist…",
+    "computerConnected": "{{name}} on ühendatud",
+    "startOnYourComputer": "Käivita seanss oma arvutis ja tule seejärel siia tagasi",
+    "cliSessionCreated": "Sinu esimene kaugseanss on käivitatud."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Sinu kontot ei õnnestunud laadida.",

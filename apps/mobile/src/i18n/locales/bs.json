@@ -194,6 +194,8 @@
     "linkedAccounts": "Povezani nalozi",
     "couldNotLoadAccounts": "Nije moguće učitati naloge.",
     "app": "Aplikacija",
+    "tutorial": "Tutorijal",
+    "tutorialSubtitle": "Ponovo pokreni vođenu turu",
     "preferencesSubtitle": "Izgled, obavijesti, razmišljanje i ponašanje ekrana",
     "deviceSessionsSubtitle": "Pregledaj i odjavi druge uređaje",
     "feedback": "Povratne informacije",
@@ -2477,6 +2479,21 @@
       "unsupportedTitle": "Ne mogu se prikazati mape",
       "unsupportedDescription": "Ovaj CLI ne može prikazati mape. Dodirom na „Gotovo“ zadržavaš početnu mapu, a dodirom na „Započni sesiju“ pokrećeš sesiju u njoj."
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Preskoči turu",
+    "chooseTitle": "Gdje želite pokrenuti Kilo?",
+    "chooseBody": "Oba puta završavaju sesijom koja radi. Odaberite gdje želite početi.",
+    "computerOption": "Vaše vlastito računalo",
+    "computerOptionDescription": "Povežite se pomoću `kilo remote` i pokrećite sesije na svom računalu.",
+    "cloudTitle": "Napravite svoju prvu cloud sesiju",
+    "cloudBody": "Vaš cloud agent radi u Kilo cloudu — nema ničega za instalirati. Odaberite repozitorij, opišite zadatak i dodirnite Započni sesiju, zatim se vratite ovdje da vidite kako radi.",
+    "cloudSessionCreated": "Vaša prva cloud sesija je pokrenuta.",
+    "cliTitle": "Povežite svoje računalo",
+    "waitingForComputer": "Čekamo povezivanje vašeg računala…",
+    "computerConnected": "{{name}} je povezan",
+    "startOnYourComputer": "Pokrenite sesiju na svom računalu, zatim se vratite ovdje",
+    "cliSessionCreated": "Vaša prva udaljena sesija je pokrenuta."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Učitavanje tvog računa nije uspjelo.",

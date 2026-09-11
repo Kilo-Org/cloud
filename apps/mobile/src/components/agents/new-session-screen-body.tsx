@@ -81,7 +81,18 @@ function AndroidPendingPickerRecovery({
   return null;
 }
 
-export function NewSessionScreenBody() {
+type NewSessionScreenBodyProps = {
+  /**
+   * `connectionId` of the instance to pre-select as the run-on target. The
+   * first-run tour's CLI leg carries the connected computer's id so the form
+   * creates a `kilo remote` session there instead of defaulting to a Cloud
+   * Agent run. Absent, or unmatched in the settled instance list, leaves the
+   * Cloud Agent default.
+   */
+  initialConnectionId?: string;
+};
+
+export function NewSessionScreenBody({ initialConnectionId }: Readonly<NewSessionScreenBodyProps>) {
   const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
   const { t } = useTranslation();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -261,6 +272,26 @@ export function NewSessionScreenBody() {
     [instancesData]
   );
 
+  // Pre-select the run-on target from the route's `connectionId` (the tour's
+  // CLI leg promises a session on the connected computer, so the form must
+  // not open on the Cloud Agent default). Applied once, as soon as the
+  // instance list carries a match: a later refetch must never re-select over
+  // an explicit user choice, and a stale id (the instance disconnected in
+  // the meantime) leaves the Cloud Agent default standing.
+  const initialRunOnAppliedRef = useRef(false);
+  const runOnTouchedRef = useRef(false);
+  useEffect(() => {
+    if (initialRunOnAppliedRef.current || runOnTouchedRef.current || !initialConnectionId) {
+      return;
+    }
+    const match = instanceList.find(instance => instance.connectionId === initialConnectionId);
+    if (match === undefined) {
+      return;
+    }
+    initialRunOnAppliedRef.current = true;
+    setRunOnInstance(match);
+  }, [initialConnectionId, instanceList]);
+
   // A successful session creation owns clearing the new-session draft; a
   // failure must preserve it for the retry. The success path navigates via
   // `replace`, so arm the discard-confirm bypass here — `onCreated` runs
@@ -410,6 +441,8 @@ export function NewSessionScreenBody() {
 
   const handleRunOnChange = useCallback(
     (next: InstancePickerInstance | null) => {
+      // Any explicit choice ends the route-param pre-selection window.
+      runOnTouchedRef.current = true;
       setRemoteOverride(null);
       setCloneImportFailureKey(null);
       handleRunOnInstanceChange(next);

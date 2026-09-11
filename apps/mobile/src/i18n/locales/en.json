@@ -194,6 +194,10 @@
     "linkedAccounts": "Linked accounts",
     "couldNotLoadAccounts": "Could not load accounts",
     "app": "App",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "Replay the guided tour",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "Replay the guided tour",
     "preferencesSubtitle": "Appearance, notifications, thinking, and screen behavior",
     "deviceSessionsSubtitle": "Review and sign out other devices",
     "feedback": "Feedback",
@@ -2464,6 +2468,21 @@
       "updating": "Updating, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Skip tour",
+    "chooseTitle": "Where would you like to run Kilo?",
+    "chooseBody": "Both paths end with a session running. Pick where you want to start.",
+    "computerOption": "Your own computer",
+    "computerOptionDescription": "Connect with `kilo remote` and run sessions on your machine.",
+    "cloudTitle": "Create your first cloud session",
+    "cloudBody": "Your cloud agent runs in Kilo's cloud — nothing to install. Pick a repository, describe the task, and tap Start session, then come back here to see it running.",
+    "cloudSessionCreated": "Your first cloud session is running.",
+    "cliTitle": "Connect your computer",
+    "waitingForComputer": "Waiting for your computer to connect…",
+    "computerConnected": "{{name}} is connected",
+    "startOnYourComputer": "Start a session on your computer, then come back here",
+    "cliSessionCreated": "Your first remote session is running."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Could not load your account",

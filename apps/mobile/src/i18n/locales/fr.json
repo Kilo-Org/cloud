@@ -194,6 +194,8 @@
     "linkedAccounts": "Comptes liés",
     "couldNotLoadAccounts": "Impossible de charger les comptes.",
     "app": "Application",
+    "tutorial": "Tutoriel",
+    "tutorialSubtitle": "Revoir la visite guidée",
     "preferencesSubtitle": "Apparence, notifications, réflexion et comportement de l'écran",
     "deviceSessionsSubtitle": "Consulter et déconnecter les autres appareils",
     "feedback": "Donner un avis",
@@ -1957,6 +1959,21 @@
       "unsupportedDescription": "Cette CLI ne permet pas d'afficher les dossiers. Touchez Terminé pour conserver le dossier de lancement, puis Démarrer la session pour démarrer dans ce dossier.",
       "unsupportedTitle": "Impossible d'afficher les dossiers"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Passer la visite",
+    "chooseTitle": "Où souhaitez-vous exécuter Kilo ?",
+    "chooseBody": "Les deux parcours se terminent par une session en cours. Choisissez où commencer.",
+    "computerOption": "Votre propre ordinateur",
+    "computerOptionDescription": "Connectez-vous avec `kilo remote` et exécutez des sessions sur votre machine.",
+    "cloudTitle": "Créez votre première session cloud",
+    "cloudBody": "Votre agent cloud s'exécute dans le cloud de Kilo — rien à installer. Choisissez un dépôt, décrivez la tâche et touchez Démarrer la session, puis revenez ici pour la voir en cours d'exécution.",
+    "cloudSessionCreated": "Votre première session cloud est en cours d'exécution.",
+    "cliTitle": "Connectez votre ordinateur",
+    "waitingForComputer": "En attente de la connexion de votre ordinateur…",
+    "computerConnected": "{{name}} est connecté",
+    "startOnYourComputer": "Démarrez une session sur votre ordinateur, puis revenez ici",
+    "cliSessionCreated": "Votre première session à distance est en cours d'exécution."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Impossible de charger votre compte.",

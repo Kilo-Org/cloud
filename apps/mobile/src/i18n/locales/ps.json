@@ -194,6 +194,8 @@
     "linkedAccounts": "نښلول شوي حسابونه",
     "couldNotLoadAccounts": "حسابونه بار نه شول.",
     "app": "اپلیکیشن",
+    "tutorial": "ښوونې",
+    "tutorialSubtitle": "لارښود سفر بیا پلی کړه",
     "preferencesSubtitle": "بڼه، خبرتیاوې، فکر او د سکرین چلند",
     "deviceSessionsSubtitle": "نورې وسیلې وګورئ او حساب ترې وباسئ",
     "feedback": "نظر ورکړئ",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "دا CLI د فولډرونو لېست نه شي ښودلی. د «بشپړ شو» تڼۍ د پیل فولډر ساتي او د «ناسته پیل کړئ» تڼۍ ناسته هلته پیلوي.",
       "unsupportedTitle": "د فولډرونو لېست نه شي ښودل کېدای"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "ګشت پرېږدئ",
+    "chooseTitle": "غواړئ Kilo چېرته وچلوئ؟",
+    "chooseBody": "دواړه لارې د روانې ناستې سره پای ته رسېږي. وټاکه چې له کومه ځایه پیل کوې.",
+    "computerOption": "خپل کمپیوټر",
+    "computerOptionDescription": "د `kilo remote` سره وصل شو او ناستې په خپل ماشین کې وچلوئ.",
+    "cloudTitle": "خپله لومړۍ ورېځمکې ناسته جوړه کړئ",
+    "cloudBody": "ستاسو د ورېځمکې استازی د Kilo په ورېځمکه کې چلیږي — د نصبولو هیڅ شی نشته. یو ګودر وټاکئ، دنده تشریح کړئ، او ناسته پیل کړئ ټک کړئ، بیا دلته راستنېږئ ترڅو دا چلیږي وګورئ.",
+    "cloudSessionCreated": "ستاسو لومړۍ ورېځمکې ناسته روانه ده.",
+    "cliTitle": "خپل کمپیوټر ونښلول",
+    "waitingForComputer": "د ستاسو د کمپیوټر د نښلېدو په تمه کې یو…",
+    "computerConnected": "{{name}} ونښلول شو",
+    "startOnYourComputer": "په خپل کمپیوټر کې ناسته پیل کړئ، بیا دلته راستنېږئ",
+    "cliSessionCreated": "ستاسو لومړۍ لرې ناسته روانه ده."
   },
   "bootstrap": {
     "couldNotLoadAccount": "ستاسو حساب بار نه شو.",

@@ -194,6 +194,8 @@
     "linkedAccounts": "Comptes vinculats",
     "couldNotLoadAccounts": "No s'han pogut carregar els comptes.",
     "app": "Aplicació",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "Torna a reproduir la visita guiada",
     "preferencesSubtitle": "Aparença, notificacions, raonament i comportament de la pantalla",
     "deviceSessionsSubtitle": "Revisa les sessions d'altres dispositius i tanca-les",
     "feedback": "Envia comentaris",
@@ -2477,6 +2479,21 @@
       "unsupportedDescription": "Aquest CLI no pot llistar carpetes. Si confirmes la selecció, es mantindrà la carpeta d'inici i la sessió s'hi iniciarà.",
       "unsupportedTitle": "No es poden llistar les carpetes"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Omet la visita",
+    "chooseTitle": "On vols executar Kilo?",
+    "chooseBody": "Els dos camins acaben amb una sessió en marxa. Tria on vols començar.",
+    "computerOption": "El teu propi ordinador",
+    "computerOptionDescription": "Connecta amb `kilo remote` i executa sessions al teu ordinador.",
+    "cloudTitle": "Crea la teva primera sessió al núvol",
+    "cloudBody": "El teu agent al núvol s'executa al núvol de Kilo — no cal instal·lar res. Tria un repositori, descriu la tasca i toca Inicia la sessió, després torna aquí per veure-la en funcionament.",
+    "cloudSessionCreated": "La teva primera sessió al núvol s'està executant.",
+    "cliTitle": "Connecta el teu ordinador",
+    "waitingForComputer": "S'espera que l'ordinador es connecti…",
+    "computerConnected": "{{name}} s'ha connectat",
+    "startOnYourComputer": "Inicia una sessió al teu ordinador i després torna aquí",
+    "cliSessionCreated": "La teva primera sessió remota s'està executant."
   },
   "bootstrap": {
     "couldNotLoadAccount": "No s'ha pogut carregar el teu compte.",

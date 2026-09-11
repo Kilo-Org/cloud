@@ -194,6 +194,8 @@
     "linkedAccounts": "Tilkoblede kontoer",
     "couldNotLoadAccounts": "Kunne ikke laste inn kontoene.",
     "app": "Appen",
+    "tutorial": "Veiledning",
+    "tutorialSubtitle": "Spill av den guidede omvisningen på nytt",
     "preferencesSubtitle": "Utseende, varsler, resonnering og skjerminnstillinger",
     "deviceSessionsSubtitle": "Se gjennom og logg ut andre enheter",
     "feedback": "Tilbakemelding",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "Denne CLI-en kan ikke vise mapper. Trykk på Ferdig for å beholde oppstartsmappen. Trykk deretter på Start økt for å starte der.",
       "unsupportedTitle": "Kan ikke vise mapper"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Hopp over omvisningen",
+    "chooseTitle": "Hvor vil du kjøre Kilo?",
+    "chooseBody": "Begge veier ender med en aktiv økt. Velg hvor du vil begynne.",
+    "computerOption": "Din egen datamaskin",
+    "computerOptionDescription": "Koble til med `kilo remote` og kjør økter på maskinen din.",
+    "cloudTitle": "Opprett din første skyøkt",
+    "cloudBody": "Skyagenten din kjører i Kilos sky — ingenting å installere. Velg et repository, beskriv oppgaven og trykk Start økt, og kom så tilbake hit for å se den kjøre.",
+    "cloudSessionCreated": "Den første skyøkten din kjører.",
+    "cliTitle": "Koble til datamaskinen din",
+    "waitingForComputer": "Venter på at datamaskinen skal koble til…",
+    "computerConnected": "{{name}} er tilkoblet",
+    "startOnYourComputer": "Start en økt på datamaskinen din, og kom tilbake hit",
+    "cliSessionCreated": "Den første eksterne økten din kjører."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Kunne ikke laste inn kontoen din.",

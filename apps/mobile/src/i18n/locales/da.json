@@ -194,6 +194,8 @@
     "linkedAccounts": "Tilknyttede konti",
     "couldNotLoadAccounts": "Kunne ikke indlæse kontiene.",
     "app": "Appen",
+    "tutorial": "Vejledning",
+    "tutorialSubtitle": "Afspil rundvisningen igen",
     "preferencesSubtitle": "Udseende, notifikationer, ræsonnementer og skærmindstillinger",
     "deviceSessionsSubtitle": "Se andre enheder og log dem ud",
     "feedback": "Giv feedback",
@@ -2456,6 +2458,21 @@
       "unsupportedTitle": "Kan ikke vise mapper",
       "unsupportedDescription": "Denne CLI kan ikke vise mapper. Tryk på Færdig for at beholde startmappen. Sessionen starter i denne mappe, når du trykker på Start en session."
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Spring rundvisningen over",
+    "chooseTitle": "Hvor vil du køre Kilo?",
+    "chooseBody": "Begge veje slutter med en kørende session. Vælg, hvor du vil begynde.",
+    "computerOption": "Din egen computer",
+    "computerOptionDescription": "Opret forbindelse med `kilo remote`, og kør sessioner på din maskine.",
+    "cloudTitle": "Opret din første cloud-session",
+    "cloudBody": "Din cloud-agent kører i Kilos cloud — intet at installere. Vælg et repository, beskriv opgaven, og tryk på Start en session, og kom så tilbage her for at se den køre.",
+    "cloudSessionCreated": "Din første cloud-session kører.",
+    "cliTitle": "Tilslut din computer",
+    "waitingForComputer": "Venter på, at din computer tilslutter…",
+    "computerConnected": "{{name}} er tilsluttet",
+    "startOnYourComputer": "Start en session på din computer, og kom så tilbage her",
+    "cliSessionCreated": "Din første fjernsession kører."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Din konto kunne ikke indlæses.",

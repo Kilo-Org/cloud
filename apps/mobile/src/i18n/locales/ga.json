@@ -194,6 +194,8 @@
     "linkedAccounts": "Cuntais nasctha",
     "couldNotLoadAccounts": "Níorbh fhéidir na cuntais a lódáil.",
     "app": "Aip",
+    "tutorial": "Teagaisc",
+    "tutorialSubtitle": "Athsheinn an turas treoraithe",
     "preferencesSubtitle": "Dealramh, fógraí, machnamh agus iompar an scáileáin",
     "deviceSessionsSubtitle": "Féach ar ghléasanna eile agus sínigh amach astu",
     "feedback": "Aiseolas",
@@ -2519,6 +2521,21 @@
       "unsupportedTitle": "Ní féidir fillteáin a liostú",
       "unsupportedDescription": "Ní féidir leis an CLI seo fillteáin a liostú. Coinníonn Déanta an fillteán tosaigh. Tosaíonn an seisiún san fhillteán sin nuair a thapálann tú Tosaigh seisiún."
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Scipeáil an turas",
+    "chooseTitle": "Cá bhfuil tú ag iarraidh Kilo a rith?",
+    "chooseBody": "Críochnaíonn an dá chonair le seisiún ag rith. Roghnaigh cá háit a dtosóidh tú.",
+    "computerOption": "Do ríomhaire féin",
+    "computerOptionDescription": "Ceangail le `kilo remote` agus rith seisiúin ar do ríomhaire.",
+    "cloudTitle": "Cruthaigh do chéad seisiún scamail",
+    "cloudBody": "Rithann do aighne scamail i scamall Kilo — ní le haon rud a shuiteáil. Roghnaigh stóras, déan cur síos ar an tasc, agus brúigh Tosaigh seisiún, ansin tag ar ais anseo chun é a fheiceáil ag rith.",
+    "cloudSessionCreated": "Tá do chéad seisiún scamail ar siúl.",
+    "cliTitle": "Ceangail do ríomhaire",
+    "waitingForComputer": "Ag fanacht le do ríomhaire a cheangal…",
+    "computerConnected": "Tá {{name}} ceangailte",
+    "startOnYourComputer": "Tosaigh seisiún ar do ríomhaire, ansin tag ar ais anseo",
+    "cliSessionCreated": "Tá do chéad seisiún cianda ar siúl."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Níorbh fhéidir do chuntas a lódáil.",

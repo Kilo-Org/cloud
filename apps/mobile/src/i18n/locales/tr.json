@@ -194,6 +194,8 @@
     "linkedAccounts": "Bağlı hesaplar",
     "couldNotLoadAccounts": "Hesaplar yüklenemedi.",
     "app": "Uygulama",
+    "tutorial": "Eğitim",
+    "tutorialSubtitle": "Rehberli turu yeniden oynat",
     "preferencesSubtitle": "Görünüm, bildirimler, düşünme ve ekran davranışı",
     "deviceSessionsSubtitle": "Diğer cihazları incele ve oturumlarını kapat",
     "feedback": "Geri bildirim",
@@ -2025,6 +2027,21 @@
       "unsupportedDescription": "Bu CLI klasörleri listeleyemiyor. “Bitti” düğmesi başlangıç klasörünü korur. “Oturumu başlat” düğmesi oturumu bu klasörde başlatır.",
       "unsupportedTitle": "Klasörler listelenemiyor"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Geziyi atla",
+    "chooseTitle": "Kilo'yu nerede çalıştırmak istersiniz?",
+    "chooseBody": "Her iki yol da çalışan bir oturumla biter. Nereden başlamak istediğinizi seçin.",
+    "computerOption": "Kendi bilgisayarınız",
+    "computerOptionDescription": "`kilo remote` ile bağlanın ve oturumları kendi makinenizde çalıştırın.",
+    "cloudTitle": "İlk bulut oturumunuzu oluşturun",
+    "cloudBody": "Bulut ajanınız Kilo'nun bulutunda çalışır — yüklenecek bir şey yok. Bir depo seçin, görevi açıklayın ve Oturumu başlat düğmesine dokunun, ardından çalıştığını görmek için buraya dönün.",
+    "cloudSessionCreated": "İlk bulut oturumunuz çalışıyor.",
+    "cliTitle": "Bilgisayarınızı bağlayın",
+    "waitingForComputer": "Bilgisayarınızın bağlanması bekleniyor…",
+    "computerConnected": "{{name}} bağlandı",
+    "startOnYourComputer": "Bilgisayarınızda bir oturum başlatın, ardından buraya dönün",
+    "cliSessionCreated": "İlk uzak oturumunuz çalışıyor."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Hesabın yüklenemedi.",

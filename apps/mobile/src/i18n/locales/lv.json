@@ -194,6 +194,8 @@
     "linkedAccounts": "Saistītie konti",
     "couldNotLoadAccounts": "Neizdevās ielādēt kontus.",
     "app": "Lietotne",
+    "tutorial": "Pamācība",
+    "tutorialSubtitle": "Atkārtoti vadīto apskatu",
     "preferencesSubtitle": "Izskats, paziņojumi, domāšana un ekrāna darbība",
     "deviceSessionsSubtitle": "Skatīt citas ierīces un izrakstīties no tām",
     "feedback": "Atsauksmes",
@@ -2477,6 +2479,21 @@
       "unsupportedDescription": "Šis CLI nevar parādīt mapju sarakstu. Poga „Gatavs” saglabā sākotnējo mapi, un poga „Sākt sesiju” sāk sesiju šajā mapē.",
       "unsupportedTitle": "Mapju saraksts nav pieejams"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Izlaist apskatu",
+    "chooseTitle": "Kur vēlaties palaist Kilo?",
+    "chooseBody": "Abi ceļi beidzas ar aktīvu sesiju. Izvēlieties, no kurienes sākt.",
+    "computerOption": "Jūsu pašu dators",
+    "computerOptionDescription": "Pievienojieties ar `kilo remote` un palaidiet sesijas savā datorā.",
+    "cloudTitle": "Izveidojiet savu pirmo mākoņa sesiju",
+    "cloudBody": "Jūsu mākoņa aģents darbojas Kilo mākonī — nav kas jāinstalē. Izvēlieties repozitoriju, aprakstiet uzdevumu un pieskarieties Sākt sesiju, pēc tam atgriezieties šeit, lai redzētu, kā tā darbojas.",
+    "cloudSessionCreated": "Jūsu pirmā mākoņa sesija darbojas.",
+    "cliTitle": "Pievienojiet savu datoru",
+    "waitingForComputer": "Gaida jūsu datora savienojumu…",
+    "computerConnected": "{{name}} ir pievienots",
+    "startOnYourComputer": "Sāciet sesiju savā datorā, pēc tam atgriezieties šeit",
+    "cliSessionCreated": "Jūsu pirmā attālinātā sesija darbojas."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Neizdevās ielādēt tavu kontu.",

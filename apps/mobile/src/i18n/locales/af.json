@@ -194,6 +194,8 @@
     "linkedAccounts": "Gekoppelde rekeninge",
     "couldNotLoadAccounts": "Die rekeninge kon nie gelaai word nie.",
     "app": "Toep",
+    "tutorial": "Tutoriaal",
+    "tutorialSubtitle": "Speel die begeleide toer weer",
     "preferencesSubtitle": "Voorkoms, kennisgewings, denke en skermgedrag",
     "deviceSessionsSubtitle": "Bekyk ander toestelle en teken hulle uit",
     "feedback": "Terugvoer",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "Hierdie CLI kan nie mappe lys nie. Tik op Klaar om die beginmap te behou. Die sessie sal in daardie map begin.",
       "unsupportedTitle": "Kan nie mappe lys nie"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Sla toer oor",
+    "chooseTitle": "Waar wil jy Kilo laat loop?",
+    "chooseBody": "Albei paaie eindig met 'n sessie wat loop. Kies waar jy wil begin.",
+    "computerOption": "Jou eie rekenaar",
+    "computerOptionDescription": "Koppel met `kilo remote` en laat sessies op jou masjien loop.",
+    "cloudTitle": "Skep jou eerste wolksessie",
+    "cloudBody": "Jou wolkagent hardloop in Kilo se wolk — niks om te installeer nie. Kies 'n repo, beskryf die taak, en tik Begin sessie, en kom dan hierheen terug om te sien dat dit hardloop.",
+    "cloudSessionCreated": "Jou eerste wolksessie hardloop.",
+    "cliTitle": "Koppel jou rekenaar",
+    "waitingForComputer": "Wag vir jou rekenaar om te koppel…",
+    "computerConnected": "{{name}} is gekoppel",
+    "startOnYourComputer": "Begin 'n sessie op jou rekenaar, en kom dan hierheen terug",
+    "cliSessionCreated": "Jou eerste afstandsessie hardloop."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Kon nie jou rekening laai nie.",

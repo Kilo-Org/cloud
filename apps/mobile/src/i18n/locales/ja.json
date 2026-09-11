@@ -194,6 +194,8 @@
     "linkedAccounts": "連携済みのアカウント",
     "couldNotLoadAccounts": "アカウントを読み込めませんでした。",
     "app": "アプリ",
+    "tutorial": "チュートリアル",
+    "tutorialSubtitle": "ガイド付きツアーをもう一度見る",
     "preferencesSubtitle": "外観、通知、思考、画面の動作",
     "deviceSessionsSubtitle": "他のデバイスを確認してサインアウト",
     "feedback": "フィードバック",
@@ -2025,6 +2027,21 @@
       "unsupportedDescription": "このCLIはフォルダの一覧表示に対応していません。「完了」をタップすると起動時のフォルダが選択され、「セッションを開始」をタップするとそのフォルダでセッションが始まります。",
       "unsupportedTitle": "フォルダを一覧表示できません"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "ツアーをスキップ",
+    "chooseTitle": "Kilo をどこで実行しますか？",
+    "chooseBody": "どちらの道も実行中のセッションで終わります。始める場所を選んでください。",
+    "computerOption": "自分のコンピュータ",
+    "computerOptionDescription": "`kilo remote` で接続し、自分のマシンでセッションを実行します。",
+    "cloudTitle": "最初のクラウドセッションを作成",
+    "cloudBody": "クラウドエージェントは Kilo のクラウド上で実行されます。インストールは不要です。リポジトリを選択し、タスクを説明して、セッションを開始 をタップし、ここに戻って実行中の様子をご覧ください。",
+    "cloudSessionCreated": "最初のクラウドセッションが実行中です。",
+    "cliTitle": "コンピュータを接続",
+    "waitingForComputer": "コンピュータの接続を待っています…",
+    "computerConnected": "{{name}} が接続されました",
+    "startOnYourComputer": "コンピュータ上でセッションを開始し、ここに戻ってください",
+    "cliSessionCreated": "最初のリモートセッションが実行中です。"
   },
   "bootstrap": {
     "couldNotLoadAccount": "アカウントを読み込めませんでした。",

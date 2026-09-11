@@ -126,7 +126,19 @@ const config: ExpoConfig = {
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-foreground.png',
     },
-    predictiveBackGestureEnabled: true,
+    // Off until React Native consumes the opt-in below Android 16. The
+    // manifest flag this writes (`android:enableOnBackInvokedCallback=true`)
+    // stops the system from delivering KEYCODE_BACK to the app, and RN 0.86
+    // registers its dispatcher back-callback only when `isAtLeastTargetSdk36`
+    // (ReactActivity.onCreate) — i.e. device SDK ≥ 36 AND targetSdk ≥ 36. On
+    // an Android 13–15 device with this targetSdk-36 build the opt-in leaves
+    // no consumer for back: the system finishes the activity, the JS
+    // BackHandler never fires, and every in-app back contract (the first-run
+    // tour's skip-on-removal guard above all) is dead. With the flag off,
+    // 13–15 devices get the legacy onBackPressed path (→ JS BackHandler), and
+    // on Android 16 devices the platform enforces the callback path and RN
+    // registers its consumer, so back works there too.
+    predictiveBackGestureEnabled: false,
     blockedPermissions: [
       'android.permission.READ_MEDIA_IMAGES',
       'android.permission.READ_MEDIA_VIDEO',

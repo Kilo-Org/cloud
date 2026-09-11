@@ -219,6 +219,14 @@ export default function AppLayout() {
               }}
             />
             <Stack.Screen
+              name="first-run-tour"
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
               name="consent"
               options={{
                 presentation: 'modal',

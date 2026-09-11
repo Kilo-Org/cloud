@@ -194,6 +194,8 @@
     "linkedAccounts": "الحسابات المرتبطة",
     "couldNotLoadAccounts": "تعذّر تحميل الحسابات.",
     "app": "التطبيق",
+    "tutorial": "البرنامج التعليمي",
+    "tutorialSubtitle": "أعد تشغيل الجولة الإرشادية",
     "preferencesSubtitle": "المظهر والإشعارات والتفكير وسلوك الشاشة",
     "deviceSessionsSubtitle": "مراجعة الأجهزة الأخرى وتسجيل الخروج منها",
     "feedback": "إرسال ملاحظات",
@@ -2081,6 +2083,21 @@
       "unsupportedDescription": "إصدار CLI هذا لا يدعم عرض المجلدات. اضغط على «تم» للاحتفاظ بمجلد بدء التشغيل، ثم على «بدء الجلسة» لبدء الجلسة فيه.",
       "unsupportedTitle": "لا يمكن عرض المجلدات"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "تخطي الجولة",
+    "chooseTitle": "أين تريد تشغيل Kilo؟",
+    "chooseBody": "ينتهي المساران بجلسة قيد التشغيل. اختر من أين تريد البدء.",
+    "computerOption": "حاسوبك الخاص",
+    "computerOptionDescription": "اتصل باستخدام `kilo remote` وشغّل الجلسات على جهازك.",
+    "cloudTitle": "أنشئ أول جلسة سحابية",
+    "cloudBody": "يعمل وكيلك السحابي في سحابة Kilo — لا شيء لتثبيته. اختر مستودعًا، وصف المهمة، ثم اضغط على بدء الجلسة، وعُد إلى هنا لرؤيتها وهي قيد التشغيل.",
+    "cloudSessionCreated": "جلستك السحابية الأولى قيد التشغيل.",
+    "cliTitle": "اربط حاسوبك",
+    "waitingForComputer": "في انتظار اتصال حاسوبك…",
+    "computerConnected": "{{name}} متصل",
+    "startOnYourComputer": "شغّل جلسة على حاسوبك، ثم عُد إلى هنا",
+    "cliSessionCreated": "جلستك الأولى عن بُعد قيد التشغيل."
   },
   "bootstrap": {
     "couldNotLoadAccount": "تعذّر تحميل حسابك.",

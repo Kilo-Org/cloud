@@ -194,6 +194,8 @@
     "linkedAccounts": "Kontijiet imqabbdin",
     "couldNotLoadAccounts": "Ma setgħux jitgħabbew il-kontijiet.",
     "app": "Applikazzjoni",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "Erġa' daqq il-ġita ggwidata",
     "preferencesSubtitle": "Dehra, notifiki, ħsieb, u mġiba tal-iskrin",
     "deviceSessionsSubtitle": "Ara l-apparati l-oħra u oħroġ mill-kont fuqhom",
     "feedback": "Agħti l-fehma tiegħek",
@@ -2519,6 +2521,21 @@
       "unsupportedDescription": "Dan il-CLI ma jistax jelenka d-direttorji. Tektek Lest biex iżżomm id-direttorju tat-tnedija, imbagħad Ibda s-sessjoni biex tibda minn hemm.",
       "unsupportedTitle": "Ma jistgħux jiġu elenkati d-direttorji"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Aqbeż it-tour",
+    "chooseTitle": "Fejn tixtieq tmexxi Kilo?",
+    "chooseBody": "Iż-żewġ toroq jispiċċaw b'sessjoni għaddejja. Agħżel fejn trid tibda.",
+    "computerOption": "Il-kompjuter tiegħek stess",
+    "computerOptionDescription": "Ikkonnettja b'`kilo remote` u mexxi sessjonijiet fuq il-magna tiegħek.",
+    "cloudTitle": "Oħloq l-ewwel sessjoni tas-sħab tiegħek",
+    "cloudBody": "L-aġent tas-sħab tiegħek jaħdem fis-sħab ta' Kilo — xejn x'tinstalla. Agħżel repożitorju, iddeskrivi l-kompitu u għafas Ibda s-sessjoni, imbagħad erġa' hawn biex taraha taħdem.",
+    "cloudSessionCreated": "L-ewwel sessjoni tas-sħab tiegħek qed taħdem.",
+    "cliTitle": "Konnetta l-kompjuter tiegħek",
+    "waitingForComputer": "Qed nistennew il-kompjuter tiegħek jikkonnetta…",
+    "computerConnected": "{{name}} huwa konness",
+    "startOnYourComputer": "Ibda sessjoni fuq il-kompjuter tiegħek, imbagħad erġa' hawn",
+    "cliSessionCreated": "L-ewwel sessjoni remoti tiegħek qed taħdem."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Ma setax jitgħabba l-kont tiegħek.",

@@ -194,6 +194,8 @@
     "linkedAccounts": "Llogaritë e lidhura",
     "couldNotLoadAccounts": "Nuk u ngarkuan llogaritë.",
     "app": "Aplikacioni",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "Riprodho turin e udhëzuar",
     "preferencesSubtitle": "Pamja, njoftimet, të menduarit dhe sjellja e ekranit",
     "deviceSessionsSubtitle": "Shiko pajisjet e tjera dhe mbyll seancat e tyre",
     "feedback": "Përshtypjet",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "Ky CLI nuk mund të shfaqë listën e dosjeve. «U krye» ruan dosjen e nisjes dhe «Nis seancën» e nis seancën aty.",
       "unsupportedTitle": "Lista e dosjeve nuk mund të shfaqet"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Kapërce udhëzimin",
+    "chooseTitle": "Ku dëshironi ta ekzekutoni Kilo?",
+    "chooseBody": "Të dyja rrugët përfundojnë me një sesion në punë. Zgjidhni nga ku dëshironi të filloni.",
+    "computerOption": "Kompjuteri juaj",
+    "computerOptionDescription": "Lidhuni me `kilo remote` dhe ekzekutoni sesione në kompjuterin tuaj.",
+    "cloudTitle": "Krijoni sesionin tuaj të parë në re",
+    "cloudBody": "Agjenti juaj në re ekzekutohet në ren e Kilo — asgjë për t'u instaluar. Zgjidhni një depo, përshkruani detyrën dhe prekni Nis seancën, pastaj kthehuni këtu për ta parë duke u ekzekutuar.",
+    "cloudSessionCreated": "Sesioni juaj i parë në re po ekzekutohet.",
+    "cliTitle": "Lidhni kompjuterin tuaj",
+    "waitingForComputer": "Duke pritur që kompjuteri juaj të lidhet…",
+    "computerConnected": "{{name}} është lidhur",
+    "startOnYourComputer": "Nis një sesion në kompjuterin tuaj, pastaj kthehuni këtu",
+    "cliSessionCreated": "Sesioni juaj i parë në distancë po ekzekutohet."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Nuk u ngarkua llogaria jote.",

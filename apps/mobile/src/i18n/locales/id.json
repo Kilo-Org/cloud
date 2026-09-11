@@ -194,6 +194,8 @@
     "linkedAccounts": "Akun tertaut",
     "couldNotLoadAccounts": "Tidak dapat memuat akun.",
     "app": "Aplikasi",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "Putar ulang tur berpemandu",
     "preferencesSubtitle": "Tampilan, notifikasi, pemikiran agen, dan perilaku layar",
     "deviceSessionsSubtitle": "Tinjau sesi dan keluar dari perangkat lain",
     "feedback": "Umpan balik",
@@ -2025,6 +2027,21 @@
       "unsupportedDescription": "CLI ini tidak dapat menampilkan daftar direktori. Ketuk Selesai untuk mempertahankan direktori awal, lalu ketuk Mulai sesi untuk memulai di sana.",
       "unsupportedTitle": "Tidak dapat menampilkan daftar direktori"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Lewati tur",
+    "chooseTitle": "Di mana Anda ingin menjalankan Kilo?",
+    "chooseBody": "Kedua jalur berakhir dengan sesi yang berjalan. Pilih tempat Anda ingin memulai.",
+    "computerOption": "Komputer Anda sendiri",
+    "computerOptionDescription": "Sambungkan dengan `kilo remote` dan jalankan sesi di komputer Anda.",
+    "cloudTitle": "Buat sesi cloud pertama Anda",
+    "cloudBody": "Agen cloud Anda berjalan di cloud Kilo — tidak ada yang perlu diinstal. Pilih repositori, jelaskan tugasnya, dan ketuk Mulai sesi, lalu kembali ke sini untuk melihatnya berjalan.",
+    "cloudSessionCreated": "Sesi cloud pertama Anda sedang berjalan.",
+    "cliTitle": "Sambungkan komputer Anda",
+    "waitingForComputer": "Menunggu komputer Anda terhubung…",
+    "computerConnected": "{{name}} terhubung",
+    "startOnYourComputer": "Mulai sesi di komputer Anda, lalu kembali ke sini",
+    "cliSessionCreated": "Sesi jarak jauh pertama Anda sedang berjalan."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Tidak dapat memuat akunmu.",

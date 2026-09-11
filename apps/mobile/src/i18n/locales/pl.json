@@ -194,6 +194,8 @@
     "linkedAccounts": "Połączone konta",
     "couldNotLoadAccounts": "Nie udało się wczytać kont.",
     "app": "Aplikacja",
+    "tutorial": "Samouczek",
+    "tutorialSubtitle": "Odtwórz ponownie przewodnik",
     "preferencesSubtitle": "Wygląd, powiadomienia, rozumowanie i działanie ekranu",
     "deviceSessionsSubtitle": "Sprawdzaj inne urządzenia i wylogowuj je",
     "feedback": "Prześlij opinię",
@@ -2053,6 +2055,21 @@
       "unsupportedDescription": "Ta instancja CLI nie obsługuje wyświetlania katalogów. Przycisk „Gotowe” zachowuje katalog uruchomienia, a „Rozpocznij sesję” uruchamia w nim sesję.",
       "unsupportedTitle": "Nie można wyświetlić katalogów"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Pomiń przewodnik",
+    "chooseTitle": "Gdzie chcesz uruchomić Kilo?",
+    "chooseBody": "Obie ścieżki kończą się działającą sesją. Wybierz, gdzie chcesz zacząć.",
+    "computerOption": "Twój własny komputer",
+    "computerOptionDescription": "Połącz się przez `kilo remote` i uruchamiaj sesje na swoim komputerze.",
+    "cloudTitle": "Utwórz swoją pierwszą sesję w chmurze",
+    "cloudBody": "Twój agent działa w chmurze Kilo — nic nie trzeba instalować. Wybierz repozytorium, opisz zadanie i dotknij Rozpocznij sesję, a potem wróć tutaj, aby zobaczyć, jak działa.",
+    "cloudSessionCreated": "Twoja pierwsza sesja w chmurze jest uruchomiona.",
+    "cliTitle": "Połącz swój komputer",
+    "waitingForComputer": "Oczekiwanie na połączenie Twojego komputera…",
+    "computerConnected": "{{name}} połączono",
+    "startOnYourComputer": "Uruchom sesję na swoim komputerze, a potem wróć tutaj",
+    "cliSessionCreated": "Twoja pierwsza zdalna sesja jest uruchomiona."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Nie udało się wczytać danych twojego konta.",

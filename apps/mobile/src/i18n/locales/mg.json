@@ -194,6 +194,8 @@
     "linkedAccounts": "Kaonty mifandray",
     "couldNotLoadAccounts": "Tsy voaray ny kaonty.",
     "app": "Rindranasa",
+    "tutorial": "Fampianarana",
+    "tutorialSubtitle": "Averina ny tour tari-dalana",
     "preferencesSubtitle": "Bika, fampandrenesana, fisainana ary fiasan'ny efijery",
     "deviceSessionsSubtitle": "Diniho ny fitaovana hafa ary ampivoahy amin'ny kaonty",
     "feedback": "Fanehoan-kevitra",
@@ -2456,6 +2458,21 @@
       "unsupportedTitle": "Tsy azo tanisaina ny lahatahiry",
       "unsupportedDescription": "Tsy afaka mitanisa lahatahiry ity CLI ity. Ny Vita dia mitazona ny lahatahiry fanombohana, ary ny Atombohy ny fotoam-piasana dia manomboka ao."
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Ahalavala ny tour",
+    "chooseTitle": "Aiza ianao no te-hampandeha an'i Kilo?",
+    "chooseBody": "Samia miafara amin'ny fotoam-piasana mandeha ny lalana roa. Safidio izay tianao hanombohana.",
+    "computerOption": "Ny solosainao manokana",
+    "computerOptionDescription": "Mifandraisa amin'ny alalan'ny `kilo remote` ary ampiasao ny fotoam-piasana amin'ny solosainao.",
+    "cloudTitle": "Mamorona ny fotoam-piasan'ny rahona voalohany",
+    "cloudBody": "Miasa ao amin'ny rahon'i Kilo ny agentanao — tsy misy zavatra hatao. Safidio ny fototra, omeo antsipiriany ny asa, ary tsindrio Atombohy ny fotoam-piasana, dia miverena eto hijery azy mandeha.",
+    "cloudSessionCreated": "Mandeha ny fotoam-piasan'ny rahona voalohany.",
+    "cliTitle": "Ampifandray ny solosainao",
+    "waitingForComputer": "Miandry ny fampifandraisana ny solosainao…",
+    "computerConnected": "Mifandray ny {{name}}",
+    "startOnYourComputer": "Alefaso ny fotoam-piasana amin'ny solosainao, dia miverena eto",
+    "cliSessionCreated": "Mandeha ny fotoam-piasana lavitra voalohany."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Tsy tafiditra ny kaontinao.",

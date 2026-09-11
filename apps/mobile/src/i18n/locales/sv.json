@@ -194,6 +194,8 @@
     "linkedAccounts": "Länkade konton",
     "couldNotLoadAccounts": "Det gick inte att läsa in kontona.",
     "app": "Appen",
+    "tutorial": "Handledning",
+    "tutorialSubtitle": "Spela upp den guidade turen igen",
     "preferencesSubtitle": "Utseende, aviseringar, resonemang och skärminställningar",
     "deviceSessionsSubtitle": "Visa andra enheter och logga ut från dem",
     "feedback": "Skicka synpunkter",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "Den här CLI-versionen kan inte visa mappar. Tryck på Klar för att behålla startmappen och på Starta session för att starta där.",
       "unsupportedTitle": "Det går inte att visa mapparna"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Hoppa över rundvisningen",
+    "chooseTitle": "Var vill du köra Kilo?",
+    "chooseBody": "Båda vägarna slutar med en aktiv session. Välj var du vill börja.",
+    "computerOption": "Din egen dator",
+    "computerOptionDescription": "Anslut med `kilo remote` och kör sessioner på din dator.",
+    "cloudTitle": "Skapa din första cloud-session",
+    "cloudBody": "Din cloud-agent körs i Kilos moln — inget att installera. Välj ett repository, beskriv uppgiften och tryck på Starta session, kom sedan tillbaka hit för att se den köras.",
+    "cloudSessionCreated": "Din första cloud-session körs.",
+    "cliTitle": "Anslut din dator",
+    "waitingForComputer": "Väntar på att din dator ska ansluta…",
+    "computerConnected": "{{name}} är ansluten",
+    "startOnYourComputer": "Starta en session på din dator och kom tillbaka hit",
+    "cliSessionCreated": "Din första fjärrsession körs."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Kunde inte läsa in ditt konto.",

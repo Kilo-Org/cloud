@@ -194,6 +194,8 @@
     "linkedAccounts": "Összekapcsolt fiókok",
     "couldNotLoadAccounts": "Nem sikerült betölteni a fiókokat.",
     "app": "Alkalmazás",
+    "tutorial": "Útmutató",
+    "tutorialSubtitle": "A vezetett kör újrajátszása",
     "preferencesSubtitle": "Megjelenés, értesítések, gondolkodás és a képernyő működése",
     "deviceSessionsSubtitle": "Más eszközök áttekintése és kijelentkeztetése",
     "feedback": "Visszajelzés",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "Ez a CLI nem tudja listázni a mappákat. A Kész gombbal megtarthatod az indítási mappát. A Munkamenet indítása gombbal ebben a mappában indíthatsz munkamenetet.",
       "unsupportedTitle": "Nem lehet listázni a mappákat"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Körbeugrás",
+    "chooseTitle": "Hol szeretné futtatni a Kilót?",
+    "chooseBody": "Mindkét útvonal egy futó munkamenettel végződik. Válassza ki, hol szeretne kezdeni.",
+    "computerOption": "A saját számítógépe",
+    "computerOptionDescription": "Kapcsolódjon a `kilo remote` használatával, és futtasson munkameneteket a gépén.",
+    "cloudTitle": "Hozza létre az első felhő-munkamenetét",
+    "cloudBody": "A felhőügynöke a Kilo felhőjében fut — semmit nem kell telepíteni. Válasszon egy adattárat, írja le a feladatot, majd érintse meg a Munkamenet indítása gombot, azután térjen vissza ide, hogy lássa, ahogy fut.",
+    "cloudSessionCreated": "Az első felhő-munkamenete fut.",
+    "cliTitle": "Csatlakoztassa a számítógépét",
+    "waitingForComputer": "Várjuk a számítógépe csatlakozását…",
+    "computerConnected": "{{name}} csatlakozott",
+    "startOnYourComputer": "Indítson egy munkamenetet a számítógépén, majd térjen vissza ide",
+    "cliSessionCreated": "Az első távoli munkamenete fut."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Nem sikerült betölteni a fiókodat.",

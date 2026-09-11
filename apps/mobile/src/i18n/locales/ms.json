@@ -194,6 +194,8 @@
     "linkedAccounts": "Akaun dipautkan",
     "couldNotLoadAccounts": "Tidak dapat memuatkan akaun.",
     "app": "Apl",
+    "tutorial": "Tutorial",
+    "tutorialSubtitle": "Main semula lawatan berpandu",
     "preferencesSubtitle": "Penampilan, pemberitahuan, pemikiran, dan tingkah laku skrin",
     "deviceSessionsSubtitle": "Semak sesi dan log keluar daripada peranti lain",
     "feedback": "Maklum balas",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "CLI ini tidak dapat menyenaraikan direktori. Ketik Selesai untuk mengekalkan direktori pelancaran, kemudian ketik Mulakan sesi untuk bermula di situ.",
       "unsupportedTitle": "Tidak dapat menyenaraikan direktori"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Langkau lawatan",
+    "chooseTitle": "Di mana anda mahu menjalankan Kilo?",
+    "chooseBody": "Kedua-dua laluan berakhir dengan sesi yang berjalan. Pilih tempat anda mahu bermula.",
+    "computerOption": "Komputer anda sendiri",
+    "computerOptionDescription": "Sambung dengan `kilo remote` dan jalankan sesi pada komputer anda.",
+    "cloudTitle": "Cipta sesi awan pertama anda",
+    "cloudBody": "Ejen awan anda berjalan dalam awan Kilo — tiada apa untuk dipasang. Pilih repositori, huraikan tugas dan ketik Mulakan sesi, kemudian kembali ke sini untuk melihatnya berjalan.",
+    "cloudSessionCreated": "Sesi awan pertama anda sedang berjalan.",
+    "cliTitle": "Sambungkan komputer anda",
+    "waitingForComputer": "Menunggu komputer anda disambungkan…",
+    "computerConnected": "{{name}} telah disambungkan",
+    "startOnYourComputer": "Mulakan sesi pada komputer anda, kemudian kembali ke sini",
+    "cliSessionCreated": "Sesi jarak jauh pertama anda sedang berjalan."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Tidak dapat memuatkan akaun anda.",

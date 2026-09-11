@@ -28,15 +28,27 @@ async function ignoreCaptureFailure(call: Promise<void>): Promise<void> {
  * native calls itself: the cleanup always runs before the next effect body, and
  * a fast route flip can no longer land a late `allow` after a live `prevent`.
  *
- * Android only. On iOS `preventScreenCaptureAsync` re-parents keyWindow.layer
- * under a secure UITextField, which blanks screenshots but stops native
- * UIAlertController presentation (the markdown link host-confirm Alert never
- * appears on covered routes) and still does not blank the Recents preview.
+ * An uncovered mount also calls allow: FLAG_SECURE is a native window flag, so
+ * a JS-context restart while covered (a Metro/dev-menu reload keeps the
+ * Activity window alive and never runs the cleanup) leaks it into the fresh
+ * context, where every capture of the app — screenshots, recordings, the e2e
+ * harness — comes out fully black until the process dies. Re-allowing on mount
+ * reconciles the flag with the route, and the call is a no-op when the flag
+ * was never set. `allowScreenCaptureAsync` exists on both platforms and is a
+ * no-op on iOS when nothing was ever prevented, so this reconcile runs the
+ * same path everywhere.
+ *
+ * The prevent side stays Android-only: iOS has no equivalent capability.
+ * `preventScreenCaptureAsync` re-parents keyWindow.layer under a secure
+ * UITextField, which blanks screenshots but stops native UIAlertController
+ * presentation (the markdown link host-confirm Alert never appears on covered
+ * routes) and still does not blank the Recents preview.
  */
 function useCaptureBlock(covered: boolean): void {
   const blocked = Platform.OS === 'android' && covered;
   useEffect(() => {
     if (!blocked) {
+      void ignoreCaptureFailure(allowScreenCaptureAsync(CAPTURE_KEY));
       return undefined;
     }
     void ignoreCaptureFailure(preventScreenCaptureAsync(CAPTURE_KEY));

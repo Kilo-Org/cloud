@@ -194,6 +194,8 @@
     "linkedAccounts": "Herregoota walqabatan",
     "couldNotLoadAccounts": "Herregoota fe'uu hin danda'amne.",
     "app": "Appilikeeshinii",
+    "tutorial": "Barnoota",
+    "tutorialSubtitle": "Geejjiba qajeelfamaa irra deebi'ii taphachiisi",
     "preferencesSubtitle": "Bifa, beeksisoota, xiinxala fi amala iskiriinii",
     "deviceSessionsSubtitle": "Meeshaalee biroo sakatta'iitii herrega keessaa baasi",
     "feedback": "Yaada",
@@ -2456,6 +2458,21 @@
       "unsupportedDescription": "CLI kun galmeewwan tarreessuu hin danda'u. Xumuri tuquun galmee jalqabaa eega; Turtii jalqabi tuquun achitti jalqaba.",
       "unsupportedTitle": "Galmeewwan tarreessuun hin danda'amu"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Daawwannoo darbuu",
+    "chooseTitle": "Kilo eessatti hojjechuu barbaadda?",
+    "chooseBody": "Karaan lamaanuu seenaa hojjechaa jiruun xumuraman. Eessaa jalqabuu akka barbaaddu filadhu.",
+    "computerOption": "Kompiitara kee mataa kee",
+    "computerOptionDescription": "`kilo remote`n wal qunnamiitii seenaa kompiitara kee irratti hojjedhu.",
+    "cloudTitle": "Sesshanii tuqaa jalqabaa keessan uumaa",
+    "cloudBody": "Agentiin keessan cloud Kilo keessatti hojjeta — wanti feamu hin jiru. Kuusaa filadhaa, hojii ibsaa, Turtii jalqabi tuqi, ergasii hojjechaa jiraachuu isaa ilaaluuf as deebi'aa.",
+    "cloudSessionCreated": "Sesshaniin tuqaa jalqabaan keessani hojjechaa jirti.",
+    "cliTitle": "Kompiitara keessani walqunnamsiisaa",
+    "waitingForComputer": "Walqunnamtii kompiitara keessani eegaa jirra…",
+    "computerConnected": "{{name}} walqunnamsiiseera",
+    "startOnYourComputer": "Kompiitara keessani irratti sesshanii jalqabaa, ergasii as deebi'aa",
+    "cliSessionCreated": "Sesshaniin fagaatii jalqabaan keessani hojjechaa jirti."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Herrega kee fe'uu hin danda'amne.",

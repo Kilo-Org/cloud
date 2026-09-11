@@ -194,6 +194,8 @@
     "linkedAccounts": "Tài khoản đã liên kết",
     "couldNotLoadAccounts": "Không thể tải danh sách tài khoản.",
     "app": "Ứng dụng",
+    "tutorial": "Hướng dẫn",
+    "tutorialSubtitle": "Phát lại chuyến tham quan có hướng dẫn",
     "preferencesSubtitle": "Giao diện, thông báo, suy luận và cách hoạt động của màn hình",
     "deviceSessionsSubtitle": "Xem và đăng xuất khỏi các thiết bị khác",
     "feedback": "Gửi góp ý",
@@ -2025,6 +2027,21 @@
       "unsupportedDescription": "CLI này không hỗ trợ liệt kê thư mục. Chạm vào Xong để giữ thư mục khởi chạy, rồi chạm vào Bắt đầu phiên để chạy phiên tại đó.",
       "unsupportedTitle": "Không hỗ trợ liệt kê thư mục"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Bỏ qua tour",
+    "chooseTitle": "Bạn muốn chạy Kilo ở đâu?",
+    "chooseBody": "Cả hai con đường đều kết thúc bằng một phiên đang chạy. Chọn nơi bạn muốn bắt đầu.",
+    "computerOption": "Máy tính của riêng bạn",
+    "computerOptionDescription": "Kết nối bằng `kilo remote` và chạy các phiên trên máy của bạn.",
+    "cloudTitle": "Tạo phiên đám mây đầu tiên của bạn",
+    "cloudBody": "Tác nhân đám mây của bạn chạy trên đám mây của Kilo — không cần cài đặt gì. Chọn một kho lưu trữ, mô tả tác vụ và chạm Bắt đầu phiên, sau đó quay lại đây để xem nó đang chạy.",
+    "cloudSessionCreated": "Phiên đám mây đầu tiên của bạn đang chạy.",
+    "cliTitle": "Kết nối máy tính của bạn",
+    "waitingForComputer": "Đang chờ máy tính của bạn kết nối…",
+    "computerConnected": "{{name}} đã kết nối",
+    "startOnYourComputer": "Bắt đầu một phiên trên máy tính của bạn, sau đó quay lại đây",
+    "cliSessionCreated": "Phiên từ xa đầu tiên của bạn đang chạy."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Không thể tải thông tin tài khoản của bạn.",

@@ -194,6 +194,8 @@
     "linkedAccounts": "Povezani računi",
     "couldNotLoadAccounts": "Računov ni bilo mogoče naložiti.",
     "app": "Aplikacija",
+    "tutorial": "Vodnik",
+    "tutorialSubtitle": "Znova predvajaj vodeni ogled",
     "preferencesSubtitle": "Videz, obvestila, razmišljanje in delovanje zaslona",
     "deviceSessionsSubtitle": "Preglej in odjavi druge naprave",
     "feedback": "Povratne informacije",
@@ -2498,6 +2500,21 @@
       "unsupportedDescription": "Ta CLI ne more prikazati map. Z gumbom »Končano« ohraniš začetno mapo, z gumbom »Začni sejo« pa v njej zaženeš sejo.",
       "unsupportedTitle": "Map ni mogoče prikazati"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Preskoči ogled",
+    "chooseTitle": "Kje želite zagnati Kilo?",
+    "chooseBody": "Obe poti se končata z delujočo sejo. Izberite, kje želite začeti.",
+    "computerOption": "Vaš lastni računalnik",
+    "computerOptionDescription": "Povežite se s `kilo remote` in zaženite seje na svojem računalniku.",
+    "cloudTitle": "Ustvarite svojo prvo oblačno sejo",
+    "cloudBody": "Vaš oblačni agent teče v oblaku Kilo — nič ni treba namestiti. Izberite shrambo, opišite nalogo in tapnite Začni sejo, nato se vrnite sem in poglejte, kako teče.",
+    "cloudSessionCreated": "Vaša prva oblačna seja teče.",
+    "cliTitle": "Povežite svoj računalnik",
+    "waitingForComputer": "Čakam na povezavo vašega računalnika…",
+    "computerConnected": "{{name}} je povezan",
+    "startOnYourComputer": "Zaženite sejo na svojem računalniku in se nato vrnite sem",
+    "cliSessionCreated": "Vaša prva oddaljena seja teče."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Tvojega računa ni bilo mogoče naložiti.",

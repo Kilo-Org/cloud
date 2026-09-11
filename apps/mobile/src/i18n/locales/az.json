@@ -194,6 +194,8 @@
     "linkedAccounts": "Əlaqələndirilmiş hesablar",
     "couldNotLoadAccounts": "Hesabları yükləmək mümkün olmadı.",
     "app": "Tətbiq",
+    "tutorial": "Təlimat",
+    "tutorialSubtitle": "Bələdçi turu yenidən oynadın",
     "preferencesSubtitle": "Görünüş, bildirişlər, düşünmə və ekranın davranışı",
     "deviceSessionsSubtitle": "Digər cihazlara bax və onlardakı hesabından çıx",
     "feedback": "Rəy",
@@ -2456,6 +2458,21 @@
       "unsupportedTitle": "Qovluqların siyahısını göstərmək mümkün deyil",
       "unsupportedDescription": "Bu CLI qovluqların siyahısını göstərə bilmir. «Hazırdır» düyməsi başlanğıc qovluğunu saxlayır, «Sessiyanı başlat» düyməsi isə sessiyanı həmin qovluqda başladır."
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Turu keç",
+    "chooseTitle": "Kilo-nu harada işlətmək istəyirsiniz?",
+    "chooseBody": "Hər iki yol işləyən sessiya ilə bitir. Haradan başlamaq istədiyinizi seçin.",
+    "computerOption": "Öz kompüteriniz",
+    "computerOptionDescription": "`kilo remote` ilə qoşulun və sessiyaları öz kompüterinizdə işlədin.",
+    "cloudTitle": "İlk bulud sessiyanızı yaradın",
+    "cloudBody": "Bulud agentiniz Kilo buludunda işləyir — heç nə quraşdırmaq lazım deyil. Repozitoriya seçin, tapşırığı təsvir edin və Sessiyanı başlat düyməsini vurun, sonra onun işlədiyini görmək üçün bura qayıdın.",
+    "cloudSessionCreated": "İlk bulud sessiyanız işləyir.",
+    "cliTitle": "Komputerinizi qoşun",
+    "waitingForComputer": "Komputerinizin qoşulması gözlənilir…",
+    "computerConnected": "{{name}} qoşuldu",
+    "startOnYourComputer": "Komputerinizdə sessiya başladın, sonra bura qayıdın",
+    "cliSessionCreated": "İlk uzaq sessiyanız işləyir."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Hesabını yükləmək mümkün olmadı.",

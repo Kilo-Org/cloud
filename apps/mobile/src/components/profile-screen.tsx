@@ -13,6 +13,7 @@ import {
   MessageSquare,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
   Trash2,
 } from '@/components/ui/icons';
 import { Alert, View } from 'react-native';
@@ -290,6 +291,18 @@ export function ProfileScreen() {
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('profile.app')}
           </Text>
+          {/* Permanent replay entry: pushes the modal route directly, so it
+              opens the tour even when the per-account decision is already
+              recorded (it never consults the auto-open gate). */}
+          <ConfigureRow
+            icon={Sparkles}
+            title={t('profile.tutorial')}
+            subtitle={t('profile.tutorialSubtitle')}
+            className="rounded-lg bg-secondary px-3"
+            onPress={() => {
+              router.push('/(app)/first-run-tour' as Href);
+            }}
+          />
           <ConfigureRow
             icon={SlidersHorizontal}
             title={t('common.preferences')}

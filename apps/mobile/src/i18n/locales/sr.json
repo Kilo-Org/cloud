@@ -194,6 +194,8 @@
     "linkedAccounts": "Povezani nalozi",
     "couldNotLoadAccounts": "Učitavanje naloga nije uspelo.",
     "app": "Aplikacija",
+    "tutorial": "Tutorijal",
+    "tutorialSubtitle": "Ponovo pokreni vođenu turu",
     "preferencesSubtitle": "Izgled, obaveštenja, razmišljanje i ponašanje ekrana",
     "deviceSessionsSubtitle": "Pregledaj i odjavi druge uređaje",
     "feedback": "Povratne informacije",
@@ -2477,6 +2479,21 @@
       "unsupportedTitle": "Prikaz spiska fascikli nije podržan",
       "unsupportedDescription": "Ovaj CLI ne može da prikaže spisak fascikli. Dugme „Gotovo“ zadržava početnu fasciklu, a dugme „Pokreni sesiju“ pokreće sesiju u njoj."
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Preskoči turu",
+    "chooseTitle": "Gde želite da pokrenete Kilo?",
+    "chooseBody": "Obe staze se završavaju aktivnom sesijom. Izaberite odakle želite da počnete.",
+    "computerOption": "Vaš sopstveni računar",
+    "computerOptionDescription": "Povežite se pomoću `kilo remote` i pokrećite sesije na svom računaru.",
+    "cloudTitle": "Napravite svoju prvu cloud sesiju",
+    "cloudBody": "Vaš cloud agent radi u Kilo cloudu — nema ničega za instaliranje. Izaberite repozitorijum, opišite zadatak i dodirnite Pokreni sesiju, zatim se vratite ovde da vidite kako radi.",
+    "cloudSessionCreated": "Vaša prva cloud sesija je pokrenuta.",
+    "cliTitle": "Povežite svoj računar",
+    "waitingForComputer": "Čekamo povezivanje vašeg računara…",
+    "computerConnected": "{{name}} je povezan",
+    "startOnYourComputer": "Pokrenite sesiju na svom računaru, zatim se vratite ovde",
+    "cliSessionCreated": "Vaša prva udaljena sesija je pokrenuta."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Nije moguće učitati tvoj nalog.",

@@ -4,12 +4,13 @@ import { NewSessionScreenBody } from '@/components/agents/new-session-screen-bod
 import { NewSessionModelProvider } from '@/components/agents/new-session-model-provider';
 
 export default function NewSessionScreen() {
-  const { organizationId } = useLocalSearchParams<{
+  const { connectionId, organizationId } = useLocalSearchParams<{
+    connectionId?: string;
     organizationId?: string;
   }>();
   return (
     <NewSessionModelProvider organizationId={organizationId}>
-      <NewSessionScreenBody />
+      <NewSessionScreenBody initialConnectionId={connectionId} />
     </NewSessionModelProvider>
   );
 }

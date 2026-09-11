@@ -194,6 +194,8 @@
     "linkedAccounts": "Susietos paskyros",
     "couldNotLoadAccounts": "Nepavyko įkelti paskyrų.",
     "app": "Programėlė",
+    "tutorial": "Pamoka",
+    "tutorialSubtitle": "Dar kartą paleisti gidomą apžvalgą",
     "preferencesSubtitle": "Išvaizda, pranešimai, mąstymas ir ekrano elgsena",
     "deviceSessionsSubtitle": "Peržiūrėti kitus įrenginius ir juose atsijungti",
     "feedback": "Atsiliepimai",
@@ -2498,6 +2500,21 @@
       "unsupportedDescription": "Ši CLI negali parodyti aplankų. Patvirtinus pasirinkimą, liks paleidimo aplankas. Nauja sesija bus pradėta jame.",
       "unsupportedTitle": "Negalima parodyti aplankų"
     }
+  },
+  "firstRunTour": {
+    "skipTour": "Praleisti apžvalgą",
+    "chooseTitle": "Kur norite paleisti Kilo?",
+    "chooseBody": "Abu keliai baigiasi veikiančia sesija. Pasirinkite, nuo ko norite pradėti.",
+    "computerOption": "Jūsų kompiuteris",
+    "computerOptionDescription": "Prisijunkite naudodami `kilo remote` ir paleiskite sesijas savo kompiuteryje.",
+    "cloudTitle": "Sukurkite pirmąją debesies sesiją",
+    "cloudBody": "Jūsų debesies agentas veikia „Kilo“ debesyje — nieko diegti nereikia. Pasirinkite saugyklą, aprašykite užduotį ir palieskite Pradėti sesiją, tada grįžkite čia, kad pamatytumėte, kaip ji veikia.",
+    "cloudSessionCreated": "Jūsų pirmoji debesies sesija veikia.",
+    "cliTitle": "Prijunkite savo kompiuterį",
+    "waitingForComputer": "Laukiama, kol prisijungs jūsų kompiuteris…",
+    "computerConnected": "{{name}} prijungtas",
+    "startOnYourComputer": "Paleiskite sesiją savo kompiuteryje, tada grįžkite čia",
+    "cliSessionCreated": "Jūsų pirmoji nuotolinė sesija veikia."
   },
   "bootstrap": {
     "couldNotLoadAccount": "Nepavyko įkelti tavo paskyros.",

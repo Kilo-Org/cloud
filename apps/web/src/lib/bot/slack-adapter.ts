@@ -1,4 +1,4 @@
-import { createSlackAdapter } from '@chat-adapter/slack';
+import { createSlackAdapter, type SlackAdapter } from '@chat-adapter/slack';
 import {
   SLACK_CLIENT_ID,
   SLACK_CLIENT_SECRET,
@@ -7,12 +7,17 @@ import {
 } from '@/lib/config.server';
 import { getActiveSlackInstallationForRuntime } from '@/lib/integrations/slack-service';
 
+const adapterRef: { current?: SlackAdapter } = {};
 export const slackAdapter = createSlackAdapter({
   clientId: SLACK_CLIENT_ID,
   clientSecret: SLACK_CLIENT_SECRET,
   signingSecret: SLACK_SIGNING_SECRET,
   encryptionKey: SLACK_ENCRYPTION_KEY || undefined,
   installationProvider: {
-    getInstallation: installationId => getActiveSlackInstallationForRuntime(installationId),
+    getInstallation: (installationId, isEnterpriseInstall) =>
+      isEnterpriseInstall
+        ? (adapterRef.current?.getInstallation(installationId) ?? Promise.resolve(null))
+        : getActiveSlackInstallationForRuntime(installationId),
   },
 });
+adapterRef.current = slackAdapter;

@@ -16,6 +16,7 @@ import { APP_URL } from '@/lib/constants';
 import {
   getAccessTokenFromInstallation,
   getActiveSlackInstallationForRuntime,
+  getUnsharedEnterpriseSlackInstallation,
   withSlackSdkTimeout,
 } from '@/lib/integrations/slack-service';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -23,7 +24,6 @@ import { getSlackMessagePermalink } from '@/lib/slack-bot/slack-utils';
 import { captureException } from '@sentry/nextjs';
 import { SlackAdapter, type SlackEvent } from '@chat-adapter/slack';
 import { getSlackTeamId } from './slack-webhook';
-import { resolveSlackInstallationAlias } from '@/lib/integrations/provider-installation-reservations';
 import type { PlatformIntegration } from '@kilocode/db';
 import type { HomeView } from '@slack/types';
 import { WebClient } from '@slack/web-api';
@@ -253,7 +253,7 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
       if (!rawTeamId) {
         throw new Error('Expected a teamId in message.raw');
       }
-      const teamId = await resolveSlackInstallationAlias(rawTeamId);
+      const teamId = rawTeamId;
       return {
         platform: PLATFORM.SLACK,
         teamId,
@@ -286,9 +286,9 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
         throw new Error(`No Slack account id for platform integration ${platformIntegration.id}`);
       }
 
-      const installation = await withSlackSdkTimeout(
-        getActiveSlackInstallationForRuntime(platformAccountId)
-      );
+      const installation =
+        (await withSlackSdkTimeout(getActiveSlackInstallationForRuntime(platformAccountId))) ??
+        (await getUnsharedEnterpriseSlackInstallation(platformIntegration));
       if (!installation) {
         throw new Error(`No Slack installation for platform integration ${platformIntegration.id}`);
       }

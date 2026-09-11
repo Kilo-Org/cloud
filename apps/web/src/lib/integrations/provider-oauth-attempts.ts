@@ -77,6 +77,27 @@ async function assertOwnerCanUseProvider(
   if (shared) throw new Error('This workflow is not available for shared GitHub installations yet');
 }
 
+export async function ownerHasSharedGitHubInstallation(owner: Owner): Promise<boolean> {
+  const [shared] = await db
+    .select({ id: platform_integrations.id })
+    .from(platform_integrations)
+    .innerJoin(
+      github_app_installations,
+      eq(platform_integrations.github_installation_id, github_app_installations.id)
+    )
+    .where(
+      and(
+        owner.type === 'org'
+          ? eq(platform_integrations.owned_by_organization_id, owner.id)
+          : eq(platform_integrations.owned_by_user_id, owner.id),
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        eq(github_app_installations.sharing_mode, 'web_cloud_agent')
+      )
+    )
+    .limit(1);
+  return Boolean(shared);
+}
+
 export async function beginProviderOAuthAttempt(input: {
   actorUserId: string;
   owner: Owner;

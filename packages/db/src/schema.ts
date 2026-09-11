@@ -4492,10 +4492,7 @@ export const provider_installation_reservations = pgTable(
     active_generation: integer(),
     status: text().$type<'pending' | 'active' | 'deleting'>().notNull().default('pending'),
     cleanup_requires_revoke: boolean().notNull().default(false),
-    cleanup_stage: text()
-      .$type<'revoke' | 'sdk' | 'identity' | 'aliases'>()
-      .notNull()
-      .default('sdk'),
+    cleanup_stage: text().$type<'revoke' | 'sdk' | 'identity'>().notNull().default('sdk'),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -4519,7 +4516,7 @@ export const provider_installation_reservations = pgTable(
     ),
     check(
       'provider_installation_reservations_cleanup_stage_check',
-      sql`${table.cleanup_stage} IN ('revoke', 'sdk', 'identity', 'aliases')`
+      sql`${table.cleanup_stage} IN ('revoke', 'sdk', 'identity')`
     ),
     check('provider_installation_reservations_generation_check', sql`${table.generation} > 0`),
     check(
@@ -4563,27 +4560,6 @@ export const provider_installation_pending_credentials = pgTable(
     index('IDX_provider_installation_pending_credentials_integration').on(
       table.platform_integration_id
     ),
-  ]
-);
-
-export const provider_installation_aliases = pgTable(
-  'provider_installation_aliases',
-  {
-    workspace_id: text().primaryKey(),
-    reservation_id: uuid()
-      .notNull()
-      .references(() => provider_installation_reservations.id, { onDelete: 'cascade' }),
-    generation: integer().notNull(),
-    event_time: bigint({ mode: 'number' }).notNull(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    check('provider_installation_aliases_generation_check', sql`${table.generation} > 0`),
-    index('IDX_provider_installation_aliases_reservation').on(table.reservation_id),
   ]
 );
 

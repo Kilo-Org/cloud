@@ -4,14 +4,12 @@ import type { SlackAdapter } from '@chat-adapter/slack';
 import { captureException } from '@sentry/nextjs';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import {
-  adoptLegacySlackInstallationByTeamId,
   completePendingSlackDeletion,
   deleteInstallationByTeamId,
   recoverSlackInstallation,
 } from '@/lib/integrations/slack-service';
 import { SLACK_SIGNING_SECRET } from '@/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { recordSlackInstallationAlias } from '@/lib/integrations/provider-installation-reservations';
 
 const SLACK_SIGNATURE_VERSION = 'v0';
 const SLACK_SIGNATURE_TOLERANCE_SECONDS = 60 * 5;
@@ -184,24 +182,6 @@ export function createSlackWebhookHandler(chat: Chat, slackAdapter: SlackAdapter
 
     const teamId = getSlackTeamId(payload);
     if (teamId) {
-      const workspaceId =
-        payload &&
-        typeof payload === 'object' &&
-        'team_id' in payload &&
-        typeof payload.team_id === 'string'
-          ? payload.team_id
-          : null;
-      if (workspaceId) {
-        await recordSlackInstallationAlias({
-          workspaceId,
-          installationId: teamId,
-          eventTime:
-            typeof (payload as { event_time?: unknown }).event_time === 'number'
-              ? (payload as { event_time: number }).event_time
-              : undefined,
-        });
-      }
-      await adoptLegacySlackInstallationByTeamId(teamId);
       await completePendingSlackDeletion(
         teamId,
         id => slackAdapter.deleteInstallation(id),

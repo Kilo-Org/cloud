@@ -55,12 +55,18 @@ export function CreateTownDialog({ isOpen, onClose }: CreateTownDialogProps) {
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="py-4">
-            <label className="mb-2 block text-sm font-medium text-white/70">Town Name</label>
+            <label htmlFor="town-name" className="mb-2 block text-sm font-medium text-white/70">
+              Town Name
+            </label>
             <Input
+              id="town-name"
+              name="town-name"
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="My Town"
               autoFocus
+              required
+              aria-required="true"
               className="border-white/10 bg-black/25"
             />
           </div>

@@ -661,14 +661,21 @@ function IntentStep({
           onChange={e => setName(e.target.value)}
           maxLength={NAME_MAX_LENGTH}
           autoFocus
+          aria-invalid={Boolean(nameError)}
+          aria-describedby={nameError ? 'wasteland-name-error' : undefined}
         />
-        {nameError && <p className="text-xs text-destructive">{nameError}</p>}
+        {nameError && (
+          <p id="wasteland-name-error" role="alert" className="text-xs text-destructive">
+            {nameError}
+          </p>
+        )}
       </div>
 
       {/* Ownership */}
       <div className="space-y-2">
-        <Label>Ownership</Label>
+        <Label id="wasteland-ownership-label">Ownership</Label>
         <RadioGroup
+          aria-labelledby="wasteland-ownership-label"
           value={ownership}
           onValueChange={v => {
             if (lockedOrgId) return;
@@ -701,7 +708,12 @@ function IntentStep({
               </p>
             ) : (
               <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger
+                  className="w-full"
+                  aria-label="Organization"
+                  aria-invalid={Boolean(orgError)}
+                  aria-describedby={orgError ? 'wasteland-org-error' : undefined}
+                >
                   <SelectValue placeholder="Select an organization" />
                 </SelectTrigger>
                 <SelectContent>
@@ -725,7 +737,11 @@ function IntentStep({
                 </SelectContent>
               </Select>
             )}
-            {orgError && <p className="mt-1 text-xs text-destructive">{orgError}</p>}
+            {orgError && (
+              <p id="wasteland-org-error" role="alert" className="mt-1 text-xs text-destructive">
+                {orgError}
+              </p>
+            )}
           </div>
         )}
       </div>

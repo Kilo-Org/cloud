@@ -5,7 +5,6 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
 }));
 
 import { resolveAutoModel } from './resolution';
-import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import {
   FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
@@ -28,7 +27,9 @@ const baseParams = {
 const nullUserPromise = Promise.resolve(null);
 const zeroBalancePromise = Promise.resolve(0);
 const primaryDefaultFallback = { model: PRIMARY_DEFAULT_MODEL };
-const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
+const { getOpenRouterModelsFromDatabase: mockedGetOpenRouterModels } = jest.requireMock<
+  jest.Mocked<typeof import('@/lib/ai-gateway/providers/gateway-models-cache')>
+>('@/lib/ai-gateway/providers/gateway-models-cache');
 
 const sampleDecision: AutoRoutingDecision = {
   model: 'anthropic/claude-haiku-4',

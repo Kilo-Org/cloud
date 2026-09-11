@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  ...jest.requireActual<typeof GatewayModelsCache>(
+    '@/lib/ai-gateway/providers/gateway-models-cache'
+  ),
   getOpenRouterModelsFromDatabase: jest.fn(),
 }));
 
@@ -14,7 +18,6 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
-import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 const { resolveAutoModel } = jest.requireActual<typeof AutoModelResolution>('./resolution');
 

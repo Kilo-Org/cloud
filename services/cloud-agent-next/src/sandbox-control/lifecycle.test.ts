@@ -5278,7 +5278,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     );
   });
 
-  it('keeps six-minute preparation and silent tool/input waits alive only with healthy heartbeats', async () => {
+  it('keeps six-minute preparation and silent tool waits alive only with healthy heartbeats', async () => {
     const h = await harness();
     await h.create();
     const connection = await h.ready();
@@ -5300,17 +5300,20 @@ describe('SandboxControl lifecycle boundaries', () => {
         connection
       );
     }
-    for (const waitingOn of ['tool', 'input'] as const) {
-      await h.hooks.onHeartbeat?.(
-        {
-          ...activeHeartbeat,
-          sessions: [
-            { kiloSessionId: ROUTE.kiloSessionId, state: 'active', idleForMs: 600_000, waitingOn },
-          ],
-        },
-        connection
-      );
-    }
+    await h.hooks.onHeartbeat?.(
+      {
+        ...activeHeartbeat,
+        sessions: [
+          {
+            kiloSessionId: ROUTE.kiloSessionId,
+            state: 'active',
+            idleForMs: 600_000,
+            waitingOn: 'tool',
+          },
+        ],
+      },
+      connection
+    );
     expect((await h.control.getPhysicalRecord()).state).toBe('running');
     expect(await loadDeadlines(h.storage)).not.toHaveProperty('idleStop');
     expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
@@ -5320,6 +5323,113 @@ describe('SandboxControl lifecycle boundaries', () => {
       'heartbeat_expired',
       connection.wrapperInstanceId
     );
+  });
+
+  it.each(['tool', 'model', 'preparation'] as const)(
+    'keeps a silent %s wait pinning the environment',
+    async waitingOn => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      await h.hooks.onHeartbeat?.(
+        {
+          ...activeHeartbeat,
+          pendingMessages: 1,
+          sessions: [
+            {
+              kiloSessionId: ROUTE.kiloSessionId,
+              state: 'active',
+              idleForMs: 0,
+              waitingOn,
+            },
+          ],
+        },
+        connection
+      );
+      expect((await h.control.getPhysicalRecord()).state).toBe('running');
+      expect(await loadDeadlines(h.storage)).not.toHaveProperty('idleStop');
+      expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
+    }
+  );
+
+  it('stops an input-only question park at the idle boundary with healthy heartbeats', async () => {
+    const h = await harness();
+    await h.create();
+    const connection = await h.ready();
+    const started = Date.now();
+    const captureHeartbeat: SandboxHeartbeatPayload = {
+      state: 'active',
+      pendingMessages: 1,
+      kilo: { ready: true },
+      sessions: [
+        {
+          kiloSessionId: ROUTE.kiloSessionId,
+          state: 'active',
+          idleForMs: 600_000,
+          waitingOn: 'input',
+        },
+      ],
+    };
+    await h.hooks.onHeartbeat?.(captureHeartbeat, connection);
+    const first = await loadDeadlines(h.storage);
+    expect(first.idleStop).toBe(started + DEADLINE_MS.idleStop);
+    expect(first.heartbeatExpiry).toBe(started + DEADLINE_MS.heartbeatExpiry);
+    expect(h.alarmAt).toBe(started + DEADLINE_MS.heartbeatExpiry);
+    for (let elapsed = 30_000; elapsed <= DEADLINE_MS.idleStop; elapsed += 30_000) {
+      vi.setSystemTime(started + elapsed);
+      await h.hooks.onHeartbeat?.(captureHeartbeat, connection);
+      await h.control.alarm();
+      await h.flush();
+    }
+    expect(h.runtime(connection.providerInstanceId)?.destroy).toHaveBeenCalledOnce();
+    expect(await h.control.getPhysicalRecord()).toMatchObject({ state: 'stopped' });
+    expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+      'idle',
+      connection.wrapperInstanceId
+    );
+  });
+
+  it('still expires an input-only park on the unchanged 90s heartbeat deadline', async () => {
+    const h = await harness();
+    await h.create();
+    const connection = await h.ready();
+    const started = Date.now();
+    await h.hooks.onHeartbeat?.(
+      {
+        state: 'active',
+        pendingMessages: 1,
+        kilo: { ready: true },
+        sessions: [
+          {
+            kiloSessionId: ROUTE.kiloSessionId,
+            state: 'active',
+            idleForMs: 600_000,
+            waitingOn: 'input',
+          },
+        ],
+      },
+      connection
+    );
+    expect(h.alarmAt).toBe(started + DEADLINE_MS.heartbeatExpiry);
+    await h.fireAlarm();
+    expect(h.runtime(connection.providerInstanceId)?.state.running).toBe(false);
+    expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+      'heartbeat_expired',
+      connection.wrapperInstanceId
+    );
+  });
+
+  it('keeps aggregate work pinning when no session reports it', async () => {
+    const h = await harness();
+    await h.create();
+    const connection = await h.ready();
+    await h.hooks.onHeartbeat?.(
+      { state: 'active', pendingMessages: 1, kilo: { ready: true }, sessions: [] },
+      connection
+    );
+    expect((await h.control.getPhysicalRecord()).state).toBe('running');
+    expect(await loadDeadlines(h.storage)).not.toHaveProperty('idleStop');
+    expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
   });
 
   it('schedules a slow pass before an unknown observation and issues only one physical stop', async () => {

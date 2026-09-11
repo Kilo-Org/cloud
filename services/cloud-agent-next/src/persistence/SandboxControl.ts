@@ -121,6 +121,7 @@ import {
   detachRoute,
   getRouteBySessionId,
   hasActiveWork,
+  hasEnvironmentPinningWork,
   resolveSessionEventRoute,
   type AttachRouteInput,
   type SessionRoute,
@@ -3790,11 +3791,7 @@ export class SandboxControl extends DurableObject<Env> {
           'heartbeatExpiry',
           now + DEADLINE_MS.heartbeatExpiry
         );
-        if (
-          payload.state !== 'idle' ||
-          (payload.pendingMessages ?? 0) > 0 ||
-          hasActiveWork(table)
-        ) {
+        if (hasEnvironmentPinningWork(table, payload)) {
           deadlines = cancelDeadline(deadlines, 'idleStop');
         } else {
           deadlines = armDeadline(

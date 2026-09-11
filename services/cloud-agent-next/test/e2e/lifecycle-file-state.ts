@@ -396,6 +396,7 @@ export async function runGatedFileTurn(
       filePath: input.expectedFile.path,
     })
   );
+  if (file.unavailable) throw new Error(file.reason);
   if (!file.exists || file.contents !== input.expectedFile.contents || !file.dirty) {
     throw new Error(
       `file ${input.expectedFile.path} mismatch: exists=${file.exists}; dirty=${file.dirty}; contents=${JSON.stringify(file.contents)}`
@@ -762,6 +763,7 @@ export async function lifecycleColdResume(args: LifecycleArgs): Promise<Lifecycl
         filePath: sentinelPath,
       })
     );
+    if (preColdState.unavailable) throw new Error(preColdState.reason);
     if (!preColdState.exists || preColdState.contents === undefined || !preColdState.dirty) {
       throw new Error('pre-cold sentinel was not captured as a dirty file');
     }
@@ -844,6 +846,7 @@ export async function lifecycleColdResume(args: LifecycleArgs): Promise<Lifecycl
         assistantMarker: `done-${preColdGateTag}`,
       })
     );
+    if (history.unavailable) throw new Error(history.reason);
     if (!history.userEntryFound || !history.assistantEntryFound) {
       throw new Error(
         `resumed history missing pre-cold entries: user=${history.userEntryFound}; assistant=${history.assistantEntryFound}`
@@ -860,9 +863,13 @@ export async function lifecycleColdResume(args: LifecycleArgs): Promise<Lifecycl
           filePath: sentinelPath,
         })
       );
-      const exactMatch =
-        resumedFile.exists && resumedFile.dirty && resumedFile.contents === capturedContents;
-      fileSurvivalObservation = `fileSurvived=${exactMatch} (observed, exact-equality)`;
+      if (resumedFile.unavailable) {
+        fileSurvivalObservation = `fileSurvived=unavailable:${resumedFile.reason}`;
+      } else {
+        const exactMatch =
+          resumedFile.exists && resumedFile.dirty && resumedFile.contents === capturedContents;
+        fileSurvivalObservation = `fileSurvived=${exactMatch} (observed, exact-equality)`;
+      }
     } catch (error) {
       fileSurvivalObservation = `fileSurvived=error:${errorMessage(error)}`;
     }
@@ -885,6 +892,7 @@ export async function lifecycleColdResume(args: LifecycleArgs): Promise<Lifecycl
         filePath: sentinelPath,
       })
     );
+    if (finalFile.unavailable) throw new Error(finalFile.reason);
     if (finalFile.head !== sentinelHead) throw new Error('resume unexpectedly changed git head');
     result = scenarioResult(
       'cold-resume',
@@ -939,14 +947,14 @@ export async function lifecycleMultiSessionCollab(args: LifecycleArgs): Promise<
     });
     const planPath = `plan-${runId}.md`;
     const planContents = `plan-token-${runId}`;
-    const initialHead = (
-      await resources.within('initial planner HEAD capture', () =>
-        inspectControlPlaneWorkspaceFile(runtime, {
-          kiloSessionId: planner.kiloSessionId,
-          filePath: planPath,
-        })
-      )
-    ).head;
+    const initialFile = await resources.within('initial planner HEAD capture', () =>
+      inspectControlPlaneWorkspaceFile(runtime, {
+        kiloSessionId: planner.kiloSessionId,
+        filePath: planPath,
+      })
+    );
+    if (initialFile.unavailable) throw new Error(initialFile.reason);
+    const initialHead = initialFile.head;
     const ownership = await resources.within('planner worktree ownership', () =>
       readWorktreeOwnership(args.config, [planner.kiloSessionId])
     );
@@ -1102,6 +1110,7 @@ export async function lifecycleMultiSessionCollab(args: LifecycleArgs): Promise<
     );
     if (
       files.some((file, index) => {
+        if (file.unavailable) throw new Error(file.reason);
         const expected = [planContents, implementationContents, reviewContents][index];
         return (
           !file.exists || !file.dirty || file.contents !== expected || file.head !== initialHead

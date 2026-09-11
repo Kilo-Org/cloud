@@ -70,6 +70,7 @@ import {
   waitForControlPlaneKiloRuntime,
   waitForNewSandboxPresent,
   waitForSandboxFamilyGone,
+  type DockerCommandExecutor,
   type SandboxContainer,
 } from './sandbox-control.js';
 
@@ -195,12 +196,14 @@ async function waitForOwnedSandbox(
   return null;
 }
 
-async function stopOwnedSandboxFamily(
+export async function stopOwnedSandboxFamily(
   sandbox: SandboxContainer,
   sessionId: string,
-  kiloSessionId: string
+  kiloSessionId: string,
+  executeDocker?: DockerCommandExecutor,
+  familyGoneTimeoutMs = 30_000
 ) {
-  const current = (await listSandboxContainers()).find(
+  const current = (await listSandboxContainers(executeDocker)).find(
     container => container.name === sandbox.name
   );
   if (current && current.id !== sandbox.id)
@@ -208,16 +211,24 @@ async function stopOwnedSandboxFamily(
   let killed: string[];
   if (current && sessionId.startsWith('workspace_')) {
     // Root presence is not exclusive ownership; the control-plane stop proves
-    // the `exclusive` operation before it kills.
-    killed = await stopOwnedControlPlaneSandbox(sandbox, kiloSessionId);
+    // the `exclusive` operation before it kills. The proof can fail merely
+    // because the runtime was retired or replaced while the container was
+    // winding down, so re-check the family before treating that as failure.
+    try {
+      killed = await stopOwnedControlPlaneSandbox(sandbox, kiloSessionId, executeDocker);
+    } catch (error) {
+      if (!(await waitForSandboxFamilyGone(sandbox, familyGoneTimeoutMs, executeDocker)))
+        throw error;
+      return [];
+    }
   } else {
     if (current) {
       const owned = await sandboxOwnsSession(current.id, sessionId, kiloSessionId);
       if (!owned) throw new Error(`Cannot prove exclusive ownership of ${sandbox.name}`);
     }
-    killed = await killSandboxFamily(sandbox);
+    killed = await killSandboxFamily(sandbox, executeDocker);
   }
-  if (!(await waitForSandboxFamilyGone(sandbox, 30_000))) {
+  if (!(await waitForSandboxFamilyGone(sandbox, familyGoneTimeoutMs, executeDocker))) {
     throw new Error(`Owned sandbox family ${sandbox.name} is still running after cleanup`);
   }
   return killed;
@@ -642,6 +653,7 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
       kiloSessionId: rootA.kiloSessionId,
       filePath: filename,
     });
+    if (writtenFile.unavailable) throw new Error(writtenFile.reason);
     if (!writtenFile.exists || writtenFile.contents !== originalContents || !writtenFile.dirty) {
       throw new Error('first chat did not create the dirty shared file through its real Kilo tool');
     }
@@ -790,6 +802,7 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
         filePath: filename,
       }),
     ]);
+    if (editedFile.unavailable) throw new Error(editedFile.reason);
     if (
       activeA.execution?.status !== 'running' ||
       activeB.execution?.status !== 'running' ||
@@ -1020,6 +1033,7 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
       kiloSessionId: rootA.kiloSessionId,
       filePath: filename,
     });
+    if (finalFile.unavailable) throw new Error(finalFile.reason);
     if (
       finalFile.contents !== replacementContents ||
       !finalFile.dirty ||

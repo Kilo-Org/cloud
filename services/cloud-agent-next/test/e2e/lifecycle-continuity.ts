@@ -591,6 +591,7 @@ async function resumeSameSession(
       assistantMarker: input.preIdleMarker,
     })
   );
+  if (history.unavailable) throw new Error(history.reason);
   if (!history.userEntryFound || !history.assistantEntryFound) {
     throw new Error(
       `resumed history missing pre-idle entries for ${input.session.kiloSessionId}: user=${history.userEntryFound}; assistant=${history.assistantEntryFound}`
@@ -605,7 +606,9 @@ async function resumeSameSession(
           filePath: input.preIdleFile!.path,
         })
       );
-      fileSurvival = `fileSurvived=${file.exists && file.dirty && file.contents === input.preIdleFile.contents} (observed, exact-equality)`;
+      fileSurvival = file.unavailable
+        ? `fileSurvived=unavailable:${file.reason}`
+        : `fileSurvived=${file.exists && file.dirty && file.contents === input.preIdleFile.contents} (observed, exact-equality)`;
     } catch (error) {
       fileSurvival = `fileSurvived=error:${errorMessage(error)}`;
     }
@@ -1490,6 +1493,7 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
         filePath: `tool-stream-${tag}.txt`,
       })
     );
+    if (file.unavailable) throw new Error(file.reason);
     const fileBytes =
       file.exists && typeof file.contents === 'string'
         ? Buffer.byteLength(file.contents, 'utf8')

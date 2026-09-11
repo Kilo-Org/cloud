@@ -9,9 +9,10 @@ import type { NativeOperationTarget, NativeRetirement } from './session-operatio
 export function stopWithinCleanupBudget(
   processes: OwnedProcessScope | undefined,
   processIssued: boolean,
-  deadlineAt: number
+  deadlineAt: number,
+  stopped?: Promise<void>
 ): Promise<boolean> {
-  if (!processes) return Promise.resolve(processIssued !== true);
+  if (!processes) return stopped?.then(() => true) ?? Promise.resolve(processIssued !== true);
   const now = Date.now();
   const observationReserve = Math.min(
     OWNED_PROCESS_OBSERVATION_TIMEOUT_MS,
@@ -25,14 +26,16 @@ export async function settleNativeCleanup(options: {
   processes: OwnedProcessScope | undefined;
   processIssued: boolean;
   deadlineAt: number;
+  stopped?: Promise<void>;
   observeDirect: (deadlineAt: number) => Promise<boolean>;
 }): Promise<boolean> {
-  const stopped = stopWithinCleanupBudget(
+  const stoppedWithinBudget = stopWithinCleanupBudget(
     options.processes,
     options.processIssued,
-    options.deadlineAt
+    options.deadlineAt,
+    options.stopped
   );
-  if (await stopped) return true;
+  if (await stoppedWithinBudget) return true;
   return options.observeDirect(options.deadlineAt);
 }
 
@@ -70,7 +73,12 @@ export function retireWorktreeRuntime<Entry extends RuntimeCleanupEntry<Root>, R
     return Promise.resolve('stale');
   const deadlineAt = deps.cleanupDeadline(entry, requested);
   if (entry.retiring) {
-    void stopWithinCleanupBudget(entry.processes, entry.processIssued === true, deadlineAt);
+    void stopWithinCleanupBudget(
+      entry.processes,
+      entry.processIssued === true,
+      deadlineAt,
+      entry.stopped
+    );
     return entry.retiring;
   }
   const completion = Promise.withResolvers<NativeRetirement>();
@@ -85,6 +93,7 @@ export function retireWorktreeRuntime<Entry extends RuntimeCleanupEntry<Root>, R
       processes: entry.processes,
       processIssued: entry.processIssued === true,
       deadlineAt,
+      stopped: entry.stopped,
       observeDirect: innerDeadlineAt => deps.unverifiedCleanup(entry, innerDeadlineAt),
     });
     if (!settled) return 'unconfirmed';

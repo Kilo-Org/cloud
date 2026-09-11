@@ -4202,6 +4202,7 @@ export class SandboxSession extends DurableObject<Env> {
     );
     return {
       expectedWrapperInstanceId,
+      fencePresent: fence.success,
       fenceWrapperInstanceId: fence.success ? fence.data.wrapperInstanceId : undefined,
       nativeRuntimeId: input.identity.nativeRuntimeId,
       fenceNativeRuntimeId: fence.success ? fence.data.nativeRuntimeId : undefined,

@@ -1923,6 +1923,7 @@ describe('SandboxSession orchestration', () => {
             wrapperInstanceId: RUNTIME_ID,
             expectedWrapperInstanceId: RUNTIME_ID,
             nativeRuntimeId,
+            fencePresent: true,
             fenceWrapperInstanceId: RUNTIME_ID,
             fenceNativeRuntimeId: nativeRuntimeId,
           })
@@ -1947,40 +1948,66 @@ describe('SandboxSession orchestration', () => {
     }
   );
 
-  it.each([
-    ['vercel-small', { vcpus: 2, memory: 4096 }],
-    ['vercel-large', { vcpus: 4, memory: 8192 }],
-  ] as const)(
-    'forwards persisted %s resources through readiness after a session reset',
-    async (sandboxAllocation, resources) => {
-      const fixture = sessionFixture({
-        identity: {
-          sessionId: SESSION_ID,
-          userId: 'user_1',
-          orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  it('reports fencePresent=false when a preparing drop has no native runtime fence', async () => {
+    const fixture = sessionFixture();
+    const nativeRuntimeId = '55555555-5555-4555-8555-555555555555';
+    const authorization: SessionOperationAuthorization = {
+      operation: 'session.attach',
+      operationId: 'attempt_1',
+      messageId: 'queued',
+      session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_root', directory: DIRECTORY },
+      wrapperInstanceId: RUNTIME_ID,
+      dispatchDeadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+    };
+    fixture.storage.kv.put('session_messages', [
+      {
+        messageId: 'queued',
+        state: 'queued',
+        wrapperInstanceId: RUNTIME_ID,
+        preparationAttemptId: 'attempt_1',
+        operations: {
+          attach: {
+            authorization,
+            dispatched: true,
+            result: {
+              ok: false,
+              error: { code: 'not_ready', message: 'Attach failed', retryable: true },
+            },
+          },
         },
-        workspace: {
-          sandboxId: SANDBOX_ID,
-          workspacePath: DIRECTORY,
-          sandboxProvider: 'vercel',
-          sandboxAllocation,
+      } satisfies SessionMessageRecord,
+    ]);
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      const preparing = receiptedPreparing(
+        1,
+        {
+          version: 2,
+          attemptId: 'attempt_1',
+          triggerMessageId: 'queued',
+          revision: 1,
+          timestamp: Date.now(),
+          step: 'workspace_setup',
+          action: 'attempt_started',
+          message: 'Preparing environment',
         },
-      });
-      const signing = deferred<[]>();
-      orchestrationMocks.signedAttachments.mockImplementationOnce(() => signing.promise);
-      await fixture.admit('sized');
-      await fixture.flush();
-      expect(fixture.control.ensureReady).not.toHaveBeenCalled();
-      fixture.reload();
-      await fixture.fireAlarm();
-      expect(fixture.control.ensureReady).toHaveBeenCalledWith(
-        expect.objectContaining({ provider: 'vercel', resources })
+        RUNTIME_ID,
+        nativeRuntimeId
       );
-      expect(fixture.record('sized')?.state).toBe('accepted');
-      signing.resolve([]);
-      await fixture.flush();
+      await expect(fixture.session.receiveSandboxControlPreparing(preparing)).resolves.toEqual({
+        applied: false,
+      });
+      expect(fields).toHaveBeenCalledWith(
+        expect.objectContaining({
+          diagnosticEvent: 'session_preparing_result',
+          disposition: 'native_runtime_mismatch',
+          fencePresent: false,
+        })
+      );
+    } finally {
+      fields.mockRestore();
     }
-  );
+  });
 
   it('persists the alarm and head budget before the first RPC and wakes the head on a fresh ID after reset', async () => {
     const fixture = sessionFixture();
@@ -4119,6 +4146,41 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.control.ensureReady).toHaveBeenCalledOnce();
     expect(fixture.record('a')?.state).toBe('accepted');
   });
+
+  it.each([
+    ['vercel-small', { vcpus: 2, memory: 4096 }],
+    ['vercel-large', { vcpus: 4, memory: 8192 }],
+  ] as const)(
+    'forwards persisted %s resources through readiness after a session reset',
+    async (sandboxAllocation, resources) => {
+      const fixture = sessionFixture({
+        identity: {
+          sessionId: SESSION_ID,
+          userId: 'user_1',
+          orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        },
+        workspace: {
+          sandboxId: SANDBOX_ID,
+          workspacePath: DIRECTORY,
+          sandboxProvider: 'vercel',
+          sandboxAllocation,
+        },
+      });
+      const signing = deferred<[]>();
+      orchestrationMocks.signedAttachments.mockImplementationOnce(() => signing.promise);
+      await fixture.admit('sized');
+      await fixture.flush();
+      expect(fixture.control.ensureReady).not.toHaveBeenCalled();
+      fixture.reload();
+      await fixture.fireAlarm();
+      expect(fixture.control.ensureReady).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'vercel', resources })
+      );
+      expect(fixture.record('sized')?.state).toBe('accepted');
+      signing.resolve([]);
+      await fixture.flush();
+    }
+  );
 
   it.each([
     { name: 'fence', error: () => new SandboxAcquisitionLostError() },

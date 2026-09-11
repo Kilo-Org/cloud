@@ -22,6 +22,7 @@ import {
   type HandlerDeps,
 } from '../../../wrapper/src/control/sandbox-control-handlers.js';
 import { startSandboxControlEventFeed } from '../../../wrapper/src/control/sandbox-control-runtime.js';
+import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type * as ControlRuntimeModule from '../../../wrapper/src/control/sandbox-control-runtime.js';
 import type * as KiloApiModule from '../../../wrapper/src/kilo-api.js';
 import type * as UtilsModule from '../../../wrapper/src/utils.js';
@@ -111,11 +112,13 @@ function fixture() {
     };
   });
   const onUnexpectedClose = vi.fn();
+  const diagnostics: ControlDiagnosticFields[] = [];
   const registry = createWorktreeKiloRuntimes({
     homeRoot: '/test-homes',
     inheritedEnv: {},
     startServer,
     onUnexpectedClose,
+    onDiagnostic: (_event, fields) => diagnostics.push(fields),
   });
   registries.push(registry);
   async function attach(
@@ -133,7 +136,17 @@ function fixture() {
       attachment.release();
     }
   }
-  return { registry, attach, startServer, close, statuses, createPty, clients, onUnexpectedClose };
+  return {
+    registry,
+    attach,
+    startServer,
+    close,
+    statuses,
+    createPty,
+    clients,
+    onUnexpectedClose,
+    diagnostics,
+  };
 }
 
 beforeEach(() => {
@@ -185,6 +198,21 @@ describe('direct worktree credential refresh', () => {
     expect(directoryForSession(sibling.kiloSessionId)).toBe(identity.directory);
     expect(f.registry.get(identity.directory)).toBe(refreshed);
     expect(f.onUnexpectedClose).not.toHaveBeenCalled();
+
+    // Shared existing-root renewal: the sibling is still committed when the
+    // existing root re-attaches with changed env, so the reason must not claim
+    // it was the sole root.
+    const renewal = f.diagnostics.find(
+      fields => fields.reason === 'refresh:existing_root_env_changed'
+    );
+    expect(renewal).toMatchObject({
+      reason: 'refresh:existing_root_env_changed',
+      kiloSessionId: identity.kiloSessionId,
+      sessionCount: 2,
+    });
+    expect(renewal?.detail).toContain('newRoot=0');
+    expect(renewal?.detail).toContain('tc=1');
+
     await f.attach(rotated, env, sibling);
     expect(f.startServer).toHaveBeenCalledTimes(2);
   });

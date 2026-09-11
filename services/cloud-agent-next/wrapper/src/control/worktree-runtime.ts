@@ -12,6 +12,7 @@ import type {
 import { safeSandboxRuntimeVersion } from '../../../src/shared/sandbox-status.js';
 import {
   SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS,
+  worktreeDeletePayloadSchema,
   type ControlErrorCode,
   type SessionAttachPayload,
   type SessionRequestIdentity,
@@ -23,7 +24,7 @@ import {
   type KiloServerHandle,
   type WrapperKiloClient,
 } from '../kilo-api.js';
-import { withTimeoutAndAbort } from '../utils.js';
+import { logToFile, withTimeoutAndAbort } from '../utils.js';
 import { isKiloServerProcess } from '../tool-cgroup.js';
 import {
   createOwnedProcessScope,
@@ -156,7 +157,10 @@ export type WorktreeKiloRuntimes = {
     target: NativeOperationTarget,
     deadlineAt: number
   ): Promise<boolean>;
-  getRetained?(directory: string, runtimeId?: string): WorktreeKiloRuntime | undefined;
+  getRetained?(
+    identity: SessionRequestIdentity | string,
+    runtimeId?: string
+  ): WorktreeKiloRuntime | undefined;
   get(identity: SessionRequestIdentity | string): WorktreeKiloRuntime | undefined;
   getAll?(directory: string): WorktreeKiloRuntime[];
   isCurrent?(runtime: WorktreeKiloRuntime): boolean;
@@ -445,6 +449,107 @@ function sameAuth(left: WorktreeKiloAuth, right: WorktreeKiloAuth): boolean {
     left.targets.backendBaseUrl === right.targets.backendBaseUrl &&
     left.targets.providerBaseUrl === right.targets.providerBaseUrl &&
     left.targets.sessionIngestBaseUrl === right.targets.sessionIngestBaseUrl
+  );
+}
+
+// Environment keys whose value derives from the Kilo token. A difference in any of
+// these is the only wrapper-side proof that the payload rotated the token.
+const TOKEN_DERIVED_ENV_KEYS = new Set([
+  'KILOCODE_TOKEN',
+  'KILO_AUTH_CONTENT',
+  'KILO_CONFIG_CONTENT',
+  'OPENCODE_CONFIG_CONTENT',
+]);
+
+type WorktreeAttachAction = 'reuse' | 'mint' | 'refresh';
+
+function worktreeIdFromDirectory(directory: string): string | undefined {
+  const parsed = worktreeDeletePayloadSchema.shape.worktreeId.safeParse(path.basename(directory));
+  return parsed.success ? parsed.data : undefined;
+}
+
+// Diagnostics only: reports which `attach()` branch ran and why. Never includes
+// credential values — only environment key names and the token-change flag.
+function emitWorktreeAttachDecision(
+  onDiagnostic: ControlDiagnosticReporter | undefined,
+  decision: {
+    directory: string;
+    kiloSessionId: string;
+    scopeId: string;
+    action: WorktreeAttachAction;
+    reason: string;
+    runtimeId?: string;
+    previousPresent: boolean;
+    retiring: boolean;
+    retirementResult?: NativeRetirement;
+    newRoot: boolean;
+    aborted: boolean;
+    committedCount: number;
+    pendingCount: number;
+    tokenChanged: boolean;
+    changedKeys: string[];
+  }
+): void {
+  const worktreeId = worktreeIdFromDirectory(decision.directory);
+  const changedKeys = decision.changedKeys.join(',');
+  // `tc` is first so the token-change discriminator survives `detail` truncation.
+  const detail = [
+    `tc=${decision.tokenChanged ? 1 : 0}`,
+    `newRoot=${decision.newRoot ? 1 : 0}`,
+    `prev=${decision.previousPresent ? 1 : 0}`,
+    `ret=${decision.retiring ? 1 : 0}`,
+    `unconf=${decision.retirementResult === 'unconfirmed' ? 1 : 0}`,
+    ...(decision.retirementResult ? [`rr=${decision.retirementResult}`] : []),
+    ...(changedKeys ? [`changed=${changedKeys}`] : []),
+  ]
+    .join(',')
+    .slice(0, 128);
+  onDiagnostic?.('control.request', {
+    operation: 'session.attach',
+    phase: 'started',
+    stage: 'runtime_attach',
+    kiloSessionId: decision.kiloSessionId,
+    scopeId: decision.scopeId,
+    ...(worktreeId ? { worktreeId } : {}),
+    ...(decision.runtimeId ? { nativeRuntimeId: decision.runtimeId } : {}),
+    reason: `${decision.action}:${decision.reason}`,
+    sessionCount: decision.committedCount,
+    pendingCount: decision.pendingCount,
+    aborted: decision.aborted,
+    detail,
+  });
+  logToFile(
+    `worktree runtime attach decision action=${decision.action} reason=${decision.reason} directory=${path.basename(decision.directory)} kiloSessionId=${decision.kiloSessionId} runtimeId=${decision.runtimeId ?? 'none'} prev=${decision.previousPresent ? 1 : 0} ret=${decision.retiring ? 1 : 0} rr=${decision.retirementResult ?? 'none'} newRoot=${decision.newRoot ? 1 : 0} aborted=${decision.aborted ? 1 : 0} unconf=${decision.retirementResult === 'unconfirmed' ? 1 : 0} tokenChanged=${decision.tokenChanged ? 1 : 0} committed=${decision.committedCount} pending=${decision.pendingCount} changed=${changedKeys || 'none'}`
+  );
+}
+
+// Diagnostics only: emitted when refresh/mint actually allocates a new runtime id,
+// so the pre-decision and post-allocation identities are both observable.
+function emitWorktreeRuntimeAllocation(
+  onDiagnostic: ControlDiagnosticReporter | undefined,
+  allocation: {
+    directory: string;
+    kiloSessionId?: string;
+    scopeId: string;
+    action: 'mint' | 'refresh';
+    previousRuntimeId?: string;
+    runtimeId: string;
+  }
+): void {
+  const worktreeId = worktreeIdFromDirectory(allocation.directory);
+  onDiagnostic?.('control.request', {
+    operation: 'session.attach',
+    phase: 'started',
+    stage: 'runtime_attach',
+    ...(allocation.kiloSessionId ? { kiloSessionId: allocation.kiloSessionId } : {}),
+    scopeId: allocation.scopeId,
+    ...(worktreeId ? { worktreeId } : {}),
+    nativeRuntimeId: allocation.runtimeId,
+    reason: `${allocation.action}:allocated`,
+    detail: `previousRuntimeId=${allocation.previousRuntimeId ?? 'none'}`,
+  });
+  logToFile(
+    `worktree runtime allocation action=${allocation.action} directory=${path.basename(allocation.directory)} runtimeId=${allocation.runtimeId} previousRuntimeId=${allocation.previousRuntimeId ?? 'none'}`
   );
 }
 
@@ -1276,7 +1381,15 @@ export function createWorktreeKiloRuntimes(options: {
       entry.cleanupDeadlineAt = undefined;
       entry.kiloClient = undefined;
       resetRootPublicationCountersForRuntimeRotation(entry);
+      const previousRuntimeId = entry.runtimeId;
       entry.runtimeId = crypto.randomUUID();
+      emitWorktreeRuntimeAllocation(options.onDiagnostic, {
+        directory: entry.directory,
+        scopeId: entry.kilo.scopeId,
+        action: 'refresh',
+        previousRuntimeId,
+        runtimeId: entry.runtimeId,
+      });
       return await start(entry, undefined, beforeMutation);
     } catch {
       failRuntime(entry, 'credential_refresh_failed');
@@ -1322,6 +1435,13 @@ export function createWorktreeKiloRuntimes(options: {
       const previous = entries.get(key);
       let entry = previous?.retiring ? undefined : previous;
       let cleanupRequired = false;
+      let entryCreated = false;
+      let refreshStarted = false;
+      let changedEnvKeys: string[] = [];
+      // A root is new when no attachment is already registered for this identity.
+      // The containment-off refresh branch below must distinguish a sibling join
+      // from renewal of an already-attached root.
+      const newRoot = !root;
       if (
         (scopeDirectory && scopeDirectory !== directory) ||
         (entry && !sameAuth(entry.kilo, kilo)) ||
@@ -1360,10 +1480,19 @@ export function createWorktreeKiloRuntimes(options: {
           options.inheritedEnv
         );
         const currentEnv = entry.env;
-        const changed = Object.keys({ ...currentEnv, ...env }).some(
+        changedEnvKeys = Object.keys({ ...currentEnv, ...env }).filter(
           key => currentEnv[key] !== env[key]
         );
-        if (changed) {
+        // One live native runtime owns each directory. A brand-new root joining an
+        // entry that already has live roots must reuse that runtime and its
+        // credentials instead of rotating the fenced incarnation out from under a
+        // committed sibling. Mandatory renewal stays on re-attach of an
+        // already-attached root (newRoot === false); a sole root with no other live
+        // root (for example after a detach) still refreshes. The incoming root is
+        // not yet registered, so liveRoots() describes the siblings already in the
+        // entry.
+        const joiningLiveEntry = newRoot && liveRoots(entry).length > 0;
+        if (changedEnvKeys.length > 0 && !joiningLiveEntry) {
           if (
             !entry.runtime ||
             entry.starting ||
@@ -1394,6 +1523,7 @@ export function createWorktreeKiloRuntimes(options: {
             .finally(() => {
               refreshing.starting = undefined;
             });
+          refreshStarted = true;
         }
       }
       if (!entry) {
@@ -1430,6 +1560,55 @@ export function createWorktreeKiloRuntimes(options: {
         entries.set(key, entry);
         cleanupRequired = true;
         if (isolation === 'directory-shared') directoriesByScope.set(kilo.scopeId, directory);
+        entryCreated = true;
+      }
+      // Capture the decision before this root is registered as pending so the
+      // committed/pending counts describe the entry as the attaching root sees it.
+      const decisionEntry = previous ?? entry;
+      const committedRootCount = [...decisionEntry.roots].filter(
+        current => current.attached
+      ).length;
+      const pendingRootCount = liveRoots(decisionEntry).length - committedRootCount;
+      const action: WorktreeAttachAction = refreshStarted
+        ? 'refresh'
+        : entryCreated
+          ? 'mint'
+          : 'reuse';
+      const reason = refreshStarted
+        ? newRoot
+          ? 'new_root_env_changed'
+          : 'existing_root_env_changed'
+        : entryCreated
+          ? previous
+            ? 'retiring'
+            : 'no_entry'
+          : 'live_entry';
+      emitWorktreeAttachDecision(options.onDiagnostic, {
+        directory,
+        kiloSessionId: identity.kiloSessionId,
+        scopeId: kilo.scopeId,
+        action,
+        reason,
+        ...(previous ? { runtimeId: previous.runtimeId } : {}),
+        previousPresent: previous !== undefined,
+        retiring: previous?.retiring !== undefined,
+        ...(previous?.retirementResult ? { retirementResult: previous.retirementResult } : {}),
+        newRoot,
+        aborted: decisionEntry.abort.signal.aborted,
+        committedCount: committedRootCount,
+        pendingCount: pendingRootCount,
+        tokenChanged: changedEnvKeys.some(key => TOKEN_DERIVED_ENV_KEYS.has(key)),
+        changedKeys: changedEnvKeys,
+      });
+      if (entryCreated) {
+        emitWorktreeRuntimeAllocation(options.onDiagnostic, {
+          directory,
+          kiloSessionId: identity.kiloSessionId,
+          scopeId: kilo.scopeId,
+          action: 'mint',
+          ...(previous ? { previousRuntimeId: previous.runtimeId } : {}),
+          runtimeId: entry.runtimeId,
+        });
       }
       if (!root) {
         root = {
@@ -1614,10 +1793,22 @@ export function createWorktreeKiloRuntimes(options: {
         !entry.abort.signal.aborted
       );
     },
-    getRetained(directory, runtimeId) {
-      if (runtimeId === undefined) return entries.get(directory)?.runtime;
+    getRetained(identity, runtimeId) {
+      if (typeof identity === 'string') {
+        const entry =
+          runtimeId === undefined
+            ? (entries.get(identity) ??
+              [...entries.values()].find(entry => entry.directory === identity))
+            : [...entries.values()].find(
+                entry => entry.directory === identity && entry.runtimeId === runtimeId
+              );
+        return entry?.runtime;
+      }
+      const entry =
+        entries.get(entryKey(identity, 'per-session')) ?? entries.get(identity.directory);
+      if (runtimeId === undefined || entry?.runtimeId === runtimeId) return entry?.runtime;
       return [...entries.values()].find(
-        entry => entry.directory === directory && entry.runtimeId === runtimeId
+        entry => entry.directory === identity.directory && entry.runtimeId === runtimeId
       )?.runtime;
     },
     getEntryRuntimeId(directory, root) {

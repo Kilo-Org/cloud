@@ -995,6 +995,66 @@ describe('worktree Kilo runtime registry', () => {
     expect(harness.unexpectedCloses).toBe(0);
   });
 
+  it('reuses the live runtime when a new sibling root joins with changed credentials', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createSharedRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        const stopped = Promise.withResolvers<void>();
+        proveOwnedProcesses(options, stopped.promise);
+        return {
+          url: server.url,
+          stopped: stopped.promise,
+          close: () => {
+            server.endFeeds();
+            stopped.resolve();
+          },
+        };
+      },
+      onDiagnostic: (_event, fields) => {
+        diagnostics.push(fields);
+      },
+    });
+    const directAuth = { ...auth, containmentEnabled: false };
+    const directory = path.join(tmpDir, 'shared');
+    const first = harness.registry.attach(rootIdentity(directory), directAuth);
+    const runtime = await first.ready;
+    first.commit();
+    const originalRuntimeId = runtime.runtimeId;
+    const originalClient = runtime.kiloClient;
+    expect(servers).toHaveLength(1);
+
+    const sibling = harness.registry.attach(
+      rootIdentity(directory, 'sibling'),
+      { ...directAuth, token: 'rotated-token' },
+      { GH_TOKEN: 'rotated-github-token' },
+      () => true
+    );
+    const reused = await sibling.ready;
+
+    expect(reused).toBe(runtime);
+    expect(reused.runtimeId).toBe(originalRuntimeId);
+    expect(reused.kiloClient).toBe(originalClient);
+    expect(servers).toHaveLength(1);
+    expect(harness.closes).toBe(0);
+
+    const decision = diagnostics.find(
+      fields =>
+        fields.operation === 'session.attach' && fields.kiloSessionId === 'root_sibling'
+    );
+    expect(decision?.reason).toBe('reuse:live_entry');
+    expect(decision?.detail).toContain('newRoot=1');
+    expect(decision?.detail).toContain('tc=1');
+    expect(diagnostics.some(fields => fields.reason === 'refresh:allocated')).toBe(false);
+
+    sibling.commit();
+    sibling.release();
+    first.release();
+    expect(harness.registry.get(directory)).toBe(runtime);
+    expect(harness.unexpectedCloses).toBe(0);
+  });
+
   it('closes retained root publication counters under the old native runtime on credential refresh', async () => {
     const diagnostics: ControlDiagnosticFields[] = [];
     const harness = createRegistry({
@@ -2201,6 +2261,288 @@ describe('worktree Kilo runtime registry', () => {
         sequence: 1,
       }),
     ]);
+  });
+});
+
+describe('worktree attach decision diagnostics', () => {
+  function decisionRecords(diagnostics: ControlDiagnosticFields[]): ControlDiagnosticFields[] {
+    return diagnostics.filter(
+      fields =>
+        fields.operation === 'session.attach' &&
+        fields.phase === 'started' &&
+        fields.stage === 'runtime_attach'
+    );
+  }
+
+  // Credential refresh requires a stoppable owned process scope and a client that
+  // answers the idle probe; the default stub harness omits both.
+  function createRefreshHarness(
+    diagnostics: ControlDiagnosticFields[],
+    isolation: 'per-session' | 'directory-shared' = 'per-session'
+  ) {
+    return createRegistry(
+      {
+        onDiagnostic: (_event, fields) => diagnostics.push(fields),
+        startServer: async options => {
+          const server = createKiloStub();
+          servers.push(server);
+          const stopped = Promise.withResolvers<void>();
+          proveOwnedProcesses(options, stopped.promise);
+          return {
+            url: server.url,
+            stopped: stopped.promise,
+            close: () => {
+              server.endFeeds();
+              stopped.resolve();
+            },
+          };
+        },
+      },
+      isolation
+    );
+  }
+
+  it('reports joining an existing live entry as reuse:live_entry', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createSharedRegistry({
+      onDiagnostic: (_event, fields) => diagnostics.push(fields),
+    });
+    const directory = path.join(tmpDir, 'reuse-live');
+    const first = harness.registry.attach(rootIdentity(directory, 'first'), auth);
+    const firstRuntime = await first.ready;
+    first.commit();
+    first.release();
+
+    const sibling = harness.registry.attach(rootIdentity(directory, 'sibling'), auth);
+    await sibling.ready;
+    sibling.commit();
+    sibling.release();
+
+    const decision = decisionRecords(diagnostics).find(
+      fields => fields.reason === 'reuse:live_entry'
+    );
+    expect(decision).toMatchObject({
+      operation: 'session.attach',
+      phase: 'started',
+      stage: 'runtime_attach',
+      reason: 'reuse:live_entry',
+      kiloSessionId: 'root_sibling',
+      nativeRuntimeId: firstRuntime.runtimeId,
+      sessionCount: 1,
+      pendingCount: 0,
+    });
+    expect(decision?.detail).toContain('newRoot=1');
+    expect(decision?.detail).toContain('prev=1');
+    expect(decision?.detail).toContain('tc=0');
+    expect(harness.launches).toHaveLength(1);
+  });
+
+  it('reports minting with no entry as mint:no_entry and logs the allocated id', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({ onDiagnostic: (_event, fields) => diagnostics.push(fields) });
+    const directory = path.join(tmpDir, 'mint-empty');
+    const attachment = harness.registry.attach(rootIdentity(directory), auth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+
+    const decision = decisionRecords(diagnostics).find(fields => fields.reason === 'mint:no_entry');
+    expect(decision).toMatchObject({
+      reason: 'mint:no_entry',
+      kiloSessionId: 'root_mint-empty',
+      sessionCount: 0,
+      pendingCount: 0,
+    });
+    expect(decision?.nativeRuntimeId).toBeUndefined();
+    expect(decision?.detail).toContain('newRoot=1');
+    expect(decision?.detail).toContain('prev=0');
+    expect(decision?.detail).toContain('tc=0');
+
+    const allocation = decisionRecords(diagnostics).find(
+      fields => fields.reason === 'mint:allocated'
+    );
+    expect(allocation).toMatchObject({
+      operation: 'session.attach',
+      reason: 'mint:allocated',
+      kiloSessionId: 'root_mint-empty',
+      nativeRuntimeId: runtime.runtimeId,
+      detail: 'previousRuntimeId=none',
+    });
+  });
+
+  it('reports an env-changed sibling join as reuse:live_entry without rotating the runtime', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRefreshHarness(diagnostics, 'directory-shared');
+    const directory = path.join(tmpDir, 'refresh-sibling');
+    const directAuth = { ...auth, containmentEnabled: false };
+    const first = harness.registry.attach(rootIdentity(directory, 'first'), directAuth);
+    const firstRuntime = await first.ready;
+    const originalRuntimeId = firstRuntime.runtimeId;
+    first.commit();
+    first.release();
+
+    const sibling = harness.registry.attach(
+      rootIdentity(directory, 'sibling'),
+      { ...directAuth, token: 'rotated-sibling-token' },
+      undefined,
+      () => true
+    );
+    const reused = await sibling.ready;
+    sibling.commit();
+    sibling.release();
+
+    const decision = decisionRecords(diagnostics).find(
+      fields => fields.reason === 'reuse:live_entry' && fields.kiloSessionId === 'root_sibling'
+    );
+    expect(decision).toMatchObject({
+      reason: 'reuse:live_entry',
+      kiloSessionId: 'root_sibling',
+      nativeRuntimeId: originalRuntimeId,
+      sessionCount: 1,
+    });
+    expect(decision?.detail).toContain('newRoot=1');
+    expect(decision?.detail).toContain('tc=1');
+    expect(String(decision?.detail)).toContain('KILOCODE_TOKEN');
+    expect(JSON.stringify(decision)).not.toContain('rotated-sibling-token');
+
+    // The joining sibling must not rotate the fenced directory incarnation.
+    expect(reused.runtimeId).toBe(originalRuntimeId);
+    expect(servers).toHaveLength(1);
+    expect(
+      decisionRecords(diagnostics).some(fields => fields.reason === 'refresh:allocated')
+    ).toBe(false);
+  });
+
+  it('reports an env-changed existing-root re-attach as refresh:existing_root_env_changed', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRefreshHarness(diagnostics);
+    const directory = path.join(tmpDir, 'refresh-sole');
+    const directAuth = { ...auth, containmentEnabled: false };
+    const identity = rootIdentity(directory);
+    const first = harness.registry.attach(identity, directAuth);
+    const firstRuntime = await first.ready;
+    const originalRuntimeId = firstRuntime.runtimeId;
+    first.commit();
+    first.release();
+
+    const refresh = harness.registry.attach(
+      identity,
+      { ...directAuth, token: 'rotated-sole-token' },
+      undefined,
+      () => true
+    );
+    await refresh.ready;
+    refresh.commit();
+    refresh.release();
+
+    const decision = decisionRecords(diagnostics).find(
+      fields => fields.reason === 'refresh:existing_root_env_changed'
+    );
+    expect(decision).toMatchObject({
+      reason: 'refresh:existing_root_env_changed',
+      kiloSessionId: identity.kiloSessionId,
+      nativeRuntimeId: originalRuntimeId,
+    });
+    expect(decision?.detail).toContain('newRoot=0');
+    expect(decision?.detail).toContain('tc=1');
+  });
+
+  it('logs abort state and untruncated changed keys without credential values', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRefreshHarness(diagnostics);
+    const directory = path.join(tmpDir, 'refresh-log-decision');
+    const directAuth = { ...auth, containmentEnabled: false };
+    const identity = rootIdentity(directory);
+    const first = harness.registry.attach(identity, directAuth);
+    await first.ready;
+    first.commit();
+    first.release();
+
+    const longKeys = [
+      `CUSTOM_CHANGED_KEY_ALPHA_${'a'.repeat(40)}`,
+      `CUSTOM_CHANGED_KEY_BETA_${'b'.repeat(40)}`,
+      `CUSTOM_CHANGED_KEY_GAMMA_${'c'.repeat(40)}`,
+    ];
+    const environment: Record<string, string> = {
+      ...Object.fromEntries(longKeys.map(key => [key, 'changed-value'])),
+      GH_TOKEN: 'rotated-log-secret',
+    };
+    const logPath = path.join(tmpDir, 'refresh-log-decision.log');
+    const previousLogPath = process.env.WRAPPER_LOG_PATH;
+    process.env.WRAPPER_LOG_PATH = logPath;
+    try {
+      const refresh = harness.registry.attach(identity, directAuth, environment, () => true);
+      await refresh.ready;
+      refresh.commit();
+      refresh.release();
+    } finally {
+      if (previousLogPath === undefined) delete process.env.WRAPPER_LOG_PATH;
+      else process.env.WRAPPER_LOG_PATH = previousLogPath;
+    }
+
+    const decisionLine = fs
+      .readFileSync(logPath, 'utf8')
+      .split('\n')
+      .find(
+        line =>
+          line.includes('worktree runtime attach decision') &&
+          line.includes('reason=existing_root_env_changed')
+      );
+    if (!decisionLine) throw new Error('Attach decision line was not logged');
+    expect(decisionLine).toContain('aborted=0');
+    for (const key of longKeys) expect(decisionLine).toContain(key);
+    expect(decisionLine).not.toContain('rotated-log-secret');
+    expect(decisionLine).not.toContain(directAuth.token);
+    expect(decisionLine).not.toContain('actual-managed');
+  });
+
+  it('reports a retiring-but-unconfirmed predecessor as mint:retiring, not confirmed retirement', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const stopGate = Promise.withResolvers<boolean>();
+    const harness = createSharedRegistry({
+      onDiagnostic: (_event, fields) => diagnostics.push(fields),
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async () => {
+            await stopGate.promise;
+            return true;
+          },
+        } as unknown as OwnedProcessScope);
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'retiring-mint');
+    const identity = rootIdentity(directory);
+    const first = harness.registry.attach(identity, auth);
+    await first.ready;
+    first.commit();
+    first.release();
+
+    expect(harness.registry.detach(identity)).toBe(true);
+    expect(harness.registry.getEntryRuntimeId?.(directory)).toBeDefined();
+
+    const sibling = harness.registry.attach(rootIdentity(directory, 'sibling'), auth);
+    const decision = decisionRecords(diagnostics).find(fields => fields.reason === 'mint:retiring');
+    expect(decision).toMatchObject({
+      reason: 'mint:retiring',
+      kiloSessionId: 'root_sibling',
+      sessionCount: 0,
+      pendingCount: 0,
+    });
+    expect(decision?.detail).toContain('prev=1');
+    expect(decision?.detail).toContain('ret=1');
+    expect(decision?.detail).toContain('unconf=0');
+    expect(JSON.stringify(decision)).not.toContain('retired');
+    expect(
+      decisionRecords(diagnostics).some(
+        fields => typeof fields.reason === 'string' && fields.reason.includes('retired')
+      )
+    ).toBe(false);
+
+    stopGate.resolve(true);
+    await sibling.ready.catch(() => undefined);
   });
 });
 
@@ -3771,7 +4113,7 @@ describe('runtime-to-registry root settlement', () => {
     expect(() => harness.registry.attach(identityA, { ...auth, token: 'unauthorized' })).toThrow(
       'Kilo worktree auth context mismatch'
     );
-    expect(observations).toBe(0);
+    expect(observations).toBe(1);
     absent = true;
     expect(() => harness.registry.attach(identityA, auth)).toThrow(
       'Native runtime retirement is unconfirmed'

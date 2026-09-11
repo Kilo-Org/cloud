@@ -28,7 +28,7 @@ describe('getCodeReviewTerminalReasonCopy', () => {
   });
 
   it('explains a no-output completion without blaming the model by name', () => {
-    const copy = getCodeReviewTerminalReasonCopy('assistant_no_reply');
+    const copy = getCodeReviewTerminalReasonCopy('assistant_empty_completion');
 
     expect(copy).toMatchObject({
       label: 'No review produced',

@@ -148,7 +148,10 @@ const StatusUpdatePayloadSchema = z
         payload.lastAssistantMessageText !== undefined &&
         payload.lastAssistantMessageTextTruncation?.retainedUtf8ByteLength === 0
       ),
-    { message: 'Assistant text cannot be present when it was omitted' }
+    {
+      message:
+        'Assistant text cannot be present when it was omitted. Note that a completed review carries no lastAssistantMessageText when the assistant produced no text at all; the route can only distinguish "no output" from "omitted for queue size" when the truncation marker is present.',
+    }
   );
 
 type StatusUpdatePayload = z.infer<typeof StatusUpdatePayloadSchema>;
@@ -299,7 +302,9 @@ function captureRuntimeModelNotFoundDiagnostics(params: {
  * response, so a `completed` callback with no retained assistant text means the
  * model finished without producing a review — the classic output-limit
  * exhaustion during reasoning, where the SDK yields an empty response — yet the
- * session still idles out and reports `completed`.
+ * session still idles out and reports `completed`. A final message whose output
+ * is tool calls only is intentionally treated the same way: the response text
+ * is the review, so no text means no review.
  *
  * Queue-size omission is a separate signal: when the payload text was dropped
  * to fit the callback queue, `lastAssistantMessageTextTruncation` carries
@@ -514,6 +519,11 @@ function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalRe
     terminalReason === 'user_cancelled' ||
     terminalReason === 'superseded' ||
     terminalReason === 'interrupted' ||
+    // No assistant output was produced, so a retry with the same model and
+    // configuration is likely to repeat. The check is failed and the PR gets
+    // an authored notice instead of a silent retry; the customer can re-run
+    // the review or adjust the reasoning/output settings.
+    terminalReason === 'assistant_empty_completion' ||
     // The customer's own provider quota is exhausted, so an immediate retry
     // burns a second review against the same closed door. hasKnownUnretryableFailureMessage
     // below already tries to catch this, but only by matching the raw '[BYOK] Your
@@ -1158,8 +1168,16 @@ export async function POST(
         '[code-review-status] Completed callback carried no review output; downgrading to failed',
         { reviewId, attemptId, sessionId, cliSessionId }
       );
+      captureMessage('Code review completed without producing output', {
+        level: 'warning',
+        tags: {
+          source: 'code-review-status-no-output',
+          review_id: reviewId,
+          cloud_agent_session_id: sessionId ?? '',
+        },
+      });
       status = 'failed';
-      terminalReason = 'assistant_no_reply';
+      terminalReason = 'assistant_empty_completion';
       errorMessage = 'The review session completed without producing a review summary or comments.';
     }
 

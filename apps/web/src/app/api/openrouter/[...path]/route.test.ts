@@ -784,7 +784,11 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it.each(['google/gemma-4-26b-a4b-it:free', 'google/gemma-4-31b-it:free'])(
+  it.each([
+    'google/gemma-4-26b-a4b-it:free',
+    'google/gemma-4-31b-it:free',
+    'thinkingmachines/inkling:free',
+  ])(
     'rejects the unavailable free model %s before upstream',
     async modelId => {
       mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: true, requestCount: 0 });

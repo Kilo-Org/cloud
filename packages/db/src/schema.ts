@@ -4434,7 +4434,7 @@ export const provider_oauth_attempts = pgTable(
     owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
     owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
     status: text()
-      .$type<'pending' | 'captured' | 'consumed' | 'expired'>()
+      .$type<'pending' | 'activating' | 'captured' | 'consumed' | 'expired'>()
       .notNull()
       .default('pending'),
     provider_installation_id: text(),
@@ -4453,7 +4453,7 @@ export const provider_oauth_attempts = pgTable(
     ),
     check(
       'provider_oauth_attempts_status_check',
-      sql`${table.status} IN ('pending', 'captured', 'consumed', 'expired')`
+      sql`${table.status} IN ('pending', 'activating', 'captured', 'consumed', 'expired')`
     ),
     check('provider_oauth_attempts_purpose_check', sql`${table.purpose} = 'provider_install'`),
     check(

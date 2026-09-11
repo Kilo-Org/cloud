@@ -172,8 +172,14 @@ export function SlackIntegrationDetails({
       })
     ) {
       uninstallApp.mutate(input, {
-        onSuccess: async () => {
-          toast.success('Slack disconnected');
+        onSuccess: async result => {
+          if (result.cleanupPending) {
+            toast.warning('Slack disconnect is still finishing', {
+              description: 'Kilo will retry cleanup when Slack reconnects or sends another event.',
+            });
+          } else {
+            toast.success('Slack disconnected');
+          }
           await refetch();
         },
         onError: err => {

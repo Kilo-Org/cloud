@@ -10,7 +10,9 @@ import {
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
 import {
-  consumeProviderOAuthAttempt,
+  claimUnsharedSlackOAuthAttemptForExchange,
+  cancelProviderOAuthAttempt,
+  completeUnsharedSlackOAuthAttempt,
   ownerHasSharedGitHubInstallation,
 } from '@/lib/integrations/provider-oauth-attempts';
 import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
@@ -139,12 +141,10 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     if (
       !sharedGitHubOwner &&
       verified.purpose === 'provider_install' &&
-      !(await consumeProviderOAuthAttempt({
+      !(await claimUnsharedSlackOAuthAttemptForExchange({
         actorUserId: user.id,
         owner,
-        provider: 'slack',
         state,
-        purpose: 'provider_install',
       }))
     ) {
       throw new Error('Slack OAuth attempt is invalid, expired, or already used');
@@ -158,8 +158,27 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       SLACK_REDIRECT_URI
     );
     if (!sharedGitHubOwner) {
-      await upsertSlackInstallation({ owner, teamId, installation });
-      await slackAdapter.setInstallation(teamId, installation);
+      try {
+        await upsertSlackInstallation({ owner, teamId, installation });
+        await slackAdapter.setInstallation(teamId, installation);
+        if (
+          verified.purpose === 'provider_install' &&
+          !(await completeUnsharedSlackOAuthAttempt({ actorUserId: user.id, owner, state }))
+        ) {
+          throw new Error('Slack OAuth attempt changed before completion');
+        }
+      } catch (error) {
+        if (verified.purpose === 'provider_install') {
+          await cancelProviderOAuthAttempt({
+            actorUserId: user.id,
+            owner,
+            provider: 'slack',
+            state,
+            purpose: 'provider_install',
+          });
+        }
+        throw error;
+      }
       const successPath = verified.returnTo
         ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=slack_installed')
         : buildIntegrationOAuthRedirectPath(PLATFORM.SLACK, owner, 'success=installed');

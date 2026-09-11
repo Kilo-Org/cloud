@@ -9,6 +9,8 @@ import {
   github_app_installations,
   github_installation_webhook_receipts,
   platform_integrations,
+  provider_installation_reservations,
+  slack_oauth_credentials,
 } from '@kilocode/db/schema';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import {
@@ -255,6 +257,72 @@ export async function connectVerifiedGitHubInstallation(
       const compatibility = await evaluateGitHubSharingCompatibility(tx, canonical.id, owner);
       if (!compatibility.compatible) {
         return { ok: false, reason: 'incompatible_workflow' };
+      }
+      const affectedOwners: Owner[] = [owner];
+      for (const association of otherOwnerAssociations) {
+        if (association.owned_by_organization_id) {
+          affectedOwners.push({ type: 'org', id: association.owned_by_organization_id });
+        } else if (association.owned_by_user_id) {
+          affectedOwners.push({ type: 'user', id: association.owned_by_user_id });
+        }
+      }
+      for (const affectedOwner of affectedOwners) {
+        const [slack] = await tx
+          .select()
+          .from(platform_integrations)
+          .where(
+            and(
+              affectedOwner.type === 'org'
+                ? eq(platform_integrations.owned_by_organization_id, affectedOwner.id)
+                : eq(platform_integrations.owned_by_user_id, affectedOwner.id),
+              eq(platform_integrations.platform, PLATFORM.SLACK),
+              eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE)
+            )
+          );
+        if (!slack) continue;
+        if (!slack.platform_installation_id) {
+          return { ok: false, reason: 'incompatible_workflow' };
+        }
+        const [reservation] = await tx
+          .select()
+          .from(provider_installation_reservations)
+          .where(
+            eq(
+              provider_installation_reservations.provider_installation_id,
+              slack.platform_installation_id
+            )
+          )
+          .for('update');
+        if (reservation?.status === 'deleting') {
+          return { ok: false, reason: 'incompatible_workflow' };
+        }
+        const [lockedSlack] = await tx
+          .select({ id: platform_integrations.id })
+          .from(platform_integrations)
+          .where(eq(platform_integrations.id, slack.id))
+          .for('update');
+        if (!lockedSlack) return { ok: false, reason: 'incompatible_workflow' };
+        const [credential] = await tx
+          .select({ enterprise: slack_oauth_credentials.is_enterprise_install })
+          .from(slack_oauth_credentials)
+          .where(eq(slack_oauth_credentials.platform_integration_id, lockedSlack.id))
+          .for('update');
+        if (!credential || credential.enterprise) {
+          return { ok: false, reason: 'incompatible_workflow' };
+        }
+        if (!reservation) {
+          await tx.insert(provider_installation_reservations).values({
+            provider: 'slack',
+            provider_installation_id: slack.platform_installation_id,
+            owned_by_user_id: affectedOwner.type === 'user' ? affectedOwner.id : null,
+            owned_by_organization_id: affectedOwner.type === 'org' ? affectedOwner.id : null,
+            platform_integration_id: slack.id,
+            generation: 1,
+            active_generation: 1,
+            status: 'active',
+            expires_at: '9999-12-31T23:59:59.999Z',
+          });
+        }
       }
       await tx
         .update(github_app_installations)

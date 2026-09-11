@@ -17,10 +17,10 @@ import {
 
 describe('controlDispatchDisposition', () => {
   it.each([
-    ['failed', 'disconnected', { action: 'fail', reason: 'environment_failed' }],
-    ['failed', 'ready', { action: 'fail', reason: 'environment_failed' }],
+    ['failed', 'disconnected', { action: 'wait' }],
+    ['failed', 'ready', { action: 'wait' }],
     ['unknown', 'disconnected', { action: 'fail', reason: 'provider_unknown' }],
-    ['stopped', 'disconnected', { action: 'fail', reason: 'environment_failed' }],
+    ['stopped', 'disconnected', { action: 'wait' }],
     ['running', 'ready', { action: 'send' }],
     ['running', 'disconnected', { action: 'wait' }],
     ['creating', 'connected', { action: 'wait' }],
@@ -28,6 +28,19 @@ describe('controlDispatchDisposition', () => {
     ['stopping', 'disconnected', { action: 'wait' }],
   ] as const)('classifies %s/%s with its failure reason', (physical, connection, expected) => {
     expect(controlDispatchDisposition({ physical, connection })).toEqual(expected);
+  });
+
+  it('keeps provider_unknown fail-closed and stopped/failed waiting', () => {
+    expect(controlDispatchDisposition({ physical: 'unknown', connection: 'ready' })).toEqual({
+      action: 'fail',
+      reason: 'provider_unknown',
+    });
+    expect(controlDispatchDisposition({ physical: 'stopped', connection: 'ready' })).toEqual({
+      action: 'wait',
+    });
+    expect(controlDispatchDisposition({ physical: 'failed', connection: 'ready' })).toEqual({
+      action: 'wait',
+    });
   });
 });
 

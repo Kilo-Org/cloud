@@ -63,7 +63,8 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
 import { events, commandQueue, executionLeases } from '../db/sqlite-schema.js';
 import type { Env } from '../types.js';
-import type { SessionId } from '../types/ids.js';
+import type { EventId, SessionId } from '../types/ids.js';
+import type { CloudStatusData } from '../shared/protocol.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import { nextMetadataAfterAdmittedAgentModel } from '../persistence/persist-admitted-agent-model.js';
 import { assertKiloModelAvailable } from '../model-validation.js';
@@ -133,11 +134,15 @@ import {
   WORKTREE_CHANGED_EVENT,
   WORKTREE_CHANGES_READY_EVENT,
 } from '../shared/worktree-changes-wire.js';
-import { createPreparationProgressRecorder } from '../session/preparation-progress.js';
+import {
+  createPreparationProgressRecorder,
+  type PreparationProgressRecorder,
+} from '../session/preparation-progress.js';
 import {
   finalizeOtherRunningAttemptsForMessage,
   finalizePreparationAttempt,
   getPreparationSnapshots,
+  readPreparationAttempt,
 } from '../session/preparation-history.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
@@ -182,6 +187,7 @@ import {
   controlDispatchDisposition,
   controlRequestResult,
   deliveryErrorLogFields,
+  isRecoverableRuntimeInvalidation,
   isRetryableDeliveryError,
   observeControlAfterStopping,
   safeErrorFromQueueReason,
@@ -193,6 +199,7 @@ import { createSessionStopLifecycle } from './session-stop-lifecycle.js';
 import { sessionStopReceipt } from './session-stop.js';
 import { progressSessionStop } from './session-stop-progress.js';
 import { bootPreparingStep, provisionPreparingStep } from './preparing-steps.js';
+import type { PhysicalState } from '../sandbox-control/status-projection.js';
 import { createSandboxTerminalBridge, type SandboxTerminalRecord } from './terminal-bridge.js';
 import {
   createSandboxTerminalLifecycle,
@@ -210,6 +217,7 @@ import {
   failedMessageSnapshot,
   freezeLegacyQueuedMessages,
   hasAcceptedMessage,
+  hasUnreleasedOperationProof,
   incrementDeliveryFailure,
   markSessionOperationRejection,
   matchesSessionMessageReplay,
@@ -217,6 +225,7 @@ import {
   recordAcceptedMessageActivity,
   releaseCompletedRetryableAttach,
   releaseUnadmittedWaitingMessages,
+  replacePreparationAttemptId,
   rotateLostPreparationAttempt,
   resolveSessionMessageIntent,
   streamCloudStatus,
@@ -297,6 +306,39 @@ function confirmedControlRejectionDetail(error: unknown): string | undefined {
   if (!(error instanceof ControlRequestError) || !error.rejectionReceived) return undefined;
   const detail = error.message.trim().slice(0, MAX_TERMINAL_DETAIL_LENGTH);
   return detail || undefined;
+}
+
+/**
+ * A pending runtime cleanup is the head's environment-preparation wait. The
+ * message is intentionally stable so the recorder can suppress a duplicate
+ * emission across 5 s alarms.
+ */
+function pendingRuntimeCleanupWaitMessage(reason: string | undefined): string {
+  switch (reason) {
+    case 'runtime_unhealthy':
+    case 'kilo_unhealthy':
+    case 'heartbeat_expired':
+      return 'Waiting for the sandbox to become healthy…';
+    case 'preparation_interrupted':
+      return 'Waiting for the sandbox to become available…';
+    default:
+      return 'Waiting for the sandbox to become healthy…';
+  }
+}
+
+/**
+ * Wait reason for a head that is not yet deliverable. Keep it stable per
+ * physical phase so the recorder can suppress a duplicate emission across 5 s
+ * alarms and clients see the reason change only when the phase does.
+ */
+function environmentWaitMessage(physical: PhysicalState): string {
+  if (physical === 'stopping') {
+    return 'Waiting for the sandbox to become healthy (environment is stopping)';
+  }
+  if (physical === 'stopped' || physical === 'failed') {
+    return 'Waiting for the sandbox to become available…';
+  }
+  return 'Waiting for the sandbox to become healthy…';
 }
 
 type ControlEventDisposition =
@@ -2744,12 +2786,12 @@ export class SandboxSession extends DurableObject<Env> {
 
   private async observeAcceptedOperation(
     message: MessageRecord,
-    epoch: number
-  ): Promise<'running' | 'completed' | 'response' | undefined> {
-    const authorization = sessionOperationAuthorizationSchema.safeParse(
-      message.operations?.prompt?.authorization
-    );
-    if (!authorization.success || !message.operations?.prompt?.dispatched) return undefined;
+    epoch: number,
+    kind: 'attach' | 'prompt' = 'prompt'
+  ): Promise<'running' | 'completed' | 'rejected' | 'uncertain' | undefined> {
+    const proof = kind === 'attach' ? message.operations?.attach : message.operations?.prompt;
+    const authorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
+    if (!authorization.success || !proof?.dispatched) return undefined;
     const metadata = await this.getMetadata();
     const sandboxId = metadata?.workspace?.sandboxId;
     if (!metadata || !sandboxId) throw new Error('Accepted runtime is unavailable');
@@ -2781,7 +2823,7 @@ export class SandboxSession extends DurableObject<Env> {
           if (
             this.terminalLifecycle.isCurrent(epoch) &&
             current?.wrapperInstanceId === authorization.data.wrapperInstanceId &&
-            current.operations?.prompt?.dispatched === true
+            current.operations?.[kind]?.dispatched === true
           )
             return;
           throw new Error('Original operation scope is unavailable');
@@ -2790,13 +2832,76 @@ export class SandboxSession extends DurableObject<Env> {
         isCurrent: () => false,
       }
     );
-    return dispatched.state === 'running' || dispatched.state === 'completed'
-      ? dispatched.state
-      : undefined;
+    switch (dispatched.state) {
+      case 'running':
+      case 'completed':
+      case 'rejected':
+      case 'uncertain':
+        return dispatched.state;
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Reconcile a queued head whose prompt was already dispatched on the ORIGINAL
+   * authorization. This is past environment preparation: the preparation
+   * deadline no longer applies, the prompt's own execution bound does, and the
+   * message must not rotate, re-attach, or emit a preparation wait. A confirmed
+   * rejection or an unobserved execution past its bound is terminal.
+   */
+  private async reconcileQueuedDispatchedPrompt(
+    queued: MessageRecord,
+    epoch: number
+  ): Promise<void> {
+    const messageId = queued.messageId;
+    const prompt = queued.operations?.prompt;
+    const authorization = prompt?.authorization;
+    if (!prompt?.dispatched || !authorization) return;
+    const promptDeadlineAt =
+      prompt.executionDeadlineAt ?? queued.executionDeadlineAt ?? authorization.dispatchDeadlineAt;
+    let observed: 'running' | 'completed' | 'rejected' | 'uncertain' | undefined;
+    try {
+      observed = await this.observeAcceptedOperation(queued, epoch, 'prompt');
+    } catch (error) {
+      logger
+        .withFields({ sessionId: this.sessionId, messageId, ...deliveryErrorLogFields(error) })
+        .warn('Queued prompt reconciliation failed');
+      observed = undefined;
+    }
+    if (!this.terminalLifecycle.isCurrent(epoch)) return;
+    const current = this.loadMessages().find(message => message.messageId === messageId);
+    if (!current || current.state !== 'queued') return;
+    if (observed === 'running' || observed === 'completed') {
+      const accepted = acceptQueuedMessage(this.loadMessages(), messageId, Date.now());
+      if (accepted && this.saveMessages(accepted, epoch))
+        await this.armQueueRetry(Date.now() + DEADLINE_MS.acceptedAlarmCap);
+      return;
+    }
+    if (observed === 'rejected' || Date.now() >= promptDeadlineAt) {
+      await this.failDelivery(messageId, 'prompt_exhausted', current.wrapperInstanceId, 'message');
+      return;
+    }
+    await this.armQueueRetry(Math.min(promptDeadlineAt, Date.now() + QUEUE_RETRY_MS));
+  }
+
+  /** True when the current queue head has already dispatched its prompt. */
+  private headDispatchedPrompt(): boolean {
+    const messages = this.loadMessages();
+    const headId = nextQueuedMessageId(messages);
+    const head = headId ? messages.find(message => message.messageId === headId) : undefined;
+    return head?.operations?.prompt?.dispatched === true;
   }
 
   async alarm(): Promise<void> {
-    if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
+    // A queued head whose prompt was already dispatched is past environment
+    // preparation. Reconcile it against its own execution bound before any
+    // pending-runtime cleanup transfer, so a quarantine cannot reorder (or
+    // extend the alarm of) a possibly-executing prompt behind cleanup.
+    const preEpoch = this.terminalLifecycle.captureEpoch();
+    const dispatchedPromptHead =
+      preEpoch !== null && !this.deletedWorktreeId && this.headDispatchedPrompt();
+    if (!dispatchedPromptHead && this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
     for (const stop of this.stopLifecycle.pending())
       void this.scheduleStopProgress(stop.request.operationId);
     await this.messageCallbacks.repair();
@@ -3172,9 +3277,21 @@ export class SandboxSession extends DurableObject<Env> {
       await this.armQueueRetry(Math.min(deadlineAt, queued.retryNotBefore));
       return;
     }
+    // A dispatched queue head is past environment preparation. Reconcile the
+    // ORIGINAL prompt authorization against its own execution bound instead of
+    // re-running acquisition/preparation, and never schedule it against the
+    // (possibly expired) preparation deadline. It must not rotate.
+    if (queued.operations?.prompt?.dispatched === true) {
+      await this.reconcileQueuedDispatchedPrompt(queued, epoch);
+      return;
+    }
+    // One effective operation/acquisition identity for this delivery. A
+    // finalized preparation attempt is replaced only at an environment wait and
+    // only once no unreleased attach/prompt proof binds the old identity;
+    // otherwise the existing operation must be reconciled first.
+    let attemptId = assigned.attemptId;
     const provider = getSandboxProvider(metadata);
-    const acquisition =
-      provider === 'cloudflare' ? { id: assigned.attemptId, deadlineAt } : undefined;
+    let acquisition = provider === 'cloudflare' ? { id: attemptId, deadlineAt } : undefined;
     const allowCreate = acquisition === undefined && options?.allowCreate === true;
     let wrapperInstanceId = queued.wrapperInstanceId;
     const isCurrent = () => this.queuedMessage(messageId, epoch, wrapperInstanceId) !== undefined;
@@ -3255,7 +3372,7 @@ export class SandboxSession extends DurableObject<Env> {
       if (!wrapperInstanceId) throw new Error('Wrapper identity is missing');
       const authorization: SessionOperationAuthorization = {
         operation,
-        operationId: operation === 'session.attach' ? assigned.attemptId : messageId,
+        operationId: operation === 'session.attach' ? attemptId : messageId,
         messageId,
         session: { sessionId, kiloSessionId, directory: this.directory(metadata) },
         wrapperInstanceId,
@@ -3364,12 +3481,11 @@ export class SandboxSession extends DurableObject<Env> {
       );
       return;
     }
-    if (this.pendingRuntimeCleanup() && !(await this.transferRuntimeCleanup())) return;
     const intent = queued.intent;
     const model = dispatchedKilocodeModelId(intent?.agent.model);
     const control = sandboxControlRpc(this.env, sandboxId);
-    const recorder = createPreparationProgressRecorder({
-      attemptId: assigned.attemptId,
+    let recorder = createPreparationProgressRecorder({
+      attemptId,
       triggerMessageId: messageId,
       sessionId,
       eventQueries: this.eventQueries,
@@ -3378,10 +3494,75 @@ export class SandboxSession extends DurableObject<Env> {
     for (const event of finalizeOtherRunningAttemptsForMessage(
       this.eventQueries,
       messageId,
-      assigned.attemptId,
+      attemptId,
       Date.now()
     )) {
       this.broadcastStoredEvent(event);
+    }
+    // Report an environment-preparation phase at the real decision point. A
+    // finalized attempt cannot carry progress (`onProgress` no-ops), so mint a
+    // fresh attempt first — but only when no unreleased operation proof binds
+    // the old identity; otherwise the delivery must reconcile that operation
+    // instead and the phase is stored as a presentation-only fallback.
+    const reportPreparation = (step: string, message: string) => {
+      if (!hasUnreleasedOperationProof(queued)) {
+        const attempt = readPreparationAttempt(this.eventQueries, attemptId);
+        if (attempt?.status === 'completed' || attempt?.status === 'failed') {
+          const nextAttemptId = crypto.randomUUID();
+          const replaced = replacePreparationAttemptId(
+            this.loadMessages(),
+            messageId,
+            nextAttemptId
+          );
+          if (this.saveMessages(replaced, epoch)) {
+            attemptId = nextAttemptId;
+            if (acquisition !== undefined) acquisition = { id: attemptId, deadlineAt };
+            recorder = createPreparationProgressRecorder({
+              attemptId,
+              triggerMessageId: messageId,
+              sessionId,
+              eventQueries: this.eventQueries,
+              broadcast: event => this.broadcastStoredEvent(event),
+            });
+            for (const event of finalizeOtherRunningAttemptsForMessage(
+              this.eventQueries,
+              messageId,
+              attemptId,
+              Date.now()
+            )) {
+              this.broadcastStoredEvent(event);
+            }
+          }
+        }
+      }
+      const attempt = readPreparationAttempt(this.eventQueries, attemptId);
+      if (attempt?.status === 'completed' || attempt?.status === 'failed') {
+        // The retained operation proof keeps this attempt terminal, so the
+        // recorder cannot persist progress. Store the phase on the head message
+        // and broadcast it; `deriveCloudStatus` reads it on reconnect.
+        this.savePreparationWait(messageId, epoch, { step, message });
+        return;
+      }
+      this.savePreparationWait(messageId, epoch, undefined, { preparingV2Follows: true });
+      this.emitPreparationWait(recorder, attemptId, step, message);
+    };
+    if (this.pendingRuntimeCleanup()) {
+      reportPreparation(
+        'workspace_setup',
+        pendingRuntimeCleanupWaitMessage(this.pendingRuntimeCleanup()?.reason)
+      );
+      if (!(await this.transferRuntimeCleanup())) return;
+      if (!isCurrent()) return;
+      const currentHead = this.queuedMessage(messageId, epoch, wrapperInstanceId);
+      if (Date.now() >= deadlineAt && currentHead?.operations?.prompt?.dispatched !== true) {
+        await this.failDelivery(
+          messageId,
+          'preparation_timeout',
+          wrapperInstanceId,
+          currentHead?.deliveryRetryScope
+        );
+        return;
+      }
     }
     if (
       !intent ||
@@ -3439,8 +3620,14 @@ export class SandboxSession extends DurableObject<Env> {
           DEADLINE_MS.startup
         );
       };
-      if (!this.terminalLifecycle.getAttachedWrapperInstanceId()) {
-        recorder.onProgress('workspace_setup', 'Preparing environment…');
+      // Emit the initial preparation line only once per attempt. On later
+      // drains the phase-specific reason (boot/wait) is already the latest
+      // detail; re-emitting this would reset it and defeat suppression.
+      if (
+        !this.terminalLifecycle.getAttachedWrapperInstanceId() &&
+        this.latestPreparationStep(attemptId) === undefined
+      ) {
+        this.emitPreparationWait(recorder, attemptId, 'workspace_setup', 'Preparing environment…');
       }
       let status = await ensureReady();
       if (!isCurrent()) {
@@ -3465,7 +3652,7 @@ export class SandboxSession extends DurableObject<Env> {
           return;
         }
         const provision = provisionPreparingStep(observed.physical, allowCreate);
-        if (provision) recorder.onProgress(provision.step, provision.message);
+        if (provision) reportPreparation(provision.step, provision.message);
         status = await ensureReady();
         if (!isCurrent()) {
           if (!this.terminalLifecycle.isCurrent(epoch))
@@ -3475,21 +3662,26 @@ export class SandboxSession extends DurableObject<Env> {
         recordRuntime(status.wrapperInstanceId);
       }
       const boot = bootPreparingStep(status.physical, status.connection);
-      if (boot) recorder.onProgress(boot.step, boot.message);
+      if (boot) reportPreparation(boot.step, boot.message);
       const disposition = controlDispatchDisposition(status);
       if (disposition.action === 'fail') {
         await this.failDelivery(messageId, disposition.reason, wrapperInstanceId);
         return;
       }
       if (disposition.action === 'wait') {
+        // Report the current environment wait reason at the real wait decision.
+        // `boot` already reported the creating/not-ready reason; stopped, failed
+        // and stopping have no hint, so report why the head is waiting here.
+        if (!boot) reportPreparation('workspace_setup', environmentWaitMessage(status.physical));
         await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
         return;
       }
       if (!wrapperInstanceId) throw new Error('Wrapper identity is missing');
       const operationResults = status.operationResults === true;
-      const proofBacked =
-        queued.operations?.attach?.dispatched === true ||
-        queued.operations?.prompt?.dispatched === true;
+      // After the dispatched-prompt early return above, the only prompt proof
+      // that can remain here is an authoritative not-admitted rejection, which
+      // needs no receipt capability. Only a still-live attach proof does.
+      const proofBacked = queued.operations?.attach?.dispatched === true;
       if (proofBacked && !operationResults)
         throw new ControlRequestError({
           code: 'runtime_unhealthy',
@@ -3499,7 +3691,7 @@ export class SandboxSession extends DurableObject<Env> {
       const needsPreparation =
         this.terminalLifecycle.getAttachedWrapperInstanceId() !== wrapperInstanceId;
       if (needsPreparation || status.attachment?.kilo?.containmentEnabled === false) {
-        if (needsPreparation) recorder.onProgress('workspace_setup', 'Setting up workspace…');
+        if (needsPreparation) reportPreparation('workspace_setup', 'Setting up workspace…');
         if (!status.attachment?.kilo)
           throw new Error('Contained session attachment is unavailable');
         attachInPreparation = needsPreparation;
@@ -3650,6 +3842,11 @@ export class SandboxSession extends DurableObject<Env> {
         attachedRuntime.wrapperInstanceId !== wrapperInstanceId
       )
         throw new Error('Wrapper changed during session attachment');
+      // The environment is up and the runtime is ready to send: the environment
+      // wait is over. Drop the durable fallback — and tell connected clients —
+      // so a later retryable not-admitted prompt cannot resurface a stale
+      // "waiting for sandbox" reason.
+      this.savePreparationWait(messageId, epoch, undefined);
       this.terminalLifecycle.recordAttachment({ metadata, sandboxId, wrapperInstanceId, epoch });
       recorder.finalize({ status: 'completed' });
       this.worktreeChanges.attached(preparationGeneration, this.worktreeContext(metadata));
@@ -4014,8 +4211,31 @@ export class SandboxSession extends DurableObject<Env> {
     }
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null) return;
-    let before = this.loadMessages();
     if (!this.terminalLifecycle.isCurrent(epoch)) return;
+    if (!isRecoverableRuntimeInvalidation(reason)) {
+      await this.failClosedWaitingMessages(reason, wrapperInstanceId, epoch);
+      return;
+    }
+    await this.settleRecoverableRuntimeInvalidation({
+      reason,
+      wrapperInstanceId,
+      epoch,
+      releaseDispatchedAttach: nativeRuntimeId !== undefined,
+    });
+  }
+
+  /**
+   * Fail-closed path for reasons with no legal create step (`missing_metadata`,
+   * `provider_unknown`): release any definitively unadmitted work, then fail the
+   * waiting queue as before.
+   */
+  private async failClosedWaitingMessages(
+    reason: string,
+    wrapperInstanceId: string | undefined,
+    epoch: number
+  ): Promise<void> {
+    if (!this.terminalLifecycle.isCurrent(epoch)) return;
+    let before = this.loadMessages();
     let released = false;
     if (wrapperInstanceId) {
       const result = releaseUnadmittedWaitingMessages(before, wrapperInstanceId);
@@ -4030,6 +4250,63 @@ export class SandboxSession extends DurableObject<Env> {
       wrapperInstanceId,
       false
     );
+    if (failedIds.length === 0 && !released) return;
+    if (!this.saveMessages(messages, epoch)) return;
+    if (this.pendingRuntimeCleanup() || nextQueuedMessageId(this.loadMessages()))
+      await this.armQueueRetry();
+  }
+
+  /**
+   * Recoverable runtime invalidation: preserve queued work that has not been
+   * dispatched to the agent. Never-dispatched and completed-attach-pre-prompt
+   * rows are released (keeping their deadline and retiring an obsolete attach
+   * proof); only accepted rows, dispatched-prompt rows, and the confirmed head
+   * are terminalized.
+   */
+  private async settleRecoverableRuntimeInvalidation(input: {
+    reason: string;
+    wrapperInstanceId?: string;
+    detail?: string;
+    detailMessageId?: string;
+    releaseDispatchedAttach?: boolean;
+    epoch: number;
+  }): Promise<void> {
+    const { reason, wrapperInstanceId, detail, detailMessageId, releaseDispatchedAttach, epoch } =
+      input;
+    if (!this.terminalLifecycle.isCurrent(epoch)) return;
+    let before = this.loadMessages();
+    let released = false;
+    if (wrapperInstanceId) {
+      const result = releaseUnadmittedWaitingMessages(
+        before,
+        wrapperInstanceId,
+        releaseDispatchedAttach ? { releaseDispatchedAttach: true } : undefined
+      );
+      if (result.releasedIds.length > 0) {
+        before = result.messages;
+        released = true;
+      }
+    }
+    const failedIds: string[] = [];
+    const messages = before.map(message => {
+      if (message.state !== 'queued' && message.state !== 'accepted') return message;
+      if (wrapperInstanceId !== undefined && message.wrapperInstanceId !== wrapperInstanceId) {
+        return message;
+      }
+      const prompt = message.operations?.prompt;
+      const confirmed =
+        message.state === 'accepted' ||
+        (prompt !== undefined && prompt.dispatched !== false) ||
+        (detailMessageId !== undefined && message.messageId === detailMessageId);
+      if (!confirmed) return message;
+      failedIds.push(message.messageId);
+      return {
+        ...message,
+        state: 'failed' as const,
+        failedReason: reason,
+        ...(detail && detailMessageId === message.messageId ? { failedDetail: detail } : {}),
+      };
+    });
     if (failedIds.length === 0 && !released) return;
     if (!this.saveMessages(messages, epoch)) return;
     if (this.pendingRuntimeCleanup() || nextQueuedMessageId(this.loadMessages()))
@@ -4568,7 +4845,137 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   private async deriveCloudStatus() {
-    return streamCloudStatus(this.loadMessages());
+    const messages = this.loadMessages();
+    const status = streamCloudStatus(messages);
+    if (status?.type !== 'preparing') return status;
+    const headId = nextQueuedMessageId(messages);
+    const head = headId ? messages.find(message => message.messageId === headId) : undefined;
+    const attemptId = head?.preparationAttemptId;
+    if (attemptId) {
+      const attempt = readPreparationAttempt(this.eventQueries, attemptId);
+      if (attempt?.status === 'running') {
+        const step = this.latestPreparationStep(attemptId);
+        return {
+          type: 'preparing' as const,
+          ...(step?.key ? { step: step.key } : {}),
+          ...(step?.latestDetail ? { message: step.latestDetail } : {}),
+        };
+      }
+    }
+    // A finalized attempt bound to a retained operation proof cannot carry
+    // progress; `reportWait` stores the current reason on the head instead so
+    // reconnect still sees it.
+    const wait = head?.preparationWait;
+    if (wait) return { type: 'preparing' as const, step: wait.step, message: wait.message };
+    return status;
+  }
+
+  /**
+   * Persist the current wait reason for a head whose attempt cannot receive
+   * progress, and tell already-connected clients. Only a real change writes or
+   * broadcasts, so unchanged 5 s alarms stay silent. Clearing the field ends
+   * the environment wait; unless a `preparing` v2 event is about to follow, a
+   * `cloud.status` `ready` drops the fallback copy on connected clients.
+   * `deriveCloudStatus` stays the reconnect path.
+   */
+  private savePreparationWait(
+    messageId: string,
+    epoch: number,
+    wait: { step: string; message: string } | undefined,
+    options?: { preparingV2Follows?: boolean }
+  ): void {
+    const messages = this.loadMessages();
+    const head = messages.find(message => message.messageId === messageId);
+    if (!head) return;
+    const current = head.preparationWait;
+    if (wait === undefined) {
+      if (current === undefined) return;
+      const cleared = this.saveMessages(
+        messages.map(message =>
+          message.messageId === messageId ? { ...message, preparationWait: undefined } : message
+        ),
+        epoch
+      );
+      if (cleared && options?.preparingV2Follows !== true)
+        this.broadcastCloudStatus({ type: 'ready' });
+      return;
+    }
+    if (current !== undefined && current.step === wait.step && current.message === wait.message)
+      return;
+    const saved = this.saveMessages(
+      messages.map(message =>
+        message.messageId === messageId ? { ...message, preparationWait: wait } : message
+      ),
+      epoch
+    );
+    if (saved)
+      this.broadcastCloudStatus({ type: 'preparing', step: wait.step, message: wait.message });
+  }
+
+  /** Broadcast a volatile `cloud.status` to already-connected stream clients. */
+  private broadcastCloudStatus(status: CloudStatusData['cloudStatus']): void {
+    this.broadcastStoredEvent({
+      id: 0 as EventId,
+      execution_id: '',
+      session_id: this.requireSessionId(),
+      stream_event_type: 'cloud.status',
+      payload: JSON.stringify({ cloudStatus: status } satisfies CloudStatusData),
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Emit a preparation wait once per phase/detail. Reconnect reads the reason
+   * from the materialized attempt snapshot, so repeating an identical sentence
+   * every 5 s adds nothing.
+   */
+  private emitPreparationWait(
+    recorder: PreparationProgressRecorder,
+    attemptId: string,
+    step: string,
+    message: string
+  ): void {
+    const latest = this.latestPreparationStep(attemptId);
+    if (latest?.key === step && latest.latestDetail === message) return;
+    recorder.onProgress(step, message);
+  }
+
+  /** Latest step snapshot for one preparation attempt, if any. */
+  private latestPreparationStep(
+    attemptId: string
+  ): { key: string; latestDetail?: string; startedAt: number } | undefined {
+    let latest: { key: string; latestDetail?: string; startedAt: number } | undefined;
+    for (const row of this.eventQueries.findByEntityPrefix(
+      `preparation/attempt/${attemptId}/step/`
+    )) {
+      let data: unknown;
+      try {
+        data = JSON.parse(row.payload);
+      } catch {
+        continue;
+      }
+      if (typeof data !== 'object' || data === null) continue;
+      const record = data as {
+        action?: unknown;
+        stepSnapshot?: {
+          key?: unknown;
+          status?: unknown;
+          startedAt?: unknown;
+          latestDetail?: unknown;
+        };
+      };
+      if (record.action !== 'step_snapshot' || !record.stepSnapshot) continue;
+      const step = record.stepSnapshot;
+      if (typeof step.key !== 'string' || typeof step.startedAt !== 'number') continue;
+      if (latest === undefined || step.startedAt >= latest.startedAt) {
+        latest = {
+          key: step.key,
+          startedAt: step.startedAt,
+          ...(typeof step.latestDetail === 'string' ? { latestDetail: step.latestDetail } : {}),
+        };
+      }
+    }
+    return latest;
   }
 
   private initialMessageFromRegistration(

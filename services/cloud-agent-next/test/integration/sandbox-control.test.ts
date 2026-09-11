@@ -9281,6 +9281,49 @@ describe('SandboxSession control-plane regressions', () => {
         throw new Error('Expected bounded acquisition B');
       const acquisitionB = { id: b.preparationAttemptId, deadlineAt: b.deliveryDeadlineAt };
       expect(b.deliveryDeadlineAt).toBeGreaterThanOrEqual(admittedAt + SESSION_DELIVERY_TIMEOUT_MS);
+      const snapshotAttemptId = (snapshot: Record<string, unknown>): string | undefined =>
+        typeof snapshot.attemptId === 'string' ? snapshot.attemptId : undefined;
+      const snapshotNestedAttemptTrigger = (snapshot: Record<string, unknown>): unknown => {
+        const attempt = snapshot.attempt;
+        return attempt !== null && typeof attempt === 'object'
+          ? (attempt as Record<string, unknown>).triggerMessageId
+          : undefined;
+      };
+      const contradictsBOwnership = (snapshot: Record<string, unknown>): boolean => {
+        const nestedTrigger = snapshotNestedAttemptTrigger(snapshot);
+        return (
+          snapshotAttemptId(snapshot) !== b.preparationAttemptId ||
+          snapshot.triggerMessageId !== 'msg_after_cancel_b' ||
+          (nestedTrigger !== undefined && nestedTrigger !== 'msg_after_cancel_b')
+        );
+      };
+      const expectOnlyBOwnedExtras = (snapshots: Record<string, unknown>[]) => {
+        expect(
+          snapshots.filter(
+            snapshot => snapshotAttemptId(snapshot) === preparing.preparationAttemptId
+          )
+        ).toEqual(cancelled);
+        const extras = snapshots.filter(
+          snapshot => snapshotAttemptId(snapshot) !== preparing.preparationAttemptId
+        );
+        const bSnapshot = extras.find(
+          snapshot =>
+            snapshot.action === 'attempt_snapshot' &&
+            snapshotAttemptId(snapshot) === b.preparationAttemptId
+        );
+        expect(bSnapshot).toBeDefined();
+        expect(bSnapshot).toMatchObject({
+          attemptId: b.preparationAttemptId,
+          triggerMessageId: 'msg_after_cancel_b',
+          action: 'attempt_snapshot',
+          attempt: {
+            id: b.preparationAttemptId,
+            triggerMessageId: 'msg_after_cancel_b',
+            status: 'running',
+          },
+        });
+        expect(extras.filter(contradictsBOwnership)).toEqual([]);
+      };
       expect(acquisitions.map(input => input.acquisition?.id)).toEqual([
         preparing.preparationAttemptId,
       ]);
@@ -9297,7 +9340,7 @@ describe('SandboxSession control-plane regressions', () => {
       ).rejects.toThrow('cleanup continuation reset');
       session = env.SANDBOX_SESSION.getByName(`${fixture.ownerId}:${fixture.sessionId}`);
       expect(await admissionState(session)).toEqual(beforeReset);
-      expect(await preparationSnapshots(session)).toEqual(cancelled);
+      expectOnlyBOwnedExtras(await preparationSnapshots(session));
       await runInDurableObject(session, (_instance, state) => {
         expect(state.storage.kv.get('pending_runtime_cleanup')).toEqual(cleanup);
       });
@@ -9315,7 +9358,7 @@ describe('SandboxSession control-plane regressions', () => {
           action: 'attempt_completed',
         },
       });
-      expect(await preparationSnapshots(session)).toEqual(cancelled);
+      expectOnlyBOwnedExtras(await preparationSnapshots(session));
       const response = await SELF.fetch(
         `http://worker.test/stream?sessionId=${fixture.sessionId}&userId=${fixture.ownerId}&replay=false`,
         { headers: { Upgrade: 'websocket' } }
@@ -9328,9 +9371,11 @@ describe('SandboxSession control-plane regressions', () => {
       });
       stream.accept();
       await vi.waitFor(() => {
-        expect(
-          events.filter(event => event.streamEventType === 'preparing').map(event => event.data)
-        ).toEqual(cancelled);
+        expectOnlyBOwnedExtras(
+          events
+            .filter(event => event.streamEventType === 'preparing')
+            .map(event => event.data as Record<string, unknown>)
+        );
       });
       stream.close();
 

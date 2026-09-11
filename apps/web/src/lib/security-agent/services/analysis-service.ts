@@ -161,7 +161,6 @@ export async function finalizeAnalysis(
     authToken,
     model,
     correlationId,
-    userId,
     organizationId,
   });
 
@@ -358,7 +357,6 @@ export async function startSecurityAnalysis(params: {
         authToken: gatewayToken,
         model: triageModel,
         correlationId,
-        userId: user.id,
         organizationId: findingOrganizationId,
       });
       const tier1DurationMs = Math.round(performance.now() - tier1Start);

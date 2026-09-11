@@ -16,7 +16,8 @@ import type {
   OpenRouterGeneration,
 } from './providers/openrouter/types';
 import { fetchGeneration } from './providers/upstream-request';
-import { OPENROUTER, VERCEL_AI_GATEWAY } from './providers/provider-definitions';
+import { OPENROUTER } from './providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from './providers/definitions/vercel';
 import { toMicrodollars } from '../utils';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';

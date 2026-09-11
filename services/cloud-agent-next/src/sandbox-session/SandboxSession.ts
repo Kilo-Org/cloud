@@ -158,6 +158,7 @@ import {
   sessionQuestionResolveResultSchema,
   sessionAbortResultSchema,
   sameSessionOperation,
+  isSandboxAcquisitionLostError,
   wrapperInstanceIdSchema,
   type SessionAttachPayload,
   type SessionOperationAck,
@@ -216,6 +217,7 @@ import {
   recordAcceptedMessageActivity,
   releaseCompletedRetryableAttach,
   releaseUnadmittedWaitingMessages,
+  rotateLostPreparationAttempt,
   resolveSessionMessageIntent,
   streamCloudStatus,
   streamQueuedSnapshots,
@@ -3726,6 +3728,7 @@ export class SandboxSession extends DurableObject<Env> {
         deadlineAt,
         error,
         attachInPreparation,
+        hadAcquisition: acquisition !== undefined,
       });
     } finally {
       this.worktreeChanges.finishPreparation(preparationGeneration);
@@ -3764,6 +3767,7 @@ export class SandboxSession extends DurableObject<Env> {
     epoch: number;
     phase: DispatchPhase;
     attachInPreparation: boolean;
+    hadAcquisition: boolean;
     wrapperInstanceId?: string;
     deadlineAt: number;
     error: unknown;
@@ -3772,6 +3776,24 @@ export class SandboxSession extends DurableObject<Env> {
       input;
     const message = this.queuedMessage(messageId, epoch, wrapperInstanceId);
     if (!message) return;
+    if (input.hadAcquisition && isSandboxAcquisitionLostError(error)) {
+      if (Date.now() >= deadlineAt) {
+        await this.failDelivery(
+          messageId,
+          'preparation_timeout',
+          wrapperInstanceId,
+          message.deliveryRetryScope
+        );
+        return;
+      }
+      const retryNotBefore = Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS);
+      const rotated = rotateLostPreparationAttempt(this.loadMessages(), messageId, retryNotBefore);
+      if (rotated) {
+        if (this.saveMessages(rotated, epoch)) await this.armQueueRetry(retryNotBefore);
+        return;
+      }
+      // Dispatched or unresolved proofs exist: fall through to the existing terminal handling.
+    }
     const rejection = error instanceof ControlRequestError && error.rejectionReceived === true;
     const retryableRejection =
       rejection && error instanceof ControlRequestError && error.code !== 'runtime_unhealthy';

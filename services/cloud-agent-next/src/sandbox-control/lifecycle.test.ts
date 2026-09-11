@@ -16,7 +16,10 @@ import {
 } from '../container-usage-context.js';
 import type { Env } from '../types.js';
 import type { VercelSandboxCreateEnvelope } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
-import type { SandboxHeartbeatPayload } from '../shared/sandbox-control-protocol.js';
+import {
+  isSandboxAcquisitionLostError,
+  type SandboxHeartbeatPayload,
+} from '../shared/sandbox-control-protocol.js';
 import type {
   SandboxControlConnectionIdentity,
   SandboxControlOutboundRequest,
@@ -1317,7 +1320,11 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
     expect(h.runtime(original.providerInstanceId)?.state.running).toBe(false);
     await h.evict();
-    await expect(h.acquire(acquisition)).rejects.toThrow('no longer owns this allocation');
+    const lostPromise = h.acquire(acquisition);
+    await expect(lostPromise).rejects.toThrow('no longer owns this allocation');
+    const lost = await lostPromise.catch(error => error);
+    expect(isSandboxAcquisitionLostError(lost)).toBe(true);
+    expect(lost).toMatchObject({ message: 'Sandbox acquisition no longer owns this allocation' });
     expect(mocks.providerCreate).toHaveBeenCalledOnce();
     expect(h.allocations.size).toBe(1);
     await h.acquire({ ...acquisition, id: 'attempt_b' });
@@ -1354,10 +1361,43 @@ describe('SandboxControl lifecycle boundaries', () => {
     const replacement = await h.ready();
     billing.resolve();
     await expect(acquiring).rejects.toThrow('runtime changed during billing admission');
+    const changed = await acquiring.catch(error => error);
+    expect(isSandboxAcquisitionLostError(changed)).toBe(true);
+    expect(changed).toMatchObject({ message: 'Sandbox runtime changed during billing admission' });
     await h.evict();
     await expect(h.acquire(acquisition)).rejects.toThrow('no longer owns this allocation');
     expect((await h.control.getPhysicalRecord()).providerRef).toBe(replacement.providerInstanceId);
     expect(h.allocations.size).toBe(2);
+  });
+
+  it('keeps the synthetic tombstone-free same-allocation billing transition generic', async () => {
+    const h = await harness();
+    await h.create();
+    const original = await h.ready();
+    const runtime = h.runtime(original.providerInstanceId);
+    if (!runtime) throw new Error('Missing runtime');
+    const billing = deferred<void>();
+    const entered = deferred<void>();
+    runtime.configureBilling.mockImplementationOnce(() => {
+      entered.resolve();
+      return billing.promise;
+    });
+    const acquisition = {
+      id: 'attempt_synthetic',
+      deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+    };
+    const acquiring = h.acquire(acquisition);
+    await entered.promise;
+    const physical = await h.control.getPhysicalRecord();
+    // Synthetic defensive fixture: no production transition was established to produce this record.
+    h.records.set('physical_record', { ...physical, state: 'unknown', stopTombstone: null });
+    billing.resolve();
+    const changed = await acquiring.then(
+      () => new Error('Expected a billing admission state rejection'),
+      error => error
+    );
+    expect(changed).toMatchObject({ message: 'Sandbox runtime changed during billing admission' });
+    expect(isSandboxAcquisitionLostError(changed)).toBe(false);
   });
 
   it('prunes expired receipts on demand without reviving an expired acquisition or adding receipt alarms', async () => {

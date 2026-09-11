@@ -59,6 +59,7 @@ import {
 import {
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_AUTO_PONG,
+  SandboxAcquisitionLostError,
   sessionOperationAckSchema,
   sessionOperationAuthorizationSchema,
   sessionOperationExpiresAt,
@@ -1656,13 +1657,14 @@ export class SandboxControl extends DurableObject<Env> {
         'Sandbox billing admission timed out'
       );
       const current = await loadPhysicalRecord(this.ctx.storage);
-      if (
+      const ownershipLost =
         !sameAllocation(current, physical) ||
         current.providerRef !== physical.providerRef ||
-        current.state !== 'running' ||
-        current.stopTombstone
-      ) {
-        throw new Error('Sandbox runtime changed during billing admission');
+        current.stopTombstone;
+      if (ownershipLost || current.state !== 'running') {
+        const error = 'Sandbox runtime changed during billing admission';
+        if (acquisition && ownershipLost) throw new SandboxAcquisitionLostError(error);
+        throw new Error(error);
       }
     }
     const preparationDeadline = Math.min(
@@ -1825,12 +1827,18 @@ export class SandboxControl extends DurableObject<Env> {
     }
     const status = await this.ctx.storage.transaction(async () => {
       const current = await loadPhysicalRecord(this.ctx.storage);
+      const allocationChanged = !sameAllocation(current, physical);
+      const providerChanged =
+        physical.providerRef !== null && current.providerRef !== physical.providerRef;
       if (
-        !sameAllocation(current, physical) ||
-        (physical.providerRef !== null && current.providerRef !== physical.providerRef) ||
+        allocationChanged ||
+        providerChanged ||
         (acquisition && !(await this.bindAcquisition(acquisition, current)))
       ) {
-        throw new Error('Sandbox allocation changed during readiness');
+        const error = 'Sandbox allocation changed during readiness';
+        if (acquisition && (allocationChanged || providerChanged))
+          throw new SandboxAcquisitionLostError(error);
+        throw new Error(error);
       }
       return this.statusForPhysical(current);
     });
@@ -1886,7 +1894,7 @@ export class SandboxControl extends DurableObject<Env> {
         receipt.allocation.kind !== allocation.kind ||
         receipt.allocation.id !== allocation.id
       ) {
-        throw new Error('Sandbox acquisition no longer owns this allocation');
+        throw new SandboxAcquisitionLostError();
       }
     }
     const available =
@@ -1911,7 +1919,7 @@ export class SandboxControl extends DurableObject<Env> {
         !sameAllocation(expected, current) ||
         !(await this.bindAcquisition(acquisition, current))
       ) {
-        throw new Error('Sandbox acquisition no longer owns this allocation');
+        throw new SandboxAcquisitionLostError();
       }
       return this.statusForPhysical(current);
     });

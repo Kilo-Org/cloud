@@ -42,6 +42,24 @@ export const SANDBOX_HELLO_DEADLINE_MS = 10_000;
 
 export const SANDBOX_CONTROL_REQUEST_TIMEOUT_MS = 30_000;
 
+export const SANDBOX_ACQUISITION_LOST_MESSAGE =
+  'Sandbox acquisition no longer owns this allocation';
+
+export class SandboxAcquisitionLostError extends Error {
+  constructor(message: string = SANDBOX_ACQUISITION_LOST_MESSAGE) {
+    super(message);
+    this.name = 'SandboxAcquisitionLostError';
+  }
+}
+
+export function isSandboxAcquisitionLostError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === 'SandboxAcquisitionLostError' ||
+      error.message === SANDBOX_ACQUISITION_LOST_MESSAGE)
+  );
+}
+
 export const SANDBOX_CONTROL_ATTACH_TIMEOUT_MS = 8 * 60_000;
 
 export const SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS = 60 * 60_000;

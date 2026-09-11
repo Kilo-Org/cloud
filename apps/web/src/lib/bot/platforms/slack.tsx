@@ -13,7 +13,11 @@ import {
 import type { BotPlatform, RequesterInfo } from '@/lib/bot/platforms/types';
 import { BOT_CONTEXT_MESSAGE_LIMIT } from '@/lib/bot/constants';
 import { APP_URL } from '@/lib/constants';
-import { getAccessTokenFromInstallation } from '@/lib/integrations/slack-service';
+import {
+  getAccessTokenFromInstallation,
+  getActiveSlackInstallationForRuntime,
+  withSlackSdkTimeout,
+} from '@/lib/integrations/slack-service';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getSlackMessagePermalink } from '@/lib/slack-bot/slack-utils';
 import { captureException } from '@sentry/nextjs';
@@ -280,7 +284,9 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
         throw new Error(`No Slack account id for platform integration ${platformIntegration.id}`);
       }
 
-      const installation = await slackAdapter.getInstallation(platformAccountId);
+      const installation = await withSlackSdkTimeout(
+        getActiveSlackInstallationForRuntime(platformAccountId)
+      );
       if (!installation) {
         throw new Error(`No Slack installation for platform integration ${platformIntegration.id}`);
       }

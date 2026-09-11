@@ -9,6 +9,7 @@ jest.mock('@/lib/config.server', () => ({
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import {
   platform_integrations,
+  provider_installation_pending_credentials,
   provider_installation_reservations,
   provider_oauth_attempts,
   slack_oauth_credentials,
@@ -17,15 +18,24 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { beginProviderOAuthAttempt } from './provider-oauth-attempts';
 import {
   claimSlackProviderInstallation,
+  claimLegacySlackProviderInstallation,
   expireStaleSlackReservation,
 } from './provider-installation-reservations';
-import { activateReservedSlackInstallation, deleteInstallationByTeamId } from './slack-service';
+import {
+  activateReservedSlackInstallation,
+  deleteInstallationByTeamId,
+  recoverSlackInstallation,
+} from './slack-service';
 
 describe('Slack provider installation activation', () => {
   afterEach(async () => {
     await cleanupDbForTest();
   });
 
+  const pendingCodec = {
+    encryptPendingCredential: (secret: string) => Buffer.from(secret).toString('base64'),
+    decryptPendingCredential: (ciphertext: string) => Buffer.from(ciphertext, 'base64').toString(),
+  } as const;
   const writeCredential = async (
     tx: typeof db,
     input: { integrationId: string; slackTeamId: string }
@@ -38,7 +48,7 @@ describe('Slack provider installation activation', () => {
       .values({
         platform_integration_id: input.integrationId,
         slack_team_id: input.slackTeamId,
-        access_token_encrypted: 'encrypted-test-value',
+        access_token_encrypted: 'encrypted-authoritative',
       })
       .returning();
     return credential;
@@ -59,7 +69,7 @@ describe('Slack provider installation activation', () => {
       state: 'activate-state',
       teamId: 'T_ACTIVATE',
     });
-    if (!claim) throw new Error('Expected reservation claim');
+    if (!claim?.attemptId) throw new Error('Expected reservation claim');
     const setInstallation = jest.fn(async () => undefined);
 
     const integration = await activateReservedSlackInstallation({
@@ -68,8 +78,9 @@ describe('Slack provider installation activation', () => {
       installation: { botToken: 'xoxb-secret', botUserId: 'U_BOT', teamName: 'Workspace' },
       grantedScopes: ['chat:write'],
       claim,
-      setChatSdkInstallation: setInstallation,
+      ...pendingCodec,
       writeCredential: writeCredential as never,
+      setChatSdkInstallation: setInstallation,
     });
 
     expect(integration.integration_status).toBe('active');
@@ -112,7 +123,7 @@ describe('Slack provider installation activation', () => {
       state: 'failure-state',
       teamId: 'T_FAILURE',
     });
-    if (!claim) throw new Error('Expected reservation claim');
+    if (!claim?.attemptId) throw new Error('Expected reservation claim');
 
     await expect(
       activateReservedSlackInstallation({
@@ -121,6 +132,7 @@ describe('Slack provider installation activation', () => {
         installation: { botToken: 'xoxb-secret', teamName: 'Workspace' },
         grantedScopes: null,
         claim,
+        ...pendingCodec,
         writeCredential: writeCredential as never,
         setChatSdkInstallation: async () => {
           throw new Error('state unavailable');
@@ -138,7 +150,7 @@ describe('Slack provider installation activation', () => {
             eq(platform_integrations.platform_installation_id, 'T_FAILURE')
           )
         )
-    ).resolves.toHaveLength(0);
+    ).resolves.toEqual([expect.objectContaining({ integration_status: 'pending' })]);
     await expect(
       db
         .select()
@@ -151,6 +163,27 @@ describe('Slack provider installation activation', () => {
         .from(provider_oauth_attempts)
         .where(eq(provider_oauth_attempts.id, claim.attemptId))
     ).resolves.toEqual([expect.objectContaining({ status: 'captured' })]);
+    await expect(
+      db
+        .select()
+        .from(provider_installation_pending_credentials)
+        .where(eq(provider_installation_pending_credentials.reservation_id, claim.reservationId))
+    ).resolves.toHaveLength(1);
+
+    const setInstallation = jest.fn(async (_teamId: string, _installation: unknown) => undefined);
+    await expect(
+      recoverSlackInstallation('T_FAILURE', setInstallation as never, {
+        decryptPendingCredential: pendingCodec.decryptPendingCredential as never,
+        writeCredential: writeCredential as never,
+      })
+    ).resolves.toBe(true);
+    expect(setInstallation).toHaveBeenCalledTimes(1);
+    await expect(
+      db
+        .select()
+        .from(provider_installation_reservations)
+        .where(eq(provider_installation_reservations.id, claim.reservationId))
+    ).resolves.toEqual([expect.objectContaining({ status: 'active' })]);
   });
 
   it('restores the incumbent generation after a failed reauthorization expires', async () => {
@@ -175,6 +208,7 @@ describe('Slack provider installation activation', () => {
       installation: { botToken: 'xoxb-v1', teamName: 'Workspace' },
       grantedScopes: null,
       claim: first,
+      ...pendingCodec,
       writeCredential: writeCredential as never,
       setChatSdkInstallation: async () => undefined,
     });
@@ -200,6 +234,26 @@ describe('Slack provider installation activation', () => {
     ).resolves.toEqual([
       expect.objectContaining({ status: 'pending', generation: 2, active_generation: 1 }),
     ]);
+    await expect(
+      activateReservedSlackInstallation({
+        owner,
+        teamId: 'T_REAUTH',
+        installation: { botToken: 'xoxb-v2', teamName: 'Workspace' },
+        grantedScopes: null,
+        claim: second,
+        ...pendingCodec,
+        writeCredential: writeCredential as never,
+        setChatSdkInstallation: async () => {
+          throw new Error('state unavailable');
+        },
+      })
+    ).rejects.toThrow('state unavailable');
+    await expect(
+      db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.platform_installation_id, 'T_REAUTH'))
+    ).resolves.toEqual([expect.objectContaining({ integration_status: 'active' })]);
 
     await db
       .update(provider_installation_reservations)
@@ -214,6 +268,120 @@ describe('Slack provider installation activation', () => {
     ).resolves.toEqual([
       expect.objectContaining({ status: 'active', generation: 1, active_generation: 1 }),
     ]);
+  });
+
+  it('releases reservation locks after an SDK timeout and permits recovery', async () => {
+    const actor = await insertTestUser();
+    const owner = { type: 'user' as const, id: actor.id };
+    await beginProviderOAuthAttempt({
+      actorUserId: actor.id,
+      owner,
+      provider: 'slack',
+      state: 'timeout-state',
+    });
+    const claim = await claimSlackProviderInstallation({
+      actorUserId: actor.id,
+      owner,
+      state: 'timeout-state',
+      teamId: 'T_TIMEOUT',
+    });
+    if (!claim) throw new Error('Expected claim');
+    await expect(
+      activateReservedSlackInstallation({
+        owner,
+        teamId: 'T_TIMEOUT',
+        installation: { botToken: 'xoxb-timeout', teamName: 'Workspace' },
+        grantedScopes: null,
+        claim,
+        ...pendingCodec,
+        writeCredential: writeCredential as never,
+        setChatSdkInstallation: () => new Promise(() => undefined),
+        sdkTimeoutMs: 5,
+      })
+    ).rejects.toThrow('timed out');
+
+    await expect(
+      recoverSlackInstallation('T_TIMEOUT', async () => undefined, {
+        sdkTimeoutMs: 100,
+        decryptPendingCredential: pendingCodec.decryptPendingCredential as never,
+        writeCredential: writeCredential as never,
+      })
+    ).resolves.toBe(true);
+  });
+
+  it('keeps the incumbent active when legacy pending encryption fails', async () => {
+    const actor = await insertTestUser();
+    const owner = { type: 'user' as const, id: actor.id };
+    await beginProviderOAuthAttempt({
+      actorUserId: actor.id,
+      owner,
+      provider: 'slack',
+      state: 'seed',
+    });
+    const seed = await claimSlackProviderInstallation({
+      actorUserId: actor.id,
+      owner,
+      state: 'seed',
+      teamId: 'T_LEGACY',
+    });
+    if (!seed) throw new Error('Expected seed claim');
+    const active = await activateReservedSlackInstallation({
+      owner,
+      teamId: 'T_LEGACY',
+      installation: { botToken: 'xoxb-old', teamName: 'Workspace' },
+      grantedScopes: null,
+      claim: seed,
+      ...pendingCodec,
+      writeCredential: writeCredential as never,
+      setChatSdkInstallation: async () => undefined,
+    });
+    const legacy = await claimLegacySlackProviderInstallation(owner, 'T_LEGACY');
+    if (!legacy) throw new Error('Expected legacy claim');
+
+    await expect(
+      activateReservedSlackInstallation({
+        owner,
+        teamId: 'T_LEGACY',
+        installation: { botToken: 'xoxb-new', teamName: 'Workspace' },
+        grantedScopes: null,
+        claim: legacy,
+        encryptPendingCredential: () => {
+          throw new Error('encryption unavailable');
+        },
+        setChatSdkInstallation: async () => undefined,
+      })
+    ).rejects.toThrow('encryption unavailable');
+    await expect(
+      db.select().from(platform_integrations).where(eq(platform_integrations.id, active.id))
+    ).resolves.toEqual([expect.objectContaining({ integration_status: 'active' })]);
+  });
+
+  it('recovers a legacy first install after SDK persistence fails', async () => {
+    const actor = await insertTestUser();
+    const owner = { type: 'user' as const, id: actor.id };
+    const claim = await claimLegacySlackProviderInstallation(owner, 'T_LEGACY_FIRST');
+    if (!claim) throw new Error('Expected legacy claim');
+    await expect(
+      activateReservedSlackInstallation({
+        owner,
+        teamId: 'T_LEGACY_FIRST',
+        installation: { botToken: 'xoxb-legacy', teamName: 'Workspace' },
+        grantedScopes: null,
+        claim,
+        ...pendingCodec,
+        writeCredential: writeCredential as never,
+        setChatSdkInstallation: async () => {
+          throw new Error('state unavailable');
+        },
+      })
+    ).rejects.toThrow('state unavailable');
+
+    await expect(
+      recoverSlackInstallation('T_LEGACY_FIRST', async () => undefined, {
+        decryptPendingCredential: pendingCodec.decryptPendingCredential as never,
+        writeCredential: writeCredential as never,
+      })
+    ).resolves.toBe(true);
   });
 
   it('releases the previous workspace when an owner switches installations', async () => {
@@ -239,6 +407,7 @@ describe('Slack provider installation activation', () => {
       installation: { botToken: 'xoxb-old', teamName: 'Old' },
       grantedScopes: null,
       claim: first,
+      ...pendingCodec,
       writeCredential: writeCredential as never,
       setChatSdkInstallation: async () => undefined,
     });
@@ -256,19 +425,17 @@ describe('Slack provider installation activation', () => {
       teamId: 'T_NEW',
     });
     if (!replacement) throw new Error('Expected replacement claim');
-    const deleteInstallation = jest.fn(async (_teamId: string) => undefined);
     const replaced = await activateReservedSlackInstallation({
       owner,
       teamId: 'T_NEW',
       installation: { botToken: 'xoxb-new', teamName: 'New' },
       grantedScopes: null,
       claim: replacement,
+      ...pendingCodec,
       writeCredential: writeCredential as never,
       setChatSdkInstallation: async () => undefined,
-      deleteChatSdkInstallation: deleteInstallation,
     });
     expect(replaced.id).toBe(initial.id);
-    expect(deleteInstallation).toHaveBeenCalledWith('T_OLD');
 
     const otherOwner = { type: 'user' as const, id: other.id };
     await beginProviderOAuthAttempt({
@@ -309,6 +476,7 @@ describe('Slack provider installation activation', () => {
       installation: { botToken: 'xoxb-current', teamName: 'Workspace' },
       grantedScopes: null,
       claim,
+      ...pendingCodec,
       writeCredential: writeCredential as never,
       setChatSdkInstallation: async () => undefined,
     });

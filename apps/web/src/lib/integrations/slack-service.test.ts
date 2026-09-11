@@ -85,6 +85,17 @@ function buildSlackIntegration(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function mockUninstallRows(integration: ReturnType<typeof buildSlackIntegration>) {
+  mockLimit.mockResolvedValue([integration]);
+  mockFor
+    .mockResolvedValueOnce([integration])
+    .mockResolvedValueOnce([integration])
+    .mockResolvedValueOnce([integration])
+    .mockResolvedValueOnce([integration])
+    .mockResolvedValueOnce([integration])
+    .mockResolvedValueOnce([]);
+}
+
 describe('slack-service uninstallApp', () => {
   beforeEach(() => {
     mockLimit.mockReset();
@@ -103,7 +114,7 @@ describe('slack-service uninstallApp', () => {
   });
 
   it('deletes Chat SDK Slack state before removing the platform integration row', async () => {
-    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+    mockUninstallRows(buildSlackIntegration());
     const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
     const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
 
@@ -119,26 +130,23 @@ describe('slack-service uninstallApp', () => {
     expect(deleteChatSdkInstallation.mock.invocationCallOrder[0]).toBeLessThan(
       deleteChatSdkIdentityCache.mock.invocationCallOrder[0]
     );
-    expect(deleteChatSdkIdentityCache.mock.invocationCallOrder[0]).toBeLessThan(
-      mockDeleteWhere.mock.invocationCallOrder[0]
-    );
   });
 
-  it('does not remove the platform integration row when Chat SDK installation cleanup fails', async () => {
-    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+  it('finishes local uninstall when Chat SDK installation cleanup fails', async () => {
+    mockUninstallRows(buildSlackIntegration());
     const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {
       throw new Error('redis unavailable');
     });
 
-    await expect(uninstallApp(owner, { deleteChatSdkInstallation })).rejects.toThrow(
-      'redis unavailable'
-    );
+    await expect(uninstallApp(owner, { deleteChatSdkInstallation })).resolves.toEqual({
+      success: true,
+    });
 
-    expect(mockDeleteWhere).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
   });
 
-  it('does not remove the platform integration row when Chat SDK identity cleanup fails', async () => {
-    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+  it('finishes local uninstall when Chat SDK identity cleanup fails', async () => {
+    mockUninstallRows(buildSlackIntegration());
     const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
     const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {
       throw new Error('redis unavailable');
@@ -146,16 +154,16 @@ describe('slack-service uninstallApp', () => {
 
     await expect(
       uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
-    ).rejects.toThrow('redis unavailable');
+    ).resolves.toEqual({ success: true });
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T123');
-    expect(mockDeleteWhere).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
   });
 
   it('falls back to the platform account ID for older rows without an installation ID', async () => {
-    mockLimit.mockResolvedValue([
-      buildSlackIntegration({ platform_installation_id: null, platform_account_id: 'T456' }),
-    ]);
+    mockUninstallRows(
+      buildSlackIntegration({ platform_installation_id: null, platform_account_id: 'T456' })
+    );
     const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
 
     await uninstallApp(owner, { deleteChatSdkInstallation });
@@ -165,13 +173,13 @@ describe('slack-service uninstallApp', () => {
   });
 
   it('disconnects suspended integrations without deleting shared Slack installation state', async () => {
-    mockLimit.mockResolvedValue([
+    mockUninstallRows(
       buildSlackIntegration({
         integration_status: 'suspended',
         platform_installation_id: null,
         platform_account_id: 'T456',
-      }),
-    ]);
+      })
+    );
     const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
     const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
 
@@ -189,12 +197,13 @@ describe('slack-service uninstallApp', () => {
 describe('slack-service deleteInstallationByTeamId', () => {
   beforeEach(() => {
     mockLimit.mockReset();
+    mockFor.mockReset();
     mockDeleteWhere.mockReset();
     mockDeleteWhere.mockResolvedValue(undefined);
   });
 
   it('deletes the platform integration and Chat SDK state for a Slack team', async () => {
-    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+    mockUninstallRows(buildSlackIntegration());
 
     await expect(deleteInstallationByTeamId('T123')).resolves.toEqual({
       success: true,

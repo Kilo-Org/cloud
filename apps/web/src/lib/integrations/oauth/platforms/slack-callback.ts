@@ -6,7 +6,6 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import {
   activateReservedSlackInstallation,
   SlackWorkspaceAlreadyConnectedError,
-  upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
 import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
@@ -21,7 +20,7 @@ import {
   cancelMissingCodeProviderOAuthAttempt,
 } from '@/lib/integrations/oauth/common';
 import {
-  adoptLegacySlackReservation,
+  claimLegacySlackProviderInstallation,
   claimSlackProviderInstallation,
 } from '@/lib/integrations/provider-installation-reservations';
 import { exchangeSlackOAuthCode } from '@/lib/integrations/platforms/slack/oauth-exchange';
@@ -157,12 +156,18 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
           grantedScopes,
           claim,
           setChatSdkInstallation: (id, value) => slackAdapter.setInstallation(id, value),
-          deleteChatSdkInstallation: id => slackAdapter.deleteInstallation(id),
         });
       } else {
-        const integration = await upsertSlackInstallation({ owner, teamId, installation });
-        await adoptLegacySlackReservation(owner, integration.id, teamId);
-        await slackAdapter.setInstallation(teamId, installation);
+        const claim = await claimLegacySlackProviderInstallation(owner, teamId);
+        if (!claim) throw new SlackWorkspaceAlreadyConnectedError(installation.teamName ?? teamId);
+        await activateReservedSlackInstallation({
+          owner,
+          teamId,
+          installation,
+          grantedScopes,
+          claim,
+          setChatSdkInstallation: (id, value) => slackAdapter.setInstallation(id, value),
+        });
       }
     } catch (error) {
       if (error instanceof SlackWorkspaceAlreadyConnectedError) {

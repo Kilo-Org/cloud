@@ -16,14 +16,15 @@ const SLACK_SIGNATURE_TOLERANCE_SECONDS = 60 * 5;
 
 type SlackAppUninstalledPayload = {
   type: 'event_callback';
-  team_id: string;
+  team_id: string | null;
+  enterprise_id?: string | null;
   event_time?: number;
   event: {
     type: 'app_uninstalled';
   };
 };
 
-function getSlackTeamId(payload: unknown): string | null {
+export function getSlackTeamId(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null;
   if ('team_id' in payload && typeof payload.team_id === 'string') return payload.team_id;
   if ('team_id' in payload && payload.team_id === null && 'enterprise_id' in payload) {
@@ -65,8 +66,6 @@ function isSlackAppUninstalledPayload(payload: unknown): payload is SlackAppUnin
     typeof payload === 'object' &&
     'type' in payload &&
     payload.type === 'event_callback' &&
-    'team_id' in payload &&
-    typeof payload.team_id === 'string' &&
     'event' in payload &&
     !!payload.event &&
     typeof payload.event === 'object' &&
@@ -128,13 +127,15 @@ export function createSlackWebhookHandler(chat: Chat, slackAdapter: SlackAdapter
     }
 
     if (isSlackAppUninstalledPayload(payload)) {
+      const teamId = getSlackTeamId(payload);
+      if (!teamId) return new Response('ok', { status: 200 });
       try {
-        await handleSlackAppUninstalled(payload.team_id, payload.event_time, chat, slackAdapter);
+        await handleSlackAppUninstalled(teamId, payload.event_time, chat, slackAdapter);
       } catch (error) {
         console.error('[Bot] Failed to handle Slack app_uninstalled event:', error);
         captureException(error, {
           tags: { component: 'kilo-bot', op: 'slack-app-uninstalled' },
-          extra: { teamId: payload.team_id },
+          extra: { teamId },
         });
       }
 
@@ -144,10 +145,8 @@ export function createSlackWebhookHandler(chat: Chat, slackAdapter: SlackAdapter
     const teamId = getSlackTeamId(payload);
     if (teamId) {
       await adoptLegacySlackInstallationByTeamId(teamId);
-      await recoverSlackInstallation(
-        teamId,
-        id => slackAdapter.getInstallation(id),
-        (id, installation) => slackAdapter.setInstallation(id, installation)
+      await recoverSlackInstallation(teamId, (id, installation) =>
+        slackAdapter.setInstallation(id, installation)
       );
     }
 

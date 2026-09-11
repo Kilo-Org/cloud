@@ -1,5 +1,5 @@
 {
-  "id": "e836e93d-eccd-4a0f-89fe-7667100150b5",
+  "id": "d0d60d74-cb68-4e74-aace-5e4aa23fe479",
   "prevId": "e00b62f1-939f-4d71-bf8f-4a5e9e304016",
   "version": "7",
   "dialect": "postgresql",
@@ -30689,6 +30689,136 @@
         "platform_oauth_credentials_credential_version_check": {
           "name": "platform_oauth_credentials_credential_version_check",
           "value": "\"platform_oauth_credentials\".\"credential_version\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.provider_installation_pending_credentials": {
+      "name": "provider_installation_pending_credentials",
+      "schema": "",
+      "columns": {
+        "reservation_id": {
+          "name": "reservation_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "platform_integration_id": {
+          "name": "platform_integration_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "generation": {
+          "name": "generation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "access_token_encrypted": {
+          "name": "access_token_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bot_user_id": {
+          "name": "bot_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "team_name": {
+          "name": "team_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "slack_enterprise_id": {
+          "name": "slack_enterprise_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_enterprise_install": {
+          "name": "is_enterprise_install",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "granted_scopes": {
+          "name": "granted_scopes",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_provider_installation_pending_credentials_integration": {
+          "name": "IDX_provider_installation_pending_credentials_integration",
+          "columns": [
+            {
+              "expression": "platform_integration_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "provider_installation_pending_credentials_reservation_id_provider_installation_reservations_id_fk": {
+          "name": "provider_installation_pending_credentials_reservation_id_provider_installation_reservations_id_fk",
+          "tableFrom": "provider_installation_pending_credentials",
+          "tableTo": "provider_installation_reservations",
+          "columnsFrom": [
+            "reservation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "provider_installation_pending_credentials_platform_integration_id_platform_integrations_id_fk": {
+          "name": "provider_installation_pending_credentials_platform_integration_id_platform_integrations_id_fk",
+          "tableFrom": "provider_installation_pending_credentials",
+          "tableTo": "platform_integrations",
+          "columnsFrom": [
+            "platform_integration_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "provider_installation_pending_credentials_generation_check": {
+          "name": "provider_installation_pending_credentials_generation_check",
+          "value": "\"provider_installation_pending_credentials\".\"generation\" > 0"
         }
       },
       "isRLSEnabled": false

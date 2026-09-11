@@ -135,7 +135,6 @@ export async function consumeProviderOAuthAttempt(input: {
           ownerCondition(input.owner),
           eq(provider_oauth_attempts.provider, input.provider),
           eq(provider_oauth_attempts.purpose, input.purpose ?? 'provider_install'),
-          eq(provider_oauth_attempts.purpose, input.purpose ?? 'provider_install'),
           or(
             eq(provider_oauth_attempts.status, 'pending'),
             eq(provider_oauth_attempts.status, 'consumed')

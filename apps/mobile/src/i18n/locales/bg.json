@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Корпоративно SSO"
   },
   "preferences": {
+    "general": "Общи",
+    "voiceInput": "Гласово въвеждане",
     "autoExpandThinking": "Автоматично разгъване на разсъжденията",
     "autoExpandThinkingSubtitle": "Показвай разсъжденията на агента разгънати, след като приключат.",
     "keepScreenOn": "Дръж екрана включен при отворена сесия",
@@ -237,6 +239,7 @@
     "appearanceLight": "Светъл",
     "appearanceDark": "Тъмен",
     "account": "Акаунт",
+    "accountSubtitle": "Език, доверени хостове и сесии на устройства",
     "prReviewAttribution": "Посочвай приложението в прегледите на PR",
     "prReviewAttributionSubtitle": "Добавяй „Прегледано чрез Kilo“ в края на всеки изпратен преглед.",
     "returnSendsMessage": "Клавишът за нов ред изпраща съобщение",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway не може да бъде достигнат. Провери връзката си и опитай отново.",
     "gatewayTimeout": "Транскрипцията отне твърде много време. Опитай отново.",
     "gatewayModelUnavailable": "Този модел за транскрипция не е наличен. Избери друг в Предпочитания.",
+    "gatewayModelUnavailableNotice": "Този модел вече не се предлага. Докосни $t(transcriptionModel.title), за да избереш друг.",
     "gatewaySignInRequired": "Влез, за да използваш транскрипция през Kilo Gateway.",
     "gatewayNoModel": "Първо избери модел за транскрипция в Предпочитания."
   },

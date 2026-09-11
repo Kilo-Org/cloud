@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO ສຳລັບອົງກອນ"
   },
   "preferences": {
+    "general": "ທົ່ວໄປ",
+    "voiceInput": "ການປ້ອນສຽງ",
     "autoExpandThinking": "ຂະຫຍາຍສ່ວນການຄິດອັດຕະໂນມັດ",
     "autoExpandThinkingSubtitle": "ຂະຫຍາຍສ່ວນການຄິດຂອງຕົວແທນໃຫ້ເຫັນທັງໝົດເມື່ອຄິດສຳເລັດ.",
     "keepScreenOn": "ເປີດໜ້າຈໍໄວ້ໃນຂະນະຢູ່ໜ້າເຊສຊັນ",
@@ -237,6 +239,7 @@
     "appearanceLight": "ສະຫວ່າງ",
     "appearanceDark": "ມືດ",
     "account": "ບັນຊີ",
+    "accountSubtitle": "ພາສາ, ໂຮສທີ່ໄວ້ໃຈໄດ້ ແລະ ເຊສຊັນຂອງອຸປະກອນ",
     "prReviewAttribution": "ລະບຸຊື່ແອັບໃນການກວດສອບ PR",
     "prReviewAttributionSubtitle": "ເພີ່ມຂໍ້ຄວາມວ່າກວດສອບຜ່ານ Kilo ຢູ່ທ້າຍຜົນການກວດສອບເມື່ອທ່ານສົ່ງ.",
     "returnSendsMessage": "ກົດປຸ່ມຂຶ້ນແຖວໃໝ່ເພື່ອສົ່ງຂໍ້ຄວາມ",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "ບໍ່ສາມາດເຊື່ອມຕໍ່ Kilo Gateway ໄດ້. ກວດສອບການເຊື່ອມຕໍ່ຂອງທ່ານ ແລ້ວລອງອີກຄັ້ງ.",
     "gatewayTimeout": "ການຖອດສຽງໃຊ້ເວລາດົນເກີນໄປ. ລອງອີກຄັ້ງ.",
     "gatewayModelUnavailable": "ໂມເດວຖອດສຽງນີ້ບໍ່ມີໃຫ້ໃຊ້. ເລືອກໂມເດວອື່ນໃນການຕັ້ງຄ່າສ່ວນຕົວ.",
+    "gatewayModelUnavailableNotice": "ໂມເດວນີ້ບໍ່ໄດ້ສະເໜີອີກຕໍ່ໄປ. ແຕະ $t(transcriptionModel.title) ເພື່ອເລືອກອັນອື່ນ.",
     "gatewaySignInRequired": "ເຂົ້າສູ່ລະບົບເພື່ອໃຊ້ການຖອດສຽງຜ່ານ Kilo Gateway.",
     "gatewayNoModel": "ເລືອກໂມເດວຖອດສຽງໃນການຕັ້ງຄ່າສ່ວນຕົວກ່ອນ."
   },

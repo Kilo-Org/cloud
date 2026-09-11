@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "நிறுவன SSO"
   },
   "preferences": {
+    "general": "பொது",
+    "voiceInput": "குரல் உள்ளீடு",
     "autoExpandThinking": "சிந்தனையைத் தானாக விரிக்கவும்",
     "autoExpandThinkingSubtitle": "ஏஜென்ட் சிந்தித்து முடித்ததும் அதன் சிந்தனையை விரித்துக் காட்டவும்.",
     "keepScreenOn": "அமர்வுப் பக்கத்தில் இருக்கும்போது திரை அணையாமல் வைக்கவும்",
@@ -237,6 +239,7 @@
     "appearanceLight": "வெளிர்",
     "appearanceDark": "அடர்",
     "account": "கணக்கு",
+    "accountSubtitle": "மொழி, நம்பகமான தளங்கள், சாதன அமர்வுகள்",
     "prReviewAttribution": "PR மதிப்பாய்வுகளில் செயலியின் பெயரைக் குறிப்பிடவும்",
     "prReviewAttributionSubtitle": "மதிப்பாய்வைச் சமர்ப்பிக்கும்போது, Kilo வழியாக மதிப்பாய்வு செய்யப்பட்டது என்ற அடிக்குறிப்பைச் சேர்க்கவும்.",
     "returnSendsMessage": "என்டர் விசை செய்தியை அனுப்பும்",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway-ஐ அணுக முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
     "gatewayTimeout": "உரையாக்கம் மிக அதிக நேரம் எடுத்தது. மீண்டும் முயற்சிக்கவும்.",
     "gatewayModelUnavailable": "இந்த உரையாக்க மாதிரி கிடைக்கவில்லை. விருப்பத்தேர்வுகளில் வேறொன்றைத் தேர்ந்தெடுக்கவும்.",
+    "gatewayModelUnavailableNotice": "இந்த மாதிரி இனி வழங்கப்படாது. வேறொன்றைத் தேர்ந்தெடுக்க $t(transcriptionModel.title) தட்டவும்.",
     "gatewaySignInRequired": "Kilo Gateway உரையாக்கத்தைப் பயன்படுத்த உள்நுழையவும்.",
     "gatewayNoModel": "முதலில் விருப்பத்தேர்வுகளில் உரையாக்க மாதிரியைத் தேர்ந்தெடுக்கவும்."
   },

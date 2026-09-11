@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Байгууллагын SSO"
   },
   "preferences": {
+    "general": "Ерөнхий",
+    "voiceInput": "Дуут оруулга",
     "autoExpandThinking": "Бодлыг автоматаар дэлгэх",
     "autoExpandThinkingSubtitle": "Дууссаны дараа агентын бодлыг дэлгэсэн байдлаар харуулна.",
     "keepScreenOn": "Сессийн дэлгэц дээр байх үед дэлгэцийг асаалттай байлгах",
@@ -237,6 +239,7 @@
     "appearanceLight": "Цайвар",
     "appearanceDark": "Бараан",
     "account": "Бүртгэл",
+    "accountSubtitle": "Хэл, итгэмжлэгдсэн хостууд, төхөөрөмжийн сессүүд",
     "prReviewAttribution": "PR-ийн хяналтад аппын нэрийг нэмэх",
     "prReviewAttributionSubtitle": "Хяналтын дүнг илгээхдээ төгсгөлд нь «Kilo ашиглан хянасан» гэсэн тэмдэглэл нэмнэ.",
     "returnSendsMessage": "Мөр шилжүүлэх товч мессеж илгээнэ",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway-д холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
     "gatewayTimeout": "Яриаг бичвэр болгох хэт удаан үргэлжиллээ. Дахин оролдоно уу.",
     "gatewayModelUnavailable": "Энэ яриаг бичвэр болгох загвар боломжгүй. Тохиргооноос өөр загвар сонгоно уу.",
+    "gatewayModelUnavailableNotice": "Энэ загварыг цаашид санал болгохгүй. Өөр загвар сонгохын тулд $t(transcriptionModel.title)-г товшино уу.",
     "gatewaySignInRequired": "Kilo Gateway-р бичвэр болгохыг ашиглахын тулд нэвтэрнэ үү.",
     "gatewayNoModel": "Эхлээд Тохиргооноос яриаг бичвэр болгох загвар сонгоно уу."
   },

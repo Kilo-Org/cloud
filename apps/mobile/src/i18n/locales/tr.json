@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Kurumsal SSO"
   },
   "preferences": {
+    "general": "Genel",
+    "voiceInput": "Sesli giriş",
     "autoExpandThinking": "Düşünce bölümünü otomatik genişlet",
     "autoExpandThinkingSubtitle": "Ajan düşünmeyi bitirdiğinde düşünce bölümünü genişletilmiş olarak göster.",
     "keepScreenOn": "Oturum sayfasındayken ekranı açık tut",
@@ -237,6 +239,7 @@
     "appearanceLight": "Açık",
     "appearanceDark": "Koyu",
     "account": "Hesap",
+    "accountSubtitle": "Dil, güvenilen sunucular ve cihaz oturumları",
     "prReviewAttribution": "PR incelemelerine uygulama bilgisi ekle",
     "prReviewAttributionSubtitle": "İnceleme gönderdiğinde sonuna “Kilo ile incelendi” notunu ekle.",
     "returnSendsMessage": "Enter tuşu mesaj gönderir",
@@ -2142,6 +2145,7 @@
     "gatewayUnreachable": "Kilo Gateway'e ulaşılamadı. Bağlantını kontrol et ve tekrar dene.",
     "gatewayTimeout": "Metne dönüştürme çok uzun sürdü. Tekrar dene.",
     "gatewayModelUnavailable": "Bu metne dönüştürme modeli kullanılamıyor. Tercihler'den başkasını seç.",
+    "gatewayModelUnavailableNotice": "Bu model artık sunulmuyor. Başka bir tane seçmek için $t(transcriptionModel.title) öğesine dokun.",
     "gatewaySignInRequired": "Kilo Gateway ile dönüştürmeyi kullanmak için oturum açın.",
     "gatewayNoModel": "Önce Tercihler'den bir metne dönüştürme modeli seçin."
   },

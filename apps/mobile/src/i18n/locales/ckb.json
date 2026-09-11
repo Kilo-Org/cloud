@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSOی کۆمپانیا"
   },
   "preferences": {
+    "general": "گشتی",
+    "voiceInput": "داخڵکردنی دەنگ",
     "autoExpandThinking": "کردنەوەی خۆکاری بەشی بیرکردنەوە",
     "autoExpandThinkingSubtitle": "کاتێک بیرکردنەوەی ئەجێنتەکە تەواو دەبێت، بەشەکە بە کراوەیی نیشان بدە.",
     "keepScreenOn": "ڕووناکهێشتنەوەی شاشە لە پەڕەی سێشن",
@@ -237,6 +239,7 @@
     "appearanceLight": "ڕووناک",
     "appearanceDark": "تاریک",
     "account": "هەژمار",
+    "accountSubtitle": "زمان، خانەخوێ متمانەپێکراوەکان و دانیشتنەکانی ئامێر",
     "prReviewAttribution": "زیادکردنی ناوی ئەپ بۆ پێداچوونەوەکانی PR",
     "prReviewAttributionSubtitle": "لە کاتی ناردنی پێداچوونەوەیەک، دەقی «لە ڕێگەی Kilo پێداچوونەوەی بۆ کراوە» لە کۆتاییدا زیاد بکە.",
     "returnSendsMessage": "دوگمەی گەڕانەوە پەیام دەنێرێت",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "نەتوانرا پەیوەندی بە Kilo Gateway بکرێت. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدە.",
     "gatewayTimeout": "گۆڕینی دەنگ بۆ دەق زۆر درێژەی خایاند. دووبارە هەوڵ بدە.",
     "gatewayModelUnavailable": "ئەم مۆدێلەی گۆڕینی دەنگ بۆ دەق بەردەست نییە. لە ڕێکخستنە کەسییەکان یەکی تر هەڵبژێرە.",
+    "gatewayModelUnavailableNotice": "ئەم مۆدێلە چیتر پێشکەش ناکرێت. دەست بدە بە $t(transcriptionModel.title) بۆ هەڵبژاردنی یەکی تر.",
     "gatewaySignInRequired": "بچۆ ژوورەوە بۆ بەکارهێنانی گۆڕینی دەنگ بە Kilo Gateway.",
     "gatewayNoModel": "سەرەتا لە ڕێکخستنە کەسییەکان مۆدێلێکی گۆڕینی دەنگ بۆ دەق هەڵبژێرە."
   },

@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO fiontair"
   },
   "preferences": {
+    "general": "Ginearálta",
+    "voiceInput": "Ionchur gutha",
     "autoExpandThinking": "Leathnaigh an machnamh go huathoibríoch",
     "autoExpandThinkingSubtitle": "Taispeáin machnamh an ghníomhaire ina iomláine nuair a chríochnaíonn sé.",
     "keepScreenOn": "Coinnigh an scáileán ar siúl ar leathanach an tseisiúin",
@@ -237,6 +239,7 @@
     "appearanceLight": "Geal",
     "appearanceDark": "Dorcha",
     "account": "Cuntas",
+    "accountSubtitle": "Teanga, óstaigh iontaofa agus seisiúin ar ghléasanna",
     "prReviewAttribution": "Luaigh an aip in athbhreithnithe PR",
     "prReviewAttributionSubtitle": "Cuir buntásc leis a deir go ndearnadh an t-athbhreithniú trí Kilo nuair a sheolann tú athbhreithniú.",
     "returnSendsMessage": "Seolann an eochair aisfhillte teachtaireacht",
@@ -2639,6 +2642,7 @@
     "gatewayUnreachable": "Níorbh fhéidir an Kilo Gateway a bhaint amach. Seiceáil do nasc agus bain triail as arís.",
     "gatewayTimeout": "Thóg an tras-scríobh rófhada. Bain triail as arís.",
     "gatewayModelUnavailable": "Níl an samhail tras-scríobh seo ar fáil. Roghnaigh ceann eile sna Roghanna.",
+    "gatewayModelUnavailableNotice": "Ní thairgtear an tsamhail seo a thuilleadh. Tapáil $t(transcriptionModel.title) chun ceann eile a roghnú.",
     "gatewaySignInRequired": "Sínigh isteach chun tras-scríobh tríd an Kilo Gateway a úsáid.",
     "gatewayNoModel": "Roghnaigh samhail tras-scríobh sna Roghanna ar dtús."
   },

@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Карпаратыўны SSO"
   },
   "preferences": {
+    "general": "Агульныя",
+    "voiceInput": "Галасавы ўвод",
     "autoExpandThinking": "Аўтаматычна разгортваць развагі",
     "autoExpandThinkingSubtitle": "Паказваць развагі агента разгорнутымі пасля іх завяршэння.",
     "keepScreenOn": "Не выключаць экран на старонцы сеанса",
@@ -237,6 +239,7 @@
     "appearanceLight": "Светлая",
     "appearanceDark": "Цёмная",
     "account": "Уліковы запіс",
+    "accountSubtitle": "Мова, давераныя сайты і сеансы на прыладах",
     "prReviewAttribution": "Згадваць праграму ў праверках PR",
     "prReviewAttributionSubtitle": "Дадаваць подпіс «Праверана праз Kilo» пры адпраўцы праверкі.",
     "returnSendsMessage": "Клавіша ўводу адпраўляе паведамленне",
@@ -2618,6 +2621,7 @@
     "gatewayUnreachable": "Не атрымалася падключыцца да Kilo Gateway. Праверце падключэнне і паспрабуйце яшчэ раз.",
     "gatewayTimeout": "Распазнаванне маўлення занадта доўга доўжылася. Паспрабуйце яшчэ раз.",
     "gatewayModelUnavailable": "Гэта мадэль распазнавання маўлення недаступная. Абярыце іншую ў наладах.",
+    "gatewayModelUnavailableNotice": "Гэта мадэль больш не прапануецца. Націсніце $t(transcriptionModel.title), каб выбраць іншую.",
     "gatewaySignInRequired": "Увайдзіце, каб карыстацца распазнаваннем маўлення праз Kilo Gateway.",
     "gatewayNoModel": "Спачатку абярыце мадэль распазнавання маўлення ў наладах."
   },

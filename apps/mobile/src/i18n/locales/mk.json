@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Деловно SSO"
   },
   "preferences": {
+    "general": "Општо",
+    "voiceInput": "Гласовен внес",
     "autoExpandThinking": "Автоматски прикажувај го размислувањето",
     "autoExpandThinkingSubtitle": "Прикажи го целото размислување на агентот кога ќе заврши.",
     "keepScreenOn": "Задржи го екранот вклучен додека ја гледаш сесијата",
@@ -237,6 +239,7 @@
     "appearanceLight": "Светло",
     "appearanceDark": "Темно",
     "account": "Сметка",
+    "accountSubtitle": "Јазик, доверливи хостови и сесии на уреди",
     "prReviewAttribution": "Додај потпис од апликацијата во прегледите на PR",
     "prReviewAttributionSubtitle": "Додај го потписот „Прегледано преку Kilo“ на крајот кога испраќаш преглед.",
     "returnSendsMessage": "Копчето за нов ред испраќа порака",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Не може да се достигне Kilo Gateway. Провери ја врската и обиди се повторно.",
     "gatewayTimeout": "Транскрипцијата трае предолго. Обиди се повторно.",
     "gatewayModelUnavailable": "Овој модел за транскрипција не е достапен. Одбери друг во Лични поставки.",
+    "gatewayModelUnavailableNotice": "Овој модел веќе не се нуди. Допрете $t(transcriptionModel.title) за да изберете друг.",
     "gatewaySignInRequired": "Најави се за да користиш транскрипција преку Kilo Gateway.",
     "gatewayNoModel": "Прво одбери модел за транскрипција во Лични поставки."
   },

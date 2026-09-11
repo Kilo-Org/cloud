@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "ଏଣ୍ଟରପ୍ରାଇଜ୍ SSO"
   },
   "preferences": {
+    "general": "ସାଧାରଣ",
+    "voiceInput": "ଭଏସ ଇନପୁଟ",
     "autoExpandThinking": "ଚିନ୍ତନର ବିବରଣୀ ଆପେ ଖୋଲନ୍ତୁ",
     "autoExpandThinkingSubtitle": "ଏଜେଣ୍ଟର ଚିନ୍ତନ ଶେଷ ହେଲେ ଏହାର ବିବରଣୀ ଖୋଲି ଦେଖାନ୍ତୁ।",
     "keepScreenOn": "ସେସନ୍ ପୃଷ୍ଠାରେ ଥିବା ସମୟରେ ସ୍କ୍ରିନ୍ ଚାଲୁ ରଖନ୍ତୁ",
@@ -237,6 +239,7 @@
     "appearanceLight": "ହାଲୁକା",
     "appearanceDark": "ଗାଢ଼",
     "account": "ଆକାଉଣ୍ଟ",
+    "accountSubtitle": "ଭାଷା, ବିଶ୍ୱସ୍ତ ହୋଷ୍ଟଗୁଡ଼ିକ ଏବଂ ଉପକରଣର ସେସନ୍",
     "prReviewAttribution": "PR ସମୀକ୍ଷାରେ ଆପ୍‌ର ନାମ ଯୋଡ଼ନ୍ତୁ",
     "prReviewAttributionSubtitle": "ସମୀକ୍ଷା ଦାଖଲ କଲେ ଶେଷରେ “Kilo ମାଧ୍ୟମରେ ସମୀକ୍ଷା ହୋଇଛି” ଯୋଡ଼ନ୍ତୁ।",
     "returnSendsMessage": "ରିଟର୍ନ କି ବାର୍ତ୍ତା ପଠାଏ",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway ପର୍ଯ୍ୟନ୍ତ ପହଞ୍ଚି ହୋଇନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "gatewayTimeout": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାରେ ଅଧିକ ସମୟ ଲାଗିଲା। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "gatewayModelUnavailable": "ଏହି ଲେଖା ବଦଳ ମଡେଲ୍ ଉପଲବ୍ଧ ନୁହେଁ। ପସନ୍ଦରେ ଅନ୍ୟ ଏକ ମଡେଲ୍ ବାଛନ୍ତୁ।",
+    "gatewayModelUnavailableNotice": "ଏହି ମଡେଲ୍ ଆଉ ଦିଆଯାଉନାହିଁ। ଅନ୍ୟଟିଏ ବାଛିବାକୁ $t(transcriptionModel.title) ଟ୍ୟାପ୍ କରନ୍ତୁ।",
     "gatewaySignInRequired": "Kilo Gateway ଲେଖା ବଦଳ ବ୍ୟବହାର ପାଇଁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
     "gatewayNoModel": "ପ୍ରଥମେ ପସନ୍ଦରେ ଏକ ଲେଖା ବଦଳ ମଡେଲ୍ ବାଛନ୍ତୁ।"
   },

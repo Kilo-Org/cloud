@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO menter"
   },
   "preferences": {
+    "general": "Cyffredinol",
+    "voiceInput": "Mewnbwn llais",
     "autoExpandThinking": "Ehangu meddwl yn awtomatig",
     "autoExpandThinkingSubtitle": "Dangos meddwl yr asiant yn llawn pan fydd wedi gorffen meddwl.",
     "keepScreenOn": "Cadw'r sgrin ymlaen ar dudalen y sesiwn",
@@ -237,6 +239,7 @@
     "appearanceLight": "Golau",
     "appearanceDark": "Tywyll",
     "account": "Cyfrif",
+    "accountSubtitle": "Iaith, gwesteiwyr dibynadwy a sesiynau dyfeisiau",
     "prReviewAttribution": "Enwi'r ap mewn adolygiadau PR",
     "prReviewAttributionSubtitle": "Ychwanegu troedyn 'Adolygwyd drwy Kilo' pan fyddwch yn cyflwyno adolygiad.",
     "returnSendsMessage": "Mae'r fysell Dychwelyd yn anfon neges",
@@ -2660,6 +2663,7 @@
     "gatewayUnreachable": "Doedd dim modd cyrraedd Kilo Gateway. Gwiriwch eich cysylltiad a cheisiwch eto.",
     "gatewayTimeout": "Cymrodd y trawsgrifio rhy lawer o amser. Ceisiwch eto.",
     "gatewayModelUnavailable": "Nid yw'r model trawsgrifio hwn ar gael. Dewiswch un arall yn y Dewisiadau.",
+    "gatewayModelUnavailableNotice": "Nid yw'r model hwn yn cael ei gynnig mwyach. Tapiwch $t(transcriptionModel.title) i ddewis un arall.",
     "gatewaySignInRequired": "Mewngofnodwch i ddefnyddio trawsgrifio drwy Kilo Gateway.",
     "gatewayNoModel": "Dewiswch fodel trawsgrifio yn y Dewisiadau yn gyntaf."
   },

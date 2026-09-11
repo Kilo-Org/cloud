@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "उद्यम SSO"
   },
   "preferences": {
+    "general": "सामान्य",
+    "voiceInput": "आवाज इनपुट",
     "autoExpandThinking": "सोचको विवरण स्वतः खोल्नुहोस्",
     "autoExpandThinkingSubtitle": "एजेन्टले सोचिसकेपछि त्यसको विवरण पूरा देखाउनुहोस्।",
     "keepScreenOn": "सत्र पृष्ठमा हुँदा स्क्रिन चालू राख्नुहोस्",
@@ -237,6 +239,7 @@
     "appearanceLight": "उज्यालो",
     "appearanceDark": "अँध्यारो",
     "account": "खाता",
+    "accountSubtitle": "भाषा, विश्वसनीय होस्टहरू र यन्त्रका सत्रहरू",
     "prReviewAttribution": "PR समीक्षाहरूमा एपको उल्लेख थप्नुहोस्",
     "prReviewAttributionSubtitle": "समीक्षा पेश गर्दा अन्त्यमा ‘Kilo मार्फत समीक्षा गरिएको’ थप्नुहोस्।",
     "returnSendsMessage": "रिटर्न कुञ्जीले सन्देश पठाउँछ",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway सम्म पुग्न सकिएन। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
     "gatewayTimeout": "बोलीलाई पाठमा रूपान्तरण गर्न धेरै समय लाग्यो। फेरि प्रयास गर्नुहोस्।",
     "gatewayModelUnavailable": "यो रूपान्तरण मोडेल उपलब्ध छैन। रुचिहरूमा अर्को छान्नुहोस्।",
+    "gatewayModelUnavailableNotice": "यो मोडेल अब उपलब्ध छैन। अर्को छान्न $t(transcriptionModel.title) मा ट्याप गर्नुहोस्।",
     "gatewaySignInRequired": "Kilo Gateway को रूपान्तरण प्रयोग गर्न साइन इन गर्नुहोस्।",
     "gatewayNoModel": "पहिले रुचिहरूमा बोलीलाई पाठमा रूपान्तरण गर्ने मोडेल छान्नुहोस्।"
   },

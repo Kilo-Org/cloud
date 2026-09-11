@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO an'orinasa"
   },
   "preferences": {
+    "general": "Ankapobeny",
+    "voiceInput": "Fampidirana feo",
     "autoExpandThinking": "Velaro ho azy ny fisainana",
     "autoExpandThinkingSubtitle": "Asehoy mivelatra ny fisainan'ny mpanampy rehefa vita izany.",
     "keepScreenOn": "Avelao hirehitra ny efijery eo amin'ny pejin'ny fotoam-piasana",
@@ -237,6 +239,7 @@
     "appearanceLight": "Mazava",
     "appearanceDark": "Maizina",
     "account": "Kaonty",
+    "accountSubtitle": "Fiteny, mpampiantrano atokisana ary fotoam-piasana amin'ny fitaovana",
     "prReviewAttribution": "Asio filazana ny rindranasa amin'ny fandinihana PR",
     "prReviewAttributionSubtitle": "Asio soratra hoe Nodinihina tamin'ny Kilo any ambany rehefa mandefa fandinihana ianao.",
     "returnSendsMessage": "Mandefa hafatra ny bokotra fampidirana",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Tsy azo ny Kilo Gateway. Hamarino ny fifandraisanao ary andramo indray.",
     "gatewayTimeout": "Nihoatra ny elanelany ny fanovana feo ho soratra. Andramo indray.",
     "gatewayModelUnavailable": "Tsy azo ampiasaina ity modely fanovana feo ho soratra ity. Safidio ny hafa ao amin'ny Safidy.",
+    "gatewayModelUnavailableNotice": "Tsy atolotra intsony ity modely ity. Tsindrio $t(transcriptionModel.title) hisafidianana ny hafa.",
     "gatewaySignInRequired": "Midira mba hampiasa ny fanovana feo ho soratra amin'ny Kilo Gateway.",
     "gatewayNoModel": "Safidio aloha ny modely fanovana feo ho soratra ao amin'ny Safidy."
   },

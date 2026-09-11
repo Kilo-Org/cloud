@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Poslovni SSO"
   },
   "preferences": {
+    "general": "Općenito",
+    "voiceInput": "Glasovni unos",
     "autoExpandThinking": "Automatski proširi razmišljanje",
     "autoExpandThinkingSubtitle": "Prikaži cijelo razmišljanje agenta nakon što završi.",
     "keepScreenOn": "Zadrži zaslon uključenim na zaslonu sesije",
@@ -237,6 +239,7 @@
     "appearanceLight": "Svijetlo",
     "appearanceDark": "Tamno",
     "account": "Račun",
+    "accountSubtitle": "Jezik, pouzdani poslužitelji i sesije na uređajima",
     "prReviewAttribution": "Dodaj oznaku aplikacije u preglede PR-ova",
     "prReviewAttributionSubtitle": "Pri slanju pregleda dodaj potpis koji navodi da je pregled obavljen putem aplikacije Kilo.",
     "returnSendsMessage": "Tipka za novi redak šalje poruku",
@@ -2597,6 +2600,7 @@
     "gatewayUnreachable": "Nije bilo moguće doseći Kilo Gateway. Provjeri vezu i pokušaj ponovno.",
     "gatewayTimeout": "Transkripcija je predugo trajala. Pokušaj ponovno.",
     "gatewayModelUnavailable": "Ovaj model za transkripciju nije dostupan. Odaberi drugi u Postavkama.",
+    "gatewayModelUnavailableNotice": "Ovaj se model više ne nudi. Dodirni $t(transcriptionModel.title) da odabereš drugi.",
     "gatewaySignInRequired": "Prijavi se za korištenje transkripcije putem Kilo Gatewaya.",
     "gatewayNoModel": "Najprije odaberi model za transkripciju u Postavkama."
   },

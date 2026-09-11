@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Podnikové SSO"
   },
   "preferences": {
+    "general": "Všeobecné",
+    "voiceInput": "Hlasový vstup",
     "autoExpandThinking": "Automaticky rozbaliť uvažovanie",
     "autoExpandThinkingSubtitle": "Po dokončení uvažovania agenta sa jeho obsah automaticky rozbalí.",
     "keepScreenOn": "Ponechať obrazovku zapnutú na stránke relácie",
@@ -237,6 +239,7 @@
     "appearanceLight": "Svetlý",
     "appearanceDark": "Tmavý",
     "account": "Účet",
+    "accountSubtitle": "Jazyk, dôveryhodné servery a relácie zariadení",
     "prReviewAttribution": "Uvádzať aplikáciu pri kontrolách PR",
     "prReviewAttributionSubtitle": "Pri odoslaní kontroly sa pridá pätička Skontrolované cez Kilo.",
     "returnSendsMessage": "Kláves Enter odošle správu",
@@ -2618,6 +2621,7 @@
     "gatewayUnreachable": "Nepodarilo sa spojiť s Kilo Gateway. Skontroluj pripojenie a skús to znova.",
     "gatewayTimeout": "Prepis trval príliš dlho. Skús to znova.",
     "gatewayModelUnavailable": "Tento model prepisu nie je dostupný. Vyberte iný v Predvoľbách.",
+    "gatewayModelUnavailableNotice": "Tento model sa už neponúka. Klepnutím na $t(transcriptionModel.title) vyberte iný.",
     "gatewaySignInRequired": "Prihláste sa, aby ste mohli používať prepis cez Kilo Gateway.",
     "gatewayNoModel": "Najprv vyberte model prepisu v Predvoľbách."
   },

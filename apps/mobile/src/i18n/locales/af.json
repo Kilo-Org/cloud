@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Onderneming-SSO"
   },
   "preferences": {
+    "general": "Algemeen",
+    "voiceInput": "Steminvoer",
     "autoExpandThinking": "Vou denke outomaties uit",
     "autoExpandThinkingSubtitle": "Wys die agent se denke volledig wanneer dit klaar gedink het.",
     "keepScreenOn": "Hou die skerm aan op die sessiebladsy",
@@ -237,6 +239,7 @@
     "appearanceLight": "Lig",
     "appearanceDark": "Donker",
     "account": "Rekening",
+    "accountSubtitle": "Taal, vertroude gashere en toestelsessies",
     "prReviewAttribution": "Voeg toepvermelding by PR-hersienings",
     "prReviewAttributionSubtitle": "Voeg 'n voetskrif met die woorde Hersien via Kilo by wanneer jy 'n hersiening indien.",
     "returnSendsMessage": "Return-toets stuur boodskap",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Die Kilo Gateway kon nie bereik word nie. Gaan jou verbinding na en probeer weer.",
     "gatewayTimeout": "Die transkripsie het te lank geneem. Probeer weer.",
     "gatewayModelUnavailable": "Hierdie transkripsiemodel is nie beskikbaar nie. Kies 'n ander een in Voorkeure.",
+    "gatewayModelUnavailableNotice": "Hierdie model word nie meer aangebied nie. Tik op $t(transcriptionModel.title) om 'n ander een te kies.",
     "gatewaySignInRequired": "Teken in om gateway-transkripsie te gebruik.",
     "gatewayNoModel": "Kies eers 'n transkripsiemodel in Voorkeure."
   },

@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "የድርጅት SSO"
   },
   "preferences": {
+    "general": "አጠቃላይ",
+    "voiceInput": "የድምጽ ግቤት",
     "autoExpandThinking": "አስተሳሰቡን በራስ ሰር ያስፉ",
     "autoExpandThinkingSubtitle": "ወኪሉ ማሰቡን ሲጨርስ አስተሳሰቡን ተዘርግቶ ያሳዩ።",
     "keepScreenOn": "በክፍለ ጊዜ ገጽ ላይ ሲሆኑ ማያ ገጹን እንደበራ ያቆዩ",
@@ -237,6 +239,7 @@
     "appearanceLight": "ብሩህ",
     "appearanceDark": "ጨለማ",
     "account": "መለያ",
+    "accountSubtitle": "ቋንቋ፣ የታመኑ አስተናጋጆች እና የመሣሪያ ክፍለ ጊዜዎች",
     "prReviewAttribution": "በPR ግምገማዎች ላይ የመተግበሪያውን ስም ያክሉ",
     "prReviewAttributionSubtitle": "ግምገማ ሲያስገቡ «በKilo ተገምግሟል» የሚል ግርጌ ያክሉ።",
     "returnSendsMessage": "የመመለሻ ቁልፍ መልእክት ይልካል",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway ማግኘት አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
     "gatewayTimeout": "ድምጽን ወደ ጽሑፍ መቀየር ረጅም ጊዜ አስፈልጎታል። እንደገና ይሞክሩ።",
     "gatewayModelUnavailable": "ይህ የድምጽ ወደ ጽሑፍ ሞዴል አይገኝም። በምርጫዎች ውስጥ ሌላ ይምረጡ።",
+    "gatewayModelUnavailableNotice": "ይህ ሞዴል ከእንግዲህ አይቀርብም። ሌላ ለመምረጥ $t(transcriptionModel.title) ይንኩ።",
     "gatewaySignInRequired": "በKilo Gateway ለመቀየር ይግቡ።",
     "gatewayNoModel": "በምርጫዎች ውስጥ መጀመሪያ የድምጽ ወደ ጽሑፍ ሞዴል ይምረጡ።"
   },

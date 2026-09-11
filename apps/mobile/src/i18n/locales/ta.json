@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway மூலம் பேச்சு உரையாக்கம்",
+    "gatewayTranscriptionSubtitle": "சாதனத்தின் பேச்சு அடையாளப்படுத்தலுக்குப் பதிலாக Kilo Gateway மாதிரியைப் பயன்படுத்தி குரல் உள்ளீட்டை உரையாக்குங்கள். உங்கள் பதிவு Kilo Gateway-க்கு அனுப்பப்படுகிறது.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "இணைப்புக் கோரிக்கை கிடைக்கவில்லை",
@@ -2568,7 +2571,13 @@
     "languageNotInstalledMessage": "{{language}}க்கான ஆஃப்லைன் பேச்சு கோப்புகள் இந்தத் தொலைபேசியில் நிறுவப்படவில்லை. அவற்றைப் பதிவிறக்கவும், பிறகு குரல் உள்ளீட்டை மீண்டும் முயற்சிக்கவும்.",
     "downloadOfflineModel": "பதிவிறக்கு",
     "offlineModelDownloadScheduled": "ஆஃப்லைன் பேச்சு கோப்புகள் பின்னணியில் பதிவிறக்கம் செய்யப்படும். பிறகு குரல் உள்ளீட்டை மீண்டும் முயற்சிக்கவும்.",
-    "listeningStopped": "கேட்பது நிறுத்தப்பட்டது."
+    "listeningStopped": "கேட்பது நிறுத்தப்பட்டது.",
+    "transcribing": "உரையாக்கம் நடைபெறுகிறது...",
+    "gatewayUnreachable": "Kilo Gateway-ஐ அணுக முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
+    "gatewayTimeout": "உரையாக்கம் மிக அதிக நேரம் எடுத்தது. மீண்டும் முயற்சிக்கவும்.",
+    "gatewayModelUnavailable": "இந்த உரையாக்க மாதிரி கிடைக்கவில்லை. விருப்பத்தேர்வுகளில் வேறொன்றைத் தேர்ந்தெடுக்கவும்.",
+    "gatewaySignInRequired": "Kilo Gateway உரையாக்கத்தைப் பயன்படுத்த உள்நுழையவும்.",
+    "gatewayNoModel": "முதலில் விருப்பத்தேர்வுகளில் உரையாக்க மாதிரியைத் தேர்ந்தெடுக்கவும்."
   },
   "share": {
     "title": "Kilo-வுக்குப் பகிர்தல்",
@@ -2950,5 +2959,12 @@
     "needsInput": "உள்ளீடு தேவை",
     "channelName": "செயலில் உள்ள ஏஜெண்டுகள்",
     "activityKitDisabledBody": "பூட்டுத் திரையில் செயலில் உள்ள ஏஜெண்டுகளைப் பார்க்க, அமைப்புகளில் நேரலைச் செயல்பாடுகளை இயக்கவும்."
+  },
+  "transcriptionModel": {
+    "title": "உரையாக்க மாதிரி",
+    "noneChosen": "எதுவும் தேர்ந்தெடுக்கப்படவில்லை",
+    "emptyTitle": "உரையாக்க மாதிரிகள் இல்லை",
+    "emptyDescription": "Kilo Gateway தற்போது உரையாக்க மாதிரிகளை வழங்கவில்லை.",
+    "loadFailed": "உரையாக்க மாதிரிகளை ஏற்ற முடியவில்லை."
   }
 }

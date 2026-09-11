@@ -79,7 +79,10 @@ describe('authenticate (s2 passthrough)', () => {
 describe('authenticate (s5 verify + s6 enforcement: only MCP tokens)', () => {
   const withKilo = {
     mcpToken,
-    resolveKiloToken: async (identity: { kiloUserId: string; clientId: string }) =>
+    resolveKiloToken: async (identity: {
+      kiloUserId: string;
+      clientId: string;
+    }) =>
       identity.kiloUserId === 'kilo-user-1' && identity.clientId === 'client-1'
         ? 'kilo-app-token'
         : null,
@@ -100,7 +103,26 @@ describe('authenticate (s5 verify + s6 enforcement: only MCP tokens)', () => {
       kiloUserId: 'kilo-user-1',
       organizationId: 'org-uuid-1',
       clientId: 'client-1',
+      resource: RESOURCE,
     });
+  });
+
+  it('a token for one org cannot resolve another org grant’s credential', async () => {
+    const strict = {
+      mcpToken,
+      resolveKiloToken: async (identity: {
+        kiloUserId: string;
+        clientId: string;
+        organizationId: string | null;
+        resource: string;
+      }) =>
+        identity.organizationId === 'org-uuid-1' && identity.resource === RESOURCE
+          ? 'kilo-app-token'
+          : null,
+    };
+    expect(await authenticate(bearerRequest(await mcpAccessToken()), strict)).not.toBeNull();
+    const token = await mcpAccessToken({ org: 'org-other' });
+    expect(await authenticate(bearerRequest(token), strict)).toBeNull();
   });
 
   it('the caller-supplied organization header is ignored; the org claim wins', async () => {

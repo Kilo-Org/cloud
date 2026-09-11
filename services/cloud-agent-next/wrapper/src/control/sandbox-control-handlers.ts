@@ -17,6 +17,7 @@ import {
   sessionPermissionResolvePayloadSchema,
   sessionPromptPayloadSchema,
   sessionQuestionResolvePayloadSchema,
+  sessionRuntimeRetirePayloadSchema,
   sessionSyncPayloadSchema,
   sessionTerminalClosePayloadSchema,
   sessionTerminalCloseResultSchema,
@@ -382,8 +383,15 @@ export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>)
   const deps: HandlerDeps = Object.assign(input, {
     operations: createOperationRegistry({
       native: {
-        get: directory => input.kiloRuntimes?.get(directory),
-        getRetained: directory => input.kiloRuntimes?.getRetained?.(directory),
+        get: identity => input.kiloRuntimes?.get(identity),
+        ...(input.kiloRuntimes?.getEntryRuntimeId
+          ? {
+              getEntryRuntimeId: (directory: string, root: string) =>
+                input.kiloRuntimes?.getEntryRuntimeId?.(directory, root),
+            }
+          : {}),
+        getRetained: (directory, runtimeId) =>
+          input.kiloRuntimes?.getRetained?.(directory, runtimeId),
         prepareForNewWork: directory => input.kiloRuntimes?.prepareForNewWork?.(directory) ?? true,
         retireRuntime: (directory, deadlineAt, target) =>
           input.kiloRuntimes?.retireRuntime?.(directory, deadlineAt, target) ??
@@ -435,7 +443,11 @@ export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>)
           directory: directoryForSession(kiloSessionId),
           revision: deps.activity?.revision(kiloSessionId),
         })),
-      getRuntime: directory => deps.kiloRuntimes?.get(directory),
+      getRuntime: (directory, kiloSessionId) =>
+        deps.kiloRuntimes
+          ?.getAll?.(directory)
+          .find(runtime => runtime.identity?.kiloSessionId === kiloSessionId) ??
+        deps.kiloRuntimes?.get(directory),
       reconcileActivity: (statuses, roots) => deps.activity?.reconcile(statuses, roots),
     });
   }
@@ -522,13 +534,18 @@ export async function handleControlRequest(
         return fail('not_ready', 'Worktree cancellation is incomplete', true);
       }
       failureStage = 'runtime_lookup';
-      const runtime = kiloRuntimes.get(input.directory);
-      const client =
-        deps.worktreeCleanupClient ??
-        (runtime ? createWorktreeKiloCleanupClient(runtime.kiloClient.serverUrl) : undefined);
+      const runtimes = kiloRuntimes.getAll?.(input.directory) ?? [];
+      // An injected cleanup client is a fallback for a checkout whose runtime has
+      // already gone away. Live runtimes each retain their own Kilo state.
+      const clients =
+        runtimes.length > 0
+          ? runtimes.map(runtime => createWorktreeKiloCleanupClient(runtime.kiloClient.serverUrl))
+          : deps.worktreeCleanupClient
+            ? [deps.worktreeCleanupClient]
+            : [];
       const cleanupDeps = {
         onDiagnostic: deps.onDiagnostic,
-        client,
+        clients,
         detachRoot: (id: string) => {
           deps.activity?.detach(id);
           const index = deps.sessions.findIndex(snapshot => snapshot.kiloSessionId === id);
@@ -636,6 +653,8 @@ async function handleSessionControlRequest(
       return handleAttach(session, payload, deps, authorization);
     case 'session.detach':
       return handleDetach(session, payload, deps);
+    case 'session.runtime.retire':
+      return handleRuntimeRetire(session, payload, deps);
     case 'session.prompt':
       return handlePrompt(session, payload, deps, authorization);
     case 'session.abort':
@@ -704,7 +723,7 @@ function sessionKiloRuntime(
     rootForSession(session.kiloSessionId) !== session.kiloSessionId
   )
     return undefined;
-  return deps.kiloRuntimes?.get(session.directory);
+  return deps.kiloRuntimes?.get(session);
 }
 
 function currentRuntimeMatchesTarget(
@@ -714,8 +733,8 @@ function currentRuntimeMatchesTarget(
 ): boolean {
   if (!target) return false;
   const runtime =
-    deps.kiloRuntimes?.getRetained?.(session.directory) ??
-    deps.kiloRuntimes?.get(session.directory);
+    deps.kiloRuntimes?.getRetained?.(session.directory, target.runtimeId) ??
+    deps.kiloRuntimes?.get(session);
   return (
     runtime !== undefined &&
     runtime.runtimeId === target.runtimeId &&
@@ -828,6 +847,49 @@ async function handleDetach(
     return ok({ detached: true });
   } catch (error) {
     return terminalFailure(error);
+  }
+}
+
+async function handleRuntimeRetire(
+  session: SessionRequestIdentity,
+  payload: unknown,
+  deps: HandlerDeps
+): Promise<ControlHandlerResult> {
+  const parsed = sessionRuntimeRetirePayloadSchema.safeParse(payload);
+  if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
+  const runtimes = deps.kiloRuntimes;
+  if (!runtimes) return missingKilo();
+  let terminalRetirementStarted = false;
+  try {
+    deps.terminalRuntime?.beginRecoveryRetirement(session);
+    terminalRetirementStarted = true;
+    if (!runtimes.retireForRecovery) return missingKilo();
+    const retirement = await runtimes.retireForRecovery(session, parsed.data.recoveryId, () => {
+      const task = deps.operations.active(session.kiloSessionId);
+      const active = deps.activity
+        ?.snapshots()
+        .some(
+          snapshot => snapshot.kiloSessionId === session.kiloSessionId && snapshot.state !== 'idle'
+        );
+      if (task || active) {
+        throw new WorktreeKiloRuntimeError('session_busy', 'Session has work in progress', true);
+      }
+      if (deps.terminalRuntime?.hasActivePty(session)) {
+        throw new WorktreeKiloRuntimeError('session_busy', 'Session has an active PTY', true);
+      }
+    });
+    if (retirement === 'retired') {
+      await deps.terminalRuntime?.detachSession(session);
+      forgetAttachedRoot(session.kiloSessionId, session.directory);
+      deps.activity?.detach(session.kiloSessionId);
+      const index = deps.sessions.findIndex(item => item.kiloSessionId === session.kiloSessionId);
+      if (index !== -1) deps.sessions.splice(index, 1);
+    }
+    return ok({ recoveryId: parsed.data.recoveryId, retired: true });
+  } catch (error) {
+    return terminalFailure(error);
+  } finally {
+    if (terminalRetirementStarted) deps.terminalRuntime?.endRecoveryRetirement(session);
   }
 }
 
@@ -1031,7 +1093,10 @@ async function handleAbort(
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
   const scopedCleanupResultGranted = supportsScopedCleanupResult(deps);
   if (parsed.data.nativeRuntimeId) {
-    const runtime = deps.kiloRuntimes?.getRetained?.(session.directory);
+    const runtime = deps.kiloRuntimes?.getRetained?.(
+      session.directory,
+      parsed.data.nativeRuntimeId
+    );
     if (!runtime || runtime.runtimeId !== parsed.data.nativeRuntimeId) {
       return ok({
         status: 'aborted',

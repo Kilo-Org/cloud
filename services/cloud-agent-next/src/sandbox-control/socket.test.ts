@@ -66,6 +66,8 @@ function helloFrame(
   requestId = 'req_hello',
   capabilities?: {
     nativeRuntimeRetirement?: boolean;
+    runtimeIsolation?: true;
+    runtimeRecovery?: true;
     scopedCleanupResult?: boolean;
     workingBranches?: boolean;
   }
@@ -104,6 +106,29 @@ describe('sandbox control socket handler', () => {
       expect(parsed.kilo.version).toBeUndefined();
       expect(JSON.stringify(parsed)).not.toContain('private');
     }
+  });
+  it('retains runtime isolation and recovery alongside scoped cleanup negotiation', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_isolation', {
+        runtimeIsolation: true,
+        runtimeRecovery: true,
+        scopedCleanupResult: true,
+      })
+    );
+
+    expect(handler.getConnectionIdentity()).toMatchObject({
+      providerInstanceId: 'inst_1',
+      runtimeIsolation: true,
+      runtimeRecovery: true,
+    });
+    expect(handler.supportsScopedCleanupResult?.()).toBe(true);
+    expect(incoming.send).toHaveBeenCalledWith(
+      expect.stringContaining('"scopedCleanupResult":true')
+    );
   });
   it.each([
     ['2.4.0', '2.4.0'],

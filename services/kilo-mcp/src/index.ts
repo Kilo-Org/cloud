@@ -423,8 +423,12 @@ export function createMcpHandler(deps: McpHandlerDeps) {
             },
             resolveKiloToken: identity =>
               mcpAuth.store.getKiloToken(
-                identity.kiloUserId,
-                identity.clientId,
+                {
+                  kiloUserId: identity.kiloUserId,
+                  clientId: identity.clientId,
+                  organizationId: identity.organizationId,
+                  resource: identity.resource,
+                },
                 new Date().toISOString()
               ),
           }

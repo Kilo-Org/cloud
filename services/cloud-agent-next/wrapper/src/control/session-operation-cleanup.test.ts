@@ -314,11 +314,13 @@ describe('SessionOperation cleanup', () => {
         release: () => {},
       }),
       detach: () => true,
+      retireForRecovery: async () => 'retired',
       deleteDirectory: async () => {},
-      getRetained: () => runtime,
+      getRetained: () => (runtime.signal.aborted ? undefined : runtime),
       retireRuntime: async () => 'unconfirmed',
       verifyQuiescence: async () => false,
-      get: () => runtime,
+      get: () => (runtime.signal.aborted ? undefined : runtime),
+      isCurrent: candidate => candidate === runtime && !runtime.signal.aborted,
       isHealthy: () => true,
       shutdown: () => {},
     };
@@ -425,7 +427,7 @@ describe('SessionOperation cleanup', () => {
       ok: true,
       result: { status: 'aborted', quiescent: true },
     });
-    expect(handlerDeps.kiloRuntimes?.get(session.directory)).toBeDefined();
+    expect(handlerDeps.kiloRuntimes?.getRetained?.(session.directory)).toBeDefined();
 
     const authorizationB = operationAuthorization('session.prompt', 'message_b');
     await handleControlRequest(
@@ -464,7 +466,7 @@ describe('SessionOperation cleanup', () => {
         quiescent: true,
       },
     });
-    expect(handlerDeps.kiloRuntimes?.get(session.directory)?.runtimeId).toBe('native_1');
+    expect(handlerDeps.kiloRuntimes?.get(session)?.runtimeId).toBe('native_1');
     expect(operationB?.snapshot().local?.result).toEqual({ ok: true, result: {} });
   });
 

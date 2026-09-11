@@ -199,6 +199,21 @@ function validate(workflow) {
     'merge job installs the Kilo CLI the dump shells out to'
   );
   const upsert = findStep(merge, step => step.run === embedCommand, 'merge job upserts Vectorize');
+  const mergeDrift = findStep(
+    merge,
+    step => /git diff --exit-code[\s\S]*services\/kilo-mcp\/catalog\.json/.test(step.run ?? ''),
+    'merge job fails when the regenerated catalog is not the committed one'
+  );
+  assert.ok(
+    merge.steps.indexOf(mergeDump) < merge.steps.indexOf(mergeDrift) &&
+      merge.steps.indexOf(mergeDrift) < merge.steps.indexOf(upsert),
+    'the merge drift check must run between the dump and the Vectorize upsert'
+  );
+  assert.match(
+    mergeDrift.run ?? '',
+    /exit 1/,
+    'a catalog changed on main must fail the merge job, not index the stale bundled catalog'
+  );
   assert.equal(
     upsert.env?.CLOUDFLARE_API_TOKEN,
     '${{ secrets.CLOUDFLARE_API_TOKEN }}',
@@ -340,6 +355,13 @@ for (const [name, defect] of [
   [
     'merge upsert removed',
     workflow => dropStep(workflow, mergeJobName, step => step.run === embedCommand),
+  ],
+  [
+    'merge drift check removed',
+    workflow =>
+      dropStep(workflow, mergeJobName, step =>
+        /git diff --exit-code[\s\S]*services\/kilo-mcp\/catalog\.json/.test(step.run ?? '')
+      ),
   ],
   [
     'PR dump reverted to the personal credential',

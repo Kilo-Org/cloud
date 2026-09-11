@@ -1243,6 +1243,9 @@ export function SessionDetailContent({
   // One condition for the composer and for the bottom BlurBar that reserves
   // its space: if the bar claimed the space on a condition the composer does
   // not share, the composer pops in and the layout jumps on every open.
+  // The strip is a pure full-bleed background/spacer: it hosts no controls,
+  // so it deliberately carries no horizontal safe-area padding — the
+  // composer's own content clears the landscape sensor insets.
   const isComposerMounted = !isReadOnly || messages.length === 0;
   const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
   const isComposerDisabled = resolveSessionComposerDisabled({

@@ -11,6 +11,7 @@ import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits'
 import { type ChatComposer } from './chat-composer';
 
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
+const safeAreaInsets = vi.hoisted(() => ({ bottom: 0, left: 0, right: 0, top: 0 }));
 const TEXT_DIRECTIONS = [
   { direction: 'LTR', isRTL: false, style: undefined },
   { direction: 'RTL', isRTL: true, style: [{ writingDirection: 'rtl' }, undefined] },
@@ -95,7 +96,7 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+  useSafeAreaInsets: () => safeAreaInsets,
 }));
 
 vi.mock('react-native-gesture-handler', () => ({
@@ -223,9 +224,11 @@ vi.mock('@/components/agents/chat-composer-input-state', () => ({
   },
 }));
 
-vi.mock('@/components/ui/blur-bar', () => ({
-  BlurBar: () => null,
-}));
+// The composer's root element; located by identity, never by a __testMarker
+// (findInputRowProps treats any marked function as the input row).
+const MockBlurBar = () => null;
+
+vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: MockBlurBar }));
 
 vi.mock('@/components/voice-input-control', () => ({
   VoiceInputStatus: () => null,
@@ -298,18 +301,27 @@ vi.mock('@/lib/share-prefill', () => ({
   useSharePrefill: vi.fn(),
 }));
 
-vi.mock('@/lib/voice-input/use-voice-input', () => ({
-  useVoiceInput: () => ({
-    available: false,
-    isActive: false,
-    settleBeforeSubmit: vi.fn(async () => true),
-    status: 'idle',
-    toggle: vi.fn(),
-  }),
+// The voice hook options (getDraft/onDraftChange) are captured so a test can
+// drive the transcript-into-draft path through the composer's wiring; the
+// draft module stays unmocked (pure logic) so the real splice runs.
+const voiceHookOptions = vi.hoisted(() => ({
+  current: null as {
+    getDraft: () => string;
+    onDraftChange: (draft: string) => void;
+  } | null,
 }));
 
-vi.mock('@/lib/voice-input/voice-input-draft', () => ({
-  applyVoiceDraftToInput: vi.fn(),
+vi.mock('@/lib/voice-input/use-voice-input', () => ({
+  useVoiceInput: (options: { getDraft: () => string; onDraftChange: (draft: string) => void }) => {
+    voiceHookOptions.current = options;
+    return {
+      available: false,
+      isActive: false,
+      settleBeforeSubmit: vi.fn(async () => true),
+      status: 'idle',
+      toggle: vi.fn(),
+    };
+  },
 }));
 
 vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
@@ -376,6 +388,27 @@ function findStripProps(node: Node): Record<string, unknown> | null {
     }
   }
   return null;
+}
+
+// The composer pads the content inside its root BlurBar with the landscape
+// sensor side insets. The container is the only View in the returned tree
+// carrying a style prop, so it is located by that style shape.
+function findComposerInsetContainer(render: React.ReactElement): {
+  type: unknown;
+  props: Record<string, unknown>;
+} {
+  const container = findNode(
+    render,
+    (type, props) =>
+      type === 'View' &&
+      typeof props.style === 'object' &&
+      props.style !== null &&
+      'paddingLeft' in props.style
+  );
+  if (container === null) {
+    throw new Error('composer side-inset container not found in the BlurBar content');
+  }
+  return container;
 }
 
 function requireInputRowOnSubmit(render: React.ReactElement): () => void {
@@ -452,6 +485,10 @@ beforeEach(() => {
   returnSendsPref.returnSendsMessage = false;
   reducedMotionOn.value = false;
   layoutDirection.isRTL = false;
+  safeAreaInsets.bottom = 0;
+  safeAreaInsets.left = 0;
+  safeAreaInsets.right = 0;
+  safeAreaInsets.top = 0;
 });
 
 // The restore contract has one axis: whether the host resolved a draft. Both
@@ -532,7 +569,49 @@ describe('ChatComposer draft restore', () => {
       onOptimisticSend: expect.any(Function),
     });
   });
+
+  // The gateway transcript lands after the Stop tap (the upload resolves
+  // post-stop). The remounted input row must show it: a stop-time snapshot
+  // restored the empty pre-transcript text while the live ref and the durable
+  // draft kept the transcript, so the next dictation appended to the hidden
+  // text and the draft showed the same transcript twice (spot check e12-back).
+  it('restores a transcript that lands after the Stop tap onto the remounted row', async () => {
+    const setNativeProps = vi.fn();
+    const props = makeProps({ draftKey: 'agent-composer:sess-1' });
+    const render = await mount(props);
+    // The first useRef slot is textRef; the second is the TextInput ref.
+    const inputRefSlot = refSlots.slots[1];
+    if (inputRefSlot === undefined) {
+      throw new Error('TextInput ref slot was not mounted');
+    }
+    inputRefSlot.current = { setNativeProps };
+    const voice = voiceHookOptions.current;
+    if (voice === null) {
+      throw new Error('useVoiceInput options were not captured');
+    }
+    voice.getDraft();
+    const onStop = findInputRowProps(render)?.onStop as (() => void) | undefined;
+    if (onStop === undefined) {
+      throw new Error('ChatComposerInputRow element did not carry an onStop handler');
+    }
+
+    onStop();
+    await settle();
+    voice.onDraftChange('Gateway transcription online');
+    expect(setNativeProps).toHaveBeenCalledTimes(1);
+
+    // The first re-render lets the stop-remount machine bump `inputEpoch`
+    // and lets the restore effect write the live text into the (new) row;
+    // the second re-render proves the restore is a one-shot.
+    await rerender(props);
+    await rerender(props);
+
+    expect(setNativeProps).toHaveBeenCalledTimes(2);
+    const restoreCall = setNativeProps.mock.calls[1]?.[0] as { text?: string };
+    expect(restoreCall.text).toBe('Gateway transcription online');
+  });
 });
+
 describe('ChatComposer return-sends wiring', () => {
   it('wires the return-sends preference and an insert-newline handler to the input row', async () => {
     returnSendsPref.returnSendsMessage = true;
@@ -655,5 +734,32 @@ describe('ChatComposer attachment strip wiring', () => {
     }
     expect(stripProps.onMove).toBe(uploadMoveAttachmentMock);
     expect(stripProps.onReorder).toBe(uploadReorderAttachmentsMock);
+  });
+});
+
+describe('ChatComposer landscape side insets', () => {
+  it('keeps portrait geometry with zero side padding', async () => {
+    safeAreaInsets.left = 0;
+    safeAreaInsets.right = 0;
+    const render = await mount(makeProps({}));
+
+    const container = findComposerInsetContainer(render);
+    expect(container.props.style).toEqual({ paddingLeft: 0, paddingRight: 0 });
+    // The unpadded container still hosts the whole composer content.
+    expect(findNode(container, type => type === MockInputRow)).not.toBeNull();
+  });
+
+  it('pads the composer content by the landscape sensor insets', async () => {
+    // iPhone sensor notch in landscape: a wider left inset than right.
+    safeAreaInsets.left = 59;
+    safeAreaInsets.right = 47;
+    const render = await mount(makeProps({}));
+
+    const container = findComposerInsetContainer(render);
+    expect(container.props.style).toEqual({ paddingLeft: 59, paddingRight: 47 });
+    // Toolbar, input row, and send control all clear the sensor area because
+    // they live inside the padded container.
+    expect(findNode(container, type => type === MockChatToolbar)).not.toBeNull();
+    expect(findNode(container, type => type === MockInputRow)).not.toBeNull();
   });
 });

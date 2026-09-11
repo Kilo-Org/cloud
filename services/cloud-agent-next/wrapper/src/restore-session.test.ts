@@ -105,6 +105,20 @@ function writeSlowMockKilo(binDir: string, startedMarker?: string): void {
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
 
+/**
+ * Poll for a file's existence instead of watching events: fs.watch delivery
+ * on macOS lags or drops events when the full suite runs under load.
+ */
+async function waitForFile(filePath: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!fs.existsSync(filePath)) {
+    if (Date.now() > deadline) {
+      throw new Error(`File did not appear within ${timeoutMs}ms: ${filePath}`);
+    }
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+}
+
 function writeSignalTerminatedMockKilo(binDir: string): void {
   const script = '#!/bin/sh\nkill -TERM $$\n';
   const kiloPath = path.join(binDir, 'kilo');
@@ -882,16 +896,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
   it('terminates kilo import when the workspace deadline is aborted after import starts', async () => {
     mockFetchOk(makeSnapshot([]));
     writeSlowMockKilo(binDir, path.join(workspace, 'import-started'));
-    const importStarted = Promise.withResolvers<void>();
-    const watcher = fs.watch(
-      workspace,
-      { signal: AbortSignal.timeout(3_000) },
-      (_event, filename) => {
-        if (filename === 'import-started') importStarted.resolve();
-      }
-    );
-    watcher.on('error', importStarted.reject);
-    watcher.on('close', () => importStarted.reject(new Error('Import did not start')));
     const controller = new AbortController();
     const restoring = restoreSession(SESSION_ID, workspace, undefined, {
       importTimeoutMs: 5_000,
@@ -900,7 +904,7 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     });
 
     try {
-      await importStarted.promise;
+      await waitForFile(path.join(workspace, 'import-started'), 10_000);
       const startedAt = Date.now();
       controller.abort();
       const result = await restoring;
@@ -915,7 +919,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
       expect(snapshotDirectories()).toEqual([]);
     } finally {
       controller.abort();
-      watcher.close();
       await restoring;
     }
   });

@@ -3,6 +3,7 @@ import { eq, or } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { isValidEmail } from '../lib/users';
 import type { SeedResult } from '../index';
 
 export const usage = '<email>';
@@ -16,11 +17,6 @@ function printUsage(): void {
   console.log('Examples:');
   console.log('  pnpm dev:seed app:user-id ada@example.com');
   console.log('  pnpm -s dev:seed app:user-id ada@example.com --json | jq -r .userId');
-}
-
-function isValidEmail(email: string): boolean {
-  // Intentionally permissive; we only guard against obvious nonsense in dev.
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 export async function run(...args: string[]): Promise<SeedResult | void> {

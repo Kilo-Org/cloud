@@ -128,6 +128,13 @@ export async function callCatalogEndpoint(options: {
 
   const schemaIsEmpty = isNoInputSchema(row.inputSchema);
   const sendInput = input !== undefined && input !== null;
+  if (schemaIsEmpty && sendInput) {
+    throw new JsonRpcFailure(
+      INVALID_PARAMS,
+      `"${path}" takes no input; omit "input" for this endpoint.`,
+      { path }
+    );
+  }
   if (sendInput && !schemaIsEmpty) {
     const validate = validatorFor(row.inputSchema);
     if (!validate(input)) {

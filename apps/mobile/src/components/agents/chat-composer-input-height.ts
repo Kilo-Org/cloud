@@ -60,13 +60,30 @@ export function shouldEnableComposerInputScroll(height: number, maxHeight: numbe
 }
 
 /**
- * Remaining-space cap for the composer input, replacing the fixed 124/160pt
- * caps. The input may grow only into the space left after the keyboard, the
- * safe areas, the session header, and every other piece of composer chrome
- * (attachment strip, send/stop, mic, newline control, starters, counter) are
- * subtracted from the window height. The result is floored at `minHeight` so
- * a single-line input is always readable, and a degenerate window (keyboard +
- * chrome exceeding the window) can never return a negative height.
+ * Hard cap for the agent chat composer input, in unscaled points.
+ *
+ * The remaining-space cap alone lets the input fill a tall window (and the
+ * whole space above the keyboard on a tablet), which pushes the transcript off
+ * screen. The input scrolls past this height instead of growing further.
+ */
+export const COMPOSER_INPUT_MAX_HEIGHT = 124;
+
+/**
+ * Hard cap for the new-session prompt input, in unscaled points. Larger than
+ * the chat composer cap: the prompt form has no transcript to protect and the
+ * first task can be several lines.
+ */
+export const NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT = 160;
+
+/**
+ * Remaining-space cap for the composer input, bounded by an absolute cap. The
+ * input may grow only into the space left after the keyboard, the safe areas,
+ * the session header, and every other piece of composer chrome (attachment
+ * strip, send/stop, mic, newline control, starters, counter) are subtracted
+ * from the window height, and never past `absoluteMaxHeight`. The result is
+ * floored at `minHeight` so a single-line input is always readable, and a
+ * degenerate window (keyboard + chrome exceeding the window) can never return
+ * a negative height.
  */
 export function resolveComposerMaxHeight({
   windowHeight,
@@ -76,6 +93,7 @@ export function resolveComposerMaxHeight({
   sessionHeaderHeight,
   composerChromeHeight,
   minHeight,
+  absoluteMaxHeight,
 }: {
   windowHeight: number;
   safeAreaInsetTop: number;
@@ -84,6 +102,7 @@ export function resolveComposerMaxHeight({
   sessionHeaderHeight: number;
   composerChromeHeight: number;
   minHeight: number;
+  absoluteMaxHeight: number;
 }): number {
   const remaining =
     windowHeight -
@@ -92,5 +111,5 @@ export function resolveComposerMaxHeight({
     keyboardHeight -
     sessionHeaderHeight -
     composerChromeHeight;
-  return Math.max(minHeight, Math.floor(remaining));
+  return Math.max(minHeight, Math.min(Math.floor(remaining), absoluteMaxHeight));
 }

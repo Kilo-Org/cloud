@@ -336,6 +336,32 @@ describe('native-scoped control event failures', () => {
     }
   });
 
+  it('selects the failed native runtime among isolated roots in the same directory', () => {
+    const first = { runtimeId: 'native_first' };
+    const second = { runtimeId: 'native_second' };
+    const retired = mock();
+    const getRuntime = mock((directory: string, nativeRuntimeId: string) =>
+      directory === session.directory
+        ? [first, second].find(runtime => runtime.runtimeId === nativeRuntimeId)
+        : undefined
+    );
+    const handleFailure = createControlEventFailureHandler({ getRuntime, onFailure: retired });
+    const failure: ControlEventOutboxFailure = {
+      reason: 'expired',
+      publication: {
+        event: 'session.event',
+        receiptId: 'receipt_second',
+        sequence: 1,
+        session: { ...session, nativeRuntimeId: second.runtimeId },
+        payload,
+      },
+    };
+    handleFailure(failure);
+    expect(getRuntime).toHaveBeenCalledWith(session.directory, second.runtimeId);
+    expect(retired).toHaveBeenCalledWith(failure, second);
+    expect(retired).toHaveBeenCalledTimes(1);
+  });
+
   it('reports failures without native identity without guessing the current runtime', async () => {
     const retired = mock();
     const getRuntime = mock(() => ({ runtimeId: crypto.randomUUID() }));
@@ -387,7 +413,7 @@ describe('native-scoped control event failures', () => {
 
     handleFailure(failure);
 
-    expect(getRuntime).toHaveBeenCalledWith('/root');
+    expect(getRuntime).toHaveBeenCalledWith('/root', runtime.runtimeId);
     expect(onFailure).toHaveBeenCalledWith(failure, runtime);
   });
 
@@ -416,7 +442,7 @@ describe('native-scoped control event failures', () => {
 
     handleFailure(failure);
 
-    expect(getRuntime).toHaveBeenCalledWith('/root');
+    expect(getRuntime).toHaveBeenCalledWith('/root', runtime.runtimeId);
     expect(onFailure).toHaveBeenCalledWith(failure, runtime);
   });
 

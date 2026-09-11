@@ -290,6 +290,12 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
   });
 
   describe('getKiloToken (forwarding credential, s6)', () => {
+    const identity = {
+      kiloUserId: 'u-k',
+      clientId: 'c-k',
+      organizationId: null,
+      resource: 'https://mcp.test/mcp',
+    };
     const grant = (
       id: string,
       createdAt: string,
@@ -308,19 +314,53 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       ...overrides,
     });
 
-    it('returns the newest live grant for (user, client)', async () => {
+    it('returns the newest live grant for the exact identity', async () => {
       await store.saveRefreshToken(grant('g-old', NOW));
       await store.saveRefreshToken(grant('g-new', LATER));
-      expect(await store.getKiloToken('u-k', 'c-k', NOW)).toBe('kilo-g-new');
+      expect(await store.getKiloToken(identity, NOW)).toBe('kilo-g-new');
     });
 
     it('skips revoked and expired grants and other identities', async () => {
-      expect(await store.getKiloToken('ghost-user', 'c-k', NOW)).toBeNull();
-      expect(await store.getKiloToken('u-k', 'ghost-client', NOW)).toBeNull();
+      expect(await store.getKiloToken({ ...identity, kiloUserId: 'ghost-user' }, NOW)).toBeNull();
+      expect(await store.getKiloToken({ ...identity, clientId: 'ghost-client' }, NOW)).toBeNull();
       await store.rotateRefreshToken('g-new', grant('g-rot', '2098-01-01T00:00:00.000Z'), NOW);
       // rotation revoked g-new; the rotated row carries the credential forward
-      expect(await store.getKiloToken('u-k', 'c-k', NOW)).toBe('kilo-g-rot');
-      expect(await store.getKiloToken('u-k', 'c-k', '2099-01-02T00:00:00.000Z')).toBeNull();
+      expect(await store.getKiloToken(identity, NOW)).toBe('kilo-g-rot');
+      expect(await store.getKiloToken(identity, '2099-01-02T00:00:00.000Z')).toBeNull();
+    });
+
+    it('never forwards a credential from a different org or resource grant', async () => {
+      await store.saveRefreshToken(
+        grant('g-org-a', NOW, { organizationId: 'org-a', kiloToken: 'kilo-org-a' })
+      );
+      await store.saveRefreshToken(
+        grant('g-org-b', LATER, { organizationId: 'org-b', kiloToken: 'kilo-org-b' })
+      );
+      await store.saveRefreshToken(
+        grant('g-other-resource', LATER, {
+          organizationId: 'org-a',
+          resource: 'https://other-mcp.test/mcp',
+          kiloToken: 'kilo-other-resource',
+        })
+      );
+      await store.saveRefreshToken(grant('g-null-org', LATER, { kiloToken: 'kilo-null-org' }));
+      expect(await store.getKiloToken({ ...identity, organizationId: 'org-a' }, NOW)).toBe(
+        'kilo-org-a'
+      );
+      expect(await store.getKiloToken({ ...identity, organizationId: 'org-b' }, NOW)).toBe(
+        'kilo-org-b'
+      );
+      // A null-org identity matches only null-org rows, never the org rows —
+      // g-org-b is the newest grant overall, so a broken org filter would surface it.
+      const nullOrg = await store.getKiloToken(identity, NOW);
+      expect(nullOrg).not.toBe('kilo-org-b');
+      // The same org but a different resource indicator is a different grant.
+      expect(
+        await store.getKiloToken(
+          { ...identity, organizationId: 'org-a', resource: 'https://third-mcp.test/mcp' },
+          NOW
+        )
+      ).toBeNull();
     });
 
     it('a grant without a Kilo token never surfaces a stale one', async () => {
@@ -332,7 +372,12 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
           tokenHash: 'f'.repeat(64),
         })
       );
-      expect(await store.getKiloToken('u-legacy', 'c-legacy', NOW)).toBeNull();
+      expect(
+        await store.getKiloToken(
+          { ...identity, kiloUserId: 'u-legacy', clientId: 'c-legacy' },
+          NOW
+        )
+      ).toBeNull();
     });
   });
 

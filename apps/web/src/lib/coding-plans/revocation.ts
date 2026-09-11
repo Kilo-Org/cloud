@@ -111,9 +111,8 @@ export async function listManualCredentialRevocations(input: {
 
   return rows.map(row => ({
     ...row,
-    // BytePlus stores the admin-supplied username in this column. It is only
-    // needed for server-side seat resolution and must never reach the admin UI.
-    upstreamPlanId: row.providerId === 'byteplus-coding' ? null : row.upstreamPlanId,
+    // The stored identifier (MiniMax Upstream Plan ID or BytePlus assigned
+    // username) is surfaced to authorized admins for remediation and mapping.
     status: row.status === 'revocation_failed' ? 'revocation_failed' : 'revocation_pending',
   }));
 }

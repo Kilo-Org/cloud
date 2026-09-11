@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway से आवाज़ को टेक्स्ट में बदलना",
+    "gatewayTranscriptionSubtitle": "डिवाइस की स्पीच रिकग्निशन के बजाय Kilo Gateway मॉडल से वॉइस इनपुट को टेक्स्ट में बदलें। आपकी रिकॉर्डिंग Kilo Gateway भेजी जाती है।",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "लाइव गतिविधियाँ",
@@ -2134,7 +2137,13 @@
     "languageNotInstalledMessage": "{{language}} की ऑफ़लाइन स्पीच फ़ाइलें इस फ़ोन पर इंस्टॉल नहीं हैं। उन्हें डाउनलोड करें, फिर वॉइस इनपुट फिर से आज़माएँ।",
     "downloadOfflineModel": "डाउनलोड",
     "offlineModelDownloadScheduled": "ऑफ़लाइन स्पीच फ़ाइलें बैकग्राउंड में डाउनलोड होंगी। बाद में वॉइस इनपुट फिर से आज़माएँ।",
-    "listeningStopped": "सुनना बंद हो गया।"
+    "listeningStopped": "सुनना बंद हो गया।",
+    "transcribing": "टेक्स्ट में बदला जा रहा है…",
+    "gatewayUnreachable": "Kilo Gateway से संपर्क नहीं हो सका। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
+    "gatewayTimeout": "आवाज़ को टेक्स्ट में बदलने में बहुत समय लगा। फिर से कोशिश करें।",
+    "gatewayModelUnavailable": "आवाज़ को टेक्स्ट में बदलने का यह मॉडल उपलब्ध नहीं है। पसंद में दूसरा चुनें।",
+    "gatewaySignInRequired": "Kilo Gateway से आवाज़ को टेक्स्ट में बदलने के लिए साइन इन करें।",
+    "gatewayNoModel": "पहले पसंद में आवाज़ को टेक्स्ट में बदलने का मॉडल चुनें।"
   },
   "share": {
     "title": "Kilo पर साझा करें",
@@ -2950,5 +2959,12 @@
     "needsInput": "इनपुट चाहिए",
     "channelName": "सक्रिय एजेंट",
     "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।"
+  },
+  "transcriptionModel": {
+    "title": "आवाज़ को टेक्स्ट में बदलने का मॉडल",
+    "noneChosen": "कोई नहीं चुना गया",
+    "emptyTitle": "आवाज़ को टेक्स्ट में बदलने का कोई मॉडल नहीं",
+    "emptyDescription": "Kilo Gateway फिलहाल आवाज़ को टेक्स्ट में बदलने के लिए कोई मॉडल नहीं दे रहा।",
+    "loadFailed": "आवाज़ को टेक्स्ट में बदलने वाले मॉडल लोड नहीं हो सके।"
   }
 }

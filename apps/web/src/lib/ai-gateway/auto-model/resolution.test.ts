@@ -14,6 +14,7 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 const baseParams = {
   model: KILO_AUTO_EFFICIENT_MODEL.id,
@@ -28,7 +29,7 @@ const nullUserPromise = Promise.resolve(null);
 const zeroBalancePromise = Promise.resolve(0);
 const primaryDefaultFallback = { model: PRIMARY_DEFAULT_MODEL };
 const { getOpenRouterModelsFromDatabase: mockedGetOpenRouterModels } = jest.requireMock<
-  jest.Mocked<typeof import('@/lib/ai-gateway/providers/gateway-models-cache')>
+  jest.Mocked<typeof GatewayModelsCache>
 >('@/lib/ai-gateway/providers/gateway-models-cache');
 
 const sampleDecision: AutoRoutingDecision = {

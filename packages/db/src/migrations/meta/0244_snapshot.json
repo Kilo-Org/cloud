@@ -1,5 +1,5 @@
 {
-  "id": "d0d60d74-cb68-4e74-aace-5e4aa23fe479",
+  "id": "5d96ee7c-7085-4a6c-be73-70cbb1a70d68",
   "prevId": "e00b62f1-939f-4d71-bf8f-4a5e9e304016",
   "version": "7",
   "dialect": "postgresql",
@@ -30693,6 +30693,92 @@
       },
       "isRLSEnabled": false
     },
+    "public.provider_installation_aliases": {
+      "name": "provider_installation_aliases",
+      "schema": "",
+      "columns": {
+        "workspace_id": {
+          "name": "workspace_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "reservation_id": {
+          "name": "reservation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "generation": {
+          "name": "generation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_time": {
+          "name": "event_time",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_provider_installation_aliases_reservation": {
+          "name": "IDX_provider_installation_aliases_reservation",
+          "columns": [
+            {
+              "expression": "reservation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "provider_installation_aliases_reservation_id_provider_installation_reservations_id_fk": {
+          "name": "provider_installation_aliases_reservation_id_provider_installation_reservations_id_fk",
+          "tableFrom": "provider_installation_aliases",
+          "tableTo": "provider_installation_reservations",
+          "columnsFrom": [
+            "reservation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "provider_installation_aliases_generation_check": {
+          "name": "provider_installation_aliases_generation_check",
+          "value": "\"provider_installation_aliases\".\"generation\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.provider_installation_pending_credentials": {
       "name": "provider_installation_pending_credentials",
       "schema": "",
@@ -30890,6 +30976,20 @@
           "notNull": true,
           "default": "'pending'"
         },
+        "cleanup_requires_revoke": {
+          "name": "cleanup_requires_revoke",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "cleanup_stage": {
+          "name": "cleanup_stage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'sdk'"
+        },
         "expires_at": {
           "name": "expires_at",
           "type": "timestamp with time zone",
@@ -31062,7 +31162,11 @@
         },
         "provider_installation_reservations_status_check": {
           "name": "provider_installation_reservations_status_check",
-          "value": "\"provider_installation_reservations\".\"status\" IN ('pending', 'active')"
+          "value": "\"provider_installation_reservations\".\"status\" IN ('pending', 'active', 'deleting')"
+        },
+        "provider_installation_reservations_cleanup_stage_check": {
+          "name": "provider_installation_reservations_cleanup_stage_check",
+          "value": "\"provider_installation_reservations\".\"cleanup_stage\" IN ('revoke', 'sdk', 'identity')"
         },
         "provider_installation_reservations_generation_check": {
           "name": "provider_installation_reservations_generation_check",

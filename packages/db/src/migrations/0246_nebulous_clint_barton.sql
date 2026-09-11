@@ -1,1 +1,0 @@
-ALTER TABLE "provider_installation_reservations" ADD COLUMN "cleanup_requires_revoke" boolean DEFAULT false NOT NULL;

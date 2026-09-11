@@ -1713,36 +1713,8 @@
     {
       "idx": 244,
       "version": "7",
-      "when": 1789154852802,
-      "tag": "0244_damp_stepford_cuckoos",
-      "breakpoints": true
-    },
-    {
-      "idx": 245,
-      "version": "7",
-      "when": 1789155863705,
-      "tag": "0245_whole_doctor_spectrum",
-      "breakpoints": true
-    },
-    {
-      "idx": 246,
-      "version": "7",
-      "when": 1789156708300,
-      "tag": "0246_nebulous_clint_barton",
-      "breakpoints": true
-    },
-    {
-      "idx": 247,
-      "version": "7",
-      "when": 1789158273897,
-      "tag": "0247_classy_quasimodo",
-      "breakpoints": true
-    },
-    {
-      "idx": 248,
-      "version": "7",
-      "when": 1789158985975,
-      "tag": "0248_mushy_justice",
+      "when": 1789159778831,
+      "tag": "0244_secret_ultimates",
       "breakpoints": true
     }
   ]

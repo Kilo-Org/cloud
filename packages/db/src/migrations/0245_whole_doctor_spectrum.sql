@@ -1,2 +1,0 @@
-ALTER TABLE "provider_installation_reservations" DROP CONSTRAINT "provider_installation_reservations_status_check";--> statement-breakpoint
-ALTER TABLE "provider_installation_reservations" ADD CONSTRAINT "provider_installation_reservations_status_check" CHECK ("provider_installation_reservations"."status" IN ('pending', 'active', 'deleting'));

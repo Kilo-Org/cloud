@@ -4,7 +4,7 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsFromDatabase: jest.fn(),
 }));
 
-import { resolveAutoModel } from './resolution';
+import type * as AutoModelResolution from './resolution';
 import {
   FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
@@ -15,6 +15,8 @@ import {
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
+
+const { resolveAutoModel } = jest.requireActual<typeof AutoModelResolution>('./resolution');
 
 const baseParams = {
   model: KILO_AUTO_EFFICIENT_MODEL.id,

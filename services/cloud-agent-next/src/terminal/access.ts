@@ -41,6 +41,7 @@ export function validateTerminalMetadata(
 
 export type TerminalWrapperClient = {
   health(): Promise<WrapperHealthResponse>;
+  listTerminals(): Promise<WrapperPty[]>;
   createTerminal(size?: { cols: number; rows: number }): Promise<WrapperPty>;
   resizeTerminal(ptyId: string, size: { cols: number; rows: number }): Promise<WrapperPty>;
   closeTerminal(ptyId: string): Promise<{ success: boolean }>;

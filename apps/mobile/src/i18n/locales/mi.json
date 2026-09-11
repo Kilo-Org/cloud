@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Tuhi ā-reo mā Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Tuhia te tāuru reo mā tētahi tauira Kilo Gateway, kau mā te mōhio kōrero o te pūrere. Ka tukuna tō pūreko ki te Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono kume",
@@ -448,6 +451,9 @@
       "acceptTerms": "Whakaae",
       "replyBadRequest": "Kāore e taea te tuku i tēnei whakautu. Kua rerekē pea te aho kōrero.",
       "replyForbidden": "Kāore koe e whakaaetia kia whakautu ki tēnei tono kume.",
+      "addCommentCta": "Tāpiri kōrero ki tēnei tono kume",
+      "commentBadRequest": "Kāore e taea te tuku i tēnei kōrero. Kua rerekē pea te tono kume.",
+      "commentForbidden": "Kāore koe e whakaaetia kia tāpiri kōrero ki tēnei tono kume.",
       "moderation": {
         "reportContent": {
           "terminal": "Kāore e taea te pūrongo i tēnei kōrero.",
@@ -2565,7 +2571,13 @@
     "languageNotInstalledMessage": "Kāore ngā kōnae kōrero kore-ipurangi mō {{language}} kua tāutitia ki tēnei waea. Tikiake, kātahi ka whakamātau anō i te tāuru reo.",
     "downloadOfflineModel": "Tikiake",
     "offlineModelDownloadScheduled": "Ka tikiaketia ngā kōnae kōrero kore-ipurangi ki te papamuri. Whakamātau anō i te tāuru reo ā muri atu.",
-    "listeningStopped": "Kua mutu te whakarongo."
+    "listeningStopped": "Kua mutu te whakarongo.",
+    "transcribing": "E tuhi ana...",
+    "gatewayUnreachable": "Kāore i taea te tae ki te Kilo Gateway. Tirohia tō hononga, kātahi ka whakamātau anō.",
+    "gatewayTimeout": "He roa rawa te tuhi ā-reo. Whakamātau anō.",
+    "gatewayModelUnavailable": "Kāore e wātea ana tēnei tauira tuhi ā-reo. Kōwhiria tētahi atu i Ngā manakohanga.",
+    "gatewaySignInRequired": "Takiuru kia taea te tuhi ā-reo mā Kilo Gateway.",
+    "gatewayNoModel": "Tuatahi, kōwhiria he tauira tuhi ā-reo i Ngā manakohanga."
   },
   "share": {
     "title": "Tohatoha ki Kilo",
@@ -2947,5 +2959,12 @@
     "needsInput": "Me whai urupare",
     "channelName": "Ngā māngai e mahi ana",
     "activityKitDisabledBody": "Whakakāngia ngā mahi wā-tūturu i ngā tautuhinga kia kite ai i ngā māngai e mahi ana i te mata maukati."
+  },
+  "transcriptionModel": {
+    "title": "Tauira tuhi ā-reo",
+    "noneChosen": "Kāore i kōwhiria",
+    "emptyTitle": "Kāore he tauira tuhi ā-reo",
+    "emptyDescription": "I tēnei wā, kāore he tauira tuhi ā-reo e wātea ana i te Kilo Gateway.",
+    "loadFailed": "Kāore i taea te uta i ngā tauira tuhi ā-reo."
   }
 }

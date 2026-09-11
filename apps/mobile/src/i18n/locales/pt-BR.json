@@ -2051,7 +2051,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transcrição com Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transcreva a digitação por voz com um modelo do Kilo Gateway em vez do reconhecimento de fala do dispositivo. Sua gravação é enviada para o Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "addCredits": {
     "cta": "Adicionar créditos",
@@ -2148,7 +2151,13 @@
     "languageNotInstalledMessage": "Os arquivos de fala off-line de {{language}} não estão instalados neste celular. Baixe-os e tente a digitação por voz novamente.",
     "downloadOfflineModel": "Baixar",
     "offlineModelDownloadScheduled": "Os arquivos de fala off-line serão baixados em segundo plano. Tente a digitação por voz novamente mais tarde.",
-    "listeningStopped": "A captação de voz foi interrompida."
+    "listeningStopped": "A captação de voz foi interrompida.",
+    "transcribing": "Transcrevendo...",
+    "gatewayUnreachable": "Não foi possível conectar ao Kilo Gateway. Verifique sua conexão e tente novamente.",
+    "gatewayTimeout": "A transcrição demorou demais. Tente novamente.",
+    "gatewayModelUnavailable": "Este modelo de transcrição não está disponível. Escolha outro em Preferências.",
+    "gatewaySignInRequired": "Entre para usar a transcrição com Kilo Gateway.",
+    "gatewayNoModel": "Escolha primeiro um modelo de transcrição em Preferências."
   },
   "share": {
     "title": "Compartilhar com o Kilo",
@@ -2422,6 +2431,9 @@
       "replyBadRequest": "Não é possível publicar esta resposta. A conversa pode ter sido alterada.",
       "replyBody": "Texto da resposta",
       "replyForbidden": "Você não tem permissão para responder a este pull request.",
+      "addCommentCta": "Comentar neste pull request",
+      "commentBadRequest": "Não é possível publicar este comentário. O pull request pode ter sido alterado.",
+      "commentForbidden": "Você não tem permissão para comentar neste pull request.",
       "replyPlaceholder": "Sua resposta…",
       "reportContent": "Denunciar conteúdo",
       "reportUser": "Denunciar usuário",
@@ -2969,5 +2981,12 @@
     "needsInput": "Aguardando resposta",
     "channelName": "Agentes ativos",
     "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada."
+  },
+  "transcriptionModel": {
+    "title": "Modelo de transcrição",
+    "noneChosen": "Nenhum selecionado",
+    "emptyTitle": "Nenhum modelo de transcrição",
+    "emptyDescription": "O Kilo Gateway não oferece modelos de transcrição no momento.",
+    "loadFailed": "Não foi possível carregar os modelos de transcrição."
   }
 }

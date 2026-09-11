@@ -1,7 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, FlatList, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Bot, Plus } from '@/components/ui/icons';
@@ -38,7 +37,7 @@ export function AgentSessionListScreen() {
   const navigation = useNavigation();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const { bottom, left, right } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
 
   const tabBarHeight = useMemo(
@@ -173,23 +172,37 @@ export function AgentSessionListScreen() {
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it. The FAB adds its own inset when it shows so the last row
-  // scrolls clear of the button too.
+  // scrolls clear of the button too. The landscape side insets keep row text
+  // clear of the sensor housing; portrait insets are 0, keeping the geometry
+  // unchanged.
   const listPadding = useMemo(
     () => ({
       paddingTop: 0,
       paddingBottom: tabBarHeight + (hasLiveRows ? FAB_SIZE + FAB_MARGIN : 0),
+      paddingLeft: left,
+      paddingRight: right,
     }),
-    [tabBarHeight, hasLiveRows]
+    [tabBarHeight, hasLiveRows, left, right]
   );
 
+  // The fixed 20pt margin gains the landscape right inset so the FAB clears the
+  // sensor area; portrait insets are 0, keeping the geometry unchanged.
   const fabStyle = useMemo(
     () => ({
       bottom: tabBarHeight + FAB_MARGIN,
-      right: 20,
+      right: 20 + right,
       width: FAB_SIZE,
       height: FAB_SIZE,
     }),
-    [tabBarHeight]
+    [tabBarHeight, right]
+  );
+
+  // The fixed 22px margins on the skeleton rows and the status wrapper gain
+  // the landscape side insets so they clear the sensor housing too; portrait
+  // insets are 0, keeping the geometry unchanged.
+  const sidePadding = useMemo(
+    () => ({ paddingLeft: 22 + left, paddingRight: 22 + right }),
+    [left, right]
   );
 
   let body: ReactNode = null;
@@ -197,8 +210,8 @@ export function AgentSessionListScreen() {
     body = (
       <View className="pt-[18px]">
         {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
-          <View key={i} className="py-1.5">
-            <Skeleton className="mx-[22px] h-[76px] rounded-none" />
+          <View key={i} className="py-1.5" style={sidePadding}>
+            <Skeleton className="h-[76px] rounded-none" />
           </View>
         ))}
       </View>
@@ -237,7 +250,6 @@ export function AgentSessionListScreen() {
         keyExtractor={item => item.id}
         extraData={attentionFocusRevision}
         contentContainerStyle={listPadding}
-        ListHeaderComponent={<RefreshProgress refreshControl={refreshControl} />}
         refreshControl={refreshControl}
         maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }}
       />
@@ -269,7 +281,10 @@ export function AgentSessionListScreen() {
             onClearSearch={query.handleClearSearch}
           />
         ) : null}
-        <View className={query.hasLoaded && content === 'error' ? 'flex-1' : 'px-[22px]'}>
+        <View
+          className={query.hasLoaded && content === 'error' ? 'flex-1' : undefined}
+          style={query.hasLoaded && content === 'error' ? undefined : sidePadding}
+        >
           <LiveSessionFeedback
             context={context}
             sessions={sessions}

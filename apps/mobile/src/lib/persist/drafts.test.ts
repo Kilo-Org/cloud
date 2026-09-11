@@ -36,6 +36,7 @@ import {
   loadDraft,
   NEW_SESSION_DRAFT_KEY,
   prCommentDraftKey,
+  prConversationCommentDraftKey,
   prMergeDraftKey,
   prReplyDraftKey,
   prReviewDraftKey,
@@ -134,6 +135,12 @@ describe('draft scope and entity keys', () => {
     );
     expect(prCommentDraftKey('acme', 'kilo', 42, 'src/a.ts', 'RIGHT', 10, 8)).toBe(
       'pr-comment:acme/kilo#42:src/a.ts:RIGHT:8-10'
+    );
+  });
+
+  it('builds the per-PR conversation comment draft entity key', () => {
+    expect(prConversationCommentDraftKey('acme', 'kilo', 42)).toBe(
+      'pr-conversation-comment:acme/kilo#42'
     );
   });
 
@@ -267,24 +274,46 @@ describe('merge, reply, and comment keys restore per account and destination', (
     ).resolves.toBeNull();
   });
 
+  it('saves and restores a conversation comment draft under the same account and PR', async () => {
+    const key = prConversationCommentDraftKey('acme', 'kilo', 42);
+    saveDraft('u1', key, 'a conversation comment');
+    await flushDraft('u1', key);
+    await expect(loadDraft('u1', key, isStringDraft)).resolves.toBe('a conversation comment');
+  });
+
+  it('does not restore a conversation comment draft under a different account or PR', async () => {
+    const key = prConversationCommentDraftKey('acme', 'kilo', 42);
+    saveDraft('u1', key, 'a conversation comment');
+    await flushDraft('u1', key);
+    await expect(loadDraft('u2', key, isStringDraft)).resolves.toBeNull();
+    await expect(
+      loadDraft('u1', prConversationCommentDraftKey('acme', 'kilo', 43), isStringDraft)
+    ).resolves.toBeNull();
+  });
+
   it('clear removes the merge, reply, and comment entries', async () => {
     const mergeKey = prMergeDraftKey('acme', 'kilo', 42);
     const replyKey = prReplyDraftKey('acme', 'kilo', 42, 7);
     const commentKey = prCommentDraftKey('acme', 'kilo', 42, 'src/a.ts', 'RIGHT', 10);
+    const conversationKey = prConversationCommentDraftKey('acme', 'kilo', 42);
     saveDraft('u1', mergeKey, { title: 'T', message: 'M' });
     saveDraft('u1', replyKey, 'a reply');
     saveDraft('u1', commentKey, 'a comment');
+    saveDraft('u1', conversationKey, 'a conversation comment');
     await Promise.all([
       flushDraft('u1', mergeKey),
       flushDraft('u1', replyKey),
       flushDraft('u1', commentKey),
+      flushDraft('u1', conversationKey),
     ]);
     await clearDraft('u1', mergeKey);
     await clearDraft('u1', replyKey);
     await clearDraft('u1', commentKey);
+    await clearDraft('u1', conversationKey);
     await expect(loadDraft('u1', mergeKey, isMergeDraft)).resolves.toBeNull();
     await expect(loadDraft('u1', replyKey, isStringDraft)).resolves.toBeNull();
     await expect(loadDraft('u1', commentKey, isStringDraft)).resolves.toBeNull();
+    await expect(loadDraft('u1', conversationKey, isStringDraft)).resolves.toBeNull();
   });
 });
 

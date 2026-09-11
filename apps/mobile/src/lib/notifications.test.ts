@@ -1711,35 +1711,22 @@ describe('cold iOS background delivery', () => {
     expect(rows.has('scope-token')).toBe(true);
   });
 
-  it('waits for an idle-only push to submit its native end before background completion', async () => {
+  it('keeps the adopted card when an idle-only push arrives in the background', async () => {
     vi.setSystemTime(Date.parse('2026-01-02T00:00:00.000Z'));
     mocks.appState.currentState = 'background';
-    const end = deferred();
-    native.endRead = end.promise;
     const background = await loadColdBackground();
-    let completed = false;
-    const applying = (async () => {
-      const result = await background.deliver({
+    expect(
+      await background.deliver({
         status: 'happy',
         running: 0,
         needsInput: 0,
         idle: 1,
         needsInputSince: null,
-      });
-      completed = true;
-      return result;
-    })();
+      })
+    ).toBe(0);
     await vi.advanceTimersByTimeAsync(0);
-
-    // The idle end is submitted during publish, and the background task cannot
-    // finish before ActivityKit accepts it.
-    expect(native.endCalls).toBe(1);
-    expect(completed).toBe(false);
-
-    end.resolve();
-    expect(await applying).toBe(0);
-    expect(native.exists).toBe(false);
-    expect(native.dismissAt).toBe(Date.parse('2026-01-02T00:10:00.000Z'));
+    expect(native.endCalls).toBe(0);
+    expect(native.exists).toBe(true);
     expect(JSON.parse(native.props ?? '{}')).toMatchObject({ status: 'happy', idle: 1 });
   });
 

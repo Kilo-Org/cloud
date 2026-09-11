@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Розпізнавання мовлення через Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Розпізнайте голосове введення за допомогою моделі Kilo Gateway замість розпізнавання мовлення на пристрої. Запис надсилається до Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Дії наживо",
@@ -2162,7 +2165,13 @@
     "languageNotInstalledMessage": "Офлайн-файли мовлення для {{language}} не встановлені на цьому телефоні. Завантажте їх, а потім спробуйте голосове введення ще раз.",
     "downloadOfflineModel": "Завантажити",
     "offlineModelDownloadScheduled": "Офлайн-файли мовлення буде завантажено у фоновому режимі. Спробуйте голосове введення пізніше.",
-    "listeningStopped": "Запис мовлення зупинено."
+    "listeningStopped": "Запис мовлення зупинено.",
+    "transcribing": "Розпізнаємо…",
+    "gatewayUnreachable": "Не вдалося зв'язатися з Kilo Gateway. Перевірте з'єднання та спробуйте ще раз.",
+    "gatewayTimeout": "Розпізнавання тривало задовго. Спробуйте ще раз.",
+    "gatewayModelUnavailable": "Ця модель розпізнавання мовлення недоступна. Виберіть іншу в Налаштуваннях.",
+    "gatewaySignInRequired": "Увійдіть, щоб використовувати розпізнавання через Kilo Gateway.",
+    "gatewayNoModel": "Спершу виберіть модель розпізнавання мовлення в Налаштуваннях."
   },
   "share": {
     "title": "Надсилання в Kilo",
@@ -2436,6 +2445,9 @@
       "replyBadRequest": "Цю відповідь неможливо опублікувати. Можливо, обговорення змінилося.",
       "replyBody": "Текст відповіді",
       "replyForbidden": "У вас немає дозволу відповідати в цьому запиті на злиття.",
+      "addCommentCta": "Коментувати цей запит на злиття",
+      "commentBadRequest": "Цей коментар неможливо опублікувати. Можливо, запит на злиття змінився.",
+      "commentForbidden": "У вас немає дозволу коментувати в цьому запиті на злиття.",
       "replyPlaceholder": "Ваша відповідь…",
       "reportContent": "Поскаржитися на вміст",
       "reportUser": "Поскаржитися на користувача",
@@ -2991,5 +3003,12 @@
     "needsInput": "Очікує відповіді",
     "channelName": "Активні агенти",
     "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані."
+  },
+  "transcriptionModel": {
+    "title": "Модель розпізнавання мовлення",
+    "noneChosen": "Не вибрано",
+    "emptyTitle": "Немає моделей розпізнавання мовлення",
+    "emptyDescription": "Зараз Kilo Gateway не пропонує моделей розпізнавання мовлення.",
+    "loadFailed": "Не вдалося завантажити моделі розпізнавання мовлення."
   }
 }

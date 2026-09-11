@@ -95,12 +95,15 @@ function fakeKiloRuntimes(overrides: Partial<WrapperKiloClient> = {}): WorktreeK
     ...overrides,
   } as WrapperKiloClient;
   const runtimes = new Map<string, WorktreeKiloRuntime>();
+  const key = (identity: typeof session) =>
+    `${identity.sessionId}\0${identity.kiloSessionId}\0${identity.directory}`;
   return {
-    attach(identity, auth, environment) {
+    attach(identity, auth, environment, _canRefreshCredentials) {
       const { directory } = identity;
-      let runtime = runtimes.get(directory);
+      let runtime = runtimes.get(key(identity));
       if (!runtime) {
         runtime = {
+          identity: { ...identity },
           runtimeId: 'native_1',
           directory,
           scopeId: auth.scopeId,
@@ -114,7 +117,7 @@ function fakeKiloRuntimes(overrides: Partial<WrapperKiloClient> = {}): WorktreeK
           kiloClient,
           signal: new AbortController().signal,
         };
-        runtimes.set(directory, runtime);
+        runtimes.set(key(identity), runtime);
       }
       return {
         ready: Promise.resolve(runtime),
@@ -125,11 +128,14 @@ function fakeKiloRuntimes(overrides: Partial<WrapperKiloClient> = {}): WorktreeK
       };
     },
     detach: () => true,
+    retireForRecovery: async () => 'retired',
     deleteDirectory: async directory => {
-      runtimes.delete(directory);
+      for (const [key, runtime] of runtimes) {
+        if (runtime.directory === directory) runtimes.delete(key);
+      }
     },
     retireRuntime: async (directory, _deadlineAt, target) => {
-      const runtime = runtimes.get(directory);
+      const runtime = [...runtimes.values()].find(runtime => runtime.directory === directory);
       if (
         !runtime ||
         !target ||
@@ -137,13 +143,21 @@ function fakeKiloRuntimes(overrides: Partial<WrapperKiloClient> = {}): WorktreeK
         target.client !== runtime.kiloClient
       )
         return 'stale';
-      runtimes.delete(directory);
+      if (runtime?.identity) runtimes.delete(key(runtime.identity));
       return 'retired';
     },
     verifyQuiescence: async (directory, target, deadlineAt) =>
-      runtimes.get(directory)?.kiloClient === target.client && Date.now() < deadlineAt,
-    getRetained: directory => runtimes.get(directory),
-    get: directory => runtimes.get(directory),
+      [...runtimes.values()].some(
+        runtime => runtime.directory === directory && runtime.kiloClient === target.client
+      ) && Date.now() < deadlineAt,
+    getRetained: directory =>
+      [...runtimes.values()].find(runtime => runtime.directory === directory),
+    get: identity =>
+      typeof identity === 'string'
+        ? [...runtimes.values()].find(runtime => runtime.directory === identity)
+        : runtimes.get(key(identity)),
+    getAll: directory => [...runtimes.values()].filter(runtime => runtime.directory === directory),
+    isCurrent: runtime => [...runtimes.values()].includes(runtime),
     isHealthy: () => true,
     shutdown: () => {},
   };
@@ -245,6 +259,52 @@ describe('applySessionAttach', () => {
       expect(await currentBranch()).toBe(branch);
     });
 
+    it('fetches synthetic review refs directly when no working branch mode is requested', async () => {
+      const branch = 'refs/pull/42/head';
+      expect((await runGit(['update-ref', branch, 'HEAD'], repository)).exitCode).toBe(0);
+
+      const result = await applySessionAttach(
+        { ...session, directory },
+        { ...payload, branch },
+        deps
+      );
+
+      expect(result).toEqual({ ok: true, result: { attached: true } });
+      expect(await currentBranch()).toBe(branch);
+    });
+
+    it('returns a non-retryable redacted failure when a synthetic review ref is missing', async () => {
+      const branch = 'refs/pull/404/head';
+      const token = 'review-token';
+      const result = await applySessionAttach(
+        { ...session, directory },
+        { ...payload, branch, git: { ...payload.git, token } },
+        {
+          ...deps,
+          runGit: async args =>
+            args[0] === 'fetch'
+              ? {
+                  stdout: '',
+                  stderr: `\u001b[31mfatal: couldn't find remote ref ${branch} ${token}\u001b[0m`,
+                  exitCode: 128,
+                }
+              : { stdout: '', stderr: '', exitCode: 0 },
+        }
+      );
+
+      expect(result).toMatchObject({
+        ok: false,
+        error: {
+          code: 'not_ready',
+          retryable: false,
+          message: expect.stringContaining(`couldn't find remote ref ${branch}`),
+        },
+      });
+      if (result.ok) throw new Error('Expected missing review ref failure');
+      expect(JSON.stringify(result)).not.toContain(token);
+      expect(JSON.stringify(result)).not.toContain('\u001b[');
+    });
+
     it.each(['main', 'feature/existing'])(
       'honors the explicitly requested branch %s',
       async branch => {
@@ -273,9 +333,13 @@ describe('applySessionAttach', () => {
           },
         }
       );
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         ok: false,
-        error: { code: 'not_ready', message: 'git checkout failed', retryable: true },
+        error: {
+          code: 'not_ready',
+          message: expect.stringContaining('git checkout failed'),
+          retryable: true,
+        },
       });
       expect(setupRan).toBe(false);
       expect(diagnostics).toContainEqual(
@@ -284,7 +348,7 @@ describe('applySessionAttach', () => {
           stage: 'git_setup',
           errorCode: 'not_ready',
           retryable: true,
-          detail: 'git checkout failed',
+          detail: expect.stringContaining('git checkout failed'),
         })
       );
     });
@@ -439,6 +503,44 @@ describe('applySessionAttach', () => {
     expect(process.env.KILOCODE_TOKEN).toBe(envBefore);
   });
 
+  it('includes redacted, ANSI-free Git diagnostics for clone failures', async () => {
+    const token = 'clone-auth-token';
+    const result = await applySessionAttach(
+      session,
+      {
+        kilo,
+        git: { url: 'https://github.com/acme/demo.git', token },
+      },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        ...noFs,
+        sessionExists: async () => true,
+        mkdir: async () => undefined,
+        hasGit: async () => false,
+        runGit: async args =>
+          args[0] === 'clone'
+            ? {
+                stdout: '',
+                stderr: `\u001b[31mfatal: Authentication failed for https://x-access-token:${token}@github.com/acme/demo.git\u001b[0m`,
+                exitCode: 128,
+              }
+            : { stdout: '', stderr: '', exitCode: 0 },
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        retryable: true,
+        message: expect.stringContaining('Authentication failed'),
+      },
+    });
+    if (result.ok) throw new Error('Expected clone failure');
+    expect(JSON.stringify(result.error.message)).not.toContain(token);
+    expect(JSON.stringify(result.error.message)).not.toContain('\u001b[');
+  });
+
   it('preserves generic repository authentication and checks out only the requested upstream branch', async () => {
     const gitCalls: string[][] = [];
     const repositoryUrl = 'https://git.example.com/acme/demo.git';
@@ -576,9 +678,13 @@ describe('applySessionAttach', () => {
 
     const failed = await applySessionAttach(session, payload, deps);
 
-    expect(failed).toEqual({
+    expect(failed).toMatchObject({
       ok: false,
-      error: { code: 'not_ready', message: 'git checkout failed', retryable: true },
+      error: {
+        code: 'not_ready',
+        message: expect.stringContaining('git checkout failed'),
+        retryable: true,
+      },
     });
     expect(gitExists).toBe(true);
     expect(setupCalls).toEqual([]);
@@ -1428,7 +1534,7 @@ describe('applySessionAttach', () => {
       const snapshotIdentity = 'snapshot_other';
       const steps: string[] = [];
       const assertRegistration = () => {
-        const runtime = runtimes.get(session.directory);
+        const runtime = runtimes.get(session);
         if (!runtime) throw new Error('Expected worktree runtime');
         const storage = path.join(runtime.env.XDG_DATA_HOME, 'kilo', 'storage', 'session_share');
         expect(
@@ -1511,7 +1617,7 @@ describe('applySessionAttach', () => {
     const runtimes = isolatedKiloRuntimes();
     const deps = { ...noFs, kiloRuntimes: runtimes };
     expect(await applySessionAttach(first, { kilo }, deps)).toMatchObject({ ok: true });
-    const runtime = runtimes.get(directory);
+    const runtime = runtimes.get(first);
     const failed = await applySessionAttach(
       sibling,
       { kilo },
@@ -1529,7 +1635,7 @@ describe('applySessionAttach', () => {
     expect(failed).toMatchObject({ ok: false });
     expect(rootForSession(sibling.kiloSessionId)).toBeUndefined();
     expect(rootForSession(first.kiloSessionId)).toBe(first.kiloSessionId);
-    expect(runtimes.get(directory)).toBe(runtime);
+    expect(runtimes.get(first)).toBe(runtime);
     expect(runtime?.signal.aborted).toBe(false);
     expect(runtimes.detach(sibling)).toBe(false);
     expect(await applySessionAttach(sibling, { kilo }, deps)).toMatchObject({ ok: true });
@@ -1541,7 +1647,7 @@ describe('applySessionAttach', () => {
     const deps = { ...noFs, kiloRuntimes: runtimes };
     expect(await applySessionAttach(identity, { kilo }, deps)).toMatchObject({ ok: true });
     rememberChildSession({ childId: 'child_existing', parentId: identity.kiloSessionId });
-    const runtime = runtimes.get(identity.directory);
+    const runtime = runtimes.get(identity);
     expect(
       await applySessionAttach(
         identity,
@@ -1560,11 +1666,11 @@ describe('applySessionAttach', () => {
     ).toMatchObject({ ok: false });
     expect(rootForSession(identity.kiloSessionId)).toBe(identity.kiloSessionId);
     expect(rootForSession('child_existing')).toBe(identity.kiloSessionId);
-    expect(runtimes.get(identity.directory)).toBe(runtime);
+    expect(runtimes.get(identity)).toBe(runtime);
     expect(runtime?.signal.aborted).toBe(false);
   });
 
-  it('retires a cancelled pending root and keeps the original immutable grant for a sibling', async () => {
+  it('retires a cancelled pending root without coupling a sibling identity to its grant', async () => {
     const directory = path.join(homeRoot, 'shared');
     const identity = { ...session, directory };
     const sibling = { ...siblingSession, directory };
@@ -1575,7 +1681,7 @@ describe('applySessionAttach', () => {
     const grant = { ...kilo, targets: { ...kilo.targets } };
     const attaching = applySessionAttach(
       identity,
-      { kilo: grant },
+      { kilo: grant, runtimeIsolation: 'per-session' },
       {
         ...noFs,
         kiloRuntimes: runtimes,
@@ -1595,22 +1701,23 @@ describe('applySessionAttach', () => {
     );
     try {
       await restoring.promise;
-      const runtime = runtimes.get(directory);
+      const runtime = runtimes.get(identity);
       grant.token = 'mutated-guest';
       grant.targets.sessionIngestBaseUrl = 'https://other.example.test';
       const deps = { ...noFs, kiloRuntimes: runtimes };
-      expect(await applySessionAttach(sibling, { kilo: grant }, deps)).toMatchObject({
-        ok: false,
-        error: { code: 'unauthorized' },
-      });
-      expect(await applySessionAttach(sibling, { kilo }, deps)).toMatchObject({ ok: true });
+      expect(
+        await applySessionAttach(sibling, { kilo: grant, runtimeIsolation: 'per-session' }, deps)
+      ).toMatchObject({ ok: true });
+      const siblingRuntime = runtimes.get(sibling);
+      expect(siblingRuntime).toBeDefined();
+      expect(siblingRuntime).not.toBe(runtime);
       const storage = path.join(
         runtime?.env.XDG_DATA_HOME ?? '',
         'kilo',
         'storage',
         'session_share'
       );
-      for (const id of [identity.kiloSessionId, sibling.kiloSessionId]) {
+      for (const id of [identity.kiloSessionId]) {
         expect(JSON.parse(fs.readFileSync(path.join(storage, `${id}.json`), 'utf8'))).toEqual({
           id,
           ingestPath: `/api/session/${id}/ingest`,
@@ -1622,12 +1729,12 @@ describe('applySessionAttach', () => {
       expect(runtimes.detach(identity)).toBe(false);
       expect(rootForSession(identity.kiloSessionId)).toBeUndefined();
       expect(rootForSession(sibling.kiloSessionId)).toBe(sibling.kiloSessionId);
-      expect(runtimes.get(directory)).toBe(runtime);
-      expect(runtime?.env.KILOCODE_TOKEN).toBe(kilo.token);
-      expect(runtime?.env.KILO_SESSION_INGEST_URL).toBe(kilo.targets.sessionIngestBaseUrl);
-      expect(runtime?.signal.aborted).toBe(false);
+      expect(runtimes.get(sibling)).toBe(siblingRuntime);
+      expect(siblingRuntime?.env.KILOCODE_TOKEN).toBe('mutated-guest');
+      expect(siblingRuntime?.env.KILO_SESSION_INGEST_URL).toBe('https://other.example.test');
+      expect(siblingRuntime?.signal.aborted).toBe(false);
       expect(runtimes.detach(sibling)).toBe(true);
-      expect(runtime?.signal.aborted).toBe(true);
+      expect(siblingRuntime?.signal.aborted).toBe(true);
     } finally {
       release.resolve();
       await attaching;
@@ -1710,7 +1817,7 @@ describe('applySessionAttach', () => {
     const runtimes = fakeKiloRuntimes();
     // Pre-attach to create the runtime so defaultSessionExists can find kiloClient.serverUrl
     runtimes.attach(session, kilo, {});
-    const runtime = runtimes.get(session.directory);
+    const runtime = runtimes.get(session);
     if (!runtime) throw new Error('Expected runtime');
     const server = Bun.serve({
       port: 0,
@@ -1979,7 +2086,7 @@ describe('applySessionAttach', () => {
         { ...noFs, kiloRuntimes: runtimes, sessionExists: async () => true }
       );
       expect(result).toEqual({ ok: true, result: { attached: true } });
-      const home = runtimes.get(directory)?.env.HOME;
+      const home = runtimes.get({ ...session, directory })?.env.HOME;
       expect(home).toStartWith(homeRoot);
       expect(fs.readFileSync(path.join(directory, 'setup-env.txt'), 'utf8')).toBe(
         `${home}\n${kilo.token}\nabsent\nabsent\nopaque-bitbucket-token\nacme-workspace\nwidgets\n{33333333-3333-4333-8333-333333333333}\n{11111111-1111-4111-8111-111111111111}\n`

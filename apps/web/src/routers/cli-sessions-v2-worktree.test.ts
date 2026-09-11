@@ -73,7 +73,12 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
 
 jest.mock('@/lib/tokens', () => ({
   generateApiToken: jest.fn(() => 'cloud-agent-token'),
-  generateCloudAgentToken: mockGenerateCloudAgentToken,
+}));
+
+jest.mock('@/lib/auth/resource-delegation', () => ({
+  createControlTokenForRequest: jest.fn(async (user: User) => ({
+    token: mockGenerateCloudAgentToken(user),
+  })),
 }));
 
 jest.mock('@/lib/session-ingest-client', () => ({

@@ -4,23 +4,49 @@ import {
   type ControlEventOutboxFailure,
   type ControlEventPublication,
 } from './control-event-outbox.js';
+import { ownerDirectoryForSession } from './session-directories.js';
 
 type EventKind = 'session.event' | 'session.preparing';
 
 export function createControlEventFailureHandler<Runtime extends { runtimeId: string }>(options: {
-  getRuntime: (directory: string) => Runtime | undefined;
-  onFailure: (failure: ControlEventOutboxFailure, runtime: Runtime) => void;
+  getRuntime: (directory: string, nativeRuntimeId: string) => Runtime | undefined;
+  onFailure: (failure: ControlEventOutboxFailure, runtime: Runtime) => unknown;
 }) {
-  const failedRuntimes = new WeakSet<Runtime>();
+  const inFlight = new WeakMap<Runtime, Set<string>>();
   return (failure?: ControlEventOutboxFailure): void => {
     if (!failure) return;
     if (failure.publication.event === 'session.preparing') return;
-    const { directory, nativeRuntimeId } = failure.publication.session;
-    if (!nativeRuntimeId) return;
-    const runtime = options.getRuntime(directory);
-    if (runtime?.runtimeId !== nativeRuntimeId || failedRuntimes.has(runtime)) return;
-    failedRuntimes.add(runtime);
-    options.onFailure(failure, runtime);
+    const { nativeRuntimeId } = failure.publication.session;
+    const root =
+      failure.publication.session.rootKiloSessionId ?? failure.publication.session.kiloSessionId;
+    if (!nativeRuntimeId || !root) return;
+    const ownerDirectory = ownerDirectoryForSession(failure.publication.session);
+    if (!ownerDirectory) return;
+    const runtime = options.getRuntime(ownerDirectory, nativeRuntimeId);
+    if (runtime?.runtimeId !== nativeRuntimeId) return;
+    const key = JSON.stringify([nativeRuntimeId, root]);
+    const keys = inFlight.get(runtime) ?? new Set<string>();
+    if (keys.has(key)) return;
+    keys.add(key);
+    inFlight.set(runtime, keys);
+    let result: unknown;
+    try {
+      result = options.onFailure(failure, runtime);
+    } catch {
+      keys.delete(key);
+      if (keys.size === 0) inFlight.delete(runtime);
+      return;
+    }
+    void Promise.resolve(result).then(
+      () => {
+        keys.delete(key);
+        if (keys.size === 0) inFlight.delete(runtime);
+      },
+      () => {
+        keys.delete(key);
+        if (keys.size === 0) inFlight.delete(runtime);
+      }
+    );
   };
 }
 

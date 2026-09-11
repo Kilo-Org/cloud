@@ -61,7 +61,7 @@ export function HomeScreen() {
         }
         size="large"
         showBackButton={false}
-        className="px-[22px]"
+        className="px-[22px] pb-1"
       />
       {centerFeedback ? (
         <LiveSessionFeedback

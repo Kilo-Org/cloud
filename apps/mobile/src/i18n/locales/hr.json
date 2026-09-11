@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkripcija putem Kilo Gatewaya",
+    "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gatewaya umjesto prepoznavanja govora na uređaju. Snimka se šalje na Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtjev za spajanje nije dostupan",
@@ -450,6 +453,9 @@
       "acceptTerms": "Prihvati",
       "replyBadRequest": "Ovaj odgovor nije moguće objaviti. Nit se možda promijenila.",
       "replyForbidden": "Nemaš dopuštenje za odgovaranje u ovom zahtjevu za spajanje.",
+      "addCommentCta": "Komentiraj ovaj zahtjev za spajanje",
+      "commentBadRequest": "Ovaj komentar nije moguće objaviti. Zahtjev za spajanje se možda promijenio.",
+      "commentForbidden": "Nemaš dopuštenje za komentiranje u ovom zahtjevu za spajanje.",
       "moderation": {
         "reportContent": {
           "terminal": "Ovaj komentar nije moguće prijaviti.",
@@ -2586,7 +2592,13 @@
     "languageNotInstalledMessage": "Datoteke govora za izvanmrežni rad za {{language}} nisu instalirane na ovom telefonu. Preuzmi ih, a zatim pokušaj glasovni unos ponovno.",
     "downloadOfflineModel": "Preuzmi",
     "offlineModelDownloadScheduled": "Datoteke govora za izvanmrežni rad preuzet će se u pozadini. Pokušaj glasovni unos ponovno kasnije.",
-    "listeningStopped": "Slušanje je zaustavljeno."
+    "listeningStopped": "Slušanje je zaustavljeno.",
+    "transcribing": "Transkripcija…",
+    "gatewayUnreachable": "Nije bilo moguće doseći Kilo Gateway. Provjeri vezu i pokušaj ponovno.",
+    "gatewayTimeout": "Transkripcija je predugo trajala. Pokušaj ponovno.",
+    "gatewayModelUnavailable": "Ovaj model za transkripciju nije dostupan. Odaberi drugi u Postavkama.",
+    "gatewaySignInRequired": "Prijavi se za korištenje transkripcije putem Kilo Gatewaya.",
+    "gatewayNoModel": "Najprije odaberi model za transkripciju u Postavkama."
   },
   "share": {
     "title": "Dijeljenje u aplikaciju Kilo",
@@ -2969,5 +2981,12 @@
     "needsInput": "Čeka unos",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama za prikaz aktivnih agenata na zaključanom zaslonu."
+  },
+  "transcriptionModel": {
+    "title": "Model za transkripciju",
+    "noneChosen": "Nije odabran",
+    "emptyTitle": "Nema modela za transkripciju",
+    "emptyDescription": "Kilo Gateway trenutačno ne nudi modele za transkripciju.",
+    "loadFailed": "Nije moguće učitati modele za transkripciju."
   }
 }

@@ -4,6 +4,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { AgentSessionListContent } from './session-list-content';
 import { type SessionSection } from './session-list-helpers';
@@ -28,6 +29,8 @@ const controls = vi.hoisted(() => ({
   scrollResets: 0,
   deleteSession: vi.fn(),
   renameSession: vi.fn(),
+  leftInset: 0,
+  rightInset: 0,
 }));
 
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
@@ -92,7 +95,13 @@ vi.mock('react-native-reanimated', () => ({
   FadeIn: { duration: () => undefined },
   FadeOut: { duration: () => undefined },
 }));
-vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({
+    bottom: 0,
+    left: controls.leftInset,
+    right: controls.rightInset,
+  }),
+}));
 vi.mock('@/components/agents/session-row', () => ({ StoredSessionRow: 'StoredSessionRow' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
   SessionListSectionHeader: 'SessionListSectionHeader',
@@ -428,5 +437,30 @@ describe('AgentSessionListContent liveness', () => {
     expect(hosts(renderer, 'Skeleton')).toHaveLength(8);
     expect(hosts(renderer, 'Button')).toHaveLength(0);
     expect(rows(renderer)).toEqual([]);
+  });
+
+  it('pads the SectionList content by the landscape side insets', () => {
+    const sections = [{ title: 'Today', data: [session('padded')] }];
+    const renderer = mount(contentProps({ sections }));
+    const style = () =>
+      (
+        renderer.root.find(node => isHost(node, 'SectionList')).props as {
+          contentContainerStyle: Record<string, number>;
+        }
+      ).contentContainerStyle;
+    const tabClearance = getEffectiveTabBarHeight({
+      bottomInset: 0,
+      platform: 'ios',
+      fontScale: 1,
+    });
+    expect(style()).toEqual({ paddingBottom: tabClearance, paddingLeft: 0, paddingRight: 0 });
+
+    // Rotation pads only the sides; the tab-bar clearance is unchanged.
+    controls.leftInset = 47;
+    controls.rightInset = 59;
+    act(() => {
+      renderer.update(createElement(AgentSessionListContent, contentProps({ sections })));
+    });
+    expect(style()).toEqual({ paddingBottom: tabClearance, paddingLeft: 47, paddingRight: 59 });
   });
 });

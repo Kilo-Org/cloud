@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Pagsasalin ng boses sa teksto gamit ang Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Gamitin ang modelong Kilo Gateway sa pagsasalin ng boses sa teksto imbes na ang pagkilala sa tinig ng device. Ipinapadala sa Kilo Gateway ang iyong recording.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Hindi mabuksan ang pull request",
@@ -448,6 +451,9 @@
       "acceptTerms": "Tanggapin",
       "replyBadRequest": "Hindi ma-post ang sagot na ito. Maaaring nagbago ang talakayan.",
       "replyForbidden": "Wala kang pahintulot na sumagot sa pull request na ito.",
+      "addCommentCta": "Magkomento sa pull request na ito",
+      "commentBadRequest": "Hindi ma-post ang komentong ito. Maaaring nagbago ang pull request.",
+      "commentForbidden": "Wala kang pahintulot na magkomento sa pull request na ito.",
       "moderation": {
         "reportContent": {
           "terminal": "Hindi maiulat ang komentong ito.",
@@ -2565,7 +2571,13 @@
     "languageNotInstalledMessage": "Hindi naka-install ang mga offline na speech file para sa {{language}} sa teleponong ito. I-download muna ang mga ito, pagkatapos ay subukang muli ang pagdikta.",
     "downloadOfflineModel": "I-download",
     "offlineModelDownloadScheduled": "Ida-download sa background ang mga offline na speech file. Subukang muli ang pagdikta mamaya.",
-    "listeningStopped": "Huminto ang pakikinig."
+    "listeningStopped": "Huminto ang pakikinig.",
+    "transcribing": "Nagsasalin ng boses sa teksto...",
+    "gatewayUnreachable": "Hindi maabot ang Kilo Gateway. Suriin ang iyong koneksyon at subukang muli.",
+    "gatewayTimeout": "Nagtagal ang pagsasalin ng boses sa teksto. Subukang muli.",
+    "gatewayModelUnavailable": "Hindi magagamit ang modelong ito para sa pagsasalin ng boses sa teksto. Pumili ng iba sa Mga kagustuhan.",
+    "gatewaySignInRequired": "Mag-sign in para gamitin ang pagsasalin ng boses sa teksto gamit ang Kilo Gateway.",
+    "gatewayNoModel": "Pumili muna ng modelo para sa pagsasalin ng boses sa teksto sa Mga kagustuhan."
   },
   "share": {
     "title": "Pagbabahagi sa Kilo",
@@ -2947,5 +2959,12 @@
     "needsInput": "Naghihintay ng sagot",
     "channelName": "Mga aktibong agent",
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen."
+  },
+  "transcriptionModel": {
+    "title": "Modelo para sa pagsasalin ng boses sa teksto",
+    "noneChosen": "Walang napili",
+    "emptyTitle": "Walang modelo para sa pagsasalin ng boses sa teksto",
+    "emptyDescription": "Walang iniaalok na modelo para sa pagsasalin ng boses sa teksto ang Kilo Gateway ngayon.",
+    "loadFailed": "Hindi ma-load ang mga modelo para sa pagsasalin ng boses sa teksto."
   }
 }

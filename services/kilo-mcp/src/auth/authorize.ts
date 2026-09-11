@@ -13,7 +13,14 @@
  */
 import { base64UrlEncode, isValidCodeChallenge } from './pkce';
 import { mcpResourceUrl } from './metadata';
-import { MCP_SCOPE, errorPage, redirectToClientError } from './http';
+import {
+  MCP_SCOPE,
+  errorPage,
+  redirectToClientError,
+  normalizeScope,
+  onlyMcpScope,
+  scopeTokens,
+} from './http';
 import { consentPage } from '../oauth-pages/authorize-page';
 import type { McpAnalytics } from '../analytics';
 import type { OAuthStoreApi, StoredClient } from '../store/oauth-store';
@@ -120,7 +127,7 @@ export async function validateAuthorizeRequest(
     fail('invalid_target', 'The resource indicator must identify this MCP server.');
   }
   const scope = params.get('scope');
-  if (scope !== null && !validScope(scope)) {
+  if (scope !== null && !onlyMcpScope(scopeTokens(scope))) {
     fail('invalid_scope', `Only the "${MCP_SCOPE}" scope is available.`);
   }
   if (state !== null && state.length > MAX_STATE_LENGTH) {
@@ -156,15 +163,6 @@ export function sameResource(candidate: string, canonical: string): boolean {
   } catch {
     return false;
   }
-}
-
-function validScope(scope: string): boolean {
-  const tokens = scope.split(' ').filter(token => token.length > 0);
-  return tokens.length === 0 || tokens.every(token => token === MCP_SCOPE);
-}
-
-function normalizeScope(scope: string): string {
-  return [...new Set(scope.split(' ').filter(token => token.length > 0))].join(' ');
 }
 
 export type KiloPairingFailure = 'rate_limited' | 'unreachable';

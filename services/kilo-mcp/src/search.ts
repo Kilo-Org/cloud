@@ -3,6 +3,9 @@ import type { Catalog, CatalogRow, SearchResult, SemanticCandidates } from './ty
 /** Default number of search rows returned when the caller omits `limit`. */
 export const DEFAULT_SEARCH_LIMIT = 10;
 
+/** Published upper bound on `search.limit`; the tool schema advertises the same value. */
+export const MAX_SEARCH_LIMIT = 50;
+
 /**
  * Hybrid-ready scoring weights. A single-token overlap contributes at most
  * OVERLAP_WEIGHT; a contiguous query-token sequence found in the endpoint's

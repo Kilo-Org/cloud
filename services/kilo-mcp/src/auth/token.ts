@@ -342,7 +342,7 @@ async function redeemRefreshToken(
   }
 
   const newRefreshToken = opaqueToken(48);
-  const rotated = await deps.store.rotateRefreshToken(
+  const rotation = await deps.store.rotateRefreshToken(
     record.id,
     {
       id: opaqueToken(16),
@@ -361,11 +361,14 @@ async function redeemRefreshToken(
     },
     nowIso
   );
-  if (!rotated) {
+  if (rotation !== 'rotated') {
+    // 'replayed' lost a concurrent rotation; the store already revoked the
+    // whole grant (RFC 9700 §2.2.2). 'missing' raced an expiry. Both need a
+    // fresh authorization.
     return oauthErrorResponse(
       400,
       'invalid_grant',
-      'This refresh token was already rotated. Use the latest token.'
+      'This refresh token is no longer valid. Reconnect to start a new authorization.'
     );
   }
 

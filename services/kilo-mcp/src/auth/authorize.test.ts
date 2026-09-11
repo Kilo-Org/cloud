@@ -27,6 +27,7 @@ function createFakeOAuthStore(): OAuthStoreApi & {
     codes,
     async registerClient(input) {
       clients.set(input.clientId, { ...input, redirectUris: [...input.redirectUris] });
+      return true;
     },
     async getClient(clientId) {
       const client = clients.get(clientId);

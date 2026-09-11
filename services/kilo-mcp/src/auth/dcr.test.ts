@@ -15,6 +15,7 @@ function createFakeOAuthStore(): OAuthStoreApi & { clients: Map<string, StoredCl
     clients,
     async registerClient(input) {
       clients.set(input.clientId, { ...input, redirectUris: [...input.redirectUris] });
+      return true;
     },
     async getClient(clientId) {
       const client = clients.get(clientId);
@@ -226,5 +227,18 @@ describe('POST /register (input validation)', () => {
       { store: createFakeOAuthStore() }
     );
     expect(response.status).toBe(405);
+  });
+
+  it('refuses with a deterministic error once the client registry is full', async () => {
+    const store = createFakeOAuthStore();
+    store.registerClient = async () => false;
+    const response = await handleRegistration(
+      registrationRequest({ redirect_uris: ['https://a.test/cb'] }),
+      { store, now: () => NOW }
+    );
+    expect(response.status).toBe(429);
+    const body = (await response.json()) as RegistrationBody;
+    expect(body.error).toBe('temporarily_unavailable');
+    expect(store.clients.size).toBe(0);
   });
 });

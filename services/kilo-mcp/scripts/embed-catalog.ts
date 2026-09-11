@@ -29,7 +29,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { EMBEDDING_DIMENSIONS, EMBEDDING_METRIC, EMBEDDING_MODEL } from '../src/embedding.ts';
-import type { Catalog } from '../src/types.ts';
+import type { Catalog, CatalogRow } from '../src/types.ts';
 
 /** Cloudflare REST API root. */
 const API_ROOT = 'https://api.cloudflare.com/client/v4';
@@ -241,12 +241,43 @@ function envFromProcess(): EmbedEnv {
   };
 }
 
+function isCatalogRow(value: unknown): value is CatalogRow {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  return (
+    typeof row['path'] === 'string' &&
+    row['kind'] === 'query' &&
+    typeof row['summary'] === 'string' &&
+    typeof row['searchBlob'] === 'string' &&
+    Array.isArray(row['tags']) &&
+    row['tags'].every(tag => typeof tag === 'string') &&
+    typeof row['inputSchema'] === 'object' &&
+    row['inputSchema'] !== null &&
+    !Array.isArray(row['inputSchema'])
+  );
+}
+
+/** Validate the committed artifact before it reaches Vectorize; fail loudly on drift. */
+export function parseCatalog(value: unknown): Catalog {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('catalog.json must be a JSON object keyed by procedure path.');
+  }
+  const catalog: Catalog = {};
+  for (const [key, row] of Object.entries(value as Record<string, unknown>)) {
+    if (!isCatalogRow(row) || row.path !== key) {
+      throw new Error(`catalog.json entry "${key}" is not a valid catalog row.`);
+    }
+    catalog[key] = row;
+  }
+  return catalog;
+}
+
 /** Read the committed catalog.json that sits next to this script's package. */
 export function loadCatalog(): Catalog {
   // import.meta.url is ALREADY a file URL: decode it with fileURLToPath —
   // pathToFileURL(import.meta.url) double-encodes and yields an ENOENT path.
   const catalogPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'catalog.json');
-  return JSON.parse(readFileSync(catalogPath, 'utf8')) as Catalog;
+  return parseCatalog(JSON.parse(readFileSync(catalogPath, 'utf8')) as unknown);
 }
 
 async function main(): Promise<void> {

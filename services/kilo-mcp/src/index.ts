@@ -21,7 +21,12 @@ import { callCatalogEndpoint } from './call';
 import { getKiloMcpOAuthStoreStub, type OAuthStoreApi } from './store/oauth-store';
 import { handlePairingStatus } from './oauth-pages/authorize-page';
 import { handleOrgPicker } from './oauth-pages/org-picker';
-import { DEFAULT_SEARCH_LIMIT, noSemanticCandidates, searchCatalog } from './search';
+import {
+  DEFAULT_SEARCH_LIMIT,
+  MAX_SEARCH_LIMIT,
+  noSemanticCandidates,
+  searchCatalog,
+} from './search';
 import { createSemanticCandidates } from './search-knn';
 import { JsonRpcFailure, type Catalog, type ForwardedAuth, type SemanticCandidates } from './types';
 
@@ -109,7 +114,7 @@ const TOOLS = [
         limit: {
           type: 'integer',
           minimum: 1,
-          maximum: 50,
+          maximum: MAX_SEARCH_LIMIT,
           description: `Maximum number of results (default ${DEFAULT_SEARCH_LIMIT}).`,
         },
       },
@@ -203,6 +208,11 @@ function textResult(text: string): ToolResult {
   return { content: [{ type: 'text', text }] };
 }
 
+/** JSON object guard for the external JSON-RPC boundary (rejects arrays and null). */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 async function runTool(
   name: string,
   args: Record<string, unknown>,
@@ -217,8 +227,17 @@ async function runTool(
       throw new JsonRpcFailure(INVALID_PARAMS, 'search requires a non-empty string "query".');
     }
     const limit = args['limit'];
-    if (limit !== undefined && (typeof limit !== 'number' || !Number.isInteger(limit))) {
-      throw new JsonRpcFailure(INVALID_PARAMS, 'search "limit" must be an integer.');
+    if (
+      limit !== undefined &&
+      (typeof limit !== 'number' ||
+        !Number.isInteger(limit) ||
+        limit < 1 ||
+        limit > MAX_SEARCH_LIMIT)
+    ) {
+      throw new JsonRpcFailure(
+        INVALID_PARAMS,
+        `search "limit" must be an integer between 1 and ${MAX_SEARCH_LIMIT}.`
+      );
     }
     const results = await searchCatalog(query, {
       catalog: deps.catalog,
@@ -293,17 +312,16 @@ async function handleRpcMessage(
   try {
     switch (method) {
       case 'initialize': {
-        const params = (message.params ?? {}) as {
-          protocolVersion?: unknown;
-          clientInfo?: unknown;
-        };
+        const params = isRecord(message.params) ? message.params : {};
         const protocolVersion =
-          typeof params.protocolVersion === 'string' ? params.protocolVersion : PROTOCOL_VERSION;
-        const clientInfo = (params.clientInfo ?? {}) as { name?: unknown };
+          typeof params['protocolVersion'] === 'string'
+            ? params['protocolVersion']
+            : PROTOCOL_VERSION;
+        const clientInfo = isRecord(params['clientInfo']) ? params['clientInfo'] : {};
         analytics.sessionStarted({
           identity: callerIdentity,
           protocolVersion,
-          ...(typeof clientInfo.name === 'string' ? { clientName: clientInfo.name } : {}),
+          ...(typeof clientInfo['name'] === 'string' ? { clientName: clientInfo['name'] } : {}),
         });
         return jsonRpcResult(id ?? 0, {
           protocolVersion,
@@ -318,12 +336,19 @@ async function handleRpcMessage(
       case 'tools/list':
         return jsonRpcResult(id ?? 0, { tools: TOOLS });
       case 'tools/call': {
-        const params = (message.params ?? {}) as { name?: unknown; arguments?: unknown };
-        if (typeof params.name !== 'string') {
+        if (!isRecord(message.params)) {
+          throw new JsonRpcFailure(INVALID_PARAMS, 'tools/call requires a params object.');
+        }
+        const params = message.params;
+        if (typeof params['name'] !== 'string') {
           throw new JsonRpcFailure(INVALID_PARAMS, 'tools/call requires a string "name".');
         }
-        const toolName = params.name;
-        const args = (params.arguments ?? {}) as Record<string, unknown>;
+        const toolName = params['name'];
+        const rawArguments = params['arguments'];
+        if (rawArguments !== undefined && !isRecord(rawArguments)) {
+          throw new JsonRpcFailure(INVALID_PARAMS, 'tools/call "arguments" must be an object.');
+        }
+        const args = rawArguments ?? {};
         // Analytics records only a published tool name; anything else is
         // caller-supplied text and must never reach PostHog verbatim.
         const analyticsTool = PUBLISHED_TOOL_NAMES.has(toolName) ? toolName : 'unknown';

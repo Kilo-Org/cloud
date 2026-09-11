@@ -20,17 +20,58 @@ function createFakeOAuthStore(): OAuthStoreApi & {
   clients: Map<string, StoredClient>;
   codes: Map<string, OAuthCodeRecord>;
   refreshTokens: Map<string, RefreshTokenRecord>;
+  barrierRotations: (count?: number) => void;
+  releaseRotations: () => void;
 } {
   const clients = new Map<string, StoredClient>();
   const codes = new Map<string, OAuthCodeRecord>();
   const refreshTokens = new Map<string, RefreshTokenRecord>();
+  let rotateBarrier = Promise.resolve();
+  let arriveAtBarrier: () => void = () => {};
+  let releaseRotations: (() => void) | null = null;
   const unused = (): never => {
     throw new Error('not reachable from these tests');
+  };
+  const revokeGrant = async (
+    grant: {
+      clientId: string;
+      kiloUserId: string;
+      organizationId: string | null;
+      resource: string;
+    },
+    nowIso: string
+  ): Promise<number> => {
+    let revoked = 0;
+    for (const [hash, record] of refreshTokens) {
+      if (
+        record.clientId === grant.clientId &&
+        record.kiloUserId === grant.kiloUserId &&
+        record.resource === grant.resource &&
+        (record.organizationId ?? null) === grant.organizationId &&
+        record.revokedAt === null &&
+        record.expiresAt > nowIso
+      ) {
+        refreshTokens.set(hash, { ...record, revokedAt: nowIso });
+        revoked += 1;
+      }
+    }
+    return revoked;
   };
   return {
     clients,
     codes,
     refreshTokens,
+    barrierRotations: (count = 2) => {
+      let remaining = count;
+      rotateBarrier = new Promise(resolve => {
+        releaseRotations = resolve;
+      });
+      arriveAtBarrier = () => {
+        remaining -= 1;
+        if (remaining <= 0) releaseRotations?.();
+      };
+    },
+    releaseRotations: () => releaseRotations?.(),
     registerClient: unused,
     async getClient(clientId) {
       const client = clients.get(clientId);
@@ -102,34 +143,46 @@ function createFakeOAuthStore(): OAuthStoreApi & {
       return record ? { ...record } : null;
     },
     async rotateRefreshToken(oldId, input, nowIso) {
+      arriveAtBarrier();
+      await rotateBarrier;
       const old = [...refreshTokens.values()].find(record => record.id === oldId);
-      if (!old || old.revokedAt !== null || old.expiresAt <= nowIso) return false;
+      if (!old) return 'missing';
+      if (old.revokedAt !== null) {
+        await revokeGrant(
+          {
+            clientId: old.clientId,
+            kiloUserId: old.kiloUserId,
+            organizationId: old.organizationId,
+            resource: old.resource,
+          },
+          nowIso
+        );
+        return 'replayed';
+      }
+      if (old.expiresAt <= nowIso) return 'missing';
       refreshTokens.set(old.tokenHash, { ...old, revokedAt: nowIso });
       refreshTokens.set(input.tokenHash, { ...input, revokedAt: null });
-      return true;
+      return 'rotated';
     },
-    async revokeGrant(grant, nowIso) {
-      let revoked = 0;
-      for (const [hash, record] of refreshTokens) {
-        if (
-          record.clientId === grant.clientId &&
-          record.kiloUserId === grant.kiloUserId &&
-          record.resource === grant.resource &&
-          (record.organizationId ?? null) === grant.organizationId &&
-          record.revokedAt === null &&
-          record.expiresAt > nowIso
-        ) {
-          refreshTokens.set(hash, { ...record, revokedAt: nowIso });
-          revoked += 1;
-        }
-      }
-      return revoked;
-    },
+    revokeGrant,
     revokeJti: unused,
     async isJtiRevoked() {
       return false;
     },
-    getKiloToken: unused,
+    async getKiloToken(identity) {
+      const live = [...refreshTokens.values()]
+        .filter(
+          record =>
+            record.kiloUserId === identity.kiloUserId &&
+            record.clientId === identity.clientId &&
+            record.resource === identity.resource &&
+            (record.organizationId ?? null) === identity.organizationId &&
+            record.revokedAt === null &&
+            record.kiloToken !== null
+        )
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return live[0]?.kiloToken ?? null;
+    },
     purgeExpired: unused,
   };
 }
@@ -638,6 +691,47 @@ describe('POST /token refresh_token (rotation)', () => {
       store
     );
     expect(((await thief.json()) as TokenBody).error).toBe('invalid_grant');
+  });
+
+  it('a refresh that loses a concurrent rotation revokes the winner and its credential', async () => {
+    const store = storeWithClient();
+    const refreshToken = await seedRefresh(store);
+    store.barrierRotations(2);
+
+    // Both exchanges read the same live row, then park just before rotating.
+    const first = handle(
+      { grant_type: 'refresh_token', refresh_token: refreshToken, client_id: CLIENT_ID },
+      store
+    );
+    const second = handle(
+      { grant_type: 'refresh_token', refresh_token: refreshToken, client_id: CLIENT_ID },
+      store
+    );
+    const responses = await Promise.all([first, second]);
+    const winner = responses.find(response => response.status === 200)!;
+    const loser = responses.find(response => response.status === 400)!;
+    expect(loser).toBeDefined();
+
+    const replacement = ((await winner.json()) as TokenBody).refresh_token!;
+    expect(((await loser.json()) as TokenBody).error).toBe('invalid_grant');
+
+    // The losing exchange revoked the winner's replacement in the same call.
+    const replacementHash = await sha256HexTest(replacement);
+    expect(
+      [...store.refreshTokens.values()].find(record => record.tokenHash === replacementHash)!
+        .revokedAt
+    ).toBe(NOW.toISOString());
+    expect(
+      await store.getKiloToken(
+        {
+          kiloUserId: 'kilo-user-1',
+          clientId: CLIENT_ID,
+          organizationId: 'org-1',
+          resource: RESOURCE,
+        },
+        NOW.toISOString()
+      )
+    ).toBeNull();
   });
 
   it('a replayed rotated-away token leaves the user grants of other orgs live', async () => {

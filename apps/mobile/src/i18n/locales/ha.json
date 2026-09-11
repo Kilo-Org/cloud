@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO na kamfani"
   },
   "preferences": {
+    "general": "Gaba ɗaya",
+    "voiceInput": "Shigar da murya",
     "autoExpandThinking": "Faɗaɗa tunani kai tsaye",
     "autoExpandThinkingSubtitle": "Nuna cikakken tunanin wakilin idan ya gama.",
     "keepScreenOn": "Bar allo a kunne a shafin zaman",
@@ -237,6 +239,7 @@
     "appearanceLight": "Haske",
     "appearanceDark": "Duhu",
     "account": "Asusu",
+    "accountSubtitle": "Harshe, rukunonin yanar gizo da aka amince da su, da zaman na'urori",
     "prReviewAttribution": "Ƙara sunan manhajar a bitar PR",
     "prReviewAttributionSubtitle": "Ƙara rubutun ƙasa na \"An yi bita ta Kilo\" lokacin da ka aika bita.",
     "returnSendsMessage": "Maɓallin sabon layi yana aika saƙo",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "An kasa samun Kilo Gateway. Duba haɗinka ka sake gwadawa.",
     "gatewayTimeout": "Mayar da magana zuwa rubutu ta ɗauki lokaci mai tsawo. Sake gwadawa.",
     "gatewayModelUnavailable": "Wannan samfurin mayar da magana zuwa rubutu ba ya nan. Zaɓi wani a Zaɓuɓɓuka.",
+    "gatewayModelUnavailableNotice": "Ba a ƙara ba da wannan samfuri ba. Matsa $t(transcriptionModel.title) don zaɓar wani.",
     "gatewaySignInRequired": "Shiga don amfani da mayar da magana ta Kilo Gateway.",
     "gatewayNoModel": "Da farko zaɓi samfurin mayar da magana zuwa rubutu a Zaɓuɓɓuka."
   },

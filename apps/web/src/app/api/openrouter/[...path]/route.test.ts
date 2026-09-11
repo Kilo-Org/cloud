@@ -498,7 +498,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
-    mockedGetOpenRouterModels.mockResolvedValue(new Set(['stepfun/step-3.7-flash:free']));
+    mockedGetOpenRouterModels.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
@@ -784,21 +784,22 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it.each(['google/gemma-4-26b-a4b-it:free', 'google/gemma-4-31b-it:free'])(
-    'rejects the unavailable free model %s before upstream',
-    async modelId => {
-      mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: true, requestCount: 0 });
+  it.each([
+    'google/gemma-4-26b-a4b-it:free',
+    'google/gemma-4-31b-it:free',
+    'thinkingmachines/inkling:free',
+  ])('rejects the unavailable free model %s before upstream', async modelId => {
+    mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: true, requestCount: 0 });
 
-      const { POST } = await import('./route');
-      const response = await POST(makeRequest(makeBody(modelId)) as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody(modelId)) as never);
 
-      expect(response.status).toBe(404);
-      expect(await response.json()).toMatchObject({
-        error_type: 'unavailable_model',
-      });
-      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-    }
-  );
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({
+      error_type: 'unavailable_model',
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
 
   it('rate limits rules-engine rate-limit actions before upstream', async () => {
     mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('rate-limit'));
@@ -870,12 +871,8 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 
     expect(response.status).toBe(200);
     expect(mockedGetProvider).toHaveBeenCalledTimes(2);
-    expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe(
-      stepfun_37_flash_free_model.public_id
-    );
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(
-      stepfun_37_flash_free_model.internal_id
-    );
+    expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe('poolside/laguna-s-2.1:free');
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('poolside/laguna-s-2.1:free');
     expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
       abuse_delay: 6000,
       abuse_downgraded_from: 'openai/gpt-4o',

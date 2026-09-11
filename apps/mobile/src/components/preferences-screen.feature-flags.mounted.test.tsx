@@ -65,6 +65,7 @@ vi.mock('@/components/ui/icons', () => ({
   MessageSquare: 'MessageSquare',
   Mic: 'Mic',
   Shield: 'Shield',
+  SlidersHorizontal: 'SlidersHorizontal',
   Smartphone: 'Smartphone',
 }));
 vi.mock('@/components/language-picker-sheet', () => ({

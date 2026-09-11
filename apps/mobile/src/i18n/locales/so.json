@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO-ga shirkadda"
   },
   "preferences": {
+    "general": "Guud",
+    "voiceInput": "Gelitaanka codka",
     "autoExpandThinking": "Si toos ah u ballaari fikirka",
     "autoExpandThinkingSubtitle": "Muuji qoraalka fikirka wakiilka oo fidsan marka uu dhammaado.",
     "keepScreenOn": "Shaashadda shid inta bogga kalfadhigu furan yahay",
@@ -237,6 +239,7 @@
     "appearanceLight": "Iftiin",
     "appearanceDark": "Madow",
     "account": "Akoonka",
+    "accountSubtitle": "Luuqad, martigeliyeyaasha la aaminay iyo kalfadhiyada aaladaha",
     "prReviewAttribution": "Dib-u-eegisyada PR ku dar magaca barnaamijka",
     "prReviewAttributionSubtitle": "Markaad gudbiso dib-u-eegis, hoosta kaga dar qoraal sheegaya in Kilo lagu eegay.",
     "returnSendsMessage": "Furaha gelintu wuxuu diraa farriinta",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway lama heli karin. Hubi xiriirkaaga oo mar kale isku day.",
     "gatewayTimeout": "Qoraal u beddelidda waxay qaadatay waqti aad u dheer. Mar kale isku day.",
     "gatewayModelUnavailable": "Moodeelkan qoraal u beddelidda lagama heli karo. Mid kale ka dooro Dookhyada.",
+    "gatewayModelUnavailableNotice": "Moodeelkan lama bixiyo mar dambe. Taabo $t(transcriptionModel.title) si aad u dooratid mid kale.",
     "gatewaySignInRequired": "Soo gal si aad u isticmaasho qoraal u beddelidda Kilo Gateway.",
     "gatewayNoModel": "Marka hore moodeel qoraal u beddelidda ka dooro Dookhyada."
   },

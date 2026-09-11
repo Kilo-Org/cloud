@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO سازمانی"
   },
   "preferences": {
+    "general": "عمومی",
+    "voiceInput": "ورودی صوتی",
     "autoExpandThinking": "باز کردن خودکار بخش تفکر",
     "autoExpandThinkingSubtitle": "پس از پایان تفکر عامل، محتوای آن را به‌صورت بازشده نمایش دهید.",
     "keepScreenOn": "روشن نگه داشتن صفحه در صفحهٔ نشست",
@@ -237,6 +239,7 @@
     "appearanceLight": "روشن",
     "appearanceDark": "تیره",
     "account": "حساب",
+    "accountSubtitle": "زبان، میزبان‌های مورد اعتماد و نشست‌های دستگاه",
     "prReviewAttribution": "درج نام برنامه در بازبینی‌های PR",
     "prReviewAttributionSubtitle": "هنگام ارسال بازبینی، عبارت «بازبینی‌شده با Kilo» را به انتهای آن اضافه کنید.",
     "returnSendsMessage": "ارسال پیام با کلید اینتر",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "اتصال به Kilo Gateway ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
     "gatewayTimeout": "تبدیل گفتار به متن بیش از حد طول کشید. دوباره تلاش کنید.",
     "gatewayModelUnavailable": "این مدل تبدیل گفتار به متن در دسترس نیست. در تنظیمات دلخواه مدل دیگری انتخاب کنید.",
+    "gatewayModelUnavailableNotice": "این مدل دیگر ارائه نمی‌شود. برای انتخاب مدل دیگر روی $t(transcriptionModel.title) ضربه بزنید.",
     "gatewaySignInRequired": "برای استفاده از تبدیل گفتار به متن با Kilo Gateway وارد شوید.",
     "gatewayNoModel": "ابتدا در تنظیمات دلخواه یک مدل تبدیل گفتار به متن انتخاب کنید."
   },

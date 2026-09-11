@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO tal-intrapriża"
   },
   "preferences": {
+    "general": "Ġenerali",
+    "voiceInput": "Input tal-vuċi",
     "autoExpandThinking": "Espandi awtomatikament il-ħsieb",
     "autoExpandThinkingSubtitle": "Uri l-ħsieb tal-aġent espandut meta jispiċċa.",
     "keepScreenOn": "Żomm l-iskrin mixgħul fil-paġna tas-sessjoni",
@@ -237,6 +239,7 @@
     "appearanceLight": "Ċar",
     "appearanceDark": "Skur",
     "account": "Kont",
+    "accountSubtitle": "Lingwa, ospitanti fdati u sessjonijiet tal-apparat",
     "prReviewAttribution": "Żid attribuzzjoni tal-applikazzjoni mar-reviżjonijiet tal-PR",
     "prReviewAttributionSubtitle": "Żid nota fil-qiegħ li tgħid Rivedut permezz ta' Kilo meta tibgħat reviżjoni.",
     "returnSendsMessage": "It-tast tar-ritorn jibgħat il-messaġġ",
@@ -2639,6 +2642,7 @@
     "gatewayUnreachable": "Ma setgħetx tasal għal Kilo Gateway. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
     "gatewayTimeout": "It-traskrizzjoni ħadet wisq ħin. Erġa' pprova.",
     "gatewayModelUnavailable": "Dan il-mudell ta' traskrizzjoni mhux disponibbli. Agħżel ieħor fil-Preferenzi.",
+    "gatewayModelUnavailableNotice": "Dan il-mudell m'għadux disponibbli. Agħfas $t(transcriptionModel.title) biex tagħżel ieħor.",
     "gatewaySignInRequired": "Idħol biex tuża t-traskrizzjoni permezz ta' Kilo Gateway.",
     "gatewayNoModel": "L-ewwel agħżel mudell ta' traskrizzjoni fil-Preferenzi."
   },

@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Podnikové SSO"
   },
   "preferences": {
+    "general": "Obecné",
+    "voiceInput": "Hlasový vstup",
     "autoExpandThinking": "Automaticky rozbalovat uvažování",
     "autoExpandThinkingSubtitle": "Po dokončení uvažování agenta zobrazí jeho obsah rozbalený.",
     "keepScreenOn": "Nezhasínat obrazovku v relaci",
@@ -237,6 +239,7 @@
     "appearanceLight": "Světlý",
     "appearanceDark": "Tmavý",
     "account": "Účet",
+    "accountSubtitle": "Jazyk, důvěryhodné domény a přihlášená zařízení",
     "prReviewAttribution": "Přidávat zmínku o aplikaci ke kontrolám PR",
     "prReviewAttributionSubtitle": "Při odeslání kontroly přidá do zápatí informaci, že kontrola proběhla přes Kilo.",
     "returnSendsMessage": "Klávesa Enter odesílá zprávu",
@@ -2618,6 +2621,7 @@
     "gatewayUnreachable": "Kilo Gateway se nepodařilo kontaktovat. Zkontrolujte připojení a zkuste to znovu.",
     "gatewayTimeout": "Přepis trval příliš dlouho. Zkuste to znovu.",
     "gatewayModelUnavailable": "Tento model přepisu není dostupný. Vyberte jiný v Předvolbách.",
+    "gatewayModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(transcriptionModel.title) vyberte jiný.",
     "gatewaySignInRequired": "Pro použití přepisu přes Kilo Gateway se přihlaste.",
     "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách."
   },

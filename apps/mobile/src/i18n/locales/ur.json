@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "انٹرپرائز SSO"
   },
   "preferences": {
+    "general": "عمومی",
+    "voiceInput": "صوتی ان پٹ",
     "autoExpandThinking": "سوچ کی تفصیل خود بخود دکھائیں",
     "autoExpandThinkingSubtitle": "ایجنٹ کی سوچ مکمل ہونے پر اس کی تفصیل کھول کر دکھائیں۔",
     "keepScreenOn": "سیشن کے صفحے پر اسکرین روشن رکھیں",
@@ -237,6 +239,7 @@
     "appearanceLight": "روشن",
     "appearanceDark": "تاریک",
     "account": "اکاؤنٹ",
+    "accountSubtitle": "زبان، قابل اعتماد ہوسٹس اور ڈیوائس کے سیشنز",
     "prReviewAttribution": "PR کے جائزوں میں ایپ کا حوالہ شامل کریں",
     "prReviewAttributionSubtitle": "جائزہ بھیجتے وقت آخر میں «Kilo کے ذریعے جائزہ لیا گیا» شامل کریں۔",
     "returnSendsMessage": "ریٹرن کی دبانے سے پیغام بھیجیں",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gateway سے رابطہ نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
     "gatewayTimeout": "متن میں بدلنے میں بہت وقت لگ گیا۔ دوبارہ کوشش کریں۔",
     "gatewayModelUnavailable": "یہ ماڈل دستیاب نہیں ہے۔ ترجیحات میں دوسرا منتخب کریں۔",
+    "gatewayModelUnavailableNotice": "یہ ماڈل اب پیش نہیں کیا جاتا۔ کوئی دوسرا منتخب کرنے کے لیے $t(transcriptionModel.title) پر ٹیپ کریں۔",
     "gatewaySignInRequired": "Kilo Gateway کی تبدیلی استعمال کرنے کے لیے سائن ان کریں۔",
     "gatewayNoModel": "پہلے ترجیحات میں متن میں بدلنے کا ماڈل منتخب کریں۔"
   },

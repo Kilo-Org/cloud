@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Korporativ SSO"
   },
   "preferences": {
+    "general": "Umumiy",
+    "voiceInput": "Ovozli kiritish",
     "autoExpandThinking": "Fikrlash matnini avtomatik ochish",
     "autoExpandThinkingSubtitle": "Agent fikrlashni tugatgach, fikrlash matnini to'liq ko'rsatish.",
     "keepScreenOn": "Sessiya sahifasida ekranni o'chirmaslik",
@@ -237,6 +239,7 @@
     "appearanceLight": "Och",
     "appearanceDark": "To'q",
     "account": "Hisob",
+    "accountSubtitle": "Til, ishonchli saytlar va qurilma seanslari",
     "prReviewAttribution": "PR tekshiruvlariga ilova nomini qo'shish",
     "prReviewAttributionSubtitle": "Tekshiruv natijasini yuborganda oxiriga Kilo orqali tekshirilganini bildiruvchi yozuv qo'shish.",
     "returnSendsMessage": "Enter tugmasi xabar yuboradi",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "Kilo Gatewayga ulanib bo'lmadi. Ulanishni tekshiring va qayta urinib ko'ring.",
     "gatewayTimeout": "Matnga aylantirish juda uzoq davom etdi. Qayta urinib ko'ring.",
     "gatewayModelUnavailable": "Ushbu matnga aylantirish modeli mavjud emas. Shaxsiy sozlamalardan boshqasini tanlang.",
+    "gatewayModelUnavailableNotice": "Bu model endi taklif etilmaydi. Boshqasini tanlash uchun $t(transcriptionModel.title) ga teging.",
     "gatewaySignInRequired": "Kilo Gateway orqali aylantirishdan foydalanish uchun tizimga kiring.",
     "gatewayNoModel": "Avval Shaxsiy sozlamalardan matnga aylantirish modelini tanlang."
   },

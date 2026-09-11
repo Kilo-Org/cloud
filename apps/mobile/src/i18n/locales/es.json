@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO empresarial"
   },
   "preferences": {
+    "general": "General",
+    "voiceInput": "Entrada de voz",
     "autoExpandThinking": "Expandir el razonamiento automáticamente",
     "autoExpandThinkingSubtitle": "Mostrar el razonamiento del agente expandido cuando termine.",
     "keepScreenOn": "Mantener la pantalla encendida durante la sesión",
@@ -237,6 +239,7 @@
     "appearanceLight": "Claro",
     "appearanceDark": "Oscuro",
     "account": "Cuenta",
+    "accountSubtitle": "Idioma, dominios de confianza y sesiones en dispositivos",
     "prReviewAttribution": "Mencionar la aplicación en las revisiones de PR",
     "prReviewAttributionSubtitle": "Añadir una nota al final de cada revisión para indicar que se ha realizado con Kilo.",
     "returnSendsMessage": "La tecla Intro envía el mensaje",
@@ -2156,6 +2159,7 @@
     "gatewayUnreachable": "No se pudo conectar con Kilo Gateway. Comprueba tu conexión e inténtalo de nuevo.",
     "gatewayTimeout": "La transcripción tardó demasiado. Inténtalo de nuevo.",
     "gatewayModelUnavailable": "Este modelo de transcripción no está disponible. Elige otro en Preferencias.",
+    "gatewayModelUnavailableNotice": "Este modelo ya no se ofrece. Toca $t(transcriptionModel.title) para elegir otro.",
     "gatewaySignInRequired": "Inicia sesión para usar la transcripción con Kilo Gateway.",
     "gatewayNoModel": "Elige primero un modelo de transcripción en Preferencias."
   },

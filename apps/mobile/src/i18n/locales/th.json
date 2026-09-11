@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO สำหรับองค์กร"
   },
   "preferences": {
+    "general": "ทั่วไป",
+    "voiceInput": "การป้อนเสียง",
     "autoExpandThinking": "ขยายกระบวนการคิดอัตโนมัติ",
     "autoExpandThinkingSubtitle": "ขยายรายละเอียดกระบวนการคิดของเอเจนต์เมื่อคิดเสร็จ",
     "keepScreenOn": "เปิดหน้าจอค้างไว้ขณะอยู่ในหน้าเซสชัน",
@@ -237,6 +239,7 @@
     "appearanceLight": "สว่าง",
     "appearanceDark": "มืด",
     "account": "บัญชี",
+    "accountSubtitle": "ภาษา โฮสต์ที่เชื่อถือ และเซสชันบนอุปกรณ์",
     "prReviewAttribution": "ระบุแอปที่ใช้ในการตรวจสอบ PR",
     "prReviewAttributionSubtitle": "เพิ่มข้อความท้ายการตรวจสอบว่าตรวจสอบผ่าน Kilo เมื่อคุณส่งผลการตรวจสอบ",
     "returnSendsMessage": "ปุ่มขึ้นบรรทัดใหม่ใช้ส่งข้อความ",
@@ -2576,6 +2579,7 @@
     "gatewayUnreachable": "ไม่สามารถเชื่อมต่อ Kilo Gateway ได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
     "gatewayTimeout": "การถอดเสียงใช้เวลานานเกินไป ลองอีกครั้ง",
     "gatewayModelUnavailable": "โมเดลถอดเสียงนี้ไม่พร้อมใช้งาน เลือกโมเดลอื่นในการตั้งค่า",
+    "gatewayModelUnavailableNotice": "โมเดลนี้ไม่ให้บริการแล้ว แตะ $t(transcriptionModel.title) เพื่อเลือกโมเดลอื่น",
     "gatewaySignInRequired": "เข้าสู่ระบบเพื่อใช้การถอดเสียงผ่าน Kilo Gateway",
     "gatewayNoModel": "เลือกโมเดลถอดเสียงในการตั้งค่าก่อน"
   },

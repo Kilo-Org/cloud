@@ -8,7 +8,7 @@ import {
   getLocalFakeTranscriptionModelsUrl,
   LOCAL_FAKE_LLM_API_KEY,
 } from '@/lib/ai-gateway/local-fake-llm';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
   OpenRouterModelsResponseSchema,

@@ -251,6 +251,12 @@ export function InviteMemberDialog({
                         handleInviteMember();
                       }
                     }}
+                    aria-invalid={shouldShowEmailError || emailDomainMatchesDirectSSODomain}
+                    aria-describedby={
+                      shouldShowEmailError || emailDomainMatchesDirectSSODomain
+                        ? 'invite-email-error'
+                        : undefined
+                    }
                     className={
                       shouldShowEmailError || emailDomainMatchesDirectSSODomain
                         ? 'border-red-500 focus:border-red-500'
@@ -316,7 +322,7 @@ export function InviteMemberDialog({
                       clipRule="evenodd"
                     />
                   </svg>
-                  <p className="text-sm text-red-300" role="alert">
+                  <p id="invite-email-error" className="text-sm text-red-300" role="alert">
                     {shouldShowEmailError && 'Please enter a valid email address'}
                     {emailDomainMatchesDirectSSODomain && ssoErrorText}
                   </p>

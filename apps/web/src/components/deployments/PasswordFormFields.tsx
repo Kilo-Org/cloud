@@ -102,17 +102,22 @@ export function PasswordProtection({
                 disabled={disabled || isSaving}
                 className="pr-10 pl-10"
                 autoComplete="new-password"
+                aria-describedby="password-requirements"
               />
               <button
                 type="button"
-                tabIndex={-1}
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                aria-controls="password confirm-password"
                 className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-500 hover:text-gray-400"
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
-            <p className="text-xs text-gray-500">Minimum 8 characters</p>
+            <p id="password-requirements" className="text-xs text-gray-500">
+              Minimum 8 characters
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -131,8 +136,10 @@ export function PasswordProtection({
               />
               <button
                 type="button"
-                tabIndex={-1}
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                aria-controls="password confirm-password"
                 className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-500 hover:text-gray-400"
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}

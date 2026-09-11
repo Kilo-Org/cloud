@@ -341,6 +341,7 @@ export function PromptInput({
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           placeholder={effectivePlaceholder}
+          aria-label={isLanding ? 'App prompt' : 'Message'}
           disabled={disabled || isSubmitting}
           className={cn(
             'resize-none border-none bg-transparent px-0 shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0',

@@ -675,6 +675,7 @@ function IntentStep({
       <div className="space-y-2">
         <Label id="wasteland-ownership-label">Ownership</Label>
         <RadioGroup
+          role="radiogroup"
           aria-labelledby="wasteland-ownership-label"
           value={ownership}
           onValueChange={v => {

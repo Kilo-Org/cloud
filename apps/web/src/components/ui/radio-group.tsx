@@ -23,7 +23,7 @@ export function RadioGroup({
 }: RadioGroupProps) {
   return (
     <RadioGroupContext.Provider value={{ value, onValueChange }}>
-      <div role="radiogroup" className={cn('grid gap-2', className)} {...props}>
+      <div className={cn('grid gap-2', className)} {...props}>
         {children}
       </div>
     </RadioGroupContext.Provider>

@@ -365,10 +365,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         })
       );
       expect(
-        await store.getKiloToken(
-          { ...identity, kiloUserId: 'u-legacy', clientId: 'c-legacy' },
-          NOW
-        )
+        await store.getKiloToken({ ...identity, kiloUserId: 'u-legacy', clientId: 'c-legacy' }, NOW)
       ).toBeNull();
     });
   });

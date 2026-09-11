@@ -79,10 +79,7 @@ describe('authenticate (s2 passthrough)', () => {
 describe('authenticate (s5 verify + s6 enforcement: only MCP tokens)', () => {
   const withKilo = {
     mcpToken,
-    resolveKiloToken: async (identity: {
-      kiloUserId: string;
-      clientId: string;
-    }) =>
+    resolveKiloToken: async (identity: { kiloUserId: string; clientId: string }) =>
       identity.kiloUserId === 'kilo-user-1' && identity.clientId === 'client-1'
         ? 'kilo-app-token'
         : null,

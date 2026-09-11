@@ -3,10 +3,8 @@
  * `platform_integrations.metadata.access_token` into the encrypted
  * `slack_oauth_credentials` store.
  *
- * This is Step 2 of the Slack bot token remediation. It is additive only: the
- * plaintext copy is left in place, and nothing reads the new store yet. Deleting the
- * plaintext copy happens in a later step, after reads have moved over and been
- * verified.
+ * The encrypted store is active. Execute mode removes the plaintext metadata copy
+ * only after the encrypted credential is present and decrypts successfully.
  *
  * Idempotent by design: integrations that already have a credential row are skipped
  * rather than re-encrypted, so re-running does not churn `credential_version` (each
@@ -28,7 +26,11 @@ import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
 import { platform_integrations, slack_oauth_credentials } from '@kilocode/db/schema';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { SlackCredentialOwner } from '@kilocode/worker-utils/slack-credential';
-import { createSlackCredentialIfAbsent } from '@/lib/integrations/platforms/slack/credential-store';
+import {
+  createSlackCredentialIfAbsent,
+  decryptSlackBotToken,
+  getSlackCredentialByIntegrationId,
+} from '@/lib/integrations/platforms/slack/credential-store';
 import { requireSlackCredentialKeyset } from '@/lib/integrations/platforms/slack/credential-keyset';
 
 type SkipReason =
@@ -102,6 +104,7 @@ async function main(): Promise<void> {
     write_failed: 0,
   };
   let migrated = 0;
+  let plaintextRemoved = 0;
   let eligible = 0;
 
   for (let offset = 0; offset < integrations.length; offset += batchSize) {
@@ -122,11 +125,6 @@ async function main(): Promise<void> {
     const alreadyMigrated = new Set(existingRows.map(row => row.integrationId));
 
     for (const integration of batch) {
-      if (alreadyMigrated.has(integration.id)) {
-        skipped.already_migrated += 1;
-        continue;
-      }
-
       const botToken = readPlaintextToken(integration.metadata);
       if (!botToken) {
         skipped.no_plaintext_token += 1;
@@ -152,18 +150,28 @@ async function main(): Promise<void> {
       if (!execute) continue;
 
       try {
-        const outcome = await createSlackCredentialIfAbsent({
-          integrationId: integration.id,
-          slackTeamId: teamId,
-          owner,
-          botToken,
-          botUserId: readBotUserId(integration.metadata),
-        });
-        if (outcome.status === 'skipped_existing') {
+        if (alreadyMigrated.has(integration.id)) {
           skipped.already_migrated += 1;
         } else {
-          migrated += 1;
+          const outcome = await createSlackCredentialIfAbsent({
+            integrationId: integration.id,
+            slackTeamId: teamId,
+            owner,
+            botToken,
+            botUserId: readBotUserId(integration.metadata),
+          });
+          if (outcome.status === 'skipped_existing') skipped.already_migrated += 1;
+          else migrated += 1;
         }
+        const credential = await getSlackCredentialByIntegrationId(integration.id);
+        if (!credential || !decryptSlackBotToken(credential, owner)) {
+          throw new Error('Encrypted Slack credential could not be verified');
+        }
+        await db
+          .update(platform_integrations)
+          .set({ metadata: sql`${platform_integrations.metadata} - 'access_token'` })
+          .where(eq(platform_integrations.id, integration.id));
+        plaintextRemoved += 1;
       } catch (error) {
         skipped.write_failed += 1;
         // Message only: the stack of an encryption failure can carry key material.
@@ -181,6 +189,7 @@ async function main(): Promise<void> {
   console.log('\n--- Summary ---');
   console.log(`Eligible for backfill:       ${eligible}`);
   console.log(`Migrated:                    ${migrated}`);
+  console.log(`Plaintext tokens removed:    ${plaintextRemoved}`);
   console.log(`Skipped (already migrated):  ${skipped.already_migrated}`);
   console.log(`Skipped (no plaintext):      ${skipped.no_plaintext_token}`);
   console.log(`Skipped (no owner):          ${skipped.no_owner}`);

@@ -1,3 +1,8 @@
+import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
+import {
+  verifyRuntimeProxyAttestation,
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRPCError } from '@trpc/server';
 import type { Env } from './types.js';
@@ -313,5 +318,146 @@ describe('buildKiloOverrideValidationUrl', () => {
     expect(
       buildKiloOverrideValidationUrl('http://localhost:8811/api/organizations/org-1', 'org-1')
     ).toBe('http://localhost:8811/api/organizations/org-1/models/validate');
+  });
+});
+
+describe('modern model validation trust boundary', () => {
+  const secret = 'model-validation-test-secret';
+  const env = { KILOCODE_BACKEND_BASE_URL: 'https://backend.test', NEXTAUTH_SECRET: secret };
+  const authorizationId = '11111111-1111-4111-8111-111111111111';
+  async function token(
+    options: { secret?: string; audience?: string; organizationId?: string } = {}
+  ) {
+    return (
+      await signModernKiloToken({
+        userId: 'oauth/test',
+        secret: options.secret ?? secret,
+        expiresInSeconds: 3600,
+        audience: options.audience ?? ['kilo-api', 'kilo-gateway'],
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+        extra: {
+          organizationId: options.organizationId,
+          runtimeAuthorization: {
+            id: authorizationId,
+            resourceKind: 'cloud-agent-next',
+            resourceId: 'session-1',
+          },
+        },
+      })
+    ).token;
+  }
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each([undefined, 'org-1'])(
+    'issues a bearer-bound proof for the intended audience (%s)',
+    async organizationId => {
+      const bearer = await token({ organizationId });
+      const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json({ valid: true }));
+      await assertKiloModelAvailable({
+        env,
+        submittedModel: 'private/model',
+        originalToken: bearer,
+        originalOrganizationId: organizationId,
+        procedure: 'send',
+      });
+      const init = fetchMock.mock.calls[0][1];
+      const headers = new Headers(init?.headers);
+      expect(init?.redirect).toBe('manual');
+      expect(
+        await verifyRuntimeProxyAttestation({
+          secret,
+          audience: organizationId ? 'kilo-api' : 'kilo-gateway',
+          userId: 'oauth/test',
+          authorizationId,
+          resourceId: 'session-1',
+          bearer,
+          value: headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+        })
+      ).toBe(true);
+    }
+  );
+
+  it.each([
+    'missing-secret',
+    'bad-signature',
+    'wrong-audience',
+    'foreign-organization',
+    'override',
+    'encoded-url',
+  ])('rejects %s before sending credentials', async scenario => {
+    let bearer = await token({
+      secret: scenario === 'bad-signature' ? 'foreign-secret' : undefined,
+      audience: scenario === 'wrong-audience' ? 'session-ingest' : undefined,
+    });
+    if (scenario === 'encoded-url') bearer = `https://evil.test/api/openrouter:${bearer}`;
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json({ valid: true }));
+    await expect(
+      assertKiloModelAvailable({
+        env: {
+          ...env,
+          ...(scenario === 'missing-secret' ? { NEXTAUTH_SECRET: undefined } : {}),
+          ...(scenario === 'override' ? { KILO_OPENROUTER_BASE: 'https://evil.test/api' } : {}),
+        },
+        submittedModel: 'public/model',
+        originalToken: bearer,
+        originalOrganizationId: scenario === 'foreign-organization' ? 'other-org' : undefined,
+        procedure: 'start',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([401, 404, 302])('does not anonymously retry or skip modern HTTP %s', async status => {
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status }));
+    await expect(
+      assertKiloModelAvailable({
+        env,
+        submittedModel: 'public/model',
+        originalToken: await token(),
+        procedure: 'send',
+      })
+    ).rejects.toMatchObject({ code: status === 401 ? 'FORBIDDEN' : 'SERVICE_UNAVAILABLE' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves non-runtime typed credential fallback without issuing proof', async () => {
+    const bearer = (
+      await signModernKiloToken({
+        userId: 'oauth/test',
+        secret,
+        expiresInSeconds: 3600,
+        audience: 'cloud-agent-next',
+        tokenPurpose: 'human-api',
+        credentialExchange: false,
+      })
+    ).token;
+    const fetchMock = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(Response.json({ valid: true }));
+    await assertKiloModelAvailable({
+      env,
+      submittedModel: 'public/model',
+      originalToken: bearer,
+      procedure: 'start',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(
+      new Headers(fetchMock.mock.calls[0][1]?.headers).has(RUNTIME_PROXY_ATTESTATION_HEADER)
+    ).toBe(false);
+  });
+
+  it('allows an override that resolves to the exact trusted backend route', async () => {
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json({ valid: true }));
+    await assertKiloModelAvailable({
+      env: { ...env, KILO_OPENROUTER_BASE: 'https://backend.test/api' },
+      submittedModel: 'private/model',
+      originalToken: await token(),
+      procedure: 'start',
+    });
+    expect(
+      new Headers(fetchMock.mock.calls[0][1]?.headers).has(RUNTIME_PROXY_ATTESTATION_HEADER)
+    ).toBe(true);
   });
 });

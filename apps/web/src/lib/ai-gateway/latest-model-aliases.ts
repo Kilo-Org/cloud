@@ -9,6 +9,7 @@ export const GEMINI_PRO_LATEST_MODEL_ALIAS = '~google/gemini-pro-latest';
 export const GEMINI_FLASH_LATEST_MODEL_ALIAS = '~google/gemini-flash-latest';
 export const GROK_LATEST_MODEL_ALIAS = '~x-ai/grok-latest';
 export const GLM_LATEST_MODEL_ALIAS = '~z-ai/glm-latest';
+export const GLM_FLASH_LATEST_MODEL_ALIAS = '~z-ai/glm-flash-latest';
 export const DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS = '~deepseek/deepseek-v4-flash-latest';
 
 export const LATEST_MODEL_ALIASES = [
@@ -23,5 +24,6 @@ export const LATEST_MODEL_ALIASES = [
   GEMINI_FLASH_LATEST_MODEL_ALIAS,
   GROK_LATEST_MODEL_ALIAS,
   GLM_LATEST_MODEL_ALIAS,
+  GLM_FLASH_LATEST_MODEL_ALIAS,
   DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
 ] as const;

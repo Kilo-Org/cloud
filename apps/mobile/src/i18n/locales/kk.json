@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway арқылы дауысты мәтінге айналдыру",
+    "gatewayTranscriptionSubtitle": "Дауыстық енгізуді құрылғының сөзді тануының орнына Kilo Gateway моделі арқылы мәтінге айналдырыңыз. Жазбаңыз Kilo Gateway-ге жіберіледі.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",
@@ -448,6 +451,9 @@
       "acceptTerms": "Қабылдау",
       "replyBadRequest": "Бұл жауапты жариялау мүмкін емес. Талқылау тармағы өзгерген болуы мүмкін.",
       "replyForbidden": "Бұл біріктіру сұрауына жауап беруге рұқсатыңыз жоқ.",
+      "addCommentCta": "Бұл біріктіру сұрауына пікір жазу",
+      "commentBadRequest": "Бұл пікірді жариялау мүмкін емес. Біріктіру сұрауы өзгерген болуы мүмкін.",
+      "commentForbidden": "Бұл біріктіру сұрауына пікір жазуға рұқсатыңыз жоқ.",
       "moderation": {
         "reportContent": {
           "terminal": "Бұл пікірге шағымдану мүмкін емес.",
@@ -2565,7 +2571,13 @@
     "languageNotInstalledMessage": "{{language}} тілінің офлайн сөйлеу файлдары бұл телефонда орнатылмаған. Оларды жүктеп алыңыз, содан кейін дауыстық енгізуді қайта көріңіз.",
     "downloadOfflineModel": "Жүктеп алу",
     "offlineModelDownloadScheduled": "Офлайн сөйлеу файлдары фондық режимде жүктеледі. Дауыстық енгізуді кейінірек қайта көріңіз.",
-    "listeningStopped": "Тыңдау тоқтатылды."
+    "listeningStopped": "Тыңдау тоқтатылды.",
+    "transcribing": "Мәтінге айналдыру жүріп жатыр...",
+    "gatewayUnreachable": "Kilo Gateway-ге қосылу мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
+    "gatewayTimeout": "Дауысты мәтінге айналдыру тым ұзақ созылды. Қайталап көріңіз.",
+    "gatewayModelUnavailable": "Бұл дауысты мәтінге айналдыру моделі қолжетімсіз. Параметрлерден басқасын таңдаңыз.",
+    "gatewaySignInRequired": "Kilo Gateway арқылы айналдыруды қолдану үшін жүйеге кіріңіз.",
+    "gatewayNoModel": "Алдымен Параметрлерден дауысты мәтінге айналдыру моделін таңдаңыз."
   },
   "share": {
     "title": "Kilo-ға жіберу",
@@ -2947,5 +2959,12 @@
     "needsInput": "Жауап қажет",
     "channelName": "Белсенді агенттер",
     "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз."
+  },
+  "transcriptionModel": {
+    "title": "Дауысты мәтінге айналдыру моделі",
+    "noneChosen": "Ештеңе таңдалмаған",
+    "emptyTitle": "Дауысты мәтінге айналдыру модельдері жоқ",
+    "emptyDescription": "Kilo Gateway қазір дауысты мәтінге айналдыру модельдерін ұсынбайды.",
+    "loadFailed": "Дауысты мәтінге айналдыру модельдерін жүктеу мүмкін болмады."
   }
 }

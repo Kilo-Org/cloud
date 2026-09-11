@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -37,8 +38,22 @@ export function SheetHeader({
 }) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const resolvedDoneLabel = doneLabel ?? t('common.done');
   const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
+  // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
+  // header row off the sensor on full-width sheets. They go on an inner wrapper
+  // so they ADD to the `px-4` gutter: an inline padding on the container would
+  // beat the className (inline style wins in React Native) and swallow the
+  // gutter. Zero insets collapse the wrapper style to `undefined`, so portrait
+  // pixels are byte-identical and a rotation never moves anything vertically.
+  const sideInsetStyle =
+    insets.left > 0 || insets.right > 0
+      ? {
+          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
+          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
+        }
+      : undefined;
   // Native row direction and logical margin keep Cancel/Share leading and Done
   // trailing. Do not derive sides from i18n.dir() or the stale I18nManager.isRTL.
   return (
@@ -46,61 +61,63 @@ export function SheetHeader({
     // view by finding the header at the screen content's subview index 0 — a
     // flattened header breaks that native pass and the list paints over it.
     <View collapsable={false} className="border-b border-border bg-background px-4 pb-3 pt-4">
-      <View className="min-h-11 flex-row items-center gap-x-3">
-        {onShare !== undefined ? (
-          <Pressable
-            onPress={onShare}
-            disabled={sharing || disabled}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.share', { title })}
-            accessibilityState={{ disabled: sharing || disabled, busy: sharing }}
-            className="min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 active:opacity-70 disabled:opacity-50"
-          >
-            <Share size={20} color={colors.foreground} />
-          </Pressable>
-        ) : null}
-        {onCancel ? (
-          <Pressable
-            onPress={onCancel}
-            disabled={disabled}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={resolvedCancelLabel}
-            className="min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 active:opacity-70 disabled:opacity-50"
-          >
-            <Text className="text-center text-base font-medium text-foreground">
-              {resolvedCancelLabel}
-            </Text>
-          </Pressable>
-        ) : null}
-        {/* min-w-0 lets the title shrink below its content width so it truncates
+      <View style={sideInsetStyle}>
+        <View className="min-h-11 flex-row items-center gap-x-3">
+          {onShare !== undefined ? (
+            <Pressable
+              onPress={onShare}
+              disabled={sharing || disabled}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.share', { title })}
+              accessibilityState={{ disabled: sharing || disabled, busy: sharing }}
+              className="min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 active:opacity-70 disabled:opacity-50"
+            >
+              <Share size={20} color={colors.foreground} />
+            </Pressable>
+          ) : null}
+          {onCancel ? (
+            <Pressable
+              onPress={onCancel}
+              disabled={disabled}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={resolvedCancelLabel}
+              className="min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 active:opacity-70 disabled:opacity-50"
+            >
+              <Text className="text-center text-base font-medium text-foreground">
+                {resolvedCancelLabel}
+              </Text>
+            </Pressable>
+          ) : null}
+          {/* min-w-0 lets the title shrink below its content width so it truncates
             instead of pushing the trailing action out of the row. Cancel and
             Done bracket the title, so center it between them; without Cancel the
             title stays leading against the sheet edge. */}
-        <View className="min-w-0 shrink grow">
-          <Text
-            className={cn('text-lg font-semibold text-foreground', onCancel && 'text-center')}
-            numberOfLines={2}
-            ellipsizeMode={titleEllipsis}
-            accessibilityRole="header"
-            accessibilityLabel={title}
+          <View className="min-w-0 shrink grow">
+            <Text
+              className={cn('text-lg font-semibold text-foreground', onCancel && 'text-center')}
+              numberOfLines={2}
+              ellipsizeMode={titleEllipsis}
+              accessibilityRole="header"
+              accessibilityLabel={title}
+            >
+              {title}
+            </Text>
+          </View>
+          <Pressable
+            onPress={onDone}
+            disabled={disabled}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={resolvedDoneLabel}
+            className="ms-auto min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-secondary px-4 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
           >
-            {title}
-          </Text>
+            <Text className="text-center text-base font-medium text-foreground">
+              {resolvedDoneLabel}
+            </Text>
+          </Pressable>
         </View>
-        <Pressable
-          onPress={onDone}
-          disabled={disabled}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={resolvedDoneLabel}
-          className="ms-auto min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-secondary px-4 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
-        >
-          <Text className="text-center text-base font-medium text-foreground">
-            {resolvedDoneLabel}
-          </Text>
-        </Pressable>
       </View>
     </View>
   );

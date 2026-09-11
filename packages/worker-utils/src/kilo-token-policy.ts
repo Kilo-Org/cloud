@@ -47,13 +47,40 @@ const policyClaims = kiloTokenPayload
           message: 'Modern tokens require audience, purpose and exchange eligibility',
         });
       }
-      if (claims.credentialExchange === true && claims.tokenPurpose !== 'human-api') {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Only human API tokens may permit credential exchange',
-          path: ['credentialExchange'],
-        });
+    }
+    if (claims.runtimeAdmission !== undefined && claims.runtimeAuthorization !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Runtime admission and runtime authorization cannot coexist',
+      });
+    }
+    if (claims.runtimeAdmission !== undefined) {
+      const permittedPurpose =
+        (claims.runtimeAdmission.source === 'user' &&
+          (claims.tokenPurpose === 'human-api' || claims.tokenPurpose === 'device-access')) ||
+        (claims.runtimeAdmission.source === 'automation' &&
+          claims.tokenPurpose === 'internal-service');
+      if (
+        !permittedPurpose ||
+        claims.credentialExchange !== false ||
+        claims.apiTokenPepper === undefined ||
+        claims.tokenPurpose === 'delegated-workload'
+      ) {
+        ctx.addIssue({ code: 'custom', message: 'Invalid runtime admission' });
       }
+    }
+    if (
+      claims.runtimeAuthorization !== undefined &&
+      (claims.tokenPurpose !== 'delegated-workload' || claims.credentialExchange !== false)
+    ) {
+      ctx.addIssue({ code: 'custom', message: 'Invalid runtime authorization reference' });
+    }
+    if (claims.credentialExchange === true && claims.tokenPurpose !== 'human-api') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Only human API tokens may permit credential exchange',
+        path: ['credentialExchange'],
+      });
     }
   });
 
@@ -242,7 +269,7 @@ export type ModernKiloTokenPurpose = z.infer<typeof modernPurpose>;
 
 const modernClaims = policyClaims
   .safeExtend({
-    aud: audienceName,
+    aud: audienceClaim,
     tokenPurpose: purposeClaim,
     credentialExchange: z.boolean(),
   })
@@ -253,7 +280,9 @@ const modernClaims = policyClaims
       .filter(([, value]) => value !== undefined)
       .map(([name]) => name);
     if (
-      claims.aud !== KILO_API_AUDIENCE ||
+      (typeof claims.aud === 'string'
+        ? claims.aud !== KILO_API_AUDIENCE
+        : claims.aud.length !== 1 || claims.aud[0] !== KILO_API_AUDIENCE) ||
       claims.apiTokenPepper === undefined ||
       !hasOnlyExchangeSafeClaims(serializedClaimNames)
     ) {
@@ -282,8 +311,9 @@ export type SignModernKiloTokenParams = {
   expiresInSeconds: number;
   pepper?: string | null;
   env?: string;
-  audience: string;
+  audience: string | string[];
   extra?: z.infer<typeof modernTokenExtra>;
+  now?: Date;
 } & ModernKiloTokenSigningPurpose;
 
 export function buildModernKiloTokenPayload(
@@ -291,14 +321,14 @@ export function buildModernKiloTokenPayload(
     userId: string;
     pepper?: string | null;
     env?: string;
-    audience: string;
+    audience: string | string[];
     issuedAt: number;
     expiresAt: number;
     extra?: z.infer<typeof modernTokenExtra>;
   } & ModernKiloTokenPurpose
 ): ModernKiloTokenClaims {
   const extra = modernTokenExtra.parse(params.extra ?? {});
-  const audience = audienceName.parse(params.audience);
+  const audience = audienceClaim.parse(params.audience);
   const claims = {
     ...extra,
     version: KILO_TOKEN_VERSION,
@@ -318,7 +348,9 @@ export async function signModernKiloToken(
   params: SignModernKiloTokenParams
 ): Promise<{ token: string; expiresAt: string }> {
   const expiresInSeconds = positiveSafeInteger.parse(params.expiresInSeconds);
-  const issuedAt = Math.floor(Date.now() / 1000);
+  const now = params.now ?? new Date();
+  if (!Number.isFinite(now.getTime())) throw new Error('Invalid token issuance time');
+  const issuedAt = Math.floor(now.getTime() / 1000);
   const expiresAt = issuedAt + expiresInSeconds;
   if (!Number.isSafeInteger(expiresAt)) {
     throw new Error('Token expiration exceeds the safe integer range');

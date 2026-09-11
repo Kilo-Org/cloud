@@ -13,6 +13,7 @@ import {
   deleteIntegrationForOwner,
   createPendingIntegration,
   findIntegrationByInstallationId,
+  getRepositoryCustomization,
   listRepositoryCustomizations,
   suspendIntegration,
   suspendIntegrationForOwner,
@@ -1181,5 +1182,49 @@ describe('repository_customizations accessors', () => {
       .where(eq(repository_customizations.platform_integration_id, integrationId));
 
     expect(remaining).toHaveLength(0);
+  });
+
+  test('getRepositoryCustomization returns null when the repository has no override', async () => {
+    const customization = await getRepositoryCustomization(integrationId, '1');
+
+    expect(customization).toBeNull();
+  });
+
+  test('getRepositoryCustomization returns the matching row', async () => {
+    await upsertRepositoryCustomization(integrationId, '1', {
+      bot_mention_model_slug: 'model-a',
+      pr_review_mode: 'on',
+    });
+
+    const customization = await getRepositoryCustomization(integrationId, '1');
+
+    expect(customization).toMatchObject({
+      platform_integration_id: integrationId,
+      repository_id: '1',
+      bot_mention_model_slug: 'model-a',
+      pr_review_mode: 'on',
+    });
+  });
+
+  test("getRepositoryCustomization does not leak another integration's row for the same repository_id", async () => {
+    const [otherIntegration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: orgId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: `${installationId}-other-lookup`,
+        integration_status: 'active',
+        repository_access: 'all',
+      })
+      .returning();
+
+    await upsertRepositoryCustomization(otherIntegration.id, '1', {
+      bot_mention_model_slug: 'other-integration-model',
+    });
+
+    const customization = await getRepositoryCustomization(integrationId, '1');
+
+    expect(customization).toBeNull();
   });
 });

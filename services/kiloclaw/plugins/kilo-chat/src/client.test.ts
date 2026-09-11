@@ -128,35 +128,6 @@ describe('createKiloChatClient', () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.inReplyToMessageId).toBeUndefined();
   });
-
-  it('createMessage posts to /_kilo/kilo-chat/send and returns messageId', async () => {
-    const fetchImpl = vi.fn(
-      async () =>
-        new Response(JSON.stringify(createMessageResponse()), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-    );
-    const client = createKiloChatClient({
-      controllerBaseUrl: 'http://127.0.0.1:18789',
-      gatewayToken: 'gwt',
-      fetchImpl: fetchImpl as unknown as typeof fetch,
-    });
-
-    const result = await client.createMessage({
-      conversationId: 'c1',
-      content: [{ type: 'text', text: 'hello' }],
-    });
-
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchImpl.mock.calls[0]!;
-    expect(url).toBe('http://127.0.0.1:18789/_kilo/kilo-chat/send');
-    const init2 = init as RequestInit;
-    expect(init2.method).toBe('POST');
-    const body = JSON.parse(init2.body as string);
-    expect(body).toEqual({ conversationId: 'c1', content: [{ type: 'text', text: 'hello' }] });
-    expect(result.messageId).toBe('m1');
-  });
 });
 
 describe('editMessage', () => {

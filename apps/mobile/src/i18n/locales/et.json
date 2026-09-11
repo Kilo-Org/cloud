@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kõnetuvastus Kilo Gateway kaudu",
+    "gatewayTranscriptionSubtitle": "Kasuta häälsisestuse tekstiks teisendamiseks seadme kõnetuvastuse asemel Kilo Gateway mudelit. Sinu salvestus saadetakse Kilo Gateway'sse.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Tõmbetaotlus pole saadaval",
@@ -448,6 +451,9 @@
       "acceptTerms": "Nõustu",
       "replyBadRequest": "Seda vastust ei saa postitada. Lõim võis muutuda.",
       "replyForbidden": "Sul pole õigust sellele tõmbetaotlusele vastata.",
+      "addCommentCta": "Kommenteeri seda tõmbetaotlust",
+      "commentBadRequest": "Seda kommentaari ei saa postitada. Tõmbetaotlus võis muutuda.",
+      "commentForbidden": "Sul pole õigust seda tõmbetaotlust kommenteerida.",
       "moderation": {
         "reportContent": {
           "terminal": "Sellest kommentaarist ei saa teatada.",
@@ -2565,7 +2571,13 @@
     "languageNotInstalledMessage": "Keele {{language}} võrguühenduseta kõnefailid pole selles telefonis installitud. Laadi need alla ja proovi häälsisestust uuesti.",
     "downloadOfflineModel": "Laadi alla",
     "offlineModelDownloadScheduled": "Võrguühenduseta kõnefailid laaditakse taustal alla. Proovi häälsisestust hiljem uuesti.",
-    "listeningStopped": "Kuulamine peatus."
+    "listeningStopped": "Kuulamine peatus.",
+    "transcribing": "Kõnetuvastus...",
+    "gatewayUnreachable": "Ühendust Kilo Gatewayga ei õnnestunud saada. Kontrolli ühendust ja proovi uuesti.",
+    "gatewayTimeout": "Kõnetuvastus võttis liiga palju aega. Proovi uuesti.",
+    "gatewayModelUnavailable": "Seda kõnetuvastuse mudelit pole saadaval. Vali Eelistustes mõni teine.",
+    "gatewaySignInRequired": "Logi sisse, et kasutada Kilo Gateway kõnetuvastust.",
+    "gatewayNoModel": "Vali kõigepealt Eelistustes kõnetuvastuse mudel."
   },
   "share": {
     "title": "Kilosse jagamine",
@@ -2947,5 +2959,12 @@
     "needsInput": "Vajab sisendit",
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente."
+  },
+  "transcriptionModel": {
+    "title": "Kõnetuvastuse mudel",
+    "noneChosen": "Pole valitud",
+    "emptyTitle": "Kõnetuvastuse mudelid puuduvad",
+    "emptyDescription": "Kilo Gateway ei paku praegu ühtegi kõnetuvastuse mudelit.",
+    "loadFailed": "Kõnetuvastuse mudeleid ei õnnestunud laadida."
   }
 }

@@ -351,10 +351,16 @@ describe('Session observation wiring', () => {
     await runInDurableObject(stub, async (instance, state) => {
       const f = await fixture(instance, state);
       const setup = Promise.withResolvers<void>();
-      const original = instance['armQueueRetry'];
-      Object.assign(instance, { armQueueRetry: () => setup.promise });
+      const originalGetAlarm = state.storage.getAlarm.bind(state.storage);
+      let alarmSetupStarted = 0;
+      state.storage.getAlarm = async () => {
+        alarmSetupStarted += 1;
+        await setup.promise;
+        return originalGetAlarm();
+      };
       try {
         const alarm = instance.alarm();
+        await vi.waitFor(() => expect(alarmSetupStarted).toBeGreaterThan(0));
         const nextMessage = { ...f.message, messageId: 'msg_new' };
         state.storage.kv.put('session_messages', [nextMessage]);
         setup.resolve();
@@ -364,7 +370,7 @@ describe('Session observation wiring', () => {
         expect(state.storage.kv.get('session_messages')).toEqual([nextMessage]);
       } finally {
         setup.resolve();
-        Object.assign(instance, { armQueueRetry: original });
+        state.storage.getAlarm = originalGetAlarm;
         await f.cleanup();
       }
     });

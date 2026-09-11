@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "ການຖອດສຽງເປັນຂໍ້ຄວາມຜ່ານ Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "ຖອດການປ້ອນຂໍ້ຄວາມດ້ວຍສຽງເປັນຂໍ້ຄວາມດ້ວຍໂມເດວ Kilo Gateway ແທນການຈຳລາສຽງພາຍໃນອຸປະກອນ. ໄຟລ໌ບັນທຶກສຽງຂອງທ່ານຈະຖືກສົ່ງໄປ Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "ບໍ່ສາມາດເປີດຄຳຂໍລວມໂຄດ",
@@ -448,6 +451,9 @@
       "acceptTerms": "ຍອມຮັບ",
       "replyBadRequest": "ບໍ່ສາມາດໂພດຄຳຕອບນີ້ໄດ້. ກະທູ້ອາດມີການປ່ຽນແປງແລ້ວ.",
       "replyForbidden": "ທ່ານບໍ່ມີສິດຕອບໃນຄຳຂໍລວມໂຄດນີ້.",
+      "addCommentCta": "ສະແດງຄຳເຫັນໃນຄຳຂໍລວມໂຄດນີ້",
+      "commentBadRequest": "ບໍ່ສາມາດໂພດຄຳເຫັນນີ້ໄດ້. ຄຳຂໍລວມໂຄດອາດມີການປ່ຽນແປງແລ້ວ.",
+      "commentForbidden": "ທ່ານບໍ່ມີສິດສະແດງຄຳເຫັນໃນຄຳຂໍລວມໂຄດນີ້.",
       "moderation": {
         "reportContent": {
           "terminal": "ບໍ່ສາມາດລາຍງານຄຳເຫັນນີ້ໄດ້.",
@@ -2565,7 +2571,13 @@
     "languageNotInstalledMessage": "ໄຟລ໌ສຽງເວົ້າອອບໄລນ໌ສຳລັບ{{language}}ຍັງບໍ່ໄດ້ຕິດຕັ້ງໃນໂທລະສັບນີ້. ກະລຸນາດາວໂຫຼດມັນກ່ອນ ແລ້ວລອງໃຊ້ການປ້ອນຂໍ້ຄວາມດ້ວຍສຽງອີກເທື່ອ.",
     "downloadOfflineModel": "ດາວໂຫຼດ",
     "offlineModelDownloadScheduled": "ໄຟລ໌ສຽງເວົ້າອອບໄລນ໌ຈະຖືກດາວໂຫຼດໃນພື້ນຫຼັງ. ລອງໃຊ້ການປ້ອນຂໍ້ຄວາມດ້ວຍສຽງອີກເທື່ອພາຍຫຼັງ.",
-    "listeningStopped": "ຢຸດການຟັງແລ້ວ."
+    "listeningStopped": "ຢຸດການຟັງແລ້ວ.",
+    "transcribing": "ກຳລັງຖອດເປັນຂໍ້ຄວາມ...",
+    "gatewayUnreachable": "ບໍ່ສາມາດເຊື່ອມຕໍ່ Kilo Gateway ໄດ້. ກວດສອບການເຊື່ອມຕໍ່ຂອງທ່ານ ແລ້ວລອງອີກຄັ້ງ.",
+    "gatewayTimeout": "ການຖອດສຽງໃຊ້ເວລາດົນເກີນໄປ. ລອງອີກຄັ້ງ.",
+    "gatewayModelUnavailable": "ໂມເດວຖອດສຽງນີ້ບໍ່ມີໃຫ້ໃຊ້. ເລືອກໂມເດວອື່ນໃນການຕັ້ງຄ່າສ່ວນຕົວ.",
+    "gatewaySignInRequired": "ເຂົ້າສູ່ລະບົບເພື່ອໃຊ້ການຖອດສຽງຜ່ານ Kilo Gateway.",
+    "gatewayNoModel": "ເລືອກໂມເດວຖອດສຽງໃນການຕັ້ງຄ່າສ່ວນຕົວກ່ອນ."
   },
   "share": {
     "title": "ແບ່ງປັນໄປທີ່ Kilo",
@@ -2947,5 +2959,12 @@
     "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ",
     "channelName": "ເອເຈນທີ່ກຳລັງເຮັດວຽກ",
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ."
+  },
+  "transcriptionModel": {
+    "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
+    "noneChosen": "ຍັງບໍ່ໄດ້ເລືອກ",
+    "emptyTitle": "ບໍ່ມີໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
+    "emptyDescription": "ຕອນນີ້ Kilo Gateway ບໍ່ມີໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ.",
+    "loadFailed": "ບໍ່ສາມາດໂຫຼດໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມໄດ້."
   }
 }

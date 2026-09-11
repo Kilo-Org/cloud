@@ -93,7 +93,45 @@ export const getOpenRouterModelsFromDatabase = createLanguageModelIdsFetcher(
   getOpenRouterModelsMetadataFromDatabase
 );
 
+// Undocumented aliases that remain in active use but are absent from OpenRouter's model catalog.
+const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
+  'anthropic/claude-haiku-4-5',
+  'anthropic/claude-sonnet-4-5',
+  'anthropic/claude-sonnet-4-6',
+  'anthropic/claude-sonnet-5-20260630',
+  'claude-opus-5',
+  'claude-sonnet-4',
+  'claude-sonnet-4.5',
+  'claude-sonnet-5',
+  'deepseek-v4-flash',
+  'deepseek-v4-flash-0731',
+  'deepseek-v4-pro',
+  'gemini-2.5-flash-lite',
+  'glm-5.1',
+  'glm-5.2',
+  'gpt-4.1-mini',
+  'gpt-4o',
+  'gpt-4o-mini',
+  'gpt-5.2',
+  'gpt-5.2-codex',
+  'gpt-5.4',
+  'gpt-5.4-mini',
+  'gpt-5.5',
+  'gpt-5.6-luna',
+  'gpt-5.6-sol',
+  'gpt-5.6-terra',
+  'kimi-k3',
+  'mimo-v2.5',
+  'minimax-m2.5',
+  'minimax-m3',
+  'minimax/minimax-m2.5-20260211',
+  'step-3.5-flash',
+]);
+
 export async function isValidOpenRouterModelId(modelId: string): Promise<boolean> {
+  if (legacyOpenRouterAliases.has(modelId)) {
+    return true;
+  }
   const openRouterModelIds = await getOpenRouterModelsFromDatabase();
   if (openRouterModelIds.size === 0) {
     warnExceptInTest(

@@ -17,6 +17,13 @@ export default defineProject({
   test: {
     name: 'mobile-pure',
     environment: 'node',
+    // Project configs do not inherit the root test options, and this suite
+    // runs both projects in parallel: on a loaded host (dev stack, simulator,
+    // Appium) workers starve and real-timer tests exceed the 5s default. One
+    // timeout leaks its pending act() loop into the worker and cascades
+    // through the file. Bounded pollers (settleBootstrap's 4s budget) still
+    // fail on their own budget, so this only absorbs starvation.
+    testTimeout: 15_000,
     include: [
       'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',

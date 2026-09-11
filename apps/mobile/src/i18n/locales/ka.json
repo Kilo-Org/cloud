@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "ტრანსკრიფცია Kilo Gateway-ით",
+    "gatewayTranscriptionSubtitle": "ხმოვანი შეყვანა აქციეთ ტექსტად Kilo Gateway-ის მოდელით, მოწყობილობის მეტყველების ამოცნობის ნაცვლად. თქვენი ჩანაწერი იგზავნება Kilo Gateway-ში.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",
@@ -448,6 +451,9 @@
       "acceptTerms": "თანხმობა",
       "replyBadRequest": "ამ პასუხის გამოქვეყნება შეუძლებელია. შესაძლოა, თემა შეიცვალა.",
       "replyForbidden": "ამ შერწყმის მოთხოვნაზე პასუხის გაცემის უფლება არ გაქვს.",
+      "addCommentCta": "კომენტარი ამ შერწყმის მოთხოვნაზე",
+      "commentBadRequest": "ამ კომენტარის გამოქვეყნება შეუძლებელია. შესაძლოა, შერწყმის მოთხოვნა შეიცვალა.",
+      "commentForbidden": "ამ შერწყმის მოთხოვნაზე კომენტარის დამატების უფლება არ გაქვს.",
       "moderation": {
         "reportContent": {
           "terminal": "ამ კომენტარის გასაჩივრება შეუძლებელია.",
@@ -2565,7 +2571,13 @@
     "languageNotInstalledMessage": "{{language}} ენის ინტერნეტგარე მეტყველების ფაილები ამ ტელეფონზე დაინსტალირებული არ არის. ჩამოტვირთეთ ისინი, შემდეგ კი ხმოვანი შეყვანა ხელახლა სცადეთ.",
     "downloadOfflineModel": "ჩამოტვირთვა",
     "offlineModelDownloadScheduled": "ინტერნეტგარე მეტყველების ფაილები ფონურად ჩამოიტვირთება. ხმოვანი შეყვანა მოგვიანებით ხელახლა სცადეთ.",
-    "listeningStopped": "მოსმენა შეჩერდა."
+    "listeningStopped": "მოსმენა შეჩერდა.",
+    "transcribing": "მიმდინარეობს ტრანსკრიფცია...",
+    "gatewayUnreachable": "Kilo Gateway-ზე წვდომა ვერ მოხერხდა. შეამოწმეთ კავშირი და სცადეთ ხელახლა.",
+    "gatewayTimeout": "ტრანსკრიფციამ ძალიან ბევრი დრო დაისვა. სცადე ხელახლა.",
+    "gatewayModelUnavailable": "ტრანსკრიფციის ეს მოდელი მიუწვდომელია. აირჩიეთ სხვა პარამეტრებში.",
+    "gatewaySignInRequired": "შედით, რომ გამოიყენოთ ტრანსკრიფცია Kilo Gateway-ით.",
+    "gatewayNoModel": "ჯერ აირჩიეთ ტრანსკრიფციის მოდელი პარამეტრებში."
   },
   "share": {
     "title": "Kilo-ში გაზიარება",
@@ -2947,5 +2959,12 @@
     "needsInput": "პასუხს ელის",
     "channelName": "აქტიური აგენტები",
     "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები."
+  },
+  "transcriptionModel": {
+    "title": "ტრანსკრიფციის მოდელი",
+    "noneChosen": "არჩეული არ არის",
+    "emptyTitle": "ტრანსკრიფციის მოდელები არ არის",
+    "emptyDescription": "Kilo Gateway ამჟამად არ სთავაზობს ტრანსკრიფციის მოდელებს.",
+    "loadFailed": "ტრანსკრიფციის მოდელების ჩატვირთვა ვერ მოხერხდა."
   }
 }

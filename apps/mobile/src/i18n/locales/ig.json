@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Ịtụgharị olu ka ọ bụrụ ederede site na Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Ejila njirimaka okwu nke ngwaọrụ ahụ; jiri ihe nlereanya Kilo Gateway tụgharịa ntinye olu ka ọ bụrụ ederede. A na-eziga ndekọ gị na Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Arịrịọ njikọta adịghị",
@@ -448,6 +451,9 @@
       "acceptTerms": "Nakwere",
       "replyBadRequest": "Enweghị ike ibipụta azịza a. O nwere ike ịbụ na usoro mkparịta ụka ahụ agbanweela.",
       "replyForbidden": "Ị nweghị ikike ịzaghachi arịrịọ njikọta a.",
+      "addCommentCta": "Nye nkwupụta na arịrịọ njikọta a",
+      "commentBadRequest": "Enweghị ike ibipụta nkwupụta a. O nwere ike ịbụ na arịrịọ njikọta a agbanweela.",
+      "commentForbidden": "Ị nweghị ikike inye nkwupụta na arịrịọ njikọta a.",
       "moderation": {
         "reportContent": {
           "terminal": "Enweghị ike ikpesa okwu a.",
@@ -2565,7 +2571,13 @@
     "languageNotInstalledMessage": "Faịlụ okwu offline maka {{language}} etinyeghị na ekwentị a. Budata ha, mgbe ahụ nwaa ntinye olu ọzọ.",
     "downloadOfflineModel": "Budata",
     "offlineModelDownloadScheduled": "A ga-ebudata faịlụ okwu offline na ndabere. Nwaa ntinye olu ọzọ ma e mesịa.",
-    "listeningStopped": "Ịge ntị kwụsịrị."
+    "listeningStopped": "Ịge ntị kwụsịrị.",
+    "transcribing": "Na-atụgharị ka ọ bụrụ ederede...",
+    "gatewayUnreachable": "Enweghị ike iru Kilo Gateway. Lelee njikọ gị ma nwaa ọzọ.",
+    "gatewayTimeout": "Ịtụgharị okwu were oge karịrị akarị. Nwaa ọzọ.",
+    "gatewayModelUnavailable": "Ihe nlereanya a maka ịtụgharị okwu adịghị. Họrọ ọzọ na Mmasị.",
+    "gatewaySignInRequired": "Banye ka i jiri ịtụgharị okwu site na Kilo Gateway.",
+    "gatewayNoModel": "Họrọ ihe nlereanya maka ịtụgharị okwu na Mmasị ụzọ."
   },
   "share": {
     "title": "Kekọrịta na Kilo",
@@ -2947,5 +2959,12 @@
     "needsInput": "Chọrọ nzaghachi",
     "channelName": "Ndị nnọchi anya na-arụ ọrụ",
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi."
+  },
+  "transcriptionModel": {
+    "title": "Ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",
+    "noneChosen": "A họpụtaghị nke ọ bụla",
+    "emptyTitle": "Enweghị ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",
+    "emptyDescription": "Kilo Gateway enyeghị ihe nlereanya ọ bụla maka ịtụgharị okwu ugbu a.",
+    "loadFailed": "Enweghị ike ibudata ihe nlereanya maka ịtụgharị okwu."
   }
 }

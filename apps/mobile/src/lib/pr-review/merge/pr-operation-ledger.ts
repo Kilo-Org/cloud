@@ -14,8 +14,13 @@ export const PR_OPERATION_AMBIGUOUS_MESSAGE = "Couldn't confirm — check the PR
 export const PR_OPERATION_PERSISTENCE_FAILED_MESSAGE =
   'We could not record this action. Please try again later.';
 
-/** The four PR mutation surfaces; each has its own existing retryable copy. */
-export type PrMutationSurface = 'create-comment' | 'submit-review' | 'reply' | 'merge';
+/** The PR mutation surfaces; each has its own existing retryable copy. */
+export type PrMutationSurface =
+  | 'create-comment'
+  | 'submit-review'
+  | 'reply'
+  | 'merge'
+  | 'pr-comment';
 
 // Existing retryable fallback copy per surface (mirrors the sheet/composer
 // defaults so an in-progress duplicate reads like a normal retryable failure).
@@ -25,6 +30,7 @@ const PR_SURFACE_RETRYABLE_COPY = {
   'submit-review': 'prReview.mutationError.couldNotSubmitReview',
   reply: 'prReview.operation.couldNotReply',
   merge: 'prReview.merge.couldNotMerge',
+  'pr-comment': 'prReview.mutationError.couldNotPostComment',
 } satisfies Record<PrMutationSurface, string>;
 
 /**

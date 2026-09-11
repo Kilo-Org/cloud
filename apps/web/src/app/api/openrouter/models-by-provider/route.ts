@@ -4,6 +4,7 @@ import { desc } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { getUserFromAuth } from '@/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { getSnapshotModelVariantId } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
@@ -42,7 +43,10 @@ export async function GET() {
     for (const provider of result[0].data.providers) {
       const models = [];
       for (const model of provider.models) {
-        const decision = await getEffectiveModelDecision(policy, model.slug);
+        // Evaluate the variant this provider actually serves (e.g. `x/y:free`),
+        // not the collapsed slug, so a provider that only offers the free
+        // variant is judged on that variant's routes.
+        const decision = await getEffectiveModelDecision(policy, getSnapshotModelVariantId(model));
         if (
           decision.allowed &&
           (!decision.eligibleProviderRoutes || decision.eligibleProviderRoutes.has(provider.slug))

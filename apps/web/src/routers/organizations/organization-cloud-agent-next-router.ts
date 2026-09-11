@@ -8,7 +8,8 @@ import {
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
-import { generateCloudAgentToken } from '@/lib/tokens';
+import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
+import type { User } from '@kilocode/db/schema';
 import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import {
   ensureOrganizationAccess,
@@ -65,6 +66,20 @@ import {
 import { linkPendingUploads, releasePendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+
+async function createCloudAgentControlToken(
+  user: User,
+  headersList: Headers | undefined,
+  organizationId: string
+): Promise<string> {
+  return (
+    await createControlTokenForRequest(user, 'cloud-agent-next', {
+      headers: headersList,
+      organizationId,
+      tokenSource: 'cloud-agent',
+    })
+  ).token;
+}
 import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { db } from '@/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
@@ -272,7 +287,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         });
       }
 
-      const authToken = generateCloudAgentToken(ctx.user);
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
       const eligibility = await computeCloudAgentNextBalanceCheckEligibility({
         fromDb: db,
         user: ctx.user,
@@ -377,7 +396,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
       });
-      const authToken = generateCloudAgentToken(ctx.user);
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
       const client = createCloudAgentNextClient(authToken);
 
       // No token fetch needed: prepare and initiate happen back-to-back,
@@ -408,7 +431,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
       });
-      const authToken = generateCloudAgentToken(ctx.user);
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
       // Prompt turns carry their own model; command turns run the session's
       // stored model, so resolve it to apply the same free/BYOK eligibility
       // to every follow-up that queues a model-using turn. If the worker
@@ -482,7 +509,12 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
       });
-      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
       return await client.getWorktreeChanges(input.cloudAgentSessionId);
     }),
 
@@ -495,7 +527,12 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
       });
-      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
       return await client.refreshWorktreeChanges(input.cloudAgentSessionId);
     }),
 
@@ -508,7 +545,12 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
       });
-      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
       return await client.getWorktreeFile({
         cloudAgentSessionId: input.cloudAgentSessionId,
         path: input.path,
@@ -527,7 +569,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       });
 
       try {
-        const authToken = generateCloudAgentToken(ctx.user);
+        const authToken = await createCloudAgentControlToken(
+          ctx.user,
+          ctx.headersList,
+          input.organizationId
+        );
         const client = createCloudAgentNextClient(authToken);
         const result = await client.createTerminal({
           cloudAgentSessionId: input.cloudAgentSessionId,
@@ -580,7 +626,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       });
 
       try {
-        const authToken = generateCloudAgentToken(ctx.user);
+        const authToken = await createCloudAgentControlToken(
+          ctx.user,
+          ctx.headersList,
+          input.organizationId
+        );
         const client = createCloudAgentNextClient(authToken);
         return await client.resizeTerminal({
           cloudAgentSessionId: input.cloudAgentSessionId,
@@ -604,7 +654,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       });
 
       try {
-        const authToken = generateCloudAgentToken(ctx.user);
+        const authToken = await createCloudAgentControlToken(
+          ctx.user,
+          ctx.headersList,
+          input.organizationId
+        );
         const client = createCloudAgentNextClient(authToken);
         return await client.closeTerminal({
           cloudAgentSessionId: input.cloudAgentSessionId,
@@ -692,7 +746,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.sessionId,
       });
-      const authToken = generateCloudAgentToken(ctx.user);
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
       const client = createCloudAgentNextClient(authToken);
 
       return await client.interruptSession(input.sessionId);
@@ -712,7 +770,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.sessionId,
       });
-      const authToken = generateCloudAgentToken(ctx.user);
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
       const client = createCloudAgentNextClient(authToken);
 
       return await client.cancelQueuedMessage(input.sessionId, input.messageId);
@@ -727,7 +789,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.sessionId,
       });
-      const authToken = generateCloudAgentToken(ctx.user);
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
       const client = createCloudAgentNextClient(authToken);
       return await client.answerQuestion({
         sessionId: input.sessionId,
@@ -745,7 +811,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.sessionId,
       });
-      const authToken = generateCloudAgentToken(ctx.user);
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
       const client = createCloudAgentNextClient(authToken);
       return await client.rejectQuestion({
         sessionId: input.sessionId,
@@ -762,7 +832,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.sessionId,
       });
-      const authToken = generateCloudAgentToken(ctx.user);
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
       const client = createCloudAgentNextClient(authToken);
       return await client.answerPermission({
         sessionId: input.sessionId,
@@ -784,7 +858,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
       });
-      const authToken = generateCloudAgentToken(ctx.user);
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
       const client = createCloudAgentNextClient(authToken);
 
       return await client.getSession(input.cloudAgentSessionId);
@@ -810,9 +888,9 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           message: 'Session not found or access denied',
         });
       }
-      return await createCloudAgentNextClient(generateCloudAgentToken(ctx.user)).getSandboxStatus(
-        input.cloudAgentSessionId
-      );
+      return await createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
+      ).getSandboxStatus(input.cloudAgentSessionId);
     }),
 
   getComputeBillingStatus: organizationMemberProcedure
@@ -824,7 +902,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         cloudAgentSessionId: input.cloudAgentSessionId,
       });
       return await createCloudAgentNextClient(
-        generateCloudAgentToken(ctx.user)
+        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
       ).getComputeBillingStatus(input.cloudAgentSessionId);
     }),
 

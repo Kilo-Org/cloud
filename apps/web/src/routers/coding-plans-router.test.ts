@@ -838,7 +838,7 @@ describe('coding plans router', () => {
     });
   });
 
-  it('restricts manual remediation and returns only the MiniMax plan ID needed to deprovision', async () => {
+  it('restricts manual remediation and returns the upstream identifier needed to deprovision', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
     const subscriptionExpiresAt = '2026-07-20T12:00:00.000Z';
@@ -921,6 +921,37 @@ describe('coding plans router', () => {
     expect(revoked.status).toBe('revoked');
     expect(revoked.upstream_plan_id).toBe('minimax-deprovision-plan');
     expect(revoked.encrypted_api_key).toBeNull();
+  });
+
+  it('returns the stored BytePlus username in the admin revocation queue', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const byteplusUsername = 'assigned-byteplus-seat';
+    const workItem = await insertInventory({
+      plan_id: BYTEPLUS_PLAN_ID,
+      provider_id: 'byteplus-coding',
+      upstream_plan_id: byteplusUsername,
+      status: 'revocation_pending',
+      revocation_requested_at: new Date().toISOString(),
+    });
+    await db.insert(coding_plan_subscriptions).values(
+      subscriptionValues(user.id, {
+        plan_id: BYTEPLUS_PLAN_ID,
+        provider_id: 'byteplus-coding',
+        key_inventory_id: workItem.id,
+      })
+    );
+
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.codingPlans.adminRevocationQueue({})).resolves.toEqual([
+      expect.objectContaining({
+        inventoryKeyId: workItem.id,
+        planId: BYTEPLUS_PLAN_ID,
+        providerId: 'byteplus-coding',
+        upstreamPlanId: byteplusUsername,
+      }),
+    ]);
   });
 
   it('returns one queue row per inventory credential when multiple canceled subscriptions reference it', async () => {

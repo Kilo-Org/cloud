@@ -40,7 +40,9 @@ export function retireWorktreeRuntime<Entry extends RuntimeCleanupEntry<Root>, R
   const completion = Promise.withResolvers<NativeRetirement>();
   entry.retiring = completion.promise;
   const processes =
-    entry.processes?.stop(deadlineAt) ?? Promise.resolve(entry.processIssued !== true);
+    entry.processes?.stop(deadlineAt) ??
+    entry.stopped?.then(() => true) ??
+    Promise.resolve(entry.processIssued !== true);
   entry.abort.abort();
   for (const root of [...entry.roots]) deps.unregisterRoot(root);
   const cleanup = async (): Promise<NativeRetirement> => {

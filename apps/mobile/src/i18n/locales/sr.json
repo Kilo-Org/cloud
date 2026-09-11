@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkripcija preko Kilo Gateway-a",
+    "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gateway-a umesto prepoznavanja govora na uređaju. Snimak se šalje na Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtev za spajanje nije dostupan",
@@ -2589,7 +2592,13 @@
     "languageNotInstalledMessage": "Datoteke govora za vanmrežni rad za {{language}} nisu instalirane na ovom telefonu. Preuzmi ih, a zatim pokušaj glasovni unos ponovo.",
     "downloadOfflineModel": "Preuzmi",
     "offlineModelDownloadScheduled": "Datoteke govora za vanmrežni rad biće preuzete u pozadini. Pokušaj glasovni unos ponovo kasnije.",
-    "listeningStopped": "Slušanje je zaustavljeno."
+    "listeningStopped": "Slušanje je zaustavljeno.",
+    "transcribing": "Transkribujem…",
+    "gatewayUnreachable": "Nije bilo moguće povezati se sa Kilo Gateway-om. Proveri vezu i pokušaj ponovo.",
+    "gatewayTimeout": "Transkripcija je predugo trajala. Pokušaj ponovo.",
+    "gatewayModelUnavailable": "Ovaj model za transkripciju nije dostupan. Izaberi drugi u Podešavanjima.",
+    "gatewaySignInRequired": "Prijavi se da koristiš transkripciju preko Kilo Gateway-a.",
+    "gatewayNoModel": "Prvo izaberi model za transkripciju u Podešavanjima."
   },
   "share": {
     "title": "Deljenje u aplikaciji Kilo",
@@ -2972,5 +2981,12 @@
     "needsInput": "Čeka unos",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu."
+  },
+  "transcriptionModel": {
+    "title": "Model za transkripciju",
+    "noneChosen": "Nije izabran",
+    "emptyTitle": "Nema modela za transkripciju",
+    "emptyDescription": "Kilo Gateway trenutno ne nudi modele za transkripciju.",
+    "loadFailed": "Nije moguće učitati modele za transkripciju."
   }
 }

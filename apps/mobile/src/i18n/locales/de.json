@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Gateway-Transkription",
+    "gatewayTranscriptionSubtitle": "Transkribiere die Spracheingabe mit einem Kilo-Gateway-Modell statt mit der Spracherkennung des Geräts. Deine Aufnahme wird an das Kilo Gateway gesendet.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Live-Aktivitäten",
@@ -2134,7 +2137,13 @@
     "languageNotInstalledMessage": "Die Offline-Sprachdateien für {{language}} sind auf diesem Telefon nicht installiert. Lade sie herunter und versuche die Spracheingabe erneut.",
     "downloadOfflineModel": "Herunterladen",
     "offlineModelDownloadScheduled": "Die Offline-Sprachdateien werden im Hintergrund heruntergeladen. Versuche die Spracheingabe später erneut.",
-    "listeningStopped": "Die Aufnahme wurde beendet."
+    "listeningStopped": "Die Aufnahme wurde beendet.",
+    "transcribing": "Transkription läuft …",
+    "gatewayUnreachable": "Das Kilo Gateway konnte nicht erreicht werden. Prüfe deine Verbindung und versuche es erneut.",
+    "gatewayTimeout": "Die Transkription hat zu lange gedauert. Versuche es erneut.",
+    "gatewayModelUnavailable": "Dieses Transkriptionsmodell ist nicht verfügbar. Wähle ein anderes in den Einstellungen.",
+    "gatewaySignInRequired": "Melde dich an, um die Gateway-Transkription zu nutzen.",
+    "gatewayNoModel": "Wähle zuerst in den Einstellungen ein Transkriptionsmodell."
   },
   "share": {
     "title": "Mit Kilo teilen",
@@ -2950,5 +2959,12 @@
     "needsInput": "Eingabe erforderlich",
     "channelName": "Aktive Agenten",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
+  },
+  "transcriptionModel": {
+    "title": "Transkriptionsmodell",
+    "noneChosen": "Keines ausgewählt",
+    "emptyTitle": "Keine Transkriptionsmodelle",
+    "emptyDescription": "Kilo Gateway bietet derzeit keine Transkriptionsmodelle.",
+    "loadFailed": "Die Transkriptionsmodelle konnten nicht geladen werden."
   }
 }

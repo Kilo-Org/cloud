@@ -308,7 +308,10 @@ describe('server /stream ticket nonce consume', () => {
     installNonceStore(env);
     const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
     env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
-    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: doFetch });
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      fetch: doFetch,
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
+    });
     const ticket = signStreamTicket({ cloudAgentSessionId: sessionId });
 
     const response = await fetchWorker(
@@ -395,6 +398,7 @@ describe('server /terminal ticket nonce consume', () => {
 
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
     env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
       getMetadata: vi.fn().mockResolvedValue({
         metadataSchemaVersion: 2,
         identity: {
@@ -426,7 +430,10 @@ describe('server /terminal ticket nonce consume', () => {
     const consumedNonces = installNonceStore(env);
     const sessionFetch = vi.fn().mockResolvedValue(new Response('bridged', { status: 200 }));
     env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
-    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: sessionFetch });
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      fetch: sessionFetch,
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
+    });
     const ticket = signTerminalTicket({ cloudAgentSessionId: sessionId });
 
     const first = await fetchWorker(terminalRequest(ticket, sessionId), env);
@@ -452,7 +459,10 @@ describe('server /terminal ticket nonce consume', () => {
     const consumedNonces = installNonceStore(env);
     const sessionFetch = vi.fn().mockResolvedValue(new Response('bridged', { status: 200 }));
     env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
-    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: sessionFetch });
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      fetch: sessionFetch,
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
+    });
     requireCurrentSessionAccessMock.mockRejectedValueOnce(
       Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
     );

@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Nutqni Kilo Gateway orqali matnga aylantirish",
+    "gatewayTranscriptionSubtitle": "Qurilmaning nutqni tanishining o'rniga Kilo Gateway modeli yordamida ovozli kiritishni matnga aylantiring. Yozuvingiz Kilo Gatewayga yuboriladi.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "PR mavjud emas",
@@ -2568,7 +2571,13 @@
     "languageNotInstalledMessage": "{{language}} tilining oflayn nutq fayllari bu telefonda o'rnatilmagan. Ularni yuklab oling, so'ngra ovozli kiritishni qayta sinab ko'ring.",
     "downloadOfflineModel": "Yuklab olish",
     "offlineModelDownloadScheduled": "Oflayn nutq fayllari fonda yuklab olinadi. Ovozli kiritishni keyinroq qayta sinab ko'ring.",
-    "listeningStopped": "Tinglash to'xtatildi."
+    "listeningStopped": "Tinglash to'xtatildi.",
+    "transcribing": "Matnga aylantirilmoqda...",
+    "gatewayUnreachable": "Kilo Gatewayga ulanib bo'lmadi. Ulanishni tekshiring va qayta urinib ko'ring.",
+    "gatewayTimeout": "Matnga aylantirish juda uzoq davom etdi. Qayta urinib ko'ring.",
+    "gatewayModelUnavailable": "Ushbu matnga aylantirish modeli mavjud emas. Shaxsiy sozlamalardan boshqasini tanlang.",
+    "gatewaySignInRequired": "Kilo Gateway orqali aylantirishdan foydalanish uchun tizimga kiring.",
+    "gatewayNoModel": "Avval Shaxsiy sozlamalardan matnga aylantirish modelini tanlang."
   },
   "share": {
     "title": "Kiloga yuborish",
@@ -2950,5 +2959,12 @@
     "needsInput": "Javob kutilmoqda",
     "channelName": "Faol agentlar",
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing."
+  },
+  "transcriptionModel": {
+    "title": "Matnga aylantirish modeli",
+    "noneChosen": "Hech narsa tanlanmagan",
+    "emptyTitle": "Matnga aylantirish modellari yo'q",
+    "emptyDescription": "Kilo Gateway hozircha matnga aylantirish modellarini taklif qilmayapti.",
+    "loadFailed": "Matnga aylantirish modellarini yuklab bo'lmadi."
   }
 }

@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkripsjon via Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkribér diktering med en Kilo Gateway-modell i stedet for enhetens stemmgjenkjenning. Opptaket ditt sendes til Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "PR-en er utilgjengelig",
@@ -2568,7 +2571,13 @@
     "languageNotInstalledMessage": "De frakoblede talefilene for {{language}} er ikke installert på denne telefonen. Last dem ned, og prøv diktering igjen.",
     "downloadOfflineModel": "Last ned",
     "offlineModelDownloadScheduled": "De frakoblede talefilene lastes ned i bakgrunnen. Prøv diktering igjen senere.",
-    "listeningStopped": "Dikteringen har stoppet."
+    "listeningStopped": "Dikteringen har stoppet.",
+    "transcribing": "Transkriberer...",
+    "gatewayUnreachable": "Kunne ikke nå Kilo Gateway. Sjekk tilkoblingen og prøv igjen.",
+    "gatewayTimeout": "Transkripsjonen tok for lang tid. Prøv igjen.",
+    "gatewayModelUnavailable": "Denne transkripsjonsmodellen er ikke tilgjengelig. Velg en annen under Innstillinger.",
+    "gatewaySignInRequired": "Logg inn for å bruke transkripsjon via Kilo Gateway.",
+    "gatewayNoModel": "Velg en transkripsjonsmodell under Innstillinger først."
   },
   "share": {
     "title": "Del med Kilo",
@@ -2950,5 +2959,12 @@
     "needsInput": "Venter på svar",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
+  },
+  "transcriptionModel": {
+    "title": "Transkripsjonsmodell",
+    "noneChosen": "Ingen valgt",
+    "emptyTitle": "Ingen transkripsjonsmodeller",
+    "emptyDescription": "Kilo Gateway tilbyr ingen transkripsjonsmodeller akkurat nå.",
+    "loadFailed": "Kunne ikke laste inn transkripsjonsmodellene."
   }
 }

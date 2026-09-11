@@ -15,7 +15,8 @@ import { type Href, useRouter } from 'expo-router';
 import { X } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useReducer } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { z } from 'zod';
 
@@ -346,7 +347,7 @@ export function OnboardingFlow() {
     <Pressable
       onPress={onDismiss}
       hitSlop={12}
-      accessibilityLabel={t('kiloclaw.onboarding.flow.close')}
+      accessibilityLabel={t('common.close')}
       accessibilityRole="button"
       className="active:opacity-70"
     >

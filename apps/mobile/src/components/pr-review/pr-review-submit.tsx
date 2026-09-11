@@ -237,7 +237,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('prReview.submit.delete'),
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             // Announce/focus only when the remove is confirmed synchronous:

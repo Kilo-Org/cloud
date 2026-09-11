@@ -25,6 +25,7 @@ const finding = {
   session_id: null,
   owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   owned_by_user_id: null,
+  platform_integration_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
 };
 
 function createDb(
@@ -71,7 +72,16 @@ function createDb(
     select: () => ({
       from: () => ({
         where: () => ({
-          limit: async () => [selectCount++ === 0 ? selectedFinding : actor],
+          limit: async () => {
+            const currentSelect = selectCount++;
+            return [
+              currentSelect === 0
+                ? selectedFinding
+                : currentSelect === 1 && selectedFinding.source === 'dependabot'
+                  ? { githubAppType: 'standard' }
+                  : actor,
+            ];
+          },
         }),
       }),
     }),

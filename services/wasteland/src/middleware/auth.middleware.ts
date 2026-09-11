@@ -1,9 +1,13 @@
-export type JwtOrgMembership = { orgId: string; role: 'owner' | 'member' | 'billing_manager' };
+import type { KiloAuthVariables } from '@kilocode/worker-utils/kilo-auth-middleware';
+import type { KiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
 
-export type AuthVariables = {
+export type JwtOrgMembership = NonNullable<KiloTokenPayload['orgMemberships']>[number];
+
+export type AuthVariables = KiloAuthVariables & {
   kiloUserId: string;
   kiloIsAdmin: boolean;
   kiloApiTokenPepper: string | null;
+  kiloGastownAccess: boolean;
   kiloOrgMemberships: JwtOrgMembership[];
   requestStartTime: number;
 };

@@ -36,6 +36,7 @@ import {
   loadDraft,
   NEW_SESSION_DRAFT_KEY,
   prCommentDraftKey,
+  prConversationCommentDraftKey,
   prMergeDraftKey,
   prReplyDraftKey,
   prReviewDraftKey,
@@ -137,6 +138,12 @@ describe('draft scope and entity keys', () => {
     );
   });
 
+  it('builds the per-PR conversation comment draft entity key', () => {
+    expect(prConversationCommentDraftKey('acme', 'kilo', 42)).toBe(
+      'pr-conversation-comment:acme/kilo#42'
+    );
+  });
+
   it('isMergeDraft accepts a title+message object and rejects other shapes', () => {
     expect(isMergeDraft({ title: 'T', message: 'M' })).toBe(true);
     expect(isMergeDraft({ title: '', message: '' })).toBe(true);
@@ -155,7 +162,20 @@ describe('draft scope and entity keys', () => {
     expect(resolvePrefillOverDraft(null, 'draft text')).toBe('draft text');
     expect(resolvePrefillOverDraft('  ', 'draft text')).toBe('draft text');
     expect(resolvePrefillOverDraft(null, null)).toBeUndefined();
-    expect(resolvePrefillOverDraft('', '')).toBe('');
+    expect(resolvePrefillOverDraft('', '')).toBeUndefined();
+  });
+
+  // b911 spot check p7-nav.png: a draft that holds only whitespace survives
+  // sign-out, restores as the uncontrolled input's defaultValue, and hides the
+  // placeholder while showing nothing — the prompt reads as blank. A draft
+  // with no visible content must never seed the input.
+  it('resolvePrefillOverDraft never seeds a whitespace-only stored draft', () => {
+    expect(resolvePrefillOverDraft(null, ' ')).toBeUndefined();
+    expect(resolvePrefillOverDraft(undefined, '   ')).toBeUndefined();
+    expect(resolvePrefillOverDraft(null, '\n')).toBeUndefined();
+    expect(resolvePrefillOverDraft(null, ' \t\n ')).toBeUndefined();
+    // Visible content keeps its surrounding whitespace untouched.
+    expect(resolvePrefillOverDraft('  ', ' hi there \n')).toBe(' hi there \n');
   });
 });
 
@@ -254,24 +274,46 @@ describe('merge, reply, and comment keys restore per account and destination', (
     ).resolves.toBeNull();
   });
 
+  it('saves and restores a conversation comment draft under the same account and PR', async () => {
+    const key = prConversationCommentDraftKey('acme', 'kilo', 42);
+    saveDraft('u1', key, 'a conversation comment');
+    await flushDraft('u1', key);
+    await expect(loadDraft('u1', key, isStringDraft)).resolves.toBe('a conversation comment');
+  });
+
+  it('does not restore a conversation comment draft under a different account or PR', async () => {
+    const key = prConversationCommentDraftKey('acme', 'kilo', 42);
+    saveDraft('u1', key, 'a conversation comment');
+    await flushDraft('u1', key);
+    await expect(loadDraft('u2', key, isStringDraft)).resolves.toBeNull();
+    await expect(
+      loadDraft('u1', prConversationCommentDraftKey('acme', 'kilo', 43), isStringDraft)
+    ).resolves.toBeNull();
+  });
+
   it('clear removes the merge, reply, and comment entries', async () => {
     const mergeKey = prMergeDraftKey('acme', 'kilo', 42);
     const replyKey = prReplyDraftKey('acme', 'kilo', 42, 7);
     const commentKey = prCommentDraftKey('acme', 'kilo', 42, 'src/a.ts', 'RIGHT', 10);
+    const conversationKey = prConversationCommentDraftKey('acme', 'kilo', 42);
     saveDraft('u1', mergeKey, { title: 'T', message: 'M' });
     saveDraft('u1', replyKey, 'a reply');
     saveDraft('u1', commentKey, 'a comment');
+    saveDraft('u1', conversationKey, 'a conversation comment');
     await Promise.all([
       flushDraft('u1', mergeKey),
       flushDraft('u1', replyKey),
       flushDraft('u1', commentKey),
+      flushDraft('u1', conversationKey),
     ]);
     await clearDraft('u1', mergeKey);
     await clearDraft('u1', replyKey);
     await clearDraft('u1', commentKey);
+    await clearDraft('u1', conversationKey);
     await expect(loadDraft('u1', mergeKey, isMergeDraft)).resolves.toBeNull();
     await expect(loadDraft('u1', replyKey, isStringDraft)).resolves.toBeNull();
     await expect(loadDraft('u1', commentKey, isStringDraft)).resolves.toBeNull();
+    await expect(loadDraft('u1', conversationKey, isStringDraft)).resolves.toBeNull();
   });
 });
 

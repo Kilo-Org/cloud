@@ -72,6 +72,62 @@ describe('resolvePurchasePresentation', () => {
     });
   });
 
+  it('marks Android Play Kilo Pass with native support and no Stripe as native_iap with NO_CTA', () => {
+    const result = resolvePurchasePresentation({
+      platform: 'android',
+      storefront: 'play',
+      product: 'kilo_pass',
+      supportsNativePlayKiloPass: true,
+      hasStripeManagedPass: false,
+    });
+
+    expect(result.kind).toBe('native_iap');
+    expect(result.cta).toEqual({ action: 'none', webPath: null });
+  });
+
+  it('marks Android Play Kilo Pass with native support and a Stripe sub as native_iap', () => {
+    const result = resolvePurchasePresentation({
+      platform: 'android',
+      storefront: 'play',
+      product: 'kilo_pass',
+      supportsNativePlayKiloPass: true,
+      hasStripeManagedPass: true,
+    });
+
+    expect(result.kind).toBe('native_iap');
+    expect(result.cta).toEqual({ action: 'none', webPath: null });
+  });
+
+  it('keeps Android Play Kilo Pass without native support and no Stripe unavailable', () => {
+    const result = resolvePurchasePresentation({
+      platform: 'android',
+      storefront: 'play',
+      product: 'kilo_pass',
+      supportsNativePlayKiloPass: false,
+      hasStripeManagedPass: false,
+    });
+
+    expect(result.kind).toBe('unavailable');
+    expect(result.reason).toBe('kilo_pass_not_available_on_android');
+    expect(result.cta).toEqual({ action: 'none', webPath: null });
+  });
+
+  it('keeps Android Play Kilo Pass without native support and Stripe as web_management', () => {
+    const result = resolvePurchasePresentation({
+      platform: 'android',
+      storefront: 'play',
+      product: 'kilo_pass',
+      supportsNativePlayKiloPass: false,
+      hasStripeManagedPass: true,
+    });
+
+    expect(result.kind).toBe('web_management');
+    expect(result.cta).toEqual({
+      action: 'open_web',
+      webPath: '/subscriptions/kilo-pass',
+    });
+  });
+
   it('marks a missing platform as unavailable with no CTA', () => {
     const result = resolvePurchasePresentation({
       platform: null,
@@ -163,9 +219,12 @@ describe('mapKiloPassStatusToClass', () => {
 });
 
 describe('isNativeIapMutationAllowed', () => {
-  it('is true only for ios + app_store + kilo_pass', () => {
+  it('is true for iOS App Store and Android Play Kilo Pass', () => {
     expect(
       isNativeIapMutationAllowed({ platform: 'ios', storefront: 'app_store', product: 'kilo_pass' })
+    ).toBe(true);
+    expect(
+      isNativeIapMutationAllowed({ platform: 'android', storefront: 'play', product: 'kilo_pass' })
     ).toBe(true);
   });
 
@@ -175,9 +234,15 @@ describe('isNativeIapMutationAllowed', () => {
     ).toBe(false);
   });
 
-  it('is false for Android Kilo Pass', () => {
+  it('is false for Android credits', () => {
     expect(
-      isNativeIapMutationAllowed({ platform: 'android', storefront: 'play', product: 'kilo_pass' })
+      isNativeIapMutationAllowed({ platform: 'android', storefront: 'play', product: 'credits' })
+    ).toBe(false);
+  });
+
+  it('is false for Android Kilo Pass on a non-Play storefront', () => {
+    expect(
+      isNativeIapMutationAllowed({ platform: 'android', storefront: 'web', product: 'kilo_pass' })
     ).toBe(false);
   });
 

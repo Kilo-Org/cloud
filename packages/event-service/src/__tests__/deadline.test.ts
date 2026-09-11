@@ -1,10 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  RequestDeadlineError,
-  CONTROL_PLANE_DEADLINE_MS,
-  SEND_DEADLINE_MS,
-  withDeadline,
-} from '../deadline';
+import { RequestDeadlineError, withDeadline } from '../deadline';
 
 /**
  * Hermes (React Native) whatwg-fetch rejects with a generic `AbortError`
@@ -258,18 +253,6 @@ describe('RequestDeadlineError', () => {
   it('includes the deadline in its message', () => {
     const err = new RequestDeadlineError(15_000);
     expect(err.message).toContain('15000');
-  });
-});
-
-describe('CONTROL_PLANE_DEADLINE_MS', () => {
-  it('is 15 seconds', () => {
-    expect(CONTROL_PLANE_DEADLINE_MS).toBe(15_000);
-  });
-});
-
-describe('SEND_DEADLINE_MS', () => {
-  it('is 30 seconds', () => {
-    expect(SEND_DEADLINE_MS).toBe(30_000);
   });
 });
 

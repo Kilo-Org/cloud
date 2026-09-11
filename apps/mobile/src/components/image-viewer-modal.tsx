@@ -13,7 +13,6 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 
 type ImageViewerModalProps = {
   visible: boolean;
@@ -40,6 +39,21 @@ export function ImageViewerModal({
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+
+  // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
+  // header row off the sensor on this full-screen modal. They go on an inner
+  // wrapper so they ADD to the `px-4` gutter: an inline padding on the header
+  // container would beat the className (inline style wins in React Native) and
+  // swallow the gutter. Zero insets collapse the wrapper style to `undefined`,
+  // so portrait pixels are byte-identical and a rotation never moves anything
+  // vertically.
+  const sideInsetStyle =
+    insets.left > 0 || insets.right > 0
+      ? {
+          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
+          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
+        }
+      : undefined;
 
   const [imageError, setImageError] = useState(false);
   // Reset a prior decode error in render when the URL changes. A successful
@@ -85,10 +99,6 @@ export function ImageViewerModal({
   useEffect(() => {
     setImageError(false);
   }, [visible]);
-
-  // Close when the privacy cover fires (app backgrounds on a covered route):
-  // a native Modal renders above the overlay, so it must close itself.
-  useEffect(() => subscribePrivacyCover(onClose), [onClose]);
 
   // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pinch().
   const pinch = Gesture.Pinch()
@@ -145,35 +155,49 @@ export function ImageViewerModal({
   return (
     <Modal
       visible={visible}
+      // RN locks a full-screen modal on iPhone to portrait unless it lists the
+      // orientations it supports (RCTModalHostView falls back to
+      // UIInterfaceOrientationMaskPortrait when the prop is unset). With
+      // rotation enabled app-wide, an unset prop keeps the viewer's content at
+      // portrait bounds in a landscape window: the header still shows at the
+      // top, but the image area runs past the visible screen and clips the
+      // photo at the bottom (e11 viewer-landscape spot defect). Android
+      // dialogs follow the activity, so the prop is inert there.
+      supportedOrientations={['portrait', 'landscape']}
       backdropColor={colors.background}
       animationType="fade"
       onRequestClose={onClose}
     >
       <StateSurface className="flex-1 bg-background">
         <View
-          className="flex-row items-center justify-between border-b border-border bg-background px-4"
+          className="border-b border-border bg-background"
           style={{ paddingTop: insets.top, height: insets.top + 56 }}
         >
-          <Pressable
-            onPress={onClose}
-            className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70"
-            accessibilityRole="button"
-            accessibilityLabel={t('imageViewer.close', { filename })}
+          <View
+            className="flex-1 flex-row items-center justify-between px-4"
+            style={sideInsetStyle}
           >
-            <X size={20} color={colors.foreground} />
-          </Pressable>
-          {onShare !== undefined ? (
             <Pressable
-              onPress={onShare}
-              disabled={sharing || uri === null}
-              accessibilityState={{ disabled: uri === null, busy: sharing }}
-              className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70 disabled:opacity-50"
+              onPress={onClose}
+              className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70"
               accessibilityRole="button"
-              accessibilityLabel={t('imageViewer.share', { filename })}
+              accessibilityLabel={t('imageViewer.close', { filename })}
             >
-              <Share size={20} color={colors.foreground} />
+              <X size={20} color={colors.foreground} />
             </Pressable>
-          ) : null}
+            {onShare !== undefined ? (
+              <Pressable
+                onPress={onShare}
+                disabled={sharing || uri === null}
+                accessibilityState={{ disabled: uri === null, busy: sharing }}
+                className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70 disabled:opacity-50"
+                accessibilityRole="button"
+                accessibilityLabel={t('imageViewer.share', { filename })}
+              >
+                <Share size={20} color={colors.foreground} />
+              </Pressable>
+            ) : null}
+          </View>
         </View>
         {/* RNGH gestures need their own root inside an RN Modal — the app-root
             GestureHandlerRootView does not reach a Modal's native view hierarchy. */}
@@ -198,7 +222,7 @@ export function ImageViewerModal({
               <CenteredState className="w-full">
                 <View className="flex-row items-center justify-center gap-2 px-6">
                   <AlertCircle size={14} color="#ffffff" />
-                  <Text className="text-xs text-white">{t('imageViewer.imageUnavailable')}</Text>
+                  <Text className="text-xs text-white">{t('common.imageUnavailable')}</Text>
                 </View>
               </CenteredState>
             ) : null}

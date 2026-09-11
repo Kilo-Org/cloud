@@ -182,6 +182,19 @@ export enum CliSessionSharedState {
   Organization = 'organization',
 }
 
+export const WorkspaceFolderColor = {
+  Default: 'default',
+  Red: 'red',
+  Orange: 'orange',
+  Yellow: 'yellow',
+  Green: 'green',
+  Teal: 'teal',
+  Blue: 'blue',
+  Purple: 'purple',
+} as const;
+
+export type WorkspaceFolderColor = (typeof WorkspaceFolderColor)[keyof typeof WorkspaceFolderColor];
+
 // --- SecurityAuditLogAction ---
 
 /**
@@ -925,6 +938,18 @@ export const ContributorChampionTier = {
 
 export type ContributorChampionTier =
   (typeof ContributorChampionTier)[keyof typeof ContributorChampionTier];
+
+// --- Repository customization enums ---
+
+// Per-repository override of automatic PR review dispatch. Manual/@mention
+// review triggers are a separate, later change; for now this only gates
+// automatic reviews on `pull_request` webhook events.
+export const RepositoryReviewMode = {
+  On: 'on',
+  Off: 'off',
+} as const;
+
+export type RepositoryReviewMode = (typeof RepositoryReviewMode)[keyof typeof RepositoryReviewMode];
 
 // =============================================================================
 // B. Type-Only Definitions (used in $type<T>())
@@ -1901,6 +1926,7 @@ export const OpenRouterBaseModel = z.object({
 export type OpenRouterEndpoint = z.infer<typeof OpenRouterEndpoint>;
 export const OpenRouterEndpoint = z.object({
   provider_display_name: z.string(),
+  variant: z.string().nullish(),
   is_free: z.boolean(),
   pricing: OpenRouterPricing,
   data_policy: z
@@ -2342,6 +2368,10 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'assistant_timeout',
   'assistant_unauthorized',
   'assistant_invalid_request',
+  'assistant_context_limit',
+  'assistant_output_limit',
+  'assistant_content_filter',
+  'assistant_structured_output',
   'assistant_no_reply',
   'wrapper_failed',
   'runtime_startup_failed',

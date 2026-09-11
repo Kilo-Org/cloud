@@ -45,8 +45,13 @@ declare type GitTokenService = {
     githubRepo: string;
     userId: string;
     orgId?: string;
+    expectedIntegrationId?: string;
   }): Promise<GitTokenForRepoResult>;
-  getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
+  getToken(
+    installationId: string,
+    appType?: 'standard' | 'lite',
+    expectedIntegrationId?: string
+  ): Promise<string>;
 };
 
 declare type SecretBinding = {

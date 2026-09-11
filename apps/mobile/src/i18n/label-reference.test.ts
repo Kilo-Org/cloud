@@ -13,7 +13,6 @@ import sr from './locales/sr.json';
  * not see.
  */
 const MESSAGE_KEYS = [
-  'authErrors.emailAlreadyUsed',
   'authErrors.differentOauth',
   'authErrors.ssoError',
   'authErrors.admissionRequired',
@@ -134,6 +133,39 @@ describe('catalog copy', () => {
       'securityAgent.findingDetails.reasonAfterReview',
     ] as const) {
       expect(i18n.t(key), key).not.toMatch(/^\p{Lu}/u);
+    }
+  });
+});
+
+describe('PR-comment copy', () => {
+  const COMMENT_KEYS = [
+    'prReview.discussion.addCommentCta',
+    'prReview.discussion.commentBadRequest',
+    'prReview.discussion.commentForbidden',
+  ] as const;
+
+  it('defines the English source strings', async () => {
+    await i18n.changeLanguage('en');
+    expect(i18n.t(COMMENT_KEYS[0])).toBe('Comment on this pull request');
+    expect(i18n.t(COMMENT_KEYS[1])).toBe(
+      "This comment can't be posted. The pull request may have changed."
+    );
+    expect(i18n.t(COMMENT_KEYS[2])).toBe(
+      "You don't have permission to comment on this pull request."
+    );
+  });
+
+  it.each(SUPPORTED_LANGUAGES)('ships translated PR-comment copy in %s', async tag => {
+    await i18n.changeLanguage(tag);
+    for (const key of COMMENT_KEYS) {
+      const value = i18n.t(key);
+      const english = i18n.t(key, { lng: 'en' });
+      expect(value, `${tag} ${key}`).toBeTruthy();
+      expect(value, `${tag} ${key}`).not.toContain('{{');
+      if (tag !== 'en') {
+        // A catalog without the key falls back to the English string here.
+        expect(value, `${tag} ${key}`).not.toBe(english);
+      }
     }
   });
 });

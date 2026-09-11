@@ -58,12 +58,6 @@ vi.mock('sonner-native', () => ({
 
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'share-id-fixed' }));
 
-vi.mock('expo-file-system/legacy', () => ({
-  cacheDirectory: null,
-  copyAsync: vi.fn().mockResolvedValue('/tmp/copy'),
-  deleteAsync: vi.fn().mockResolvedValue(undefined),
-}));
-
 const expoFileSystemMock = vi.hoisted(() => {
   const files = new Map<string, string>();
   const File = vi.fn(function FileMock(_base: unknown, ...rest: unknown[]) {
@@ -585,7 +579,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
 
     onStart();
     await vi.waitFor(() => {
-      expect(onCloneImportFailure).toHaveBeenCalledWith('agentChat.session.notFound');
+      expect(onCloneImportFailure).toHaveBeenCalledWith('common.notFound');
     });
     // The inline reason, never the generic spawn toast.
     expect(toastErrorMock).not.toHaveBeenCalled();

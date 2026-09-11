@@ -1,14 +1,25 @@
 import { describe, expect, it, mock, spyOn } from 'bun:test';
 import { z } from 'zod';
 import { helloResult } from '../../../src/sandbox-control/frames';
-import { buildHeartbeatPayload } from './sandbox-control-handlers';
+import { buildHeartbeatPayload, createControlHandlerDeps } from './sandbox-control-handlers';
 import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   sandboxHeartbeatPayloadSchema,
+  sandboxEventPublicationPayloadSchema,
   sessionEventPayloadSchema,
+  type SandboxEventPublicationPayload,
+  type SessionOperationDelivery,
 } from '../../../src/shared/sandbox-control-protocol';
 import { unfilteredKiloEvents } from './feed';
+import { acknowledgeOperation, operationAuthorization } from './control-test-fixtures';
+import { createControlEventFailureHandler } from './control-event-transport';
+import {
+  MAX_WORKTREE_FILE_BYTES,
+  MAX_WORKTREE_SNAPSHOT_BYTES,
+  sessionGitSnapshotResultSchema,
+  type SessionGitSnapshotResult,
+} from '../../../src/shared/worktree-changes-wire.js';
 import {
   createSandboxControlClient,
   type SandboxControlClientOptions,
@@ -119,25 +130,28 @@ const previousHeartbeatSchema = z
   .strict();
 
 function versionHeartbeat(version: string | null) {
-  return buildHeartbeatPayload({
-    kiloRuntimes: {
-      kiloCliVersion: version,
-      attach() {
-        throw new Error('Unexpected attach');
+  return buildHeartbeatPayload(
+    createControlHandlerDeps({
+      kiloRuntimes: {
+        kiloCliVersion: version,
+        attach() {
+          throw new Error('Unexpected attach');
+        },
+        detach: () => false,
+        retireForRecovery: async () => 'absent',
+        deleteDirectory: async () => {},
+        get: () => undefined,
+        isCurrent: () => false,
+        isHealthy: () => true,
+        shutdown() {},
       },
-      detach: () => false,
-      deleteDirectory: async () => {},
-      get: () => undefined,
-      isHealthy: () => true,
-      shutdown() {},
-    },
-    version: '2.4.0',
-    kiloReady: true,
-    sessions: [],
-    tasks: new Map(),
-    emitSessionEvent() {},
-    retireRuntime() {},
-  });
+      version: '2.4.0',
+      kiloReady: true,
+      sessions: [],
+      emitSessionEvent() {},
+      retireRuntime() {},
+    })
+  );
 }
 
 describe('heartbeat version rollout compatibility', () => {
@@ -210,7 +224,7 @@ describe('heartbeat version rollout compatibility', () => {
           type: 'response',
           requestId: hello.requestId,
           ok: true,
-          result: helloResult(),
+          result: helloResult({ connectionRecovery: true }),
         })
       );
       first.close();
@@ -239,6 +253,10 @@ describe('heartbeat version rollout compatibility', () => {
 
   it('old wrappers accept new Worker hello acknowledgements and their old heartbeats remain valid', () => {
     expect(previousHelloResultSchema.parse(helloResult())).toEqual({
+      protocolVersion: 1,
+      handshakeComplete: true,
+    });
+    expect(previousHelloResultSchema.parse(helloResult({ scopedCleanupResult: true }))).toEqual({
       protocolVersion: 1,
       handshakeComplete: true,
     });
@@ -274,9 +292,70 @@ describe('heartbeat version rollout compatibility', () => {
       }
     }
   );
+
+  it('exposes scoped cleanup results only after the Worker grants the capability', async () => {
+    const fake = new FakeWebSocket();
+    const { client } = createClientFixture({ openWebSocket: () => fake as unknown as WebSocket });
+    try {
+      const connecting = client.connect();
+      await handshake(fake, helloResult({ scopedCleanupResult: true }));
+      await connecting;
+      expect(client.supportsScopedCleanupResult?.()).toBe(true);
+    } finally {
+      client.close();
+    }
+  });
 });
 
 describe('createSandboxControlClient', () => {
+  it('replays one native retirement receipt after a lost acknowledgement on reconnect', async () => {
+    const { client, sockets } = createClientFixture();
+    const payload = {
+      retirementId: '11111111-1111-4111-8111-111111111111',
+      directory: '/workspace/a',
+      nativeRuntimeId: '22222222-2222-4222-8222-222222222222',
+      reason: 'process_exited',
+      cleanupDeadlineAt: Date.now() + 5_000,
+    };
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      await handshake(sockets[0], helloResult({ connectionRecovery: true }));
+      await connecting;
+      const report = client.reportNativeRuntimeRetirement?.(payload);
+      const first = sockets[0];
+      if (!report || !first) throw new Error('Native retirement report did not start');
+      await Promise.resolve();
+      const initial = JSON.parse(first.sent.at(-1) ?? '{}');
+      expect(initial).toMatchObject({ operation: 'session.runtime.retired', payload });
+      first.close();
+
+      await waitForReconnect();
+      const replacement = sockets[1];
+      await handshake(replacement);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const replay = JSON.parse(replacement?.sent.at(-1) ?? '{}');
+      expect(replay).toMatchObject({ operation: 'session.runtime.retired', payload });
+      replacement?.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: replay.requestId,
+          ok: true,
+          result: { retired: true },
+        })
+      );
+      expect(await report).toBe(true);
+      const replayedReport = client.reportNativeRuntimeRetirement?.(payload);
+      if (!replayedReport) throw new Error('Native retirement receipt was not retained');
+      expect(await replayedReport).toBe(true);
+      expect(
+        replacement?.sent.filter(frame => frame.includes('session.runtime.retired'))
+      ).toHaveLength(1);
+    } finally {
+      client.close();
+    }
+  });
+
   it('opens with an Authorization header and completes sandbox.hello plus status probe', async () => {
     const fake = new FakeWebSocket();
     const client = createSandboxControlClient({
@@ -299,13 +378,39 @@ describe('createSandboxControlClient', () => {
     const hello = JSON.parse(fake.sent[0] ?? '{}') as {
       requestId: string;
       operation: string;
-      payload: { protocolVersion: number; wrapperVersion: string; providerInstanceId: string };
+      payload: {
+        protocolVersion: number;
+        wrapperVersion: string;
+        providerInstanceId: string;
+        capabilities?: {
+          sessionOperationResults?: boolean;
+          scopedStopAbort?: boolean;
+          nativeRuntimeRetirement?: boolean;
+          connectionRecovery?: boolean;
+          eventReceipts?: boolean;
+          runtimeIsolation?: boolean;
+          runtimeRecovery?: boolean;
+          scopedCleanupResult?: boolean;
+          workingBranches?: boolean;
+        };
+      };
     };
     expect(hello.operation).toBe('sandbox.hello');
     expect(hello.payload).toEqual({
       protocolVersion: 1,
       wrapperVersion: '2.4.0',
       providerInstanceId: 'inst_1',
+      capabilities: {
+        sessionOperationResults: true,
+        scopedStopAbort: true,
+        nativeRuntimeRetirement: true,
+        connectionRecovery: true,
+        eventReceipts: true,
+        runtimeIsolation: true,
+        runtimeRecovery: true,
+        scopedCleanupResult: true,
+        workingBranches: true,
+      },
     });
     fake.respond(
       JSON.stringify({
@@ -417,11 +522,399 @@ describe('createSandboxControlClient', () => {
     client.close();
   });
 
+  it('gates new session work until the exact recovery episode is marked ready', async () => {
+    const fake = new FakeWebSocket();
+    const onRequest = mock(async () => ({ ok: true as const, result: { accepted: true } }));
+    const onReconcile = mock(async () => {});
+    const client = createSandboxControlClient({
+      url: 'wss://example.test/sandbox-control/sbx_1',
+      credential: 'secret',
+      providerInstanceId: 'inst_1',
+      openWebSocket: () => fake as unknown as WebSocket,
+      onRequest,
+      onReconcile,
+    });
+    const recovery = {
+      episodeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      cause: 'control_disconnected' as const,
+      startedAt: 1,
+      deadlineAt: Date.now() + 10_000,
+      attempt: 1,
+    };
+
+    const connecting = client.connect();
+    await handshake(fake);
+    await connecting;
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'drain',
+        operation: 'sandbox.reconcile',
+        payload: { recovery, phase: 'drain' },
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'blocked',
+        operation: 'session.prompt',
+        payload: {},
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onReconcile).toHaveBeenCalledWith('drain', recovery.deadlineAt);
+    expect(onRequest).not.toHaveBeenCalled();
+    expect(JSON.parse(fake.sent.at(-1) ?? '{}')).toMatchObject({
+      requestId: 'blocked',
+      ok: false,
+      error: { code: 'not_ready' },
+    });
+
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'ready',
+        operation: 'sandbox.reconcile',
+        payload: { recovery, phase: 'ready' },
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'commit',
+        operation: 'sandbox.reconcile',
+        payload: { recovery, phase: 'commit' },
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'commit-replay',
+        operation: 'sandbox.reconcile',
+        payload: { recovery, phase: 'commit' },
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(JSON.parse(fake.sent.at(-1) ?? '{}')).toMatchObject({
+      requestId: 'commit-replay',
+      ok: true,
+      result: { episodeId: recovery.episodeId, attempt: recovery.attempt, phase: 'commit' },
+    });
+
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'admitted',
+        operation: 'session.prompt',
+        payload: {},
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onReconcile).toHaveBeenLastCalledWith('commit', recovery.deadlineAt);
+    expect(onReconcile).toHaveBeenCalledTimes(3);
+    expect(onRequest).toHaveBeenCalledTimes(1);
+    client.close();
+  });
+
+  it('ACKs an exact committed recovery after a lost reply and the original deadline expires', async () => {
+    const startedAt = Date.now();
+    const clock = spyOn(Date, 'now').mockReturnValue(startedAt);
+    const onReconcile = mock(async () => {});
+    const onRequest = mock(async () => ({ ok: true, result: { accepted: true } }));
+    const { client, sockets } = createClientFixture({ onReconcile, onRequest });
+    const recovery = {
+      episodeId: crypto.randomUUID(),
+      cause: 'control_disconnected',
+      startedAt,
+      deadlineAt: startedAt + 1_000,
+      attempt: 1,
+    };
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      const first = sockets[0];
+      if (!first) throw new Error('Missing first socket');
+      await handshake(first, helloResult({ connectionRecovery: true }));
+      await connecting;
+      for (const phase of ['drain', 'ready', 'commit']) {
+        if (phase === 'commit') {
+          first.send = () => {
+            throw new Error('Lost commit reply');
+          };
+        }
+        first.respond(
+          JSON.stringify({
+            type: 'request',
+            requestId: phase,
+            operation: 'sandbox.reconcile',
+            payload: { recovery, phase },
+          })
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+      }
+      expect(onReconcile).toHaveBeenNthCalledWith(1, 'drain', recovery.deadlineAt);
+      expect(onReconcile).toHaveBeenNthCalledWith(2, 'ready', recovery.deadlineAt);
+      expect(onReconcile).toHaveBeenNthCalledWith(3, 'commit', recovery.deadlineAt);
+      expect(first.sent.map(data => JSON.parse(data).requestId)).not.toContain('commit');
+      expect(first.readyState).toBe(3);
+      await waitForReconnect();
+      clock.mockReturnValue(recovery.deadlineAt + 1);
+      const replacement = sockets[1];
+      if (!replacement) throw new Error('Missing replacement socket');
+      await handshake(replacement, helloResult({ connectionRecovery: true }));
+      await client.connect();
+      for (const payload of [
+        { recovery, phase: 'commit' },
+        { recovery: { ...recovery, episodeId: crypto.randomUUID() }, phase: 'commit' },
+        { recovery: { ...recovery, attempt: 2 }, phase: 'commit' },
+        { recovery: { ...recovery, deadlineAt: recovery.deadlineAt - 1 }, phase: 'commit' },
+        { recovery, phase: 'ready' },
+        { recovery, phase: 'drain' },
+        { recovery, phase: 'commit' },
+      ]) {
+        const exactCommit = payload.recovery === recovery && payload.phase === 'commit';
+        const requestId = crypto.randomUUID();
+        replacement.respond(
+          JSON.stringify({ type: 'request', requestId, operation: 'sandbox.reconcile', payload })
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(JSON.parse(replacement.sent.at(-1) ?? '{}')).toEqual({
+          type: 'response',
+          requestId,
+          ...(exactCommit
+            ? {
+                ok: true,
+                result: {
+                  episodeId: recovery.episodeId,
+                  attempt: recovery.attempt,
+                  phase: 'commit',
+                },
+              }
+            : {
+                ok: false,
+                error: {
+                  code: 'not_ready',
+                  message: 'Recovery authority changed',
+                  retryable: false,
+                },
+              }),
+        });
+      }
+      expect(onReconcile).toHaveBeenCalledTimes(3);
+      expect(onRequest).not.toHaveBeenCalled();
+      expect(replacement.readyState).toBe(1);
+    } finally {
+      client.close();
+      clock.mockRestore();
+    }
+  });
+
+  it('ACKs an exact committed recovery after socket loss during commit reconcile', async () => {
+    const startedAt = Date.now();
+    const clock = spyOn(Date, 'now').mockReturnValue(startedAt);
+    const held = Promise.withResolvers<void>();
+    let commitStarted = (): void => {};
+    const started = new Promise<void>(resolve => {
+      commitStarted = resolve;
+    });
+    const onReconcile = mock(async (phase: string) => {
+      if (phase !== 'commit') return;
+      commitStarted();
+      await held.promise;
+    });
+    const onRequest = mock(async () => ({ ok: true, result: { accepted: true } }));
+    const { client, sockets } = createClientFixture({ onReconcile, onRequest });
+    const recovery = {
+      episodeId: crypto.randomUUID(),
+      cause: 'control_disconnected',
+      startedAt,
+      deadlineAt: startedAt + 1_000,
+      attempt: 1,
+    };
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      const first = sockets[0];
+      if (!first) throw new Error('Missing first socket');
+      await handshake(first, helloResult({ connectionRecovery: true }));
+      await connecting;
+      for (const phase of ['drain', 'ready', 'commit']) {
+        first.respond(
+          JSON.stringify({
+            type: 'request',
+            requestId: phase,
+            operation: 'sandbox.reconcile',
+            payload: { recovery, phase },
+          })
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+      }
+      await started;
+      first.close();
+      held.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await waitForReconnect();
+      clock.mockReturnValue(recovery.deadlineAt + 1);
+      const replacement = sockets[1];
+      if (!replacement) throw new Error('Missing replacement socket');
+      await handshake(replacement, helloResult({ connectionRecovery: true }));
+      await client.connect();
+      const requestId = crypto.randomUUID();
+      replacement.respond(
+        JSON.stringify({
+          type: 'request',
+          requestId,
+          operation: 'sandbox.reconcile',
+          payload: { recovery, phase: 'commit' },
+        })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(JSON.parse(replacement.sent.at(-1) ?? '{}')).toEqual({
+        type: 'response',
+        requestId,
+        ok: true,
+        result: {
+          episodeId: recovery.episodeId,
+          attempt: recovery.attempt,
+          phase: 'commit',
+        },
+      });
+      expect(onReconcile).toHaveBeenCalledTimes(3);
+      expect(onRequest).not.toHaveBeenCalled();
+    } finally {
+      client.close();
+      clock.mockRestore();
+    }
+  });
+
+  it('rejects a stale committed replay without clearing a newer recovery gate', async () => {
+    const startedAt = Date.now();
+    const clock = spyOn(Date, 'now').mockReturnValue(startedAt);
+    const fake = new FakeWebSocket();
+    const onReconcile = mock(async () => {});
+    const onRequest = mock(async () => ({ ok: true, result: { accepted: true } }));
+    const { client } = createClientFixture({
+      openWebSocket: () => fake as unknown as WebSocket,
+      onReconcile,
+      onRequest,
+    });
+    const previous = {
+      episodeId: crypto.randomUUID(),
+      cause: 'control_disconnected',
+      startedAt,
+      deadlineAt: startedAt + 1_000,
+      attempt: 1,
+    };
+    const current = {
+      ...previous,
+      episodeId: crypto.randomUUID(),
+      deadlineAt: startedAt + 10_000,
+    };
+    try {
+      const connecting = client.connect();
+      await handshake(fake);
+      await connecting;
+      for (const payload of [
+        { recovery: previous, phase: 'drain' },
+        { recovery: previous, phase: 'ready' },
+        { recovery: previous, phase: 'commit' },
+        { recovery: current, phase: 'drain' },
+      ]) {
+        fake.respond(
+          JSON.stringify({
+            type: 'request',
+            requestId: crypto.randomUUID(),
+            operation: 'sandbox.reconcile',
+            payload,
+          })
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(JSON.parse(fake.sent.at(-1) ?? '{}').ok).toBe(true);
+      }
+      for (const now of [startedAt, previous.deadlineAt + 1]) {
+        clock.mockReturnValue(now);
+        fake.respond(
+          JSON.stringify({
+            type: 'request',
+            requestId: 'stale-commit',
+            operation: 'sandbox.reconcile',
+            payload: { recovery: previous, phase: 'commit' },
+          })
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(JSON.parse(fake.sent.at(-1) ?? '{}')).toMatchObject({
+          requestId: 'stale-commit',
+          ok: false,
+          error: { code: 'not_ready', retryable: false },
+        });
+        for (const operation of ['session.attach', 'session.prompt']) {
+          fake.respond(
+            JSON.stringify({ type: 'request', requestId: operation, operation, payload: {} })
+          );
+          await Promise.resolve();
+          await Promise.resolve();
+          expect(JSON.parse(fake.sent.at(-1) ?? '{}')).toMatchObject({
+            requestId: operation,
+            ok: false,
+            error: { code: 'not_ready', retryable: true },
+          });
+        }
+      }
+      expect(onReconcile).toHaveBeenCalledTimes(4);
+      expect(onRequest).not.toHaveBeenCalled();
+      for (const phase of ['ready', 'commit']) {
+        fake.respond(
+          JSON.stringify({
+            type: 'request',
+            requestId: phase,
+            operation: 'sandbox.reconcile',
+            payload: { recovery: current, phase },
+          })
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(JSON.parse(fake.sent.at(-1) ?? '{}')).toMatchObject({
+          requestId: phase,
+          ok: true,
+          result: { episodeId: current.episodeId, attempt: current.attempt, phase },
+        });
+      }
+      expect(onReconcile).toHaveBeenCalledTimes(6);
+      expect(onReconcile).toHaveBeenLastCalledWith('commit', current.deadlineAt);
+    } finally {
+      client.close();
+      clock.mockRestore();
+    }
+  });
+
   it.each([
     { ok: true, result: '漢'.repeat(MAX_SANDBOX_CONTROL_FRAME_BYTES / 2) },
     {
       ok: false,
-      error: { code: 'failure', message: 'private-data'.repeat(100_000), retryable: false },
+      error: {
+        code: 'failure',
+        message: 'private-data'.repeat(Math.ceil(MAX_SANDBOX_CONTROL_FRAME_BYTES / 12)),
+        retryable: false,
+      },
     },
   ])(
     'replaces oversized response envelopes with a small error and preserves the socket',
@@ -481,8 +974,8 @@ describe('createSandboxControlClient', () => {
     }
   );
 
-  it.each([0, 1])(
-    'keeps the full response strictly below the frame limit with %s bytes of headroom',
+  it.each([-1, 0, 1])(
+    'enforces the inclusive frame limit with %s bytes of headroom',
     async headroom => {
       const fake = new FakeWebSocket();
       const requestId = 'quote"漢';
@@ -513,11 +1006,119 @@ describe('createSandboxControlClient', () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(JSON.parse(fake.sent[2] ?? '{}').ok).toBe(headroom === 1);
-      expect(Buffer.byteLength(fake.sent[2] ?? '')).toBeLessThan(MAX_SANDBOX_CONTROL_FRAME_BYTES);
+      expect(JSON.parse(fake.sent[2] ?? '{}').ok).toBe(headroom >= 0);
+      expect(Buffer.byteLength(fake.sent[2] ?? '')).toBeLessThanOrEqual(
+        MAX_SANDBOX_CONTROL_FRAME_BYTES
+      );
       client.close();
     }
   );
+
+  it('sends a complete 10 MiB snapshot as nested objects inside a bounded frame', async () => {
+    const snapshot: SessionGitSnapshotResult = {
+      summary: {
+        revision: 1,
+        comparison: {
+          baseRef: 'refs/remotes/origin/main',
+          mergeBase: 'a'.repeat(40),
+          head: 'b'.repeat(40),
+        },
+        files: Array.from({ length: 20 }, (_, index) => ({
+          path: `file-${index}.txt`,
+          status: 'modified',
+          additions: 1,
+          deletions: 1,
+          tracked: true,
+          binary: false,
+          countsComplete: true,
+        })),
+        truncated: false,
+      },
+      files: [],
+    };
+    snapshot.files = snapshot.summary.files.map(file => ({
+      schemaVersion: 1,
+      revision: 1,
+      path: file.path,
+      diff: { status: 'available', patch: `diff --git a/${file.path} b/${file.path}\n漢\n` },
+      content: { status: 'unavailable', reason: 'budget_exhausted' },
+    }));
+    for (const file of snapshot.files.slice(0, -1)) {
+      if (file.diff.status !== 'available') throw new Error('Expected patch');
+      file.diff.patch += 'x'.repeat(
+        MAX_WORKTREE_FILE_BYTES - Buffer.byteLength(JSON.stringify(file))
+      );
+    }
+    const last = snapshot.files.at(-1);
+    if (last?.diff.status !== 'available') throw new Error('Expected final patch');
+    last.diff.patch += 'x'.repeat(
+      MAX_WORKTREE_SNAPSHOT_BYTES - Buffer.byteLength(JSON.stringify(snapshot))
+    );
+    expect(Buffer.byteLength(JSON.stringify(snapshot))).toBe(MAX_WORKTREE_SNAPSHOT_BYTES);
+    expect(sessionGitSnapshotResultSchema.safeParse(snapshot).success).toBe(true);
+    const fake = new FakeWebSocket();
+    const client = createSandboxControlClient({
+      url: 'wss://example.test/sandbox-control/sbx_1',
+      credential: 'secret',
+      providerInstanceId: 'inst_1',
+      openWebSocket: () => fake as unknown as WebSocket,
+      onRequest: async () => ({ ok: true, result: snapshot }),
+    });
+    const connecting = client.connect();
+    await handshake(fake);
+    await connecting;
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'snapshot',
+        operation: 'session.git.snapshot',
+        session: { sessionId: 'ses_1', kiloSessionId: 'kilo_1', directory: '/workspace' },
+        payload: { revision: 1 },
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    const frame = fake.sent[2] ?? '';
+    expect(Buffer.byteLength(frame)).toBeLessThan(MAX_SANDBOX_CONTROL_FRAME_BYTES);
+    const decoded = JSON.parse(frame);
+    expect(decoded.ok).toBe(true);
+    expect(typeof decoded.result).toBe('object');
+    expect(decoded.result.files).toHaveLength(20);
+    expect(Buffer.byteLength(JSON.stringify(decoded.result))).toBe(MAX_WORKTREE_SNAPSHOT_BYTES);
+    client.close();
+  });
+
+  it('ignores oversized multibyte requests before invoking the handler', async () => {
+    const fake = new FakeWebSocket();
+    let requests = 0;
+    const client = createSandboxControlClient({
+      url: 'wss://example.test/sandbox-control/sbx_1',
+      credential: 'secret',
+      providerInstanceId: 'inst_1',
+      openWebSocket: () => fake as unknown as WebSocket,
+      onRequest: async () => {
+        requests += 1;
+        return { ok: true };
+      },
+    });
+    const connecting = client.connect();
+    await handshake(fake);
+    await connecting;
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'oversized',
+        operation: 'session.git.snapshot',
+        payload: { baseRef: '漢'.repeat(MAX_SANDBOX_CONTROL_FRAME_BYTES / 2) },
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(requests).toBe(0);
+    expect(fake.sent).toHaveLength(2);
+    expect(fake.readyState).toBe(1);
+    client.close();
+  });
 
   it('safely handles unserializable results without closing the shared socket', async () => {
     const fake = new FakeWebSocket();
@@ -592,6 +1193,7 @@ describe('createSandboxControlClient', () => {
         directory: '/workspace',
         kiloSessionId: 'ses_1',
         rootKiloSessionId: 'ses_1',
+        nativeRuntimeId: crypto.randomUUID(),
       }
     );
 
@@ -611,6 +1213,331 @@ describe('createSandboxControlClient', () => {
       payload: { type: 'session.status', properties: { sessionID: 'ses_1' } },
     });
     client.close();
+  });
+
+  it.each([
+    'event-rejected',
+    'retryable-rejection',
+    'transport-error',
+    'other-error',
+    'false-ack',
+    'wrong-receipt',
+  ] as const)(
+    'preserves N1 before N2 ordering through publication disposition: %s',
+    async disposition => {
+      const failure = mock(() => {});
+      const logs: string[] = [];
+      const { client, sockets, onDisconnected } = createClientFixture({
+        onEventReceiptFailure: failure,
+        log: message => logs.push(message),
+      });
+      const hello = {
+        protocolVersion: 1,
+        handshakeComplete: true,
+        capabilities: { connectionRecovery: true, eventReceipts: true },
+      };
+      const nativeIds = [crypto.randomUUID(), crypto.randomUUID()];
+      const published: SandboxEventPublicationPayload[] = [];
+      const firstPublished = Promise.withResolvers<void>();
+      const replacementPublished = Promise.withResolvers<void>();
+      try {
+        const connecting = client.connect();
+        await Promise.resolve();
+        await handshake(sockets[0], hello);
+        await connecting;
+        sockets[0]?.close();
+        for (const nativeRuntimeId of nativeIds)
+          expect(
+            client.sendEvent?.(
+              'session.event',
+              { type: 'session.status', properties: { status: { type: 'idle' } } },
+              {
+                directory: '/workspace',
+                kiloSessionId: 'ses_1',
+                rootKiloSessionId: 'ses_1',
+                nativeRuntimeId,
+              }
+            )
+          ).toBe(true);
+        await waitForReconnect();
+        const socket = sockets[1];
+        if (!socket) throw new Error('Missing replacement socket');
+        socket.send = data => {
+          socket.sent.push(data);
+          const frame = JSON.parse(data) as {
+            operation?: string;
+            requestId: string;
+            payload: unknown;
+          };
+          if (frame.operation !== 'sandbox.event.publish') return;
+          const publication = sandboxEventPublicationPayloadSchema.parse(frame.payload);
+          published.push(publication);
+          firstPublished.resolve();
+          if (publication.sequence === 2) replacementPublished.resolve();
+          const acknowledgement = { receiptId: publication.receiptId, applied: true };
+          const response =
+            published.length > 1
+              ? { ok: true, result: acknowledgement }
+              : disposition === 'false-ack'
+                ? { ok: true, result: { ...acknowledgement, applied: false } }
+                : disposition === 'wrong-receipt'
+                  ? { ok: true, result: { ...acknowledgement, receiptId: crypto.randomUUID() } }
+                  : {
+                      ok: false,
+                      error: {
+                        code:
+                          disposition === 'transport-error'
+                            ? 'not_ready'
+                            : disposition === 'other-error'
+                              ? 'unauthorized'
+                              : 'event_rejected',
+                        retryable:
+                          disposition === 'retryable-rejection' ||
+                          disposition === 'transport-error',
+                        message: 'private rejected input',
+                      },
+                    };
+          socket.respond(
+            JSON.stringify({ type: 'response', requestId: frame.requestId, ...response })
+          );
+        };
+        await handshake(socket, hello);
+        await firstPublished.promise;
+        await waitForReconnect();
+        if (disposition === 'retryable-rejection' || disposition === 'transport-error') {
+          expect(published.map(item => item.session.nativeRuntimeId)).toEqual(
+            nativeIds.slice(0, 1)
+          );
+          await replacementPublished.promise;
+          await waitForReconnect();
+          expect(published.map(item => item.session.nativeRuntimeId)).toEqual([
+            nativeIds[0],
+            ...nativeIds,
+          ]);
+          expect(published.map(item => item.sequence)).toEqual([1, 1, 2]);
+          expect(published[1]).toEqual(published[0]);
+          expect(failure).not.toHaveBeenCalled();
+          expect(logs).not.toContain('sandbox control event publication rejected');
+        } else {
+          expect(published.map(item => item.session.nativeRuntimeId)).toEqual(nativeIds);
+          expect(published.map(item => item.sequence)).toEqual([1, 2]);
+          expect(failure).toHaveBeenCalledTimes(1);
+          expect(failure).toHaveBeenCalledWith({
+            reason: 'rejected',
+            publication: expect.objectContaining(published[0]),
+          });
+          expect(logs).toContain('sandbox control event publication rejected');
+        }
+        expect(socket.readyState).toBe(1);
+        expect(sockets).toHaveLength(2);
+        socket.close();
+        await waitForReconnect();
+        await handshake(sockets[2], hello);
+        await waitForReconnect();
+        expect(sockets[2]?.sent.some(data => data.includes('sandbox.event.publish'))).toBe(false);
+        expect(onDisconnected).not.toHaveBeenCalled();
+        expect(logs.join('\n')).not.toContain('private rejected input');
+      } finally {
+        client.close();
+      }
+    }
+  );
+
+  it('keeps reconnect readiness, attach, maintenance and sealed results independent of expiring N1 events', async () => {
+    const startedAt = Date.now();
+    const clock = spyOn(Date, 'now').mockReturnValue(startedAt);
+    const timers = spyOn(globalThis, 'setTimeout');
+    const failure = mock();
+    const retire = mock();
+    let currentRuntime = { runtimeId: crypto.randomUUID() };
+    const handleFailure = createControlEventFailureHandler({
+      getRuntime: () => currentRuntime,
+      onFailure: retire,
+    });
+    const connected = mock();
+    const request = mock(async () => ({ ok: true, result: { attached: true } }));
+    const logs: string[] = [];
+    const { client, sockets, onDisconnected } = createClientFixture({
+      onConnected: connected,
+      onEventReceiptFailure: eventFailure => {
+        failure(eventFailure);
+        handleFailure(eventFailure);
+      },
+      onRequest: request,
+      log: message => logs.push(message),
+    });
+    const hello = {
+      protocolVersion: 1,
+      handshakeComplete: true,
+      capabilities: { connectionRecovery: true, eventReceipts: true },
+    };
+    const identity = {
+      directory: '/workspace',
+      kiloSessionId: 'kilo_1',
+      rootKiloSessionId: 'kilo_1',
+      nativeRuntimeId: currentRuntime.runtimeId,
+    };
+    const delivery: SessionOperationDelivery = {
+      version: 2,
+      authorization: operationAuthorization(),
+      completedAt: startedAt,
+      result: { ok: true, result: {} },
+      outcome: { messageId: 'msg_1', status: 'completed' },
+      events: [],
+      preparing: [],
+    };
+    const acknowledgement = await acknowledgeOperation(delivery);
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      await handshake(sockets[0], hello);
+      await connecting;
+      sockets[0]?.close();
+      expect(
+        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, identity)
+      ).toBe(true);
+      const result = client
+        .sendOperationResult?.(
+          delivery.authorization.session,
+          delivery,
+          new AbortController().signal,
+          startedAt + 60_000
+        )
+        .catch((error: unknown) => error);
+      const retirement = client.reportNativeRuntimeRetirement?.({
+        retirementId: crypto.randomUUID(),
+        directory: identity.directory,
+        nativeRuntimeId: identity.nativeRuntimeId,
+        reason: 'process_exited',
+        cleanupDeadlineAt: startedAt + 60_000,
+      });
+      await waitForReconnect();
+      clock.mockReturnValue(startedAt + 250);
+      const socket = sockets[1];
+      if (!socket) throw new Error('Missing replacement socket');
+      const reconnectTimers = timers.mock.calls.length;
+      await handshake(socket, hello);
+      await waitForReconnect();
+      const frames = socket.sent.map(data => JSON.parse(data));
+      const eventFrame = frames.find(frame => frame.operation === 'sandbox.event.publish');
+      const resultFrame = frames.find(frame => frame.operation === 'session.operation.result');
+      const retirementFrame = frames.find(frame => frame.operation === 'session.runtime.retired');
+      expect(connected).toHaveBeenCalledTimes(2);
+      expect(eventFrame?.payload.session.nativeRuntimeId).toBe(identity.nativeRuntimeId);
+      expect(resultFrame?.payload).toEqual(delivery);
+      expect(retirementFrame).toBeDefined();
+      socket.respond(
+        JSON.stringify({
+          type: 'request',
+          requestId: 'attach-n2',
+          operation: 'session.attach',
+          session: delivery.authorization.session,
+          payload: {},
+        })
+      );
+      expect(client.sendEvent?.('sandbox.heartbeat', versionHeartbeat(null))).toBe(true);
+      await waitForReconnect();
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(socket.sent.map(data => JSON.parse(data))).toContainEqual({
+        type: 'response',
+        requestId: 'attach-n2',
+        ok: true,
+        result: { attached: true },
+      });
+      socket.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: retirementFrame.requestId,
+          ok: true,
+          result: { retired: true },
+        })
+      );
+      expect(await retirement).toBe(true);
+      clock.mockReturnValue(startedAt + 29_000);
+      const replacement = { ...identity, nativeRuntimeId: crypto.randomUUID() };
+      currentRuntime = { runtimeId: replacement.nativeRuntimeId };
+      expect(
+        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, replacement)
+      ).toBe(true);
+      clock.mockReturnValue(startedAt + 30_000);
+      for (let index = reconnectTimers; index < timers.mock.calls.length; index += 1) {
+        const [expire, ms] = timers.mock.calls[index] ?? [];
+        if (ms !== 29_750 || typeof expire !== 'function') continue;
+        clearTimeout(
+          timers.mock.results[index]?.value as ReturnType<typeof setTimeout> | undefined
+        );
+        expire();
+      }
+      await waitForReconnect();
+      expect(logs).toContain('sandbox control event publication expired');
+      expect(failure).toHaveBeenCalledTimes(1);
+      expect(failure).toHaveBeenCalledWith({
+        reason: 'expired',
+        publication: expect.objectContaining(eventFrame.payload),
+      });
+      expect(retire).not.toHaveBeenCalled();
+      expect(onDisconnected).not.toHaveBeenCalled();
+      expect(socket.readyState).toBe(1);
+      const replacementFrame = socket.sent
+        .map(data => JSON.parse(data))
+        .find(
+          frame =>
+            frame.operation === 'sandbox.event.publish' &&
+            frame.payload.session.nativeRuntimeId === replacement.nativeRuntimeId
+        );
+      expect(replacementFrame).toBeDefined();
+      socket.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: resultFrame.requestId,
+          ok: true,
+          result: acknowledgement,
+        })
+      );
+      expect(await result).toEqual(acknowledgement);
+      socket.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: replacementFrame.requestId,
+          ok: true,
+          result: { receiptId: replacementFrame.payload.receiptId, applied: true },
+        })
+      );
+      await waitForReconnect();
+      expect(failure).toHaveBeenCalledTimes(1);
+      expect(retire).not.toHaveBeenCalled();
+      expect(sockets).toHaveLength(2);
+    } finally {
+      client.close();
+      timers.mockRestore();
+      clock.mockRestore();
+    }
+  });
+
+  it('uses the legacy session.event frame when event receipts are not negotiated', async () => {
+    const fake = new FakeWebSocket();
+    const { client } = createClientFixture({ openWebSocket: () => fake as unknown as WebSocket });
+    try {
+      const connecting = client.connect();
+      await handshake(fake);
+      await connecting;
+      if (!client.publishSessionEvent) throw new Error('Missing session event publisher');
+      expect(
+        await client.publishSessionEvent(
+          {
+            type: 'session.message.outcome',
+            properties: { messageId: 'msg_1', status: 'completed' },
+          },
+          { directory: '/workspace', kiloSessionId: 'ses_1', rootKiloSessionId: 'ses_1' }
+        )
+      ).toBe(true);
+      expect(JSON.parse(fake.sent.at(-1) ?? '{}')).toMatchObject({
+        type: 'event',
+        event: 'session.event',
+      });
+    } finally {
+      client.close();
+    }
   });
 
   it('bounds a producer-shaped 2 MiB PDF event and preserves the following owned outcome', async () => {
@@ -658,9 +1585,7 @@ describe('createSandboxControlClient', () => {
         },
       },
     };
-    expect(Buffer.byteLength(JSON.stringify(producer))).toBeGreaterThan(
-      MAX_SANDBOX_CONTROL_FRAME_BYTES
-    );
+    expect(Buffer.byteLength(JSON.stringify(producer))).toBeGreaterThan(2 * 1024 * 1024);
     try {
       for await (const event of unfilteredKiloEvents([producer])) {
         expect(
@@ -754,7 +1679,7 @@ describe('createSandboxControlClient', () => {
     }
   });
 
-  it('retires the wrapper connection instead of reconnecting across an established gap', async () => {
+  it('reconnects the wrapper connection across an established gap', async () => {
     const sockets: FakeWebSocket[] = [];
     const wrapperInstanceId = crypto.randomUUID();
     let disconnects = 0;
@@ -777,22 +1702,23 @@ describe('createSandboxControlClient', () => {
 
     const connecting = client.connect();
     await Promise.resolve();
-    await handshake(sockets[0]);
+    await handshake(sockets[0], helloResult({ connectionRecovery: true }));
     await connecting;
     expect(JSON.parse(sockets[0]?.sent[0] ?? '{}')).toMatchObject({
       payload: { wrapperInstanceId },
     });
     sockets[0]?.close();
     await waitForReconnect();
-    expect(sockets).toHaveLength(1);
-    expect(disconnects).toBe(1);
+    expect(sockets).toHaveLength(2);
+    expect(disconnects).toBe(0);
+    await handshake(sockets[1], helloResult({ connectionRecovery: true }));
+    await client.connect();
     expect(
       client.sendEvent?.('session.event', {
         type: 'session.message.outcome',
         properties: { messageId: 'msg_1', status: 'completed' },
       })
-    ).toBe(false);
-    expect(client.connect()).rejects.toThrow('sandbox control client closed');
+    ).toBe(true);
     client.close();
   });
 
@@ -885,13 +1811,13 @@ describe('createSandboxControlClient', () => {
 
     const connecting = client.connect();
     await Promise.resolve();
-    await handshake(sockets[0]);
+    await handshake(sockets[0], helloResult({ connectionRecovery: true }));
     await connecting;
     sockets[0]?.error();
     sockets[0]?.close();
     await waitForReconnect();
-    expect(sockets).toHaveLength(1);
-    expect(disconnects).toBe(1);
+    expect(sockets).toHaveLength(2);
+    expect(disconnects).toBe(0);
     client.close();
   });
 
@@ -911,7 +1837,7 @@ describe('createSandboxControlClient', () => {
 
     const connecting = client.connect();
     await Promise.resolve();
-    await handshake(sockets[0]);
+    await handshake(sockets[0], helloResult({ connectionRecovery: true }));
     await connecting;
     client.close();
     await waitForReconnect();
@@ -936,13 +1862,13 @@ describe('createSandboxControlClient', () => {
 
     const connecting = client.connect();
     await Promise.resolve();
-    await handshake(sockets[0]);
+    await handshake(sockets[0], helloResult({ connectionRecovery: true }));
     await connecting;
     const first = sockets[0];
     if (!first) throw new Error('missing first socket');
     first.close();
     await waitForReconnect();
-    expect(sockets).toHaveLength(1);
+    expect(sockets).toHaveLength(2);
 
     first.readyState = 1;
     const sentBefore = first.sent.length;
@@ -1151,7 +2077,7 @@ describe('createSandboxControlClient', () => {
     try {
       const connecting = client.connect();
       await Promise.resolve();
-      await handshake(sockets[0]);
+      await handshake(sockets[0], helloResult({ connectionRecovery: true }));
       await connecting;
       const socket = sockets[0];
       if (!socket) throw new Error('missing socket');
@@ -1198,10 +2124,9 @@ describe('createSandboxControlClient', () => {
       await waitForReconnect();
       socket.error();
       socket.close();
-      expect(onDisconnected).toHaveBeenCalledTimes(1);
-      expect(openWebSocket).toHaveBeenCalledTimes(1);
+      expect(onDisconnected).toHaveBeenCalledTimes(0);
+      expect(openWebSocket).toHaveBeenCalledTimes(2);
       expect(client.sendEvent?.('sandbox.ready', { kiloReady: true })).toBe(false);
-      expect(client.connect()).rejects.toThrow('sandbox control client closed');
     } finally {
       client.close();
       timers.mockRestore();
@@ -1215,7 +2140,7 @@ describe('createSandboxControlClient', () => {
     try {
       const connecting = client.connect();
       await Promise.resolve();
-      await handshake(sockets[0]);
+      await handshake(sockets[0], helloResult({ connectionRecovery: true }));
       await connecting;
       const socket = sockets[0];
       if (!socket) throw new Error('missing socket');
@@ -1233,7 +2158,7 @@ describe('createSandboxControlClient', () => {
       await waitForReconnect();
       expect(onRequest).toHaveBeenCalledTimes(1);
       expect(socket.sent).toHaveLength(2);
-      expect(onDisconnected).toHaveBeenCalledTimes(1);
+      expect(onDisconnected).toHaveBeenCalledTimes(0);
     } finally {
       outcome.resolve({ ok: true });
       client.close();

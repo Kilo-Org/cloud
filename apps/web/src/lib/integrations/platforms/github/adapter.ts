@@ -6,6 +6,7 @@ import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import crypto from 'crypto';
 import type { InstallationToken } from '@/lib/integrations/core/types';
 import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
+import { assertGitHubInstallationRuntimeAuthorized } from '../../github/runtime-authorization';
 
 export type { GitHubAppType } from './app-selector';
 
@@ -65,6 +66,14 @@ export function verifyGitHubWebhookSignature(
  * @param appType - The type of GitHub App to use (defaults to 'standard')
  */
 export async function generateGitHubInstallationToken(
+  installationId: string,
+  appType: GitHubAppType = 'standard'
+): Promise<InstallationToken> {
+  await assertGitHubInstallationRuntimeAuthorized(installationId, appType);
+  return await generateGitHubInstallationTokenForMaintenance(installationId, appType);
+}
+
+export async function generateGitHubInstallationTokenForMaintenance(
   installationId: string,
   appType: GitHubAppType = 'standard'
 ): Promise<InstallationToken> {
@@ -217,6 +226,33 @@ export async function fetchGitHubRepositories(
     page++;
   }
 
+  return repositories;
+}
+
+export async function fetchGitHubRepositoriesForMaintenance(
+  installationId: string,
+  appType: GitHubAppType
+): Promise<GitHubRepository[]> {
+  const tokenData = await generateGitHubInstallationTokenForMaintenance(installationId, appType);
+  const octokit = new Octokit({ auth: tokenData.token });
+  const repositories: GitHubRepository[] = [];
+  let page = 1;
+  while (true) {
+    const response = await octokit.apps.listReposAccessibleToInstallation({ per_page: 100, page });
+    repositories.push(
+      ...response.data.repositories
+        .filter(repository => !repository.archived)
+        .map(repository => ({
+          id: repository.id,
+          name: repository.name,
+          full_name: repository.full_name,
+          private: repository.private,
+          created_at: repository.created_at ?? new Date().toISOString(),
+        }))
+    );
+    if (response.data.repositories.length < 100) break;
+    page += 1;
+  }
   return repositories;
 }
 
@@ -487,7 +523,8 @@ export async function replyToReviewComment(
  */
 export async function exchangeGitHubOAuthCode(
   code: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  codeVerifier?: string
 ): Promise<{
   id: string;
   login: string;
@@ -504,6 +541,7 @@ export async function exchangeGitHubOAuthCode(
     clientSecret: credentials.clientSecret,
     clientType: 'github-app',
     code,
+    ...(codeVerifier ? { codeVerifier } : {}),
   });
 
   if (!authentication.token) {

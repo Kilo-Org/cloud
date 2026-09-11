@@ -182,7 +182,7 @@ export function useConversationMessageActions({
             [
               { text: i18n.t('common.cancel'), style: 'cancel' },
               {
-                text: i18n.t('chat.messageActions.delete'),
+                text: i18n.t('common.delete'),
                 style: 'destructive',
                 onPress: () => {
                   deleteMessage.mutate(

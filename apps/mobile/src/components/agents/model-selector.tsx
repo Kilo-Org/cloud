@@ -83,16 +83,6 @@ function toSessionModelOption(option: ModelOption | SessionModelOption): Session
   return { ...option, displayId: option.id, showGatewayMetadata: true };
 }
 
-function compactThinkingEffortLabel(variant: string) {
-  if (variant === 'xhigh') {
-    return i18n.t('agentChat.modelSelector.thinkingEffortXhigh');
-  }
-  if (variant === 'medium') {
-    return i18n.t('agentChat.modelSelector.thinkingEffortMedium');
-  }
-  return thinkingEffortLabel(variant);
-}
-
 export function openModelPicker(
   router: ImperativeRouter,
   params: {
@@ -142,12 +132,10 @@ export function ModelSelector({
   const providerAware = pickerOptions.some(
     option => option.modelRef !== undefined || !option.showGatewayMetadata
   );
-  const label =
-    selectedModel?.name ?? (!providerAware && value ? value : t('agentChat.modelSelector.model'));
+  const label = selectedModel?.name ?? (!providerAware && value ? value : t('common.model'));
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
-  const compactVariantLabel = variant ? compactThinkingEffortLabel(variant) : '';
   const dataLabel = collectsData ? getFreeModelDataAccessibilityLabel(label) : label;
   const modelLabel = byok ? `${dataLabel}, ${BYOK_MODEL_LABEL}` : dataLabel;
   const accessibilityLabel =
@@ -160,7 +148,7 @@ export function ModelSelector({
     (lockLabel && disabled ? t('agentChat.modelSelector.lockedByAgent', { agent: lockLabel }) : '');
   // A pinned variant is meaningful even when the locked option carries a single
   // variant, so surface the badge whenever a lock label is present.
-  const showVariantBadge = compactVariantLabel !== '' && (hasVariants || Boolean(lockLabel));
+  const showVariantBadge = variantLabel !== '' && (hasVariants || Boolean(lockLabel));
 
   function handlePress() {
     if (effectivelyDisabled) {
@@ -183,15 +171,12 @@ export function ModelSelector({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: effectivelyDisabled }}
       className={cn(
-        'max-w-[240px] shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70',
+        'min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70',
         effectivelyDisabled && 'opacity-50'
       )}
     >
       <View className="min-w-0 shrink flex-row items-center gap-1.5">
-        <Text
-          className="max-w-[170px] shrink text-sm font-medium text-foreground"
-          numberOfLines={1}
-        >
+        <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
           {label}
         </Text>
         {byok ? (
@@ -206,7 +191,7 @@ export function ModelSelector({
           <View className="flex-row items-center gap-1 rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-800">
             <Brain size={12} color={colors.mutedForeground} />
             <Text className="text-xs font-medium text-muted-foreground" numberOfLines={1}>
-              {compactVariantLabel}
+              {variantLabel}
             </Text>
           </View>
         ) : null}

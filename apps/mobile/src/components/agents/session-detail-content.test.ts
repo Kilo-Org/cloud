@@ -38,6 +38,8 @@ import { i18n } from '@/i18n';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/agents/session-provider', () => ({
   useSessionManager: () => {
     if (!managerSlot.current) {
@@ -534,9 +536,9 @@ function pressHeaderBack(renderer: ReactTestRenderer) {
 
 describe('SessionDetailContent display scope', () => {
   it.each([
-    { organizationId: null, isResolved: true, label: i18n.t('profile.personal') },
+    { organizationId: null, isResolved: true, label: i18n.t('common.personal') },
     { organizationId: 'org-a', isResolved: true, label: 'Session organization' },
-    { organizationId: 'missing-org', isResolved: true, label: i18n.t('profile.organization') },
+    { organizationId: 'missing-org', isResolved: true, label: i18n.t('common.organization') },
     { organizationId: null, isResolved: false, label: i18n.t('profile.selectAccount') },
   ])('omits the $label context label and preserves header actions', async state => {
     const { renderer } = await mountDetails([], undefined, {
@@ -545,15 +547,18 @@ describe('SessionDetailContent display scope', () => {
     });
     const header = renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 1,
+      numberOfLines: 2,
       ellipsizeMode: 'tail',
     });
+    expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
+      'min-h-14'
+    );
     expect(header.props.context).toBeUndefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
     expect(
       header.findAll(node => node.props.accessibilityHint === i18n.t('profile.selectAccount'))
     ).toHaveLength(0);
-    expect(header.findByProps({ accessibilityLabel: i18n.t('screenHeader.goBack') })).toBeDefined();
+    expect(header.findByProps({ accessibilityLabel: i18n.t('common.goBack') })).toBeDefined();
     const { onPress } = header.findByProps({
       accessibilityLabel: i18n.t('agentChat.session.renameAccessibility', {
         title: `Root ${ROOT_ID}`,
@@ -591,6 +596,22 @@ describe('session detail status placement', () => {
       expect(view.renderer.root.findAllByType(EmptyState)).toHaveLength(0);
     }
   );
+});
+
+describe('session detail bottom strip', () => {
+  it('keeps the home-indicator strip full-bleed (pure background, no side padding)', async () => {
+    const { renderer } = await mountDetails([]);
+    const strips = renderer.root.findAll(node => Object.is(node.type, 'BlurBar'));
+    expect(strips).toHaveLength(1);
+    // The spacer pads only the bottom inset: it hosts no controls, so it
+    // stays full-bleed in landscape while the composer content carries the
+    // sensor side insets.
+    const spacer = strips[0]?.findAll(node => Object.is(node.type, 'View'))[0];
+    expect(spacer).toBeDefined();
+    const spacerStyle = spacer?.props.style as { height: number } | undefined;
+    expect(spacerStyle).toEqual({ height: 16 });
+    expect(Object.keys(spacerStyle ?? {})).toEqual(['height']);
+  });
 });
 
 describe.each([true, false])('session detail return with history=%s', hasHistory => {
@@ -656,9 +677,12 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
 
     const header = view.renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 1,
+      numberOfLines: 2,
       ellipsizeMode: 'tail',
     });
+    expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
+      'min-h-14'
+    );
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
       hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']

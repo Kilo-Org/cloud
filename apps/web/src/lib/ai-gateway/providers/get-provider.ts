@@ -16,11 +16,9 @@ import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
-import {
-  OPENROUTER,
-  tryGetProviderById,
-  VERCEL_AI_GATEWAY,
-} from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { tryGetProviderById } from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
@@ -35,6 +33,7 @@ import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import {
   getLocalFakeLlmProvider,
+  getLocalFakeTranscriptionProvider,
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
 } from '@/lib/ai-gateway/local-fake-llm';
@@ -350,5 +349,11 @@ export async function getTranscriptionProvider(): Promise<{
   provider: Provider;
   userByok: BYOKResult[] | null;
 }> {
+  if (isLocalFakeLlmEnabled()) {
+    const localFakeProvider = getLocalFakeTranscriptionProvider();
+    if (localFakeProvider) {
+      return { provider: localFakeProvider, userByok: null };
+    }
+  }
   return { provider: OPENROUTER, userByok: null };
 }

@@ -10,9 +10,18 @@ import {
 } from '../execution/types.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
-import type { SessionMessageOutcome } from '../shared/sandbox-control-protocol.js';
+import {
+  SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
+  sessionOperationAuthorizationSchema,
+  sameSessionOperation,
+  type SessionMessageOutcome,
+  type SessionOperationAck,
+  type SessionOperationAuthorization,
+  type SessionOperationDelivery,
+} from '../shared/sandbox-control-protocol.js';
 
 export type SessionMessageState = 'queued' | 'accepted' | 'completed' | 'failed' | 'cancelled';
+export type SessionMessageTerminalSource = 'coordinator' | 'wrapper_outcome' | 'operation_result';
 
 export type ControlCommandAgentSelection = Omit<AgentSelection, 'model'> & { model?: string };
 
@@ -27,6 +36,19 @@ export type ControlSessionMessageInput = Pick<SessionMessageIntent, 'turn' | 'fi
   agent?: AgentSelectionOverride;
 };
 
+export type SessionOperationProof = {
+  authorization: SessionOperationAuthorization;
+  dispatched: boolean;
+  executionDeadlineAt?: number;
+  executionDeadlineSource?: 'dispatch' | 'wrapper';
+  result?: SessionOperationDelivery['result'];
+  resultHash?: string;
+  completedAt?: number;
+  attachmentEpoch?: number;
+  decision?: SessionOperationAck['decision'];
+  rejectionReceived?: true;
+};
+
 type SessionMessageLifecycle = {
   messageId: string;
   state: SessionMessageState;
@@ -37,10 +59,20 @@ type SessionMessageLifecycle = {
   unresolvedDispatch?: true;
   wrapperInstanceId?: string;
   terminalAt?: number;
+  terminalSource?: SessionMessageTerminalSource;
   failedReason?: string;
+  failedDetail?: string;
   attachFailures?: number;
   promptFailures?: number;
   preparationAttemptId?: string;
+  retryNotBefore?: number;
+  executionDeadlineAt?: number;
+  cancellation?: { operationId: string; deadlineAt: number };
+  operations?: {
+    attach?: SessionOperationProof;
+    retiredAttach?: SessionOperationProof;
+    prompt?: SessionOperationProof;
+  };
 };
 
 export type SessionMessageRecordV2 = SessionMessageLifecycle & {
@@ -224,13 +256,15 @@ export function assignPreparationAttemptId(
 export function failWaitingMessages(
   messages: readonly SessionMessageRecord[],
   reason: string,
-  wrapperInstanceId?: string
+  wrapperInstanceId?: string,
+  includeUnassigned = true
 ): { messages: SessionMessageRecord[]; failedIds: string[] } {
   const head =
     messages.find(message => message.state === 'accepted') ??
     messages.find(message => message.state === 'queued');
   const failUnassigned =
-    wrapperInstanceId === undefined || head?.wrapperInstanceId === wrapperInstanceId;
+    wrapperInstanceId === undefined ||
+    (includeUnassigned && head?.wrapperInstanceId === wrapperInstanceId);
   const failedIds: string[] = [];
   return {
     messages: messages.map(message => {
@@ -243,10 +277,71 @@ export function failWaitingMessages(
         return message;
       }
       failedIds.push(message.messageId);
-      return { ...message, state: 'failed', failedReason: reason };
+      return {
+        ...message,
+        state: 'failed',
+        failedReason: reason,
+      };
     }),
     failedIds,
   };
+}
+
+/**
+ * Release queued messages bound to a dying wrapper that never reached a
+ * committed attach or prompt. These are safe to retry on a replacement
+ * runtime. Messages with a completed attach proof, a prompt operation,
+ * or exhausted attach failures remain bound so `failWaitingMessages`
+ * can fail them as today.
+ */
+export function releaseUnadmittedWaitingMessages(
+  messages: readonly SessionMessageRecord[],
+  wrapperInstanceId: string
+): { messages: SessionMessageRecord[]; releasedIds: string[] } {
+  const releasedIds: string[] = [];
+  return {
+    messages: messages.map(message => {
+      if (message.state !== 'queued' || message.wrapperInstanceId !== wrapperInstanceId) {
+        return message;
+      }
+      if (message.unresolvedDispatch) return message;
+      if (message.operations?.prompt) return message;
+      if (message.operations?.attach?.completedAt !== undefined) return message;
+      if ((message.attachFailures ?? 0) >= ATTACH_FAILURE_LIMIT) return message;
+
+      releasedIds.push(message.messageId);
+      return {
+        ...message,
+        wrapperInstanceId: undefined,
+        preparationAttemptId: undefined,
+        retryNotBefore: undefined,
+        deliveryDeadlineAt: undefined,
+        operations: undefined,
+      };
+    }),
+    releasedIds,
+  };
+}
+
+export function releaseCompletedRetryableAttach(
+  messages: readonly SessionMessageRecord[],
+  messageId: string,
+  retryNotBefore: number
+): SessionMessageRecord[] {
+  return messages.map(message => {
+    const attach = message.messageId === messageId ? message.operations?.attach : undefined;
+    if (!attach?.dispatched || attach.result?.ok !== false) return message;
+    const operations = { ...message.operations };
+    operations.retiredAttach = attach;
+    delete operations.attach;
+    return {
+      ...message,
+      unresolvedDispatch: undefined,
+      preparationAttemptId: undefined,
+      retryNotBefore,
+      ...(Object.keys(operations).length > 0 ? { operations } : { operations: undefined }),
+    };
+  });
 }
 
 export function incrementDeliveryFailure(
@@ -276,7 +371,8 @@ export function applyMessageOutcome(
   messages: readonly SessionMessageRecord[],
   outcome: SessionMessageOutcome,
   wrapperInstanceId: string,
-  now: number
+  now: number,
+  terminalSource: SessionMessageTerminalSource = 'wrapper_outcome'
 ): SessionMessageRecord[] | undefined {
   const message = messages.find(item => item.messageId === outcome.messageId);
   if (
@@ -295,6 +391,7 @@ export function applyMessageOutcome(
           unresolvedDispatch: undefined,
           acceptedAt: item.acceptedAt ?? now,
           terminalAt: now,
+          terminalSource,
           ...(outcome.reason ? { failedReason: outcome.reason } : {}),
         }
       : item
@@ -308,16 +405,53 @@ export function hasAcceptedMessage(messages: readonly SessionMessageRecord[]): b
 export function failQueuedMessage(
   messages: readonly SessionMessageRecord[],
   messageId: string,
-  reason?: string
+  reason?: string,
+  detail?: string
 ): SessionMessageRecord[] | undefined {
   if (!messages.some(message => message.messageId === messageId && message.state === 'queued')) {
     return undefined;
   }
   return messages.map(message =>
     message.messageId === messageId && message.state === 'queued'
-      ? { ...message, state: 'failed', ...(reason ? { failedReason: reason } : {}) }
+      ? {
+          ...message,
+          state: 'failed',
+          ...(reason ? { failedReason: reason } : {}),
+          ...(detail ? { failedDetail: detail } : {}),
+        }
       : message
   );
+}
+
+export function cancelPendingMessage(
+  messages: readonly SessionMessageRecord[],
+  messageId: string
+): { dropped: boolean; messages?: SessionMessageRecord[] } {
+  const target = messages.find(message => message.messageId === messageId);
+  if (!target) return { dropped: false };
+  if (target.state === 'cancelled' && target.failedReason === 'queued_message_cancelled') {
+    return { dropped: true };
+  }
+  if (
+    target.state !== 'queued' ||
+    target.acceptedAt !== undefined ||
+    target.unresolvedDispatch ||
+    target.preparationAttemptId !== undefined ||
+    target.deliveryDeadlineAt !== undefined ||
+    target.wrapperInstanceId !== undefined ||
+    target.operations !== undefined ||
+    target.cancellation !== undefined
+  ) {
+    return { dropped: false };
+  }
+  return {
+    dropped: true,
+    messages: messages.map(message =>
+      message.messageId === messageId
+        ? { ...message, state: 'cancelled', failedReason: 'queued_message_cancelled' }
+        : message
+    ),
+  };
 }
 
 export function acceptQueuedMessage(
@@ -369,7 +503,11 @@ export function failedMessageSnapshot(
     delivery: accepted ? 'sent' : 'queued',
     accepted,
     reason: cancelled ? 'interrupted' : message.failedReason,
-    ...(cancelled ? { error: 'The message was interrupted' } : {}),
+    ...(cancelled
+      ? { error: 'The message was interrupted' }
+      : message.failedDetail || message.failedReason
+        ? { error: message.failedDetail ?? message.failedReason }
+        : {}),
     timestamp: message.acceptedAt ?? now,
   };
 }
@@ -403,4 +541,254 @@ export function streamCloudStatus(
   if (hasAcceptedMessage(messages)) return { type: 'ready' };
   if (messages.some(message => message.state === 'queued')) return { type: 'preparing' };
   return messages.length > 0 ? { type: 'ready' } : null;
+}
+
+export function applySessionOperationResult(
+  messages: readonly SessionMessageRecord[],
+  delivery: SessionOperationDelivery,
+  resultHash: string,
+  now: number
+):
+  | {
+      messages: SessionMessageRecord[];
+      disposition: SessionOperationAck['disposition'];
+      decision: SessionOperationAck['decision'];
+    }
+  | undefined {
+  const authorization = delivery.authorization;
+  const message = messages.find(item => item.messageId === authorization.messageId);
+  const kind = authorization.operation === 'session.attach' ? 'attach' : 'prompt';
+  let proof = message?.operations?.[kind];
+  let proofSlot: 'attach' | 'retiredAttach' | 'prompt' = kind;
+  let storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
+  if (
+    kind === 'attach' &&
+    (!proof?.dispatched ||
+      !storedAuthorization.success ||
+      !sameSessionOperation(storedAuthorization.data, authorization))
+  ) {
+    proof = message?.operations?.retiredAttach;
+    proofSlot = 'retiredAttach';
+    storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
+  }
+  if (
+    !message ||
+    !proof?.dispatched ||
+    !storedAuthorization.success ||
+    message.wrapperInstanceId !== authorization.wrapperInstanceId ||
+    !sameSessionOperation(storedAuthorization.data, authorization)
+  )
+    return undefined;
+  if (message.state !== 'queued' && message.state !== 'accepted') {
+    if (message.terminalAt === undefined) return undefined;
+    return {
+      messages: [...messages],
+      disposition:
+        proof.resultHash === resultHash
+          ? 'identical'
+          : message.terminalSource === 'coordinator'
+            ? 'superseded'
+            : 'already_final',
+      decision: { state: message.state, at: message.terminalAt },
+    };
+  }
+  if (proof.resultHash !== undefined) {
+    return proof.resultHash === resultHash && proof.decision
+      ? { messages: [...messages], disposition: 'identical', decision: proof.decision }
+      : undefined;
+  }
+  const applied = delivery.outcome
+    ? applyMessageOutcome(
+        messages,
+        delivery.outcome,
+        authorization.wrapperInstanceId,
+        now,
+        'operation_result'
+      )
+    : [...messages];
+  if (!applied) return undefined;
+  const resultMessage = applied.find(item => item.messageId === message.messageId);
+  if (!resultMessage) return undefined;
+  const decision = {
+    state: resultMessage.state,
+    at: resultMessage.terminalAt ?? delivery.completedAt,
+  };
+  const attachmentEpoch =
+    kind === 'attach'
+      ? (proof.attachmentEpoch ??
+        Math.max(0, ...messages.map(item => item.operations?.attach?.attachmentEpoch ?? 0)) + 1)
+      : undefined;
+  return {
+    messages: applied.map(item =>
+      item.messageId === message.messageId
+        ? {
+            ...item,
+            operations: {
+              ...item.operations,
+              [proofSlot]: {
+                ...proof,
+                result: delivery.result,
+                resultHash,
+                completedAt: delivery.completedAt,
+                decision,
+                ...(attachmentEpoch !== undefined ? { attachmentEpoch } : {}),
+              },
+            },
+          }
+        : item
+    ),
+    disposition: 'applied',
+    decision,
+  };
+}
+
+export function recordSessionOperationDispatch(
+  messages: readonly SessionMessageRecord[],
+  authorization: SessionOperationAuthorization,
+  dispatched = true
+): SessionMessageRecord[] | undefined {
+  const message = messages.find(item => item.messageId === authorization.messageId);
+  const kind = authorization.operation === 'session.attach' ? 'attach' : 'prompt';
+  const proof = message?.operations?.[kind];
+  const storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
+  if (
+    !message ||
+    message.cancellation ||
+    nextQueuedMessageId(messages) !== message.messageId ||
+    message.wrapperInstanceId !== authorization.wrapperInstanceId ||
+    (proof &&
+      (!storedAuthorization.success ||
+        !sameSessionOperation(storedAuthorization.data, authorization)))
+  )
+    return undefined;
+  return messages.map(item =>
+    item.messageId === message.messageId
+      ? {
+          ...item,
+          unresolvedDispatch: dispatched ? true : undefined,
+          deliveryRetryScope: undefined,
+          operations: {
+            ...item.operations,
+            [kind]: {
+              authorization: structuredClone(authorization),
+              dispatched,
+              ...(kind === 'prompt' && dispatched
+                ? {
+                    executionDeadlineAt:
+                      item.executionDeadlineAt ??
+                      authorization.dispatchDeadlineAt + SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
+                    executionDeadlineSource: proof?.executionDeadlineSource ?? 'dispatch',
+                  }
+                : {}),
+            },
+          },
+          ...(kind === 'prompt' && dispatched
+            ? {
+                executionDeadlineAt:
+                  item.executionDeadlineAt ??
+                  authorization.dispatchDeadlineAt + SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
+              }
+            : {}),
+        }
+      : item
+  );
+}
+
+export function markSessionOperationRejection(
+  messages: readonly SessionMessageRecord[],
+  authorization: SessionOperationAuthorization
+): SessionMessageRecord[] | undefined {
+  if (authorization.operation !== 'session.attach') return [...messages];
+  const message = messages.find(item => item.messageId === authorization.messageId);
+  const proof = message?.operations?.attach;
+  const storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
+  if (
+    !message ||
+    !proof?.dispatched ||
+    !storedAuthorization.success ||
+    !sameSessionOperation(storedAuthorization.data, authorization)
+  )
+    return undefined;
+  if (proof.rejectionReceived) return [...messages];
+  return messages.map(item =>
+    item.messageId === message.messageId
+      ? {
+          ...item,
+          operations: {
+            ...item.operations,
+            attach: { ...proof, rejectionReceived: true },
+          },
+        }
+      : item
+  );
+}
+
+export function recordSessionOperationExecutionDeadline(
+  messages: readonly SessionMessageRecord[],
+  authorization: SessionOperationAuthorization,
+  executionDeadlineAt: number
+): SessionMessageRecord[] | undefined {
+  const message = messages.find(item => item.messageId === authorization.messageId);
+  const prompt = message?.operations?.prompt;
+  const storedAuthorization = sessionOperationAuthorizationSchema.safeParse(prompt?.authorization);
+  if (
+    authorization.operation !== 'session.prompt' ||
+    !Number.isSafeInteger(executionDeadlineAt) ||
+    executionDeadlineAt <= 0 ||
+    !message ||
+    !prompt?.dispatched ||
+    !storedAuthorization.success ||
+    !sameSessionOperation(storedAuthorization.data, authorization)
+  )
+    return undefined;
+  if (prompt.executionDeadlineSource === 'wrapper') return [...messages];
+  return messages.map(item =>
+    item.messageId === message.messageId
+      ? {
+          ...item,
+          executionDeadlineAt,
+          operations: {
+            ...item.operations,
+            prompt: {
+              ...prompt,
+              executionDeadlineAt,
+              executionDeadlineSource: 'wrapper',
+            },
+          },
+        }
+      : item
+  );
+}
+
+export function completeSessionOperationAttachment(
+  messages: readonly SessionMessageRecord[],
+  authorization: SessionOperationAuthorization
+): SessionMessageRecord[] | undefined {
+  const message = messages.find(item => item.messageId === authorization.messageId);
+  const proof = message?.operations?.attach;
+  const storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
+  if (
+    authorization.operation !== 'session.attach' ||
+    !message ||
+    !proof?.dispatched ||
+    !storedAuthorization.success ||
+    !sameSessionOperation(storedAuthorization.data, authorization) ||
+    nextQueuedMessageId(messages) !== message.messageId
+  )
+    return undefined;
+  const attachmentEpoch =
+    proof.attachmentEpoch ??
+    Math.max(0, ...messages.map(item => item.operations?.attach?.attachmentEpoch ?? 0)) + 1;
+  return messages.map(item =>
+    item.messageId === message.messageId
+      ? {
+          ...item,
+          unresolvedDispatch: undefined,
+          operations: {
+            ...item.operations,
+            attach: { ...proof, completedAt: proof.completedAt ?? Date.now(), attachmentEpoch },
+          },
+        }
+      : item
+  );
 }

@@ -16,6 +16,7 @@ export type ModelRestrictions = {
   modelDenyList: string[];
 };
 
+/** Receives the requested model id as-is (including variant suffixes such as `:free`). */
 export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 
 export async function isModelRestrictionExempt(modelId: string): Promise<boolean> {
@@ -50,8 +51,7 @@ export function createAllowPredicateFromProviderAllowList(
       return false;
     }
     const providerSlugs =
-      getKiloExclusiveInferenceProviderRestriction(modelId) ??
-      (await providerLookup(normalizedModelId));
+      getKiloExclusiveInferenceProviderRestriction(modelId) ?? (await providerLookup(modelId));
     if (providerSlugs.size === 0) return false;
     if (!providerAllowSet) return true;
     return [...providerSlugs].some(slug => providerAllowSet.has(slug));

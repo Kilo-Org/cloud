@@ -9,21 +9,6 @@
 /** Kilo Pass plan title. Consumed by mobile and E2E; keep exact. */
 export const KILO_PASS_TITLE = 'Kilo Pass';
 
-/**
- * Android unavailable description. The mobile app renders
- * `kiloPass.unavailableDescription` from its catalog instead; this constant is
- * the English source that web and E2E compare against. Keep the two in step.
- */
-export const KILO_PASS_UNAVAILABLE_DESCRIPTION =
-  'Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.';
-
-/**
- * Web-management description. The mobile app renders
- * `kiloPass.webManagementDescription` from its catalog instead; this constant
- * is the English source that web and E2E compare against. Keep the two in step.
- */
-export const KILO_PASS_WEB_MANAGEMENT_DESCRIPTION = 'This Kilo Pass is managed on the web.';
-
 /** Label for the web-management CTA. Consumed by mobile and E2E; keep exact. */
 export const KILO_PASS_MANAGE_CTA_LABEL = 'Manage';
 
@@ -91,6 +76,12 @@ export type ResolvePurchasePresentationInput = {
    * ended. `unpaid` is ended, so it is false.
    */
   hasStripeManagedPass: boolean;
+  /**
+   * Old Android omits the field or sends false and keeps unavailable or Stripe
+   * web_management. New Android sends true and gets native_iap. Remove the
+   * field when every Android client mounts Play IAP.
+   */
+  supportsNativePlayKiloPass?: boolean;
 };
 
 const NO_CTA: PurchasePresentationCta = { action: 'none', webPath: null };
@@ -108,7 +99,7 @@ function webCta(webPath: string): PurchasePresentationCta {
 export function resolvePurchasePresentation(
   input: ResolvePurchasePresentationInput
 ): PurchasePresentation {
-  const { platform, storefront, product, hasStripeManagedPass } = input;
+  const { platform, storefront, product, hasStripeManagedPass, supportsNativePlayKiloPass } = input;
   const program = input.program ?? null;
 
   // Credits are not sold in the iOS app.
@@ -121,12 +112,22 @@ export function resolvePurchasePresentation(
     return { kind: 'web_management', reason: null, cta: webCta('/credits'), program };
   }
 
-  // Kilo Pass native IAP is allowed only for iOS App Store.
+  // Kilo Pass native IAP is allowed for iOS App Store.
   if (product === 'kilo_pass' && platform === 'ios' && storefront === 'app_store') {
     return { kind: 'native_iap', reason: null, cta: NO_CTA, program };
   }
 
-  // Android Kilo Pass is never native IAP.
+  // Kilo Pass native IAP is allowed for Android Play when the client mounts Play IAP.
+  if (
+    product === 'kilo_pass' &&
+    platform === 'android' &&
+    storefront === 'play' &&
+    supportsNativePlayKiloPass === true
+  ) {
+    return { kind: 'native_iap', reason: null, cta: NO_CTA, program };
+  }
+
+  // Android Kilo Pass without native Play IAP support.
   if (product === 'kilo_pass' && platform === 'android') {
     if (hasStripeManagedPass) {
       return {
@@ -178,7 +179,7 @@ export function mapKiloPassStatusToClass(
 }
 
 /**
- * True only for iOS App Store Kilo Pass, the single native IAP combination.
+ * True for iOS App Store Kilo Pass and for Android Play Kilo Pass.
  */
 export function isNativeIapMutationAllowed(input: {
   platform: PurchasePlatform | null | undefined;
@@ -186,6 +187,9 @@ export function isNativeIapMutationAllowed(input: {
   product: PurchaseProduct;
 }): boolean {
   return (
-    input.platform === 'ios' && input.storefront === 'app_store' && input.product === 'kilo_pass'
+    (input.platform === 'ios' &&
+      input.storefront === 'app_store' &&
+      input.product === 'kilo_pass') ||
+    (input.platform === 'android' && input.storefront === 'play' && input.product === 'kilo_pass')
   );
 }

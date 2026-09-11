@@ -8,9 +8,12 @@
  *  - a meta text alone
  *  - nothing
  *
- * Plus an independent `showPlatformIcon` flag: true when a platform icon
- * was provided AND the kind is not `needs-input` (attention treatment
- * keeps priority and suppresses the icon).
+ * Plus an independent `showPlatformIcon` flag. The platform glyph renders
+ * only when NO state glyph is drawn: needs-input suppresses it (attention
+ * keeps priority), and the live kinds draw the session's status glyph —
+ * the one mark that names the state — so a platform-origin glyph beside it
+ * reads as a stray second mark crowding the meta. Kinds `meta`/`none`
+ * (no status glyph) show the icon iff one was provided.
  *
  * Home and the Agents list both call this, but only the Agents tray
  * opts into `metaWhileLive`. Keeping the rule here makes it testable
@@ -38,10 +41,12 @@ export function selectSessionRowEyebrowRight(inputs: {
     return { kind: 'needs-input', showPlatformIcon: false };
   }
   if (live && hasMeta && metaWhileLive) {
-    return { kind: 'live-and-meta', showPlatformIcon: hasPlatformIcon };
+    // The status glyph draws here; a platform glyph beside it would read as
+    // a stray second mark in the cluster.
+    return { kind: 'live-and-meta', showPlatformIcon: false };
   }
   if (live) {
-    return { kind: 'live', showPlatformIcon: hasPlatformIcon };
+    return { kind: 'live', showPlatformIcon: false };
   }
   if (hasMeta) {
     return { kind: 'meta', showPlatformIcon: hasPlatformIcon };

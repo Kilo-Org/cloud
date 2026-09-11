@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
 import { envVarsSchema } from '../types.js';
-import { buildSessionAttachPayload } from './attach-payload.js';
+import {
+  adaptSessionAttachPayloadForWrapper,
+  buildSessionAttachPayload,
+} from './attach-payload.js';
 
 describe('buildSessionAttachPayload', () => {
   it('packs directory, git clone, branch, snapshot identity, and session env', () => {
@@ -53,6 +56,39 @@ describe('buildSessionAttachPayload', () => {
       env: { KILOCODE_TOKEN: 'cap_1' },
       setupCommands: ['pnpm install'],
       preparation: { attemptId: 'att_1', triggerMessageId: 'msg_1' },
+    });
+  });
+
+  it('marks a generated workspace branch as a working branch', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        userId: 'user-1',
+      },
+      auth: { kiloSessionId: 'kilo_1', kilocodeToken: 'cap_1' },
+      agent: { mode: 'code', model: 'kilo/test' },
+      repository: { type: 'github', repo: 'acme/demo' },
+      workspace: { branchName: 'kilo/quiet-forest-abc' },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(buildSessionAttachPayload(metadata)).toMatchObject({
+      branch: 'kilo/quiet-forest-abc',
+      branchMode: 'working',
+    });
+  });
+
+  it('drops working-branch fields for a legacy wrapper', () => {
+    const payload = {
+      branch: 'kilo/quiet-forest-abc',
+      branchMode: 'working' as const,
+      directory: '/workspace/a',
+    };
+
+    expect(adaptSessionAttachPayloadForWrapper(payload, true)).toEqual(payload);
+    expect(adaptSessionAttachPayloadForWrapper(payload, false)).toEqual({
+      directory: '/workspace/a',
     });
   });
 

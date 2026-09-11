@@ -4,6 +4,7 @@ import {
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
+import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import {
   CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES,
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
@@ -576,6 +577,10 @@ export const baseWorktreeChangesNextSchema = z
       ),
   })
   .strict();
+
+export const baseWorktreeFileNextSchema = worktreeFileQuerySchema.extend(
+  baseWorktreeChangesNextSchema.shape
+);
 
 export const cloudAgentTerminalSizeSchema = z.object({
   cols: z.number().int().min(2).max(500),

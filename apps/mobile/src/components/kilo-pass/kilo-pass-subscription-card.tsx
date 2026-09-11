@@ -1,6 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Linking, Platform, Pressable, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { AppState, Linking, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -15,7 +16,18 @@ import {
   getKiloPassSubscriptionCardContentState,
 } from '@/lib/kilo-pass/subscription-card-state';
 
-export function KiloPassSubscriptionCard() {
+export function KiloPassSubscriptionCard({
+  hideLoadingSkeleton = false,
+}: Readonly<{
+  /**
+   * Render no loading shimmer while the card's queries are still in flight:
+   * the credits section already shows its one loading indicator (the balance
+   * skeleton), and stacking a second skeleton card reads as two loaders at
+   * once. The slot keeps the card's final height so the swap in and out of
+   * this state never moves the sections below.
+   */
+  hideLoadingSkeleton?: boolean;
+}>) {
   const colors = useThemeColors();
   const router = useRouter();
   const trpc = useTRPC();
@@ -28,6 +40,7 @@ export function KiloPassSubscriptionCard() {
       platform,
       storefront,
       product: 'kilo_pass',
+      supportsNativePlayKiloPass: true,
     })
   );
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
@@ -60,6 +73,31 @@ export function KiloPassSubscriptionCard() {
       queryClient.invalidateQueries(trpc.kiloPass.getCreditHistory.pathFilter()),
     ]);
   };
+
+  // Returning to the app may follow a store-management trip (App Store or Play);
+  // refetch both the presentation and state so the card reflects any change.
+  const refetchRef = useRef({
+    presentation: presentationQuery.refetch,
+    state: stateQuery.refetch,
+  });
+  useEffect(() => {
+    refetchRef.current = {
+      presentation: presentationQuery.refetch,
+      state: stateQuery.refetch,
+    };
+  }, [presentationQuery.refetch, stateQuery.refetch]);
+  useEffect(() => {
+    const appStateSubscription = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        void refetchRef.current.presentation();
+        void refetchRef.current.state();
+      }
+    });
+    return () => {
+      appStateSubscription.remove();
+    };
+  }, []);
+
   const handlePress = () => {
     if (contentState.kind !== 'card') {
       return;
@@ -79,9 +117,6 @@ export function KiloPassSubscriptionCard() {
       return;
     }
     if (cardState.action === 'open-store-management') {
-      if (Platform.OS !== 'ios') {
-        return;
-      }
       void (async () => {
         const { openAppStoreManagement } = await import('./kilo-pass-ios-manage');
         await openAppStoreManagement({ invalidateAfter: invalidateKiloPassState });
@@ -114,7 +149,14 @@ export function KiloPassSubscriptionCard() {
 
   return (
     <View className="gap-2">
-      {contentState.kind === 'loading' ? (
+      {contentState.kind === 'loading' && hideLoadingSkeleton ? (
+        // p-3 (24) + the h-10 icon row (40) + the 1px borders (2): the
+        // exact height every card state below renders at, so the swap to
+        // content or to the shimmering skeleton never moves layout.
+        <View className="h-[66px]" />
+      ) : null}
+
+      {contentState.kind === 'loading' && !hideLoadingSkeleton ? (
         <View
           accessibilityLabel={t('kiloPass.subscriptionLoading')}
           accessibilityState={{ busy: true }}
@@ -176,10 +218,12 @@ export function KiloPassSubscriptionCard() {
       {contentState.kind === 'card' && contentState.state.action !== 'none' ? (
         <Pressable
           accessibilityHint={
-            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityHint
+            getKiloPassSubscriptionCardAccessibility(contentState.state, Platform.OS)
+              .accessibilityHint
           }
           accessibilityLabel={
-            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityLabel
+            getKiloPassSubscriptionCardAccessibility(contentState.state, Platform.OS)
+              .accessibilityLabel
           }
           accessibilityRole="button"
           className="rounded-lg border border-border bg-card p-3 active:opacity-80"

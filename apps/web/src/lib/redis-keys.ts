@@ -5,8 +5,6 @@
  * collisions when adding new features.
  */
 
-import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-
 declare const redisKeyBrand: unique symbol;
 
 export type RedisKey = string & {
@@ -16,31 +14,6 @@ export type RedisKey = string & {
 const redisKey = <const Key extends string>(key: Key): Key & RedisKey => key as Key & RedisKey;
 
 export const BLACKLIST_DOMAINS_REDIS_KEY = redisKey('admin:blacklisted-domains');
-
-export const VERCEL_ROUTING_REDIS_KEY = redisKey('ai-gateway:vercel-routing-percentage');
-
-export const SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY = redisKey(
-  'ai-gateway:sync-providers:last-completed-at'
-);
-
-export const SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY = redisKey(
-  'ai-gateway:sync-providers:stale-alert-last-posted-at'
-);
-
-export const GATEWAY_METADATA_REDIS_KEYS = {
-  allProviders: redisKey('ai-gateway.metadata:all-providers'),
-  // Lightweight lists of language model ids used for existence checks without
-  // loading every model's metadata and endpoints.
-  openrouterModelIds: redisKey('ai-gateway.metadata:openrouter-model-ids'),
-  vercelModelIds: redisKey('ai-gateway.metadata:vercel-model-ids'),
-  openrouterProviders: redisKey('ai-gateway.metadata:openrouter-providers'),
-} as const;
-
-export const vercelInferenceProvidersRedisKey = (modelId: string) =>
-  redisKey(`ai-gateway.metadata:vercel-inference-providers:${modelId}`);
-
-export const directByokModelsRedisKey = (providerId: DirectUserByokInferenceProviderId) =>
-  redisKey(`ai-gateway.metadata.direct-byok-models:${providerId}`);
 
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
 
@@ -60,8 +33,6 @@ export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
 );
 export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
 export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderboard-provider-race');
-
-export const REQUEST_LOGGING_OPT_INS_REDIS_KEY = redisKey('ai-gateway:request-logging-opt-ins');
 
 export const abuseRulesClassificationRedisKey = (identityKey: string) =>
   redisKey(`ai-gateway.abuse-rules:last-classification:${identityKey}`);
@@ -86,3 +57,6 @@ export const gitLabOAuthCredentialsRedisKey = (credentialRef: string) =>
 
 export const githubUserAuthorizationPkceRedisKey = (verifierRef: string) =>
   redisKey(`auth-pkce:github-user:${verifierRef}`);
+
+export const githubConnectionPkceRedisKey = (verifierRef: string) =>
+  redisKey(`auth-pkce:github-connection:${verifierRef}`);

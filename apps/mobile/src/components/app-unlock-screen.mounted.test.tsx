@@ -18,7 +18,7 @@ import {
   text,
   unmountUnlock,
 } from '@/components/app-unlock-screen.test-helpers';
-import { PreferencesScreen } from '@/components/preferences-screen';
+import { GeneralSettingsScreen } from '@/components/general-settings-screen';
 import { type ElementType } from 'react';
 import { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -67,10 +67,6 @@ it.each([false, true])(
     for (const Layout of layouts) {
       const boundary = root().findByType(Layout);
       expect(boundary.findAllByType('Scene' as ElementType)).toHaveLength(1);
-    }
-    for (const Layout of [OrganizationLayout, SecurityAgentScopeLayout]) {
-      const wrapper = root().findByType(Layout).findByProps({ pointerEvents: 'none' });
-      expect(wrapper.findAllByType('PrivacyCover' as ElementType)).toHaveLength(1);
     }
     const observer = root().findByType('SecurityAgentCommandObserver' as ElementType);
     const scene = root().findByType(KiloClawLayout);
@@ -130,7 +126,7 @@ it.each([null, 'disabled'])('shows the scene without a prompt for %s', async raw
   expect(native.authenticateAsync).not.toHaveBeenCalled();
 });
 
-it('hides scenes during preference loading and retries a failed read without disclosure', async () => {
+it('hides scenes during preference loading and recovers a failed read without a gate', async () => {
   const read = Promise.withResolvers<string | null>();
   storage.getItemAsync.mockReturnValueOnce(read.promise);
   await mount();
@@ -140,21 +136,28 @@ it('hides scenes during preference loading and retries a failed read without dis
     { busy: true }
   );
   expect(retry()).toBeUndefined();
-  await flush(() => {
-    read.reject(new Error('read failed'));
-  });
-  expectHidden(root(), true);
-  expect(text(root())).toContain('Something went wrong');
-  expect(retry()?.props.disabled).toBe(false);
-  const reread = Promise.withResolvers<string | null>();
-  storage.getItemAsync.mockReturnValueOnce(reread.promise);
-  await flush(retry()?.props.onPress as () => void);
-  expectHidden(root(), true);
-  expect(root().findAllByType('Skeleton' as ElementType)).toHaveLength(1);
-  await flush(() => {
-    reread.resolve('disabled');
-  });
+  // The read rejects; the bounded read helper re-reads with backoff before
+  // the fresh read answers. Fake timers go in before the rejection lands, so
+  // the backoff runs on the fake clock, and the gate stays on the skeleton
+  // the whole time — never an error state, never a Retry tap.
+  vi.useFakeTimers();
+  try {
+    await flush(() => {
+      read.reject(new Error('read failed'));
+    });
+    expectHidden(root(), true);
+    expect(root().findAllByType('Skeleton' as ElementType)).toHaveLength(1);
+    expect(retry()).toBeUndefined();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+  } finally {
+    vi.useRealTimers();
+  }
+  await flush();
   expectHidden(root(), false);
+  expect(text(root())).not.toContain('Something went wrong');
+  expect(native.authenticateAsync).toHaveBeenCalledTimes(1);
 });
 
 it.each(['user_cancel', 'authentication_failed', 'lockout'])(
@@ -195,8 +198,15 @@ describe.each(['ios', 'android'])('%s shared unlock announcements', os => {
     platform.OS = os;
   });
 
-  it('waits for localized read feedback and keeps one owner on rerender', async () => {
-    storage.getItemAsync.mockRejectedValueOnce(new Error('read failed'));
+  it('waits for localized feedback and keeps one owner on rerender', async () => {
+    // A failed authenticate is the earliest feedback a gate can carry: with
+    // language not ready the prompt is null, so no authenticate can run and
+    // the announcement owner is not mounted yet. The failure lands on the
+    // rerender that readies the language, and the message is the localized one.
+    native.authenticateAsync.mockResolvedValueOnce({
+      success: false,
+      error: 'authentication_failed',
+    });
     i18n.addResourceBundle('fr', 'translation', fr);
     const ui = nestedUnlockScenes(<KiloClawLayout />);
     await mount(ui, false);
@@ -217,13 +227,10 @@ describe.each(['ios', 'android'])('%s shared unlock announcements', os => {
   });
 
   it.each([
-    ['read', 'Something went wrong'],
     ['authentication_failed', 'Something went wrong'],
     ['setup', 'Check your device security settings and try again.'],
   ])('announces %s once across nested gates and again after Retry', async (code, message) => {
-    if (code === 'read') {
-      storage.getItemAsync.mockRejectedValueOnce(new Error('read failed'));
-    } else if (code === 'setup') {
+    if (code === 'setup') {
       native.getEnrolledLevelAsync.mockResolvedValue(0);
     } else {
       native.authenticateAsync.mockResolvedValueOnce({ success: false, error: code });
@@ -233,27 +240,19 @@ describe.each(['ios', 'android'])('%s shared unlock announcements', os => {
     expect(announcements.mock.calls).toEqual(os === 'ios' ? [[message]] : []);
 
     const pending = Promise.withResolvers<number>();
-    if (code === 'read') {
-      storage.getItemAsync.mockReturnValueOnce(pending.promise);
-    } else {
-      native.getEnrolledLevelAsync.mockReturnValueOnce(pending.promise);
-      native.authenticateAsync.mockResolvedValueOnce({ success: false, error: code });
-    }
+    native.getEnrolledLevelAsync.mockReturnValueOnce(pending.promise);
+    native.authenticateAsync.mockResolvedValueOnce({ success: false, error: code });
     await flush(retry()?.props.onPress as () => void);
     expect(text(root())).not.toContain(message);
     await flush(() => {
-      if (code === 'read') {
-        pending.reject(new Error('read failed again'));
-      } else {
-        pending.resolve(code === 'setup' ? 0 : 3);
-      }
+      pending.resolve(code === 'setup' ? 0 : 3);
     });
     expectFeedback(root(), message, 3);
     expect(announcements.mock.calls).toEqual(os === 'ios' ? [[message], [message]] : []);
   });
 
   it.each([false, true])('announces setting feedback once with locked=%s', async locked => {
-    await mount(nestedUnlockScenes(<PreferencesScreen />));
+    await mount(nestedUnlockScenes(<GeneralSettingsScreen />));
     const preference = root().findByProps({ accessibilityLabel: 'Unlock with biometrics' });
     const save = Promise.withResolvers<undefined>();
     storage.setItemAsync.mockReturnValueOnce(save.promise);

@@ -32,6 +32,7 @@ const permission = vi.hoisted(() => ({
   canEdit: true,
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   Switch: 'Switch',

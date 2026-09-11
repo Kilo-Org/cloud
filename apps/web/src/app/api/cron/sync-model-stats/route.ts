@@ -18,7 +18,7 @@ import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
 import { CRON_SECRET, ENKRYPT_SYNC_ENABLED } from '@/lib/config.server';
 import { ENKRYPT_MODEL_MAPPINGS } from '@/lib/model-stats/enkrypt-identity';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
+import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
 
 /**
  * Vercel Cron Job: Sync Model Stats
@@ -28,7 +28,7 @@ import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
  * - Artificial Analysis benchmarks
  * - Internal usage statistics from Posthog
  *
- * It ensures all models in the preferredModels list are tracked and marked as active.
+ * It ensures concrete models in the preferredModels list are tracked and marked as active.
  * It also updates OpenRouter data for any other models already in the database.
  * Note: Models are never automatically deactivated - only users can deactivate models.
  */
@@ -70,7 +70,6 @@ export async function GET(request: NextRequest) {
       return model;
     });
 
-    const monitoredModels = await getMonitoredModels();
     const preferredModelData = allModels.filter(model => monitoredModels.includes(model.id));
 
     console.log(

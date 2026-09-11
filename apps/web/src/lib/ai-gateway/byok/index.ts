@@ -36,7 +36,6 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
   if (isCodestralModel(modelId)) {
     providers.unshift('codestral');
   }
-  console.debug('[getModelUserByokProviders] found user byok providers for %s', modelId, providers);
   return providers;
 }
 

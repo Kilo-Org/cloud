@@ -1,9 +1,10 @@
 import { Search, X } from '@/components/ui/icons';
-import { type RefObject } from 'react';
-import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { type RefObject, useMemo } from 'react';
+import { Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
-import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type SessionListSearchHeaderProps = {
@@ -12,7 +13,6 @@ type SessionListSearchHeaderProps = {
    * parent so the TextInput itself stays uncontrolled (iOS TextInput rules). */
   hasText: boolean;
   showSearchBusy: boolean;
-  showInlineError: boolean;
   onChangeText: (text: string) => void;
   onClearSearch: () => void;
   /** Initial content for the uncontrolled input, applied on a restore remount. */
@@ -25,7 +25,6 @@ export function SessionListSearchHeader({
   inputRef,
   hasText,
   showSearchBusy,
-  showInlineError,
   onChangeText,
   onClearSearch,
   defaultValue,
@@ -33,9 +32,20 @@ export function SessionListSearchHeader({
 }: Readonly<SessionListSearchHeaderProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  // The landscape side insets keep the field's rounded border and left tap
+  // area clear of the sensor housing; portrait insets are 0, keeping the
+  // fixed 22px margin unchanged.
+  const { left, right } = useSafeAreaInsets();
+  const fieldMargins = useMemo(
+    () => ({ marginLeft: 22 + left, marginRight: 22 + right }),
+    [left, right]
+  );
   return (
     <View>
-      <View className="mx-[22px] my-2 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
+      <View
+        style={fieldMargins}
+        className="my-2 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
+      >
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
         <View className="h-[18px] w-[18px] items-center justify-center">
           {showSearchBusy ? (
@@ -64,7 +74,7 @@ export function SessionListSearchHeader({
         {hasText ? (
           <Pressable
             onPress={onClearSearch}
-            accessibilityLabel={t('agents.search.clearSearch')}
+            accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
             hitSlop={12}
             className="active:opacity-70"
@@ -73,11 +83,6 @@ export function SessionListSearchHeader({
           </Pressable>
         ) : null}
       </View>
-      {showInlineError ? (
-        <Text variant="muted" className="mx-[22px] mb-[14px] text-xs">
-          {t('common.couldNotRefresh')}
-        </Text>
-      ) : null}
     </View>
   );
 }

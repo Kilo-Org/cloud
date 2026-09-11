@@ -1,7 +1,5 @@
 import { DirectUserByokInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db } from '@/lib/drizzle';
-import { redisClient } from '@/lib/redis';
-import { directByokModelsRedisKey } from '@/lib/redis-keys';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import type { DirectByokModel } from './types';
@@ -10,10 +8,6 @@ import {
   parseOpenAICompatibleProviderModels,
   syncDirectByokModels,
 } from './sync-direct-byok';
-
-jest.mock('@/lib/redis', () => ({
-  redisClient: { set: jest.fn() },
-}));
 
 describe('parseOpenAICompatibleProviderModels', () => {
   test('parses Morph OpenAI-compatible model metadata', () => {
@@ -314,8 +308,6 @@ describe('parseModelsDevProviderModels', () => {
 
 describe('syncDirectByokModels database snapshots', () => {
   const providerId = 'nvidia-byok';
-  const providerKey = directByokModelsRedisKey(providerId);
-  const redisSet = jest.mocked(redisClient.set);
   const oldSyncedAt = '2020-01-02T03:04:05.000Z';
   const downloadedModels = {
     reasoner: {
@@ -362,7 +354,6 @@ describe('syncDirectByokModels database snapshots', () => {
           DirectUserByokInferenceProviderIdSchema.options
         )
       );
-    redisSet.mockReset().mockResolvedValue('OK');
     providerModels = downloadedModels;
     fetchAvailableModels = async () =>
       Response.json({ data: Object.values(providerModels).map(({ id }) => ({ id })) });
@@ -406,37 +397,7 @@ describe('syncDirectByokModels database snapshots', () => {
       .where(eq(direct_byok_model_lists.provider_id, providerId));
   }
 
-  function expectCachedModels(models: DirectByokModel[]) {
-    const cachedWrite = redisSet.mock.calls.find(([key]) => key === providerKey);
-    expect(cachedWrite?.[2]).toEqual({ ex: 604_800 });
-    const cachedModels = cachedWrite?.[1];
-    if (typeof cachedModels !== 'string') {
-      throw new Error('Expected a Redis SET with a serialized model list');
-    }
-    expect(JSON.parse(cachedModels)).toStrictEqual(models);
-  }
-
-  function waitForOtherProviderWrites(redisError?: Error) {
-    const pendingKeys = new Set(
-      redisSet.mock.calls.map(([key]) => key).filter(key => key !== providerKey)
-    );
-    const completed = Promise.withResolvers<void>();
-    redisSet.mockClear();
-    redisSet.mockImplementation(async key => {
-      if (key === providerKey) {
-        await completed.promise;
-        if (redisError) throw redisError;
-      } else {
-        pendingKeys.delete(key);
-        if (pendingKeys.size === 0) completed.resolve();
-      }
-      return 'OK';
-    });
-    if (pendingKeys.size === 0) completed.resolve();
-    return completed.promise;
-  }
-
-  test('persists the normalized download, defaults, and nested variants in PostgreSQL and Redis', async () => {
+  test('persists the normalized download, defaults, and nested variants in PostgreSQL', async () => {
     const startedAt = Date.now();
     const counts = await syncDirectByokModels();
     const snapshot = await readSnapshot();
@@ -448,12 +409,6 @@ describe('syncDirectByokModels database snapshots', () => {
     expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(
       normalizedModels.length
     );
-    expectCachedModels(normalizedModels);
-    expect(redisSet).toHaveBeenCalledTimes(Object.keys(counts).length);
-    for (const [, , options] of redisSet.mock.calls) {
-      expect(options).toEqual({ ex: 604_800 });
-    }
-
     const snapshots = await db.select().from(direct_byok_model_lists);
     expect(snapshots.map(row => row.provider_id).sort()).toEqual(Object.keys(counts).sort());
     expect(snapshots.filter(row => row.provider_id !== providerId).map(row => row.models)).toEqual(
@@ -474,7 +429,6 @@ describe('syncDirectByokModels database snapshots', () => {
         limit: { context: 128_000, output: 64_000 },
       },
     };
-    redisSet.mockClear();
     const startedAt = Date.now();
 
     const counts = await syncDirectByokModels();
@@ -492,31 +446,25 @@ describe('syncDirectByokModels database snapshots', () => {
     expect(Date.parse(snapshot.synced_at)).toBeGreaterThanOrEqual(startedAt);
     expect(Date.parse(snapshot.synced_at)).toBeLessThanOrEqual(Date.now());
     expect(counts[providerId]).toBe(1);
-    expectCachedModels(snapshot.models);
   });
 
   test('persists a successful empty list over the previous snapshot', async () => {
     await syncDirectByokModels();
     await backdateSnapshot();
     fetchAvailableModels = async () => Response.json({ data: [] });
-    redisSet.mockClear();
-
     const counts = await syncDirectByokModels();
     const snapshot = await readSnapshot();
 
     expect(snapshot.models).toStrictEqual([]);
     expect(new Date(snapshot.synced_at).toISOString()).not.toBe(oldSyncedAt);
     expect(counts[providerId]).toBe(0);
-    expect(redisSet).toHaveBeenCalledWith(providerKey, '[]', { ex: 604_800 });
   });
 
   test('rejects an upstream failure without replacing the last successful snapshot', async () => {
     await syncDirectByokModels();
     await backdateSnapshot();
     const previousSnapshot = await readSnapshot();
-    const otherProvidersWritten = waitForOtherProviderWrites();
     fetchAvailableModels = async () => {
-      await otherProvidersWritten;
       return new Response(null, { status: 503, statusText: 'Service Unavailable' });
     };
 
@@ -525,20 +473,5 @@ describe('syncDirectByokModels database snapshots', () => {
     );
 
     expect(await readSnapshot()).toStrictEqual(previousSnapshot);
-    expect(redisSet.mock.calls.some(([key]) => key === providerKey)).toBe(false);
-  });
-
-  test('retains the database write when the subsequent Redis write fails', async () => {
-    providerModels = {};
-    await syncDirectByokModels();
-    const redisError = new Error('Redis unavailable');
-    const otherProvidersWritten = waitForOtherProviderWrites(redisError);
-    providerModels = downloadedModels;
-
-    await expect(syncDirectByokModels()).rejects.toThrow(redisError);
-    await otherProvidersWritten;
-
-    expect((await readSnapshot()).models).toStrictEqual(normalizedModels);
-    expectCachedModels(normalizedModels);
   });
 });

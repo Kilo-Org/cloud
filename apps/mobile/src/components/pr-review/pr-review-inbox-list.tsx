@@ -10,9 +10,10 @@
 
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
-import { type ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -47,6 +48,15 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
     firstPageErrorState,
     laterPageError,
   });
+
+  // Landscape: side insets keep inbox rows and the px-6 header/footer
+  // content clear of the sensor housing; portrait insets are zero, so the
+  // style carries explicit zeros and nothing else changes.
+  const insets = useSafeAreaInsets();
+  const contentContainerStyle = useMemo<ViewStyle>(
+    () => ({ paddingLeft: insets.left, paddingRight: insets.right }),
+    [insets.left, insets.right]
+  );
 
   return (
     <FlashList
@@ -87,6 +97,7 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
         }
       }}
       onEndReachedThreshold={0.5}
+      contentContainerStyle={contentContainerStyle}
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
     />
@@ -113,7 +124,7 @@ function RecentEyebrow() {
     <View className="flex-row items-center gap-2">
       <Clock size={16} color={colors.mutedForeground} />
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('prReview.inbox.recent')}
+        {t('common.recent')}
       </Text>
     </View>
   );
@@ -146,7 +157,7 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
           {item.isDraft ? (
             <View className="rounded-full bg-secondary px-2 py-0.5">
               <Text variant="muted" className="text-[10px] font-medium">
-                {t('prReview.inbox.draft')}
+                {t('common.draft')}
               </Text>
             </View>
           ) : null}
@@ -221,13 +232,13 @@ function LoadMoreRetry({ onRetry }: Readonly<{ onRetry: () => void }>) {
   return (
     <View className="items-center gap-2">
       <Text variant="muted" className="text-center text-xs">
-        {t('prReview.inbox.couldNotLoadMore')}
+        {t('common.couldnTLoadMore')}
       </Text>
       <Button
         size="sm"
         variant="outline"
         onPress={onRetry}
-        accessibilityLabel={t('prReview.inbox.retryLoadingMore')}
+        accessibilityLabel={t('common.retryLoadingMore')}
       >
         <Text>{t('common.retry')}</Text>
       </Button>

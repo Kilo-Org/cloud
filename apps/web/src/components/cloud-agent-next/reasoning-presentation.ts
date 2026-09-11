@@ -10,12 +10,12 @@ function formatReasoningDuration(ms: number): string {
 
 export function getReasoningHeader(
   title: string | undefined,
-  time: ReasoningPart['time'],
+  time: ReasoningPart['time'] | undefined,
   streaming: boolean
 ): string {
   const label = streaming ? 'Thinking' : 'Thought';
   const duration =
-    !streaming && time.end !== undefined
+    !streaming && time?.end !== undefined
       ? formatReasoningDuration(Math.max(0, time.end - time.start))
       : undefined;
   const detail = [title, duration].filter(Boolean).join(' · ');

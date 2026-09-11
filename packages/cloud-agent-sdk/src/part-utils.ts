@@ -48,6 +48,28 @@ export function stripPartContentIfFile(part: Part): Part {
 }
 
 /**
+ * The generated `Part` types declare `text: string` on text and reasoning
+ * parts, but the wire can omit the field (the per-event schemas are
+ * `.passthrough()`), and a textless part stored verbatim crashes every mobile
+ * reader (`part.text.trim()` — Sentry KILO-APP-99). Normalize once at the
+ * chat-processor seam — the single funnel every part write goes through — so
+ * all downstream readers see a string.
+ *
+ * Identity-preserving: when nothing needs fixing the SAME object is returned
+ * so memoized stored messages keep their reference. Whitespace-only text is
+ * left untouched; only absent or non-string text is filled with `''`.
+ */
+export function normalizeMissingPartText(part: Part): Part {
+  if (part.type !== 'text' && part.type !== 'reasoning') {
+    return part;
+  }
+  if (typeof part.text === 'string') {
+    return part;
+  }
+  return { ...part, text: '' };
+}
+
+/**
  * The concrete routed model stamped by the CLI onto step-finish parts for
  * kilo-auto turns (`{ providerID, modelID }`). Preserved at runtime on both
  * the live-stream path (`messagePartUpdatedDataSchema` uses `.passthrough()`)

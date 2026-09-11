@@ -6,6 +6,7 @@
 // a new owner refetches and never reuses the previous owner's cached balance.
 
 import { createElement, type ElementType } from 'react';
+import type * as ReactModule from 'react';
 import { Platform, Pressable } from 'react-native';
 import { act, type ReactTestRenderer } from 'react-test-renderer';
 import { type QueryClient } from '@tanstack/react-query';
@@ -95,6 +96,7 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: { duration: vi.fn() },
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
@@ -102,8 +104,22 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+
+vi.mock('@/lib/hooks/use-hide-balance-preference', async () => {
+  const { useState } = await vi.importActual<typeof ReactModule>('react');
+  return {
+    useHideBalancePreference: () => {
+      const [hideBalance, setHideBalance] = useState(false);
+      return { hideBalance, hasLoaded: true, setHideBalance };
+    },
+  };
+});
+
 vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
+  Eye: 'Eye',
+  EyeOff: 'EyeOff',
 }));
 
 vi.mock('@/components/ui/skeleton', () => ({
@@ -116,9 +132,20 @@ vi.mock('@/components/add-credits-row', () => ({
   AddCreditsRow: () => 'ADD_CREDITS_ROW',
 }));
 
-vi.mock('@/components/kilo-pass/kilo-pass-subscription-card', () => ({
-  KiloPassSubscriptionCard: () => null,
+const kiloPassCardProps = vi.hoisted(() => ({
+  latest: undefined as { hideLoadingSkeleton?: boolean } | undefined,
 }));
+vi.mock('@/components/kilo-pass/kilo-pass-subscription-card', () => ({
+  KiloPassSubscriptionCard: (props: { hideLoadingSkeleton?: boolean }) => {
+    kiloPassCardProps.latest = props;
+    return null;
+  },
+}));
+
+/** Read the last render's props without the caller's narrowing of the store. */
+function lastKiloPassProps(): { hideLoadingSkeleton?: boolean } | undefined {
+  return kiloPassCardProps.latest;
+}
 
 vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://example.com',
@@ -300,6 +327,25 @@ describe('CreditsCard balance state', () => {
     unmount();
   });
 
+  it('hides the KiloPass loading skeleton while the balance skeleton is the section loader', async () => {
+    // One loading indicator per section: while the balance slot shimmers, the
+    // card reserves its slot quietly; once the balance resolves, the card may
+    // show its own loader again.
+    kiloPassCardProps.latest = undefined;
+    const { unmount } = await mountCard();
+    expect(lastKiloPassProps()?.hideLoadingSkeleton).toBe(true);
+    unmount();
+
+    kiloPassCardProps.latest = undefined;
+    const queryClient = createTestQueryClient();
+    currentUser.userId = 'user-1';
+    queryClient.setQueryData([...BALANCE_KEY], { balance: 10 });
+    const settled = await mountCard(queryClient);
+    await waitFor(() => settled.texts().includes('$10.00'));
+    expect(lastKiloPassProps()?.hideLoadingSkeleton).toBe(false);
+    settled.unmount();
+  });
+
   it('shows a cached balance without reusing it after an account change', async () => {
     const queryClient = createTestQueryClient();
 
@@ -359,6 +405,34 @@ describe('CreditsCard balance state', () => {
 
     expect(refetchUserId).toHaveBeenCalledTimes(1);
     expect(getContextBalanceQueryFn).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('toggles the balance between the amount and *****', async () => {
+    currentUser.userId = 'user-A';
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData([...BALANCE_KEY], { balance: 10 });
+
+    const { renderer, texts, unmount } = await mountCard(queryClient);
+    await waitFor(() => texts().includes('$10.00'));
+
+    const hide = renderer.root.findByProps({ accessibilityLabel: 'Hide balance' });
+    expect(hide.props.accessibilityRole).toBe('button');
+    await act(() => {
+      (hide.props.onPress as () => void)();
+    });
+
+    expect(texts()).toContain('*****');
+    expect(texts()).not.toContain('$10.00');
+    const show = renderer.root.findByProps({ accessibilityLabel: 'Show balance' });
+    expect(show.findAllByType('Eye' as ElementType)).toHaveLength(1);
+
+    await act(() => {
+      (show.props.onPress as () => void)();
+    });
+    expect(texts()).toContain('$10.00');
+    expect(texts()).not.toContain('*****');
 
     unmount();
   });

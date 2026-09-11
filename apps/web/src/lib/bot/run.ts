@@ -22,6 +22,7 @@ export async function processLinkedMessage({
     thread,
     messageId: message.id,
     status: 'Thinking...',
+    platformIntegration,
   });
 
   let handedOff = false;
@@ -49,9 +50,13 @@ export async function processLinkedMessage({
           messageId: message.id,
         },
       });
-      await thread.post({
-        markdown:
-          'Sorry, I could not start processing your message because of an internal error. Please try again in a moment.',
+      await botPlatform.withAuthContext({
+        platformIntegration,
+        fn: () =>
+          thread.post({
+            markdown:
+              'Sorry, I could not start processing your message because of an internal error. Please try again in a moment.',
+          }),
       });
       return;
     }
@@ -82,6 +87,7 @@ async function processMessage({
   botRequestId: string;
 }): Promise<boolean> {
   const startedAt = Date.now();
+  const botPlatform = botPlatforms.requireByAdapter(thread.adapter);
 
   // Upload all supported files through the canonical attachments contract so
   // mixed image/document messages share one path and one five-file limit.
@@ -117,7 +123,10 @@ async function processMessage({
     });
 
     if (!result.startedCloudAgentSession) {
-      await thread.post({ markdown: result.finalText });
+      await botPlatform.withAuthContext({
+        platformIntegration,
+        fn: () => thread.post({ markdown: result.finalText }),
+      });
     }
 
     return result.startedCloudAgentSession;
@@ -132,9 +141,11 @@ async function processMessage({
 
     console.error(`[KiloBot] Error during bot run:`, errMsg, error);
 
-    await Promise.all([
-      thread.post(`Sorry, there was an error calling the AI service: ${errMsg.slice(0, 200)}`),
-    ]);
+    await botPlatform.withAuthContext({
+      platformIntegration,
+      fn: () =>
+        thread.post(`Sorry, there was an error calling the AI service: ${errMsg.slice(0, 200)}`),
+    });
 
     return false;
   }

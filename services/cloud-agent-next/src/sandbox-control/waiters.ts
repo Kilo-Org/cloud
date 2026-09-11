@@ -5,9 +5,11 @@ import {
 
 export class SandboxControlConnectionError extends Error {
   readonly code = 'not_ready';
-  readonly retryable = true;
 
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly retryable = true
+  ) {
     super(message);
     this.name = 'SandboxControlConnectionError';
   }

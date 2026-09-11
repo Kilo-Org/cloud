@@ -374,6 +374,34 @@ describe('buildSessionModelOptions', () => {
     expect(result.options.some(option => option.name === 'Use session model')).toBe(false);
   });
 
+  it('locks the chip to the observed model id when catalog parse never becomes v1', () => {
+    const result = buildSessionModelOptions({
+      activeSessionType: 'remote',
+      remoteModelState: {
+        ownerConnectionId: 'cli-owner',
+        protocol: 'unknown',
+        refresh: 'error',
+        error: 'Invalid remote model catalog',
+      },
+      observedModel: {
+        model: { providerID: 'kilo', modelID: 'muse-spark-1.3-contributor' },
+      },
+      remoteModelOverride: null,
+      gatewayModels,
+      gatewayModelsLoading: false,
+      organizationId: 'org-persisted',
+    });
+
+    expect(result.source).toBe('remote-unavailable');
+    expect(result.pickerDisabled).toBe(true);
+    expect(result.options).toEqual([
+      expect.objectContaining({
+        name: 'muse-spark-1.3-contributor',
+        unavailable: true,
+      }),
+    ]);
+  });
+
   it('disables model changes when remote discovery fails without exposing Gateway rows', () => {
     const result = buildSessionModelOptions({
       activeSessionType: 'remote',

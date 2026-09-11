@@ -126,7 +126,7 @@ export async function exitRemoteSessionWithFeedback({
       throw error;
     }
 
-    toast.success(i18n.t('agentChat.remoteSession.exited'));
+    toast.success(i18n.t('common.sessionExited'));
     onAccepted();
     // `dismissTo` dispatches POP_TO, which finds the existing `(tabs)` route
     // at the stack root and truncates the stack so a back gesture cannot

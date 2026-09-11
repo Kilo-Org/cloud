@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, type Text as RNText, ScrollView, View } from 'react-native';
+import { type Text as RNText, ScrollView, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
 

@@ -2,6 +2,7 @@ import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
 import type { VercelUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   DirectUserByokInferenceProviderIdSchema,
+  AzureCredentialsSchema,
   BedrockCredentialsSchema,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
@@ -18,7 +19,7 @@ import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelId
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
   getCachedVercelInferenceProviderIdsForModel,
-  getVercelModelsFromRedis,
+  getVercelModelsFromDatabase,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
@@ -93,7 +94,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  const vercelModels = await getVercelModelsFromRedis();
+  const vercelModels = await getVercelModelsFromDatabase();
   const vercelModelId = mapModelIdToVercel(requestedModel);
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
@@ -177,6 +178,7 @@ export function convertProviderOptions(
     );
   })();
 
+  const serviceTier = requestToMutate.body.service_tier;
   return {
     gateway: {
       only,
@@ -185,23 +187,20 @@ export function convertProviderOptions(
       zeroDataRetention: provider?.zdr,
       disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
       models: requestToMutate.body.models,
+      serviceTier: serviceTier === 'flex' || serviceTier === 'priority' ? serviceTier : undefined,
     },
   };
 }
 
-function parseBedrockCredentials(input: string) {
+function parseCredentials<T>(
+  input: string,
+  schema: { parse(input: unknown): T },
+  providerName: string
+): T {
   try {
-    return BedrockCredentialsSchema.parse(JSON.parse(input));
+    return schema.parse(JSON.parse(input));
   } catch {
-    throw new Error('Failed to parse AWS credentials');
-  }
-}
-
-function parseVertexCredentials(input: string) {
-  try {
-    return VertexCredentialsSchema.parse(JSON.parse(input));
-  } catch {
-    throw new Error('Failed to parse Google Vertex credentials');
+    throw new Error(`Failed to parse ${providerName} credentials`);
   }
 }
 
@@ -244,10 +243,12 @@ export function getVercelInferenceProviderConfigForUserByok(
     });
   }
 
-  if (key === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
-    list.push(parseBedrockCredentials(provider.decryptedAPIKey));
+  if (key === VercelUserByokInferenceProviderIdSchema.enum.azure) {
+    list.push(parseCredentials(provider.decryptedAPIKey, AzureCredentialsSchema, 'Azure'));
+  } else if (key === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
+    list.push(parseCredentials(provider.decryptedAPIKey, BedrockCredentialsSchema, 'AWS'));
   } else if (key === VercelUserByokInferenceProviderIdSchema.enum.vertex) {
-    list.push(parseVertexCredentials(provider.decryptedAPIKey));
+    list.push(parseCredentials(provider.decryptedAPIKey, VertexCredentialsSchema, 'Google Vertex'));
   } else {
     list.push({ apiKey: provider.decryptedAPIKey });
   }

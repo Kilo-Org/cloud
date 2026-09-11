@@ -1,5 +1,6 @@
 let mockEnabled = false;
 let mockCronSecret: string | undefined = 'cron-secret';
+let mockMonitoredModels = ['fixture/monitored'];
 
 jest.mock('@/lib/config.server', () => ({
   get CRON_SECRET() {
@@ -30,7 +31,11 @@ jest.mock('@/lib/model-stats/model-stats-cache', () => ({
   invalidateModelStatsCache: jest.fn(),
 }));
 jest.mock('@/lib/model-stats/sync-enkrypt', () => ({ syncEnkryptBenchmarks: jest.fn() }));
-jest.mock('@/lib/ai-gateway/monitored-models', () => ({ getMonitoredModels: jest.fn() }));
+jest.mock('@/lib/ai-gateway/monitored-models', () => ({
+  get monitoredModels() {
+    return mockMonitoredModels;
+  },
+}));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 import { NextRequest } from 'next/server';
@@ -39,7 +44,6 @@ import {
   getEnhancedOpenRouterModels,
   getRawOpenRouterModels,
 } from '@/lib/ai-gateway/providers/openrouter';
-import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
 import { ENKRYPT_MODEL_MAPPINGS } from '@/lib/model-stats/enkrypt-identity';
 import { syncArtificialAnalysisBenchmarks } from '@/lib/model-stats/sync-artificial-analysis';
 import { syncInternalUsageStats } from '@/lib/model-stats/sync-internal-data';
@@ -81,7 +85,6 @@ function expectExistingSyncCalls() {
   expect(getRawOpenRouterModels).toHaveBeenCalledWith();
   expect(getEnhancedOpenRouterModels).toHaveBeenCalledTimes(1);
   expect(getEnhancedOpenRouterModels).toHaveBeenCalledWith();
-  expect(getMonitoredModels).toHaveBeenCalledTimes(1);
   expect(syncOpenRouterModels).toHaveBeenCalledTimes(1);
   expect(syncArtificialAnalysisBenchmarks).toHaveBeenCalledTimes(1);
   expect(syncInternalUsageStats).toHaveBeenCalledTimes(1);
@@ -99,10 +102,10 @@ describe('GET /api/cron/sync-model-stats', () => {
     jest.clearAllMocks();
     mockEnabled = false;
     mockCronSecret = 'cron-secret';
+    mockMonitoredModels = [monitoredModel.id];
     mockFetch = jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected fetch'));
     jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [monitoredModel] });
     jest.mocked(getEnhancedOpenRouterModels).mockResolvedValue({ data: [monitoredModel] });
-    jest.mocked(getMonitoredModels).mockResolvedValue([monitoredModel.id]);
     jest.mocked(syncArtificialAnalysisBenchmarks).mockReset().mockResolvedValue(undefined);
     jest.mocked(syncInternalUsageStats).mockReset().mockResolvedValue(undefined);
     jest.mocked(invalidateModelStatsCache).mockReset();
@@ -302,7 +305,7 @@ describe('GET /api/cron/sync-model-stats', () => {
     const monitored = [raw.id, enhancedOnly.id];
     jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [raw] });
     jest.mocked(getEnhancedOpenRouterModels).mockResolvedValue({ data: [raw, enhancedOnly] });
-    jest.mocked(getMonitoredModels).mockResolvedValue(monitored);
+    mockMonitoredModels = monitored;
 
     expect((await GET(request())).status).toBe(200);
     expect(syncOpenRouterModels).toHaveBeenCalledWith([raw, enhancedOnly], monitored, monitored);
@@ -354,7 +357,6 @@ describe('GET /api/cron/sync-model-stats', () => {
       expect(createScheduledJobRun).not.toHaveBeenCalled();
       expect(getRawOpenRouterModels).not.toHaveBeenCalled();
       expect(getEnhancedOpenRouterModels).not.toHaveBeenCalled();
-      expect(getMonitoredModels).not.toHaveBeenCalled();
       expect(syncOpenRouterModels).not.toHaveBeenCalled();
       expect(syncArtificialAnalysisBenchmarks).not.toHaveBeenCalled();
       expect(syncInternalUsageStats).not.toHaveBeenCalled();
@@ -378,8 +380,6 @@ describe('GET /api/cron/sync-model-stats', () => {
     [true, 'raw'],
     [false, 'enhanced'],
     [true, 'enhanced'],
-    [false, 'monitored'],
-    [true, 'monitored'],
   ] as const)(
     'emits a failure without invalidating when fetching fails before writes (enabled: %s, source: %s)',
     async (enabled, source) => {
@@ -388,8 +388,6 @@ describe('GET /api/cron/sync-model-stats', () => {
       if (source === 'raw') jest.mocked(getRawOpenRouterModels).mockRejectedValueOnce(error);
       if (source === 'enhanced')
         jest.mocked(getEnhancedOpenRouterModels).mockRejectedValueOnce(error);
-      if (source === 'monitored') jest.mocked(getMonitoredModels).mockRejectedValueOnce(error);
-
       const response = await GET(request());
 
       expect(response.status).toBe(500);

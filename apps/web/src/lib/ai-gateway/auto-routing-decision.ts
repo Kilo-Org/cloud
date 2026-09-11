@@ -9,7 +9,7 @@ import type { ClassifierApiKind, MirrorPayload } from '@kilocode/auto-routing-co
 import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
 import { warnExceptInTest } from '@/lib/utils.server';
 
-export const EFFICIENT_DECISION_TIMEOUT_MS = 2_000;
+export const EFFICIENT_DECISION_TIMEOUT_MS = 5_000;
 
 export type EfficientDecisionParams = {
   apiKind: ClassifierApiKind;
@@ -74,9 +74,9 @@ function buildDecidePayload(params: EfficientDecisionParams): MirrorPayload | nu
   };
 }
 
-// kilo-auto/efficient waits for the worker's routing decision (cache hits
-// ~20ms, classifier misses ~1.2s) and falls back to the static default on
-// timeout or error.
+// kilo-auto/efficient waits for the worker's routing decision and falls back
+// to the static default on timeout or error. Do not retry an ambiguous timeout:
+// the worker may already have completed a billable classifier call.
 export async function fetchEfficientAutoDecision(
   params: EfficientDecisionParams,
   options: FetchEfficientDecisionOptions = {}

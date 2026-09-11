@@ -236,7 +236,11 @@ describe('cloud agent reporting store', () => {
     const result = await store.recordSessionFailure({
       cloudAgentSessionId,
       occurredAt,
-      failure: { stage: 'initial_admission', code: 'initial_queue_full' },
+      failure: {
+        stage: 'initial_admission',
+        code: 'initial_queue_full',
+        admissionCode: 'PENDING_QUEUE_FULL',
+      },
       diagnostic: {
         errorMessageRedacted: 'Initial queue is full',
         errorExpiresAt: '2026-06-01T12:00:00.000Z',
@@ -247,9 +251,30 @@ describe('cloud agent reporting store', () => {
       failure_at: occurredAt,
       failure_stage: 'initial_admission',
       failure_code: 'initial_queue_full',
-      failure_responsibility: 'unknown',
-      failure_reason: 'initial_admission_unknown',
+      failure_responsibility: 'platform',
+      failure_reason: 'admission_capacity',
       error_message_redacted: 'Initial queue is full',
+    });
+  });
+
+  it('attributes an admission rejection from the preserved admission code', async () => {
+    const fake = makeDb([], [[{ cloudAgentSessionId }]]);
+    const store = createCloudAgentReportStore(fake.db as never);
+    const result = await store.recordSessionFailure({
+      cloudAgentSessionId,
+      occurredAt,
+      failure: {
+        stage: 'initial_admission',
+        code: 'initial_admission_rejected',
+        admissionCode: 'INTERNAL',
+      },
+    });
+    expect(result).toEqual({ applied: true });
+    expect(fake.updates.find(call => call.table === cloud_agent_sessions)?.values).toMatchObject({
+      failure_stage: 'initial_admission',
+      failure_code: 'initial_admission_rejected',
+      failure_responsibility: 'platform',
+      failure_reason: 'admission_internal',
     });
   });
 

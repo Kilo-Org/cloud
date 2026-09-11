@@ -8,6 +8,12 @@
  * deterministically; `startNewSession` and the reconcile ladder run real code.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import jwt from 'jsonwebtoken';
+import {
+  createRuntimeAuthorization,
+  sealRuntimeAuthorization,
+} from '@kilocode/worker-utils/runtime-authorization';
+import { assertKiloModelAvailable } from '../model-validation.js';
 import type { WorkerDb } from '@kilocode/db/client';
 import type { OperationLedgerRow } from '@kilocode/db/schema';
 
@@ -64,6 +70,38 @@ const {
   generateSandboxRoutingTargetMock: vi.fn(),
 }));
 
+vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
+  createRuntimeAuthorization: vi.fn(),
+  sealRuntimeAuthorization: vi.fn(),
+}));
+vi.mock('../model-validation.js', () => ({ assertKiloModelAvailable: vi.fn() }));
+
+function modernContext(
+  ctx: SessionRegistrationContext,
+  organizationId?: string
+): SessionRegistrationContext {
+  ctx.env.NEXTAUTH_SECRET = 'registration-test-secret';
+  ctx.env.RUNTIME_ISOLATION_ENABLED = 'true';
+  ctx.authToken = jwt.sign(
+    {
+      kiloUserId: ctx.userId,
+      ...(organizationId ? { organizationId } : {}),
+      aud: 'cloud-agent-next',
+      tokenPurpose: 'human-api',
+      credentialExchange: false,
+    },
+    'registration-test-secret'
+  );
+  vi.mocked(createRuntimeAuthorization).mockResolvedValue({
+    token: 'runtime-token',
+    authorization: { id: 'authorization-test' },
+    expiresAt: '2099-01-01T00:00:00Z',
+  } as Awaited<ReturnType<typeof createRuntimeAuthorization>>);
+  vi.mocked(sealRuntimeAuthorization).mockResolvedValue('runtime-seal');
+  vi.mocked(assertKiloModelAvailable).mockResolvedValue(undefined);
+  return ctx;
+}
+
 vi.mock('@kilocode/db/operation-ledger', () => ({
   admitOperation: admitOperationMock,
   settleOperation: settleOperationMock,
@@ -81,7 +119,7 @@ vi.mock('../utils/do-retry.js', () => ({
 }));
 
 vi.mock('../session-service.js', () => ({
-  generateSessionId: () => generateSessionIdMock(),
+  generateSessionId: (plane?: 'legacy' | 'control') => generateSessionIdMock(plane),
   SessionService: class SessionService {
     createCliSessionViaSessionIngest = createCliSessionMock;
     deleteCliSessionViaSessionIngest = deleteCliSessionMock;
@@ -384,6 +422,22 @@ describe('createSessionWithLedger admission ladder', () => {
     });
   });
 
+  it('rejects a new modern control-plane session before durable session effects when isolation is disabled', async () => {
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.RUNTIME_ISOLATION_ENABLED = 'false';
+    ctx.authToken = 'eyJhbGciOiJub25lIn0.eyJhdWQiOiJhcGkifQ.';
+
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'runtime_isolation_unavailable',
+    });
+    expect(createSessionReportMock).not.toHaveBeenCalled();
+    expect(recordSandboxIdentityMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
   describe.each([undefined, 'true', 'false', '', 'False', '0'] as const)(
     'workspace containment samples CREDENTIAL_CONTAINMENT_ENABLED=%s',
     flag => {
@@ -676,6 +730,7 @@ describe('createSessionWithLedger admission ladder', () => {
       );
 
       expect(result.cloudAgentSessionId).toBe(WORKSPACE_SESSION_ID);
+      expect(generateSessionIdMock).toHaveBeenCalledWith('control');
       expect(createCliSessionMock.mock.calls[0]).toHaveLength(9);
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -850,6 +905,35 @@ describe('createSessionWithLedger admission ladder', () => {
       })
     );
   });
+
+  it.each([
+    ['missing platform', undefined, undefined],
+    ['automation origin', 'browser', 'scheduled'],
+    ['integration origin', 'browser', 'slack'],
+    ['code-review origin', undefined, 'code-review'],
+  ] as const)(
+    'keeps enrolled %s creates on agent_ sessions',
+    async (_label, clientProvenance, createdOnPlatform) => {
+      const doStub = makeDoStub();
+      const ctx = makeContext(doStub);
+      ctx.env.CONTROL_PLANE_IDS = '*';
+      ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
+
+      await runCreate(
+        ctx,
+        makeRequest({
+          options: { operationKey: OPERATION_KEY, createdOnPlatform, clientProvenance },
+        })
+      );
+
+      expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID }),
+        })
+      );
+    }
+  );
 
   it.each([
     ['missing provenance', undefined, 'cloud-agent-web'],
@@ -2133,6 +2217,95 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
     };
   }
 
+  it.each([false, true])(
+    'restores modern authorization after a lost ownership response (registered=%s)',
+    async registered => {
+      const input = request();
+      const stub = makeDoStub({
+        getMetadata: vi
+          .fn()
+          .mockResolvedValue(registered ? { identity: { sessionId: WORKSPACE_SESSION_ID } } : null),
+      });
+      const ctx = modernContext(context(stub));
+      createCliSessionMock.mockRejectedValueOnce(new Error('ownership response lost after commit'));
+      await expect(runCreate(ctx, input)).rejects.toThrow('ownership response lost after commit');
+      const progress = Object.assign(
+        {},
+        ...recordOperationProgressMock.mock.calls.map(call => call[2])
+      );
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_reconcile_pending',
+        row: makeLedgerRow({ status: 'reconcile_pending', canonical_result: progress }),
+      });
+      getPgDbMock.mockReturnValue(makeDb([[ownershipRow()], [{ email: 'test@example.com' }]]));
+      vi.mocked(createRuntimeAuthorization).mockClear();
+      vi.mocked(assertKiloModelAvailable).mockClear();
+      await expect(runCreate(ctx, input)).resolves.toMatchObject({
+        cloudAgentSessionId: WORKSPACE_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+        replayed: true,
+      });
+      if (registered) {
+        expect(createRuntimeAuthorization).not.toHaveBeenCalled();
+        expect(stub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+      } else {
+        expect(createRuntimeAuthorization).toHaveBeenCalledWith(
+          expect.objectContaining({
+            token: ctx.authToken,
+            resourceId: WORKSPACE_SESSION_ID,
+            resourceKind: 'cloud-agent-next',
+          })
+        );
+        expect(stub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+          expect.objectContaining({
+            auth: expect.objectContaining({
+              kilocodeToken: 'runtime-token',
+              kiloSessionId: KILO_SESSION_ID,
+            }),
+            runtimeAuthorizationSeal: 'runtime-seal',
+            message: { initialTurn: expect.objectContaining({ messageId: INITIAL_MESSAGE_ID }) },
+          })
+        );
+        expect(assertKiloModelAvailable).toHaveBeenCalledWith(
+          expect.objectContaining({ originalToken: 'runtime-token' })
+        );
+      }
+      expect(createCliSessionMock).toHaveBeenCalledTimes(1);
+      expect(generateSessionIdMock).toHaveBeenCalledTimes(1);
+      expect(deleteCliSessionMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['admission', 'isolation', 'model'] as const)(
+    'fails closed on resumed modern %s rejection',
+    async failure => {
+      const input = request();
+      const stub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+      const ctx = modernContext(context(stub));
+      const progress = await canonicalProgress(input);
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_reconcile_pending',
+        row: makeLedgerRow({ status: 'reconcile_pending', canonical_result: progress }),
+      });
+      getPgDbMock.mockReturnValue(makeDb([[ownershipRow()], [{ email: 'test@example.com' }]]));
+      if (failure === 'admission') {
+        vi.mocked(createRuntimeAuthorization).mockRejectedValueOnce(
+          new Error('Invalid runtime admission')
+        );
+      } else if (failure === 'isolation') {
+        ctx.env.RUNTIME_ISOLATION_ENABLED = 'false';
+      } else {
+        vi.mocked(assertKiloModelAvailable).mockRejectedValueOnce(new Error('Model unavailable'));
+      }
+      await expect(runCreate(ctx, input)).rejects.toThrow();
+      expect(stub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+      expect(stub.registerSession).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(deleteCliSessionMock).not.toHaveBeenCalled();
+      expect(settleOperationMock).not.toHaveBeenCalled();
+    }
+  );
+
   it.each([true, false, undefined])(
     'recovers committed ownership with autoCommit=%s after rollout changes without changing the initial turn',
     async autoCommit => {
@@ -3137,6 +3310,18 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     });
   }
 
+  function cloneWebRequest(): SessionCreateRequest {
+    return makeRequest({
+      initialTurn: undefined,
+      clone: { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID },
+      options: {
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'cloud-agent-web',
+        clientProvenance: 'browser',
+      },
+    });
+  }
+
   it('forwards the clone source into the ingest call and continues on ready', async () => {
     createCliSessionMock.mockResolvedValue({
       status: 'ready',
@@ -3182,10 +3367,11 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     const cloudAgentSessionGet = vi.spyOn(ctx.env.CLOUD_AGENT_SESSION, 'get');
     ctx.env.CONTROL_PLANE_IDS = USER_ID;
 
-    await expect(runCreate(ctx, cloneRequest())).resolves.toEqual({
+    await expect(runCreate(ctx, cloneWebRequest())).resolves.toEqual({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
     });
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
 
     expect(sandboxSessionIdFromName).toHaveBeenCalledWith(`${USER_ID}:${WORKSPACE_SESSION_ID}`);
     expect(sandboxSessionGet).toHaveBeenCalledTimes(1);
@@ -3215,7 +3401,11 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
         ctx,
         makeRequest({
           runtime: { sandboxAllocation: 'isolated-standard' },
-          options: { operationKey: OPERATION_KEY },
+          options: {
+            operationKey: OPERATION_KEY,
+            createdOnPlatform: 'cloud-agent-web',
+            clientProvenance: 'browser',
+          },
         })
       )
     ).rejects.toMatchObject({
@@ -3226,6 +3416,30 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     expect(admitOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('allows isolated Standard allocation for enrolled non-interactive sessions', async () => {
+    const sandboxId = `istd-${'a'.repeat(48)}` as const;
+    generateSandboxRoutingTargetMock.mockResolvedValueOnce({ kind: 'isolated', sandboxId });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = USER_ID;
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        runtime: { sandboxAllocation: 'isolated-standard' },
+        options: { operationKey: OPERATION_KEY, createdOnPlatform: 'slack' },
+      })
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID }),
+        workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
+      })
+    );
   });
 
   it.each([
@@ -3589,6 +3803,44 @@ describe('createSessionWithLedger clone reconciliation', () => {
       },
     });
   }
+
+  it.each([undefined, 'org-registration-test'])(
+    'restores modern authorization for the canonical resumed clone (organization=%s)',
+    async organizationId => {
+      const input = cloneRequest({
+        options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: organizationId },
+      });
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'takeover',
+        row: { ...(await cloneRow({}, input)), organization_id: organizationId ?? null },
+      });
+      createCliSessionMock.mockResolvedValueOnce({
+        status: 'ready',
+        clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 3 },
+      });
+      getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+      const stub = makeDoStub();
+      const ctx = modernContext(makeContext(stub), organizationId);
+      await runCreate(ctx, input);
+      expect(createRuntimeAuthorization).toHaveBeenCalledWith({
+        token: ctx.authToken,
+        secret: 'registration-test-secret',
+        connectionString: ctx.env.HYPERDRIVE.connectionString,
+        resourceKind: 'cloud-agent-next',
+        resourceId: CLOUD_AGENT_SESSION_ID,
+        ...(organizationId ? { organizationId } : {}),
+      });
+      expect(stub.registerSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identity: expect.objectContaining({ userId: USER_ID, orgId: organizationId }),
+          auth: expect.objectContaining({ kilocodeToken: 'runtime-token' }),
+          runtimeAuthorizationSeal: 'runtime-seal',
+        })
+      );
+      expect(assertKiloModelAvailable).not.toHaveBeenCalled();
+      expect(generateSessionIdMock).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([undefined, '2026-08-01T10:00:00.000Z'])(
     'resumes stored clone IDs without changing or inventing reporting age (%s)',

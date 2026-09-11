@@ -6,22 +6,37 @@ import {
 import { z } from 'zod';
 import { prepareIngestFrame } from '../../../src/shared/ingest-frame.js';
 import type { IngestEvent } from '../../../src/shared/protocol.js';
+import { withTimeoutAndAbort } from '../utils.js';
+import { createControlEventTransport } from './control-event-transport.js';
+import type { ControlEventOutboxFailure } from './control-event-outbox.js';
 import {
   CONTROL_OPERATIONS,
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_PROTOCOL_VERSION,
+  SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   controlFrameSchema,
   controlErrorCodes,
   sandboxHelloResultSchema,
   sandboxHeartbeatPayloadSchema,
+  sandboxEventPublicationResultSchema,
+  sandboxReconcilePayloadSchema,
   sessionEventPayloadSchema,
+  sessionPreparingPayloadSchema,
+  sessionNativeRuntimeRetirementPayloadSchema,
+  sessionNativeRuntimeRetirementResultSchema,
+  sessionOperationDeliverySchema,
+  sessionOperationAckSchema,
   type ControlError,
   type EventFrame,
+  type ResponseFrame,
   type SessionEventPayload,
+  type SessionOperationAck,
+  type SessionOperationDelivery,
   type RequestFrame,
   type SessionEventIdentity,
+  type SessionOperationAuthorization,
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 
@@ -33,7 +48,8 @@ type WebSocketCtor = new (
 export type SandboxControlRequestHandler = (
   operation: string,
   session: SessionRequestIdentity | undefined,
-  payload: unknown
+  payload: unknown,
+  authorization?: SessionOperationAuthorization
 ) => Promise<{ ok: boolean; result?: unknown; error?: ControlError }>;
 
 export type SandboxControlClientOptions = {
@@ -45,10 +61,31 @@ export type SandboxControlClientOptions = {
   openWebSocket?: (url: string, credential: string) => WebSocket;
   onRequest?: SandboxControlRequestHandler;
   onDisconnected?: () => void;
+  onConnectionLost?: () => void;
+  onReconnectExhausted?: () => void;
+  onConnected?: () => void;
+  onEventReceiptFailure?: (failure: ControlEventOutboxFailure) => void;
+  onReconcile?: (phase: 'drain' | 'ready' | 'commit', deadlineAt: number) => Promise<void> | void;
   log?: (message: string) => void;
   onDiagnostic?: ControlDiagnosticReporter;
   reconnectDelayMs?: (attempt: number) => number;
 };
+
+export class ControlDeliveryError extends Error {
+  constructor(
+    message: string,
+    readonly retryable: boolean
+  ) {
+    super(message);
+  }
+}
+
+const PERMANENT_CONTROL_ERRORS = new Set([
+  'unauthorized',
+  'protocol_error',
+  'unknown_operation',
+  'idempotency_conflict',
+]);
 
 export type SandboxControlClient = {
   connect(): Promise<void>;
@@ -56,14 +93,38 @@ export type SandboxControlClient = {
   sendEvent?(
     event: string,
     payload: unknown,
-    session?: { directory: string; kiloSessionId?: string; rootKiloSessionId?: string }
+    session?: SessionEventIdentity,
+    options?: { preserveConnectionOnFailure?: boolean }
   ): boolean;
+  publishSessionEvent?(payload: unknown, session: SessionEventIdentity): Promise<boolean>;
+  sendOperationResult?(
+    session: SessionRequestIdentity,
+    delivery: SessionOperationDelivery,
+    signal: AbortSignal,
+    deadlineAt: number
+  ): Promise<SessionOperationAck>;
+  reportNativeRuntimeRetirement?(input: {
+    retirementId: string;
+    directory: string;
+    nativeRuntimeId: string;
+    reason: string;
+    cleanupDeadlineAt: number;
+  }): Promise<boolean>;
+  supportsScopedCleanupResult?(): boolean;
 };
 
 type ClientState =
   | { kind: 'idle' }
   | { kind: 'starting'; promise: Promise<void>; abort: AbortController }
-  | { kind: 'ready'; socket: WebSocket; dispose: () => void; kiloVersionHeartbeat: boolean }
+  | {
+      kind: 'ready';
+      socket: WebSocket;
+      dispose: () => void;
+      kiloVersionHeartbeat: boolean;
+      connectionRecovery: boolean;
+      eventReceipts: boolean;
+      scopedCleanupResult: boolean;
+    }
   | { kind: 'closed' };
 
 const CONNECT_TIMEOUT_MS = 10_000;
@@ -103,7 +164,19 @@ function serializeEvent(event: string, payload: unknown, session?: SessionEventI
   const frame: EventFrame = {
     type: 'event',
     event,
-    ...(session ? { session } : {}),
+    ...(session
+      ? {
+          session: {
+            directory: session.directory,
+            ...(session.kiloSessionId !== undefined
+              ? { kiloSessionId: session.kiloSessionId }
+              : {}),
+            ...(session.rootKiloSessionId !== undefined
+              ? { rootKiloSessionId: session.rootKiloSessionId }
+              : {}),
+          },
+        }
+      : {}),
     payload: sessionPayload ? prepareSessionEvent(sessionPayload) : payload,
   };
   let serialized = JSON.stringify(frame);
@@ -145,7 +218,31 @@ export function createSandboxControlClient(
 ): SandboxControlClient {
   const wrapperInstanceId = options.wrapperInstanceId;
   let state: ClientState = { kind: 'idle' };
+  let recovery: { episodeId: string; attempt: number; deadlineAt: number } | undefined;
+  let committedRecovery: { episodeId: string; attempt: number; deadlineAt: number } | undefined;
+  let readiness = Promise.withResolvers<void>();
+  let reconnecting = false;
   let eventSequence = 0;
+  let eventReceipts = false;
+  const nativeRetirementReports = new Map<string, Promise<boolean>>();
+  const pendingRequests = new Map<
+    string,
+    { resolve: (frame: ResponseFrame) => void; reject: (reason: unknown) => void }
+  >();
+
+  function settleResponse(frame: ResponseFrame): void {
+    const waiter = pendingRequests.get(frame.requestId);
+    if (!waiter) return;
+    pendingRequests.delete(frame.requestId);
+    waiter.resolve(frame);
+  }
+
+  function rejectPendingRequests(reason: string): void {
+    for (const [id, waiter] of pendingRequests) {
+      pendingRequests.delete(id);
+      waiter.reject(new ControlDeliveryError(reason, true));
+    }
+  }
   const diagnostic = (phase: string, ws?: WebSocket): void =>
     emitControlDiagnostic(options.onDiagnostic, 'control.socket', {
       phase,
@@ -157,13 +254,23 @@ export function createSandboxControlClient(
     if (state.kind !== 'ready' || state.socket !== ws) return;
     const current = state;
     diagnostic('retired', ws);
-    state = { kind: 'closed' };
+    rejectPendingRequests('Sandbox control connection closed');
+    state = { kind: 'idle' };
+    readiness = Promise.withResolvers<void>();
     current.dispose();
-    options.onDisconnected?.();
+    eventTransport.pause();
+    options.onConnectionLost?.();
+    if (!current.connectionRecovery) {
+      state = { kind: 'closed' };
+      readiness.resolve();
+      options.onDisconnected?.();
+      return;
+    }
+    reconnect();
   }
 
   async function dispatchRequest(ws: WebSocket, request: RequestFrame): Promise<void> {
-    if (state.kind !== 'ready' || state.socket !== ws || !options.onRequest) return;
+    if (state.kind !== 'ready' || state.socket !== ws) return;
     const startedAt = Date.now();
     let errorCode: string | undefined;
     let retryable: boolean | undefined;
@@ -182,7 +289,97 @@ export function createSandboxControlClient(
     requestDiagnostic('received');
     let outcome: Awaited<ReturnType<SandboxControlRequestHandler>>;
     try {
-      outcome = await options.onRequest(request.operation, request.session, request.payload);
+      const reconciliation =
+        request.operation === 'sandbox.reconcile'
+          ? sandboxReconcilePayloadSchema.safeParse(request.payload)
+          : undefined;
+      if (reconciliation) {
+        if (!reconciliation.success) {
+          outcome = {
+            ok: false,
+            error: {
+              code: 'protocol_error',
+              message: 'Invalid recovery request',
+              retryable: false,
+            },
+          };
+        } else {
+          const matchesCommittedRecovery =
+            reconciliation.data.phase === 'commit' &&
+            committedRecovery?.episodeId === reconciliation.data.recovery.episodeId &&
+            committedRecovery.attempt === reconciliation.data.recovery.attempt &&
+            committedRecovery.deadlineAt === reconciliation.data.recovery.deadlineAt;
+          const matchesActiveRecovery =
+            recovery?.episodeId === reconciliation.data.recovery.episodeId &&
+            recovery.attempt === reconciliation.data.recovery.attempt &&
+            recovery.deadlineAt === reconciliation.data.recovery.deadlineAt;
+          if (
+            !matchesCommittedRecovery &&
+            (Date.now() >= reconciliation.data.recovery.deadlineAt ||
+              (reconciliation.data.phase !== 'drain' && !matchesActiveRecovery))
+          ) {
+            outcome = {
+              ok: false,
+              error: { code: 'not_ready', message: 'Recovery authority changed', retryable: false },
+            };
+          } else {
+            if (!matchesCommittedRecovery) {
+              if (reconciliation.data.phase === 'drain') {
+                recovery = {
+                  episodeId: reconciliation.data.recovery.episodeId,
+                  attempt: reconciliation.data.recovery.attempt,
+                  deadlineAt: reconciliation.data.recovery.deadlineAt,
+                };
+                committedRecovery = undefined;
+              }
+              await options.onReconcile?.(
+                reconciliation.data.phase,
+                reconciliation.data.recovery.deadlineAt
+              );
+              if (
+                recovery?.episodeId !== reconciliation.data.recovery.episodeId ||
+                recovery.attempt !== reconciliation.data.recovery.attempt ||
+                recovery.deadlineAt !== reconciliation.data.recovery.deadlineAt ||
+                (state.kind === 'ready' && state.socket !== ws)
+              )
+                return;
+              if (reconciliation.data.phase === 'commit') {
+                committedRecovery = {
+                  episodeId: reconciliation.data.recovery.episodeId,
+                  attempt: reconciliation.data.recovery.attempt,
+                  deadlineAt: reconciliation.data.recovery.deadlineAt,
+                };
+                recovery = undefined;
+              }
+            }
+            outcome = {
+              ok: true,
+              result: {
+                episodeId: reconciliation.data.recovery.episodeId,
+                attempt: reconciliation.data.recovery.attempt,
+                phase: reconciliation.data.phase,
+              },
+            };
+          }
+        }
+      } else if (recovery && ['session.attach', 'session.prompt'].includes(request.operation)) {
+        outcome = {
+          ok: false,
+          error: { code: 'not_ready', message: 'Recovery is still in progress', retryable: true },
+        };
+      } else if (options.onRequest) {
+        outcome = await options.onRequest(
+          request.operation,
+          request.session,
+          request.payload,
+          request.authorization
+        );
+      } else {
+        outcome = {
+          ok: false,
+          error: { code: 'not_ready', message: 'No request handler', retryable: true },
+        };
+      }
     } catch {
       outcome = {
         ok: false,
@@ -232,7 +429,7 @@ export function createSandboxControlClient(
         },
       });
     }
-    if (Buffer.byteLength(response) >= MAX_SANDBOX_CONTROL_FRAME_BYTES) {
+    if (Buffer.byteLength(response) > MAX_SANDBOX_CONTROL_FRAME_BYTES) {
       response = JSON.stringify({
         type: 'response',
         requestId: request.requestId,
@@ -264,6 +461,9 @@ export function createSandboxControlClient(
       const requestId = crypto.randomUUID();
       let phase: 'opening' | 'hello' | 'status' | 'finished' = 'opening';
       let kiloVersionHeartbeat = false;
+      let connectionRecovery = false;
+      let negotiatedEventReceipts = false;
+      let negotiatedScopedCleanupResult = false;
       let timeout = setTimeout(fail, Math.min(CONNECT_TIMEOUT_MS, deadlineAt - Date.now()));
 
       function dispose(): void {
@@ -318,6 +518,17 @@ export function createSandboxControlClient(
           payload: {
             protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
             providerInstanceId: options.providerInstanceId,
+            capabilities: {
+              sessionOperationResults: true,
+              scopedStopAbort: true,
+              nativeRuntimeRetirement: true,
+              connectionRecovery: true,
+              eventReceipts: true,
+              runtimeIsolation: true,
+              runtimeRecovery: true,
+              scopedCleanupResult: true,
+              workingBranches: true,
+            },
             ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
             ...(options.wrapperVersion ? { wrapperVersion: options.wrapperVersion } : {}),
           },
@@ -331,7 +542,11 @@ export function createSandboxControlClient(
       }
 
       function onMessage(event: MessageEvent): void {
-        if (typeof event.data !== 'string') return;
+        if (
+          typeof event.data !== 'string' ||
+          Buffer.byteLength(event.data) > MAX_SANDBOX_CONTROL_FRAME_BYTES
+        )
+          return;
         if (state !== starting && !(state.kind === 'ready' && state.socket === ws)) return;
         if (state === starting && phase === 'finished') return;
         let parsedJson: unknown;
@@ -344,7 +559,8 @@ export function createSandboxControlClient(
         if (!parsed.success) return;
         const frame = parsed.data;
         if (state.kind === 'ready') {
-          if (frame.type === 'request') void dispatchRequest(ws, frame);
+          if (frame.type === 'response') settleResponse(frame);
+          else if (frame.type === 'request') void dispatchRequest(ws, frame);
           return;
         }
         if (Date.now() >= deadlineAt) {
@@ -360,6 +576,9 @@ export function createSandboxControlClient(
             return;
           }
           kiloVersionHeartbeat = hello.data.capabilities?.kiloVersionHeartbeat === true;
+          connectionRecovery = hello.data.capabilities?.connectionRecovery === true;
+          negotiatedEventReceipts = hello.data.capabilities?.eventReceipts === true;
+          negotiatedScopedCleanupResult = hello.data.capabilities?.scopedCleanupResult === true;
           phase = 'status';
           diagnostic('hello_accepted', ws);
           return;
@@ -402,13 +621,20 @@ export function createSandboxControlClient(
           kind: 'ready',
           socket: ws,
           kiloVersionHeartbeat,
+          connectionRecovery,
+          eventReceipts: negotiatedEventReceipts,
+          scopedCleanupResult: negotiatedScopedCleanupResult,
           dispose: () => {
             clearInterval(keepalive);
             dispose();
           },
         };
         diagnostic('ready', ws);
+        eventReceipts = negotiatedEventReceipts;
         resolve();
+        readiness.resolve();
+        options.onConnected?.();
+        void eventTransport.resume();
       }
 
       signal.addEventListener('abort', fail, { once: true });
@@ -431,7 +657,7 @@ export function createSandboxControlClient(
       deadlineAt - Date.now()
     );
     try {
-      for (let attempt = 1; ; attempt += 1) {
+      for (let attempt = 1; attempt <= SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS; attempt += 1) {
         signal.throwIfAborted();
         if (Date.now() >= deadlineAt) throw new Error('sandbox control startup timeout');
         try {
@@ -444,7 +670,8 @@ export function createSandboxControlClient(
         } catch {
           signal.throwIfAborted();
           const remaining = deadlineAt - Date.now();
-          if (remaining <= 0) throw new Error('sandbox control startup timeout');
+          if (remaining <= 0 || attempt === SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS)
+            throw new Error('sandbox control startup timeout');
           options.log?.('sandbox control connect failed');
           const delayMs = Math.min(
             remaining,
@@ -468,32 +695,376 @@ export function createSandboxControlClient(
     }
   }
 
+  function startConnection(): Promise<void> {
+    if (state.kind === 'closed') return Promise.reject(new Error('sandbox control client closed'));
+    if (state.kind === 'ready') return Promise.resolve();
+    if (state.kind === 'starting') return state.promise;
+    const deadlineAt = Date.now() + SANDBOX_CONTROL_REQUEST_TIMEOUT_MS;
+    const starting: Extract<ClientState, { kind: 'starting' }> = {
+      kind: 'starting',
+      abort: new AbortController(),
+      promise: Promise.resolve().then(() => connectUntilReady(starting, deadlineAt)),
+    };
+    state = starting;
+    return starting.promise;
+  }
+
+  function reconnect(): void {
+    if (reconnecting || state.kind !== 'idle') return;
+    reconnecting = true;
+    void startConnection().then(
+      () => {
+        reconnecting = false;
+      },
+      () => {
+        reconnecting = false;
+        if (state.kind !== 'closed') state = { kind: 'closed' };
+        readiness.resolve();
+        options.onReconnectExhausted?.();
+        options.onDisconnected?.();
+      }
+    );
+  }
+
+  async function waitForReady(signal: AbortSignal, deadlineAt: number): Promise<WebSocket> {
+    while (state.kind !== 'ready') {
+      signal.throwIfAborted();
+      if (state.kind === 'closed' || Date.now() >= deadlineAt)
+        throw new ControlDeliveryError('Control transport unavailable', true);
+      try {
+        await withTimeoutAndAbort(readiness.promise, {
+          signal,
+          timeoutMs: Math.max(1, deadlineAt - Date.now()),
+          timeoutMessage: 'Control transport unavailable',
+          abortMessage: 'Control transport wait cancelled',
+        });
+      } catch {
+        signal.throwIfAborted();
+        throw new ControlDeliveryError('Control transport unavailable', true);
+      }
+    }
+    return state.socket;
+  }
+
+  async function publishEvent(
+    publication: {
+      event: 'session.event' | 'session.preparing';
+      receiptId: string;
+      sequence: number;
+      session: SessionEventIdentity;
+      payload: unknown;
+    },
+    deadlineAt: number
+  ): Promise<void> {
+    if (
+      state.kind !== 'ready' ||
+      !state.eventReceipts ||
+      state.socket.readyState !== 1 ||
+      Date.now() >= deadlineAt
+    )
+      throw new ControlDeliveryError('Control event transport is unavailable', true);
+    const socket = state.socket;
+    const requestId = crypto.randomUUID();
+    const frame: RequestFrame = {
+      type: 'request',
+      requestId,
+      operation: 'sandbox.event.publish',
+      payload: publication,
+    };
+    const serialized = JSON.stringify(frame);
+    if (Buffer.byteLength(serialized) > MAX_SANDBOX_CONTROL_FRAME_BYTES)
+      throw new ControlDeliveryError('Control event exceeds the frame budget', false);
+    const response = await new Promise<ResponseFrame>((resolve, reject) => {
+      const timeout = setTimeout(
+        () => {
+          pendingRequests.delete(requestId);
+          reject(new ControlDeliveryError('Control event receipt timed out', true));
+        },
+        Math.max(1, Math.min(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS, deadlineAt - Date.now()))
+      );
+      timeout.unref();
+      pendingRequests.set(requestId, {
+        resolve: frame => {
+          clearTimeout(timeout);
+          resolve(frame);
+        },
+        reject: reason => {
+          clearTimeout(timeout);
+          reject(reason);
+        },
+      });
+      try {
+        socket.send(serialized);
+      } catch {
+        pendingRequests.delete(requestId);
+        clearTimeout(timeout);
+        reject(new ControlDeliveryError('Control event publication failed', true));
+      }
+    });
+    if (
+      state.kind !== 'ready' ||
+      state.socket !== socket ||
+      socket.readyState !== 1 ||
+      Date.now() >= deadlineAt
+    )
+      throw new ControlDeliveryError('Control event acknowledgement is stale', true);
+    if (!response.ok)
+      throw new ControlDeliveryError(
+        'Control event was not acknowledged',
+        response.error?.retryable === true && !PERMANENT_CONTROL_ERRORS.has(response.error.code)
+      );
+    const acknowledgement = sandboxEventPublicationResultSchema.safeParse(response.result);
+    if (!acknowledgement.success || acknowledgement.data.receiptId !== publication.receiptId)
+      throw new ControlDeliveryError('Control event acknowledgement is invalid', false);
+  }
+
+  function sendLegacySessionEvent(payload: unknown, session: SessionEventIdentity): boolean {
+    if (state.kind !== 'ready') return false;
+    const { socket } = state;
+    if (socket.readyState !== 1) {
+      retireConnection(socket);
+      return false;
+    }
+    try {
+      socket.send(serializeEvent('session.event', payload, session));
+      return true;
+    } catch {
+      retireConnection(socket);
+      return false;
+    }
+  }
+
+  const eventTransport = createControlEventTransport({
+    supportsReceipts: () => eventReceipts,
+    publish: publishEvent,
+    prepare: ({ event, payload, session }) =>
+      event === 'session.event'
+        ? {
+            event,
+            session,
+            payload: prepareSessionEvent(sessionEventPayloadSchema.parse(payload)),
+          }
+        : { event, session, payload: sessionPreparingPayloadSchema.parse(payload) },
+    sendLegacy: (payload, session) => sendLegacySessionEvent(payload, session),
+    onFailure: failure => {
+      options.log?.(`sandbox control event publication ${failure.reason}`);
+      options.onEventReceiptFailure?.(failure);
+    },
+  });
+
+  async function sendNativeRuntimeRetirement(
+    payload: ReturnType<typeof sessionNativeRuntimeRetirementPayloadSchema.parse>,
+    deadlineAt: number
+  ): Promise<boolean> {
+    const signal = new AbortController().signal;
+    while (Date.now() < deadlineAt) {
+      try {
+        const socket = await waitForReady(signal, deadlineAt);
+        if (socket.readyState !== 1)
+          throw new ControlDeliveryError('Control transport unavailable', true);
+        const requestId = crypto.randomUUID();
+        const frame: RequestFrame = {
+          type: 'request',
+          requestId,
+          operation: 'session.runtime.retired',
+          payload,
+        };
+        const serialized = JSON.stringify(frame);
+        if (Buffer.byteLength(serialized) > MAX_SANDBOX_CONTROL_FRAME_BYTES)
+          throw new ControlDeliveryError(
+            'Native runtime retirement exceeds the frame budget',
+            false
+          );
+        const response = await new Promise<ResponseFrame>((resolve, reject) => {
+          const timeout = setTimeout(
+            () => {
+              pendingRequests.delete(requestId);
+              reject(new ControlDeliveryError('Native runtime retirement timed out', true));
+            },
+            Math.max(1, Math.min(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS, deadlineAt - Date.now()))
+          );
+          timeout.unref();
+          pendingRequests.set(requestId, {
+            resolve: frame => {
+              clearTimeout(timeout);
+              resolve(frame);
+            },
+            reject: reason => {
+              clearTimeout(timeout);
+              reject(reason);
+            },
+          });
+          try {
+            socket.send(serialized);
+          } catch {
+            pendingRequests.delete(requestId);
+            clearTimeout(timeout);
+            reject(new ControlDeliveryError('Native runtime retirement publication failed', true));
+          }
+        });
+        if (
+          state.kind !== 'ready' ||
+          state.socket !== socket ||
+          socket.readyState !== 1 ||
+          Date.now() >= deadlineAt
+        )
+          throw new ControlDeliveryError(
+            'Native runtime retirement acknowledgement is stale',
+            true
+          );
+        if (!response.ok)
+          throw new ControlDeliveryError(
+            'Native runtime retirement was not acknowledged',
+            response.error?.retryable === true && !PERMANENT_CONTROL_ERRORS.has(response.error.code)
+          );
+        return sessionNativeRuntimeRetirementResultSchema.safeParse(response.result).success;
+      } catch (error) {
+        if (!(error instanceof ControlDeliveryError) || !error.retryable) return false;
+        if (Date.now() >= deadlineAt) return false;
+        await delay(Math.min(250, Math.max(1, deadlineAt - Date.now())));
+      }
+    }
+    return false;
+  }
+
   return {
     connect(): Promise<void> {
-      if (state.kind === 'closed')
-        return Promise.reject(new Error('sandbox control client closed'));
-      if (state.kind === 'ready') return Promise.resolve();
-      if (state.kind === 'starting') return state.promise;
-      const deadlineAt = Date.now() + SANDBOX_CONTROL_REQUEST_TIMEOUT_MS;
-      const starting: Extract<ClientState, { kind: 'starting' }> = {
-        kind: 'starting',
-        abort: new AbortController(),
-        promise: Promise.resolve().then(() => connectUntilReady(starting, deadlineAt)),
-      };
-      state = starting;
-      return starting.promise;
+      return startConnection();
     },
 
     close(): void {
       const current = state;
       diagnostic('closed', current.kind === 'ready' ? current.socket : undefined);
+      rejectPendingRequests('Sandbox control client closed');
+      eventTransport.close();
       state = { kind: 'closed' };
+      readiness.resolve();
       if (current.kind === 'starting')
         current.abort.abort(new Error('sandbox control client closed'));
       else if (current.kind === 'ready') current.dispose();
     },
 
-    sendEvent(event: string, payload: unknown, session?: SessionEventIdentity): boolean {
+    async sendOperationResult(
+      session: SessionRequestIdentity,
+      delivery: SessionOperationDelivery,
+      signal: AbortSignal,
+      deadlineAt: number
+    ): Promise<SessionOperationAck> {
+      signal.throwIfAborted();
+      if (Date.now() >= deadlineAt)
+        throw new ControlDeliveryError('Control delivery expired', false);
+      const socket = await waitForReady(signal, deadlineAt);
+      if (socket.readyState !== 1)
+        throw new ControlDeliveryError('Control transport unavailable', true);
+      const requestId = crypto.randomUUID();
+      let payload: SessionOperationDelivery;
+      try {
+        payload = sessionOperationDeliverySchema.parse(delivery);
+      } catch {
+        throw new ControlDeliveryError('Operation result payload is invalid', false);
+      }
+      const frame: RequestFrame = {
+        type: 'request',
+        requestId,
+        operation: 'session.operation.result',
+        session,
+        payload,
+      };
+      let serialized: string;
+      try {
+        serialized = JSON.stringify(frame);
+      } catch {
+        throw new ControlDeliveryError('Operation result cannot be serialized', false);
+      }
+      if (Buffer.byteLength(serialized) > MAX_SANDBOX_CONTROL_FRAME_BYTES)
+        throw new ControlDeliveryError('Control delivery exceeds the frame budget', false);
+      const pending = new Promise<ResponseFrame>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => {
+            pendingRequests.delete(requestId);
+            reject(new ControlDeliveryError('Operation result delivery timed out', true));
+          },
+          Math.max(1, Math.min(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS, deadlineAt - Date.now()))
+        );
+        timeout.unref();
+        pendingRequests.set(requestId, {
+          resolve: frame => {
+            clearTimeout(timeout);
+            resolve(frame);
+          },
+          reject: reason => {
+            clearTimeout(timeout);
+            reject(reason);
+          },
+        });
+      });
+      const onAbort = () => {
+        const waiter = pendingRequests.get(requestId);
+        if (waiter) {
+          pendingRequests.delete(requestId);
+          waiter.reject(new ControlDeliveryError('Control delivery cancelled', false));
+        }
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      try {
+        signal.throwIfAborted();
+        socket.send(serialized);
+      } catch {
+        const waiter = pendingRequests.get(requestId);
+        if (waiter) {
+          pendingRequests.delete(requestId);
+          waiter.reject(new ControlDeliveryError('Control delivery publication failed', true));
+        }
+      }
+      try {
+        const response = await pending;
+        signal.throwIfAborted();
+        if (
+          Date.now() >= deadlineAt ||
+          state.kind !== 'ready' ||
+          state.socket !== socket ||
+          socket.readyState !== 1
+        )
+          throw new ControlDeliveryError('Control delivery acknowledgement is stale', true);
+        if (!response.ok)
+          throw new ControlDeliveryError(
+            'Control delivery was not acknowledged',
+            response.error?.retryable === true && !PERMANENT_CONTROL_ERRORS.has(response.error.code)
+          );
+        try {
+          return sessionOperationAckSchema.parse(response.result);
+        } catch {
+          throw new ControlDeliveryError('Control delivery acknowledgement is invalid', false);
+        }
+      } finally {
+        signal.removeEventListener('abort', onAbort);
+      }
+    },
+
+    async reportNativeRuntimeRetirement(input): Promise<boolean> {
+      const payload = sessionNativeRuntimeRetirementPayloadSchema.parse(input);
+      const key = JSON.stringify(payload);
+      const existing = nativeRetirementReports.get(key);
+      if (existing) return existing;
+      const report = sendNativeRuntimeRetirement(payload, payload.cleanupDeadlineAt);
+      nativeRetirementReports.set(key, report);
+      return report;
+    },
+
+    supportsScopedCleanupResult(): boolean {
+      return state.kind === 'ready' && state.scopedCleanupResult;
+    },
+
+    async publishSessionEvent(payload, session): Promise<boolean> {
+      return eventTransport.publishSessionEvent(payload, session);
+    },
+
+    sendEvent(
+      event: string,
+      payload: unknown,
+      session?: SessionEventIdentity,
+      deliveryOptions?: { preserveConnectionOnFailure?: boolean }
+    ): boolean {
       eventSequence += 1;
       const category =
         event === 'session.event'
@@ -519,6 +1090,24 @@ export function createSandboxControlClient(
           bytes,
           bufferedBytes: state.kind === 'ready' ? state.socket.bufferedAmount : undefined,
         });
+      if (
+        eventReceipts &&
+        session &&
+        (event === 'session.event' || event === 'session.preparing')
+      ) {
+        try {
+          const accepted = eventTransport.enqueue(event, payload, session);
+          if (!accepted) eventDiagnostic('outbox_rejected');
+          else {
+            void eventTransport.resume();
+            eventDiagnostic('outbox_enqueued');
+          }
+          return accepted;
+        } catch {
+          eventDiagnostic('outbox_rejected');
+          return false;
+        }
+      }
       if (state.kind !== 'ready') {
         eventDiagnostic('skipped');
         return false;
@@ -526,7 +1115,7 @@ export function createSandboxControlClient(
       const { socket } = state;
       if (socket.readyState !== 1) {
         eventDiagnostic('send_failed');
-        retireConnection(socket);
+        if (!deliveryOptions?.preserveConnectionOnFailure) retireConnection(socket);
         return false;
       }
       try {
@@ -539,7 +1128,7 @@ export function createSandboxControlClient(
         return true;
       } catch {
         eventDiagnostic('send_failed');
-        retireConnection(socket);
+        if (!deliveryOptions?.preserveConnectionOnFailure) retireConnection(socket);
         return false;
       }
     },

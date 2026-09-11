@@ -393,7 +393,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         <Button
           size="icon"
           variant="ghost"
-          accessibilityLabel={t('share.close')}
+          accessibilityLabel={t('common.close')}
           onPress={dismiss}
           className="absolute right-2"
         >
@@ -408,13 +408,13 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       {reviewPr ? (
         <DestinationOptionRow
           icon={GitPullRequest}
-          title={t('share.reviewPr')}
+          title={t('common.reviewPr')}
           subtitle={t('share.reviewPrSubtitle', {
             owner: reviewPr.owner,
             repo: reviewPr.repo,
             number: reviewPr.number,
           })}
-          accessibilityLabel={t('share.reviewPr')}
+          accessibilityLabel={t('common.reviewPr')}
           onPress={handleReviewPr}
         />
       ) : null}
@@ -424,7 +424,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
           onPress={newSessionDisabled ? undefined : handleNewSession}
           disabled={newSessionDisabled}
           accessibilityRole="button"
-          accessibilityLabel={t('share.newSession')}
+          accessibilityLabel={t('common.newSession')}
           accessibilityState={{ disabled: newSessionDisabled }}
           className={`flex-row items-center gap-3 border-t border-border px-4 py-3.5 ${
             newSessionDisabled ? 'opacity-50' : 'active:opacity-70'
@@ -433,7 +433,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
           <View className="h-9 w-9 items-center justify-center rounded-full bg-primary">
             <Plus size={18} color={colors.primaryForeground} />
           </View>
-          <Text className="text-base font-semibold text-foreground">{t('share.newSession')}</Text>
+          <Text className="text-base font-semibold text-foreground">{t('common.newSession')}</Text>
         </Pressable>
       ) : null}
     </View>

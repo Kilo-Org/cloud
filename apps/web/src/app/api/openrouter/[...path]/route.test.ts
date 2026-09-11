@@ -498,7 +498,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
-    mockedGetOpenRouterModels.mockResolvedValue(new Set(['stepfun/step-3.7-flash:free']));
+    mockedGetOpenRouterModels.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
@@ -870,12 +870,8 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 
     expect(response.status).toBe(200);
     expect(mockedGetProvider).toHaveBeenCalledTimes(2);
-    expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe(
-      stepfun_37_flash_free_model.public_id
-    );
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(
-      stepfun_37_flash_free_model.internal_id
-    );
+    expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe('poolside/laguna-s-2.1:free');
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('poolside/laguna-s-2.1:free');
     expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
       abuse_delay: 6000,
       abuse_downgraded_from: 'openai/gpt-4o',

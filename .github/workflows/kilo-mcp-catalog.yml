@@ -347,6 +347,17 @@ jobs:
       - name: Regenerate catalog.json
         run: pnpm --filter web script src/scripts/mcp-catalog/dump.ts
 
+      # The bundled catalog a production deploy serves must match the index this
+      # run upserts. If the dump changes the checked-in file, main was stale
+      # (the PR job never landed the refresh): fail instead of indexing content
+      # the Worker bundle does not carry (requirement 22).
+      - name: Fail if the regenerated catalog is not the committed one
+        run: |
+          if ! git diff --exit-code -- services/kilo-mcp/catalog.json > /dev/null; then
+            echo "::error::The dump changed services/kilo-mcp/catalog.json on main. Commit the regenerated catalog before the Vectorize upsert; otherwise the deployed Worker bundle and the index diverge."
+            exit 1
+          fi
+
       # Vectorize upsert (requirement 9). The index name and account id match
       # the production bindings in services/kilo-mcp/wrangler.jsonc; the
       # account id is not a secret (it is committed there).

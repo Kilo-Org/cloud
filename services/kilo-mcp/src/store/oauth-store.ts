@@ -166,10 +166,21 @@ export interface OAuthStoreApi {
     nowIso: string
   ): Promise<number>;
   /**
-   * The Kilo API token to forward for a verified MCP identity (s6): the newest
-   * live grant for (user, client). Null when the user must reconnect.
+   * The Kilo API token to forward for a verified MCP identity: the newest live
+   * grant for (user, client, org, resource). Null when the user must
+   * reconnect. The lookup must be scoped to the token's own grant — a token
+   * minted for one org or resource must never forward another grant's
+   * credential.
    */
-  getKiloToken(kiloUserId: string, clientId: string, nowIso: string): Promise<string | null>;
+  getKiloToken(
+    identity: {
+      kiloUserId: string;
+      clientId: string;
+      organizationId: string | null;
+      resource: string;
+    },
+    nowIso: string
+  ): Promise<string | null>;
   revokeJti(jti: string, tokenExpiresAt: string, nowIso: string): Promise<void>;
   isJtiRevoked(jti: string): Promise<boolean>;
   /** Housekeeping: drop rows past their own expiry. Returns deleted row count. */
@@ -452,14 +463,27 @@ export class KiloMcpOAuthStore extends DurableObject<Env> implements OAuthStoreA
     return rows.length;
   }
 
-  async getKiloToken(kiloUserId: string, clientId: string, nowIso: string): Promise<string | null> {
+  async getKiloToken(
+    identity: {
+      kiloUserId: string;
+      clientId: string;
+      organizationId: string | null;
+      resource: string;
+    },
+    nowIso: string
+  ): Promise<string | null> {
     const row = this.db
       .select({ kiloToken: oauthRefreshTokens.kilo_token })
       .from(oauthRefreshTokens)
       .where(
         and(
-          eq(oauthRefreshTokens.kilo_user_id, kiloUserId),
-          eq(oauthRefreshTokens.client_id, clientId),
+          eq(oauthRefreshTokens.kilo_user_id, identity.kiloUserId),
+          eq(oauthRefreshTokens.client_id, identity.clientId),
+          eq(oauthRefreshTokens.resource, identity.resource),
+          // organization_id is nullable; a null-org identity matches only null rows.
+          identity.organizationId === null
+            ? isNull(oauthRefreshTokens.organization_id)
+            : eq(oauthRefreshTokens.organization_id, identity.organizationId),
           isNull(oauthRefreshTokens.revoked_at),
           gt(oauthRefreshTokens.expires_at, nowIso)
         )

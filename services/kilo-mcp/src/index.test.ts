@@ -538,20 +538,27 @@ describe('auth endpoint routing (s5)', () => {
         refreshTokens.set(input.id, { ...input, revokedAt: null });
         return true;
       },
-      async getKiloToken(kiloUserId, clientId) {
+      async getKiloToken(identity) {
         for (const grant of [...refreshTokens.values()].reverse()) {
           if (
-            grant.kiloUserId === kiloUserId &&
-            grant.clientId === clientId &&
+            grant.kiloUserId === identity.kiloUserId &&
+            grant.clientId === identity.clientId &&
+            grant.organizationId === identity.organizationId &&
+            grant.resource === identity.resource &&
             grant.revokedAt === null &&
             grant.kiloToken
           ) {
             return grant.kiloToken;
           }
         }
-        // The s5 verification tests mint tokens for user-1/c-1 without going
-        // through the exchange; that pair keeps a standing credential.
-        return kiloUserId === 'user-1' && clientId === 'c-1' ? 'kilo-forward-me' : null;
+        // The s5 verification tests mint tokens for user-1/c-1/org-1 without
+        // going through the exchange; that grant keeps a standing credential.
+        return identity.kiloUserId === 'user-1' &&
+          identity.clientId === 'c-1' &&
+          identity.organizationId === 'org-1' &&
+          identity.resource === `${ISSUER}/mcp`
+          ? 'kilo-forward-me'
+          : null;
       },
       revokeGrant: unused,
       revokeJti: unused,

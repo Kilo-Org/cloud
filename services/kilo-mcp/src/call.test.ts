@@ -149,6 +149,22 @@ describe('callCatalogEndpoint', () => {
     expect('x-kilocode-organizationid' in headers).toBe(false);
   });
 
+  it('rejects any input for a no-input procedure before any request', async () => {
+    const fetchImpl = vi.fn();
+    const error = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'organizations.list',
+      input: { unexpected: true },
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonRpcFailure);
+    expect((error as JsonRpcFailure).code).toBe(-32602);
+    expect((error as Error).message).toMatch(/takes no input/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('maps a tRPC error body to a JSON-RPC error preserving code and httpStatus (retryable)', async () => {
     const fetchImpl = vi.fn(async () =>
       upstreamResponse(

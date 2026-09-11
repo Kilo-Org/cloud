@@ -17,6 +17,8 @@ export type VerifiedMcpToken = {
   kiloUserId: string;
   organizationId: string | null;
   clientId: string;
+  /** The token's bound resource (`aud`), so credential lookups stay grant-scoped. */
+  resource: string;
   /** Seconds (JWT `exp`), for callers that want to cache the verify result. */
   expiresAt: number;
 };
@@ -77,6 +79,7 @@ export async function verifyMcpAccessToken(
       kiloUserId: sub,
       organizationId: typeof org === 'string' ? org : null,
       clientId,
+      resource: deps.resource,
       expiresAt: exp,
     },
   };

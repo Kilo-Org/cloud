@@ -37,6 +37,7 @@ describe('verifyMcpAccessToken', () => {
         kiloUserId: 'kilo-user-1',
         organizationId: 'org-1',
         clientId: 'client-1',
+        resource: RESOURCE,
         expiresAt: expect.any(Number),
       },
     });

@@ -47,7 +47,7 @@ export type NewOAuthClient = {
   createdAt: string;
 };
 
-export type OAuthCodeStatus = 'pending' | 'approved' | 'used' | 'denied';
+export type OAuthCodeStatus = 'pending' | 'approved' | 'used' | 'denied' | 'expired';
 
 export type OAuthCodeRecord = {
   code: string;
@@ -138,6 +138,8 @@ export interface OAuthStoreApi {
   ): Promise<boolean>;
   /** pending -> denied after the user denied the Kilo pairing upstream (s6). */
   denyCode(deviceAuthCode: string, nowIso: string): Promise<boolean>;
+  /** pending -> expired after apps/web reported the pairing expired upstream. */
+  markCodeExpired(deviceAuthCode: string, nowIso: string): Promise<boolean>;
   /** pending -> approved with the Kilo identity; false when not exchangeable-pending. */
   approveCode(
     deviceAuthCode: string,
@@ -307,6 +309,22 @@ export class KiloMcpOAuthStore extends DurableObject<Env> implements OAuthStoreA
     const row = this.db
       .update(oauthCodes)
       .set({ status: 'denied' })
+      .where(
+        and(
+          eq(oauthCodes.device_auth_code, deviceAuthCode),
+          eq(oauthCodes.status, 'pending'),
+          gt(oauthCodes.expires_at, nowIso)
+        )
+      )
+      .returning({ code: oauthCodes.code })
+      .get();
+    return row !== undefined;
+  }
+
+  async markCodeExpired(deviceAuthCode: string, nowIso: string): Promise<boolean> {
+    const row = this.db
+      .update(oauthCodes)
+      .set({ status: 'expired' })
       .where(
         and(
           eq(oauthCodes.device_auth_code, deviceAuthCode),

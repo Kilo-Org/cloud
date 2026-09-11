@@ -73,6 +73,19 @@ function createFakeOAuthStore(): OAuthStoreApi & {
       }
       return false;
     },
+    async markCodeExpired(deviceAuthCode, nowIso) {
+      for (const [code, record] of codes) {
+        if (
+          record.deviceAuthCode === deviceAuthCode &&
+          record.status === 'pending' &&
+          record.expiresAt > nowIso
+        ) {
+          codes.set(code, { ...record, status: 'expired' });
+          return true;
+        }
+      }
+      return false;
+    },
     async approveCode(deviceAuthCode, identity, nowIso) {
       for (const [code, record] of codes) {
         if (
@@ -299,18 +312,41 @@ describe('GET /authorize/status (consent-page pairing poll)', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it('an expired upstream pairing reports expired (retryable via restart)', async () => {
+  it('concurrent denied polls emit the failure only once', async () => {
+    const store = createFakeOAuthStore();
+    const record = seedPendingCode(store);
+    const fetchImpl = upstreamFetch(() => Response.json({ status: 'denied' }, { status: 403 }));
+    const { analytics, calls } = fakeAnalytics();
+    const deps = { store, webBaseUrl: WEB, fetchImpl, analytics };
+    // Both requests read the same pending record before either persists the
+    // denial; only the transition winner may emit.
+    const responses = await Promise.all([
+      handlePairingStatus(statusRequest(record.code), deps).then(r => r.json()),
+      handlePairingStatus(statusRequest(record.code), deps).then(r => r.json()),
+    ]);
+    expect(responses).toEqual([{ status: 'denied' }, { status: 'denied' }]);
+    expect(store.codes.get(record.code)?.status).toBe('denied');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('an expired upstream pairing reports expired once and persists the terminal state', async () => {
     const store = createFakeOAuthStore();
     const record = seedPendingCode(store);
     const fetchImpl = upstreamFetch(() => Response.json({ status: 'expired' }, { status: 410 }));
+    const { analytics, calls } = fakeAnalytics();
+    const deps = { store, webBaseUrl: WEB, fetchImpl, analytics };
     await expect(
-      handlePairingStatus(statusRequest(record.code), { store, webBaseUrl: WEB, fetchImpl }).then(
-        r => r.json()
-      )
+      handlePairingStatus(statusRequest(record.code), deps).then(r => r.json())
     ).resolves.toEqual({ status: 'expired' });
-    // The local record stays pending (no terminal store state for upstream
-    // expiry) so the page can still restart before its own TTL.
-    expect(store.codes.get(record.code)?.status).toBe('pending');
+    // The terminal expiry is persisted so repeated polls answer from the
+    // record instead of re-emitting the failure.
+    expect(store.codes.get(record.code)?.status).toBe('expired');
+    expect(calls).toHaveLength(1);
+    await expect(
+      handlePairingStatus(statusRequest(record.code), deps).then(r => r.json())
+    ).resolves.toEqual({ status: 'expired' });
+    expect(calls).toHaveLength(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it('an unreachable upstream keeps the page waiting instead of failing the flow', async () => {

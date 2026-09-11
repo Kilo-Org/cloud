@@ -47,6 +47,7 @@ function createFakeOAuthStore(): OAuthStoreApi & {
     },
     recordPairingApproval: unused,
     denyCode: unused,
+    markCodeExpired: unused,
     async approveCode(deviceAuthCode, identity, nowIso) {
       for (const [code, record] of codes) {
         if (

@@ -512,6 +512,19 @@ describe('auth endpoint routing (s5)', () => {
         }
         return false;
       },
+      async markCodeExpired(deviceAuthCode, nowIso) {
+        for (const [code, record] of codes) {
+          if (
+            record.deviceAuthCode === deviceAuthCode &&
+            record.status === 'pending' &&
+            record.expiresAt > nowIso
+          ) {
+            codes.set(code, { ...record, status: 'expired' });
+            return true;
+          }
+        }
+        return false;
+      },
       async approveCode(deviceAuthCode, identity, nowIso) {
         for (const [code, record] of codes) {
           if (

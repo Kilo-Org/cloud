@@ -181,6 +181,11 @@ export async function handlePairingStatus(
     // the same record must answer denied without re-emitting.
     return authJsonResponse({ status: 'denied' } satisfies PairingStatus);
   }
+  if (record.status === 'expired') {
+    // Terminal state, recorded when the first poll learned of the upstream
+    // expiry; later polls answer expired without re-emitting.
+    return authJsonResponse({ status: 'expired' } satisfies PairingStatus);
+  }
   if (record.status === 'approved') {
     return clientRedirect(record);
   }
@@ -196,23 +201,33 @@ export async function handlePairingStatus(
       // Transient upstream failure keeps the page waiting; its next poll retries.
       return authJsonResponse({ status: 'pending' } satisfies PairingStatus);
     case 'denied': {
-      await deps.store.denyCode(record.deviceAuthCode, nowIso);
-      deps.analytics?.oauthSignIn({
-        phase: 'failed',
-        identity: null,
-        clientId: record.clientId,
-        reason: 'denied',
-      });
+      // Emit only when THIS request won the pending -> denied transition;
+      // a concurrent poll that lost the race must not double-count.
+      const transitioned = await deps.store.denyCode(record.deviceAuthCode, nowIso);
+      if (transitioned) {
+        deps.analytics?.oauthSignIn({
+          phase: 'failed',
+          identity: null,
+          clientId: record.clientId,
+          reason: 'denied',
+        });
+      }
       return authJsonResponse({ status: 'denied' } satisfies PairingStatus);
     }
-    case 'expired':
-      deps.analytics?.oauthSignIn({
-        phase: 'failed',
-        identity: null,
-        clientId: record.clientId,
-        reason: 'expired',
-      });
+    case 'expired': {
+      // Persist the terminal expiry so every later poll answers from the
+      // record instead of re-emitting the failure.
+      const transitioned = await deps.store.markCodeExpired(record.deviceAuthCode, nowIso);
+      if (transitioned) {
+        deps.analytics?.oauthSignIn({
+          phase: 'failed',
+          identity: null,
+          clientId: record.clientId,
+          reason: 'expired',
+        });
+      }
       return authJsonResponse({ status: 'expired' } satisfies PairingStatus);
+    }
     case 'approved': {
       // Persist BEFORE any further poll: the upstream answer is single-use.
       await deps.store.recordPairingApproval(

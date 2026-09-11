@@ -38,7 +38,9 @@ export const oauthCodes = sqliteTable(
     state: text('state'),
     /** The apps/web device-auth pairing code (`code` from POST /api/device-auth/codes). */
     device_auth_code: text('device_auth_code').notNull(),
-    status: text('status', { enum: ['pending', 'approved', 'used', 'denied'] }).notNull(),
+    status: text('status', {
+      enum: ['pending', 'approved', 'used', 'denied', 'expired'],
+    }).notNull(),
     /** Set when the user approves the pairing; until then the code cannot be exchanged. */
     kilo_user_id: text('kilo_user_id'),
     /** Null for personal (org-less) identities. */

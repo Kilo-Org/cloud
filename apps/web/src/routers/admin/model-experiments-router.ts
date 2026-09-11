@@ -13,14 +13,12 @@ import {
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { deepStrict } from '@/lib/zod/deep-strict';
-import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
 import { CustomLlmApiConfigSchema, CustomLlmMetadataSchema } from '@kilocode/db/schema-types';
 import {
   CUSTOM_LLM_PREFIX,
   KILOCLAW_KILO_PROVIDER_PREFIX,
   KILOCODE_KILO_PROVIDER_PREFIX,
 } from '@/lib/ai-gateway/model-utils';
-import { redisClient } from '@/lib/redis';
 import { TRPCError } from '@trpc/server';
 import { and, asc, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -79,15 +77,6 @@ async function loadVariantOrThrow(variantId: string) {
   return row ?? notFound('Variant');
 }
 
-async function recomputeExperimentedPublicIds() {
-  const rows = await db
-    .select({ public_model_id: model_experiment.public_model_id })
-    .from(model_experiment)
-    .where(inArray(model_experiment.status, ROUTING_STATUSES));
-  const ids = Array.from(new Set(rows.map(r => r.public_model_id))).sort();
-  await redisClient.set(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY, JSON.stringify(ids));
-}
-
 /**
  * Postgres unique-constraint violation. We use this to convert the
  * `UQ_model_experiment_public_model_id_routing` partial unique index
@@ -136,7 +125,6 @@ async function applyExperimentTransition(opts: {
       .where(eq(model_experiment.id, opts.id))
       .returning();
     if (!updated) notFound('Experiment');
-    await refreshExperimentedPublicIdsCache();
     return updated;
   } catch (err) {
     if (isUniqueViolation(err)) {
@@ -146,15 +134,6 @@ async function applyExperimentTransition(opts: {
       );
     }
     throw err;
-  }
-}
-
-async function refreshExperimentedPublicIdsCache() {
-  // Best-effort — Redis being down does not block admin writes.
-  try {
-    await recomputeExperimentedPublicIds();
-  } catch {
-    // already captured by redis helper
   }
 }
 
@@ -505,7 +484,6 @@ export const adminModelExperimentsRouter = createTRPCRouter({
     // Only routing-relevant edits touch the experimented-public-id cache;
     // cosmetic name/description-only changes don't refresh it.
     if (existing.public_model_id !== updated.public_model_id) {
-      await refreshExperimentedPublicIdsCache();
     }
     return updated;
   }),
@@ -649,7 +627,6 @@ export const adminModelExperimentsRouter = createTRPCRouter({
           created_by: ctx.user.id,
         })
         .returning(variantVersionPublicColumns);
-      await refreshExperimentedPublicIdsCache();
       return inserted;
     }),
 
@@ -690,7 +667,6 @@ export const adminModelExperimentsRouter = createTRPCRouter({
         created_by: ctx.user.id,
       })
       .returning(variantVersionPublicColumns);
-    await refreshExperimentedPublicIdsCache();
     return inserted;
   }),
 });

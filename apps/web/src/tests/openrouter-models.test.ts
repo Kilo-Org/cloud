@@ -15,7 +15,6 @@ import type * as ModelSettings from '@/lib/ai-gateway/providers/model-settings';
 import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
 import type * as AutoRouting from '@/lib/ai-gateway/auto-routing-models';
 import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
-import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
 import type * as DirectByok from '@/lib/ai-gateway/providers/direct-byok';
@@ -135,10 +134,6 @@ jest.mock('@/lib/ai-gateway/byok', () => {
   };
 });
 
-jest.mock('@/lib/ai-gateway/experiments/list-available-experiment-models', () => ({
-  listAvailableExperimentModels: jest.fn(async () => []),
-}));
-
 jest.mock('@/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getBenchmarkRoutingTable: jest.fn(async () => ({ status: 200, body: { table: null } })),
 }));
@@ -209,7 +204,6 @@ beforeEach(() => {
     .mockImplementation(realDirectByok.getDirectByokModelsForUser);
   jest.mocked(getUserByokProviderIds).mockReset().mockResolvedValue([]);
   jest.mocked(getAvailableModelsForOrganization).mockReset().mockResolvedValue(null);
-  jest.mocked(listAvailableExperimentModels).mockReset().mockResolvedValue([]);
   invalidateModelStatsCache();
   mockRows.mockReset().mockResolvedValue(new Map());
   jest.spyOn(Date, 'now').mockReturnValue(Date.parse(enkryptBenchmark.ingestedAt));
@@ -726,9 +720,7 @@ describe('final Enkrypt serialization boundaries', () => {
     ['direct', 'free'],
     ['direct', 'opencode'],
     ['anonymous', 'autoRouting'],
-    ['anonymous', 'experiments'],
     ['authenticated', 'autoRouting'],
-    ['authenticated', 'experiments'],
     ['authenticated', 'byokModels'],
     ['authenticated', 'byokProviders'],
     ['authenticated', 'byokAvailability'],
@@ -762,12 +754,6 @@ describe('final Enkrypt serialization boundaries', () => {
         jest.mocked(addAutoRoutingModels).mockImplementationOnce(async (...args) => {
           await pause();
           return realAutoRouting.addAutoRoutingModels(...args);
-        });
-        break;
-      case 'experiments':
-        jest.mocked(listAvailableExperimentModels).mockImplementationOnce(async () => {
-          await pause();
-          return [];
         });
         break;
       case 'byokModels':
@@ -899,17 +885,12 @@ describe('final Enkrypt serialization boundaries', () => {
     }
   );
 
-  test.each(['anonymous', 'authenticated', 'organization'] as const)(
+  test.each(['authenticated', 'organization'] as const)(
     'sanitizes appended %s models without changing availability',
     async branch => {
       configureBranch(branch);
       const original = mockOpenRouterModels.data.find(model => model.id === 'some-other-model');
       if (!original) throw new Error('Expected catalog fixture');
-      const experiment = {
-        ...original,
-        id: 'partner/experiment',
-        enkrypt: publishedEnkryptBenchmark,
-      };
       const byok = {
         ...original,
         id: 'byok/provider/model',
@@ -929,9 +910,8 @@ describe('final Enkrypt serialization boundaries', () => {
         opencode: { ai_sdk_provider: 'openai-compatible' as const, variants: undefined },
         enkrypt: publishedEnkryptBenchmark,
       };
-      jest.mocked(listAvailableExperimentModels).mockResolvedValue([experiment]);
       jest.mocked(getDirectByokModelsForUser).mockResolvedValue([byok]);
-      const appended = branch === 'anonymous' ? [experiment] : [experiment, byok];
+      const appended = [byok];
       if (branch === 'organization') {
         jest
           .mocked(getAvailableModelsForOrganization)
@@ -943,7 +923,6 @@ describe('final Enkrypt serialization boundaries', () => {
           OpenRouterModelsResponseSchema.parse({ data: [expected] }).data[0]
         );
       }
-      expect(experiment.enkrypt).toEqual(publishedEnkryptBenchmark);
       expect(byok.enkrypt).toEqual(publishedEnkryptBenchmark);
       expect(mockRows).toHaveBeenCalledTimes(1);
     }

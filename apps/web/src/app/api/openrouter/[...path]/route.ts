@@ -671,18 +671,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     user,
     organizationId,
     taskId,
-    clientIp: ipAddress ?? null,
-    machineId: machineIdHeader,
     getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
   });
-  if (initialProviderResultForAbuseService.kind === 'not-found') {
-    // Paused experiment for this public id — return a local model-unavailable
-    // response instead of silently falling through to default routing.
-    return modelDoesNotExistResponse();
-  }
-  if (initialProviderResultForAbuseService.kind === 'unavailable') {
-    return temporarilyUnavailableResponse();
-  }
   let effectiveProviderContext = initialProviderResultForAbuseService;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
@@ -796,23 +786,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       user,
       organizationId,
       taskId,
-      clientIp: ipAddress ?? null,
-      machineId: machineIdHeader,
       getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
     });
-    if (quarantineProviderResult.kind === 'not-found') {
-      if (rulesEngineDecision.delayMs > 0) {
-        await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
-      }
-      return modelDoesNotExistResponse();
-    }
-    if (quarantineProviderResult.kind === 'unavailable') {
-      if (rulesEngineDecision.delayMs > 0) {
-        await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
-      }
-      return temporarilyUnavailableResponse();
-    }
-
     effectiveProviderContext = quarantineProviderResult;
 
     console.warn('SECURITY: Abuse quarantine-3 model override applied', {
@@ -850,7 +825,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       groupModelAllowed,
       groupProvidersAllowed,
       modelRestrictionError,
-      settings,
     } = await accessCheckResolver.get();
 
     if (
@@ -872,29 +846,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
     if (!groupProvidersAllowed) return modelNotAllowedResponse();
 
-    // Experiment traffic captures prompts to R2 for partner evaluation, which
-    // is a form of data collection that the gateway-pinned `data_collection`
-    // setting cannot enforce on a direct partner upstream. If the org has
-    // explicitly disabled data collection, refuse the experimented public id
-    // here rather than routing through and silently capturing prompts.
-    if (effectiveProviderContext.experiment && settings?.data_collection === 'deny') {
-      return dataCollectionRequiredResponse();
-    }
-
-    // OpenRouter's `body.provider.only` does not reach a direct experiment
-    // partner, so enforce any effective provider routes locally instead.
-    if (
-      effectiveProviderContext.experiment &&
-      effectiveProviderConfig?.only &&
-      !effectiveProviderConfig.only.includes(effectiveProviderContext.provider.id)
-    ) {
-      return modelNotAllowedResponse();
-    }
-
-    // Direct experiment upstreams must not have a Vercel/OpenRouter
-    // provider config pinned onto them — the partner endpoint is selected
-    // by the variant version.
-    if (effectiveProviderConfig && !effectiveProviderContext.experiment) {
+    if (effectiveProviderConfig) {
       requestBodyParsed.body.provider = effectiveProviderConfig;
     }
   }
@@ -971,15 +923,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed.body.provider
   );
   if (providerNotAllowedError) return providerNotAllowedError;
-
-  if (effectiveProviderContext.experiment) {
-    usageContext.modelExperimentVariantVersionId =
-      effectiveProviderContext.experiment.variantVersionId;
-    usageContext.modelExperimentAllocationSubject =
-      effectiveProviderContext.experiment.allocationSubject;
-    // Cost zeroing for experiment traffic is handled by `isFreeModel`, which
-    // returns true for experimented public ids.
-  }
 
   sentryRootSpan()?.setAttribute(
     'openrouter.time_to_request_start_ms',
@@ -1059,8 +1002,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (attempt.type === 'error') return attempt.response;
   }
 
-  const { response, toolsAvailable, toolsUsed, experimentPromptCapture } = attempt;
-  if (experimentPromptCapture) usageContext.experimentPromptCapture = experimentPromptCapture;
+  const { response, toolsAvailable, toolsUsed } = attempt;
   const finalUpstreamModel = requestBodyParsed.body.model ?? effectiveModelIdLowerCased;
   logExceptInTest(
     'upstream response status: %s, x-vercel-id: %s, session_id: %s',

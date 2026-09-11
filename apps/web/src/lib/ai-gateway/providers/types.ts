@@ -21,7 +21,6 @@ export type ProviderId =
   | 'streamlake'
   | 'vercel'
   | 'custom'
-  | 'experiment'
   | 'dev-tools';
 
 export type BYOKResult = {

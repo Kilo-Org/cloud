@@ -146,11 +146,11 @@ export function shouldRedactModelNameInMicrodollarUsage(
   provider: ProviderId,
   model: string
 ): boolean {
-  return provider === 'custom' || provider === 'experiment' || isKiloStealthModel(model);
+  return provider === 'custom' || isKiloStealthModel(model);
 }
 
 export function shouldRedactErrorResponse(provider: ProviderId, model: string): boolean {
-  return provider === 'experiment' || isKiloStealthModel(model);
+  return isKiloStealthModel(model);
 }
 
 export function isDisabledKiloExclusiveModel(model: string): boolean {

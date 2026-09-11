@@ -7,7 +7,6 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
 import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
-import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 import { appendLocalFakeDeterministicCatalogModels } from '@/lib/ai-gateway/local-fake-llm';
 
 const BodySchema = z.object({ modelId: z.string().trim().min(1) });
@@ -53,12 +52,9 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(models.data)) {
       throw new Error('Model catalog returned invalid data');
     }
-    const [byokModels, experimentModels] = await Promise.all([
-      auth?.user ? getDirectByokModelsForUser(auth.user.id) : [],
-      listAvailableExperimentModels(),
-    ]);
+    const byokModels = auth?.user ? await getDirectByokModelsForUser(auth.user.id) : [];
     const available = appendLocalFakeDeterministicCatalogModels(
-      models.data.concat(byokModels, experimentModels)
+      models.data.concat(byokModels)
     ).some(model => model.id === bodyResult.data.modelId);
     return NextResponse.json(available ? { valid: true } : { valid: false, reason: 'unavailable' });
   } catch (error) {

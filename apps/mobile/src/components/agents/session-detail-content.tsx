@@ -1507,7 +1507,13 @@ export function SessionDetailContent({
           agentStatusType={agentStatus.type}
         />
         {sessionGoal ? (
-          <SessionGoalSection goal={sessionGoal} onPress={handleOpenGoalActions} />
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(150)}
+            layout={LinearTransition.duration(150)}
+          >
+            <SessionGoalSection goal={sessionGoal} onPress={handleOpenGoalActions} />
+          </Animated.View>
         ) : null}
         {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 

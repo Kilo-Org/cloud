@@ -15,6 +15,13 @@
       "when": 1788976576814,
       "tag": "0001_cynical_karen_page",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789165450224,
+      "tag": "0002_square_the_spike",
+      "breakpoints": true
     }
   ]
 }

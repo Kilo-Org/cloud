@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import type { AuthRequest } from '@cloudflare/workers-oauth-provider';
 import { and, count, desc, eq, gt, isNull, lt, notInArray } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -6,6 +7,7 @@ import migrations from '../../drizzle/migrations';
 import {
   oauthClients,
   oauthCodes,
+  oauthPendingAuthorizations,
   oauthRefreshTokens,
   oauthRevokedJtis,
 } from '../db/sqlite-schema';
@@ -101,6 +103,42 @@ export type NewOAuthCode = {
   expiresAt: string;
 };
 
+export type PendingAuthorizationStatus =
+  | 'pending'
+  | 'approved'
+  | 'denied'
+  | 'expired'
+  | 'completed';
+
+/**
+ * A short-lived pending-authorization record: the library AuthRequest JSON plus
+ * the apps/web device-auth pairing it is waiting on. Created at GET /authorize,
+ * read by /authorize/status and /authorize/org, and consumed by the library's
+ * authorize handler.
+ */
+export type PendingAuthorization = {
+  id: string;
+  /** The parsed library authorization request, stored as JSON. */
+  authRequest: AuthRequest;
+  deviceAuthCode: string;
+  status: PendingAuthorizationStatus;
+  kiloUserId: string | null;
+  organizationId: string | null;
+  /** Kilo API token from the approved pairing; never log it. */
+  kiloToken: string | null;
+  createdAt: string;
+  expiresAt: string;
+};
+
+export type NewPendingAuthorization = {
+  id: string;
+  authRequest: AuthRequest;
+  deviceAuthCode: string;
+  createdAt: string;
+  /** ISO timestamp; the record is only actionable until then. */
+  expiresAt: string;
+};
+
 export type RefreshTokenRecord = {
   id: string;
   tokenHash: string;
@@ -141,11 +179,16 @@ export interface OAuthStoreApi {
   createCode(input: NewOAuthCode): Promise<void>;
   getCode(code: string): Promise<OAuthCodeRecord | null>;
   /**
-   * Record the approved Kilo pairing while the code is still pending (s6):
+   * Record the approved Kilo pairing while the record is still pending (s6):
    * binds `{ kiloUserId, kiloToken }` without choosing an org. The upstream
    * device-auth poll is single-use, so this write is what stops the status
    * endpoint from ever polling apps/web twice for one pairing. The first
-   * writer wins; a second call never overwrites the stored token.
+   * writer wins (`kilo_user_id IS NULL`); a second call never overwrites the
+   * stored token.
+   *
+   * During the s2 coexistence window this targets `oauth_pending_authorizations`
+   * when a pending record exists for the device-auth code and otherwise the
+   * legacy `oauth_codes` row (either may own the pairing).
    */
   recordPairingApproval(
     deviceAuthCode: string,
@@ -164,6 +207,21 @@ export interface OAuthStoreApi {
   ): Promise<boolean>;
   /** Atomic single-use exchange: approved -> used. Null when the code is not exchangeable. */
   consumeCode(code: string, nowIso: string): Promise<OAuthCodeRecord | null>;
+  /** Insert a fresh pending authorization (status 'pending'). */
+  createPendingAuthorization(input: NewPendingAuthorization): Promise<void>;
+  getPendingAuthorization(id: string): Promise<PendingAuthorization | null>;
+  /** pending -> denied after the user denied the Kilo pairing upstream (s2). */
+  denyPendingAuthorization(deviceAuthCode: string, nowIso: string): Promise<boolean>;
+  /** pending -> expired after apps/web reported the pairing expired upstream (s2). */
+  expirePendingAuthorization(deviceAuthCode: string, nowIso: string): Promise<boolean>;
+  /** pending -> approved with the Kilo identity; false when not actionable-pending (s2). */
+  approvePendingAuthorization(
+    deviceAuthCode: string,
+    identity: { kiloUserId: string; organizationId: string | null },
+    nowIso: string
+  ): Promise<boolean>;
+  /** Terminal transition: approved -> completed once the library issues the code (s2). */
+  completePendingAuthorization(id: string, nowIso: string): Promise<boolean>;
   saveRefreshToken(input: NewRefreshToken): Promise<void>;
   getRefreshTokenByHash(tokenHash: string): Promise<RefreshTokenRecord | null>;
   /**
@@ -234,6 +292,22 @@ function rowToCode(row: typeof oauthCodes.$inferSelect): OAuthCodeRecord {
     resource: row.resource,
     scope: row.scope,
     state: row.state,
+    deviceAuthCode: row.device_auth_code,
+    status: row.status,
+    kiloUserId: row.kilo_user_id,
+    organizationId: row.organization_id,
+    kiloToken: row.kilo_token,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+  };
+}
+
+function rowToPendingAuthorization(
+  row: typeof oauthPendingAuthorizations.$inferSelect
+): PendingAuthorization {
+  return {
+    id: row.id,
+    authRequest: JSON.parse(row.auth_request) as AuthRequest,
     deviceAuthCode: row.device_auth_code,
     status: row.status,
     kiloUserId: row.kilo_user_id,
@@ -330,6 +404,31 @@ export class KiloMcpOAuthStore extends DurableObject<Env> implements OAuthStoreA
     // `kilo_user_id IS NULL` keeps this first-writer-wins: the upstream poll
     // that returned the token is never re-run, and a racing second poll can
     // not overwrite the stored credential.
+    //
+    // s2 coexistence: a pending-authorization record owns the pairing when one
+    // exists for this device-auth code; otherwise the legacy oauth_codes row
+    // does (the hand-rolled flow still runs until later slices retire it).
+    const ownsPairing = this.db
+      .select({ id: oauthPendingAuthorizations.id })
+      .from(oauthPendingAuthorizations)
+      .where(eq(oauthPendingAuthorizations.device_auth_code, deviceAuthCode))
+      .get();
+    if (ownsPairing !== undefined) {
+      const pending = this.db
+        .update(oauthPendingAuthorizations)
+        .set({ kilo_user_id: identity.kiloUserId, kilo_token: identity.kiloToken })
+        .where(
+          and(
+            eq(oauthPendingAuthorizations.id, ownsPairing.id),
+            eq(oauthPendingAuthorizations.status, 'pending'),
+            isNull(oauthPendingAuthorizations.kilo_user_id),
+            gt(oauthPendingAuthorizations.expires_at, nowIso)
+          )
+        )
+        .returning({ id: oauthPendingAuthorizations.id })
+        .get();
+      return pending !== undefined;
+    }
     const row = this.db
       .update(oauthCodes)
       .set({ kilo_user_id: identity.kiloUserId, kilo_token: identity.kiloToken })
@@ -416,6 +515,101 @@ export class KiloMcpOAuthStore extends DurableObject<Env> implements OAuthStoreA
       .returning()
       .get();
     return row ? rowToCode(row) : null;
+  }
+
+  async createPendingAuthorization(input: NewPendingAuthorization): Promise<void> {
+    this.db
+      .insert(oauthPendingAuthorizations)
+      .values({
+        id: input.id,
+        auth_request: JSON.stringify(input.authRequest),
+        device_auth_code: input.deviceAuthCode,
+        status: 'pending',
+        created_at: input.createdAt,
+        expires_at: input.expiresAt,
+      })
+      .run();
+  }
+
+  async getPendingAuthorization(id: string): Promise<PendingAuthorization | null> {
+    const row = this.db
+      .select()
+      .from(oauthPendingAuthorizations)
+      .where(eq(oauthPendingAuthorizations.id, id))
+      .get();
+    return row ? rowToPendingAuthorization(row) : null;
+  }
+
+  async denyPendingAuthorization(deviceAuthCode: string, nowIso: string): Promise<boolean> {
+    const row = this.db
+      .update(oauthPendingAuthorizations)
+      .set({ status: 'denied' })
+      .where(
+        and(
+          eq(oauthPendingAuthorizations.device_auth_code, deviceAuthCode),
+          eq(oauthPendingAuthorizations.status, 'pending'),
+          gt(oauthPendingAuthorizations.expires_at, nowIso)
+        )
+      )
+      .returning({ id: oauthPendingAuthorizations.id })
+      .get();
+    return row !== undefined;
+  }
+
+  async expirePendingAuthorization(deviceAuthCode: string, nowIso: string): Promise<boolean> {
+    const row = this.db
+      .update(oauthPendingAuthorizations)
+      .set({ status: 'expired' })
+      .where(
+        and(
+          eq(oauthPendingAuthorizations.device_auth_code, deviceAuthCode),
+          eq(oauthPendingAuthorizations.status, 'pending'),
+          gt(oauthPendingAuthorizations.expires_at, nowIso)
+        )
+      )
+      .returning({ id: oauthPendingAuthorizations.id })
+      .get();
+    return row !== undefined;
+  }
+
+  async approvePendingAuthorization(
+    deviceAuthCode: string,
+    identity: { kiloUserId: string; organizationId: string | null },
+    nowIso: string
+  ): Promise<boolean> {
+    const row = this.db
+      .update(oauthPendingAuthorizations)
+      .set({
+        status: 'approved',
+        kilo_user_id: identity.kiloUserId,
+        organization_id: identity.organizationId,
+      })
+      .where(
+        and(
+          eq(oauthPendingAuthorizations.device_auth_code, deviceAuthCode),
+          eq(oauthPendingAuthorizations.status, 'pending'),
+          gt(oauthPendingAuthorizations.expires_at, nowIso)
+        )
+      )
+      .returning({ id: oauthPendingAuthorizations.id })
+      .get();
+    return row !== undefined;
+  }
+
+  async completePendingAuthorization(id: string, nowIso: string): Promise<boolean> {
+    const row = this.db
+      .update(oauthPendingAuthorizations)
+      .set({ status: 'completed' })
+      .where(
+        and(
+          eq(oauthPendingAuthorizations.id, id),
+          eq(oauthPendingAuthorizations.status, 'approved'),
+          gt(oauthPendingAuthorizations.expires_at, nowIso)
+        )
+      )
+      .returning({ id: oauthPendingAuthorizations.id })
+      .get();
+    return row !== undefined;
   }
 
   async saveRefreshToken(input: NewRefreshToken): Promise<void> {
@@ -586,6 +780,11 @@ export class KiloMcpOAuthStore extends DurableObject<Env> implements OAuthStoreA
       .where(lt(oauthCodes.expires_at, nowIso))
       .returning({ code: oauthCodes.code })
       .all().length;
+    const expiredPendingAuthorizations = this.db
+      .delete(oauthPendingAuthorizations)
+      .where(lt(oauthPendingAuthorizations.expires_at, nowIso))
+      .returning({ id: oauthPendingAuthorizations.id })
+      .all().length;
     const expiredRefreshTokens = this.db
       .delete(oauthRefreshTokens)
       .where(lt(oauthRefreshTokens.expires_at, nowIso))
@@ -613,7 +812,13 @@ export class KiloMcpOAuthStore extends DurableObject<Env> implements OAuthStoreA
       )
       .returning({ clientId: oauthClients.client_id })
       .all().length;
-    return expiredCodes + expiredRefreshTokens + expiredJtis + expiredClients;
+    return (
+      expiredCodes +
+      expiredPendingAuthorizations +
+      expiredRefreshTokens +
+      expiredJtis +
+      expiredClients
+    );
   }
 
   /** One alarm per DO: purge rows past their own expiry, then reschedule. */

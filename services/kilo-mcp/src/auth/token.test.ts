@@ -110,6 +110,12 @@ function createFakeOAuthStore(): OAuthStoreApi & {
     },
     denyCode: unused,
     markCodeExpired: unused,
+    createPendingAuthorization: unused,
+    getPendingAuthorization: unused,
+    denyPendingAuthorization: unused,
+    expirePendingAuthorization: unused,
+    approvePendingAuthorization: unused,
+    completePendingAuthorization: unused,
     async approveCode(deviceAuthCode, identity, nowIso) {
       for (const [code, record] of codes) {
         if (

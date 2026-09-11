@@ -627,6 +627,12 @@ describe('auth endpoint routing (s5)', () => {
           ? 'kilo-forward-me'
           : null;
       },
+      createPendingAuthorization: unused,
+      getPendingAuthorization: unused,
+      denyPendingAuthorization: unused,
+      expirePendingAuthorization: unused,
+      approvePendingAuthorization: unused,
+      completePendingAuthorization: unused,
       revokeGrant: unused,
       revokeJti: unused,
       async isJtiRevoked() {

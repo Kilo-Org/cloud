@@ -68,6 +68,12 @@ function createFakeOAuthStore(): OAuthStoreApi & {
       return false;
     },
     consumeCode: unused,
+    createPendingAuthorization: unused,
+    getPendingAuthorization: unused,
+    denyPendingAuthorization: unused,
+    expirePendingAuthorization: unused,
+    approvePendingAuthorization: unused,
+    completePendingAuthorization: unused,
     saveRefreshToken: unused,
     getRefreshTokenByHash: unused,
     rotateRefreshToken: unused,

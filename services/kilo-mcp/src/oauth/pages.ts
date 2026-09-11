@@ -3,10 +3,10 @@
  * served at GET /authorize and the organization picker served at
  * GET|POST /authorize/org.
  *
- * These are moved out of src/oauth-pages/ so the new defaultHandler routes
- * (src/oauth/consent.ts) own their pages; the markup, the Kilo Cloud palette,
- * and the status-polling script are unchanged. Only the shared shell
- * (authPage/escapeHtml/htmlResponse) is reused from src/auth/http.ts.
+ * These pages live beside the defaultHandler (src/oauth/consent.ts) that owns
+ * them; the markup, the Kilo Cloud palette, and the status-polling script are
+ * unchanged. Only the shared shell (authPage/escapeHtml/htmlResponse) is
+ * reused from src/auth/http.ts.
  */
 import {
   authPage,

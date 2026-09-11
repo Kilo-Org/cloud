@@ -11,9 +11,9 @@
  * - `fetchOrgOptions` lists the paired identity's organizations by calling the
  *   read-only `organizations.list` catalog query with the Kilo bearer.
  *
- * Moved from src/auth/authorize.ts (createKiloPairing) and
- * src/oauth-pages/authorize-page.ts (pollKiloPairing) plus the org-picker
- * list read, so the new defaultHandler routes own their I/O.
+ * This module now owns the pairing I/O that the hand-rolled authorization
+ * endpoint and consent page used to do, so the new defaultHandler routes own
+ * their own I/O.
  *
  * Trust boundary: apps/web responses are trusted and never zod-validated.
  * Only the UNTRUSTED request headers forwarded upstream are validated, with

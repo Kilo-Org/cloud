@@ -124,7 +124,7 @@ const forwardedHeaderValue = z
 
 /**
  * The client-identity headers forwarded to apps/web when opening a device-auth
- * pairing (see `src/auth/authorize.ts`). A `Headers` instance is not a plain
+ * pairing (see `src/oauth/kilo-pairing.ts`). A `Headers` instance is not a plain
  * object, so callers pass `Object.fromEntries(headers)`. The Fetch Headers
  * iterator lowercases names, so the keys below are lowercase — including
  * `cf-connecting-ip` — or the value would be silently stripped. Absent headers

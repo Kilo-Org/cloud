@@ -1,7 +1,8 @@
 /**
- * Shared HTTP plumbing for the OAuth endpoints (metadata, DCR, authorize,
- * token): CORS, RFC 6749 §5.2 error bodies, HTML error/consent surfaces, and
- * the endpoint path constants every module routes against.
+ * Shared HTTP plumbing for the custom OAuth routes this worker still serves,
+ * `/authorize` and its consent/org-picker sub-routes: CORS, RFC 6749 §5.2
+ * error bodies, HTML error/consent surfaces, and their path constants. The
+ * library owns `/token`, `/register`, and the discovery documents.
  */
 
 /** The only scope this MCP issues; PKCE + DCR + resource indicator ride on it (requirement 16). */
@@ -22,18 +23,16 @@ export function normalizeScope(scope: string): string {
   return [...new Set(scopeTokens(scope))].join(' ');
 }
 
-/** Routes served by the auth endpoints, shared by index.ts routing and metadata. */
+/**
+ * Custom routes still owned by this worker, shared by the defaultHandler and
+ * the consent pages. The library owns `/token`, `/register`, and the
+ * `/.well-known/*` discovery documents, so no path constants exist for them.
+ */
 export const AUTH_PATHS = {
   authorize: '/authorize',
   pairingStatus: '/authorize/status',
   orgPicker: '/authorize/org',
-  token: '/token',
-  register: '/register',
   mcp: '/mcp',
-  authorizationServerMetadata: '/.well-known/oauth-authorization-server',
-  authorizationServerMetadataScoped: '/.well-known/oauth-authorization-server/mcp',
-  protectedResourceMetadata: '/.well-known/oauth-protected-resource',
-  protectedResourceMetadataScoped: '/.well-known/oauth-protected-resource/mcp',
 } as const;
 
 /** How often the consent page re-checks pairing status (s5; rendered by s6's page). */

@@ -33,10 +33,14 @@ import {
 import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
 import { isControlPlaneOwner, isWorktreeOwner } from '../../src/session-plane.js';
 import { LIFECYCLE_SCENARIOS, type LifecycleResult } from './lifecycle.js';
-import {
-  FILE_STATE_SCENARIOS,
-  FILE_STATE_SCENARIO_TIMEOUT_MS,
-} from './lifecycle-file-state.js';
+import { FILE_STATE_SCENARIO_TIMEOUT_MS } from './lifecycle-file-state.js';
+import { CONTINUITY_SCENARIO_TIMEOUT_MS } from './lifecycle-continuity.js';
+
+/** Every scenario that accepts an explicit `--timeout-ms` and runs long. */
+const LONG_RUNNING_SCENARIO_TIMEOUT_MS: Record<string, number> = {
+  ...FILE_STATE_SCENARIO_TIMEOUT_MS,
+  ...CONTINUITY_SCENARIO_TIMEOUT_MS,
+};
 
 const SERVICE_PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -97,9 +101,9 @@ export function parseArgs(argv: string[]): {
   }
   const [lifecycle, conversation] = positional;
   if (!lifecycle || !conversation) return null;
-  if (timeoutMs !== undefined && FILE_STATE_SCENARIO_TIMEOUT_MS[lifecycle] === undefined) {
+  if (timeoutMs !== undefined && LONG_RUNNING_SCENARIO_TIMEOUT_MS[lifecycle] === undefined) {
     console.error(
-      `--timeout-ms is only supported for: ${Object.keys(FILE_STATE_SCENARIO_TIMEOUT_MS).join(', ')}`
+      `--timeout-ms is only supported for: ${Object.keys(LONG_RUNNING_SCENARIO_TIMEOUT_MS).join(', ')}`
     );
     return null;
   }
@@ -194,9 +198,10 @@ async function main(): Promise<void> {
           funded: process.env.E2E_FUNDED === '1',
         });
   const expectControlPlane = Boolean(devVars.CONTROL_PLANE_IDS?.trim());
-  const requiresWorktreeEnrollment = new Set(['worktree-shared', ...FILE_STATE_SCENARIOS]).has(
-    lifecycle
-  );
+  const requiresWorktreeEnrollment = new Set([
+    'worktree-shared',
+    ...Object.keys(LONG_RUNNING_SCENARIO_TIMEOUT_MS),
+  ]).has(lifecycle);
   if (
     requiresWorktreeEnrollment &&
     (!isControlPlaneOwner(devVars, { userId: user.id }) ||
@@ -234,8 +239,8 @@ async function main(): Promise<void> {
     api,
     ...(requestedTimeoutMs !== undefined
       ? { timeoutMs: requestedTimeoutMs }
-      : FILE_STATE_SCENARIO_TIMEOUT_MS[lifecycle] !== undefined
-        ? { timeoutMs: FILE_STATE_SCENARIO_TIMEOUT_MS[lifecycle] }
+      : LONG_RUNNING_SCENARIO_TIMEOUT_MS[lifecycle] !== undefined
+        ? { timeoutMs: LONG_RUNNING_SCENARIO_TIMEOUT_MS[lifecycle] }
         : {}),
   });
   printResult(result, { verbose });

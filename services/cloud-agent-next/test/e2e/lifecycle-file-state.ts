@@ -76,7 +76,13 @@ export type OperationRole =
   | 'cold-resume-admission'
   | 'multi-session-planner'
   | 'multi-session-implementer'
-  | 'multi-session-reviewer';
+  | 'multi-session-reviewer'
+  | 'continuity-recover'
+  | 'continuity-interrupt'
+  | 'continuity-warm-cold'
+  | 'continuity-question'
+  | 'continuity-large-stream'
+  | 'continuity-concurrent';
 
 export type ScenarioOperation = { label: string; operationKey: string };
 
@@ -104,9 +110,20 @@ export type ScenarioResources = {
   cleanupStarted: boolean;
   lateCleanupFailures: string[];
   lateUncleanedResource: boolean;
-  ownership: { sandbox?: SandboxContainer; rootKiloSessionId?: string };
+  /**
+   * Root/container ownership is paired per independent session. A replacement
+   * runtime for the same root replaces that root's pair; independent boots get
+   * their own pair. Cleanup must never stop one session's container under
+   * another session's Kilo root.
+   */
+  ownership: { pairs: OwnedRuntimePair[] };
   connect: (sessionId: string, replay?: boolean) => Promise<StreamConnection>;
   within: <T>(label: string, operation: (signal: AbortSignal) => Promise<T>) => Promise<T>;
+};
+
+export type OwnedRuntimePair = {
+  rootKiloSessionId: string;
+  sandbox: SandboxContainer;
 };
 
 export type CleanupResult = { failures: string[]; uncleanedResource: boolean };
@@ -118,7 +135,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function scenarioResult(
+export function scenarioResult(
   name: string,
   args: LifecycleArgs,
   startedAt: number,
@@ -136,11 +153,11 @@ function scenarioResult(
   };
 }
 
-function fakeDirective(scenario: string, ...args: string[]): string {
+export function fakeDirective(scenario: string, ...args: string[]): string {
   return `__fake__:${scenario}${args.length > 0 ? `:${args.join(':')}` : ''}`;
 }
 
-function assertScenarioPreconditions(config: DriverConfig, api: ApiVersion | undefined): void {
+export function assertScenarioPreconditions(config: DriverConfig, api: ApiVersion | undefined): void {
   if ((api ?? 'unified') !== 'unified') {
     throw new Error('file-state lifecycle scenarios require the unified API');
   }
@@ -165,7 +182,7 @@ export function createScenarioResources(
   const ownedGateTags = new Set<string>();
   const pendingAcquisitions = new Set<PendingAcquisition>();
   const uncertainAcquisitions = new Set<PendingAcquisition>();
-  const ownership: ScenarioResources['ownership'] = {};
+  const ownership: ScenarioResources['ownership'] = { pairs: [] };
   const deadlineAt = Date.now() + timeoutMs;
   const resources: ScenarioResources = {
     config,
@@ -243,8 +260,34 @@ function remaining(resources: ScenarioResources, label: string): number {
 
 function trackSession(resources: ScenarioResources, session: WorktreeSessionResult): void {
   resources.sessions.set(session.kiloSessionId, session);
-  resources.ownership.rootKiloSessionId ??= session.kiloSessionId;
   if (resources.cleanupStarted) resources.lateUncleanedResource = true;
+}
+
+/**
+ * Pair a Kilo root with the sandbox that currently owns it. Replacement
+ * discovery updates the existing root's pair in place; a new root gets a new
+ * pair. This is the only writer of tracked sandbox ownership, so cleanup can
+ * never mix one session's root with another session's container.
+ */
+export function recordOwnedRuntime(
+  resources: ScenarioResources,
+  rootKiloSessionId: string,
+  sandbox: SandboxContainer
+): void {
+  const existing = resources.ownership.pairs.find(
+    pair => pair.rootKiloSessionId === rootKiloSessionId
+  );
+  if (existing) existing.sandbox = sandbox;
+  else resources.ownership.pairs.push({ rootKiloSessionId, sandbox });
+  if (resources.cleanupStarted) resources.lateUncleanedResource = true;
+}
+
+export function ownedSandboxFor(
+  resources: ScenarioResources,
+  rootKiloSessionId: string
+): SandboxContainer | undefined {
+  return resources.ownership.pairs.find(pair => pair.rootKiloSessionId === rootKiloSessionId)
+    ?.sandbox;
 }
 
 export function acquireTracked<T>(
@@ -305,7 +348,7 @@ function expectedToolCounters(expectedTool: ExpectedTool): Array<'read' | 'write
   return ['read', 'write'];
 }
 
-async function runGatedFileTurn(
+export async function runGatedFileTurn(
   deps: ScenarioResources,
   input: {
     session: WorktreeSessionResult;
@@ -374,6 +417,51 @@ async function runGatedFileTurn(
   return { messageId: sent.messageId, head: file.head };
 }
 
+/**
+ * Run one operation under a hard deadline, independent of the scenario budget.
+ * The operation receives an abort signal that fires when the deadline is
+ * reached; the signal is also aborted after the operation settles so late work
+ * cannot outlive the step.
+ */
+async function runBounded<T>(
+  label: string,
+  deadlineAt: number,
+  operation: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
+  const remainingMs = deadlineAt - Date.now();
+  if (remainingMs <= 0) throw new Error(`cleanup deadline exceeded before ${label}`);
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort(new Error(`cleanup deadline exceeded during ${label}`));
+      reject(new Error(`cleanup deadline exceeded during ${label}`));
+    }, remainingMs);
+  });
+  try {
+    return await Promise.race([
+      Promise.resolve().then(() => operation(controller.signal)),
+      timeout,
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    if (!controller.signal.aborted) controller.abort();
+  }
+}
+
+/**
+ * Run one operation under its own cleanup-scale budget. Unlike `resources.within`
+ * this is not gated by the scenario deadline, so post-failure bookkeeping (for
+ * example claiming a replacement runtime after a timed-out recovery) still runs
+ * after the scenario budget is spent. It stays bounded by `CLEANUP_BUDGET_MS`.
+ */
+export async function withinCleanupBudget<T>(
+  label: string,
+  operation: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
+  return runBounded(label, Date.now() + CLEANUP_BUDGET_MS, operation);
+}
+
 export async function cleanupScenario(resources: ScenarioResources): Promise<CleanupResult> {
   const failures: string[] = [];
   const cleanupDeadline = Date.now() + CLEANUP_BUDGET_MS;
@@ -384,28 +472,12 @@ export async function cleanupScenario(resources: ScenarioResources): Promise<Cle
     label: string,
     operation: (signal: AbortSignal) => Promise<void>
   ): Promise<boolean> => {
-    const remainingMs = cleanupDeadline - Date.now();
-    if (remainingMs <= 0) {
-      failures.push(`${label}: cleanup deadline exceeded`);
-      return false;
-    }
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => {
-        controller.abort(new Error(`cleanup deadline exceeded during ${label}`));
-        reject(new Error(`cleanup deadline exceeded during ${label}`));
-      }, remainingMs);
-    });
     try {
-      await Promise.race([Promise.resolve().then(() => operation(controller.signal)), timeout]);
+      await runBounded(label, cleanupDeadline, operation);
       return true;
     } catch (error) {
       failures.push(`${label}: ${errorMessage(error)}`);
       return false;
-    } finally {
-      if (timer !== undefined) clearTimeout(timer);
-      if (!controller.signal.aborted) controller.abort();
     }
   };
 
@@ -426,20 +498,24 @@ export async function cleanupScenario(resources: ScenarioResources): Promise<Cle
         )
       );
     }
-    const rootKiloSessionId = resources.ownership.rootKiloSessionId;
-    const ownedSandbox = resources.ownership.sandbox;
-    if (rootKiloSessionId && ownedSandbox) {
+    const pairs = resources.ownership.pairs;
+    const stoppedContainerIds = new Set<string>();
+    for (const pair of pairs) {
+      if (stoppedContainerIds.has(pair.sandbox.id)) continue;
+      stoppedContainerIds.add(pair.sandbox.id);
       if (
-        !(await boundedCleanup('stop-owned-sandbox', () =>
-          stopOwnedControlPlaneSandbox(ownedSandbox, rootKiloSessionId)
+        !(await boundedCleanup(`stop-owned-sandbox(${pair.rootKiloSessionId})`, () =>
+          stopOwnedControlPlaneSandbox(pair.sandbox, pair.rootKiloSessionId).then(() => undefined)
         ))
       ) {
         uncleanedResource = true;
       }
-    } else if (
-      resources.sessions.size > 0 ||
-      resources.pendingAcquisitions.size > 0 ||
-      resources.uncertainAcquisitions.size > 0
+    }
+    if (
+      pairs.length === 0 &&
+      (resources.sessions.size > 0 ||
+        resources.pendingAcquisitions.size > 0 ||
+        resources.uncertainAcquisitions.size > 0)
     ) {
       uncleanedResource = true;
       failures.push(
@@ -468,7 +544,7 @@ export async function cleanupScenario(resources: ScenarioResources): Promise<Cle
   return { failures, uncleanedResource };
 }
 
-function addCleanupReport(result: LifecycleResult, cleanup: CleanupResult): LifecycleResult {
+export function addCleanupReport(result: LifecycleResult, cleanup: CleanupResult): LifecycleResult {
   if (cleanup.failures.length === 0 && !cleanup.uncleanedResource) return result;
   const suffix = [
     ...(cleanup.failures.length > 0 ? [`cleanupFailure=${cleanup.failures.join(' | ')}`] : []),
@@ -477,7 +553,7 @@ function addCleanupReport(result: LifecycleResult, cleanup: CleanupResult): Life
   return { ...result, message: `${result.message}; ${suffix}` };
 }
 
-async function waitForOwnedRuntime(
+export async function waitForOwnedRuntime(
   resources: ScenarioResources,
   kiloSessionId: string
 ): Promise<ControlPlaneKiloRuntime> {
@@ -488,23 +564,17 @@ async function waitForOwnedRuntime(
       waitForControlPlaneKiloRuntime(
         kiloSessionId,
         remaining(resources, `runtime ${kiloSessionId}`),
-        sandbox => {
-          resources.ownership.sandbox = sandbox;
-          if (resources.cleanupStarted) resources.lateUncleanedResource = true;
-        }
+        sandbox => recordOwnedRuntime(resources, kiloSessionId, sandbox)
       ),
     value => {
-      if (value) {
-        resources.ownership.sandbox = value.container;
-        if (resources.cleanupStarted) resources.lateUncleanedResource = true;
-      }
+      if (value) recordOwnedRuntime(resources, kiloSessionId, value.container);
     }
   );
   if (!runtime) throw new Error(`no control-plane runtime for ${kiloSessionId}`);
   return runtime;
 }
 
-async function bootSession(
+export async function bootSession(
   resources: ScenarioResources,
   input: { runId: string; operation: ScenarioOperation }
 ): Promise<{
@@ -551,7 +621,7 @@ async function bootSession(
   return { session, runtime, sandboxId };
 }
 
-async function captureLogCursor(): Promise<{ fromByte: number; capturedAt: number }> {
+export async function captureLogCursor(): Promise<{ fromByte: number; capturedAt: number }> {
   const capturedAt = Date.now();
   try {
     return { fromByte: (await stat(CLOUD_AGENT_LOG_PATH)).size, capturedAt };
@@ -609,7 +679,7 @@ export async function lifecycleLongSession(args: LifecycleArgs): Promise<Lifecyc
       else writes += 1;
       const checkpoint = await resources.within(`turn ${turn} runtime checkpoint`, () =>
         findControlPlaneKiloRuntime(session.kiloSessionId, undefined, sandbox => {
-          resources.ownership.sandbox = sandbox;
+          recordOwnedRuntime(resources, session.kiloSessionId, sandbox);
         })
       );
       if (!checkpoint) throw new Error(`turn ${turn} runtime checkpoint was not found`);
@@ -704,7 +774,7 @@ export async function lifecycleColdResume(args: LifecycleArgs): Promise<Lifecycl
       messageId: preCold.messageId,
       assistantMarker: `done-${preColdGateTag}`,
     });
-    const ownedSandbox = resources.ownership.sandbox;
+    const ownedSandbox = ownedSandboxFor(resources, session.kiloSessionId);
     if (!ownedSandbox) throw new Error('pre-cold sandbox ownership was not captured');
     const oldContainerId = bootRuntime.container.id;
     const running = await resources.within('pre-cold container running check', async () => {
@@ -767,15 +837,6 @@ export async function lifecycleColdResume(args: LifecycleArgs): Promise<Lifecycl
       )
     );
     resumedAdmissionReconciled = true;
-    const resumedFile = await resources.within('resumed sentinel read-only check', () =>
-      inspectControlPlaneWorkspaceFile(resumedRuntime, {
-        kiloSessionId: session.kiloSessionId,
-        filePath: sentinelPath,
-      })
-    );
-    if (!resumedFile.exists || resumedFile.contents !== capturedContents || !resumedFile.dirty) {
-      throw new Error('resumed sentinel did not exactly match pre-cold contents');
-    }
     const history = await resources.within('resumed history read-only check', () =>
       inspectControlPlaneHistory(resumedRuntime, {
         kiloSessionId: session.kiloSessionId,
@@ -787,6 +848,23 @@ export async function lifecycleColdResume(args: LifecycleArgs): Promise<Lifecycl
       throw new Error(
         `resumed history missing pre-cold entries: user=${history.userEntryFound}; assistant=${history.assistantEntryFound}`
       );
+    }
+    // Uncommitted files are not guaranteed across environment replacement
+    // (spec Persistence 4), so record survival as an observation only. An
+    // inspection failure is recorded as `error:<reason>`, never as `false`.
+    let fileSurvivalObservation: string;
+    try {
+      const resumedFile = await resources.within('resumed sentinel read-only check', () =>
+        inspectControlPlaneWorkspaceFile(resumedRuntime, {
+          kiloSessionId: session.kiloSessionId,
+          filePath: sentinelPath,
+        })
+      );
+      const exactMatch =
+        resumedFile.exists && resumedFile.dirty && resumedFile.contents === capturedContents;
+      fileSurvivalObservation = `fileSurvived=${exactMatch} (observed, exact-equality)`;
+    } catch (error) {
+      fileSurvivalObservation = `fileSurvived=error:${errorMessage(error)}`;
     }
     await resources.within('release gate-only resume', signal =>
       releaseGate(resources.config.fakeLlmUrl, resumedPromptTag, signal)
@@ -814,7 +892,7 @@ export async function lifecycleColdResume(args: LifecycleArgs): Promise<Lifecycl
       startedAt,
       resources.events,
       true,
-      `coldAt=${idleEvidence.elapsedMs}; resumed=${resumedRuntime.container.id}; fileSurvived=true (asserted, exact-equality); historySurvived=true (asserted, pre-cold user messageId + marker); headStable=true; exportHadSentinelDiff=${exportHadSentinelDiff} (observed)`
+      `coldAt=${idleEvidence.elapsedMs}; resumed=${resumedRuntime.container.id}; ${fileSurvivalObservation}; historySurvived=true (asserted, pre-cold user messageId + marker); headStable=true; exportHadSentinelDiff=${exportHadSentinelDiff} (observed)`
     );
   } catch (error) {
     if (resumedAdmissionReconciled && resumedAdmission) {

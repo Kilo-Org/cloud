@@ -192,6 +192,8 @@ import { adaptSessionAttachPayloadForWrapper } from '../sandbox-session/attach-p
 import { parseControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import { verifyRuntimeCredentialProxyHandle } from '../runtime-credential-proxy.js';
 import {
+  CONTROL_DIAGNOSTIC_STRING_CHARSET,
+  CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH,
   diagnosticCause,
   diagnosticConnection,
   diagnosticEventType,
@@ -252,6 +254,7 @@ import {
 const CREDENTIAL_HASH_KEY = 'wrapper_credential_hash';
 const OWNER_ID_KEY = 'owner_id';
 const WRAPPER_READY_AT_KEY = 'wrapper_ready_at';
+const WRAPPER_HEARTBEAT_OBSERVATION_KEY = 'wrapper_heartbeat_observation';
 const ACTIVE_WRAPPER_RUNTIME_KEY = 'active_wrapper_runtime';
 const DIAGNOSTIC_BUNDLE_KEY = 'diagnostic_bundle';
 const PROVIDER_KIND_KEY = 'provider_kind';
@@ -293,6 +296,44 @@ function allocationIdentity(physical: PhysicalRecord) {
 type PersistedWrapperRuntime = SandboxControlConnectionIdentity & {
   readyConnectionId?: string;
 };
+
+type WrapperHeartbeatDecision =
+  | 'accepted'
+  | 'kilo_unhealthy'
+  | 'runtime_not_ready'
+  | 'stale_during_apply';
+
+// One observation belongs to the currently armed connection. `armedAt` is the
+// deadline basis time (`now` on accept, `readyAt` on ready/repair); it is not
+// `armedExpiryAt` (the scheduled expiry). This is report-only: the deadline
+// logic remains the single source of truth.
+type WrapperHeartbeatObservation = {
+  connectionId: string;
+  wrapperInstanceId?: string;
+  lastReceivedAt?: number;
+  lastAcceptedAt?: number;
+  armedAt?: number;
+  armedExpiryAt?: number;
+  armedBasis: 'wrapper_ready' | 'heartbeat_receipt';
+  lastDecision?: WrapperHeartbeatDecision;
+};
+
+// Per-session heartbeat evidence is report-only and bounded by the
+// `logControlDiagnostic` string shape (see diagnostics.ts). Entries are whole or
+// omitted: a `kiloSessionId` is never truncated.
+function packSessionReport(sessions: SandboxHeartbeatPayload['sessions']): string | undefined {
+  let report = '';
+  for (const session of sessions) {
+    // A field outside the diagnostic alphabet would redact the whole joined
+    // string, so omit that entry instead of losing every session.
+    if (!CONTROL_DIAGNOSTIC_STRING_CHARSET.test(session.kiloSessionId)) continue;
+    const entry = `${session.kiloSessionId}:${session.state}:${session.waitingOn ?? 'none'}`;
+    const candidate = report.length === 0 ? entry : `${report}.${entry}`;
+    if (candidate.length > CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH) continue;
+    report = candidate;
+  }
+  return report.length > 0 ? report : undefined;
+}
 
 type TerminalRuntimeSnapshot = {
   allowed: true;
@@ -373,7 +414,6 @@ export class SandboxControl extends DurableObject<Env> {
     maxRpcWaitMs: 0,
     maxTotalForwardMs: 0,
   };
-  private lastAcceptedHeartbeat: { connectionId: string; at: number } | null = null;
   private credentialUpdates: Promise<void> = Promise.resolve();
   private provider: ProviderAdapter;
   private stopAttemptInFlight: {
@@ -583,20 +623,38 @@ export class SandboxControl extends DurableObject<Env> {
     for (const id of dueDeadlines(deadlines, now)) {
       const before = await loadDeadlines(this.ctx.storage);
       if (before[id] === undefined || before[id] > now) continue;
-      this.logDiagnostic('deadline_fired', {
-        deadlineId: id,
-        deadlineAt: before[id],
-        latenessMs: Math.max(0, now - before[id]),
-        heartbeatDeadlineAt: before.heartbeatExpiry,
-        idleDeadlineAt: before.idleStop,
-        connectionState: this.connectionState(),
-        lastAcceptedHeartbeatAt:
-          this.lastAcceptedHeartbeat?.connectionId === this.activeConnection?.connectionId
-            ? this.lastAcceptedHeartbeat?.at
-            : undefined,
-        ...diagnosticConnection(this.activeConnection),
-        ...this.forwarding,
-      });
+      // Report-only read: a failure degrades to "no observation" and must not
+      // block `handleDeadline`.
+      const heartbeatObservation = await this.readHeartbeatObservationBestEffort();
+      try {
+        this.logDiagnostic('deadline_fired', {
+          deadlineId: id,
+          deadlineAt: before[id],
+          latenessMs: Math.max(0, now - before[id]),
+          heartbeatDeadlineAt: before.heartbeatExpiry,
+          idleDeadlineAt: before.idleStop,
+          connectionState: this.connectionState(),
+          ...(id === 'heartbeatExpiry'
+            ? {
+                ...this.heartbeatLogFields(
+                  heartbeatObservation,
+                  this.activeConnection?.connectionId
+                ),
+                readyAt: await this.ctx.storage.get<number>(WRAPPER_READY_AT_KEY),
+                pendingControlRequests: this.socketHandler.pendingControlRequests(),
+              }
+            : {
+                lastAcceptedHeartbeatAt:
+                  heartbeatObservation?.connectionId === this.activeConnection?.connectionId
+                    ? heartbeatObservation?.lastAcceptedAt
+                    : undefined,
+              }),
+          ...diagnosticConnection(this.activeConnection),
+          ...this.forwarding,
+        });
+      } catch {
+        // Report-only: the deadline action must run even if diagnostics fail.
+      }
       await this.appendLog(deadlineTransition(now, id, 'fired'));
       await this.handleDeadline(id);
       await this.ctx.storage.transaction(async () => {
@@ -631,7 +689,11 @@ export class SandboxControl extends DurableObject<Env> {
         );
       }
       await this.ctx.storage.put(CREDENTIAL_HASH_KEY, hash);
-      await this.ctx.storage.delete([ACTIVE_WRAPPER_RUNTIME_KEY, WRAPPER_READY_AT_KEY]);
+      await this.ctx.storage.delete([
+        ACTIVE_WRAPPER_RUNTIME_KEY,
+        WRAPPER_READY_AT_KEY,
+        WRAPPER_HEARTBEAT_OBSERVATION_KEY,
+      ]);
       await saveDeadlines(this.ctx.storage, deadlines);
       await this.scheduleAlarm(deadlines);
       await this.appendLog(credentialTransition(Date.now(), 'rotated'));
@@ -2907,6 +2969,7 @@ export class SandboxControl extends DurableObject<Env> {
       OWNER_ID_KEY,
       CREDENTIAL_HASH_KEY,
       WRAPPER_READY_AT_KEY,
+      WRAPPER_HEARTBEAT_OBSERVATION_KEY,
       ACTIVE_WRAPPER_RUNTIME_KEY,
       DIAGNOSTIC_BUNDLE_KEY,
       PROVIDER_KIND_KEY,
@@ -3431,7 +3494,7 @@ export class SandboxControl extends DurableObject<Env> {
             })()
           : recovery;
       await this.ctx.storage.put(ACTIVE_WRAPPER_RUNTIME_KEY, identity);
-      await this.ctx.storage.delete(WRAPPER_READY_AT_KEY);
+      await this.ctx.storage.delete([WRAPPER_READY_AT_KEY, WRAPPER_HEARTBEAT_OBSERVATION_KEY]);
       if (current.state === 'creating') {
         const providerRef =
           current.providerRef ??
@@ -3533,6 +3596,13 @@ export class SandboxControl extends DurableObject<Env> {
           readyConnectionId: identity.connectionId,
         } satisfies PersistedWrapperRuntime,
         [WRAPPER_READY_AT_KEY]: now,
+        [WRAPPER_HEARTBEAT_OBSERVATION_KEY]: {
+          connectionId: identity.connectionId,
+          ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
+          armedAt: now,
+          armedExpiryAt: now + DEADLINE_MS.heartbeatExpiry,
+          armedBasis: 'wrapper_ready',
+        } satisfies WrapperHeartbeatObservation,
       });
       let deadlines = cancelDeadline(await loadDeadlines(tx), 'wrapperReadiness');
       deadlines = armDeadline(deadlines, 'heartbeatExpiry', now + DEADLINE_MS.heartbeatExpiry);
@@ -3576,27 +3646,43 @@ export class SandboxControl extends DurableObject<Env> {
       reportedSessions: payload.sessions.length,
       pendingMessages: payload.pendingMessages,
       activeKiloSessions: payload.activeKiloSessions,
+      ...(await this.heartbeatSessionFields(payload.sessions)),
       ...this.forwarding,
     };
     if (!this.isCurrentConnection(identity)) {
+      // Log-only: a stale connection must not overwrite the armed connection's
+      // accept/arm history.
       this.logDiagnostic('heartbeat', { ...diagnostic, decision: 'stale_connection' });
       return;
     }
     if (!payload.kilo.ready) {
+      const now = Date.now();
+      const stored = await this.readHeartbeatObservationBestEffort();
       this.logDiagnostic(
         'heartbeat',
         {
           ...diagnostic,
           decision: 'kilo_unhealthy',
           reason: payload.kilo.reason ?? 'unknown',
+          ...this.heartbeatLogFields(stored, identity.connectionId),
+          lastReceivedHeartbeatAt: now,
         },
         'warn'
       );
+      await this.overlayHeartbeatObservation(identity, 'kilo_unhealthy', now);
       await this.quarantineConnection(identity, 'kilo_unhealthy');
       return;
     }
     if (!this.readyWrapperRuntime() && !identity.recoveryCapable) {
-      this.logDiagnostic('heartbeat', { ...diagnostic, decision: 'runtime_not_ready' });
+      const now = Date.now();
+      const stored = await this.readHeartbeatObservationBestEffort();
+      this.logDiagnostic('heartbeat', {
+        ...diagnostic,
+        decision: 'runtime_not_ready',
+        ...this.heartbeatLogFields(stored, identity.connectionId),
+        lastReceivedHeartbeatAt: now,
+      });
+      await this.overlayHeartbeatObservation(identity, 'runtime_not_ready', now);
       return;
     }
 
@@ -3664,6 +3750,16 @@ export class SandboxControl extends DurableObject<Env> {
           );
         }
         await saveDeadlines(this.ctx.storage, deadlines);
+        await this.ctx.storage.put(WRAPPER_HEARTBEAT_OBSERVATION_KEY, {
+          connectionId: identity.connectionId,
+          ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
+          lastReceivedAt: now,
+          lastAcceptedAt: now,
+          armedAt: now,
+          armedExpiryAt: now + DEADLINE_MS.heartbeatExpiry,
+          armedBasis: 'heartbeat_receipt',
+          lastDecision: 'accepted',
+        } satisfies WrapperHeartbeatObservation);
         await this.scheduleAlarm(deadlines);
         return {
           routeCount: table.size,
@@ -3685,7 +3781,6 @@ export class SandboxControl extends DurableObject<Env> {
         this.logDiagnostic('heartbeat', { ...diagnostic, decision: 'apply_failed' }, 'warn');
         throw error;
       });
-    if (applied) this.lastAcceptedHeartbeat = { connectionId: identity.connectionId, at: now };
     this.logDiagnostic('heartbeat', {
       ...diagnostic,
       ...applied,
@@ -4426,10 +4521,15 @@ export class SandboxControl extends DurableObject<Env> {
     identity: SandboxControlConnectionIdentity,
     cause: 'control_disconnected' | 'heartbeat_expired'
   ): Promise<void> {
-    if (!identity.wrapperInstanceId || !this.isActiveConnection(identity)) return;
+    if (!identity.wrapperInstanceId || !this.isActiveConnection(identity)) {
+      this.emitRecoveryOutcome(identity, cause, 'skipped');
+      return;
+    }
     const wrapperInstanceId = identity.wrapperInstanceId;
+    let allocationId: string | undefined;
     const started = await this.ctx.storage.transaction(async tx => {
       const physical = await loadPhysicalRecord(tx);
+      allocationId = physical.createIntent?.intentId;
       if (
         physical.state !== 'running' ||
         physical.stopTombstone !== null ||
@@ -4453,7 +4553,7 @@ export class SandboxControl extends DurableObject<Env> {
       const nextRecovery = [...recovery.filter(item => item.episodeId !== next.episodeId), next];
       await saveRecoveryDecisions(tx, nextRecovery);
       await tx.put(ACTIVE_WRAPPER_RUNTIME_KEY, identity);
-      await tx.delete(WRAPPER_READY_AT_KEY);
+      await tx.delete([WRAPPER_READY_AT_KEY, WRAPPER_HEARTBEAT_OBSERVATION_KEY]);
       const deadlines = controlRecovery.recoveryDeadlines(
         cancelDeadline(await loadDeadlines(tx), 'heartbeatExpiry'),
         nextRecovery
@@ -4464,6 +4564,10 @@ export class SandboxControl extends DurableObject<Env> {
     });
     this.readyConnectionId = null;
     this.kiloReady = false;
+    // A returned decision means this call committed recovery storage, even when
+    // an authority or exhaustion was already present; only an undefined
+    // transaction result is a skip.
+    this.emitRecoveryOutcome(identity, cause, started ? 'started' : 'skipped', allocationId);
     if (!started || started.authority || started.exhaustedAt !== undefined) return;
     const authority = await this.recoveryAuthority.load(started);
     if (!authority) return;
@@ -4480,11 +4584,36 @@ export class SandboxControl extends DurableObject<Env> {
     });
   }
 
+  // Report-only F11 record. Emitted synchronously once the commit/skip is known
+  // by the existing recovery/quarantine owner; carries no decision authority and
+  // is never read back. A failing logger must not alter recovery.
+  private emitRecoveryOutcome(
+    identity: SandboxControlConnectionIdentity,
+    cause: string,
+    outcome: 'started' | 'skipped',
+    allocationId?: string
+  ): void {
+    const resolvedCause = diagnosticCause(cause);
+    try {
+      this.logDiagnostic('recovery_outcome', {
+        ...diagnosticConnection(identity),
+        cause: resolvedCause,
+        outcome,
+        ...(allocationId ? { allocationId } : {}),
+        ...(resolvedCause === 'heartbeat_expired' ? { deadlineId: 'heartbeatExpiry' } : {}),
+        committedAt: Date.now(),
+      });
+    } catch {
+      // Diagnostics must never block recovery.
+    }
+  }
+
   private async quarantineConnection(
     identity: SandboxControlConnectionIdentity,
     reason: string
   ): Promise<void> {
     const physical = await loadPhysicalRecord(this.ctx.storage);
+    const allocationId = physical.createIntent?.intentId;
     if (
       !this.isActiveConnection(identity) ||
       physical.state === 'stopped' ||
@@ -4496,10 +4625,12 @@ export class SandboxControl extends DurableObject<Env> {
         physicalState: physical.state,
         hasTombstone: physical.stopTombstone !== null,
       });
+      this.emitRecoveryOutcome(identity, reason, 'skipped', allocationId);
       return;
     }
     const next = beginStop(physical, reason, Date.now(), identity.wrapperInstanceId);
     await this.persistPhysical(physical, next, reason);
+    this.emitRecoveryOutcome(identity, reason, 'started', allocationId);
     this.ctx.waitUntil(this.recordStopAttempt());
   }
 
@@ -4595,6 +4726,89 @@ export class SandboxControl extends DurableObject<Env> {
       return null;
     }
     return current;
+  }
+
+  private async readHeartbeatObservation(): Promise<WrapperHeartbeatObservation | undefined> {
+    return this.ctx.storage.get<WrapperHeartbeatObservation>(WRAPPER_HEARTBEAT_OBSERVATION_KEY);
+  }
+
+  // Report-only diagnostics must never block recovery: a failing read degrades
+  // to "no observation" and the caller proceeds with its lifecycle action.
+  private async readHeartbeatObservationBestEffort(): Promise<
+    WrapperHeartbeatObservation | undefined
+  > {
+    try {
+      return await this.readHeartbeatObservation();
+    } catch {
+      return undefined;
+    }
+  }
+
+  // Report-only view of the stored observation. Never the deadline authority.
+  // Stored fields are omitted unless the observation belongs to `connectionId`,
+  // so evidence for a stale connection cannot be reported as current.
+  private heartbeatLogFields(
+    observation: WrapperHeartbeatObservation | undefined,
+    connectionId: string | undefined
+  ): ControlDiagnosticFields {
+    if (!observation || connectionId === undefined || observation.connectionId !== connectionId) {
+      return {};
+    }
+    return {
+      lastReceivedHeartbeatAt: observation.lastReceivedAt,
+      lastAcceptedHeartbeatAt: observation.lastAcceptedAt,
+      armedAt: observation.armedAt,
+      armedExpiryAt: observation.armedExpiryAt,
+      heartbeatArmedBasis: observation.armedBasis,
+      lastDecision: observation.lastDecision,
+      observationConnectionId: observation.connectionId,
+      observationWrapperInstanceId: observation.wrapperInstanceId,
+    };
+  }
+
+  // Bounded report-only per-session heartbeat evidence. The single-route fields
+  // come from the payload row that exactly matches the DO's one route, never
+  // from route-table `lastState` and never from an implicit "only" row.
+  private async heartbeatSessionFields(
+    sessions: SandboxHeartbeatPayload['sessions']
+  ): Promise<ControlDiagnosticFields> {
+    const fields: ControlDiagnosticFields = {};
+    const report = packSessionReport(sessions);
+    if (report !== undefined) fields.sessionReport = report;
+    let routeKiloSessionIds: string[] = [];
+    try {
+      const table = await loadRouteTable(this.ctx.storage);
+      routeKiloSessionIds = [...table.values()].map(route => route.kiloSessionId);
+    } catch {
+      routeKiloSessionIds = [];
+    }
+    if (routeKiloSessionIds.length !== 1) return fields;
+    const target = sessions.find(session => session.kiloSessionId === routeKiloSessionIds[0]);
+    if (!target) return fields;
+    fields.kiloSessionId = target.kiloSessionId;
+    fields.sessionState = target.state;
+    fields.sessionWaitingOn = target.waitingOn ?? 'none';
+    return fields;
+  }
+
+  // Bounded matching-identity overlay: only the armed connection's observation
+  // is updated, and its accept/arm history is preserved.
+  private async overlayHeartbeatObservation(
+    identity: SandboxControlConnectionIdentity,
+    lastDecision: WrapperHeartbeatDecision,
+    lastReceivedAt: number
+  ): Promise<void> {
+    try {
+      const existing = await this.readHeartbeatObservation();
+      if (!existing || existing.connectionId !== identity.connectionId) return;
+      await this.ctx.storage.put(WRAPPER_HEARTBEAT_OBSERVATION_KEY, {
+        ...existing,
+        lastReceivedAt,
+        lastDecision,
+      } satisfies WrapperHeartbeatObservation);
+    } catch {
+      this.logDiagnostic('heartbeat_observation_failed', diagnosticConnection(identity));
+    }
   }
 
   private supportsNativeRuntimeRetirement(): boolean {
@@ -4769,6 +4983,31 @@ export class SandboxControl extends DurableObject<Env> {
             'heartbeatExpiry',
             readyAt + DEADLINE_MS.heartbeatExpiry
           );
+          // Re-arm from `readyAt` but keep any retained accept history for the
+          // same connection; do not rewrite `lastAcceptedAt`. The read is
+          // best-effort so a diagnostic failure cannot block the repair.
+          const existing = await this.readHeartbeatObservationBestEffort();
+          const observation: WrapperHeartbeatObservation = {
+            connectionId: runtime.connectionId,
+            ...(runtime.wrapperInstanceId ? { wrapperInstanceId: runtime.wrapperInstanceId } : {}),
+            ...(existing?.connectionId === runtime.connectionId
+              ? {
+                  ...(existing.lastReceivedAt !== undefined
+                    ? { lastReceivedAt: existing.lastReceivedAt }
+                    : {}),
+                  ...(existing.lastAcceptedAt !== undefined
+                    ? { lastAcceptedAt: existing.lastAcceptedAt }
+                    : {}),
+                  ...(existing.lastDecision !== undefined
+                    ? { lastDecision: existing.lastDecision }
+                    : {}),
+                }
+              : {}),
+            armedAt: readyAt,
+            armedExpiryAt: readyAt + DEADLINE_MS.heartbeatExpiry,
+            armedBasis: 'wrapper_ready',
+          };
+          await this.ctx.storage.put(WRAPPER_HEARTBEAT_OBSERVATION_KEY, observation);
         } else if (physical.state === 'creating') {
           deadlines = armDeadline(
             deadlines,
@@ -4949,6 +5188,7 @@ export class SandboxControl extends DurableObject<Env> {
           CREDENTIAL_HASH_KEY,
           ACTIVE_WRAPPER_RUNTIME_KEY,
           WRAPPER_READY_AT_KEY,
+          WRAPPER_HEARTBEAT_OBSERVATION_KEY,
         ]);
       }
       next = { startup: (to.createIntent?.createdAt ?? Date.now()) + DEADLINE_MS.startup };
@@ -4960,6 +5200,7 @@ export class SandboxControl extends DurableObject<Env> {
         CREDENTIAL_HASH_KEY,
         ACTIVE_WRAPPER_RUNTIME_KEY,
         WRAPPER_READY_AT_KEY,
+        WRAPPER_HEARTBEAT_OBSERVATION_KEY,
       ]);
       next = {};
       if (to.state !== 'stopped') {

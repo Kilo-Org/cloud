@@ -47,10 +47,12 @@ import {
   lifecycleLongSession,
   lifecycleMultiSessionCollab,
 } from './lifecycle-file-state.js';
+import { CONTINUITY_SCENARIOS } from './lifecycle-continuity.js';
 import { createMessageId } from '../../src/session/message-id.js';
 import { generateKiloSessionId } from '../../src/utils/kilo-session-id.js';
 import {
   controlPlaneKiloRootExists,
+  findControlPlaneKiloRuntime,
   importControlPlaneKiloRoot,
   inspectControlPlaneKiloRoot,
   inspectControlPlaneQuestions,
@@ -126,20 +128,27 @@ function hasPreparationForMessage(events: StreamEvent[], messageId: string): boo
   );
 }
 
-async function sandboxOwnsSession(containerId: string, sessionId: string): Promise<boolean> {
+/**
+ * Presence probe for a control-plane primary. Root presence is NOT exclusive
+ * ownership: the wrapper restore paths no longer emit `session.attach ready
+ * directory=`, so discovery now goes through the live Kilo root. Callers that
+ * need exclusivity (kill, pause) must use the `exclusive` operation instead.
+ */
+async function sandboxOwnsSession(
+  containerId: string,
+  sessionId: string,
+  kiloSessionId: string
+): Promise<boolean> {
+  if (sessionId.startsWith('workspace_')) {
+    const runtime = await findControlPlaneKiloRuntime(kiloSessionId).catch(() => null);
+    return runtime?.container.id === containerId;
+  }
   const probe = `
     const fs = require('node:fs');
     const sessionId = process.argv.at(-1);
-    if (!sessionId.startsWith('workspace_')) {
-      const logs = fs.readdirSync('/tmp').filter(name => /^kilocode-wrapper-agent_.+\\.log$/.test(name));
-      process.exit(logs.length > 0 && logs.every(name =>
-        name.startsWith('kilocode-wrapper-' + sessionId + '-')
-      ) ? 0 : 1);
-    }
-    const log = fs.readFileSync('/tmp/kilocode-control-wrapper.log', 'utf8');
-    const directories = [...log.matchAll(/session\\.attach ready directory=([^\\n]+)/g)];
-    process.exit(directories.length > 0 && directories.every(match =>
-      match[1].trim().split('/').at(-1) === sessionId
+    const logs = fs.readdirSync('/tmp').filter(name => /^kilocode-wrapper-agent_.+\\.log$/.test(name));
+    process.exit(logs.length > 0 && logs.every(name =>
+      name.startsWith('kilocode-wrapper-' + sessionId + '-')
     ) ? 0 : 1);
   `;
   try {
@@ -152,26 +161,31 @@ async function sandboxOwnsSession(containerId: string, sessionId: string): Promi
   }
 }
 
-async function findOwnedSandboxes(sessionId: string, knownIds: Set<string>) {
+async function findOwnedSandboxes(
+  sessionId: string,
+  kiloSessionId: string,
+  knownIds: Set<string>
+) {
   const candidates = sessionId.startsWith('workspace_')
     ? await listSandboxContainers()
     : await listSandboxesForAgentSession(sessionId);
   const matches: SandboxContainer[] = [];
   for (const container of candidates) {
     if (container.isProxy || knownIds.has(container.id)) continue;
-    if (await sandboxOwnsSession(container.id, sessionId)) matches.push(container);
+    if (await sandboxOwnsSession(container.id, sessionId, kiloSessionId)) matches.push(container);
   }
   return matches;
 }
 
 async function waitForOwnedSandbox(
   sessionId: string,
+  kiloSessionId: string,
   knownIds: Set<string>,
   timeoutMs: number
 ): Promise<SandboxContainer | null> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const matches = await findOwnedSandboxes(sessionId, knownIds);
+    const matches = await findOwnedSandboxes(sessionId, kiloSessionId, knownIds);
     if (matches.length > 1) {
       throw new Error(`Multiple containers match ${sessionId}; refusing ambiguous ownership`);
     }
@@ -181,17 +195,28 @@ async function waitForOwnedSandbox(
   return null;
 }
 
-async function stopOwnedSandboxFamily(sandbox: SandboxContainer, sessionId: string) {
+async function stopOwnedSandboxFamily(
+  sandbox: SandboxContainer,
+  sessionId: string,
+  kiloSessionId: string
+) {
   const current = (await listSandboxContainers()).find(
     container => container.name === sandbox.name
   );
-  if (current) {
-    if (current.id !== sandbox.id)
-      throw new Error(`Container identity changed for ${sandbox.name}`);
-    const owned = await sandboxOwnsSession(current.id, sessionId);
-    if (!owned) throw new Error(`Cannot prove exclusive ownership of ${sandbox.name}`);
+  if (current && current.id !== sandbox.id)
+    throw new Error(`Container identity changed for ${sandbox.name}`);
+  let killed: string[];
+  if (current && sessionId.startsWith('workspace_')) {
+    // Root presence is not exclusive ownership; the control-plane stop proves
+    // the `exclusive` operation before it kills.
+    killed = await stopOwnedControlPlaneSandbox(sandbox, kiloSessionId);
+  } else {
+    if (current) {
+      const owned = await sandboxOwnsSession(current.id, sessionId, kiloSessionId);
+      if (!owned) throw new Error(`Cannot prove exclusive ownership of ${sandbox.name}`);
+    }
+    killed = await killSandboxFamily(sandbox);
   }
-  const killed = await killSandboxFamily(sandbox);
   if (!(await waitForSandboxFamilyGone(sandbox, 30_000))) {
     throw new Error(`Owned sandbox family ${sandbox.name} is still running after cleanup`);
   }
@@ -1085,6 +1110,7 @@ export async function lifecycleCold(args: LifecycleArgs): Promise<LifecycleResul
     const stream = await openConnectedStream(config, sessionResult.cloudAgentSessionId);
     const sandbox = await waitForOwnedSandbox(
       sessionResult.cloudAgentSessionId,
+      sessionResult.kiloSessionId,
       knownSandboxIds,
       timeoutMs
     );
@@ -1176,6 +1202,7 @@ export async function lifecycleHot(args: LifecycleArgs): Promise<LifecycleResult
     const warmupStream = await openConnectedStream(config, session.cloudAgentSessionId);
     const warmupSandbox = await waitForOwnedSandbox(
       session.cloudAgentSessionId,
+      session.kiloSessionId,
       knownSandboxIds,
       timeoutMs
     );
@@ -1292,6 +1319,7 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
     const coldStream = await openConnectedStream(config, session.cloudAgentSessionId);
     const sandbox = await waitForOwnedSandbox(
       session.cloudAgentSessionId,
+      session.kiloSessionId,
       knownSandboxIds,
       timeoutMs
     );
@@ -1389,13 +1417,20 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
   const ownedFamilies = new Map<string, SandboxContainer>();
   let knownSandboxIds = new Set<string>();
   let sessionId: string | undefined;
+  let kiloSessionId: string | undefined;
   try {
     knownSandboxIds = await snapshotSandboxIds();
     const session = await startSession(config, { prompt: fakeDirective('echo:warmup') }, api);
     sessionId = session.cloudAgentSessionId;
+    kiloSessionId = session.kiloSessionId;
     const firstStream = await openConnectedStream(config, sessionId);
     streams.push(firstStream);
-    const firstSandbox = await waitForOwnedSandbox(sessionId, knownSandboxIds, timeoutMs);
+    const firstSandbox = await waitForOwnedSandbox(
+      sessionId,
+      session.kiloSessionId,
+      knownSandboxIds,
+      timeoutMs
+    );
     if (!firstSandbox) throw new Error('Could not identify an exclusively owned warmup sandbox');
     ownedFamilies.set(sandboxFamilyKey(firstSandbox), firstSandbox);
     const warmup = await collectUntilTerminal(firstStream, session.messageId, timeoutMs);
@@ -1405,7 +1440,7 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
       throw new Error(`Warmup message ${session.messageId} did not complete successfully`);
     }
 
-    const killed = await stopOwnedSandboxFamily(firstSandbox, sessionId);
+    const killed = await stopOwnedSandboxFamily(firstSandbox, sessionId, session.kiloSessionId);
     if (!killed.includes(firstSandbox.name))
       throw new Error('Fault did not kill the owned primary');
     const beforeRecovery = await snapshotSandboxIds();
@@ -1440,7 +1475,12 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
     ) {
       throw new Error(`Recovery message ${recovery.messageId} did not complete in ${sessionId}`);
     }
-    const replacement = await waitForOwnedSandbox(sessionId, beforeRecovery, timeoutMs);
+    const replacement = await waitForOwnedSandbox(
+      sessionId,
+      session.kiloSessionId,
+      beforeRecovery,
+      timeoutMs
+    );
     if (!replacement) throw new Error('Could not identify the owned replacement sandbox');
     ownedFamilies.set(sandboxFamilyKey(replacement), replacement);
     if (
@@ -1469,13 +1509,13 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
     };
   } finally {
     for (const stream of streams) stream.close();
-    if (sessionId) {
+    if (sessionId && kiloSessionId) {
       await interruptSession(config, sessionId).catch(() => {});
-      for (const sandbox of await findOwnedSandboxes(sessionId, knownSandboxIds)) {
+      for (const sandbox of await findOwnedSandboxes(sessionId, kiloSessionId, knownSandboxIds)) {
         ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
       }
       for (const sandbox of ownedFamilies.values())
-        await stopOwnedSandboxFamily(sandbox, sessionId);
+        await stopOwnedSandboxFamily(sandbox, sessionId, kiloSessionId);
     }
   }
 }
@@ -1488,13 +1528,20 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
   const ownedFamilies = new Map<string, SandboxContainer>();
   let knownSandboxIds = new Set<string>();
   let sessionId: string | undefined;
+  let kiloSessionId: string | undefined;
   let stream: ReturnType<typeof openStream> | undefined;
   try {
     knownSandboxIds = await snapshotSandboxIds();
     const session = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
     sessionId = session.cloudAgentSessionId;
+    kiloSessionId = session.kiloSessionId;
     stream = await openConnectedStream(config, sessionId);
-    const sandbox = await waitForOwnedSandbox(sessionId, knownSandboxIds, timeoutMs);
+    const sandbox = await waitForOwnedSandbox(
+      sessionId,
+      session.kiloSessionId,
+      knownSandboxIds,
+      timeoutMs
+    );
     if (!sandbox) throw new Error('Could not identify an exclusively owned active sandbox');
     ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
     if (!(await waitForGateEngaged(config, gateTag, timeoutMs))) {
@@ -1510,7 +1557,7 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
     if (!accepted || active.status !== 'running')
       throw new Error(`Message ${session.messageId} is not running`);
 
-    const killed = await stopOwnedSandboxFamily(sandbox, sessionId);
+    const killed = await stopOwnedSandboxFamily(sandbox, sessionId, session.kiloSessionId);
     if (!killed.includes(sandbox.name)) throw new Error('Fault did not kill the owned primary');
     const terminal = await stream.waitForTerminal(timeoutMs, session.messageId);
     events.push(...stream.events);
@@ -1532,7 +1579,12 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
     ) {
       throw new Error(`Recovery message ${recovery.messageId} did not complete in ${sessionId}`);
     }
-    const replacement = await waitForOwnedSandbox(sessionId, beforeRecovery, timeoutMs);
+    const replacement = await waitForOwnedSandbox(
+      sessionId,
+      session.kiloSessionId,
+      beforeRecovery,
+      timeoutMs
+    );
     if (!replacement) throw new Error('Could not identify the owned replacement sandbox');
     ownedFamilies.set(sandboxFamilyKey(replacement), replacement);
     if (
@@ -1562,13 +1614,13 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
   } finally {
     stream?.close();
     await releaseGate(config.fakeLlmUrl, gateTag).catch(() => {});
-    if (sessionId) {
+    if (sessionId && kiloSessionId) {
       await interruptSession(config, sessionId).catch(() => {});
-      for (const sandbox of await findOwnedSandboxes(sessionId, knownSandboxIds)) {
+      for (const sandbox of await findOwnedSandboxes(sessionId, kiloSessionId, knownSandboxIds)) {
         ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
       }
       for (const sandbox of ownedFamilies.values())
-        await stopOwnedSandboxFamily(sandbox, sessionId);
+        await stopOwnedSandboxFamily(sandbox, sessionId, kiloSessionId);
     }
   }
 }
@@ -1658,7 +1710,12 @@ export async function lifecycleQueueWhileBusy(args: LifecycleArgs): Promise<Life
     const gate = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
     cleanupSessionId = gate.cloudAgentSessionId;
     const stream = await openConnectedStream(config, gate.cloudAgentSessionId);
-    const sandbox = await waitForOwnedSandbox(gate.cloudAgentSessionId, knownSandboxIds, timeoutMs);
+    const sandbox = await waitForOwnedSandbox(
+      gate.cloudAgentSessionId,
+      gate.kiloSessionId,
+      knownSandboxIds,
+      timeoutMs
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -3033,4 +3090,5 @@ export const LIFECYCLE_SCENARIOS: Record<
   'callback-completion': lifecycleCallbackCompletion,
   'callback-batch-followup': lifecycleCallbackBatchFollowup,
   'callback-interrupt': lifecycleCallbackInterrupt,
+  ...CONTINUITY_SCENARIOS,
 };

@@ -17,6 +17,7 @@ import {
   extractMultipartField,
   MAX_REALISTIC_CHARS,
   MAX_REALISTIC_PIECES,
+  MAX_TOOL_STREAM_BYTES,
   parseDirective,
   startFakeLlmServer,
   splitRealisticContent,
@@ -979,6 +980,63 @@ describe('fake-llm-server HTTP', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: {
         message: 'read-then-write directive requires tag, srcPath, destPath, and prefix',
+        type: 'invalid_request',
+      },
+    });
+  });
+
+  it('tool-stream writes the requested byte count and then reads it back', async () => {
+    const h = await start();
+    const prompt = '__fake__:tool-stream:streamer:100';
+    const writeCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(writeCall).toMatchObject({ name: 'write' });
+    expect((writeCall.arguments.content as string).length).toBe(100);
+
+    const writeHistory = [
+      { role: 'assistant', tool_calls: [{ id: writeCall.id }] },
+      { role: 'tool', tool_call_id: writeCall.id, content: 'File written successfully' },
+    ];
+    const readCall = extractToolCall(
+      await parseSse(await postToolChat(h.url, prompt, writeHistory))
+    );
+    expect(readCall).toMatchObject({ name: 'read' });
+
+    const completed = await parseSse(
+      await postToolChat(h.url, prompt, [
+        ...writeHistory,
+        { role: 'assistant', tool_calls: [{ id: readCall.id }] },
+        { role: 'tool', tool_call_id: readCall.id, content: 'x'.repeat(100) },
+      ])
+    );
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({ delta: { role: 'assistant', content: 'done-streamer' } }),
+    ]);
+    const status = await fetch(`${h.url}/test/scenario-status?tag=streamer`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { write: 1, read: 1, edit: 0, question: 0 },
+      toolResults: { write: 1, read: 1, edit: 0, question: 0 },
+    });
+  });
+
+  it('rejects malformed or oversized tool-stream directives', async () => {
+    const h = await start();
+    const missingArgs = await postChat(h.url, '__fake__:tool-stream:streamer');
+    expect(missingArgs.status).toBe(402);
+    await expect(missingArgs.json()).resolves.toMatchObject({
+      error: {
+        message: 'tool-stream directive requires a tag and a byte count',
+        type: 'invalid_request',
+      },
+    });
+
+    const overCap = await postChat(
+      h.url,
+      `__fake__:tool-stream:streamer:${MAX_TOOL_STREAM_BYTES + 1}`
+    );
+    expect(overCap.status).toBe(402);
+    await expect(overCap.json()).resolves.toMatchObject({
+      error: {
+        message: `tool-stream byte request ${MAX_TOOL_STREAM_BYTES + 1} exceeds maximum ${MAX_TOOL_STREAM_BYTES}`,
         type: 'invalid_request',
       },
     });

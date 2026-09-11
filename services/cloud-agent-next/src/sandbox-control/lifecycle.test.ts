@@ -356,6 +356,7 @@ async function harness(
     closeProvisionalSockets: vi.fn(),
     supportsOperationResults: () => true,
     supportsNativeRuntimeRetirement: () => true,
+    pendingControlRequests: () => 0,
     sendRequest,
   } as unknown as SandboxControlSocketHandler;
   mocks.socket.mockImplementation(
@@ -5564,4 +5565,602 @@ describe('SandboxControl lifecycle boundaries', () => {
       ).resolves.toEqual({ allowed: false, reason: 'billing_runtime_mismatch' });
     }
   );
+
+  describe('heartbeat lapse observation', () => {
+    const OBSERVATION_KEY = 'wrapper_heartbeat_observation';
+    const readObservation = (h: { records: Map<string, unknown> }) =>
+      h.records.get(OBSERVATION_KEY) as Record<string, unknown> | undefined;
+
+    async function readyWithAcceptedHeartbeat() {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+      return { h, identity };
+    }
+
+    it('keeps the accepted observation across eviction for the heartbeat expiry snapshot', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const acceptedAt = readObservation(h)?.lastAcceptedAt;
+      expect(acceptedAt).toEqual(expect.any(Number));
+
+      await h.evict();
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.fireAlarm();
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'deadline_fired',
+            deadlineId: 'heartbeatExpiry',
+            lastReceivedHeartbeatAt: acceptedAt,
+            lastAcceptedHeartbeatAt: acceptedAt,
+            armedAt: acceptedAt,
+            armedExpiryAt: (acceptedAt as number) + DEADLINE_MS.heartbeatExpiry,
+            heartbeatArmedBasis: 'heartbeat_receipt',
+            lastDecision: 'accepted',
+            observationConnectionId: identity.connectionId,
+            pendingControlRequests: 0,
+          })
+        );
+      } finally {
+        fields.mockRestore();
+      }
+      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+        'heartbeat_expired',
+        identity.wrapperInstanceId
+      );
+      expect(h.runtime(identity.providerInstanceId)?.state.running).toBe(false);
+    });
+
+    it('keeps the observation for a passive eviction followed directly by alarm', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const acceptedAt = readObservation(h)?.lastAcceptedAt;
+      await h.evict(true);
+
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.fireAlarm();
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'deadline_fired',
+            deadlineId: 'heartbeatExpiry',
+            lastReceivedHeartbeatAt: acceptedAt,
+            heartbeatArmedBasis: 'heartbeat_receipt',
+            lastDecision: 'accepted',
+            pendingControlRequests: 0,
+          })
+        );
+      } finally {
+        fields.mockRestore();
+      }
+      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+        'heartbeat_expired',
+        identity.wrapperInstanceId
+      );
+    });
+
+    it('records a current-connection reject without clearing retained accept history', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const acceptedAt = readObservation(h)?.lastAcceptedAt as number;
+      const runtime = h.records.get('active_wrapper_runtime') as Record<string, unknown>;
+      h.records.set('active_wrapper_runtime', {
+        ...runtime,
+        readyConnectionId: 'replaced-connection',
+      });
+      await h.evict();
+      vi.setSystemTime(acceptedAt + 5_000);
+
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'heartbeat',
+            decision: 'runtime_not_ready',
+            connectionId: identity.connectionId,
+          })
+        );
+      } finally {
+        fields.mockRestore();
+      }
+      expect(readObservation(h)).toMatchObject({
+        connectionId: identity.connectionId,
+        lastDecision: 'runtime_not_ready',
+        armedBasis: 'heartbeat_receipt',
+        lastAcceptedAt: acceptedAt,
+        lastReceivedAt: acceptedAt + 5_000,
+      });
+
+      const expiryFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.fireAlarm();
+        expect(expiryFields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'deadline_fired',
+            deadlineId: 'heartbeatExpiry',
+            lastReceivedHeartbeatAt: acceptedAt + 5_000,
+            lastAcceptedHeartbeatAt: acceptedAt,
+            lastDecision: 'runtime_not_ready',
+          })
+        );
+      } finally {
+        expiryFields.mockRestore();
+      }
+      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+        'heartbeat_expired',
+        identity.wrapperInstanceId
+      );
+    });
+
+    it('does not let a stale connection overwrite the armed connection observation', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const before = readObservation(h);
+      expect(before).toMatchObject({
+        connectionId: identity.connectionId,
+        lastDecision: 'accepted',
+      });
+
+      const staleIdentity = { ...identity, connectionId: crypto.randomUUID() };
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.hooks.onHeartbeat?.(activeHeartbeat, staleIdentity);
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'heartbeat',
+            decision: 'stale_connection',
+            connectionId: staleIdentity.connectionId,
+          })
+        );
+      } finally {
+        fields.mockRestore();
+      }
+      expect(readObservation(h)).toEqual(before);
+    });
+
+    it('omits stored snapshot fields when the observation belongs to another connection', async () => {
+      const { h } = await readyWithAcceptedHeartbeat();
+      const observation = readObservation(h) as Record<string, unknown>;
+      h.records.set(OBSERVATION_KEY, { ...observation, connectionId: 'other-connection' });
+
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.fireAlarm();
+        const deadline = fields.mock.calls
+          .map(([value]) => value as Record<string, unknown>)
+          .find(
+            value =>
+              value.diagnosticEvent === 'deadline_fired' && value.deadlineId === 'heartbeatExpiry'
+          );
+        expect(deadline).toBeDefined();
+        expect(deadline).not.toHaveProperty('lastAcceptedHeartbeatAt');
+        expect(deadline).not.toHaveProperty('lastReceivedHeartbeatAt');
+        expect(deadline).not.toHaveProperty('observationConnectionId');
+      } finally {
+        fields.mockRestore();
+      }
+    });
+
+    it('emits retained arm history on kilo_unhealthy and still quarantines', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const acceptedAt = readObservation(h)?.lastAcceptedAt;
+
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      const put = vi.spyOn(h.storage, 'put');
+      try {
+        await h.hooks.onHeartbeat?.(
+          { ...activeHeartbeat, kilo: { ready: false, reason: 'feed_stale' } },
+          identity
+        );
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'heartbeat',
+            decision: 'kilo_unhealthy',
+            reason: 'feed_stale',
+            lastReceivedHeartbeatAt: expect.any(Number),
+            lastAcceptedHeartbeatAt: acceptedAt,
+            heartbeatArmedBasis: 'heartbeat_receipt',
+            lastDecision: 'accepted',
+            observationConnectionId: identity.connectionId,
+          })
+        );
+        // The bounded matching-identity overlay runs before quarantine; the
+        // stop transition may then delete the observation, so the write itself
+        // is the durable evidence.
+        expect(put).toHaveBeenCalledWith(
+          OBSERVATION_KEY,
+          expect.objectContaining({
+            lastDecision: 'kilo_unhealthy',
+            lastAcceptedAt: acceptedAt,
+            armedBasis: 'heartbeat_receipt',
+          })
+        );
+      } finally {
+        fields.mockRestore();
+        warn.mockRestore();
+        put.mockRestore();
+      }
+      await h.flush();
+      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+        'kilo_unhealthy',
+        identity.wrapperInstanceId
+      );
+    });
+
+    it('records wrapper_ready on ready and repair, and heartbeat_receipt on accept', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const readyObservation = readObservation(h);
+      expect(readyObservation).toMatchObject({
+        connectionId: identity.connectionId,
+        armedBasis: 'wrapper_ready',
+      });
+      expect(readyObservation).not.toHaveProperty('lastDecision');
+      expect(readyObservation).not.toHaveProperty('lastAcceptedAt');
+
+      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+      const acceptedAt = readObservation(h)?.lastAcceptedAt as number;
+      expect(readObservation(h)).toMatchObject({
+        armedBasis: 'heartbeat_receipt',
+        lastDecision: 'accepted',
+        lastAcceptedAt: acceptedAt,
+      });
+      expect(acceptedAt).toEqual(expect.any(Number));
+
+      h.records.delete('deadlines');
+      await h.evict();
+      expect(readObservation(h)).toMatchObject({
+        armedBasis: 'wrapper_ready',
+        lastDecision: 'accepted',
+        lastAcceptedAt: acceptedAt,
+        armedAt: h.records.get('wrapper_ready_at'),
+      });
+
+      h.session.failWaitingMessages.mockClear();
+      await h.fireAlarm();
+      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+        'heartbeat_expired',
+        identity.wrapperInstanceId
+      );
+    });
+  });
+
+  describe('heartbeat diagnostic resilience', () => {
+    const OBSERVATION_KEY = 'wrapper_heartbeat_observation';
+    const readObservation = (h: { records: Map<string, unknown> }) =>
+      h.records.get(OBSERVATION_KEY) as Record<string, unknown> | undefined;
+
+    async function readyWithAcceptedHeartbeat() {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+      return { h, identity };
+    }
+
+    // Diagnostic reads are report-only; a rejection must not cancel the
+    // lifecycle action that follows (quarantine or deadline handling).
+    it('continues heartbeat expiry handling when the observation read rejects', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const storage = h.storage as unknown as { get: (key: string) => Promise<unknown> };
+      const originalGet = storage.get.bind(storage);
+      storage.get = async (key: string) => {
+        if (key === OBSERVATION_KEY) throw new Error('observation read failed');
+        return originalGet(key);
+      };
+      try {
+        await h.fireAlarm();
+        expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+          'heartbeat_expired',
+          identity.wrapperInstanceId
+        );
+      } finally {
+        storage.get = originalGet;
+      }
+    });
+
+    it('quarantines when the observation overlay write rejects', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const storage = h.storage as unknown as {
+        put: (key: unknown, value?: unknown) => Promise<void>;
+      };
+      const originalPut = storage.put.bind(storage);
+      storage.put = async (key: unknown, value?: unknown) => {
+        if (key === OBSERVATION_KEY) throw new Error('overlay write failed');
+        return originalPut(key, value);
+      };
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        await h.hooks.onHeartbeat?.(
+          { ...activeHeartbeat, kilo: { ready: false, reason: 'feed_stale' } },
+          identity
+        );
+        await h.flush();
+        expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+          'kilo_unhealthy',
+          identity.wrapperInstanceId
+        );
+      } finally {
+        storage.put = originalPut;
+        warn.mockRestore();
+      }
+    });
+
+    it('leaves the stored observation unchanged when the apply transaction rolls back', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const before = readObservation(h);
+      expect(before).toMatchObject({ lastDecision: 'accepted' });
+      vi.setSystemTime((before?.lastAcceptedAt as number) + 10_000);
+
+      vi.spyOn(h.storage, 'setAlarm').mockRejectedValueOnce(new Error('alarm write failed'));
+      await expect(h.hooks.onHeartbeat?.(activeHeartbeat, identity)).rejects.toThrow(
+        'alarm write failed'
+      );
+      expect(readObservation(h)).toEqual(before);
+    });
+
+    // Time advances between ready, acceptance and repair, so the repair basis
+    // can only match `readyAt` and not the repair-time `Date.now()`.
+    it('repairs the heartbeat deadline from readyAt after time has advanced', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const readyAt = h.records.get('wrapper_ready_at') as number;
+      expect(readyAt).toBe(Date.now());
+
+      vi.setSystemTime(readyAt + 30_000);
+      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+      expect(readObservation(h)).toMatchObject({
+        armedBasis: 'heartbeat_receipt',
+        armedAt: readyAt + 30_000,
+        lastAcceptedAt: readyAt + 30_000,
+      });
+
+      h.records.delete('deadlines');
+      vi.setSystemTime(readyAt + 60_000);
+      await h.evict();
+      expect(readObservation(h)).toMatchObject({
+        connectionId: identity.connectionId,
+        armedBasis: 'wrapper_ready',
+        armedAt: readyAt,
+        armedExpiryAt: readyAt + DEADLINE_MS.heartbeatExpiry,
+        lastAcceptedAt: readyAt + 30_000,
+        lastDecision: 'accepted',
+      });
+    });
+  });
+
+  describe('recovery outcome evidence', () => {
+    async function readyWithAcceptedHeartbeat(recoveryCapable = false) {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready(
+        recoveryCapable ? { wrapperVersion: null, recoveryCapable: true } : undefined
+      );
+      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+      await h.flush();
+      return { h, identity };
+    }
+
+    // Recovery-capable readiness arms its own retry/readiness deadlines; drop
+    // everything except the heartbeat expiry so this alarm exercises that path.
+    async function fireHeartbeatExpiry(h: Awaited<ReturnType<typeof harness>>) {
+      const deadlines = { ...(h.records.get('deadlines') as Record<string, unknown>) };
+      for (const id of [
+        'recoveryRetry',
+        'idleStop',
+        'recoveryExpiry',
+        'wrapperReadiness',
+        'startup',
+      ]) {
+        delete deadlines[id];
+      }
+      h.records.set('deadlines', deadlines);
+      vi.setSystemTime(deadlines.heartbeatExpiry as number);
+      await h.control.alarm();
+      await h.flush();
+    }
+
+    it('emits recovery_outcome started when heartbeat expiry commits recovery', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat(true);
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const closeHandshaken = vi.spyOn(h.socket, 'closeHandshakenSockets');
+      try {
+        await fireHeartbeatExpiry(h);
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'recovery_outcome',
+            cause: 'heartbeat_expired',
+            outcome: 'started',
+            deadlineId: 'heartbeatExpiry',
+            connectionId: identity.connectionId,
+            wrapperInstanceId: identity.wrapperInstanceId,
+            committedAt: expect.any(Number),
+          })
+        );
+        expect(closeHandshaken).toHaveBeenCalledWith(4002, 'application_report_expired');
+      } finally {
+        fields.mockRestore();
+        closeHandshaken.mockRestore();
+      }
+    });
+
+    it('emits recovery_outcome skipped when recovery cannot commit', async () => {
+      const { h } = await readyWithAcceptedHeartbeat(true);
+      const physical = h.records.get('physical_record') as Record<string, unknown>;
+      h.records.set('physical_record', { ...physical, state: 'stopped' });
+
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await fireHeartbeatExpiry(h);
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'recovery_outcome',
+            cause: 'heartbeat_expired',
+            outcome: 'skipped',
+          })
+        );
+        expect(fields).not.toHaveBeenCalledWith(
+          expect.objectContaining({ diagnosticEvent: 'recovery_outcome', outcome: 'started' })
+        );
+      } finally {
+        fields.mockRestore();
+      }
+    });
+
+    it('emits recovery_outcome started when quarantine commits and skipped when it cannot', async () => {
+      const started = await readyWithAcceptedHeartbeat();
+      const startedFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await fireHeartbeatExpiry(started.h);
+        expect(startedFields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'recovery_outcome',
+            cause: 'heartbeat_expired',
+            outcome: 'started',
+            deadlineId: 'heartbeatExpiry',
+            connectionId: started.identity.connectionId,
+          })
+        );
+      } finally {
+        startedFields.mockRestore();
+      }
+
+      const skipped = await readyWithAcceptedHeartbeat();
+      const physical = skipped.h.records.get('physical_record') as Record<string, unknown>;
+      skipped.h.records.set('physical_record', { ...physical, state: 'stopped' });
+      const skippedFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await fireHeartbeatExpiry(skipped.h);
+        expect(skippedFields).toHaveBeenCalledWith(
+          expect.objectContaining({ diagnosticEvent: 'quarantine_skipped' })
+        );
+        expect(skippedFields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'recovery_outcome',
+            cause: 'heartbeat_expired',
+            outcome: 'skipped',
+          })
+        );
+      } finally {
+        skippedFields.mockRestore();
+      }
+    });
+
+    // A throwing logger must not cancel the recovery it was reporting on.
+    it('keeps quarantining when the recovery_outcome emit throws', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const emitted: Record<string, unknown>[] = [];
+      const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+        emitted.push(fields as Record<string, unknown>);
+        return {
+          ...logger,
+          info: () => {
+            throw new Error('logger unavailable');
+          },
+        } as unknown as typeof logger;
+      });
+      try {
+        await fireHeartbeatExpiry(h);
+      } finally {
+        withFields.mockRestore();
+      }
+      expect(
+        emitted.some(
+          fields => fields.diagnosticEvent === 'recovery_outcome' && fields.outcome === 'started'
+        )
+      ).toBe(true);
+      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+        'heartbeat_expired',
+        identity.wrapperInstanceId
+      );
+    });
+  });
+
+  describe('per-session heartbeat evidence', () => {
+    const heartbeatCall = (
+      calls: unknown[][],
+      decision: string
+    ): Record<string, unknown> | undefined =>
+      calls
+        .map(args => args[0] as Record<string, unknown>)
+        .find(value => value.diagnosticEvent === 'heartbeat' && value.decision === decision);
+
+    it('logs a bounded sessionReport and the single-route payload row', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+        const log = heartbeatCall(fields.mock.calls, 'accepted');
+        expect(log).toMatchObject({
+          reportedState: 'active',
+          kiloSessionId: ROUTE.kiloSessionId,
+          sessionState: 'active',
+          sessionWaitingOn: 'model',
+          sessionReport: `${ROUTE.kiloSessionId}:active:model`,
+        });
+        expect(typeof log?.sessionReport).toBe('string');
+        const report = log?.sessionReport;
+        expect((report as string).length).toBeLessThanOrEqual(128);
+      } finally {
+        fields.mockRestore();
+      }
+    });
+
+    it('omits whole sessionReport entries to stay within 128 characters', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const first = `ses_${'a'.repeat(70)}`;
+      const second = `ses_${'b'.repeat(70)}`;
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.hooks.onHeartbeat?.(
+          {
+            ...activeHeartbeat,
+            sessions: [
+              { kiloSessionId: first, state: 'active', idleForMs: 0, waitingOn: 'model' },
+              { kiloSessionId: second, state: 'idle', idleForMs: 0 },
+            ],
+          },
+          identity
+        );
+        const report = heartbeatCall(fields.mock.calls, 'accepted')?.sessionReport;
+        expect(typeof report).toBe('string');
+        expect((report as string).length).toBeLessThanOrEqual(128);
+        expect(report).toBe(`${first}:active:model`);
+        expect(report).not.toContain(second);
+      } finally {
+        fields.mockRestore();
+      }
+    });
+
+    it('omits the single-route fields when the payload has no exact route match', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.hooks.onHeartbeat?.(
+          {
+            ...activeHeartbeat,
+            sessions: [
+              { kiloSessionId: 'ses_other', state: 'active', idleForMs: 0, waitingOn: 'tool' },
+            ],
+          },
+          identity
+        );
+        const log = heartbeatCall(fields.mock.calls, 'accepted');
+        expect(log).not.toHaveProperty('kiloSessionId');
+        expect(log).not.toHaveProperty('sessionState');
+        expect(log).not.toHaveProperty('sessionWaitingOn');
+        expect(log?.sessionReport).toBe('ses_other:active:tool');
+      } finally {
+        fields.mockRestore();
+      }
+    });
+  });
 });

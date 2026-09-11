@@ -7,7 +7,7 @@ import {
   type SandboxHeartbeatPayload,
 } from '../shared/sandbox-control-protocol.js';
 import { createSandboxControlSocketHandler, readSandboxControlConnection } from './socket.js';
-import { createControlRequestWaiters } from './waiters.js';
+import { createControlRequestWaiters, type ControlRequestWaiters } from './waiters.js';
 
 vi.mock('../logger.js', () => {
   const logger = {
@@ -89,6 +89,18 @@ const WRAPPER_INSTANCE_ID = '11111111-1111-4111-8111-111111111111';
 const REPLACEMENT_WRAPPER_INSTANCE_ID = '22222222-2222-4222-8222-222222222222';
 
 describe('sandbox control socket handler', () => {
+  it('exposes the current isolate outstanding control-request waiter count', () => {
+    const pendingCount = vi.fn(() => 4);
+    const handler = createSandboxControlSocketHandler(createFakeState(), 'sbx_test', {
+      wait: vi.fn(),
+      settle: vi.fn(),
+      rejectAll: vi.fn(),
+      pendingCount,
+    } as unknown as ControlRequestWaiters);
+    expect(handler.pendingControlRequests()).toBe(4);
+    expect(pendingCount).toHaveBeenCalledTimes(1);
+  });
+
   it('accepts old heartbeats and ignores invalid optional versions without rejecting readiness', () => {
     const heartbeat = { state: 'idle', kilo: { ready: true }, sessions: [] };
     expect(sandboxHeartbeatPayloadSchema.parse(heartbeat)).toEqual(heartbeat);

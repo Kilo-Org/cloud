@@ -63,6 +63,7 @@ const LOG_FIELD_KEYS = [
   'physicalSandboxId',
   'sandboxId',
   'wrapperInstanceId',
+  'connectionId',
   'fromState',
   'toState',
   'cause',
@@ -70,8 +71,35 @@ const LOG_FIELD_KEYS = [
   'result',
   'deadlineId',
   'deadlineAt',
+  'latenessMs',
   'time',
   'logTag',
+  // Heartbeat-lapse snapshot fields emitted by `heartbeatLogFields`. Wrangler's
+  // local logger can pretty-print these records, so the fallback parser must
+  // know each key.
+  'lastReceivedHeartbeatAt',
+  'lastAcceptedHeartbeatAt',
+  'armedAt',
+  'armedExpiryAt',
+  'heartbeatArmedBasis',
+  'lastDecision',
+  'observationConnectionId',
+  'observationWrapperInstanceId',
+  // Heartbeat payload summary fields (used to capture the question-idle pin).
+  'reportedState',
+  'pendingMessages',
+  'reportedSessions',
+  'activeKiloSessions',
+  'inputWaitingRoutes',
+  // Recovery-outcome fields emitted by `emitRecoveryOutcome`.
+  'outcome',
+  'committedAt',
+  // Per-session heartbeat payload fields emitted by `heartbeatSessionFields`.
+  'decision',
+  'kiloSessionId',
+  'sessionState',
+  'sessionWaitingOn',
+  'sessionReport',
 ] as const;
 
 function parseLogRecord(text: string): LogRecord | null {
@@ -420,28 +448,11 @@ export async function readIdleStopEvidence(input: {
   const decoder = new TextDecoder();
 
   while (Date.now() < deadline) {
-    let chunk = '';
-    let handle;
-    try {
-      handle = await open(CLOUD_AGENT_LOG_PATH, 'r');
-      const size = (await handle.stat()).size;
-      if (size < cursor) {
-        throw new Error('cloud-agent-next log was truncated or rotated during idle-stop wait');
-      }
-      const length = Math.min(size - cursor, IDLE_LOG_READ_CHUNK_BYTES);
-      if (length > 0) {
-        const buffer = Buffer.alloc(length);
-        const read = await handle.read(buffer, 0, length, cursor);
-        cursor += read.bytesRead;
-        chunk = decoder.decode(buffer.subarray(0, read.bytesRead), { stream: true });
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('truncated or rotated')) throw error;
-      chunk = '';
-    } finally {
-      await handle?.close().catch(() => undefined);
+    const { chunk, next, truncated } = await readLogChunkFrom(cursor, decoder);
+    if (truncated) {
+      throw new Error('cloud-agent-next log was truncated or rotated during idle-stop wait');
     }
-
+    cursor = next;
     for (const record of framer.push(chunk)) {
       const evidence = matcher.feed(record);
       if (evidence) return evidence;
@@ -451,4 +462,101 @@ export async function readIdleStopEvidence(input: {
     );
   }
   throw new Error(`idle-stop evidence not found within ${input.budgetMs}ms`);
+}
+
+async function readLogChunkFrom(
+  cursor: number,
+  decoder: TextDecoder
+): Promise<{ chunk: string; next: number; size: number; truncated: boolean }> {
+  let handle;
+  try {
+    handle = await open(CLOUD_AGENT_LOG_PATH, 'r');
+    const size = (await handle.stat()).size;
+    if (size < cursor) return { chunk: '', next: cursor, size, truncated: true };
+    if (size === cursor) return { chunk: '', next: cursor, size, truncated: false };
+    const length = Math.min(size - cursor, IDLE_LOG_READ_CHUNK_BYTES);
+    const buffer = Buffer.alloc(length);
+    const read = await handle.read(buffer, 0, length, cursor);
+    return {
+      chunk: decoder.decode(buffer.subarray(0, read.bytesRead), { stream: true }),
+      next: cursor + read.bytesRead,
+      size,
+      truncated: false,
+    };
+  } catch {
+    return { chunk: '', next: cursor, size: cursor, truncated: false };
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
+}
+
+/**
+ * Read every complete framed record from `fromByte` to the current end of the
+ * cloud-agent-next log and return those matching `match`. This is a bounded
+ * snapshot, not a wait: it does not poll for later writes. A truncated or
+ * rotated log yields the matches seen so far (usually none).
+ */
+export async function readWorkerLogSnapshot(input: {
+  fromByte: number;
+  match: (record: LogRecord) => boolean;
+  limit?: number;
+}): Promise<LogRecord[]> {
+  if (!Number.isInteger(input.fromByte) || input.fromByte < 0) {
+    throw new Error(`invalid worker-log cursor: ${input.fromByte}`);
+  }
+  const limit = input.limit ?? 4096;
+  const framer = createLogRecordFramer();
+  const decoder = new TextDecoder();
+  const matches: LogRecord[] = [];
+  let cursor = input.fromByte;
+  for (;;) {
+    const { chunk, next, size, truncated } = await readLogChunkFrom(cursor, decoder);
+    if (truncated) return matches;
+    for (const record of framer.push(chunk)) {
+      if (input.match(record)) {
+        matches.push(record);
+        if (matches.length >= limit) return matches;
+      }
+    }
+    if (next <= cursor || next >= size) break;
+    cursor = next;
+  }
+  return matches;
+}
+
+/**
+ * Wait up to `budgetMs` for the first framed record after `fromByte` that
+ * matches `match`. Returns null on budget expiry or log truncation. Framing and
+ * correlation only: callers own the record-to-identity matching.
+ */
+export async function waitForWorkerLogEvidence(input: {
+  fromByte: number;
+  budgetMs: number;
+  match: (record: LogRecord) => boolean;
+}): Promise<LogRecord | null> {
+  if (!Number.isInteger(input.fromByte) || input.fromByte < 0) {
+    throw new Error(`invalid worker-log cursor: ${input.fromByte}`);
+  }
+  if (!Number.isFinite(input.budgetMs) || input.budgetMs <= 0) {
+    throw new Error(`invalid worker-log evidence budget: ${input.budgetMs}`);
+  }
+  const deadline = Date.now() + input.budgetMs;
+  const framer = createLogRecordFramer();
+  const decoder = new TextDecoder();
+  let cursor = input.fromByte;
+  while (Date.now() < deadline) {
+    const { chunk, next, truncated } = await readLogChunkFrom(cursor, decoder);
+    if (truncated) return null;
+    for (const record of framer.push(chunk)) {
+      if (input.match(record)) return record;
+    }
+    if (next > cursor) {
+      cursor = next;
+      continue;
+    }
+    await new Promise(resolve =>
+      setTimeout(resolve, Math.min(IDLE_LOG_POLL_MS, Math.max(1, deadline - Date.now())))
+    );
+  }
+  return null;
 }

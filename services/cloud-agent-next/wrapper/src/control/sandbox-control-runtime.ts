@@ -359,6 +359,13 @@ export function maybeStartSandboxControlClient(
       lastSentAt,
       sinceLastSentMs: lastSentAt === undefined ? undefined : Date.now() - lastSentAt,
     });
+  // `phase=sent` means `sendEvent` returned, not that the worker received the
+  // frame. File logs give the pre-pause send outcome and sequence for E2E
+  // correlation; it is not receipt proof.
+  const logHeartbeat = (phase: string): void =>
+    log(
+      `control heartbeat phase=${phase} sequence=${heartbeatSequence} lastSentAt=${lastSentAt ?? 0}`
+    );
 
   function stopHeartbeat(): void {
     sampleAbort.abort();
@@ -406,11 +413,13 @@ export function maybeStartSandboxControlClient(
     if (!options.getHeartbeatPayload) return;
     heartbeatSequence += 1;
     diagnostic('sending');
+    logHeartbeat('sending');
     let payload: SandboxHeartbeatPayload;
     try {
       payload = options.getHeartbeatPayload();
     } catch {
       diagnostic('send_threw');
+      logHeartbeat('send_threw');
       log('sandbox control heartbeat failed');
       return;
     }
@@ -418,13 +427,16 @@ export function maybeStartSandboxControlClient(
     try {
       if (!active.sendEvent?.('sandbox.heartbeat', payload)) {
         diagnostic('send_failed');
+        logHeartbeat('send_failed');
         handleConnectionLost();
       } else {
         lastSentAt = Date.now();
         diagnostic('sent');
+        logHeartbeat('sent');
       }
     } catch {
       diagnostic('send_threw');
+      logHeartbeat('send_threw');
       handleConnectionLost();
     }
   }

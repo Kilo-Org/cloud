@@ -140,6 +140,8 @@ export type SandboxControlSocketHandler = {
   supportsConnectionRecovery(): boolean;
   getConnectionIdentity(): SandboxControlConnectionIdentity | null;
   getReadySocket(): WebSocket | null;
+  /** Current-isolate outstanding control-RPC waiters. */
+  pendingControlRequests(): number;
   closeProvisionalSockets(): void;
 };
 
@@ -414,6 +416,10 @@ export function createSandboxControlSocketHandler(
     getReadySocket(): WebSocket | null {
       const ws = currentHandshakenSocket(state)?.socket;
       return ws && readAttachment(ws)?.kiloReady === true ? ws : null;
+    },
+
+    pendingControlRequests(): number {
+      return waiters.pendingCount();
     },
 
     closeProvisionalSockets(): void {

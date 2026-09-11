@@ -183,6 +183,63 @@ describe('maybeStartSandboxControlClient', () => {
     started?.close();
   });
 
+  it('logs the heartbeat send outcome and sequence without claiming remote receipt', async () => {
+    const logs: string[] = [];
+    const client: SandboxControlClient = {
+      connect: async () => {},
+      close: () => {},
+      sendEvent: () => true,
+    };
+
+    const started = maybeStartSandboxControlClient(
+      {
+        SANDBOX_CONTROL_URL: 'wss://example.test/sandbox-control/sbx_1',
+        SANDBOX_CONTROL_CREDENTIAL: 'secret',
+        PROVIDER_INSTANCE_ID: 'inst_1',
+      },
+      message => logs.push(message),
+      {
+        wrapperVersion: '2.4.0',
+        getHeartbeatPayload: () => idlePayload(),
+        createClient: () => client,
+      }
+    );
+
+    await flushAsyncWork();
+    const line = logs.find(message => message.startsWith('control heartbeat phase=sent '));
+    expect(line).toMatch(/^control heartbeat phase=sent sequence=1 lastSentAt=\d+$/);
+    expect(line).not.toContain('received');
+    started?.close();
+  });
+
+  it('logs the heartbeat send failure phase with its sequence', async () => {
+    const logs: string[] = [];
+    const client: SandboxControlClient = {
+      connect: async () => {},
+      close: () => {},
+      sendEvent: event => event !== 'sandbox.heartbeat',
+    };
+
+    const started = maybeStartSandboxControlClient(
+      {
+        SANDBOX_CONTROL_URL: 'wss://example.test/sandbox-control/sbx_1',
+        SANDBOX_CONTROL_CREDENTIAL: 'secret',
+        PROVIDER_INSTANCE_ID: 'inst_1',
+      },
+      message => logs.push(message),
+      {
+        wrapperVersion: '2.4.0',
+        getHeartbeatPayload: () => idlePayload(),
+        createClient: () => client,
+      }
+    );
+
+    await flushAsyncWork();
+    expect(logs).toContain('control heartbeat phase=sending sequence=1 lastSentAt=0');
+    expect(logs).toContain('control heartbeat phase=send_failed sequence=1 lastSentAt=0');
+    started?.close();
+  });
+
   it('emits readiness and heartbeats only while the Kilo event feed is live', async () => {
     const events: Array<{ event: string; payload: unknown }> = [];
     const heartbeatPayload = idlePayload();

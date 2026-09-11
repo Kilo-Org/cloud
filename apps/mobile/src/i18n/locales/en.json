@@ -2972,6 +2972,7 @@
     "loadFailed": "Couldn't load transcription models."
   },
   "tour": {
+    "eyebrow": "Quick tour",
     "forkTitle": "Where would you like to run Kilo?",
     "forkSubtitle": "Pick where Kilo runs for your first session.",
     "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
@@ -2979,6 +2980,7 @@
     "remoteOptionTitle": "Your computer",
     "remoteOptionBody": "Run Kilo on your own machine through the `kilo remote` CLI.",
     "skip": "Skip tour",
+    "tutorialLabel": "Tutorial",
     "done": "$t(common.done)",
     "cloudTitle": "Start your first cloud session",
     "cloudBody": "Create a new session and Kilo runs it in the cloud.",

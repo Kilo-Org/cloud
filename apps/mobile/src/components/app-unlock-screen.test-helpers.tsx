@@ -132,6 +132,7 @@ vi.mock('expo-router', () => ({
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => '/(app)/(tabs)/(0_home)',
   useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
   useSegments: () => ['(app)', '(tabs)', '(3_profile)', 'organization'],
 }));

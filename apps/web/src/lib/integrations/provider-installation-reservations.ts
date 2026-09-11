@@ -36,6 +36,7 @@ export async function claimSlackProviderInstallation(input: {
   state: string;
   teamId: string;
 }): Promise<SlackReservationClaim | null> {
+  await expireStaleSlackReservation(input.teamId);
   try {
     return await db.transaction(async tx => {
       await lockProviderOAuthOwnerRow(tx, input.owner);
@@ -146,6 +147,7 @@ export async function claimLegacySlackProviderInstallation(
   owner: Owner,
   teamId: string
 ): Promise<SlackReservationClaim | null> {
+  await expireStaleSlackReservation(teamId);
   try {
     return await db.transaction(async tx => {
       await lockProviderOAuthOwnerRow(tx, owner);
@@ -376,14 +378,33 @@ export async function expireSlackReservations(input: {
 
 export async function expireStaleSlackReservation(teamId: string): Promise<void> {
   const now = new Date().toISOString();
+  const [candidate] = await db
+    .select()
+    .from(provider_installation_reservations)
+    .where(
+      and(
+        eq(provider_installation_reservations.provider, 'slack'),
+        eq(provider_installation_reservations.provider_installation_id, teamId),
+        eq(provider_installation_reservations.status, 'pending'),
+        lt(provider_installation_reservations.expires_at, now)
+      )
+    )
+    .limit(1);
+  if (!candidate) return;
+  const owner: Owner | null = candidate.owned_by_organization_id
+    ? { type: 'org', id: candidate.owned_by_organization_id }
+    : candidate.owned_by_user_id
+      ? { type: 'user', id: candidate.owned_by_user_id }
+      : null;
+  if (!owner) return;
   await db.transaction(async tx => {
+    await lockProviderOAuthOwnerRow(tx, owner);
     const [reservation] = await tx
       .select()
       .from(provider_installation_reservations)
       .where(
         and(
-          eq(provider_installation_reservations.provider, 'slack'),
-          eq(provider_installation_reservations.provider_installation_id, teamId),
+          eq(provider_installation_reservations.id, candidate.id),
           eq(provider_installation_reservations.status, 'pending'),
           lt(provider_installation_reservations.expires_at, now)
         )

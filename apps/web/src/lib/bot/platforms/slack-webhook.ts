@@ -27,6 +27,32 @@ type SlackAppUninstalledPayload = {
 
 export function getSlackTeamId(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null;
+  const envelope = payload as {
+    team_id?: unknown;
+    enterprise_id?: unknown;
+    is_enterprise_install?: unknown;
+    authorizations?: unknown;
+  };
+  const enterpriseAuthorization = Array.isArray(envelope.authorizations)
+    ? envelope.authorizations.find(
+        authorization =>
+          authorization &&
+          typeof authorization === 'object' &&
+          'is_enterprise_install' in authorization &&
+          authorization.is_enterprise_install === true
+      )
+    : null;
+  if (envelope.is_enterprise_install === true || enterpriseAuthorization) {
+    if (
+      enterpriseAuthorization &&
+      typeof enterpriseAuthorization === 'object' &&
+      'enterprise_id' in enterpriseAuthorization &&
+      typeof enterpriseAuthorization.enterprise_id === 'string'
+    ) {
+      return enterpriseAuthorization.enterprise_id;
+    }
+    if (typeof envelope.enterprise_id === 'string') return envelope.enterprise_id;
+  }
   if ('team_id' in payload && typeof payload.team_id === 'string') return payload.team_id;
   if ('team_id' in payload && payload.team_id === null && 'enterprise_id' in payload) {
     return typeof payload.enterprise_id === 'string' ? payload.enterprise_id : null;

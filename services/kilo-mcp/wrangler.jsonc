@@ -40,6 +40,13 @@
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["KiloMcpOAuthStore"] }],
 
+  // KV the OAuth provider library requires (its own client/token/grant state).
+  // PRODUCTION: replace the placeholder id below with the id from
+  //   wrangler kv namespace create OAUTH_KV
+  // and record it in the PR description. Local `wrangler dev --env dev`
+  // simulates KV from the `env.dev` binding; the id there is a placeholder.
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
+
   // HMAC key for MCP access tokens (src/auth/token.ts). Set with
   // `wrangler secret put MCP_TOKEN_SECRET` (prod) or `MCP_TOKEN_SECRET` in
   // .dev.vars (dev). Never logged, never committed.
@@ -104,6 +111,9 @@
           "new_sqlite_classes": ["KiloMcpOAuthStore"],
         },
       ],
+      // Local dev/tests simulate KV; `wrangler dev` ignores the id. Deploying
+      // the dev worker remotely (not done by CI) would need a real dev id.
+      "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
     },
   },
 }

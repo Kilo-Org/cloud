@@ -8,6 +8,8 @@ interface __BaseEnv_Env {
 	MCP_TOKEN_SECRET: string;
 	KILO_MCP_OAUTH_STORE: DurableObjectNamespace<import("./src/index").KiloMcpOAuthStore>;
 	NEXT_PUBLIC_POSTHOG_KEY?: "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z";
+	OAUTH_KV: KVNamespace;
+	OAUTH_PROVIDER: import('@cloudflare/workers-oauth-provider').OAuthHelpers;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
@@ -20,6 +22,8 @@ declare namespace Cloudflare {
 		WEB_BASE_URL: "http://localhost:3000";
 		MCP_TOKEN_SECRET: string;
 		KILO_MCP_OAUTH_STORE: DurableObjectNamespace<import("./src/index").KiloMcpOAuthStore>;
+		OAUTH_KV: KVNamespace;
+		OAUTH_PROVIDER: import('@cloudflare/workers-oauth-provider').OAuthHelpers;
 	}
 	interface Env extends __BaseEnv_Env {}
 }

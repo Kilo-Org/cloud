@@ -85,6 +85,13 @@ export function VoiceInputSettingsScreen() {
         className="flex-1"
         contentContainerClassName="px-6 gap-3 pt-4"
         showsVerticalScrollIndicator={false}
+        // The test field and its Clear control live in this scroll view. With
+        // the keyboard up, the default ('never') spends the first tap outside
+        // the input on dismissing the keyboard, so tapping Clear only closed
+        // the keyboard and kept the text (e3, 2026-09-12). 'handled' delivers
+        // the tap to the Clear pressable itself; taps on inert space still
+        // dismiss.
+        keyboardShouldPersistTaps="handled"
       >
         <PreferenceRow
           icon={Mic}

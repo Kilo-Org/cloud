@@ -342,7 +342,7 @@ describe('VoiceInputSettingsScreen', () => {
     expect(fields).toHaveLength(1);
   });
 
-  it('insets the scroll content so the focused test field clears the keyboard', async () => {
+  it('insets the scroll content and persists taps on the test-field controls', async () => {
     const renderer = await mountVoiceInputSettingsScreen();
 
     const [scroll] = renderer.root.findAll(
@@ -352,5 +352,9 @@ describe('VoiceInputSettingsScreen', () => {
       throw new Error('ScrollView not found');
     }
     expect(scroll.props.automaticallyAdjustKeyboardInsets).toBe(true);
+    // With the keyboard up, the default ('never') spends the first tap on the
+    // Clear control dismissing the keyboard, so the text survives the tap
+    // (e3, 2026-09-12). 'handled' hands the tap to the control itself.
+    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
   });
 });

@@ -2,9 +2,7 @@ import 'server-only';
 
 import { and, eq, gt, isNull, lt, or } from 'drizzle-orm';
 import {
-  bot_requests,
   platform_integrations,
-  provider_installation_pending_credentials,
   provider_installation_reservations,
   provider_oauth_attempts,
 } from '@kilocode/db/schema';
@@ -69,7 +67,6 @@ export async function claimSlackProviderInstallation(input: {
         .for('update');
 
       if (reservation?.status === 'active' && !matchesOwner(reservation, input.owner)) return null;
-      if (reservation?.status === 'deleting') return null;
       if (
         reservation?.status === 'pending' &&
         !matchesOwner(reservation, input.owner) &&
@@ -161,7 +158,6 @@ export async function claimLegacySlackProviderInstallation(
         )
         .for('update');
       if (reservation && !matchesOwner(reservation, owner)) return null;
-      if (reservation?.status === 'deleting') return null;
       const generation = (reservation?.generation ?? 0) + 1;
       const activeGeneration =
         reservation?.status === 'active'
@@ -390,14 +386,6 @@ export async function expireStaleSlackReservation(teamId: string): Promise<void>
       )
       .for('update');
     if (!reservation) return;
-    await tx
-      .delete(provider_installation_pending_credentials)
-      .where(
-        and(
-          eq(provider_installation_pending_credentials.reservation_id, reservation.id),
-          eq(provider_installation_pending_credentials.generation, reservation.generation)
-        )
-      );
     if (reservation.active_generation && reservation.platform_integration_id) {
       await tx
         .update(provider_installation_reservations)
@@ -411,41 +399,14 @@ export async function expireStaleSlackReservation(teamId: string): Promise<void>
         .where(eq(provider_installation_reservations.id, reservation.id));
       return;
     }
-    if (reservation.platform_integration_id) {
-      const [integration] = await tx
-        .select()
-        .from(platform_integrations)
-        .where(eq(platform_integrations.id, reservation.platform_integration_id))
-        .for('update');
-      if (integration?.integration_status === 'pending') {
-        const [history] = await tx
-          .select({ id: bot_requests.id })
-          .from(bot_requests)
-          .where(eq(bot_requests.platform_integration_id, integration.id))
-          .limit(1);
-        if (history) {
-          await tx
-            .update(platform_integrations)
-            .set({
-              integration_status: 'suspended',
-              platform_installation_id: null,
-              platform_account_id: null,
-              suspended_at: now,
-              updated_at: now,
-            })
-            .where(eq(platform_integrations.id, integration.id));
-          await tx
-            .delete(provider_installation_reservations)
-            .where(eq(provider_installation_reservations.id, reservation.id));
-          return;
-        }
-        await tx.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
-        return;
-      }
-    }
     await tx
       .delete(provider_installation_reservations)
-      .where(eq(provider_installation_reservations.id, reservation.id));
+      .where(
+        and(
+          eq(provider_installation_reservations.id, reservation.id),
+          isNull(provider_installation_reservations.platform_integration_id)
+        )
+      );
   });
 }
 

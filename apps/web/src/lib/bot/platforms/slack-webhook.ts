@@ -5,7 +5,6 @@ import { captureException } from '@sentry/nextjs';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import {
   adoptLegacySlackInstallationByTeamId,
-  completePendingSlackDeletion,
   deleteInstallationByTeamId,
   recoverSlackInstallation,
 } from '@/lib/integrations/slack-service';
@@ -146,7 +145,6 @@ export function createSlackWebhookHandler(chat: Chat, slackAdapter: SlackAdapter
     const teamId = getSlackTeamId(payload);
     if (teamId) {
       await adoptLegacySlackInstallationByTeamId(teamId);
-      await completePendingSlackDeletion(teamId, id => slackAdapter.deleteInstallation(id));
       await recoverSlackInstallation(teamId, (id, installation) =>
         slackAdapter.setInstallation(id, installation)
       );

@@ -799,7 +799,7 @@ async function deactivateSlackInstallation(
     if (
       reservation &&
       eventTime !== undefined &&
-      eventTime < Math.floor(new Date(reservation.updated_at).getTime() / 1000)
+      eventTime * 1000 < new Date(reservation.updated_at).getTime()
     ) {
       return null;
     }
@@ -842,16 +842,8 @@ async function deactivateSlackInstallation(
           status: 'deleting',
           active_generation: null,
           oauth_attempt_id: null,
-          cleanup_requires_revoke:
-            reservation.status === 'deleting'
-              ? reservation.cleanup_requires_revoke
-              : cleanupRequiresRevoke && wasActive,
-          cleanup_stage:
-            reservation.status === 'deleting'
-              ? reservation.cleanup_stage
-              : cleanupRequiresRevoke && wasActive
-                ? 'revoke'
-                : 'sdk',
+          cleanup_requires_revoke: cleanupRequiresRevoke && wasActive,
+          cleanup_stage: cleanupRequiresRevoke && wasActive ? 'revoke' : 'sdk',
           expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -885,7 +877,7 @@ async function cleanupDeactivatedSlackInstallation(
   deactivated: NonNullable<Awaited<ReturnType<typeof deactivateSlackInstallation>>>,
   options: SlackUninstallOptions
 ): Promise<boolean> {
-  if (deactivated.cleanupStage === 'revoke') {
+  if (deactivated.cleanupRequiresRevoke) {
     if (!deactivated.accessToken) return false;
     try {
       if (!(await withSlackSdkTimeout(revokeSlackToken(deactivated.accessToken)))) return false;
@@ -929,7 +921,7 @@ async function cleanupDeactivatedSlackInstallation(
       return false;
     }
     let installationDeleted = true;
-    let cleanupStage = replacement.cleanup_stage ?? 'sdk';
+    const cleanupStage = replacement.cleanup_stage ?? 'sdk';
     if (cleanupStage === 'sdk' && deactivated.wasActive && options.deleteChatSdkInstallation) {
       try {
         await withSlackSdkTimeout(options.deleteChatSdkInstallation(deactivated.teamId));
@@ -945,41 +937,23 @@ async function cleanupDeactivatedSlackInstallation(
         .update(provider_installation_reservations)
         .set({ cleanup_stage: 'identity', updated_at: new Date().toISOString() })
         .where(eq(provider_installation_reservations.id, replacement.id));
-      cleanupStage = 'identity';
     }
     if (!installationDeleted) return false;
-    if (cleanupStage === 'identity' && deactivated.wasActive) {
-      if (!options.deleteChatSdkIdentityCache) return false;
-      try {
-        await withSlackSdkTimeout(options.deleteChatSdkIdentityCache(deactivated.teamId));
-        await tx
-          .update(provider_installation_reservations)
-          .set({ cleanup_stage: 'aliases', updated_at: new Date().toISOString() })
-          .where(eq(provider_installation_reservations.id, replacement.id));
-        cleanupStage = 'aliases';
-      } catch (error) {
-        captureException(error, {
-          tags: { component: 'slack-service', op: 'delete-sdk-identity' },
-          extra: { integrationId: deactivated.integrationId },
-        });
-        return false;
-      }
-    }
-    if (cleanupStage === 'aliases' && deactivated.wasActive) {
-      if (!options.deleteChatSdkIdentityCache) return false;
+    if (deactivated.wasActive && options.deleteChatSdkIdentityCache) {
       try {
         const aliases = await tx
           .select({ workspaceId: provider_installation_aliases.workspace_id })
           .from(provider_installation_aliases)
           .where(eq(provider_installation_aliases.reservation_id, replacement.id))
           .limit(100);
-        for (const alias of aliases) {
-          await withSlackSdkTimeout(options.deleteChatSdkIdentityCache(alias.workspaceId));
-          await tx
-            .delete(provider_installation_aliases)
-            .where(eq(provider_installation_aliases.workspace_id, alias.workspaceId));
+        for (const identityId of [
+          deactivated.teamId,
+          ...aliases.flatMap(alias =>
+            typeof alias.workspaceId === 'string' ? [alias.workspaceId] : []
+          ),
+        ]) {
+          await withSlackSdkTimeout(options.deleteChatSdkIdentityCache(identityId));
         }
-        if (aliases.length === 100) return false;
       } catch (error) {
         captureException(error, {
           tags: { component: 'slack-service', op: 'delete-sdk-identity' },
@@ -1064,7 +1038,7 @@ export async function completePendingSlackDeletion(
     reservation.cleanup_requires_revoke && integration
       ? await getSlackAccessToken(integration)
       : null;
-  const completed = await cleanupDeactivatedSlackInstallation(
+  return cleanupDeactivatedSlackInstallation(
     {
       integrationId: reservation.platform_integration_id,
       owner,
@@ -1078,24 +1052,6 @@ export async function completePendingSlackDeletion(
     },
     { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
   );
-  if (completed) return true;
-  const [currentReservation] = await db
-    .select({ cleanupStage: provider_installation_reservations.cleanup_stage })
-    .from(provider_installation_reservations)
-    .where(eq(provider_installation_reservations.id, reservation.id))
-    .limit(1);
-  const [remaining] = await db
-    .select({ id: provider_installation_aliases.workspace_id })
-    .from(provider_installation_aliases)
-    .where(eq(provider_installation_aliases.reservation_id, reservation.id))
-    .limit(1);
-  if (currentReservation?.cleanupStage === 'aliases' && !remaining) {
-    await db
-      .delete(platform_integrations)
-      .where(eq(platform_integrations.id, reservation.platform_integration_id));
-    return true;
-  }
-  return false;
 }
 
 /**

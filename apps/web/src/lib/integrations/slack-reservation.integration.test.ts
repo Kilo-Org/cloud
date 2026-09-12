@@ -633,15 +633,17 @@ describe('Slack provider installation activation', () => {
       })
     ).resolves.toBeNull();
 
-    const completeDeletion = () =>
-      completePendingSlackDeletion(
-        'T_DELETING',
-        async () => undefined,
-        async () => undefined
-      );
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      if (await completeDeletion()) break;
-    }
+    await expect(completePendingSlackDeletion('T_DELETING', async () => undefined)).resolves.toBe(
+      true
+    );
+    await expect(
+      claimSlackProviderInstallation({
+        actorUserId: other.id,
+        owner: retryOwner,
+        state: 'delete-retry',
+        teamId: 'T_DELETING',
+      })
+    ).resolves.toMatchObject({ generation: 1 });
   });
 
   it('maps multiple Enterprise Grid workspaces to the active installation generation', async () => {

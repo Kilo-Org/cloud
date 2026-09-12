@@ -10,7 +10,7 @@ import {
   platform_integrations,
   provider_oauth_attempts,
 } from '@kilocode/db/schema';
-import { and, eq, gt, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, eq, gt, lt, ne, or, sql } from 'drizzle-orm';
 import { PLATFORM } from './core/constants';
 
 export type ReservedOAuthProvider = 'slack' | 'linear' | 'discord';
@@ -31,7 +31,7 @@ export async function lockProviderOAuthOwnerRow(tx: DrizzleTransaction, owner: O
       ? await tx
           .select({ id: organizations.id })
           .from(organizations)
-          .where(and(eq(organizations.id, owner.id), isNull(organizations.deleted_at)))
+          .where(eq(organizations.id, owner.id))
           .for('update')
       : await tx
           .select({ id: kilocode_users.id })

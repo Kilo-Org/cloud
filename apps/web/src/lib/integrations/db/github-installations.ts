@@ -1,6 +1,5 @@
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
-import { isSlackEnterpriseInstallationId } from '@/lib/integrations/platforms/slack/installation-id';
 import type {
   IntegrationPermissions,
   Owner,
@@ -281,10 +280,7 @@ export async function connectVerifiedGitHubInstallation(
             )
           );
         if (!slack) continue;
-        if (
-          !slack.platform_installation_id ||
-          isSlackEnterpriseInstallationId(slack.platform_installation_id)
-        ) {
+        if (!slack.platform_installation_id) {
           return { ok: false, reason: 'incompatible_workflow' };
         }
         const [reservation] = await tx

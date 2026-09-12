@@ -12,6 +12,7 @@ import { MCP_SCOPE, scopeTokens } from './auth/http';
 import { callCatalogEndpoint } from './call';
 import { createDefaultHandler } from './oauth/consent';
 import { onError, tokenExchangeCallback } from './oauth/provider-hooks';
+import { forwardWithRefreshReuseDetection } from './oauth/refresh-reuse';
 import {
   callArgsSchema,
   clientRegistrationSchema,
@@ -37,8 +38,10 @@ import {
   type SemanticCandidates,
 } from './types';
 import OAuthProvider, {
+  getOAuthApi,
   type ClientRegistrationCallbackOptions,
   type ClientRegistrationCallbackResult,
+  type OAuthProviderOptions,
 } from '@cloudflare/workers-oauth-provider';
 import type { ZodError } from 'zod';
 
@@ -550,7 +553,7 @@ const defaultHandler: ExportedHandler<Env> = {
  * `resource`/`authorization_servers` unset makes the library derive the issuer
  * from the request origin, matching this worker's dynamic dev/prod issuer.
  */
-export default new OAuthProvider<Env>({
+const providerOptions: OAuthProviderOptions<Env> = {
   apiRoute: '/mcp',
   apiHandler,
   defaultHandler,
@@ -568,4 +571,23 @@ export default new OAuthProvider<Env>({
   clientRegistrationCallback,
   tokenExchangeCallback: options => tokenExchangeCallback(options),
   onError: error => onError(error),
-});
+};
+
+const provider = new OAuthProvider<Env>(providerOptions);
+
+/**
+ * The library rotates refresh tokens but keeps the immediately previous one
+ * valid for a retry ("one-step grace"). RFC 9700 requires a replayed superseded
+ * token to be rejected AND its grant revoked, so the token endpoint is wrapped
+ * with that strict policy (src/oauth/refresh-reuse.ts) before the library sees
+ * the request. Every other path goes straight to the library.
+ */
+export default {
+  fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    return forwardWithRefreshReuseDetection(request, req => provider.fetch(req, env, ctx), {
+      kv: env.OAUTH_KV,
+      revokeGrant: (grantId, userId) =>
+        getOAuthApi(providerOptions, env).revokeGrant(grantId, userId),
+    });
+  },
+} satisfies ExportedHandler<Env>;

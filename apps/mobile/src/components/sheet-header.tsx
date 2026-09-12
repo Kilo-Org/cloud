@@ -7,6 +7,21 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
+/**
+ * How much top clearance the header reserves:
+ *
+ * - 'always': the surface owns the top of the window (full-screen modals,
+ *   pageSheets), so the status-bar inset applies whenever it is non-zero.
+ * - 'bottom-form-sheet': a bottom-anchored formSheet never draws under the
+ *   status bar. The detent heights are capped just below the top inset
+ *   (useFormSheetDetents) and the keyboard expansion reuses that same capped
+ *   full detent, so the constant window inset would only be a dead band
+ *   above the header (p7) — Android gets no top clearance. iOS insets are
+ *   sheet-relative and rise exactly when the sheet reaches the status bar,
+ *   so iOS keeps them.
+ */
+export type SheetHeaderTopInset = 'always' | 'bottom-form-sheet';
+
 export function SheetHeader({
   title,
   titleEllipsis = 'tail',
@@ -17,6 +32,7 @@ export function SheetHeader({
   onShare,
   sharing = false,
   disabled = false,
+  topInset = 'always',
 }: {
   title: string;
   /**
@@ -35,25 +51,26 @@ export function SheetHeader({
   onShare?: () => void;
   sharing?: boolean;
   disabled?: boolean;
+  topInset?: SheetHeaderTopInset;
 }) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const resolvedDoneLabel = doneLabel ?? t('common.done');
   const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
-  // Sheets can reach the status bar when expanded by the keyboard. Reserve
-  // top clearance as well as landscape cutout clearance inside the gutters.
-  // Keeping the inset on an inner wrapper preserves the header's own padding.
-  // Android can report top: 0 for the frame a freshly presented sheet first
-  // lays out (before the insets propagate), which would draw the Done pill
-  // over the status-bar icons; fall back to the synchronous status-bar height
-  // the same way the form-sheet detents do.
+  // Reserve top clearance as well as landscape cutout clearance inside the
+  // gutters. Keeping the inset on an inner wrapper preserves the header's own
+  // padding. Android can report top: 0 for the frame a freshly presented
+  // sheet first lays out (before the insets propagate); fall back to the
+  // synchronous status-bar height the same way the form-sheet detents do.
   const androidStatusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0;
-  const topInset = insets.top > 0 ? insets.top : androidStatusBarHeight;
+  const resolvedTopInset = insets.top > 0 ? insets.top : androidStatusBarHeight;
+  const topInsetHeight =
+    topInset === 'bottom-form-sheet' && Platform.OS === 'android' ? 0 : resolvedTopInset;
   const safeAreaStyle =
-    topInset > 0 || insets.left > 0 || insets.right > 0
+    topInsetHeight > 0 || insets.left > 0 || insets.right > 0
       ? {
-          ...(topInset > 0 ? { paddingTop: topInset } : undefined),
+          ...(topInsetHeight > 0 ? { paddingTop: topInsetHeight } : undefined),
           ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
           ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
         }

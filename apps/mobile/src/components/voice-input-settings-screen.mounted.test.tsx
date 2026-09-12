@@ -312,12 +312,17 @@ describe('VoiceInputSettingsScreen', () => {
     expect(push).toHaveBeenCalledWith('/(app)/voice-language-picker');
   });
 
-  it('names the stored voice language by its endonym', async () => {
-    voiceLanguage.chosen = 'de-DE';
+  it.each([
+    ['de-DE', 'Deutsch'],
+    // Android's speech service stores the choice as `cmn-Hans-CN`; the row
+    // must read like the picker rows (p16, p4) instead of quoting the tag.
+    ['cmn-Hans-CN', '简体中文'],
+  ])('names the stored voice language %s by its endonym', async (chosen, endonym) => {
+    voiceLanguage.chosen = chosen;
     const renderer = await mountVoiceInputSettingsScreen();
 
     expect(findConfigureRow(renderer, 'Language').props).toMatchObject({
-      subtitle: 'Deutsch',
+      subtitle: endonym,
       disabled: false,
     });
   });

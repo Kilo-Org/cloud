@@ -5,7 +5,14 @@ import { LANGUAGE_ENDONYMS, LANGUAGE_ENGLISH_NAMES, SUPPORTED_LANGUAGES } from '
 import { resolveSupportedLanguageTag } from '@/i18n/resolve-language';
 
 function normalizeLocale(tag: string): string {
-  return tag.toLowerCase().replaceAll('_', '-');
+  // Android's speech service names Mandarin with the ISO 639-3 code `cmn`
+  // (`cmn-Hans-CN`), the app ships it as `zh-Hans`/`zh-Hant`. Canonicalizing
+  // the primary subtag here makes the picker's reconciliation treat a stored
+  // `cmn` tag and an app `zh` tag as the same language (p16).
+  return tag
+    .toLowerCase()
+    .replaceAll('_', '-')
+    .replace(/^cmn(?=-|$)/, 'zh');
 }
 
 function scriptSubtag(tag: string): string | undefined {

@@ -111,6 +111,23 @@ describe('pickSupportedVoiceInputLanguageTag', () => {
   it('keeps the old behavior for a non-Chinese tag', () => {
     expect(pickSupportedVoiceInputLanguageTag(['de-AT'], ['de-DE', 'de-CH'])).toBe('de-DE');
   });
+
+  it.each([
+    ['cmn-Hans-CN', 'zh-Hans'],
+    ['cmn-Hant-TW', 'zh-Hant'],
+  ])('maps the Android Mandarin tag %s onto the app script (p16)', (tag, expected) => {
+    // Android's speech service stores the explicit choice with the ISO 639-3
+    // code `cmn`; the gateway list offers the app's `zh` scripts.
+    expect(pickSupportedVoiceInputLanguageTag([tag], ['zh-Hans', 'zh-Hant'])).toBe(expected);
+  });
+
+  it('keeps the service spelling when the device list names Mandarin cmn', () => {
+    // A gateway choice (`zh-Hans`) used in device mode must land on the
+    // service's own spelling so the recogniser accepts it.
+    expect(pickSupportedVoiceInputLanguageTag(['zh-Hans'], ['cmn-Hans-CN', 'cmn-Hant-TW'])).toBe(
+      'cmn-Hans-CN'
+    );
+  });
 });
 
 describe('resolveVoiceInputStartLanguageTag', () => {
@@ -329,6 +346,11 @@ describe('voiceInputLanguageDisplayName', () => {
     expect(voiceInputLanguageDisplayName('zh-TW')).toBe('繁體中文');
   });
 
+  it('maps the Android Mandarin tag onto the shipped script endonym', () => {
+    expect(voiceInputLanguageDisplayName('cmn-Hans-CN')).toBe('简体中文');
+    expect(voiceInputLanguageDisplayName('cmn-Hant-TW')).toBe('繁體中文');
+  });
+
   it('falls back to the primary-subtag endonym for an unlisted region', () => {
     expect(voiceInputLanguageDisplayName('pt-PT')).toBe('Português (Portugal)');
   });
@@ -350,6 +372,7 @@ describe('voiceInputLanguageEnglishName', () => {
   it('maps Chinese service tags onto the English script names', () => {
     expect(voiceInputLanguageEnglishName('zh-CN')).toBe('Chinese (Simplified)');
     expect(voiceInputLanguageEnglishName('zh-TW')).toBe('Chinese (Traditional)');
+    expect(voiceInputLanguageEnglishName('cmn-Hans-CN')).toBe('Chinese (Simplified)');
   });
 
   it('returns undefined for a language the app does not ship', () => {

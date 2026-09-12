@@ -464,4 +464,81 @@ describe('SheetHeader', () => {
 
     renderer.unmount();
   });
+
+  it('drops the Android top clearance for a bottom formSheet', async () => {
+    // p7: a bottom-anchored sheet never draws under the status bar (the
+    // detent heights are capped just below the top inset, and the keyboard
+    // expansion reuses that capped full detent), so the constant window inset
+    // is a dead band above the header — Android reserves nothing.
+    rn.os = 'android';
+    rn.statusHeight = 48;
+    safeArea.top = 24;
+    const renderer = await mount({
+      title: 'Voice language',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+      topInset: 'bottom-form-sheet',
+    });
+
+    const wrapper = findSafeAreaWrapper(renderer.root);
+    expect(wrapper.props.style).toBeUndefined();
+
+    renderer.unmount();
+  });
+
+  it('keeps the resolved top inset for a bottom formSheet on iOS', async () => {
+    // iOS insets are sheet-relative: they rise exactly when the sheet covers
+    // the status bar (full detent), so the clearance stays.
+    safeArea.top = 59;
+    const renderer = await mount({
+      title: 'Voice language',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+      topInset: 'bottom-form-sheet',
+    });
+
+    const wrapper = findSafeAreaWrapper(renderer.root);
+    expect(wrapper.props.style).toEqual({ paddingTop: 59 });
+
+    renderer.unmount();
+  });
+
+  it('keeps landscape side insets for a bottom formSheet while dropping the top clearance', async () => {
+    rn.os = 'android';
+    rn.statusHeight = 48;
+    safeArea.top = 24;
+    safeArea.left = 47;
+    safeArea.right = 59;
+    const renderer = await mount({
+      title: 'Voice language',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+      topInset: 'bottom-form-sheet',
+    });
+
+    const wrapper = findSafeAreaWrapper(renderer.root);
+    expect(wrapper.props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
+
+    renderer.unmount();
+  });
+
+  it('passes the bottom-form-sheet top-inset mode through PickerSheet', async () => {
+    // The picker shells are bottom formSheets: at rest they sit below the
+    // status bar, so the shell must not reserve the window's top inset.
+    rn.os = 'android';
+    rn.statusHeight = 48;
+    safeArea.top = 24;
+    const renderer = await mountElement(
+      createElement(
+        PickerSheet,
+        { title: 'Voice language', onDone: () => undefined },
+        createElement('Text', null, 'Picker content')
+      )
+    );
+
+    const wrapper = findSafeAreaWrapper(renderer.root);
+    expect(wrapper.props.style).toBeUndefined();
+
+    renderer.unmount();
+  });
 });

@@ -115,6 +115,26 @@ describe('VoiceLanguagePickerSheet', () => {
     renderer.unmount();
   });
 
+  it('checks the app Chinese script for the Android Mandarin tag in gateway mode', async () => {
+    // p16: the device speech service stores the explicit choice as `cmn-Hans-CN`
+    // (ISO 639-3 Mandarin). The gateway list offers the app languages, so the
+    // picker must check the 简体中文 row — the same language the settings row
+    // names — instead of falling back to Automatic with nothing checked.
+    preferenceState.gatewayEnabled = true;
+    preferenceState.language = 'cmn-Hans-CN';
+    const renderer = await mountSheet();
+
+    const rows = findByType(renderer.root, 'ChoiceRow');
+    const selected = rows.filter(row => row.props.selected === true);
+    expect(selected).toHaveLength(1);
+    expect(selected[0]?.props).toMatchObject({
+      label: '简体中文',
+      description: 'Chinese (Simplified)',
+    });
+
+    renderer.unmount();
+  });
+
   it('checks Automatic when the stored tag has no option in the active mode', async () => {
     preferenceState.language = 'fil-PH';
     deviceState.current = {

@@ -8,6 +8,7 @@ import {
 } from '@kilocode/db';
 import {
   fetchFakeScenarioStatus,
+  messageIdFromEvent,
   openStream,
   waitForGateEngaged,
   type DriverConfig,
@@ -97,7 +98,8 @@ export async function requireWorktreeGate(
   config: DriverConfig,
   tag: string,
   timeoutMs: number,
-  stream?: StreamConnection
+  stream?: StreamConnection,
+  messageId?: string
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   const firstEvent = stream?.events.length ?? 0;
@@ -110,11 +112,16 @@ export async function requireWorktreeGate(
       throw new Error(`unsupported real Kilo tool schema for fake directive ${tag}`);
     }
     if (engaged) return;
-    const failure = stream?.events
-      .slice(firstEvent)
-      .find(event =>
-        ['error', 'interrupted', 'cloud.message.failed'].includes(event.streamEventType)
-      );
+    // With a message id, fail fast on a failure this exact message already
+    // received before the wait began. Without one, keep the window scoped to
+    // this gate so a multi-turn caller never reads an earlier turn's failure
+    // as this gate miss.
+    const observed = messageId === undefined ? stream?.events.slice(firstEvent) : stream?.events;
+    const failure = observed?.find(
+      event =>
+        ['error', 'interrupted', 'cloud.message.failed'].includes(event.streamEventType) &&
+        (messageId === undefined || messageIdFromEvent(event) === messageId)
+    );
     if (failure) {
       throw new Error(
         `fake directive ${tag} terminated as ${failure.streamEventType} before gating`

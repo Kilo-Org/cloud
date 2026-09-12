@@ -410,6 +410,26 @@ async function run() {
     if (await getRoot(request.serverUrl, request.kiloSessionId)) {
       return { ok: false, reason: 'new Kilo root already exists' };
     }
+    // Production ensureSession imports under the live current project id, not a
+    // hardcoded one. A non-2xx here is reported with its HTTP status only; the
+    // response body is never dumped.
+    const projectEndpoint = new URL('/project/current', request.serverUrl);
+    projectEndpoint.searchParams.set('directory', source.directory);
+    const projectResponse = await fetch(projectEndpoint, { signal: AbortSignal.timeout(5_000) });
+    if (!projectResponse.ok) {
+      return { ok: false, reason: 'Kilo project lookup returned HTTP ' + projectResponse.status };
+    }
+    const project = await projectResponse.json();
+    const projectId =
+      project && typeof project === 'object' && typeof project.id === 'string' && project.id.length > 0
+        ? project.id
+        : null;
+    if (!projectId) {
+      return {
+        ok: false,
+        reason: 'Kilo project lookup returned no project id (HTTP ' + projectResponse.status + ')',
+      };
+    }
     const now = Date.now();
     const endpoint = new URL('/kilocode/session-import/session', request.serverUrl);
     endpoint.searchParams.set('directory', source.directory);
@@ -419,7 +439,7 @@ async function run() {
       signal: AbortSignal.timeout(8_000),
       body: JSON.stringify({
         id: request.kiloSessionId,
-        projectID: 'global',
+        projectID: projectId,
         slug: request.kiloSessionId.slice(0, 24),
         directory: source.directory,
         title: 'Cloud Agent Gate 0',
@@ -429,7 +449,24 @@ async function run() {
       }),
     });
     if (!response.ok) {
-      return { ok: false, reason: 'Kilo session import returned HTTP ' + response.status };
+      // Keep the failure diagnostic bounded: an HTTP status plus an optional
+      // short diagnostic ref token. Never dump the response body.
+      let ref: string | undefined;
+      try {
+        const body: unknown = await response.json();
+        const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : undefined;
+        const data =
+          record && record.data && typeof record.data === 'object'
+            ? (record.data as Record<string, unknown>)
+            : undefined;
+        const candidate =
+          typeof record?.ref === 'string' ? record.ref : typeof data?.ref === 'string' ? data.ref : undefined;
+        if (candidate !== undefined && /^[A-Za-z0-9_-]{1,64}$/.test(candidate)) ref = candidate;
+      } catch {}
+      return {
+        ok: false,
+        reason: 'Kilo session import returned HTTP ' + response.status + (ref ? ' ref=' + ref : ''),
+      };
     }
     const root = await getRoot(request.serverUrl, request.kiloSessionId);
     if (!root || root.directory !== source.directory) {
@@ -640,6 +677,16 @@ async function runControlPlaneKiloOperation(
         `Kilo ${operation.action} could not reach ${containerId}: the container is gone`
       );
     }
+    // A marker-less mid-exec death must be classified against the exact
+    // container at this operation boundary. A running container keeps the
+    // original throw; only a confirmed-absent one becomes typed-gone.
+    const unavailable = await unavailableIfContainerGone(
+      containerId,
+      error,
+      executeDocker,
+      `Kilo ${operation.action} could not reach ${containerId}: the container is gone`
+    );
+    if (unavailable) throw unavailable;
     throw error;
   }
   const result: unknown = JSON.parse(stdout.trim());
@@ -1151,17 +1198,31 @@ export async function waitForControlPlaneKiloCompletion(
 ): Promise<ControlPlaneKiloCompletion> {
   const deadline = Date.now() + input.timeoutMs;
   while (Date.now() < deadline) {
-    const result = await runControlPlaneKiloOperation(runtime.container.id, {
-      action: 'completion',
-      kiloSessionId: input.kiloSessionId,
-      serverUrl: runtime.serverUrl,
-      directory: runtime.directory,
-      home: runtime.home,
-      processId: runtime.processId,
-      ownerKiloSessionId: runtime.kiloSessionId,
-      messageId: input.messageId,
-      ...(input.expectedText ? { expectedText: input.expectedText } : {}),
-    });
+    let result: Record<string, unknown>;
+    try {
+      result = await runControlPlaneKiloOperation(runtime.container.id, {
+        action: 'completion',
+        kiloSessionId: input.kiloSessionId,
+        serverUrl: runtime.serverUrl,
+        directory: runtime.directory,
+        home: runtime.home,
+        processId: runtime.processId,
+        ownerKiloSessionId: runtime.kiloSessionId,
+        messageId: input.messageId,
+        ...(input.expectedText ? { expectedText: input.expectedText } : {}),
+      });
+    } catch (error) {
+      // One slow in-container `/message` fetch surfaces as a `TimeoutError`
+      // from the 5s `AbortSignal.timeout`. That is a transient poll failure,
+      // not a terminal completion verdict, so keep polling until the deadline.
+      // Every other failure (HTTP status, assistant error, identity mismatch,
+      // gone container) stays terminal.
+      if (error instanceof Error && error.message.includes('completion failed (TimeoutError)')) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        continue;
+      }
+      throw error;
+    }
     if (result.found === true) {
       if (result.failed === true) {
         throw new Error(`Kilo root ${input.kiloSessionId} finished with an assistant error`);

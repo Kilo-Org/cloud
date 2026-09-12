@@ -2497,38 +2497,37 @@ export async function lifecycleEmptyResponse(args: LifecycleArgs): Promise<Lifec
  */
 export async function lifecycleInterruptMidStream(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 60_000, api = 'unified' } = args;
-  const gateTag = 'intactive';
+  const { config, conversation, timeoutMs = 180_000, api = 'unified' } = args;
+  const gateTag = `intactive-${randomUUID()}`;
+  const deadlineAt = start + timeoutMs;
+  let stream: StreamConnection | undefined;
   try {
     const knownSandboxIds = await snapshotSandboxIds();
     const session = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
-    const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
+    stream = openStream(config, session.cloudAgentSessionId, { replay: false });
 
     const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
     if (!sandbox) {
-      stream.close();
       return {
         name: 'interrupt-mid-stream',
         conversation,
         ok: false,
         message: 'sandbox did not appear',
-        events: [],
-        durationMs: Date.now() - start,
-      };
-    }
-
-    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
-    if (!engaged) {
-      stream.close();
-      return {
-        name: 'interrupt-mid-stream',
-        conversation,
-        ok: false,
-        message: `gate:${gateTag} did not engage within 90s`,
         events: [...stream.events],
         durationMs: Date.now() - start,
       };
     }
+
+    // Pass this message's id so a `cloud.message.failed` received during
+    // sandbox discovery (before this wait) still fails fast instead of being
+    // missed by the gate window.
+    await requireWorktreeGate(
+      config,
+      gateTag,
+      Math.max(1, deadlineAt - Date.now()),
+      stream,
+      session.messageId
+    );
 
     await interruptSession(config, session.cloudAgentSessionId);
 
@@ -2538,7 +2537,6 @@ export async function lifecycleInterruptMidStream(args: LifecycleArgs): Promise<
       timeoutMs
     );
     const events = [...stream.events];
-    stream.close();
 
     if (!failed) {
       return {
@@ -2573,10 +2571,13 @@ export async function lifecycleInterruptMidStream(args: LifecycleArgs): Promise<
       conversation,
       ok: false,
       message: `threw: ${msg}`,
-      events: [],
+      events: stream ? [...stream.events] : [],
       durationMs: Date.now() - start,
     };
   } finally {
+    try {
+      stream?.close();
+    } catch {}
     await releaseGate(config.fakeLlmUrl, gateTag).catch(() => {});
   }
 }

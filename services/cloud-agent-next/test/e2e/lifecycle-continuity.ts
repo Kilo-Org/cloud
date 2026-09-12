@@ -47,6 +47,7 @@ import {
   createScenarioOperation,
   createScenarioResources,
   fakeDirective,
+  isDockerExecFailureForContainer,
   recordOwnedRuntime,
   runGatedFileTurn,
   scenarioResult,
@@ -62,6 +63,7 @@ import {
 } from './idle-stop-evidence.js';
 import { toolCallId } from './fake-llm-server.js';
 import {
+  ControlPlaneContainerUnavailableError,
   findControlPlaneKiloRuntime,
   inspectControlPlaneHistory,
   inspectControlPlaneQuestions,
@@ -645,15 +647,72 @@ async function resumeSameSession(
     releaseGate(resources.config.fakeLlmUrl, input.tag, signal)
   );
   resources.ownedGateTags.delete(input.tag);
-  await resources.within(`resume completion ${input.tag}`, () =>
-    waitForOwnedCompletion(
-      resumed,
-      input.session,
-      sent.messageId,
-      `done-${input.tag}`,
-      remainingMs(resources, `resume completion ${input.tag}`)
-    )
+  // Non-waking final probe: only a runtime discoverable NOW can serve the
+  // docker-exec completion check. When it is gone, the message-id stream
+  // lifecycle plus durable completion stand in, but only after the previously
+  // proven resumed container is confirmed absent.
+  const runtimeNow = await resources.within(`resume runtime ${input.tag}`, () =>
+    findControlPlaneKiloRuntime(input.session.kiloSessionId)
   );
+  if (runtimeNow) {
+    recordOwnedRuntime(resources, input.session.kiloSessionId, runtimeNow.container);
+  }
+  const selectedContainer = (runtimeNow ?? resumed).container;
+  const ABSENCE_RECONFIRM_RESERVE_MS = 2_000;
+  // Bounded absence re-confirm while the reaper may still be in flight. The
+  // poll budget leaves room for `awaitDurableCompletion` and the message-id
+  // lifecycle check; `resources.within` is the hard wall-clock cutoff. Absence
+  // only observed at that cutoff is a failure, not a pass.
+  const reconfirmAbsence = async (): Promise<void> => {
+    const budgetMs = resources.deadlineAt - Date.now();
+    if (budgetMs <= ABSENCE_RECONFIRM_RESERVE_MS) {
+      throw new Error(
+        `insufficient scenario budget to re-confirm ${selectedContainer.id} absence before durable completion`
+      );
+    }
+    const gone = await resources.within(
+      `resume completion ${input.tag} absence reconfirm`,
+      () => waitForSandboxPrimaryGone(selectedContainer, budgetMs - ABSENCE_RECONFIRM_RESERVE_MS)
+    );
+    if (!gone) {
+      throw new Error(
+        `resumed container ${selectedContainer.id} is still listed after the absence re-confirm window`
+      );
+    }
+    if (resources.deadlineAt - Date.now() <= 0) {
+      throw new Error(
+        `scenario budget exhausted after confirming ${selectedContainer.id} absence; refusing to skip durable completion`
+      );
+    }
+  };
+  let completionAfterDisappearance = runtimeNow === null;
+  if (runtimeNow) {
+    try {
+      await resources.within(`resume completion ${input.tag}`, () =>
+        waitForOwnedCompletion(
+          runtimeNow,
+          input.session,
+          sent.messageId,
+          `done-${input.tag}`,
+          remainingMs(resources, `resume completion ${input.tag}`)
+        )
+      );
+    } catch (error) {
+      if (error instanceof ControlPlaneContainerUnavailableError) {
+        completionAfterDisappearance = true;
+      } else if (isDockerExecFailureForContainer(error, runtimeNow.container.id)) {
+        // The reaper is in flight: `docker ps` still lists the container while
+        // a Docker-exec against exactly this runtime failed. The bounded
+        // re-confirm below lets the stop settle; anything else keeps failing.
+        completionAfterDisappearance = true;
+      } else {
+        throw error;
+      }
+    }
+  }
+  if (completionAfterDisappearance) {
+    await reconfirmAbsence();
+  }
   const status = await awaitDurableCompletion(resources, input.session, sent.messageId, `resume ${input.tag}`);
   if (status !== 'completed') {
     throw new Error(`resume ${input.tag} durable status=${status} for ${sent.messageId}`);
@@ -1404,6 +1463,22 @@ type ReadMeasurement = {
   streamCorrelated: boolean;
 };
 
+/**
+ * One diagnostic rendering, reused by the measured result line and by the
+ * scenario-failure line, so a later deadline error cannot erase what the
+ * bounded measurement actually observed.
+ */
+function readMeasurementDiagnostic(measurement: ReadMeasurement): string {
+  return [
+    `requestedBytes=${LARGE_STREAM_REQUESTED_BYTES}`,
+    `minObservedBytes=${LARGE_STREAM_MIN_OBSERVED_BYTES}`,
+    `observedBytes=${measurement.bytes ?? 'unmeasured'}`,
+    `measurementSource=${measurement.source}`,
+    `readCallId=${measurement.callID ?? 'none'}`,
+    `streamCorrelated=${measurement.streamCorrelated}`,
+  ].join('; ');
+}
+
 /** Collect streamed `message.part.updated` parts for one exact read call id. */
 function streamedReadParts(
   stream: StreamConnection,
@@ -1429,6 +1504,12 @@ function streamedReadParts(
  * Measure the intended `tool-stream` read. The persisted read must be the exact
  * `call_<tag>_read` call and completed, and its streamed part must be
  * correlated; a completed read from another call never qualifies.
+ *
+ * A single one-shot transcript read is not enough: the low observation was
+ * already a completed matching part, so the size can differ between runs. Poll
+ * under one explicit deadline until BOTH the 48 KiB floor and stream
+ * correlation qualify. Each fetch is bounded by the remaining deadline so a
+ * hung transcript request cannot outlive it. The floor is never lowered.
  */
 async function measureReadToolOutput(
   resources: ScenarioResources,
@@ -1437,44 +1518,71 @@ async function measureReadToolOutput(
   stream: StreamConnection
 ): Promise<ReadMeasurement> {
   const expectedCallID = toolCallId(tag, 'read');
-  const streamCorrelated = streamedReadParts(stream, expectedCallID).some(
-    part => part.state.status === 'completed'
-  );
-  try {
-    const client = createKiloClient({
-      baseUrl: `${resources.config.workerUrl.replace(/\/$/, '')}/kilo`,
-      headers: {
-        Authorization: `Bearer ${mintApiToken(resources.config.user, resources.config.nextAuthSecret)}`,
-      },
-    });
-    const result = await client.session.messages({ sessionID: kiloSessionId, limit: 100 });
-    if (result.error !== undefined || result.data === undefined) {
-      return {
-        source: `transcript-error:${result.response?.status ?? 'unknown'}`,
-        streamCorrelated,
-      };
-    }
-    const entries = result.data as Array<{ parts: Part[] }>;
-    for (const entry of entries) {
-      for (const part of entry.parts) {
-        if (part.type !== 'tool') continue;
-        if (part.tool !== 'read') continue;
-        if (part.state.status !== 'completed') continue;
-        if (part.callID !== expectedCallID) continue;
-        return {
-          bytes: Buffer.byteLength(part.state.output, 'utf8'),
-          source: streamCorrelated
-            ? 'transcript-matched+stream-correlated'
-            : 'transcript-matched-stream-uncorrelated',
-          callID: part.callID,
+  const deadline =
+    Date.now() +
+    Math.min(LARGE_STREAM_TURN_BUDGET_MS, remainingMs(resources, 'tool-stream measurement'));
+  const client = createKiloClient({
+    baseUrl: `${resources.config.workerUrl.replace(/\/$/, '')}/kilo`,
+    headers: {
+      Authorization: `Bearer ${mintApiToken(resources.config.user, resources.config.nextAuthSecret)}`,
+    },
+  });
+  let last: ReadMeasurement = { source: 'transcript-unmeasured', streamCorrelated: false };
+  while (Date.now() < deadline) {
+    const streamCorrelated = streamedReadParts(stream, expectedCallID).some(
+      part => part.state.status === 'completed'
+    );
+    let measurement: ReadMeasurement;
+    try {
+      const result = await client.session.messages(
+        { sessionID: kiloSessionId, limit: 100 },
+        { signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())) }
+      );
+      if (result.error !== undefined || result.data === undefined) {
+        measurement = {
+          source: `transcript-error:${result.response?.status ?? 'unknown'}`,
           streamCorrelated,
         };
+      } else {
+        const entries = result.data as Array<{ parts: Part[] }>;
+        measurement = { source: 'transcript-no-matching-completed-read-part', streamCorrelated };
+        for (const entry of entries) {
+          let matched: ReadMeasurement | undefined;
+          for (const part of entry.parts) {
+            if (part.type !== 'tool') continue;
+            if (part.tool !== 'read') continue;
+            if (part.state.status !== 'completed') continue;
+            if (part.callID !== expectedCallID) continue;
+            matched = {
+              bytes: Buffer.byteLength(part.state.output, 'utf8'),
+              source: streamCorrelated
+                ? 'transcript-matched+stream-correlated'
+                : 'transcript-matched-stream-uncorrelated',
+              callID: part.callID,
+              streamCorrelated,
+            };
+            break;
+          }
+          if (matched) {
+            measurement = matched;
+            break;
+          }
+        }
       }
+    } catch (error) {
+      measurement = { source: `transcript-threw:${errorMessage(error)}`, streamCorrelated };
     }
-    return { source: 'transcript-no-matching-completed-read-part', streamCorrelated };
-  } catch (error) {
-    return { source: `transcript-threw:${errorMessage(error)}`, streamCorrelated };
+    last = measurement;
+    if (
+      measurement.bytes !== undefined &&
+      measurement.bytes >= LARGE_STREAM_MIN_OBSERVED_BYTES &&
+      measurement.streamCorrelated
+    ) {
+      return measurement;
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
   }
+  return last;
 }
 
 /**
@@ -1535,6 +1643,9 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
     false,
     'scenario did not start'
   );
+  // Kept outside the try so a later scenario-deadline error still reports what
+  // the bounded measurement observed instead of replacing it.
+  let lastMeasurement: ReadMeasurement | undefined;
   try {
     assertScenarioPreconditions(args.config, args.api);
     const runId = randomUUID();
@@ -1561,6 +1672,7 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
     const readSucceeded = status.toolResults.read >= 1 && status.toolCalls.read >= 1;
     const stream = await resources.connect(session.cloudAgentSessionId, false);
     const measured = await measureReadToolOutput(resources, session.kiloSessionId, tag, stream);
+    lastMeasurement = measured;
     const file = await resources.within('tool-stream file', () =>
       inspectControlPlaneWorkspaceFile(runtime, {
         kiloSessionId: session.kiloSessionId,
@@ -1586,13 +1698,8 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
       measured.bytes >= LARGE_STREAM_MIN_OBSERVED_BYTES;
     const detail = [
       `session=${session.cloudAgentSessionId}`,
-      `requestedBytes=${LARGE_STREAM_REQUESTED_BYTES}`,
-      `minObservedBytes=${LARGE_STREAM_MIN_OBSERVED_BYTES}`,
+      readMeasurementDiagnostic(measured),
       `stagedBytes=${staged.byteCount}`,
-      `observedBytes=${measured.bytes ?? 'unmeasured'}`,
-      `measurementSource=${measured.source}`,
-      `readCallId=${measured.callID ?? 'none'}`,
-      `streamCorrelated=${measured.streamCorrelated}`,
       `writtenFileBytes=${fileBytes}`,
       `readSucceeded=${readSucceeded}`,
       `toolStreamMessage=${streamTurn.messageId}`,
@@ -1600,7 +1707,7 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
       `largeStreamCoverage=${largeStreamCoverage}`,
       largeStreamCoverage
         ? 'coverage=verified'
-        : `coverage=not-claimed (requested=${LARGE_STREAM_REQUESTED_BYTES}, minObserved=${LARGE_STREAM_MIN_OBSERVED_BYTES}, observed=${measured.bytes ?? 'unmeasured'}; tool-output cap, unmatched call, or unmeasured)`,
+        : `coverage=not-claimed (requested=${LARGE_STREAM_REQUESTED_BYTES}, minObserved=${LARGE_STREAM_MIN_OBSERVED_BYTES}, observed=${measured.bytes ?? 'unmeasured'}; completed matching read=${measured.callID ?? 'none'}, streamCorrelated=${measured.streamCorrelated}; cause=unresolved output truncation/capping (unproven); the 48KiB floor is not lowered)`,
     ].join('; ');
     result = scenarioResult(
       'large-stream',
@@ -1611,7 +1718,19 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
       detail
     );
   } catch (error) {
-    result = scenarioResult('large-stream', args, startedAt, resources.events, false, errorMessage(error));
+    // A later scenario-deadline error must not erase the bounded measurement
+    // result: keep observed/minimum bytes, exact call id, and correlation.
+    const measurementNote = lastMeasurement
+      ? `; lastMeasurement: ${readMeasurementDiagnostic(lastMeasurement)}`
+      : '';
+    result = scenarioResult(
+      'large-stream',
+      args,
+      startedAt,
+      resources.events,
+      false,
+      `${errorMessage(error)}${measurementNote}`
+    );
   } finally {
     const cleanup = await cleanupScenario(resources);
     result = addCleanupReport(result, cleanup);

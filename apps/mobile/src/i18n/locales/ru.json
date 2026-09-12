@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "Корпоративный SSO"
   },
   "preferences": {
+    "general": "Общие",
+    "voiceInput": "Голосовой ввод",
     "autoExpandThinking": "Автоматически раскрывать рассуждения",
     "autoExpandThinkingSubtitle": "Показывать рассуждения агента целиком, когда он закончит обдумывание.",
     "keepScreenOn": "Не выключать экран на странице сеанса",
@@ -238,6 +240,7 @@
     "appearanceLight": "Светлая",
     "appearanceDark": "Тёмная",
     "account": "Аккаунт",
+    "accountSubtitle": "Язык, доверенные сайты и сеансы на устройствах",
     "prReviewAttribution": "Указывать приложение в проверках PR",
     "prReviewAttributionSubtitle": "Добавлять подпись «Проверено с помощью Kilo» в конце проверки при её отправке.",
     "returnSendsMessage": "Отправлять сообщение клавишей ввода",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Распознавание речи через Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Распознавайте голосовой ввод с помощью модели Kilo Gateway вместо распознавания речи на устройстве. Запись отправляется в Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Эфир активности",
@@ -2172,7 +2178,14 @@
     "languageNotInstalledMessage": "Офлайн-файлы распознавания речи для {{language}} не установлены на этом телефоне. Скачайте их, а затем снова попробуйте голосовой ввод.",
     "downloadOfflineModel": "Скачать",
     "offlineModelDownloadScheduled": "Офлайн-файлы распознавания речи будут скачаны в фоновом режиме. Попробуйте голосовой ввод позже.",
-    "listeningStopped": "Запись речи остановлена."
+    "listeningStopped": "Запись речи остановлена.",
+    "transcribing": "Распознавание…",
+    "gatewayUnreachable": "Не удалось связаться с Kilo Gateway. Проверьте подключение и попробуйте снова.",
+    "gatewayTimeout": "Распознавание заняло слишком много времени. Попробуйте снова.",
+    "gatewayModelUnavailable": "Эта модель распознавания речи недоступна. Выберите другую в настройках.",
+    "gatewayModelUnavailableNotice": "Эта модель больше не предлагается. Нажмите $t(transcriptionModel.title), чтобы выбрать другую.",
+    "gatewaySignInRequired": "Войдите, чтобы использовать распознавание речи через Kilo Gateway.",
+    "gatewayNoModel": "Сначала выберите модель распознавания речи в настройках."
   },
   "share": {
     "title": "Отправка в Kilo",
@@ -2350,11 +2363,176 @@
     "installAttributionPromptTitle": "Разрешить определение источника установки?"
   },
   "prReview": {
-    "pullRequestUnavailable": "Запрос на слияние недоступен",
-    "pullRequestUnavailableDescription": "Не удаётся открыть этот PR. Возможно, он удалён, репозиторий закрытый или в нём не установлено приложение Kilo для GitHub.",
     "accessDeniedDescription": "У вас нет прав на просмотр этого запроса на слияние.",
-    "noFilesChanged": "Нет изменённых файлов",
-    "noFilesChangedDescription": "В этом запросе на слияние нет изменений в файлах.",
+    "checkConnection": "Проверить подключение",
+    "checks": {
+      "checksCount": "проверок: {{displayCount}}",
+      "couldNotLoad": "Не удалось загрузить проверки.",
+      "failed": "с ошибками: {{displayCount}}",
+      "noAccess": "У вас нет доступа к проверкам этого репозитория.",
+      "noChecksReported": "Нет данных о проверках",
+      "notAvailable": "Проверки пока недоступны. Возможно, последний коммит ещё не обработан или в исходном репозитории не установлено приложение Kilo для GitHub.",
+      "openDetails": "Открыть сведения о {{name}}",
+      "passed": "успешно: {{displayCount}}",
+      "pending": "в ожидании: {{displayCount}}",
+      "retryChecks": "Повторить проверки",
+      "skipped": "пропущено: {{displayCount}}",
+      "title": "Проверки",
+      "viewOnGitHub": "Открыть PR на GitHub",
+      "checkDetails": "сведения о проверке"
+    },
+    "composer": {
+      "addTitle": "Новый комментарий",
+      "addToReview": "Добавить в ревью",
+      "comment": "Комментарий",
+      "commentBody": "Текст комментария",
+      "commentBodyPlaceholder": "Ваш комментарий",
+      "commentNow": "Отправить комментарий",
+      "discardMessage": "Черновик будет удалён.",
+      "discardTitle": "Удалить черновик комментария?",
+      "editTitle": "Редактирование комментария",
+      "insertSuggestion": "Вставить правку",
+      "insertSuggestionA11y": "Вставить предлагаемую правку кода",
+      "loadFailedTitle": "Не удалось загрузить редактор комментария.",
+      "ok": "ОК",
+      "unavailableMessage": "Этот неотправленный комментарий уже удалён или опубликован.",
+      "unavailableTitle": "Комментарий недоступен",
+      "bodyEmpty": "Текст комментария не может быть пустым.",
+      "suggestionsOnlyAddedLines": "Предлагаемые правки применяются только к добавленным строкам.",
+      "tapDiffLineToSuggest": "Нажмите на строку в изменениях, чтобы предложить правку."
+    },
+    "connect": {
+      "checkFailedTitle": "Не удалось проверить подключение к GitHub.",
+      "checkFailedMessage": "Пока данные не загрузятся, статус входа будет недоступен.",
+      "checkFailedTitleGitLab": "Не удалось проверить подключение к GitLab",
+      "checkFailedTitleBitbucket": "Не удалось проверить подключение к Bitbucket",
+      "providerCheckFailedMessage": "Статус подключения недоступен до загрузки.",
+      "reconnectTitle": "Подключить GitHub снова",
+      "reconnectDescription": "Доступ к вашему аккаунту GitHub отозван. Подключитесь снова, чтобы продолжить ревью запросов на слияние в мобильном приложении.",
+      "description": "Подключите аккаунт GitHub, чтобы проводить ревью запросов на слияние в мобильном приложении.",
+      "gitlabDescription": "Подключите аккаунт GitLab, чтобы просматривать запросы на слияние с мобильного.",
+      "bitbucketDescription": "Подключите Bitbucket к этой организации, чтобы просматривать пул-реквесты с мобильного.",
+      "bitbucketOrgOnlyDescription": "Выберите организацию в профиле, чтобы просматривать её пул-реквесты Bitbucket."
+    },
+    "connectionExpired": "Срок действия подключения к GitHub истёк.",
+    "couldNotLoadPullRequest": "Не удалось загрузить запрос на слияние.",
+    "couldNotOpenGitHubAppSettings": "Не удалось открыть настройки приложения GitHub.",
+    "description": "Описание",
+    "discussion": {
+      "acceptTerms": "Принять",
+      "accessDeniedMessage": "У вас нет прав на просмотр обсуждения этого PR.",
+      "addReaction": "Добавить реакцию",
+      "block": "Заблокировать",
+      "blockedUser": "{{login}} заблокирован",
+      "collapseThread": "Свернуть обсуждение",
+      "commentActions": "Действия с комментарием",
+      "comment": "{{displayCount}} комментария",
+      "comment_other": "{{displayCount}} комментария",
+      "couldNotLoad": "Не удалось загрузить обсуждение.",
+      "couldNotLoadMore": "Не удалось загрузить остальные комментарии.",
+      "loadMoreComments": "Загрузить ещё комментарии",
+      "loading": "Загрузка обсуждения",
+      "moderation": {
+        "block": {
+          "retryable": "Не удалось заблокировать этого пользователя. Проверьте подключение и попробуйте снова.",
+          "terminal": "Этого пользователя нельзя заблокировать."
+        },
+        "mute": {
+          "retryable": "Не удалось скрыть сообщения этого пользователя. Проверьте подключение и попробуйте снова.",
+          "terminal": "Нельзя скрыть сообщения этого пользователя."
+        },
+        "reportContent": {
+          "retryable": "Не удалось пожаловаться на этот комментарий. Проверьте подключение и попробуйте снова.",
+          "terminal": "На этот комментарий нельзя пожаловаться."
+        },
+        "reportUser": {
+          "retryable": "Не удалось пожаловаться на этого пользователя. Проверьте подключение и попробуйте снова.",
+          "terminal": "На этого пользователя нельзя пожаловаться."
+        }
+      },
+      "moreLinesAbove": "… строк выше: {{displayCount}}",
+      "mute": "Скрыть сообщения",
+      "mutedUser": "Сообщения от {{login}} скрыты",
+      "noDiscussion": "Обсуждений пока нет",
+      "noDiscussionDescription": "В этом запросе на слияние пока нет обсуждений кода и общих комментариев.",
+      "comment_one": "1 комментарий",
+      "outdated": "Устарело",
+      "quotedDiffSnippet": "Цитата из фрагмента изменений",
+      "reactionPill": "Реакция {{emoji}}: {{displayCount}} {{countLabel}}",
+      "reaction": "реакций",
+      "reaction_other": "реакций",
+      "reaction_one": "реакция",
+      "replyBadRequest": "Не удаётся опубликовать ответ. Возможно, обсуждение изменилось.",
+      "replyBody": "Текст ответа",
+      "replyForbidden": "У вас нет прав на ответы в этом запросе на слияние.",
+      "addCommentCta": "Комментировать этот запрос на слияние",
+      "commentBadRequest": "Не удаётся опубликовать этот комментарий. Возможно, запрос на слияние изменился.",
+      "commentForbidden": "У вас нет прав на комментарии в этом запросе на слияние.",
+      "replyPlaceholder": "Ваш ответ…",
+      "reportContent": "Пожаловаться на комментарий",
+      "reportUser": "Пожаловаться на пользователя",
+      "resolveThread": "Закрыть обсуждение",
+      "resolved": "Закрыто",
+      "retryLoadingMore": "Повторить загрузку остальных комментариев",
+      "reviewFiles": "Проверить файлы",
+      "startedRelative": " · начато {{relative}}",
+      "submitReply": "Отправить ответ",
+      "termsAcceptRetry": "Не удалось принять условия. Проверьте подключение и попробуйте снова.",
+      "termsCopy": "Публиковать сообщения можно с 13 лет.",
+      "termsTitle": "Условия использования",
+      "threadAccessibilityLabel": "Обсуждение {{anchorLabel}}",
+      "unavailable": "Обсуждение недоступно.",
+      "unavailableMessage": "Возможно, этот запрос на слияние удалён.",
+      "unresolveThread": "Открыть обсуждение снова",
+      "viewTerms": "Открыть условия",
+      "termsAcceptRequired": "Чтобы публиковать сообщения, нужно принять условия использования.",
+      "termsCheckRetryCopy": "Не удалось проверить условия использования. Проверьте подключение и попробуйте снова.",
+      "termsOutdatedCopy": "Условия использования изменились. Откройте этот экран снова, чтобы принять новую версию.",
+      "comment_few": "{{displayCount}} комментария",
+      "comment_many": "{{displayCount}} комментариев",
+      "reaction_few": "реакции",
+      "reaction_many": "реакций",
+      "reactions": {
+        "thumbsUp": "Большой палец вверх",
+        "thumbsDown": "Большой палец вниз",
+        "laugh": "Смех",
+        "hooray": "Ура",
+        "confused": "Недоумение",
+        "heart": "Сердце",
+        "rocket": "Ракета",
+        "eyes": "Глаза"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Комментарий к файлу {{path}}",
+        "fileComment": "Комментарий к файлу",
+        "outdatedOnPathLines": "Устаревший комментарий: {{path}}, {{lines}}",
+        "outdatedOnLines": "Устаревший комментарий: {{lines}}",
+        "outdatedOnPath": "Устаревший комментарий: {{path}}"
+      },
+      "deletedUser": "удалённый пользователь",
+      "replyForbiddenTerm": "У вас нет прав для ответа в {{term}}."
+    },
+    "entry": {
+      "eyebrow": "Откройте пул-реквест или запрос на слияние по URL",
+      "pastePrLink": "Вставьте ссылку на пул-реквест или запрос на слияние",
+      "noRecentPrs": "Нет недавних ревью",
+      "noRecentPrsDescription": "Вставьте ссылку выше, чтобы начать ревью. В следующий раз оно появится здесь.",
+      "couldNotLoad": "Не удалось загрузить данные.",
+      "removeFromRecentsTitle": "Удалить из недавних?",
+      "removeFromRecentsMessage": "Это ревью будет удалено из списка недавних.",
+      "removeRecentAccessibility": "Удалить {{repo}} из недавних",
+      "urlAccessibility": "Введите URL пул-реквеста или запроса на слияние",
+      "urlPlaceholder": "URL пул-реквеста или запроса на слияние",
+      "openAccessibility": "Открыть пул-реквест или запрос на слияние",
+      "clearLink": "Очистить ссылку",
+      "pasteLink": "Вставить ссылку на пул-реквест или запрос на слияние",
+      "open": "Открыть"
+    },
+    "eventChips": {
+      "comment": "Комментарий",
+      "label": "Результат ревью",
+      "requestChanges": "Запросить изменения"
+    },
     "fileList": {
       "filesList": "Список файлов",
       "filesViewed": "Файлы · просмотрено {{viewed}} из {{total}}",
@@ -2399,6 +2577,7 @@
       "commentOnSelectedLines": "Прокомментировать выделенные строки",
       "finishReview": "Завершить ревью"
     },
+    "headLine": "{{counts}} · последний коммит {{sha}}",
     "hunkRows": {
       "contextUnavailable": "Контекст недоступен для этой версии.",
       "expandAll": "Развернуть все",
@@ -2435,21 +2614,14 @@
       "fileLoadedOfTotalCount_few": "загружено {{displayCount}} файла из {{total}}",
       "fileLoadedOfTotalCount_many": "загружено {{displayCount}} файлов из {{total}}"
     },
-    "sideBySide": {
-      "emptyDiffColumn": "пустой столбец изменений",
-      "emptyDiffRow": "Пустая строка изменений",
-      "newOnly": "Только в новой версии: {{text}}",
-      "noNewlineAtEndOfFile": "⚠️ нет перевода строки в конце файла",
-      "oldNew": "До: {{old}} | После: {{new}}",
-      "oldOnly": "Только в исходной версии: {{text}}"
+    "inbox": {
+      "couldNotLoad": "Не удалось загрузить входящие.",
+      "loading": "Загрузка входящих",
+      "noReviewRequests": "Нет запросов на ревью",
+      "noReviewRequestsDescription": "Здесь появятся запросы на слияние, ожидающие вашего ревью. Вы также можете вставить выше ссылку на любой PR.",
+      "title": "Входящие"
     },
-    "connectionExpired": "Срок действия подключения к GitHub истёк.",
-    "capabilities": {
-      "banner": {
-        "title": "Недоступно у этого провайдера",
-        "accessibility": "Недоступно у этого провайдера: {{reason}}"
-      }
-    },
+    "installKiloGitHubApp": "Установить приложение Kilo для GitHub",
     "merge": {
       "merge": "Объединение",
       "mergeNow": "Выполнить слияние сейчас",
@@ -2541,210 +2713,9 @@
         "rebase": "Все коммиты этой ветки последовательно применяются к базовой без создания коммита слияния."
       }
     },
-    "discussion": {
-      "threadAccessibilityLabel": "Обсуждение {{anchorLabel}}",
-      "collapseThread": "Свернуть обсуждение",
-      "resolveThread": "Закрыть обсуждение",
-      "unresolveThread": "Открыть обсуждение снова",
-      "resolved": "Закрыто",
-      "outdated": "Устарело",
-      "comment_one": "1 комментарий",
-      "comment": "{{displayCount}} комментария",
-      "comment_other": "{{displayCount}} комментария",
-      "startedRelative": " · начато {{relative}}",
-      "couldNotLoadMore": "Не удалось загрузить остальные комментарии.",
-      "retryLoadingMore": "Повторить загрузку остальных комментариев",
-      "loadMoreComments": "Загрузить ещё комментарии",
-      "addReaction": "Добавить реакцию",
-      "reactionPill": "Реакция {{emoji}}: {{displayCount}} {{countLabel}}",
-      "reaction_one": "реакция",
-      "reaction": "реакций",
-      "reaction_other": "реакций",
-      "commentActions": "Действия с комментарием",
-      "reportContent": "Пожаловаться на комментарий",
-      "reportUser": "Пожаловаться на пользователя",
-      "mute": "Скрыть сообщения",
-      "block": "Заблокировать",
-      "blockedUser": "{{login}} заблокирован",
-      "mutedUser": "Сообщения от {{login}} скрыты",
-      "replyPlaceholder": "Ваш ответ…",
-      "replyBody": "Текст ответа",
-      "submitReply": "Отправить ответ",
-      "termsTitle": "Условия использования",
-      "termsCopy": "Публиковать сообщения можно с 13 лет.",
-      "termsAcceptRetry": "Не удалось принять условия. Проверьте подключение и попробуйте снова.",
-      "viewTerms": "Открыть условия",
-      "acceptTerms": "Принять",
-      "replyBadRequest": "Не удаётся опубликовать ответ. Возможно, обсуждение изменилось.",
-      "replyForbidden": "У вас нет прав на ответы в этом запросе на слияние.",
-      "replyForbiddenTerm": "У вас нет прав для ответа в {{term}}.",
-      "moderation": {
-        "block": {
-          "retryable": "Не удалось заблокировать этого пользователя. Проверьте подключение и попробуйте снова.",
-          "terminal": "Этого пользователя нельзя заблокировать."
-        },
-        "mute": {
-          "retryable": "Не удалось скрыть сообщения этого пользователя. Проверьте подключение и попробуйте снова.",
-          "terminal": "Нельзя скрыть сообщения этого пользователя."
-        },
-        "reportContent": {
-          "retryable": "Не удалось пожаловаться на этот комментарий. Проверьте подключение и попробуйте снова.",
-          "terminal": "На этот комментарий нельзя пожаловаться."
-        },
-        "reportUser": {
-          "retryable": "Не удалось пожаловаться на этого пользователя. Проверьте подключение и попробуйте снова.",
-          "terminal": "На этого пользователя нельзя пожаловаться."
-        }
-      },
-      "accessDeniedMessage": "У вас нет прав на просмотр обсуждения этого PR.",
-      "unavailable": "Обсуждение недоступно.",
-      "unavailableMessage": "Возможно, этот запрос на слияние удалён.",
-      "couldNotLoad": "Не удалось загрузить обсуждение.",
-      "loading": "Загрузка обсуждения",
-      "noDiscussion": "Обсуждений пока нет",
-      "noDiscussionDescription": "В этом запросе на слияние пока нет обсуждений кода и общих комментариев.",
-      "reviewFiles": "Проверить файлы",
-      "quotedDiffSnippet": "Цитата из фрагмента изменений",
-      "moreLinesAbove": "… строк выше: {{displayCount}}",
-      "termsAcceptRequired": "Чтобы публиковать сообщения, нужно принять условия использования.",
-      "termsOutdatedCopy": "Условия использования изменились. Откройте этот экран снова, чтобы принять новую версию.",
-      "termsCheckRetryCopy": "Не удалось проверить условия использования. Проверьте подключение и попробуйте снова.",
-      "reactions": {
-        "thumbsUp": "Большой палец вверх",
-        "thumbsDown": "Большой палец вниз",
-        "laugh": "Смех",
-        "hooray": "Ура",
-        "confused": "Недоумение",
-        "heart": "Сердце",
-        "rocket": "Ракета",
-        "eyes": "Глаза"
-      },
-      "anchor": {
-        "fileCommentOnPath": "Комментарий к файлу {{path}}",
-        "fileComment": "Комментарий к файлу",
-        "outdatedOnPathLines": "Устаревший комментарий: {{path}}, {{lines}}",
-        "outdatedOnLines": "Устаревший комментарий: {{lines}}",
-        "outdatedOnPath": "Устаревший комментарий: {{path}}"
-      },
-      "deletedUser": "удалённый пользователь",
-      "comment_few": "{{displayCount}} комментария",
-      "comment_many": "{{displayCount}} комментариев",
-      "reaction_few": "реакции",
-      "reaction_many": "реакций"
-    },
-    "couldNotOpenGitHubAppSettings": "Не удалось открыть настройки приложения GitHub.",
-    "installKiloGitHubApp": "Установить приложение Kilo для GitHub",
-    "checkConnection": "Проверить подключение",
-    "couldNotLoadPullRequest": "Не удалось загрузить запрос на слияние.",
-    "description": "Описание",
     "noDescriptionProvided": "Описания нет.",
-    "review": "Проверка",
-    "reviewPullRequest": "Провести ревью запроса на слияние",
-    "headLine": "{{counts}} · последний коммит {{sha}}",
-    "entry": {
-      "eyebrow": "Откройте пул-реквест или запрос на слияние по URL",
-      "pastePrLink": "Вставьте ссылку на пул-реквест или запрос на слияние",
-      "noRecentPrs": "Нет недавних ревью",
-      "noRecentPrsDescription": "Вставьте ссылку выше, чтобы начать ревью. В следующий раз оно появится здесь.",
-      "couldNotLoad": "Не удалось загрузить данные.",
-      "removeFromRecentsTitle": "Удалить из недавних?",
-      "removeFromRecentsMessage": "Это ревью будет удалено из списка недавних.",
-      "removeRecentAccessibility": "Удалить {{repo}} из недавних",
-      "urlAccessibility": "Введите URL пул-реквеста или запроса на слияние",
-      "urlPlaceholder": "URL пул-реквеста или запроса на слияние",
-      "openAccessibility": "Открыть пул-реквест или запрос на слияние",
-      "clearLink": "Очистить ссылку",
-      "pasteLink": "Вставить ссылку на пул-реквест или запрос на слияние",
-      "open": "Открыть"
-    },
-    "checks": {
-      "checksCount": "проверок: {{displayCount}}",
-      "couldNotLoad": "Не удалось загрузить проверки.",
-      "failed": "с ошибками: {{displayCount}}",
-      "noAccess": "У вас нет доступа к проверкам этого репозитория.",
-      "noChecksReported": "Нет данных о проверках",
-      "notAvailable": "Проверки пока недоступны. Возможно, последний коммит ещё не обработан или в исходном репозитории не установлено приложение Kilo для GitHub.",
-      "openDetails": "Открыть сведения о {{name}}",
-      "passed": "успешно: {{displayCount}}",
-      "pending": "в ожидании: {{displayCount}}",
-      "retryChecks": "Повторить проверки",
-      "skipped": "пропущено: {{displayCount}}",
-      "title": "Проверки",
-      "viewOnGitHub": "Открыть PR на GitHub",
-      "checkDetails": "сведения о проверке"
-    },
-    "inbox": {
-      "couldNotLoad": "Не удалось загрузить входящие.",
-      "loading": "Загрузка входящих",
-      "noReviewRequests": "Нет запросов на ревью",
-      "noReviewRequestsDescription": "Здесь появятся запросы на слияние, ожидающие вашего ревью. Вы также можете вставить выше ссылку на любой PR.",
-      "title": "Входящие"
-    },
-    "composer": {
-      "addTitle": "Новый комментарий",
-      "addToReview": "Добавить в ревью",
-      "comment": "Комментарий",
-      "commentBody": "Текст комментария",
-      "commentBodyPlaceholder": "Ваш комментарий",
-      "commentNow": "Отправить комментарий",
-      "discardMessage": "Черновик будет удалён.",
-      "discardTitle": "Удалить черновик комментария?",
-      "editTitle": "Редактирование комментария",
-      "insertSuggestion": "Вставить правку",
-      "insertSuggestionA11y": "Вставить предлагаемую правку кода",
-      "loadFailedTitle": "Не удалось загрузить редактор комментария.",
-      "ok": "ОК",
-      "unavailableMessage": "Этот неотправленный комментарий уже удалён или опубликован.",
-      "unavailableTitle": "Комментарий недоступен",
-      "bodyEmpty": "Текст комментария не может быть пустым.",
-      "suggestionsOnlyAddedLines": "Предлагаемые правки применяются только к добавленным строкам.",
-      "tapDiffLineToSuggest": "Нажмите на строку в изменениях, чтобы предложить правку."
-    },
-    "connect": {
-      "checkFailedTitle": "Не удалось проверить подключение к GitHub.",
-      "checkFailedMessage": "Пока данные не загрузятся, статус входа будет недоступен.",
-      "checkFailedTitleGitLab": "Не удалось проверить подключение к GitLab",
-      "checkFailedTitleBitbucket": "Не удалось проверить подключение к Bitbucket",
-      "providerCheckFailedMessage": "Статус подключения недоступен до загрузки.",
-      "reconnectTitle": "Подключить GitHub снова",
-      "reconnectDescription": "Доступ к вашему аккаунту GitHub отозван. Подключитесь снова, чтобы продолжить ревью запросов на слияние в мобильном приложении.",
-      "description": "Подключите аккаунт GitHub, чтобы проводить ревью запросов на слияние в мобильном приложении.",
-      "gitlabDescription": "Подключите аккаунт GitLab, чтобы просматривать запросы на слияние с мобильного.",
-      "bitbucketDescription": "Подключите Bitbucket к этой организации, чтобы просматривать пул-реквесты с мобильного.",
-      "bitbucketOrgOnlyDescription": "Выберите организацию в профиле, чтобы просматривать её пул-реквесты Bitbucket."
-    },
-    "screen": {
-      "shareA11y": "Поделиться запросом на слияние",
-      "title": "#{{number}}"
-    },
-    "submit": {
-      "deletePendingMessage": "Этот комментарий будет удалён из очереди ревью.",
-      "deletePendingTitle": "Удалить неотправленный комментарий?",
-      "loadFailedTitle": "Не удалось загрузить форму отправки ревью.",
-      "pendingComment": "неотправленного комментария",
-      "pendingComment_other": "неотправленного комментария",
-      "pendingComment_one": "неотправленный комментарий",
-      "summaryOptional": "Итоговый комментарий (необязательно)",
-      "partialPostedMessage": "Опубликовано комментариев: {{displayFreshCount}}. Остались в очереди комментарии к старому коммиту: {{displayStaleCount}}.",
-      "submitCountOfTotal": "Отправить {{displayFreshCount}} из {{displayTotalCount}} комментариев",
-      "submitReview": "Отправить результаты проверки",
-      "pendingComment_few": "неотправленных комментария",
-      "pendingComment_many": "неотправленных комментариев",
-      "blockedRequestChanges": "Добавьте итоговый комментарий или хотя бы один комментарий к коду, чтобы запросить изменения.",
-      "blockedComment": "Добавьте итоговый комментарий или хотя бы один комментарий к коду, чтобы отправить ревью с комментариями."
-    },
-    "reconnectNotice": {
-      "title": "Срок действия подключения к GitHub истёк.",
-      "message": "Подключение к GitHub больше не действует. Проверьте его снова — при необходимости появится предложение подключиться заново.",
-      "gitlabTitle": "Срок действия подключения к GitLab истёк",
-      "bitbucketTitle": "Срок действия подключения к Bitbucket истёк",
-      "providerMessage": "Ваше подключение к {{provider}} больше не действительно. Повторно проверьте подключение — при необходимости вам предложат подключиться заново."
-    },
-    "eventChips": {
-      "comment": "Комментарий",
-      "label": "Результат ревью",
-      "requestChanges": "Запросить изменения"
-    },
+    "noFilesChanged": "Нет изменённых файлов",
+    "noFilesChangedDescription": "В этом запросе на слияние нет изменений в файлах.",
     "overview": {
       "commit": "коммита",
       "commit_other": "коммита",
@@ -2789,31 +2760,55 @@
       "summaryA11y": "Итоговый комментарий к ревью",
       "summaryPlaceholder": "Итоговый комментарий к ревью (необязательно)"
     },
-    "tabs": {
-      "discussion": "Обсуждение",
-      "files": "Файлы",
-      "overview": "Обзор"
+    "pullRequestUnavailable": "Запрос на слияние недоступен",
+    "pullRequestUnavailableDescription": "Не удаётся открыть этот PR. Возможно, он удалён, репозиторий закрытый или в нём не установлено приложение Kilo для GitHub.",
+    "reconnectNotice": {
+      "title": "Срок действия подключения к GitHub истёк.",
+      "message": "Подключение к GitHub больше не действует. Проверьте его снова — при необходимости появится предложение подключиться заново.",
+      "gitlabTitle": "Срок действия подключения к GitLab истёк",
+      "bitbucketTitle": "Срок действия подключения к Bitbucket истёк",
+      "providerMessage": "Ваше подключение к {{provider}} больше не действительно. Повторно проверьте подключение — при необходимости вам предложат подключиться заново."
     },
-    "terms": {
-      "pullRequest": "Пул-реквест",
-      "mergeRequest": "Запрос на слияние",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Поделиться запросом на слияние",
-      "viewOnProvider": "Открыть в {{provider}}",
-      "mergeRequestUnavailable": "Запрос на слияние недоступен",
-      "unavailableDescription": "Возможно, он был удалён или у вас нет к нему доступа.",
-      "accessDeniedMergeRequest": "У вас нет прав на просмотр этого запроса на слияние.",
-      "couldNotLoadMergeRequest": "Не удалось загрузить запрос на слияние",
-      "discussionAccessDenied": "У вас нет прав на просмотр обсуждения этого запроса на слияние.",
-      "discussionUnavailableMessage": "Этот запрос на слияние мог быть удалён.",
-      "noDiscussionDescription": "В этом запросе на слияние нет веток ревью или комментариев.",
-      "noFilesChangedDescription": "В этом запросе на слияние нет изменений файлов."
+    "review": "Проверка",
+    "reviewPullRequest": "Провести ревью запроса на слияние",
+    "screen": {
+      "shareA11y": "Поделиться запросом на слияние",
+      "title": "#{{number}}"
+    },
+    "sideBySide": {
+      "emptyDiffColumn": "пустой столбец изменений",
+      "emptyDiffRow": "Пустая строка изменений",
+      "newOnly": "Только в новой версии: {{text}}",
+      "noNewlineAtEndOfFile": "⚠️ нет перевода строки в конце файла",
+      "oldNew": "До: {{old}} | После: {{new}}",
+      "oldOnly": "Только в исходной версии: {{text}}"
+    },
+    "submit": {
+      "deletePendingMessage": "Этот комментарий будет удалён из очереди ревью.",
+      "deletePendingTitle": "Удалить неотправленный комментарий?",
+      "loadFailedTitle": "Не удалось загрузить форму отправки ревью.",
+      "pendingComment": "неотправленного комментария",
+      "pendingComment_other": "неотправленного комментария",
+      "pendingComment_one": "неотправленный комментарий",
+      "summaryOptional": "Итоговый комментарий (необязательно)",
+      "partialPostedMessage": "Опубликовано комментариев: {{displayFreshCount}}. Остались в очереди комментарии к старому коммиту: {{displayStaleCount}}.",
+      "submitCountOfTotal": "Отправить {{displayFreshCount}} из {{displayTotalCount}} комментариев",
+      "submitReview": "Отправить результаты проверки",
+      "pendingComment_few": "неотправленных комментария",
+      "pendingComment_many": "неотправленных комментариев",
+      "blockedRequestChanges": "Добавьте итоговый комментарий или хотя бы один комментарий к коду, чтобы запросить изменения.",
+      "blockedComment": "Добавьте итоговый комментарий или хотя бы один комментарий к коду, чтобы отправить ревью с комментариями."
     },
     "fileStatus": {
       "changed": "Изменён",
       "copied": "Скопировано",
       "modified": "Изменён",
       "renamed": "Переименован"
+    },
+    "tabs": {
+      "discussion": "Обсуждение",
+      "files": "Файлы",
+      "overview": "Обзор"
     },
     "diff": {
       "selectedTapToChange": "Выделено: {{label}}. Нажмите, чтобы изменить выделение",
@@ -2846,6 +2841,27 @@
       "ambiguous": "Не удалось подтвердить результат — проверьте PR перед повторной попыткой.",
       "persistenceFailed": "Не удалось записать это действие. Повторите попытку позже.",
       "forbidden": "Доступ запрещён."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Недоступно у этого провайдера",
+        "accessibility": "Недоступно у этого провайдера: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Пул-реквест",
+      "mergeRequest": "Запрос на слияние",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Поделиться запросом на слияние",
+      "viewOnProvider": "Открыть в {{provider}}",
+      "mergeRequestUnavailable": "Запрос на слияние недоступен",
+      "unavailableDescription": "Возможно, он был удалён или у вас нет к нему доступа.",
+      "accessDeniedMergeRequest": "У вас нет прав на просмотр этого запроса на слияние.",
+      "couldNotLoadMergeRequest": "Не удалось загрузить запрос на слияние",
+      "discussionAccessDenied": "У вас нет прав на просмотр обсуждения этого запроса на слияние.",
+      "discussionUnavailableMessage": "Этот запрос на слияние мог быть удалён.",
+      "noDiscussionDescription": "В этом запросе на слияние нет веток ревью или комментариев.",
+      "noFilesChangedDescription": "В этом запросе на слияние нет изменений файлов."
     }
   },
   "organization": {
@@ -3055,5 +3071,12 @@
     "needsInput": "Ожидание ввода",
     "channelName": "Активные агенты",
     "activityKitDisabledBody": "Включите «Эфир активности» в настройках, чтобы видеть активных агентов на экране блокировки."
+  },
+  "transcriptionModel": {
+    "title": "Модель распознавания речи",
+    "noneChosen": "Не выбрано",
+    "emptyTitle": "Нет моделей распознавания речи",
+    "emptyDescription": "Сейчас Kilo Gateway не предлагает моделей распознавания речи.",
+    "loadFailed": "Не удалось загрузить модели распознавания речи."
   }
 }

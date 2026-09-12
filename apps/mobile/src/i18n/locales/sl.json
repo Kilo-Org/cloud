@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO za podjetja"
   },
   "preferences": {
+    "general": "Splošno",
+    "voiceInput": "Glasovni vnos",
     "autoExpandThinking": "Samodejno razširi razmišljanje",
     "autoExpandThinkingSubtitle": "Ko agent konča razmišljanje, prikaži njegovo celotno vsebino.",
     "keepScreenOn": "Ohrani zaslon vklopljen med ogledom seje",
@@ -238,6 +240,7 @@
     "appearanceLight": "Svetlo",
     "appearanceDark": "Temno",
     "account": "Račun",
+    "accountSubtitle": "Jezik, zaupanja vredni gostitelji in seje v napravah",
     "prReviewAttribution": "Dodaj navedbo aplikacije k pregledom PR",
     "prReviewAttributionSubtitle": "Ob oddaji pregleda dodaj vrstico »Pregledano prek aplikacije Kilo«.",
     "returnSendsMessage": "Tipka Enter pošlje sporočilo",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Prepisovanje prek Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Glasovni vnos prepiši z modelom Kilo Gateway namesto prepoznavanja govora naprave. Posnetje se pošlje v Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtevek za združitev ni na voljo",
@@ -345,12 +351,6 @@
       "emptyDiffRow": "Prazna vrstica prikaza razlik"
     },
     "connectionExpired": "Povezava z računom GitHub je potekla.",
-    "capabilities": {
-      "banner": {
-        "title": "Ni na voljo pri tem ponudniku",
-        "accessibility": "Ni na voljo pri tem ponudniku: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Združitev",
       "mergeNow": "Združi zdaj",
@@ -478,7 +478,9 @@
       "acceptTerms": "Sprejmi",
       "replyBadRequest": "Tega odgovora ni mogoče objaviti. Nit se je morda spremenila.",
       "replyForbidden": "Nimaš dovoljenja za odgovarjanje na ta zahtevek za združitev.",
-      "replyForbiddenTerm": "Nimaš dovoljenja za odgovarjanje na ta {{term}}.",
+      "addCommentCta": "Komentiraj ta zahtevek za združitev",
+      "commentBadRequest": "Tega komentarja ni mogoče objaviti. Zahtevek za združitev se je morda spremenil.",
+      "commentForbidden": "Nimaš dovoljenja za komentiranje tega zahtevka za združitev.",
       "moderation": {
         "reportContent": {
           "terminal": "Tega komentarja ni mogoče prijaviti.",
@@ -510,6 +512,10 @@
       "termsAcceptRequired": "Za objavljanje moraš sprejeti pogoje uporabe.",
       "termsOutdatedCopy": "Pogoji uporabe so se spremenili. Znova odpri ta zaslon, da sprejmeš najnovejšo različico.",
       "termsCheckRetryCopy": "Pogojev uporabe ni bilo mogoče preveriti. Preveri povezavo in poskusi znova.",
+      "comment_two": "{{displayCount}} komentarja",
+      "comment_few": "{{displayCount}} komentarji",
+      "reaction_two": "reakciji",
+      "reaction_few": "reakcije",
       "reactions": {
         "thumbsUp": "Palec gor",
         "thumbsDown": "Palec dol",
@@ -528,10 +534,7 @@
         "outdatedOnPath": "Zastarelo: {{path}}"
       },
       "deletedUser": "izbrisani uporabnik",
-      "comment_two": "{{displayCount}} komentarja",
-      "comment_few": "{{displayCount}} komentarji",
-      "reaction_two": "reakciji",
-      "reaction_few": "reakcije"
+      "replyForbiddenTerm": "Nimaš dovoljenja za odgovarjanje na ta {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Nastavitev aplikacije GitHub ni bilo mogoče odpreti.",
     "installKiloGitHubApp": "Namesti aplikacijo Kilo za GitHub",
@@ -695,21 +698,6 @@
       "files": "Datotek",
       "discussion": "Razprava"
     },
-    "terms": {
-      "pullRequest": "Zahteva za združitev",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Deli merge request",
-      "viewOnProvider": "Poglej na {{provider}}",
-      "mergeRequestUnavailable": "Merge request ni na voljo",
-      "unavailableDescription": "Morda je bil odstranjen ali pa nimaš dostopa do njega.",
-      "accessDeniedMergeRequest": "Nimaš dovoljenja za ogled tega merge requesta.",
-      "couldNotLoadMergeRequest": "Merge requesta ni bilo mogoče naložiti.",
-      "discussionAccessDenied": "Nimaš dovoljenja za ogled razprave o tem merge requestu.",
-      "discussionUnavailableMessage": "Ta merge request je bil morda odstranjen.",
-      "noDiscussionDescription": "Ta merge request še nima niti razprave o pregledu ali drugih komentarjev.",
-      "noFilesChangedDescription": "Ta merge request ne vsebuje sprememb datotek."
-    },
     "fileStatus": {
       "modified": "Spremenjeno",
       "renamed": "Preimenovano",
@@ -747,6 +735,27 @@
       "ambiguous": "Dejanja ni bilo mogoče potrditi — pred ponovnim poskusom preveri PR.",
       "persistenceFailed": "Tega dejanja ni bilo mogoče zabeležiti. Poskusi znova pozneje.",
       "forbidden": "Dejanje ni dovoljeno."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ni na voljo pri tem ponudniku",
+        "accessibility": "Ni na voljo pri tem ponudniku: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Zahteva za združitev",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Deli merge request",
+      "viewOnProvider": "Poglej na {{provider}}",
+      "mergeRequestUnavailable": "Merge request ni na voljo",
+      "unavailableDescription": "Morda je bil odstranjen ali pa nimaš dostopa do njega.",
+      "accessDeniedMergeRequest": "Nimaš dovoljenja za ogled tega merge requesta.",
+      "couldNotLoadMergeRequest": "Merge requesta ni bilo mogoče naložiti.",
+      "discussionAccessDenied": "Nimaš dovoljenja za ogled razprave o tem merge requestu.",
+      "discussionUnavailableMessage": "Ta merge request je bil morda odstranjen.",
+      "noDiscussionDescription": "Ta merge request še nima niti razprave o pregledu ali drugih komentarjev.",
+      "noFilesChangedDescription": "Ta merge request ne vsebuje sprememb datotek."
     }
   },
   "notifications": {
@@ -2671,7 +2680,14 @@
     "languageNotInstalledMessage": "Datoteke govora za delo brez povezave za {{language}} niso nameščene na tem telefonu. Prenesi jih, nato poskusi glasovni vnos znova.",
     "downloadOfflineModel": "Prenesi",
     "offlineModelDownloadScheduled": "Datoteke govora za delo brez povezave bodo prenesene v ozadju. Poskusi glasovni vnos znova pozneje.",
-    "listeningStopped": "Poslušanje je ustavljeno."
+    "listeningStopped": "Poslušanje je ustavljeno.",
+    "transcribing": "Prepisovanje...",
+    "gatewayUnreachable": "Kilo Gateway ni dosegljiv. Preveri povezavo in poskusi znova.",
+    "gatewayTimeout": "Prepisovanje je predolgo trajalo. Poskusi znova.",
+    "gatewayModelUnavailable": "Ta model za prepisovanje ni na voljo. Izberite drugega v Nastavitvah.",
+    "gatewayModelUnavailableNotice": "Ta model se ne ponuja več. Dotaknite se $t(transcriptionModel.title) in izberite drugega.",
+    "gatewaySignInRequired": "Prijavite se za uporabo prepisovanja prek Kilo Gateway.",
+    "gatewayNoModel": "Najprej izberite model za prepisovanje v Nastavitvah."
   },
   "share": {
     "title": "Deljenje v Kilo",
@@ -3055,5 +3071,12 @@
     "needsInput": "Čaka na vnos",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu."
+  },
+  "transcriptionModel": {
+    "title": "Model za prepisovanje",
+    "noneChosen": "Ni izbran",
+    "emptyTitle": "Ni modelov za prepisovanje",
+    "emptyDescription": "Kilo Gateway trenutno ne ponuja modelov za prepisovanje.",
+    "loadFailed": "Modelov za prepisovanje ni bilo mogoče naložiti."
   }
 }

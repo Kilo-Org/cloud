@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "လုပ်ငန်းသုံး SSO"
   },
   "preferences": {
+    "general": "အထွေထွေ",
+    "voiceInput": "အသံဖြင့်ထည့်သွင်းမှု",
     "autoExpandThinking": "စဉ်းစားချက်ကို အလိုအလျောက် ချဲ့ပြပါ",
     "autoExpandThinkingSubtitle": "အေးဂျင့်၏ စဉ်းစားချက်ကို ရေးပြီးသည့်အခါ အပြည့်အစုံချဲ့ပြပါ။",
     "keepScreenOn": "စက်ရှင်စာမျက်နှာတွင် ရှိနေစဉ် မျက်နှာပြင်ကို ဖွင့်ထားပါ",
@@ -238,6 +240,7 @@
     "appearanceLight": "အလင်း",
     "appearanceDark": "အမှောင်",
     "account": "အကောင့်",
+    "accountSubtitle": "ဘာသာစကား၊ ယုံကြည်ထားသော ဟို့စ်များ နှင့် စက်ပစ္စည်း ဆက်ရှင်များ",
     "prReviewAttribution": "PR သုံးသပ်ချက်များတွင် အက်ပ်အမည်ကို ထည့်ပါ",
     "prReviewAttributionSubtitle": "သုံးသပ်ချက်တင်သွင်းသည့်အခါ Kilo မှတစ်ဆင့် သုံးသပ်ထားကြောင်း အောက်ခြေစာသားကို ထည့်ပါ။",
     "returnSendsMessage": "စာကြောင်းပြန်ခလုတ်ဖြင့် မက်ဆေ့ခ်ျပို့ပါ",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway ဖြင့် အသံမှစာသားပြောင်းခြင်း",
+    "gatewayTranscriptionSubtitle": "စက်၏ အသံခွဲခြားသိရှိမှုအစား Kilo Gateway မော်ဒယ်ဖြင့် အသံထည့်သွင်းမှုကို စာသားပြောင်းပါ။ သင့်အသံသွင်းချက်ကို Kilo Gateway သို့ ပို့ပါမည်။",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "PR မရနိုင်ပါ",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "ကွာခြားချက် အတန်းအလွတ်"
     },
     "connectionExpired": "GitHub ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါပြီ။",
-    "capabilities": {
-      "banner": {
-        "title": "ဤဝန်ဆောင်မှုပေးသူတွင် မရရှိနိုင်ပါ",
-        "accessibility": "ဤဝန်ဆောင်မှုပေးသူတွင် မရရှိနိုင်ပါ: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "ပေါင်းစည်းခြင်း",
       "mergeNow": "ယခု ပေါင်းစည်းပါ",
@@ -472,7 +472,9 @@
       "acceptTerms": "လက်ခံပါ",
       "replyBadRequest": "ဒီအကြောင်းပြန်စာကို တင်၍မရပါ။ ဆွေးနွေးချက်တွဲ ပြောင်းလဲသွားခြင်း ဖြစ်နိုင်ပါသည်။",
       "replyForbidden": "ဒီ PR တွင် အကြောင်းပြန်ခွင့် မရှိပါ။",
-      "replyForbiddenTerm": "ဒီ {{term}} တွင် အကြောင်းပြန်ခွင့် မရှိပါ။",
+      "addCommentCta": "ဒီ PR တွင် မှတ်ချက် ရေးသားပါ",
+      "commentBadRequest": "ဒီမှတ်ချက်ကို တင်၍မရပါ။ PR ပြောင်းလဲသွားခြင်း ဖြစ်နိုင်ပါသည်။",
+      "commentForbidden": "ဒီ PR တွင် မှတ်ချက်ရေးသားခွင့် မရှိပါ။",
       "moderation": {
         "reportContent": {
           "terminal": "ဒီမှတ်ချက်ကို တိုင်ကြား၍မရပါ။",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "{{lines}} အတွက် ခေတ်မမီတော့သော မှတ်ချက်",
         "outdatedOnPath": "{{path}} အတွက် ခေတ်မမီတော့သော မှတ်ချက်"
       },
-      "deletedUser": "အကောင့်ဖျက်ထားသော အသုံးပြုသူ"
+      "deletedUser": "အကောင့်ဖျက်ထားသော အသုံးပြုသူ",
+      "replyForbiddenTerm": "ဒီ {{term}} တွင် အကြောင်းပြန်ခွင့် မရှိပါ။"
     },
     "couldNotOpenGitHubAppSettings": "GitHub အက်ပ်၏ ဆက်တင်များကို မဖွင့်နိုင်ပါ။",
     "installKiloGitHubApp": "Kilo GitHub အက်ပ်ကို ထည့်သွင်းပါ",
@@ -679,21 +682,6 @@
       "files": "ဖိုင်",
       "discussion": "ဆွေးနွေးချက်"
     },
-    "terms": {
-      "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Merge request ကို မျှဝေပါ",
-      "viewOnProvider": "{{provider}} တွင် ကြည့်ရန်",
-      "mergeRequestUnavailable": "Merge request မရနိုင်ပါ",
-      "unavailableDescription": "၎င်းကို ဖယ်ရှားထားခြင်း ဖြစ်နိုင်သည်၊ သို့မဟုတ် သင့်တွင် ဝင်ရောက်ခွင့် မရှိနိုင်ပါ။",
-      "accessDeniedMergeRequest": "ဒီ merge request ကို ကြည့်ရှုခွင့် မရှိပါ။",
-      "couldNotLoadMergeRequest": "Merge request ကို ရယူ၍မရပါ။",
-      "discussionAccessDenied": "ဒီ merge request ၏ ဆွေးနွေးချက်ကို ကြည့်ရှုခွင့် မရှိပါ။",
-      "discussionUnavailableMessage": "ဒီ merge request ကို ဖယ်ရှားထားခြင်း ဖြစ်နိုင်ပါသည်။",
-      "noDiscussionDescription": "ဒီ merge request တွင် သုံးသပ်မှု ဆွေးနွေးချက်တွဲများ သို့မဟုတ် စကားဝိုင်းမှတ်ချက်များ မရှိပါ။",
-      "noFilesChangedDescription": "ဒီ merge request တွင် ဖိုင်ပြောင်းလဲမှု မရှိပါ။"
-    },
     "fileStatus": {
       "modified": "ပြုပြင်ပြီး",
       "renamed": "အမည်ပြောင်းပြီး",
@@ -731,6 +719,27 @@
       "ambiguous": "လုပ်ဆောင်မှုရလဒ်ကို အတည်ပြု၍မရပါ။ ထပ်မစမ်းမီ PR ကို စစ်ဆေးပါ။",
       "persistenceFailed": "ဒီလုပ်ဆောင်ချက်ကို မှတ်တမ်းတင်၍မရပါ။ နောက်မှ ထပ်စမ်းကြည့်ပါ။",
       "forbidden": "လုပ်ဆောင်ခွင့် မရှိပါ။"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "ဤဝန်ဆောင်မှုပေးသူတွင် မရရှိနိုင်ပါ",
+        "accessibility": "ဤဝန်ဆောင်မှုပေးသူတွင် မရရှိနိုင်ပါ: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Merge request ကို မျှဝေပါ",
+      "viewOnProvider": "{{provider}} တွင် ကြည့်ရန်",
+      "mergeRequestUnavailable": "Merge request မရနိုင်ပါ",
+      "unavailableDescription": "၎င်းကို ဖယ်ရှားထားခြင်း ဖြစ်နိုင်သည်၊ သို့မဟုတ် သင့်တွင် ဝင်ရောက်ခွင့် မရှိနိုင်ပါ။",
+      "accessDeniedMergeRequest": "ဒီ merge request ကို ကြည့်ရှုခွင့် မရှိပါ။",
+      "couldNotLoadMergeRequest": "Merge request ကို ရယူ၍မရပါ။",
+      "discussionAccessDenied": "ဒီ merge request ၏ ဆွေးနွေးချက်ကို ကြည့်ရှုခွင့် မရှိပါ။",
+      "discussionUnavailableMessage": "ဒီ merge request ကို ဖယ်ရှားထားခြင်း ဖြစ်နိုင်ပါသည်။",
+      "noDiscussionDescription": "ဒီ merge request တွင် သုံးသပ်မှု ဆွေးနွေးချက်တွဲများ သို့မဟုတ် စကားဝိုင်းမှတ်ချက်များ မရှိပါ။",
+      "noFilesChangedDescription": "ဒီ merge request တွင် ဖိုင်ပြောင်းလဲမှု မရှိပါ။"
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "{{language}} အတွက် အွန်လိုင်းမပါ အသံဖိုင်များကို ဖုန်းတွင် ထည့်သွင်းထားခြင်း မရှိပါ။ ဖိုင်များကို ဒေါင်းလုဒ်လုပ်ပြီး အသံဖြင့် စာထည့်သွင်းမှုကို ထပ်မံ ကြိုးစားပါ။",
     "downloadOfflineModel": "ဒေါင်းလုဒ်",
     "offlineModelDownloadScheduled": "အွန်လိုင်းမပါ အသံဖိုင်များကို နောက်ခံတွင် ဒေါင်းလုဒ်လုပ်မည်။ နောက်မှ အသံဖြင့် စာထည့်သွင်းမှုကို ထပ်မံ ကြိုးစားပါ။",
-    "listeningStopped": "နားထောင်ခြင်း ရပ်သွားသည်။"
+    "listeningStopped": "နားထောင်ခြင်း ရပ်သွားသည်။",
+    "transcribing": "စာသားပြောင်းနေသည်...",
+    "gatewayUnreachable": "Kilo Gateway သို့ မချိတ်ဆက်နိုင်ပါ။ ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ။",
+    "gatewayTimeout": "အသံမှစာသားပြောင်းရန် အချိန်အလွန်ကြာခဲ့သည်။ ထပ်ကြိုးစားပါ။",
+    "gatewayModelUnavailable": "ဤအသံမှစာသားပြောင်းမော်ဒယ် မရရှိနိုင်ပါ။ စိတ်ကြိုက်ဆက်တင်များတွင် အခြားတစ်ခုကို ရွေးချယ်ပါ။",
+    "gatewayModelUnavailableNotice": "ဤမော်ဒယ်ကို ပေးအပ်ခြင်း မရှိတော့ပါ။ အခြားတစ်ခု ရွေးချယ်ရန် $t(transcriptionModel.title) ကို နှိပ်ပါ။",
+    "gatewaySignInRequired": "Kilo Gateway စာသားပြောင်းခြင်းကို သုံးရန် အကောင့်ဝင်ပါ။",
+    "gatewayNoModel": "ပထမ စိတ်ကြိုက်ဆက်တင်များတွင် အသံမှစာသားပြောင်းမော်ဒယ်တစ်ခုကို ရွေးချယ်ပါ။"
   },
   "share": {
     "title": "Kilo သို့ မျှဝေခြင်း",
@@ -3009,5 +3025,12 @@
     "needsInput": "တုံ့ပြန်ချက် လိုအပ်",
     "channelName": "လုပ်ဆောင်နေသော အေးဂျင့်များ",
     "activityKitDisabledBody": "သော့ခတ်မျက်နှာပြင်တွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ကြည့်ရန် ဆက်တင်များ၌ တိုက်ရိုက်လုပ်ဆောင်မှုများကို ဖွင့်ပါ။"
+  },
+  "transcriptionModel": {
+    "title": "အသံမှစာသားပြောင်းမော်ဒယ်",
+    "noneChosen": "မရွေးချယ်ရသေး",
+    "emptyTitle": "အသံမှစာသားပြောင်းမော်ဒယ်များ မရှိပါ",
+    "emptyDescription": "Kilo Gateway သည် လက်ရှိအချိန်တွင် အသံမှစာသားပြောင်းမော်ဒယ်များ မပေးဆောင်ပါ။",
+    "loadFailed": "အသံမှစာသားပြောင်းမော်ဒယ်များကို မရယူနိုင်ပါ။"
   }
 }

@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO tal-intrapriża"
   },
   "preferences": {
+    "general": "Ġenerali",
+    "voiceInput": "Input tal-vuċi",
     "autoExpandThinking": "Espandi awtomatikament il-ħsieb",
     "autoExpandThinkingSubtitle": "Uri l-ħsieb tal-aġent espandut meta jispiċċa.",
     "keepScreenOn": "Żomm l-iskrin mixgħul fil-paġna tas-sessjoni",
@@ -238,6 +240,7 @@
     "appearanceLight": "Ċar",
     "appearanceDark": "Skur",
     "account": "Kont",
+    "accountSubtitle": "Lingwa, ospitanti fdati u sessjonijiet tal-apparat",
     "prReviewAttribution": "Żid attribuzzjoni tal-applikazzjoni mar-reviżjonijiet tal-PR",
     "prReviewAttributionSubtitle": "Żid nota fil-qiegħ li tgħid Rivedut permezz ta' Kilo meta tibgħat reviżjoni.",
     "returnSendsMessage": "It-tast tar-ritorn jibgħat il-messaġġ",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Traskrizzjoni permezz ta' Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Ittraskrivi d-dħul bil-vuċi b'mudell ta' Kilo Gateway minflok ir-rikonoxximent tal-vuċi tal-apparat. Ir-reġistrazzjoni tiegħek tintbagħat lil Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "It-talba għall-għaqda mhix disponibbli",
@@ -347,12 +353,6 @@
       "emptyDiffRow": "Ringiela vojta tad-differenzi"
     },
     "connectionExpired": "Il-konnessjoni ma' GitHub skadiet.",
-    "capabilities": {
-      "banner": {
-        "title": "Mhux disponibbli ma' dan il-fornitur",
-        "accessibility": "Mhux disponibbli ma' dan il-fornitur: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Għaqda",
       "mergeNow": "Għaqqad issa",
@@ -481,7 +481,9 @@
       "acceptTerms": "Aċċetta",
       "replyBadRequest": "Din ir-risposta ma tistax tiġi ppubblikata. Is-sensiela ta' kummenti setgħet inbidlet.",
       "replyForbidden": "M'għandekx permess biex tirrispondi għal din it-talba għall-għaqda.",
-      "replyForbiddenTerm": "M'għandekx permess biex tirrispondi għal dan il-{{term}}.",
+      "addCommentCta": "Ikkummenta fuq din it-talba għall-għaqda",
+      "commentBadRequest": "Dan il-kumment ma jistax jiġi ppubblikat. Jista' jkun li t-talba għall-għaqda nbidlet.",
+      "commentForbidden": "M'għandekx permess biex tikkummenta fuq din it-talba għall-għaqda.",
       "moderation": {
         "reportContent": {
           "terminal": "Dan il-kumment ma jistax jiġi rrapportat.",
@@ -513,6 +515,12 @@
       "termsAcceptRequired": "Trid taċċetta t-termini tas-servizz biex tippubblika.",
       "termsOutdatedCopy": "It-termini tas-servizz inbidlu. Erġa' iftaħ dan l-iskrin biex taċċetta l-aħħar verżjoni.",
       "termsCheckRetryCopy": "Ma setgħux jiġu ċċekkjati t-termini tas-servizz. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "comment_two": "{{displayCount}} kummenti",
+      "comment_few": "{{displayCount}} kummenti",
+      "comment_many": "{{displayCount}}-il kumment",
+      "reaction_two": "reazzjonijiet",
+      "reaction_few": "reazzjonijiet",
+      "reaction_many": "reazzjoni",
       "reactions": {
         "thumbsUp": "Is-saba' l-kbir 'il fuq",
         "thumbsDown": "Is-saba' l-kbir 'l isfel",
@@ -531,12 +539,7 @@
         "outdatedOnPath": "Mhux aġġornat fuq {{path}}"
       },
       "deletedUser": "utent imħassar",
-      "comment_two": "{{displayCount}} kummenti",
-      "comment_few": "{{displayCount}} kummenti",
-      "comment_many": "{{displayCount}}-il kumment",
-      "reaction_two": "reazzjonijiet",
-      "reaction_few": "reazzjonijiet",
-      "reaction_many": "reazzjoni"
+      "replyForbiddenTerm": "M'għandekx permess biex tirrispondi għal dan il-{{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Ma stajniex niftħu l-issettjar tal-app ta' GitHub.",
     "installKiloGitHubApp": "Installa l-app ta' Kilo għal GitHub",
@@ -703,21 +706,6 @@
       "files": "Fajls",
       "discussion": "Diskussjoni"
     },
-    "terms": {
-      "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Aqsam il-merge request",
-      "viewOnProvider": "Ara fuq {{provider}}",
-      "mergeRequestUnavailable": "Il-merge request mhux disponibbli",
-      "unavailableDescription": "Fori ġiet imħassra, jew fori m'għandekx aċċess għaliha.",
-      "accessDeniedMergeRequest": "M'għandekx permess biex tara dan il-merge request.",
-      "couldNotLoadMergeRequest": "Ma setgħax jitgħabba l-merge request.",
-      "discussionAccessDenied": "M'għandekx permess biex tara d-diskussjoni ta' dan il-merge request.",
-      "discussionUnavailableMessage": "Dan il-merge request setgħa tneħħa.",
-      "noDiscussionDescription": "Dan il-merge request għadu m'għandhu l-ebda sensiela ta' kummenti ta' reviżjoni jew kummenti fid-diskussjoni.",
-      "noFilesChangedDescription": "Dan il-merge request m'għandux bidliet fil-fajls."
-    },
     "fileStatus": {
       "modified": "Modifikat",
       "renamed": "Isem mibdul",
@@ -755,6 +743,27 @@
       "ambiguous": "Ma stajniex nikkonfermaw ir-riżultat — iċċekkja l-PR qabel terġa' tipprova.",
       "persistenceFailed": "Ma stajniex nirreġistraw din l-azzjoni. Jekk jogħġbok erġa' pprova aktar tard.",
       "forbidden": "Din l-azzjoni mhix permessa."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Mhux disponibbli ma' dan il-fornitur",
+        "accessibility": "Mhux disponibbli ma' dan il-fornitur: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Aqsam il-merge request",
+      "viewOnProvider": "Ara fuq {{provider}}",
+      "mergeRequestUnavailable": "Il-merge request mhux disponibbli",
+      "unavailableDescription": "Fori ġiet imħassra, jew fori m'għandekx aċċess għaliha.",
+      "accessDeniedMergeRequest": "M'għandekx permess biex tara dan il-merge request.",
+      "couldNotLoadMergeRequest": "Ma setgħax jitgħabba l-merge request.",
+      "discussionAccessDenied": "M'għandekx permess biex tara d-diskussjoni ta' dan il-merge request.",
+      "discussionUnavailableMessage": "Dan il-merge request setgħa tneħħa.",
+      "noDiscussionDescription": "Dan il-merge request għadu m'għandhu l-ebda sensiela ta' kummenti ta' reviżjoni jew kummenti fid-diskussjoni.",
+      "noFilesChangedDescription": "Dan il-merge request m'għandux bidliet fil-fajls."
     }
   },
   "notifications": {
@@ -2693,7 +2702,14 @@
     "languageNotInstalledMessage": "Il-fajls tad-diskors offline għal {{language}} mhumiex installati fuq dan it-telefon. Niżżelhom, imbagħad erġa' pprova d-dħul bil-vuċi.",
     "downloadOfflineModel": "Niżżel",
     "offlineModelDownloadScheduled": "Il-fajls tad-diskors offline se jinżżlu fl-isfond. Erġa' pprova d-dħul bil-vuċi iktar 'il quddiem.",
-    "listeningStopped": "Is-smigħ waqaf."
+    "listeningStopped": "Is-smigħ waqaf.",
+    "transcribing": "Qed nitraskrivi…",
+    "gatewayUnreachable": "Ma setgħetx tasal għal Kilo Gateway. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+    "gatewayTimeout": "It-traskrizzjoni ħadet wisq ħin. Erġa' pprova.",
+    "gatewayModelUnavailable": "Dan il-mudell ta' traskrizzjoni mhux disponibbli. Agħżel ieħor fil-Preferenzi.",
+    "gatewayModelUnavailableNotice": "Dan il-mudell m'għadux disponibbli. Agħfas $t(transcriptionModel.title) biex tagħżel ieħor.",
+    "gatewaySignInRequired": "Idħol biex tuża t-traskrizzjoni permezz ta' Kilo Gateway.",
+    "gatewayNoModel": "L-ewwel agħżel mudell ta' traskrizzjoni fil-Preferenzi."
   },
   "share": {
     "title": "Aqsam ma' Kilo",
@@ -3078,5 +3094,12 @@
     "needsInput": "Jistenna tweġiba",
     "channelName": "Aġenti attivi",
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar."
+  },
+  "transcriptionModel": {
+    "title": "Mudell ta' traskrizzjoni",
+    "noneChosen": "Xejn magħżul",
+    "emptyTitle": "L-ebda mudell ta' traskrizzjoni",
+    "emptyDescription": "Kilo Gateway bħalissa ma joffri l-ebda mudell ta' traskrizzjoni.",
+    "loadFailed": "Ma setgħetx titgħabba l-mudelli ta' traskrizzjoni."
   }
 }

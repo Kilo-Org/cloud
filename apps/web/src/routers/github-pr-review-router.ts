@@ -154,6 +154,14 @@ const ReplyToCommentInput = ownerRepoSchema
   })
   .strict();
 
+const AddIssueCommentInput = ownerRepoSchema
+  .extend({
+    number: prNumberSchema,
+    body: z.string().min(1).max(65_535),
+    operationKey: operationKeySchema,
+  })
+  .strict();
+
 const SubmitReviewInput = ownerRepoSchema
   .extend({
     number: prNumberSchema,
@@ -1803,6 +1811,38 @@ export const githubPrReviewRouter = createTRPCRouter({
       },
       readRef: async (octokit, commentId) => {
         const response = await octokit.pulls.getReviewComment({
+          owner: input.owner,
+          repo: input.repo,
+          comment_id: commentId,
+        });
+        return { commentId: response.data.id, nodeId: response.data.node_id };
+      },
+    });
+  }),
+
+  // Post a REGULAR PR conversation (issue) comment — not a review-thread
+  // reply, not a review. Ledger dedupe (same operationKey replays the
+  // canonical result) is the duplicate-submission guard for the GitHub write.
+  addIssueComment: baseProcedure.input(AddIssueCommentInput).mutation(async ({ ctx, input }) => {
+    await assertTermsAccepted(ctx.user.id);
+    return runPrCommentMutation({
+      userId: ctx.user.id,
+      distinctId: ctx.user.google_user_email ?? ctx.user.id,
+      intent: 'add_pr_comment',
+      input,
+      operationKey: input.operationKey,
+      providerRefKey: 'commentId',
+      write: async octokit => {
+        const response = await octokit.issues.createComment({
+          owner: input.owner,
+          repo: input.repo,
+          issue_number: input.number,
+          body: input.body,
+        });
+        return { commentId: response.data.id, nodeId: response.data.node_id };
+      },
+      readRef: async (octokit, commentId) => {
+        const response = await octokit.issues.getComment({
           owner: input.owner,
           repo: input.repo,
           comment_id: commentId,

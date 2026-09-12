@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "Εταιρική ενιαία σύνδεση (SSO)"
   },
   "preferences": {
+    "general": "Γενικά",
+    "voiceInput": "Φωνητική εισαγωγή",
     "autoExpandThinking": "Αυτόματη ανάπτυξη σκέψης",
     "autoExpandThinkingSubtitle": "Εμφανίζει ολόκληρη τη σκέψη του πράκτορα μόλις ολοκληρωθεί.",
     "keepScreenOn": "Διατήρηση ενεργής οθόνης στη σελίδα συνεδρίας",
@@ -238,6 +240,7 @@
     "appearanceLight": "Ανοιχτό",
     "appearanceDark": "Σκούρο",
     "account": "Λογαριασμός",
+    "accountSubtitle": "Γλώσσα, αξιόπιστοι ιστότοποι και συνεδρίες συσκευών",
     "prReviewAttribution": "Προσθήκη αναφοράς της εφαρμογής στους ελέγχους PR",
     "prReviewAttributionSubtitle": "Προσθέτει την υποσημείωση «Έλεγχος μέσω Kilo» όταν υποβάλλεις έναν έλεγχο.",
     "returnSendsMessage": "Αποστολή μηνύματος με το πλήκτρο Enter",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Απομαγνητοφώνηση μέσω Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Η φωνητική πληκτρολόγηση μετατρέπεται σε κείμενο με ένα μοντέλο του Kilo Gateway αντί για την αναγνώριση ομιλίας της συσκευής. Η ηχογράφηση αποστέλλεται στο Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Μη διαθέσιμο αίτημα ενσωμάτωσης",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Κενή γραμμή διαφορών"
     },
     "connectionExpired": "Η σύνδεση με το GitHub έληξε.",
-    "capabilities": {
-      "banner": {
-        "title": "Μη διαθέσιμο σε αυτόν τον πάροχο",
-        "accessibility": "Μη διαθέσιμο σε αυτόν τον πάροχο: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Συγχώνευση",
       "mergeNow": "Συγχώνευση τώρα",
@@ -472,7 +472,9 @@
       "acceptTerms": "Αποδοχή",
       "replyBadRequest": "Αυτή η απάντηση δεν μπορεί να δημοσιευτεί. Το νήμα μπορεί να έχει αλλάξει.",
       "replyForbidden": "Δεν έχεις δικαίωμα να απαντήσεις σε αυτό το αίτημα ενσωμάτωσης.",
-      "replyForbiddenTerm": "Δεν έχεις δικαίωμα να απαντήσεις σε αυτό το {{term}}.",
+      "addCommentCta": "Σχολίασε αυτό το αίτημα ενσωμάτωσης",
+      "commentBadRequest": "Αυτό το σχόλιο δεν μπορεί να δημοσιευτεί. Το αίτημα ενσωμάτωσης μπορεί να έχει αλλάξει.",
+      "commentForbidden": "Δεν έχεις δικαίωμα να σχολιάσεις αυτό το αίτημα ενσωμάτωσης.",
       "moderation": {
         "reportContent": {
           "terminal": "Δεν είναι δυνατή η αναφορά αυτού του σχολίου.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Παρωχημένο: {{lines}}",
         "outdatedOnPath": "Παρωχημένο στο {{path}}"
       },
-      "deletedUser": "διαγραμμένος χρήστης"
+      "deletedUser": "διαγραμμένος χρήστης",
+      "replyForbiddenTerm": "Δεν έχεις δικαίωμα να απαντήσεις σε αυτό το {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Δεν ήταν δυνατό το άνοιγμα των ρυθμίσεων της εφαρμογής GitHub.",
     "installKiloGitHubApp": "Εγκατάσταση της εφαρμογής Kilo για το GitHub",
@@ -679,21 +682,6 @@
       "files": "Αρχεία",
       "discussion": "Συζήτηση"
     },
-    "terms": {
-      "pullRequest": "Αίτημα ενσωμάτωσης",
-      "mergeRequest": "Αίτημα συγχώνευσης",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Κοινοποίηση αιτήματος συγχώνευσης",
-      "viewOnProvider": "Προβολή σε {{provider}}",
-      "mergeRequestUnavailable": "Μη διαθέσιμο αίτημα συγχώνευσης",
-      "unavailableDescription": "Μπορεί να έχει διαγραφεί, ή μπορεί να μην έχετε πρόσβαση σε αυτό.",
-      "accessDeniedMergeRequest": "Δεν έχεις δικαίωμα προβολής αυτού του αιτήματος συγχώνευσης.",
-      "couldNotLoadMergeRequest": "Δεν ήταν δυνατή η φόρτωση του αιτήματος συγχώνευσης.",
-      "discussionAccessDenied": "Δεν έχεις δικαίωμα προβολής της συζήτησης αυτού του αιτήματος συγχώνευσης.",
-      "discussionUnavailableMessage": "Αυτό το αίτημα συγχώνευσης μπορεί να έχει αφαιρεθεί.",
-      "noDiscussionDescription": "Δεν υπάρχουν νήματα αξιολόγησης ή σχόλια συζήτησης σε αυτό το αίτημα συγχώνευσης.",
-      "noFilesChangedDescription": "Αυτό το αίτημα συγχώνευσης δεν περιέχει αλλαγές σε αρχεία."
-    },
     "fileStatus": {
       "modified": "Τροποποιήθηκε",
       "renamed": "Μετονομάστηκε",
@@ -731,6 +719,27 @@
       "ambiguous": "Δεν ήταν δυνατή η επιβεβαίωση — έλεγξε το PR πριν δοκιμάσεις ξανά.",
       "persistenceFailed": "Δεν ήταν δυνατή η καταγραφή αυτής της ενέργειας. Δοκίμασε ξανά αργότερα.",
       "forbidden": "Δεν επιτρέπεται η πρόσβαση."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Μη διαθέσιμο σε αυτόν τον πάροχο",
+        "accessibility": "Μη διαθέσιμο σε αυτόν τον πάροχο: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Αίτημα ενσωμάτωσης",
+      "mergeRequest": "Αίτημα συγχώνευσης",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Κοινοποίηση αιτήματος συγχώνευσης",
+      "viewOnProvider": "Προβολή σε {{provider}}",
+      "mergeRequestUnavailable": "Μη διαθέσιμο αίτημα συγχώνευσης",
+      "unavailableDescription": "Μπορεί να έχει διαγραφεί, ή μπορεί να μην έχετε πρόσβαση σε αυτό.",
+      "accessDeniedMergeRequest": "Δεν έχεις δικαίωμα προβολής αυτού του αιτήματος συγχώνευσης.",
+      "couldNotLoadMergeRequest": "Δεν ήταν δυνατή η φόρτωση του αιτήματος συγχώνευσης.",
+      "discussionAccessDenied": "Δεν έχεις δικαίωμα προβολής της συζήτησης αυτού του αιτήματος συγχώνευσης.",
+      "discussionUnavailableMessage": "Αυτό το αίτημα συγχώνευσης μπορεί να έχει αφαιρεθεί.",
+      "noDiscussionDescription": "Δεν υπάρχουν νήματα αξιολόγησης ή σχόλια συζήτησης σε αυτό το αίτημα συγχώνευσης.",
+      "noFilesChangedDescription": "Αυτό το αίτημα συγχώνευσης δεν περιέχει αλλαγές σε αρχεία."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Τα αρχεία ομιλίας εκτός σύνδεσης για {{language}} δεν είναι εγκατεστημένα σε αυτό το τηλέφωνο. Κάνε λήψη τους και μετά δοκίμασε ξανά τη φωνητική πληκτρολόγηση.",
     "downloadOfflineModel": "Λήψη",
     "offlineModelDownloadScheduled": "Η λήψη των αρχείων ομιλίας εκτός σύνδεσης θα γίνει στο παρασκήνιο. Δοκίμασε ξανά τη φωνητική πληκτρολόγηση αργότερα.",
-    "listeningStopped": "Η ακρόαση σταμάτησε."
+    "listeningStopped": "Η ακρόαση σταμάτησε.",
+    "transcribing": "Απομαγνητοφώνηση...",
+    "gatewayUnreachable": "Δεν ήταν δυνατή η επικοινωνία με το Kilo Gateway. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
+    "gatewayTimeout": "Η απομαγνητοφώνηση πήρε υπερβολικό χρόνο. Δοκίμασε ξανά.",
+    "gatewayModelUnavailable": "Αυτό το μοντέλο απομαγνητοφώνησης δεν είναι διαθέσιμο. Διάλεξε άλλο στις Προτιμήσεις.",
+    "gatewayModelUnavailableNotice": "Αυτό το μοντέλο δεν προσφέρεται πλέον. Πατήστε $t(transcriptionModel.title) για να διαλέξετε άλλο.",
+    "gatewaySignInRequired": "Συνδέσου για να χρησιμοποιήσεις την απομαγνητοφώνηση μέσω Kilo Gateway.",
+    "gatewayNoModel": "Διάλεξε πρώτα ένα μοντέλο απομαγνητοφώνησης στις Προτιμήσεις."
   },
   "share": {
     "title": "Κοινοποίηση στο Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Αναμονή απάντησης",
     "channelName": "Ενεργοί πράκτορες",
     "activityKitDisabledBody": "Ενεργοποίησε τις ζωντανές δραστηριότητες στις ρυθμίσεις για να βλέπεις τους ενεργούς πράκτορες στην οθόνη κλειδώματος."
+  },
+  "transcriptionModel": {
+    "title": "Μοντέλο απομαγνητοφώνησης",
+    "noneChosen": "Δεν έχει επιλεγεί",
+    "emptyTitle": "Δεν υπάρχουν μοντέλα απομαγνητοφώνησης",
+    "emptyDescription": "Το Kilo Gateway δεν προσφέρει αυτή τη στιγμή μοντέλα απομαγνητοφώνησης.",
+    "loadFailed": "Δεν ήταν δυνατή η φόρτωση των μοντέλων απομαγνητοφώνησης."
   }
 }

@@ -57,12 +57,10 @@ import {
   usePrReviewViewedFiles,
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { usePrDiffListScroll } from '@/lib/pr-review/diff/use-pr-diff-list-scroll';
+import { usePrDiffListContentPadding } from '@/lib/pr-review/diff/use-pr-diff-list-content-padding';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { CenteredState } from '@/components/centered-state';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
-
-// Gap between the last diff row and the in-flow footer bar's top edge.
-const PR_DIFF_LIST_FOOTER_GAP = 12;
 
 type PrReviewFileListProps = {
   readonly owner: string;
@@ -135,9 +133,10 @@ export function PrReviewFileList({
   // comment composer and the review-submit sheet — are siblings of the
   // GitHub route AND of the provider route, so the bar pushes the sheet
   // inside the scope its queries run under. The bar is an in-flow footer
-  // below the list (spot check e3), so the list only keeps a small gap
-  // between its last row and the footer's top edge.
-  const listContentStyle = useMemo(() => ({ paddingBottom: PR_DIFF_LIST_FOOTER_GAP }), []);
+  // below the list (spot check e3), so the list keeps only the fixed footer
+  // gap plus the landscape side insets (which keep rows clear of the sensor
+  // housing).
+  const listContentStyle = usePrDiffListContentPadding(null);
 
   // Which provider's words the terminal and empty states use.
   const copy = usePrDiffStateCopy({ owner, repo, number });

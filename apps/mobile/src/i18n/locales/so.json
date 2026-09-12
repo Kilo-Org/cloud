@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO-ga shirkadda"
   },
   "preferences": {
+    "general": "Guud",
+    "voiceInput": "Gelitaanka codka",
     "autoExpandThinking": "Si toos ah u ballaari fikirka",
     "autoExpandThinkingSubtitle": "Muuji qoraalka fikirka wakiilka oo fidsan marka uu dhammaado.",
     "keepScreenOn": "Shaashadda shid inta bogga kalfadhigu furan yahay",
@@ -238,6 +240,7 @@
     "appearanceLight": "Iftiin",
     "appearanceDark": "Madow",
     "account": "Akoonka",
+    "accountSubtitle": "Luuqad, martigeliyeyaasha la aaminay iyo kalfadhiyada aaladaha",
     "prReviewAttribution": "Dib-u-eegisyada PR ku dar magaca barnaamijka",
     "prReviewAttributionSubtitle": "Markaad gudbiso dib-u-eegis, hoosta kaga dar qoraal sheegaya in Kilo lagu eegay.",
     "returnSendsMessage": "Furaha gelintu wuxuu diraa farriinta",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Qoraal u beddelidda codka ee Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Codka ku beddel qoraal moodeelka Kilo Gateway adigoo aan isticmaalayn aqoonsiga hadalka ee qalabka. Duubistaada waxaa loo diraa Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Codsiga isku-darka lama heli karo",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Saf madhan oo kala duwanaanshaha ah"
     },
     "connectionExpired": "Muddadii xiriirka GitHub way dhammaatay.",
-    "capabilities": {
-      "banner": {
-        "title": "Kuma jirto bixiyahan",
-        "accessibility": "Kuma jirto bixiyahan: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Isku-darid",
       "mergeNow": "Hadda isku dar",
@@ -472,7 +472,9 @@
       "acceptTerms": "Aqbal",
       "replyBadRequest": "Jawaabtan lama daabici karo. Waxaa laga yaabaa in dooddu isbeddeshay.",
       "replyForbidden": "Ma haysatid oggolaansho aad uga jawaabto codsigan isku-darka.",
-      "replyForbiddenTerm": "Ma haysatid oggolaansho aad uga jawaabto {{term}}.",
+      "addCommentCta": "Faallo ku dari codsigan isku-darka",
+      "commentBadRequest": "Faalladan lama daabici karo. Waxaa laga yaabaa in codsiga isku-darku isbeddelay.",
+      "commentForbidden": "Ma haysatid oggolaansho aad faallo ku darto codsigan isku-darka.",
       "moderation": {
         "reportContent": {
           "terminal": "Faalladan lama soo sheegi karo.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Duugoobay: {{lines}}",
         "outdatedOnPath": "Duugoobay: {{path}}"
       },
-      "deletedUser": "isticmaale la tirtiray"
+      "deletedUser": "isticmaale la tirtiray",
+      "replyForbiddenTerm": "Ma haysatid oggolaansho aad uga jawaabto {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Dejinta abka GitHub lama furi karin.",
     "installKiloGitHubApp": "Rakib barnaamijka Kilo ee GitHub",
@@ -679,21 +682,6 @@
       "files": "Faylal",
       "discussion": "Dood"
     },
-    "terms": {
-      "pullRequest": "Codsi isku-darid",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "La wadaag merge request-ka",
-      "viewOnProvider": "Kasoo eeg {{provider}}",
-      "mergeRequestUnavailable": "Merge request-ka lama heli karo",
-      "unavailableDescription": "Waa laga yaabaa in la tirtiray, ama inadan helin ogolaansho.",
-      "accessDeniedMergeRequest": "Ma haysatid oggolaansho aad ku aragto merge request-kan.",
-      "couldNotLoadMergeRequest": "Merge request-ka lama soo rari karin.",
-      "discussionAccessDenied": "Ma haysatid oggolaansho aad ku aragto doodda merge request-kan.",
-      "discussionUnavailableMessage": "Waxaa laga yaabaa in merge request-kan la saaray.",
-      "noDiscussionDescription": "Merge request-kan kuma jiraan dooddo dib-u-eegis ama faallooyin wada hadal.",
-      "noFilesChangedDescription": "Merge request-kan kuma jiraan isbeddello faylal."
-    },
     "fileStatus": {
       "modified": "Waa la beddelay",
       "renamed": "Magaca ayaa la beddelay",
@@ -731,6 +719,27 @@
       "ambiguous": "Lama xaqiijin karin — hubi PR-ka ka hor intaadan mar kale isku dayin.",
       "persistenceFailed": "Falkan lama diiwaangelin karin. Fadlan mar kale isku day waqti dambe.",
       "forbidden": "Lama oggola."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Kuma jirto bixiyahan",
+        "accessibility": "Kuma jirto bixiyahan: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Codsi isku-darid",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "La wadaag merge request-ka",
+      "viewOnProvider": "Kasoo eeg {{provider}}",
+      "mergeRequestUnavailable": "Merge request-ka lama heli karo",
+      "unavailableDescription": "Waa laga yaabaa in la tirtiray, ama inadan helin ogolaansho.",
+      "accessDeniedMergeRequest": "Ma haysatid oggolaansho aad ku aragto merge request-kan.",
+      "couldNotLoadMergeRequest": "Merge request-ka lama soo rari karin.",
+      "discussionAccessDenied": "Ma haysatid oggolaansho aad ku aragto doodda merge request-kan.",
+      "discussionUnavailableMessage": "Waxaa laga yaabaa in merge request-kan la saaray.",
+      "noDiscussionDescription": "Merge request-kan kuma jiraan dooddo dib-u-eegis ama faallooyin wada hadal.",
+      "noFilesChangedDescription": "Merge request-kan kuma jiraan isbeddello faylal."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Faylasha hadalka khadka la'aanta ee {{language}} lama rakibin telefoonkan. Soo deji iyaga, ka dibna markale isku day gelinta codka.",
     "downloadOfflineModel": "Soo deji",
     "offlineModelDownloadScheduled": "Faylasha hadalka khadka la'aanta waxay soo deji doonaan gadaasha. Markale isku day gelinta codka goor dambe.",
-    "listeningStopped": "Dhageysigu wuu joogsaday."
+    "listeningStopped": "Dhageysigu wuu joogsaday.",
+    "transcribing": "Qoraal u beddelidda...",
+    "gatewayUnreachable": "Kilo Gateway lama heli karin. Hubi xiriirkaaga oo mar kale isku day.",
+    "gatewayTimeout": "Qoraal u beddelidda waxay qaadatay waqti aad u dheer. Mar kale isku day.",
+    "gatewayModelUnavailable": "Moodeelkan qoraal u beddelidda lagama heli karo. Mid kale ka dooro Dookhyada.",
+    "gatewayModelUnavailableNotice": "Moodeelkan lama bixiyo mar dambe. Taabo $t(transcriptionModel.title) si aad u dooratid mid kale.",
+    "gatewaySignInRequired": "Soo gal si aad u isticmaasho qoraal u beddelidda Kilo Gateway.",
+    "gatewayNoModel": "Marka hore moodeel qoraal u beddelidda ka dooro Dookhyada."
   },
   "share": {
     "title": "U wadaag Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Jawaab sugaya",
     "channelName": "Wakiillada firfircoon",
     "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka."
+  },
+  "transcriptionModel": {
+    "title": "Moodeelka qoraal u beddelidda",
+    "noneChosen": "Waxba lama dooran",
+    "emptyTitle": "Ma jiraan moodeello qoraal u beddelid",
+    "emptyDescription": "Kilo Gateway hadda ma bixiyo moodeello qoraal u beddelid.",
+    "loadFailed": "Moodeellada qoraal u beddelidda lama soo rari karin."
   }
 }

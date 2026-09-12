@@ -16,7 +16,11 @@ import type {
 } from '../sandbox-control/terminal-billing.js';
 import type { SessionOperationAuthorization } from '../shared/sandbox-control-protocol.js';
 import type { Env } from '../types.js';
-import type { RuntimeQuarantineResult, SandboxAcquisition } from '../persistence/SandboxControl.js';
+import type {
+  ControlRuntimeCredentialProxyFence,
+  RuntimeQuarantineResult,
+  SandboxAcquisition,
+} from '../persistence/SandboxControl.js';
 import type { SandboxBillingInput } from '../container-usage-context.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { withDORetry } from '../utils/do-retry.js';
@@ -39,6 +43,7 @@ type SandboxControlRpc = {
     physical: PhysicalState;
     wrapperInstanceId?: string;
     operationResults?: true;
+    runtimeRecovery?: true;
     attachment?: SessionAttachPayload;
   }>;
   getStatus(): Promise<{
@@ -46,7 +51,14 @@ type SandboxControlRpc = {
     physical: PhysicalState;
     wrapperInstanceId?: string;
     operationResults?: true;
+    runtimeRecovery?: true;
   }>;
+  getRuntimeCredentialProxyFence(input: {
+    ownerId: string;
+    sessionId: string;
+    kiloSessionId: string;
+    directory: string;
+  }): Promise<ControlRuntimeCredentialProxyFence | null>;
   quarantineRuntime(input: {
     ownerId: string;
     sessionId: string;
@@ -56,6 +68,13 @@ type SandboxControlRpc = {
     authorization?: SessionOperationAuthorization;
   }): Promise<RuntimeQuarantineResult>;
   attachSession(input: AttachRouteInput): Promise<unknown>;
+  bindRuntimeCredentialProxyHandle(input: {
+    ownerId: string;
+    sessionId: string;
+    kiloSessionId: string;
+    directory: string;
+    handle: string;
+  }): Promise<{ bound: true }>;
   detachSession(sessionId: string): Promise<{ existed: boolean }>;
   validateTerminalAccess(input: SandboxTerminalAccessInput): Promise<SandboxTerminalAccessResult>;
   recordTerminalActivity(input: SandboxTerminalAccessInput): Promise<SandboxTerminalAccessResult>;
@@ -92,8 +111,21 @@ export function sandboxControlRpc(
       ),
     ensureReady: input => stub().ensureReady(input),
     getStatus: () => withDORetry(stub, control => control.getStatus(), 'getStatus', config()),
+    getRuntimeCredentialProxyFence: input =>
+      withDORetry(
+        stub,
+        control => control.getRuntimeCredentialProxyFence(input),
+        'getRuntimeCredentialProxyFence',
+        config()
+      ),
     quarantineRuntime: input => stub().quarantineRuntime(input),
     attachSession: input => stub().attachSession(input),
+    bindRuntimeCredentialProxyHandle: input =>
+      withDORetry(
+        stub,
+        control => control.bindRuntimeCredentialProxyHandle(input),
+        'bindRuntimeCredentialProxyHandle'
+      ),
     detachSession: sessionId =>
       withDORetry(stub, control => control.detachSession(sessionId), 'detachSession'),
     validateTerminalAccess: input =>

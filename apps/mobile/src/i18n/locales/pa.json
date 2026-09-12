@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "ਐਂਟਰਪ੍ਰਾਈਜ਼ SSO"
   },
   "preferences": {
+    "general": "ਆਮ",
+    "voiceInput": "ਵੌਇਸ ਇਨਪੁਟ",
     "autoExpandThinking": "ਸੋਚ ਦਾ ਵੇਰਵਾ ਆਪਣੇ ਆਪ ਖੋਲ੍ਹੋ",
     "autoExpandThinkingSubtitle": "ਏਜੰਟ ਦੇ ਸੋਚਣ ਤੋਂ ਬਾਅਦ ਉਸ ਦੀ ਸੋਚ ਦਾ ਪੂਰਾ ਵੇਰਵਾ ਦਿਖਾਓ।",
     "keepScreenOn": "ਸੈਸ਼ਨ ਪੰਨੇ 'ਤੇ ਸਕ੍ਰੀਨ ਚਾਲੂ ਰੱਖੋ",
@@ -238,6 +240,7 @@
     "appearanceLight": "ਚਾਨਣੀ",
     "appearanceDark": "ਹਨੇਰੀ",
     "account": "ਖਾਤਾ",
+    "accountSubtitle": "ਭਾਸ਼ਾ, ਭਰੋਸੇਯੋਗ ਹੋਸਟ ਅਤੇ ਡਿਵਾਈਸਾਂ ਦੇ ਸੈਸ਼ਨ",
     "prReviewAttribution": "PR ਸਮੀਖਿਆਵਾਂ ਵਿੱਚ ਐਪ ਦਾ ਜ਼ਿਕਰ ਜੋੜੋ",
     "prReviewAttributionSubtitle": "ਸਮੀਖਿਆ ਭੇਜਣ ਵੇਲੇ ਅੰਤ ਵਿੱਚ ‘Kilo ਰਾਹੀਂ ਸਮੀਖਿਆ ਕੀਤੀ ਗਈ’ ਜੋੜੋ।",
     "returnSendsMessage": "ਰਿਟਰਨ ਕੁੰਜੀ ਸੁਨੇਹਾ ਭੇਜਦੀ ਹੈ",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway ਰਾਹੀਂ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣਾ",
+    "gatewayTranscriptionSubtitle": "ਡਿਵਾਈਸ ਦੀ ਸਪੀਚ ਰੈਕਗਨੀਸ਼ਨ ਦੀ ਥਾਂ Kilo Gateway ਮਾਡਲ ਨਾਲ ਵੌਇਸ ਇਨਪੁਟ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲੋ। ਤੁਹਾਡੀ ਰਿਕਾਰਡਿੰਗ Kilo Gateway ਨੂੰ ਭੇਜੀ ਜਾਂਦੀ ਹੈ।",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "ਡਿਫ਼ ਦੀ ਖਾਲੀ ਕਤਾਰ"
     },
     "connectionExpired": "GitHub ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
-    "capabilities": {
-      "banner": {
-        "title": "ਇਸ ਪ੍ਰਦਾਤਾ ਉੱਤੇ ਉਪਲਬਧ ਨਹੀਂ",
-        "accessibility": "ਇਸ ਪ੍ਰਦਾਤਾ ਉੱਤੇ ਉਪਲਬਧ ਨਹੀਂ: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "ਮਰਜ",
       "mergeNow": "ਹੁਣੇ ਮਰਜ ਕਰੋ",
@@ -472,7 +472,9 @@
       "acceptTerms": "ਸਵੀਕਾਰ ਕਰੋ",
       "replyBadRequest": "ਇਹ ਜਵਾਬ ਪੋਸਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ। ਥ੍ਰੈਡ ਬਦਲਿਆ ਹੋ ਸਕਦਾ ਹੈ।",
       "replyForbidden": "ਤੁਹਾਨੂੰ ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
-      "replyForbiddenTerm": "ਤੁਹਾਨੂੰ ਇਸ {{term}} 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+      "addCommentCta": "ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਟਿੱਪਣੀ ਕਰੋ",
+      "commentBadRequest": "ਇਹ ਟਿੱਪਣੀ ਪੋਸਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ। ਪੁੱਲ ਰਿਕਵੈਸਟ ਬਦਲਿਆ ਹੋ ਸਕਦਾ ਹੈ।",
+      "commentForbidden": "ਤੁਹਾਨੂੰ ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਟਿੱਪਣੀ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "moderation": {
         "reportContent": {
           "terminal": "ਇਸ ਟਿੱਪਣੀ ਦੀ ਰਿਪੋਰਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "{{lines}} 'ਤੇ ਪੁਰਾਣਾ",
         "outdatedOnPath": "{{path}} 'ਤੇ ਪੁਰਾਣਾ"
       },
-      "deletedUser": "ਮਿਟਾਇਆ ਗਿਆ ਵਰਤੋਂਕਾਰ"
+      "deletedUser": "ਮਿਟਾਇਆ ਗਿਆ ਵਰਤੋਂਕਾਰ",
+      "replyForbiddenTerm": "ਤੁਹਾਨੂੰ ਇਸ {{term}} 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ਐਪ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕੀਆਂ।",
     "installKiloGitHubApp": "Kilo GitHub ਐਪ ਸਥਾਪਿਤ ਕਰੋ",
@@ -679,21 +682,6 @@
       "files": "ਫਾਈਲਾਂ",
       "discussion": "ਚਰਚਾ"
     },
-    "terms": {
-      "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ",
-      "mergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਸਾਂਝੀ ਕਰੋ",
-      "viewOnProvider": "{{provider}} ਉੱਤੇ ਵੇਖੋ",
-      "mergeRequestUnavailable": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
-      "unavailableDescription": "ਹੋ ਸਕਦਾ ਹੈ ਇਹ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੋਵੇ, ਜਾਂ ਤੁਹਾਡੇ ਕੋਲ ਇਸ ਦੀ ਪਹੁੰਚ ਨਾ ਹੋਵੇ।",
-      "accessDeniedMergeRequest": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਨੂੰ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
-      "couldNotLoadMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
-      "discussionAccessDenied": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦੀ ਚਰਚਾ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
-      "discussionUnavailableMessage": "ਇਹ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਹਟਾਈ ਗਈ ਹੋ ਸਕਦੀ ਹੈ।",
-      "noDiscussionDescription": "ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ 'ਤੇ ਸਮੀਖਿਆ ਦਾ ਕੋਈ ਥ੍ਰੈਡ ਜਾਂ ਗੱਲਬਾਤ ਦੀ ਕੋਈ ਟਿੱਪਣੀ ਨਹੀਂ ਹੈ।",
-      "noFilesChangedDescription": "ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਵਿੱਚ ਕਿਸੇ ਫਾਈਲ ਵਿੱਚ ਬਦਲਾਅ ਨਹੀਂ ਕੀਤਾ ਗਿਆ।"
-    },
     "fileStatus": {
       "modified": "ਸੋਧੀ ਗਈ",
       "renamed": "ਨਾਮ ਬਦਲਿਆ",
@@ -731,6 +719,27 @@
       "ambiguous": "ਪੁਸ਼ਟੀ ਨਹੀਂ ਹੋ ਸਕੀ — ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ PR ਦੀ ਜਾਂਚ ਕਰੋ।",
       "persistenceFailed": "ਅਸੀਂ ਇਹ ਕਾਰਵਾਈ ਰਿਕਾਰਡ ਨਹੀਂ ਕਰ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "forbidden": "ਇਸ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "ਇਸ ਪ੍ਰਦਾਤਾ ਉੱਤੇ ਉਪਲਬਧ ਨਹੀਂ",
+        "accessibility": "ਇਸ ਪ੍ਰਦਾਤਾ ਉੱਤੇ ਉਪਲਬਧ ਨਹੀਂ: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ",
+      "mergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਸਾਂਝੀ ਕਰੋ",
+      "viewOnProvider": "{{provider}} ਉੱਤੇ ਵੇਖੋ",
+      "mergeRequestUnavailable": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
+      "unavailableDescription": "ਹੋ ਸਕਦਾ ਹੈ ਇਹ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੋਵੇ, ਜਾਂ ਤੁਹਾਡੇ ਕੋਲ ਇਸ ਦੀ ਪਹੁੰਚ ਨਾ ਹੋਵੇ।",
+      "accessDeniedMergeRequest": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਨੂੰ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+      "couldNotLoadMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "discussionAccessDenied": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦੀ ਚਰਚਾ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+      "discussionUnavailableMessage": "ਇਹ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਹਟਾਈ ਗਈ ਹੋ ਸਕਦੀ ਹੈ।",
+      "noDiscussionDescription": "ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ 'ਤੇ ਸਮੀਖਿਆ ਦਾ ਕੋਈ ਥ੍ਰੈਡ ਜਾਂ ਗੱਲਬਾਤ ਦੀ ਕੋਈ ਟਿੱਪਣੀ ਨਹੀਂ ਹੈ।",
+      "noFilesChangedDescription": "ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਵਿੱਚ ਕਿਸੇ ਫਾਈਲ ਵਿੱਚ ਬਦਲਾਅ ਨਹੀਂ ਕੀਤਾ ਗਿਆ।"
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "{{language}} ਦੀਆਂ ਆਫ਼ਲਾਈਨ ਸਪੀਚ ਫ਼ਾਈਲਾਂ ਇਸ ਫ਼ੋਨ 'ਤੇ ਇੰਸਟਾਲ ਨਹੀਂ ਹਨ। ਉਨ੍ਹਾਂ ਨੂੰ ਡਾਊਨਲੋਡ ਕਰੋ, ਫਿਰ ਵੌਇਸ ਇਨਪੁਟ ਦੁਬਾਰਾ ਵਰਤੋ।",
     "downloadOfflineModel": "ਡਾਊਨਲੋਡ",
     "offlineModelDownloadScheduled": "ਆਫ਼ਲਾਈਨ ਸਪੀਚ ਫ਼ਾਈਲਾਂ ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ ਡਾਊਨਲੋਡ ਹੋਣਗੀਆਂ। ਬਾਅਦ ਵਿੱਚ ਵੌਇਸ ਇਨਪੁਟ ਦੁਬਾਰਾ ਵਰਤੋ।",
-    "listeningStopped": "ਸੁਣਨਾ ਰੁਕ ਗਿਆ।"
+    "listeningStopped": "ਸੁਣਨਾ ਰੁਕ ਗਿਆ।",
+    "transcribing": "ਲਿਖਤ ਵਿੱਚ ਬਦਲਿਆ ਜਾ ਰਿਹਾ ਹੈ...",
+    "gatewayUnreachable": "Kilo Gateway ਨਾਲ ਸੰਪਰਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਚੈੱਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "gatewayTimeout": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਿੱਚ ਬਹੁਤ ਸਮਾਂ ਲੱਗਾ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "gatewayModelUnavailable": "ਇਹ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਤਰਜੀਹਾਂ ਵਿੱਚ ਕੋਈ ਹੋਰ ਚੁਣੋ।",
+    "gatewayModelUnavailableNotice": "ਇਹ ਮਾਡਲ ਹੁਣ ਪੇਸ਼ ਨਹੀਂ ਕੀਤਾ ਜਾਂਦਾ। ਹੋਰ ਚੁਣਨ ਲਈ $t(transcriptionModel.title) 'ਤੇ ਟੈਪ ਕਰੋ।",
+    "gatewaySignInRequired": "Kilo Gateway ਬਦਲੀ ਵਰਤਣ ਲਈ ਸਾਈਨ ਇਨ ਕਰੋ।",
+    "gatewayNoModel": "ਪਹਿਲਾਂ ਤਰਜੀਹਾਂ ਵਿੱਚ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਚੁਣੋ।"
   },
   "share": {
     "title": "Kilo ਵਿੱਚ ਸਾਂਝਾ ਕਰਨਾ",
@@ -3009,5 +3025,12 @@
     "needsInput": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
     "channelName": "ਸਰਗਰਮ ਏਜੰਟ",
     "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।"
+  },
+  "transcriptionModel": {
+    "title": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਦਾ ਮਾਡਲ",
+    "noneChosen": "ਕੋਈ ਨਹੀਂ ਚੁਣਿਆ",
+    "emptyTitle": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਲਈ ਕੋਈ ਮਾਡਲ ਨਹੀਂ",
+    "emptyDescription": "Kilo Gateway ਹੁਣ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਲਈ ਕੋਈ ਮਾਡਲ ਨਹੀਂ ਦੇ ਰਿਹਾ।",
+    "loadFailed": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲੇ ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।"
   }
 }

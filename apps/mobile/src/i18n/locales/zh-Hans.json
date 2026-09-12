@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "企业 SSO"
   },
   "preferences": {
+    "general": "通用",
+    "voiceInput": "语音输入",
     "autoExpandThinking": "自动展开思考过程",
     "autoExpandThinkingSubtitle": "智能体思考结束后，自动展开思考过程。",
     "keepScreenOn": "在会话页面保持屏幕常亮",
@@ -238,6 +240,7 @@
     "appearanceLight": "浅色",
     "appearanceDark": "深色",
     "account": "账户",
+    "accountSubtitle": "语言、受信任的网站和设备会话",
     "prReviewAttribution": "在 PR 审查中添加应用署名",
     "prReviewAttributionSubtitle": "提交审查时，在末尾添加“通过 Kilo 审查”的署名。",
     "returnSendsMessage": "回车键发送消息",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "使用 Kilo Gateway 转写",
+    "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型转写语音输入，而不使用设备上的语音识别。您的录音将发送至 Kilo Gateway。",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "实时活动",
@@ -2144,7 +2150,14 @@
     "languageNotInstalledMessage": "此手机尚未安装 {{language}} 的离线语音文件。请下载这些文件，然后重试语音输入。",
     "downloadOfflineModel": "下载",
     "offlineModelDownloadScheduled": "离线语音文件将在后台下载。稍后请重试语音输入。",
-    "listeningStopped": "已停止收听。"
+    "listeningStopped": "已停止收听。",
+    "transcribing": "正在转写…",
+    "gatewayUnreachable": "无法连接到 Kilo Gateway。请检查网络连接后重试。",
+    "gatewayTimeout": "转写耗时过长。请重试。",
+    "gatewayModelUnavailable": "此转写模型不可用。请在偏好设置中选择其他模型。",
+    "gatewayModelUnavailableNotice": "此模型已不再提供。点按$t(transcriptionModel.title)选择其他模型。",
+    "gatewaySignInRequired": "登录后可使用 Kilo Gateway 转写。",
+    "gatewayNoModel": "请先在偏好设置中选择转写模型。"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2322,11 +2335,172 @@
     "installAttributionPromptTitle": "允许安装归因？"
   },
   "prReview": {
-    "pullRequestUnavailable": "无法打开拉取请求",
-    "pullRequestUnavailableDescription": "无法打开此 PR。可能是 PR 已被删除、仓库为私有仓库，或仓库尚未安装 Kilo GitHub 应用。",
     "accessDeniedDescription": "你无权查看此拉取请求。",
-    "noFilesChanged": "没有文件变更",
-    "noFilesChangedDescription": "此拉取请求不包含文件变更。",
+    "checkConnection": "检查连接",
+    "checks": {
+      "checksCount": "{{displayCount}} 项检查",
+      "couldNotLoad": "无法加载检查结果。",
+      "failed": "{{displayCount}} 项失败",
+      "noAccess": "你无权查看此仓库的检查结果。",
+      "noChecksReported": "暂无检查结果",
+      "notAvailable": "暂时无法查看检查结果。可能是最新提交尚未处理，或源仓库尚未安装 Kilo GitHub 应用。",
+      "openDetails": "查看 {{name}} 的详情",
+      "passed": "{{displayCount}} 项通过",
+      "pending": "{{displayCount}} 项待处理",
+      "retryChecks": "重新加载检查结果",
+      "skipped": "{{displayCount}} 项已跳过",
+      "title": "检查",
+      "viewOnGitHub": "在 GitHub 上查看 PR",
+      "checkDetails": "检查详情"
+    },
+    "composer": {
+      "addTitle": "添加评论",
+      "addToReview": "添加到审查",
+      "comment": "评论",
+      "commentBody": "评论内容",
+      "commentBodyPlaceholder": "评论内容",
+      "commentNow": "立即评论",
+      "discardMessage": "放弃后，草稿将丢失。",
+      "discardTitle": "放弃评论？",
+      "editTitle": "编辑评论",
+      "insertSuggestion": "插入建议",
+      "insertSuggestionA11y": "插入代码建议",
+      "loadFailedTitle": "无法加载评论编辑器。",
+      "ok": "确定",
+      "unavailableMessage": "这条待提交的评论已被删除或提交。",
+      "unavailableTitle": "评论已不可用",
+      "bodyEmpty": "评论内容不能为空。",
+      "suggestionsOnlyAddedLines": "建议仅适用于新增的行。",
+      "tapDiffLineToSuggest": "点按差异中的一行，即可添加代码建议。"
+    },
+    "connect": {
+      "checkFailedTitle": "无法检查 GitHub 连接。",
+      "checkFailedMessage": "加载完成前，无法确认登录状态。",
+      "checkFailedTitleGitLab": "无法检查 GitLab 连接。",
+      "checkFailedTitleBitbucket": "无法检查 Bitbucket 连接。",
+      "providerCheckFailedMessage": "加载完成前无法获取连接状态。",
+      "reconnectTitle": "重新连接 GitHub",
+      "reconnectDescription": "GitHub 连接授权已被撤销。请重新连接，继续在手机上审查拉取请求。",
+      "description": "连接 GitHub 账号，即可在手机上审查拉取请求。",
+      "gitlabDescription": "连接你的 GitLab 账户，以便在移动端审查合并请求。",
+      "bitbucketDescription": "将 Bitbucket 连接到此组织，以便在移动端审查拉取请求。",
+      "bitbucketOrgOnlyDescription": "在你的个人资料中选择一个组织，以审查其 Bitbucket 拉取请求。"
+    },
+    "connectionExpired": "GitHub 连接已过期。",
+    "couldNotLoadPullRequest": "无法加载拉取请求。",
+    "couldNotOpenGitHubAppSettings": "无法打开 GitHub 应用设置。",
+    "description": "描述",
+    "discussion": {
+      "acceptTerms": "同意",
+      "accessDeniedMessage": "你无权查看此 PR 的讨论。",
+      "addReaction": "添加表情回应",
+      "block": "阻止",
+      "blockedUser": "已屏蔽 {{login}}",
+      "collapseThread": "折叠讨论串",
+      "commentActions": "评论操作",
+      "comment": "{{displayCount}} 条评论",
+      "comment_other": "{{displayCount}} 条评论",
+      "couldNotLoad": "无法加载讨论。",
+      "couldNotLoadMore": "无法加载更多评论。",
+      "loadMoreComments": "加载更多评论",
+      "loading": "正在加载讨论",
+      "moderation": {
+        "block": {
+          "retryable": "屏蔽此用户失败。请检查网络连接后重试。",
+          "terminal": "无法屏蔽此用户。"
+        },
+        "mute": {
+          "retryable": "将此用户静音失败。请检查网络连接后重试。",
+          "terminal": "无法静音此用户。"
+        },
+        "reportContent": {
+          "retryable": "举报此评论失败。请检查网络连接后重试。",
+          "terminal": "无法举报此评论。"
+        },
+        "reportUser": {
+          "retryable": "举报此用户失败。请检查网络连接后重试。",
+          "terminal": "无法举报此用户。"
+        }
+      },
+      "moreLinesAbove": "上方还有 {{displayCount}} 行。",
+      "mute": "静音",
+      "mutedUser": "已静音 {{login}}",
+      "noDiscussion": "暂无讨论",
+      "noDiscussionDescription": "此拉取请求暂无审查讨论串或评论。",
+      "comment_one": "1 条评论",
+      "outdated": "已过时",
+      "quotedDiffSnippet": "引用的差异片段",
+      "reactionPill": "{{emoji}} 表情回应，{{displayCount}} {{countLabel}}",
+      "reaction": "表情回应",
+      "reaction_other": "表情回应",
+      "reaction_one": "个表情回应",
+      "replyBadRequest": "无法发布此回复。讨论串可能已发生变化。",
+      "replyBody": "回复正文",
+      "replyForbidden": "你无权回复此拉取请求。",
+      "addCommentCta": "评论此拉取请求",
+      "commentBadRequest": "无法发布此评论。此拉取请求可能已发生变化。",
+      "commentForbidden": "你无权评论此拉取请求。",
+      "replyPlaceholder": "回复…",
+      "reportContent": "举报内容",
+      "reportUser": "举报用户",
+      "resolveThread": "将讨论串标记为已解决",
+      "resolved": "已解决",
+      "retryLoadingMore": "重新加载更多评论",
+      "reviewFiles": "审查文件",
+      "startedRelative": " · {{relative}}发起",
+      "submitReply": "提交回复",
+      "termsAcceptRetry": "未能确认同意服务条款。请检查网络连接后重试。",
+      "termsCopy": "年满 13 岁才能发布内容。",
+      "termsTitle": "服务条款",
+      "threadAccessibilityLabel": "讨论串 {{anchorLabel}}",
+      "unavailable": "无法查看讨论。",
+      "unavailableMessage": "此拉取请求可能已被删除。",
+      "unresolveThread": "将讨论串标记为未解决",
+      "viewTerms": "查看服务条款",
+      "termsAcceptRequired": "同意服务条款后才能发布内容。",
+      "termsCheckRetryCopy": "无法检查服务条款。请检查网络连接后重试。",
+      "termsOutdatedCopy": "服务条款已更新。请重新打开此页面，同意最新版本。",
+      "reactions": {
+        "thumbsUp": "赞",
+        "thumbsDown": "踩",
+        "laugh": "大笑",
+        "hooray": "欢呼",
+        "confused": "困惑",
+        "heart": "爱心",
+        "rocket": "火箭",
+        "eyes": "眼睛"
+      },
+      "anchor": {
+        "fileCommentOnPath": "文件 {{path}} 的评论",
+        "fileComment": "文件评论",
+        "outdatedOnPathLines": "{{path}} {{lines}}（已过时）",
+        "outdatedOnLines": "{{lines}}（已过时）",
+        "outdatedOnPath": "{{path}}（已过时）"
+      },
+      "deletedUser": "已删除的用户",
+      "replyForbiddenTerm": "你无权回复此{{term}}。"
+    },
+    "entry": {
+      "eyebrow": "通过 URL 打开拉取请求或合并请求",
+      "pastePrLink": "粘贴拉取请求或合并请求链接",
+      "noRecentPrs": "暂无最近审查",
+      "noRecentPrsDescription": "在上方粘贴链接即可开始审查，下次就能在这里找到它。",
+      "couldNotLoad": "无法加载。",
+      "removeFromRecentsTitle": "从最近记录中移除？",
+      "removeFromRecentsMessage": "此审查将从你的最近记录中移除。",
+      "removeRecentAccessibility": "从最近记录中移除 {{repo}}",
+      "urlAccessibility": "输入拉取请求或合并请求 URL",
+      "urlPlaceholder": "拉取请求或合并请求 URL",
+      "openAccessibility": "打开拉取请求或合并请求",
+      "clearLink": "清除链接",
+      "pasteLink": "粘贴拉取请求或合并请求链接",
+      "open": "开启"
+    },
+    "eventChips": {
+      "comment": "评论",
+      "label": "审查类型",
+      "requestChanges": "要求更改"
+    },
     "fileList": {
       "filesList": "文件列表",
       "filesViewed": "文件 · 已查看 {{viewed}}/{{total}}",
@@ -2371,6 +2545,7 @@
       "commentOnSelectedLines": "对所选行发表评论",
       "finishReview": "完成审查"
     },
+    "headLine": "{{counts}} · 最新提交 {{sha}}",
     "hunkRows": {
       "contextUnavailable": "无法获取此引用对应的上下文。",
       "expandAll": "全部展开",
@@ -2403,21 +2578,14 @@
       "retryLoadingContext": "重新加载上下文",
       "retryLoadingNextPage": "重新加载下一页"
     },
-    "sideBySide": {
-      "emptyDiffColumn": "空差异列",
-      "emptyDiffRow": "空差异行",
-      "newOnly": "仅新内容：{{text}}",
-      "noNewlineAtEndOfFile": "⚠️ 文件末尾没有换行符",
-      "oldNew": "旧内容：{{old}}；新内容：{{new}}",
-      "oldOnly": "仅旧内容：{{text}}"
+    "inbox": {
+      "couldNotLoad": "无法加载收件箱。",
+      "loading": "正在加载收件箱",
+      "noReviewRequests": "暂无审查请求",
+      "noReviewRequestsDescription": "等待你审查的拉取请求会显示在这里。你也可以在上方粘贴任意 PR 链接。",
+      "title": "收件箱"
     },
-    "connectionExpired": "GitHub 连接已过期。",
-    "capabilities": {
-      "banner": {
-        "title": "此提供商不支持",
-        "accessibility": "此提供商不支持: {{reason}}"
-      }
-    },
+    "installKiloGitHubApp": "安装 Kilo GitHub 应用",
     "merge": {
       "merge": "合并",
       "mergeNow": "立即合并",
@@ -2507,204 +2675,9 @@
         "rebase": "不创建合并提交，将此分支的所有提交重放到基础分支上。"
       }
     },
-    "discussion": {
-      "threadAccessibilityLabel": "讨论串 {{anchorLabel}}",
-      "collapseThread": "折叠讨论串",
-      "resolveThread": "将讨论串标记为已解决",
-      "unresolveThread": "将讨论串标记为未解决",
-      "resolved": "已解决",
-      "outdated": "已过时",
-      "comment_one": "1 条评论",
-      "comment": "{{displayCount}} 条评论",
-      "comment_other": "{{displayCount}} 条评论",
-      "startedRelative": " · {{relative}}发起",
-      "couldNotLoadMore": "无法加载更多评论。",
-      "retryLoadingMore": "重新加载更多评论",
-      "loadMoreComments": "加载更多评论",
-      "addReaction": "添加表情回应",
-      "reactionPill": "{{emoji}} 表情回应，{{displayCount}} {{countLabel}}",
-      "reaction_one": "个表情回应",
-      "reaction": "表情回应",
-      "reaction_other": "表情回应",
-      "commentActions": "评论操作",
-      "reportContent": "举报内容",
-      "reportUser": "举报用户",
-      "mute": "静音",
-      "block": "阻止",
-      "blockedUser": "已屏蔽 {{login}}",
-      "mutedUser": "已静音 {{login}}",
-      "replyPlaceholder": "回复…",
-      "replyBody": "回复正文",
-      "submitReply": "提交回复",
-      "termsTitle": "服务条款",
-      "termsCopy": "年满 13 岁才能发布内容。",
-      "termsAcceptRetry": "未能确认同意服务条款。请检查网络连接后重试。",
-      "viewTerms": "查看服务条款",
-      "acceptTerms": "同意",
-      "replyBadRequest": "无法发布此回复。讨论串可能已发生变化。",
-      "replyForbidden": "你无权回复此拉取请求。",
-      "replyForbiddenTerm": "你无权回复此{{term}}。",
-      "moderation": {
-        "block": {
-          "retryable": "屏蔽此用户失败。请检查网络连接后重试。",
-          "terminal": "无法屏蔽此用户。"
-        },
-        "mute": {
-          "retryable": "将此用户静音失败。请检查网络连接后重试。",
-          "terminal": "无法静音此用户。"
-        },
-        "reportContent": {
-          "retryable": "举报此评论失败。请检查网络连接后重试。",
-          "terminal": "无法举报此评论。"
-        },
-        "reportUser": {
-          "retryable": "举报此用户失败。请检查网络连接后重试。",
-          "terminal": "无法举报此用户。"
-        }
-      },
-      "accessDeniedMessage": "你无权查看此 PR 的讨论。",
-      "unavailable": "无法查看讨论。",
-      "unavailableMessage": "此拉取请求可能已被删除。",
-      "couldNotLoad": "无法加载讨论。",
-      "loading": "正在加载讨论",
-      "noDiscussion": "暂无讨论",
-      "noDiscussionDescription": "此拉取请求暂无审查讨论串或评论。",
-      "reviewFiles": "审查文件",
-      "quotedDiffSnippet": "引用的差异片段",
-      "moreLinesAbove": "上方还有 {{displayCount}} 行。",
-      "termsAcceptRequired": "同意服务条款后才能发布内容。",
-      "termsOutdatedCopy": "服务条款已更新。请重新打开此页面，同意最新版本。",
-      "termsCheckRetryCopy": "无法检查服务条款。请检查网络连接后重试。",
-      "reactions": {
-        "thumbsUp": "赞",
-        "thumbsDown": "踩",
-        "laugh": "大笑",
-        "hooray": "欢呼",
-        "confused": "困惑",
-        "heart": "爱心",
-        "rocket": "火箭",
-        "eyes": "眼睛"
-      },
-      "anchor": {
-        "fileCommentOnPath": "文件 {{path}} 的评论",
-        "fileComment": "文件评论",
-        "outdatedOnPathLines": "{{path}} {{lines}}（已过时）",
-        "outdatedOnLines": "{{lines}}（已过时）",
-        "outdatedOnPath": "{{path}}（已过时）"
-      },
-      "deletedUser": "已删除的用户"
-    },
-    "couldNotOpenGitHubAppSettings": "无法打开 GitHub 应用设置。",
-    "installKiloGitHubApp": "安装 Kilo GitHub 应用",
-    "checkConnection": "检查连接",
-    "couldNotLoadPullRequest": "无法加载拉取请求。",
-    "description": "描述",
     "noDescriptionProvided": "未提供描述。",
-    "review": "审查",
-    "reviewPullRequest": "审查拉取请求",
-    "headLine": "{{counts}} · 最新提交 {{sha}}",
-    "entry": {
-      "eyebrow": "通过 URL 打开拉取请求或合并请求",
-      "pastePrLink": "粘贴拉取请求或合并请求链接",
-      "noRecentPrs": "暂无最近审查",
-      "noRecentPrsDescription": "在上方粘贴链接即可开始审查，下次就能在这里找到它。",
-      "couldNotLoad": "无法加载。",
-      "removeFromRecentsTitle": "从最近记录中移除？",
-      "removeFromRecentsMessage": "此审查将从你的最近记录中移除。",
-      "removeRecentAccessibility": "从最近记录中移除 {{repo}}",
-      "urlAccessibility": "输入拉取请求或合并请求 URL",
-      "urlPlaceholder": "拉取请求或合并请求 URL",
-      "openAccessibility": "打开拉取请求或合并请求",
-      "clearLink": "清除链接",
-      "pasteLink": "粘贴拉取请求或合并请求链接",
-      "open": "开启"
-    },
-    "checks": {
-      "checksCount": "{{displayCount}} 项检查",
-      "couldNotLoad": "无法加载检查结果。",
-      "failed": "{{displayCount}} 项失败",
-      "noAccess": "你无权查看此仓库的检查结果。",
-      "noChecksReported": "暂无检查结果",
-      "notAvailable": "暂时无法查看检查结果。可能是最新提交尚未处理，或源仓库尚未安装 Kilo GitHub 应用。",
-      "openDetails": "查看 {{name}} 的详情",
-      "passed": "{{displayCount}} 项通过",
-      "pending": "{{displayCount}} 项待处理",
-      "retryChecks": "重新加载检查结果",
-      "skipped": "{{displayCount}} 项已跳过",
-      "title": "检查",
-      "viewOnGitHub": "在 GitHub 上查看 PR",
-      "checkDetails": "检查详情"
-    },
-    "inbox": {
-      "couldNotLoad": "无法加载收件箱。",
-      "loading": "正在加载收件箱",
-      "noReviewRequests": "暂无审查请求",
-      "noReviewRequestsDescription": "等待你审查的拉取请求会显示在这里。你也可以在上方粘贴任意 PR 链接。",
-      "title": "收件箱"
-    },
-    "composer": {
-      "addTitle": "添加评论",
-      "addToReview": "添加到审查",
-      "comment": "评论",
-      "commentBody": "评论内容",
-      "commentBodyPlaceholder": "评论内容",
-      "commentNow": "立即评论",
-      "discardMessage": "放弃后，草稿将丢失。",
-      "discardTitle": "放弃评论？",
-      "editTitle": "编辑评论",
-      "insertSuggestion": "插入建议",
-      "insertSuggestionA11y": "插入代码建议",
-      "loadFailedTitle": "无法加载评论编辑器。",
-      "ok": "确定",
-      "unavailableMessage": "这条待提交的评论已被删除或提交。",
-      "unavailableTitle": "评论已不可用",
-      "bodyEmpty": "评论内容不能为空。",
-      "suggestionsOnlyAddedLines": "建议仅适用于新增的行。",
-      "tapDiffLineToSuggest": "点按差异中的一行，即可添加代码建议。"
-    },
-    "connect": {
-      "checkFailedTitle": "无法检查 GitHub 连接。",
-      "checkFailedMessage": "加载完成前，无法确认登录状态。",
-      "checkFailedTitleGitLab": "无法检查 GitLab 连接。",
-      "checkFailedTitleBitbucket": "无法检查 Bitbucket 连接。",
-      "providerCheckFailedMessage": "加载完成前无法获取连接状态。",
-      "reconnectTitle": "重新连接 GitHub",
-      "reconnectDescription": "GitHub 连接授权已被撤销。请重新连接，继续在手机上审查拉取请求。",
-      "description": "连接 GitHub 账号，即可在手机上审查拉取请求。",
-      "gitlabDescription": "连接你的 GitLab 账户，以便在移动端审查合并请求。",
-      "bitbucketDescription": "将 Bitbucket 连接到此组织，以便在移动端审查拉取请求。",
-      "bitbucketOrgOnlyDescription": "在你的个人资料中选择一个组织，以审查其 Bitbucket 拉取请求。"
-    },
-    "screen": {
-      "shareA11y": "分享拉取请求",
-      "title": "#{{number}}"
-    },
-    "submit": {
-      "deletePendingMessage": "此评论将从审查队列中移除。",
-      "deletePendingTitle": "删除待提交的评论？",
-      "loadFailedTitle": "无法加载审查提交页面。",
-      "pendingComment": "条待提交评论",
-      "pendingComment_other": "条待提交评论",
-      "pendingComment_one": "条待提交的评论",
-      "summaryOptional": "总结（可选）",
-      "partialPostedMessage": "已发布 {{displayFreshCount}} 条评论。另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",
-      "submitCountOfTotal": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
-      "submitReview": "提交审查意见",
-      "blockedRequestChanges": "请填写总结或添加至少一条评论，才能要求更改。",
-      "blockedComment": "请填写总结或添加至少一条评论，才能提交评论类型的审查。"
-    },
-    "reconnectNotice": {
-      "title": "GitHub 连接已过期。",
-      "message": "GitHub 连接已失效。请重新检查连接；如需重新连接，系统会提示你。",
-      "gitlabTitle": "GitLab 连接已过期。",
-      "bitbucketTitle": "Bitbucket 连接已过期。",
-      "providerMessage": "{{provider}} 连接已失效。请重新检查连接；如需重新连接，系统会提示你。"
-    },
-    "eventChips": {
-      "comment": "评论",
-      "label": "审查类型",
-      "requestChanges": "要求更改"
-    },
+    "noFilesChanged": "没有文件变更",
+    "noFilesChangedDescription": "此拉取请求不包含文件变更。",
     "overview": {
       "commit": "提交",
       "commit_other": "提交",
@@ -2745,31 +2718,53 @@
       "summaryA11y": "审查总结",
       "summaryPlaceholder": "审查总结（可选）"
     },
-    "tabs": {
-      "discussion": "讨论",
-      "files": "文件",
-      "overview": "概览"
+    "pullRequestUnavailable": "无法打开拉取请求",
+    "pullRequestUnavailableDescription": "无法打开此 PR。可能是 PR 已被删除、仓库为私有仓库，或仓库尚未安装 Kilo GitHub 应用。",
+    "reconnectNotice": {
+      "title": "GitHub 连接已过期。",
+      "message": "GitHub 连接已失效。请重新检查连接；如需重新连接，系统会提示你。",
+      "gitlabTitle": "GitLab 连接已过期。",
+      "bitbucketTitle": "Bitbucket 连接已过期。",
+      "providerMessage": "{{provider}} 连接已失效。请重新检查连接；如需重新连接，系统会提示你。"
     },
-    "terms": {
-      "pullRequest": "拉取请求",
-      "mergeRequest": "合并请求",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "分享合并请求",
-      "viewOnProvider": "在 {{provider}} 上查看",
-      "mergeRequestUnavailable": "无法打开合并请求",
-      "unavailableDescription": "它可能已被删除，或者你可能没有访问权限。",
-      "accessDeniedMergeRequest": "你无权查看此合并请求。",
-      "couldNotLoadMergeRequest": "无法加载合并请求。",
-      "discussionAccessDenied": "你无权查看此合并请求的讨论。",
-      "discussionUnavailableMessage": "此合并请求可能已被删除。",
-      "noDiscussionDescription": "此合并请求暂无审查讨论串或评论。",
-      "noFilesChangedDescription": "此合并请求不包含文件变更。"
+    "review": "审查",
+    "reviewPullRequest": "审查拉取请求",
+    "screen": {
+      "shareA11y": "分享拉取请求",
+      "title": "#{{number}}"
+    },
+    "sideBySide": {
+      "emptyDiffColumn": "空差异列",
+      "emptyDiffRow": "空差异行",
+      "newOnly": "仅新内容：{{text}}",
+      "noNewlineAtEndOfFile": "⚠️ 文件末尾没有换行符",
+      "oldNew": "旧内容：{{old}}；新内容：{{new}}",
+      "oldOnly": "仅旧内容：{{text}}"
+    },
+    "submit": {
+      "deletePendingMessage": "此评论将从审查队列中移除。",
+      "deletePendingTitle": "删除待提交的评论？",
+      "loadFailedTitle": "无法加载审查提交页面。",
+      "pendingComment": "条待提交评论",
+      "pendingComment_other": "条待提交评论",
+      "pendingComment_one": "条待提交的评论",
+      "summaryOptional": "总结（可选）",
+      "partialPostedMessage": "已发布 {{displayFreshCount}} 条评论。另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",
+      "submitCountOfTotal": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
+      "submitReview": "提交审查意见",
+      "blockedRequestChanges": "请填写总结或添加至少一条评论，才能要求更改。",
+      "blockedComment": "请填写总结或添加至少一条评论，才能提交评论类型的审查。"
     },
     "fileStatus": {
       "changed": "已更改",
       "copied": "已复制",
       "modified": "已修改",
       "renamed": "已重命名"
+    },
+    "tabs": {
+      "discussion": "讨论",
+      "files": "文件",
+      "overview": "概览"
     },
     "diff": {
       "selectedTapToChange": "已选择 {{label}}，点按更改选择",
@@ -2802,6 +2797,27 @@
       "ambiguous": "无法确认操作结果，请先检查 PR 再重试。",
       "persistenceFailed": "无法记录此操作。请稍后重试。",
       "forbidden": "无权执行此操作。"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "此提供商不支持",
+        "accessibility": "此提供商不支持: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "拉取请求",
+      "mergeRequest": "合并请求",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "分享合并请求",
+      "viewOnProvider": "在 {{provider}} 上查看",
+      "mergeRequestUnavailable": "无法打开合并请求",
+      "unavailableDescription": "它可能已被删除，或者你可能没有访问权限。",
+      "accessDeniedMergeRequest": "你无权查看此合并请求。",
+      "couldNotLoadMergeRequest": "无法加载合并请求。",
+      "discussionAccessDenied": "你无权查看此合并请求的讨论。",
+      "discussionUnavailableMessage": "此合并请求可能已被删除。",
+      "noDiscussionDescription": "此合并请求暂无审查讨论串或评论。",
+      "noFilesChangedDescription": "此合并请求不包含文件变更。"
     }
   },
   "organization": {
@@ -3009,5 +3025,12 @@
     "needsInput": "等待输入",
     "channelName": "运行中的智能体",
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。"
+  },
+  "transcriptionModel": {
+    "title": "转写模型",
+    "noneChosen": "未选择",
+    "emptyTitle": "没有转写模型",
+    "emptyDescription": "Kilo Gateway 当前没有提供转写模型。",
+    "loadFailed": "无法加载转写模型。"
   }
 }

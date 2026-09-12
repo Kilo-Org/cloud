@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO for bedrifter"
   },
   "preferences": {
+    "general": "Generelt",
+    "voiceInput": "Taleinndata",
     "autoExpandThinking": "Vis resonnering automatisk",
     "autoExpandThinkingSubtitle": "Vis hele agentens resonnement når det er ferdig.",
     "keepScreenOn": "Hold skjermen på i øktvisningen",
@@ -238,6 +240,7 @@
     "appearanceLight": "Lys",
     "appearanceDark": "Mørk",
     "account": "Konto",
+    "accountSubtitle": "Språk, godkjente verter og enhetsøkter",
     "prReviewAttribution": "Oppgi appen i PR-gjennomganger",
     "prReviewAttributionSubtitle": "Legg til bunnteksten «Gjennomgått via Kilo» når du sender inn en kodegjennomgang.",
     "returnSendsMessage": "Returtasten sender meldingen",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkripsjon via Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkribér diktering med en Kilo Gateway-modell i stedet for enhetens stemmgjenkjenning. Opptaket ditt sendes til Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "PR-en er utilgjengelig",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Tom rad i endringsvisningen"
     },
     "connectionExpired": "GitHub-tilkoblingen er utløpt.",
-    "capabilities": {
-      "banner": {
-        "title": "Ikke tilgjengelig hos denne leverandøren",
-        "accessibility": "Ikke tilgjengelig hos denne leverandøren: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Fletting",
       "mergeNow": "Flett nå",
@@ -472,7 +472,9 @@
       "acceptTerms": "Godta",
       "replyBadRequest": "Dette svaret kan ikke publiseres. Tråden kan ha endret seg.",
       "replyForbidden": "Du har ikke tillatelse til å svare på denne PR-en.",
-      "replyForbiddenTerm": "Du har ikke tillatelse til å svare på denne {{term}}.",
+      "addCommentCta": "Kommenter denne PR-en",
+      "commentBadRequest": "Denne kommentaren kan ikke publiseres. PR-en kan ha endret seg.",
+      "commentForbidden": "Du har ikke tillatelse til å kommentere denne PR-en.",
       "moderation": {
         "reportContent": {
           "terminal": "Denne kommentaren kan ikke rapporteres.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Utdatert på {{lines}}",
         "outdatedOnPath": "Utdatert i {{path}}"
       },
-      "deletedUser": "slettet bruker"
+      "deletedUser": "slettet bruker",
+      "replyForbiddenTerm": "Du har ikke tillatelse til å svare på denne {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Kunne ikke åpne innstillingene for GitHub-appen.",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
@@ -679,21 +682,6 @@
       "files": "Filer",
       "discussion": "Diskusjon"
     },
-    "terms": {
-      "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Del merge request",
-      "viewOnProvider": "Vis på {{provider}}",
-      "mergeRequestUnavailable": "Merge request er utilgjengelig",
-      "unavailableDescription": "Den kan ha blitt slettet, eller du har ikke tilgang til den.",
-      "accessDeniedMergeRequest": "Du har ikke tilgang til å se denne merge request.",
-      "couldNotLoadMergeRequest": "Kunne ikke laste inn merge request.",
-      "discussionAccessDenied": "Du har ikke tilgang til diskusjonen om denne merge request.",
-      "discussionUnavailableMessage": "Denne merge request kan ha blitt fjernet.",
-      "noDiscussionDescription": "Denne merge request har ingen diskusjonstråder fra kodegjennomganger eller andre kommentarer.",
-      "noFilesChangedDescription": "Denne merge request inneholder ingen filendringer."
-    },
     "fileStatus": {
       "modified": "Endret",
       "renamed": "Omdøpt",
@@ -731,6 +719,27 @@
       "ambiguous": "Kunne ikke bekrefte resultatet. Sjekk PR-en før du prøver igjen.",
       "persistenceFailed": "Vi kunne ikke registrere denne handlingen. Prøv igjen senere.",
       "forbidden": "Du har ikke tilgang."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ikke tilgjengelig hos denne leverandøren",
+        "accessibility": "Ikke tilgjengelig hos denne leverandøren: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Del merge request",
+      "viewOnProvider": "Vis på {{provider}}",
+      "mergeRequestUnavailable": "Merge request er utilgjengelig",
+      "unavailableDescription": "Den kan ha blitt slettet, eller du har ikke tilgang til den.",
+      "accessDeniedMergeRequest": "Du har ikke tilgang til å se denne merge request.",
+      "couldNotLoadMergeRequest": "Kunne ikke laste inn merge request.",
+      "discussionAccessDenied": "Du har ikke tilgang til diskusjonen om denne merge request.",
+      "discussionUnavailableMessage": "Denne merge request kan ha blitt fjernet.",
+      "noDiscussionDescription": "Denne merge request har ingen diskusjonstråder fra kodegjennomganger eller andre kommentarer.",
+      "noFilesChangedDescription": "Denne merge request inneholder ingen filendringer."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "De frakoblede talefilene for {{language}} er ikke installert på denne telefonen. Last dem ned, og prøv diktering igjen.",
     "downloadOfflineModel": "Last ned",
     "offlineModelDownloadScheduled": "De frakoblede talefilene lastes ned i bakgrunnen. Prøv diktering igjen senere.",
-    "listeningStopped": "Dikteringen har stoppet."
+    "listeningStopped": "Dikteringen har stoppet.",
+    "transcribing": "Transkriberer...",
+    "gatewayUnreachable": "Kunne ikke nå Kilo Gateway. Sjekk tilkoblingen og prøv igjen.",
+    "gatewayTimeout": "Transkripsjonen tok for lang tid. Prøv igjen.",
+    "gatewayModelUnavailable": "Denne transkripsjonsmodellen er ikke tilgjengelig. Velg en annen under Innstillinger.",
+    "gatewayModelUnavailableNotice": "Denne modellen tilbys ikke lenger. Trykk på $t(transcriptionModel.title) for å velge en annen.",
+    "gatewaySignInRequired": "Logg inn for å bruke transkripsjon via Kilo Gateway.",
+    "gatewayNoModel": "Velg en transkripsjonsmodell under Innstillinger først."
   },
   "share": {
     "title": "Del med Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Venter på svar",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
+  },
+  "transcriptionModel": {
+    "title": "Transkripsjonsmodell",
+    "noneChosen": "Ingen valgt",
+    "emptyTitle": "Ingen transkripsjonsmodeller",
+    "emptyDescription": "Kilo Gateway tilbyr ingen transkripsjonsmodeller akkurat nå.",
+    "loadFailed": "Kunne ikke laste inn transkripsjonsmodellene."
   }
 }

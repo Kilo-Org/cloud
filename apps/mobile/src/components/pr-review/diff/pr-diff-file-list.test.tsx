@@ -158,11 +158,6 @@ function mountListInScope(
   return renderer;
 }
 
-function listBottomPadding(renderer: TestRenderer.ReactTestRenderer): number {
-  const list = renderer.root.find(node => String(node.type) === 'FlashList');
-  return (list.props.contentContainerStyle as { paddingBottom: number }).paddingBottom;
-}
-
 function bottomPaddedViews(
   renderer: TestRenderer.ReactTestRenderer
 ): TestRenderer.ReactTestInstance[] {
@@ -186,12 +181,22 @@ function resetState(): void {
   listQueryState.firstPageErrorState = null;
 }
 
-describe('PrReviewFileList full-body states', () => {
-  beforeEach(() => {
-    insetsState.bottom = 0;
-    resetState();
-  });
+function flashListProps(renderer: TestRenderer.ReactTestRenderer): {
+  contentContainerStyle?: Record<string, number | undefined>;
+} {
+  return renderer.root.find(node => String(node.type) === 'FlashList').props as {
+    contentContainerStyle?: Record<string, number | undefined>;
+  };
+}
 
+beforeEach(() => {
+  insetsState.bottom = 0;
+  insetsState.left = 0;
+  insetsState.right = 0;
+  resetState();
+});
+
+describe('PrReviewFileList full-body states', () => {
   it('centers the reconnect notice without local bottom padding', () => {
     listQueryState.firstPageErrorState = { kind: 'reconnect' };
     const renderer = mountList();
@@ -252,8 +257,6 @@ describe('PrReviewFileList full-body states', () => {
 // the ref's own route — never the GitHub sibling.
 describe('PrReviewFileList write affordances per provider', () => {
   beforeEach(() => {
-    insetsState.bottom = 0;
-    resetState();
     listQueryState.files = [{ path: 'src/file.ts' }];
     viewedFilesCalls.length = 0;
   });
@@ -285,45 +288,43 @@ describe('PrReviewFileList write affordances per provider', () => {
     ]);
   });
 
-  it('keeps the write bar on a GitLab merge request, carrying the provider ref', () => {
-    const renderer = mountListInScope({
-      platform: 'gitlab',
-      projectPath: 'group/sub/repo',
-      mrIid: 12,
-    });
+  it.each([
+    { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 },
+    { platform: 'bitbucket', workspace: 'acme', repoSlug: 'api', prId: 42 },
+  ] as const)('keeps the write bar on a $platform request with the provider ref', prRef => {
+    const renderer = mountListInScope(prRef);
     const bar = renderer.root.find(node => String(node.type) === 'PrDiffFloatingActions');
-    expect(bar.props.prRef).toEqual({
-      platform: 'gitlab',
-      projectPath: 'group/sub/repo',
-      mrIid: 12,
-    });
-  });
-
-  it('keeps the write bar on a Bitbucket pull request, carrying the provider ref', () => {
-    const renderer = mountListInScope({
-      platform: 'bitbucket',
-      workspace: 'acme',
-      repoSlug: 'api',
-      prId: 42,
-    });
-    const bar = renderer.root.find(node => String(node.type) === 'PrDiffFloatingActions');
-    expect(bar.props.prRef).toEqual({
-      platform: 'bitbucket',
-      workspace: 'acme',
-      repoSlug: 'api',
-      prId: 42,
-    });
+    expect(bar.props.prRef).toEqual(prRef);
   });
 
   it('keeps the small footer gap under a provider diff list too', () => {
-    const githubPadding = listBottomPadding(mountList());
-    const gitlabPadding = listBottomPadding(
+    const githubPadding = flashListProps(mountList()).contentContainerStyle?.paddingBottom;
+    const gitlabPadding = flashListProps(
       mountListInScope({ platform: 'gitlab', projectPath: 'group/repo', mrIid: 12 })
-    );
+    ).contentContainerStyle?.paddingBottom;
     // The bar is an in-flow footer below the list (spot check e3), so no
     // row can ever scroll under it; the list only keeps a 12-point gap
     // between its last row and the footer's top edge, on every provider.
     expect(githubPadding).toBe(12);
     expect(gitlabPadding).toBe(12);
+  });
+});
+
+describe('PrReviewFileList content container side insets (landscape)', () => {
+  beforeEach(() => {
+    listQueryState.files = [{ path: 'src/file.ts' }];
+  });
+
+  it.each([
+    { left: 0, right: 0, pl: 0, pr: 0 },
+    { left: 47, right: 59, pl: 47, pr: 59 },
+  ] as const)('pads the content container (left=$left right=$right)', ({ left, right, pl, pr }) => {
+    insetsState.left = left;
+    insetsState.right = right;
+    expect(flashListProps(mountList()).contentContainerStyle).toEqual({
+      paddingBottom: 12,
+      paddingLeft: pl,
+      paddingRight: pr,
+    });
   });
 });

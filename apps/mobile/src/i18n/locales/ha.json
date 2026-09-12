@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO na kamfani"
   },
   "preferences": {
+    "general": "Gaba ɗaya",
+    "voiceInput": "Shigar da murya",
     "autoExpandThinking": "Faɗaɗa tunani kai tsaye",
     "autoExpandThinkingSubtitle": "Nuna cikakken tunanin wakilin idan ya gama.",
     "keepScreenOn": "Bar allo a kunne a shafin zaman",
@@ -238,6 +240,7 @@
     "appearanceLight": "Haske",
     "appearanceDark": "Duhu",
     "account": "Asusu",
+    "accountSubtitle": "Harshe, rukunonin yanar gizo da aka amince da su, da zaman na'urori",
     "prReviewAttribution": "Ƙara sunan manhajar a bitar PR",
     "prReviewAttributionSubtitle": "Ƙara rubutun ƙasa na \"An yi bita ta Kilo\" lokacin da ka aika bita.",
     "returnSendsMessage": "Maɓallin sabon layi yana aika saƙo",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Mayar da magana zuwa rubutu ta Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Mayar da shigar da murya zuwa rubutu da samfurin Kilo Gateway maimakon gane magana na na'urar. Ana aika rikodinka zuwa Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Layin bambancin fayil marar komai"
     },
     "connectionExpired": "Wa'adin haɗin GitHub ya ƙare.",
-    "capabilities": {
-      "banner": {
-        "title": "Ba ya samuwa ga wannan mai ba da sabis",
-        "accessibility": "Ba ya samuwa ga wannan mai ba da sabis: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Haɗawa",
       "mergeNow": "Haɗa yanzu",
@@ -472,7 +472,9 @@
       "acceptTerms": "Amince",
       "replyBadRequest": "Ba za a iya wallafa wannan amsar ba. Wataƙila silsilar tattaunawar ta canza.",
       "replyForbidden": "Ba ka da izinin amsa wannan buƙatar haɗawa.",
-      "replyForbiddenTerm": "Ba ka da izinin amsa wannan {{term}}.",
+      "addCommentCta": "Yi tsokaci a wannan buƙatar haɗawa",
+      "commentBadRequest": "Ba za a iya wallafa wannan tsokaci ba. Wataƙila buƙatar haɗawa ta canza.",
+      "commentForbidden": "Ba ka da izinin yin tsokaci a wannan buƙatar haɗawa.",
       "moderation": {
         "reportContent": {
           "terminal": "Ba za a iya kai rahoton wannan tsokacin ba.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Bai dace da sabon yanayin {{lines}} ba",
         "outdatedOnPath": "Bai dace da sabon yanayin {{path}} ba"
       },
-      "deletedUser": "mai amfani da aka share"
+      "deletedUser": "mai amfani da aka share",
+      "replyForbiddenTerm": "Ba ka da izinin amsa wannan {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "An kasa buɗe saitunan manhajar GitHub.",
     "installKiloGitHubApp": "Shigar da manhajar Kilo ta GitHub",
@@ -679,21 +682,6 @@
       "files": "Fayiloli",
       "discussion": "Tattaunawa"
     },
-    "terms": {
-      "pullRequest": "Buƙatar haɗa canje-canje",
-      "mergeRequest": "Buƙatar haɗawa",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Raba buƙatar haɗawa",
-      "viewOnProvider": "Duba a {{provider}}",
-      "mergeRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
-      "unavailableDescription": "Wataƙila an share shi, ko kuma ba ka da damar shiga.",
-      "accessDeniedMergeRequest": "Ba ka da izinin duba wannan buƙatar haɗawa.",
-      "couldNotLoadMergeRequest": "Ba a iya loda buƙatar haɗawa ba.",
-      "discussionAccessDenied": "Ba ka da izinin duba tattaunawar wannan buƙatar haɗawa.",
-      "discussionUnavailableMessage": "Wataƙila an cire wannan buƙatar haɗawa.",
-      "noDiscussionDescription": "Babu silsilar bita ko tsokacin tattaunawa a wannan buƙatar haɗawa.",
-      "noFilesChangedDescription": "Babu canje-canje ga fayiloli a wannan buƙatar haɗawa."
-    },
     "fileStatus": {
       "modified": "An gyara",
       "renamed": "An canza suna",
@@ -731,6 +719,27 @@
       "ambiguous": "Ba a iya tabbatarwa ba — duba PR kafin ka sake gwadawa.",
       "persistenceFailed": "Ba mu iya adana wannan aikin ba. Sake gwadawa daga baya.",
       "forbidden": "Ba a ba da izini ba."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ba ya samuwa ga wannan mai ba da sabis",
+        "accessibility": "Ba ya samuwa ga wannan mai ba da sabis: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Buƙatar haɗa canje-canje",
+      "mergeRequest": "Buƙatar haɗawa",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Raba buƙatar haɗawa",
+      "viewOnProvider": "Duba a {{provider}}",
+      "mergeRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
+      "unavailableDescription": "Wataƙila an share shi, ko kuma ba ka da damar shiga.",
+      "accessDeniedMergeRequest": "Ba ka da izinin duba wannan buƙatar haɗawa.",
+      "couldNotLoadMergeRequest": "Ba a iya loda buƙatar haɗawa ba.",
+      "discussionAccessDenied": "Ba ka da izinin duba tattaunawar wannan buƙatar haɗawa.",
+      "discussionUnavailableMessage": "Wataƙila an cire wannan buƙatar haɗawa.",
+      "noDiscussionDescription": "Babu silsilar bita ko tsokacin tattaunawa a wannan buƙatar haɗawa.",
+      "noFilesChangedDescription": "Babu canje-canje ga fayiloli a wannan buƙatar haɗawa."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Fayilolin magana na offline na {{language}} ba a shigar da su a wayar ba. Sauke su, sannan sake gwada shigar da rubutu ta murya.",
     "downloadOfflineModel": "Sauke",
     "offlineModelDownloadScheduled": "Za a sauke fayilolin magana na offline a bango. Gwada shigar da rubutu ta murya daga baya.",
-    "listeningStopped": "An dakatar da sauraro."
+    "listeningStopped": "An dakatar da sauraro.",
+    "transcribing": "Ana mayar da magana rubutu...",
+    "gatewayUnreachable": "An kasa samun Kilo Gateway. Duba haɗinka ka sake gwadawa.",
+    "gatewayTimeout": "Mayar da magana zuwa rubutu ta ɗauki lokaci mai tsawo. Sake gwadawa.",
+    "gatewayModelUnavailable": "Wannan samfurin mayar da magana zuwa rubutu ba ya nan. Zaɓi wani a Zaɓuɓɓuka.",
+    "gatewayModelUnavailableNotice": "Ba a ƙara ba da wannan samfuri ba. Matsa $t(transcriptionModel.title) don zaɓar wani.",
+    "gatewaySignInRequired": "Shiga don amfani da mayar da magana ta Kilo Gateway.",
+    "gatewayNoModel": "Da farko zaɓi samfurin mayar da magana zuwa rubutu a Zaɓuɓɓuka."
   },
   "share": {
     "title": "Raba zuwa Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Ana buƙatar bayani",
     "channelName": "Wakilai da ke aiki",
     "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle."
+  },
+  "transcriptionModel": {
+    "title": "Samfurin mayar da magana zuwa rubutu",
+    "noneChosen": "Ba a zaɓi ba",
+    "emptyTitle": "Babu samfuran mayar da magana zuwa rubutu",
+    "emptyDescription": "Kilo Gateway bai ba da samfuran mayar da magana zuwa rubutu a halin yanzu.",
+    "loadFailed": "An kasa loda samfuran mayar da magana zuwa rubutu."
   }
 }

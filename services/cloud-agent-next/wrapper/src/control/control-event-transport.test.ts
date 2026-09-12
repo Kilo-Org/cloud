@@ -1,4 +1,4 @@
-import { describe, expect, it, mock, spyOn } from 'bun:test';
+import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import {
   createControlEventFailureHandler,
   createControlEventTransport,
@@ -7,6 +7,11 @@ import type { ControlEventOutboxFailure, ControlEventPublication } from './contr
 import { ControlDeliveryError } from './sandbox-control-client';
 import { createOperationRegistry } from './operation-registry';
 import { acknowledgeOperation, fakeKilo, operationAuthorization } from './control-test-fixtures';
+import {
+  rememberAttachedRoot,
+  rememberChildSession,
+  resetSessionDirectoryState,
+} from './session-directories';
 import type {
   SessionOperationAck,
   SessionOperationDelivery,
@@ -21,6 +26,11 @@ const session = {
 const payload = { type: 'session.idle', properties: {} };
 
 describe('native-scoped control event failures', () => {
+  beforeEach(() => {
+    resetSessionDirectoryState();
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+  });
+
   it.each([
     ['session.preparing', false],
     ['session.event', true],
@@ -121,9 +131,13 @@ describe('native-scoped control event failures', () => {
     const original = { runtimeId: crypto.randomUUID() };
     let current = original;
     const retired = mock();
+    const cleanup = Promise.withResolvers<void>();
     const handleFailure = createControlEventFailureHandler({
       getRuntime: () => current,
-      onFailure: retired,
+      onFailure: (...args) => {
+        retired(...args);
+        return cleanup.promise;
+      },
     });
     const failures: ControlEventOutboxFailure[] = [];
     const published: ControlEventPublication[] = [];
@@ -153,6 +167,10 @@ describe('native-scoped control event failures', () => {
       expect(failures).toHaveLength(2);
       expect(retired).toHaveBeenCalledTimes(1);
       expect(retired).toHaveBeenCalledWith(failures[0], original);
+      cleanup.resolve();
+      await Promise.resolve();
+      handleFailure(failures[0]);
+      expect(retired).toHaveBeenCalledTimes(2);
       current = { runtimeId: crypto.randomUUID() };
       expect(
         await transport.publishSessionEvent(payload, {
@@ -162,7 +180,7 @@ describe('native-scoped control event failures', () => {
       ).toBe(true);
       expect(await transport.resume()).toBe(true);
       expect(published.at(-1)?.session.nativeRuntimeId).toBe(current.runtimeId);
-      expect(retired).toHaveBeenCalledTimes(1);
+      expect(retired).toHaveBeenCalledTimes(2);
       const failure = failures[0];
       if (!failure) throw new Error('Missing native failure');
       handleFailure(failure);
@@ -173,11 +191,50 @@ describe('native-scoped control event failures', () => {
           session: { ...session, nativeRuntimeId: current.runtimeId },
         },
       });
-      expect(retired).toHaveBeenCalledTimes(2);
-      expect(retired.mock.calls[1]?.[1]).toBe(current);
+      expect(retired).toHaveBeenCalledTimes(3);
+      expect(retired.mock.calls[2]?.[1]).toBe(current);
     } finally {
       transport.close();
     }
+  });
+
+  it('coalesces distinct roots only during registry cleanup and separates a reused native object incarnation', async () => {
+    rememberAttachedRoot('root_a', session.directory);
+    rememberAttachedRoot('root_b', session.directory);
+    const runtime = { runtimeId: 'N1' };
+    const cleanup = Promise.withResolvers<void>();
+    const failures: ControlEventOutboxFailure[] = [];
+    const handleFailure = createControlEventFailureHandler({
+      getRuntime: () => runtime,
+      onFailure: failure => {
+        failures.push(failure);
+        return cleanup.promise;
+      },
+    });
+    const failure = (root: string, nativeRuntimeId: string): ControlEventOutboxFailure => ({
+      reason: 'rejected',
+      publication: {
+        event: 'session.event',
+        receiptId: `${root}-${nativeRuntimeId}`,
+        sequence: failures.length + 1,
+        session: { ...session, kiloSessionId: root, rootKiloSessionId: root, nativeRuntimeId },
+        payload,
+      },
+    });
+
+    handleFailure(failure('root_a', 'N1'));
+    handleFailure(failure('root_a', 'N1'));
+    handleFailure(failure('root_b', 'N1'));
+    expect(failures).toHaveLength(2);
+    cleanup.resolve();
+    await Promise.resolve();
+    handleFailure(failure('root_a', 'N1'));
+    expect(failures).toHaveLength(3);
+
+    runtime.runtimeId = 'N2';
+    handleFailure(failure('root_a', 'N1'));
+    handleFailure(failure('root_a', 'N2'));
+    expect(failures).toHaveLength(4);
   });
 
   it('preserves a sealed result and its acknowledgement when failure retires the matching native runtime', async () => {
@@ -279,6 +336,32 @@ describe('native-scoped control event failures', () => {
     }
   });
 
+  it('selects the failed native runtime among isolated roots in the same directory', () => {
+    const first = { runtimeId: 'native_first' };
+    const second = { runtimeId: 'native_second' };
+    const retired = mock();
+    const getRuntime = mock((directory: string, nativeRuntimeId: string) =>
+      directory === session.directory
+        ? [first, second].find(runtime => runtime.runtimeId === nativeRuntimeId)
+        : undefined
+    );
+    const handleFailure = createControlEventFailureHandler({ getRuntime, onFailure: retired });
+    const failure: ControlEventOutboxFailure = {
+      reason: 'expired',
+      publication: {
+        event: 'session.event',
+        receiptId: 'receipt_second',
+        sequence: 1,
+        session: { ...session, nativeRuntimeId: second.runtimeId },
+        payload,
+      },
+    };
+    handleFailure(failure);
+    expect(getRuntime).toHaveBeenCalledWith(session.directory, second.runtimeId);
+    expect(retired).toHaveBeenCalledWith(failure, second);
+    expect(retired).toHaveBeenCalledTimes(1);
+  });
+
   it('reports failures without native identity without guessing the current runtime', async () => {
     const retired = mock();
     const getRuntime = mock(() => ({ runtimeId: crypto.randomUUID() }));
@@ -303,5 +386,89 @@ describe('native-scoped control event failures', () => {
     } finally {
       transport.close();
     }
+  });
+
+  it('routes a child receipt failure through its root owner while preserving child identity', () => {
+    rememberAttachedRoot('root', '/root');
+    rememberChildSession({ childId: 'child', parentId: 'root', directory: '/child' });
+    const runtime = { runtimeId: 'native-root' };
+    const getRuntime = mock((directory: string) => (directory === '/root' ? runtime : undefined));
+    const onFailure = mock();
+    const handleFailure = createControlEventFailureHandler({ getRuntime, onFailure });
+    const failure: ControlEventOutboxFailure = {
+      reason: 'rejected',
+      publication: {
+        event: 'session.event',
+        receiptId: 'receipt_child',
+        sequence: 1,
+        session: {
+          directory: '/child',
+          kiloSessionId: 'child',
+          rootKiloSessionId: 'root',
+          nativeRuntimeId: runtime.runtimeId,
+        },
+        payload,
+      },
+    };
+
+    handleFailure(failure);
+
+    expect(getRuntime).toHaveBeenCalledWith('/root', runtime.runtimeId);
+    expect(onFailure).toHaveBeenCalledWith(failure, runtime);
+  });
+
+  it('routes an expired child receipt through the root owner before runtime lookup', () => {
+    rememberAttachedRoot('root', '/root');
+    rememberChildSession({ childId: 'child_expired', parentId: 'root', directory: '/child' });
+    const runtime = { runtimeId: 'native-root' };
+    const getRuntime = mock((directory: string) => (directory === '/root' ? runtime : undefined));
+    const onFailure = mock();
+    const handleFailure = createControlEventFailureHandler({ getRuntime, onFailure });
+    const failure: ControlEventOutboxFailure = {
+      reason: 'expired',
+      publication: {
+        event: 'session.event',
+        receiptId: 'receipt_child_expired',
+        sequence: 2,
+        session: {
+          directory: '/child',
+          kiloSessionId: 'child_expired',
+          rootKiloSessionId: 'root',
+          nativeRuntimeId: runtime.runtimeId,
+        },
+        payload,
+      },
+    };
+
+    handleFailure(failure);
+
+    expect(getRuntime).toHaveBeenCalledWith('/root', runtime.runtimeId);
+    expect(onFailure).toHaveBeenCalledWith(failure, runtime);
+  });
+
+  it('fails closed for an unresolved child receipt failure', () => {
+    rememberAttachedRoot('root', '/root');
+    const getRuntime = mock(() => ({ runtimeId: 'native-root' }));
+    const onFailure = mock();
+    const handleFailure = createControlEventFailureHandler({ getRuntime, onFailure });
+
+    handleFailure({
+      reason: 'rejected',
+      publication: {
+        event: 'session.event',
+        receiptId: 'receipt_unknown',
+        sequence: 1,
+        session: {
+          directory: '/child',
+          kiloSessionId: 'unknown-child',
+          rootKiloSessionId: 'root',
+          nativeRuntimeId: 'native-root',
+        },
+        payload,
+      },
+    });
+
+    expect(getRuntime).not.toHaveBeenCalled();
+    expect(onFailure).not.toHaveBeenCalled();
   });
 });

@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "انٹرپرائز SSO"
   },
   "preferences": {
+    "general": "عمومی",
+    "voiceInput": "صوتی ان پٹ",
     "autoExpandThinking": "سوچ کی تفصیل خود بخود دکھائیں",
     "autoExpandThinkingSubtitle": "ایجنٹ کی سوچ مکمل ہونے پر اس کی تفصیل کھول کر دکھائیں۔",
     "keepScreenOn": "سیشن کے صفحے پر اسکرین روشن رکھیں",
@@ -238,6 +240,7 @@
     "appearanceLight": "روشن",
     "appearanceDark": "تاریک",
     "account": "اکاؤنٹ",
+    "accountSubtitle": "زبان، قابل اعتماد ہوسٹس اور ڈیوائس کے سیشنز",
     "prReviewAttribution": "PR کے جائزوں میں ایپ کا حوالہ شامل کریں",
     "prReviewAttributionSubtitle": "جائزہ بھیجتے وقت آخر میں «Kilo کے ذریعے جائزہ لیا گیا» شامل کریں۔",
     "returnSendsMessage": "ریٹرن کی دبانے سے پیغام بھیجیں",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway کے ذریعے آواز کو متن میں بدلنا",
+    "gatewayTranscriptionSubtitle": "ڈیوائس کی آواز کی پہچان کے بجائے Kilo Gateway ماڈل کے ذریعے آواز سے لکھنے کو متن میں بدلیں۔ آپ کی ریکارڈنگ Kilo Gateway کو بھیجی جاتی ہے۔",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "تبدیلیوں کے موازنے کی خالی قطار"
     },
     "connectionExpired": "GitHub سے کنکشن کی مدت ختم ہو گئی۔",
-    "capabilities": {
-      "banner": {
-        "title": "اس پرووائیڈر پر دستیاب نہیں",
-        "accessibility": "اس پرووائیڈر پر دستیاب نہیں: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "مرج",
       "mergeNow": "ابھی مرج کریں",
@@ -472,7 +472,9 @@
       "acceptTerms": "قبول کریں",
       "replyBadRequest": "یہ جواب پوسٹ نہیں ہو سکتا۔ شاید تھریڈ تبدیل ہو گیا ہے۔",
       "replyForbidden": "آپ کو اس پل ریکویسٹ پر جواب دینے کی اجازت نہیں ہے۔",
-      "replyForbiddenTerm": "آپ کو اس {{term}} پر جواب دینے کی اجازت نہیں ہے۔",
+      "addCommentCta": "اس پل ریکویسٹ پر تبصرہ کریں",
+      "commentBadRequest": "یہ تبصرہ پوسٹ نہیں ہو سکتا۔ شاید پل ریکویسٹ تبدیل ہو گیا ہے۔",
+      "commentForbidden": "آپ کو اس پل ریکویسٹ پر تبصرہ کرنے کی اجازت نہیں ہے۔",
       "moderation": {
         "reportContent": {
           "terminal": "اس تبصرے کی شکایت نہیں کی جا سکتی۔",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "{{lines}} پر پرانا",
         "outdatedOnPath": "{{path}} پر پرانا"
       },
-      "deletedUser": "حذف شدہ صارف"
+      "deletedUser": "حذف شدہ صارف",
+      "replyForbiddenTerm": "آپ کو اس {{term}} پر جواب دینے کی اجازت نہیں ہے۔"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ایپ کی ترتیبات نہیں کھل سکیں۔",
     "installKiloGitHubApp": "Kilo GitHub ایپ انسٹال کریں",
@@ -679,21 +682,6 @@
       "files": "فائلیں",
       "discussion": "گفتگو"
     },
-    "terms": {
-      "pullRequest": "پل ریکویسٹ",
-      "mergeRequest": "مرج ریکویسٹ",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "مرج ریکویسٹ شیئر کریں",
-      "viewOnProvider": "{{provider}} پر دیکھیں",
-      "mergeRequestUnavailable": "مرج ریکویسٹ دستیاب نہیں",
-      "unavailableDescription": "ہو سکتا ہے یہ حذف کر دی گئی ہو، یا ہو سکتا ہے آپ کو اس تک رسائی نہ ہو۔",
-      "accessDeniedMergeRequest": "آپ کو اس مرج ریکویسٹ کو دیکھنے کی اجازت نہیں ہے۔",
-      "couldNotLoadMergeRequest": "مرج ریکویسٹ لوڈ نہیں ہو سکی۔",
-      "discussionAccessDenied": "آپ کو اس مرج ریکویسٹ کی گفتگو دیکھنے کی اجازت نہیں ہے۔",
-      "discussionUnavailableMessage": "ممکن ہے یہ مرج ریکویسٹ ہٹا دی گئی ہو۔",
-      "noDiscussionDescription": "اس مرج ریکویسٹ پر ابھی جائزے کا کوئی تھریڈ یا گفتگو کا کوئی تبصرہ نہیں ہے۔",
-      "noFilesChangedDescription": "اس مرج ریکویسٹ میں کسی فائل میں تبدیلی نہیں کی گئی۔"
-    },
     "fileStatus": {
       "modified": "ترمیم شدہ",
       "renamed": "نام تبدیل",
@@ -731,6 +719,27 @@
       "ambiguous": "تصدیق نہیں ہو سکی — دوبارہ کوشش کرنے سے پہلے PR چیک کریں۔",
       "persistenceFailed": "ہم اس کارروائی کو ریکارڈ نہیں کر سکے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
       "forbidden": "اس کارروائی کی اجازت نہیں ہے۔"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "اس پرووائیڈر پر دستیاب نہیں",
+        "accessibility": "اس پرووائیڈر پر دستیاب نہیں: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "پل ریکویسٹ",
+      "mergeRequest": "مرج ریکویسٹ",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "مرج ریکویسٹ شیئر کریں",
+      "viewOnProvider": "{{provider}} پر دیکھیں",
+      "mergeRequestUnavailable": "مرج ریکویسٹ دستیاب نہیں",
+      "unavailableDescription": "ہو سکتا ہے یہ حذف کر دی گئی ہو، یا ہو سکتا ہے آپ کو اس تک رسائی نہ ہو۔",
+      "accessDeniedMergeRequest": "آپ کو اس مرج ریکویسٹ کو دیکھنے کی اجازت نہیں ہے۔",
+      "couldNotLoadMergeRequest": "مرج ریکویسٹ لوڈ نہیں ہو سکی۔",
+      "discussionAccessDenied": "آپ کو اس مرج ریکویسٹ کی گفتگو دیکھنے کی اجازت نہیں ہے۔",
+      "discussionUnavailableMessage": "ممکن ہے یہ مرج ریکویسٹ ہٹا دی گئی ہو۔",
+      "noDiscussionDescription": "اس مرج ریکویسٹ پر ابھی جائزے کا کوئی تھریڈ یا گفتگو کا کوئی تبصرہ نہیں ہے۔",
+      "noFilesChangedDescription": "اس مرج ریکویسٹ میں کسی فائل میں تبدیلی نہیں کی گئی۔"
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "{{language}} کی آف لائن تقریر کی فائلیں اس فون پر انسٹال نہیں ہیں۔ انہیں ڈاؤن لوڈ کریں، پھر آواز سے لکھنا دوبارہ آزمانے کی کوشش کریں۔",
     "downloadOfflineModel": "ڈاؤن لوڈ",
     "offlineModelDownloadScheduled": "آف لائن تقریر کی فائلیں پس منظر میں ڈاؤن لوڈ ہوں گی۔ بعد میں آواز سے لکھنا دوبارہ آزمانے کی کوشش کریں۔",
-    "listeningStopped": "سننے کا عمل رک گیا۔"
+    "listeningStopped": "سننے کا عمل رک گیا۔",
+    "transcribing": "متن میں بدلا جا رہا ہے...",
+    "gatewayUnreachable": "Kilo Gateway سے رابطہ نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+    "gatewayTimeout": "متن میں بدلنے میں بہت وقت لگ گیا۔ دوبارہ کوشش کریں۔",
+    "gatewayModelUnavailable": "یہ ماڈل دستیاب نہیں ہے۔ ترجیحات میں دوسرا منتخب کریں۔",
+    "gatewayModelUnavailableNotice": "یہ ماڈل اب پیش نہیں کیا جاتا۔ کوئی دوسرا منتخب کرنے کے لیے $t(transcriptionModel.title) پر ٹیپ کریں۔",
+    "gatewaySignInRequired": "Kilo Gateway کی تبدیلی استعمال کرنے کے لیے سائن ان کریں۔",
+    "gatewayNoModel": "پہلے ترجیحات میں متن میں بدلنے کا ماڈل منتخب کریں۔"
   },
   "share": {
     "title": "Kilo پر شیئر کریں",
@@ -3009,5 +3025,12 @@
     "needsInput": "ان پٹ درکار",
     "channelName": "فعال ایجنٹس",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔"
+  },
+  "transcriptionModel": {
+    "title": "متن میں بدلنے کا ماڈل",
+    "noneChosen": "کوئی نہیں چنا گیا",
+    "emptyTitle": "متن میں بدلنے کا کوئی ماڈل موجود نہیں",
+    "emptyDescription": "Kilo Gateway فی الحال متن میں بدلنے کا کوئی ماڈل نہیں دیتا۔",
+    "loadFailed": "متن میں بدلنے والے ماڈلز لوڈ نہیں ہو سکے۔"
   }
 }

@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "Poslovna jedinstvena prijava (SSO)"
   },
   "preferences": {
+    "general": "Općenito",
+    "voiceInput": "Glasovni unos",
     "autoExpandThinking": "Automatski proširi razmišljanje",
     "autoExpandThinkingSubtitle": "Prikaži cijelo razmišljanje agenta kada završi.",
     "keepScreenOn": "Ostavi ekran uključen dok je otvorena sesija",
@@ -238,6 +240,7 @@
     "appearanceLight": "Svijetlo",
     "appearanceDark": "Tamno",
     "account": "Nalog",
+    "accountSubtitle": "Jezik, pouzdani hostovi i sesije na uređajima",
     "prReviewAttribution": "Navedi aplikaciju u PR pregledima",
     "prReviewAttributionSubtitle": "Dodaj napomenu „Pregledano putem aplikacije Kilo“ na kraj pregleda koji šalješ.",
     "returnSendsMessage": "Tipka za novi red šalje poruku",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkripcija putem Kilo Gatewaya",
+    "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gatewaya umjesto prepoznavanja govora na uređaju. Snimka se šalje na Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtjev za spajanje nije dostupan",
@@ -343,12 +349,6 @@
       "emptyDiffRow": "Prazan red prikaza razlika"
     },
     "connectionExpired": "Veza s GitHubom je istekla.",
-    "capabilities": {
-      "banner": {
-        "title": "Nije dostupno kod ovog pružatelja usluga",
-        "accessibility": "Nije dostupno kod ovog pružatelja usluga: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Spajanje",
       "mergeNow": "Spoji sada",
@@ -475,7 +475,9 @@
       "acceptTerms": "Prihvati",
       "replyBadRequest": "Ovaj odgovor se ne može objaviti. Nit se možda promijenila.",
       "replyForbidden": "Nemaš dozvolu da odgovoriš na ovaj zahtjev za spajanje.",
-      "replyForbiddenTerm": "Nemaš dozvolu da odgovoriš na ovaj {{term}}.",
+      "addCommentCta": "Komentariši ovaj zahtjev za spajanje",
+      "commentBadRequest": "Ovaj komentar se ne može objaviti. Zahtjev za spajanje se možda promijenio.",
+      "commentForbidden": "Nemaš dozvolu da komentarišeš ovaj zahtjev za spajanje.",
       "moderation": {
         "reportContent": {
           "terminal": "Ovaj komentar se ne može prijaviti.",
@@ -507,6 +509,8 @@
       "termsAcceptRequired": "Za objavljivanje moraš prihvatiti uslove korištenja.",
       "termsOutdatedCopy": "Uslovi korištenja su promijenjeni. Ponovo otvori ovaj ekran da prihvatiš najnoviju verziju.",
       "termsCheckRetryCopy": "Provjera uslova korištenja nije uspjela. Provjeri vezu i pokušaj ponovo.",
+      "comment_few": "{{displayCount}} komentara",
+      "reaction_few": "reakcije",
       "reactions": {
         "thumbsUp": "Palac gore",
         "thumbsDown": "Palac dolje",
@@ -525,8 +529,7 @@
         "outdatedOnPath": "Zastarjelo na {{path}}"
       },
       "deletedUser": "obrisani korisnik",
-      "comment_few": "{{displayCount}} komentara",
-      "reaction_few": "reakcije"
+      "replyForbiddenTerm": "Nemaš dozvolu da odgovoriš na ovaj {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Nije moguće otvoriti postavke GitHub aplikacije.",
     "installKiloGitHubApp": "Instaliraj aplikaciju Kilo za GitHub",
@@ -687,21 +690,6 @@
       "files": "Datoteke",
       "discussion": "Rasprava"
     },
-    "terms": {
-      "pullRequest": "Zahtjev za spajanje",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Podijeli merge request",
-      "viewOnProvider": "Pogledaj na {{provider}}",
-      "mergeRequestUnavailable": "Merge request nije dostupan",
-      "unavailableDescription": "Možda je obrisan ili nemaš pristup njemu.",
-      "accessDeniedMergeRequest": "Nemaš dozvolu za pregled ovog merge requesta.",
-      "couldNotLoadMergeRequest": "Učitavanje merge requesta nije uspjelo.",
-      "discussionAccessDenied": "Nemaš dozvolu za pregled rasprave o ovom merge requestu.",
-      "discussionUnavailableMessage": "Ovaj merge request je možda uklonjen.",
-      "noDiscussionDescription": "Ovaj merge request još nema niti za pregled koda ni komentara u raspravi.",
-      "noFilesChangedDescription": "Ovaj merge request ne sadrži promjene u datotekama."
-    },
     "fileStatus": {
       "modified": "Izmijenjeno",
       "renamed": "Preimenovano",
@@ -739,6 +727,27 @@
       "ambiguous": "Nije moguće potvrditi ishod radnje — provjeri PR prije ponovnog pokušaja.",
       "persistenceFailed": "Nismo mogli zabilježiti ovu radnju. Pokušaj ponovo kasnije.",
       "forbidden": "Radnja nije dozvoljena."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Nije dostupno kod ovog pružatelja usluga",
+        "accessibility": "Nije dostupno kod ovog pružatelja usluga: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Zahtjev za spajanje",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Podijeli merge request",
+      "viewOnProvider": "Pogledaj na {{provider}}",
+      "mergeRequestUnavailable": "Merge request nije dostupan",
+      "unavailableDescription": "Možda je obrisan ili nemaš pristup njemu.",
+      "accessDeniedMergeRequest": "Nemaš dozvolu za pregled ovog merge requesta.",
+      "couldNotLoadMergeRequest": "Učitavanje merge requesta nije uspjelo.",
+      "discussionAccessDenied": "Nemaš dozvolu za pregled rasprave o ovom merge requestu.",
+      "discussionUnavailableMessage": "Ovaj merge request je možda uklonjen.",
+      "noDiscussionDescription": "Ovaj merge request još nema niti za pregled koda ni komentara u raspravi.",
+      "noFilesChangedDescription": "Ovaj merge request ne sadrži promjene u datotekama."
     }
   },
   "notifications": {
@@ -2649,7 +2658,14 @@
     "languageNotInstalledMessage": "Vanmrežne datoteke govora za {{language}} nisu instalirane na ovom telefonu. Preuzmi ih, a zatim pokušaj glasovni unos ponovo.",
     "downloadOfflineModel": "Preuzmi",
     "offlineModelDownloadScheduled": "Vanmrežne datoteke govora bit će preuzete u pozadini. Pokušaj glasovni unos ponovo kasnije.",
-    "listeningStopped": "Slušanje je zaustavljeno."
+    "listeningStopped": "Slušanje je zaustavljeno.",
+    "transcribing": "Transkribiram...",
+    "gatewayUnreachable": "Nije bilo moguće povezati se s Kilo Gatewayem. Provjeri vezu i pokušaj ponovo.",
+    "gatewayTimeout": "Transkripcija je predugo trajala. Pokušaj ponovo.",
+    "gatewayModelUnavailable": "Ovaj model za transkripciju nije dostupan. Odaberi drugi u Postavkama.",
+    "gatewayModelUnavailableNotice": "Ovaj model se više ne nudi. Dodirni $t(transcriptionModel.title) da odabereš drugi.",
+    "gatewaySignInRequired": "Prijavi se da koristiš transkripciju putem Kilo Gatewaya.",
+    "gatewayNoModel": "Prvo odaberi model za transkripciju u Postavkama."
   },
   "share": {
     "title": "Podijeli s aplikacijom Kilo",
@@ -3032,5 +3048,12 @@
     "needsInput": "Čeka unos",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama da vidiš aktivne agente na zaključanom ekranu."
+  },
+  "transcriptionModel": {
+    "title": "Model za transkripciju",
+    "noneChosen": "Nije odabran",
+    "emptyTitle": "Nema modela za transkripciju",
+    "emptyDescription": "Kilo Gateway trenutno ne nudi modele za transkripciju.",
+    "loadFailed": "Nije moguće učitati modele za transkripciju."
   }
 }

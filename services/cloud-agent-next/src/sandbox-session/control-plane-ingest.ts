@@ -1,3 +1,9 @@
+import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
+import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
+import {
+  issueRuntimeProxyAttestation,
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { z } from 'zod';
 import { logger } from '../logger.js';
 import {
@@ -90,6 +96,14 @@ export async function publishControlPlaneSessionIngest(params: {
   directory?: string;
   internalSecret?: string;
   items: IngestItem[];
+  // Supplied only by the owning DO, never from event payloads or JWT claims.
+  runtimeContext?: {
+    secret: string;
+    userId: string;
+    organizationId?: string;
+    authorization: unknown;
+    isCurrent: () => boolean;
+  };
 }): Promise<void> {
   if (params.items.length === 0) return;
   const eventKiloSessionId = params.eventKiloSessionId ?? params.rootKiloSessionId;
@@ -135,6 +149,53 @@ export async function publishControlPlaneSessionIngest(params: {
     if (lineage) headers.set(cloudAgentSessionScopeHeaders.trustedLineage, '1');
   }
 
+  if (params.runtimeContext) {
+    try {
+      const context = params.runtimeContext;
+      const { claims } = await verifyKiloTokenForPolicy(params.token, context.secret, {
+        audience: 'session-ingest',
+        mode: 'allow-legacy',
+      });
+      if (claims.kiloUserId !== context.userId || claims.organizationId !== context.organizationId)
+        return;
+      if (claims.runtimeAuthorization) {
+        const authorization = RuntimeAuthorizationSchema.parse(context.authorization);
+        const reference = claims.runtimeAuthorization;
+        if (
+          authorization.state !== 'active' ||
+          authorization.resourceKind !== 'cloud-agent-next' ||
+          authorization.resourceId !== params.cloudAgentSessionId ||
+          authorization.userId !== context.userId ||
+          authorization.organizationId !== context.organizationId ||
+          reference.id !== authorization.id ||
+          reference.resourceKind !== authorization.resourceKind ||
+          reference.resourceId !== authorization.resourceId ||
+          Date.parse(authorization.issuedAt) > Date.now() ||
+          Date.parse(authorization.delegationExpiresAt) <= Date.now() ||
+          claims.exp * 1000 > Date.parse(authorization.delegationExpiresAt)
+        )
+          return;
+        headers.set(
+          RUNTIME_PROXY_ATTESTATION_HEADER,
+          await issueRuntimeProxyAttestation({
+            secret: context.secret,
+            audience: 'session-ingest',
+            userId: authorization.userId,
+            authorizationId: authorization.id,
+            resourceId: authorization.resourceId,
+            bearer: params.token,
+          })
+        );
+      } else if (context.authorization !== undefined && context.authorization !== null) {
+        return;
+      }
+      if (!context.isCurrent()) return;
+    } catch {
+      logger.warn('Control-plane session ingest authorization failed');
+      return;
+    }
+  }
+
   const body = JSON.stringify({ data: params.items });
   const ingestHeaders = new Headers(headers);
   ingestHeaders.set('Content-Length', String(new TextEncoder().encode(body).byteLength));
@@ -165,6 +226,7 @@ export async function publishControlPlaneSessionIngest(params: {
       }
     }
 
+    if (params.runtimeContext && !params.runtimeContext.isCurrent()) return;
     const response = await params.fetchIngest(
       new Request(ingestUrl, {
         method: 'POST',

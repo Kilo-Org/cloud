@@ -344,3 +344,43 @@ describe('PrDiffFloatingActions bottom inset (plan §6)', () => {
     expect(classes).toContain('w-full');
   });
 });
+
+describe('PrDiffFloatingActions side insets (landscape)', () => {
+  beforeEach(() => {
+    insets.top = 0;
+    insets.bottom = 0;
+    insets.left = 0;
+    insets.right = 0;
+  });
+
+  function rootBarStyle(): Record<string, number | undefined> {
+    // eslint-disable-next-line new-cap
+    const element = PrDiffFloatingActions(baseProps);
+    // The bar is an in-flow footer below the list (not an overlay), so the
+    // component's returned element IS the bar root — there is no wrapper
+    // View with `pointerEvents: box-none` to find.
+    return (element.props as { style?: Record<string, number | undefined> }).style ?? {};
+  }
+
+  it('keeps exactly the current style keys at zero portrait insets', () => {
+    const style = rootBarStyle();
+
+    // Spread only when nonzero: the `px-4` className gutter must survive
+    // portrait untouched (inline style wins over className).
+    expect(style.paddingLeft).toBeUndefined();
+    expect(style.paddingRight).toBeUndefined();
+    expect(style.paddingBottom).toBe(24);
+  });
+
+  it('clears the sensor housing with the landscape side insets', () => {
+    insets.left = 47;
+    insets.right = 59;
+    const style = rootBarStyle();
+
+    expect(style.paddingLeft).toBe(47);
+    expect(style.paddingRight).toBe(59);
+    // The card shrink is horizontal-only: the paddingBottom that feeds the
+    // measured onLayout height (and `prDiffListBottomPadding`) is unchanged.
+    expect(style.paddingBottom).toBe(24);
+  });
+});

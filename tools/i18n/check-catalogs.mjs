@@ -109,11 +109,13 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'agentChat.prBadge.label',
   'share.reviewPrSubtitle',
   // Format-only strings with no translatable words: a placeholder-only screen
-  // title, a placeholder-plus-UTC time-range label, and the GitLab merge
-  // request number, which is the provider's own "!" reference syntax.
+  // title, a placeholder-plus-UTC time-range label, the GitLab merge request
+  // number (the provider's own "!" reference syntax), and a pure $t()
+  // reference that names the transcription-model section title.
   'prReview.screen.title',
   'prReview.terms.mergeRequestNumber',
   'securityAgent.auditReport.periodUtc',
+  'preferences.transcriptionModel',
 ]);
 
 /** The supported tags, read from the one source of truth. */

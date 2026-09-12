@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "Деловно SSO"
   },
   "preferences": {
+    "general": "Општо",
+    "voiceInput": "Гласовен внес",
     "autoExpandThinking": "Автоматски прикажувај го размислувањето",
     "autoExpandThinkingSubtitle": "Прикажи го целото размислување на агентот кога ќе заврши.",
     "keepScreenOn": "Задржи го екранот вклучен додека ја гледаш сесијата",
@@ -238,6 +240,7 @@
     "appearanceLight": "Светло",
     "appearanceDark": "Темно",
     "account": "Сметка",
+    "accountSubtitle": "Јазик, доверливи хостови и сесии на уреди",
     "prReviewAttribution": "Додај потпис од апликацијата во прегледите на PR",
     "prReviewAttributionSubtitle": "Додај го потписот „Прегледано преку Kilo“ на крајот кога испраќаш преглед.",
     "returnSendsMessage": "Копчето за нов ред испраќа порака",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Транскрипција преку Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Транскрибирај го гласовниот внес со модел на Kilo Gateway наместо со препознавањето на говор на уредот. Снимката се испраќа до Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Барањето за спојување е недостапно",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Празен ред со разлики"
     },
     "connectionExpired": "Врската со GitHub истече.",
-    "capabilities": {
-      "banner": {
-        "title": "Не е достапно кај овој оператор",
-        "accessibility": "Не е достапно кај овој оператор: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Спојување",
       "mergeNow": "Спој сега",
@@ -472,7 +472,9 @@
       "acceptTerms": "Прифати",
       "replyBadRequest": "Овој одговор не може да се објави. Можеби нишката е променета.",
       "replyForbidden": "Немаш дозвола да одговориш на ова барање за спојување.",
-      "replyForbiddenTerm": "Немате дозвола за одговор на {{term}}.",
+      "addCommentCta": "Коментирај ова барање за спојување",
+      "commentBadRequest": "Овој коментар не може да се објави. Можеби барањето за спојување е променето.",
+      "commentForbidden": "Немаш дозвола да коментираш ова барање за спојување.",
       "moderation": {
         "reportContent": {
           "terminal": "Овој коментар не може да се пријави.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Застарено на {{lines}}",
         "outdatedOnPath": "Застарено на {{path}}"
       },
-      "deletedUser": "избришан корисник"
+      "deletedUser": "избришан корисник",
+      "replyForbiddenTerm": "Немате дозвола за одговор на {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Поставките за апликацијата на GitHub не се отворија.",
     "installKiloGitHubApp": "Инсталирај ја апликацијата Kilo за GitHub",
@@ -679,21 +682,6 @@
       "files": "Датотеки",
       "discussion": "Дискусија"
     },
-    "terms": {
-      "pullRequest": "PR",
-      "mergeRequest": "Merge барање",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Сподели merge барање",
-      "viewOnProvider": "Прикажи на {{provider}}",
-      "mergeRequestUnavailable": "Merge барањето е недостапно",
-      "unavailableDescription": "Можеби е избришано или немате пристап до него.",
-      "accessDeniedMergeRequest": "Немате дозвола за преглед на ова merge барање.",
-      "couldNotLoadMergeRequest": "Не можеше да се вчита merge барањето",
-      "discussionAccessDenied": "Немате дозвола за преглед на дискусијата на ова merge барање.",
-      "discussionUnavailableMessage": "Ова merge барање можеби е отстрането.",
-      "noDiscussionDescription": "Нема ни теми за преглед ни коментари за разговор на ова merge барање.",
-      "noFilesChangedDescription": "Ова merge барање нема промени на датотеки."
-    },
     "fileStatus": {
       "modified": "Изменета",
       "renamed": "Преименувана",
@@ -731,6 +719,27 @@
       "ambiguous": "Не успеа потврдата на дејството — провери го PR пред повторниот обид.",
       "persistenceFailed": "Не успеа евидентирањето на ова дејство. Обиди се повторно подоцна.",
       "forbidden": "Пристапот е забранет."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Не е достапно кај овој оператор",
+        "accessibility": "Не е достапно кај овој оператор: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge барање",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Сподели merge барање",
+      "viewOnProvider": "Прикажи на {{provider}}",
+      "mergeRequestUnavailable": "Merge барањето е недостапно",
+      "unavailableDescription": "Можеби е избришано или немате пристап до него.",
+      "accessDeniedMergeRequest": "Немате дозвола за преглед на ова merge барање.",
+      "couldNotLoadMergeRequest": "Не можеше да се вчита merge барањето",
+      "discussionAccessDenied": "Немате дозвола за преглед на дискусијата на ова merge барање.",
+      "discussionUnavailableMessage": "Ова merge барање можеби е отстрането.",
+      "noDiscussionDescription": "Нема ни теми за преглед ни коментари за разговор на ова merge барање.",
+      "noFilesChangedDescription": "Ова merge барање нема промени на датотеки."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Офлајн датотеките со говор за {{language}} не се инсталирани на овој телефон. Преземи ги, а потоа обиди се повторно со гласовниот внес.",
     "downloadOfflineModel": "Преземи",
     "offlineModelDownloadScheduled": "Офлајн датотеките со говор ќе се преземат во позадина. Обиди се повторно со гласовниот внес подоцна.",
-    "listeningStopped": "Слушањето е запрено."
+    "listeningStopped": "Слушањето е запрено.",
+    "transcribing": "Се транскрибира...",
+    "gatewayUnreachable": "Не може да се достигне Kilo Gateway. Провери ја врската и обиди се повторно.",
+    "gatewayTimeout": "Транскрипцијата трае предолго. Обиди се повторно.",
+    "gatewayModelUnavailable": "Овој модел за транскрипција не е достапен. Одбери друг во Лични поставки.",
+    "gatewayModelUnavailableNotice": "Овој модел веќе не се нуди. Допрете $t(transcriptionModel.title) за да изберете друг.",
+    "gatewaySignInRequired": "Најави се за да користиш транскрипција преку Kilo Gateway.",
+    "gatewayNoModel": "Прво одбери модел за транскрипција во Лични поставки."
   },
   "share": {
     "title": "Споделување во Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Чека внес",
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран."
+  },
+  "transcriptionModel": {
+    "title": "Модел за транскрипција",
+    "noneChosen": "Не е избран",
+    "emptyTitle": "Нема модели за транскрипција",
+    "emptyDescription": "Kilo Gateway моментално не нуди модели за транскрипција.",
+    "loadFailed": "Моделите за транскрипција не се вчитаа."
   }
 }

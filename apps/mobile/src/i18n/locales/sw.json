@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO ya biashara"
   },
   "preferences": {
+    "general": "Jumla",
+    "voiceInput": "Uingizaji wa sauti",
     "autoExpandThinking": "Panua mawazo kiotomatiki",
     "autoExpandThinkingSubtitle": "Onyesha mawazo ya wakala yakiwa yamepanuliwa anapomaliza kufikiri.",
     "keepScreenOn": "Acha skrini iwake ukiwa kwenye ukurasa wa kikao",
@@ -238,6 +240,7 @@
     "appearanceLight": "Angavu",
     "appearanceDark": "Giza",
     "account": "Akaunti",
+    "accountSubtitle": "Lugha, tovuti zinazoaminika na vikao vya vifaa",
     "prReviewAttribution": "Ongeza jina la programu kwenye ukaguzi wa PR",
     "prReviewAttributionSubtitle": "Ongeza maelezo chini ya ukaguzi yanayoonyesha kuwa umetumia Kilo unapowasilisha ukaguzi.",
     "returnSendsMessage": "Kitufe cha kuingiza hutuma ujumbe",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Unukuzi wa sauti kupitia Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Badilisha uingizaji wa sauti kuwa maandishi kwa modeli ya Kilo Gateway badala ya utambuzi wa sauti wa kifaa. Rekodi yako imetumwa kwa Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Ombi la kuunganisha halipatikani",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Safu mlalo tupu ya tofauti za msimbo"
     },
     "connectionExpired": "Muda wa muunganisho wa GitHub umeisha.",
-    "capabilities": {
-      "banner": {
-        "title": "Haipatikani kwa mtoa huduma huyu",
-        "accessibility": "Haipatikani kwa mtoa huduma huyu: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Uunganishaji",
       "mergeNow": "Unganisha sasa",
@@ -472,7 +472,9 @@
       "acceptTerms": "Kubali",
       "replyBadRequest": "Jibu hili haliwezi kuchapishwa. Mada huenda imebadilika.",
       "replyForbidden": "Huna ruhusa ya kujibu ombi hili la kuunganisha.",
-      "replyForbiddenTerm": "Huna ruhusa ya kujibu {{term}}.",
+      "addCommentCta": "Toa maoni kwenye ombi hili la kuunganisha",
+      "commentBadRequest": "Maoni haya haliwezi kuchapishwa. Huenda ombi hili la kuunganisha likabadilika.",
+      "commentForbidden": "Huna ruhusa ya kutoa maoni kwenye ombi hili la kuunganisha.",
       "moderation": {
         "reportContent": {
           "terminal": "Maoni haya hayawezi kuripotiwa.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Yaliyopitwa na wakati kwenye {{lines}}",
         "outdatedOnPath": "Yaliyopitwa na wakati kwenye {{path}}"
       },
-      "deletedUser": "mtumiaji aliyefutwa"
+      "deletedUser": "mtumiaji aliyefutwa",
+      "replyForbiddenTerm": "Huna ruhusa ya kujibu {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Imeshindikana kufungua mipangilio ya programu ya GitHub.",
     "installKiloGitHubApp": "Sakinisha programu ya Kilo ya GitHub",
@@ -679,21 +682,6 @@
       "files": "Faili",
       "discussion": "Mazungumzo"
     },
-    "terms": {
-      "pullRequest": "Ombi la kuunganisha",
-      "mergeRequest": "Ombi la kuunganisha",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Shiriki ombi la kuunganisha",
-      "viewOnProvider": "Tazama kwenye {{provider}}",
-      "mergeRequestUnavailable": "Ombi la kuunganisha halipatikani",
-      "unavailableDescription": "Huenda kimefutwa, au huenda huna ruhusa ya kukionoa.",
-      "accessDeniedMergeRequest": "Huna ruhusa ya kuona ombi hili la kuunganisha.",
-      "couldNotLoadMergeRequest": "Imeshindikana kupakia ombi la kuunganisha.",
-      "discussionAccessDenied": "Huna ruhusa ya kuangalia mazungumzo ya ombi hili la kuunganisha.",
-      "discussionUnavailableMessage": "Huenda ombi hili la kuunganisha limeondolewa.",
-      "noDiscussionDescription": "Hakuna mada za ukaguzi wala maoni ya mazungumzo kwenye ombi hili la kuunganisha.",
-      "noFilesChangedDescription": "Ombi hili la kuunganisha halina mabadiliko ya faili."
-    },
     "fileStatus": {
       "modified": "Imebadilishwa",
       "renamed": "Jina limebadilishwa",
@@ -731,6 +719,27 @@
       "ambiguous": "Imeshindikana kuthibitisha matokeo — angalia PR kabla ya kujaribu tena.",
       "persistenceFailed": "Hatukuweza kurekodi kitendo hiki. Tafadhali jaribu tena baadaye.",
       "forbidden": "Kitendo hiki hakiruhusiwi."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Haipatikani kwa mtoa huduma huyu",
+        "accessibility": "Haipatikani kwa mtoa huduma huyu: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Ombi la kuunganisha",
+      "mergeRequest": "Ombi la kuunganisha",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Shiriki ombi la kuunganisha",
+      "viewOnProvider": "Tazama kwenye {{provider}}",
+      "mergeRequestUnavailable": "Ombi la kuunganisha halipatikani",
+      "unavailableDescription": "Huenda kimefutwa, au huenda huna ruhusa ya kukionoa.",
+      "accessDeniedMergeRequest": "Huna ruhusa ya kuona ombi hili la kuunganisha.",
+      "couldNotLoadMergeRequest": "Imeshindikana kupakia ombi la kuunganisha.",
+      "discussionAccessDenied": "Huna ruhusa ya kuangalia mazungumzo ya ombi hili la kuunganisha.",
+      "discussionUnavailableMessage": "Huenda ombi hili la kuunganisha limeondolewa.",
+      "noDiscussionDescription": "Hakuna mada za ukaguzi wala maoni ya mazungumzo kwenye ombi hili la kuunganisha.",
+      "noFilesChangedDescription": "Ombi hili la kuunganisha halina mabadiliko ya faili."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Mafaili ya sauti ya nje ya mtandao ya {{language}} hayajasakinishwa kwenye simu hii. Pakua mafaili hayo, kisha ujaribu tena uingizaji kwa sauti.",
     "downloadOfflineModel": "Pakua",
     "offlineModelDownloadScheduled": "Mafaili ya sauti ya nje ya mtandao yatapakuliwa nyuma ya pazia. Jaribu tena uingizaji kwa sauti baadaye.",
-    "listeningStopped": "Usikilizaji umesimama."
+    "listeningStopped": "Usikilizaji umesimama.",
+    "transcribing": "Inanukuuza...",
+    "gatewayUnreachable": "Kilo Gateway haikupatikana. Angalia muunganisho wako na ujaribu tena.",
+    "gatewayTimeout": "Unukuzi umechukua muda mrefu sana. Jaribu tena.",
+    "gatewayModelUnavailable": "Modeli hii ya unukuzi haipatikani. Chagua nyingine katika Mapendeleo.",
+    "gatewayModelUnavailableNotice": "Modeli hii haitolewi tena. Gusa $t(transcriptionModel.title) kuchagua nyingine.",
+    "gatewaySignInRequired": "Ingia ili utumie unukuzi wa Kilo Gateway.",
+    "gatewayNoModel": "Kwanza chagua modeli ya unukuzi katika Mapendeleo."
   },
   "share": {
     "title": "Kushiriki kwenye Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Inasubiri jibu",
     "channelName": "Mawakala wanaofanya kazi",
     "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa."
+  },
+  "transcriptionModel": {
+    "title": "Modeli ya unukuzi",
+    "noneChosen": "Hakuna iliyochaguliwa",
+    "emptyTitle": "Hakuna modeli za unukuzi",
+    "emptyDescription": "Kilo Gateway haina modeli za unukuzi kwa sasa.",
+    "loadFailed": "Imeshindikana kupakia modeli za unukuzi."
   }
 }

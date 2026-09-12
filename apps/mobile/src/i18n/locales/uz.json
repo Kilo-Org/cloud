@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "Korporativ SSO"
   },
   "preferences": {
+    "general": "Umumiy",
+    "voiceInput": "Ovozli kiritish",
     "autoExpandThinking": "Fikrlash matnini avtomatik ochish",
     "autoExpandThinkingSubtitle": "Agent fikrlashni tugatgach, fikrlash matnini to'liq ko'rsatish.",
     "keepScreenOn": "Sessiya sahifasida ekranni o'chirmaslik",
@@ -238,6 +240,7 @@
     "appearanceLight": "Och",
     "appearanceDark": "To'q",
     "account": "Hisob",
+    "accountSubtitle": "Til, ishonchli saytlar va qurilma seanslari",
     "prReviewAttribution": "PR tekshiruvlariga ilova nomini qo'shish",
     "prReviewAttributionSubtitle": "Tekshiruv natijasini yuborganda oxiriga Kilo orqali tekshirilganini bildiruvchi yozuv qo'shish.",
     "returnSendsMessage": "Enter tugmasi xabar yuboradi",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Nutqni Kilo Gateway orqali matnga aylantirish",
+    "gatewayTranscriptionSubtitle": "Qurilmaning nutqni tanishining o'rniga Kilo Gateway modeli yordamida ovozli kiritishni matnga aylantiring. Yozuvingiz Kilo Gatewayga yuboriladi.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "PR mavjud emas",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Farqlar jadvalidagi bo'sh qator"
     },
     "connectionExpired": "GitHub bilan ulanish muddati tugadi.",
-    "capabilities": {
-      "banner": {
-        "title": "Ushbu provayderda mavjud emas",
-        "accessibility": "Ushbu provayderda mavjud emas: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Birlashtirish",
       "mergeNow": "Hozir birlashtirish",
@@ -472,7 +472,9 @@
       "acceptTerms": "Qabul qilish",
       "replyBadRequest": "Bu javobni joylab bo'lmaydi. Izohlar zanjiri o'zgargan bo'lishi mumkin.",
       "replyForbidden": "Bu PRga javob yozishga ruxsatingiz yo'q.",
-      "replyForbiddenTerm": "Bu {{term}}ga javob yozishga ruxsatingiz yo‘q.",
+      "addCommentCta": "Bu PRga izoh yozish",
+      "commentBadRequest": "Bu izohni joylab bo'lmaydi. PR o'zgargan bo'lishi mumkin.",
+      "commentForbidden": "Bu PRga izoh yozishga ruxsatingiz yo'q.",
       "moderation": {
         "reportContent": {
           "terminal": "Bu izoh ustidan shikoyat qilib bo'lmaydi.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Eskirgan: {{lines}}",
         "outdatedOnPath": "Eskirgan: {{path}}"
       },
-      "deletedUser": "o'chirilgan foydalanuvchi"
+      "deletedUser": "o'chirilgan foydalanuvchi",
+      "replyForbiddenTerm": "Bu {{term}}ga javob yozishga ruxsatingiz yo‘q."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ilovasi sozlamalarini ochib bo‘lmadi.",
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",
@@ -679,21 +682,6 @@
       "files": "Fayl",
       "discussion": "Muhokama"
     },
-    "terms": {
-      "pullRequest": "PR",
-      "mergeRequest": "Merge so‘rovi",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Merge so‘rovini ulashish",
-      "viewOnProvider": "{{provider}}da ko'rish",
-      "mergeRequestUnavailable": "Merge so‘rovi mavjud emas",
-      "unavailableDescription": "Ehtimol u o‘chirilgan yoki unga kirish huquqingiz yo‘q.",
-      "accessDeniedMergeRequest": "Bu merge so‘rovini ko‘rishga ruxsatingiz yo‘q.",
-      "couldNotLoadMergeRequest": "Merge so‘rovini yuklab bo‘lmadi.",
-      "discussionAccessDenied": "Bu merge so‘rovi muhokamasini ko‘rishga ruxsatingiz yo‘q.",
-      "discussionUnavailableMessage": "Bu merge so‘rovi o‘chirilgan bo‘lishi mumkin.",
-      "noDiscussionDescription": "Bu merge so‘rovida ko‘rib chiqishga oid izohlar zanjiri ham, umumiy izohlar ham yo‘q.",
-      "noFilesChangedDescription": "Bu merge so‘rovida hech bir fayl o‘zgarmagan."
-    },
     "fileStatus": {
       "modified": "O'zgartirildi",
       "renamed": "Nomi o'zgartirildi",
@@ -731,6 +719,27 @@
       "ambiguous": "Amal natijasini tasdiqlab bo'lmadi — qayta urinishdan oldin PRni tekshiring.",
       "persistenceFailed": "Bu amalni qayd etib bo'lmadi. Keyinroq qayta urinib ko'ring.",
       "forbidden": "Bu amalni bajarishga ruxsat yo'q."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ushbu provayderda mavjud emas",
+        "accessibility": "Ushbu provayderda mavjud emas: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge so‘rovi",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Merge so‘rovini ulashish",
+      "viewOnProvider": "{{provider}}da ko'rish",
+      "mergeRequestUnavailable": "Merge so‘rovi mavjud emas",
+      "unavailableDescription": "Ehtimol u o‘chirilgan yoki unga kirish huquqingiz yo‘q.",
+      "accessDeniedMergeRequest": "Bu merge so‘rovini ko‘rishga ruxsatingiz yo‘q.",
+      "couldNotLoadMergeRequest": "Merge so‘rovini yuklab bo‘lmadi.",
+      "discussionAccessDenied": "Bu merge so‘rovi muhokamasini ko‘rishga ruxsatingiz yo‘q.",
+      "discussionUnavailableMessage": "Bu merge so‘rovi o‘chirilgan bo‘lishi mumkin.",
+      "noDiscussionDescription": "Bu merge so‘rovida ko‘rib chiqishga oid izohlar zanjiri ham, umumiy izohlar ham yo‘q.",
+      "noFilesChangedDescription": "Bu merge so‘rovida hech bir fayl o‘zgarmagan."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "{{language}} tilining oflayn nutq fayllari bu telefonda o'rnatilmagan. Ularni yuklab oling, so'ngra ovozli kiritishni qayta sinab ko'ring.",
     "downloadOfflineModel": "Yuklab olish",
     "offlineModelDownloadScheduled": "Oflayn nutq fayllari fonda yuklab olinadi. Ovozli kiritishni keyinroq qayta sinab ko'ring.",
-    "listeningStopped": "Tinglash to'xtatildi."
+    "listeningStopped": "Tinglash to'xtatildi.",
+    "transcribing": "Matnga aylantirilmoqda...",
+    "gatewayUnreachable": "Kilo Gatewayga ulanib bo'lmadi. Ulanishni tekshiring va qayta urinib ko'ring.",
+    "gatewayTimeout": "Matnga aylantirish juda uzoq davom etdi. Qayta urinib ko'ring.",
+    "gatewayModelUnavailable": "Ushbu matnga aylantirish modeli mavjud emas. Shaxsiy sozlamalardan boshqasini tanlang.",
+    "gatewayModelUnavailableNotice": "Bu model endi taklif etilmaydi. Boshqasini tanlash uchun $t(transcriptionModel.title) ga teging.",
+    "gatewaySignInRequired": "Kilo Gateway orqali aylantirishdan foydalanish uchun tizimga kiring.",
+    "gatewayNoModel": "Avval Shaxsiy sozlamalardan matnga aylantirish modelini tanlang."
   },
   "share": {
     "title": "Kiloga yuborish",
@@ -3009,5 +3025,12 @@
     "needsInput": "Javob kutilmoqda",
     "channelName": "Faol agentlar",
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing."
+  },
+  "transcriptionModel": {
+    "title": "Matnga aylantirish modeli",
+    "noneChosen": "Hech narsa tanlanmagan",
+    "emptyTitle": "Matnga aylantirish modellari yo'q",
+    "emptyDescription": "Kilo Gateway hozircha matnga aylantirish modellarini taklif qilmayapti.",
+    "loadFailed": "Matnga aylantirish modellarini yuklab bo'lmadi."
   }
 }

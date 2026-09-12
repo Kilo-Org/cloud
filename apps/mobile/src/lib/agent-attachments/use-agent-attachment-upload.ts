@@ -246,8 +246,8 @@ export function useAgentAttachmentUpload(
   // Cancel handles for in-flight uploads, keyed by attachment id. Each handle
   // cancels the upload task and deletes a cache-owned partial file. The entry
   // is removed when the upload settles (in `startUpload`'s finally) or when a
-  // cancel runs.
-  const cancelHandlesRef = useRef(new Map<string, () => Promise<void>>());
+  // cancel runs. The modern task cancels synchronously, so a handle returns void.
+  const cancelHandlesRef = useRef(new Map<string, () => void>());
 
   const cancelUpload = useCallback((id: string) => {
     const handle = cancelHandlesRef.current.get(id);
@@ -255,7 +255,11 @@ export function useAgentAttachmentUpload(
       return;
     }
     cancelHandlesRef.current.delete(id);
-    void runBestEffort(handle);
+    try {
+      handle();
+    } catch {
+      // Best-effort: a failed cancel must not block removal.
+    }
   }, []);
 
   useEffect(() => {
@@ -322,14 +326,12 @@ export function useAgentAttachmentUpload(
         // cache-owned file and blocks task creation after the signed URL
         // returns.
         let cancelled = false;
-        let task: { cancelAsync: () => Promise<void> } | undefined = undefined;
-        cancelHandlesRef.current.set(attachment.id, async () => {
+        let task: { cancel: () => void } | undefined = undefined;
+        cancelHandlesRef.current.set(attachment.id, () => {
           cancelled = true;
           progressCoalescer.cancel();
           try {
-            if (task) {
-              await task.cancelAsync();
-            }
+            task?.cancel();
           } finally {
             deleteCacheOwnedFile(attachment.localUri);
           }

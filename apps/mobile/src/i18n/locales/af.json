@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "Onderneming-SSO"
   },
   "preferences": {
+    "general": "Algemeen",
+    "voiceInput": "Steminvoer",
     "autoExpandThinking": "Vou denke outomaties uit",
     "autoExpandThinkingSubtitle": "Wys die agent se denke volledig wanneer dit klaar gedink het.",
     "keepScreenOn": "Hou die skerm aan op die sessiebladsy",
@@ -238,6 +240,7 @@
     "appearanceLight": "Lig",
     "appearanceDark": "Donker",
     "account": "Rekening",
+    "accountSubtitle": "Taal, vertroude gashere en toestelsessies",
     "prReviewAttribution": "Voeg toepvermelding by PR-hersienings",
     "prReviewAttributionSubtitle": "Voeg 'n voetskrif met die woorde Hersien via Kilo by wanneer jy 'n hersiening indien.",
     "returnSendsMessage": "Return-toets stuur boodskap",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Gateway-transkripsie",
+    "gatewayTranscriptionSubtitle": "Transkribeer steminvoer met 'n Kilo Gateway-model in plaas van die toestel se spraakherkenning. Jou opname word na die Kilo Gateway gestuur.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Leë ry in die verskille"
     },
     "connectionExpired": "Die GitHub-verbinding het verval.",
-    "capabilities": {
-      "banner": {
-        "title": "Nie beskikbaar by hierdie verskaffer nie",
-        "accessibility": "Nie beskikbaar by hierdie verskaffer nie: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Samevoeging",
       "mergeNow": "Voeg nou saam",
@@ -472,7 +472,9 @@
       "acceptTerms": "Aanvaar",
       "replyBadRequest": "Hierdie antwoord kan nie geplaas word nie. Die draad het dalk verander.",
       "replyForbidden": "Jy het nie toestemming om op hierdie trekversoek te antwoord nie.",
-      "replyForbiddenTerm": "Jy het nie toestemming om op hierdie {{term}} te antwoord nie.",
+      "addCommentCta": "Kommenteer op hierdie trekversoek",
+      "commentBadRequest": "Hierdie kommentaar kan nie geplaas word nie. Die trekversoek het dalk verander.",
+      "commentForbidden": "Jy het nie toestemming om op hierdie trekversoek kommentaar te lewer nie.",
       "moderation": {
         "reportContent": {
           "terminal": "Hierdie kommentaar kan nie gerapporteer word nie.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Verouderd op {{lines}}",
         "outdatedOnPath": "Verouderd op {{path}}"
       },
-      "deletedUser": "geskrapte gebruiker"
+      "deletedUser": "geskrapte gebruiker",
+      "replyForbiddenTerm": "Jy het nie toestemming om op hierdie {{term}} te antwoord nie."
     },
     "couldNotOpenGitHubAppSettings": "Die GitHub-toepassing se instellings kon nie oopgemaak word nie.",
     "installKiloGitHubApp": "Installeer die Kilo GitHub-toep",
@@ -679,21 +682,6 @@
       "files": "Lêers",
       "discussion": "Bespreking"
     },
-    "terms": {
-      "pullRequest": "Trekversoek",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Deel merge request",
-      "viewOnProvider": "Bekyk op {{provider}}",
-      "mergeRequestUnavailable": "Merge request onbeskikbaar",
-      "unavailableDescription": "Dit is dalk uitgevee, of jy het nie toegang daartoe nie.",
-      "accessDeniedMergeRequest": "Jy het nie toestemming om hierdie merge request te bekyk nie.",
-      "couldNotLoadMergeRequest": "Kon nie die merge request laai nie.",
-      "discussionAccessDenied": "Jy het nie toestemming om hierdie merge request se bespreking te bekyk nie.",
-      "discussionUnavailableMessage": "Hierdie merge request is dalk verwyder.",
-      "noDiscussionDescription": "Daar is nog geen hersieningsdrade of gesprekskommentare op hierdie merge request nie.",
-      "noFilesChangedDescription": "Hierdie merge request het geen lêerveranderings nie."
-    },
     "fileStatus": {
       "modified": "Gewysig",
       "renamed": "Hernoem",
@@ -731,6 +719,27 @@
       "ambiguous": "Kon nie bevestig nie — kyk na die PR voordat jy weer probeer.",
       "persistenceFailed": "Ons kon nie hierdie aksie aanteken nie. Probeer asseblief later weer.",
       "forbidden": "Toegang is verbode."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Nie beskikbaar by hierdie verskaffer nie",
+        "accessibility": "Nie beskikbaar by hierdie verskaffer nie: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Trekversoek",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Deel merge request",
+      "viewOnProvider": "Bekyk op {{provider}}",
+      "mergeRequestUnavailable": "Merge request onbeskikbaar",
+      "unavailableDescription": "Dit is dalk uitgevee, of jy het nie toegang daartoe nie.",
+      "accessDeniedMergeRequest": "Jy het nie toestemming om hierdie merge request te bekyk nie.",
+      "couldNotLoadMergeRequest": "Kon nie die merge request laai nie.",
+      "discussionAccessDenied": "Jy het nie toestemming om hierdie merge request se bespreking te bekyk nie.",
+      "discussionUnavailableMessage": "Hierdie merge request is dalk verwyder.",
+      "noDiscussionDescription": "Daar is nog geen hersieningsdrade of gesprekskommentare op hierdie merge request nie.",
+      "noFilesChangedDescription": "Hierdie merge request het geen lêerveranderings nie."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Die vanlyn-spraaklêers vir {{language}} is nie op hierdie foon geïnstalleer nie. Laai hulle af en probeer steminvoer weer.",
     "downloadOfflineModel": "Laai af",
     "offlineModelDownloadScheduled": "Die vanlyn-spraaklêers sal op die agtergrond afgelaai word. Probeer steminvoer later weer.",
-    "listeningStopped": "Die toestel luister nie meer nie."
+    "listeningStopped": "Die toestel luister nie meer nie.",
+    "transcribing": "Transkribeer...",
+    "gatewayUnreachable": "Die Kilo Gateway kon nie bereik word nie. Gaan jou verbinding na en probeer weer.",
+    "gatewayTimeout": "Die transkripsie het te lank geneem. Probeer weer.",
+    "gatewayModelUnavailable": "Hierdie transkripsiemodel is nie beskikbaar nie. Kies 'n ander een in Voorkeure.",
+    "gatewayModelUnavailableNotice": "Hierdie model word nie meer aangebied nie. Tik op $t(transcriptionModel.title) om 'n ander een te kies.",
+    "gatewaySignInRequired": "Teken in om gateway-transkripsie te gebruik.",
+    "gatewayNoModel": "Kies eers 'n transkripsiemodel in Voorkeure."
   },
   "share": {
     "title": "Deel met Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Wag op invoer",
     "channelName": "Aktiewe agente",
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien."
+  },
+  "transcriptionModel": {
+    "title": "Transkripsiemodel",
+    "noneChosen": "Geen gekies nie",
+    "emptyTitle": "Geen transkripsiemodelle nie",
+    "emptyDescription": "Die Kilo Gateway bied tans geen transkripsiemodelle nie.",
+    "loadFailed": "Die transkripsiemodelle kon nie gelaai word nie."
   }
 }

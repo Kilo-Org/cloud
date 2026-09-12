@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "Корпоративтік SSO"
   },
   "preferences": {
+    "general": "Жалпы",
+    "voiceInput": "Дауыспен енгізу",
     "autoExpandThinking": "Ойлау барысын автоматты түрде ашу",
     "autoExpandThinkingSubtitle": "Агент ойлануды аяқтағанда, оның ойлау барысын толық көрсету.",
     "keepScreenOn": "Сессия бетінде экранды қосулы ұстау",
@@ -238,6 +240,7 @@
     "appearanceLight": "Ашық",
     "appearanceDark": "Күңгірт",
     "account": "Тіркелгі",
+    "accountSubtitle": "Тіл, сенімді хосттар және құрылғылардағы сессиялар",
     "prReviewAttribution": "PR тексерулеріне қолданба атауын қосу",
     "prReviewAttributionSubtitle": "Тексеру нәтижесін жібергенде, соңына «Kilo арқылы тексерілді» деген жазу қосу.",
     "returnSendsMessage": "Enter пернесімен хабарлама жіберу",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway арқылы дауысты мәтінге айналдыру",
+    "gatewayTranscriptionSubtitle": "Дауыстық енгізуді құрылғының сөзді тануының орнына Kilo Gateway моделі арқылы мәтінге айналдырыңыз. Жазбаңыз Kilo Gateway-ге жіберіледі.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Өзгерістердің бос жолы"
     },
     "connectionExpired": "GitHub қосылымының мерзімі аяқталды.",
-    "capabilities": {
-      "banner": {
-        "title": "Бұл провайдерде қолжетімсіз",
-        "accessibility": "Бұл провайдерде қолжетімсіз: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Біріктіру",
       "mergeNow": "Қазір біріктіру",
@@ -472,7 +472,9 @@
       "acceptTerms": "Қабылдау",
       "replyBadRequest": "Бұл жауапты жариялау мүмкін емес. Талқылау тармағы өзгерген болуы мүмкін.",
       "replyForbidden": "Бұл біріктіру сұрауына жауап беруге рұқсатыңыз жоқ.",
-      "replyForbiddenTerm": "Бұл {{term}}на жауап беруге рұқсатыңыз жоқ.",
+      "addCommentCta": "Бұл біріктіру сұрауына пікір жазу",
+      "commentBadRequest": "Бұл пікірді жариялау мүмкін емес. Біріктіру сұрауы өзгерген болуы мүмкін.",
+      "commentForbidden": "Бұл біріктіру сұрауына пікір жазуға рұқсатыңыз жоқ.",
       "moderation": {
         "reportContent": {
           "terminal": "Бұл пікірге шағымдану мүмкін емес.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Ескірген: {{lines}}",
         "outdatedOnPath": "Ескірген: {{path}}"
       },
-      "deletedUser": "жойылған пайдаланушы"
+      "deletedUser": "жойылған пайдаланушы",
+      "replyForbiddenTerm": "Бұл {{term}}на жауап беруге рұқсатыңыз жоқ."
     },
     "couldNotOpenGitHubAppSettings": "GitHub қолданбасының параметрлерін ашу мүмкін болмады.",
     "installKiloGitHubApp": "Kilo GitHub қолданбасын орнату",
@@ -679,21 +682,6 @@
       "files": "Файл",
       "discussion": "Талқылау"
     },
-    "terms": {
-      "pullRequest": "Біріктіру сұрауы",
-      "mergeRequest": "Біріктіру сұрауы",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Біріктіру сұрауымен бөлісу",
-      "viewOnProvider": "{{provider}}-да қарау",
-      "mergeRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",
-      "unavailableDescription": "Ол жойылған болуы мүмкін, немесе оған рұқсатыңыз жоқ.",
-      "accessDeniedMergeRequest": "Бұл біріктіру сұрауын көруге рұқсатыңыз жоқ.",
-      "couldNotLoadMergeRequest": "Біріктіру сұрауын жүктеу мүмкін болмады.",
-      "discussionAccessDenied": "Бұл біріктіру сұрауының талқылауын қарауға рұқсатыңыз жоқ.",
-      "discussionUnavailableMessage": "Бұл біріктіру сұрауы жойылған болуы мүмкін.",
-      "noDiscussionDescription": "Бұл біріктіру сұрауында кодты тексеру талқылаулары да, жалпы пікірлер де жоқ.",
-      "noFilesChangedDescription": "Бұл біріктіру сұрауында файлдарға өзгеріс енгізілмеген."
-    },
     "fileStatus": {
       "modified": "Өзгертілді",
       "renamed": "Атауы өзгертілді",
@@ -731,6 +719,27 @@
       "ambiguous": "Әрекеттің орындалғанын растау мүмкін болмады — қайталау алдында PR-ді тексеріңіз.",
       "persistenceFailed": "Бұл әрекетті тіркей алмадық. Кейінірек қайталап көріңіз.",
       "forbidden": "Рұқсат жоқ."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Бұл провайдерде қолжетімсіз",
+        "accessibility": "Бұл провайдерде қолжетімсіз: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Біріктіру сұрауы",
+      "mergeRequest": "Біріктіру сұрауы",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Біріктіру сұрауымен бөлісу",
+      "viewOnProvider": "{{provider}}-да қарау",
+      "mergeRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",
+      "unavailableDescription": "Ол жойылған болуы мүмкін, немесе оған рұқсатыңыз жоқ.",
+      "accessDeniedMergeRequest": "Бұл біріктіру сұрауын көруге рұқсатыңыз жоқ.",
+      "couldNotLoadMergeRequest": "Біріктіру сұрауын жүктеу мүмкін болмады.",
+      "discussionAccessDenied": "Бұл біріктіру сұрауының талқылауын қарауға рұқсатыңыз жоқ.",
+      "discussionUnavailableMessage": "Бұл біріктіру сұрауы жойылған болуы мүмкін.",
+      "noDiscussionDescription": "Бұл біріктіру сұрауында кодты тексеру талқылаулары да, жалпы пікірлер де жоқ.",
+      "noFilesChangedDescription": "Бұл біріктіру сұрауында файлдарға өзгеріс енгізілмеген."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "{{language}} тілінің офлайн сөйлеу файлдары бұл телефонда орнатылмаған. Оларды жүктеп алыңыз, содан кейін дауыстық енгізуді қайта көріңіз.",
     "downloadOfflineModel": "Жүктеп алу",
     "offlineModelDownloadScheduled": "Офлайн сөйлеу файлдары фондық режимде жүктеледі. Дауыстық енгізуді кейінірек қайта көріңіз.",
-    "listeningStopped": "Тыңдау тоқтатылды."
+    "listeningStopped": "Тыңдау тоқтатылды.",
+    "transcribing": "Мәтінге айналдыру жүріп жатыр...",
+    "gatewayUnreachable": "Kilo Gateway-ге қосылу мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
+    "gatewayTimeout": "Дауысты мәтінге айналдыру тым ұзақ созылды. Қайталап көріңіз.",
+    "gatewayModelUnavailable": "Бұл дауысты мәтінге айналдыру моделі қолжетімсіз. Параметрлерден басқасын таңдаңыз.",
+    "gatewayModelUnavailableNotice": "Бұл модель енді ұсынылмайды. Басқасын таңдау үшін $t(transcriptionModel.title) түртіңіз.",
+    "gatewaySignInRequired": "Kilo Gateway арқылы айналдыруды қолдану үшін жүйеге кіріңіз.",
+    "gatewayNoModel": "Алдымен Параметрлерден дауысты мәтінге айналдыру моделін таңдаңыз."
   },
   "share": {
     "title": "Kilo-ға жіберу",
@@ -3009,5 +3025,12 @@
     "needsInput": "Жауап қажет",
     "channelName": "Белсенді агенттер",
     "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз."
+  },
+  "transcriptionModel": {
+    "title": "Дауысты мәтінге айналдыру моделі",
+    "noneChosen": "Ештеңе таңдалмаған",
+    "emptyTitle": "Дауысты мәтінге айналдыру модельдері жоқ",
+    "emptyDescription": "Kilo Gateway қазір дауысты мәтінге айналдыру модельдерін ұсынбайды.",
+    "loadFailed": "Дауысты мәтінге айналдыру модельдерін жүктеу мүмкін болмады."
   }
 }

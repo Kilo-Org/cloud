@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO ụlọ ọrụ"
   },
   "preferences": {
+    "general": "Izugbe",
+    "voiceInput": "Ntinye olu",
     "autoExpandThinking": "Gbasaa echiche na-akpaghị aka",
     "autoExpandThinkingSubtitle": "Gosi echiche onye nnọchi anya n'ụzọ zuru ezu mgbe ọ mechara iche echiche.",
     "keepScreenOn": "Hapụ ihuenyo ka ọ na-enwu n'ibe nnọkọ",
@@ -238,6 +240,7 @@
     "appearanceLight": "Ìhè",
     "appearanceDark": "Ọchịchịrị",
     "account": "Akaụntụ",
+    "accountSubtitle": "Asụsụ, saịtị a tụkwasịrị obi na nnọkọ ngwaọrụ",
     "prReviewAttribution": "Tinye aha ngwa na nyocha PR",
     "prReviewAttributionSubtitle": "Tinye ahịrị E nyochara site na Kilo n'ala mgbe ị zigara nyocha.",
     "returnSendsMessage": "Igodo nloghachi na-eziga ozi",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Ịtụgharị olu ka ọ bụrụ ederede site na Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Ejila njirimaka okwu nke ngwaọrụ ahụ; jiri ihe nlereanya Kilo Gateway tụgharịa ntinye olu ka ọ bụrụ ederede. A na-eziga ndekọ gị na Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Arịrịọ njikọta adịghị",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Ahịrị ọdịiche tọgbọ chakoo"
     },
     "connectionExpired": "Oge njikọ GitHub agwụla.",
-    "capabilities": {
-      "banner": {
-        "title": "Ọ naghị adị n'aka onye na-enye ọrụ a",
-        "accessibility": "Ọ naghị adị n'aka onye na-enye ọrụ a: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Njikọta",
       "mergeNow": "Jikọta ugbu a",
@@ -472,7 +472,9 @@
       "acceptTerms": "Nakwere",
       "replyBadRequest": "Enweghị ike ibipụta azịza a. O nwere ike ịbụ na usoro mkparịta ụka ahụ agbanweela.",
       "replyForbidden": "Ị nweghị ikike ịzaghachi arịrịọ njikọta a.",
-      "replyForbiddenTerm": "Ị nweghị ikike ịzaghachi {{term}} a.",
+      "addCommentCta": "Nye nkwupụta na arịrịọ njikọta a",
+      "commentBadRequest": "Enweghị ike ibipụta nkwupụta a. O nwere ike ịbụ na arịrịọ njikọta a agbanweela.",
+      "commentForbidden": "Ị nweghị ikike inye nkwupụta na arịrịọ njikọta a.",
       "moderation": {
         "reportContent": {
           "terminal": "Enweghị ike ikpesa okwu a.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Adịla ochie na {{lines}}",
         "outdatedOnPath": "Adịla ochie na {{path}}"
       },
-      "deletedUser": "onye ọrụ ehichapụrụ"
+      "deletedUser": "onye ọrụ ehichapụrụ",
+      "replyForbiddenTerm": "Ị nweghị ikike ịzaghachi {{term}} a."
     },
     "couldNotOpenGitHubAppSettings": "Enweghị ike imepe ntọala ngwa GitHub.",
     "installKiloGitHubApp": "Tinye ngwa Kilo GitHub",
@@ -679,21 +682,6 @@
       "files": "Faịlụ",
       "discussion": "Mkparịta ụka"
     },
-    "terms": {
-      "pullRequest": "Arịrịọ ijikọ koodu",
-      "mergeRequest": "Arịrịọ njikọta",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Kekọrịta arịrịọ njikọta",
-      "viewOnProvider": "Lelee na {{provider}}",
-      "mergeRequestUnavailable": "Arịrịọ njikọta adịghị",
-      "unavailableDescription": "Ọ nwere ike ịbụ na ehichapụrụ ya, ma ọ bụ ị nweghị ikike ịbanye ya.",
-      "accessDeniedMergeRequest": "Ị nweghị ikike ilele arịrịọ njikọta a.",
-      "couldNotLoadMergeRequest": "Enweghị ike ibudata arịrịọ njikọta.",
-      "discussionAccessDenied": "Ị nweghị ikike ilele mkparịta ụka arịrịọ njikọta a.",
-      "discussionUnavailableMessage": "O nwere ike ịbụ na ewepụla arịrịọ njikọta a.",
-      "noDiscussionDescription": "Enweghị usoro mkparịta ụka nyocha ma ọ bụ okwu mkparịta ụka na arịrịọ njikọta a.",
-      "noFilesChangedDescription": "Enweghị mgbanwe faịlụ na arịrịọ njikọta a."
-    },
     "fileStatus": {
       "modified": "Agbanwere",
       "renamed": "Agbanwere aha",
@@ -731,6 +719,27 @@
       "ambiguous": "Enweghị ike ịchọpụta ma emechara ya — lelee PR ahụ tupu ị nwaa ọzọ.",
       "persistenceFailed": "Anyị enweghị ike ịdekọ omume a. Biko nwaa ọzọ ma emechaa.",
       "forbidden": "A machibidoro nke a."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ọ naghị adị n'aka onye na-enye ọrụ a",
+        "accessibility": "Ọ naghị adị n'aka onye na-enye ọrụ a: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Arịrịọ ijikọ koodu",
+      "mergeRequest": "Arịrịọ njikọta",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Kekọrịta arịrịọ njikọta",
+      "viewOnProvider": "Lelee na {{provider}}",
+      "mergeRequestUnavailable": "Arịrịọ njikọta adịghị",
+      "unavailableDescription": "Ọ nwere ike ịbụ na ehichapụrụ ya, ma ọ bụ ị nweghị ikike ịbanye ya.",
+      "accessDeniedMergeRequest": "Ị nweghị ikike ilele arịrịọ njikọta a.",
+      "couldNotLoadMergeRequest": "Enweghị ike ibudata arịrịọ njikọta.",
+      "discussionAccessDenied": "Ị nweghị ikike ilele mkparịta ụka arịrịọ njikọta a.",
+      "discussionUnavailableMessage": "O nwere ike ịbụ na ewepụla arịrịọ njikọta a.",
+      "noDiscussionDescription": "Enweghị usoro mkparịta ụka nyocha ma ọ bụ okwu mkparịta ụka na arịrịọ njikọta a.",
+      "noFilesChangedDescription": "Enweghị mgbanwe faịlụ na arịrịọ njikọta a."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Faịlụ okwu offline maka {{language}} etinyeghị na ekwentị a. Budata ha, mgbe ahụ nwaa ntinye olu ọzọ.",
     "downloadOfflineModel": "Budata",
     "offlineModelDownloadScheduled": "A ga-ebudata faịlụ okwu offline na ndabere. Nwaa ntinye olu ọzọ ma e mesịa.",
-    "listeningStopped": "Ịge ntị kwụsịrị."
+    "listeningStopped": "Ịge ntị kwụsịrị.",
+    "transcribing": "Na-atụgharị ka ọ bụrụ ederede...",
+    "gatewayUnreachable": "Enweghị ike iru Kilo Gateway. Lelee njikọ gị ma nwaa ọzọ.",
+    "gatewayTimeout": "Ịtụgharị okwu were oge karịrị akarị. Nwaa ọzọ.",
+    "gatewayModelUnavailable": "Ihe nlereanya a maka ịtụgharị okwu adịghị. Họrọ ọzọ na Mmasị.",
+    "gatewayModelUnavailableNotice": "A naghịzi enye ihe nlereanya a. Pịa $t(transcriptionModel.title) iji họrọ ọzọ.",
+    "gatewaySignInRequired": "Banye ka i jiri ịtụgharị okwu site na Kilo Gateway.",
+    "gatewayNoModel": "Họrọ ihe nlereanya maka ịtụgharị okwu na Mmasị ụzọ."
   },
   "share": {
     "title": "Kekọrịta na Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Chọrọ nzaghachi",
     "channelName": "Ndị nnọchi anya na-arụ ọrụ",
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi."
+  },
+  "transcriptionModel": {
+    "title": "Ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",
+    "noneChosen": "A họpụtaghị nke ọ bụla",
+    "emptyTitle": "Enweghị ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",
+    "emptyDescription": "Kilo Gateway enyeghị ihe nlereanya ọ bụla maka ịtụgharị okwu ugbu a.",
+    "loadFailed": "Enweghị ike ibudata ihe nlereanya maka ịtụgharị okwu."
   }
 }

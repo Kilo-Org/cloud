@@ -39,7 +39,6 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { useOrgKiloClawNavState } from '@/hooks/useOrgKiloClaw';
 import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
-import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 
@@ -61,6 +60,7 @@ export default function OrganizationAppSidebar({
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
+  const isDeployEnabled = useFeatureFlagEnabled('deploy-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Get current organization role and data
@@ -233,7 +233,7 @@ export default function OrganizationAppSidebar({
           { title: 'Auto Fix', icon: Wrench, url: `/organizations/${organizationId}/auto-fix` },
         ]
       : []),
-    ...(ENABLE_DEPLOY_FEATURE
+    ...(isDeployEnabled || isDevelopment
       ? [
           {
             title: 'Deploy',
@@ -287,15 +287,11 @@ export default function OrganizationAppSidebar({
           },
         ]
       : []),
-    ...(ENABLE_DEPLOY_FEATURE
-      ? [
-          {
-            title: 'Integrations',
-            icon: Cable,
-            url: `/organizations/${organizationId}/integrations`,
-          },
-        ]
-      : []),
+    {
+      title: 'Integrations',
+      icon: Cable,
+      url: `/organizations/${organizationId}/integrations`,
+    },
     ...(hasOwnerLevelAccess && currentOrg?.plan === 'enterprise'
       ? [
           {

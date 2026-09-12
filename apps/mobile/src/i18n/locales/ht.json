@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO antrepriz"
   },
   "preferences": {
+    "general": "Jeneral",
+    "voiceInput": "Antre vwa",
     "autoExpandThinking": "Montre refleksyon yo otomatikman",
     "autoExpandThinkingSubtitle": "Montre tout refleksyon ajan an lè li fin reflechi.",
     "keepScreenOn": "Kenbe ekran an limen sou paj sesyon an",
@@ -238,6 +240,7 @@
     "appearanceLight": "Klè",
     "appearanceDark": "Fonse",
     "account": "Kont",
+    "accountSubtitle": "Lang, domèn ou fè konfyans ak sesyon aparèy",
     "prReviewAttribution": "Mansyone aplikasyon an nan revizyon PR yo",
     "prReviewAttributionSubtitle": "Ajoute mansyon Revize atravè Kilo nan pye chak revizyon ou soumèt.",
     "returnSendsMessage": "Bouton retou a voye mesaj",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkripsyon ak Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkripte dikte a ak yon modèl Kilo Gateway olye rekonesans vokal aparèy la. Yo voye anrejistrman ou a bay Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Demann fizyon an pa disponib",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Ranje vid nan diferans kòd yo"
     },
     "connectionExpired": "Koneksyon ak GitHub la ekspire.",
-    "capabilities": {
-      "banner": {
-        "title": "Pa disponib pou founisè sa a",
-        "accessibility": "Pa disponib pou founisè sa a: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Fizyon",
       "mergeNow": "Fizyonnen kounye a",
@@ -472,7 +472,9 @@
       "acceptTerms": "Aksepte",
       "replyBadRequest": "Pa ka pibliye repons sa a. Petèt fil diskisyon an chanje.",
       "replyForbidden": "Ou pa gen pèmisyon pou reponn demann fizyon sa a.",
-      "replyForbiddenTerm": "Ou pa gen pèmisyon pou reponn {{term}} sa a.",
+      "addCommentCta": "Fè yon kòmantè sou demann fizyon sa a",
+      "commentBadRequest": "Pa ka pibliye kòmantè sa a. Petèt demann fizyon an chanje.",
+      "commentForbidden": "Ou pa gen pèmisyon pou fè yon kòmantè sou demann fizyon sa a.",
       "moderation": {
         "reportContent": {
           "terminal": "Pa ka rapòte kòmantè sa a.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Pa ajou sou {{lines}}",
         "outdatedOnPath": "Pa ajou sou {{path}}"
       },
-      "deletedUser": "itilizatè ki efase"
+      "deletedUser": "itilizatè ki efase",
+      "replyForbiddenTerm": "Ou pa gen pèmisyon pou reponn {{term}} sa a."
     },
     "couldNotOpenGitHubAppSettings": "Nou pa t kapab louvri paramèt aplikasyon GitHub la.",
     "installKiloGitHubApp": "Enstale aplikasyon Kilo pou GitHub la",
@@ -679,21 +682,6 @@
       "files": "Fichye",
       "discussion": "Diskisyon"
     },
-    "terms": {
-      "pullRequest": "Demann fizyon",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Pataje merge request la",
-      "viewOnProvider": "Gade sou {{provider}}",
-      "mergeRequestUnavailable": "Merge request la pa disponib",
-      "unavailableDescription": "Petèt yo te efase l, oswa ou pa gen aksè a li.",
-      "accessDeniedMergeRequest": "Ou pa gen pèmisyon pou wè merge request sa a.",
-      "couldNotLoadMergeRequest": "Pa t ka chaje merge request la.",
-      "discussionAccessDenied": "Ou pa gen pèmisyon pou wè diskisyon merge request sa a.",
-      "discussionUnavailableMessage": "Petèt yo te retire merge request sa a.",
-      "noDiscussionDescription": "Pa gen fil diskisyon pou revizyon ni kòmantè nan konvèsasyon merge request sa a.",
-      "noFilesChangedDescription": "Pa gen chanjman nan fichye yo nan merge request sa a."
-    },
     "fileStatus": {
       "modified": "Modifye",
       "renamed": "Non chanje",
@@ -731,6 +719,27 @@
       "ambiguous": "Pa t ka konfime — tcheke PR a anvan ou eseye ankò.",
       "persistenceFailed": "Nou pa t ka anrejistre aksyon sa a. Tanpri eseye ankò pita.",
       "forbidden": "Aksyon sa a entèdi."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Pa disponib pou founisè sa a",
+        "accessibility": "Pa disponib pou founisè sa a: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Demann fizyon",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Pataje merge request la",
+      "viewOnProvider": "Gade sou {{provider}}",
+      "mergeRequestUnavailable": "Merge request la pa disponib",
+      "unavailableDescription": "Petèt yo te efase l, oswa ou pa gen aksè a li.",
+      "accessDeniedMergeRequest": "Ou pa gen pèmisyon pou wè merge request sa a.",
+      "couldNotLoadMergeRequest": "Pa t ka chaje merge request la.",
+      "discussionAccessDenied": "Ou pa gen pèmisyon pou wè diskisyon merge request sa a.",
+      "discussionUnavailableMessage": "Petèt yo te retire merge request sa a.",
+      "noDiscussionDescription": "Pa gen fil diskisyon pou revizyon ni kòmantè nan konvèsasyon merge request sa a.",
+      "noFilesChangedDescription": "Pa gen chanjman nan fichye yo nan merge request sa a."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Fichye lapawòl offline pou {{language}} pa enstale sou telefòn sa a. Telechaje yo, epi eseye dikte ankò.",
     "downloadOfflineModel": "Telechaje",
     "offlineModelDownloadScheduled": "Fichye lapawòl offline yo ap telechaje nan background la. Eseye dikte ankò pita.",
-    "listeningStopped": "Sistèm nan sispann koute."
+    "listeningStopped": "Sistèm nan sispann koute.",
+    "transcribing": "Ap transkripte...",
+    "gatewayUnreachable": "Nou pa t ka rive nan Kilo Gateway. Tcheke koneksyon ou a epi eseye ankò.",
+    "gatewayTimeout": "Transkripsyon an te pran twòp tan. Eseye ankò.",
+    "gatewayModelUnavailable": "Modèl transkripsyon sa a pa disponib. Chwazi yon lòt nan Preferans yo.",
+    "gatewayModelUnavailableNotice": "Modèl sa a pa ofri ankò. Tape sou $t(transcriptionModel.title) pou chwazi yon lòt.",
+    "gatewaySignInRequired": "Konekte pou sèvi ak transkripsyon Kilo Gateway.",
+    "gatewayNoModel": "Chwazi yon modèl transkripsyon nan Preferans yo an premye."
   },
   "share": {
     "title": "Pataj nan Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Bezwen repons",
     "channelName": "Ajan aktif",
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an."
+  },
+  "transcriptionModel": {
+    "title": "Modèl transkripsyon",
+    "noneChosen": "Okenn pa chwazi",
+    "emptyTitle": "Pa gen modèl transkripsyon",
+    "emptyDescription": "Kilo Gateway pa ofri okenn modèl transkripsyon kounye a.",
+    "loadFailed": "Nou pa t kapab chaje modèl transkripsyon yo."
   }
 }

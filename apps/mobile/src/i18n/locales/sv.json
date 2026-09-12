@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO för företag"
   },
   "preferences": {
+    "general": "Allmänt",
+    "voiceInput": "Röstinmatning",
     "autoExpandThinking": "Visa resonemang automatiskt",
     "autoExpandThinkingSubtitle": "Visa agentens resonemang i sin helhet när det är klart.",
     "keepScreenOn": "Håll skärmen tänd på sessionssidan",
@@ -238,6 +240,7 @@
     "appearanceLight": "Ljust",
     "appearanceDark": "Mörkt",
     "account": "Konto",
+    "accountSubtitle": "Språk, betrodda webbplatser och enhetssessioner",
     "prReviewAttribution": "Ange appen i PR-granskningar",
     "prReviewAttributionSubtitle": "Lägg till en sidfot som anger att granskningen gjordes via Kilo när du skickar den.",
     "returnSendsMessage": "Returtangenten skickar meddelanden",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkribering via Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkribera röstinmatningen med en Kilo Gateway-modell i stället för enhetens taligenkänning. Din inspelning skickas till Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "PR:en är inte tillgänglig",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Tom diffrad"
     },
     "connectionExpired": "GitHub-anslutningen har upphört att gälla.",
-    "capabilities": {
-      "banner": {
-        "title": "Inte tillgänglig hos den här leverantören",
-        "accessibility": "Inte tillgänglig hos den här leverantören: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Sammanfogning",
       "mergeNow": "Slå samman nu",
@@ -472,7 +472,9 @@
       "acceptTerms": "Godkänn",
       "replyBadRequest": "Det här svaret kan inte publiceras. Tråden kan ha ändrats.",
       "replyForbidden": "Du har inte behörighet att svara på den här PR:en.",
-      "replyForbiddenTerm": "Du har inte behörighet att svara på {{term}}.",
+      "addCommentCta": "Kommentera den här PR:en",
+      "commentBadRequest": "Den här kommentaren kan inte publiceras. PR:en kan ha ändrats.",
+      "commentForbidden": "Du har inte behörighet att kommentera den här PR:en.",
       "moderation": {
         "reportContent": {
           "terminal": "Den här kommentaren kan inte anmälas.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Inaktuell på {{lines}}",
         "outdatedOnPath": "Inaktuell i {{path}}"
       },
-      "deletedUser": "borttagen användare"
+      "deletedUser": "borttagen användare",
+      "replyForbiddenTerm": "Du har inte behörighet att svara på {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Det gick inte att öppna inställningarna för GitHub-appen.",
     "installKiloGitHubApp": "Installera GitHub-appen för Kilo",
@@ -679,21 +682,6 @@
       "files": "Filer",
       "discussion": "Diskussion"
     },
-    "terms": {
-      "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Dela merge request",
-      "viewOnProvider": "Visa på {{provider}}",
-      "mergeRequestUnavailable": "Merge requesten är inte tillgänglig",
-      "unavailableDescription": "Den kan ha tagits bort, eller så har du inte åtkomst.",
-      "accessDeniedMergeRequest": "Du har inte behörighet att se den här merge requesten.",
-      "couldNotLoadMergeRequest": "Kunde inte läsa in merge requesten.",
-      "discussionAccessDenied": "Du har inte behörighet att se diskussionen för den här merge requesten.",
-      "discussionUnavailableMessage": "Den här merge requesten kan ha tagits bort.",
-      "noDiscussionDescription": "Den här merge requesten har inga granskningstrådar eller kommentarer i diskussionen.",
-      "noFilesChangedDescription": "Den här merge requesten innehåller inga filändringar."
-    },
     "fileStatus": {
       "modified": "Ändrad",
       "renamed": "Namnändrad",
@@ -731,6 +719,27 @@
       "ambiguous": "Kunde inte bekräfta resultatet. Kontrollera PR:en innan du försöker igen.",
       "persistenceFailed": "Vi kunde inte registrera den här åtgärden. Försök igen senare.",
       "forbidden": "Du saknar behörighet."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Inte tillgänglig hos den här leverantören",
+        "accessibility": "Inte tillgänglig hos den här leverantören: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Dela merge request",
+      "viewOnProvider": "Visa på {{provider}}",
+      "mergeRequestUnavailable": "Merge requesten är inte tillgänglig",
+      "unavailableDescription": "Den kan ha tagits bort, eller så har du inte åtkomst.",
+      "accessDeniedMergeRequest": "Du har inte behörighet att se den här merge requesten.",
+      "couldNotLoadMergeRequest": "Kunde inte läsa in merge requesten.",
+      "discussionAccessDenied": "Du har inte behörighet att se diskussionen för den här merge requesten.",
+      "discussionUnavailableMessage": "Den här merge requesten kan ha tagits bort.",
+      "noDiscussionDescription": "Den här merge requesten har inga granskningstrådar eller kommentarer i diskussionen.",
+      "noFilesChangedDescription": "Den här merge requesten innehåller inga filändringar."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "De offlinebaserade talfilerna för {{language}} är inte installerade på den här telefonen. Ladda ned dem och prova röstinmatning igen.",
     "downloadOfflineModel": "Ladda ned",
     "offlineModelDownloadScheduled": "De offlinebaserade talfilerna laddas ned i bakgrunden. Prova röstinmatning igen senare.",
-    "listeningStopped": "Lyssningen stoppades."
+    "listeningStopped": "Lyssningen stoppades.",
+    "transcribing": "Transkriberar…",
+    "gatewayUnreachable": "Det gick inte att nå Kilo Gateway. Kontrollera anslutningen och försök igen.",
+    "gatewayTimeout": "Transkriberingen tog för lång tid. Försök igen.",
+    "gatewayModelUnavailable": "Den här transkriberingsmodellen är inte tillgänglig. Välj en annan i Inställningar.",
+    "gatewayModelUnavailableNotice": "Den här modellen erbjuds inte längre. Tryck på $t(transcriptionModel.title) för att välja en annan.",
+    "gatewaySignInRequired": "Logga in för att använda transkribering via Kilo Gateway.",
+    "gatewayNoModel": "Välj först en transkriberingsmodell i Inställningar."
   },
   "share": {
     "title": "Dela till Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Väntar på svar",
     "channelName": "Aktiva agenter",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen."
+  },
+  "transcriptionModel": {
+    "title": "Transkriberingsmodell",
+    "noneChosen": "Ingen vald",
+    "emptyTitle": "Inga transkriberingsmodeller",
+    "emptyDescription": "Kilo Gateway erbjuder inga transkriberingsmodeller just nu.",
+    "loadFailed": "Det gick inte att läsa in transkriberingsmodellerna."
   }
 }

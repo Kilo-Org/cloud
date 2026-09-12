@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "Корпоративно SSO"
   },
   "preferences": {
+    "general": "Общи",
+    "voiceInput": "Гласово въвеждане",
     "autoExpandThinking": "Автоматично разгъване на разсъжденията",
     "autoExpandThinkingSubtitle": "Показвай разсъжденията на агента разгънати, след като приключат.",
     "keepScreenOn": "Дръж екрана включен при отворена сесия",
@@ -238,6 +240,7 @@
     "appearanceLight": "Светъл",
     "appearanceDark": "Тъмен",
     "account": "Акаунт",
+    "accountSubtitle": "Език, доверени хостове и сесии на устройства",
     "prReviewAttribution": "Посочвай приложението в прегледите на PR",
     "prReviewAttributionSubtitle": "Добавяй „Прегледано чрез Kilo“ в края на всеки изпратен преглед.",
     "returnSendsMessage": "Клавишът за нов ред изпраща съобщение",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Транскрипция през Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Преобразувай гласовото въвеждане с модел на Kilo Gateway вместо разпознаването на реч на устройството. Записът ти се изпраща до Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Недостъпна заявка за обединяване",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Празен ред в изгледа с разликите"
     },
     "connectionExpired": "Срокът на връзката с GitHub изтече.",
-    "capabilities": {
-      "banner": {
-        "title": "Не е налично при този доставчик",
-        "accessibility": "Не е налично при този доставчик: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Сливане",
       "mergeNow": "Обедини сега",
@@ -472,7 +472,9 @@
       "acceptTerms": "Приеми",
       "replyBadRequest": "Този отговор не може да бъде публикуван. Нишката може да се е променила.",
       "replyForbidden": "Нямаш права да отговаряш в тази заявка за обединяване.",
-      "replyForbiddenTerm": "Нямате разрешение да отговаряте в {{term}}.",
+      "addCommentCta": "Коментирай тази заявка за обединяване",
+      "commentBadRequest": "Този коментар не може да бъде публикуван. Заявката за обединяване може да се е променила.",
+      "commentForbidden": "Нямаш права да коментираш в тази заявка за обединяване.",
       "moderation": {
         "reportContent": {
           "terminal": "Не можеш да подадеш сигнал за този коментар.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Неактуален коментар: {{lines}}",
         "outdatedOnPath": "Неактуален коментар: {{path}}"
       },
-      "deletedUser": "изтрит потребител"
+      "deletedUser": "изтрит потребител",
+      "replyForbiddenTerm": "Нямате разрешение да отговаряте в {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Настройките на приложението в GitHub не се отвориха.",
     "installKiloGitHubApp": "Инсталирай приложението Kilo за GitHub",
@@ -679,21 +682,6 @@
       "files": "Файлове",
       "discussion": "Дискусия"
     },
-    "terms": {
-      "pullRequest": "Заявка за сливане",
-      "mergeRequest": "Merge заявка",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Сподели merge заявка",
-      "viewOnProvider": "Преглед в {{provider}}",
-      "mergeRequestUnavailable": "Merge заявката е недостъпна",
-      "unavailableDescription": "Може би е изтрита или нямате достъп до нея.",
-      "accessDeniedMergeRequest": "Нямате разрешение да прегледате тази merge заявка.",
-      "couldNotLoadMergeRequest": "Merge заявката не можа да се зареди",
-      "discussionAccessDenied": "Нямате разрешение да прегледате дискусиата по тази merge заявка.",
-      "discussionUnavailableMessage": "Тази merge заявка може би е премахната.",
-      "noDiscussionDescription": "Няма нишки за преглед или коментари по тази merge заявка.",
-      "noFilesChangedDescription": "Тази merge заявка няма промени по файлове."
-    },
     "fileStatus": {
       "modified": "Променен",
       "renamed": "Преименуван",
@@ -731,6 +719,27 @@
       "ambiguous": "Не можахме да потвърдим резултата. Провери този PR, преди да опиташ отново.",
       "persistenceFailed": "Не можахме да запишем това действие. Опитай отново по-късно.",
       "forbidden": "Действието не е разрешено."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Не е налично при този доставчик",
+        "accessibility": "Не е налично при този доставчик: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Заявка за сливане",
+      "mergeRequest": "Merge заявка",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Сподели merge заявка",
+      "viewOnProvider": "Преглед в {{provider}}",
+      "mergeRequestUnavailable": "Merge заявката е недостъпна",
+      "unavailableDescription": "Може би е изтрита или нямате достъп до нея.",
+      "accessDeniedMergeRequest": "Нямате разрешение да прегледате тази merge заявка.",
+      "couldNotLoadMergeRequest": "Merge заявката не можа да се зареди",
+      "discussionAccessDenied": "Нямате разрешение да прегледате дискусиата по тази merge заявка.",
+      "discussionUnavailableMessage": "Тази merge заявка може би е премахната.",
+      "noDiscussionDescription": "Няма нишки за преглед или коментари по тази merge заявка.",
+      "noFilesChangedDescription": "Тази merge заявка няма промени по файлове."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Файловете с офлайн реч за {{language}} не са инсталирани на този телефон. Изтегли ги, след което опитай гласовото въвеждане отново.",
     "downloadOfflineModel": "Изтегляне",
     "offlineModelDownloadScheduled": "Файловете с офлайн реч ще се изтеглят на заден план. Опитай гласовото въвеждане отново по-късно.",
-    "listeningStopped": "Слушането е спряно."
+    "listeningStopped": "Слушането е спряно.",
+    "transcribing": "Транскрибирам…",
+    "gatewayUnreachable": "Kilo Gateway не може да бъде достигнат. Провери връзката си и опитай отново.",
+    "gatewayTimeout": "Транскрипцията отне твърде много време. Опитай отново.",
+    "gatewayModelUnavailable": "Този модел за транскрипция не е наличен. Избери друг в Предпочитания.",
+    "gatewayModelUnavailableNotice": "Този модел вече не се предлага. Докосни $t(transcriptionModel.title), за да избереш друг.",
+    "gatewaySignInRequired": "Влез, за да използваш транскрипция през Kilo Gateway.",
+    "gatewayNoModel": "Първо избери модел за транскрипция в Предпочитания."
   },
   "share": {
     "title": "Споделяне в Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Нужен е отговор",
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран."
+  },
+  "transcriptionModel": {
+    "title": "Модел за транскрипция",
+    "noneChosen": "Не е избран",
+    "emptyTitle": "Няма модели за транскрипция",
+    "emptyDescription": "Kilo Gateway в момента не предлага модели за транскрипция.",
+    "loadFailed": "Моделите за транскрипция не се заредиха."
   }
 }

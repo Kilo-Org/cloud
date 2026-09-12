@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "Įmonės SSO"
   },
   "preferences": {
+    "general": "Bendra",
+    "voiceInput": "Balso įvestis",
     "autoExpandThinking": "Automatiškai išskleisti mąstymą",
     "autoExpandThinkingSubtitle": "Baigus mąstyti, automatiškai išskleisti agento mąstymo tekstą.",
     "keepScreenOn": "Neišjungti ekrano sesijos puslapyje",
@@ -238,6 +240,7 @@
     "appearanceLight": "Šviesi",
     "appearanceDark": "Tamsi",
     "account": "Paskyra",
+    "accountSubtitle": "Kalba, patikimos svetainės ir įrenginių sesijos",
     "prReviewAttribution": "PR peržiūrose nurodyti programėlę",
     "prReviewAttributionSubtitle": "Pateikiant peržiūrą pridėti poraštę, nurodančią, kad peržiūrėta naudojant Kilo.",
     "returnSendsMessage": "Įvesties klavišas siunčia žinutę",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkribavimas per Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkribuok balso įvestį Kilo Gateway modeliu vietoj įrenginio kalbos atpažinimo. Įrašas siunčiamas į Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Pakeitimų užklausa nepasiekiama",
@@ -345,12 +351,6 @@
       "emptyDiffRow": "Tuščia pakeitimų palyginimo eilutė"
     },
     "connectionExpired": "Baigėsi GitHub prieigos galiojimas.",
-    "capabilities": {
-      "banner": {
-        "title": "Nepasiekiama šio teikėjo",
-        "accessibility": "Nepasiekiama šio teikėjo: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Sujungimas",
       "mergeNow": "Sujungti dabar",
@@ -478,7 +478,9 @@
       "acceptTerms": "Sutikti",
       "replyBadRequest": "Šio atsakymo negalima paskelbti. Gija galėjo pasikeisti.",
       "replyForbidden": "Neturi teisės atsakyti šios pakeitimų užklausos diskusijoje.",
-      "replyForbiddenTerm": "Neturi teisės atsakyti į {{term}}.",
+      "addCommentCta": "Komentuoti šią pakeitimų užklausą",
+      "commentBadRequest": "Šio komentaro negalima paskelbti. Pakeitimų užklausa galėjo pasikeisti.",
+      "commentForbidden": "Neturi teisės komentuoti šios pakeitimų užklausos.",
       "moderation": {
         "reportContent": {
           "terminal": "Apie šį komentarą negalima pranešti.",
@@ -510,6 +512,10 @@
       "termsAcceptRequired": "Kad galėtum skelbti, turi sutikti su paslaugų teikimo sąlygomis.",
       "termsOutdatedCopy": "Paslaugų teikimo sąlygos pasikeitė. Iš naujo atidaryk šį ekraną ir sutik su naujausia jų versija.",
       "termsCheckRetryCopy": "Nepavyko patikrinti paslaugų teikimo sąlygų. Patikrink ryšį ir bandyk dar kartą.",
+      "comment_few": "{{displayCount}} komentarai",
+      "comment_many": "{{displayCount}} komentaro",
+      "reaction_few": "reakcijos",
+      "reaction_many": "reakcijos",
       "reactions": {
         "thumbsUp": "Patinka",
         "thumbsDown": "Nepatinka",
@@ -528,10 +534,7 @@
         "outdatedOnPath": "Pasenęs komentaras: {{path}}"
       },
       "deletedUser": "ištrintas naudotojas",
-      "comment_few": "{{displayCount}} komentarai",
-      "comment_many": "{{displayCount}} komentaro",
-      "reaction_few": "reakcijos",
-      "reaction_many": "reakcijos"
+      "replyForbiddenTerm": "Neturi teisės atsakyti į {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų.",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
@@ -695,21 +698,6 @@
       "files": "Failai",
       "discussion": "Diskusija"
     },
-    "terms": {
-      "pullRequest": "Pakeitimų užklausa",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Bendrinti merge request",
-      "viewOnProvider": "Peržiūrėti {{provider}}",
-      "mergeRequestUnavailable": "Merge request nepasiekiamas",
-      "unavailableDescription": "Galbūt jis buvo ištrintas, arba neturi prieigos prie jo.",
-      "accessDeniedMergeRequest": "Neturi teisės peržiūrėti šio merge request.",
-      "couldNotLoadMergeRequest": "Nepavyko įkelti merge request.",
-      "discussionAccessDenied": "Neturi teisės peržiūrėti šio merge request diskusijos.",
-      "discussionUnavailableMessage": "Šis merge request galėjo būti pašalintas.",
-      "noDiscussionDescription": "Šiame merge request nėra peržiūros gijų ar diskusijos komentarų.",
-      "noFilesChangedDescription": "Šiame merge request nėra failų pakeitimų."
-    },
     "fileStatus": {
       "modified": "Pakeista",
       "renamed": "Pervadinta",
@@ -747,6 +735,27 @@
       "ambiguous": "Nepavyko patvirtinti rezultato — prieš bandydamas dar kartą patikrink PR.",
       "persistenceFailed": "Nepavyko užfiksuoti šio veiksmo. Bandyk dar kartą vėliau.",
       "forbidden": "Šis veiksmas neleidžiamas."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Nepasiekiama šio teikėjo",
+        "accessibility": "Nepasiekiama šio teikėjo: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Pakeitimų užklausa",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Bendrinti merge request",
+      "viewOnProvider": "Peržiūrėti {{provider}}",
+      "mergeRequestUnavailable": "Merge request nepasiekiamas",
+      "unavailableDescription": "Galbūt jis buvo ištrintas, arba neturi prieigos prie jo.",
+      "accessDeniedMergeRequest": "Neturi teisės peržiūrėti šio merge request.",
+      "couldNotLoadMergeRequest": "Nepavyko įkelti merge request.",
+      "discussionAccessDenied": "Neturi teisės peržiūrėti šio merge request diskusijos.",
+      "discussionUnavailableMessage": "Šis merge request galėjo būti pašalintas.",
+      "noDiscussionDescription": "Šiame merge request nėra peržiūros gijų ar diskusijos komentarų.",
+      "noFilesChangedDescription": "Šiame merge request nėra failų pakeitimų."
     }
   },
   "notifications": {
@@ -2671,7 +2680,14 @@
     "languageNotInstalledMessage": "{{language}} kalbos neprisijungus veikiantys kalbos failai šiame telefone nėra įdiegti. Atsisiųsk juos ir vėl pabandyk balso įvestį.",
     "downloadOfflineModel": "Atsisiųsti",
     "offlineModelDownloadScheduled": "Neprisijungus veikiantys kalbos failai bus atsisiunčiami fone. Pabandyk balso įvestį vėliau.",
-    "listeningStopped": "Klausymasis sustabdytas."
+    "listeningStopped": "Klausymasis sustabdytas.",
+    "transcribing": "Transkribuojama...",
+    "gatewayUnreachable": "Nepavyko pasiekti Kilo Gateway. Patikrinkite ryšį ir bandykite dar kartą.",
+    "gatewayTimeout": "Transkribavimas užtruko per ilgai. Bandyk dar kartą.",
+    "gatewayModelUnavailable": "Šis transkribavimo modelis nepasiekiamas. Pasirinkite kitą Nuostatose.",
+    "gatewayModelUnavailableNotice": "Šis modelis nebeteikiamas. Palieskite $t(transcriptionModel.title), kad pasirinktumėte kitą.",
+    "gatewaySignInRequired": "Prisijunkite, kad naudotumėte transkribavimą per Kilo Gateway.",
+    "gatewayNoModel": "Pirmiausia pasirinkite transkribavimo modelį Nuostatose."
   },
   "share": {
     "title": "Bendrinimas su Kilo",
@@ -3055,5 +3071,12 @@
     "needsInput": "Laukia atsakymo",
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus."
+  },
+  "transcriptionModel": {
+    "title": "Transkribavimo modelis",
+    "noneChosen": "Neišrinkta",
+    "emptyTitle": "Nėra transkribavimo modelių",
+    "emptyDescription": "Šiuo metu Kilo Gateway neteikia jokių transkribavimo modelių.",
+    "loadFailed": "Nepavyko įkelti transkribavimo modelių."
   }
 }

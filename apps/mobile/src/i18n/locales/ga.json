@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO fiontair"
   },
   "preferences": {
+    "general": "Ginearálta",
+    "voiceInput": "Ionchur gutha",
     "autoExpandThinking": "Leathnaigh an machnamh go huathoibríoch",
     "autoExpandThinkingSubtitle": "Taispeáin machnamh an ghníomhaire ina iomláine nuair a chríochnaíonn sé.",
     "keepScreenOn": "Coinnigh an scáileán ar siúl ar leathanach an tseisiúin",
@@ -238,6 +240,7 @@
     "appearanceLight": "Geal",
     "appearanceDark": "Dorcha",
     "account": "Cuntas",
+    "accountSubtitle": "Teanga, óstaigh iontaofa agus seisiúin ar ghléasanna",
     "prReviewAttribution": "Luaigh an aip in athbhreithnithe PR",
     "prReviewAttributionSubtitle": "Cuir buntásc leis a deir go ndearnadh an t-athbhreithniú trí Kilo nuair a sheolann tú athbhreithniú.",
     "returnSendsMessage": "Seolann an eochair aisfhillte teachtaireacht",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Tras-scríobh tríd an Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Déan an t-ionchur gutha a thras-scríobh le samhail Kilo Gateway in ionad aithint cainte an ghléis. Seoltar do thaifeadadh chuig an Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Iarratas tarraingthe gan fáil",
@@ -347,12 +353,6 @@
       "emptyDiffRow": "Ró folamh sa chomparáid athruithe"
     },
     "connectionExpired": "Tá an nasc GitHub imithe in éag.",
-    "capabilities": {
-      "banner": {
-        "title": "Níl ar fáil leis an soláthraí seo",
-        "accessibility": "Níl ar fáil leis an soláthraí seo: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Cumasc",
       "mergeNow": "Cumasc anois",
@@ -481,7 +481,9 @@
       "acceptTerms": "Glac",
       "replyBadRequest": "Ní féidir an freagra seo a phostáil. Seans gur athraíodh an snáithe.",
       "replyForbidden": "Níl cead agat freagra a thabhairt ar an iarratas tarraingthe seo.",
-      "replyForbiddenTerm": "Níl cead agat freagra a thabhairt ar an {{term}} seo.",
+      "addCommentCta": "Trácht ar an iarratas tarraingthe seo",
+      "commentBadRequest": "Ní féidir an trácht seo a phostáil. Seans gur athraíodh an t-iarratas tarraingthe.",
+      "commentForbidden": "Níl cead agat trácht a dhéanamh ar an iarratas tarraingthe seo.",
       "moderation": {
         "reportContent": {
           "terminal": "Ní féidir an trácht seo a thuairisciú.",
@@ -513,6 +515,12 @@
       "termsAcceptRequired": "Caithfidh tú glacadh leis na téarmaí seirbhíse chun postáil.",
       "termsOutdatedCopy": "Athraíodh na téarmaí seirbhíse. Oscail an scáileán seo arís chun glacadh leis an leagan is déanaí.",
       "termsCheckRetryCopy": "Níorbh fhéidir na téarmaí seirbhíse a sheiceáil. Seiceáil do nasc agus bain triail as arís.",
+      "comment_two": "{{displayCount}} thrácht",
+      "comment_few": "{{displayCount}} thrácht",
+      "comment_many": "{{displayCount}} dtrácht",
+      "reaction_two": "imoibriúchán",
+      "reaction_few": "imoibriúchán",
+      "reaction_many": "n-imoibriúchán",
       "reactions": {
         "thumbsUp": "Ordóg suas",
         "thumbsDown": "Ordóg síos",
@@ -531,12 +539,7 @@
         "outdatedOnPath": "As dáta ar {{path}}"
       },
       "deletedUser": "úsáideoir scriosta",
-      "comment_two": "{{displayCount}} thrácht",
-      "comment_few": "{{displayCount}} thrácht",
-      "comment_many": "{{displayCount}} dtrácht",
-      "reaction_two": "imoibriúchán",
-      "reaction_few": "imoibriúchán",
-      "reaction_many": "n-imoibriúchán"
+      "replyForbiddenTerm": "Níl cead agat freagra a thabhairt ar an {{term}} seo."
     },
     "couldNotOpenGitHubAppSettings": "Níorbh fhéidir socruithe na haipe GitHub a oscailt.",
     "installKiloGitHubApp": "Suiteáil aip GitHub Kilo",
@@ -703,21 +706,6 @@
       "files": "Comhaid",
       "discussion": "Plé"
     },
-    "terms": {
-      "pullRequest": "Iarratas tarraingthe",
-      "mergeRequest": "Iarratas cumaisc",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Comhroinn iarratas cumaisc",
-      "viewOnProvider": "Amharc ar {{provider}}",
-      "mergeRequestUnavailable": "Iarratas cumaisc gan fáil",
-      "unavailableDescription": "B’fhéidir gur scriosadh é, nó b’fhéidir nach bhfuil rochtain agat air.",
-      "accessDeniedMergeRequest": "Níl cead agat an t-iarratas cumaisc seo a fheiceáil.",
-      "couldNotLoadMergeRequest": "Níorbh fhéidir an t-iarratas cumaisc a lódáil.",
-      "discussionAccessDenied": "Níl cead agat plé an iarratais chumaisc seo a fheiceáil.",
-      "discussionUnavailableMessage": "Seans gur baineadh an t-iarratas cumaisc seo.",
-      "noDiscussionDescription": "Níl aon snáithe athbhreithnithe ná trácht comhrá ar an iarratas cumaisc seo.",
-      "noFilesChangedDescription": "Níl aon athrú ar chomhaid san iarratas cumaisc seo."
-    },
     "fileStatus": {
       "modified": "Modhnaithe",
       "renamed": "Athainmnithe",
@@ -755,6 +743,27 @@
       "ambiguous": "Níorbh fhéidir an toradh a dheimhniú — seiceáil an PR sula mbainfidh tú triail as arís.",
       "persistenceFailed": "Níorbh fhéidir linn an gníomh seo a thaifeadadh. Bain triail as arís níos déanaí.",
       "forbidden": "Tá an gníomh seo toirmiscthe."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Níl ar fáil leis an soláthraí seo",
+        "accessibility": "Níl ar fáil leis an soláthraí seo: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Iarratas tarraingthe",
+      "mergeRequest": "Iarratas cumaisc",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Comhroinn iarratas cumaisc",
+      "viewOnProvider": "Amharc ar {{provider}}",
+      "mergeRequestUnavailable": "Iarratas cumaisc gan fáil",
+      "unavailableDescription": "B’fhéidir gur scriosadh é, nó b’fhéidir nach bhfuil rochtain agat air.",
+      "accessDeniedMergeRequest": "Níl cead agat an t-iarratas cumaisc seo a fheiceáil.",
+      "couldNotLoadMergeRequest": "Níorbh fhéidir an t-iarratas cumaisc a lódáil.",
+      "discussionAccessDenied": "Níl cead agat plé an iarratais chumaisc seo a fheiceáil.",
+      "discussionUnavailableMessage": "Seans gur baineadh an t-iarratas cumaisc seo.",
+      "noDiscussionDescription": "Níl aon snáithe athbhreithnithe ná trácht comhrá ar an iarratas cumaisc seo.",
+      "noFilesChangedDescription": "Níl aon athrú ar chomhaid san iarratas cumaisc seo."
     }
   },
   "notifications": {
@@ -2693,7 +2702,14 @@
     "languageNotInstalledMessage": "Níl comhaid cainte as líne do {{language}} suiteáilte ar an bhfón seo. Íoslódáil iad, agus bain triail as ionchur gutha arís ina dhiaidh sin.",
     "downloadOfflineModel": "Íoslódáil",
     "offlineModelDownloadScheduled": "Íoslódófar na comhaid cainte as líne sa chúlra. Bain triail as ionchur gutha arís níos déanaí.",
-    "listeningStopped": "Stopadh an éisteacht."
+    "listeningStopped": "Stopadh an éisteacht.",
+    "transcribing": "Ag tras-scríobh...",
+    "gatewayUnreachable": "Níorbh fhéidir an Kilo Gateway a bhaint amach. Seiceáil do nasc agus bain triail as arís.",
+    "gatewayTimeout": "Thóg an tras-scríobh rófhada. Bain triail as arís.",
+    "gatewayModelUnavailable": "Níl an samhail tras-scríobh seo ar fáil. Roghnaigh ceann eile sna Roghanna.",
+    "gatewayModelUnavailableNotice": "Ní thairgtear an tsamhail seo a thuilleadh. Tapáil $t(transcriptionModel.title) chun ceann eile a roghnú.",
+    "gatewaySignInRequired": "Sínigh isteach chun tras-scríobh tríd an Kilo Gateway a úsáid.",
+    "gatewayNoModel": "Roghnaigh samhail tras-scríobh sna Roghanna ar dtús."
   },
   "share": {
     "title": "Comhroinnt le Kilo",
@@ -3078,5 +3094,12 @@
     "needsInput": "Ionchur de dhíth",
     "channelName": "Gníomhairí gníomhacha",
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála."
+  },
+  "transcriptionModel": {
+    "title": "Samhail tras-scríobh",
+    "noneChosen": "Níor roghnaíadh aon cheann",
+    "emptyTitle": "Níl samhail tras-scríobh ar bith ann",
+    "emptyDescription": "Níl aon shamhail tras-scríobh ar fáil ón Kilo Gateway faoi láthair.",
+    "loadFailed": "Níorbh fhéidir na samhlacha tras-scríobh a lódáil."
   }
 }

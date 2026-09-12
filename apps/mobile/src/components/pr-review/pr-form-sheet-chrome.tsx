@@ -69,14 +69,19 @@ export function PrFormSheetHeader(props: { title: string; eyebrow: string; onBac
  * Trailing ScrollView footer for formSheets. No keyboard-height padding —
  * parent ScrollView automaticallyAdjustKeyboardInsets owns that. On Android
  * the footer sits on the bottom edge, so it adds the system bottom inset.
+ * The px-6 gutter is widened by the side insets so the footer CTAs clear the
+ * landscape safe area when the sheet runs edge-to-edge (portrait insets are
+ * zero, so the gutter stays 24).
  */
 export function PrFormSheetFooter(props: { children: ReactNode }) {
-  const { bottom } = useSafeAreaInsets();
+  const { bottom, left, right } = useSafeAreaInsets();
   const paddingBottom = Platform.OS === 'android' ? 16 + bottom : 16;
+  const paddingLeft = 24 + left;
+  const paddingRight = 24 + right;
   return (
     <View
-      className="mt-0.5 border-t-[0.5px] border-hair-soft bg-background px-6 pt-3"
-      style={{ paddingBottom }}
+      className="mt-0.5 border-t-[0.5px] border-hair-soft bg-background pt-3"
+      style={{ paddingBottom, paddingLeft, paddingRight }}
     >
       {props.children}
     </View>

@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "Ettevõtte SSO"
   },
   "preferences": {
+    "general": "Üldine",
+    "voiceInput": "Häälsisestus",
     "autoExpandThinking": "Ava mõttekäik automaatselt",
     "autoExpandThinkingSubtitle": "Näita agendi mõttekäiku avatuna, kui mõtlemine lõpeb.",
     "keepScreenOn": "Hoia ekraan seansi lehel sisselülitatuna",
@@ -238,6 +240,7 @@
     "appearanceLight": "Hele",
     "appearanceDark": "Tume",
     "account": "Konto",
+    "accountSubtitle": "Keel, usaldatud hostid ja seadmete seansid",
     "prReviewAttribution": "Lisa PR-ülevaatustele rakenduse viide",
     "prReviewAttributionSubtitle": "Lisa ülevaatuse esitamisel jalusesse märge „Üle vaadatud Kilo kaudu“.",
     "returnSendsMessage": "Sisestusklahv saadab sõnumi",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kõnetuvastus Kilo Gateway kaudu",
+    "gatewayTranscriptionSubtitle": "Kasuta häälsisestuse tekstiks teisendamiseks seadme kõnetuvastuse asemel Kilo Gateway mudelit. Sinu salvestus saadetakse Kilo Gateway'sse.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Tõmbetaotlus pole saadaval",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Tühi rida muudatuste vaates"
     },
     "connectionExpired": "GitHubi ühendus aegus.",
-    "capabilities": {
-      "banner": {
-        "title": "Selle pakkuja juures pole saadaval",
-        "accessibility": "Selle pakkuja juures pole saadaval: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Mestimine",
       "mergeNow": "Ühenda kohe",
@@ -472,7 +472,9 @@
       "acceptTerms": "Nõustu",
       "replyBadRequest": "Seda vastust ei saa postitada. Lõim võis muutuda.",
       "replyForbidden": "Sul pole õigust sellele tõmbetaotlusele vastata.",
-      "replyForbiddenTerm": "Sul pole õigust sellele {{term}}ele vastata.",
+      "addCommentCta": "Kommenteeri seda tõmbetaotlust",
+      "commentBadRequest": "Seda kommentaari ei saa postitada. Tõmbetaotlus võis muutuda.",
+      "commentForbidden": "Sul pole õigust seda tõmbetaotlust kommenteerida.",
       "moderation": {
         "reportContent": {
           "terminal": "Sellest kommentaarist ei saa teatada.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Aegunud: {{lines}}",
         "outdatedOnPath": "Aegunud: {{path}}"
       },
-      "deletedUser": "kustutatud kasutaja"
+      "deletedUser": "kustutatud kasutaja",
+      "replyForbiddenTerm": "Sul pole õigust sellele {{term}}ele vastata."
     },
     "couldNotOpenGitHubAppSettings": "GitHubi rakenduse seadeid ei õnnestunud avada.",
     "installKiloGitHubApp": "Installi Kilo GitHubi rakendus",
@@ -679,21 +682,6 @@
       "files": "Failid",
       "discussion": "Arutelu"
     },
-    "terms": {
-      "pullRequest": "Tõmbetaotlus",
-      "mergeRequest": "Liitmistaotlus",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Jaga liitmistaotlust",
-      "viewOnProvider": "Kuva {{provider}}",
-      "mergeRequestUnavailable": "Liitmistaotlus pole saadaval",
-      "unavailableDescription": "See võib olla kustutatud või sul puudub ligipääs.",
-      "accessDeniedMergeRequest": "Sul pole õigust seda liitmistaotlust vaadata.",
-      "couldNotLoadMergeRequest": "Liitmistaotlust ei õnnestunud laadida.",
-      "discussionAccessDenied": "Sul puudub õigus selle liitmistaotluse arutelu vaadata.",
-      "discussionUnavailableMessage": "See liitmistaotlus võib olla eemaldatud.",
-      "noDiscussionDescription": "Selle liitmistaotluse juures pole veel ülevaatuslõime ega arutelukommentaare.",
-      "noFilesChangedDescription": "See liitmistaotlus ei sisalda failimuudatusi."
-    },
     "fileStatus": {
       "modified": "Muudetud",
       "renamed": "Ümber nimetatud",
@@ -731,6 +719,27 @@
       "ambiguous": "Toimingu õnnestumist ei õnnestunud kinnitada — kontrolli PR-i enne uuesti proovimist.",
       "persistenceFailed": "Seda toimingut ei õnnestunud salvestada. Proovi hiljem uuesti.",
       "forbidden": "See toiming pole lubatud."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Selle pakkuja juures pole saadaval",
+        "accessibility": "Selle pakkuja juures pole saadaval: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Tõmbetaotlus",
+      "mergeRequest": "Liitmistaotlus",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Jaga liitmistaotlust",
+      "viewOnProvider": "Kuva {{provider}}",
+      "mergeRequestUnavailable": "Liitmistaotlus pole saadaval",
+      "unavailableDescription": "See võib olla kustutatud või sul puudub ligipääs.",
+      "accessDeniedMergeRequest": "Sul pole õigust seda liitmistaotlust vaadata.",
+      "couldNotLoadMergeRequest": "Liitmistaotlust ei õnnestunud laadida.",
+      "discussionAccessDenied": "Sul puudub õigus selle liitmistaotluse arutelu vaadata.",
+      "discussionUnavailableMessage": "See liitmistaotlus võib olla eemaldatud.",
+      "noDiscussionDescription": "Selle liitmistaotluse juures pole veel ülevaatuslõime ega arutelukommentaare.",
+      "noFilesChangedDescription": "See liitmistaotlus ei sisalda failimuudatusi."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Keele {{language}} võrguühenduseta kõnefailid pole selles telefonis installitud. Laadi need alla ja proovi häälsisestust uuesti.",
     "downloadOfflineModel": "Laadi alla",
     "offlineModelDownloadScheduled": "Võrguühenduseta kõnefailid laaditakse taustal alla. Proovi häälsisestust hiljem uuesti.",
-    "listeningStopped": "Kuulamine peatus."
+    "listeningStopped": "Kuulamine peatus.",
+    "transcribing": "Kõnetuvastus...",
+    "gatewayUnreachable": "Ühendust Kilo Gatewayga ei õnnestunud saada. Kontrolli ühendust ja proovi uuesti.",
+    "gatewayTimeout": "Kõnetuvastus võttis liiga palju aega. Proovi uuesti.",
+    "gatewayModelUnavailable": "Seda kõnetuvastuse mudelit pole saadaval. Vali Eelistustes mõni teine.",
+    "gatewayModelUnavailableNotice": "Seda mudelit enam ei pakuta. Puuduta $t(transcriptionModel.title), et valida teine.",
+    "gatewaySignInRequired": "Logi sisse, et kasutada Kilo Gateway kõnetuvastust.",
+    "gatewayNoModel": "Vali kõigepealt Eelistustes kõnetuvastuse mudel."
   },
   "share": {
     "title": "Kilosse jagamine",
@@ -3009,5 +3025,12 @@
     "needsInput": "Vajab sisendit",
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente."
+  },
+  "transcriptionModel": {
+    "title": "Kõnetuvastuse mudel",
+    "noneChosen": "Pole valitud",
+    "emptyTitle": "Kõnetuvastuse mudelid puuduvad",
+    "emptyDescription": "Kilo Gateway ei paku praegu ühtegi kõnetuvastuse mudelit.",
+    "loadFailed": "Kõnetuvastuse mudeleid ei õnnestunud laadida."
   }
 }

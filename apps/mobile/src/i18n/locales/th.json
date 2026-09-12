@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO สำหรับองค์กร"
   },
   "preferences": {
+    "general": "ทั่วไป",
+    "voiceInput": "การป้อนเสียง",
     "autoExpandThinking": "ขยายกระบวนการคิดอัตโนมัติ",
     "autoExpandThinkingSubtitle": "ขยายรายละเอียดกระบวนการคิดของเอเจนต์เมื่อคิดเสร็จ",
     "keepScreenOn": "เปิดหน้าจอค้างไว้ขณะอยู่ในหน้าเซสชัน",
@@ -238,6 +240,7 @@
     "appearanceLight": "สว่าง",
     "appearanceDark": "มืด",
     "account": "บัญชี",
+    "accountSubtitle": "ภาษา โฮสต์ที่เชื่อถือ และเซสชันบนอุปกรณ์",
     "prReviewAttribution": "ระบุแอปที่ใช้ในการตรวจสอบ PR",
     "prReviewAttributionSubtitle": "เพิ่มข้อความท้ายการตรวจสอบว่าตรวจสอบผ่าน Kilo เมื่อคุณส่งผลการตรวจสอบ",
     "returnSendsMessage": "ปุ่มขึ้นบรรทัดใหม่ใช้ส่งข้อความ",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "การถอดเสียงผ่าน Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "ถอดเสียงจากการพิมพ์ด้วยเสียงด้วยโมเดลของ Kilo Gateway แทนการรู้จำเสียงของอุปกรณ์ ระบบจะส่งการบันทึกเสียงของคุณไปยัง Kilo Gateway",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "เปิด PR ไม่ได้",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "แถวว่างในส่วนต่าง"
     },
     "connectionExpired": "การเชื่อมต่อ GitHub หมดอายุแล้ว",
-    "capabilities": {
-      "banner": {
-        "title": "ไม่พร้อมใช้งานในผู้ให้บริการนี้",
-        "accessibility": "ไม่พร้อมใช้งานในผู้ให้บริการนี้: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "ผสาน",
       "mergeNow": "รวมตอนนี้",
@@ -472,7 +472,9 @@
       "acceptTerms": "ยอมรับ",
       "replyBadRequest": "ไม่สามารถโพสต์การตอบกลับนี้ได้ เธรดอาจมีการเปลี่ยนแปลง",
       "replyForbidden": "คุณไม่มีสิทธิ์ตอบกลับใน PR นี้",
-      "replyForbiddenTerm": "คุณไม่มีสิทธิ์ตอบกลับใน {{term}} นี้",
+      "addCommentCta": "แสดงความคิดเห็นใน PR นี้",
+      "commentBadRequest": "ไม่สามารถโพสต์ความคิดเห็นนี้ได้ PR อาจมีการเปลี่ยนแปลง",
+      "commentForbidden": "คุณไม่มีสิทธิ์แสดงความคิดเห็นใน PR นี้",
       "moderation": {
         "reportContent": {
           "terminal": "ไม่สามารถรายงานความคิดเห็นนี้ได้",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "อ้างอิงโค้ดเก่าที่ {{lines}}",
         "outdatedOnPath": "อ้างอิงโค้ดเก่าที่ {{path}}"
       },
-      "deletedUser": "ผู้ใช้ที่ถูกลบ"
+      "deletedUser": "ผู้ใช้ที่ถูกลบ",
+      "replyForbiddenTerm": "คุณไม่มีสิทธิ์ตอบกลับใน {{term}} นี้"
     },
     "couldNotOpenGitHubAppSettings": "ไม่สามารถเปิดการตั้งค่าแอป GitHub ได้",
     "installKiloGitHubApp": "ติดตั้ง Kilo GitHub App",
@@ -679,21 +682,6 @@
       "files": "ไฟล์",
       "discussion": "การสนทนา"
     },
-    "terms": {
-      "pullRequest": "พูลรีเควสต์",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "แชร์ merge request",
-      "viewOnProvider": "ดูบน {{provider}}",
-      "mergeRequestUnavailable": "เปิด merge request ไม่ได้",
-      "unavailableDescription": "อาจถูกลบไปแล้ว หรือคุณอาจไม่มีสิทธิ์เข้าถึง",
-      "accessDeniedMergeRequest": "คุณไม่มีสิทธิ์ดู merge request นี้",
-      "couldNotLoadMergeRequest": "ไม่สามารถโหลด merge request ได้",
-      "discussionAccessDenied": "คุณไม่มีสิทธิ์ดูการสนทนาของ merge request นี้",
-      "discussionUnavailableMessage": "Merge request นี้อาจถูกลบไปแล้ว",
-      "noDiscussionDescription": "Merge request นี้ยังไม่มีเธรดรีวิวหรือความคิดเห็นในการสนทนา",
-      "noFilesChangedDescription": "Merge request นี้ไม่มีการเปลี่ยนแปลงไฟล์"
-    },
     "fileStatus": {
       "modified": "แก้ไขแล้ว",
       "renamed": "เปลี่ยนชื่อแล้ว",
@@ -731,6 +719,27 @@
       "ambiguous": "ยืนยันผลไม่ได้ — ตรวจสอบ PR ก่อนลองอีกครั้ง",
       "persistenceFailed": "เราไม่สามารถบันทึกการดำเนินการนี้ได้ โปรดลองอีกครั้งในภายหลัง",
       "forbidden": "ไม่มีสิทธิ์ดำเนินการ"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "ไม่พร้อมใช้งานในผู้ให้บริการนี้",
+        "accessibility": "ไม่พร้อมใช้งานในผู้ให้บริการนี้: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "พูลรีเควสต์",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "แชร์ merge request",
+      "viewOnProvider": "ดูบน {{provider}}",
+      "mergeRequestUnavailable": "เปิด merge request ไม่ได้",
+      "unavailableDescription": "อาจถูกลบไปแล้ว หรือคุณอาจไม่มีสิทธิ์เข้าถึง",
+      "accessDeniedMergeRequest": "คุณไม่มีสิทธิ์ดู merge request นี้",
+      "couldNotLoadMergeRequest": "ไม่สามารถโหลด merge request ได้",
+      "discussionAccessDenied": "คุณไม่มีสิทธิ์ดูการสนทนาของ merge request นี้",
+      "discussionUnavailableMessage": "Merge request นี้อาจถูกลบไปแล้ว",
+      "noDiscussionDescription": "Merge request นี้ยังไม่มีเธรดรีวิวหรือความคิดเห็นในการสนทนา",
+      "noFilesChangedDescription": "Merge request นี้ไม่มีการเปลี่ยนแปลงไฟล์"
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "ไฟล์เสียงพูดออฟไลน์สำหรับ{{language}}ยังไม่ได้ติดตั้งในโทรศัพท์เครื่องนี้ ดาวน์โหลดไฟล์ก่อน แล้วลองใช้การพิมพ์ด้วยเสียงอีกครั้ง",
     "downloadOfflineModel": "ดาวน์โหลด",
     "offlineModelDownloadScheduled": "ไฟล์เสียงพูดออฟไลน์จะดาวน์โหลดในเบื้องหลัง ลองใช้การพิมพ์ด้วยเสียงอีกครั้งในภายหลัง",
-    "listeningStopped": "หยุดฟังแล้ว"
+    "listeningStopped": "หยุดฟังแล้ว",
+    "transcribing": "กำลังถอดเสียง...",
+    "gatewayUnreachable": "ไม่สามารถเชื่อมต่อ Kilo Gateway ได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
+    "gatewayTimeout": "การถอดเสียงใช้เวลานานเกินไป ลองอีกครั้ง",
+    "gatewayModelUnavailable": "โมเดลถอดเสียงนี้ไม่พร้อมใช้งาน เลือกโมเดลอื่นในการตั้งค่า",
+    "gatewayModelUnavailableNotice": "โมเดลนี้ไม่ให้บริการแล้ว แตะ $t(transcriptionModel.title) เพื่อเลือกโมเดลอื่น",
+    "gatewaySignInRequired": "เข้าสู่ระบบเพื่อใช้การถอดเสียงผ่าน Kilo Gateway",
+    "gatewayNoModel": "เลือกโมเดลถอดเสียงในการตั้งค่าก่อน"
   },
   "share": {
     "title": "แชร์ไปยัง Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "รอข้อมูลจากคุณ",
     "channelName": "เอเจนต์ที่กำลังทำงาน",
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก"
+  },
+  "transcriptionModel": {
+    "title": "โมเดลถอดเสียง",
+    "noneChosen": "ยังไม่ได้เลือก",
+    "emptyTitle": "ไม่มีโมเดลถอดเสียง",
+    "emptyDescription": "ขณะนี้ Kilo Gateway ไม่มีโมเดลถอดเสียงให้บริการ",
+    "loadFailed": "ไม่สามารถโหลดโมเดลถอดเสียงได้"
   }
 }

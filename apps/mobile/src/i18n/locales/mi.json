@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO umanga"
   },
   "preferences": {
+    "general": "Whānui",
+    "voiceInput": "Tāuru reo",
     "autoExpandThinking": "Whakawhānuitia aunoa te whakaaro",
     "autoExpandThinkingSubtitle": "Whakaaturia katoatia ngā whakaaro o te māngai ina oti tana whakaaro.",
     "keepScreenOn": "Whakakā tonutia te mata i te whārangi wātū",
@@ -238,6 +240,7 @@
     "appearanceLight": "Mārama",
     "appearanceDark": "Pōuri",
     "account": "Pūkete",
+    "accountSubtitle": "Reo, ngā paetukutuku whirinaki me ngā wātū pūrere",
     "prReviewAttribution": "Tāpirihia te ingoa taupānga ki ngā arotake PR",
     "prReviewAttributionSubtitle": "Tāpirihia he hiku e mea ana 'Kua arotakengia mā Kilo' ina tuku koe i tētahi arotake.",
     "returnSendsMessage": "Ka tukuna te karere mā te pātuhi tāuru",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Tuhi ā-reo mā Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Tuhia te tāuru reo mā tētahi tauira Kilo Gateway, kau mā te mōhio kōrero o te pūrere. Ka tukuna tō pūreko ki te Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono kume",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Rārangi rerekētanga pātea"
     },
     "connectionExpired": "Kua pau te wā o te hononga GitHub.",
-    "capabilities": {
-      "banner": {
-        "title": "Kāore e wātea ana i tēnei kaiwhakarato",
-        "accessibility": "Kāore e wātea ana i tēnei kaiwhakarato: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Whakakotahitanga",
       "mergeNow": "Whakakotahitia ināianei",
@@ -472,7 +472,9 @@
       "acceptTerms": "Whakaae",
       "replyBadRequest": "Kāore e taea te tuku i tēnei whakautu. Kua rerekē pea te aho kōrero.",
       "replyForbidden": "Kāore koe e whakaaetia kia whakautu ki tēnei tono kume.",
-      "replyForbiddenTerm": "Kāore koe e whakaaetia kia whakautu ki tēnei {{term}}.",
+      "addCommentCta": "Tāpiri kōrero ki tēnei tono kume",
+      "commentBadRequest": "Kāore e taea te tuku i tēnei kōrero. Kua rerekē pea te tono kume.",
+      "commentForbidden": "Kāore koe e whakaaetia kia tāpiri kōrero ki tēnei tono kume.",
       "moderation": {
         "reportContent": {
           "terminal": "Kāore e taea te pūrongo i tēnei kōrero.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Kua tawhito i {{lines}}",
         "outdatedOnPath": "Kua tawhito i {{path}}"
       },
-      "deletedUser": "kaiwhakamahi kua mukua"
+      "deletedUser": "kaiwhakamahi kua mukua",
+      "replyForbiddenTerm": "Kāore koe e whakaaetia kia whakautu ki tēnei {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Kāore i taea te whakatuwhera i ngā tautuhinga o te taupānga GitHub.",
     "installKiloGitHubApp": "Tāutatia te taupānga Kilo GitHub",
@@ -679,21 +682,6 @@
       "files": "Kōnae",
       "discussion": "Kōrerorero"
     },
-    "terms": {
-      "pullRequest": "Tono kume",
-      "mergeRequest": "Tono whakakotahi",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Tohaina te tono whakakotahi",
-      "viewOnProvider": "Tirohia i {{provider}}",
-      "mergeRequestUnavailable": "Kāore i te wātea te tono whakakotahi",
-      "unavailableDescription": "Tērā pea kua mukua, tērā pea kāore ō urunga.",
-      "accessDeniedMergeRequest": "Kāore koe e whakaaetia kia tiro i tēnei tono whakakotahi.",
-      "couldNotLoadMergeRequest": "Kāore i taea te uta i te tono whakakotahi.",
-      "discussionAccessDenied": "Kāore koe e whakaaetia kia tiro i te kōrerorero o tēnei tono whakakotahi.",
-      "discussionUnavailableMessage": "Kua tangohia pea tēnei tono whakakotahi.",
-      "noDiscussionDescription": "Kāore he aho arotake, he kōrero rānei mō tēnei tono whakakotahi.",
-      "noFilesChangedDescription": "Kāore he huringa kōnae i tēnei tono whakakotahi."
-    },
     "fileStatus": {
       "modified": "Kua whakarerekētia",
       "renamed": "Kua whakaingoatia anō",
@@ -731,6 +719,27 @@
       "ambiguous": "Kāore i taea te whakaū — tirohia te PR i mua i te whakamātau anō.",
       "persistenceFailed": "Kāore i taea e mātou te tuhi i tēnei mahi. Whakamātau anō ā muri ake.",
       "forbidden": "Kāore e whakaaetia."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Kāore e wātea ana i tēnei kaiwhakarato",
+        "accessibility": "Kāore e wātea ana i tēnei kaiwhakarato: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Tono kume",
+      "mergeRequest": "Tono whakakotahi",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Tohaina te tono whakakotahi",
+      "viewOnProvider": "Tirohia i {{provider}}",
+      "mergeRequestUnavailable": "Kāore i te wātea te tono whakakotahi",
+      "unavailableDescription": "Tērā pea kua mukua, tērā pea kāore ō urunga.",
+      "accessDeniedMergeRequest": "Kāore koe e whakaaetia kia tiro i tēnei tono whakakotahi.",
+      "couldNotLoadMergeRequest": "Kāore i taea te uta i te tono whakakotahi.",
+      "discussionAccessDenied": "Kāore koe e whakaaetia kia tiro i te kōrerorero o tēnei tono whakakotahi.",
+      "discussionUnavailableMessage": "Kua tangohia pea tēnei tono whakakotahi.",
+      "noDiscussionDescription": "Kāore he aho arotake, he kōrero rānei mō tēnei tono whakakotahi.",
+      "noFilesChangedDescription": "Kāore he huringa kōnae i tēnei tono whakakotahi."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Kāore ngā kōnae kōrero kore-ipurangi mō {{language}} kua tāutitia ki tēnei waea. Tikiake, kātahi ka whakamātau anō i te tāuru reo.",
     "downloadOfflineModel": "Tikiake",
     "offlineModelDownloadScheduled": "Ka tikiaketia ngā kōnae kōrero kore-ipurangi ki te papamuri. Whakamātau anō i te tāuru reo ā muri atu.",
-    "listeningStopped": "Kua mutu te whakarongo."
+    "listeningStopped": "Kua mutu te whakarongo.",
+    "transcribing": "E tuhi ana...",
+    "gatewayUnreachable": "Kāore i taea te tae ki te Kilo Gateway. Tirohia tō hononga, kātahi ka whakamātau anō.",
+    "gatewayTimeout": "He roa rawa te tuhi ā-reo. Whakamātau anō.",
+    "gatewayModelUnavailable": "Kāore e wātea ana tēnei tauira tuhi ā-reo. Kōwhiria tētahi atu i Ngā manakohanga.",
+    "gatewayModelUnavailableNotice": "Kāore tēnei tauira e tukuna ana ināianei. Pāwhiritia $t(transcriptionModel.title) ki te kōwhiri i tētahi atu.",
+    "gatewaySignInRequired": "Takiuru kia taea te tuhi ā-reo mā Kilo Gateway.",
+    "gatewayNoModel": "Tuatahi, kōwhiria he tauira tuhi ā-reo i Ngā manakohanga."
   },
   "share": {
     "title": "Tohatoha ki Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Me whai urupare",
     "channelName": "Ngā māngai e mahi ana",
     "activityKitDisabledBody": "Whakakāngia ngā mahi wā-tūturu i ngā tautuhinga kia kite ai i ngā māngai e mahi ana i te mata maukati."
+  },
+  "transcriptionModel": {
+    "title": "Tauira tuhi ā-reo",
+    "noneChosen": "Kāore i kōwhiria",
+    "emptyTitle": "Kāore he tauira tuhi ā-reo",
+    "emptyDescription": "I tēnei wā, kāore he tauira tuhi ā-reo e wātea ana i te Kilo Gateway.",
+    "loadFailed": "Kāore i taea te uta i ngā tauira tuhi ā-reo."
   }
 }

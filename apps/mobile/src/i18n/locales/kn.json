@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "ಸಾಂಸ್ಥಿಕ SSO"
   },
   "preferences": {
+    "general": "ಸಾಮಾನ್ಯ",
+    "voiceInput": "ಧ್ವನಿ ಇನ್ಪುಟ್",
     "autoExpandThinking": "ಯೋಚನೆಯನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ವಿಸ್ತರಿಸಿ",
     "autoExpandThinkingSubtitle": "ಏಜೆಂಟ್ ಯೋಚಿಸುವುದನ್ನು ಮುಗಿಸಿದಾಗ ಅದರ ಯೋಚನೆಯನ್ನು ವಿಸ್ತರಿಸಿ ತೋರಿಸಿ.",
     "keepScreenOn": "ಸೆಶನ್ ಪುಟದಲ್ಲಿರುವಾಗ ಪರದೆಯನ್ನು ಆನ್ ಆಗಿರಿಸಿ",
@@ -238,6 +240,7 @@
     "appearanceLight": "ತಿಳಿ",
     "appearanceDark": "ಗಾಢ",
     "account": "ಖಾತೆ",
+    "accountSubtitle": "ಭಾಷೆ, ವಿಶ್ವಾಸಾರ್ಹ ಹೋಸ್ಟ್‌ಗಳು ಮತ್ತು ಸಾಧನ ಸೆಷನ್‌ಗಳು",
     "prReviewAttribution": "PR ಪರಿಶೀಲನೆಗಳಿಗೆ ಅಪ್ಲಿಕೇಶನ್ ಉಲ್ಲೇಖ ಸೇರಿಸಿ",
     "prReviewAttributionSubtitle": "ನೀವು ಪರಿಶೀಲನೆಯನ್ನು ಸಲ್ಲಿಸಿದಾಗ ಕೊನೆಯಲ್ಲಿ Kilo ಮೂಲಕ ಪರಿಶೀಲಿಸಲಾಗಿದೆ ಎಂಬ ಸಾಲನ್ನು ಸೇರಿಸಿ.",
     "returnSendsMessage": "ರಿಟರ್ನ್ ಕೀಲಿಯು ಸಂದೇಶ ಕಳುಹಿಸುತ್ತದೆ",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway ಮೂಲಕ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವಿಕೆ",
+    "gatewayTranscriptionSubtitle": "ಸಾಧನದ ಮಾತು ಗುರುತಿಸುವಿಕೆಗೆ ಬದಲಾಗಿ Kilo Gateway ಮಾದರಿಯನ್ನು ಬಳಸಿ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಅನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಿ. ನಿಮ್ಮ ಧ್ವನಿಮುದ್ರಣ Kilo Gateway ಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "ಬದಲಾವಣೆಗಳ ಹೋಲಿಕೆಯಲ್ಲಿ ಖಾಲಿ ಸಾಲು"
     },
     "connectionExpired": "GitHub ಸಂಪರ್ಕದ ಅವಧಿ ಮುಗಿದಿದೆ.",
-    "capabilities": {
-      "banner": {
-        "title": "ಈ ಪ್ರೊವೈಡರ್‌ನಲ್ಲಿ ಲಭ್ಯವಿಲ್ಲ",
-        "accessibility": "ಈ ಪ್ರೊವೈಡರ್‌ನಲ್ಲಿ ಲಭ್ಯವಿಲ್ಲ: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "ವಿಲೀನ",
       "mergeNow": "ಈಗ ವಿಲೀನಗೊಳಿಸಿ",
@@ -472,7 +472,9 @@
       "acceptTerms": "ಒಪ್ಪಿಕೊಳ್ಳಿ",
       "replyBadRequest": "ಈ ಉತ್ತರವನ್ನು ಪೋಸ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಚರ್ಚಾ ಸರಣಿ ಬದಲಾಗಿರಬಹುದು.",
       "replyForbidden": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗೆ ಉತ್ತರಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
-      "replyForbiddenTerm": "ಈ {{term}}‌ಗೆ ಉತ್ತರಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
+      "addCommentCta": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗೆ ಟಿಪ್ಪಣಿ ಮಾಡಿ",
+      "commentBadRequest": "ಈ ಟಿಪ್ಪಣಿಯನ್ನು ಪೋಸ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಬದಲಾಗಿರಬಹುದು.",
+      "commentForbidden": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗೆ ಟಿಪ್ಪಣಿ ಮಾಡಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
       "moderation": {
         "reportContent": {
           "terminal": "ಈ ಕಾಮೆಂಟ್ ಬಗ್ಗೆ ವರದಿ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "{{lines}} — ಹಳೆಯ ಆವೃತ್ತಿಯ ಕಾಮೆಂಟ್",
         "outdatedOnPath": "{{path}} — ಹಳೆಯ ಆವೃತ್ತಿಯ ಕಾಮೆಂಟ್"
       },
-      "deletedUser": "ಅಳಿಸಲಾದ ಬಳಕೆದಾರ"
+      "deletedUser": "ಅಳಿಸಲಾದ ಬಳಕೆದಾರ",
+      "replyForbiddenTerm": "ಈ {{term}}‌ಗೆ ಉತ್ತರಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ಆ್ಯಪ್‌ನ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "installKiloGitHubApp": "Kilo GitHub ಆ್ಯಪ್ ಸ್ಥಾಪಿಸಿ",
@@ -679,21 +682,6 @@
       "files": "ಫೈಲ್‌ಗಳು",
       "discussion": "ಚರ್ಚೆ"
     },
-    "terms": {
-      "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್",
-      "mergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಹಂಚಿ",
-      "viewOnProvider": "{{provider}}ನಲ್ಲಿ ವೀಕ್ಷಿಸಿ",
-      "mergeRequestUnavailable": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
-      "unavailableDescription": "ಅದು ಅಳಿಸಲ್ಪಟ್ಟಿರಬಹುದು, ಅಥವಾ ನಿಮಗೆ ಅದಕ್ಕೆ ಪ್ರವೇಶವಿರದಿರಬಹುದು.",
-      "accessDeniedMergeRequest": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ವೀಕ್ಷಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
-      "couldNotLoadMergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "discussionAccessDenied": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ನ ಚರ್ಚೆಯನ್ನು ವೀಕ್ಷಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
-      "discussionUnavailableMessage": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ತೆಗೆದುಹಾಕಿರಬಹುದು.",
-      "noDiscussionDescription": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ನಲ್ಲಿ ಪರಿಶೀಲನೆಗೆ ಸಂಬಂಧಿಸಿದ ಚರ್ಚಾ ಸರಣಿಗಳಾಗಲಿ, ಸಾಮಾನ್ಯ ಕಾಮೆಂಟ್‌ಗಳಾಗಲಿ ಇಲ್ಲ.",
-      "noFilesChangedDescription": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ನಲ್ಲಿ ಯಾವುದೇ ಫೈಲ್ ಬದಲಾವಣೆಗಳಿಲ್ಲ."
-    },
     "fileStatus": {
       "modified": "ಮಾರ್ಪಡಿಸಲಾಗಿದೆ",
       "renamed": "ಮರುಹೆಸರಿಸಲಾಗಿದೆ",
@@ -731,6 +719,27 @@
       "ambiguous": "ದೃಢೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ — ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುವ ಮೊದಲು PR ಪರಿಶೀಲಿಸಿ.",
       "persistenceFailed": "ಈ ಕ್ರಿಯೆಯನ್ನು ದಾಖಲಿಸಲು ನಮಗೆ ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "forbidden": "ಇದಕ್ಕೆ ಅನುಮತಿ ಇಲ್ಲ."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "ಈ ಪ್ರೊವೈಡರ್‌ನಲ್ಲಿ ಲಭ್ಯವಿಲ್ಲ",
+        "accessibility": "ಈ ಪ್ರೊವೈಡರ್‌ನಲ್ಲಿ ಲಭ್ಯವಿಲ್ಲ: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್",
+      "mergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಹಂಚಿ",
+      "viewOnProvider": "{{provider}}ನಲ್ಲಿ ವೀಕ್ಷಿಸಿ",
+      "mergeRequestUnavailable": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
+      "unavailableDescription": "ಅದು ಅಳಿಸಲ್ಪಟ್ಟಿರಬಹುದು, ಅಥವಾ ನಿಮಗೆ ಅದಕ್ಕೆ ಪ್ರವೇಶವಿರದಿರಬಹುದು.",
+      "accessDeniedMergeRequest": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ವೀಕ್ಷಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
+      "couldNotLoadMergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "discussionAccessDenied": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ನ ಚರ್ಚೆಯನ್ನು ವೀಕ್ಷಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
+      "discussionUnavailableMessage": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ತೆಗೆದುಹಾಕಿರಬಹುದು.",
+      "noDiscussionDescription": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ನಲ್ಲಿ ಪರಿಶೀಲನೆಗೆ ಸಂಬಂಧಿಸಿದ ಚರ್ಚಾ ಸರಣಿಗಳಾಗಲಿ, ಸಾಮಾನ್ಯ ಕಾಮೆಂಟ್‌ಗಳಾಗಲಿ ಇಲ್ಲ.",
+      "noFilesChangedDescription": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ನಲ್ಲಿ ಯಾವುದೇ ಫೈಲ್ ಬದಲಾವಣೆಗಳಿಲ್ಲ."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "{{language}} ಭಾಷೆಯ ಆಫ್‌ಲೈನ್ ಮಾತು ಫೈಲ್‌ಗಳು ಈ ಫೋನ್‌ನಲ್ಲಿ ಸ್ಥಾಪಿಸಲಾಗಿಲ್ಲ. ಅವುಗಳನ್ನು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ, ನಂತರ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಅನ್ನು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "downloadOfflineModel": "ಡೌನ್‌ಲೋಡ್",
     "offlineModelDownloadScheduled": "ಆಫ್‌ಲೈನ್ ಮಾತು ಫೈಲ್‌ಗಳು ಹಿನ್ನೆಲೆಯಲ್ಲಿ ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತವೆ. ನಂತರ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಅನ್ನು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-    "listeningStopped": "ಆಲಿಸುವುದು ನಿಂತಿದೆ."
+    "listeningStopped": "ಆಲಿಸುವುದು ನಿಂತಿದೆ.",
+    "transcribing": "ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಲಾಗುತ್ತಿದೆ...",
+    "gatewayUnreachable": "Kilo Gateway ಅನ್ನು ತಲುಪಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "gatewayTimeout": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಲು ತುಂಬಾ ಸಮಯ ತೆಗೆದುಕೊಂಡಿತು. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "gatewayModelUnavailable": "ಈ ಪರಿವರ್ತನಾ ಮಾದರಿ ಲಭ್ಯವಿಲ್ಲ. ಆದ್ಯತೆಗಳಲ್ಲಿ ಇನ್ನೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+    "gatewayModelUnavailableNotice": "ಈ ಮಾದರಿಯನ್ನು ಇನ್ನು ಮುಂದೆ ನೀಡಲಾಗುವುದಿಲ್ಲ. ಇನ್ನೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಲು $t(transcriptionModel.title) ಅನ್ನು ಟ್ಯಾಪ್ ಮಾಡಿ.",
+    "gatewaySignInRequired": "Kilo Gateway ಪರಿವರ್ತನೆಯನ್ನು ಬಳಸಲು ಸೈನ್ ಇನ್ ಮಾಡಿ.",
+    "gatewayNoModel": "ಮೊದಲು ಆದ್ಯತೆಗಳಲ್ಲಿ ಪರಿವರ್ತನಾ ಮಾದರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ."
   },
   "share": {
     "title": "Kiloಗೆ ಹಂಚಿಕೆ",
@@ -3009,5 +3025,12 @@
     "needsInput": "ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಅಗತ್ಯ",
     "channelName": "ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳು",
     "activityKitDisabledBody": "ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳನ್ನು ನೋಡಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಲೈವ್ ಚಟುವಟಿಕೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ."
+  },
+  "transcriptionModel": {
+    "title": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಮಾದರಿ",
+    "noneChosen": "ಯಾವುದನ್ನೂ ಆಯ್ಕೆ ಮಾಡಿಲ್ಲ",
+    "emptyTitle": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಯಾವುದೇ ಮಾದರಿಗಳಿಲ್ಲ",
+    "emptyDescription": "Kilo Gateway ಪ್ರಸ್ತುತ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಯಾವುದೇ ಮಾದರಿಗಳನ್ನು ಒದಗಿಸುತ್ತಿಲ್ಲ.",
+    "loadFailed": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
   }
 }

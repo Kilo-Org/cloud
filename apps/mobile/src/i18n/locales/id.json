@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO perusahaan"
   },
   "preferences": {
+    "general": "Umum",
+    "voiceInput": "Input suara",
     "autoExpandThinking": "Tampilkan pemikiran secara otomatis",
     "autoExpandThinkingSubtitle": "Buka bagian pemikiran agen secara otomatis setelah agen selesai berpikir.",
     "keepScreenOn": "Biarkan layar tetap menyala di halaman sesi",
@@ -238,6 +240,7 @@
     "appearanceLight": "Terang",
     "appearanceDark": "Gelap",
     "account": "Akun",
+    "accountSubtitle": "Bahasa, host tepercaya, dan sesi perangkat",
     "prReviewAttribution": "Tambahkan atribusi aplikasi ke tinjauan PR",
     "prReviewAttributionSubtitle": "Tambahkan keterangan Ditinjau melalui Kilo di bagian bawah saat kamu mengirim tinjauan.",
     "returnSendsMessage": "Tombol Enter mengirim pesan",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkripsi dengan Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkripsikan masukan suara dengan model Kilo Gateway alih-alih pengenalan bicara perangkat. Rekaman Anda dikirim ke Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Aktivitas langsung",
@@ -2144,7 +2150,14 @@
     "languageNotInstalledMessage": "File suara offline untuk {{language}} belum terinstal di ponsel ini. Unduh filenya, lalu coba masukan suara lagi.",
     "downloadOfflineModel": "Unduh",
     "offlineModelDownloadScheduled": "File suara offline akan diunduh di latar belakang. Coba masukan suara lagi nanti.",
-    "listeningStopped": "Pendeteksian suara dihentikan."
+    "listeningStopped": "Pendeteksian suara dihentikan.",
+    "transcribing": "Mentranskripsi...",
+    "gatewayUnreachable": "Tidak dapat menghubungi Kilo Gateway. Periksa koneksi Anda dan coba lagi.",
+    "gatewayTimeout": "Transkripsi terlalu lama. Coba lagi.",
+    "gatewayModelUnavailable": "Model transkripsi ini tidak tersedia. Pilih yang lain di Preferensi.",
+    "gatewayModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketuk $t(transcriptionModel.title) untuk memilih yang lain.",
+    "gatewaySignInRequired": "Masuk untuk menggunakan transkripsi Kilo Gateway.",
+    "gatewayNoModel": "Pilih model transkripsi di Preferensi terlebih dahulu."
   },
   "share": {
     "title": "Bagikan ke Kilo",
@@ -2322,11 +2335,172 @@
     "installAttributionPromptTitle": "Izinkan pelacakan sumber pemasangan?"
   },
   "prReview": {
-    "pullRequestUnavailable": "PR tidak tersedia",
-    "pullRequestUnavailableDescription": "PR ini tidak dapat dibuka. PR ini mungkin sudah dihapus, repositorinya bersifat privat, atau aplikasi Kilo untuk GitHub belum dipasang di repositori tersebut.",
     "accessDeniedDescription": "Kamu tidak memiliki izin untuk melihat PR ini.",
-    "noFilesChanged": "Tidak ada file yang diubah",
-    "noFilesChangedDescription": "Tidak ada perubahan file dalam PR ini.",
+    "checkConnection": "Periksa koneksi",
+    "checks": {
+      "checksCount": "{{displayCount}} pemeriksaan",
+      "couldNotLoad": "Tidak dapat memuat pemeriksaan.",
+      "failed": "{{displayCount}} gagal",
+      "noAccess": "Kamu tidak memiliki akses ke pemeriksaan repositori ini.",
+      "noChecksReported": "Belum ada hasil pemeriksaan",
+      "notAvailable": "Pemeriksaan belum tersedia. Commit terkini mungkin belum diproses, atau aplikasi Kilo untuk GitHub belum dipasang di repositori sumber.",
+      "openDetails": "Buka detail {{name}}",
+      "passed": "{{displayCount}} lulus",
+      "pending": "{{displayCount}} menunggu",
+      "retryChecks": "Coba pemeriksaan lagi",
+      "skipped": "{{displayCount}} dilewati",
+      "title": "Pemeriksaan",
+      "viewOnGitHub": "Lihat PR di GitHub",
+      "checkDetails": "detail pemeriksaan"
+    },
+    "composer": {
+      "addTitle": "Tambah komentar",
+      "addToReview": "Tambahkan ke tinjauan",
+      "comment": "Komentar",
+      "commentBody": "Isi komentar",
+      "commentBodyPlaceholder": "Komentar…",
+      "commentNow": "Kirim komentar sekarang",
+      "discardMessage": "Drafmu akan hilang.",
+      "discardTitle": "Buang komentar?",
+      "editTitle": "Ubah komentar",
+      "insertSuggestion": "Sisipkan saran",
+      "insertSuggestionA11y": "Sisipkan saran kode",
+      "loadFailedTitle": "Tidak dapat memuat editor komentar.",
+      "ok": "OK",
+      "unavailableMessage": "Komentar dalam antrean ini sudah dihapus atau dikirim.",
+      "unavailableTitle": "Komentar tidak tersedia",
+      "bodyEmpty": "Isi komentar tidak boleh kosong.",
+      "suggestionsOnlyAddedLines": "Saran hanya berlaku pada baris yang ditambahkan.",
+      "tapDiffLineToSuggest": "Ketuk baris perbedaan kode untuk mengaktifkan saran."
+    },
+    "connect": {
+      "checkFailedTitle": "Tidak dapat memeriksa koneksi GitHub.",
+      "checkFailedMessage": "Status masuk belum tersedia sampai data ini selesai dimuat.",
+      "checkFailedTitleGitLab": "Tidak dapat memeriksa koneksi GitLab.",
+      "checkFailedTitleBitbucket": "Tidak dapat memeriksa koneksi Bitbucket.",
+      "providerCheckFailedMessage": "Status koneksi tidak tersedia hingga bagian ini termuat.",
+      "reconnectTitle": "Hubungkan ulang GitHub",
+      "reconnectDescription": "Akses ke akun GitHub kamu telah dicabut. Hubungkan ulang untuk terus meninjau PR di ponsel.",
+      "description": "Hubungkan akun GitHub kamu untuk meninjau PR di ponsel.",
+      "gitlabDescription": "Hubungkan akun GitLab kamu untuk meninjau merge request di ponsel.",
+      "bitbucketDescription": "Hubungkan Bitbucket ke organisasi ini untuk meninjau PR di ponsel.",
+      "bitbucketOrgOnlyDescription": "Pilih organisasi di profilmu untuk meninjau PR Bitbucket-nya."
+    },
+    "connectionExpired": "Koneksi GitHub kedaluwarsa.",
+    "couldNotLoadPullRequest": "Tidak dapat memuat PR.",
+    "couldNotOpenGitHubAppSettings": "Tidak dapat membuka pengaturan aplikasi GitHub.",
+    "description": "Deskripsi",
+    "discussion": {
+      "acceptTerms": "Setuju",
+      "accessDeniedMessage": "Kamu tidak memiliki izin untuk melihat diskusi PR ini.",
+      "addReaction": "Tambah reaksi",
+      "block": "Blokir",
+      "blockedUser": "{{login}} diblokir",
+      "collapseThread": "Ciutkan utas",
+      "commentActions": "Tindakan pada komentar",
+      "comment": "{{displayCount}} komentar",
+      "comment_other": "{{displayCount}} komentar",
+      "couldNotLoad": "Tidak dapat memuat diskusi.",
+      "couldNotLoadMore": "Tidak dapat memuat komentar lainnya.",
+      "loadMoreComments": "Muat komentar lainnya",
+      "loading": "Memuat diskusi",
+      "moderation": {
+        "block": {
+          "retryable": "Tidak dapat memblokir pengguna ini. Periksa koneksimu dan coba lagi.",
+          "terminal": "Pengguna ini tidak dapat diblokir."
+        },
+        "mute": {
+          "retryable": "Tidak dapat membisukan pengguna ini. Periksa koneksimu dan coba lagi.",
+          "terminal": "Pengguna ini tidak dapat dibisukan."
+        },
+        "reportContent": {
+          "retryable": "Tidak dapat melaporkan komentar ini. Periksa koneksimu dan coba lagi.",
+          "terminal": "Komentar ini tidak dapat dilaporkan."
+        },
+        "reportUser": {
+          "retryable": "Tidak dapat melaporkan pengguna ini. Periksa koneksimu dan coba lagi.",
+          "terminal": "Pengguna ini tidak dapat dilaporkan."
+        }
+      },
+      "moreLinesAbove": "… {{displayCount}} baris lagi di atas",
+      "mute": "Bisukan",
+      "mutedUser": "{{login}} dibisukan",
+      "noDiscussion": "Belum ada diskusi",
+      "noDiscussionDescription": "Belum ada utas tinjauan atau komentar diskusi pada PR ini.",
+      "comment_one": "1 komentar",
+      "outdated": "Usang",
+      "quotedDiffSnippet": "Cuplikan perbedaan kode yang dikutip",
+      "reactionPill": "reaksi {{emoji}}, {{displayCount}} {{countLabel}}",
+      "reaction": "reaksi",
+      "reaction_other": "reaksi",
+      "reaction_one": "reaksi",
+      "replyBadRequest": "Balasan ini tidak dapat dikirim. Utasnya mungkin sudah berubah.",
+      "replyBody": "Isi balasan",
+      "replyForbidden": "Kamu tidak memiliki izin untuk membalas PR ini.",
+      "addCommentCta": "Komentari PR ini",
+      "commentBadRequest": "Komentar ini tidak dapat dikirim. PR mungkin sudah berubah.",
+      "commentForbidden": "Kamu tidak memiliki izin untuk berkomentar di PR ini.",
+      "replyPlaceholder": "Balasan…",
+      "reportContent": "Laporkan konten",
+      "reportUser": "Laporkan pengguna",
+      "resolveThread": "Selesaikan utas",
+      "resolved": "Selesai",
+      "retryLoadingMore": "Coba muat komentar lainnya lagi",
+      "reviewFiles": "Tinjau file",
+      "startedRelative": " · dimulai {{relative}}",
+      "submitReply": "Kirim balasan",
+      "termsAcceptRetry": "Tidak dapat menyimpan persetujuan atas ketentuan layanan. Periksa koneksimu dan coba lagi.",
+      "termsCopy": "Kamu harus berusia minimal 13 tahun untuk mengirim komentar.",
+      "termsTitle": "Ketentuan layanan",
+      "threadAccessibilityLabel": "Utas diskusi {{anchorLabel}}",
+      "unavailable": "Diskusi tidak tersedia.",
+      "unavailableMessage": "PR ini mungkin sudah dihapus.",
+      "unresolveThread": "Batalkan status selesai pada utas",
+      "viewTerms": "Lihat ketentuan",
+      "termsAcceptRequired": "Kamu harus menyetujui ketentuan layanan untuk mengirim komentar.",
+      "termsCheckRetryCopy": "Tidak dapat memeriksa ketentuan layanan. Periksa koneksimu dan coba lagi.",
+      "termsOutdatedCopy": "Ketentuan layanan telah berubah. Buka kembali layar ini untuk menyetujui versi terbaru.",
+      "reactions": {
+        "thumbsUp": "Jempol ke atas",
+        "thumbsDown": "Jempol ke bawah",
+        "laugh": "Tertawa",
+        "hooray": "Hore",
+        "confused": "Bingung",
+        "heart": "Hati",
+        "rocket": "Roket",
+        "eyes": "Mata"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Komentar pada file {{path}}",
+        "fileComment": "Komentar file",
+        "outdatedOnPathLines": "Sudah tidak sesuai di {{path}} {{lines}}",
+        "outdatedOnLines": "Sudah tidak sesuai di {{lines}}",
+        "outdatedOnPath": "Sudah tidak sesuai di {{path}}"
+      },
+      "deletedUser": "pengguna yang dihapus",
+      "replyForbiddenTerm": "Kamu tidak memiliki izin untuk membalas {{term}} ini."
+    },
+    "entry": {
+      "eyebrow": "Buka PR atau merge request melalui URL",
+      "pastePrLink": "Tempel tautan PR atau merge request",
+      "noRecentPrs": "Belum ada riwayat tinjauan",
+      "noRecentPrsDescription": "Tempel tautan di atas untuk mulai meninjau — akan muncul di sini saat kamu kembali.",
+      "couldNotLoad": "Tidak dapat memuat data.",
+      "removeFromRecentsTitle": "Hapus dari riwayat?",
+      "removeFromRecentsMessage": "Tinjauan ini akan dihapus dari riwayatmu.",
+      "removeRecentAccessibility": "Hapus {{repo}} dari riwayat",
+      "urlAccessibility": "Masukkan URL PR atau merge request",
+      "urlPlaceholder": "URL PR atau merge request",
+      "openAccessibility": "Buka PR atau merge request",
+      "clearLink": "Hapus tautan",
+      "pasteLink": "Tempel tautan PR atau merge request",
+      "open": "Buka"
+    },
+    "eventChips": {
+      "comment": "Komentar",
+      "label": "Jenis tinjauan",
+      "requestChanges": "Minta perubahan"
+    },
     "fileList": {
       "filesList": "Daftar file",
       "filesViewed": "File · {{viewed}} dari {{total}} sudah dilihat",
@@ -2371,6 +2545,7 @@
       "commentOnSelectedLines": "Komentari baris yang dipilih",
       "finishReview": "Selesaikan tinjauan"
     },
+    "headLine": "{{counts}} · commit terkini {{sha}}",
     "hunkRows": {
       "contextUnavailable": "Konteks tidak tersedia pada referensi ini.",
       "expandAll": "Tampilkan semua",
@@ -2403,21 +2578,14 @@
       "retryLoadingContext": "Coba muat konteks lagi",
       "retryLoadingNextPage": "Coba muat halaman berikutnya lagi"
     },
-    "sideBySide": {
-      "emptyDiffColumn": "kolom perbedaan kode kosong",
-      "emptyDiffRow": "Baris perbedaan kode kosong",
-      "newOnly": "Hanya versi baru: {{text}}",
-      "noNewlineAtEndOfFile": "⚠️ tidak ada baris baru di akhir file",
-      "oldNew": "Lama: {{old}} | Baru: {{new}}",
-      "oldOnly": "Hanya versi lama: {{text}}"
+    "inbox": {
+      "couldNotLoad": "Tidak dapat memuat kotak masuk.",
+      "loading": "Memuat kotak masuk",
+      "noReviewRequests": "Tidak ada permintaan tinjauan",
+      "noReviewRequestsDescription": "PR yang menunggu tinjauanmu muncul di sini. Kamu tetap dapat menempelkan tautan PR apa pun di atas.",
+      "title": "Kotak masuk"
     },
-    "connectionExpired": "Koneksi GitHub kedaluwarsa.",
-    "capabilities": {
-      "banner": {
-        "title": "Tidak tersedia di penyedia ini",
-        "accessibility": "Tidak tersedia di penyedia ini: {{reason}}"
-      }
-    },
+    "installKiloGitHubApp": "Pasang aplikasi Kilo untuk GitHub",
     "merge": {
       "merge": "Penggabungan",
       "mergeNow": "Gabungkan sekarang",
@@ -2507,204 +2675,9 @@
         "rebase": "Terapkan kembali semua commit dari cabang ini di atas cabang tujuan tanpa membuat commit penggabungan."
       }
     },
-    "discussion": {
-      "threadAccessibilityLabel": "Utas diskusi {{anchorLabel}}",
-      "collapseThread": "Ciutkan utas",
-      "resolveThread": "Selesaikan utas",
-      "unresolveThread": "Batalkan status selesai pada utas",
-      "resolved": "Selesai",
-      "outdated": "Usang",
-      "comment_one": "1 komentar",
-      "comment": "{{displayCount}} komentar",
-      "comment_other": "{{displayCount}} komentar",
-      "startedRelative": " · dimulai {{relative}}",
-      "couldNotLoadMore": "Tidak dapat memuat komentar lainnya.",
-      "retryLoadingMore": "Coba muat komentar lainnya lagi",
-      "loadMoreComments": "Muat komentar lainnya",
-      "addReaction": "Tambah reaksi",
-      "reactionPill": "reaksi {{emoji}}, {{displayCount}} {{countLabel}}",
-      "reaction_one": "reaksi",
-      "reaction": "reaksi",
-      "reaction_other": "reaksi",
-      "commentActions": "Tindakan pada komentar",
-      "reportContent": "Laporkan konten",
-      "reportUser": "Laporkan pengguna",
-      "mute": "Bisukan",
-      "block": "Blokir",
-      "blockedUser": "{{login}} diblokir",
-      "mutedUser": "{{login}} dibisukan",
-      "replyPlaceholder": "Balasan…",
-      "replyBody": "Isi balasan",
-      "submitReply": "Kirim balasan",
-      "termsTitle": "Ketentuan layanan",
-      "termsCopy": "Kamu harus berusia minimal 13 tahun untuk mengirim komentar.",
-      "termsAcceptRetry": "Tidak dapat menyimpan persetujuan atas ketentuan layanan. Periksa koneksimu dan coba lagi.",
-      "viewTerms": "Lihat ketentuan",
-      "acceptTerms": "Setuju",
-      "replyBadRequest": "Balasan ini tidak dapat dikirim. Utasnya mungkin sudah berubah.",
-      "replyForbidden": "Kamu tidak memiliki izin untuk membalas PR ini.",
-      "replyForbiddenTerm": "Kamu tidak memiliki izin untuk membalas {{term}} ini.",
-      "moderation": {
-        "block": {
-          "retryable": "Tidak dapat memblokir pengguna ini. Periksa koneksimu dan coba lagi.",
-          "terminal": "Pengguna ini tidak dapat diblokir."
-        },
-        "mute": {
-          "retryable": "Tidak dapat membisukan pengguna ini. Periksa koneksimu dan coba lagi.",
-          "terminal": "Pengguna ini tidak dapat dibisukan."
-        },
-        "reportContent": {
-          "retryable": "Tidak dapat melaporkan komentar ini. Periksa koneksimu dan coba lagi.",
-          "terminal": "Komentar ini tidak dapat dilaporkan."
-        },
-        "reportUser": {
-          "retryable": "Tidak dapat melaporkan pengguna ini. Periksa koneksimu dan coba lagi.",
-          "terminal": "Pengguna ini tidak dapat dilaporkan."
-        }
-      },
-      "accessDeniedMessage": "Kamu tidak memiliki izin untuk melihat diskusi PR ini.",
-      "unavailable": "Diskusi tidak tersedia.",
-      "unavailableMessage": "PR ini mungkin sudah dihapus.",
-      "couldNotLoad": "Tidak dapat memuat diskusi.",
-      "loading": "Memuat diskusi",
-      "noDiscussion": "Belum ada diskusi",
-      "noDiscussionDescription": "Belum ada utas tinjauan atau komentar diskusi pada PR ini.",
-      "reviewFiles": "Tinjau file",
-      "quotedDiffSnippet": "Cuplikan perbedaan kode yang dikutip",
-      "moreLinesAbove": "… {{displayCount}} baris lagi di atas",
-      "termsAcceptRequired": "Kamu harus menyetujui ketentuan layanan untuk mengirim komentar.",
-      "termsOutdatedCopy": "Ketentuan layanan telah berubah. Buka kembali layar ini untuk menyetujui versi terbaru.",
-      "termsCheckRetryCopy": "Tidak dapat memeriksa ketentuan layanan. Periksa koneksimu dan coba lagi.",
-      "reactions": {
-        "thumbsUp": "Jempol ke atas",
-        "thumbsDown": "Jempol ke bawah",
-        "laugh": "Tertawa",
-        "hooray": "Hore",
-        "confused": "Bingung",
-        "heart": "Hati",
-        "rocket": "Roket",
-        "eyes": "Mata"
-      },
-      "anchor": {
-        "fileCommentOnPath": "Komentar pada file {{path}}",
-        "fileComment": "Komentar file",
-        "outdatedOnPathLines": "Sudah tidak sesuai di {{path}} {{lines}}",
-        "outdatedOnLines": "Sudah tidak sesuai di {{lines}}",
-        "outdatedOnPath": "Sudah tidak sesuai di {{path}}"
-      },
-      "deletedUser": "pengguna yang dihapus"
-    },
-    "couldNotOpenGitHubAppSettings": "Tidak dapat membuka pengaturan aplikasi GitHub.",
-    "installKiloGitHubApp": "Pasang aplikasi Kilo untuk GitHub",
-    "checkConnection": "Periksa koneksi",
-    "couldNotLoadPullRequest": "Tidak dapat memuat PR.",
-    "description": "Deskripsi",
     "noDescriptionProvided": "Belum ada deskripsi.",
-    "review": "Tinjauan",
-    "reviewPullRequest": "Tinjau PR",
-    "headLine": "{{counts}} · commit terkini {{sha}}",
-    "entry": {
-      "eyebrow": "Buka PR atau merge request melalui URL",
-      "pastePrLink": "Tempel tautan PR atau merge request",
-      "noRecentPrs": "Belum ada riwayat tinjauan",
-      "noRecentPrsDescription": "Tempel tautan di atas untuk mulai meninjau — akan muncul di sini saat kamu kembali.",
-      "couldNotLoad": "Tidak dapat memuat data.",
-      "removeFromRecentsTitle": "Hapus dari riwayat?",
-      "removeFromRecentsMessage": "Tinjauan ini akan dihapus dari riwayatmu.",
-      "removeRecentAccessibility": "Hapus {{repo}} dari riwayat",
-      "urlAccessibility": "Masukkan URL PR atau merge request",
-      "urlPlaceholder": "URL PR atau merge request",
-      "openAccessibility": "Buka PR atau merge request",
-      "clearLink": "Hapus tautan",
-      "pasteLink": "Tempel tautan PR atau merge request",
-      "open": "Buka"
-    },
-    "checks": {
-      "checksCount": "{{displayCount}} pemeriksaan",
-      "couldNotLoad": "Tidak dapat memuat pemeriksaan.",
-      "failed": "{{displayCount}} gagal",
-      "noAccess": "Kamu tidak memiliki akses ke pemeriksaan repositori ini.",
-      "noChecksReported": "Belum ada hasil pemeriksaan",
-      "notAvailable": "Pemeriksaan belum tersedia. Commit terkini mungkin belum diproses, atau aplikasi Kilo untuk GitHub belum dipasang di repositori sumber.",
-      "openDetails": "Buka detail {{name}}",
-      "passed": "{{displayCount}} lulus",
-      "pending": "{{displayCount}} menunggu",
-      "retryChecks": "Coba pemeriksaan lagi",
-      "skipped": "{{displayCount}} dilewati",
-      "title": "Pemeriksaan",
-      "viewOnGitHub": "Lihat PR di GitHub",
-      "checkDetails": "detail pemeriksaan"
-    },
-    "inbox": {
-      "couldNotLoad": "Tidak dapat memuat kotak masuk.",
-      "loading": "Memuat kotak masuk",
-      "noReviewRequests": "Tidak ada permintaan tinjauan",
-      "noReviewRequestsDescription": "PR yang menunggu tinjauanmu muncul di sini. Kamu tetap dapat menempelkan tautan PR apa pun di atas.",
-      "title": "Kotak masuk"
-    },
-    "composer": {
-      "addTitle": "Tambah komentar",
-      "addToReview": "Tambahkan ke tinjauan",
-      "comment": "Komentar",
-      "commentBody": "Isi komentar",
-      "commentBodyPlaceholder": "Komentar…",
-      "commentNow": "Kirim komentar sekarang",
-      "discardMessage": "Drafmu akan hilang.",
-      "discardTitle": "Buang komentar?",
-      "editTitle": "Ubah komentar",
-      "insertSuggestion": "Sisipkan saran",
-      "insertSuggestionA11y": "Sisipkan saran kode",
-      "loadFailedTitle": "Tidak dapat memuat editor komentar.",
-      "ok": "OK",
-      "unavailableMessage": "Komentar dalam antrean ini sudah dihapus atau dikirim.",
-      "unavailableTitle": "Komentar tidak tersedia",
-      "bodyEmpty": "Isi komentar tidak boleh kosong.",
-      "suggestionsOnlyAddedLines": "Saran hanya berlaku pada baris yang ditambahkan.",
-      "tapDiffLineToSuggest": "Ketuk baris perbedaan kode untuk mengaktifkan saran."
-    },
-    "connect": {
-      "checkFailedTitle": "Tidak dapat memeriksa koneksi GitHub.",
-      "checkFailedMessage": "Status masuk belum tersedia sampai data ini selesai dimuat.",
-      "checkFailedTitleGitLab": "Tidak dapat memeriksa koneksi GitLab.",
-      "checkFailedTitleBitbucket": "Tidak dapat memeriksa koneksi Bitbucket.",
-      "providerCheckFailedMessage": "Status koneksi tidak tersedia hingga bagian ini termuat.",
-      "reconnectTitle": "Hubungkan ulang GitHub",
-      "reconnectDescription": "Akses ke akun GitHub kamu telah dicabut. Hubungkan ulang untuk terus meninjau PR di ponsel.",
-      "description": "Hubungkan akun GitHub kamu untuk meninjau PR di ponsel.",
-      "gitlabDescription": "Hubungkan akun GitLab kamu untuk meninjau merge request di ponsel.",
-      "bitbucketDescription": "Hubungkan Bitbucket ke organisasi ini untuk meninjau PR di ponsel.",
-      "bitbucketOrgOnlyDescription": "Pilih organisasi di profilmu untuk meninjau PR Bitbucket-nya."
-    },
-    "screen": {
-      "shareA11y": "Bagikan PR",
-      "title": "#{{number}}"
-    },
-    "submit": {
-      "deletePendingMessage": "Komentar ini akan dihapus dari antrean tinjauan.",
-      "deletePendingTitle": "Hapus komentar dalam antrean?",
-      "loadFailedTitle": "Tidak dapat memuat formulir pengiriman tinjauan.",
-      "pendingComment": "komentar belum dikirim",
-      "pendingComment_other": "komentar belum dikirim",
-      "pendingComment_one": "komentar dalam antrean",
-      "summaryOptional": "Ringkasan (opsional)",
-      "partialPostedMessage": "{{displayFreshCount}} komentar terkirim. {{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
-      "submitCountOfTotal": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
-      "submitReview": "Kirim tinjauan",
-      "blockedRequestChanges": "Tambahkan ringkasan atau setidaknya satu komentar untuk meminta perubahan.",
-      "blockedComment": "Tambahkan ringkasan atau setidaknya satu komentar untuk mengirim tinjauan berupa komentar."
-    },
-    "reconnectNotice": {
-      "title": "Koneksi GitHub kedaluwarsa.",
-      "message": "Koneksi GitHub kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu.",
-      "gitlabTitle": "Koneksi GitLab kedaluwarsa.",
-      "bitbucketTitle": "Koneksi Bitbucket kedaluwarsa.",
-      "providerMessage": "Koneksi {{provider}} kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu."
-    },
-    "eventChips": {
-      "comment": "Komentar",
-      "label": "Jenis tinjauan",
-      "requestChanges": "Minta perubahan"
-    },
+    "noFilesChanged": "Tidak ada file yang diubah",
+    "noFilesChangedDescription": "Tidak ada perubahan file dalam PR ini.",
     "overview": {
       "commit": "commit",
       "commit_other": "commit",
@@ -2745,31 +2718,53 @@
       "summaryA11y": "Ringkasan tinjauan",
       "summaryPlaceholder": "Ringkasan opsional untuk tinjauan"
     },
-    "tabs": {
-      "discussion": "Diskusi",
-      "files": "Berkas",
-      "overview": "Ringkasan"
+    "pullRequestUnavailable": "PR tidak tersedia",
+    "pullRequestUnavailableDescription": "PR ini tidak dapat dibuka. PR ini mungkin sudah dihapus, repositorinya bersifat privat, atau aplikasi Kilo untuk GitHub belum dipasang di repositori tersebut.",
+    "reconnectNotice": {
+      "title": "Koneksi GitHub kedaluwarsa.",
+      "message": "Koneksi GitHub kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu.",
+      "gitlabTitle": "Koneksi GitLab kedaluwarsa.",
+      "bitbucketTitle": "Koneksi Bitbucket kedaluwarsa.",
+      "providerMessage": "Koneksi {{provider}} kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu."
     },
-    "terms": {
-      "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Bagikan merge request",
-      "viewOnProvider": "Lihat di {{provider}}",
-      "mergeRequestUnavailable": "Merge request tidak tersedia",
-      "unavailableDescription": "Mungkin sudah dihapus, atau kamu tidak punya akses ke sana.",
-      "accessDeniedMergeRequest": "Kamu tidak memiliki izin untuk melihat merge request ini.",
-      "couldNotLoadMergeRequest": "Tidak dapat memuat merge request.",
-      "discussionAccessDenied": "Kamu tidak memiliki izin untuk melihat diskusi merge request ini.",
-      "discussionUnavailableMessage": "Merge request ini mungkin sudah dihapus.",
-      "noDiscussionDescription": "Belum ada utas tinjauan atau komentar diskusi pada merge request ini.",
-      "noFilesChangedDescription": "Tidak ada perubahan file dalam merge request ini."
+    "review": "Tinjauan",
+    "reviewPullRequest": "Tinjau PR",
+    "screen": {
+      "shareA11y": "Bagikan PR",
+      "title": "#{{number}}"
+    },
+    "sideBySide": {
+      "emptyDiffColumn": "kolom perbedaan kode kosong",
+      "emptyDiffRow": "Baris perbedaan kode kosong",
+      "newOnly": "Hanya versi baru: {{text}}",
+      "noNewlineAtEndOfFile": "⚠️ tidak ada baris baru di akhir file",
+      "oldNew": "Lama: {{old}} | Baru: {{new}}",
+      "oldOnly": "Hanya versi lama: {{text}}"
+    },
+    "submit": {
+      "deletePendingMessage": "Komentar ini akan dihapus dari antrean tinjauan.",
+      "deletePendingTitle": "Hapus komentar dalam antrean?",
+      "loadFailedTitle": "Tidak dapat memuat formulir pengiriman tinjauan.",
+      "pendingComment": "komentar belum dikirim",
+      "pendingComment_other": "komentar belum dikirim",
+      "pendingComment_one": "komentar dalam antrean",
+      "summaryOptional": "Ringkasan (opsional)",
+      "partialPostedMessage": "{{displayFreshCount}} komentar terkirim. {{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
+      "submitCountOfTotal": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
+      "submitReview": "Kirim tinjauan",
+      "blockedRequestChanges": "Tambahkan ringkasan atau setidaknya satu komentar untuk meminta perubahan.",
+      "blockedComment": "Tambahkan ringkasan atau setidaknya satu komentar untuk mengirim tinjauan berupa komentar."
     },
     "fileStatus": {
       "changed": "Diubah",
       "copied": "Disalin",
       "modified": "Diubah",
       "renamed": "Nama diubah"
+    },
+    "tabs": {
+      "discussion": "Diskusi",
+      "files": "Berkas",
+      "overview": "Ringkasan"
     },
     "diff": {
       "selectedTapToChange": "{{label}} dipilih, ketuk untuk mengubah pilihan",
@@ -2802,6 +2797,27 @@
       "ambiguous": "Hasil tindakan belum dapat dipastikan. Periksa PR sebelum mencoba lagi.",
       "persistenceFailed": "Kami tidak dapat mencatat tindakan ini. Silakan coba lagi nanti.",
       "forbidden": "Akses tidak diizinkan."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Tidak tersedia di penyedia ini",
+        "accessibility": "Tidak tersedia di penyedia ini: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Bagikan merge request",
+      "viewOnProvider": "Lihat di {{provider}}",
+      "mergeRequestUnavailable": "Merge request tidak tersedia",
+      "unavailableDescription": "Mungkin sudah dihapus, atau kamu tidak punya akses ke sana.",
+      "accessDeniedMergeRequest": "Kamu tidak memiliki izin untuk melihat merge request ini.",
+      "couldNotLoadMergeRequest": "Tidak dapat memuat merge request.",
+      "discussionAccessDenied": "Kamu tidak memiliki izin untuk melihat diskusi merge request ini.",
+      "discussionUnavailableMessage": "Merge request ini mungkin sudah dihapus.",
+      "noDiscussionDescription": "Belum ada utas tinjauan atau komentar diskusi pada merge request ini.",
+      "noFilesChangedDescription": "Tidak ada perubahan file dalam merge request ini."
     }
   },
   "organization": {
@@ -3009,5 +3025,12 @@
     "needsInput": "Perlu masukan",
     "channelName": "Agen aktif",
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci."
+  },
+  "transcriptionModel": {
+    "title": "Model transkripsi",
+    "noneChosen": "Belum ada yang dipilih",
+    "emptyTitle": "Tidak ada model transkripsi",
+    "emptyDescription": "Kilo Gateway tidak menawarkan model transkripsi saat ini.",
+    "loadFailed": "Tidak dapat memuat model transkripsi."
   }
 }

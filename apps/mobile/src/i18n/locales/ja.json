@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "エンタープライズSSO"
   },
   "preferences": {
+    "general": "一般",
+    "voiceInput": "音声入力",
     "autoExpandThinking": "思考を自動展開",
     "autoExpandThinkingSubtitle": "エージェントの思考が終了したときに展開して表示します。",
     "keepScreenOn": "セッション画面で画面を常時オン",
@@ -238,6 +240,7 @@
     "appearanceLight": "ライト",
     "appearanceDark": "ダーク",
     "account": "アカウント",
+    "accountSubtitle": "言語、信頼済みホスト、デバイスのセッション",
     "prReviewAttribution": "PRレビューに使用アプリ名を追加",
     "prReviewAttributionSubtitle": "レビューを送信すると、末尾にKiloでレビューしたことを示す文言を追加します。",
     "returnSendsMessage": "リターンキーでメッセージを送信",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gatewayによる文字起こし",
+    "gatewayTranscriptionSubtitle": "デバイスの音声認識の代わりにKilo Gatewayのモデルで音声入力を文字起こしします。録音はKilo Gatewayに送信されます。",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "ライブアクティビティ",
@@ -2144,7 +2150,14 @@
     "languageNotInstalledMessage": "{{language}}のオフライン音声ファイルがこのスマートフォンにインストールされていません。ダウンロードしてから、音声入力をもう一度お試しください。",
     "downloadOfflineModel": "ダウンロード",
     "offlineModelDownloadScheduled": "オフライン音声ファイルはバックグラウンドでダウンロードされます。しばらくしてから、音声入力をもう一度お試しください。",
-    "listeningStopped": "聞き取りを停止しました。"
+    "listeningStopped": "聞き取りを停止しました。",
+    "transcribing": "文字起こし中…",
+    "gatewayUnreachable": "Kilo Gatewayに接続できませんでした。接続を確認して、もう一度お試しください。",
+    "gatewayTimeout": "文字起こしに時間がかかりすぎました。もう一度お試しください。",
+    "gatewayModelUnavailable": "この文字起こしモデルは利用できません。設定で別のモデルを選択してください。",
+    "gatewayModelUnavailableNotice": "このモデルは提供が終了しました。別のモデルを選ぶには$t(transcriptionModel.title)をタップしてください。",
+    "gatewaySignInRequired": "Kilo Gatewayの文字起こしを使うにはサインインしてください。",
+    "gatewayNoModel": "まず設定で文字起こしモデルを選択してください。"
   },
   "share": {
     "title": "Kiloに共有",
@@ -2322,11 +2335,172 @@
     "installAttributionPromptTitle": "インストール元の特定を許可しますか？"
   },
   "prReview": {
-    "pullRequestUnavailable": "プルリクエストを開けません",
-    "pullRequestUnavailableDescription": "このPRを開けません。PRが削除されたか、リポジトリが非公開になっているか、リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
     "accessDeniedDescription": "このプルリクエストを表示する権限がありません。",
-    "noFilesChanged": "変更されたファイルはありません",
-    "noFilesChangedDescription": "このプルリクエストにはファイルの変更がありません。",
+    "checkConnection": "接続を確認",
+    "checks": {
+      "checksCount": "{{displayCount}}件のチェック",
+      "couldNotLoad": "チェックを読み込めませんでした。",
+      "failed": "{{displayCount}}件失敗",
+      "noAccess": "このリポジトリのチェックにアクセスできません。",
+      "noChecksReported": "チェックは報告されていません",
+      "notAvailable": "チェックの情報はまだ表示できません。マージ元ブランチの先頭コミットが未処理か、マージ元リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
+      "openDetails": "{{name}}の詳細を開く",
+      "passed": "{{displayCount}}件成功",
+      "pending": "{{displayCount}}件待機中",
+      "retryChecks": "チェックを再試行",
+      "skipped": "{{displayCount}}件スキップ",
+      "title": "チェック",
+      "viewOnGitHub": "GitHubでPRを表示",
+      "checkDetails": "チェックの詳細"
+    },
+    "composer": {
+      "addTitle": "コメントの追加",
+      "addToReview": "レビューに追加",
+      "comment": "コメント",
+      "commentBody": "コメントの本文",
+      "commentBodyPlaceholder": "コメントを入力",
+      "commentNow": "今すぐコメント",
+      "discardMessage": "下書きは保存されません。",
+      "discardTitle": "コメントを破棄しますか？",
+      "editTitle": "コメントの編集",
+      "insertSuggestion": "修正提案を挿入",
+      "insertSuggestionA11y": "コードの修正提案を挿入",
+      "loadFailedTitle": "コメントの入力画面を読み込めませんでした。",
+      "ok": "OK",
+      "unavailableMessage": "この未送信のコメントは、すでに削除または送信されています。",
+      "unavailableTitle": "コメントが見つかりません",
+      "bodyEmpty": "コメントの本文を入力してください。",
+      "suggestionsOnlyAddedLines": "修正提案は追加された行にのみ適用できます。",
+      "tapDiffLineToSuggest": "修正提案を入力するには、差分の行をタップしてください。"
+    },
+    "connect": {
+      "checkFailedTitle": "GitHubとの接続を確認できませんでした。",
+      "checkFailedMessage": "読み込みが完了するまで、サインイン状態を確認できません。",
+      "checkFailedTitleGitLab": "GitLabとの接続を確認できませんでした。",
+      "checkFailedTitleBitbucket": "Bitbucketとの接続を確認できませんでした。",
+      "providerCheckFailedMessage": "読み込みが完了するまで接続状態は利用できません。",
+      "reconnectTitle": "GitHubに再接続",
+      "reconnectDescription": "GitHubとの接続が解除されました。モバイルでプルリクエストのレビューを続けるには、再接続してください。",
+      "description": "モバイルでプルリクエストをレビューするには、GitHubアカウントを接続してください。",
+      "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
+      "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
+      "bitbucketOrgOnlyDescription": "プロフィールで組織を選択すると、そのBitbucketプルリクエストをレビューできます。"
+    },
+    "connectionExpired": "GitHubとの連携が期限切れになりました。",
+    "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",
+    "couldNotOpenGitHubAppSettings": "GitHub Appの設定を開けませんでした。",
+    "description": "説明",
+    "discussion": {
+      "acceptTerms": "同意",
+      "accessDeniedMessage": "このPRのディスカッションを表示する権限がありません。",
+      "addReaction": "リアクションを追加",
+      "block": "ブロック",
+      "blockedUser": "{{login}}をブロックしました",
+      "collapseThread": "スレッドを折りたたむ",
+      "commentActions": "コメントの操作",
+      "comment": "{{displayCount}}件のコメント",
+      "comment_other": "{{displayCount}}件のコメント",
+      "couldNotLoad": "ディスカッションを読み込めませんでした。",
+      "couldNotLoadMore": "追加のコメントを読み込めませんでした。",
+      "loadMoreComments": "さらにコメントを読み込む",
+      "loading": "ディスカッションを読み込み中",
+      "moderation": {
+        "block": {
+          "retryable": "このユーザーをブロックできませんでした。接続を確認して、もう一度お試しください。",
+          "terminal": "このユーザーはブロックできません。"
+        },
+        "mute": {
+          "retryable": "このユーザーをミュートできませんでした。接続を確認して、もう一度お試しください。",
+          "terminal": "このユーザーはミュートできません。"
+        },
+        "reportContent": {
+          "retryable": "このコメントを報告できませんでした。接続を確認して、もう一度お試しください。",
+          "terminal": "このコメントは報告できません。"
+        },
+        "reportUser": {
+          "retryable": "このユーザーを報告できませんでした。接続を確認して、もう一度お試しください。",
+          "terminal": "このユーザーは報告できません。"
+        }
+      },
+      "moreLinesAbove": "… この上にさらに{{displayCount}}行あります。",
+      "mute": "ミュート",
+      "mutedUser": "{{login}}をミュートしました",
+      "noDiscussion": "まだディスカッションはありません",
+      "noDiscussionDescription": "このプルリクエストには、レビュースレッドもコメントもまだありません。",
+      "comment_one": "1件のコメント",
+      "outdated": "古い内容",
+      "quotedDiffSnippet": "引用した差分の一部",
+      "reactionPill": "{{emoji}}のリアクション、{{displayCount}}{{countLabel}}",
+      "reaction": "リアクション",
+      "reaction_other": "リアクション",
+      "reaction_one": "件",
+      "replyBadRequest": "この返信は投稿できません。スレッドが変更された可能性があります。",
+      "replyBody": "返信の本文",
+      "replyForbidden": "このプルリクエストに返信する権限がありません。",
+      "addCommentCta": "このプルリクエストにコメントする",
+      "commentBadRequest": "このコメントは投稿できません。プルリクエストが変更された可能性があります。",
+      "commentForbidden": "このプルリクエストにコメントする権限がありません。",
+      "replyPlaceholder": "返信…",
+      "reportContent": "コンテンツを報告",
+      "reportUser": "ユーザーを報告",
+      "resolveThread": "スレッドを解決",
+      "resolved": "解決済み",
+      "retryLoadingMore": "追加のコメントの読み込みを再試行",
+      "reviewFiles": "ファイルをレビュー",
+      "startedRelative": " · {{relative}}に開始",
+      "submitReply": "返信を送信",
+      "termsAcceptRetry": "利用規約に同意できませんでした。接続を確認して、もう一度お試しください。",
+      "termsCopy": "投稿できるのは13歳以上の方です。",
+      "termsTitle": "利用規約",
+      "threadAccessibilityLabel": "ディスカッションスレッド {{anchorLabel}}",
+      "unavailable": "ディスカッションを表示できません。",
+      "unavailableMessage": "このプルリクエストは削除された可能性があります。",
+      "unresolveThread": "スレッドを未解決に戻す",
+      "viewTerms": "利用規約を表示",
+      "termsAcceptRequired": "投稿するには利用規約に同意する必要があります。",
+      "termsCheckRetryCopy": "利用規約を確認できませんでした。接続を確認して、もう一度お試しください。",
+      "termsOutdatedCopy": "利用規約が変更されました。最新版に同意するにはこの画面を開き直してください。",
+      "reactions": {
+        "thumbsUp": "いいね",
+        "thumbsDown": "よくないね",
+        "laugh": "笑い",
+        "hooray": "お祝い",
+        "confused": "困惑",
+        "heart": "ハート",
+        "rocket": "ロケット",
+        "eyes": "目"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}}全体へのコメント",
+        "fileComment": "ファイル全体へのコメント",
+        "outdatedOnPathLines": "{{path}} {{lines}}（変更前のコードへのコメント）",
+        "outdatedOnLines": "{{lines}}（変更前のコードへのコメント）",
+        "outdatedOnPath": "{{path}}（変更前のコードへのコメント）"
+      },
+      "deletedUser": "削除されたユーザー",
+      "replyForbiddenTerm": "この{{term}}に返信する権限がありません。"
+    },
+    "entry": {
+      "eyebrow": "URLからプルリクエストまたはマージリクエストを開く",
+      "pastePrLink": "プルリクエストまたはマージリクエストのリンクを貼り付け",
+      "noRecentPrs": "最近のレビューはありません",
+      "noRecentPrsDescription": "上にリンクを貼り付けてレビューを始めると、次からはここに表示されます。",
+      "couldNotLoad": "読み込めませんでした。",
+      "removeFromRecentsTitle": "最近の履歴から削除しますか？",
+      "removeFromRecentsMessage": "このレビューは最近の履歴から削除されます。",
+      "removeRecentAccessibility": "{{repo}}を最近の履歴から削除",
+      "urlAccessibility": "プルリクエストまたはマージリクエストのURLを入力",
+      "urlPlaceholder": "プルリクエストまたはマージリクエストのURL",
+      "openAccessibility": "プルリクエストまたはマージリクエストを開く",
+      "clearLink": "リンクをクリア",
+      "pasteLink": "プルリクエストまたはマージリクエストのリンクを貼り付け",
+      "open": "オープン"
+    },
+    "eventChips": {
+      "comment": "コメント",
+      "label": "レビューの種類",
+      "requestChanges": "変更を要求"
+    },
     "fileList": {
       "filesList": "ファイル一覧",
       "filesViewed": "ファイル · {{total}}件中{{viewed}}件を確認済み",
@@ -2371,6 +2545,7 @@
       "commentOnSelectedLines": "選択した行にコメント",
       "finishReview": "レビューを完了"
     },
+    "headLine": "{{counts}} · 先頭コミット {{sha}}",
     "hunkRows": {
       "contextUnavailable": "この参照では前後の行を表示できません。",
       "expandAll": "すべて展開",
@@ -2403,21 +2578,14 @@
       "retryLoadingContext": "前後の行の読み込みを再試行",
       "retryLoadingNextPage": "次のページの読み込みを再試行"
     },
-    "sideBySide": {
-      "emptyDiffColumn": "空の差分列",
-      "emptyDiffRow": "空の差分行",
-      "newOnly": "変更後のみ：{{text}}",
-      "noNewlineAtEndOfFile": "⚠️ ファイル末尾に改行がありません",
-      "oldNew": "変更前：{{old}}、変更後：{{new}}",
-      "oldOnly": "変更前のみ：{{text}}"
+    "inbox": {
+      "couldNotLoad": "受信トレイを読み込めませんでした。",
+      "loading": "受信トレイを読み込み中",
+      "noReviewRequests": "レビュー依頼はありません",
+      "noReviewRequestsDescription": "レビューを依頼されたプルリクエストがここに表示されます。上の欄に任意のPRのリンクを貼り付けることもできます。",
+      "title": "受信トレイ"
     },
-    "connectionExpired": "GitHubとの連携が期限切れになりました。",
-    "capabilities": {
-      "banner": {
-        "title": "このプロバイダーでは利用できません",
-        "accessibility": "このプロバイダーでは利用できません: {{reason}}"
-      }
-    },
+    "installKiloGitHubApp": "Kilo GitHub Appをインストール",
     "merge": {
       "merge": "マージ",
       "mergeNow": "今すぐマージ",
@@ -2507,204 +2675,9 @@
         "rebase": "このブランチのすべてのコミットを、マージコミットなしでベースブランチに適用し直します。"
       }
     },
-    "discussion": {
-      "threadAccessibilityLabel": "ディスカッションスレッド {{anchorLabel}}",
-      "collapseThread": "スレッドを折りたたむ",
-      "resolveThread": "スレッドを解決",
-      "unresolveThread": "スレッドを未解決に戻す",
-      "resolved": "解決済み",
-      "outdated": "古い内容",
-      "comment_one": "1件のコメント",
-      "comment": "{{displayCount}}件のコメント",
-      "comment_other": "{{displayCount}}件のコメント",
-      "startedRelative": " · {{relative}}に開始",
-      "couldNotLoadMore": "追加のコメントを読み込めませんでした。",
-      "retryLoadingMore": "追加のコメントの読み込みを再試行",
-      "loadMoreComments": "さらにコメントを読み込む",
-      "addReaction": "リアクションを追加",
-      "reactionPill": "{{emoji}}のリアクション、{{displayCount}}{{countLabel}}",
-      "reaction_one": "件",
-      "reaction": "リアクション",
-      "reaction_other": "リアクション",
-      "commentActions": "コメントの操作",
-      "reportContent": "コンテンツを報告",
-      "reportUser": "ユーザーを報告",
-      "mute": "ミュート",
-      "block": "ブロック",
-      "blockedUser": "{{login}}をブロックしました",
-      "mutedUser": "{{login}}をミュートしました",
-      "replyPlaceholder": "返信…",
-      "replyBody": "返信の本文",
-      "submitReply": "返信を送信",
-      "termsTitle": "利用規約",
-      "termsCopy": "投稿できるのは13歳以上の方です。",
-      "termsAcceptRetry": "利用規約に同意できませんでした。接続を確認して、もう一度お試しください。",
-      "viewTerms": "利用規約を表示",
-      "acceptTerms": "同意",
-      "replyBadRequest": "この返信は投稿できません。スレッドが変更された可能性があります。",
-      "replyForbidden": "このプルリクエストに返信する権限がありません。",
-      "replyForbiddenTerm": "この{{term}}に返信する権限がありません。",
-      "moderation": {
-        "block": {
-          "retryable": "このユーザーをブロックできませんでした。接続を確認して、もう一度お試しください。",
-          "terminal": "このユーザーはブロックできません。"
-        },
-        "mute": {
-          "retryable": "このユーザーをミュートできませんでした。接続を確認して、もう一度お試しください。",
-          "terminal": "このユーザーはミュートできません。"
-        },
-        "reportContent": {
-          "retryable": "このコメントを報告できませんでした。接続を確認して、もう一度お試しください。",
-          "terminal": "このコメントは報告できません。"
-        },
-        "reportUser": {
-          "retryable": "このユーザーを報告できませんでした。接続を確認して、もう一度お試しください。",
-          "terminal": "このユーザーは報告できません。"
-        }
-      },
-      "accessDeniedMessage": "このPRのディスカッションを表示する権限がありません。",
-      "unavailable": "ディスカッションを表示できません。",
-      "unavailableMessage": "このプルリクエストは削除された可能性があります。",
-      "couldNotLoad": "ディスカッションを読み込めませんでした。",
-      "loading": "ディスカッションを読み込み中",
-      "noDiscussion": "まだディスカッションはありません",
-      "noDiscussionDescription": "このプルリクエストには、レビュースレッドもコメントもまだありません。",
-      "reviewFiles": "ファイルをレビュー",
-      "quotedDiffSnippet": "引用した差分の一部",
-      "moreLinesAbove": "… この上にさらに{{displayCount}}行あります。",
-      "termsAcceptRequired": "投稿するには利用規約に同意する必要があります。",
-      "termsOutdatedCopy": "利用規約が変更されました。最新版に同意するにはこの画面を開き直してください。",
-      "termsCheckRetryCopy": "利用規約を確認できませんでした。接続を確認して、もう一度お試しください。",
-      "reactions": {
-        "thumbsUp": "いいね",
-        "thumbsDown": "よくないね",
-        "laugh": "笑い",
-        "hooray": "お祝い",
-        "confused": "困惑",
-        "heart": "ハート",
-        "rocket": "ロケット",
-        "eyes": "目"
-      },
-      "anchor": {
-        "fileCommentOnPath": "{{path}}全体へのコメント",
-        "fileComment": "ファイル全体へのコメント",
-        "outdatedOnPathLines": "{{path}} {{lines}}（変更前のコードへのコメント）",
-        "outdatedOnLines": "{{lines}}（変更前のコードへのコメント）",
-        "outdatedOnPath": "{{path}}（変更前のコードへのコメント）"
-      },
-      "deletedUser": "削除されたユーザー"
-    },
-    "couldNotOpenGitHubAppSettings": "GitHub Appの設定を開けませんでした。",
-    "installKiloGitHubApp": "Kilo GitHub Appをインストール",
-    "checkConnection": "接続を確認",
-    "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",
-    "description": "説明",
     "noDescriptionProvided": "説明はありません。",
-    "review": "レビュー",
-    "reviewPullRequest": "プルリクエストをレビュー",
-    "headLine": "{{counts}} · 先頭コミット {{sha}}",
-    "entry": {
-      "eyebrow": "URLからプルリクエストまたはマージリクエストを開く",
-      "pastePrLink": "プルリクエストまたはマージリクエストのリンクを貼り付け",
-      "noRecentPrs": "最近のレビューはありません",
-      "noRecentPrsDescription": "上にリンクを貼り付けてレビューを始めると、次からはここに表示されます。",
-      "couldNotLoad": "読み込めませんでした。",
-      "removeFromRecentsTitle": "最近の履歴から削除しますか？",
-      "removeFromRecentsMessage": "このレビューは最近の履歴から削除されます。",
-      "removeRecentAccessibility": "{{repo}}を最近の履歴から削除",
-      "urlAccessibility": "プルリクエストまたはマージリクエストのURLを入力",
-      "urlPlaceholder": "プルリクエストまたはマージリクエストのURL",
-      "openAccessibility": "プルリクエストまたはマージリクエストを開く",
-      "clearLink": "リンクをクリア",
-      "pasteLink": "プルリクエストまたはマージリクエストのリンクを貼り付け",
-      "open": "オープン"
-    },
-    "checks": {
-      "checksCount": "{{displayCount}}件のチェック",
-      "couldNotLoad": "チェックを読み込めませんでした。",
-      "failed": "{{displayCount}}件失敗",
-      "noAccess": "このリポジトリのチェックにアクセスできません。",
-      "noChecksReported": "チェックは報告されていません",
-      "notAvailable": "チェックの情報はまだ表示できません。マージ元ブランチの先頭コミットが未処理か、マージ元リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
-      "openDetails": "{{name}}の詳細を開く",
-      "passed": "{{displayCount}}件成功",
-      "pending": "{{displayCount}}件待機中",
-      "retryChecks": "チェックを再試行",
-      "skipped": "{{displayCount}}件スキップ",
-      "title": "チェック",
-      "viewOnGitHub": "GitHubでPRを表示",
-      "checkDetails": "チェックの詳細"
-    },
-    "inbox": {
-      "couldNotLoad": "受信トレイを読み込めませんでした。",
-      "loading": "受信トレイを読み込み中",
-      "noReviewRequests": "レビュー依頼はありません",
-      "noReviewRequestsDescription": "レビューを依頼されたプルリクエストがここに表示されます。上の欄に任意のPRのリンクを貼り付けることもできます。",
-      "title": "受信トレイ"
-    },
-    "composer": {
-      "addTitle": "コメントの追加",
-      "addToReview": "レビューに追加",
-      "comment": "コメント",
-      "commentBody": "コメントの本文",
-      "commentBodyPlaceholder": "コメントを入力",
-      "commentNow": "今すぐコメント",
-      "discardMessage": "下書きは保存されません。",
-      "discardTitle": "コメントを破棄しますか？",
-      "editTitle": "コメントの編集",
-      "insertSuggestion": "修正提案を挿入",
-      "insertSuggestionA11y": "コードの修正提案を挿入",
-      "loadFailedTitle": "コメントの入力画面を読み込めませんでした。",
-      "ok": "OK",
-      "unavailableMessage": "この未送信のコメントは、すでに削除または送信されています。",
-      "unavailableTitle": "コメントが見つかりません",
-      "bodyEmpty": "コメントの本文を入力してください。",
-      "suggestionsOnlyAddedLines": "修正提案は追加された行にのみ適用できます。",
-      "tapDiffLineToSuggest": "修正提案を入力するには、差分の行をタップしてください。"
-    },
-    "connect": {
-      "checkFailedTitle": "GitHubとの接続を確認できませんでした。",
-      "checkFailedMessage": "読み込みが完了するまで、サインイン状態を確認できません。",
-      "checkFailedTitleGitLab": "GitLabとの接続を確認できませんでした。",
-      "checkFailedTitleBitbucket": "Bitbucketとの接続を確認できませんでした。",
-      "providerCheckFailedMessage": "読み込みが完了するまで接続状態は利用できません。",
-      "reconnectTitle": "GitHubに再接続",
-      "reconnectDescription": "GitHubとの接続が解除されました。モバイルでプルリクエストのレビューを続けるには、再接続してください。",
-      "description": "モバイルでプルリクエストをレビューするには、GitHubアカウントを接続してください。",
-      "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
-      "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
-      "bitbucketOrgOnlyDescription": "プロフィールで組織を選択すると、そのBitbucketプルリクエストをレビューできます。"
-    },
-    "screen": {
-      "shareA11y": "プルリクエストを共有",
-      "title": "#{{number}}"
-    },
-    "submit": {
-      "deletePendingMessage": "このコメントを未送信のレビューから削除します。",
-      "deletePendingTitle": "未送信のコメントを削除しますか？",
-      "loadFailedTitle": "レビューの送信画面を読み込めませんでした。",
-      "pendingComment": "未送信のコメント",
-      "pendingComment_other": "未送信のコメント",
-      "pendingComment_one": "未送信のコメント",
-      "summaryOptional": "総評（任意）",
-      "partialPostedMessage": "{{displayFreshCount}}件のコメントを投稿しました。{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
-      "submitCountOfTotal": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
-      "submitReview": "レビューを送信",
-      "blockedRequestChanges": "変更を要求するには、総評を入力するか、コメントを1件以上追加してください。",
-      "blockedComment": "コメントとしてレビューを投稿するには、総評を入力するか、コメントを1件以上追加してください。"
-    },
-    "reconnectNotice": {
-      "title": "GitHubとの連携が期限切れになりました。",
-      "message": "GitHubとの接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
-      "gitlabTitle": "GitLabとの連携が期限切れになりました。",
-      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。",
-      "providerMessage": "{{provider}}との接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。"
-    },
-    "eventChips": {
-      "comment": "コメント",
-      "label": "レビューの種類",
-      "requestChanges": "変更を要求"
-    },
+    "noFilesChanged": "変更されたファイルはありません",
+    "noFilesChangedDescription": "このプルリクエストにはファイルの変更がありません。",
     "overview": {
       "commit": "コミット",
       "commit_other": "コミット",
@@ -2745,31 +2718,53 @@
       "summaryA11y": "レビューの総評",
       "summaryPlaceholder": "レビューの総評（任意）"
     },
-    "tabs": {
-      "discussion": "ディスカッション",
-      "files": "ファイル",
-      "overview": "概要"
+    "pullRequestUnavailable": "プルリクエストを開けません",
+    "pullRequestUnavailableDescription": "このPRを開けません。PRが削除されたか、リポジトリが非公開になっているか、リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
+    "reconnectNotice": {
+      "title": "GitHubとの連携が期限切れになりました。",
+      "message": "GitHubとの接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
+      "gitlabTitle": "GitLabとの連携が期限切れになりました。",
+      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。",
+      "providerMessage": "{{provider}}との接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。"
     },
-    "terms": {
-      "pullRequest": "プルリクエスト",
-      "mergeRequest": "マージリクエスト",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "マージリクエストを共有",
-      "viewOnProvider": "{{provider}}で表示",
-      "mergeRequestUnavailable": "マージリクエストを開けません",
-      "unavailableDescription": "削除されたか、アクセス権がない可能性があります。",
-      "accessDeniedMergeRequest": "このマージリクエストを表示する権限がありません。",
-      "couldNotLoadMergeRequest": "マージリクエストを読み込めませんでした。",
-      "discussionAccessDenied": "このマージリクエストのディスカッションを表示する権限がありません。",
-      "discussionUnavailableMessage": "このマージリクエストは削除された可能性があります。",
-      "noDiscussionDescription": "このマージリクエストには、レビュースレッドもコメントもまだありません。",
-      "noFilesChangedDescription": "このマージリクエストにはファイルの変更がありません。"
+    "review": "レビュー",
+    "reviewPullRequest": "プルリクエストをレビュー",
+    "screen": {
+      "shareA11y": "プルリクエストを共有",
+      "title": "#{{number}}"
+    },
+    "sideBySide": {
+      "emptyDiffColumn": "空の差分列",
+      "emptyDiffRow": "空の差分行",
+      "newOnly": "変更後のみ：{{text}}",
+      "noNewlineAtEndOfFile": "⚠️ ファイル末尾に改行がありません",
+      "oldNew": "変更前：{{old}}、変更後：{{new}}",
+      "oldOnly": "変更前のみ：{{text}}"
+    },
+    "submit": {
+      "deletePendingMessage": "このコメントを未送信のレビューから削除します。",
+      "deletePendingTitle": "未送信のコメントを削除しますか？",
+      "loadFailedTitle": "レビューの送信画面を読み込めませんでした。",
+      "pendingComment": "未送信のコメント",
+      "pendingComment_other": "未送信のコメント",
+      "pendingComment_one": "未送信のコメント",
+      "summaryOptional": "総評（任意）",
+      "partialPostedMessage": "{{displayFreshCount}}件のコメントを投稿しました。{{displayStaleCount}}件のコメントは古いコミットに対するもののため、未送信の一覧に残っています。",
+      "submitCountOfTotal": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
+      "submitReview": "レビューを送信",
+      "blockedRequestChanges": "変更を要求するには、総評を入力するか、コメントを1件以上追加してください。",
+      "blockedComment": "コメントとしてレビューを投稿するには、総評を入力するか、コメントを1件以上追加してください。"
     },
     "fileStatus": {
       "changed": "変更",
       "copied": "コピー済み",
       "modified": "変更",
       "renamed": "名前変更"
+    },
+    "tabs": {
+      "discussion": "ディスカッション",
+      "files": "ファイル",
+      "overview": "概要"
     },
     "diff": {
       "selectedTapToChange": "{{label}}を選択中。タップして選択を変更",
@@ -2802,6 +2797,27 @@
       "ambiguous": "操作の結果を確認できませんでした。再試行する前にPRを確認してください。",
       "persistenceFailed": "この操作を記録できませんでした。しばらくしてからもう一度お試しください。",
       "forbidden": "この操作を行う権限がありません。"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "このプロバイダーでは利用できません",
+        "accessibility": "このプロバイダーでは利用できません: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "プルリクエスト",
+      "mergeRequest": "マージリクエスト",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "マージリクエストを共有",
+      "viewOnProvider": "{{provider}}で表示",
+      "mergeRequestUnavailable": "マージリクエストを開けません",
+      "unavailableDescription": "削除されたか、アクセス権がない可能性があります。",
+      "accessDeniedMergeRequest": "このマージリクエストを表示する権限がありません。",
+      "couldNotLoadMergeRequest": "マージリクエストを読み込めませんでした。",
+      "discussionAccessDenied": "このマージリクエストのディスカッションを表示する権限がありません。",
+      "discussionUnavailableMessage": "このマージリクエストは削除された可能性があります。",
+      "noDiscussionDescription": "このマージリクエストには、レビュースレッドもコメントもまだありません。",
+      "noFilesChangedDescription": "このマージリクエストにはファイルの変更がありません。"
     }
   },
   "organization": {
@@ -3009,5 +3025,12 @@
     "needsInput": "入力が必要",
     "channelName": "アクティブなエージェント",
     "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。"
+  },
+  "transcriptionModel": {
+    "title": "文字起こしモデル",
+    "noneChosen": "未選択",
+    "emptyTitle": "文字起こしモデルがありません",
+    "emptyDescription": "現在、Kilo Gatewayは文字起こしモデルを提供していません。",
+    "loadFailed": "文字起こしモデルを読み込めませんでした。"
   }
 }

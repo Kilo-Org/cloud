@@ -1451,7 +1451,6 @@ describe('direct worktree Kilo token stability', () => {
     ['organization', { organizationId: INTEGRATION_ID }],
     ['role', { organizationRole: 'member' }],
     ['bot', { botId: 'bot-a' }],
-    ['audience', { aud: 'internal-service' }],
     ['unknown authorization', { futurePermission: 'restricted' }],
   ])('does not substitute the retained token after a change to %s', async (_name, claims) => {
     const first = await prepareDirect(env, data(token()));
@@ -1459,6 +1458,14 @@ describe('direct worktree Kilo token stability', () => {
     const refreshed = await prepareDirect(env, data(changed), first.grant, NOW + 2000);
     expect(refreshed.payload.kilo.token).toBe(changed);
     expect(refreshed.payload.env?.KILOCODE_TOKEN).toBe(changed);
+  });
+
+  it('fails closed for unsupported audience-bearing direct credentials at this checkpoint', async () => {
+    const first = await prepareDirect(env, data(token()));
+    const changed = token(NOW + 1000, { aud: 'internal-service' });
+    await expect(prepareDirect(env, data(changed), first.grant, NOW + 2000)).rejects.toThrow(
+      'Invalid contained worktree credentials'
+    );
   });
 
   it.each([
@@ -1816,6 +1823,63 @@ describe('credential resolution boundaries', () => {
 });
 
 describe('native Vercel worktree policies', () => {
+  it('uses only Worker proxy targets for a modern runtime and never serializes its backing authority', async () => {
+    const { broker } = createBroker();
+    const backingToken = jwt.sign(
+      { runtimeAuthorization: { id: '11111111-1111-4111-8111-111111111111' } },
+      'backing-secret'
+    );
+    const env = { ...environment(broker), WORKER_URL: 'https://worker.example.test' };
+    const { grant } = await prepare(
+      env,
+      vercelMetadata({ auth: { kiloSessionId: ROOT_ID, kilocodeToken: backingToken } })
+    );
+
+    const staticPolicy = buildControlNetworkPolicy([grant]);
+    expect(JSON.stringify(staticPolicy)).not.toContain(backingToken);
+    expect(staticPolicy.allowedDomains).toContain('worker.example.test');
+    expect(staticPolicy.injectionRules).toEqual(
+      expect.not.arrayContaining([
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: expect.stringContaining('backing-secret'),
+          }),
+        }),
+      ])
+    );
+
+    const policy = buildControlNetworkPolicy([
+      {
+        ...grant,
+        kilo: {
+          ...grant.kilo,
+          runtimeProxy: {
+            ...grant.kilo.runtimeProxy!,
+            members: [{ sessionId: SESSION_ID, kiloSessionId: ROOT_ID, handle: 'member-handle' }],
+          },
+        },
+      },
+    ]);
+    const serialized = JSON.stringify(policy);
+    expect(serialized).toContain('member-handle');
+    expect(serialized).not.toContain(backingToken);
+    expect(serialized).not.toContain('runtimeAuthorization');
+    expect(
+      policy.injectionRules
+        .filter(rule => rule.headers.authorization === 'Bearer member-handle')
+        .every(rule => rule.domain === 'worker.example.test')
+    ).toBe(true);
+    expect(
+      findMatchingCredentialInjectionRule(policy.injectionRules, {
+        url: new URL(
+          'https://worker.example.test/api/runtime-credential-proxy/provider/anything-else'
+        ),
+        method: 'POST',
+        headers: new Headers({ authorization: 'Bearer member-handle' }),
+      })
+    ).toBeUndefined();
+  });
+
   it('composes sibling worktree rules without losing registered roots or broadening aliases', async () => {
     const { broker } = createBroker();
     const env = environment(broker);
@@ -1862,6 +1926,61 @@ describe('native Vercel worktree policies', () => {
       allowedDomains: ['*'],
       injectionRules: [],
     });
+  });
+
+  it('keeps distinct modern sibling runtime credentials isolated', async () => {
+    const { broker } = createBroker();
+    const env = { ...environment(broker), WORKER_URL: 'https://worker.example.test' };
+    const firstToken = jwt.sign(
+      { runtimeAuthorization: { id: '11111111-1111-4111-8111-111111111111' } },
+      'first-backing-secret'
+    );
+    const secondToken = jwt.sign(
+      { runtimeAuthorization: { id: '22222222-2222-4222-8222-222222222222' } },
+      'second-backing-secret'
+    );
+    const first = await prepare(
+      env,
+      vercelMetadata({ auth: { kiloSessionId: ROOT_ID, kilocodeToken: firstToken } })
+    );
+    const second = await prepare(
+      env,
+      vercelMetadata({
+        identity: secondRoot().identity,
+        auth: { kiloSessionId: SECOND_ROOT_ID, kilocodeToken: secondToken },
+      }),
+      first.grant
+    );
+    expect(second.grant.kilo.token).not.toBe(firstToken);
+    expect(second.grant.members).toEqual([
+      { sessionId: SESSION_ID, kiloSessionId: ROOT_ID },
+      { sessionId: SECOND_SESSION_ID, kiloSessionId: SECOND_ROOT_ID },
+    ]);
+    expect(JSON.stringify(buildControlNetworkPolicy([second.grant]))).not.toContain(secondToken);
+  });
+
+  it('rejects a persisted singleton runtime proxy handle', async () => {
+    const { broker } = createBroker();
+    const backingToken = jwt.sign(
+      { runtimeAuthorization: { id: '11111111-1111-4111-8111-111111111111' } },
+      'backing-secret'
+    );
+    const { grant } = await prepare(
+      { ...environment(broker), WORKER_URL: 'https://worker.example.test' },
+      vercelMetadata({ auth: { kiloSessionId: ROOT_ID, kilocodeToken: backingToken } })
+    );
+    const runtimeProxy = grant.kilo.runtimeProxy;
+    if (!runtimeProxy) throw new Error('Expected runtime proxy');
+
+    expect(
+      sessionCredentialGrantSchema.safeParse({
+        ...grant,
+        kilo: {
+          ...grant.kilo,
+          runtimeProxy: { ...runtimeProxy, handle: 'old-singleton-handle' },
+        },
+      }).success
+    ).toBe(false);
   });
 
   it('refreshes native GitHub injection on trusted prepare while preserving the integration pin and alias', async () => {

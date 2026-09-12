@@ -14,6 +14,9 @@ const observed = vi.hoisted(() => ({ options: [] as TaggedOptions[] }));
 // Records every query the list mounts and answers the overview with a viewer
 // login, so a test can assert BOTH which namespace was asked and what the
 // answer drives.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: TaggedOptions) => {
     observed.options.push(options);

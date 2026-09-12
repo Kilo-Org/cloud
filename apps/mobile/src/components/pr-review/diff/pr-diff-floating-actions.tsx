@@ -65,10 +65,13 @@ export function PrDiffFloatingActions({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const pending = usePendingReview();
-  // The footer sits on the bottom edge, so its bottom padding must include
-  // the Android system inset. The container is opaque (`bg-background`) and
-  // in-flow: the diff list ends at its top edge, so no row is ever clipped
-  // by it and nothing shows through around the card.
+  // The footer is an in-flow bar below the list, so no row is ever clipped
+  // by it and nothing shows through around the opaque (`bg-background`)
+  // card. Its bottom padding must include the Android system inset. The
+  // landscape side insets (`insets.left` / `insets.right`) clear the sensor
+  // housing; like ScreenHeader they are spread only when nonzero, so the
+  // `px-4` gutter survives portrait (inline style wins over className), and
+  // they are horizontal-only, so the bottom padding stays untouched.
   const insets = useSafeAreaInsets();
 
   const showSelectionAction = viewMode === 'unified' && selection !== null;
@@ -114,7 +117,11 @@ export function PrDiffFloatingActions({
   return (
     <View
       className="w-full items-center gap-2 bg-background px-4 pt-3"
-      style={{ paddingBottom: 24 + insets.bottom }}
+      style={{
+        paddingBottom: 24 + insets.bottom,
+        ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
+        ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
+      }}
     >
       <View className="w-full gap-2 rounded-2xl border border-border bg-background px-3 py-3 shadow-lg shadow-[#0000001A]">
         {showSelectionAction ? (

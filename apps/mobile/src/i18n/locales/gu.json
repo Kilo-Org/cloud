@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "એન્ટરપ્રાઇઝ SSO"
   },
   "preferences": {
+    "general": "સામાન્ય",
+    "voiceInput": "વૉઇસ ઇનપુટ",
     "autoExpandThinking": "વિચારપ્રક્રિયા આપમેળે ખોલો",
     "autoExpandThinkingSubtitle": "એજન્ટની વિચારપ્રક્રિયા પૂરી થાય ત્યારે તેની વિગતો ખોલીને બતાવો.",
     "keepScreenOn": "સત્ર પૃષ્ઠ પર હોય ત્યારે સ્ક્રીન ચાલુ રાખો",
@@ -238,6 +240,7 @@
     "appearanceLight": "લાઇટ",
     "appearanceDark": "ડાર્ક",
     "account": "એકાઉન્ટ",
+    "accountSubtitle": "ભાષા, વિશ્વસનીય હોસ્ટ અને ઉપકરણનાં સત્રો",
     "prReviewAttribution": "PR સમીક્ષાઓમાં એપનો ઉલ્લેખ ઉમેરો",
     "prReviewAttributionSubtitle": "સમીક્ષા મોકલો ત્યારે અંતે “Kilo દ્વારા સમીક્ષા કરેલી” લખાણ ઉમેરો.",
     "returnSendsMessage": "રિટર્ન કી સંદેશ મોકલે છે",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway દ્વારા અવાજને લખાણમાં ફેરવવું",
+    "gatewayTranscriptionSubtitle": "ઉપકરણની સ્પીચ રિકગ્નિશનને બદલે Kilo Gateway મોડેલ વડે વૉઇસ ઇનપુટને લખાણમાં ફેરવો. તમારું રેકોર્ડિંગ Kilo Gateway પર મોકલાય છે.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "પુલ રિક્વેસ્ટ ઉપલબ્ધ નથી",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "તફાવતની ખાલી પંક્તિ"
     },
     "connectionExpired": "GitHub સાથેના જોડાણની મુદત પૂરી થઈ ગઈ છે.",
-    "capabilities": {
-      "banner": {
-        "title": "આ પ્રદાતા પર ઉપલબ્ધ નથી",
-        "accessibility": "આ પ્રદાતા પર ઉપલબ્ધ નથી: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "મર્જ",
       "mergeNow": "હવે મર્જ કરો",
@@ -472,7 +472,9 @@
       "acceptTerms": "સ્વીકારો",
       "replyBadRequest": "આ જવાબ પોસ્ટ કરી શકાતો નથી. થ્રેડ બદલાયો હોઈ શકે છે.",
       "replyForbidden": "તમને આ પુલ રિક્વેસ્ટ પર જવાબ આપવાની પરવાનગી નથી.",
-      "replyForbiddenTerm": "તમને આ {{term}} પર જવાબ આપવાની પરવાનગી નથી.",
+      "addCommentCta": "આ પુલ રિક્વેસ્ટ પર ટિપ્પણી કરો",
+      "commentBadRequest": "આ ટિપ્પણી પોસ્ટ કરી શકાતી નથી. પુલ રિક્વેસ્ટ બદલાયો હોઈ શકે છે.",
+      "commentForbidden": "તમને આ પુલ રિક્વેસ્ટ પર ટિપ્પણી કરવાની પરવાનગી નથી.",
       "moderation": {
         "reportContent": {
           "terminal": "આ ટિપ્પણી વિશે ફરિયાદ કરી શકાતી નથી.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "{{lines}} પર જૂનું",
         "outdatedOnPath": "{{path}} પર જૂનું"
       },
-      "deletedUser": "કાઢી નાખેલો વપરાશકર્તા"
+      "deletedUser": "કાઢી નાખેલો વપરાશકર્તા",
+      "replyForbiddenTerm": "તમને આ {{term}} પર જવાબ આપવાની પરવાનગી નથી."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ઍપનાં સેટિંગ્સ ખોલી શકાયાં નહીં.",
     "installKiloGitHubApp": "Kilo GitHub એપ ઇન્સ્ટોલ કરો",
@@ -679,21 +682,6 @@
       "files": "ફાઇલો",
       "discussion": "ચર્ચા"
     },
-    "terms": {
-      "pullRequest": "પુલ રિક્વેસ્ટ",
-      "mergeRequest": "મર્જ રિક્વેસ્ટ",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "મર્જ રિક્વેસ્ટ શેર કરો",
-      "viewOnProvider": "{{provider}} પર જુઓ",
-      "mergeRequestUnavailable": "મર્જ રિક્વેસ્ટ ઉપલબ્ધ નથી",
-      "unavailableDescription": "કદાચ તે કાઢી નાખવામાં આવી હોય, અથવા તમારી પાસે તેની એક્સેસ ન હોય.",
-      "accessDeniedMergeRequest": "તમને આ મર્જ રિક્વેસ્ટ જોવાની પરવાનગી નથી.",
-      "couldNotLoadMergeRequest": "મર્જ રિક્વેસ્ટ લોડ કરી શકાઈ નહીં.",
-      "discussionAccessDenied": "તમને આ મર્જ રિક્વેસ્ટની ચર્ચા જોવાની પરવાનગી નથી.",
-      "discussionUnavailableMessage": "આ મર્જ રિક્વેસ્ટ કાઢી નાખવામાં આવી હોઈ શકે છે.",
-      "noDiscussionDescription": "આ મર્જ રિક્વેસ્ટ પર હજી સમીક્ષાનો કોઈ થ્રેડ કે ચર્ચાની કોઈ ટિપ્પણી નથી.",
-      "noFilesChangedDescription": "આ મર્જ રિક્વેસ્ટમાં કોઈ ફાઇલમાં ફેરફાર નથી."
-    },
     "fileStatus": {
       "modified": "ફેરફાર કરેલી",
       "renamed": "નામ બદલેલી",
@@ -731,6 +719,27 @@
       "ambiguous": "પુષ્ટિ કરી શકાઈ નહીં — ફરી પ્રયત્ન કરતાં પહેલાં PR તપાસો.",
       "persistenceFailed": "આ ક્રિયાની નોંધ કરી શકાઈ નહીં. કૃપા કરીને પછીથી ફરી પ્રયત્ન કરો.",
       "forbidden": "આ માટે પરવાનગી નથી."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "આ પ્રદાતા પર ઉપલબ્ધ નથી",
+        "accessibility": "આ પ્રદાતા પર ઉપલબ્ધ નથી: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "પુલ રિક્વેસ્ટ",
+      "mergeRequest": "મર્જ રિક્વેસ્ટ",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "મર્જ રિક્વેસ્ટ શેર કરો",
+      "viewOnProvider": "{{provider}} પર જુઓ",
+      "mergeRequestUnavailable": "મર્જ રિક્વેસ્ટ ઉપલબ્ધ નથી",
+      "unavailableDescription": "કદાચ તે કાઢી નાખવામાં આવી હોય, અથવા તમારી પાસે તેની એક્સેસ ન હોય.",
+      "accessDeniedMergeRequest": "તમને આ મર્જ રિક્વેસ્ટ જોવાની પરવાનગી નથી.",
+      "couldNotLoadMergeRequest": "મર્જ રિક્વેસ્ટ લોડ કરી શકાઈ નહીં.",
+      "discussionAccessDenied": "તમને આ મર્જ રિક્વેસ્ટની ચર્ચા જોવાની પરવાનગી નથી.",
+      "discussionUnavailableMessage": "આ મર્જ રિક્વેસ્ટ કાઢી નાખવામાં આવી હોઈ શકે છે.",
+      "noDiscussionDescription": "આ મર્જ રિક્વેસ્ટ પર હજી સમીક્ષાનો કોઈ થ્રેડ કે ચર્ચાની કોઈ ટિપ્પણી નથી.",
+      "noFilesChangedDescription": "આ મર્જ રિક્વેસ્ટમાં કોઈ ફાઇલમાં ફેરફાર નથી."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "{{language}} માટેની ઓફલાઇન સ્પીચ ફાઇલો આ ફોન પર ઇન્સ્ટોલ કરેલી નથી. તેમને ડાઉનલોડ કરો, પછી વૉઇસ ઇનપુટ ફરી અજમાવો.",
     "downloadOfflineModel": "ડાઉનલોડ",
     "offlineModelDownloadScheduled": "ઓફલાઇન સ્પીચ ફાઇલો બેકગ્રાઉન્ડમાં ડાઉનલોડ થશે. પછી વૉઇસ ઇનપુટ ફરી અજમાવો.",
-    "listeningStopped": "સાંભળવાનું બંધ થયું."
+    "listeningStopped": "સાંભળવાનું બંધ થયું.",
+    "transcribing": "લખાણમાં ફેરવી રહ્યાં છીએ...",
+    "gatewayUnreachable": "Kilo Gateway સાથે સંપર્ક થઈ શક્યો નથી. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
+    "gatewayTimeout": "અવાજને લખાણમાં ફેરવવામાં બહુ સમય લાગ્યો. ફરી પ્રયાસ કરો.",
+    "gatewayModelUnavailable": "અવાજને લખાણમાં ફેરવતું આ મોડેલ ઉપલબ્ધ નથી. પસંદગીઓમાં બીજું પસંદ કરો.",
+    "gatewayModelUnavailableNotice": "આ મોડેલ હવે ઑફર કરવામાં આવતું નથી. બીજું પસંદ કરવા $t(transcriptionModel.title) પર ટૅપ કરો.",
+    "gatewaySignInRequired": "Kilo Gateway દ્વારા લખાણ વાપરવા સાઇન ઇન કરો.",
+    "gatewayNoModel": "પહેલા પસંદગીઓમાં અવાજને લખાણમાં ફેરવતું મોડેલ પસંદ કરો."
   },
   "share": {
     "title": "Kilo પર શેર",
@@ -3009,5 +3025,12 @@
     "needsInput": "જવાબ જરૂરી",
     "channelName": "સક્રિય એજન્ટો",
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો."
+  },
+  "transcriptionModel": {
+    "title": "અવાજને લખાણમાં ફેરવવાનું મોડેલ",
+    "noneChosen": "કંઈ પસંદ થયું નથી",
+    "emptyTitle": "અવાજને લખાણમાં ફેરવતાં કોઈ મોડેલ નથી",
+    "emptyDescription": "Kilo Gateway હાલમાં અવાજને લખાણમાં ફેરવતાં કોઈ મોડેલ આપતું નથી.",
+    "loadFailed": "અવાજને લખાણમાં ફેરવતાં મોડેલ લોડ કરી શકાયાં નહીં."
   }
 }

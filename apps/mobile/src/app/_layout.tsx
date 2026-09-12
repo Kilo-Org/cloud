@@ -7,8 +7,9 @@ import '../global.css';
 import '@/lib/cloud-agent-runtime';
 // Enter the local module's JS in the main process on both platforms. Its
 // Android branch stays a no-op until slice `and` lands; iOS runs the
-// registered glanceable sink below.
-import 'active-agents-live-update';
+// registered glanceable sink below. Imported by path: the module is
+// autolinked from modules/ and intentionally absent from dependencies.
+import '../../modules/active-agents-live-update/src';
 // Registers the iOS Live Activity and widget sink with the glanceable publisher.
 import '@/glanceable-ios/register';
 
@@ -975,9 +976,12 @@ function RootLayoutNav({
         // from touch, but not from screen readers. Leave both accessibility
         // trees while hidden (iOS, then Android). The held error surface
         // forces the same presentation: it owns the screen above the wrapper.
+        // `bg-background` keeps the root surface opaque: while a rotation
+        // relayout runs, frames before React's first commit must show the
+        // app's own background, never the window's foreign default.
         accessibilityElementsHidden={hidden || showRestoreError}
         importantForAccessibility={hidden || showRestoreError ? 'no-hide-descendants' : 'auto'}
-        className={`flex-1 ${hidden || showRestoreError ? 'opacity-0' : 'opacity-100'}`}
+        className={`flex-1 bg-background ${hidden || showRestoreError ? 'opacity-0' : 'opacity-100'}`}
         pointerEvents={hidden || showRestoreError ? 'none' : 'auto'}
       >
         <Slot />
@@ -1009,7 +1013,10 @@ function AppContentReveal({ children }: Readonly<{ children: React.ReactNode }>)
     transform: [{ scale: splashContentScale.value }],
   }));
   return (
-    <Animated.View className="flex-1" style={style}>
+    // bg-background keeps the scaled wrapper opaque over the window: the
+    // overscan frame and every relayout gap behind it render the app's own
+    // background, never the platform default.
+    <Animated.View className="flex-1 bg-background" style={style}>
       {children}
     </Animated.View>
   );

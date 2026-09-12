@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO empresarial"
   },
   "preferences": {
+    "general": "Geral",
+    "voiceInput": "Entrada de voz",
     "autoExpandThinking": "Expandir automaticamente o raciocínio",
     "autoExpandThinkingSubtitle": "Mostrar todo o raciocínio do agente quando este terminar de pensar.",
     "keepScreenOn": "Manter o ecrã ligado na página da sessão",
@@ -238,6 +240,7 @@
     "appearanceLight": "Claro",
     "appearanceDark": "Escuro",
     "account": "Conta",
+    "accountSubtitle": "Idioma, servidores de confiança e sessões nos dispositivos",
     "prReviewAttribution": "Identificar a aplicação nas revisões de PR",
     "prReviewAttributionSubtitle": "Adicionar um rodapé que indica que a revisão foi feita através do Kilo quando a enviar.",
     "returnSendsMessage": "A tecla de retorno envia a mensagem",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transcrição com Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transcreva o ditado com um modelo do Kilo Gateway em vez do reconhecimento de fala do dispositivo. A sua gravação é enviada para o Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "PR indisponível",
@@ -343,12 +349,6 @@
       "emptyDiffRow": "Linha de diferenças vazia"
     },
     "connectionExpired": "A ligação ao GitHub expirou.",
-    "capabilities": {
-      "banner": {
-        "title": "Não disponível neste fornecedor",
-        "accessibility": "Não disponível neste fornecedor: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Fusão",
       "mergeNow": "Integrar agora",
@@ -475,7 +475,9 @@
       "acceptTerms": "Aceitar",
       "replyBadRequest": "Esta resposta não pode ser publicada. A conversa pode ter mudado.",
       "replyForbidden": "Não tens permissão para responder a este PR.",
-      "replyForbiddenTerm": "Não tens permissão para responder a este {{term}}.",
+      "addCommentCta": "Comentar neste PR",
+      "commentBadRequest": "Este comentário não pode ser publicado. O PR pode ter mudado.",
+      "commentForbidden": "Não tens permissão para comentar neste PR.",
       "moderation": {
         "reportContent": {
           "terminal": "Este comentário não pode ser denunciado.",
@@ -507,6 +509,8 @@
       "termsAcceptRequired": "Tens de aceitar os termos de serviço para publicar.",
       "termsOutdatedCopy": "Os termos de serviço foram alterados. Volta a abrir este ecrã para aceitar a versão mais recente.",
       "termsCheckRetryCopy": "Não foi possível verificar os termos de serviço. Verifica a tua ligação e tenta novamente.",
+      "comment_many": "{{displayCount}} comentários",
+      "reaction_many": "reações",
       "reactions": {
         "thumbsUp": "Polegar para cima",
         "thumbsDown": "Polegar para baixo",
@@ -525,8 +529,7 @@
         "outdatedOnPath": "Desatualizado em {{path}}"
       },
       "deletedUser": "utilizador eliminado",
-      "comment_many": "{{displayCount}} comentários",
-      "reaction_many": "reações"
+      "replyForbiddenTerm": "Não tens permissão para responder a este {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Não foi possível abrir as definições da aplicação GitHub.",
     "installKiloGitHubApp": "Instalar a aplicação do Kilo para o GitHub",
@@ -687,21 +690,6 @@
       "files": "Ficheiros",
       "discussion": "Discussão"
     },
-    "terms": {
-      "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Partilhar merge request",
-      "viewOnProvider": "Ver em {{provider}}",
-      "mergeRequestUnavailable": "Merge request indisponível",
-      "unavailableDescription": "Pode ter sido eliminado, ou não tens acesso a ele.",
-      "accessDeniedMergeRequest": "Não tens permissão para ver este merge request.",
-      "couldNotLoadMergeRequest": "Não foi possível carregar o merge request.",
-      "discussionAccessDenied": "Não tens permissão para ver a discussão deste merge request.",
-      "discussionUnavailableMessage": "Este merge request pode ter sido removido.",
-      "noDiscussionDescription": "Este merge request ainda não tem conversas de revisão nem comentários na discussão.",
-      "noFilesChangedDescription": "Este merge request não tem alterações nos ficheiros."
-    },
     "fileStatus": {
       "modified": "Modificado",
       "renamed": "Renomeado",
@@ -739,6 +727,27 @@
       "ambiguous": "Não foi possível confirmar o resultado. Verifica o PR antes de tentar novamente.",
       "persistenceFailed": "Não foi possível registar esta ação. Tenta novamente mais tarde.",
       "forbidden": "Não tens permissão para executar esta ação."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Não disponível neste fornecedor",
+        "accessibility": "Não disponível neste fornecedor: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Partilhar merge request",
+      "viewOnProvider": "Ver em {{provider}}",
+      "mergeRequestUnavailable": "Merge request indisponível",
+      "unavailableDescription": "Pode ter sido eliminado, ou não tens acesso a ele.",
+      "accessDeniedMergeRequest": "Não tens permissão para ver este merge request.",
+      "couldNotLoadMergeRequest": "Não foi possível carregar o merge request.",
+      "discussionAccessDenied": "Não tens permissão para ver a discussão deste merge request.",
+      "discussionUnavailableMessage": "Este merge request pode ter sido removido.",
+      "noDiscussionDescription": "Este merge request ainda não tem conversas de revisão nem comentários na discussão.",
+      "noFilesChangedDescription": "Este merge request não tem alterações nos ficheiros."
     }
   },
   "notifications": {
@@ -2649,7 +2658,14 @@
     "languageNotInstalledMessage": "Os ficheiros de voz offline de {{language}} não estão instalados neste telemóvel. Descarrega-os e tenta o ditado novamente.",
     "downloadOfflineModel": "Descarregar",
     "offlineModelDownloadScheduled": "Os ficheiros de voz offline serão descarregados em segundo plano. Tenta o ditado novamente mais tarde.",
-    "listeningStopped": "O ditado foi interrompido."
+    "listeningStopped": "O ditado foi interrompido.",
+    "transcribing": "A transcrever...",
+    "gatewayUnreachable": "Não foi possível contactar o Kilo Gateway. Verifique a sua ligação e tente novamente.",
+    "gatewayTimeout": "A transcrição demorou demasiado tempo. Tente novamente.",
+    "gatewayModelUnavailable": "Este modelo de transcrição não está disponível. Escolha outro em Preferências.",
+    "gatewayModelUnavailableNotice": "Este modelo já não é oferecido. Toque em $t(transcriptionModel.title) para escolher outro.",
+    "gatewaySignInRequired": "Inicie sessão para usar a transcrição com Kilo Gateway.",
+    "gatewayNoModel": "Escolha primeiro um modelo de transcrição em Preferências."
   },
   "share": {
     "title": "Partilhar com o Kilo",
@@ -3032,5 +3048,12 @@
     "needsInput": "À espera de resposta",
     "channelName": "Agentes ativos",
     "activityKitDisabledBody": "Ativa as atividades em direto nas definições para ver os agentes ativos no ecrã bloqueado."
+  },
+  "transcriptionModel": {
+    "title": "Modelo de transcrição",
+    "noneChosen": "Nenhum selecionado",
+    "emptyTitle": "Sem modelos de transcrição",
+    "emptyDescription": "O Kilo Gateway não oferece modelos de transcrição de momento.",
+    "loadFailed": "Não foi possível carregar os modelos de transcrição."
   }
 }

@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "Байгууллагын SSO"
   },
   "preferences": {
+    "general": "Ерөнхий",
+    "voiceInput": "Дуут оруулга",
     "autoExpandThinking": "Бодлыг автоматаар дэлгэх",
     "autoExpandThinkingSubtitle": "Дууссаны дараа агентын бодлыг дэлгэсэн байдлаар харуулна.",
     "keepScreenOn": "Сессийн дэлгэц дээр байх үед дэлгэцийг асаалттай байлгах",
@@ -238,6 +240,7 @@
     "appearanceLight": "Цайвар",
     "appearanceDark": "Бараан",
     "account": "Бүртгэл",
+    "accountSubtitle": "Хэл, итгэмжлэгдсэн хостууд, төхөөрөмжийн сессүүд",
     "prReviewAttribution": "PR-ийн хяналтад аппын нэрийг нэмэх",
     "prReviewAttributionSubtitle": "Хяналтын дүнг илгээхдээ төгсгөлд нь «Kilo ашиглан хянасан» гэсэн тэмдэглэл нэмнэ.",
     "returnSendsMessage": "Мөр шилжүүлэх товч мессеж илгээнэ",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway-р яриаг бичвэр болгох",
+    "gatewayTranscriptionSubtitle": "Төхөөрөмжийн яриа танихын оронд Kilo Gateway загвар ашиглан дуугаар оруулж буй зүйлээ бичвэр болгоно уу. Таны бичлэг Kilo Gateway руу илгээгдэнэ.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Нэгтгэх хүсэлтийг нээх боломжгүй",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Өөрчлөлтийн харьцуулалтын хоосон мөр"
     },
     "connectionExpired": "GitHub холболтын хугацаа дууссан.",
-    "capabilities": {
-      "banner": {
-        "title": "Энэ провайдерт боломжгүй",
-        "accessibility": "Энэ провайдерт боломжгүй: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Нэгтгэх",
       "mergeNow": "Одоо нэгтгэх",
@@ -472,7 +472,9 @@
       "acceptTerms": "Зөвшөөрөх",
       "replyBadRequest": "Энэ хариуг нийтлэх боломжгүй. Сэдэв өөрчлөгдсөн байж болзошгүй.",
       "replyForbidden": "Танд энэ нэгтгэх хүсэлтэд хариу бичих эрх байхгүй.",
-      "replyForbiddenTerm": "Танд энэ {{term}}эд хариу бичих эрх байхгүй.",
+      "addCommentCta": "Энэ нэгтгэх хүсэлтэд сэтгэгдэл бичих",
+      "commentBadRequest": "Энэ сэтгэгдлийг нийтлэх боломжгүй. Нэгтгэх хүсэлт өөрчлөгдсөн байж болзошгүй.",
+      "commentForbidden": "Танд энэ нэгтгэх хүсэлтэд сэтгэгдэл бичих эрх байхгүй.",
       "moderation": {
         "reportContent": {
           "terminal": "Энэ сэтгэгдлийн талаар гомдол гаргах боломжгүй.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Хуучирсан: {{lines}}",
         "outdatedOnPath": "Хуучирсан: {{path}}"
       },
-      "deletedUser": "устгагдсан хэрэглэгч"
+      "deletedUser": "устгагдсан хэрэглэгч",
+      "replyForbiddenTerm": "Танд энэ {{term}}эд хариу бичих эрх байхгүй."
     },
     "couldNotOpenGitHubAppSettings": "GitHub аппын тохиргоог нээж чадсангүй.",
     "installKiloGitHubApp": "Kilo GitHub аппыг суулгах",
@@ -679,21 +682,6 @@
       "files": "Файл",
       "discussion": "Хэлэлцүүлэг"
     },
-    "terms": {
-      "pullRequest": "Нэгтгэх хүсэлт",
-      "mergeRequest": "Нэгтгэх хүсэлт",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Нэгтгэх хүсэлтийг хуваалцах",
-      "viewOnProvider": "{{provider}} дээр харах",
-      "mergeRequestUnavailable": "Нэгтгэх хүсэлтийг нээх боломжгүй",
-      "unavailableDescription": "Устсан байж болзошгүй, эсвэл танд хандах эрх байхгүй.",
-      "accessDeniedMergeRequest": "Танд энэ нэгтгэх хүсэлтийг үзэх эрх байхгүй.",
-      "couldNotLoadMergeRequest": "Нэгтгэх хүсэлтийг ачаалж чадсангүй.",
-      "discussionAccessDenied": "Танд энэ нэгтгэх хүсэлтийн хэлэлцүүлгийг үзэх эрх байхгүй.",
-      "discussionUnavailableMessage": "Энэ нэгтгэх хүсэлтийг устгасан байж болзошгүй.",
-      "noDiscussionDescription": "Энэ нэгтгэх хүсэлтэд хяналтын сэдэв эсвэл хэлэлцүүлгийн сэтгэгдэл байхгүй.",
-      "noFilesChangedDescription": "Энэ нэгтгэх хүсэлтэд файлын өөрчлөлт байхгүй."
-    },
     "fileStatus": {
       "modified": "Өөрчилсөн",
       "renamed": "Нэрийг өөрчилсөн",
@@ -731,6 +719,27 @@
       "ambiguous": "Баталгаажуулж чадсангүй. Дахин оролдохын өмнө PR-ыг шалгана уу.",
       "persistenceFailed": "Энэ үйлдлийг бүртгэж чадсангүй. Дараа дахин оролдоно уу.",
       "forbidden": "Энэ үйлдлийг хийх эрх байхгүй."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Энэ провайдерт боломжгүй",
+        "accessibility": "Энэ провайдерт боломжгүй: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Нэгтгэх хүсэлт",
+      "mergeRequest": "Нэгтгэх хүсэлт",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Нэгтгэх хүсэлтийг хуваалцах",
+      "viewOnProvider": "{{provider}} дээр харах",
+      "mergeRequestUnavailable": "Нэгтгэх хүсэлтийг нээх боломжгүй",
+      "unavailableDescription": "Устсан байж болзошгүй, эсвэл танд хандах эрх байхгүй.",
+      "accessDeniedMergeRequest": "Танд энэ нэгтгэх хүсэлтийг үзэх эрх байхгүй.",
+      "couldNotLoadMergeRequest": "Нэгтгэх хүсэлтийг ачаалж чадсангүй.",
+      "discussionAccessDenied": "Танд энэ нэгтгэх хүсэлтийн хэлэлцүүлгийг үзэх эрх байхгүй.",
+      "discussionUnavailableMessage": "Энэ нэгтгэх хүсэлтийг устгасан байж болзошгүй.",
+      "noDiscussionDescription": "Энэ нэгтгэх хүсэлтэд хяналтын сэдэв эсвэл хэлэлцүүлгийн сэтгэгдэл байхгүй.",
+      "noFilesChangedDescription": "Энэ нэгтгэх хүсэлтэд файлын өөрчлөлт байхгүй."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "{{language}} хэлний офлайн ярианы файлууд энэ утсанд суулгагдаагүй байна. Файлуудыг татаж аваад, дуугаар оруулахыг дахин турна уу.",
     "downloadOfflineModel": "Татах",
     "offlineModelDownloadScheduled": "Офлайн ярианы файлууд дэвсгэрт татагдана. Дуугаар оруулахыг дараа дахин турна уу.",
-    "listeningStopped": "Сонсох ажиллагаа зогссон."
+    "listeningStopped": "Сонсох ажиллагаа зогссон.",
+    "transcribing": "Бичвэр болгож байна...",
+    "gatewayUnreachable": "Kilo Gateway-д холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
+    "gatewayTimeout": "Яриаг бичвэр болгох хэт удаан үргэлжиллээ. Дахин оролдоно уу.",
+    "gatewayModelUnavailable": "Энэ яриаг бичвэр болгох загвар боломжгүй. Тохиргооноос өөр загвар сонгоно уу.",
+    "gatewayModelUnavailableNotice": "Энэ загварыг цаашид санал болгохгүй. Өөр загвар сонгохын тулд $t(transcriptionModel.title)-г товшино уу.",
+    "gatewaySignInRequired": "Kilo Gateway-р бичвэр болгохыг ашиглахын тулд нэвтэрнэ үү.",
+    "gatewayNoModel": "Эхлээд Тохиргооноос яриаг бичвэр болгох загвар сонгоно уу."
   },
   "share": {
     "title": "Kilo руу хуваалцах",
@@ -3009,5 +3025,12 @@
     "needsInput": "Хариу хүлээж байна",
     "channelName": "Идэвхтэй агентууд",
     "activityKitDisabledBody": "Түгжээтэй дэлгэц дээр идэвхтэй агентуудыг харахын тулд тохиргооноос шууд үйл ажиллагааг идэвхжүүлнэ үү."
+  },
+  "transcriptionModel": {
+    "title": "Яриаг бичвэр болгох загвар",
+    "noneChosen": "Сонгоогүй",
+    "emptyTitle": "Яриаг бичвэр болгох загвар байхгүй",
+    "emptyDescription": "Kilo Gateway одоогоор яриаг бичвэр болгох загвар санал болгохгүй байна.",
+    "loadFailed": "Яриаг бичвэр болгох загваруудыг ачаалж чадсангүй."
   }
 }

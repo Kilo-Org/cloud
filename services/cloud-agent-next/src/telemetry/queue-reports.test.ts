@@ -70,7 +70,7 @@ describe('Cloud Agent report emitter', () => {
           failureStage: 'agent_activity',
           failureCode: 'wrapper_error_after_activity',
           failureResponsibility: 'platform',
-          failureReason: 'wrapper_liveness',
+          failureReason: 'wrapper_crash',
           diagnostic: {
             errorMessageRedacted: 'Wrapper failed after agent activity',
             errorExpiresAt: new Date(5 + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -165,38 +165,45 @@ describe('Cloud Agent report emitter', () => {
   });
 
   it.each([
-    ['wrapper_ping_timeout', 'Wrapper health check timed out'],
-    ['wrapper_no_output', 'Wrapper made no execution progress during the watchdog window'],
-    ['wrapper_disconnected', 'Wrapper disconnected before completion'],
-  ] as const)('reports %s before and after activity', async (failureCode, expectedDiagnostic) => {
-    for (const failureStage of ['post_dispatch_no_activity', 'agent_activity'] as const) {
-      const reports: CloudAgentQueueReport[] = [];
-      await emitRunStateReport({
-        queue: { send: async report => void reports.push(report) },
-        cloudAgentSessionId: 'agent_report',
-        state: {
-          ...state,
+    ['wrapper_ping_timeout', 'Wrapper health check timed out', 'wrapper_liveness'],
+    [
+      'wrapper_no_output',
+      'Wrapper made no execution progress during the watchdog window',
+      'wrapper_liveness',
+    ],
+    ['wrapper_disconnected', 'Wrapper disconnected before completion', 'wrapper_disconnected'],
+  ] as const)(
+    'reports %s before and after activity',
+    async (failureCode, expectedDiagnostic, expectedFailureReason) => {
+      for (const failureStage of ['post_dispatch_no_activity', 'agent_activity'] as const) {
+        const reports: CloudAgentQueueReport[] = [];
+        await emitRunStateReport({
+          queue: { send: async report => void reports.push(report) },
+          cloudAgentSessionId: 'agent_report',
+          state: {
+            ...state,
+            failureStage,
+            failureCode,
+            agentActivityObservedAt: failureStage === 'agent_activity' ? 4 : undefined,
+          },
+        });
+
+        expect(reports).toHaveLength(1);
+        expect(reports[0].run).toMatchObject({
           failureStage,
           failureCode,
-          agentActivityObservedAt: failureStage === 'agent_activity' ? 4 : undefined,
-        },
-      });
-
-      expect(reports).toHaveLength(1);
-      expect(reports[0].run).toMatchObject({
-        failureStage,
-        failureCode,
-        failureResponsibility: 'platform',
-        failureReason: 'wrapper_liveness',
-        diagnostic: { errorMessageRedacted: expectedDiagnostic },
-      });
-      if (failureStage === 'agent_activity') {
-        expect(reports[0].run.agentActivityObservedAt).toBe(new Date(4).toISOString());
-      } else {
-        expect(reports[0].run).not.toHaveProperty('agentActivityObservedAt');
+          failureResponsibility: 'platform',
+          failureReason: expectedFailureReason,
+          diagnostic: { errorMessageRedacted: expectedDiagnostic },
+        });
+        if (failureStage === 'agent_activity') {
+          expect(reports[0].run.agentActivityObservedAt).toBe(new Date(4).toISOString());
+        } else {
+          expect(reports[0].run).not.toHaveProperty('agentActivityObservedAt');
+        }
       }
     }
-  });
+  );
 
   it.each([
     [
@@ -213,18 +220,18 @@ describe('Cloud Agent report emitter', () => {
     ],
     ['provider_unavailable', 'Assistant service is unavailable', 'managed_provider_unavailable'],
     ['timeout', 'Assistant request timed out', 'request_timeout'],
-    ['invalid_request', 'Assistant request was invalid', 'invalid_request'],
-    ['context_limit', 'The model context limit was exceeded', 'context_limit'],
-    ['output_limit', 'The model output limit was reached', 'output_limit'],
+    ['invalid_request', 'Assistant request was invalid', 'assistant_invalid_request'],
+    ['context_limit', 'The model context limit was exceeded', 'assistant_context_limit'],
+    ['output_limit', 'The model output limit was reached', 'assistant_output_limit'],
     [
       'content_filter',
       'The model provider blocked the response under its content policy',
-      'content_filter',
+      'assistant_content_filter',
     ],
     [
       'structured_output',
       'The model response did not match the required format',
-      'structured_output',
+      'assistant_structured_output',
     ],
     ['unknown', 'Assistant request failed', 'assistant_unknown'],
     [undefined, 'Assistant request failed', 'assistant_unknown'],

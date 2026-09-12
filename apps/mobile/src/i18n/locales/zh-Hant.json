@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "企業 SSO"
   },
   "preferences": {
+    "general": "一般",
+    "voiceInput": "語音輸入",
     "autoExpandThinking": "自動展開思考內容",
     "autoExpandThinkingSubtitle": "智慧代理完成思考後，自動展開思考內容。",
     "keepScreenOn": "在工作階段頁面保持螢幕亮起",
@@ -238,6 +240,7 @@
     "appearanceLight": "淺色",
     "appearanceDark": "深色",
     "account": "帳戶",
+    "accountSubtitle": "語言、信任的主機和裝置工作階段",
     "prReviewAttribution": "在 PR 審查中註明使用的應用程式",
     "prReviewAttributionSubtitle": "送出審查時，在結尾註明透過 Kilo 審查。",
     "returnSendsMessage": "按換行鍵傳送訊息",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "使用 Kilo Gateway 轉錄",
+    "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型將語音輸入轉錄成文字，而不使用裝置上的語音辨識。您的錄音將傳送至 Kilo Gateway。",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "即時動態",
@@ -2144,7 +2150,14 @@
     "languageNotInstalledMessage": "此手機尚未安裝 {{language}} 的離線語音檔案。請下載這些檔案，然後再試一次語音輸入。",
     "downloadOfflineModel": "下載",
     "offlineModelDownloadScheduled": "離線語音檔案將在背景下載。請稍後再試一次語音輸入。",
-    "listeningStopped": "已停止聆聽。"
+    "listeningStopped": "已停止聆聽。",
+    "transcribing": "正在轉錄…",
+    "gatewayUnreachable": "無法連線至 Kilo Gateway。請檢查連線後再試一次。",
+    "gatewayTimeout": "轉錄花費太長時間。請再試一次。",
+    "gatewayModelUnavailable": "這個轉錄模型無法使用。請在偏好設定中選擇其他模型。",
+    "gatewayModelUnavailableNotice": "這個模型已不再提供。點一下$t(transcriptionModel.title)選擇另一個。",
+    "gatewaySignInRequired": "登入後即可使用 Kilo Gateway 轉錄。",
+    "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2322,11 +2335,172 @@
     "installAttributionPromptTitle": "允許追蹤安裝來源？"
   },
   "prReview": {
-    "pullRequestUnavailable": "無法開啟提取請求",
-    "pullRequestUnavailableDescription": "無法開啟此 PR。可能是 PR 已刪除、存放庫設為私人，或存放庫尚未安裝 Kilo GitHub App。",
     "accessDeniedDescription": "你沒有權限檢視此提取請求。",
-    "noFilesChanged": "沒有檔案變更",
-    "noFilesChangedDescription": "此提取請求沒有檔案變更。",
+    "checkConnection": "檢查連線",
+    "checks": {
+      "checksCount": "{{displayCount}} 項檢查",
+      "couldNotLoad": "無法載入檢查。",
+      "failed": "{{displayCount}} 項失敗",
+      "noAccess": "你沒有權限檢視此存放庫的檢查結果。",
+      "noChecksReported": "尚無檢查結果",
+      "notAvailable": "目前尚無檢查結果。可能是來源分支的最新提交尚未處理，或來源存放庫尚未安裝 Kilo GitHub App。",
+      "openDetails": "開啟 {{name}} 的詳細資料",
+      "passed": "{{displayCount}} 項通過",
+      "pending": "{{displayCount}} 項待處理",
+      "retryChecks": "重試檢查",
+      "skipped": "{{displayCount}} 項略過",
+      "title": "檢查",
+      "viewOnGitHub": "在 GitHub 上檢視 PR",
+      "checkDetails": "檢查詳細資料"
+    },
+    "composer": {
+      "addTitle": "新增留言",
+      "addToReview": "加入審查",
+      "comment": "留言",
+      "commentBody": "留言內容",
+      "commentBodyPlaceholder": "留言內容",
+      "commentNow": "立即留言",
+      "discardMessage": "你的草稿將不會保留。",
+      "discardTitle": "要捨棄留言嗎？",
+      "editTitle": "編輯留言",
+      "insertSuggestion": "插入建議",
+      "insertSuggestionA11y": "插入程式碼建議",
+      "loadFailedTitle": "無法載入留言編輯器。",
+      "ok": "確定",
+      "unavailableMessage": "此待送出留言已刪除或送出。",
+      "unavailableTitle": "留言已無法編輯",
+      "bodyEmpty": "留言內容不可為空白。",
+      "suggestionsOnlyAddedLines": "建議僅適用於新增的行。",
+      "tapDiffLineToSuggest": "點一下差異中的任一行，即可啟用建議功能。"
+    },
+    "connect": {
+      "checkFailedTitle": "無法檢查 GitHub 連線。",
+      "checkFailedMessage": "載入完成前，無法確認登入狀態。",
+      "checkFailedTitleGitLab": "無法檢查 GitLab 連線。",
+      "checkFailedTitleBitbucket": "無法檢查 Bitbucket 連線。",
+      "providerCheckFailedMessage": "載入完成前無法取得連線狀態。",
+      "reconnectTitle": "重新連線至 GitHub",
+      "reconnectDescription": "你的 GitHub 連線授權已撤銷。請重新連線，以繼續在行動裝置上審查提取請求。",
+      "description": "連結你的 GitHub 帳戶，即可在行動裝置上審查提取請求。",
+      "gitlabDescription": "連結你的 GitLab 帳戶，以便在行動裝置上審查合併請求。",
+      "bitbucketDescription": "將 Bitbucket 連結到此組織，以便在行動裝置上審查提取請求。",
+      "bitbucketOrgOnlyDescription": "在你的個人資料中選取一個組織，以審查其 Bitbucket 提取請求。"
+    },
+    "connectionExpired": "GitHub 連線已過期。",
+    "couldNotLoadPullRequest": "無法載入提取請求。",
+    "couldNotOpenGitHubAppSettings": "無法開啟 GitHub 應用程式設定。",
+    "description": "說明",
+    "discussion": {
+      "acceptTerms": "同意",
+      "accessDeniedMessage": "你沒有權限檢視此 PR 的討論。",
+      "addReaction": "新增表情反應",
+      "block": "封鎖",
+      "blockedUser": "已封鎖 {{login}}",
+      "collapseThread": "收合討論串",
+      "commentActions": "留言操作",
+      "comment": "{{displayCount}} 則留言",
+      "comment_other": "{{displayCount}} 則留言",
+      "couldNotLoad": "無法載入討論。",
+      "couldNotLoadMore": "無法載入更多留言。",
+      "loadMoreComments": "載入更多留言",
+      "loading": "正在載入討論",
+      "moderation": {
+        "block": {
+          "retryable": "無法封鎖此使用者。請檢查連線後再試一次。",
+          "terminal": "無法封鎖此使用者。"
+        },
+        "mute": {
+          "retryable": "無法將此使用者設為靜音。請檢查連線後再試一次。",
+          "terminal": "無法將此使用者設為靜音。"
+        },
+        "reportContent": {
+          "retryable": "無法檢舉此留言。請檢查連線後再試一次。",
+          "terminal": "無法檢舉此留言。"
+        },
+        "reportUser": {
+          "retryable": "無法檢舉此使用者。請檢查連線後再試一次。",
+          "terminal": "無法檢舉此使用者。"
+        }
+      },
+      "moreLinesAbove": "…上方還有 {{displayCount}} 行。",
+      "mute": "靜音",
+      "mutedUser": "已將 {{login}} 設為靜音",
+      "noDiscussion": "尚無討論",
+      "noDiscussionDescription": "此提取請求尚無審查討論串或留言。",
+      "comment_one": "1 則留言",
+      "outdated": "已過時",
+      "quotedDiffSnippet": "引用的差異片段",
+      "reactionPill": "{{emoji}} 表情反應，共 {{displayCount}} {{countLabel}}",
+      "reaction": "表情回應",
+      "reaction_other": "表情回應",
+      "reaction_one": "個表情反應",
+      "replyBadRequest": "無法發佈此回覆。討論串可能已變更。",
+      "replyBody": "回覆內容",
+      "replyForbidden": "你沒有權限回覆此提取請求。",
+      "addCommentCta": "對此提取請求留言",
+      "commentBadRequest": "無法發佈此留言。此提取請求可能已變更。",
+      "commentForbidden": "你沒有權限在此提取請求留言。",
+      "replyPlaceholder": "回覆…",
+      "reportContent": "檢舉內容",
+      "reportUser": "檢舉使用者",
+      "resolveThread": "將討論串標記為已解決",
+      "resolved": "已解決",
+      "retryLoadingMore": "重新載入更多留言",
+      "reviewFiles": "審查檔案",
+      "startedRelative": " · {{relative}}開始",
+      "submitReply": "送出回覆",
+      "termsAcceptRetry": "同意服務條款時發生錯誤。請檢查連線後再試一次。",
+      "termsCopy": "你必須年滿 13 歲才能發佈內容。",
+      "termsTitle": "服務條款",
+      "threadAccessibilityLabel": "討論串 {{anchorLabel}}",
+      "unavailable": "無法開啟討論。",
+      "unavailableMessage": "此提取請求可能已移除。",
+      "unresolveThread": "將討論串標記為未解決",
+      "viewTerms": "檢視條款",
+      "termsAcceptRequired": "你必須同意服務條款才能發佈內容。",
+      "termsCheckRetryCopy": "無法檢查服務條款。請檢查連線後再試一次。",
+      "termsOutdatedCopy": "服務條款已更新。請重新開啟此畫面，同意最新版本的條款。",
+      "reactions": {
+        "thumbsUp": "讚",
+        "thumbsDown": "倒讚",
+        "laugh": "大笑",
+        "hooray": "歡呼",
+        "confused": "困惑",
+        "heart": "愛心",
+        "rocket": "火箭",
+        "eyes": "眼睛"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} 的檔案留言",
+        "fileComment": "檔案留言",
+        "outdatedOnPathLines": "{{path}} {{lines}} 的留言已過時",
+        "outdatedOnLines": "{{lines}} 的留言已過時",
+        "outdatedOnPath": "{{path}} 的留言已過時"
+      },
+      "deletedUser": "已刪除的使用者",
+      "replyForbiddenTerm": "你沒有權限回覆此{{term}}。"
+    },
+    "entry": {
+      "eyebrow": "透過 URL 開啟提取請求或合併請求",
+      "pastePrLink": "貼上提取請求或合併請求連結",
+      "noRecentPrs": "尚無最近審查",
+      "noRecentPrsDescription": "在上方貼上連結即可開始審查，下次就會在這裡看到。",
+      "couldNotLoad": "無法載入。",
+      "removeFromRecentsTitle": "要從最近項目移除嗎？",
+      "removeFromRecentsMessage": "此審查將從你的最近項目中移除。",
+      "removeRecentAccessibility": "從最近項目移除 {{repo}}",
+      "urlAccessibility": "輸入提取請求或合併請求 URL",
+      "urlPlaceholder": "提取請求或合併請求 URL",
+      "openAccessibility": "開啟提取請求或合併請求",
+      "clearLink": "清除連結",
+      "pasteLink": "貼上提取請求或合併請求連結",
+      "open": "開啟"
+    },
+    "eventChips": {
+      "comment": "留言",
+      "label": "審查類型",
+      "requestChanges": "要求變更"
+    },
     "fileList": {
       "filesList": "檔案清單",
       "filesViewed": "檔案 · 已檢視 {{viewed}} / {{total}}",
@@ -2371,6 +2545,7 @@
       "commentOnSelectedLines": "對選取的行留言",
       "finishReview": "完成審查"
     },
+    "headLine": "{{counts}} · 最新提交 {{sha}}",
     "hunkRows": {
       "contextUnavailable": "無法取得此參照的前後文。",
       "expandAll": "全部展開",
@@ -2403,21 +2578,14 @@
       "retryLoadingContext": "重新載入前後文",
       "retryLoadingNextPage": "重新載入下一頁"
     },
-    "sideBySide": {
-      "emptyDiffColumn": "空白差異欄",
-      "emptyDiffRow": "空白差異列",
-      "newOnly": "僅新版有：{{text}}",
-      "noNewlineAtEndOfFile": "⚠️ 檔案結尾沒有換行",
-      "oldNew": "舊版：{{old}} | 新版：{{new}}",
-      "oldOnly": "僅舊版有：{{text}}"
+    "inbox": {
+      "couldNotLoad": "無法載入收件匣。",
+      "loading": "正在載入收件匣",
+      "noReviewRequests": "尚無審查請求",
+      "noReviewRequestsDescription": "等待你審查的提取請求會顯示在這裡。你也可以在上方貼上任何 PR 連結。",
+      "title": "收件匣"
     },
-    "connectionExpired": "GitHub 連線已過期。",
-    "capabilities": {
-      "banner": {
-        "title": "此供應商不支援",
-        "accessibility": "此供應商不支援: {{reason}}"
-      }
-    },
+    "installKiloGitHubApp": "安裝 Kilo GitHub App",
     "merge": {
       "merge": "合併",
       "mergeNow": "立即合併",
@@ -2507,204 +2675,9 @@
         "rebase": "將此分支的所有提交依序重新套用到基礎分支，不另建合併提交。"
       }
     },
-    "discussion": {
-      "threadAccessibilityLabel": "討論串 {{anchorLabel}}",
-      "collapseThread": "收合討論串",
-      "resolveThread": "將討論串標記為已解決",
-      "unresolveThread": "將討論串標記為未解決",
-      "resolved": "已解決",
-      "outdated": "已過時",
-      "comment_one": "1 則留言",
-      "comment": "{{displayCount}} 則留言",
-      "comment_other": "{{displayCount}} 則留言",
-      "startedRelative": " · {{relative}}開始",
-      "couldNotLoadMore": "無法載入更多留言。",
-      "retryLoadingMore": "重新載入更多留言",
-      "loadMoreComments": "載入更多留言",
-      "addReaction": "新增表情反應",
-      "reactionPill": "{{emoji}} 表情反應，共 {{displayCount}} {{countLabel}}",
-      "reaction_one": "個表情反應",
-      "reaction": "表情回應",
-      "reaction_other": "表情回應",
-      "commentActions": "留言操作",
-      "reportContent": "檢舉內容",
-      "reportUser": "檢舉使用者",
-      "mute": "靜音",
-      "block": "封鎖",
-      "blockedUser": "已封鎖 {{login}}",
-      "mutedUser": "已將 {{login}} 設為靜音",
-      "replyPlaceholder": "回覆…",
-      "replyBody": "回覆內容",
-      "submitReply": "送出回覆",
-      "termsTitle": "服務條款",
-      "termsCopy": "你必須年滿 13 歲才能發佈內容。",
-      "termsAcceptRetry": "同意服務條款時發生錯誤。請檢查連線後再試一次。",
-      "viewTerms": "檢視條款",
-      "acceptTerms": "同意",
-      "replyBadRequest": "無法發佈此回覆。討論串可能已變更。",
-      "replyForbidden": "你沒有權限回覆此提取請求。",
-      "replyForbiddenTerm": "你沒有權限回覆此{{term}}。",
-      "moderation": {
-        "block": {
-          "retryable": "無法封鎖此使用者。請檢查連線後再試一次。",
-          "terminal": "無法封鎖此使用者。"
-        },
-        "mute": {
-          "retryable": "無法將此使用者設為靜音。請檢查連線後再試一次。",
-          "terminal": "無法將此使用者設為靜音。"
-        },
-        "reportContent": {
-          "retryable": "無法檢舉此留言。請檢查連線後再試一次。",
-          "terminal": "無法檢舉此留言。"
-        },
-        "reportUser": {
-          "retryable": "無法檢舉此使用者。請檢查連線後再試一次。",
-          "terminal": "無法檢舉此使用者。"
-        }
-      },
-      "accessDeniedMessage": "你沒有權限檢視此 PR 的討論。",
-      "unavailable": "無法開啟討論。",
-      "unavailableMessage": "此提取請求可能已移除。",
-      "couldNotLoad": "無法載入討論。",
-      "loading": "正在載入討論",
-      "noDiscussion": "尚無討論",
-      "noDiscussionDescription": "此提取請求尚無審查討論串或留言。",
-      "reviewFiles": "審查檔案",
-      "quotedDiffSnippet": "引用的差異片段",
-      "moreLinesAbove": "…上方還有 {{displayCount}} 行。",
-      "termsAcceptRequired": "你必須同意服務條款才能發佈內容。",
-      "termsOutdatedCopy": "服務條款已更新。請重新開啟此畫面，同意最新版本的條款。",
-      "termsCheckRetryCopy": "無法檢查服務條款。請檢查連線後再試一次。",
-      "reactions": {
-        "thumbsUp": "讚",
-        "thumbsDown": "倒讚",
-        "laugh": "大笑",
-        "hooray": "歡呼",
-        "confused": "困惑",
-        "heart": "愛心",
-        "rocket": "火箭",
-        "eyes": "眼睛"
-      },
-      "anchor": {
-        "fileCommentOnPath": "{{path}} 的檔案留言",
-        "fileComment": "檔案留言",
-        "outdatedOnPathLines": "{{path}} {{lines}} 的留言已過時",
-        "outdatedOnLines": "{{lines}} 的留言已過時",
-        "outdatedOnPath": "{{path}} 的留言已過時"
-      },
-      "deletedUser": "已刪除的使用者"
-    },
-    "couldNotOpenGitHubAppSettings": "無法開啟 GitHub 應用程式設定。",
-    "installKiloGitHubApp": "安裝 Kilo GitHub App",
-    "checkConnection": "檢查連線",
-    "couldNotLoadPullRequest": "無法載入提取請求。",
-    "description": "說明",
     "noDescriptionProvided": "未提供說明。",
-    "review": "審查",
-    "reviewPullRequest": "審查提取請求",
-    "headLine": "{{counts}} · 最新提交 {{sha}}",
-    "entry": {
-      "eyebrow": "透過 URL 開啟提取請求或合併請求",
-      "pastePrLink": "貼上提取請求或合併請求連結",
-      "noRecentPrs": "尚無最近審查",
-      "noRecentPrsDescription": "在上方貼上連結即可開始審查，下次就會在這裡看到。",
-      "couldNotLoad": "無法載入。",
-      "removeFromRecentsTitle": "要從最近項目移除嗎？",
-      "removeFromRecentsMessage": "此審查將從你的最近項目中移除。",
-      "removeRecentAccessibility": "從最近項目移除 {{repo}}",
-      "urlAccessibility": "輸入提取請求或合併請求 URL",
-      "urlPlaceholder": "提取請求或合併請求 URL",
-      "openAccessibility": "開啟提取請求或合併請求",
-      "clearLink": "清除連結",
-      "pasteLink": "貼上提取請求或合併請求連結",
-      "open": "開啟"
-    },
-    "checks": {
-      "checksCount": "{{displayCount}} 項檢查",
-      "couldNotLoad": "無法載入檢查。",
-      "failed": "{{displayCount}} 項失敗",
-      "noAccess": "你沒有權限檢視此存放庫的檢查結果。",
-      "noChecksReported": "尚無檢查結果",
-      "notAvailable": "目前尚無檢查結果。可能是來源分支的最新提交尚未處理，或來源存放庫尚未安裝 Kilo GitHub App。",
-      "openDetails": "開啟 {{name}} 的詳細資料",
-      "passed": "{{displayCount}} 項通過",
-      "pending": "{{displayCount}} 項待處理",
-      "retryChecks": "重試檢查",
-      "skipped": "{{displayCount}} 項略過",
-      "title": "檢查",
-      "viewOnGitHub": "在 GitHub 上檢視 PR",
-      "checkDetails": "檢查詳細資料"
-    },
-    "inbox": {
-      "couldNotLoad": "無法載入收件匣。",
-      "loading": "正在載入收件匣",
-      "noReviewRequests": "尚無審查請求",
-      "noReviewRequestsDescription": "等待你審查的提取請求會顯示在這裡。你也可以在上方貼上任何 PR 連結。",
-      "title": "收件匣"
-    },
-    "composer": {
-      "addTitle": "新增留言",
-      "addToReview": "加入審查",
-      "comment": "留言",
-      "commentBody": "留言內容",
-      "commentBodyPlaceholder": "留言內容",
-      "commentNow": "立即留言",
-      "discardMessage": "你的草稿將不會保留。",
-      "discardTitle": "要捨棄留言嗎？",
-      "editTitle": "編輯留言",
-      "insertSuggestion": "插入建議",
-      "insertSuggestionA11y": "插入程式碼建議",
-      "loadFailedTitle": "無法載入留言編輯器。",
-      "ok": "確定",
-      "unavailableMessage": "此待送出留言已刪除或送出。",
-      "unavailableTitle": "留言已無法編輯",
-      "bodyEmpty": "留言內容不可為空白。",
-      "suggestionsOnlyAddedLines": "建議僅適用於新增的行。",
-      "tapDiffLineToSuggest": "點一下差異中的任一行，即可啟用建議功能。"
-    },
-    "connect": {
-      "checkFailedTitle": "無法檢查 GitHub 連線。",
-      "checkFailedMessage": "載入完成前，無法確認登入狀態。",
-      "checkFailedTitleGitLab": "無法檢查 GitLab 連線。",
-      "checkFailedTitleBitbucket": "無法檢查 Bitbucket 連線。",
-      "providerCheckFailedMessage": "載入完成前無法取得連線狀態。",
-      "reconnectTitle": "重新連線至 GitHub",
-      "reconnectDescription": "你的 GitHub 連線授權已撤銷。請重新連線，以繼續在行動裝置上審查提取請求。",
-      "description": "連結你的 GitHub 帳戶，即可在行動裝置上審查提取請求。",
-      "gitlabDescription": "連結你的 GitLab 帳戶，以便在行動裝置上審查合併請求。",
-      "bitbucketDescription": "將 Bitbucket 連結到此組織，以便在行動裝置上審查提取請求。",
-      "bitbucketOrgOnlyDescription": "在你的個人資料中選取一個組織，以審查其 Bitbucket 提取請求。"
-    },
-    "screen": {
-      "shareA11y": "分享提取請求",
-      "title": "#{{number}}"
-    },
-    "submit": {
-      "deletePendingMessage": "此留言將從待送出的審查留言中移除。",
-      "deletePendingTitle": "要刪除待送出留言嗎？",
-      "loadFailedTitle": "無法載入審查送出畫面。",
-      "pendingComment": "則待送出的留言",
-      "pendingComment_other": "則待送出的留言",
-      "pendingComment_one": "則待送出留言",
-      "summaryOptional": "摘要（非必填）",
-      "partialPostedMessage": "已發佈 {{displayFreshCount}} 則留言。另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
-      "submitCountOfTotal": "送出 {{displayTotalCount}} 則留言中的 {{displayFreshCount}} 則",
-      "submitReview": "送出審查",
-      "blockedRequestChanges": "請先填寫摘要或新增至少一則留言，才能要求變更。",
-      "blockedComment": "請先填寫摘要或新增至少一則留言，才能送出留言型審查。"
-    },
-    "reconnectNotice": {
-      "title": "GitHub 連線已過期。",
-      "message": "你的 GitHub 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。",
-      "gitlabTitle": "GitLab 連線已過期。",
-      "bitbucketTitle": "Bitbucket 連線已過期。",
-      "providerMessage": "你的 {{provider}} 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。"
-    },
-    "eventChips": {
-      "comment": "留言",
-      "label": "審查類型",
-      "requestChanges": "要求變更"
-    },
+    "noFilesChanged": "沒有檔案變更",
+    "noFilesChangedDescription": "此提取請求沒有檔案變更。",
     "overview": {
       "commit": "提交",
       "commit_other": "提交",
@@ -2745,31 +2718,53 @@
       "summaryA11y": "審查摘要",
       "summaryPlaceholder": "審查摘要（非必填）"
     },
-    "tabs": {
-      "discussion": "討論",
-      "files": "檔案",
-      "overview": "總覽"
+    "pullRequestUnavailable": "無法開啟提取請求",
+    "pullRequestUnavailableDescription": "無法開啟此 PR。可能是 PR 已刪除、存放庫設為私人，或存放庫尚未安裝 Kilo GitHub App。",
+    "reconnectNotice": {
+      "title": "GitHub 連線已過期。",
+      "message": "你的 GitHub 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。",
+      "gitlabTitle": "GitLab 連線已過期。",
+      "bitbucketTitle": "Bitbucket 連線已過期。",
+      "providerMessage": "你的 {{provider}} 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。"
     },
-    "terms": {
-      "pullRequest": "提取要求",
-      "mergeRequest": "合併請求",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "分享合併請求",
-      "viewOnProvider": "在 {{provider}} 上檢視",
-      "mergeRequestUnavailable": "無法開啟合併請求",
-      "unavailableDescription": "它可能已被移除，或者你可能沒有存取權限。",
-      "accessDeniedMergeRequest": "你沒有權限檢視此合併請求。",
-      "couldNotLoadMergeRequest": "無法載入合併請求。",
-      "discussionAccessDenied": "你沒有權限檢視此合併請求的討論。",
-      "discussionUnavailableMessage": "此合併請求可能已移除。",
-      "noDiscussionDescription": "此合併請求尚無審查討論串或留言。",
-      "noFilesChangedDescription": "此合併請求沒有檔案變更。"
+    "review": "審查",
+    "reviewPullRequest": "審查提取請求",
+    "screen": {
+      "shareA11y": "分享提取請求",
+      "title": "#{{number}}"
+    },
+    "sideBySide": {
+      "emptyDiffColumn": "空白差異欄",
+      "emptyDiffRow": "空白差異列",
+      "newOnly": "僅新版有：{{text}}",
+      "noNewlineAtEndOfFile": "⚠️ 檔案結尾沒有換行",
+      "oldNew": "舊版：{{old}} | 新版：{{new}}",
+      "oldOnly": "僅舊版有：{{text}}"
+    },
+    "submit": {
+      "deletePendingMessage": "此留言將從待送出的審查留言中移除。",
+      "deletePendingTitle": "要刪除待送出留言嗎？",
+      "loadFailedTitle": "無法載入審查送出畫面。",
+      "pendingComment": "則待送出的留言",
+      "pendingComment_other": "則待送出的留言",
+      "pendingComment_one": "則待送出留言",
+      "summaryOptional": "摘要（非必填）",
+      "partialPostedMessage": "已發佈 {{displayFreshCount}} 則留言。另有 {{displayStaleCount}} 則留言對應舊版提交，仍保留在待送出清單中。",
+      "submitCountOfTotal": "送出 {{displayTotalCount}} 則留言中的 {{displayFreshCount}} 則",
+      "submitReview": "送出審查",
+      "blockedRequestChanges": "請先填寫摘要或新增至少一則留言，才能要求變更。",
+      "blockedComment": "請先填寫摘要或新增至少一則留言，才能送出留言型審查。"
     },
     "fileStatus": {
       "changed": "已變更",
       "copied": "已複製",
       "modified": "已修改",
       "renamed": "已重新命名"
+    },
+    "tabs": {
+      "discussion": "討論",
+      "files": "檔案",
+      "overview": "總覽"
     },
     "diff": {
       "selectedTapToChange": "已選取 {{label}}，點一下即可變更選取範圍",
@@ -2802,6 +2797,27 @@
       "ambiguous": "無法確認操作結果。請先檢查 PR，再試一次。",
       "persistenceFailed": "無法記錄此操作。請稍後再試。",
       "forbidden": "沒有執行此操作的權限。"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "此供應商不支援",
+        "accessibility": "此供應商不支援: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "提取要求",
+      "mergeRequest": "合併請求",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "分享合併請求",
+      "viewOnProvider": "在 {{provider}} 上檢視",
+      "mergeRequestUnavailable": "無法開啟合併請求",
+      "unavailableDescription": "它可能已被移除，或者你可能沒有存取權限。",
+      "accessDeniedMergeRequest": "你沒有權限檢視此合併請求。",
+      "couldNotLoadMergeRequest": "無法載入合併請求。",
+      "discussionAccessDenied": "你沒有權限檢視此合併請求的討論。",
+      "discussionUnavailableMessage": "此合併請求可能已移除。",
+      "noDiscussionDescription": "此合併請求尚無審查討論串或留言。",
+      "noFilesChangedDescription": "此合併請求沒有檔案變更。"
     }
   },
   "organization": {
@@ -3009,5 +3025,12 @@
     "needsInput": "等待輸入",
     "channelName": "執行中的代理程式",
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。"
+  },
+  "transcriptionModel": {
+    "title": "轉錄模型",
+    "noneChosen": "未選擇",
+    "emptyTitle": "沒有轉錄模型",
+    "emptyDescription": "Kilo Gateway 目前沒有提供轉錄模型。",
+    "loadFailed": "無法載入轉錄模型。"
   }
 }

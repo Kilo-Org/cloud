@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO ארגוני"
   },
   "preferences": {
+    "general": "כללי",
+    "voiceInput": "קלט קולי",
     "autoExpandThinking": "הרחבה אוטומטית של תהליך החשיבה",
     "autoExpandThinkingSubtitle": "הצג את תהליך החשיבה המלא של הסוכן בסיומו.",
     "keepScreenOn": "השארת המסך דלוק במסך הסשן",
@@ -238,6 +240,7 @@
     "appearanceLight": "בהיר",
     "appearanceDark": "כהה",
     "account": "חשבון",
+    "accountSubtitle": "שפה, אתרים מהימנים וסשנים במכשירים",
     "prReviewAttribution": "הוספת אזכור האפליקציה לסקירות PR",
     "prReviewAttributionSubtitle": "הוסף את הכיתוב 'נסקר דרך Kilo' בסוף כל סקירה שאתה שולח.",
     "returnSendsMessage": "מקש אנטר שולח הודעה",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "תמלול דרך Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "תמלל את ההכתבה בעזרת מודל של Kilo Gateway במקום זיהוי הדיבור של המכשיר. ההקלטה נשלחת ל־Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "פעילויות בזמן אמת",
@@ -2158,7 +2164,14 @@
     "languageNotInstalledMessage": "קובצי הדיבור הלא מקוונים עבור {{language}} לא מותקנים בטלפון הזה. הורד אותם ואז נסה שוב להשתמש בהכתבה.",
     "downloadOfflineModel": "הורדה",
     "offlineModelDownloadScheduled": "קובצי הדיבור הלא מקוונים יורדו ברקע. נסה שוב להשתמש בהכתבה מאוחר יותר.",
-    "listeningStopped": "ההאזנה הופסקה."
+    "listeningStopped": "ההאזנה הופסקה.",
+    "transcribing": "בתמלול...",
+    "gatewayUnreachable": "לא ניתן להתחבר ל־Kilo Gateway. בדוק את החיבור ונסה שוב.",
+    "gatewayTimeout": "התמלול ארך יותר מדי. נסה שוב.",
+    "gatewayModelUnavailable": "מודל התמלול הזה אינו זמין. בחר מודל אחר בהעדפות.",
+    "gatewayModelUnavailableNotice": "המודל הזה כבר לא מוצע. הקש על $t(transcriptionModel.title) כדי לבחור אחר.",
+    "gatewaySignInRequired": "היכנס כדי להשתמש בתמלול דרך Kilo Gateway.",
+    "gatewayNoModel": "בחר קודם מודל תמלול בהעדפות."
   },
   "share": {
     "title": "שיתוף עם Kilo",
@@ -2336,11 +2349,174 @@
     "installAttributionPromptTitle": "לאפשר זיהוי של מקור ההתקנה?"
   },
   "prReview": {
-    "pullRequestUnavailable": "בקשת המשיכה אינה זמינה",
-    "pullRequestUnavailableDescription": "לא ניתן לפתוח את ה-PR הזה. ייתכן שהוא נמחק, שהמאגר פרטי או שאפליקציית Kilo ל-GitHub אינה מותקנת במאגר.",
     "accessDeniedDescription": "אין לך הרשאה לצפות בבקשת המשיכה הזו.",
-    "noFilesChanged": "אין שינויים בקבצים",
-    "noFilesChangedDescription": "אין שינויים בקבצים בבקשת המשיכה הזו.",
+    "checkConnection": "בדיקת החיבור",
+    "checks": {
+      "checksCount": "{{displayCount}} בדיקות",
+      "couldNotLoad": "לא ניתן היה לטעון את הבדיקות.",
+      "failed": "{{displayCount}} נכשלו",
+      "noAccess": "אין לך גישה לבדיקות של המאגר הזה.",
+      "noChecksReported": "לא דווחו בדיקות",
+      "notAvailable": "הבדיקות עדיין אינן זמינות. ייתכן שהקומיט האחרון בענף המקור עדיין לא עובד, או שאפליקציית Kilo ל-GitHub אינה מותקנת במאגר המקור.",
+      "openDetails": "פתיחת הפרטים של {{name}}",
+      "passed": "{{displayCount}} עברו",
+      "pending": "{{displayCount}} ממתינות",
+      "retryChecks": "ניסיון נוסף לטעינת הבדיקות",
+      "skipped": "דילוג על {{displayCount}}",
+      "title": "בדיקות",
+      "viewOnGitHub": "הצגת ה-PR ב-GitHub",
+      "checkDetails": "פרטי בדיקה"
+    },
+    "composer": {
+      "addTitle": "הוספת תגובה",
+      "addToReview": "הוספה לסקירה",
+      "comment": "תגובה",
+      "commentBody": "תוכן התגובה",
+      "commentBodyPlaceholder": "כתיבת תגובה",
+      "commentNow": "פרסום תגובה עכשיו",
+      "discardMessage": "הטיוטה שלך תימחק.",
+      "discardTitle": "למחוק את טיוטת התגובה?",
+      "editTitle": "עריכת תגובה",
+      "insertSuggestion": "הוספת הצעה",
+      "insertSuggestionA11y": "הוספת הצעת קוד",
+      "loadFailedTitle": "לא ניתן היה לטעון את עורך התגובות.",
+      "ok": "אישור",
+      "unavailableMessage": "התגובה הממתינה הזו כבר נמחקה או נשלחה.",
+      "unavailableTitle": "התגובה אינה זמינה",
+      "bodyEmpty": "לא ניתן לשלוח תגובה ריקה.",
+      "suggestionsOnlyAddedLines": "אפשר להציע שינויים רק בשורות שנוספו.",
+      "tapDiffLineToSuggest": "הקש על שורה בהשוואת השינויים כדי להוסיף הצעה."
+    },
+    "connect": {
+      "checkFailedTitle": "לא ניתן היה לבדוק את החיבור ל-GitHub.",
+      "checkFailedMessage": "מצב ההתחברות אינו זמין עד לסיום הטעינה.",
+      "checkFailedTitleGitLab": "לא ניתן היה לבדוק את החיבור ל-GitLab.",
+      "checkFailedTitleBitbucket": "לא ניתן היה לבדוק את החיבור ל-Bitbucket.",
+      "providerCheckFailedMessage": "מצב החיבור אינו זמין עד לסיום הטעימה.",
+      "reconnectTitle": "חיבור מחדש ל-GitHub",
+      "reconnectDescription": "החיבור שלך ל-GitHub בוטל. התחבר מחדש כדי להמשיך לסקור בקשות משיכה בנייד.",
+      "description": "חבר את חשבון ה-GitHub שלך כדי לסקור בקשות משיכה בנייד.",
+      "gitlabDescription": "חברו את חשבון GitLab שלכם כדי לסקור בקשות מיזוג בנייד.",
+      "bitbucketDescription": "חברו את Bitbucket לארגון הזה כדי לסקור בקשות משיכה בנייד.",
+      "bitbucketOrgOnlyDescription": "בחרו ארגון בפרופיל שלכם כדי לסקור את בקשות המשיכה של Bitbucket שלו."
+    },
+    "connectionExpired": "פג תוקף החיבור ל-GitHub.",
+    "couldNotLoadPullRequest": "לא ניתן היה לטעון את בקשת המשיכה.",
+    "couldNotOpenGitHubAppSettings": "לא הצלחנו לפתוח את הגדרות האפליקציה ב-GitHub.",
+    "description": "תיאור",
+    "discussion": {
+      "acceptTerms": "אישור",
+      "accessDeniedMessage": "אין לך הרשאה לצפות בדיון של ה-PR הזה.",
+      "addReaction": "הוספת תגובת אימוג׳י",
+      "block": "חסימה",
+      "blockedUser": "{{login}} נחסם",
+      "collapseThread": "כיווץ השרשור",
+      "commentActions": "פעולות בתגובה",
+      "comment": "{{displayCount}} תגובות",
+      "comment_other": "{{displayCount}} תגובות",
+      "couldNotLoad": "לא ניתן היה לטעון את הדיון.",
+      "couldNotLoadMore": "לא ניתן היה לטעון עוד תגובות.",
+      "loadMoreComments": "טעינת תגובות נוספות",
+      "loading": "הדיון נטען",
+      "moderation": {
+        "block": {
+          "retryable": "לא ניתן היה לחסום את המשתמש הזה. בדוק את החיבור ונסה שוב.",
+          "terminal": "לא ניתן לחסום את המשתמש הזה."
+        },
+        "mute": {
+          "retryable": "לא ניתן היה להשתיק את המשתמש הזה. בדוק את החיבור ונסה שוב.",
+          "terminal": "לא ניתן להשתיק את המשתמש הזה."
+        },
+        "reportContent": {
+          "retryable": "לא ניתן היה לדווח על התגובה הזו. בדוק את החיבור ונסה שוב.",
+          "terminal": "לא ניתן לדווח על התגובה הזו."
+        },
+        "reportUser": {
+          "retryable": "לא ניתן היה לדווח על המשתמש הזה. בדוק את החיבור ונסה שוב.",
+          "terminal": "לא ניתן לדווח על המשתמש הזה."
+        }
+      },
+      "moreLinesAbove": "… עוד {{displayCount}} שורות למעלה.",
+      "mute": "השתקה",
+      "mutedUser": "{{login}} הושתק",
+      "noDiscussion": "אין עדיין דיון",
+      "noDiscussionDescription": "אין שרשורי סקירה או תגובות בדיון של בקשת המשיכה הזו.",
+      "comment_one": "תגובה אחת",
+      "outdated": "לא עדכני",
+      "quotedDiffSnippet": "קטע מצוטט מהשוואת השינויים",
+      "reactionPill": "תגובת אימוג׳י {{emoji}}, {{displayCount}} {{countLabel}}",
+      "reaction": "תגובות אמוג׳י",
+      "reaction_other": "תגובות אמוג׳י",
+      "reaction_one": "תגובת אימוג׳י",
+      "replyBadRequest": "לא ניתן לפרסם את התשובה הזו. ייתכן שהשרשור השתנה.",
+      "replyBody": "תוכן התשובה",
+      "replyForbidden": "אין לך הרשאה להשיב לבקשת המשיכה הזו.",
+      "addCommentCta": "הגב על בקשת המשיכה הזו",
+      "commentBadRequest": "לא ניתן לפרסם את התגובה הזו. ייתכן שבקשת המשיכה השתנתה.",
+      "commentForbidden": "אין לך הרשאה להגיב על בקשת המשיכה הזו.",
+      "replyPlaceholder": "תשובה…",
+      "reportContent": "דיווח על תוכן",
+      "reportUser": "דיווח על משתמש",
+      "resolveThread": "סימון השרשור כטופל",
+      "resolved": "טופל",
+      "retryLoadingMore": "ניסיון נוסף לטעינת תגובות נוספות",
+      "reviewFiles": "סקירת הקבצים",
+      "startedRelative": " · התחיל {{relative}}",
+      "submitReply": "שליחת תשובה",
+      "termsAcceptRetry": "לא ניתן היה לאשר את תנאי השירות. בדוק את החיבור ונסה שוב.",
+      "termsCopy": "הפרסום מותר מגיל 13 ומעלה.",
+      "termsTitle": "תנאי השירות",
+      "threadAccessibilityLabel": "שרשור דיון {{anchorLabel}}",
+      "unavailable": "הדיון אינו זמין.",
+      "unavailableMessage": "ייתכן שבקשת המשיכה הזו הוסרה.",
+      "unresolveThread": "ביטול סימון השרשור כטופל",
+      "viewTerms": "הצגת התנאים",
+      "termsAcceptRequired": "עליך לאשר את תנאי השירות כדי לפרסם.",
+      "termsCheckRetryCopy": "לא ניתן היה לבדוק את תנאי השירות. בדוק את החיבור ונסה שוב.",
+      "termsOutdatedCopy": "תנאי השירות השתנו. פתח מחדש את המסך הזה כדי לאשר את הגרסה האחרונה.",
+      "comment_two": "{{displayCount}} תגובות",
+      "reaction_two": "תגובות אימוג׳י",
+      "reactions": {
+        "thumbsUp": "אגודל למעלה",
+        "thumbsDown": "אגודל למטה",
+        "laugh": "צחוק",
+        "hooray": "הידד",
+        "confused": "מבולבל",
+        "heart": "לב",
+        "rocket": "טיל",
+        "eyes": "עיניים"
+      },
+      "anchor": {
+        "fileCommentOnPath": "תגובה על הקובץ {{path}}",
+        "fileComment": "תגובה על הקובץ",
+        "outdatedOnPathLines": "לא עדכני: {{path}} {{lines}}",
+        "outdatedOnLines": "לא עדכני: {{lines}}",
+        "outdatedOnPath": "לא עדכני: {{path}}"
+      },
+      "deletedUser": "משתמש שנמחק",
+      "replyForbiddenTerm": "אין לך הרשאה להשיב ל-{{term}} הזה."
+    },
+    "entry": {
+      "eyebrow": "אפשר לפתוח בקשת משיכה או בקשת מיזוג באמצעות כתובת URL.",
+      "pastePrLink": "הדבקת קישור לבקשת משיכה או מיזוג",
+      "noRecentPrs": "אין סקירות לאחרונה",
+      "noRecentPrsDescription": "הדבקו קישור למעלה כדי להתחיל סקירה — הוא יופיע כאן בפעם הבאה.",
+      "couldNotLoad": "לא ניתן היה לטעון את הנתונים.",
+      "removeFromRecentsTitle": "להסיר מהבקשות האחרונות?",
+      "removeFromRecentsMessage": "הסקירה הזו תוסר מרשימת האחרונות שלך.",
+      "removeRecentAccessibility": "הסרת {{repo}} מרשימת הבקשות האחרונות",
+      "urlAccessibility": "הזנת כתובת URL של בקשת משיכה או מיזוג",
+      "urlPlaceholder": "כתובת URL של בקשת משיכה או בקשת מיזוג",
+      "openAccessibility": "פתיחת בקשת משיכה או בקשת מיזוג",
+      "clearLink": "ניקוי הקישור",
+      "pasteLink": "הדבקת קישור לבקשת משיכה או מיזוג",
+      "open": "פתוח"
+    },
+    "eventChips": {
+      "comment": "תגובה",
+      "label": "סוג הסקירה",
+      "requestChanges": "בקשת שינויים"
+    },
     "fileList": {
       "filesList": "רשימת קבצים",
       "filesViewed": "קבצים · נצפו {{viewed}} מתוך {{total}}",
@@ -2385,6 +2561,7 @@
       "commentOnSelectedLines": "הוספת תגובה לשורות שנבחרו",
       "finishReview": "סיום הסקירה"
     },
+    "headLine": "{{counts}} · קצה הענף: {{sha}}",
     "hunkRows": {
       "contextUnavailable": "שורות ההקשר אינן זמינות בגרסה הזו.",
       "expandAll": "הרחבת הכול",
@@ -2419,21 +2596,14 @@
       "fileLoadedCount_two": "נטענו {{displayCount}} קבצים",
       "fileLoadedOfTotalCount_two": "נטענו {{displayCount}} קבצים מתוך {{total}}"
     },
-    "sideBySide": {
-      "emptyDiffColumn": "עמודה ריקה בהשוואת השינויים",
-      "emptyDiffRow": "שורה ריקה בהשוואת השינויים",
-      "newOnly": "רק בגרסה החדשה: {{text}}",
-      "noNewlineAtEndOfFile": "אין תו שורה חדשה בסוף הקובץ.",
-      "oldNew": "לפני: {{old}} | אחרי: {{new}}",
-      "oldOnly": "רק בגרסה הישנה: {{text}}"
+    "inbox": {
+      "couldNotLoad": "לא ניתן היה לטעון את הבקשות הנכנסות.",
+      "loading": "הבקשות הנכנסות נטענות",
+      "noReviewRequests": "אין בקשות לסקירה",
+      "noReviewRequestsDescription": "כאן יופיעו בקשות משיכה שממתינות לסקירה שלך. אפשר גם להדביק למעלה קישור לכל PR.",
+      "title": "בקשות נכנסות"
     },
-    "connectionExpired": "פג תוקף החיבור ל-GitHub.",
-    "capabilities": {
-      "banner": {
-        "title": "לא זמין אצל הספק הזה",
-        "accessibility": "לא זמין אצל הספק הזה: {{reason}}"
-      }
-    },
+    "installKiloGitHubApp": "התקנת אפליקציית Kilo ל-GitHub",
     "merge": {
       "merge": "מיזוג",
       "mergeNow": "מיזוג עכשיו",
@@ -2524,207 +2694,9 @@
         "rebase": "כל הקומיטים מהענף הזה יוחלו מחדש על ענף הבסיס ללא קומיט מיזוג."
       }
     },
-    "discussion": {
-      "threadAccessibilityLabel": "שרשור דיון {{anchorLabel}}",
-      "collapseThread": "כיווץ השרשור",
-      "resolveThread": "סימון השרשור כטופל",
-      "unresolveThread": "ביטול סימון השרשור כטופל",
-      "resolved": "טופל",
-      "outdated": "לא עדכני",
-      "comment_one": "תגובה אחת",
-      "comment": "{{displayCount}} תגובות",
-      "comment_other": "{{displayCount}} תגובות",
-      "startedRelative": " · התחיל {{relative}}",
-      "couldNotLoadMore": "לא ניתן היה לטעון עוד תגובות.",
-      "retryLoadingMore": "ניסיון נוסף לטעינת תגובות נוספות",
-      "loadMoreComments": "טעינת תגובות נוספות",
-      "addReaction": "הוספת תגובת אימוג׳י",
-      "reactionPill": "תגובת אימוג׳י {{emoji}}, {{displayCount}} {{countLabel}}",
-      "reaction_one": "תגובת אימוג׳י",
-      "reaction": "תגובות אמוג׳י",
-      "reaction_other": "תגובות אמוג׳י",
-      "commentActions": "פעולות בתגובה",
-      "reportContent": "דיווח על תוכן",
-      "reportUser": "דיווח על משתמש",
-      "mute": "השתקה",
-      "block": "חסימה",
-      "blockedUser": "{{login}} נחסם",
-      "mutedUser": "{{login}} הושתק",
-      "replyPlaceholder": "תשובה…",
-      "replyBody": "תוכן התשובה",
-      "submitReply": "שליחת תשובה",
-      "termsTitle": "תנאי השירות",
-      "termsCopy": "הפרסום מותר מגיל 13 ומעלה.",
-      "termsAcceptRetry": "לא ניתן היה לאשר את תנאי השירות. בדוק את החיבור ונסה שוב.",
-      "viewTerms": "הצגת התנאים",
-      "acceptTerms": "אישור",
-      "replyBadRequest": "לא ניתן לפרסם את התשובה הזו. ייתכן שהשרשור השתנה.",
-      "replyForbidden": "אין לך הרשאה להשיב לבקשת המשיכה הזו.",
-      "replyForbiddenTerm": "אין לך הרשאה להשיב ל-{{term}} הזה.",
-      "moderation": {
-        "block": {
-          "retryable": "לא ניתן היה לחסום את המשתמש הזה. בדוק את החיבור ונסה שוב.",
-          "terminal": "לא ניתן לחסום את המשתמש הזה."
-        },
-        "mute": {
-          "retryable": "לא ניתן היה להשתיק את המשתמש הזה. בדוק את החיבור ונסה שוב.",
-          "terminal": "לא ניתן להשתיק את המשתמש הזה."
-        },
-        "reportContent": {
-          "retryable": "לא ניתן היה לדווח על התגובה הזו. בדוק את החיבור ונסה שוב.",
-          "terminal": "לא ניתן לדווח על התגובה הזו."
-        },
-        "reportUser": {
-          "retryable": "לא ניתן היה לדווח על המשתמש הזה. בדוק את החיבור ונסה שוב.",
-          "terminal": "לא ניתן לדווח על המשתמש הזה."
-        }
-      },
-      "accessDeniedMessage": "אין לך הרשאה לצפות בדיון של ה-PR הזה.",
-      "unavailable": "הדיון אינו זמין.",
-      "unavailableMessage": "ייתכן שבקשת המשיכה הזו הוסרה.",
-      "couldNotLoad": "לא ניתן היה לטעון את הדיון.",
-      "loading": "הדיון נטען",
-      "noDiscussion": "אין עדיין דיון",
-      "noDiscussionDescription": "אין שרשורי סקירה או תגובות בדיון של בקשת המשיכה הזו.",
-      "reviewFiles": "סקירת הקבצים",
-      "quotedDiffSnippet": "קטע מצוטט מהשוואת השינויים",
-      "moreLinesAbove": "… עוד {{displayCount}} שורות למעלה.",
-      "termsAcceptRequired": "עליך לאשר את תנאי השירות כדי לפרסם.",
-      "termsOutdatedCopy": "תנאי השירות השתנו. פתח מחדש את המסך הזה כדי לאשר את הגרסה האחרונה.",
-      "termsCheckRetryCopy": "לא ניתן היה לבדוק את תנאי השירות. בדוק את החיבור ונסה שוב.",
-      "reactions": {
-        "thumbsUp": "אגודל למעלה",
-        "thumbsDown": "אגודל למטה",
-        "laugh": "צחוק",
-        "hooray": "הידד",
-        "confused": "מבולבל",
-        "heart": "לב",
-        "rocket": "טיל",
-        "eyes": "עיניים"
-      },
-      "anchor": {
-        "fileCommentOnPath": "תגובה על הקובץ {{path}}",
-        "fileComment": "תגובה על הקובץ",
-        "outdatedOnPathLines": "לא עדכני: {{path}} {{lines}}",
-        "outdatedOnLines": "לא עדכני: {{lines}}",
-        "outdatedOnPath": "לא עדכני: {{path}}"
-      },
-      "deletedUser": "משתמש שנמחק",
-      "comment_two": "{{displayCount}} תגובות",
-      "reaction_two": "תגובות אימוג׳י"
-    },
-    "couldNotOpenGitHubAppSettings": "לא הצלחנו לפתוח את הגדרות האפליקציה ב-GitHub.",
-    "installKiloGitHubApp": "התקנת אפליקציית Kilo ל-GitHub",
-    "checkConnection": "בדיקת החיבור",
-    "couldNotLoadPullRequest": "לא ניתן היה לטעון את בקשת המשיכה.",
-    "description": "תיאור",
     "noDescriptionProvided": "לא נוסף תיאור.",
-    "review": "סקירה",
-    "reviewPullRequest": "סקירת בקשת המשיכה",
-    "headLine": "{{counts}} · קצה הענף: {{sha}}",
-    "entry": {
-      "eyebrow": "אפשר לפתוח בקשת משיכה או בקשת מיזוג באמצעות כתובת URL.",
-      "pastePrLink": "הדבקת קישור לבקשת משיכה או מיזוג",
-      "noRecentPrs": "אין סקירות לאחרונה",
-      "noRecentPrsDescription": "הדבקו קישור למעלה כדי להתחיל סקירה — הוא יופיע כאן בפעם הבאה.",
-      "couldNotLoad": "לא ניתן היה לטעון את הנתונים.",
-      "removeFromRecentsTitle": "להסיר מהבקשות האחרונות?",
-      "removeFromRecentsMessage": "הסקירה הזו תוסר מרשימת האחרונות שלך.",
-      "removeRecentAccessibility": "הסרת {{repo}} מרשימת הבקשות האחרונות",
-      "urlAccessibility": "הזנת כתובת URL של בקשת משיכה או מיזוג",
-      "urlPlaceholder": "כתובת URL של בקשת משיכה או בקשת מיזוג",
-      "openAccessibility": "פתיחת בקשת משיכה או בקשת מיזוג",
-      "clearLink": "ניקוי הקישור",
-      "pasteLink": "הדבקת קישור לבקשת משיכה או מיזוג",
-      "open": "פתוח"
-    },
-    "checks": {
-      "checksCount": "{{displayCount}} בדיקות",
-      "couldNotLoad": "לא ניתן היה לטעון את הבדיקות.",
-      "failed": "{{displayCount}} נכשלו",
-      "noAccess": "אין לך גישה לבדיקות של המאגר הזה.",
-      "noChecksReported": "לא דווחו בדיקות",
-      "notAvailable": "הבדיקות עדיין אינן זמינות. ייתכן שהקומיט האחרון בענף המקור עדיין לא עובד, או שאפליקציית Kilo ל-GitHub אינה מותקנת במאגר המקור.",
-      "openDetails": "פתיחת הפרטים של {{name}}",
-      "passed": "{{displayCount}} עברו",
-      "pending": "{{displayCount}} ממתינות",
-      "retryChecks": "ניסיון נוסף לטעינת הבדיקות",
-      "skipped": "דילוג על {{displayCount}}",
-      "title": "בדיקות",
-      "viewOnGitHub": "הצגת ה-PR ב-GitHub",
-      "checkDetails": "פרטי בדיקה"
-    },
-    "inbox": {
-      "couldNotLoad": "לא ניתן היה לטעון את הבקשות הנכנסות.",
-      "loading": "הבקשות הנכנסות נטענות",
-      "noReviewRequests": "אין בקשות לסקירה",
-      "noReviewRequestsDescription": "כאן יופיעו בקשות משיכה שממתינות לסקירה שלך. אפשר גם להדביק למעלה קישור לכל PR.",
-      "title": "בקשות נכנסות"
-    },
-    "composer": {
-      "addTitle": "הוספת תגובה",
-      "addToReview": "הוספה לסקירה",
-      "comment": "תגובה",
-      "commentBody": "תוכן התגובה",
-      "commentBodyPlaceholder": "כתיבת תגובה",
-      "commentNow": "פרסום תגובה עכשיו",
-      "discardMessage": "הטיוטה שלך תימחק.",
-      "discardTitle": "למחוק את טיוטת התגובה?",
-      "editTitle": "עריכת תגובה",
-      "insertSuggestion": "הוספת הצעה",
-      "insertSuggestionA11y": "הוספת הצעת קוד",
-      "loadFailedTitle": "לא ניתן היה לטעון את עורך התגובות.",
-      "ok": "אישור",
-      "unavailableMessage": "התגובה הממתינה הזו כבר נמחקה או נשלחה.",
-      "unavailableTitle": "התגובה אינה זמינה",
-      "bodyEmpty": "לא ניתן לשלוח תגובה ריקה.",
-      "suggestionsOnlyAddedLines": "אפשר להציע שינויים רק בשורות שנוספו.",
-      "tapDiffLineToSuggest": "הקש על שורה בהשוואת השינויים כדי להוסיף הצעה."
-    },
-    "connect": {
-      "checkFailedTitle": "לא ניתן היה לבדוק את החיבור ל-GitHub.",
-      "checkFailedMessage": "מצב ההתחברות אינו זמין עד לסיום הטעינה.",
-      "checkFailedTitleGitLab": "לא ניתן היה לבדוק את החיבור ל-GitLab.",
-      "checkFailedTitleBitbucket": "לא ניתן היה לבדוק את החיבור ל-Bitbucket.",
-      "providerCheckFailedMessage": "מצב החיבור אינו זמין עד לסיום הטעימה.",
-      "reconnectTitle": "חיבור מחדש ל-GitHub",
-      "reconnectDescription": "החיבור שלך ל-GitHub בוטל. התחבר מחדש כדי להמשיך לסקור בקשות משיכה בנייד.",
-      "description": "חבר את חשבון ה-GitHub שלך כדי לסקור בקשות משיכה בנייד.",
-      "gitlabDescription": "חברו את חשבון GitLab שלכם כדי לסקור בקשות מיזוג בנייד.",
-      "bitbucketDescription": "חברו את Bitbucket לארגון הזה כדי לסקור בקשות משיכה בנייד.",
-      "bitbucketOrgOnlyDescription": "בחרו ארגון בפרופיל שלכם כדי לסקור את בקשות המשיכה של Bitbucket שלו."
-    },
-    "screen": {
-      "shareA11y": "שיתוף בקשת המשיכה",
-      "title": "#{{number}}"
-    },
-    "submit": {
-      "deletePendingMessage": "התגובה הזו תוסר מהתגובות שממתינות לשליחה בסקירה.",
-      "deletePendingTitle": "למחוק תגובה ממתינה?",
-      "loadFailedTitle": "לא ניתן היה לטעון את מסך שליחת הסקירה.",
-      "pendingComment": "תגובות ממתינות",
-      "pendingComment_other": "תגובות ממתינות",
-      "pendingComment_one": "תגובה ממתינה",
-      "summaryOptional": "סיכום (לא חובה)",
-      "partialPostedMessage": "פורסמו {{displayFreshCount}} תגובות. {{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
-      "submitCountOfTotal": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
-      "submitReview": "שליחת סקירה",
-      "pendingComment_two": "תגובות ממתינות",
-      "blockedRequestChanges": "הוסף סיכום או לפחות תגובה אחת כדי לבקש שינויים.",
-      "blockedComment": "הוסף סיכום או לפחות תגובה אחת כדי לשלוח סקירה מסוג תגובה."
-    },
-    "reconnectNotice": {
-      "title": "פג תוקף החיבור ל-GitHub.",
-      "message": "החיבור שלך ל-GitHub אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
-      "gitlabTitle": "פג תוקף החיבור ל-GitLab.",
-      "bitbucketTitle": "פג תוקף החיבור ל-Bitbucket.",
-      "providerMessage": "החיבור שלך ל-{{provider}} אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך."
-    },
-    "eventChips": {
-      "comment": "תגובה",
-      "label": "סוג הסקירה",
-      "requestChanges": "בקשת שינויים"
-    },
+    "noFilesChanged": "אין שינויים בקבצים",
+    "noFilesChangedDescription": "אין שינויים בקבצים בבקשת המשיכה הזו.",
     "overview": {
       "commit": "קומיטים",
       "commit_other": "קומיטים",
@@ -2767,31 +2739,54 @@
       "summaryA11y": "סיכום הסקירה",
       "summaryPlaceholder": "סיכום הסקירה (לא חובה)"
     },
-    "tabs": {
-      "discussion": "דיון",
-      "files": "קבצים",
-      "overview": "סקירה כללית"
+    "pullRequestUnavailable": "בקשת המשיכה אינה זמינה",
+    "pullRequestUnavailableDescription": "לא ניתן לפתוח את ה-PR הזה. ייתכן שהוא נמחק, שהמאגר פרטי או שאפליקציית Kilo ל-GitHub אינה מותקנת במאגר.",
+    "reconnectNotice": {
+      "title": "פג תוקף החיבור ל-GitHub.",
+      "message": "החיבור שלך ל-GitHub אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
+      "gitlabTitle": "פג תוקף החיבור ל-GitLab.",
+      "bitbucketTitle": "פג תוקף החיבור ל-Bitbucket.",
+      "providerMessage": "החיבור שלך ל-{{provider}} אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך."
     },
-    "terms": {
-      "pullRequest": "PR",
-      "mergeRequest": "בקשת מיזוג",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "שיתוף בקשת המיזוג",
-      "viewOnProvider": "הצגה ב-{{provider}}",
-      "mergeRequestUnavailable": "בקשת המיזוג אינה זמינה",
-      "unavailableDescription": "ייתכן שנמחק, או שייתכן שאין לך גישה אליו.",
-      "accessDeniedMergeRequest": "אין לך הרשאה לצפות בבקשת המיזוג הזו.",
-      "couldNotLoadMergeRequest": "לא ניתן היה לטעון את בקשת המיזוג.",
-      "discussionAccessDenied": "אין לך הרשאה לצפות בדיון של בקשת המיזוג הזו.",
-      "discussionUnavailableMessage": "ייתכן שבקשת המיזוג הזו הוסרה.",
-      "noDiscussionDescription": "אין שרשורי סקירה או תגובות בדיון של בקשת המיזוג הזו.",
-      "noFilesChangedDescription": "אין שינויים בקבצים בבקשת המיזוג הזו."
+    "review": "סקירה",
+    "reviewPullRequest": "סקירת בקשת המשיכה",
+    "screen": {
+      "shareA11y": "שיתוף בקשת המשיכה",
+      "title": "#{{number}}"
+    },
+    "sideBySide": {
+      "emptyDiffColumn": "עמודה ריקה בהשוואת השינויים",
+      "emptyDiffRow": "שורה ריקה בהשוואת השינויים",
+      "newOnly": "רק בגרסה החדשה: {{text}}",
+      "noNewlineAtEndOfFile": "אין תו שורה חדשה בסוף הקובץ.",
+      "oldNew": "לפני: {{old}} | אחרי: {{new}}",
+      "oldOnly": "רק בגרסה הישנה: {{text}}"
+    },
+    "submit": {
+      "deletePendingMessage": "התגובה הזו תוסר מהתגובות שממתינות לשליחה בסקירה.",
+      "deletePendingTitle": "למחוק תגובה ממתינה?",
+      "loadFailedTitle": "לא ניתן היה לטעון את מסך שליחת הסקירה.",
+      "pendingComment": "תגובות ממתינות",
+      "pendingComment_other": "תגובות ממתינות",
+      "pendingComment_one": "תגובה ממתינה",
+      "summaryOptional": "סיכום (לא חובה)",
+      "partialPostedMessage": "פורסמו {{displayFreshCount}} תגובות. {{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
+      "submitCountOfTotal": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
+      "submitReview": "שליחת סקירה",
+      "pendingComment_two": "תגובות ממתינות",
+      "blockedRequestChanges": "הוסף סיכום או לפחות תגובה אחת כדי לבקש שינויים.",
+      "blockedComment": "הוסף סיכום או לפחות תגובה אחת כדי לשלוח סקירה מסוג תגובה."
     },
     "fileStatus": {
       "changed": "השתנה",
       "copied": "הועתק",
       "modified": "שונה",
       "renamed": "השם שונה"
+    },
+    "tabs": {
+      "discussion": "דיון",
+      "files": "קבצים",
+      "overview": "סקירה כללית"
     },
     "diff": {
       "selectedTapToChange": "נבחר: {{label}}, הקשה לשינוי הבחירה",
@@ -2824,6 +2819,27 @@
       "ambiguous": "לא ניתן היה לוודא שהפעולה הושלמה — בדוק את ה-PR לפני שתנסה שוב.",
       "persistenceFailed": "לא הצלחנו לתעד את הפעולה הזו. נסה שוב מאוחר יותר.",
       "forbidden": "אין הרשאה לפעולה הזו."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "לא זמין אצל הספק הזה",
+        "accessibility": "לא זמין אצל הספק הזה: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "בקשת מיזוג",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "שיתוף בקשת המיזוג",
+      "viewOnProvider": "הצגה ב-{{provider}}",
+      "mergeRequestUnavailable": "בקשת המיזוג אינה זמינה",
+      "unavailableDescription": "ייתכן שנמחק, או שייתכן שאין לך גישה אליו.",
+      "accessDeniedMergeRequest": "אין לך הרשאה לצפות בבקשת המיזוג הזו.",
+      "couldNotLoadMergeRequest": "לא ניתן היה לטעון את בקשת המיזוג.",
+      "discussionAccessDenied": "אין לך הרשאה לצפות בדיון של בקשת המיזוג הזו.",
+      "discussionUnavailableMessage": "ייתכן שבקשת המיזוג הזו הוסרה.",
+      "noDiscussionDescription": "אין שרשורי סקירה או תגובות בדיון של בקשת המיזוג הזו.",
+      "noFilesChangedDescription": "אין שינויים בקבצים בבקשת המיזוג הזו."
     }
   },
   "organization": {
@@ -3032,5 +3048,12 @@
     "needsInput": "נדרש קלט",
     "channelName": "סוכנים פעילים",
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
+  },
+  "transcriptionModel": {
+    "title": "מודל תמלול",
+    "noneChosen": "לא נבחר",
+    "emptyTitle": "אין מודלי תמלול",
+    "emptyDescription": "Kilo Gateway לא מציע כרגע מודלי תמלול.",
+    "loadFailed": "לא הצלחנו לטעון את מודלי התמלול."
   }
 }

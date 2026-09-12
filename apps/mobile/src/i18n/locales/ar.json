@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "تسجيل الدخول الموحّد للمؤسسات"
   },
   "preferences": {
+    "general": "عام",
+    "voiceInput": "إدخال صوتي",
     "autoExpandThinking": "عرض تفاصيل التفكير تلقائيًا",
     "autoExpandThinkingSubtitle": "عرض تفاصيل تفكير الوكيل عند انتهائه.",
     "keepScreenOn": "إبقاء الشاشة مضاءة في صفحة الجلسة",
@@ -238,6 +240,7 @@
     "appearanceLight": "فاتح",
     "appearanceDark": "داكن",
     "account": "الحساب",
+    "accountSubtitle": "اللغة والمضيفون الموثوقون وجلسات الأجهزة",
     "prReviewAttribution": "ذكر التطبيق في مراجعات PR",
     "prReviewAttributionSubtitle": "إضافة تذييل «تمت المراجعة عبر Kilo» عند إرسال مراجعة.",
     "returnSendsMessage": "مفتاح الإدخال يرسل الرسالة",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "التفريغ الصوتي عبر Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "حوّل الإدخال الصوتي إلى نص باستخدام أحد نماذج Kilo Gateway بدلاً من التعرف على الكلام في جهازك. يُرسل تسجيلك إلى Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "الأنشطة المباشرة",
@@ -2200,7 +2206,14 @@
     "languageNotInstalledMessage": "ملفات الكلام دون اتصال للغة {{language}} غير مثبّتة على هذا الهاتف. نزّلها، ثم حاول استخدام الإدخال الصوتي مرة أخرى.",
     "downloadOfflineModel": "تنزيل",
     "offlineModelDownloadScheduled": "ستُنزَّل ملفات الكلام دون اتصال في الخلفية. حاول استخدام الإدخال الصوتي مرة أخرى لاحقًا.",
-    "listeningStopped": "توقف الاستماع."
+    "listeningStopped": "توقف الاستماع.",
+    "transcribing": "جارٍ التفريغ...",
+    "gatewayUnreachable": "تعذّر الوصول إلى Kilo Gateway. تحقق من اتصالك وحاول مرة أخرى.",
+    "gatewayTimeout": "استغرق التفريغ وقتًا طويلًا. حاول مرة أخرى.",
+    "gatewayModelUnavailable": "نموذج التفريغ الصوتي هذا غير متاح. اختر نموذجًا آخر من التفضيلات.",
+    "gatewayModelUnavailableNotice": "لم يعد هذا النموذج معروضًا. اضغط على $t(transcriptionModel.title) لاختيار نموذج آخر.",
+    "gatewaySignInRequired": "سجّل الدخول لاستخدام التفريغ الصوتي عبر Kilo Gateway.",
+    "gatewayNoModel": "اختر نموذج التفريغ الصوتي في التفضيلات أولًا."
   },
   "share": {
     "title": "المشاركة مع Kilo",
@@ -2378,11 +2391,180 @@
     "installAttributionPromptTitle": "السماح بتحديد مصدر التثبيت؟"
   },
   "prReview": {
-    "pullRequestUnavailable": "طلب السحب غير متاح",
-    "pullRequestUnavailableDescription": "لا يمكن فتح PR هذا. ربما حُذف، أو أن المستودع خاص، أو أن تطبيق Kilo على GitHub غير مثبّت فيه.",
     "accessDeniedDescription": "ليست لديك صلاحية لعرض طلب السحب هذا.",
-    "noFilesChanged": "لم تتغير أي ملفات",
-    "noFilesChangedDescription": "لا يتضمن طلب السحب هذا أي تغييرات على الملفات.",
+    "checkConnection": "التحقق من الاتصال",
+    "checks": {
+      "checksCount": "الفحوصات: {{displayCount}}",
+      "couldNotLoad": "تعذّر تحميل الفحوصات.",
+      "failed": "فاشلة: {{displayCount}}",
+      "noAccess": "ليست لديك صلاحية للوصول إلى فحوصات هذا المستودع.",
+      "noChecksReported": "لا توجد نتائج فحوصات",
+      "notAvailable": "الفحوصات غير متاحة بعد. ربما لم يُعالَج آخر إيداع، أو أن تطبيق Kilo على GitHub غير مثبّت في المستودع المصدر.",
+      "openDetails": "فتح تفاصيل {{name}}",
+      "passed": "ناجحة: {{displayCount}}",
+      "pending": "قيد الانتظار: {{displayCount}}",
+      "retryChecks": "إعادة محاولة تحميل الفحوصات",
+      "skipped": "تم تخطيها: {{displayCount}}",
+      "title": "الفحوصات",
+      "viewOnGitHub": "عرض PR على GitHub",
+      "checkDetails": "تفاصيل الفحص"
+    },
+    "composer": {
+      "addTitle": "إضافة تعليق",
+      "addToReview": "إضافة إلى المراجعة",
+      "comment": "تعليق",
+      "commentBody": "نص التعليق",
+      "commentBodyPlaceholder": "نص التعليق",
+      "commentNow": "نشر التعليق الآن",
+      "discardMessage": "ستفقد مسودتك.",
+      "discardTitle": "إلغاء التعليق؟",
+      "editTitle": "تعديل التعليق",
+      "insertSuggestion": "إدراج اقتراح",
+      "insertSuggestionA11y": "إدراج اقتراح شيفرة",
+      "loadFailedTitle": "تعذّر تحميل محرر التعليقات.",
+      "ok": "حسنًا",
+      "unavailableMessage": "تم حذف هذا التعليق المعلّق أو إرساله بالفعل.",
+      "unavailableTitle": "التعليق غير متاح",
+      "bodyEmpty": "لا يمكن أن يكون نص التعليق فارغًا.",
+      "suggestionsOnlyAddedLines": "تنطبق الاقتراحات على الأسطر المضافة فقط.",
+      "tapDiffLineToSuggest": "اضغط على سطر في عرض الفروق لتفعيل الاقتراحات."
+    },
+    "connect": {
+      "checkFailedTitle": "تعذّر التحقق من ربط حساب GitHub.",
+      "checkFailedMessage": "لا يمكن معرفة حالة تسجيل الدخول حتى يكتمل التحميل.",
+      "checkFailedTitleGitLab": "تعذّر التحقق من ربط حساب GitLab.",
+      "checkFailedTitleBitbucket": "تعذّر التحقق من ربط حساب Bitbucket.",
+      "providerCheckFailedMessage": "حالة الاتصال غير متاحة حتى يتم تحميلها.",
+      "reconnectTitle": "إعادة ربط GitHub",
+      "reconnectDescription": "أُلغي ربط حسابك على GitHub. أعد ربطه لمواصلة مراجعة طلبات السحب على الجوال.",
+      "description": "اربط حسابك على GitHub لمراجعة طلبات السحب على الجوال.",
+      "gitlabDescription": "اربط حسابك في GitLab لمراجعة طلبات الدمج على الجوال.",
+      "bitbucketDescription": "اربط Bitbucket بهذه المؤسسة لمراجعة طلبات السحب على الجوال.",
+      "bitbucketOrgOnlyDescription": "اختر مؤسسة في ملفك الشخصي لمراجعة طلبات السحب الخاصة بها على Bitbucket."
+    },
+    "connectionExpired": "انتهت صلاحية الربط مع GitHub.",
+    "couldNotLoadPullRequest": "تعذّر تحميل طلب السحب.",
+    "couldNotOpenGitHubAppSettings": "تعذّر فتح إعدادات تطبيق GitHub.",
+    "description": "الوصف",
+    "discussion": {
+      "acceptTerms": "قبول",
+      "accessDeniedMessage": "ليست لديك صلاحية لعرض مناقشة PR هذا.",
+      "addReaction": "إضافة تفاعل",
+      "block": "حظر",
+      "blockedUser": "تم حظر {{login}}",
+      "collapseThread": "طي سلسلة المناقشة",
+      "commentActions": "إجراءات التعليق",
+      "comment": "التعليقات: {{displayCount}}",
+      "comment_other": "التعليقات: {{displayCount}}",
+      "couldNotLoad": "تعذّر تحميل المناقشة.",
+      "couldNotLoadMore": "تعذّر تحميل المزيد من التعليقات.",
+      "loadMoreComments": "تحميل المزيد من التعليقات",
+      "loading": "جارٍ تحميل المناقشة",
+      "moderation": {
+        "block": {
+          "retryable": "تعذّر حظر هذا المستخدم. تحقق من اتصالك وحاول مرة أخرى.",
+          "terminal": "لا يمكن حظر هذا المستخدم."
+        },
+        "mute": {
+          "retryable": "تعذّر كتم هذا المستخدم. تحقق من اتصالك وحاول مرة أخرى.",
+          "terminal": "لا يمكن كتم هذا المستخدم."
+        },
+        "reportContent": {
+          "retryable": "تعذّر الإبلاغ عن هذا التعليق. تحقق من اتصالك وحاول مرة أخرى.",
+          "terminal": "لا يمكن الإبلاغ عن هذا التعليق."
+        },
+        "reportUser": {
+          "retryable": "تعذّر الإبلاغ عن هذا المستخدم. تحقق من اتصالك وحاول مرة أخرى.",
+          "terminal": "لا يمكن الإبلاغ عن هذا المستخدم."
+        }
+      },
+      "moreLinesAbove": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
+      "mute": "كتم",
+      "mutedUser": "تم كتم {{login}}",
+      "noDiscussion": "لا توجد مناقشة بعد",
+      "noDiscussionDescription": "لا توجد سلاسل مناقشة للمراجعة أو تعليقات عامة على طلب السحب هذا.",
+      "comment_one": "تعليق واحد",
+      "outdated": "قديم",
+      "quotedDiffSnippet": "مقتطف مقتبس من الفروق",
+      "reactionPill": "تفاعل {{emoji}}، {{displayCount}} {{countLabel}}",
+      "reaction": "تفاعل",
+      "reaction_other": "تفاعل",
+      "reaction_one": "تفاعل",
+      "replyBadRequest": "لا يمكن نشر هذا الرد. ربما تغيّرت سلسلة المناقشة.",
+      "replyBody": "نص الرد",
+      "replyForbidden": "ليست لديك صلاحية للرد على طلب السحب هذا.",
+      "addCommentCta": "التعليق على طلب السحب هذا",
+      "commentBadRequest": "لا يمكن نشر هذا التعليق. ربما تغيّر طلب السحب.",
+      "commentForbidden": "ليست لديك صلاحية التعليق على طلب السحب هذا.",
+      "replyPlaceholder": "الرد…",
+      "reportContent": "الإبلاغ عن المحتوى",
+      "reportUser": "الإبلاغ عن المستخدم",
+      "resolveThread": "تحديد سلسلة المناقشة كمحلولة",
+      "resolved": "تم الحل",
+      "retryLoadingMore": "إعادة محاولة تحميل المزيد من التعليقات",
+      "reviewFiles": "مراجعة الملفات",
+      "startedRelative": " · بدأت {{relative}}",
+      "submitReply": "إرسال الرد",
+      "termsAcceptRetry": "تعذّر قبول الشروط. تحقق من اتصالك وحاول مرة أخرى.",
+      "termsCopy": "يجب أن يكون عمرك 13 عامًا أو أكثر للنشر.",
+      "termsTitle": "شروط الخدمة",
+      "threadAccessibilityLabel": "سلسلة المناقشة {{anchorLabel}}",
+      "unavailable": "المناقشة غير متاحة.",
+      "unavailableMessage": "ربما تمت إزالة طلب السحب هذا.",
+      "unresolveThread": "إلغاء تحديد سلسلة المناقشة كمحلولة",
+      "viewTerms": "عرض الشروط",
+      "termsAcceptRequired": "يجب أن توافق على شروط الخدمة للنشر.",
+      "termsCheckRetryCopy": "تعذّر التحقق من شروط الخدمة. تحقق من اتصالك وحاول مرة أخرى.",
+      "termsOutdatedCopy": "تغيّرت شروط الخدمة. أعد فتح هذه الشاشة للموافقة على أحدث نسخة.",
+      "comment_zero": "عدد التعليقات: {{displayCount}}",
+      "comment_two": "تعليقان ({{displayCount}})",
+      "comment_few": "{{displayCount}} تعليقات",
+      "comment_many": "{{displayCount}} تعليقًا",
+      "reaction_zero": "تفاعل",
+      "reaction_two": "تفاعلان",
+      "reaction_few": "تفاعلات",
+      "reaction_many": "تفاعلًا",
+      "reactions": {
+        "thumbsUp": "إعجاب",
+        "thumbsDown": "عدم إعجاب",
+        "laugh": "ضحك",
+        "hooray": "احتفال",
+        "confused": "حيرة",
+        "heart": "قلب",
+        "rocket": "صاروخ",
+        "eyes": "عيون"
+      },
+      "anchor": {
+        "fileCommentOnPath": "تعليق على الملف {{path}}",
+        "fileComment": "تعليق على الملف",
+        "outdatedOnPathLines": "قديم في {{path}} {{lines}}",
+        "outdatedOnLines": "قديم في {{lines}}",
+        "outdatedOnPath": "قديم في {{path}}"
+      },
+      "deletedUser": "مستخدم محذوف",
+      "replyForbiddenTerm": "ليست لديك صلاحية للرد على {{term}} هذا."
+    },
+    "entry": {
+      "eyebrow": "افتح طلب سحب أو طلب دمج باستخدام عنوان URL.",
+      "pastePrLink": "الصق رابط طلب سحب أو طلب دمج",
+      "noRecentPrs": "لا توجد مراجعات حديثة",
+      "noRecentPrsDescription": "الصق رابطًا أعلاه لبدء المراجعة. سيظهر هنا في المرة القادمة.",
+      "couldNotLoad": "تعذّر التحميل.",
+      "removeFromRecentsTitle": "إزالة الطلب من القائمة الأخيرة؟",
+      "removeFromRecentsMessage": "ستتم إزالة هذه المراجعة من قائمة العناصر الأخيرة.",
+      "removeRecentAccessibility": "إزالة {{repo}} من قائمة الطلبات الأخيرة",
+      "urlAccessibility": "أدخل عنوان URL لطلب سحب أو طلب دمج",
+      "urlPlaceholder": "عنوان URL لطلب السحب أو طلب الدمج",
+      "openAccessibility": "فتح طلب سحب أو طلب دمج",
+      "clearLink": "مسح الرابط",
+      "pasteLink": "الصق رابط طلب سحب أو طلب دمج",
+      "open": "فتح"
+    },
+    "eventChips": {
+      "comment": "تعليق",
+      "label": "نوع المراجعة",
+      "requestChanges": "طلب تغييرات"
+    },
     "fileList": {
       "filesList": "قائمة الملفات",
       "filesViewed": "الملفات · تم الاطلاع على {{viewed}} من {{total}}",
@@ -2427,6 +2609,7 @@
       "commentOnSelectedLines": "إضافة تعليق على الأسطر المحددة",
       "finishReview": "إنهاء المراجعة"
     },
+    "headLine": "{{counts}} · آخر إيداع: {{sha}}",
     "hunkRows": {
       "contextUnavailable": "السياق غير متاح في هذا المرجع.",
       "expandAll": "توسيع الكل",
@@ -2467,21 +2650,14 @@
       "fileLoadedOfTotalCount_few": "تم تحميل {{displayCount}} ملفات من {{total}}",
       "fileLoadedOfTotalCount_many": "تم تحميل {{displayCount}} ملفًا من {{total}}"
     },
-    "sideBySide": {
-      "emptyDiffColumn": "عمود فارغ في عرض الفروق",
-      "emptyDiffRow": "صف فارغ في عرض الفروق",
-      "newOnly": "الجديد فقط: {{text}}",
-      "noNewlineAtEndOfFile": "⚠️ لا يوجد سطر جديد في نهاية الملف",
-      "oldNew": "القديم: {{old}} | الجديد: {{new}}",
-      "oldOnly": "القديم فقط: {{text}}"
+    "inbox": {
+      "couldNotLoad": "تعذّر تحميل صندوق الوارد.",
+      "loading": "جارٍ تحميل صندوق الوارد",
+      "noReviewRequests": "لا توجد طلبات مراجعة",
+      "noReviewRequestsDescription": "تظهر هنا طلبات السحب التي تنتظر مراجعتك. ويمكنك أيضًا لصق أي رابط PR أعلاه.",
+      "title": "صندوق الوارد"
     },
-    "connectionExpired": "انتهت صلاحية الربط مع GitHub.",
-    "capabilities": {
-      "banner": {
-        "title": "غير متاح لدى هذا المزوّد",
-        "accessibility": "غير متاح لدى هذا المزوّد: {{reason}}"
-      }
-    },
+    "installKiloGitHubApp": "تثبيت تطبيق Kilo على GitHub",
     "merge": {
       "merge": "دمج",
       "mergeNow": "دمج الآن",
@@ -2575,216 +2751,9 @@
         "rebase": "أعد تطبيق جميع إيداعات هذا الفرع على الفرع الأساسي دون إنشاء إيداع دمج."
       }
     },
-    "discussion": {
-      "threadAccessibilityLabel": "سلسلة المناقشة {{anchorLabel}}",
-      "collapseThread": "طي سلسلة المناقشة",
-      "resolveThread": "تحديد سلسلة المناقشة كمحلولة",
-      "unresolveThread": "إلغاء تحديد سلسلة المناقشة كمحلولة",
-      "resolved": "تم الحل",
-      "outdated": "قديم",
-      "comment_one": "تعليق واحد",
-      "comment": "التعليقات: {{displayCount}}",
-      "comment_other": "التعليقات: {{displayCount}}",
-      "startedRelative": " · بدأت {{relative}}",
-      "couldNotLoadMore": "تعذّر تحميل المزيد من التعليقات.",
-      "retryLoadingMore": "إعادة محاولة تحميل المزيد من التعليقات",
-      "loadMoreComments": "تحميل المزيد من التعليقات",
-      "addReaction": "إضافة تفاعل",
-      "reactionPill": "تفاعل {{emoji}}، {{displayCount}} {{countLabel}}",
-      "reaction_one": "تفاعل",
-      "reaction": "تفاعل",
-      "reaction_other": "تفاعل",
-      "commentActions": "إجراءات التعليق",
-      "reportContent": "الإبلاغ عن المحتوى",
-      "reportUser": "الإبلاغ عن المستخدم",
-      "mute": "كتم",
-      "block": "حظر",
-      "blockedUser": "تم حظر {{login}}",
-      "mutedUser": "تم كتم {{login}}",
-      "replyPlaceholder": "الرد…",
-      "replyBody": "نص الرد",
-      "submitReply": "إرسال الرد",
-      "termsTitle": "شروط الخدمة",
-      "termsCopy": "يجب أن يكون عمرك 13 عامًا أو أكثر للنشر.",
-      "termsAcceptRetry": "تعذّر قبول الشروط. تحقق من اتصالك وحاول مرة أخرى.",
-      "viewTerms": "عرض الشروط",
-      "acceptTerms": "قبول",
-      "replyBadRequest": "لا يمكن نشر هذا الرد. ربما تغيّرت سلسلة المناقشة.",
-      "replyForbidden": "ليست لديك صلاحية للرد على طلب السحب هذا.",
-      "replyForbiddenTerm": "ليست لديك صلاحية للرد على {{term}} هذا.",
-      "moderation": {
-        "block": {
-          "retryable": "تعذّر حظر هذا المستخدم. تحقق من اتصالك وحاول مرة أخرى.",
-          "terminal": "لا يمكن حظر هذا المستخدم."
-        },
-        "mute": {
-          "retryable": "تعذّر كتم هذا المستخدم. تحقق من اتصالك وحاول مرة أخرى.",
-          "terminal": "لا يمكن كتم هذا المستخدم."
-        },
-        "reportContent": {
-          "retryable": "تعذّر الإبلاغ عن هذا التعليق. تحقق من اتصالك وحاول مرة أخرى.",
-          "terminal": "لا يمكن الإبلاغ عن هذا التعليق."
-        },
-        "reportUser": {
-          "retryable": "تعذّر الإبلاغ عن هذا المستخدم. تحقق من اتصالك وحاول مرة أخرى.",
-          "terminal": "لا يمكن الإبلاغ عن هذا المستخدم."
-        }
-      },
-      "accessDeniedMessage": "ليست لديك صلاحية لعرض مناقشة PR هذا.",
-      "unavailable": "المناقشة غير متاحة.",
-      "unavailableMessage": "ربما تمت إزالة طلب السحب هذا.",
-      "couldNotLoad": "تعذّر تحميل المناقشة.",
-      "loading": "جارٍ تحميل المناقشة",
-      "noDiscussion": "لا توجد مناقشة بعد",
-      "noDiscussionDescription": "لا توجد سلاسل مناقشة للمراجعة أو تعليقات عامة على طلب السحب هذا.",
-      "reviewFiles": "مراجعة الملفات",
-      "quotedDiffSnippet": "مقتطف مقتبس من الفروق",
-      "moreLinesAbove": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
-      "termsAcceptRequired": "يجب أن توافق على شروط الخدمة للنشر.",
-      "termsOutdatedCopy": "تغيّرت شروط الخدمة. أعد فتح هذه الشاشة للموافقة على أحدث نسخة.",
-      "termsCheckRetryCopy": "تعذّر التحقق من شروط الخدمة. تحقق من اتصالك وحاول مرة أخرى.",
-      "reactions": {
-        "thumbsUp": "إعجاب",
-        "thumbsDown": "عدم إعجاب",
-        "laugh": "ضحك",
-        "hooray": "احتفال",
-        "confused": "حيرة",
-        "heart": "قلب",
-        "rocket": "صاروخ",
-        "eyes": "عيون"
-      },
-      "anchor": {
-        "fileCommentOnPath": "تعليق على الملف {{path}}",
-        "fileComment": "تعليق على الملف",
-        "outdatedOnPathLines": "قديم في {{path}} {{lines}}",
-        "outdatedOnLines": "قديم في {{lines}}",
-        "outdatedOnPath": "قديم في {{path}}"
-      },
-      "deletedUser": "مستخدم محذوف",
-      "comment_zero": "عدد التعليقات: {{displayCount}}",
-      "comment_two": "تعليقان ({{displayCount}})",
-      "comment_few": "{{displayCount}} تعليقات",
-      "comment_many": "{{displayCount}} تعليقًا",
-      "reaction_zero": "تفاعل",
-      "reaction_two": "تفاعلان",
-      "reaction_few": "تفاعلات",
-      "reaction_many": "تفاعلًا"
-    },
-    "couldNotOpenGitHubAppSettings": "تعذّر فتح إعدادات تطبيق GitHub.",
-    "installKiloGitHubApp": "تثبيت تطبيق Kilo على GitHub",
-    "checkConnection": "التحقق من الاتصال",
-    "couldNotLoadPullRequest": "تعذّر تحميل طلب السحب.",
-    "description": "الوصف",
     "noDescriptionProvided": "لا يوجد وصف.",
-    "review": "مراجعة",
-    "reviewPullRequest": "مراجعة طلب السحب",
-    "headLine": "{{counts}} · آخر إيداع: {{sha}}",
-    "entry": {
-      "eyebrow": "افتح طلب سحب أو طلب دمج باستخدام عنوان URL.",
-      "pastePrLink": "الصق رابط طلب سحب أو طلب دمج",
-      "noRecentPrs": "لا توجد مراجعات حديثة",
-      "noRecentPrsDescription": "الصق رابطًا أعلاه لبدء المراجعة. سيظهر هنا في المرة القادمة.",
-      "couldNotLoad": "تعذّر التحميل.",
-      "removeFromRecentsTitle": "إزالة الطلب من القائمة الأخيرة؟",
-      "removeFromRecentsMessage": "ستتم إزالة هذه المراجعة من قائمة العناصر الأخيرة.",
-      "removeRecentAccessibility": "إزالة {{repo}} من قائمة الطلبات الأخيرة",
-      "urlAccessibility": "أدخل عنوان URL لطلب سحب أو طلب دمج",
-      "urlPlaceholder": "عنوان URL لطلب السحب أو طلب الدمج",
-      "openAccessibility": "فتح طلب سحب أو طلب دمج",
-      "clearLink": "مسح الرابط",
-      "pasteLink": "الصق رابط طلب سحب أو طلب دمج",
-      "open": "فتح"
-    },
-    "checks": {
-      "checksCount": "الفحوصات: {{displayCount}}",
-      "couldNotLoad": "تعذّر تحميل الفحوصات.",
-      "failed": "فاشلة: {{displayCount}}",
-      "noAccess": "ليست لديك صلاحية للوصول إلى فحوصات هذا المستودع.",
-      "noChecksReported": "لا توجد نتائج فحوصات",
-      "notAvailable": "الفحوصات غير متاحة بعد. ربما لم يُعالَج آخر إيداع، أو أن تطبيق Kilo على GitHub غير مثبّت في المستودع المصدر.",
-      "openDetails": "فتح تفاصيل {{name}}",
-      "passed": "ناجحة: {{displayCount}}",
-      "pending": "قيد الانتظار: {{displayCount}}",
-      "retryChecks": "إعادة محاولة تحميل الفحوصات",
-      "skipped": "تم تخطيها: {{displayCount}}",
-      "title": "الفحوصات",
-      "viewOnGitHub": "عرض PR على GitHub",
-      "checkDetails": "تفاصيل الفحص"
-    },
-    "inbox": {
-      "couldNotLoad": "تعذّر تحميل صندوق الوارد.",
-      "loading": "جارٍ تحميل صندوق الوارد",
-      "noReviewRequests": "لا توجد طلبات مراجعة",
-      "noReviewRequestsDescription": "تظهر هنا طلبات السحب التي تنتظر مراجعتك. ويمكنك أيضًا لصق أي رابط PR أعلاه.",
-      "title": "صندوق الوارد"
-    },
-    "composer": {
-      "addTitle": "إضافة تعليق",
-      "addToReview": "إضافة إلى المراجعة",
-      "comment": "تعليق",
-      "commentBody": "نص التعليق",
-      "commentBodyPlaceholder": "نص التعليق",
-      "commentNow": "نشر التعليق الآن",
-      "discardMessage": "ستفقد مسودتك.",
-      "discardTitle": "إلغاء التعليق؟",
-      "editTitle": "تعديل التعليق",
-      "insertSuggestion": "إدراج اقتراح",
-      "insertSuggestionA11y": "إدراج اقتراح شيفرة",
-      "loadFailedTitle": "تعذّر تحميل محرر التعليقات.",
-      "ok": "حسنًا",
-      "unavailableMessage": "تم حذف هذا التعليق المعلّق أو إرساله بالفعل.",
-      "unavailableTitle": "التعليق غير متاح",
-      "bodyEmpty": "لا يمكن أن يكون نص التعليق فارغًا.",
-      "suggestionsOnlyAddedLines": "تنطبق الاقتراحات على الأسطر المضافة فقط.",
-      "tapDiffLineToSuggest": "اضغط على سطر في عرض الفروق لتفعيل الاقتراحات."
-    },
-    "connect": {
-      "checkFailedTitle": "تعذّر التحقق من ربط حساب GitHub.",
-      "checkFailedMessage": "لا يمكن معرفة حالة تسجيل الدخول حتى يكتمل التحميل.",
-      "checkFailedTitleGitLab": "تعذّر التحقق من ربط حساب GitLab.",
-      "checkFailedTitleBitbucket": "تعذّر التحقق من ربط حساب Bitbucket.",
-      "providerCheckFailedMessage": "حالة الاتصال غير متاحة حتى يتم تحميلها.",
-      "reconnectTitle": "إعادة ربط GitHub",
-      "reconnectDescription": "أُلغي ربط حسابك على GitHub. أعد ربطه لمواصلة مراجعة طلبات السحب على الجوال.",
-      "description": "اربط حسابك على GitHub لمراجعة طلبات السحب على الجوال.",
-      "gitlabDescription": "اربط حسابك في GitLab لمراجعة طلبات الدمج على الجوال.",
-      "bitbucketDescription": "اربط Bitbucket بهذه المؤسسة لمراجعة طلبات السحب على الجوال.",
-      "bitbucketOrgOnlyDescription": "اختر مؤسسة في ملفك الشخصي لمراجعة طلبات السحب الخاصة بها على Bitbucket."
-    },
-    "screen": {
-      "shareA11y": "مشاركة طلب السحب",
-      "title": "#{{number}}"
-    },
-    "submit": {
-      "deletePendingMessage": "ستتم إزالة هذا التعليق من قائمة انتظار المراجعة.",
-      "deletePendingTitle": "حذف التعليق المعلّق؟",
-      "loadFailedTitle": "تعذّر تحميل شاشة إرسال المراجعة.",
-      "pendingComment": "تعليق معلّق",
-      "pendingComment_other": "تعليق معلّق",
-      "pendingComment_one": "تعليق معلّق",
-      "summaryOptional": "الملخص (اختياري)",
-      "partialPostedMessage": "عدد التعليقات المنشورة: {{displayFreshCount}}. بقيت في قائمة الانتظار تعليقات مرتبطة بإيداع أقدم، وعددها {{displayStaleCount}}.",
-      "submitCountOfTotal": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
-      "submitReview": "إرسال المراجعة",
-      "pendingComment_zero": "تعليق معلّق",
-      "pendingComment_two": "تعليقان معلّقان",
-      "pendingComment_few": "تعليقات معلّقة",
-      "pendingComment_many": "تعليقًا معلّقًا",
-      "blockedRequestChanges": "أضف ملخصًا أو تعليقًا واحدًا على الأقل لطلب تغييرات.",
-      "blockedComment": "أضف ملخصًا أو تعليقًا واحدًا على الأقل لنشر مراجعة من نوع تعليق."
-    },
-    "reconnectNotice": {
-      "title": "انتهت صلاحية الربط مع GitHub.",
-      "message": "لم يعد ربط حسابك على GitHub صالحًا. أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر.",
-      "gitlabTitle": "انتهت صلاحية الربط مع GitLab.",
-      "bitbucketTitle": "انتهت صلاحية الربط مع Bitbucket.",
-      "providerMessage": "لم يعد ربط حسابك على {{provider}} صالحًا. أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر."
-    },
-    "eventChips": {
-      "comment": "تعليق",
-      "label": "نوع المراجعة",
-      "requestChanges": "طلب تغييرات"
-    },
+    "noFilesChanged": "لم تتغير أي ملفات",
+    "noFilesChangedDescription": "لا يتضمن طلب السحب هذا أي تغييرات على الملفات.",
     "overview": {
       "commit": "إيداع",
       "commit_other": "إيداع",
@@ -2833,31 +2802,57 @@
       "summaryA11y": "ملخص المراجعة",
       "summaryPlaceholder": "ملخص اختياري للمراجعة"
     },
-    "tabs": {
-      "discussion": "المناقشة",
-      "files": "ملف",
-      "overview": "نظرة عامة"
+    "pullRequestUnavailable": "طلب السحب غير متاح",
+    "pullRequestUnavailableDescription": "لا يمكن فتح PR هذا. ربما حُذف، أو أن المستودع خاص، أو أن تطبيق Kilo على GitHub غير مثبّت فيه.",
+    "reconnectNotice": {
+      "title": "انتهت صلاحية الربط مع GitHub.",
+      "message": "لم يعد ربط حسابك على GitHub صالحًا. أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر.",
+      "gitlabTitle": "انتهت صلاحية الربط مع GitLab.",
+      "bitbucketTitle": "انتهت صلاحية الربط مع Bitbucket.",
+      "providerMessage": "لم يعد ربط حسابك على {{provider}} صالحًا. أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر."
     },
-    "terms": {
-      "pullRequest": "طلب سحب",
-      "mergeRequest": "طلب دمج",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "مشاركة طلب الدمج",
-      "viewOnProvider": "عرض على {{provider}}",
-      "mergeRequestUnavailable": "طلب الدمج غير متاح",
-      "unavailableDescription": "ربما تم حذفه، أو ربما لا تملك صلاحية الوصول إليه.",
-      "accessDeniedMergeRequest": "ليست لديك صلاحية لعرض طلب الدمج هذا.",
-      "couldNotLoadMergeRequest": "تعذّر تحميل طلب الدمج.",
-      "discussionAccessDenied": "ليست لديك صلاحية لعرض مناقشة طلب الدمج هذا.",
-      "discussionUnavailableMessage": "ربما تمت إزالة طلب الدمج هذا.",
-      "noDiscussionDescription": "لا توجد سلاسل مناقشة للمراجعة أو تعليقات عامة على طلب الدمج هذا.",
-      "noFilesChangedDescription": "لا يتضمن طلب الدمج هذا أي تغييرات على الملفات."
+    "review": "مراجعة",
+    "reviewPullRequest": "مراجعة طلب السحب",
+    "screen": {
+      "shareA11y": "مشاركة طلب السحب",
+      "title": "#{{number}}"
+    },
+    "sideBySide": {
+      "emptyDiffColumn": "عمود فارغ في عرض الفروق",
+      "emptyDiffRow": "صف فارغ في عرض الفروق",
+      "newOnly": "الجديد فقط: {{text}}",
+      "noNewlineAtEndOfFile": "⚠️ لا يوجد سطر جديد في نهاية الملف",
+      "oldNew": "القديم: {{old}} | الجديد: {{new}}",
+      "oldOnly": "القديم فقط: {{text}}"
+    },
+    "submit": {
+      "deletePendingMessage": "ستتم إزالة هذا التعليق من قائمة انتظار المراجعة.",
+      "deletePendingTitle": "حذف التعليق المعلّق؟",
+      "loadFailedTitle": "تعذّر تحميل شاشة إرسال المراجعة.",
+      "pendingComment": "تعليق معلّق",
+      "pendingComment_other": "تعليق معلّق",
+      "pendingComment_one": "تعليق معلّق",
+      "summaryOptional": "الملخص (اختياري)",
+      "partialPostedMessage": "عدد التعليقات المنشورة: {{displayFreshCount}}. بقيت في قائمة الانتظار تعليقات مرتبطة بإيداع أقدم، وعددها {{displayStaleCount}}.",
+      "submitCountOfTotal": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
+      "submitReview": "إرسال المراجعة",
+      "pendingComment_zero": "تعليق معلّق",
+      "pendingComment_two": "تعليقان معلّقان",
+      "pendingComment_few": "تعليقات معلّقة",
+      "pendingComment_many": "تعليقًا معلّقًا",
+      "blockedRequestChanges": "أضف ملخصًا أو تعليقًا واحدًا على الأقل لطلب تغييرات.",
+      "blockedComment": "أضف ملخصًا أو تعليقًا واحدًا على الأقل لنشر مراجعة من نوع تعليق."
     },
     "fileStatus": {
       "changed": "متغيّر",
       "copied": "تم النسخ",
       "modified": "معدّل",
       "renamed": "أُعيدت تسميته"
+    },
+    "tabs": {
+      "discussion": "المناقشة",
+      "files": "ملف",
+      "overview": "نظرة عامة"
     },
     "diff": {
       "selectedTapToChange": "تم تحديد {{label}}، اضغط لتغيير التحديد",
@@ -2890,6 +2885,27 @@
       "ambiguous": "تعذّر التأكيد — تحقق من PR قبل إعادة المحاولة.",
       "persistenceFailed": "تعذّر تسجيل هذا الإجراء. حاول مرة أخرى لاحقًا.",
       "forbidden": "هذا الإجراء غير مسموح."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "غير متاح لدى هذا المزوّد",
+        "accessibility": "غير متاح لدى هذا المزوّد: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "طلب سحب",
+      "mergeRequest": "طلب دمج",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "مشاركة طلب الدمج",
+      "viewOnProvider": "عرض على {{provider}}",
+      "mergeRequestUnavailable": "طلب الدمج غير متاح",
+      "unavailableDescription": "ربما تم حذفه، أو ربما لا تملك صلاحية الوصول إليه.",
+      "accessDeniedMergeRequest": "ليست لديك صلاحية لعرض طلب الدمج هذا.",
+      "couldNotLoadMergeRequest": "تعذّر تحميل طلب الدمج.",
+      "discussionAccessDenied": "ليست لديك صلاحية لعرض مناقشة طلب الدمج هذا.",
+      "discussionUnavailableMessage": "ربما تمت إزالة طلب الدمج هذا.",
+      "noDiscussionDescription": "لا توجد سلاسل مناقشة للمراجعة أو تعليقات عامة على طلب الدمج هذا.",
+      "noFilesChangedDescription": "لا يتضمن طلب الدمج هذا أي تغييرات على الملفات."
     }
   },
   "organization": {
@@ -3101,5 +3117,12 @@
     "needsInput": "بانتظار تدخلك",
     "channelName": "الوكلاء النشطون",
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل."
+  },
+  "transcriptionModel": {
+    "title": "نموذج التفريغ الصوتي",
+    "noneChosen": "لا يوجد اختيار",
+    "emptyTitle": "لا توجد نماذج تفريغ صوتي",
+    "emptyDescription": "لا يقدّم Kilo Gateway أي نماذج تفريغ صوتي في الوقت الحالي.",
+    "loadFailed": "تعذّر تحميل نماذج التفريغ الصوتي."
   }
 }

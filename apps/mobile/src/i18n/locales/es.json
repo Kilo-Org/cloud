@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO empresarial"
   },
   "preferences": {
+    "general": "General",
+    "voiceInput": "Entrada de voz",
     "autoExpandThinking": "Expandir el razonamiento automáticamente",
     "autoExpandThinkingSubtitle": "Mostrar el razonamiento del agente expandido cuando termine.",
     "keepScreenOn": "Mantener la pantalla encendida durante la sesión",
@@ -238,6 +240,7 @@
     "appearanceLight": "Claro",
     "appearanceDark": "Oscuro",
     "account": "Cuenta",
+    "accountSubtitle": "Idioma, dominios de confianza y sesiones en dispositivos",
     "prReviewAttribution": "Mencionar la aplicación en las revisiones de PR",
     "prReviewAttributionSubtitle": "Añadir una nota al final de cada revisión para indicar que se ha realizado con Kilo.",
     "returnSendsMessage": "La tecla Intro envía el mensaje",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transcripción con Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transcribe el dictado con un modelo de Kilo Gateway en lugar del reconocimiento de voz del dispositivo. Tu grabación se envía a Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "channel": {
@@ -2158,7 +2164,14 @@
     "languageNotInstalledMessage": "Los archivos de voz sin conexión de {{language}} no están instalados en este teléfono. Descárgalos y vuelve a intentar el dictado.",
     "downloadOfflineModel": "Descargar",
     "offlineModelDownloadScheduled": "Los archivos de voz sin conexión se descargarán en segundo plano. Vuelve a probar el dictado más tarde.",
-    "listeningStopped": "Se ha detenido la escucha."
+    "listeningStopped": "Se ha detenido la escucha.",
+    "transcribing": "Transcribiendo...",
+    "gatewayUnreachable": "No se pudo conectar con Kilo Gateway. Comprueba tu conexión e inténtalo de nuevo.",
+    "gatewayTimeout": "La transcripción tardó demasiado. Inténtalo de nuevo.",
+    "gatewayModelUnavailable": "Este modelo de transcripción no está disponible. Elige otro en Preferencias.",
+    "gatewayModelUnavailableNotice": "Este modelo ya no se ofrece. Toca $t(transcriptionModel.title) para elegir otro.",
+    "gatewaySignInRequired": "Inicia sesión para usar la transcripción con Kilo Gateway.",
+    "gatewayNoModel": "Elige primero un modelo de transcripción en Preferencias."
   },
   "share": {
     "title": "Compartir en Kilo",
@@ -2336,11 +2349,174 @@
     "installAttributionPromptTitle": "¿Permitir que se identifique el origen de la instalación?"
   },
   "prReview": {
-    "pullRequestUnavailable": "PR no disponible",
-    "pullRequestUnavailableDescription": "No se puede abrir esta PR. Puede que se haya eliminado, que el repositorio sea privado o que la aplicación de Kilo para GitHub no esté instalada en él.",
     "accessDeniedDescription": "No tienes permiso para ver esta PR.",
-    "noFilesChanged": "No hay archivos modificados",
-    "noFilesChangedDescription": "Esta PR no contiene cambios en los archivos.",
+    "checkConnection": "Comprobar conexión",
+    "checks": {
+      "checksCount": "{{displayCount}} verificaciones",
+      "couldNotLoad": "No se pudieron cargar las verificaciones.",
+      "failed": "{{displayCount}} fallidas",
+      "noAccess": "No tienes acceso a las verificaciones de este repositorio.",
+      "noChecksReported": "No se han notificado verificaciones",
+      "notAvailable": "Las verificaciones aún no están disponibles. Puede que la última confirmación no se haya procesado o que la aplicación de Kilo para GitHub no esté instalada en el repositorio de origen.",
+      "openDetails": "Abrir los detalles de {{name}}",
+      "passed": "{{displayCount}} superadas",
+      "pending": "{{displayCount}} pendientes",
+      "retryChecks": "Reintentar verificaciones",
+      "skipped": "{{displayCount}} omitidas",
+      "title": "Verificaciones",
+      "viewOnGitHub": "Ver PR en GitHub",
+      "checkDetails": "detalles de la verificación"
+    },
+    "composer": {
+      "addTitle": "Añadir comentario",
+      "addToReview": "Añadir a la revisión",
+      "comment": "Comentario",
+      "commentBody": "Texto del comentario",
+      "commentBodyPlaceholder": "Tu comentario",
+      "commentNow": "Comentar ahora",
+      "discardMessage": "Se perderá tu borrador.",
+      "discardTitle": "¿Descartar comentario?",
+      "editTitle": "Editar comentario",
+      "insertSuggestion": "Insertar sugerencia",
+      "insertSuggestionA11y": "Insertar una sugerencia de código",
+      "loadFailedTitle": "No se pudo cargar el editor de comentarios.",
+      "ok": "ACEPTAR",
+      "unavailableMessage": "Este comentario pendiente ya se eliminó o se envió.",
+      "unavailableTitle": "Comentario no disponible",
+      "bodyEmpty": "El comentario no puede estar vacío.",
+      "suggestionsOnlyAddedLines": "Las sugerencias solo se aplican a las líneas añadidas.",
+      "tapDiffLineToSuggest": "Toca una línea de las diferencias para activar las sugerencias."
+    },
+    "connect": {
+      "checkFailedTitle": "No se pudo comprobar la conexión con GitHub.",
+      "checkFailedMessage": "No se puede consultar el estado de tu sesión hasta que termine la carga.",
+      "checkFailedTitleGitLab": "No se pudo comprobar la conexión con GitLab.",
+      "checkFailedTitleBitbucket": "No se pudo comprobar la conexión con Bitbucket.",
+      "providerCheckFailedMessage": "No se puede consultar el estado de la conexión hasta que termine la carga.",
+      "reconnectTitle": "Volver a conectar GitHub",
+      "reconnectDescription": "Se revocó tu conexión con GitHub. Vuelve a conectar tu cuenta para seguir revisando PR en el móvil.",
+      "description": "Conecta tu cuenta de GitHub para revisar PR en el móvil.",
+      "gitlabDescription": "Conecta tu cuenta de GitLab para revisar merge requests en el móvil.",
+      "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar PR en el móvil.",
+      "bitbucketOrgOnlyDescription": "Selecciona una organización en tu perfil para revisar sus PR de Bitbucket."
+    },
+    "connectionExpired": "La conexión con GitHub ha caducado.",
+    "couldNotLoadPullRequest": "No se pudo cargar la PR.",
+    "couldNotOpenGitHubAppSettings": "No se pudieron abrir los ajustes de la aplicación de GitHub.",
+    "description": "Descripción",
+    "discussion": {
+      "acceptTerms": "Aceptar",
+      "accessDeniedMessage": "No tienes permiso para ver la conversación de esta PR.",
+      "addReaction": "Añadir reacción",
+      "block": "Bloqueo",
+      "blockedUser": "{{login}} bloqueado",
+      "collapseThread": "Contraer hilo",
+      "commentActions": "Acciones del comentario",
+      "comment": "{{displayCount}} comentarios",
+      "comment_other": "{{displayCount}} comentarios",
+      "couldNotLoad": "No se pudo cargar la conversación.",
+      "couldNotLoadMore": "No se pudieron cargar más comentarios.",
+      "loadMoreComments": "Cargar más comentarios",
+      "loading": "Cargando la conversación",
+      "moderation": {
+        "block": {
+          "retryable": "No se pudo bloquear a este usuario. Comprueba tu conexión e inténtalo de nuevo.",
+          "terminal": "No se puede bloquear a este usuario."
+        },
+        "mute": {
+          "retryable": "No se pudo silenciar a este usuario. Comprueba tu conexión e inténtalo de nuevo.",
+          "terminal": "No se puede silenciar a este usuario."
+        },
+        "reportContent": {
+          "retryable": "No se pudo denunciar este comentario. Comprueba tu conexión e inténtalo de nuevo.",
+          "terminal": "No se puede denunciar este comentario."
+        },
+        "reportUser": {
+          "retryable": "No se pudo denunciar a este usuario. Comprueba tu conexión e inténtalo de nuevo.",
+          "terminal": "No se puede denunciar a este usuario."
+        }
+      },
+      "moreLinesAbove": "… {{displayCount}} líneas más arriba",
+      "mute": "Silenciar",
+      "mutedUser": "{{login}} silenciado",
+      "noDiscussion": "Aún no hay conversación",
+      "noDiscussionDescription": "Esta PR aún no tiene hilos de revisión ni comentarios en la conversación.",
+      "comment_one": "1 comentario",
+      "outdated": "Desactualizado",
+      "quotedDiffSnippet": "Fragmento citado de las diferencias",
+      "reactionPill": "reacción {{emoji}}, {{displayCount}} {{countLabel}}",
+      "reaction": "reacciones",
+      "reaction_other": "reacciones",
+      "reaction_one": "reacción",
+      "replyBadRequest": "No se puede publicar esta respuesta. Puede que el hilo haya cambiado.",
+      "replyBody": "Texto de la respuesta",
+      "replyForbidden": "No tienes permiso para responder a esta PR.",
+      "addCommentCta": "Comentar en esta PR",
+      "commentBadRequest": "No se puede publicar este comentario. Puede que la PR haya cambiado.",
+      "commentForbidden": "No tienes permiso para comentar en esta PR.",
+      "replyPlaceholder": "Tu respuesta…",
+      "reportContent": "Denunciar contenido",
+      "reportUser": "Denunciar al usuario",
+      "resolveThread": "Resolver hilo",
+      "resolved": "Resuelto",
+      "retryLoadingMore": "Volver a cargar más comentarios",
+      "reviewFiles": "Revisar archivos",
+      "startedRelative": " · iniciado {{relative}}",
+      "submitReply": "Enviar respuesta",
+      "termsAcceptRetry": "No se pudieron aceptar las condiciones. Comprueba tu conexión e inténtalo de nuevo.",
+      "termsCopy": "Debes tener 13 años o más para publicar.",
+      "termsTitle": "Condiciones del servicio",
+      "threadAccessibilityLabel": "Hilo de conversación {{anchorLabel}}",
+      "unavailable": "La conversación no está disponible.",
+      "unavailableMessage": "Es posible que esta PR se haya eliminado.",
+      "unresolveThread": "Reabrir hilo",
+      "viewTerms": "Ver condiciones",
+      "termsAcceptRequired": "Debes aceptar las condiciones del servicio para publicar.",
+      "termsCheckRetryCopy": "No se pudieron consultar las condiciones del servicio. Comprueba tu conexión e inténtalo de nuevo.",
+      "termsOutdatedCopy": "Las condiciones del servicio han cambiado. Vuelve a abrir esta pantalla para aceptar la versión más reciente.",
+      "comment_many": "{{displayCount}} comentarios",
+      "reaction_many": "reacciones",
+      "reactions": {
+        "thumbsUp": "Pulgar arriba",
+        "thumbsDown": "Pulgar abajo",
+        "laugh": "Risa",
+        "hooray": "Hurra",
+        "confused": "Confundido",
+        "heart": "Corazón",
+        "rocket": "Cohete",
+        "eyes": "Ojos"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Comentario sobre el archivo {{path}}",
+        "fileComment": "Comentario sobre el archivo",
+        "outdatedOnPathLines": "Desactualizado en {{path}} {{lines}}",
+        "outdatedOnLines": "Desactualizado en {{lines}}",
+        "outdatedOnPath": "Desactualizado en {{path}}"
+      },
+      "deletedUser": "usuario eliminado",
+      "replyForbiddenTerm": "No tienes permiso para responder a {{term}}."
+    },
+    "entry": {
+      "eyebrow": "Abre una PR o una merge request mediante su URL",
+      "pastePrLink": "Pegar un enlace de PR o de merge request",
+      "noRecentPrs": "No hay revisiones recientes",
+      "noRecentPrsDescription": "Pega un enlace arriba para iniciar una revisión — aparecerá aquí la próxima vez.",
+      "couldNotLoad": "No se pudo cargar.",
+      "removeFromRecentsTitle": "¿Quitar de la lista de recientes?",
+      "removeFromRecentsMessage": "Esta revisión se quitará de tu lista de recientes.",
+      "removeRecentAccessibility": "Quitar {{repo}} de la lista de recientes",
+      "urlAccessibility": "Introduce una URL de PR o de merge request",
+      "urlPlaceholder": "URL de PR o de merge request",
+      "openAccessibility": "Abrir una PR o un merge request",
+      "clearLink": "Borrar el enlace",
+      "pasteLink": "Pegar el enlace de PR o de merge request",
+      "open": "Apertura"
+    },
+    "eventChips": {
+      "comment": "Comentario",
+      "label": "Tipo de revisión",
+      "requestChanges": "Solicitar cambios"
+    },
     "fileList": {
       "filesList": "Lista de archivos",
       "filesViewed": "Archivos · {{viewed}} de {{total}} vistos",
@@ -2385,6 +2561,7 @@
       "commentOnSelectedLines": "Comentar en las líneas seleccionadas",
       "finishReview": "Finalizar revisión"
     },
+    "headLine": "{{counts}} · última confirmación {{sha}}",
     "hunkRows": {
       "contextUnavailable": "El contexto no está disponible en esta referencia.",
       "expandAll": "Expandir todo",
@@ -2419,21 +2596,14 @@
       "fileLoadedCount_many": "{{displayCount}} archivos cargados",
       "fileLoadedOfTotalCount_many": "{{displayCount}} archivos cargados de {{total}}"
     },
-    "sideBySide": {
-      "emptyDiffColumn": "columna de diferencias vacía",
-      "emptyDiffRow": "Fila de diferencias vacía",
-      "newOnly": "Solo en la versión nueva: {{text}}",
-      "noNewlineAtEndOfFile": "⚠️ sin salto de línea al final del archivo",
-      "oldNew": "Anterior: {{old}} | Nuevo: {{new}}",
-      "oldOnly": "Solo en la versión anterior: {{text}}"
+    "inbox": {
+      "couldNotLoad": "No se pudo cargar la bandeja de entrada.",
+      "loading": "Cargando la bandeja de entrada",
+      "noReviewRequests": "No hay solicitudes de revisión",
+      "noReviewRequestsDescription": "Aquí aparecen las PR pendientes de tu revisión. También puedes pegar cualquier enlace de PR arriba.",
+      "title": "Bandeja de entrada"
     },
-    "connectionExpired": "La conexión con GitHub ha caducado.",
-    "capabilities": {
-      "banner": {
-        "title": "No disponible en este proveedor",
-        "accessibility": "No disponible en este proveedor: {{reason}}"
-      }
-    },
+    "installKiloGitHubApp": "Instalar la aplicación de Kilo para GitHub",
     "merge": {
       "merge": "Fusión",
       "mergeNow": "Fusionar ahora",
@@ -2524,207 +2694,9 @@
         "rebase": "Vuelve a aplicar todas las confirmaciones de esta rama sobre la rama base sin crear una confirmación de fusión."
       }
     },
-    "discussion": {
-      "threadAccessibilityLabel": "Hilo de conversación {{anchorLabel}}",
-      "collapseThread": "Contraer hilo",
-      "resolveThread": "Resolver hilo",
-      "unresolveThread": "Reabrir hilo",
-      "resolved": "Resuelto",
-      "outdated": "Desactualizado",
-      "comment_one": "1 comentario",
-      "comment": "{{displayCount}} comentarios",
-      "comment_other": "{{displayCount}} comentarios",
-      "startedRelative": " · iniciado {{relative}}",
-      "couldNotLoadMore": "No se pudieron cargar más comentarios.",
-      "retryLoadingMore": "Volver a cargar más comentarios",
-      "loadMoreComments": "Cargar más comentarios",
-      "addReaction": "Añadir reacción",
-      "reactionPill": "reacción {{emoji}}, {{displayCount}} {{countLabel}}",
-      "reaction_one": "reacción",
-      "reaction": "reacciones",
-      "reaction_other": "reacciones",
-      "commentActions": "Acciones del comentario",
-      "reportContent": "Denunciar contenido",
-      "reportUser": "Denunciar al usuario",
-      "mute": "Silenciar",
-      "block": "Bloqueo",
-      "blockedUser": "{{login}} bloqueado",
-      "mutedUser": "{{login}} silenciado",
-      "replyPlaceholder": "Tu respuesta…",
-      "replyBody": "Texto de la respuesta",
-      "submitReply": "Enviar respuesta",
-      "termsTitle": "Condiciones del servicio",
-      "termsCopy": "Debes tener 13 años o más para publicar.",
-      "termsAcceptRetry": "No se pudieron aceptar las condiciones. Comprueba tu conexión e inténtalo de nuevo.",
-      "viewTerms": "Ver condiciones",
-      "acceptTerms": "Aceptar",
-      "replyBadRequest": "No se puede publicar esta respuesta. Puede que el hilo haya cambiado.",
-      "replyForbidden": "No tienes permiso para responder a esta PR.",
-      "replyForbiddenTerm": "No tienes permiso para responder a {{term}}.",
-      "moderation": {
-        "block": {
-          "retryable": "No se pudo bloquear a este usuario. Comprueba tu conexión e inténtalo de nuevo.",
-          "terminal": "No se puede bloquear a este usuario."
-        },
-        "mute": {
-          "retryable": "No se pudo silenciar a este usuario. Comprueba tu conexión e inténtalo de nuevo.",
-          "terminal": "No se puede silenciar a este usuario."
-        },
-        "reportContent": {
-          "retryable": "No se pudo denunciar este comentario. Comprueba tu conexión e inténtalo de nuevo.",
-          "terminal": "No se puede denunciar este comentario."
-        },
-        "reportUser": {
-          "retryable": "No se pudo denunciar a este usuario. Comprueba tu conexión e inténtalo de nuevo.",
-          "terminal": "No se puede denunciar a este usuario."
-        }
-      },
-      "accessDeniedMessage": "No tienes permiso para ver la conversación de esta PR.",
-      "unavailable": "La conversación no está disponible.",
-      "unavailableMessage": "Es posible que esta PR se haya eliminado.",
-      "couldNotLoad": "No se pudo cargar la conversación.",
-      "loading": "Cargando la conversación",
-      "noDiscussion": "Aún no hay conversación",
-      "noDiscussionDescription": "Esta PR aún no tiene hilos de revisión ni comentarios en la conversación.",
-      "reviewFiles": "Revisar archivos",
-      "quotedDiffSnippet": "Fragmento citado de las diferencias",
-      "moreLinesAbove": "… {{displayCount}} líneas más arriba",
-      "termsAcceptRequired": "Debes aceptar las condiciones del servicio para publicar.",
-      "termsOutdatedCopy": "Las condiciones del servicio han cambiado. Vuelve a abrir esta pantalla para aceptar la versión más reciente.",
-      "termsCheckRetryCopy": "No se pudieron consultar las condiciones del servicio. Comprueba tu conexión e inténtalo de nuevo.",
-      "reactions": {
-        "thumbsUp": "Pulgar arriba",
-        "thumbsDown": "Pulgar abajo",
-        "laugh": "Risa",
-        "hooray": "Hurra",
-        "confused": "Confundido",
-        "heart": "Corazón",
-        "rocket": "Cohete",
-        "eyes": "Ojos"
-      },
-      "anchor": {
-        "fileCommentOnPath": "Comentario sobre el archivo {{path}}",
-        "fileComment": "Comentario sobre el archivo",
-        "outdatedOnPathLines": "Desactualizado en {{path}} {{lines}}",
-        "outdatedOnLines": "Desactualizado en {{lines}}",
-        "outdatedOnPath": "Desactualizado en {{path}}"
-      },
-      "deletedUser": "usuario eliminado",
-      "comment_many": "{{displayCount}} comentarios",
-      "reaction_many": "reacciones"
-    },
-    "couldNotOpenGitHubAppSettings": "No se pudieron abrir los ajustes de la aplicación de GitHub.",
-    "installKiloGitHubApp": "Instalar la aplicación de Kilo para GitHub",
-    "checkConnection": "Comprobar conexión",
-    "couldNotLoadPullRequest": "No se pudo cargar la PR.",
-    "description": "Descripción",
     "noDescriptionProvided": "No se ha proporcionado ninguna descripción.",
-    "review": "Revisión",
-    "reviewPullRequest": "Revisar PR",
-    "headLine": "{{counts}} · última confirmación {{sha}}",
-    "entry": {
-      "eyebrow": "Abre una PR o una merge request mediante su URL",
-      "pastePrLink": "Pegar un enlace de PR o de merge request",
-      "noRecentPrs": "No hay revisiones recientes",
-      "noRecentPrsDescription": "Pega un enlace arriba para iniciar una revisión — aparecerá aquí la próxima vez.",
-      "couldNotLoad": "No se pudo cargar.",
-      "removeFromRecentsTitle": "¿Quitar de la lista de recientes?",
-      "removeFromRecentsMessage": "Esta revisión se quitará de tu lista de recientes.",
-      "removeRecentAccessibility": "Quitar {{repo}} de la lista de recientes",
-      "urlAccessibility": "Introduce una URL de PR o de merge request",
-      "urlPlaceholder": "URL de PR o de merge request",
-      "openAccessibility": "Abrir una PR o un merge request",
-      "clearLink": "Borrar el enlace",
-      "pasteLink": "Pegar el enlace de PR o de merge request",
-      "open": "Apertura"
-    },
-    "checks": {
-      "checksCount": "{{displayCount}} verificaciones",
-      "couldNotLoad": "No se pudieron cargar las verificaciones.",
-      "failed": "{{displayCount}} fallidas",
-      "noAccess": "No tienes acceso a las verificaciones de este repositorio.",
-      "noChecksReported": "No se han notificado verificaciones",
-      "notAvailable": "Las verificaciones aún no están disponibles. Puede que la última confirmación no se haya procesado o que la aplicación de Kilo para GitHub no esté instalada en el repositorio de origen.",
-      "openDetails": "Abrir los detalles de {{name}}",
-      "passed": "{{displayCount}} superadas",
-      "pending": "{{displayCount}} pendientes",
-      "retryChecks": "Reintentar verificaciones",
-      "skipped": "{{displayCount}} omitidas",
-      "title": "Verificaciones",
-      "viewOnGitHub": "Ver PR en GitHub",
-      "checkDetails": "detalles de la verificación"
-    },
-    "inbox": {
-      "couldNotLoad": "No se pudo cargar la bandeja de entrada.",
-      "loading": "Cargando la bandeja de entrada",
-      "noReviewRequests": "No hay solicitudes de revisión",
-      "noReviewRequestsDescription": "Aquí aparecen las PR pendientes de tu revisión. También puedes pegar cualquier enlace de PR arriba.",
-      "title": "Bandeja de entrada"
-    },
-    "composer": {
-      "addTitle": "Añadir comentario",
-      "addToReview": "Añadir a la revisión",
-      "comment": "Comentario",
-      "commentBody": "Texto del comentario",
-      "commentBodyPlaceholder": "Tu comentario",
-      "commentNow": "Comentar ahora",
-      "discardMessage": "Se perderá tu borrador.",
-      "discardTitle": "¿Descartar comentario?",
-      "editTitle": "Editar comentario",
-      "insertSuggestion": "Insertar sugerencia",
-      "insertSuggestionA11y": "Insertar una sugerencia de código",
-      "loadFailedTitle": "No se pudo cargar el editor de comentarios.",
-      "ok": "ACEPTAR",
-      "unavailableMessage": "Este comentario pendiente ya se eliminó o se envió.",
-      "unavailableTitle": "Comentario no disponible",
-      "bodyEmpty": "El comentario no puede estar vacío.",
-      "suggestionsOnlyAddedLines": "Las sugerencias solo se aplican a las líneas añadidas.",
-      "tapDiffLineToSuggest": "Toca una línea de las diferencias para activar las sugerencias."
-    },
-    "connect": {
-      "checkFailedTitle": "No se pudo comprobar la conexión con GitHub.",
-      "checkFailedMessage": "No se puede consultar el estado de tu sesión hasta que termine la carga.",
-      "checkFailedTitleGitLab": "No se pudo comprobar la conexión con GitLab.",
-      "checkFailedTitleBitbucket": "No se pudo comprobar la conexión con Bitbucket.",
-      "providerCheckFailedMessage": "No se puede consultar el estado de la conexión hasta que termine la carga.",
-      "reconnectTitle": "Volver a conectar GitHub",
-      "reconnectDescription": "Se revocó tu conexión con GitHub. Vuelve a conectar tu cuenta para seguir revisando PR en el móvil.",
-      "description": "Conecta tu cuenta de GitHub para revisar PR en el móvil.",
-      "gitlabDescription": "Conecta tu cuenta de GitLab para revisar merge requests en el móvil.",
-      "bitbucketDescription": "Conecta Bitbucket a esta organización para revisar PR en el móvil.",
-      "bitbucketOrgOnlyDescription": "Selecciona una organización en tu perfil para revisar sus PR de Bitbucket."
-    },
-    "screen": {
-      "shareA11y": "Compartir PR",
-      "title": "#{{number}}"
-    },
-    "submit": {
-      "deletePendingMessage": "Este comentario se eliminará de la cola de revisión.",
-      "deletePendingTitle": "¿Eliminar comentario pendiente?",
-      "loadFailedTitle": "No se pudo cargar el formulario de envío de la revisión.",
-      "pendingComment": "comentarios pendientes",
-      "pendingComment_other": "comentarios pendientes",
-      "pendingComment_one": "comentario pendiente",
-      "summaryOptional": "Resumen (opcional)",
-      "partialPostedMessage": "Comentarios publicados: {{displayFreshCount}}. Comentarios sobre una confirmación anterior que siguen pendientes de envío: {{displayStaleCount}}.",
-      "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
-      "submitReview": "Enviar revisión",
-      "pendingComment_many": "comentarios pendientes",
-      "blockedRequestChanges": "Añade un resumen o al menos un comentario para solicitar cambios.",
-      "blockedComment": "Añade un resumen o al menos un comentario para enviar una revisión con comentarios."
-    },
-    "reconnectNotice": {
-      "title": "La conexión con GitHub ha caducado.",
-      "message": "Tu conexión con GitHub ya no es válida. Vuelve a comprobarla. Si es necesario, se te pedirá que conectes tu cuenta de nuevo.",
-      "gitlabTitle": "La conexión con GitLab ha caducado.",
-      "bitbucketTitle": "La conexión con Bitbucket ha caducado.",
-      "providerMessage": "Tu conexión con {{provider}} ya no es válida. Vuelve a comprobarla. Si es necesario, se te pedirá que conectes tu cuenta de nuevo."
-    },
-    "eventChips": {
-      "comment": "Comentario",
-      "label": "Tipo de revisión",
-      "requestChanges": "Solicitar cambios"
-    },
+    "noFilesChanged": "No hay archivos modificados",
+    "noFilesChangedDescription": "Esta PR no contiene cambios en los archivos.",
     "overview": {
       "commit": "confirmaciones",
       "commit_other": "confirmaciones",
@@ -2767,31 +2739,54 @@
       "summaryA11y": "Resumen de la revisión",
       "summaryPlaceholder": "Resumen opcional de la revisión"
     },
-    "tabs": {
-      "discussion": "Conversación",
-      "files": "Archivos",
-      "overview": "Resumen"
+    "pullRequestUnavailable": "PR no disponible",
+    "pullRequestUnavailableDescription": "No se puede abrir esta PR. Puede que se haya eliminado, que el repositorio sea privado o que la aplicación de Kilo para GitHub no esté instalada en él.",
+    "reconnectNotice": {
+      "title": "La conexión con GitHub ha caducado.",
+      "message": "Tu conexión con GitHub ya no es válida. Vuelve a comprobarla. Si es necesario, se te pedirá que conectes tu cuenta de nuevo.",
+      "gitlabTitle": "La conexión con GitLab ha caducado.",
+      "bitbucketTitle": "La conexión con Bitbucket ha caducado.",
+      "providerMessage": "Tu conexión con {{provider}} ya no es válida. Vuelve a comprobarla. Si es necesario, se te pedirá que conectes tu cuenta de nuevo."
     },
-    "terms": {
-      "pullRequest": "Solicitud de cambios",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Compartir el merge request",
-      "viewOnProvider": "Ver en {{provider}}",
-      "mergeRequestUnavailable": "Merge request no disponible",
-      "unavailableDescription": "Puede que se haya eliminado o que no tengas acceso a él.",
-      "accessDeniedMergeRequest": "No tienes permiso para ver este merge request.",
-      "couldNotLoadMergeRequest": "No se pudo cargar el merge request.",
-      "discussionAccessDenied": "No tienes permiso para ver la conversación de este merge request.",
-      "discussionUnavailableMessage": "Es posible que este merge request se haya eliminado.",
-      "noDiscussionDescription": "Este merge request aún no tiene hilos de revisión ni comentarios en la conversación.",
-      "noFilesChangedDescription": "Este merge request no contiene cambios en los archivos."
+    "review": "Revisión",
+    "reviewPullRequest": "Revisar PR",
+    "screen": {
+      "shareA11y": "Compartir PR",
+      "title": "#{{number}}"
+    },
+    "sideBySide": {
+      "emptyDiffColumn": "columna de diferencias vacía",
+      "emptyDiffRow": "Fila de diferencias vacía",
+      "newOnly": "Solo en la versión nueva: {{text}}",
+      "noNewlineAtEndOfFile": "⚠️ sin salto de línea al final del archivo",
+      "oldNew": "Anterior: {{old}} | Nuevo: {{new}}",
+      "oldOnly": "Solo en la versión anterior: {{text}}"
+    },
+    "submit": {
+      "deletePendingMessage": "Este comentario se eliminará de la cola de revisión.",
+      "deletePendingTitle": "¿Eliminar comentario pendiente?",
+      "loadFailedTitle": "No se pudo cargar el formulario de envío de la revisión.",
+      "pendingComment": "comentarios pendientes",
+      "pendingComment_other": "comentarios pendientes",
+      "pendingComment_one": "comentario pendiente",
+      "summaryOptional": "Resumen (opcional)",
+      "partialPostedMessage": "Comentarios publicados: {{displayFreshCount}}. Comentarios sobre una confirmación anterior que siguen pendientes de envío: {{displayStaleCount}}.",
+      "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
+      "submitReview": "Enviar revisión",
+      "pendingComment_many": "comentarios pendientes",
+      "blockedRequestChanges": "Añade un resumen o al menos un comentario para solicitar cambios.",
+      "blockedComment": "Añade un resumen o al menos un comentario para enviar una revisión con comentarios."
     },
     "fileStatus": {
       "changed": "Cambiado",
       "copied": "Copiado",
       "modified": "Modificado",
       "renamed": "Renombrado"
+    },
+    "tabs": {
+      "discussion": "Conversación",
+      "files": "Archivos",
+      "overview": "Resumen"
     },
     "diff": {
       "selectedTapToChange": "Selección actual: {{label}}. Toca para cambiarla",
@@ -2824,6 +2819,27 @@
       "ambiguous": "No se pudo confirmar el resultado. Comprueba la PR antes de volver a intentarlo.",
       "persistenceFailed": "No se pudo registrar esta acción. Inténtalo de nuevo más tarde.",
       "forbidden": "No tienes permiso para realizar esta acción."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "No disponible en este proveedor",
+        "accessibility": "No disponible en este proveedor: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Solicitud de cambios",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Compartir el merge request",
+      "viewOnProvider": "Ver en {{provider}}",
+      "mergeRequestUnavailable": "Merge request no disponible",
+      "unavailableDescription": "Puede que se haya eliminado o que no tengas acceso a él.",
+      "accessDeniedMergeRequest": "No tienes permiso para ver este merge request.",
+      "couldNotLoadMergeRequest": "No se pudo cargar el merge request.",
+      "discussionAccessDenied": "No tienes permiso para ver la conversación de este merge request.",
+      "discussionUnavailableMessage": "Es posible que este merge request se haya eliminado.",
+      "noDiscussionDescription": "Este merge request aún no tiene hilos de revisión ni comentarios en la conversación.",
+      "noFilesChangedDescription": "Este merge request no contiene cambios en los archivos."
     }
   },
   "organization": {
@@ -3032,5 +3048,12 @@
     "needsInput": "En espera de respuesta",
     "channelName": "Agentes activos",
     "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo."
+  },
+  "transcriptionModel": {
+    "title": "Modelo de transcripción",
+    "noneChosen": "Ninguno seleccionado",
+    "emptyTitle": "No hay modelos de transcripción",
+    "emptyDescription": "Kilo Gateway no ofrece modelos de transcripción en este momento.",
+    "loadFailed": "No se pudieron cargar los modelos de transcripción."
   }
 }

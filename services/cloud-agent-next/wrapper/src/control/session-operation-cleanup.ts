@@ -16,6 +16,7 @@ export type NativeOperationTarget = Readonly<{
 
 export type NativeRetirement = 'retired' | 'stale' | 'unconfirmed';
 export type NativeCleanupEvidence = 'not_issued' | 'finished' | 'unconfirmed';
+export type RootScopedCleanupResult = 'confirmed' | 'unconfirmed';
 
 type CleanupState = 'not_requested' | 'acknowledged' | 'confirmed' | 'unconfirmed';
 
@@ -23,6 +24,8 @@ export class SessionOperationCleanup {
   private deadlineAt?: number;
   private state: CleanupState = 'not_requested';
   private pending?: Promise<boolean>;
+  private rootScopedPending?: Promise<RootScopedCleanupResult>;
+  private rootScopedFull?: Promise<RootScopedCleanupResult>;
   private processStop?: Promise<boolean>;
   private nativeAbort?: Promise<boolean>;
 
@@ -95,6 +98,25 @@ export class SessionOperationCleanup {
     return this.pending;
   }
 
+  cleanupRootScoped(input: {
+    deadlineAt: number;
+    target?: NativeOperationTarget;
+    completionEvidence: NativeCleanupEvidence;
+    cancel: () => void;
+  }): Promise<RootScopedCleanupResult> {
+    if (this.rootScopedPending) return this.rootScopedPending;
+
+    const deadlineAt = this.captureDeadline(input.deadlineAt);
+    const fullCleanup = this.performRootScopedCleanup(input, deadlineAt);
+    this.rootScopedFull = fullCleanup;
+    this.rootScopedPending = fullCleanup;
+    return this.rootScopedPending;
+  }
+
+  waitForRootScopedCleanup(): Promise<RootScopedCleanupResult> {
+    return this.rootScopedFull ?? this.rootScopedPending ?? Promise.resolve('unconfirmed');
+  }
+
   confirm(confirmed: boolean, deadlineAt: number): boolean {
     if (this.state === 'confirmed') return true;
     const quiescent =
@@ -148,6 +170,102 @@ export class SessionOperationCleanup {
       );
     } finally {
       controller.abort();
+    }
+  }
+
+  private rootCurrent(target: NativeOperationTarget, deadlineAt: number): boolean {
+    const { kiloSessionId, directory } = this.session;
+    const root = rootForSession(kiloSessionId, directory);
+    const attachment = root === undefined ? undefined : rootAttachmentId(root);
+    return (
+      root !== undefined &&
+      attachment !== undefined &&
+      rootAttachmentId(root) === attachment &&
+      rootForSession(kiloSessionId, directory) === root &&
+      directoriesForRoot(root, directory).every(value => value === directory) &&
+      this.isCurrent(target) &&
+      Date.now() < Math.min(deadlineAt, this.deadlineAt ?? Infinity)
+    );
+  }
+
+  private async observeRootIdle(
+    target: NativeOperationTarget,
+    client: WrapperKiloClient,
+    deadlineAt: number
+  ): Promise<boolean> {
+    const { kiloSessionId, directory } = this.session;
+    const root = rootForSession(kiloSessionId, directory);
+    const attachment = root === undefined ? undefined : rootAttachmentId(root);
+    const current = () =>
+      root !== undefined &&
+      attachment !== undefined &&
+      rootAttachmentId(root) === attachment &&
+      rootForSession(kiloSessionId, directory) === root &&
+      directoriesForRoot(root, directory).every(value => value === directory) &&
+      this.isCurrent(target) &&
+      Date.now() < Math.min(deadlineAt, this.deadlineAt ?? Infinity);
+    if (!current()) return false;
+    const controller = new AbortController();
+    try {
+      return await withTimeoutAndAbort(
+        withKiloRequestDeadline(async signal => {
+          if (root === undefined) return false;
+          const session = await client.getSessionDetails(root, directory, signal);
+          if (session.id !== root || session.directory !== directory) return false;
+          while (current()) {
+            const statuses = await client.getSessionStatuses(directory, signal);
+            if (!current()) return false;
+            let idle = true;
+            for (const [id, status] of Object.entries(statuses)) {
+              if (status.type === 'idle') continue;
+              const statusRoot = rootForSession(id, directory);
+              if (!statusRoot || statusRoot === root) {
+                idle = false;
+                break;
+              }
+            }
+            if (idle) return current();
+            await delay(Math.min(25, Math.max(1, deadlineAt - Date.now())), undefined, {
+              signal,
+            });
+          }
+          return false;
+        }, controller.signal),
+        {
+          timeoutMs: Math.max(1, deadlineAt - Date.now()),
+          timeoutMessage: 'Kilo root cleanup status probe timed out',
+          abortMessage: 'Kilo root cleanup status probe cancelled',
+        }
+      );
+    } finally {
+      controller.abort();
+    }
+  }
+
+  private async performRootScopedCleanup(
+    input: {
+      deadlineAt: number;
+      target?: NativeOperationTarget;
+      completionEvidence: NativeCleanupEvidence;
+      cancel: () => void;
+    },
+    deadlineAt: number
+  ): Promise<RootScopedCleanupResult> {
+    const processes = this.stopProcesses(deadlineAt);
+    if (input.completionEvidence === 'unconfirmed') input.cancel();
+    const target = input.target;
+    const client = target?.client;
+    const native =
+      target && client && input.completionEvidence === 'unconfirmed'
+        ? this.abortNative(target, deadlineAt)
+        : Promise.resolve(target && client ? true : false);
+    try {
+      const [processesStopped, nativeAccepted] = await Promise.all([processes, native]);
+      if (!processesStopped || !nativeAccepted || !target || !client) return 'unconfirmed';
+      if (!this.rootCurrent(target, deadlineAt)) return 'unconfirmed';
+      return (await this.observeRootIdle(target, client, deadlineAt)) ? 'confirmed' : 'unconfirmed';
+    } catch {
+      return 'unconfirmed';
     }
   }
 

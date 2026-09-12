@@ -121,6 +121,17 @@ vi.mock('@/lib/pr-review/merge/merge-result-banner-store', () => ({
   consumeMergePartialSuccess: () => null,
 }));
 
+// The header's offline-banner reservation: the banner visibility and the
+// banner height are stubbed so the tree walk can assert the reserved
+// paddingTop per state.
+const offlineBanner = vi.hoisted(() => ({ isOffline: false }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useOfflineBannerState: () => offlineBanner.isOffline,
+}));
+vi.mock('@/components/offline-banner', () => ({
+  OFFLINE_BANNER_HEIGHT: 36,
+}));
+
 vi.mock('@/lib/pr-review/recent-prs', () => ({
   upsertRecentPr: vi.fn(),
   markRecentPrFailed: vi.fn(),
@@ -497,6 +508,40 @@ describe('PrReviewScreen recents backfill per provider', () => {
       repo: 'repo',
       number: 12,
       platform: 'gitlab',
+    });
+  });
+});
+
+describe('PrReviewScreen offline-banner header reservation (uxs2)', () => {
+  afterEach(() => {
+    offlineBanner.isOffline = false;
+  });
+
+  function findHeaderReservation(): React.ReactElement | null {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    return findElement({ node: element, type: 'View', prop: 'className', value: 'bg-background' });
+  }
+
+  it('reserves the banner height above the header while offline', () => {
+    offlineBanner.isOffline = true;
+    const reservation = findHeaderReservation();
+    if (!reservation) {
+      throw new Error('header reservation View not found');
+    }
+    expect((reservation.props as { style?: { paddingTop?: number } }).style).toEqual({
+      paddingTop: 36,
+    });
+  });
+
+  it('keeps the header flush while online', () => {
+    offlineBanner.isOffline = false;
+    const reservation = findHeaderReservation();
+    if (!reservation) {
+      throw new Error('header reservation View not found');
+    }
+    expect((reservation.props as { style?: { paddingTop?: number } }).style).toEqual({
+      paddingTop: 0,
     });
   });
 });

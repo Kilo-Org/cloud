@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO សម្រាប់សហគ្រាស"
   },
   "preferences": {
+    "general": "ទូទៅ",
+    "voiceInput": "ការបញ្ចូលសំឡេង",
     "autoExpandThinking": "ពង្រីកការគិតដោយស្វ័យប្រវត្តិ",
     "autoExpandThinkingSubtitle": "បង្ហាញខ្លឹមសារនៃការគិតរបស់ភ្នាក់ងារទាំងមូល នៅពេលវាគិតរួច។",
     "keepScreenOn": "ទុកអេក្រង់ឱ្យបើកពេលនៅលើទំព័រវគ្គ",
@@ -238,6 +240,7 @@
     "appearanceLight": "ភ្លឺ",
     "appearanceDark": "ងងឹត",
     "account": "គណនី",
+    "accountSubtitle": "ភាសា ដែនគេហទំព័រដែលជឿទុកចិត្ត និងវគ្គប្រើប្រាស់លើឧបករណ៍",
     "prReviewAttribution": "បន្ថែមឈ្មោះកម្មវិធីក្នុងការពិនិត្យ PR",
     "prReviewAttributionSubtitle": "បន្ថែមអត្ថបទនៅខាងក្រោមថាបានពិនិត្យតាម Kilo នៅពេលអ្នកដាក់ស្នើការពិនិត្យ។",
     "returnSendsMessage": "គ្រាប់ចុចបញ្ចូលប្រើសម្រាប់ផ្ញើសារ",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "ការបម្លែងសំឡេងជាអត្ថបទតាម Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "បម្លែងការបញ្ចូលដោយសំឡេងទៅជាអត្ថបទដោយប្រើម៉ូដែល Kilo Gateway ជំនួសឱ្យការចាប់សម្ដីរបស់ឧបករណ៍។ ការថតរបស់អ្នកត្រូវបានផ្ញើទៅ Kilo Gateway។",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "មិនអាចបើកសំណើបញ្ចូលកូដបាន",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "ជួរដេកទទេក្នុងការប្រៀបធៀបកូដ"
     },
     "connectionExpired": "ការតភ្ជាប់ទៅ GitHub បានផុតកំណត់ហើយ។",
-    "capabilities": {
-      "banner": {
-        "title": "មិនអាចប្រើបានលើអ្នកផ្តល់សេវានេះទេ",
-        "accessibility": "មិនអាចប្រើបានលើអ្នកផ្តល់សេវានេះទេ: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "បញ្ចូលគ្នា",
       "mergeNow": "បញ្ចូលឥឡូវនេះ",
@@ -472,7 +472,9 @@
       "acceptTerms": "ទទួលយក",
       "replyBadRequest": "មិនអាចបង្ហោះការឆ្លើយតបនេះបានទេ។ ការពិភាក្សាអាចបានផ្លាស់ប្តូរ។",
       "replyForbidden": "អ្នកគ្មានសិទ្ធិឆ្លើយតបលើសំណើបញ្ចូលកូដនេះទេ។",
-      "replyForbiddenTerm": "អ្នកគ្មានសិទ្ធិឆ្លើយតបលើ{{term}}នេះទេ។",
+      "addCommentCta": "បញ្ចេញមតិលើសំណើបញ្ចូលកូដនេះ",
+      "commentBadRequest": "មិនអាចបង្ហោះមតិយោបល់នេះបានទេ។ សំណើបញ្ចូលកូដអាចបានផ្លាស់ប្តូរ។",
+      "commentForbidden": "អ្នកគ្មានសិទ្ធិបញ្ចេញមតិលើសំណើបញ្ចូលកូដនេះទេ។",
       "moderation": {
         "reportContent": {
           "terminal": "មិនអាចរាយការណ៍មតិយោបល់នេះបានទេ។",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "លែងទាន់សម័យនៅ {{lines}}",
         "outdatedOnPath": "លែងទាន់សម័យនៅ {{path}}"
       },
-      "deletedUser": "អ្នកប្រើប្រាស់ដែលបានលុបគណនី"
+      "deletedUser": "អ្នកប្រើប្រាស់ដែលបានលុបគណនី",
+      "replyForbiddenTerm": "អ្នកគ្មានសិទ្ធិឆ្លើយតបលើ{{term}}នេះទេ។"
     },
     "couldNotOpenGitHubAppSettings": "មិនអាចបើកការកំណត់កម្មវិធី GitHub បានទេ។",
     "installKiloGitHubApp": "ដំឡើងកម្មវិធី Kilo សម្រាប់ GitHub",
@@ -679,21 +682,6 @@
       "files": "ឯកសារ",
       "discussion": "ការពិភាក្សា"
     },
-    "terms": {
-      "pullRequest": "សំណើបញ្ចូលកូដ",
-      "mergeRequest": "សំណើបញ្ចូល",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "ចែករំលែកសំណើបញ្ចូល",
-      "viewOnProvider": "មើលលើ {{provider}}",
-      "mergeRequestUnavailable": "មិនអាចបើកសំណើបញ្ចូលបាន",
-      "unavailableDescription": "វាអាចត្រូវបានលុបចោល ឬអ្នកអាចគ្មានសិទ្ធិចូលប្រើទេ។",
-      "accessDeniedMergeRequest": "អ្នកគ្មានសិទ្ធិមើលសំណើបញ្ចូលនេះទេ។",
-      "couldNotLoadMergeRequest": "មិនអាចផ្ទុកសំណើបញ្ចូលបានទេ។",
-      "discussionAccessDenied": "អ្នកគ្មានសិទ្ធិមើលការពិភាក្សារបស់ សំណើបញ្ចូល នេះទេ។",
-      "discussionUnavailableMessage": "សំណើបញ្ចូលនេះអាចត្រូវបានដកចេញ។",
-      "noDiscussionDescription": "មិនទាន់មានការពិភាក្សាពិនិត្យកូដ ឬមតិយោបល់លើសំណើបញ្ចូលនេះទេ។",
-      "noFilesChangedDescription": "សំណើបញ្ចូលនេះមិនមានការកែប្រែឯកសារទេ។"
-    },
     "fileStatus": {
       "modified": "បានកែប្រែ",
       "renamed": "បានប្តូរឈ្មោះ",
@@ -731,6 +719,27 @@
       "ambiguous": "មិនអាចបញ្ជាក់បានទេ — សូមពិនិត្យ PR មុនពេលព្យាយាមម្តងទៀត។",
       "persistenceFailed": "យើងមិនអាចកត់ត្រាសកម្មភាពនេះបានទេ។ សូមព្យាយាមម្តងទៀតនៅពេលក្រោយ។",
       "forbidden": "អ្នកគ្មានសិទ្ធិធ្វើសកម្មភាពនេះទេ។"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "មិនអាចប្រើបានលើអ្នកផ្តល់សេវានេះទេ",
+        "accessibility": "មិនអាចប្រើបានលើអ្នកផ្តល់សេវានេះទេ: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "សំណើបញ្ចូលកូដ",
+      "mergeRequest": "សំណើបញ្ចូល",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "ចែករំលែកសំណើបញ្ចូល",
+      "viewOnProvider": "មើលលើ {{provider}}",
+      "mergeRequestUnavailable": "មិនអាចបើកសំណើបញ្ចូលបាន",
+      "unavailableDescription": "វាអាចត្រូវបានលុបចោល ឬអ្នកអាចគ្មានសិទ្ធិចូលប្រើទេ។",
+      "accessDeniedMergeRequest": "អ្នកគ្មានសិទ្ធិមើលសំណើបញ្ចូលនេះទេ។",
+      "couldNotLoadMergeRequest": "មិនអាចផ្ទុកសំណើបញ្ចូលបានទេ។",
+      "discussionAccessDenied": "អ្នកគ្មានសិទ្ធិមើលការពិភាក្សារបស់ សំណើបញ្ចូល នេះទេ។",
+      "discussionUnavailableMessage": "សំណើបញ្ចូលនេះអាចត្រូវបានដកចេញ។",
+      "noDiscussionDescription": "មិនទាន់មានការពិភាក្សាពិនិត្យកូដ ឬមតិយោបល់លើសំណើបញ្ចូលនេះទេ។",
+      "noFilesChangedDescription": "សំណើបញ្ចូលនេះមិនមានការកែប្រែឯកសារទេ។"
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "ឯកសារសំឡេងក្រៅបណ្តាញសម្រាប់{{language}}មិនទាន់ដំឡើងនៅលើទូរស័ព្ទនេះទេ។ សូមទាញយកវាមុន បន្ទាប់មកសូមព្យាយាមការបញ្ចូលដោយសំឡេងម្តងទៀត។",
     "downloadOfflineModel": "ទាញយក",
     "offlineModelDownloadScheduled": "ឯកសារសំឡេងក្រៅបណ្តាញនឹងត្រូវបានទាញយកនៅផ្ទៃខាងក្រោយ។ សូមព្យាយាមការបញ្ចូលដោយសំឡេងម្តងទៀតពេលក្រោយ។",
-    "listeningStopped": "បានបញ្ឈប់ការស្តាប់។"
+    "listeningStopped": "បានបញ្ឈប់ការស្តាប់។",
+    "transcribing": "កំពុងបម្លែងជាអត្ថបទ...",
+    "gatewayUnreachable": "មិនអាចទំនាក់ទំនងទៅ Kilo Gateway បានទេ។ សូមពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្ដងទៀត។",
+    "gatewayTimeout": "ការបម្លែងសំឡេងជាអត្ថបទចំណាយពេលយូរពេក។ សូមព្យាយាមម្ដងទៀត។",
+    "gatewayModelUnavailable": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទនេះមិនមានទេ។ សូមជ្រើសរើសម៉ូដែលផ្សេងទៀតក្នុងចំណូលចិត្ត។",
+    "gatewayModelUnavailableNotice": "ម៉ូដែលនេះលែងផ្តល់ជូនទៀតទេ។ ចុច $t(transcriptionModel.title) ដើម្បីជ្រើសរើសមួយផ្សេងទៀត។",
+    "gatewaySignInRequired": "ចូលគណនីដើម្បីប្រើការបម្លែងសំឡេងជាអត្ថបទតាម Kilo Gateway។",
+    "gatewayNoModel": "សូមជ្រើសរើសម៉ូដែលបម្លែងសំឡេងជាអត្ថបទក្នុងចំណូលចិត្តជាមុនសិន។"
   },
   "share": {
     "title": "ចែករំលែកទៅ Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "ត្រូវការការឆ្លើយតប",
     "channelName": "ភ្នាក់ងារសកម្ម",
     "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។"
+  },
+  "transcriptionModel": {
+    "title": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទ",
+    "noneChosen": "មិនទាន់ជ្រើសរើសទេ",
+    "emptyTitle": "គ្មានម៉ូដែលបម្លែងសំឡេងជាអត្ថបទ",
+    "emptyDescription": "Kilo Gateway មិនផ្ដល់ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទនៅពេលនេះទេ។",
+    "loadFailed": "មិនអាចផ្ទុកម៉ូដែលបម្លែងសំឡេងជាអត្ថបទបានទេ។"
   }
 }

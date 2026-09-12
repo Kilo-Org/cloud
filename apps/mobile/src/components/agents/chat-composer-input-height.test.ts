@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   COMPOSER_CHROME_HEIGHT,
+  COMPOSER_INPUT_MAX_HEIGHT,
   COMPOSER_INPUT_PADDING_HORIZONTAL,
   NEW_SESSION_PROMPT_CHROME_HEIGHT,
+  NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
   resolveComposerMaxHeight,
   resolveComposerTextContentWidth,
   shouldEnableComposerInputScroll,
@@ -21,6 +23,7 @@ const MAX_HEIGHT_ARGS = {
   sessionHeaderHeight: 92,
   composerChromeHeight: 120,
   minHeight: MIN,
+  absoluteMaxHeight: 1000,
 } as const;
 
 describe('shouldEnableComposerInputScroll', () => {
@@ -56,6 +59,19 @@ describe('resolveComposerMaxHeight', () => {
   it('subtracts safe areas, keyboard, header, and chrome from the window height', () => {
     // 1000 - 44 - 34 - 336 - 92 - 120 = 374
     expect(resolveComposerMaxHeight(MAX_HEIGHT_ARGS)).toBe(374);
+  });
+
+  it('caps the input below the remaining space', () => {
+    // A tall window with no keyboard leaves 1000 - 44 - 34 - 92 - 120 = 710,
+    // but the absolute cap bounds it so the input cannot fill the screen.
+    expect(
+      resolveComposerMaxHeight({ ...MAX_HEIGHT_ARGS, keyboardHeight: 0, absoluteMaxHeight: MAX })
+    ).toBe(MAX);
+  });
+
+  it('exposes the chat and new-session caps', () => {
+    expect(COMPOSER_INPUT_MAX_HEIGHT).toBe(124);
+    expect(NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT).toBe(160);
   });
 
   it('floors at minHeight when the remaining space is smaller', () => {

@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "उद्यम SSO"
   },
   "preferences": {
+    "general": "सामान्य",
+    "voiceInput": "आवाज इनपुट",
     "autoExpandThinking": "सोचको विवरण स्वतः खोल्नुहोस्",
     "autoExpandThinkingSubtitle": "एजेन्टले सोचिसकेपछि त्यसको विवरण पूरा देखाउनुहोस्।",
     "keepScreenOn": "सत्र पृष्ठमा हुँदा स्क्रिन चालू राख्नुहोस्",
@@ -238,6 +240,7 @@
     "appearanceLight": "उज्यालो",
     "appearanceDark": "अँध्यारो",
     "account": "खाता",
+    "accountSubtitle": "भाषा, विश्वसनीय होस्टहरू र यन्त्रका सत्रहरू",
     "prReviewAttribution": "PR समीक्षाहरूमा एपको उल्लेख थप्नुहोस्",
     "prReviewAttributionSubtitle": "समीक्षा पेश गर्दा अन्त्यमा ‘Kilo मार्फत समीक्षा गरिएको’ थप्नुहोस्।",
     "returnSendsMessage": "रिटर्न कुञ्जीले सन्देश पठाउँछ",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway मार्फत बोलीलाई पाठमा रूपान्तरण",
+    "gatewayTranscriptionSubtitle": "यन्त्रको वाणी पहिचानको सट्टा Kilo Gateway मोडेल प्रयोग गरेर भ्वाइस इनपुटलाई पाठमा रूपान्तरण गर्नुहोस्। तपाईंको रेकर्डिङ Kilo Gateway मा पठाइन्छ।",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट उपलब्ध छैन",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "परिवर्तन विवरणको खाली पङ्क्ति"
     },
     "connectionExpired": "GitHub जडानको म्याद सकियो।",
-    "capabilities": {
-      "banner": {
-        "title": "यस प्रदायकमा उपलब्ध छैन",
-        "accessibility": "यस प्रदायकमा उपलब्ध छैन: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "मर्ज",
       "mergeNow": "अहिले मर्ज गर्नुहोस्",
@@ -472,7 +472,9 @@
       "acceptTerms": "स्वीकार गर्नुहोस्",
       "replyBadRequest": "यो जवाफ पोस्ट गर्न सकिँदैन। थ्रेड परिवर्तन भएको हुन सक्छ।",
       "replyForbidden": "तपाईंसँग यो पुल रिक्वेस्टमा जवाफ दिने अनुमति छैन।",
-      "replyForbiddenTerm": "तपाईंसँग यो {{term}}मा जवाफ दिने अनुमति छैन।",
+      "addCommentCta": "यो पुल रिक्वेस्टमा टिप्पणी गर्नुहोस्",
+      "commentBadRequest": "यो टिप्पणी पोस्ट गर्न सकिँदैन। पुल रिक्वेस्ट परिवर्तन भएको हुन सक्छ।",
+      "commentForbidden": "तपाईंसँग यो पुल रिक्वेस्टमा टिप्पणी गर्ने अनुमति छैन।",
       "moderation": {
         "reportContent": {
           "terminal": "यो टिप्पणी रिपोर्ट गर्न सकिँदैन।",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "{{lines}} मा पुरानो भइसकेको",
         "outdatedOnPath": "{{path}} मा पुरानो भइसकेको"
       },
-      "deletedUser": "खाता मेटिएको प्रयोगकर्ता"
+      "deletedUser": "खाता मेटिएको प्रयोगकर्ता",
+      "replyForbiddenTerm": "तपाईंसँग यो {{term}}मा जवाफ दिने अनुमति छैन।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub एपको सेटिङ खोल्न सकिएन।",
     "installKiloGitHubApp": "Kilo GitHub एप स्थापना गर्नुहोस्",
@@ -679,21 +682,6 @@
       "files": "फाइलहरू",
       "discussion": "छलफल"
     },
-    "terms": {
-      "pullRequest": "पुल रिक्वेस्ट",
-      "mergeRequest": "मर्ज रिक्वेस्ट",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "मर्ज रिक्वेस्ट सेयर गर्नुहोस्",
-      "viewOnProvider": "{{provider}} मा हेर्नुहोस्",
-      "mergeRequestUnavailable": "मर्ज रिक्वेस्ट उपलब्ध छैन",
-      "unavailableDescription": "यो मेटिएको हुनसक्छ, वा तपाईंलाई यसको पहुँच नहुन सक्छ।",
-      "accessDeniedMergeRequest": "तपाईंसँग यो मर्ज रिक्वेस्ट हेर्ने अनुमति छैन।",
-      "couldNotLoadMergeRequest": "मर्ज रिक्वेस्ट लोड गर्न सकिएन।",
-      "discussionAccessDenied": "यो मर्ज रिक्वेस्ट को छलफल हेर्ने अनुमति तपाईंसँग छैन।",
-      "discussionUnavailableMessage": "यो मर्ज रिक्वेस्ट हटाइएको हुन सक्छ।",
-      "noDiscussionDescription": "यो मर्ज रिक्वेस्टमा समीक्षाका थ्रेड वा छलफलका टिप्पणीहरू छैनन्।",
-      "noFilesChangedDescription": "यो मर्ज रिक्वेस्टमा कुनै पनि फाइल परिवर्तन भएको छैन।"
-    },
     "fileStatus": {
       "modified": "परिमार्जित",
       "renamed": "नाम फेरिएको",
@@ -731,6 +719,27 @@
       "ambiguous": "पुष्टि गर्न सकिएन — पुनः प्रयास गर्नुअघि PR जाँच्नुहोस्।",
       "persistenceFailed": "हामीले यो कार्यको अभिलेख राख्न सकेनौँ। कृपया पछि फेरि प्रयास गर्नुहोस्।",
       "forbidden": "अनुमति छैन।"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "यस प्रदायकमा उपलब्ध छैन",
+        "accessibility": "यस प्रदायकमा उपलब्ध छैन: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "पुल रिक्वेस्ट",
+      "mergeRequest": "मर्ज रिक्वेस्ट",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "मर्ज रिक्वेस्ट सेयर गर्नुहोस्",
+      "viewOnProvider": "{{provider}} मा हेर्नुहोस्",
+      "mergeRequestUnavailable": "मर्ज रिक्वेस्ट उपलब्ध छैन",
+      "unavailableDescription": "यो मेटिएको हुनसक्छ, वा तपाईंलाई यसको पहुँच नहुन सक्छ।",
+      "accessDeniedMergeRequest": "तपाईंसँग यो मर्ज रिक्वेस्ट हेर्ने अनुमति छैन।",
+      "couldNotLoadMergeRequest": "मर्ज रिक्वेस्ट लोड गर्न सकिएन।",
+      "discussionAccessDenied": "यो मर्ज रिक्वेस्ट को छलफल हेर्ने अनुमति तपाईंसँग छैन।",
+      "discussionUnavailableMessage": "यो मर्ज रिक्वेस्ट हटाइएको हुन सक्छ।",
+      "noDiscussionDescription": "यो मर्ज रिक्वेस्टमा समीक्षाका थ्रेड वा छलफलका टिप्पणीहरू छैनन्।",
+      "noFilesChangedDescription": "यो मर्ज रिक्वेस्टमा कुनै पनि फाइल परिवर्तन भएको छैन।"
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "{{language}} का अफलाइन स्पिच फाइलहरू यो फोनमा इन्स्टल छैनन्। तिनीहरूलाई डाउनलोड गर्नुहोस्, अनि भ्वाइस इनपुट फेरि प्रयास गर्नुहोस्।",
     "downloadOfflineModel": "डाउनलोड",
     "offlineModelDownloadScheduled": "अफलाइन स्पिच फाइलहरू पृष्ठभूमिमा डाउनलोड हुनेछन्। पछि भ्वाइस इनपुट फेरि प्रयास गर्नुहोस्।",
-    "listeningStopped": "सुन्ने प्रक्रिया रोकियो।"
+    "listeningStopped": "सुन्ने प्रक्रिया रोकियो।",
+    "transcribing": "पाठमा रूपान्तरण हुँदैछ…",
+    "gatewayUnreachable": "Kilo Gateway सम्म पुग्न सकिएन। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+    "gatewayTimeout": "बोलीलाई पाठमा रूपान्तरण गर्न धेरै समय लाग्यो। फेरि प्रयास गर्नुहोस्।",
+    "gatewayModelUnavailable": "यो रूपान्तरण मोडेल उपलब्ध छैन। रुचिहरूमा अर्को छान्नुहोस्।",
+    "gatewayModelUnavailableNotice": "यो मोडेल अब उपलब्ध छैन। अर्को छान्न $t(transcriptionModel.title) मा ट्याप गर्नुहोस्।",
+    "gatewaySignInRequired": "Kilo Gateway को रूपान्तरण प्रयोग गर्न साइन इन गर्नुहोस्।",
+    "gatewayNoModel": "पहिले रुचिहरूमा बोलीलाई पाठमा रूपान्तरण गर्ने मोडेल छान्नुहोस्।"
   },
   "share": {
     "title": "Kilo मा सेयर",
@@ -3009,5 +3025,12 @@
     "needsInput": "जवाफ चाहिन्छ",
     "channelName": "सक्रिय एजेन्टहरू",
     "activityKitDisabledBody": "लक स्क्रिनमा सक्रिय एजेन्टहरू हेर्न सेटिङ्समा प्रत्यक्ष गतिविधिहरू चालू गर्नुहोस्।"
+  },
+  "transcriptionModel": {
+    "title": "बोलीलाई पाठमा रूपान्तरण गर्ने मोडेल",
+    "noneChosen": "कुनै पनि चयन गरिएको छैन",
+    "emptyTitle": "बोलीलाई पाठमा रूपान्तरण गर्ने कुनै मोडेल छैन",
+    "emptyDescription": "Kilo Gateway ले अहिले बोलीलाई पाठमा रूपान्तरण गर्ने कुनै मोडेल प्रदान गरिरहेको छैन।",
+    "loadFailed": "बोलीलाई पाठमा रूपान्तरण गर्ने मोडेलहरू लोड गर्न सकिएन।"
   }
 }

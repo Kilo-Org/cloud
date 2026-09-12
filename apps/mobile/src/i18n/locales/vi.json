@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO doanh nghiệp"
   },
   "preferences": {
+    "general": "Chung",
+    "voiceInput": "Nhập bằng giọng nói",
     "autoExpandThinking": "Tự động mở phần suy luận",
     "autoExpandThinkingSubtitle": "Hiển thị toàn bộ nội dung suy luận của tác nhân sau khi suy luận xong.",
     "keepScreenOn": "Giữ màn hình sáng khi xem phiên",
@@ -238,6 +240,7 @@
     "appearanceLight": "Sáng",
     "appearanceDark": "Tối",
     "account": "Tài khoản",
+    "accountSubtitle": "Ngôn ngữ, máy chủ được tin cậy và phiên đăng nhập trên thiết bị",
     "prReviewAttribution": "Ghi tên ứng dụng trong bản rà soát PR",
     "prReviewAttributionSubtitle": "Thêm dòng Đã rà soát qua Kilo ở cuối mỗi bản rà soát bạn gửi.",
     "returnSendsMessage": "Phím xuống dòng gửi tin nhắn",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Chuyển giọng nói thành văn bản qua Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Sử dụng mô hình Kilo Gateway để chuyển nội dung nhập bằng giọng nói thành văn bản thay vì nhận dạng giọng nói của thiết bị. Bản ghi của bạn được gửi tới Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Hoạt động trực tiếp",
@@ -2144,7 +2150,14 @@
     "languageNotInstalledMessage": "Các tệp giọng nói ngoại tuyến cho {{language}} chưa được cài đặt trên điện thoại này. Hãy tải các tệp đó xuống, rồi thử nhập bằng giọng nói lại.",
     "downloadOfflineModel": "Tải xuống",
     "offlineModelDownloadScheduled": "Các tệp giọng nói ngoại tuyến sẽ được tải xuống trong nền. Hãy thử nhập bằng giọng nói lại sau.",
-    "listeningStopped": "Đã dừng nghe."
+    "listeningStopped": "Đã dừng nghe.",
+    "transcribing": "Đang chuyển thành văn bản...",
+    "gatewayUnreachable": "Không thể kết nối tới Kilo Gateway. Hãy kiểm tra kết nối và thử lại.",
+    "gatewayTimeout": "Việc chuyển giọng nói thành văn bản mất quá nhiều thời gian. Hãy thử lại.",
+    "gatewayModelUnavailable": "Mô hình này hiện không khả dụng. Hãy chọn mô hình khác trong Tùy chọn.",
+    "gatewayModelUnavailableNotice": "Mô hình này không còn được cung cấp nữa. Nhấn $t(transcriptionModel.title) để chọn mô hình khác.",
+    "gatewaySignInRequired": "Đăng nhập để dùng tính năng chuyển giọng nói qua Kilo Gateway.",
+    "gatewayNoModel": "Trước tiên, hãy chọn một mô hình chuyển giọng nói trong Tùy chọn."
   },
   "share": {
     "title": "Chia sẻ đến Kilo",
@@ -2322,11 +2335,172 @@
     "installAttributionPromptTitle": "Cho phép xác định nguồn cài đặt?"
   },
   "prReview": {
-    "pullRequestUnavailable": "Không thể truy cập PR",
-    "pullRequestUnavailableDescription": "Không thể mở PR này. Có thể PR đã bị xóa, kho lưu trữ ở chế độ riêng tư hoặc ứng dụng Kilo trên GitHub chưa được cài đặt cho kho lưu trữ này.",
     "accessDeniedDescription": "Bạn không có quyền xem PR này.",
-    "noFilesChanged": "Không có tệp nào thay đổi",
-    "noFilesChangedDescription": "PR này không có tệp nào thay đổi.",
+    "checkConnection": "Kiểm tra kết nối",
+    "checks": {
+      "checksCount": "{{displayCount}} bước kiểm tra",
+      "couldNotLoad": "Không thể tải các bước kiểm tra.",
+      "failed": "{{displayCount}} không đạt",
+      "noAccess": "Bạn không có quyền xem các bước kiểm tra của kho lưu trữ này.",
+      "noChecksReported": "Chưa có thông tin kiểm tra",
+      "notAvailable": "Chưa có thông tin kiểm tra. Có thể bản ghi mới nhất chưa được xử lý hoặc ứng dụng Kilo trên GitHub chưa được cài đặt cho kho lưu trữ nguồn.",
+      "openDetails": "Mở chi tiết {{name}}",
+      "passed": "{{displayCount}} đạt",
+      "pending": "{{displayCount}} đang chờ",
+      "retryChecks": "Thử lại các bước kiểm tra",
+      "skipped": "{{displayCount}} đã bỏ qua",
+      "title": "Các bước kiểm tra",
+      "viewOnGitHub": "Xem PR trên GitHub",
+      "checkDetails": "chi tiết bước kiểm tra"
+    },
+    "composer": {
+      "addTitle": "Thêm bình luận",
+      "addToReview": "Thêm vào bản đánh giá",
+      "comment": "Bình luận",
+      "commentBody": "Nội dung bình luận",
+      "commentBodyPlaceholder": "Nội dung bình luận…",
+      "commentNow": "Bình luận ngay",
+      "discardMessage": "Bản nháp của bạn sẽ bị mất.",
+      "discardTitle": "Hủy bình luận?",
+      "editTitle": "Chỉnh sửa bình luận",
+      "insertSuggestion": "Chèn đề xuất",
+      "insertSuggestionA11y": "Chèn đề xuất sửa mã",
+      "loadFailedTitle": "Không thể tải trình soạn bình luận.",
+      "ok": "OK",
+      "unavailableMessage": "Bình luận chờ gửi này đã bị xóa hoặc đã được gửi.",
+      "unavailableTitle": "Không thể truy cập bình luận",
+      "bodyEmpty": "Nội dung bình luận không được để trống.",
+      "suggestionsOnlyAddedLines": "Đề xuất chỉ áp dụng cho các dòng mới thêm.",
+      "tapDiffLineToSuggest": "Chạm vào một dòng trong bản so sánh để bật đề xuất."
+    },
+    "connect": {
+      "checkFailedTitle": "Không thể kiểm tra kết nối GitHub.",
+      "checkFailedMessage": "Chưa thể xác định trạng thái đăng nhập cho đến khi tải xong dữ liệu.",
+      "checkFailedTitleGitLab": "Không thể kiểm tra kết nối GitLab.",
+      "checkFailedTitleBitbucket": "Không thể kiểm tra kết nối Bitbucket.",
+      "providerCheckFailedMessage": "Trạng thái kết nối chưa khả dụng cho đến khi tải xong.",
+      "reconnectTitle": "Kết nối lại GitHub",
+      "reconnectDescription": "Quyền kết nối với GitHub của bạn đã bị thu hồi. Kết nối lại để tiếp tục đánh giá PR trên thiết bị di động.",
+      "description": "Kết nối tài khoản GitHub của bạn để đánh giá PR trên thiết bị di động.",
+      "gitlabDescription": "Kết nối tài khoản GitLab để xem merge request trên thiết bị di động.",
+      "bitbucketDescription": "Kết nối Bitbucket với tổ chức này để xem PR trên thiết bị di động.",
+      "bitbucketOrgOnlyDescription": "Chọn một tổ chức trong hồ sơ của bạn để xem các PR Bitbucket của tổ chức đó."
+    },
+    "connectionExpired": "Kết nối GitHub đã hết hạn.",
+    "couldNotLoadPullRequest": "Không thể tải PR.",
+    "couldNotOpenGitHubAppSettings": "Không thể mở cài đặt ứng dụng GitHub.",
+    "description": "Mô tả",
+    "discussion": {
+      "acceptTerms": "Chấp nhận",
+      "accessDeniedMessage": "Bạn không có quyền xem thảo luận của PR này.",
+      "addReaction": "Thêm cảm xúc",
+      "block": "Chặn",
+      "blockedUser": "Đã chặn {{login}}",
+      "collapseThread": "Thu gọn chuỗi thảo luận",
+      "commentActions": "Thao tác với bình luận",
+      "comment": "{{displayCount}} bình luận",
+      "comment_other": "{{displayCount}} bình luận",
+      "couldNotLoad": "Không thể tải phần thảo luận.",
+      "couldNotLoadMore": "Không thể tải thêm bình luận.",
+      "loadMoreComments": "Tải thêm bình luận",
+      "loading": "Đang tải thảo luận",
+      "moderation": {
+        "block": {
+          "retryable": "Không thể chặn người dùng này. Kiểm tra kết nối và thử lại.",
+          "terminal": "Không thể chặn người dùng này."
+        },
+        "mute": {
+          "retryable": "Không thể tắt tiếng người dùng này. Kiểm tra kết nối và thử lại.",
+          "terminal": "Không thể tắt tiếng người dùng này."
+        },
+        "reportContent": {
+          "retryable": "Không thể báo cáo bình luận này. Kiểm tra kết nối và thử lại.",
+          "terminal": "Không thể báo cáo bình luận này."
+        },
+        "reportUser": {
+          "retryable": "Không thể báo cáo người dùng này. Kiểm tra kết nối và thử lại.",
+          "terminal": "Không thể báo cáo người dùng này."
+        }
+      },
+      "moreLinesAbove": "… Còn {{displayCount}} dòng ở trên.",
+      "mute": "Tắt tiếng",
+      "mutedUser": "Đã tắt tiếng {{login}}",
+      "noDiscussion": "Chưa có thảo luận",
+      "noDiscussionDescription": "PR này chưa có chuỗi thảo luận đánh giá hay bình luận nào.",
+      "comment_one": "1 bình luận",
+      "outdated": "Lỗi thời",
+      "quotedDiffSnippet": "Đoạn trích từ bản so sánh",
+      "reactionPill": "Cảm xúc {{emoji}}, {{displayCount}} {{countLabel}}",
+      "reaction": "biểu cảm",
+      "reaction_other": "biểu cảm",
+      "reaction_one": "cảm xúc",
+      "replyBadRequest": "Không thể đăng câu trả lời này. Chuỗi thảo luận có thể đã thay đổi.",
+      "replyBody": "Nội dung trả lời",
+      "replyForbidden": "Bạn không có quyền trả lời trong PR này.",
+      "addCommentCta": "Bình luận trong PR này",
+      "commentBadRequest": "Không thể đăng bình luận này. PR có thể đã thay đổi.",
+      "commentForbidden": "Bạn không có quyền bình luận trong PR này.",
+      "replyPlaceholder": "Trả lời…",
+      "reportContent": "Báo cáo nội dung",
+      "reportUser": "Báo cáo người dùng",
+      "resolveThread": "Đánh dấu chuỗi thảo luận là đã giải quyết",
+      "resolved": "Đã giải quyết",
+      "retryLoadingMore": "Thử tải thêm bình luận",
+      "reviewFiles": "Đánh giá tệp",
+      "startedRelative": " · bắt đầu {{relative}}",
+      "submitReply": "Gửi câu trả lời",
+      "termsAcceptRetry": "Không thể ghi nhận việc chấp nhận điều khoản. Kiểm tra kết nối rồi thử lại.",
+      "termsCopy": "Bạn phải từ 13 tuổi trở lên mới được đăng nội dung.",
+      "termsTitle": "Điều khoản dịch vụ",
+      "threadAccessibilityLabel": "Chuỗi thảo luận {{anchorLabel}}",
+      "unavailable": "Không thể truy cập phần thảo luận.",
+      "unavailableMessage": "PR này có thể đã bị xóa.",
+      "unresolveThread": "Mở lại chuỗi thảo luận",
+      "viewTerms": "Xem điều khoản",
+      "termsAcceptRequired": "Bạn phải chấp nhận điều khoản dịch vụ mới được đăng nội dung.",
+      "termsCheckRetryCopy": "Không thể kiểm tra Điều khoản dịch vụ. Kiểm tra kết nối và thử lại.",
+      "termsOutdatedCopy": "Điều khoản dịch vụ đã thay đổi. Mở lại màn hình này để chấp nhận phiên bản mới nhất.",
+      "reactions": {
+        "thumbsUp": "Thích",
+        "thumbsDown": "Không thích",
+        "laugh": "Cười",
+        "hooray": "Hoan hô",
+        "confused": "Bối rối",
+        "heart": "Trái tim",
+        "rocket": "Tên lửa",
+        "eyes": "Đôi mắt"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Bình luận về tệp {{path}}",
+        "fileComment": "Bình luận về tệp",
+        "outdatedOnPathLines": "Không còn cập nhật tại {{path}} {{lines}}",
+        "outdatedOnLines": "Không còn cập nhật tại {{lines}}",
+        "outdatedOnPath": "Không còn cập nhật tại {{path}}"
+      },
+      "deletedUser": "người dùng đã bị xóa",
+      "replyForbiddenTerm": "Bạn không có quyền trả lời trong {{term}} này."
+    },
+    "entry": {
+      "eyebrow": "Mở PR hoặc merge request bằng URL",
+      "pastePrLink": "Dán liên kết PR hoặc merge request",
+      "noRecentPrs": "Chưa có đánh giá gần đây",
+      "noRecentPrsDescription": "Dán liên kết ở trên để bắt đầu đánh giá — lần sau nó sẽ xuất hiện ở đây.",
+      "couldNotLoad": "Không thể tải dữ liệu.",
+      "removeFromRecentsTitle": "Xóa khỏi mục gần đây?",
+      "removeFromRecentsMessage": "Đánh giá này sẽ được xóa khỏi danh sách gần đây của bạn.",
+      "removeRecentAccessibility": "Xóa {{repo}} khỏi mục gần đây",
+      "urlAccessibility": "Nhập URL của PR hoặc merge request",
+      "urlPlaceholder": "URL của PR hoặc merge request",
+      "openAccessibility": "Mở PR hoặc merge request",
+      "clearLink": "Xóa liên kết",
+      "pasteLink": "Dán liên kết PR hoặc merge request",
+      "open": "Mở"
+    },
+    "eventChips": {
+      "comment": "Bình luận",
+      "label": "Hình thức đánh giá",
+      "requestChanges": "Yêu cầu thay đổi"
+    },
     "fileList": {
       "filesList": "Danh sách tệp",
       "filesViewed": "Tệp · Đã xem {{viewed}}/{{total}}",
@@ -2371,6 +2545,7 @@
       "commentOnSelectedLines": "Bình luận về các dòng đã chọn",
       "finishReview": "Hoàn tất đánh giá"
     },
+    "headLine": "{{counts}} · bản ghi mới nhất {{sha}}",
     "hunkRows": {
       "contextUnavailable": "Không có các dòng ngữ cảnh tại tham chiếu này.",
       "expandAll": "Mở rộng tất cả",
@@ -2403,21 +2578,14 @@
       "retryLoadingContext": "Thử tải lại các dòng ngữ cảnh",
       "retryLoadingNextPage": "Thử tải lại trang tiếp theo"
     },
-    "sideBySide": {
-      "emptyDiffColumn": "cột so sánh trống",
-      "emptyDiffRow": "Dòng so sánh trống",
-      "newOnly": "Chỉ có ở bản mới: {{text}}",
-      "noNewlineAtEndOfFile": "không có ký tự xuống dòng ở cuối tệp.",
-      "oldNew": "Cũ: {{old}} | Mới: {{new}}",
-      "oldOnly": "Chỉ có ở bản cũ: {{text}}"
+    "inbox": {
+      "couldNotLoad": "Không thể tải hộp thư đến.",
+      "loading": "Đang tải hộp thư đến",
+      "noReviewRequests": "Chưa có yêu cầu đánh giá",
+      "noReviewRequestsDescription": "Các PR đang chờ bạn đánh giá sẽ xuất hiện ở đây. Bạn vẫn có thể dán liên kết của bất kỳ PR nào ở trên.",
+      "title": "Hộp thư đến"
     },
-    "connectionExpired": "Kết nối GitHub đã hết hạn.",
-    "capabilities": {
-      "banner": {
-        "title": "Không khả dụng trên nhà cung cấp này",
-        "accessibility": "Không khả dụng trên nhà cung cấp này: {{reason}}"
-      }
-    },
+    "installKiloGitHubApp": "Cài đặt ứng dụng Kilo trên GitHub",
     "merge": {
       "merge": "Hợp nhất",
       "mergeNow": "Hợp nhất ngay",
@@ -2507,204 +2675,9 @@
         "rebase": "Áp dụng lại lần lượt các bản ghi từ nhánh này lên nhánh đích mà không tạo bản ghi hợp nhất."
       }
     },
-    "discussion": {
-      "threadAccessibilityLabel": "Chuỗi thảo luận {{anchorLabel}}",
-      "collapseThread": "Thu gọn chuỗi thảo luận",
-      "resolveThread": "Đánh dấu chuỗi thảo luận là đã giải quyết",
-      "unresolveThread": "Mở lại chuỗi thảo luận",
-      "resolved": "Đã giải quyết",
-      "outdated": "Lỗi thời",
-      "comment_one": "1 bình luận",
-      "comment": "{{displayCount}} bình luận",
-      "comment_other": "{{displayCount}} bình luận",
-      "startedRelative": " · bắt đầu {{relative}}",
-      "couldNotLoadMore": "Không thể tải thêm bình luận.",
-      "retryLoadingMore": "Thử tải thêm bình luận",
-      "loadMoreComments": "Tải thêm bình luận",
-      "addReaction": "Thêm cảm xúc",
-      "reactionPill": "Cảm xúc {{emoji}}, {{displayCount}} {{countLabel}}",
-      "reaction_one": "cảm xúc",
-      "reaction": "biểu cảm",
-      "reaction_other": "biểu cảm",
-      "commentActions": "Thao tác với bình luận",
-      "reportContent": "Báo cáo nội dung",
-      "reportUser": "Báo cáo người dùng",
-      "mute": "Tắt tiếng",
-      "block": "Chặn",
-      "blockedUser": "Đã chặn {{login}}",
-      "mutedUser": "Đã tắt tiếng {{login}}",
-      "replyPlaceholder": "Trả lời…",
-      "replyBody": "Nội dung trả lời",
-      "submitReply": "Gửi câu trả lời",
-      "termsTitle": "Điều khoản dịch vụ",
-      "termsCopy": "Bạn phải từ 13 tuổi trở lên mới được đăng nội dung.",
-      "termsAcceptRetry": "Không thể ghi nhận việc chấp nhận điều khoản. Kiểm tra kết nối rồi thử lại.",
-      "viewTerms": "Xem điều khoản",
-      "acceptTerms": "Chấp nhận",
-      "replyBadRequest": "Không thể đăng câu trả lời này. Chuỗi thảo luận có thể đã thay đổi.",
-      "replyForbidden": "Bạn không có quyền trả lời trong PR này.",
-      "replyForbiddenTerm": "Bạn không có quyền trả lời trong {{term}} này.",
-      "moderation": {
-        "block": {
-          "retryable": "Không thể chặn người dùng này. Kiểm tra kết nối và thử lại.",
-          "terminal": "Không thể chặn người dùng này."
-        },
-        "mute": {
-          "retryable": "Không thể tắt tiếng người dùng này. Kiểm tra kết nối và thử lại.",
-          "terminal": "Không thể tắt tiếng người dùng này."
-        },
-        "reportContent": {
-          "retryable": "Không thể báo cáo bình luận này. Kiểm tra kết nối và thử lại.",
-          "terminal": "Không thể báo cáo bình luận này."
-        },
-        "reportUser": {
-          "retryable": "Không thể báo cáo người dùng này. Kiểm tra kết nối và thử lại.",
-          "terminal": "Không thể báo cáo người dùng này."
-        }
-      },
-      "accessDeniedMessage": "Bạn không có quyền xem thảo luận của PR này.",
-      "unavailable": "Không thể truy cập phần thảo luận.",
-      "unavailableMessage": "PR này có thể đã bị xóa.",
-      "couldNotLoad": "Không thể tải phần thảo luận.",
-      "loading": "Đang tải thảo luận",
-      "noDiscussion": "Chưa có thảo luận",
-      "noDiscussionDescription": "PR này chưa có chuỗi thảo luận đánh giá hay bình luận nào.",
-      "reviewFiles": "Đánh giá tệp",
-      "quotedDiffSnippet": "Đoạn trích từ bản so sánh",
-      "moreLinesAbove": "… Còn {{displayCount}} dòng ở trên.",
-      "termsAcceptRequired": "Bạn phải chấp nhận điều khoản dịch vụ mới được đăng nội dung.",
-      "termsOutdatedCopy": "Điều khoản dịch vụ đã thay đổi. Mở lại màn hình này để chấp nhận phiên bản mới nhất.",
-      "termsCheckRetryCopy": "Không thể kiểm tra Điều khoản dịch vụ. Kiểm tra kết nối và thử lại.",
-      "reactions": {
-        "thumbsUp": "Thích",
-        "thumbsDown": "Không thích",
-        "laugh": "Cười",
-        "hooray": "Hoan hô",
-        "confused": "Bối rối",
-        "heart": "Trái tim",
-        "rocket": "Tên lửa",
-        "eyes": "Đôi mắt"
-      },
-      "anchor": {
-        "fileCommentOnPath": "Bình luận về tệp {{path}}",
-        "fileComment": "Bình luận về tệp",
-        "outdatedOnPathLines": "Không còn cập nhật tại {{path}} {{lines}}",
-        "outdatedOnLines": "Không còn cập nhật tại {{lines}}",
-        "outdatedOnPath": "Không còn cập nhật tại {{path}}"
-      },
-      "deletedUser": "người dùng đã bị xóa"
-    },
-    "couldNotOpenGitHubAppSettings": "Không thể mở cài đặt ứng dụng GitHub.",
-    "installKiloGitHubApp": "Cài đặt ứng dụng Kilo trên GitHub",
-    "checkConnection": "Kiểm tra kết nối",
-    "couldNotLoadPullRequest": "Không thể tải PR.",
-    "description": "Mô tả",
     "noDescriptionProvided": "Chưa có mô tả.",
-    "review": "Rà soát",
-    "reviewPullRequest": "Đánh giá PR",
-    "headLine": "{{counts}} · bản ghi mới nhất {{sha}}",
-    "entry": {
-      "eyebrow": "Mở PR hoặc merge request bằng URL",
-      "pastePrLink": "Dán liên kết PR hoặc merge request",
-      "noRecentPrs": "Chưa có đánh giá gần đây",
-      "noRecentPrsDescription": "Dán liên kết ở trên để bắt đầu đánh giá — lần sau nó sẽ xuất hiện ở đây.",
-      "couldNotLoad": "Không thể tải dữ liệu.",
-      "removeFromRecentsTitle": "Xóa khỏi mục gần đây?",
-      "removeFromRecentsMessage": "Đánh giá này sẽ được xóa khỏi danh sách gần đây của bạn.",
-      "removeRecentAccessibility": "Xóa {{repo}} khỏi mục gần đây",
-      "urlAccessibility": "Nhập URL của PR hoặc merge request",
-      "urlPlaceholder": "URL của PR hoặc merge request",
-      "openAccessibility": "Mở PR hoặc merge request",
-      "clearLink": "Xóa liên kết",
-      "pasteLink": "Dán liên kết PR hoặc merge request",
-      "open": "Mở"
-    },
-    "checks": {
-      "checksCount": "{{displayCount}} bước kiểm tra",
-      "couldNotLoad": "Không thể tải các bước kiểm tra.",
-      "failed": "{{displayCount}} không đạt",
-      "noAccess": "Bạn không có quyền xem các bước kiểm tra của kho lưu trữ này.",
-      "noChecksReported": "Chưa có thông tin kiểm tra",
-      "notAvailable": "Chưa có thông tin kiểm tra. Có thể bản ghi mới nhất chưa được xử lý hoặc ứng dụng Kilo trên GitHub chưa được cài đặt cho kho lưu trữ nguồn.",
-      "openDetails": "Mở chi tiết {{name}}",
-      "passed": "{{displayCount}} đạt",
-      "pending": "{{displayCount}} đang chờ",
-      "retryChecks": "Thử lại các bước kiểm tra",
-      "skipped": "{{displayCount}} đã bỏ qua",
-      "title": "Các bước kiểm tra",
-      "viewOnGitHub": "Xem PR trên GitHub",
-      "checkDetails": "chi tiết bước kiểm tra"
-    },
-    "inbox": {
-      "couldNotLoad": "Không thể tải hộp thư đến.",
-      "loading": "Đang tải hộp thư đến",
-      "noReviewRequests": "Chưa có yêu cầu đánh giá",
-      "noReviewRequestsDescription": "Các PR đang chờ bạn đánh giá sẽ xuất hiện ở đây. Bạn vẫn có thể dán liên kết của bất kỳ PR nào ở trên.",
-      "title": "Hộp thư đến"
-    },
-    "composer": {
-      "addTitle": "Thêm bình luận",
-      "addToReview": "Thêm vào bản đánh giá",
-      "comment": "Bình luận",
-      "commentBody": "Nội dung bình luận",
-      "commentBodyPlaceholder": "Nội dung bình luận…",
-      "commentNow": "Bình luận ngay",
-      "discardMessage": "Bản nháp của bạn sẽ bị mất.",
-      "discardTitle": "Hủy bình luận?",
-      "editTitle": "Chỉnh sửa bình luận",
-      "insertSuggestion": "Chèn đề xuất",
-      "insertSuggestionA11y": "Chèn đề xuất sửa mã",
-      "loadFailedTitle": "Không thể tải trình soạn bình luận.",
-      "ok": "OK",
-      "unavailableMessage": "Bình luận chờ gửi này đã bị xóa hoặc đã được gửi.",
-      "unavailableTitle": "Không thể truy cập bình luận",
-      "bodyEmpty": "Nội dung bình luận không được để trống.",
-      "suggestionsOnlyAddedLines": "Đề xuất chỉ áp dụng cho các dòng mới thêm.",
-      "tapDiffLineToSuggest": "Chạm vào một dòng trong bản so sánh để bật đề xuất."
-    },
-    "connect": {
-      "checkFailedTitle": "Không thể kiểm tra kết nối GitHub.",
-      "checkFailedMessage": "Chưa thể xác định trạng thái đăng nhập cho đến khi tải xong dữ liệu.",
-      "checkFailedTitleGitLab": "Không thể kiểm tra kết nối GitLab.",
-      "checkFailedTitleBitbucket": "Không thể kiểm tra kết nối Bitbucket.",
-      "providerCheckFailedMessage": "Trạng thái kết nối chưa khả dụng cho đến khi tải xong.",
-      "reconnectTitle": "Kết nối lại GitHub",
-      "reconnectDescription": "Quyền kết nối với GitHub của bạn đã bị thu hồi. Kết nối lại để tiếp tục đánh giá PR trên thiết bị di động.",
-      "description": "Kết nối tài khoản GitHub của bạn để đánh giá PR trên thiết bị di động.",
-      "gitlabDescription": "Kết nối tài khoản GitLab để xem merge request trên thiết bị di động.",
-      "bitbucketDescription": "Kết nối Bitbucket với tổ chức này để xem PR trên thiết bị di động.",
-      "bitbucketOrgOnlyDescription": "Chọn một tổ chức trong hồ sơ của bạn để xem các PR Bitbucket của tổ chức đó."
-    },
-    "screen": {
-      "shareA11y": "Chia sẻ PR",
-      "title": "#{{number}}"
-    },
-    "submit": {
-      "deletePendingMessage": "Bình luận này sẽ được xóa khỏi danh sách chờ gửi của bản đánh giá.",
-      "deletePendingTitle": "Xóa bình luận chờ gửi?",
-      "loadFailedTitle": "Không thể tải màn hình gửi đánh giá.",
-      "pendingComment": "bình luận chưa gửi",
-      "pendingComment_other": "bình luận chưa gửi",
-      "pendingComment_one": "bình luận chờ gửi",
-      "summaryOptional": "Tóm tắt (tùy chọn)",
-      "partialPostedMessage": "Đã đăng {{displayFreshCount}} bình luận. Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
-      "submitCountOfTotal": "Gửi {{displayFreshCount}} trong {{displayTotalCount}} bình luận",
-      "submitReview": "Gửi kết quả rà soát",
-      "blockedRequestChanges": "Thêm tóm tắt hoặc ít nhất một bình luận để yêu cầu thay đổi.",
-      "blockedComment": "Thêm tóm tắt hoặc ít nhất một bình luận để gửi bản đánh giá dưới dạng bình luận."
-    },
-    "reconnectNotice": {
-      "title": "Kết nối GitHub đã hết hạn.",
-      "message": "Kết nối GitHub của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
-      "gitlabTitle": "Kết nối GitLab đã hết hạn.",
-      "bitbucketTitle": "Kết nối Bitbucket đã hết hạn.",
-      "providerMessage": "Kết nối {{provider}} của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần."
-    },
-    "eventChips": {
-      "comment": "Bình luận",
-      "label": "Hình thức đánh giá",
-      "requestChanges": "Yêu cầu thay đổi"
-    },
+    "noFilesChanged": "Không có tệp nào thay đổi",
+    "noFilesChangedDescription": "PR này không có tệp nào thay đổi.",
     "overview": {
       "commit": "commit",
       "commit_other": "commit",
@@ -2745,31 +2718,53 @@
       "summaryA11y": "Tóm tắt đánh giá",
       "summaryPlaceholder": "Tóm tắt đánh giá (không bắt buộc)"
     },
-    "tabs": {
-      "discussion": "Thảo luận",
-      "files": "Tệp",
-      "overview": "Tổng quan"
+    "pullRequestUnavailable": "Không thể truy cập PR",
+    "pullRequestUnavailableDescription": "Không thể mở PR này. Có thể PR đã bị xóa, kho lưu trữ ở chế độ riêng tư hoặc ứng dụng Kilo trên GitHub chưa được cài đặt cho kho lưu trữ này.",
+    "reconnectNotice": {
+      "title": "Kết nối GitHub đã hết hạn.",
+      "message": "Kết nối GitHub của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
+      "gitlabTitle": "Kết nối GitLab đã hết hạn.",
+      "bitbucketTitle": "Kết nối Bitbucket đã hết hạn.",
+      "providerMessage": "Kết nối {{provider}} của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần."
     },
-    "terms": {
-      "pullRequest": "Yêu cầu hợp nhất",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Chia sẻ merge request",
-      "viewOnProvider": "Xem trên {{provider}}",
-      "mergeRequestUnavailable": "Không thể truy cập merge request",
-      "unavailableDescription": "Có thể nó đã bị xóa, hoặc bạn không có quyền truy cập.",
-      "accessDeniedMergeRequest": "Bạn không có quyền xem merge request này.",
-      "couldNotLoadMergeRequest": "Không thể tải merge request.",
-      "discussionAccessDenied": "Bạn không có quyền xem thảo luận của merge request này.",
-      "discussionUnavailableMessage": "Merge request này có thể đã bị xóa.",
-      "noDiscussionDescription": "Merge request này chưa có chuỗi thảo luận đánh giá hay bình luận nào.",
-      "noFilesChangedDescription": "Merge request này không có tệp nào thay đổi."
+    "review": "Rà soát",
+    "reviewPullRequest": "Đánh giá PR",
+    "screen": {
+      "shareA11y": "Chia sẻ PR",
+      "title": "#{{number}}"
+    },
+    "sideBySide": {
+      "emptyDiffColumn": "cột so sánh trống",
+      "emptyDiffRow": "Dòng so sánh trống",
+      "newOnly": "Chỉ có ở bản mới: {{text}}",
+      "noNewlineAtEndOfFile": "không có ký tự xuống dòng ở cuối tệp.",
+      "oldNew": "Cũ: {{old}} | Mới: {{new}}",
+      "oldOnly": "Chỉ có ở bản cũ: {{text}}"
+    },
+    "submit": {
+      "deletePendingMessage": "Bình luận này sẽ được xóa khỏi danh sách chờ gửi của bản đánh giá.",
+      "deletePendingTitle": "Xóa bình luận chờ gửi?",
+      "loadFailedTitle": "Không thể tải màn hình gửi đánh giá.",
+      "pendingComment": "bình luận chưa gửi",
+      "pendingComment_other": "bình luận chưa gửi",
+      "pendingComment_one": "bình luận chờ gửi",
+      "summaryOptional": "Tóm tắt (tùy chọn)",
+      "partialPostedMessage": "Đã đăng {{displayFreshCount}} bình luận. Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
+      "submitCountOfTotal": "Gửi {{displayFreshCount}} trong {{displayTotalCount}} bình luận",
+      "submitReview": "Gửi kết quả rà soát",
+      "blockedRequestChanges": "Thêm tóm tắt hoặc ít nhất một bình luận để yêu cầu thay đổi.",
+      "blockedComment": "Thêm tóm tắt hoặc ít nhất một bình luận để gửi bản đánh giá dưới dạng bình luận."
     },
     "fileStatus": {
       "changed": "Đã thay đổi",
       "copied": "Đã sao chép",
       "modified": "Đã sửa đổi",
       "renamed": "Đã đổi tên"
+    },
+    "tabs": {
+      "discussion": "Thảo luận",
+      "files": "Tệp",
+      "overview": "Tổng quan"
     },
     "diff": {
       "selectedTapToChange": "Đã chọn {{label}}, chạm để đổi lựa chọn",
@@ -2802,6 +2797,27 @@
       "ambiguous": "Không thể xác nhận — hãy kiểm tra PR trước khi thử lại.",
       "persistenceFailed": "Không thể ghi nhận thao tác này. Vui lòng thử lại sau.",
       "forbidden": "Bạn không có quyền thực hiện thao tác này."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Không khả dụng trên nhà cung cấp này",
+        "accessibility": "Không khả dụng trên nhà cung cấp này: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Yêu cầu hợp nhất",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Chia sẻ merge request",
+      "viewOnProvider": "Xem trên {{provider}}",
+      "mergeRequestUnavailable": "Không thể truy cập merge request",
+      "unavailableDescription": "Có thể nó đã bị xóa, hoặc bạn không có quyền truy cập.",
+      "accessDeniedMergeRequest": "Bạn không có quyền xem merge request này.",
+      "couldNotLoadMergeRequest": "Không thể tải merge request.",
+      "discussionAccessDenied": "Bạn không có quyền xem thảo luận của merge request này.",
+      "discussionUnavailableMessage": "Merge request này có thể đã bị xóa.",
+      "noDiscussionDescription": "Merge request này chưa có chuỗi thảo luận đánh giá hay bình luận nào.",
+      "noFilesChangedDescription": "Merge request này không có tệp nào thay đổi."
     }
   },
   "organization": {
@@ -3009,5 +3025,12 @@
     "needsInput": "Cần phản hồi",
     "channelName": "Tác nhân đang hoạt động",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
+  },
+  "transcriptionModel": {
+    "title": "Mô hình chuyển giọng nói thành văn bản",
+    "noneChosen": "Chưa chọn",
+    "emptyTitle": "Không có mô hình chuyển giọng nói thành văn bản",
+    "emptyDescription": "Hiện Kilo Gateway không cung cấp mô hình chuyển giọng nói thành văn bản.",
+    "loadFailed": "Không thể tải các mô hình chuyển giọng nói thành văn bản."
   }
 }

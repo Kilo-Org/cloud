@@ -239,7 +239,10 @@
     "appearanceSystem": "System",
     "appearanceLight": "Light",
     "appearanceDark": "Dark",
+    "general": "General",
     "account": "Account",
+    "accountSubtitle": "Language, trusted hosts, and device sessions",
+    "voiceInput": "Voice input",
     "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "returnSendsMessage": "Return key sends message",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Gateway transcription",
+    "gatewayTranscriptionSubtitle": "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Empty diff row"
     },
     "connectionExpired": "GitHub connection expired.",
-    "capabilities": {
-      "banner": {
-        "title": "Not available on this provider",
-        "accessibility": "Not available on this provider: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Merge",
       "mergeNow": "Merge now",
@@ -472,7 +472,9 @@
       "acceptTerms": "Accept",
       "replyBadRequest": "This reply can't be posted. The thread may have changed.",
       "replyForbidden": "You don't have permission to reply to this pull request.",
-      "replyForbiddenTerm": "You don't have permission to reply to this {{term}}.",
+      "addCommentCta": "Comment on this pull request",
+      "commentBadRequest": "This comment can't be posted. The pull request may have changed.",
+      "commentForbidden": "You don't have permission to comment on this pull request.",
       "moderation": {
         "reportContent": {
           "terminal": "This comment can't be reported.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Outdated on {{lines}}",
         "outdatedOnPath": "Outdated on {{path}}"
       },
-      "deletedUser": "deleted user"
+      "deletedUser": "deleted user",
+      "replyForbiddenTerm": "You don't have permission to reply to this {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Could not open GitHub App settings",
     "installKiloGitHubApp": "Install the Kilo GitHub App",
@@ -679,21 +682,6 @@
       "files": "Files",
       "discussion": "Discussion"
     },
-    "terms": {
-      "pullRequest": "Pull request",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Share merge request",
-      "viewOnProvider": "View on {{provider}}",
-      "mergeRequestUnavailable": "Merge request unavailable",
-      "unavailableDescription": "It may have been deleted, or you may not have access to it.",
-      "accessDeniedMergeRequest": "You don't have permission to view this merge request.",
-      "couldNotLoadMergeRequest": "Could not load merge request",
-      "discussionAccessDenied": "You don't have permission to view this merge request's discussion.",
-      "discussionUnavailableMessage": "This merge request may have been removed.",
-      "noDiscussionDescription": "No review threads or conversation comments on this merge request.",
-      "noFilesChangedDescription": "This merge request has no file changes."
-    },
     "fileStatus": {
       "modified": "Modified",
       "renamed": "Renamed",
@@ -731,6 +719,27 @@
       "ambiguous": "Couldn't confirm — check the PR before retrying.",
       "persistenceFailed": "We could not record this action. Please try again later.",
       "forbidden": "Forbidden"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Not available on this provider",
+        "accessibility": "Not available on this provider: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Pull request",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "Merge request !{{number}}",
+      "shareMergeRequest": "Share merge request",
+      "viewOnProvider": "View on {{provider}}",
+      "mergeRequestUnavailable": "Merge request unavailable",
+      "unavailableDescription": "It may have been deleted, or you may not have access to it.",
+      "accessDeniedMergeRequest": "You don't have permission to view this merge request.",
+      "couldNotLoadMergeRequest": "Could not load merge request",
+      "discussionAccessDenied": "You don't have permission to view this merge request's discussion.",
+      "discussionUnavailableMessage": "This merge request may have been removed.",
+      "noDiscussionDescription": "No review threads or conversation comments on this merge request.",
+      "noFilesChangedDescription": "This merge request has no file changes."
     }
   },
   "notifications": {
@@ -2643,7 +2652,14 @@
     "languageNotInstalledTitle": "Voice input for {{language}} isn't ready",
     "languageNotInstalledMessage": "The {{language}} offline speech files aren't installed on this phone. Download them, then try voice input again.",
     "downloadOfflineModel": "Download",
-    "offlineModelDownloadScheduled": "The offline speech files will download in the background. Try voice input again later."
+    "offlineModelDownloadScheduled": "The offline speech files will download in the background. Try voice input again later.",
+    "transcribing": "Transcribing...",
+    "gatewayUnreachable": "Couldn't reach the Kilo gateway. Check your connection and try again.",
+    "gatewayTimeout": "Transcription took too long. Try again.",
+    "gatewayModelUnavailable": "This transcription model isn't available. Pick another one in Preferences.",
+    "gatewayModelUnavailableNotice": "This model is no longer offered. Tap $t(transcriptionModel.title) to choose another.",
+    "gatewaySignInRequired": "Sign in to use gateway transcription.",
+    "gatewayNoModel": "Choose a transcription model in Preferences first."
   },
   "share": {
     "title": "Share to Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Needs input",
     "channelName": "Active agents",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."
+  },
+  "transcriptionModel": {
+    "title": "Transcription model",
+    "noneChosen": "None chosen",
+    "emptyTitle": "No transcription models",
+    "emptyDescription": "The gateway offers no transcription models right now.",
+    "loadFailed": "Couldn't load transcription models."
   }
 }

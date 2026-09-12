@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO dhaabbataa"
   },
   "preferences": {
+    "general": "Waliigalaa",
+    "voiceInput": "Galtee sagalee",
     "autoExpandThinking": "Xiinxala ofumaan bal'isi",
     "autoExpandThinkingSubtitle": "Yeroo ergamaan xiinxala isaa xumuru, bal'isiitii agarsiisi.",
     "keepScreenOn": "Fuula turtii irra yeroo jirtu iskiriiniin akka hin dhaamne godhi",
@@ -238,6 +240,7 @@
     "appearanceLight": "Ifa",
     "appearanceDark": "Dukkana",
     "account": "Herrega",
+    "accountSubtitle": "Afaan, keessummeessitoota amanaman fi turtiiwwan meeshaalee",
     "prReviewAttribution": "Maqaa appilikeeshinii sakatta'iinsa PR irratti dabali",
     "prReviewAttributionSubtitle": "Yeroo sakatta'iinsa ergitu, barruu jalaa Kilo dhaan sakatta'ame jedhu dabali.",
     "returnSendsMessage": "Furtuun galchii ergaa ergiti",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Sagalee interneetiin barreeffamatti jijjiiruu Kilo Gateway'n",
+    "gatewayTranscriptionSubtitle": "Sagalee galchuu mallattoo sagalee meeshaa irraa haa ta'u moodeela Kilo Gateway'ttiin barreeffamatti jijjiiri. Sagaleen kee Kilo Gateway'tti ergama.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Gaaffiin walitti makuu hin argamu",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Tarree garaagarummaa duwwaa"
     },
     "connectionExpired": "Yeroon walitti hidhamiinsa GitHub darbeera.",
-    "capabilities": {
-      "banner": {
-        "title": "Waltajjii kanaan hin argamu",
-        "accessibility": "Waltajjii kanaan hin argamu: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Walitti makuu",
       "mergeNow": "Amma walitti maki",
@@ -472,7 +472,9 @@
       "acceptTerms": "Fudhadhu",
       "replyBadRequest": "Deebiin kun maxxanfamuu hin danda'u. Dameen marii jijjiirameera ta'a.",
       "replyForbidden": "Gaaffii walitti makuu kanaaf deebii kennuuf hayyama hin qabdu.",
-      "replyForbiddenTerm": "{{term}} kanaaf deebii kennuuf hayyama hin qabdu.",
+      "addCommentCta": "Gaaffii walitti makuu kanaa irratti yaada kenni",
+      "commentBadRequest": "Yaadni kun maxxanfamuu hin danda'u. Gaaffiin walitti makuu jijjiirameera ta'a.",
+      "commentForbidden": "Gaaffii walitti makuu kanaa irratti yaada kennuuf hayyama hin qabdu.",
       "moderation": {
         "reportContent": {
           "terminal": "Yaadni kun gabaafamuu hin danda'u.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Yeroon kan darbe: {{lines}}",
         "outdatedOnPath": "Yeroon kan darbe: {{path}}"
       },
-      "deletedUser": "fayyadamaa haqame"
+      "deletedUser": "fayyadamaa haqame",
+      "replyForbiddenTerm": "{{term}} kanaaf deebii kennuuf hayyama hin qabdu."
     },
     "couldNotOpenGitHubAppSettings": "Qindaa'ina appii GitHub banuun hin danda'amne.",
     "installKiloGitHubApp": "Appii Kilo GitHub fe'i",
@@ -679,21 +682,6 @@
       "files": "Faayiloota",
       "discussion": "Marii"
     },
-    "terms": {
-      "pullRequest": "Gaaffii walitti makuu",
-      "mergeRequest": "Gaaffii walitti makuu",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Gaaffii walitti makuu qoodi",
-      "viewOnProvider": "{{provider}} irratti ilaali",
-      "mergeRequestUnavailable": "Gaaffiin walitti makuu hin argamu",
-      "unavailableDescription": "Haqame ta'uu danda'a, yookiin hayyama isaa hin qabdu.",
-      "accessDeniedMergeRequest": "Gaaffii walitti makuu kana ilaaluuf hayyama hin qabdu.",
-      "couldNotLoadMergeRequest": "Gaaffii walitti makuu fe'uu hin danda'amne.",
-      "discussionAccessDenied": "Marii gaaffii walitti makuu kanaa ilaaluuf hayyama hin qabdu.",
-      "discussionUnavailableMessage": "Gaaffiin walitti makuu kun haqameera ta'a.",
-      "noDiscussionDescription": "Gaaffii walitti makuu kana irratti dameewwan gamaaggamaa ykn yaadonni marii hin jiran.",
-      "noFilesChangedDescription": "Gaaffiin walitti makuu kun jijjiirama faayilii hin qabu."
-    },
     "fileStatus": {
       "modified": "Fooyya'e",
       "renamed": "Maqaan jijjiirame",
@@ -731,6 +719,27 @@
       "ambiguous": "Mirkaneessuu hin dandeenye — deebi'ii yaaluu dura PR ilaali.",
       "persistenceFailed": "Gocha kana galmeessuu hin dandeenye. Maaloo booda deebi'ii yaali.",
       "forbidden": "Hayyamni hin jiru."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Waltajjii kanaan hin argamu",
+        "accessibility": "Waltajjii kanaan hin argamu: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Gaaffii walitti makuu",
+      "mergeRequest": "Gaaffii walitti makuu",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Gaaffii walitti makuu qoodi",
+      "viewOnProvider": "{{provider}} irratti ilaali",
+      "mergeRequestUnavailable": "Gaaffiin walitti makuu hin argamu",
+      "unavailableDescription": "Haqame ta'uu danda'a, yookiin hayyama isaa hin qabdu.",
+      "accessDeniedMergeRequest": "Gaaffii walitti makuu kana ilaaluuf hayyama hin qabdu.",
+      "couldNotLoadMergeRequest": "Gaaffii walitti makuu fe'uu hin danda'amne.",
+      "discussionAccessDenied": "Marii gaaffii walitti makuu kanaa ilaaluuf hayyama hin qabdu.",
+      "discussionUnavailableMessage": "Gaaffiin walitti makuu kun haqameera ta'a.",
+      "noDiscussionDescription": "Gaaffii walitti makuu kana irratti dameewwan gamaaggamaa ykn yaadonni marii hin jiran.",
+      "noFilesChangedDescription": "Gaaffiin walitti makuu kun jijjiirama faayilii hin qabu."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Faayiloota sagalee offlaayinii afaan {{language}} tiif bilbilaa kana irratti hin dhaabbatamin. Isaan buufadhu, ergasii sagaleen galchuu irra deebi'ii yaali.",
     "downloadOfflineModel": "Buufadhu",
     "offlineModelDownloadScheduled": "Faayiloota sagalee offlaayinii duubatti buufamu. Sagaleen galchuu booda irra deebi'ii yaali.",
-    "listeningStopped": "Dhaggeeffachuun dhaabbateera."
+    "listeningStopped": "Dhaggeeffachuun dhaabbateera.",
+    "transcribing": "Barreeffamatti jijjiiraa jira...",
+    "gatewayUnreachable": "Kilo Gateway'tti quhamuun hin danda'amne. Walqabannaa kee ilaaliitii deebi'ii yaali.",
+    "gatewayTimeout": "Sagalee barreeffamatti jijjiiruun yeroo dheeraa fudhate. Irra deebi'ii yaali.",
+    "gatewayModelUnavailable": "Moodeeli sagalee jijjiiru kun hin jiru. Filannoowwan keessaa kan biroo filadhu.",
+    "gatewayModelUnavailableNotice": "Moodeeli kun hin dhiyaatu. Kan biraa filachuuf $t(transcriptionModel.title) tuqi.",
+    "gatewaySignInRequired": "Jijjiirraa sagalee Kilo Gateway'tti fayyadamuuf seeni.",
+    "gatewayNoModel": "Dursee Filannoowwan keessatti moodeela sagalee jijjiiru filadhu."
   },
   "share": {
     "title": "Gara Kilo qoodi",
@@ -3009,5 +3025,12 @@
     "needsInput": "Deebii barbaada",
     "channelName": "Eejentoota hojii irra jiran",
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi."
+  },
+  "transcriptionModel": {
+    "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",
+    "noneChosen": "Homni hin filatamne",
+    "emptyTitle": "Moodeeli sagalee jijjiiru hin jiru",
+    "emptyDescription": "Kilo Gateway amma moodeela sagalee gara barreeffamaatti jijjiiru hin dhiyeessu.",
+    "loadFailed": "Moodeelota sagalee jijjiiru fe'uun hin danda'amne."
   }
 }

@@ -66,18 +66,20 @@ function createRuntime(
   const runtime = createControlTerminalRuntime({
     controlUrl,
     wrapperInstanceId,
-    getKiloRuntime: directory => {
-      let worktree = worktrees.get(directory);
+    getKiloRuntime: identity => {
+      const key = `${identity.sessionId}\0${identity.kiloSessionId}\0${identity.directory}`;
+      let worktree = worktrees.get(key);
       if (!worktree) {
         worktree = {
+          identity: { ...identity },
           runtimeId: `native_${worktrees.size + 1}`,
-          scopeId: directory,
-          directory,
-          env: { WORKTREE_VALUE: directory },
+          scopeId: identity.directory,
+          directory: identity.directory,
+          env: { WORKTREE_VALUE: identity.directory },
           kiloClient,
           signal: new AbortController().signal,
         };
-        worktrees.set(directory, worktree);
+        worktrees.set(key, worktree);
       }
       return worktree;
     },
@@ -251,7 +253,49 @@ describe('control terminal PTY ownership', () => {
 
     rememberAttachedRoot(firstSession.kiloSessionId, '/workspace/different');
     expect(() => runtime.rememberAttachedSession(firstSession)).toThrow(
-      'Terminal session ownership mismatch'
+      'Terminal session belongs to another session'
+    );
+  });
+
+  it('names unavailable, replaced, and conflicting terminal attachment runtimes', () => {
+    const unavailable = createControlTerminalRuntime({
+      controlUrl: 'ws://127.0.0.1:1/sandbox-control/unavailable',
+      wrapperInstanceId,
+      getKiloRuntime: () => undefined,
+    });
+    activeRuntimes.add(unavailable);
+    rememberAttachedRoot(firstSession.kiloSessionId, firstSession.directory);
+    expect(() => unavailable.rememberAttachedSession(firstSession)).toThrow(
+      'Terminal session runtime unavailable'
+    );
+
+    const initial: WorktreeKiloRuntime = {
+      runtimeId: 'native_initial',
+      scopeId: firstSession.directory,
+      directory: firstSession.directory,
+      env: {},
+      kiloClient: fakeKilo(),
+      signal: new AbortController().signal,
+    };
+    let current = initial;
+    const replaced = createControlTerminalRuntime({
+      controlUrl: 'ws://127.0.0.1:1/sandbox-control/replaced',
+      wrapperInstanceId,
+      getKiloRuntime: () => current,
+    });
+    activeRuntimes.add(replaced);
+    rememberAttachedRoot(firstSession.kiloSessionId, firstSession.directory);
+    replaced.rememberAttachedSession(firstSession);
+    current = { ...initial, runtimeId: 'native_replacement' };
+    expect(() => replaced.rememberAttachedSession(firstSession)).toThrow(
+      'Terminal session runtime was replaced'
+    );
+
+    const otherSession = { ...firstSession, sessionId: 'workspace_other' };
+    const conflicting = createRuntime(fakeKilo());
+    attach(conflicting, firstSession);
+    expect(() => attach(conflicting, otherSession)).toThrow(
+      'Terminal session belongs to another session'
     );
   });
 
@@ -546,12 +590,42 @@ describe('control terminal PTY ownership', () => {
     });
   });
 
+  it('rejects a same-directory sibling when lookup returns another root runtime', async () => {
+    const sibling = { ...secondSession, directory: firstSession.directory };
+    const firstRuntime: WorktreeKiloRuntime = {
+      identity: { ...firstSession },
+      isolation: 'per-session',
+      runtimeId: 'native_first',
+      directory: firstSession.directory,
+      scopeId: firstSession.directory,
+      env: { HOME: '/home/first', KILOCODE_TOKEN: 'first-token' },
+      kiloClient: fakeKilo(),
+      signal: new AbortController().signal,
+    };
+    const runtime = createControlTerminalRuntime({
+      controlUrl: 'ws://127.0.0.1:1/sandbox-control/sandbox',
+      wrapperInstanceId,
+      getKiloRuntime: identity =>
+        identity.directory === firstSession.directory ? firstRuntime : undefined,
+    });
+    activeRuntimes.add(runtime);
+
+    attach(runtime, firstSession);
+    expect(() => runtime.rememberAttachedSession(sibling)).toThrow(
+      /Terminal session ownership mismatch/
+    );
+    expect(await runtime.create(firstSession, creationPayload())).toMatchObject({
+      pty: { cwd: firstSession.directory },
+    });
+  });
+
   it('uses the owning worktree client and credentials for every PTY operation', async () => {
     const calls: Array<{ operation: string; directory: string; env?: Record<string, string> }> = [];
     const worktrees = new Map<string, WorktreeKiloRuntime>();
     for (const identity of [firstSession, secondSession]) {
       const directory = identity.directory;
-      worktrees.set(directory, {
+      worktrees.set(identity.kiloSessionId, {
+        identity: { ...identity },
         runtimeId: `native_${identity.sessionId}`,
         directory,
         scopeId: directory,
@@ -576,7 +650,7 @@ describe('control terminal PTY ownership', () => {
     const runtime = createControlTerminalRuntime({
       controlUrl: 'ws://127.0.0.1:1/sandbox-control/sandbox',
       wrapperInstanceId,
-      getKiloRuntime: directory => worktrees.get(directory),
+      getKiloRuntime: identity => worktrees.get(identity.kiloSessionId),
     });
     activeRuntimes.add(runtime);
     attach(runtime, firstSession);
@@ -589,7 +663,7 @@ describe('control terminal PTY ownership', () => {
       expect(calls.at(-3)).toMatchObject({
         operation: 'create',
         directory: identity.directory,
-        env: worktrees.get(identity.directory)?.env,
+        env: worktrees.get(identity.kiloSessionId)?.env,
       });
       expect(calls.at(-3)?.env).not.toHaveProperty('SANDBOX_CONTROL_CREDENTIAL');
       expect(calls.slice(-2)).toEqual([
@@ -598,7 +672,7 @@ describe('control terminal PTY ownership', () => {
       ]);
     }
 
-    worktrees.delete(firstSession.directory);
+    worktrees.delete(firstSession.kiloSessionId);
     expect(
       await terminalFailure(runtime.create(firstSession, creationPayload(crypto.randomUUID())))
     ).toMatchObject({ code: 'not_ready', message: 'Kilo worktree is not available' });
@@ -764,7 +838,8 @@ describe('control terminal reverse WebSocket bridge', () => {
       [firstSession, firstServers, 'pty_first'],
       [secondSession, secondServers, 'pty_second'],
     ] as const) {
-      worktrees.set(identity.directory, {
+      worktrees.set(identity.kiloSessionId, {
+        identity: { ...identity },
         runtimeId: `native_${identity.sessionId}`,
         scopeId: identity.directory,
         directory: identity.directory,
@@ -779,7 +854,7 @@ describe('control terminal reverse WebSocket bridge', () => {
     const runtime = createControlTerminalRuntime({
       controlUrl: firstServers.controlUrl,
       wrapperInstanceId,
-      getKiloRuntime: directory => worktrees.get(directory),
+      getKiloRuntime: identity => worktrees.get(identity.kiloSessionId),
     });
     activeRuntimes.add(runtime);
     attach(runtime, firstSession);

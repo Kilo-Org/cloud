@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO fyrir fyrirtæki"
   },
   "preferences": {
+    "general": "Almennt",
+    "voiceInput": "Raddinntak",
     "autoExpandThinking": "Opna hugsunarferlið sjálfkrafa",
     "autoExpandThinkingSubtitle": "Sýna allt hugsunarferli fulltrúans þegar því er lokið.",
     "keepScreenOn": "Halda skjánum kveiktum á lotusíðunni",
@@ -238,6 +240,7 @@
     "appearanceLight": "Ljóst",
     "appearanceDark": "Dökkt",
     "account": "Reikningur",
+    "accountSubtitle": "Tungumál, traustir vefþjónar og innskráningar í tækjum",
     "prReviewAttribution": "Merkja PR-yfirferðir með heiti forritsins",
     "prReviewAttributionSubtitle": "Bæta við textanum „Yfirfarið með Kilo“ neðst þegar þú sendir inn yfirferð.",
     "returnSendsMessage": "Færsluhnappur sendir skilaboð",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Umritun í gegnum Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Umritið raddinnsláttinn með Kilo Gateway líkani í stað talaþekkingar tækisins. Upptakan er send í Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Sameiningarbeiðni ekki tiltæk",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Tóm röð í breytingasamanburði"
     },
     "connectionExpired": "Tengingin við GitHub er útrunnin.",
-    "capabilities": {
-      "banner": {
-        "title": "Ekki í boði hjá þessari þjónustu",
-        "accessibility": "Ekki í boði hjá þessari þjónustu: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Sameining",
       "mergeNow": "Sameina núna",
@@ -472,7 +472,9 @@
       "acceptTerms": "Samþykkja",
       "replyBadRequest": "Ekki er hægt að birta þetta svar. Þráðurinn gæti hafa breyst.",
       "replyForbidden": "Þú hefur ekki heimild til að svara þessari sameiningarbeiðni.",
-      "replyForbiddenTerm": "Þú hefur ekki heimild til að svara við {{term}}.",
+      "addCommentCta": "Gera athugasemd við þessa sameiningarbeiðni",
+      "commentBadRequest": "Ekki er hægt að birta þessa athugasemd. Sameiningarbeiðnin gæti hafa breyst.",
+      "commentForbidden": "Þú hefur ekki heimild til að gera athugasemd við þessa sameiningarbeiðni.",
       "moderation": {
         "reportContent": {
           "terminal": "Ekki er hægt að tilkynna þessa athugasemd.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "Úrelt við {{lines}}",
         "outdatedOnPath": "Úrelt við {{path}}"
       },
-      "deletedUser": "eyddur notandi"
+      "deletedUser": "eyddur notandi",
+      "replyForbiddenTerm": "Þú hefur ekki heimild til að svara við {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Tókst ekki að opna stillingar GitHub-forritsins.",
     "installKiloGitHubApp": "Setja upp Kilo-forritið fyrir GitHub",
@@ -679,21 +682,6 @@
       "files": "Skrár",
       "discussion": "Umræða"
     },
-    "terms": {
-      "pullRequest": "Samrunabeiðni",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Deila merge request",
-      "viewOnProvider": "Skoða á {{provider}}",
-      "mergeRequestUnavailable": "Merge request ekki tiltæk",
-      "unavailableDescription": "Hún gæti hafa verið fjarlægð, eða þú hefur ekki aðgang að henni.",
-      "accessDeniedMergeRequest": "Þú hefur ekki heimild til að skoða þessa merge request.",
-      "couldNotLoadMergeRequest": "Ekki tókst að hlaða merge request.",
-      "discussionAccessDenied": "Þú hefur ekki heimild til að skoða umræðuna um þessa merge request.",
-      "discussionUnavailableMessage": "Þessi merge request gæti hafa verið fjarlægð.",
-      "noDiscussionDescription": "Engir yfirferðarþræðir eða almennar athugasemdir eru við þessa merge request.",
-      "noFilesChangedDescription": "Engar skrár hafa breyst í þessari merge request."
-    },
     "fileStatus": {
       "modified": "Breytt",
       "renamed": "Endurnefnd",
@@ -731,6 +719,27 @@
       "ambiguous": "Ekki tókst að staðfesta niðurstöðuna — athugaðu PR-beiðnina áður en þú reynir aftur.",
       "persistenceFailed": "Ekki tókst að skrá þessa aðgerð. Reyndu aftur síðar.",
       "forbidden": "Þú hefur ekki heimild til þessarar aðgerðar."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ekki í boði hjá þessari þjónustu",
+        "accessibility": "Ekki í boði hjá þessari þjónustu: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Samrunabeiðni",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Deila merge request",
+      "viewOnProvider": "Skoða á {{provider}}",
+      "mergeRequestUnavailable": "Merge request ekki tiltæk",
+      "unavailableDescription": "Hún gæti hafa verið fjarlægð, eða þú hefur ekki aðgang að henni.",
+      "accessDeniedMergeRequest": "Þú hefur ekki heimild til að skoða þessa merge request.",
+      "couldNotLoadMergeRequest": "Ekki tókst að hlaða merge request.",
+      "discussionAccessDenied": "Þú hefur ekki heimild til að skoða umræðuna um þessa merge request.",
+      "discussionUnavailableMessage": "Þessi merge request gæti hafa verið fjarlægð.",
+      "noDiscussionDescription": "Engir yfirferðarþræðir eða almennar athugasemdir eru við þessa merge request.",
+      "noFilesChangedDescription": "Engar skrár hafa breyst í þessari merge request."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Ónettengdu talgagnaskrárnar fyrir {{language}} eru ekki uppsettar á þessum síma. Hladdu þeim niður og reyndu raddinnslátt aftur.",
     "downloadOfflineModel": "Hlaða niður",
     "offlineModelDownloadScheduled": "Ónettengdu talgagnaskrárnar verða hlaðnar niður í bakgrunni. Reyndu raddinnslátt aftur síðar.",
-    "listeningStopped": "Hlustun stöðvuð."
+    "listeningStopped": "Hlustun stöðvuð.",
+    "transcribing": "Umriti…",
+    "gatewayUnreachable": "Ekki tókst að ná sambandi við Kilo Gateway. Athugaðu tenginguna og reyndu aftur.",
+    "gatewayTimeout": "Umritunin tók of langan tíma. Reyndu aftur.",
+    "gatewayModelUnavailable": "Þetta umritunarlíkan er ekki í boði. Veldu annað í Kjörstillingum.",
+    "gatewayModelUnavailableNotice": "Þetta líkan er ekki lengur í boði. Ýttu á $t(transcriptionModel.title) til að velja annað.",
+    "gatewaySignInRequired": "Skráðu þig inn til að nota umritun í gegnum Kilo Gateway.",
+    "gatewayNoModel": "Veldu fyrst umritunarlíkan í Kjörstillingum."
   },
   "share": {
     "title": "Deila með Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Bíður eftir svari",
     "channelName": "Virkir fulltrúar",
     "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum."
+  },
+  "transcriptionModel": {
+    "title": "Umritunarlíkan",
+    "noneChosen": "Ekkert valið",
+    "emptyTitle": "Engin umritunarlíkan",
+    "emptyDescription": "Kilo Gateway býður ekki upp á umritunarlíkan um þessar mundir.",
+    "loadFailed": "Ekki tókst að sækja umritunarlíkin."
   }
 }

@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "엔터프라이즈 SSO"
   },
   "preferences": {
+    "general": "일반",
+    "voiceInput": "음성 입력",
     "autoExpandThinking": "추론 내용 자동 펼치기",
     "autoExpandThinkingSubtitle": "에이전트의 추론이 끝나면 추론 내용을 펼쳐서 표시합니다.",
     "keepScreenOn": "세션 화면에서 화면 켜짐 유지",
@@ -238,6 +240,7 @@
     "appearanceLight": "라이트",
     "appearanceDark": "다크",
     "account": "계정",
+    "accountSubtitle": "언어, 신뢰하는 호스트, 기기 세션",
     "prReviewAttribution": "PR 리뷰에 사용 앱 표시",
     "prReviewAttributionSubtitle": "리뷰를 제출할 때 Kilo로 리뷰했다는 문구를 하단에 추가합니다.",
     "returnSendsMessage": "리턴 키로 메시지 보내기",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway 음성 텍스트 변환",
+    "gatewayTranscriptionSubtitle": "기기의 음성 인식 대신 Kilo Gateway 모델로 음성 입력을 텍스트로 변환합니다. 녹음 내용은 Kilo Gateway로 전송됩니다.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "실시간 활동",
@@ -2144,7 +2150,14 @@
     "languageNotInstalledMessage": "이 휴대전화에 {{language}} 오프라인 음성 파일이 설치되어 있지 않습니다. 파일을 다운로드한 후 음성 입력을 다시 시도하세요.",
     "downloadOfflineModel": "다운로드",
     "offlineModelDownloadScheduled": "오프라인 음성 파일이 백그라운드에서 다운로드됩니다. 나중에 음성 입력을 다시 시도하세요.",
-    "listeningStopped": "음성 입력이 중지되었습니다."
+    "listeningStopped": "음성 입력이 중지되었습니다.",
+    "transcribing": "변환 중...",
+    "gatewayUnreachable": "Kilo Gateway에 연결하지 못했습니다. 연결 상태를 확인하고 다시 시도하세요.",
+    "gatewayTimeout": "변환에 시간이 너무 오래 걸렸습니다. 다시 시도하세요.",
+    "gatewayModelUnavailable": "이 음성 텍스트 변환 모델은 사용할 수 없습니다. 환경설정에서 다른 모델을 선택하세요.",
+    "gatewayModelUnavailableNotice": "이 모델은 더 이상 제공되지 않습니다. 다른 모델을 선택하려면 $t(transcriptionModel.title)을 탭하세요.",
+    "gatewaySignInRequired": "Kilo Gateway 변환을 사용하려면 로그인하세요.",
+    "gatewayNoModel": "먼저 환경설정에서 음성 텍스트 변환 모델을 선택하세요."
   },
   "share": {
     "title": "Kilo로 공유",
@@ -2322,11 +2335,172 @@
     "installAttributionPromptTitle": "설치 경로 분석을 허용할까요?"
   },
   "prReview": {
-    "pullRequestUnavailable": "풀 리퀘스트를 열 수 없음",
-    "pullRequestUnavailableDescription": "이 PR을 열 수 없습니다. PR이 삭제되었거나 저장소가 비공개이거나 해당 저장소에 Kilo GitHub 앱이 설치되지 않았을 수 있습니다.",
     "accessDeniedDescription": "이 풀 리퀘스트를 볼 권한이 없습니다.",
-    "noFilesChanged": "변경된 파일 없음",
-    "noFilesChangedDescription": "이 풀 리퀘스트에는 변경된 파일이 없습니다.",
+    "checkConnection": "연결 확인",
+    "checks": {
+      "checksCount": "검사 {{displayCount}}개",
+      "couldNotLoad": "검사 결과를 불러오지 못했습니다.",
+      "failed": "{{displayCount}}개 실패",
+      "noAccess": "이 저장소의 검사 결과를 볼 권한이 없습니다.",
+      "noChecksReported": "보고된 검사 결과 없음",
+      "notAvailable": "아직 검사 결과를 확인할 수 없습니다. 최신 커밋이 처리되지 않았거나 해당 커밋의 저장소에 Kilo GitHub 앱이 설치되지 않았을 수 있습니다.",
+      "openDetails": "{{name}} 세부 정보 열기",
+      "passed": "{{displayCount}}개 통과",
+      "pending": "{{displayCount}}개 대기 중",
+      "retryChecks": "검사 다시 시도",
+      "skipped": "{{displayCount}}개 건너뜀",
+      "title": "검사",
+      "viewOnGitHub": "GitHub에서 PR 보기",
+      "checkDetails": "검사 세부 정보"
+    },
+    "composer": {
+      "addTitle": "댓글 추가",
+      "addToReview": "리뷰에 추가",
+      "comment": "댓글",
+      "commentBody": "댓글 내용",
+      "commentBodyPlaceholder": "댓글 입력",
+      "commentNow": "지금 댓글 달기",
+      "discardMessage": "작성 중인 내용이 사라집니다.",
+      "discardTitle": "작성 중인 댓글을 버릴까요?",
+      "editTitle": "댓글 수정",
+      "insertSuggestion": "제안 삽입",
+      "insertSuggestionA11y": "코드 제안 삽입",
+      "loadFailedTitle": "댓글 작성 화면을 불러오지 못했습니다.",
+      "ok": "확인",
+      "unavailableMessage": "이 제출 대기 중인 댓글은 이미 삭제되었거나 제출되었습니다.",
+      "unavailableTitle": "댓글을 열 수 없음",
+      "bodyEmpty": "댓글 내용을 입력해야 합니다.",
+      "suggestionsOnlyAddedLines": "제안은 추가된 줄에만 적용됩니다.",
+      "tapDiffLineToSuggest": "코드 제안을 사용하려면 변경 내용에서 줄을 탭하세요."
+    },
+    "connect": {
+      "checkFailedTitle": "GitHub 연결을 확인하지 못했습니다.",
+      "checkFailedMessage": "정보를 불러올 때까지 로그인 상태를 확인할 수 없습니다.",
+      "checkFailedTitleGitLab": "GitLab 연결을 확인하지 못했습니다.",
+      "checkFailedTitleBitbucket": "Bitbucket 연결을 확인하지 못했습니다.",
+      "providerCheckFailedMessage": "로드될 때까지 연결 상태를 사용할 수 없습니다.",
+      "reconnectTitle": "GitHub 다시 연결",
+      "reconnectDescription": "GitHub 연결이 해제되었습니다. 모바일에서 풀 리퀘스트를 계속 리뷰하려면 다시 연결하세요.",
+      "description": "모바일에서 풀 리퀘스트를 리뷰하려면 GitHub 계정을 연결하세요.",
+      "gitlabDescription": "모바일에서 머지 요청을 검토하려면 GitLab 계정을 연결하세요.",
+      "bitbucketDescription": "모바일에서 풀 리퀘스트를 검토하려면 이 조직을 Bitbucket에 연결하세요.",
+      "bitbucketOrgOnlyDescription": "프로필에서 조직을 선택하면 해당 조직의 Bitbucket 풀 리퀘스트를 검토할 수 있습니다."
+    },
+    "connectionExpired": "GitHub 연결이 만료되었습니다.",
+    "couldNotLoadPullRequest": "풀 리퀘스트를 불러오지 못했습니다.",
+    "couldNotOpenGitHubAppSettings": "GitHub 앱 설정을 열지 못했습니다.",
+    "description": "설명",
+    "discussion": {
+      "acceptTerms": "동의",
+      "accessDeniedMessage": "이 PR의 토론을 볼 권한이 없습니다.",
+      "addReaction": "반응 추가",
+      "block": "차단",
+      "blockedUser": "{{login}} 님을 차단했습니다.",
+      "collapseThread": "스레드 접기",
+      "commentActions": "댓글 작업",
+      "comment": "댓글 {{displayCount}}개",
+      "comment_other": "댓글 {{displayCount}}개",
+      "couldNotLoad": "토론을 불러오지 못했습니다.",
+      "couldNotLoadMore": "댓글을 더 불러오지 못했습니다.",
+      "loadMoreComments": "댓글 더 불러오기",
+      "loading": "토론 불러오는 중",
+      "moderation": {
+        "block": {
+          "retryable": "이 사용자를 차단하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+          "terminal": "이 사용자는 차단할 수 없습니다."
+        },
+        "mute": {
+          "retryable": "이 사용자를 숨기지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+          "terminal": "이 사용자는 숨길 수 없습니다."
+        },
+        "reportContent": {
+          "retryable": "이 댓글을 신고하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+          "terminal": "이 댓글은 신고할 수 없습니다."
+        },
+        "reportUser": {
+          "retryable": "이 사용자를 신고하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+          "terminal": "이 사용자는 신고할 수 없습니다."
+        }
+      },
+      "moreLinesAbove": "… 위에 {{displayCount}}줄이 더 있습니다.",
+      "mute": "숨기기",
+      "mutedUser": "{{login}} 님을 숨겼습니다.",
+      "noDiscussion": "아직 토론 없음",
+      "noDiscussionDescription": "이 풀 리퀘스트에는 아직 리뷰 스레드나 댓글이 없습니다.",
+      "comment_one": "댓글 1개",
+      "outdated": "이전 버전",
+      "quotedDiffSnippet": "인용된 변경 내용 일부",
+      "reactionPill": "{{emoji}} {{countLabel}} {{displayCount}}개",
+      "reaction": "반응",
+      "reaction_other": "반응",
+      "reaction_one": "반응",
+      "replyBadRequest": "이 답글을 게시할 수 없습니다. 스레드가 변경되었을 수 있습니다.",
+      "replyBody": "답글 내용",
+      "replyForbidden": "이 풀 리퀘스트에 답글을 달 권한이 없습니다.",
+      "addCommentCta": "이 풀 리퀘스트에 댓글 달기",
+      "commentBadRequest": "이 댓글을 게시할 수 없습니다. 풀 리퀘스트가 변경되었을 수 있습니다.",
+      "commentForbidden": "이 풀 리퀘스트에 댓글을 달 권한이 없습니다.",
+      "replyPlaceholder": "답글…",
+      "reportContent": "콘텐츠 신고",
+      "reportUser": "사용자 신고",
+      "resolveThread": "스레드 해결",
+      "resolved": "해결됨",
+      "retryLoadingMore": "댓글 더 불러오기 다시 시도",
+      "reviewFiles": "파일 리뷰",
+      "startedRelative": " · {{relative}} 시작",
+      "submitReply": "답글 제출",
+      "termsAcceptRetry": "약관 동의를 처리하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+      "termsCopy": "만 13세 이상만 게시할 수 있습니다.",
+      "termsTitle": "서비스 약관",
+      "threadAccessibilityLabel": "{{anchorLabel}} 토론 스레드",
+      "unavailable": "토론을 볼 수 없습니다.",
+      "unavailableMessage": "이 풀 리퀘스트가 삭제되었을 수 있습니다.",
+      "unresolveThread": "스레드 해결 취소",
+      "viewTerms": "약관 보기",
+      "termsAcceptRequired": "게시하려면 서비스 약관에 동의해야 합니다.",
+      "termsCheckRetryCopy": "서비스 약관을 확인하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+      "termsOutdatedCopy": "서비스 약관이 변경되었습니다. 최신 약관에 동의하려면 이 화면을 다시 여세요.",
+      "reactions": {
+        "thumbsUp": "좋아요",
+        "thumbsDown": "싫어요",
+        "laugh": "웃음",
+        "hooray": "만세",
+        "confused": "혼란스러워요",
+        "heart": "하트",
+        "rocket": "로켓",
+        "eyes": "눈"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} 파일에 대한 댓글",
+        "fileComment": "파일 댓글",
+        "outdatedOnPathLines": "{{path}} {{lines}} · 이전 버전",
+        "outdatedOnLines": "{{lines}} · 이전 버전",
+        "outdatedOnPath": "{{path}} · 이전 버전"
+      },
+      "deletedUser": "삭제된 사용자",
+      "replyForbiddenTerm": "이 {{term}}에 답글을 달 권한이 없습니다."
+    },
+    "entry": {
+      "eyebrow": "URL로 풀 리퀘스트 또는 머지 요청 열기",
+      "pastePrLink": "풀 리퀘스트 또는 머지 요청 링크 붙여넣기",
+      "noRecentPrs": "최근 리뷰 없음",
+      "noRecentPrsDescription": "위에 링크를 붙여넣어 리뷰를 시작하세요. 다음부터는 여기에 표시됩니다.",
+      "couldNotLoad": "불러오지 못했습니다.",
+      "removeFromRecentsTitle": "최근 항목에서 제거할까요?",
+      "removeFromRecentsMessage": "이 리뷰는 최근 항목에서 제거됩니다.",
+      "removeRecentAccessibility": "최근 항목에서 {{repo}} 제거",
+      "urlAccessibility": "풀 리퀘스트 또는 머지 요청 URL 입력",
+      "urlPlaceholder": "풀 리퀘스트 또는 머지 요청 URL",
+      "openAccessibility": "풀 리퀘스트 또는 머지 요청 열기",
+      "clearLink": "링크 지우기",
+      "pasteLink": "풀 리퀘스트 또는 머지 요청 링크 붙여넣기",
+      "open": "오픈"
+    },
+    "eventChips": {
+      "comment": "댓글",
+      "label": "리뷰 유형",
+      "requestChanges": "변경 요청"
+    },
     "fileList": {
       "filesList": "파일 목록",
       "filesViewed": "파일 · {{total}}개 중 {{viewed}}개 확인함",
@@ -2371,6 +2545,7 @@
       "commentOnSelectedLines": "선택한 줄에 댓글 달기",
       "finishReview": "리뷰 완료"
     },
+    "headLine": "{{counts}} · 최신 커밋 {{sha}}",
     "hunkRows": {
       "contextUnavailable": "이 참조에서는 주변 코드를 불러올 수 없습니다.",
       "expandAll": "모두 펼치기",
@@ -2403,21 +2578,14 @@
       "retryLoadingContext": "주변 코드 불러오기 다시 시도",
       "retryLoadingNextPage": "다음 페이지 불러오기 다시 시도"
     },
-    "sideBySide": {
-      "emptyDiffColumn": "변경 내용의 빈 열",
-      "emptyDiffRow": "변경 내용의 빈 행",
-      "newOnly": "변경 후에만 있음: {{text}}",
-      "noNewlineAtEndOfFile": "파일 끝에 줄 바꿈이 없습니다.",
-      "oldNew": "변경 전: {{old}} | 변경 후: {{new}}",
-      "oldOnly": "변경 전에만 있음: {{text}}"
+    "inbox": {
+      "couldNotLoad": "받은 편지함을 불러오지 못했습니다.",
+      "loading": "받은 편지함 불러오는 중",
+      "noReviewRequests": "리뷰 요청 없음",
+      "noReviewRequestsDescription": "리뷰를 요청받은 풀 리퀘스트가 여기에 표시됩니다. 위에 다른 PR 링크를 붙여넣을 수도 있습니다.",
+      "title": "받은 편지함"
     },
-    "connectionExpired": "GitHub 연결이 만료되었습니다.",
-    "capabilities": {
-      "banner": {
-        "title": "이 공급업체에서 사용할 수 없음",
-        "accessibility": "이 공급업체에서 사용할 수 없음: {{reason}}"
-      }
-    },
+    "installKiloGitHubApp": "Kilo GitHub 앱 설치",
     "merge": {
       "merge": "병합",
       "mergeNow": "지금 병합",
@@ -2507,204 +2675,9 @@
         "rebase": "병합 커밋 없이 이 브랜치의 모든 커밋을 기준 브랜치에 차례로 다시 적용합니다."
       }
     },
-    "discussion": {
-      "threadAccessibilityLabel": "{{anchorLabel}} 토론 스레드",
-      "collapseThread": "스레드 접기",
-      "resolveThread": "스레드 해결",
-      "unresolveThread": "스레드 해결 취소",
-      "resolved": "해결됨",
-      "outdated": "이전 버전",
-      "comment_one": "댓글 1개",
-      "comment": "댓글 {{displayCount}}개",
-      "comment_other": "댓글 {{displayCount}}개",
-      "startedRelative": " · {{relative}} 시작",
-      "couldNotLoadMore": "댓글을 더 불러오지 못했습니다.",
-      "retryLoadingMore": "댓글 더 불러오기 다시 시도",
-      "loadMoreComments": "댓글 더 불러오기",
-      "addReaction": "반응 추가",
-      "reactionPill": "{{emoji}} {{countLabel}} {{displayCount}}개",
-      "reaction_one": "반응",
-      "reaction": "반응",
-      "reaction_other": "반응",
-      "commentActions": "댓글 작업",
-      "reportContent": "콘텐츠 신고",
-      "reportUser": "사용자 신고",
-      "mute": "숨기기",
-      "block": "차단",
-      "blockedUser": "{{login}} 님을 차단했습니다.",
-      "mutedUser": "{{login}} 님을 숨겼습니다.",
-      "replyPlaceholder": "답글…",
-      "replyBody": "답글 내용",
-      "submitReply": "답글 제출",
-      "termsTitle": "서비스 약관",
-      "termsCopy": "만 13세 이상만 게시할 수 있습니다.",
-      "termsAcceptRetry": "약관 동의를 처리하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
-      "viewTerms": "약관 보기",
-      "acceptTerms": "동의",
-      "replyBadRequest": "이 답글을 게시할 수 없습니다. 스레드가 변경되었을 수 있습니다.",
-      "replyForbidden": "이 풀 리퀘스트에 답글을 달 권한이 없습니다.",
-      "replyForbiddenTerm": "이 {{term}}에 답글을 달 권한이 없습니다.",
-      "moderation": {
-        "block": {
-          "retryable": "이 사용자를 차단하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
-          "terminal": "이 사용자는 차단할 수 없습니다."
-        },
-        "mute": {
-          "retryable": "이 사용자를 숨기지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
-          "terminal": "이 사용자는 숨길 수 없습니다."
-        },
-        "reportContent": {
-          "retryable": "이 댓글을 신고하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
-          "terminal": "이 댓글은 신고할 수 없습니다."
-        },
-        "reportUser": {
-          "retryable": "이 사용자를 신고하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
-          "terminal": "이 사용자는 신고할 수 없습니다."
-        }
-      },
-      "accessDeniedMessage": "이 PR의 토론을 볼 권한이 없습니다.",
-      "unavailable": "토론을 볼 수 없습니다.",
-      "unavailableMessage": "이 풀 리퀘스트가 삭제되었을 수 있습니다.",
-      "couldNotLoad": "토론을 불러오지 못했습니다.",
-      "loading": "토론 불러오는 중",
-      "noDiscussion": "아직 토론 없음",
-      "noDiscussionDescription": "이 풀 리퀘스트에는 아직 리뷰 스레드나 댓글이 없습니다.",
-      "reviewFiles": "파일 리뷰",
-      "quotedDiffSnippet": "인용된 변경 내용 일부",
-      "moreLinesAbove": "… 위에 {{displayCount}}줄이 더 있습니다.",
-      "termsAcceptRequired": "게시하려면 서비스 약관에 동의해야 합니다.",
-      "termsOutdatedCopy": "서비스 약관이 변경되었습니다. 최신 약관에 동의하려면 이 화면을 다시 여세요.",
-      "termsCheckRetryCopy": "서비스 약관을 확인하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
-      "reactions": {
-        "thumbsUp": "좋아요",
-        "thumbsDown": "싫어요",
-        "laugh": "웃음",
-        "hooray": "만세",
-        "confused": "혼란스러워요",
-        "heart": "하트",
-        "rocket": "로켓",
-        "eyes": "눈"
-      },
-      "anchor": {
-        "fileCommentOnPath": "{{path}} 파일에 대한 댓글",
-        "fileComment": "파일 댓글",
-        "outdatedOnPathLines": "{{path}} {{lines}} · 이전 버전",
-        "outdatedOnLines": "{{lines}} · 이전 버전",
-        "outdatedOnPath": "{{path}} · 이전 버전"
-      },
-      "deletedUser": "삭제된 사용자"
-    },
-    "couldNotOpenGitHubAppSettings": "GitHub 앱 설정을 열지 못했습니다.",
-    "installKiloGitHubApp": "Kilo GitHub 앱 설치",
-    "checkConnection": "연결 확인",
-    "couldNotLoadPullRequest": "풀 리퀘스트를 불러오지 못했습니다.",
-    "description": "설명",
     "noDescriptionProvided": "설명이 없습니다.",
-    "review": "리뷰",
-    "reviewPullRequest": "풀 리퀘스트 리뷰",
-    "headLine": "{{counts}} · 최신 커밋 {{sha}}",
-    "entry": {
-      "eyebrow": "URL로 풀 리퀘스트 또는 머지 요청 열기",
-      "pastePrLink": "풀 리퀘스트 또는 머지 요청 링크 붙여넣기",
-      "noRecentPrs": "최근 리뷰 없음",
-      "noRecentPrsDescription": "위에 링크를 붙여넣어 리뷰를 시작하세요. 다음부터는 여기에 표시됩니다.",
-      "couldNotLoad": "불러오지 못했습니다.",
-      "removeFromRecentsTitle": "최근 항목에서 제거할까요?",
-      "removeFromRecentsMessage": "이 리뷰는 최근 항목에서 제거됩니다.",
-      "removeRecentAccessibility": "최근 항목에서 {{repo}} 제거",
-      "urlAccessibility": "풀 리퀘스트 또는 머지 요청 URL 입력",
-      "urlPlaceholder": "풀 리퀘스트 또는 머지 요청 URL",
-      "openAccessibility": "풀 리퀘스트 또는 머지 요청 열기",
-      "clearLink": "링크 지우기",
-      "pasteLink": "풀 리퀘스트 또는 머지 요청 링크 붙여넣기",
-      "open": "오픈"
-    },
-    "checks": {
-      "checksCount": "검사 {{displayCount}}개",
-      "couldNotLoad": "검사 결과를 불러오지 못했습니다.",
-      "failed": "{{displayCount}}개 실패",
-      "noAccess": "이 저장소의 검사 결과를 볼 권한이 없습니다.",
-      "noChecksReported": "보고된 검사 결과 없음",
-      "notAvailable": "아직 검사 결과를 확인할 수 없습니다. 최신 커밋이 처리되지 않았거나 해당 커밋의 저장소에 Kilo GitHub 앱이 설치되지 않았을 수 있습니다.",
-      "openDetails": "{{name}} 세부 정보 열기",
-      "passed": "{{displayCount}}개 통과",
-      "pending": "{{displayCount}}개 대기 중",
-      "retryChecks": "검사 다시 시도",
-      "skipped": "{{displayCount}}개 건너뜀",
-      "title": "검사",
-      "viewOnGitHub": "GitHub에서 PR 보기",
-      "checkDetails": "검사 세부 정보"
-    },
-    "inbox": {
-      "couldNotLoad": "받은 편지함을 불러오지 못했습니다.",
-      "loading": "받은 편지함 불러오는 중",
-      "noReviewRequests": "리뷰 요청 없음",
-      "noReviewRequestsDescription": "리뷰를 요청받은 풀 리퀘스트가 여기에 표시됩니다. 위에 다른 PR 링크를 붙여넣을 수도 있습니다.",
-      "title": "받은 편지함"
-    },
-    "composer": {
-      "addTitle": "댓글 추가",
-      "addToReview": "리뷰에 추가",
-      "comment": "댓글",
-      "commentBody": "댓글 내용",
-      "commentBodyPlaceholder": "댓글 입력",
-      "commentNow": "지금 댓글 달기",
-      "discardMessage": "작성 중인 내용이 사라집니다.",
-      "discardTitle": "작성 중인 댓글을 버릴까요?",
-      "editTitle": "댓글 수정",
-      "insertSuggestion": "제안 삽입",
-      "insertSuggestionA11y": "코드 제안 삽입",
-      "loadFailedTitle": "댓글 작성 화면을 불러오지 못했습니다.",
-      "ok": "확인",
-      "unavailableMessage": "이 제출 대기 중인 댓글은 이미 삭제되었거나 제출되었습니다.",
-      "unavailableTitle": "댓글을 열 수 없음",
-      "bodyEmpty": "댓글 내용을 입력해야 합니다.",
-      "suggestionsOnlyAddedLines": "제안은 추가된 줄에만 적용됩니다.",
-      "tapDiffLineToSuggest": "코드 제안을 사용하려면 변경 내용에서 줄을 탭하세요."
-    },
-    "connect": {
-      "checkFailedTitle": "GitHub 연결을 확인하지 못했습니다.",
-      "checkFailedMessage": "정보를 불러올 때까지 로그인 상태를 확인할 수 없습니다.",
-      "checkFailedTitleGitLab": "GitLab 연결을 확인하지 못했습니다.",
-      "checkFailedTitleBitbucket": "Bitbucket 연결을 확인하지 못했습니다.",
-      "providerCheckFailedMessage": "로드될 때까지 연결 상태를 사용할 수 없습니다.",
-      "reconnectTitle": "GitHub 다시 연결",
-      "reconnectDescription": "GitHub 연결이 해제되었습니다. 모바일에서 풀 리퀘스트를 계속 리뷰하려면 다시 연결하세요.",
-      "description": "모바일에서 풀 리퀘스트를 리뷰하려면 GitHub 계정을 연결하세요.",
-      "gitlabDescription": "모바일에서 머지 요청을 검토하려면 GitLab 계정을 연결하세요.",
-      "bitbucketDescription": "모바일에서 풀 리퀘스트를 검토하려면 이 조직을 Bitbucket에 연결하세요.",
-      "bitbucketOrgOnlyDescription": "프로필에서 조직을 선택하면 해당 조직의 Bitbucket 풀 리퀘스트를 검토할 수 있습니다."
-    },
-    "screen": {
-      "shareA11y": "풀 리퀘스트 공유",
-      "title": "#{{number}}"
-    },
-    "submit": {
-      "deletePendingMessage": "이 댓글이 리뷰 대기열에서 제거됩니다.",
-      "deletePendingTitle": "제출 대기 중인 댓글을 삭제할까요?",
-      "loadFailedTitle": "리뷰 제출 화면을 불러오지 못했습니다.",
-      "pendingComment": "제출 대기 중인 댓글",
-      "pendingComment_other": "제출 대기 중인 댓글",
-      "pendingComment_one": "제출 대기 중인 댓글",
-      "summaryOptional": "요약(선택 사항)",
-      "partialPostedMessage": "댓글 {{displayFreshCount}}개를 게시했습니다. 이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
-      "submitCountOfTotal": "댓글 {{displayTotalCount}}개 중 {{displayFreshCount}}개 제출",
-      "submitReview": "리뷰 제출",
-      "blockedRequestChanges": "변경을 요청하려면 요약을 작성하거나 댓글을 하나 이상 추가하세요.",
-      "blockedComment": "댓글 리뷰를 게시하려면 요약을 작성하거나 댓글을 하나 이상 추가하세요."
-    },
-    "reconnectNotice": {
-      "title": "GitHub 연결이 만료되었습니다.",
-      "message": "GitHub 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다.",
-      "gitlabTitle": "GitLab 연결이 만료되었습니다.",
-      "bitbucketTitle": "Bitbucket 연결이 만료되었습니다.",
-      "providerMessage": "{{provider}} 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다."
-    },
-    "eventChips": {
-      "comment": "댓글",
-      "label": "리뷰 유형",
-      "requestChanges": "변경 요청"
-    },
+    "noFilesChanged": "변경된 파일 없음",
+    "noFilesChangedDescription": "이 풀 리퀘스트에는 변경된 파일이 없습니다.",
     "overview": {
       "commit": "커밋",
       "commit_other": "커밋",
@@ -2745,31 +2718,53 @@
       "summaryA11y": "리뷰 요약",
       "summaryPlaceholder": "리뷰 요약(선택 사항)"
     },
-    "tabs": {
-      "discussion": "토론",
-      "files": "파일",
-      "overview": "개요"
+    "pullRequestUnavailable": "풀 리퀘스트를 열 수 없음",
+    "pullRequestUnavailableDescription": "이 PR을 열 수 없습니다. PR이 삭제되었거나 저장소가 비공개이거나 해당 저장소에 Kilo GitHub 앱이 설치되지 않았을 수 있습니다.",
+    "reconnectNotice": {
+      "title": "GitHub 연결이 만료되었습니다.",
+      "message": "GitHub 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다.",
+      "gitlabTitle": "GitLab 연결이 만료되었습니다.",
+      "bitbucketTitle": "Bitbucket 연결이 만료되었습니다.",
+      "providerMessage": "{{provider}} 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다."
     },
-    "terms": {
-      "pullRequest": "풀 리퀘스트",
-      "mergeRequest": "머지 요청",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "머지 요청 공유",
-      "viewOnProvider": "{{provider}}에서 보기",
-      "mergeRequestUnavailable": "머지 요청를 열 수 없음",
-      "unavailableDescription": "삭제되었거나 접근 권한이 없을 수 있습니다.",
-      "accessDeniedMergeRequest": "이 머지 요청를 볼 권한이 없습니다.",
-      "couldNotLoadMergeRequest": "머지 요청를 불러오지 못했습니다.",
-      "discussionAccessDenied": "이 머지 요청의 토론을 볼 권한이 없습니다.",
-      "discussionUnavailableMessage": "이 머지 요청가 삭제되었을 수 있습니다.",
-      "noDiscussionDescription": "이 머지 요청에는 아직 리뷰 스레드나 댓글이 없습니다.",
-      "noFilesChangedDescription": "이 머지 요청에는 변경된 파일이 없습니다."
+    "review": "리뷰",
+    "reviewPullRequest": "풀 리퀘스트 리뷰",
+    "screen": {
+      "shareA11y": "풀 리퀘스트 공유",
+      "title": "#{{number}}"
+    },
+    "sideBySide": {
+      "emptyDiffColumn": "변경 내용의 빈 열",
+      "emptyDiffRow": "변경 내용의 빈 행",
+      "newOnly": "변경 후에만 있음: {{text}}",
+      "noNewlineAtEndOfFile": "파일 끝에 줄 바꿈이 없습니다.",
+      "oldNew": "변경 전: {{old}} | 변경 후: {{new}}",
+      "oldOnly": "변경 전에만 있음: {{text}}"
+    },
+    "submit": {
+      "deletePendingMessage": "이 댓글이 리뷰 대기열에서 제거됩니다.",
+      "deletePendingTitle": "제출 대기 중인 댓글을 삭제할까요?",
+      "loadFailedTitle": "리뷰 제출 화면을 불러오지 못했습니다.",
+      "pendingComment": "제출 대기 중인 댓글",
+      "pendingComment_other": "제출 대기 중인 댓글",
+      "pendingComment_one": "제출 대기 중인 댓글",
+      "summaryOptional": "요약(선택 사항)",
+      "partialPostedMessage": "댓글 {{displayFreshCount}}개를 게시했습니다. 이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
+      "submitCountOfTotal": "댓글 {{displayTotalCount}}개 중 {{displayFreshCount}}개 제출",
+      "submitReview": "리뷰 제출",
+      "blockedRequestChanges": "변경을 요청하려면 요약을 작성하거나 댓글을 하나 이상 추가하세요.",
+      "blockedComment": "댓글 리뷰를 게시하려면 요약을 작성하거나 댓글을 하나 이상 추가하세요."
     },
     "fileStatus": {
       "changed": "변경됨",
       "copied": "복사 완료",
       "modified": "수정됨",
       "renamed": "이름 변경됨"
+    },
+    "tabs": {
+      "discussion": "토론",
+      "files": "파일",
+      "overview": "개요"
     },
     "diff": {
       "selectedTapToChange": "{{label}} 선택됨, 탭하여 선택 변경",
@@ -2802,6 +2797,27 @@
       "ambiguous": "작업 결과를 확인하지 못했습니다. 다시 시도하기 전에 PR을 확인하세요.",
       "persistenceFailed": "이 작업을 기록하지 못했습니다. 나중에 다시 시도하세요.",
       "forbidden": "이 작업을 수행할 권한이 없습니다."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "이 공급업체에서 사용할 수 없음",
+        "accessibility": "이 공급업체에서 사용할 수 없음: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "풀 리퀘스트",
+      "mergeRequest": "머지 요청",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "머지 요청 공유",
+      "viewOnProvider": "{{provider}}에서 보기",
+      "mergeRequestUnavailable": "머지 요청를 열 수 없음",
+      "unavailableDescription": "삭제되었거나 접근 권한이 없을 수 있습니다.",
+      "accessDeniedMergeRequest": "이 머지 요청를 볼 권한이 없습니다.",
+      "couldNotLoadMergeRequest": "머지 요청를 불러오지 못했습니다.",
+      "discussionAccessDenied": "이 머지 요청의 토론을 볼 권한이 없습니다.",
+      "discussionUnavailableMessage": "이 머지 요청가 삭제되었을 수 있습니다.",
+      "noDiscussionDescription": "이 머지 요청에는 아직 리뷰 스레드나 댓글이 없습니다.",
+      "noFilesChangedDescription": "이 머지 요청에는 변경된 파일이 없습니다."
     }
   },
   "organization": {
@@ -3009,5 +3025,12 @@
     "needsInput": "입력 필요",
     "channelName": "활성 에이전트",
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요."
+  },
+  "transcriptionModel": {
+    "title": "음성 텍스트 변환 모델",
+    "noneChosen": "선택 안 됨",
+    "emptyTitle": "음성 텍스트 변환 모델 없음",
+    "emptyDescription": "지금 Kilo Gateway에서 제공하는 음성 텍스트 변환 모델이 없습니다.",
+    "loadFailed": "음성 텍스트 변환 모델을 불러오지 못했습니다."
   }
 }

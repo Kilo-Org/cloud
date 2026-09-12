@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO për ndërmarrje"
   },
   "preferences": {
+    "general": "Të përgjithshme",
+    "voiceInput": "Hyrje me zë",
     "autoExpandThinking": "Zgjero automatikisht arsyetimin",
     "autoExpandThinkingSubtitle": "Shfaq arsyetimin e plotë të agjentit pasi të përfundojë.",
     "keepScreenOn": "Mbaje ekranin ndezur në faqen e seancës",
@@ -238,6 +240,7 @@
     "appearanceLight": "E çelët",
     "appearanceDark": "E errët",
     "account": "Llogaria",
+    "accountSubtitle": "Gjuha, serverët e besuar dhe sesionet në pajisje",
     "prReviewAttribution": "Përmend aplikacionin në rishikimet e PR",
     "prReviewAttributionSubtitle": "Shto shënimin «Rishikuar përmes Kilo» në fund kur dërgon një rishikim.",
     "returnSendsMessage": "Tasti Enter dërgon mesazhin",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkriptim me Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkripto diktimin me një model Kilo Gateway në vend të njohjes së të folurit të pajisjes. Regjistrimi yt dërgohet te Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa për bashkim nuk është e disponueshme",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "Rresht bosh në pamjen e ndryshimeve"
     },
     "connectionExpired": "Lidhja me GitHub skadoi.",
-    "capabilities": {
-      "banner": {
-        "title": "Nuk është e disponueshme te ky ofrues",
-        "accessibility": "Nuk është e disponueshme te ky ofrues: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Bashkimi",
       "mergeNow": "Bashko tani",
@@ -472,7 +472,9 @@
       "acceptTerms": "Prano",
       "replyBadRequest": "Kjo përgjigje nuk mund të postohet. Diskutimi mund të ketë ndryshuar.",
       "replyForbidden": "Nuk ke leje të përgjigjesh në këtë kërkesë për bashkim.",
-      "replyForbiddenTerm": "Nuk ke leje të përgjigjesh në këtë {{term}}.",
+      "addCommentCta": "Komento në këtë kërkesë për bashkim",
+      "commentBadRequest": "Ky koment nuk mund të postohet. Kërkesa për bashkim mund të ketë ndryshuar.",
+      "commentForbidden": "Nuk ke leje të komentosh në këtë kërkesë për bashkim.",
       "moderation": {
         "reportContent": {
           "terminal": "Ky koment nuk mund të raportohet.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "I vjetëruar te {{lines}}",
         "outdatedOnPath": "I vjetëruar te {{path}}"
       },
-      "deletedUser": "përdorues i fshirë"
+      "deletedUser": "përdorues i fshirë",
+      "replyForbiddenTerm": "Nuk ke leje të përgjigjesh në këtë {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Cilësimet e aplikacionit GitHub nuk u hapën.",
     "installKiloGitHubApp": "Instalo aplikacionin Kilo për GitHub",
@@ -679,21 +682,6 @@
       "files": "Skedarë",
       "discussion": "Diskutimi"
     },
-    "terms": {
-      "pullRequest": "Kërkesë bashkimi",
-      "mergeRequest": "Kërkesë integrimi",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Ndaj kërkesën e integrimit",
-      "viewOnProvider": "Shih te {{provider}}",
-      "mergeRequestUnavailable": "Kërkesa e integrimit nuk është e disponueshme",
-      "unavailableDescription": "Mbase është fshirë, ose mbase nuk ke akses për të.",
-      "accessDeniedMergeRequest": "Nuk ke leje për ta parë këtë kërkesë integrimi.",
-      "couldNotLoadMergeRequest": "Nuk u ngarkua kërkesa e integrimit.",
-      "discussionAccessDenied": "Nuk ke leje për ta parë diskutimin e kësaj kërkeze integrimi.",
-      "discussionUnavailableMessage": "Kjo kërkesë integrimi mund të jetë hequr.",
-      "noDiscussionDescription": "Nuk ka diskutime rishikimi ose komente bisede në këtë kërkesë integrimi.",
-      "noFilesChangedDescription": "Kjo kërkesë integrimi nuk përmban ndryshime në skedarë."
-    },
     "fileStatus": {
       "modified": "I modifikuar",
       "renamed": "I riemërtuar",
@@ -731,6 +719,27 @@
       "ambiguous": "Nuk u konfirmua — kontrollo PR-në përpara se të provosh përsëri.",
       "persistenceFailed": "Nuk arritëm ta regjistronim këtë veprim. Provo përsëri më vonë.",
       "forbidden": "Ky veprim nuk lejohet."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Nuk është e disponueshme te ky ofrues",
+        "accessibility": "Nuk është e disponueshme te ky ofrues: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Kërkesë bashkimi",
+      "mergeRequest": "Kërkesë integrimi",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Ndaj kërkesën e integrimit",
+      "viewOnProvider": "Shih te {{provider}}",
+      "mergeRequestUnavailable": "Kërkesa e integrimit nuk është e disponueshme",
+      "unavailableDescription": "Mbase është fshirë, ose mbase nuk ke akses për të.",
+      "accessDeniedMergeRequest": "Nuk ke leje për ta parë këtë kërkesë integrimi.",
+      "couldNotLoadMergeRequest": "Nuk u ngarkua kërkesa e integrimit.",
+      "discussionAccessDenied": "Nuk ke leje për ta parë diskutimin e kësaj kërkeze integrimi.",
+      "discussionUnavailableMessage": "Kjo kërkesë integrimi mund të jetë hequr.",
+      "noDiscussionDescription": "Nuk ka diskutime rishikimi ose komente bisede në këtë kërkesë integrimi.",
+      "noFilesChangedDescription": "Kjo kërkesë integrimi nuk përmban ndryshime në skedarë."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "Skedarët e të folurit jashtë interneti për {{language}} nuk janë të instaluar në këtë telefon. Shkarkoji dhe pastaj provo diktimin përsëri.",
     "downloadOfflineModel": "Shkarko",
     "offlineModelDownloadScheduled": "Skedarët e të folurit jashtë interneti do të shkarkohen në sfond. Provo diktimin përsëri më vonë.",
-    "listeningStopped": "Dëgjimi u ndal."
+    "listeningStopped": "Dëgjimi u ndal.",
+    "transcribing": "Duke transkriptuar...",
+    "gatewayUnreachable": "Kilo Gateway nuk u arrit dot. Kontrollo lidhjen dhe provo përsëri.",
+    "gatewayTimeout": "Transkriptimi zgjati tepër. Provo përsëri.",
+    "gatewayModelUnavailable": "Ky model transkriptimi nuk është i disponueshëm. Zgjidh një tjetër te Preferencat.",
+    "gatewayModelUnavailableNotice": "Ky model nuk ofrohet më. Trokit $t(transcriptionModel.title) për të zgjedhur një tjetër.",
+    "gatewaySignInRequired": "Hyr për të përdorur transkriptimin me Kilo Gateway.",
+    "gatewayNoModel": "Së pari zgjidh një model transkriptimi te Preferencat."
   },
   "share": {
     "title": "Ndarja në Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "Pret përgjigje",
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
+  },
+  "transcriptionModel": {
+    "title": "Modeli i transkriptimit",
+    "noneChosen": "Asgjë nuk u zgjodh",
+    "emptyTitle": "Nuk ka modele transkriptimi",
+    "emptyDescription": "Kilo Gateway nuk ofron tani asnjë model transkriptimi.",
+    "loadFailed": "Modelet e transkriptimit nuk u ngarkuan."
   }
 }

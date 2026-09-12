@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO menter"
   },
   "preferences": {
+    "general": "Cyffredinol",
+    "voiceInput": "Mewnbwn llais",
     "autoExpandThinking": "Ehangu meddwl yn awtomatig",
     "autoExpandThinkingSubtitle": "Dangos meddwl yr asiant yn llawn pan fydd wedi gorffen meddwl.",
     "keepScreenOn": "Cadw'r sgrin ymlaen ar dudalen y sesiwn",
@@ -238,6 +240,7 @@
     "appearanceLight": "Golau",
     "appearanceDark": "Tywyll",
     "account": "Cyfrif",
+    "accountSubtitle": "Iaith, gwesteiwyr dibynadwy a sesiynau dyfeisiau",
     "prReviewAttribution": "Enwi'r ap mewn adolygiadau PR",
     "prReviewAttributionSubtitle": "Ychwanegu troedyn 'Adolygwyd drwy Kilo' pan fyddwch yn cyflwyno adolygiad.",
     "returnSendsMessage": "Mae'r fysell Dychwelyd yn anfon neges",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Trawsgrifio drwy Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Trawsgrifiwch fewnbwn llais â model Kilo Gateway yn lle adnabod lleferydd y ddyfais. Anfonir eich recordiad i Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Cais tynnu ddim ar gael",
@@ -349,12 +355,6 @@
       "emptyDiffRow": "Rhes wag yn y gwahaniaethau"
     },
     "connectionExpired": "Mae'r cysylltiad â GitHub wedi dod i ben.",
-    "capabilities": {
-      "banner": {
-        "title": "Ddim ar gael ar y darparwr hwn",
-        "accessibility": "Ddim ar gael ar y darparwr hwn: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Cyfuno",
       "mergeNow": "Cyfuno nawr",
@@ -484,7 +484,9 @@
       "acceptTerms": "Derbyn",
       "replyBadRequest": "Ni ellir postio'r ateb hwn. Efallai fod yr edefyn wedi newid.",
       "replyForbidden": "Nid oes gennych ganiatâd i ateb y cais tynnu hwn.",
-      "replyForbiddenTerm": "Nid oes gennych ganiatâd i ateb y {{term}} hwn.",
+      "addCommentCta": "Sylwadu ar y cais tynnu hwn",
+      "commentBadRequest": "Ni ellir postio'r sylw hwn. Efallai fod y cais tynnu wedi newid.",
+      "commentForbidden": "Nid oes gennych ganiatâd i sylwadu ar y cais tynnu hwn.",
       "moderation": {
         "reportContent": {
           "terminal": "Ni ellir adrodd am y sylw hwn.",
@@ -516,6 +518,14 @@
       "termsAcceptRequired": "Rhaid i chi dderbyn y telerau gwasanaeth i bostio.",
       "termsOutdatedCopy": "Mae'r telerau gwasanaeth wedi newid. Ailagorwch y sgrin hon i dderbyn y fersiwn ddiweddaraf.",
       "termsCheckRetryCopy": "Ni lwyddwyd i wirio'r telerau gwasanaeth. Gwiriwch eich cysylltiad a rhowch gynnig eto.",
+      "comment_zero": "{{displayCount}} sylw",
+      "comment_two": "{{displayCount}} sylw",
+      "comment_few": "{{displayCount}} sylw",
+      "comment_many": "{{displayCount}} sylw",
+      "reaction_zero": "ymateb",
+      "reaction_two": "ymateb",
+      "reaction_few": "ymateb",
+      "reaction_many": "ymateb",
       "reactions": {
         "thumbsUp": "Bawd i fyny",
         "thumbsDown": "Bawd i lawr",
@@ -534,14 +544,7 @@
         "outdatedOnPath": "Wedi dyddio ar {{path}}"
       },
       "deletedUser": "defnyddiwr wedi'i ddileu",
-      "comment_zero": "{{displayCount}} sylw",
-      "comment_two": "{{displayCount}} sylw",
-      "comment_few": "{{displayCount}} sylw",
-      "comment_many": "{{displayCount}} sylw",
-      "reaction_zero": "ymateb",
-      "reaction_two": "ymateb",
-      "reaction_few": "ymateb",
-      "reaction_many": "ymateb"
+      "replyForbiddenTerm": "Nid oes gennych ganiatâd i ateb y {{term}} hwn."
     },
     "couldNotOpenGitHubAppSettings": "Doedd dim modd agor gosodiadau ap GitHub.",
     "installKiloGitHubApp": "Gosod ap GitHub Kilo",
@@ -711,21 +714,6 @@
       "files": "Ffeiliau",
       "discussion": "Trafodaeth"
     },
-    "terms": {
-      "pullRequest": "Cais tynnu",
-      "mergeRequest": "Cais uno",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Rhannu cais uno",
-      "viewOnProvider": "Gweld ar {{provider}}",
-      "mergeRequestUnavailable": "Cais uno ddim ar gael",
-      "unavailableDescription": "Efallai ei fod wedi'i ddileu, neu efallai nad oes gennych fynediad ato.",
-      "accessDeniedMergeRequest": "Nid oes gennych ganiatâd i weld y cais uno hwn.",
-      "couldNotLoadMergeRequest": "Ni lwyddwyd i lwytho'r cais uno.",
-      "discussionAccessDenied": "Nid oes gennych ganiatâd i weld trafodaeth y cais uno hwn.",
-      "discussionUnavailableMessage": "Efallai fod y cais uno hwn wedi'i ddileu.",
-      "noDiscussionDescription": "Nid oes edafedd adolygu na sylwadau trafod ar y cais uno hwn.",
-      "noFilesChangedDescription": "Nid oes unrhyw ffeiliau wedi'u newid yn y cais uno hwn."
-    },
     "fileStatus": {
       "modified": "Wedi'i addasu",
       "renamed": "Wedi'i ailenwi",
@@ -763,6 +751,27 @@
       "ambiguous": "Ni lwyddwyd i gadarnhau'r canlyniad — gwiriwch y PR cyn rhoi cynnig eto.",
       "persistenceFailed": "Ni lwyddwyd i gofnodi'r weithred hon. Rhowch gynnig eto yn nes ymlaen.",
       "forbidden": "Ni chaniateir hyn."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ddim ar gael ar y darparwr hwn",
+        "accessibility": "Ddim ar gael ar y darparwr hwn: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Cais tynnu",
+      "mergeRequest": "Cais uno",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Rhannu cais uno",
+      "viewOnProvider": "Gweld ar {{provider}}",
+      "mergeRequestUnavailable": "Cais uno ddim ar gael",
+      "unavailableDescription": "Efallai ei fod wedi'i ddileu, neu efallai nad oes gennych fynediad ato.",
+      "accessDeniedMergeRequest": "Nid oes gennych ganiatâd i weld y cais uno hwn.",
+      "couldNotLoadMergeRequest": "Ni lwyddwyd i lwytho'r cais uno.",
+      "discussionAccessDenied": "Nid oes gennych ganiatâd i weld trafodaeth y cais uno hwn.",
+      "discussionUnavailableMessage": "Efallai fod y cais uno hwn wedi'i ddileu.",
+      "noDiscussionDescription": "Nid oes edafedd adolygu na sylwadau trafod ar y cais uno hwn.",
+      "noFilesChangedDescription": "Nid oes unrhyw ffeiliau wedi'u newid yn y cais uno hwn."
     }
   },
   "notifications": {
@@ -2715,7 +2724,14 @@
     "languageNotInstalledMessage": "Nid yw ffeiliau lleferydd all-lein {{language}} wedi'u gosod ar y ffôn hon. Llwythwch nhw i lawr, yna ceisiwch fewnbwn llais eto.",
     "downloadOfflineModel": "Llwytho i lawr",
     "offlineModelDownloadScheduled": "Bydd y ffeiliau lleferydd all-lein yn cael eu llwytho i lawr yn y cefndir. Ceisiwch fewnbwn llais eto yn nes ymlaen.",
-    "listeningStopped": "Daeth y gwrando i ben."
+    "listeningStopped": "Daeth y gwrando i ben.",
+    "transcribing": "Yn trawsgrifio...",
+    "gatewayUnreachable": "Doedd dim modd cyrraedd Kilo Gateway. Gwiriwch eich cysylltiad a cheisiwch eto.",
+    "gatewayTimeout": "Cymrodd y trawsgrifio rhy lawer o amser. Ceisiwch eto.",
+    "gatewayModelUnavailable": "Nid yw'r model trawsgrifio hwn ar gael. Dewiswch un arall yn y Dewisiadau.",
+    "gatewayModelUnavailableNotice": "Nid yw'r model hwn yn cael ei gynnig mwyach. Tapiwch $t(transcriptionModel.title) i ddewis un arall.",
+    "gatewaySignInRequired": "Mewngofnodwch i ddefnyddio trawsgrifio drwy Kilo Gateway.",
+    "gatewayNoModel": "Dewiswch fodel trawsgrifio yn y Dewisiadau yn gyntaf."
   },
   "share": {
     "title": "Rhannu â Kilo",
@@ -3101,5 +3117,12 @@
     "needsInput": "Angen mewnbwn",
     "channelName": "Asiantau gweithredol",
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo."
+  },
+  "transcriptionModel": {
+    "title": "Model trawsgrifio",
+    "noneChosen": "Dim wedi'i ddewis",
+    "emptyTitle": "Dim modelau trawsgrifio",
+    "emptyDescription": "Does dim modelau trawsgrifio ar gael gan Kilo Gateway ar hyn o bryd.",
+    "loadFailed": "Doedd dim modd llwytho'r modelau trawsgrifio."
   }
 }

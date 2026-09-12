@@ -1976,6 +1976,8 @@
     "retryLoadingPrivacy": "Réessayer de charger les préférences de confidentialité"
   },
   "preferences": {
+    "general": "Général",
+    "voiceInput": "Saisie vocale",
     "autoExpandThinking": "Développer automatiquement la réflexion",
     "autoExpandThinkingSubtitle": "Afficher le détail de la réflexion de l'agent une fois celle-ci terminée.",
     "keepScreenOn": "Garder l'écran allumé sur la page de la session",
@@ -1986,6 +1988,7 @@
     "appearanceLight": "Clair",
     "appearanceDark": "Sombre",
     "account": "Compte",
+    "accountSubtitle": "Langue, sites de confiance et sessions sur les appareils",
     "prReviewAttribution": "Mentionner l'application dans les revues de PR",
     "prReviewAttributionSubtitle": "Ajouter la mention « Revue via Kilo » au bas de chaque revue envoyée.",
     "returnSendsMessage": "La touche Entrée envoie le message",
@@ -1996,7 +1999,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transcription via Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transcrivez la saisie vocale avec un modèle Kilo Gateway au lieu de la reconnaissance vocale de l'appareil. Votre enregistrement est envoyé à Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "addCredits": {
     "cta": "Ajouter des crédits",
@@ -2089,7 +2095,14 @@
     "languageNotInstalledMessage": "Les fichiers de reconnaissance vocale hors ligne pour {{language}} ne sont pas installés sur ce téléphone. Téléchargez-les, puis réessayez la saisie vocale.",
     "downloadOfflineModel": "Télécharger",
     "offlineModelDownloadScheduled": "Les fichiers de reconnaissance vocale hors ligne seront téléchargés en arrière-plan. Réessayez la saisie vocale plus tard.",
-    "listeningStopped": "Écoute arrêtée."
+    "listeningStopped": "Écoute arrêtée.",
+    "transcribing": "Transcription en cours…",
+    "gatewayUnreachable": "Impossible de joindre Kilo Gateway. Vérifiez votre connexion et réessayez.",
+    "gatewayTimeout": "La transcription a pris trop de temps. Réessayez.",
+    "gatewayModelUnavailable": "Ce modèle de transcription n'est pas disponible. Choisissez-en un autre dans les Préférences.",
+    "gatewayModelUnavailableNotice": "Ce modèle n'est plus proposé. Touchez $t(transcriptionModel.title) pour en choisir un autre.",
+    "gatewaySignInRequired": "Connectez-vous pour utiliser la transcription via Kilo Gateway.",
+    "gatewayNoModel": "Choisissez d'abord un modèle de transcription dans les Préférences."
   },
   "share": {
     "title": "Partager avec Kilo",
@@ -2336,11 +2349,174 @@
     "scroll": "Défilement"
   },
   "prReview": {
-    "pullRequestUnavailable": "Demande de fusion indisponible",
-    "pullRequestUnavailableDescription": "Impossible d'ouvrir cette PR. Elle a peut-être été supprimée, le dépôt est privé ou l'application GitHub de Kilo n'y est pas installée.",
     "accessDeniedDescription": "Vous n'avez pas l'autorisation de consulter cette demande de fusion.",
-    "noFilesChanged": "Aucun fichier modifié",
-    "noFilesChangedDescription": "Cette demande de fusion ne modifie aucun fichier.",
+    "checkConnection": "Vérifier la connexion",
+    "checks": {
+      "checksCount": "{{displayCount}} vérifications",
+      "couldNotLoad": "Impossible de charger les vérifications.",
+      "failed": "{{displayCount}} en échec",
+      "noAccess": "Vous n'avez pas accès aux vérifications de ce dépôt.",
+      "noChecksReported": "Aucun résultat de vérification",
+      "notAvailable": "Les vérifications ne sont pas encore disponibles. Le dernier commit n'a peut-être pas été traité ou l'application GitHub de Kilo n'est pas installée sur le dépôt source.",
+      "openDetails": "Afficher les détails de {{name}}",
+      "passed": "{{displayCount}} réussies",
+      "pending": "{{displayCount}} en attente",
+      "retryChecks": "Réessayer de charger les vérifications",
+      "skipped": "{{displayCount}} ignorées",
+      "title": "Vérifications",
+      "viewOnGitHub": "Voir la PR sur GitHub",
+      "checkDetails": "détails de la vérification"
+    },
+    "composer": {
+      "addTitle": "Nouveau commentaire",
+      "addToReview": "Ajouter à la revue",
+      "comment": "Commenter",
+      "commentBody": "Texte du commentaire",
+      "commentBodyPlaceholder": "Votre commentaire",
+      "commentNow": "Commenter maintenant",
+      "discardMessage": "Votre brouillon sera perdu.",
+      "discardTitle": "Supprimer le brouillon du commentaire ?",
+      "editTitle": "Modification du commentaire",
+      "insertSuggestion": "Insérer une suggestion",
+      "insertSuggestionA11y": "Insérer une suggestion de code",
+      "loadFailedTitle": "Impossible de charger l'éditeur de commentaires.",
+      "ok": "OK",
+      "unavailableMessage": "Ce commentaire en attente a déjà été supprimé ou envoyé.",
+      "unavailableTitle": "Commentaire indisponible",
+      "bodyEmpty": "Le commentaire ne peut pas être vide.",
+      "suggestionsOnlyAddedLines": "Les suggestions ne s'appliquent qu'aux lignes ajoutées.",
+      "tapDiffLineToSuggest": "Touchez une ligne dans les différences pour activer les suggestions."
+    },
+    "connect": {
+      "checkFailedTitle": "Impossible de vérifier la connexion GitHub.",
+      "checkFailedMessage": "L'état de la connexion reste indisponible jusqu'à la fin du chargement.",
+      "checkFailedTitleGitLab": "Impossible de vérifier la connexion GitLab.",
+      "checkFailedTitleBitbucket": "Impossible de vérifier la connexion Bitbucket.",
+      "providerCheckFailedMessage": "L'état de la connexion reste indisponible jusqu'à la fin du chargement.",
+      "reconnectTitle": "Reconnecter GitHub",
+      "reconnectDescription": "L'accès à votre compte GitHub a été révoqué. Reconnectez-vous pour continuer à examiner des demandes de fusion sur mobile.",
+      "description": "Connectez votre compte GitHub pour examiner des demandes de fusion sur mobile.",
+      "gitlabDescription": "Connectez votre compte GitLab pour examiner des merge requests sur mobile.",
+      "bitbucketDescription": "Connectez Bitbucket à cette organisation pour examiner des PR sur mobile.",
+      "bitbucketOrgOnlyDescription": "Sélectionnez une organisation dans votre profil pour examiner ses PR Bitbucket sur mobile."
+    },
+    "connectionExpired": "La connexion à GitHub a expiré.",
+    "couldNotLoadPullRequest": "Impossible de charger la demande de fusion.",
+    "couldNotOpenGitHubAppSettings": "Impossible d'ouvrir les paramètres de l'application GitHub.",
+    "description": "Présentation",
+    "discussion": {
+      "acceptTerms": "Accepter",
+      "accessDeniedMessage": "Vous n'avez pas l'autorisation de consulter les échanges de cette PR.",
+      "addReaction": "Ajouter une réaction",
+      "block": "Bloquer",
+      "blockedUser": "{{login}} bloqué",
+      "collapseThread": "Réduire le fil",
+      "commentActions": "Actions du commentaire",
+      "comment": "{{displayCount}} commentaires",
+      "comment_other": "{{displayCount}} commentaires",
+      "couldNotLoad": "Impossible de charger les échanges.",
+      "couldNotLoadMore": "Impossible de charger d'autres commentaires.",
+      "loadMoreComments": "Charger d'autres commentaires",
+      "loading": "Chargement des échanges",
+      "moderation": {
+        "block": {
+          "retryable": "Impossible de bloquer cet utilisateur. Vérifiez votre connexion et réessayez.",
+          "terminal": "Cet utilisateur ne peut pas être bloqué."
+        },
+        "mute": {
+          "retryable": "Impossible de mettre cet utilisateur en sourdine. Vérifiez votre connexion et réessayez.",
+          "terminal": "Cet utilisateur ne peut pas être mis en sourdine."
+        },
+        "reportContent": {
+          "retryable": "Impossible de signaler ce commentaire. Vérifiez votre connexion et réessayez.",
+          "terminal": "Ce commentaire ne peut pas être signalé."
+        },
+        "reportUser": {
+          "retryable": "Impossible de signaler cet utilisateur. Vérifiez votre connexion et réessayez.",
+          "terminal": "Cet utilisateur ne peut pas être signalé."
+        }
+      },
+      "moreLinesAbove": "… {{displayCount}} lignes supplémentaires se trouvent au-dessus.",
+      "mute": "Mettre en sourdine",
+      "mutedUser": "{{login}} mis en sourdine",
+      "noDiscussion": "Aucun échange pour le moment",
+      "noDiscussionDescription": "Cette demande de fusion ne contient encore aucun fil de revue ni commentaire.",
+      "comment_one": "1 commentaire",
+      "outdated": "Obsolète",
+      "quotedDiffSnippet": "Extrait des différences cité",
+      "reactionPill": "réaction {{emoji}}, {{displayCount}} {{countLabel}}",
+      "reaction": "réactions",
+      "reaction_other": "réactions",
+      "reaction_one": "réaction",
+      "replyBadRequest": "Cette réponse ne peut pas être publiée. Le fil a peut-être changé.",
+      "replyBody": "Texte de la réponse",
+      "replyForbidden": "Vous n'avez pas l'autorisation de répondre à cette demande de fusion.",
+      "addCommentCta": "Commenter cette demande de fusion",
+      "commentBadRequest": "Ce commentaire ne peut pas être publié. La demande de fusion a peut-être changé.",
+      "commentForbidden": "Vous n'avez pas l'autorisation de commenter cette demande de fusion.",
+      "replyPlaceholder": "Votre réponse…",
+      "reportContent": "Signaler le contenu",
+      "reportUser": "Signaler l'utilisateur",
+      "resolveThread": "Marquer le fil comme résolu",
+      "resolved": "Résolu",
+      "retryLoadingMore": "Réessayer de charger d'autres commentaires",
+      "reviewFiles": "Examiner les fichiers",
+      "startedRelative": " · ouvert {{relative}}",
+      "submitReply": "Envoyer la réponse",
+      "termsAcceptRetry": "Impossible d'accepter les conditions d'utilisation. Vérifiez votre connexion et réessayez.",
+      "termsCopy": "Vous devez avoir au moins 13 ans pour publier.",
+      "termsTitle": "Conditions d'utilisation",
+      "threadAccessibilityLabel": "Fil de discussion {{anchorLabel}}",
+      "unavailable": "Les échanges sont indisponibles.",
+      "unavailableMessage": "Cette demande de fusion a peut-être été supprimée.",
+      "unresolveThread": "Rouvrir le fil",
+      "viewTerms": "Consulter les conditions",
+      "termsAcceptRequired": "Vous devez accepter les conditions d'utilisation pour publier.",
+      "termsCheckRetryCopy": "Impossible de vérifier les conditions d'utilisation. Vérifiez votre connexion et réessayez.",
+      "termsOutdatedCopy": "Les conditions d'utilisation ont été modifiées. Rouvrez cet écran pour accepter la nouvelle version.",
+      "comment_many": "{{displayCount}} commentaires",
+      "reaction_many": "réactions",
+      "reactions": {
+        "thumbsUp": "Pouce levé",
+        "thumbsDown": "Pouce baissé",
+        "laugh": "Rire",
+        "hooray": "Hourra",
+        "confused": "Perplexe",
+        "heart": "Cœur",
+        "rocket": "Fusée",
+        "eyes": "Yeux"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Commentaire sur le fichier {{path}}",
+        "fileComment": "Commentaire sur le fichier",
+        "outdatedOnPathLines": "Obsolète : {{path}}, {{lines}}",
+        "outdatedOnLines": "Obsolète : {{lines}}",
+        "outdatedOnPath": "Obsolète : {{path}}"
+      },
+      "deletedUser": "utilisateur supprimé",
+      "replyForbiddenTerm": "Vous n'avez pas l'autorisation de répondre à {{term}}."
+    },
+    "entry": {
+      "eyebrow": "Ouvrez une PR ou une merge request à partir de son URL",
+      "pastePrLink": "Coller un lien de PR ou de merge request",
+      "noRecentPrs": "Aucune revue récente",
+      "noRecentPrsDescription": "Collez un lien ci-dessus pour démarrer une revue — elle apparaîtra ici la prochaine fois.",
+      "couldNotLoad": "Le chargement est impossible.",
+      "removeFromRecentsTitle": "Retirer des éléments récents ?",
+      "removeFromRecentsMessage": "Cette revue sera retirée de vos éléments récents.",
+      "removeRecentAccessibility": "Retirer {{repo}} des éléments récents",
+      "urlAccessibility": "Saisissez une URL de PR ou de merge request",
+      "urlPlaceholder": "URL de PR ou de merge request",
+      "openAccessibility": "Ouvrir une PR ou un merge request",
+      "clearLink": "Effacer le lien",
+      "pasteLink": "Coller le lien de PR ou de merge request",
+      "open": "Ouverture"
+    },
+    "eventChips": {
+      "comment": "Commenter",
+      "label": "Type de revue",
+      "requestChanges": "Demander des modifications"
+    },
     "fileList": {
       "filesList": "Liste des fichiers",
       "filesViewed": "Fichiers · {{viewed}} sur {{total}} consultés",
@@ -2385,6 +2561,7 @@
       "commentOnSelectedLines": "Commenter les lignes sélectionnées",
       "finishReview": "Terminer la revue"
     },
+    "headLine": "{{counts}} · dernier commit {{sha}}",
     "hunkRows": {
       "contextUnavailable": "Le contexte n'est pas disponible pour cette référence.",
       "expandAll": "Tout afficher",
@@ -2419,21 +2596,14 @@
       "fileLoadedCount_many": "{{displayCount}} fichiers chargés",
       "fileLoadedOfTotalCount_many": "{{displayCount}} fichiers chargés sur {{total}}"
     },
-    "sideBySide": {
-      "emptyDiffColumn": "colonne de différences vide",
-      "emptyDiffRow": "Ligne de différences vide",
-      "newOnly": "Nouvelle version uniquement : {{text}}",
-      "noNewlineAtEndOfFile": "le fichier ne se termine pas par un saut de ligne.",
-      "oldNew": "Avant : {{old}} | Après : {{new}}",
-      "oldOnly": "Ancienne version uniquement : {{text}}"
+    "inbox": {
+      "couldNotLoad": "Impossible de charger la boîte de réception.",
+      "loading": "Chargement de la boîte de réception",
+      "noReviewRequests": "Aucune demande de revue",
+      "noReviewRequestsDescription": "Les demandes de fusion en attente de votre revue apparaissent ici. Vous pouvez aussi coller n'importe quel lien de PR ci-dessus.",
+      "title": "Boîte de réception"
     },
-    "connectionExpired": "La connexion à GitHub a expiré.",
-    "capabilities": {
-      "banner": {
-        "title": "Non disponible avec ce fournisseur",
-        "accessibility": "Non disponible avec ce fournisseur : {{reason}}"
-      }
-    },
+    "installKiloGitHubApp": "Installer l'application GitHub de Kilo",
     "merge": {
       "merge": "Fusion",
       "mergeNow": "Fusionner maintenant",
@@ -2524,207 +2694,9 @@
         "rebase": "Réappliquez tous les commits de cette branche sur la branche cible, sans créer de commit de fusion."
       }
     },
-    "discussion": {
-      "threadAccessibilityLabel": "Fil de discussion {{anchorLabel}}",
-      "collapseThread": "Réduire le fil",
-      "resolveThread": "Marquer le fil comme résolu",
-      "unresolveThread": "Rouvrir le fil",
-      "resolved": "Résolu",
-      "outdated": "Obsolète",
-      "comment_one": "1 commentaire",
-      "comment": "{{displayCount}} commentaires",
-      "comment_other": "{{displayCount}} commentaires",
-      "startedRelative": " · ouvert {{relative}}",
-      "couldNotLoadMore": "Impossible de charger d'autres commentaires.",
-      "retryLoadingMore": "Réessayer de charger d'autres commentaires",
-      "loadMoreComments": "Charger d'autres commentaires",
-      "addReaction": "Ajouter une réaction",
-      "reactionPill": "réaction {{emoji}}, {{displayCount}} {{countLabel}}",
-      "reaction_one": "réaction",
-      "reaction": "réactions",
-      "reaction_other": "réactions",
-      "commentActions": "Actions du commentaire",
-      "reportContent": "Signaler le contenu",
-      "reportUser": "Signaler l'utilisateur",
-      "mute": "Mettre en sourdine",
-      "block": "Bloquer",
-      "blockedUser": "{{login}} bloqué",
-      "mutedUser": "{{login}} mis en sourdine",
-      "replyPlaceholder": "Votre réponse…",
-      "replyBody": "Texte de la réponse",
-      "submitReply": "Envoyer la réponse",
-      "termsTitle": "Conditions d'utilisation",
-      "termsCopy": "Vous devez avoir au moins 13 ans pour publier.",
-      "termsAcceptRetry": "Impossible d'accepter les conditions d'utilisation. Vérifiez votre connexion et réessayez.",
-      "viewTerms": "Consulter les conditions",
-      "acceptTerms": "Accepter",
-      "replyBadRequest": "Cette réponse ne peut pas être publiée. Le fil a peut-être changé.",
-      "replyForbidden": "Vous n'avez pas l'autorisation de répondre à cette demande de fusion.",
-      "replyForbiddenTerm": "Vous n'avez pas l'autorisation de répondre à {{term}}.",
-      "moderation": {
-        "block": {
-          "retryable": "Impossible de bloquer cet utilisateur. Vérifiez votre connexion et réessayez.",
-          "terminal": "Cet utilisateur ne peut pas être bloqué."
-        },
-        "mute": {
-          "retryable": "Impossible de mettre cet utilisateur en sourdine. Vérifiez votre connexion et réessayez.",
-          "terminal": "Cet utilisateur ne peut pas être mis en sourdine."
-        },
-        "reportContent": {
-          "retryable": "Impossible de signaler ce commentaire. Vérifiez votre connexion et réessayez.",
-          "terminal": "Ce commentaire ne peut pas être signalé."
-        },
-        "reportUser": {
-          "retryable": "Impossible de signaler cet utilisateur. Vérifiez votre connexion et réessayez.",
-          "terminal": "Cet utilisateur ne peut pas être signalé."
-        }
-      },
-      "accessDeniedMessage": "Vous n'avez pas l'autorisation de consulter les échanges de cette PR.",
-      "unavailable": "Les échanges sont indisponibles.",
-      "unavailableMessage": "Cette demande de fusion a peut-être été supprimée.",
-      "couldNotLoad": "Impossible de charger les échanges.",
-      "loading": "Chargement des échanges",
-      "noDiscussion": "Aucun échange pour le moment",
-      "noDiscussionDescription": "Cette demande de fusion ne contient encore aucun fil de revue ni commentaire.",
-      "reviewFiles": "Examiner les fichiers",
-      "quotedDiffSnippet": "Extrait des différences cité",
-      "moreLinesAbove": "… {{displayCount}} lignes supplémentaires se trouvent au-dessus.",
-      "termsAcceptRequired": "Vous devez accepter les conditions d'utilisation pour publier.",
-      "termsOutdatedCopy": "Les conditions d'utilisation ont été modifiées. Rouvrez cet écran pour accepter la nouvelle version.",
-      "termsCheckRetryCopy": "Impossible de vérifier les conditions d'utilisation. Vérifiez votre connexion et réessayez.",
-      "reactions": {
-        "thumbsUp": "Pouce levé",
-        "thumbsDown": "Pouce baissé",
-        "laugh": "Rire",
-        "hooray": "Hourra",
-        "confused": "Perplexe",
-        "heart": "Cœur",
-        "rocket": "Fusée",
-        "eyes": "Yeux"
-      },
-      "anchor": {
-        "fileCommentOnPath": "Commentaire sur le fichier {{path}}",
-        "fileComment": "Commentaire sur le fichier",
-        "outdatedOnPathLines": "Obsolète : {{path}}, {{lines}}",
-        "outdatedOnLines": "Obsolète : {{lines}}",
-        "outdatedOnPath": "Obsolète : {{path}}"
-      },
-      "deletedUser": "utilisateur supprimé",
-      "comment_many": "{{displayCount}} commentaires",
-      "reaction_many": "réactions"
-    },
-    "couldNotOpenGitHubAppSettings": "Impossible d'ouvrir les paramètres de l'application GitHub.",
-    "installKiloGitHubApp": "Installer l'application GitHub de Kilo",
-    "checkConnection": "Vérifier la connexion",
-    "couldNotLoadPullRequest": "Impossible de charger la demande de fusion.",
-    "description": "Présentation",
     "noDescriptionProvided": "Aucune description n'a été fournie.",
-    "review": "Revue",
-    "reviewPullRequest": "Examiner la demande de fusion",
-    "headLine": "{{counts}} · dernier commit {{sha}}",
-    "entry": {
-      "eyebrow": "Ouvrez une PR ou une merge request à partir de son URL",
-      "pastePrLink": "Coller un lien de PR ou de merge request",
-      "noRecentPrs": "Aucune revue récente",
-      "noRecentPrsDescription": "Collez un lien ci-dessus pour démarrer une revue — elle apparaîtra ici la prochaine fois.",
-      "couldNotLoad": "Le chargement est impossible.",
-      "removeFromRecentsTitle": "Retirer des éléments récents ?",
-      "removeFromRecentsMessage": "Cette revue sera retirée de vos éléments récents.",
-      "removeRecentAccessibility": "Retirer {{repo}} des éléments récents",
-      "urlAccessibility": "Saisissez une URL de PR ou de merge request",
-      "urlPlaceholder": "URL de PR ou de merge request",
-      "openAccessibility": "Ouvrir une PR ou un merge request",
-      "clearLink": "Effacer le lien",
-      "pasteLink": "Coller le lien de PR ou de merge request",
-      "open": "Ouverture"
-    },
-    "checks": {
-      "checksCount": "{{displayCount}} vérifications",
-      "couldNotLoad": "Impossible de charger les vérifications.",
-      "failed": "{{displayCount}} en échec",
-      "noAccess": "Vous n'avez pas accès aux vérifications de ce dépôt.",
-      "noChecksReported": "Aucun résultat de vérification",
-      "notAvailable": "Les vérifications ne sont pas encore disponibles. Le dernier commit n'a peut-être pas été traité ou l'application GitHub de Kilo n'est pas installée sur le dépôt source.",
-      "openDetails": "Afficher les détails de {{name}}",
-      "passed": "{{displayCount}} réussies",
-      "pending": "{{displayCount}} en attente",
-      "retryChecks": "Réessayer de charger les vérifications",
-      "skipped": "{{displayCount}} ignorées",
-      "title": "Vérifications",
-      "viewOnGitHub": "Voir la PR sur GitHub",
-      "checkDetails": "détails de la vérification"
-    },
-    "inbox": {
-      "couldNotLoad": "Impossible de charger la boîte de réception.",
-      "loading": "Chargement de la boîte de réception",
-      "noReviewRequests": "Aucune demande de revue",
-      "noReviewRequestsDescription": "Les demandes de fusion en attente de votre revue apparaissent ici. Vous pouvez aussi coller n'importe quel lien de PR ci-dessus.",
-      "title": "Boîte de réception"
-    },
-    "composer": {
-      "addTitle": "Nouveau commentaire",
-      "addToReview": "Ajouter à la revue",
-      "comment": "Commenter",
-      "commentBody": "Texte du commentaire",
-      "commentBodyPlaceholder": "Votre commentaire",
-      "commentNow": "Commenter maintenant",
-      "discardMessage": "Votre brouillon sera perdu.",
-      "discardTitle": "Supprimer le brouillon du commentaire ?",
-      "editTitle": "Modification du commentaire",
-      "insertSuggestion": "Insérer une suggestion",
-      "insertSuggestionA11y": "Insérer une suggestion de code",
-      "loadFailedTitle": "Impossible de charger l'éditeur de commentaires.",
-      "ok": "OK",
-      "unavailableMessage": "Ce commentaire en attente a déjà été supprimé ou envoyé.",
-      "unavailableTitle": "Commentaire indisponible",
-      "bodyEmpty": "Le commentaire ne peut pas être vide.",
-      "suggestionsOnlyAddedLines": "Les suggestions ne s'appliquent qu'aux lignes ajoutées.",
-      "tapDiffLineToSuggest": "Touchez une ligne dans les différences pour activer les suggestions."
-    },
-    "connect": {
-      "checkFailedTitle": "Impossible de vérifier la connexion GitHub.",
-      "checkFailedMessage": "L'état de la connexion reste indisponible jusqu'à la fin du chargement.",
-      "checkFailedTitleGitLab": "Impossible de vérifier la connexion GitLab.",
-      "checkFailedTitleBitbucket": "Impossible de vérifier la connexion Bitbucket.",
-      "providerCheckFailedMessage": "L'état de la connexion reste indisponible jusqu'à la fin du chargement.",
-      "reconnectTitle": "Reconnecter GitHub",
-      "reconnectDescription": "L'accès à votre compte GitHub a été révoqué. Reconnectez-vous pour continuer à examiner des demandes de fusion sur mobile.",
-      "description": "Connectez votre compte GitHub pour examiner des demandes de fusion sur mobile.",
-      "gitlabDescription": "Connectez votre compte GitLab pour examiner des merge requests sur mobile.",
-      "bitbucketDescription": "Connectez Bitbucket à cette organisation pour examiner des PR sur mobile.",
-      "bitbucketOrgOnlyDescription": "Sélectionnez une organisation dans votre profil pour examiner ses PR Bitbucket sur mobile."
-    },
-    "screen": {
-      "shareA11y": "Partager la demande de fusion",
-      "title": "#{{number}}"
-    },
-    "submit": {
-      "deletePendingMessage": "Ce commentaire sera retiré des commentaires en attente de la revue.",
-      "deletePendingTitle": "Supprimer le commentaire en attente ?",
-      "loadFailedTitle": "Impossible de charger le formulaire d'envoi de la revue.",
-      "pendingComment": "commentaires en attente",
-      "pendingComment_other": "commentaires en attente",
-      "pendingComment_one": "commentaire en attente",
-      "summaryOptional": "Résumé (facultatif)",
-      "partialPostedMessage": "Commentaires publiés : {{displayFreshCount}}. Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
-      "submitCountOfTotal": "Envoyer {{displayFreshCount}} commentaires sur {{displayTotalCount}}",
-      "submitReview": "Envoyer la revue",
-      "pendingComment_many": "commentaires en attente",
-      "blockedRequestChanges": "Ajoutez un résumé ou au moins un commentaire pour demander des modifications.",
-      "blockedComment": "Ajoutez un résumé ou au moins un commentaire pour publier une revue avec des commentaires."
-    },
-    "reconnectNotice": {
-      "title": "La connexion à GitHub a expiré.",
-      "message": "Votre connexion GitHub n'est plus valide. Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter.",
-      "gitlabTitle": "La connexion à GitLab a expiré.",
-      "bitbucketTitle": "La connexion à Bitbucket a expiré.",
-      "providerMessage": "Votre connexion {{provider}} n'est plus valide. Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter."
-    },
-    "eventChips": {
-      "comment": "Commenter",
-      "label": "Type de revue",
-      "requestChanges": "Demander des modifications"
-    },
+    "noFilesChanged": "Aucun fichier modifié",
+    "noFilesChangedDescription": "Cette demande de fusion ne modifie aucun fichier.",
     "overview": {
       "commit": "validations",
       "commit_other": "validations",
@@ -2767,31 +2739,54 @@
       "summaryA11y": "Résumé de la revue",
       "summaryPlaceholder": "Résumé de la revue (facultatif)"
     },
-    "tabs": {
-      "discussion": "Échanges",
-      "files": "Fichiers",
-      "overview": "Aperçu"
+    "pullRequestUnavailable": "Demande de fusion indisponible",
+    "pullRequestUnavailableDescription": "Impossible d'ouvrir cette PR. Elle a peut-être été supprimée, le dépôt est privé ou l'application GitHub de Kilo n'y est pas installée.",
+    "reconnectNotice": {
+      "title": "La connexion à GitHub a expiré.",
+      "message": "Votre connexion GitHub n'est plus valide. Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter.",
+      "gitlabTitle": "La connexion à GitLab a expiré.",
+      "bitbucketTitle": "La connexion à Bitbucket a expiré.",
+      "providerMessage": "Votre connexion {{provider}} n'est plus valide. Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter."
     },
-    "terms": {
-      "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Partager le merge request",
-      "viewOnProvider": "Voir sur {{provider}}",
-      "mergeRequestUnavailable": "Merge request indisponible",
-      "unavailableDescription": "Il a peut-être été supprimé, ou vous n'y avez pas accès.",
-      "accessDeniedMergeRequest": "Vous n'avez pas l'autorisation de consulter ce merge request.",
-      "couldNotLoadMergeRequest": "Impossible de charger le merge request.",
-      "discussionAccessDenied": "Vous n'avez pas l'autorisation de consulter les échanges de ce merge request.",
-      "discussionUnavailableMessage": "Ce merge request a peut-être été supprimé.",
-      "noDiscussionDescription": "Ce merge request ne contient encore aucun fil de revue ni commentaire.",
-      "noFilesChangedDescription": "Ce merge request ne modifie aucun fichier."
+    "review": "Revue",
+    "reviewPullRequest": "Examiner la demande de fusion",
+    "screen": {
+      "shareA11y": "Partager la demande de fusion",
+      "title": "#{{number}}"
+    },
+    "sideBySide": {
+      "emptyDiffColumn": "colonne de différences vide",
+      "emptyDiffRow": "Ligne de différences vide",
+      "newOnly": "Nouvelle version uniquement : {{text}}",
+      "noNewlineAtEndOfFile": "le fichier ne se termine pas par un saut de ligne.",
+      "oldNew": "Avant : {{old}} | Après : {{new}}",
+      "oldOnly": "Ancienne version uniquement : {{text}}"
+    },
+    "submit": {
+      "deletePendingMessage": "Ce commentaire sera retiré des commentaires en attente de la revue.",
+      "deletePendingTitle": "Supprimer le commentaire en attente ?",
+      "loadFailedTitle": "Impossible de charger le formulaire d'envoi de la revue.",
+      "pendingComment": "commentaires en attente",
+      "pendingComment_other": "commentaires en attente",
+      "pendingComment_one": "commentaire en attente",
+      "summaryOptional": "Résumé (facultatif)",
+      "partialPostedMessage": "Commentaires publiés : {{displayFreshCount}}. Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",
+      "submitCountOfTotal": "Envoyer {{displayFreshCount}} commentaires sur {{displayTotalCount}}",
+      "submitReview": "Envoyer la revue",
+      "pendingComment_many": "commentaires en attente",
+      "blockedRequestChanges": "Ajoutez un résumé ou au moins un commentaire pour demander des modifications.",
+      "blockedComment": "Ajoutez un résumé ou au moins un commentaire pour publier une revue avec des commentaires."
     },
     "fileStatus": {
       "changed": "Modifié",
       "copied": "Copié",
       "modified": "Modifié",
       "renamed": "Renommé"
+    },
+    "tabs": {
+      "discussion": "Échanges",
+      "files": "Fichiers",
+      "overview": "Aperçu"
     },
     "diff": {
       "selectedTapToChange": "Sélection : {{label}}, touchez pour modifier la sélection",
@@ -2824,6 +2819,27 @@
       "ambiguous": "Impossible de confirmer le résultat. Vérifiez la PR avant de réessayer.",
       "persistenceFailed": "Nous n'avons pas pu enregistrer cette action. Veuillez réessayer plus tard.",
       "forbidden": "Cette action n'est pas autorisée."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Non disponible avec ce fournisseur",
+        "accessibility": "Non disponible avec ce fournisseur : {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Partager le merge request",
+      "viewOnProvider": "Voir sur {{provider}}",
+      "mergeRequestUnavailable": "Merge request indisponible",
+      "unavailableDescription": "Il a peut-être été supprimé, ou vous n'y avez pas accès.",
+      "accessDeniedMergeRequest": "Vous n'avez pas l'autorisation de consulter ce merge request.",
+      "couldNotLoadMergeRequest": "Impossible de charger le merge request.",
+      "discussionAccessDenied": "Vous n'avez pas l'autorisation de consulter les échanges de ce merge request.",
+      "discussionUnavailableMessage": "Ce merge request a peut-être été supprimé.",
+      "noDiscussionDescription": "Ce merge request ne contient encore aucun fil de revue ni commentaire.",
+      "noFilesChangedDescription": "Ce merge request ne modifie aucun fichier."
     }
   },
   "organization": {
@@ -3032,5 +3048,12 @@
     "needsInput": "Intervention requise",
     "channelName": "Agents actifs",
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé."
+  },
+  "transcriptionModel": {
+    "title": "Modèle de transcription",
+    "noneChosen": "Aucun choisi",
+    "emptyTitle": "Aucun modèle de transcription",
+    "emptyDescription": "Kilo Gateway ne propose actuellement aucun modèle de transcription.",
+    "loadFailed": "Impossible de charger les modèles de transcription."
   }
 }

@@ -6,7 +6,10 @@ const hapticsMock = vi.hoisted(() => ({ impactAsync: vi.fn().mockResolvedValue(u
 const accessibilityMock = vi.hoisted(() => ({ announceForAccessibility: vi.fn() }));
 const alertMock = vi.hoisted(() => ({ alert: vi.fn() }));
 const linkingMock = vi.hoisted(() => ({ openSettings: vi.fn() }));
-const toastMock = vi.hoisted(() => ({ error: vi.fn() }));
+const toastMock = vi.hoisted(() => ({
+  error: vi.fn(),
+  dismiss: vi.fn(),
+}));
 
 vi.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
@@ -20,6 +23,11 @@ vi.mock('expo-speech-recognition', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: toastMock }));
 vi.mock('expo-secure-store', () => ({}));
+vi.mock('expo-router', () => ({ router: { push: vi.fn() } }));
+vi.mock('./gateway/gateway-transcription-preference', () => ({
+  isGatewayTranscriptionEnabled: () => false,
+  readGatewayTranscriptionModel: () => null,
+}));
 vi.mock('react-native', () => ({
   AccessibilityInfo: accessibilityMock,
   Alert: alertMock,
@@ -64,7 +72,8 @@ describe('voice input feedback side effects', () => {
 
     expect(alertMock.alert).not.toHaveBeenCalled();
     expect(toastMock.error).toHaveBeenCalledWith(
-      'No speech detected. Tap the microphone to try again.'
+      'No speech detected. Tap the microphone to try again.',
+      { id: 'voice-input-feedback' }
     );
   });
 

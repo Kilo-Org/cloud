@@ -268,7 +268,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
             </Text>
           </View>
         )}
-      {enabled && !selectedOrgId ? <KiloPassSubscriptionCard /> : null}
+      {/* One loading indicator per section: while the balance slot shows its
+          skeleton, the KiloPass card reserves its slot quietly instead of
+          stacking a second skeleton card. The card's queries still run from
+          mount, so the swap adds no fetch latency. */}
+      {enabled && !selectedOrgId ? (
+        <KiloPassSubscriptionCard hideLoadingSkeleton={balanceLoading || balancePending} />
+      ) : null}
     </View>
   );
 }

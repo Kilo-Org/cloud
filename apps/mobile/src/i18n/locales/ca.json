@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO d'empresa"
   },
   "preferences": {
+    "general": "General",
+    "voiceInput": "Entrada de veu",
     "autoExpandThinking": "Desplega automàticament el raonament",
     "autoExpandThinkingSubtitle": "Mostra el raonament de l'agent desplegat quan acaba de raonar.",
     "keepScreenOn": "Mantén la pantalla encesa mentre vegis la sessió",
@@ -238,6 +240,7 @@
     "appearanceLight": "Clar",
     "appearanceDark": "Fosc",
     "account": "Compte",
+    "accountSubtitle": "Idioma, servidors de confiança i sessions als dispositius",
     "prReviewAttribution": "Afegeix l'atribució de l'aplicació a les revisions de PR",
     "prReviewAttributionSubtitle": "Afegeix un peu amb el text «Revisat amb Kilo» quan enviïs una revisió.",
     "returnSendsMessage": "La tecla de retorn envia el missatge",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transcripció amb Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transcriu el dictat amb un model de Kilo Gateway en lloc del reconeixement de veu del dispositiu. Enviarem la teva gravació a Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Sol·licitud d'integració no disponible",
@@ -343,12 +349,6 @@
       "emptyDiffRow": "Fila de diferències buida"
     },
     "connectionExpired": "La connexió amb GitHub ha caducat.",
-    "capabilities": {
-      "banner": {
-        "title": "No està disponible amb aquest proveïdor",
-        "accessibility": "No està disponible amb aquest proveïdor: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Fusió",
       "mergeNow": "Fusiona ara",
@@ -475,7 +475,9 @@
       "acceptTerms": "Accepta",
       "replyBadRequest": "Aquesta resposta no es pot publicar. Pot ser que el fil hagi canviat.",
       "replyForbidden": "No tens permís per respondre a aquesta sol·licitud d'integració.",
-      "replyForbiddenTerm": "No tens permís per respondre a aquesta {{term}}.",
+      "addCommentCta": "Comenta aquesta sol·licitud d'integració",
+      "commentBadRequest": "Aquest comentari no es pot publicar. Pot ser que la sol·licitud d'integració hagi canviat.",
+      "commentForbidden": "No tens permís per comentar aquesta sol·licitud d'integració.",
       "moderation": {
         "reportContent": {
           "terminal": "Aquest comentari no es pot denunciar.",
@@ -507,6 +509,8 @@
       "termsAcceptRequired": "Has d'acceptar les condicions del servei per publicar.",
       "termsOutdatedCopy": "Les condicions del servei han canviat. Torna a obrir aquesta pantalla per acceptar-ne la versió més recent.",
       "termsCheckRetryCopy": "No s'han pogut comprovar les condicions del servei. Comprova la connexió i torna-ho a provar.",
+      "comment_many": "{{displayCount}} comentaris",
+      "reaction_many": "reaccions",
       "reactions": {
         "thumbsUp": "Polze amunt",
         "thumbsDown": "Polze avall",
@@ -525,8 +529,7 @@
         "outdatedOnPath": "Desactualitzat a {{path}}"
       },
       "deletedUser": "usuari eliminat",
-      "comment_many": "{{displayCount}} comentaris",
-      "reaction_many": "reaccions"
+      "replyForbiddenTerm": "No tens permís per respondre a aquesta {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "No s'ha pogut obrir la configuració de l'aplicació de GitHub.",
     "installKiloGitHubApp": "Instal·la l'aplicació de Kilo per a GitHub",
@@ -687,21 +690,6 @@
       "files": "Fitxers",
       "discussion": "Discussió"
     },
-    "terms": {
-      "pullRequest": "PR",
-      "mergeRequest": "Sol·licitud de fusió",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Comparteix la sol·licitud de fusió",
-      "viewOnProvider": "Mostra-ho a {{provider}}",
-      "mergeRequestUnavailable": "Sol·licitud de fusió no disponible",
-      "unavailableDescription": "Pot ser que l'hagin eliminat o que no hi tinguis accés.",
-      "accessDeniedMergeRequest": "No tens permís per veure aquesta sol·licitud de fusió.",
-      "couldNotLoadMergeRequest": "No s'ha pogut carregar la sol·licitud de fusió.",
-      "discussionAccessDenied": "No tens permís per veure la discussió d'aquesta sol·licitud de fusió.",
-      "discussionUnavailableMessage": "Pot ser que aquesta sol·licitud de fusió s'hagi eliminat.",
-      "noDiscussionDescription": "Aquesta sol·licitud de fusió encara no té cap fil de revisió ni cap comentari a la conversa.",
-      "noFilesChangedDescription": "Aquesta sol·licitud de fusió no modifica cap fitxer."
-    },
     "fileStatus": {
       "modified": "Modificat",
       "renamed": "Reanomenat",
@@ -739,6 +727,27 @@
       "ambiguous": "No s'ha pogut confirmar l'acció. Comprova la PR abans de tornar-ho a provar.",
       "persistenceFailed": "No s'ha pogut registrar aquesta acció. Torna-ho a provar més tard.",
       "forbidden": "No tens permís per fer aquesta acció."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "No està disponible amb aquest proveïdor",
+        "accessibility": "No està disponible amb aquest proveïdor: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Sol·licitud de fusió",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Comparteix la sol·licitud de fusió",
+      "viewOnProvider": "Mostra-ho a {{provider}}",
+      "mergeRequestUnavailable": "Sol·licitud de fusió no disponible",
+      "unavailableDescription": "Pot ser que l'hagin eliminat o que no hi tinguis accés.",
+      "accessDeniedMergeRequest": "No tens permís per veure aquesta sol·licitud de fusió.",
+      "couldNotLoadMergeRequest": "No s'ha pogut carregar la sol·licitud de fusió.",
+      "discussionAccessDenied": "No tens permís per veure la discussió d'aquesta sol·licitud de fusió.",
+      "discussionUnavailableMessage": "Pot ser que aquesta sol·licitud de fusió s'hagi eliminat.",
+      "noDiscussionDescription": "Aquesta sol·licitud de fusió encara no té cap fil de revisió ni cap comentari a la conversa.",
+      "noFilesChangedDescription": "Aquesta sol·licitud de fusió no modifica cap fitxer."
     }
   },
   "notifications": {
@@ -2649,7 +2658,14 @@
     "languageNotInstalledMessage": "Els fitxers de veu fora de línia de {{language}} no estan instal·lats en aquest telèfon. Baixa'ls i torna-ho a provar amb el dictat.",
     "downloadOfflineModel": "Baixa",
     "offlineModelDownloadScheduled": "Els fitxers de veu fora de línia es baixaran en segon pla. Torna a provar el dictat més tard.",
-    "listeningStopped": "S'ha deixat d'escoltar."
+    "listeningStopped": "S'ha deixat d'escoltar.",
+    "transcribing": "S'està transcrivint…",
+    "gatewayUnreachable": "No s'ha pogut contactar amb Kilo Gateway. Comprova la connexió i torna-ho a provar.",
+    "gatewayTimeout": "La transcripció ha trigat massa. Torna-ho a provar.",
+    "gatewayModelUnavailable": "Aquest model de transcripció no està disponible. Tria'n un altre a les Preferències.",
+    "gatewayModelUnavailableNotice": "Aquest model ja no s'ofereix. Toca $t(transcriptionModel.title) per triar-ne un altre.",
+    "gatewaySignInRequired": "Inicia la sessió per utilitzar la transcripció amb Kilo Gateway.",
+    "gatewayNoModel": "Primer tria un model de transcripció a les Preferències."
   },
   "share": {
     "title": "Compartir amb Kilo",
@@ -3032,5 +3048,12 @@
     "needsInput": "Pendent de resposta",
     "channelName": "Agents actius",
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig."
+  },
+  "transcriptionModel": {
+    "title": "Model de transcripció",
+    "noneChosen": "Cap seleccionat",
+    "emptyTitle": "Cap model de transcripció",
+    "emptyDescription": "Kilo Gateway no ofereix cap model de transcripció ara mateix.",
+    "loadFailed": "No s'han pogut carregar els models de transcripció."
   }
 }

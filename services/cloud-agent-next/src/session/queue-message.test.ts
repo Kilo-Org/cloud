@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 
 import {
   preflightAndQueuePromptMessage,
+  preflightRuntimeAuthorizationRecovery,
   queueMessage,
   type QueueMessageInput,
 } from './queue-message.js';
@@ -80,6 +81,33 @@ describe('preflightAndQueuePromptMessage', () => {
     );
     expect(idFromName).toHaveBeenCalledWith('user_abc:agent_existing');
     expect(getSandboxSession).not.toHaveBeenCalled();
+  });
+
+  it('runs foreground runtime authorization recovery once before normal admission', async () => {
+    const { stub, admitSubmittedMessage } = makeDoStub({
+      success: true,
+      outcome: 'queued',
+      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      compatibilityDelivery: 'queued',
+    });
+    const getRuntimeAuthorizationRecoveryState = vi.fn().mockResolvedValue({ state: 'active' });
+    Object.assign(stub, { getRuntimeAuthorizationRecoveryState });
+
+    await preflightAndQueuePromptMessage(
+      {
+        cloudAgentSessionId: 'agent_existing',
+        turn: { type: 'prompt', id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn', prompt: 'follow up' },
+      },
+      {
+        env: makeEnv(stub) as Env,
+        userId: 'user_abc',
+        authToken: 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJraWxvIn0.signature',
+      },
+      'send'
+    );
+
+    expect(getRuntimeAuthorizationRecoveryState).toHaveBeenCalledOnce();
+    expect(admitSubmittedMessage).toHaveBeenCalledOnce();
   });
 });
 
@@ -457,5 +485,39 @@ describe('queueMessage', () => {
         throw err;
       }
     }
+  });
+});
+
+describe('preflightRuntimeAuthorizationRecovery', () => {
+  const currentAuthToken = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJraWxvIn0.signature';
+
+  it('denies an explicitly revoked modern runtime authorization before admission', async () => {
+    const admitSubmittedMessage = vi.fn();
+    const getRuntimeAuthorizationRecoveryState = vi.fn().mockResolvedValue({ state: 'revoked' });
+
+    await expect(
+      preflightRuntimeAuthorizationRecovery('agent_revoked', {
+        env: makeEnv({ admitSubmittedMessage, getRuntimeAuthorizationRecoveryState }) as Env,
+        userId: 'user_abc',
+        authToken: currentAuthToken,
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+
+    expect(getRuntimeAuthorizationRecoveryState).toHaveBeenCalledOnce();
+    expect(admitSubmittedMessage).not.toHaveBeenCalled();
+  });
+
+  it('does nothing for a legacy runtime authorization', async () => {
+    const getRuntimeAuthorizationRecoveryState = vi.fn().mockResolvedValue({ state: 'legacy' });
+
+    await expect(
+      preflightRuntimeAuthorizationRecovery('agent_legacy', {
+        env: makeEnv({ getRuntimeAuthorizationRecoveryState }) as Env,
+        userId: 'user_abc',
+        authToken: currentAuthToken,
+      })
+    ).resolves.toBeUndefined();
+
+    expect(getRuntimeAuthorizationRecoveryState).toHaveBeenCalledOnce();
   });
 });

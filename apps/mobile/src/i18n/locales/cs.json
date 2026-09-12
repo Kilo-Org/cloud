@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "Podnikové SSO"
   },
   "preferences": {
+    "general": "Obecné",
+    "voiceInput": "Hlasový vstup",
     "autoExpandThinking": "Automaticky rozbalovat uvažování",
     "autoExpandThinkingSubtitle": "Po dokončení uvažování agenta zobrazí jeho obsah rozbalený.",
     "keepScreenOn": "Nezhasínat obrazovku v relaci",
@@ -238,6 +240,7 @@
     "appearanceLight": "Světlý",
     "appearanceDark": "Tmavý",
     "account": "Účet",
+    "accountSubtitle": "Jazyk, důvěryhodné domény a přihlášená zařízení",
     "prReviewAttribution": "Přidávat zmínku o aplikaci ke kontrolám PR",
     "prReviewAttributionSubtitle": "Při odeslání kontroly přidá do zápatí informaci, že kontrola proběhla přes Kilo.",
     "returnSendsMessage": "Klávesa Enter odesílá zprávu",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Přepis přes Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Přepisujte diktování pomocí modelu Kilo Gateway místo rozpoznávání řeči ve vašem zařízení. Nahraný zvuk se odešle do Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "PR není dostupný",
@@ -345,12 +351,6 @@
       "emptyDiffRow": "Prázdný řádek přehledu změn"
     },
     "connectionExpired": "Platnost připojení ke službě GitHub vypršela.",
-    "capabilities": {
-      "banner": {
-        "title": "Není dostupné u tohoto poskytovatele",
-        "accessibility": "Není dostupné u tohoto poskytovatele: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "Sloučení",
       "mergeNow": "Sloučit nyní",
@@ -478,7 +478,9 @@
       "acceptTerms": "Přijmout",
       "replyBadRequest": "Tuto odpověď nelze odeslat. Vlákno se možná změnilo.",
       "replyForbidden": "Nemáš oprávnění odpovídat v tomto PR.",
-      "replyForbiddenTerm": "Nemáš oprávnění odpovídat v tomto {{term}}.",
+      "addCommentCta": "Okomentovat tento PR",
+      "commentBadRequest": "Tento komentář nelze odeslat. PR se možná změnil.",
+      "commentForbidden": "Nemáš oprávnění komentovat tento PR.",
       "moderation": {
         "reportContent": {
           "terminal": "Tento komentář nelze nahlásit.",
@@ -510,6 +512,10 @@
       "termsAcceptRequired": "Před přidáním příspěvku musíš přijmout podmínky používání.",
       "termsOutdatedCopy": "Podmínky používání se změnily. Znovu otevři tuto obrazovku a přijmi jejich nejnovější verzi.",
       "termsCheckRetryCopy": "Podmínky používání se nepodařilo ověřit. Zkontroluj připojení a zkus to znovu.",
+      "comment_few": "{{displayCount}} komentáře",
+      "comment_many": "{{displayCount}} komentáře",
+      "reaction_few": "reakce",
+      "reaction_many": "reakce",
       "reactions": {
         "thumbsUp": "Palec nahoru",
         "thumbsDown": "Palec dolů",
@@ -528,10 +534,7 @@
         "outdatedOnPath": "Zastaralé: {{path}}"
       },
       "deletedUser": "smazaný uživatel",
-      "comment_few": "{{displayCount}} komentáře",
-      "comment_many": "{{displayCount}} komentáře",
-      "reaction_few": "reakce",
-      "reaction_many": "reakce"
+      "replyForbiddenTerm": "Nemáš oprávnění odpovídat v tomto {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Nepodařilo se otevřít nastavení aplikace GitHub.",
     "installKiloGitHubApp": "Nainstalovat aplikaci Kilo pro GitHub",
@@ -695,21 +698,6 @@
       "files": "Soubory",
       "discussion": "Diskuse"
     },
-    "terms": {
-      "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Sdílet merge request",
-      "viewOnProvider": "Zobrazit na {{provider}}",
-      "mergeRequestUnavailable": "Merge request není dostupný",
-      "unavailableDescription": "Byl možná odstraněn, nebo k němu nemáš přístup.",
-      "accessDeniedMergeRequest": "Nemáš oprávnění zobrazit tento merge request.",
-      "couldNotLoadMergeRequest": "Merge request se nepodařilo načíst.",
-      "discussionAccessDenied": "Nemáš oprávnění zobrazit diskusi k tomuto merge request.",
-      "discussionUnavailableMessage": "Tento merge request byl možná smazán.",
-      "noDiscussionDescription": "Tento merge request zatím neobsahuje žádná vlákna revize ani komentáře v diskusi.",
-      "noFilesChangedDescription": "Tento merge request neobsahuje žádné změny souborů."
-    },
     "fileStatus": {
       "modified": "Upraven",
       "renamed": "Přejmenován",
@@ -747,6 +735,27 @@
       "ambiguous": "Výsledek se nepodařilo potvrdit. Před dalším pokusem zkontroluj PR.",
       "persistenceFailed": "Tuto akci se nepodařilo zaznamenat. Zkus to později.",
       "forbidden": "K této akci nemáš oprávnění."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Není dostupné u tohoto poskytovatele",
+        "accessibility": "Není dostupné u tohoto poskytovatele: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Sdílet merge request",
+      "viewOnProvider": "Zobrazit na {{provider}}",
+      "mergeRequestUnavailable": "Merge request není dostupný",
+      "unavailableDescription": "Byl možná odstraněn, nebo k němu nemáš přístup.",
+      "accessDeniedMergeRequest": "Nemáš oprávnění zobrazit tento merge request.",
+      "couldNotLoadMergeRequest": "Merge request se nepodařilo načíst.",
+      "discussionAccessDenied": "Nemáš oprávnění zobrazit diskusi k tomuto merge request.",
+      "discussionUnavailableMessage": "Tento merge request byl možná smazán.",
+      "noDiscussionDescription": "Tento merge request zatím neobsahuje žádná vlákna revize ani komentáře v diskusi.",
+      "noFilesChangedDescription": "Tento merge request neobsahuje žádné změny souborů."
     }
   },
   "notifications": {
@@ -2671,7 +2680,14 @@
     "languageNotInstalledMessage": "Offline soubory řeči pro {{language}} nejsou v tomto telefonu nainstalovány. Stáhněte je a poté zkuste diktování znovu.",
     "downloadOfflineModel": "Stáhnout",
     "offlineModelDownloadScheduled": "Offline soubory řeči se stáhnou na pozadí. Zkuste diktování znovu později.",
-    "listeningStopped": "Poslech zastaven."
+    "listeningStopped": "Poslech zastaven.",
+    "transcribing": "Přepisuji…",
+    "gatewayUnreachable": "Kilo Gateway se nepodařilo kontaktovat. Zkontrolujte připojení a zkuste to znovu.",
+    "gatewayTimeout": "Přepis trval příliš dlouho. Zkuste to znovu.",
+    "gatewayModelUnavailable": "Tento model přepisu není dostupný. Vyberte jiný v Předvolbách.",
+    "gatewayModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(transcriptionModel.title) vyberte jiný.",
+    "gatewaySignInRequired": "Pro použití přepisu přes Kilo Gateway se přihlaste.",
+    "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách."
   },
   "share": {
     "title": "Sdílení do Kilo",
@@ -3055,5 +3071,12 @@
     "needsInput": "Čeká na reakci",
     "channelName": "Aktivní agenti",
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce."
+  },
+  "transcriptionModel": {
+    "title": "Model přepisu",
+    "noneChosen": "Není vybrán žádný",
+    "emptyTitle": "Žádné modely přepisu",
+    "emptyDescription": "Kilo Gateway nyní nenabízí žádné modely přepisu.",
+    "loadFailed": "Modely přepisu se nepodařilo načíst."
   }
 }

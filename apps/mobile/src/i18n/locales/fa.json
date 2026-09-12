@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSO سازمانی"
   },
   "preferences": {
+    "general": "عمومی",
+    "voiceInput": "ورودی صوتی",
     "autoExpandThinking": "باز کردن خودکار بخش تفکر",
     "autoExpandThinkingSubtitle": "پس از پایان تفکر عامل، محتوای آن را به‌صورت بازشده نمایش دهید.",
     "keepScreenOn": "روشن نگه داشتن صفحه در صفحهٔ نشست",
@@ -238,6 +240,7 @@
     "appearanceLight": "روشن",
     "appearanceDark": "تیره",
     "account": "حساب",
+    "accountSubtitle": "زبان، میزبان‌های مورد اعتماد و نشست‌های دستگاه",
     "prReviewAttribution": "درج نام برنامه در بازبینی‌های PR",
     "prReviewAttributionSubtitle": "هنگام ارسال بازبینی، عبارت «بازبینی‌شده با Kilo» را به انتهای آن اضافه کنید.",
     "returnSendsMessage": "ارسال پیام با کلید اینتر",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "تبدیل گفتار به متن با Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "ورودی صوتی را به‌جای تشخیص گفتار دستگاه، با یک مدل Kilo Gateway به متن تبدیل کنید. صدای ضبط‌شده شما به Kilo Gateway فرستاده می‌شود.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست ادغام در دسترس نیست",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "ردیف خالی در نمایش تغییرات"
     },
     "connectionExpired": "اعتبار اتصال به GitHub تمام شده است.",
-    "capabilities": {
-      "banner": {
-        "title": "در این ارائه‌دهنده در دسترس نیست",
-        "accessibility": "در این ارائه‌دهنده در دسترس نیست: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "ادغام",
       "mergeNow": "ادغام فوری",
@@ -472,7 +472,9 @@
       "acceptTerms": "پذیرش",
       "replyBadRequest": "این پاسخ قابل ارسال نیست. ممکن است گفت‌وگو تغییر کرده باشد.",
       "replyForbidden": "اجازهٔ پاسخ دادن در این درخواست ادغام را ندارید.",
-      "replyForbiddenTerm": "اجازهٔ پاسخ دادن در این {{term}} را ندارید.",
+      "addCommentCta": "نظر دادن در این درخواست ادغام",
+      "commentBadRequest": "این نظر قابل ارسال نیست. ممکن است درخواست ادغام تغییر کرده باشد.",
+      "commentForbidden": "اجازهٔ نظر دادن در این درخواست ادغام را ندارید.",
       "moderation": {
         "reportContent": {
           "terminal": "این نظر قابل گزارش نیست.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "مربوط به نسخهٔ قبلی: {{lines}}",
         "outdatedOnPath": "مربوط به نسخهٔ قبلی: {{path}}"
       },
-      "deletedUser": "کاربر حذف‌شده"
+      "deletedUser": "کاربر حذف‌شده",
+      "replyForbiddenTerm": "اجازهٔ پاسخ دادن در این {{term}} را ندارید."
     },
     "couldNotOpenGitHubAppSettings": "باز کردن تنظیمات برنامه GitHub ناموفق بود.",
     "installKiloGitHubApp": "نصب برنامهٔ Kilo در GitHub",
@@ -679,21 +682,6 @@
       "files": "فایل",
       "discussion": "گفت‌وگو"
     },
-    "terms": {
-      "pullRequest": "پول ریکوئست",
-      "mergeRequest": "درخواست ادغام",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "اشتراک‌گذاری درخواست ادغام",
-      "viewOnProvider": "مشاهده در {{provider}}",
-      "mergeRequestUnavailable": "درخواست ادغام در دسترس نیست",
-      "unavailableDescription": "ممکن است حذف شده باشد، یا شاید دسترسی به آن نداشته باشید.",
-      "accessDeniedMergeRequest": "اجازهٔ مشاهدهٔ این درخواست ادغام را ندارید.",
-      "couldNotLoadMergeRequest": "بارگذاری درخواست ادغام ممکن نشد.",
-      "discussionAccessDenied": "اجازهٔ مشاهدهٔ گفت‌وگوی این درخواست ادغام را ندارید.",
-      "discussionUnavailableMessage": "ممکن است این درخواست ادغام حذف شده باشد.",
-      "noDiscussionDescription": "هنوز هیچ گفت‌وگوی بازبینی یا نظری در این درخواست ادغام ثبت نشده است.",
-      "noFilesChangedDescription": "در این درخواست ادغام هیچ فایلی تغییر نکرده است."
-    },
     "fileStatus": {
       "modified": "تغییریافته",
       "renamed": "تغییرنام‌یافته",
@@ -731,6 +719,27 @@
       "ambiguous": "تأیید نتیجه ممکن نشد. پیش از تلاش مجدد، PR را بررسی کنید.",
       "persistenceFailed": "نتوانستیم این اقدام را ثبت کنیم. لطفاً بعداً دوباره تلاش کنید.",
       "forbidden": "اجازهٔ انجام این کار را ندارید."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "در این ارائه‌دهنده در دسترس نیست",
+        "accessibility": "در این ارائه‌دهنده در دسترس نیست: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "پول ریکوئست",
+      "mergeRequest": "درخواست ادغام",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "اشتراک‌گذاری درخواست ادغام",
+      "viewOnProvider": "مشاهده در {{provider}}",
+      "mergeRequestUnavailable": "درخواست ادغام در دسترس نیست",
+      "unavailableDescription": "ممکن است حذف شده باشد، یا شاید دسترسی به آن نداشته باشید.",
+      "accessDeniedMergeRequest": "اجازهٔ مشاهدهٔ این درخواست ادغام را ندارید.",
+      "couldNotLoadMergeRequest": "بارگذاری درخواست ادغام ممکن نشد.",
+      "discussionAccessDenied": "اجازهٔ مشاهدهٔ گفت‌وگوی این درخواست ادغام را ندارید.",
+      "discussionUnavailableMessage": "ممکن است این درخواست ادغام حذف شده باشد.",
+      "noDiscussionDescription": "هنوز هیچ گفت‌وگوی بازبینی یا نظری در این درخواست ادغام ثبت نشده است.",
+      "noFilesChangedDescription": "در این درخواست ادغام هیچ فایلی تغییر نکرده است."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "فایل‌های گفتار آفلاین برای {{language}} روی این گوشی نصب نشده‌اند. آن‌ها را دانلود کنید، سپس دوباره ورودی صوتی را امتحان کنید.",
     "downloadOfflineModel": "دانلود",
     "offlineModelDownloadScheduled": "فایل‌های گفتار آفلاین در پس‌زمینه دانلود می‌شوند. بعداً دوباره ورودی صوتی را امتحان کنید.",
-    "listeningStopped": "گوش دادن متوقف شد."
+    "listeningStopped": "گوش دادن متوقف شد.",
+    "transcribing": "در حال تبدیل به متن...",
+    "gatewayUnreachable": "اتصال به Kilo Gateway ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+    "gatewayTimeout": "تبدیل گفتار به متن بیش از حد طول کشید. دوباره تلاش کنید.",
+    "gatewayModelUnavailable": "این مدل تبدیل گفتار به متن در دسترس نیست. در تنظیمات دلخواه مدل دیگری انتخاب کنید.",
+    "gatewayModelUnavailableNotice": "این مدل دیگر ارائه نمی‌شود. برای انتخاب مدل دیگر روی $t(transcriptionModel.title) ضربه بزنید.",
+    "gatewaySignInRequired": "برای استفاده از تبدیل گفتار به متن با Kilo Gateway وارد شوید.",
+    "gatewayNoModel": "ابتدا در تنظیمات دلخواه یک مدل تبدیل گفتار به متن انتخاب کنید."
   },
   "share": {
     "title": "اشتراک‌گذاری با Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "در انتظار ورودی",
     "channelName": "عامل‌های فعال",
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید."
+  },
+  "transcriptionModel": {
+    "title": "مدل تبدیل گفتار به متن",
+    "noneChosen": "هیچ‌کدام انتخاب نشده",
+    "emptyTitle": "مدل تبدیل گفتار به متن وجود ندارد",
+    "emptyDescription": "Kilo Gateway در حال حاضر مدلی برای تبدیل گفتار به متن ارائه نمی‌دهد.",
+    "loadFailed": "بارگذاری مدل‌های تبدیل گفتار به متن ناموفق بود."
   }
 }

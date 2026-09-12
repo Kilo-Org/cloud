@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "SSOی کۆمپانیا"
   },
   "preferences": {
+    "general": "گشتی",
+    "voiceInput": "داخڵکردنی دەنگ",
     "autoExpandThinking": "کردنەوەی خۆکاری بەشی بیرکردنەوە",
     "autoExpandThinkingSubtitle": "کاتێک بیرکردنەوەی ئەجێنتەکە تەواو دەبێت، بەشەکە بە کراوەیی نیشان بدە.",
     "keepScreenOn": "ڕووناکهێشتنەوەی شاشە لە پەڕەی سێشن",
@@ -238,6 +240,7 @@
     "appearanceLight": "ڕووناک",
     "appearanceDark": "تاریک",
     "account": "هەژمار",
+    "accountSubtitle": "زمان، خانەخوێ متمانەپێکراوەکان و دانیشتنەکانی ئامێر",
     "prReviewAttribution": "زیادکردنی ناوی ئەپ بۆ پێداچوونەوەکانی PR",
     "prReviewAttributionSubtitle": "لە کاتی ناردنی پێداچوونەوەیەک، دەقی «لە ڕێگەی Kilo پێداچوونەوەی بۆ کراوە» لە کۆتاییدا زیاد بکە.",
     "returnSendsMessage": "دوگمەی گەڕانەوە پەیام دەنێرێت",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "گۆڕینی دەنگ بۆ دەق بە Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "دەنگەکانت بە مۆدێلێکی Kilo Gateway بگۆڕە بۆ دەق، نەک بە ناسینەوەی قسەکردنی ئامێرەکەت. تۆمارەکەت بۆ Kilo Gateway دەنێردرێت.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "داواکاری ڕاکێشان بەردەست نییە",
@@ -341,12 +347,6 @@
       "emptyDiffRow": "ڕیزی بەتاڵی جیاوازی"
     },
     "connectionExpired": "ماوەی پەیوەندی بە GitHub بەسەرچووە.",
-    "capabilities": {
-      "banner": {
-        "title": "لەم پێشکەشکارە بەردەست نییە",
-        "accessibility": "لەم پێشکەشکارە بەردەست نییە: {{reason}}"
-      }
-    },
     "merge": {
       "merge": "یەکخستن",
       "mergeNow": "ئێستا تێکەڵ بکە",
@@ -472,7 +472,9 @@
       "acceptTerms": "پەسند بکە",
       "replyBadRequest": "ناتوانرێت ئەم وەڵامە بڵاو بکرێتەوە. ڕەنگە زنجیرەی گفتوگۆکە گۆڕابێت.",
       "replyForbidden": "مۆڵەتی وەڵامدانەوەی ئەم داواکارییەی ڕاکێشانت نییە.",
-      "replyForbiddenTerm": "مۆڵەتی وەڵامدانەوەی ئەم {{term}}ەت نییە.",
+      "addCommentCta": "بۆچوون لەسەر ئەم داواکارییەی ڕاکێشان",
+      "commentBadRequest": "ناتوانرێت ئەم بۆچوونە بڵاو بکرێتەوە. ڕەنگە داواکارییە ڕاکێشراوەکە گۆڕابێت.",
+      "commentForbidden": "مۆڵەتی بۆچوونکردن لەسەر ئەم داواکارییەی ڕاکێشانت نییە.",
       "moderation": {
         "reportContent": {
           "terminal": "ئەم بۆچوونە ناتوانرێت ڕاپۆرت بکرێت.",
@@ -521,7 +523,8 @@
         "outdatedOnLines": "کۆنبووەوە لە {{lines}}",
         "outdatedOnPath": "کۆنبووەوە لە {{path}}"
       },
-      "deletedUser": "بەکارهێنەری سڕاوە"
+      "deletedUser": "بەکارهێنەری سڕاوە",
+      "replyForbiddenTerm": "مۆڵەتی وەڵامدانەوەی ئەم {{term}}ەت نییە."
     },
     "couldNotOpenGitHubAppSettings": "نەتوانرا ڕێکخستنەکانی ئەپی GitHub بکرێنەوە.",
     "installKiloGitHubApp": "ئەپی Kilo بۆ GitHub دامەزرێنە",
@@ -679,21 +682,6 @@
       "files": "پەڕگە",
       "discussion": "گفتوگۆ"
     },
-    "terms": {
-      "pullRequest": "داواکاری یەکخستن",
-      "mergeRequest": "داواکاری تێکەڵکردن",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "داواکارییەکەی تێکەڵکردن هاوبەش بکە",
-      "viewOnProvider": "بینین لە {{provider}}",
-      "mergeRequestUnavailable": "داواکاری تێکەڵکردن بەردەست نییە",
-      "unavailableDescription": "لەوانەیە سڕابێتەوە، یان لەوانەیە مۆڵەتی بینینت نەبێت.",
-      "accessDeniedMergeRequest": "مۆڵەتی بینینی ئەم داواکاری تێکەڵکردنەت نییە.",
-      "couldNotLoadMergeRequest": "نەتوانرا داواکاری تێکەڵکردن بار بکرێت.",
-      "discussionAccessDenied": "مۆڵەتی بینینی گفتوگۆی ئەم داواکارییەی تێکەڵکردنەت نییە.",
-      "discussionUnavailableMessage": "ڕەنگە ئەم داواکاری تێکەڵکردنە لابرابێت.",
-      "noDiscussionDescription": "لەسەر ئەم داواکارییەی تێکەڵکردن هیچ زنجیرەی پێداچوونەوە یان بۆچوونێکی گفتوگۆ نییە.",
-      "noFilesChangedDescription": "لە ئەم داواکارییەی تێکەڵکردندا هیچ فایلێک نەگۆڕاوە."
-    },
     "fileStatus": {
       "modified": "گۆڕدراو",
       "renamed": "ناوگۆڕدراو",
@@ -731,6 +719,27 @@
       "ambiguous": "نەتوانرا پشتڕاست بکرێتەوە — پێش هەوڵدانەوە، PR بپشکنە.",
       "persistenceFailed": "نەتوانرا ئەم کردارە تۆمار بکرێت. تکایە دواتر هەوڵ بدەوە.",
       "forbidden": "ئەم کارە ڕێگەپێدراو نییە."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "لەم پێشکەشکارە بەردەست نییە",
+        "accessibility": "لەم پێشکەشکارە بەردەست نییە: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "داواکاری یەکخستن",
+      "mergeRequest": "داواکاری تێکەڵکردن",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "داواکارییەکەی تێکەڵکردن هاوبەش بکە",
+      "viewOnProvider": "بینین لە {{provider}}",
+      "mergeRequestUnavailable": "داواکاری تێکەڵکردن بەردەست نییە",
+      "unavailableDescription": "لەوانەیە سڕابێتەوە، یان لەوانەیە مۆڵەتی بینینت نەبێت.",
+      "accessDeniedMergeRequest": "مۆڵەتی بینینی ئەم داواکاری تێکەڵکردنەت نییە.",
+      "couldNotLoadMergeRequest": "نەتوانرا داواکاری تێکەڵکردن بار بکرێت.",
+      "discussionAccessDenied": "مۆڵەتی بینینی گفتوگۆی ئەم داواکارییەی تێکەڵکردنەت نییە.",
+      "discussionUnavailableMessage": "ڕەنگە ئەم داواکاری تێکەڵکردنە لابرابێت.",
+      "noDiscussionDescription": "لەسەر ئەم داواکارییەی تێکەڵکردن هیچ زنجیرەی پێداچوونەوە یان بۆچوونێکی گفتوگۆ نییە.",
+      "noFilesChangedDescription": "لە ئەم داواکارییەی تێکەڵکردندا هیچ فایلێک نەگۆڕاوە."
     }
   },
   "notifications": {
@@ -2627,7 +2636,14 @@
     "languageNotInstalledMessage": "فایلە دەنگییە ئۆفلاینەکانی {{language}} لەسەر ئەم مۆبایلە دانەمەزراون. داگریان بکە، پاشان دووبارە نووسین بە دەنگ تاقی بکەوە.",
     "downloadOfflineModel": "داگرتن",
     "offlineModelDownloadScheduled": "فایلە دەنگییە ئۆفلاینەکان لە پاشبنەمادا داگیرێن. پاشان دووبارە نووسین بە دەنگ تاقی بکەوە.",
-    "listeningStopped": "گوێگرتن وەستا."
+    "listeningStopped": "گوێگرتن وەستا.",
+    "transcribing": "گۆڕانی دەنگ بۆ دەق...",
+    "gatewayUnreachable": "نەتوانرا پەیوەندی بە Kilo Gateway بکرێت. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدە.",
+    "gatewayTimeout": "گۆڕینی دەنگ بۆ دەق زۆر درێژەی خایاند. دووبارە هەوڵ بدە.",
+    "gatewayModelUnavailable": "ئەم مۆدێلەی گۆڕینی دەنگ بۆ دەق بەردەست نییە. لە ڕێکخستنە کەسییەکان یەکی تر هەڵبژێرە.",
+    "gatewayModelUnavailableNotice": "ئەم مۆدێلە چیتر پێشکەش ناکرێت. دەست بدە بە $t(transcriptionModel.title) بۆ هەڵبژاردنی یەکی تر.",
+    "gatewaySignInRequired": "بچۆ ژوورەوە بۆ بەکارهێنانی گۆڕینی دەنگ بە Kilo Gateway.",
+    "gatewayNoModel": "سەرەتا لە ڕێکخستنە کەسییەکان مۆدێلێکی گۆڕینی دەنگ بۆ دەق هەڵبژێرە."
   },
   "share": {
     "title": "هاوبەشکردن بۆ Kilo",
@@ -3009,5 +3025,12 @@
     "needsInput": "چاوەڕێی وەڵام",
     "channelName": "ئەجێنتە چالاکەکان",
     "activityKitDisabledBody": "بۆ بینینی ئەجێنتە چالاکەکان لە شاشەی قوفڵدا، چالاکییە ڕاستەوخۆکان لە ڕێکخستنەکاندا چالاک بکە."
+  },
+  "transcriptionModel": {
+    "title": "مۆدێلی گۆڕینی دەنگ بۆ دەق",
+    "noneChosen": "هیچ هەڵنەبژێردراوە",
+    "emptyTitle": "هیچ مۆدێلێکی گۆڕینی دەنگ بۆ دەق نییە",
+    "emptyDescription": "Kilo Gateway ئێستا هیچ مۆدێلێکی گۆڕینی دەنگ بۆ دەقی نییە.",
+    "loadFailed": "نەتوانرا مۆدێلەکانی گۆڕینی دەنگ بۆ دەق بار بکرێن."
   }
 }

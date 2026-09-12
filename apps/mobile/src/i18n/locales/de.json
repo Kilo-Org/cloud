@@ -228,6 +228,8 @@
     "providerEnterpriseSso": "Unternehmens-SSO"
   },
   "preferences": {
+    "general": "Allgemein",
+    "voiceInput": "Spracheingabe",
     "autoExpandThinking": "Denkprozess automatisch aufklappen",
     "autoExpandThinkingSubtitle": "Den Denkprozess des Agenten nach Abschluss aufgeklappt anzeigen.",
     "keepScreenOn": "Bildschirm in der Sitzungsansicht eingeschaltet lassen",
@@ -238,6 +240,7 @@
     "appearanceLight": "Hell",
     "appearanceDark": "Dunkel",
     "account": "Konto",
+    "accountSubtitle": "Sprache, vertrauenswürdige Hosts und Gerätesitzungen",
     "prReviewAttribution": "App-Hinweis zu PR-Prüfungen hinzufügen",
     "prReviewAttributionSubtitle": "Beim Einreichen einer Prüfung die Fußzeile „Mit Kilo geprüft“ hinzufügen.",
     "returnSendsMessage": "Eingabetaste sendet Nachricht",
@@ -248,7 +251,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Gateway-Transkription",
+    "gatewayTranscriptionSubtitle": "Transkribiere die Spracheingabe mit einem Kilo-Gateway-Modell statt mit der Spracherkennung des Geräts. Deine Aufnahme wird an das Kilo Gateway gesendet.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Live-Aktivitäten",
@@ -2144,7 +2150,14 @@
     "languageNotInstalledMessage": "Die Offline-Sprachdateien für {{language}} sind auf diesem Telefon nicht installiert. Lade sie herunter und versuche die Spracheingabe erneut.",
     "downloadOfflineModel": "Herunterladen",
     "offlineModelDownloadScheduled": "Die Offline-Sprachdateien werden im Hintergrund heruntergeladen. Versuche die Spracheingabe später erneut.",
-    "listeningStopped": "Die Aufnahme wurde beendet."
+    "listeningStopped": "Die Aufnahme wurde beendet.",
+    "transcribing": "Transkription läuft …",
+    "gatewayUnreachable": "Das Kilo Gateway konnte nicht erreicht werden. Prüfe deine Verbindung und versuche es erneut.",
+    "gatewayTimeout": "Die Transkription hat zu lange gedauert. Versuche es erneut.",
+    "gatewayModelUnavailable": "Dieses Transkriptionsmodell ist nicht verfügbar. Wähle ein anderes in den Einstellungen.",
+    "gatewayModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(transcriptionModel.title), um ein anderes zu wählen.",
+    "gatewaySignInRequired": "Melde dich an, um die Gateway-Transkription zu nutzen.",
+    "gatewayNoModel": "Wähle zuerst in den Einstellungen ein Transkriptionsmodell."
   },
   "share": {
     "title": "Mit Kilo teilen",
@@ -2322,11 +2335,172 @@
     "installAttributionPromptTitle": "Installationszuordnung erlauben?"
   },
   "prReview": {
-    "pullRequestUnavailable": "Pull-Request nicht verfügbar",
-    "pullRequestUnavailableDescription": "Dieser PR kann nicht geöffnet werden. Möglicherweise wurde er gelöscht, das Repository ist privat oder die GitHub-App von Kilo ist dort nicht installiert.",
     "accessDeniedDescription": "Du hast keine Berechtigung, diesen Pull-Request anzusehen.",
-    "noFilesChanged": "Keine Dateien geändert",
-    "noFilesChangedDescription": "Dieser Pull-Request enthält keine Dateiänderungen.",
+    "checkConnection": "Verbindung prüfen",
+    "checks": {
+      "checksCount": "{{displayCount}} Prüfungen",
+      "couldNotLoad": "Die Prüfungen konnten nicht geladen werden.",
+      "failed": "{{displayCount}} fehlgeschlagen",
+      "noAccess": "Du hast keinen Zugriff auf die Prüfungen dieses Repositorys.",
+      "noChecksReported": "Keine Prüfungen gemeldet",
+      "notAvailable": "Die Prüfungen sind noch nicht verfügbar. Möglicherweise wurde der aktuelle Commit noch nicht verarbeitet oder die GitHub-App von Kilo ist im Quell-Repository nicht installiert.",
+      "openDetails": "Details zu {{name}} öffnen",
+      "passed": "{{displayCount}} bestanden",
+      "pending": "{{displayCount}} ausstehend",
+      "retryChecks": "Prüfungen erneut laden",
+      "skipped": "{{displayCount}} übersprungen",
+      "title": "Prüfungen",
+      "viewOnGitHub": "PR auf GitHub ansehen",
+      "checkDetails": "details zur Prüfung"
+    },
+    "composer": {
+      "addTitle": "Kommentar hinzufügen",
+      "addToReview": "Zum Review hinzufügen",
+      "comment": "Kommentieren",
+      "commentBody": "Kommentartext",
+      "commentBodyPlaceholder": "Dein Kommentar",
+      "commentNow": "Jetzt kommentieren",
+      "discardMessage": "Dein Entwurf geht verloren.",
+      "discardTitle": "Kommentar verwerfen?",
+      "editTitle": "Kommentar bearbeiten",
+      "insertSuggestion": "Vorschlag einfügen",
+      "insertSuggestionA11y": "Code-Vorschlag einfügen",
+      "loadFailedTitle": "Der Kommentareditor konnte nicht geladen werden.",
+      "ok": "OK",
+      "unavailableMessage": "Dieser ausstehende Kommentar wurde bereits gelöscht oder gesendet.",
+      "unavailableTitle": "Kommentar nicht verfügbar",
+      "bodyEmpty": "Der Kommentartext darf nicht leer sein.",
+      "suggestionsOnlyAddedLines": "Vorschläge sind nur für hinzugefügte Zeilen möglich.",
+      "tapDiffLineToSuggest": "Tippe auf eine Diff-Zeile, um Vorschläge zu aktivieren."
+    },
+    "connect": {
+      "checkFailedTitle": "Die GitHub-Verbindung konnte nicht geprüft werden.",
+      "checkFailedMessage": "Der Anmeldestatus ist erst verfügbar, wenn die Prüfung abgeschlossen ist.",
+      "checkFailedTitleGitLab": "Die GitLab-Verbindung konnte nicht geprüft werden.",
+      "checkFailedTitleBitbucket": "Die Bitbucket-Verbindung konnte nicht geprüft werden.",
+      "providerCheckFailedMessage": "Der Verbindungsstatus ist erst verfügbar, wenn die Prüfung abgeschlossen ist.",
+      "reconnectTitle": "GitHub erneut verbinden",
+      "reconnectDescription": "Deine GitHub-Verbindung wurde widerrufen. Stelle sie erneut her, um Pull-Requests weiterhin in der App zu prüfen.",
+      "description": "Verbinde dein GitHub-Konto, um Pull-Requests in der App zu prüfen.",
+      "gitlabDescription": "Verbinde dein GitLab-Konto, um Merge-Requests in der App zu prüfen.",
+      "bitbucketDescription": "Verbinde Bitbucket mit dieser Organisation, um Pull-Requests in der App zu prüfen.",
+      "bitbucketOrgOnlyDescription": "Wähle in deinem Profil eine Organisation aus, um deren Bitbucket-Pull-Requests in der App zu prüfen."
+    },
+    "connectionExpired": "Die GitHub-Verbindung ist abgelaufen.",
+    "couldNotLoadPullRequest": "Der Pull-Request konnte nicht geladen werden.",
+    "couldNotOpenGitHubAppSettings": "Die Einstellungen der GitHub-App konnten nicht geöffnet werden.",
+    "description": "Beschreibung",
+    "discussion": {
+      "acceptTerms": "Akzeptieren",
+      "accessDeniedMessage": "Du hast keine Berechtigung, die Diskussion zu diesem PR anzusehen.",
+      "addReaction": "Reaktion hinzufügen",
+      "block": "Blockieren",
+      "blockedUser": "{{login}} blockiert",
+      "collapseThread": "Thread einklappen",
+      "commentActions": "Kommentaraktionen",
+      "comment": "{{displayCount}} Kommentare",
+      "comment_other": "{{displayCount}} Kommentare",
+      "couldNotLoad": "Die Diskussion konnte nicht geladen werden.",
+      "couldNotLoadMore": "Weitere Kommentare konnten nicht geladen werden.",
+      "loadMoreComments": "Weitere Kommentare laden",
+      "loading": "Diskussion wird geladen",
+      "moderation": {
+        "block": {
+          "retryable": "Dieser Benutzer konnte nicht blockiert werden. Prüfe deine Verbindung und versuche es erneut.",
+          "terminal": "Dieser Benutzer kann nicht blockiert werden."
+        },
+        "mute": {
+          "retryable": "Dieser Benutzer konnte nicht stummgeschaltet werden. Prüfe deine Verbindung und versuche es erneut.",
+          "terminal": "Dieser Benutzer kann nicht stummgeschaltet werden."
+        },
+        "reportContent": {
+          "retryable": "Dieser Kommentar konnte nicht gemeldet werden. Prüfe deine Verbindung und versuche es erneut.",
+          "terminal": "Dieser Kommentar kann nicht gemeldet werden."
+        },
+        "reportUser": {
+          "retryable": "Dieser Benutzer konnte nicht gemeldet werden. Prüfe deine Verbindung und versuche es erneut.",
+          "terminal": "Dieser Benutzer kann nicht gemeldet werden."
+        }
+      },
+      "moreLinesAbove": "… darüber stehen {{displayCount}} weitere Zeilen.",
+      "mute": "Stummschalten",
+      "mutedUser": "{{login}} stummgeschaltet",
+      "noDiscussion": "Noch keine Diskussion",
+      "noDiscussionDescription": "Zu diesem Pull-Request gibt es noch keine Review-Threads oder Kommentare.",
+      "comment_one": "1 kommentar",
+      "outdated": "Veraltet",
+      "quotedDiffSnippet": "Zitierter Diff-Ausschnitt",
+      "reactionPill": "Reaktion {{emoji}}, {{displayCount}} {{countLabel}}",
+      "reaction": "reaktionen",
+      "reaction_other": "reaktionen",
+      "reaction_one": "reaktion",
+      "replyBadRequest": "Diese Antwort kann nicht veröffentlicht werden. Der Thread hat sich möglicherweise geändert.",
+      "replyBody": "Antworttext",
+      "replyForbidden": "Du hast keine Berechtigung, auf diesen Pull-Request zu antworten.",
+      "addCommentCta": "Diesen Pull-Request kommentieren",
+      "commentBadRequest": "Dieser Kommentar kann nicht veröffentlicht werden. Der Pull-Request hat sich möglicherweise geändert.",
+      "commentForbidden": "Du hast keine Berechtigung, diesen Pull-Request zu kommentieren.",
+      "replyPlaceholder": "Deine Antwort …",
+      "reportContent": "Inhalt melden",
+      "reportUser": "Benutzer melden",
+      "resolveThread": "Thread als erledigt markieren",
+      "resolved": "Erledigt",
+      "retryLoadingMore": "Weitere Kommentare erneut laden",
+      "reviewFiles": "Dateien prüfen",
+      "startedRelative": " · {{relative}} begonnen",
+      "submitReply": "Antwort senden",
+      "termsAcceptRetry": "Die Nutzungsbedingungen konnten nicht akzeptiert werden. Prüfe deine Verbindung und versuche es erneut.",
+      "termsCopy": "Du musst mindestens 13 Jahre alt sein, um Beiträge zu veröffentlichen.",
+      "termsTitle": "Nutzungsbedingungen",
+      "threadAccessibilityLabel": "Diskussionsthread {{anchorLabel}}",
+      "unavailable": "Die Diskussion ist nicht verfügbar.",
+      "unavailableMessage": "Dieser Pull-Request wurde möglicherweise entfernt.",
+      "unresolveThread": "Thread wieder öffnen",
+      "viewTerms": "Nutzungsbedingungen ansehen",
+      "termsAcceptRequired": "Du musst die Nutzungsbedingungen akzeptieren, um Beiträge zu veröffentlichen.",
+      "termsCheckRetryCopy": "Die Nutzungsbedingungen konnten nicht geprüft werden. Prüfe deine Verbindung und versuche es erneut.",
+      "termsOutdatedCopy": "Die Nutzungsbedingungen haben sich geändert. Öffne diesen Bildschirm erneut, um die neueste Version zu akzeptieren.",
+      "reactions": {
+        "thumbsUp": "Daumen hoch",
+        "thumbsDown": "Daumen runter",
+        "laugh": "Lachen",
+        "hooray": "Hurra",
+        "confused": "Verwirrt",
+        "heart": "Herz",
+        "rocket": "Rakete",
+        "eyes": "Augen"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Kommentar zur Datei {{path}}",
+        "fileComment": "Kommentar zur Datei",
+        "outdatedOnPathLines": "Veraltet: {{path}}, {{lines}}",
+        "outdatedOnLines": "Veraltet: {{lines}}",
+        "outdatedOnPath": "Veraltet: {{path}}"
+      },
+      "deletedUser": "gelöschter Benutzer",
+      "replyForbiddenTerm": "Du hast keine Berechtigung, auf diesen {{term}} zu antworten."
+    },
+    "entry": {
+      "eyebrow": "Öffne einen Pull-Request oder Merge-Request über seine URL",
+      "pastePrLink": "Pull-Request- oder Merge-Request-Link einfügen",
+      "noRecentPrs": "Noch keine aktuellen Reviews",
+      "noRecentPrsDescription": "Füge oben einen Link ein, um ein Review zu starten — es erscheint beim nächsten Mal hier.",
+      "couldNotLoad": "Die Daten konnten nicht geladen werden.",
+      "removeFromRecentsTitle": "Aus dem Verlauf entfernen?",
+      "removeFromRecentsMessage": "Dieses Review wird aus deinem Verlauf entfernt.",
+      "removeRecentAccessibility": "{{repo}} aus dem Verlauf entfernen",
+      "urlAccessibility": "Gib eine Pull-Request- oder Merge-Request-URL ein",
+      "urlPlaceholder": "Pull-Request- oder Merge-Request-URL",
+      "openAccessibility": "Pull-Request oder Merge-Request öffnen",
+      "clearLink": "Link löschen",
+      "pasteLink": "Füge einen Pull-Request- oder Merge-Request-Link ein",
+      "open": "Offen"
+    },
+    "eventChips": {
+      "comment": "Kommentieren",
+      "label": "Review-Ereignis",
+      "requestChanges": "Änderungen anfordern"
+    },
     "fileList": {
       "filesList": "Dateiliste",
       "filesViewed": "Dateien · {{viewed}} von {{total}} angesehen",
@@ -2371,6 +2545,7 @@
       "commentOnSelectedLines": "Ausgewählte Zeilen kommentieren",
       "finishReview": "Review abschließen"
     },
+    "headLine": "{{counts}} · aktueller Commit: {{sha}}",
     "hunkRows": {
       "contextUnavailable": "Für diese Referenz ist kein Kontext verfügbar.",
       "expandAll": "Alles einblenden",
@@ -2403,21 +2578,14 @@
       "retryLoadingContext": "Kontext erneut laden",
       "retryLoadingNextPage": "Nächste Seite erneut laden"
     },
-    "sideBySide": {
-      "emptyDiffColumn": "leere Diff-Spalte",
-      "emptyDiffRow": "Leere Diff-Zeile",
-      "newOnly": "Nur in der neuen Version: {{text}}",
-      "noNewlineAtEndOfFile": "⚠️ kein Zeilenumbruch am Dateiende",
-      "oldNew": "Alt: {{old}} | Neu: {{new}}",
-      "oldOnly": "Nur in der alten Version: {{text}}"
+    "inbox": {
+      "couldNotLoad": "Der Posteingang konnte nicht geladen werden.",
+      "loading": "Posteingang wird geladen",
+      "noReviewRequests": "Keine Review-Anfragen",
+      "noReviewRequestsDescription": "Hier erscheinen Pull-Requests, die auf dein Review warten. Du kannst oben auch einen beliebigen PR-Link einfügen.",
+      "title": "Posteingang"
     },
-    "connectionExpired": "Die GitHub-Verbindung ist abgelaufen.",
-    "capabilities": {
-      "banner": {
-        "title": "Mit diesem Anbieter nicht verfügbar",
-        "accessibility": "Mit diesem Anbieter nicht verfügbar: {{reason}}"
-      }
-    },
+    "installKiloGitHubApp": "GitHub-App von Kilo installieren",
     "merge": {
       "merge": "Zusammenführen",
       "mergeNow": "Jetzt zusammenführen",
@@ -2507,204 +2675,9 @@
         "rebase": "Wende alle Commits dieses Branchs nacheinander auf den Basis-Branch an, ohne einen Merge-Commit zu erstellen."
       }
     },
-    "discussion": {
-      "threadAccessibilityLabel": "Diskussionsthread {{anchorLabel}}",
-      "collapseThread": "Thread einklappen",
-      "resolveThread": "Thread als erledigt markieren",
-      "unresolveThread": "Thread wieder öffnen",
-      "resolved": "Erledigt",
-      "outdated": "Veraltet",
-      "comment_one": "1 kommentar",
-      "comment": "{{displayCount}} Kommentare",
-      "comment_other": "{{displayCount}} Kommentare",
-      "startedRelative": " · {{relative}} begonnen",
-      "couldNotLoadMore": "Weitere Kommentare konnten nicht geladen werden.",
-      "retryLoadingMore": "Weitere Kommentare erneut laden",
-      "loadMoreComments": "Weitere Kommentare laden",
-      "addReaction": "Reaktion hinzufügen",
-      "reactionPill": "Reaktion {{emoji}}, {{displayCount}} {{countLabel}}",
-      "reaction_one": "reaktion",
-      "reaction": "reaktionen",
-      "reaction_other": "reaktionen",
-      "commentActions": "Kommentaraktionen",
-      "reportContent": "Inhalt melden",
-      "reportUser": "Benutzer melden",
-      "mute": "Stummschalten",
-      "block": "Blockieren",
-      "blockedUser": "{{login}} blockiert",
-      "mutedUser": "{{login}} stummgeschaltet",
-      "replyPlaceholder": "Deine Antwort …",
-      "replyBody": "Antworttext",
-      "submitReply": "Antwort senden",
-      "termsTitle": "Nutzungsbedingungen",
-      "termsCopy": "Du musst mindestens 13 Jahre alt sein, um Beiträge zu veröffentlichen.",
-      "termsAcceptRetry": "Die Nutzungsbedingungen konnten nicht akzeptiert werden. Prüfe deine Verbindung und versuche es erneut.",
-      "viewTerms": "Nutzungsbedingungen ansehen",
-      "acceptTerms": "Akzeptieren",
-      "replyBadRequest": "Diese Antwort kann nicht veröffentlicht werden. Der Thread hat sich möglicherweise geändert.",
-      "replyForbidden": "Du hast keine Berechtigung, auf diesen Pull-Request zu antworten.",
-      "replyForbiddenTerm": "Du hast keine Berechtigung, auf diesen {{term}} zu antworten.",
-      "moderation": {
-        "block": {
-          "retryable": "Dieser Benutzer konnte nicht blockiert werden. Prüfe deine Verbindung und versuche es erneut.",
-          "terminal": "Dieser Benutzer kann nicht blockiert werden."
-        },
-        "mute": {
-          "retryable": "Dieser Benutzer konnte nicht stummgeschaltet werden. Prüfe deine Verbindung und versuche es erneut.",
-          "terminal": "Dieser Benutzer kann nicht stummgeschaltet werden."
-        },
-        "reportContent": {
-          "retryable": "Dieser Kommentar konnte nicht gemeldet werden. Prüfe deine Verbindung und versuche es erneut.",
-          "terminal": "Dieser Kommentar kann nicht gemeldet werden."
-        },
-        "reportUser": {
-          "retryable": "Dieser Benutzer konnte nicht gemeldet werden. Prüfe deine Verbindung und versuche es erneut.",
-          "terminal": "Dieser Benutzer kann nicht gemeldet werden."
-        }
-      },
-      "accessDeniedMessage": "Du hast keine Berechtigung, die Diskussion zu diesem PR anzusehen.",
-      "unavailable": "Die Diskussion ist nicht verfügbar.",
-      "unavailableMessage": "Dieser Pull-Request wurde möglicherweise entfernt.",
-      "couldNotLoad": "Die Diskussion konnte nicht geladen werden.",
-      "loading": "Diskussion wird geladen",
-      "noDiscussion": "Noch keine Diskussion",
-      "noDiscussionDescription": "Zu diesem Pull-Request gibt es noch keine Review-Threads oder Kommentare.",
-      "reviewFiles": "Dateien prüfen",
-      "quotedDiffSnippet": "Zitierter Diff-Ausschnitt",
-      "moreLinesAbove": "… darüber stehen {{displayCount}} weitere Zeilen.",
-      "termsAcceptRequired": "Du musst die Nutzungsbedingungen akzeptieren, um Beiträge zu veröffentlichen.",
-      "termsOutdatedCopy": "Die Nutzungsbedingungen haben sich geändert. Öffne diesen Bildschirm erneut, um die neueste Version zu akzeptieren.",
-      "termsCheckRetryCopy": "Die Nutzungsbedingungen konnten nicht geprüft werden. Prüfe deine Verbindung und versuche es erneut.",
-      "reactions": {
-        "thumbsUp": "Daumen hoch",
-        "thumbsDown": "Daumen runter",
-        "laugh": "Lachen",
-        "hooray": "Hurra",
-        "confused": "Verwirrt",
-        "heart": "Herz",
-        "rocket": "Rakete",
-        "eyes": "Augen"
-      },
-      "anchor": {
-        "fileCommentOnPath": "Kommentar zur Datei {{path}}",
-        "fileComment": "Kommentar zur Datei",
-        "outdatedOnPathLines": "Veraltet: {{path}}, {{lines}}",
-        "outdatedOnLines": "Veraltet: {{lines}}",
-        "outdatedOnPath": "Veraltet: {{path}}"
-      },
-      "deletedUser": "gelöschter Benutzer"
-    },
-    "couldNotOpenGitHubAppSettings": "Die Einstellungen der GitHub-App konnten nicht geöffnet werden.",
-    "installKiloGitHubApp": "GitHub-App von Kilo installieren",
-    "checkConnection": "Verbindung prüfen",
-    "couldNotLoadPullRequest": "Der Pull-Request konnte nicht geladen werden.",
-    "description": "Beschreibung",
     "noDescriptionProvided": "Es ist keine Beschreibung vorhanden.",
-    "review": "Prüfung",
-    "reviewPullRequest": "Pull-Request prüfen",
-    "headLine": "{{counts}} · aktueller Commit: {{sha}}",
-    "entry": {
-      "eyebrow": "Öffne einen Pull-Request oder Merge-Request über seine URL",
-      "pastePrLink": "Pull-Request- oder Merge-Request-Link einfügen",
-      "noRecentPrs": "Noch keine aktuellen Reviews",
-      "noRecentPrsDescription": "Füge oben einen Link ein, um ein Review zu starten — es erscheint beim nächsten Mal hier.",
-      "couldNotLoad": "Die Daten konnten nicht geladen werden.",
-      "removeFromRecentsTitle": "Aus dem Verlauf entfernen?",
-      "removeFromRecentsMessage": "Dieses Review wird aus deinem Verlauf entfernt.",
-      "removeRecentAccessibility": "{{repo}} aus dem Verlauf entfernen",
-      "urlAccessibility": "Gib eine Pull-Request- oder Merge-Request-URL ein",
-      "urlPlaceholder": "Pull-Request- oder Merge-Request-URL",
-      "openAccessibility": "Pull-Request oder Merge-Request öffnen",
-      "clearLink": "Link löschen",
-      "pasteLink": "Füge einen Pull-Request- oder Merge-Request-Link ein",
-      "open": "Offen"
-    },
-    "checks": {
-      "checksCount": "{{displayCount}} Prüfungen",
-      "couldNotLoad": "Die Prüfungen konnten nicht geladen werden.",
-      "failed": "{{displayCount}} fehlgeschlagen",
-      "noAccess": "Du hast keinen Zugriff auf die Prüfungen dieses Repositorys.",
-      "noChecksReported": "Keine Prüfungen gemeldet",
-      "notAvailable": "Die Prüfungen sind noch nicht verfügbar. Möglicherweise wurde der aktuelle Commit noch nicht verarbeitet oder die GitHub-App von Kilo ist im Quell-Repository nicht installiert.",
-      "openDetails": "Details zu {{name}} öffnen",
-      "passed": "{{displayCount}} bestanden",
-      "pending": "{{displayCount}} ausstehend",
-      "retryChecks": "Prüfungen erneut laden",
-      "skipped": "{{displayCount}} übersprungen",
-      "title": "Prüfungen",
-      "viewOnGitHub": "PR auf GitHub ansehen",
-      "checkDetails": "details zur Prüfung"
-    },
-    "inbox": {
-      "couldNotLoad": "Der Posteingang konnte nicht geladen werden.",
-      "loading": "Posteingang wird geladen",
-      "noReviewRequests": "Keine Review-Anfragen",
-      "noReviewRequestsDescription": "Hier erscheinen Pull-Requests, die auf dein Review warten. Du kannst oben auch einen beliebigen PR-Link einfügen.",
-      "title": "Posteingang"
-    },
-    "composer": {
-      "addTitle": "Kommentar hinzufügen",
-      "addToReview": "Zum Review hinzufügen",
-      "comment": "Kommentieren",
-      "commentBody": "Kommentartext",
-      "commentBodyPlaceholder": "Dein Kommentar",
-      "commentNow": "Jetzt kommentieren",
-      "discardMessage": "Dein Entwurf geht verloren.",
-      "discardTitle": "Kommentar verwerfen?",
-      "editTitle": "Kommentar bearbeiten",
-      "insertSuggestion": "Vorschlag einfügen",
-      "insertSuggestionA11y": "Code-Vorschlag einfügen",
-      "loadFailedTitle": "Der Kommentareditor konnte nicht geladen werden.",
-      "ok": "OK",
-      "unavailableMessage": "Dieser ausstehende Kommentar wurde bereits gelöscht oder gesendet.",
-      "unavailableTitle": "Kommentar nicht verfügbar",
-      "bodyEmpty": "Der Kommentartext darf nicht leer sein.",
-      "suggestionsOnlyAddedLines": "Vorschläge sind nur für hinzugefügte Zeilen möglich.",
-      "tapDiffLineToSuggest": "Tippe auf eine Diff-Zeile, um Vorschläge zu aktivieren."
-    },
-    "connect": {
-      "checkFailedTitle": "Die GitHub-Verbindung konnte nicht geprüft werden.",
-      "checkFailedMessage": "Der Anmeldestatus ist erst verfügbar, wenn die Prüfung abgeschlossen ist.",
-      "checkFailedTitleGitLab": "Die GitLab-Verbindung konnte nicht geprüft werden.",
-      "checkFailedTitleBitbucket": "Die Bitbucket-Verbindung konnte nicht geprüft werden.",
-      "providerCheckFailedMessage": "Der Verbindungsstatus ist erst verfügbar, wenn die Prüfung abgeschlossen ist.",
-      "reconnectTitle": "GitHub erneut verbinden",
-      "reconnectDescription": "Deine GitHub-Verbindung wurde widerrufen. Stelle sie erneut her, um Pull-Requests weiterhin in der App zu prüfen.",
-      "description": "Verbinde dein GitHub-Konto, um Pull-Requests in der App zu prüfen.",
-      "gitlabDescription": "Verbinde dein GitLab-Konto, um Merge-Requests in der App zu prüfen.",
-      "bitbucketDescription": "Verbinde Bitbucket mit dieser Organisation, um Pull-Requests in der App zu prüfen.",
-      "bitbucketOrgOnlyDescription": "Wähle in deinem Profil eine Organisation aus, um deren Bitbucket-Pull-Requests in der App zu prüfen."
-    },
-    "screen": {
-      "shareA11y": "Pull-Request teilen",
-      "title": "#{{number}}"
-    },
-    "submit": {
-      "deletePendingMessage": "Dieser Kommentar wird aus den vorgemerkten Kommentaren für das Review entfernt.",
-      "deletePendingTitle": "Ausstehenden Kommentar löschen?",
-      "loadFailedTitle": "Das Formular zum Senden des Reviews konnte nicht geladen werden.",
-      "pendingComment": "noch nicht gesendete Kommentare",
-      "pendingComment_other": "noch nicht gesendete Kommentare",
-      "pendingComment_one": "ausstehender Kommentar",
-      "summaryOptional": "Zusammenfassung (optional)",
-      "partialPostedMessage": "Veröffentlichte Kommentare: {{displayFreshCount}}. Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
-      "submitCountOfTotal": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
-      "submitReview": "Prüfung senden",
-      "blockedRequestChanges": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um Änderungen anzufordern.",
-      "blockedComment": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um ein Review mit Kommentaren zu senden."
-    },
-    "reconnectNotice": {
-      "title": "Die GitHub-Verbindung ist abgelaufen.",
-      "message": "Deine GitHub-Verbindung ist nicht mehr gültig. Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen.",
-      "gitlabTitle": "Die GitLab-Verbindung ist abgelaufen.",
-      "bitbucketTitle": "Die Bitbucket-Verbindung ist abgelaufen.",
-      "providerMessage": "Deine {{provider}}-Verbindung ist nicht mehr gültig. Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen."
-    },
-    "eventChips": {
-      "comment": "Kommentieren",
-      "label": "Review-Ereignis",
-      "requestChanges": "Änderungen anfordern"
-    },
+    "noFilesChanged": "Keine Dateien geändert",
+    "noFilesChangedDescription": "Dieser Pull-Request enthält keine Dateiänderungen.",
     "overview": {
       "commit": "commits",
       "commit_other": "commits",
@@ -2745,31 +2718,53 @@
       "summaryA11y": "Review-Zusammenfassung",
       "summaryPlaceholder": "Optionale Zusammenfassung für das Review"
     },
-    "tabs": {
-      "discussion": "Diskussion",
-      "files": "Dateien",
-      "overview": "Übersicht"
+    "pullRequestUnavailable": "Pull-Request nicht verfügbar",
+    "pullRequestUnavailableDescription": "Dieser PR kann nicht geöffnet werden. Möglicherweise wurde er gelöscht, das Repository ist privat oder die GitHub-App von Kilo ist dort nicht installiert.",
+    "reconnectNotice": {
+      "title": "Die GitHub-Verbindung ist abgelaufen.",
+      "message": "Deine GitHub-Verbindung ist nicht mehr gültig. Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen.",
+      "gitlabTitle": "Die GitLab-Verbindung ist abgelaufen.",
+      "bitbucketTitle": "Die Bitbucket-Verbindung ist abgelaufen.",
+      "providerMessage": "Deine {{provider}}-Verbindung ist nicht mehr gültig. Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen."
     },
-    "terms": {
-      "pullRequest": "Pull-Request",
-      "mergeRequest": "Merge-Request",
-      "mergeRequestNumber": "!{{number}}",
-      "shareMergeRequest": "Merge-Request teilen",
-      "viewOnProvider": "Auf {{provider}} ansehen",
-      "mergeRequestUnavailable": "Merge-Request nicht verfügbar",
-      "unavailableDescription": "Möglicherweise wurde er gelöscht, oder du hast keinen Zugriff darauf.",
-      "accessDeniedMergeRequest": "Du hast keine Berechtigung, diesen Merge-Request anzusehen.",
-      "couldNotLoadMergeRequest": "Der Merge-Request konnte nicht geladen werden.",
-      "discussionAccessDenied": "Du hast keine Berechtigung, die Diskussion zu diesem Merge-Request anzusehen.",
-      "discussionUnavailableMessage": "Dieser Merge-Request wurde möglicherweise entfernt.",
-      "noDiscussionDescription": "Zu diesem Merge-Request gibt es noch keine Review-Threads oder Kommentare.",
-      "noFilesChangedDescription": "Dieser Merge-Request enthält keine Dateiänderungen."
+    "review": "Prüfung",
+    "reviewPullRequest": "Pull-Request prüfen",
+    "screen": {
+      "shareA11y": "Pull-Request teilen",
+      "title": "#{{number}}"
+    },
+    "sideBySide": {
+      "emptyDiffColumn": "leere Diff-Spalte",
+      "emptyDiffRow": "Leere Diff-Zeile",
+      "newOnly": "Nur in der neuen Version: {{text}}",
+      "noNewlineAtEndOfFile": "⚠️ kein Zeilenumbruch am Dateiende",
+      "oldNew": "Alt: {{old}} | Neu: {{new}}",
+      "oldOnly": "Nur in der alten Version: {{text}}"
+    },
+    "submit": {
+      "deletePendingMessage": "Dieser Kommentar wird aus den vorgemerkten Kommentaren für das Review entfernt.",
+      "deletePendingTitle": "Ausstehenden Kommentar löschen?",
+      "loadFailedTitle": "Das Formular zum Senden des Reviews konnte nicht geladen werden.",
+      "pendingComment": "noch nicht gesendete Kommentare",
+      "pendingComment_other": "noch nicht gesendete Kommentare",
+      "pendingComment_one": "ausstehender Kommentar",
+      "summaryOptional": "Zusammenfassung (optional)",
+      "partialPostedMessage": "Veröffentlichte Kommentare: {{displayFreshCount}}. Kommentare zu einem älteren Commit: {{displayStaleCount}}. Diese bleiben vorgemerkt.",
+      "submitCountOfTotal": "{{displayFreshCount}} von {{displayTotalCount}} Kommentaren senden",
+      "submitReview": "Prüfung senden",
+      "blockedRequestChanges": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um Änderungen anzufordern.",
+      "blockedComment": "Füge eine Zusammenfassung oder mindestens einen Kommentar hinzu, um ein Review mit Kommentaren zu senden."
     },
     "fileStatus": {
       "changed": "Geändert",
       "copied": "Kopiert",
       "modified": "Geändert",
       "renamed": "Umbenannt"
+    },
+    "tabs": {
+      "discussion": "Diskussion",
+      "files": "Dateien",
+      "overview": "Übersicht"
     },
     "diff": {
       "selectedTapToChange": "{{label}} ausgewählt, zum Ändern der Auswahl tippen",
@@ -2802,6 +2797,27 @@
       "ambiguous": "Die Aktion konnte nicht bestätigt werden. Prüfe den PR, bevor du es erneut versuchst.",
       "persistenceFailed": "Wir konnten diese Aktion nicht speichern. Bitte versuche es später erneut.",
       "forbidden": "Du hast keine Berechtigung für diese Aktion."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Mit diesem Anbieter nicht verfügbar",
+        "accessibility": "Mit diesem Anbieter nicht verfügbar: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Pull-Request",
+      "mergeRequest": "Merge-Request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Merge-Request teilen",
+      "viewOnProvider": "Auf {{provider}} ansehen",
+      "mergeRequestUnavailable": "Merge-Request nicht verfügbar",
+      "unavailableDescription": "Möglicherweise wurde er gelöscht, oder du hast keinen Zugriff darauf.",
+      "accessDeniedMergeRequest": "Du hast keine Berechtigung, diesen Merge-Request anzusehen.",
+      "couldNotLoadMergeRequest": "Der Merge-Request konnte nicht geladen werden.",
+      "discussionAccessDenied": "Du hast keine Berechtigung, die Diskussion zu diesem Merge-Request anzusehen.",
+      "discussionUnavailableMessage": "Dieser Merge-Request wurde möglicherweise entfernt.",
+      "noDiscussionDescription": "Zu diesem Merge-Request gibt es noch keine Review-Threads oder Kommentare.",
+      "noFilesChangedDescription": "Dieser Merge-Request enthält keine Dateiänderungen."
     }
   },
   "organization": {
@@ -3009,5 +3025,12 @@
     "needsInput": "Eingabe erforderlich",
     "channelName": "Aktive Agenten",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
+  },
+  "transcriptionModel": {
+    "title": "Transkriptionsmodell",
+    "noneChosen": "Keines ausgewählt",
+    "emptyTitle": "Keine Transkriptionsmodelle",
+    "emptyDescription": "Kilo Gateway bietet derzeit keine Transkriptionsmodelle.",
+    "loadFailed": "Die Transkriptionsmodelle konnten nicht geladen werden."
   }
 }

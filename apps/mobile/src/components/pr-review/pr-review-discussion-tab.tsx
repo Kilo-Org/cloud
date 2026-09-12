@@ -32,6 +32,13 @@
 //                   kinds and a "Review files" CTA that switches
 //                   to the Files tab via `onRequestFiles`.
 //
+//   - bottom CTA:   the happy and empty views render a static
+//                   "Comment on this pull request" bar under the
+//                   body (`PrCommentCta`) that pushes the
+//                   conversation-comment formSheet. The loading
+//                   skeleton and the four terminal/error states
+//                   render full-body with no bar.
+//
 //   - later-page error: a per-page refetch failure during a
 //                       "Load more" tap. The current loaded
 //                       items are kept and a small retry row
@@ -47,11 +54,14 @@
 
 import { type FlashListRef } from '@shopify/flash-list';
 import { MessageSquarePlus } from '@/components/ui/icons';
-import { useEffect, useRef, useState } from 'react';
+import { type Href, useIsFocused, useRouter } from 'expo-router';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
+import { PrCommentCta } from '@/components/pr-review/discussion/pr-comment-cta';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
@@ -75,6 +85,7 @@ import {
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
@@ -90,6 +101,9 @@ type PrReviewDiscussionTabProps = {
 };
 
 const SKELETON_ROW_COUNT = 4;
+
+const CONVERSATION_COMMENT_PATH =
+  '/(app)/pr-review/[owner]/[repo]/[number]/conversation-comment' as const;
 
 export function PrReviewDiscussionTab({
   owner,
@@ -110,6 +124,7 @@ export function PrReviewDiscussionTab({
   // alone rather than forking the tab per provider.
   const { ref } = useProviderPrScope({ owner, repo, number });
   const isMergeRequest = ref.platform === 'gitlab';
+  const router = useRouter();
 
   const [expansion, setExpansion] = useState<Record<string, boolean>>({});
   const [suppressContentPosition, setSuppressContentPosition] = useState(false);
@@ -118,9 +133,30 @@ export function PrReviewDiscussionTab({
   const settleGenerationRef = useRef(0);
   const settleThreadIdRef = useRef<string | null>(null);
   const { scrollAnimated } = useMotionPolicy();
+  // Keyboard-open reply focus: scroll the focused thread row above the
+  // keyboard-lifted CTA bar so the reply input and its submit button stay
+  // usable (the CTA must stay visible and tappable above the keyboard). The
+  // scroll anchors on the list's viewport commit, not a guessed frame
+  // (useReplyFocusScroll).
+  const replyScroll = useReplyFocusScroll(listRef);
+  // Handler wiring for the list's focus-scroll props (the hook's own method
+  // names follow its protocol, the JSX handlers follow the handle* rule).
+  const handleReplyInputFocus = replyScroll.markFocus;
+  const handleViewportLayout = replyScroll.onViewportLayout;
+  // The CTA bar lifts on GLOBAL keyboard events; while another surface owns
+  // the keyboard (the conversation-comment formSheet) that lift only shrinks
+  // the list viewport behind the sheet and parks the last thread's reply
+  // field under the bar (uxs3 spot check, e4-confirm-discard). Lift only
+  // while this tab's screen is focused.
+  const isFocused = useIsFocused();
   // Bottom clearance for the non-list chrome (loading, empty, and every
   // first-page error state) so the last control clears the system bar.
   const bottomPadding = useDetailScreenBottomPadding();
+  // Landscape: side insets keep the loading skeleton cards clear of the
+  // sensor housing. Spread only when nonzero: the skeleton wrapper's `px-4`
+  // className gutter must survive portrait untouched (inline style wins over
+  // className). Same treatment as the diff floating-actions bar.
+  const insets = useSafeAreaInsets();
 
   // Single write path: the ref is the tap-time source of truth (render-closure
   // state can lag a queued update on rapid taps).
@@ -231,6 +267,24 @@ export function PrReviewDiscussionTab({
     isEmpty,
   });
 
+  const openConversationComment = () => {
+    const href: Href = {
+      pathname: CONVERSATION_COMMENT_PATH,
+      params: { owner, repo, number },
+    };
+    router.push(href);
+  };
+
+  // The bottom CTA bar is static chrome for the two content-bearing views
+  // only (happy list + empty). The loading skeleton and the four
+  // terminal/error states render exactly as before — full-body, no bar.
+  const withCommentCta = (body: ReactNode) => (
+    <View className="flex-1">
+      <View className="flex-1">{body}</View>
+      <PrCommentCta onPress={openConversationComment} keyboardLift={isFocused} />
+    </View>
+  );
+
   if (view.kind === 'permission') {
     return (
       <QueryError
@@ -282,7 +336,11 @@ export function PrReviewDiscussionTab({
       <View
         accessibilityLabel={t('prReview.discussion.loading')}
         className="flex-1 gap-3 px-4 pt-3"
-        style={{ paddingBottom: bottomPadding }}
+        style={{
+          paddingBottom: bottomPadding,
+          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
+          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
+        }}
       >
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
@@ -299,7 +357,7 @@ export function PrReviewDiscussionTab({
 
   // ── Empty (neither threads nor conversation comments) ──────────────
   if (view.kind === 'empty') {
-    return (
+    return withCommentCta(
       <EmptyState
         icon={MessageSquarePlus}
         title={t('prReview.discussion.noDiscussion')}
@@ -328,7 +386,7 @@ export function PrReviewDiscussionTab({
   // comments (R4: "Load more" may insert rows mid-list; accepted).
   const listItems = mergeDiscussionListItems(threads, conversation);
 
-  return (
+  return withCommentCta(
     <PrReviewDiscussionList
       owner={owner}
       repo={repo}
@@ -338,7 +396,12 @@ export function PrReviewDiscussionTab({
       expansion={expansion}
       suppressContentPosition={suppressContentPosition}
       onToggleExpand={handleToggleExpand}
-      onScrollBeginDrag={invalidateSettle}
+      onScrollBeginDrag={() => {
+        invalidateSettle();
+        // A user drag wins over the keyboard-open reply park: drop the
+        // pending focus scroll (useReplyFocusScroll).
+        replyScroll.invalidate();
+      }}
       hasNextPage={query.hasNextPage}
       isFetchingNextPage={query.isFetchingNextPage}
       laterPageError={laterPageError || retainedContentError}
@@ -348,6 +411,8 @@ export function PrReviewDiscussionTab({
       onRetryLoadMore={() => {
         void query.refetch();
       }}
+      onReplyInputFocus={handleReplyInputFocus}
+      onViewportLayout={handleViewportLayout}
     />
   );
 }

@@ -29,6 +29,7 @@ describe('validateFeatureHeader', () => {
     'linear',
     'scheduled',
     'quick-chat',
+    'mobile-chat',
   ])('accepts emitted feature %s', feature => {
     expect(validateFeatureHeader(feature)).toBe(feature);
   });

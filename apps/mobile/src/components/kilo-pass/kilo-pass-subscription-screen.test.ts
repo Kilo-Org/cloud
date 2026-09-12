@@ -325,6 +325,83 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
+  it('error: a failed presentation load shows the retryable load-failure state', async () => {
+    mocks.presentation.isError = true;
+    const renderer = await renderScreen();
+
+    expect(allText(renderer)).toContain("Couldn't load Kilo Pass.");
+    expect(allText(renderer)).toContain('Kilo Pass could not be loaded. Try again.');
+
+    const retry = renderer.root.find(
+      node =>
+        String(node.type) === 'Button' &&
+        (node.props as { accessibilityLabel?: string }).accessibilityLabel ===
+          'Retry loading Kilo Pass'
+    );
+    await press(retry);
+    expect(mocks.presentation.refetch).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('loading: the presentation placeholder reserves the product card height', async () => {
+    mocks.presentation.isPending = true;
+    const renderer = await renderScreen();
+
+    const skeletons = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Skeleton' &&
+        String((node.props as { className?: string }).className).includes('h-[88px]')
+    );
+    expect(skeletons).toHaveLength(3);
+
+    renderer.unmount();
+  });
+
+  it('loading: the presentation placeholder renders the settled sheet chrome', async () => {
+    mocks.presentation.isPending = true;
+    const renderer = await renderScreen();
+
+    // The description is static copy, so it renders as text, not a skeleton.
+    expect(allText(renderer)).toContain(
+      'A monthly subscription that adds credits to your Kilo balance'
+    );
+    expect(
+      renderer.root.findAll(
+        node =>
+          String(node.type) === 'Skeleton' &&
+          String((node.props as { className?: string }).className).includes('h-4')
+      )
+    ).toHaveLength(0);
+
+    // The Restore Purchases row and legal copy reserve their settled slots.
+    const restore = renderer.root.find(
+      node =>
+        String(node.type) === 'Button' &&
+        (node.props as { accessibilityLabel?: string }).accessibilityLabel === 'Restore Purchases'
+    );
+    expect((restore.props as { disabled?: boolean }).disabled).toBe(true);
+    expect(allText(renderer)).toContain('Terms of Use');
+    expect(allText(renderer)).toContain('Privacy Policy');
+
+    renderer.unmount();
+  });
+
+  it('loading: the products placeholder reserves the product card height', async () => {
+    setNativeIapPresentation();
+    mocks.nativeIap.productsIsLoading = true;
+    const renderer = await renderScreen();
+
+    const skeletons = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Skeleton' &&
+        String((node.props as { className?: string }).className).includes('h-[88px]')
+    );
+    expect(skeletons).toHaveLength(3);
+
+    renderer.unmount();
+  });
+
   it('happy: native_iap with products and an allowed preflight enables tiles and starts purchase', async () => {
     setNativeIapPresentation();
     mocks.nativeIap.products = [product];

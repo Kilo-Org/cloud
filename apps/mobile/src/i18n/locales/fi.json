@@ -2944,14 +2944,6 @@
     "revoke": "Poista luottamus verkkotunnukseen {{host}}",
     "backToPreferences": "Takaisin asetuksiin"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Aloita keskustelu",
-      "description": "Aloita keskustelu mallin kanssa lähettämällä viesti."
-    },
-    "historyRetry": "Keskusteluhistoriaa ei voitu ladata.",
-    "sendError": "Viestiä ei voitu lähettää. Yritä uudelleen."
-  },
   "glanceable": {
     "waiting": "Päivitetään agentteja",
     "empty": "Ei keskeneräisiä töitä",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "Ei puheentunnistusmalleja",
     "emptyDescription": "Kilo Gateway ei juuri nyt tarjoa puheentunnistusmalleja.",
     "loadFailed": "Puheentunnistusmallien lataaminen epäonnistui."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Aloita keskustelu",
+      "description": "Lähetä viesti keskustellaksesi mallin kanssa."
+    },
+    "list": {
+      "loadFailed": "Keskusteluhistoriaa ei voitu ladata.",
+      "new": "Uusi keskustelu",
+      "openHint": "Avaa keskustelun. Poista painamalla pitkään.",
+      "deleteTitle": "Poistetaanko tämä keskustelu?"
+    },
+    "beta": "Beta"
   }
 }

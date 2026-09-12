@@ -2944,14 +2944,6 @@
     "revoke": "Bỏ tin cậy {{host}}",
     "backToPreferences": "Quay lại cài đặt"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Bắt đầu trò chuyện",
-      "description": "Gửi tin nhắn để trò chuyện với mô hình AI."
-    },
-    "historyRetry": "Không thể tải lịch sử trò chuyện.",
-    "sendError": "Không thể gửi tin nhắn. Vui lòng thử lại."
-  },
   "glanceable": {
     "waiting": "Đang cập nhật tác nhân",
     "empty": "Không có tác vụ đang chạy",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "Không có mô hình chuyển giọng nói thành văn bản",
     "emptyDescription": "Hiện Kilo Gateway không cung cấp mô hình chuyển giọng nói thành văn bản.",
     "loadFailed": "Không thể tải các mô hình chuyển giọng nói thành văn bản."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Bắt đầu trò chuyện",
+      "description": "Gửi tin nhắn để trò chuyện với mô hình."
+    },
+    "list": {
+      "loadFailed": "Không thể tải lịch sử trò chuyện.",
+      "new": "Cuộc trò chuyện mới",
+      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để xóa.",
+      "deleteTitle": "Xóa cuộc trò chuyện này?"
+    },
+    "beta": "Beta"
   }
 }

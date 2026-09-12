@@ -1,10 +1,10 @@
-import { sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /**
  * DO SQLite schema for the KiloMcpOAuthStore Durable Object (s6, migration tag
  * v1). The library (`@cloudflare/workers-oauth-provider`) owns clients, codes,
- * refresh tokens, and revoked jtis in OAUTH_KV; the only hand-rolled state here
- * is the pending-authorization records (s2).
+ * refresh tokens, and revoked jtis in OAUTH_KV. Local state bridges consent
+ * and records issued refresh-token hashes for the strict reuse policy.
  *
  * All timestamps are ISO-8601 strings (UTC) so they compare correctly with
  * `>` / `<` in SQLite and clone cleanly over DO RPC.
@@ -41,4 +41,17 @@ export const oauthPendingAuthorizations = sqliteTable(
   table => [
     uniqueIndex('uq_oauth_pending_authorizations_device_auth_code').on(table.device_auth_code),
   ]
+);
+
+/** Issued hashes authenticate replays; public token parts alone never do. */
+export const oauthRefreshTokenHistory = sqliteTable(
+  'oauth_refresh_token_history',
+  {
+    token_hash: text('token_hash').primaryKey(),
+    user_id: text('user_id').notNull(),
+    grant_id: text('grant_id').notNull(),
+    current: integer('current', { mode: 'boolean' }).notNull(),
+    expires_at: text('expires_at').notNull(),
+  },
+  table => [index('idx_oauth_refresh_token_grant').on(table.user_id, table.grant_id)]
 );

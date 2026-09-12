@@ -12,7 +12,7 @@ import { MCP_SCOPE, scopeTokens } from './auth/http';
 import { callCatalogEndpoint } from './call';
 import { createDefaultHandler } from './oauth/consent';
 import { onError, tokenExchangeCallback } from './oauth/provider-hooks';
-import { forwardWithRefreshReuseDetection } from './oauth/refresh-reuse';
+import { createRefreshReuseHandler, isTokenRequest } from './oauth/refresh-reuse';
 import {
   callArgsSchema,
   clientRegistrationSchema,
@@ -29,7 +29,7 @@ import {
   searchCatalog,
 } from './search';
 import { createSemanticCandidates } from './search-knn';
-import { getKiloMcpOAuthStoreStub } from './store/oauth-store';
+import { getKiloMcpOAuthStoreStub, KiloMcpOAuthStore as OAuthStore } from './store/oauth-store';
 import {
   JsonRpcFailure,
   type Catalog,
@@ -44,9 +44,6 @@ import OAuthProvider, {
   type OAuthProviderOptions,
 } from '@cloudflare/workers-oauth-provider';
 import type { ZodError } from 'zod';
-
-/** The Durable Object class must stay exported from the entry module for wrangler. */
-export { KiloMcpOAuthStore } from './store/oauth-store';
 
 /** The bundled catalog dumped by apps/web/src/scripts/mcp-catalog (s1). */
 const catalog = catalogJson as unknown as Catalog;
@@ -570,24 +567,43 @@ const providerOptions: OAuthProviderOptions<Env> = {
   },
   clientRegistrationCallback,
   tokenExchangeCallback: options => tokenExchangeCallback(options),
-  onError: error => onError(error),
 };
 
-const provider = new OAuthProvider<Env>(providerOptions);
+function fetchWithProvider(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const analytics = createMcpAnalytics({ env, ctx });
+  const provider = new OAuthProvider<Env>({
+    ...providerOptions,
+    onError: error => onError(error, { analytics }),
+  });
+  return provider.fetch(request, env, ctx);
+}
 
 /**
- * The library rotates refresh tokens but keeps the immediately previous one
- * valid for a retry ("one-step grace"). RFC 9700 requires a replayed superseded
- * token to be rejected AND its grant revoked, so the token endpoint is wrapped
- * with that strict policy (src/oauth/refresh-reuse.ts) before the library sees
- * the request. Every other path goes straight to the library.
+ * All token exchanges use the existing named DO, not a per-Worker mutex.
+ * The queue spans the provider's KV I/O without blocking consent RPCs or MCP.
  */
+export class KiloMcpOAuthStore extends OAuthStore {
+  private readonly forwardToken = createRefreshReuseHandler({
+    store: this,
+    revokeGrant: (grantId, userId) =>
+      getOAuthApi(providerOptions, this.env).revokeGrant(grantId, userId),
+  });
+
+  fetch(request: Request): Promise<Response> {
+    if (!isTokenRequest(request))
+      return Promise.resolve(new Response('Not found', { status: 404 }));
+    // The provider's token route never dispatches a handler or uses ctx beyond
+    // our analytics waitUntil. The DO state supplies that request lifetime.
+    const tokenContext: Pick<ExecutionContext, 'waitUntil' | 'props'> = this.ctx;
+    return this.forwardToken(request, req =>
+      fetchWithProvider(req, this.env, tokenContext as ExecutionContext)
+    );
+  }
+}
+
 export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    return forwardWithRefreshReuseDetection(request, req => provider.fetch(req, env, ctx), {
-      kv: env.OAUTH_KV,
-      revokeGrant: (grantId, userId) =>
-        getOAuthApi(providerOptions, env).revokeGrant(grantId, userId),
-    });
+    if (isTokenRequest(request)) return getKiloMcpOAuthStoreStub(env).fetch(request);
+    return fetchWithProvider(request, env, ctx);
   },
 } satisfies ExportedHandler<Env>;

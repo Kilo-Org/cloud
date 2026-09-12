@@ -297,6 +297,14 @@ function expectNoCredentialLeak(calls: OAuthSignInInput[]): void {
 }
 
 describe('GET /authorize (consent)', () => {
+  function expectPrivateStatusUrl(html: string, id: string): void {
+    const serializedUrl = html.match(/var u=("[^"]*");/)?.[1];
+    expect(serializedUrl).toBeDefined();
+    const statusUrl = JSON.parse(serializedUrl ?? '""') as string;
+    expect(statusUrl).not.toContain('PAIR-1');
+    expect(statusUrl).toBe(`/authorize/status?id=${id}`);
+  }
+
   it('parses the request, opens a pairing, emits started, and points at the status id', async () => {
     const store = createFakeStore();
     const { helpers } = fakeHelpers({ authRequest: authRequest(), client: clientInfo() });
@@ -311,7 +319,14 @@ describe('GET /authorize (consent)', () => {
     const id = [...store.pending.keys()][0]!;
     // The status URL carries the internal pending id, never the device-auth code.
     expect(html).toContain(`/authorize/status?id=${id}`);
-    expect(html).not.toContain('PAIR-1</');
+    expectPrivateStatusUrl(html, id);
+    // A leaked query parameter must fail the invariant, not just visible text.
+    expect(() =>
+      expectPrivateStatusUrl(
+        html.replace(`/authorize/status?id=${id}`, `/authorize/status?id=${id}&code=PAIR-1`),
+        id
+      )
+    ).toThrow();
     expect(store.pending.get(id)).toMatchObject({ deviceAuthCode: 'PAIR-1', status: 'pending' });
     expect(calls).toEqual([{ phase: 'started', identity: null, clientId: CLIENT_ID }]);
     expectNoCredentialLeak(calls);

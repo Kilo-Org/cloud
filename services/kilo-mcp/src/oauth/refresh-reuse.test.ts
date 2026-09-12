@@ -1,55 +1,41 @@
-import { describe, expect, it, vi, type Mock } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  createRefreshReuseHandler,
   detectRefreshTokenReuse,
-  forwardWithRefreshReuseDetection,
   hashRefreshToken,
   parseRefreshToken,
   rememberIssuedRefreshToken,
-  type RefreshReuseKv,
+  type IssuedRefreshToken,
+  type RefreshReuseStore,
 } from './refresh-reuse';
 
-/** In-memory KV standing in for OAUTH_KV. */
-type FakeKv = RefreshReuseKv & { store: Map<string, string> };
-
-type RevokeGrant = (grantId: string, userId: string) => Promise<void>;
-
-function makeKv(initial: Record<string, string> = {}): FakeKv {
-  const store = new Map(Object.entries(initial));
-  return {
-    store,
-    get: (key: string) => Promise.resolve(store.get(key) ?? null),
-    put: (key: string, value: string) => {
-      store.set(key, value);
-      return Promise.resolve();
+function makeDeps() {
+  const tokens = new Map<string, IssuedRefreshToken>();
+  const store: RefreshReuseStore = {
+    getRefreshToken: async hash => tokens.get(hash) ?? null,
+    rememberRefreshToken: async (hash, parts) => {
+      for (const token of tokens.values()) {
+        if (token.userId === parts.userId && token.grantId === parts.grantId) token.current = false;
+      }
+      tokens.set(hash, { ...parts, current: true });
     },
   };
-}
-
-function token(userId: string, grantId: string, secret: string): string {
-  return `${userId}:${grantId}:${secret}`;
+  return { tokens, store, revokeGrant: vi.fn(async (_grantId: string, _userId: string) => {}) };
 }
 
 function refreshRequest(refreshToken: string, origin?: string): Request {
-  const body = new URLSearchParams({
-    grant_type: 'refresh_token',
-    refresh_token: refreshToken,
-    client_id: 'client-1',
-  }).toString();
   return new Request('https://kilo-mcp.test/token', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       ...(origin ? { Origin: origin } : {}),
     },
-    body,
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: 'client-1',
+    }),
   });
-}
-
-function makeDeps(): { kv: FakeKv; revokeGrant: Mock<RevokeGrant> } {
-  return {
-    kv: makeKv(),
-    revokeGrant: vi.fn<RevokeGrant>().mockResolvedValue(undefined),
-  };
 }
 
 describe('parseRefreshToken', () => {
@@ -60,172 +46,219 @@ describe('parseRefreshToken', () => {
     });
   });
 
-  it('rejects tokens that are not three non-empty parts', () => {
-    expect(parseRefreshToken('nope')).toBeNull();
-    expect(parseRefreshToken('a:b')).toBeNull();
-    expect(parseRefreshToken('a:b:c:d')).toBeNull();
-    expect(parseRefreshToken(':grant:secret')).toBeNull();
-    expect(parseRefreshToken('user::secret')).toBeNull();
-  });
+  it.each(['nope', 'a:b', 'a:b:c:d', ':grant:secret', 'user::secret', 'user:grant:'])(
+    'rejects malformed token %s',
+    token => expect(parseRefreshToken(token)).toBeNull()
+  );
 });
 
 describe('detectRefreshTokenReuse', () => {
-  it('ignores requests that are not a POST to the token endpoint', async () => {
+  it('does not revoke a grant when only its public token parts match', async () => {
     const deps = makeDeps();
-    expect(
-      await detectRefreshTokenReuse(
-        new Request('https://kilo-mcp.test/mcp', { method: 'POST', body: 'x' }),
-        deps
-      )
-    ).toBeNull();
-    expect(
-      await detectRefreshTokenReuse(new Request('https://kilo-mcp.test/token'), deps)
-    ).toBeNull();
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:real' }), deps);
+    expect(await detectRefreshTokenReuse(refreshRequest('u:g:forged'), deps)).toBeNull();
     expect(deps.revokeGrant).not.toHaveBeenCalled();
   });
 
-  it('ignores non-refresh grants and missing or malformed tokens', async () => {
+  it('leaves unknown and malformed tokens to the library', async () => {
     const deps = makeDeps();
-    const codeExchange = new Request('https://kilo-mcp.test/token', {
-      method: 'POST',
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code: 'c',
-        refresh_token: 'a:b:c',
-      }).toString(),
-    });
-    expect(await detectRefreshTokenReuse(codeExchange, deps)).toBeNull();
-
-    const noToken = new Request('https://kilo-mcp.test/token', {
-      method: 'POST',
-      body: new URLSearchParams({ grant_type: 'refresh_token' }).toString(),
-    });
-    expect(await detectRefreshTokenReuse(noToken, deps)).toBeNull();
-
-    expect(await detectRefreshTokenReuse(refreshRequest('not-a-token'), deps)).toBeNull();
+    for (const token of ['u:g:first', 'nope', 'u:g:']) {
+      expect(await detectRefreshTokenReuse(refreshRequest(token), deps)).toBeNull();
+    }
     expect(deps.revokeGrant).not.toHaveBeenCalled();
   });
 
-  it('allows the first refresh of a grant (nothing recorded yet)', async () => {
+  it('allows the current token but revokes on a known superseded token', async () => {
     const deps = makeDeps();
-    expect(await detectRefreshTokenReuse(refreshRequest(token('u', 'g', 's1')), deps)).toBeNull();
-    expect(deps.revokeGrant).not.toHaveBeenCalled();
-  });
-
-  it('allows the refresh token the server most recently issued', async () => {
-    const current = token('u', 'g', 's2');
-    const kv = makeKv({ [`refresh-latest:u:g`]: await hashRefreshToken(current) });
-    const revokeGrant = vi.fn<RevokeGrant>().mockResolvedValue(undefined);
-    expect(await detectRefreshTokenReuse(refreshRequest(current), { kv, revokeGrant })).toBeNull();
-    expect(revokeGrant).not.toHaveBeenCalled();
-  });
-
-  it('rejects a superseded token, revokes the grant, and answers invalid_grant', async () => {
-    const superseded = token('u', 'g', 's1');
-    const kv = makeKv({ [`refresh-latest:u:g`]: await hashRefreshToken(token('u', 'g', 's2')) });
-    const revokeGrant = vi.fn<RevokeGrant>().mockResolvedValue(undefined);
-
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
+    expect(await detectRefreshTokenReuse(refreshRequest('u:g:second'), deps)).toBeNull();
     const response = await detectRefreshTokenReuse(
-      refreshRequest(superseded, 'https://client.test'),
-      {
-        kv,
-        revokeGrant,
-      }
+      refreshRequest('u:g:first', 'https://client.test'),
+      deps
     );
-
-    expect(response).not.toBeNull();
-    expect(response!.status).toBe(400);
-    expect(response!.headers.get('Content-Type')).toBe('application/json');
-    expect(response!.headers.get('Cache-Control')).toBe('no-store');
-    expect(response!.headers.get('Access-Control-Allow-Origin')).toBe('https://client.test');
-    expect(await response!.json()).toEqual({
+    expect(response?.status).toBe(400);
+    expect(response?.headers.get('Cache-Control')).toBe('no-store');
+    expect(response?.headers.get('Access-Control-Allow-Origin')).toBe('https://client.test');
+    expect(await response?.json()).toEqual({
       error: 'invalid_grant',
       error_description: 'Refresh token reuse detected; the grant has been revoked.',
     });
-    expect(revokeGrant).toHaveBeenCalledTimes(1);
-    expect(revokeGrant).toHaveBeenCalledWith('g', 'u');
+    expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('g', 'u');
+  });
+
+  it('uses the stored identity rather than parsing the presented token for revocation', async () => {
+    const deps = makeDeps();
+    deps.tokens.set(await hashRefreshToken('not:trusted:parts'), {
+      userId: 'stored-user',
+      grantId: 'stored-grant',
+      current: false,
+    });
+    await detectRefreshTokenReuse(refreshRequest('not:trusted:parts'), deps);
+    expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('stored-grant', 'stored-user');
+  });
+
+  it('leaves wrong media types, ambiguous parameters and non-refresh requests to the library', async () => {
+    const deps = makeDeps();
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
+    for (const request of [
+      new Request('https://kilo-mcp.test/token'),
+      new Request('https://kilo-mcp.test/mcp', { method: 'POST', body: '{}' }),
+      new Request('https://kilo-mcp.test/token', {
+        method: 'POST',
+        body: 'grant_type=refresh_token&refresh_token=u:g:first',
+      }),
+      new Request('https://kilo-mcp.test/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'grant_type=refresh_token&refresh_token=u:g:first&refresh_token=u:g:second',
+      }),
+      new Request('https://kilo-mcp.test/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'grant_type=authorization_code&refresh_token=u:g:first',
+      }),
+      refreshRequest(''),
+    ]) {
+      expect(await detectRefreshTokenReuse(request, deps)).toBeNull();
+    }
+    expect(deps.revokeGrant).not.toHaveBeenCalled();
   });
 });
 
 describe('rememberIssuedRefreshToken', () => {
-  it('stores the hash of the issued refresh token on a successful response', async () => {
+  it('stores full token hashes only, isolating grants and users', async () => {
     const deps = makeDeps();
-    const issued = token('u', 'g', 's2');
-    await rememberIssuedRefreshToken(
-      new Response(JSON.stringify({ refresh_token: issued }), { status: 200 }),
-      deps
-    );
-    expect(deps.kv.store.get('refresh-latest:u:g')).toBe(await hashRefreshToken(issued));
+    for (const token of ['u:g:first', 'u:other:secret', 'other:g:secret', 'u:g:second']) {
+      await rememberIssuedRefreshToken(Response.json({ refresh_token: token }), deps);
+      expect(deps.tokens.has(token)).toBe(false);
+    }
+    expect(deps.tokens.get(await hashRefreshToken('u:g:first'))?.current).toBe(false);
+    for (const token of ['u:other:secret', 'other:g:secret', 'u:g:second']) {
+      expect(deps.tokens.get(await hashRefreshToken(token))?.current).toBe(true);
+    }
   });
 
-  it('stores a hash, never the token itself', async () => {
+  it('ignores failed, empty and malformed token responses', async () => {
     const deps = makeDeps();
-    const issued = token('u', 'g', 's2');
-    await rememberIssuedRefreshToken(
-      new Response(JSON.stringify({ refresh_token: issued }), { status: 200 }),
-      deps
-    );
-    expect(deps.kv.store.get('refresh-latest:u:g')).not.toContain(issued);
-  });
-
-  it('ignores error responses, refusals, and bodies without a refresh token', async () => {
-    const deps = makeDeps();
-    await rememberIssuedRefreshToken(new Response('{}', { status: 400 }), deps);
-    await rememberIssuedRefreshToken(new Response('not json', { status: 200 }), deps);
-    await rememberIssuedRefreshToken(
-      new Response(JSON.stringify({ access_token: 'a' }), { status: 200 }),
-      deps
-    );
-    expect(deps.kv.store.size).toBe(0);
+    for (const response of [
+      Response.json({ refresh_token: 'u:g:first' }, { status: 503 }),
+      new Response('not json'),
+      Response.json({ access_token: 'access' }),
+      Response.json({ refresh_token: 1 }),
+      Response.json({ refresh_token: 'malformed' }),
+    ])
+      await rememberIssuedRefreshToken(response, deps);
+    expect(deps.tokens.size).toBe(0);
   });
 });
 
-describe('forwardWithRefreshReuseDetection', () => {
-  it('records the issued token so the same token refreshes again, then rejects a replay', async () => {
+describe('createRefreshReuseHandler (one per named DO)', () => {
+  it('never issues two rotations for concurrent uses of the same token', async () => {
     const deps = makeDeps();
-    const issuedFirst = token('u', 'g', 's1');
-    const issuedSecond = token('u', 'g', 's2');
-
-    const forward = vi
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ refresh_token: issuedFirst })))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ refresh_token: issuedSecond })));
-
-    // 1. Authorization-code exchange: no reuse check, records s1.
-    await forwardWithRefreshReuseDetection(
-      new Request('https://kilo-mcp.test/token', {
-        method: 'POST',
-        body: new URLSearchParams({ grant_type: 'authorization_code', code: 'c' }).toString(),
-      }),
-      forward,
-      deps
-    );
-
-    // 2. Refresh with s1: matches the record, allowed, records s2.
-    const ok = await forwardWithRefreshReuseDetection(refreshRequest(issuedFirst), forward, deps);
-    expect(ok.status).toBe(200);
-
-    // 3. Replay s1: superseded -> rejected, revoked, library never called.
-    const replay = await forwardWithRefreshReuseDetection(
-      refreshRequest(issuedFirst),
-      forward,
-      deps
-    );
-    expect(replay.status).toBe(400);
-    expect(deps.revokeGrant).toHaveBeenCalledWith('g', 'u');
-    expect(forward).toHaveBeenCalledTimes(2);
+    const handle = createRefreshReuseHandler(deps);
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:current' }), deps);
+    let issued = 0;
+    const forward = vi.fn(async () => Response.json({ refresh_token: `u:g:next-${++issued}` }));
+    const responses = await Promise.all([
+      handle(refreshRequest('u:g:current'), forward),
+      handle(refreshRequest('u:g:current'), forward),
+    ]);
+    expect(responses.filter(response => response.ok)).toHaveLength(1);
+    expect(forward).toHaveBeenCalledTimes(1);
+    expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('g', 'u');
   });
 
-  it('passes non-token requests straight through', async () => {
+  it.each(['/mcp', '/register', '/authorize', '/.well-known/oauth-authorization-server', '/token'])(
+    'never clones an unrelated response body (%s GET)',
+    async path => {
+      const deps = makeDeps();
+      const response = Response.json({ refresh_token: 'u:g:must-not-be-recorded' });
+      const clone = vi.spyOn(response, 'clone');
+      expect(
+        await createRefreshReuseHandler(deps)(
+          new Request(`https://kilo-mcp.test${path}`),
+          async () => response
+        )
+      ).toBe(response);
+      expect(clone).not.toHaveBeenCalled();
+      expect(deps.tokens.size).toBe(0);
+    }
+  );
+
+  it('records code exchange, accepts successive rotations and rejects old history after recreation', async () => {
     const deps = makeDeps();
-    const forward = vi.fn().mockResolvedValue(new Response('ok'));
-    const response = await forwardWithRefreshReuseDetection(
-      new Request('https://kilo-mcp.test/mcp', { method: 'POST', body: '{}' }),
-      forward,
-      deps
+    const handle = createRefreshReuseHandler(deps);
+    await handle(
+      new Request('https://kilo-mcp.test/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'grant_type=authorization_code&code=code',
+      }),
+      async () => Response.json({ refresh_token: 'u:g:first' })
     );
-    expect(await response.text()).toBe('ok');
-    expect(forward).toHaveBeenCalledTimes(1);
-    expect(deps.kv.store.size).toBe(0);
+    expect(
+      (
+        await handle(refreshRequest('u:g:first'), async () =>
+          Response.json({ refresh_token: 'u:g:second' })
+        )
+      ).status
+    ).toBe(200);
+    expect(
+      (
+        await handle(refreshRequest('u:g:second'), async () =>
+          Response.json({ refresh_token: 'u:g:third' })
+        )
+      ).status
+    ).toBe(200);
+    const forward = vi.fn();
+    const replay = await createRefreshReuseHandler(deps)(refreshRequest('u:g:first'), forward);
+    expect(replay.status).toBe(400);
+    expect(forward).not.toHaveBeenCalled();
+    expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('g', 'u');
+  });
+
+  it('a failed exchange does not poison the queue or consume the token, and retry succeeds', async () => {
+    const deps = makeDeps();
+    const handle = createRefreshReuseHandler(deps);
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:current' }), deps);
+    await expect(
+      handle(refreshRequest('u:g:current'), async () => {
+        throw new Error('storage unavailable');
+      })
+    ).rejects.toThrow('storage unavailable');
+    expect(
+      (
+        await handle(refreshRequest('u:g:current'), async () =>
+          Response.json({ error: 'temporarily_unavailable' }, { status: 503 })
+        )
+      ).status
+    ).toBe(503);
+    expect(
+      (
+        await handle(refreshRequest('u:g:current'), async () =>
+          Response.json({ refresh_token: 'u:g:next' })
+        )
+      ).status
+    ).toBe(200);
+    expect(deps.revokeGrant).not.toHaveBeenCalled();
+  });
+
+  it('does not release an issued response before its history is durable', async () => {
+    const deps = makeDeps();
+    let fail = true;
+    const remember = deps.store.rememberRefreshToken.bind(deps.store);
+    deps.store.rememberRefreshToken = async (...args) => {
+      if (fail) throw new Error('history unavailable');
+      return remember(...args);
+    };
+    const handle = createRefreshReuseHandler(deps);
+    const forward = async () => Response.json({ refresh_token: 'u:g:next' });
+    await expect(handle(refreshRequest('u:g:current'), forward)).rejects.toThrow(
+      'history unavailable'
+    );
+    fail = false;
+    expect((await handle(refreshRequest('u:g:current'), forward)).status).toBe(200);
   });
 });

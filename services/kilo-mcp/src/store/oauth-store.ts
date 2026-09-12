@@ -4,15 +4,16 @@ import { and, eq, gt, isNull, lt } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
-import { oauthPendingAuthorizations } from '../db/sqlite-schema';
+import { oauthPendingAuthorizations, oauthRefreshTokenHistory } from '../db/sqlite-schema';
+import type { RefreshReuseStore, RefreshTokenParts } from '../oauth/refresh-reuse';
 
 /**
  * KiloMcpOAuthStore — the only hand-rolled OAuth state the library does not own
  * (s2): the short-lived pending-authorization records that bridge GET
  * /authorize to the apps/web device-auth pairing. Clients, codes, refresh
  * tokens, and revoked jtis are owned by `@cloudflare/workers-oauth-provider`
- * (OAUTH_KV); this store is the DO SQLite pending-authorization table via
- * Drizzle's query builder. Tracked migration: wrangler.jsonc `migrations` v1.
+ * (OAUTH_KV); this store holds pending authorizations and issued refresh-token
+ * hashes for strict replay detection via Drizzle's query builder.
  *
  * The pending records are one logical namespace (any worker instance must see
  * any record), so a single SQLite DO instance (`getByName(STORE_INSTANCE_NAME)`)
@@ -124,7 +125,10 @@ function rowToPendingAuthorization(
   };
 }
 
-export class KiloMcpOAuthStore extends DurableObject<Env> implements OAuthStoreApi {
+export class KiloMcpOAuthStore
+  extends DurableObject<Env>
+  implements OAuthStoreApi, RefreshReuseStore
+{
   private readonly db: DrizzleSqliteDODatabase;
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -258,12 +262,63 @@ export class KiloMcpOAuthStore extends DurableObject<Env> implements OAuthStoreA
   }
 
   async purgeExpired(nowIso: string): Promise<number> {
+    this.db
+      .delete(oauthRefreshTokenHistory)
+      .where(lt(oauthRefreshTokenHistory.expires_at, nowIso))
+      .run();
     const expiredPendingAuthorizations = this.db
       .delete(oauthPendingAuthorizations)
       .where(lt(oauthPendingAuthorizations.expires_at, nowIso))
       .returning({ id: oauthPendingAuthorizations.id })
       .all().length;
     return expiredPendingAuthorizations;
+  }
+
+  async getRefreshToken(hash: string, nowIso: string) {
+    const row = this.db
+      .select()
+      .from(oauthRefreshTokenHistory)
+      .where(
+        and(
+          eq(oauthRefreshTokenHistory.token_hash, hash),
+          gt(oauthRefreshTokenHistory.expires_at, nowIso)
+        )
+      )
+      .get();
+    return row ? { userId: row.user_id, grantId: row.grant_id, current: row.current } : null;
+  }
+
+  async rememberRefreshToken(
+    hash: string,
+    parts: RefreshTokenParts,
+    expiresAt: string
+  ): Promise<void> {
+    this.ctx.storage.transactionSync(() => {
+      this.db
+        .update(oauthRefreshTokenHistory)
+        .set({ current: false })
+        .where(
+          and(
+            eq(oauthRefreshTokenHistory.user_id, parts.userId),
+            eq(oauthRefreshTokenHistory.grant_id, parts.grantId)
+          )
+        )
+        .run();
+      this.db
+        .insert(oauthRefreshTokenHistory)
+        .values({
+          token_hash: hash,
+          user_id: parts.userId,
+          grant_id: parts.grantId,
+          current: true,
+          expires_at: expiresAt,
+        })
+        .onConflictDoUpdate({
+          target: oauthRefreshTokenHistory.token_hash,
+          set: { current: true, expires_at: expiresAt },
+        })
+        .run();
+    });
   }
 
   /** One alarm per DO: purge rows past their own expiry, then reschedule. */
@@ -274,7 +329,7 @@ export class KiloMcpOAuthStore extends DurableObject<Env> implements OAuthStoreA
 }
 
 /** Repo DO convention: a single stub helper so callers never touch the namespace directly. */
-export function getKiloMcpOAuthStoreStub(env: Env): OAuthStoreApi {
+export function getKiloMcpOAuthStoreStub(env: Env) {
   const namespace = env.KILO_MCP_OAUTH_STORE;
   if (!namespace) {
     throw new Error(

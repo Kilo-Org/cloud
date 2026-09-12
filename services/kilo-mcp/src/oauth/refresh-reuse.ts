@@ -1,59 +1,44 @@
-/**
- * Strict refresh-token reuse detection on top of the OAuth provider library.
- *
- * `@cloudflare/workers-oauth-provider` rotates refresh tokens on every use but
- * deliberately keeps the IMMEDIATELY PREVIOUS token valid ("one-step grace") so
- * a client that lost the refresh response can retry once. RFC 9700 (OAuth 2.0
- * Security BCP) instead requires the authorization server to treat a replayed,
- * superseded refresh token as a breach of the grant: reject it AND revoke every
- * token for that grant.
- *
- * This module adds that strict policy in front of the library's token endpoint:
- * it remembers the most recently issued refresh token's HASH per grant (never
- * the token itself) and, when a refresh request presents a different token for
- * a grant that already has a record, revokes the whole grant and answers
- * `invalid_grant`. The first refresh after a code exchange has no record yet,
- * so it is allowed and becomes the baseline.
- */
+import { z } from 'zod';
 
-/** The library's token endpoint (`tokenEndpoint: '/token'` in src/index.ts). */
 export const TOKEN_ENDPOINT_PATH = '/token';
 
-/** KV key prefix for the most recently issued refresh token hash per grant. */
-const LATEST_REFRESH_PREFIX = 'refresh-latest:';
+/** At least the provider's maximum grant lifetime (30 days). */
+const REFRESH_HISTORY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** Bookkeeping lifetime; matches the configured refreshTokenTTL (30 days). */
-const LATEST_REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
+export type RefreshTokenParts = { userId: string; grantId: string };
+export type IssuedRefreshToken = RefreshTokenParts & { current: boolean };
 
-/** The KV surface this module needs; `KVNamespace` satisfies it structurally. */
-export type RefreshReuseKv = {
-  get(key: string): Promise<string | null>;
-  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+/** Strongly consistent DO SQLite state, not eventually consistent Workers KV. */
+export type RefreshReuseStore = {
+  getRefreshToken(hash: string, nowIso: string): Promise<IssuedRefreshToken | null>;
+  rememberRefreshToken(hash: string, parts: RefreshTokenParts, expiresAt: string): Promise<void>;
 };
 
 export type RefreshReuseDeps = {
-  kv: RefreshReuseKv;
-  /** Revoke every token for the grant; wired to OAuthHelpers.revokeGrant. */
+  store: RefreshReuseStore;
   revokeGrant(grantId: string, userId: string): Promise<void>;
 };
 
-/** The pieces encoded in the library's `userId:grantId:secret` refresh token. */
-export type RefreshTokenParts = { userId: string; grantId: string };
+const tokenPartsSchema = z.tuple([z.string().min(1), z.string().min(1), z.string().min(1)]);
+const refreshRequestSchema = z.object({
+  grant_type: z.literal('refresh_token'),
+  refresh_token: z.string().min(1),
+});
+const issuedResponseSchema = z.object({ refresh_token: z.string().min(1) });
 
-/**
- * Split the library's refresh token format. Tokens that do not match are left
- * to the library to reject; this guard only ever adds strictness for tokens it
- * can attribute to a grant.
- */
+/** Used only on tokens issued by the library, never as proof of ownership. */
 export function parseRefreshToken(token: string): RefreshTokenParts | null {
-  const parts = token.split(':');
-  if (parts.length !== 3) return null;
-  const [userId, grantId] = parts;
-  if (!userId || !grantId) return null;
+  const parsed = tokenPartsSchema.safeParse(token.split(':'));
+  if (!parsed.success) return null;
+  const [userId, grantId] = parsed.data;
   return { userId, grantId };
 }
 
-/** Hex SHA-256 of a token. The token itself is never stored in KV. */
+export function isTokenRequest(request: Request): boolean {
+  return request.method === 'POST' && new URL(request.url).pathname === TOKEN_ENDPOINT_PATH;
+}
+
+/** The token itself is never persisted by the reuse guard. */
 export async function hashRefreshToken(token: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
   return Array.from(new Uint8Array(digest))
@@ -61,15 +46,6 @@ export async function hashRefreshToken(token: string): Promise<string> {
     .join('');
 }
 
-function latestRefreshKey(userId: string, grantId: string): string {
-  return `${LATEST_REFRESH_PREFIX}${userId}:${grantId}`;
-}
-
-/**
- * The token-endpoint error for a detected replay. Mirrors the library's own
- * error shape (`{error, error_description}`), no-cache headers, and CORS echo
- * so a browser-based public client can read it.
- */
 function reuseDetectedResponse(request: Request): Response {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -92,42 +68,37 @@ function reuseDetectedResponse(request: Request): Response {
   );
 }
 
-/**
- * Reject a refresh request whose token is not the one this server most recently
- * issued for its grant, revoking the grant first. Returns null when the request
- * is not a refresh exchange, carries no attributable token, or presents the
- * latest token (or the first token seen, before any record exists).
- */
 export async function detectRefreshTokenReuse(
   request: Request,
   deps: RefreshReuseDeps
 ): Promise<Response | null> {
-  const url = new URL(request.url);
-  if (request.method !== 'POST' || url.pathname !== TOKEN_ENDPOINT_PATH) return null;
-
+  if (!isTokenRequest(request)) return null;
+  const contentType = request.headers.get('Content-Type') ?? '';
+  if (contentType.split(';')[0]?.trim().toLowerCase() !== 'application/x-www-form-urlencoded') {
+    return null;
+  }
   const params = new URLSearchParams(await request.clone().text());
-  if (params.get('grant_type') !== 'refresh_token') return null;
-  const token = params.get('refresh_token');
-  if (!token) return null;
-  const parts = parseRefreshToken(token);
-  if (!parts) return null;
-
-  const latest = await deps.kv.get(latestRefreshKey(parts.userId, parts.grantId));
-  if (latest === null) return null;
-  if ((await hashRefreshToken(token)) === latest) return null;
-
-  await deps.revokeGrant(parts.grantId, parts.userId);
+  // Match the library's duplicate-parameter rejection, rather than acting on
+  // one interpretation of an ambiguous request.
+  if ([...params.keys()].some(key => key !== 'resource' && params.getAll(key).length > 1)) {
+    return null;
+  }
+  const parsed = refreshRequestSchema.safeParse(Object.fromEntries(params));
+  if (!parsed.success) return null;
+  const issued = await deps.store.getRefreshToken(
+    await hashRefreshToken(parsed.data.refresh_token),
+    new Date().toISOString()
+  );
+  // A mismatch with the latest token is NOT proof of replay. Only a full hash
+  // of a previously issued token authenticates the stored grant identity.
+  if (!issued || issued.current) return null;
+  await deps.revokeGrant(issued.grantId, issued.userId);
   return reuseDetectedResponse(request);
 }
 
-/**
- * Remember the refresh token the library just issued so the next refresh can be
- * checked against it. Only successful token responses that carry a refresh
- * token are recorded; the stored value is a hash, never the token.
- */
 export async function rememberIssuedRefreshToken(
   response: Response,
-  deps: Pick<RefreshReuseDeps, 'kv'>
+  deps: Pick<RefreshReuseDeps, 'store'>
 ): Promise<void> {
   if (!response.ok) return;
   let body: unknown;
@@ -136,28 +107,40 @@ export async function rememberIssuedRefreshToken(
   } catch {
     return;
   }
-  if (typeof body !== 'object' || body === null) return;
-  const token = (body as Record<string, unknown>)['refresh_token'];
-  if (typeof token !== 'string' || token.length === 0) return;
+  const parsed = issuedResponseSchema.safeParse(body);
+  if (!parsed.success) return;
+  const token = parsed.data.refresh_token;
   const parts = parseRefreshToken(token);
   if (!parts) return;
-  await deps.kv.put(latestRefreshKey(parts.userId, parts.grantId), await hashRefreshToken(token), {
-    expirationTtl: LATEST_REFRESH_TTL_SECONDS,
-  });
+  await deps.store.rememberRefreshToken(
+    await hashRefreshToken(token),
+    parts,
+    new Date(Date.now() + REFRESH_HISTORY_TTL_MS).toISOString()
+  );
 }
 
 /**
- * Wrap the library's token endpoint with the strict reuse policy: reject a
- * replayed superseded token, otherwise forward and remember the new one.
+ * Instantiate ONCE in the named OAuth Durable Object. Its queue covers the
+ * entire check → library rotation/revocation → durable history write, including
+ * external awaits. An isolate-local queue in the Worker would not be sufficient.
+ * Only token requests queue; MCP responses are never cloned or parsed here.
  */
-export async function forwardWithRefreshReuseDetection(
-  request: Request,
-  forward: (request: Request) => Promise<Response>,
-  deps: RefreshReuseDeps
-): Promise<Response> {
-  const rejected = await detectRefreshTokenReuse(request, deps);
-  if (rejected) return rejected;
-  const response = await forward(request);
-  await rememberIssuedRefreshToken(response, deps);
-  return response;
+export function createRefreshReuseHandler(deps: RefreshReuseDeps) {
+  let pending: Promise<unknown> = Promise.resolve();
+  return (
+    request: Request,
+    forward: (request: Request) => Promise<Response>
+  ): Promise<Response> => {
+    if (!isTokenRequest(request)) return forward(request);
+    const response = pending.then(async () => {
+      const rejected = await detectRefreshTokenReuse(request, deps);
+      if (rejected) return rejected;
+      const result = await forward(request);
+      await rememberIssuedRefreshToken(result, deps);
+      return result;
+    });
+    // A failed request must not poison the queue for subsequent retries.
+    pending = response.catch(() => {});
+    return response;
+  };
 }

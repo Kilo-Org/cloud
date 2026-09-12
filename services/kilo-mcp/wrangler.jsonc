@@ -42,11 +42,9 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["KiloMcpOAuthStore"] }],
 
   // KV the OAuth provider library requires (its own client/token/grant state).
-  // PRODUCTION: replace the placeholder id below with the id from
-  //   wrangler kv namespace create OAUTH_KV
-  // and record it in the PR description. Local `wrangler dev --env dev`
-  // simulates KV from the `env.dev` binding; the id there is a placeholder.
-  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
+  // Wrangler provisions this namespace on the first deploy and inherits the
+  // deployed binding on subsequent deploys. Do not use a placeholder id.
+  "kv_namespaces": [{ "binding": "OAUTH_KV" }],
 
   // Vectorize: the catalog kNN index. Vector ids are procedure paths; the
   // index is provisioned and populated by scripts/embed-catalog.ts

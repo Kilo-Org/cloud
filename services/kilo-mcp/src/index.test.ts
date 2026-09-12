@@ -57,12 +57,13 @@ function makeHandler(fetchImpl?: typeof fetch) {
 async function rpc(
   handler: ReturnType<typeof makeHandler>,
   body: unknown,
-  auth: ForwardedAuth = AUTH
+  auth: ForwardedAuth = AUTH,
+  headers: Record<string, string> = {}
 ): Promise<Response> {
   return handler(
     new Request('https://kilo-mcp.test/mcp', {
       method: 'POST',
-      headers: JSON_HEADERS,
+      headers: { ...JSON_HEADERS, ...headers },
       body: JSON.stringify(body),
     }),
     auth
@@ -368,19 +369,23 @@ describe('tools/call call', () => {
           headers: { 'Content-Type': 'application/json' },
         })
     );
+    const handler = vi.fn(makeHandler(fetchImpl));
     const response = await rpc(
-      makeHandler(fetchImpl),
+      handler,
       {
         jsonrpc: '2.0',
         id: 10,
         method: 'tools/call',
         params: { name: 'call', arguments: { path: 'organizations.list' } },
       },
-      AUTH
+      AUTH,
+      { [ORGANIZATION_ID_HEADER]: 'org-attacker', Authorization: 'Bearer caller-mcp-token' }
     );
     expect(response.status).toBe(200);
+    expect(handler.mock.calls[0]?.[0].headers.get(ORGANIZATION_ID_HEADER)).toBe('org-attacker');
     const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect((init.headers as Record<string, string>)[ORGANIZATION_ID_HEADER]).toBe('org-1');
+    expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer kilo-token');
   });
 
   it('non-retryable: unknown path is a JSON-RPC error before any upstream request', async () => {
@@ -499,6 +504,74 @@ describe('tools/call call', () => {
 describe('OAuthProvider transport (library auth)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it.each([false, true])(
+    'emits anonymous OAuth error analytics without changing the response (capture fails: %s)',
+    async captureFails => {
+      const captures: Record<string, unknown>[] = [];
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (_url: string, init: RequestInit) => {
+          captures.push(
+            JSON.parse(typeof init.body === 'string' ? init.body : '{}') as Record<string, unknown>
+          );
+          if (captureFails) throw new Error('capture unavailable');
+          return Response.json({});
+        })
+      );
+      const promises: Promise<unknown>[] = [];
+      const response = await worker.fetch(
+        new Request('https://kilo-mcp.test/mcp', { headers: { Authorization: 'Bearer forged' } }),
+        {
+          NEXT_PUBLIC_POSTHOG_KEY: 'phc_test',
+          OAUTH_KV: { get: async () => null },
+        } as unknown as Env,
+        { ...TEST_CTX, waitUntil: promise => promises.push(promise) }
+      );
+      expect(response.status).toBe(401);
+      await Promise.all(promises);
+      expect(captures).toHaveLength(1);
+      expect(captures[0]).toMatchObject({
+        event: 'kilo_mcp_oauth_sign_in_failed',
+        distinct_id: ANONYMOUS_DISTINCT_ID,
+        properties: { phase: 'failed', reason: 'invalid_token', $process_person_profile: false },
+      });
+      expect(JSON.stringify(captures)).not.toContain('forged');
+    }
+  );
+
+  it('keeps concurrent provider errors bound to their own request analytics', async () => {
+    const captures: Record<string, unknown>[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        captures.push(
+          JSON.parse(typeof init.body === 'string' ? init.body : '{}') as Record<string, unknown>
+        );
+        return Response.json({});
+      })
+    );
+    const pending = [[], []] as Promise<unknown>[][];
+    await Promise.all(
+      pending.map(async (promises, index) => {
+        const response = await worker.fetch(
+          new Request('https://kilo-mcp.test/mcp', { headers: { Authorization: 'Bearer forged' } }),
+          {
+            NEXT_PUBLIC_POSTHOG_KEY: `phc_request_${index}`,
+            OAUTH_KV: { get: async () => null },
+          } as unknown as Env,
+          { ...TEST_CTX, waitUntil: promise => promises.push(promise) }
+        );
+        expect(response.status).toBe(401);
+        expect(promises).toHaveLength(1);
+        await Promise.all(promises);
+      })
+    );
+    expect(captures.map(capture => capture['api_key']).sort()).toEqual([
+      'phc_request_0',
+      'phc_request_1',
+    ]);
   });
 
   it('GET /mcp with no bearer returns the library RFC 9728 challenge', async () => {

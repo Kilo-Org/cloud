@@ -632,7 +632,7 @@ describe('MarkdownRenderer list marker alignment', () => {
     const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
     const { View: StubView } = await import('react-native');
     const renderer = new RendererClass(palette, true, {});
-    const styles = getMarkdownStyles(palette);
+    const styles = getMarkdownStyles(palette, false);
     function Host() {
       const elements = useMarkdown(value, { styles, renderer, colorScheme: 'light' });
       return createElement(StubView, null, elements);
@@ -789,7 +789,7 @@ describe('MarkdownRenderer nested table fallback', () => {
     const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
     const { View: StubView } = await import('react-native');
     const renderer = new RendererClass(palette, true, {});
-    const styles = getMarkdownStyles(palette);
+    const styles = getMarkdownStyles(palette, false);
     function Host() {
       const elements = useMarkdown('> | a | b |\n> |---|---|\n> | 1 | 2 |', {
         styles,

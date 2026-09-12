@@ -15,6 +15,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  I18nManager,
   type LayoutChangeEvent,
   Modal,
   Pressable,
@@ -430,13 +431,14 @@ function MarkdownTableBody({
   const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const { width: windowWidth } = useWindowDimensions();
+  const isRTL = I18nManager.isRTL;
 
   const columnWidth = Math.max(
     MODAL_COLUMN_MIN_WIDTH,
     Math.floor((windowWidth - MODAL_HORIZONTAL_PADDING * 2) / Math.max(columnCount, 1))
   );
 
-  const styles = useMemo(() => getMarkdownStyles(palette), [palette]);
+  const styles = useMemo(() => getMarkdownStyles(palette, isRTL), [palette, isRTL]);
 
   const theme = useMemo(
     () => ({

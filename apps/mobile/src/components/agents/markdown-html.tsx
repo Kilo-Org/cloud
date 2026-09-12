@@ -4,6 +4,7 @@ import { marked, type Token } from 'marked';
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
+  I18nManager,
   Text,
   useWindowDimensions,
 } from 'react-native';
@@ -201,14 +202,15 @@ export function MarkdownHtml({
   onPressLink,
 }: Readonly<MarkdownHtmlProps>) {
   const { width } = useWindowDimensions();
+  const isRTL = I18nManager.isRTL;
   const source = useMemo(() => ({ html }), [html]);
   const baseStyle = useMemo(
     () => ({ color: palette.textColor, fontSize: 16, lineHeight: 24 }),
     [palette]
   );
   const tagsStyles = useMemo(
-    () => ({ ...getMarkdownHeadingStyles(palette), ...getMarkdownHtmlTagStyles(palette) }),
-    [palette]
+    () => ({ ...getMarkdownHeadingStyles(palette), ...getMarkdownHtmlTagStyles(palette, isRTL) }),
+    [palette, isRTL]
   );
   const renderersProps = useMemo<Partial<RenderersProps>>(
     () => ({

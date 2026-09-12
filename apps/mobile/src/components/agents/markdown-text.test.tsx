@@ -271,10 +271,27 @@ describe('MarkdownText HTML routing', () => {
 
     expect(htmlProps(renderer).tagsStyles).toMatchObject({
       a: { color: '#111111', textDecorationLine: 'underline' },
-      blockquote: { borderStartColor: '#cccccc', borderStartWidth: 3, paddingStart: 12 },
+      blockquote: { borderLeftColor: '#cccccc', borderLeftWidth: 3, paddingLeft: 12 },
       p: { marginVertical: 2, paddingVertical: 0 },
       strong: { color: '#111111', fontWeight: '700' },
     });
+  });
+
+  it('puts the HTML blockquote start rule on the right edge in RTL', async () => {
+    rnStub.I18nManager.isRTL = true;
+    try {
+      const renderer = await mount(<MarkdownText value="> <strong>quoted</strong>" />);
+
+      expect(htmlProps(renderer).tagsStyles.blockquote).toMatchObject({
+        borderRightColor: '#cccccc',
+        borderRightWidth: 3,
+        paddingRight: 12,
+      });
+      expect(htmlProps(renderer).tagsStyles.blockquote).not.toHaveProperty('borderLeftWidth');
+      expect(htmlProps(renderer).tagsStyles.blockquote).not.toHaveProperty('paddingLeft');
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+    }
   });
 
   it('does not match raw HTML inside a preceding code span', async () => {

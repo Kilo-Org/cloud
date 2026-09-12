@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useColorScheme, View } from 'react-native';
+import { I18nManager, useColorScheme, View } from 'react-native';
 import { useMarkdown } from 'react-native-marked';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -142,8 +142,9 @@ function MarkdownSegment({
   onPressLink,
 }: Readonly<MarkdownSegmentProps>) {
   const colorScheme = useColorScheme();
+  const isRTL = I18nManager.isRTL;
 
-  const styles = useMemo(() => getMarkdownStyles(palette), [palette]);
+  const styles = useMemo(() => getMarkdownStyles(palette, isRTL), [palette, isRTL]);
 
   const theme = useMemo(
     () => ({

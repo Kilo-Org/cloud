@@ -48,7 +48,7 @@ describe('markdown palette', () => {
 
   it('keeps list marker boxes free of a top margin so markers align with the first line', () => {
     for (const variant of ['assistant', 'user', 'kilo-chat-user'] as const) {
-      const styles = getMarkdownStyles(getPalette(variant, colors));
+      const styles = getMarkdownStyles(getPalette(variant, colors), false);
 
       // react-native-marked applies `list` to each item's marker box View;
       // any top margin pushes the marker below the first text line.

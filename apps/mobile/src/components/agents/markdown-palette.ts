@@ -114,14 +114,21 @@ export function getMarkdownHeadingStyles(palette: MarkdownPalette) {
   };
 }
 
-export function getMarkdownHtmlTagStyles(palette: MarkdownPalette) {
+export function getMarkdownHtmlTagStyles(palette: MarkdownPalette, isRTL: boolean) {
   const { textColor, borderColor } = palette;
+  // `@native-html/css-processor` (react-native-render-html) rejects the logical
+  // `borderStartWidth`/`borderStartColor`/`paddingStart` properties with a
+  // warning and drops them, so the quote loses its rule entirely. Mirror the
+  // start edge onto physical properties chosen from the active layout
+  // direction instead; `I18nManager.isRTL` is stable for the app's lifetime
+  // (the app reloads on a direction change).
+  const blockquoteStart = isRTL
+    ? { borderRightWidth: 3, borderRightColor: borderColor, paddingRight: 12 }
+    : { borderLeftWidth: 3, borderLeftColor: borderColor, paddingLeft: 12 };
   return {
     a: { color: textColor, fontStyle: 'normal' as const, textDecorationLine: 'underline' as const },
     blockquote: {
-      borderStartWidth: 3,
-      borderStartColor: borderColor,
-      paddingStart: 12,
+      ...blockquoteStart,
       marginVertical: 4,
     },
     p: { marginVertical: 2, paddingVertical: 0 },
@@ -132,9 +139,9 @@ export function getMarkdownHtmlTagStyles(palette: MarkdownPalette) {
 // `react-native-marked`'s `useMarkdown` takes an inline styles map rather than
 // `className`, so we cannot use NativeWind here. Centralizing style creation
 // keeps both variants in sync and makes the color choices reviewable.
-export function getMarkdownStyles(palette: MarkdownPalette): MarkedStyles {
+export function getMarkdownStyles(palette: MarkdownPalette, isRTL: boolean): MarkedStyles {
   const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
-  const htmlTagStyles = getMarkdownHtmlTagStyles(palette);
+  const htmlTagStyles = getMarkdownHtmlTagStyles(palette, isRTL);
 
   return {
     text: { color: textColor, fontSize: 16, lineHeight: 24 },

@@ -29,6 +29,12 @@ export type ProviderReviewCapability = {
 export type ProviderReviewCapabilities = {
   /** Whether the viewer can post a comment on the PR/MR. */
   canComment: boolean;
+  /**
+   * The provider can post a top-level conversation (issue/note) comment on
+   * the review object — distinct from `canComment`, which covers inline
+   * review comments.
+   */
+  canCommentConversation: boolean;
   /** The review events the provider accepts, in display order. */
   reviewEvents: ProviderReviewEvent[];
   canResolveThreads: boolean;
@@ -43,6 +49,7 @@ const SUPPORTED: ProviderReviewCapability = { supported: true, reason: '' };
 
 export const GITHUB_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
   canComment: true,
+  canCommentConversation: true,
   reviewEvents: ['approve', 'request_changes', 'comment'],
   canResolveThreads: true,
   canMerge: true,
@@ -53,6 +60,7 @@ export const GITHUB_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
 
 export const GITLAB_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
   canComment: true,
+  canCommentConversation: true,
   reviewEvents: ['approve', 'request_changes', 'comment'],
   canResolveThreads: true,
   canMerge: true,
@@ -63,6 +71,7 @@ export const GITLAB_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
 
 export const BITBUCKET_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
   canComment: true,
+  canCommentConversation: true,
   reviewEvents: ['approve', 'request_changes', 'comment'],
   canResolveThreads: true,
   canMerge: true,

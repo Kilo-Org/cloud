@@ -52,6 +52,16 @@ describe('PROVIDER_REVIEW_CAPABILITIES', () => {
       }
     }
   });
+
+  it('lets every provider post a top-level conversation comment, as a boolean', () => {
+    for (const platform of PLATFORMS) {
+      const capabilities = PROVIDER_REVIEW_CAPABILITIES[platform];
+      expect(typeof capabilities.canCommentConversation).toBe('boolean');
+      // All three providers carry a real top-level write path: GitHub via
+      // addIssueComment, GitLab/Bitbucket via addComment with no anchor.
+      expect(capabilities.canCommentConversation).toBe(true);
+    }
+  });
 });
 
 describe('providerPrTerm', () => {

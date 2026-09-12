@@ -80,6 +80,7 @@ export const GITLAB_AUTO_MERGE_NO_PIPELINE_REASON =
  */
 export const GITLAB_MR_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
   canComment: true,
+  canCommentConversation: true,
   reviewEvents: ['approve', 'comment'],
   canResolveThreads: true,
   canMerge: true,

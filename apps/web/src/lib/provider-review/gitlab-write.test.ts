@@ -352,6 +352,12 @@ describe('submitReview', () => {
     expect(GITLAB_MR_REVIEW_CAPABILITIES.reviewEvents).toEqual(['approve', 'comment']);
     expect(GITLAB_MR_REVIEW_CAPABILITIES.reviewEvents).not.toContain('request_changes');
   });
+
+  it('the capability list exposes conversation-comment support as true', () => {
+    // The MR has a real top-level note path (addComment without an anchor),
+    // so the mobile conversation CTA gates on this flag.
+    expect(GITLAB_MR_REVIEW_CAPABILITIES.canCommentConversation).toBe(true);
+  });
 });
 
 describe('submitReview with an inline comment batch', () => {

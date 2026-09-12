@@ -13,7 +13,10 @@ import { Mic, SearchX } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LANGUAGE_ENDONYMS, LANGUAGE_ENGLISH_NAMES, SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { voiceInputLanguageDisplayName } from '@/lib/voice-input/voice-input-language';
+import {
+  reconcileVoiceInputLanguageTag,
+  voiceInputLanguageDisplayName,
+} from '@/lib/voice-input/voice-input-language';
 import {
   useVoiceInputLanguage,
   useVoiceInputLanguageLoaded,
@@ -166,7 +169,17 @@ function DeviceVoiceLanguages({
       description: tag,
     })),
   ];
-  return <VoiceLanguageList options={options} chosen={chosen} query={query} onSelect={onSelect} />;
+  // The stored tag may have been chosen in gateway mode (an app language), so
+  // map it onto the device's locales before checking a row: otherwise no row
+  // is checked while the settings row still names a language.
+  return (
+    <VoiceLanguageList
+      options={options}
+      chosen={reconcileVoiceInputLanguageTag(chosen, languages)}
+      query={query}
+      onSelect={onSelect}
+    />
+  );
 }
 
 /**
@@ -212,7 +225,12 @@ export function VoiceLanguagePickerSheet() {
         })),
       ];
       content = (
-        <VoiceLanguageList options={options} chosen={chosen} query={query} onSelect={onSelect} />
+        <VoiceLanguageList
+          options={options}
+          chosen={reconcileVoiceInputLanguageTag(chosen, SUPPORTED_LANGUAGES)}
+          query={query}
+          onSelect={onSelect}
+        />
       );
     } else {
       content = <DeviceVoiceLanguages chosen={chosen} query={query} onSelect={onSelect} />;

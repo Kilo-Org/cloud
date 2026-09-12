@@ -278,6 +278,34 @@ describe('useVoiceInput integration', () => {
         expect(startOptions.languageTag).toBe('nl-NL');
       });
 
+      it('reconciles a gateway language tag onto the device locale before starting', async () => {
+        const { actions } = buildActions({ languageTag: 'zh-Hans', userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('granted');
+        getSupportedLocalesMock.mockResolvedValue({
+          locales: ['zh-CN', 'en-US'],
+          installedLocales: ['zh-CN'],
+        });
+
+        await actions.toggle();
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.languageTag).toBe('zh-CN');
+      });
+
+      it('reconciles a device locale onto the app language in gateway mode without a device fetch', async () => {
+        const { actions } = buildActions({ languageTag: 'de-DE', userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
+
+        await actions.toggle();
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.languageTag).toBe('de');
+        expect(getSupportedLocalesMock).not.toHaveBeenCalled();
+      });
+
       it('resolves the app/device language when no language choice is persisted', async () => {
         const { actions } = buildActions({ languageTag: null });
         mockController.setSnapshot(idleSnapshot());

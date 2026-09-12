@@ -1,7 +1,7 @@
 import { getLocales } from 'expo-localization';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 
-import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
+import { LANGUAGE_ENDONYMS, SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { resolveSupportedLanguageTag } from '@/i18n/resolve-language';
 
 function normalizeLocale(tag: string): string {
@@ -120,6 +120,26 @@ export function pickSupportedVoiceInputLanguageTag(
   return null;
 }
 
+/**
+ * Map a stored voice-input language tag onto the option list of the mode that
+ * is in effect now. A choice is stored as one tag, but gateway mode offers the
+ * app's languages (`de`) while device mode offers the OS locales (`de-DE`), so
+ * a tag saved in the other mode matches no row: the picker shows nothing
+ * checked and the tag cannot reach the recogniser unchanged. An exact match
+ * wins (case/`_`-insensitive), then the same-language fallback inside
+ * `pickSupportedVoiceInputLanguageTag`; `null` — the Automatic row — means no
+ * option shares the stored tag's language.
+ */
+export function reconcileVoiceInputLanguageTag(
+  storedTag: string | null,
+  optionTags: readonly string[]
+): string | null {
+  if (storedTag === null) {
+    return null;
+  }
+  return pickSupportedVoiceInputLanguageTag([storedTag], optionTags);
+}
+
 let cachedVoiceRecognitionLocales: {
   locales: readonly string[];
   installedLocales: readonly string[];
@@ -187,6 +207,41 @@ export async function resolveVoiceInputStartLanguageTag(appLanguage: string): Pr
   }
 
   return pickSupportedVoiceInputLanguageTag(preferredTags, supported.locales) ?? appLanguage;
+}
+
+/**
+ * Resolve the tag a session actually starts with. A persisted tag wins only
+ * when it maps onto the active mode's list (`reconcileVoiceInputLanguageTag`);
+ * otherwise the app/device language is resolved fresh. This is what keeps a
+ * tag chosen in the other mode — a gateway `zh-Hans` used in device mode —
+ * from reaching the recogniser and failing with `language-not-supported`.
+ * Gateway mode reconciles against the static app list, so it never fetches the
+ * device's locales. A failed or empty device answer is no evidence the stored
+ * tag is wrong, so device mode keeps it rather than discarding an explicit
+ * choice on a probe that returned nothing.
+ */
+export async function resolveVoiceInputSessionLanguageTag(
+  storedTag: string | null,
+  mode: 'device' | 'gateway',
+  appLanguage: string
+): Promise<string> {
+  if (storedTag === null) {
+    return resolveVoiceInputStartLanguageTag(appLanguage);
+  }
+
+  // Gateway mode never fetches the device's locales: it reconciles against the
+  // static app list only.
+  const deviceLocales = mode === 'device' ? await getVoiceRecognitionLocales() : null;
+  // A failed or empty device answer cannot prove the tag wrong, so it wins:
+  // discarding an explicit choice on a probe that returned nothing would
+  // silently drop the user's selection.
+  if (mode === 'device' && (deviceLocales === null || deviceLocales.locales.length === 0)) {
+    return storedTag;
+  }
+
+  const optionTags = deviceLocales === null ? SUPPORTED_LANGUAGES : deviceLocales.locales;
+  const reconciled = reconcileVoiceInputLanguageTag(storedTag, optionTags);
+  return reconciled ?? resolveVoiceInputStartLanguageTag(appLanguage);
 }
 
 /**

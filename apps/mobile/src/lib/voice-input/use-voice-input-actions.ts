@@ -17,7 +17,7 @@ import {
 import {
   invalidateVoiceRecognitionLocalesCache,
   isVoiceInputLanguageInstalledOnDevice,
-  resolveVoiceInputStartLanguageTag,
+  resolveVoiceInputSessionLanguageTag,
   voiceInputLanguageDisplayName,
 } from './voice-input-language';
 import {
@@ -171,8 +171,16 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
       return;
     }
 
-    const chosen = getLanguageTag?.() ?? null;
-    const languageTag = chosen ?? (await resolveVoiceInputStartLanguageTag(i18n.language));
+    const gatewayMode = isGatewayTranscriptionEnabled();
+    // A persisted tag is reconciled against the active mode's list before it
+    // starts: a tag saved in the other mode (gateway `zh-Hans` in device mode)
+    // matches no option and would fail with `language-not-supported`.
+    const storedTag = getLanguageTag?.() ?? null;
+    const languageTag = await resolveVoiceInputSessionLanguageTag(
+      storedTag,
+      gatewayMode ? 'gateway' : 'device',
+      i18n.language
+    );
 
     const startWith = async (requiresOnDeviceRecognition: boolean): Promise<void> => {
       const startOptions: VoiceInputStartOptions = {
@@ -186,7 +194,7 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
       await controller.start(startOptions);
     };
 
-    if (isGatewayTranscriptionEnabled()) {
+    if (gatewayMode) {
       // Gateway mode: the switch itself is the consent to send the recording
       // to the Kilo gateway, so no OS network-recognition disclosure applies.
       // The chosen model is resolved by the engine (the stored choice, else

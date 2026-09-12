@@ -210,6 +210,57 @@ describe('VoiceLanguagePickerSheet', () => {
     renderer.unmount();
   });
 
+  it('checks the device locale that shares the stored gateway language', async () => {
+    // A gateway choice (`zh-Hans`) is an app tag, but device mode offers OS
+    // locales; the same-language match must be the one checked.
+    preferenceState.language = 'zh-Hans';
+    deviceState.current = {
+      languages: ['zh-CN', 'de-DE'],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn<() => void>(),
+    };
+    const renderer = await mountSheet();
+
+    const rows = findByType(renderer.root, 'ChoiceRow');
+    const selected = rows.filter(row => row.props.selected === true);
+    expect(selected).toHaveLength(1);
+    expect(selected[0]?.props).toMatchObject({ description: 'zh-CN' });
+
+    renderer.unmount();
+  });
+
+  it('checks the app language that shares the stored device locale in gateway mode', async () => {
+    preferenceState.gatewayEnabled = true;
+    preferenceState.language = 'de-DE';
+    const renderer = await mountSheet();
+
+    const rows = findByType(renderer.root, 'ChoiceRow');
+    const selected = rows.filter(row => row.props.selected === true);
+    expect(selected).toHaveLength(1);
+    expect(selected[0]?.props).toMatchObject({ label: 'Deutsch', description: 'German' });
+
+    renderer.unmount();
+  });
+
+  it('checks Automatic when the stored tag has no option in the active mode', async () => {
+    preferenceState.language = 'fil-PH';
+    deviceState.current = {
+      languages: ['de-DE'],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn<() => void>(),
+    };
+    const renderer = await mountSheet();
+
+    const rows = findByType(renderer.root, 'ChoiceRow');
+    const selected = rows.filter(row => row.props.selected === true);
+    expect(selected).toHaveLength(1);
+    expect(selected[0]?.props.label).toBe('Automatic');
+
+    renderer.unmount();
+  });
+
   it('shows the retryable error state and retries through refetch', async () => {
     const refetch = vi.fn<() => void>();
     deviceState.current = {

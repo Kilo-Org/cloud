@@ -142,6 +142,24 @@ describe('provider OAuth attempts', () => {
       state: 'state-started',
       purpose: 'provider_install',
     });
+    for (const platform of ['linear', 'discord']) {
+      await db.insert(platform_integrations).values({
+        owned_by_organization_id: organizationB.id,
+        platform,
+        integration_type: 'oauth',
+        platform_installation_id: `${platform}-existing`,
+        platform_account_id: `${platform}-existing`,
+        integration_status: 'active',
+        installed_at: new Date().toISOString(),
+      });
+      await expect(
+        connectVerifiedGitHubInstallation(
+          { type: 'org', id: organizationB.id },
+          { ...github, kiloUserId: destinationUser.id }
+        )
+      ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+      await db.delete(platform_integrations).where(eq(platform_integrations.platform, platform));
+    }
     await expect(
       connectVerifiedGitHubInstallation(
         { type: 'org', id: organizationB.id },

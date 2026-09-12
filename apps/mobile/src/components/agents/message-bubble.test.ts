@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import type * as React from 'react';
 
 import type * as PartTypes from './part-types';
 import {
@@ -15,6 +16,13 @@ import {
 
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
+
+// The harness invokes the memoized component directly (no React renderer), so
+// the identity `useCallback` mock keeps the stabilized handler callable there.
+vi.mock('react', async importOriginal => ({
+  ...(await importOriginal<typeof React>()),
+  useCallback: <T>(fn: T) => fn,
+}));
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();

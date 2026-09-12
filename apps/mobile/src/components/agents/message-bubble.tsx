@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
@@ -78,9 +78,13 @@ function MessageBubbleImpl({
     canOpenDetails: onLongPressDetails !== undefined,
   });
 
-  const handleLongPress = () => {
+  // Stable identity matters: this handler becomes `onLongPressCode` in the
+  // markdown renderer's useMemo deps, so an inline function would rebuild the
+  // renderer (and re-parse the fence markdown) on every bubble render rather
+  // than only when the markdown source changes.
+  const handleLongPress = useCallback(() => {
     onLongPressDetails?.(message);
-  };
+  }, [message, onLongPressDetails]);
 
   // Keep actions on the separate host so interactive descendants remain reachable.
   // Accessible Copy retains the existing ActionSheet path; details matches long-press.

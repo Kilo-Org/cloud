@@ -7,6 +7,7 @@ import {
   pickSupportedVoiceInputLanguageTag,
   resolveVoiceInputStartLanguageTag,
   voiceInputLanguageDisplayName,
+  voiceInputLanguageEnglishName,
 } from './voice-input-language';
 
 const localizationMock = vi.hoisted(() => ({
@@ -334,5 +335,24 @@ describe('voiceInputLanguageDisplayName', () => {
 
   it('returns the raw tag for a language the app does not ship', () => {
     expect(voiceInputLanguageDisplayName('xx-LOL')).toBe('xx-LOL');
+  });
+});
+
+describe('voiceInputLanguageEnglishName', () => {
+  it('names the locale in English so a search for "german" finds de-DE', () => {
+    expect(voiceInputLanguageEnglishName('de-DE')).toBe('German');
+  });
+
+  it('matches the full tag, so pt-BR names the Brazilian variant', () => {
+    expect(voiceInputLanguageEnglishName('pt-BR')).toBe('Portuguese (Brazil)');
+  });
+
+  it('maps Chinese service tags onto the English script names', () => {
+    expect(voiceInputLanguageEnglishName('zh-CN')).toBe('Chinese (Simplified)');
+    expect(voiceInputLanguageEnglishName('zh-TW')).toBe('Chinese (Traditional)');
+  });
+
+  it('returns undefined for a language the app does not ship', () => {
+    expect(voiceInputLanguageEnglishName('xx-LOL')).toBeUndefined();
   });
 });

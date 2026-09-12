@@ -1,147 +1,19 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as transcription-model-picker-sheet.mounted.test.tsx) */
-import { createElement, Fragment, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
-import { VoiceLanguagePickerSheet } from '@/components/voice-language-picker-sheet';
-
-// ── Hoisted mocks ──────────────────────────────────────────────────────────
-
-const routerBack = vi.hoisted(() => vi.fn());
-
-const preferenceState = vi.hoisted(() => ({
-  gatewayEnabled: false,
-  gatewayLoaded: true,
-  language: null as string | null,
-  languageLoaded: true,
-  writeLanguage: vi.fn<(tag: string | null) => void>(),
-}));
-
-const deviceState = vi.hoisted(() => ({
-  current: {
-    languages: [] as string[],
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn<() => void>(),
-  },
-}));
-
-const useVoiceRecognitionLanguagesMock = vi.hoisted(() => vi.fn());
-
-vi.mock('@/lib/voice-input/gateway/gateway-transcription-preference', () => ({
-  useGatewayTranscriptionPreference: () => ({
-    gatewayTranscriptionEnabled: preferenceState.gatewayEnabled,
-    hasLoaded: preferenceState.gatewayLoaded,
-    setGatewayTranscriptionEnabled: vi.fn<(value: boolean) => void>(),
-  }),
-}));
-
-vi.mock('@/lib/voice-input/voice-input-language-preference', () => ({
-  useVoiceInputLanguage: () => preferenceState.language,
-  useVoiceInputLanguageLoaded: () => preferenceState.languageLoaded,
-  writeVoiceInputLanguage: preferenceState.writeLanguage,
-}));
-
-vi.mock('@/lib/voice-input/use-voice-recognition-languages', () => ({
-  useVoiceRecognitionLanguages: useVoiceRecognitionLanguagesMock,
-}));
-
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: routerBack, push: vi.fn() }),
-}));
-// The sheet reaches `voiceInputLanguageDisplayName`, which imports both native
-// modules; mock them so the node environment never loads the native packages.
-vi.mock('expo-localization', () => ({
-  getLocales: () => [{ languageTag: 'en-US' }],
-}));
-vi.mock('expo-speech-recognition', () => ({
-  ExpoSpeechRecognitionModule: { getSupportedLocales: vi.fn() },
-}));
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#888888' }),
-}));
-
-// FlatList renders through a callback, so a host-string mock would drop every
-// row. This mock calls the render props so the row assertions still see rows.
-const flatListMock = vi.hoisted(
-  () =>
-    ({
-      data,
-      renderItem,
-      keyExtractor,
-      ListFooterComponent,
-    }: {
-      data: readonly unknown[];
-      renderItem: (info: { item: unknown; index: number }) => ReactNode;
-      keyExtractor: (item: unknown, index: number) => string;
-      ListFooterComponent?: ReactNode;
-    }) => {
-      const rows = data.map((item, index) =>
-        createElement(Fragment, { key: keyExtractor(item, index) }, renderItem({ item, index }))
-      );
-      return createElement('FlatList', null, ...rows, ListFooterComponent);
-    }
-);
-vi.mock('react-native', () => ({
-  FlatList: flatListMock,
-  View: 'View',
-  TextInput: 'TextInput',
-  I18nManager: { isRTL: false },
-}));
-
-vi.mock('@/components/picker-sheet', () => ({
-  PickerSheet: (props: { children?: ReactNode }) =>
-    createElement('PickerSheet', props, props.children),
-}));
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({ Mic: 'Mic', SearchX: 'SearchX' }));
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function findByType(root: TestRenderer.ReactTestInstance, type: string) {
-  return root.findAll(node => typeof node.type === 'string' && node.type === type);
-}
-
-async function mountSheet(): Promise<TestRenderer.ReactTestRenderer> {
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  await act(async () => {
-    ref.current = TestRenderer.create(createElement(VoiceLanguagePickerSheet));
-    await Promise.resolve();
-  });
-  const renderer = ref.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
-
-// ── Tests ──────────────────────────────────────────────────────────────────
+import {
+  deviceState,
+  findByType,
+  mountSheet,
+  preferenceState,
+  resetVoiceLanguagePickerMocks,
+  routerBack,
+  useVoiceRecognitionLanguagesMock,
+} from '@/components/voice-language-picker-sheet.test-helpers';
 
 describe('VoiceLanguagePickerSheet', () => {
-  beforeEach(() => {
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    routerBack.mockClear();
-    preferenceState.writeLanguage.mockClear();
-    preferenceState.gatewayEnabled = false;
-    preferenceState.gatewayLoaded = true;
-    preferenceState.language = null;
-    preferenceState.languageLoaded = true;
-    deviceState.current = {
-      languages: [],
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn<() => void>(),
-    };
-    useVoiceRecognitionLanguagesMock.mockClear();
-    useVoiceRecognitionLanguagesMock.mockImplementation(() => deviceState.current);
-  });
+  beforeEach(resetVoiceLanguagePickerMocks);
 
   it('lists the app languages in gateway mode and writes the pressed tag', async () => {
     preferenceState.gatewayEnabled = true;

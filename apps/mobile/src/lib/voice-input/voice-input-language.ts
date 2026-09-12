@@ -1,7 +1,7 @@
 import { getLocales } from 'expo-localization';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 
-import { LANGUAGE_ENDONYMS, SUPPORTED_LANGUAGES } from '@/i18n/languages';
+import { LANGUAGE_ENDONYMS, LANGUAGE_ENGLISH_NAMES, SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { resolveSupportedLanguageTag } from '@/i18n/resolve-language';
 
 function normalizeLocale(tag: string): string {
@@ -274,6 +274,18 @@ export async function isVoiceInputLanguageInstalledOnDevice(languageTag: string)
 export function voiceInputLanguageDisplayName(languageTag: string): string {
   const language = resolveSupportedLanguageTag([{ languageTag }]);
   return language ? LANGUAGE_ENDONYMS[language] : languageTag;
+}
+
+/**
+ * The English name of a recognition language, so the picker's search matches
+ * the name a user is likelier to know than the endonym or the raw tag
+ * (`de-DE` → "German"). Mirrors `voiceInputLanguageDisplayName`: resolves the
+ * whole tag first, and returns `undefined` for a language the app does not
+ * ship so callers add no match term rather than the raw tag twice.
+ */
+export function voiceInputLanguageEnglishName(languageTag: string): string | undefined {
+  const language = resolveSupportedLanguageTag([{ languageTag }]);
+  return language ? LANGUAGE_ENGLISH_NAMES[language] : undefined;
 }
 
 /**

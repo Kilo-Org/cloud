@@ -11,11 +11,14 @@ import { QueryError } from '@/components/query-error';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Mic, SearchX } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LANGUAGE_ENDONYMS, LANGUAGE_ENGLISH_NAMES, SUPPORTED_LANGUAGES } from '@/i18n/languages';
+import { foldForSearch } from '@/i18n/fold-for-search';
+import { languageRows } from '@/i18n/language-rows';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   reconcileVoiceInputLanguageTag,
   voiceInputLanguageDisplayName,
+  voiceInputLanguageEnglishName,
 } from '@/lib/voice-input/voice-input-language';
 import {
   useVoiceInputLanguage,
@@ -54,6 +57,8 @@ type VoiceLanguageOption = {
   tag: string | null;
   label: string;
   description: string;
+  /** Extra terms the search matches, e.g. the English name in device mode. */
+  searchTerms: readonly string[];
 };
 
 function automaticOption(t: TFunction): VoiceLanguageOption {
@@ -63,16 +68,18 @@ function automaticOption(t: TFunction): VoiceLanguageOption {
     // Automatic resolves from the active app language and the device's
     // locales, so the device wording names what the row actually does.
     description: t('language.deviceLanguage'),
+    searchTerms: [],
   };
 }
 
 function matchesQuery(option: VoiceLanguageOption, query: string): boolean {
-  const needle = query.trim().toLowerCase();
+  // Fold like the app language picker so "espanol" finds "Español".
+  const needle = foldForSearch(query.trim());
   if (needle.length === 0) {
     return true;
   }
-  return (
-    option.label.toLowerCase().includes(needle) || option.description.toLowerCase().includes(needle)
+  return [option.label, option.description, ...option.searchTerms].some(value =>
+    foldForSearch(value).includes(needle)
   );
 }
 
@@ -163,11 +170,17 @@ function DeviceVoiceLanguages({
 
   const options: VoiceLanguageOption[] = [
     automaticOption(t),
-    ...languages.map(tag => ({
-      tag,
-      label: voiceInputLanguageDisplayName(tag),
-      description: tag,
-    })),
+    ...languages.map(tag => {
+      const englishName = voiceInputLanguageEnglishName(tag);
+      return {
+        tag,
+        label: voiceInputLanguageDisplayName(tag),
+        description: tag,
+        // The endonym and the tag are already searchable; the English name is
+        // what a user who does not read the native name will type.
+        searchTerms: englishName ? [englishName] : [],
+      };
+    }),
   ];
   // The stored tag may have been chosen in gateway mode (an app language), so
   // map it onto the device's locales before checking a row: otherwise no row
@@ -216,12 +229,18 @@ export function VoiceLanguagePickerSheet() {
   let content: ReactNode = <SkeletonRows />;
   if (gatewayTranscriptionLoaded && chosenLoaded) {
     if (gatewayTranscriptionEnabled) {
+      // The canonical app language picker's list: every supported language
+      // collated by endonym, with the English name as the secondary line.
       const options: VoiceLanguageOption[] = [
         automaticOption(t),
-        ...SUPPORTED_LANGUAGES.map(tag => ({
-          tag,
-          label: LANGUAGE_ENDONYMS[tag],
-          description: LANGUAGE_ENGLISH_NAMES[tag],
+        ...languageRows('').map(row => ({
+          tag: row.tag,
+          label: row.endonym,
+          description: row.englishName,
+          // The row already shows the endonym and English name; the tag is
+          // searchable too, so "zh-Hant" finds a language whose endonym the
+          // user cannot type.
+          searchTerms: [row.tag],
         })),
       ];
       content = (

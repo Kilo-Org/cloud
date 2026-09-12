@@ -132,9 +132,20 @@ vi.mock('@/components/add-credits-row', () => ({
   AddCreditsRow: () => 'ADD_CREDITS_ROW',
 }));
 
-vi.mock('@/components/kilo-pass/kilo-pass-subscription-card', () => ({
-  KiloPassSubscriptionCard: () => null,
+const kiloPassCardProps = vi.hoisted(() => ({
+  latest: undefined as { hideLoadingSkeleton?: boolean } | undefined,
 }));
+vi.mock('@/components/kilo-pass/kilo-pass-subscription-card', () => ({
+  KiloPassSubscriptionCard: (props: { hideLoadingSkeleton?: boolean }) => {
+    kiloPassCardProps.latest = props;
+    return null;
+  },
+}));
+
+/** Read the last render's props without the caller's narrowing of the store. */
+function lastKiloPassProps(): { hideLoadingSkeleton?: boolean } | undefined {
+  return kiloPassCardProps.latest;
+}
 
 vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://example.com',
@@ -314,6 +325,25 @@ describe('CreditsCard balance state', () => {
     expect(texts()).not.toContain('$0.00');
 
     unmount();
+  });
+
+  it('hides the KiloPass loading skeleton while the balance skeleton is the section loader', async () => {
+    // One loading indicator per section: while the balance slot shimmers, the
+    // card reserves its slot quietly; once the balance resolves, the card may
+    // show its own loader again.
+    kiloPassCardProps.latest = undefined;
+    const { unmount } = await mountCard();
+    expect(lastKiloPassProps()?.hideLoadingSkeleton).toBe(true);
+    unmount();
+
+    kiloPassCardProps.latest = undefined;
+    const queryClient = createTestQueryClient();
+    currentUser.userId = 'user-1';
+    queryClient.setQueryData([...BALANCE_KEY], { balance: 10 });
+    const settled = await mountCard(queryClient);
+    await waitFor(() => settled.texts().includes('$10.00'));
+    expect(lastKiloPassProps()?.hideLoadingSkeleton).toBe(false);
+    settled.unmount();
   });
 
   it('shows a cached balance without reusing it after an account change', async () => {

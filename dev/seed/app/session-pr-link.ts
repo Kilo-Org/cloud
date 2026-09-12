@@ -3,6 +3,7 @@ import { and, eq, like, or, sql } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { isValidEmail } from '../lib/users';
 import type { SeedResult } from '../index';
 
 export const usage =
@@ -67,11 +68,6 @@ function printUsage(): void {
   console.log(
     '  pnpm dev:seed app:session-pr-link ada@example.com ses_e2eprempty0000000000000001 --empty'
   );
-}
-
-function isValidEmail(email: string): boolean {
-  // Intentionally permissive; we only guard against obvious nonsense in dev.
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function sessionTitleFor(sessionId: string): string {

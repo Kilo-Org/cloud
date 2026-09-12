@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO perusahaan"
   },
   "preferences": {
+    "general": "Umum",
+    "voiceInput": "Input suara",
     "autoExpandThinking": "Kembangkan pemikiran secara automatik",
     "autoExpandThinkingSubtitle": "Paparkan pemikiran ejen sepenuhnya setelah ejen selesai berfikir.",
     "keepScreenOn": "Kekalkan skrin hidup pada halaman sesi",
@@ -237,6 +239,7 @@
     "appearanceLight": "Cerah",
     "appearanceDark": "Gelap",
     "account": "Akaun",
+    "accountSubtitle": "Bahasa, hos yang dipercayai dan sesi peranti",
     "prReviewAttribution": "Nyatakan apl dalam semakan PR",
     "prReviewAttributionSubtitle": "Tambahkan pengaki Disemak melalui Kilo apabila anda menghantar semakan.",
     "returnSendsMessage": "Kekunci baris baharu menghantar mesej",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkripsi dengan Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkripsikan input suara dengan model Kilo Gateway dan bukan pengecaman pertuturan peranti. Rakaman anda dihantar ke Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Permintaan tarik tidak tersedia",
@@ -448,6 +454,9 @@
       "acceptTerms": "Terima",
       "replyBadRequest": "Balasan ini tidak dapat disiarkan. Rantaian perbincangan ini mungkin telah berubah.",
       "replyForbidden": "Anda tidak mempunyai kebenaran untuk membalas permintaan tarik ini.",
+      "addCommentCta": "Beri komen pada permintaan tarik ini",
+      "commentBadRequest": "Komen ini tidak dapat disiarkan. Permintaan tarik ini mungkin telah berubah.",
+      "commentForbidden": "Anda tidak mempunyai kebenaran untuk memberi komen pada permintaan tarik ini.",
       "moderation": {
         "reportContent": {
           "terminal": "Komen ini tidak boleh dilaporkan.",
@@ -2565,7 +2574,14 @@
     "languageNotInstalledMessage": "Fail pertuturan luar talian untuk {{language}} tidak dipasang pada telefon ini. Muat turun fail itu, kemudian cuba input suara lagi.",
     "downloadOfflineModel": "Muat turun",
     "offlineModelDownloadScheduled": "Fail pertuturan luar talian akan dimuat turun di latar belakang. Cuba input suara lagi kemudian.",
-    "listeningStopped": "Input suara telah dihentikan."
+    "listeningStopped": "Input suara telah dihentikan.",
+    "transcribing": "Mentranskripsi...",
+    "gatewayUnreachable": "Tidak dapat menghubungi Kilo Gateway. Semak sambungan anda dan cuba semula.",
+    "gatewayTimeout": "Transkripsi mengambil masa terlalu lama. Cuba lagi.",
+    "gatewayModelUnavailable": "Model transkripsi ini tidak tersedia. Pilih yang lain dalam Keutamaan.",
+    "gatewayModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketik $t(transcriptionModel.title) untuk memilih yang lain.",
+    "gatewaySignInRequired": "Log masuk untuk menggunakan transkripsi Kilo Gateway.",
+    "gatewayNoModel": "Pilih model transkripsi dalam Keutamaan terlebih dahulu."
   },
   "share": {
     "title": "Kongsi ke Kilo",
@@ -2947,5 +2963,12 @@
     "needsInput": "Perlu input",
     "channelName": "Ejen aktif",
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci."
+  },
+  "transcriptionModel": {
+    "title": "Model transkripsi",
+    "noneChosen": "Tiada dipilih",
+    "emptyTitle": "Tiada model transkripsi",
+    "emptyDescription": "Kilo Gateway tidak menawarkan model transkripsi pada masa ini.",
+    "loadFailed": "Tidak dapat memuatkan model transkripsi."
   }
 }

@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "എന്റർപ്രൈസ് SSO"
   },
   "preferences": {
+    "general": "പൊതുവായത്",
+    "voiceInput": "ശബ്ദ ഇൻപുട്ട്",
     "autoExpandThinking": "ചിന്തയുടെ വിശദാംശങ്ങൾ സ്വയമേവ കാണിക്കുക",
     "autoExpandThinkingSubtitle": "ഏജന്റ് ചിന്തിച്ച് കഴിയുമ്പോൾ അതിന്റെ വിശദാംശങ്ങൾ പൂർണ്ണമായി കാണിക്കുക.",
     "keepScreenOn": "സെഷൻ പേജിലായിരിക്കുമ്പോൾ സ്ക്രീൻ ഓണാക്കി നിർത്തുക",
@@ -237,6 +239,7 @@
     "appearanceLight": "ലൈറ്റ്",
     "appearanceDark": "ഡാർക്ക്",
     "account": "അക്കൗണ്ട്",
+    "accountSubtitle": "ഭാഷ, വിശ്വസനീയ ഹോസ്റ്റുകൾ, ഉപകരണ സെഷനുകൾ",
     "prReviewAttribution": "PR അവലോകനങ്ങളിൽ ആപ്പിന്റെ പേര് ചേർക്കുക",
     "prReviewAttributionSubtitle": "അവലോകനം സമർപ്പിക്കുമ്പോൾ അവസാനം 'Kilo വഴി അവലോകനം ചെയ്തത്' എന്ന് ചേർക്കുക.",
     "returnSendsMessage": "റിട്ടേൺ കീ സന്ദേശം അയയ്ക്കുന്നു",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway വഴിയുള്ള ശബ്ദം ടെക്സ്റ്റാക്കൽ",
+    "gatewayTranscriptionSubtitle": "ഉപകരണത്തിന്റെ സ്പീച്ച് റെക്കഗ്നിഷന് പകരം Kilo Gateway മോഡൽ ഉപയോഗിച്ച് ശബ്ദ ഇൻപുട്ട് ടെക്സ്റ്റാക്കുക. നിങ്ങളുടെ റെക്കോർഡിംഗ് Kilo Gateway-ലേക്ക് അയയ്ക്കുന്നു.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
@@ -448,6 +454,9 @@
       "acceptTerms": "അംഗീകരിക്കുക",
       "replyBadRequest": "ഈ മറുപടി പോസ്റ്റ് ചെയ്യാൻ കഴിയില്ല. ത്രെഡ് മാറിയിരിക്കാം.",
       "replyForbidden": "ഈ പുൾ റിക്വസ്റ്റിന് മറുപടി നൽകാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
+      "addCommentCta": "ഈ പുൾ റിക്വസ്റ്റിൽ അഭിപ്രായം രേഖപ്പെടുത്തുക",
+      "commentBadRequest": "ഈ അഭിപ്രായം പോസ്റ്റ് ചെയ്യാൻ കഴിയില്ല. പുൾ റിക്വസ്റ്റ് മാറിയിരിക്കാം.",
+      "commentForbidden": "ഈ പുൾ റിക്വസ്റ്റിൽ അഭിപ്രായം രേഖപ്പെടുത്താൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
       "moderation": {
         "reportContent": {
           "terminal": "ഈ അഭിപ്രായം റിപ്പോർട്ട് ചെയ്യാൻ കഴിയില്ല.",
@@ -2565,7 +2574,14 @@
     "languageNotInstalledMessage": "{{language}}-നുള്ള ഓഫ്‌ലൈൻ സംഭാഷണ ഫയലുകൾ ഈ ഫോണിൽ ഇൻസ്റ്റാൾ ചെയ്തിട്ടില്ല. അവ ഡൗൺലോഡ് ചെയ്യുക, പിന്നീട് ശബ്ദ ഇൻപുട്ട് വീണ്ടും ശ്രമിക്കുക.",
     "downloadOfflineModel": "ഡൗൺലോഡ്",
     "offlineModelDownloadScheduled": "ഓഫ്‌ലൈൻ സംഭാഷണ ഫയലുകൾ പശ്ചാത്തലത്തിൽ ഡൗൺലോഡ് ചെയ്യപ്പെടും. പിന്നീട് ശബ്ദ ഇൻപുട്ട് വീണ്ടും ശ്രമിക്കുക.",
-    "listeningStopped": "കേൾക്കുന്നത് നിർത്തി."
+    "listeningStopped": "കേൾക്കുന്നത് നിർത്തി.",
+    "transcribing": "ടെക്സ്റ്റാക്കുന്നു...",
+    "gatewayUnreachable": "Kilo Gateway-നെ ബന്ധപ്പെടാനായില്ല. നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
+    "gatewayTimeout": "ശബ്ദം ടെക്സ്റ്റാക്കാൻ വളരെ സമയമെടുത്തു. വീണ്ടും ശ്രമിക്കുക.",
+    "gatewayModelUnavailable": "ഈ ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ ലഭ്യമല്ല. മുൻഗണനകളിൽ മറ്റൊന്ന് തിരഞ്ഞെടുക്കുക.",
+    "gatewayModelUnavailableNotice": "ഈ മോഡൽ ഇനി ലഭ്യമല്ല. മറ്റൊന്ന് തിരഞ്ഞെടുക്കാൻ $t(transcriptionModel.title) ടാപ്പ് ചെയ്യുക.",
+    "gatewaySignInRequired": "Kilo Gateway വഴിയുള്ള ടെക്സ്റ്റാക്കൽ ഉപയോഗിക്കാൻ സൈൻ ഇൻ ചെയ്യുക.",
+    "gatewayNoModel": "ആദ്യം മുൻഗണനകളിൽ ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ തിരഞ്ഞെടുക്കുക."
   },
   "share": {
     "title": "Kilo-യിലേക്ക് പങ്കിടുക",
@@ -2947,5 +2963,12 @@
     "needsInput": "നിങ്ങളുടെ പ്രതികരണം വേണം",
     "channelName": "സജീവ ഏജന്റുകൾ",
     "activityKitDisabledBody": "ലോക്ക് സ്ക്രീനിൽ സജീവ ഏജന്റുകളെ കാണാൻ ക്രമീകരണങ്ങളിൽ തത്സമയ പ്രവർത്തനങ്ങൾ പ്രവർത്തനക്ഷമമാക്കുക."
+  },
+  "transcriptionModel": {
+    "title": "ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ",
+    "noneChosen": "ഒന്നും തിരഞ്ഞെടുത്തിട്ടില്ല",
+    "emptyTitle": "ശബ്ദം ടെക്സ്റ്റാക്കാൻ മോഡലുകളില്ല",
+    "emptyDescription": "Kilo Gateway ഇപ്പോൾ ശബ്ദം ടെക്സ്റ്റാക്കാൻ മോഡലുകൾ നൽകുന്നില്ല.",
+    "loadFailed": "ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡലുകൾ ലോഡ് ചെയ്യാനായില്ല."
   }
 }

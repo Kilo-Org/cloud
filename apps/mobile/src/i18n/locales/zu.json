@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO yebhizinisi"
   },
   "preferences": {
+    "general": "Okujwayelekile",
+    "voiceInput": "Ukufaka ngezwi",
     "autoExpandThinking": "Nweba ukucabanga ngokuzenzakalelayo",
     "autoExpandThinkingSubtitle": "Bonisa ukucabanga komenzeli kunwetshiwe uma eseqedile ukucabanga.",
     "keepScreenOn": "Gcina isikrini sivuliwe ngenkathi usekhasini leseshini",
@@ -237,6 +239,7 @@
     "appearanceLight": "Okukhanyayo",
     "appearanceDark": "Okumnyama",
     "account": "I-akhawunti",
+    "accountSubtitle": "Ulimi, abasingathi abathenjwayo namaseshini edivayisi",
     "prReviewAttribution": "Veza uhlelo lokusebenza ekuhlolweni kwe-PR",
     "prReviewAttributionSubtitle": "Faka umbhalo ongezansi othi kuhlolwe nge-Kilo uma uthumela ukuhlolwa.",
     "returnSendsMessage": "Inkinobho yokubuyela ithumela umlayezo",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Ukuguqulwa kwenkulumo ibe umbhalo nge-Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Guqula ukufaka ngezwi kube umbhalo usebenzisa imodeli ye-Kilo Gateway kunokubona inkulumo kwedivayisi. Ukuqopha kwakho kuthunyelwa ku-Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokuhlanganisa asitholakali",
@@ -448,6 +454,9 @@
       "acceptTerms": "Yamukela",
       "replyBadRequest": "Le mpendulo ayikwazi ukuthunyelwa. Kungenzeka uchungechunge lwengxoxo lushintshile.",
       "replyForbidden": "Awunayo imvume yokuphendula kulesi sicelo sokuhlanganisa.",
+      "addCommentCta": "Phawula kulesi sicelo sokuhlanganisa",
+      "commentBadRequest": "Le phawula ayikwazi ukuthunyelwa. Kungenzeka lesi sicelo sokuhlanganisa sishintshile.",
+      "commentForbidden": "Awunayo imvume yokuphawula kulesi sicelo sokuhlanganisa.",
       "moderation": {
         "reportContent": {
           "terminal": "La mazwana awakwazi ukubikwa.",
@@ -2565,7 +2574,14 @@
     "languageNotInstalledMessage": "Amafayela okukhuluma e-offline e-{{language}} awafakwanga kule foni. Landa la mafayela, bese uzame futhi ukufaka ngezwi.",
     "downloadOfflineModel": "Landa",
     "offlineModelDownloadScheduled": "Amafayela okukhuluma e-offline azolandwa ngemuva. Zama futhi ukufaka ngezwi kamuva.",
-    "listeningStopped": "Ukulalela kumisiwe."
+    "listeningStopped": "Ukulalela kumisiwe.",
+    "transcribing": "Kuguqulwa ibe umbhalo...",
+    "gatewayUnreachable": "I-Kilo Gateway ayifinyelelwanga. Hlola ukuxhumana kwakho bese uzama futhi.",
+    "gatewayTimeout": "Ukuguqula inkulumo kuthathe isikhathi eside kakhulu. Zama futhi.",
+    "gatewayModelUnavailable": "Le modeli yokuguqula inkulumo ayitholakali. Khetha enye Ku-Okuncamelayo.",
+    "gatewayModelUnavailableNotice": "Le modeli ayisanikezwa. Thepha $t(transcriptionModel.title) ukukhetha enye.",
+    "gatewaySignInRequired": "Ngena ngemvume ukuze usebenzise ukuguqula inkulumo nge-Kilo Gateway.",
+    "gatewayNoModel": "Okokuqala, khetha imodeli yokuguqula inkulumo Ku-Okuncamelayo."
   },
   "share": {
     "title": "Yabelana ku-Kilo",
@@ -2947,5 +2963,12 @@
     "needsInput": "Kudinga impendulo",
     "channelName": "Ama-ejenti asebenzayo",
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe."
+  },
+  "transcriptionModel": {
+    "title": "Imodeli yokuguqula inkulumo",
+    "noneChosen": "Akukho okukhethiwe",
+    "emptyTitle": "Azikho izimodeli zokuguqula inkulumo",
+    "emptyDescription": "I-Kilo Gateway ayinikezi zimodeli zokuguqula inkulumo okwamanje.",
+    "loadFailed": "Azikwazanga ukulayisha izimodeli zokuguqula inkulumo."
   }
 }

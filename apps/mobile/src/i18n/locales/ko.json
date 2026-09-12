@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "엔터프라이즈 SSO"
   },
   "preferences": {
+    "general": "일반",
+    "voiceInput": "음성 입력",
     "autoExpandThinking": "추론 내용 자동 펼치기",
     "autoExpandThinkingSubtitle": "에이전트의 추론이 끝나면 추론 내용을 펼쳐서 표시합니다.",
     "keepScreenOn": "세션 화면에서 화면 켜짐 유지",
@@ -237,6 +239,7 @@
     "appearanceLight": "라이트",
     "appearanceDark": "다크",
     "account": "계정",
+    "accountSubtitle": "언어, 신뢰하는 호스트, 기기 세션",
     "prReviewAttribution": "PR 리뷰에 사용 앱 표시",
     "prReviewAttributionSubtitle": "리뷰를 제출할 때 Kilo로 리뷰했다는 문구를 하단에 추가합니다.",
     "returnSendsMessage": "리턴 키로 메시지 보내기",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway 음성 텍스트 변환",
+    "gatewayTranscriptionSubtitle": "기기의 음성 인식 대신 Kilo Gateway 모델로 음성 입력을 텍스트로 변환합니다. 녹음 내용은 Kilo Gateway로 전송됩니다.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "실시간 활동",
@@ -2134,7 +2140,14 @@
     "languageNotInstalledMessage": "이 휴대전화에 {{language}} 오프라인 음성 파일이 설치되어 있지 않습니다. 파일을 다운로드한 후 음성 입력을 다시 시도하세요.",
     "downloadOfflineModel": "다운로드",
     "offlineModelDownloadScheduled": "오프라인 음성 파일이 백그라운드에서 다운로드됩니다. 나중에 음성 입력을 다시 시도하세요.",
-    "listeningStopped": "음성 입력이 중지되었습니다."
+    "listeningStopped": "음성 입력이 중지되었습니다.",
+    "transcribing": "변환 중...",
+    "gatewayUnreachable": "Kilo Gateway에 연결하지 못했습니다. 연결 상태를 확인하고 다시 시도하세요.",
+    "gatewayTimeout": "변환에 시간이 너무 오래 걸렸습니다. 다시 시도하세요.",
+    "gatewayModelUnavailable": "이 음성 텍스트 변환 모델은 사용할 수 없습니다. 환경설정에서 다른 모델을 선택하세요.",
+    "gatewayModelUnavailableNotice": "이 모델은 더 이상 제공되지 않습니다. 다른 모델을 선택하려면 $t(transcriptionModel.title)을 탭하세요.",
+    "gatewaySignInRequired": "Kilo Gateway 변환을 사용하려면 로그인하세요.",
+    "gatewayNoModel": "먼저 환경설정에서 음성 텍스트 변환 모델을 선택하세요."
   },
   "share": {
     "title": "Kilo로 공유",
@@ -2408,6 +2421,9 @@
       "replyBadRequest": "이 답글을 게시할 수 없습니다. 스레드가 변경되었을 수 있습니다.",
       "replyBody": "답글 내용",
       "replyForbidden": "이 풀 리퀘스트에 답글을 달 권한이 없습니다.",
+      "addCommentCta": "이 풀 리퀘스트에 댓글 달기",
+      "commentBadRequest": "이 댓글을 게시할 수 없습니다. 풀 리퀘스트가 변경되었을 수 있습니다.",
+      "commentForbidden": "이 풀 리퀘스트에 댓글을 달 권한이 없습니다.",
       "replyPlaceholder": "답글…",
       "reportContent": "콘텐츠 신고",
       "reportUser": "사용자 신고",
@@ -2947,5 +2963,12 @@
     "needsInput": "입력 필요",
     "channelName": "활성 에이전트",
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요."
+  },
+  "transcriptionModel": {
+    "title": "음성 텍스트 변환 모델",
+    "noneChosen": "선택 안 됨",
+    "emptyTitle": "음성 텍스트 변환 모델 없음",
+    "emptyDescription": "지금 Kilo Gateway에서 제공하는 음성 텍스트 변환 모델이 없습니다.",
+    "loadFailed": "음성 텍스트 변환 모델을 불러오지 못했습니다."
   }
 }

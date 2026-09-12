@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO tal-intrapriża"
   },
   "preferences": {
+    "general": "Ġenerali",
+    "voiceInput": "Input tal-vuċi",
     "autoExpandThinking": "Espandi awtomatikament il-ħsieb",
     "autoExpandThinkingSubtitle": "Uri l-ħsieb tal-aġent espandut meta jispiċċa.",
     "keepScreenOn": "Żomm l-iskrin mixgħul fil-paġna tas-sessjoni",
@@ -237,6 +239,7 @@
     "appearanceLight": "Ċar",
     "appearanceDark": "Skur",
     "account": "Kont",
+    "accountSubtitle": "Lingwa, ospitanti fdati u sessjonijiet tal-apparat",
     "prReviewAttribution": "Żid attribuzzjoni tal-applikazzjoni mar-reviżjonijiet tal-PR",
     "prReviewAttributionSubtitle": "Żid nota fil-qiegħ li tgħid Rivedut permezz ta' Kilo meta tibgħat reviżjoni.",
     "returnSendsMessage": "It-tast tar-ritorn jibgħat il-messaġġ",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Traskrizzjoni permezz ta' Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Ittraskrivi d-dħul bil-vuċi b'mudell ta' Kilo Gateway minflok ir-rikonoxximent tal-vuċi tal-apparat. Ir-reġistrazzjoni tiegħek tintbagħat lil Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "It-talba għall-għaqda mhix disponibbli",
@@ -454,6 +460,9 @@
       "acceptTerms": "Aċċetta",
       "replyBadRequest": "Din ir-risposta ma tistax tiġi ppubblikata. Is-sensiela ta' kummenti setgħet inbidlet.",
       "replyForbidden": "M'għandekx permess biex tirrispondi għal din it-talba għall-għaqda.",
+      "addCommentCta": "Ikkummenta fuq din it-talba għall-għaqda",
+      "commentBadRequest": "Dan il-kumment ma jistax jiġi ppubblikat. Jista' jkun li t-talba għall-għaqda nbidlet.",
+      "commentForbidden": "M'għandekx permess biex tikkummenta fuq din it-talba għall-għaqda.",
       "moderation": {
         "reportContent": {
           "terminal": "Dan il-kumment ma jistax jiġi rrapportat.",
@@ -2628,7 +2637,14 @@
     "languageNotInstalledMessage": "Il-fajls tad-diskors offline għal {{language}} mhumiex installati fuq dan it-telefon. Niżżelhom, imbagħad erġa' pprova d-dħul bil-vuċi.",
     "downloadOfflineModel": "Niżżel",
     "offlineModelDownloadScheduled": "Il-fajls tad-diskors offline se jinżżlu fl-isfond. Erġa' pprova d-dħul bil-vuċi iktar 'il quddiem.",
-    "listeningStopped": "Is-smigħ waqaf."
+    "listeningStopped": "Is-smigħ waqaf.",
+    "transcribing": "Qed nitraskrivi…",
+    "gatewayUnreachable": "Ma setgħetx tasal għal Kilo Gateway. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+    "gatewayTimeout": "It-traskrizzjoni ħadet wisq ħin. Erġa' pprova.",
+    "gatewayModelUnavailable": "Dan il-mudell ta' traskrizzjoni mhux disponibbli. Agħżel ieħor fil-Preferenzi.",
+    "gatewayModelUnavailableNotice": "Dan il-mudell m'għadux disponibbli. Agħfas $t(transcriptionModel.title) biex tagħżel ieħor.",
+    "gatewaySignInRequired": "Idħol biex tuża t-traskrizzjoni permezz ta' Kilo Gateway.",
+    "gatewayNoModel": "L-ewwel agħżel mudell ta' traskrizzjoni fil-Preferenzi."
   },
   "share": {
     "title": "Aqsam ma' Kilo",
@@ -3013,5 +3029,12 @@
     "needsInput": "Jistenna tweġiba",
     "channelName": "Aġenti attivi",
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar."
+  },
+  "transcriptionModel": {
+    "title": "Mudell ta' traskrizzjoni",
+    "noneChosen": "Xejn magħżul",
+    "emptyTitle": "L-ebda mudell ta' traskrizzjoni",
+    "emptyDescription": "Kilo Gateway bħalissa ma joffri l-ebda mudell ta' traskrizzjoni.",
+    "loadFailed": "Ma setgħetx titgħabba l-mudelli ta' traskrizzjoni."
   }
 }

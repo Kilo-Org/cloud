@@ -32,6 +32,8 @@ export type CallbackTarget = {
 };
 
 export type DriverConfig = {
+  /** Track returned session IDs, including prepare success followed by initiation failure. */
+  onSessionCreated?: (sessionId: string) => void;
   workerUrl: string;
   expectControlPlane?: boolean;
   user: TestUser;
@@ -44,6 +46,14 @@ export type DriverConfig = {
   internalApiSecret?: string;
   /** HTTPS git URL to bootstrap the workspace. Public tiny repos work fine. */
   gitUrl: string;
+  /**
+   * GitHub `owner/repo` for token-backed clones (prepareSession `githubRepo`
+   * / unified `repository.type: 'github'`). Mutually exclusive with `gitUrl`
+   * on the wire. Use the cloud-worktree-setup user's installation.
+   */
+  githubRepo?: string;
+  /** Optional checkout ref forwarded on start (`upstreamBranch` / `repository.branch`). */
+  branch?: string;
   /**
    * Model ID sent to tRPC `start`. Must be accepted by the fake LLM gateway's
    * `/api/openrouter/models/validate` response - the default
@@ -173,6 +183,7 @@ export type StartSessionArgs = {
   prompt: string;
   mode?: string;
   shallow?: boolean;
+  branch?: string;
   callbackTarget?: CallbackTarget;
   messageId?: string;
 };
@@ -189,10 +200,15 @@ export async function startSession(
   args: StartSessionArgs,
   api: ApiVersion = 'unified'
 ): Promise<StartSessionResult> {
+  const started = {
+    ...args,
+    branch: args.branch ?? config.branch,
+  };
   const result =
     api === 'legacy'
-      ? await startSessionLegacy(config, args)
-      : await startSessionUnified(config, args);
+      ? await startSessionLegacy(config, started)
+      : await startSessionUnified(config, started);
+  if (api === 'unified') config.onSessionCreated?.(result.cloudAgentSessionId);
   if (config.expectControlPlane && !result.cloudAgentSessionId.startsWith('workspace_')) {
     throw new Error(
       `Started ${result.cloudAgentSessionId}, but expected an enrolled workspace_* session; do not retry start`
@@ -205,6 +221,9 @@ async function startSessionUnified(
   config: DriverConfig,
   args: StartSessionArgs
 ): Promise<StartSessionResult> {
+  if (args.callbackTarget) {
+    throw new Error('callbackTarget is accepted by prepareSession only; rerun with --api=legacy');
+  }
   return trpcCall<StartSessionResult>(config, 'start', {
     message: {
       prompt: args.prompt,
@@ -214,13 +233,19 @@ async function startSessionUnified(
       mode: args.mode ?? 'code',
       model: config.model,
     },
-    repository: {
-      type: 'git',
-      url: config.gitUrl,
-    },
+    repository: config.githubRepo
+      ? {
+          type: 'github' as const,
+          repo: config.githubRepo,
+          ...(args.branch !== undefined ? { branch: args.branch } : {}),
+        }
+      : {
+          type: 'git' as const,
+          url: config.gitUrl,
+          ...(args.branch !== undefined ? { branch: args.branch } : {}),
+        },
     options: {
       createdOnPlatform: 'cloud-agent-web',
-      ...(args.callbackTarget ? { callbackTarget: args.callbackTarget } : {}),
       ...(config.kilocodeOrganizationId
         ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
         : {}),
@@ -259,9 +284,10 @@ async function startSessionLegacy(
       prompt: args.prompt,
       mode: args.mode ?? 'code',
       model: config.model,
-      gitUrl: config.gitUrl,
+      ...(config.githubRepo ? { githubRepo: config.githubRepo } : { gitUrl: config.gitUrl }),
       createdOnPlatform: 'cloud-agent-web',
       shallow: args.shallow ?? true,
+      ...(args.branch !== undefined ? { upstreamBranch: args.branch } : {}),
       ...(args.callbackTarget ? { callbackTarget: args.callbackTarget } : {}),
       ...(args.messageId ? { initialMessageId: args.messageId } : {}),
       ...(config.kilocodeOrganizationId
@@ -279,6 +305,7 @@ async function startSessionLegacy(
     streamUrl?: string;
     status?: string;
   };
+  config.onSessionCreated?.(prepared.cloudAgentSessionId);
   const initiated = await trpcCall<InitiateResult>(config, 'initiateFromKilocodeSessionV2', {
     cloudAgentSessionId: prepared.cloudAgentSessionId,
   });

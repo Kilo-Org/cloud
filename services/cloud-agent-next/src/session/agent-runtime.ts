@@ -23,6 +23,7 @@ import type { WrapperCommand } from '../shared/protocol.js';
 import type { Env as WorkerEnv } from '../types.js';
 import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
+import { RUNTIME_AUTHORIZATION_RECOVERY_KEY } from './runtime-authorization-persistence.js';
 import {
   allocateWrapperRuntimeState,
   clearAllocatedWrapperRuntimeState,
@@ -318,6 +319,13 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
     plan: MessageDeliveryRequest,
     hooks: AgentRuntimeSendHooks = {}
   ): Promise<MessageDeliveryResult> {
+    if (await storage.get<string>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return {
+        success: false,
+        code: 'WRAPPER_FINALIZING',
+        error: 'Runtime authorization recovery is in progress',
+      };
+    }
     if (canUseSandboxRuntime && !(await canUseSandboxRuntime())) {
       return { success: false, code: 'INTERNAL', error: 'Session deletion is in progress' };
     }
@@ -349,10 +357,13 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
       (allocatedPhysicalInstance || requiresFreshRunFence) &&
       (previousRuntimeState.wrapperConnectionId || previousRuntimeState.wrapperRunId)
     ) {
-      await clearWrapperRuntimeIdentity(storage, {}, { incrementGeneration: true });
+      await clearWrapperRuntimeIdentity(storage);
     }
-    const { state: wrapperRuntimeState, allocatedNewIdentity } =
-      await allocateWrapperRuntimeState(storage);
+    const { state: wrapperRuntimeState, allocatedNewIdentity } = await allocateWrapperRuntimeState(
+      storage,
+      Date.now(),
+      leasedInstance.instanceGeneration
+    );
     logger
       .withFields({
         sessionId,

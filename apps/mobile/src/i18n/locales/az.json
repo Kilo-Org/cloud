@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Korporativ SSO"
   },
   "preferences": {
+    "general": "Ümumi",
+    "voiceInput": "Səsli daxiletmə",
     "autoExpandThinking": "Düşüncə bölməsini avtomatik aç",
     "autoExpandThinkingSubtitle": "Agent düşünməni bitirdikdə düşüncə bölməsini açıq göstər.",
     "keepScreenOn": "Sessiya səhifəsində ikən ekranı açıq saxla",
@@ -237,6 +239,7 @@
     "appearanceLight": "Açıq",
     "appearanceDark": "Tünd",
     "account": "Hesab",
+    "accountSubtitle": "Dil, etibarlı saytlar və cihaz sessiyaları",
     "prReviewAttribution": "PR yoxlamalarında tətbiqin adını qeyd et",
     "prReviewAttributionSubtitle": "Yoxlama nəticəsini göndərərkən sonuna «Kilo vasitəsilə yoxlanılıb» qeydi əlavə et.",
     "returnSendsMessage": "Sətirsonu düyməsi mesaj göndərir",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Səsin Kilo Gateway ilə mətnə çevrilməsi",
+    "gatewayTranscriptionSubtitle": "Səslə daxiletməni cihazın nitq tanımasının əvəzinə Kilo Gateway modeli ilə mətnə çevirin. Səs yazınız Kilo Gateway-e göndərilir.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Birləşdirmə sorğusu əlçatan deyil",
@@ -448,6 +454,9 @@
       "acceptTerms": "Qəbul et",
       "replyBadRequest": "Bu cavabı göndərmək mümkün deyil. Müzakirə dəyişmiş ola bilər.",
       "replyForbidden": "Bu birləşdirmə sorğusuna cavab vermək icazən yoxdur.",
+      "addCommentCta": "Bu birləşdirmə sorğusuna şərh yaz",
+      "commentBadRequest": "Bu şərhi göndərmək mümkün deyil. Birləşdirmə sorğusu dəyişmiş ola bilər.",
+      "commentForbidden": "Bu birləşdirmə sorğusuna şərh yazmaq icazən yoxdur.",
       "moderation": {
         "reportContent": {
           "terminal": "Bu şərhdən şikayət etmək mümkün deyil.",
@@ -2565,7 +2574,14 @@
     "languageNotInstalledMessage": "{{language}} dilinin oflayn nitq faylları bu telefonda quraşdırılmayıb. Onları endir, sonra səslə daxiletməni yenidən sına.",
     "downloadOfflineModel": "Endir",
     "offlineModelDownloadScheduled": "Oflayn nitq faylları fonda endiriləcək. Səslə daxiletməni daha sonra yenidən sına.",
-    "listeningStopped": "Dinləmə dayandı."
+    "listeningStopped": "Dinləmə dayandı.",
+    "transcribing": "Mətnə çevrilir...",
+    "gatewayUnreachable": "Kilo Gateway-e qoşulmaq mümkün olmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
+    "gatewayTimeout": "Səsin mətnə çevrilməsi çox vaxt apardı. Yenidən cəhd edin.",
+    "gatewayModelUnavailable": "Bu səsin mətnə çevrilməsi modeli əlçatan deyil. Seçimlərdə başqasını seçin.",
+    "gatewayModelUnavailableNotice": "Bu model artıq təklif edilmir. Başqasını seçmək üçün $t(transcriptionModel.title) üzərinə toxunun.",
+    "gatewaySignInRequired": "Kilo Gateway ilə mətnə çevirməkdən istifadə etmək üçün hesabınıza daxil olun.",
+    "gatewayNoModel": "Əvvəlcə Seçimlərdə bir səsin mətnə çevrilməsi modeli seçin."
   },
   "share": {
     "title": "Kilo-ya göndər",
@@ -2947,5 +2963,12 @@
     "needsInput": "Cavab gözləyir",
     "channelName": "Aktiv agentlər",
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir."
+  },
+  "transcriptionModel": {
+    "title": "Səsin mətnə çevrilməsi modeli",
+    "noneChosen": "Seçilməyib",
+    "emptyTitle": "Səsin mətnə çevrilməsi modeli yoxdur",
+    "emptyDescription": "Kilo Gateway hazırda səsin mətnə çevrilməsi modeli təklif etmir.",
+    "loadFailed": "Səsin mətnə çevrilməsi modellərini yükləmək mümkün olmadı."
   }
 }

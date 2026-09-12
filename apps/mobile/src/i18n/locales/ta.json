@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "நிறுவன SSO"
   },
   "preferences": {
+    "general": "பொது",
+    "voiceInput": "குரல் உள்ளீடு",
     "autoExpandThinking": "சிந்தனையைத் தானாக விரிக்கவும்",
     "autoExpandThinkingSubtitle": "ஏஜென்ட் சிந்தித்து முடித்ததும் அதன் சிந்தனையை விரித்துக் காட்டவும்.",
     "keepScreenOn": "அமர்வுப் பக்கத்தில் இருக்கும்போது திரை அணையாமல் வைக்கவும்",
@@ -237,6 +239,7 @@
     "appearanceLight": "வெளிர்",
     "appearanceDark": "அடர்",
     "account": "கணக்கு",
+    "accountSubtitle": "மொழி, நம்பகமான தளங்கள், சாதன அமர்வுகள்",
     "prReviewAttribution": "PR மதிப்பாய்வுகளில் செயலியின் பெயரைக் குறிப்பிடவும்",
     "prReviewAttributionSubtitle": "மதிப்பாய்வைச் சமர்ப்பிக்கும்போது, Kilo வழியாக மதிப்பாய்வு செய்யப்பட்டது என்ற அடிக்குறிப்பைச் சேர்க்கவும்.",
     "returnSendsMessage": "என்டர் விசை செய்தியை அனுப்பும்",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway மூலம் பேச்சு உரையாக்கம்",
+    "gatewayTranscriptionSubtitle": "சாதனத்தின் பேச்சு அடையாளப்படுத்தலுக்குப் பதிலாக Kilo Gateway மாதிரியைப் பயன்படுத்தி குரல் உள்ளீட்டை உரையாக்குங்கள். உங்கள் பதிவு Kilo Gateway-க்கு அனுப்பப்படுகிறது.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "இணைப்புக் கோரிக்கை கிடைக்கவில்லை",
@@ -448,6 +454,9 @@
       "acceptTerms": "ஏற்கவும்",
       "replyBadRequest": "இந்தப் பதிலை இடுகையிட முடியாது. கருத்துத் தொடர் மாறியிருக்கலாம்.",
       "replyForbidden": "இந்த இணைப்புக் கோரிக்கைக்குப் பதிலளிக்க உங்களுக்கு அனுமதி இல்லை.",
+      "addCommentCta": "இந்த இணைப்புக் கோரிக்கையில் கருத்துத் தெரிவிக்கவும்",
+      "commentBadRequest": "இந்தக் கருத்தை இடுகையிட முடியாது. இணைப்புக் கோரிக்கை மாறியிருக்கலாம்.",
+      "commentForbidden": "இந்த இணைப்புக் கோரிக்கையில் கருத்துத் தெரிவிக்க உங்களுக்கு அனுமதி இல்லை.",
       "moderation": {
         "reportContent": {
           "terminal": "இந்தக் கருத்து குறித்துப் புகாரளிக்க முடியாது.",
@@ -2565,7 +2574,14 @@
     "languageNotInstalledMessage": "{{language}}க்கான ஆஃப்லைன் பேச்சு கோப்புகள் இந்தத் தொலைபேசியில் நிறுவப்படவில்லை. அவற்றைப் பதிவிறக்கவும், பிறகு குரல் உள்ளீட்டை மீண்டும் முயற்சிக்கவும்.",
     "downloadOfflineModel": "பதிவிறக்கு",
     "offlineModelDownloadScheduled": "ஆஃப்லைன் பேச்சு கோப்புகள் பின்னணியில் பதிவிறக்கம் செய்யப்படும். பிறகு குரல் உள்ளீட்டை மீண்டும் முயற்சிக்கவும்.",
-    "listeningStopped": "கேட்பது நிறுத்தப்பட்டது."
+    "listeningStopped": "கேட்பது நிறுத்தப்பட்டது.",
+    "transcribing": "உரையாக்கம் நடைபெறுகிறது...",
+    "gatewayUnreachable": "Kilo Gateway-ஐ அணுக முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
+    "gatewayTimeout": "உரையாக்கம் மிக அதிக நேரம் எடுத்தது. மீண்டும் முயற்சிக்கவும்.",
+    "gatewayModelUnavailable": "இந்த உரையாக்க மாதிரி கிடைக்கவில்லை. விருப்பத்தேர்வுகளில் வேறொன்றைத் தேர்ந்தெடுக்கவும்.",
+    "gatewayModelUnavailableNotice": "இந்த மாதிரி இனி வழங்கப்படாது. வேறொன்றைத் தேர்ந்தெடுக்க $t(transcriptionModel.title) தட்டவும்.",
+    "gatewaySignInRequired": "Kilo Gateway உரையாக்கத்தைப் பயன்படுத்த உள்நுழையவும்.",
+    "gatewayNoModel": "முதலில் விருப்பத்தேர்வுகளில் உரையாக்க மாதிரியைத் தேர்ந்தெடுக்கவும்."
   },
   "share": {
     "title": "Kilo-வுக்குப் பகிர்தல்",
@@ -2947,5 +2963,12 @@
     "needsInput": "உள்ளீடு தேவை",
     "channelName": "செயலில் உள்ள ஏஜெண்டுகள்",
     "activityKitDisabledBody": "பூட்டுத் திரையில் செயலில் உள்ள ஏஜெண்டுகளைப் பார்க்க, அமைப்புகளில் நேரலைச் செயல்பாடுகளை இயக்கவும்."
+  },
+  "transcriptionModel": {
+    "title": "உரையாக்க மாதிரி",
+    "noneChosen": "எதுவும் தேர்ந்தெடுக்கப்படவில்லை",
+    "emptyTitle": "உரையாக்க மாதிரிகள் இல்லை",
+    "emptyDescription": "Kilo Gateway தற்போது உரையாக்க மாதிரிகளை வழங்கவில்லை.",
+    "loadFailed": "உரையாக்க மாதிரிகளை ஏற்ற முடியவில்லை."
   }
 }

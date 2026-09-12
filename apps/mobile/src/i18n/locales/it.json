@@ -2031,6 +2031,8 @@
     "retryLoadingPrivacy": "Riprova a caricare le preferenze sulla privacy"
   },
   "preferences": {
+    "general": "Generale",
+    "voiceInput": "Input vocale",
     "autoExpandThinking": "Espandi automaticamente il ragionamento",
     "autoExpandThinkingSubtitle": "Mostra il ragionamento completo dell'agente al termine dell'elaborazione.",
     "keepScreenOn": "Mantieni lo schermo acceso nella schermata della sessione",
@@ -2041,6 +2043,7 @@
     "appearanceLight": "Chiaro",
     "appearanceDark": "Scuro",
     "account": "Il tuo account",
+    "accountSubtitle": "Lingua, siti attendibili e sessioni sui dispositivi",
     "prReviewAttribution": "Indica l'app usata nelle revisioni delle PR",
     "prReviewAttributionSubtitle": "Aggiungi la dicitura «Revisione effettuata tramite Kilo» in fondo a ogni revisione che invii.",
     "returnSendsMessage": "Il tasto Invio invia il messaggio",
@@ -2051,7 +2054,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Trascrizione con Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Trascrivi la dettatura con un modello Kilo Gateway anziché con il riconoscimento vocale del dispositivo. La registrazione viene inviata a Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "addCredits": {
     "cta": "Aggiungi crediti",
@@ -2148,7 +2154,14 @@
     "languageNotInstalledMessage": "I file vocali offline per {{language}} non sono installati su questo telefono. Scaricali, poi riprova con la dettatura.",
     "downloadOfflineModel": "Scarica",
     "offlineModelDownloadScheduled": "I file vocali offline verranno scaricati in background. Riprova con la dettatura più tardi.",
-    "listeningStopped": "Ascolto interrotto."
+    "listeningStopped": "Ascolto interrotto.",
+    "transcribing": "Trascrizione in corso…",
+    "gatewayUnreachable": "Impossibile contattare Kilo Gateway. Controlla la connessione e riprova.",
+    "gatewayTimeout": "La trascrizione ha richiesto troppo tempo. Riprova.",
+    "gatewayModelUnavailable": "Questo modello di trascrizione non è disponibile. Scegline un altro in Preferenze.",
+    "gatewayModelUnavailableNotice": "Questo modello non è più offerto. Tocca $t(transcriptionModel.title) per sceglierne un altro.",
+    "gatewaySignInRequired": "Accedi per usare la trascrizione con Kilo Gateway.",
+    "gatewayNoModel": "Scegli prima un modello di trascrizione in Preferenze."
   },
   "share": {
     "title": "Condivisione su Kilo",
@@ -2422,6 +2435,9 @@
       "replyBadRequest": "Impossibile pubblicare questa risposta. La discussione potrebbe essere stata modificata.",
       "replyBody": "Testo della risposta",
       "replyForbidden": "Non hai il permesso di rispondere a questa pull request.",
+      "addCommentCta": "Commenta questa pull request",
+      "commentBadRequest": "Impossibile pubblicare questo commento. La pull request potrebbe essere stata modificata.",
+      "commentForbidden": "Non hai il permesso di commentare questa pull request.",
       "replyPlaceholder": "La tua risposta…",
       "reportContent": "Segnala il contenuto",
       "reportUser": "Segnala l'utente",
@@ -2969,5 +2985,12 @@
     "needsInput": "In attesa di risposta",
     "channelName": "Agenti attivi",
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco."
+  },
+  "transcriptionModel": {
+    "title": "Modello di trascrizione",
+    "noneChosen": "Nessuno selezionato",
+    "emptyTitle": "Nessun modello di trascrizione",
+    "emptyDescription": "Kilo Gateway non offre modelli di trascrizione in questo momento.",
+    "loadFailed": "Impossibile caricare i modelli di trascrizione."
   }
 }

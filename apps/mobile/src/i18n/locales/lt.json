@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Įmonės SSO"
   },
   "preferences": {
+    "general": "Bendra",
+    "voiceInput": "Balso įvestis",
     "autoExpandThinking": "Automatiškai išskleisti mąstymą",
     "autoExpandThinkingSubtitle": "Baigus mąstyti, automatiškai išskleisti agento mąstymo tekstą.",
     "keepScreenOn": "Neišjungti ekrano sesijos puslapyje",
@@ -237,6 +239,7 @@
     "appearanceLight": "Šviesi",
     "appearanceDark": "Tamsi",
     "account": "Paskyra",
+    "accountSubtitle": "Kalba, patikimos svetainės ir įrenginių sesijos",
     "prReviewAttribution": "PR peržiūrose nurodyti programėlę",
     "prReviewAttributionSubtitle": "Pateikiant peržiūrą pridėti poraštę, nurodančią, kad peržiūrėta naudojant Kilo.",
     "returnSendsMessage": "Įvesties klavišas siunčia žinutę",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkribavimas per Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkribuok balso įvestį Kilo Gateway modeliu vietoj įrenginio kalbos atpažinimo. Įrašas siunčiamas į Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Pakeitimų užklausa nepasiekiama",
@@ -452,6 +458,9 @@
       "acceptTerms": "Sutikti",
       "replyBadRequest": "Šio atsakymo negalima paskelbti. Gija galėjo pasikeisti.",
       "replyForbidden": "Neturi teisės atsakyti šios pakeitimų užklausos diskusijoje.",
+      "addCommentCta": "Komentuoti šią pakeitimų užklausą",
+      "commentBadRequest": "Šio komentaro negalima paskelbti. Pakeitimų užklausa galėjo pasikeisti.",
+      "commentForbidden": "Neturi teisės komentuoti šios pakeitimų užklausos.",
       "moderation": {
         "reportContent": {
           "terminal": "Apie šį komentarą negalima pranešti.",
@@ -2607,7 +2616,14 @@
     "languageNotInstalledMessage": "{{language}} kalbos neprisijungus veikiantys kalbos failai šiame telefone nėra įdiegti. Atsisiųsk juos ir vėl pabandyk balso įvestį.",
     "downloadOfflineModel": "Atsisiųsti",
     "offlineModelDownloadScheduled": "Neprisijungus veikiantys kalbos failai bus atsisiunčiami fone. Pabandyk balso įvestį vėliau.",
-    "listeningStopped": "Klausymasis sustabdytas."
+    "listeningStopped": "Klausymasis sustabdytas.",
+    "transcribing": "Transkribuojama...",
+    "gatewayUnreachable": "Nepavyko pasiekti Kilo Gateway. Patikrinkite ryšį ir bandykite dar kartą.",
+    "gatewayTimeout": "Transkribavimas užtruko per ilgai. Bandyk dar kartą.",
+    "gatewayModelUnavailable": "Šis transkribavimo modelis nepasiekiamas. Pasirinkite kitą Nuostatose.",
+    "gatewayModelUnavailableNotice": "Šis modelis nebeteikiamas. Palieskite $t(transcriptionModel.title), kad pasirinktumėte kitą.",
+    "gatewaySignInRequired": "Prisijunkite, kad naudotumėte transkribavimą per Kilo Gateway.",
+    "gatewayNoModel": "Pirmiausia pasirinkite transkribavimo modelį Nuostatose."
   },
   "share": {
     "title": "Bendrinimas su Kilo",
@@ -2991,5 +3007,12 @@
     "needsInput": "Laukia atsakymo",
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus."
+  },
+  "transcriptionModel": {
+    "title": "Transkribavimo modelis",
+    "noneChosen": "Neišrinkta",
+    "emptyTitle": "Nėra transkribavimo modelių",
+    "emptyDescription": "Šiuo metu Kilo Gateway neteikia jokių transkribavimo modelių.",
+    "loadFailed": "Nepavyko įkelti transkribavimo modelių."
   }
 }

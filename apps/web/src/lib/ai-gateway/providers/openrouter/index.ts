@@ -4,7 +4,11 @@ import {
   preferredModels,
 } from '@/lib/ai-gateway/models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/provider-definitions';
+import {
+  getLocalFakeTranscriptionModelsUrl,
+  LOCAL_FAKE_LLM_API_KEY,
+} from '@/lib/ai-gateway/local-fake-llm';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
   OpenRouterModelsResponseSchema,
@@ -286,14 +290,21 @@ export async function getEnhancedOpenRouterModels(): Promise<OpenRouterModelsRes
  * Fetch speech-to-text models from the OpenRouter API.
  */
 export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterModelsResponse> {
-  const response = await fetch(`${OPENROUTER.apiUrl}/models?output_modalities=transcription`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${OPENROUTER.apiKey}`,
-      ...ATTRIBUTION_HEADERS,
-    },
-    next: { revalidate: 60 },
-  });
+  const localFakeModelsUrl = getLocalFakeTranscriptionModelsUrl();
+  const response = await fetch(
+    localFakeModelsUrl ?? `${OPENROUTER.apiUrl}/models?output_modalities=transcription`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${localFakeModelsUrl ? LOCAL_FAKE_LLM_API_KEY : OPENROUTER.apiKey}`,
+        ...ATTRIBUTION_HEADERS,
+      },
+      // Never serve a cached catalogue: a cached answer would mask an
+      // unreachable gateway and the mobile picker would list stale models
+      // instead of showing its load-failed retry state.
+      cache: 'no-store',
+    }
+  );
 
   if (!response.ok) {
     const errorMessage = `Failed to fetch OpenRouter transcription models: ${response.status} ${response.statusText}`;

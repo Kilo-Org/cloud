@@ -17,13 +17,15 @@ export class ControlRequestError extends Error {
   readonly code: string;
   readonly retryable: boolean;
   readonly admission: ControlError['admission'];
+  readonly rejectionReceived?: true;
 
-  constructor(error: ControlError) {
+  constructor(error: ControlError, options?: { rejectionReceived?: true }) {
     super(error.message);
     this.name = 'ControlRequestError';
     this.code = error.code;
     this.retryable = error.retryable;
     this.admission = error.admission;
+    if (options?.rejectionReceived) this.rejectionReceived = true;
   }
 }
 
@@ -53,7 +55,9 @@ export async function withDeliveryDeadline<T>(
 
 export function controlRequestResult(response: ResponseFrame): unknown {
   if (response.ok) return response.result;
-  throw new ControlRequestError(controlErrorSchema.parse(response.error));
+  throw new ControlRequestError(controlErrorSchema.parse(response.error), {
+    rejectionReceived: true,
+  });
 }
 
 export function isRetryableDeliveryError(error: unknown): boolean {

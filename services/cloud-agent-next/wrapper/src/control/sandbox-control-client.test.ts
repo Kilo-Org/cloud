@@ -138,8 +138,10 @@ function versionHeartbeat(version: string | null) {
           throw new Error('Unexpected attach');
         },
         detach: () => false,
+        retireForRecovery: async () => 'absent',
         deleteDirectory: async () => {},
         get: () => undefined,
+        isCurrent: () => false,
         isHealthy: () => true,
         shutdown() {},
       },
@@ -254,6 +256,10 @@ describe('heartbeat version rollout compatibility', () => {
       protocolVersion: 1,
       handshakeComplete: true,
     });
+    expect(previousHelloResultSchema.parse(helloResult({ scopedCleanupResult: true }))).toEqual({
+      protocolVersion: 1,
+      handshakeComplete: true,
+    });
     const heartbeat = previousHeartbeatSchema.parse({
       state: 'idle',
       kilo: { ready: true },
@@ -286,6 +292,19 @@ describe('heartbeat version rollout compatibility', () => {
       }
     }
   );
+
+  it('exposes scoped cleanup results only after the Worker grants the capability', async () => {
+    const fake = new FakeWebSocket();
+    const { client } = createClientFixture({ openWebSocket: () => fake as unknown as WebSocket });
+    try {
+      const connecting = client.connect();
+      await handshake(fake, helloResult({ scopedCleanupResult: true }));
+      await connecting;
+      expect(client.supportsScopedCleanupResult?.()).toBe(true);
+    } finally {
+      client.close();
+    }
+  });
 });
 
 describe('createSandboxControlClient', () => {
@@ -369,6 +388,9 @@ describe('createSandboxControlClient', () => {
           nativeRuntimeRetirement?: boolean;
           connectionRecovery?: boolean;
           eventReceipts?: boolean;
+          runtimeIsolation?: boolean;
+          runtimeRecovery?: boolean;
+          scopedCleanupResult?: boolean;
           workingBranches?: boolean;
         };
       };
@@ -384,6 +406,9 @@ describe('createSandboxControlClient', () => {
         nativeRuntimeRetirement: true,
         connectionRecovery: true,
         eventReceipts: true,
+        runtimeIsolation: true,
+        runtimeRecovery: true,
+        scopedCleanupResult: true,
         workingBranches: true,
       },
     });

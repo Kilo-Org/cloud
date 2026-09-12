@@ -101,7 +101,7 @@ export function AgentSessionListContent({
 
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const { bottom, left, right } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const { deleteSession, renameSession } = useSessionMutations();
   // The stored refetch resolves void: a pull failure surfaces through the
@@ -130,7 +130,9 @@ export function AgentSessionListContent({
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it or the last rows are stuck underneath it. The history list
-  // owns no FAB, so tab-bar-only clearance is the only inset it needs.
+  // owns no FAB, so tab-bar-only clearance plus the landscape side insets that
+  // keep row text clear of the sensor housing (portrait insets are 0, keeping
+  // the geometry unchanged) are the only insets it needs.
   const tabBarOnlyClearanceStyle = useMemo(
     () => ({
       paddingBottom: getEffectiveTabBarHeight({
@@ -138,8 +140,10 @@ export function AgentSessionListContent({
         platform: Platform.OS,
         fontScale,
       }),
+      paddingLeft: left,
+      paddingRight: right,
     }),
-    [bottom, fontScale]
+    [bottom, fontScale, left, right]
   );
 
   // Pure body decision — see `session-list-body-model.ts`.

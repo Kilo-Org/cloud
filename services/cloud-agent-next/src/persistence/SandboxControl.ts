@@ -209,6 +209,7 @@ import type {
   StopResult,
 } from '../sandbox-control/provider.js';
 import { nextEnsureReadyStep } from '../sandbox-control/ensure-ready.js';
+import { ControlRequestError } from '../sandbox-session/control-dispatch.js';
 import {
   planReconciliation,
   shouldRearmReconciliation,
@@ -293,6 +294,10 @@ function allocationIdentity(physical: PhysicalRecord) {
   return physical.providerRef === null
     ? undefined
     : allocationIdentitySchema.parse({ kind: 'provider', id: physical.providerRef });
+}
+
+function isLivePhysicalRecord(physical: PhysicalRecord): boolean {
+  return !physical.stopTombstone && (physical.state === 'creating' || physical.state === 'running');
 }
 
 type PersistedWrapperRuntime = SandboxControlConnectionIdentity & {
@@ -874,7 +879,13 @@ export class SandboxControl extends DurableObject<Env> {
     const runtime = usesMaintenanceChannel
       ? this.socketHandler.getConnectionIdentity()
       : this.readyWrapperRuntime();
-    if (!runtime) throw new Error('Sandbox runtime is not ready');
+    if (!runtime)
+      throw new ControlRequestError({
+        code: 'not_ready',
+        message: 'Sandbox runtime is not ready',
+        retryable: true,
+        admission: 'not-admitted',
+      });
     if (
       expectedWrapperInstanceId !== undefined &&
       runtime.wrapperInstanceId !== expectedWrapperInstanceId
@@ -922,7 +933,12 @@ export class SandboxControl extends DurableObject<Env> {
       physical.providerRef !== runtime.providerInstanceId ||
       !isCurrent()
     ) {
-      throw new Error('Sandbox runtime is not ready');
+      throw new ControlRequestError({
+        code: 'not_ready',
+        message: 'Sandbox runtime is not ready',
+        retryable: true,
+        admission: 'not-admitted',
+      });
     }
     const scopedSession = scopedStop
       ? sessionRequestIdentitySchema.safeParse(input.session)
@@ -1946,7 +1962,10 @@ export class SandboxControl extends DurableObject<Env> {
       ) {
         throw new Error('Sandbox containment mode conflicts with the session');
       }
-      if (await this.bindAcquisition(acquisition, physical, sessionId))
+      if (
+        (await this.bindAcquisition(acquisition, physical, sessionId)) &&
+        isLivePhysicalRecord(physical)
+      )
         return { physical, action: 'reuse' };
       if (physical.state !== 'stopped' || physical.stopTombstone) {
         return { physical, action: 'wait' };
@@ -1993,8 +2012,7 @@ export class SandboxControl extends DurableObject<Env> {
     ) {
       return false;
     }
-    const available =
-      !physical.stopTombstone && (physical.state === 'creating' || physical.state === 'running');
+    const available = isLivePhysicalRecord(physical);
     if (!receipt && available) {
       if (!allocation) throw new Error('Sandbox allocation identity is unavailable');
       receipts.push({ ...acquisition, allocation });

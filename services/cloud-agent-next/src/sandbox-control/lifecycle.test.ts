@@ -1307,10 +1307,13 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(h.allocations.size).toBe(0);
     expect((await h.control.getPhysicalRecord()).createIntent).toEqual(claimed.createIntent);
     await h.fireAlarm();
-    await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'failed' });
+    // The spent receipt must not create a second allocation; a failed record now
+    // waits and enters the existing release path instead of being reused.
+    await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'stopping' });
     expect(mocks.providerCreate).not.toHaveBeenCalled();
-    expect(h.allocations.size).toBe(0);
-    expect((await h.control.getPhysicalRecord()).createIntent).toEqual(claimed.createIntent);
+    expect(h.records.get('acquisition_receipts')).toEqual([
+      { ...acquisition, allocation: { kind: 'intent', id: claimed.createIntent?.intentId } },
+    ]);
   });
 
   it('rejects a lost acquisition reply after reaping and lets only a new request acquire a replacement', async () => {
@@ -1339,6 +1342,67 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(h.allocations.size).toBe(2);
     expect(mocks.providerCreate).toHaveBeenCalledTimes(2);
     expect(h.runtime(replacement.providerInstanceId)?.startProcess).toHaveBeenCalledOnce();
+  });
+
+  it('does not reuse a receipt-bound allocation observed failed and only rotates after stopped', async () => {
+    const h = await harness();
+    const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
+    await h.acquire(acquisition);
+    const original = await h.ready();
+    await h.control.observeProvider('terminal');
+    expect((await h.control.getPhysicalRecord()).state).toBe('failed');
+    expect(mocks.providerCreate).toHaveBeenCalledOnce();
+
+    const sameId = await h.acquire(acquisition).then(
+      value => ({ value }),
+      error => ({ error })
+    );
+    // No second allocation is created for the spent receipt. If the release
+    // confirmed the stop inside this call, it surfaces as acquisition loss.
+    expect(mocks.providerCreate).toHaveBeenCalledOnce();
+    expect(h.allocations.size).toBe(1);
+    if ('error' in sameId) {
+      expect(isSandboxAcquisitionLostError(sameId.error)).toBe(true);
+    } else {
+      expect(sameId.value.physical).toBe('stopping');
+    }
+
+    if ((await h.control.getPhysicalRecord()).state !== 'stopped') {
+      await h.control.recordStopAttempt();
+      await h.flush();
+    }
+    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
+    const lost = await h.acquire(acquisition).then(
+      value => value,
+      error => error
+    );
+    expect(isSandboxAcquisitionLostError(lost)).toBe(true);
+    expect(mocks.providerCreate).toHaveBeenCalledOnce();
+
+    await h.acquire({ ...acquisition, id: 'attempt_b' });
+    const replacement = await h.ready();
+    expect(replacement.providerInstanceId).not.toBe(original.providerInstanceId);
+    expect(h.allocations.size).toBe(2);
+    expect(mocks.providerCreate).toHaveBeenCalledTimes(2);
+    expect(h.runtime(replacement.providerInstanceId)?.startProcess).toHaveBeenCalledOnce();
+  });
+
+  it('refuses a control request before send as a retryable not_ready admission', async () => {
+    const h = await harness();
+    const refusal = await h.control
+      .request({ operation: 'session.prompt', session: ROUTE, payload: PROMPT })
+      .then(
+        value => value,
+        error => error
+      );
+    expect(refusal).toMatchObject({
+      code: 'not_ready',
+      message: 'Sandbox runtime is not ready',
+      retryable: true,
+      admission: 'not-admitted',
+    });
+    expect((refusal as { rejectionReceived?: unknown }).rejectionReceived).toBeUndefined();
+    expect(h.sendRequest).not.toHaveBeenCalled();
   });
 
   it('binds warm acquisition before billing and rejects its late reply after replacement', async () => {

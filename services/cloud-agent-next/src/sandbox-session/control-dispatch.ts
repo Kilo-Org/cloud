@@ -29,6 +29,33 @@ export class ControlRequestError extends Error {
   }
 }
 
+const CONTROL_ERROR_OWN_FIELDS = Object.keys(controlErrorSchema.shape);
+
+/**
+ * Rebuild a peer-thrown control rejection into the local `ControlRequestError`.
+ * Custom prototypes do not survive Cloudflare RPC, so classify by the
+ * serializable fields the class owns. Only own values of the schema's fields
+ * are projected: Zod reads through the prototype chain, so an object whose
+ * fields are only inherited must not be reconstructed as a valid rejection.
+ * Own-field reads also preserve the non-enumerable own `Error.message`, which
+ * copying enumerable keys would drop. An already-local error is returned
+ * unchanged, and a malformed value is passed through for transport handling.
+ * `rejectionReceived` is never reconstructed: it is only set when a wrapper
+ * response frame was seen (`controlRequestResult`).
+ */
+export function reconstructControlRequestError(error: unknown): unknown {
+  if (error instanceof ControlRequestError) return error;
+  if (typeof error !== 'object' || error === null) return error;
+  const projection: Record<string, unknown> = {};
+  for (const field of CONTROL_ERROR_OWN_FIELDS) {
+    if (Object.hasOwn(error, field)) {
+      projection[field] = (error as Record<string, unknown>)[field];
+    }
+  }
+  const parsed = controlErrorSchema.safeParse(projection);
+  return parsed.success ? new ControlRequestError(parsed.data) : error;
+}
+
 export async function withDeliveryDeadline<T>(
   operation: () => Promise<T>,
   deadlineAt: number,

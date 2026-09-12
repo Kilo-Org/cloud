@@ -4085,6 +4085,145 @@ describe('SandboxSession orchestration', () => {
     });
   });
 
+  it('clears a serialized pre-send not_ready refusal so the next attempt really sends', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    const original = fixture.control.request.getMockImplementation();
+    if (!original) throw new Error('Missing control fixture');
+    let attachAttempts = 0;
+    delegateRequest(fixture, 'session.attach', async input => {
+      attachAttempts += 1;
+      if (attachAttempts === 1) {
+        // Cloudflare RPC serializes a rejection to its own fields; the custom
+        // prototype does not cross. The production control-rpc boundary must
+        // rebuild it into a local ControlRequestError.
+        throw Object.assign(new Error('Sandbox runtime is not ready'), {
+          name: 'ControlRequestError',
+          code: 'not_ready',
+          retryable: true,
+          admission: 'not-admitted',
+        });
+      }
+      return original(input);
+    });
+
+    await fixture.admit('a');
+    await fixture.flush();
+
+    expect(attachAttempts).toBe(1);
+    expect(fixture.record('a')).toMatchObject({ state: 'queued' });
+    // `record(false)` must run. A residual dispatched proof would reconcile a
+    // phantom operation on the next drain instead of sending.
+    expect(fixture.record('a')?.operations?.attach?.dispatched).toBe(false);
+    expect(fixture.terminalEvents()).toHaveLength(0);
+
+    const retryAt = fixture.alarmAt();
+    if (retryAt === null) throw new Error('Missing queue retry alarm');
+    vi.setSystemTime(retryAt);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(attachAttempts).toBe(2);
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
+    ).toHaveLength(2);
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
+    ).toHaveLength(1);
+    expect(fixture.record('a')).toMatchObject({ state: 'accepted' });
+  });
+
+  it('bounds a serialized pre-send not_ready attach refusal by the original head deadline', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    let attachAttempts = 0;
+    delegateRequest(fixture, 'session.attach', async () => {
+      attachAttempts += 1;
+      throw Object.assign(new Error('Sandbox runtime is not ready'), {
+        name: 'ControlRequestError',
+        code: 'not_ready',
+        retryable: true,
+        admission: 'not-admitted',
+      });
+    });
+
+    await fixture.admit('a');
+    await fixture.flush();
+
+    const deadlineAt = fixture.record('a')?.deliveryDeadlineAt;
+    if (deadlineAt === undefined) throw new Error('Missing head delivery deadline');
+    expect(deadlineAt).toBe(Date.now() + SESSION_DELIVERY_TIMEOUT_MS);
+    // The ~11 minute bound is far beyond the 5-minute E2E recovery budget.
+    expect(SESSION_DELIVERY_TIMEOUT_MS).toBe(11 * 60_000);
+
+    let guard = 0;
+    while (fixture.record('a')?.state === 'queued') {
+      if (++guard > 300) throw new Error('Attach refusal did not reach the head deadline');
+      const retryAt = fixture.alarmAt();
+      if (retryAt === null) throw new Error('Missing queue retry alarm');
+      vi.setSystemTime(retryAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+    }
+
+    expect(attachAttempts).toBeGreaterThan(1);
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      failedReason: 'preparation_timeout',
+      terminalAt: deadlineAt,
+    });
+    expect(fixture.terminalEvents()).toHaveLength(1);
+  });
+
+  it('exhausts a serialized pre-send not_ready prompt refusal at the cap before the head deadline', async () => {
+    const fixture = sessionFixture();
+    let promptAttempts = 0;
+    delegateRequest(fixture, 'session.prompt', async () => {
+      promptAttempts += 1;
+      throw Object.assign(new Error('Sandbox runtime is not ready'), {
+        name: 'ControlRequestError',
+        code: 'not_ready',
+        retryable: true,
+        admission: 'not-admitted',
+      });
+    });
+
+    await fixture.admit('a');
+    await fixture.flush();
+
+    const deadlineAt = fixture.record('a')?.deliveryDeadlineAt;
+    if (deadlineAt === undefined) throw new Error('Missing head delivery deadline');
+    expect(fixture.record('a')?.promptFailures).toBe(1);
+
+    for (let attempt = 2; attempt <= PROMPT_FAILURE_LIMIT; attempt++) {
+      const retryAt = fixture.alarmAt();
+      if (retryAt === null) throw new Error('Missing queue retry alarm');
+      vi.setSystemTime(retryAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+      if (attempt < PROMPT_FAILURE_LIMIT) expect(fixture.record('a')?.promptFailures).toBe(attempt);
+    }
+
+    expect(promptAttempts).toBe(PROMPT_FAILURE_LIMIT);
+    expect(Date.now()).toBeLessThan(deadlineAt);
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      failedReason: 'prompt_exhausted',
+      promptFailures: PROMPT_FAILURE_LIMIT,
+    });
+    expect(fixture.terminalEvents()).toHaveLength(1);
+  });
+
   it.each(['unmarked', 'permanent', 'overloaded', 'hangs'] as const)(
     'fails the waiting queue immediately for an ensureReady failure that is %s',
     async failure => {

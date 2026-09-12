@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { type VoiceInputControllerSnapshot } from './voice-input-controller';
+import { useVoiceInputLanguage } from './voice-input-language-preference';
 import { voiceInputController } from './native-voice-input';
 import { type VoiceInputStatus } from './voice-input-state';
 import { resolveOwnerVoiceInputView } from './voice-input-view-state';
@@ -74,6 +75,12 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
   const getUserIdRef = useRef(userId);
   getUserIdRef.current = userId;
 
+  // Read through a ref so an action created once in `actionsRef` always sees
+  // the latest persisted language choice.
+  const voiceLanguage = useVoiceInputLanguage();
+  const voiceLanguageRef = useRef(voiceLanguage);
+  voiceLanguageRef.current = voiceLanguage;
+
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const actionsRef = useRef<VoiceInputActions | null>(null);
@@ -81,6 +88,7 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
     controller: voiceInputController,
     getDisabled: () => getDisabledRef.current,
     getDraft: () => getDraftRef.current(),
+    getLanguageTag: () => voiceLanguageRef.current,
     getOnDraftChange: () => getOnDraftChangeRef.current,
     getOwner: () => owner,
     getUserId: () => getUserIdRef.current,

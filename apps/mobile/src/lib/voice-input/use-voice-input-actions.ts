@@ -50,6 +50,7 @@ type VoiceInputActionsConfig = {
   controller: VoiceInputControllerLike;
   getDisabled: () => boolean;
   getDraft: () => string;
+  getLanguageTag?: () => string | null;
   getOnDraftChange: () => (draft: string) => void;
   getOwner: () => string;
   getUserId: () => string | undefined;
@@ -125,7 +126,15 @@ export function shouldAbortVoiceInputForOwner(
 }
 
 export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceInputActions {
-  const { controller, getDisabled, getDraft, getOnDraftChange, getOwner, getUserId } = config;
+  const {
+    controller,
+    getDisabled,
+    getDraft,
+    getLanguageTag,
+    getOnDraftChange,
+    getOwner,
+    getUserId,
+  } = config;
 
   const abort = async (): Promise<boolean> => {
     const result = await controller.abort(getOwner());
@@ -162,7 +171,8 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
       return;
     }
 
-    const languageTag = await resolveVoiceInputStartLanguageTag(i18n.language);
+    const chosen = getLanguageTag?.() ?? null;
+    const languageTag = chosen ?? (await resolveVoiceInputStartLanguageTag(i18n.language));
 
     const startWith = async (requiresOnDeviceRecognition: boolean): Promise<void> => {
       const startOptions: VoiceInputStartOptions = {

@@ -336,19 +336,6 @@ describe('Slack provider installation activation', () => {
         teamId: 'T_ORPHANED',
       });
       expect(retry).toMatchObject({ generation: 1 });
-      if (!retry) throw new Error('Expected retry claim');
-      await expect(
-        activateReservedSlackInstallation({
-          owner: retryOwner,
-          teamId: 'T_ORPHANED',
-          installation: { botToken: 'xoxb-retry', teamName: 'Workspace' },
-          grantedScopes: null,
-          claim: retry,
-          ...pendingCodec,
-          writeCredential: writeCredential as never,
-          setChatSdkInstallation: async () => undefined,
-        })
-      ).resolves.toMatchObject({ integration_status: 'active' });
     }
   );
 

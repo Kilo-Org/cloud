@@ -4491,7 +4491,6 @@ export const provider_installation_reservations = pgTable(
     generation: integer().notNull().default(1),
     active_generation: integer(),
     status: text().$type<'pending' | 'active' | 'deleting'>().notNull().default('pending'),
-    cleanup_requires_revoke: boolean().notNull().default(false),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })

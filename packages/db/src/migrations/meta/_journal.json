@@ -1723,13 +1723,6 @@
       "when": 1789155863705,
       "tag": "0245_whole_doctor_spectrum",
       "breakpoints": true
-    },
-    {
-      "idx": 246,
-      "version": "7",
-      "when": 1789156708300,
-      "tag": "0246_nebulous_clint_barton",
-      "breakpoints": true
     }
   ]
 }

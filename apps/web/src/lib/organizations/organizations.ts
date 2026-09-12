@@ -22,8 +22,6 @@ import {
   organization_user_usage,
   organizations,
   provider_oauth_attempts,
-  platform_integrations,
-  provider_installation_reservations,
   external_side_effect_outbox,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
@@ -1090,46 +1088,6 @@ export async function markOrganizationAsDeleted(
       .where(eq(organizations.id, organizationId))
       .for('update');
     if (!organization) return;
-    await tx
-      .select({ id: provider_installation_reservations.id })
-      .from(provider_installation_reservations)
-      .where(eq(provider_installation_reservations.owned_by_organization_id, organizationId))
-      .for('update');
-    const slackIntegrations = await tx
-      .select({ id: platform_integrations.id, status: platform_integrations.integration_status })
-      .from(platform_integrations)
-      .where(
-        and(
-          eq(platform_integrations.owned_by_organization_id, organizationId),
-          eq(platform_integrations.platform, 'slack')
-        )
-      )
-      .for('update');
-    for (const integration of slackIntegrations) {
-      if (integration.status === 'pending') {
-        await tx.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
-        continue;
-      }
-      await tx
-        .update(provider_installation_reservations)
-        .set({
-          status: 'deleting',
-          active_generation: null,
-          oauth_attempt_id: null,
-          cleanup_requires_revoke: true,
-          expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .where(eq(provider_installation_reservations.platform_integration_id, integration.id));
-      await tx
-        .update(platform_integrations)
-        .set({
-          integration_status: 'suspended',
-          suspended_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .where(eq(platform_integrations.id, integration.id));
-    }
     await tx
       .delete(provider_oauth_attempts)
       .where(eq(provider_oauth_attempts.owned_by_organization_id, organizationId));

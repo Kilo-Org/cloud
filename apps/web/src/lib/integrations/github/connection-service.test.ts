@@ -16,6 +16,7 @@ import {
   fetchGitHubInstallationDetails,
   fetchGitHubRepositoriesForMaintenance,
 } from '@/lib/integrations/platforms/github/adapter';
+import { disconnectGitHubInstallation } from '@/lib/integrations/db/github-installations';
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchGitHubInstallationDetails: jest.fn(),
@@ -205,6 +206,86 @@ describe('GitHub connection attempt persistence', () => {
         .from(platform_integrations)
         .where(eq(platform_integrations.id, completed.integrationId))
     ).resolves.toHaveLength(1);
+
+    // Authorization provenance must reflect the identity that actually
+    // completed the connection, not be left null.
+    const [integrationRow] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, completed.integrationId));
+    expect(integrationRow).toMatchObject({
+      github_authorized_by_user_id: userId,
+      github_authorized_user_id: '456',
+      github_authorized_at: expect.any(String),
+    });
+  });
+
+  test('completes a fresh connection attempt for the same installation after a prior local disconnect', async () => {
+    const personalCandidate = {
+      ...candidate,
+      accountLogin: 'picker',
+      accountType: 'User' as const,
+    };
+    const firstAttemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'user', id: userId },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId: firstAttemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [personalCandidate],
+    });
+    await selectGitHubConnectionInstallation({
+      attemptId: firstAttemptId,
+      userId,
+      installationId: '123',
+    });
+    const firstCompleted = await completeGitHubConnectionAttempt({
+      attemptId: firstAttemptId,
+      userId,
+      githubUserId: '456',
+      candidate: personalCandidate,
+      authorizeOwner: async () => {},
+    });
+    expect(firstCompleted.ok).toBe(true);
+    if (!firstCompleted.ok) throw new Error('Expected initial completion');
+
+    await disconnectGitHubInstallation({ type: 'user', id: userId }, firstCompleted.integrationId);
+
+    const secondAttemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'user', id: userId },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId: secondAttemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [personalCandidate],
+    });
+    await selectGitHubConnectionInstallation({
+      attemptId: secondAttemptId,
+      userId,
+      installationId: '123',
+    });
+    const secondCompleted = await completeGitHubConnectionAttempt({
+      attemptId: secondAttemptId,
+      userId,
+      githubUserId: '456',
+      candidate: personalCandidate,
+      authorizeOwner: async () => {},
+    });
+    expect(secondCompleted).toEqual({ ok: true, integrationId: firstCompleted.integrationId });
+
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, firstCompleted.integrationId));
+    expect(row).toMatchObject({ github_disconnected_at: null, integration_status: 'active' });
   });
 
   test('rejects completion when verified identity does not match the locked attempt', async () => {

@@ -12,6 +12,7 @@ import {
   deleteIntegration,
   deleteGitHubInstallationRecords,
   deleteIntegrationForOwner,
+  autoCompleteInstallation,
   createPendingIntegration,
   findIntegrationByInstallationId,
   findGitHubBotLinkIntegrations,
@@ -112,6 +113,55 @@ describe('upsertPlatformIntegrationForOwner', () => {
     expect(row.owned_by_user_id).toBe(userId);
     expect(row.owned_by_organization_id).toBeNull();
     expect(row.platform).toBe('github');
+  });
+
+  test('records authorization provenance when a verified GitHub identity is supplied', async () => {
+    const owner: Owner = { type: 'user', id: userId };
+    const result = await upsertPlatformIntegrationForOwner(owner, {
+      ...baseInstallData(INSTALLATION_ID),
+      kiloUserId: userId,
+      githubUserId: '999888',
+    });
+    expect(result).toEqual({ ok: true });
+
+    const [inserted] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, INSTALLATION_ID));
+    expect(inserted).toMatchObject({
+      github_authorized_by_user_id: userId,
+      github_authorized_user_id: '999888',
+      github_authorized_at: expect.any(String),
+    });
+
+    // A later update from a different verified identity refreshes provenance.
+    const updateResult = await upsertPlatformIntegrationForOwner(owner, {
+      ...baseInstallData(INSTALLATION_ID),
+      kiloUserId: userId,
+      githubUserId: '111222',
+    });
+    expect(updateResult).toEqual({ ok: true });
+    const [updated] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, INSTALLATION_ID));
+    expect(updated).toMatchObject({ github_authorized_user_id: '111222' });
+  });
+
+  test('leaves authorization provenance null when no verified identity is supplied', async () => {
+    const owner: Owner = { type: 'user', id: userId };
+    const result = await upsertPlatformIntegrationForOwner(owner, baseInstallData(INSTALLATION_ID));
+    expect(result).toEqual({ ok: true });
+
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, INSTALLATION_ID));
+    expect(row).toMatchObject({
+      github_authorized_by_user_id: null,
+      github_authorized_user_id: null,
+      github_authorized_at: null,
+    });
   });
 
   test('inserts a new GitHub installation for an org owner', async () => {
@@ -411,6 +461,52 @@ describe('upsertPlatformIntegrationForOwner', () => {
       .from(platform_integrations)
       .where(eq(platform_integrations.platform_account_id, accountId));
     expect(rows).toHaveLength(2);
+  });
+
+  test('autoCompleteInstallation records the original requester as authorization provenance', async () => {
+    const accountId = `autocomplete-provenance-${Date.now()}`;
+    const pending = await createPendingIntegration({
+      userId,
+      requester: {
+        kilo_user_id: userId,
+        kilo_user_email: 'requester@example.com',
+        kilo_user_name: 'Requester',
+        requested_at: new Date().toISOString(),
+      },
+      githubRequester: { id: 'github-requester-42', login: 'requester' },
+      githubRequest: {
+        id: 'github-request-1',
+        accountId,
+        accountLogin: 'target-org',
+      },
+      githubAppType: 'standard',
+    });
+    if (!pending) throw new Error('Expected a pending row to be created');
+
+    await autoCompleteInstallation({
+      integrationId: pending.id,
+      installationData: {
+        installation_id: INSTALLATION_ID,
+        account_id: accountId,
+        account_login: 'target-org',
+        repository_selection: 'all',
+        permissions: {},
+        events: [],
+        created_at: new Date().toISOString(),
+      },
+      existingMetadata: pending.metadata as Record<string, unknown>,
+    });
+
+    const [completed] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, pending.id));
+    expect(completed).toMatchObject({
+      integration_status: 'active',
+      github_authorized_by_user_id: userId,
+      github_authorized_user_id: 'github-requester-42',
+      github_authorized_at: expect.any(String),
+    });
   });
 
   test('same-owner refresh with app type is not confused by another owner other-app-type row', async () => {

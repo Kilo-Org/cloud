@@ -1307,6 +1307,16 @@ describe('GET /api/integrations/github/callback admin proof', () => {
       installationId: INSTALLATION_ID,
     });
     expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalled();
+    // Even on the legacy access-list admin check path, the OAuth code
+    // exchange resolved a real GitHub identity — it must still be recorded
+    // as authorization provenance rather than left null.
+    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        kiloUserId: USER_ID,
+        githubUserId: GITHUB_USER_ID,
+      })
+    );
   });
 
   test('rejects an install when admin check returns false', async () => {

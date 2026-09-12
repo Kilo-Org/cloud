@@ -997,13 +997,7 @@ async function cleanupDeactivatedSlackInstallation(
   if (deactivated.locallyDeleted) {
     if (deactivated.accessToken) {
       try {
-        const revoked = await withSlackSdkTimeout(revokeSlackToken(deactivated.accessToken));
-        if (!revoked) {
-          captureException(new Error('Legacy Enterprise Slack token revocation failed'), {
-            tags: { component: 'slack-service', op: 'legacy-enterprise-revoke' },
-            extra: { integrationId: deactivated.integrationId },
-          });
-        }
+        await withSlackSdkTimeout(revokeSlackToken(deactivated.accessToken));
       } catch (error) {
         captureException(error, {
           tags: { component: 'slack-service', op: 'legacy-enterprise-revoke' },
@@ -1150,15 +1144,6 @@ async function cleanupDeactivatedSlackInstallation(
       )
       .for('update');
     if (!current) return false;
-    await tx
-      .delete(provider_installation_reservations)
-      .where(
-        and(
-          eq(provider_installation_reservations.id, current.id),
-          eq(provider_installation_reservations.status, 'deleting'),
-          eq(provider_installation_reservations.generation, replacement.generation)
-        )
-      );
     await tx
       .delete(platform_integrations)
       .where(

@@ -217,13 +217,6 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL(successPath, APP_URL));
     }
     if (installation.isEnterpriseInstall) {
-      await cancelProviderOAuthAttempt({
-        actorUserId: user.id,
-        owner,
-        provider: 'slack',
-        state,
-        purpose: 'provider_install',
-      });
       throw new Error('Enterprise Grid is not supported for shared GitHub Slack workflows');
     }
     await completePendingSlackDeletion(

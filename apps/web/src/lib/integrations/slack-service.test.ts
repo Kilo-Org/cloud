@@ -126,7 +126,7 @@ describe('slack-service uninstallApp', () => {
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T123');
     expect(deleteChatSdkIdentityCache).toHaveBeenCalledWith('T123');
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(3);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
     expect(deleteChatSdkInstallation.mock.invocationCallOrder[0]).toBeLessThan(
       deleteChatSdkIdentityCache.mock.invocationCallOrder[0]
     );
@@ -173,13 +173,12 @@ describe('slack-service uninstallApp', () => {
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
   });
 
-  it('runs identity cleanup before terminalizing suspended integrations', async () => {
+  it('disconnects suspended integrations without deleting shared Slack installation state', async () => {
     mockUninstallRows(
       buildSlackIntegration({
         integration_status: 'suspended',
         platform_installation_id: null,
         platform_account_id: 'T456',
-        cleanup_stage: 'identity',
       })
     );
     const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
@@ -191,8 +190,8 @@ describe('slack-service uninstallApp', () => {
 
     expect(mockAuthRevoke).not.toHaveBeenCalled();
     expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
-    expect(deleteChatSdkIdentityCache).toHaveBeenCalledWith('T456');
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(3);
+    expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
   });
 });
 

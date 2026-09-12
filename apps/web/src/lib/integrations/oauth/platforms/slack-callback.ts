@@ -7,9 +7,7 @@ import {
   activateReservedSlackInstallation,
   completePendingSlackDeletion,
   SlackWorkspaceAlreadyConnectedError,
-  upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
-import { ownerHasSharedGitHubInstallation } from '@/lib/integrations/provider-oauth-attempts';
 import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
@@ -142,17 +140,6 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       code,
       SLACK_REDIRECT_URI
     );
-    if (installation.isEnterpriseInstall) {
-      if (await ownerHasSharedGitHubInstallation(owner)) {
-        throw new Error('Enterprise Grid is not supported for shared GitHub Slack workflows');
-      }
-      await slackAdapter.setInstallation(teamId, installation);
-      await upsertSlackInstallation({ owner, teamId, installation });
-      const successPath = verified.returnTo
-        ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=slack_installed')
-        : buildIntegrationOAuthRedirectPath(PLATFORM.SLACK, owner, 'success=installed');
-      return NextResponse.redirect(new URL(successPath, APP_URL));
-    }
     await completePendingSlackDeletion(
       teamId,
       id => slackAdapter.deleteInstallation(id),
@@ -227,7 +214,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
         source: 'slack_oauth',
       },
       extra: {
-        hasState: Boolean(state),
+        state,
         hasCode: !!searchParams.get('code'),
       },
     });

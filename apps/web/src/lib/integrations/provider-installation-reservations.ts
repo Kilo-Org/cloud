@@ -1,10 +1,11 @@
 import 'server-only';
 
-import { and, eq, gt, isNull, lt, or } from 'drizzle-orm';
+import { and, eq, gt, isNull, lt, or, sql } from 'drizzle-orm';
 import {
   bot_requests,
   platform_integrations,
   provider_installation_pending_credentials,
+  provider_installation_aliases,
   provider_installation_reservations,
   provider_oauth_attempts,
 } from '@kilocode/db/schema';
@@ -141,6 +142,106 @@ export async function claimSlackProviderInstallation(input: {
     }
     throw error;
   }
+}
+
+export async function recordSlackInstallationAlias(input: {
+  workspaceId: string;
+  installationId: string;
+  eventTime?: number;
+}): Promise<void> {
+  const eventTime = input.eventTime;
+  if (input.workspaceId === input.installationId || eventTime === undefined) return;
+  const [candidate] = await db
+    .select()
+    .from(provider_installation_reservations)
+    .where(
+      and(
+        eq(provider_installation_reservations.provider, 'slack'),
+        eq(provider_installation_reservations.provider_installation_id, input.installationId),
+        or(
+          eq(provider_installation_reservations.status, 'active'),
+          and(
+            eq(provider_installation_reservations.status, 'pending'),
+            sql`${provider_installation_reservations.active_generation} IS NOT NULL`
+          )
+        )
+      )
+    )
+    .limit(1);
+  if (!candidate) return;
+  const owner: Owner | null = candidate.owned_by_organization_id
+    ? { type: 'org', id: candidate.owned_by_organization_id }
+    : candidate.owned_by_user_id
+      ? { type: 'user', id: candidate.owned_by_user_id }
+      : null;
+  if (!owner) return;
+  await db.transaction(async tx => {
+    await lockProviderOAuthOwnerRow(tx, owner);
+    const [reservation] = await tx
+      .select()
+      .from(provider_installation_reservations)
+      .where(eq(provider_installation_reservations.id, candidate.id))
+      .for('update');
+    if (!reservation) return;
+    const generation = reservation.active_generation ?? reservation.generation;
+    const [existing] = await tx
+      .select()
+      .from(provider_installation_aliases)
+      .where(eq(provider_installation_aliases.workspace_id, input.workspaceId))
+      .for('update');
+    if (
+      existing &&
+      (existing.event_time > eventTime ||
+        (existing.event_time === eventTime &&
+          (existing.reservation_id !== reservation.id || existing.generation !== generation)))
+    ) {
+      return;
+    }
+    await tx
+      .insert(provider_installation_aliases)
+      .values({
+        workspace_id: input.workspaceId,
+        reservation_id: reservation.id,
+        generation,
+        event_time: eventTime,
+      })
+      .onConflictDoUpdate({
+        target: provider_installation_aliases.workspace_id,
+        set: {
+          reservation_id: reservation.id,
+          generation,
+          event_time: eventTime,
+          updated_at: new Date().toISOString(),
+        },
+        setWhere: or(
+          lt(provider_installation_aliases.event_time, eventTime),
+          and(
+            eq(provider_installation_aliases.event_time, eventTime),
+            eq(provider_installation_aliases.reservation_id, reservation.id),
+            eq(provider_installation_aliases.generation, generation)
+          )
+        ),
+      });
+  });
+}
+
+export async function resolveSlackInstallationAlias(workspaceId: string): Promise<string> {
+  const [alias] = await db
+    .select({ installationId: provider_installation_reservations.provider_installation_id })
+    .from(provider_installation_aliases)
+    .innerJoin(
+      provider_installation_reservations,
+      and(
+        eq(provider_installation_aliases.reservation_id, provider_installation_reservations.id),
+        eq(
+          provider_installation_aliases.generation,
+          sql`coalesce(${provider_installation_reservations.active_generation}, ${provider_installation_reservations.generation})`
+        )
+      )
+    )
+    .where(eq(provider_installation_aliases.workspace_id, workspaceId))
+    .limit(1);
+  return alias?.installationId ?? workspaceId;
 }
 
 export async function claimLegacySlackProviderInstallation(

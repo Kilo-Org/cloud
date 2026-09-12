@@ -5,6 +5,7 @@ import {
   platform_integrations,
   provider_installation_reservations,
   provider_installation_pending_credentials,
+  provider_installation_aliases,
   provider_oauth_attempts,
   slack_oauth_credentials,
 } from '@kilocode/db/schema';
@@ -305,8 +306,6 @@ async function persistSlackCredential({
     owner,
     botToken: installation.botToken,
     botUserId: installation.botUserId ?? null,
-    slackEnterpriseId: installation.enterpriseId ?? null,
-    isEnterpriseInstall: installation.isEnterpriseInstall ?? false,
   });
 }
 
@@ -694,9 +693,6 @@ async function completeReservedSlackInstallation(
 export async function activateReservedSlackInstallation(
   input: ReservedSlackInstallationInput
 ): Promise<PlatformIntegration> {
-  if (input.installation.isEnterpriseInstall) {
-    throw new Error('Enterprise Grid is not supported for shared Slack activation');
-  }
   await prepareReservedSlackInstallation(input);
   return completeReservedSlackInstallation(input);
 }
@@ -956,6 +952,34 @@ async function cleanupDeactivatedSlackInstallation(
       if (!options.deleteChatSdkIdentityCache) return false;
       try {
         await withSlackSdkTimeout(options.deleteChatSdkIdentityCache(deactivated.teamId));
+        await tx
+          .update(provider_installation_reservations)
+          .set({ cleanup_stage: 'aliases', updated_at: new Date().toISOString() })
+          .where(eq(provider_installation_reservations.id, replacement.id));
+        cleanupStage = 'aliases';
+      } catch (error) {
+        captureException(error, {
+          tags: { component: 'slack-service', op: 'delete-sdk-identity' },
+          extra: { integrationId: deactivated.integrationId },
+        });
+        return false;
+      }
+    }
+    if (cleanupStage === 'aliases' && deactivated.wasActive) {
+      if (!options.deleteChatSdkIdentityCache) return false;
+      try {
+        const aliases = await tx
+          .select({ workspaceId: provider_installation_aliases.workspace_id })
+          .from(provider_installation_aliases)
+          .where(eq(provider_installation_aliases.reservation_id, replacement.id))
+          .limit(100);
+        for (const alias of aliases) {
+          await withSlackSdkTimeout(options.deleteChatSdkIdentityCache(alias.workspaceId));
+          await tx
+            .delete(provider_installation_aliases)
+            .where(eq(provider_installation_aliases.workspace_id, alias.workspaceId));
+        }
+        if (aliases.length === 100) return false;
       } catch (error) {
         captureException(error, {
           tags: { component: 'slack-service', op: 'delete-sdk-identity' },
@@ -1055,6 +1079,22 @@ export async function completePendingSlackDeletion(
     { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
   );
   if (completed) return true;
+  const [currentReservation] = await db
+    .select({ cleanupStage: provider_installation_reservations.cleanup_stage })
+    .from(provider_installation_reservations)
+    .where(eq(provider_installation_reservations.id, reservation.id))
+    .limit(1);
+  const [remaining] = await db
+    .select({ id: provider_installation_aliases.workspace_id })
+    .from(provider_installation_aliases)
+    .where(eq(provider_installation_aliases.reservation_id, reservation.id))
+    .limit(1);
+  if (currentReservation?.cleanupStage === 'aliases' && !remaining) {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.id, reservation.platform_integration_id));
+    return true;
+  }
   return false;
 }
 
@@ -1222,23 +1262,6 @@ export async function getAccessTokenFromInstallation(
   integration: PlatformIntegration
 ): Promise<string | null> {
   return getSlackAccessToken(integration);
-}
-
-export async function getUnsharedEnterpriseSlackInstallation(
-  integration: PlatformIntegration
-): Promise<SlackInstallation | null> {
-  const owner = getOwnerFromInstallation(integration);
-  if (!owner) return null;
-  const credential = await getSlackCredentialByIntegrationId(integration.id);
-  if (!credential?.is_enterprise_install) return null;
-  const botToken = decryptSlackBotToken(credential, owner);
-  if (!botToken) return null;
-  return {
-    botToken,
-    isEnterpriseInstall: true,
-    ...(credential.bot_user_id ? { botUserId: credential.bot_user_id } : {}),
-    ...(credential.slack_enterprise_id ? { enterpriseId: credential.slack_enterprise_id } : {}),
-  };
 }
 
 /**

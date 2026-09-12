@@ -127,7 +127,7 @@ describe('slack-service uninstallApp', () => {
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T123');
     expect(deleteChatSdkIdentityCache).toHaveBeenCalledWith('T123');
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(3);
     expect(deleteChatSdkInstallation.mock.invocationCallOrder[0]).toBeLessThan(
       deleteChatSdkIdentityCache.mock.invocationCallOrder[0]
     );
@@ -401,15 +401,13 @@ describe('upsertSlackInstallation', () => {
 
     await upsertSlackInstallation({ owner, teamId: 'T123', installation });
 
-    expect(mockWriteSlackCredential).toHaveBeenCalledWith(
-      expect.objectContaining({
-        integrationId: 'integration-1',
-        slackTeamId: 'T123',
-        owner,
-        botToken: 'xoxb-new-token',
-        botUserId: 'U_NEW_BOT',
-      })
-    );
+    expect(mockWriteSlackCredential).toHaveBeenCalledWith({
+      integrationId: 'integration-1',
+      slackTeamId: 'T123',
+      owner,
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+    });
   });
 
   it('dual-writes the bot token when refreshing an existing install', async () => {

@@ -1,5 +1,5 @@
 {
-  "id": "0d168799-31b0-4612-a396-66d7509df770",
+  "id": "5d96ee7c-7085-4a6c-be73-70cbb1a70d68",
   "prevId": "e00b62f1-939f-4d71-bf8f-4a5e9e304016",
   "version": "7",
   "dialect": "postgresql",
@@ -30689,6 +30689,92 @@
         "platform_oauth_credentials_credential_version_check": {
           "name": "platform_oauth_credentials_credential_version_check",
           "value": "\"platform_oauth_credentials\".\"credential_version\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.provider_installation_aliases": {
+      "name": "provider_installation_aliases",
+      "schema": "",
+      "columns": {
+        "workspace_id": {
+          "name": "workspace_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "reservation_id": {
+          "name": "reservation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "generation": {
+          "name": "generation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_time": {
+          "name": "event_time",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_provider_installation_aliases_reservation": {
+          "name": "IDX_provider_installation_aliases_reservation",
+          "columns": [
+            {
+              "expression": "reservation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "provider_installation_aliases_reservation_id_provider_installation_reservations_id_fk": {
+          "name": "provider_installation_aliases_reservation_id_provider_installation_reservations_id_fk",
+          "tableFrom": "provider_installation_aliases",
+          "tableTo": "provider_installation_reservations",
+          "columnsFrom": [
+            "reservation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "provider_installation_aliases_generation_check": {
+          "name": "provider_installation_aliases_generation_check",
+          "value": "\"provider_installation_aliases\".\"generation\" > 0"
         }
       },
       "isRLSEnabled": false

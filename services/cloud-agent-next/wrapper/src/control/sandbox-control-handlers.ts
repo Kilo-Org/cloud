@@ -606,16 +606,19 @@ export async function handleControlRequest(
   if (operation === 'session.operation.ack') return deps.operations.acknowledge(session, payload);
   const admission = deps.operations.admission(operation, session, payload, authorization);
   if (admission.kind === 'reply') return admission.result;
-  if (
-    (operation === 'session.prompt' || operation === 'session.terminal.create') &&
-    deps.kiloRuntimes?.prepareForNewWork?.(session.directory) === false
-  ) {
-    // A prompt must not count against the worker's prompt-failure budget while the
-    // native feed recovers: the worker retries `session_busy` without counting until
-    // the head deadline. Terminal creation keeps its non-retry-counted `not_ready`.
-    return operation === 'session.prompt'
-      ? rejectBeforeAdmission('session_busy', 'Native feed recovery is in progress', true)
-      : rejectBeforeAdmission('not_ready', 'Native feed recovery is in progress', true);
+  if (operation === 'session.prompt' || operation === 'session.terminal.create') {
+    if (
+      operation === 'session.prompt' &&
+      deps.kiloRuntimes?.feedRecovering?.(session.directory) === true
+    ) {
+      // A feed-recovery deferral must not count against the worker's prompt-failure
+      // budget: the worker retries `session_busy` without counting until the head
+      // deadline. A genuinely unavailable runtime keeps the established `not_ready`.
+      return rejectBeforeAdmission('session_busy', 'Native feed recovery is in progress', true);
+    }
+    if (deps.kiloRuntimes?.prepareForNewWork?.(session.directory) === false) {
+      return rejectBeforeAdmission('not_ready', 'Kilo worktree is not available', true);
+    }
   }
   if (
     (deps.signal?.aborted ||

@@ -35,6 +35,7 @@ export type WorktreeFeedSource = Readonly<{
 export type WorktreeFeed = {
   open(): Promise<void>;
   isFresh(): boolean;
+  isRecovering(): boolean;
   prepareForNewWork(): boolean;
   close(): void;
 };
@@ -261,6 +262,9 @@ export function createWorktreeFeed(options: {
     },
     isFresh() {
       return state === 'ready' && active?.feed?.isFresh() === true;
+    },
+    isRecovering() {
+      return isCurrent() && state === 'recovering';
     },
     prepareForNewWork() {
       if (!isCurrent() || state === 'unavailable') return false;

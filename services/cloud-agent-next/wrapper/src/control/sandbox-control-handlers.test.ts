@@ -727,6 +727,7 @@ describe('handleControlRequest', () => {
     const runtimes = handlerDeps.kiloRuntimes;
     if (!runtimes) throw new Error('Expected Kilo runtimes');
     runtimes.prepareForNewWork = () => false;
+    runtimes.feedRecovering = () => true;
 
     expect(
       await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
@@ -750,7 +751,7 @@ describe('handleControlRequest', () => {
       ok: false,
       error: {
         code: 'not_ready',
-        message: 'Native feed recovery is in progress',
+        message: 'Kilo worktree is not available',
         retryable: true,
         admission: 'not-admitted',
       },
@@ -773,6 +774,62 @@ describe('handleControlRequest', () => {
     });
   });
 
+  it('defers a prompt while the native feed is recovering', async () => {
+    const handlerDeps = deps();
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Expected Kilo runtimes');
+    runtimes.prepareForNewWork = () => false;
+    runtimes.feedRecovering = () => true;
+
+    expect(
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'session_busy',
+        message: 'Native feed recovery is in progress',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+  });
+
+  it('reports an unavailable worktree as not_ready rather than feed recovery', async () => {
+    const handlerDeps = deps();
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Expected Kilo runtimes');
+    runtimes.prepareForNewWork = () => false;
+    runtimes.feedRecovering = () => false;
+
+    expect(
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        message: 'Kilo worktree is not available',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+    expect(
+      await handleControlRequest(
+        'session.terminal.create',
+        session,
+        { operationId: '11111111-1111-4111-8111-111111111111' },
+        handlerDeps
+      )
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        message: 'Kilo worktree is not available',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+  });
+
   it('defers an authorized prompt before admission during feed recovery without retaining a receipt', async () => {
     const started = Promise.withResolvers<void>();
     const finished = Promise.withResolvers<Completion>();
@@ -787,6 +844,7 @@ describe('handleControlRequest', () => {
     const runtimes = handlerDeps.kiloRuntimes;
     if (!runtimes) throw new Error('Expected Kilo runtimes');
     runtimes.prepareForNewWork = () => false;
+    runtimes.feedRecovering = () => true;
     const authorization = {
       operation: 'session.prompt' as const,
       operationId: promptPayload.messageId,
@@ -818,6 +876,7 @@ describe('handleControlRequest', () => {
     expect(handlerDeps.operations.retained()).toEqual([]);
 
     runtimes.prepareForNewWork = () => true;
+    runtimes.feedRecovering = () => false;
     try {
       expect(
         await handleControlRequest(

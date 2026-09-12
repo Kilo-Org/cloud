@@ -36,6 +36,7 @@
     "cost": "Құны",
     "discard": "Бас тарту",
     "findings": "Анықталған мәселелер",
+    "mergeRequest": "біріктіру сұрауы",
     "notConnected": "Қосылмаған",
     "notifications": "Хабарландырулар",
     "pullRequest": "біріктіру сұрауы",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "Өзгерістердің бос жолы"
     },
     "connectionExpired": "GitHub қосылымының мерзімі аяқталды.",
+    "capabilities": {
+      "banner": {
+        "title": "Бұл провайдерде қолжетімсіз",
+        "accessibility": "Бұл провайдерде қолжетімсіз: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Біріктіру",
       "mergeNow": "Қазір біріктіру",
       "mergePullRequest": "Біріктіру сұрауын біріктіру",
+      "mergeTermTitle": "{{term}}н біріктіру",
       "enableAutoMerge": "Автоматты біріктіруді қосу",
       "disableAutoMerge": "Автоматты біріктіруді өшіру",
       "autoMergeOn": "Автоматты біріктіру қосулы",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "Біріктіргеннен кейін тармақты жою",
       "noEnabledMethods": "Бұл репозиторийде біріктіру әдістері қосылмаған. Репозиторий әкімшісінен біріктіру коммитін жасау, коммиттерді біріктіру немесе негізін ауыстыру әдісін қосуды сұраңыз.",
       "confirmTitle": "Біріктіру сұрауын біріктіру керек пе?",
+      "confirmTitleTerm": "{{term}}н біріктіру керек пе?",
       "confirmMessage": "Өзгерістеріңіз негізгі тармаққа біріктіріледі.",
       "enableAutoMergeConfirmTitle": "Автоматты біріктіруді қосу керек пе?",
       "enableAutoMergeConfirmMessage": "Барлық міндетті тексерулер сәтті аяқталғанда, GitHub бұл біріктіру сұрауын автоматты түрде біріктіреді.",
+      "enableAutoMergeConfirmMessageTerm": "Пайплайн сәтті аяқталған соң, {{term}} автоматты түрде біріктіріледі.",
+      "enableAutoMergeDescriptionTerm": "Пайплайн сәтті аяқталған соң, бұл {{term}} GitLab-та автоматты түрде біріктіріледі.",
       "forbidden": "Бұл біріктіру сұрауын біріктіруге рұқсатыңыз жоқ.",
       "cannotMerge": "Бұл біріктіру сұрауын қазіргі күйінде біріктіру мүмкін емес.",
       "couldNotMerge": "Біріктіру сұрауын біріктіру мүмкін болмады.",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Бұрын біріктірілген",
-        "closed": "Бұл біріктіру сұрауы жабылған"
+        "closed": "Бұл біріктіру сұрауы жабылған",
+        "closedMergeRequest": "Бұл біріктіру сұрауы жабылған"
       },
       "partialSuccessBanner": {
         "body": "Тармақты жою мүмкін болмады: {{reason}}.",
@@ -400,6 +412,18 @@
         "behindDetail": "Бастапқы тармақ негізгі тармақтан артта қалған. Біріктіру алдында оның негізін ауыстырыңыз немесе оны жаңартыңыз.",
         "notMergeableTitle": "Бұл біріктіру сұрауын әзірге біріктіру мүмкін емес",
         "notMergeableDetail": "GitHub хабарлаған біріктіру күйі: {{state}}."
+      },
+      "restrictions": {
+        "title": "Біріктіру шектеулері",
+        "approvalsRequired_one": "{{displayCount}} мақұлдау қажет",
+        "approvalsRequired_other": "{{displayCount}} мақұлдау қажет",
+        "pipelineMustSucceed": "Біріктіру алдында пайплайн сәтті аяқталуы керек."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Пайплайн соңғы коммитте сәтсіз аяқталды.",
+        "pendingPipeline": "Пайплайн соңғы коммитте әлі жұмыс істеп тұр.",
+        "permission": "Бұл {{term}}н біріктіруге рұқсатыңыз жоқ.",
+        "draft": "Біріктіру алдында {{term}}н кодты тексеруге дайын деп белгілеңіз."
       },
       "methodLabels": {
         "merge": "Біріктіру коммитін жасау",
@@ -448,6 +472,7 @@
       "acceptTerms": "Қабылдау",
       "replyBadRequest": "Бұл жауапты жариялау мүмкін емес. Талқылау тармағы өзгерген болуы мүмкін.",
       "replyForbidden": "Бұл біріктіру сұрауына жауап беруге рұқсатыңыз жоқ.",
+      "replyForbiddenTerm": "Бұл {{term}}на жауап беруге рұқсатыңыз жоқ.",
       "moderation": {
         "reportContent": {
           "terminal": "Бұл пікірге шағымдану мүмкін емес.",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "Біріктіру сұрауындағы кодты тексеру",
     "headLine": "{{counts}} · соңғы коммит: {{sha}}",
     "entry": {
-      "eyebrow": "Біріктіру сұрауын URL арқылы ашыңыз.",
-      "pastePrLink": "PR сілтемесін қою",
-      "noRecentPrs": "Жақында ашылған PR жоқ",
-      "noRecentPrsDescription": "Кодты тексеруді бастау үшін жоғарыдағы өріске PR сілтемесін қойыңыз — келесі жолы ол осында көрсетіледі.",
+      "eyebrow": "Тарту немесе біріктіру сұрауын URL арқылы ашыңыз.",
+      "pastePrLink": "Тарту немесе біріктіру сұрауының сілтемесін қою",
+      "noRecentPrs": "Жақында қаралғандар жоқ",
+      "noRecentPrsDescription": "Тексеруді бастау үшін жоғарыға сілтеме қойыңыз — келесі жолы ол осында көрсетіледі.",
       "couldNotLoad": "Жүктеу мүмкін болмады.",
       "removeFromRecentsTitle": "Соңғы ашылғандар тізімінен жою керек пе?",
-      "removeFromRecentsMessage": "Бұл біріктіру сұрауы соңғы ашылғандар тізімінен жойылады.",
+      "removeFromRecentsMessage": "Бұл тексеру соңғы қаралғандар тізімінен жойылады.",
       "removeRecentAccessibility": "Соңғы ашылғандар тізімінен жою: {{repo}}",
-      "urlAccessibility": "GitHub-тағы біріктіру сұрауының URL мекенжайы",
-      "clearLink": "Біріктіру сұрауының сілтемесін тазалау",
-      "pasteLink": "Біріктіру сұрауының сілтемесін қою",
+      "urlAccessibility": "Тарту немесе біріктіру сұрауының URL мекенжайын енгізіңіз",
+      "urlPlaceholder": "Тарту немесе біріктіру сұрауының URL мекенжайы",
+      "openAccessibility": "Тарту немесе біріктіру сұрауын ашу",
+      "clearLink": "Сілтемені тазалау",
+      "pasteLink": "Тарту немесе біріктіру сұрауының сілтемесін қою",
       "open": "Ашу"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "GitHub қосылымын тексеру мүмкін болмады.",
       "checkFailedMessage": "Бұл деректер жүктелмейінше, жүйеге кіру күйін анықтау мүмкін емес.",
+      "checkFailedTitleGitLab": "GitLab қосылымын тексеру мүмкін болмады.",
+      "checkFailedTitleBitbucket": "Bitbucket қосылымын тексеру мүмкін болмады.",
+      "providerCheckFailedMessage": "Жүктелгенше қосылым күйі қолжетімсіз.",
       "reconnectTitle": "GitHub-қа қайта қосылу",
       "reconnectDescription": "GitHub қосылымына берілген рұқсат қайтарып алынды. Телефонда біріктіру сұрауларындағы кодты тексеруді жалғастыру үшін қайта қосылыңыз.",
-      "description": "Телефонда біріктіру сұрауларындағы кодты тексеру үшін GitHub тіркелгіңізді қосыңыз."
+      "description": "Телефонда біріктіру сұрауларындағы кодты тексеру үшін GitHub тіркелгіңізді қосыңыз.",
+      "gitlabDescription": "Мобильдіде біріктіру сұрауларын қарау үшін GitLab тіркелгіңізді қосыңыз.",
+      "bitbucketDescription": "Мобильдіде тарту сұрауларын қарау үшін Bitbucket-ты осы ұйымға қосыңыз.",
+      "bitbucketOrgOnlyDescription": "Осы ұйымның Bitbucket тарту сұрауларын қарау үшін профиліңізден ұйымды таңдаңыз."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub қосылымының мерзімі аяқталды.",
-      "message": "GitHub қосылымыңыз енді жарамсыз. Қосылымды қайта тексеріңіз — қажет болса, қайта қосылу ұсынылады."
+      "message": "GitHub қосылымыңыз енді жарамсыз. Қосылымды қайта тексеріңіз — қажет болса, қайта қосылу ұсынылады.",
+      "gitlabTitle": "GitLab қосылымының мерзімі аяқталды.",
+      "bitbucketTitle": "Bitbucket қосылымының мерзімі аяқталды.",
+      "providerMessage": "{{provider}} қосылымыңыз енді жарамсыз. Қосылымды қайта тексеріңіз — қажет болса, қайта қосылу ұсынылады."
     },
     "eventChips": {
       "comment": "Пікір жазу",
@@ -643,6 +679,21 @@
       "files": "Файл",
       "discussion": "Талқылау"
     },
+    "terms": {
+      "pullRequest": "Біріктіру сұрауы",
+      "mergeRequest": "Біріктіру сұрауы",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Біріктіру сұрауымен бөлісу",
+      "viewOnProvider": "{{provider}}-да қарау",
+      "mergeRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",
+      "unavailableDescription": "Ол жойылған болуы мүмкін, немесе оған рұқсатыңыз жоқ.",
+      "accessDeniedMergeRequest": "Бұл біріктіру сұрауын көруге рұқсатыңыз жоқ.",
+      "couldNotLoadMergeRequest": "Біріктіру сұрауын жүктеу мүмкін болмады.",
+      "discussionAccessDenied": "Бұл біріктіру сұрауының талқылауын қарауға рұқсатыңыз жоқ.",
+      "discussionUnavailableMessage": "Бұл біріктіру сұрауы жойылған болуы мүмкін.",
+      "noDiscussionDescription": "Бұл біріктіру сұрауында кодты тексеру талқылаулары да, жалпы пікірлер де жоқ.",
+      "noFilesChangedDescription": "Бұл біріктіру сұрауында файлдарға өзгеріс енгізілмеген."
+    },
     "fileStatus": {
       "modified": "Өзгертілді",
       "renamed": "Атауы өзгертілді",
@@ -659,7 +710,7 @@
       "emptyLine": "(бос)"
     },
     "linkPasteClipboardEmpty": "Алмасу буфері бос.",
-    "linkPasteNotAPullRequest": "Бұл GitHub-тағы біріктіру сұрауының сілтемесі емес.",
+    "linkPasteNotAPullRequest": "Бұл тарту немесе біріктіру сұрауының сілтемесі емес.",
     "announce": {
       "commentPosted": "Пікір жарияланды",
       "reviewSubmitted": "Кодты тексеру нәтижесі жіберілді",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "Бұл пікірді жариялау мүмкін емес. Таңдалған жол өзгерген немесе PR жаңартылған болуы мүмкін.",
       "reviewNotSubmitted": "Кодты тексеру нәтижесін осы күйінде жіберу мүмкін емес. PR өзгерген болуы мүмкін немесе өз біріктіру сұрауыңыздағы кодты тексеруге рұқсат жоқ.",
+      "reviewNotSubmittedTerm": "Бұл тексеруді осы күйінде жіберу мүмкін емес. {{term}} өзгерген болуы мүмкін, немесе сіз өз {{term}} бойынша тексере алмайсыз.",
       "couldNotPostComment": "Пікірді жариялау мүмкін болмады.",
       "couldNotSubmitReview": "Кодты тексеру нәтижесін жіберу мүмкін болмады. Байланысты тексеріп, қайталап көріңіз."
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "Жауап беру мүмкін болмады.",
       "couldNotCompleteAction": "Бұл әрекетті аяқтау мүмкін болмады.",
       "mergeResultDefaultError": "GitHub біріктіруді аяқтамады.",
+      "mergeResultNotCompleted": "{{term}} біріктірілмеді. Күйін тексеріп, қайталап көріңіз.",
       "ambiguous": "Әрекеттің орындалғанын растау мүмкін болмады — қайталау алдында PR-ді тексеріңіз.",
       "persistenceFailed": "Бұл әрекетті тіркей алмадық. Кейінірек қайталап көріңіз.",
       "forbidden": "Рұқсат жоқ."
@@ -1988,11 +2041,31 @@
       "retryConnection": "Қайта қосылу"
     },
     "newSession": {
+      "recentlyUsed": "Жақында қолданылған",
+      "couldNotLoadGithubRepositories": "GitHub репозиторийлерін жүктеу мүмкін болмады.",
+      "couldNotLoadGitlabRepositories": "GitLab репозиторийлерін жүктеу мүмкін болмады.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket репозиторийлерін жүктеу мүмкін болмады.",
       "connectGithubDescription": "Браузерде GitHub тіркелгісін байланыстырып, репозиторий таңдау үшін осында оралыңыз.",
+      "connectGitlabDescription": "Браузерде GitLab тіркелгісін байланыстырып, репозиторий таңдау үшін осында оралыңыз.",
+      "connectBitbucketDescription": "Браузерде Bitbucket тіркелгісін байланыстырып, репозиторий таңдау үшін осында оралыңыз.",
       "openGithub": "GitHub-ты ашу",
+      "openGitlab": "GitLab-ты ашу",
+      "openBitbucket": "Bitbucket-ті ашу",
       "refreshRepositories": "Репозиторийлерді жаңарту",
       "githubConnected": "GitHub қосылды",
+      "gitlabConnected": "GitLab қосылды",
       "noRepositoriesVisible": "Репозиторийлер көрінбейді. Kilo GitHub қолданбасының репозиторийлерге кіру рұқсатын тексеріп, тізімді жаңартыңыз.",
+      "noRepositoriesVisibleGitlab": "Репозиторийлер көрінбейді. GitLab репозиторийлеріне кіру рұқсатын тексеріп, тізімді жаңартыңыз.",
+      "noRepositoriesVisibleBitbucket": "Репозиторийлер көрінбейді. Bitbucket репозиторийлеріне кіру рұқсатын тексеріп, тізімді жаңартыңыз.",
+      "bitbucketOrganizationsOnly": "Bitbucket тек ұйымдарға қолжетімді.",
+      "branchPickerTitle": "Тармақты таңдау",
+      "branchDefault": "Әдепкі",
+      "branchAccessibility": "Тармақ: {{label}}",
+      "branchLoading": "Тармақтар жүктелуде",
+      "branchLoadError": "Тармақтарды жүктеу мүмкін болмады",
+      "branchUnavailable": "Бұл репозиторий үшін тармақтар қолжетімсіз. Провайдердегі рұқсатыңызды тексеріңіз, содан кейін басқа репозиторийді таңдаңыз.",
+      "branchEmpty": "Тармақтар жоқ",
+      "branchPlaceholder": "Тармақты таңдаңыз",
       "runOnWithTarget": "Іске қосу орны: {{target}}",
       "environment": "Орта",
       "couldNotLoadEnvironment": "Ортаңызды жүктеу мүмкін болмады.",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "Репозиторийлерді жаңарту мүмкін болмады. Қайталап көріңіз.",
       "discardDraftTitle": "Нобайды жою керек пе?",
       "discardDraftMessage": "Сұрауыңыз жойылады.",
+      "discardWithUploadsMessage": "Сұрауыңыз бен ешбір хабарламаға тіркелмеген жүктелген файлдар жойылады.",
       "discardFailed": "Нобайды жою мүмкін болмады. Қайталап көріңіз.",
       "remoteHint": "Жергілікті kilo процесін басқару үшін компьютеріңізде `kilo remote` пәрменін немесе іске қосылған CLI сессиясында `/remote` пәрменін орындаңыз.",
-      "connectBitbucketDescription": "Браузерде Bitbucket тіркелгісін байланыстырып, репозиторий таңдау үшін осында оралыңыз.",
-      "connectGitlabDescription": "Браузерде GitLab тіркелгісін байланыстырып, репозиторий таңдау үшін осында оралыңыз.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket репозиторийлерін жүктеу мүмкін болмады.",
-      "couldNotLoadGithubRepositories": "GitHub репозиторийлерін жүктеу мүмкін болмады.",
-      "couldNotLoadGitlabRepositories": "GitLab репозиторийлерін жүктеу мүмкін болмады.",
-      "gitlabConnected": "GitLab қосылды",
-      "noRepositoriesVisibleBitbucket": "Репозиторийлер көрінбейді. Bitbucket репозиторийлеріне кіру рұқсатын тексеріп, тізімді жаңартыңыз.",
-      "noRepositoriesVisibleGitlab": "Репозиторийлер көрінбейді. GitLab репозиторийлеріне кіру рұқсатын тексеріп, тізімді жаңартыңыз.",
-      "openBitbucket": "Bitbucket-ті ашу",
-      "openGitlab": "GitLab-ты ашу",
-      "recentlyUsed": "Жақында қолданылған",
       "continueFrom": "«{{title}}» сессиясы жалғасуда.",
       "importingSession": "Сессия импортталуда",
       "cliCannotContinue": "Бұл CLI сессияны жалғастыра алмайды. Cloud Agent қызметін немесе басқа CLI құралын таңдаңыз.",
-      "importFailed": "Бұл сессияны импорттау мүмкін болмады.",
-      "discardWithUploadsMessage": "Сұрауыңыз бен ешбір хабарламаға тіркелмеген жүктелген файлдар жойылады."
+      "importFailed": "Бұл сессияны импорттау мүмкін болмады."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды.",

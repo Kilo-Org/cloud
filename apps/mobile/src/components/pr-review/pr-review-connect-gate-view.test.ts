@@ -1,14 +1,9 @@
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
+import '@/i18n';
 import { PrReviewConnectGate } from './pr-review-connect-gate';
-import {
-  type PrReviewGateView,
-  selectPrReviewGateView,
-  type SelectPrReviewGateViewInput,
-} from './pr-review-connect-gate-view';
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -21,57 +16,6 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 
-const base: SelectPrReviewGateViewInput = {
-  isError: false,
-  isLoading: false,
-  connected: true,
-  revoked: false,
-};
-
-function viewFor(patch: Partial<SelectPrReviewGateViewInput>): PrReviewGateView {
-  return selectPrReviewGateView({ ...base, ...patch });
-}
-
-describe('selectPrReviewGateView', () => {
-  it('returns loading while the query is loading', () => {
-    expect(viewFor({ isLoading: true })).toBe('loading');
-  });
-
-  it('returns error when the query failed and is not loading', () => {
-    expect(viewFor({ isError: true })).toBe('error');
-  });
-
-  it('returns error when both error and loading are true', () => {
-    expect(selectPrReviewGateView({ ...base, isError: true, isLoading: true })).toBe('error');
-  });
-
-  it('returns connect when not connected and not revoked', () => {
-    expect(viewFor({ connected: false })).toBe('connect');
-  });
-
-  it('returns reconnect when the connection was revoked', () => {
-    expect(viewFor({ connected: false, revoked: true })).toBe('reconnect');
-  });
-
-  it('returns children when connected', () => {
-    expect(viewFor({ connected: true })).toBe('children');
-  });
-
-  it('exposes only one happy view and four non-happy header-bearing views', () => {
-    const inputs: Partial<SelectPrReviewGateViewInput>[] = [
-      { isLoading: true },
-      { isError: true },
-      { connected: false },
-      { connected: false, revoked: true },
-      { connected: true },
-    ];
-    const views = inputs.map(patch => viewFor(patch));
-    expect(views.filter(view => view === 'children')).toHaveLength(1);
-    expect(views.filter(view => view !== 'children')).toHaveLength(4);
-    expect(new Set(views).size).toBe(views.length);
-  });
-});
-
 // The gate passes `authorization.isPending` (no data yet) to the view
 // selector, not `isLoading` (isPending && isFetching). A paused query
 // (offline/unknown connectivity, empty cache) is pending but not fetching,
@@ -79,6 +23,9 @@ describe('selectPrReviewGateView', () => {
 // Connect on a cold launch before NetInfo settles. This pins that wiring:
 // a revert to `isLoading` would make the paused query render Connect and
 // fail the assertions below.
+//
+// The view selector itself lives in `@/lib/pr-review/pr-review-connect-gate-view`
+// with its decision table beside it.
 //
 // Rendered as a plain function call (same pattern as pr-review-screen.test.tsx)
 // with hooks and child components stubbed so the tree walk stays deterministic.
@@ -116,6 +63,13 @@ vi.mock('@/lib/trpc', () => ({
       connectUserAuthorization: { mutationOptions: () => ({}) },
     },
   }),
+}));
+
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://web.example' }));
+
+vi.mock('expo-router', () => ({
+  // Any non-entry pathname reaches the GitHub arm.
+  usePathname: () => '/pr-review/github/owner/repo/1',
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -162,6 +116,14 @@ function containsType(node: unknown, type: string): boolean {
   if (React.isValidElement(node)) {
     const element = node;
     if (element.type === type) {
+      return true;
+    }
+    // A function component element (the gate dispatches to GitHubConnectGate)
+    // is walked by calling it: hooks are stubbed, so a plain call renders.
+    if (
+      typeof element.type === 'function' &&
+      containsType((element.type as (props: unknown) => unknown)(element.props), type)
+    ) {
       return true;
     }
     return Object.values(element.props as Record<string, unknown>).some(value =>

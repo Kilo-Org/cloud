@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- One hook wires the GitHub, GitLab, and Bitbucket provider queries, recents resolution, and connect/refresh flows end-to-end. */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
@@ -7,13 +7,17 @@ import { toast } from 'sonner-native';
 import {
   dedupeRepositoriesByPlatformAndFullName,
   detectRepositoryPlatform,
+  getNewSessionBranchState,
   type NewSessionRepository,
   type RepositoryGroup,
   type RepositoryGroups,
+  repositoryIdentityKey,
   type RepositoryPlatform,
   resolveBitbucketStatus,
   resolveProviderStatus,
   resolveRepositoryGroups,
+  setNewSessionBranchScope,
+  subscribeNewSessionBranchState,
 } from '@/components/agents/new-session-repository-state';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
@@ -22,8 +26,9 @@ import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
 import { useExternalAuthReturn } from '@/lib/external-auth/use-external-auth-return';
+import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
-import { useTRPC } from '@/lib/trpc';
+import { trpcClient, useTRPC } from '@/lib/trpc';
 
 type UseNewSessionReposArgs = {
   organizationId: string | undefined;
@@ -47,6 +52,14 @@ export function useNewSessionRepos({
 }: UseNewSessionReposArgs): UseNewSessionReposResult {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+
+  // Publish the route's organization scope for the branch queries. The route
+  // hands this hook the scope already, and `useRepositoryBranches` reads it
+  // from the shared new-session branch state rather than from props the
+  // repository section is not given.
+  useEffect(() => {
+    setNewSessionBranchScope(organizationId);
+  }, [organizationId]);
 
   const githubQuery = useQuery(
     organizationId
@@ -372,4 +385,98 @@ export function useNewSessionRepos({
 
 function repoKey(repository: NewSessionRepository): string {
   return `${repository.platform}/${repository.fullName.toLowerCase()}`;
+}
+
+// ── Branches of the selected repository ──────────────────────────────
+
+export type RepositoryBranchesState = {
+  /** The provider's default branch, or null when it reports none. */
+  defaultBranch: string | null;
+  branches: string[];
+  /** The query runs only for a selected repository in a scope that can serve it. */
+  isEnabled: boolean;
+  isLoading: boolean;
+  /** A transient failure: the caller offers a retry. */
+  isRetryableError: boolean;
+  /** FORBIDDEN/UNAUTHORIZED/NOT_FOUND — a retry cannot fix it, so no retry CTA. */
+  isPermanentError: boolean;
+  isRetrying: boolean;
+  retry: () => void;
+};
+
+/**
+ * Branches of the selected repository, from the provider, through the s4
+ * `listRepositoryBranches` procedures (organization variant when the
+ * new-session route carries an organization).
+ *
+ * The query runs only when a repository is selected. Bitbucket is
+ * organization-only, so a personal Bitbucket row never issues a request — the
+ * server would refuse it with the org-only message, and the section explains
+ * the restriction instead.
+ *
+ * The cache key carries the full repository identity: the procedure input
+ * only accepts `platform` + `fullName`, so the Bitbucket workspace/repository
+ * uuids are appended to the key here. Two same-named rows — across providers,
+ * or across renamed Bitbucket workspaces — can never read each other's
+ * branches out of the cache.
+ */
+export function useRepositoryBranches(
+  repository: NewSessionRepository | null
+): RepositoryBranchesState {
+  const trpc = useTRPC();
+  const { isScopeReady, organizationId } = useSyncExternalStore(
+    subscribeNewSessionBranchState,
+    getNewSessionBranchState
+  );
+
+  const platform: RepositoryPlatform = repository?.platform ?? 'github';
+  const fullName = repository?.fullName ?? '';
+  const isEnabled =
+    repository !== null &&
+    isScopeReady &&
+    fullName !== '' &&
+    !(platform === 'bitbucket' && !organizationId);
+
+  const personalInput = { platform, repository: { fullName } };
+  const organizationInput = { organizationId: organizationId ?? '', ...personalInput };
+  const identity = repository ? repositoryIdentityKey(repository) : 'none';
+
+  const branchQuery = useQuery({
+    queryKey: [
+      ...(organizationId
+        ? trpc.organizations.cloudAgentNext.listRepositoryBranches.queryKey(organizationInput)
+        : trpc.cloudAgentNext.listRepositoryBranches.queryKey(personalInput)),
+      identity,
+    ],
+    queryFn: async () => {
+      const listing = organizationId
+        ? await trpcClient.organizations.cloudAgentNext.listRepositoryBranches.query(
+            organizationInput
+          )
+        : await trpcClient.cloudAgentNext.listRepositoryBranches.query(personalInput);
+      return listing;
+    },
+    enabled: isEnabled,
+  });
+
+  const errorCode = branchQuery.isError
+    ? // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- the query fn calls tRPC directly, so the error is a TRPCClientError carrying `data.code`
+      (branchQuery.error as { data?: { code?: string } } | null)?.data?.code
+    : undefined;
+  const { permanent } = classifyProviderErrorCode(errorCode);
+
+  const retry = useCallback(() => {
+    void branchQuery.refetch();
+  }, [branchQuery]);
+
+  return {
+    defaultBranch: branchQuery.data?.defaultBranch ?? null,
+    branches: branchQuery.data?.branches ?? [],
+    isEnabled,
+    isLoading: isEnabled && branchQuery.isPending,
+    isRetryableError: branchQuery.isError && !permanent,
+    isPermanentError: branchQuery.isError && permanent,
+    isRetrying: branchQuery.isFetching && branchQuery.isError,
+    retry,
+  };
 }

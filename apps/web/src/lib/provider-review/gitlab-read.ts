@@ -610,7 +610,9 @@ export async function listInbox(
           // merge requests, not review requests. `reviews_for_me` selects the
           // merge requests where the acting user is the reviewer;
           // reviewer_username keeps that filter on versions that predate the
-          // scope value.
+          // scope value. reviewer_username is supported on gitlab.com and on
+          // self-managed GitLab since 10.x — older than the versions we
+          // advertise.
           scope: 'reviews_for_me',
           reviewer_username: me.username,
           per_page: GITLAB_PAGE_SIZE,

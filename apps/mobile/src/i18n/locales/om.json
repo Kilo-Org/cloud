@@ -36,6 +36,7 @@
     "cost": "Baasii",
     "discard": "Dhiisi",
     "findings": "Argannoowwan",
+    "mergeRequest": "gaaffii walitti makuu",
     "notConnected": "Walitti hin hidhamne",
     "notifications": "Beeksisota",
     "pullRequest": "gaaffii walitti makuu",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "Tarree garaagarummaa duwwaa"
     },
     "connectionExpired": "Yeroon walitti hidhamiinsa GitHub darbeera.",
+    "capabilities": {
+      "banner": {
+        "title": "Waltajjii kanaan hin argamu",
+        "accessibility": "Waltajjii kanaan hin argamu: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Walitti makuu",
       "mergeNow": "Amma walitti maki",
       "mergePullRequest": "Gaaffii walitti makuu raawwachuu",
+      "mergeTermTitle": "{{term}} raawwachuu",
       "enableAutoMerge": "Ofumaan walitti makuu hojii irra oolchi",
       "disableAutoMerge": "Ofumaan walitti makuu dhaabi",
       "autoMergeOn": "Ofumaan walitti makuun hojii irra jira",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "Walitti makuu booda damee haqi",
       "noEnabledMethods": "Kuusaan koodii kun mala walitti makuu hojii irra jiru hin qabu. Bulchaa kuusaa koodii mala walitti makuu, galmee tokkootti cuunfuu ykn bu'uura jijjiiruu akka hojii irra oolchu gaafadhu.",
       "confirmTitle": "Gaaffii walitti makuu raawwatamuu?",
+      "confirmTitleTerm": "{{term}} raawwatamuu?",
       "confirmMessage": "Kun jijjiiramoota kee damee bu'uuraatti walitti maka.",
       "enableAutoMergeConfirmTitle": "Ofumaan walitti makuun hojii irra haa oolu?",
       "enableAutoMergeConfirmMessage": "Qorannoowwan barbaachisan hundi yeroo darban, GitHub gaaffii walitti makuu kana ofumaan raawwata.",
+      "enableAutoMergeConfirmMessageTerm": "Piipilaayiniin isaa yoo milkaa'e, {{term}} ofumaan ni raawwatama.",
+      "enableAutoMergeDescriptionTerm": "GitLab {{term}} kana piipilaayiniin isaa yoo milkaa'e ofumaan ni raawwata.",
       "forbidden": "Gaaffii walitti makuu kana raawwachuuf hayyama hin qabdu.",
       "cannotMerge": "Gaaffiin walitti makuu kun akkuma jirutti raawwatamuu hin danda'u.",
       "couldNotMerge": "Gaaffii walitti makuu raawwachuun hin danda'amne.",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Duraan walitti makameera",
-        "closed": "Gaaffiin walitti makuu kun cufameera"
+        "closed": "Gaaffiin walitti makuu kun cufameera",
+        "closedMergeRequest": "Gaaffiin walitti makuu kun cufameera"
       },
       "partialSuccessBanner": {
         "body": "Damee haquun hin danda'amne: {{reason}}",
@@ -400,6 +412,18 @@
         "behindDetail": "Dameen madda jijjiiramaa damee bu'uuraa duubatti hafeera. Walitti makuu dura bu'uura isaa jijjiiri ykn damee haaromsi.",
         "notMergeableTitle": "Gaaffiin walitti makuu kun ammatti raawwatamuu hin danda'u",
         "notMergeableDetail": "GitHub haala walitti makamuu {{state}} jedhamu gabaase."
+      },
+      "restrictions": {
+        "title": "Dhorkawwan raawwachuu",
+        "approvalsRequired_one": "Mirkaneessi {{displayCount}} barbaachisa",
+        "approvalsRequired_other": "Mirkaneewwan {{displayCount}} barbaachisu",
+        "pipelineMustSucceed": "Raawwachuu dura piipilaayiniin milkaa'uun dirqama."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Piipilaayiniin galmee jijjiiramaa dhiyeenya kanaa irratti ni kufaa jira.",
+        "pendingPipeline": "Piipilaayiniin galmee jijjiiramaa dhiyeenya kanaa irratti ammallee hojjechaa jira.",
+        "permission": "{{term}} kana raawwachuuf hayyama hin qabdu.",
+        "draft": "Walitti makuu dura {{term}} gamaaggamaaf qophii ta'uu isaa mallatteessi."
       },
       "methodLabels": {
         "merge": "Galmee walitti makuu uumi",
@@ -448,6 +472,7 @@
       "acceptTerms": "Fudhadhu",
       "replyBadRequest": "Deebiin kun maxxanfamuu hin danda'u. Dameen marii jijjiirameera ta'a.",
       "replyForbidden": "Gaaffii walitti makuu kanaaf deebii kennuuf hayyama hin qabdu.",
+      "replyForbiddenTerm": "{{term}} kanaaf deebii kennuuf hayyama hin qabdu.",
       "moderation": {
         "reportContent": {
           "terminal": "Yaadni kun gabaafamuu hin danda'u.",
@@ -508,16 +533,18 @@
     "reviewPullRequest": "Gaaffii walitti makuu gamaaggami",
     "headLine": "{{counts}} · galmee dhumaa {{sha}}",
     "entry": {
-      "eyebrow": "URL fayyadamuun gaaffii walitti makuu bani.",
-      "pastePrLink": "Liinkii PR maxxansi",
-      "noRecentPrs": "PR dhiheenyaa hin jiru",
-      "noRecentPrsDescription": "Gamaaggama jalqabuuf liinkii PR bakka armaan oliitti maxxansi — yeroo itti aanu asitti mul'ata.",
+      "eyebrow": "Gaaffii walitti makuu URL dhaan bani",
+      "pastePrLink": "Liinkii gaaffii walitti makuu maxxansi",
+      "noRecentPrs": "Gamaaggawwan dhiyeenya kanaa hin jiran",
+      "noRecentPrsDescription": "Gamaaggama jalqabuuf liinkii olitti maxxansi — yeroo itti aanu asitti ni mul'ata.",
       "couldNotLoad": "Fe'uu hin danda'amne.",
       "removeFromRecentsTitle": "Tarree dhiheenyaa keessaa haqamuu?",
-      "removeFromRecentsMessage": "Gaaffiin walitti makuu kun tarree dhiheenyaa kee keessaa haqama.",
+      "removeFromRecentsMessage": "Gamaaggamaan kun gamaaggawwan dhiyeenya kanaa keessaa ni haqama.",
       "removeRecentAccessibility": "{{repo}} tarree dhiheenyaa keessaa haqi",
-      "urlAccessibility": "URL gaaffii walitti makuu GitHub",
-      "clearLink": "Liinkii gaaffii walitti makuu haqi",
+      "urlAccessibility": "URL gaaffii walitti makuu galchi",
+      "urlPlaceholder": "URL gaaffii walitti makuu",
+      "openAccessibility": "Gaaffii walitti makuu bani",
+      "clearLink": "Liinkii qulqulleessi",
       "pasteLink": "Liinkii gaaffii walitti makuu maxxansi",
       "open": "Banaa"
     },
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "Walqunnamtii GitHub sakatta'uun hin danda'amne.",
       "checkFailedMessage": "Hanga kun fe'amutti haala seensaa beekuun hin danda'amu.",
+      "checkFailedTitleGitLab": "Walqunnamtii GitLab sakatta'uun hin danda'amne.",
+      "checkFailedTitleBitbucket": "Walqunnamtii Bitbucket sakatta'uun hin danda'amne.",
+      "providerCheckFailedMessage": "Kun fe'amuun isaa dura haalli walqunnamtii hin argamu.",
       "reconnectTitle": "GitHub irra deebi'ii walqabsiisi",
       "reconnectDescription": "Hayyamni walqunnamtii GitHub kee haqameera. Gaaffiiwwan walitti makuu bilbilaan gamaaggamuu itti fufuuf irra deebi'ii walqabsiisi.",
-      "description": "Gaaffiiwwan walitti makuu bilbilaan gamaaggamuuf herrega GitHub kee walqabsiisi."
+      "description": "Gaaffiiwwan walitti makuu bilbilaan gamaaggamuuf herrega GitHub kee walqabsiisi.",
+      "gitlabDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf herrega GitLab kee walqabsiisi.",
+      "bitbucketDescription": "Gaaffiiwwan walitti makuu simbirroo harkaan gamaaggamuuf Bitbucket dhaabbata kana waliin walqabsiisi.",
+      "bitbucketOrgOnlyDescription": "Gaaffiiwwan walitti makuu Bitbucket isaa gamaaggamuuf profaayilii kee keessatti dhaabbata filadhu."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "Yeroon walitti hidhamiinsa GitHub darbeera.",
-      "message": "Walqunnamtiin GitHub kee kana booda hin hojjetu. Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta."
+      "message": "Walqunnamtiin GitHub kee kana booda hin hojjetu. Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta.",
+      "gitlabTitle": "Yeroon walitti hidhamiinsa GitLab darbeera.",
+      "bitbucketTitle": "Yeroon walitti hidhamiinsa Bitbucket darbeera.",
+      "providerMessage": "Walqunnamtiin {{provider}} kee kana booda hin hojjetu. Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta."
     },
     "eventChips": {
       "comment": "Yaada kenni",
@@ -643,6 +679,21 @@
       "files": "Faayiloota",
       "discussion": "Marii"
     },
+    "terms": {
+      "pullRequest": "Gaaffii walitti makuu",
+      "mergeRequest": "Gaaffii walitti makuu",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Gaaffii walitti makuu qoodi",
+      "viewOnProvider": "{{provider}} irratti ilaali",
+      "mergeRequestUnavailable": "Gaaffiin walitti makuu hin argamu",
+      "unavailableDescription": "Haqame ta'uu danda'a, yookiin hayyama isaa hin qabdu.",
+      "accessDeniedMergeRequest": "Gaaffii walitti makuu kana ilaaluuf hayyama hin qabdu.",
+      "couldNotLoadMergeRequest": "Gaaffii walitti makuu fe'uu hin danda'amne.",
+      "discussionAccessDenied": "Marii gaaffii walitti makuu kanaa ilaaluuf hayyama hin qabdu.",
+      "discussionUnavailableMessage": "Gaaffiin walitti makuu kun haqameera ta'a.",
+      "noDiscussionDescription": "Gaaffii walitti makuu kana irratti dameewwan gamaaggamaa ykn yaadonni marii hin jiran.",
+      "noFilesChangedDescription": "Gaaffiin walitti makuu kun jijjiirama faayilii hin qabu."
+    },
     "fileStatus": {
       "modified": "Fooyya'e",
       "renamed": "Maqaan jijjiirame",
@@ -659,7 +710,7 @@
       "emptyLine": "(duwwaa)"
     },
     "linkPasteClipboardEmpty": "Gabateen waraabbii duwwaadha.",
-    "linkPasteNotAPullRequest": "Kun liinkii gaaffii walitti makuu GitHub miti.",
+    "linkPasteNotAPullRequest": "Liinkii gaaffii walitti makuu miti",
     "announce": {
       "commentPosted": "Yaadni maxxanfameera",
       "reviewSubmitted": "Gamaaggamni dhiheeffameera",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "Yaadni kun maxxanfamuu hin danda'u. Sararri filatame jijjiirameera ta'a, ykn PR haaromfameera ta'a.",
       "reviewNotSubmitted": "Gamaaggamni kun akkuma jirutti dhiheeffamuu hin danda'u. PR jijjiirameera ta'a, ykn gaaffii walitti makuu mataa keetii gamaaggamuu hin dandeessu.",
+      "reviewNotSubmittedTerm": "Gamaaggamaan kun akkasumaan hin galmaa'u. {{term}} jijjiirame ta'uu danda'a, yookiin {{term}} ofii kee gamaaggamuu hin dandeessu.",
       "couldNotPostComment": "Yaada maxxansuu hin dandeenye.",
       "couldNotSubmitReview": "Gamaaggama dhiheessuun hin danda'amne. Walqunnamtii kee ilaaliitii irra deebi'ii yaali."
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "Deebii kennuun hin danda'amne.",
       "couldNotCompleteAction": "Gocha kana xumuruu hin dandeenye.",
       "mergeResultDefaultError": "GitHub walitti makuu hin xumurre.",
+      "mergeResultNotCompleted": "{{term}} ni raawwatame hin jiru. Haala isaa ilaali itti deebi'ii yaali.",
       "ambiguous": "Mirkaneessuu hin dandeenye — deebi'ii yaaluu dura PR ilaali.",
       "persistenceFailed": "Gocha kana galmeessuu hin dandeenye. Maaloo booda deebi'ii yaali.",
       "forbidden": "Hayyamni hin jiru."
@@ -1988,11 +2041,31 @@
       "retryConnection": "Deebi'ii walqabsiisuuf yaali"
     },
     "newSession": {
+      "recentlyUsed": "Dhiheenya itti fayyadamte",
+      "couldNotLoadGithubRepositories": "Kuusaawwan koodii GitHub fe'uu hin danda'amne.",
+      "couldNotLoadGitlabRepositories": "Kuusaawwan koodii GitLab fe'uu hin danda'amne.",
+      "couldNotLoadBitbucketRepositories": "Kuusaawwan koodii Bitbucket fe'uu hin danda'amne.",
       "connectGithubDescription": "GitHub biraawzarii kee keessatti walqabsiisi, sana booda kuusaa koodii filachuuf asitti deebi'i.",
+      "connectGitlabDescription": "GitLab biraawzarii kee keessatti walqabsiisi, sana booda kuusaa koodii filachuuf asitti deebi'i.",
+      "connectBitbucketDescription": "Bitbucket biraawzarii kee keessatti walqabsiisi, sana booda kuusaa koodii filachuuf asitti deebi'i.",
       "openGithub": "GitHub bani",
+      "openGitlab": "GitLab bani",
+      "openBitbucket": "Bitbucket bani",
       "refreshRepositories": "Kuusaawwan koodii haaromsi",
       "githubConnected": "GitHub walqabateera",
+      "gitlabConnected": "GitLab walqabateera",
       "noRepositoriesVisible": "Kuusaan koodii mul'atu hin jiru. Hayyama appilikeeshinii Kilo GitHub kuusaa koodii bira ga'uuf qabu ilaaliitii haaromsi.",
+      "noRepositoriesVisibleGitlab": "Kuusaan koodii mul'atu hin jiru. Hayyama GitLab kuusaa koodii bira ga'uuf qabu ilaaliitii haaromsi.",
+      "noRepositoriesVisibleBitbucket": "Kuusaan koodii mul'atu hin jiru. Hayyama Bitbucket kuusaa koodii bira ga'uuf qabu ilaaliitii haaromsi.",
+      "bitbucketOrganizationsOnly": "Bitbucket dhaabbilee qofaaf ni argama.",
+      "branchPickerTitle": "Damee filadhu",
+      "branchDefault": "Ofumaan",
+      "branchAccessibility": "Damee: {{label}}",
+      "branchLoading": "Dameewwan fe'amaa jiru",
+      "branchLoadError": "Dameewwan fe'uu hin danda'amne",
+      "branchUnavailable": "Kuusaa koodii kanaaf dameewwan hin argaman. Hayyama waltajjii waliin qabdu ilaali, erga kanaan booda kuusaa koodii bira filadhu.",
+      "branchEmpty": "Damee hin jiru",
+      "branchPlaceholder": "Damee tokko filadhu",
       "runOnWithTarget": "{{target}} irratti hojjechiisi",
       "environment": "Naannoo",
       "couldNotLoadEnvironment": "Naannoo kee fe'uu hin danda'amne.",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "Kuusaawwan koodii haaromsuu hin danda'amne. Deebi'ii yaali.",
       "discardDraftTitle": "Wixinee haqxaa?",
       "discardDraftMessage": "Gaaffiin kee ni bada.",
+      "discardWithUploadsMessage": "Gaaffiin kee fi faayiloonni ol fe'aman kan ergaa ergametti hin qabachiifamne ni haqamu.",
       "discardFailed": "Wixinee haquu hin danda'amne. Deebi'ii yaali.",
       "remoteHint": "Adeemsa kilo kompiitara kee irratti hojjechaa jiru to'achuuf, kompiitara kee irratti `kilo remote` yookaan turtii CLI hojjechaa jiru keessatti `/remote` raawwadhu.",
-      "connectBitbucketDescription": "Bitbucket biraawzarii kee keessatti walqabsiisi, sana booda kuusaa koodii filachuuf asitti deebi'i.",
-      "connectGitlabDescription": "GitLab biraawzarii kee keessatti walqabsiisi, sana booda kuusaa koodii filachuuf asitti deebi'i.",
-      "couldNotLoadBitbucketRepositories": "Kuusaawwan koodii Bitbucket fe'uu hin danda'amne.",
-      "couldNotLoadGithubRepositories": "Kuusaawwan koodii GitHub fe'uu hin danda'amne.",
-      "couldNotLoadGitlabRepositories": "Kuusaawwan koodii GitLab fe'uu hin danda'amne.",
-      "gitlabConnected": "GitLab walqabateera",
-      "noRepositoriesVisibleBitbucket": "Kuusaan koodii mul'atu hin jiru. Hayyama Bitbucket kuusaa koodii bira ga'uuf qabu ilaaliitii haaromsi.",
-      "noRepositoriesVisibleGitlab": "Kuusaan koodii mul'atu hin jiru. Hayyama GitLab kuusaa koodii bira ga'uuf qabu ilaaliitii haaromsi.",
-      "openBitbucket": "Bitbucket bani",
-      "openGitlab": "GitLab bani",
-      "recentlyUsed": "Dhiheenya itti fayyadamte",
-      "cliCannotContinue": "CLI kun turtii itti fufuu hin danda'u. Cloud Agent yookaan CLI biraa filadhu.",
       "continueFrom": "{{title}} itti fufaa jira.",
-      "importFailed": "Turtii kana galchuu hin danda'amne.",
       "importingSession": "Turtii galchaa jira",
-      "discardWithUploadsMessage": "Gaaffiin kee fi faayiloonni ol fe'aman kan ergaa ergametti hin qabachiifamne ni haqamu."
+      "cliCannotContinue": "CLI kun turtii itti fufuu hin danda'u. Cloud Agent yookaan CLI biraa filadhu.",
+      "importFailed": "Turtii kana galchuu hin danda'amne."
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayiliin {{displayCount}} haaromfameera.",

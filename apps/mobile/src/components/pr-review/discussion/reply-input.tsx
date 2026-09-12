@@ -10,6 +10,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { UGC_AGE_POSTURE } from '@kilocode/app-shared/moderation';
 
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -22,6 +23,7 @@ import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import { isPrOperationPersistenceFailed } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 import { trpcClient } from '@/lib/trpc';
 
 /**
@@ -139,9 +141,32 @@ type ReplyInputProps = {
   readonly number: number;
   readonly commentId: number;
   readonly reply: ReturnType<typeof useReplyToCommentMutation>;
+  /**
+   * The provider arm (s6). Present on a GitLab MR / Bitbucket PR thread:
+   * the reply posts `{ threadId, commentNodeId, body }` through the
+   * `providerReview` seam (GitLab answers inside the discussion, Bitbucket
+   * attaches to the root comment), and the durable draft key folds the
+   * collision-free ref identity so the same-numbered PR on another provider
+   * can never share this reply's draft (identity rule 17). Absent on GitHub,
+   * which keeps the exact pre-s6 call and key bytes.
+   */
+  readonly provider?:
+    | {
+        readonly ref: ProviderPrRef;
+        readonly threadId: string;
+        readonly commentNodeId: string;
+      }
+    | undefined;
 };
 
-export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<ReplyInputProps>) {
+export function ReplyInput({
+  owner,
+  repo,
+  number,
+  commentId,
+  reply,
+  provider,
+}: Readonly<ReplyInputProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const bodyRef = useRef<string>('');
@@ -151,11 +176,19 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
     'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
   >(null);
   const [resetKey, setResetKey] = useState(0);
+  // The provider platform as a stable primitive: the error effect words a
+  // refusal after it without depending on the `provider` object identity.
+  const providerPlatform = provider?.ref.platform;
 
   // Durable reply draft, keyed by account and thread. Nothing is saved or
   // restored while the user id is unknown.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
-  const replyDraftKey = prReplyDraftKey(owner, repo, number, commentId);
+  const positionReplyDraftKey = prReplyDraftKey(owner, repo, number, commentId);
+  // Provider arms fold the collision-free ref identity into the key (identity
+  // rule 17); the GitHub bytes stay exactly as stored before this slice.
+  const replyDraftKey = provider
+    ? `${positionReplyDraftKey}@${providerPrRefKey(provider.ref)}`
+    : positionReplyDraftKey;
   const draft = useFencedDraftLoad({ userId, isIdentityLoading, entityKey: replyDraftKey });
   useDraftFlushOnBackground(userId, replyDraftKey, true);
 
@@ -205,7 +238,15 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
         setInlineError(t('prReview.discussion.replyBadRequest'));
         setInlineErrorKind('bad-request');
       } else if (classification.kind === 'forbidden') {
-        setInlineError(t('prReview.discussion.replyForbidden'));
+        // The provider arm words the refusal after the connected provider
+        // (merge request vs pull request); GitHub keeps the exact pre-s6 copy.
+        setInlineError(
+          providerPlatform
+            ? t('prReview.discussion.replyForbiddenTerm', {
+                term: t(providerPrNounKey(providerPlatform)),
+              })
+            : t('prReview.discussion.replyForbidden')
+        );
         setInlineErrorKind('forbidden');
       } else if (classification.kind === 'reconnect') {
         setInlineError(t('prReview.connectionExpired'));
@@ -219,7 +260,7 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
         setInlineErrorKind('retryable');
       }
     }
-  }, [reply.error, t]);
+  }, [reply.error, t, providerPlatform]);
 
   const submit = async () => {
     const body = bodyRef.current.trim();
@@ -238,7 +279,12 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
       return;
     }
     reply.mutate(
-      { owner, repo, number, commentId, body },
+      // The provider arm posts the seam vars; the mutation hook routes the
+      // call by the live provider scope, so the ids here are provider-native
+      // (discussion id / root-comment id), never GitHub's numeric comment id.
+      provider
+        ? { threadId: provider.threadId, commentNodeId: provider.commentNodeId, body }
+        : { owner, repo, number, commentId, body },
       {
         onSuccess: () => {
           bodyRef.current = '';

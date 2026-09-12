@@ -36,6 +36,7 @@
     "cost": "Kaina",
     "discard": "Atmesti",
     "findings": "Problemos",
+    "mergeRequest": "merge request",
     "notConnected": "Neprijungta",
     "notifications": "Pranešimai",
     "pullRequest": "pakeitimų užklausa",
@@ -344,10 +345,17 @@
       "emptyDiffRow": "Tuščia pakeitimų palyginimo eilutė"
     },
     "connectionExpired": "Baigėsi GitHub prieigos galiojimas.",
+    "capabilities": {
+      "banner": {
+        "title": "Nepasiekiama šio teikėjo",
+        "accessibility": "Nepasiekiama šio teikėjo: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Sujungimas",
       "mergeNow": "Sujungti dabar",
       "mergePullRequest": "Pakeitimų užklausos sujungimas",
+      "mergeTermTitle": "Sujungti {{term}}",
       "enableAutoMerge": "Įjungti automatinį sujungimą",
       "disableAutoMerge": "Išjungti automatinį sujungimą",
       "autoMergeOn": "Automatinis sujungimas įjungtas",
@@ -366,9 +374,12 @@
       "deleteBranchAfterMerge": "Ištrinti šaką po sujungimo",
       "noEnabledMethods": "Šioje saugykloje neįjungtas nė vienas sujungimo būdas. Paprašyk saugyklos administratoriaus įjungti įprastą sujungimą, įrašų sutraukimą arba perkėlimą į kitą bazę.",
       "confirmTitle": "Sujungti pakeitimų užklausą?",
+      "confirmTitleTerm": "Sujungti {{term}}?",
       "confirmMessage": "Tavo pakeitimai bus sujungti su bazine šaka.",
       "enableAutoMergeConfirmTitle": "Įjungti automatinį sujungimą?",
       "enableAutoMergeConfirmMessage": "GitHub automatiškai sujungs šią pakeitimų užklausą, kai visi privalomi patikrinimai bus sėkmingi.",
+      "enableAutoMergeConfirmMessageTerm": "Automatinis {{term}} sujungimas įvyks sėkmingai įvykdžius pipeline.",
+      "enableAutoMergeDescriptionTerm": "GitLab automatiškai sujungs {{term}}, kai pipeline bus sėkmingas.",
       "forbidden": "Neturi teisės sujungti šios pakeitimų užklausos.",
       "cannotMerge": "Dabartinės būsenos pakeitimų užklausos negalima sujungti.",
       "couldNotMerge": "Nepavyko sujungti pakeitimų užklausos.",
@@ -379,7 +390,8 @@
       },
       "terminal": {
         "alreadyMerged": "Jau sujungta",
-        "closed": "Ši pakeitimų užklausa uždaryta"
+        "closed": "Ši pakeitimų užklausa uždaryta",
+        "closedMergeRequest": "Šis merge request uždarytas"
       },
       "partialSuccessBanner": {
         "body": "Nepavyko ištrinti šakos: {{reason}}.",
@@ -404,6 +416,20 @@
         "behindDetail": "Užklausos šaka atsilieka nuo bazinės šakos. Prieš sujungdamas perkelk pakeitimų įrašus į naują bazę arba atnaujink šaką.",
         "notMergeableTitle": "Šios pakeitimų užklausos dar negalima sujungti",
         "notMergeableDetail": "GitHub nurodė sujungimo būseną: {{state}}."
+      },
+      "restrictions": {
+        "title": "Sujungimo apribojimai",
+        "approvalsRequired_one": "Reikalingas {{displayCount}} patvirtinimas",
+        "approvalsRequired_other": "Reikalingi {{displayCount}} patvirtinimai",
+        "pipelineMustSucceed": "Prieš sujungiant pipeline turi būti sėkmingas.",
+        "approvalsRequired_many": "Reikalinga {{displayCount}} patvirtinimų",
+        "approvalsRequired_few": "Reikalingi {{displayCount}} patvirtinimai"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline nepavyksta paskutiniame commit.",
+        "pendingPipeline": "Pipeline vis dar vykdomas paskutiniame commit.",
+        "permission": "Trūksta teisių sujungti {{term}}.",
+        "draft": "Prieš sujungiant pakeisk {{term}} būseną į paruoštą peržiūrai."
       },
       "methodLabels": {
         "merge": "Sukurti sujungimo įrašą",
@@ -452,6 +478,7 @@
       "acceptTerms": "Sutikti",
       "replyBadRequest": "Šio atsakymo negalima paskelbti. Gija galėjo pasikeisti.",
       "replyForbidden": "Neturi teisės atsakyti šios pakeitimų užklausos diskusijoje.",
+      "replyForbiddenTerm": "Neturi teisės atsakyti į {{term}}.",
       "moderation": {
         "reportContent": {
           "terminal": "Apie šį komentarą negalima pranešti.",
@@ -483,10 +510,6 @@
       "termsAcceptRequired": "Kad galėtum skelbti, turi sutikti su paslaugų teikimo sąlygomis.",
       "termsOutdatedCopy": "Paslaugų teikimo sąlygos pasikeitė. Iš naujo atidaryk šį ekraną ir sutik su naujausia jų versija.",
       "termsCheckRetryCopy": "Nepavyko patikrinti paslaugų teikimo sąlygų. Patikrink ryšį ir bandyk dar kartą.",
-      "comment_few": "{{displayCount}} komentarai",
-      "comment_many": "{{displayCount}} komentaro",
-      "reaction_few": "reakcijos",
-      "reaction_many": "reakcijos",
       "reactions": {
         "thumbsUp": "Patinka",
         "thumbsDown": "Nepatinka",
@@ -504,7 +527,11 @@
         "outdatedOnLines": "Pasenęs komentaras: {{lines}}",
         "outdatedOnPath": "Pasenęs komentaras: {{path}}"
       },
-      "deletedUser": "ištrintas naudotojas"
+      "deletedUser": "ištrintas naudotojas",
+      "comment_few": "{{displayCount}} komentarai",
+      "comment_many": "{{displayCount}} komentaro",
+      "reaction_few": "reakcijos",
+      "reaction_many": "reakcijos"
     },
     "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų.",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
@@ -516,17 +543,19 @@
     "reviewPullRequest": "Peržiūrėti pakeitimų užklausą",
     "headLine": "{{counts}} · naujausias įrašas {{sha}}",
     "entry": {
-      "eyebrow": "Atidaryk pakeitimų užklausą pagal URL.",
-      "pastePrLink": "Įklijuoti PR nuorodą",
-      "noRecentPrs": "Nėra neseniai peržiūrėtų PR",
-      "noRecentPrsDescription": "Įklijuok PR nuorodą viršuje ir pradėk peržiūrą — kitą kartą PR bus rodomas čia.",
+      "eyebrow": "Atidaryk pakeitimų užklausą arba merge request pagal URL",
+      "pastePrLink": "Įklijuoti pakeitimų užklausos arba merge request nuorodą",
+      "noRecentPrs": "Nėra nesenių peržiūrų",
+      "noRecentPrsDescription": "Įklijuok nuorodą viršuje ir pradėk peržiūrą — kitą kartą ji bus rodoma čia.",
       "couldNotLoad": "Nepavyko įkelti.",
       "removeFromRecentsTitle": "Pašalinti iš neseniai peržiūrėtų?",
-      "removeFromRecentsMessage": "Ši pakeitimų užklausa bus pašalinta iš tavo neseniai peržiūrėtų užklausų sąrašo.",
+      "removeFromRecentsMessage": "Ši peržiūra bus pašalinta iš neseniai peržiūrėtų sąrašo.",
       "removeRecentAccessibility": "Pašalinti {{repo}} iš neseniai peržiūrėtų užklausų sąrašo",
-      "urlAccessibility": "GitHub pakeitimų užklausos URL",
-      "clearLink": "Išvalyti pakeitimų užklausos nuorodą",
-      "pasteLink": "Įklijuoti pakeitimų užklausos nuorodą",
+      "urlAccessibility": "Įvesk pakeitimų užklausos arba merge request URL",
+      "urlPlaceholder": "Pakeitimų užklausos arba merge request URL",
+      "openAccessibility": "Atidaryti pakeitimų užklausą arba merge request",
+      "clearLink": "Išvalyti nuorodą",
+      "pasteLink": "Įklijuoti pakeitimų užklausos arba merge request nuorodą",
       "open": "Atidaryti"
     },
     "checks": {
@@ -575,9 +604,15 @@
     "connect": {
       "checkFailedTitle": "Nepavyko patikrinti GitHub ryšio.",
       "checkFailedMessage": "Kol duomenys neįkelti, prisijungimo būsena nepasiekiama.",
+      "checkFailedTitleGitLab": "Nepavyko patikrinti GitLab ryšio.",
+      "checkFailedTitleBitbucket": "Nepavyko patikrinti Bitbucket ryšio.",
+      "providerCheckFailedMessage": "Ryšio būsena bus prieinama įkėlus duomenis.",
       "reconnectTitle": "Prisijungti prie GitHub iš naujo",
       "reconnectDescription": "Tavo GitHub prieiga atšaukta. Prisijunk iš naujo, kad galėtum toliau peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
-      "description": "Prijunk savo GitHub paskyrą, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje."
+      "description": "Prijunk savo GitHub paskyrą, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
+      "gitlabDescription": "Prijunk savo GitLab paskyrą, kad galėtum peržiūrėti merge requests mobiliajame įrenginyje.",
+      "bitbucketDescription": "Prijunk Bitbucket prie šios organizacijos, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
+      "bitbucketOrgOnlyDescription": "Profilyje pasirink organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas."
     },
     "screen": {
       "title": "#{{number}}",
@@ -601,7 +636,10 @@
     },
     "reconnectNotice": {
       "title": "Baigėsi GitHub prieigos galiojimas.",
-      "message": "Tavo GitHub ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo."
+      "message": "Tavo GitHub ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
+      "gitlabTitle": "Baigėsi GitLab prieigos galiojimas.",
+      "bitbucketTitle": "Baigėsi Bitbucket prieigos galiojimas.",
+      "providerMessage": "Tavo {{provider}} ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo."
     },
     "eventChips": {
       "comment": "Komentuoti",
@@ -657,6 +695,21 @@
       "files": "Failai",
       "discussion": "Diskusija"
     },
+    "terms": {
+      "pullRequest": "Pakeitimų užklausa",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Bendrinti merge request",
+      "viewOnProvider": "Peržiūrėti {{provider}}",
+      "mergeRequestUnavailable": "Merge request nepasiekiamas",
+      "unavailableDescription": "Galbūt jis buvo ištrintas, arba neturi prieigos prie jo.",
+      "accessDeniedMergeRequest": "Neturi teisės peržiūrėti šio merge request.",
+      "couldNotLoadMergeRequest": "Nepavyko įkelti merge request.",
+      "discussionAccessDenied": "Neturi teisės peržiūrėti šio merge request diskusijos.",
+      "discussionUnavailableMessage": "Šis merge request galėjo būti pašalintas.",
+      "noDiscussionDescription": "Šiame merge request nėra peržiūros gijų ar diskusijos komentarų.",
+      "noFilesChangedDescription": "Šiame merge request nėra failų pakeitimų."
+    },
     "fileStatus": {
       "modified": "Pakeista",
       "renamed": "Pervadinta",
@@ -673,7 +726,7 @@
       "emptyLine": "(tuščia)"
     },
     "linkPasteClipboardEmpty": "Iškarpinė tuščia.",
-    "linkPasteNotAPullRequest": "Tai ne GitHub pakeitimų užklausos nuoroda.",
+    "linkPasteNotAPullRequest": "Tai ne pakeitimų užklausos ar merge request nuoroda",
     "announce": {
       "commentPosted": "Komentaras paskelbtas",
       "reviewSubmitted": "Peržiūra pateikta",
@@ -682,6 +735,7 @@
     "mutationError": {
       "commentNotPosted": "Šio komentaro paskelbti negalima. Pasirinkta eilutė galėjo pasikeisti arba PR galėjo būti atnaujintas.",
       "reviewNotSubmitted": "Dabartinės peržiūros pateikti negalima. PR galėjo pasikeisti arba bandai peržiūrėti savo paties pakeitimų užklausą.",
+      "reviewNotSubmittedTerm": "Šios peržiūros pateikti negalima. {{term}} galėjo pasikeisti arba negali peržiūrėti savo {{term}}.",
       "couldNotPostComment": "Nepavyko paskelbti komentaro.",
       "couldNotSubmitReview": "Nepavyko pateikti peržiūros. Patikrink ryšį ir bandyk dar kartą."
     },
@@ -689,6 +743,7 @@
       "couldNotReply": "Nepavyko atsakyti.",
       "couldNotCompleteAction": "Nepavyko atlikti šio veiksmo.",
       "mergeResultDefaultError": "GitHub neužbaigė sujungimo.",
+      "mergeResultNotCompleted": "Nepavyko sujungti {{term}}. Patikrink būseną ir bandyk dar kartą.",
       "ambiguous": "Nepavyko patvirtinti rezultato — prieš bandydamas dar kartą patikrink PR.",
       "persistenceFailed": "Nepavyko užfiksuoti šio veiksmo. Bandyk dar kartą vėliau.",
       "forbidden": "Šis veiksmas neleidžiamas."
@@ -2020,11 +2075,31 @@
       "retryConnection": "Bandyti prisijungti iš naujo"
     },
     "newSession": {
+      "recentlyUsed": "Neseniai naudota",
+      "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų.",
+      "couldNotLoadGitlabRepositories": "Nepavyko įkelti GitLab saugyklų.",
+      "couldNotLoadBitbucketRepositories": "Nepavyko įkelti Bitbucket saugyklų.",
       "connectGithubDescription": "Naršyklėje susiekite GitHub paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
+      "connectGitlabDescription": "Naršyklėje susiekite GitLab paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
+      "connectBitbucketDescription": "Naršyklėje susiekite Bitbucket paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
       "openGithub": "Atidaryti GitHub",
+      "openGitlab": "Atidaryti GitLab",
+      "openBitbucket": "Atidaryti Bitbucket",
       "refreshRepositories": "Atnaujinti saugyklas",
       "githubConnected": "GitHub paskyra susieta",
+      "gitlabConnected": "GitLab paskyra susieta",
       "noRepositoriesVisible": "Saugyklų nerasta. Patikrinkite, ar Kilo programėlė turi prieigą prie GitHub saugyklų, tada atnaujinkite sąrašą.",
+      "noRepositoriesVisibleGitlab": "Saugyklų nerasta. Patikrinkite prieigą prie GitLab saugyklų, tada atnaujinkite sąrašą.",
+      "noRepositoriesVisibleBitbucket": "Saugyklų nerasta. Patikrinkite prieigą prie Bitbucket saugyklų, tada atnaujinkite sąrašą.",
+      "bitbucketOrganizationsOnly": "Bitbucket prieinamas tik organizacijoms.",
+      "branchPickerTitle": "Pasirinkti šaką",
+      "branchDefault": "Numatytoji",
+      "branchAccessibility": "Šaka: {{label}}",
+      "branchLoading": "Įkeliamos šakos",
+      "branchLoadError": "Nepavyko įkelti šakų",
+      "branchUnavailable": "Šiai saugyklai šakų nėra. Patikrink prieigos teises pas tiekėją ir pasirink kitą saugyklą.",
+      "branchEmpty": "Nėra prieinamų šakų",
+      "branchPlaceholder": "Pasirinkti šaką",
       "runOnWithTarget": "Vykdymo vieta: {{target}}",
       "environment": "Aplinka",
       "couldNotLoadEnvironment": "Nepavyko įkelti jūsų aplinkos.",
@@ -2045,24 +2120,13 @@
       "couldNotRefreshRepositories": "Nepavyko atnaujinti saugyklų. Bandykite dar kartą.",
       "discardDraftTitle": "Atmesti juodraštį?",
       "discardDraftMessage": "Jūsų užklausa bus prarasta.",
+      "discardWithUploadsMessage": "Jūsų užklausa ir visi prie išsiųstų žinučių nepridėti įkelti failai bus ištrinti.",
       "discardFailed": "Nepavyko atmesti juodraščio. Bandykite dar kartą.",
       "remoteHint": "Norėdami valdyti vietinį kilo procesą, kompiuteryje vykdykite `kilo remote` arba veikiančioje CLI sesijoje vykdykite `/remote`.",
-      "connectBitbucketDescription": "Naršyklėje susiekite Bitbucket paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
-      "connectGitlabDescription": "Naršyklėje susiekite GitLab paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
-      "couldNotLoadBitbucketRepositories": "Nepavyko įkelti Bitbucket saugyklų.",
-      "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų.",
-      "couldNotLoadGitlabRepositories": "Nepavyko įkelti GitLab saugyklų.",
-      "gitlabConnected": "GitLab paskyra susieta",
-      "noRepositoriesVisibleBitbucket": "Saugyklų nerasta. Patikrinkite prieigą prie Bitbucket saugyklų, tada atnaujinkite sąrašą.",
-      "noRepositoriesVisibleGitlab": "Saugyklų nerasta. Patikrinkite prieigą prie GitLab saugyklų, tada atnaujinkite sąrašą.",
-      "openBitbucket": "Atidaryti Bitbucket",
-      "openGitlab": "Atidaryti GitLab",
-      "recentlyUsed": "Neseniai naudota",
       "continueFrom": "Tęsiama sesija „{{title}}“.",
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šioje CLI sesijos tęsti negalima. Pasirinkite „Cloud Agent“ arba kitą CLI.",
-      "importFailed": "Nepavyko importuoti šios sesijos.",
-      "discardWithUploadsMessage": "Jūsų užklausa ir visi prie išsiųstų žinučių nepridėti įkelti failai bus ištrinti."
+      "importFailed": "Nepavyko importuoti šios sesijos."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujintas {{displayCount}} failas.",

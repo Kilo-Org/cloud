@@ -36,6 +36,7 @@
     "cost": "Costuri",
     "discard": "Renunță",
     "findings": "Probleme detectate",
+    "mergeRequest": "merge request",
     "notConnected": "Neconectat",
     "notifications": "Notificări",
     "pullRequest": "pR",
@@ -342,10 +343,17 @@
       "emptyDiffRow": "Rând gol în comparație"
     },
     "connectionExpired": "Conexiunea la GitHub a expirat.",
+    "capabilities": {
+      "banner": {
+        "title": "Nu este disponibil pentru acest furnizor",
+        "accessibility": "Nu este disponibil pentru acest furnizor: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Îmbinare",
       "mergeNow": "Îmbină acum",
       "mergePullRequest": "Îmbinarea PR-ului",
+      "mergeTermTitle": "Îmbinarea {{term}}-ului",
       "enableAutoMerge": "Activează îmbinarea automată",
       "disableAutoMerge": "Dezactivează îmbinarea automată",
       "autoMergeOn": "Îmbinare automată activată",
@@ -364,9 +372,12 @@
       "deleteBranchAfterMerge": "Șterge ramura după îmbinare",
       "noEnabledMethods": "Acest depozit nu are nicio metodă de îmbinare activată. Cere unui administrator al depozitului să activeze îmbinarea printr-un commit nou, prin comasarea commiturilor sau prin rebazare.",
       "confirmTitle": "Îmbini PR-ul?",
+      "confirmTitleTerm": "Îmbini {{term}}-ul?",
       "confirmMessage": "Modificările tale vor fi îmbinate în ramura de bază.",
       "enableAutoMergeConfirmTitle": "Activezi îmbinarea automată?",
       "enableAutoMergeConfirmMessage": "GitHub va îmbina automat acest PR după ce toate verificările obligatorii se încheie cu succes.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} va fi îmbinat automat după ce pipeline-ul său are succes.",
+      "enableAutoMergeDescriptionTerm": "GitLab îmbină automat acest {{term}} după ce pipeline-ul său are succes.",
       "forbidden": "Nu ai permisiunea să îmbini acest PR.",
       "cannotMerge": "Acest PR nu poate fi îmbinat în forma actuală.",
       "couldNotMerge": "Nu s-a putut îmbina PR-ul.",
@@ -377,7 +388,8 @@
       },
       "terminal": {
         "alreadyMerged": "Deja îmbinat",
-        "closed": "PR închis"
+        "closed": "PR închis",
+        "closedMergeRequest": "Merge request închis"
       },
       "partialSuccessBanner": {
         "body": "Nu s-a putut șterge ramura: {{reason}}.",
@@ -402,6 +414,19 @@
         "behindDetail": "Ramura sursă nu include cele mai recente modificări din ramura de bază. Rebazează sau actualizează ramura înainte de îmbinare.",
         "notMergeableTitle": "Acest PR nu poate fi îmbinat încă",
         "notMergeableDetail": "GitHub a raportat următoarea stare pentru îmbinare: {{state}}."
+      },
+      "restrictions": {
+        "title": "Restricții de îmbinare",
+        "approvalsRequired_one": "{{displayCount}} aprobare necesară",
+        "approvalsRequired_other": "{{displayCount}} aprobări necesare",
+        "pipelineMustSucceed": "Pipeline-ul trebuie să aibă succes înainte de îmbinare.",
+        "approvalsRequired_few": "{{displayCount}} aprobări necesare"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline-ul eșuează la cel mai recent commit.",
+        "pendingPipeline": "Pipeline-ul încă rulează la cel mai recent commit.",
+        "permission": "Nu ai permisiunea să îmbini acest {{term}}.",
+        "draft": "Marchează {{term}}-ul ca pregătit pentru revizuire înainte de îmbinare."
       },
       "methodLabels": {
         "merge": "Creează un commit de îmbinare",
@@ -450,6 +475,7 @@
       "acceptTerms": "Acceptă",
       "replyBadRequest": "Acest răspuns nu poate fi publicat. Este posibil ca firul de discuție să se fi modificat.",
       "replyForbidden": "Nu ai permisiunea să răspunzi la acest PR.",
+      "replyForbiddenTerm": "Nu ai permisiunea să răspunzi la acest {{term}}.",
       "moderation": {
         "reportContent": {
           "terminal": "Acest comentariu nu poate fi raportat.",
@@ -481,8 +507,6 @@
       "termsAcceptRequired": "Trebuie să accepți termenii de utilizare pentru a publica mesaje.",
       "termsOutdatedCopy": "Termenii de utilizare s-au modificat. Redeschide acest ecran pentru a accepta cea mai recentă versiune.",
       "termsCheckRetryCopy": "Nu s-au putut verifica termenii de utilizare. Verifică conexiunea și încearcă din nou.",
-      "comment_few": "{{displayCount}} comentarii",
-      "reaction_few": "reacții",
       "reactions": {
         "thumbsUp": "Degetul mare în sus",
         "thumbsDown": "Degetul mare în jos",
@@ -500,7 +524,9 @@
         "outdatedOnLines": "Depășit: {{lines}}",
         "outdatedOnPath": "Depășit: {{path}}"
       },
-      "deletedUser": "utilizator șters"
+      "deletedUser": "utilizator șters",
+      "comment_few": "{{displayCount}} comentarii",
+      "reaction_few": "reacții"
     },
     "couldNotOpenGitHubAppSettings": "Nu s-au putut deschide setările aplicației GitHub.",
     "installKiloGitHubApp": "Instalează aplicația Kilo pentru GitHub",
@@ -512,17 +538,19 @@
     "reviewPullRequest": "Revizuiește PR-ul",
     "headLine": "{{counts}} · ultimul commit {{sha}}",
     "entry": {
-      "eyebrow": "Deschide un PR folosind adresa URL.",
-      "pastePrLink": "Lipește o legătură către un PR",
-      "noRecentPrs": "Fără PR-uri recente",
-      "noRecentPrsDescription": "Lipește mai sus o legătură către un PR pentru a începe revizuirea. PR-ul va apărea aici data viitoare.",
+      "eyebrow": "Deschide un PR sau un merge request folosind adresa URL",
+      "pastePrLink": "Lipește o legătură către un PR sau un merge request",
+      "noRecentPrs": "Nicio revizuire recentă",
+      "noRecentPrsDescription": "Lipește o legătură mai sus pentru a începe o revizuire — va apărea aici data viitoare.",
       "couldNotLoad": "Nu s-au putut încărca datele.",
       "removeFromRecentsTitle": "Elimini din lista de PR-uri recente?",
-      "removeFromRecentsMessage": "Acest PR va fi eliminat din lista ta de PR-uri recente.",
+      "removeFromRecentsMessage": "Această revizuire va fi eliminată din recente.",
       "removeRecentAccessibility": "Elimină {{repo}} din lista de PR-uri recente",
-      "urlAccessibility": "Adresa URL a PR-ului de pe GitHub",
-      "clearLink": "Șterge legătura către PR",
-      "pasteLink": "Lipește legătura către PR",
+      "urlAccessibility": "Introdu URL-ul unui PR sau al unui merge request",
+      "urlPlaceholder": "URL pentru PR sau merge request",
+      "openAccessibility": "Deschide un PR sau un merge request",
+      "clearLink": "Șterge legătura",
+      "pasteLink": "Lipește legătura către PR sau merge request",
       "open": "Deschidere"
     },
     "checks": {
@@ -571,9 +599,15 @@
     "connect": {
       "checkFailedTitle": "Nu s-a putut verifica conexiunea la GitHub.",
       "checkFailedMessage": "Starea autentificării nu este disponibilă până la încărcarea acestor date.",
+      "checkFailedTitleGitLab": "Nu s-a putut verifica conexiunea la GitLab.",
+      "checkFailedTitleBitbucket": "Nu s-a putut verifica conexiunea la Bitbucket.",
+      "providerCheckFailedMessage": "Starea conexiunii nu este disponibilă până când se încarcă.",
       "reconnectTitle": "Reconectare la GitHub",
       "reconnectDescription": "Accesul la contul tău GitHub a fost revocat. Reconectează-te pentru a continua să revizuiești PR-uri pe mobil.",
-      "description": "Conectează-ți contul GitHub pentru a revizui PR-uri pe mobil."
+      "description": "Conectează-ți contul GitHub pentru a revizui PR-uri pe mobil.",
+      "gitlabDescription": "Conectează-ți contul GitLab pentru a revizui merge requesturi de pe mobil.",
+      "bitbucketDescription": "Conectează Bitbucket la această organizație pentru a revizui PR-uri de pe mobil.",
+      "bitbucketOrgOnlyDescription": "Selectează o organizație în profilul tău pentru a-i revizui PR-urile Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -596,7 +630,10 @@
     },
     "reconnectNotice": {
       "title": "Conexiunea la GitHub a expirat.",
-      "message": "Conexiunea ta la GitHub nu mai este validă. Verifică din nou conexiunea — ți se va cere să te reconectezi dacă este necesar."
+      "message": "Conexiunea ta la GitHub nu mai este validă. Verifică din nou conexiunea — ți se va cere să te reconectezi dacă este necesar.",
+      "gitlabTitle": "Conexiunea la GitLab a expirat.",
+      "bitbucketTitle": "Conexiunea la Bitbucket a expirat.",
+      "providerMessage": "Conexiunea ta la {{provider}} nu mai este validă. Verifică din nou conexiunea — ți se va cere să te reconectezi dacă este necesar."
     },
     "eventChips": {
       "comment": "Comentariu",
@@ -650,6 +687,21 @@
       "files": "Fișiere",
       "discussion": "Discuție"
     },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Distribuie merge request-ul",
+      "viewOnProvider": "Vezi pe {{provider}}",
+      "mergeRequestUnavailable": "Merge request indisponibil",
+      "unavailableDescription": "S-ar putea să fi fost șters sau să nu ai acces la el.",
+      "accessDeniedMergeRequest": "Nu ai permisiunea să vezi acest merge request.",
+      "couldNotLoadMergeRequest": "Nu s-a putut încărca merge request-ul.",
+      "discussionAccessDenied": "Nu ai permisiunea să vezi discuția acestui merge request.",
+      "discussionUnavailableMessage": "Este posibil ca acest merge request să fi fost eliminat.",
+      "noDiscussionDescription": "Acest merge request nu are încă fire de discuție pentru revizuire sau comentarii generale.",
+      "noFilesChangedDescription": "Acest merge request nu conține modificări ale fișierelor."
+    },
     "fileStatus": {
       "modified": "Modificat",
       "renamed": "Redenumit",
@@ -666,7 +718,7 @@
       "emptyLine": "(gol)"
     },
     "linkPasteClipboardEmpty": "Clipboardul este gol.",
-    "linkPasteNotAPullRequest": "Aceasta nu este o legătură către un PR de pe GitHub.",
+    "linkPasteNotAPullRequest": "Aceasta nu este o legătură către un PR sau un merge request",
     "announce": {
       "commentPosted": "Comentariu publicat",
       "reviewSubmitted": "Revizuire trimisă",
@@ -675,6 +727,7 @@
     "mutationError": {
       "commentNotPosted": "Acest comentariu nu poate fi publicat. Este posibil ca linia selectată să se fi modificat sau PR-ul să fi fost actualizat.",
       "reviewNotSubmitted": "Această revizuire nu poate fi trimisă în forma actuală. Este posibil ca PR-ul să se fi modificat sau să fie propriul tău PR, pe care nu îl poți revizui.",
+      "reviewNotSubmittedTerm": "Această revizuire nu poate fi trimisă în starea curentă. E posibil ca {{term}} să se fi modificat sau nu îți poți revizui propriul {{term}}.",
       "couldNotPostComment": "Nu s-a putut publica comentariul.",
       "couldNotSubmitReview": "Nu s-a putut trimite revizuirea. Verifică conexiunea și încearcă din nou."
     },
@@ -682,6 +735,7 @@
       "couldNotReply": "Nu s-a putut trimite răspunsul.",
       "couldNotCompleteAction": "Nu s-a putut finaliza această acțiune.",
       "mergeResultDefaultError": "GitHub nu a finalizat îmbinarea.",
+      "mergeResultNotCompleted": "{{term}} nu a fost îmbinat. Verifică starea lui și încearcă din nou.",
       "ambiguous": "Nu s-a putut confirma rezultatul — verifică PR-ul înainte de a încerca din nou.",
       "persistenceFailed": "Nu am putut înregistra această acțiune. Încearcă din nou mai târziu.",
       "forbidden": "Accesul este interzis."
@@ -2004,11 +2058,31 @@
       "retryConnection": "Încearcă din nou conectarea"
     },
     "newSession": {
+      "recentlyUsed": "Folosite recent",
+      "couldNotLoadGithubRepositories": "Nu s-au putut încărca depozitele GitHub.",
+      "couldNotLoadGitlabRepositories": "Nu s-au putut încărca depozitele GitLab.",
+      "couldNotLoadBitbucketRepositories": "Nu s-au putut încărca depozitele Bitbucket.",
       "connectGithubDescription": "Conectează contul GitHub în browser, apoi revino aici pentru a alege un depozit.",
+      "connectGitlabDescription": "Conectează contul GitLab în browser, apoi revino aici pentru a alege un depozit.",
+      "connectBitbucketDescription": "Conectează contul Bitbucket în browser, apoi revino aici pentru a alege un depozit.",
       "openGithub": "Deschide GitHub",
+      "openGitlab": "Deschide GitLab",
+      "openBitbucket": "Deschide Bitbucket",
       "refreshRepositories": "Reîmprospătează depozitele",
       "githubConnected": "GitHub conectat",
+      "gitlabConnected": "GitLab conectat",
       "noRepositoriesVisible": "Nu este vizibil niciun depozit. Verifică accesul aplicației Kilo pentru GitHub la depozite, apoi reîmprospătează lista.",
+      "noRepositoriesVisibleGitlab": "Nu este vizibil niciun depozit. Verifică accesul la depozitele GitLab, apoi reîmprospătează lista.",
+      "noRepositoriesVisibleBitbucket": "Nu este vizibil niciun depozit. Verifică accesul la depozitele Bitbucket, apoi reîmprospătează lista.",
+      "bitbucketOrganizationsOnly": "Bitbucket este disponibil doar pentru organizații.",
+      "branchPickerTitle": "Selectează ramura",
+      "branchDefault": "Implicit",
+      "branchAccessibility": "Ramură: {{label}}",
+      "branchLoading": "Se încarcă ramurile",
+      "branchLoadError": "Nu s-au putut încărca ramurile",
+      "branchUnavailable": "Nu există ramuri disponibile pentru acest depozit. Verifică-ți accesul la furnizor, apoi alege alt depozit.",
+      "branchEmpty": "Nicio ramură disponibilă",
+      "branchPlaceholder": "Selectează o ramură",
       "runOnWithTarget": "Rulează pe: {{target}}",
       "environment": "Mediu",
       "couldNotLoadEnvironment": "Nu s-a putut încărca mediul tău.",
@@ -2029,24 +2103,13 @@
       "couldNotRefreshRepositories": "Nu s-au putut reîmprospăta depozitele. Încearcă din nou.",
       "discardDraftTitle": "Renunți la ciornă?",
       "discardDraftMessage": "Instrucțiunile tale se vor pierde.",
+      "discardWithUploadsMessage": "Instrucțiunile tale și fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
       "discardFailed": "Nu s-a putut șterge ciorna. Încearcă din nou.",
       "remoteHint": "Rulează `kilo remote` pe computerul tău sau `/remote` într-o sesiune CLI activă pentru a controla un proces kilo local.",
-      "connectBitbucketDescription": "Conectează contul Bitbucket în browser, apoi revino aici pentru a alege un depozit.",
-      "connectGitlabDescription": "Conectează contul GitLab în browser, apoi revino aici pentru a alege un depozit.",
-      "couldNotLoadBitbucketRepositories": "Nu s-au putut încărca depozitele Bitbucket.",
-      "couldNotLoadGithubRepositories": "Nu s-au putut încărca depozitele GitHub.",
-      "couldNotLoadGitlabRepositories": "Nu s-au putut încărca depozitele GitLab.",
-      "gitlabConnected": "GitLab conectat",
-      "noRepositoriesVisibleBitbucket": "Nu este vizibil niciun depozit. Verifică accesul la depozitele Bitbucket, apoi reîmprospătează lista.",
-      "noRepositoriesVisibleGitlab": "Nu este vizibil niciun depozit. Verifică accesul la depozitele GitLab, apoi reîmprospătează lista.",
-      "openBitbucket": "Deschide Bitbucket",
-      "openGitlab": "Deschide GitLab",
-      "recentlyUsed": "Folosite recent",
       "continueFrom": "Se continuă sesiunea {{title}}.",
       "importingSession": "Se importă sesiunea",
       "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
-      "importFailed": "Nu s-a putut importa această sesiune.",
-      "discardWithUploadsMessage": "Instrucțiunile tale și fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse."
+      "importFailed": "Nu s-a putut importa această sesiune."
     },
     "partRenderer": {
       "updatedFileCount_one": "S-a actualizat {{displayCount}} fișier.",

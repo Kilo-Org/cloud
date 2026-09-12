@@ -36,6 +36,7 @@
     "cost": "هزینه",
     "discard": "کنار گذاشتن",
     "findings": "یافته‌ها",
+    "mergeRequest": "درخواست ادغام",
     "notConnected": "متصل نیست",
     "notifications": "اعلان‌ها",
     "pullRequest": "پول ریکوئست",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "ردیف خالی در نمایش تغییرات"
     },
     "connectionExpired": "اعتبار اتصال به GitHub تمام شده است.",
+    "capabilities": {
+      "banner": {
+        "title": "در این ارائه‌دهنده در دسترس نیست",
+        "accessibility": "در این ارائه‌دهنده در دسترس نیست: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "ادغام",
       "mergeNow": "ادغام فوری",
       "mergePullRequest": "ادغام درخواست",
+      "mergeTermTitle": "ادغام {{term}}",
       "enableAutoMerge": "فعال‌سازی ادغام خودکار",
       "disableAutoMerge": "غیرفعال‌سازی ادغام خودکار",
       "autoMergeOn": "ادغام خودکار فعال است",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "حذف شاخه پس از ادغام",
       "noEnabledMethods": "هیچ روش ادغامی برای این مخزن فعال نیست. از مدیر مخزن بخواهید ادغام معمولی، اسکواش یا ری‌بیس را فعال کند.",
       "confirmTitle": "درخواست ادغام شود؟",
+      "confirmTitleTerm": "{{term}} ادغام شود؟",
       "confirmMessage": "این کار تغییرات شما را در شاخهٔ پایه ادغام می‌کند.",
       "enableAutoMergeConfirmTitle": "ادغام خودکار فعال شود؟",
       "enableAutoMergeConfirmMessage": "پس از موفقیت همهٔ بررسی‌های الزامی، GitHub این درخواست ادغام را به‌طور خودکار ادغام می‌کند.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} پس از موفقیت خط لوله به‌طور خودکار ادغام می‌شود.",
+      "enableAutoMergeDescriptionTerm": "GitLab این {{term}} را پس از موفقیت خط لوله به‌طور خودکار ادغام می‌کند.",
       "forbidden": "اجازهٔ ادغام این درخواست را ندارید.",
       "cannotMerge": "این درخواست در وضعیت فعلی قابل ادغام نیست.",
       "couldNotMerge": "ادغام درخواست ممکن نشد.",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "قبلاً ادغام شده",
-        "closed": "این درخواست ادغام بسته شده است"
+        "closed": "این درخواست ادغام بسته شده است",
+        "closedMergeRequest": "این درخواست ادغام بسته شده است"
       },
       "partialSuccessBanner": {
         "body": "حذف شاخه ممکن نشد: {{reason}}.",
@@ -400,6 +412,18 @@
         "behindDetail": "شاخهٔ مبدأ از شاخهٔ پایه عقب است. پیش از ادغام، شاخه را ری‌بیس یا به‌روزرسانی کنید.",
         "notMergeableTitle": "این درخواست هنوز قابل ادغام نیست",
         "notMergeableDetail": "GitHub وضعیت ادغام‌پذیری {{state}} را گزارش کرده است."
+      },
+      "restrictions": {
+        "title": "محدودیت‌های ادغام",
+        "approvalsRequired_one": "به {{displayCount}} تأیید نیاز است",
+        "approvalsRequired_other": "به {{displayCount}} تأیید نیاز است",
+        "pipelineMustSucceed": "خط لوله باید پیش از ادغام موفق باشد."
+      },
+      "providerBlocked": {
+        "failingPipeline": "خط لوله در آخرین کامیت ناموفق است.",
+        "pendingPipeline": "خط لوله هنوز در آخرین کامیت در حال اجرا است.",
+        "permission": "اجازهٔ ادغام این {{term}} را ندارید.",
+        "draft": "پیش از ادغام، {{term}} را به‌عنوان آمادهٔ بازبینی علامت‌گذاری کنید."
       },
       "methodLabels": {
         "merge": "ایجاد کامیت ادغام",
@@ -448,6 +472,7 @@
       "acceptTerms": "پذیرش",
       "replyBadRequest": "این پاسخ قابل ارسال نیست. ممکن است گفت‌وگو تغییر کرده باشد.",
       "replyForbidden": "اجازهٔ پاسخ دادن در این درخواست ادغام را ندارید.",
+      "replyForbiddenTerm": "اجازهٔ پاسخ دادن در این {{term}} را ندارید.",
       "moderation": {
         "reportContent": {
           "terminal": "این نظر قابل گزارش نیست.",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "بازبینی درخواست ادغام",
     "headLine": "{{counts}} · آخرین کامیت {{sha}}",
     "entry": {
-      "eyebrow": "درخواست ادغام را با URL باز کنید.",
-      "pastePrLink": "جای‌گذاری پیوند PR",
-      "noRecentPrs": "هنوز PR اخیری وجود ندارد",
-      "noRecentPrsDescription": "برای شروع بازبینی، پیوند یک PR را در بالا جای‌گذاری کنید. دفعهٔ بعد، آن PR اینجا نمایش داده می‌شود.",
+      "eyebrow": "یک پول ریکوئست یا درخواست ادغام را با URL باز کنید.",
+      "pastePrLink": "پیوند پول ریکوئست یا درخواست ادغام را جای‌گذاری کنید",
+      "noRecentPrs": "بازبینی اخیری وجود ندارد",
+      "noRecentPrsDescription": "برای شروع بازبینی، پیوندی را در بالا جای‌گذاری کنید. دفعهٔ بعد، اینجا نمایش داده می‌شود.",
       "couldNotLoad": "بارگذاری ممکن نشد.",
       "removeFromRecentsTitle": "از موارد اخیر حذف شود؟",
-      "removeFromRecentsMessage": "این درخواست ادغام از فهرست موارد اخیر شما حذف می‌شود.",
+      "removeFromRecentsMessage": "این بازبینی از فهرست موارد اخیر شما حذف می‌شود.",
       "removeRecentAccessibility": "حذف {{repo}} از موارد اخیر",
-      "urlAccessibility": "URL درخواست ادغام در GitHub",
-      "clearLink": "پاک کردن پیوند درخواست ادغام",
-      "pasteLink": "جای‌گذاری پیوند درخواست ادغام",
+      "urlAccessibility": "URL پول ریکوئست یا درخواست ادغام را وارد کنید",
+      "urlPlaceholder": "URL پول ریکوئست یا درخواست ادغام",
+      "openAccessibility": "باز کردن پول ریکوئست یا درخواست ادغام",
+      "clearLink": "پاک کردن پیوند",
+      "pasteLink": "پیوند پول ریکوئست یا درخواست ادغام را جای‌گذاری کنید",
       "open": "باز"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "بررسی اتصال به GitHub ممکن نشد.",
       "checkFailedMessage": "وضعیت ورود تا بارگذاری این بخش در دسترس نیست.",
+      "checkFailedTitleGitLab": "بررسی اتصال به GitLab ممکن نشد.",
+      "checkFailedTitleBitbucket": "بررسی اتصال به Bitbucket ممکن نشد.",
+      "providerCheckFailedMessage": "وضعیت اتصال تا بارگذاری در دسترس نیست.",
       "reconnectTitle": "اتصال مجدد به GitHub",
       "reconnectDescription": "مجوز اتصال شما به GitHub لغو شده است. برای ادامهٔ بازبینی درخواست‌های ادغام در موبایل، دوباره متصل شوید.",
-      "description": "برای بازبینی درخواست‌های ادغام در موبایل، حساب GitHub خود را متصل کنید."
+      "description": "برای بازبینی درخواست‌های ادغام در موبایل، حساب GitHub خود را متصل کنید.",
+      "gitlabDescription": "حساب GitLab خود را وصل کنید تا درخواست‌های ادغام را در موبایل بازبینی کنید.",
+      "bitbucketDescription": "Bitbucket را به این سازمان وصل کنید تا پول ریکوئست‌ها را در موبایل بازبینی کنید.",
+      "bitbucketOrgOnlyDescription": "یک سازمان در نمایه خود انتخاب کنید تا پول ریکوئست‌های Bitbucket آن را بازبینی کنید."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "اعتبار اتصال به GitHub تمام شده است.",
-      "message": "اتصال شما به GitHub دیگر معتبر نیست. آن را دوباره بررسی کنید. در صورت نیاز، از شما خواسته می‌شود دوباره متصل شوید."
+      "message": "اتصال شما به GitHub دیگر معتبر نیست. آن را دوباره بررسی کنید. در صورت نیاز، از شما خواسته می‌شود دوباره متصل شوید.",
+      "gitlabTitle": "اعتبار اتصال به GitLab تمام شده است.",
+      "bitbucketTitle": "اعتبار اتصال به Bitbucket تمام شده است.",
+      "providerMessage": "اتصال شما به {{provider}} دیگر معتبر نیست. آن را دوباره بررسی کنید. در صورت نیاز، از شما خواسته می‌شود دوباره متصل شوید."
     },
     "eventChips": {
       "comment": "نظر",
@@ -643,6 +679,21 @@
       "files": "فایل",
       "discussion": "گفت‌وگو"
     },
+    "terms": {
+      "pullRequest": "پول ریکوئست",
+      "mergeRequest": "درخواست ادغام",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "اشتراک‌گذاری درخواست ادغام",
+      "viewOnProvider": "مشاهده در {{provider}}",
+      "mergeRequestUnavailable": "درخواست ادغام در دسترس نیست",
+      "unavailableDescription": "ممکن است حذف شده باشد، یا شاید دسترسی به آن نداشته باشید.",
+      "accessDeniedMergeRequest": "اجازهٔ مشاهدهٔ این درخواست ادغام را ندارید.",
+      "couldNotLoadMergeRequest": "بارگذاری درخواست ادغام ممکن نشد.",
+      "discussionAccessDenied": "اجازهٔ مشاهدهٔ گفت‌وگوی این درخواست ادغام را ندارید.",
+      "discussionUnavailableMessage": "ممکن است این درخواست ادغام حذف شده باشد.",
+      "noDiscussionDescription": "هنوز هیچ گفت‌وگوی بازبینی یا نظری در این درخواست ادغام ثبت نشده است.",
+      "noFilesChangedDescription": "در این درخواست ادغام هیچ فایلی تغییر نکرده است."
+    },
     "fileStatus": {
       "modified": "تغییریافته",
       "renamed": "تغییرنام‌یافته",
@@ -659,7 +710,7 @@
       "emptyLine": "(خالی)"
     },
     "linkPasteClipboardEmpty": "کلیپ‌بورد خالی است.",
-    "linkPasteNotAPullRequest": "این پیوند مربوط به درخواست ادغام در GitHub نیست.",
+    "linkPasteNotAPullRequest": "این پیوند مربوط به پول ریکوئست یا درخواست ادغام نیست.",
     "announce": {
       "commentPosted": "نظر ارسال شد",
       "reviewSubmitted": "بازبینی ارسال شد",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "این نظر قابل ارسال نیست. ممکن است خط انتخاب‌شده تغییر کرده باشد یا PR به‌روزرسانی شده باشد.",
       "reviewNotSubmitted": "این بازبینی در وضعیت فعلی قابل ارسال نیست. ممکن است PR تغییر کرده باشد یا اجازهٔ بازبینی درخواست ادغام خودتان را نداشته باشید.",
+      "reviewNotSubmittedTerm": "این بازبینی به همین شکل قابل ارسال نیست. ممکن است {{term}} تغییر کرده باشد، یا نتوانید {{term}} خود را بازبینی کنید.",
       "couldNotPostComment": "ارسال نظر ممکن نشد.",
       "couldNotSubmitReview": "ارسال بازبینی ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید."
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "ارسال پاسخ ناموفق بود.",
       "couldNotCompleteAction": "انجام این کار ممکن نشد.",
       "mergeResultDefaultError": "GitHub ادغام را تکمیل نکرد.",
+      "mergeResultNotCompleted": "{{term}} ادغام نشد. وضعیت آن را بررسی کنید و دوباره تلاش کنید.",
       "ambiguous": "تأیید نتیجه ممکن نشد. پیش از تلاش مجدد، PR را بررسی کنید.",
       "persistenceFailed": "نتوانستیم این اقدام را ثبت کنیم. لطفاً بعداً دوباره تلاش کنید.",
       "forbidden": "اجازهٔ انجام این کار را ندارید."
@@ -1988,11 +2041,31 @@
       "retryConnection": "تلاش دوباره برای اتصال"
     },
     "newSession": {
+      "recentlyUsed": "موارد استفاده‌شدهٔ اخیر",
+      "couldNotLoadGithubRepositories": "بارگذاری مخزن‌های GitHub ممکن نشد.",
+      "couldNotLoadGitlabRepositories": "بارگذاری مخزن‌های GitLab ممکن نشد.",
+      "couldNotLoadBitbucketRepositories": "بارگذاری مخزن‌های Bitbucket ممکن نشد.",
       "connectGithubDescription": "حساب GitHub خود را از طریق مرورگر متصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",
+      "connectGitlabDescription": "حساب GitLab خود را از طریق مرورگر متصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",
+      "connectBitbucketDescription": "حساب Bitbucket خود را از طریق مرورگر متصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",
       "openGithub": "باز کردن GitHub",
+      "openGitlab": "باز کردن GitLab",
+      "openBitbucket": "باز کردن Bitbucket",
       "refreshRepositories": "تازه‌سازی مخزن‌ها",
       "githubConnected": "اتصال به GitHub برقرار است",
+      "gitlabConnected": "اتصال به GitLab برقرار است",
       "noRepositoriesVisible": "هیچ مخزنی نمایش داده نمی‌شود. دسترسی برنامهٔ Kilo در GitHub به مخزن‌ها را بررسی کنید، سپس فهرست را تازه‌سازی کنید.",
+      "noRepositoriesVisibleGitlab": "هیچ مخزنی نمایش داده نمی‌شود. دسترسی به مخزن‌های GitLab را بررسی کنید، سپس فهرست را تازه‌سازی کنید.",
+      "noRepositoriesVisibleBitbucket": "هیچ مخزنی نمایش داده نمی‌شود. دسترسی به مخزن‌های Bitbucket را بررسی کنید، سپس فهرست را تازه‌سازی کنید.",
+      "bitbucketOrganizationsOnly": "Bitbucket فقط برای سازمان‌ها در دسترس است.",
+      "branchPickerTitle": "انتخاب شاخه",
+      "branchDefault": "پیش‌فرض",
+      "branchAccessibility": "شاخه: {{label}}",
+      "branchLoading": "در حال بارگذاری شاخه‌ها",
+      "branchLoadError": "شاخه‌ها بارگذاری نشدند",
+      "branchUnavailable": "شاخه‌ها برای این مخزن در دسترس نیستند. دسترسی خود را با ارائه‌دهنده بررسی کنید، سپس مخزن دیگری را انتخاب کنید.",
+      "branchEmpty": "هیچ شاخه‌ای در دسترس نیست",
+      "branchPlaceholder": "یک شاخه انتخاب کنید",
       "runOnWithTarget": "اجرا روی: {{target}}",
       "environment": "محیط",
       "couldNotLoadEnvironment": "بارگذاری محیط شما ممکن نشد.",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "تازه‌سازی مخزن‌ها ممکن نشد. لطفاً دوباره تلاش کنید.",
       "discardDraftTitle": "پیش‌نویس حذف شود؟",
       "discardDraftMessage": "متن پیام شما حذف می‌شود.",
+      "discardWithUploadsMessage": "متن پیام شما و فایل‌های آپلودشده‌ای که به هیچ پیام ارسالی پیوست نشده‌اند، حذف می‌شوند.",
       "discardFailed": "حذف پیش‌نویس ممکن نشد. لطفاً دوباره تلاش کنید.",
       "remoteHint": "برای کنترل یک فرایند محلی kilo، دستور `kilo remote` را روی رایانهٔ خود یا دستور `/remote` را در یک نشست فعال CLI اجرا کنید.",
-      "connectBitbucketDescription": "حساب Bitbucket خود را از طریق مرورگر متصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",
-      "connectGitlabDescription": "حساب GitLab خود را از طریق مرورگر متصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",
-      "couldNotLoadBitbucketRepositories": "بارگذاری مخزن‌های Bitbucket ممکن نشد.",
-      "couldNotLoadGithubRepositories": "بارگذاری مخزن‌های GitHub ممکن نشد.",
-      "couldNotLoadGitlabRepositories": "بارگذاری مخزن‌های GitLab ممکن نشد.",
-      "gitlabConnected": "اتصال به GitLab برقرار است",
-      "noRepositoriesVisibleBitbucket": "هیچ مخزنی نمایش داده نمی‌شود. دسترسی به مخزن‌های Bitbucket را بررسی کنید، سپس فهرست را تازه‌سازی کنید.",
-      "noRepositoriesVisibleGitlab": "هیچ مخزنی نمایش داده نمی‌شود. دسترسی به مخزن‌های GitLab را بررسی کنید، سپس فهرست را تازه‌سازی کنید.",
-      "openBitbucket": "باز کردن Bitbucket",
-      "openGitlab": "باز کردن GitLab",
-      "recentlyUsed": "موارد استفاده‌شدهٔ اخیر",
-      "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
       "continueFrom": "نشست {{title}} را ادامه می‌دهید.",
-      "importFailed": "وارد کردن این نشست ممکن نشد.",
       "importingSession": "در حال وارد کردن نشست",
-      "discardWithUploadsMessage": "متن پیام شما و فایل‌های آپلودشده‌ای که به هیچ پیام ارسالی پیوست نشده‌اند، حذف می‌شوند."
+      "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
+      "importFailed": "وارد کردن این نشست ممکن نشد."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل به‌روزرسانی شد.",

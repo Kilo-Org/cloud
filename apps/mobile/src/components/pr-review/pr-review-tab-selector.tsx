@@ -24,6 +24,12 @@ type PrReviewTabSelectorProps = {
    * while the PR query is still loading, which draws no badge.
    */
   discussionCount?: number;
+  /**
+   * Disables every tab while the PR body is in a failed load state: the
+   * tabs' own reads cannot succeed while the overview that gates them
+   * failed, so the row stays at its size but stops switching.
+   */
+  disabled?: boolean;
 };
 
 /**
@@ -36,6 +42,7 @@ export function PrReviewTabSelector({
   activeTab,
   onChange,
   discussionCount,
+  disabled = false,
 }: PrReviewTabSelectorProps) {
   const { t } = useTranslation();
   return (
@@ -50,7 +57,8 @@ export function PrReviewTabSelector({
           <Pressable
             key={tab.id}
             accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
+            accessibilityState={{ selected: active, disabled }}
+            disabled={disabled}
             onPress={() => {
               if (active) {
                 return;
@@ -60,7 +68,8 @@ export function PrReviewTabSelector({
             }}
             className={cn(
               'flex-1 items-center justify-center rounded-md py-2 active:opacity-70',
-              active && 'bg-card shadow-sm shadow-[#0000000D]'
+              active && 'bg-card shadow-sm shadow-[#0000000D]',
+              disabled && 'opacity-60'
             )}
           >
             <View className="flex-row items-center gap-1.5">

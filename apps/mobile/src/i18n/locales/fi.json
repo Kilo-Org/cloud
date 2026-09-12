@@ -36,6 +36,7 @@
     "cost": "Kustannus",
     "discard": "Hylkää",
     "findings": "Havainnot",
+    "mergeRequest": "yhdistämispyyntö",
     "notConnected": "Ei yhdistetty",
     "notifications": "Ilmoitukset",
     "pullRequest": "muutospyyntö",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "Tyhjä muutosvertailun rivi"
     },
     "connectionExpired": "GitHub-yhteys on vanhentunut.",
+    "capabilities": {
+      "banner": {
+        "title": "Ei ole käytettävissä tämän palveluntarjoajan kanssa",
+        "accessibility": "Ei ole käytettävissä tämän palveluntarjoajan kanssa: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Yhdistäminen",
       "mergeNow": "Yhdistä nyt",
       "mergePullRequest": "Muutospyynnön yhdistäminen",
+      "mergeTermTitle": "Yhdistä {{term}}",
       "enableAutoMerge": "Ota automaattinen yhdistäminen käyttöön",
       "disableAutoMerge": "Poista automaattinen yhdistäminen käytöstä",
       "autoMergeOn": "Automaattinen yhdistäminen käytössä",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "Poista haara yhdistämisen jälkeen",
       "noEnabledMethods": "Tässä tietovarastossa ei ole käytössä yhtään yhdistämismenetelmää. Pyydä tietovaraston ylläpitäjää sallimaan yhdistäminen yhdistämistallennuksella, tiivistämällä tai uudelleenperustamalla.",
       "confirmTitle": "Yhdistetäänkö muutospyyntö?",
+      "confirmTitleTerm": "Yhdistetäänkö {{term}}?",
       "confirmMessage": "Muutoksesi yhdistetään kohdehaaraan.",
       "enableAutoMergeConfirmTitle": "Otetaanko automaattinen yhdistäminen käyttöön?",
       "enableAutoMergeConfirmMessage": "GitHub yhdistää tämän muutospyynnön automaattisesti, kun kaikki pakolliset tarkistukset onnistuvat.",
+      "enableAutoMergeConfirmMessageTerm": "Kun pipeline onnistuu, {{term}} yhdistetään automaattisesti.",
+      "enableAutoMergeDescriptionTerm": "GitLab yhdistää {{term}} automaattisesti, kun pipeline onnistuu.",
       "forbidden": "Sinulla ei ole oikeutta yhdistää tätä muutospyyntöä.",
       "cannotMerge": "Tätä muutospyyntöä ei voi yhdistää sellaisenaan.",
       "couldNotMerge": "Muutospyyntöä ei voitu yhdistää.",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Jo yhdistetty",
-        "closed": "Muutospyyntö suljettu"
+        "closed": "Muutospyyntö suljettu",
+        "closedMergeRequest": "Yhdistämispyyntö suljettu"
       },
       "partialSuccessBanner": {
         "body": "Haaraa ei voitu poistaa: {{reason}}.",
@@ -400,6 +412,18 @@
         "behindDetail": "Lähdehaara on jäljessä kohdehaarasta. Uudelleenperusta tai päivitä lähdehaara ennen yhdistämistä.",
         "notMergeableTitle": "Tätä muutospyyntöä ei voi vielä yhdistää",
         "notMergeableDetail": "GitHub ilmoitti yhdistettävyyden tilaksi {{state}}."
+      },
+      "restrictions": {
+        "title": "Yhdistämisen ehdot",
+        "approvalsRequired_one": "Vaaditaan {{displayCount}} hyväksyntä",
+        "approvalsRequired_other": "Vaaditaan {{displayCount}} hyväksyntää",
+        "pipelineMustSucceed": "Pipelinen on oltava onnistunut ennen yhdistämistä."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline epäonnistuu viimeisimmässä commitissa.",
+        "pendingPipeline": "Pipeline on vielä käynnissä viimeisimmässä commitissa.",
+        "permission": "Sinulla ei ole oikeutta yhdistää tätä {{term}}ä.",
+        "draft": "Merkitse {{term}} valmiiksi katselmointiin ennen yhdistämistä."
       },
       "methodLabels": {
         "merge": "Luo yhdistämistallennus",
@@ -448,6 +472,7 @@
       "acceptTerms": "Hyväksy",
       "replyBadRequest": "Tätä vastausta ei voi julkaista. Ketju on voinut muuttua.",
       "replyForbidden": "Sinulla ei ole oikeutta vastata tähän muutospyyntöön.",
+      "replyForbiddenTerm": "Sinulla ei ole oikeutta vastata tähän {{term}}ön.",
       "moderation": {
         "reportContent": {
           "terminal": "Tätä kommenttia ei voi ilmiantaa.",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "Katselmoi muutospyyntö",
     "headLine": "{{counts}} · uusin muutostallennus {{sha}}",
     "entry": {
-      "eyebrow": "Avaa muutospyyntö URL-osoitteella.",
-      "pastePrLink": "Liitä PR-linkki",
-      "noRecentPrs": "Ei viimeaikaisia PR:iä",
-      "noRecentPrsDescription": "Aloita katselmointi liittämällä PR-linkki yllä olevaan kenttään. PR näkyy tässä seuraavalla kerralla.",
+      "eyebrow": "Avaa muutospyyntö tai yhdistämispyyntö URL-osoitteella",
+      "pastePrLink": "Liitä muutospyynnön tai yhdistämispyynnön linkki",
+      "noRecentPrs": "Ei viimeaikaisia katselmointeja",
+      "noRecentPrsDescription": "Aloita katselmointi liittämällä linkki yllä olevaan kenttään — se näkyy tässä seuraavalla kerralla.",
       "couldNotLoad": "Lataus epäonnistui.",
       "removeFromRecentsTitle": "Poistetaanko viimeksi avatuista?",
-      "removeFromRecentsMessage": "Tämä muutospyyntö poistetaan viimeksi avattujen luettelosta.",
+      "removeFromRecentsMessage": "Tämä katselmointi poistetaan viimeisimmistä.",
       "removeRecentAccessibility": "Poista {{repo}} viimeksi avatuista",
-      "urlAccessibility": "GitHub-muutospyynnön URL-osoite",
-      "clearLink": "Tyhjennä muutospyynnön linkki",
-      "pasteLink": "Liitä muutospyynnön linkki",
+      "urlAccessibility": "Anna muutospyynnön tai yhdistämispyynnön URL-osoite",
+      "urlPlaceholder": "Muutospyynnön tai yhdistämispyynnön URL-osoite",
+      "openAccessibility": "Avaa muutospyyntö tai yhdistämispyyntö",
+      "clearLink": "Tyhjennä linkki",
+      "pasteLink": "Liitä muutospyynnön tai yhdistämispyynnön linkki",
       "open": "Avaa"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "GitHub-yhteyttä ei voitu tarkistaa.",
       "checkFailedMessage": "Kirjautumisen tila ei ole saatavilla, ennen kuin lataus valmistuu.",
+      "checkFailedTitleGitLab": "GitLab-yhteyttä ei voitu tarkistaa.",
+      "checkFailedTitleBitbucket": "Bitbucket-yhteyttä ei voitu tarkistaa.",
+      "providerCheckFailedMessage": "Yhteyden tila näkyy vasta latauksen valmistuttua.",
       "reconnectTitle": "Yhdistä GitHub uudelleen",
       "reconnectDescription": "GitHub-yhteytesi käyttöoikeus on peruttu. Yhdistä uudelleen, jotta voit jatkaa muutospyyntöjen katselmointia mobiililaitteella.",
-      "description": "Yhdistä GitHub-tilisi, niin voit katselmoida muutospyyntöjä mobiililaitteella."
+      "description": "Yhdistä GitHub-tilisi, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
+      "gitlabDescription": "Yhdistä GitLab-tilisi, niin voit katselmoida yhdistämispyyntöjä mobiililaitteella.",
+      "bitbucketDescription": "Yhdistä Bitbucket tähän organisaatioon, niin voit katselmoida muutospyyntöjä mobiililaitteella.",
+      "bitbucketOrgOnlyDescription": "Valitse profiilissasi organisaatio, niin voit katselmoida sen Bitbucket-muutospyyntöjä."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub-yhteys on vanhentunut.",
-      "message": "GitHub-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen."
+      "message": "GitHub-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen.",
+      "gitlabTitle": "GitLab-yhteys on vanhentunut.",
+      "bitbucketTitle": "Bitbucket-yhteys on vanhentunut.",
+      "providerMessage": "{{provider}}-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen."
     },
     "eventChips": {
       "comment": "Kommentoi",
@@ -643,6 +679,21 @@
       "files": "Tiedostot",
       "discussion": "Keskustelu"
     },
+    "terms": {
+      "pullRequest": "Muutospyyntö",
+      "mergeRequest": "Yhdistämispyyntö",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Jaa yhdistämispyyntö",
+      "viewOnProvider": "Näytä palvelussa {{provider}}",
+      "mergeRequestUnavailable": "Yhdistämispyyntö ei ole käytettävissä",
+      "unavailableDescription": "Se on voitu poistaa, tai sinulla ei ole siihen pääsyä.",
+      "accessDeniedMergeRequest": "Sinulla ei ole oikeutta tarkastella tätä yhdistämispyyntöä.",
+      "couldNotLoadMergeRequest": "Yhdistämispyyntöä ei voitu ladata.",
+      "discussionAccessDenied": "Sinulla ei ole oikeutta tarkastella tämän yhdistämispyynnön keskustelua.",
+      "discussionUnavailableMessage": "Tämä yhdistämispyyntö on voitu poistaa.",
+      "noDiscussionDescription": "Tässä yhdistämispyynnössä ei ole katselmointiketjuja eikä keskustelukommentteja.",
+      "noFilesChangedDescription": "Tässä yhdistämispyynnössä ei ole tiedostomuutoksia."
+    },
     "fileStatus": {
       "modified": "Muokattu",
       "renamed": "Nimetty uudelleen",
@@ -659,7 +710,7 @@
       "emptyLine": "(tyhjä)"
     },
     "linkPasteClipboardEmpty": "Leikepöytä on tyhjä.",
-    "linkPasteNotAPullRequest": "Tämä ei ole GitHub-muutospyynnön linkki.",
+    "linkPasteNotAPullRequest": "Tämä ei ole muutospyynnön tai yhdistämispyynnön linkki",
     "announce": {
       "commentPosted": "Kommentti julkaistu",
       "reviewSubmitted": "Katselmointi lähetetty",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "Tätä kommenttia ei voi julkaista. Valittu rivi on saattanut muuttua tai PR on saatettu päivittää.",
       "reviewNotSubmitted": "Tätä katselmointia ei voi lähettää sellaisenaan. PR on voinut muuttua tai kyseessä on oma muutospyyntösi, jota et voi katselmoida.",
+      "reviewNotSubmittedTerm": "Tätä katselmointia ei voi lähettää sellaisenaan. {{term}} on voinut muuttua, tai kyseessä on oma {{term}}, jota et voi katselmoida.",
       "couldNotPostComment": "Kommenttia ei voitu julkaista.",
       "couldNotSubmitReview": "Katselmointia ei voitu lähettää. Tarkista yhteys ja yritä uudelleen."
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "Vastaaminen epäonnistui.",
       "couldNotCompleteAction": "Tätä toimintoa ei voitu suorittaa loppuun.",
       "mergeResultDefaultError": "GitHub ei saattanut yhdistämistä loppuun.",
+      "mergeResultNotCompleted": "{{term}} ei yhdistynyt. Tarkista sen tila ja yritä uudelleen.",
       "ambiguous": "Toiminnon onnistumista ei voitu vahvistaa. Tarkista PR ennen kuin yrität uudelleen.",
       "persistenceFailed": "Emme voineet tallentaa tätä toimintoa. Yritä myöhemmin uudelleen.",
       "forbidden": "Toiminto ei ole sallittu."
@@ -1988,11 +2041,31 @@
       "retryConnection": "Yhdistä uudelleen"
     },
     "newSession": {
+      "recentlyUsed": "Äskettäin käytetyt",
+      "couldNotLoadGithubRepositories": "GitHub-repositorioiden lataus epäonnistui.",
+      "couldNotLoadGitlabRepositories": "GitLab-repositorioiden lataus epäonnistui.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket-repositorioiden lataus epäonnistui.",
       "connectGithubDescription": "Yhdistä GitHub selaimessa ja palaa sitten tänne valitsemaan repositorio.",
+      "connectGitlabDescription": "Yhdistä GitLab selaimessa ja palaa sitten tänne valitsemaan repositorio.",
+      "connectBitbucketDescription": "Yhdistä Bitbucket selaimessa ja palaa sitten tänne valitsemaan repositorio.",
       "openGithub": "Avaa GitHub",
+      "openGitlab": "Avaa GitLab",
+      "openBitbucket": "Avaa Bitbucket",
       "refreshRepositories": "Päivitä repositoriot",
       "githubConnected": "GitHub yhdistetty",
+      "gitlabConnected": "GitLab yhdistetty",
       "noRepositoriesVisible": "Repositorioita ei näy. Tarkista Kilon GitHub-sovelluksen käyttöoikeudet repositorioihin ja päivitä sitten luettelo.",
+      "noRepositoriesVisibleGitlab": "Repositorioita ei näy. Tarkista GitLab-repositorioiden käyttöoikeudet ja päivitä sitten luettelo.",
+      "noRepositoriesVisibleBitbucket": "Repositorioita ei näy. Tarkista Bitbucket-repositorioiden käyttöoikeudet ja päivitä sitten luettelo.",
+      "bitbucketOrganizationsOnly": "Bitbucket on käytettävissä vain organisaatioille.",
+      "branchPickerTitle": "Valitse haara",
+      "branchDefault": "Oletus",
+      "branchAccessibility": "Haara: {{label}}",
+      "branchLoading": "Ladataan haaroja",
+      "branchLoadError": "Haarojen lataaminen epäonnistui",
+      "branchUnavailable": "Tämän koodivaraston haarat eivät ole käytettävissä. Tarkista pääsysi palveluntarjoajalta ja valitse toinen koodivarasto.",
+      "branchEmpty": "Haaroja ei ole käytettävissä",
+      "branchPlaceholder": "Valitse haara",
       "runOnWithTarget": "Suoritusympäristö: {{target}}",
       "environment": "Ympäristö",
       "couldNotLoadEnvironment": "Ympäristöäsi ei voitu ladata.",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "Repositorioita ei voitu päivittää. Yritä uudelleen.",
       "discardDraftTitle": "Hylätäänkö luonnos?",
       "discardDraftMessage": "Kehotteesi poistetaan.",
+      "discardWithUploadsMessage": "Kehotteesi ja palvelimelle siirretyt tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
       "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen.",
       "remoteHint": "Voit hallita paikallista kilo-prosessia suorittamalla `kilo remote` tietokoneellasi tai `/remote` käynnissä olevassa CLI-istunnossa.",
-      "connectBitbucketDescription": "Yhdistä Bitbucket selaimessa ja palaa sitten tänne valitsemaan repositorio.",
-      "connectGitlabDescription": "Yhdistä GitLab selaimessa ja palaa sitten tänne valitsemaan repositorio.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket-repositorioiden lataus epäonnistui.",
-      "couldNotLoadGithubRepositories": "GitHub-repositorioiden lataus epäonnistui.",
-      "couldNotLoadGitlabRepositories": "GitLab-repositorioiden lataus epäonnistui.",
-      "gitlabConnected": "GitLab yhdistetty",
-      "noRepositoriesVisibleBitbucket": "Repositorioita ei näy. Tarkista Bitbucket-repositorioiden käyttöoikeudet ja päivitä sitten luettelo.",
-      "noRepositoriesVisibleGitlab": "Repositorioita ei näy. Tarkista GitLab-repositorioiden käyttöoikeudet ja päivitä sitten luettelo.",
-      "openBitbucket": "Avaa Bitbucket",
-      "openGitlab": "Avaa GitLab",
-      "recentlyUsed": "Äskettäin käytetyt",
-      "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
       "continueFrom": "Jatketaan istuntoa: {{title}}.",
-      "importFailed": "Tätä istuntoa ei voitu tuoda.",
       "importingSession": "Tuodaan istuntoa",
-      "discardWithUploadsMessage": "Kehotteesi ja palvelimelle siirretyt tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan."
+      "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
+      "importFailed": "Tätä istuntoa ei voitu tuoda."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} tiedosto päivitettiin.",

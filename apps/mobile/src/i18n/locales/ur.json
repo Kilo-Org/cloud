@@ -36,6 +36,7 @@
     "cost": "لاگت",
     "discard": "ضائع کریں",
     "findings": "شناخت شدہ مسائل",
+    "mergeRequest": "مرج ریکویسٹ",
     "notConnected": "منسلک نہیں",
     "notifications": "اطلاعات",
     "pullRequest": "پل ریکویسٹ",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "تبدیلیوں کے موازنے کی خالی قطار"
     },
     "connectionExpired": "GitHub سے کنکشن کی مدت ختم ہو گئی۔",
+    "capabilities": {
+      "banner": {
+        "title": "اس پرووائیڈر پر دستیاب نہیں",
+        "accessibility": "اس پرووائیڈر پر دستیاب نہیں: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "مرج",
       "mergeNow": "ابھی مرج کریں",
       "mergePullRequest": "پل ریکویسٹ کا مرج",
+      "mergeTermTitle": "{{term}} کا مرج",
       "enableAutoMerge": "خودکار مرج فعال کریں",
       "disableAutoMerge": "خودکار مرج غیر فعال کریں",
       "autoMergeOn": "خودکار مرج فعال ہے",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "مرج کے بعد برانچ حذف کریں",
       "noEnabledMethods": "اس ریپوزٹری میں مرج کا کوئی طریقہ فعال نہیں ہے۔ ریپوزٹری کے منتظم سے مرج، اسکواش یا ریبیس کا طریقہ فعال کرنے کو کہیں۔",
       "confirmTitle": "پل ریکویسٹ مرج کریں؟",
+      "confirmTitleTerm": "{{term}} مرج کریں؟",
       "confirmMessage": "اس سے آپ کی تبدیلیاں بنیادی برانچ میں مرج ہو جائیں گی۔",
       "enableAutoMergeConfirmTitle": "خودکار مرج فعال کریں؟",
       "enableAutoMergeConfirmMessage": "تمام ضروری جانچیں کامیاب ہونے پر GitHub اس پل ریکویسٹ کو خود بخود مرج کر دے گا۔",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} پائپ لائن کے کامیاب ہوتے ہی خودکار طور پر مرج ہو جائے گا۔",
+      "enableAutoMergeDescriptionTerm": "GitLab یہ {{term}} پائپ لائن کے کامیاب ہوتے ہی خودکار طور پر مرج کر دیتا ہے۔",
       "forbidden": "آپ کو اس پل ریکویسٹ کو مرج کرنے کی اجازت نہیں ہے۔",
       "cannotMerge": "یہ پل ریکویسٹ اپنی موجودہ حالت میں مرج نہیں ہو سکتی۔",
       "couldNotMerge": "پل ریکویسٹ مرج نہیں ہو سکی۔",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "پہلے ہی مرج شدہ",
-        "closed": "یہ پل ریکویسٹ بند ہے"
+        "closed": "یہ پل ریکویسٹ بند ہے",
+        "closedMergeRequest": "یہ مرج ریکویسٹ بند ہے"
       },
       "partialSuccessBanner": {
         "body": "برانچ حذف نہیں ہو سکی: {{reason}}۔",
@@ -400,6 +412,18 @@
         "behindDetail": "ہیڈ برانچ میں بنیادی برانچ کی تازہ تبدیلیاں شامل نہیں ہیں۔ مرج کرنے سے پہلے برانچ کو ریبیس یا اپ ڈیٹ کریں۔",
         "notMergeableTitle": "یہ پل ریکویسٹ ابھی مرج نہیں ہو سکتی",
         "notMergeableDetail": "GitHub کے مطابق مرج کی حالت {{state}} ہے۔"
+      },
+      "restrictions": {
+        "title": "مرج پابندیاں",
+        "approvalsRequired_one": "{{displayCount}} منظوری درکار ہے",
+        "approvalsRequired_other": "{{displayCount}} منظوری درکار ہیں",
+        "pipelineMustSucceed": "مرج سے پہلے پائپ لائن کا کامیاب ہونا ضروری ہے۔"
+      },
+      "providerBlocked": {
+        "failingPipeline": "پائپ لائن آخری کمٹ پر ناکام ہو رہی ہے۔",
+        "pendingPipeline": "پائپ لائن آخری کمٹ پر ابھی چل رہی ہے۔",
+        "permission": "آپ کو اس {{term}} کو مرج کرنے کی اجازت نہیں ہے۔",
+        "draft": "مرج کرنے سے پہلے {{term}} پر جائزے کے لیے تیار ہونے کا نشان لگائیں۔"
       },
       "methodLabels": {
         "merge": "مرج کمیٹ بنائیں",
@@ -448,6 +472,7 @@
       "acceptTerms": "قبول کریں",
       "replyBadRequest": "یہ جواب پوسٹ نہیں ہو سکتا۔ شاید تھریڈ تبدیل ہو گیا ہے۔",
       "replyForbidden": "آپ کو اس پل ریکویسٹ پر جواب دینے کی اجازت نہیں ہے۔",
+      "replyForbiddenTerm": "آپ کو اس {{term}} پر جواب دینے کی اجازت نہیں ہے۔",
       "moderation": {
         "reportContent": {
           "terminal": "اس تبصرے کی شکایت نہیں کی جا سکتی۔",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "پل ریکویسٹ کا جائزہ لیں",
     "headLine": "{{counts}} · ہیڈ {{sha}}",
     "entry": {
-      "eyebrow": "URL کے ذریعے پل ریکویسٹ کھولیں۔",
-      "pastePrLink": "PR کا لنک چسپاں کریں",
-      "noRecentPrs": "کوئی حالیہ PR نہیں",
-      "noRecentPrsDescription": "جائزہ شروع کرنے کے لیے اوپر PR کا لنک چسپاں کریں — یہ اگلی بار یہاں دکھائی دے گی۔",
+      "eyebrow": "URL کے ذریعے پل ریکویسٹ یا مرج ریکویسٹ کھولیں۔",
+      "pastePrLink": "پل ریکویسٹ یا مرج ریکویسٹ کا لنک چسپاں کریں",
+      "noRecentPrs": "کوئی حالیہ جائزہ نہیں",
+      "noRecentPrsDescription": "جائزہ شروع کرنے کے لیے اوپر ایک لنک چسپاں کریں — یہ اگلی بار یہاں دکھائی دے گا۔",
       "couldNotLoad": "لوڈ نہیں ہو سکا۔",
       "removeFromRecentsTitle": "حالیہ فہرست سے ہٹائیں؟",
-      "removeFromRecentsMessage": "یہ پل ریکویسٹ آپ کی حالیہ فہرست سے ہٹا دی جائے گی۔",
+      "removeFromRecentsMessage": "یہ جائزہ آپ کی حالیہ فہرست سے ہٹا دیا جائے گا۔",
       "removeRecentAccessibility": "{{repo}} کو حالیہ فہرست سے ہٹائیں",
-      "urlAccessibility": "GitHub پل ریکویسٹ کا URL",
-      "clearLink": "پل ریکویسٹ کا لنک صاف کریں",
-      "pasteLink": "پل ریکویسٹ کا لنک چسپاں کریں",
+      "urlAccessibility": "پل ریکویسٹ یا مرج ریکویسٹ کا URL درج کریں",
+      "urlPlaceholder": "پل ریکویسٹ یا مرج ریکویسٹ کا URL",
+      "openAccessibility": "پل ریکویسٹ یا مرج ریکویسٹ کھولیں",
+      "clearLink": "لنک صاف کریں",
+      "pasteLink": "پل ریکویسٹ یا مرج ریکویسٹ کا لنک چسپاں کریں",
       "open": "کھولیں"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "GitHub کنکشن چیک نہیں ہو سکا۔",
       "checkFailedMessage": "جب تک یہ لوڈ نہیں ہوتا، سائن ان کی حالت دستیاب نہیں ہوگی۔",
+      "checkFailedTitleGitLab": "GitLab کنکشن چیک نہیں ہو سکا۔",
+      "checkFailedTitleBitbucket": "Bitbucket کنکشن چیک نہیں ہو سکا۔",
+      "providerCheckFailedMessage": "لوڈ ہونے تک کنکشن کی حالت دستیاب نہیں۔",
       "reconnectTitle": "GitHub سے دوبارہ رابطہ",
       "reconnectDescription": "آپ کا GitHub کنکشن منسوخ کر دیا گیا ہے۔ موبائل پر پل ریکویسٹ کا جائزہ جاری رکھنے کے لیے اسے دوبارہ منسلک کریں۔",
-      "description": "موبائل پر پل ریکویسٹ کا جائزہ لینے کے لیے اپنا GitHub اکاؤنٹ منسلک کریں۔"
+      "description": "موبائل پر پل ریکویسٹ کا جائزہ لینے کے لیے اپنا GitHub اکاؤنٹ منسلک کریں۔",
+      "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لینے کے لیے اپنا GitLab اکاؤنٹ منسلک کریں۔",
+      "bitbucketDescription": "موبائل پر پل ریکویسٹس کا جائزہ لینے کے لیے Bitbucket کو اس تنظیم سے منسلک کریں۔",
+      "bitbucketOrgOnlyDescription": "اپنے پروفائل میں ایک تنظیم منتخب کریں تاکہ اس کی Bitbucket پل ریکویسٹس کا جائزہ لیا جا سکے۔"
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub سے کنکشن کی مدت ختم ہو گئی۔",
-      "message": "آپ کا GitHub کنکشن اب قابل استعمال نہیں ہے۔ کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔"
+      "message": "آپ کا GitHub کنکشن اب قابل استعمال نہیں ہے۔ کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔",
+      "gitlabTitle": "GitLab سے کنکشن کی مدت ختم ہو گئی۔",
+      "bitbucketTitle": "Bitbucket سے کنکشن کی مدت ختم ہو گئی۔",
+      "providerMessage": "آپ کا {{provider}} کنکشن اب قابل استعمال نہیں ہے۔ کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔"
     },
     "eventChips": {
       "comment": "تبصرہ",
@@ -643,6 +679,21 @@
       "files": "فائلیں",
       "discussion": "گفتگو"
     },
+    "terms": {
+      "pullRequest": "پل ریکویسٹ",
+      "mergeRequest": "مرج ریکویسٹ",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "مرج ریکویسٹ شیئر کریں",
+      "viewOnProvider": "{{provider}} پر دیکھیں",
+      "mergeRequestUnavailable": "مرج ریکویسٹ دستیاب نہیں",
+      "unavailableDescription": "ہو سکتا ہے یہ حذف کر دی گئی ہو، یا ہو سکتا ہے آپ کو اس تک رسائی نہ ہو۔",
+      "accessDeniedMergeRequest": "آپ کو اس مرج ریکویسٹ کو دیکھنے کی اجازت نہیں ہے۔",
+      "couldNotLoadMergeRequest": "مرج ریکویسٹ لوڈ نہیں ہو سکی۔",
+      "discussionAccessDenied": "آپ کو اس مرج ریکویسٹ کی گفتگو دیکھنے کی اجازت نہیں ہے۔",
+      "discussionUnavailableMessage": "ممکن ہے یہ مرج ریکویسٹ ہٹا دی گئی ہو۔",
+      "noDiscussionDescription": "اس مرج ریکویسٹ پر ابھی جائزے کا کوئی تھریڈ یا گفتگو کا کوئی تبصرہ نہیں ہے۔",
+      "noFilesChangedDescription": "اس مرج ریکویسٹ میں کسی فائل میں تبدیلی نہیں کی گئی۔"
+    },
     "fileStatus": {
       "modified": "ترمیم شدہ",
       "renamed": "نام تبدیل",
@@ -659,7 +710,7 @@
       "emptyLine": "(خالی)"
     },
     "linkPasteClipboardEmpty": "کلپ بورڈ خالی ہے۔",
-    "linkPasteNotAPullRequest": "یہ GitHub پل ریکویسٹ کا لنک نہیں ہے۔",
+    "linkPasteNotAPullRequest": "یہ پل ریکویسٹ یا مرج ریکویسٹ کا لنک نہیں ہے۔",
     "announce": {
       "commentPosted": "تبصرہ پوسٹ ہو گیا",
       "reviewSubmitted": "جائزہ جمع ہو گیا",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "یہ تبصرہ پوسٹ نہیں کیا جا سکتا۔ ممکن ہے منتخب سطر بدل گئی ہو یا PR اپ ڈیٹ ہو گئی ہو۔",
       "reviewNotSubmitted": "یہ جائزہ اپنی موجودہ صورت میں جمع نہیں ہو سکتا۔ ممکن ہے PR بدل گئی ہو یا یہ آپ کی اپنی پل ریکویسٹ ہو، جس کا آپ جائزہ نہیں لے سکتے۔",
+      "reviewNotSubmittedTerm": "اس جائزے کو یونہی جمع نہیں کیا جا سکتا۔ ہو سکتا ہے {{term}} بدل گیا ہو، یا آپ اپنا خود {{term}} کا جائزہ نہیں لے سکتے۔",
       "couldNotPostComment": "تبصرہ پوسٹ نہیں ہو سکا۔",
       "couldNotSubmitReview": "جائزہ جمع نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔"
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "جواب نہیں بھیجا جا سکا۔",
       "couldNotCompleteAction": "یہ کارروائی مکمل نہیں ہو سکی۔",
       "mergeResultDefaultError": "GitHub نے مرج مکمل نہیں کیا۔",
+      "mergeResultNotCompleted": "{{term}} مرج نہیں ہوا۔ اس کی حالت چیک کریں اور دوبارہ کوشش کریں۔",
       "ambiguous": "تصدیق نہیں ہو سکی — دوبارہ کوشش کرنے سے پہلے PR چیک کریں۔",
       "persistenceFailed": "ہم اس کارروائی کو ریکارڈ نہیں کر سکے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
       "forbidden": "اس کارروائی کی اجازت نہیں ہے۔"
@@ -1988,11 +2041,31 @@
       "retryConnection": "کنکشن دوبارہ قائم کرنے کی کوشش کریں"
     },
     "newSession": {
+      "recentlyUsed": "حال ہی میں استعمال شدہ",
+      "couldNotLoadGithubRepositories": "GitHub کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
+      "couldNotLoadGitlabRepositories": "GitLab کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
+      "couldNotLoadBitbucketRepositories": "Bitbucket کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
       "connectGithubDescription": "اپنے براؤزر میں GitHub کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
+      "connectGitlabDescription": "اپنے براؤزر میں GitLab کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
+      "connectBitbucketDescription": "اپنے براؤزر میں Bitbucket کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
       "openGithub": "GitHub کھولیں",
+      "openGitlab": "GitLab کھولیں",
+      "openBitbucket": "Bitbucket کھولیں",
       "refreshRepositories": "ریپوزٹریوں کی فہرست تازہ کریں",
       "githubConnected": "GitHub منسلک",
+      "gitlabConnected": "GitLab منسلک",
       "noRepositoriesVisible": "کوئی ریپوزٹری نظر نہیں آ رہی۔ چیک کریں کہ Kilo کی GitHub ایپ کو ریپوزٹریوں تک رسائی حاصل ہے، پھر فہرست تازہ کریں۔",
+      "noRepositoriesVisibleGitlab": "کوئی ریپوزٹری نظر نہیں آ رہی۔ GitLab کے لیے ریپوزٹریوں تک رسائی چیک کریں، پھر فہرست تازہ کریں۔",
+      "noRepositoriesVisibleBitbucket": "کوئی ریپوزٹری نظر نہیں آ رہی۔ Bitbucket کے لیے ریپوزٹریوں تک رسائی چیک کریں، پھر فہرست تازہ کریں۔",
+      "bitbucketOrganizationsOnly": "Bitbucket صرف تنظیموں کے لیے دستیاب ہے۔",
+      "branchPickerTitle": "برانچ منتخب کریں",
+      "branchDefault": "ڈیفالٹ",
+      "branchAccessibility": "برانچ: {{label}}",
+      "branchLoading": "برانچز لوڈ ہو رہی ہیں",
+      "branchLoadError": "برانچز لوڈ نہیں ہو سکیں",
+      "branchUnavailable": "اس ریپوزٹری کے لیے برانچز دستیاب نہیں ہیں۔ پرووائیڈر کے ساتھ اپنی رسائی چیک کریں، پھر کوئی دوسری ریپوزٹری منتخب کریں۔",
+      "branchEmpty": "کوئی برانچ دستیاب نہیں",
+      "branchPlaceholder": "ایک برانچ منتخب کریں",
       "runOnWithTarget": "{{target}} پر چلائیں",
       "environment": "ماحول",
       "couldNotLoadEnvironment": "آپ کا ماحول لوڈ نہیں ہو سکا۔",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "ریپوزٹریوں کی فہرست تازہ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
       "discardDraftTitle": "مسودہ حذف کریں؟",
       "discardDraftMessage": "آپ کا پرامپٹ ضائع ہو جائے گا۔",
+      "discardWithUploadsMessage": "آپ کا پرامپٹ اور اپ لوڈ کی گئی وہ فائلیں حذف ہو جائیں گی جو کسی بھیجے گئے پیغام سے منسلک نہیں ہیں۔",
       "discardFailed": "مسودہ حذف نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
       "remoteHint": "مقامی kilo پراسیس کو کنٹرول کرنے کے لیے اپنے کمپیوٹر پر `kilo remote` یا چلتے ہوئے CLI سیشن میں `/remote` چلائیں۔",
-      "connectBitbucketDescription": "اپنے براؤزر میں Bitbucket کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
-      "connectGitlabDescription": "اپنے براؤزر میں GitLab کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
-      "couldNotLoadBitbucketRepositories": "Bitbucket کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
-      "couldNotLoadGithubRepositories": "GitHub کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
-      "couldNotLoadGitlabRepositories": "GitLab کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",
-      "gitlabConnected": "GitLab منسلک",
-      "noRepositoriesVisibleBitbucket": "کوئی ریپوزٹری نظر نہیں آ رہی۔ Bitbucket کے لیے ریپوزٹریوں تک رسائی چیک کریں، پھر فہرست تازہ کریں۔",
-      "noRepositoriesVisibleGitlab": "کوئی ریپوزٹری نظر نہیں آ رہی۔ GitLab کے لیے ریپوزٹریوں تک رسائی چیک کریں، پھر فہرست تازہ کریں۔",
-      "openBitbucket": "Bitbucket کھولیں",
-      "openGitlab": "GitLab کھولیں",
-      "recentlyUsed": "حال ہی میں استعمال شدہ",
       "continueFrom": "{{title}} جاری رکھا جا رہا ہے۔",
       "importingSession": "سیشن درآمد ہو رہا ہے",
       "cliCannotContinue": "یہ CLI سیشن جاری نہیں رکھ سکتا۔ Cloud Agent یا کوئی اور CLI منتخب کریں۔",
-      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔",
-      "discardWithUploadsMessage": "آپ کا پرامپٹ اور اپ لوڈ کی گئی وہ فائلیں حذف ہو جائیں گی جو کسی بھیجے گئے پیغام سے منسلک نہیں ہیں۔"
+      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہو گئی ہے۔",

@@ -36,6 +36,7 @@
     "cost": "Kostnaður",
     "discard": "Farga",
     "findings": "Niðurstöður",
+    "mergeRequest": "merge request",
     "notConnected": "Ekki tengt",
     "notifications": "Tilkynningar",
     "pullRequest": "samrunabeiðni",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "Tóm röð í breytingasamanburði"
     },
     "connectionExpired": "Tengingin við GitHub er útrunnin.",
+    "capabilities": {
+      "banner": {
+        "title": "Ekki í boði hjá þessari þjónustu",
+        "accessibility": "Ekki í boði hjá þessari þjónustu: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Sameining",
       "mergeNow": "Sameina núna",
       "mergePullRequest": "Sameining beiðnar",
+      "mergeTermTitle": "Sameina {{term}}",
       "enableAutoMerge": "Virkja sjálfvirka sameiningu",
       "disableAutoMerge": "Gera sjálfvirka sameiningu óvirka",
       "autoMergeOn": "Sjálfvirk sameining virk",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "Eyða grein eftir sameiningu",
       "noEnabledMethods": "Engar sameiningaraðferðir eru virkar í þessari kóðageymslu. Biddu stjórnanda kóðageymslunnar um að virkja sameiningu, samþjöppun eða endurgrunnun.",
       "confirmTitle": "Sameina sameiningarbeiðni?",
+      "confirmTitleTerm": "Sameina {{term}}?",
       "confirmMessage": "Breytingarnar þínar verða sameinaðar grunngreininni.",
       "enableAutoMergeConfirmTitle": "Virkja sjálfvirka sameiningu?",
       "enableAutoMergeConfirmMessage": "GitHub sameinar þessa sameiningarbeiðni sjálfkrafa þegar allar áskildar athuganir standast.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} sameinast sjálfkrafa þegar pipeline tekst.",
+      "enableAutoMergeDescriptionTerm": "GitLab sameinar {{term}} sjálfkrafa þegar pipeline tekst.",
       "forbidden": "Þú hefur ekki heimild til að sameina þessa sameiningarbeiðni.",
       "cannotMerge": "Ekki er hægt að sameina þessa sameiningarbeiðni í núverandi mynd.",
       "couldNotMerge": "Ekki tókst að sameina sameiningarbeiðnina.",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Þegar sameinað",
-        "closed": "Þessi sameiningarbeiðni er lokuð"
+        "closed": "Þessi sameiningarbeiðni er lokuð",
+        "closedMergeRequest": "Þessi merge request er lokuð"
       },
       "partialSuccessBanner": {
         "body": "Ekki tókst að eyða greininni: {{reason}}.",
@@ -400,6 +412,18 @@
         "behindDetail": "Upprunagreinin er á eftir grunngreininni. Endurgrunnaðu eða uppfærðu greinina áður en þú sameinar.",
         "notMergeableTitle": "Ekki er enn hægt að sameina þessa sameiningarbeiðni",
         "notMergeableDetail": "GitHub tilkynnti eftirfarandi sameiningarstöðu: {{state}}."
+      },
+      "restrictions": {
+        "title": "Takmarkanir við sameiningu",
+        "approvalsRequired_one": "Þarf {{displayCount}} samþykki",
+        "approvalsRequired_other": "Þarf {{displayCount}} samþykki",
+        "pipelineMustSucceed": "Pipeline verður að takast áður en sameinað er."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline tekst ekki á síðasta commit.",
+        "pendingPipeline": "Pipeline er enn í gangi á síðasta commit.",
+        "permission": "Þú hefur ekki heimild til að sameina {{term}}.",
+        "draft": "Merktu {{term}} sem tilbúna til yfirferðar áður en þú sameinar."
       },
       "methodLabels": {
         "merge": "Búa til sameiningarinnsendingu",
@@ -448,6 +472,7 @@
       "acceptTerms": "Samþykkja",
       "replyBadRequest": "Ekki er hægt að birta þetta svar. Þráðurinn gæti hafa breyst.",
       "replyForbidden": "Þú hefur ekki heimild til að svara þessari sameiningarbeiðni.",
+      "replyForbiddenTerm": "Þú hefur ekki heimild til að svara við {{term}}.",
       "moderation": {
         "reportContent": {
           "terminal": "Ekki er hægt að tilkynna þessa athugasemd.",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "Yfirfara sameiningarbeiðni",
     "headLine": "{{counts}} · nýjasta innsending: {{sha}}.",
     "entry": {
-      "eyebrow": "Opnaðu sameiningarbeiðni með URL-slóð.",
-      "pastePrLink": "Líma PR-tengil",
-      "noRecentPrs": "Engar nýlegar PR-beiðnir",
-      "noRecentPrsDescription": "Límdu PR-tengil hér að ofan til að hefja yfirferð — beiðnin birtist hér næst.",
+      "eyebrow": "Opnaðu samrunabeiðni eða merge request með URL-slóð",
+      "pastePrLink": "Líma tengil á samrunabeiðni eða merge request",
+      "noRecentPrs": "Engar nýlegar yfirferðir",
+      "noRecentPrsDescription": "Límdu tengil hér að ofan til að hefja yfirferð — hún birtist hér næst.",
       "couldNotLoad": "Ekki tókst að hlaða efni.",
       "removeFromRecentsTitle": "Fjarlægja úr nýlegum beiðnum?",
-      "removeFromRecentsMessage": "Þessi sameiningarbeiðni verður fjarlægð af listanum yfir nýlegar beiðnir.",
+      "removeFromRecentsMessage": "Þessi yfirferð verður fjarlægð af listanum yfir nýlegar.",
       "removeRecentAccessibility": "Fjarlægja {{repo}} úr nýlegum beiðnum",
-      "urlAccessibility": "URL-slóð á sameiningarbeiðni á GitHub",
-      "clearLink": "Hreinsa tengil á sameiningarbeiðni",
-      "pasteLink": "Líma tengil á sameiningarbeiðni",
+      "urlAccessibility": "Settu inn URL á samrunabeiðni eða merge request",
+      "urlPlaceholder": "Veffang á sameiningarbeiðni eða merge request",
+      "openAccessibility": "Opna sameiningarbeiðni eða merge request",
+      "clearLink": "Hreinsa tengil",
+      "pasteLink": "Líma tengil á samrunabeiðni eða merge request",
       "open": "Opna"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "Ekki tókst að athuga GitHub-tenginguna.",
       "checkFailedMessage": "Ekki er hægt að sýna innskráningarstöðu fyrr en hleðslu lýkur.",
+      "checkFailedTitleGitLab": "Ekki tókst að athuga GitLab-tenginguna.",
+      "checkFailedTitleBitbucket": "Ekki tókst að athuga Bitbucket-tenginguna.",
+      "providerCheckFailedMessage": "Ekki er hægt að sýna tengistöðu fyrr en hleðslu lýkur.",
       "reconnectTitle": "Tengja GitHub aftur",
       "reconnectDescription": "Heimild fyrir GitHub-tengingunni þinni var afturkölluð. Tengdu aftur til að halda áfram að yfirfara sameiningarbeiðnir í símanum.",
-      "description": "Tengdu GitHub-reikninginn þinn til að yfirfara sameiningarbeiðnir í símanum."
+      "description": "Tengdu GitHub-reikninginn þinn til að yfirfara sameiningarbeiðnir í símanum.",
+      "gitlabDescription": "Tengdu GitLab-reikninginn þinn til að yfirfara merge requests í símanum.",
+      "bitbucketDescription": "Tengdu Bitbucket við þessa stofnun til að yfirfara sameiningarbeiðnir í símanum.",
+      "bitbucketOrgOnlyDescription": "Veldu stofnun í notandasniðinu þínu til að yfirfara sameiningarbeiðnir hennar á Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "Tengingin við GitHub er útrunnin.",
-      "message": "GitHub-tengingin þín er ekki lengur gild. Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á."
+      "message": "GitHub-tengingin þín er ekki lengur gild. Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á.",
+      "gitlabTitle": "Tengingin við GitLab er útrunnin.",
+      "bitbucketTitle": "Tengingin við Bitbucket er útrunnin.",
+      "providerMessage": "{{provider}}-tengingin þín er ekki lengur gild. Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á."
     },
     "eventChips": {
       "comment": "Gera athugasemd",
@@ -643,6 +679,21 @@
       "files": "Skrár",
       "discussion": "Umræða"
     },
+    "terms": {
+      "pullRequest": "Samrunabeiðni",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Deila merge request",
+      "viewOnProvider": "Skoða á {{provider}}",
+      "mergeRequestUnavailable": "Merge request ekki tiltæk",
+      "unavailableDescription": "Hún gæti hafa verið fjarlægð, eða þú hefur ekki aðgang að henni.",
+      "accessDeniedMergeRequest": "Þú hefur ekki heimild til að skoða þessa merge request.",
+      "couldNotLoadMergeRequest": "Ekki tókst að hlaða merge request.",
+      "discussionAccessDenied": "Þú hefur ekki heimild til að skoða umræðuna um þessa merge request.",
+      "discussionUnavailableMessage": "Þessi merge request gæti hafa verið fjarlægð.",
+      "noDiscussionDescription": "Engir yfirferðarþræðir eða almennar athugasemdir eru við þessa merge request.",
+      "noFilesChangedDescription": "Engar skrár hafa breyst í þessari merge request."
+    },
     "fileStatus": {
       "modified": "Breytt",
       "renamed": "Endurnefnd",
@@ -659,7 +710,7 @@
       "emptyLine": "(tómt)"
     },
     "linkPasteClipboardEmpty": "Klippiborðið er tómt.",
-    "linkPasteNotAPullRequest": "Þetta er ekki tengill á sameiningarbeiðni á GitHub.",
+    "linkPasteNotAPullRequest": "Þetta er ekki tengill á samrunabeiðni eða merge request",
     "announce": {
       "commentPosted": "Athugasemd birt",
       "reviewSubmitted": "Yfirferð send",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "Ekki er hægt að birta þessa athugasemd. Valda línan gæti hafa breyst eða PR-beiðnin verið uppfærð.",
       "reviewNotSubmitted": "Ekki er hægt að senda þessa yfirferð í núverandi mynd. PR-beiðnin gæti hafa breyst eða þú ert að yfirfara eigin sameiningarbeiðni, sem er ekki leyfilegt.",
+      "reviewNotSubmittedTerm": "Ekki er hægt að senda þessa yfirferð í núverandi mynd. {{term}} gæti hafa breyst, eða þú mátt ekki yfirfara þína eigin {{term}}.",
       "couldNotPostComment": "Ekki tókst að birta athugasemd.",
       "couldNotSubmitReview": "Ekki tókst að senda yfirferð. Athugaðu tenginguna og reyndu aftur."
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "Tókst ekki að svara.",
       "couldNotCompleteAction": "Ekki tókst að ljúka þessari aðgerð.",
       "mergeResultDefaultError": "GitHub lauk ekki sameiningunni.",
+      "mergeResultNotCompleted": "{{term}} var ekki sameinuð. Athugaðu stöðuna og reyndu aftur.",
       "ambiguous": "Ekki tókst að staðfesta niðurstöðuna — athugaðu PR-beiðnina áður en þú reynir aftur.",
       "persistenceFailed": "Ekki tókst að skrá þessa aðgerð. Reyndu aftur síðar.",
       "forbidden": "Þú hefur ekki heimild til þessarar aðgerðar."
@@ -1988,11 +2041,31 @@
       "retryConnection": "Reyna að tengjast aftur"
     },
     "newSession": {
+      "recentlyUsed": "Nýlega notað",
+      "couldNotLoadGithubRepositories": "Ekki tókst að hlaða kóðasöfnum frá GitHub.",
+      "couldNotLoadGitlabRepositories": "Ekki tókst að hlaða kóðasöfnum frá GitLab.",
+      "couldNotLoadBitbucketRepositories": "Ekki tókst að hlaða kóðasöfnum frá Bitbucket.",
       "connectGithubDescription": "Tengdu GitHub í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn.",
+      "connectGitlabDescription": "Tengdu GitLab í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn.",
+      "connectBitbucketDescription": "Tengdu Bitbucket í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn.",
       "openGithub": "Opna GitHub",
+      "openGitlab": "Opna GitLab",
+      "openBitbucket": "Opna Bitbucket",
       "refreshRepositories": "Endurnýja kóðasöfn",
       "githubConnected": "GitHub tengt",
+      "gitlabConnected": "GitLab tengt",
       "noRepositoriesVisible": "Engin kóðasöfn sjást. Athugaðu aðgang GitHub-forritsins frá Kilo að kóðasöfnum og endurnýjaðu svo.",
+      "noRepositoriesVisibleGitlab": "Engin kóðasöfn sjást. Athugaðu aðgang að kóðasöfnum í GitLab og endurnýjaðu svo.",
+      "noRepositoriesVisibleBitbucket": "Engin kóðasöfn sjást. Athugaðu aðgang að kóðasöfnum í Bitbucket og endurnýjaðu svo.",
+      "bitbucketOrganizationsOnly": "Bitbucket er aðeins í boði fyrir stofnanir.",
+      "branchPickerTitle": "Velja kvist",
+      "branchDefault": "Sjálfgefið",
+      "branchAccessibility": "Kvistur: {{label}}",
+      "branchLoading": "Hleður kvista",
+      "branchLoadError": "Ekki tókst að hlaða kvistum",
+      "branchUnavailable": "Engir kvistar eru tiltækir fyrir þetta kóðasafn. Athugaðu aðganginn þinn hjá veitunni og veldu annað kóðasafn.",
+      "branchEmpty": "Engir kvistar tiltækir",
+      "branchPlaceholder": "Veldu kvist",
       "runOnWithTarget": "Keyra á: {{target}}",
       "environment": "Umhverfi",
       "couldNotLoadEnvironment": "Ekki tókst að hlaða umhverfinu þínu.",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "Ekki tókst að endurnýja kóðasöfnin. Reyndu aftur.",
       "discardDraftTitle": "Farga drögum?",
       "discardDraftMessage": "Skilaboðin þín glatast.",
+      "discardWithUploadsMessage": "Skilaboðunum þínum og upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt.",
       "discardFailed": "Ekki tókst að farga drögunum. Reyndu aftur.",
       "remoteHint": "Keyrðu `kilo remote` á tölvunni þinni eða `/remote` í CLI-lotu sem er í gangi til að stjórna staðbundnu kilo-ferli.",
-      "connectBitbucketDescription": "Tengdu Bitbucket í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn.",
-      "connectGitlabDescription": "Tengdu GitLab í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn.",
-      "couldNotLoadBitbucketRepositories": "Ekki tókst að hlaða kóðasöfnum frá Bitbucket.",
-      "couldNotLoadGithubRepositories": "Ekki tókst að hlaða kóðasöfnum frá GitHub.",
-      "couldNotLoadGitlabRepositories": "Ekki tókst að hlaða kóðasöfnum frá GitLab.",
-      "gitlabConnected": "GitLab tengt",
-      "noRepositoriesVisibleBitbucket": "Engin kóðasöfn sjást. Athugaðu aðgang að kóðasöfnum í Bitbucket og endurnýjaðu svo.",
-      "noRepositoriesVisibleGitlab": "Engin kóðasöfn sjást. Athugaðu aðgang að kóðasöfnum í GitLab og endurnýjaðu svo.",
-      "openBitbucket": "Opna Bitbucket",
-      "openGitlab": "Opna GitLab",
-      "recentlyUsed": "Nýlega notað",
       "continueFrom": "Haldið er áfram með {{title}}.",
       "importingSession": "Flytur lotuna inn",
       "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
-      "importFailed": "Ekki tókst að flytja inn þessa lotu.",
-      "discardWithUploadsMessage": "Skilaboðunum þínum og upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt."
+      "importFailed": "Ekki tókst að flytja inn þessa lotu."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} skrá var uppfærð.",

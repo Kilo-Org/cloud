@@ -36,6 +36,7 @@
     "cost": "Трошок",
     "discard": "Отфрли",
     "findings": "Наоди",
+    "mergeRequest": "merge барање",
     "notConnected": "Неповрзано",
     "notifications": "Известувања",
     "pullRequest": "pR",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "Празен ред со разлики"
     },
     "connectionExpired": "Врската со GitHub истече.",
+    "capabilities": {
+      "banner": {
+        "title": "Не е достапно кај овој оператор",
+        "accessibility": "Не е достапно кај овој оператор: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Спојување",
       "mergeNow": "Спој сега",
       "mergePullRequest": "Спојување на барањето",
+      "mergeTermTitle": "Спој {{term}}",
       "enableAutoMerge": "Овозможи автоматско спојување",
       "disableAutoMerge": "Оневозможи автоматско спојување",
       "autoMergeOn": "Автоматското спојување е вклучено",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "Избриши ја гранката по спојувањето",
       "noEnabledMethods": "Во ова складиште нема овозможени методи за спојување. Побарај од администратор на складиштето да овозможи спојување, обединување на комитите или пребазирање.",
       "confirmTitle": "Да се спои барањето за спојување?",
+      "confirmTitleTerm": "Да се спои ли {{term}}?",
       "confirmMessage": "Ова ќе ги спои твоите промени во основната гранка.",
       "enableAutoMergeConfirmTitle": "Да се овозможи автоматско спојување?",
       "enableAutoMergeConfirmMessage": "GitHub автоматски ќе го спои ова барање за спојување кога ќе поминат сите задолжителни проверки.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} ќе се спои автоматски откако фајплајнот ќе успее.",
+      "enableAutoMergeDescriptionTerm": "GitLab автоматски го спојува овој {{term}} откако фајплајнот ќе успее.",
       "forbidden": "Немаш дозвола да го споиш ова барање за спојување.",
       "cannotMerge": "Ова барање за спојување не може да се спои во сегашната состојба.",
       "couldNotMerge": "Не успеа спојувањето на барањето.",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Веќе споено",
-        "closed": "Ова барање за спојување е затворено"
+        "closed": "Ова барање за спојување е затворено",
+        "closedMergeRequest": "Ова merge барање е затворено"
       },
       "partialSuccessBanner": {
         "body": "Не успеа бришењето на гранката: {{reason}}.",
@@ -400,6 +412,18 @@
         "behindDetail": "Изворната гранка заостанува зад основната. Пребазирај ја или ажурирај ја пред спојувањето.",
         "notMergeableTitle": "Ова барање за спојување сè уште не може да се спои",
         "notMergeableDetail": "GitHub ја пријави состојбата {{state}} за можноста за спојување."
+      },
+      "restrictions": {
+        "title": "Ограничувања при спојување",
+        "approvalsRequired_one": "Потребно е {{displayCount}} одобрение",
+        "approvalsRequired_other": "Потребни се {{displayCount}} одобренија",
+        "pipelineMustSucceed": "Фајплајнот мора да успее пред спојувањето."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Фајплајнот не успева на последниот комит.",
+        "pendingPipeline": "Фајплајнот сè уште работи на последниот комит.",
+        "permission": "Немате дозвола за спојување на {{term}}.",
+        "draft": "Означете го {{term}} како подготвен за преглед пред спојувањето."
       },
       "methodLabels": {
         "merge": "Создај комит за спојување",
@@ -448,6 +472,7 @@
       "acceptTerms": "Прифати",
       "replyBadRequest": "Овој одговор не може да се објави. Можеби нишката е променета.",
       "replyForbidden": "Немаш дозвола да одговориш на ова барање за спојување.",
+      "replyForbiddenTerm": "Немате дозвола за одговор на {{term}}.",
       "moderation": {
         "reportContent": {
           "terminal": "Овој коментар не може да се пријави.",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "Прегледај го барањето за спојување",
     "headLine": "{{counts}} · последен комит {{sha}}",
     "entry": {
-      "eyebrow": "Отвори барање за спојување преку URL.",
-      "pastePrLink": "Залепи линк до PR",
-      "noRecentPrs": "Нема неодамнешни PR",
-      "noRecentPrsDescription": "Залепи линк до PR погоре за да започнеш преглед — следниот пат ќе се појави тука.",
+      "eyebrow": "Отворете барање за спојување или merge барање преку URL",
+      "pastePrLink": "Залепете врска до барање за спојување или merge барање",
+      "noRecentPrs": "Нема скорешни прегледи",
+      "noRecentPrsDescription": "Залепете врска горе за да започнете преглед — следниот пат ќе се појави тука.",
       "couldNotLoad": "Вчитувањето не успеа.",
       "removeFromRecentsTitle": "Да се отстрани од неодамнешните?",
-      "removeFromRecentsMessage": "Ова барање за спојување ќе се отстрани од списокот со неодамнешни барања.",
+      "removeFromRecentsMessage": "Овој преглед ќе биде отстранет од вашата листа на скорешни.",
       "removeRecentAccessibility": "Отстрани {{repo}} од неодамнешните",
-      "urlAccessibility": "URL на барањето за спојување на GitHub",
-      "clearLink": "Исчисти го линкот до барањето за спојување",
-      "pasteLink": "Залепи линк до барањето за спојување",
+      "urlAccessibility": "Внесете URL до барање за спојување или merge барање",
+      "urlPlaceholder": "URL до барање за спојување или merge барање",
+      "openAccessibility": "Отвори барање за спојување или merge барање",
+      "clearLink": "Исчисти врска",
+      "pasteLink": "Залепи врска до барање за спојување или merge барање",
       "open": "Отворено"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "Не успеа проверката на врската со GitHub.",
       "checkFailedMessage": "Статусот на најавата е недостапен додека не заврши вчитувањето.",
+      "checkFailedTitleGitLab": "Не можеше да се провери врската со GitLab",
+      "checkFailedTitleBitbucket": "Не можеше да се провери врската со Bitbucket",
+      "providerCheckFailedMessage": "Статусот на врската е недостапен додека не се вчита.",
       "reconnectTitle": "Повторно поврзување со GitHub",
       "reconnectDescription": "Пристапот до твојата сметка на GitHub е отповикан. Поврзи се повторно за да продолжиш да прегледуваш барања за спојување од телефонот.",
-      "description": "Поврзи ја твојата сметка на GitHub за да прегледуваш барања за спојување од телефонот."
+      "description": "Поврзи ја твојата сметка на GitHub за да прегледуваш барања за спојување од телефонот.",
+      "gitlabDescription": "Поврзете ја вашата GitLab сметка за преглед на merge барања на мобилно.",
+      "bitbucketDescription": "Поврзете Bitbucket со оваа организација за преглед на барања за спојување на мобилно.",
+      "bitbucketOrgOnlyDescription": "Изберете организација во вашиот профил за да ги прегледате нејзините Bitbucket барања за спојување."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "Врската со GitHub истече.",
-      "message": "Твојата врска со GitHub веќе не важи. Провери ја повторно — ако е потребно, ќе добиеш барање повторно да се поврзеш."
+      "message": "Твојата врска со GitHub веќе не важи. Провери ја повторно — ако е потребно, ќе добиеш барање повторно да се поврзеш.",
+      "gitlabTitle": "Врската со GitLab истече",
+      "bitbucketTitle": "Врската со Bitbucket истече",
+      "providerMessage": "Вашата врска со {{provider}} повеќе не е важечка. Проверете ја врската повторно — ако е потребно, ќе биде побарано да се поврзете одново."
     },
     "eventChips": {
       "comment": "Коментирај",
@@ -643,6 +679,21 @@
       "files": "Датотеки",
       "discussion": "Дискусија"
     },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge барање",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Сподели merge барање",
+      "viewOnProvider": "Прикажи на {{provider}}",
+      "mergeRequestUnavailable": "Merge барањето е недостапно",
+      "unavailableDescription": "Можеби е избришано или немате пристап до него.",
+      "accessDeniedMergeRequest": "Немате дозвола за преглед на ова merge барање.",
+      "couldNotLoadMergeRequest": "Не можеше да се вчита merge барањето",
+      "discussionAccessDenied": "Немате дозвола за преглед на дискусијата на ова merge барање.",
+      "discussionUnavailableMessage": "Ова merge барање можеби е отстрането.",
+      "noDiscussionDescription": "Нема ни теми за преглед ни коментари за разговор на ова merge барање.",
+      "noFilesChangedDescription": "Ова merge барање нема промени на датотеки."
+    },
     "fileStatus": {
       "modified": "Изменета",
       "renamed": "Преименувана",
@@ -659,7 +710,7 @@
       "emptyLine": "(празно)"
     },
     "linkPasteClipboardEmpty": "Таблата со исечоци е празна.",
-    "linkPasteNotAPullRequest": "Ова не е линк до барање за спојување на GitHub.",
+    "linkPasteNotAPullRequest": "Ова не е врска до барање за спојување или merge барање",
     "announce": {
       "commentPosted": "Коментарот е објавен",
       "reviewSubmitted": "Прегледот е испратен",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "Овој коментар не може да се објави. Можеби избраниот ред е променет или PR е ажуриран.",
       "reviewNotSubmitted": "Овој преглед не може да се испрати во сегашната состојба. Можеби PR е променет или се обидуваш да прегледаш сопствено барање за спојување.",
+      "reviewNotSubmittedTerm": "Овој преглед не може да се поднесе во сегашна состојба. {{term}} можеби се променил или не можете да го прегледате вашето сопствено {{term}}.",
       "couldNotPostComment": "Не успеа објавувањето на коментарот.",
       "couldNotSubmitReview": "Не успеа испраќањето на прегледот. Провери ја врската и обиди се повторно."
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "Одговорот не се испрати.",
       "couldNotCompleteAction": "Не успеа извршувањето на ова дејство.",
       "mergeResultDefaultError": "GitHub не го заврши спојувањето.",
+      "mergeResultNotCompleted": "{{term}} не беше споено. Проверете ја неговата состојба и обидете се повторно.",
       "ambiguous": "Не успеа потврдата на дејството — провери го PR пред повторниот обид.",
       "persistenceFailed": "Не успеа евидентирањето на ова дејство. Обиди се повторно подоцна.",
       "forbidden": "Пристапот е забранет."
@@ -1988,11 +2041,31 @@
       "retryConnection": "Поврзи се повторно"
     },
     "newSession": {
+      "recentlyUsed": "Неодамна користени",
+      "couldNotLoadGithubRepositories": "Не успеа вчитувањето на репозиториумите од GitHub.",
+      "couldNotLoadGitlabRepositories": "Не успеа вчитувањето на репозиториумите од GitLab.",
+      "couldNotLoadBitbucketRepositories": "Не успеа вчитувањето на репозиториумите од Bitbucket.",
       "connectGithubDescription": "Поврзи го GitHub преку прелистувачот, па врати се тука за да избереш репозиториум.",
+      "connectGitlabDescription": "Поврзи го GitLab преку прелистувачот, па врати се тука за да избереш репозиториум.",
+      "connectBitbucketDescription": "Поврзи го Bitbucket преку прелистувачот, па врати се тука за да избереш репозиториум.",
       "openGithub": "Отвори GitHub",
+      "openGitlab": "Отвори GitLab",
+      "openBitbucket": "Отвори Bitbucket",
       "refreshRepositories": "Освежи ги репозиториумите",
       "githubConnected": "GitHub е поврзан",
+      "gitlabConnected": "GitLab е поврзан",
       "noRepositoriesVisible": "Нема видливи репозиториуми. Провери дали апликацијата Kilo за GitHub има пристап до репозиториумите, па освежи.",
+      "noRepositoriesVisibleGitlab": "Нема видливи репозиториуми. Провери го пристапот до репозиториумите на GitLab, па освежи.",
+      "noRepositoriesVisibleBitbucket": "Нема видливи репозиториуми. Провери го пристапот до репозиториумите на Bitbucket, па освежи.",
+      "bitbucketOrganizationsOnly": "Bitbucket е достапен само за организации.",
+      "branchPickerTitle": "Избери гранка",
+      "branchDefault": "Основна",
+      "branchAccessibility": "Гранка: {{label}}",
+      "branchLoading": "Се вчитуваат гранки",
+      "branchLoadError": "Не можеше да се вчитаат гранките",
+      "branchUnavailable": "Гранките се недостапни за овој репозиториум. Проверете го пристапот кај операторот, па изберете друг репозиториум.",
+      "branchEmpty": "Нема достапни гранки",
+      "branchPlaceholder": "Изберете гранка",
       "runOnWithTarget": "Изврши на: {{target}}",
       "environment": "Околина",
       "couldNotLoadEnvironment": "Не успеа вчитувањето на твојата околина.",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "Не успеа освежувањето на репозиториумите. Обиди се повторно.",
       "discardDraftTitle": "Да се отфрли нацртот?",
       "discardDraftMessage": "Твоето упатство ќе се изгуби.",
+      "discardWithUploadsMessage": "Твоето упатство и сите прикачени датотеки што не се приложени кон испратени пораки ќе се избришат.",
       "discardFailed": "Не успеа отфрлањето на нацртот. Обиди се повторно.",
       "remoteHint": "За да управуваш со локален процес на kilo, изврши `kilo remote` на компјутерот или `/remote` во активна сесија на CLI.",
-      "connectBitbucketDescription": "Поврзи го Bitbucket преку прелистувачот, па врати се тука за да избереш репозиториум.",
-      "connectGitlabDescription": "Поврзи го GitLab преку прелистувачот, па врати се тука за да избереш репозиториум.",
-      "couldNotLoadBitbucketRepositories": "Не успеа вчитувањето на репозиториумите од Bitbucket.",
-      "couldNotLoadGithubRepositories": "Не успеа вчитувањето на репозиториумите од GitHub.",
-      "couldNotLoadGitlabRepositories": "Не успеа вчитувањето на репозиториумите од GitLab.",
-      "gitlabConnected": "GitLab е поврзан",
-      "noRepositoriesVisibleBitbucket": "Нема видливи репозиториуми. Провери го пристапот до репозиториумите на Bitbucket, па освежи.",
-      "noRepositoriesVisibleGitlab": "Нема видливи репозиториуми. Провери го пристапот до репозиториумите на GitLab, па освежи.",
-      "openBitbucket": "Отвори Bitbucket",
-      "openGitlab": "Отвори GitLab",
-      "recentlyUsed": "Неодамна користени",
       "continueFrom": "Се продолжува сесијата {{title}}.",
       "importingSession": "Увезување на сесијата",
       "cliCannotContinue": "Овој CLI не може да продолжи сесија. Избери Cloud Agent или друг CLI.",
-      "importFailed": "Не успеа увезувањето на оваа сесија.",
-      "discardWithUploadsMessage": "Твоето упатство и сите прикачени датотеки што не се приложени кон испратени пораки ќе се избришат."
+      "importFailed": "Не успеа увезувањето на оваа сесија."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ажурирана е {{displayCount}} датотека.",

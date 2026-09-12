@@ -17,6 +17,7 @@ import {
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { expandedForThread } from '@/lib/pr-review/discussion/thread-expansion';
+import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 
@@ -61,8 +62,14 @@ export function PrReviewDiscussionList({
   const trpc = useTRPC();
   // Account-local hidden users (blocked + muted GitHub logins) filter rows.
   const hiddenUsers = useQuery(trpc.moderation.listHiddenUsers.queryOptions());
-  // Viewer login for self-target gating on the comment overflow menu.
-  const pr = useQuery(trpc.githubPrReview.getPullRequest.queryOptions({ owner, repo, number }));
+  // Viewer login for self-target gating on the comment overflow menu. The
+  // overview goes through the provider seam, not `githubPrReview` directly:
+  // this list also renders under a GitLab MR / Bitbucket PR scope, where the
+  // GitHub-shaped triple is a synthesized stand-in and a GitHub call with it
+  // would fail on every render. On GitHub the key is unchanged, so this
+  // still dedupes with the screen's own overview query.
+  const queries = useProviderPrQueries({ owner, repo, number });
+  const pr = useQuery(queries.overviewOptions());
   const viewerLogin = pr.data?.repo.viewerLogin ?? null;
 
   const hiddenLogins = useMemo(() => {
@@ -118,6 +125,9 @@ export function PrReviewDiscussionList({
                 <CommentRow
                   comment={item.comment}
                   readOnly
+                  // s6: reactions render only when the provider exposes them;
+                  // a provider without them shows no reaction row at all.
+                  reactionsSupported={queries.capabilities.reactions.supported}
                   viewerLogin={viewerLogin}
                   onToggleReaction={noopReactionToggle}
                 />

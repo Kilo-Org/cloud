@@ -36,6 +36,7 @@
     "cost": "Разход",
     "discard": "Отхвърли",
     "findings": "Открити проблеми",
+    "mergeRequest": "merge заявка",
     "notConnected": "Не е свързан",
     "notifications": "Известия",
     "pullRequest": "заявка за сливане",
@@ -340,10 +341,17 @@
       "emptyDiffRow": "Празен ред в изгледа с разликите"
     },
     "connectionExpired": "Срокът на връзката с GitHub изтече.",
+    "capabilities": {
+      "banner": {
+        "title": "Не е налично при този доставчик",
+        "accessibility": "Не е налично при този доставчик: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Сливане",
       "mergeNow": "Обедини сега",
       "mergePullRequest": "Обединяване на заявката",
+      "mergeTermTitle": "Обедини {{term}}",
       "enableAutoMerge": "Активирай автоматично обединяване",
       "disableAutoMerge": "Деактивирай автоматичното обединяване",
       "autoMergeOn": "Автоматичното обединяване е включено",
@@ -362,9 +370,12 @@
       "deleteBranchAfterMerge": "Изтрий клона след обединяването",
       "noEnabledMethods": "В това хранилище няма активирани методи за обединяване. Помоли администратор на хранилището да активира обединяване с комит, свиване или пребазиране.",
       "confirmTitle": "Да се обедини ли заявката?",
+      "confirmTitleTerm": "Да се обедини ли {{term}}?",
       "confirmMessage": "Това ще обедини промените ти в основния клон.",
       "enableAutoMergeConfirmTitle": "Да се активира ли автоматичното обединяване?",
       "enableAutoMergeConfirmMessage": "GitHub ще обедини тази заявка автоматично, когато всички задължителни проверки завършат успешно.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} ще бъде обединен автоматично, след като конвейерът завърши успешно.",
+      "enableAutoMergeDescriptionTerm": "GitLab обединява тази {{term}} автоматично, след като конвейерът завърши успешно.",
       "forbidden": "Нямаш права да обединяваш тази заявка.",
       "cannotMerge": "Тази заявка не може да се обедини в сегашния си вид.",
       "couldNotMerge": "Не можахме да обединим заявката.",
@@ -375,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Вече обединена",
-        "closed": "Заявката е затворена"
+        "closed": "Заявката е затворена",
+        "closedMergeRequest": "Тази merge заявка е затворена"
       },
       "partialSuccessBanner": {
         "body": "Не можахме да изтрием клона: {{reason}}.",
@@ -400,6 +412,18 @@
         "behindDetail": "Изходният клон изостава от основния. Пребазирай или обнови клона преди обединяването.",
         "notMergeableTitle": "Тази заявка все още не може да се обедини",
         "notMergeableDetail": "GitHub съобщи следното състояние за възможността за обединяване: {{state}}."
+      },
+      "restrictions": {
+        "title": "Ограничения при обединяване",
+        "approvalsRequired_one": "Необходимо е {{displayCount}} одобрение",
+        "approvalsRequired_other": "Необходими са {{displayCount}} одобрения",
+        "pipelineMustSucceed": "Конвейерът трябва да завърши успешно преди обединяването."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Конвейерът се проваля при последния комит.",
+        "pendingPipeline": "Конвейерът все още работи при последния комит.",
+        "permission": "Нямате разрешение да обединявате {{term}}.",
+        "draft": "Маркирайте {{term}} като готов за преглед преди обединяване."
       },
       "methodLabels": {
         "merge": "Създай комит за обединяване",
@@ -448,6 +472,7 @@
       "acceptTerms": "Приеми",
       "replyBadRequest": "Този отговор не може да бъде публикуван. Нишката може да се е променила.",
       "replyForbidden": "Нямаш права да отговаряш в тази заявка за обединяване.",
+      "replyForbiddenTerm": "Нямате разрешение да отговаряте в {{term}}.",
       "moderation": {
         "reportContent": {
           "terminal": "Не можеш да подадеш сигнал за този коментар.",
@@ -508,17 +533,19 @@
     "reviewPullRequest": "Прегледай заявката за обединяване",
     "headLine": "{{counts}} · последен комит {{sha}}",
     "entry": {
-      "eyebrow": "Отвори заявка за обединяване чрез URL.",
-      "pastePrLink": "Постави връзка към PR",
-      "noRecentPrs": "Няма скорошни PR",
-      "noRecentPrsDescription": "Постави връзка към PR по-горе, за да започнеш преглед. Следващия път този PR ще се покаже тук.",
+      "eyebrow": "Отворете заявка за сливане или merge заявка чрез URL",
+      "pastePrLink": "Поставете връзка към заявка за сливане или merge заявка",
+      "noRecentPrs": "Няма скорошни прегледи",
+      "noRecentPrsDescription": "Поставете връзка по-горе, за да започнете преглед — следващия път ще се появи тук.",
       "couldNotLoad": "Не можахме да заредим данните.",
       "removeFromRecentsTitle": "Да се премахне ли от последно отваряните?",
-      "removeFromRecentsMessage": "Тази заявка за обединяване ще бъде премахната от списъка ти с последно отваряни заявки.",
+      "removeFromRecentsMessage": "Този преглед ще бъде премахнат от скорошните ви.",
       "removeRecentAccessibility": "Премахни {{repo}} от последно отваряните",
-      "urlAccessibility": "URL на заявка за обединяване в GitHub",
-      "clearLink": "Изчисти връзката към заявката за обединяване",
-      "pasteLink": "Постави връзка към заявка за обединяване",
+      "urlAccessibility": "Въведете URL на заявка за сливане или merge заявка",
+      "urlPlaceholder": "URL на заявка за сливане или merge заявка",
+      "openAccessibility": "Отвори заявка за сливане или merge заявка",
+      "clearLink": "Изчисти връзката",
+      "pasteLink": "Поставете връзка към заявка за сливане или merge заявка",
       "open": "Отваряне"
     },
     "checks": {
@@ -567,9 +594,15 @@
     "connect": {
       "checkFailedTitle": "Не можахме да проверим връзката с GitHub.",
       "checkFailedMessage": "Не можем да проверим дали си влязъл, докато данните не се заредят.",
+      "checkFailedTitleGitLab": "Не можа да се провери връзката с GitLab",
+      "checkFailedTitleBitbucket": "Не можа да се провери връзката с Bitbucket",
+      "providerCheckFailedMessage": "Състоянието на връзката е недостъпно, докато това се зареди.",
       "reconnectTitle": "Повторно свързване с GitHub",
       "reconnectDescription": "Достъпът ти до GitHub е отнет. Свържи се отново, за да продължиш да преглеждаш заявки за обединяване от телефона си.",
-      "description": "Свържи акаунта си в GitHub, за да преглеждаш заявки за обединяване от телефона си."
+      "description": "Свържи акаунта си в GitHub, за да преглеждаш заявки за обединяване от телефона си.",
+      "gitlabDescription": "Свържете акаунта си в GitLab, за да преглеждате merge заявки на мобилно устройство.",
+      "bitbucketDescription": "Свържете Bitbucket с тази организация, за да преглеждате заявки за сливане на мобилно устройство.",
+      "bitbucketOrgOnlyDescription": "Изберете организация в профила си, за да преглеждате нейните Bitbucket заявки за сливане."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +624,10 @@
     },
     "reconnectNotice": {
       "title": "Срокът на връзката с GitHub изтече.",
-      "message": "Връзката ти с GitHub вече не е валидна. Провери я отново — при нужда ще получиш подкана да се свържеш отново."
+      "message": "Връзката ти с GitHub вече не е валидна. Провери я отново — при нужда ще получиш подкана да се свържеш отново.",
+      "gitlabTitle": "Връзката с GitLab изтече",
+      "bitbucketTitle": "Връзката с Bitbucket изтече",
+      "providerMessage": "Връзката ви с {{provider}} вече не е валидна. Проверете връзката отново — при необходимост ще бъдете подканени да се свържете повторно."
     },
     "eventChips": {
       "comment": "Коментар",
@@ -643,6 +679,21 @@
       "files": "Файлове",
       "discussion": "Дискусия"
     },
+    "terms": {
+      "pullRequest": "Заявка за сливане",
+      "mergeRequest": "Merge заявка",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Сподели merge заявка",
+      "viewOnProvider": "Преглед в {{provider}}",
+      "mergeRequestUnavailable": "Merge заявката е недостъпна",
+      "unavailableDescription": "Може би е изтрита или нямате достъп до нея.",
+      "accessDeniedMergeRequest": "Нямате разрешение да прегледате тази merge заявка.",
+      "couldNotLoadMergeRequest": "Merge заявката не можа да се зареди",
+      "discussionAccessDenied": "Нямате разрешение да прегледате дискусиата по тази merge заявка.",
+      "discussionUnavailableMessage": "Тази merge заявка може би е премахната.",
+      "noDiscussionDescription": "Няма нишки за преглед или коментари по тази merge заявка.",
+      "noFilesChangedDescription": "Тази merge заявка няма промени по файлове."
+    },
     "fileStatus": {
       "modified": "Променен",
       "renamed": "Преименуван",
@@ -659,7 +710,7 @@
       "emptyLine": "(празно)"
     },
     "linkPasteClipboardEmpty": "Клипбордът е празен.",
-    "linkPasteNotAPullRequest": "Това не е връзка към заявка за обединяване в GitHub.",
+    "linkPasteNotAPullRequest": "Това не е връзка към заявка за сливане или merge заявка",
     "announce": {
       "commentPosted": "Коментарът е публикуван",
       "reviewSubmitted": "Прегледът е изпратен",
@@ -668,6 +719,7 @@
     "mutationError": {
       "commentNotPosted": "Този коментар не може да се публикува. Избраният ред може да се е променил или този PR да е обновен.",
       "reviewNotSubmitted": "Този преглед не може да се изпрати в сегашния си вид. Възможно е този PR да е променен или да се опитваш да прегледаш собствената си заявка за обединяване.",
+      "reviewNotSubmittedTerm": "Този преглед не може да бъде изпратен такъв. {{term}} може да се е променил или не можете да преглеждате собствения си {{term}}.",
       "couldNotPostComment": "Не можахме да публикуваме коментара.",
       "couldNotSubmitReview": "Не можахме да изпратим прегледа. Провери връзката си и опитай отново."
     },
@@ -675,6 +727,7 @@
       "couldNotReply": "Отговорът не беше изпратен.",
       "couldNotCompleteAction": "Не можахме да завършим това действие.",
       "mergeResultDefaultError": "GitHub не завърши обединяването.",
+      "mergeResultNotCompleted": "{{term}} не беше обединен. Проверете състоянието му и опитайте отново.",
       "ambiguous": "Не можахме да потвърдим резултата. Провери този PR, преди да опиташ отново.",
       "persistenceFailed": "Не можахме да запишем това действие. Опитай отново по-късно.",
       "forbidden": "Действието не е разрешено."
@@ -1988,11 +2041,31 @@
       "retryConnection": "Опитай да се свържеш отново"
     },
     "newSession": {
+      "recentlyUsed": "Наскоро използвани",
+      "couldNotLoadGithubRepositories": "Не успяхме да заредим хранилищата в GitHub.",
+      "couldNotLoadGitlabRepositories": "Не успяхме да заредим хранилищата в GitLab.",
+      "couldNotLoadBitbucketRepositories": "Не успяхме да заредим хранилищата в Bitbucket.",
       "connectGithubDescription": "Свържи GitHub в браузъра си, след което се върни тук, за да избереш хранилище.",
+      "connectGitlabDescription": "Свържи GitLab в браузъра си, след което се върни тук, за да избереш хранилище.",
+      "connectBitbucketDescription": "Свържи Bitbucket в браузъра си, след което се върни тук, за да избереш хранилище.",
       "openGithub": "Отвори GitHub",
+      "openGitlab": "Отвори GitLab",
+      "openBitbucket": "Отвори Bitbucket",
       "refreshRepositories": "Опресни хранилищата",
       "githubConnected": "Връзка с GitHub",
+      "gitlabConnected": "Връзка с GitLab",
       "noRepositoriesVisible": "Няма видими хранилища. Провери достъпа на приложението Kilo за GitHub до хранилищата, след което опресни списъка.",
+      "noRepositoriesVisibleGitlab": "Няма видими хранилища. Провери достъпа до хранилищата в GitLab, след което опресни списъка.",
+      "noRepositoriesVisibleBitbucket": "Няма видими хранилища. Провери достъпа до хранилищата в Bitbucket, след което опресни списъка.",
+      "bitbucketOrganizationsOnly": "Bitbucket е наличен само за организации.",
+      "branchPickerTitle": "Избери клон",
+      "branchDefault": "По подразбиране",
+      "branchAccessibility": "Клон: {{label}}",
+      "branchLoading": "Клоновете се зареждат",
+      "branchLoadError": "Клоновете не можаха да се заредят",
+      "branchUnavailable": "Клоновете не са налични за това хранилище. Проверете достъпа си при доставчика и изберете друго хранилище.",
+      "branchEmpty": "Няма налични клонове",
+      "branchPlaceholder": "Изберете клон",
       "runOnWithTarget": "Изпълнение в: {{target}}",
       "environment": "Среда",
       "couldNotLoadEnvironment": "Не успяхме да заредим средата ти.",
@@ -2013,24 +2086,13 @@
       "couldNotRefreshRepositories": "Не успяхме да опресним хранилищата. Опитай отново.",
       "discardDraftTitle": "Да се изтрие ли черновата?",
       "discardDraftMessage": "Подканата ти ще се загуби.",
+      "discardWithUploadsMessage": "Подканата ти и всички качени файлове, които не са прикачени към изпратени съобщения, ще бъдат изтрити.",
       "discardFailed": "Не успяхме да изтрием черновата. Опитай отново.",
       "remoteHint": "Изпълни `kilo remote` на компютъра си или `/remote` в работеща CLI сесия, за да управляваш локален процес на kilo.",
-      "connectBitbucketDescription": "Свържи Bitbucket в браузъра си, след което се върни тук, за да избереш хранилище.",
-      "connectGitlabDescription": "Свържи GitLab в браузъра си, след което се върни тук, за да избереш хранилище.",
-      "couldNotLoadBitbucketRepositories": "Не успяхме да заредим хранилищата в Bitbucket.",
-      "couldNotLoadGithubRepositories": "Не успяхме да заредим хранилищата в GitHub.",
-      "couldNotLoadGitlabRepositories": "Не успяхме да заредим хранилищата в GitLab.",
-      "gitlabConnected": "Връзка с GitLab",
-      "noRepositoriesVisibleBitbucket": "Няма видими хранилища. Провери достъпа до хранилищата в Bitbucket, след което опресни списъка.",
-      "noRepositoriesVisibleGitlab": "Няма видими хранилища. Провери достъпа до хранилищата в GitLab, след което опресни списъка.",
-      "openBitbucket": "Отвори Bitbucket",
-      "openGitlab": "Отвори GitLab",
-      "recentlyUsed": "Наскоро използвани",
       "continueFrom": "Продължаваш сесията {{title}}.",
       "importingSession": "Импортиране на сесията",
       "cliCannotContinue": "Този CLI не може да продължи сесия. Избери Cloud Agent или друг CLI.",
-      "importFailed": "Тази сесия не можа да бъде импортирана.",
-      "discardWithUploadsMessage": "Подканата ти и всички качени файлове, които не са прикачени към изпратени съобщения, ще бъдат изтрити."
+      "importFailed": "Тази сесия не можа да бъде импортирана."
     },
     "partRenderer": {
       "updatedFileCount_one": "Актуализиран е {{displayCount}} файл.",

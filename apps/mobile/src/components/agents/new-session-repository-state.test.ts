@@ -1,12 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   dedupeRepositoriesByPlatformAndFullName,
+  getNewSessionBranchState,
+  getSelectedBranchOverride,
   type NewSessionRepository,
   type RepositoryGroup,
+  repositoryIdentityKey,
+  resetSelectedBranchOverrides,
   resolveBitbucketStatus,
   resolveProviderStatus,
   resolveRepositoryGroups,
+  setNewSessionBranchScope,
+  setSelectedBranchOverride,
+  subscribeNewSessionBranchState,
 } from './new-session-repository-state';
 
 describe('resolveProviderStatus', () => {
@@ -205,5 +212,97 @@ describe('resolveRepositoryGroups', () => {
     expect(githubGroup?.status).toBe('repos');
     expect(githubGroup?.repositories).toEqual([githubRow]);
     expect(gitlabGroup?.status).toBe('error');
+  });
+});
+
+const bitbucket = (
+  fullName: string,
+  workspaceUuid: string,
+  repositoryUuid: string
+): NewSessionRepository => ({
+  platform: 'bitbucket',
+  fullName,
+  isPrivate: true,
+  workspaceUuid,
+  repositoryUuid,
+});
+
+describe('repositoryIdentityKey', () => {
+  it('separates the same fullName on two providers', () => {
+    expect(repositoryIdentityKey(github('owner/repo'))).not.toBe(
+      repositoryIdentityKey(gitlab('owner/repo'))
+    );
+  });
+
+  it('separates two same-named Bitbucket rows with different uuids', () => {
+    expect(repositoryIdentityKey(bitbucket('team/repo', 'ws-1', 'id-1'))).not.toBe(
+      repositoryIdentityKey(bitbucket('team/repo', 'ws-2', 'id-2'))
+    );
+  });
+});
+
+describe('new-session branch state', () => {
+  beforeEach(() => {
+    resetSelectedBranchOverrides();
+  });
+
+  it('reports no override until one is chosen, so the provider default is used', () => {
+    expect(getSelectedBranchOverride(github('owner/repo'))).toBeNull();
+    expect(getSelectedBranchOverride(null)).toBeNull();
+  });
+
+  it('returns the branch chosen for that repository', () => {
+    setSelectedBranchOverride(github('owner/repo'), 'release/2.0');
+    expect(getSelectedBranchOverride(github('owner/repo'))).toBe('release/2.0');
+  });
+
+  it('never lets a branch survive onto another repository', () => {
+    setSelectedBranchOverride(github('owner/repo'), 'release/2.0');
+    // Same name, other provider; other owner; other Bitbucket workspace.
+    expect(getSelectedBranchOverride(gitlab('owner/repo'))).toBeNull();
+    expect(getSelectedBranchOverride(github('other-owner/repo'))).toBeNull();
+    setSelectedBranchOverride(bitbucket('team/repo', 'ws-1', 'id-1'), 'feature');
+    expect(getSelectedBranchOverride(bitbucket('team/repo', 'ws-2', 'id-2'))).toBeNull();
+  });
+
+  it('drops the override when the default branch is chosen again', () => {
+    const repository = github('owner/repo');
+    setSelectedBranchOverride(repository, 'release/2.0');
+    setSelectedBranchOverride(repository, null);
+    expect(getSelectedBranchOverride(repository)).toBeNull();
+  });
+
+  it('clears every override on reset and notifies subscribers', () => {
+    const listener = vi.fn(() => undefined);
+    const unsubscribe = subscribeNewSessionBranchState(listener);
+    setSelectedBranchOverride(github('owner/repo'), 'release/2.0');
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    resetSelectedBranchOverrides();
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(getSelectedBranchOverride(github('owner/repo'))).toBeNull();
+
+    unsubscribe();
+    setSelectedBranchOverride(github('owner/repo'), 'release/2.0');
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('publishes a new snapshot object only when the state changes', () => {
+    const first = getNewSessionBranchState();
+    setSelectedBranchOverride(github('owner/repo'), 'release/2.0');
+    const second = getNewSessionBranchState();
+    expect(second).not.toBe(first);
+    setSelectedBranchOverride(github('owner/repo'), 'release/2.0');
+    expect(getNewSessionBranchState()).toBe(second);
+  });
+
+  it('marks the organization scope ready, including a personal (undefined) scope', () => {
+    setNewSessionBranchScope(undefined);
+    expect(getNewSessionBranchState()).toMatchObject({
+      isScopeReady: true,
+      organizationId: undefined,
+    });
+    setNewSessionBranchScope('org-1');
+    expect(getNewSessionBranchState().organizationId).toBe('org-1');
   });
 });

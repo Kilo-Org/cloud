@@ -217,6 +217,7 @@ export function NewSessionConfigureForm({
       contentContainerClassName="flex-grow px-4 pb-8 pt-4"
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="on-drag"
     >
       <NewSessionPrompt
         attachments={attachments}

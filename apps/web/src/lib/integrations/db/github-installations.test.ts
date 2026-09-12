@@ -8,6 +8,7 @@ import {
   github_connection_attempts,
   github_installation_webhook_receipts,
   kilocode_users,
+  operation_ledgers,
   platform_integrations,
 } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -952,6 +953,148 @@ describe('GitHub installation persistence', () => {
       { ...data('991001'), kiloUserId: ownerId }
     );
     expect(connectedC).toEqual({ ok: true, integrationId: expect.any(String) });
+  });
+
+  test('uninstall terminalizes active review work, clears its reservation, and settles the ledger only after the delete commits', async () => {
+    const organization = await createTestOrganization('Uninstall review cleanup org', ownerId, 0);
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      data('992001')
+    );
+    if (!connected.ok) throw new Error('Expected initial connection');
+
+    const reviewId = await createCodeReview({
+      owner: { type: 'org', id: organization.id, userId: ownerId },
+      platformIntegrationId: connected.integrationId,
+      repoFullName: 'acme/uninstall-review-cleanup',
+      prNumber: 1,
+      prUrl: 'https://github.com/acme/uninstall-review-cleanup/pull/1',
+      prTitle: 'uninstall review cleanup',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/uninstall-review-cleanup',
+      headSha: 'uninstall-review-cleanup-head-sha',
+      platform: 'github',
+      triggerSource: 'manual',
+    });
+    await updateCodeReviewStatus(reviewId, 'queued');
+    const attempt = await createCodeReviewAttempt({ codeReviewId: reviewId, status: 'queued' });
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ dispatch_reservation_id: crypto.randomUUID() })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    await uninstallExclusiveGitHubInstallation({
+      owner: { type: 'org', id: organization.id },
+      integrationId: connected.integrationId,
+      deleteUpstream: async () => {},
+    });
+
+    const [reviewRow] = await db
+      .select({
+        status: cloud_agent_code_reviews.status,
+        dispatchReservationId: cloud_agent_code_reviews.dispatch_reservation_id,
+        platformIntegrationId: cloud_agent_code_reviews.platform_integration_id,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+    // ON DELETE SET NULL: the terminal review survives the association's
+    // deletion, but is no longer linked to it.
+    expect(reviewRow).toMatchObject({
+      status: 'cancelled',
+      dispatchReservationId: null,
+      platformIntegrationId: null,
+    });
+
+    const [attemptRow] = await db
+      .select({ status: cloud_agent_code_review_attempts.status })
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, attempt.id));
+    expect(attemptRow?.status).toBe('cancelled');
+
+    const [integrationRow] = await db
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integrationId));
+    expect(integrationRow).toBeUndefined();
+
+    const [ledgerRow] = await db
+      .select({ status: operation_ledgers.status, settledAt: operation_ledgers.settled_at })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+    expect(ledgerRow).toMatchObject({ status: 'no_op', settledAt: expect.any(String) });
+  });
+
+  test('a failed uninstall rolls back review cancellation and never settles the ledger', async () => {
+    const organization = await createTestOrganization('Uninstall rollback org', ownerId, 0);
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      data('992002')
+    );
+    if (!connected.ok) throw new Error('Expected initial connection');
+
+    const reviewId = await createCodeReview({
+      owner: { type: 'org', id: organization.id, userId: ownerId },
+      platformIntegrationId: connected.integrationId,
+      repoFullName: 'acme/uninstall-rollback',
+      prNumber: 1,
+      prUrl: 'https://github.com/acme/uninstall-rollback/pull/1',
+      prTitle: 'uninstall rollback',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/uninstall-rollback',
+      headSha: 'uninstall-rollback-head-sha',
+      platform: 'github',
+      triggerSource: 'manual',
+    });
+    await updateCodeReviewStatus(reviewId, 'queued');
+    const attempt = await createCodeReviewAttempt({ codeReviewId: reviewId, status: 'queued' });
+    const reservationId = crypto.randomUUID();
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ dispatch_reservation_id: reservationId })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    await expect(
+      uninstallExclusiveGitHubInstallation({
+        owner: { type: 'org', id: organization.id },
+        integrationId: connected.integrationId,
+        deleteUpstream: async () => {
+          throw new Error('upstream GitHub delete failed');
+        },
+      })
+    ).rejects.toThrow('upstream GitHub delete failed');
+
+    // The whole transaction — including the review cancellation and the
+    // association delete — must have rolled back together.
+    const [reviewRow] = await db
+      .select({
+        status: cloud_agent_code_reviews.status,
+        dispatchReservationId: cloud_agent_code_reviews.dispatch_reservation_id,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+    expect(reviewRow).toMatchObject({ status: 'queued', dispatchReservationId: reservationId });
+
+    const [attemptRow] = await db
+      .select({ status: cloud_agent_code_review_attempts.status })
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, attempt.id));
+    expect(attemptRow?.status).toBe('queued');
+
+    const [integrationRow] = await db
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integrationId));
+    expect(integrationRow).toBeDefined();
+
+    // The ledger must never have been settled for a cancellation that was
+    // itself rolled back.
+    const [ledgerRow] = await db
+      .select({ status: operation_ledgers.status, settledAt: operation_ledgers.settled_at })
+      .from(operation_ledgers)
+      .where(eq(operation_ledgers.operation_key, `review:${reviewId}`));
+    expect(ledgerRow).toMatchObject({ status: 'admitted', settledAt: null });
   });
 
   test('revokes the real runtime authorization query on local disconnect', async () => {

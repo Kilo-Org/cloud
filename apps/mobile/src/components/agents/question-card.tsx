@@ -227,6 +227,14 @@ export function QuestionCard({
                 <View className="gap-1">
                   {question.options.map((option, oIndex) => {
                     const isSelected = selectedOptions[qIndex]?.has(oIndex) ?? false;
+                    // The description is content, not an action hint: TalkBack
+                    // (Android) reads the node's hint text, never the tooltip
+                    // React Native fills from `accessibilityHint`, so a hint
+                    // would leave the subtitle unannounced. Join it into the
+                    // accessible name, the way the Kilo Pass card does.
+                    const optionLabel = option.description
+                      ? `${option.label}, ${option.description}`
+                      : option.label;
                     return (
                       <Button
                         key={oIndex}
@@ -239,22 +247,43 @@ export function QuestionCard({
                         accessibilityRole="button"
                         accessibilityLabel={
                           isSelected
-                            ? t('agentChat.questionCard.optionSelected', { label: option.label })
-                            : t('agentChat.questionCard.option', { label: option.label })
+                            ? t('agentChat.questionCard.optionSelected', { label: optionLabel })
+                            : t('agentChat.questionCard.option', { label: optionLabel })
                         }
                         className={cn(
                           'h-auto justify-start py-2.5',
                           isSelected ? 'bg-primary' : 'bg-background'
                         )}
                       >
-                        <Text
-                          className={cn(
-                            'text-sm',
-                            isSelected ? 'text-primary-foreground' : 'text-foreground'
-                          )}
-                        >
-                          {option.label}
-                        </Text>
+                        {/*
+                          The agent may attach an explanation to a choice; the
+                          CLI, web, and extension all show it as a muted
+                          subtitle under the label. Stack the two lines so the
+                          label stays the prominent line and the description
+                          reads as supporting text.
+                        */}
+                        <View className="flex-1 flex-col items-start gap-0.5">
+                          <Text
+                            className={cn(
+                              'text-sm',
+                              isSelected ? 'text-primary-foreground' : 'text-foreground'
+                            )}
+                          >
+                            {option.label}
+                          </Text>
+                          {option.description ? (
+                            <Text
+                              className={cn(
+                                'text-xs',
+                                isSelected
+                                  ? 'text-primary-foreground opacity-70'
+                                  : 'text-muted-foreground'
+                              )}
+                            >
+                              {option.description}
+                            </Text>
+                          ) : null}
+                        </View>
                       </Button>
                     );
                   })}

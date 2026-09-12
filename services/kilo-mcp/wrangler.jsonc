@@ -6,9 +6,10 @@
   "compatibility_date": "2025-09-01",
   "compatibility_flags": ["nodejs_compat"],
   // Production is reached only through its custom domain, so the OAuth issuer
-  // in the metadata is always https://mcp.kiloapps.io (the issuer is derived
-  // from the request URL — src/auth/metadata.ts). The workers.dev URL stays
-  // disabled in prod; the `dev` env below keeps its own workers.dev URL.
+  // is always https://mcp.kiloapps.io (the issuer is derived by the
+  // @cloudflare/workers-oauth-provider from the request URL). The workers.dev
+  // URL stays disabled in prod; the `dev` env below keeps its own workers.dev
+  // URL.
   "workers_dev": false,
   "preview_urls": false,
   "routes": [
@@ -31,21 +32,21 @@
   // (src/search-knn.ts). The model is pinned in src/embedding.ts.
   "ai": { "binding": "AI" },
 
-  // OAuth 2.1 state for THIS MCP (clients, pairing codes, refresh tokens,
-  // revoked jtis) — src/store/oauth-store.ts, DO SQLite via Drizzle.
-  // One logical registry, so the store is reached via getByName (single named
-  // instance).
+  // Pending-authorization state for THIS MCP (the library owns clients, codes,
+  // refresh tokens, and revoked jtis in OAUTH_KV) — src/store/oauth-store.ts,
+  // DO SQLite via Drizzle. One logical registry, so the store is reached via
+  // getByName (single named instance).
   "durable_objects": {
     "bindings": [{ "name": "KILO_MCP_OAUTH_STORE", "class_name": "KiloMcpOAuthStore" }],
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["KiloMcpOAuthStore"] }],
 
-  // HMAC key for MCP access tokens (src/auth/token.ts). Set with
-  // `wrangler secret put MCP_TOKEN_SECRET` (prod) or `MCP_TOKEN_SECRET` in
-  // .dev.vars (dev). Never logged, never committed.
-  "secrets": {
-    "required": ["MCP_TOKEN_SECRET"],
-  },
+  // KV the OAuth provider library requires (its own client/token/grant state).
+  // PRODUCTION: replace the placeholder id below with the id from
+  //   wrangler kv namespace create OAUTH_KV
+  // and record it in the PR description. Local `wrangler dev --env dev`
+  // simulates KV from the `env.dev` binding; the id there is a placeholder.
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
 
   // Vectorize: the catalog kNN index. Vector ids are procedure paths; the
   // index is provisioned and populated by scripts/embed-catalog.ts
@@ -75,11 +76,6 @@
     "dev": {
       "name": "kilo-mcp-dev",
       "workers_dev": true,
-      // `secrets` is not inherited from the top level by environments
-      // (wrangler): the dev worker enforces the same required MCP_TOKEN_SECRET.
-      "secrets": {
-        "required": ["MCP_TOKEN_SECRET"],
-      },
       "vars": {
         "WEB_BASE_URL": "http://localhost:3000",
       },
@@ -104,6 +100,9 @@
           "new_sqlite_classes": ["KiloMcpOAuthStore"],
         },
       ],
+      // Local dev/tests simulate KV; `wrangler dev` ignores the id. Deploying
+      // the dev worker remotely (not done by CI) would need a real dev id.
+      "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
     },
   },
 }

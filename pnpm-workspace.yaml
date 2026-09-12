@@ -11,6 +11,10 @@ packages:
 
 catalog:
   '@cloudflare/vitest-pool-workers': 0.16.13
+  # The OAuth 2.1 provider the kilo-mcp worker delegates its hand-rolled
+  # authorization/token server to. Pinned exactly; adopted with the KV binding
+  # and zod schemas in the same change.
+  '@cloudflare/workers-oauth-provider': 0.10.3
   '@cloudflare/workers-types': 4.20260605.1
   '@octokit/auth-app': 8.2.0
   # Only for packages that shell out to the `sentry-cli` binary directly (Workers,

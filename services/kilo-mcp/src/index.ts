@@ -7,20 +7,21 @@ import {
   type CallRejectedReason,
   type McpAnalytics,
 } from './analytics';
-import { authenticate } from './auth';
-import { handleAuthorize } from './auth/authorize';
-import { handleRegistration } from './auth/dcr';
-import { AUTH_PATHS } from './auth/http';
-import {
-  handleAuthorizationServerMetadata,
-  handleProtectedResourceMetadata,
-  protectedResourceMetadataUrl,
-} from './auth/metadata';
-import { handleToken } from './auth/token';
+import { forwardedAuthFromProps } from './auth';
+import { MCP_SCOPE, scopeTokens } from './auth/http';
 import { callCatalogEndpoint } from './call';
-import { getKiloMcpOAuthStoreStub, type OAuthStoreApi } from './store/oauth-store';
-import { handlePairingStatus } from './oauth-pages/authorize-page';
-import { handleOrgPicker } from './oauth-pages/org-picker';
+import { createDefaultHandler } from './oauth/consent';
+import { onError, tokenExchangeCallback } from './oauth/provider-hooks';
+import { forwardWithRefreshReuseDetection } from './oauth/refresh-reuse';
+import {
+  callArgsSchema,
+  clientRegistrationSchema,
+  initializeParamsSchema,
+  jsonRpcEnvelopeSchema,
+  searchArgsSchema,
+  toolsCallParamsSchema,
+  type JsonRpcEnvelope,
+} from './schemas';
 import {
   DEFAULT_SEARCH_LIMIT,
   MAX_SEARCH_LIMIT,
@@ -28,7 +29,21 @@ import {
   searchCatalog,
 } from './search';
 import { createSemanticCandidates } from './search-knn';
-import { JsonRpcFailure, type Catalog, type ForwardedAuth, type SemanticCandidates } from './types';
+import { getKiloMcpOAuthStoreStub } from './store/oauth-store';
+import {
+  JsonRpcFailure,
+  type Catalog,
+  type ForwardedAuth,
+  type GrantProps,
+  type SemanticCandidates,
+} from './types';
+import OAuthProvider, {
+  getOAuthApi,
+  type ClientRegistrationCallbackOptions,
+  type ClientRegistrationCallbackResult,
+  type OAuthProviderOptions,
+} from '@cloudflare/workers-oauth-provider';
+import type { ZodError } from 'zod';
 
 /** The Durable Object class must stay exported from the entry module for wrangler. */
 export { KiloMcpOAuthStore } from './store/oauth-store';
@@ -36,20 +51,12 @@ export { KiloMcpOAuthStore } from './store/oauth-store';
 /** The bundled catalog dumped by apps/web/src/scripts/mcp-catalog (s1). */
 const catalog = catalogJson as unknown as Catalog;
 
-/** The token endpoint cannot mint unsigned tokens: fail loudly if unconfigured. */
-function requireMcpTokenSecret(env: Env): string {
-  if (!env.MCP_TOKEN_SECRET) {
-    throw new Error('MCP_TOKEN_SECRET is not configured (wrangler secret put MCP_TOKEN_SECRET).');
-  }
-  return env.MCP_TOKEN_SECRET;
-}
-
 /** JSON-RPC 2.0 error codes (https://www.jsonrpc.org/specification). */
 const PARSE_ERROR = -32700;
 const INVALID_REQUEST = -32600;
 const METHOD_NOT_FOUND = -32601;
 const INVALID_PARAMS = -32602;
-/** Bearer token required before this slice's OAuth flow (s5/s6) lands. */
+/** The library already authenticated the request; this is the post-auth "no Kilo token bound" case. */
 const UNAUTHORIZED = -32001;
 
 const PROTOCOL_VERSION = '2025-06-18';
@@ -99,6 +106,16 @@ function jsonRpcError(
   return jsonResponse({ jsonrpc: '2.0', id, error: { code, message, ...(data ? { data } : {}) } });
 }
 
+/** Render zod issues without echoing any caller value (paths and messages only). */
+function describeZodIssues(error: ZodError): string {
+  return error.issues
+    .map(
+      issue =>
+        `${issue.path.length > 0 ? issue.path.map(String).join('.') : '(root)'}: ${issue.message}`
+    )
+    .join('; ');
+}
+
 const TOOLS = [
   {
     name: 'search',
@@ -146,26 +163,12 @@ const TOOLS = [
   },
 ] as const;
 
-type RpcMessage = {
-  jsonrpc?: unknown;
-  id?: string | number | null;
-  method?: unknown;
-  params?: unknown;
-};
-
 type McpHandlerDeps = {
   catalog: Catalog;
   webBaseUrl: string;
   fetchImpl?: typeof fetch;
   /** Vectorize kNN hook; token-only search when omitted. */
   semanticCandidates?: SemanticCandidates;
-  /**
-   * MCP OAuth verification (s5) + enforcement (s6). When present, /mcp
-   * accepts ONLY a bearer signed by this worker (signature/exp/iss/aud/jti
-   * checked) and forwards the Kilo credential bound to the verified identity;
-   * foreign bearers are rejected. Omitted in tests without the OAuth flow.
-   */
-  mcpAuth?: { tokenSecret: string; store: OAuthStoreApi };
   /**
    * PostHog emitter for this request (s2). Omitted in tests that do not care
    * about analytics; the handler then uses a no-op emitter so behaviour is
@@ -187,15 +190,12 @@ const noopAnalytics: McpAnalytics = {
 };
 
 /**
- * The identity an event is bound to: present only when the bearer was verified
- * as this worker's MCP access token (s6). A caller-supplied header never
- * contributes — identity comes from the verified claims, never from the
- * request.
+ * The identity an event is bound to. The provider verified the bearer before
+ * the API handler runs, so the grant props are the identity; a caller-supplied
+ * header never contributes.
  */
-function identity(auth: ForwardedAuth): AnalyticsIdentity | null {
-  return auth.mcpIdentity
-    ? { kiloUserId: auth.mcpIdentity.kiloUserId, organizationId: auth.mcpIdentity.organizationId }
-    : null;
+function identity(auth: ForwardedAuth): AnalyticsIdentity {
+  return { kiloUserId: auth.kiloUserId, organizationId: auth.organizationId ?? null };
 }
 
 /** An MCP tools/call success payload. */
@@ -208,7 +208,7 @@ function textResult(text: string): ToolResult {
   return { content: [{ type: 'text', text }] };
 }
 
-/** JSON object guard for the external JSON-RPC boundary (rejects arrays and null). */
+/** JSON object guard used only to recover the JSON-RPC `id` from a malformed envelope. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -219,26 +219,17 @@ async function runTool(
   auth: ForwardedAuth,
   deps: McpHandlerDeps,
   analytics: McpAnalytics,
-  callerIdentity: AnalyticsIdentity | null
+  callerIdentity: AnalyticsIdentity
 ): Promise<ToolResult> {
   if (name === 'search') {
-    const query = args['query'];
-    if (typeof query !== 'string' || query.trim().length === 0) {
-      throw new JsonRpcFailure(INVALID_PARAMS, 'search requires a non-empty string "query".');
-    }
-    const limit = args['limit'];
-    if (
-      limit !== undefined &&
-      (typeof limit !== 'number' ||
-        !Number.isInteger(limit) ||
-        limit < 1 ||
-        limit > MAX_SEARCH_LIMIT)
-    ) {
+    const parsed = searchArgsSchema.safeParse(args);
+    if (!parsed.success) {
       throw new JsonRpcFailure(
         INVALID_PARAMS,
-        `search "limit" must be an integer between 1 and ${MAX_SEARCH_LIMIT}.`
+        `Invalid search arguments: ${describeZodIssues(parsed.error)}`
       );
     }
+    const { query, limit } = parsed.data;
     const results = await searchCatalog(query, {
       catalog: deps.catalog,
       limit,
@@ -264,17 +255,14 @@ async function runTool(
     return textResult(JSON.stringify({ results }));
   }
   if (name === 'call') {
-    const path = args['path'];
-    if (typeof path !== 'string' || path.length === 0) {
+    const parsed = callArgsSchema.safeParse(args);
+    if (!parsed.success) {
       throw new JsonRpcFailure(
         INVALID_PARAMS,
-        'call requires a string "path" — run search first to find one.'
+        `Invalid call arguments: ${describeZodIssues(parsed.error)}`
       );
     }
-    const input = args['input'];
-    if (input !== undefined && (typeof input !== 'object' || input === null)) {
-      throw new JsonRpcFailure(INVALID_PARAMS, 'call "input" must be an object when present.');
-    }
+    const { path, input } = parsed.data;
     const outcome = await callCatalogEndpoint({
       catalog: deps.catalog,
       path,
@@ -295,12 +283,12 @@ async function runTool(
 }
 
 async function handleRpcMessage(
-  message: RpcMessage,
+  message: JsonRpcEnvelope,
   auth: ForwardedAuth,
   deps: McpHandlerDeps
 ): Promise<Response> {
-  const id = typeof message.id === 'string' || typeof message.id === 'number' ? message.id : null;
-  const method = typeof message.method === 'string' ? message.method : '';
+  const id = message.id ?? null;
+  const method = message.method;
   const analytics = deps.analytics ?? noopAnalytics;
   const callerIdentity = identity(auth);
 
@@ -312,16 +300,20 @@ async function handleRpcMessage(
   try {
     switch (method) {
       case 'initialize': {
-        const params = isRecord(message.params) ? message.params : {};
-        const protocolVersion =
-          typeof params['protocolVersion'] === 'string'
-            ? params['protocolVersion']
-            : PROTOCOL_VERSION;
-        const clientInfo = isRecord(params['clientInfo']) ? params['clientInfo'] : {};
+        const parsed = initializeParamsSchema.safeParse(message.params ?? {});
+        if (!parsed.success) {
+          throw new JsonRpcFailure(
+            INVALID_PARAMS,
+            `Invalid initialize params: ${describeZodIssues(parsed.error)}`
+          );
+        }
+        const params = parsed.data;
+        const protocolVersion = params.protocolVersion ?? PROTOCOL_VERSION;
+        const clientName = params.clientInfo?.name;
         analytics.sessionStarted({
           identity: callerIdentity,
           protocolVersion,
-          ...(typeof clientInfo['name'] === 'string' ? { clientName: clientInfo['name'] } : {}),
+          ...(clientName !== undefined ? { clientName } : {}),
         });
         return jsonRpcResult(id ?? 0, {
           protocolVersion,
@@ -336,19 +328,15 @@ async function handleRpcMessage(
       case 'tools/list':
         return jsonRpcResult(id ?? 0, { tools: TOOLS });
       case 'tools/call': {
-        if (!isRecord(message.params)) {
-          throw new JsonRpcFailure(INVALID_PARAMS, 'tools/call requires a params object.');
+        const parsed = toolsCallParamsSchema.safeParse(message.params);
+        if (!parsed.success) {
+          throw new JsonRpcFailure(
+            INVALID_PARAMS,
+            `Invalid tools/call params: ${describeZodIssues(parsed.error)}`
+          );
         }
-        const params = message.params;
-        if (typeof params['name'] !== 'string') {
-          throw new JsonRpcFailure(INVALID_PARAMS, 'tools/call requires a string "name".');
-        }
-        const toolName = params['name'];
-        const rawArguments = params['arguments'];
-        if (rawArguments !== undefined && !isRecord(rawArguments)) {
-          throw new JsonRpcFailure(INVALID_PARAMS, 'tools/call "arguments" must be an object.');
-        }
-        const args = rawArguments ?? {};
+        const toolName = parsed.data.name;
+        const args = parsed.data.arguments ?? {};
         // Analytics records only a published tool name; anything else is
         // caller-supplied text and must never reach PostHog verbatim.
         const analyticsTool = PUBLISHED_TOOL_NAMES.has(toolName) ? toolName : 'unknown';
@@ -413,11 +401,11 @@ async function handleRpcMessage(
 /**
  * The MCP Streamable HTTP endpoint: stateless JSON POST responses for
  * initialize, notifications/initialized, tools/list, tools/call, and ping.
- * Exported for tests with an injectable catalog and web base URL; the default
- * fetch handler wires in the bundled catalog and env.
+ * The caller passes the grant-derived `auth` the OAuth provider authenticated
+ * (see `apiHandler`); this handler never reads the request's bearer itself.
  */
 export function createMcpHandler(deps: McpHandlerDeps) {
-  return async function handleMcp(request: Request): Promise<Response> {
+  return async function handleMcp(request: Request, auth: ForwardedAuth): Promise<Response> {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
@@ -425,186 +413,181 @@ export function createMcpHandler(deps: McpHandlerDeps) {
       return withCorsHeaders(new Response('Method not allowed', { status: 405 }));
     }
 
-    const analytics = deps.analytics ?? noopAnalytics;
-
-    // The issuer is always the URL this worker is reached at (dev vs prod
-    // advertise themselves); the access token's `aud` is the `/mcp` resource.
-    const issuer = new URL(request.url).origin;
-
-    // s6 enforcement: with the OAuth deps present, /mcp accepts ONLY MCP
-    // tokens signed by this worker; the forwarded bearer + org come from the
-    // verified claims. Without them (unconfigured worker) the s2 passthrough
-    // stays — see the fetch router for the binding check.
-    const mcpAuth = deps.mcpAuth;
-    const auth = await authenticate(
-      request,
-      mcpAuth
-        ? {
-            mcpToken: {
-              tokenSecret: mcpAuth.tokenSecret,
-              issuer,
-              resource: `${issuer}/mcp`,
-              isJtiRevoked: jti => mcpAuth.store.isJtiRevoked(jti),
-            },
-            resolveKiloToken: identity =>
-              mcpAuth.store.getKiloToken(
-                {
-                  kiloUserId: identity.kiloUserId,
-                  clientId: identity.clientId,
-                  organizationId: identity.organizationId,
-                  resource: identity.resource,
-                },
-                new Date().toISOString()
-              ),
-          }
-        : undefined
-    );
-    if (!auth) {
-      // Anonymous by construction: no user has been verified, so the event
-      // must not be bound to a person ($process_person_profile: false).
-      analytics.callRejected({ identity: null, reason: 'auth_failure' });
-      // HTTP 401 alongside a JSON-RPC error body; rejected before any
-      // catalog lookup or upstream request. The challenge names this
-      // server's protected-resource metadata (RFC 9728) so the MCP client
-      // discovers the authorization server and runs the browser flow.
-      return withCorsHeaders(
-        new Response(
-          JSON.stringify({
-            jsonrpc: '2.0',
-            id: null,
-            error: {
-              code: UNAUTHORIZED,
-              message:
-                'A valid Kilo MCP access token is required in the Authorization header. Reconnect the Kilo MCP server and sign in.',
-            },
-          }),
-          {
-            status: 401,
-            headers: {
-              'Content-Type': 'application/json',
-              'WWW-Authenticate': `Bearer error="invalid_token", resource_metadata="${protectedResourceMetadataUrl(issuer)}"`,
-            },
-          }
-        )
-      );
-    }
-
-    let message: unknown;
+    let raw: unknown;
     try {
-      message = await request.json();
+      raw = await request.json();
     } catch {
       return jsonRpcError(null, PARSE_ERROR, 'Request body is not valid JSON.');
     }
-    if (Array.isArray(message)) {
+    if (Array.isArray(raw)) {
       return jsonRpcError(
         null,
         INVALID_REQUEST,
         'Batch requests are not supported; send one JSON-RPC message per request.'
       );
     }
-    const rpc = message as RpcMessage;
-    if (typeof rpc !== 'object' || rpc === null || typeof rpc.method !== 'string') {
+    const parsed = jsonRpcEnvelopeSchema.safeParse(raw);
+    if (!parsed.success) {
+      // Recover the id when it is well-typed so a client can correlate the error.
+      const rawId = isRecord(raw) ? raw['id'] : undefined;
+      const id = typeof rawId === 'string' || typeof rawId === 'number' ? rawId : null;
       return jsonRpcError(
-        typeof rpc?.id === 'number' || typeof rpc?.id === 'string' ? rpc.id : null,
+        id,
         INVALID_REQUEST,
         'Expected a JSON-RPC 2.0 request with a string "method".'
       );
     }
-    return handleRpcMessage(rpc, auth, deps);
+    return handleRpcMessage(parsed.data, auth, deps);
   };
 }
 
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-    const issuer = url.origin;
-    // Best-effort PostHog emitter for this request; every emit is scheduled
-    // through `ctx.waitUntil` so it never blocks or fails the response.
-    const analytics = createMcpAnalytics({ env, ctx });
+/**
+ * The bearer challenge this worker names when the library authenticated the
+ * request but the grant carries no Kilo credential (the user must reconnect).
+ * Mirrors the library's RFC 9728 challenge so an MCP client rediscovers the
+ * authorization server.
+ */
+function unauthorizedResponse(request: Request): Response {
+  const url = new URL(request.url);
+  const resourceMetadata = `${url.origin}/.well-known/oauth-protected-resource${url.pathname}`;
+  return withCorsHeaders(
+    new Response(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: null,
+        error: {
+          code: UNAUTHORIZED,
+          message:
+            'A valid Kilo MCP access token is required in the Authorization header. Reconnect the Kilo MCP server and sign in.',
+        },
+      }),
+      {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'WWW-Authenticate': `Bearer realm="OAuth", resource_metadata="${resourceMetadata}", error="invalid_token", scope="${MCP_SCOPE}"`,
+        },
+      }
+    )
+  );
+}
 
-    switch (url.pathname) {
-      case AUTH_PATHS.mcp: {
-        // s6 enforcement: with the OAuth bindings present, /mcp accepts only
-        // MCP tokens signed by this worker. Without them the worker cannot
-        // verify anything, so it must not forward unverified bearers either —
-        // POSTs are refused outright (transport replies stay available).
-        if (!env.MCP_TOKEN_SECRET || !env.KILO_MCP_OAUTH_STORE) {
-          if (request.method !== 'OPTIONS' && request.method !== 'GET') {
-            return withCorsHeaders(
-              new Response(
-                JSON.stringify({
-                  jsonrpc: '2.0',
-                  id: null,
-                  error: {
-                    code: -32000,
-                    message:
-                      'This Kilo MCP deployment is missing its token-verification bindings (MCP_TOKEN_SECRET / OAuth store). Contact the operator.',
-                  },
-                }),
-                { status: 503, headers: { 'Content-Type': 'application/json' } }
-              )
-            );
-          }
-          const transportOnly = createMcpHandler({
-            catalog,
-            webBaseUrl: env.WEB_BASE_URL,
-            semanticCandidates: createSemanticCandidates(env),
-            analytics,
-          });
-          return transportOnly(request);
-        }
-        const handler = createMcpHandler({
-          catalog,
-          webBaseUrl: env.WEB_BASE_URL,
-          semanticCandidates: createSemanticCandidates(env),
-          mcpAuth: { tokenSecret: env.MCP_TOKEN_SECRET, store: getKiloMcpOAuthStoreStub(env) },
-          analytics,
-        });
-        return handler(request);
-      }
-      case AUTH_PATHS.authorizationServerMetadata:
-      case AUTH_PATHS.authorizationServerMetadataScoped:
-        return handleAuthorizationServerMetadata(request, { issuer });
-      case AUTH_PATHS.protectedResourceMetadata:
-      case AUTH_PATHS.protectedResourceMetadataScoped:
-        return handleProtectedResourceMetadata(request, { issuer });
-      case AUTH_PATHS.register:
-        return handleRegistration(request, { store: getKiloMcpOAuthStoreStub(env) });
-      case AUTH_PATHS.authorize: {
-        // Built as a variable (not an inline literal) so the extra `analytics`
-        // property is allowed until s3 adds the optional field to the handler
-        // deps type. s3 emits OAuth sign-in events from this emitter.
-        const authorizeDeps = {
-          store: getKiloMcpOAuthStoreStub(env),
-          webBaseUrl: env.WEB_BASE_URL,
-          analytics,
-        };
-        return handleAuthorize(request, authorizeDeps);
-      }
-      case AUTH_PATHS.pairingStatus: {
-        const pairingStatusDeps = {
-          store: getKiloMcpOAuthStoreStub(env),
-          webBaseUrl: env.WEB_BASE_URL,
-          analytics,
-        };
-        return handlePairingStatus(request, pairingStatusDeps);
-      }
-      case AUTH_PATHS.orgPicker:
-        return handleOrgPicker(request, {
-          store: getKiloMcpOAuthStoreStub(env),
-          webBaseUrl: env.WEB_BASE_URL,
-        });
-      case AUTH_PATHS.token: {
-        const tokenDeps = {
-          store: getKiloMcpOAuthStoreStub(env),
-          tokenSecret: requireMcpTokenSecret(env),
-          issuer,
-          analytics,
-        };
-        return handleToken(request, tokenDeps);
-      }
-      default:
-        return withCorsHeaders(new Response('Not found', { status: 404 }));
+/** The ExecutionContext the library hands the API handler carries the decrypted grant props. */
+type McpApiContext = ExecutionContext & { props?: GrantProps };
+
+/**
+ * The `apiHandler` for `/mcp`. The OAuthProvider verifies the bearer and
+ * decrypts the grant props before this runs, so identity comes entirely from
+ * `ctx.props`. A grant with no Kilo token bound (a stale/foreign grant) is
+ * rejected with the MCP 401 challenge and an anonymous auth_failure event.
+ */
+export const apiHandler = {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const analytics = createMcpAnalytics({ env, ctx });
+    const props = (ctx as McpApiContext).props;
+    if (!props || typeof props.kiloToken !== 'string' || props.kiloToken.length === 0) {
+      // Anonymous by construction: no Kilo user is bound, so the event must not
+      // be attributed to a person ($process_person_profile: false).
+      analytics.callRejected({ identity: null, reason: 'auth_failure' });
+      return unauthorizedResponse(request);
     }
+    const handler = createMcpHandler({
+      catalog,
+      webBaseUrl: env.WEB_BASE_URL,
+      semanticCandidates: createSemanticCandidates(env),
+      analytics,
+    });
+    return handler(request, forwardedAuthFromProps(props));
+  },
+} satisfies ExportedHandler<Env>;
+
+/**
+ * DCR guard (RFC 7591). The library hands the raw, untrusted client metadata to
+ * this callback before storing the client: zod rejects a malformed body and a
+ * declared `scope` this server does not issue is refused rather than
+ * broadened. Public/loopback clients stay registerable (no
+ * `disallowPublicClientRegistration`).
+ */
+export function clientRegistrationCallback(
+  options: ClientRegistrationCallbackOptions
+): ClientRegistrationCallbackResult | void {
+  const parsed = clientRegistrationSchema.safeParse(options.clientMetadata);
+  if (!parsed.success) {
+    return {
+      code: 'invalid_client_metadata',
+      description: `Invalid client metadata: ${describeZodIssues(parsed.error)}`,
+    };
+  }
+  const unsupported = scopeTokens(parsed.data.scope ?? '').filter(scope => scope !== MCP_SCOPE);
+  if (unsupported.length > 0) {
+    return {
+      code: 'invalid_client_metadata',
+      description: `Unsupported scope(s): ${unsupported.join(', ')}. This server supports only "${MCP_SCOPE}".`,
+    };
+  }
+}
+
+/**
+ * Every non-/mcp path (including the browser-facing authorize UI) is owned by
+ * the consent handler, rebuilt per request so its Durable-Object store and
+ * analytics are bound to that request's env.
+ */
+const defaultHandler: ExportedHandler<Env> = {
+  async fetch(request, env, ctx): Promise<Response> {
+    const analytics = createMcpAnalytics({ env, ctx });
+    const consent = createDefaultHandler({
+      store: getKiloMcpOAuthStoreStub(env),
+      webBaseUrl: env.WEB_BASE_URL,
+      analytics,
+    });
+    const fetchHandler = consent.fetch;
+    if (!fetchHandler) return new Response('Not found', { status: 404 });
+    return fetchHandler(request, env, ctx);
+  },
+};
+
+/**
+ * The worker: `@cloudflare/workers-oauth-provider` owns the OAuth 2.1 protocol
+ * endpoints (token, DCR, metadata) and the /mcp audience check; this module
+ * supplies the /mcp JSON-RPC handler and the browser consent handler. Leaving
+ * `resource`/`authorization_servers` unset makes the library derive the issuer
+ * from the request origin, matching this worker's dynamic dev/prod issuer.
+ */
+const providerOptions: OAuthProviderOptions<Env> = {
+  apiRoute: '/mcp',
+  apiHandler,
+  defaultHandler,
+  authorizeEndpoint: '/authorize',
+  tokenEndpoint: '/token',
+  clientRegistrationEndpoint: '/register',
+  scopesSupported: [MCP_SCOPE],
+  accessTokenTTL: 3600,
+  refreshTokenTTL: 2592000,
+  resourceMetadata: {
+    resource_name: 'Kilo MCP',
+    scopes_supported: [MCP_SCOPE],
+    bearer_methods_supported: ['header'],
+  },
+  clientRegistrationCallback,
+  tokenExchangeCallback: options => tokenExchangeCallback(options),
+  onError: error => onError(error),
+};
+
+const provider = new OAuthProvider<Env>(providerOptions);
+
+/**
+ * The library rotates refresh tokens but keeps the immediately previous one
+ * valid for a retry ("one-step grace"). RFC 9700 requires a replayed superseded
+ * token to be rejected AND its grant revoked, so the token endpoint is wrapped
+ * with that strict policy (src/oauth/refresh-reuse.ts) before the library sees
+ * the request. Every other path goes straight to the library.
+ */
+export default {
+  fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    return forwardWithRefreshReuseDetection(request, req => provider.fetch(req, env, ctx), {
+      kv: env.OAUTH_KV,
+      revokeGrant: (grantId, userId) =>
+        getOAuthApi(providerOptions, env).revokeGrant(grantId, userId),
+    });
   },
 } satisfies ExportedHandler<Env>;

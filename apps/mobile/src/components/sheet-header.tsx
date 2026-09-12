@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, StatusBar, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Share } from '@/components/ui/icons';
@@ -44,10 +44,16 @@ export function SheetHeader({
   // Sheets can reach the status bar when expanded by the keyboard. Reserve
   // top clearance as well as landscape cutout clearance inside the gutters.
   // Keeping the inset on an inner wrapper preserves the header's own padding.
+  // Android can report top: 0 for the frame a freshly presented sheet first
+  // lays out (before the insets propagate), which would draw the Done pill
+  // over the status-bar icons; fall back to the synchronous status-bar height
+  // the same way the form-sheet detents do.
+  const androidStatusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0;
+  const topInset = insets.top > 0 ? insets.top : androidStatusBarHeight;
   const safeAreaStyle =
-    insets.top > 0 || insets.left > 0 || insets.right > 0
+    topInset > 0 || insets.left > 0 || insets.right > 0
       ? {
-          ...(insets.top > 0 ? { paddingTop: insets.top } : undefined),
+          ...(topInset > 0 ? { paddingTop: topInset } : undefined),
           ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
           ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
         }

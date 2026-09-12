@@ -8,12 +8,23 @@ import { SheetHeader } from './sheet-header';
 import '@/i18n';
 
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+const rn = vi.hoisted(() => ({ os: 'ios', statusHeight: 0 }));
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
   I18nManager: { allowRTL: vi.fn(), isRTL: false, forceRTL: vi.fn() },
+  Platform: {
+    get OS() {
+      return rn.os;
+    },
+  },
+  StatusBar: {
+    get currentHeight() {
+      return rn.statusHeight;
+    },
+  },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
@@ -114,6 +125,8 @@ function HeaderWithActionFeedback({
 describe('SheetHeader', () => {
   beforeEach(() => {
     Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
+    rn.os = 'ios';
+    rn.statusHeight = 0;
   });
 
   it('renders a Share pressable in the leading slot when onShare is provided', async () => {
@@ -415,6 +428,39 @@ describe('SheetHeader', () => {
     expect(wrapper.props.style).toEqual({ paddingTop: 24 });
     expect(pressablesByLabel(renderer.root, 'Cancel')[0]?.parent?.parent).toBe(wrapper);
     expect(pressablesByLabel(renderer.root, 'Done')[0]?.parent?.parent).toBe(wrapper);
+
+    renderer.unmount();
+  });
+
+  it('falls back to the Android status-bar height while the top inset is unresolved', async () => {
+    rn.os = 'android';
+    rn.statusHeight = 48;
+    const renderer = await mount({
+      title: 'Voice language',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    });
+
+    // The frame a freshly presented Android sheet lays out can report top: 0;
+    // the synchronous status-bar height keeps the Done pill below the icons.
+    const wrapper = findSafeAreaWrapper(renderer.root);
+    expect(wrapper.props.style).toEqual({ paddingTop: 48 });
+
+    renderer.unmount();
+  });
+
+  it('prefers a resolved top inset over the Android status-bar fallback', async () => {
+    rn.os = 'android';
+    rn.statusHeight = 48;
+    safeArea.top = 24;
+    const renderer = await mount({
+      title: 'Voice language',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    });
+
+    const wrapper = findSafeAreaWrapper(renderer.root);
+    expect(wrapper.props.style).toEqual({ paddingTop: 24 });
 
     renderer.unmount();
   });

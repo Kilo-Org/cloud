@@ -7,6 +7,7 @@ import {
   rememberChildSession,
   resetSessionDirectoryState,
   rootForSession,
+  ownerDirectoryForSession,
 } from './session-directories';
 
 describe('session directory root mappings', () => {
@@ -179,6 +180,32 @@ describe('session directory root mappings', () => {
     expect(directoryForSession('child')).toBeUndefined();
     expect(directoryForSession('nested')).toBeUndefined();
     expect(rootForSession('sibling', '/other')).toBe('sibling');
+  });
+
+  it('resolves a child and grandchild to the root owner directory without changing wire identity', () => {
+    rememberAttachedRoot('root', '/root');
+    rememberChildSession({ childId: 'child', parentId: 'root', directory: '/child' });
+    rememberChildSession({ childId: 'grandchild', parentId: 'child', directory: '/grandchild' });
+
+    expect(
+      ownerDirectoryForSession({
+        kiloSessionId: 'grandchild',
+        rootKiloSessionId: 'root',
+        directory: '/grandchild',
+      })
+    ).toBe('/root');
+  });
+
+  it('fails closed when a child lineage is unresolved', () => {
+    rememberAttachedRoot('root', '/root');
+
+    expect(
+      ownerDirectoryForSession({
+        kiloSessionId: 'unknown-child',
+        rootKiloSessionId: 'root',
+        directory: '/child',
+      })
+    ).toBeUndefined();
   });
 
   it('excludes existing descendants when their external directory gains an independent root', () => {

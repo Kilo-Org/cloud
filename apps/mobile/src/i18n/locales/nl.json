@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO voor bedrijven"
   },
   "preferences": {
+    "general": "Algemeen",
+    "voiceInput": "Spraakinvoer",
     "autoExpandThinking": "Gedachtegang automatisch uitvouwen",
     "autoExpandThinkingSubtitle": "Toon de volledige gedachtegang van de agent zodra die klaar is met nadenken.",
     "keepScreenOn": "Scherm aanhouden op de sessiepagina",
@@ -237,6 +239,7 @@
     "appearanceLight": "Licht",
     "appearanceDark": "Donker",
     "account": "Gebruikersaccount",
+    "accountSubtitle": "Taal, vertrouwde hosts en apparaatsessies",
     "prReviewAttribution": "De app vermelden bij PR-beoordelingen",
     "prReviewAttributionSubtitle": "Voeg bij het indienen van een beoordeling een voettekst toe die vermeldt dat je de beoordeling via Kilo hebt gedaan.",
     "returnSendsMessage": "Return-toets verzendt bericht",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transcriptie via Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Zet spraakinvoer om met een Kilo Gateway-model in plaats van de spraakherkenning van het apparaat. Je opname wordt naar Kilo Gateway verzonden.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "channel": {
@@ -2134,7 +2140,14 @@
     "languageNotInstalledMessage": "De offline spraakbestanden voor {{language}} zijn niet op deze telefoon geïnstalleerd. Download ze en probeer spraakinvoer opnieuw.",
     "downloadOfflineModel": "Downloaden",
     "offlineModelDownloadScheduled": "De offline spraakbestanden worden op de achtergrond gedownload. Probeer spraakinvoer later opnieuw.",
-    "listeningStopped": "Het luisteren is gestopt."
+    "listeningStopped": "Het luisteren is gestopt.",
+    "transcribing": "Transcriberen...",
+    "gatewayUnreachable": "Kilo Gateway kon niet worden bereikt. Controleer je verbinding en probeer het opnieuw.",
+    "gatewayTimeout": "De transcriptie duurde te lang. Probeer het opnieuw.",
+    "gatewayModelUnavailable": "Dit transcriptiemodel is niet beschikbaar. Kies een ander model bij Voorkeuren.",
+    "gatewayModelUnavailableNotice": "Dit model wordt niet meer aangeboden. Tik op $t(transcriptionModel.title) om een ander te kiezen.",
+    "gatewaySignInRequired": "Meld je aan om transcriptie via Kilo Gateway te gebruiken.",
+    "gatewayNoModel": "Kies eerst een transcriptiemodel bij Voorkeuren."
   },
   "share": {
     "title": "Delen met Kilo",
@@ -2408,6 +2421,9 @@
       "replyBadRequest": "Dit antwoord kan niet worden geplaatst. De discussie is mogelijk gewijzigd.",
       "replyBody": "Antwoordtekst",
       "replyForbidden": "Je hebt geen toestemming om op deze PR te reageren.",
+      "addCommentCta": "Een opmerking op deze PR plaatsen",
+      "commentBadRequest": "Deze opmerking kan niet worden geplaatst. De PR is mogelijk gewijzigd.",
+      "commentForbidden": "Je hebt geen toestemming om een opmerking op deze PR te plaatsen.",
       "replyPlaceholder": "Je antwoord…",
       "reportContent": "Inhoud melden",
       "reportUser": "Gebruiker melden",
@@ -2939,6 +2955,13 @@
     "needsInput": "Invoer nodig",
     "channelName": "Actieve agents",
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien."
+  },
+  "transcriptionModel": {
+    "title": "Transcriptiemodel",
+    "noneChosen": "Geen gekozen",
+    "emptyTitle": "Geen transcriptiemodellen",
+    "emptyDescription": "Kilo Gateway biedt op dit moment geen transcriptiemodellen.",
+    "loadFailed": "De transcriptiemodellen konden niet worden geladen."
   },
   "modelChat": {
     "empty": {

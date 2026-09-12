@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "企業 SSO"
   },
   "preferences": {
+    "general": "一般",
+    "voiceInput": "語音輸入",
     "autoExpandThinking": "自動展開思考內容",
     "autoExpandThinkingSubtitle": "智慧代理完成思考後，自動展開思考內容。",
     "keepScreenOn": "在工作階段頁面保持螢幕亮起",
@@ -237,6 +239,7 @@
     "appearanceLight": "淺色",
     "appearanceDark": "深色",
     "account": "帳戶",
+    "accountSubtitle": "語言、信任的主機和裝置工作階段",
     "prReviewAttribution": "在 PR 審查中註明使用的應用程式",
     "prReviewAttributionSubtitle": "送出審查時，在結尾註明透過 Kilo 審查。",
     "returnSendsMessage": "按換行鍵傳送訊息",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "使用 Kilo Gateway 轉錄",
+    "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型將語音輸入轉錄成文字，而不使用裝置上的語音辨識。您的錄音將傳送至 Kilo Gateway。",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "即時動態",
@@ -2134,7 +2140,14 @@
     "languageNotInstalledMessage": "此手機尚未安裝 {{language}} 的離線語音檔案。請下載這些檔案，然後再試一次語音輸入。",
     "downloadOfflineModel": "下載",
     "offlineModelDownloadScheduled": "離線語音檔案將在背景下載。請稍後再試一次語音輸入。",
-    "listeningStopped": "已停止聆聽。"
+    "listeningStopped": "已停止聆聽。",
+    "transcribing": "正在轉錄…",
+    "gatewayUnreachable": "無法連線至 Kilo Gateway。請檢查連線後再試一次。",
+    "gatewayTimeout": "轉錄花費太長時間。請再試一次。",
+    "gatewayModelUnavailable": "這個轉錄模型無法使用。請在偏好設定中選擇其他模型。",
+    "gatewayModelUnavailableNotice": "這個模型已不再提供。點一下$t(transcriptionModel.title)選擇另一個。",
+    "gatewaySignInRequired": "登入後即可使用 Kilo Gateway 轉錄。",
+    "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2408,6 +2421,9 @@
       "replyBadRequest": "無法發佈此回覆。討論串可能已變更。",
       "replyBody": "回覆內容",
       "replyForbidden": "你沒有權限回覆此提取請求。",
+      "addCommentCta": "對此提取請求留言",
+      "commentBadRequest": "無法發佈此留言。此提取請求可能已變更。",
+      "commentForbidden": "你沒有權限在此提取請求留言。",
       "replyPlaceholder": "回覆…",
       "reportContent": "檢舉內容",
       "reportUser": "檢舉使用者",
@@ -2939,6 +2955,13 @@
     "needsInput": "等待輸入",
     "channelName": "執行中的代理程式",
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。"
+  },
+  "transcriptionModel": {
+    "title": "轉錄模型",
+    "noneChosen": "未選擇",
+    "emptyTitle": "沒有轉錄模型",
+    "emptyDescription": "Kilo Gateway 目前沒有提供轉錄模型。",
+    "loadFailed": "無法載入轉錄模型。"
   },
   "modelChat": {
     "empty": {

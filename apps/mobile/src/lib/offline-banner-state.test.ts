@@ -1,107 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { type ConnectivityState } from '@/lib/connectivity-online';
 import {
-  type BannerState,
-  type ConnectivitySource,
-  createOfflineBannerStore,
-  type OfflineBannerTimer,
-} from '@/lib/offline-banner-state';
-
-const offlineState: ConnectivityState = { isConnected: true, isInternetReachable: false };
-const onlineState: ConnectivityState = { isConnected: true, isInternetReachable: true };
-const unknownState: ConnectivityState = { isConnected: null, isInternetReachable: null };
-const outcomes = ['online', 'offline', 'reject'] as const;
-type Outcome = (typeof outcomes)[number];
-
-function createFakeSource() {
-  const listeners = new Set<(state: ConnectivityState) => void>();
-  const unsubscribe = vi.fn(() => undefined);
-  const source: ConnectivitySource = {
-    subscribe: listener => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-        unsubscribe();
-      };
-    },
-  };
-  return {
-    source,
-    emit(state: ConnectivityState): void {
-      for (const listener of listeners) {
-        listener(state);
-      }
-    },
-    unsubscribe,
-  };
-}
-
-function createFakeTimer() {
-  let now = 0;
-  const scheduled: { callback: () => void; at: number; cancelled: boolean }[] = [];
-  const timer: OfflineBannerTimer = {
-    // oxlint-disable-next-line promise/prefer-await-to-callbacks -- manually controlled timer callbacks
-    set(callback, delayMs) {
-      const entry = { callback, at: now + delayMs, cancelled: false };
-      scheduled.push(entry);
-      return {
-        cancel() {
-          entry.cancelled = true;
-        },
-      };
-    },
-  };
-  return {
-    timer,
-    scheduled,
-    advanceBy(ms: number): void {
-      now += ms;
-      for (const entry of scheduled) {
-        if (!entry.cancelled && entry.at <= now) {
-          entry.cancelled = true;
-          entry.callback();
-        }
-      }
-    },
-  };
-}
-
-function createStore() {
-  const source = createFakeSource();
-  const timer = createFakeTimer();
-  const attempts: ReturnType<typeof Promise.withResolvers<boolean>>[] = [];
-  const probe = vi.fn(async () => {
-    const attempt = Promise.withResolvers<boolean>();
-    attempts.push(attempt);
-    const result = await attempt.promise;
-    return result;
-  });
-  const store = createOfflineBannerStore({ source: source.source, timer: timer.timer, probe });
-  const changes: BannerState[] = [];
-  store.subscribe(() => {
-    changes.push(store.state());
-  });
-  return {
-    store,
-    source,
-    timer,
-    probe,
-    changes,
-    settle: async (index: number, outcome: Outcome) => {
-      const attempt = attempts[index];
-      if (!attempt) {
-        throw new Error(`Missing probe ${index}`);
-      }
-      if (outcome === 'reject') {
-        attempt.reject(new Error('Transport failed'));
-      } else {
-        attempt.resolve(outcome === 'online');
-      }
-      await Promise.allSettled([attempt.promise]);
-    },
-  };
-}
+  createStore,
+  offlineState,
+  onlineState,
+  outcomes,
+  radioUpUnknownState,
+  unknownState,
+} from './offline-banner-state.test-helpers';
 
 describe('createOfflineBannerStore', () => {
   it('starts unknown and stays hidden without probing unknown connectivity', () => {
@@ -251,6 +157,65 @@ describe('createOfflineBannerStore', () => {
     source.emit(unknownState);
     expect(store.isOffline()).toBe(true);
     expect(changes).toEqual(['offline']);
+  });
+
+  // The radio-back-without-reachability case (uxs3 spot check, e6-after-net:
+  // airplane mode → 3G while NetInfo's external probe never answers). The
+  // committed offline must not be preserved forever: the app's own probe is
+  // the decider, fired immediately without the five-second delay. The
+  // radioUpUnknownState fixture lives in the test helpers.
+
+  it('probes immediately on unknown with the radio up while committed offline, and clears on a reachable probe', async () => {
+    const { store, source, timer, probe, changes, settle } = createStore();
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    await settle(0, 'offline');
+    expect(store.isOffline()).toBe(true);
+
+    source.emit(radioUpUnknownState);
+    // No timer wait: the probe fired on the event itself.
+    expect(probe).toHaveBeenCalledTimes(2);
+    await settle(1, 'online');
+    expect(store.state()).toBe('online');
+    expect(store.isOffline()).toBe(false);
+    expect(changes).toEqual(['offline', 'online']);
+  });
+
+  it('keeps the offline commit when the radio-up probe fails, without a duplicate notification', async () => {
+    const { store, source, timer, probe, changes, settle } = createStore();
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    await settle(0, 'offline');
+
+    source.emit(radioUpUnknownState);
+    expect(probe).toHaveBeenCalledTimes(2);
+    await settle(1, 'offline');
+    expect(store.state()).toBe('offline');
+    expect(store.isOffline()).toBe(true);
+    expect(changes).toEqual(['offline']);
+  });
+
+  it('does not probe on unknown with the radio state itself unknown while committed offline', async () => {
+    // isConnected null means NetInfo has not settled the radio either — no
+    // new information to chase; the last committed state stands (the
+    // pre-existing preserve rule).
+    const { store, source, timer, probe, settle } = createStore();
+    source.emit(offlineState);
+    timer.advanceBy(5000);
+    await settle(0, 'offline');
+
+    source.emit(unknownState);
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(store.state()).toBe('offline');
+  });
+
+  it('does not probe on unknown while committed online (no offline to un-stick)', () => {
+    const { store, source, probe, changes } = createStore();
+    source.emit(onlineState);
+    source.emit(radioUpUnknownState);
+    expect(probe).not.toHaveBeenCalled();
+    expect(store.state()).toBe('online');
+    expect(changes).toEqual(['online']);
   });
 
   it('destroy cancels the timer, unsubscribes, and ignores a queued timer callback', () => {

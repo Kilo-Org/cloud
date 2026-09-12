@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 import { DurableObject } from 'cloudflare:workers';
 import type {
   GetWorktreeChangesOutput,
@@ -8,6 +9,25 @@ import type {
 import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
 import { TRPCError } from '@trpc/server';
 import { withTimeout } from '@kilocode/worker-utils';
+import {
+  renewRuntimeAuthorization,
+  RuntimeAuthorizationExpiredError,
+  RuntimeAuthorizationRevokedError,
+  unsealRuntimeAuthorization,
+} from '@kilocode/worker-utils/runtime-authorization';
+import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
+import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
+import { resolveSecret } from '../auth.js';
+import {
+  issuePersistedRuntimeProxyGrant,
+  resolvePersistedRuntimeProxyCredential,
+} from '../runtime-credential-proxy-rpc.js';
+import {
+  runtimeCredentialProxyFacadeBaseUrl,
+  runtimeProxyGrantSchema,
+  RUNTIME_PROXY_GRANT_KEY,
+  verifyRuntimeCredentialProxyHandle,
+} from '../runtime-credential-proxy.js';
 import { z } from 'zod';
 import { diagnosticSyncStatus } from '../shared/control-diagnostics.js';
 import {
@@ -87,6 +107,15 @@ import { sandboxControlRpc } from './control-rpc.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createMessageId } from '../session/message-id.js';
+import {
+  getRuntimeAuthorizationStatus,
+  getRuntimeAuthorizationRecoveryState,
+  hasModernRuntimeAuthorization,
+  renewStoredRuntimeAuthorization,
+  RUNTIME_AUTHORIZATION_RECOVERY_KEY,
+  RUNTIME_AUTHORIZATION_KEY,
+  runtimeAuthorizationRecoveryLockSchema,
+} from '../session/runtime-authorization-persistence.js';
 import { validateControlSessionOptions } from './attach-payload.js';
 import { pendingInputProjection } from './session-input-projection.js';
 import {
@@ -122,12 +151,14 @@ import {
   sessionOperationExpiresAt,
   sessionOperationResultHash,
   sessionPromptResultSchema,
+  sessionRuntimeRetireResultSchema,
   sessionSyncResultSchema,
   sessionPermissionResolveResultSchema,
   sessionQuestionResolveResultSchema,
   sessionAbortResultSchema,
   sameSessionOperation,
   wrapperInstanceIdSchema,
+  type SessionAttachPayload,
   type SessionOperationAck,
   type SessionOperationAuthorization,
   type SessionRequestIdentity,
@@ -175,6 +206,7 @@ import {
   freezeLegacyQueuedMessages,
   hasAcceptedMessage,
   incrementDeliveryFailure,
+  markSessionOperationRejection,
   matchesSessionMessageReplay,
   nextQueuedMessageId,
   recordAcceptedMessageActivity,
@@ -186,6 +218,7 @@ import {
   type ControlSessionMessageInput,
   type SessionMessageRecord,
 } from './session-message-queue.js';
+import { createMessageCallbacks, type MessageCallbacks } from './message-callbacks.js';
 import { PENDING_SESSION_MESSAGE_LIMIT } from '../session/pending-messages.js';
 import {
   commitSessionOperationResult,
@@ -235,6 +268,15 @@ const pendingRuntimeCleanupSchema = z.object({
 
 type MessageRecord = SessionMessageRecord;
 type DispatchPhase = 'preparing' | 'attach' | 'prompt';
+
+const MAX_TERMINAL_DETAIL_LENGTH = 4_096;
+
+function confirmedControlRejectionDetail(error: unknown): string | undefined {
+  if (!(error instanceof ControlRequestError) || !error.rejectionReceived) return undefined;
+  const detail = error.message.trim().slice(0, MAX_TERMINAL_DETAIL_LENGTH);
+  return detail || undefined;
+}
+
 type ControlEventDisposition =
   | 'apply'
   | 'duplicate'
@@ -264,6 +306,7 @@ type ControlEventEvaluationRequest =
 type SandboxSessionRegistrationInput = {
   identity: SessionMetadata['identity'];
   auth: SessionMetadata['auth'];
+  runtimeAuthorizationSeal?: string;
   agent: SessionMetadata['agent'];
   repository?: SessionMetadata['repository'];
   workspace?: SessionMetadata['workspace'];
@@ -280,6 +323,7 @@ type SandboxSessionInitialAdmissionInput = Omit<SandboxSessionRegistrationInput,
 export class SandboxSession extends DurableObject<Env> {
   private readonly sessionId: SessionId | undefined;
   private readonly eventQueries: EventQueries;
+  private readonly messageCallbacks: MessageCallbacks;
   private readonly terminalLifecycle: ReturnType<typeof createSandboxTerminalLifecycle>;
   private readonly terminalBridge: ReturnType<typeof createSandboxTerminalBridge>;
   private readonly dispatches = new Map<string, Promise<void>>();
@@ -291,6 +335,7 @@ export class SandboxSession extends DurableObject<Env> {
   private deletionCompletion: Promise<void> | undefined;
   private readonly worktreeChanges: ReturnType<typeof createWorktreeChanges>;
   private readonly interactionRefresh: InteractionRefresh;
+  private callbackRepairRequired = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -323,6 +368,17 @@ export class SandboxSession extends DurableObject<Env> {
     });
     const db = drizzle(ctx.storage, { logger: false });
     this.eventQueries = createEventQueries(db, ctx.storage.sql);
+    this.messageCallbacks = createMessageCallbacks({
+      storage: ctx.storage,
+      getMetadata: () => this.terminalLifecycle.getStoredMetadata(),
+      getCallbackQueue: () => env.CALLBACK_QUEUE,
+      getAssistantMessageForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
+        this.eventQueries.getAssistantMessageForUserMessage(
+          sessionId,
+          kiloSessionId,
+          parentMessageId
+        ),
+    });
     this.worktreeChanges = createWorktreeChanges({
       storage: ctx.storage,
       saveSnapshotEvent: snapshot => {
@@ -741,11 +797,46 @@ export class SandboxSession extends DurableObject<Env> {
       if (!isChild || internalSecret) {
         const publication = this.ingestPublicationChain
           .catch(() => undefined)
-          .then(() => {
+          .then(async () => {
             if (!this.terminalLifecycle.isCurrent(epoch)) return;
+            const storedAuthorization = this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY);
+            const decoded = jwt.decode(token);
+            // Classification only: the bridge cryptographically verifies every
+            // modern claim before granting any attestation.
+            const modern =
+              storedAuthorization !== undefined ||
+              (typeof decoded === 'object' &&
+                decoded !== null &&
+                'runtimeAuthorization' in decoded);
+            const currentToken = modern ? await this.getRuntimeToken() : token;
+            const secret = modern ? await resolveSecret(this.env.NEXTAUTH_SECRET) : undefined;
+            const currentMetadata = await this.getMetadata();
+            if (
+              !currentToken ||
+              (modern && !secret) ||
+              !currentMetadata ||
+              currentMetadata.auth.kiloSessionId !== rootKiloSessionId
+            )
+              return;
+            const authorization = this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY);
             return publishControlPlaneSessionIngest({
               fetchIngest: request => this.env.SESSION_INGEST.fetch(request),
-              token,
+              token: currentToken,
+              runtimeContext:
+                modern && secret
+                  ? {
+                      secret,
+                      userId: currentMetadata.identity.userId,
+                      organizationId: currentMetadata.identity.orgId,
+                      authorization,
+                      isCurrent: () =>
+                        this.terminalLifecycle.isCurrent(epoch) &&
+                        !this.deletedWorktreeId &&
+                        !this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY) &&
+                        JSON.stringify(this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_KEY)) ===
+                          JSON.stringify(authorization),
+                    }
+                  : undefined,
               rootKiloSessionId,
               eventKiloSessionId,
               cloudAgentSessionId: metadata.identity.sessionId,
@@ -754,8 +845,13 @@ export class SandboxSession extends DurableObject<Env> {
               items: ingestItems,
             });
           });
-        this.ingestPublicationChain = publication;
-        this.ctx.waitUntil(publication);
+        const settledPublication = publication.catch(() => {
+          logger
+            .withFields({ sessionId: this.sessionId })
+            .warn('Control-plane session ingest authorization unavailable');
+        });
+        this.ingestPublicationChain = settledPublication;
+        this.ctx.waitUntil(settledPublication);
       }
     }
     const applied = this.terminalLifecycle.isCurrent(epoch);
@@ -945,6 +1041,7 @@ export class SandboxSession extends DurableObject<Env> {
       eventQueries: this.eventQueries,
       notifications,
     });
+    this.scheduleCallbackRepairIfRequired();
     if (!ack) return undefined;
     if (authorization.operation === 'session.attach') {
       const attached = delivery.result.ok
@@ -1012,9 +1109,297 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async getMetadata(): Promise<SessionMetadata | null> {
-    return this.deletedWorktreeId || this.terminalLifecycle.isDeleted()
+    return this.deletedWorktreeId || this.terminalLifecycle.isBlocked()
       ? null
       : this.terminalLifecycle.getStoredMetadata();
+  }
+
+  async getRuntimeToken(): Promise<string | null> {
+    const metadata = await this.getMetadata();
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('NEXTAUTH_SECRET is not configured on the worker');
+    return renewStoredRuntimeAuthorization({
+      metadata,
+      getAuthorization: async () => this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      putAuthorization: async authorization => {
+        this.ctx.storage.kv.put(RUNTIME_AUTHORIZATION_KEY, authorization);
+      },
+      getMetadata: () => this.getMetadata(),
+      putMetadata: async updated => {
+        this.ctx.storage.kv.put(METADATA_KEY, updated);
+      },
+      renew: authorization =>
+        renewRuntimeAuthorization({
+          authorization,
+          secret,
+          connectionString: this.env.HYPERDRIVE.connectionString,
+        }),
+    });
+  }
+
+  async getRuntimeAuthorizationStatus(): Promise<'legacy' | 'active' | 'revoked'> {
+    return getRuntimeAuthorizationStatus({
+      metadata: await this.getMetadata(),
+      getAuthorization: async () => this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
+  async getRuntimeAuthorizationRecoveryState(): Promise<{
+    state: 'legacy' | 'revoked' | 'active' | 'expired';
+    id?: string;
+    recoveryId?: string;
+  }> {
+    const state = await getRuntimeAuthorizationRecoveryState({
+      metadata: await this.getMetadata(),
+      getAuthorization: async () => this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+    const lock = runtimeAuthorizationRecoveryLockSchema.safeParse(
+      this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)
+    );
+    return state.state === 'expired' && lock.success && lock.data.expectedOldId === state.id
+      ? { ...state, recoveryId: lock.data.recoveryId }
+      : state;
+  }
+
+  async isRuntimeAuthorizationRecoveryInProgress(): Promise<boolean> {
+    return this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY) !== undefined;
+  }
+
+  async recoverExpiredRuntimeAuthorization(input: {
+    ownerId: string;
+    expectedOldId: string;
+    recoveryId: string;
+    runtimeAuthorizationSeal: string;
+    runtimeToken: string;
+  }): Promise<{ status: 'recovered' | 'not-needed' | 'denied' | 'busy' | 'retry' }> {
+    const metadata = await this.getMetadata();
+    if (!metadata || metadata.identity.userId !== input.ownerId) return { status: 'denied' };
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) return { status: 'denied' };
+    let fresh: RuntimeAuthorization;
+    try {
+      fresh = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
+        resourceKind: 'cloud-agent-next',
+        resourceId: metadata.identity.sessionId,
+        userId: metadata.identity.userId,
+        organizationId: metadata.identity.orgId,
+      });
+    } catch {
+      return { status: 'denied' };
+    }
+    if (fresh.state !== 'active') return { status: 'denied' };
+    if (!metadata.auth.kiloSessionId) return { status: 'denied' };
+    const current = await this.getRuntimeAuthorizationRecoveryState();
+    if (current.state === 'legacy' || current.state === 'active') return { status: 'not-needed' };
+    if (current.state !== 'expired' || current.id !== input.expectedOldId)
+      return { status: 'denied' };
+    if (
+      this.loadMessages().some(
+        message => message.state === 'accepted' || message.state === 'queued'
+      )
+    ) {
+      return { status: 'busy' };
+    }
+    const held = runtimeAuthorizationRecoveryLockSchema.safeParse(
+      this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)
+    );
+    if (
+      held.success &&
+      (held.data.recoveryId !== input.recoveryId || held.data.expectedOldId !== input.expectedOldId)
+    ) {
+      return { status: 'retry' };
+    }
+    this.ctx.storage.kv.put(RUNTIME_AUTHORIZATION_RECOVERY_KEY, {
+      expectedOldId: input.expectedOldId,
+      recoveryId: input.recoveryId,
+    });
+    try {
+      const sandboxId = metadata.workspace?.sandboxId;
+      if (sandboxId) {
+        const control = sandboxControlRpc(this.env, sandboxId);
+        const status = await control.getStatus();
+        if (status.physical === 'running') {
+          if (
+            status.connection !== 'ready' ||
+            !status.wrapperInstanceId ||
+            status.runtimeRecovery !== true
+          ) {
+            return { status: 'busy' };
+          }
+          const attached = this.terminalLifecycle.getAttachedWrapperInstanceId();
+          if (attached && attached !== status.wrapperInstanceId) return { status: 'retry' };
+          const retired = sessionRuntimeRetireResultSchema.parse(
+            controlRequestResult(
+              await control.request({
+                operation: 'session.runtime.retire',
+                session: {
+                  sessionId: metadata.identity.sessionId,
+                  kiloSessionId: metadata.auth.kiloSessionId ?? '',
+                  directory: this.directory(metadata),
+                },
+                expectedWrapperInstanceId: status.wrapperInstanceId,
+                payload: { recoveryId: input.recoveryId },
+              })
+            )
+          );
+          if (retired.recoveryId !== input.recoveryId || !retired.retired)
+            return { status: 'retry' };
+          if (
+            attached &&
+            !this.terminalLifecycle.clearAttachedWrapperAfterRecovery(status.wrapperInstanceId)
+          ) {
+            return { status: 'busy' };
+          }
+        } else if (status.physical !== 'stopped') {
+          return { status: 'retry' };
+        }
+      }
+      const latest = await this.getRuntimeAuthorizationRecoveryState();
+      if (latest.state !== 'expired' || latest.id !== input.expectedOldId)
+        return { status: 'retry' };
+      this.ctx.storage.transactionSync(() => {
+        const stored = RuntimeAuthorizationSchema.safeParse(
+          this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+        );
+        if (
+          !stored.success ||
+          stored.data.id !== input.expectedOldId ||
+          stored.data.state !== 'active' ||
+          Date.parse(stored.data.delegationExpiresAt) > Date.now()
+        ) {
+          throw new Error('runtime_authorization_recovery_cas_failed');
+        }
+        const currentMetadata = this.terminalLifecycle.getStoredMetadata();
+        if (
+          !currentMetadata ||
+          currentMetadata.identity.sessionId !== metadata.identity.sessionId ||
+          currentMetadata.identity.userId !== metadata.identity.userId ||
+          currentMetadata.identity.orgId !== metadata.identity.orgId
+        ) {
+          throw new Error('runtime_authorization_recovery_cas_failed');
+        }
+        this.ctx.storage.kv.put(RUNTIME_AUTHORIZATION_KEY, fresh);
+        this.ctx.storage.kv.put(
+          METADATA_KEY,
+          serializeSessionMetadata({
+            ...currentMetadata,
+            auth: { ...currentMetadata.auth, kilocodeToken: input.runtimeToken },
+          })
+        );
+        this.ctx.storage.kv.delete(RUNTIME_PROXY_GRANT_KEY);
+        this.ctx.storage.kv.delete(RUNTIME_AUTHORIZATION_RECOVERY_KEY);
+      });
+      return { status: 'recovered' };
+    } catch {
+      return { status: 'retry' };
+    }
+  }
+
+  async issueRuntimeCredentialProxyGrant(_fence: {
+    wrapperRunId: string;
+    wrapperGeneration: number;
+    wrapperConnectionId: string;
+  }): Promise<string | null> {
+    const metadata = await this.getMetadata();
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    const sandboxId = metadata?.workspace?.sandboxId;
+    if (!metadata || !kiloSessionId || !sandboxId) return null;
+    const control = sandboxControlRpc(this.env, sandboxId);
+    const readFence = () =>
+      control.getRuntimeCredentialProxyFence({
+        ownerId: metadata.identity.userId,
+        sessionId: metadata.identity.sessionId,
+        kiloSessionId,
+        directory: this.directory(metadata),
+      });
+    const fence = await readFence();
+    if (!fence) return null;
+    const token = await this.getRuntimeToken();
+    const [latestMetadata, storedAuthorization, latestFence] = await Promise.all([
+      this.getMetadata(),
+      this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      readFence(),
+    ]);
+    const authorization = RuntimeAuthorizationSchema.safeParse(storedAuthorization);
+    if (
+      !latestFence ||
+      latestFence.allocationId !== fence.allocationId ||
+      latestFence.providerInstanceId !== fence.providerInstanceId ||
+      latestFence.connectionId !== fence.connectionId ||
+      latestFence.wrapperInstanceId !== fence.wrapperInstanceId
+    ) {
+      return null;
+    }
+    return issuePersistedRuntimeProxyGrant({
+      env: this.env,
+      storage: this.ctx.storage,
+      metadata: latestMetadata,
+      authorization: authorization.success ? authorization.data : null,
+      fence: latestFence,
+      token,
+      mode: 'contained',
+    });
+  }
+
+  async resolveRuntimeCredentialProxyGrant(_handle: string): Promise<{
+    token: string;
+    organizationId?: string;
+    runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+  } | null> {
+    return resolvePersistedRuntimeProxyCredential({
+      env: this.env,
+      storage: this.ctx.storage,
+      handle: _handle,
+      metadata: () => this.getMetadata(),
+      authorization: async () => {
+        const parsed = RuntimeAuthorizationSchema.safeParse(
+          await this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+        );
+        return parsed.success ? parsed.data : null;
+      },
+      fence: async () => {
+        const metadata = await this.getMetadata();
+        const kiloSessionId = metadata?.auth.kiloSessionId;
+        const sandboxId = metadata?.workspace?.sandboxId;
+        if (!metadata || !kiloSessionId || !sandboxId) return null;
+        return sandboxControlRpc(this.env, sandboxId).getRuntimeCredentialProxyFence({
+          ownerId: metadata.identity.userId,
+          sessionId: metadata.identity.sessionId,
+          kiloSessionId,
+          directory: this.directory(metadata),
+        });
+      },
+      token: () => this.getRuntimeToken(),
+    });
+  }
+
+  async reauthorizeRuntimeAuthorization(input: {
+    ownerId: string;
+    expectedOldId: string;
+    runtimeAuthorizationSeal: string;
+  }): Promise<boolean> {
+    const metadata = await this.getMetadata();
+    if (!metadata || metadata.identity.userId !== input.ownerId) return false;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) return false;
+    let authorization: RuntimeAuthorization;
+    try {
+      authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
+        resourceKind: 'cloud-agent-next',
+        resourceId: metadata.identity.sessionId,
+        userId: metadata.identity.userId,
+        organizationId: metadata.identity.orgId,
+      });
+    } catch {
+      return false;
+    }
+    if (authorization.state !== 'active') return false;
+    const current = RuntimeAuthorizationSchema.safeParse(
+      this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (!current.success || current.data.id !== input.expectedOldId) return false;
+    this.ctx.storage.kv.put(RUNTIME_AUTHORIZATION_KEY, authorization);
+    return true;
   }
 
   async getCredentialMetadata(): Promise<SessionMetadata | null> {
@@ -1475,6 +1860,9 @@ export class SandboxSession extends DurableObject<Env> {
     rows?: number;
     operationId?: string;
   }): Promise<OperationResult<{ pty: WrapperPty }>> {
+    if (this.ctx.storage.kv.get<string>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return { success: false, error: 'Runtime authorization recovery is in progress' };
+    }
     if (this.pendingRuntimeCleanup())
       return { success: false, error: 'Runtime cleanup is pending' };
     return this.trackOperation(this.terminalLifecycle.createTerminal(input));
@@ -1485,6 +1873,9 @@ export class SandboxSession extends DurableObject<Env> {
     cols?: number;
     rows?: number;
   }): Promise<OperationResult<{ pty: WrapperPty }>> {
+    if (this.ctx.storage.kv.get<string>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return { success: false, error: 'Runtime authorization recovery is in progress' };
+    }
     return this.trackOperation(this.terminalLifecycle.resizeTerminal(input));
   }
 
@@ -1632,24 +2023,21 @@ export class SandboxSession extends DurableObject<Env> {
     if (
       this.deletedWorktreeId === worktreeId &&
       (await this.ctx.storage.get(DELETION_COMPLETED_KEY))
-    )
+    ) {
+      if (this.messageCallbacks.pendingCallbackCount() > 0) this.scheduleCallbackRepair();
       return null;
+    }
     this.worktreeChanges.suppress();
     this.ctx.storage.transactionSync(() => {
       this.ctx.storage.kv.put(DELETED_WORKTREE_KEY, worktreeId);
       this.terminalLifecycle.beginDeletion(metadata);
       this.worktreeChanges.purge();
-      const messages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
-      const cancelled = messages.map(message =>
-        message.state === 'queued' || message.state === 'accepted'
-          ? { ...message, state: 'cancelled' as const }
-          : message
-      );
-      this.ctx.storage.kv.put(MESSAGES_KEY, cancelled);
+      this.snapshotDeletedMessages(metadata);
     });
+    if (this.messageCallbacks.pendingCallbackCount() > 0) this.scheduleCallbackRepair();
     this.deletedWorktreeId = worktreeId;
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
-    await this.ctx.storage.deleteAlarm();
+    if (this.messageCallbacks.pendingCallbackCount() === 0) await this.ctx.storage.deleteAlarm();
     if (!metadata) return null;
     return cloudAgentWorktreeLocationSchema.parse({
       sandboxId: metadata.workspace?.sandboxId,
@@ -1715,9 +2103,13 @@ export class SandboxSession extends DurableObject<Env> {
       await Promise.allSettled([...this.activeOperations]);
     }
     await this.ingestPublicationChain.catch(() => undefined);
-    if (await this.ctx.storage.get(DELETION_COMPLETED_KEY)) return;
+    if (await this.ctx.storage.get(DELETION_COMPLETED_KEY)) {
+      if (this.messageCallbacks.pendingCallbackCount() > 0) this.scheduleCallbackRepair();
+      return;
+    }
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
-    await this.ctx.storage.deleteAlarm();
+    const callbacksPending = this.messageCallbacks.pendingCallbackCount() > 0;
+    if (!callbacksPending) await this.ctx.storage.deleteAlarm();
     const db = drizzle(this.ctx.storage, { logger: false });
     this.ctx.storage.transactionSync(() => {
       db.delete(events).where(eq(events.session_id, this.requireSessionId())).run();
@@ -1727,6 +2119,9 @@ export class SandboxSession extends DurableObject<Env> {
       this.ctx.storage.kv.put(DELETED_WORKTREE_KEY, worktreeId);
       this.ctx.storage.kv.put(DELETION_COMPLETED_KEY, true);
     });
+    if (callbacksPending) {
+      await this.armQueueRetry(this.messageCallbacks.nextCallbackDueAt() ?? Date.now());
+    }
   }
 
   private trackOperation<T>(operation: Promise<T>): Promise<T> {
@@ -1734,24 +2129,75 @@ export class SandboxSession extends DurableObject<Env> {
     return operation.finally(() => this.activeOperations.delete(operation));
   }
 
+  private snapshotDeletedMessages(metadata: SessionMetadata | null): void {
+    const messages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
+    const cancelled = messages.map(message => {
+      if (message.state !== 'queued' && message.state !== 'accepted') return message;
+      const next = { ...message, state: 'cancelled' as const };
+      this.messageCallbacks.persistTerminalCallback(next, metadata);
+      return next;
+    });
+    this.ctx.storage.kv.put(MESSAGES_KEY, cancelled);
+  }
+
+  private async interruptDeletedMessage(
+    metadata: SessionMetadata | null,
+    message: MessageRecord | undefined
+  ): Promise<void> {
+    const sandboxId = metadata?.workspace?.sandboxId;
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    if (!message || message.state !== 'accepted' || !metadata || !sandboxId || !kiloSessionId)
+      return;
+    try {
+      const response = await withTimeout(
+        sandboxControlRpc(this.env, sandboxId).request({
+          operation: 'session.abort',
+          session: {
+            sessionId: metadata.identity.sessionId,
+            kiloSessionId,
+            directory: this.directory(metadata),
+          },
+          payload: { messageId: message.messageId },
+        }),
+        SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+        'Session abort timed out'
+      );
+      if (response.ok) sessionAbortResultSchema.parse(response.result);
+    } catch {
+      // Deletion cleanup remains authoritative when abort cannot be confirmed.
+    }
+  }
+
   async deleteSession(): Promise<void> {
     if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     this.worktreeChanges.suppress();
-    await this.interruptExecution();
-    if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     const metadata = this.terminalLifecycle.getStoredMetadata();
+    const active = (this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? []).filter(
+      message => message.state === 'queued' || message.state === 'accepted'
+    );
+    const accepted = active.find(message => message.state === 'accepted');
+    const preparing = accepted ? undefined : active[0];
     const records = this.ctx.storage.transactionSync(() => {
+      if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const records = this.terminalLifecycle.beginDeletion(metadata);
       this.worktreeChanges.purge();
+      if (preparing?.wrapperInstanceId && preparing.deliveryRetryScope !== 'message' && metadata) {
+        this.retainRuntimeCleanup(metadata, preparing.wrapperInstanceId, 'preparation_interrupted');
+      }
+      this.snapshotDeletedMessages(metadata);
       return records;
     });
+    if (this.messageCallbacks.pendingCallbackCount() > 0) this.scheduleCallbackRepair();
     for (const ws of this.ctx.getWebSockets('stream')) {
       ws.close(1000, 'session access revoked');
     }
+    if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
+    else await this.interruptDeletedMessage(metadata, accepted);
     await this.terminalLifecycle.cleanupSession(metadata, records);
     await this.ingestPublicationChain.catch(() => undefined);
     if (this.deletedWorktreeId) throw new Error('worktree_deleting');
-    await this.ctx.storage.deleteAlarm();
+    const callbacksPending = this.messageCallbacks.pendingCallbackCount() > 0;
+    if (!callbacksPending) await this.ctx.storage.deleteAlarm();
     this.ctx.storage.transactionSync(() => {
       if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const pendingCleanup = this.pendingRuntimeCleanup();
@@ -1760,6 +2206,8 @@ export class SandboxSession extends DurableObject<Env> {
       if (pendingCleanup) this.ctx.storage.kv.put(PENDING_RUNTIME_CLEANUP_KEY, pendingCleanup);
     });
     if (this.pendingRuntimeCleanup()) await this.armQueueRetry();
+    else if (callbacksPending)
+      await this.armQueueRetry(this.messageCallbacks.nextCallbackDueAt() ?? Date.now());
   }
 
   async registerSession(input: SandboxSessionRegistrationInput): Promise<OperationResult> {
@@ -1785,6 +2233,28 @@ export class SandboxSession extends DurableObject<Env> {
         );
       }
       return { success: true };
+    }
+    let runtimeAuthorization: RuntimeAuthorization | undefined;
+    if (input.runtimeAuthorizationSeal) {
+      const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+      if (!secret) return { success: false, error: 'Authentication unavailable' };
+      let authorization: RuntimeAuthorization;
+      try {
+        authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
+          resourceKind: 'cloud-agent-next',
+          resourceId: input.identity.sessionId,
+          userId: input.identity.userId,
+          organizationId: input.identity.orgId,
+        });
+      } catch {
+        return { success: false, error: 'Invalid runtime authorization' };
+      }
+      if (authorization.state !== 'active')
+        return { success: false, error: 'Runtime authorization revoked' };
+      if (this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_KEY)) {
+        return { success: false, error: 'Runtime authorization already installed' };
+      }
+      runtimeAuthorization = authorization;
     }
     try {
       validateControlSessionOptions(input);
@@ -1820,6 +2290,9 @@ export class SandboxSession extends DurableObject<Env> {
     });
     if (this.deletedWorktreeId) return { success: false, error: 'worktree_deleting' };
     if (this.terminalLifecycle.isBlocked()) return { success: false, error: 'Session not found' };
+    if (runtimeAuthorization) {
+      this.ctx.storage.kv.put(RUNTIME_AUTHORIZATION_KEY, runtimeAuthorization);
+    }
     this.ctx.storage.kv.put(METADATA_KEY, serializeSessionMetadata(metadata));
     this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
       revision: 0,
@@ -2080,6 +2553,9 @@ export class SandboxSession extends DurableObject<Env> {
     if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
     for (const stop of this.stopLifecycle.pending())
       void this.scheduleStopProgress(stop.request.operationId);
+    await this.messageCallbacks.repair();
+    const callbackDueAt = this.messageCallbacks.nextCallbackDueAt();
+    if (callbackDueAt !== undefined) await this.armQueueRetry(callbackDueAt);
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null || this.deletedWorktreeId) return;
     const now = Date.now();
@@ -2179,6 +2655,13 @@ export class SandboxSession extends DurableObject<Env> {
     input: ControlSessionMessageInput,
     origin: 'initial' | 'followup'
   ): Promise<SessionMessageAdmissionResult> {
+    if (this.ctx.storage.kv.get<string>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return {
+        success: false,
+        code: 'COMPUTE_STOPPING',
+        error: 'Runtime authorization recovery is in progress',
+      };
+    }
     const epoch = this.terminalLifecycle.captureEpoch();
     const metadata = this.terminalLifecycle.getStoredMetadata();
     if (epoch === null || !metadata || this.deletedWorktreeId) {
@@ -2220,10 +2703,37 @@ export class SandboxSession extends DurableObject<Env> {
     let validationFailure: Extract<SessionMessageAdmissionResult, { success: false }> | undefined;
     if (intent?.turn.type === 'prompt' && origin === 'followup') {
       try {
+        let validationToken = metadata.auth.kilocodeToken;
+        if (
+          this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_KEY) !== undefined ||
+          hasModernRuntimeAuthorization(metadata)
+        ) {
+          try {
+            validationToken = (await this.getRuntimeToken()) ?? undefined;
+          } catch (error) {
+            throw new TRPCError({
+              code:
+                error instanceof RuntimeAuthorizationExpiredError ||
+                error instanceof RuntimeAuthorizationRevokedError
+                  ? 'FORBIDDEN'
+                  : 'SERVICE_UNAVAILABLE',
+              message: 'Runtime credential unavailable for model validation',
+            });
+          }
+          if (!validationToken)
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime credential unavailable' });
+          if (this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+            return {
+              success: false,
+              code: 'COMPUTE_STOPPING',
+              error: 'Runtime authorization recovery is in progress',
+            };
+          }
+        }
         await assertKiloModelAvailable({
           env: this.env,
           submittedModel: intent.agent.model,
-          originalToken: metadata.auth.kilocodeToken,
+          originalToken: validationToken,
           originalOrganizationId: metadata.identity.orgId,
           createdOnPlatform: metadata.identity.createdOnPlatform,
           procedure: 'admitSubmittedMessage',
@@ -2245,6 +2755,13 @@ export class SandboxSession extends DurableObject<Env> {
     }
     let admitted = false;
     const result = this.ctx.storage.transactionSync((): SessionMessageAdmissionResult => {
+      if (this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+        return {
+          success: false,
+          code: 'COMPUTE_STOPPING',
+          error: 'Runtime authorization recovery is in progress',
+        };
+      }
       const latestMetadata = this.terminalLifecycle.getStoredMetadata();
       if (!this.terminalLifecycle.isCurrent(epoch) || !latestMetadata) {
         return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
@@ -2281,10 +2798,16 @@ export class SandboxSession extends DurableObject<Env> {
       }
       if (validationFailure) return validationFailure;
       if (!intent) return { success: false, code: 'NOT_FOUND', error: 'Message not found' };
-      if (
-        latestMessages.filter(message => message.state === 'queued').length >=
-        PENDING_SESSION_MESSAGE_LIMIT
-      ) {
+      const pendingCallbackCount = this.messageCallbacks.pendingCallbackCount();
+      const callbackFlow =
+        latestMetadata.callback?.target !== undefined || pendingCallbackCount > 0;
+      const outstandingMessages = latestMessages.filter(
+        message => message.state === 'queued' || message.state === 'accepted'
+      ).length;
+      const pendingCount = callbackFlow
+        ? outstandingMessages + pendingCallbackCount
+        : latestMessages.filter(message => message.state === 'queued').length;
+      if (pendingCount >= PENDING_SESSION_MESSAGE_LIMIT) {
         return {
           success: false,
           code: 'PENDING_QUEUE_FULL',
@@ -2344,6 +2867,7 @@ export class SandboxSession extends DurableObject<Env> {
     messageId: string,
     options?: { allowCreate?: boolean }
   ): Promise<void> {
+    if (this.ctx.storage.kv.get<string>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) return;
     if (this.deletedWorktreeId) return;
     const metadata = this.terminalLifecycle.getStoredMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
@@ -2462,7 +2986,12 @@ export class SandboxSession extends DurableObject<Env> {
     };
     const dispatchAuthorized = async (
       operation: SessionOperationAuthorization['operation'],
-      payload: unknown
+      payload: unknown,
+      expectedConnection?: {
+        providerInstanceId: string;
+        connectionId: string;
+        wrapperInstanceId: string;
+      }
     ) => {
       if (!wrapperInstanceId) throw new Error('Wrapper identity is missing');
       const authorization: SessionOperationAuthorization = {
@@ -2476,7 +3005,7 @@ export class SandboxSession extends DurableObject<Env> {
       let dispatched: Awaited<ReturnType<typeof dispatchSessionOperation>>;
       try {
         dispatched = await dispatchSessionOperation(
-          { authorization, payload },
+          { authorization, payload, expectedConnection },
           {
             read: () => this.loadMessages(),
             commit: messages => this.saveMessages(messages, epoch, 'wrapper_outcome'),
@@ -2610,6 +3139,7 @@ export class SandboxSession extends DurableObject<Env> {
       return;
     }
     let phase: DispatchPhase = 'preparing';
+    let attachInPreparation = false;
     let credentialsPrepared = false;
     const preparationGeneration = this.worktreeChanges.beginPreparation();
     try {
@@ -2712,13 +3242,77 @@ export class SandboxSession extends DurableObject<Env> {
         if (needsPreparation) recorder.onProgress('workspace_setup', 'Setting up workspace…');
         if (!status.attachment?.kilo)
           throw new Error('Contained session attachment is unavailable');
+        attachInPreparation = needsPreparation;
         const attachPayload = {
           ...status.attachment,
+          ...(hasModernRuntimeAuthorization(metadata)
+            ? { runtimeIsolation: 'per-session' as const }
+            : {}),
           ...(needsPreparation
             ? { preparation: { attemptId: recorder.attemptId, triggerMessageId: messageId } }
             : {}),
         };
-        phase = needsPreparation ? 'preparing' : 'attach';
+        const authorization = RuntimeAuthorizationSchema.safeParse(
+          this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+        );
+        let proxyKilo: SessionAttachPayload['kilo'] | undefined;
+        let proxyFence:
+          | {
+              providerInstanceId: string;
+              connectionId: string;
+              wrapperInstanceId: string;
+            }
+          | undefined;
+        if (authorization.success && authorization.data.state === 'active') {
+          const proxyBaseUrl = this.env.WORKER_URL
+            ? runtimeCredentialProxyFacadeBaseUrl(this.env.WORKER_URL)
+            : null;
+          if (!proxyBaseUrl) throw new Error('Runtime credential proxy is unavailable');
+          const handle = await wait(
+            () =>
+              this.issueRuntimeCredentialProxyGrant({
+                wrapperRunId: '',
+                wrapperGeneration: 0,
+                wrapperConnectionId: '',
+              }),
+            SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
+          );
+          if (!handle) throw new Error('Runtime credential proxy grant is unavailable');
+          const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle);
+          if (!claims) throw new Error('Runtime credential proxy grant is invalid');
+          const grant = runtimeProxyGrantSchema.safeParse(
+            this.ctx.storage.kv.get<unknown>(RUNTIME_PROXY_GRANT_KEY)
+          );
+          if (!grant.success || grant.data.plane !== 'control') {
+            throw new Error('Runtime credential proxy grant is unavailable');
+          }
+          proxyFence = {
+            providerInstanceId: grant.data.providerInstanceId,
+            connectionId: grant.data.connectionId,
+            wrapperInstanceId: grant.data.wrapperInstanceId,
+          };
+          proxyKilo = {
+            ...status.attachment.kilo,
+            token: handle,
+            targets: {
+              backendBaseUrl: proxyBaseUrl,
+              providerBaseUrl: proxyBaseUrl,
+              sessionIngestBaseUrl: proxyBaseUrl,
+            },
+          };
+          if (getSandboxProvider(metadata) === 'vercel') {
+            await wait(() =>
+              control.bindRuntimeCredentialProxyHandle({
+                ownerId: metadata.identity.userId,
+                sessionId,
+                kiloSessionId,
+                directory: session.directory,
+                handle,
+              })
+            );
+          }
+        }
+        phase = 'preparing';
         await wait(() =>
           control.attachSession({
             ...(metadata.workspace?.worktreeId
@@ -2735,8 +3329,23 @@ export class SandboxSession extends DurableObject<Env> {
             await this.compensateSessionAttachment(metadata);
           return;
         }
+        phase = 'attach';
         if (operationResults) {
-          if ((await dispatchAuthorized('session.attach', attachPayload)).state === 'running') {
+          if (
+            (
+              await dispatchAuthorized(
+                'session.attach',
+                proxyKilo
+                  ? {
+                      ...attachPayload,
+                      env: { ...attachPayload.env, KILOCODE_TOKEN: proxyKilo.token },
+                      kilo: proxyKilo,
+                    }
+                  : attachPayload,
+                proxyFence
+              )
+            ).state === 'running'
+          ) {
             await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
             return;
           }
@@ -2750,7 +3359,14 @@ export class SandboxSession extends DurableObject<Env> {
                       operation: 'session.attach',
                       session,
                       expectedWrapperInstanceId: wrapperInstanceId,
-                      payload: attachPayload,
+                      ...(proxyFence ? { expectedConnection: proxyFence } : {}),
+                      payload: proxyKilo
+                        ? {
+                            ...attachPayload,
+                            env: { ...attachPayload.env, KILOCODE_TOKEN: proxyKilo.token },
+                            kilo: proxyKilo,
+                          }
+                        : attachPayload,
                       timeoutMs: SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
                     })
                   )
@@ -2759,6 +3375,7 @@ export class SandboxSession extends DurableObject<Env> {
             )
           );
         }
+        phase = 'preparing';
         if (!isCurrent()) {
           if (!this.terminalLifecycle.isCurrent(epoch))
             await this.compensateSessionAttachment(metadata);
@@ -2850,6 +3467,7 @@ export class SandboxSession extends DurableObject<Env> {
         wrapperInstanceId,
         deadlineAt,
         error,
+        attachInPreparation,
       });
     } finally {
       this.worktreeChanges.finishPreparation(preparationGeneration);
@@ -2887,41 +3505,55 @@ export class SandboxSession extends DurableObject<Env> {
     messageId: string;
     epoch: number;
     phase: DispatchPhase;
+    attachInPreparation: boolean;
     wrapperInstanceId?: string;
     deadlineAt: number;
     error: unknown;
   }): Promise<void> {
-    const { messageId, epoch, phase, wrapperInstanceId, deadlineAt, error } = input;
+    const { messageId, epoch, phase, wrapperInstanceId, deadlineAt, error, attachInPreparation } =
+      input;
     const message = this.queuedMessage(messageId, epoch, wrapperInstanceId);
     if (!message) return;
-    const rejection = error instanceof ControlRequestError && error.code !== 'runtime_unhealthy';
+    const rejection = error instanceof ControlRequestError && error.rejectionReceived === true;
+    const retryableRejection =
+      rejection && error instanceof ControlRequestError && error.code !== 'runtime_unhealthy';
+    const detail = confirmedControlRejectionDetail(error);
+    const attachProof = message.operations?.attach;
+    const attachRejectionAlreadyCounted = attachProof?.rejectionReceived === true;
+    const countAttachRejection = phase === 'attach' && rejection && !attachRejectionAlreadyCounted;
     const completedAttachFailure =
       message.operations?.attach?.dispatched === true &&
       message.operations.attach.result?.ok === false;
     const retryableCompletedAttach =
-      phase !== 'prompt' && rejection && isRetryableDeliveryError(error) && completedAttachFailure;
-    const scope =
+      phase !== 'prompt' &&
+      retryableRejection &&
+      isRetryableDeliveryError(error) &&
+      completedAttachFailure;
+    const messageRetryScope =
       phase === 'attach'
-        ? retryableCompletedAttach
-          ? 'message'
-          : 'runtime'
-        : rejection && !message.unresolvedDispatch
-          ? 'message'
-          : 'runtime';
+        ? (attachInPreparation && retryableRejection && !message.unresolvedDispatch) ||
+          retryableCompletedAttach
+        : retryableRejection && !message.unresolvedDispatch;
+    const scope: 'message' | 'runtime' = messageRetryScope ? 'message' : 'runtime';
     if (Date.now() >= deadlineAt) {
-      await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId, scope);
+      await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId, scope, detail);
       return;
     }
-    const busy = rejection && error.code === 'session_busy';
+    const busy = retryableRejection && error.code === 'session_busy';
     const retryNotBefore = Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS);
     const released = retryableCompletedAttach
       ? releaseCompletedRetryableAttach(this.loadMessages(), messageId, retryNotBefore)
       : this.loadMessages();
+    const marked =
+      countAttachRejection && attachProof
+        ? markSessionOperationRejection(released, attachProof.authorization)
+        : released;
+    const nextMessages = marked ?? released;
     const updated =
-      phase === 'preparing' || busy
+      busy || (phase !== 'prompt' && !countAttachRejection)
         ? undefined
-        : incrementDeliveryFailure(released, messageId, phase);
-    const messages = (updated?.messages ?? released).map(
+        : incrementDeliveryFailure(nextMessages, messageId, phase);
+    const messages = (updated?.messages ?? nextMessages).map(
       (message): MessageRecord =>
         message.messageId === messageId ? { ...message, deliveryRetryScope: scope } : message
     );
@@ -2938,11 +3570,12 @@ export class SandboxSession extends DurableObject<Env> {
       messageId,
       phase === 'prompt'
         ? 'prompt_exhausted'
-        : phase === 'attach'
+        : phase === 'attach' && rejection
           ? 'attach_exhausted'
           : 'environment_failed',
       wrapperInstanceId,
-      scope
+      scope,
+      detail
     );
   }
 
@@ -3058,7 +3691,8 @@ export class SandboxSession extends DurableObject<Env> {
     messageId: string,
     reason: string,
     wrapperInstanceId?: string,
-    scope: 'message' | 'runtime' = 'runtime'
+    scope: 'message' | 'runtime' = 'runtime',
+    detail?: string
   ): Promise<void> {
     const epoch = this.terminalLifecycle.captureEpoch();
     const metadata = this.terminalLifecycle.getStoredMetadata();
@@ -3072,13 +3706,13 @@ export class SandboxSession extends DurableObject<Env> {
     )
       return;
     if (scope === 'message') {
-      const messages = failQueuedMessage(this.loadMessages(), messageId, reason);
+      const messages = failQueuedMessage(this.loadMessages(), messageId, reason, detail);
       if (!messages || !this.saveMessages(messages, epoch)) return;
       if (nextQueuedMessageId(messages)) await this.armQueueRetry();
       return;
     }
     if (wrapperInstanceId) this.retainRuntimeCleanup(metadata, wrapperInstanceId, reason);
-    await this.failDeliveryWaitingMessages(reason, wrapperInstanceId);
+    await this.failDeliveryWaitingMessages(reason, wrapperInstanceId, detail, messageId);
     if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
   }
 
@@ -3124,7 +3758,9 @@ export class SandboxSession extends DurableObject<Env> {
 
   private async failDeliveryWaitingMessages(
     reason: string,
-    wrapperInstanceId?: string
+    wrapperInstanceId?: string,
+    detail?: string,
+    detailMessageId?: string
   ): Promise<void> {
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null) return;
@@ -3136,7 +3772,15 @@ export class SandboxSession extends DurableObject<Env> {
       wrapperInstanceId,
       false
     );
-    if (failedIds.length === 0 || !this.saveMessages(messages, epoch)) return;
+    const messagesWithDetail =
+      detail && detailMessageId
+        ? messages.map(message =>
+            message.messageId === detailMessageId && failedIds.includes(message.messageId)
+              ? { ...message, failedDetail: detail }
+              : message
+          )
+        : messages;
+    if (failedIds.length === 0 || !this.saveMessages(messagesWithDetail, epoch)) return;
     if (this.pendingRuntimeCleanup() || nextQueuedMessageId(this.loadMessages()))
       await this.armQueueRetry();
   }
@@ -3147,18 +3791,34 @@ export class SandboxSession extends DurableObject<Env> {
     createStreamHandler(this.ctx, this.eventQueries, sessionId).broadcastEvent(event);
   }
 
+  private scheduleCallbackRepair(): void {
+    this.ctx.waitUntil(this.ctx.storage.setAlarm(Date.now()));
+    this.ctx.waitUntil(this.messageCallbacks.repair());
+  }
+
+  private scheduleCallbackRepairIfRequired(): void {
+    if (!this.callbackRepairRequired) return;
+    this.callbackRepairRequired = false;
+    this.scheduleCallbackRepair();
+  }
+
   private async armQueueRetry(when = Date.now() + QUEUE_RETRY_MS): Promise<void> {
     const epoch = this.terminalLifecycle.captureEpoch();
     const hasPendingStop = this.stopLifecycle.pending().length > 0;
-    if (epoch === null && !this.pendingRuntimeCleanup() && !hasPendingStop) return;
+    const callbackDueAt = this.messageCallbacks.nextCallbackDueAt();
+    const hasPendingCallbacks = callbackDueAt !== undefined;
+    if (epoch === null && !this.pendingRuntimeCleanup() && !hasPendingStop && !hasPendingCallbacks)
+      return;
     const existing = await this.ctx.storage.getAlarm();
     if (
       (epoch === null || !this.terminalLifecycle.isCurrent(epoch)) &&
       !this.pendingRuntimeCleanup() &&
-      !hasPendingStop
+      !hasPendingStop &&
+      !hasPendingCallbacks
     )
       return;
-    if (existing === null || existing > when) await this.ctx.storage.setAlarm(when);
+    const requested = Math.min(when, callbackDueAt ?? Number.MAX_SAFE_INTEGER);
+    if (existing === null || existing > requested) await this.ctx.storage.setAlarm(requested);
   }
 
   private readPendingInteractions(): PendingInteractions | undefined {
@@ -3803,7 +4463,8 @@ export class SandboxSession extends DurableObject<Env> {
         deferredNotifications,
         undefined,
         undefined,
-        write => write()
+        write => write(),
+        false
       ) === true
     );
   }
@@ -3815,7 +4476,8 @@ export class SandboxSession extends DurableObject<Env> {
     deferredNotifications: StoredEvent[] | undefined,
     onPersist: (() => void) | undefined,
     beforePersist: (() => ControlEventDisposition) | undefined,
-    enclose: (write: () => void) => void
+    enclose: (write: () => void) => void,
+    scheduleCallbackRepair = true
   ): boolean | ControlEventDisposition {
     const returnsControlEventDisposition = beforePersist !== undefined;
     const currentEpoch = epoch ?? this.terminalLifecycle.captureEpoch();
@@ -3827,6 +4489,7 @@ export class SandboxSession extends DurableObject<Env> {
       return returnsControlEventDisposition ? 'epoch_changed' : false;
     const events: StoredEvent[] = [];
     const committed: ControlDiagnosticFields[] = [];
+    let callbackPersisted = false;
     let persisted = false;
     let disposition: ControlEventDisposition = 'epoch_changed';
     const write = () => {
@@ -3873,6 +4536,7 @@ export class SandboxSession extends DurableObject<Env> {
         }
         const event = this.persistMessageLifecycleEvent(terminal);
         if (event) events.push(event);
+        if (this.messageCallbacks.persistTerminalCallback(terminal)) callbackPersisted = true;
         committed.push({
           messageId: terminal.messageId,
           wrapperInstanceId: terminal.wrapperInstanceId,
@@ -3894,7 +4558,8 @@ export class SandboxSession extends DurableObject<Env> {
                     safeError:
                       terminal.state === 'cancelled'
                         ? 'The message was interrupted'
-                        : safeErrorFromQueueReason(terminal.failedReason ?? 'environment_failed'),
+                        : (terminal.failedDetail ??
+                          safeErrorFromQueueReason(terminal.failedReason ?? 'environment_failed')),
                     timestamp: terminal.terminalAt,
                   }
             )
@@ -3908,6 +4573,10 @@ export class SandboxSession extends DurableObject<Env> {
     };
     enclose(write);
     if (!persisted) return returnsControlEventDisposition ? disposition : false;
+    if (callbackPersisted) {
+      if (scheduleCallbackRepair) this.scheduleCallbackRepair();
+      else this.callbackRepairRequired = true;
+    }
     for (const fields of committed) {
       logControlDiagnostic('session_message_committed', {
         sessionId: this.sessionId,

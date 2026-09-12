@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO empresarial"
   },
   "preferences": {
+    "general": "Xeral",
+    "voiceInput": "Entrada de voz",
     "autoExpandThinking": "Despregar o razoamento automaticamente",
     "autoExpandThinkingSubtitle": "Mostrar o razoamento do axente despregado cando remate.",
     "keepScreenOn": "Manter a pantalla acesa ao ver a sesión",
@@ -237,6 +239,7 @@
     "appearanceLight": "Claro",
     "appearanceDark": "Escuro",
     "account": "Conta",
+    "accountSubtitle": "Idioma, dominios de confianza e sesións nos dispositivos",
     "prReviewAttribution": "Engadir unha mención á aplicación nas revisións de PR",
     "prReviewAttributionSubtitle": "Ao enviar unha revisión, engadir unha nota ao pé que indique que se fixo con Kilo.",
     "returnSendsMessage": "A tecla Intro envía a mensaxe",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transcrición con Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transcribe o ditado cun modelo de Kilo Gateway no canto do recoñecemento de voz do dispositivo. A túa gravación envíaselle a Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Solicitude de integración non dispoñible",
@@ -448,6 +454,9 @@
       "acceptTerms": "Aceptar",
       "replyBadRequest": "Non se pode publicar esta resposta. Pode que o fío cambiase.",
       "replyForbidden": "Non tes permiso para responder a esta solicitude de integración.",
+      "addCommentCta": "Comentar esta solicitude de integración",
+      "commentBadRequest": "Non se pode publicar este comentario. Pode que a solicitude de integración cambiase.",
+      "commentForbidden": "Non tes permiso para comentar nesta solicitude de integración.",
       "moderation": {
         "reportContent": {
           "terminal": "Este comentario non se pode denunciar.",
@@ -2565,7 +2574,14 @@
     "languageNotInstalledMessage": "Os ficheiros de voz sen conexión de {{language}} non están instalados neste teléfono. Descarga-os e tenta o ditado de novo.",
     "downloadOfflineModel": "Descargar",
     "offlineModelDownloadScheduled": "Os ficheiros de voz sen conexión descargaránse en segundo plano. Tenta o ditado de novo máis tarde.",
-    "listeningStopped": "Detívose o ditado."
+    "listeningStopped": "Detívose o ditado.",
+    "transcribing": "Transcribindo...",
+    "gatewayUnreachable": "Non se puido conectar con Kilo Gateway. Comproba a conexión e téntao de novo.",
+    "gatewayTimeout": "A transcrición tardou demasiado. Téntao de novo.",
+    "gatewayModelUnavailable": "Este modelo de transcrición non está dispoñible. Escolle outro en Preferencias.",
+    "gatewayModelUnavailableNotice": "Este modelo xa non se ofrece. Toca $t(transcriptionModel.title) para escoller outro.",
+    "gatewaySignInRequired": "Inicia sesión para usar a transcrición con Kilo Gateway.",
+    "gatewayNoModel": "Escolle primeiro un modelo de transcrición en Preferencias."
   },
   "share": {
     "title": "Compartir en Kilo",
@@ -2939,6 +2955,13 @@
     "needsInput": "Agardando resposta",
     "channelName": "Axentes activos",
     "activityKitDisabledBody": "Activa as actividades en directo nos axustes para ver os axentes activos na pantalla de bloqueo."
+  },
+  "transcriptionModel": {
+    "title": "Modelo de transcrición",
+    "noneChosen": "Ningún seleccionado",
+    "emptyTitle": "Non hai modelos de transcrición",
+    "emptyDescription": "Kilo Gateway non ofrece modelos de transcrición neste momento.",
+    "loadFailed": "Non se puideron cargar os modelos de transcrición."
   },
   "modelChat": {
     "empty": {

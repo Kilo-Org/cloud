@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO fiontair"
   },
   "preferences": {
+    "general": "Ginearálta",
+    "voiceInput": "Ionchur gutha",
     "autoExpandThinking": "Leathnaigh an machnamh go huathoibríoch",
     "autoExpandThinkingSubtitle": "Taispeáin machnamh an ghníomhaire ina iomláine nuair a chríochnaíonn sé.",
     "keepScreenOn": "Coinnigh an scáileán ar siúl ar leathanach an tseisiúin",
@@ -237,6 +239,7 @@
     "appearanceLight": "Geal",
     "appearanceDark": "Dorcha",
     "account": "Cuntas",
+    "accountSubtitle": "Teanga, óstaigh iontaofa agus seisiúin ar ghléasanna",
     "prReviewAttribution": "Luaigh an aip in athbhreithnithe PR",
     "prReviewAttributionSubtitle": "Cuir buntásc leis a deir go ndearnadh an t-athbhreithniú trí Kilo nuair a sheolann tú athbhreithniú.",
     "returnSendsMessage": "Seolann an eochair aisfhillte teachtaireacht",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Tras-scríobh tríd an Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Déan an t-ionchur gutha a thras-scríobh le samhail Kilo Gateway in ionad aithint cainte an ghléis. Seoltar do thaifeadadh chuig an Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Iarratas tarraingthe gan fáil",
@@ -454,6 +460,9 @@
       "acceptTerms": "Glac",
       "replyBadRequest": "Ní féidir an freagra seo a phostáil. Seans gur athraíodh an snáithe.",
       "replyForbidden": "Níl cead agat freagra a thabhairt ar an iarratas tarraingthe seo.",
+      "addCommentCta": "Trácht ar an iarratas tarraingthe seo",
+      "commentBadRequest": "Ní féidir an trácht seo a phostáil. Seans gur athraíodh an t-iarratas tarraingthe.",
+      "commentForbidden": "Níl cead agat trácht a dhéanamh ar an iarratas tarraingthe seo.",
       "moderation": {
         "reportContent": {
           "terminal": "Ní féidir an trácht seo a thuairisciú.",
@@ -2628,7 +2637,14 @@
     "languageNotInstalledMessage": "Níl comhaid cainte as líne do {{language}} suiteáilte ar an bhfón seo. Íoslódáil iad, agus bain triail as ionchur gutha arís ina dhiaidh sin.",
     "downloadOfflineModel": "Íoslódáil",
     "offlineModelDownloadScheduled": "Íoslódófar na comhaid cainte as líne sa chúlra. Bain triail as ionchur gutha arís níos déanaí.",
-    "listeningStopped": "Stopadh an éisteacht."
+    "listeningStopped": "Stopadh an éisteacht.",
+    "transcribing": "Ag tras-scríobh...",
+    "gatewayUnreachable": "Níorbh fhéidir an Kilo Gateway a bhaint amach. Seiceáil do nasc agus bain triail as arís.",
+    "gatewayTimeout": "Thóg an tras-scríobh rófhada. Bain triail as arís.",
+    "gatewayModelUnavailable": "Níl an samhail tras-scríobh seo ar fáil. Roghnaigh ceann eile sna Roghanna.",
+    "gatewayModelUnavailableNotice": "Ní thairgtear an tsamhail seo a thuilleadh. Tapáil $t(transcriptionModel.title) chun ceann eile a roghnú.",
+    "gatewaySignInRequired": "Sínigh isteach chun tras-scríobh tríd an Kilo Gateway a úsáid.",
+    "gatewayNoModel": "Roghnaigh samhail tras-scríobh sna Roghanna ar dtús."
   },
   "share": {
     "title": "Comhroinnt le Kilo",
@@ -3005,6 +3021,13 @@
     "needsInput": "Ionchur de dhíth",
     "channelName": "Gníomhairí gníomhacha",
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála."
+  },
+  "transcriptionModel": {
+    "title": "Samhail tras-scríobh",
+    "noneChosen": "Níor roghnaíadh aon cheann",
+    "emptyTitle": "Níl samhail tras-scríobh ar bith ann",
+    "emptyDescription": "Níl aon shamhail tras-scríobh ar fáil ón Kilo Gateway faoi láthair.",
+    "loadFailed": "Níorbh fhéidir na samhlacha tras-scríobh a lódáil."
   },
   "modelChat": {
     "empty": {

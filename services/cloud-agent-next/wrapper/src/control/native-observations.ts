@@ -18,7 +18,7 @@ type DirectoryObservation = {
 type NativeObservationDeps = {
   signal?: AbortSignal;
   roots: () => readonly RootSnapshot[];
-  getRuntime: (directory: string) => WorktreeKiloRuntime | undefined;
+  getRuntime: (directory: string, kiloSessionId: string) => WorktreeKiloRuntime | undefined;
   reconcileActivity: (
     statuses: Awaited<ReturnType<WrapperKiloClient['getSessionStatuses']>>,
     roots: readonly string[]
@@ -27,23 +27,35 @@ type NativeObservationDeps = {
 
 export function createNativeObservations(deps: NativeObservationDeps) {
   const observations = new Map<string, DirectoryObservation>();
+  const runtimeIds = new WeakMap<WorktreeKiloRuntime, number>();
+  let nextRuntimeId = 0;
 
-  function forget(directory: string): void {
-    observations.delete(directory);
+  function runtimeKey(runtime: WorktreeKiloRuntime): number {
+    const known = runtimeIds.get(runtime);
+    if (known !== undefined) return known;
+    const id = nextRuntimeId;
+    nextRuntimeId += 1;
+    runtimeIds.set(runtime, id);
+    return id;
+  }
+
+  function forget(observationKey: string): void {
+    observations.delete(observationKey);
   }
 
   async function sampleDirectory(
+    observationKey: string,
     directory: string,
     roots: readonly RootSnapshot[],
     signal?: AbortSignal
   ): Promise<void> {
-    const runtime = deps.getRuntime(directory);
+    const runtime = deps.getRuntime(directory, roots[0]?.kiloSessionId ?? '');
     if (!runtime) {
-      forget(directory);
+      forget(observationKey);
       return;
     }
     const client = runtime.kiloClient;
-    let entry = observations.get(directory);
+    let entry = observations.get(observationKey);
     if (
       entry &&
       (entry.runtime !== runtime ||
@@ -59,7 +71,7 @@ export function createNativeObservations(deps: NativeObservationDeps) {
     }
     if (!entry) {
       entry = { runtime, client, roots: roots.map(root => ({ ...root })), pending: undefined };
-      observations.set(directory, entry);
+      observations.set(observationKey, entry);
     }
     if (entry.pending) return entry.pending;
     const target = entry;
@@ -70,8 +82,8 @@ export function createNativeObservations(deps: NativeObservationDeps) {
     const readSignal = AbortSignal.any(signals);
     const isCurrent = () =>
       !readSignal.aborted &&
-      observations.get(directory) === target &&
-      deps.getRuntime(directory) === runtime &&
+      observations.get(observationKey) === target &&
+      deps.getRuntime(directory, capturedRoots[0]?.kiloSessionId ?? '') === runtime &&
       runtime.kiloClient === client;
 
     const pending = (async () => {
@@ -101,18 +113,23 @@ export function createNativeObservations(deps: NativeObservationDeps) {
 
   async function refresh(signal?: AbortSignal): Promise<void> {
     if (deps.signal?.aborted || signal?.aborted) return;
-    const rootsByDirectory = new Map<string, RootSnapshot[]>();
+    const rootsByRuntime = new Map<string, RootSnapshot[]>();
     for (const root of deps.roots()) {
       if (!root.directory) continue;
-      const roots = rootsByDirectory.get(root.directory) ?? [];
+      const runtime = deps.getRuntime(root.directory, root.kiloSessionId);
+      if (!runtime) continue;
+      const key = `${root.directory}\0${runtimeKey(runtime)}`;
+      const roots = rootsByRuntime.get(key) ?? [];
       roots.push(root);
-      rootsByDirectory.set(root.directory, roots);
+      rootsByRuntime.set(key, roots);
     }
-    for (const directory of observations.keys()) {
-      if (!rootsByDirectory.has(directory)) forget(directory);
+    for (const key of observations.keys()) {
+      if (!rootsByRuntime.has(key)) forget(key);
     }
     await Promise.all(
-      [...rootsByDirectory].map(([directory, roots]) => sampleDirectory(directory, roots, signal))
+      [...rootsByRuntime.entries()].map(([key, roots]) =>
+        sampleDirectory(key, roots[0]?.directory ?? '', roots, signal)
+      )
     );
   }
 

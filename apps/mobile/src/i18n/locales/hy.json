@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Կորպորատիվ SSO"
   },
   "preferences": {
+    "general": "Ընդհանուր",
+    "voiceInput": "Ձայնային մուտք",
     "autoExpandThinking": "Ինքնաշխատ բացել մտածման բաժինը",
     "autoExpandThinkingSubtitle": "Մտածումն ավարտվելուց հետո բացել գործակալի մտածման բաժինը։",
     "keepScreenOn": "Նիստի էջում էկրանը միացված պահել",
@@ -237,6 +239,7 @@
     "appearanceLight": "Բաց",
     "appearanceDark": "Մուգ",
     "account": "Հաշիվ",
+    "accountSubtitle": "Լեզու, վստահելի կայքեր և սարքերի աշխատաշրջաններ",
     "prReviewAttribution": "PR ստուգումներում նշել հավելվածը",
     "prReviewAttributionSubtitle": "Ստուգումն ուղարկելիս վերջում ավելացնել «Ստուգվել է Kilo-ի միջոցով» նշումը։",
     "returnSendsMessage": "Մուտքի ստեղնն ուղարկում է հաղորդագրությունը",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Խոսքի տեքստի վերածում Kilo Gateway-ով",
+    "gatewayTranscriptionSubtitle": "Ձայնային մուտքագրումը տեքստի վերածեք Kilo Gateway-ի մոդելով՝ սարքի խոսքի ճանաչման փոխարեն։ Ձեր ձայնագրությունը ուղարկվում է Kilo Gateway։",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Միավորման հարցումը հասանելի չէ",
@@ -448,6 +454,9 @@
       "acceptTerms": "Ընդունել",
       "replyBadRequest": "Այս պատասխանը հնարավոր չէ հրապարակել։ Հնարավոր է՝ քննարկման շղթան փոխվել է։",
       "replyForbidden": "Այս միավորման հարցմանը պատասխանելու թույլտվություն չունես։",
+      "addCommentCta": "Մեկնաբանել այս միավորման հարցումը",
+      "commentBadRequest": "Այս մեկնաբանությունը հնարավոր չէ հրապարակել։ Հնարավոր է՝ միավորման հարցումը փոխվել է։",
+      "commentForbidden": "Այս միավորման հարցման վրա մեկնաբանություն գրելու թույլտվություն չունես։",
       "moderation": {
         "reportContent": {
           "terminal": "Այս մեկնաբանությունից հնարավոր չէ բողոքել։",
@@ -2565,7 +2574,14 @@
     "languageNotInstalledMessage": "{{language}} լեզվի օֆլայն խոսքի ֆայլերը տեղադրված չեն այս հեռախոսում։ Ներբեռնիր դրանք, ապա կրկին փորձիր ձայնային մուտքագրումը։",
     "downloadOfflineModel": "Ներբեռնել",
     "offlineModelDownloadScheduled": "Օֆլայն խոսքի ֆայլերը կներբեռնվեն ֆոնային ռեժիմում։ Փորձիր ձայնային մուտքագրումը ավելի ուշ։",
-    "listeningStopped": "Լսումը դադարեցվել է։"
+    "listeningStopped": "Լսումը դադարեցվել է։",
+    "transcribing": "Վերածում ենք տեքստի...",
+    "gatewayUnreachable": "Հնարավոր չեղավ կապ հաստատել Kilo Gateway-ի հետ։ Ստուգեք կապը և կրկին փորձեք։",
+    "gatewayTimeout": "Տեքստի վերածումը չափազանց երկար տևեց։ Կրկին փորձեք։",
+    "gatewayModelUnavailable": "Այս տեքստի վերածման մոդելը հասանելի չէ։ Ընտրեք մեկ այլ՝ Նախապատվություններում։",
+    "gatewayModelUnavailableNotice": "Այս մոդելը այլևս չի առաջարկվում։ Մեկ այլ ընտրելու համար հպեք $t(transcriptionModel.title)։",
+    "gatewaySignInRequired": "Մուտք գործեք՝ Kilo Gateway-ի վերածումն օգտագործելու համար։",
+    "gatewayNoModel": "Նախ ընտրեք տեքստի վերածման մոդել՝ Նախապատվություններում։"
   },
   "share": {
     "title": "Ուղարկում Kilo-ին",
@@ -2939,6 +2955,13 @@
     "needsInput": "Սպասում է պատասխանի",
     "channelName": "Ակտիվ գործակալներ",
     "activityKitDisabledBody": "Կարգավորումներում միացրու ընթացիկ գործողությունների ցուցադրումը՝ ակտիվ գործակալներին կողպման էկրանին տեսնելու համար։"
+  },
+  "transcriptionModel": {
+    "title": "Տեքստի վերածման մոդել",
+    "noneChosen": "Ոչինչ չի ընտրվել",
+    "emptyTitle": "Տեքստի վերածման մոդելներ չկան",
+    "emptyDescription": "Kilo Gateway-ը հիմա տեքստի վերածման մոդելներ չի առաջարկում։",
+    "loadFailed": "Չհաջողվեց բեռնել տեքստի վերածման մոդելները։"
   },
   "modelChat": {
     "empty": {

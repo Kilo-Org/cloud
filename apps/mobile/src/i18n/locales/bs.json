@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Poslovna jedinstvena prijava (SSO)"
   },
   "preferences": {
+    "general": "Općenito",
+    "voiceInput": "Glasovni unos",
     "autoExpandThinking": "Automatski proširi razmišljanje",
     "autoExpandThinkingSubtitle": "Prikaži cijelo razmišljanje agenta kada završi.",
     "keepScreenOn": "Ostavi ekran uključen dok je otvorena sesija",
@@ -237,6 +239,7 @@
     "appearanceLight": "Svijetlo",
     "appearanceDark": "Tamno",
     "account": "Nalog",
+    "accountSubtitle": "Jezik, pouzdani hostovi i sesije na uređajima",
     "prReviewAttribution": "Navedi aplikaciju u PR pregledima",
     "prReviewAttributionSubtitle": "Dodaj napomenu „Pregledano putem aplikacije Kilo“ na kraj pregleda koji šalješ.",
     "returnSendsMessage": "Tipka za novi red šalje poruku",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkripcija putem Kilo Gatewaya",
+    "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gatewaya umjesto prepoznavanja govora na uređaju. Snimka se šalje na Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtjev za spajanje nije dostupan",
@@ -450,6 +456,9 @@
       "acceptTerms": "Prihvati",
       "replyBadRequest": "Ovaj odgovor se ne može objaviti. Nit se možda promijenila.",
       "replyForbidden": "Nemaš dozvolu da odgovoriš na ovaj zahtjev za spajanje.",
+      "addCommentCta": "Komentariši ovaj zahtjev za spajanje",
+      "commentBadRequest": "Ovaj komentar se ne može objaviti. Zahtjev za spajanje se možda promijenio.",
+      "commentForbidden": "Nemaš dozvolu da komentarišeš ovaj zahtjev za spajanje.",
       "moderation": {
         "reportContent": {
           "terminal": "Ovaj komentar se ne može prijaviti.",
@@ -2586,7 +2595,14 @@
     "languageNotInstalledMessage": "Vanmrežne datoteke govora za {{language}} nisu instalirane na ovom telefonu. Preuzmi ih, a zatim pokušaj glasovni unos ponovo.",
     "downloadOfflineModel": "Preuzmi",
     "offlineModelDownloadScheduled": "Vanmrežne datoteke govora bit će preuzete u pozadini. Pokušaj glasovni unos ponovo kasnije.",
-    "listeningStopped": "Slušanje je zaustavljeno."
+    "listeningStopped": "Slušanje je zaustavljeno.",
+    "transcribing": "Transkribiram...",
+    "gatewayUnreachable": "Nije bilo moguće povezati se s Kilo Gatewayem. Provjeri vezu i pokušaj ponovo.",
+    "gatewayTimeout": "Transkripcija je predugo trajala. Pokušaj ponovo.",
+    "gatewayModelUnavailable": "Ovaj model za transkripciju nije dostupan. Odaberi drugi u Postavkama.",
+    "gatewayModelUnavailableNotice": "Ovaj model se više ne nudi. Dodirni $t(transcriptionModel.title) da odabereš drugi.",
+    "gatewaySignInRequired": "Prijavi se da koristiš transkripciju putem Kilo Gatewaya.",
+    "gatewayNoModel": "Prvo odaberi model za transkripciju u Postavkama."
   },
   "share": {
     "title": "Podijeli s aplikacijom Kilo",
@@ -2961,6 +2977,13 @@
     "needsInput": "Čeka unos",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama da vidiš aktivne agente na zaključanom ekranu."
+  },
+  "transcriptionModel": {
+    "title": "Model za transkripciju",
+    "noneChosen": "Nije odabran",
+    "emptyTitle": "Nema modela za transkripciju",
+    "emptyDescription": "Kilo Gateway trenutno ne nudi modele za transkripciju.",
+    "loadFailed": "Nije moguće učitati modele za transkripciju."
   },
   "modelChat": {
     "empty": {

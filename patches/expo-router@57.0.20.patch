@@ -1,4 +1,5 @@
 diff --git a/build/fork/useLinking.native.js b/build/fork/useLinking.native.js
+index c080a58..5da1348 100644
 --- a/build/fork/useLinking.native.js
 +++ b/build/fork/useLinking.native.js
 @@ -114,20 +114,30 @@ function useLinking(ref, { enabled = true, prefixes, filter, config, getInitialU

@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO d'empresa"
   },
   "preferences": {
+    "general": "General",
+    "voiceInput": "Entrada de veu",
     "autoExpandThinking": "Desplega automàticament el raonament",
     "autoExpandThinkingSubtitle": "Mostra el raonament de l'agent desplegat quan acaba de raonar.",
     "keepScreenOn": "Mantén la pantalla encesa mentre vegis la sessió",
@@ -237,6 +239,7 @@
     "appearanceLight": "Clar",
     "appearanceDark": "Fosc",
     "account": "Compte",
+    "accountSubtitle": "Idioma, servidors de confiança i sessions als dispositius",
     "prReviewAttribution": "Afegeix l'atribució de l'aplicació a les revisions de PR",
     "prReviewAttributionSubtitle": "Afegeix un peu amb el text «Revisat amb Kilo» quan enviïs una revisió.",
     "returnSendsMessage": "La tecla de retorn envia el missatge",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transcripció amb Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transcriu el dictat amb un model de Kilo Gateway en lloc del reconeixement de veu del dispositiu. Enviarem la teva gravació a Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Sol·licitud d'integració no disponible",
@@ -450,6 +456,9 @@
       "acceptTerms": "Accepta",
       "replyBadRequest": "Aquesta resposta no es pot publicar. Pot ser que el fil hagi canviat.",
       "replyForbidden": "No tens permís per respondre a aquesta sol·licitud d'integració.",
+      "addCommentCta": "Comenta aquesta sol·licitud d'integració",
+      "commentBadRequest": "Aquest comentari no es pot publicar. Pot ser que la sol·licitud d'integració hagi canviat.",
+      "commentForbidden": "No tens permís per comentar aquesta sol·licitud d'integració.",
       "moderation": {
         "reportContent": {
           "terminal": "Aquest comentari no es pot denunciar.",
@@ -2586,7 +2595,14 @@
     "languageNotInstalledMessage": "Els fitxers de veu fora de línia de {{language}} no estan instal·lats en aquest telèfon. Baixa'ls i torna-ho a provar amb el dictat.",
     "downloadOfflineModel": "Baixa",
     "offlineModelDownloadScheduled": "Els fitxers de veu fora de línia es baixaran en segon pla. Torna a provar el dictat més tard.",
-    "listeningStopped": "S'ha deixat d'escoltar."
+    "listeningStopped": "S'ha deixat d'escoltar.",
+    "transcribing": "S'està transcrivint…",
+    "gatewayUnreachable": "No s'ha pogut contactar amb Kilo Gateway. Comprova la connexió i torna-ho a provar.",
+    "gatewayTimeout": "La transcripció ha trigat massa. Torna-ho a provar.",
+    "gatewayModelUnavailable": "Aquest model de transcripció no està disponible. Tria'n un altre a les Preferències.",
+    "gatewayModelUnavailableNotice": "Aquest model ja no s'ofereix. Toca $t(transcriptionModel.title) per triar-ne un altre.",
+    "gatewaySignInRequired": "Inicia la sessió per utilitzar la transcripció amb Kilo Gateway.",
+    "gatewayNoModel": "Primer tria un model de transcripció a les Preferències."
   },
   "share": {
     "title": "Compartir amb Kilo",
@@ -2961,6 +2977,13 @@
     "needsInput": "Pendent de resposta",
     "channelName": "Agents actius",
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig."
+  },
+  "transcriptionModel": {
+    "title": "Model de transcripció",
+    "noneChosen": "Cap seleccionat",
+    "emptyTitle": "Cap model de transcripció",
+    "emptyDescription": "Kilo Gateway no ofereix cap model de transcripció ara mateix.",
+    "loadFailed": "No s'han pogut carregar els models de transcripció."
   },
   "modelChat": {
     "empty": {

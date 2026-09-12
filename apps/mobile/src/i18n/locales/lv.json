@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Uzņēmuma SSO"
   },
   "preferences": {
+    "general": "Vispārīgi",
+    "voiceInput": "Balss ievade",
     "autoExpandThinking": "Automātiski izvērst domāšanu",
     "autoExpandThinkingSubtitle": "Rādīt aģenta domas izvērstā veidā, kad domāšana ir pabeigta.",
     "keepScreenOn": "Neizslēgt ekrānu sesijas skatā",
@@ -237,6 +239,7 @@
     "appearanceLight": "Gaišs",
     "appearanceDark": "Tumšs",
     "account": "Konts",
+    "accountSubtitle": "Valoda, uzticamie resursdatori un ierīču sesijas",
     "prReviewAttribution": "Pievienot lietotnes norādi PR pārbaudēm",
     "prReviewAttributionSubtitle": "Iesniedzot pārbaudes rezultātus, pievienot norādi „Pārbaudīts, izmantojot Kilo”.",
     "returnSendsMessage": "Ievades taustiņš nosūta ziņojumu",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkripcija, izmantojot Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkribē balss ievadi, izmantojot Kilo Gateway modeli, nevis ierīces runas atpazīšanu. Ieraksts tiek nosūtīts uz Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Izmaiņu pieprasījums nav pieejams",
@@ -450,6 +456,9 @@
       "acceptTerms": "Pieņemt",
       "replyBadRequest": "Šo atbildi nevar publicēt. Pavediens, iespējams, ir mainījies.",
       "replyForbidden": "Tev nav atļaujas atbildēt šajā izmaiņu pieprasījumā.",
+      "addCommentCta": "Komentēt šo izmaiņu pieprasījumu",
+      "commentBadRequest": "Šo komentāru nevar publicēt. Iespējams, izmaiņu pieprasījums ir mainījies.",
+      "commentForbidden": "Tev nav atļaujas komentēt šajā izmaiņu pieprasījumā.",
       "moderation": {
         "reportContent": {
           "terminal": "Par šo komentāru nevar ziņot.",
@@ -2586,7 +2595,14 @@
     "languageNotInstalledMessage": "{{language}} valodas bezsauses runas faili šajā tālrunī nav instalēti. Lejupielādē tos un pēc tam mēģini balss ievadi vēlreiz.",
     "downloadOfflineModel": "Lejupielādēt",
     "offlineModelDownloadScheduled": "Bezsauses runas faili tiks lejupielādēti fonā. Vēlāk mēģini balss ievadi vēlreiz.",
-    "listeningStopped": "Klausīšanās apturēta."
+    "listeningStopped": "Klausīšanās apturēta.",
+    "transcribing": "Transkribē…",
+    "gatewayUnreachable": "Neizdevās sasniegt Kilo Gateway. Pārbaudi savienojumu un mēģini vēlreiz.",
+    "gatewayTimeout": "Transkripcija aizņēma par daudz laika. Mēģini vēlreiz.",
+    "gatewayModelUnavailable": "Šis transkripcijas modelis nav pieejams. Izvēlies citu Lietotāja iestatījumos.",
+    "gatewayModelUnavailableNotice": "Šis modelis vairs netiek piedāvāts. Pieskaries $t(transcriptionModel.title), lai izvēlētos citu.",
+    "gatewaySignInRequired": "Pieraksties, lai izmantotu transkripciju, izmantojot Kilo Gateway.",
+    "gatewayNoModel": "Vispirms izvēlies transkripcijas modeli Lietotāja iestatījumos."
   },
   "share": {
     "title": "Kopīgošana lietotnē Kilo",
@@ -2961,6 +2977,13 @@
     "needsInput": "Gaida ievadi",
     "channelName": "Aktīvie aģenti",
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus."
+  },
+  "transcriptionModel": {
+    "title": "Transkripcijas modelis",
+    "noneChosen": "Nav izvēlēts",
+    "emptyTitle": "Nav transkripcijas modeļu",
+    "emptyDescription": "Pašlaik Kilo Gateway nepiedāvā nevienu transkripcijas modeli.",
+    "loadFailed": "Neizdevās ielādēt transkripcijas modeļus."
   },
   "modelChat": {
     "empty": {

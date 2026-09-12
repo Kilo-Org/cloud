@@ -87,6 +87,8 @@ type ServerState = {
   nextRequestId: number;
   /** Count of dispatched completions, exposed for fail-fast scenario assertions. */
   chatCompletionRequests: number;
+  /** Count of dispatched audio/transcriptions calls, exposed for fail-fast scenario assertions. */
+  transcriptionRequests: number;
   scenarios: Map<string, InternalScenarioStatus>;
 };
 
@@ -114,7 +116,7 @@ const DIRECTIVE_PREFIX = '__fake__:';
  * remaining text (including any further colons) becomes a single trailing
  * argument. This keeps `echo:hello:world` → `{ scenario: 'echo', args: ['hello:world'] }`
  * so scenario payloads are free to contain colons. Scenarios that take a
- * fixed number of numeric args (e.g. `slow:<n>:<ms>`) split their trailing
+ * fixed number of numeric args (e.g. `slow:<n>:<ms>:<bytes>`) split their trailing
  * arg themselves if needed — the harness callers (`slow`) split on `:` and
  * take the first N.
  *
@@ -180,6 +182,40 @@ export function extractLastUserMessageText(body: unknown): string {
  */
 export function stripKiloPromptWrapping(text: string): string {
   return text.replace(/<environment_details>[\s\S]*?<\/environment_details>/gi, '').trim();
+}
+
+/**
+ * Extract a top-level field's value from a `multipart/form-data` body.
+ *
+ * node:http ships no formData parser and the harness must not gain a runtime
+ * dependency for one, so this does the minimal boundary split the gateway
+ * proxy path needs: parts are separated by `--<boundary>` lines, each part
+ * carries a `Content-Disposition` header whose `name="<field>"` selects it,
+ * and the value is everything between the header block and the next
+ * delimiter. Binary file parts survive as mangled utf8 — irrelevant, since
+ * only text fields (currently `model`) are read.
+ *
+ * Returns the decoded value, or null when the field is absent.
+ */
+export function extractMultipartField(
+  body: string,
+  boundary: string,
+  field: string
+): string | null {
+  const delimiter = `--${boundary}`;
+  for (const part of body.split(delimiter)) {
+    const headerEnd = part.indexOf('\r\n\r\n');
+    if (headerEnd < 0) continue;
+    const disposition = part
+      .slice(0, headerEnd)
+      .split('\r\n')
+      .find(line => /^content-disposition:/i.test(line));
+    if (!disposition) continue;
+    if (disposition.match(/name="([^"]*)"/)?.[1] !== field) continue;
+    // Drop the `\r\n` that frames the value against the next delimiter.
+    return part.slice(headerEnd + 4).replace(/\r\n$/, '');
+  }
+  return null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -424,6 +460,27 @@ const FAKE_MODEL = {
 function modelsCatalogue(): { data: Array<typeof FAKE_MODEL> } {
   return { data: [FAKE_MODEL] };
 }
+
+/**
+ * Speech-to-text catalogue served for `GET /api/openrouter/models` with
+ * `output_modalities=transcription`. Two ids: the happy path the mobile e2e
+ * scenarios address, and a broken one whose transcription request 404s so the
+ * non-retryable unhappy state is provable without an upstream key.
+ */
+const TRANSCRIPTION_MODELS = [
+  {
+    id: 'fake-transcribe',
+    name: 'Fake Transcribe',
+    context_length: 128000,
+    pricing: { prompt: '0', completion: '0' },
+  },
+  {
+    id: 'fake-transcribe-broken',
+    name: 'Broken Transcriber',
+    context_length: 128000,
+    pricing: { prompt: '0', completion: '0' },
+  },
+];
 
 // ---------------------------------------------------------------------------
 // SSE framing helpers
@@ -713,16 +770,23 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
   async slow(args, ctx) {
     const raw = args[0] ?? '';
     const parts = raw.split(':');
-    const n = Math.max(1, Number.parseInt(parts[0] ?? '1', 10) || 1);
+    const n = Math.min(200, Math.max(1, Number.parseInt(parts[0] ?? '1', 10) || 1));
     const delayMs = Math.max(0, Number.parseInt(parts[1] ?? '0', 10) || 0);
-    const payload = 'slow-response';
+    const chunkBytes = Math.min(2048, Math.max(0, Number.parseInt(parts[2] ?? '0', 10) || 0));
     writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { role: 'assistant', content: '' }));
     let totalContent = 0;
     for (let i = 0; i < n; i++) {
-      const piece = payload.slice(
-        Math.floor((i * payload.length) / n),
-        Math.floor(((i + 1) * payload.length) / n)
-      );
+      let piece: string;
+      if (chunkBytes > 0) {
+        const token = ` w${i} `;
+        piece = token.repeat(Math.ceil(chunkBytes / token.length)).slice(0, chunkBytes);
+      } else {
+        const payload = 'slow-response';
+        piece = payload.slice(
+          Math.floor((i * payload.length) / n),
+          Math.floor(((i + 1) * payload.length) / n)
+        );
+      }
       totalContent += piece.length;
       writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { content: piece }));
       if (i < n - 1 && delayMs > 0) await sleep(delayMs);
@@ -750,6 +814,11 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
         reason: 'client-closed',
       });
     });
+  },
+
+  'error-terminal'(args, ctx) {
+    const message = args[0] ?? 'simulated error';
+    writeJsonError(ctx.res, 400, message, 'invalid_request');
   },
 
   error(args, ctx) {
@@ -971,6 +1040,87 @@ async function handleChatCompletions(
   }
 }
 
+/**
+ * `POST /api/openrouter/audio/transcriptions` — the speech-to-text leg the
+ * Kilo gateway proxy dials. Accepts the two shapes that reach it: a
+ * `multipart/form-data` body (mobile proxy path) or the JSON
+ * `{ model, input_audio: { data, format } }` the web proxy forwards.
+ * `fake-transcribe-broken` 404s so scenarios can drive the non-retryable
+ * unhappy state; every other model returns the fixed transcript.
+ */
+async function handleAudioTranscriptions(
+  req: IncomingMessage,
+  res: ServerResponse,
+  state: ServerState
+): Promise<void> {
+  state.transcriptionRequests += 1;
+  const reqLogId = ++state.nextRequestId;
+  const startedAt = Date.now();
+
+  const contentType = req.headers['content-type'] ?? '';
+  const multipart = contentType.startsWith('multipart/form-data');
+  const raw = await readBody(req);
+
+  let model: string | null = null;
+  let invalidBody: string | null = null;
+  if (multipart) {
+    const boundary = contentType.match(/boundary=(?:"([^"]+)"|([^;\s]+))/);
+    const delimiter = boundary?.[1] ?? boundary?.[2];
+    if (delimiter) {
+      model = extractMultipartField(raw, delimiter, 'model');
+    } else {
+      invalidBody = 'multipart body is missing a boundary';
+    }
+  } else {
+    try {
+      const body: unknown = JSON.parse(raw);
+      if (isRecord(body) && typeof body.model === 'string') model = body.model;
+      else invalidBody = 'model field is required';
+    } catch {
+      invalidBody = 'invalid JSON body';
+    }
+  }
+
+  logEvent('request.start', {
+    reqId: reqLogId,
+    route: 'POST /api/openrouter/audio/transcriptions',
+    mode: multipart ? 'multipart' : 'json',
+    model: model ?? undefined,
+  });
+
+  const fail = (status: number, message: string, type: string, reason: string): void => {
+    writeJsonError(res, status, message, type);
+    logEvent('request.end', {
+      reqId: reqLogId,
+      status,
+      reason,
+      durationMs: Date.now() - startedAt,
+    });
+  };
+
+  if (invalidBody) {
+    fail(400, invalidBody, 'invalid_request', 'invalid-body');
+    return;
+  }
+  if (model === null) {
+    fail(400, 'model field is required', 'invalid_request', 'missing-model');
+    return;
+  }
+  if (model === 'fake-transcribe-broken') {
+    fail(404, `model not found: ${model}`, 'model_not_found', 'model-not-found');
+    return;
+  }
+
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ text: 'Gateway transcription online' }));
+  logEvent('request.end', {
+    reqId: reqLogId,
+    status: 200,
+    reason: 'finished',
+    durationMs: Date.now() - startedAt,
+  });
+}
+
 function handleRelease(req: IncomingMessage, res: ServerResponse, state: ServerState): void {
   const url = new URL(req.url ?? '/', 'http://localhost');
   const tag = url.searchParams.get('tag');
@@ -1021,8 +1171,13 @@ function handleGateStatus(req: IncomingMessage, res: ServerResponse, state: Serv
   res.end(JSON.stringify({ tag, engaged }));
 }
 
-function handleModels(res: ServerResponse): void {
+function handleModels(req: IncomingMessage, res: ServerResponse): void {
+  const url = new URL(req.url ?? '/', 'http://localhost');
   res.writeHead(200, { 'Content-Type': 'application/json' });
+  if (url.searchParams.get('output_modalities') === 'transcription') {
+    res.end(JSON.stringify({ data: TRANSCRIPTION_MODELS }));
+    return;
+  }
   res.end(JSON.stringify(modelsCatalogue()));
 }
 
@@ -1052,7 +1207,12 @@ async function handleModelValidation(req: IncomingMessage, res: ServerResponse):
 
 function handleRequestCounts(res: ServerResponse, state: ServerState): void {
   res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ chatCompletions: state.chatCompletionRequests }));
+  res.end(
+    JSON.stringify({
+      chatCompletions: state.chatCompletionRequests,
+      transcriptions: state.transcriptionRequests,
+    })
+  );
 }
 
 function handleScenarioStatus(req: IncomingMessage, res: ServerResponse, state: ServerState): void {
@@ -1105,6 +1265,7 @@ export async function startFakeLlmServer(opts?: {
     liveResponses: new Set(),
     nextRequestId: 0,
     chatCompletionRequests: 0,
+    transcriptionRequests: 0,
     scenarios: new Map(),
   };
 
@@ -1115,7 +1276,7 @@ export async function startFakeLlmServer(opts?: {
     const route = `${req.method ?? 'GET'} ${url.pathname}`;
 
     if (route === 'GET /api/openrouter/models') {
-      handleModels(res);
+      handleModels(req, res);
       return;
     }
     if (
@@ -1136,6 +1297,17 @@ export async function startFakeLlmServer(opts?: {
     if (route === 'POST /api/openrouter/chat/completions') {
       handleChatCompletions(req, res, state).catch(err => {
         console.error('fake-llm chat/completions error:', err);
+        if (!res.headersSent) {
+          writeJsonError(res, 500, 'internal error', 'server_error');
+        } else {
+          res.end();
+        }
+      });
+      return;
+    }
+    if (route === 'POST /api/openrouter/audio/transcriptions') {
+      handleAudioTranscriptions(req, res, state).catch(err => {
+        console.error('fake-llm audio/transcriptions error:', err);
         if (!res.headersSent) {
           writeJsonError(res, 500, 'internal error', 'server_error');
         } else {

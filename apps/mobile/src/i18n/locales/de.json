@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Unternehmens-SSO"
   },
   "preferences": {
+    "general": "Allgemein",
+    "voiceInput": "Spracheingabe",
     "autoExpandThinking": "Denkprozess automatisch aufklappen",
     "autoExpandThinkingSubtitle": "Den Denkprozess des Agenten nach Abschluss aufgeklappt anzeigen.",
     "keepScreenOn": "Bildschirm in der Sitzungsansicht eingeschaltet lassen",
@@ -237,6 +239,7 @@
     "appearanceLight": "Hell",
     "appearanceDark": "Dunkel",
     "account": "Konto",
+    "accountSubtitle": "Sprache, vertrauenswürdige Hosts und Gerätesitzungen",
     "prReviewAttribution": "App-Hinweis zu PR-Prüfungen hinzufügen",
     "prReviewAttributionSubtitle": "Beim Einreichen einer Prüfung die Fußzeile „Mit Kilo geprüft“ hinzufügen.",
     "returnSendsMessage": "Eingabetaste sendet Nachricht",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Gateway-Transkription",
+    "gatewayTranscriptionSubtitle": "Transkribiere die Spracheingabe mit einem Kilo-Gateway-Modell statt mit der Spracherkennung des Geräts. Deine Aufnahme wird an das Kilo Gateway gesendet.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Live-Aktivitäten",
@@ -2134,7 +2140,14 @@
     "languageNotInstalledMessage": "Die Offline-Sprachdateien für {{language}} sind auf diesem Telefon nicht installiert. Lade sie herunter und versuche die Spracheingabe erneut.",
     "downloadOfflineModel": "Herunterladen",
     "offlineModelDownloadScheduled": "Die Offline-Sprachdateien werden im Hintergrund heruntergeladen. Versuche die Spracheingabe später erneut.",
-    "listeningStopped": "Die Aufnahme wurde beendet."
+    "listeningStopped": "Die Aufnahme wurde beendet.",
+    "transcribing": "Transkription läuft …",
+    "gatewayUnreachable": "Das Kilo Gateway konnte nicht erreicht werden. Prüfe deine Verbindung und versuche es erneut.",
+    "gatewayTimeout": "Die Transkription hat zu lange gedauert. Versuche es erneut.",
+    "gatewayModelUnavailable": "Dieses Transkriptionsmodell ist nicht verfügbar. Wähle ein anderes in den Einstellungen.",
+    "gatewayModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(transcriptionModel.title), um ein anderes zu wählen.",
+    "gatewaySignInRequired": "Melde dich an, um die Gateway-Transkription zu nutzen.",
+    "gatewayNoModel": "Wähle zuerst in den Einstellungen ein Transkriptionsmodell."
   },
   "share": {
     "title": "Mit Kilo teilen",
@@ -2408,6 +2421,9 @@
       "replyBadRequest": "Diese Antwort kann nicht veröffentlicht werden. Der Thread hat sich möglicherweise geändert.",
       "replyBody": "Antworttext",
       "replyForbidden": "Du hast keine Berechtigung, auf diesen Pull-Request zu antworten.",
+      "addCommentCta": "Diesen Pull-Request kommentieren",
+      "commentBadRequest": "Dieser Kommentar kann nicht veröffentlicht werden. Der Pull-Request hat sich möglicherweise geändert.",
+      "commentForbidden": "Du hast keine Berechtigung, diesen Pull-Request zu kommentieren.",
       "replyPlaceholder": "Deine Antwort …",
       "reportContent": "Inhalt melden",
       "reportUser": "Benutzer melden",
@@ -2939,6 +2955,13 @@
     "needsInput": "Eingabe erforderlich",
     "channelName": "Aktive Agenten",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
+  },
+  "transcriptionModel": {
+    "title": "Transkriptionsmodell",
+    "noneChosen": "Keines ausgewählt",
+    "emptyTitle": "Keine Transkriptionsmodelle",
+    "emptyDescription": "Kilo Gateway bietet derzeit keine Transkriptionsmodelle.",
+    "loadFailed": "Die Transkriptionsmodelle konnten nicht geladen werden."
   },
   "modelChat": {
     "empty": {

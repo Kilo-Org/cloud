@@ -2041,8 +2041,11 @@ describe('startup credential read failure', () => {
     // Let the abandoned retry's remaining reads exhaust (~1.75 s of backoff)
     // and flush its catch. Resurrecting the flag here would repaint the error
     // screen over the login route, where the sign-out dedupe makes a second
-    // tap a no-op — the escape hatch would be permanently dead.
-    for (let waited = 0; waited <= 4000 && readCount() < 8; waited += 20) {
+    // tap a no-op — the escape hatch would be permanently dead. The budget is a
+    // real wall-clock wait so a loaded machine's stretched cycles do not cut the
+    // retry's backoff short.
+    const abandonedSettleStartedAt = Date.now();
+    while (Date.now() - abandonedSettleStartedAt <= 30_000 && readCount() < 8) {
       // eslint-disable-next-line no-await-in-loop -- polling must flush and re-check sequentially between act cycles
       await act(async () => {
         await new Promise<void>(resolve => {

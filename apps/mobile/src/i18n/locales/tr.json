@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Kurumsal SSO"
   },
   "preferences": {
+    "general": "Genel",
+    "voiceInput": "Sesli giriş",
     "autoExpandThinking": "Düşünce bölümünü otomatik genişlet",
     "autoExpandThinkingSubtitle": "Ajan düşünmeyi bitirdiğinde düşünce bölümünü genişletilmiş olarak göster.",
     "keepScreenOn": "Oturum sayfasındayken ekranı açık tut",
@@ -237,6 +239,7 @@
     "appearanceLight": "Açık",
     "appearanceDark": "Koyu",
     "account": "Hesap",
+    "accountSubtitle": "Dil, güvenilen sunucular ve cihaz oturumları",
     "prReviewAttribution": "PR incelemelerine uygulama bilgisi ekle",
     "prReviewAttributionSubtitle": "İnceleme gönderdiğinde sonuna “Kilo ile incelendi” notunu ekle.",
     "returnSendsMessage": "Enter tuşu mesaj gönderir",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway ile sesi metne dönüştürme",
+    "gatewayTranscriptionSubtitle": "Sesli girişi cihazın konuşma tanıması yerine bir Kilo Gateway modeliyle metne dönüştürün. Kaydınız Kilo Gateway'e gönderilir.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Canlı etkinlikler",
@@ -2134,7 +2140,14 @@
     "languageNotInstalledMessage": "{{language}} dilinin çevrimdışı konuşma dosyaları bu telefonda yüklü değil. Dosyaları indir, ardından sesli girişi tekrar dene.",
     "downloadOfflineModel": "İndir",
     "offlineModelDownloadScheduled": "Çevrimdışı konuşma dosyaları arka planda indirilecek. Sesli girişi daha sonra tekrar dene.",
-    "listeningStopped": "Dinleme durdu."
+    "listeningStopped": "Dinleme durdu.",
+    "transcribing": "Metne dönüştürülüyor...",
+    "gatewayUnreachable": "Kilo Gateway'e ulaşılamadı. Bağlantını kontrol et ve tekrar dene.",
+    "gatewayTimeout": "Metne dönüştürme çok uzun sürdü. Tekrar dene.",
+    "gatewayModelUnavailable": "Bu metne dönüştürme modeli kullanılamıyor. Tercihler'den başkasını seç.",
+    "gatewayModelUnavailableNotice": "Bu model artık sunulmuyor. Başka bir tane seçmek için $t(transcriptionModel.title) öğesine dokun.",
+    "gatewaySignInRequired": "Kilo Gateway ile dönüştürmeyi kullanmak için oturum açın.",
+    "gatewayNoModel": "Önce Tercihler'den bir metne dönüştürme modeli seçin."
   },
   "share": {
     "title": "Kilo ile paylaş",
@@ -2408,6 +2421,9 @@
       "replyBadRequest": "Bu yanıt gönderilemiyor. Yorum dizisi değişmiş olabilir.",
       "replyBody": "Yanıt metni",
       "replyForbidden": "Bu çekme isteğine yanıt verme iznin yok.",
+      "addCommentCta": "Bu çekme isteğine yorum yap",
+      "commentBadRequest": "Bu yorum gönderilemiyor. Çekme isteği değişmiş olabilir.",
+      "commentForbidden": "Bu çekme isteğine yorum yapma iznin yok.",
       "replyPlaceholder": "Yanıtın…",
       "reportContent": "İçeriği bildir",
       "reportUser": "Kullanıcıyı bildir",
@@ -2939,6 +2955,13 @@
     "needsInput": "Yanıt bekliyor",
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç."
+  },
+  "transcriptionModel": {
+    "title": "Metne dönüştürme modeli",
+    "noneChosen": "Hiçbiri seçilmedi",
+    "emptyTitle": "Metne dönüştürme modeli yok",
+    "emptyDescription": "Kilo Gateway şu anda metne dönüştürme modeli sunmuyor.",
+    "loadFailed": "Metne dönüştürme modelleri yüklenemedi."
   },
   "modelChat": {
     "empty": {

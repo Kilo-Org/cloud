@@ -69,6 +69,9 @@ describe('sandbox control frames', () => {
     expect(
       sandboxHelloResultSchema.safeParse({ ...helloResult(), handshakeComplete: false }).success
     ).toBe(false);
+    expect(
+      sandboxHelloResultSchema.parse(helloResult({ scopedCleanupResult: true })).capabilities
+    ).toMatchObject({ scopedCleanupResult: true });
   });
 
   it('accepts a valid request envelope', () => {

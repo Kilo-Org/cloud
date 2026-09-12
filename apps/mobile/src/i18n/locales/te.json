@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "ఎంటర్‌ప్రైజ్ SSO"
   },
   "preferences": {
+    "general": "సాధారణం",
+    "voiceInput": "వాయిస్ ఇన్‌పుట్",
     "autoExpandThinking": "ఆలోచనను స్వయంచాలకంగా విస్తరించండి",
     "autoExpandThinkingSubtitle": "ఏజెంట్ ఆలోచించడం పూర్తయినప్పుడు ఆ వివరాలను విస్తరించి చూపించండి.",
     "keepScreenOn": "సెషన్ పేజీలో ఉన్నంతసేపు స్క్రీన్ ఆన్‌లో ఉంచండి",
@@ -237,6 +239,7 @@
     "appearanceLight": "లైట్",
     "appearanceDark": "డార్క్",
     "account": "ఖాతా",
+    "accountSubtitle": "భాష, విశ్వసించిన హోస్ట్‌లు, పరికర సెషన్‌లు",
     "prReviewAttribution": "PR సమీక్షల్లో యాప్ పేరును చేర్చండి",
     "prReviewAttributionSubtitle": "సమీక్షను సమర్పించినప్పుడు చివరలో ‘Kilo ద్వారా సమీక్షించబడింది’ అని జోడించండి.",
     "returnSendsMessage": "రిటర్న్ కీ సందేశాన్ని పంపుతుంది",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway ద్వారా మాటలను వచనంగా మార్చడం",
+    "gatewayTranscriptionSubtitle": "పరికరం యొక్క మాటల గుర్తింపుకు బదులు Kilo Gateway మోడల్‌తో వాయిస్ ఇన్‌పుట్‌ను వచనంగా మార్చండి. మీ రికార్డింగ్ Kilo Gatewayకు పంపబడుతుంది.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
@@ -448,6 +454,9 @@
       "acceptTerms": "అంగీకరించండి",
       "replyBadRequest": "ఈ ప్రత్యుత్తరాన్ని పోస్ట్ చేయలేము. చర్చలో మార్పులు జరిగి ఉండవచ్చు.",
       "replyForbidden": "ఈ పుల్ రిక్వెస్ట్‌కు ప్రత్యుత్తరం ఇవ్వడానికి మీకు అనుమతి లేదు.",
+      "addCommentCta": "ఈ పుల్ రిక్వెస్ట్‌పై వ్యాఖ్యానించండి",
+      "commentBadRequest": "ఈ వ్యాఖ్యను పోస్ట్ చేయలేము. పుల్ రిక్వెస్ట్ మారి ఉండవచ్చు.",
+      "commentForbidden": "ఈ పుల్ రిక్వెస్ట్‌పై వ్యాఖ్యానించడానికి మీకు అనుమతి లేదు.",
       "moderation": {
         "reportContent": {
           "terminal": "ఈ వ్యాఖ్యపై ఫిర్యాదు చేయలేము.",
@@ -2565,7 +2574,14 @@
     "languageNotInstalledMessage": "{{language}} భాష ఆఫ్‌లైన్ స్పీచ్ ఫైల్‌లు ఈ ఫోన్‌లో ఇన్‌స్టాల్ చేయలేదు. వాటిని డౌన్‌లోడ్ చేసి, తర్వాత వాయిస్ ఇన్‌పుట్‌ను మళ్లీ ప్రయత్నించండి.",
     "downloadOfflineModel": "డౌన్‌లోడ్",
     "offlineModelDownloadScheduled": "ఆఫ్‌లైన్ స్పీచ్ ఫైల్‌లు నేపథ్యంలో డౌన్‌లోడ్ అవుతాయి. తర్వాత వాయిస్ ఇన్‌పుట్‌ను మళ్లీ ప్రయత్నించండి.",
-    "listeningStopped": "వినడం ఆగిపోయింది."
+    "listeningStopped": "వినడం ఆగిపోయింది.",
+    "transcribing": "వచనంగా మారుస్తోంది...",
+    "gatewayUnreachable": "Kilo Gatewayను చేరుకోలేకపోయాం. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+    "gatewayTimeout": "వచనంగా మార్చడానికి చాలా సమయం పట్టింది. మళ్లీ ప్రయత్నించండి.",
+    "gatewayModelUnavailable": "ఈ వచన మార్పిడి మోడల్ అందుబాటులో లేదు. ప్రాధాన్యతలలో మరొకదాన్ని ఎంచుకోండి.",
+    "gatewayModelUnavailableNotice": "ఈ మోడల్ ఇకపై అందించబడదు. మరొకదాన్ని ఎంచుకోవడానికి $t(transcriptionModel.title) ని నొక్కండి.",
+    "gatewaySignInRequired": "Kilo Gateway మార్పిడిని ఉపయోగించడానికి సైన్ ఇన్ చేయండి.",
+    "gatewayNoModel": "ముందుగా ప్రాధాన్యతలలో వచనంగా మార్చే మోడల్‌ను ఎంచుకోండి."
   },
   "share": {
     "title": "Kiloలో పంచుకోవడం",
@@ -2939,6 +2955,13 @@
     "needsInput": "మీ స్పందన అవసరం",
     "channelName": "పనిచేస్తున్న ఏజెంట్లు",
     "activityKitDisabledBody": "లాక్ స్క్రీన్‌పై పనిచేస్తున్న ఏజెంట్లను చూడటానికి సెట్టింగ్‌లలో లైవ్ యాక్టివిటీస్‌ను ఆన్ చేయండి."
+  },
+  "transcriptionModel": {
+    "title": "వచనంగా మార్చే మోడల్",
+    "noneChosen": "ఏదీ ఎంచుకోలేదు",
+    "emptyTitle": "వచనంగా మార్చే మోడల్లు లేవు",
+    "emptyDescription": "Kilo Gateway ప్రస్తుతం వచనంగా మార్చే మోడల్లను అందించడం లేదు.",
+    "loadFailed": "వచనంగా మార్చే మోడల్లను లోడ్ చేయలేకపోయాం."
   },
   "modelChat": {
     "empty": {

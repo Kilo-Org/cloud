@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "የድርጅት SSO"
   },
   "preferences": {
+    "general": "አጠቃላይ",
+    "voiceInput": "የድምጽ ግቤት",
     "autoExpandThinking": "አስተሳሰቡን በራስ ሰር ያስፉ",
     "autoExpandThinkingSubtitle": "ወኪሉ ማሰቡን ሲጨርስ አስተሳሰቡን ተዘርግቶ ያሳዩ።",
     "keepScreenOn": "በክፍለ ጊዜ ገጽ ላይ ሲሆኑ ማያ ገጹን እንደበራ ያቆዩ",
@@ -237,6 +239,7 @@
     "appearanceLight": "ብሩህ",
     "appearanceDark": "ጨለማ",
     "account": "መለያ",
+    "accountSubtitle": "ቋንቋ፣ የታመኑ አስተናጋጆች እና የመሣሪያ ክፍለ ጊዜዎች",
     "prReviewAttribution": "በPR ግምገማዎች ላይ የመተግበሪያውን ስም ያክሉ",
     "prReviewAttributionSubtitle": "ግምገማ ሲያስገቡ «በKilo ተገምግሟል» የሚል ግርጌ ያክሉ።",
     "returnSendsMessage": "የመመለሻ ቁልፍ መልእክት ይልካል",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "በKilo Gateway ድምጽን ወደ ጽሑፍ መቀየር",
+    "gatewayTranscriptionSubtitle": "የድምፅ ግብዓትን በመሣሪያው የንግግር ማውቂያ ምትክ በKilo Gateway ሞዴል ወደ ጽሑፍ ቀይሩ። ቀረጻዎ ወደ Kilo Gateway ይላካል።",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "የማዋሃድ ጥያቄው አይገኝም",
@@ -448,6 +454,9 @@
       "acceptTerms": "ተቀበል",
       "replyBadRequest": "ይህን ምላሽ መለጠፍ አይቻልም። የውይይት ሰንሰለቱ ተለውጦ ሊሆን ይችላል።",
       "replyForbidden": "ለዚህ የማዋሃድ ጥያቄ ምላሽ ለመስጠት ፈቃድ የለህም።",
+      "addCommentCta": "በዚህ የማዋሃድ ጥያቄ ላይ አስተያየት ስጥ",
+      "commentBadRequest": "ይህ አስተያየት መለጠፍ አይቻልም። የማዋሃዱ ጥያቄ ተለውጦ ሊሆን ይችላል።",
+      "commentForbidden": "በዚህ የማዋሃድ ጥያቄ ላይ አስተያየት ለመስጠት ፈቃድ የለህም።",
       "moderation": {
         "reportContent": {
           "terminal": "ይህ አስተያየት ሪፖርት ሊደረግ አይችልም።",
@@ -2565,7 +2574,14 @@
     "languageNotInstalledMessage": "የ{{language}} ከመስመር ውጭ ያሉ የንግግር ፋይሎች በዚህ ስልክ ላይ አልተጫኑም። ያውርዱዋቸው፣ ከዚያ የድምፅ ግብዓትን እንደገና ይሞክሩ።",
     "downloadOfflineModel": "አውርድ",
     "offlineModelDownloadScheduled": "ከመስመር ውጭ ያሉ የንግግር ፋይሎች በጀርባ ይወርዳሉ። የድምፅ ግብዓትን በኋላ እንደገና ይሞክሩ።",
-    "listeningStopped": "ማዳመጥ ቆሟል።"
+    "listeningStopped": "ማዳመጥ ቆሟል።",
+    "transcribing": "ወደ ጽሑፍ በመቀየር ላይ...",
+    "gatewayUnreachable": "Kilo Gateway ማግኘት አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
+    "gatewayTimeout": "ድምጽን ወደ ጽሑፍ መቀየር ረጅም ጊዜ አስፈልጎታል። እንደገና ይሞክሩ።",
+    "gatewayModelUnavailable": "ይህ የድምጽ ወደ ጽሑፍ ሞዴል አይገኝም። በምርጫዎች ውስጥ ሌላ ይምረጡ።",
+    "gatewayModelUnavailableNotice": "ይህ ሞዴል ከእንግዲህ አይቀርብም። ሌላ ለመምረጥ $t(transcriptionModel.title) ይንኩ።",
+    "gatewaySignInRequired": "በKilo Gateway ለመቀየር ይግቡ።",
+    "gatewayNoModel": "በምርጫዎች ውስጥ መጀመሪያ የድምጽ ወደ ጽሑፍ ሞዴል ይምረጡ።"
   },
   "share": {
     "title": "ወደ Kilo ማጋራት",
@@ -2939,6 +2955,13 @@
     "needsInput": "ምላሽ ይፈልጋል",
     "channelName": "ንቁ ወኪሎች",
     "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።"
+  },
+  "transcriptionModel": {
+    "title": "የድምጽ ወደ ጽሑፍ ሞዴል",
+    "noneChosen": "ምንም አልተመረጠም",
+    "emptyTitle": "ምንም የድምጽ ወደ ጽሑፍ ሞዴሎች የሉም",
+    "emptyDescription": "Kilo Gateway በአሁኑ ሰዓት ምንም የድምጽ ወደ ጽሑፍ ሞዴሎችን አያቀርብም።",
+    "loadFailed": "የድምጽ ወደ ጽሑፍ ሞዴሎችን መጫን አልተቻለም።"
   },
   "modelChat": {
     "empty": {

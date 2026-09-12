@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { OPENROUTER, VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
+import { getProvider, getTranscriptionProvider } from '@/lib/ai-gateway/providers/get-provider';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { User } from '@kilocode/db/schema';
@@ -112,6 +113,20 @@ describe('getProvider local fake deterministic routing', () => {
       bypassAccessCheck: false,
     });
     missingUrl.restore();
+  });
+
+  test('routes transcription requests to FAKE_LLM_URL only when enabled', async () => {
+    expect(await getTranscriptionProvider()).toEqual({ provider: OPENROUTER, userByok: null });
+
+    const env = replaceEnv({ NODE_ENV: 'development', FAKE_LLM_URL: 'http://localhost:8811' });
+    const { provider, userByok } = await getTranscriptionProvider();
+    expect(provider).toMatchObject({
+      id: 'openrouter',
+      apiUrl: 'http://localhost:8811/api/openrouter',
+      apiKey: 'local-fake-llm',
+    });
+    expect(userByok).toBeNull();
+    env.restore();
   });
 
   describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])('%s', modelId => {

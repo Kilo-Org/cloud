@@ -30,6 +30,7 @@ import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import {
   NEW_SESSION_PROMPT_CHROME_HEIGHT,
+  NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
   resolveComposerMaxHeight,
   SESSION_HEADER_HEIGHT,
 } from '@/components/agents/chat-composer-input-height';
@@ -157,6 +158,7 @@ export function NewSessionPrompt({
     sessionHeaderHeight: SESSION_HEADER_HEIGHT * fontScale,
     composerChromeHeight: NEW_SESSION_PROMPT_CHROME_HEIGHT * fontScale,
     minHeight: promptMinHeight,
+    absoluteMaxHeight: NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT * fontScale,
   });
 
   // Track the keyboard's reported height so the remaining-space cap follows it.

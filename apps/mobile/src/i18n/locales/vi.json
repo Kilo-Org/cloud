@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO doanh nghiệp"
   },
   "preferences": {
+    "general": "Chung",
+    "voiceInput": "Nhập bằng giọng nói",
     "autoExpandThinking": "Tự động mở phần suy luận",
     "autoExpandThinkingSubtitle": "Hiển thị toàn bộ nội dung suy luận của tác nhân sau khi suy luận xong.",
     "keepScreenOn": "Giữ màn hình sáng khi xem phiên",
@@ -237,6 +239,7 @@
     "appearanceLight": "Sáng",
     "appearanceDark": "Tối",
     "account": "Tài khoản",
+    "accountSubtitle": "Ngôn ngữ, máy chủ được tin cậy và phiên đăng nhập trên thiết bị",
     "prReviewAttribution": "Ghi tên ứng dụng trong bản rà soát PR",
     "prReviewAttributionSubtitle": "Thêm dòng Đã rà soát qua Kilo ở cuối mỗi bản rà soát bạn gửi.",
     "returnSendsMessage": "Phím xuống dòng gửi tin nhắn",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Chuyển giọng nói thành văn bản qua Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Sử dụng mô hình Kilo Gateway để chuyển nội dung nhập bằng giọng nói thành văn bản thay vì nhận dạng giọng nói của thiết bị. Bản ghi của bạn được gửi tới Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Hoạt động trực tiếp",
@@ -2134,7 +2140,14 @@
     "languageNotInstalledMessage": "Các tệp giọng nói ngoại tuyến cho {{language}} chưa được cài đặt trên điện thoại này. Hãy tải các tệp đó xuống, rồi thử nhập bằng giọng nói lại.",
     "downloadOfflineModel": "Tải xuống",
     "offlineModelDownloadScheduled": "Các tệp giọng nói ngoại tuyến sẽ được tải xuống trong nền. Hãy thử nhập bằng giọng nói lại sau.",
-    "listeningStopped": "Đã dừng nghe."
+    "listeningStopped": "Đã dừng nghe.",
+    "transcribing": "Đang chuyển thành văn bản...",
+    "gatewayUnreachable": "Không thể kết nối tới Kilo Gateway. Hãy kiểm tra kết nối và thử lại.",
+    "gatewayTimeout": "Việc chuyển giọng nói thành văn bản mất quá nhiều thời gian. Hãy thử lại.",
+    "gatewayModelUnavailable": "Mô hình này hiện không khả dụng. Hãy chọn mô hình khác trong Tùy chọn.",
+    "gatewayModelUnavailableNotice": "Mô hình này không còn được cung cấp nữa. Nhấn $t(transcriptionModel.title) để chọn mô hình khác.",
+    "gatewaySignInRequired": "Đăng nhập để dùng tính năng chuyển giọng nói qua Kilo Gateway.",
+    "gatewayNoModel": "Trước tiên, hãy chọn một mô hình chuyển giọng nói trong Tùy chọn."
   },
   "share": {
     "title": "Chia sẻ đến Kilo",
@@ -2408,6 +2421,9 @@
       "replyBadRequest": "Không thể đăng câu trả lời này. Chuỗi thảo luận có thể đã thay đổi.",
       "replyBody": "Nội dung trả lời",
       "replyForbidden": "Bạn không có quyền trả lời trong PR này.",
+      "addCommentCta": "Bình luận trong PR này",
+      "commentBadRequest": "Không thể đăng bình luận này. PR có thể đã thay đổi.",
+      "commentForbidden": "Bạn không có quyền bình luận trong PR này.",
       "replyPlaceholder": "Trả lời…",
       "reportContent": "Báo cáo nội dung",
       "reportUser": "Báo cáo người dùng",
@@ -2939,6 +2955,13 @@
     "needsInput": "Cần phản hồi",
     "channelName": "Tác nhân đang hoạt động",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
+  },
+  "transcriptionModel": {
+    "title": "Mô hình chuyển giọng nói thành văn bản",
+    "noneChosen": "Chưa chọn",
+    "emptyTitle": "Không có mô hình chuyển giọng nói thành văn bản",
+    "emptyDescription": "Hiện Kilo Gateway không cung cấp mô hình chuyển giọng nói thành văn bản.",
+    "loadFailed": "Không thể tải các mô hình chuyển giọng nói thành văn bản."
   },
   "modelChat": {
     "empty": {

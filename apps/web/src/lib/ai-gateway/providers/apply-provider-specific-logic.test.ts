@@ -1,10 +1,12 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import { CLAUDE_OPUS_FALLBACK_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
   applyAnthropicThinkingDefault,
   applyGatewayModelsFallback,
   applyPreferredProvider,
+  applyProviderSpecificLogic,
   applyReasoningDetailsTransform,
+  removeUnsupportedRequestServiceTier,
 } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -13,8 +15,17 @@ import {
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
 import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
+import { QWEN37_MAX_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
+import {
+  gpt_5_6_sol_discounted_model,
+  gpt_6_astra_flex_model,
+} from '@/lib/ai-gateway/providers/openai-exclusive';
+import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 
-function makeRequest(model: string, models?: string[]): GatewayRequest {
+function makeRequest(
+  model: string,
+  models?: string[]
+): Extract<GatewayRequest, { kind: 'chat_completions' }> {
   return {
     kind: 'chat_completions',
     body: {
@@ -22,6 +33,19 @@ function makeRequest(model: string, models?: string[]): GatewayRequest {
       models,
       messages: [{ role: 'user', content: 'hello' }],
     },
+  };
+}
+
+function makeProvider(responseTransforms: Provider['responseTransforms']): Provider {
+  return {
+    id: 'perplexity',
+    apiUrl: 'https://example.com/v1',
+    apiUrlOverrides: {},
+    apiKey: 'test-key',
+    apiKeyHeader: null,
+    supportedChatApis: ['chat_completions'],
+    responseTransforms,
+    async transformRequest() {},
   };
 }
 
@@ -85,20 +109,106 @@ describe('applyAnthropicThinkingDefault', () => {
   );
 });
 
-describe('applyReasoningDetailsTransform', () => {
-  function makeProvider(responseTransforms: Provider['responseTransforms']): Provider {
-    return {
-      id: 'perplexity',
-      apiUrl: 'https://example.com/v1',
-      apiUrlOverrides: {},
-      apiKey: 'test-key',
-      apiKeyHeader: null,
-      supportedChatApis: ['chat_completions'],
-      responseTransforms,
-      async transformRequest() {},
-    };
+describe('removeUnsupportedRequestServiceTier', () => {
+  it.each([
+    {
+      model: QWEN37_MAX_MODEL_ID,
+      kiloExclusiveModel: null,
+      reason: 'non-fallback custom pricing',
+    },
+    {
+      model: gpt_5_6_sol_discounted_model.public_id,
+      kiloExclusiveModel: gpt_5_6_sol_discounted_model,
+      reason: 'non-Flex Kilo-exclusive model',
+    },
+  ])(
+    'removes and logs the request-level tier for $reason',
+    ({ model, kiloExclusiveModel, reason }) => {
+      const request = makeRequest(model);
+      request.body.service_tier = 'priority';
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel);
+
+      expect(request.body.service_tier).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed unsupported request-level service tier',
+        {
+          model,
+          requestKind: 'chat_completions',
+          serviceTier: 'priority',
+          reason,
+        }
+      );
+      warn.mockRestore();
+    }
+  );
+
+  it.each([
+    [PERPLEXITY_KIMI_PUBLIC_ID, null],
+    [gpt_6_astra_flex_model.public_id, gpt_6_astra_flex_model],
+    ['vendor/standard-model', null],
+  ] as const)('preserves the request-level tier for %s', (model, kiloExclusiveModel) => {
+    const request = makeRequest(model);
+    request.body.service_tier = 'priority';
+
+    removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel);
+
+    expect(request.body.service_tier).toBe('priority');
+  });
+});
+
+describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
+  async function applyToToolResult(model: string, content: string) {
+    const request = makeRequest(model);
+    request.body.messages = [
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: { name: 'lookup', arguments: '{}' },
+          },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'call-1', content },
+    ];
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null
+    );
+
+    return request.body.messages.find(message => message.role === 'tool')?.content;
   }
 
+  it('sanitizes JSON ref fields for Gemini models', async () => {
+    const content = await applyToToolResult(
+      'google/gemini-3.1-pro-preview:free',
+      '{"$ref":"#/$defs/result"}'
+    );
+
+    expect(content).toBe('{"_ref":"#/$defs/result"}');
+  });
+
+  it('preserves JSON ref fields for non-Gemini models', async () => {
+    const content = await applyToToolResult('vendor/model:free', '{"$ref":"#/$defs/result"}');
+
+    expect(content).toBe('{"$ref":"#/$defs/result"}');
+  });
+});
+
+describe('applyReasoningDetailsTransform', () => {
   function makeReasoningRequest(): Extract<GatewayRequest, { kind: 'chat_completions' }> {
     return {
       kind: 'chat_completions',
@@ -328,7 +438,7 @@ describe('applyPreferredProvider', () => {
 
     expect(request.body.provider).toEqual({
       zdr: true,
-      order: ['amazon-bedrock', 'anthropic'],
+      order: ['google-vertex', 'amazon-bedrock', 'anthropic'],
     });
   });
 
@@ -354,6 +464,8 @@ describe('applyPreferredProvider', () => {
 
     applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body);
 
-    expect(request.body.provider).toEqual({ order: ['amazon-bedrock', 'anthropic'] });
+    expect(request.body.provider).toEqual({
+      order: ['google-vertex', 'amazon-bedrock', 'anthropic'],
+    });
   });
 });

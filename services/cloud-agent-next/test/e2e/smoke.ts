@@ -14,15 +14,14 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureTestUser, loadDevVars, loadRepoEnvFiles, DRIVER_USER_EMAIL_SUFFIX } from './auth.js';
-import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
-import { LIFECYCLE_SCENARIOS, type LifecycleResult } from './lifecycle.js';
-import { printResult } from './run.js';
+import { DEFAULT_CONFIG, interruptSession, type ApiVersion, type DriverConfig } from './client.js';
 import {
-  killSandboxFamily,
-  listSandboxContainers,
-  waitForSandboxFamilyGone,
-  type SandboxContainer,
-} from './sandbox-control.js';
+  LIFECYCLE_SCENARIOS,
+  stopOwnedSessionSandboxes,
+  type LifecycleResult,
+} from './lifecycle.js';
+import { cleanupOwnedSessions } from './smoke-cleanup.js';
+import { printResult } from './run.js';
 
 const SERVICE_PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -67,32 +66,6 @@ const DEFAULT_MATRIX: Case[] = [
   { lifecycle: 'kill-mid-flight', conversation: 'hang' },
 ];
 
-function sandboxFamilyKey(container: SandboxContainer): string {
-  return container.isProxy ? container.name.replace(/-proxy$/, '') : container.name;
-}
-
-async function cleanupMatrixSandboxes(baselineSandboxIds: Set<string>): Promise<void> {
-  const createdSandboxes = (await listSandboxContainers()).filter(
-    container => !baselineSandboxIds.has(container.id)
-  );
-  const sandboxFamilies = new Map<string, SandboxContainer>();
-  for (const container of createdSandboxes) {
-    const key = sandboxFamilyKey(container);
-    const existing = sandboxFamilies.get(key);
-    if (!existing || (existing.isProxy && !container.isProxy)) {
-      sandboxFamilies.set(key, container);
-    }
-  }
-
-  for (const sandbox of sandboxFamilies.values()) {
-    await killSandboxFamily(sandbox);
-    const gone = await waitForSandboxFamilyGone(sandbox, 30_000);
-    if (!gone) {
-      console.warn(`smoke: sandbox family ${sandboxFamilyKey(sandbox)} remained after cleanup`);
-    }
-  }
-}
-
 async function main(): Promise<void> {
   loadRepoEnvFiles(SERVICE_PACKAGE_DIR);
   const devVars = loadDevVars(SERVICE_PACKAGE_DIR);
@@ -101,7 +74,11 @@ async function main(): Promise<void> {
   const user = await ensureTestUser(process.env.DATABASE_URL, email);
   console.log(`driver user: ${user.id} (${user.email})`);
 
+  const ownedSessionIds = new Set<string>();
   const config: DriverConfig = {
+    onSessionCreated: sessionId => {
+      ownedSessionIds.add(sessionId);
+    },
     ...DEFAULT_CONFIG,
     user,
     nextAuthSecret: devVars.NEXTAUTH_SECRET ?? '',
@@ -111,26 +88,6 @@ async function main(): Promise<void> {
     model: process.env.E2E_MODEL ?? DEFAULT_CONFIG.model,
   };
 
-  // Kill stale sandbox containers from previous runs before starting.
-  // Accumulated stopped/running containers degrade Docker Desktop performance
-  // and cause the preparing×7 wrapper-startup stall pattern. The baseline
-  // snapshot below only identifies *new* containers, so leftovers from prior
-  // runs would be skipped by cleanupMatrixSandboxes.
-  const staleContainers = await listSandboxContainers();
-  if (staleContainers.length > 0) {
-    console.log(`smoke: cleaning ${staleContainers.length} stale sandbox container(s)`);
-    for (const container of staleContainers) {
-      await killSandboxFamily(container);
-      const gone = await waitForSandboxFamilyGone(container, 30_000);
-      if (!gone) {
-        console.warn(`smoke: sandbox family ${sandboxFamilyKey(container)} remained after cleanup`);
-      }
-    }
-  }
-
-  const baselineSandboxIds = new Set(
-    (await listSandboxContainers()).map(container => container.id)
-  );
   const results: LifecycleResult[] = [];
   for (const { lifecycle, conversation, api = 'unified' } of DEFAULT_MATRIX) {
     const scenarioFn = LIFECYCLE_SCENARIOS[lifecycle];
@@ -144,7 +101,11 @@ async function main(): Promise<void> {
       printResult(result);
       results.push(result);
     } finally {
-      await cleanupMatrixSandboxes(baselineSandboxIds);
+      await cleanupOwnedSessions(ownedSessionIds, {
+        interrupt: sessionId => interruptSession(config, sessionId),
+        stopOwnedSandboxes: stopOwnedSessionSandboxes,
+      });
+      ownedSessionIds.clear();
     }
   }
 

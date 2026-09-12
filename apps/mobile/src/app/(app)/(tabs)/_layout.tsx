@@ -23,6 +23,7 @@ import {
 } from '@/lib/session-attention';
 import {
   getEffectiveTabBarHeight,
+  getTabBarHorizontalInset,
   getTabBarIconSize,
   shouldHideTabBar,
   shouldShowTabLabel,
@@ -69,7 +70,7 @@ export default function TabsLayout() {
   const pathname = usePathname();
   const segments = useSegments();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
+  const { bottom, left, right } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const hideTabs = shouldHideTabBar(pathname, segments);
   const showTabLabel = shouldShowTabLabel(fontScale);
@@ -78,6 +79,7 @@ export default function TabsLayout() {
     platform: Platform.OS,
     fontScale,
   });
+  const tabBarHorizontalInset = getTabBarHorizontalInset({ left, right });
   const tabIconSize = getTabBarIconSize(fontScale);
   const showKiloClawTab = useKiloClawTabVisible();
   const showChatTab = useFeatureFlag(FEATURE_FLAG_CHAT, false);
@@ -136,6 +138,7 @@ export default function TabsLayout() {
             elevation: 0,
             height: tabBarHeight,
             position: 'absolute',
+            ...tabBarHorizontalInset,
           },
           tabBarShowLabel: showTabLabel,
         }}

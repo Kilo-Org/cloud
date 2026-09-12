@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "企业 SSO"
   },
   "preferences": {
+    "general": "通用",
+    "voiceInput": "语音输入",
     "autoExpandThinking": "自动展开思考过程",
     "autoExpandThinkingSubtitle": "智能体思考结束后，自动展开思考过程。",
     "keepScreenOn": "在会话页面保持屏幕常亮",
@@ -237,6 +239,7 @@
     "appearanceLight": "浅色",
     "appearanceDark": "深色",
     "account": "账户",
+    "accountSubtitle": "语言、受信任的网站和设备会话",
     "prReviewAttribution": "在 PR 审查中添加应用署名",
     "prReviewAttributionSubtitle": "提交审查时，在末尾添加“通过 Kilo 审查”的署名。",
     "returnSendsMessage": "回车键发送消息",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "使用 Kilo Gateway 转写",
+    "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型转写语音输入，而不使用设备上的语音识别。您的录音将发送至 Kilo Gateway。",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "实时活动",
@@ -2134,7 +2140,14 @@
     "languageNotInstalledMessage": "此手机尚未安装 {{language}} 的离线语音文件。请下载这些文件，然后重试语音输入。",
     "downloadOfflineModel": "下载",
     "offlineModelDownloadScheduled": "离线语音文件将在后台下载。稍后请重试语音输入。",
-    "listeningStopped": "已停止收听。"
+    "listeningStopped": "已停止收听。",
+    "transcribing": "正在转写…",
+    "gatewayUnreachable": "无法连接到 Kilo Gateway。请检查网络连接后重试。",
+    "gatewayTimeout": "转写耗时过长。请重试。",
+    "gatewayModelUnavailable": "此转写模型不可用。请在偏好设置中选择其他模型。",
+    "gatewayModelUnavailableNotice": "此模型已不再提供。点按$t(transcriptionModel.title)选择其他模型。",
+    "gatewaySignInRequired": "登录后可使用 Kilo Gateway 转写。",
+    "gatewayNoModel": "请先在偏好设置中选择转写模型。"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2408,6 +2421,9 @@
       "replyBadRequest": "无法发布此回复。讨论串可能已发生变化。",
       "replyBody": "回复正文",
       "replyForbidden": "你无权回复此拉取请求。",
+      "addCommentCta": "评论此拉取请求",
+      "commentBadRequest": "无法发布此评论。此拉取请求可能已发生变化。",
+      "commentForbidden": "你无权评论此拉取请求。",
       "replyPlaceholder": "回复…",
       "reportContent": "举报内容",
       "reportUser": "举报用户",
@@ -2939,6 +2955,13 @@
     "needsInput": "等待输入",
     "channelName": "运行中的智能体",
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。"
+  },
+  "transcriptionModel": {
+    "title": "转写模型",
+    "noneChosen": "未选择",
+    "emptyTitle": "没有转写模型",
+    "emptyDescription": "Kilo Gateway 当前没有提供转写模型。",
+    "loadFailed": "无法加载转写模型。"
   },
   "modelChat": {
     "empty": {

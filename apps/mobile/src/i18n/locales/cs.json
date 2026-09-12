@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Podnikové SSO"
   },
   "preferences": {
+    "general": "Obecné",
+    "voiceInput": "Hlasový vstup",
     "autoExpandThinking": "Automaticky rozbalovat uvažování",
     "autoExpandThinkingSubtitle": "Po dokončení uvažování agenta zobrazí jeho obsah rozbalený.",
     "keepScreenOn": "Nezhasínat obrazovku v relaci",
@@ -237,6 +239,7 @@
     "appearanceLight": "Světlý",
     "appearanceDark": "Tmavý",
     "account": "Účet",
+    "accountSubtitle": "Jazyk, důvěryhodné domény a přihlášená zařízení",
     "prReviewAttribution": "Přidávat zmínku o aplikaci ke kontrolám PR",
     "prReviewAttributionSubtitle": "Při odeslání kontroly přidá do zápatí informaci, že kontrola proběhla přes Kilo.",
     "returnSendsMessage": "Klávesa Enter odesílá zprávu",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Přepis přes Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Přepisujte diktování pomocí modelu Kilo Gateway místo rozpoznávání řeči ve vašem zařízení. Nahraný zvuk se odešle do Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "PR není dostupný",
@@ -452,6 +458,9 @@
       "acceptTerms": "Přijmout",
       "replyBadRequest": "Tuto odpověď nelze odeslat. Vlákno se možná změnilo.",
       "replyForbidden": "Nemáš oprávnění odpovídat v tomto PR.",
+      "addCommentCta": "Okomentovat tento PR",
+      "commentBadRequest": "Tento komentář nelze odeslat. PR se možná změnil.",
+      "commentForbidden": "Nemáš oprávnění komentovat tento PR.",
       "moderation": {
         "reportContent": {
           "terminal": "Tento komentář nelze nahlásit.",
@@ -2607,7 +2616,14 @@
     "languageNotInstalledMessage": "Offline soubory řeči pro {{language}} nejsou v tomto telefonu nainstalovány. Stáhněte je a poté zkuste diktování znovu.",
     "downloadOfflineModel": "Stáhnout",
     "offlineModelDownloadScheduled": "Offline soubory řeči se stáhnou na pozadí. Zkuste diktování znovu později.",
-    "listeningStopped": "Poslech zastaven."
+    "listeningStopped": "Poslech zastaven.",
+    "transcribing": "Přepisuji…",
+    "gatewayUnreachable": "Kilo Gateway se nepodařilo kontaktovat. Zkontrolujte připojení a zkuste to znovu.",
+    "gatewayTimeout": "Přepis trval příliš dlouho. Zkuste to znovu.",
+    "gatewayModelUnavailable": "Tento model přepisu není dostupný. Vyberte jiný v Předvolbách.",
+    "gatewayModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(transcriptionModel.title) vyberte jiný.",
+    "gatewaySignInRequired": "Pro použití přepisu přes Kilo Gateway se přihlaste.",
+    "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách."
   },
   "share": {
     "title": "Sdílení do Kilo",
@@ -2983,6 +2999,13 @@
     "needsInput": "Čeká na reakci",
     "channelName": "Aktivní agenti",
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce."
+  },
+  "transcriptionModel": {
+    "title": "Model přepisu",
+    "noneChosen": "Není vybrán žádný",
+    "emptyTitle": "Žádné modely přepisu",
+    "emptyDescription": "Kilo Gateway nyní nenabízí žádné modely přepisu.",
+    "loadFailed": "Modely přepisu se nepodařilo načíst."
   },
   "modelChat": {
     "empty": {

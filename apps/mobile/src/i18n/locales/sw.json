@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO ya biashara"
   },
   "preferences": {
+    "general": "Jumla",
+    "voiceInput": "Uingizaji wa sauti",
     "autoExpandThinking": "Panua mawazo kiotomatiki",
     "autoExpandThinkingSubtitle": "Onyesha mawazo ya wakala yakiwa yamepanuliwa anapomaliza kufikiri.",
     "keepScreenOn": "Acha skrini iwake ukiwa kwenye ukurasa wa kikao",
@@ -237,6 +239,7 @@
     "appearanceLight": "Angavu",
     "appearanceDark": "Giza",
     "account": "Akaunti",
+    "accountSubtitle": "Lugha, tovuti zinazoaminika na vikao vya vifaa",
     "prReviewAttribution": "Ongeza jina la programu kwenye ukaguzi wa PR",
     "prReviewAttributionSubtitle": "Ongeza maelezo chini ya ukaguzi yanayoonyesha kuwa umetumia Kilo unapowasilisha ukaguzi.",
     "returnSendsMessage": "Kitufe cha kuingiza hutuma ujumbe",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Unukuzi wa sauti kupitia Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Badilisha uingizaji wa sauti kuwa maandishi kwa modeli ya Kilo Gateway badala ya utambuzi wa sauti wa kifaa. Rekodi yako imetumwa kwa Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Ombi la kuunganisha halipatikani",
@@ -448,6 +454,9 @@
       "acceptTerms": "Kubali",
       "replyBadRequest": "Jibu hili haliwezi kuchapishwa. Mada huenda imebadilika.",
       "replyForbidden": "Huna ruhusa ya kujibu ombi hili la kuunganisha.",
+      "addCommentCta": "Toa maoni kwenye ombi hili la kuunganisha",
+      "commentBadRequest": "Maoni haya haliwezi kuchapishwa. Huenda ombi hili la kuunganisha likabadilika.",
+      "commentForbidden": "Huna ruhusa ya kutoa maoni kwenye ombi hili la kuunganisha.",
       "moderation": {
         "reportContent": {
           "terminal": "Maoni haya hayawezi kuripotiwa.",
@@ -2565,7 +2574,14 @@
     "languageNotInstalledMessage": "Mafaili ya sauti ya nje ya mtandao ya {{language}} hayajasakinishwa kwenye simu hii. Pakua mafaili hayo, kisha ujaribu tena uingizaji kwa sauti.",
     "downloadOfflineModel": "Pakua",
     "offlineModelDownloadScheduled": "Mafaili ya sauti ya nje ya mtandao yatapakuliwa nyuma ya pazia. Jaribu tena uingizaji kwa sauti baadaye.",
-    "listeningStopped": "Usikilizaji umesimama."
+    "listeningStopped": "Usikilizaji umesimama.",
+    "transcribing": "Inanukuuza...",
+    "gatewayUnreachable": "Kilo Gateway haikupatikana. Angalia muunganisho wako na ujaribu tena.",
+    "gatewayTimeout": "Unukuzi umechukua muda mrefu sana. Jaribu tena.",
+    "gatewayModelUnavailable": "Modeli hii ya unukuzi haipatikani. Chagua nyingine katika Mapendeleo.",
+    "gatewayModelUnavailableNotice": "Modeli hii haitolewi tena. Gusa $t(transcriptionModel.title) kuchagua nyingine.",
+    "gatewaySignInRequired": "Ingia ili utumie unukuzi wa Kilo Gateway.",
+    "gatewayNoModel": "Kwanza chagua modeli ya unukuzi katika Mapendeleo."
   },
   "share": {
     "title": "Kushiriki kwenye Kilo",
@@ -2939,6 +2955,13 @@
     "needsInput": "Inasubiri jibu",
     "channelName": "Mawakala wanaofanya kazi",
     "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa."
+  },
+  "transcriptionModel": {
+    "title": "Modeli ya unukuzi",
+    "noneChosen": "Hakuna iliyochaguliwa",
+    "emptyTitle": "Hakuna modeli za unukuzi",
+    "emptyDescription": "Kilo Gateway haina modeli za unukuzi kwa sasa.",
+    "loadFailed": "Imeshindikana kupakia modeli za unukuzi."
   },
   "modelChat": {
     "empty": {

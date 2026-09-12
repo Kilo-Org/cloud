@@ -46,6 +46,7 @@ export type SessionOperationProof = {
   completedAt?: number;
   attachmentEpoch?: number;
   decision?: SessionOperationAck['decision'];
+  rejectionReceived?: true;
 };
 
 type SessionMessageLifecycle = {
@@ -60,6 +61,7 @@ type SessionMessageLifecycle = {
   terminalAt?: number;
   terminalSource?: SessionMessageTerminalSource;
   failedReason?: string;
+  failedDetail?: string;
   attachFailures?: number;
   promptFailures?: number;
   preparationAttemptId?: string;
@@ -275,7 +277,11 @@ export function failWaitingMessages(
         return message;
       }
       failedIds.push(message.messageId);
-      return { ...message, state: 'failed', failedReason: reason };
+      return {
+        ...message,
+        state: 'failed',
+        failedReason: reason,
+      };
     }),
     failedIds,
   };
@@ -399,14 +405,20 @@ export function hasAcceptedMessage(messages: readonly SessionMessageRecord[]): b
 export function failQueuedMessage(
   messages: readonly SessionMessageRecord[],
   messageId: string,
-  reason?: string
+  reason?: string,
+  detail?: string
 ): SessionMessageRecord[] | undefined {
   if (!messages.some(message => message.messageId === messageId && message.state === 'queued')) {
     return undefined;
   }
   return messages.map(message =>
     message.messageId === messageId && message.state === 'queued'
-      ? { ...message, state: 'failed', ...(reason ? { failedReason: reason } : {}) }
+      ? {
+          ...message,
+          state: 'failed',
+          ...(reason ? { failedReason: reason } : {}),
+          ...(detail ? { failedDetail: detail } : {}),
+        }
       : message
   );
 }
@@ -493,8 +505,8 @@ export function failedMessageSnapshot(
     reason: cancelled ? 'interrupted' : message.failedReason,
     ...(cancelled
       ? { error: 'The message was interrupted' }
-      : message.failedReason
-        ? { error: message.failedReason }
+      : message.failedDetail || message.failedReason
+        ? { error: message.failedDetail ?? message.failedReason }
         : {}),
     timestamp: message.acceptedAt ?? now,
   };
@@ -677,6 +689,35 @@ export function recordSessionOperationDispatch(
                   authorization.dispatchDeadlineAt + SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
               }
             : {}),
+        }
+      : item
+  );
+}
+
+export function markSessionOperationRejection(
+  messages: readonly SessionMessageRecord[],
+  authorization: SessionOperationAuthorization
+): SessionMessageRecord[] | undefined {
+  if (authorization.operation !== 'session.attach') return [...messages];
+  const message = messages.find(item => item.messageId === authorization.messageId);
+  const proof = message?.operations?.attach;
+  const storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
+  if (
+    !message ||
+    !proof?.dispatched ||
+    !storedAuthorization.success ||
+    !sameSessionOperation(storedAuthorization.data, authorization)
+  )
+    return undefined;
+  if (proof.rejectionReceived) return [...messages];
+  return messages.map(item =>
+    item.messageId === message.messageId
+      ? {
+          ...item,
+          operations: {
+            ...item.operations,
+            attach: { ...proof, rejectionReceived: true },
+          },
         }
       : item
   );

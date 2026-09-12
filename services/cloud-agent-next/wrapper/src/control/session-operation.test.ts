@@ -25,8 +25,10 @@ import {
   session,
   type Completion,
 } from './control-test-fixtures';
+import { SessionOperation } from './session-operation';
 import { rememberAttachedRoot, resetSessionDirectoryState } from './session-directories';
 import { resetDirectoryOperationState } from './worktree-operations';
+import type { WorktreeKiloRuntime } from './worktree-runtime';
 
 let homeRoot: string;
 
@@ -179,6 +181,84 @@ describe('operation results and delivery', () => {
     await record.waitForDelivery();
     expect(retired).toBeUndefined();
     expect(record.snapshot().outcome?.status).toBe('cancelled');
+  });
+
+  it('does not retire the wrapper when a claimed operation publishes a failed outcome', async () => {
+    const prompt = Promise.withResolvers<Completion>();
+    let retirementCalls = 0;
+    let outcomeEvents = 0;
+    const client = fakeKilo({ sendPrompt: () => prompt.promise });
+    const runtime: WorktreeKiloRuntime = {
+      scopeId: 'worktree_1',
+      runtimeId: 'native_1',
+      directory: session.directory,
+      env: {},
+      kiloClient: client,
+      signal: new AbortController().signal,
+    };
+    const operation = new SessionOperation(
+      session,
+      undefined,
+      { operation: 'session.prompt', payload: promptPayload, runtime },
+      {
+        isCurrent: () => true,
+        getRuntime: () => runtime,
+        verifyQuiescence: async () => true,
+        retireRuntime: () => {
+          retirementCalls += 1;
+        },
+        emitSessionEvent: () => {
+          outcomeEvents += 1;
+          return false;
+        },
+        onLocalCompletion: () => {},
+        onCleanupConfirmed: () => {},
+      }
+    );
+    operation.markPublicationScoped('outcome publication failed', Date.now() + 1_000);
+    prompt.resolve(completion());
+    await operation.done;
+    expect(retirementCalls).toBe(0);
+    expect(outcomeEvents).toBe(1);
+  });
+
+  it('does not retire the wrapper when execution expiry follows a publication claim', async () => {
+    const prompt = Promise.withResolvers<Completion>();
+    let retirementCalls = 0;
+    const client = fakeKilo({
+      sendPrompt: () => prompt.promise,
+      abortSession: async () => true,
+    });
+    const runtime: WorktreeKiloRuntime = {
+      scopeId: 'worktree_1',
+      runtimeId: 'native_1',
+      directory: session.directory,
+      env: {},
+      kiloClient: client,
+      signal: new AbortController().signal,
+    };
+    const operation = new SessionOperation(
+      session,
+      undefined,
+      { operation: 'session.prompt', payload: promptPayload, runtime },
+      {
+        isCurrent: () => true,
+        getRuntime: () => runtime,
+        verifyQuiescence: async () => true,
+        retireRuntime: () => {
+          retirementCalls += 1;
+        },
+        emitSessionEvent: () => true,
+        onLocalCompletion: () => {},
+        onCleanupConfirmed: () => {},
+      }
+    );
+    operation.markPublicationScoped('execution publication failed', Date.now() + 1_000);
+    (operation as unknown as { expire(): void }).expire();
+    expect(retirementCalls).toBe(0);
+    prompt.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+    await operation.done;
+    expect(retirementCalls).toBe(0);
   });
 
   it('aborts an already-awaiting finalizer and retains its late original result without false quiescence', async () => {

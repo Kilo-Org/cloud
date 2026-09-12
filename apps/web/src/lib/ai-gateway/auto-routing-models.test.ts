@@ -65,6 +65,42 @@ describe('addAutoRoutingModels', () => {
     ]);
   });
 
+  test('annotates the frontier auto model with its visible targets', async () => {
+    const frontierModel = makeModel('kilo-auto/frontier');
+    const opusModel = makeModel('anthropic/claude-opus-5');
+    const sonnetModel = makeModel('anthropic/claude-sonnet-5');
+
+    const result = await addAutoRoutingModels([frontierModel, sonnetModel, opusModel]);
+
+    expect(result).toEqual([
+      {
+        ...frontierModel,
+        autoRouting: { models: ['anthropic/claude-opus-5', 'anthropic/claude-sonnet-5'] },
+      },
+      sonnetModel,
+      opusModel,
+    ]);
+  });
+
+  test('annotates the small auto model with its visible targets', async () => {
+    const smallModel = makeModel('kilo-auto/small');
+    const paidModel = makeModel('google/gemma-4-26b-a4b-it');
+    const freeModel = makeModel('google/gemma-4-26b-a4b-it:free');
+
+    const result = await addAutoRoutingModels([smallModel, paidModel, freeModel]);
+
+    expect(result).toEqual([
+      {
+        ...smallModel,
+        autoRouting: {
+          models: ['google/gemma-4-26b-a4b-it', 'google/gemma-4-26b-a4b-it:free'],
+        },
+      },
+      paidModel,
+      freeModel,
+    ]);
+  });
+
   test('excludes virtual auto ids and dedupes and sorts candidates', async () => {
     const efficientModel = makeModel('kilo-auto/efficient');
     const balancedModel = makeModel('kilo-auto/balanced');

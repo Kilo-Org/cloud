@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO ארגוני"
   },
   "preferences": {
+    "general": "כללי",
+    "voiceInput": "קלט קולי",
     "autoExpandThinking": "הרחבה אוטומטית של תהליך החשיבה",
     "autoExpandThinkingSubtitle": "הצג את תהליך החשיבה המלא של הסוכן בסיומו.",
     "keepScreenOn": "השארת המסך דלוק במסך הסשן",
@@ -237,6 +239,7 @@
     "appearanceLight": "בהיר",
     "appearanceDark": "כהה",
     "account": "חשבון",
+    "accountSubtitle": "שפה, אתרים מהימנים וסשנים במכשירים",
     "prReviewAttribution": "הוספת אזכור האפליקציה לסקירות PR",
     "prReviewAttributionSubtitle": "הוסף את הכיתוב 'נסקר דרך Kilo' בסוף כל סקירה שאתה שולח.",
     "returnSendsMessage": "מקש אנטר שולח הודעה",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "תמלול דרך Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "תמלל את ההכתבה בעזרת מודל של Kilo Gateway במקום זיהוי הדיבור של המכשיר. ההקלטה נשלחת ל־Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "פעילויות בזמן אמת",
@@ -2148,7 +2154,14 @@
     "languageNotInstalledMessage": "קובצי הדיבור הלא מקוונים עבור {{language}} לא מותקנים בטלפון הזה. הורד אותם ואז נסה שוב להשתמש בהכתבה.",
     "downloadOfflineModel": "הורדה",
     "offlineModelDownloadScheduled": "קובצי הדיבור הלא מקוונים יורדו ברקע. נסה שוב להשתמש בהכתבה מאוחר יותר.",
-    "listeningStopped": "ההאזנה הופסקה."
+    "listeningStopped": "ההאזנה הופסקה.",
+    "transcribing": "בתמלול...",
+    "gatewayUnreachable": "לא ניתן להתחבר ל־Kilo Gateway. בדוק את החיבור ונסה שוב.",
+    "gatewayTimeout": "התמלול ארך יותר מדי. נסה שוב.",
+    "gatewayModelUnavailable": "מודל התמלול הזה אינו זמין. בחר מודל אחר בהעדפות.",
+    "gatewayModelUnavailableNotice": "המודל הזה כבר לא מוצע. הקש על $t(transcriptionModel.title) כדי לבחור אחר.",
+    "gatewaySignInRequired": "היכנס כדי להשתמש בתמלול דרך Kilo Gateway.",
+    "gatewayNoModel": "בחר קודם מודל תמלול בהעדפות."
   },
   "share": {
     "title": "שיתוף עם Kilo",
@@ -2422,6 +2435,9 @@
       "replyBadRequest": "לא ניתן לפרסם את התשובה הזו. ייתכן שהשרשור השתנה.",
       "replyBody": "תוכן התשובה",
       "replyForbidden": "אין לך הרשאה להשיב לבקשת המשיכה הזו.",
+      "addCommentCta": "הגב על בקשת המשיכה הזו",
+      "commentBadRequest": "לא ניתן לפרסם את התגובה הזו. ייתכן שבקשת המשיכה השתנתה.",
+      "commentForbidden": "אין לך הרשאה להגיב על בקשת המשיכה הזו.",
       "replyPlaceholder": "תשובה…",
       "reportContent": "דיווח על תוכן",
       "reportUser": "דיווח על משתמש",
@@ -2961,6 +2977,13 @@
     "needsInput": "נדרש קלט",
     "channelName": "סוכנים פעילים",
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
+  },
+  "transcriptionModel": {
+    "title": "מודל תמלול",
+    "noneChosen": "לא נבחר",
+    "emptyTitle": "אין מודלי תמלול",
+    "emptyDescription": "Kilo Gateway לא מציע כרגע מודלי תמלול.",
+    "loadFailed": "לא הצלחנו לטעון את מודלי התמלול."
   },
   "modelChat": {
     "empty": {

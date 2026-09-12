@@ -75,6 +75,25 @@ export function getEffectiveTabBarHeight({
     : getTabBarIconForwardHeight(bottomInset, platform);
 }
 
+/**
+ * Horizontal padding that keeps the tab bar icon row clear of the landscape
+ * side safe areas (notch/Dynamic Island, Android cutouts). The bar's BlurBar
+ * background stays full-bleed because it is absolutely positioned, so only the
+ * icon row is inset. Zero insets (portrait) collapse to a no-op.
+ */
+export function getTabBarHorizontalInset({
+  left = 0,
+  right = 0,
+}: {
+  left?: number;
+  right?: number;
+}) {
+  return {
+    paddingLeft: Math.max(left, 0),
+    paddingRight: Math.max(right, 0),
+  };
+}
+
 export function shouldShowTabLabel(fontScale = 1): boolean {
   return fontScale < TAB_ICON_FORWARD_FONT_SCALE;
 }

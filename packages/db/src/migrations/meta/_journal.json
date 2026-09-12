@@ -1737,13 +1737,6 @@
       "when": 1789158273897,
       "tag": "0247_classy_quasimodo",
       "breakpoints": true
-    },
-    {
-      "idx": 248,
-      "version": "7",
-      "when": 1789158985975,
-      "tag": "0248_mushy_justice",
-      "breakpoints": true
     }
   ]
 }

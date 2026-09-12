@@ -149,9 +149,8 @@ export async function recordSlackInstallationAlias(input: {
   installationId: string;
   eventTime?: number;
 }): Promise<void> {
-  const eventTime = input.eventTime;
-  if (input.workspaceId === input.installationId || eventTime === undefined) return;
-  const [candidate] = await db
+  if (input.workspaceId === input.installationId) return;
+  const [reservation] = await db
     .select()
     .from(provider_installation_reservations)
     .where(
@@ -168,53 +167,28 @@ export async function recordSlackInstallationAlias(input: {
       )
     )
     .limit(1);
-  if (!candidate || eventTime * 1000 < new Date(candidate.updated_at).getTime()) return;
-  const owner: Owner | null = candidate.owned_by_organization_id
-    ? { type: 'org', id: candidate.owned_by_organization_id }
-    : candidate.owned_by_user_id
-      ? { type: 'user', id: candidate.owned_by_user_id }
-      : null;
-  if (!owner) return;
-  await db.transaction(async tx => {
-    await lockProviderOAuthOwnerRow(tx, owner);
-    const [reservation] = await tx
-      .select()
-      .from(provider_installation_reservations)
-      .where(eq(provider_installation_reservations.id, candidate.id))
-      .for('update');
-    if (!reservation) return;
-    const generation = reservation.active_generation ?? reservation.generation;
-    const [existing] = await tx
-      .select()
-      .from(provider_installation_aliases)
-      .where(eq(provider_installation_aliases.workspace_id, input.workspaceId))
-      .for('update');
-    if (
-      existing &&
-      (existing.event_time > eventTime ||
-        (existing.event_time === eventTime &&
-          (existing.reservation_id !== reservation.id || existing.generation !== generation)))
-    ) {
-      return;
-    }
-    await tx
-      .insert(provider_installation_aliases)
-      .values({
-        workspace_id: input.workspaceId,
+  if (
+    !reservation ||
+    (input.eventTime !== undefined &&
+      input.eventTime * 1000 < new Date(reservation.updated_at).getTime())
+  ) {
+    return;
+  }
+  await db
+    .insert(provider_installation_aliases)
+    .values({
+      workspace_id: input.workspaceId,
+      reservation_id: reservation.id,
+      generation: reservation.active_generation ?? reservation.generation,
+    })
+    .onConflictDoUpdate({
+      target: provider_installation_aliases.workspace_id,
+      set: {
         reservation_id: reservation.id,
-        generation,
-        event_time: eventTime,
-      })
-      .onConflictDoUpdate({
-        target: provider_installation_aliases.workspace_id,
-        set: {
-          reservation_id: reservation.id,
-          generation,
-          event_time: eventTime,
-          updated_at: new Date().toISOString(),
-        },
-      });
-  });
+        generation: reservation.active_generation ?? reservation.generation,
+        updated_at: new Date().toISOString(),
+      },
+    });
 }
 
 export async function resolveSlackInstallationAlias(workspaceId: string): Promise<string> {

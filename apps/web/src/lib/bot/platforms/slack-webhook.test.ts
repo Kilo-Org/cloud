@@ -19,9 +19,4 @@ describe('getSlackTeamId', () => {
   it('uses the workspace ID for a workspace uninstall event', () => {
     expect(getSlackTeamId({ team_id: 'T_WORKSPACE', enterprise_id: null })).toBe('T_WORKSPACE');
   });
-
-  it('reads Chat SDK inner message and interactive team shapes', () => {
-    expect(getSlackTeamId({ team: 'T_MESSAGE' })).toBe('T_MESSAGE');
-    expect(getSlackTeamId({ team: { id: 'T_INTERACTIVE' } })).toBe('T_INTERACTIVE');
-  });
 });

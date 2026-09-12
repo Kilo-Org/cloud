@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Info, Search, SearchX } from '@/components/ui/icons';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
 import { FlatList, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -33,6 +33,9 @@ export function ModelPickerContent() {
   const routeKey = parseParam(rawRouteKey) ?? UNFENCED_ROUTE_KEY;
   useRouteRegistry(routeKey);
   const [search, setSearch] = useState('');
+  // The input stays urgent; the list derivation and its rows trail behind so a
+  // typing burst on a large catalog does not filter/reconcile on every key.
+  const deferredSearch = useDeferredValue(search);
   const [bridge, setBridge] = useState(() => modelPickerSlot.get(routeKey));
   const [selectedModel, setSelectedModel] = useState(bridge?.currentValue ?? '');
   const [selectedVariant, setSelectedVariant] = useState(bridge?.currentVariant ?? '');
@@ -82,8 +85,9 @@ export function ModelPickerContent() {
   );
 
   const rows = useMemo<ModelPickerRow[]>(
-    () => buildModelPickerRows({ models: bridge?.options ?? [], search, favoriteIds }),
-    [bridge, search, favoriteIds]
+    () =>
+      buildModelPickerRows({ models: bridge?.options ?? [], search: deferredSearch, favoriteIds }),
+    [bridge, deferredSearch, favoriteIds]
   );
 
   // The favorite star button in ModelPickerOptionRow already fires its own
@@ -185,12 +189,14 @@ export function ModelPickerContent() {
     >
       {rows.length === 0 ? (
         <EmptyState
-          icon={search.trim() ? SearchX : Info}
+          icon={deferredSearch.trim() ? SearchX : Info}
           title={
-            search.trim() ? t('agentChat.repoPicker.noMatches') : t('common.noModelsAvailable')
+            deferredSearch.trim()
+              ? t('agentChat.repoPicker.noMatches')
+              : t('common.noModelsAvailable')
           }
           description={
-            search.trim()
+            deferredSearch.trim()
               ? t('agents.sessionList.tryDifferentSearch')
               : t('agentChat.modelPicker.noModelsDescription')
           }

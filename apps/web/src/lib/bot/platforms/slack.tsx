@@ -343,7 +343,6 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
             adapter.name,
             adapter.botUserId
           );
-          if (!platformIntegration) return;
           console.error('[Bot] Missing scope:', error.data.needed);
           await postSlackReinstallInstruction(
             adapter,

@@ -924,21 +924,14 @@ async function cleanupDeactivatedSlackInstallation(
   options: SlackUninstallOptions
 ): Promise<boolean> {
   if (deactivated.cleanupStage === 'revoke') {
-    if (!deactivated.accessToken) {
-      if (!deactivated.reservationId) throw new Error('Slack credential is unavailable');
-      return false;
-    }
+    if (!deactivated.accessToken) return false;
     try {
-      if (!(await withSlackSdkTimeout(revokeSlackToken(deactivated.accessToken)))) {
-        if (!deactivated.reservationId) throw new Error('Slack token revocation failed');
-        return false;
-      }
+      if (!(await withSlackSdkTimeout(revokeSlackToken(deactivated.accessToken)))) return false;
     } catch (error) {
       captureException(error, {
         tags: { component: 'slack-service', op: 'revoke-on-uninstall' },
         extra: { integrationId: deactivated.integrationId },
       });
-      if (!deactivated.reservationId) throw error;
       return false;
     }
     await db
@@ -952,24 +945,6 @@ async function cleanupDeactivatedSlackInstallation(
           eq(provider_installation_reservations.cleanup_stage, 'revoke')
         )
       );
-  }
-
-  if (!deactivated.reservationId) {
-    if (deactivated.wasActive && options.deleteChatSdkInstallation) {
-      await withSlackSdkTimeout(options.deleteChatSdkInstallation(deactivated.teamId));
-    }
-    if (deactivated.wasActive && options.deleteChatSdkIdentityCache) {
-      await withSlackSdkTimeout(options.deleteChatSdkIdentityCache(deactivated.teamId));
-    }
-    await db
-      .delete(platform_integrations)
-      .where(
-        and(
-          eq(platform_integrations.id, deactivated.integrationId),
-          eq(platform_integrations.integration_status, INTEGRATION_STATUS.SUSPENDED)
-        )
-      );
-    return true;
   }
 
   return db.transaction(async tx => {

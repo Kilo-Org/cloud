@@ -18,6 +18,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { beginProviderOAuthAttempt } from './provider-oauth-attempts';
 import {
   claimSlackProviderInstallation,
+  adoptUnsharedSlackWorkspaceReservation,
   expireStaleSlackReservation,
 } from './provider-installation-reservations';
 import {
@@ -70,6 +71,34 @@ describe('Slack provider installation activation', () => {
         setChatSdkInstallation: async () => undefined,
       })
     ).rejects.toThrow('Enterprise Grid is not supported');
+  });
+
+  it('adopts a successful unshared workspace for later cleanup', async () => {
+    const actor = await insertTestUser();
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: actor.id,
+        platform: 'slack',
+        integration_type: 'oauth',
+        platform_installation_id: 'T_UNSHARED',
+        platform_account_id: 'T_UNSHARED',
+        integration_status: 'active',
+        installed_at: new Date().toISOString(),
+      })
+      .returning();
+    await adoptUnsharedSlackWorkspaceReservation({
+      owner: { type: 'user', id: actor.id },
+      integrationId: integration.id,
+      teamId: 'T_UNSHARED',
+    });
+
+    await expect(
+      db
+        .select()
+        .from(provider_installation_reservations)
+        .where(eq(provider_installation_reservations.platform_integration_id, integration.id))
+    ).resolves.toEqual([expect.objectContaining({ status: 'active', generation: 1 })]);
   });
 
   it('rejects suspended legacy Slack runtime fallback without a reservation', async () => {

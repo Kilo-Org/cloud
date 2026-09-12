@@ -641,7 +641,7 @@ async function prepareReservedSlackInstallation(
 async function completeReservedSlackInstallation(
   input: Omit<ReservedSlackInstallationInput, 'installation' | 'grantedScopes'>
 ): Promise<PlatformIntegration> {
-  const prepared = await db.transaction(async tx => {
+  return db.transaction(async tx => {
     await lockProviderOAuthOwnerRow(tx, input.owner);
     const reservation = await lockSlackReservation(tx, input.claim, input.owner, input.teamId);
     if (!reservation?.platform_integration_id) {
@@ -680,38 +680,12 @@ async function completeReservedSlackInstallation(
       ...(pending.slack_enterprise_id ? { enterpriseId: pending.slack_enterprise_id } : {}),
       ...(pending.is_enterprise_install ? { isEnterpriseInstall: true } : {}),
     };
-    return { installation, pending, botToken };
-  });
 
-  await withSlackSdkTimeout(
-    input.setChatSdkInstallation(input.teamId, prepared.installation),
-    input.sdkTimeoutMs
-  );
+    await withSlackSdkTimeout(
+      input.setChatSdkInstallation(input.teamId, installation),
+      input.sdkTimeoutMs
+    );
 
-  return db.transaction(async tx => {
-    await lockProviderOAuthOwnerRow(tx, input.owner);
-    const reservation = await lockSlackReservation(tx, input.claim, input.owner, input.teamId);
-    if (!reservation?.platform_integration_id) {
-      throw new Error('Slack installation reservation changed before activation');
-    }
-    const [pending] = await tx
-      .select()
-      .from(provider_installation_pending_credentials)
-      .where(
-        and(
-          eq(provider_installation_pending_credentials.reservation_id, input.claim.reservationId),
-          eq(provider_installation_pending_credentials.generation, input.claim.generation),
-          eq(
-            provider_installation_pending_credentials.platform_integration_id,
-            reservation.platform_integration_id
-          )
-        )
-      )
-      .for('update');
-    if (!pending || pending.access_token_encrypted !== prepared.pending.access_token_encrypted) {
-      throw new Error('Slack installation material changed before activation');
-    }
-    const botToken = prepared.botToken;
     const [integration] = await tx
       .select()
       .from(platform_integrations)
@@ -998,74 +972,59 @@ async function cleanupDeactivatedSlackInstallation(
     return true;
   }
 
-  const [replacement] = await db
-    .select()
-    .from(provider_installation_reservations)
-    .where(
-      and(
-        eq(provider_installation_reservations.id, deactivated.reservationId),
-        eq(provider_installation_reservations.provider, 'slack'),
-        eq(provider_installation_reservations.status, 'deleting'),
-        eq(provider_installation_reservations.generation, deactivated.generation ?? 0)
-      )
-    )
-    .limit(1);
-  if (!replacement) return false;
-  let cleanupStage = replacement.cleanup_stage ?? 'sdk';
-  if (cleanupStage === 'sdk' && deactivated.wasActive) {
-    if (!options.deleteChatSdkInstallation) return false;
-    try {
-      await withSlackSdkTimeout(options.deleteChatSdkInstallation(deactivated.teamId));
-    } catch (error) {
-      captureException(error, {
-        tags: { component: 'slack-service', op: 'delete-sdk-installation' },
-        extra: { integrationId: deactivated.integrationId },
-      });
-      return false;
-    }
-    const advanced = await db
-      .update(provider_installation_reservations)
-      .set({ cleanup_stage: 'identity', updated_at: new Date().toISOString() })
-      .where(
-        and(
-          eq(provider_installation_reservations.id, replacement.id),
-          eq(provider_installation_reservations.generation, replacement.generation),
-          eq(provider_installation_reservations.cleanup_stage, 'sdk')
-        )
-      )
-      .returning({ id: provider_installation_reservations.id });
-    if (advanced.length !== 1) return false;
-    cleanupStage = 'identity';
-  }
-  if (cleanupStage === 'identity' && deactivated.wasActive) {
-    if (!options.deleteChatSdkIdentityCache) return false;
-    try {
-      await withSlackSdkTimeout(options.deleteChatSdkIdentityCache(deactivated.teamId));
-    } catch (error) {
-      captureException(error, {
-        tags: { component: 'slack-service', op: 'delete-sdk-identity' },
-        extra: { integrationId: deactivated.integrationId },
-      });
-      return false;
-    }
-  }
   return db.transaction(async tx => {
     await lockProviderOAuthOwnerRow(tx, deactivated.owner, {
       allowDeletedOrganization: true,
     });
-    const [current] = await tx
-      .select({ id: provider_installation_reservations.id })
+    const [replacement] = await tx
+      .select()
       .from(provider_installation_reservations)
       .where(
         and(
-          eq(provider_installation_reservations.id, replacement.id),
-          eq(provider_installation_reservations.generation, replacement.generation),
+          eq(provider_installation_reservations.provider, 'slack'),
+          eq(provider_installation_reservations.provider_installation_id, deactivated.teamId),
           eq(provider_installation_reservations.status, 'deleting'),
-          eq(provider_installation_reservations.cleanup_stage, 'identity')
+          deactivated.generation
+            ? eq(provider_installation_reservations.generation, deactivated.generation)
+            : undefined
         )
       )
       .for('update');
-    if (!current) return false;
+    if (!replacement || replacement.id !== deactivated.reservationId) {
+      return false;
+    }
+    let installationDeleted = true;
+    let cleanupStage = replacement.cleanup_stage ?? 'sdk';
+    if (cleanupStage === 'sdk' && deactivated.wasActive && options.deleteChatSdkInstallation) {
+      try {
+        await withSlackSdkTimeout(options.deleteChatSdkInstallation(deactivated.teamId));
+      } catch (error) {
+        installationDeleted = false;
+        captureException(error, {
+          tags: { component: 'slack-service', op: 'delete-sdk-installation' },
+          extra: { integrationId: deactivated.integrationId },
+        });
+        return false;
+      }
+      await tx
+        .update(provider_installation_reservations)
+        .set({ cleanup_stage: 'identity', updated_at: new Date().toISOString() })
+        .where(eq(provider_installation_reservations.id, replacement.id));
+      cleanupStage = 'identity';
+    }
+    if (!installationDeleted) return false;
+    if (cleanupStage === 'identity' && deactivated.wasActive) {
+      if (!options.deleteChatSdkIdentityCache) return false;
+      try {
+        await withSlackSdkTimeout(options.deleteChatSdkIdentityCache(deactivated.teamId));
+      } catch (error) {
+        captureException(error, {
+          tags: { component: 'slack-service', op: 'delete-sdk-identity' },
+          extra: { integrationId: deactivated.integrationId },
+        });
+        return false;
+      }
+    }
     await tx
       .delete(platform_integrations)
       .where(

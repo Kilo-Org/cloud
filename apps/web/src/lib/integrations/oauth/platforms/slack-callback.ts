@@ -29,7 +29,10 @@ import {
   parseOAuthStateOwner,
   cancelMissingCodeProviderOAuthAttempt,
 } from '@/lib/integrations/oauth/common';
-import { claimSlackProviderInstallation } from '@/lib/integrations/provider-installation-reservations';
+import {
+  adoptUnsharedSlackWorkspaceReservation,
+  claimSlackProviderInstallation,
+} from '@/lib/integrations/provider-installation-reservations';
 import { exchangeSlackOAuthCode } from '@/lib/integrations/platforms/slack/oauth-exchange';
 
 const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
@@ -173,31 +176,20 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     const { teamId, installation, grantedScopes } = exchanged;
     if (!sharedGitHubOwner) {
       try {
+        const integration = await upsertSlackInstallation({ owner, teamId, installation });
+        await slackAdapter.setInstallation(teamId, installation);
         if (!installation.isEnterpriseInstall) {
-          const claim = await claimSlackProviderInstallation({
-            actorUserId: user.id,
+          await adoptUnsharedSlackWorkspaceReservation({
             owner,
-            state,
+            integrationId: integration.id,
             teamId,
           });
-          if (!claim) throw new Error('Slack OAuth attempt changed before reservation');
-          await activateReservedSlackInstallation({
-            owner,
-            teamId,
-            installation,
-            grantedScopes,
-            claim,
-            setChatSdkInstallation: (id, value) => slackAdapter.setInstallation(id, value),
-          });
-        } else {
-          await upsertSlackInstallation({ owner, teamId, installation });
-          await slackAdapter.setInstallation(teamId, installation);
-          if (
-            verified.purpose === 'provider_install' &&
-            !(await completeUnsharedSlackOAuthAttempt({ actorUserId: user.id, owner, state }))
-          ) {
-            throw new Error('Slack OAuth attempt changed before completion');
-          }
+        }
+        if (
+          verified.purpose === 'provider_install' &&
+          !(await completeUnsharedSlackOAuthAttempt({ actorUserId: user.id, owner, state }))
+        ) {
+          throw new Error('Slack OAuth attempt changed before completion');
         }
       } catch (error) {
         if (verified.purpose === 'provider_install') {

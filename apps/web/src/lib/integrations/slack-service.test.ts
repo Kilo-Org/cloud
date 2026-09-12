@@ -203,15 +203,15 @@ describe('slack-service deleteInstallationByTeamId', () => {
     mockDeleteWhere.mockResolvedValue(undefined);
   });
 
-  it('keeps cleanup pending when no Chat SDK cleanup callbacks are provided', async () => {
+  it('deletes the platform integration and Chat SDK state for a Slack team', async () => {
     mockUninstallRows(buildSlackIntegration());
 
     await expect(deleteInstallationByTeamId('T123')).resolves.toEqual({
       success: true,
-      deleted: false,
+      deleted: true,
     });
 
-    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(2);
   });
 });
 

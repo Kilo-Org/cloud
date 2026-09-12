@@ -287,7 +287,7 @@ export function SlackIntegrationDetails({
         </Alert>
       )}
 
-      {isInstalled && !cleanupPending && missingScopes.length > 0 && (
+      {isInstalled && missingScopes.length > 0 && (
         <Alert variant="warning">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Slack permissions need to be refreshed</AlertTitle>

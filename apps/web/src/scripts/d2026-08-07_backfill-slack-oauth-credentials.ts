@@ -32,6 +32,7 @@ import {
   getSlackCredentialByIntegrationId,
 } from '@/lib/integrations/platforms/slack/credential-store';
 import { requireSlackCredentialKeyset } from '@/lib/integrations/platforms/slack/credential-keyset';
+import { isSlackEnterpriseInstallationId } from '@/lib/integrations/platforms/slack/installation-id';
 
 type SkipReason =
   | 'already_migrated'
@@ -159,6 +160,8 @@ async function main(): Promise<void> {
             owner,
             botToken,
             botUserId: readBotUserId(integration.metadata),
+            slackEnterpriseId: isSlackEnterpriseInstallationId(teamId) ? teamId : null,
+            isEnterpriseInstall: isSlackEnterpriseInstallationId(teamId),
           });
           if (outcome.status === 'skipped_existing') skipped.already_migrated += 1;
           else migrated += 1;

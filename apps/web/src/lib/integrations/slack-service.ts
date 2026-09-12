@@ -13,6 +13,7 @@ import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
+import { isSlackEnterpriseInstallationId } from '@/lib/integrations/platforms/slack/installation-id';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { SLACK_CLIENT_ID } from '@/lib/config.server';
@@ -888,7 +889,7 @@ async function deactivateSlackInstallation(
     const isEnterpriseInstall =
       credential?.is_enterprise_install === true ||
       legacyMetadata?.is_enterprise_install === true ||
-      teamId.startsWith('E');
+      isSlackEnterpriseInstallationId(teamId);
     await tx
       .update(provider_oauth_attempts)
       .set({ status: 'expired' })

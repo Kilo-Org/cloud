@@ -61,5 +61,6 @@ INSERT INTO "provider_installation_reservations" ("provider", "provider_installa
 SELECT 'slack', integration."platform_installation_id", integration."owned_by_user_id", integration."owned_by_organization_id", integration."id", 1, 1, 'active', '9999-12-31 23:59:59.999+00'
 FROM "platform_integrations" integration
 WHERE integration."platform" = 'slack' AND integration."integration_status" = 'active' AND integration."platform_installation_id" IS NOT NULL
+AND integration."platform_installation_id" NOT LIKE 'E%'
 AND NOT EXISTS (SELECT 1 FROM "slack_oauth_credentials" credential WHERE credential."platform_integration_id" = integration."id" AND credential."is_enterprise_install" = true)
 ON CONFLICT ("provider", "provider_installation_id") DO NOTHING;

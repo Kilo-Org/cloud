@@ -280,7 +280,8 @@ export async function cancelProviderOAuthAttempt(input: {
           eq(provider_oauth_attempts.state_hash, providerOAuthStateHash(input.state)),
           or(
             eq(provider_oauth_attempts.status, 'pending'),
-            eq(provider_oauth_attempts.status, 'activating')
+            eq(provider_oauth_attempts.status, 'activating'),
+            eq(provider_oauth_attempts.status, 'captured')
           )
         )
       )

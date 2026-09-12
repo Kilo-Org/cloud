@@ -112,7 +112,7 @@ describe('detectRefreshTokenReuse', () => {
       new Request('https://kilo-mcp.test/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'grant_type=refresh_token&refresh_token=u:g:first&refresh_token=u:g:second',
+        body: 'grant_type=refresh_token&refresh_token=u:g:second&refresh_token=u:g:first',
       }),
       new Request('https://kilo-mcp.test/token', {
         method: 'POST',

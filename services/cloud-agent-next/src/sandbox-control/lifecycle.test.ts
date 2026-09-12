@@ -4153,6 +4153,324 @@ describe('SandboxControl lifecycle boundaries', () => {
     });
   });
 
+  describe('unmatched native cleanup observation', () => {
+    const NATIVE = '11111111-1111-4111-8111-111111111111';
+    const REPLACEMENT = '22222222-2222-4222-8222-222222222222';
+
+    function authorization(
+      route: { sessionId: string; kiloSessionId: string; directory: string },
+      wrapperInstanceId: string
+    ) {
+      return {
+        operation: 'session.attach' as const,
+        operationId: '33333333-3333-4333-8333-333333333333',
+        messageId: 'message_1',
+        session: {
+          sessionId: route.sessionId,
+          kiloSessionId: route.kiloSessionId,
+          directory: route.directory,
+        },
+        wrapperInstanceId,
+        dispatchDeadlineAt: Date.now() + 1_000,
+      };
+    }
+
+    function quarantineInput(
+      route: { sessionId: string; kiloSessionId: string; directory: string },
+      wrapperInstanceId: string,
+      nativeRuntimeId: string
+    ) {
+      return {
+        ownerId: OWNER,
+        sessionId: route.sessionId,
+        wrapperInstanceId,
+        reason: 'native_cleanup_unavailable',
+        nativeRuntimeId,
+        authorization: authorization(route, wrapperInstanceId),
+      };
+    }
+
+    async function readyWithRoute() {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const [route] = await h.control.listRoutes();
+      if (!route) throw new Error('Missing route');
+      const runtime = h.runtime(identity.providerInstanceId);
+      if (!runtime) throw new Error('Missing runtime');
+      return { h, identity, route, runtime };
+    }
+
+    it('observes a dead identity-matched allocation whose route native id is missing', async () => {
+      const { h, identity, route, runtime } = await readyWithRoute();
+      h.records.set('session_routes', [{ ...route }]);
+      runtime.state.running = false;
+      h.sendRequest.mockClear();
+
+      await expect(
+        h.control.quarantineRuntime(
+          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
+        )
+      ).resolves.toEqual({ quarantined: true, disposition: 'physical_stopping' });
+
+      expect(mocks.providerCreate).toHaveBeenCalledOnce();
+      expect(h.sendRequest).not.toHaveBeenCalled();
+      const dead = await h.control.getPhysicalRecord();
+      expect(dead.stopTombstone?.reason).toBe('environment_failed');
+      expect(['failed', 'stopping']).toContain(dead.state);
+    });
+
+    it('continues the observed loss on the scheduled stop-attempt alarm', async () => {
+      const { h, identity, route, runtime } = await readyWithRoute();
+      h.records.set('session_routes', [{ ...route }]);
+      runtime.state.running = false;
+      runtime.destroy.mockRejectedValue(new Error('provider unavailable'));
+
+      await expect(
+        h.control.quarantineRuntime(
+          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
+        )
+      ).resolves.toEqual({ quarantined: true, disposition: 'physical_stopping' });
+
+      // The provider still reports the container alive, so the scheduled stop
+      // cannot confirm death yet and must arm the durable stop-attempt alarm.
+      runtime.state.running = true;
+      await h.flush();
+      expect(h.alarmAt).not.toBeNull();
+      expect((await h.control.getPhysicalRecord()).stopTombstone?.attempts).toBe(1);
+
+      // Past create-settle, the dead container is now observable as terminal.
+      vi.setSystemTime(Date.now() + DEADLINE_MS.createSettle);
+      runtime.state.running = false;
+      await h.fireAlarm();
+      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({ state: 'stopped' });
+    });
+
+    it('rehydrates the wrapper runtime before the first loss observation', async () => {
+      const h = await harness();
+      h.session.getControlState.mockResolvedValue({
+        version: 1,
+        scope: { sandboxId: SANDBOX_ID },
+        targets: [],
+      });
+      h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+        type: 'response',
+        requestId: 'request_1',
+        ok: true,
+        result:
+          request.operation === 'sandbox.status'
+            ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+            : request.operation === 'sandbox.reconcile'
+              ? {
+                  episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                    .episodeId,
+                  attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                  phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+                }
+              : undefined,
+      }));
+      await h.create();
+      const original = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+      await h.flush();
+      await h.hooks.onSocketClosed?.(true, original);
+      const runtime = h.runtime(original.providerInstanceId);
+      if (!runtime) throw new Error('Missing runtime');
+      runtime.state.running = false;
+      const [route] = await h.control.listRoutes();
+      if (!route) throw new Error('Missing route');
+      h.records.set('session_routes', [{ ...route }]);
+
+      await h.evict();
+      await expect(
+        h.control.quarantineRuntime(
+          quarantineInput(route, original.wrapperInstanceId ?? '', NATIVE)
+        )
+      ).resolves.toEqual({ quarantined: true, disposition: 'physical_stopping' });
+
+      const dead = await h.control.getPhysicalRecord();
+      expect(dead.stopTombstone?.reason).toBe('environment_failed');
+      expect(['failed', 'stopping']).toContain(dead.state);
+    });
+
+    it('does not release a live identity-matched allocation whose route native id is missing', async () => {
+      const { h, identity, route, runtime } = await readyWithRoute();
+      h.records.set('session_routes', [{ ...route }]);
+      expect(runtime.state.running).toBe(true);
+      h.sendRequest.mockClear();
+
+      await expect(
+        h.control.quarantineRuntime(
+          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
+        )
+      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
+
+      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+      expect(runtime.destroy).not.toHaveBeenCalled();
+      expect(h.sendRequest).not.toHaveBeenCalled();
+    });
+
+    it('keeps cleanup pending when the loss observation rejects', async () => {
+      const { h, identity, route, runtime } = await readyWithRoute();
+      h.records.set('session_routes', [{ ...route }]);
+      runtime.isContainerRunning.mockRejectedValue(new Error('probe failed'));
+      runtime.isContainerRunning.mockClear();
+      h.sendRequest.mockClear();
+
+      await expect(
+        h.control.quarantineRuntime(
+          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
+        )
+      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
+
+      expect(runtime.isContainerRunning).toHaveBeenCalled();
+      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+      expect(runtime.destroy).not.toHaveBeenCalled();
+      expect(h.sendRequest).not.toHaveBeenCalled();
+    });
+
+    it('keeps cleanup pending when the loss observation exceeds its budget', async () => {
+      const { h, identity, route, runtime } = await readyWithRoute();
+      h.records.set('session_routes', [{ ...route }]);
+      runtime.isContainerRunning.mockImplementation(() => new Promise(() => undefined));
+      h.sendRequest.mockClear();
+
+      const quarantine = h.control.quarantineRuntime(
+        quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
+      );
+      await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt);
+      await expect(quarantine).resolves.toEqual({
+        quarantined: false,
+        disposition: 'unconfirmed',
+      });
+
+      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+      expect(runtime.destroy).not.toHaveBeenCalled();
+      expect(h.sendRequest).not.toHaveBeenCalled();
+    });
+
+    it('leaves a different bound native id untouched while the allocation is live', async () => {
+      const { h, identity, route, runtime } = await readyWithRoute();
+      h.records.set('session_routes', [{ ...route, nativeRuntimeId: REPLACEMENT }]);
+      runtime.isContainerRunning.mockClear();
+      h.sendRequest.mockClear();
+
+      await expect(
+        h.control.quarantineRuntime(
+          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
+        )
+      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
+
+      await expect(h.control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId: REPLACEMENT }),
+      ]);
+      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+      expect(runtime.destroy).not.toHaveBeenCalled();
+      expect(h.sendRequest).not.toHaveBeenCalled();
+    });
+
+    it('does not observe when the route is missing', async () => {
+      const { h, identity, runtime } = await readyWithRoute();
+      const [route] = await h.control.listRoutes();
+      if (!route) throw new Error('Missing route');
+      h.records.set('session_routes', []);
+      runtime.isContainerRunning.mockClear();
+      runtime.destroy.mockClear();
+
+      await expect(
+        h.control.quarantineRuntime(
+          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
+        )
+      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
+
+      expect(runtime.isContainerRunning).not.toHaveBeenCalled();
+      expect(runtime.destroy).not.toHaveBeenCalled();
+      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+    });
+
+    it('does not observe when the route identity does not match', async () => {
+      const { h, identity, route, runtime } = await readyWithRoute();
+      h.records.set('session_routes', [
+        { ...route, kiloSessionId: 'ses_ffffffffffffffffffffffffffff' },
+      ]);
+      runtime.isContainerRunning.mockClear();
+      runtime.destroy.mockClear();
+
+      await expect(
+        h.control.quarantineRuntime(
+          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
+        )
+      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
+
+      expect(runtime.isContainerRunning).not.toHaveBeenCalled();
+      expect(runtime.destroy).not.toHaveBeenCalled();
+      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+    });
+
+    it('keeps the matched native id when targeted retirement is unavailable', async () => {
+      const { h, identity, route, runtime } = await readyWithRoute();
+      h.records.set('session_routes', [{ ...route, nativeRuntimeId: NATIVE }]);
+      h.socket.supportsNativeRuntimeRetirement = () => false;
+      runtime.isContainerRunning.mockClear();
+      h.sendRequest.mockClear();
+
+      await expect(
+        h.control.quarantineRuntime(
+          quarantineInput(route, identity.wrapperInstanceId ?? '', NATIVE)
+        )
+      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
+
+      expect(runtime.isContainerRunning).not.toHaveBeenCalled();
+      expect(h.sendRequest).not.toHaveBeenCalled();
+      await expect(h.control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId: NATIVE }),
+      ]);
+      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+    });
+
+    it('does not observe when the wrapper identity is unsettled', async () => {
+      const h = await harness();
+      await h.create();
+      const physical = await h.control.getPhysicalRecord();
+      if (!physical.providerRef) throw new Error('Missing provider reference');
+      const runtime = h.runtime(physical.providerRef);
+      if (!runtime) throw new Error('Missing runtime');
+      runtime.isContainerRunning.mockClear();
+      runtime.destroy.mockClear();
+
+      await expect(
+        h.control.quarantineRuntime(quarantineInput(ROUTE, crypto.randomUUID(), NATIVE))
+      ).resolves.toEqual({ quarantined: false, disposition: 'unconfirmed' });
+
+      expect(runtime.isContainerRunning).not.toHaveBeenCalled();
+      expect(runtime.destroy).not.toHaveBeenCalled();
+      await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+    });
+  });
+
   it('performs all five stop attempts, never reactivates the tombstone, and eventually releases by observation', async () => {
     const h = await harness({
       configureAllocation: runtime => {

@@ -1397,18 +1397,19 @@ export class SandboxControl extends DurableObject<Env> {
     if (wrapperInstanceId !== input.wrapperInstanceId)
       return { quarantined: false, disposition: 'unconfirmed' };
     const route = (await loadRouteTable(this.ctx.storage)).get(input.sessionId);
+    const routeIdentityMatches =
+      route !== undefined &&
+      (nativeRuntimeId?.success && authorization?.success
+        ? route.ownerId === input.ownerId &&
+          route.kiloSessionId === authorization.data.session.kiloSessionId &&
+          route.directory === authorization.data.session.directory
+        : true);
     const targetRoute =
       nativeRuntimeId?.success && authorization?.success
-        ? route &&
-          route.ownerId === input.ownerId &&
-          route.kiloSessionId === authorization.data.session.kiloSessionId &&
-          route.directory === authorization.data.session.directory &&
-          route.nativeRuntimeId === nativeRuntimeId.data
+        ? routeIdentityMatches && route?.nativeRuntimeId === nativeRuntimeId.data
           ? route
           : undefined
         : route;
-    if (nativeRuntimeId?.success && !targetRoute)
-      return { quarantined: false, disposition: 'unconfirmed' };
     if (
       targetRoute &&
       targetRoute.ownerId === input.ownerId &&
@@ -1426,7 +1427,37 @@ export class SandboxControl extends DurableObject<Env> {
       if (retirement === 'retired') return { quarantined: true, disposition: 'native_retired' };
       if (retirement === 'pending') return { quarantined: true, disposition: 'native_pending' };
     }
-    if (nativeRuntimeId?.success) return { quarantined: false, disposition: 'unconfirmed' };
+    if (nativeRuntimeId?.success) {
+      // An already-established stop tombstone keeps the cleanup gate armed even
+      // when the route no longer names the pending native. Do not re-observe.
+      if (physical.stopTombstone) {
+        await this.repairLifecycleScheduling(physical);
+        return { quarantined: true, disposition: 'physical_stopping' };
+      }
+      // A route whose identity matches but whose recorded native id is missing
+      // or different is not proof the native process is gone. Observe the bound
+      // allocation and release the gate only on a committed stop.
+      if (
+        !targetRoute &&
+        routeIdentityMatches &&
+        physical.state === 'running' &&
+        physical.providerRef !== null
+      ) {
+        await this.observeRunningAllocationLoss(physical, input.wrapperInstanceId);
+        const observed = await loadPhysicalRecord(this.ctx.storage);
+        if (!sameAllocation(observed, physical)) {
+          return { quarantined: false, disposition: 'unconfirmed' };
+        }
+        if (observed.stopTombstone) {
+          this.ctx.waitUntil(this.recordStopAttempt());
+          return { quarantined: true, disposition: 'physical_stopping' };
+        }
+        if (observed.state === 'stopped') {
+          return { quarantined: false, disposition: 'physical_stopped' };
+        }
+      }
+      return { quarantined: false, disposition: 'unconfirmed' };
+    }
     if (!physical.stopTombstone) {
       const next = beginStop(physical, input.reason, Date.now(), wrapperInstanceId);
       await this.persistPhysical(physical, next, input.reason);

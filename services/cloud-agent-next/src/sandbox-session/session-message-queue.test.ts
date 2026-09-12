@@ -3790,6 +3790,46 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.control.quarantineRuntime).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps the recovery message queued through physical stopping and acquires after cleanup clears', async () => {
+    const fixture = sessionFixture();
+    const authorization: SessionOperationAuthorization = {
+      operation: 'session.attach',
+      operationId: 'attach-a',
+      messageId: 'a',
+      session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_root', directory: DIRECTORY },
+      wrapperInstanceId: RUNTIME_ID,
+      dispatchDeadlineAt: Date.now() + 30_000,
+    };
+    fixture.values.set('pending_runtime_cleanup', {
+      ownerId: 'user_1',
+      sessionId: SESSION_ID,
+      sandboxId: SANDBOX_ID,
+      wrapperInstanceId: RUNTIME_ID,
+      nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+      reason: 'runtime_unhealthy',
+      authorization,
+    });
+    fixture.control.quarantineRuntime
+      .mockResolvedValueOnce({ quarantined: true, disposition: 'physical_stopping' })
+      .mockResolvedValueOnce({ quarantined: false, disposition: 'physical_stopped' });
+    fixture.control.ensureReady.mockClear();
+
+    await fixture.admit('a');
+    await fixture.flush();
+
+    expect(fixture.control.ensureReady).not.toHaveBeenCalled();
+    expect(fixture.control.quarantineRuntime).toHaveBeenCalledTimes(1);
+    expect(fixture.values.get('pending_runtime_cleanup')).toBeDefined();
+    expect(fixture.record('a')).toMatchObject({ state: 'queued' });
+
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.values.get('pending_runtime_cleanup')).toBeUndefined();
+    expect(fixture.control.quarantineRuntime).toHaveBeenCalledTimes(2);
+    expect(fixture.control.ensureReady).toHaveBeenCalled();
+  });
+
   it.each(['cloudflare', 'vercel'] as const)(
     'sends the expected runtime fence for cold and warm handoffs on %s',
     async provider => {

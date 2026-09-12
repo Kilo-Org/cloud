@@ -5,14 +5,10 @@ import {
   SLACK_ENCRYPTION_KEY,
   SLACK_SIGNING_SECRET,
 } from '@/lib/config.server';
-import { getActiveSlackInstallationForRuntime } from '@/lib/integrations/slack-service';
 
 export const slackAdapter = createSlackAdapter({
   clientId: SLACK_CLIENT_ID,
   clientSecret: SLACK_CLIENT_SECRET,
   signingSecret: SLACK_SIGNING_SECRET,
   encryptionKey: SLACK_ENCRYPTION_KEY || undefined,
-  installationProvider: {
-    getInstallation: installationId => getActiveSlackInstallationForRuntime(installationId),
-  },
 });

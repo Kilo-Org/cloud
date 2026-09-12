@@ -4524,39 +4524,6 @@ export const provider_installation_reservations = pgTable(
   ]
 );
 
-export const provider_installation_pending_credentials = pgTable(
-  'provider_installation_pending_credentials',
-  {
-    reservation_id: uuid()
-      .primaryKey()
-      .references(() => provider_installation_reservations.id, { onDelete: 'cascade' }),
-    platform_integration_id: uuid()
-      .notNull()
-      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
-    generation: integer().notNull(),
-    access_token_encrypted: text().notNull(),
-    bot_user_id: text(),
-    team_name: text(),
-    slack_enterprise_id: text(),
-    is_enterprise_install: boolean().notNull().default(false),
-    granted_scopes: text().array(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    check(
-      'provider_installation_pending_credentials_generation_check',
-      sql`${table.generation} > 0`
-    ),
-    index('IDX_provider_installation_pending_credentials_integration').on(
-      table.platform_integration_id
-    ),
-  ]
-);
-
 export const github_connection_attempts = pgTable(
   'github_connection_attempts',
   {

@@ -24,7 +24,7 @@ const attemptOwnerCondition = (owner: Owner) =>
 
 export type SlackReservationClaim = {
   reservationId: string;
-  attemptId: string | null;
+  attemptId: string;
   generation: number;
 };
 
@@ -85,9 +85,7 @@ export async function claimSlackProviderInstallation(input: {
         owned_by_user_id: input.owner.type === 'user' ? input.owner.id : null,
         owned_by_organization_id: input.owner.type === 'org' ? input.owner.id : null,
         platform_integration_id:
-          reservation?.status === 'active' || reservation?.active_generation
-            ? reservation.platform_integration_id
-            : null,
+          reservation?.status === 'active' ? reservation.platform_integration_id : null,
         oauth_attempt_id: attempt.id,
         generation,
         active_generation: activeGeneration,
@@ -139,69 +137,6 @@ export async function claimSlackProviderInstallation(input: {
   }
 }
 
-export async function claimLegacySlackProviderInstallation(
-  owner: Owner,
-  teamId: string
-): Promise<SlackReservationClaim | null> {
-  try {
-    return await db.transaction(async tx => {
-      await lockProviderOAuthOwnerRow(tx, owner);
-      const now = new Date().toISOString();
-      const [reservation] = await tx
-        .select()
-        .from(provider_installation_reservations)
-        .where(
-          and(
-            eq(provider_installation_reservations.provider, 'slack'),
-            eq(provider_installation_reservations.provider_installation_id, teamId)
-          )
-        )
-        .for('update');
-      if (reservation && !matchesOwner(reservation, owner)) return null;
-      const generation = (reservation?.generation ?? 0) + 1;
-      const activeGeneration =
-        reservation?.status === 'active'
-          ? reservation.generation
-          : (reservation?.active_generation ?? null);
-      const values = {
-        owned_by_user_id: owner.type === 'user' ? owner.id : null,
-        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-        platform_integration_id:
-          reservation?.status === 'active' || reservation?.active_generation
-            ? reservation.platform_integration_id
-            : null,
-        oauth_attempt_id: null,
-        generation,
-        active_generation: activeGeneration,
-        status: 'pending' as const,
-        expires_at: new Date(Date.now() + RESERVATION_TTL_MS).toISOString(),
-        updated_at: now,
-      };
-      const [claimed] = reservation
-        ? await tx
-            .update(provider_installation_reservations)
-            .set(values)
-            .where(eq(provider_installation_reservations.id, reservation.id))
-            .returning({ id: provider_installation_reservations.id })
-        : await tx
-            .insert(provider_installation_reservations)
-            .values({ provider: 'slack', provider_installation_id: teamId, ...values })
-            .returning({ id: provider_installation_reservations.id });
-      return { reservationId: claimed.id, attemptId: null, generation };
-    });
-  } catch (error) {
-    if (
-      error &&
-      typeof error === 'object' &&
-      'constraint' in error &&
-      error.constraint === 'UQ_provider_installation_reservations_identity'
-    ) {
-      return null;
-    }
-    throw error;
-  }
-}
-
 function matchesOwner(
   reservation: typeof provider_installation_reservations.$inferSelect,
   owner: Owner
@@ -225,9 +160,7 @@ export async function lockSlackReservation(
         eq(provider_installation_reservations.id, claim.reservationId),
         eq(provider_installation_reservations.provider, 'slack'),
         eq(provider_installation_reservations.provider_installation_id, teamId),
-        claim.attemptId
-          ? eq(provider_installation_reservations.oauth_attempt_id, claim.attemptId)
-          : isNull(provider_installation_reservations.oauth_attempt_id),
+        eq(provider_installation_reservations.oauth_attempt_id, claim.attemptId),
         eq(provider_installation_reservations.generation, claim.generation),
         eq(provider_installation_reservations.status, 'pending'),
         ownerCondition(owner),
@@ -256,16 +189,13 @@ export async function activateSlackReservation(
     .where(
       and(
         eq(provider_installation_reservations.id, claim.reservationId),
-        claim.attemptId
-          ? eq(provider_installation_reservations.oauth_attempt_id, claim.attemptId)
-          : isNull(provider_installation_reservations.oauth_attempt_id),
+        eq(provider_installation_reservations.oauth_attempt_id, claim.attemptId),
         eq(provider_installation_reservations.generation, claim.generation),
         eq(provider_installation_reservations.status, 'pending')
       )
     )
     .returning({ id: provider_installation_reservations.id });
   if (activated.length !== 1) return false;
-  if (!claim.attemptId) return true;
   const completed = await tx
     .update(provider_oauth_attempts)
     .set({
@@ -289,17 +219,6 @@ export async function adoptLegacySlackReservation(
   integrationId: string,
   teamId: string
 ): Promise<void> {
-  const [existing] = await db
-    .select({ id: provider_installation_reservations.id })
-    .from(provider_installation_reservations)
-    .where(
-      and(
-        eq(provider_installation_reservations.provider, 'slack'),
-        eq(provider_installation_reservations.provider_installation_id, teamId)
-      )
-    )
-    .limit(1);
-  if (existing) return;
   await db.transaction(async tx => {
     await lockProviderOAuthOwnerRow(tx, owner);
     const [integration] = await tx
@@ -417,9 +336,10 @@ export async function getRecoverableSlackReservation(teamId: string): Promise<{
   const [row] = await db
     .select({
       reservation: provider_installation_reservations,
+      attemptStatus: provider_oauth_attempts.status,
     })
     .from(provider_installation_reservations)
-    .leftJoin(
+    .innerJoin(
       provider_oauth_attempts,
       eq(provider_installation_reservations.oauth_attempt_id, provider_oauth_attempts.id)
     )
@@ -429,14 +349,11 @@ export async function getRecoverableSlackReservation(teamId: string): Promise<{
         eq(provider_installation_reservations.provider_installation_id, teamId),
         eq(provider_installation_reservations.status, 'pending'),
         gt(provider_installation_reservations.expires_at, new Date().toISOString()),
-        or(
-          isNull(provider_installation_reservations.oauth_attempt_id),
-          eq(provider_oauth_attempts.status, 'captured')
-        )
+        eq(provider_oauth_attempts.status, 'captured')
       )
     )
     .limit(1);
-  if (!row) return null;
+  if (!row?.reservation.oauth_attempt_id) return null;
   const owner: Owner | null = row.reservation.owned_by_organization_id
     ? { type: 'org', id: row.reservation.owned_by_organization_id }
     : row.reservation.owned_by_user_id

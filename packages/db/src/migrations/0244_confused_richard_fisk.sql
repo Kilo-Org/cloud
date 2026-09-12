@@ -1,18 +1,3 @@
-CREATE TABLE "provider_installation_pending_credentials" (
-	"reservation_id" uuid PRIMARY KEY NOT NULL,
-	"platform_integration_id" uuid NOT NULL,
-	"generation" integer NOT NULL,
-	"access_token_encrypted" text NOT NULL,
-	"bot_user_id" text,
-	"team_name" text,
-	"slack_enterprise_id" text,
-	"is_enterprise_install" boolean DEFAULT false NOT NULL,
-	"granted_scopes" text[],
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "provider_installation_pending_credentials_generation_check" CHECK ("provider_installation_pending_credentials"."generation" > 0)
-);
---> statement-breakpoint
 CREATE TABLE "provider_installation_reservations" (
 	"id" uuid PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid() NOT NULL,
 	"provider" text NOT NULL,
@@ -38,13 +23,10 @@ ALTER TABLE "provider_oauth_attempts" DROP CONSTRAINT "provider_oauth_attempts_s
 ALTER TABLE "provider_oauth_attempts" ADD COLUMN "provider_installation_id" text;--> statement-breakpoint
 ALTER TABLE "provider_oauth_attempts" ADD COLUMN "generation" integer;--> statement-breakpoint
 ALTER TABLE "provider_oauth_attempts" ADD COLUMN "completed_integration_id" uuid;--> statement-breakpoint
-ALTER TABLE "provider_installation_pending_credentials" ADD CONSTRAINT "provider_installation_pending_credentials_reservation_id_provider_installation_reservations_id_fk" FOREIGN KEY ("reservation_id") REFERENCES "public"."provider_installation_reservations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "provider_installation_pending_credentials" ADD CONSTRAINT "provider_installation_pending_credentials_platform_integration_id_platform_integrations_id_fk" FOREIGN KEY ("platform_integration_id") REFERENCES "public"."platform_integrations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "provider_installation_reservations" ADD CONSTRAINT "provider_installation_reservations_owned_by_user_id_kilocode_users_id_fk" FOREIGN KEY ("owned_by_user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "provider_installation_reservations" ADD CONSTRAINT "provider_installation_reservations_owned_by_organization_id_organizations_id_fk" FOREIGN KEY ("owned_by_organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "provider_installation_reservations" ADD CONSTRAINT "provider_installation_reservations_platform_integration_id_platform_integrations_id_fk" FOREIGN KEY ("platform_integration_id") REFERENCES "public"."platform_integrations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "provider_installation_reservations" ADD CONSTRAINT "provider_installation_reservations_oauth_attempt_id_provider_oauth_attempts_id_fk" FOREIGN KEY ("oauth_attempt_id") REFERENCES "public"."provider_oauth_attempts"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "IDX_provider_installation_pending_credentials_integration" ON "provider_installation_pending_credentials" USING btree ("platform_integration_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "UQ_provider_installation_reservations_identity" ON "provider_installation_reservations" USING btree ("provider","provider_installation_id");--> statement-breakpoint
 CREATE INDEX "IDX_provider_installation_reservations_owner_user" ON "provider_installation_reservations" USING btree ("owned_by_user_id");--> statement-breakpoint
 CREATE INDEX "IDX_provider_installation_reservations_owner_org" ON "provider_installation_reservations" USING btree ("owned_by_organization_id");--> statement-breakpoint

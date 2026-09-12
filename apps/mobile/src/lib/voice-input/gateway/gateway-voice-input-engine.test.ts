@@ -561,13 +561,13 @@ describe('progressive segment rotation', () => {
     }
   });
 
-  it('emits no-speech on stop when every segment is empty', async () => {
+  it.each(['', '   '])('emits no-speech for empty segments (%j) and allows retry', async text => {
     vi.useFakeTimers();
     try {
-      const { engine, events } = buildEngine({
+      const { engine, events, upload } = buildEngine({
         segmentDurationMs: 30,
-        upload: async (): Promise<TranscribeRecordingResult> => ({ ok: true, text: '   ' }),
       });
+      upload.mockResolvedValue({ ok: true, text });
 
       engine.start(START_OPTIONS);
       await settle();
@@ -584,6 +584,22 @@ describe('progressive segment rotation', () => {
       expect(events.map(entry => entry.event)).toEqual(['start', 'transcribing', 'error', 'end']);
       const errorPayload = events[2]?.payload as VoiceInputNativeEvent['error'];
       expect(errorPayload.error).toBe('no-speech');
+
+      // A silent session never emits a draft write. A new microphone tap can
+      // still transcribe normally using the same engine after the error ends.
+      upload.mockResolvedValue({ ok: true, text: 'retry words' });
+      engine.start(START_OPTIONS);
+      await settle();
+      engine.stop();
+      await settle();
+      expect(events.slice(4).map(entry => entry.event)).toEqual([
+        'start',
+        'transcribing',
+        'result',
+        'end',
+      ]);
+      const resultPayload = events[6]?.payload as VoiceInputNativeEvent['result'];
+      expect(resultPayload.results[0]?.transcript).toBe('retry words');
     } finally {
       vi.useRealTimers();
     }

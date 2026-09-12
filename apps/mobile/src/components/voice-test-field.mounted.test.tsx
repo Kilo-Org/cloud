@@ -1,5 +1,6 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as preferences-screen.mounted.test.tsx) */
 import { act, type ReactTestRenderer } from 'react-test-renderer';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -219,6 +220,54 @@ describe('VoiceTestField', () => {
 
     expect(findByType(renderer, 'AccessibleStatus')).toHaveLength(0);
   });
+
+  it.each(['', 'Keep these words'])(
+    'keeps draft %j unchanged on no-speech and leaves the microphone available to retry',
+    async draft => {
+      const renderer = await mountVoiceTestField();
+      const [input] = findByType(renderer, 'TextInput');
+      if (!input) {
+        throw new Error('TextInput not found');
+      }
+      act(() => {
+        (input.props.onChangeText as (text: string) => void)(draft);
+      });
+
+      voice.feedback = {
+        action: 'none',
+        availability: 'available',
+        message: 'No speech detected. Tap the microphone to try again.',
+        retryable: true,
+      };
+      if (!view) {
+        throw new Error('VoiceTestField was not mounted');
+      }
+      const { queryClient } = view;
+      act(() => {
+        renderer.update(
+          <QueryClientProvider client={queryClient}>
+            <VoiceTestField />
+          </QueryClientProvider>
+        );
+      });
+
+      expect(voice.options?.getDraft()).toBe(draft);
+      expect(applyVoiceDraftToInput).not.toHaveBeenCalled();
+      expect(findByType(renderer, 'AccessibleStatus')[0]?.props.message).toBe(
+        voice.feedback.message
+      );
+      const [button] = findByType(renderer, 'VoiceInputButton');
+      if (!button) {
+        throw new Error('VoiceInputButton not found');
+      }
+      expect(button.props.disabled).toBe(false);
+      expect(findByLabel(renderer, 'Clear text').props.disabled).toBe(draft.length === 0);
+      act(() => {
+        (button.props.onPress as () => void)();
+      });
+      expect(voice.toggle).toHaveBeenCalledOnce();
+    }
+  );
 
   it('shows no failure line while the session is healthy', async () => {
     const renderer = await mountVoiceTestField();

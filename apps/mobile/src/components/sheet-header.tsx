@@ -41,15 +41,13 @@ export function SheetHeader({
   const insets = useSafeAreaInsets();
   const resolvedDoneLabel = doneLabel ?? t('common.done');
   const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
-  // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
-  // header row off the sensor on full-width sheets. They go on an inner wrapper
-  // so they ADD to the `px-4` gutter: an inline padding on the container would
-  // beat the className (inline style wins in React Native) and swallow the
-  // gutter. Zero insets collapse the wrapper style to `undefined`, so portrait
-  // pixels are byte-identical and a rotation never moves anything vertically.
-  const sideInsetStyle =
-    insets.left > 0 || insets.right > 0
+  // Sheets can reach the status bar when expanded by the keyboard. Reserve
+  // top clearance as well as landscape cutout clearance inside the gutters.
+  // Keeping the inset on an inner wrapper preserves the header's own padding.
+  const safeAreaStyle =
+    insets.top > 0 || insets.left > 0 || insets.right > 0
       ? {
+          ...(insets.top > 0 ? { paddingTop: insets.top } : undefined),
           ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
           ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
         }
@@ -61,7 +59,7 @@ export function SheetHeader({
     // view by finding the header at the screen content's subview index 0 — a
     // flattened header breaks that native pass and the list paints over it.
     <View collapsable={false} className="border-b border-border bg-background px-4 pb-3 pt-4">
-      <View style={sideInsetStyle}>
+      <View style={safeAreaStyle}>
         <View className="min-h-11 flex-row items-center gap-x-3">
           {onShare !== undefined ? (
             <Pressable

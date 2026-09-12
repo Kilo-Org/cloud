@@ -69,13 +69,11 @@ function findHeaderContainer(root: TestRenderer.ReactTestInstance): TestRenderer
 }
 
 /**
- * The header row sits in an inner wrapper that carries only the landscape side
+ * The header row sits in an inner wrapper that carries the top and landscape side
  * insets, so they add to the outer container's `px-4` gutter instead of
  * overriding it. It is the only View in the header without a className.
  */
-function findSideInsetWrapper(
-  root: TestRenderer.ReactTestInstance
-): TestRenderer.ReactTestInstance {
+function findSafeAreaWrapper(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
   const wrappers = root.findAll(
     node =>
       typeof node.type === 'string' &&
@@ -84,7 +82,7 @@ function findSideInsetWrapper(
   );
   const wrapper = wrappers[0];
   if (!wrapper) {
-    throw new Error('side-inset wrapper not found');
+    throw new Error('safe-area wrapper not found');
   }
   return wrapper;
 }
@@ -370,7 +368,7 @@ describe('SheetHeader', () => {
     expect(container.props.collapsable).toBe(false);
     expect(container.props.className).toContain('px-4');
     expect(container.props.style).toBeUndefined();
-    expect(findSideInsetWrapper(renderer.root).props.style).toBeUndefined();
+    expect(findSafeAreaWrapper(renderer.root).props.style).toBeUndefined();
 
     renderer.unmount();
   });
@@ -391,12 +389,32 @@ describe('SheetHeader', () => {
     expect(container.props.collapsable).toBe(false);
     expect(container.props.className).toContain('px-4');
     expect(container.props.style).toBeUndefined();
-    const wrapper = findSideInsetWrapper(renderer.root);
+    const wrapper = findSafeAreaWrapper(renderer.root);
     expect(wrapper.props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
     const cancel = pressablesByLabel(renderer.root, 'Cancel')[0];
     const done = pressablesByLabel(renderer.root, 'Done')[0];
     expect(cancel?.parent?.parent).toBe(wrapper);
     expect(done?.parent?.parent).toBe(wrapper);
+
+    renderer.unmount();
+  });
+
+  it('clears the status bar when the sheet reaches the top safe area', async () => {
+    safeArea.top = 24;
+    const renderer = await mount({
+      title: 'Voice language',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    });
+
+    const container = findHeaderContainer(renderer.root);
+    // The safe area adds clearance rather than replacing the outer gutter.
+    // Cancel, the title, and Done remain together inside the protected row.
+    expect(container.props.className).toContain('pt-4');
+    const wrapper = findSafeAreaWrapper(renderer.root);
+    expect(wrapper.props.style).toEqual({ paddingTop: 24 });
+    expect(pressablesByLabel(renderer.root, 'Cancel')[0]?.parent?.parent).toBe(wrapper);
+    expect(pressablesByLabel(renderer.root, 'Done')[0]?.parent?.parent).toBe(wrapper);
 
     renderer.unmount();
   });

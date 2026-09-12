@@ -29,7 +29,10 @@ import {
   parseOAuthStateOwner,
   cancelMissingCodeProviderOAuthAttempt,
 } from '@/lib/integrations/oauth/common';
-import { claimSlackProviderInstallation } from '@/lib/integrations/provider-installation-reservations';
+import {
+  adoptUnsharedSlackWorkspaceReservation,
+  claimSlackProviderInstallation,
+} from '@/lib/integrations/provider-installation-reservations';
 import { exchangeSlackOAuthCode } from '@/lib/integrations/platforms/slack/oauth-exchange';
 
 const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
@@ -173,8 +176,15 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     const { teamId, installation, grantedScopes } = exchanged;
     if (!sharedGitHubOwner) {
       try {
-        await upsertSlackInstallation({ owner, teamId, installation });
+        const integration = await upsertSlackInstallation({ owner, teamId, installation });
         await slackAdapter.setInstallation(teamId, installation);
+        if (!installation.isEnterpriseInstall) {
+          await adoptUnsharedSlackWorkspaceReservation({
+            owner,
+            integrationId: integration.id,
+            teamId,
+          });
+        }
         if (
           verified.purpose === 'provider_install' &&
           !(await completeUnsharedSlackOAuthAttempt({ actorUserId: user.id, owner, state }))

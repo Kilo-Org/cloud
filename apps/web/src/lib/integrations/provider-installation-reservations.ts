@@ -30,6 +30,60 @@ export type SlackReservationClaim = {
   generation: number;
 };
 
+export async function adoptUnsharedSlackWorkspaceReservation(input: {
+  owner: Owner;
+  integrationId: string;
+  teamId: string;
+}): Promise<void> {
+  await db.transaction(async tx => {
+    await lockProviderOAuthOwnerRow(tx, input.owner);
+    const [reservation] = await tx
+      .select()
+      .from(provider_installation_reservations)
+      .where(
+        and(
+          eq(provider_installation_reservations.provider, 'slack'),
+          eq(provider_installation_reservations.provider_installation_id, input.teamId)
+        )
+      )
+      .for('update');
+    if (reservation) {
+      if (
+        reservation.status !== 'active' ||
+        reservation.platform_integration_id !== input.integrationId ||
+        !matchesOwner(reservation, input.owner)
+      ) {
+        throw new Error('Slack workspace reservation conflicts with this installation');
+      }
+      return;
+    }
+    const [integration] = await tx
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.id, input.integrationId),
+          eq(platform_integrations.platform, 'slack'),
+          eq(platform_integrations.platform_installation_id, input.teamId),
+          eq(platform_integrations.integration_status, 'active')
+        )
+      )
+      .for('update');
+    if (!integration) throw new Error('Slack workspace integration is unavailable');
+    await tx.insert(provider_installation_reservations).values({
+      provider: 'slack',
+      provider_installation_id: input.teamId,
+      owned_by_user_id: input.owner.type === 'user' ? input.owner.id : null,
+      owned_by_organization_id: input.owner.type === 'org' ? input.owner.id : null,
+      platform_integration_id: input.integrationId,
+      generation: 1,
+      active_generation: 1,
+      status: 'active',
+      expires_at: '9999-12-31T23:59:59.999Z',
+    });
+  });
+}
+
 export async function claimSlackProviderInstallation(input: {
   actorUserId: string;
   owner: Owner;

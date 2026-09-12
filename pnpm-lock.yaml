@@ -1219,9 +1219,6 @@ importers:
       uuid:
         specifier: 11.1.1
         version: 11.1.1
-      vaul:
-        specifier: 1.1.2
-        version: 1.1.2(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -39180,6 +39177,7 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
       - '@types/react-dom'
+    optional: true
 
   vfile-message@4.0.3:
     dependencies:

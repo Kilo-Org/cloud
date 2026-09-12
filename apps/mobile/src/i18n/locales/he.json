@@ -2161,7 +2161,17 @@
     "gatewayModelUnavailable": "מודל התמלול הזה אינו זמין. בחר מודל אחר בהעדפות.",
     "gatewayModelUnavailableNotice": "המודל הזה כבר לא מוצע. הקש על $t(transcriptionModel.title) כדי לבחור אחר.",
     "gatewaySignInRequired": "היכנס כדי להשתמש בתמלול דרך Kilo Gateway.",
-    "gatewayNoModel": "בחר קודם מודל תמלול בהעדפות."
+    "gatewayNoModel": "בחר קודם מודל תמלול בהעדפות.",
+    "testTitle": "בדיקת הכתבה",
+    "testPlaceholder": "הקישו על המיקרופון והתחילו לדבר.",
+    "testClear": "נקה טקסט"
+  },
+  "voiceLanguage": {
+    "title": "שפת ההכתבה",
+    "automatic": "אוטומטי",
+    "loadFailed": "לא ניתן היה לטעון את השפות שהמכשיר הזה תומך בהן.",
+    "emptyTitle": "אין שפות נתמכות",
+    "emptyDescription": "זיהוי הדיבור של המכשיר הזה אינו מדווח על שפות נתמכות."
   },
   "share": {
     "title": "שיתוף עם Kilo",

@@ -2203,7 +2203,17 @@
     "gatewayModelUnavailable": "نموذج التفريغ الصوتي هذا غير متاح. اختر نموذجًا آخر من التفضيلات.",
     "gatewayModelUnavailableNotice": "لم يعد هذا النموذج معروضًا. اضغط على $t(transcriptionModel.title) لاختيار نموذج آخر.",
     "gatewaySignInRequired": "سجّل الدخول لاستخدام التفريغ الصوتي عبر Kilo Gateway.",
-    "gatewayNoModel": "اختر نموذج التفريغ الصوتي في التفضيلات أولًا."
+    "gatewayNoModel": "اختر نموذج التفريغ الصوتي في التفضيلات أولًا.",
+    "testTitle": "اختبار الإدخال الصوتي",
+    "testPlaceholder": "اضغط على الميكروفون وابدأ التحدث.",
+    "testClear": "مسح النص"
+  },
+  "voiceLanguage": {
+    "title": "لغة الإدخال الصوتي",
+    "automatic": "تلقائي",
+    "loadFailed": "تعذّر تحميل اللغات التي يدعمها هذا الجهاز.",
+    "emptyTitle": "لا توجد لغات مدعومة",
+    "emptyDescription": "لا يفيد التعرّف على الكلام في هذا الجهاز بأي لغة مدعومة."
   },
   "share": {
     "title": "المشاركة مع Kilo",

@@ -2623,7 +2623,17 @@
     "gatewayModelUnavailable": "Tento model přepisu není dostupný. Vyberte jiný v Předvolbách.",
     "gatewayModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(transcriptionModel.title) vyberte jiný.",
     "gatewaySignInRequired": "Pro použití přepisu přes Kilo Gateway se přihlaste.",
-    "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách."
+    "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách.",
+    "testTitle": "Otestovat diktování",
+    "testPlaceholder": "Klepněte na mikrofon a začněte mluvit.",
+    "testClear": "Vymazat text"
+  },
+  "voiceLanguage": {
+    "title": "Jazyk diktování",
+    "automatic": "Automaticky",
+    "loadFailed": "Nepodařilo se načíst jazyky, které toto zařízení podporuje.",
+    "emptyTitle": "Žádné podporované jazyky",
+    "emptyDescription": "Rozpoznávání řeči tohoto zařízení nehlásí žádné podporované jazyky."
   },
   "share": {
     "title": "Sdílení do Kilo",

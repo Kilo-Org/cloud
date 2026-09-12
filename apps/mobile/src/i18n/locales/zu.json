@@ -2581,7 +2581,17 @@
     "gatewayModelUnavailable": "Le modeli yokuguqula inkulumo ayitholakali. Khetha enye Ku-Okuncamelayo.",
     "gatewayModelUnavailableNotice": "Le modeli ayisanikezwa. Thepha $t(transcriptionModel.title) ukukhetha enye.",
     "gatewaySignInRequired": "Ngena ngemvume ukuze usebenzise ukuguqula inkulumo nge-Kilo Gateway.",
-    "gatewayNoModel": "Okokuqala, khetha imodeli yokuguqula inkulumo Ku-Okuncamelayo."
+    "gatewayNoModel": "Okokuqala, khetha imodeli yokuguqula inkulumo Ku-Okuncamelayo.",
+    "testTitle": "Hlola ukufaka ngezwi",
+    "testPlaceholder": "Thepha imakrofoni bese uqala ukukhuluma.",
+    "testClear": "Sula umbhalo"
+  },
+  "voiceLanguage": {
+    "title": "Ulimi lokufaka ngezwi",
+    "automatic": "Okuzenzakalelayo",
+    "loadFailed": "Izilimi ezisekelwa yile divayisi azikwazanga ukulayishwa.",
+    "emptyTitle": "Azikho izilimi ezisekelwayo",
+    "emptyDescription": "Ukubona inkulumo kwale divayisi akubiki zilimi ezisekelwayo."
   },
   "share": {
     "title": "Yabelana ku-Kilo",

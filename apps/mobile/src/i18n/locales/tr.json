@@ -2147,7 +2147,17 @@
     "gatewayModelUnavailable": "Bu metne dönüştürme modeli kullanılamıyor. Tercihler'den başkasını seç.",
     "gatewayModelUnavailableNotice": "Bu model artık sunulmuyor. Başka bir tane seçmek için $t(transcriptionModel.title) öğesine dokun.",
     "gatewaySignInRequired": "Kilo Gateway ile dönüştürmeyi kullanmak için oturum açın.",
-    "gatewayNoModel": "Önce Tercihler'den bir metne dönüştürme modeli seçin."
+    "gatewayNoModel": "Önce Tercihler'den bir metne dönüştürme modeli seçin.",
+    "testTitle": "Sesli girişi test et",
+    "testPlaceholder": "Mikrofona dokunun ve konuşmaya başlayın.",
+    "testClear": "Metni temizle"
+  },
+  "voiceLanguage": {
+    "title": "Sesli giriş dili",
+    "automatic": "Otomatik",
+    "loadFailed": "Bu cihazın desteklediği diller yüklenemedi.",
+    "emptyTitle": "Desteklenen dil yok",
+    "emptyDescription": "Bu cihazın konuşma tanıması desteklenen bir dil bildirmiyor."
   },
   "share": {
     "title": "Kilo ile paylaş",

@@ -2665,7 +2665,17 @@
     "gatewayModelUnavailable": "Nid yw'r model trawsgrifio hwn ar gael. Dewiswch un arall yn y Dewisiadau.",
     "gatewayModelUnavailableNotice": "Nid yw'r model hwn yn cael ei gynnig mwyach. Tapiwch $t(transcriptionModel.title) i ddewis un arall.",
     "gatewaySignInRequired": "Mewngofnodwch i ddefnyddio trawsgrifio drwy Kilo Gateway.",
-    "gatewayNoModel": "Dewiswch fodel trawsgrifio yn y Dewisiadau yn gyntaf."
+    "gatewayNoModel": "Dewiswch fodel trawsgrifio yn y Dewisiadau yn gyntaf.",
+    "testTitle": "Profwch fewnbwn llais",
+    "testPlaceholder": "Tapiwch y meicroffon a dechreuwch siarad.",
+    "testClear": "Clirio'r testun"
+  },
+  "voiceLanguage": {
+    "title": "Iaith mewnbwn llais",
+    "automatic": "Awtomatig",
+    "loadFailed": "Methwyd llwytho'r ieithoedd y mae'r ddyfais hon yn eu cefnogi.",
+    "emptyTitle": "Dim ieithoedd wedi'u cefnogi",
+    "emptyDescription": "Nid yw adnabyddiaeth lafar y ddyfais hon yn nodi unrhyw iaith a gefnogir."
   },
   "share": {
     "title": "Rhannu â Kilo",

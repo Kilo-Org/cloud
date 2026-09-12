@@ -2581,7 +2581,17 @@
     "gatewayModelUnavailable": "یہ ماڈل دستیاب نہیں ہے۔ ترجیحات میں دوسرا منتخب کریں۔",
     "gatewayModelUnavailableNotice": "یہ ماڈل اب پیش نہیں کیا جاتا۔ کوئی دوسرا منتخب کرنے کے لیے $t(transcriptionModel.title) پر ٹیپ کریں۔",
     "gatewaySignInRequired": "Kilo Gateway کی تبدیلی استعمال کرنے کے لیے سائن ان کریں۔",
-    "gatewayNoModel": "پہلے ترجیحات میں متن میں بدلنے کا ماڈل منتخب کریں۔"
+    "gatewayNoModel": "پہلے ترجیحات میں متن میں بدلنے کا ماڈل منتخب کریں۔",
+    "testTitle": "آواز سے لکھنے کی جانچ کریں",
+    "testPlaceholder": "مائیکروفون پر ٹیپ کریں اور بولنا شروع کریں۔",
+    "testClear": "متن صاف کریں"
+  },
+  "voiceLanguage": {
+    "title": "آواز سے لکھنے کی زبان",
+    "automatic": "خودکار",
+    "loadFailed": "اس ڈیوائس کے معاون زبانوں کو لوڈ نہیں کیا جا سکا۔",
+    "emptyTitle": "کوئی معاون زبان نہیں",
+    "emptyDescription": "اس ڈیوائس کی تقریر کی شناخت کسی معاون زبان کی اطلاع نہیں دیتی۔"
   },
   "share": {
     "title": "Kilo پر شیئر کریں",

@@ -2602,7 +2602,17 @@
     "gatewayModelUnavailable": "Aquest model de transcripció no està disponible. Tria'n un altre a les Preferències.",
     "gatewayModelUnavailableNotice": "Aquest model ja no s'ofereix. Toca $t(transcriptionModel.title) per triar-ne un altre.",
     "gatewaySignInRequired": "Inicia la sessió per utilitzar la transcripció amb Kilo Gateway.",
-    "gatewayNoModel": "Primer tria un model de transcripció a les Preferències."
+    "gatewayNoModel": "Primer tria un model de transcripció a les Preferències.",
+    "testTitle": "Prova el dictat",
+    "testPlaceholder": "Toca el micròfon i comença a parlar.",
+    "testClear": "Esborra el text"
+  },
+  "voiceLanguage": {
+    "title": "Idioma del dictat",
+    "automatic": "Automàtic",
+    "loadFailed": "No s'han pogut carregar els idiomes que admet aquest dispositiu.",
+    "emptyTitle": "Cap idioma admès",
+    "emptyDescription": "El reconeixement de veu d'aquest dispositiu no indica cap idioma admès."
   },
   "share": {
     "title": "Compartir amb Kilo",

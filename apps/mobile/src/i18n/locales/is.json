@@ -2581,7 +2581,17 @@
     "gatewayModelUnavailable": "Þetta umritunarlíkan er ekki í boði. Veldu annað í Kjörstillingum.",
     "gatewayModelUnavailableNotice": "Þetta líkan er ekki lengur í boði. Ýttu á $t(transcriptionModel.title) til að velja annað.",
     "gatewaySignInRequired": "Skráðu þig inn til að nota umritun í gegnum Kilo Gateway.",
-    "gatewayNoModel": "Veldu fyrst umritunarlíkan í Kjörstillingum."
+    "gatewayNoModel": "Veldu fyrst umritunarlíkan í Kjörstillingum.",
+    "testTitle": "Prófa raddinnslátt",
+    "testPlaceholder": "Ýttu á hljóðnemann og byrjaðu að tala.",
+    "testClear": "Hreinsa texta"
+  },
+  "voiceLanguage": {
+    "title": "Tungumál raddinnsláttar",
+    "automatic": "Sjálfvirkt",
+    "loadFailed": "Ekki tókst að hlaða tungumálunum sem þetta tæki styður.",
+    "emptyTitle": "Engin studd tungumál",
+    "emptyDescription": "Talgreining þessa tækis tilkynnir engin studd tungumál."
   },
   "share": {
     "title": "Deila með Kilo",

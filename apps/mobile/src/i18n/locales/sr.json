@@ -2602,7 +2602,17 @@
     "gatewayModelUnavailable": "Ovaj model za transkripciju nije dostupan. Izaberi drugi u Podešavanjima.",
     "gatewayModelUnavailableNotice": "Ovaj model se više ne nudi. Dodirni $t(transcriptionModel.title) da izabereš drugi.",
     "gatewaySignInRequired": "Prijavi se da koristiš transkripciju preko Kilo Gateway-a.",
-    "gatewayNoModel": "Prvo izaberi model za transkripciju u Podešavanjima."
+    "gatewayNoModel": "Prvo izaberi model za transkripciju u Podešavanjima.",
+    "testTitle": "Testiraj glasovni unos",
+    "testPlaceholder": "Dodirnite mikrofon i počnite da govorite.",
+    "testClear": "Obriši tekst"
+  },
+  "voiceLanguage": {
+    "title": "Jezik glasovnog unosa",
+    "automatic": "Automatski",
+    "loadFailed": "Nije bilo moguće učitati jezike koje ovaj uređaj podržava.",
+    "emptyTitle": "Nema podržanih jezika",
+    "emptyDescription": "Prepoznavanje govora na ovom uređaju ne prijavljuje nijedan podržani jezik."
   },
   "share": {
     "title": "Deljenje u aplikaciji Kilo",

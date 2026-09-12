@@ -2161,7 +2161,17 @@
     "gatewayModelUnavailable": "Questo modello di trascrizione non è disponibile. Scegline un altro in Preferenze.",
     "gatewayModelUnavailableNotice": "Questo modello non è più offerto. Tocca $t(transcriptionModel.title) per sceglierne un altro.",
     "gatewaySignInRequired": "Accedi per usare la trascrizione con Kilo Gateway.",
-    "gatewayNoModel": "Scegli prima un modello di trascrizione in Preferenze."
+    "gatewayNoModel": "Scegli prima un modello di trascrizione in Preferenze.",
+    "testTitle": "Prova la dettatura",
+    "testPlaceholder": "Tocca il microfono e inizia a parlare.",
+    "testClear": "Cancella testo"
+  },
+  "voiceLanguage": {
+    "title": "Lingua della dettatura",
+    "automatic": "Automatico",
+    "loadFailed": "Impossibile caricare le lingue supportate da questo dispositivo.",
+    "emptyTitle": "Nessuna lingua supportata",
+    "emptyDescription": "Il riconoscimento vocale di questo dispositivo non segnala lingue supportate."
   },
   "share": {
     "title": "Condivisione su Kilo",

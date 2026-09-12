@@ -142,6 +142,35 @@ function cloneSlackRequest(request: Request, body: BodyInit): Request {
   });
 }
 
+export async function runSlackMaintenanceBestEffort(
+  teamId: string,
+  cleanup: () => Promise<unknown>,
+  recover: () => Promise<unknown>
+): Promise<void> {
+  try {
+    await cleanup();
+  } catch (error) {
+    captureException(new Error('Slack deletion maintenance failed'), {
+      tags: { component: 'kilo-bot', op: 'slack-deletion-maintenance' },
+      extra: {
+        teamId,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      },
+    });
+  }
+  try {
+    await recover();
+  } catch (error) {
+    captureException(new Error('Slack activation maintenance failed'), {
+      tags: { component: 'kilo-bot', op: 'slack-activation-maintenance' },
+      extra: {
+        teamId,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      },
+    });
+  }
+}
+
 /**
  * Returns a webhook handler that verifies the Slack signature, peels off the
  * `app_uninstalled` event for our own cleanup, and forwards everything else to
@@ -182,15 +211,20 @@ export function createSlackWebhookHandler(chat: Chat, slackAdapter: SlackAdapter
 
     const teamId = getSlackTeamId(payload);
     if (teamId) {
-      await completePendingSlackDeletion(
+      await runSlackMaintenanceBestEffort(
         teamId,
-        id => slackAdapter.deleteInstallation(id),
-        async id => {
-          await unlinkTeamKiloUsers(chat.getState(), PLATFORM.SLACK, id);
-        }
-      );
-      await recoverSlackInstallation(teamId, (id, installation) =>
-        slackAdapter.setInstallation(id, installation)
+        () =>
+          completePendingSlackDeletion(
+            teamId,
+            id => slackAdapter.deleteInstallation(id),
+            async id => {
+              await unlinkTeamKiloUsers(chat.getState(), PLATFORM.SLACK, id);
+            }
+          ),
+        () =>
+          recoverSlackInstallation(teamId, (id, installation) =>
+            slackAdapter.setInstallation(id, installation)
+          )
       );
     }
 

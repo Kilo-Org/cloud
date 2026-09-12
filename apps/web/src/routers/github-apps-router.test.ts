@@ -24,6 +24,14 @@ type InstallationDetails = {
 
 const mockGetIntegrationForOwner =
   jest.fn<(owner: Owner, platform: string) => Promise<TestIntegration | null>>();
+const mockFindIntegrationByInstallationId =
+  jest.fn<
+    (
+      platform: string,
+      installationId: string,
+      appType: GitHubAppType
+    ) => Promise<TestIntegration | null>
+  >();
 const mockUpsertPlatformIntegrationForOwner =
   jest.fn<
     (owner: Owner, details: Record<string, unknown>) => Promise<UpsertPlatformIntegrationResult>
@@ -152,6 +160,11 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     mockUpsertPlatformIntegrationForOwner(owner, details),
   updateRepositoriesForIntegration: (integrationId: string, repositories: unknown[]) =>
     mockUpdateRepositoriesForIntegration(integrationId, repositories),
+  findIntegrationByInstallationId: (
+    platform: string,
+    installationId: string,
+    appType: GitHubAppType
+  ) => mockFindIntegrationByInstallationId(platform, installationId, appType),
 }));
 jest.mock('@/lib/integrations/db/github-installations', () => ({
   disconnectGitHubInstallation: jest.fn(),
@@ -199,6 +212,12 @@ let createCaller: (ctx: { user: User }) => {
     githubLogin: string;
     githubUserId: string;
   }) => Promise<{ success: boolean; githubLogin: string }>;
+  devAddInstallation: (input: {
+    organizationId?: string;
+    installationId: string;
+    accountLogin: string;
+    appType?: 'standard' | 'lite';
+  }) => Promise<{ success: boolean }>;
   uninstallApp: (input: {
     organizationId?: string;
     integrationId?: string;
@@ -673,6 +692,58 @@ describe('githubAppsRouter.devSeedUserGithubToken', () => {
 
     expect(result.success).toBe(false);
     expect(result.githubLogin).toBe('octocat');
+  });
+});
+
+describe('githubAppsRouter.devAddInstallation', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const installationDetails = {
+    account: { id: 555, login: 'octocat' },
+    permissions: { contents: 'read' },
+    events: ['push'],
+    repository_selection: 'all',
+    created_at: '2026-09-12T00:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFetchGitHubInstallationDetails.mockResolvedValue(installationDetails);
+    mockFindIntegrationByInstallationId.mockResolvedValue(null);
+    mockUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
+  });
+
+  afterEach(() => {
+    Object.assign(process.env, { NODE_ENV: originalNodeEnv });
+  });
+
+  it('throws FORBIDDEN when NODE_ENV is not development', async () => {
+    Object.assign(process.env, { NODE_ENV: 'production' });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    await expect(
+      caller.devAddInstallation({ installationId: '555', accountLogin: 'octocat' })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(mockUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+  });
+
+  it('in development, seeds the installation without authorization provenance (no live OAuth identity exists on this dev-only shortcut)', async () => {
+    Object.assign(process.env, { NODE_ENV: 'development' });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    const result = await caller.devAddInstallation({
+      installationId: '555',
+      accountLogin: 'octocat',
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(mockUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
+      { type: 'user', id: 'user-1' },
+      expect.objectContaining({ platform: 'github', platformInstallationId: '555' })
+    );
+    const [, details] = mockUpsertPlatformIntegrationForOwner.mock.calls[0] ?? [];
+    expect(details).not.toHaveProperty('kiloUserId');
+    expect(details).not.toHaveProperty('githubUserId');
   });
 });
 

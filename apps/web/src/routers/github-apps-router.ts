@@ -763,6 +763,12 @@ export const githubAppsRouter = createTRPCRouter({
 
       const owner = resolveOwner(ctx, input.organizationId);
 
+      // Intentionally omits kiloUserId/githubUserId: this dev-only E2E
+      // seeding shortcut never performs a live GitHub OAuth exchange, so
+      // there is no verified GitHub identity to record as authorization
+      // provenance. It is gated to NODE_ENV === 'development' above and can
+      // never run in production, so leaving provenance null here does not
+      // affect production data.
       const devUpsertResult = await upsertPlatformIntegrationForOwner(owner, {
         platform: 'github',
         integrationType: 'app',

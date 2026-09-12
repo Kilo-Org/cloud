@@ -11,6 +11,7 @@ import { failureResult } from '@/lib/maybe-result';
 import { consumeInstallState } from '@/lib/integrations/github/install-state';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
+  connectVerifiedGitHubInstallation,
   observeGitHubInstallationLifecycle,
 } from '@/lib/integrations/db/github-installations';
 import type * as InstallStateModule from '@/lib/integrations/github/install-state';
@@ -132,6 +133,7 @@ const mockedCaptureMessage = jest.mocked(captureMessage);
 const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
 const mockedAssertUserAdministersInstallation = jest.mocked(assertUserAdministersInstallation);
 const mockedObserveGitHubInstallationLifecycle = jest.mocked(observeGitHubInstallationLifecycle);
+const mockedConnectVerifiedGitHubInstallation = jest.mocked(connectVerifiedGitHubInstallation);
 const mockedBindGitHubIntegrationToCanonicalInstallation = jest.mocked(
   bindGitHubIntegrationToCanonicalInstallation
 );
@@ -1217,6 +1219,10 @@ describe('GET /api/integrations/github/callback plaintext state rejection', () =
 describe('GET /api/integrations/github/callback admin proof', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Most tests in this describe exercise the legacy access-list admin
+    // check; the connection-management-enabled test below opts back in
+    // explicitly so it does not leak into the tests that follow it.
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
 
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
@@ -1312,6 +1318,33 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     // as authorization provenance rather than left null.
     expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
       expect.anything(),
+      expect.objectContaining({
+        kiloUserId: USER_ID,
+        githubUserId: GITHUB_USER_ID,
+      })
+    );
+  });
+
+  test('routes a management-enabled install through the verified writer with both identities', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+    mockedConnectVerifiedGitHubInstallation.mockResolvedValue({
+      ok: true,
+      integrationId: '00000000-0000-4000-8000-0000000000aa',
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expect(mockedVerifyGitHubInstallationAuthorization).toHaveBeenCalled();
+    expect(mockedAssertUserAdministersInstallation).not.toHaveBeenCalled();
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockedConnectVerifiedGitHubInstallation).toHaveBeenCalledWith(
+      { type: 'user', id: USER_ID },
       expect.objectContaining({
         kiloUserId: USER_ID,
         githubUserId: GITHUB_USER_ID,

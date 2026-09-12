@@ -1387,6 +1387,270 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(h.runtime(replacement.providerInstanceId)?.startProcess).toHaveBeenCalledOnce();
   });
 
+  describe('externally killed runtime observation', () => {
+    // An established wrapper incarnation that survives a recovery-capable close
+    // while the container itself is gone. This is the external-kill state: the
+    // durable record is still `running` and no tombstone exists.
+    async function establishedRuntime() {
+      const h = await harness();
+      h.session.getControlState.mockResolvedValue({
+        version: 1,
+        scope: { sandboxId: SANDBOX_ID },
+        targets: [],
+      });
+      h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+        type: 'response',
+        requestId: 'request_1',
+        ok: true,
+        result:
+          request.operation === 'sandbox.status'
+            ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+            : request.operation === 'sandbox.reconcile'
+              ? {
+                  episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                    .episodeId,
+                  attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                  phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+                }
+              : undefined,
+      }));
+      await h.create();
+      const original = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+      await h.flush();
+      expect((await h.control.getPhysicalRecord()).state).toBe('running');
+      expect(await h.control.getStatus()).toMatchObject({ connection: 'ready' });
+      await h.hooks.onSocketClosed?.(true, original);
+      const runtime = h.runtime(original.providerInstanceId);
+      if (!runtime) throw new Error('Missing runtime');
+      return { h, original, runtime };
+    }
+
+    async function killedRuntime() {
+      const fixture = await establishedRuntime();
+      fixture.runtime.state.running = false;
+      return fixture;
+    }
+
+    async function drainMicrotasks(turns = 200) {
+      for (let index = 0; index < turns; index++) await Promise.resolve();
+    }
+
+    it('does not probe a running allocation whose wrapper has never connected', async () => {
+      const entered = deferred<void>();
+      const release = deferred<void>();
+      const h = await harness({
+        configureAllocation: value => {
+          value.startProcess.mockImplementation(async () => {
+            entered.resolve();
+            await release.promise;
+            value.state.running = true;
+            return { id: 'proc_1' };
+          });
+        },
+      });
+      const creating = h.create();
+      await entered.promise;
+      const physical = await h.control.getPhysicalRecord();
+      expect(physical.state).toBe('running');
+      if (!physical.providerRef) throw new Error('Missing provider reference');
+      const runtime = h.runtime(physical.providerRef);
+      if (!runtime) throw new Error('Missing runtime');
+      expect(runtime.state.running).toBe(false);
+
+      const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
+      await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'running' });
+      expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+      expect(runtime.destroy).not.toHaveBeenCalled();
+      expect(mocks.providerCreate).toHaveBeenCalledOnce();
+
+      release.resolve();
+      await creating;
+      expect((await h.control.getPhysicalRecord()).state).toBe('running');
+      expect(runtime.startProcess).toHaveBeenCalledOnce();
+      expect(mocks.providerCreate).toHaveBeenCalledOnce();
+    });
+
+    it('does not apply a late terminal observation to a replaced allocation', async () => {
+      const { h, original, runtime } = await killedRuntime();
+      const probe = deferred<boolean>();
+      const entered = deferred<void>();
+      runtime.isContainerRunning.mockImplementation(() => {
+        entered.resolve();
+        return probe.promise;
+      });
+
+      const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
+      const losing = h.acquire(acquisition);
+      await entered.promise;
+
+      await h.control.beginStop('execution_failed');
+      await h.control.recordStopAttempt();
+      await h.flush();
+      expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
+
+      await h.acquire({ ...acquisition, id: 'attempt_b' });
+      const replacement = await h.ready();
+      expect(replacement.providerInstanceId).not.toBe(original.providerInstanceId);
+      const before = await h.control.getPhysicalRecord();
+
+      probe.resolve(false);
+      const outcome = await losing.then(
+        value => ({ value }),
+        error => ({ error })
+      );
+      if ('error' in outcome) {
+        expect(isSandboxAcquisitionLostError(outcome.error)).toBe(true);
+      } else {
+        expect(outcome.value.physical).not.toBe('failed');
+      }
+
+      const after = await h.control.getPhysicalRecord();
+      expect(after.state).toBe('running');
+      expect(after.providerRef).toBe(replacement.providerInstanceId);
+      expect(after.providerRef).toBe(before.providerRef);
+      expect(after.stopTombstone).toBeNull();
+      expect(h.runtime(replacement.providerInstanceId)?.destroy).not.toHaveBeenCalled();
+      expect(mocks.providerCreate).toHaveBeenCalledTimes(2);
+    });
+
+    it('applies exactly one running-to-failed commit under overlapping terminal probes', async () => {
+      const { h, original, runtime } = await killedRuntime();
+      const probes: { promise: Promise<boolean>; resolve: (value: boolean) => void }[] = [];
+      const enteredA = deferred<void>();
+      const enteredB = deferred<void>();
+      runtime.isContainerRunning.mockImplementation(() => {
+        const probe = deferred<boolean>();
+        probes.push(probe);
+        if (probes.length === 1) enteredA.resolve();
+        if (probes.length === 2) enteredB.resolve();
+        return probe.promise;
+      });
+
+      const attemptA = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
+      const attemptB = { id: 'attempt_b', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
+      const acquiringA = h.acquire(attemptA);
+      await enteredA.promise;
+      const acquiringB = h.acquire(attemptB);
+      await enteredB.promise;
+      expect(probes).toHaveLength(2);
+
+      const stopEntered = deferred<void>();
+      const stopRelease = deferred<void>();
+      runtime.destroy.mockImplementation(async () => {
+        stopEntered.resolve();
+        await stopRelease.promise;
+        runtime.state.running = false;
+      });
+
+      probes[0].resolve(false);
+      await stopEntered.promise;
+      const beforeCleanup = await h.control.getPhysicalRecord();
+      expect(beforeCleanup.state).not.toBe('stopped');
+
+      probes[1].resolve(false);
+      await drainMicrotasks();
+
+      const log = await h.control.getTransitionLog();
+      expect(
+        log.filter(row => row.kind === 'physical' && row.from === 'running' && row.to === 'failed')
+      ).toHaveLength(1);
+      expect(log.filter(row => row.kind === 'physical' && row.to === 'stopped')).toHaveLength(0);
+      expect((await h.control.getPhysicalRecord()).state).not.toBe('stopped');
+      expect(mocks.providerCreate).toHaveBeenCalledOnce();
+
+      stopRelease.resolve();
+      await Promise.allSettled([acquiringA, acquiringB]);
+      expect(runtime.destroy).toHaveBeenCalledOnce();
+
+      await h.acquire({ ...attemptA, id: 'attempt_c' });
+      const replacement = await h.ready();
+      expect(replacement.providerInstanceId).not.toBe(original.providerInstanceId);
+      expect(mocks.providerCreate).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not probe while a ready wrapper is reused', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const runtime = h.runtime(identity.providerInstanceId);
+      if (!runtime) throw new Error('Missing runtime');
+      const probesBefore = runtime.isContainerRunning.mock.calls.length;
+
+      const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
+      await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'running' });
+      expect(runtime.isContainerRunning.mock.calls.length).toBe(probesBefore);
+      expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+    });
+
+    it('does not tombstone an established runtime that is still running', async () => {
+      const { h, runtime } = await establishedRuntime();
+      const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
+      await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'running' });
+      expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+      expect(runtime.destroy).not.toHaveBeenCalled();
+      expect(mocks.providerCreate).toHaveBeenCalledOnce();
+      expect(h.allocations.size).toBe(1);
+    });
+
+    it('does not tombstone an established runtime when the observation rejects', async () => {
+      const { h, runtime } = await establishedRuntime();
+      runtime.isContainerRunning.mockRejectedValue(new Error('probe failed'));
+      const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
+      await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'running' });
+      expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+      expect(runtime.destroy).not.toHaveBeenCalled();
+      expect(mocks.providerCreate).toHaveBeenCalledOnce();
+    });
+
+    it('does not tombstone an established runtime when the observation exceeds its budget', async () => {
+      const { h, runtime } = await establishedRuntime();
+      runtime.state.running = false;
+      const entered = deferred<void>();
+      runtime.isContainerRunning.mockImplementation(() => {
+        entered.resolve();
+        return new Promise(() => {});
+      });
+      const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
+      const acquiring = h.acquire(acquisition);
+      await entered.promise;
+      await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt + 1);
+      await expect(acquiring).resolves.toMatchObject({ physical: 'running' });
+      expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+      expect(runtime.destroy).not.toHaveBeenCalled();
+      expect(mocks.providerCreate).toHaveBeenCalledOnce();
+    });
+
+    it('rotates to a replacement after an externally killed runtime is observed terminal', async () => {
+      const { h, original } = await killedRuntime();
+      const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
+      const first = await h.acquire(acquisition).then(
+        value => ({ value }),
+        error => ({ error })
+      );
+      // The spent receipt must not stay bound to the dead running allocation.
+      expect(mocks.providerCreate).toHaveBeenCalledOnce();
+      expect(h.allocations.size).toBe(1);
+      if ('error' in first) {
+        expect(isSandboxAcquisitionLostError(first.error)).toBe(true);
+      } else {
+        expect(['stopping', 'failed']).toContain(first.value.physical);
+      }
+
+      if ((await h.control.getPhysicalRecord()).state !== 'stopped') {
+        await h.control.recordStopAttempt();
+        await h.flush();
+      }
+      expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
+      expect(h.runtime(original.providerInstanceId)?.state.running).toBe(false);
+
+      await h.acquire({ ...acquisition, id: 'attempt_b' });
+      const replacement = await h.ready();
+      expect(replacement.providerInstanceId).not.toBe(original.providerInstanceId);
+      expect(h.allocations.size).toBe(2);
+      expect(mocks.providerCreate).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it('refuses a control request before send as a retryable not_ready admission', async () => {
     const h = await harness();
     const refusal = await h.control

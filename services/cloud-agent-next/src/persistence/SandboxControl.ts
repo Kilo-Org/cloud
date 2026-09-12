@@ -1681,6 +1681,24 @@ export class SandboxControl extends DurableObject<Env> {
         worktreeId,
         input.sessionId
       );
+      if (
+        selected.action === 'reuse' &&
+        selected.physical.state === 'running' &&
+        selected.physical.stopTombstone === null &&
+        selected.physical.providerRef !== null &&
+        this.readyWrapperRuntime() === null
+      ) {
+        const established = this.establishedWrapperForAllocation(selected.physical);
+        if (established?.wrapperInstanceId) {
+          await this.observeRunningAllocationLoss(selected.physical, established.wrapperInstanceId);
+          selected = await this.acquirePhysical(
+            acquisition,
+            requiredContainment,
+            worktreeId,
+            input.sessionId
+          );
+        }
+      }
       if (selected.action === 'wait') {
         const step = nextEnsureReadyStep(selected.physical.state, true);
         if (step === 'release-failed') {
@@ -4747,6 +4765,81 @@ export class SandboxControl extends DurableObject<Env> {
     return this.observeProvider(result.status);
   }
 
+  // Non-waking probe for a bound running allocation whose wrapper incarnation
+  // is established but not ready now. Omitting the create intent lets a
+  // container report `terminal` instead of `unknown` even inside create-settle
+  // (the warmed-runtime case). The apply is a separate transaction that
+  // re-checks the running allocation.
+  private async observeRunningAllocationLoss(
+    physical: PhysicalRecord,
+    wrapperInstanceId: string
+  ): Promise<void> {
+    const startedAt = Date.now();
+    let timedOut = false;
+    let failed = false;
+    let result: ProviderObservation;
+    try {
+      result = await withTimeout(
+        this.provider.observe(physical.providerRef),
+        DEADLINE_MS.stopAttempt,
+        'Sandbox loss observation timed out',
+        () => {
+          timedOut = true;
+        }
+      );
+    } catch {
+      failed = true;
+      result = { status: 'unknown' };
+    }
+    const current = await loadPhysicalRecord(this.ctx.storage);
+    const stale = !sameAllocation(current, physical) || current.state === 'stopped';
+    this.logDiagnostic('provider_observation', {
+      allocationId: physical.createIntent?.intentId,
+      physicalSandboxId: physical.createIntent?.allocationName,
+      physicalState: physical.state,
+      observation: result.status,
+      result: timedOut ? 'timed_out' : failed ? 'failed' : 'completed',
+      stale,
+      durationMs: Date.now() - startedAt,
+    });
+    if (result.status !== 'terminal') return;
+    await this.commitRunningAllocationLoss(physical, wrapperInstanceId);
+  }
+
+  // Atomic `running → failed` + failure tombstone for an observed terminal
+  // allocation. A concurrent or stale probe sees a non-running record or a
+  // different allocation and no-ops instead of skipping the stop ladder.
+  private async commitRunningAllocationLoss(
+    expected: PhysicalRecord,
+    wrapperInstanceId: string
+  ): Promise<void> {
+    const committed = await this.ctx.storage.transaction(async () => {
+      const current = await loadPhysicalRecord(this.ctx.storage);
+      if (
+        !sameAllocation(current, expected) ||
+        current.state !== 'running' ||
+        current.stopTombstone
+      ) {
+        return undefined;
+      }
+      const next = observe(current, 'terminal');
+      const tombstoned: PhysicalRecord = {
+        ...next,
+        stopTombstone: beginStop(next, 'environment_failed', Date.now(), wrapperInstanceId)
+          .stopTombstone,
+      };
+      await this.persistPhysicalState(current, tombstoned, 'observe:terminal');
+      return { from: current, to: tombstoned };
+    });
+    if (!committed) return;
+    await this.afterPhysicalPersistence(
+      committed.from,
+      committed.to,
+      'observe:terminal',
+      committed.to.stopTombstone?.wrapperInstanceId
+    );
+  }
+
   private async rearmReconciliation(physical: PhysicalRecord): Promise<void> {
     if (this.shouldSlowReap(physical)) {
       await this.armDeadlineIfAbsent('reconciliation', Date.now() + DEADLINE_MS.reconciliation);
@@ -4795,6 +4888,25 @@ export class SandboxControl extends DurableObject<Env> {
       return null;
     }
     return current;
+  }
+
+  // Matching evidence that this exact allocation ever established a wrapper
+  // incarnation. Recovery-capable close keeps the identity after the ready
+  // socket is gone, so it is the discriminator between a warmed runtime and a
+  // `running` record that only committed `confirmInstance` before launch.
+  private establishedWrapperForAllocation(
+    physical: PhysicalRecord
+  ): SandboxControlConnectionIdentity | null {
+    const connection = this.activeConnection;
+    if (
+      !connection ||
+      !connection.wrapperInstanceId ||
+      physical.providerRef === null ||
+      connection.providerInstanceId !== physical.providerRef
+    ) {
+      return null;
+    }
+    return connection;
   }
 
   private async readHeartbeatObservation(): Promise<WrapperHeartbeatObservation | undefined> {

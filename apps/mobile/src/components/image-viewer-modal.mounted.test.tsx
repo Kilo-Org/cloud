@@ -138,6 +138,23 @@ describe('ImageViewerModal mounted', () => {
     Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
   });
 
+  it('gives the close and share controls a 44pt minimum touch target', async () => {
+    const renderer = await mountViewer({ onShare: () => undefined });
+
+    // Both icon controls must meet the app's 44pt minimum, not the old 40pt
+    // box. Native rem is 14pt, so `min-h-11` is only 38.5pt; the px form is
+    // what button.tsx uses for its icon size (`h-[44px] w-[44px]`) and these
+    // controls have no hitSlop to close the gap.
+    const close = pressableByLabel(renderer.root, 'Close photo.png');
+    const share = pressableByLabel(renderer.root, 'Share photo.png');
+    expect(close?.props.className).toContain('min-h-[44px]');
+    expect(close?.props.className).toContain('min-w-[44px]');
+    expect(share?.props.className).toContain('min-h-[44px]');
+    expect(share?.props.className).toContain('min-w-[44px]');
+
+    renderer.unmount();
+  });
+
   it('shows the Image unavailable fallback and keeps Share enabled on decode failure', async () => {
     const onShare = vi.fn<() => void>();
     const renderer = await mountViewer({ onShare });

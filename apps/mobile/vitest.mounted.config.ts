@@ -18,6 +18,7 @@ export default defineProject({
   test: {
     name: 'mobile-mounted',
     environment: 'node',
+    setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.mounted.test.tsx'],
     // Project configs do not inherit the root test options, and this suite
     // runs both projects in parallel: on a loaded host (dev stack, simulator,

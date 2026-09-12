@@ -1434,6 +1434,10 @@ export function SessionDetailContent({
           <SessionContextSheet
             visible={sheetMountState.visible}
             info={sheetMountState.info}
+            sessionId={sessionId}
+            sessionTitle={rename.title}
+            activeSessionType={activeSessionType}
+            ownerConnectionId={remoteModelState.ownerConnectionId}
             modelDisplay={contextModelAndProvider.model}
             providerDisplay={contextModelAndProvider.provider}
             totalCostMicrodollars={totalMicrodollars}

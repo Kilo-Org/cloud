@@ -9,7 +9,7 @@ import {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { rejectBeforeAdmission } from './control-handler-result.js';
 import { rootForSession } from './session-directories.js';
-import type { WorktreeKiloRuntimes } from './worktree-runtime.js';
+import type { WorktreeKiloRuntime, WorktreeKiloRuntimes } from './worktree-runtime.js';
 import type {
   NativeOperationTarget,
   NativeRetirement,
@@ -24,12 +24,9 @@ import {
 
 type OperationRegistryDependencies = {
   native: {
-    get(
-      directory: string
-    ): WorktreeKiloRuntimes['get'] extends (directory: string) => infer Runtime ? Runtime : never;
-    getRetained(
-      directory: string
-    ): WorktreeKiloRuntimes['get'] extends (directory: string) => infer Runtime ? Runtime : never;
+    get(identity: SessionRequestIdentity): ReturnType<WorktreeKiloRuntimes['get']>;
+    getEntryRuntimeId?(directory: string, root: string): string | undefined;
+    getRetained(directory: string, runtimeId?: string): WorktreeKiloRuntime | undefined;
     prepareForNewWork?(directory: string): boolean;
     retireRuntime(
       directory: string,
@@ -199,8 +196,8 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
     return JSON.stringify([root, nativeRuntimeId]);
   }
 
-  function currentRuntime(directory: string) {
-    return deps.native.getRetained(directory) ?? deps.native.get(directory);
+  function currentRuntime(directory: string, nativeRuntimeId: string) {
+    return deps.native.getRetained(directory, nativeRuntimeId);
   }
 
   function installPhysical(
@@ -263,8 +260,15 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
 
   function clearStaleScopedFailures(): void {
     for (const [id, failure] of scopedFailures) {
-      const runtime = currentRuntime(failure.directory);
-      if (runtime && runtime.runtimeId !== failure.nativeRuntimeId) scopedFailures.delete(id);
+      const currentId = deps.native.getEntryRuntimeId
+        ? deps.native.getEntryRuntimeId(failure.directory, failure.root)
+        : currentRuntime(failure.directory, failure.nativeRuntimeId)?.runtimeId;
+      if (
+        deps.native.getEntryRuntimeId
+          ? currentId !== failure.nativeRuntimeId
+          : currentId !== undefined && currentId !== failure.nativeRuntimeId
+      )
+        scopedFailures.delete(id);
     }
     removeOrphanedArchivedClaims();
   }
@@ -610,7 +614,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
     clearStaleScopedFailures();
     const root = rootForSession(session.kiloSessionId, session.directory);
     if (!root) return false;
-    const runtime = currentRuntime(session.directory);
+    const runtime = deps.native.get(session);
     for (const failure of scopedFailures.values()) {
       if (
         failure.directory === session.directory &&
@@ -788,7 +792,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
     const operation = new SessionOperation(identity, authorization, work, {
       ...effects,
       isCurrent: () => active.get(identity.kiloSessionId) === operation,
-      getRuntime: () => deps.native.get(identity.directory),
+      getRuntime: () => deps.native.get(identity),
       prepareForNewWork: () => deps.native.prepareForNewWork?.(identity.directory) ?? true,
       verifyQuiescence: (target, deadlineAt) =>
         deps.native.verifyQuiescence(identity.directory, target, deadlineAt),

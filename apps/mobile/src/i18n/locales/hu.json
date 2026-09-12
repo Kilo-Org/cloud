@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Vállalati SSO"
   },
   "preferences": {
+    "general": "Általános",
+    "voiceInput": "Hangbevitel",
     "autoExpandThinking": "Gondolkodás automatikus kibontása",
     "autoExpandThinkingSubtitle": "Az ügynök gondolatmenete automatikusan megjelenik kibontva, amint elkészül.",
     "keepScreenOn": "Képernyő bekapcsolva tartása a munkamenet oldalán",
@@ -237,6 +239,7 @@
     "appearanceLight": "Világos",
     "appearanceDark": "Sötét",
     "account": "Fiók",
+    "accountSubtitle": "Nyelv, megbízható webhelyek és eszközök munkamenetei",
     "prReviewAttribution": "Az alkalmazás feltüntetése a PR-ellenőrzésekben",
     "prReviewAttributionSubtitle": "Az elküldött ellenőrzés végére bekerül az „Ellenőrizve a Kilo alkalmazással” lábléc.",
     "returnSendsMessage": "Az Enter billentyű elküldi az üzenetet",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Átírás Kilo Gateway-n keresztül",
+    "gatewayTranscriptionSubtitle": "Írd át a hangbevitelt egy Kilo Gateway-modell segítségével az eszköz beszédfelismerése helyett. A felvételt elküldjük a Kilo Gateway-nek.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "A módosítási kérelem nem érhető el",
@@ -2568,7 +2574,14 @@
     "languageNotInstalledMessage": "A(z) {{language}} nyelv offline beszédfájljai nincsenek telepítve ezen a telefonon. Töltsd le őket, majd próbáld újra a hangbevitelt.",
     "downloadOfflineModel": "Letöltés",
     "offlineModelDownloadScheduled": "Az offline beszédfájlok a háttérben töltődnek le. Próbáld újra a hangbevitelt később.",
-    "listeningStopped": "A beszéd figyelése leállt."
+    "listeningStopped": "A beszéd figyelése leállt.",
+    "transcribing": "Átírás folyamatban…",
+    "gatewayUnreachable": "Nem sikerült elérni a Kilo Gateway-t. Ellenőrizd a kapcsolatot, és próbáld újra.",
+    "gatewayTimeout": "Túl sokáig tartott az átírás. Próbáld újra.",
+    "gatewayModelUnavailable": "Ez az átírási modell nem érhető el. Válassz egy másikat a Beállításokban.",
+    "gatewayModelUnavailableNotice": "Ez a modell már nem elérhető. Koppints a $t(transcriptionModel.title) elemre egy másik kiválasztásához.",
+    "gatewaySignInRequired": "Jelentkezz be a Kilo Gateway-es átírás használatához.",
+    "gatewayNoModel": "Először válassz egy átírási modellt a Beállításokban."
   },
   "share": {
     "title": "Megosztás a Kilo alkalmazással",
@@ -2950,5 +2963,12 @@
     "needsInput": "Válaszra vár",
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
+  },
+  "transcriptionModel": {
+    "title": "Átírási modell",
+    "noneChosen": "Nincs kiválasztva",
+    "emptyTitle": "Nincsenek átírási modellek",
+    "emptyDescription": "A Kilo Gateway jelenleg nem kínál átírási modelleket.",
+    "loadFailed": "Nem sikerült betölteni az átírási modelleket."
   }
 }

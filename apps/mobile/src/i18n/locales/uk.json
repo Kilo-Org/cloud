@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Корпоративний SSO"
   },
   "preferences": {
+    "general": "Загальні",
+    "voiceInput": "Голосове введення",
     "autoExpandThinking": "Автоматично розгортати міркування",
     "autoExpandThinkingSubtitle": "Показувати міркування агента в розгорнутому вигляді після їх завершення.",
     "keepScreenOn": "Не вимикати екран на сторінці сеансу",
@@ -237,6 +239,7 @@
     "appearanceLight": "Світла",
     "appearanceDark": "Темна",
     "account": "Обліковий запис",
+    "accountSubtitle": "Мова, довірені хости та сеанси на пристроях",
     "prReviewAttribution": "Додавати згадку про застосунок до перевірок PR",
     "prReviewAttributionSubtitle": "Додавати підпис «Перевірено через Kilo» в кінці перевірки під час надсилання.",
     "returnSendsMessage": "Клавіша вводу надсилає повідомлення",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Розпізнавання мовлення через Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Розпізнайте голосове введення за допомогою моделі Kilo Gateway замість розпізнавання мовлення на пристрої. Запис надсилається до Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Дії наживо",
@@ -2162,7 +2168,14 @@
     "languageNotInstalledMessage": "Офлайн-файли мовлення для {{language}} не встановлені на цьому телефоні. Завантажте їх, а потім спробуйте голосове введення ще раз.",
     "downloadOfflineModel": "Завантажити",
     "offlineModelDownloadScheduled": "Офлайн-файли мовлення буде завантажено у фоновому режимі. Спробуйте голосове введення пізніше.",
-    "listeningStopped": "Запис мовлення зупинено."
+    "listeningStopped": "Запис мовлення зупинено.",
+    "transcribing": "Розпізнаємо…",
+    "gatewayUnreachable": "Не вдалося зв'язатися з Kilo Gateway. Перевірте з'єднання та спробуйте ще раз.",
+    "gatewayTimeout": "Розпізнавання тривало задовго. Спробуйте ще раз.",
+    "gatewayModelUnavailable": "Ця модель розпізнавання мовлення недоступна. Виберіть іншу в Налаштуваннях.",
+    "gatewayModelUnavailableNotice": "Ця модель більше не пропонується. Натисніть $t(transcriptionModel.title), щоб вибрати іншу.",
+    "gatewaySignInRequired": "Увійдіть, щоб використовувати розпізнавання через Kilo Gateway.",
+    "gatewayNoModel": "Спершу виберіть модель розпізнавання мовлення в Налаштуваннях."
   },
   "share": {
     "title": "Надсилання в Kilo",
@@ -2994,5 +3007,12 @@
     "needsInput": "Очікує відповіді",
     "channelName": "Активні агенти",
     "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані."
+  },
+  "transcriptionModel": {
+    "title": "Модель розпізнавання мовлення",
+    "noneChosen": "Не вибрано",
+    "emptyTitle": "Немає моделей розпізнавання мовлення",
+    "emptyDescription": "Зараз Kilo Gateway не пропонує моделей розпізнавання мовлення.",
+    "loadFailed": "Не вдалося завантажити моделі розпізнавання мовлення."
   }
 }

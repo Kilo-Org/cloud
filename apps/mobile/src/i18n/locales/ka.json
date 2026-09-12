@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "კორპორაციული SSO"
   },
   "preferences": {
+    "general": "ზოგადი",
+    "voiceInput": "ხმოვანი შეყვანა",
     "autoExpandThinking": "მსჯელობის ავტომატურად გაშლა",
     "autoExpandThinkingSubtitle": "აგენტის მსჯელობა დასრულებისთანავე გაშლილად გამოჩნდება.",
     "keepScreenOn": "სესიის გვერდზე ეკრანის ჩართულად დატოვება",
@@ -237,6 +239,7 @@
     "appearanceLight": "ღია",
     "appearanceDark": "მუქი",
     "account": "ანგარიში",
+    "accountSubtitle": "ენა, სანდო ჰოსტები და მოწყობილობების სესიები",
     "prReviewAttribution": "PR-ის შემოწმებისას აპის მითითება",
     "prReviewAttributionSubtitle": "შემოწმების გაგზავნისას ბოლოში დაემატება წარწერა „შემოწმებულია Kilo-ს მეშვეობით“.",
     "returnSendsMessage": "შეყვანის კლავიშით შეტყობინების გაგზავნა",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "ტრანსკრიფცია Kilo Gateway-ით",
+    "gatewayTranscriptionSubtitle": "ხმოვანი შეყვანა აქციეთ ტექსტად Kilo Gateway-ის მოდელით, მოწყობილობის მეტყველების ამოცნობის ნაცვლად. თქვენი ჩანაწერი იგზავნება Kilo Gateway-ში.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",
@@ -2568,7 +2574,14 @@
     "languageNotInstalledMessage": "{{language}} ენის ინტერნეტგარე მეტყველების ფაილები ამ ტელეფონზე დაინსტალირებული არ არის. ჩამოტვირთეთ ისინი, შემდეგ კი ხმოვანი შეყვანა ხელახლა სცადეთ.",
     "downloadOfflineModel": "ჩამოტვირთვა",
     "offlineModelDownloadScheduled": "ინტერნეტგარე მეტყველების ფაილები ფონურად ჩამოიტვირთება. ხმოვანი შეყვანა მოგვიანებით ხელახლა სცადეთ.",
-    "listeningStopped": "მოსმენა შეჩერდა."
+    "listeningStopped": "მოსმენა შეჩერდა.",
+    "transcribing": "მიმდინარეობს ტრანსკრიფცია...",
+    "gatewayUnreachable": "Kilo Gateway-ზე წვდომა ვერ მოხერხდა. შეამოწმეთ კავშირი და სცადეთ ხელახლა.",
+    "gatewayTimeout": "ტრანსკრიფციამ ძალიან ბევრი დრო დაისვა. სცადე ხელახლა.",
+    "gatewayModelUnavailable": "ტრანსკრიფციის ეს მოდელი მიუწვდომელია. აირჩიეთ სხვა პარამეტრებში.",
+    "gatewayModelUnavailableNotice": "ეს მოდელი აღარ არის ხელმისაწვდომი. სხვის ასარჩევად შეეხეთ $t(transcriptionModel.title)-ს.",
+    "gatewaySignInRequired": "შედით, რომ გამოიყენოთ ტრანსკრიფცია Kilo Gateway-ით.",
+    "gatewayNoModel": "ჯერ აირჩიეთ ტრანსკრიფციის მოდელი პარამეტრებში."
   },
   "share": {
     "title": "Kilo-ში გაზიარება",
@@ -2950,5 +2963,12 @@
     "needsInput": "პასუხს ელის",
     "channelName": "აქტიური აგენტები",
     "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები."
+  },
+  "transcriptionModel": {
+    "title": "ტრანსკრიფციის მოდელი",
+    "noneChosen": "არჩეული არ არის",
+    "emptyTitle": "ტრანსკრიფციის მოდელები არ არის",
+    "emptyDescription": "Kilo Gateway ამჟამად არ სთავაზობს ტრანსკრიფციის მოდელებს.",
+    "loadFailed": "ტრანსკრიფციის მოდელების ჩატვირთვა ვერ მოხერხდა."
   }
 }

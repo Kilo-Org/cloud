@@ -9,6 +9,14 @@ import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
 import type * as TokenOwnerModule from './token-owner';
 
+// Every test re-imports the auth module graph after vi.resetModules() and the
+// failure-matrix tests wait out real 250/500/1000 ms retry backoffs. On a
+// loaded machine (the full gate saturates every core) both stretch several
+// fold, so the 5 s vitest default times out healthy tests and the abandoned
+// act scopes cascade failures across the file. The file-wide timeout leaves
+// that headroom; a genuinely hung bootstrap still fails, only later.
+vi.setConfig({ testTimeout: 30_000 });
+
 // ---- hoisted mocks ----
 
 const hoisted = vi.hoisted(() => {
@@ -398,12 +406,17 @@ async function mountAndGetContext(): Promise<{
 }
 
 /** Flush act passes on real timers until bootstrap stops loading, bounded so a
- *  stuck provider fails as a timeout rather than hanging the suite. */
+ *  stuck provider fails as a timeout rather than hanging the suite. The budget
+ *  is real wall-clock time, not an iteration count: a loaded machine stretches
+ *  every 20 ms cycle, and an iteration-counted budget would expire while the
+ *  provider's equally stretched retry backoffs (250/500/1000 ms) are still in
+ *  flight. */
 async function settleBootstrap(
   read: () => AuthContextValue | undefined,
-  budgetMs = 4000
+  budgetMs = 30_000
 ): Promise<void> {
-  for (let elapsed = 0; elapsed <= budgetMs; elapsed += 20) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt <= budgetMs) {
     // eslint-disable-next-line no-await-in-loop -- polling must flush and re-check sequentially between act cycles
     await act(async () => {
       await new Promise<void>(resolve => {
@@ -1882,7 +1895,7 @@ describe('startup credential read failure', () => {
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).not.toHaveBeenCalled();
 
     unmount();
-  }, 15_000);
+  }, 60_000);
 
   it('restores the session when retryRestore runs after the storage recovers', async () => {
     // Every attempt of the first bootstrap fails; the retry's reads succeed.
@@ -1907,7 +1920,7 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBe('stored-token');
 
     unmount();
-  }, 15_000);
+  }, 60_000);
 
   it('a failed retry settles back onto the restore error surface', async () => {
     // Four reads for the first bootstrap, four for the retry: every attempt
@@ -1933,7 +1946,7 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBeUndefined();
 
     unmount();
-  }, 15_000);
+  }, 60_000);
 
   it('sends the person to login when the retry finds no stored session', async () => {
     // Every attempt of the first bootstrap fails; the retry's reads resolve
@@ -1958,7 +1971,7 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBeUndefined();
 
     unmount();
-  }, 15_000);
+  }, 60_000);
 
   it('does not resurrect the restore error surface when signOut lands mid-retry', async () => {
     // Four reads for the first bootstrap, four for the in-flight retry: the
@@ -1985,8 +1998,10 @@ describe('startup credential read failure', () => {
     // Let the abandoned retry's remaining reads exhaust (~1.75 s of backoff)
     // and flush its catch. Resurrecting the flag here would repaint the error
     // screen over the login route, where the sign-out dedupe makes a second
-    // tap a no-op — the escape hatch would be permanently dead.
-    for (let waited = 0; waited <= 4000 && readCount() < 8; waited += 20) {
+    // tap a no-op — the escape hatch would be permanently dead. The budget is
+    // real wall-clock time for the same reason as settleBootstrap above.
+    const abandonedSettleStartedAt = Date.now();
+    while (Date.now() - abandonedSettleStartedAt <= 30_000 && readCount() < 8) {
       // eslint-disable-next-line no-await-in-loop -- polling must flush and re-check sequentially between act cycles
       await act(async () => {
         await new Promise<void>(resolve => {
@@ -2005,7 +2020,7 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBeUndefined();
 
     unmount();
-  }, 15_000);
+  }, 60_000);
 
   it('clears the restore failure when signOut is used as the escape hatch', async () => {
     failTokenReads(4);
@@ -2023,5 +2038,5 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBeUndefined();
 
     unmount();
-  }, 15_000);
+  }, 60_000);
 });

@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "سازماني SSO"
   },
   "preferences": {
+    "general": "عمومي",
+    "voiceInput": "غږیز ننوتل",
     "autoExpandThinking": "د فکر برخه په اوتومات ډول پرانیزئ",
     "autoExpandThinkingSubtitle": "کله چې د ایجنټ فکر بشپړ شي، د فکر برخه پرانیستې وښیئ.",
     "keepScreenOn": "د ناستې پر پاڼه سکرین روښانه وساتئ",
@@ -237,6 +239,7 @@
     "appearanceLight": "روښانه",
     "appearanceDark": "تیاره",
     "account": "حساب",
+    "accountSubtitle": "ژبه، باوري کوربه‌ګان او د وسیلو ناستې",
     "prReviewAttribution": "د PR په بیاکتنو کې د اپلیکیشن نوم زیات کړئ",
     "prReviewAttributionSubtitle": "کله چې بیاکتنه لېږئ، په پای کې یې «د Kilo له لارې بیاکتل شوی» ورزیات کړئ.",
     "returnSendsMessage": "د انټر کیلي پیغام لېږي",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "د Kilo Gateway له لارې د غږ متن ته بدلول",
+    "gatewayTranscriptionSubtitle": "غږیز لیکل د وسیلې د ویې پېژندنې پر ځای د Kilo Gateway ماډل سره متن ته واړوئ. غږیز ریکارډ مو د Kilo Gateway ته لیږل کېږي.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسټ نشته",
@@ -2568,7 +2574,14 @@
     "languageNotInstalledMessage": "د {{language}} آفلاین وینا فایلونه پر دې تلیفون نصب شوي نه دي. هغوی ښکته کړئ، بیا د غږیز لیکلو هڅه وکړئ.",
     "downloadOfflineModel": "ښکته کول",
     "offlineModelDownloadScheduled": "آفلاین وینا فایلونه به شالید کې ښکته شي. وروسته بیا د غږیز لیکلو هڅه وکړئ.",
-    "listeningStopped": "اورېدل ودرېدل."
+    "listeningStopped": "اورېدل ودرېدل.",
+    "transcribing": "متن ته اړول کېږي...",
+    "gatewayUnreachable": "له Kilo Gateway سره اړیکه نشو ټینګېدلی. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
+    "gatewayTimeout": "د غږ بدلول ډېر وخت ونیو. بیا هڅه وکړئ.",
+    "gatewayModelUnavailable": "دا ماډل شتون نلري. په غوره توبونو کې بل وټاکئ.",
+    "gatewayModelUnavailableNotice": "دا ماډل نور وړاندې نه کېږي. د بل غوره کولو لپاره $t(transcriptionModel.title) ته ټک ووهئ.",
+    "gatewaySignInRequired": "د Kilo Gateway بدلولو کارولو لپاره ننوځئ.",
+    "gatewayNoModel": "لومړی په غوره توبونو کې یو ماډل وټاکئ."
   },
   "share": {
     "title": "له Kilo سره شریکول",
@@ -2950,5 +2963,12 @@
     "needsInput": "ځواب ته اړتیا لري",
     "channelName": "فعال اجنټان",
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ."
+  },
+  "transcriptionModel": {
+    "title": "د غږ د متن ته بدلولو ماډل",
+    "noneChosen": "هیڅ نه دی ټاکل شوی",
+    "emptyTitle": "د غږ د متن ته بدلولو هیڅ ماډل نشته",
+    "emptyDescription": "Kilo Gateway اوس مهال د غږ د متن ته بدلولو هیڅ ماډل نه وړاندې کوي.",
+    "loadFailed": "د غږ د متن ته بدلولو ماډلونه بار نه شول."
   }
 }

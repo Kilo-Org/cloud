@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Podnikové SSO"
   },
   "preferences": {
+    "general": "Všeobecné",
+    "voiceInput": "Hlasový vstup",
     "autoExpandThinking": "Automaticky rozbaliť uvažovanie",
     "autoExpandThinkingSubtitle": "Po dokončení uvažovania agenta sa jeho obsah automaticky rozbalí.",
     "keepScreenOn": "Ponechať obrazovku zapnutú na stránke relácie",
@@ -237,6 +239,7 @@
     "appearanceLight": "Svetlý",
     "appearanceDark": "Tmavý",
     "account": "Účet",
+    "accountSubtitle": "Jazyk, dôveryhodné servery a relácie zariadení",
     "prReviewAttribution": "Uvádzať aplikáciu pri kontrolách PR",
     "prReviewAttributionSubtitle": "Pri odoslaní kontroly sa pridá pätička Skontrolované cez Kilo.",
     "returnSendsMessage": "Kláves Enter odošle správu",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Prepis cez Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Prepisujte hlasový vstup modelom Kilo Gateway namiesto rozpoznávania reči v zariadení. Nahrávka sa odošle do Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Žiadosť o zlúčenie nie je dostupná",
@@ -2610,7 +2616,14 @@
     "languageNotInstalledMessage": "Offline súbory reči pre jazyk {{language}} nie sú v tomto telefóne nainštalované. Stiahnite ich a potom skúste hlasový vstup znova.",
     "downloadOfflineModel": "Stiahnuť",
     "offlineModelDownloadScheduled": "Offline súbory reči sa stiahnu na pozadí. Skúste hlasový vstup znova neskôr.",
-    "listeningStopped": "Počúvanie sa skončilo."
+    "listeningStopped": "Počúvanie sa skončilo.",
+    "transcribing": "Prepisuje sa…",
+    "gatewayUnreachable": "Nepodarilo sa spojiť s Kilo Gateway. Skontroluj pripojenie a skús to znova.",
+    "gatewayTimeout": "Prepis trval príliš dlho. Skús to znova.",
+    "gatewayModelUnavailable": "Tento model prepisu nie je dostupný. Vyberte iný v Predvoľbách.",
+    "gatewayModelUnavailableNotice": "Tento model sa už neponúka. Klepnutím na $t(transcriptionModel.title) vyberte iný.",
+    "gatewaySignInRequired": "Prihláste sa, aby ste mohli používať prepis cez Kilo Gateway.",
+    "gatewayNoModel": "Najprv vyberte model prepisu v Predvoľbách."
   },
   "share": {
     "title": "Zdieľanie do aplikácie Kilo",
@@ -2994,5 +3007,12 @@
     "needsInput": "Čaká na odpoveď",
     "channelName": "Aktívne agenty",
     "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke."
+  },
+  "transcriptionModel": {
+    "title": "Model prepisu",
+    "noneChosen": "Nie je vybraný žiadny",
+    "emptyTitle": "Žiadne modely prepisu",
+    "emptyDescription": "Kilo Gateway teraz neponúka žiadne modely prepisu.",
+    "loadFailed": "Nepodarilo sa načítať modely prepisu."
   }
 }

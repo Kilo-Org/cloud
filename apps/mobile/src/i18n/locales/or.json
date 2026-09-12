@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "ଏଣ୍ଟରପ୍ରାଇଜ୍ SSO"
   },
   "preferences": {
+    "general": "ସାଧାରଣ",
+    "voiceInput": "ଭଏସ ଇନପୁଟ",
     "autoExpandThinking": "ଚିନ୍ତନର ବିବରଣୀ ଆପେ ଖୋଲନ୍ତୁ",
     "autoExpandThinkingSubtitle": "ଏଜେଣ୍ଟର ଚିନ୍ତନ ଶେଷ ହେଲେ ଏହାର ବିବରଣୀ ଖୋଲି ଦେଖାନ୍ତୁ।",
     "keepScreenOn": "ସେସନ୍ ପୃଷ୍ଠାରେ ଥିବା ସମୟରେ ସ୍କ୍ରିନ୍ ଚାଲୁ ରଖନ୍ତୁ",
@@ -237,6 +239,7 @@
     "appearanceLight": "ହାଲୁକା",
     "appearanceDark": "ଗାଢ଼",
     "account": "ଆକାଉଣ୍ଟ",
+    "accountSubtitle": "ଭାଷା, ବିଶ୍ୱସ୍ତ ହୋଷ୍ଟଗୁଡ଼ିକ ଏବଂ ଉପକରଣର ସେସନ୍",
     "prReviewAttribution": "PR ସମୀକ୍ଷାରେ ଆପ୍‌ର ନାମ ଯୋଡ଼ନ୍ତୁ",
     "prReviewAttributionSubtitle": "ସମୀକ୍ଷା ଦାଖଲ କଲେ ଶେଷରେ “Kilo ମାଧ୍ୟମରେ ସମୀକ୍ଷା ହୋଇଛି” ଯୋଡ଼ନ୍ତୁ।",
     "returnSendsMessage": "ରିଟର୍ନ କି ବାର୍ତ୍ତା ପଠାଏ",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway ମାଧ୍ୟମରେ କଥାକୁ ଲେଖାରେ ବଦଳାଇବା",
+    "gatewayTranscriptionSubtitle": "ଡିଭାଇସ୍‌ର ସ୍ପିଚ୍ ରେକଗ୍ନିସନ୍ ପରିବର୍ତ୍ତେ Kilo Gateway ମଡେଲ୍ ବ୍ୟବହାର କରି କହି ଲେଖିବାକୁ ଲେଖାରେ ବଦଳାନ୍ତୁ। ଆପଣଙ୍କ ରେକର୍ଡିଂ Kilo Gateway ପଠାଯାଏ।",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଉପଲବ୍ଧ ନାହିଁ",
@@ -2568,7 +2574,14 @@
     "languageNotInstalledMessage": "{{language}} ପାଇଁ ଅଫଲାଇନ୍ ସ୍ପିଚ୍ ଫାଇଲ୍ ଏହି ଫୋନ୍‌ରେ ଇନଷ୍ଟଲ୍ ହୋଇନାହିଁ। ସେଗୁଡ଼ିକ ଡାଉନଲୋଡ୍ କରନ୍ତୁ, ତାପରେ କହି ଲେଖିବା ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "downloadOfflineModel": "ଡାଉନଲୋଡ୍",
     "offlineModelDownloadScheduled": "ଅଫଲାଇନ୍ ସ୍ପିଚ୍ ଫାଇଲ୍ ଗୁଡ଼ିକ ପୃଷ୍ଠପଟରେ ଡାଉନଲୋଡ୍ ହେବ। ପରେ କହି ଲେଖିବା ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-    "listeningStopped": "ଶୁଣିବା ବନ୍ଦ ହେଲା।"
+    "listeningStopped": "ଶୁଣିବା ବନ୍ଦ ହେଲା।",
+    "transcribing": "ଲେଖାରେ ବଦଳାଯାଉଛି...",
+    "gatewayUnreachable": "Kilo Gateway ପର୍ଯ୍ୟନ୍ତ ପହଞ୍ଚି ହୋଇନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "gatewayTimeout": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାରେ ଅଧିକ ସମୟ ଲାଗିଲା। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "gatewayModelUnavailable": "ଏହି ଲେଖା ବଦଳ ମଡେଲ୍ ଉପଲବ୍ଧ ନୁହେଁ। ପସନ୍ଦରେ ଅନ୍ୟ ଏକ ମଡେଲ୍ ବାଛନ୍ତୁ।",
+    "gatewayModelUnavailableNotice": "ଏହି ମଡେଲ୍ ଆଉ ଦିଆଯାଉନାହିଁ। ଅନ୍ୟଟିଏ ବାଛିବାକୁ $t(transcriptionModel.title) ଟ୍ୟାପ୍ କରନ୍ତୁ।",
+    "gatewaySignInRequired": "Kilo Gateway ଲେଖା ବଦଳ ବ୍ୟବହାର ପାଇଁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
+    "gatewayNoModel": "ପ୍ରଥମେ ପସନ୍ଦରେ ଏକ ଲେଖା ବଦଳ ମଡେଲ୍ ବାଛନ୍ତୁ।"
   },
   "share": {
     "title": "Kilo କୁ ସେୟାର",
@@ -2950,5 +2963,12 @@
     "needsInput": "ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ",
     "channelName": "ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ",
     "activityKitDisabledBody": "ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ ଦେଖିବାକୁ ସେଟିଂସ୍‌ରେ ଲାଇଭ୍ କାର୍ଯ୍ୟକଳାପ ଚାଲୁ କରନ୍ତୁ।"
+  },
+  "transcriptionModel": {
+    "title": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର ମଡେଲ୍",
+    "noneChosen": "କିଛି ବଛାଯାଇନାହିଁ",
+    "emptyTitle": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର କୌଣସି ମଡେଲ୍ ନାହିଁ",
+    "emptyDescription": "Kilo Gateway ବର୍ତ୍ତମାନ କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର କୌଣସି ମଡେଲ୍ ଦେଉନାହିଁ।",
+    "loadFailed": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର ମଡେଲ୍ ଗୁଡ଼ିକୁ ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ।"
   }
 }

@@ -52,3 +52,38 @@ describe('PrDiffFileListLoading bottom inset (plan §6)', () => {
     expect(style.paddingBottom).toBe(50);
   });
 });
+
+describe('PrDiffFileListLoading side insets (landscape)', () => {
+  beforeEach(() => {
+    insetsState.top = 0;
+    insetsState.bottom = 0;
+    insetsState.left = 0;
+    insetsState.right = 0;
+  });
+
+  it('keeps the container style a portrait no-op with zero side insets', () => {
+    const renderer = mountLoading();
+
+    // No paddingLeft/paddingRight keys at zero, so the skeleton rows keep
+    // their portrait `px-4` gutter geometry exactly.
+    const style = loadingView(renderer).props.style as Record<string, number | undefined>;
+    expect(style.paddingLeft).toBeUndefined();
+    expect(style.paddingRight).toBeUndefined();
+    expect(style.paddingBottom).toBe(32);
+  });
+
+  it('clears the sensor housing with the landscape side insets', () => {
+    insetsState.left = 47;
+    insetsState.right = 59;
+    const renderer = mountLoading();
+
+    // The insets land on the skeleton container so the rows (and their
+    // hairline separators) match the loaded FlashList geometry, whose
+    // content-container padding carries the same side insets. The
+    // height-feeding paddingBottom is unchanged.
+    const style = loadingView(renderer).props.style as Record<string, number | undefined>;
+    expect(style.paddingLeft).toBe(47);
+    expect(style.paddingRight).toBe(59);
+    expect(style.paddingBottom).toBe(32);
+  });
+});

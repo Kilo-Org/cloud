@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO perusahaan"
   },
   "preferences": {
+    "general": "Umum",
+    "voiceInput": "Input suara",
     "autoExpandThinking": "Tampilkan pemikiran secara otomatis",
     "autoExpandThinkingSubtitle": "Buka bagian pemikiran agen secara otomatis setelah agen selesai berpikir.",
     "keepScreenOn": "Biarkan layar tetap menyala di halaman sesi",
@@ -237,6 +239,7 @@
     "appearanceLight": "Terang",
     "appearanceDark": "Gelap",
     "account": "Akun",
+    "accountSubtitle": "Bahasa, host tepercaya, dan sesi perangkat",
     "prReviewAttribution": "Tambahkan atribusi aplikasi ke tinjauan PR",
     "prReviewAttributionSubtitle": "Tambahkan keterangan Ditinjau melalui Kilo di bagian bawah saat kamu mengirim tinjauan.",
     "returnSendsMessage": "Tombol Enter mengirim pesan",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkripsi dengan Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkripsikan masukan suara dengan model Kilo Gateway alih-alih pengenalan bicara perangkat. Rekaman Anda dikirim ke Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Aktivitas langsung",
@@ -2134,7 +2140,14 @@
     "languageNotInstalledMessage": "File suara offline untuk {{language}} belum terinstal di ponsel ini. Unduh filenya, lalu coba masukan suara lagi.",
     "downloadOfflineModel": "Unduh",
     "offlineModelDownloadScheduled": "File suara offline akan diunduh di latar belakang. Coba masukan suara lagi nanti.",
-    "listeningStopped": "Pendeteksian suara dihentikan."
+    "listeningStopped": "Pendeteksian suara dihentikan.",
+    "transcribing": "Mentranskripsi...",
+    "gatewayUnreachable": "Tidak dapat menghubungi Kilo Gateway. Periksa koneksi Anda dan coba lagi.",
+    "gatewayTimeout": "Transkripsi terlalu lama. Coba lagi.",
+    "gatewayModelUnavailable": "Model transkripsi ini tidak tersedia. Pilih yang lain di Preferensi.",
+    "gatewayModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketuk $t(transcriptionModel.title) untuk memilih yang lain.",
+    "gatewaySignInRequired": "Masuk untuk menggunakan transkripsi Kilo Gateway.",
+    "gatewayNoModel": "Pilih model transkripsi di Preferensi terlebih dahulu."
   },
   "share": {
     "title": "Bagikan ke Kilo",
@@ -2950,5 +2963,12 @@
     "needsInput": "Perlu masukan",
     "channelName": "Agen aktif",
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci."
+  },
+  "transcriptionModel": {
+    "title": "Model transkripsi",
+    "noneChosen": "Belum ada yang dipilih",
+    "emptyTitle": "Tidak ada model transkripsi",
+    "emptyDescription": "Kilo Gateway tidak menawarkan model transkripsi saat ini.",
+    "loadFailed": "Tidak dapat memuat model transkripsi."
   }
 }

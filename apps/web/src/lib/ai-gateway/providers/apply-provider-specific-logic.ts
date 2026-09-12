@@ -53,6 +53,8 @@ import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { ReasoningFormat } from '@/lib/ai-gateway/custom-llm/format';
 import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
+import { isGeminiModel } from '@/lib/ai-gateway/providers/google';
+import { sanitizeJsonRefToolResults } from '@/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -136,9 +138,9 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum.openai];
   }
   if (isClaudeModel(requestedModel) && !isFableModel(requestedModel)) {
-    // fable is not available on bedrock on vercel
-    // and specifying bedrock breaks the opus fallback
+    // specifying this for fable breaks the opus fallback on vercel
     return [
+      OpenRouterInferenceProviderIdSchema.enum['google-vertex'],
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
       OpenRouterInferenceProviderIdSchema.enum.anthropic,
     ];
@@ -294,6 +296,10 @@ export async function applyProviderSpecificLogic(
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
+
+  if (isGeminiModel(requestedModel)) {
+    sanitizeJsonRefToolResults(requestToMutate);
+  }
 
   if (requestToMutate.kind === 'chat_completions') {
     scrubOpenCodeSpecificProperties(requestToMutate.body);

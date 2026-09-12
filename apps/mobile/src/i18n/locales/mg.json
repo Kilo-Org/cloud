@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO an'orinasa"
   },
   "preferences": {
+    "general": "Ankapobeny",
+    "voiceInput": "Fampidirana feo",
     "autoExpandThinking": "Velaro ho azy ny fisainana",
     "autoExpandThinkingSubtitle": "Asehoy mivelatra ny fisainan'ny mpanampy rehefa vita izany.",
     "keepScreenOn": "Avelao hirehitra ny efijery eo amin'ny pejin'ny fotoam-piasana",
@@ -237,6 +239,7 @@
     "appearanceLight": "Mazava",
     "appearanceDark": "Maizina",
     "account": "Kaonty",
+    "accountSubtitle": "Fiteny, mpampiantrano atokisana ary fotoam-piasana amin'ny fitaovana",
     "prReviewAttribution": "Asio filazana ny rindranasa amin'ny fandinihana PR",
     "prReviewAttributionSubtitle": "Asio soratra hoe Nodinihina tamin'ny Kilo any ambany rehefa mandefa fandinihana ianao.",
     "returnSendsMessage": "Mandefa hafatra ny bokotra fampidirana",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Fanovana feo ho soratra amin'ny Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Aova ho soratra amin'ny modely Kilo Gateway ny fampidirana amin'ny feo fa tsy ny famantarana ny feon'ny fitaovana. Alefa amin'ny Kilo Gateway ny rakitra nosoronanao.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Tsy azo sokafana ny fangatahana fampiraisana",
@@ -2568,7 +2574,14 @@
     "languageNotInstalledMessage": "Tsy napetraka amin'ity finday ity ny rakitra feo offline ho an'ny {{language}}. Sintomy aloha izy ireo, avy eo andramo indray ny fampidirana amin'ny feo.",
     "downloadOfflineModel": "Sintomy",
     "offlineModelDownloadScheduled": "Ho sintomy ao amin'ny background ny rakitra feo offline. Andramo indray ny fampidirana amin'ny feo raha vao ela.",
-    "listeningStopped": "Nijanona ny fihainoana."
+    "listeningStopped": "Nijanona ny fihainoana.",
+    "transcribing": "Manova feo ho soratra...",
+    "gatewayUnreachable": "Tsy azo ny Kilo Gateway. Hamarino ny fifandraisanao ary andramo indray.",
+    "gatewayTimeout": "Nihoatra ny elanelany ny fanovana feo ho soratra. Andramo indray.",
+    "gatewayModelUnavailable": "Tsy azo ampiasaina ity modely fanovana feo ho soratra ity. Safidio ny hafa ao amin'ny Safidy.",
+    "gatewayModelUnavailableNotice": "Tsy atolotra intsony ity modely ity. Tsindrio $t(transcriptionModel.title) hisafidianana ny hafa.",
+    "gatewaySignInRequired": "Midira mba hampiasa ny fanovana feo ho soratra amin'ny Kilo Gateway.",
+    "gatewayNoModel": "Safidio aloha ny modely fanovana feo ho soratra ao amin'ny Safidy."
   },
   "share": {
     "title": "Fizarana amin'ny Kilo",
@@ -2950,5 +2963,12 @@
     "needsInput": "Mila valiny",
     "channelName": "Mpanatanteraka mandeha",
     "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy."
+  },
+  "transcriptionModel": {
+    "title": "Modely fanovana feo ho soratra",
+    "noneChosen": "Tsy misy safidy",
+    "emptyTitle": "Tsy misy modely fanovana feo ho soratra",
+    "emptyDescription": "Tsy manome modely fanovana feo ho soratra amin'izao fotoana izao ny Kilo Gateway.",
+    "loadFailed": "Tsy tafiditra ny modely fanovana feo ho soratra."
   }
 }

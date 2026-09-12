@@ -1,4 +1,8 @@
+import { db } from '@/lib/drizzle';
+import { kilocode_users } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import jwt from 'jsonwebtoken';
 import type { SecurityFinding, User } from '@kilocode/db/schema';
 import type * as securityAnalysisModule from '../db/security-analysis';
 import type * as securityFindingsModule from '../db/security-findings';
@@ -6,7 +10,19 @@ import type * as triageModule from './triage-service';
 import type { startSecurityAnalysis as startSecurityAnalysisType } from './analysis-service';
 import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { expectNonExchangeableSystemToken } from '@/tests/helpers/system-token.helper';
+import {
+  isKiloCredentialExchangeEligible,
+  verifyKiloTokenForPolicy,
+} from '@kilocode/worker-utils/kilo-token-policy';
+
+const shared = { enabled: true };
+const tokenSecret = 'security-agent-token-source-test-secret';
+
+jest.mock('@/lib/config.server', () => ({
+  NEXTAUTH_SECRET: 'security-agent-token-source-test-secret',
+  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
+  isResourceTokenIssuanceEnabled: () => shared.enabled,
+}));
 
 const mockGetSecurityFindingById = jest.fn<typeof securityFindingsModule.getSecurityFindingById>();
 const mockUpdateAnalysisStatus = jest.fn<typeof securityAnalysisModule.updateAnalysisStatus>();
@@ -124,6 +140,7 @@ function createFinding(user: User): SecurityFinding {
 describe('startSecurityAnalysis token source', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    shared.enabled = true;
     mockTryAcquireAnalysisStartLease.mockResolvedValue(true);
     mockUpdateAnalysisStatus.mockResolvedValue(true);
     mockTriageSecurityFinding.mockResolvedValue({
@@ -147,28 +164,99 @@ describe('startSecurityAnalysis token source', () => {
     });
   });
 
-  it('uses one non-exchangeable security-agent token for triage and sandbox analysis', async () => {
+  it.each([null, 'existing-pepper'])(
+    'uses persisted pepper %s for modern gateway and sandbox credentials',
+    async api_token_pepper => {
+      const user = await insertTestUser({ api_token_pepper });
+      const organizationId = crypto.randomUUID();
+      const finding = {
+        ...createFinding(user),
+        owned_by_organization_id: organizationId,
+        owned_by_user_id: null,
+      };
+      mockGetSecurityFindingById.mockResolvedValue(finding);
+
+      const result = await startSecurityAnalysis({
+        findingId: finding.id,
+        user,
+        githubRepo: finding.repo_full_name,
+        githubToken: 'github-token',
+        organizationId,
+      });
+
+      expect(result).toEqual({ started: true, triageOnly: false });
+      const [persisted] = await db
+        .select()
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, user.id));
+      expect(persisted.api_token_pepper).toBe(api_token_pepper);
+      const triageInput = mockTriageSecurityFinding.mock.calls[0]?.[0];
+      const cloudAgentToken = mockCreateCloudAgentNextClient.mock.calls[0]?.[0];
+      if (!triageInput) throw new Error('Expected triage to receive an input');
+      expect(triageInput.authToken).toEqual(expect.any(String));
+      const gatewayClaims = jwt.verify(triageInput.authToken, tokenSecret) as jwt.JwtPayload;
+      const cloudAgentClaims = jwt.decode(cloudAgentToken);
+      if (!cloudAgentClaims || typeof cloudAgentClaims === 'string') {
+        throw new Error('Expected sandbox JWT claims');
+      }
+      expect(gatewayClaims).toMatchObject({
+        aud: 'kilo-gateway',
+        apiTokenPepper: persisted.api_token_pepper,
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+        organizationId,
+        tokenSource: 'security-agent',
+      });
+      expect(gatewayClaims.exp! - gatewayClaims.iat!).toBeLessThanOrEqual(60 * 60);
+      expect(cloudAgentClaims).toMatchObject({
+        aud: 'cloud-agent-next',
+        apiTokenPepper: persisted.api_token_pepper,
+        runtimeAdmission: {
+          authorizationUserId: user.id,
+          authorizationPepper: persisted.api_token_pepper,
+        },
+        tokenPurpose: 'internal-service',
+        credentialExchange: false,
+        organizationId,
+      });
+      expect(cloudAgentToken).not.toBe(triageInput.authToken);
+      const tokenPolicy = await verifyKiloTokenForPolicy(triageInput.authToken, tokenSecret, {
+        audience: 'kilo-gateway',
+        mode: 'required',
+      });
+      expect(isKiloCredentialExchangeEligible(tokenPolicy, { legacy: 'five-year-api' })).toBe(
+        false
+      );
+      expect(mockPrepareSession).toHaveBeenCalledTimes(1);
+      expect(mockInitiateFromPreparedSession).toHaveBeenCalledWith({
+        cloudAgentSessionId: 'agent-session-123',
+      });
+    }
+  );
+
+  it('preserves the legacy gateway token shape when shared issuance is disabled', async () => {
+    shared.enabled = false;
     const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
     const finding = createFinding(user);
     mockGetSecurityFindingById.mockResolvedValue(finding);
 
-    const result = await startSecurityAnalysis({
+    await startSecurityAnalysis({
       findingId: finding.id,
       user,
       githubRepo: finding.repo_full_name,
       githubToken: 'github-token',
     });
 
-    expect(result).toEqual({ started: true, triageOnly: false });
     const triageInput = mockTriageSecurityFinding.mock.calls[0]?.[0];
-    const cloudAgentToken = mockCreateCloudAgentNextClient.mock.calls[0]?.[0];
     if (!triageInput) throw new Error('Expected triage to receive an input');
-    expect(triageInput.authToken).toEqual(expect.any(String));
-    expect(cloudAgentToken).toBe(triageInput.authToken);
-    await expectNonExchangeableSystemToken(triageInput.authToken, user, 'security-agent');
-    expect(mockPrepareSession).toHaveBeenCalledTimes(1);
-    expect(mockInitiateFromPreparedSession).toHaveBeenCalledWith({
-      cloudAgentSessionId: 'agent-session-123',
+    const claims = jwt.verify(triageInput.authToken, tokenSecret) as jwt.JwtPayload;
+    expect(claims).toMatchObject({
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      tokenSource: 'security-agent',
     });
+    expect(claims).not.toHaveProperty('aud');
+    expect(claims).not.toHaveProperty('tokenPurpose');
+    expect(claims).not.toHaveProperty('credentialExchange');
   });
 });

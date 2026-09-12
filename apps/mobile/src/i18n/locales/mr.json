@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "एंटरप्राइझ SSO"
   },
   "preferences": {
+    "general": "सामान्य",
+    "voiceInput": "व्हॉइस इनपुट",
     "autoExpandThinking": "विचारप्रक्रिया आपोआप उघडून दाखवा",
     "autoExpandThinkingSubtitle": "एजंटची विचारप्रक्रिया पूर्ण झाल्यावर तिचा संपूर्ण मजकूर दाखवा.",
     "keepScreenOn": "सत्र पृष्ठावर असताना स्क्रीन चालू ठेवा",
@@ -237,6 +239,7 @@
     "appearanceLight": "लाइट",
     "appearanceDark": "डार्क",
     "account": "खाते",
+    "accountSubtitle": "भाषा, विश्वासार्ह होस्ट आणि उपकरणांवरील सत्रे",
     "prReviewAttribution": "PR पुनरावलोकनांमध्ये अ‍ॅपचा उल्लेख जोडा",
     "prReviewAttributionSubtitle": "पुनरावलोकन पाठवताना शेवटी Kilo द्वारे पुनरावलोकन केले असा उल्लेख जोडा.",
     "returnSendsMessage": "रिटर्न कळ संदेश पाठवते",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway द्वारे लिप्यंतरण",
+    "gatewayTranscriptionSubtitle": "उपकरणाच्या स्पीच रेकग्निशनऐवजी Kilo Gateway मॉडेल वापरून व्हॉइस इनपुटचे लिप्यंतरण करा. तुमचे रेकॉर्डिंग Kilo Gateway कडे पाठवले जाते.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",
@@ -2568,7 +2574,14 @@
     "languageNotInstalledMessage": "{{language}} साठीच्या ऑफलाइन स्पीच फाइल्स या फोनवर इंस्टॉल केलेल्या नाहीत. त्या डाउनलोड करा, नंतर व्हॉइस इनपुट पुन्हा वापरून पहा.",
     "downloadOfflineModel": "डाउनलोड",
     "offlineModelDownloadScheduled": "ऑफलाइन स्पीच फाइल्स बॅकग्राउंडमध्ये डाउनलोड होतील. नंतर व्हॉइस इनपुट पुन्हा वापरून पहा.",
-    "listeningStopped": "ऐकणे थांबले."
+    "listeningStopped": "ऐकणे थांबले.",
+    "transcribing": "लिप्यंतरण होत आहे...",
+    "gatewayUnreachable": "Kilo Gateway पर्यंत पोहोचता आले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+    "gatewayTimeout": "लिप्यंतरणास खूप वेळ लागला. पुन्हा प्रयत्न करा.",
+    "gatewayModelUnavailable": "हे लिप्यंतरण मॉडेल उपलब्ध नाही. प्राधान्यांमध्ये दुसरे निवडा.",
+    "gatewayModelUnavailableNotice": "हे मॉडेल आता उपलब्ध नाही. दुसरे निवडण्यासाठी $t(transcriptionModel.title) वर टॅप करा.",
+    "gatewaySignInRequired": "Kilo Gateway लिप्यंतरण वापरण्यासाठी साइन इन करा.",
+    "gatewayNoModel": "प्राधान्यांमध्ये आधी लिप्यंतरण मॉडेल निवडा."
   },
   "share": {
     "title": "Kilo वर शेअर करा",
@@ -2950,5 +2963,12 @@
     "needsInput": "प्रतिसाद आवश्यक",
     "channelName": "सक्रिय एजंट्स",
     "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये लाइव्ह अॅक्टिव्हिटी चालू करा."
+  },
+  "transcriptionModel": {
+    "title": "लिप्यंतरण मॉडेल",
+    "noneChosen": "काहीही निवडले नाही",
+    "emptyTitle": "लिप्यंतरणासाठी मॉडेल्स नाहीत",
+    "emptyDescription": "Kilo Gateway सध्या लिप्यंतरणासाठी कोणतीही मॉडेल्स देत नाही.",
+    "loadFailed": "लिप्यंतरण मॉडेल्स लोड करता आली नाहीत."
   }
 }

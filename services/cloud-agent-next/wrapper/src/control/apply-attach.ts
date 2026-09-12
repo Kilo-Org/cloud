@@ -367,6 +367,7 @@ async function executeSessionAttach(
       attach.kilo,
       attach.env,
       deps.canRefreshCredentials,
+      attach.runtimeIsolation,
       deps.onMutation,
       deps.onCleanupTarget
     );

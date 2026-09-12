@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO dla firm"
   },
   "preferences": {
+    "general": "Ogólne",
+    "voiceInput": "Wprowadzanie głosu",
     "autoExpandThinking": "Automatycznie rozwijaj tok rozumowania",
     "autoExpandThinkingSubtitle": "Rozwijaj tok rozumowania agenta po jego zakończeniu.",
     "keepScreenOn": "Nie wygaszaj ekranu podczas wyświetlania sesji",
@@ -237,6 +239,7 @@
     "appearanceLight": "Jasny",
     "appearanceDark": "Ciemny",
     "account": "Konto",
+    "accountSubtitle": "Język, zaufane hosty i sesje na urządzeniach",
     "prReviewAttribution": "Dodawaj informację o aplikacji do przeglądów PR",
     "prReviewAttributionSubtitle": "Dodawaj stopkę „Przegląd wykonano w Kilo” przy przesyłaniu przeglądu.",
     "returnSendsMessage": "Klawisz Enter wysyła wiadomość",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transkrypcja przez Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transkrybuj dyktowanie modelem Kilo Gateway zamiast rozpoznawania mowy na urządzeniu. Twoje nagranie zostanie wysłane do Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "Aktywności na żywo",
@@ -2162,7 +2168,14 @@
     "languageNotInstalledMessage": "Pliki mowy offline dla języka {{language}} nie są zainstalowane na tym telefonie. Pobierz je, a następnie ponownie spróbuj dyktowania.",
     "downloadOfflineModel": "Pobierz",
     "offlineModelDownloadScheduled": "Pliki mowy offline zostaną pobrane w tle. Spróbuj dyktowania ponownie później.",
-    "listeningStopped": "Nasłuchiwanie zostało zatrzymane."
+    "listeningStopped": "Nasłuchiwanie zostało zatrzymane.",
+    "transcribing": "Transkrypcja...",
+    "gatewayUnreachable": "Nie udało się połączyć z Kilo Gateway. Sprawdź połączenie i spróbuj ponownie.",
+    "gatewayTimeout": "Transkrypcja trwała zbyt długo. Spróbuj ponownie.",
+    "gatewayModelUnavailable": "Ten model transkrypcji jest niedostępny. Wybierz inny w Preferencjach.",
+    "gatewayModelUnavailableNotice": "Ten model nie jest już oferowany. Dotknij $t(transcriptionModel.title), aby wybrać inny.",
+    "gatewaySignInRequired": "Zaloguj się, aby korzystać z transkrypcji przez Kilo Gateway.",
+    "gatewayNoModel": "Najpierw wybierz model transkrypcji w Preferencjach."
   },
   "share": {
     "title": "Udostępnianie w Kilo",
@@ -2994,5 +3007,12 @@
     "needsInput": "Czeka na odpowiedź",
     "channelName": "Aktywni agenci",
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
+  },
+  "transcriptionModel": {
+    "title": "Model transkrypcji",
+    "noneChosen": "Nie wybrano",
+    "emptyTitle": "Brak modeli transkrypcji",
+    "emptyDescription": "Kilo Gateway nie oferuje teraz żadnych modeli transkrypcji.",
+    "loadFailed": "Nie udało się wczytać modeli transkrypcji."
   }
 }

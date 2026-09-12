@@ -2031,6 +2031,8 @@
     "retryLoadingPrivacy": "Tentar carregar as opções de privacidade novamente"
   },
   "preferences": {
+    "general": "Geral",
+    "voiceInput": "Entrada de voz",
     "autoExpandThinking": "Expandir raciocínio automaticamente",
     "autoExpandThinkingSubtitle": "Mostrar o raciocínio do agente expandido quando ele terminar de pensar.",
     "keepScreenOn": "Manter a tela ligada durante a sessão",
@@ -2041,6 +2043,7 @@
     "appearanceLight": "Claro",
     "appearanceDark": "Escuro",
     "account": "Conta",
+    "accountSubtitle": "Idioma, domínios confiáveis e sessões nos dispositivos",
     "prReviewAttribution": "Adicionar identificação do app às revisões de PR",
     "prReviewAttributionSubtitle": "Adicionar o rodapé \"Revisado pelo Kilo\" ao enviar uma revisão.",
     "returnSendsMessage": "A tecla Enter envia a mensagem",
@@ -2051,7 +2054,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Transcrição com Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Transcreva a digitação por voz com um modelo do Kilo Gateway em vez do reconhecimento de fala do dispositivo. Sua gravação é enviada para o Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "addCredits": {
     "cta": "Adicionar créditos",
@@ -2148,7 +2154,14 @@
     "languageNotInstalledMessage": "Os arquivos de fala off-line de {{language}} não estão instalados neste celular. Baixe-os e tente a digitação por voz novamente.",
     "downloadOfflineModel": "Baixar",
     "offlineModelDownloadScheduled": "Os arquivos de fala off-line serão baixados em segundo plano. Tente a digitação por voz novamente mais tarde.",
-    "listeningStopped": "A captação de voz foi interrompida."
+    "listeningStopped": "A captação de voz foi interrompida.",
+    "transcribing": "Transcrevendo...",
+    "gatewayUnreachable": "Não foi possível conectar ao Kilo Gateway. Verifique sua conexão e tente novamente.",
+    "gatewayTimeout": "A transcrição demorou demais. Tente novamente.",
+    "gatewayModelUnavailable": "Este modelo de transcrição não está disponível. Escolha outro em Preferências.",
+    "gatewayModelUnavailableNotice": "Este modelo não é mais oferecido. Toque em $t(transcriptionModel.title) para escolher outro.",
+    "gatewaySignInRequired": "Entre para usar a transcrição com Kilo Gateway.",
+    "gatewayNoModel": "Escolha primeiro um modelo de transcrição em Preferências."
   },
   "share": {
     "title": "Compartilhar com o Kilo",
@@ -2972,5 +2985,12 @@
     "needsInput": "Aguardando resposta",
     "channelName": "Agentes ativos",
     "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada."
+  },
+  "transcriptionModel": {
+    "title": "Modelo de transcrição",
+    "noneChosen": "Nenhum selecionado",
+    "emptyTitle": "Nenhum modelo de transcrição",
+    "emptyDescription": "O Kilo Gateway não oferece modelos de transcrição no momento.",
+    "loadFailed": "Não foi possível carregar os modelos de transcrição."
   }
 }

@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "SSO menter"
   },
   "preferences": {
+    "general": "Cyffredinol",
+    "voiceInput": "Mewnbwn llais",
     "autoExpandThinking": "Ehangu meddwl yn awtomatig",
     "autoExpandThinkingSubtitle": "Dangos meddwl yr asiant yn llawn pan fydd wedi gorffen meddwl.",
     "keepScreenOn": "Cadw'r sgrin ymlaen ar dudalen y sesiwn",
@@ -237,6 +239,7 @@
     "appearanceLight": "Golau",
     "appearanceDark": "Tywyll",
     "account": "Cyfrif",
+    "accountSubtitle": "Iaith, gwesteiwyr dibynadwy a sesiynau dyfeisiau",
     "prReviewAttribution": "Enwi'r ap mewn adolygiadau PR",
     "prReviewAttributionSubtitle": "Ychwanegu troedyn 'Adolygwyd drwy Kilo' pan fyddwch yn cyflwyno adolygiad.",
     "returnSendsMessage": "Mae'r fysell Dychwelyd yn anfon neges",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Trawsgrifio drwy Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Trawsgrifiwch fewnbwn llais â model Kilo Gateway yn lle adnabod lleferydd y ddyfais. Anfonir eich recordiad i Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Cais tynnu ddim ar gael",
@@ -2652,7 +2658,14 @@
     "languageNotInstalledMessage": "Nid yw ffeiliau lleferydd all-lein {{language}} wedi'u gosod ar y ffôn hon. Llwythwch nhw i lawr, yna ceisiwch fewnbwn llais eto.",
     "downloadOfflineModel": "Llwytho i lawr",
     "offlineModelDownloadScheduled": "Bydd y ffeiliau lleferydd all-lein yn cael eu llwytho i lawr yn y cefndir. Ceisiwch fewnbwn llais eto yn nes ymlaen.",
-    "listeningStopped": "Daeth y gwrando i ben."
+    "listeningStopped": "Daeth y gwrando i ben.",
+    "transcribing": "Yn trawsgrifio...",
+    "gatewayUnreachable": "Doedd dim modd cyrraedd Kilo Gateway. Gwiriwch eich cysylltiad a cheisiwch eto.",
+    "gatewayTimeout": "Cymrodd y trawsgrifio rhy lawer o amser. Ceisiwch eto.",
+    "gatewayModelUnavailable": "Nid yw'r model trawsgrifio hwn ar gael. Dewiswch un arall yn y Dewisiadau.",
+    "gatewayModelUnavailableNotice": "Nid yw'r model hwn yn cael ei gynnig mwyach. Tapiwch $t(transcriptionModel.title) i ddewis un arall.",
+    "gatewaySignInRequired": "Mewngofnodwch i ddefnyddio trawsgrifio drwy Kilo Gateway.",
+    "gatewayNoModel": "Dewiswch fodel trawsgrifio yn y Dewisiadau yn gyntaf."
   },
   "share": {
     "title": "Rhannu â Kilo",
@@ -3038,5 +3051,12 @@
     "needsInput": "Angen mewnbwn",
     "channelName": "Asiantau gweithredol",
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo."
+  },
+  "transcriptionModel": {
+    "title": "Model trawsgrifio",
+    "noneChosen": "Dim wedi'i ddewis",
+    "emptyTitle": "Dim modelau trawsgrifio",
+    "emptyDescription": "Does dim modelau trawsgrifio ar gael gan Kilo Gateway ar hyn o bryd.",
+    "loadFailed": "Doedd dim modd llwytho'r modelau trawsgrifio."
   }
 }

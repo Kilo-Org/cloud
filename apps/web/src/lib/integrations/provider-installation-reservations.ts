@@ -168,7 +168,7 @@ export async function recordSlackInstallationAlias(input: {
       )
     )
     .limit(1);
-  if (!candidate) return;
+  if (!candidate || eventTime * 1000 < new Date(candidate.updated_at).getTime()) return;
   const owner: Owner | null = candidate.owned_by_organization_id
     ? { type: 'org', id: candidate.owned_by_organization_id }
     : candidate.owned_by_user_id
@@ -213,14 +213,6 @@ export async function recordSlackInstallationAlias(input: {
           event_time: eventTime,
           updated_at: new Date().toISOString(),
         },
-        setWhere: or(
-          lt(provider_installation_aliases.event_time, eventTime),
-          and(
-            eq(provider_installation_aliases.event_time, eventTime),
-            eq(provider_installation_aliases.reservation_id, reservation.id),
-            eq(provider_installation_aliases.generation, generation)
-          )
-        ),
       });
   });
 }

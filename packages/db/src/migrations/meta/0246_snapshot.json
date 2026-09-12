@@ -1,6 +1,6 @@
 {
-  "id": "d0d60d74-cb68-4e74-aace-5e4aa23fe479",
-  "prevId": "e00b62f1-939f-4d71-bf8f-4a5e9e304016",
+  "id": "6531dd80-274e-49d5-a2fb-801479cd0357",
+  "prevId": "5d3e4385-dacd-483b-80d7-704c1fdc2e55",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -30890,6 +30890,13 @@
           "notNull": true,
           "default": "'pending'"
         },
+        "cleanup_requires_revoke": {
+          "name": "cleanup_requires_revoke",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "expires_at": {
           "name": "expires_at",
           "type": "timestamp with time zone",
@@ -31062,7 +31069,7 @@
         },
         "provider_installation_reservations_status_check": {
           "name": "provider_installation_reservations_status_check",
-          "value": "\"provider_installation_reservations\".\"status\" IN ('pending', 'active')"
+          "value": "\"provider_installation_reservations\".\"status\" IN ('pending', 'active', 'deleting')"
         },
         "provider_installation_reservations_generation_check": {
           "name": "provider_installation_reservations_generation_check",

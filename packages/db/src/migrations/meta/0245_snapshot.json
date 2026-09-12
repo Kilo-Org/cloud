@@ -1,6 +1,6 @@
 {
-  "id": "d0d60d74-cb68-4e74-aace-5e4aa23fe479",
-  "prevId": "e00b62f1-939f-4d71-bf8f-4a5e9e304016",
+  "id": "5d3e4385-dacd-483b-80d7-704c1fdc2e55",
+  "prevId": "d0d60d74-cb68-4e74-aace-5e4aa23fe479",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -31062,7 +31062,7 @@
         },
         "provider_installation_reservations_status_check": {
           "name": "provider_installation_reservations_status_check",
-          "value": "\"provider_installation_reservations\".\"status\" IN ('pending', 'active')"
+          "value": "\"provider_installation_reservations\".\"status\" IN ('pending', 'active', 'deleting')"
         },
         "provider_installation_reservations_generation_check": {
           "name": "provider_installation_reservations_generation_check",

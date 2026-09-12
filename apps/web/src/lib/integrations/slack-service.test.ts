@@ -122,7 +122,6 @@ describe('slack-service uninstallApp', () => {
       uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
     ).resolves.toEqual({
       success: true,
-      cleanupPending: false,
     });
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T123');
@@ -141,7 +140,6 @@ describe('slack-service uninstallApp', () => {
 
     await expect(uninstallApp(owner, { deleteChatSdkInstallation })).resolves.toEqual({
       success: true,
-      cleanupPending: true,
     });
 
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
@@ -156,7 +154,7 @@ describe('slack-service uninstallApp', () => {
 
     await expect(
       uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
-    ).resolves.toEqual({ success: true, cleanupPending: true });
+    ).resolves.toEqual({ success: true });
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T123');
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
@@ -187,7 +185,7 @@ describe('slack-service uninstallApp', () => {
 
     await expect(
       uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
-    ).resolves.toEqual({ success: true, cleanupPending: false });
+    ).resolves.toEqual({ success: true });
 
     expect(mockAuthRevoke).not.toHaveBeenCalled();
     expect(deleteChatSdkInstallation).not.toHaveBeenCalled();

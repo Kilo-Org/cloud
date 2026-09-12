@@ -18,6 +18,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { beginProviderOAuthAttempt } from './provider-oauth-attempts';
 import {
   claimSlackProviderInstallation,
+  claimLegacySlackProviderInstallation,
   expireStaleSlackReservation,
 } from './provider-installation-reservations';
 import {
@@ -401,6 +402,81 @@ describe('Slack provider installation activation', () => {
     await expect(
       recoverSlackInstallation('T_TIMEOUT', async () => undefined, {
         sdkTimeoutMs: 100,
+        decryptPendingCredential: pendingCodec.decryptPendingCredential as never,
+        writeCredential: writeCredential as never,
+      })
+    ).resolves.toBe(true);
+  });
+
+  it('keeps the incumbent active when legacy pending encryption fails', async () => {
+    const actor = await insertTestUser();
+    const owner = { type: 'user' as const, id: actor.id };
+    await beginProviderOAuthAttempt({
+      actorUserId: actor.id,
+      owner,
+      provider: 'slack',
+      state: 'seed',
+    });
+    const seed = await claimSlackProviderInstallation({
+      actorUserId: actor.id,
+      owner,
+      state: 'seed',
+      teamId: 'T_LEGACY',
+    });
+    if (!seed) throw new Error('Expected seed claim');
+    const active = await activateReservedSlackInstallation({
+      owner,
+      teamId: 'T_LEGACY',
+      installation: { botToken: 'xoxb-old', teamName: 'Workspace' },
+      grantedScopes: null,
+      claim: seed,
+      ...pendingCodec,
+      writeCredential: writeCredential as never,
+      setChatSdkInstallation: async () => undefined,
+    });
+    const legacy = await claimLegacySlackProviderInstallation(owner, 'T_LEGACY');
+    if (!legacy) throw new Error('Expected legacy claim');
+
+    await expect(
+      activateReservedSlackInstallation({
+        owner,
+        teamId: 'T_LEGACY',
+        installation: { botToken: 'xoxb-new', teamName: 'Workspace' },
+        grantedScopes: null,
+        claim: legacy,
+        encryptPendingCredential: () => {
+          throw new Error('encryption unavailable');
+        },
+        setChatSdkInstallation: async () => undefined,
+      })
+    ).rejects.toThrow('encryption unavailable');
+    await expect(
+      db.select().from(platform_integrations).where(eq(platform_integrations.id, active.id))
+    ).resolves.toEqual([expect.objectContaining({ integration_status: 'active' })]);
+  });
+
+  it('recovers a legacy first install after SDK persistence fails', async () => {
+    const actor = await insertTestUser();
+    const owner = { type: 'user' as const, id: actor.id };
+    const claim = await claimLegacySlackProviderInstallation(owner, 'T_LEGACY_FIRST');
+    if (!claim) throw new Error('Expected legacy claim');
+    await expect(
+      activateReservedSlackInstallation({
+        owner,
+        teamId: 'T_LEGACY_FIRST',
+        installation: { botToken: 'xoxb-legacy', teamName: 'Workspace' },
+        grantedScopes: null,
+        claim,
+        ...pendingCodec,
+        writeCredential: writeCredential as never,
+        setChatSdkInstallation: async () => {
+          throw new Error('state unavailable');
+        },
+      })
+    ).rejects.toThrow('state unavailable');
+
+    await expect(
+      recoverSlackInstallation('T_LEGACY_FIRST', async () => undefined, {
         decryptPendingCredential: pendingCodec.decryptPendingCredential as never,
         writeCredential: writeCredential as never,
       })

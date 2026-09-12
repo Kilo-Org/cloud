@@ -49,6 +49,7 @@ jest.mock('@/lib/integrations/provider-installation-reservations', () => ({
   getRecoverableSlackReservation: jest.fn(async () => null),
   lockSlackReservation: jest.fn(),
   activateSlackReservation: jest.fn(),
+  adoptLegacySlackReservation: jest.fn(async () => undefined),
 }));
 
 const mockCaptureException = jest.fn();

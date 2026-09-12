@@ -55,6 +55,30 @@ describe('platform helpers', () => {
     ).resolves.toBeNull();
   });
 
+  it('routes a shared Slack owner with an exact active reservation', async () => {
+    const integration = {
+      id: 'pi_shared',
+      platform: PLATFORM.SLACK,
+      integration_status: 'active',
+      platform_installation_id: 'T_SHARED',
+      owned_by_user_id: 'user-1',
+    };
+    mockOwnerHasSharedGitHubInstallation.mockResolvedValue(true);
+    mockLimit.mockResolvedValueOnce([integration]).mockResolvedValueOnce([{ id: 'reservation-1' }]);
+
+    await expect(
+      getPlatformIntegration({ platform: 'slack', teamId: 'T_SHARED', userId: 'U1' })
+    ).resolves.toBe(integration);
+  });
+
+  it('rejects ambiguous workspace-scoped bot user IDs', async () => {
+    mockLimit.mockResolvedValue([
+      { id: 'one', platform: 'slack', integration_status: 'active' },
+      { id: 'two', platform: 'slack', integration_status: 'active' },
+    ]);
+    await expect(getPlatformIntegrationByBotUserId('slack', 'U_BOT')).resolves.toBeNull();
+  });
+
   it('returns the platform integration for a given identity', async () => {
     const integration = {
       id: 'pi_slack',

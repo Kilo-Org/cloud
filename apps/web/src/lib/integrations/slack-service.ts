@@ -3,6 +3,7 @@ import { db } from '@/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import {
   platform_integrations,
+  organizations,
   provider_installation_reservations,
   provider_installation_pending_credentials,
   provider_oauth_attempts,
@@ -11,6 +12,7 @@ import {
 import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { SLACK_CLIENT_ID } from '@/lib/config.server';
@@ -187,6 +189,7 @@ export async function getSlackCleanupState(integration: PlatformIntegration): Pr
     .from(provider_installation_reservations)
     .where(
       and(
+        eq(provider_installation_reservations.provider, 'slack'),
         eq(provider_installation_reservations.provider_installation_id, teamId),
         eq(provider_installation_reservations.platform_integration_id, integration.id),
         eq(provider_installation_reservations.status, 'deleting')
@@ -230,7 +233,23 @@ export async function getActiveSlackInstallationForRuntime(
   if (!row) {
     const legacy = await getInstallationByTeamId(teamId);
     const owner = legacy ? getOwnerFromInstallation(legacy) : null;
-    if (!legacy || !owner || (await ownerHasSharedGitHubInstallation(owner))) return null;
+    if (
+      !legacy ||
+      !owner ||
+      legacy.integration_status !== INTEGRATION_STATUS.ACTIVE ||
+      !isPlatformIntegrationHealthy(legacy) ||
+      (await ownerHasSharedGitHubInstallation(owner))
+    ) {
+      return null;
+    }
+    if (owner.type === 'org') {
+      const [organization] = await db
+        .select({ deletedAt: organizations.deleted_at })
+        .from(organizations)
+        .where(eq(organizations.id, owner.id))
+        .limit(1);
+      if (!organization || organization.deletedAt) return null;
+    }
     const botToken = await getSlackAccessToken(legacy);
     if (!botToken) return null;
     return { botToken };

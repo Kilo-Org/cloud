@@ -15,6 +15,27 @@
       "when": 1788976576814,
       "tag": "0001_cynical_karen_page",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789165450224,
+      "tag": "0002_square_the_spike",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789168932925,
+      "tag": "0003_wandering_colleen_wing",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789210431926,
+      "tag": "0004_refresh_token_history",
+      "breakpoints": true
     }
   ]
 }

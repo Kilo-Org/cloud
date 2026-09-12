@@ -1221,6 +1221,84 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.alarmAt()).toBe(Date.now());
   });
 
+  it('sends one terminal callback for a drained batch naming the last admitted message', async () => {
+    const send = vi.fn(async (_job: CallbackJob) => ({}) as QueueSendResponse);
+    const fixture = sessionFixture(
+      { callback: { target: { url: 'https://example.com/callback' } } },
+      undefined,
+      { send }
+    );
+
+    await fixture.admit('a');
+    await fixture.flush();
+    await fixture.admit('b');
+    await fixture.admit('c');
+    await fixture.flush();
+    expect(fixture.record('a')?.state).toBe('accepted');
+    expect(fixture.record('b')?.state).toBe('queued');
+    expect(fixture.record('c')?.state).toBe('queued');
+
+    await fixture.outcome('a', 'completed');
+    await fixture.flush();
+    expect(send).toHaveBeenCalledTimes(0);
+
+    await fixture.outcome('b', 'completed');
+    await fixture.flush();
+    expect(send).toHaveBeenCalledTimes(0);
+
+    await fixture.outcome('c', 'completed');
+    await fixture.flush();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          messageId: 'c',
+          executionId: 'c',
+          idempotencyKey: 'c',
+          status: 'completed',
+        }),
+      })
+    );
+  });
+
+  it('coalesces a two-write interrupt drain to the last admitted follow-up', async () => {
+    const send = vi.fn(async (_job: CallbackJob) => ({}) as QueueSendResponse);
+    const fixture = sessionFixture(
+      { callback: { target: { url: 'https://example.com/callback' } } },
+      undefined,
+      { send }
+    );
+    const abort = deferred<ResponseFrame>();
+    delegateRequest(fixture, 'session.abort', () => abort.promise);
+
+    await fixture.admit('a');
+    await fixture.flush();
+    await fixture.admit('b');
+    await fixture.admit('c');
+    await fixture.flush();
+    expect(fixture.record('a')?.state).toBe('accepted');
+    expect(fixture.record('b')?.state).toBe('queued');
+    expect(fixture.record('c')?.state).toBe('queued');
+
+    const interrupt = fixture.session.interruptExecution();
+    await fixture.flush();
+    expect(fixture.record('a')?.state).toBe('accepted');
+    expect(fixture.record('b')?.state).toBe('cancelled');
+    expect(fixture.record('c')?.state).toBe('cancelled');
+    expect(send).toHaveBeenCalledTimes(0);
+
+    abort.resolve(controlResponse({ status: 'aborted' }));
+    await interrupt;
+    await fixture.flush();
+    expect(fixture.record('a')?.state).toBe('cancelled');
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ messageId: 'c', status: 'interrupted' }),
+      })
+    );
+  });
+
   it('counts callback-bearing outstanding messages against admission capacity', async () => {
     const fixture = sessionFixture({
       callback: { target: { url: 'https://example.com/callback' } },
@@ -5457,6 +5535,41 @@ describe('SandboxSession orchestration', () => {
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
         payload: expect.objectContaining({ messageId: 'a', status: 'interrupted' }),
+      })
+    );
+  });
+
+  it('snapshots one callback for the last admitted row when deleting multiple active messages', async () => {
+    const send = vi.fn(async (_job: CallbackJob) => ({}) as QueueSendResponse);
+    const fixture = sessionFixture(
+      { callback: { target: { url: 'https://example.com/callback' } } },
+      undefined,
+      { send }
+    );
+    const abort = deferred<ResponseFrame>();
+    delegateRequest(fixture, 'session.abort', () => abort.promise);
+
+    await fixture.admit('a');
+    await fixture.flush();
+    await fixture.admit('b');
+    await fixture.admit('c');
+    await fixture.flush();
+    expect(fixture.record('a')?.state).toBe('accepted');
+    expect(fixture.record('b')?.state).toBe('queued');
+    expect(fixture.record('c')?.state).toBe('queued');
+
+    const deletion = fixture.session.deleteSession();
+    expect(fixture.record('a')?.state).toBe('cancelled');
+    expect(fixture.record('b')?.state).toBe('cancelled');
+    expect(fixture.record('c')?.state).toBe('cancelled');
+
+    abort.resolve(controlResponse({ status: 'aborted' }));
+    await deletion;
+    await fixture.flush();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ messageId: 'c', status: 'interrupted' }),
       })
     );
   });

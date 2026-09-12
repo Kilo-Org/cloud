@@ -2409,6 +2409,7 @@ export class SandboxSession extends DurableObject<Env> {
   private snapshotDeletedMessages(metadata: SessionMetadata | null): void {
     const messages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
     const now = Date.now();
+    const newlyTerminalMessageIds = new Set<string>();
     const cancelled = messages.map(message => {
       if (message.state !== 'queued' && message.state !== 'accepted') return message;
       const acceptanceObserved = message.state === 'accepted';
@@ -2418,11 +2419,12 @@ export class SandboxSession extends DurableObject<Env> {
         terminalAt: now,
         terminalSource: 'coordinator' as const,
       };
-      this.messageCallbacks.persistTerminalCallback(next, metadata);
+      newlyTerminalMessageIds.add(next.messageId);
       this.recordMessageReport(next, acceptanceObserved);
       return next;
     });
     this.ctx.storage.kv.put(MESSAGES_KEY, cancelled);
+    this.messageCallbacks.persistDrainedBatchCallback(cancelled, newlyTerminalMessageIds, metadata);
   }
 
   private async interruptDeletedMessage(
@@ -5341,6 +5343,7 @@ export class SandboxSession extends DurableObject<Env> {
     let reportPersisted = false;
     let persisted = false;
     let disposition: ControlEventDisposition = 'epoch_changed';
+    const newlyTerminalMessageIds = new Set<string>();
     const write = () => {
       if (!this.terminalLifecycle.isCurrent(currentEpoch)) return;
       if (beforePersist) {
@@ -5387,7 +5390,7 @@ export class SandboxSession extends DurableObject<Env> {
         }
         const event = this.persistMessageLifecycleEvent(terminal);
         if (event) events.push(event);
-        if (this.messageCallbacks.persistTerminalCallback(terminal)) callbackPersisted = true;
+        newlyTerminalMessageIds.add(terminal.messageId);
         this.recordMessageReport(terminal, previous?.state === 'accepted');
         reportPersisted = true;
         committed.push({
@@ -5421,6 +5424,10 @@ export class SandboxSession extends DurableObject<Env> {
         return terminal;
       });
       this.ctx.storage.kv.put(MESSAGES_KEY, next);
+      callbackPersisted = this.messageCallbacks.persistDrainedBatchCallback(
+        next,
+        newlyTerminalMessageIds
+      );
       onPersist?.();
       persisted = true;
     };

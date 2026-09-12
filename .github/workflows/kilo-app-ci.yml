@@ -183,6 +183,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build harness SDK
+        run: pnpm --filter @kilocode/harness-sdk run build
+
       - name: Check unused exports
         run: pnpm --filter kilo-app run check:unused
 

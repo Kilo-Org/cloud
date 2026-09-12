@@ -3,6 +3,7 @@ import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo } from 'react';
 import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
@@ -86,10 +87,16 @@ function ScopedChatListScreen() {
       return;
     }
     void (async () => {
-      const sessionId = await newChat(place, model);
-      router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);
+      try {
+        const sessionId = await newChat(place, model);
+        router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);
+      } catch (error) {
+        /* Starting the chat or opening its session failed. Saying nothing would
+           read as a button that does not work. */
+        toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'));
+      }
     })();
-  }, [models, place, router]);
+  }, [models, place, router, t]);
 
   const open = useCallback(
     (sessionId: string) => {

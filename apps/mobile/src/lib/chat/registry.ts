@@ -164,6 +164,12 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
   const work = (async () => {
     try {
       await reopen(place, sessionId);
+    } catch (error) {
+      /* Opening the store, the session, or its history can fail. The chat is
+         not left saying it is opening with the rejection swallowing it: it
+         settles idle with the reason, so entering it again is possible rather
+         than a screen that spins forever. */
+      change(sessionId, { status: 'idle', failed: openReason(error) });
     } finally {
       opening.delete(sessionId);
     }
@@ -235,6 +241,10 @@ export async function say(sessionId: string, text: string, model: string): Promi
 /** A short reason for the log, from something thrown rather than from a cause. */
 const reason = (error: unknown): string =>
   error instanceof Error ? error.message : 'the question could not be sent';
+
+/** The same, for a chat that could not be reopened. */
+const openReason = (error: unknown): string =>
+  error instanceof Error ? error.message : 'the chat could not be opened';
 
 /** Asks again what was asked and never answered. */
 export async function retryChat(sessionId: string): Promise<void> {
@@ -372,8 +382,10 @@ async function ontoModel(sessionId: string, model: string): Promise<string> {
   /* The chat it moved off is left pointing at the one it became, rather than
      forgotten. Whoever asked for the move is not always the screen — a question
      queued on another model moves the chat from inside the registry — so the
-     state is what says where the conversation went. */
-  change(sessionId, { sessionId: handle.id });
+     state is what says where the conversation went. It is only the pointer:
+     the turns and everything else belong to the session that carried on, and
+     keeping a second copy here would leak one conversation per model switch. */
+  change(sessionId, { ...NOTHING, sessionId: handle.id, model: held.model });
   await runtime.runPromise(Scope.close(chat.scope, Exit.void));
   forgetSession(database, sessionId);
   return handle.id;
@@ -423,6 +435,9 @@ async function halt(sessionId: string, chat: Chat): Promise<boolean> {
 export async function releaseChat(sessionId: string): Promise<void> {
   const chat = chats.get(sessionId);
   if (chat === undefined) {
+    /* Deleting a chat that was never opened still has a state subscribed by the
+       row that was tapped, so it is forgotten here too. */
+    forgetState(sessionId);
     return;
   }
   await halt(sessionId, chat);

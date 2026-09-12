@@ -19,6 +19,16 @@ const asked: Asked[] = [];
 let openedWith: { readonly tools?: readonly string[] } | undefined = undefined;
 /** Ends the answer that is arriving, so a test decides when a turn finishes. */
 let finish: (() => void) | undefined = undefined;
+/** A session id whose reopen fails, so the failed-open path can be exercised. */
+let failOpenFor: string | undefined = undefined;
+
+/** One stored turn, so a state that still holds turns can be told from an empty one. */
+const TURN = {
+  id: 'trn_1',
+  sessionId: 's1',
+  role: 'user',
+  parts: [{ id: 'prt_1', kind: 'text', body: 'hi' }],
+} as const;
 
 const handleFor = (id: string) => ({
   id,
@@ -33,7 +43,7 @@ const handleFor = (id: string) => ({
         return Effect.void;
       })
     ),
-  history: Effect.succeed([]),
+  history: Effect.succeed([TURN]),
 });
 
 vi.mock('@kilocode/harness-sdk', () => ({
@@ -41,7 +51,8 @@ vi.mock('@kilocode/harness-sdk', () => ({
     openedWith = options;
     return Effect.succeed(handleFor('s1'));
   },
-  continueSession: (id: string) => Effect.succeed(handleFor(id)),
+  continueSession: (id: string) =>
+    failOpenFor === id ? Effect.fail(new Error('no such session')) : Effect.succeed(handleFor(id)),
   cloneSession: () => Effect.succeed(handleFor('s2')),
 }));
 vi.mock('./layers', () => ({ chatLayers: () => Layer.empty }));
@@ -75,7 +86,8 @@ vi.mock('./store', () => ({
 }));
 
 const { enterChat, releaseChat, say, startChat, stopChat } = await import('./registry');
-const { snapshotOf } = await import('./state');
+const { change, NOTHING, snapshotOf } = await import('./state');
+const { chatPlaceOf } = await import('./use-chat');
 
 const place = { chatScope: 'me:personal', org: { kind: 'personal' } } as const;
 
@@ -94,6 +106,7 @@ let opened = '';
 beforeEach(async () => {
   asked.length = 0;
   finish = undefined;
+  failOpenFor = undefined;
   opened = await startChat(place, 'kilo/one');
   await settled();
 });
@@ -171,6 +184,63 @@ describe('a chat that moved', () => {
        identifier back to the screen. The chat it left says where it went, so a
        screen watching the old one follows without being told. */
     expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
+  it('moves the turns with the chat rather than keeping a copy on the one it left', async () => {
+    await say(opened, 'first', 'kilo/one');
+    await settled();
+    await say(opened, 'second', 'kilo/two');
+    await settled();
+
+    finish?.();
+    await settled();
+
+    /* The pointer is all the old chat keeps. A second copy of its turns would
+       leak one conversation per model switch, and the copy would then go stale
+       against the session that actually carried them. */
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+    expect(snapshotOf(opened).turns).toBe(NOTHING.turns);
+    expect(snapshotOf('s2').turns).toEqual([TURN]);
+  });
+});
+
+describe('a chat that could not be opened', () => {
+  it('settles idle with the reason instead of staying on opening', async () => {
+    failOpenFor = 'missing';
+
+    await enterChat(place, 'missing');
+
+    expect(snapshotOf('missing').status).toBe('idle');
+    expect(snapshotOf('missing').failed).toContain('no such session');
+  });
+});
+
+describe('deleting a chat that was never opened', () => {
+  it('forgets the state the row left behind', async () => {
+    change('never-opened', { status: 'working' });
+    expect(snapshotOf('never-opened').status).toBe('working');
+
+    await releaseChat('never-opened');
+
+    /* Forgotten: the next read starts a fresh state rather than the stale one. */
+    expect(snapshotOf('never-opened').status).toBe('opening');
+  });
+});
+
+describe('where a chat belongs', () => {
+  it('answers the same object for the same account and organization', () => {
+    /* A screen reads this on every render; a fresh object would re-run the
+       open effect each time and reopen a chat a model switch just moved. */
+    expect(chatPlaceOf('user-1', null)).toBe(chatPlaceOf('user-1', null));
+    expect(chatPlaceOf('user-1', 'org-1')).toBe(chatPlaceOf('user-1', 'org-1'));
+  });
+
+  it('keeps scopes apart and answers nothing without a user', () => {
+    expect(chatPlaceOf('user-1', null)).not.toBe(chatPlaceOf('user-2', null));
+    expect(chatPlaceOf('user-1', null)?.chatScope).toBe('user-1:personal');
+    expect(chatPlaceOf('user-1', 'org-1')?.chatScope).toBe('user-1:org-1');
+    expect(chatPlaceOf(null, null)).toBeNull();
+    expect(chatPlaceOf('', 'org-1')).toBeNull();
   });
 });
 

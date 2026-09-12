@@ -110,6 +110,11 @@ export function watch(sessionId: string, watcher: () => void): () => void {
   watchers.set(sessionId, held);
   return () => {
     held.delete(watcher);
+    /* A chat that nothing watches any more holds nothing here. Without this the
+       map keeps one empty set for every session a screen ever visited. */
+    if (held.size === 0) {
+      watchers.delete(sessionId);
+    }
   };
 }
 

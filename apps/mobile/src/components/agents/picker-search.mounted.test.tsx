@@ -54,8 +54,11 @@ const model: SessionModelOption = {
   showGatewayMetadata: false,
 };
 const repo: RepoOption = { platform: 'github', fullName: 'org/repo', isPrivate: false };
+const organization = vi.hoisted(() => ({ organizationId: null as string | null }));
+vi.mock('@/lib/organization-context', () => ({ useOrganization: () => organization }));
 
 beforeEach(() => {
+  organization.organizationId = null;
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   modelPickerSlot.set(UNFENCED_ROUTE_KEY, {
     options: [model],
@@ -75,6 +78,67 @@ beforeEach(() => {
     sections: [{ key: 'github', titleKey: 'common.github', repos: [repo] }],
     currentValue: '',
     onSelect: vi.fn<() => void>(),
+  });
+});
+
+describe('repository picker Bitbucket scope note', () => {
+  const note = 'Bitbucket is available for organizations only.';
+
+  it('explains the Personal limitation without a retry action', async () => {
+    const renderer = await mount(RepoPickerScreen);
+    expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(true);
+    expect(hosts(renderer, 'Pressable')).toHaveLength(1);
+  });
+
+  it.each(['recents', 'no-bitbucket-rows'] as const)(
+    'does not claim Bitbucket is unavailable to an organization with %s',
+    async kind => {
+      organization.organizationId = 'org-1';
+      const onSelect = vi.fn<() => void>();
+      if (kind === 'recents') {
+        const bitbucket: RepoOption = {
+          platform: 'bitbucket',
+          fullName: 'workspace/repo',
+          isPrivate: true,
+        };
+        repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
+          repositories: [bitbucket],
+          sections: [
+            { key: 'recents', titleKey: 'agentChat.newSession.recentlyUsed', repos: [bitbucket] },
+          ],
+          currentValue: '',
+          onSelect,
+        });
+      }
+      const renderer = await mount(RepoPickerScreen);
+      expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(false);
+      expect(hosts(renderer, 'Pressable')).toHaveLength(1);
+      if (kind === 'recents') {
+        const row = renderer.root.findByProps({ accessibilityLabel: 'Bitbucket workspace/repo' });
+        act(() => {
+          (row.props.onPress as () => void)();
+        });
+        expect(onSelect).toHaveBeenCalledWith('bitbucket:workspace/repo');
+      }
+    }
+  );
+
+  it('hides the Personal note while searching, even when repositories match', async () => {
+    const renderer = await mount(RepoPickerScreen);
+    const input = hosts(renderer, 'TextInput')[0];
+    if (!input) {
+      throw new Error('Picker search input did not mount');
+    }
+    const changeSearch = input.props.onChangeText as (text: string) => void;
+    act(() => {
+      changeSearch('org/repo');
+    });
+    expect(hosts(renderer, 'Pressable')).toHaveLength(1);
+    expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(false);
+    act(() => {
+      changeSearch('');
+    });
+    expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(true);
   });
 });
 

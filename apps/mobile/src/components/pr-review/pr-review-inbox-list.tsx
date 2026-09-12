@@ -55,17 +55,20 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
   const handleRetryMore = () => {
     inbox.retryFailedPages();
   };
+  const reconnectOnly = inbox.githubNeedsReconnect && !inbox.isPending && inbox.items.length === 0;
   const view = selectPrInboxView({
     isLoading: inbox.isPending,
     itemCount: inbox.items.length,
-    firstPageErrorState: inbox.firstPageErrorState,
+    firstPageErrorState:
+      inbox.firstPageErrorState ?? (reconnectOnly ? { kind: 'reconnect' } : null),
     laterPageError: inbox.laterPageError,
   });
   // A provider outage while the merged list happens to be empty is still a
   // retryable failure, not "no review requests": keep the footer retry so the
   // failing provider has a CTA the empty state itself must not carry.
   const showLoadMoreRetry =
-    view.showLoadMoreRetry || (view.kind === 'empty' && inbox.laterPageError);
+    view.showLoadMoreRetry ||
+    ((view.kind === 'empty' || view.kind === 'reconnect') && inbox.laterPageError);
 
   return (
     <FlashList
@@ -83,6 +86,9 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
       }
       ListFooterComponent={
         <View className="gap-6 px-6 pb-12 pt-4">
+          {inbox.githubNeedsReconnect && view.kind !== 'reconnect' ? (
+            <PrReviewReconnectNotice />
+          ) : null}
           {showLoadMoreRetry ? <LoadMoreRetry onRetry={handleRetryMore} /> : null}
           <RecentEyebrow />
           {recents}

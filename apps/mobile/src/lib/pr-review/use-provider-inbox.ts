@@ -7,15 +7,14 @@
 // cursor its own provider handed back, and a source that has run out simply
 // stops contributing rows.
 //
-// A provider the user has not connected is never queried: the GitLab and
-// Bitbucket sources stay disabled until their connection status says so, so
-// a GitHub-only user sees no provider errors at all.
+// A provider the user has not connected is never queried: each source stays
+// disabled until its connection status says so.
 //
 // `mergeProviderInboxSources` is pure so the merge, the sort and the
 // partial-failure rules are testable without mounting the hook.
 
 import { type ProviderPrInboxItem } from '@kilocode/app-shared/provider-review';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
@@ -181,11 +180,13 @@ export function inboxRetryAction(
 type RetryableQuery = {
   refetch: () => void;
   fetchNextPage: () => void;
+  isRefetchError: boolean;
 };
 
 function runInboxRetry(source: ProviderInboxSource, query: RetryableQuery): void {
   const action = inboxRetryAction(source);
-  if (action === 'refetch') {
+  // A failed refresh has cached pages, but must reload them rather than advance a cursor.
+  if (action === 'refetch' || (action === 'fetch-next-page' && query.isRefetchError)) {
     query.refetch();
   } else if (action === 'fetch-next-page') {
     query.fetchNextPage();
@@ -227,9 +228,8 @@ export function buildBitbucketInboxQueryOptions(
 }
 
 /**
- * The merged inbox. GitHub keeps `usePrInbox` untouched; the two provider
- * sources are gated on their connection status so an unconnected provider
- * is never called.
+ * The merged inbox. Each source is gated on its connection status so an
+ * unconnected provider is never called.
  */
 export function useProviderInbox(enabled: boolean) {
   const trpc = useTRPC();
@@ -237,8 +237,15 @@ export function useProviderInbox(enabled: boolean) {
   const scope = organizationId ?? PERSONAL_SCOPE;
   const gitlabStatus = useGitLabStatus(scope);
   const bitbucketReadiness = useBitbucketReadiness(scope);
+  // Like the GitHub detail gate, inbox reads require the user's authorization,
+  // not a personal or organization GitHub App installation.
+  const githubAuthorization = useQuery({
+    ...trpc.githubApps.getUserAuthorization.queryOptions(),
+    enabled,
+  });
 
-  const github = usePrInbox(enabled);
+  const githubEnabled = enabled && githubAuthorization.data?.connected === true;
+  const github = usePrInbox(githubEnabled);
   const gitlabEnabled = enabled && gitlabStatus.data?.connected === true;
   const bitbucketEnabled = enabled && bitbucketReadiness.data?.connected === true;
   const gitlab = useInfiniteQuery(
@@ -262,13 +269,16 @@ export function useProviderInbox(enabled: boolean) {
 
   const githubSource: ProviderInboxSource = {
     platform: 'github',
-    enabled,
-    rows: githubRows,
-    isPending: github.query.isPending,
-    hasLoadedPages: (github.query.data?.pages.length ?? 0) > 0,
-    error: github.query.error,
-    hasNextPage: github.query.hasNextPage,
-    isFetchingNextPage: github.query.isFetchingNextPage,
+    // Status loading/failure participates in the existing inbox states, but
+    // only a connected source can expose cached pages or issue inbox reads.
+    enabled:
+      enabled && (githubEnabled || githubAuthorization.isPending || githubAuthorization.isError),
+    rows: githubEnabled ? githubRows : [],
+    isPending: githubEnabled ? github.query.isPending : githubAuthorization.isPending,
+    hasLoadedPages: githubEnabled && (github.query.data?.pages.length ?? 0) > 0,
+    error: githubEnabled ? github.query.error : githubAuthorization.error,
+    hasNextPage: githubEnabled && github.query.hasNextPage,
+    isFetchingNextPage: githubEnabled && github.query.isFetchingNextPage,
   };
   const gitlabSource: ProviderInboxSource = {
     platform: 'gitlab',
@@ -294,7 +304,7 @@ export function useProviderInbox(enabled: boolean) {
 
   // Every source advances on ITS OWN cursor; nothing is shared or merged.
   const fetchNextPage = useCallback(() => {
-    if (github.query.hasNextPage && !github.query.isFetchingNextPage) {
+    if (githubEnabled && github.query.hasNextPage && !github.query.isFetchingNextPage) {
       void github.query.fetchNextPage();
     }
     if (gitlabEnabled && gitlab.hasNextPage && !gitlab.isFetchingNextPage) {
@@ -303,17 +313,30 @@ export function useProviderInbox(enabled: boolean) {
     if (bitbucketEnabled && bitbucket.hasNextPage && !bitbucket.isFetchingNextPage) {
       void bitbucket.fetchNextPage();
     }
-  }, [github.query, gitlab, bitbucket, gitlabEnabled, bitbucketEnabled]);
+  }, [github.query, gitlab, bitbucket, githubEnabled, gitlabEnabled, bitbucketEnabled]);
 
   const refetch = useCallback(() => {
-    void github.query.refetch();
+    if (githubEnabled) {
+      void github.query.refetch();
+    } else if (enabled) {
+      void githubAuthorization.refetch();
+    }
     if (gitlabEnabled) {
       void gitlab.refetch();
     }
     if (bitbucketEnabled) {
       void bitbucket.refetch();
     }
-  }, [github.query, gitlab, bitbucket, gitlabEnabled, bitbucketEnabled]);
+  }, [
+    github.query,
+    githubAuthorization,
+    gitlab,
+    bitbucket,
+    enabled,
+    githubEnabled,
+    gitlabEnabled,
+    bitbucketEnabled,
+  ]);
 
   // The "couldn't load more" retry: it must load the page that FAILED, not
   // re-run the whole inbox. Each failed provider gets exactly the call its
@@ -322,14 +345,24 @@ export function useProviderInbox(enabled: boolean) {
   // a memo keyed on the query results would fire the previous render's
   // decision whenever only an `enabled` flag moved.
   const retryFailedPages = () => {
-    runInboxRetry(githubSource, github.query);
+    if (!githubEnabled && enabled && githubAuthorization.isError) {
+      void githubAuthorization.refetch();
+    } else {
+      runInboxRetry(githubSource, github.query);
+    }
     runInboxRetry(gitlabSource, gitlab);
     runInboxRetry(bitbucketSource, bitbucket);
   };
 
   return {
     ...merged,
-    isFetching: github.query.isFetching || gitlab.isFetching || bitbucket.isFetching,
+    // Revoked authorization needs the connect flow, not an inbox-page retry.
+    githubNeedsReconnect: enabled && githubAuthorization.data?.revoked === true,
+    isFetching:
+      (enabled && githubAuthorization.isFetching) ||
+      (githubEnabled && github.query.isFetching) ||
+      (gitlabEnabled && gitlab.isFetching) ||
+      (bitbucketEnabled && bitbucket.isFetching),
     fetchNextPage,
     retryFailedPages,
     refetch,

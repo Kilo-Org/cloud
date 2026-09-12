@@ -55,12 +55,13 @@ type FakeRecorder = GatewayRecorder & {
   release: Mock<() => void>;
 };
 
-function makeRecorder(): FakeRecorder {
+function makeRecorder(uri: string | null = null): FakeRecorder {
   const recorder = {
-    uri: null as string | null,
+    uri,
     prepareToRecordAsync: vi.fn(async (): Promise<void> => undefined),
     record: vi.fn((): void => {
-      recorder.uri = 'file:///recordings/recording.m4a';
+      // A real recorder exposes its file URI only once it is recording.
+      recorder.uri ??= 'file:///recordings/recording.m4a';
     }),
     stop: vi.fn(async (): Promise<void> => undefined),
     release: vi.fn((): void => undefined),
@@ -107,6 +108,14 @@ function buildEngine(overrides: Partial<GatewayVoiceInputEngineDeps> = {}): {
     });
   }
   return { engine, events, recorder, upload, deleteRecording };
+}
+
+/** Drain the engine's queued microtasks without advancing the fake clock. */
+async function settle(): Promise<void> {
+  for (let i = 0; i < 6; i += 1) {
+    // eslint-disable-next-line no-await-in-loop -- each pass lets one chained continuation land
+    await vi.advanceTimersByTimeAsync(0);
+  }
 }
 
 async function startAndStop(
@@ -448,5 +457,189 @@ describe('recording file cleanup', () => {
     await flush();
 
     expect(deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+  });
+});
+
+describe('progressive segment rotation', () => {
+  it('emits a final result while listening when a segment elapses, then stop ends the session', async () => {
+    vi.useFakeTimers();
+    try {
+      const { engine, events } = buildEngine({ segmentDurationMs: 40 });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      expect(events.map(entry => entry.event)).toEqual(['start']);
+
+      await vi.advanceTimersByTimeAsync(40);
+      await settle();
+
+      // The segment transcribed before the user stopped; the status is still
+      // `listening`, so `transcribing` has not fired yet.
+      expect(events.map(entry => entry.event)).toEqual(['start', 'result']);
+      const result = events[1]?.payload as VoiceInputNativeEvent['result'];
+      expect(result.isFinal).toBe(true);
+      expect(result.results[0]?.transcript).toBe('hello world');
+
+      engine.stop();
+      await settle();
+
+      expect(events.map(entry => entry.event)).toEqual([
+        'start',
+        'result',
+        'transcribing',
+        'result',
+        'end',
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stop finalizes the in-flight segment and drains queued uploads in order', async () => {
+    vi.useFakeTimers();
+    try {
+      let sequence = 0;
+      const pending: { uri: string; resolve: (result: TranscribeRecordingResult) => void }[] = [];
+      const { engine, events } = buildEngine({
+        createRecorder: () => {
+          sequence += 1;
+          return makeRecorder(`file:///recordings/segment-${sequence}.m4a`);
+        },
+        segmentDurationMs: 30,
+        upload: async input =>
+          new Promise<TranscribeRecordingResult>(resolve => {
+            pending.push({ uri: input.recordingUri, resolve });
+          }),
+      });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      // Two rotations queued segment 1 and 2; stop captures the in-flight 3.
+      engine.stop();
+      await settle();
+
+      // Uploads are serialized: only the first starts until it resolves.
+      expect(pending.map(entry => entry.uri)).toEqual(['file:///recordings/segment-1.m4a']);
+
+      pending[0]?.resolve({ ok: true, text: 'one' });
+      await settle();
+      expect(pending.map(entry => entry.uri)).toEqual([
+        'file:///recordings/segment-1.m4a',
+        'file:///recordings/segment-2.m4a',
+      ]);
+
+      pending[1]?.resolve({ ok: true, text: 'two' });
+      await settle();
+      // The segment captured by stop() drains last.
+      expect(pending.map(entry => entry.uri)).toEqual([
+        'file:///recordings/segment-1.m4a',
+        'file:///recordings/segment-2.m4a',
+        'file:///recordings/segment-3.m4a',
+      ]);
+
+      pending[2]?.resolve({ ok: true, text: 'three' });
+      await settle();
+
+      const transcripts = events
+        .filter(entry => entry.event === 'result')
+        .map(entry => (entry.payload as VoiceInputNativeEvent['result']).results[0]?.transcript);
+      expect(transcripts).toEqual(['one', 'two', 'three']);
+      expect(events.map(entry => entry.event)).toEqual([
+        'start',
+        'transcribing',
+        'result',
+        'result',
+        'result',
+        'end',
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('emits no-speech on stop when every segment is empty', async () => {
+    vi.useFakeTimers();
+    try {
+      const { engine, events } = buildEngine({
+        segmentDurationMs: 30,
+        upload: async (): Promise<TranscribeRecordingResult> => ({ ok: true, text: '   ' }),
+      });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      // Empty segments are skipped silently while listening.
+      expect(events.map(entry => entry.event)).toEqual(['start']);
+
+      engine.stop();
+      await settle();
+
+      expect(events.map(entry => entry.event)).toEqual(['start', 'transcribing', 'error', 'end']);
+      const errorPayload = events[2]?.payload as VoiceInputNativeEvent['error'];
+      expect(errorPayload.error).toBe('no-speech');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a mid-session segment failure emits the gateway error and keeps the earlier result', async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const { engine, events } = buildEngine({
+        segmentDurationMs: 30,
+        upload: async (): Promise<TranscribeRecordingResult> => {
+          calls += 1;
+          return calls === 1
+            ? { ok: true, text: 'first words' }
+            : { ok: false, isTimeout: false, isNetworkError: true };
+        },
+      });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+      expect(events.map(entry => entry.event)).toEqual(['start', 'result']);
+
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+
+      expect(events.map(entry => entry.event)).toEqual(['start', 'result', 'error', 'end']);
+      const errorPayload = events[2]?.payload as VoiceInputNativeEvent['error'];
+      expect(errorPayload.error).toBe('gateway-unreachable');
+      const resultPayload = events[1]?.payload as VoiceInputNativeEvent['result'];
+      expect(resultPayload.results[0]?.transcript).toBe('first words');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('abort clears the rotation timer so no further recorder is created', async () => {
+    vi.useFakeTimers();
+    try {
+      const createRecorder = vi.fn(() => makeRecorder());
+      const { engine, events } = buildEngine({ createRecorder, segmentDurationMs: 40 });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      expect(createRecorder).toHaveBeenCalledTimes(1);
+
+      engine.abort();
+      await vi.advanceTimersByTimeAsync(80);
+      await settle();
+
+      expect(events.map(entry => entry.event)).toEqual(['start', 'end']);
+      expect(createRecorder).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

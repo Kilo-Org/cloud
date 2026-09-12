@@ -238,6 +238,23 @@ describe('createGatewayVoiceInputEngine', () => {
     expect(upload).not.toHaveBeenCalled();
   });
 
+  it('terminalizes with a client error when the model read rejects', async () => {
+    const { engine, events, upload, deleteRecording } = buildEngine({
+      readModelId: async () => {
+        throw new Error('secure store unavailable');
+      },
+    });
+
+    await startAndStop(engine);
+    await flush();
+
+    expect(events.map(entry => entry.event)).toEqual(['start', 'transcribing', 'error', 'end']);
+    const errorPayload = events[2]?.payload as VoiceInputNativeEvent['error'];
+    expect(errorPayload.error).toBe('client');
+    expect(upload).not.toHaveBeenCalled();
+    expect(deleteRecording).toHaveBeenCalledWith('file:///recordings/recording.m4a');
+  });
+
   it('emits client error and end when recording prep fails', async () => {
     const { engine, events } = buildEngine({
       setAudioMode: async () => {

@@ -344,7 +344,17 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
       }
       let credentials = current.credentials;
       if (credentials === null) {
-        const model = await deps.readModelId();
+        let model: { id: string; name: string } | null = null;
+        try {
+          model = await deps.readModelId();
+        } catch {
+          // A rejected model read must not poison the upload chain: the
+          // session terminalizes like any other client failure.
+          if (!stale(current)) {
+            fail(current, 'client');
+          }
+          return;
+        }
         if (stale(current)) {
           return;
         }

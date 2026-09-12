@@ -82,17 +82,20 @@ function findHeaderContainer(root: TestRenderer.ReactTestInstance): TestRenderer
 /**
  * The header row sits in an inner wrapper that carries the top and landscape side
  * insets, so they add to the outer container's `px-4` gutter instead of
- * overriding it. It is the only View in the header without a className.
+ * overriding it. Derive it from the row it wraps: a parent shell (PickerSheet)
+ * also renders a className-less View, so scanning for one would return the shell
+ * and the assertion on the wrapper's style would be vacuous.
  */
 function findSafeAreaWrapper(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
-  const wrappers = root.findAll(
+  const row = root.find(
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'View' &&
-      node.props.className === undefined
+      typeof node.props.className === 'string' &&
+      node.props.className.includes('flex-row')
   );
-  const wrapper = wrappers[0];
-  if (!wrapper) {
+  const wrapper = row.parent;
+  if (!wrapper || typeof wrapper.type !== 'string') {
     throw new Error('safe-area wrapper not found');
   }
   return wrapper;
@@ -537,6 +540,9 @@ describe('SheetHeader', () => {
     );
 
     const wrapper = findSafeAreaWrapper(renderer.root);
+    // The wrapper must be SheetHeader's own inset wrapper, not PickerSheet's
+    // className-less shell, or this assertion is vacuous.
+    expect(pressablesByLabel(renderer.root, 'Done')[0]?.parent?.parent).toBe(wrapper);
     expect(wrapper.props.style).toBeUndefined();
 
     renderer.unmount();

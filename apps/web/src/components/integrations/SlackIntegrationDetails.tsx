@@ -273,6 +273,7 @@ export function SlackIntegrationDetails({
 
   const isInstalled = installationData?.installed;
   const installation = installationData?.installation;
+  const cleanupPending = installationData?.cleanupPending === true;
   const isSuspended = installation?.status === 'suspended';
   const missingScopes = installation?.missingScopes ?? [];
 
@@ -307,7 +308,18 @@ export function SlackIntegrationDetails({
         </Alert>
       )}
 
-      {installation && isSuspended && (
+      {cleanupPending && (
+        <Alert variant="warning">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Slack disconnect is still finishing</AlertTitle>
+          <AlertDescription>
+            Kilo has disabled this connection and will retry the remaining cleanup when Slack sends
+            another event. Cleanup stage: {installationData?.cleanupStage ?? 'pending'}.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {installation && isSuspended && !cleanupPending && (
         <Alert variant="warning">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Slack integration suspended</AlertTitle>

@@ -42,14 +42,18 @@ export const slackRouter = createTRPCRouter({
       return {
         installed: false,
         installation: null,
+        cleanupPending: false,
+        cleanupStage: null,
       };
     }
 
     const isInstalled = integration.integration_status === 'active';
+    const cleanup = await slackService.getSlackCleanupState(integration);
     const metadata = integration.metadata as { model_slug?: string } | null;
 
     return {
       installed: isInstalled,
+      ...cleanup,
       installation: {
         teamId: integration.platform_account_id,
         teamName: integration.platform_account_login,

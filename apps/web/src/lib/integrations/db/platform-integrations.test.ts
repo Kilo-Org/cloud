@@ -29,6 +29,7 @@ import {
 } from './platform-integrations';
 import type { Owner } from '../core/types';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { disconnectGitHubInstallation } from './github-installations';
 
 const INSTALLATION_ID = `test-github-install-${Date.now()}`;
 
@@ -196,6 +197,43 @@ describe('upsertPlatformIntegrationForOwner', () => {
       .where(eq(platform_integrations.owned_by_organization_id, orgId));
     expect(rows).toHaveLength(1);
     expect(rows[0]?.platform_installation_id).toBe(INSTALLATION_ID);
+  });
+
+  test('legacy writer: local disconnect frees a non-allowlisted organization to connect a fresh installation', async () => {
+    const owner: Owner = { type: 'org', id: orgId };
+    const first = await upsertPlatformIntegrationForOwner(owner, baseInstallData(INSTALLATION_ID));
+    expect(first).toEqual({ ok: true });
+    const [firstRow] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, INSTALLATION_ID));
+
+    // Blocked while the first installation is still connected.
+    const blocked = await upsertPlatformIntegrationForOwner(
+      owner,
+      baseInstallData(`${INSTALLATION_ID}-fresh`)
+    );
+    expect(blocked).toEqual({ ok: false, reason: 'multiple_installations_disabled' });
+
+    await disconnectGitHubInstallation(owner, firstRow.id);
+
+    // The disconnected legacy row must not keep occupying the org's slot.
+    const afterDisconnect = await upsertPlatformIntegrationForOwner(
+      owner,
+      baseInstallData(`${INSTALLATION_ID}-fresh`)
+    );
+    expect(afterDisconnect).toEqual({ ok: true });
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, orgId));
+    expect(rows.find(row => row.platform_installation_id === INSTALLATION_ID)).toMatchObject({
+      github_disconnected_at: expect.any(String),
+    });
+    expect(
+      rows.find(row => row.platform_installation_id === `${INSTALLATION_ID}-fresh`)
+    ).toMatchObject({ github_disconnected_at: null, integration_status: 'active' });
   });
 
   test('serializes concurrent different installations for a non-allowlisted organization', async () => {

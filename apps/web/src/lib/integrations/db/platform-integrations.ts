@@ -1146,7 +1146,11 @@ export async function upsertPlatformIntegrationForOwner(
           .where(
             and(
               eq(platform_integrations.owned_by_organization_id, owner.id),
-              eq(platform_integrations.platform, PLATFORM.GITHUB)
+              eq(platform_integrations.platform, PLATFORM.GITHUB),
+              // A locally disconnected connection has relinquished its slot;
+              // it must not block attaching a different installation. Matches
+              // the equivalent guard in connectVerifiedGitHubInstallation.
+              isNull(platform_integrations.github_disconnected_at)
             )
           );
         if (

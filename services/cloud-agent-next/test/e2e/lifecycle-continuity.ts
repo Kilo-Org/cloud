@@ -1375,8 +1375,20 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
           event.data.event === 'question.replied' ||
           event.data.event === 'question.rejected')
     );
-    if (questionResolved) {
-      throw new Error(`question ${question.id} was resolved before idle shutdown`);
+    // The parked turn settles either as terminal (the fenced inactivity abort at
+    // five minutes) or stays accepted behind the input wait. A question that
+    // disappeared is only explained by terminal evidence on this exact message.
+    const parkedStatus = await awaitDurableCompletion(
+      resources,
+      session,
+      sent.messageId,
+      'parked question'
+    );
+    const parkedTerminal = parkedStatus === 'failed' || parkedStatus === 'interrupted';
+    if (questionResolved && !parkedTerminal) {
+      throw new Error(
+        `question ${question.id} was resolved before idle shutdown without terminal evidence for ${sent.messageId} (durable=${parkedStatus})`
+      );
     }
     if (!idleObserved) {
       throw new Error(
@@ -1388,19 +1400,26 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
         `question ${question.id} received an answer before idle shutdown; heartbeat=${heartbeat?.summary ?? 'missing-target-evidence'}`
       );
     }
-    if (!heartbeat) {
+    // The last pre-stop heartbeat reporting `waitingOn=input` is the boundary
+    // proof that the turn was parked on the unanswered input through idle
+    // shutdown. A successful inactivity abort can clear the question before
+    // that heartbeat, so once the exact parked message is terminal the terminal
+    // evidence satisfies the input-wait proof and a missing heartbeat is
+    // allowed. The parked turn must still settle before the post-idle
+    // follow-up; a matching heartbeat alone never authorizes continuing.
+    if (!parkedTerminal) {
+      if (!heartbeat) {
+        throw new Error(
+          `INCONCLUSIVE: no heartbeat with exact kiloSessionId=${session.kiloSessionId} on the captured connection ${connectionSummary(connection)}`
+        );
+      }
+      if (heartbeat.sessionWaitingOn !== 'input') {
+        throw new Error(
+          `INCONCLUSIVE: the last pre-stop heartbeat did not report a pending input wait; heartbeat=${heartbeat.summary}; scopedObserved=${lastScopedObservation !== undefined}`
+        );
+      }
       throw new Error(
-        `INCONCLUSIVE: no heartbeat with exact kiloSessionId=${session.kiloSessionId} on the captured connection ${connectionSummary(connection)}`
-      );
-    }
-    // The last heartbeat before the environment stopped is the boundary proof:
-    // it still reports the parked input wait. A question that had been answered
-    // or woken would have dropped `waitingOn=input`, and an answer would also
-    // have emitted a resolution or a fake question tool result.
-    const questionPendingThroughIdle = heartbeat.sessionWaitingOn === 'input';
-    if (!questionPendingThroughIdle) {
-      throw new Error(
-        `INCONCLUSIVE: the last pre-stop heartbeat did not report a pending input wait; heartbeat=${heartbeat.summary}; scopedObserved=${lastScopedObservation !== undefined}`
+        `parked message ${sent.messageId} did not settle before the post-idle follow-up (durable=${parkedStatus})`
       );
     }
 
@@ -1430,7 +1449,9 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
         `session=${session.cloudAgentSessionId}`,
         `questionId=${question.id}`,
         `questionScoped=${questionVisibility.scoped.count}`,
-        `questionPendingThroughIdle=true (${pendingDetail})`,
+        `questionPendingThroughIdle=${heartbeat?.sessionWaitingOn === 'input'} (${pendingDetail})`,
+        `parkedTerminal=${parkedTerminal}`,
+        `parkedStatus=${parkedStatus}`,
         `questionScopedObserved=${lastScopedObservation !== undefined}`,
         `questionUnanswered=${questionUnanswered}`,
         `questionMessage=${sent.messageId}`,
@@ -1440,7 +1461,7 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
         `newContainer=${resumed.container.id}`,
         `postIdleMessage=${postIdle.messageId}`,
         `postRestoreAnswer=not-claimed (live question is not re-answered)`,
-        `heartbeat(${heartbeat.summary})`,
+        `heartbeat=${heartbeat?.summary ?? 'not-required(terminal-parked)'}`,
       ].join('; ')
     );
   } catch (error) {

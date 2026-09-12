@@ -524,6 +524,27 @@ export function failQueuedMessage(
   );
 }
 
+export function failAcceptedMessage(
+  messages: readonly SessionMessageRecord[],
+  messageId: string,
+  reason?: string,
+  detail?: string
+): SessionMessageRecord[] | undefined {
+  if (!messages.some(message => message.messageId === messageId && message.state === 'accepted')) {
+    return undefined;
+  }
+  return messages.map(message =>
+    message.messageId === messageId && message.state === 'accepted'
+      ? {
+          ...message,
+          state: 'failed',
+          ...(reason ? { failedReason: reason } : {}),
+          ...(detail ? { failedDetail: detail } : {}),
+        }
+      : message
+  );
+}
+
 export function cancelPendingMessage(
   messages: readonly SessionMessageRecord[],
   messageId: string

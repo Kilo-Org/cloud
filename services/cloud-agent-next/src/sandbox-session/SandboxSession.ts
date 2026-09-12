@@ -194,7 +194,8 @@ import {
   SESSION_DELIVERY_TIMEOUT_MS,
   withDeliveryDeadline,
 } from './control-dispatch.js';
-import { acceptedAlarmDecision } from './accepted-overdue.js';
+import { acceptedAlarmDecision, acceptedInactivityDue } from './accepted-overdue.js';
+import { acceptedSnapshotKind, isRealTurnActivity } from './turn-activity.js';
 import { createSessionStopLifecycle } from './session-stop-lifecycle.js';
 import { sessionStopReceipt } from './session-stop.js';
 import { progressSessionStop } from './session-stop-progress.js';
@@ -212,6 +213,7 @@ import {
   assignPreparationAttemptId,
   cancelPendingMessage,
   createSessionMessageRecord,
+  failAcceptedMessage,
   failQueuedMessage,
   failWaitingMessages as applyFailWaitingMessages,
   failedMessageSnapshot,
@@ -823,9 +825,11 @@ export class SandboxSession extends DurableObject<Env> {
         eventQueries: this.eventQueries,
         broadcast: event => notifications.push(event),
       });
-      const activeMessages = recordAcceptedMessageActivity(this.loadMessages(), Date.now());
-      if (activeMessages && this.terminalLifecycle.isCurrent(epoch))
-        this.ctx.storage.kv.put(MESSAGES_KEY, activeMessages);
+      if (isRealTurnActivity(input.payload.type, input.payload.properties)) {
+        const activeMessages = recordAcceptedMessageActivity(this.loadMessages(), Date.now());
+        if (activeMessages && this.terminalLifecycle.isCurrent(epoch))
+          this.ctx.storage.kv.put(MESSAGES_KEY, activeMessages);
+      }
       this.recordControlEventReceipt(input);
       return 'apply' as const;
     });
@@ -2926,79 +2930,92 @@ export class SandboxSession extends DurableObject<Env> {
         now,
         accepted.lastActivityAt
       );
+      if (decision.action === 'rearm') {
+        await this.armQueueRetry(decision.at);
+        return;
+      }
       const scope = this.captureInteractionScope();
-      await this.armQueueRetry(
-        decision.action === 'rearm' ? decision.at : now + DEADLINE_MS.acceptedAlarmCap
-      );
-      if (decision.action === 'check') {
-        const startedAt = Date.now();
-        const diagnostic: ControlDiagnosticFields = {
-          sessionId: this.sessionId,
-          messageId: accepted.messageId,
-          expectedWrapperInstanceId: accepted.wrapperInstanceId,
-          epoch,
-          acceptedAt: accepted.acceptedAt,
-          lastActivityAt: accepted.lastActivityAt,
-          stage: 'sync',
-        };
-        const report = (result: 'healthy' | 'superseded' | 'runtime_unhealthy') =>
-          logControlDiagnostic(
-            'accepted_reconciliation',
-            { ...diagnostic, phase: 'finished', result, durationMs: Date.now() - startedAt },
-            result === 'runtime_unhealthy' ? 'warn' : 'info'
-          );
-        logControlDiagnostic('accepted_reconciliation', { ...diagnostic, phase: 'started' });
-        try {
-          if (accepted.operations?.prompt?.dispatched) {
-            diagnostic.stage = 'operation_receipt';
-            const observed = await this.observeAcceptedOperation(accepted, epoch);
-            if (observed === 'running' || observed === 'completed') {
-              report('healthy');
+      const startedAt = Date.now();
+      const diagnostic: ControlDiagnosticFields = {
+        sessionId: this.sessionId,
+        messageId: accepted.messageId,
+        expectedWrapperInstanceId: accepted.wrapperInstanceId,
+        epoch,
+        acceptedAt: accepted.acceptedAt,
+        lastActivityAt: accepted.lastActivityAt,
+        stage: 'sync',
+      };
+      const report = (result: 'healthy' | 'superseded' | 'runtime_unhealthy' | 'inactivity') =>
+        logControlDiagnostic(
+          'accepted_reconciliation',
+          { ...diagnostic, phase: 'finished', result, durationMs: Date.now() - startedAt },
+          result === 'runtime_unhealthy' ? 'warn' : 'info'
+        );
+      logControlDiagnostic('accepted_reconciliation', { ...diagnostic, phase: 'started' });
+      try {
+        if (accepted.operations?.prompt?.dispatched) {
+          diagnostic.stage = 'operation_receipt';
+          const observed = await this.observeAcceptedOperation(accepted, epoch);
+          if (observed === 'running' || observed === 'completed') {
+            if (!this.isCurrentAcceptedMessage(accepted, epoch)) {
+              diagnostic.reason = 'accepted_message_changed';
+              report('superseded');
               return;
             }
-          }
-          const snapshot = await this.interactionRefresh.refresh(scope, 'accepted_alarm');
-          if (
-            !snapshot ||
-            !scope ||
-            !this.interactionRefresh.isCurrent(scope, (scope.interactionRevision ?? 0) + 1)
-          ) {
-            diagnostic.reason = snapshot ? 'accepted_message_changed' : 'sync_superseded';
-            report('superseded');
+            if (await this.failOverdueAcceptedMessage(accepted, epoch, diagnostic)) {
+              report('inactivity');
+              return;
+            }
+            diagnostic.healthy = true;
+            report('healthy');
+            await this.scheduleAcceptedRecheck(epoch, accepted.messageId);
             return;
           }
-          diagnostic.stage = 'activity_check';
-          diagnostic.syncStatus = diagnosticSyncStatus(snapshot.status.type);
-          diagnostic.questionCount = snapshot.questions.length;
-          diagnostic.permissionCount = snapshot.permissions.length;
-          const healthy =
-            snapshot.status.type === 'busy' ||
-            snapshot.status.type === 'retry' ||
-            snapshot.questions.length > 0 ||
-            snapshot.permissions.length > 0;
-          diagnostic.healthy = healthy;
-          if (!healthy) {
-            diagnostic.reason = 'inactive_snapshot';
-            throw new Error('Accepted execution is no longer active');
-          }
-          diagnostic.stage = 'record_activity';
-          const active = recordAcceptedMessageActivity(this.loadMessages(), Date.now());
-          diagnostic.activityRecorded = active ? this.saveMessages(active, epoch) : false;
-          report('healthy');
-        } catch {
-          if (this.isCurrentAcceptedMessage(accepted, epoch)) {
-            diagnostic.reason ??=
-              diagnostic.stage === 'record_activity' ? 'activity_record_failed' : 'sync_failed';
-            report('runtime_unhealthy');
-            await this.failDelivery(
-              accepted.messageId,
-              'runtime_unhealthy',
-              accepted.wrapperInstanceId
-            );
-          } else {
-            diagnostic.reason = 'accepted_message_changed';
-            report('superseded');
-          }
+        }
+        const snapshot = await this.interactionRefresh.refresh(scope, 'accepted_alarm');
+        if (
+          !snapshot ||
+          !scope ||
+          !this.interactionRefresh.isCurrent(scope, (scope.interactionRevision ?? 0) + 1)
+        ) {
+          diagnostic.reason = snapshot ? 'accepted_message_changed' : 'sync_superseded';
+          report('superseded');
+          // A pending-input event (question/permission) during the awaited sync
+          // changes the interaction scope, so the sync returns undefined. The
+          // accepted turn is usually still current, so the watchdog must
+          // survive; a superseded original still needs one for the turn that is
+          // now current.
+          await this.rescheduleAcceptedWatchdog(accepted, epoch, diagnostic);
+          return;
+        }
+        diagnostic.stage = 'activity_check';
+        diagnostic.syncStatus = diagnosticSyncStatus(snapshot.status.type);
+        diagnostic.questionCount = snapshot.questions.length;
+        diagnostic.permissionCount = snapshot.permissions.length;
+        const waiting = acceptedSnapshotKind(snapshot) === 'waiting';
+        diagnostic.healthy = waiting;
+        if (await this.failOverdueAcceptedMessage(accepted, epoch, diagnostic)) {
+          report('inactivity');
+          return;
+        }
+        if (!waiting) {
+          diagnostic.reason = 'inactive_snapshot';
+          throw new Error('Accepted execution is no longer active');
+        }
+        report('healthy');
+        await this.scheduleAcceptedRecheck(epoch, accepted.messageId);
+      } catch {
+        if (this.isCurrentAcceptedMessage(accepted, epoch)) {
+          diagnostic.reason ??= 'sync_failed';
+          report('runtime_unhealthy');
+          await this.failDelivery(
+            accepted.messageId,
+            'runtime_unhealthy',
+            accepted.wrapperInstanceId
+          );
+        } else {
+          diagnostic.reason = 'accepted_message_changed';
+          report('superseded');
         }
       }
       return;
@@ -3009,6 +3026,118 @@ export class SandboxSession extends DurableObject<Env> {
     // acquisition path). Cloudflare keeps its acquisition-driven create, and
     // `nextEnsureReadyStep` still refuses to create from running/stopping.
     if (headId) await this.dispatchQueued(headId, { allowCreate: true });
+  }
+
+  /**
+   * The inactivity fail path. Re-reads the accepted row and re-evaluates the
+   * bound synchronously before persisting, so real progress that landed during
+   * the preceding observe/sync keeps the turn alive. Message-only: no
+   * quarantine and no native-runtime retirement. The follow-up abort is
+   * best-effort and fenced with the captured wrapper instance.
+   */
+  private async failOverdueAcceptedMessage(
+    accepted: MessageRecord,
+    epoch: number,
+    diagnostic: ControlDiagnosticFields
+  ): Promise<boolean> {
+    const current = this.loadMessages().find(item => item.messageId === accepted.messageId);
+    const activityAt = current?.lastActivityAt ?? current?.acceptedAt;
+    if (
+      !current ||
+      current.state !== 'accepted' ||
+      activityAt === undefined ||
+      !acceptedInactivityDue(activityAt, Date.now())
+    )
+      return false;
+    diagnostic.stage = 'inactivity';
+    diagnostic.reason = 'inactivity_due';
+    diagnostic.lastActivityAt = activityAt;
+    const wrapperInstanceId = current.wrapperInstanceId;
+    const messages = failAcceptedMessage(
+      this.loadMessages(),
+      current.messageId,
+      'accepted_overdue',
+      'Turn did not complete'
+    );
+    if (!messages || !this.saveMessages(messages, epoch)) return false;
+    if (nextQueuedMessageId(messages)) await this.armQueueRetry();
+    await this.abortOverdueAcceptedMessage(current.messageId, wrapperInstanceId);
+    return true;
+  }
+
+  /**
+   * Schedule the next non-failing check from the freshly read clock:
+   * `min(now + acceptedAlarmCap, activityAt + idleStop)`. Never rearm at the
+   * already-past 90s threshold.
+   */
+  private async scheduleAcceptedRecheck(epoch: number, messageId: string): Promise<void> {
+    const current = this.loadMessages().find(item => item.messageId === messageId);
+    if (!this.terminalLifecycle.isCurrent(epoch) || current?.state !== 'accepted') return;
+    const activityAt = current.lastActivityAt ?? current.acceptedAt;
+    if (activityAt === undefined) {
+      await this.armQueueRetry(Date.now() + DEADLINE_MS.acceptedAlarmCap);
+      return;
+    }
+    await this.armQueueRetry(
+      Math.min(Date.now() + DEADLINE_MS.acceptedAlarmCap, activityAt + DEADLINE_MS.idleStop)
+    );
+  }
+
+  /**
+   * Keep the accepted-turn watchdog alive when the interaction scope changes
+   * during an awaited health-check sync. The original turn is re-checked before
+   * failing; a superseded or terminal original is left alone, and a watchdog is
+   * retained for whichever accepted turn is current.
+   */
+  private async rescheduleAcceptedWatchdog(
+    accepted: MessageRecord,
+    epoch: number,
+    diagnostic: ControlDiagnosticFields
+  ): Promise<void> {
+    if (!this.terminalLifecycle.isCurrent(epoch)) return;
+    if (this.isCurrentAcceptedMessage(accepted, epoch)) {
+      if (await this.failOverdueAcceptedMessage(accepted, epoch, diagnostic)) return;
+      await this.scheduleAcceptedRecheck(epoch, accepted.messageId);
+      return;
+    }
+    const current = this.loadMessages().find(
+      message => message.state === 'accepted' && message.cancellation === undefined
+    );
+    if (current) await this.scheduleAcceptedRecheck(epoch, current.messageId);
+  }
+
+  /**
+   * Best-effort message-specific abort after an inactivity fail. The message is
+   * already terminal; the abort only attempts to free the runtime. The fence
+   * prevents aborting a replacement wrapper.
+   */
+  private async abortOverdueAcceptedMessage(
+    messageId: string,
+    wrapperInstanceId: string | undefined
+  ): Promise<void> {
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    const sandboxId = metadata?.workspace?.sandboxId;
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    if (!metadata || !sandboxId || !kiloSessionId) return;
+    try {
+      const response = await withTimeout(
+        sandboxControlRpc(this.env, sandboxId).request({
+          operation: 'session.abort',
+          session: {
+            sessionId: metadata.identity.sessionId,
+            kiloSessionId,
+            directory: this.directory(metadata),
+          },
+          payload: { messageId },
+          ...(wrapperInstanceId ? { expectedWrapperInstanceId: wrapperInstanceId } : {}),
+        }),
+        SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+        'Session abort timed out'
+      );
+      if (response.ok) sessionAbortResultSchema.parse(response.result);
+    } catch {
+      // The turn is terminal; the abort attempt is not a confirmed runtime release.
+    }
   }
 
   private async queueAndDispatch(

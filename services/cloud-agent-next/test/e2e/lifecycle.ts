@@ -2302,30 +2302,41 @@ export async function lifecycleQueueInterruptClears(args: LifecycleArgs): Promis
 // Single-turn scenarios driving specific fake-LLM directives
 // ---------------------------------------------------------------------------
 
+function isRetryStatusEvent(event: StreamEvent): boolean {
+  if (event.streamEventType !== 'kilocode') return false;
+  const data = event.data as
+    | { type?: string; properties?: { status?: { type?: string } } }
+    | undefined;
+  return data?.type === 'session.status' && data.properties?.status?.type === 'retry';
+}
+
 /**
- * llm-error: drives `__fake__:error-terminal:<msg>` so the fake returns HTTP 400
- * with an OpenAI-shape error body. The gateway converts upstream 402 to retryable
- * 503 for non-BYOK requests. Assert the worker terminalizes with a failure
- * (not `complete`), and the sandbox doesn't hang indefinitely.
+ * llm-error: drives `__fake__:error:<msg>` so the fake returns HTTP 402 with
+ * an OpenAI-shape error body. The wrapper surfaces the provider failure as a
+ * retry. Prove Stop ends that retry (the continuation path the product already
+ * owns) instead of waiting for the five-minute inactivity bound:
+ *
+ * 1. The retry status MUST be visible on the stream.
+ * 2. `interruptSession` MUST surface `cloud.message.failed reason=interrupted`
+ *    for that exact message and a durable `interrupted` status.
+ * 3. A follow-up MUST complete on the SAME `cloudAgentSessionId` and the SAME
+ *    container.
  *
  * Conversation arg is the error message (e.g. `llm-error boom`).
  */
 export async function lifecycleLlmError(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 60_000, api = 'unified' } = args;
+  const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
   const errorMsg = conversation || 'simulated-error';
+  let stream: StreamConnection | undefined;
+  let session: Awaited<ReturnType<typeof startSession>> | undefined;
   try {
     const knownSandboxIds = await snapshotSandboxIds();
-    const session = await startSession(
-      config,
-      { prompt: fakeDirective(`error-terminal:${errorMsg}`) },
-      api
-    );
-    const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
+    session = await startSession(config, { prompt: fakeDirective(`error:${errorMsg}`) }, api);
+    stream = openStream(config, session.cloudAgentSessionId, { replay: false });
 
     const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
     if (!sandbox) {
-      stream.close();
       return {
         name: 'llm-error',
         conversation,
@@ -2336,21 +2347,92 @@ export async function lifecycleLlmError(args: LifecycleArgs): Promise<LifecycleR
       };
     }
 
-    const terminal = await stream.waitForTerminal(timeoutMs, session.messageId);
-    const events = [...stream.events];
-    stream.close();
+    const retry = await stream.waitFor(isRetryStatusEvent, timeoutMs);
+    if (!retry) {
+      return {
+        name: 'llm-error',
+        conversation,
+        ok: false,
+        message: `retry status was not visible within ${timeoutMs}ms`,
+        events: [...stream.events],
+        durationMs: Date.now() - start,
+      };
+    }
 
-    const isFailure =
-      terminal?.streamEventType === 'cloud.message.failed' || terminal?.streamEventType === 'error';
+    const before = await findControlPlaneKiloRuntime(session.kiloSessionId).catch(() => null);
+    await interruptSession(config, session.cloudAgentSessionId);
 
+    const failed = await stream.waitFor(
+      event =>
+        event.streamEventType === 'cloud.message.failed' &&
+        messageIdFromEvent(event) === session?.messageId &&
+        ((event.data as { reason?: string; payload?: { reason?: string } }).reason ??
+          (event.data as { payload?: { reason?: string } }).payload?.reason) === 'interrupted',
+      timeoutMs
+    );
+    if (!failed) {
+      return {
+        name: 'llm-error',
+        conversation,
+        ok: false,
+        message: 'no interrupted cloud.message.failed after Stop',
+        events: [...stream.events],
+        durationMs: Date.now() - start,
+      };
+    }
+
+    const interruptedStatus = await getMessageResult(
+      config,
+      session.cloudAgentSessionId,
+      session.messageId
+    );
+    if (interruptedStatus.status !== 'interrupted') {
+      return {
+        name: 'llm-error',
+        conversation,
+        ok: false,
+        message: `durable status=${interruptedStatus.status} after Stop`,
+        events: [...stream.events],
+        durationMs: Date.now() - start,
+      };
+    }
+
+    const followUp = await sendMessage(
+      config,
+      {
+        cloudAgentSessionId: session.cloudAgentSessionId,
+        prompt: fakeDirective('echo:after-interrupt'),
+      },
+      api
+    );
+    const followTerminal = await stream.waitForTerminal(timeoutMs, followUp.messageId);
+    const followStatus = await getMessageResult(
+      config,
+      session.cloudAgentSessionId,
+      followUp.messageId
+    );
+    if (!isMessageCompleted(followTerminal, followUp.messageId) || followStatus.status !== 'completed') {
+      return {
+        name: 'llm-error',
+        conversation,
+        ok: false,
+        message: `follow-up stream=${followTerminal?.streamEventType ?? 'none'} durable=${followStatus.status}`,
+        events: [...stream.events],
+        durationMs: Date.now() - start,
+      };
+    }
+
+    const after = await findControlPlaneKiloRuntime(session.kiloSessionId).catch(() => null);
+    const sameContainer =
+      before !== null && after !== null && before.container.id === after.container.id;
     return {
       name: 'llm-error',
       conversation,
-      ok: !!terminal && isFailure,
-      message: terminal
-        ? `terminal=${terminal.streamEventType}${isFailure ? '' : ' (expected failure)'}`
-        : `no terminal event within ${timeoutMs}ms`,
-      events,
+      ok: sameContainer,
+      message: sameContainer
+        ? `retryVisible=true; interrupted=true; followUp=completed; container=${after.container.id}`
+        : `container changed or missing: before=${before?.container.id ?? 'none'}; after=${after?.container.id ?? 'none'}`,
+      events: [...stream.events],
       durationMs: Date.now() - start,
     };
   } catch (err) {
@@ -2360,9 +2442,14 @@ export async function lifecycleLlmError(args: LifecycleArgs): Promise<LifecycleR
       conversation,
       ok: false,
       message: `threw: ${msg}`,
-      events: [],
+      events: stream ? [...stream.events] : [],
       durationMs: Date.now() - start,
     };
+  } finally {
+    if (session) await interruptSession(config, session.cloudAgentSessionId).catch(() => {});
+    try {
+      stream?.close();
+    } catch {}
   }
 }
 

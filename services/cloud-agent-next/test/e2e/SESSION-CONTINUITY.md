@@ -56,7 +56,7 @@ full contract | `PLANNED` not written | `BLOCKED` needs an enabler.
 | ID | Scenario (name) | Asserts | Status |
 |---|---|---|---|
 | C1 | `question-isolation` | a question is answerable in its own chat only; sibling isolation; replay after refresh | PASS -- `worktree-shared` (`question=isolated; questionRefresh=replayed`) |
-| C2 | `unanswered-question-idle` | an unanswered question does not pin the environment; idle winds it down; restore then answer/continue | PARTIAL -- `question-idle-resume` requires a positive `inspectControlPlaneQuestions` observation scoped to the captured question while the primary is inspectable (inspection failure is INCONCLUSIVE), an exact-match target heartbeat payload (`reportedState`/allocation-wide `pendingMessages` plus payload-derived `sessionState`/`sessionWaitingOn`), idle-stop within budget, and continued work on a replacement container. Sibling isolation is not claimed |
+| C2 | `unanswered-question-idle` | an unanswered question does not pin the environment; idle winds it down; restore then answer/continue | PARTIAL -- `question-idle-resume` requires a positive `inspectControlPlaneQuestions` observation scoped to the captured question while the primary is inspectable (inspection failure is INCONCLUSIVE), the parked turn to settle terminal (`failed`/`interrupted`) before continuing (the exact-match target heartbeat payload `reportedState`/allocation-wide `pendingMessages` plus payload-derived `sessionState`/`sessionWaitingOn` is the input-wait proof and may be absent once terminal), idle-stop within budget, and continued work on a replacement container. Sibling isolation is not claimed |
 | C3 | `targeted-cancel` | cancelling a sibling does not disturb the other root | PASS -- `worktree-shared` `targetedCancellation` |
 
 ### D. Liveness under load
@@ -94,7 +94,9 @@ fails the scenario when the sentinel is missing.
      uses it.
    - `rate:<chunks>:<ms>` and rate variation around `realistic` for token/sec.
    - `question:<tag>:<text>` -- landed; raises a real Kilo question that stays
-     open until answered, so C2 can idle out with the question pending.
+     open until answered. The parked turn settles either by the fenced
+     five-minute inactivity abort or by idle shutdown, so C2 proves the
+     question does not pin the environment.
 2. **Fault injection (test-only seams)**
    - `pauseOwnedPrimary`/`unpauseOwnedPrimary` (chunk 2) freeze and unfreeze the
      exact owned primary; `recover-same-session` uses this to lapse heartbeats.

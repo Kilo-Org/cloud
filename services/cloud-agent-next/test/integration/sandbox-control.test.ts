@@ -11511,7 +11511,6 @@ describe('SandboxSession control-plane regressions', () => {
         } satisfies SessionMessageRecord;
         await state.storage.put('session_messages', [accepted, queued]);
 
-        const observedAt = Date.now();
         await expect(
           instance.receiveSandboxControlEvent({
             identity: {
@@ -11525,8 +11524,8 @@ describe('SandboxSession control-plane regressions', () => {
         ).resolves.toEqual({ applied: true });
 
         const messages = await state.storage.get<SessionMessageRecord[]>('session_messages');
-        expect(messages).toEqual([{ ...accepted, lastActivityAt: expect.any(Number) }, queued]);
-        expect(messages?.[0]?.lastActivityAt).toBeGreaterThanOrEqual(observedAt);
+        expect(messages).toEqual([accepted, queued]);
+        expect(messages?.[0]?.lastActivityAt).toBe(accepted.lastActivityAt);
         await expect(instance.getCurrentMessageWork()).resolves.toEqual({
           messageId: accepted.messageId,
           status: 'running',

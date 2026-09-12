@@ -835,6 +835,25 @@ export async function autoCompleteInstallation({
     },
   };
 
+  // The webhook that completes a pending request carries no live OAuth
+  // session, so there is no independently verified identity for whoever
+  // clicked "Install" on GitHub. The original requester's identity was
+  // already verified via OAuth when the request was created (see
+  // createPendingIntegration), so record it as the authorizing identity
+  // rather than leaving provenance null. This can misattribute completion
+  // if a different GitHub org admin approves someone else's request; there
+  // is no stronger identity available on this path to resolve that.
+  const requesterKiloUserId = pendingApproval?.requester?.kilo_user_id;
+  const requesterGithubUserId = pendingApproval?.github_requester?.id;
+  const authorizationProvenance =
+    requesterKiloUserId && requesterGithubUserId
+      ? {
+          github_authorized_by_user_id: requesterKiloUserId,
+          github_authorized_user_id: requesterGithubUserId,
+          github_authorized_at: new Date().toISOString(),
+        }
+      : {};
+
   await db
     .update(platform_integrations)
     .set({
@@ -849,6 +868,7 @@ export async function autoCompleteInstallation({
       metadata: completedMetadata,
       auth_invalid_at: null,
       auth_invalid_reason: null,
+      ...authorizationProvenance,
       updated_at: new Date().toISOString(),
     })
     .where(eq(platform_integrations.id, integrationId));
@@ -1037,9 +1057,25 @@ export async function upsertPlatformIntegrationForOwner(
     repositories?: PlatformRepository[] | null;
     installedAt?: string;
     githubAppType?: GitHubAppType;
+    /** Kilo user id that authorized this connection, when known. Callers
+     *  with a verified GitHub OAuth identity should always pass this and
+     *  `githubUserId` so authorization provenance stays consistent with
+     *  `connectVerifiedGitHubInstallation`. */
+    kiloUserId?: string;
+    /** Verified GitHub user id that authorized this connection, when known. */
+    githubUserId?: string;
   }
 ): Promise<UpsertPlatformIntegrationResult> {
   const appType = data.githubAppType ?? 'standard';
+  const now = new Date().toISOString();
+  const authorizationProvenance =
+    data.kiloUserId && data.githubUserId
+      ? {
+          github_authorized_by_user_id: data.kiloUserId,
+          github_authorized_user_id: data.githubUserId,
+          github_authorized_at: now,
+        }
+      : {};
 
   // Build values object used for both insert paths.
   const values = {
@@ -1057,6 +1093,7 @@ export async function upsertPlatformIntegrationForOwner(
     repositories: data.repositories || null,
     installed_at: data.installedAt || new Date().toISOString(),
     github_app_type: appType,
+    ...authorizationProvenance,
   };
 
   // Preserve exclusive behavior for old callback/refresh paths after the
@@ -1140,6 +1177,7 @@ export async function upsertPlatformIntegrationForOwner(
           github_app_type: appType,
           auth_invalid_at: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_at} END`,
           auth_invalid_reason: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_reason} END`,
+          ...authorizationProvenance,
           updated_at: new Date().toISOString(),
         })
         .where(eq(platform_integrations.id, existing.id));

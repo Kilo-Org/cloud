@@ -486,6 +486,12 @@ async function handleCoreInstallFlow(params: {
   // installation before using app credentials to fetch or persist it.
   let verifiedGitHubUserId: string | null = null;
   let verifiedAccountType: 'Organization' | 'User' | null = null;
+  // The authenticated GitHub identity resolved by the OAuth exchange below,
+  // captured regardless of which authorization check ran. Used to record
+  // authorization provenance even on the legacy access-list admin check
+  // path, which only proves membership (not org ownership) but still
+  // authenticates a real GitHub user via the same code exchange.
+  let exchangedGitHubUserId: string | null = null;
   if (setupAction === 'install' || setupAction === 'update') {
     const code = searchParams.get('code');
     const rejectUnauthorizedInstallation = () =>
@@ -508,6 +514,7 @@ async function handleCoreInstallFlow(params: {
 
     try {
       const exchangeResult = await exchangeGitHubOAuthCode(code, githubAppType);
+      exchangedGitHubUserId = exchangeResult.id;
       const authorization = isGitHubConnectionManagementEnabled()
         ? await verifyGitHubInstallationAuthorization({
             accessToken: exchangeResult.accessToken,
@@ -679,6 +686,13 @@ async function handleCoreInstallFlow(params: {
             repositories: repositories && repositories.length > 0 ? repositories : null,
             installedAt,
             githubAppType,
+            // `exchangeGitHubOAuthCode` always resolves a real authenticated
+            // GitHub identity on this path, even when connection management
+            // is disabled and only the weaker access-list admin check ran.
+            // Record it so authorization provenance stays consistent with
+            // the verified writer above.
+            kiloUserId: user.id,
+            githubUserId: exchangedGitHubUserId ?? undefined,
           });
 
     if (!upsertResult.ok) {

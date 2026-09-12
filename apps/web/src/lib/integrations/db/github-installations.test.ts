@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import {
   agent_configs,
+  cloud_agent_code_review_attempts,
+  cloud_agent_code_reviews,
   github_app_installations,
   github_connection_attempts,
   github_installation_webhook_receipts,
@@ -11,6 +13,11 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { assertGitHubAutomationCanBeEnabled } from '../github/sharing-compatibility';
+import {
+  createCodeReview,
+  createCodeReviewAttempt,
+  updateCodeReviewStatus,
+} from '@/lib/code-reviews/db/code-reviews';
 import {
   connectVerifiedGitHubInstallation,
   getGitHubInstallationDeliveryStatus,
@@ -846,6 +853,105 @@ describe('GitHub installation persistence', () => {
         },
       })
     ).rejects.toThrow('GitHub installation must be disconnected locally');
+  });
+
+  test('disconnect terminalizes active review work, clears its dispatch reservation, leaves unrelated work untouched, and unblocks connect-existing', async () => {
+    const organizationA = await createTestOrganization('Disconnect review cleanup A', ownerId, 0);
+    const unrelatedOrganization = await createTestOrganization(
+      'Disconnect review cleanup unrelated',
+      ownerId,
+      0
+    );
+
+    const connectedA = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data('991001')
+    );
+    const connectedUnrelated = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: unrelatedOrganization.id },
+      data('991002')
+    );
+    if (!connectedA.ok || !connectedUnrelated.ok) throw new Error('Expected both connections');
+
+    const activeReviewId = await createCodeReview({
+      owner: { type: 'org', id: organizationA.id, userId: ownerId },
+      platformIntegrationId: connectedA.integrationId,
+      repoFullName: 'acme/disconnect-review-cleanup',
+      prNumber: 1,
+      prUrl: 'https://github.com/acme/disconnect-review-cleanup/pull/1',
+      prTitle: 'disconnect review cleanup',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/disconnect-review-cleanup',
+      headSha: 'disconnect-review-cleanup-head-sha',
+      platform: 'github',
+    });
+    await updateCodeReviewStatus(activeReviewId, 'queued');
+    const activeAttempt = await createCodeReviewAttempt({
+      codeReviewId: activeReviewId,
+      status: 'queued',
+    });
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ dispatch_reservation_id: crypto.randomUUID() })
+      .where(eq(cloud_agent_code_reviews.id, activeReviewId));
+
+    const unrelatedReviewId = await createCodeReview({
+      owner: { type: 'org', id: unrelatedOrganization.id, userId: ownerId },
+      platformIntegrationId: connectedUnrelated.integrationId,
+      repoFullName: 'acme/disconnect-review-cleanup-unrelated',
+      prNumber: 2,
+      prUrl: 'https://github.com/acme/disconnect-review-cleanup-unrelated/pull/2',
+      prTitle: 'unrelated integration review',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/unrelated-integration-review',
+      headSha: 'unrelated-integration-review-head-sha',
+      platform: 'github',
+    });
+    await updateCodeReviewStatus(unrelatedReviewId, 'queued');
+
+    await disconnectGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      connectedA.integrationId
+    );
+
+    const [reviewRow] = await db
+      .select({
+        status: cloud_agent_code_reviews.status,
+        dispatchReservationId: cloud_agent_code_reviews.dispatch_reservation_id,
+        terminalReason: cloud_agent_code_reviews.terminal_reason,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, activeReviewId));
+    expect(reviewRow).toMatchObject({
+      status: 'cancelled',
+      dispatchReservationId: null,
+      terminalReason: 'user_cancelled',
+    });
+
+    const [attemptRow] = await db
+      .select({ status: cloud_agent_code_review_attempts.status })
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, activeAttempt.id));
+    expect(attemptRow?.status).toBe('cancelled');
+
+    // A completely different integration's active review must be untouched.
+    const [unrelatedReviewRow] = await db
+      .select({ status: cloud_agent_code_reviews.status })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, unrelatedReviewId));
+    expect(unrelatedReviewRow?.status).toBe('queued');
+
+    // A different, newly approved organization can now connect-existing to
+    // the same canonical installation that organization A disconnected from.
+    const organizationC = await createTestOrganization('Disconnect review cleanup C', ownerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationC.id;
+    const connectedC = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationC.id },
+      { ...data('991001'), kiloUserId: ownerId }
+    );
+    expect(connectedC).toEqual({ ok: true, integrationId: expect.any(String) });
   });
 
   test('revokes the real runtime authorization query on local disconnect', async () => {

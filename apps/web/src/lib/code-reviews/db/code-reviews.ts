@@ -1936,7 +1936,11 @@ async function cancelActiveCodeReviewsByIdWithDatabase(
 }
 
 type IntegrationReviewCancellationInput = {
-  organizationId: string;
+  // Deliberately narrower than the core `Owner` type (which also requires an
+  // acting `userId` for review-creation purposes): this is a
+  // system/background cancellation with no acting user, and only the
+  // owner's type/id is ever used, to build the ownership WHERE clause below.
+  owner: { type: 'org' | 'user'; id: string };
   platform: CodeReviewPlatform;
   integrationId: string;
 };
@@ -1946,6 +1950,10 @@ async function cancelActiveCodeReviewsForIntegrationWithDatabase(
   input: IntegrationReviewCancellationInput,
   errorMessage: string
 ): Promise<CancelledReviewRow[]> {
+  const ownerCondition =
+    input.owner.type === 'org'
+      ? sql`${cloud_agent_code_reviews.owned_by_organization_id} = ${input.owner.id}`
+      : sql`${cloud_agent_code_reviews.owned_by_user_id} = ${input.owner.id}`;
   const result = await database.execute<CancelledReviewDatabaseRow>(sql`
     WITH targets AS (
       SELECT
@@ -1967,7 +1975,7 @@ async function cancelActiveCodeReviewsForIntegrationWithDatabase(
         platform_integration_id,
         trigger_source
       FROM ${cloud_agent_code_reviews}
-      WHERE ${cloud_agent_code_reviews.owned_by_organization_id} = ${input.organizationId}
+      WHERE ${ownerCondition}
         AND ${cloud_agent_code_reviews.platform} = ${input.platform}
         AND ${cloud_agent_code_reviews.platform_integration_id} = ${input.integrationId}
         AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
@@ -1988,6 +1996,7 @@ async function cancelActiveCodeReviewsForIntegrationWithDatabase(
       status = 'cancelled',
       terminal_reason = 'user_cancelled',
       error_message = ${errorMessage},
+      dispatch_reservation_id = NULL,
       completed_at = now(),
       updated_at = now()
     FROM targets
@@ -2028,11 +2037,16 @@ async function settleCancelledReviews(
 }
 
 export async function cancelActiveCodeReviewsForIntegration(
-  input: IntegrationReviewCancellationInput
+  input: IntegrationReviewCancellationInput,
+  /** Run the cancellation query inside a caller-owned transaction (for
+   *  example, alongside a disconnect/uninstall update under the same
+   *  advisory-lock ordering) instead of the default connection. Ledger
+   *  settling always runs afterward, best-effort, against `db`. */
+  transaction?: DrizzleTransaction
 ): Promise<CancelledReviewRow[]> {
   try {
     const cancelled = await cancelActiveCodeReviewsForIntegrationWithDatabase(
-      db,
+      transaction ?? db,
       input,
       'Platform integration disconnected'
     );
@@ -2085,7 +2099,8 @@ export async function disableBitbucketCodeReviewerForIntegration(input: {
       return cancelActiveCodeReviewsForIntegrationWithDatabase(
         tx,
         {
-          ...input,
+          owner: { type: 'org', id: input.organizationId },
+          integrationId: input.integrationId,
           platform: 'bitbucket',
         },
         'Bitbucket Code Reviewer disabled'

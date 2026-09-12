@@ -252,9 +252,30 @@ export async function getActiveSlackInstallationForRuntime(
         .limit(1);
       if (!organization || organization.deletedAt) return null;
     }
-    const botToken = await getSlackAccessToken(legacy);
+    const credential = await getSlackCredentialByIntegrationId(legacy.id);
+    const metadata = legacy.metadata as {
+      access_token?: string;
+      bot_user_id?: string;
+      enterprise_id?: string;
+      is_enterprise_install?: boolean;
+    } | null;
+    const botToken = credential
+      ? decryptSlackBotToken(credential, owner)
+      : (metadata?.access_token ?? null);
     if (!botToken) return null;
-    return { botToken };
+    return {
+      botToken,
+      ...(credential?.bot_user_id || metadata?.bot_user_id
+        ? { botUserId: credential?.bot_user_id ?? metadata?.bot_user_id }
+        : {}),
+      ...(legacy.platform_account_login ? { teamName: legacy.platform_account_login } : {}),
+      ...(credential?.slack_enterprise_id || metadata?.enterprise_id
+        ? { enterpriseId: credential?.slack_enterprise_id ?? metadata?.enterprise_id }
+        : {}),
+      ...((credential?.is_enterprise_install ?? metadata?.is_enterprise_install)
+        ? { isEnterpriseInstall: true }
+        : {}),
+    };
   }
   const owner = getOwnerFromInstallation(row.integration);
   if (!owner || !isPlatformIntegrationHealthy(row.integration)) return null;

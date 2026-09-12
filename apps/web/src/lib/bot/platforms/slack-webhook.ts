@@ -176,7 +176,17 @@ export async function runSlackMaintenanceBestEffort(
  * `app_uninstalled` event for our own cleanup, and forwards everything else to
  * the Slack adapter.
  */
-export function createSlackWebhookHandler(chat: Chat, slackAdapter: SlackAdapter) {
+export function createSlackWebhookHandler(
+  chat: Chat,
+  slackAdapter: SlackAdapter,
+  maintenance: {
+    cleanup: typeof completePendingSlackDeletion;
+    recover: typeof recoverSlackInstallation;
+  } = {
+    cleanup: completePendingSlackDeletion,
+    recover: recoverSlackInstallation,
+  }
+) {
   return async (request: Request, options?: WebhookOptions): Promise<Response> => {
     const body = await request.text();
 
@@ -214,7 +224,7 @@ export function createSlackWebhookHandler(chat: Chat, slackAdapter: SlackAdapter
       await runSlackMaintenanceBestEffort(
         teamId,
         () =>
-          completePendingSlackDeletion(
+          maintenance.cleanup(
             teamId,
             id => slackAdapter.deleteInstallation(id),
             async id => {
@@ -222,7 +232,7 @@ export function createSlackWebhookHandler(chat: Chat, slackAdapter: SlackAdapter
             }
           ),
         () =>
-          recoverSlackInstallation(teamId, (id, installation) =>
+          maintenance.recover(teamId, (id, installation) =>
             slackAdapter.setInstallation(id, installation)
           )
       );

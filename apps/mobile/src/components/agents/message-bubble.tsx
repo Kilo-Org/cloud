@@ -181,7 +181,15 @@ function MessageBubbleImpl({
               <Bubble side="user">
                 <InMessageBubbleContext.Provider value>
                   {userTextContent ? (
-                    <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />
+                    <ChatMarkdownText
+                      value={userTextContent}
+                      variant="user"
+                      selectable={false}
+                      // Forward the bubble's long-press so a press-and-hold on a
+                      // code fence still opens message details instead of being
+                      // swallowed by the fence's copy trigger.
+                      onLongPressCode={onLongPressDetails ? handleLongPress : undefined}
+                    />
                   ) : null}
                   {fileParts.map(part => (
                     <FilePartRenderer
@@ -270,6 +278,9 @@ function MessageBubbleImpl({
                 defaultReasoningExpanded={defaultReasoningExpanded}
                 onOpenChildSession={onOpenChildSession}
                 modelOptions={modelOptions}
+                // Markdown text parts forward this into the code-fence copy
+                // trigger so a long press still opens message details.
+                onLongPressCode={onLongPressDetails ? handleLongPress : undefined}
               />
             ))}
           </View>

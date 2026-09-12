@@ -606,6 +606,70 @@ describe('MessageBubble in-bubble text selection context', () => {
   });
 });
 
+describe('MessageBubble code-copy long-press forwarding', () => {
+  it('forwards the details long-press into user markdown code fences', async () => {
+    const { isTextPart } = await import('./part-types');
+    vi.mocked(isTextPart).mockReturnValue(true);
+    try {
+      const { ChatMarkdownText: MockChatMarkdownText } = await import('./chat-markdown-text');
+      const message = userMessage('m-code-copy');
+      const onLongPressDetails = vi.fn<(value: StoredMessage) => void>();
+      const tree = await renderBubbleWithHandlers(message, { onLongPressDetails });
+
+      const element = findElementByTypeFn(tree, MockChatMarkdownText);
+      expect(element).not.toBeNull();
+      const handler = element?.props.onLongPressCode as (() => void) | undefined;
+      expect(typeof handler).toBe('function');
+      handler?.();
+      expect(onLongPressDetails).toHaveBeenCalledWith(message);
+    } finally {
+      vi.mocked(isTextPart).mockReturnValue(false);
+    }
+  });
+
+  it('forwards the details long-press into assistant part renderers', async () => {
+    const { PartRenderer: MockPartRenderer } = await import('./part-renderer');
+    const message = assistantMessage('m-code-copy-assistant');
+    message.parts = [
+      {
+        id: 'm-code-copy-assistant-text',
+        sessionID: 'ses_1',
+        messageID: 'm-code-copy-assistant',
+        type: 'text',
+        text: 'hi',
+      },
+    ] as typeof message.parts;
+    const onLongPressDetails = vi.fn<(value: StoredMessage) => void>();
+    const tree = await renderBubbleWithHandlers(message, { onLongPressDetails });
+
+    const element = findElementByTypeFn(tree, MockPartRenderer);
+    expect(element).not.toBeNull();
+    const handler = element?.props.onLongPressCode as (() => void) | undefined;
+    expect(typeof handler).toBe('function');
+    handler?.();
+    expect(onLongPressDetails).toHaveBeenCalledWith(message);
+  });
+
+  it('omits the long-press handler when the bubble has no details action', async () => {
+    const { PartRenderer: MockPartRenderer } = await import('./part-renderer');
+    const message = assistantMessage('m-code-copy-none');
+    message.parts = [
+      {
+        id: 'm-code-copy-none-text',
+        sessionID: 'ses_1',
+        messageID: 'm-code-copy-none',
+        type: 'text',
+        text: 'hi',
+      },
+    ] as typeof message.parts;
+    const tree = await renderBubbleWithHandlers(message, {});
+
+    const element = findElementByTypeFn(tree, MockPartRenderer);
+    expect(element).not.toBeNull();
+    expect(element?.props.onLongPressCode).toBeUndefined();
+  });
+});
+
 describe('MessageBubble row rhythm', () => {
   // Spacing class contract: two parts of one assistant message sit gap-2
   // apart; two adjacent messages sit py-1 + py-1 apart, the same value; the

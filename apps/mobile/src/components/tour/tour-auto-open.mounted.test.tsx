@@ -117,4 +117,26 @@ describe('TourAutoOpen', () => {
 
     renderer.unmount();
   });
+
+  // A brand-new account signs in behind the consent gate; its bootstrap guard
+  // replaces any other route back to the gate, so a tour pushed from the gate
+  // is undone within a frame. The once-only marker must survive that bounce and
+  // the tour must open as soon as the gate is answered.
+  it('holds the once-only marker through the consent gate and opens after it', () => {
+    state.pathname = '/consent';
+    const renderer = mountAutoOpen();
+
+    expect(routerPush).not.toHaveBeenCalled();
+
+    // Answering the gate lands on Home; the tour opens then, exactly once.
+    state.pathname = '/(app)/(tabs)/(0_home)';
+    rerender(renderer);
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledWith('/(app)/tour');
+
+    rerender(renderer);
+    expect(routerPush).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
 });

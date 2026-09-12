@@ -69,7 +69,17 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 vi.mock('@/lib/utils', () => ({
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(' '),
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: routerPush }) }));
+vi.mock('expo-router', async () => {
+  const { useEffect } = await import('react');
+  return {
+    useRouter: () => ({ push: routerPush }),
+    // The step refreshes the live list whenever the tour regains focus (the
+    // pushed session screen popping back). Behave like an effect for tests.
+    useFocusEffect: (effect: () => void) => {
+      useEffect(effect, [effect]);
+    },
+  };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#666666', good: '#24784A' }),
 }));
@@ -158,7 +168,9 @@ describe('TourCloudStep', () => {
       press(renderer.root.findByType('Button' as ElementType));
     });
 
-    expect(refetch).toHaveBeenCalledTimes(1);
+    // The mount focus refresh already fired once; the retry control must add
+    // its own call on top of it.
+    expect(refetch).toHaveBeenCalledTimes(2);
     expect(hasText(renderer, 'tour.cloudCheck')).toBe(false);
     unmount();
   });
@@ -210,5 +222,51 @@ describe('TourCloudStep', () => {
     expect(hasText(renderer, 'tour.cloudCheck')).toBe(false);
     expect(renderer.root.findAllByType('Skeleton' as ElementType).length).toBeGreaterThan(0);
     unmount();
+  });
+
+  it('refreshes the live list on focus so a session created in a pushed screen lands', async () => {
+    const onCompletedChange = vi.fn<(completed: boolean) => void>();
+    const refetch = vi.fn(async () => {
+      await Promise.resolve();
+      return true;
+    });
+    liveSync.set({ data: { sessions: [] }, refetch });
+
+    const { unmount } = await renderWithProviders(
+      createElement(TourCloudStep, { onCompletedChange })
+    );
+
+    expect(refetch).toHaveBeenCalled();
+    unmount();
+  });
+
+  it('keeps refreshing while waiting so the created session lands without a heartbeat poll', async () => {
+    vi.useFakeTimers();
+    try {
+      const onCompletedChange = vi.fn<(completed: boolean) => void>();
+      const refetch = vi.fn(async () => {
+        await Promise.resolve();
+        return true;
+      });
+      liveSync.set({ data: { sessions: [] }, refetch });
+
+      const { renderer, unmount } = await renderWithProviders(
+        createElement(TourCloudStep, { onCompletedChange })
+      );
+      const afterMount = refetch.mock.calls.length;
+
+      await act(async () => {
+        await Promise.resolve();
+        press(renderer.root.findByType('Button' as ElementType));
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(5000);
+      });
+
+      expect(refetch.mock.calls.length).toBeGreaterThan(afterMount);
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

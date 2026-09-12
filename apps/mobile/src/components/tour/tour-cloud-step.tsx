@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { type Href, useRouter } from 'expo-router';
+import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -42,6 +42,21 @@ export function TourCloudStep({ onCompletedChange }: Readonly<TourCloudStepProps
     }
   }, [baselineIds, sessions]);
 
+  // The heartbeat stream writes this same cache entry every few seconds, and a
+  // cache write restarts the query's refetch interval (TanStack Query clears
+  // and re-arms it on every query update), so the 30 s poll can be starved for
+  // as long as heartbeats keep arriving. Without this, returning from the
+  // session the person just created leaves the step waiting on a stale list.
+  // Refresh on focus so the check lands the moment the tour is back on screen —
+  // both when the step mounts and when the pushed session screen pops.
+  const refetchRef = useRef(refetch);
+  refetchRef.current = refetch;
+  useFocusEffect(
+    useCallback(() => {
+      void refetchRef.current();
+    }, [])
+  );
+
   const [hasStartedNewSession, setHasStartedNewSession] = useState(false);
 
   const detected =
@@ -57,6 +72,22 @@ export function TourCloudStep({ onCompletedChange }: Readonly<TourCloudStepProps
       setCompleted(true);
     }
   }, [detected]);
+
+  // While the session the person just created is still on its way, refresh the
+  // live list on a short cadence. The heartbeat writes above starve the query's
+  // own refetch interval, so this is what makes the check land promptly after
+  // the create instead of waiting on a poll that never fires.
+  useEffect(() => {
+    if (!hasStartedNewSession || completed) {
+      return undefined;
+    }
+    const id = setInterval(() => {
+      void refetchRef.current();
+    }, 5000);
+    return () => {
+      clearInterval(id);
+    };
+  }, [hasStartedNewSession, completed]);
 
   // Report only on a real change so a re-render never re-notifies the shell.
   const reportedRef = useRef<boolean | null>(null);

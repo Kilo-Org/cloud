@@ -36,6 +36,7 @@
     "cost": "ఖర్చు",
     "discard": "విస్మరించండి",
     "findings": "గుర్తించిన సమస్యలు",
+    "mergeRequest": "మెర్జ్ రిక్వెస్ట్",
     "notConnected": "కనెక్ట్ కాలేదు",
     "notifications": "నోటిఫికేషన్లు",
     "pullRequest": "పుల్ రిక్వెస్ట్",
@@ -350,6 +351,7 @@
       "merge": "మెర్జ్",
       "mergeNow": "ఇప్పుడు మెర్జ్ చేయండి",
       "mergePullRequest": "పుల్ రిక్వెస్ట్ మెర్జ్",
+      "mergeTermTitle": "{{term}} మెర్జ్",
       "enableAutoMerge": "ఆటో-మెర్జ్‌ను ప్రారంభించండి",
       "disableAutoMerge": "ఆటో-మెర్జ్‌ను నిలిపివేయండి",
       "autoMergeOn": "ఆటో-మెర్జ్ ఆన్‌లో ఉంది",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "మెర్జ్ తర్వాత బ్రాంచ్‌ను తొలగించండి",
       "noEnabledMethods": "ఈ రిపోజిటరీలో ఏ మెర్జ్ పద్ధతినీ ప్రారంభించలేదు. మెర్జ్, స్క్వాష్ లేదా రీబేస్ పద్ధతిని ప్రారంభించమని రిపోజిటరీ నిర్వాహకుడిని అడగండి.",
       "confirmTitle": "పుల్ రిక్వెస్ట్‌ను మెర్జ్ చేయాలా?",
+      "confirmTitleTerm": "{{term}}‌ను మెర్జ్ చేయాలా?",
       "confirmMessage": "దీనితో మీ మార్పులు బేస్ బ్రాంచ్‌లో మెర్జ్ అవుతాయి.",
       "enableAutoMergeConfirmTitle": "ఆటో-మెర్జ్‌ను ప్రారంభించాలా?",
       "enableAutoMergeConfirmMessage": "అవసరమైన తనిఖీలన్నీ విజయవంతమయ్యాక GitHub ఈ పుల్ రిక్వెస్ట్‌ను స్వయంచాలకంగా మెర్జ్ చేస్తుంది.",
+      "enableAutoMergeConfirmMessageTerm": "పైప్‌లైన్ విజయవంతమైన తర్వాత {{term}} ఆటోమేటిక్‌గా మెర్జ్ అవుతుంది.",
+      "enableAutoMergeDescriptionTerm": "పైప్‌లైన్ విజయవంతమైన తర్వాత GitLab ఈ {{term}}ను ఆటోమేటిక్‌గా మెర్జ్ చేస్తుంది.",
       "forbidden": "ఈ పుల్ రిక్వెస్ట్‌ను మెర్జ్ చేయడానికి మీకు అనుమతి లేదు.",
       "cannotMerge": "ఈ పుల్ రిక్వెస్ట్‌ను ప్రస్తుత స్థితిలో మెర్జ్ చేయలేము.",
       "couldNotMerge": "పుల్ రిక్వెస్ట్‌ను మెర్జ్ చేయలేకపోయాము.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "ఇప్పటికే మెర్జ్ అయింది",
-        "closed": "ఈ పుల్ రిక్వెస్ట్ మూసివేయబడింది"
+        "closed": "ఈ పుల్ రిక్వెస్ట్ మూసివేయబడింది",
+        "closedMergeRequest": "ఈ మెర్జ్ రిక్వెస్ట్ మూసివేయబడింది"
       },
       "partialSuccessBanner": {
         "body": "బ్రాంచ్‌ను తొలగించలేకపోయాము: {{reason}}.",
@@ -406,6 +412,18 @@
         "behindDetail": "హెడ్ బ్రాంచ్‌లో బేస్ బ్రాంచ్‌లోని తాజా మార్పులు లేవు. మెర్జ్ చేయడానికి ముందు బ్రాంచ్‌ను రీబేస్ చేయండి లేదా నవీకరించండి.",
         "notMergeableTitle": "ఈ పుల్ రిక్వెస్ట్‌ను ఇంకా మెర్జ్ చేయలేము",
         "notMergeableDetail": "మెర్జ్ చేయగల స్థితిని GitHub {{state}}గా తెలిపింది."
+      },
+      "restrictions": {
+        "title": "మెర్జ్ పరిమితులు",
+        "approvalsRequired_one": "{{displayCount}} ఆమోదం అవసరం",
+        "approvalsRequired_other": "{{displayCount}} ఆమోదాలు అవసరం",
+        "pipelineMustSucceed": "మెర్జ్ చేసే ముందు పైప్‌లైన్ విజయవంతం కావాలి."
+      },
+      "providerBlocked": {
+        "failingPipeline": "చివరి కమిట్‌పై పైప్‌లైన్ విఫలమవుతోంది.",
+        "pendingPipeline": "చివరి కమిట్‌పై పైప్‌లైన్ ఇంకా నడుస్తోంది.",
+        "permission": "ఈ {{term}}‌ను మెర్జ్ చేయడానికి మీకు అనుమతి లేదు.",
+        "draft": "మెర్జ్ చేయడానికి ముందు {{term}}‌ను సమీక్షకు సిద్ధంగా ఉన్నట్లు గుర్తించండి."
       },
       "methodLabels": {
         "merge": "మెర్జ్ కమిట్‌ను సృష్టించండి",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "{{lines}}పై పాత వ్యాఖ్య",
         "outdatedOnPath": "{{path}}పై పాత వ్యాఖ్య"
       },
-      "deletedUser": "తొలగించబడిన వినియోగదారు"
+      "deletedUser": "తొలగించబడిన వినియోగదారు",
+      "replyForbiddenTerm": "ఈ {{term}}‌కు ప్రత్యుత్తరం ఇవ్వడానికి మీకు అనుమతి లేదు."
     },
     "couldNotOpenGitHubAppSettings": "GitHub యాప్ సెట్టింగ్‌లను తెరవలేకపోయాం.",
     "installKiloGitHubApp": "Kilo GitHub యాప్‌ను ఇన్‌స్టాల్ చేయండి",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "పుల్ రిక్వెస్ట్‌ను సమీక్షించండి",
     "headLine": "{{counts}} · హెడ్ {{sha}}",
     "entry": {
-      "eyebrow": "URL ద్వారా పుల్ రిక్వెస్ట్‌ను తెరవండి.",
-      "pastePrLink": "PR లింక్‌ను పేస్ట్ చేయండి",
-      "noRecentPrs": "ఇటీవలి PRలు లేవు",
-      "noRecentPrsDescription": "సమీక్ష ప్రారంభించడానికి పైన PR లింక్‌ను పేస్ట్ చేయండి — ఆ PR తదుపరిసారి ఇక్కడ కనిపిస్తుంది.",
+      "eyebrow": "URL ద్వారా పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్‌ను తెరవండి",
+      "pastePrLink": "పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ లింక్‌ను పేస్ట్ చేయండి",
+      "noRecentPrs": "ఇటీవలి సమీక్షలు లేవు",
+      "noRecentPrsDescription": "సమీక్ష ప్రారంభించడానికి పైన లింక్‌ను పేస్ట్ చేయండి — తదుపరి సారి అది ఇక్కడ కనిపిస్తుంది.",
       "couldNotLoad": "లోడ్ చేయలేకపోయాము.",
       "removeFromRecentsTitle": "ఇటీవలి జాబితా నుంచి తీసివేయాలా?",
-      "removeFromRecentsMessage": "ఈ పుల్ రిక్వెస్ట్‌ను మీ ఇటీవలి జాబితా నుంచి తీసివేస్తాము.",
+      "removeFromRecentsMessage": "ఈ సమీక్ష మీ ఇటీవలి జాబితా నుండి తొలగించబడుతుంది.",
       "removeRecentAccessibility": "{{repo}}ను ఇటీవలి జాబితా నుంచి తీసివేయండి",
-      "urlAccessibility": "GitHub పుల్ రిక్వెస్ట్ URL",
-      "clearLink": "పుల్ రిక్వెస్ట్ లింక్‌ను తీసివేయండి",
-      "pasteLink": "పుల్ రిక్వెస్ట్ లింక్‌ను పేస్ట్ చేయండి",
+      "urlAccessibility": "పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ URLను నమోదు చేయండి",
+      "urlPlaceholder": "పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ URL",
+      "openAccessibility": "పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్‌ను తెరవండి",
+      "clearLink": "లింక్‌ను తొలగించండి",
+      "pasteLink": "పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ లింక్‌ను పేస్ట్ చేయండి",
       "open": "ఓపెన్"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "GitHub కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
       "checkFailedMessage": "ఇది లోడ్ అయ్యే వరకు సైన్ ఇన్ స్థితిని తెలుసుకోలేము.",
+      "checkFailedTitleGitLab": "GitLab కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
+      "checkFailedTitleBitbucket": "Bitbucket కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
+      "providerCheckFailedMessage": "ఇది లోడ్ అయ్యే వరకు కనెక్షన్ స్థితి అందుబాటులో ఉండదు.",
       "reconnectTitle": "GitHubకు మళ్లీ కనెక్షన్",
       "reconnectDescription": "మీ GitHub కనెక్షన్ అనుమతిని రద్దు చేశారు. మొబైల్‌లో పుల్ రిక్వెస్ట్‌లను సమీక్షించడం కొనసాగించడానికి మళ్లీ కనెక్ట్ చేయండి.",
-      "description": "మొబైల్‌లో పుల్ రిక్వెస్ట్‌లను సమీక్షించడానికి మీ GitHub ఖాతాను కనెక్ట్ చేయండి."
+      "description": "మొబైల్‌లో పుల్ రిక్వెస్ట్‌లను సమీక్షించడానికి మీ GitHub ఖాతాను కనెక్ట్ చేయండి.",
+      "gitlabDescription": "మొబైల్‌లో మెర్జ్ రిక్వెస్ట్‌లను సమీక్షించడానికి మీ GitLab ఖాతాను కనెక్ట్ చేయండి.",
+      "bitbucketDescription": "మొబైల్‌లో పుల్ రిక్వెస్ట్‌లను సమీక్షించడానికి ఈ సంస్థను Bitbucketకు కనెక్ట్ చేయండి.",
+      "bitbucketOrgOnlyDescription": "దాని Bitbucket పుల్ రిక్వెస్ట్‌లను సమీక్షించడానికి మీ ప్రొఫైల్‌లో సంస్థను ఎంచుకోండి."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub కనెక్షన్ గడువు ముగిసింది.",
-      "message": "మీ GitHub కనెక్షన్ ఇక చెల్లదు. కనెక్షన్‌ను మళ్లీ తనిఖీ చేయండి — అవసరమైతే మళ్లీ కనెక్ట్ చేయమని అడుగుతాము."
+      "message": "మీ GitHub కనెక్షన్ ఇక చెల్లదు. కనెక్షన్‌ను మళ్లీ తనిఖీ చేయండి — అవసరమైతే మళ్లీ కనెక్ట్ చేయమని అడుగుతాము.",
+      "gitlabTitle": "GitLab కనెక్షన్ గడువు ముగిసింది.",
+      "bitbucketTitle": "Bitbucket కనెక్షన్ గడువు ముగిసింది.",
+      "providerMessage": "మీ {{provider}} కనెక్షన్ ఇక చెల్లదు. కనెక్షన్‌ను మళ్లీ తనిఖీ చేయండి — అవసరమైతే మళ్లీ కనెక్ట్ చేయమని అడుగుతాము."
     },
     "eventChips": {
       "comment": "వ్యాఖ్య",
@@ -668,7 +698,7 @@
       "emptyLine": "(ఖాళీ)"
     },
     "linkPasteClipboardEmpty": "క్లిప్‌బోర్డ్ ఖాళీగా ఉంది.",
-    "linkPasteNotAPullRequest": "ఇది GitHub పుల్ రిక్వెస్ట్ లింక్ కాదు.",
+    "linkPasteNotAPullRequest": "ఇది పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ లింక్ కాదు",
     "announce": {
       "commentPosted": "వ్యాఖ్య పోస్ట్ చేయబడింది",
       "reviewSubmitted": "సమీక్ష సమర్పించబడింది",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "ఈ వ్యాఖ్యను పోస్ట్ చేయలేము. ఎంచుకున్న పంక్తి మారి ఉండవచ్చు లేదా PRను నవీకరించి ఉండవచ్చు.",
       "reviewNotSubmitted": "ఈ సమీక్షను ప్రస్తుత స్థితిలో సమర్పించలేము. PRలో మార్పులు జరిగి ఉండవచ్చు లేదా ఇది మీ స్వంత పుల్ రిక్వెస్ట్ కావచ్చు, దాన్ని మీరే సమీక్షించలేరు.",
+      "reviewNotSubmittedTerm": "ఈ సమీక్షను అలాగే సమర్పించలేము. {{term}} మారి ఉండవచ్చు, లేదా మీ స్వంత {{term}}ను మీరు సమీక్షించలేరు.",
       "couldNotPostComment": "వ్యాఖ్యను పోస్ట్ చేయలేకపోయాము.",
       "couldNotSubmitReview": "సమీక్షను సమర్పించలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "బదులు పంపలేకపోయాం.",
       "couldNotCompleteAction": "ఈ చర్యను పూర్తి చేయలేకపోయాము.",
       "mergeResultDefaultError": "GitHub మెర్జ్‌ను పూర్తి చేయలేదు.",
+      "mergeResultNotCompleted": "{{term}} మెర్జ్ కాలేదు. దాని స్థితిని తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
       "ambiguous": "నిర్ధారించలేకపోయాము — మళ్లీ ప్రయత్నించే ముందు PRని తనిఖీ చేయండి.",
       "persistenceFailed": "ఈ చర్యను నమోదు చేయలేకపోయాము. తర్వాత మళ్లీ ప్రయత్నించండి.",
       "forbidden": "ఈ చర్యకు అనుమతి లేదు."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "ఈ ప్రొవైడర్‌లో అందుబాటులో లేదు",
+        "accessibility": "ఈ ప్రొవైడర్‌లో అందుబాటులో లేదు: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "పుల్ రిక్వెస్ట్",
+      "mergeRequest": "మెర్జ్ రిక్వెస్ట్",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "మెర్జ్ రిక్వెస్ట్‌ను పంచుకోండి",
+      "viewOnProvider": "{{provider}}పై చూడండి",
+      "mergeRequestUnavailable": "మెర్జ్ రిక్వెస్ట్ అందుబాటులో లేదు",
+      "unavailableDescription": "అది తొలగించబడి ఉండవచ్చు, లేదా మీకు దానికి యాక్సెస్ ఉండకపోవచ్చు.",
+      "accessDeniedMergeRequest": "ఈ మెర్జ్ రిక్వెస్ట్‌ను చూడటానికి మీకు అనుమతి లేదు.",
+      "couldNotLoadMergeRequest": "మెర్జ్ రిక్వెస్ట్‌ను లోడ్ చేయలేకపోయాము.",
+      "discussionAccessDenied": "ఈ మెర్జ్ రిక్వెస్ట్ చర్చను చూడటానికి మీకు అనుమతి లేదు.",
+      "discussionUnavailableMessage": "ఈ మెర్జ్ రిక్వెస్ట్ తీసివేయబడి ఉండవచ్చు.",
+      "noDiscussionDescription": "ఈ మెర్జ్ రిక్వెస్ట్‌పై సమీక్ష చర్చలు లేదా సంభాషణలో వ్యాఖ్యలు లేవు.",
+      "noFilesChangedDescription": "ఈ మెర్జ్ రిక్వెస్ట్‌లో ఏ ఫైల్‌లోనూ మార్పులు లేవు."
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "కనెక్ట్ చేయడానికి మళ్లీ ప్రయత్నించండి"
     },
     "newSession": {
+      "recentlyUsed": "ఇటీవల ఉపయోగించినవి",
+      "couldNotLoadGithubRepositories": "GitHub రిపోజిటరీలను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoadGitlabRepositories": "GitLab రిపోజిటరీలను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket రిపోజిటరీలను లోడ్ చేయలేకపోయాము.",
       "connectGithubDescription": "మీ బ్రౌజర్‌లో GitHubను కనెక్ట్ చేయండి. తర్వాత రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడికి తిరిగి రండి.",
+      "connectGitlabDescription": "మీ బ్రౌజర్‌లో GitLabను కనెక్ట్ చేయండి. తర్వాత రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడికి తిరిగి రండి.",
+      "connectBitbucketDescription": "మీ బ్రౌజర్‌లో Bitbucketను కనెక్ట్ చేయండి. తర్వాత రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడికి తిరిగి రండి.",
       "openGithub": "GitHub తెరవండి",
+      "openGitlab": "GitLab తెరవండి",
+      "openBitbucket": "Bitbucket తెరవండి",
       "refreshRepositories": "రిపోజిటరీలను రిఫ్రెష్ చేయండి",
       "githubConnected": "GitHub కనెక్ట్ అయింది",
+      "gitlabConnected": "GitLab కనెక్ట్ అయింది",
       "noRepositoriesVisible": "రిపోజిటరీలు కనిపించడం లేదు. Kilo GitHub యాప్‌కు రిపోజిటరీలను యాక్సెస్ చేసే అనుమతి ఉందో తనిఖీ చేసి, రిఫ్రెష్ చేయండి.",
+      "noRepositoriesVisibleGitlab": "రిపోజిటరీలు కనిపించడం లేదు. GitLabలో రిపోజిటరీలను యాక్సెస్ చేసే అనుమతులను తనిఖీ చేసి, రిఫ్రెష్ చేయండి.",
+      "noRepositoriesVisibleBitbucket": "రిపోజిటరీలు కనిపించడం లేదు. Bitbucketలో రిపోజిటరీలను యాక్సెస్ చేసే అనుమతులను తనిఖీ చేసి, రిఫ్రెష్ చేయండి.",
+      "bitbucketOrganizationsOnly": "Bitbucket సంస్థలకు మాత్రమే అందుబాటులో ఉంటుంది.",
+      "branchPickerTitle": "బ్రాంచ్‌ను ఎంచుకోండి",
+      "branchDefault": "డిఫాల్ట్",
+      "branchAccessibility": "బ్రాంచ్: {{label}}",
+      "branchLoading": "బ్రాంచ్‌లు లోడ్ అవుతున్నాయి",
+      "branchLoadError": "బ్రాంచ్‌లను లోడ్ చేయలేకపోయాము",
+      "branchUnavailable": "ఈ రిపొజిటరీ కోసం బ్రాంచ్‌లు అందుబాటులో లేవు. ప్రొవైడర్ వద్ద మీ యాక్సెస్‌ను తనిఖీ చేసి, వేరే రిపొజిటరీని ఎంచుకోండి.",
+      "branchEmpty": "బ్రాంచ్‌లు అందుబాటులో లేవు",
+      "branchPlaceholder": "బ్రాంచ్‌ను ఎంచుకోండి",
       "runOnWithTarget": "అమలు చేసే చోటు: {{target}}",
       "environment": "పని వాతావరణం",
       "couldNotLoadEnvironment": "మీ పని వాతావరణాన్ని లోడ్ చేయలేకపోయాము.",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "రిపోజిటరీలను రిఫ్రెష్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించండి.",
       "discardDraftTitle": "చిత్తుప్రతిని తొలగించాలా?",
       "discardDraftMessage": "మీ ప్రాంప్ట్ తొలగిపోతుంది.",
+      "discardWithUploadsMessage": "మీ ప్రాంప్ట్‌తో పాటు, అప్‌లోడ్ చేసి ఇంకా ఉపయోగించని ఫైళ్లు కూడా తొలగిపోతాయి.",
       "discardFailed": "చిత్తుప్రతిని తొలగించలేకపోయాము. మళ్లీ ప్రయత్నించండి.",
       "remoteHint": "స్థానిక kilo ప్రాసెస్‌ను నియంత్రించడానికి మీ కంప్యూటర్‌లో `kilo remote` అమలు చేయండి లేదా నడుస్తున్న CLI సెషన్‌లో `/remote` అమలు చేయండి.",
-      "connectBitbucketDescription": "మీ బ్రౌజర్‌లో Bitbucketను కనెక్ట్ చేయండి. తర్వాత రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడికి తిరిగి రండి.",
-      "connectGitlabDescription": "మీ బ్రౌజర్‌లో GitLabను కనెక్ట్ చేయండి. తర్వాత రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడికి తిరిగి రండి.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket రిపోజిటరీలను లోడ్ చేయలేకపోయాము.",
-      "couldNotLoadGithubRepositories": "GitHub రిపోజిటరీలను లోడ్ చేయలేకపోయాము.",
-      "couldNotLoadGitlabRepositories": "GitLab రిపోజిటరీలను లోడ్ చేయలేకపోయాము.",
-      "gitlabConnected": "GitLab కనెక్ట్ అయింది",
-      "noRepositoriesVisibleBitbucket": "రిపోజిటరీలు కనిపించడం లేదు. Bitbucketలో రిపోజిటరీలను యాక్సెస్ చేసే అనుమతులను తనిఖీ చేసి, రిఫ్రెష్ చేయండి.",
-      "noRepositoriesVisibleGitlab": "రిపోజిటరీలు కనిపించడం లేదు. GitLabలో రిపోజిటరీలను యాక్సెస్ చేసే అనుమతులను తనిఖీ చేసి, రిఫ్రెష్ చేయండి.",
-      "openBitbucket": "Bitbucket తెరవండి",
-      "openGitlab": "GitLab తెరవండి",
-      "recentlyUsed": "ఇటీవల ఉపయోగించినవి",
       "continueFrom": "{{title}}ను కొనసాగిస్తోంది.",
       "importingSession": "సెషన్‌ను దిగుమతి చేస్తోంది",
       "cliCannotContinue": "ఈ CLIతో సెషన్‌ను కొనసాగించడం సాధ్యం కాదు. Cloud Agent లేదా మరో CLIను ఎంచుకోండి.",
-      "importFailed": "ఈ సెషన్‌ను దిగుమతి చేయలేకపోయాము.",
-      "discardWithUploadsMessage": "మీ ప్రాంప్ట్‌తో పాటు, అప్‌లోడ్ చేసి ఇంకా ఉపయోగించని ఫైళ్లు కూడా తొలగిపోతాయి."
+      "importFailed": "ఈ సెషన్‌ను దిగుమతి చేయలేకపోయాము."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్‌ను నవీకరించాము.",

@@ -36,6 +36,7 @@
     "cost": "Зардал",
     "discard": "Хаях",
     "findings": "Илэрсэн асуудлууд",
+    "mergeRequest": "нэгтгэх хүсэлт",
     "notConnected": "Холбогдоогүй",
     "notifications": "Мэдэгдэл",
     "pullRequest": "нэгтгэх хүсэлт",
@@ -350,6 +351,7 @@
       "merge": "Нэгтгэх",
       "mergeNow": "Одоо нэгтгэх",
       "mergePullRequest": "Нэгтгэх хүсэлтийг нэгтгэх",
+      "mergeTermTitle": "{{term}}ийг нэгтгэх",
       "enableAutoMerge": "Автоматаар нэгтгэхийг идэвхжүүлэх",
       "disableAutoMerge": "Автоматаар нэгтгэхийг идэвхгүй болгох",
       "autoMergeOn": "Автоматаар нэгтгэх идэвхтэй",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "Нэгтгэсний дараа салбарыг устгах",
       "noEnabledMethods": "Энэ кодын санд нэгтгэх ямар ч аргыг идэвхжүүлээгүй байна. Энгийн нэгтгэл, коммитуудыг багцлан нэгтгэх эсвэл суурийг нь сольж нэгтгэх аргыг идэвхжүүлэхийг кодын сангийн админаас хүснэ үү.",
       "confirmTitle": "Нэгтгэх хүсэлтийг нэгтгэх үү?",
+      "confirmTitleTerm": "{{term}}ийг нэгтгэх үү?",
       "confirmMessage": "Энэ нь таны өөрчлөлтийг суурь салбарт нэгтгэнэ.",
       "enableAutoMergeConfirmTitle": "Автоматаар нэгтгэхийг идэвхжүүлэх үү?",
       "enableAutoMergeConfirmMessage": "Шаардлагатай бүх шалгалт амжилттай болмогц GitHub энэ нэгтгэх хүсэлтийг автоматаар нэгтгэнэ.",
+      "enableAutoMergeConfirmMessageTerm": "Пайплайн амжилттай болсны дараа {{term}} автоматаар нэгтгэгдэнэ.",
+      "enableAutoMergeDescriptionTerm": "Пайплайн амжилттай болвол GitLab энэ {{term}}-ийг автоматаар нэгтгэнэ.",
       "forbidden": "Танд энэ нэгтгэх хүсэлтийг нэгтгэх эрх байхгүй.",
       "cannotMerge": "Энэ нэгтгэх хүсэлтийг одоогийн байдлаар нь нэгтгэх боломжгүй.",
       "couldNotMerge": "Нэгтгэх хүсэлтийг нэгтгэж чадсангүй.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Аль хэдийн нэгтгэсэн",
-        "closed": "Энэ нэгтгэх хүсэлт хаагдсан"
+        "closed": "Энэ нэгтгэх хүсэлт хаагдсан",
+        "closedMergeRequest": "Энэ нэгтгэх хүсэлт хаагдсан"
       },
       "partialSuccessBanner": {
         "body": "Салбарыг устгаж чадсангүй: {{reason}}.",
@@ -406,6 +412,18 @@
         "behindDetail": "Эх салбар суурь салбараас хоцорсон байна. Нэгтгэхээс өмнө салбарын суурийг солих эсвэл салбарыг шинэчилнэ үү.",
         "notMergeableTitle": "Энэ нэгтгэх хүсэлтийг хараахан нэгтгэх боломжгүй",
         "notMergeableDetail": "GitHub нэгтгэх боломжийн төлөвийг {{state}} гэж мэдээлсэн."
+      },
+      "restrictions": {
+        "title": "Нэгтгэх хязгаарлалт",
+        "approvalsRequired_one": "{{displayCount}} зөвшөөрөл шаардлагатай",
+        "approvalsRequired_other": "{{displayCount}} зөвшөөрөл шаардлагатай",
+        "pipelineMustSucceed": "Нэгтгэхээс өмнө пайплайн амжилттай байх ёстой."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Пайплайн сүүлийн коммит дээр амжилтгүй байна.",
+        "pendingPipeline": "Пайплайн сүүлийн коммит дээр ажиллаж байна.",
+        "permission": "Танд энэ {{term}}ийг нэгтгэх эрх байхгүй.",
+        "draft": "Нэгтгэхээс өмнө {{term}}ийг хянуулахад бэлэн гэж тэмдэглэнэ үү."
       },
       "methodLabels": {
         "merge": "Нэгтгэх коммит үүсгэх",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "Хуучирсан: {{lines}}",
         "outdatedOnPath": "Хуучирсан: {{path}}"
       },
-      "deletedUser": "устгагдсан хэрэглэгч"
+      "deletedUser": "устгагдсан хэрэглэгч",
+      "replyForbiddenTerm": "Танд энэ {{term}}эд хариу бичих эрх байхгүй."
     },
     "couldNotOpenGitHubAppSettings": "GitHub аппын тохиргоог нээж чадсангүй.",
     "installKiloGitHubApp": "Kilo GitHub аппыг суулгах",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "Нэгтгэх хүсэлтийг хянах",
     "headLine": "{{counts}} · сүүлийн коммит: {{sha}}",
     "entry": {
-      "eyebrow": "Нэгтгэх хүсэлтийг URL-ээр нээнэ үү.",
-      "pastePrLink": "PR-ын холбоосыг буулгах",
-      "noRecentPrs": "Саяхан үзсэн PR алга",
-      "noRecentPrsDescription": "Хянаж эхлэхийн тулд PR-ын холбоосыг дээр буулгана уу. Дараагийн удаа тэр PR энд харагдана.",
+      "eyebrow": "URL-ээр татах эсвэл нэгтгэх хүсэлт нээнэ үү.",
+      "pastePrLink": "Татах эсвэл нэгтгэх хүсэлтийн холбоосыг буулгах",
+      "noRecentPrs": "Саяхны шалгалт алга",
+      "noRecentPrsDescription": "Шалгалт эхлэхийн тулд холбоосыг дээр буулгана уу — дараагийн удаа тэр энд харагдана.",
       "couldNotLoad": "Ачаалж чадсангүй.",
       "removeFromRecentsTitle": "Саяхан үзсэн жагсаалтаас хасах уу?",
-      "removeFromRecentsMessage": "Энэ нэгтгэх хүсэлт таны саяхан үзсэн жагсаалтаас хасагдана.",
+      "removeFromRecentsMessage": "Энэ шалгалт таны саяхны жагсаалтаас хасагдана.",
       "removeRecentAccessibility": "{{repo}}-г саяхан үзсэн жагсаалтаас хасах",
-      "urlAccessibility": "GitHub нэгтгэх хүсэлтийн URL",
-      "clearLink": "Нэгтгэх хүсэлтийн холбоосыг арилгах",
-      "pasteLink": "Нэгтгэх хүсэлтийн холбоосыг буулгах",
+      "urlAccessibility": "Татах эсвэл нэгтгэх хүсэлтийн URL-ийг бичнэ үү",
+      "urlPlaceholder": "Татах эсвэл нэгтгэх хүсэлтийн URL",
+      "openAccessibility": "Татах эсвэл нэгтгэх хүсэлт нээх",
+      "clearLink": "Холбоосыг арилгах",
+      "pasteLink": "Татах эсвэл нэгтгэх хүсэлтийн холбоосыг буулгах",
       "open": "Нээлттэй"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "GitHub холболтыг шалгаж чадсангүй.",
       "checkFailedMessage": "Энэ мэдээллийг ачаалж дуустал нэвтэрсэн эсэхийг харуулах боломжгүй.",
+      "checkFailedTitleGitLab": "GitLab холболтыг шалгаж чадсангүй.",
+      "checkFailedTitleBitbucket": "Bitbucket холболтыг шалгаж чадсангүй.",
+      "providerCheckFailedMessage": "Ачаалагдах хүртэл холболтын төлөв харагдахгүй.",
       "reconnectTitle": "GitHub-ыг дахин холбох",
       "reconnectDescription": "Таны GitHub холболтын зөвшөөрлийг цуцалсан байна. Гар утаснаасаа нэгтгэх хүсэлтүүдийг үргэлжлүүлэн хянахын тулд дахин холбоно уу.",
-      "description": "Гар утаснаасаа нэгтгэх хүсэлтүүдийг хянахын тулд GitHub бүртгэлээ холбоно уу."
+      "description": "Гар утаснаасаа нэгтгэх хүсэлтүүдийг хянахын тулд GitHub бүртгэлээ холбоно уу.",
+      "gitlabDescription": "Гар утаснаас нэгтгэх хүсэлтүүдийг шалгахын тулд GitLab бүртгэлээ холбоно уу.",
+      "bitbucketDescription": "Гар утаснаас татах хүсэлтүүдийг шалгахын тулд Bitbucket-ийг энэ байгууллагад холбоно уу.",
+      "bitbucketOrgOnlyDescription": "Тухайн байгууллагын Bitbucket татах хүсэлтүүдийг шалгахын тулд профайлаасаа байгууллага сонгоно уу."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub холболтын хугацаа дууссан.",
-      "message": "Таны GitHub холболт хүчингүй болсон. Холболтоо дахин шалгана уу. Шаардлагатай бол дахин холбох заавар гарна."
+      "message": "Таны GitHub холболт хүчингүй болсон. Холболтоо дахин шалгана уу. Шаардлагатай бол дахин холбох заавар гарна.",
+      "gitlabTitle": "GitLab холболтын хугацаа дууссан.",
+      "bitbucketTitle": "Bitbucket холболтын хугацаа дууссан.",
+      "providerMessage": "Таны {{provider}} холболт хүчингүй болсон. Холболтоо дахин шалгана уу. Шаардлагатай бол дахин холбох заавар гарна."
     },
     "eventChips": {
       "comment": "Сэтгэгдэл бичих",
@@ -668,7 +698,7 @@
       "emptyLine": "(хоосон)"
     },
     "linkPasteClipboardEmpty": "Хуулах санах ой хоосон байна.",
-    "linkPasteNotAPullRequest": "Энэ нь GitHub нэгтгэх хүсэлтийн холбоос биш байна.",
+    "linkPasteNotAPullRequest": "Энэ татах эсвэл нэгтгэх хүсэлтийн холбоос биш байна.",
     "announce": {
       "commentPosted": "Сэтгэгдэл нийтлэгдсэн",
       "reviewSubmitted": "Хяналтыг илгээсэн",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "Энэ сэтгэгдлийг нийтлэх боломжгүй. Сонгосон мөр өөрчлөгдсөн эсвэл PR шинэчлэгдсэн байж болзошгүй.",
       "reviewNotSubmitted": "Энэ хяналтыг одоогийн байдлаар нь илгээх боломжгүй. PR өөрчлөгдсөн байж болзошгүй, эсвэл та өөрийн нэгтгэх хүсэлтийг хянах гэж оролдсон байна.",
+      "reviewNotSubmittedTerm": "Энэ шалгалтыг хэвээр нь илгээх боломжгүй. {{term}} өөрчлөгдсөн байж болзошгүй, эсвэл та өөрийн {{term}}-г шалгах боломжгүй.",
       "couldNotPostComment": "Сэтгэгдлийг нийтэлж чадсангүй.",
       "couldNotSubmitReview": "Хяналтыг илгээж чадсангүй. Холболтоо шалгаад дахин оролдоно уу."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "Хариу илгээж чадсангүй.",
       "couldNotCompleteAction": "Энэ үйлдлийг гүйцэтгэж чадсангүй.",
       "mergeResultDefaultError": "GitHub нэгтгэх үйлдлийг дуусгаагүй.",
+      "mergeResultNotCompleted": "{{term}} нэгтгэгдсэнгүй. Төлөвийг шалгаад дахин оролдоно уу.",
       "ambiguous": "Баталгаажуулж чадсангүй. Дахин оролдохын өмнө PR-ыг шалгана уу.",
       "persistenceFailed": "Энэ үйлдлийг бүртгэж чадсангүй. Дараа дахин оролдоно уу.",
       "forbidden": "Энэ үйлдлийг хийх эрх байхгүй."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Энэ провайдерт боломжгүй",
+        "accessibility": "Энэ провайдерт боломжгүй: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Нэгтгэх хүсэлт",
+      "mergeRequest": "Нэгтгэх хүсэлт",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Нэгтгэх хүсэлтийг хуваалцах",
+      "viewOnProvider": "{{provider}} дээр харах",
+      "mergeRequestUnavailable": "Нэгтгэх хүсэлтийг нээх боломжгүй",
+      "unavailableDescription": "Устсан байж болзошгүй, эсвэл танд хандах эрх байхгүй.",
+      "accessDeniedMergeRequest": "Танд энэ нэгтгэх хүсэлтийг үзэх эрх байхгүй.",
+      "couldNotLoadMergeRequest": "Нэгтгэх хүсэлтийг ачаалж чадсангүй.",
+      "discussionAccessDenied": "Танд энэ нэгтгэх хүсэлтийн хэлэлцүүлгийг үзэх эрх байхгүй.",
+      "discussionUnavailableMessage": "Энэ нэгтгэх хүсэлтийг устгасан байж болзошгүй.",
+      "noDiscussionDescription": "Энэ нэгтгэх хүсэлтэд хяналтын сэдэв эсвэл хэлэлцүүлгийн сэтгэгдэл байхгүй.",
+      "noFilesChangedDescription": "Энэ нэгтгэх хүсэлтэд файлын өөрчлөлт байхгүй."
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "Дахин холбогдох"
     },
     "newSession": {
+      "recentlyUsed": "Сүүлд ашигласан",
+      "couldNotLoadGithubRepositories": "GitHub-ийн кодын сангуудыг ачаалж чадсангүй.",
+      "couldNotLoadGitlabRepositories": "GitLab-ийн кодын сангуудыг ачаалж чадсангүй.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket-ийн кодын сангуудыг ачаалж чадсангүй.",
       "connectGithubDescription": "Хөтөч дээрээ GitHub-ыг холбоод, энд буцаж ирж кодын сангаа сонгоно уу.",
+      "connectGitlabDescription": "Хөтөч дээрээ GitLab-ыг холбоод, энд буцаж ирж кодын сангаа сонгоно уу.",
+      "connectBitbucketDescription": "Хөтөч дээрээ Bitbucket-ыг холбоод, энд буцаж ирж кодын сангаа сонгоно уу.",
       "openGithub": "GitHub-ыг нээх",
+      "openGitlab": "GitLab-ыг нээх",
+      "openBitbucket": "Bitbucket-ыг нээх",
       "refreshRepositories": "Кодын сангийн жагсаалтыг шинэчлэх",
       "githubConnected": "GitHub холбогдсон",
+      "gitlabConnected": "GitLab холбогдсон",
       "noRepositoriesVisible": "Кодын сан харагдахгүй байна. Kilo GitHub аппын кодын санд хандах эрхийг шалгаад жагсаалтыг шинэчилнэ үү.",
+      "noRepositoriesVisibleGitlab": "Кодын сан харагдахгүй байна. GitLab-ийн кодын санд хандах эрхийг шалгаад жагсаалтыг шинэчилнэ үү.",
+      "noRepositoriesVisibleBitbucket": "Кодын сан харагдахгүй байна. Bitbucket-ийн кодын санд хандах эрхийг шалгаад жагсаалтыг шинэчилнэ үү.",
+      "bitbucketOrganizationsOnly": "Bitbucket зөвхөн байгууллагуудад боломжтой.",
+      "branchPickerTitle": "Салбар сонгох",
+      "branchDefault": "Өгөгдмөл",
+      "branchAccessibility": "Салбар: {{label}}",
+      "branchLoading": "Салбаруудыг ачаалж байна",
+      "branchLoadError": "Салбаруудыг ачаалж чадсангүй",
+      "branchUnavailable": "Энэ кодны санд салбарууд боломжгүй. Провайдераас хандах эрхээ шалгаад, өөр кодны сан сонгоно уу.",
+      "branchEmpty": "Салбар боломжгүй",
+      "branchPlaceholder": "Салбар сонгоно уу",
       "runOnWithTarget": "{{target}} дээр ажиллуулах",
       "environment": "Орчин",
       "couldNotLoadEnvironment": "Таны орчныг ачаалж чадсангүй.",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "Кодын сангийн жагсаалтыг шинэчилж чадсангүй. Дахин оролдоно уу.",
       "discardDraftTitle": "Нооргийг устгах уу?",
       "discardDraftMessage": "Таны бичсэн заавар устах болно.",
+      "discardWithUploadsMessage": "Таны бичсэн заавар болон илгээсэн мессежид хавсаргаагүй файлууд устах болно.",
       "discardFailed": "Нооргийг устгаж чадсангүй. Дахин оролдоно уу.",
       "remoteHint": "Компьютер дээрээ ажиллаж буй kilo процессыг удирдахын тулд `kilo remote`, эсвэл ажиллаж буй CLI сессэд `/remote` командыг ажиллуулна уу.",
-      "connectBitbucketDescription": "Хөтөч дээрээ Bitbucket-ыг холбоод, энд буцаж ирж кодын сангаа сонгоно уу.",
-      "connectGitlabDescription": "Хөтөч дээрээ GitLab-ыг холбоод, энд буцаж ирж кодын сангаа сонгоно уу.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket-ийн кодын сангуудыг ачаалж чадсангүй.",
-      "couldNotLoadGithubRepositories": "GitHub-ийн кодын сангуудыг ачаалж чадсангүй.",
-      "couldNotLoadGitlabRepositories": "GitLab-ийн кодын сангуудыг ачаалж чадсангүй.",
-      "gitlabConnected": "GitLab холбогдсон",
-      "noRepositoriesVisibleBitbucket": "Кодын сан харагдахгүй байна. Bitbucket-ийн кодын санд хандах эрхийг шалгаад жагсаалтыг шинэчилнэ үү.",
-      "noRepositoriesVisibleGitlab": "Кодын сан харагдахгүй байна. GitLab-ийн кодын санд хандах эрхийг шалгаад жагсаалтыг шинэчилнэ үү.",
-      "openBitbucket": "Bitbucket-ыг нээх",
-      "openGitlab": "GitLab-ыг нээх",
-      "recentlyUsed": "Сүүлд ашигласан",
       "continueFrom": "«{{title}}» сессийг үргэлжлүүлж байна.",
       "importingSession": "Сесс импортлож байна",
       "cliCannotContinue": "Энэ CLI сессийг үргэлжлүүлэх боломжгүй. Cloud Agent эсвэл өөр CLI сонгоно уу.",
-      "importFailed": "Энэ сессийг импортолж чадсангүй.",
-      "discardWithUploadsMessage": "Таны бичсэн заавар болон илгээсэн мессежид хавсаргаагүй файлууд устах болно."
+      "importFailed": "Энэ сессийг импортолж чадсангүй."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файлыг шинэчиллээ.",

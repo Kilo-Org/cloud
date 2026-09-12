@@ -4,6 +4,8 @@
     "done": "Xong",
     "retry": "Thử lại",
     "tryAgain": "Thử lại",
+    "continue": "Tiếp tục",
+    "notNow": "Để sau",
     "language": "Ngôn ngữ",
     "device": "Thiết bị",
     "share": "Chia sẻ {{title}}",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "Không thể sao chép vào bộ nhớ tạm.",
     "required": "bắt buộc",
     "error": "lỗi: {{error}}",
-    "notNow": "Để sau",
-    "continue": "Tiếp tục",
     "back": "Quay lại",
     "somethingWentWrong": "Đã xảy ra lỗi.",
     "couldNotOpen": "Không thể mở {{label}}.",
@@ -36,6 +36,7 @@
     "cost": "Chi phí",
     "discard": "Hủy bỏ",
     "findings": "Vấn đề",
+    "mergeRequest": "merge request",
     "notConnected": "Chưa kết nối",
     "notifications": "Thông báo",
     "pullRequest": "yêu cầu hợp nhất",
@@ -1563,11 +1564,31 @@
       "retryConnection": "Thử kết nối lại"
     },
     "newSession": {
+      "recentlyUsed": "Đã dùng gần đây",
+      "couldNotLoadGithubRepositories": "Không thể tải danh sách kho mã GitHub.",
+      "couldNotLoadGitlabRepositories": "Không thể tải danh sách kho mã GitLab.",
+      "couldNotLoadBitbucketRepositories": "Không thể tải danh sách kho mã Bitbucket.",
       "connectGithubDescription": "Kết nối GitHub trong trình duyệt, rồi quay lại đây để chọn kho mã.",
+      "connectGitlabDescription": "Kết nối GitLab trong trình duyệt, rồi quay lại đây để chọn kho mã.",
+      "connectBitbucketDescription": "Kết nối Bitbucket trong trình duyệt, rồi quay lại đây để chọn kho mã.",
       "openGithub": "Mở GitHub",
+      "openGitlab": "Mở GitLab",
+      "openBitbucket": "Mở Bitbucket",
       "refreshRepositories": "Làm mới danh sách kho mã",
       "githubConnected": "Đã kết nối GitHub",
+      "gitlabConnected": "Đã kết nối GitLab",
       "noRepositoriesVisible": "Không thấy kho mã nào. Hãy kiểm tra quyền truy cập kho mã của ứng dụng Kilo trên GitHub, rồi làm mới danh sách.",
+      "noRepositoriesVisibleGitlab": "Không thấy kho mã nào. Hãy kiểm tra quyền truy cập kho mã trên GitLab, rồi làm mới danh sách.",
+      "noRepositoriesVisibleBitbucket": "Không thấy kho mã nào. Hãy kiểm tra quyền truy cập kho mã trên Bitbucket, rồi làm mới danh sách.",
+      "bitbucketOrganizationsOnly": "Bitbucket chỉ khả dụng cho các tổ chức.",
+      "branchPickerTitle": "Chọn nhánh",
+      "branchDefault": "Mặc định",
+      "branchAccessibility": "Nhánh: {{label}}",
+      "branchLoading": "Đang tải các nhánh",
+      "branchLoadError": "Không tải được các nhánh",
+      "branchUnavailable": "Không có nhánh khả dụng cho kho mã nguồn này. Kiểm tra quyền truy cập của bạn với nhà cung cấp, rồi chọn kho mã nguồn khác.",
+      "branchEmpty": "Không có nhánh khả dụng",
+      "branchPlaceholder": "Chọn một nhánh",
       "runOnWithTarget": "Chạy trên: {{target}}",
       "environment": "Môi trường",
       "couldNotLoadEnvironment": "Không thể tải môi trường của bạn.",
@@ -1586,26 +1607,15 @@
       "couldNotReadPendingSessions": "Không thể đọc danh sách phiên đang chờ. Vui lòng thử lại.",
       "failedToCreate": "Không thể tạo phiên.",
       "couldNotRefreshRepositories": "Không thể làm mới danh sách kho mã. Vui lòng thử lại.",
-      "discardDraftMessage": "Nội dung yêu cầu của bạn sẽ bị mất.",
       "discardDraftTitle": "Hủy bản nháp?",
+      "discardDraftMessage": "Nội dung yêu cầu của bạn sẽ bị mất.",
+      "discardWithUploadsMessage": "Nội dung yêu cầu và các tệp đã tải lên nhưng chưa gắn với tin nhắn đã gửi sẽ bị xóa.",
       "discardFailed": "Không thể hủy bản nháp. Vui lòng thử lại.",
       "remoteHint": "Chạy `kilo remote` trên máy tính hoặc `/remote` trong phiên CLI đang chạy để điều khiển tiến trình kilo trên máy.",
-      "connectBitbucketDescription": "Kết nối Bitbucket trong trình duyệt, rồi quay lại đây để chọn kho mã.",
-      "connectGitlabDescription": "Kết nối GitLab trong trình duyệt, rồi quay lại đây để chọn kho mã.",
-      "couldNotLoadBitbucketRepositories": "Không thể tải danh sách kho mã Bitbucket.",
-      "couldNotLoadGithubRepositories": "Không thể tải danh sách kho mã GitHub.",
-      "couldNotLoadGitlabRepositories": "Không thể tải danh sách kho mã GitLab.",
-      "gitlabConnected": "Đã kết nối GitLab",
-      "noRepositoriesVisibleBitbucket": "Không thấy kho mã nào. Hãy kiểm tra quyền truy cập kho mã trên Bitbucket, rồi làm mới danh sách.",
-      "noRepositoriesVisibleGitlab": "Không thấy kho mã nào. Hãy kiểm tra quyền truy cập kho mã trên GitLab, rồi làm mới danh sách.",
-      "openBitbucket": "Mở Bitbucket",
-      "openGitlab": "Mở GitLab",
-      "recentlyUsed": "Đã dùng gần đây",
       "continueFrom": "Đang tiếp tục phiên {{title}}.",
       "importingSession": "Đang nhập phiên",
       "cliCannotContinue": "CLI này không hỗ trợ tiếp tục phiên. Hãy chọn Cloud Agent hoặc CLI khác.",
-      "importFailed": "Không thể nhập phiên này.",
-      "discardWithUploadsMessage": "Nội dung yêu cầu và các tệp đã tải lên nhưng chưa gắn với tin nhắn đã gửi sẽ bị xóa."
+      "importFailed": "Không thể nhập phiên này."
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp.",
@@ -2364,11 +2374,17 @@
       "tapDiffLineToSuggest": "Chạm vào một dòng trong bản so sánh để bật đề xuất."
     },
     "connect": {
-      "checkFailedMessage": "Chưa thể xác định trạng thái đăng nhập cho đến khi tải xong dữ liệu.",
       "checkFailedTitle": "Không thể kiểm tra kết nối GitHub.",
-      "description": "Kết nối tài khoản GitHub của bạn để đánh giá PR trên thiết bị di động.",
+      "checkFailedMessage": "Chưa thể xác định trạng thái đăng nhập cho đến khi tải xong dữ liệu.",
+      "checkFailedTitleGitLab": "Không thể kiểm tra kết nối GitLab.",
+      "checkFailedTitleBitbucket": "Không thể kiểm tra kết nối Bitbucket.",
+      "providerCheckFailedMessage": "Trạng thái kết nối chưa khả dụng cho đến khi tải xong.",
+      "reconnectTitle": "Kết nối lại GitHub",
       "reconnectDescription": "Quyền kết nối với GitHub của bạn đã bị thu hồi. Kết nối lại để tiếp tục đánh giá PR trên thiết bị di động.",
-      "reconnectTitle": "Kết nối lại GitHub"
+      "description": "Kết nối tài khoản GitHub của bạn để đánh giá PR trên thiết bị di động.",
+      "gitlabDescription": "Kết nối tài khoản GitLab để xem merge request trên thiết bị di động.",
+      "bitbucketDescription": "Kết nối Bitbucket với tổ chức này để xem PR trên thiết bị di động.",
+      "bitbucketOrgOnlyDescription": "Chọn một tổ chức trong hồ sơ của bạn để xem các PR Bitbucket của tổ chức đó."
     },
     "connectionExpired": "Kết nối GitHub đã hết hạn.",
     "couldNotLoadPullRequest": "Không thể tải PR.",
@@ -2461,21 +2477,24 @@
         "outdatedOnLines": "Không còn cập nhật tại {{lines}}",
         "outdatedOnPath": "Không còn cập nhật tại {{path}}"
       },
-      "deletedUser": "người dùng đã bị xóa"
+      "deletedUser": "người dùng đã bị xóa",
+      "replyForbiddenTerm": "Bạn không có quyền trả lời trong {{term}} này."
     },
     "entry": {
-      "clearLink": "Xóa liên kết PR",
+      "eyebrow": "Mở PR hoặc merge request bằng URL",
+      "pastePrLink": "Dán liên kết PR hoặc merge request",
+      "noRecentPrs": "Chưa có đánh giá gần đây",
+      "noRecentPrsDescription": "Dán liên kết ở trên để bắt đầu đánh giá — lần sau nó sẽ xuất hiện ở đây.",
       "couldNotLoad": "Không thể tải dữ liệu.",
-      "eyebrow": "Mở PR bằng URL.",
-      "noRecentPrs": "Chưa có PR gần đây",
-      "noRecentPrsDescription": "Dán liên kết PR ở trên để bắt đầu đánh giá. PR sẽ xuất hiện ở đây vào lần sau.",
-      "open": "Mở",
-      "pasteLink": "Dán liên kết PR",
-      "pastePrLink": "Dán liên kết PR",
-      "removeFromRecentsMessage": "PR này sẽ được xóa khỏi danh sách gần đây của bạn.",
       "removeFromRecentsTitle": "Xóa khỏi mục gần đây?",
+      "removeFromRecentsMessage": "Đánh giá này sẽ được xóa khỏi danh sách gần đây của bạn.",
       "removeRecentAccessibility": "Xóa {{repo}} khỏi mục gần đây",
-      "urlAccessibility": "URL của PR trên GitHub"
+      "urlAccessibility": "Nhập URL của PR hoặc merge request",
+      "urlPlaceholder": "URL của PR hoặc merge request",
+      "openAccessibility": "Mở PR hoặc merge request",
+      "clearLink": "Xóa liên kết",
+      "pasteLink": "Dán liên kết PR hoặc merge request",
+      "open": "Mở"
     },
     "eventChips": {
       "comment": "Bình luận",
@@ -2568,47 +2587,52 @@
     },
     "installKiloGitHubApp": "Cài đặt ứng dụng Kilo trên GitHub",
     "merge": {
-      "autoMergeDescription": "GitHub sẽ tự động hợp nhất PR này khi tất cả các bước kiểm tra bắt buộc đều đạt yêu cầu (phương thức: {{method}}).",
-      "autoMergeOn": "Đã bật tự động hợp nhất",
-      "blockedTitle": "Lý do chưa thể hợp nhất",
-      "cannotMerge": "Không thể hợp nhất PR này ở trạng thái hiện tại.",
-      "checking": "Đang kiểm tra khả năng hợp nhất…",
-      "commitMessage": "Thông điệp bản ghi",
-      "commitMessagePlaceholder": "Mô tả bản ghi hợp nhất (không bắt buộc)",
-      "commitTitle": "Tiêu đề bản ghi",
-      "confirmMessage": "Thao tác này sẽ hợp nhất các thay đổi của bạn vào nhánh đích.",
-      "confirmTitle": "Hợp nhất PR?",
-      "couldNotDetermine": "Không thể xác định khả năng hợp nhất.",
-      "couldNotMerge": "Không thể hợp nhất PR.",
-      "deleteBranch": "Xóa nhánh",
-      "deleteBranchAfterMerge": "Xóa nhánh sau khi hợp nhất",
-      "disableAutoMerge": "Tắt tự động hợp nhất",
-      "enableAutoMerge": "Bật tự động hợp nhất",
-      "enableAutoMergeConfirmMessage": "GitHub sẽ tự động hợp nhất PR này khi tất cả các bước kiểm tra bắt buộc đều đạt yêu cầu.",
-      "enableAutoMergeConfirmTitle": "Bật tự động hợp nhất?",
-      "forbidden": "Bạn không có quyền hợp nhất PR này.",
-      "loadFailedTitle": "Không thể tải các tùy chọn hợp nhất.",
       "merge": "Hợp nhất",
       "mergeNow": "Hợp nhất ngay",
       "mergePullRequest": "Hợp nhất PR",
+      "mergeTermTitle": "Hợp nhất {{term}}",
+      "enableAutoMerge": "Bật tự động hợp nhất",
+      "disableAutoMerge": "Tắt tự động hợp nhất",
+      "autoMergeOn": "Đã bật tự động hợp nhất",
+      "autoMergeDescription": "GitHub sẽ tự động hợp nhất PR này khi tất cả các bước kiểm tra bắt buộc đều đạt yêu cầu (phương thức: {{method}}).",
+      "checking": "Đang kiểm tra khả năng hợp nhất…",
+      "couldNotDetermine": "Không thể xác định khả năng hợp nhất.",
+      "refreshMergeability": "Kiểm tra lại khả năng hợp nhất",
+      "blockedTitle": "Lý do chưa thể hợp nhất",
+      "updateBranch": "Cập nhật nhánh",
+      "updateBranchFromBase": "Cập nhật nhánh từ nhánh đích",
       "methodLabel": "Phương thức",
+      "commitTitle": "Tiêu đề bản ghi",
+      "commitMessage": "Thông điệp bản ghi",
+      "commitMessagePlaceholder": "Mô tả bản ghi hợp nhất (không bắt buộc)",
+      "deleteBranch": "Xóa nhánh",
+      "deleteBranchAfterMerge": "Xóa nhánh sau khi hợp nhất",
+      "noEnabledMethods": "Kho lưu trữ này chưa bật phương thức hợp nhất nào. Hãy nhờ quản trị viên bật phương thức tạo bản ghi hợp nhất, gộp bản ghi hoặc chuyển gốc.",
+      "confirmTitle": "Hợp nhất PR?",
+      "confirmTitleTerm": "Hợp nhất {{term}}?",
+      "confirmMessage": "Thao tác này sẽ hợp nhất các thay đổi của bạn vào nhánh đích.",
+      "enableAutoMergeConfirmTitle": "Bật tự động hợp nhất?",
+      "enableAutoMergeConfirmMessage": "GitHub sẽ tự động hợp nhất PR này khi tất cả các bước kiểm tra bắt buộc đều đạt yêu cầu.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} sẽ được hợp nhất tự động khi pipeline thành công.",
+      "enableAutoMergeDescriptionTerm": "GitLab sẽ tự động hợp nhất {{term}} này khi pipeline thành công.",
+      "forbidden": "Bạn không có quyền hợp nhất PR này.",
+      "cannotMerge": "Không thể hợp nhất PR này ở trạng thái hiện tại.",
+      "couldNotMerge": "Không thể hợp nhất PR.",
       "methods": {
         "merge": "Hợp nhất",
         "rebase": "Chuyển gốc",
         "squash": "Gộp bản ghi"
       },
-      "noEnabledMethods": "Kho lưu trữ này chưa bật phương thức hợp nhất nào. Hãy nhờ quản trị viên bật phương thức tạo bản ghi hợp nhất, gộp bản ghi hoặc chuyển gốc.",
+      "terminal": {
+        "alreadyMerged": "Đã hợp nhất",
+        "closed": "PR này đã đóng",
+        "closedMergeRequest": "Merge request này đã đóng"
+      },
       "partialSuccessBanner": {
         "accessibility": "Đã hợp nhất. Không thể xóa nhánh: {{reason}}",
         "body": "Không thể xóa nhánh: {{reason}}."
       },
-      "refreshMergeability": "Kiểm tra lại khả năng hợp nhất",
-      "terminal": {
-        "alreadyMerged": "Đã hợp nhất",
-        "closed": "PR này đã đóng"
-      },
-      "updateBranch": "Cập nhật nhánh",
-      "updateBranchFromBase": "Cập nhật nhánh từ nhánh đích",
+      "loadFailedTitle": "Không thể tải các tùy chọn hợp nhất.",
       "blocked": {
         "unknownStateTitle": "GitHub chưa xác nhận có thể hợp nhất",
         "unknownStateDetail": "Đợi một lát rồi thử làm mới phần tổng quan.",
@@ -2627,6 +2651,18 @@
         "behindDetail": "Nhánh nguồn chưa có các thay đổi mới nhất từ nhánh đích. Chuyển gốc hoặc cập nhật nhánh trước khi hợp nhất.",
         "notMergeableTitle": "Chưa thể hợp nhất PR này",
         "notMergeableDetail": "GitHub đã báo cáo trạng thái hợp nhất là {{state}}."
+      },
+      "restrictions": {
+        "title": "Hạn chế hợp nhất",
+        "approvalsRequired_one": "Cần {{displayCount}} phê duyệt",
+        "approvalsRequired_other": "Cần {{displayCount}} phê duyệt",
+        "pipelineMustSucceed": "Pipeline phải thành công trước khi hợp nhất."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline đang thất bại ở bản ghi mới nhất.",
+        "pendingPipeline": "Pipeline vẫn đang chạy ở bản ghi mới nhất.",
+        "permission": "Bạn không có quyền hợp nhất {{term}} này.",
+        "draft": "Đánh dấu {{term}} là sẵn sàng để đánh giá trước khi hợp nhất."
       },
       "methodLabels": {
         "merge": "Tạo bản ghi hợp nhất",
@@ -2685,8 +2721,11 @@
     "pullRequestUnavailable": "Không thể truy cập PR",
     "pullRequestUnavailableDescription": "Không thể mở PR này. Có thể PR đã bị xóa, kho lưu trữ ở chế độ riêng tư hoặc ứng dụng Kilo trên GitHub chưa được cài đặt cho kho lưu trữ này.",
     "reconnectNotice": {
+      "title": "Kết nối GitHub đã hết hạn.",
       "message": "Kết nối GitHub của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
-      "title": "Kết nối GitHub đã hết hạn."
+      "gitlabTitle": "Kết nối GitLab đã hết hạn.",
+      "bitbucketTitle": "Kết nối Bitbucket đã hết hạn.",
+      "providerMessage": "Kết nối {{provider}} của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần."
     },
     "review": "Rà soát",
     "reviewPullRequest": "Đánh giá PR",
@@ -2737,7 +2776,7 @@
       "emptyLine": "(trống)"
     },
     "linkPasteClipboardEmpty": "Bộ nhớ tạm trống.",
-    "linkPasteNotAPullRequest": "Đây không phải là liên kết PR trên GitHub.",
+    "linkPasteNotAPullRequest": "Đây không phải là liên kết PR hoặc merge request",
     "announce": {
       "commentPosted": "Đã đăng bình luận",
       "reviewSubmitted": "Đã gửi đánh giá",
@@ -2746,6 +2785,7 @@
     "mutationError": {
       "commentNotPosted": "Không thể đăng bình luận này. Dòng đã chọn có thể đã thay đổi hoặc PR có thể đã được cập nhật.",
       "reviewNotSubmitted": "Không thể gửi bản đánh giá này ở trạng thái hiện tại. Có thể PR đã thay đổi hoặc đây là PR của bạn nên bạn không thể tự đánh giá.",
+      "reviewNotSubmittedTerm": "Không thể gửi đánh giá này ở trạng thái hiện tại. {{term}} có thể đã thay đổi, hoặc bạn không thể đánh giá {{term}} của chính mình.",
       "couldNotPostComment": "Không thể đăng bình luận.",
       "couldNotSubmitReview": "Không thể gửi đánh giá. Kiểm tra kết nối và thử lại."
     },
@@ -2753,9 +2793,31 @@
       "couldNotReply": "Không thể trả lời.",
       "couldNotCompleteAction": "Không thể hoàn tất thao tác này.",
       "mergeResultDefaultError": "GitHub chưa hoàn tất việc hợp nhất.",
+      "mergeResultNotCompleted": "{{term}} chưa được hợp nhất. Kiểm tra trạng thái và thử lại.",
       "ambiguous": "Không thể xác nhận — hãy kiểm tra PR trước khi thử lại.",
       "persistenceFailed": "Không thể ghi nhận thao tác này. Vui lòng thử lại sau.",
       "forbidden": "Bạn không có quyền thực hiện thao tác này."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Không khả dụng trên nhà cung cấp này",
+        "accessibility": "Không khả dụng trên nhà cung cấp này: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Yêu cầu hợp nhất",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Chia sẻ merge request",
+      "viewOnProvider": "Xem trên {{provider}}",
+      "mergeRequestUnavailable": "Không thể truy cập merge request",
+      "unavailableDescription": "Có thể nó đã bị xóa, hoặc bạn không có quyền truy cập.",
+      "accessDeniedMergeRequest": "Bạn không có quyền xem merge request này.",
+      "couldNotLoadMergeRequest": "Không thể tải merge request.",
+      "discussionAccessDenied": "Bạn không có quyền xem thảo luận của merge request này.",
+      "discussionUnavailableMessage": "Merge request này có thể đã bị xóa.",
+      "noDiscussionDescription": "Merge request này chưa có chuỗi thảo luận đánh giá hay bình luận nào.",
+      "noFilesChangedDescription": "Merge request này không có tệp nào thay đổi."
     }
   },
   "organization": {

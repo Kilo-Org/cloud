@@ -1,4 +1,4 @@
-// Slack uses E-prefixed enterprise IDs as the installation key for org-wide installs.
+// Slack Enterprise Grid IDs are uppercase E followed by 8-15 uppercase alphanumeric characters.
 export function isSlackEnterpriseInstallationId(installationId: string): boolean {
-  return installationId.startsWith('E');
+  return /^E[A-Z0-9]{8,15}$/.test(installationId);
 }

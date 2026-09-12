@@ -764,5 +764,19 @@ describe('Slack provider installation activation', () => {
     for (let attempt = 0; attempt < 4; attempt += 1) {
       if (await completeDeletion()) break;
     }
+    await expect(
+      db
+        .select()
+        .from(provider_installation_reservations)
+        .where(eq(provider_installation_reservations.provider_installation_id, 'T_DELETING'))
+    ).resolves.toHaveLength(0);
+    await expect(
+      claimSlackProviderInstallation({
+        actorUserId: other.id,
+        owner: retryOwner,
+        state: 'delete-retry',
+        teamId: 'T_DELETING',
+      })
+    ).resolves.toMatchObject({ generation: 1 });
   });
 });

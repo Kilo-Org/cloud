@@ -11,6 +11,9 @@ import type { resolveModelForGitHubRepository as ResolveModelForGitHubRepository
 import type { resolveGitHubRepositoryForOwner as ResolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
 import type SpawnCloudAgentSession from './spawn-cloud-agent-session';
 
+const mockGetGitHubIntegrationById =
+  jest.fn<(...args: unknown[]) => Promise<PlatformIntegration | null>>();
+
 jest.mock('@/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'callback-secret',
 }));
@@ -28,11 +31,7 @@ jest.mock('@/lib/slack-bot/github-repository-context', () => ({
 }));
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
-  getGitHubIntegrationById: jest.fn(async (_owner: unknown, id: string) => ({
-    ...userIntegration,
-    id,
-    repositories: [{ id: 1, name: 'repo', full_name: 'owner/repo', private: true }],
-  })),
+  getGitHubIntegrationById: (...args: unknown[]) => mockGetGitHubIntegrationById(...args),
 }));
 
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
@@ -127,6 +126,11 @@ describe('spawnCloudAgentSession delegation', () => {
       githubIntegrationId: 'github-association-1',
       githubAppType: 'standard',
     });
+    mockGetGitHubIntegrationById.mockResolvedValue({
+      ...userIntegration,
+      id: 'github-association-1',
+      repositories: [{ id: 1, name: 'repo', full_name: 'owner/repo', private: true }],
+    });
     mockGetGitLabTokenForUser.mockResolvedValue('gitlab-token');
     mockGetGitLabInstanceUrlForUser.mockResolvedValue('https://gitlab.com');
     mockBuildGitLabCloneUrl.mockReturnValue('https://gitlab.com/group/repo.git');
@@ -161,6 +165,7 @@ describe('spawnCloudAgentSession delegation', () => {
       })
     );
     expect(prepareInput).not.toHaveProperty('images');
+    expect(prepareInput).not.toHaveProperty('githubToken');
     for (const field of profileDerivedInlineFields) {
       expect(prepareInput).not.toHaveProperty(field);
     }
@@ -189,6 +194,23 @@ describe('spawnCloudAgentSession delegation', () => {
       )
     ).resolves.toEqual(
       expect.objectContaining({ response: expect.stringContaining('not uniquely available') })
+    );
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects a repository when its selected association is foreign to the owner', async () => {
+    mockGetGitHubIntegrationById.mockResolvedValue(null);
+
+    await expect(
+      spawnCloudAgentSession(
+        { githubRepo: 'owner/repo', prompt: 'Inspect it', mode: 'code' },
+        'model',
+        organizationIntegration,
+        'auth-token',
+        'request-foreign'
+      )
+    ).resolves.toEqual(
+      expect.objectContaining({ response: expect.stringContaining('no longer available') })
     );
     expect(mockPrepareSession).not.toHaveBeenCalled();
   });

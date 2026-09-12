@@ -89,3 +89,38 @@ test('rejects a repository exposed by multiple associations', async () => {
     resolveGitHubRepositoryForOwner({ type: 'org', id: 'organization-1' }, 'shared/api')
   ).resolves.toBeNull();
 });
+
+test('keeps the same canonical repository associated to each Kilo owner separately', async () => {
+  const repository = { id: 7, name: 'shared', full_name: 'acme/shared', private: true };
+  jest
+    .mocked(getAllIntegrationsForOwner)
+    .mockResolvedValueOnce([
+      {
+        id: 'association-owner-a',
+        platform: 'github',
+        integration_status: 'active',
+        github_disconnected_at: null,
+        suspended_at: null,
+        auth_invalid_at: null,
+        repositories: [repository],
+      },
+    ] as never)
+    .mockResolvedValueOnce([
+      {
+        id: 'association-owner-b',
+        platform: 'github',
+        integration_status: 'active',
+        github_disconnected_at: null,
+        suspended_at: null,
+        auth_invalid_at: null,
+        repositories: [repository],
+      },
+    ] as never);
+
+  await expect(
+    resolveGitHubRepositoryForOwner({ type: 'org', id: 'owner-a' }, repository.full_name)
+  ).resolves.toMatchObject({ githubIntegrationId: 'association-owner-a' });
+  await expect(
+    resolveGitHubRepositoryForOwner({ type: 'org', id: 'owner-b' }, repository.full_name)
+  ).resolves.toMatchObject({ githubIntegrationId: 'association-owner-b' });
+});

@@ -33,7 +33,13 @@ const mockUpdateRepositoriesForIntegration =
 const mockFetchGitHubInstallationDetails =
   jest.fn<(installationId: string, appType: GitHubAppType) => Promise<InstallationDetails>>();
 const mockFetchGitHubRepositories =
-  jest.fn<(installationId: string, appType: GitHubAppType) => Promise<unknown[]>>();
+  jest.fn<
+    (
+      installationId: string,
+      appType: GitHubAppType,
+      expectedIntegrationId?: string
+    ) => Promise<unknown[]>
+  >();
 const mockSeedUserGithubToken =
   jest.fn<
     (input: Record<string, unknown>) => Promise<{ upserted: boolean; githubLogin: string }>
@@ -158,8 +164,11 @@ jest.mock('@/lib/integrations/db/github-installations', () => ({
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchGitHubInstallationDetails: (installationId: string, appType: GitHubAppType) =>
     mockFetchGitHubInstallationDetails(installationId, appType),
-  fetchGitHubRepositories: (installationId: string, appType: GitHubAppType) =>
-    mockFetchGitHubRepositories(installationId, appType),
+  fetchGitHubRepositories: (
+    installationId: string,
+    appType: GitHubAppType,
+    expectedIntegrationId?: string
+  ) => mockFetchGitHubRepositories(installationId, appType, expectedIntegrationId),
 }));
 
 jest.mock('@/lib/github-pr-review/dev-seed', () => ({
@@ -169,6 +178,15 @@ jest.mock('@/lib/github-pr-review/dev-seed', () => ({
 let createCaller: (ctx: { user: User }) => {
   listOrganizationInstallations: (input: { organizationId: string }) => Promise<{
     canAdd: boolean;
+    canConnectExisting: boolean;
+    existingConnectionAdmission: {
+      allowed: boolean;
+      reason:
+        | 'not_authorized'
+        | 'sharing_not_approved'
+        | 'multiple_installations_not_approved'
+        | null;
+    };
     installations: Array<{ id: string }>;
   }>;
   mintInstallState: (input: {
@@ -281,8 +299,10 @@ function organizationIntegration(): PlatformIntegration {
 describe('githubAppsRouter organization install capability', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
     process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS =
       '9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55';
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = '';
     mockEnsureOrganizationAccess.mockResolvedValue('member');
     mockGetGitHubAppTypeForOrganization.mockResolvedValue('standard');
     mockCreateInstallState.mockResolvedValue('install-token');
@@ -343,6 +363,7 @@ describe('githubAppsRouter organization install capability', () => {
       const listed = await caller.listOrganizationInstallations({ organizationId });
 
       expect(listed.canAdd).toBe(role === 'owner' || role === 'admin');
+      expect(listed.canConnectExisting).toBe(false);
       expect(listed.installations).toHaveLength(0);
     }
   );
@@ -360,6 +381,7 @@ describe('githubAppsRouter organization install capability', () => {
 
   it('reports additional installation capability for allowlisted organizations', async () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = multiInstallationOrganizationId;
     mockListIntegrations.mockResolvedValue([
       { ...organizationIntegration(), owned_by_organization_id: multiInstallationOrganizationId },
     ]);
@@ -370,6 +392,23 @@ describe('githubAppsRouter organization install capability', () => {
     });
 
     expect(listed.canAdd).toBe(true);
+    expect(listed.existingConnectionAdmission).toEqual({ allowed: true, reason: null });
+  });
+
+  it('reports why an existing connection cannot be started without both destination flags', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([organizationIntegration()]);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationId;
+    process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = '';
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    const listed = await caller.listOrganizationInstallations({ organizationId });
+
+    expect(listed.canConnectExisting).toBe(false);
+    expect(listed.existingConnectionAdmission).toEqual({
+      allowed: false,
+      reason: 'multiple_installations_not_approved',
+    });
   });
 
   it('refuses to mint another install state outside the allowlist', async () => {
@@ -476,23 +515,24 @@ describe('githubAppsRouter.refreshInstallation', () => {
     mockUpdateRepositoriesForIntegration.mockResolvedValue(undefined);
   });
 
-  it('persists the current account login returned by GitHub', async () => {
+  it('refreshes the selected association through canonical installation state', async () => {
     const caller = createCaller({ user: { id: 'user-1' } as User });
 
     await caller.refreshInstallation();
 
-    expect(mockUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
-      { type: 'user', id: 'user-1' },
-      expect.objectContaining({ platformAccountLogin: 'renamed-owner' })
-    );
     expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
-      expect.objectContaining({ installationId: '98765', state: 'active' })
+      expect.objectContaining({
+        installationId: '98765',
+        accountLogin: 'renamed-owner',
+        state: 'active',
+      })
     );
     expect(mockBindGitHubIntegrationToCanonicalInstallation).toHaveBeenCalledWith({
       integrationId: 'integration-1',
       installationId: '98765',
       appType: 'standard',
     });
+    expect(mockFetchGitHubRepositories).toHaveBeenCalledWith('98765', 'standard', 'integration-1');
   });
 
   it('does not clear stored identity when GitHub returns no current account login', async () => {
@@ -509,7 +549,7 @@ describe('githubAppsRouter.refreshInstallation', () => {
       'GitHub installation account identity unavailable'
     );
 
-    expect(mockUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockObserveGitHubInstallationLifecycle).not.toHaveBeenCalled();
     expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
   });

@@ -21,6 +21,7 @@ import {
   organization_user_limits,
   organization_user_usage,
   organizations,
+  provider_oauth_attempts,
   external_side_effect_outbox,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
@@ -1080,10 +1081,23 @@ export async function markOrganizationAsDeleted(
   organizationId: Organization['id'],
   txn?: DrizzleTransaction
 ): Promise<void> {
-  await (txn ?? db)
-    .update(organizations)
-    .set({ ...auto_deleted_at })
-    .where(eq(organizations.id, organizationId));
+  const execute = async (tx: DrizzleTransaction) => {
+    const [organization] = await tx
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .for('update');
+    if (!organization) return;
+    await tx
+      .delete(provider_oauth_attempts)
+      .where(eq(provider_oauth_attempts.owned_by_organization_id, organizationId));
+    await tx
+      .update(organizations)
+      .set({ ...auto_deleted_at })
+      .where(eq(organizations.id, organizationId));
+  };
+  if (txn) await execute(txn);
+  else await db.transaction(execute);
 }
 
 export async function getOrganizationMemberByEmail(

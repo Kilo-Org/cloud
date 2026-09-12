@@ -13,7 +13,8 @@ const mockFetchGitHubInstallationDetails =
 const mockUpdateIntegrationAccountIdentity =
   jest.fn<
     (
-      integrationId: string,
+      installationId: string,
+      appType: GitHubAppType,
       platformAccountId: string,
       platformAccountLogin: string
     ) => Promise<void>
@@ -26,18 +27,21 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
 
 jest.mock('@/lib/integrations/db/github-installations', () => ({
   updateGitHubInstallationAccountIdentity: (input: {
-    integrationId: string;
+    installationId: string;
+    appType: GitHubAppType;
     accountId: string;
     accountLogin: string;
   }) =>
-    mockUpdateIntegrationAccountIdentity(input.integrationId, input.accountId, input.accountLogin),
+    mockUpdateIntegrationAccountIdentity(
+      input.installationId,
+      input.appType,
+      input.accountId,
+      input.accountLogin
+    ),
 }));
-
-const integrationId = '00000000-0000-4000-8000-000000000001';
 
 let handleInstallationTargetRenamed: (
   payload: InstallationTargetRenamedPayload,
-  integration: { id: string; github_disconnected_at: string | null },
   appType: GitHubAppType
 ) => Promise<Response>;
 
@@ -63,14 +67,14 @@ describe('handleInstallationTargetRenamed', () => {
         changes: { login: { from: 'old-owner' } },
         target_type: 'User',
       },
-      { id: integrationId, github_disconnected_at: null },
       'lite'
     );
 
     expect(response.status).toBe(200);
     expect(mockFetchGitHubInstallationDetails).toHaveBeenCalledWith('98765', 'lite');
     expect(mockUpdateIntegrationAccountIdentity).toHaveBeenCalledWith(
-      integrationId,
+      '98765',
+      'lite',
       '123',
       'authoritative-current-owner'
     );
@@ -90,7 +94,6 @@ describe('handleInstallationTargetRenamed', () => {
           changes: {},
           target_type: 'Organization',
         },
-        { id: integrationId, github_disconnected_at: null },
         'standard'
       )
     ).rejects.toThrow('GitHub installation account identity missing after rename event');
@@ -107,13 +110,13 @@ describe('handleInstallationTargetRenamed', () => {
         changes: {},
         target_type: 'Organization',
       },
-      { id: integrationId, github_disconnected_at: '2026-09-07T00:00:00.000Z' },
       'standard'
     );
     expect(response.status).toBe(200);
     expect(mockFetchGitHubInstallationDetails).toHaveBeenCalledWith('98765', 'standard');
     expect(mockUpdateIntegrationAccountIdentity).toHaveBeenCalledWith(
-      integrationId,
+      '98765',
+      'standard',
       '123',
       'authoritative-current-owner'
     );

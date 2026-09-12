@@ -9,6 +9,7 @@ import { createSecurityAgentCommand, type SecurityAgentCommandOwner } from '@kil
 import { agent_configs } from '@kilocode/db/schema';
 import type { SecurityCommandType } from '@kilocode/app-shared/security-agent';
 import { TRPCError } from '@trpc/server';
+import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 import { and, eq } from 'drizzle-orm';
 import {
   DEFAULT_SECURITY_AGENT_CONFIG,
@@ -165,6 +166,9 @@ async function writeSecurityAgentConfigWithRevision(
     platform: string;
   }
 ): Promise<number> {
+  if (params.platform === 'github') {
+    await assertGitHubAutomationCanBeEnabled(params.owner, tx);
+  }
   const ownerValues =
     params.owner.type === 'org'
       ? { owned_by_organization_id: params.owner.id, owned_by_user_id: null }

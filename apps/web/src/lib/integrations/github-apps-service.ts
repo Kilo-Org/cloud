@@ -8,7 +8,6 @@ import { requireNumericPlatformRepositories, type Owner } from '@/lib/integratio
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { platformIntegrationHealthSql } from '@/lib/integrations/core/health';
 import {
-  deleteIntegrationForOwner,
   findPendingInstallationByKiloUserId,
   getGitHubIntegrationById,
   listRepositoryCustomizations,
@@ -16,6 +15,7 @@ import {
   updateRepositoriesForIntegration,
   upsertRepositoryCustomization,
 } from '@/lib/integrations/db/platform-integrations';
+import { uninstallExclusiveGitHubInstallation } from '@/lib/integrations/db/github-installations';
 import {
   deleteGitHubInstallation,
   fetchGitHubBranches,
@@ -126,28 +126,30 @@ export async function uninstallApp(
     });
   }
 
-  // Delete the installation from GitHub
-  const appType = integration.github_app_type || 'standard';
   try {
-    await deleteGitHubInstallation(integration.platform_installation_id, appType);
+    await uninstallExclusiveGitHubInstallation({
+      owner,
+      integrationId: integration.id,
+      deleteUpstream: async (installationId, appType) => {
+        try {
+          await deleteGitHubInstallation(installationId, appType);
+        } catch (error) {
+          if (!isInstallationGoneError(error)) throw error;
+        }
+      },
+    });
   } catch (error) {
-    // If the installation is already gone on GitHub (404, 401, 403),
-    // proceed to delete from our database anyway
-    if (!isInstallationGoneError(error)) {
+    if (error instanceof Error && error.message.includes('disconnected locally')) {
       throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: `Failed to delete GitHub installation: ${error instanceof Error ? error.message : String(error)}`,
+        code: 'CONFLICT',
+        message: 'Disconnect this Kilo connection instead of uninstalling the shared GitHub App',
       });
     }
-    // Installation is already gone on GitHub, continue to delete from our database
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: `Failed to delete GitHub installation: ${error instanceof Error ? error.message : String(error)}`,
+    });
   }
-
-  await deleteIntegrationForOwner(
-    owner,
-    PLATFORM.GITHUB,
-    appType,
-    integration.platform_installation_id
-  );
 
   return { success: true };
 }
@@ -196,7 +198,11 @@ export async function listRepositories(
   // If forceRefresh, no cached repos, or never synced before, fetch from GitHub and update cache
   if (forceRefresh || !cachedRepositories?.length || !integration.repositories_synced_at) {
     const appType = integration.github_app_type || 'standard';
-    const repos = await fetchGitHubRepositories(integration.platform_installation_id, appType);
+    const repos = await fetchGitHubRepositories(
+      integration.platform_installation_id,
+      appType,
+      integration.id
+    );
     await updateRepositoriesForIntegration(integrationId, repos);
     return {
       repositories: repos,
@@ -294,7 +300,8 @@ export async function listBranches(
   const branches = await fetchGitHubBranches(
     integration.platform_installation_id,
     repositoryFullName,
-    appType
+    appType,
+    integration.id
   );
 
   return { branches };

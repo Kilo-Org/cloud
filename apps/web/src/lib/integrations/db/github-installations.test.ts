@@ -1,21 +1,30 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import {
+  agent_configs,
   github_app_installations,
   github_connection_attempts,
+  github_installation_webhook_receipts,
   kilocode_users,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { assertGitHubAutomationCanBeEnabled } from '../github/sharing-compatibility';
 import {
   connectVerifiedGitHubInstallation,
+  getGitHubInstallationDeliveryStatus,
+  materializeGitHubInstallationIdentity,
   disconnectGitHubInstallation,
   observeGitHubInstallationLifecycle,
+  recordCompletedGitHubInstallationDelivery,
+  uninstallExclusiveGitHubInstallation,
   updateGitHubInstallationRepositories,
   updateGitHubInstallationAccountIdentity,
 } from './github-installations';
 import { backfillGitHubInstallations } from './github-installations-backfill';
 import { assertGitHubInstallationRuntimeAuthorized } from '../github/runtime-authorization';
+import { upsertAgentConfig } from '@/lib/agent-config/db/agent-configs';
 import { getPlatformIntegration } from '../../bot/platform-helpers';
 import {
   findIntegrationByInstallationId,
@@ -43,6 +52,8 @@ const data = (installationId = '123456') => ({
 
 describe('GitHub installation persistence', () => {
   beforeEach(async () => {
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = '';
+    process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = '';
     await cleanupDbForTest();
     await db.insert(kilocode_users).values([
       {
@@ -63,6 +74,667 @@ describe('GitHub installation persistence', () => {
   });
 
   afterEach(cleanupDbForTest);
+
+  test('connects two approved organizations to one canonical installation', async () => {
+    const organizationA = await createTestOrganization('Shared GitHub A', ownerId, 0);
+    const organizationB = await createTestOrganization('Shared GitHub B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data()
+    );
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data(), kiloUserId: otherOwnerId }
+    );
+
+    expect(first).toMatchObject({ ok: true });
+    expect(second).toMatchObject({ ok: true });
+    if (!first.ok) throw new Error('Expected first shared association');
+    const refreshedRepositories = [
+      { id: 2, name: 'shared', full_name: 'acme/shared', private: true },
+    ];
+    await updateRepositoriesForIntegration(first.integrationId, refreshedRepositories);
+    const associations = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '123456'));
+    expect(associations).toHaveLength(2);
+    expect(associations.every(association => association.repositories?.length === 1)).toBe(true);
+    expect(associations.map(association => association.repositories)).toEqual([
+      refreshedRepositories,
+      refreshedRepositories,
+    ]);
+    expect(new Set(associations.map(association => association.github_installation_id)).size).toBe(
+      1
+    );
+    const [canonical] = await db
+      .select()
+      .from(github_app_installations)
+      .where(eq(github_app_installations.id, associations[0]?.github_installation_id ?? ''));
+    expect(canonical).toMatchObject({
+      sharing_mode: 'web_cloud_agent',
+      sharing_admission_checked_at: expect.any(String),
+    });
+    await expect(
+      assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationB.id })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    await expect(
+      getGitHubInstallationDeliveryStatus({
+        installationId: '123456',
+        appType: 'standard',
+        deliveryId: 'delivery-1',
+      })
+    ).resolves.toBe('not_completed');
+    await recordCompletedGitHubInstallationDelivery({
+      installationId: '123456',
+      appType: 'standard',
+      deliveryId: 'delivery-1',
+      eventType: 'installation.deleted',
+    });
+    await expect(
+      getGitHubInstallationDeliveryStatus({
+        installationId: '123456',
+        appType: 'standard',
+        deliveryId: 'delivery-1',
+      })
+    ).resolves.toBe('completed');
+    await expect(db.select().from(github_installation_webhook_receipts)).resolves.toHaveLength(1);
+  });
+
+  test('serializes shared attach commit before a concurrent agent enable recheck', async () => {
+    const organizationA = await createTestOrganization('Attach race GitHub A', ownerId, 0);
+    const organizationB = await createTestOrganization('Attach race GitHub B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data()
+    );
+    if (!first.ok) throw new Error('Expected incumbent connection');
+    let releaseAttach: (() => void) | undefined;
+    const attachBarrier = new Promise<void>(resolve => {
+      releaseAttach = resolve;
+    });
+    let markAttached: (() => void) | undefined;
+    const attachedBeforeCommit = new Promise<void>(resolve => {
+      markAttached = resolve;
+    });
+    const attach = db.transaction(async tx => {
+      const result = await connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationB.id },
+        { ...data(), kiloUserId: otherOwnerId },
+        tx
+      );
+      markAttached?.();
+      await attachBarrier;
+      return result;
+    });
+    await attachedBeforeCommit;
+    let enableSettled = false;
+    const enable = upsertAgentConfig({
+      organizationId: organizationB.id,
+      agentType: 'code_review',
+      platform: 'github',
+      config: {},
+      isEnabled: true,
+      createdBy: otherOwnerId,
+    }).finally(() => {
+      enableSettled = true;
+    });
+    await Promise.resolve();
+    expect(enableSettled).toBe(false);
+    releaseAttach?.();
+
+    await expect(attach).resolves.toMatchObject({ ok: true });
+    await expect(enable).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+
+  test('rechecks compatibility after a concurrent agent enable commits before attach', async () => {
+    const organizationA = await createTestOrganization('Enable race GitHub A', ownerId, 0);
+    const organizationB = await createTestOrganization('Enable race GitHub B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data()
+    );
+    if (!first.ok) throw new Error('Expected incumbent connection');
+    let releaseEnable: (() => void) | undefined;
+    const enableBarrier = new Promise<void>(resolve => {
+      releaseEnable = resolve;
+    });
+    let markEnabled: (() => void) | undefined;
+    const enabledBeforeCommit = new Promise<void>(resolve => {
+      markEnabled = resolve;
+    });
+    const enable = db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`org:${organizationA.id}`}))`);
+      await tx.insert(agent_configs).values({
+        owned_by_organization_id: organizationA.id,
+        agent_type: 'code_review',
+        platform: 'github',
+        config: {},
+        is_enabled: true,
+        created_by: ownerId,
+      });
+      markEnabled?.();
+      await enableBarrier;
+    });
+    await enabledBeforeCommit;
+    const attach = connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data(), kiloUserId: otherOwnerId }
+    );
+    releaseEnable?.();
+
+    await expect(enable).resolves.toBeUndefined();
+    await expect(attach).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+  });
+
+  test('orders participant owner locks across inverse concurrent shared attaches', async () => {
+    const organizationA = await createTestOrganization('Inverse attach GitHub A', ownerId, 0);
+    const organizationB = await createTestOrganization('Inverse attach GitHub B', otherOwnerId, 0);
+    const allowlist = [organizationA.id, organizationB.id].join(',');
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = allowlist;
+    process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = allowlist;
+    const firstA = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data('123456')
+    );
+    const firstB = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data('654321'), kiloUserId: otherOwnerId }
+    );
+    if (!firstA.ok || !firstB.ok) throw new Error('Expected incumbent connections');
+
+    const [attachBToA, attachAToB] = await Promise.all([
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationB.id },
+        { ...data('123456'), kiloUserId: otherOwnerId }
+      ),
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationA.id },
+        { ...data('654321'), kiloUserId: ownerId }
+      ),
+    ]);
+
+    expect(attachBToA).toMatchObject({ ok: true });
+    expect(attachAToB).toMatchObject({ ok: true });
+  });
+
+  test('keeps admission off for an unapproved destination without changing the incumbent', async () => {
+    const organizationA = await createTestOrganization('Unshared GitHub A', ownerId, 0);
+    const organizationB = await createTestOrganization('Unshared GitHub B', otherOwnerId, 0);
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data()
+    );
+    expect(first).toMatchObject({ ok: true });
+
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationB.id },
+        { ...data(), kiloUserId: otherOwnerId }
+      )
+    ).resolves.toEqual({ ok: false, reason: 'shared_installation_disabled' });
+    const associations = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '123456'));
+    expect(associations).toHaveLength(1);
+    expect(associations[0]?.id).toBe(first.ok ? first.integrationId : undefined);
+  });
+
+  test('refuses sharing without changing an incumbent automation workflow', async () => {
+    const organizationA = await createTestOrganization('Automated GitHub A', ownerId, 0);
+    const organizationB = await createTestOrganization('Automated GitHub B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data()
+    );
+    if (!first.ok) throw new Error('Expected incumbent connection');
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organizationA.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {},
+      is_enabled: true,
+      created_by: ownerId,
+    });
+
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationB.id },
+        { ...data(), kiloUserId: otherOwnerId }
+      )
+    ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+    const [incumbentConfig] = await db
+      .select()
+      .from(agent_configs)
+      .where(eq(agent_configs.owned_by_organization_id, organizationA.id));
+    expect(incumbentConfig?.is_enabled).toBe(true);
+  });
+
+  test('keeps local disconnect separate from shared upstream suspension recovery', async () => {
+    const organizationA = await createTestOrganization('Lifecycle GitHub A', ownerId, 0);
+    const organizationB = await createTestOrganization('Lifecycle GitHub B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data()
+    );
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data(), kiloUserId: otherOwnerId }
+    );
+    if (!first.ok || !second.ok) throw new Error('Expected shared connections');
+    await expect(assertGitHubInstallationRuntimeAuthorized('123456', 'standard')).rejects.toThrow(
+      'GitHub installation is unavailable for runtime use'
+    );
+
+    await disconnectGitHubInstallation({ type: 'org', id: organizationA.id }, first.integrationId);
+    await observeGitHubInstallationLifecycle({
+      installationId: '123456',
+      appType: 'standard',
+      state: 'suspended',
+    });
+    await observeGitHubInstallationLifecycle({
+      installationId: '123456',
+      appType: 'standard',
+      state: 'active',
+    });
+
+    const associations = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '123456'));
+    expect(associations.find(association => association.id === first.integrationId)).toMatchObject({
+      integration_status: 'suspended',
+      suspended_by: 'local_disconnect',
+      github_disconnected_at: expect.any(String),
+    });
+    expect(associations.find(association => association.id === second.integrationId)).toMatchObject(
+      {
+        integration_status: 'active',
+        suspended_by: null,
+        github_disconnected_at: null,
+      }
+    );
+    const [canonical] = await db
+      .select()
+      .from(github_app_installations)
+      .where(eq(github_app_installations.id, associations[0]?.github_installation_id ?? ''));
+    expect(canonical).toMatchObject({
+      sharing_mode: 'exclusive',
+      sharing_admission_checked_at: null,
+    });
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('123456', 'standard')
+    ).resolves.toBeUndefined();
+    await expect(
+      getGitHubInstallationDeliveryStatus({
+        installationId: '123456',
+        appType: 'standard',
+        deliveryId: 'delivery-after-demotion',
+      })
+    ).resolves.toBe('not_completed');
+    await recordCompletedGitHubInstallationDelivery({
+      installationId: '123456',
+      appType: 'standard',
+      deliveryId: 'delivery-after-demotion',
+      eventType: 'installation.deleted',
+    });
+    await expect(
+      assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationB.id })
+    ).resolves.toBeUndefined();
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organizationB.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {},
+      is_enabled: true,
+      created_by: otherOwnerId,
+    });
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = [
+      organizationA.id,
+      organizationB.id,
+    ].join(',');
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationA.id },
+        { ...data(), kiloUserId: ownerId }
+      )
+    ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+  });
+
+  test('serializes distinct installations for a non-allowlisted organization', async () => {
+    const organization = await createTestOrganization('Cardinality lock org', ownerId, 0);
+    let release: (() => void) | undefined;
+    const barrier = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    let ready: ((pid: number) => void) | undefined;
+    const holderReady = new Promise<number>(resolve => {
+      ready = resolve;
+    });
+    const first = db.transaction(async tx => {
+      const result = await connectVerifiedGitHubInstallation(
+        { type: 'org', id: organization.id },
+        data('771001'),
+        tx
+      );
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      ready?.(backend.rows[0]!.pid);
+      await barrier;
+      return result;
+    });
+    let second: ReturnType<typeof connectVerifiedGitHubInstallation> | undefined;
+    let observationError: unknown;
+    try {
+      const holderPid = await githubTestTimeout(holderReady, 'owner-cardinality holder');
+      second = connectVerifiedGitHubInstallation(
+        { type: 'org', id: organization.id },
+        data('771002')
+      );
+      await githubTestTimeout(
+        waitForBlockedGitHubOwnerLock(holderPid, `org:${organization.id}`),
+        'owner-cardinality contender'
+      );
+    } catch (error) {
+      observationError = error;
+    } finally {
+      release?.();
+    }
+    const [firstResult, secondResult] = await Promise.allSettled([
+      first,
+      second ?? Promise.reject(new Error('Second callback did not start')),
+    ]);
+    if (observationError) throw observationError;
+    expect(firstResult).toMatchObject({ status: 'fulfilled', value: { ok: true } });
+    expect(secondResult).toEqual({
+      status: 'fulfilled',
+      value: { ok: false, reason: 'multiple_installations_disabled' },
+    });
+    const associations = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, organization.id));
+    expect(associations).toHaveLength(1);
+  });
+
+  test('allows distinct installations for an allowlisted organization', async () => {
+    const organization = await createTestOrganization('Multi-install org', ownerId, 0);
+    process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = organization.id;
+    const results = await Promise.all([
+      connectVerifiedGitHubInstallation({ type: 'org', id: organization.id }, data('772001')),
+      connectVerifiedGitHubInstallation({ type: 'org', id: organization.id }, data('772002')),
+    ]);
+    expect(results).toEqual([
+      expect.objectContaining({ ok: true }),
+      expect.objectContaining({ ok: true }),
+    ]);
+    const associations = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, organization.id));
+    expect(associations).toHaveLength(2);
+  });
+
+  test('serializes upstream uninstall against a concurrent shared attach', async () => {
+    const organizationA = await createTestOrganization('Uninstall race GitHub A', ownerId, 0);
+    const organizationB = await createTestOrganization('Uninstall race GitHub B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data()
+    );
+    if (!first.ok) throw new Error('Expected incumbent connection');
+    let releaseDelete: (() => void) | undefined;
+    const deleteBarrier = new Promise<void>(resolve => {
+      releaseDelete = resolve;
+    });
+    let markDeleteStarted: (() => void) | undefined;
+    const upstreamDeleteStarted = new Promise<void>(resolve => {
+      markDeleteStarted = resolve;
+    });
+    const uninstall = uninstallExclusiveGitHubInstallation({
+      owner: { type: 'org', id: organizationA.id },
+      integrationId: first.integrationId,
+      deleteUpstream: async () => {
+        markDeleteStarted?.();
+        await deleteBarrier;
+      },
+    });
+    await upstreamDeleteStarted;
+    const attach = connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data(), kiloUserId: otherOwnerId }
+    );
+    releaseDelete?.();
+
+    await expect(uninstall).resolves.toBeUndefined();
+    await expect(attach).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+  });
+
+  test('serializes repository refresh behind terminal lifecycle without reviving projection', async () => {
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('773001')
+    );
+    if (!connected.ok) throw new Error('Expected canonical connection');
+    let release: (() => void) | undefined;
+    const barrier = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    let deleted: ((pid: number) => void) | undefined;
+    const deletedBeforeCommit = new Promise<number>(resolve => {
+      deleted = resolve;
+    });
+    const lifecycle = db.transaction(async tx => {
+      await observeGitHubInstallationLifecycle(
+        { installationId: '773001', appType: 'standard', state: 'deleted' },
+        tx
+      );
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      deleted?.(backend.rows[0]!.pid);
+      await barrier;
+    });
+    let refresh: ReturnType<typeof updateRepositoriesForIntegration> | undefined;
+    let observationError: unknown;
+    try {
+      const holderPid = await githubTestTimeout(deletedBeforeCommit, 'lifecycle holder readiness');
+      refresh = updateRepositoriesForIntegration(connected.integrationId, [
+        { id: 99, name: 'revived', full_name: 'acme/revived', private: true },
+      ]);
+      await githubTestTimeout(
+        waitForBlockedGitHubOwnerLock(holderPid, 'standard:773001'),
+        'repository refresh lock observation'
+      );
+    } catch (error) {
+      observationError = error;
+    } finally {
+      release?.();
+    }
+    const results = await Promise.allSettled([
+      lifecycle,
+      refresh ?? Promise.reject(new Error('Repository refresh did not start')),
+    ]);
+    if (observationError) throw observationError;
+    expect(results).toEqual([
+      { status: 'fulfilled', value: undefined },
+      { status: 'fulfilled', value: undefined },
+    ]);
+
+    const [canonical] = await db
+      .select()
+      .from(github_app_installations)
+      .where(eq(github_app_installations.installation_id, '773001'));
+    const [association] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integrationId));
+    expect(canonical).toMatchObject({ lifecycle_state: 'deleted' });
+    expect(canonical?.repositories).toEqual([expect.objectContaining({ full_name: 'acme/repo' })]);
+    expect(association).toMatchObject({ integration_status: 'suspended' });
+    expect(association?.repositories).toEqual([
+      expect.objectContaining({ full_name: 'acme/repo' }),
+    ]);
+  });
+
+  test('keeps concurrent duplicate deletion cleanup idempotent with one completed receipt', async () => {
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('773002')
+    );
+    if (!connected.ok) throw new Error('Expected canonical connection');
+    const processDeletion = async () => {
+      await observeGitHubInstallationLifecycle({
+        installationId: '773002',
+        appType: 'standard',
+        state: 'deleted',
+      });
+      await recordCompletedGitHubInstallationDelivery({
+        installationId: '773002',
+        appType: 'standard',
+        deliveryId: 'concurrent-delete',
+        eventType: 'installation.deleted',
+      });
+    };
+
+    let release: (() => void) | undefined;
+    const barrier = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    let held: ((pid: number) => void) | undefined;
+    const holderReady = new Promise<number>(resolve => {
+      held = resolve;
+    });
+    const first = db
+      .transaction(async tx => {
+        await observeGitHubInstallationLifecycle(
+          { installationId: '773002', appType: 'standard', state: 'deleted' },
+          tx
+        );
+        const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+        held?.(backend.rows[0]!.pid);
+        await barrier;
+      })
+      .then(() =>
+        recordCompletedGitHubInstallationDelivery({
+          installationId: '773002',
+          appType: 'standard',
+          deliveryId: 'concurrent-delete',
+          eventType: 'installation.deleted',
+        })
+      );
+    let second: ReturnType<typeof processDeletion> | undefined;
+    let observationError: unknown;
+    try {
+      const holderPid = await githubTestTimeout(holderReady, 'duplicate deletion holder readiness');
+      second = processDeletion();
+      await githubTestTimeout(
+        waitForBlockedGitHubOwnerLock(holderPid, 'standard:773002'),
+        'duplicate deletion lock observation'
+      );
+    } catch (error) {
+      observationError = error;
+    } finally {
+      release?.();
+    }
+    const deletionResults = await Promise.allSettled([
+      first,
+      second ?? Promise.reject(new Error('Second deletion did not start')),
+    ]);
+    if (observationError) throw observationError;
+    expect(deletionResults).toEqual([
+      { status: 'fulfilled', value: undefined },
+      { status: 'fulfilled', value: undefined },
+    ]);
+    await observeGitHubInstallationLifecycle({
+      installationId: '773002',
+      appType: 'standard',
+      state: 'active',
+    });
+
+    const [canonical] = await db
+      .select()
+      .from(github_app_installations)
+      .where(eq(github_app_installations.installation_id, '773002'));
+    const [association] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integrationId));
+    expect(canonical?.lifecycle_state).toBe('deleted');
+    expect(association?.integration_status).toBe('suspended');
+    await expect(
+      db
+        .select()
+        .from(github_installation_webhook_receipts)
+        .where(eq(github_installation_webhook_receipts.delivery_id, 'concurrent-delete'))
+    ).resolves.toHaveLength(1);
+  });
+
+  test('maps bounded lock waits to a retryable connection conflict', async () => {
+    const statements: string[] = [];
+    const transaction = {
+      execute: async (query: { toQuery: (config: unknown) => { sql: string } }) => {
+        const rendered = query.toQuery({
+          escapeName: (name: string) => name,
+          escapeParam: (index: number) => `$${index + 1}`,
+          escapeString: (value: string) => `'${value}'`,
+          casing: { getColumnCasing: (column: { name: string }) => column.name },
+        });
+        statements.push(rendered.sql);
+        if (statements.length === 4) {
+          throw { cause: { code: '55P03' } };
+        }
+      },
+    } as never;
+
+    await expect(
+      connectVerifiedGitHubInstallation({ type: 'user', id: ownerId }, data(), transaction)
+    ).resolves.toEqual({ ok: false, reason: 'retryable_conflict' });
+    expect(statements.slice(0, 3).join(' ')).toContain('SET LOCAL lock_timeout');
+    expect(statements.slice(0, 3).join(' ')).toContain('SET LOCAL statement_timeout');
+    expect(statements.slice(0, 3).join(' ')).toContain('idle_in_transaction_session_timeout');
+  });
+
+  test.each([
+    { sharing: false, multiple: false, expected: 'multiple_installations_disabled' },
+    { sharing: true, multiple: false, expected: 'multiple_installations_disabled' },
+    { sharing: false, multiple: true, expected: 'shared_installation_disabled' },
+    { sharing: true, multiple: true, expected: 'ok' },
+  ] as const)(
+    'applies sharing=$sharing and multiple-installation=$multiple independently',
+    async ({ sharing, multiple, expected }) => {
+      const organizationA = await createTestOrganization('Policy GitHub A', ownerId, 0);
+      const organizationB = await createTestOrganization('Policy GitHub B', otherOwnerId, 0);
+      process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = sharing ? organizationB.id : '';
+      process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = multiple ? organizationB.id : '';
+      const incumbent = await connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationA.id },
+        data('123456')
+      );
+      const destinationExisting = await connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationB.id },
+        { ...data('654321'), kiloUserId: otherOwnerId }
+      );
+      if (!incumbent.ok || !destinationExisting.ok) {
+        throw new Error('Expected policy fixtures');
+      }
+
+      const result = await connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationB.id },
+        { ...data('123456'), kiloUserId: otherOwnerId }
+      );
+      if (expected === 'ok') {
+        expect(result).toMatchObject({ ok: true });
+      } else {
+        expect(result).toEqual({ ok: false, reason: expected });
+      }
+    }
+  );
 
   test('reconnects the same association after local disconnect and rejects another owner', async () => {
     const first = await connectVerifiedGitHubInstallation({ type: 'user', id: ownerId }, data());
@@ -125,6 +797,58 @@ describe('GitHub installation persistence', () => {
     await expect(
       findIntegrationByInstallationId('github', '654321', 'standard')
     ).resolves.toMatchObject({ id: legacy.id });
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('654321', 'standard')
+    ).resolves.toBeUndefined();
+    await materializeGitHubInstallationIdentity({ installationId: '654321', appType: 'standard' });
+    await expect(
+      getGitHubInstallationDeliveryStatus({
+        installationId: '654321',
+        appType: 'standard',
+        deliveryId: 'legacy-delete',
+      })
+    ).resolves.toBe('not_completed');
+    await recordCompletedGitHubInstallationDelivery({
+      installationId: '654321',
+      appType: 'standard',
+      deliveryId: 'legacy-delete',
+      eventType: 'installation.deleted',
+    });
+    await expect(
+      getGitHubInstallationDeliveryStatus({
+        installationId: '654321',
+        appType: 'standard',
+        deliveryId: 'legacy-delete',
+      })
+    ).resolves.toBe('completed');
+  });
+
+  test('ignores an unbound shadow when canonical identity already exists', async () => {
+    const organization = await createTestOrganization('Canonical coexistence org', ownerId, 0);
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      data('654322')
+    );
+    if (!connected.ok) throw new Error('Expected canonical connection');
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: ownerId,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '654322',
+      github_app_type: 'standard',
+      integration_status: 'active',
+    });
+
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('654322', 'standard')
+    ).resolves.toBeUndefined();
+    await db
+      .update(github_app_installations)
+      .set({ sharing_mode: 'web_cloud_agent' })
+      .where(eq(github_app_installations.installation_id, '654322'));
+    await expect(assertGitHubInstallationRuntimeAuthorized('654322', 'standard')).rejects.toThrow(
+      'GitHub installation is unavailable for runtime use'
+    );
   });
 
   test('routes the same numeric GitHub installation ID by app identity', async () => {
@@ -298,7 +1022,8 @@ describe('GitHub installation persistence', () => {
     if (!connected.ok) throw new Error('Expected initial connection');
     await disconnectGitHubInstallation({ type: 'user', id: ownerId }, connected.integrationId);
     await updateGitHubInstallationAccountIdentity({
-      integrationId: connected.integrationId,
+      installationId: '123456',
+      appType: 'standard',
       accountId: '222',
       accountLogin: 'renamed-acme',
     });
@@ -404,3 +1129,38 @@ describe('GitHub installation persistence', () => {
     ).resolves.toMatchObject({ github_installation_id: null, integration_status: 'suspended' });
   });
 });
+
+async function waitForBlockedGitHubOwnerLock(
+  holderPid: number,
+  expectedLockKey: string
+): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const result = await db.execute<{ blocked: boolean }>(sql`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_stat_activity
+        WHERE datname = current_database()
+          AND ${holderPid} = ANY(pg_blocking_pids(pid))
+          AND wait_event_type = 'Lock'
+          AND wait_event = 'advisory'
+          AND query LIKE 'SELECT pg_advisory_xact_lock(hashtext(%'
+      ) AS blocked
+    `);
+    if (result.rows[0]?.blocked) return;
+    await new Promise<void>(resolve => setImmediate(resolve));
+  }
+  throw new Error(`Expected contender blocked on advisory lock ${expectedLockKey}`);
+}
+
+async function githubTestTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out`)), 5_000);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}

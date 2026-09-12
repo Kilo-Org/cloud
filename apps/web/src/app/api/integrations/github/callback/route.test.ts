@@ -24,6 +24,7 @@ import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import type { Owner } from '@/lib/integrations/core/types';
 import {
+  findGitHubBotLinkIntegrations,
   findIntegrationByInstallationId,
   findIntegrationByInstallationIdForOwner,
   upsertPlatformIntegrationForOwner,
@@ -85,6 +86,7 @@ jest.mock('@/routers/organizations/utils', () => ({
 }));
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   createPendingIntegration: jest.fn(),
+  findGitHubBotLinkIntegrations: jest.fn(),
   findIntegrationByInstallationId: jest.fn(),
   findIntegrationByInstallationIdForOwner: jest.fn(),
   findPendingInstallationByRequesterId: jest.fn(),
@@ -113,6 +115,7 @@ const mockedExchangeGitHubOAuthCode = jest.mocked(exchangeGitHubOAuthCode);
 const mockedLinkKiloUser = jest.mocked(linkKiloUser);
 const mockedBot = jest.mocked(bot);
 const mockedFindIntegrationByInstallationId = jest.mocked(findIntegrationByInstallationId);
+const mockedFindGitHubBotLinkIntegrations = jest.mocked(findGitHubBotLinkIntegrations);
 const mockedFindIntegrationByInstallationIdForOwner = jest.mocked(
   findIntegrationByInstallationIdForOwner
 );
@@ -160,6 +163,18 @@ beforeEach(() => {
         github_app_type: 'standard',
       }) as never
   );
+  mockedFindGitHubBotLinkIntegrations.mockImplementation(
+    async () =>
+      [
+        {
+          id: '00000000-0000-4000-8000-000000000099',
+          owned_by_user_id: writtenOwner.type === 'user' ? writtenOwner.id : null,
+          owned_by_organization_id: writtenOwner.type === 'org' ? writtenOwner.id : null,
+          platform_installation_id: INSTALLATION_ID,
+          github_app_type: 'standard',
+        },
+      ] as never
+  );
   mockedFindIntegrationByInstallationIdForOwner.mockImplementation(
     async () =>
       ({
@@ -197,6 +212,8 @@ function expectRedirectLocation(response: Response, expectedPathWithQuery: strin
 describe('GET /api/integrations/github/callback bot link flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = '';
 
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: USER_ID },
@@ -206,6 +223,7 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       userId: USER_ID,
       installationId: INSTALLATION_ID,
       callbackPath: '/github/link',
+      platformIntegrationId: '00000000-0000-4000-8000-000000000099',
     });
     mockedExchangeGitHubOAuthCode.mockResolvedValue({
       id: GITHUB_USER_ID,
@@ -218,6 +236,15 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       github_app_type: 'standard',
       metadata: null,
     } as never);
+    mockedFindGitHubBotLinkIntegrations.mockResolvedValue([
+      {
+        id: '00000000-0000-4000-8000-000000000099',
+        owned_by_organization_id: 'org_1',
+        owned_by_user_id: null,
+        platform_installation_id: INSTALLATION_ID,
+        github_app_type: 'standard',
+      } as never,
+    ]);
     mockedIsOrganizationMember.mockResolvedValue(true);
   });
 
@@ -281,11 +308,11 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     await expect(response.text()).resolves.toContain(
       'not a member of the organization that owns this GitHub integration'
     );
-    expect(mockedFindIntegrationByInstallationId).toHaveBeenCalledWith(
-      'github',
-      INSTALLATION_ID,
-      'standard'
-    );
+    expect(mockedFindGitHubBotLinkIntegrations).toHaveBeenCalledWith({
+      installationId: INSTALLATION_ID,
+      appType: 'standard',
+      platformIntegrationId: '00000000-0000-4000-8000-000000000099',
+    });
     expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
     expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
@@ -299,11 +326,11 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toContain('GitHub account octocat has been linked');
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'standard');
-    expect(mockedFindIntegrationByInstallationId).toHaveBeenCalledWith(
-      'github',
-      INSTALLATION_ID,
-      'standard'
-    );
+    expect(mockedFindGitHubBotLinkIntegrations).toHaveBeenCalledWith({
+      installationId: INSTALLATION_ID,
+      appType: 'standard',
+      platformIntegrationId: '00000000-0000-4000-8000-000000000099',
+    });
     expect(mockedIsOrganizationMember).toHaveBeenCalledWith('org_1', USER_ID);
     expect(mockedBot.initialize).toHaveBeenCalled();
     expect(mockedLinkKiloUser).toHaveBeenCalledWith(
@@ -318,27 +345,80 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     );
   });
 
+  test('allows one healthy legacy no-ID state while management and sharing are disabled', async () => {
+    mockedVerifyGitHubBotLinkState.mockReturnValue({
+      userId: USER_ID,
+      installationId: INSTALLATION_ID,
+      callbackPath: '/github/link',
+    });
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
+    expect(response.status).toBe(200);
+    expect(mockedFindGitHubBotLinkIntegrations).toHaveBeenCalledWith({
+      installationId: INSTALLATION_ID,
+      appType: 'standard',
+      platformIntegrationId: undefined,
+    });
+  });
+
+  test('rejects a no-ID state after connection management is enabled', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+    mockedVerifyGitHubBotLinkState.mockReturnValue({
+      userId: USER_ID,
+      installationId: INSTALLATION_ID,
+      callbackPath: '/github/link',
+    });
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
+    expect(response.status).toBe(404);
+    expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
+  });
+
+  test('rejects a no-ID state after shared-installation admission is enabled', async () => {
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS =
+      '00000000-0000-4000-8000-000000000001';
+    mockedVerifyGitHubBotLinkState.mockReturnValue({
+      userId: USER_ID,
+      installationId: INSTALLATION_ID,
+      callbackPath: '/github/link',
+    });
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
+    expect(response.status).toBe(404);
+    expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
+  });
+
   test('routes a Lite bot-link callback through the Lite app identity', async () => {
     mockedVerifyGitHubBotLinkState.mockReturnValue({
       userId: USER_ID,
       installationId: INSTALLATION_ID,
       callbackPath: '/github/link',
       githubAppType: 'lite',
+      platformIntegrationId: '00000000-0000-4000-8000-000000000099',
     });
-    mockedFindIntegrationByInstallationId.mockResolvedValue({
-      owned_by_organization_id: 'org_1',
-      github_app_type: 'lite',
-    } as never);
+    mockedFindGitHubBotLinkIntegrations.mockResolvedValue([
+      {
+        id: '00000000-0000-4000-8000-000000000099',
+        owned_by_organization_id: 'org_1',
+        github_app_type: 'lite',
+      } as never,
+    ]);
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
     );
     expect(response.status).toBe(200);
-    expect(mockedFindIntegrationByInstallationId).toHaveBeenCalledWith(
-      'github',
-      INSTALLATION_ID,
-      'lite'
-    );
+    expect(mockedFindGitHubBotLinkIntegrations).toHaveBeenCalledWith({
+      installationId: INSTALLATION_ID,
+      appType: 'lite',
+      platformIntegrationId: '00000000-0000-4000-8000-000000000099',
+    });
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'lite');
     expect(mockedLinkKiloUser).toHaveBeenCalledWith(
       mockState,
@@ -347,18 +427,16 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     );
   });
 
-  test("exchanges the OAuth code against the integration's github_app_type", async () => {
-    mockedFindIntegrationByInstallationId.mockResolvedValue({
-      owned_by_organization_id: 'org_1',
-      owned_by_user_id: null,
-      github_app_type: 'lite',
-      metadata: null,
-    } as never);
+  test('rejects an integration whose app type does not match signed state', async () => {
+    mockedFindGitHubBotLinkIntegrations.mockResolvedValue([]);
 
     const { GET } = await import('./route');
-    await GET(makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never);
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
 
-    expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'lite');
+    expect(response.status).toBe(404);
+    expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
   });
 });
 

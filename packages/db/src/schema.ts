@@ -4245,7 +4245,7 @@ export const platform_integrations = pgTable(
     // GitHub App type (for GitHub platform only)
     // 'standard' = full KiloConnect app, 'lite' = read-only KiloConnect-Lite app
     github_app_type: text().$type<'standard' | 'lite'>().default('standard'),
-    github_installation_id: uuid(),
+    github_installation_id: uuid().references(() => github_app_installations.id),
     github_disconnected_at: timestamp({ withTimezone: true, mode: 'string' }),
     github_authorized_by_user_id: text(),
     github_authorized_user_id: text(),
@@ -4273,14 +4273,34 @@ export const platform_integrations = pgTable(
     uniqueIndex('UQ_platform_integrations_linear_platform_inst')
       .on(table.platform, table.platform_installation_id)
       .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
-    uniqueIndex('UQ_platform_integrations_github_platform_inst')
-      .on(table.platform, table.github_app_type, table.platform_installation_id)
+    uniqueIndex('UQ_platform_integrations_github_org_canonical')
+      .on(table.owned_by_organization_id, table.github_installation_id)
       .concurrently()
-      .where(sql`${table.platform} = 'github' AND ${table.platform_installation_id} IS NOT NULL`),
-    uniqueIndex('UQ_platform_integrations_github_pending_target')
-      .on(table.platform, table.github_app_type, table.platform_account_id)
       .where(
-        sql`${table.platform} = 'github' AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
+        sql`${table.platform} = 'github' AND ${table.owned_by_organization_id} IS NOT NULL AND ${table.github_installation_id} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_platform_integrations_github_user_canonical')
+      .on(table.owned_by_user_id, table.github_installation_id)
+      .concurrently()
+      .where(
+        sql`${table.platform} = 'github' AND ${table.owned_by_user_id} IS NOT NULL AND ${table.github_installation_id} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_platform_integrations_github_org_pending_target')
+      .on(
+        table.owned_by_organization_id,
+        table.platform,
+        table.github_app_type,
+        table.platform_account_id
+      )
+      .concurrently()
+      .where(
+        sql`${table.platform} = 'github' AND ${table.owned_by_organization_id} IS NOT NULL AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_platform_integrations_github_user_pending_target')
+      .on(table.owned_by_user_id, table.platform, table.github_app_type, table.platform_account_id)
+      .concurrently()
+      .where(
+        sql`${table.platform} = 'github' AND ${table.owned_by_user_id} IS NOT NULL AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
       ),
     uniqueIndex('UQ_platform_integrations_user_bitbucket')
       .on(table.owned_by_user_id)
@@ -4348,6 +4368,8 @@ export const github_app_installations = pgTable(
     deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
     auth_invalid_at: timestamp({ withTimezone: true, mode: 'string' }),
     auth_invalid_reason: text(),
+    sharing_mode: text().$type<'exclusive' | 'web_cloud_agent'>().notNull().default('exclusive'),
+    sharing_admission_checked_at: timestamp({ withTimezone: true, mode: 'string' }),
     revision: integer().notNull().default(0),
     observed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -4373,6 +4395,70 @@ export const github_app_installations = pgTable(
       'github_app_installations_lifecycle_state_check',
       sql`${table.lifecycle_state} IN ('unknown', 'active', 'suspended', 'deleted')`
     ),
+    check(
+      'github_app_installations_sharing_mode_check',
+      sql`${table.sharing_mode} IN ('exclusive', 'web_cloud_agent')`
+    ),
+  ]
+);
+
+export const github_installation_webhook_receipts = pgTable(
+  'github_installation_webhook_receipts',
+  {
+    id: idPrimaryKeyColumn,
+    github_installation_id: uuid()
+      .notNull()
+      .references(() => github_app_installations.id, { onDelete: 'cascade' }),
+    delivery_id: text().notNull(),
+    event_type: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_github_installation_webhook_receipts_delivery').on(
+      table.github_installation_id,
+      table.delivery_id
+    ),
+  ]
+);
+
+export const provider_oauth_attempts = pgTable(
+  'provider_oauth_attempts',
+  {
+    id: idPrimaryKeyColumn,
+    provider: text().$type<'slack' | 'linear' | 'discord'>().notNull(),
+    purpose: text().$type<'provider_install'>().notNull().default('provider_install'),
+    state_hash: text().notNull().unique(),
+    initiated_by_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    status: text().$type<'pending' | 'consumed' | 'expired'>().notNull().default('pending'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    check(
+      'provider_oauth_attempts_provider_check',
+      sql`${table.provider} IN ('slack', 'linear', 'discord')`
+    ),
+    check(
+      'provider_oauth_attempts_status_check',
+      sql`${table.status} IN ('pending', 'consumed', 'expired')`
+    ),
+    check('provider_oauth_attempts_purpose_check', sql`${table.purpose} = 'provider_install'`),
+    check(
+      'provider_oauth_attempts_owner_check',
+      sql`num_nonnulls(${table.owned_by_user_id}, ${table.owned_by_organization_id}) = 1`
+    ),
+    uniqueIndex('UQ_provider_oauth_attempts_user_pending')
+      .on(table.owned_by_user_id, table.provider)
+      .where(sql`${table.status} = 'pending' AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_provider_oauth_attempts_org_pending')
+      .on(table.owned_by_organization_id, table.provider)
+      .where(sql`${table.status} = 'pending' AND ${table.owned_by_organization_id} IS NOT NULL`),
+    index('IDX_provider_oauth_attempts_expires_at').on(table.expires_at),
   ]
 );
 

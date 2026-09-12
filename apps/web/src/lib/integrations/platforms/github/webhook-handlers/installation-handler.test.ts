@@ -292,6 +292,32 @@ describe('handleInstallationCreated', () => {
     });
     expect(mockAutoCompleteInstallation).not.toHaveBeenCalled();
   });
+
+  it('does not auto-attach a pending owner when the installation is already associated', async () => {
+    selectResults = [[], [{ ...orgIntegration, metadata: {} }], [{ id: 'existing-association' }]];
+    const response = await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: { id: 22, login: 'owner' },
+        sender: { login: 'owner' },
+      },
+      'standard'
+    );
+
+    expect(await response.json()).toEqual({
+      message: 'Installation association requires verified connection confirmation',
+    });
+    expect(mockAutoCompleteInstallation).not.toHaveBeenCalled();
+    expect(mockBindCanonical).not.toHaveBeenCalled();
+  });
 });
 
 describe('handleInstallationDeleted', () => {
@@ -318,6 +344,28 @@ describe('handleInstallationDeleted', () => {
       state: 'deleted',
     });
     expect(mockDeleteGitHubInstallationRecords).toHaveBeenCalledWith('98765', 'standard');
+  });
+
+  it('keeps completed database cleanup when bot identity unlink fails', async () => {
+    mockUnlinkTeamKiloUsers.mockRejectedValue(new Error('identity store unavailable'));
+
+    await expect(handleInstallationDeleted(deletedPayload, 'standard')).resolves.toBeDefined();
+    expect(mockCaptureException).toHaveBeenCalled();
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({ state: 'deleted' })
+    );
+    expect(mockObserveGitHubInstallationLifecycle.mock.invocationCallOrder[0]).toBeLessThan(
+      mockUnlinkTeamKiloUsers.mock.invocationCallOrder[0]!
+    );
+  });
+
+  it('fails before bot unlink when required database cleanup fails', async () => {
+    mockObserveGitHubInstallationLifecycle.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(handleInstallationDeleted(deletedPayload, 'standard')).rejects.toThrow(
+      'database unavailable'
+    );
+    expect(mockUnlinkTeamKiloUsers).not.toHaveBeenCalled();
   });
 
   it('lite app deletion does not unlink bot identities and passes the app type', async () => {

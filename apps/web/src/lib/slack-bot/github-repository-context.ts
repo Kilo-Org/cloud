@@ -4,70 +4,63 @@ import {
   type PlatformRepository,
 } from '@/lib/integrations/core/types';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
+import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 
 export type GitHubRepositoryContext = {
-  accountLogin: string | null;
-  repositoryAccess: string | null;
-  repositoriesSyncedAt: string | null;
-  repositories: PlatformRepository[] | null;
+  repositories: GitHubRepositoryChoice[] | null;
 };
 
-/**
- * Get GitHub repository context for an owner from their GitHub integration.
- * This does not perform extra API requests; it uses data stored on the integration row.
- */
+export type GitHubRepositoryChoice = PlatformRepository & {
+  githubIntegrationId: string;
+  githubAppType: 'standard' | 'lite';
+};
+
 export async function getGitHubRepositoryContext(owner: Owner): Promise<GitHubRepositoryContext> {
-  const integration = await getIntegrationForOwner(owner, PLATFORM.GITHUB);
-  if (!isPlatformIntegrationHealthy(integration) || integration.integration_status !== 'active') {
-    return {
-      accountLogin: null,
-      repositoryAccess: null,
-      repositoriesSyncedAt: null,
-      repositories: null,
-    };
-  }
+  const integrations = await getAllIntegrationsForOwner(owner);
+  const repositories = integrations.flatMap(integration => {
+    if (
+      integration.platform !== PLATFORM.GITHUB ||
+      integration.integration_status !== 'active' ||
+      !isPlatformIntegrationHealthy(integration)
+    ) {
+      return [];
+    }
 
-  const repositories = requireNumericPlatformRepositories(integration.repositories);
+    return (requireNumericPlatformRepositories(integration.repositories) ?? []).map(repository => ({
+      ...repository,
+      githubIntegrationId: integration.id,
+      githubAppType: integration.github_app_type ?? 'standard',
+    }));
+  });
 
-  return {
-    accountLogin: integration.platform_account_login,
-    repositoryAccess: integration.repository_access,
-    repositoriesSyncedAt: integration.repositories_synced_at,
-    repositories,
-  };
+  return { repositories: repositories.length > 0 ? repositories : null };
+}
+
+export async function resolveGitHubRepositoryForOwner(
+  owner: Owner,
+  fullName: string
+): Promise<GitHubRepositoryChoice | null> {
+  const context = await getGitHubRepositoryContext(owner);
+  const matches =
+    context.repositories?.filter(repository => repository.full_name === fullName) ?? [];
+
+  return matches.length === 1 ? matches[0] : null;
 }
 
 export function formatGitHubRepositoriesForPrompt(context: GitHubRepositoryContext): string {
-  const headerLines: string[] = ['\n\nGitHub repository context for this workspace:'];
-
-  if (context.accountLogin) {
-    headerLines.push(`- Installation account: ${context.accountLogin}`);
-  }
-  if (context.repositoryAccess) {
-    headerLines.push(`- Repository access: ${context.repositoryAccess}`);
-  }
-  if (context.repositoriesSyncedAt) {
-    headerLines.push(`- Repositories synced at: ${context.repositoriesSyncedAt}`);
-  }
-
-  const header = headerLines.join('\n');
+  const header = '\n\nGitHub repository context for this workspace:';
 
   if (!context.repositories || context.repositories.length === 0) {
-    if (context.repositoryAccess === 'all') {
-      return `${header}
-- Repository list: not stored for "all" access (no repo list to show without extra requests).
-
-When the user asks you to work on code, ask them to specify the repository explicitly in owner/repo format.`;
-    }
-
     return `${header}
-- No GitHub repositories are currently connected. The user will need to specify a repository manually.`;
+- No GitHub repositories are currently available for this Kilo organization.`;
   }
 
   const repoList = context.repositories
-    .map(repo => `- ${repo.full_name}${repo.private ? ' (private)' : ''} [id: ${repo.id}]`)
+    .map(
+      repo =>
+        `- ${repo.full_name}${repo.private ? ' (private)' : ''} [id: ${repo.id}; association: ${repo.githubIntegrationId}; app: ${repo.githubAppType}]`
+    )
     .join('\n');
 
   return `${header}

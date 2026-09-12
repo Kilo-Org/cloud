@@ -1,6 +1,6 @@
 import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { organizations, provider_oauth_attempts } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { organizations, platform_integrations, provider_oauth_attempts } from '@kilocode/db/schema';
+import { and, eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import {
@@ -113,11 +113,21 @@ describe('provider OAuth attempts', () => {
     await expect(
       connectVerifiedGitHubInstallation({ type: 'org', id: organizationA.id }, github)
     ).resolves.toMatchObject({ ok: true });
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organizationB.id,
+      platform: 'slack',
+      integration_type: 'oauth',
+      platform_installation_id: 'T_EXISTING',
+      platform_account_id: 'T_EXISTING',
+      integration_status: 'active',
+      installed_at: new Date().toISOString(),
+    });
     await beginProviderOAuthAttempt({
       actorUserId: destinationUser.id,
       owner: { type: 'org', id: organizationB.id },
       provider: 'slack',
       state: 'state-started',
+      purpose: 'provider_install',
     });
     await expect(
       connectVerifiedGitHubInstallation(
@@ -125,6 +135,44 @@ describe('provider OAuth attempts', () => {
         { ...github, kiloUserId: destinationUser.id }
       )
     ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+    await cancelProviderOAuthAttempt({
+      actorUserId: destinationUser.id,
+      owner: { type: 'org', id: organizationB.id },
+      provider: 'slack',
+      state: 'state-started',
+      purpose: 'provider_install',
+    });
+    for (const platform of ['linear', 'discord']) {
+      await db.insert(platform_integrations).values({
+        owned_by_organization_id: organizationB.id,
+        platform,
+        integration_type: 'oauth',
+        platform_installation_id: `${platform}-existing`,
+        platform_account_id: `${platform}-existing`,
+        integration_status: 'active',
+        installed_at: new Date().toISOString(),
+      });
+      await expect(
+        connectVerifiedGitHubInstallation(
+          { type: 'org', id: organizationB.id },
+          { ...github, kiloUserId: destinationUser.id }
+        )
+      ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+      await db
+        .delete(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, platform),
+            eq(platform_integrations.owned_by_organization_id, organizationB.id)
+          )
+        );
+    }
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationB.id },
+        { ...github, kiloUserId: destinationUser.id }
+      )
+    ).resolves.toMatchObject({ ok: true });
   });
 
   it('blocks provider start after shared GitHub attach', async () => {

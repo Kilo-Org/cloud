@@ -3,16 +3,16 @@ import type { PlatformIntegration } from '@kilocode/db';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { createCloudAgentNextClient as CreateCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type {
-  getGitHubTokenForOrganization as GetGitHubTokenForOrganization,
-  getGitHubTokenForUser as GetGitHubTokenForUser,
-} from '@/lib/cloud-agent/github-integration-helpers';
-import type {
   buildGitLabCloneUrl as BuildGitLabCloneUrl,
   getGitLabInstanceUrlForUser as GetGitLabInstanceUrlForUser,
   getGitLabTokenForUser as GetGitLabTokenForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type { resolveModelForGitHubRepository as ResolveModelForGitHubRepository } from '@/lib/integrations/github-repository-settings';
+import type { resolveGitHubRepositoryForOwner as ResolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
 import type SpawnCloudAgentSession from './spawn-cloud-agent-session';
+
+const mockGetGitHubIntegrationById =
+  jest.fn<(...args: unknown[]) => Promise<PlatformIntegration | null>>();
 
 jest.mock('@/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'callback-secret',
@@ -26,9 +26,12 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(),
 }));
 
-jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
-  getGitHubTokenForOrganization: jest.fn(),
-  getGitHubTokenForUser: jest.fn(),
+jest.mock('@/lib/slack-bot/github-repository-context', () => ({
+  resolveGitHubRepositoryForOwner: jest.fn(),
+}));
+
+jest.mock('@/lib/integrations/db/platform-integrations', () => ({
+  getGitHubIntegrationById: (...args: unknown[]) => mockGetGitHubIntegrationById(...args),
 }));
 
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
@@ -73,8 +76,9 @@ const mockPrepareSession =
 const mockInitiateFromPreparedSession = jest.fn<(input: unknown) => Promise<unknown>>();
 let spawnCloudAgentSession: typeof SpawnCloudAgentSession;
 let mockCreateCloudAgentNextClient: jest.MockedFunction<typeof CreateCloudAgentNextClient>;
-let mockGetGitHubTokenForOrganization: jest.MockedFunction<typeof GetGitHubTokenForOrganization>;
-let mockGetGitHubTokenForUser: jest.MockedFunction<typeof GetGitHubTokenForUser>;
+let mockResolveGitHubRepositoryForOwner: jest.MockedFunction<
+  typeof ResolveGitHubRepositoryForOwner
+>;
 let mockGetGitLabTokenForUser: jest.MockedFunction<typeof GetGitLabTokenForUser>;
 let mockGetGitLabInstanceUrlForUser: jest.MockedFunction<typeof GetGitLabInstanceUrlForUser>;
 let mockBuildGitLabCloneUrl: jest.MockedFunction<typeof BuildGitLabCloneUrl>;
@@ -85,14 +89,15 @@ let mockResolveModelForGitHubRepository: jest.MockedFunction<
 describe('spawnCloudAgentSession delegation', () => {
   beforeAll(async () => {
     const client = await import('@/lib/cloud-agent-next/cloud-agent-client');
-    const github = await import('@/lib/cloud-agent/github-integration-helpers');
+    const githubRepositoryContext = await import('@/lib/slack-bot/github-repository-context');
     const gitlab = await import('@/lib/cloud-agent/gitlab-integration-helpers');
     const repositorySettings = await import('@/lib/integrations/github-repository-settings');
     const spawn = await import('./spawn-cloud-agent-session');
 
     mockCreateCloudAgentNextClient = jest.mocked(client.createCloudAgentNextClient);
-    mockGetGitHubTokenForOrganization = jest.mocked(github.getGitHubTokenForOrganization);
-    mockGetGitHubTokenForUser = jest.mocked(github.getGitHubTokenForUser);
+    mockResolveGitHubRepositoryForOwner = jest.mocked(
+      githubRepositoryContext.resolveGitHubRepositoryForOwner
+    );
     mockGetGitLabTokenForUser = jest.mocked(gitlab.getGitLabTokenForUser);
     mockGetGitLabInstanceUrlForUser = jest.mocked(gitlab.getGitLabInstanceUrlForUser);
     mockBuildGitLabCloneUrl = jest.mocked(gitlab.buildGitLabCloneUrl);
@@ -113,8 +118,19 @@ describe('spawnCloudAgentSession delegation', () => {
       kiloSessionId: 'kilo-session-1',
     });
     mockInitiateFromPreparedSession.mockResolvedValue({});
-    mockGetGitHubTokenForOrganization.mockResolvedValue('organization-github-token');
-    mockGetGitHubTokenForUser.mockResolvedValue('github-token');
+    mockResolveGitHubRepositoryForOwner.mockResolvedValue({
+      id: 1,
+      name: 'repo',
+      full_name: 'owner/repo',
+      private: true,
+      githubIntegrationId: 'github-association-1',
+      githubAppType: 'standard',
+    });
+    mockGetGitHubIntegrationById.mockResolvedValue({
+      ...userIntegration,
+      id: 'github-association-1',
+      repositories: [{ id: 1, name: 'repo', full_name: 'owner/repo', private: true }],
+    });
     mockGetGitLabTokenForUser.mockResolvedValue('gitlab-token');
     mockGetGitLabInstanceUrlForUser.mockResolvedValue('https://gitlab.com');
     mockBuildGitLabCloneUrl.mockReturnValue('https://gitlab.com/group/repo.git');
@@ -138,7 +154,7 @@ describe('spawnCloudAgentSession delegation', () => {
     expect(prepareInput).toEqual(
       expect.objectContaining({
         githubRepo: 'owner/repo',
-        githubToken: 'organization-github-token',
+        githubIntegrationId: 'github-association-1',
         kilocodeOrganizationId: 'organization-1',
         createdOnPlatform: 'slack',
         attachments,
@@ -149,6 +165,7 @@ describe('spawnCloudAgentSession delegation', () => {
       })
     );
     expect(prepareInput).not.toHaveProperty('images');
+    expect(prepareInput).not.toHaveProperty('githubToken');
     for (const field of profileDerivedInlineFields) {
       expect(prepareInput).not.toHaveProperty(field);
     }
@@ -162,6 +179,40 @@ describe('spawnCloudAgentSession delegation', () => {
       cloudAgentSessionId: 'cloud-session-1',
       kiloSessionId: 'kilo-session-1',
     });
+  });
+
+  it('rejects GitHub repositories outside the owner inventory', async () => {
+    mockResolveGitHubRepositoryForOwner.mockResolvedValue(null);
+
+    await expect(
+      spawnCloudAgentSession(
+        { githubRepo: 'other/repo', prompt: 'Use the files', mode: 'code' },
+        'model',
+        organizationIntegration,
+        'auth-token',
+        'request-unknown'
+      )
+    ).resolves.toEqual(
+      expect.objectContaining({ response: expect.stringContaining('not uniquely available') })
+    );
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects a repository when its selected association is foreign to the owner', async () => {
+    mockGetGitHubIntegrationById.mockResolvedValue(null);
+
+    await expect(
+      spawnCloudAgentSession(
+        { githubRepo: 'owner/repo', prompt: 'Inspect it', mode: 'code' },
+        'model',
+        organizationIntegration,
+        'auth-token',
+        'request-foreign'
+      )
+    ).resolves.toEqual(
+      expect.objectContaining({ response: expect.stringContaining('no longer available') })
+    );
+    expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
   it('delegates GitLab profile resolution while preserving canonical repository context', async () => {
@@ -224,7 +275,10 @@ describe('spawnCloudAgentSession delegation', () => {
       { chatPlatform: 'slack' }
     );
 
-    expect(mockResolveModelForGitHubRepository).toHaveBeenCalledWith(userIntegration, 'owner/repo');
+    expect(mockResolveModelForGitHubRepository).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'github-association-1' }),
+      'owner/repo'
+    );
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({ model: 'repo-override-model' })
     );

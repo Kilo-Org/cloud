@@ -5,10 +5,6 @@ import {
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type { RunSessionInput } from '@/lib/cloud-agent-next/run-session';
 import {
-  getGitHubTokenForOrganization,
-  getGitHubTokenForUser,
-} from '@/lib/cloud-agent/github-integration-helpers';
-import {
   getGitLabTokenForOrganization,
   getGitLabTokenForUser,
   getGitLabInstanceUrlForOrganization,
@@ -27,6 +23,8 @@ import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
 import z from 'zod';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
+import { resolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
+import { getGitHubIntegrationById } from '@/lib/integrations/db/platform-integrations';
 
 /**
  * Derive a per-request callback token so the dedicated callback HMAC secret
@@ -184,52 +182,47 @@ export default async function spawnCloudAgentSession(
       attachments: options?.attachments,
     };
   } else {
-    // GitHub path: get token, use githubRepo/githubToken
     if (!args.githubRepo) {
       // Unreachable given the guard above (one of githubRepo/gitlabProject
       // is always set here), but keeps the repo-model lookup below type-safe.
       return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
     }
 
-    // The token fetch and the per-repository model override lookup are
-    // independent of each other, so resolve them concurrently rather than
-    // paying for two sequential round trips.
-    const [githubToken, effectiveModel] = await Promise.all([
-      owner.type === 'org'
-        ? getGitHubTokenForOrganization(owner.id)
-        : getGitHubTokenForUser(owner.id),
-      // A per-repository model override (`repository_customizations`) takes
-      // precedence over the installation-default `model` resolved earlier for
-      // this whole bot conversation — the repo is only known now that the LLM
-      // has picked one via this tool call. Guard this lookup independently so
-      // a customization-query failure falls back to the incoming `model`
-      // instead of aborting session creation entirely.
-      resolveModelForGitHubRepository(platformIntegration, args.githubRepo).catch(error => {
-        console.error(
-          '[KiloBot] Failed to resolve per-repository model override, falling back to installation model:',
-          error
-        );
-        captureException(error, {
-          tags: { component: 'kilo-bot', op: 'resolve-model-for-github-repository' },
-          extra: { botRequestId, githubRepo: args.githubRepo },
-        });
-        return model;
-      }),
-    ]);
-
-    if (!githubToken) {
+    const repository = await resolveGitHubRepositoryForOwner(owner, args.githubRepo);
+    if (!repository) {
       return {
         response:
-          'Error: No GitHub token available. Please ensure a GitHub integration is connected in your Kilo Code settings.',
+          "Error: That GitHub repository is not uniquely available through this organization's approved GitHub connections.",
       };
     }
+
+    const githubIntegration = await getGitHubIntegrationById(owner, repository.githubIntegrationId);
+    if (!githubIntegration) {
+      return {
+        response: 'Error: That GitHub connection is no longer available to this Kilo organization.',
+      };
+    }
+    const effectiveModel = await resolveModelForGitHubRepository(
+      githubIntegration,
+      args.githubRepo
+    ).catch(error => {
+      console.error(
+        '[KiloBot] Failed to resolve per-repository model override, falling back to installation model:',
+        error
+      );
+      captureException(error, {
+        tags: { component: 'kilo-bot', op: 'resolve-model-for-github-repository' },
+        extra: { botRequestId, githubRepo: args.githubRepo },
+      });
+      return model;
+    });
 
     prepareInput = {
       githubRepo: args.githubRepo,
       prompt,
       mode,
       model: effectiveModel,
-      githubToken,
+      githubIntegrationId: repository.githubIntegrationId,
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,
       callbackTarget,

@@ -65,6 +65,15 @@ export async function safeDeleteStripeCustomer(stripeCustomerId: string) {
   }
 }
 
+function isStripeResourceMissing(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'resource_missing'
+  );
+}
+
 export async function hasPaymentMethodInStripe({
   stripeCustomerId,
 }: {
@@ -72,10 +81,21 @@ export async function hasPaymentMethodInStripe({
 }): Promise<boolean> {
   if (skipStripeApi) return false;
 
-  // This function may become redundant if our in-db administration is accurate.
-  const paymentMethods = await client.paymentMethods.list({
-    customer: stripeCustomerId,
-    type: 'card',
-  });
-  return paymentMethods.data.length > 0;
+  try {
+    // This function may become redundant if our in-db administration is accurate.
+    const paymentMethods = await client.paymentMethods.list({
+      customer: stripeCustomerId,
+      type: 'card',
+    });
+    return paymentMethods.data.length > 0;
+  } catch (error) {
+    if (isStripeResourceMissing(error)) {
+      // The user row can outlive its Stripe customer (GDPR removal, see
+      // safeDeleteStripeCustomer). A customer that no longer exists has no
+      // payment method on file; rethrowing here would take down every page
+      // that awaits this check, e.g. the profile page.
+      return false;
+    }
+    throw error;
+  }
 }

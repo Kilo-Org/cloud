@@ -622,6 +622,59 @@ describe('progressive segment rotation', () => {
     }
   });
 
+  it('prepares the successor while the predecessor records, then hands off capture', async () => {
+    vi.useFakeTimers();
+    try {
+      const trace: string[] = [];
+      const recorders: FakeRecorder[] = [];
+      const makeTracedRecorder = (label: string): FakeRecorder => ({
+        uri: `file:///recordings/${label}.m4a`,
+        prepareToRecordAsync: vi.fn(async (): Promise<void> => {
+          trace.push(`${label}:prepare`);
+        }),
+        record: vi.fn((): void => {
+          trace.push(`${label}:record`);
+        }),
+        stop: vi.fn(async (): Promise<void> => {
+          trace.push(`${label}:stop`);
+        }),
+        release: vi.fn((): void => {
+          trace.push(`${label}:release`);
+        }),
+      });
+      const { engine } = buildEngine({
+        createRecorder: () => {
+          const label = `seg-${recorders.length + 1}`;
+          const recorder = makeTracedRecorder(label);
+          recorders.push(recorder);
+          return recorder;
+        },
+        segmentDurationMs: 30,
+      });
+
+      engine.start(START_OPTIONS);
+      await settle();
+      expect(trace).toEqual(['seg-1:prepare', 'seg-1:record']);
+
+      await vi.advanceTimersByTimeAsync(30);
+      await settle();
+
+      // The microphone is never idle across the rotation: the successor is
+      // created and prepared while the predecessor still captures, and capture
+      // only moves in the stop -> record handoff.
+      expect(trace).toEqual([
+        'seg-1:prepare',
+        'seg-1:record',
+        'seg-2:prepare',
+        'seg-1:stop',
+        'seg-2:record',
+        'seg-1:release',
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('abort clears the rotation timer so no further recorder is created', async () => {
     vi.useFakeTimers();
     try {

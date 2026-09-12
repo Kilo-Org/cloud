@@ -281,6 +281,57 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
   };
 
   /**
+   * Finish the outgoing segment and move capture to the successor in one
+   * handoff. The successor was already prepared while the outgoing recorder
+   * was still capturing, so only the native stop separates the two captures:
+   * the recorder is exclusive, so the successor must not start before the
+   * outgoing recorder stops, but it starts immediately after it does. The
+   * outgoing file URI is read, and its recorder released, once the successor
+   * is live.
+   */
+  const stopAndHandOff = async (
+    previous: RecorderHandle,
+    next: RecorderHandle
+  ): Promise<CapturedSegment> => {
+    try {
+      await previous.recorder.stop();
+    } catch {
+      await releaseAndDeleteRecording(previous, deleteRecording);
+      return { ok: false };
+    }
+    try {
+      next.recorder.record();
+    } catch {
+      await releaseAndDeleteRecording(previous, deleteRecording);
+      return { ok: false };
+    }
+    let uri: string | null = null;
+    try {
+      uri = previous.recorder.uri;
+    } catch {
+      // A recorder that refuses a URI read has no file to delete.
+    }
+    releaseRecorder(previous);
+    return { ok: true, uri };
+  };
+
+  /**
+   * Begin capture on a prepared recorder. A native refusal terminalizes the
+   * session; the caller still owns the handle and must release it.
+   */
+  const startRecorder = (current: GatewaySession, handle: RecorderHandle): boolean => {
+    try {
+      handle.recorder.record();
+      return true;
+    } catch {
+      if (!stale(current)) {
+        fail(current, 'client');
+      }
+      return false;
+    }
+  };
+
+  /**
    * Transcribe one finished segment and emit its final result. Empty or
    * no-speech segments are skipped silently; a real failure terminalizes the
    * session with the classified gateway code. The file is deleted on every
@@ -384,9 +435,11 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
   };
 
   /**
-   * Create, prepare, and start a fresh recorder. Returns null when the session
-   * was taken over while preparing or when preparation failed (which already
-   * terminalized the session); the caller owns the returned handle otherwise.
+   * Create and prepare a fresh recorder, leaving it ready but not yet
+   * recording. Returns null when the session was taken over while preparing or
+   * when preparation failed (which already terminalized the session); the
+   * caller owns the returned handle and starts capture with `startRecorder`
+   * when it becomes the session's recorder.
    */
   const prepareRecorder = async (current: GatewaySession): Promise<RecorderHandle | null> => {
     let handle: RecorderHandle | null = null;
@@ -412,7 +465,6 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
         handle = null;
         return null;
       }
-      recorder.record();
       return handle;
     } catch {
       if (handle) {
@@ -472,10 +524,12 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
   };
 
   /**
-   * One segment elapsed: stop and upload the current recording, then start a
-   * fresh recorder and schedule the next rotation. A `stop()` that raced this
-   * rotation owns the terminal signals, so the continuation emits
-   * `transcribing` and finalizes on its behalf.
+   * One segment elapsed: prepare a successor while the finished segment is
+   * still recording, then stop the finished segment and start the successor in
+   * one handoff — the microphone is never idle for the successor's creation,
+   * preparation or audio-mode setup. A `stop()` that raced this rotation owns
+   * the terminal signals, so the continuation emits `transcribing` and
+   * finalizes on its behalf.
    */
   const rotateSegment = async (current: GatewaySession): Promise<void> => {
     clearRotationTimer(current);
@@ -484,42 +538,47 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
     }
     current.rotationInFlight = true;
     try {
-      const handle = current.handle;
-      current.handle = null;
-      if (handle) {
-        const captured = await detachSegment(handle);
-        if (!captured.ok || captured.uri === null || captured.uri === '') {
-          if (!stale(current)) {
-            fail(current, 'client');
-          }
-          return;
-        }
-        enqueueSegmentUpload(current, captured.uri);
-      }
-      if (isStopped(current) || stale(current)) {
-        // `stop()` arrived while rotating; it left the terminal signals here.
-        if (!stale(current)) {
-          emit('transcribing', null);
-          await finalizeStop(current);
-        }
-        return;
-      }
       const next = await prepareRecorder(current);
       if (!next) {
+        // `prepareRecorder` terminalized the session, or it was taken over.
         return;
       }
       if (stale(current)) {
         await releaseAndDeleteRecording(next, deleteRecording);
         return;
       }
-      if (isStopped(current)) {
-        // `stop()` raced the next segment's preparation: stop it, upload it,
-        // and finalize now.
-        emit('transcribing', null);
-        void completeSegmentAndFinalize(current, next);
+      const previous = current.handle;
+      current.handle = null;
+      if (previous) {
+        const captured = await stopAndHandOff(previous, next);
+        if (!captured.ok || captured.uri === null || captured.uri === '') {
+          await releaseAndDeleteRecording(next, deleteRecording);
+          if (!stale(current)) {
+            fail(current, 'client');
+          }
+          return;
+        }
+        enqueueSegmentUpload(current, captured.uri);
+      } else if (!startRecorder(current, next)) {
+        await releaseAndDeleteRecording(next, deleteRecording);
+        return;
+      }
+      if (stale(current)) {
+        // The session was aborted or replaced mid-rotation; its recorder is
+        // the successor, which abort could not see while it was being handed
+        // off, so free it here.
+        current.handle = null;
+        await releaseAndDeleteRecording(next, deleteRecording);
         return;
       }
       current.handle = next;
+      if (isStopped(current)) {
+        // `stop()` arrived while rotating; it left the terminal signals here.
+        emit('transcribing', null);
+        current.handle = null;
+        void completeSegmentAndFinalize(current, next);
+        return;
+      }
       scheduleRotation(current);
     } finally {
       current.rotationInFlight = false;
@@ -543,6 +602,10 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
       return;
     }
     if (stale(current)) {
+      await releaseAndDeleteRecording(handle, deleteRecording);
+      return;
+    }
+    if (!startRecorder(current, handle)) {
       await releaseAndDeleteRecording(handle, deleteRecording);
       return;
     }

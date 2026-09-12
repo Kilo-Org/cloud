@@ -1730,13 +1730,6 @@
       "when": 1789156708300,
       "tag": "0246_nebulous_clint_barton",
       "breakpoints": true
-    },
-    {
-      "idx": 247,
-      "version": "7",
-      "when": 1789158273897,
-      "tag": "0247_classy_quasimodo",
-      "breakpoints": true
     }
   ]
 }

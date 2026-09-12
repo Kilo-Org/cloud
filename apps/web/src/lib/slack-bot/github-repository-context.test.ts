@@ -23,7 +23,6 @@ test('does not expose cached repository context from a disconnected association'
   ]);
   await expect(getGitHubRepositoryContext({ type: 'user', id: 'user-1' })).resolves.toEqual({
     repositories: null,
-    allAccessAssociations: [],
   });
 });
 
@@ -56,55 +55,12 @@ test('retains association provenance across repository choices', async () => {
       expect.objectContaining({ full_name: 'alpha/api', githubIntegrationId: 'association-a' }),
       expect.objectContaining({ full_name: 'beta/api', githubIntegrationId: 'association-b' }),
     ],
-    allAccessAssociations: [],
   });
   await expect(
     resolveGitHubRepositoryForOwner({ type: 'org', id: 'organization-1' }, 'alpha/api')
   ).resolves.toMatchObject({
     githubIntegrationId: 'association-a',
   });
-});
-
-test('resolves a freeform repository through one all-access association', async () => {
-  jest.mocked(getAllIntegrationsForOwner).mockResolvedValue([
-    {
-      id: 'association-all',
-      platform: 'github',
-      integration_status: 'active',
-      repository_access: 'all',
-      github_app_type: 'standard',
-      github_disconnected_at: null,
-      suspended_at: null,
-      auth_invalid_at: null,
-      repositories: null,
-    },
-  ] as never);
-
-  await expect(
-    resolveGitHubRepositoryForOwner({ type: 'org', id: 'organization-1' }, 'unlisted/repo')
-  ).resolves.toMatchObject({
-    full_name: 'unlisted/repo',
-    githubIntegrationId: 'association-all',
-  });
-});
-
-test('rejects a freeform repository when multiple all-access associations could authorize it', async () => {
-  jest.mocked(getAllIntegrationsForOwner).mockResolvedValue(
-    ['association-a', 'association-b'].map(id => ({
-      id,
-      platform: 'github',
-      integration_status: 'active',
-      repository_access: 'all',
-      github_disconnected_at: null,
-      suspended_at: null,
-      auth_invalid_at: null,
-      repositories: null,
-    })) as never
-  );
-
-  await expect(
-    resolveGitHubRepositoryForOwner({ type: 'org', id: 'organization-1' }, 'unlisted/repo')
-  ).resolves.toBeNull();
 });
 
 test('rejects a repository exposed by multiple associations', async () => {

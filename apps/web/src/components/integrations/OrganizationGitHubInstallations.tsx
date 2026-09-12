@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { TRPCClientError } from '@trpc/client';
 import { ChevronDown, ExternalLink, Github, MoreHorizontal, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -275,7 +276,12 @@ export function OrganizationGitHubInstallations({
               candidates={connectionAttempt.data?.candidates}
               isSelecting={selectConnection.isPending}
               isRestarting={beginConnection.isPending}
+              isNotFound={
+                connectionAttempt.error instanceof TRPCClientError &&
+                connectionAttempt.error.data?.code === 'NOT_FOUND'
+              }
               onRestart={startConnection}
+              onRetry={() => void connectionAttempt.refetch()}
               onSelect={confirmConnection}
               canInstallNew={Boolean(query.data?.canAdd)}
               onInstallNew={startInstall}

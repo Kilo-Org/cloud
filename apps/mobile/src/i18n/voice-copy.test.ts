@@ -7,7 +7,7 @@ import en from './locales/en.json';
  * is the source of truth: the translation slice fills the other catalogs, and
  * this test pins the eight new messages so a rename cannot ship silently.
  */
-const VOICE_LANGUAGE_COPY: Array<[keyof typeof en.voiceLanguage, string]> = [
+const VOICE_LANGUAGE_COPY: [keyof typeof en.voiceLanguage, string][] = [
   ['title', 'Voice language'],
   ['automatic', 'Automatic'],
   ['loadFailed', "Couldn't load the languages this device supports."],
@@ -15,7 +15,7 @@ const VOICE_LANGUAGE_COPY: Array<[keyof typeof en.voiceLanguage, string]> = [
   ['emptyDescription', "This device's speech recognition reports no supported languages."],
 ];
 
-const VOICE_INPUT_TEST_COPY: Array<[keyof typeof en.voiceInput, string]> = [
+const VOICE_INPUT_TEST_COPY: [keyof typeof en.voiceInput, string][] = [
   ['testTitle', 'Test voice input'],
   ['testPlaceholder', 'Tap the microphone and start speaking.'],
   ['testClear', 'Clear text'],

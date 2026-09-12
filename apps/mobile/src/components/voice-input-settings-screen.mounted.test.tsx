@@ -1,16 +1,16 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as preferences-screen.mounted.test.tsx) */
-import { act, type ReactTestRenderer } from 'react-test-renderer';
+import { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { VoiceInputSettingsScreen } from '@/components/voice-input-settings-screen';
 import {
   findConfigureRow,
   findGatewaySwitch,
   findQueryErrors,
   findTexts,
+  mountVoiceInputSettingsScreen,
+  unmountVoiceInputSettingsScreen,
 } from '@/components/voice-input-settings-screen.test-helpers';
-import { renderWithProviders } from '@/test/render-with-providers';
 
 type SelectionStatus = 'off' | 'loading' | 'error' | 'empty' | 'unavailable' | 'ready';
 type SelectionState = {
@@ -108,15 +108,6 @@ function setSelection(patch: Partial<SelectionState>): void {
   selection.current = { ...selection.current, ...patch };
 }
 
-let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
-async function mountVoiceInput(): Promise<ReactTestRenderer> {
-  view = await renderWithProviders(<VoiceInputSettingsScreen />);
-  await act(async () => {
-    await vi.dynamicImportSettled();
-  });
-  return view.renderer;
-}
-
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.resetAllMocks();
@@ -129,13 +120,12 @@ beforeEach(() => {
   selection.current = emptySelection();
 });
 afterEach(() => {
-  view?.unmount();
-  view = undefined;
+  unmountVoiceInputSettingsScreen();
 });
 
 describe('VoiceInputSettingsScreen', () => {
   it('renders the gateway transcription switch and its title and subtitle', async () => {
-    const renderer = await mountVoiceInput();
+    const renderer = await mountVoiceInputSettingsScreen();
 
     expect(findGatewaySwitch(renderer).props).toMatchObject({ value: false, disabled: false });
 
@@ -148,14 +138,14 @@ describe('VoiceInputSettingsScreen', () => {
 
   it('scopes the model catalogue read to the selected organization', async () => {
     organization.organizationId = 'org-42';
-    await mountVoiceInput();
+    await mountVoiceInputSettingsScreen();
 
     expect(selectionArgs.organizationId).toBe('org-42');
   });
 
   it('reads the catalogue unscoped for a personal account', async () => {
     organization.organizationId = null;
-    await mountVoiceInput();
+    await mountVoiceInputSettingsScreen();
 
     expect(selectionArgs.organizationId).toBeUndefined();
   });
@@ -164,7 +154,7 @@ describe('VoiceInputSettingsScreen', () => {
     // The catalogue is loaded, so the hook reports a model; the off status must
     // still win and keep the caption unset rather than naming that model.
     setSelection({ status: 'off', model: MODELS[0], models: MODELS });
-    const renderer = await mountVoiceInput();
+    const renderer = await mountVoiceInputSettingsScreen();
 
     expect(findConfigureRow(renderer, 'Transcription model').props).toMatchObject({
       icon: 'Cpu',
@@ -180,7 +170,7 @@ describe('VoiceInputSettingsScreen', () => {
   it('shows the loading caption disabled while the catalogue settles', async () => {
     gatewayTranscription.enabled = true;
     setSelection({ status: 'loading', isLoading: true });
-    const renderer = await mountVoiceInput();
+    const renderer = await mountVoiceInputSettingsScreen();
 
     expect(findConfigureRow(renderer, 'Transcription model').props).toMatchObject({
       subtitle: 'Loading…',
@@ -192,7 +182,7 @@ describe('VoiceInputSettingsScreen', () => {
   it('shows the auto-selected model and opens the picker when ready', async () => {
     gatewayTranscription.enabled = true;
     setSelection({ status: 'ready', model: MODELS[0], models: MODELS });
-    const renderer = await mountVoiceInput();
+    const renderer = await mountVoiceInputSettingsScreen();
 
     const row = findConfigureRow(renderer, 'Transcription model');
     expect(row.props).toMatchObject({ subtitle: 'Whisper Large v3', disabled: false });
@@ -206,7 +196,7 @@ describe('VoiceInputSettingsScreen', () => {
   it('keeps an unavailable stored model, opens the picker, and shows the notice with no retry', async () => {
     gatewayTranscription.enabled = true;
     setSelection({ status: 'unavailable', model: MODELS[0], models: MODELS });
-    const renderer = await mountVoiceInput();
+    const renderer = await mountVoiceInputSettingsScreen();
 
     const row = findConfigureRow(renderer, 'Transcription model');
     expect(row.props).toMatchObject({ subtitle: 'Whisper Large v3', disabled: false });
@@ -233,7 +223,7 @@ describe('VoiceInputSettingsScreen', () => {
     gatewayTranscription.enabled = true;
     const refetch = vi.fn<() => void>();
     setSelection({ status: 'error', isLoading: false, isError: true, refetch });
-    const renderer = await mountVoiceInput();
+    const renderer = await mountVoiceInputSettingsScreen();
 
     // The row is disabled and carries no failure copy: the state block below is
     // the single message, so the same failure is never read twice.
@@ -262,7 +252,7 @@ describe('VoiceInputSettingsScreen', () => {
     gatewayTranscription.enabled = true;
     const refetch = vi.fn<() => void>();
     setSelection({ status: 'empty', isLoading: false, isError: false, models: [], refetch });
-    const renderer = await mountVoiceInput();
+    const renderer = await mountVoiceInputSettingsScreen();
 
     // The row is disabled and carries no failure copy: the state block below is
     // the single message, so the same failure is never read twice.
@@ -292,7 +282,7 @@ describe('VoiceInputSettingsScreen', () => {
     async status => {
       gatewayTranscription.enabled = true;
       setSelection({ status, model: MODELS[0], models: MODELS });
-      const renderer = await mountVoiceInput();
+      const renderer = await mountVoiceInputSettingsScreen();
 
       expect(findTexts(renderer)).not.toContain('None chosen');
     }
@@ -300,14 +290,14 @@ describe('VoiceInputSettingsScreen', () => {
 
   it('keeps the gateway switch disabled until the preference has loaded', async () => {
     gatewayTranscription.hasLoaded = false;
-    const renderer = await mountVoiceInput();
+    const renderer = await mountVoiceInputSettingsScreen();
 
     expect(findGatewaySwitch(renderer).props.disabled).toBe(true);
   });
 
   it('shows the automatic language and opens the picker when no choice is stored', async () => {
     voiceLanguage.chosen = null;
-    const renderer = await mountVoiceInput();
+    const renderer = await mountVoiceInputSettingsScreen();
 
     const row = findConfigureRow(renderer, 'Language');
     expect(row.props).toMatchObject({
@@ -324,7 +314,7 @@ describe('VoiceInputSettingsScreen', () => {
 
   it('names the stored voice language by its endonym', async () => {
     voiceLanguage.chosen = 'de-DE';
-    const renderer = await mountVoiceInput();
+    const renderer = await mountVoiceInputSettingsScreen();
 
     expect(findConfigureRow(renderer, 'Language').props).toMatchObject({
       subtitle: 'Deutsch',
@@ -335,7 +325,7 @@ describe('VoiceInputSettingsScreen', () => {
   it('shows the loading caption and disables the language row until the choice has loaded', async () => {
     voiceLanguage.loaded = false;
     voiceLanguage.chosen = 'de-DE';
-    const renderer = await mountVoiceInput();
+    const renderer = await mountVoiceInputSettingsScreen();
 
     expect(findConfigureRow(renderer, 'Language').props).toMatchObject({
       subtitle: 'Loading…',
@@ -344,7 +334,7 @@ describe('VoiceInputSettingsScreen', () => {
   });
 
   it('renders the voice testing field below the model states', async () => {
-    const renderer = await mountVoiceInput();
+    const renderer = await mountVoiceInputSettingsScreen();
 
     const fields = renderer.root.findAll(
       node => typeof node.type === 'string' && (node.type as string) === 'VoiceTestField'
@@ -353,7 +343,7 @@ describe('VoiceInputSettingsScreen', () => {
   });
 
   it('insets the scroll content so the focused test field clears the keyboard', async () => {
-    const renderer = await mountVoiceInput();
+    const renderer = await mountVoiceInputSettingsScreen();
 
     const [scroll] = renderer.root.findAll(
       node => typeof node.type === 'string' && (node.type as string) === 'ScrollView'

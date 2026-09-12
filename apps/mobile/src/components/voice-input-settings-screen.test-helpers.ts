@@ -1,5 +1,31 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer types for the mounted-test finders (same pattern as the sibling mounted tests) */
-import { type ReactTestRenderer } from 'react-test-renderer';
+import { createElement } from 'react';
+import { act, type ReactTestRenderer } from 'react-test-renderer';
+import { vi } from 'vitest';
+
+import { VoiceInputSettingsScreen } from '@/components/voice-input-settings-screen';
+import { renderWithProviders } from '@/test/render-with-providers';
+
+let mountedView: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
+
+/**
+ * Mounts the voice input settings screen with its providers and lets pending
+ * dynamic imports settle. The rendered tree is tracked so the caller can unmount
+ * it from `afterEach`.
+ */
+export async function mountVoiceInputSettingsScreen(): Promise<ReactTestRenderer> {
+  const view = await renderWithProviders(createElement(VoiceInputSettingsScreen));
+  await act(async () => {
+    await vi.dynamicImportSettled();
+  });
+  mountedView = view;
+  return view.renderer;
+}
+
+export function unmountVoiceInputSettingsScreen(): void {
+  mountedView?.unmount();
+  mountedView = undefined;
+}
 
 /**
  * Finders shared by the voice input settings mounted tests. They live here so

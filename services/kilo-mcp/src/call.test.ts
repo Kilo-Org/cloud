@@ -32,7 +32,12 @@ const testCatalog: Catalog = {
   },
 };
 
-const auth: ForwardedAuth = { authorization: 'Bearer tok_123', organizationId: 'org-uuid-1' };
+const auth: ForwardedAuth = {
+  authorization: 'Bearer tok_123',
+  organizationId: 'org-uuid-1',
+  kiloUserId: 'user-1',
+  clientId: 'client-1',
+};
 const WEB_BASE_URL = 'https://app.kilo.ai';
 
 function upstreamResponse(body: unknown, status = 200): Response {
@@ -137,7 +142,7 @@ describe('callCatalogEndpoint', () => {
       catalog: testCatalog,
       path: 'organizations.list',
       input: undefined,
-      auth: { authorization: 'Bearer tok_123' },
+      auth: { authorization: 'Bearer tok_123', kiloUserId: 'user-1', clientId: 'client-1' },
       webBaseUrl: WEB_BASE_URL,
       fetchImpl,
     });

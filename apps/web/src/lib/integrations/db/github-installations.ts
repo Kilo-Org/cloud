@@ -17,6 +17,7 @@ import {
 } from '@/lib/integrations/github/multiple-installations';
 import { evaluateGitHubSharingCompatibility } from '@/lib/integrations/github/sharing-compatibility';
 import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-attempts';
+import { cancelActiveCodeReviewsForIntegration } from '@/lib/code-reviews/db/code-reviews';
 
 export type DbTransaction = DrizzleTransaction;
 
@@ -400,6 +401,15 @@ export async function disconnectGitHubInstallation(
       )
       .returning({ id: platform_integrations.id });
     if (disconnected.length !== 1) throw new Error('GitHub connection not found');
+    // Terminalize this association's own active review work as part of the
+    // same disconnect: otherwise a queued/running review keeps its dispatch
+    // reservation and status, which both leaves it stuck and makes
+    // evaluateGitHubSharingCompatibility treat the disconnected association
+    // as still-active incumbent work for a later connect-existing attempt.
+    await cancelActiveCodeReviewsForIntegration(
+      { owner, platform: PLATFORM.GITHUB, integrationId },
+      tx
+    );
     if (integration.canonicalId) {
       const connectedAssociations = await tx
         .select({ id: platform_integrations.id })
@@ -503,6 +513,15 @@ export async function uninstallExclusiveGitHubInstallation(input: {
     if (otherConnectedAssociations.length > 0) {
       throw new Error('GitHub installation must be disconnected locally');
     }
+
+    // Terminalize this association's own active review work before it is
+    // deleted below: the FK is ON DELETE SET NULL, not cascade, so without
+    // this a still-queued/running review would just lose its integration
+    // reference and never reach a terminal status.
+    await cancelActiveCodeReviewsForIntegration(
+      { owner: input.owner, platform: PLATFORM.GITHUB, integrationId: input.integrationId },
+      tx
+    );
 
     await input.deleteUpstream(identity.installationId, appType);
     await observeGitHubInstallationLifecycle(

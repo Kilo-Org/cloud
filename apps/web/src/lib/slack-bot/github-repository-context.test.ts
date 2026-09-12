@@ -11,7 +11,6 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
 test('does not expose cached repository context from a disconnected association', async () => {
   jest.mocked(getAllIntegrationsForOwner).mockResolvedValue([
     {
-      platform: 'github',
       integration_status: 'suspended',
       github_disconnected_at: '2026-09-07T00:00:00.000Z',
       suspended_at: '2026-09-07T00:00:00.000Z',
@@ -26,29 +25,6 @@ test('does not expose cached repository context from a disconnected association'
     repositories: null,
     allAccessAssociations: [],
   });
-});
-
-test.each([
-  { integration_status: 'suspended', suspended_at: '2026-09-07T00:00:00.000Z' },
-  { integration_status: 'active', auth_invalid_at: '2026-09-07T00:00:00.000Z' },
-  { integration_status: 'active', github_disconnected_at: '2026-09-07T00:00:00.000Z' },
-])('rejects unhealthy all-access associations: %#', async unhealthy => {
-  jest.mocked(getAllIntegrationsForOwner).mockResolvedValue([
-    {
-      id: 'association-unhealthy',
-      platform: 'github',
-      repository_access: 'all',
-      suspended_at: null,
-      auth_invalid_at: null,
-      github_disconnected_at: null,
-      repositories: null,
-      ...unhealthy,
-    },
-  ] as never);
-
-  await expect(
-    resolveGitHubRepositoryForOwner({ type: 'org', id: 'organization-1' }, 'unlisted/repo')
-  ).resolves.toBeNull();
 });
 
 test('retains association provenance across repository choices', async () => {

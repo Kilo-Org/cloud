@@ -17,7 +17,10 @@ import {
 } from '@/lib/integrations/github/multiple-installations';
 import { evaluateGitHubSharingCompatibility } from '@/lib/integrations/github/sharing-compatibility';
 import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-attempts';
-import { cancelActiveCodeReviewsForIntegration } from '@/lib/code-reviews/db/code-reviews';
+import {
+  cancelActiveCodeReviewsForIntegration,
+  settleCancelledReviews,
+} from '@/lib/code-reviews/db/code-reviews';
 
 export type DbTransaction = DrizzleTransaction;
 
@@ -364,7 +367,7 @@ export async function disconnectGitHubInstallation(
   owner: Owner,
   integrationId: string
 ): Promise<void> {
-  await db.transaction(async tx => {
+  const cancelledReviews = await db.transaction(async tx => {
     const [integration] = await tx
       .select({
         installationId: platform_integrations.platform_installation_id,
@@ -406,7 +409,7 @@ export async function disconnectGitHubInstallation(
     // reservation and status, which both leaves it stuck and makes
     // evaluateGitHubSharingCompatibility treat the disconnected association
     // as still-active incumbent work for a later connect-existing attempt.
-    await cancelActiveCodeReviewsForIntegration(
+    const cancelled = await cancelActiveCodeReviewsForIntegration(
       { owner, platform: PLATFORM.GITHUB, integrationId },
       tx
     );
@@ -432,7 +435,13 @@ export async function disconnectGitHubInstallation(
           .where(eq(github_app_installations.id, integration.canonicalId));
       }
     }
+    return cancelled;
   });
+  // Settle the ledger only after the disconnect transaction above has
+  // actually committed: settling writes through the default connection, so
+  // doing it inside the transaction could mark the ledger terminal even if
+  // a later step in that transaction rolled the cancellation back.
+  await settleCancelledReviews(cancelledReviews, 'user_cancelled');
 }
 
 export async function uninstallExclusiveGitHubInstallation(input: {
@@ -440,7 +449,7 @@ export async function uninstallExclusiveGitHubInstallation(input: {
   integrationId: string;
   deleteUpstream: (installationId: string, appType: 'standard' | 'lite') => Promise<void>;
 }): Promise<void> {
-  await db.transaction(async tx => {
+  const cancelledReviews = await db.transaction(async tx => {
     const [identity] = await tx
       .select({
         installationId: platform_integrations.platform_installation_id,
@@ -518,7 +527,7 @@ export async function uninstallExclusiveGitHubInstallation(input: {
     // deleted below: the FK is ON DELETE SET NULL, not cascade, so without
     // this a still-queued/running review would just lose its integration
     // reference and never reach a terminal status.
-    await cancelActiveCodeReviewsForIntegration(
+    const cancelled = await cancelActiveCodeReviewsForIntegration(
       { owner: input.owner, platform: PLATFORM.GITHUB, integrationId: input.integrationId },
       tx
     );
@@ -529,7 +538,14 @@ export async function uninstallExclusiveGitHubInstallation(input: {
       tx
     );
     await tx.delete(platform_integrations).where(eq(platform_integrations.id, input.integrationId));
+    return cancelled;
   });
+  // Settle the ledger only after the uninstall transaction above has
+  // actually committed: if deleteUpstream (or anything after it) throws,
+  // the transaction — including this cancellation — rolls back, and this
+  // line is never reached, so the ledger never goes terminal for a
+  // cancellation that didn't actually happen.
+  await settleCancelledReviews(cancelledReviews, 'user_cancelled');
 }
 
 export async function observeGitHubInstallationLifecycle(

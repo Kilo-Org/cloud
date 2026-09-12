@@ -2021,8 +2021,16 @@ async function cancelActiveCodeReviewsForIntegrationWithDatabase(
  * Best-effort settles the admitted ledger rows for already-committed
  * cancellations. A settle failure is logged by `settleCodeReviewLedgerRow` and
  * never fails the cancel.
+ *
+ * Callers that composed their cancellation into a caller-owned transaction
+ * (via `cancelActiveCodeReviewsForIntegration`'s `transaction` parameter)
+ * MUST call this themselves only after that transaction has committed.
+ * Settling here writes through the default `db` connection, independent of
+ * any caller transaction, so calling it before commit would let the ledger
+ * go terminal even if the caller's transaction later rolls back the
+ * cancellation itself.
  */
-async function settleCancelledReviews(
+export async function settleCancelledReviews(
   cancelled: CancelledReviewRow[],
   terminalReason: 'superseded' | 'user_cancelled'
 ): Promise<void> {
@@ -2040,8 +2048,16 @@ export async function cancelActiveCodeReviewsForIntegration(
   input: IntegrationReviewCancellationInput,
   /** Run the cancellation query inside a caller-owned transaction (for
    *  example, alongside a disconnect/uninstall update under the same
-   *  advisory-lock ordering) instead of the default connection. Ledger
-   *  settling always runs afterward, best-effort, against `db`. */
+   *  advisory-lock ordering) instead of the default connection.
+   *
+   *  When a transaction is supplied, ledger settling is skipped here: the
+   *  caller must call `settleCancelledReviews` itself, only after its own
+   *  transaction has committed. Settling always writes through the default
+   *  `db` connection, so settling before commit would let the ledger go
+   *  terminal even if the caller's transaction later rolls back (for
+   *  example, disconnect/uninstall failing a later step and rolling back
+   *  this very cancellation). Without a transaction, settling runs
+   *  immediately, best-effort, matching prior standalone-call semantics. */
   transaction?: DrizzleTransaction
 ): Promise<CancelledReviewRow[]> {
   try {
@@ -2050,7 +2066,9 @@ export async function cancelActiveCodeReviewsForIntegration(
       input,
       'Platform integration disconnected'
     );
-    await settleCancelledReviews(cancelled, 'user_cancelled');
+    if (!transaction) {
+      await settleCancelledReviews(cancelled, 'user_cancelled');
+    }
     return cancelled;
   } catch (error) {
     captureException(error, {

@@ -81,7 +81,7 @@ export class PlatformIntegrationNotFoundError extends Error {
  * Platform-agnostic: queries by identity.platform + identity.teamId.
  */
 export async function getPlatformIntegration(identity: PlatformIdentity) {
-  const integrations = await db
+  const [integration] = await db
     .select()
     .from(platform_integrations)
     .where(
@@ -98,10 +98,8 @@ export async function getPlatformIntegration(identity: PlatformIdentity) {
           : undefined
       )
     )
-    .limit(2);
+    .limit(1);
 
-  if (integrations.length !== 1) return null;
-  const [integration] = integrations;
   if (!integration || !isAvailableForBot(integration)) return null;
   return integration.platform === 'slack' && !(await isSlackIntegrationAvailable(integration))
     ? null
@@ -129,6 +127,7 @@ export async function getPlatformIntegrationById(platformIntegrationId: string) 
     .from(platform_integrations)
     .where(eq(platform_integrations.id, platformIntegrationId))
     .limit(1);
+
   if (!integration) {
     throw new PlatformIntegrationNotFoundError(platformIntegrationId);
   }
@@ -149,7 +148,7 @@ export async function getPlatformIntegrationByBotUserId(
 ) {
   if (!botUserId) return null;
 
-  const integrations = await db
+  const [integration] = await db
     .select()
     .from(platform_integrations)
     .where(
@@ -158,10 +157,8 @@ export async function getPlatformIntegrationByBotUserId(
         eq(sql<string>`${platform_integrations.metadata}->>'bot_user_id'`, botUserId)
       )
     )
-    .limit(2);
+    .limit(1);
 
-  if (integrations.length !== 1) return null;
-  const [integration] = integrations;
   if (!integration || !isAvailableForBot(integration)) return null;
   return integration.platform === 'slack' && !(await isSlackIntegrationAvailable(integration))
     ? null

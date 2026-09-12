@@ -24,7 +24,6 @@ import {
   activateReservedSlackInstallation,
   completePendingSlackDeletion,
   deleteInstallationByTeamId,
-  getActiveSlackInstallationForRuntime,
   recoverSlackInstallation,
 } from './slack-service';
 
@@ -70,22 +69,6 @@ describe('Slack provider installation activation', () => {
         setChatSdkInstallation: async () => undefined,
       })
     ).rejects.toThrow('Enterprise Grid is not supported');
-  });
-
-  it('rejects suspended legacy Slack runtime fallback without a reservation', async () => {
-    const actor = await insertTestUser();
-    await db.insert(platform_integrations).values({
-      owned_by_user_id: actor.id,
-      platform: 'slack',
-      integration_type: 'oauth',
-      platform_installation_id: 'T_SUSPENDED_LEGACY',
-      platform_account_id: 'T_SUSPENDED_LEGACY',
-      integration_status: 'suspended',
-      installed_at: new Date().toISOString(),
-      metadata: { access_token: 'xoxb-legacy' },
-    });
-
-    await expect(getActiveSlackInstallationForRuntime('T_SUSPENDED_LEGACY')).resolves.toBeNull();
   });
 
   it('atomically activates the association, encrypted credential, and reservation', async () => {

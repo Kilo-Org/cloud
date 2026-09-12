@@ -424,17 +424,15 @@ export function SlackIntegrationDetails({
 
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-3">
-                  {!cleanupPending && (
-                    <Button
-                      variant="outline"
-                      onClick={handleInstall}
-                      disabled={isStartingSlackConnection}
-                      title="Re-run the Slack OAuth flow to refresh scopes and permissions"
-                    >
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      {isStartingSlackConnection ? 'Loading...' : 'Re-install'}
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    onClick={handleInstall}
+                    disabled={isStartingSlackConnection}
+                    title="Re-run the Slack OAuth flow to refresh scopes and permissions"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    {isStartingSlackConnection ? 'Loading...' : 'Re-install'}
+                  </Button>
                   {!isSuspended && (
                     <TestConnectionButton
                       isPending={testConnection.isPending}

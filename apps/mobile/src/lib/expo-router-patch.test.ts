@@ -62,7 +62,7 @@ describe('Expo Router provider review routes', () => {
     ]);
   });
 
-  it('automatically registers the provider index alongside the explicitly configured sheets', () => {
+  it('registers the provider overview index ahead of the explicitly configured sheets', () => {
     const directory = new URL('../app/(app)/pr-review/[platform]/[...identity]/', import.meta.url);
     const layout = readFileSync(new URL('_layout.tsx', directory), 'utf8');
     const order = [...layout.matchAll(/<Stack\.Screen name="([^"]+)"/g)].map(match => ({
@@ -87,11 +87,11 @@ describe('Expo Router provider review routes', () => {
       }
     ) as { route: { route: string } }[];
     expect(screens.map(screen => screen.route.route)).toEqual([
+      'index',
       'comment-composer',
       'review-submit',
       'merge',
       'file-navigator',
-      'index',
     ]);
   });
 });

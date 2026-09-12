@@ -88,7 +88,39 @@ export function runVoiceInputListeningFeedback(
  */
 const VOICE_INPUT_TOAST_ID = 'voice-input-feedback';
 
+/**
+ * Last voice-input feedback, mirrored for surfaces that render it inline.
+ * sonner-native toasts are drawn outside the accessibility hierarchy, so a
+ * toast-only error is invisible to assistive tech (and to the on-device
+ * hierarchy digest the e2 scenario reads). `showFeedback` publishes here as
+ * well as showing the toast, and a voice surface renders the message inline
+ * via `AccessibleStatus` — a real Text node with a live region.
+ */
+let currentFeedback: VoiceInputFeedback | null = null;
+const feedbackListeners = new Set<(feedback: VoiceInputFeedback | null) => void>();
+
+export function publishVoiceInputFeedback(feedback: VoiceInputFeedback | null): void {
+  currentFeedback = feedback;
+  for (const listener of feedbackListeners) {
+    listener(feedback);
+  }
+}
+
+export function readVoiceInputFeedback(): VoiceInputFeedback | null {
+  return currentFeedback;
+}
+
+export function subscribeVoiceInputFeedback(
+  listener: (feedback: VoiceInputFeedback | null) => void
+): () => void {
+  feedbackListeners.add(listener);
+  return () => {
+    feedbackListeners.delete(listener);
+  };
+}
+
 export function showFeedback(feedback: VoiceInputFeedback): void {
+  publishVoiceInputFeedback(feedback);
   const presentation = resolveVoiceInputFeedbackPresentation(feedback);
   if (presentation.kind === 'alert') {
     // The alert is the message now; clear the toast channel with it.

@@ -15,6 +15,12 @@ type VoiceInputOptions = {
 const voice = vi.hoisted(() => ({
   options: undefined as VoiceInputOptions | undefined,
   available: true,
+  feedback: null as {
+    action: 'none' | 'open-settings' | 'open-transcription-settings';
+    availability: 'available' | 'unavailable';
+    message: string;
+    retryable: boolean;
+  } | null,
   isActive: false,
   status: 'idle' as 'idle' | 'starting' | 'listening' | 'transcribing' | 'stopping',
   abort: vi.fn<() => Promise<boolean>>(),
@@ -28,6 +34,7 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/voice-input-control', () => ({
   VoiceInputButton: 'VoiceInputButton',
   VoiceInputStatus: 'VoiceInputStatus',
@@ -41,6 +48,7 @@ vi.mock('@/lib/voice-input/use-voice-input', () => ({
     return {
       abort: voice.abort,
       available: voice.available,
+      feedback: voice.feedback,
       isActive: voice.isActive,
       settleBeforeSubmit: vi.fn<() => Promise<boolean>>(),
       status: voice.status,
@@ -86,6 +94,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   voice.options = undefined;
   voice.available = true;
+  voice.feedback = null;
   voice.isActive = false;
   voice.status = 'idle';
 });
@@ -172,12 +181,48 @@ describe('VoiceTestField', () => {
 
     const clear = findByLabel(renderer, 'Clear text');
     const className = clear.props.className as string;
-    // DESIGN.md: touch surfaces keep at least a 44px target. 11 * 4px = 44px,
-    // with the compact label centered inside it.
-    expect(className).toContain('min-h-11');
-    expect(className).toContain('min-w-11');
+    // DESIGN.md: touch surfaces keep at least a 44px target. An arbitrary px
+    // value, not the rem-scaled min-h-11/min-w-11: NativeWind's rem is ~14px
+    // on device, so those render ~38.5pt tall (e14, 2026-09-12).
+    expect(className).toContain('min-h-[44px]');
+    expect(className).toContain('min-w-[44px]');
     expect(className).toContain('items-center');
     expect(className).toContain('justify-center');
     expect(className).toContain('disabled:opacity-50');
+  });
+
+  it('renders a transient failure inline, where the accessibility tree can see it', async () => {
+    voice.feedback = {
+      action: 'none',
+      availability: 'available',
+      message: "Couldn't reach the Kilo gateway. Check your connection and try again.",
+      retryable: true,
+    };
+    const renderer = await mountVoiceTestField();
+
+    const [status] = findByType(renderer, 'AccessibleStatus');
+    expect(status?.props).toMatchObject({
+      message: "Couldn't reach the Kilo gateway. Check your connection and try again.",
+      tone: 'error',
+    });
+    expect(textValues(renderer)).not.toContain('Listening...');
+  });
+
+  it('leaves alert-backed feedback to its own surface', async () => {
+    voice.feedback = {
+      action: 'open-settings',
+      availability: 'available',
+      message: 'Microphone access is off.',
+      retryable: false,
+    };
+    const renderer = await mountVoiceTestField();
+
+    expect(findByType(renderer, 'AccessibleStatus')).toHaveLength(0);
+  });
+
+  it('shows no failure line while the session is healthy', async () => {
+    const renderer = await mountVoiceTestField();
+
+    expect(findByType(renderer, 'AccessibleStatus')).toHaveLength(0);
   });
 });

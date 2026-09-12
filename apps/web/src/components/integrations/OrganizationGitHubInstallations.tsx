@@ -169,6 +169,22 @@ export function OrganizationGitHubInstallations({
     }
   };
 
+  // A user has no way to know ahead of time whether the App is already
+  // installed somewhere they can access, so there is exactly one primary
+  // entry point. When connection management is enabled it always begins
+  // the OAuth-first connection attempt (discover-then-pick), matching
+  // "Connect existing" today; the resulting picker also offers installing
+  // on a different org. When management is disabled, this preserves
+  // today's direct-to-installer behavior unchanged, since the OAuth-first
+  // procedures are gated behind connection management and would reject it.
+  const startPrimaryAction = async () => {
+    if (query.data?.connectionManagementEnabled) {
+      await startConnection();
+    } else {
+      await startInstall();
+    }
+  };
+
   const confirmConnection = async (installationId: string) => {
     const confirmed = await confirm({
       title: `Connect GitHub to ${organization?.name ?? 'this organization'}?`,
@@ -216,31 +232,20 @@ export function OrganizationGitHubInstallations({
           <h2 id="github-organizations-heading" className="type-heading">
             GitHub organizations
           </h2>
-          {(query.data?.canAdd || query.data?.canConnectExisting) && (
+          {!connectionAttemptId && (query.data?.canAdd || query.data?.canConnectExisting) && (
             <div className="flex gap-2">
-              {query.data?.canConnectExisting && (
-                <Button
-                  variant="outline"
-                  onClick={startConnection}
-                  disabled={beginConnection.isPending}
-                >
-                  Connect existing
-                </Button>
-              )}
-              {query.data?.canAdd && (
-                <Button
-                  onClick={startInstall}
-                  disabled={starting}
-                  className="min-h-11 w-full shrink-0 sm:min-h-0 sm:w-auto"
-                >
-                  <Github className="size-4" />
-                  {starting
-                    ? 'Opening GitHub...'
-                    : installations.length
-                      ? 'Add organization'
-                      : 'Connect GitHub'}
-                </Button>
-              )}
+              <Button
+                onClick={startPrimaryAction}
+                disabled={starting || beginConnection.isPending}
+                className="min-h-11 w-full shrink-0 sm:min-h-0 sm:w-auto"
+              >
+                <Github className="size-4" />
+                {starting || beginConnection.isPending
+                  ? 'Opening GitHub...'
+                  : installations.length
+                    ? 'Add organization'
+                    : 'Connect GitHub'}
+              </Button>
             </div>
           )}
         </div>
@@ -259,9 +264,10 @@ export function OrganizationGitHubInstallations({
         )}
         {connectionAttemptId && (
           <div className="border-border border-t px-5 py-5 sm:px-6">
-            <h3 className="font-medium">Choose a GitHub organization</h3>
+            <h3 className="font-medium">Connect a GitHub organization</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Only organizations where you are an active GitHub owner are shown.
+              Attach an installation where you are an active GitHub owner, or install the App on a
+              different organization.
             </p>
             <GitHubConnectionAttemptState
               isLoading={connectionAttempt.isLoading}
@@ -271,6 +277,9 @@ export function OrganizationGitHubInstallations({
               isRestarting={beginConnection.isPending}
               onRestart={startConnection}
               onSelect={confirmConnection}
+              canInstallNew={Boolean(query.data?.canAdd)}
+              onInstallNew={startInstall}
+              isInstalling={starting}
             />
           </div>
         )}

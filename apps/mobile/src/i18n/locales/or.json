@@ -2581,7 +2581,17 @@
     "gatewayModelUnavailable": "ଏହି ଲେଖା ବଦଳ ମଡେଲ୍ ଉପଲବ୍ଧ ନୁହେଁ। ପସନ୍ଦରେ ଅନ୍ୟ ଏକ ମଡେଲ୍ ବାଛନ୍ତୁ।",
     "gatewayModelUnavailableNotice": "ଏହି ମଡେଲ୍ ଆଉ ଦିଆଯାଉନାହିଁ। ଅନ୍ୟଟିଏ ବାଛିବାକୁ $t(transcriptionModel.title) ଟ୍ୟାପ୍ କରନ୍ତୁ।",
     "gatewaySignInRequired": "Kilo Gateway ଲେଖା ବଦଳ ବ୍ୟବହାର ପାଇଁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
-    "gatewayNoModel": "ପ୍ରଥମେ ପସନ୍ଦରେ ଏକ ଲେଖା ବଦଳ ମଡେଲ୍ ବାଛନ୍ତୁ।"
+    "gatewayNoModel": "ପ୍ରଥମେ ପସନ୍ଦରେ ଏକ ଲେଖା ବଦଳ ମଡେଲ୍ ବାଛନ୍ତୁ।",
+    "testTitle": "କହି ଲେଖିବା ପରୀକ୍ଷା କରନ୍ତୁ",
+    "testPlaceholder": "ମାଇକ୍ରୋଫୋନ୍‌ରେ ଟ୍ୟାପ୍ କରନ୍ତୁ ଏବଂ କହିବା ଆରମ୍ଭ କରନ୍ତୁ।",
+    "testClear": "ଲେଖା ସଫା କରନ୍ତୁ"
+  },
+  "voiceLanguage": {
+    "title": "କହି ଲେଖିବାର ଭାଷା",
+    "automatic": "ସ୍ୱୟଂଚାଳିତ",
+    "loadFailed": "ଏହି ଡିଭାଇସ୍ ସମର୍ଥନ କରୁଥିବା ଭାଷାଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "emptyTitle": "କୌଣସି ସମର୍ଥିତ ଭାଷା ନାହିଁ",
+    "emptyDescription": "ଏହି ଡିଭାଇସ୍‌ର ବାକ୍ ଚିହ୍ନଟ କୌଣସି ସମର୍ଥିତ ଭାଷା ଜଣାଏ ନାହିଁ।"
   },
   "share": {
     "title": "Kilo କୁ ସେୟାର",

@@ -64,6 +64,7 @@ export function PickerSheet({
           doneLabel={doneLabel}
           cancelLabel={cancelLabel}
           disabled={disabled}
+          topInset="bottom-form-sheet"
         />
         {headerContent}
       </View>

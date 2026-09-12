@@ -2581,7 +2581,17 @@
     "gatewayModelUnavailable": "Denne transkripsjonsmodellen er ikke tilgjengelig. Velg en annen under Innstillinger.",
     "gatewayModelUnavailableNotice": "Denne modellen tilbys ikke lenger. Trykk på $t(transcriptionModel.title) for å velge en annen.",
     "gatewaySignInRequired": "Logg inn for å bruke transkripsjon via Kilo Gateway.",
-    "gatewayNoModel": "Velg en transkripsjonsmodell under Innstillinger først."
+    "gatewayNoModel": "Velg en transkripsjonsmodell under Innstillinger først.",
+    "testTitle": "Test diktering",
+    "testPlaceholder": "Trykk på mikrofonen og begynn å snakke.",
+    "testClear": "Fjern tekst"
+  },
+  "voiceLanguage": {
+    "title": "Dikteringsspråk",
+    "automatic": "Automatisk",
+    "loadFailed": "Kunne ikke laste inn språkene denne enheten støtter.",
+    "emptyTitle": "Ingen støttede språk",
+    "emptyDescription": "Talegjenkjenningen på denne enheten rapporterer ingen støttede språk."
   },
   "share": {
     "title": "Del med Kilo",

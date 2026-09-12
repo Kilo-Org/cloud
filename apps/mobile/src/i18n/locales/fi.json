@@ -2581,7 +2581,17 @@
     "gatewayModelUnavailable": "Tätä puheentunnistusmallia ei ole käytettävissä. Valitse toinen Asetuksissa.",
     "gatewayModelUnavailableNotice": "Tätä mallia ei enää tarjota. Valitse toinen napauttamalla $t(transcriptionModel.title).",
     "gatewaySignInRequired": "Kirjaudu sisään käyttääksesi Kilo Gatewayn puheentunnistusta.",
-    "gatewayNoModel": "Valitse ensin puheentunnistusmalli Asetuksissa."
+    "gatewayNoModel": "Valitse ensin puheentunnistusmalli Asetuksissa.",
+    "testTitle": "Testaa puheentunnistusta",
+    "testPlaceholder": "Napauta mikrofonia ja ala puhua.",
+    "testClear": "Tyhjennä teksti"
+  },
+  "voiceLanguage": {
+    "title": "Puheentunnistuksen kieli",
+    "automatic": "Automaattinen",
+    "loadFailed": "Tämän laitteen tukemia kieliä ei voitu ladata.",
+    "emptyTitle": "Ei tuettuja kieliä",
+    "emptyDescription": "Tämän laitteen puheentunnistus ei ilmoita tuettuja kieliä."
   },
   "share": {
     "title": "Jaa Kiloon",

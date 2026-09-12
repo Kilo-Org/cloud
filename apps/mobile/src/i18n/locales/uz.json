@@ -2581,7 +2581,17 @@
     "gatewayModelUnavailable": "Ushbu matnga aylantirish modeli mavjud emas. Shaxsiy sozlamalardan boshqasini tanlang.",
     "gatewayModelUnavailableNotice": "Bu model endi taklif etilmaydi. Boshqasini tanlash uchun $t(transcriptionModel.title) ga teging.",
     "gatewaySignInRequired": "Kilo Gateway orqali aylantirishdan foydalanish uchun tizimga kiring.",
-    "gatewayNoModel": "Avval Shaxsiy sozlamalardan matnga aylantirish modelini tanlang."
+    "gatewayNoModel": "Avval Shaxsiy sozlamalardan matnga aylantirish modelini tanlang.",
+    "testTitle": "Ovozli kiritishni sinash",
+    "testPlaceholder": "Mikrofonga teging va gapirishni boshlang.",
+    "testClear": "Matnni tozalash"
+  },
+  "voiceLanguage": {
+    "title": "Ovozli kiritish tili",
+    "automatic": "Avtomatik",
+    "loadFailed": "Bu qurilma qo'llab-quvvatlaydigan tillar yuklanmadi.",
+    "emptyTitle": "Qo'llab-quvvatlanadigan tillar yo'q",
+    "emptyDescription": "Bu qurilmaning nutqni aniqlashi qo'llab-quvvatlanadigan tillar haqida xabar bermaydi."
   },
   "share": {
     "title": "Kiloga yuborish",

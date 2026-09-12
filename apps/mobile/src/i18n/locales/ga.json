@@ -2644,7 +2644,17 @@
     "gatewayModelUnavailable": "Níl an samhail tras-scríobh seo ar fáil. Roghnaigh ceann eile sna Roghanna.",
     "gatewayModelUnavailableNotice": "Ní thairgtear an tsamhail seo a thuilleadh. Tapáil $t(transcriptionModel.title) chun ceann eile a roghnú.",
     "gatewaySignInRequired": "Sínigh isteach chun tras-scríobh tríd an Kilo Gateway a úsáid.",
-    "gatewayNoModel": "Roghnaigh samhail tras-scríobh sna Roghanna ar dtús."
+    "gatewayNoModel": "Roghnaigh samhail tras-scríobh sna Roghanna ar dtús.",
+    "testTitle": "Tástáil ionchur gutha",
+    "testPlaceholder": "Tapáil an micreafón agus tosaigh ag labhairt.",
+    "testClear": "Glan an téacs"
+  },
+  "voiceLanguage": {
+    "title": "Teanga an ionchuir ghutha",
+    "automatic": "Uathoibríoch",
+    "loadFailed": "Níorbh fhéidir na teangacha a thacaíonn an gléas seo a lódáil.",
+    "emptyTitle": "Níl aon teanga thacaithe ann",
+    "emptyDescription": "Ní thuairiscíonn aithint cainte an ghléis seo aon teanga thacaithe."
   },
   "share": {
     "title": "Comhroinnt le Kilo",

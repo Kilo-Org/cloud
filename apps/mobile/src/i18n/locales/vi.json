@@ -2147,7 +2147,17 @@
     "gatewayModelUnavailable": "Mô hình này hiện không khả dụng. Hãy chọn mô hình khác trong Tùy chọn.",
     "gatewayModelUnavailableNotice": "Mô hình này không còn được cung cấp nữa. Nhấn $t(transcriptionModel.title) để chọn mô hình khác.",
     "gatewaySignInRequired": "Đăng nhập để dùng tính năng chuyển giọng nói qua Kilo Gateway.",
-    "gatewayNoModel": "Trước tiên, hãy chọn một mô hình chuyển giọng nói trong Tùy chọn."
+    "gatewayNoModel": "Trước tiên, hãy chọn một mô hình chuyển giọng nói trong Tùy chọn.",
+    "testTitle": "Kiểm tra nhập bằng giọng nói",
+    "testPlaceholder": "Chạm vào micrô và bắt đầu nói.",
+    "testClear": "Xóa văn bản"
+  },
+  "voiceLanguage": {
+    "title": "Ngôn ngữ nhập bằng giọng nói",
+    "automatic": "Tự động",
+    "loadFailed": "Không thể tải các ngôn ngữ mà thiết bị này hỗ trợ.",
+    "emptyTitle": "Không có ngôn ngữ được hỗ trợ",
+    "emptyDescription": "Tính năng nhận dạng giọng nói của thiết bị này không báo cáo ngôn ngữ được hỗ trợ nào."
   },
   "share": {
     "title": "Chia sẻ đến Kilo",

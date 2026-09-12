@@ -2602,7 +2602,17 @@
     "gatewayModelUnavailable": "Acest model de transcriere nu este disponibil. Alege altul în Preferințe.",
     "gatewayModelUnavailableNotice": "Acest model nu mai este oferit. Atinge $t(transcriptionModel.title) pentru a alege altul.",
     "gatewaySignInRequired": "Autentifică-te pentru a folosi transcrierea cu Kilo Gateway.",
-    "gatewayNoModel": "Alege mai întâi un model de transcriere în Preferințe."
+    "gatewayNoModel": "Alege mai întâi un model de transcriere în Preferințe.",
+    "testTitle": "Testează dictarea",
+    "testPlaceholder": "Atinge microfonul și începe să vorbești.",
+    "testClear": "Șterge textul"
+  },
+  "voiceLanguage": {
+    "title": "Limba dictării",
+    "automatic": "Automat",
+    "loadFailed": "Limbile acceptate de acest dispozitiv nu au putut fi încărcate.",
+    "emptyTitle": "Nicio limbă acceptată",
+    "emptyDescription": "Recunoașterea vocală a acestui dispozitiv nu raportează nicio limbă acceptată."
   },
   "share": {
     "title": "Distribuire către Kilo",

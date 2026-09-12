@@ -2581,7 +2581,17 @@
     "gatewayModelUnavailable": "Moodeeli sagalee jijjiiru kun hin jiru. Filannoowwan keessaa kan biroo filadhu.",
     "gatewayModelUnavailableNotice": "Moodeeli kun hin dhiyaatu. Kan biraa filachuuf $t(transcriptionModel.title) tuqi.",
     "gatewaySignInRequired": "Jijjiirraa sagalee Kilo Gateway'tti fayyadamuuf seeni.",
-    "gatewayNoModel": "Dursee Filannoowwan keessatti moodeela sagalee jijjiiru filadhu."
+    "gatewayNoModel": "Dursee Filannoowwan keessatti moodeela sagalee jijjiiru filadhu.",
+    "testTitle": "Sagaleen galchuu qori",
+    "testPlaceholder": "Maayikirofoon tuqiitii dubbachuu jalqabi.",
+    "testClear": "Barreeffama haqi"
+  },
+  "voiceLanguage": {
+    "title": "Afaan sagaleen galchuu",
+    "automatic": "Ofumaan",
+    "loadFailed": "Afaan meeshaan kun deeggartu fe'amuu hin dandeenye.",
+    "emptyTitle": "Afaan deeggarame hin jiru",
+    "emptyDescription": "Meeshaan kun beekumsa sagalee afaan deeggarame hin ibsu."
   },
   "share": {
     "title": "Gara Kilo qoodi",

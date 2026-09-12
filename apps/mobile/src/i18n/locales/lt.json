@@ -2623,7 +2623,17 @@
     "gatewayModelUnavailable": "Šis transkribavimo modelis nepasiekiamas. Pasirinkite kitą Nuostatose.",
     "gatewayModelUnavailableNotice": "Šis modelis nebeteikiamas. Palieskite $t(transcriptionModel.title), kad pasirinktumėte kitą.",
     "gatewaySignInRequired": "Prisijunkite, kad naudotumėte transkribavimą per Kilo Gateway.",
-    "gatewayNoModel": "Pirmiausia pasirinkite transkribavimo modelį Nuostatose."
+    "gatewayNoModel": "Pirmiausia pasirinkite transkribavimo modelį Nuostatose.",
+    "testTitle": "Išbandyti balso įvestį",
+    "testPlaceholder": "Bakstelėkite mikrofoną ir pradėkite kalbėti.",
+    "testClear": "Išvalyti tekstą"
+  },
+  "voiceLanguage": {
+    "title": "Balso įvesties kalba",
+    "automatic": "Automatinė",
+    "loadFailed": "Nepavyko įkelti šio įrenginio palaikomų kalbų.",
+    "emptyTitle": "Nėra palaikomų kalbų",
+    "emptyDescription": "Šio įrenginio kalbos atpažinimas nepraneša jokių palaikomų kalbų."
   },
   "share": {
     "title": "Bendrinimas su Kilo",

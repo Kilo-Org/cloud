@@ -2581,7 +2581,17 @@
     "gatewayModelUnavailable": "Model transkripsi ini tidak tersedia. Pilih yang lain dalam Keutamaan.",
     "gatewayModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketik $t(transcriptionModel.title) untuk memilih yang lain.",
     "gatewaySignInRequired": "Log masuk untuk menggunakan transkripsi Kilo Gateway.",
-    "gatewayNoModel": "Pilih model transkripsi dalam Keutamaan terlebih dahulu."
+    "gatewayNoModel": "Pilih model transkripsi dalam Keutamaan terlebih dahulu.",
+    "testTitle": "Uji input suara",
+    "testPlaceholder": "Ketik mikrofon dan mula bercakap.",
+    "testClear": "Kosongkan teks"
+  },
+  "voiceLanguage": {
+    "title": "Bahasa input suara",
+    "automatic": "Automatik",
+    "loadFailed": "Bahasa yang disokong peranti ini tidak dapat dimuatkan.",
+    "emptyTitle": "Tiada bahasa yang disokong",
+    "emptyDescription": "Pengecaman pertuturan peranti ini tidak melaporkan sebarang bahasa yang disokong."
   },
   "share": {
     "title": "Kongsi ke Kilo",

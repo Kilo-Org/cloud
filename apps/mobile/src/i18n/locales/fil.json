@@ -2581,7 +2581,17 @@
     "gatewayModelUnavailable": "Hindi magagamit ang modelong ito para sa pagsasalin ng boses sa teksto. Pumili ng iba sa Mga kagustuhan.",
     "gatewayModelUnavailableNotice": "Hindi na inaalok ang modelong ito. I-tap ang $t(transcriptionModel.title) para pumili ng iba.",
     "gatewaySignInRequired": "Mag-sign in para gamitin ang pagsasalin ng boses sa teksto gamit ang Kilo Gateway.",
-    "gatewayNoModel": "Pumili muna ng modelo para sa pagsasalin ng boses sa teksto sa Mga kagustuhan."
+    "gatewayNoModel": "Pumili muna ng modelo para sa pagsasalin ng boses sa teksto sa Mga kagustuhan.",
+    "testTitle": "Subukan ang pagdikta",
+    "testPlaceholder": "I-tap ang mikropono at magsimulang magsalita.",
+    "testClear": "I-clear ang text"
+  },
+  "voiceLanguage": {
+    "title": "Wika ng pagdikta",
+    "automatic": "Awtomatiko",
+    "loadFailed": "Hindi ma-load ang mga wikang sinusuportahan ng device na ito.",
+    "emptyTitle": "Walang sinusuportahang wika",
+    "emptyDescription": "Walang sinusuportahang wikang iniuulat ng pagkilala sa pagsasalita ng device na ito."
   },
   "share": {
     "title": "Pagbabahagi sa Kilo",

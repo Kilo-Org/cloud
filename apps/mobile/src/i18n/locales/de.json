@@ -2592,7 +2592,10 @@
         "outdatedOnLines": "Veraltet: {{lines}}",
         "outdatedOnPath": "Veraltet: {{path}}"
       },
-      "deletedUser": "gelöschter Benutzer"
+      "deletedUser": "gelöschter Benutzer",
+      "addCommentCta": "Diesen Pull-Request kommentieren",
+      "commentBadRequest": "Dieser Kommentar kann nicht veröffentlicht werden. Der Pull-Request hat sich möglicherweise geändert.",
+      "commentForbidden": "Du hast keine Berechtigung, diesen Pull-Request zu kommentieren."
     },
     "couldNotOpenGitHubAppSettings": "Die Einstellungen der GitHub-App konnten nicht geöffnet werden.",
     "installKiloGitHubApp": "GitHub-App von Kilo installieren",

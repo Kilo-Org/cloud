@@ -521,7 +521,10 @@
         "outdatedOnLines": "Zaharkitua: {{lines}}",
         "outdatedOnPath": "Zaharkitua: {{path}}"
       },
-      "deletedUser": "erabiltzaile ezabatua"
+      "deletedUser": "erabiltzaile ezabatua",
+      "addCommentCta": "Egin iruzkina bateratze-eskaera honetan",
+      "commentBadRequest": "Iruzkin hau ezin da argitaratu. Baliteke bateratze-eskaera aldatu izana.",
+      "commentForbidden": "Ez duzu baimenik bateratze-eskaera honetan iruzkinik egiteko."
     },
     "couldNotOpenGitHubAppSettings": "Ezin izan dira GitHub aplikazioaren ezarpenak ireki.",
     "installKiloGitHubApp": "Instalatu Kilo GitHub aplikazioa",

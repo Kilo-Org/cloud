@@ -521,7 +521,10 @@
         "outdatedOnLines": "Köhnəlib: {{lines}}",
         "outdatedOnPath": "Köhnəlib: {{path}}"
       },
-      "deletedUser": "silinmiş istifadəçi"
+      "deletedUser": "silinmiş istifadəçi",
+      "addCommentCta": "Bu birləşdirmə sorğusuna şərh yaz",
+      "commentBadRequest": "Bu şərhi göndərmək mümkün deyil. Birləşdirmə sorğusu dəyişmiş ola bilər.",
+      "commentForbidden": "Bu birləşdirmə sorğusuna şərh yazmaq icazən yoxdur."
     },
     "couldNotOpenGitHubAppSettings": "GitHub tətbiqinin parametrlərini açmaq mümkün olmadı.",
     "installKiloGitHubApp": "Kilo GitHub tətbiqini quraşdır",

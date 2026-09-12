@@ -2668,7 +2668,10 @@
       "reaction_zero": "تفاعل",
       "reaction_two": "تفاعلان",
       "reaction_few": "تفاعلات",
-      "reaction_many": "تفاعلًا"
+      "reaction_many": "تفاعلًا",
+      "addCommentCta": "التعليق على طلب السحب هذا",
+      "commentBadRequest": "لا يمكن نشر هذا التعليق. ربما تغيّر طلب السحب.",
+      "commentForbidden": "ليست لديك صلاحية التعليق على طلب السحب هذا."
     },
     "couldNotOpenGitHubAppSettings": "تعذّر فتح إعدادات تطبيق GitHub.",
     "installKiloGitHubApp": "تثبيت تطبيق Kilo على GitHub",

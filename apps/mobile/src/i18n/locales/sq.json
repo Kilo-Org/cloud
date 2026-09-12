@@ -521,7 +521,10 @@
         "outdatedOnLines": "I vjetëruar te {{lines}}",
         "outdatedOnPath": "I vjetëruar te {{path}}"
       },
-      "deletedUser": "përdorues i fshirë"
+      "deletedUser": "përdorues i fshirë",
+      "addCommentCta": "Komento në këtë kërkesë për bashkim",
+      "commentBadRequest": "Ky koment nuk mund të postohet. Kërkesa për bashkim mund të ketë ndryshuar.",
+      "commentForbidden": "Nuk ke leje të komentosh në këtë kërkesë për bashkim."
     },
     "couldNotOpenGitHubAppSettings": "Cilësimet e aplikacionit GitHub nuk u hapën.",
     "installKiloGitHubApp": "Instalo aplikacionin Kilo për GitHub",

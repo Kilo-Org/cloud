@@ -521,7 +521,10 @@
         "outdatedOnLines": "Aphelelwe yisikhathi ku-{{lines}}",
         "outdatedOnPath": "Aphelelwe yisikhathi ku-{{path}}"
       },
-      "deletedUser": "umsebenzisi osusiwe"
+      "deletedUser": "umsebenzisi osusiwe",
+      "addCommentCta": "Phawula kulesi sicelo sokuhlanganisa",
+      "commentBadRequest": "Le phawula ayikwazi ukuthunyelwa. Kungenzeka lesi sicelo sokuhlanganisa sishintshile.",
+      "commentForbidden": "Awunayo imvume yokuphawula kulesi sicelo sokuhlanganisa."
     },
     "couldNotOpenGitHubAppSettings": "Asikwazanga ukuvula izilungiselelo zohlelo lokusebenza lwe-GitHub.",
     "installKiloGitHubApp": "Faka i-Kilo GitHub App",

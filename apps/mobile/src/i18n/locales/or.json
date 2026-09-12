@@ -521,7 +521,10 @@
         "outdatedOnLines": "{{lines}}ରେ ପୁରୁଣା ମନ୍ତବ୍ୟ",
         "outdatedOnPath": "{{path}}ରେ ପୁରୁଣା ମନ୍ତବ୍ୟ"
       },
-      "deletedUser": "ବିଲୋପ ହୋଇଥିବା ବ୍ୟବହାରକାରୀ"
+      "deletedUser": "ବିଲୋପ ହୋଇଥିବା ବ୍ୟବହାରକାରୀ",
+      "addCommentCta": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟରେ ମନ୍ତବ୍ୟ ଦିଅନ୍ତୁ",
+      "commentBadRequest": "ଏହି ମନ୍ତବ୍ୟ ପୋଷ୍ଟ କରିହେବ ନାହିଁ। ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ବଦଳିଥାଇପାରେ।",
+      "commentForbidden": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟରେ ମନ୍ତବ୍ୟ ଦେବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ଆପ୍‌ର ସେଟିଂସ୍ ଖୋଲିହେଲା ନାହିଁ।",
     "installKiloGitHubApp": "Kilo GitHub ଆପ୍ ଇନଷ୍ଟଲ୍ କରନ୍ତୁ",

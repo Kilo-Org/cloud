@@ -526,7 +526,10 @@
       },
       "deletedUser": "dzēsts lietotājs",
       "comment_zero": "{{displayCount}} komentāru",
-      "reaction_zero": "reakciju"
+      "reaction_zero": "reakciju",
+      "addCommentCta": "Komentēt šo izmaiņu pieprasījumu",
+      "commentBadRequest": "Šo komentāru nevar publicēt. Iespējams, izmaiņu pieprasījums ir mainījies.",
+      "commentForbidden": "Tev nav atļaujas komentēt šajā izmaiņu pieprasījumā."
     },
     "couldNotOpenGitHubAppSettings": "Neizdevās atvērt GitHub lietotnes iestatījumus.",
     "installKiloGitHubApp": "Instalēt Kilo GitHub lietotni",

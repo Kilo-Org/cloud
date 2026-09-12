@@ -2592,7 +2592,10 @@
         "outdatedOnLines": "पुराने कोड पर: {{lines}}",
         "outdatedOnPath": "पुराने कोड पर: {{path}}"
       },
-      "deletedUser": "हटाया गया उपयोगकर्ता"
+      "deletedUser": "हटाया गया उपयोगकर्ता",
+      "addCommentCta": "इस पुल रिक्वेस्ट पर टिप्पणी करें",
+      "commentBadRequest": "यह टिप्पणी पोस्ट नहीं की जा सकती। हो सकता है कि पुल रिक्वेस्ट बदल गया हो।",
+      "commentForbidden": "आपको इस पुल रिक्वेस्ट पर टिप्पणी करने की अनुमति नहीं है।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ऐप की सेटिंग नहीं खुल सकीं।",
     "installKiloGitHubApp": "Kilo GitHub ऐप इंस्टॉल करें",

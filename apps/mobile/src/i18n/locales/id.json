@@ -2592,7 +2592,10 @@
         "outdatedOnLines": "Sudah tidak sesuai di {{lines}}",
         "outdatedOnPath": "Sudah tidak sesuai di {{path}}"
       },
-      "deletedUser": "pengguna yang dihapus"
+      "deletedUser": "pengguna yang dihapus",
+      "addCommentCta": "Komentari PR ini",
+      "commentBadRequest": "Komentar ini tidak dapat dikirim. PR mungkin sudah berubah.",
+      "commentForbidden": "Kamu tidak memiliki izin untuk berkomentar di PR ini."
     },
     "couldNotOpenGitHubAppSettings": "Tidak dapat membuka pengaturan aplikasi GitHub.",
     "installKiloGitHubApp": "Pasang aplikasi Kilo untuk GitHub",

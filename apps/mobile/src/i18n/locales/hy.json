@@ -521,7 +521,10 @@
         "outdatedOnLines": "Հնացած՝ {{lines}}",
         "outdatedOnPath": "Հնացած՝ {{path}}"
       },
-      "deletedUser": "ջնջված օգտատեր"
+      "deletedUser": "ջնջված օգտատեր",
+      "addCommentCta": "Մեկնաբանել այս միավորման հարցումը",
+      "commentBadRequest": "Այս մեկնաբանությունը հնարավոր չէ հրապարակել։ Հնարավոր է՝ միավորման հարցումը փոխվել է։",
+      "commentForbidden": "Այս միավորման հարցման վրա մեկնաբանություն գրելու թույլտվություն չունես։"
     },
     "couldNotOpenGitHubAppSettings": "Չհաջողվեց բացել GitHub հավելվածի կարգավորումները։",
     "installKiloGitHubApp": "Տեղադրել Kilo GitHub հավելվածը",

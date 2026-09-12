@@ -521,7 +521,10 @@
         "outdatedOnLines": "Ескірген: {{lines}}",
         "outdatedOnPath": "Ескірген: {{path}}"
       },
-      "deletedUser": "жойылған пайдаланушы"
+      "deletedUser": "жойылған пайдаланушы",
+      "addCommentCta": "Бұл біріктіру сұрауына пікір жазу",
+      "commentBadRequest": "Бұл пікірді жариялау мүмкін емес. Біріктіру сұрауы өзгерген болуы мүмкін.",
+      "commentForbidden": "Бұл біріктіру сұрауына пікір жазуға рұқсатыңыз жоқ."
     },
     "couldNotOpenGitHubAppSettings": "GitHub қолданбасының параметрлерін ашу мүмкін болмады.",
     "installKiloGitHubApp": "Kilo GitHub қолданбасын орнату",

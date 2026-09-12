@@ -521,7 +521,10 @@
         "outdatedOnLines": "{{lines}} پر پرانا",
         "outdatedOnPath": "{{path}} پر پرانا"
       },
-      "deletedUser": "حذف شدہ صارف"
+      "deletedUser": "حذف شدہ صارف",
+      "addCommentCta": "اس پل ریکویسٹ پر تبصرہ کریں",
+      "commentBadRequest": "یہ تبصرہ پوسٹ نہیں ہو سکتا۔ شاید پل ریکویسٹ تبدیل ہو گیا ہے۔",
+      "commentForbidden": "آپ کو اس پل ریکویسٹ پر تبصرہ کرنے کی اجازت نہیں ہے۔"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ایپ کی ترتیبات نہیں کھل سکیں۔",
     "installKiloGitHubApp": "Kilo GitHub ایپ انسٹال کریں",

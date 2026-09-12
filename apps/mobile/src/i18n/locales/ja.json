@@ -2592,7 +2592,10 @@
         "outdatedOnLines": "{{lines}}（変更前のコードへのコメント）",
         "outdatedOnPath": "{{path}}（変更前のコードへのコメント）"
       },
-      "deletedUser": "削除されたユーザー"
+      "deletedUser": "削除されたユーザー",
+      "addCommentCta": "このプルリクエストにコメントする",
+      "commentBadRequest": "このコメントは投稿できません。プルリクエストが変更された可能性があります。",
+      "commentForbidden": "このプルリクエストにコメントする権限がありません。"
     },
     "couldNotOpenGitHubAppSettings": "GitHub Appの設定を開けませんでした。",
     "installKiloGitHubApp": "Kilo GitHub Appをインストール",

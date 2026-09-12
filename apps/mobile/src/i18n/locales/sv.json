@@ -521,7 +521,10 @@
         "outdatedOnLines": "Inaktuell på {{lines}}",
         "outdatedOnPath": "Inaktuell i {{path}}"
       },
-      "deletedUser": "borttagen användare"
+      "deletedUser": "borttagen användare",
+      "addCommentCta": "Kommentera den här PR:en",
+      "commentBadRequest": "Den här kommentaren kan inte publiceras. PR:en kan ha ändrats.",
+      "commentForbidden": "Du har inte behörighet att kommentera den här PR:en."
     },
     "couldNotOpenGitHubAppSettings": "Det gick inte att öppna inställningarna för GitHub-appen.",
     "installKiloGitHubApp": "Installera GitHub-appen för Kilo",

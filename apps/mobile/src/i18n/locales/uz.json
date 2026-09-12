@@ -521,7 +521,10 @@
         "outdatedOnLines": "Eskirgan: {{lines}}",
         "outdatedOnPath": "Eskirgan: {{path}}"
       },
-      "deletedUser": "o'chirilgan foydalanuvchi"
+      "deletedUser": "o'chirilgan foydalanuvchi",
+      "addCommentCta": "Bu PRga izoh yozish",
+      "commentBadRequest": "Bu izohni joylab bo'lmaydi. PR o'zgargan bo'lishi mumkin.",
+      "commentForbidden": "Bu PRga izoh yozishga ruxsatingiz yo'q."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ilovasi sozlamalarini ochib bo‘lmadi.",
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",

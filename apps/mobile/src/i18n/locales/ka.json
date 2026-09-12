@@ -521,7 +521,10 @@
         "outdatedOnLines": "მოძველებული · {{lines}}",
         "outdatedOnPath": "მოძველებული · {{path}}"
       },
-      "deletedUser": "წაშლილი მომხმარებელი"
+      "deletedUser": "წაშლილი მომხმარებელი",
+      "addCommentCta": "კომენტარი ამ შერწყმის მოთხოვნაზე",
+      "commentBadRequest": "ამ კომენტარის გამოქვეყნება შეუძლებელია. შესაძლოა, შერწყმის მოთხოვნა შეიცვალა.",
+      "commentForbidden": "ამ შერწყმის მოთხოვნაზე კომენტარის დამატების უფლება არ გაქვს."
     },
     "couldNotOpenGitHubAppSettings": "GitHub-ის აპის პარამეტრები ვერ გაიხსნა.",
     "installKiloGitHubApp": "Kilo-ს GitHub აპის დაყენება",

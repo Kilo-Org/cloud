@@ -526,7 +526,10 @@
       },
       "deletedUser": "usuari eliminat",
       "comment_many": "{{displayCount}} comentaris",
-      "reaction_many": "reaccions"
+      "reaction_many": "reaccions",
+      "addCommentCta": "Comenta aquesta sol·licitud d'integració",
+      "commentBadRequest": "Aquest comentari no es pot publicar. Pot ser que la sol·licitud d'integració hagi canviat.",
+      "commentForbidden": "No tens permís per comentar aquesta sol·licitud d'integració."
     },
     "couldNotOpenGitHubAppSettings": "No s'ha pogut obrir la configuració de l'aplicació de GitHub.",
     "installKiloGitHubApp": "Instal·la l'aplicació de Kilo per a GitHub",

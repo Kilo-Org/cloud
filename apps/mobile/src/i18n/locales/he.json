@@ -2611,7 +2611,10 @@
       },
       "deletedUser": "משתמש שנמחק",
       "comment_two": "{{displayCount}} תגובות",
-      "reaction_two": "תגובות אימוג׳י"
+      "reaction_two": "תגובות אימוג׳י",
+      "addCommentCta": "הגב על בקשת המשיכה הזו",
+      "commentBadRequest": "לא ניתן לפרסם את התגובה הזו. ייתכן שבקשת המשיכה השתנתה.",
+      "commentForbidden": "אין לך הרשאה להגיב על בקשת המשיכה הזו."
     },
     "couldNotOpenGitHubAppSettings": "לא הצלחנו לפתוח את הגדרות האפליקציה ב-GitHub.",
     "installKiloGitHubApp": "התקנת אפליקציית Kilo ל-GitHub",

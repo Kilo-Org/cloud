@@ -2592,7 +2592,10 @@
         "outdatedOnLines": "{{lines}} 的留言已過時",
         "outdatedOnPath": "{{path}} 的留言已過時"
       },
-      "deletedUser": "已刪除的使用者"
+      "deletedUser": "已刪除的使用者",
+      "addCommentCta": "對此提取請求留言",
+      "commentBadRequest": "無法發佈此留言。此提取請求可能已變更。",
+      "commentForbidden": "你沒有權限在此提取請求留言。"
     },
     "couldNotOpenGitHubAppSettings": "無法開啟 GitHub 應用程式設定。",
     "installKiloGitHubApp": "安裝 Kilo GitHub App",

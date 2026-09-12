@@ -521,7 +521,10 @@
         "outdatedOnLines": "Yeroon kan darbe: {{lines}}",
         "outdatedOnPath": "Yeroon kan darbe: {{path}}"
       },
-      "deletedUser": "fayyadamaa haqame"
+      "deletedUser": "fayyadamaa haqame",
+      "addCommentCta": "Gaaffii walitti makuu kanaa irratti yaada kenni",
+      "commentBadRequest": "Yaadni kun maxxanfamuu hin danda'u. Gaaffiin walitti makuu jijjiirameera ta'a.",
+      "commentForbidden": "Gaaffii walitti makuu kanaa irratti yaada kennuuf hayyama hin qabdu."
     },
     "couldNotOpenGitHubAppSettings": "Qindaa'ina appii GitHub banuun hin danda'amne.",
     "installKiloGitHubApp": "Appii Kilo GitHub fe'i",

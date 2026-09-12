@@ -521,7 +521,10 @@
         "outdatedOnLines": "{{lines}} — යල් පැන ඇත",
         "outdatedOnPath": "{{path}} — යල් පැන ඇත"
       },
-      "deletedUser": "මකා දැමූ පරිශීලකයා"
+      "deletedUser": "මකා දැමූ පරිශීලකයා",
+      "addCommentCta": "මෙම පුල් ඉල්ලීම පිළිබඳ අදහස් දක්වන්න",
+      "commentBadRequest": "මෙම අදහස පළ කළ නොහැක. පුල් ඉල්ලීම වෙනස් වී තිබිය හැක.",
+      "commentForbidden": "මෙම පුල් ඉල්ලීම පිළිබඳ අදහස් දැක්වීමට ඔබට අවසර නොමැත."
     },
     "couldNotOpenGitHubAppSettings": "GitHub යෙදුමේ සැකසුම් විවෘත කළ නොහැකි විය.",
     "installKiloGitHubApp": "Kilo GitHub යෙදුම ස්ථාපනය කරන්න",

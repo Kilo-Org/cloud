@@ -521,7 +521,10 @@
         "outdatedOnLines": "Utdatert på {{lines}}",
         "outdatedOnPath": "Utdatert i {{path}}"
       },
-      "deletedUser": "slettet bruker"
+      "deletedUser": "slettet bruker",
+      "addCommentCta": "Kommenter denne PR-en",
+      "commentBadRequest": "Denne kommentaren kan ikke publiseres. PR-en kan ha endret seg.",
+      "commentForbidden": "Du har ikke tillatelse til å kommentere denne PR-en."
     },
     "couldNotOpenGitHubAppSettings": "Kunne ikke åpne innstillingene for GitHub-appen.",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",

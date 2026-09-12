@@ -521,7 +521,10 @@
         "outdatedOnLines": "ອ້າງອີງໂຄດເກົ່າໃນ {{lines}}",
         "outdatedOnPath": "ອ້າງອີງໂຄດເກົ່າໃນ {{path}}"
       },
-      "deletedUser": "ຜູ້ໃຊ້ທີ່ຖືກລຶບ"
+      "deletedUser": "ຜູ້ໃຊ້ທີ່ຖືກລຶບ",
+      "addCommentCta": "ສະແດງຄຳເຫັນໃນຄຳຂໍລວມໂຄດນີ້",
+      "commentBadRequest": "ບໍ່ສາມາດໂພດຄຳເຫັນນີ້ໄດ້. ຄຳຂໍລວມໂຄດອາດມີການປ່ຽນແປງແລ້ວ.",
+      "commentForbidden": "ທ່ານບໍ່ມີສິດສະແດງຄຳເຫັນໃນຄຳຂໍລວມໂຄດນີ້."
     },
     "couldNotOpenGitHubAppSettings": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າແອັບ GitHub ໄດ້.",
     "installKiloGitHubApp": "ຕິດຕັ້ງແອັບ Kilo ສຳລັບ GitHub",

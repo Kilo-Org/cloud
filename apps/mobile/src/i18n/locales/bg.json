@@ -521,7 +521,10 @@
         "outdatedOnLines": "Неактуален коментар: {{lines}}",
         "outdatedOnPath": "Неактуален коментар: {{path}}"
       },
-      "deletedUser": "изтрит потребител"
+      "deletedUser": "изтрит потребител",
+      "addCommentCta": "Коментирай тази заявка за обединяване",
+      "commentBadRequest": "Този коментар не може да бъде публикуван. Заявката за обединяване може да се е променила.",
+      "commentForbidden": "Нямаш права да коментираш в тази заявка за обединяване."
     },
     "couldNotOpenGitHubAppSettings": "Настройките на приложението в GitHub не се отвориха.",
     "installKiloGitHubApp": "Инсталирай приложението Kilo за GitHub",

@@ -41,6 +41,19 @@ type PrReviewDiscussionListProps = {
   readonly laterPageError: boolean;
   readonly onLoadMore: () => void;
   readonly onRetryLoadMore: () => void;
+  /**
+   * Invoked when a thread row's inline reply field gains focus, with the
+   * row's index. The tab scrolls the row above the keyboard-lifted bottom
+   * CTA bar (useReplyFocusScroll). Optional; absent = no scroll handling.
+   */
+  readonly onReplyInputFocus?: (index: number) => void;
+  /**
+   * Invoked with the list viewport's height on every layout commit. The tab
+   * anchors the keyboard-open reply scroll on the COMMITTED viewport — the
+   * CTA bar's keyboard lift lands asynchronously and shrinks this frame
+   * (useReplyFocusScroll). Optional; absent = no viewport reporting.
+   */
+  readonly onViewportLayout?: (height: number) => void;
 };
 
 export function PrReviewDiscussionList({
@@ -58,6 +71,8 @@ export function PrReviewDiscussionList({
   laterPageError,
   onLoadMore,
   onRetryLoadMore,
+  onReplyInputFocus,
+  onViewportLayout,
 }: Readonly<PrReviewDiscussionListProps>) {
   const trpc = useTRPC();
   // Account-local hidden users (blocked + muted GitHub logins) filter rows.
@@ -148,6 +163,9 @@ export function PrReviewDiscussionList({
               onToggleExpand={() => {
                 onToggleExpand(thread, index);
               }}
+              onReplyFocus={() => {
+                onReplyInputFocus?.(index);
+              }}
             />
           </View>
         );
@@ -155,6 +173,9 @@ export function PrReviewDiscussionList({
       contentContainerStyle={DISCUSSION_LIST_CONTENT_STYLE}
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
+      onLayout={event => {
+        onViewportLayout?.(event.nativeEvent.layout.height);
+      }}
       ListFooterComponent={
         <ListFooter
           hasNextPage={hasNextPage}

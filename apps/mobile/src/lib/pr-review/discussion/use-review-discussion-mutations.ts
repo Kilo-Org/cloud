@@ -11,6 +11,16 @@
 //                                the inline reply input keeps its own
 //                                error state so the user can retry.
 //
+//   - `addPrComment`          — the regular PR conversation (issue)
+//                                comment. Same non-optimistic contract
+//                                as replies: the comment is appended
+//                                only after the server confirms, and
+//                                the settle invalidation of
+//                                `listReviewThreads` (which fetches the
+//                                conversation comments) makes the
+//                                posted comment appear on the next
+//                                render. Success announces for a11y.
+//
 //   - `resolveThread` /
 //     `unresolveThread`       — OPTIMISTIC. The reducer flips the
 //                                thread's resolved flag in the cached
@@ -55,6 +65,9 @@ import { toast } from 'sonner-native';
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
 import { type ProviderPrRef } from '@kilocode/app-shared/provider-review';
 
+import { i18n } from '@/i18n';
+import { announceForA11y } from '@/lib/a11y/announce';
+import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import {
   isLatestMutationGeneration,
   nextMutationGeneration,
@@ -76,6 +89,7 @@ import {
   mapPrOperationError,
   prOperationToastMessage,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { withUiDeadline } from '@/lib/ui-deadline';
 
 import {
   applyReactionToggle,
@@ -156,11 +170,46 @@ function useDiscussionKeys(scope: ProviderPrScope) {
   };
 }
 
-async function invalidateDiscussionCaches(
+// Fire-and-forget ON PURPOSE: v5 dispatches a mutation's terminal state only
+// after `onSettled` resolves, and a blocked/offline network hangs the refetch
+// `invalidateQueries` triggers — an awaited invalidation would pin the
+// composer/reply UI on an endless spinner with no inline error even after the
+// UI deadline settles the write (uxs2 spot check, e6-offline-hang). The
+// invalidation still marks the cache stale and reconciles in the background
+// once the network returns; the posted comment renders on that next fetch.
+function invalidateDiscussionCaches(
   queryClient: ReturnType<typeof useQueryClient>,
   keys: ReturnType<typeof useDiscussionKeys>
-): Promise<void> {
-  await queryClient.invalidateQueries(keys.threadsPath);
+): void {
+  void queryClient.invalidateQueries(keys.threadsPath);
+}
+
+// The surfaces that own a discussion composer/reply input.
+type DiscussionErrorSurface = 'reply' | 'pr-comment';
+
+// The retryable copy per surface — the same catalog keys the inline boxes
+// show, so the toast and the inline error never disagree (uxs3 spot check,
+// e6-offline-banner: the raw GitHub access/install text is actionable to
+// nobody).
+const DISCUSSION_RETRYABLE_COPY = {
+  reply: 'prReview.operation.couldNotReply',
+  'pr-comment': 'prReview.mutationError.couldNotPostComment',
+} satisfies Record<DiscussionErrorSurface, string>;
+
+/**
+ * Toast copy for a discussion mutation failure. The ledger markers and the
+ * code-classified rejections keep the existing display mapping; a GENERIC
+ * retryable failure must not surface the raw provider message — the toast
+ * mirrors the inline retryable copy instead.
+ */
+function discussionErrorToastMessage(error: unknown, surface: DiscussionErrorSurface): string {
+  if (mapPrOperationError(error, surface) !== error) {
+    return prOperationToastMessage(error, surface);
+  }
+  if (classifyPrReviewMutationError(error).kind === 'retryable') {
+    return i18n.t(DISCUSSION_RETRYABLE_COPY[surface]);
+  }
+  return prOperationToastMessage(error, surface);
 }
 
 // ── Reply (not optimistic) ────────────────────────────────────────────
@@ -240,10 +289,64 @@ export function useReplyToCommentMutation(ref?: ProviderPrRef) {
       }
     },
     onError: (error: { message: string }) => {
-      toast.error(prOperationToastMessage(error, 'reply'));
+      toast.error(discussionErrorToastMessage(error, 'reply'));
     },
-    onSettled: async () => {
-      await invalidateDiscussionCaches(queryClient, keys);
+    onSettled: () => {
+      invalidateDiscussionCaches(queryClient, keys);
+    },
+  });
+}
+
+// ── Regular PR conversation (issue) comment (not optimistic) ─────────
+
+export type AddPrCommentInput = {
+  owner: string;
+  repo: string;
+  number: number;
+  body: string;
+};
+
+// A blocked/offline request can hang the underlying fetch indefinitely; the
+// composer must never sit on a disabled Cancel + endless spinner (uxs2 spot
+// check, e6-offline-hang). Bound the wait like the rename modal does
+// (SAVE_UI_DEADLINE_MS there): past the deadline the mutation settles with
+// the retryable "taking longer" copy, the draft stays intact, and a same-key
+// retry is ledger-deduped if the original write eventually lands.
+const PR_COMMENT_UI_DEADLINE_MS = 15_000;
+
+export function useAddPrCommentMutation() {
+  const queryClient = useQueryClient();
+  const keys = useGithubDiscussionKeys();
+  const { getKey, rotateKey } = useHoistedOperationKey();
+
+  return useMutation({
+    mutationFn: async (input: AddPrCommentInput) => {
+      try {
+        const result = await withUiDeadline(
+          trpcClient.githubPrReview.addIssueComment.mutate({
+            ...input,
+            operationKey: getKey(prIntentFingerprint('add_pr_comment', input)),
+          }),
+          PR_COMMENT_UI_DEADLINE_MS
+        );
+        rotateKey();
+        return result;
+      } catch (error) {
+        if (!isPrMutationRetryable(error)) {
+          rotateKey();
+        }
+        throw mapPrOperationError(error, 'pr-comment');
+      }
+    },
+    onSuccess: () => {
+      // Bare success announcement, mirroring useCreateReviewCommentMutation.
+      announceForA11y(i18n.t('prReview.announce.commentPosted'));
+    },
+    onError: (error: { message: string }) => {
+      toast.error(discussionErrorToastMessage(error, 'pr-comment'));
+    },
+    onSettled: () => {
+      invalidateDiscussionCaches(queryClient, keys);
     },
   });
 }
@@ -325,8 +428,8 @@ function useResolveToggleMutation(
       }
       toast.error(error.message);
     },
-    onSettled: async () => {
-      await invalidateDiscussionCaches(queryClient, keys);
+    onSettled: () => {
+      invalidateDiscussionCaches(queryClient, keys);
     },
   });
 }
@@ -413,8 +516,8 @@ export function useAddReactionMutation(threadId: string) {
         }
         toast.error(error.message);
       },
-      onSettled: async () => {
-        await invalidateDiscussionCaches(queryClient, keys);
+      onSettled: () => {
+        invalidateDiscussionCaches(queryClient, keys);
       },
       // The reaction DTO carries only {commentNodeId, content}; the owning
       // threadId comes from the hook closure, so scope.id serializes network
@@ -459,8 +562,8 @@ export function useRemoveReactionMutation(threadId: string) {
         }
         toast.error(error.message);
       },
-      onSettled: async () => {
-        await invalidateDiscussionCaches(queryClient, keys);
+      onSettled: () => {
+        invalidateDiscussionCaches(queryClient, keys);
       },
       // The reaction DTO carries only {commentNodeId, content}; the owning
       // threadId comes from the hook closure, so scope.id serializes network

@@ -526,7 +526,10 @@
       },
       "deletedUser": "utilizator șters",
       "comment_few": "{{displayCount}} comentarii",
-      "reaction_few": "reacții"
+      "reaction_few": "reacții",
+      "addCommentCta": "Comentează acest PR",
+      "commentBadRequest": "Acest comentariu nu poate fi publicat. Este posibil ca PR-ul să se fi modificat.",
+      "commentForbidden": "Nu ai permisiunea să comentezi acest PR."
     },
     "couldNotOpenGitHubAppSettings": "Nu s-au putut deschide setările aplicației GitHub.",
     "installKiloGitHubApp": "Instalează aplicația Kilo pentru GitHub",

@@ -521,7 +521,10 @@
         "outdatedOnLines": "Forældet på {{lines}}",
         "outdatedOnPath": "Forældet i {{path}}"
       },
-      "deletedUser": "slettet bruger"
+      "deletedUser": "slettet bruger",
+      "addCommentCta": "Kommenter på denne pull request",
+      "commentBadRequest": "Denne kommentar kan ikke sendes. Pull requesten kan have ændret sig.",
+      "commentForbidden": "Du har ikke tilladelse til at kommentere på denne pull request."
     },
     "couldNotOpenGitHubAppSettings": "Indstillingerne for GitHub-appen kunne ikke åbnes.",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",

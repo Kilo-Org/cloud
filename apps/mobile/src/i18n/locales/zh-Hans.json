@@ -2592,7 +2592,10 @@
         "outdatedOnLines": "{{lines}}（已过时）",
         "outdatedOnPath": "{{path}}（已过时）"
       },
-      "deletedUser": "已删除的用户"
+      "deletedUser": "已删除的用户",
+      "addCommentCta": "评论此拉取请求",
+      "commentBadRequest": "无法发布此评论。此拉取请求可能已发生变化。",
+      "commentForbidden": "你无权评论此拉取请求。"
     },
     "couldNotOpenGitHubAppSettings": "无法打开 GitHub 应用设置。",
     "installKiloGitHubApp": "安装 Kilo GitHub 应用",

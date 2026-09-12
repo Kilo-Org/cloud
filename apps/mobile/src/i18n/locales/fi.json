@@ -521,7 +521,10 @@
         "outdatedOnLines": "Vanhentunut: {{lines}}",
         "outdatedOnPath": "Vanhentunut: {{path}}"
       },
-      "deletedUser": "poistettu käyttäjä"
+      "deletedUser": "poistettu käyttäjä",
+      "addCommentCta": "Kommentoi tätä muutospyyntöä",
+      "commentBadRequest": "Tätä kommenttia ei voi julkaista. Muutospyyntö on voinut muuttua.",
+      "commentForbidden": "Sinulla ei ole oikeutta kommentoida tätä muutospyyntöä."
     },
     "couldNotOpenGitHubAppSettings": "GitHub-sovelluksen asetusten avaaminen epäonnistui.",
     "installKiloGitHubApp": "Asenna Kilo GitHub -sovellus",

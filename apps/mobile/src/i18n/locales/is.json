@@ -521,7 +521,10 @@
         "outdatedOnLines": "Úrelt við {{lines}}",
         "outdatedOnPath": "Úrelt við {{path}}"
       },
-      "deletedUser": "eyddur notandi"
+      "deletedUser": "eyddur notandi",
+      "addCommentCta": "Gera athugasemd við þessa sameiningarbeiðni",
+      "commentBadRequest": "Ekki er hægt að birta þessa athugasemd. Sameiningarbeiðnin gæti hafa breyst.",
+      "commentForbidden": "Þú hefur ekki heimild til að gera athugasemd við þessa sameiningarbeiðni."
     },
     "couldNotOpenGitHubAppSettings": "Tókst ekki að opna stillingar GitHub-forritsins.",
     "installKiloGitHubApp": "Setja upp Kilo-forritið fyrir GitHub",

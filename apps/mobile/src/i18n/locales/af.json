@@ -521,7 +521,10 @@
         "outdatedOnLines": "Verouderd op {{lines}}",
         "outdatedOnPath": "Verouderd op {{path}}"
       },
-      "deletedUser": "geskrapte gebruiker"
+      "deletedUser": "geskrapte gebruiker",
+      "addCommentCta": "Kommenteer op hierdie trekversoek",
+      "commentBadRequest": "Hierdie kommentaar kan nie geplaas word nie. Die trekversoek het dalk verander.",
+      "commentForbidden": "Jy het nie toestemming om op hierdie trekversoek kommentaar te lewer nie."
     },
     "couldNotOpenGitHubAppSettings": "Die GitHub-toepassing se instellings kon nie oopgemaak word nie.",
     "installKiloGitHubApp": "Installeer die Kilo GitHub-toep",

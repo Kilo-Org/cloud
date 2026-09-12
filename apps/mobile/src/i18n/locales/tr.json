@@ -2592,7 +2592,10 @@
         "outdatedOnLines": "{{lines}} · Güncel değil",
         "outdatedOnPath": "{{path}} · Güncel değil"
       },
-      "deletedUser": "silinen kullanıcı"
+      "deletedUser": "silinen kullanıcı",
+      "addCommentCta": "Bu çekme isteğine yorum yap",
+      "commentBadRequest": "Bu yorum gönderilemiyor. Çekme isteği değişmiş olabilir.",
+      "commentForbidden": "Bu çekme isteğine yorum yapma iznin yok."
     },
     "couldNotOpenGitHubAppSettings": "GitHub uygulaması ayarları açılamadı.",
     "installKiloGitHubApp": "Kilo GitHub uygulamasını yükle",

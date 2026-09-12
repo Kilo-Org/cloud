@@ -2592,7 +2592,10 @@
         "outdatedOnLines": "Verouderd bij {{lines}}",
         "outdatedOnPath": "Verouderd in {{path}}"
       },
-      "deletedUser": "verwijderde gebruiker"
+      "deletedUser": "verwijderde gebruiker",
+      "addCommentCta": "Een opmerking op deze PR plaatsen",
+      "commentBadRequest": "Deze opmerking kan niet worden geplaatst. De PR is mogelijk gewijzigd.",
+      "commentForbidden": "Je hebt geen toestemming om een opmerking op deze PR te plaatsen."
     },
     "couldNotOpenGitHubAppSettings": "De instellingen van de GitHub-app konden niet worden geopend.",
     "installKiloGitHubApp": "Kilo GitHub-app installeren",

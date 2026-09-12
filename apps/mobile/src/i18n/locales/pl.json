@@ -2630,7 +2630,10 @@
       "comment_few": "{{displayCount}} komentarze",
       "comment_many": "{{displayCount}} komentarzy",
       "reaction_few": "reakcje",
-      "reaction_many": "reakcji"
+      "reaction_many": "reakcji",
+      "addCommentCta": "Skomentuj ten PR",
+      "commentBadRequest": "Tego komentarza nie można opublikować. PR mógł się zmienić.",
+      "commentForbidden": "Nie masz uprawnień do komentowania w tym PR."
     },
     "couldNotOpenGitHubAppSettings": "Nie udało się otworzyć ustawień aplikacji GitHub.",
     "installKiloGitHubApp": "Zainstaluj aplikację Kilo dla GitHub",

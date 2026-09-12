@@ -521,7 +521,10 @@
         "outdatedOnLines": "കാലഹരണപ്പെട്ടത് · {{lines}}",
         "outdatedOnPath": "കാലഹരണപ്പെട്ടത് · {{path}}"
       },
-      "deletedUser": "ഇല്ലാതാക്കിയ ഉപയോക്താവ്"
+      "deletedUser": "ഇല്ലാതാക്കിയ ഉപയോക്താവ്",
+      "addCommentCta": "ഈ പുൾ റിക്വസ്റ്റിൽ അഭിപ്രായം രേഖപ്പെടുത്തുക",
+      "commentBadRequest": "ഈ അഭിപ്രായം പോസ്റ്റ് ചെയ്യാൻ കഴിയില്ല. പുൾ റിക്വസ്റ്റ് മാറിയിരിക്കാം.",
+      "commentForbidden": "ഈ പുൾ റിക്വസ്റ്റിൽ അഭിപ്രായം രേഖപ്പെടുത്താൻ നിങ്ങൾക്ക് അനുമതിയില്ല."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ആപ്പിന്റെ ക്രമീകരണങ്ങൾ തുറക്കാനായില്ല.",
     "installKiloGitHubApp": "Kilo GitHub ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",

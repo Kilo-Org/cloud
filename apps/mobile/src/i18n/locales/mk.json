@@ -521,7 +521,10 @@
         "outdatedOnLines": "Застарено на {{lines}}",
         "outdatedOnPath": "Застарено на {{path}}"
       },
-      "deletedUser": "избришан корисник"
+      "deletedUser": "избришан корисник",
+      "addCommentCta": "Коментирај ова барање за спојување",
+      "commentBadRequest": "Овој коментар не може да се објави. Можеби барањето за спојување е променето.",
+      "commentForbidden": "Немаш дозвола да коментираш ова барање за спојување."
     },
     "couldNotOpenGitHubAppSettings": "Поставките за апликацијата на GitHub не се отворија.",
     "installKiloGitHubApp": "Инсталирај ја апликацијата Kilo за GitHub",

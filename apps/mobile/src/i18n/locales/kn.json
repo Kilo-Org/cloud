@@ -521,7 +521,10 @@
         "outdatedOnLines": "{{lines}} — ಹಳೆಯ ಆವೃತ್ತಿಯ ಕಾಮೆಂಟ್",
         "outdatedOnPath": "{{path}} — ಹಳೆಯ ಆವೃತ್ತಿಯ ಕಾಮೆಂಟ್"
       },
-      "deletedUser": "ಅಳಿಸಲಾದ ಬಳಕೆದಾರ"
+      "deletedUser": "ಅಳಿಸಲಾದ ಬಳಕೆದಾರ",
+      "addCommentCta": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗೆ ಟಿಪ್ಪಣಿ ಮಾಡಿ",
+      "commentBadRequest": "ಈ ಟಿಪ್ಪಣಿಯನ್ನು ಪೋಸ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಬದಲಾಗಿರಬಹುದು.",
+      "commentForbidden": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗೆ ಟಿಪ್ಪಣಿ ಮಾಡಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ಆ್ಯಪ್‌ನ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "installKiloGitHubApp": "Kilo GitHub ಆ್ಯಪ್ ಸ್ಥಾಪಿಸಿ",

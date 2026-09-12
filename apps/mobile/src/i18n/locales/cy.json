@@ -541,7 +541,10 @@
       "reaction_zero": "ymateb",
       "reaction_two": "ymateb",
       "reaction_few": "ymateb",
-      "reaction_many": "ymateb"
+      "reaction_many": "ymateb",
+      "addCommentCta": "Sylwadu ar y cais tynnu hwn",
+      "commentBadRequest": "Ni ellir postio'r sylw hwn. Efallai fod y cais tynnu wedi newid.",
+      "commentForbidden": "Nid oes gennych ganiatâd i sylwadu ar y cais tynnu hwn."
     },
     "couldNotOpenGitHubAppSettings": "Doedd dim modd agor gosodiadau ap GitHub.",
     "installKiloGitHubApp": "Gosod ap GitHub Kilo",

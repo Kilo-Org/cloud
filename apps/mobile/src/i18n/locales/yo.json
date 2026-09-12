@@ -521,7 +521,10 @@
         "outdatedOnLines": "Tí kò bá ẹ̀dà tuntun mu lórí {{lines}}",
         "outdatedOnPath": "Tí kò bá ẹ̀dà tuntun mu lórí {{path}}"
       },
-      "deletedUser": "olùlò tí a pa rẹ́"
+      "deletedUser": "olùlò tí a pa rẹ́",
+      "addCommentCta": "Fi àsọyé sí ìbéèrè ìṣọ̀kan yìí",
+      "commentBadRequest": "A kò lè fi àsọyé yìí ránṣẹ́. Ìbéèrè ìṣọ̀kan náà lè ti yí padà.",
+      "commentForbidden": "O kò ní àṣẹ láti fi àsọyé sí ìbéèrè ìṣọ̀kan yìí."
     },
     "couldNotOpenGitHubAppSettings": "A kò lè ṣí àwọn ètò ohun èlò GitHub.",
     "installKiloGitHubApp": "Fi ìṣàfilọ́lẹ̀ Kilo fún GitHub sórí rẹ̀",

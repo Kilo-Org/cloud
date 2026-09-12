@@ -521,7 +521,10 @@
         "outdatedOnLines": "Luma na sa {{lines}}",
         "outdatedOnPath": "Luma na sa {{path}}"
       },
-      "deletedUser": "binurang user"
+      "deletedUser": "binurang user",
+      "addCommentCta": "Magkomento sa pull request na ito",
+      "commentBadRequest": "Hindi ma-post ang komentong ito. Maaaring nagbago ang pull request.",
+      "commentForbidden": "Wala kang pahintulot na magkomento sa pull request na ito."
     },
     "couldNotOpenGitHubAppSettings": "Hindi mabuksan ang mga setting ng GitHub App.",
     "installKiloGitHubApp": "I-install ang Kilo GitHub App",

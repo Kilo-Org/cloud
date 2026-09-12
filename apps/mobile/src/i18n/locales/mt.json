@@ -536,7 +536,10 @@
       "comment_many": "{{displayCount}}-il kumment",
       "reaction_two": "reazzjonijiet",
       "reaction_few": "reazzjonijiet",
-      "reaction_many": "reazzjoni"
+      "reaction_many": "reazzjoni",
+      "addCommentCta": "Ikkummenta fuq din it-talba għall-għaqda",
+      "commentBadRequest": "Dan il-kumment ma jistax jiġi ppubblikat. Jista' jkun li t-talba għall-għaqda nbidlet.",
+      "commentForbidden": "M'għandekx permess biex tikkummenta fuq din it-talba għall-għaqda."
     },
     "couldNotOpenGitHubAppSettings": "Ma stajniex niftħu l-issettjar tal-app ta' GitHub.",
     "installKiloGitHubApp": "Installa l-app ta' Kilo għal GitHub",

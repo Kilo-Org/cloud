@@ -17,6 +17,7 @@ import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 import { ensureTermsAcceptedOutcome, ReplyInput } from './reply-input';
 import { clearDraft } from '@/lib/persist/drafts';
+import { PR_OPERATION_AMBIGUOUS_MESSAGE } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 
@@ -34,14 +35,24 @@ vi.mock('react-i18next', async importOriginal => {
 type AlertButton = { text?: string; onPress?: () => void };
 type AlertCall = { title: string; message: string; buttons: AlertButton[] };
 
-const { alertCalls, getTermsStatusMock, acceptTermsMock, draftLoadMock } = vi.hoisted(() => ({
-  alertCalls: [] as AlertCall[],
-  getTermsStatusMock: vi.fn(),
-  acceptTermsMock: vi.fn(),
-  draftLoadMock: vi.fn((): { settled: boolean; value: string | null } => ({
-    settled: true,
-    value: null,
-  })),
+const { alertCalls, getTermsStatusMock, acceptTermsMock, draftLoadMock, connectivity } = vi.hoisted(
+  () => ({
+    alertCalls: [] as AlertCall[],
+    getTermsStatusMock: vi.fn(),
+    acceptTermsMock: vi.fn(),
+    draftLoadMock: vi.fn((): { settled: boolean; value: string | null } => ({
+      settled: true,
+      value: null,
+    })),
+    // The committed connectivity the submit gate reads; 'online' by default,
+    // flipped per test. The real module pulls in NetInfo + the probe store,
+    // which the node environment cannot resolve.
+    connectivity: { value: 'online' as 'online' | 'offline' | 'unknown' },
+  })
+);
+
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => connectivity.value,
 }));
 
 vi.mock('react-native', () => ({
@@ -111,21 +122,32 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 // `ReplyInput` is mounted by calling it as a plain function (no renderer), so
 // the React hook primitives are stubbed to no-op/simple versions, mirroring
 // pr-merge-sheet.test.tsx. The pure `ensureTermsAcceptedOutcome` tests above
-// do not touch these.
-//
-// The useState mock records every setter it hands out: the error effect
-// writes its inline copy through one of them, so a test can observe the
-// state write even though the no-op mock never re-renders.
+// do not touch these. useState keeps a box per slot (same pattern as the
+// composer test) so a press can flip the inline-error state and the next
+// mount renders it. The same mock records every setter it hands out
+// (`stateSetters`), so an error effect that writes its inline copy through
+// one of them is observed even on a mount that never re-renders.
 const stateSetters = vi.hoisted(() => [] as { mock: { calls: unknown[][] } }[]);
+const hookState = vi.hoisted(() => ({ boxes: [] as unknown[], cursor: 0 }));
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
   return {
     ...actual,
     useState: vi.fn(<T>(initial: T) => {
-      const setter = vi.fn();
+      const index = hookState.cursor;
+      hookState.cursor += 1;
+      if (hookState.boxes.length <= index) {
+        hookState.boxes.push(initial);
+      }
+      const setter = vi.fn((value: T) => {
+        hookState.boxes[index] =
+          typeof value === 'function'
+            ? (value as (prev: T) => T)(hookState.boxes[index] as T)
+            : value;
+      });
       stateSetters.push(setter);
-      return [initial, setter as () => void] as [T, (value: T) => void];
+      return [hookState.boxes[index] as T, setter as (value: T) => void] as [T, (value: T) => void];
     }),
     useMemo: vi.fn(<T>(factory: () => T) => factory()),
     useRef: vi.fn(<T>(initial: T) => {
@@ -271,6 +293,11 @@ function makeReply(mutate: unknown): ReplyMutation {
   return { mutate, isPending: false, error: null } as unknown as ReplyMutation;
 }
 
+/** A reply mutation result frozen in its ERROR state (no request in flight). */
+function makeFailedReply(error: unknown): ReplyMutation {
+  return { mutate: vi.fn(), isPending: false, error } as unknown as ReplyMutation;
+}
+
 type FindElementArgs = {
   node: unknown;
   type: string;
@@ -311,16 +338,21 @@ function findElement({ node, type, prop, value }: FindElementArgs): React.ReactE
   return null;
 }
 
-/** Mounts ReplyInput, types a body, and presses the submit button. */
-function mountAndSubmit(reply: ReplyMutation): void {
+/** Mounts ReplyInput (one render pass: cursor restarts, boxes persist). */
+function mountReplyInput(reply: ReplyMutation): React.ReactElement {
+  hookState.cursor = 0;
   // eslint-disable-next-line new-cap
-  const element = ReplyInput({
+  return ReplyInput({
     owner: 'octocat',
     repo: 'hello',
     number: 1,
     commentId: 42,
     reply,
   });
+}
+
+/** Types a body into the mounted input and returns the submit button. */
+function typeAndSubmit(element: React.ReactElement, text = 'hello'): void {
   const input = findElement({
     node: element,
     type: 'TextInput',
@@ -330,7 +362,7 @@ function mountAndSubmit(reply: ReplyMutation): void {
   if (!input) {
     throw new Error('Reply body TextInput not found');
   }
-  (input.props as { onChangeText?: (value: string) => void }).onChangeText?.('hello');
+  (input.props as { onChangeText?: (value: string) => void }).onChangeText?.(text);
   const button = findElement({
     node: element,
     type: 'Button',
@@ -343,11 +375,58 @@ function mountAndSubmit(reply: ReplyMutation): void {
   (button.props as { onPress?: () => void }).onPress?.();
 }
 
+/** Drains the microtask queue plus one macrotask tick. */
+async function flushMacrotask(): Promise<void> {
+  await new Promise(resolve => {
+    setTimeout(resolve, 0);
+  });
+}
+
+/** The mounted tree's inline error Text (absent when no error renders). */
+function inlineErrorText(element: React.ReactElement): string | null {
+  const texts = ((): React.ReactElement[] => {
+    const found: React.ReactElement[] = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) {
+        for (const child of node) {
+          walk(child);
+        }
+        return;
+      }
+      if (!React.isValidElement(node)) {
+        return;
+      }
+      if (node.type === 'Text') {
+        found.push(node);
+      }
+      walk((node.props as Record<string, unknown>).children);
+    };
+    walk(element);
+    return found;
+  })();
+  const error = texts.find(
+    text =>
+      typeof (text.props as { children?: unknown }).children === 'string' &&
+      ((text.props as { className?: string }).className ?? '').includes('text-destructive')
+  );
+  return error ? (error.props as { children: string }).children : null;
+}
+
+/** Mounts ReplyInput, types a body, and presses the submit button. */
+function mountAndSubmit(reply: ReplyMutation): void {
+  const element = mountReplyInput(reply);
+  typeAndSubmit(element);
+}
+
 describe('ReplyInput draft clear on submit', () => {
   beforeEach(() => {
+    hookState.boxes = [];
+    hookState.cursor = 0;
     alertCalls.length = 0;
     getTermsStatusMock.mockReset();
     acceptTermsMock.mockReset();
+    connectivity.value = 'online';
+    draftLoadMock.mockReturnValue({ settled: true, value: null });
   });
 
   afterEach(() => {
@@ -390,20 +469,18 @@ describe('ReplyInput draft clear on submit', () => {
 });
 
 describe('ReplyInput seeds the field from the settled draft during render', () => {
+  beforeEach(() => {
+    hookState.boxes = [];
+    hookState.cursor = 0;
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  function mountReplyInput(): React.ReactElement | null {
+  function mountReplyBody(): React.ReactElement | null {
     return findElement({
-      // eslint-disable-next-line new-cap
-      node: ReplyInput({
-        owner: 'octocat',
-        repo: 'hello',
-        number: 1,
-        commentId: 42,
-        reply: makeReply(vi.fn()),
-      }),
+      node: mountReplyInput(makeReply(vi.fn())),
       type: 'TextInput',
       prop: 'accessibilityLabel',
       value: 'Reply body',
@@ -412,7 +489,7 @@ describe('ReplyInput seeds the field from the settled draft during render', () =
 
   it('seeds the defaultValue from the settled draft value', () => {
     draftLoadMock.mockReturnValue({ settled: true, value: 'saved reply' });
-    const input = mountReplyInput();
+    const input = mountReplyBody();
     if (!input) {
       throw new Error('Reply body TextInput not found');
     }
@@ -421,7 +498,7 @@ describe('ReplyInput seeds the field from the settled draft during render', () =
 
   it('seeds an empty field when the settled draft has no value (no stale previous-thread text)', () => {
     draftLoadMock.mockReturnValue({ settled: true, value: null });
-    const input = mountReplyInput();
+    const input = mountReplyBody();
     if (!input) {
       throw new Error('Reply body TextInput not found');
     }
@@ -506,16 +583,14 @@ describe('ReplyInput provider arm (s6)', () => {
 });
 
 describe('ReplyInput gates input on draft settle', () => {
+  beforeEach(() => {
+    hookState.boxes = [];
+    hookState.cursor = 0;
+  });
+
   it('hides the input and disables submit until the draft settles', () => {
     draftLoadMock.mockReturnValue({ settled: false, value: null });
-    // eslint-disable-next-line new-cap
-    const hidden = ReplyInput({
-      owner: 'octocat',
-      repo: 'hello',
-      number: 1,
-      commentId: 42,
-      reply: makeReply(vi.fn()),
-    });
+    const hidden = mountReplyInput(makeReply(vi.fn()));
     expect(
       findElement({
         node: hidden,
@@ -536,14 +611,7 @@ describe('ReplyInput gates input on draft settle', () => {
     expect((button.props as { disabled?: boolean }).disabled).toBe(true);
 
     draftLoadMock.mockReturnValue({ settled: true, value: null });
-    // eslint-disable-next-line new-cap
-    const shown = ReplyInput({
-      owner: 'octocat',
-      repo: 'hello',
-      number: 1,
-      commentId: 42,
-      reply: makeReply(vi.fn()),
-    });
+    const shown = mountReplyInput(makeReply(vi.fn()));
     expect(
       findElement({
         node: shown,
@@ -555,7 +623,7 @@ describe('ReplyInput gates input on draft settle', () => {
   });
 });
 
-// ── s6f: refused-reply wording ───────────────────────────────────────
+// ── s6f: refused-reply wording and failure copy ──────────────────────
 
 /** True when the error effect wrote `value` into any state slot. */
 function stateValueWritten(value: string): boolean {
@@ -566,9 +634,20 @@ function forbiddenError(): Error {
   return Object.assign(new Error('403 Forbidden'), { data: { code: 'FORBIDDEN' } });
 }
 
-describe('ReplyInput refused-reply wording (s6f)', () => {
+// The failed-reply surface (uxs3 spot check, e6-offline-hang / e6-offline-
+// banner): a generic provider failure shows the specified retryable copy —
+// never the raw GitHub text — and a CONFIRMED-offline submit fails at once
+// with that copy, without a request, keeping Reply enabled for the retry.
+describe('ReplyInput refused-reply wording and failure copy', () => {
   beforeEach(() => {
     stateSetters.length = 0;
+    hookState.boxes = [];
+    hookState.cursor = 0;
+    alertCalls.length = 0;
+    getTermsStatusMock.mockReset();
+    acceptTermsMock.mockReset();
+    connectivity.value = 'online';
+    draftLoadMock.mockReturnValue({ settled: true, value: null });
   });
 
   afterEach(() => {
@@ -612,5 +691,69 @@ describe('ReplyInput refused-reply wording (s6f)', () => {
     expect(stateValueWritten("You don't have permission to reply to this pull request.")).toBe(
       true
     );
+  });
+
+  it('mirrors a generic provider failure as the retryable copy, never the raw message', () => {
+    const raw = new Error(
+      'You do not have access to this repository. Install the Kilo GitHub App to continue.'
+    );
+    // The mirror effect writes the state boxes during this mount; the next
+    // render reads them back.
+    mountReplyInput(makeFailedReply(raw));
+    const shown = mountReplyInput(makeFailedReply(raw));
+    expect(inlineErrorText(shown)).toBe('Could not reply.');
+    // The raw provider text never reaches the tree at all.
+    expect(JSON.stringify(shown)).not.toContain('Kilo GitHub App');
+    // Retry stays offered: the button is not disabled by the retryable kind.
+    const button = findElement({
+      node: shown,
+      type: 'Button',
+      prop: 'accessibilityLabel',
+      value: 'Submit reply',
+    });
+    if (!button) {
+      throw new Error('Submit reply Button not found');
+    }
+    expect((button.props as { disabled?: boolean }).disabled).toBe(false);
+  });
+
+  it('mirrors the ambiguous ledger marker as the verify-before-retrying copy', () => {
+    const ambiguous = new Error(PR_OPERATION_AMBIGUOUS_MESSAGE);
+    mountReplyInput(makeFailedReply(ambiguous));
+    const shown = mountReplyInput(makeFailedReply(ambiguous));
+    expect(inlineErrorText(shown)).toBe(PR_OPERATION_AMBIGUOUS_MESSAGE);
+  });
+
+  it('fails a submit while CONFIRMED offline at once — no request, retryable copy, Reply stays enabled', async () => {
+    connectivity.value = 'offline';
+    const mutate = vi.fn();
+    const element = mountReplyInput(makeReply(mutate));
+    typeAndSubmit(element);
+    await flushMacrotask();
+
+    // No request was started (the hang behind the spinner with the disabled
+    // Cancel is structurally impossible now), and the Terms gate never ran.
+    expect(mutate).not.toHaveBeenCalled();
+    expect(getTermsStatusMock).not.toHaveBeenCalled();
+
+    const shown = mountReplyInput(makeReply(mutate));
+    expect(inlineErrorText(shown)).toBe('Could not reply.');
+    const button = findElement({
+      node: shown,
+      type: 'Button',
+      prop: 'accessibilityLabel',
+      value: 'Submit reply',
+    });
+    if (!button) {
+      throw new Error('Submit reply Button not found');
+    }
+    expect((button.props as { disabled?: boolean }).disabled).toBe(false);
+
+    // Back online: the same tap posts.
+    connectivity.value = 'online';
+    getTermsStatusMock.mockResolvedValue({ accepted: true, currentVersion: 'v1' });
+    typeAndSubmit(shown);
+    await flushMacrotask();
+    expect(mutate).toHaveBeenCalledTimes(1);
   });
 });

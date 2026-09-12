@@ -521,7 +521,10 @@
         "outdatedOnLines": "Παρωχημένο: {{lines}}",
         "outdatedOnPath": "Παρωχημένο στο {{path}}"
       },
-      "deletedUser": "διαγραμμένος χρήστης"
+      "deletedUser": "διαγραμμένος χρήστης",
+      "addCommentCta": "Σχολίασε αυτό το αίτημα ενσωμάτωσης",
+      "commentBadRequest": "Αυτό το σχόλιο δεν μπορεί να δημοσιευτεί. Το αίτημα ενσωμάτωσης μπορεί να έχει αλλάξει.",
+      "commentForbidden": "Δεν έχεις δικαίωμα να σχολιάσεις αυτό το αίτημα ενσωμάτωσης."
     },
     "couldNotOpenGitHubAppSettings": "Δεν ήταν δυνατό το άνοιγμα των ρυθμίσεων της εφαρμογής GitHub.",
     "installKiloGitHubApp": "Εγκατάσταση της εφαρμογής Kilo για το GitHub",

@@ -521,7 +521,10 @@
         "outdatedOnLines": "{{lines}} — பழைய பதிப்பிலுள்ளது",
         "outdatedOnPath": "{{path}} — பழைய பதிப்பிலுள்ளது"
       },
-      "deletedUser": "நீக்கப்பட்ட பயனர்"
+      "deletedUser": "நீக்கப்பட்ட பயனர்",
+      "addCommentCta": "இந்த இணைப்புக் கோரிக்கையில் கருத்துத் தெரிவிக்கவும்",
+      "commentBadRequest": "இந்தக் கருத்தை இடுகையிட முடியாது. இணைப்புக் கோரிக்கை மாறியிருக்கலாம்.",
+      "commentForbidden": "இந்த இணைப்புக் கோரிக்கையில் கருத்துத் தெரிவிக்க உங்களுக்கு அனுமதி இல்லை."
     },
     "couldNotOpenGitHubAppSettings": "GitHub செயலியின் அமைப்புகளைத் திறக்க முடியவில்லை.",
     "installKiloGitHubApp": "Kilo GitHub செயலியை நிறுவவும்",

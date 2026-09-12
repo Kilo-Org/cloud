@@ -521,7 +521,10 @@
         "outdatedOnLines": "Tsy mifanaraka intsony amin'ny {{lines}}",
         "outdatedOnPath": "Tsy mifanaraka intsony amin'ny {{path}}"
       },
-      "deletedUser": "mpampiasa voafafa"
+      "deletedUser": "mpampiasa voafafa",
+      "addCommentCta": "Manao fanehoan-kevitra momba ity fangatahana fampiraisana ity",
+      "commentBadRequest": "Tsy azo avoaka ity fanehoan-kevitra ity. Mety niova ny fangatahana fampiraisana.",
+      "commentForbidden": "Tsy manana alalana hanao fanehoan-kevitra momba ity fangatahana fampiraisana ity ianao."
     },
     "couldNotOpenGitHubAppSettings": "Tsy voasokatra ny fikirana ho an'ny rindranasa GitHub.",
     "installKiloGitHubApp": "Apetraho ny rindranasa Kilo ho an'ny GitHub",

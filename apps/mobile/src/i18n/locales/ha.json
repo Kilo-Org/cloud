@@ -521,7 +521,10 @@
         "outdatedOnLines": "Bai dace da sabon yanayin {{lines}} ba",
         "outdatedOnPath": "Bai dace da sabon yanayin {{path}} ba"
       },
-      "deletedUser": "mai amfani da aka share"
+      "deletedUser": "mai amfani da aka share",
+      "addCommentCta": "Yi tsokaci a wannan buƙatar haɗawa",
+      "commentBadRequest": "Ba za a iya wallafa wannan tsokaci ba. Wataƙila buƙatar haɗawa ta canza.",
+      "commentForbidden": "Ba ka da izinin yin tsokaci a wannan buƙatar haɗawa."
     },
     "couldNotOpenGitHubAppSettings": "An kasa buɗe saitunan manhajar GitHub.",
     "installKiloGitHubApp": "Shigar da manhajar Kilo ta GitHub",

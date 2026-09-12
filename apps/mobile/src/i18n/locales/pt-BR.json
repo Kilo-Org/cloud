@@ -2611,7 +2611,10 @@
       },
       "deletedUser": "usuário excluído",
       "comment_many": "{{displayCount}} comentários",
-      "reaction_many": "reações"
+      "reaction_many": "reações",
+      "addCommentCta": "Comentar neste pull request",
+      "commentBadRequest": "Não é possível publicar este comentário. O pull request pode ter sido alterado.",
+      "commentForbidden": "Você não tem permissão para comentar neste pull request."
     },
     "couldNotOpenGitHubAppSettings": "Não foi possível abrir as configurações do aplicativo do GitHub.",
     "installKiloGitHubApp": "Instalar o aplicativo do Kilo para GitHub",

@@ -69,6 +69,8 @@ type DiscussionThreadProps = {
   readonly onToggleExpand: () => void;
   /** The viewer's GitHub login, passed to comment rows for self-target gating. */
   readonly viewerLogin?: string | null;
+  /** Invoked when the inline reply field gains focus (see useReplyFocusScroll). */
+  readonly onReplyFocus?: () => void;
 };
 
 export function DiscussionThread({
@@ -79,6 +81,7 @@ export function DiscussionThread({
   expanded,
   onToggleExpand,
   viewerLogin = null,
+  onReplyFocus,
 }: Readonly<DiscussionThreadProps>) {
   // s6: the reply and resolve writes route through the `providerReview` seam
   // on a GitLab MR / Bitbucket PR (the mutation hooks pick the arm from the
@@ -193,6 +196,7 @@ export function DiscussionThread({
             commentId={firstComment.commentId}
             reply={reply}
             provider={providerReply}
+            onInputFocus={onReplyFocus}
           />
         ) : null}
       </View>

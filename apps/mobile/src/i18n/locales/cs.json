@@ -531,7 +531,10 @@
       "comment_few": "{{displayCount}} komentáře",
       "comment_many": "{{displayCount}} komentáře",
       "reaction_few": "reakce",
-      "reaction_many": "reakce"
+      "reaction_many": "reakce",
+      "addCommentCta": "Okomentovat tento PR",
+      "commentBadRequest": "Tento komentář nelze odeslat. PR se možná změnil.",
+      "commentForbidden": "Nemáš oprávnění komentovat tento PR."
     },
     "couldNotOpenGitHubAppSettings": "Nepodařilo se otevřít nastavení aplikace GitHub.",
     "installKiloGitHubApp": "Nainstalovat aplikaci Kilo pro GitHub",

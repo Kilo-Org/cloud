@@ -42,6 +42,13 @@ const REPLY_INPUT = {
   body: 'good point',
 };
 
+const ADD_COMMENT_INPUT = {
+  owner: 'octocat',
+  repo: 'hello',
+  number: 1,
+  body: 'ship it',
+};
+
 // The web router hashes this string into the stored `resource_key` and the
 // mobile hooks derive the operation key from it, so the bytes are the dedupe
 // identity for the ledger's 30-day retention window. Pin them: a reordered or
@@ -59,6 +66,9 @@ describe('prIntentFingerprint', () => {
     );
     expect(prIntentFingerprint('reply_comment', REPLY_INPUT)).toBe(
       '{"resource":["octocat","hello",1],"commentId":42,"body":"good point"}'
+    );
+    expect(prIntentFingerprint('add_pr_comment', ADD_COMMENT_INPUT)).toBe(
+      '{"resource":["octocat","hello",1],"body":"ship it"}'
     );
   });
 

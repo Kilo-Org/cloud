@@ -521,7 +521,10 @@
         "outdatedOnLines": "Pa ajou sou {{lines}}",
         "outdatedOnPath": "Pa ajou sou {{path}}"
       },
-      "deletedUser": "itilizatè ki efase"
+      "deletedUser": "itilizatè ki efase",
+      "addCommentCta": "Fè yon kòmantè sou demann fizyon sa a",
+      "commentBadRequest": "Pa ka pibliye kòmantè sa a. Petèt demann fizyon an chanje.",
+      "commentForbidden": "Ou pa gen pèmisyon pou fè yon kòmantè sou demann fizyon sa a."
     },
     "couldNotOpenGitHubAppSettings": "Nou pa t kapab louvri paramèt aplikasyon GitHub la.",
     "installKiloGitHubApp": "Enstale aplikasyon Kilo pou GitHub la",

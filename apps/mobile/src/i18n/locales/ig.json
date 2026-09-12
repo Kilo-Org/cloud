@@ -521,7 +521,10 @@
         "outdatedOnLines": "Adịla ochie na {{lines}}",
         "outdatedOnPath": "Adịla ochie na {{path}}"
       },
-      "deletedUser": "onye ọrụ ehichapụrụ"
+      "deletedUser": "onye ọrụ ehichapụrụ",
+      "addCommentCta": "Nye nkwupụta na arịrịọ njikọta a",
+      "commentBadRequest": "Enweghị ike ibipụta nkwupụta a. O nwere ike ịbụ na arịrịọ njikọta a agbanweela.",
+      "commentForbidden": "Ị nweghị ikike inye nkwupụta na arịrịọ njikọta a."
     },
     "couldNotOpenGitHubAppSettings": "Enweghị ike imepe ntọala ngwa GitHub.",
     "installKiloGitHubApp": "Tinye ngwa Kilo GitHub",

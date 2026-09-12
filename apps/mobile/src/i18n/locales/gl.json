@@ -521,7 +521,10 @@
         "outdatedOnLines": "Desactualizado en {{lines}}",
         "outdatedOnPath": "Desactualizado en {{path}}"
       },
-      "deletedUser": "usuario eliminado"
+      "deletedUser": "usuario eliminado",
+      "addCommentCta": "Comentar esta solicitude de integración",
+      "commentBadRequest": "Non se pode publicar este comentario. Pode que a solicitude de integración cambiase.",
+      "commentForbidden": "Non tes permiso para comentar nesta solicitude de integración."
     },
     "couldNotOpenGitHubAppSettings": "Non se puideron abrir os axustes da aplicación de GitHub.",
     "installKiloGitHubApp": "Instalar a aplicación de Kilo para GitHub",

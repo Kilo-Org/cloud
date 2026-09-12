@@ -521,7 +521,10 @@
         "outdatedOnLines": "{{lines}}పై పాత వ్యాఖ్య",
         "outdatedOnPath": "{{path}}పై పాత వ్యాఖ్య"
       },
-      "deletedUser": "తొలగించబడిన వినియోగదారు"
+      "deletedUser": "తొలగించబడిన వినియోగదారు",
+      "addCommentCta": "ఈ పుల్ రిక్వెస్ట్‌పై వ్యాఖ్యానించండి",
+      "commentBadRequest": "ఈ వ్యాఖ్యను పోస్ట్ చేయలేము. పుల్ రిక్వెస్ట్ మారి ఉండవచ్చు.",
+      "commentForbidden": "ఈ పుల్ రిక్వెస్ట్‌పై వ్యాఖ్యానించడానికి మీకు అనుమతి లేదు."
     },
     "couldNotOpenGitHubAppSettings": "GitHub యాప్ సెట్టింగ్‌లను తెరవలేకపోయాం.",
     "installKiloGitHubApp": "Kilo GitHub యాప్‌ను ఇన్‌స్టాల్ చేయండి",

@@ -521,7 +521,10 @@
         "outdatedOnLines": "په {{lines}} کې پخوانۍ تبصره",
         "outdatedOnPath": "په {{path}} کې پخوانۍ تبصره"
       },
-      "deletedUser": "ړنګ شوی کارن"
+      "deletedUser": "ړنګ شوی کارن",
+      "addCommentCta": "په دې پل ریکویسټ باندې تبصره وکړئ",
+      "commentBadRequest": "دا تبصره نه شي خپرېدای. کېدای شي پل ریکویسټ بدل شوی وي.",
+      "commentForbidden": "تاسو دې پل ریکویسټ ته د تبصرې کولو اجازه نه لرئ."
     },
     "couldNotOpenGitHubAppSettings": "د GitHub اپ امستنې پرانیستل نه شوې.",
     "installKiloGitHubApp": "د Kilo د GitHub اپلیکیشن نصب کړئ",

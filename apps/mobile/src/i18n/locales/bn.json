@@ -521,7 +521,10 @@
         "outdatedOnLines": "পুরোনো সংস্করণের {{lines}}-এ",
         "outdatedOnPath": "পুরোনো সংস্করণের {{path}}-এ"
       },
-      "deletedUser": "মুছে ফেলা ব্যবহারকারী"
+      "deletedUser": "মুছে ফেলা ব্যবহারকারী",
+      "addCommentCta": "এই পুল রিকোয়েস্টে মন্তব্য করুন",
+      "commentBadRequest": "এই মন্তব্যটি পোস্ট করা যাচ্ছে না। পুল রিকোয়েস্টটি বদলে গিয়ে থাকতে পারে।",
+      "commentForbidden": "এই পুল রিকোয়েস্টে মন্তব্য করার অনুমতি আপনার নেই।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub অ্যাপের সেটিংস খোলা যায়নি।",
     "installKiloGitHubApp": "Kilo GitHub অ্যাপ ইনস্টল করুন",

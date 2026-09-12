@@ -521,7 +521,10 @@
         "outdatedOnLines": "{{lines}} အတွက် ခေတ်မမီတော့သော မှတ်ချက်",
         "outdatedOnPath": "{{path}} အတွက် ခေတ်မမီတော့သော မှတ်ချက်"
       },
-      "deletedUser": "အကောင့်ဖျက်ထားသော အသုံးပြုသူ"
+      "deletedUser": "အကောင့်ဖျက်ထားသော အသုံးပြုသူ",
+      "addCommentCta": "ဒီ PR တွင် မှတ်ချက် ရေးသားပါ",
+      "commentBadRequest": "ဒီမှတ်ချက်ကို တင်၍မရပါ။ PR ပြောင်းလဲသွားခြင်း ဖြစ်နိုင်ပါသည်။",
+      "commentForbidden": "ဒီ PR တွင် မှတ်ချက်ရေးသားခွင့် မရှိပါ။"
     },
     "couldNotOpenGitHubAppSettings": "GitHub အက်ပ်၏ ဆက်တင်များကို မဖွင့်နိုင်ပါ။",
     "installKiloGitHubApp": "Kilo GitHub အက်ပ်ကို ထည့်သွင်းပါ",

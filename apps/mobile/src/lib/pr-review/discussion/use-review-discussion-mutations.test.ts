@@ -1,4 +1,5 @@
-// P1-A-08c + s6 wiring tests for the discussion mutations.
+// P1-A-08c + s6 wiring tests for the discussion mutations, including the
+// regular PR conversation comment (`useAddPrCommentMutation`).
 //
 // Replies are NOT optimistic (per the S7b contract): the comment is
 // appended only after the server confirms. These tests assert the HOOK
@@ -16,17 +17,19 @@
 // and resolve carry the ledger key, and the optimistic resolve flips the
 // provider-shaped cache (`resolved`, not `isResolved`). Reactions stay
 // GitHub-only: no provider exposes them through the seam.
-/* eslint-disable max-lines -- one file for the reply wiring, the resolve/unresolve/reaction generation guard + chainSave/scope serialization, the real-MutationCache scope.id serialization suite, and the s6 provider arms */
+/* eslint-disable max-lines -- one file for the reply/add-comment wiring, the resolve/unresolve/reaction generation guard + chainSave/scope serialization, the real-MutationCache scope.id serialization suite, and the s6 provider arms */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as OperationKeyModule from '@/lib/operation-key';
 import type * as ReactQuery from '@tanstack/react-query';
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+import { announceForA11y } from '@/lib/a11y/announce';
 import type * as ProviderPrRefModule from '@/lib/pr-review/provider-pr-ref';
 import { type ProviderPrRef, type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import {
   applyProviderResolveToggle,
+  useAddPrCommentMutation,
   useAddReactionMutation,
   useRemoveReactionMutation,
   useReplyToCommentMutation,
@@ -37,6 +40,10 @@ import {
 const hoistedKeys = vi.hoisted(() => ({
   getKey: vi.fn(() => 'hoisted-op-key'),
   rotateKey: vi.fn(),
+}));
+
+const hoistedAnnounce = vi.hoisted(() => ({
+  announceForA11y: vi.fn(),
 }));
 
 vi.mock('expo-crypto', () => ({
@@ -62,9 +69,15 @@ vi.mock('@/lib/pr-review/provider-pr-ref', async importOriginal => {
   };
 });
 
+// `useAddPrCommentMutation` announces success through `announceForA11y`,
+// whose real module imports react-native (which does not parse under the
+// pure project). Mock the single import surface instead.
+vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: hoistedAnnounce.announceForA11y }));
+
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
   onMutate?: (vars: unknown) => Promise<unknown> | unknown;
+  onSuccess?: () => void;
   onError?: (error: unknown, vars?: unknown, context?: unknown) => void;
   onSettled?: (data?: unknown, error?: unknown, vars?: unknown) => Promise<void> | void;
   scope?: { id: string };
@@ -82,6 +95,7 @@ function captureOptions(run: () => unknown): MutationOptions {
 
 let lastCapturedOptions: MutationOptions | null = null;
 const replyMutateMock = vi.fn();
+const addCommentMutateMock = vi.fn();
 const resolveMutateMock = vi.fn();
 const unresolveMutateMock = vi.fn();
 const providerReplyMutateMock = vi.fn();
@@ -100,9 +114,7 @@ vi.mock('@tanstack/react-query', () => ({
     return { mutateAsync: vi.fn(), mutate: vi.fn() };
   },
   useQueryClient: () => ({
-    invalidateQueries: (...args: unknown[]) => {
-      invalidateQueriesMock(...args);
-    },
+    invalidateQueries: (...args: unknown[]) => invalidateQueriesMock(...args),
     cancelQueries: (...args: unknown[]) => {
       cancelQueriesMock(...args);
     },
@@ -127,6 +139,8 @@ vi.mock('@/lib/trpc', () => ({
     githubPrReview: {
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       replyToComment: { mutate: (vars: unknown) => replyMutateMock(vars) },
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      addIssueComment: { mutate: (vars: unknown) => addCommentMutateMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       resolveThread: { mutate: (vars: unknown) => resolveMutateMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -216,6 +230,13 @@ function resetMocks() {
   hoistedKeys.rotateKey.mockClear();
 }
 
+const ADD_COMMENT_INPUT = {
+  owner: 'octocat',
+  repo: 'hello',
+  number: 1,
+  body: 'a regular comment',
+};
+
 describe('useReplyToCommentMutation (P1-A-08c wiring)', () => {
   beforeEach(() => {
     resetMocks();
@@ -296,10 +317,12 @@ describe('useReplyToCommentMutation (P1-A-08c wiring)', () => {
     expect(toastErrorMock).toHaveBeenCalledWith("Couldn't confirm — check the PR before retrying.");
   });
 
-  it('onError still toasts the message (so the retryable inline error surfaces)', () => {
+  it('toasts the retryable reply copy for a generic failure, never the raw provider message', () => {
+    // The raw GitHub access/install text is actionable to nobody; the toast
+    // mirrors the inline retryable copy (uxs3 spot check, e6-offline-banner).
     useReplyToCommentMutation();
     lastCapturedOptions?.onError?.(new Error('boom'));
-    expect(toastErrorMock).toHaveBeenCalledWith('boom');
+    expect(toastErrorMock).toHaveBeenCalledWith('Could not reply.');
   });
 
   it('onSettled invalidates the listReviewThreads cache', async () => {
@@ -385,6 +408,179 @@ describe('reply_comment fingerprint (P1-A-08c changed-input)', () => {
       commentId: 43,
     });
     expect(otherComment).not.toBe(original);
+  });
+});
+
+describe('useAddPrCommentMutation (regular PR conversation comment wiring)', () => {
+  beforeEach(() => {
+    lastCapturedOptions = null;
+    addCommentMutateMock.mockReset();
+    invalidateQueriesMock.mockReset();
+    toastErrorMock.mockReset();
+    hoistedAnnounce.announceForA11y.mockClear();
+    hoistedKeys.getKey.mockClear();
+    hoistedKeys.rotateKey.mockClear();
+  });
+
+  it('delegates the input to addIssueComment.mutate and resolves the comment', async () => {
+    const comment = { id: 99, htmlUrl: 'https://example.com' };
+    addCommentMutateMock.mockResolvedValueOnce(comment);
+    useAddPrCommentMutation();
+
+    await expect(lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT)).resolves.toEqual(comment);
+    expect(addCommentMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'octocat',
+        repo: 'hello',
+        number: 1,
+        body: 'a regular comment',
+      })
+    );
+  });
+
+  it('sends the hoisted operation key derived from the add_pr_comment fingerprint', async () => {
+    addCommentMutateMock.mockResolvedValueOnce({ id: 99 });
+    useAddPrCommentMutation();
+
+    await lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT);
+
+    // The fingerprint is the dedupe identity the server hashes into
+    // `resource_key` for 30 days. Pin the exact bytes: a drift in the shared
+    // field list must fail here instead of silently rotating in-flight keys.
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["octocat","hello",1],"body":"a regular comment"}'
+    );
+    expect(addCommentMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: 'hoisted-op-key' })
+    );
+  });
+
+  it('regenerates the key after a successful post (fresh intent next)', async () => {
+    addCommentMutateMock.mockResolvedValueOnce({ id: 99 });
+    useAddPrCommentMutation();
+
+    await lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT);
+
+    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the key on an in-progress CONFLICT and toasts the pr-comment surface copy', async () => {
+    addCommentMutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
+    useAddPrCommentMutation();
+
+    let thrown: unknown = null;
+    try {
+      await lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toMatchObject({ message: 'Could not post comment.' });
+    // The key stays stable so the ledger dedupes the same-key retry.
+    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+
+    lastCapturedOptions?.onError?.(thrown);
+    expect(toastErrorMock).toHaveBeenCalledWith('Could not post comment.');
+  });
+
+  it('regenerates the key on a non-retryable failure (bad-request ends the intent)', async () => {
+    const badRequest = new Error('Comment body is too long');
+    Object.assign(badRequest, { data: { code: 'BAD_REQUEST' } });
+    addCommentMutateMock.mockRejectedValueOnce(badRequest);
+    useAddPrCommentMutation();
+
+    await expect(lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT)).rejects.toMatchObject({
+      message: 'Comment body is too long',
+    });
+    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('settles a hung post on the UI deadline with the retryable taking-longer copy', async () => {
+    // e6-offline-hang: a blocked/offline request must not leave the composer
+    // on an endless spinner — the mutation itself has to settle.
+    vi.useFakeTimers();
+    try {
+      addCommentMutateMock.mockReturnValue(new Promise(() => undefined));
+      useAddPrCommentMutation();
+
+      const settled = lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT);
+      let thrown: unknown = null;
+      const recordRejection = async (): Promise<void> => {
+        try {
+          await settled;
+        } catch (error) {
+          thrown = error;
+        }
+      };
+      // The rejection handler must be attached before the deadline timer
+      // fires, so record and advance concurrently.
+      await Promise.all([recordRejection(), vi.advanceTimersByTimeAsync(15_000)]);
+
+      expect(thrown).toMatchObject({
+        message: 'This is taking longer than expected. You can close this and check again.',
+      });
+      // The timeout is retryable: the key stays so a same-key retry is
+      // ledger-deduped if the original write eventually lands.
+      expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('onSettled never gates the mutation settle on the invalidation (offline-hang root)', () => {
+    // Root cause of e6-offline-hang beyond the UI deadline: v5 dispatches a
+    // mutation's terminal state only AFTER `onSettled` resolves, and a
+    // blocked/offline network hangs the refetch `invalidateQueries` triggers.
+    // The settle invalidation must therefore be fire-and-forget, or the
+    // composer sits on an endless spinner with no inline error even after the
+    // deadline rejects the write.
+    invalidateQueriesMock.mockReturnValue(new Promise(() => undefined));
+    useAddPrCommentMutation();
+
+    const settled = lastCapturedOptions?.onSettled?.();
+
+    // Returns synchronously — nothing for the mutation to await — while the
+    // invalidation still fires in the background.
+    expect(settled).toBeUndefined();
+    expect(invalidateQueriesMock).toHaveBeenCalledWith(['githubPrReview', 'listReviewThreads']);
+  });
+
+  it('success announces the posted-comment copy for a11y', async () => {
+    addCommentMutateMock.mockResolvedValueOnce({ id: 99 });
+    useAddPrCommentMutation();
+
+    await lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT);
+    lastCapturedOptions?.onSuccess?.();
+
+    expect(announceForA11y).toHaveBeenCalledWith('Comment posted');
+  });
+
+  it('toasts the retryable comment copy for a generic failure, never the raw provider message', () => {
+    useAddPrCommentMutation();
+    lastCapturedOptions?.onError?.(
+      new Error('You do not have access to this repository. Install the Kilo GitHub App.')
+    );
+    expect(toastErrorMock).toHaveBeenCalledWith('Could not post comment.');
+  });
+
+  it('onSettled invalidates the listReviewThreads cache (the conversation comments query)', async () => {
+    useAddPrCommentMutation();
+
+    await lastCapturedOptions?.onSettled?.();
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith(['githubPrReview', 'listReviewThreads']);
+  });
+});
+
+describe('add_pr_comment fingerprint (changed-input)', () => {
+  it('stays stable for a retry of the same comment and rotates when the body changes', () => {
+    const original = prIntentFingerprint('add_pr_comment', ADD_COMMENT_INPUT);
+    expect(prIntentFingerprint('add_pr_comment', ADD_COMMENT_INPUT)).toBe(original);
+
+    const editedBody = prIntentFingerprint('add_pr_comment', {
+      ...ADD_COMMENT_INPUT,
+      body: 'a regular comment, edited',
+    });
+    expect(editedBody).not.toBe(original);
   });
 });
 

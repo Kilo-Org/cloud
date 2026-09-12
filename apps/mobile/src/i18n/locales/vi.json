@@ -2592,7 +2592,10 @@
         "outdatedOnLines": "Không còn cập nhật tại {{lines}}",
         "outdatedOnPath": "Không còn cập nhật tại {{path}}"
       },
-      "deletedUser": "người dùng đã bị xóa"
+      "deletedUser": "người dùng đã bị xóa",
+      "addCommentCta": "Bình luận trong PR này",
+      "commentBadRequest": "Không thể đăng bình luận này. PR có thể đã thay đổi.",
+      "commentForbidden": "Bạn không có quyền bình luận trong PR này."
     },
     "couldNotOpenGitHubAppSettings": "Không thể mở cài đặt ứng dụng GitHub.",
     "installKiloGitHubApp": "Cài đặt ứng dụng Kilo trên GitHub",

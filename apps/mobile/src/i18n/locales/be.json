@@ -531,7 +531,10 @@
       "comment_few": "{{displayCount}} каментары",
       "comment_many": "{{displayCount}} каментароў",
       "reaction_few": "рэакцыі",
-      "reaction_many": "рэакцый"
+      "reaction_many": "рэакцый",
+      "addCommentCta": "Каментаваць гэты запыт на зліццё",
+      "commentBadRequest": "Немагчыма апублікаваць гэты каментарый. Магчыма, запыт на зліццё змяніўся.",
+      "commentForbidden": "У цябе няма дазволу каментаваць гэты запыт на зліццё."
     },
     "couldNotOpenGitHubAppSettings": "Не атрымалася адкрыць налады праграмы GitHub.",
     "installKiloGitHubApp": "Усталяваць праграму Kilo для GitHub",

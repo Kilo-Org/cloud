@@ -521,7 +521,10 @@
         "outdatedOnLines": "مربوط به نسخهٔ قبلی: {{lines}}",
         "outdatedOnPath": "مربوط به نسخهٔ قبلی: {{path}}"
       },
-      "deletedUser": "کاربر حذف‌شده"
+      "deletedUser": "کاربر حذف‌شده",
+      "addCommentCta": "نظر دادن در این درخواست ادغام",
+      "commentBadRequest": "این نظر قابل ارسال نیست. ممکن است درخواست ادغام تغییر کرده باشد.",
+      "commentForbidden": "اجازهٔ نظر دادن در این درخواست ادغام را ندارید."
     },
     "couldNotOpenGitHubAppSettings": "باز کردن تنظیمات برنامه GitHub ناموفق بود.",
     "installKiloGitHubApp": "نصب برنامهٔ Kilo در GitHub",

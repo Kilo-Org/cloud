@@ -521,7 +521,10 @@
         "outdatedOnLines": "Хуучирсан: {{lines}}",
         "outdatedOnPath": "Хуучирсан: {{path}}"
       },
-      "deletedUser": "устгагдсан хэрэглэгч"
+      "deletedUser": "устгагдсан хэрэглэгч",
+      "addCommentCta": "Энэ нэгтгэх хүсэлтэд сэтгэгдэл бичих",
+      "commentBadRequest": "Энэ сэтгэгдлийг нийтлэх боломжгүй. Нэгтгэх хүсэлт өөрчлөгдсөн байж болзошгүй.",
+      "commentForbidden": "Танд энэ нэгтгэх хүсэлтэд сэтгэгдэл бичих эрх байхгүй."
     },
     "couldNotOpenGitHubAppSettings": "GitHub аппын тохиргоог нээж чадсангүй.",
     "installKiloGitHubApp": "Kilo GitHub аппыг суулгах",

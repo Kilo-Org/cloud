@@ -521,7 +521,10 @@
         "outdatedOnLines": "Outdated on {{lines}}",
         "outdatedOnPath": "Outdated on {{path}}"
       },
-      "deletedUser": "deleted user"
+      "deletedUser": "deleted user",
+      "addCommentCta": "Comment on this pull request",
+      "commentBadRequest": "This comment can't be posted. The pull request may have changed.",
+      "commentForbidden": "You don't have permission to comment on this pull request."
     },
     "couldNotOpenGitHubAppSettings": "Could not open GitHub App settings",
     "installKiloGitHubApp": "Install the Kilo GitHub App",

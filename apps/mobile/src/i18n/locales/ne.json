@@ -521,7 +521,10 @@
         "outdatedOnLines": "{{lines}} मा पुरानो भइसकेको",
         "outdatedOnPath": "{{path}} मा पुरानो भइसकेको"
       },
-      "deletedUser": "खाता मेटिएको प्रयोगकर्ता"
+      "deletedUser": "खाता मेटिएको प्रयोगकर्ता",
+      "addCommentCta": "यो पुल रिक्वेस्टमा टिप्पणी गर्नुहोस्",
+      "commentBadRequest": "यो टिप्पणी पोस्ट गर्न सकिँदैन। पुल रिक्वेस्ट परिवर्तन भएको हुन सक्छ।",
+      "commentForbidden": "तपाईंसँग यो पुल रिक्वेस्टमा टिप्पणी गर्ने अनुमति छैन।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub एपको सेटिङ खोल्न सकिएन।",
     "installKiloGitHubApp": "Kilo GitHub एप स्थापना गर्नुहोस्",

@@ -521,7 +521,10 @@
         "outdatedOnLines": "อ้างอิงโค้ดเก่าที่ {{lines}}",
         "outdatedOnPath": "อ้างอิงโค้ดเก่าที่ {{path}}"
       },
-      "deletedUser": "ผู้ใช้ที่ถูกลบ"
+      "deletedUser": "ผู้ใช้ที่ถูกลบ",
+      "addCommentCta": "แสดงความคิดเห็นใน PR นี้",
+      "commentBadRequest": "ไม่สามารถโพสต์ความคิดเห็นนี้ได้ PR อาจมีการเปลี่ยนแปลง",
+      "commentForbidden": "คุณไม่มีสิทธิ์แสดงความคิดเห็นใน PR นี้"
     },
     "couldNotOpenGitHubAppSettings": "ไม่สามารถเปิดการตั้งค่าแอป GitHub ได้",
     "installKiloGitHubApp": "ติดตั้ง Kilo GitHub App",

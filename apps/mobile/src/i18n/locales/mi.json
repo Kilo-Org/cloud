@@ -521,7 +521,10 @@
         "outdatedOnLines": "Kua tawhito i {{lines}}",
         "outdatedOnPath": "Kua tawhito i {{path}}"
       },
-      "deletedUser": "kaiwhakamahi kua mukua"
+      "deletedUser": "kaiwhakamahi kua mukua",
+      "addCommentCta": "Tāpiri kōrero ki tēnei tono kume",
+      "commentBadRequest": "Kāore e taea te tuku i tēnei kōrero. Kua rerekē pea te tono kume.",
+      "commentForbidden": "Kāore koe e whakaaetia kia tāpiri kōrero ki tēnei tono kume."
     },
     "couldNotOpenGitHubAppSettings": "Kāore i taea te whakatuwhera i ngā tautuhinga o te taupānga GitHub.",
     "installKiloGitHubApp": "Tāutatia te taupānga Kilo GitHub",

@@ -531,7 +531,10 @@
       "comment_two": "{{displayCount}} komentarja",
       "comment_few": "{{displayCount}} komentarji",
       "reaction_two": "reakciji",
-      "reaction_few": "reakcije"
+      "reaction_few": "reakcije",
+      "addCommentCta": "Komentiraj ta zahtevek za združitev",
+      "commentBadRequest": "Tega komentarja ni mogoče objaviti. Zahtevek za združitev se je morda spremenil.",
+      "commentForbidden": "Nimaš dovoljenja za komentiranje tega zahtevka za združitev."
     },
     "couldNotOpenGitHubAppSettings": "Nastavitev aplikacije GitHub ni bilo mogoče odpreti.",
     "installKiloGitHubApp": "Namesti aplikacijo Kilo za GitHub",

@@ -531,7 +531,10 @@
       "comment_few": "{{displayCount}} komentáre",
       "comment_many": "{{displayCount}} komentára",
       "reaction_few": "reakcie",
-      "reaction_many": "reakcie"
+      "reaction_many": "reakcie",
+      "addCommentCta": "Skomentovať túto žiadosť o zlúčenie",
+      "commentBadRequest": "Tento komentár nemožno odoslať. Žiadosť o zlúčenie sa mohla zmeniť.",
+      "commentForbidden": "Nemáš oprávnenie komentovať túto žiadosť o zlúčenie."
     },
     "couldNotOpenGitHubAppSettings": "Nepodarilo sa otvoriť nastavenia aplikácie GitHub.",
     "installKiloGitHubApp": "Nainštalovať aplikáciu Kilo pre GitHub",

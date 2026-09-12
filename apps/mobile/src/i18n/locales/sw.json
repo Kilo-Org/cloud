@@ -521,7 +521,10 @@
         "outdatedOnLines": "Yaliyopitwa na wakati kwenye {{lines}}",
         "outdatedOnPath": "Yaliyopitwa na wakati kwenye {{path}}"
       },
-      "deletedUser": "mtumiaji aliyefutwa"
+      "deletedUser": "mtumiaji aliyefutwa",
+      "addCommentCta": "Toa maoni kwenye ombi hili la kuunganisha",
+      "commentBadRequest": "Maoni haya haliwezi kuchapishwa. Huenda ombi hili la kuunganisha likabadilika.",
+      "commentForbidden": "Huna ruhusa ya kutoa maoni kwenye ombi hili la kuunganisha."
     },
     "couldNotOpenGitHubAppSettings": "Imeshindikana kufungua mipangilio ya programu ya GitHub.",
     "installKiloGitHubApp": "Sakinisha programu ya Kilo ya GitHub",

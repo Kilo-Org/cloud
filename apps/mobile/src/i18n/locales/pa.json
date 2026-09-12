@@ -521,7 +521,10 @@
         "outdatedOnLines": "{{lines}} 'ਤੇ ਪੁਰਾਣਾ",
         "outdatedOnPath": "{{path}} 'ਤੇ ਪੁਰਾਣਾ"
       },
-      "deletedUser": "ਮਿਟਾਇਆ ਗਿਆ ਵਰਤੋਂਕਾਰ"
+      "deletedUser": "ਮਿਟਾਇਆ ਗਿਆ ਵਰਤੋਂਕਾਰ",
+      "addCommentCta": "ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਟਿੱਪਣੀ ਕਰੋ",
+      "commentBadRequest": "ਇਹ ਟਿੱਪਣੀ ਪੋਸਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ। ਪੁੱਲ ਰਿਕਵੈਸਟ ਬਦਲਿਆ ਹੋ ਸਕਦਾ ਹੈ।",
+      "commentForbidden": "ਤੁਹਾਨੂੰ ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਟਿੱਪਣੀ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ਐਪ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕੀਆਂ।",
     "installKiloGitHubApp": "Kilo GitHub ਐਪ ਸਥਾਪਿਤ ਕਰੋ",

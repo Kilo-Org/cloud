@@ -521,7 +521,10 @@
         "outdatedOnLines": "Aegunud: {{lines}}",
         "outdatedOnPath": "Aegunud: {{path}}"
       },
-      "deletedUser": "kustutatud kasutaja"
+      "deletedUser": "kustutatud kasutaja",
+      "addCommentCta": "Kommenteeri seda tõmbetaotlust",
+      "commentBadRequest": "Seda kommentaari ei saa postitada. Tõmbetaotlus võis muutuda.",
+      "commentForbidden": "Sul pole õigust seda tõmbetaotlust kommenteerida."
     },
     "couldNotOpenGitHubAppSettings": "GitHubi rakenduse seadeid ei õnnestunud avada.",
     "installKiloGitHubApp": "Installi Kilo GitHubi rakendus",

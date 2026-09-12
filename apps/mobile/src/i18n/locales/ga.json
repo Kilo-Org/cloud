@@ -536,7 +536,10 @@
       "comment_many": "{{displayCount}} dtrácht",
       "reaction_two": "imoibriúchán",
       "reaction_few": "imoibriúchán",
-      "reaction_many": "n-imoibriúchán"
+      "reaction_many": "n-imoibriúchán",
+      "addCommentCta": "Trácht ar an iarratas tarraingthe seo",
+      "commentBadRequest": "Ní féidir an trácht seo a phostáil. Seans gur athraíodh an t-iarratas tarraingthe.",
+      "commentForbidden": "Níl cead agat trácht a dhéanamh ar an iarratas tarraingthe seo."
     },
     "couldNotOpenGitHubAppSettings": "Níorbh fhéidir socruithe na haipe GitHub a oscailt.",
     "installKiloGitHubApp": "Suiteáil aip GitHub Kilo",

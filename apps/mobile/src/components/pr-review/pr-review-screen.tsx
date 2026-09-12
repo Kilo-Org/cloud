@@ -7,6 +7,8 @@ import { Pressable, Share, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 
 import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-merge-partial-success-banner';
+import { OFFLINE_BANNER_HEIGHT } from '@/components/offline-banner';
+import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { PrReviewDiscussionTab } from '@/components/pr-review/pr-review-discussion-tab';
 import { PrReviewFilesTab } from '@/components/pr-review/pr-review-files-tab';
 import { PrReviewOverview } from '@/components/pr-review/pr-review-overview';
@@ -63,6 +65,12 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<PrReviewTabId>('overview');
   const [refreshing, setRefreshing] = useState(false);
+  // The app-wide offline banner is an absolute overlay at the safe-area top,
+  // so it paints over this screen's header title. Reserve its height above
+  // the header while it is visible (uxs2 spot check, e6-offline-hang).
+  const isOffline = useOfflineBannerState();
+  // 0 while online keeps the header's natural position (no reserved space).
+  const headerTopPadding = isOffline ? OFFLINE_BANNER_HEIGHT : 0;
 
   // P1-F-46b: push the review-submit route with the same params the
   // Files-tab `PrDiffFloatingActions` uses, so a clean PR (no queued
@@ -261,50 +269,52 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={
-          isMergeRequest
-            ? t('prReview.terms.mergeRequestNumber', { number })
-            : t('prReview.screen.title', { number })
-        }
-        eyebrow={`${owner}/${repo}`}
-        headerRight={
-          <View className="flex-row items-center gap-1">
-            {webUrl ? (
-              <Pressable
-                onPress={sharePullRequest}
-                disabled={loadFailed}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  isMergeRequest
-                    ? t('prReview.terms.shareMergeRequest')
-                    : t('prReview.screen.shareA11y')
-                }
-                accessibilityState={{ disabled: loadFailed }}
-                className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
-              >
-                <ShareIcon size={18} color={colors.foreground} />
-              </Pressable>
-            ) : null}
-            {/* P1-F-46b: the Submit-review affordance is reachable from the
-                Overview tab (header right) and the Files tab (floating
-                action bar). The Discussion tab is intentionally left without
-                a submit affordance — comment threads there are read-only. */}
-            {tab === 'overview' && canSubmitReview ? (
-              <Button
-                size="sm"
-                onPress={openReviewSubmit}
-                disabled={loadFailed}
-                accessibilityLabel={t('prReview.submit.submitReview')}
-                className={cn('px-3')}
-              >
-                <Check size={14} color={colors.primaryForeground} />
-                <Text>{t('prReview.submit.submitReview')}</Text>
-              </Button>
-            ) : null}
-          </View>
-        }
-      />
+      <View className="bg-background" style={{ paddingTop: headerTopPadding }}>
+        <ScreenHeader
+          title={
+            isMergeRequest
+              ? t('prReview.terms.mergeRequestNumber', { number })
+              : t('prReview.screen.title', { number })
+          }
+          eyebrow={`${owner}/${repo}`}
+          headerRight={
+            <View className="flex-row items-center gap-1">
+              {webUrl ? (
+                <Pressable
+                  onPress={sharePullRequest}
+                  disabled={loadFailed}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    isMergeRequest
+                      ? t('prReview.terms.shareMergeRequest')
+                      : t('prReview.screen.shareA11y')
+                  }
+                  accessibilityState={{ disabled: loadFailed }}
+                  className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+                >
+                  <ShareIcon size={18} color={colors.foreground} />
+                </Pressable>
+              ) : null}
+              {/* P1-F-46b: the Submit-review affordance is reachable from the
+                  Overview tab (header right) and the Files tab (floating
+                  action bar). The Discussion tab is intentionally left without
+                  a submit affordance — comment threads there are read-only. */}
+              {tab === 'overview' && canSubmitReview ? (
+                <Button
+                  size="sm"
+                  onPress={openReviewSubmit}
+                  disabled={loadFailed}
+                  accessibilityLabel={t('prReview.submit.submitReview')}
+                  className={cn('px-3')}
+                >
+                  <Check size={14} color={colors.primaryForeground} />
+                  <Text>{t('prReview.submit.submitReview')}</Text>
+                </Button>
+              ) : null}
+            </View>
+          }
+        />
+      </View>
       {queries.isReady ? (
         <View className="px-4 pb-2 pt-3">
           <PrReviewTabSelector

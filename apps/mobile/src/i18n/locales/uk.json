@@ -2630,7 +2630,10 @@
       "comment_few": "{{displayCount}} коментарі",
       "comment_many": "{{displayCount}} коментарів",
       "reaction_few": "реакції",
-      "reaction_many": "реакцій"
+      "reaction_many": "реакцій",
+      "addCommentCta": "Коментувати цей запит на злиття",
+      "commentBadRequest": "Цей коментар неможливо опублікувати. Можливо, запит на злиття змінився.",
+      "commentForbidden": "У вас немає дозволу коментувати в цьому запиті на злиття."
     },
     "couldNotOpenGitHubAppSettings": "Не вдалося відкрити налаштування застосунку GitHub.",
     "installKiloGitHubApp": "Установити застосунок Kilo для GitHub",

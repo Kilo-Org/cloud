@@ -531,7 +531,10 @@
       "comment_few": "{{displayCount}} komentarai",
       "comment_many": "{{displayCount}} komentaro",
       "reaction_few": "reakcijos",
-      "reaction_many": "reakcijos"
+      "reaction_many": "reakcijos",
+      "addCommentCta": "Komentuoti šią pakeitimų užklausą",
+      "commentBadRequest": "Šio komentaro negalima paskelbti. Pakeitimų užklausa galėjo pasikeisti.",
+      "commentForbidden": "Neturi teisės komentuoti šios pakeitimų užklausos."
     },
     "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų.",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",

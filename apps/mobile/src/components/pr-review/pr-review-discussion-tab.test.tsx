@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as screen-header.mounted.test.tsx) */
+/* eslint-disable max-lines -- cohesive suite for the Discussion tab's full-body states, provider wording, comment CTA, keyboard-lift gating, and reply focus-scroll wiring */
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,6 +9,19 @@ import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/pro
 import { PrReviewDiscussionTab } from './pr-review-discussion-tab';
 
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+
+const pushMock = vi.hoisted(() => vi.fn());
+
+// The tab's screen focus drives the CTA bar's keyboard lift (a foreign
+// surface's keyboard must not lift the bar behind it — uxs3, e4-confirm-
+// discard). Flippable so the suite can mount the tab unfocused.
+const focusState = vi.hoisted(() => ({ value: true }));
+
+const replyScrollFns = vi.hoisted(() => ({
+  markFocus: vi.fn(),
+  onViewportLayout: vi.fn(),
+  invalidate: vi.fn(),
+}));
 
 const discussionState = vi.hoisted(() => ({
   query: {
@@ -29,11 +43,20 @@ vi.mock('react-native', () => ({
   View: 'View',
   Platform: { OS: 'ios' },
 }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: pushMock }),
+  useIsFocused: () => focusState.value,
+}));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insetsState,
 }));
 vi.mock('@/lib/pr-review/discussion/use-pr-review-discussion-threads', () => ({
   usePrReviewDiscussionThreads: () => discussionState,
+}));
+vi.mock('@/lib/pr-review/discussion/use-reply-focus-scroll', () => ({
+  // The tab-level focus scroll is covered by use-reply-focus-scroll.test.ts;
+  // here it is inert so the tab body states stay the subject.
+  useReplyFocusScroll: () => replyScrollFns,
 }));
 vi.mock('@/lib/a11y/motion', () => ({
   useMotionPolicy: () => ({ scrollAnimated: false }),
@@ -50,6 +73,9 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus' }));
 vi.mock('@/components/pr-review/discussion/pr-review-discussion-list', () => ({
   PrReviewDiscussionList: 'PrReviewDiscussionList',
+}));
+vi.mock('@/components/pr-review/discussion/pr-comment-cta', () => ({
+  PrCommentCta: 'PrCommentCta',
 }));
 
 const BASE_PROPS = {
@@ -115,9 +141,15 @@ function resetState(): void {
   discussionState.laterPageError = false;
 }
 
+function expectCtaPresence(renderer: TestRenderer.ReactTestRenderer, present: boolean): void {
+  const ctas = renderer.root.findAll(node => String(node.type) === 'PrCommentCta');
+  expect(ctas.length > 0).toBe(present);
+}
+
 describe('PrReviewDiscussionTab full-body states', () => {
   beforeEach(() => {
     insetsState.bottom = 0;
+    pushMock.mockClear();
     resetState();
   });
 
@@ -127,6 +159,7 @@ describe('PrReviewDiscussionTab full-body states', () => {
     const error = renderer.root.find(node => String(node.type) === 'QueryError');
     expect(error.props.placement).toBeUndefined();
     expect(bottomPaddedViews(renderer)).toHaveLength(0);
+    expectCtaPresence(renderer, false);
     if (kind === 'retryable') {
       act(() => {
         (error.props.onRetry as () => void)();
@@ -143,11 +176,13 @@ describe('PrReviewDiscussionTab full-body states', () => {
     const centered = renderer.root.find(node => String(node.type) === 'CenteredState');
     expect(centered.find(node => String(node.type) === 'PrReviewReconnectNotice')).toBeDefined();
     expect(bottomPaddedViews(renderer)).toHaveLength(0);
+    expectCtaPresence(renderer, false);
   });
 
   it('keeps the loading skeleton padding', () => {
     discussionState.query.isPending = true;
     expectSinglePadding(mountTab(), 32);
+    expectCtaPresence(mountTab(), false);
   });
 
   it('escapes a stuck skeleton when the first page is paused, not in flight', () => {
@@ -233,7 +268,7 @@ describe('PrReviewDiscussionTab full-body states', () => {
     expect(description()).toContain('pull request');
   });
 
-  it('renders the happy list without a chrome wrapper', () => {
+  it('renders the happy list under the comment CTA bar', () => {
     discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
     const renderer = mountTab();
 
@@ -243,5 +278,94 @@ describe('PrReviewDiscussionTab full-body states', () => {
         node => typeof node.type === 'string' && (node.type as string) === 'PrReviewDiscussionList'
       )
     ).toHaveLength(1);
+    expectCtaPresence(renderer, true);
+  });
+
+  it('renders the comment CTA bar on the empty view', () => {
+    const renderer = mountTab();
+    expect(renderer.root.find(node => String(node.type) === 'EmptyState')).toBeDefined();
+    expectCtaPresence(renderer, true);
+  });
+
+  it('pushes the conversation-comment route from the CTA bar', () => {
+    const renderer = mountTab();
+    const cta = renderer.root.find(node => String(node.type) === 'PrCommentCta');
+    act(() => {
+      (cta.props.onPress as () => void)();
+    });
+    expect(pushMock).toHaveBeenCalledWith({
+      pathname: '/(app)/pr-review/[owner]/[repo]/[number]/conversation-comment',
+      params: { owner: 'octocat', repo: 'hello-world', number: 7 },
+    });
+  });
+
+  // s1: the provider route's own conversation sheet does not exist yet (it
+  // lands in s3), so a provider tab must not push the GitHub `[owner]` route.
+  it('hides the comment CTA bar on a provider scope', () => {
+    expectCtaPresence(mountTab(GITLAB_REF), false);
+  });
+});
+
+// The keyboard-lift gating and the viewport-anchored reply scroll wiring
+// (uxs3 spot check: e4-confirm-discard — a foreign sheet's keyboard lifted
+// the bar behind it and clipped the last thread's reply field; e7-typed —
+// the scroll parked against a pre-lift viewport). The scroll itself is
+// covered by use-reply-focus-scroll.test.ts; here the TAB must hand the hook
+// the real viewport commits and must gate the lift on screen focus.
+describe('PrReviewDiscussionTab keyboard-lift gating and reply-scroll wiring', () => {
+  beforeEach(() => {
+    focusState.value = true;
+    resetState();
+    replyScrollFns.markFocus.mockClear();
+    replyScrollFns.onViewportLayout.mockClear();
+    replyScrollFns.invalidate.mockClear();
+  });
+
+  function mountHappyList(): TestRenderer.ReactTestRenderer {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    return mountTab();
+  }
+
+  it('gates the CTA lift on screen focus: lifted while focused, parked while not', () => {
+    const focused = mountHappyList();
+    expect(
+      (
+        focused.root.find(node => String(node.type) === 'PrCommentCta').props as {
+          keyboardLift?: boolean;
+        }
+      ).keyboardLift
+    ).toBe(true);
+
+    focusState.value = false;
+    const blurred = mountHappyList();
+    expect(
+      (
+        blurred.root.find(node => String(node.type) === 'PrCommentCta').props as {
+          keyboardLift?: boolean;
+        }
+      ).keyboardLift
+    ).toBe(false);
+  });
+
+  it('feeds the list viewport commits and reply focuses into the scroll hook, and a drag invalidates it', () => {
+    const renderer = mountHappyList();
+    const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    const listProps = list.props as {
+      onReplyInputFocus?: (index: number) => void;
+      onViewportLayout?: (height: number) => void;
+      onScrollBeginDrag?: () => void;
+    };
+    expect(listProps.onViewportLayout).toBeTypeOf('function');
+    expect(listProps.onReplyInputFocus).toBeTypeOf('function');
+
+    listProps.onReplyInputFocus?.(3);
+    expect(replyScrollFns.markFocus).toHaveBeenCalledWith(3);
+    listProps.onViewportLayout?.(420);
+    expect(replyScrollFns.onViewportLayout).toHaveBeenCalledWith(420);
+
+    // A user drag wins over the parked scroll (and still invalidates the
+    // content-position settle, the pre-existing behavior).
+    listProps.onScrollBeginDrag?.();
+    expect(replyScrollFns.invalidate).toHaveBeenCalledTimes(1);
   });
 });

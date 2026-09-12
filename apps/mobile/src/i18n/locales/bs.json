@@ -526,7 +526,10 @@
       },
       "deletedUser": "obrisani korisnik",
       "comment_few": "{{displayCount}} komentara",
-      "reaction_few": "reakcije"
+      "reaction_few": "reakcije",
+      "addCommentCta": "Komentariši ovaj zahtjev za spajanje",
+      "commentBadRequest": "Ovaj komentar se ne može objaviti. Zahtjev za spajanje se možda promijenio.",
+      "commentForbidden": "Nemaš dozvolu da komentarišeš ovaj zahtjev za spajanje."
     },
     "couldNotOpenGitHubAppSettings": "Nije moguće otvoriti postavke GitHub aplikacije.",
     "installKiloGitHubApp": "Instaliraj aplikaciju Kilo za GitHub",

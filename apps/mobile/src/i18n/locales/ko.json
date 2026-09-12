@@ -2592,7 +2592,10 @@
         "outdatedOnLines": "{{lines}} · 이전 버전",
         "outdatedOnPath": "{{path}} · 이전 버전"
       },
-      "deletedUser": "삭제된 사용자"
+      "deletedUser": "삭제된 사용자",
+      "addCommentCta": "이 풀 리퀘스트에 댓글 달기",
+      "commentBadRequest": "이 댓글을 게시할 수 없습니다. 풀 리퀘스트가 변경되었을 수 있습니다.",
+      "commentForbidden": "이 풀 리퀘스트에 댓글을 달 권한이 없습니다."
     },
     "couldNotOpenGitHubAppSettings": "GitHub 앱 설정을 열지 못했습니다.",
     "installKiloGitHubApp": "Kilo GitHub 앱 설치",

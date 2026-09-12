@@ -521,7 +521,10 @@
         "outdatedOnLines": "کۆنبووەوە لە {{lines}}",
         "outdatedOnPath": "کۆنبووەوە لە {{path}}"
       },
-      "deletedUser": "بەکارهێنەری سڕاوە"
+      "deletedUser": "بەکارهێنەری سڕاوە",
+      "addCommentCta": "بۆچوون لەسەر ئەم داواکارییەی ڕاکێشان",
+      "commentBadRequest": "ناتوانرێت ئەم بۆچوونە بڵاو بکرێتەوە. ڕەنگە داواکارییە ڕاکێشراوەکە گۆڕابێت.",
+      "commentForbidden": "مۆڵەتی بۆچوونکردن لەسەر ئەم داواکارییەی ڕاکێشانت نییە."
     },
     "couldNotOpenGitHubAppSettings": "نەتوانرا ڕێکخستنەکانی ئەپی GitHub بکرێنەوە.",
     "installKiloGitHubApp": "ئەپی Kilo بۆ GitHub دامەزرێنە",

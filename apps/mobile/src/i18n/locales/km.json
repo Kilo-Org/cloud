@@ -521,7 +521,10 @@
         "outdatedOnLines": "លែងទាន់សម័យនៅ {{lines}}",
         "outdatedOnPath": "លែងទាន់សម័យនៅ {{path}}"
       },
-      "deletedUser": "អ្នកប្រើប្រាស់ដែលបានលុបគណនី"
+      "deletedUser": "អ្នកប្រើប្រាស់ដែលបានលុបគណនី",
+      "addCommentCta": "បញ្ចេញមតិលើសំណើបញ្ចូលកូដនេះ",
+      "commentBadRequest": "មិនអាចបង្ហោះមតិយោបល់នេះបានទេ។ សំណើបញ្ចូលកូដអាចបានផ្លាស់ប្តូរ។",
+      "commentForbidden": "អ្នកគ្មានសិទ្ធិបញ្ចេញមតិលើសំណើបញ្ចូលកូដនេះទេ។"
     },
     "couldNotOpenGitHubAppSettings": "មិនអាចបើកការកំណត់កម្មវិធី GitHub បានទេ។",
     "installKiloGitHubApp": "ដំឡើងកម្មវិធី Kilo សម្រាប់ GitHub",

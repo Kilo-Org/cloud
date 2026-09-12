@@ -2630,7 +2630,10 @@
       "comment_few": "{{displayCount}} комментария",
       "comment_many": "{{displayCount}} комментариев",
       "reaction_few": "реакции",
-      "reaction_many": "реакций"
+      "reaction_many": "реакций",
+      "addCommentCta": "Комментировать этот запрос на слияние",
+      "commentBadRequest": "Не удаётся опубликовать этот комментарий. Возможно, запрос на слияние изменился.",
+      "commentForbidden": "У вас нет прав на комментарии в этом запросе на слияние."
     },
     "couldNotOpenGitHubAppSettings": "Не удалось открыть настройки приложения GitHub.",
     "installKiloGitHubApp": "Установить приложение Kilo для GitHub",

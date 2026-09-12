@@ -2611,7 +2611,10 @@
       },
       "deletedUser": "utilisateur supprimé",
       "comment_many": "{{displayCount}} commentaires",
-      "reaction_many": "réactions"
+      "reaction_many": "réactions",
+      "addCommentCta": "Commenter cette demande de fusion",
+      "commentBadRequest": "Ce commentaire ne peut pas être publié. La demande de fusion a peut-être changé.",
+      "commentForbidden": "Vous n'avez pas l'autorisation de commenter cette demande de fusion."
     },
     "couldNotOpenGitHubAppSettings": "Impossible d'ouvrir les paramètres de l'application GitHub.",
     "installKiloGitHubApp": "Installer l'application GitHub de Kilo",

@@ -833,7 +833,7 @@ async function deactivateSlackInstallation(
   if (!teamId) throw new Error('Slack installation is missing a team ID');
   return db.transaction(async tx => {
     await lockProviderOAuthOwnerRow(tx, owner, { allowDeletedOrganization: true });
-    const [reservation] = await tx
+    let [reservation] = await tx
       .select()
       .from(provider_installation_reservations)
       .where(
@@ -868,19 +868,19 @@ async function deactivateSlackInstallation(
       return null;
     }
 
-    const [credential] = readAccessToken
-      ? await tx
-          .select()
-          .from(slack_oauth_credentials)
-          .where(eq(slack_oauth_credentials.platform_integration_id, integration.id))
-          .for('update')
-      : [];
+    const [credential] = await tx
+      .select()
+      .from(slack_oauth_credentials)
+      .where(eq(slack_oauth_credentials.platform_integration_id, integration.id))
+      .for('update');
     const ownerForCredential = getOwnerFromInstallation(integration);
     const legacyMetadata = integration.metadata as { access_token?: string } | null;
-    const accessToken =
-      credential && ownerForCredential
+    const accessToken = !readAccessToken
+      ? null
+      : credential && ownerForCredential
         ? decryptSlackBotToken(credential, ownerForCredential)
         : (legacyMetadata?.access_token ?? null);
+    const isEnterpriseInstall = credential?.is_enterprise_install === true;
     await tx
       .update(provider_oauth_attempts)
       .set({ status: 'expired' })
@@ -896,6 +896,23 @@ async function deactivateSlackInstallation(
           )
         )
       );
+    if (!reservation && !isEnterpriseInstall) {
+      [reservation] = await tx
+        .insert(provider_installation_reservations)
+        .values({
+          provider: 'slack',
+          provider_installation_id: teamId,
+          owned_by_user_id: owner.type === 'user' ? owner.id : null,
+          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+          platform_integration_id: integration.id,
+          generation: 1,
+          status: 'deleting',
+          cleanup_requires_revoke: cleanupRequiresRevoke && wasActive,
+          cleanup_stage: cleanupRequiresRevoke && wasActive ? 'revoke' : 'sdk',
+          expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
+        })
+        .returning();
+    }
     if (reservation) {
       await tx
         .delete(provider_installation_pending_credentials)
@@ -921,6 +938,21 @@ async function deactivateSlackInstallation(
         })
         .where(eq(provider_installation_reservations.id, reservation.id));
     }
+    if (!reservation && isEnterpriseInstall) {
+      await tx.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
+      return {
+        integrationId: integration.id,
+        owner,
+        teamId,
+        accessToken,
+        wasActive,
+        reservationId: null,
+        generation: null,
+        cleanupRequiresRevoke: false,
+        cleanupStage: 'sdk' as const,
+        locallyDeleted: true,
+      };
+    }
     await tx
       .update(platform_integrations)
       .set({
@@ -941,6 +973,7 @@ async function deactivateSlackInstallation(
         reservation?.cleanup_requires_revoke ?? (cleanupRequiresRevoke && wasActive),
       cleanupStage:
         reservation?.cleanup_stage ?? (cleanupRequiresRevoke && wasActive ? 'revoke' : 'sdk'),
+      locallyDeleted: false,
     };
   });
 }
@@ -949,6 +982,24 @@ async function cleanupDeactivatedSlackInstallation(
   deactivated: NonNullable<Awaited<ReturnType<typeof deactivateSlackInstallation>>>,
   options: SlackUninstallOptions
 ): Promise<boolean> {
+  if (deactivated.locallyDeleted) {
+    try {
+      if (deactivated.accessToken)
+        await withSlackSdkTimeout(revokeSlackToken(deactivated.accessToken));
+      if (options.deleteChatSdkInstallation) {
+        await withSlackSdkTimeout(options.deleteChatSdkInstallation(deactivated.teamId));
+      }
+      if (options.deleteChatSdkIdentityCache) {
+        await withSlackSdkTimeout(options.deleteChatSdkIdentityCache(deactivated.teamId));
+      }
+    } catch (error) {
+      captureException(error, {
+        tags: { component: 'slack-service', op: 'legacy-enterprise-cleanup' },
+        extra: { integrationId: deactivated.integrationId },
+      });
+    }
+    return true;
+  }
   if (deactivated.cleanupStage === 'revoke') {
     if (!deactivated.accessToken) {
       if (!deactivated.reservationId) throw new Error('Slack credential is unavailable');
@@ -1151,6 +1202,7 @@ export async function completePendingSlackDeletion(
       generation: reservation.generation,
       cleanupRequiresRevoke: reservation.cleanup_requires_revoke,
       cleanupStage: reservation.cleanup_stage,
+      locallyDeleted: false,
     },
     { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
   );

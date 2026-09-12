@@ -88,63 +88,6 @@ describe('Slack provider installation activation', () => {
     await expect(getActiveSlackInstallationForRuntime('T_SUSPENDED_LEGACY')).resolves.toBeNull();
   });
 
-  it('locally deletes a credentialless legacy Enterprise install before best-effort cleanup', async () => {
-    const actor = await insertTestUser();
-    const [integration] = await db
-      .insert(platform_integrations)
-      .values({
-        owned_by_user_id: actor.id,
-        platform: 'slack',
-        integration_type: 'oauth',
-        platform_installation_id: 'E_LEGACY',
-        platform_account_id: 'E_LEGACY',
-        integration_status: 'active',
-        installed_at: new Date().toISOString(),
-        metadata: { access_token: 'xoxb-legacy' },
-      })
-      .returning();
-    const identityCleanup = jest.fn(async (_teamId: string) => undefined);
-    await expect(
-      deleteInstallationByTeamId('E_LEGACY', {
-        deleteChatSdkInstallation: async () => {
-          throw new Error('state unavailable');
-        },
-        deleteChatSdkIdentityCache: identityCleanup,
-      })
-    ).resolves.toEqual({ success: true, deleted: true });
-    expect(identityCleanup).toHaveBeenCalledWith('E_LEGACY');
-    await expect(
-      db.select().from(platform_integrations).where(eq(platform_integrations.id, integration.id))
-    ).resolves.toHaveLength(0);
-  });
-
-  it('runs identity cleanup for a suspended reservationless normal workspace', async () => {
-    const actor = await insertTestUser();
-    const [integration] = await db
-      .insert(platform_integrations)
-      .values({
-        owned_by_user_id: actor.id,
-        platform: 'slack',
-        integration_type: 'oauth',
-        platform_installation_id: 'T_SUSPENDED_CLEANUP',
-        platform_account_id: 'T_SUSPENDED_CLEANUP',
-        integration_status: 'suspended',
-        installed_at: new Date().toISOString(),
-      })
-      .returning();
-    const identityCleanup = jest.fn(async (_teamId: string) => undefined);
-    await expect(
-      deleteInstallationByTeamId('T_SUSPENDED_CLEANUP', {
-        deleteChatSdkInstallation: async () => undefined,
-        deleteChatSdkIdentityCache: identityCleanup,
-      })
-    ).resolves.toEqual({ success: true, deleted: true });
-    expect(identityCleanup).toHaveBeenCalledWith('T_SUSPENDED_CLEANUP');
-    await expect(
-      db.select().from(platform_integrations).where(eq(platform_integrations.id, integration.id))
-    ).resolves.toHaveLength(0);
-  });
-
   it('rejects an auth-invalid reservation-backed runtime integration', async () => {
     const actor = await insertTestUser();
     const owner = { type: 'user' as const, id: actor.id };

@@ -4,6 +4,12 @@ import { vi } from 'vitest';
 // Native hosts only: the inbox, authorization queries, and reconnect mutation
 // remain real in the mounted recovery tests.
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
+// The mounted tree reads landscape insets from the inbox list; the real
+// package pulls Flow-typed react-native, which this DOM-free transform
+// cannot parse.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));

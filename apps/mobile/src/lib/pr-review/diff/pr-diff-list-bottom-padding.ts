@@ -1,4 +1,4 @@
-export const PR_DIFF_LIST_FOOTER_GAP = 12;
+const PR_DIFF_LIST_FOOTER_GAP = 12;
 
 /**
  * Returns the content-container padding for the diff FlashList: the fixed

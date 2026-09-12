@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const patch = readFileSync(
-  new URL('../../../../patches/expo-router@57.0.15.patch', import.meta.url),
+  new URL('../../../../patches/expo-router@57.0.20.patch', import.meta.url),
   'utf8'
 );
 
@@ -46,9 +46,9 @@ describe('Expo Router provider review routes', () => {
   it('locks every router snapshot to the current patch bytes', () => {
     const hash = createHash('sha256').update(patch).digest('hex');
     const lock = readFileSync(new URL('../../../../pnpm-lock.yaml', import.meta.url), 'utf8');
-    expect(lock).toContain(`expo-router@57.0.15: ${hash}`);
+    expect(lock).toContain(`expo-router@57.0.20: ${hash}`);
     const hashes = [
-      ...lock.matchAll(/(?:expo-router(?:@|: )|version: )57\.0\.15\(patch_hash=([a-f0-9]+)\)/g),
+      ...lock.matchAll(/(?:expo-router(?:@|: )|version: )57\.0\.20\(patch_hash=([a-f0-9]+)\)/g),
     ].map(match => match[1]);
     expect(hashes.length).toBeGreaterThan(0);
     expect(new Set(hashes)).toEqual(new Set([hash]));

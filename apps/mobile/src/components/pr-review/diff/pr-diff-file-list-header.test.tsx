@@ -116,11 +116,8 @@ describe('PrDiffFileListHeader side insets (landscape)', () => {
     });
 
     expect(routerPush).toHaveBeenCalledTimes(1);
-    expect(routerPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/pr-review/[owner]/[repo]/[number]/file-navigator',
-        params: { owner: 'octocat', repo: 'hello', number: 7 },
-      })
-    );
+    // GitHub keeps the existing three-segment sibling; `providerPrChildRoutePath`
+    // resolves the ref to a string href (locked by provider-pr-ref.test.ts).
+    expect(routerPush).toHaveBeenCalledWith('/(app)/pr-review/octocat/hello/7/file-navigator');
   });
 });

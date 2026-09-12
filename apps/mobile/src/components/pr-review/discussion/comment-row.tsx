@@ -235,6 +235,7 @@ export function CommentRow({
             className="size-6 rounded-full"
             transition={0}
             cachePolicy="memory"
+            recyclingKey={comment.author.avatarUrl}
             accessibilityIgnoresInvertColors
           />
         ) : (

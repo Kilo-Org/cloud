@@ -3,10 +3,7 @@ import { isSlackEnterpriseInstallationId } from './installation-id';
 
 describe('isSlackEnterpriseInstallationId', () => {
   it('distinguishes Slack Enterprise and workspace installation IDs', () => {
-    expect(isSlackEnterpriseInstallationId('E123ABC456')).toBe(true);
-    expect(isSlackEnterpriseInstallationId('E')).toBe(false);
-    expect(isSlackEnterpriseInstallationId('E_GRID')).toBe(false);
-    expect(isSlackEnterpriseInstallationId('Example')).toBe(false);
-    expect(isSlackEnterpriseInstallationId('T123ABC456')).toBe(false);
+    expect(isSlackEnterpriseInstallationId('E123')).toBe(true);
+    expect(isSlackEnterpriseInstallationId('T123')).toBe(false);
   });
 });

@@ -96,8 +96,8 @@ describe('Slack provider installation activation', () => {
         owned_by_user_id: actor.id,
         platform: 'slack',
         integration_type: 'oauth',
-        platform_installation_id: 'E123ABC456',
-        platform_account_id: 'E123ABC456',
+        platform_installation_id: 'E_LEGACY',
+        platform_account_id: 'E_LEGACY',
         integration_status: 'active',
         installed_at: new Date().toISOString(),
         metadata: { access_token: 'xoxb-legacy' },
@@ -105,14 +105,14 @@ describe('Slack provider installation activation', () => {
       .returning();
     const identityCleanup = jest.fn(async (_teamId: string) => undefined);
     await expect(
-      deleteInstallationByTeamId('E123ABC456', {
+      deleteInstallationByTeamId('E_LEGACY', {
         deleteChatSdkInstallation: async () => {
           throw new Error('state unavailable');
         },
         deleteChatSdkIdentityCache: identityCleanup,
       })
     ).resolves.toEqual({ success: true, deleted: true });
-    expect(identityCleanup).toHaveBeenCalledWith('E123ABC456');
+    expect(identityCleanup).toHaveBeenCalledWith('E_LEGACY');
     await expect(
       db.select().from(platform_integrations).where(eq(platform_integrations.id, integration.id))
     ).resolves.toHaveLength(0);
@@ -177,61 +177,6 @@ describe('Slack provider installation activation', () => {
       .where(eq(platform_integrations.id, integration.id));
 
     await expect(getActiveSlackInstallationForRuntime('T_INVALID')).resolves.toBeNull();
-  });
-
-  it('clears stale health markers after a successful reserved reinstall', async () => {
-    const actor = await insertTestUser();
-    const owner = { type: 'user' as const, id: actor.id };
-    const [existing] = await db
-      .insert(platform_integrations)
-      .values({
-        owned_by_user_id: actor.id,
-        platform: 'slack',
-        integration_type: 'oauth',
-        platform_installation_id: 'T_REINSTALL',
-        platform_account_id: 'T_REINSTALL',
-        integration_status: 'suspended',
-        suspended_at: new Date().toISOString(),
-        suspended_by: actor.id,
-        auth_invalid_at: new Date().toISOString(),
-        auth_invalid_reason: 'revoked',
-        installed_at: new Date().toISOString(),
-      })
-      .returning();
-    await beginProviderOAuthAttempt({
-      actorUserId: actor.id,
-      owner,
-      provider: 'slack',
-      state: 'reinstall-health',
-    });
-    const claim = await claimSlackProviderInstallation({
-      actorUserId: actor.id,
-      owner,
-      state: 'reinstall-health',
-      teamId: 'T_REINSTALL',
-    });
-    if (!claim) throw new Error('Expected claim');
-    await activateReservedSlackInstallation({
-      owner,
-      teamId: 'T_REINSTALL',
-      installation: { botToken: 'xoxb-new', teamName: 'Workspace' },
-      grantedScopes: null,
-      claim,
-      ...pendingCodec,
-      writeCredential: writeCredential as never,
-      setChatSdkInstallation: async () => undefined,
-    });
-    await expect(
-      db.select().from(platform_integrations).where(eq(platform_integrations.id, existing.id))
-    ).resolves.toEqual([
-      expect.objectContaining({
-        integration_status: 'active',
-        suspended_at: null,
-        suspended_by: null,
-        auth_invalid_at: null,
-        auth_invalid_reason: null,
-      }),
-    ]);
   });
 
   it('atomically activates the association, encrypted credential, and reservation', async () => {

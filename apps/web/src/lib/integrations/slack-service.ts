@@ -420,10 +420,6 @@ export async function upsertSlackInstallation({
           platform_account_login: teamName,
           scopes: SLACK_SCOPES,
           integration_status: INTEGRATION_STATUS.ACTIVE,
-          suspended_at: null,
-          suspended_by: null,
-          auth_invalid_at: null,
-          auth_invalid_reason: null,
           metadata,
           updated_at: new Date().toISOString(),
         })
@@ -457,10 +453,6 @@ export async function upsertSlackInstallation({
         platform_account_login: teamName,
         scopes: SLACK_SCOPES,
         integration_status: INTEGRATION_STATUS.ACTIVE,
-        suspended_at: null,
-        suspended_by: null,
-        auth_invalid_at: null,
-        auth_invalid_reason: null,
         metadata,
         installed_at: new Date().toISOString(),
       })
@@ -743,10 +735,6 @@ async function completeReservedSlackInstallation(
         platform_account_login: pending.team_name ?? 'Unknown Team',
         scopes: pending.granted_scopes ?? SLACK_SCOPES,
         integration_status: INTEGRATION_STATUS.ACTIVE,
-        suspended_at: null,
-        suspended_by: null,
-        auth_invalid_at: null,
-        auth_invalid_reason: null,
         metadata: { ...safeMetadata, bot_user_id: pending.bot_user_id },
         updated_at: new Date().toISOString(),
       })

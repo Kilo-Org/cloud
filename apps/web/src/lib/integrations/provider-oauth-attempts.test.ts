@@ -1,6 +1,6 @@
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { organizations, platform_integrations, provider_oauth_attempts } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import {
@@ -158,7 +158,14 @@ describe('provider OAuth attempts', () => {
           { ...github, kiloUserId: destinationUser.id }
         )
       ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
-      await db.delete(platform_integrations).where(eq(platform_integrations.platform, platform));
+      await db
+        .delete(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, platform),
+            eq(platform_integrations.owned_by_organization_id, organizationB.id)
+          )
+        );
     }
     await expect(
       connectVerifiedGitHubInstallation(

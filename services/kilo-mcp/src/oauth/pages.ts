@@ -8,12 +8,7 @@
  * unchanged. Only the shared shell (authPage/escapeHtml/htmlResponse) is
  * reused from src/auth/http.ts.
  */
-import {
-  authPage,
-  escapeHtml,
-  htmlResponse,
-  PAIRING_POLL_INTERVAL_MS,
-} from '../auth/http';
+import { authPage, escapeHtml, htmlResponse, PAIRING_POLL_INTERVAL_MS } from '../auth/http';
 
 /** A selectable organization; `id` is the value posted back to the worker. */
 export type OrgOption = { id: string; name: string };

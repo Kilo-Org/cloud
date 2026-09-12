@@ -144,11 +144,7 @@ function errorRedirect(error: AuthorizationError): Response {
   return response;
 }
 
-async function handleAuthorize(
-  request: Request,
-  env: Env,
-  deps: ConsentDeps
-): Promise<Response> {
+async function handleAuthorize(request: Request, env: Env, deps: ConsentDeps): Promise<Response> {
   if (request.method !== 'GET') {
     return errorPage('invalid_request', 'Use GET for /authorize.');
   }
@@ -313,11 +309,7 @@ async function handlePairingStatus(request: Request, deps: ConsentDeps): Promise
   }
 }
 
-async function handleOrgPicker(
-  request: Request,
-  env: Env,
-  deps: ConsentDeps
-): Promise<Response> {
+async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): Promise<Response> {
   if (request.method !== 'GET' && request.method !== 'POST') {
     return errorPage('invalid_request', 'Use GET or POST for /authorize/org.');
   }

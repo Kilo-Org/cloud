@@ -180,7 +180,11 @@ async function seedPending(
 
 async function seedPaired(store: ReturnType<typeof createFakeStore>): Promise<string> {
   const id = await seedPending(store);
-  await store.recordPairingApproval('PAIR-1', { kiloUserId: 'u-1', kiloToken: 'kilo-tok-1' }, iso(0));
+  await store.recordPairingApproval(
+    'PAIR-1',
+    { kiloUserId: 'u-1', kiloToken: 'kilo-tok-1' },
+    iso(0)
+  );
   return id;
 }
 
@@ -240,11 +244,7 @@ function deps(
 
 type CfRequest = Parameters<NonNullable<ExportedHandler<Env>['fetch']>>[0];
 
-async function run(
-  handler: ExportedHandler<Env>,
-  request: Request,
-  env: Env
-): Promise<Response> {
+async function run(handler: ExportedHandler<Env>, request: Request, env: Env): Promise<Response> {
   return handler.fetch!(request as unknown as CfRequest, env, {} as ExecutionContext);
 }
 
@@ -411,7 +411,9 @@ describe('GET /authorize/status', () => {
   it('reports pending while the user has not approved upstream, and keeps the next poll alive', async () => {
     const store = createFakeStore();
     await seedPending(store);
-    const fetchImpl = flowFetch({ '/api/device-auth/codes/PAIR-1': () => new Response('', { status: 202 }) });
+    const fetchImpl = flowFetch({
+      '/api/device-auth/codes/PAIR-1': () => new Response('', { status: 202 }),
+    });
     const handler = createDefaultHandler(deps(store, fetchImpl));
     const response = await run(
       handler,

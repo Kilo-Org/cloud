@@ -6,9 +6,9 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
   activateReservedSlackInstallation,
+  activateUnsharedEnterpriseSlackInstallation,
   completePendingSlackDeletion,
   SlackWorkspaceAlreadyConnectedError,
-  upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
 import {
   claimUnsharedSlackOAuthAttemptForExchange,
@@ -190,8 +190,12 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
             setChatSdkInstallation: (id, value) => slackAdapter.setInstallation(id, value),
           });
         } else {
-          await upsertSlackInstallation({ owner, teamId, installation });
-          await slackAdapter.setInstallation(teamId, installation);
+          await activateUnsharedEnterpriseSlackInstallation({
+            owner,
+            teamId,
+            installation,
+            setChatSdkInstallation: (id, value) => slackAdapter.setInstallation(id, value),
+          });
           if (
             verified.purpose === 'provider_install' &&
             !(await completeUnsharedSlackOAuthAttempt({ actorUserId: user.id, owner, state }))

@@ -14,6 +14,7 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import { isSlackEnterpriseInstallationId } from '@/lib/integrations/platforms/slack/installation-id';
+import { requireSlackCredentialKeyset } from '@/lib/integrations/platforms/slack/credential-keyset';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { SLACK_CLIENT_ID } from '@/lib/config.server';
@@ -424,6 +425,7 @@ export async function upsertSlackInstallation({
           suspended_by: null,
           auth_invalid_at: null,
           auth_invalid_reason: null,
+          github_disconnected_at: null,
           metadata,
           updated_at: new Date().toISOString(),
         })
@@ -461,6 +463,7 @@ export async function upsertSlackInstallation({
         suspended_by: null,
         auth_invalid_at: null,
         auth_invalid_reason: null,
+        github_disconnected_at: null,
         metadata,
         installed_at: new Date().toISOString(),
       })
@@ -469,6 +472,102 @@ export async function upsertSlackInstallation({
     await persistSlackCredential({ integration: created, owner, teamId, installation });
 
     return created;
+  } catch (error) {
+    if (isSlackWorkspaceUniqueViolation(error)) {
+      throw new SlackWorkspaceAlreadyConnectedError(teamName);
+    }
+    throw error;
+  }
+}
+
+export async function activateUnsharedEnterpriseSlackInstallation(input: {
+  owner: Owner;
+  teamId: string;
+  installation: SlackInstallation;
+  setChatSdkInstallation: (teamId: string, installation: SlackInstallation) => Promise<void>;
+}): Promise<PlatformIntegration> {
+  requireSlackCredentialKeyset();
+  await withSlackSdkTimeout(input.setChatSdkInstallation(input.teamId, input.installation));
+  const teamName = input.installation.teamName ?? 'Unknown Team';
+  try {
+    return await db.transaction(async tx => {
+      await lockProviderOAuthOwnerRow(tx, input.owner);
+      const [existing] = await tx
+        .select()
+        .from(platform_integrations)
+        .where(
+          and(
+            ...getOwnershipConditions(input.owner),
+            eq(platform_integrations.platform, PLATFORM.SLACK)
+          )
+        )
+        .for('update');
+      const conflicts = await tx
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.SLACK),
+            eq(platform_integrations.platform_installation_id, input.teamId)
+          )
+        )
+        .for('update');
+      if (conflicts.some(conflict => conflict.id !== existing?.id)) {
+        throw new SlackWorkspaceAlreadyConnectedError(teamName);
+      }
+      const existingMetadata =
+        existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {};
+      const { access_token: _legacyToken, ...safeMetadata } = existingMetadata as Record<
+        string,
+        unknown
+      >;
+      const values = {
+        platform_installation_id: input.teamId,
+        platform_account_id: input.teamId,
+        platform_account_login: teamName,
+        scopes: SLACK_SCOPES,
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        suspended_at: null,
+        suspended_by: null,
+        auth_invalid_at: null,
+        auth_invalid_reason: null,
+        github_disconnected_at: null,
+        metadata: {
+          ...safeMetadata,
+          bot_user_id: input.installation.botUserId,
+          is_enterprise_install: true,
+          enterprise_id: input.installation.enterpriseId,
+        },
+        updated_at: new Date().toISOString(),
+      };
+      const [integration] = existing
+        ? await tx
+            .update(platform_integrations)
+            .set(values)
+            .where(eq(platform_integrations.id, existing.id))
+            .returning()
+        : await tx
+            .insert(platform_integrations)
+            .values({
+              owned_by_user_id: input.owner.type === 'user' ? input.owner.id : null,
+              owned_by_organization_id: input.owner.type === 'org' ? input.owner.id : null,
+              platform: PLATFORM.SLACK,
+              integration_type: 'oauth',
+              installed_at: new Date().toISOString(),
+              ...values,
+            })
+            .returning();
+      await writeSlackCredentialInTransaction(tx, {
+        integrationId: integration.id,
+        slackTeamId: input.teamId,
+        owner: input.owner,
+        botToken: input.installation.botToken,
+        botUserId: input.installation.botUserId ?? null,
+        slackEnterpriseId: input.installation.enterpriseId ?? input.teamId,
+        isEnterpriseInstall: true,
+      });
+      return integration;
+    });
   } catch (error) {
     if (isSlackWorkspaceUniqueViolation(error)) {
       throw new SlackWorkspaceAlreadyConnectedError(teamName);
@@ -747,6 +846,7 @@ async function completeReservedSlackInstallation(
         suspended_by: null,
         auth_invalid_at: null,
         auth_invalid_reason: null,
+        github_disconnected_at: null,
         metadata: { ...safeMetadata, bot_user_id: pending.bot_user_id },
         updated_at: new Date().toISOString(),
       })

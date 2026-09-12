@@ -1,0 +1,104 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "name": "kilo-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // Production is reached only through its custom domain, so the OAuth issuer
+  // in the metadata is always https://mcp.kiloapps.io (the issuer is derived
+  // from the request URL — src/auth/metadata.ts). The workers.dev URL stays
+  // disabled in prod; the `dev` env below keeps its own workers.dev URL.
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "mcp.kiloapps.io",
+      "zone_name": "kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
+  "dev": {
+    "port": 8815,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+  "observability": {
+    "enabled": true,
+  },
+
+  // Workers AI: query embedding for the semantic half of hybrid search
+  // (src/search-knn.ts). The model is pinned in src/embedding.ts.
+  "ai": { "binding": "AI" },
+
+  // OAuth 2.1 state for THIS MCP (clients, pairing codes, refresh tokens,
+  // revoked jtis) — src/store/oauth-store.ts, DO SQLite via Drizzle.
+  // One logical registry, so the store is reached via getByName (single named
+  // instance).
+  "durable_objects": {
+    "bindings": [{ "name": "KILO_MCP_OAUTH_STORE", "class_name": "KiloMcpOAuthStore" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["KiloMcpOAuthStore"] }],
+
+  // HMAC key for MCP access tokens (src/auth/token.ts). Set with
+  // `wrangler secret put MCP_TOKEN_SECRET` (prod) or `MCP_TOKEN_SECRET` in
+  // .dev.vars (dev). Never logged, never committed.
+  "secrets": {
+    "required": ["MCP_TOKEN_SECRET"],
+  },
+
+  // Vectorize: the catalog kNN index. Vector ids are procedure paths; the
+  // index is provisioned and populated by scripts/embed-catalog.ts
+  // (main-branch merge job + one-time bootstrap, never PR jobs).
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "kilo-mcp-catalog",
+    },
+  ],
+
+  "vars": {
+    "WEB_BASE_URL": "https://app.kilo.ai",
+  },
+
+  // ============================================
+  // DEVELOPMENT ENVIRONMENT
+  // Deploy with: wrangler deploy --env dev
+  // This creates a SEPARATE worker: kilo-mcp-dev
+  // ============================================
+  "env": {
+    "dev": {
+      "name": "kilo-mcp-dev",
+      "workers_dev": true,
+      // `secrets` is not inherited from the top level by environments
+      // (wrangler): the dev worker enforces the same required MCP_TOKEN_SECRET.
+      "secrets": {
+        "required": ["MCP_TOKEN_SECRET"],
+      },
+      "vars": {
+        "WEB_BASE_URL": "http://localhost:3000",
+      },
+      "ai": { "binding": "AI" },
+      "vectorize": [
+        {
+          "binding": "VECTORIZE",
+          "index_name": "kilo-mcp-catalog-dev",
+        },
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "KILO_MCP_OAUTH_STORE",
+            "class_name": "KiloMcpOAuthStore",
+          },
+        ],
+      },
+      "migrations": [
+        {
+          "tag": "v1",
+          "new_sqlite_classes": ["KiloMcpOAuthStore"],
+        },
+      ],
+    },
+  },
+}

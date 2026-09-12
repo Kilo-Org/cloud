@@ -1,5 +1,4 @@
 import type { NextRequest } from 'next/server';
-import type { SlackAdapter } from '@chat-adapter/slack';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
@@ -139,38 +138,25 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     }
 
     const sharedGitHubOwner = await ownerHasSharedGitHubInstallation(owner);
-    const unsharedAttemptClaimed =
+    if (
       !sharedGitHubOwner &&
       verified.purpose === 'provider_install' &&
-      (await claimUnsharedSlackOAuthAttemptForExchange({
+      !(await claimUnsharedSlackOAuthAttemptForExchange({
         actorUserId: user.id,
         owner,
         state,
-      }));
-    if (!sharedGitHubOwner && verified.purpose === 'provider_install' && !unsharedAttemptClaimed) {
+      }))
+    ) {
       throw new Error('Slack OAuth attempt is invalid, expired, or already used');
     }
 
     // 7. Exchange with Slack before writing provider installation state.
-    let slackAdapter: SlackAdapter;
-    let exchanged: Awaited<ReturnType<typeof exchangeSlackOAuthCode>>;
-    try {
-      await bot.initialize();
-      slackAdapter = bot.getAdapter('slack');
-      exchanged = await exchangeSlackOAuthCode(code, SLACK_REDIRECT_URI);
-    } catch (error) {
-      if (unsharedAttemptClaimed) {
-        await cancelProviderOAuthAttempt({
-          actorUserId: user.id,
-          owner,
-          provider: 'slack',
-          state,
-          purpose: 'provider_install',
-        });
-      }
-      throw error;
-    }
-    const { teamId, installation, grantedScopes } = exchanged;
+    await bot.initialize();
+    const slackAdapter = bot.getAdapter('slack');
+    const { teamId, installation, grantedScopes } = await exchangeSlackOAuthCode(
+      code,
+      SLACK_REDIRECT_URI
+    );
     if (!sharedGitHubOwner) {
       try {
         await upsertSlackInstallation({ owner, teamId, installation });

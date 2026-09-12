@@ -293,16 +293,7 @@ export async function connectVerifiedGitHubInstallation(
             )
           )
           .for('update');
-        if (
-          reservation &&
-          (reservation.status !== 'active' ||
-            reservation.platform_integration_id !== slack.id ||
-            (affectedOwner.type === 'org'
-              ? reservation.owned_by_organization_id !== affectedOwner.id ||
-                reservation.owned_by_user_id !== null
-              : reservation.owned_by_user_id !== affectedOwner.id ||
-                reservation.owned_by_organization_id !== null))
-        ) {
+        if (reservation?.status === 'deleting') {
           return { ok: false, reason: 'incompatible_workflow' };
         }
         const [lockedSlack] = await tx

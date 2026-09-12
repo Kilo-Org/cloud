@@ -98,7 +98,7 @@ describe('provider OAuth attempts', () => {
     ).resolves.toBe(false);
   });
 
-  it('blocks shared GitHub admission while a Slack attempt is live', async () => {
+  it('allows a live Slack attempt to transition into shared GitHub support', async () => {
     const incumbent = await insertTestUser();
     const destinationUser = await insertTestUser();
     const organizationA = await createTestOrganization('Reservation A', incumbent.id, 0);
@@ -132,7 +132,7 @@ describe('provider OAuth attempts', () => {
         { type: 'org', id: organizationB.id },
         { ...github, kiloUserId: destinationUser.id }
       )
-    ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+    ).resolves.toMatchObject({ ok: true });
   });
 
   it('blocks provider start after shared GitHub attach', async () => {

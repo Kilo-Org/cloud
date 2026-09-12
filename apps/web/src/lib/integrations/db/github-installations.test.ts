@@ -752,6 +752,102 @@ describe('GitHub installation persistence', () => {
     ).resolves.toEqual({ ok: true, integrationId: first.integrationId });
   });
 
+  test('frees a non-allowlisted organization to connect a different installation after local disconnect', async () => {
+    const organization = await createTestOrganization('Disconnect frees slot org', ownerId, 0);
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      data('881001')
+    );
+    expect(first).toMatchObject({ ok: true });
+    if (!first.ok) throw new Error('Expected initial connection');
+
+    await disconnectGitHubInstallation({ type: 'org', id: organization.id }, first.integrationId);
+
+    // Reconnecting a completely different installation must not be blocked
+    // by the stale, locally disconnected association left behind.
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      data('881002')
+    );
+    expect(second).toEqual({ ok: true, integrationId: expect.any(String) });
+    if (!second.ok) throw new Error('Expected reconnection to a new installation');
+    expect(second.integrationId).not.toBe(first.integrationId);
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, organization.id));
+    expect(rows.find(row => row.id === first.integrationId)).toMatchObject({
+      platform_installation_id: '881001',
+      github_disconnected_at: expect.any(String),
+    });
+    expect(rows.find(row => row.id === second.integrationId)).toMatchObject({
+      platform_installation_id: '881002',
+      github_disconnected_at: null,
+      integration_status: 'active',
+    });
+  });
+
+  test('allows uninstalling an already locally disconnected sole association', async () => {
+    const organization = await createTestOrganization('Disconnected removal org', ownerId, 0);
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      data('881003')
+    );
+    if (!connected.ok) throw new Error('Expected initial connection');
+    await disconnectGitHubInstallation(
+      { type: 'org', id: organization.id },
+      connected.integrationId
+    );
+
+    let deleteUpstreamCalled = false;
+    await uninstallExclusiveGitHubInstallation({
+      owner: { type: 'org', id: organization.id },
+      integrationId: connected.integrationId,
+      deleteUpstream: async () => {
+        deleteUpstreamCalled = true;
+      },
+    });
+    expect(deleteUpstreamCalled).toBe(true);
+
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integrationId));
+    expect(row).toBeUndefined();
+  });
+
+  test('refuses to uninstall a disconnected association while another owner remains connected', async () => {
+    const organizationA = await createTestOrganization('Shared disconnect removal A', ownerId, 0);
+    const organizationB = await createTestOrganization(
+      'Shared disconnect removal B',
+      otherOwnerId,
+      0
+    );
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data()
+    );
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data(), kiloUserId: otherOwnerId }
+    );
+    if (!first.ok || !second.ok) throw new Error('Expected shared connections');
+
+    await disconnectGitHubInstallation({ type: 'org', id: organizationA.id }, first.integrationId);
+
+    await expect(
+      uninstallExclusiveGitHubInstallation({
+        owner: { type: 'org', id: organizationA.id },
+        integrationId: first.integrationId,
+        deleteUpstream: async () => {
+          throw new Error('deleteUpstream must not be called while another owner is connected');
+        },
+      })
+    ).rejects.toThrow('GitHub installation must be disconnected locally');
+  });
+
   test('revokes the real runtime authorization query on local disconnect', async () => {
     const connected = await connectVerifiedGitHubInstallation(
       { type: 'user', id: ownerId },

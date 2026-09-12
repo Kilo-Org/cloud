@@ -20,7 +20,7 @@ import {
  * "real time" is a sequence of short batch uploads whose final results the
  * controller appends to the live draft while `status` stays `listening`.
  */
-export const GATEWAY_SEGMENT_DURATION_MS = 3000;
+const GATEWAY_SEGMENT_DURATION_MS = 3000;
 
 /**
  * The slice of an expo-audio recorder the engine drives. `AudioModule.AudioRecorder`

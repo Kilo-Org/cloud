@@ -255,7 +255,15 @@ export async function getActiveSlackInstallationForRuntime(
     return { botToken };
   }
   const owner = getOwnerFromInstallation(row.integration);
-  if (!owner) return null;
+  if (!owner || !isPlatformIntegrationHealthy(row.integration)) return null;
+  if (owner.type === 'org') {
+    const [organization] = await db
+      .select({ deletedAt: organizations.deleted_at })
+      .from(organizations)
+      .where(eq(organizations.id, owner.id))
+      .limit(1);
+    if (!organization || organization.deletedAt) return null;
+  }
   const credential = await getSlackCredentialByIntegrationId(row.integration.id);
   const metadata = row.integration.metadata as {
     access_token?: string;

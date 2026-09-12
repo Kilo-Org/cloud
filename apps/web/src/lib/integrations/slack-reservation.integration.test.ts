@@ -88,6 +88,40 @@ describe('Slack provider installation activation', () => {
     await expect(getActiveSlackInstallationForRuntime('T_SUSPENDED_LEGACY')).resolves.toBeNull();
   });
 
+  it('rejects an auth-invalid reservation-backed runtime integration', async () => {
+    const actor = await insertTestUser();
+    const owner = { type: 'user' as const, id: actor.id };
+    await beginProviderOAuthAttempt({
+      actorUserId: actor.id,
+      owner,
+      provider: 'slack',
+      state: 'invalid',
+    });
+    const claim = await claimSlackProviderInstallation({
+      actorUserId: actor.id,
+      owner,
+      state: 'invalid',
+      teamId: 'T_INVALID',
+    });
+    if (!claim) throw new Error('Expected claim');
+    const integration = await activateReservedSlackInstallation({
+      owner,
+      teamId: 'T_INVALID',
+      installation: { botToken: 'xoxb-invalid', teamName: 'Workspace' },
+      grantedScopes: null,
+      claim,
+      ...pendingCodec,
+      writeCredential: writeCredential as never,
+      setChatSdkInstallation: async () => undefined,
+    });
+    await db
+      .update(platform_integrations)
+      .set({ auth_invalid_at: new Date().toISOString() })
+      .where(eq(platform_integrations.id, integration.id));
+
+    await expect(getActiveSlackInstallationForRuntime('T_INVALID')).resolves.toBeNull();
+  });
+
   it('atomically activates the association, encrypted credential, and reservation', async () => {
     const actor = await insertTestUser();
     const owner = { type: 'user' as const, id: actor.id };
@@ -492,6 +526,81 @@ describe('Slack provider installation activation', () => {
         teamId: 'T_OLD',
       })
     ).resolves.toMatchObject({ generation: 1 });
+  });
+
+  it('keeps the old workspace active when a new-workspace SDK write fails and expires', async () => {
+    const actor = await insertTestUser();
+    const owner = { type: 'user' as const, id: actor.id };
+    await beginProviderOAuthAttempt({
+      actorUserId: actor.id,
+      owner,
+      provider: 'slack',
+      state: 'old',
+    });
+    const oldClaim = await claimSlackProviderInstallation({
+      actorUserId: actor.id,
+      owner,
+      state: 'old',
+      teamId: 'T_OLD_SAFE',
+    });
+    if (!oldClaim) throw new Error('Expected old claim');
+    const oldIntegration = await activateReservedSlackInstallation({
+      owner,
+      teamId: 'T_OLD_SAFE',
+      installation: { botToken: 'xoxb-old', teamName: 'Old' },
+      grantedScopes: null,
+      claim: oldClaim,
+      ...pendingCodec,
+      writeCredential: writeCredential as never,
+      setChatSdkInstallation: async () => undefined,
+    });
+    await beginProviderOAuthAttempt({
+      actorUserId: actor.id,
+      owner,
+      provider: 'slack',
+      state: 'new',
+    });
+    const newClaim = await claimSlackProviderInstallation({
+      actorUserId: actor.id,
+      owner,
+      state: 'new',
+      teamId: 'T_NEW_FAILED',
+    });
+    if (!newClaim) throw new Error('Expected new claim');
+    await expect(
+      activateReservedSlackInstallation({
+        owner,
+        teamId: 'T_NEW_FAILED',
+        installation: { botToken: 'xoxb-new', teamName: 'New' },
+        grantedScopes: null,
+        claim: newClaim,
+        ...pendingCodec,
+        writeCredential: writeCredential as never,
+        setChatSdkInstallation: async () => {
+          throw new Error('state unavailable');
+        },
+      })
+    ).rejects.toThrow('state unavailable');
+    await db
+      .update(provider_installation_reservations)
+      .set({ expires_at: '2020-01-01T00:00:00.000Z' })
+      .where(eq(provider_installation_reservations.id, newClaim.reservationId));
+    await expireStaleSlackReservation('T_NEW_FAILED');
+
+    await expect(
+      db.select().from(platform_integrations).where(eq(platform_integrations.id, oldIntegration.id))
+    ).resolves.toEqual([
+      expect.objectContaining({
+        platform_installation_id: 'T_OLD_SAFE',
+        integration_status: 'active',
+      }),
+    ]);
+    await expect(
+      db
+        .select()
+        .from(provider_installation_reservations)
+        .where(eq(provider_installation_reservations.provider_installation_id, 'T_NEW_FAILED'))
+    ).resolves.toHaveLength(0);
   });
 
   it('ignores an uninstall event older than the active generation', async () => {

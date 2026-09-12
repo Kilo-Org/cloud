@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Yrityksen SSO"
   },
   "preferences": {
+    "general": "Yleiset",
+    "voiceInput": "Äänisyöte",
     "autoExpandThinking": "Avaa päättely automaattisesti",
     "autoExpandThinkingSubtitle": "Näytä agentin päättely kokonaan, kun päättely valmistuu.",
     "keepScreenOn": "Pidä näyttö päällä istuntosivulla",
@@ -237,6 +239,7 @@
     "appearanceLight": "Vaalea",
     "appearanceDark": "Tumma",
     "account": "Tili",
+    "accountSubtitle": "Kieli, luotetut verkkotunnukset ja laiteistunnot",
     "prReviewAttribution": "Lisää maininta sovelluksesta PR-katselmointeihin",
     "prReviewAttributionSubtitle": "Lisää lähetettävän katselmoinnin loppuun maininta, että katselmointi tehtiin Kilolla.",
     "returnSendsMessage": "Enter-näppäin lähettää viestin",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Puheentunnistus Kilo Gatewayn kautta",
+    "gatewayTranscriptionSubtitle": "Muodosta äänisyötteestä teksti Kilo Gateway -mallilla laitteen puheentunnistuksen sijaan. Äänitteesi lähetetään Kilo Gatewayhin.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Muutospyyntö ei ole käytettävissä",
@@ -448,6 +454,9 @@
       "acceptTerms": "Hyväksy",
       "replyBadRequest": "Tätä vastausta ei voi julkaista. Ketju on voinut muuttua.",
       "replyForbidden": "Sinulla ei ole oikeutta vastata tähän muutospyyntöön.",
+      "addCommentCta": "Kommentoi tätä muutospyyntöä",
+      "commentBadRequest": "Tätä kommenttia ei voi julkaista. Muutospyyntö on voinut muuttua.",
+      "commentForbidden": "Sinulla ei ole oikeutta kommentoida tätä muutospyyntöä.",
       "moderation": {
         "reportContent": {
           "terminal": "Tätä kommenttia ei voi ilmiantaa.",
@@ -2565,7 +2574,14 @@
     "languageNotInstalledMessage": "Kielen {{language}} offline-puhetiedostoja ei ole asennettu tähän puhelimeen. Lataa ne ja kokeile puheentunnistusta uudelleen.",
     "downloadOfflineModel": "Lataa",
     "offlineModelDownloadScheduled": "Offline-puhetiedostot ladataan taustalla. Kokeile puheentunnistusta myöhemmin uudelleen.",
-    "listeningStopped": "Kuuntelu lopetettiin."
+    "listeningStopped": "Kuuntelu lopetettiin.",
+    "transcribing": "Muunnetaan tekstiksi…",
+    "gatewayUnreachable": "Kilo Gatewayhin ei saatu yhteyttä. Tarkista yhteys ja yritä uudelleen.",
+    "gatewayTimeout": "Puheentunnistus kesti liian kauan. Yritä uudelleen.",
+    "gatewayModelUnavailable": "Tätä puheentunnistusmallia ei ole käytettävissä. Valitse toinen Asetuksissa.",
+    "gatewayModelUnavailableNotice": "Tätä mallia ei enää tarjota. Valitse toinen napauttamalla $t(transcriptionModel.title).",
+    "gatewaySignInRequired": "Kirjaudu sisään käyttääksesi Kilo Gatewayn puheentunnistusta.",
+    "gatewayNoModel": "Valitse ensin puheentunnistusmalli Asetuksissa."
   },
   "share": {
     "title": "Jaa Kiloon",
@@ -2947,5 +2963,12 @@
     "needsInput": "Odottaa vastausta",
     "channelName": "Aktiiviset agentit",
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä."
+  },
+  "transcriptionModel": {
+    "title": "Puheentunnistusmalli",
+    "noneChosen": "Ei valintaa",
+    "emptyTitle": "Ei puheentunnistusmalleja",
+    "emptyDescription": "Kilo Gateway ei juuri nyt tarjoa puheentunnistusmalleja.",
+    "loadFailed": "Puheentunnistusmallien lataaminen epäonnistui."
   }
 }

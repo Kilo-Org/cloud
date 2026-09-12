@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "ව්‍යවසාය SSO"
   },
   "preferences": {
+    "general": "සාමාන්‍ය",
+    "voiceInput": "හඬ ආදානය",
     "autoExpandThinking": "සිතීමේ විස්තර ස්වයංක්‍රීයව විහිදුවන්න",
     "autoExpandThinkingSubtitle": "නියෝජිතයා සිතීම අවසන් කළ විට එහි විස්තර විහිදුවා පෙන්වන්න.",
     "keepScreenOn": "සැසි පිටුවේ සිටින විට තිරය දැල්වී තබන්න",
@@ -237,6 +239,7 @@
     "appearanceLight": "ලා පැහැති",
     "appearanceDark": "අඳුරු",
     "account": "ගිණුම",
+    "accountSubtitle": "භාෂාව, විශ්වාස කළ ධාරක සහ උපාංග සැසි",
     "prReviewAttribution": "PR සමාලෝචනවල යෙදුම සඳහන් කරන්න",
     "prReviewAttributionSubtitle": "සමාලෝචනයක් යවන විට එය Kilo හරහා කළ බව දැක්වෙන පාද සටහනක් එක් කරන්න.",
     "returnSendsMessage": "එන්ටර් යතුරෙන් පණිවිඩය යවයි",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway හරහා හඬ පෙළට හැරවීම",
+    "gatewayTranscriptionSubtitle": "උපාංගයේ කථන හඳුනාගැනීම වෙනුවට Kilo Gateway ආකෘතියක් භාවිතයෙන් හඬ ආදානය පෙළ බවට හරින්න. ඔබේ පටිගත කිරීම Kilo Gateway වෙත යවනු ලැබේ.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "පුල් ඉල්ලීම ලබා ගත නොහැක",
@@ -448,6 +454,9 @@
       "acceptTerms": "පිළිගන්න",
       "replyBadRequest": "මෙම පිළිතුර පළ කළ නොහැක. සාකච්ඡා පෙළ වෙනස් වී තිබිය හැක.",
       "replyForbidden": "මෙම පුල් ඉල්ලීමට පිළිතුරු දීමට ඔබට අවසර නොමැත.",
+      "addCommentCta": "මෙම පුල් ඉල්ලීම පිළිබඳ අදහස් දක්වන්න",
+      "commentBadRequest": "මෙම අදහස පළ කළ නොහැක. පුල් ඉල්ලීම වෙනස් වී තිබිය හැක.",
+      "commentForbidden": "මෙම පුල් ඉල්ලීම පිළිබඳ අදහස් දැක්වීමට ඔබට අවසර නොමැත.",
       "moderation": {
         "reportContent": {
           "terminal": "මෙම අදහස වාර්තා කළ නොහැක.",
@@ -2565,7 +2574,14 @@
     "languageNotInstalledMessage": "{{language}} සඳහා ඔෆ්ලයින් කථන ගොනු මෙම දුරකථනයේ ස්ථාපනය කර නැත. ඒවා බාගන්න, පසුව හඬ ආදානය නැවත උත්සාහ කරන්න.",
     "downloadOfflineModel": "බාගන්න",
     "offlineModelDownloadScheduled": "ඔෆ්ලයින් කථන ගොනු පසුබිමින් බාගත වනු ඇත. පසුව හඬ ආදානය නැවත උත්සාහ කරන්න.",
-    "listeningStopped": "සවන් දීම නතර විය."
+    "listeningStopped": "සවන් දීම නතර විය.",
+    "transcribing": "පෙළට හරිමින්...",
+    "gatewayUnreachable": "Kilo Gateway වෙත ළඟා විය නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+    "gatewayTimeout": "හඬ පෙළට හැරවීමට වැඩි වේලාවක් ගත විය. නැවත උත්සාහ කරන්න.",
+    "gatewayModelUnavailable": "මෙම හඬ පෙළට හැරවීමේ ආකෘතිය ලබා ගත නොහැක. මනාප වලින් තවත් එකක් තෝරන්න.",
+    "gatewayModelUnavailableNotice": "මෙම ආකෘතිය තවදුරටත් ලබා දෙන්නේ නැත. තවත් එකක් තෝරන්න $t(transcriptionModel.title) තට්ටු කරන්න.",
+    "gatewaySignInRequired": "Kilo Gateway හඬ පෙළට හැරවීම භාවිත කිරීමට පුරනය වන්න.",
+    "gatewayNoModel": "පළමුව මනාප වලින් හඬ පෙළට හැරවීමේ ආකෘතියක් තෝරන්න."
   },
   "share": {
     "title": "Kilo වෙත බෙදාගැනීම",
@@ -2947,5 +2963,12 @@
     "needsInput": "ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
     "channelName": "සක්‍රීය නියෝජිතයන්",
     "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න."
+  },
+  "transcriptionModel": {
+    "title": "හඬ පෙළට හරවන ආකෘතිය",
+    "noneChosen": "කිසිවක් තෝරා නැත",
+    "emptyTitle": "හඬ පෙළට හැරවීමේ ආකෘති නොමැත",
+    "emptyDescription": "දැනට Kilo Gateway හඬ පෙළට හැරවීමේ ආකෘති ලබා දෙන්නේ නැත.",
+    "loadFailed": "හඬ පෙළට හැරවීමේ ආකෘති පූරණය කළ නොහැකි විය."
   }
 }

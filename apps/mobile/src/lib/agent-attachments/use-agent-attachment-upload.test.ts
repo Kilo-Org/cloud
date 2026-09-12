@@ -23,7 +23,7 @@ import { useAgentAttachmentUpload } from './use-agent-attachment-upload';
 //
 // The hook tests below drive the upload FSM through `useAgentAttachmentUpload`
 // with `uploadOne` as a manually-resolved promise. `uploadOne` is mocked so
-// `expo-file-system/legacy` and the tRPC client never load in the node env.
+// the upload-task module and the tRPC client never load in the node env.
 
 const hoisted = vi.hoisted(() => {
   let idCounter = 0;
@@ -34,7 +34,7 @@ const hoisted = vi.hoisted(() => {
     announceForA11y: vi.fn(),
     announcingToastError: vi.fn(),
     measureLocalSize: vi.fn(),
-    cancelAsync: vi.fn(),
+    cancel: vi.fn<() => void>(),
     fileDelete: vi.fn(),
     captureException: vi.fn(),
     deletedUris: new Set<string>(),
@@ -43,7 +43,6 @@ const hoisted = vi.hoisted(() => {
 
 vi.mock('expo-crypto', () => ({ randomUUID: hoisted.randomUUID }));
 vi.mock('@sentry/react-native', () => ({ captureException: hoisted.captureException }));
-vi.mock('expo-file-system/legacy', () => ({ deleteAsync: vi.fn() }));
 vi.mock('expo-image-manipulator', () => ({
   SaveFormat: { PNG: 'png', WEBP: 'webp', JPEG: 'jpeg' },
   manipulateAsync: vi.fn(),
@@ -1005,7 +1004,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     hoisted.announceForA11y.mockReset();
     hoisted.announcingToastError.mockReset();
     hoisted.measureLocalSize.mockReset();
-    hoisted.cancelAsync.mockReset();
+    hoisted.cancel.mockReset();
     hoisted.fileDelete.mockReset();
     hoisted.captureException.mockReset();
     hoisted.deletedUris.clear();
@@ -1019,15 +1018,15 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       rejectUpload = reject;
     });
     // The mock mirrors `uploadOne`'s real contract: it admits the key through
-    // `onAdmitted` and hands the created task's `cancelAsync` back through
+    // `onAdmitted` and hands the created task's `cancel` back through
     // `onTask` before the upload settles.
     hoisted.uploadOne.mockImplementation(
       async (args: {
-        onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
+        onTask?: (task: { cancel: () => void }) => void;
         onAdmitted?: (key: string) => void;
       }) => {
         args.onAdmitted?.('org/2026/08/uuid/doc.pdf');
-        args.onTask?.({ cancelAsync: hoisted.cancelAsync });
+        args.onTask?.({ cancel: hoisted.cancel });
         const result = await controlled;
         return result;
       }
@@ -1222,7 +1221,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     // Restore replaces the occupied chip and cancels its in-flight upload.
     expect(hookApi().attachments.map(item => item.filename)).toEqual([restoredName]);
     expect(hookApi().attachments[0]?.id).not.toBe(discardedId);
-    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.cancel).toHaveBeenCalledTimes(1);
 
     // The stale upload later resolves: it must not announce, toast, or write
     // the discarded chip back into the attachments list.
@@ -1288,7 +1287,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       await settle();
     });
 
-    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.cancel).toHaveBeenCalledTimes(1);
     expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
     expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/doc.pdf');
     renderer.unmount();
@@ -1297,10 +1296,9 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
   it('deletes the cache-owned file when removed during the presign window (onTask not yet called)', async () => {
     // Simulate the presign window: `uploadOne` captures `onTask` but does not
     // hand the task back before the upload settles, so `task` stays undefined.
-    let capturedOnTask: ((task: { cancelAsync: () => Promise<void> }) => void) | undefined =
-      undefined;
+    let capturedOnTask: ((task: { cancel: () => void }) => void) | undefined = undefined;
     hoisted.uploadOne.mockImplementation(
-      async (args: { onTask?: (task: { cancelAsync: () => Promise<void> }) => void }) => {
+      async (args: { onTask?: (task: { cancel: () => void }) => void }) => {
         capturedOnTask = args.onTask;
         // Never resolves: the upload stays in the presign window, so the task
         // is never handed back through `onTask`.
@@ -1322,10 +1320,10 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       await settle();
     });
 
-    // The task was never handed back, so no cancelAsync; the finally cleanup
+    // The task was never handed back, so no cancel; the finally cleanup
     // must still delete the cache-owned file.
     expect(capturedOnTask).toBeDefined();
-    expect(hoisted.cancelAsync).not.toHaveBeenCalled();
+    expect(hoisted.cancel).not.toHaveBeenCalled();
     expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
     expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/doc.pdf');
     renderer.unmount();
@@ -1336,7 +1334,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     let cancelledAfterPresign = false;
     hoisted.uploadOne.mockImplementation(
       async (args: {
-        onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
+        onTask?: (task: { cancel: () => void }) => void;
         isCancelled?: () => boolean;
       }) => {
         const result = await new Promise<{ key: string }>(resolve => {
@@ -1347,7 +1345,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
           throw new Error('Upload cancelled');
         }
         createTaskAfterPresign += 1;
-        args.onTask?.({ cancelAsync: hoisted.cancelAsync });
+        args.onTask?.({ cancel: hoisted.cancel });
         return result;
       }
     );
@@ -1370,13 +1368,15 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
 
     expect(cancelledAfterPresign).toBe(true);
     expect(createTaskAfterPresign).toBe(0);
-    expect(hoisted.cancelAsync).not.toHaveBeenCalled();
+    expect(hoisted.cancel).not.toHaveBeenCalled();
     expect(hookApi().attachments).toHaveLength(0);
     renderer.unmount();
   });
 
-  it('deletes the cache-owned file even when cancelAsync rejects', async () => {
-    hoisted.cancelAsync.mockRejectedValue(new Error('cancel failed'));
+  it('deletes the cache-owned file even when cancel throws', async () => {
+    hoisted.cancel.mockImplementationOnce(() => {
+      throw new Error('cancel failed');
+    });
     const renderer = await mountHook();
     await addDocument();
     const id = hookApi().attachments[0]?.id;
@@ -1389,7 +1389,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       await settle();
     });
 
-    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.cancel).toHaveBeenCalledTimes(1);
     expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
     expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/doc.pdf');
     renderer.unmount();
@@ -1410,7 +1410,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       await settle();
     });
 
-    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.cancel).toHaveBeenCalledTimes(1);
     expect(hoisted.fileDelete).not.toHaveBeenCalled();
     renderer.unmount();
   });
@@ -1424,7 +1424,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       await settle();
     });
 
-    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.cancel).toHaveBeenCalledTimes(1);
     expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
     renderer.unmount();
   });
@@ -1438,7 +1438,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       await settle();
     });
 
-    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.cancel).toHaveBeenCalledTimes(1);
     expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
 
     // The cancelled upload later rejects: unmount invalidated the live id, so
@@ -1485,7 +1485,7 @@ describe('useAgentAttachmentUpload — release of admitted keys (Steps 4/5)', ()
     hoisted.announceForA11y.mockReset();
     hoisted.announcingToastError.mockReset();
     hoisted.measureLocalSize.mockReset();
-    hoisted.cancelAsync.mockReset();
+    hoisted.cancel.mockReset();
     hoisted.fileDelete.mockReset();
     hoisted.deletedUris.clear();
     hoisted.measureLocalSize.mockResolvedValue(1024);
@@ -1497,11 +1497,11 @@ describe('useAgentAttachmentUpload — release of admitted keys (Steps 4/5)', ()
     });
     hoisted.uploadOne.mockImplementation(
       async (args: {
-        onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
+        onTask?: (task: { cancel: () => void }) => void;
         onAdmitted?: (key: string) => void;
       }) => {
         args.onAdmitted?.('org/2026/08/uuid/doc.pdf');
-        args.onTask?.({ cancelAsync: hoisted.cancelAsync });
+        args.onTask?.({ cancel: hoisted.cancel });
         const result = await controlled;
         return result;
       }

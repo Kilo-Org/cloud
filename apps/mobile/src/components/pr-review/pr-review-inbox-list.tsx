@@ -10,9 +10,10 @@
 
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
-import { type ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -47,6 +48,15 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
     firstPageErrorState,
     laterPageError,
   });
+
+  // Landscape: side insets keep inbox rows and the px-6 header/footer
+  // content clear of the sensor housing; portrait insets are zero, so the
+  // style carries explicit zeros and nothing else changes.
+  const insets = useSafeAreaInsets();
+  const contentContainerStyle = useMemo<ViewStyle>(
+    () => ({ paddingLeft: insets.left, paddingRight: insets.right }),
+    [insets.left, insets.right]
+  );
 
   return (
     <FlashList
@@ -87,6 +97,7 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
         }
       }}
       onEndReachedThreshold={0.5}
+      contentContainerStyle={contentContainerStyle}
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
     />

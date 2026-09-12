@@ -1,6 +1,7 @@
 import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@/lib/ai-gateway/processUsage.types';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
 import { QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 import { partnerPricingByModelId } from '@/lib/ai-gateway/providers/partner/pricing';
 import {
@@ -23,6 +24,21 @@ export type CustomPricing = {
 };
 
 export const customPricingByModelId: Record<string, CustomPricing> = {
+  // Google's 50% promotional discount is available through the end of 2026.
+  [GEMINI_FLASH_CURRENT_MODEL_ID]: {
+    discountPercentage: 50,
+    pricing: [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 0.75,
+          completion_per_million: 3.75,
+          input_cache_read_per_million: 0.075,
+          input_cache_write_per_million: 0.0416666666667,
+        },
+      },
+    ],
+  },
   [QWEN37_MAX_MODEL_ID]: {
     discountPercentage: 50,
     pricing: [

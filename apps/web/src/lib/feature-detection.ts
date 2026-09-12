@@ -44,6 +44,7 @@ export const FEATURE_VALUES = [
   'kiloclaw-embedding',
   'openclaw-embedding',
   'gastown',
+  'mobile-voice-input',
 ] as const;
 
 const featureSchema = z.enum(FEATURE_VALUES);

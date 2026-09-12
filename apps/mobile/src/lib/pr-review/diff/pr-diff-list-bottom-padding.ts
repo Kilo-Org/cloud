@@ -15,3 +15,19 @@ export function prDiffListBottomPadding(floatingActionsHeight: number | null): n
   }
   return Math.round(floatingActionsHeight) + PR_DIFF_LIST_FOOTER_GAP;
 }
+
+/**
+ * Returns the content-container padding for the diff FlashList: the bottom
+ * padding that clears the floating action bar, plus the landscape side
+ * insets that keep rows clear of the sensor housing.
+ */
+export function prDiffListContentPadding(
+  floatingActionsHeight: number | null,
+  insets: { left: number; right: number }
+) {
+  return {
+    paddingBottom: prDiffListBottomPadding(floatingActionsHeight),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
+}

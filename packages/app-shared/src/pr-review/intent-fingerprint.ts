@@ -23,6 +23,7 @@ export type PrLedgerIntent =
   | 'submit_review'
   | 'create_review_comment'
   | 'reply_comment'
+  | 'add_pr_comment'
   | 'resolve_thread'
   | 'unresolve_thread'
   | 'enable_auto_merge'
@@ -40,6 +41,7 @@ export type PrLedgerIntent =
 const PR_FINGERPRINT_FIELDS: Record<PrLedgerIntent, readonly string[]> = {
   create_review_comment: ['body', 'path', 'line', 'side', 'startLine', 'startSide', 'commitSha'],
   reply_comment: ['commentId', 'body'],
+  add_pr_comment: ['body'],
   submit_review: ['event', 'body', 'commitSha', 'comments'],
   merge: ['method', 'commitTitle', 'commitMessage', 'deleteBranch', 'expectedHeadSha'],
   resolve_thread: ['threadId'],

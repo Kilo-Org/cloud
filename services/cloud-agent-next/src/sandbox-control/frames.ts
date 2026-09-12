@@ -15,6 +15,7 @@ import {
   sessionAbortPayloadSchema,
   sessionAttachPayloadSchema,
   sessionDetachPayloadSchema,
+  sessionRuntimeRetirePayloadSchema,
   sessionEventPayloadSchema,
   sessionGitSummaryPayloadSchema,
   sessionGitSnapshotPayloadSchema,
@@ -61,6 +62,7 @@ const REQUEST_PAYLOAD_SCHEMAS: Record<ControlOperation, z.ZodType> = {
   'session.git.summary': sessionGitSummaryPayloadSchema,
   'session.git.snapshot': sessionGitSnapshotPayloadSchema,
   'session.detach': sessionDetachPayloadSchema,
+  'session.runtime.retire': sessionRuntimeRetirePayloadSchema,
   'session.terminal.create': sessionTerminalCreatePayloadSchema,
   'session.terminal.resize': sessionTerminalResizePayloadSchema,
   'session.terminal.close': sessionTerminalClosePayloadSchema,
@@ -186,6 +188,7 @@ export function errorResponse(
 export function helloResult(capabilities?: {
   connectionRecovery?: boolean;
   eventReceipts?: boolean;
+  scopedCleanupResult?: boolean;
 }): SandboxHelloResult {
   return {
     protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
@@ -197,6 +200,7 @@ export function helloResult(capabilities?: {
       nativeRuntimeRetirement: true,
       ...(capabilities?.connectionRecovery ? { connectionRecovery: true } : {}),
       ...(capabilities?.eventReceipts ? { eventReceipts: true } : {}),
+      ...(capabilities?.scopedCleanupResult ? { scopedCleanupResult: true } : {}),
     },
   };
 }

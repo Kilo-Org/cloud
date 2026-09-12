@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "Enpresako SSO"
   },
   "preferences": {
+    "general": "Orokorra",
+    "voiceInput": "Ahots-sarrera",
     "autoExpandThinking": "Zabaldu pentsamendua automatikoki",
     "autoExpandThinkingSubtitle": "Erakutsi agentearen pentsamendua zabalduta amaitzen denean.",
     "keepScreenOn": "Mantendu pantaila piztuta saio-orrian",
@@ -237,6 +239,7 @@
     "appearanceLight": "Argia",
     "appearanceDark": "Iluna",
     "account": "Kontua",
+    "accountSubtitle": "Hizkuntza, konfiantzako ostalariak eta gailuen saioak",
     "prReviewAttribution": "Gehitu aplikazioaren aipamena PR berrikuspenei",
     "prReviewAttributionSubtitle": "Erantsi 'Kilo-ren bidez berrikusia' orri-oina berrikuspen bat bidaltzen duzunean.",
     "returnSendsMessage": "Sartu teklak mezua bidaltzen du",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway bidezko transkripzioa",
+    "gatewayTranscriptionSubtitle": "Transkribatu ahots-sarrera gailuaren hitz-sorgailuaren ordez Kilo Gateway eredu batekin. Zure grabaketa Kilo Gatewayra bidaltzen da.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Bateratze-eskaera ez dago eskuragarri",
@@ -448,6 +454,9 @@
       "acceptTerms": "Onartu",
       "replyBadRequest": "Erantzun hau ezin da argitaratu. Baliteke haria aldatu izana.",
       "replyForbidden": "Ez duzu baimenik bateratze-eskaera honi erantzuteko.",
+      "addCommentCta": "Egin iruzkina bateratze-eskaera honetan",
+      "commentBadRequest": "Iruzkin hau ezin da argitaratu. Baliteke bateratze-eskaera aldatu izana.",
+      "commentForbidden": "Ez duzu baimenik bateratze-eskaera honetan iruzkinik egiteko.",
       "moderation": {
         "reportContent": {
           "terminal": "Iruzkin hau ezin da salatu.",
@@ -2565,7 +2574,14 @@
     "languageNotInstalledMessage": "{{language}} hizkuntzaren lineaz kanpo ahots-fitxategiak ez daude instalatuta telefono honetan. Deskargatu itzazu eta saiatu berriro ahots-sarrerarekin.",
     "downloadOfflineModel": "Deskargatu",
     "offlineModelDownloadScheduled": "Lineaz kanpoko ahots-fitxategiak atzeko planoan deskargatuko dira. Saiatu ahots-sarrerarekin berriro geroago.",
-    "listeningStopped": "Entzutea gelditu da."
+    "listeningStopped": "Entzutea gelditu da.",
+    "transcribing": "Transkribatzen...",
+    "gatewayUnreachable": "Ezin izan da Kilo Gatewayra iritsi. Egiaztatu konexioa eta saiatu berriro.",
+    "gatewayTimeout": "Transkripzioak gehiegi iraun du. Saiatu berriro.",
+    "gatewayModelUnavailable": "Transkripzio-eredu hau ez dago erabilgarri. Hautatu besteren bat Hobespenetan.",
+    "gatewayModelUnavailableNotice": "Eredu hau jada ez da eskaintzen. Sakatu $t(transcriptionModel.title) beste bat hautatzeko.",
+    "gatewaySignInRequired": "Hasi saioa Kilo Gateway bidezko transkripzioa erabiltzeko.",
+    "gatewayNoModel": "Hautatu lehenik transkripzio-eredu bat Hobespenetan."
   },
   "share": {
     "title": "Partekatu Kilo-n",
@@ -2947,5 +2963,12 @@
     "needsInput": "Zure erantzunaren zain",
     "channelName": "Agente aktiboak",
     "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko."
+  },
+  "transcriptionModel": {
+    "title": "Transkripzio-eredua",
+    "noneChosen": "Ezer hautatu gabe",
+    "emptyTitle": "Ez dago transkripzio-eredurik",
+    "emptyDescription": "Kilo Gateway-k ez du transkripzio-eredurik eskaintzen oraintxe.",
+    "loadFailed": "Ezin izan dira transkripzio-ereduak kargatu."
   }
 }

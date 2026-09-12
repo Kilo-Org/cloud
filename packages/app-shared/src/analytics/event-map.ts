@@ -84,6 +84,7 @@ export const PR_INTENTS = [
   'submit_review',
   'create_review_comment',
   'reply_comment',
+  'add_pr_comment',
   'resolve_thread',
   'unresolve_thread',
   'enable_auto_merge',

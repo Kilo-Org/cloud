@@ -1,11 +1,13 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/ui/accessible-status.mounted.test.tsx) */
+/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/ui/accessible-status.mounted.test.tsx) */
 import { type ComponentProps, createElement, type ReactElement, useState } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PickerSheet } from './picker-sheet';
 import { SheetHeader } from './sheet-header';
 import '@/i18n';
+
+const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -14,7 +16,7 @@ vi.mock('react-native', () => ({
   I18nManager: { allowRTL: vi.fn(), isRTL: false, forceRTL: vi.fn() },
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
+  useSafeAreaInsets: () => safeArea,
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -57,6 +59,36 @@ function pressablesByLabel(
   );
 }
 
+function findHeaderContainer(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  return root.find(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      node.props.collapsable === false
+  );
+}
+
+/**
+ * The header row sits in an inner wrapper that carries only the landscape side
+ * insets, so they add to the outer container's `px-4` gutter instead of
+ * overriding it. It is the only View in the header without a className.
+ */
+function findSideInsetWrapper(
+  root: TestRenderer.ReactTestInstance
+): TestRenderer.ReactTestInstance {
+  const wrappers = root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      node.props.className === undefined
+  );
+  const wrapper = wrappers[0];
+  if (!wrapper) {
+    throw new Error('side-inset wrapper not found');
+  }
+  return wrapper;
+}
+
 function HeaderWithActionFeedback({
   initialTitle = 'report.pdf',
   doneLabel = 'Finish',
@@ -82,6 +114,10 @@ function HeaderWithActionFeedback({
 }
 
 describe('SheetHeader', () => {
+  beforeEach(() => {
+    Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
+  });
+
   it('renders a Share pressable in the leading slot when onShare is provided', async () => {
     const renderer = await mount({
       title: 'report.pdf',
@@ -319,4 +355,49 @@ describe('SheetHeader', () => {
       renderer.unmount();
     }
   );
+
+  it('keeps the outer container classes and a styleless wrapper at zero side insets', async () => {
+    const renderer = await mount({
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    });
+
+    // Portrait no-op: the wrapper style collapses to undefined (an inline 0
+    // would override the `px-4` className gutter) and the outer container keeps
+    // the non-collapsible header contract and its gutter class untouched.
+    const container = findHeaderContainer(renderer.root);
+    expect(container.props.collapsable).toBe(false);
+    expect(container.props.className).toContain('px-4');
+    expect(container.props.style).toBeUndefined();
+    expect(findSideInsetWrapper(renderer.root).props.style).toBeUndefined();
+
+    renderer.unmount();
+  });
+
+  it('pads the row by the landscape side insets inside the outer gutter', async () => {
+    safeArea.left = 47;
+    safeArea.right = 59;
+    const renderer = await mount({
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    });
+
+    // The side insets land on the inner wrapper so they ADD to the `px-4`
+    // gutter (an inline padding on the container would override the class),
+    // and the non-collapsible header contract stays on the outer View.
+    const container = findHeaderContainer(renderer.root);
+    expect(container.props.collapsable).toBe(false);
+    expect(container.props.className).toContain('px-4');
+    expect(container.props.style).toBeUndefined();
+    const wrapper = findSideInsetWrapper(renderer.root);
+    expect(wrapper.props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
+    const cancel = pressablesByLabel(renderer.root, 'Cancel')[0];
+    const done = pressablesByLabel(renderer.root, 'Done')[0];
+    expect(cancel?.parent?.parent).toBe(wrapper);
+    expect(done?.parent?.parent).toBe(wrapper);
+
+    renderer.unmount();
+  });
 });

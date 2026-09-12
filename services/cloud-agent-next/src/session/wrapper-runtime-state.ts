@@ -599,7 +599,8 @@ export type AllocatedWrapperRuntimeState = {
 
 export async function allocateWrapperRuntimeState(
   storage: DurableObjectStorage,
-  now = Date.now()
+  now = Date.now(),
+  wrapperGeneration?: number
 ): Promise<AllocatedWrapperRuntimeState> {
   const current = await getWrapperRuntimeState(storage);
   if (isActiveWrapperRuntimeState(current)) {
@@ -617,7 +618,7 @@ export async function allocateWrapperRuntimeState(
     // Obsolete grace cleanup is best-effort; fresh fenced work must proceed.
   }
   const next = {
-    wrapperGeneration: current.wrapperGeneration + 1,
+    wrapperGeneration: wrapperGeneration ?? current.wrapperGeneration + 1,
     wrapperConnectionId: crypto.randomUUID(),
     wrapperRunId: `wr_${crypto.randomUUID().replace(/-/g, '')}`,
     messageIndexVersion: WRAPPER_RUN_MESSAGE_INDEX_VERSION,
@@ -666,14 +667,10 @@ export async function clearAllocatedWrapperRuntimeState(
 ): Promise<void> {
   if (!allocated.wrapperConnectionId) return;
 
-  await clearWrapperRuntimeIdentity(
-    storage,
-    {
-      wrapperGeneration: allocated.wrapperGeneration,
-      wrapperConnectionId: allocated.wrapperConnectionId,
-    },
-    { incrementGeneration: true }
-  );
+  await clearWrapperRuntimeIdentity(storage, {
+    wrapperGeneration: allocated.wrapperGeneration,
+    wrapperConnectionId: allocated.wrapperConnectionId,
+  });
 }
 
 export async function isCurrentWrapperConnection(

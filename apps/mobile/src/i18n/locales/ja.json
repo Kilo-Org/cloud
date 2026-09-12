@@ -227,6 +227,8 @@
     "providerEnterpriseSso": "エンタープライズSSO"
   },
   "preferences": {
+    "general": "一般",
+    "voiceInput": "音声入力",
     "autoExpandThinking": "思考を自動展開",
     "autoExpandThinkingSubtitle": "エージェントの思考が終了したときに展開して表示します。",
     "keepScreenOn": "セッション画面で画面を常時オン",
@@ -237,6 +239,7 @@
     "appearanceLight": "ライト",
     "appearanceDark": "ダーク",
     "account": "アカウント",
+    "accountSubtitle": "言語、信頼済みホスト、デバイスのセッション",
     "prReviewAttribution": "PRレビューに使用アプリ名を追加",
     "prReviewAttributionSubtitle": "レビューを送信すると、末尾にKiloでレビューしたことを示す文言を追加します。",
     "returnSendsMessage": "リターンキーでメッセージを送信",
@@ -247,7 +250,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gatewayによる文字起こし",
+    "gatewayTranscriptionSubtitle": "デバイスの音声認識の代わりにKilo Gatewayのモデルで音声入力を文字起こしします。録音はKilo Gatewayに送信されます。",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "notifications": {
     "liveActivities": "ライブアクティビティ",
@@ -2134,7 +2140,14 @@
     "languageNotInstalledMessage": "{{language}}のオフライン音声ファイルがこのスマートフォンにインストールされていません。ダウンロードしてから、音声入力をもう一度お試しください。",
     "downloadOfflineModel": "ダウンロード",
     "offlineModelDownloadScheduled": "オフライン音声ファイルはバックグラウンドでダウンロードされます。しばらくしてから、音声入力をもう一度お試しください。",
-    "listeningStopped": "聞き取りを停止しました。"
+    "listeningStopped": "聞き取りを停止しました。",
+    "transcribing": "文字起こし中…",
+    "gatewayUnreachable": "Kilo Gatewayに接続できませんでした。接続を確認して、もう一度お試しください。",
+    "gatewayTimeout": "文字起こしに時間がかかりすぎました。もう一度お試しください。",
+    "gatewayModelUnavailable": "この文字起こしモデルは利用できません。設定で別のモデルを選択してください。",
+    "gatewayModelUnavailableNotice": "このモデルは提供が終了しました。別のモデルを選ぶには$t(transcriptionModel.title)をタップしてください。",
+    "gatewaySignInRequired": "Kilo Gatewayの文字起こしを使うにはサインインしてください。",
+    "gatewayNoModel": "まず設定で文字起こしモデルを選択してください。"
   },
   "share": {
     "title": "Kiloに共有",
@@ -2408,6 +2421,9 @@
       "replyBadRequest": "この返信は投稿できません。スレッドが変更された可能性があります。",
       "replyBody": "返信の本文",
       "replyForbidden": "このプルリクエストに返信する権限がありません。",
+      "addCommentCta": "このプルリクエストにコメントする",
+      "commentBadRequest": "このコメントは投稿できません。プルリクエストが変更された可能性があります。",
+      "commentForbidden": "このプルリクエストにコメントする権限がありません。",
       "replyPlaceholder": "返信…",
       "reportContent": "コンテンツを報告",
       "reportUser": "ユーザーを報告",
@@ -2947,5 +2963,12 @@
     "needsInput": "入力が必要",
     "channelName": "アクティブなエージェント",
     "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。"
+  },
+  "transcriptionModel": {
+    "title": "文字起こしモデル",
+    "noneChosen": "未選択",
+    "emptyTitle": "文字起こしモデルがありません",
+    "emptyDescription": "現在、Kilo Gatewayは文字起こしモデルを提供していません。",
+    "loadFailed": "文字起こしモデルを読み込めませんでした。"
   }
 }

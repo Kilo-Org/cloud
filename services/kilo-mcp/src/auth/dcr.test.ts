@@ -25,6 +25,7 @@ function createFakeOAuthStore(): OAuthStoreApi & { clients: Map<string, StoredCl
     getCode: unused,
     recordPairingApproval: unused,
     denyCode: unused,
+    markCodeExpired: unused,
     approveCode: unused,
     consumeCode: unused,
     saveRefreshToken: unused,

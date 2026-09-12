@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handleAuthorize } from './authorize';
 import { codeChallengeFromVerifier, generateCodeVerifier } from './pkce';
+import type { McpAnalytics, OAuthSignInInput } from '../analytics';
 import type {
   NewOAuthCode,
   OAuthCodeRecord,
@@ -47,6 +48,7 @@ function createFakeOAuthStore(): OAuthStoreApi & {
     },
     recordPairingApproval: unused,
     denyCode: unused,
+    markCodeExpired: unused,
     async approveCode(deviceAuthCode, identity, nowIso) {
       for (const [code, record] of codes) {
         if (
@@ -118,9 +120,43 @@ function deviceAuthFetch(code = 'PAIR-1234') {
   );
 }
 
+/**
+ * Fake emitter cast to the production `McpAnalytics` interface: the tests
+ * assert exactly what the worker hands it, so a new field cannot slip past.
+ */
+function fakeAnalytics(): { analytics: McpAnalytics; calls: OAuthSignInInput[] } {
+  const calls: OAuthSignInInput[] = [];
+  const analytics = {
+    oauthSignIn: vi.fn((input: OAuthSignInInput) => {
+      calls.push(input);
+    }),
+  } as unknown as McpAnalytics;
+  return { analytics, calls };
+}
+
+const OAUTH_EVENT_FIELDS = ['clientId', 'identity', 'phase', 'reason'];
+const IDENTITY_FIELDS = ['kiloUserId', 'organizationId'];
+
+/**
+ * The sign-in events must carry no token, authorization code, PKCE verifier,
+ * or state: every recorded event exposes only the documented fields.
+ */
+function expectNoCredentialLeak(calls: OAuthSignInInput[]): void {
+  for (const call of calls) {
+    for (const key of Object.keys(call)) {
+      expect(OAUTH_EVENT_FIELDS).toContain(key);
+    }
+    if (call.identity) {
+      for (const key of Object.keys(call.identity)) {
+        expect(IDENTITY_FIELDS).toContain(key);
+      }
+    }
+  }
+}
+
 async function authorize(
   overrides: Record<string, string | undefined> = {},
-  deps: { store?: OAuthStoreApi; fetchImpl?: typeof fetch } = {}
+  deps: { store?: OAuthStoreApi; fetchImpl?: typeof fetch; analytics?: McpAnalytics } = {}
 ): Promise<{ response: Response; store: ReturnType<typeof createFakeOAuthStore> }> {
   const store = deps.store ?? storeWithClient();
   const response = await handleAuthorize(
@@ -141,6 +177,7 @@ async function authorize(
       store,
       webBaseUrl: WEB,
       fetchImpl: (deps.fetchImpl ?? deviceAuthFetch()) as typeof fetch,
+      analytics: deps.analytics,
     }
   );
   return { response, store: store as ReturnType<typeof createFakeOAuthStore> };
@@ -309,5 +346,59 @@ describe('GET /authorize (retryable unhappy: Kilo pairing unavailable)', () => {
     const html = await response.text();
     expect(html).toMatch(/could not be reached/);
     expect(store.codes.size).toBe(0);
+  });
+});
+
+describe('GET /authorize analytics (s3)', () => {
+  it('emits exactly one anonymous started event with the client_id on success', async () => {
+    const { analytics, calls } = fakeAnalytics();
+    const { response } = await authorize({}, { analytics });
+    expect(response.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual({ phase: 'started', identity: null, clientId: CLIENT_ID });
+    expectNoCredentialLeak(calls);
+  });
+
+  it('reports a rate-limited pairing as failed with that reason', async () => {
+    const { analytics, calls } = fakeAnalytics();
+    const fetchImpl = vi.fn(async () => Response.json({ error: 'too many' }, { status: 429 }));
+    const { response } = await authorize(
+      {},
+      { fetchImpl: fetchImpl as unknown as typeof fetch, analytics }
+    );
+    expect(response.status).toBe(503);
+    expect(calls).toEqual([
+      { phase: 'failed', identity: null, clientId: CLIENT_ID, reason: 'rate_limited' },
+    ]);
+    expectNoCredentialLeak(calls);
+  });
+
+  it('reports an unreachable pairing as failed with that reason', async () => {
+    const { analytics, calls } = fakeAnalytics();
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('network down');
+    });
+    await authorize({}, { fetchImpl: fetchImpl as unknown as typeof fetch, analytics });
+    expect(calls).toEqual([
+      { phase: 'failed', identity: null, clientId: CLIENT_ID, reason: 'unreachable' },
+    ]);
+    expectNoCredentialLeak(calls);
+  });
+
+  it('reports a redirectable validation error as failed with the OAuth error code', async () => {
+    const { analytics, calls } = fakeAnalytics();
+    await authorize({ resource: 'https://other.test/mcp' }, { analytics });
+    expect(calls).toEqual([
+      { phase: 'failed', identity: null, clientId: CLIENT_ID, reason: 'invalid_target' },
+    ]);
+    expectNoCredentialLeak(calls);
+  });
+
+  it('reports a rendered validation error and omits clientId when it was not parsed', async () => {
+    const { analytics, calls } = fakeAnalytics();
+    // `authorizeUrl` drops undefined params, so this request has no client_id.
+    await authorize({ client_id: undefined }, { analytics });
+    expect(calls).toStrictEqual([{ phase: 'failed', identity: null, reason: 'invalid_request' }]);
+    expectNoCredentialLeak(calls);
   });
 });

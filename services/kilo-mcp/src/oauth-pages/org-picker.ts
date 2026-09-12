@@ -190,7 +190,8 @@ export async function handleOrgPicker(request: Request, deps: OrgPickerDeps): Pr
     !record ||
     record.expiresAt <= nowIso ||
     record.status === 'used' ||
-    record.status === 'denied'
+    record.status === 'denied' ||
+    record.status === 'expired'
   ) {
     return errorPage(
       'invalid_request',

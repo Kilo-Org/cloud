@@ -1,4 +1,12 @@
 import catalogJson from '../catalog.json';
+import {
+  classifyToolError,
+  createMcpAnalytics,
+  queryShape,
+  type AnalyticsIdentity,
+  type CallRejectedReason,
+  type McpAnalytics,
+} from './analytics';
 import { authenticate } from './auth';
 import { handleAuthorize } from './auth/authorize';
 import { handleRegistration } from './auth/dcr';
@@ -46,6 +54,14 @@ const UNAUTHORIZED = -32001;
 
 const PROTOCOL_VERSION = '2025-06-18';
 const SERVER_INFO = { name: 'kilo-mcp', version: '1.0.0' } as const;
+
+/**
+ * The published tool names. `tools/call` accepts any string as `name`, so the
+ * value is caller-controlled; analytics records a name only when it is one of
+ * these and reports everything else as `unknown`, so arbitrary caller text can
+ * never reach PostHog.
+ */
+const PUBLISHED_TOOL_NAMES = new Set(['search', 'call']);
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -150,7 +166,37 @@ type McpHandlerDeps = {
    * foreign bearers are rejected. Omitted in tests without the OAuth flow.
    */
   mcpAuth?: { tokenSecret: string; store: OAuthStoreApi };
+  /**
+   * PostHog emitter for this request (s2). Omitted in tests that do not care
+   * about analytics; the handler then uses a no-op emitter so behaviour is
+   * unchanged. The emitter is best-effort and can never throw.
+   */
+  analytics?: McpAnalytics;
 };
+
+/**
+ * Used when a handler is built without an analytics emitter (existing tests,
+ * and any caller that does not opt in). Every method is a no-op.
+ */
+const noopAnalytics: McpAnalytics = {
+  sessionStarted: () => {},
+  toolCalled: () => {},
+  searchPerformed: () => {},
+  callRejected: () => {},
+  oauthSignIn: () => {},
+};
+
+/**
+ * The identity an event is bound to: present only when the bearer was verified
+ * as this worker's MCP access token (s6). A caller-supplied header never
+ * contributes — identity comes from the verified claims, never from the
+ * request.
+ */
+function identity(auth: ForwardedAuth): AnalyticsIdentity | null {
+  return auth.mcpIdentity
+    ? { kiloUserId: auth.mcpIdentity.kiloUserId, organizationId: auth.mcpIdentity.organizationId }
+    : null;
+}
 
 /** An MCP tools/call success payload. */
 type ToolResult = {
@@ -171,7 +217,9 @@ async function runTool(
   name: string,
   args: Record<string, unknown>,
   auth: ForwardedAuth,
-  deps: McpHandlerDeps
+  deps: McpHandlerDeps,
+  analytics: McpAnalytics,
+  callerIdentity: AnalyticsIdentity | null
 ): Promise<ToolResult> {
   if (name === 'search') {
     const query = args['query'];
@@ -195,6 +243,14 @@ async function runTool(
       catalog: deps.catalog,
       limit,
       semanticCandidates: deps.semanticCandidates ?? noSemanticCandidates,
+    });
+    // The query's shape only — never the raw text (it can carry personal data).
+    analytics.searchPerformed({
+      identity: callerIdentity,
+      hitCount: results.length,
+      empty: results.length === 0,
+      ...queryShape(query),
+      limit: Math.max(1, Math.floor(limit ?? DEFAULT_SEARCH_LIMIT)),
     });
     if (results.length === 0) {
       // Empty state, not an error: tell the agent how to recover.
@@ -245,6 +301,8 @@ async function handleRpcMessage(
 ): Promise<Response> {
   const id = typeof message.id === 'string' || typeof message.id === 'number' ? message.id : null;
   const method = typeof message.method === 'string' ? message.method : '';
+  const analytics = deps.analytics ?? noopAnalytics;
+  const callerIdentity = identity(auth);
 
   // Notifications carry no id and get no JSON-RPC response body.
   if (id === null && method.startsWith('notifications/')) {
@@ -255,11 +313,18 @@ async function handleRpcMessage(
     switch (method) {
       case 'initialize': {
         const params = isRecord(message.params) ? message.params : {};
+        const protocolVersion =
+          typeof params['protocolVersion'] === 'string'
+            ? params['protocolVersion']
+            : PROTOCOL_VERSION;
+        const clientInfo = isRecord(params['clientInfo']) ? params['clientInfo'] : {};
+        analytics.sessionStarted({
+          identity: callerIdentity,
+          protocolVersion,
+          ...(typeof clientInfo['name'] === 'string' ? { clientName: clientInfo['name'] } : {}),
+        });
         return jsonRpcResult(id ?? 0, {
-          protocolVersion:
-            typeof params['protocolVersion'] === 'string'
-              ? params['protocolVersion']
-              : PROTOCOL_VERSION,
+          protocolVersion,
           capabilities: { tools: {} },
           serverInfo: SERVER_INFO,
           instructions:
@@ -278,13 +343,61 @@ async function handleRpcMessage(
         if (typeof params['name'] !== 'string') {
           throw new JsonRpcFailure(INVALID_PARAMS, 'tools/call requires a string "name".');
         }
+        const toolName = params['name'];
         const rawArguments = params['arguments'];
         if (rawArguments !== undefined && !isRecord(rawArguments)) {
           throw new JsonRpcFailure(INVALID_PARAMS, 'tools/call "arguments" must be an object.');
         }
         const args = rawArguments ?? {};
-        const result = await runTool(params['name'], args, auth, deps);
-        return jsonRpcResult(id ?? 0, result);
+        // Analytics records only a published tool name; anything else is
+        // caller-supplied text and must never reach PostHog verbatim.
+        const analyticsTool = PUBLISHED_TOOL_NAMES.has(toolName) ? toolName : 'unknown';
+        // The path is only recorded when it is a real catalog key, so a caller
+        // cannot put arbitrary text into the event through `path`.
+        const path =
+          typeof args['path'] === 'string' &&
+          Object.prototype.hasOwnProperty.call(deps.catalog, args['path'])
+            ? args['path']
+            : undefined;
+        const startedAt = performance.now();
+        try {
+          const result = await runTool(toolName, args, auth, deps, analytics, callerIdentity);
+          analytics.toolCalled({
+            identity: callerIdentity,
+            tool: analyticsTool,
+            ...(path !== undefined ? { path } : {}),
+            success: true,
+            errorClass: 'none',
+            latencyMs: performance.now() - startedAt,
+          });
+          return jsonRpcResult(id ?? 0, result);
+        } catch (error) {
+          const errorClass = classifyToolError(error);
+          analytics.toolCalled({
+            identity: callerIdentity,
+            tool: analyticsTool,
+            ...(path !== undefined ? { path } : {}),
+            success: false,
+            errorClass,
+            latencyMs: performance.now() - startedAt,
+          });
+          // A `call` rejected locally — before any upstream request — is a
+          // distinct event: auth failure is handled at the transport above.
+          const rejectedReason: CallRejectedReason | null =
+            errorClass === 'unknown_path' ||
+            errorClass === 'schema_invalid' ||
+            errorClass === 'invalid_params'
+              ? errorClass
+              : null;
+          if (toolName === 'call' && rejectedReason) {
+            analytics.callRejected({
+              identity: callerIdentity,
+              reason: rejectedReason,
+              ...(path !== undefined ? { path } : {}),
+            });
+          }
+          throw error;
+        }
       }
       default:
         return jsonRpcError(id, METHOD_NOT_FOUND, `Unknown method "${method}".`);
@@ -311,6 +424,8 @@ export function createMcpHandler(deps: McpHandlerDeps) {
     if (request.method !== 'POST') {
       return withCorsHeaders(new Response('Method not allowed', { status: 405 }));
     }
+
+    const analytics = deps.analytics ?? noopAnalytics;
 
     // The issuer is always the URL this worker is reached at (dev vs prod
     // advertise themselves); the access token's `aud` is the `/mcp` resource.
@@ -345,6 +460,9 @@ export function createMcpHandler(deps: McpHandlerDeps) {
         : undefined
     );
     if (!auth) {
+      // Anonymous by construction: no user has been verified, so the event
+      // must not be bound to a person ($process_person_profile: false).
+      analytics.callRejected({ identity: null, reason: 'auth_failure' });
       // HTTP 401 alongside a JSON-RPC error body; rejected before any
       // catalog lookup or upstream request. The challenge names this
       // server's protected-resource metadata (RFC 9728) so the MCP client
@@ -397,9 +515,12 @@ export function createMcpHandler(deps: McpHandlerDeps) {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const issuer = url.origin;
+    // Best-effort PostHog emitter for this request; every emit is scheduled
+    // through `ctx.waitUntil` so it never blocks or fails the response.
+    const analytics = createMcpAnalytics({ env, ctx });
 
     switch (url.pathname) {
       case AUTH_PATHS.mcp: {
@@ -428,6 +549,7 @@ export default {
             catalog,
             webBaseUrl: env.WEB_BASE_URL,
             semanticCandidates: createSemanticCandidates(env),
+            analytics,
           });
           return transportOnly(request);
         }
@@ -436,6 +558,7 @@ export default {
           webBaseUrl: env.WEB_BASE_URL,
           semanticCandidates: createSemanticCandidates(env),
           mcpAuth: { tokenSecret: env.MCP_TOKEN_SECRET, store: getKiloMcpOAuthStoreStub(env) },
+          analytics,
         });
         return handler(request);
       }
@@ -447,27 +570,39 @@ export default {
         return handleProtectedResourceMetadata(request, { issuer });
       case AUTH_PATHS.register:
         return handleRegistration(request, { store: getKiloMcpOAuthStoreStub(env) });
-      case AUTH_PATHS.authorize:
-        return handleAuthorize(request, {
+      case AUTH_PATHS.authorize: {
+        // Built as a variable (not an inline literal) so the extra `analytics`
+        // property is allowed until s3 adds the optional field to the handler
+        // deps type. s3 emits OAuth sign-in events from this emitter.
+        const authorizeDeps = {
           store: getKiloMcpOAuthStoreStub(env),
           webBaseUrl: env.WEB_BASE_URL,
-        });
-      case AUTH_PATHS.pairingStatus:
-        return handlePairingStatus(request, {
+          analytics,
+        };
+        return handleAuthorize(request, authorizeDeps);
+      }
+      case AUTH_PATHS.pairingStatus: {
+        const pairingStatusDeps = {
           store: getKiloMcpOAuthStoreStub(env),
           webBaseUrl: env.WEB_BASE_URL,
-        });
+          analytics,
+        };
+        return handlePairingStatus(request, pairingStatusDeps);
+      }
       case AUTH_PATHS.orgPicker:
         return handleOrgPicker(request, {
           store: getKiloMcpOAuthStoreStub(env),
           webBaseUrl: env.WEB_BASE_URL,
         });
-      case AUTH_PATHS.token:
-        return handleToken(request, {
+      case AUTH_PATHS.token: {
+        const tokenDeps = {
           store: getKiloMcpOAuthStoreStub(env),
           tokenSecret: requireMcpTokenSecret(env),
           issuer,
-        });
+          analytics,
+        };
+        return handleToken(request, tokenDeps);
+      }
       default:
         return withCorsHeaders(new Response('Not found', { status: 404 }));
     }

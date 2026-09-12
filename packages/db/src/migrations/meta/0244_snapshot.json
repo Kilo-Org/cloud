@@ -1,5 +1,5 @@
 {
-  "id": "cd16d65b-2c1a-4f5d-9d06-16a600559805",
+  "id": "0d168799-31b0-4612-a396-66d7509df770",
   "prevId": "e00b62f1-939f-4d71-bf8f-4a5e9e304016",
   "version": "7",
   "dialect": "postgresql",
@@ -31340,7 +31340,7 @@
         },
         "provider_oauth_attempts_status_check": {
           "name": "provider_oauth_attempts_status_check",
-          "value": "\"provider_oauth_attempts\".\"status\" IN ('pending', 'activating', 'captured', 'consumed', 'expired')"
+          "value": "\"provider_oauth_attempts\".\"status\" IN ('pending', 'captured', 'consumed', 'expired')"
         },
         "provider_oauth_attempts_purpose_check": {
           "name": "provider_oauth_attempts_purpose_check",

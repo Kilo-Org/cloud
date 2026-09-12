@@ -23,11 +23,7 @@ const ownerCondition = (owner: Owner) =>
     ? eq(provider_oauth_attempts.owned_by_organization_id, owner.id)
     : eq(provider_oauth_attempts.owned_by_user_id, owner.id);
 
-export async function lockProviderOAuthOwnerRow(
-  tx: DrizzleTransaction,
-  owner: Owner,
-  options: { allowDeletedOrganization?: boolean } = {}
-) {
+export async function lockProviderOAuthOwnerRow(tx: DrizzleTransaction, owner: Owner) {
   await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
   await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
   const rows =
@@ -35,11 +31,7 @@ export async function lockProviderOAuthOwnerRow(
       ? await tx
           .select({ id: organizations.id })
           .from(organizations)
-          .where(
-            options.allowDeletedOrganization
-              ? eq(organizations.id, owner.id)
-              : and(eq(organizations.id, owner.id), isNull(organizations.deleted_at))
-          )
+          .where(and(eq(organizations.id, owner.id), isNull(organizations.deleted_at)))
           .for('update')
       : await tx
           .select({ id: kilocode_users.id })
@@ -52,7 +44,7 @@ export async function lockProviderOAuthOwnerRow(
 export async function pruneProviderOAuthAttempts(tx: DrizzleTransaction): Promise<void> {
   const now = new Date().toISOString();
   await tx.execute(
-    sql`WITH expired AS (SELECT id FROM ${provider_oauth_attempts} WHERE status IN ('pending', 'activating', 'captured', 'consumed') AND expires_at < ${now} ORDER BY expires_at LIMIT 100) UPDATE ${provider_oauth_attempts} attempts SET status = 'expired' FROM expired WHERE attempts.id = expired.id`
+    sql`WITH expired AS (SELECT id FROM ${provider_oauth_attempts} WHERE status IN ('pending', 'captured', 'consumed') AND expires_at < ${now} ORDER BY expires_at LIMIT 100) UPDATE ${provider_oauth_attempts} attempts SET status = 'expired' FROM expired WHERE attempts.id = expired.id`
   );
   await tx.execute(
     sql`DELETE FROM ${provider_oauth_attempts} WHERE id IN (SELECT id FROM ${provider_oauth_attempts} WHERE status = 'expired' AND expires_at < ${new Date(Date.now() - 24 * 60 * 60_000).toISOString()} ORDER BY expires_at LIMIT 100)`
@@ -189,75 +181,6 @@ export async function consumeProviderOAuthAttempt(input: {
   });
 }
 
-export async function claimUnsharedSlackOAuthAttemptForExchange(input: {
-  actorUserId: string;
-  owner: Owner;
-  state: string;
-}): Promise<boolean> {
-  return db.transaction(async tx => {
-    await lockProviderOAuthOwnerRow(tx, input.owner);
-    const [shared] = await tx
-      .select({ id: platform_integrations.id })
-      .from(platform_integrations)
-      .innerJoin(
-        github_app_installations,
-        eq(platform_integrations.github_installation_id, github_app_installations.id)
-      )
-      .where(
-        and(
-          input.owner.type === 'org'
-            ? eq(platform_integrations.owned_by_organization_id, input.owner.id)
-            : eq(platform_integrations.owned_by_user_id, input.owner.id),
-          eq(platform_integrations.platform, PLATFORM.GITHUB),
-          eq(github_app_installations.sharing_mode, 'web_cloud_agent')
-        )
-      )
-      .limit(1);
-    if (shared) return false;
-    const claimed = await tx
-      .update(provider_oauth_attempts)
-      .set({ status: 'activating' })
-      .where(
-        and(
-          ownerCondition(input.owner),
-          eq(provider_oauth_attempts.provider, 'slack'),
-          eq(provider_oauth_attempts.purpose, 'provider_install'),
-          eq(provider_oauth_attempts.initiated_by_user_id, input.actorUserId),
-          eq(provider_oauth_attempts.state_hash, providerOAuthStateHash(input.state)),
-          eq(provider_oauth_attempts.status, 'pending'),
-          gt(provider_oauth_attempts.expires_at, new Date().toISOString())
-        )
-      )
-      .returning({ id: provider_oauth_attempts.id });
-    return claimed.length === 1;
-  });
-}
-
-export async function completeUnsharedSlackOAuthAttempt(input: {
-  actorUserId: string;
-  owner: Owner;
-  state: string;
-}): Promise<boolean> {
-  return db.transaction(async tx => {
-    await lockProviderOAuthOwnerRow(tx, input.owner);
-    const completed = await tx
-      .update(provider_oauth_attempts)
-      .set({ status: 'consumed', consumed_at: new Date().toISOString() })
-      .where(
-        and(
-          ownerCondition(input.owner),
-          eq(provider_oauth_attempts.provider, 'slack'),
-          eq(provider_oauth_attempts.purpose, 'provider_install'),
-          eq(provider_oauth_attempts.initiated_by_user_id, input.actorUserId),
-          eq(provider_oauth_attempts.state_hash, providerOAuthStateHash(input.state)),
-          eq(provider_oauth_attempts.status, 'activating')
-        )
-      )
-      .returning({ id: provider_oauth_attempts.id });
-    return completed.length === 1;
-  });
-}
-
 export async function cancelProviderOAuthAttempt(input: {
   actorUserId: string;
   owner: Owner;
@@ -278,10 +201,7 @@ export async function cancelProviderOAuthAttempt(input: {
           eq(provider_oauth_attempts.purpose, input.purpose),
           eq(provider_oauth_attempts.initiated_by_user_id, input.actorUserId),
           eq(provider_oauth_attempts.state_hash, providerOAuthStateHash(input.state)),
-          or(
-            eq(provider_oauth_attempts.status, 'pending'),
-            eq(provider_oauth_attempts.status, 'activating')
-          )
+          eq(provider_oauth_attempts.status, 'pending')
         )
       )
       .returning({ id: provider_oauth_attempts.id });
@@ -302,13 +222,10 @@ export async function hasPendingProviderOAuthAttempt(
     .where(
       and(
         or(...conditions),
+        ne(provider_oauth_attempts.provider, 'slack'),
         or(
           eq(provider_oauth_attempts.status, 'pending'),
-          eq(provider_oauth_attempts.status, 'activating'),
-          and(
-            ne(provider_oauth_attempts.provider, 'slack'),
-            eq(provider_oauth_attempts.status, 'consumed')
-          )
+          eq(provider_oauth_attempts.status, 'consumed')
         ),
         lt(provider_oauth_attempts.expires_at, now)
       )
@@ -319,14 +236,10 @@ export async function hasPendingProviderOAuthAttempt(
     .where(
       and(
         or(...conditions),
+        ne(provider_oauth_attempts.provider, 'slack'),
         or(
           eq(provider_oauth_attempts.status, 'pending'),
-          eq(provider_oauth_attempts.status, 'activating'),
-          eq(provider_oauth_attempts.status, 'captured'),
-          and(
-            ne(provider_oauth_attempts.provider, 'slack'),
-            eq(provider_oauth_attempts.status, 'consumed')
-          )
+          eq(provider_oauth_attempts.status, 'consumed')
         ),
         gt(provider_oauth_attempts.expires_at, now)
       )

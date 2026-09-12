@@ -757,7 +757,7 @@ async function deactivateSlackInstallation(
   const teamId = candidate.platform_installation_id ?? candidate.platform_account_id;
   if (!teamId) throw new Error('Slack installation is missing a team ID');
   return db.transaction(async tx => {
-    await lockProviderOAuthOwnerRow(tx, owner, { allowDeletedOrganization: true });
+    await lockProviderOAuthOwnerRow(tx, owner);
     const [reservation] = await tx
       .select()
       .from(provider_installation_reservations)
@@ -899,9 +899,7 @@ async function cleanupDeactivatedSlackInstallation(
   }
 
   return db.transaction(async tx => {
-    await lockProviderOAuthOwnerRow(tx, deactivated.owner, {
-      allowDeletedOrganization: true,
-    });
+    await lockProviderOAuthOwnerRow(tx, deactivated.owner);
     const [replacement] = await tx
       .select()
       .from(provider_installation_reservations)

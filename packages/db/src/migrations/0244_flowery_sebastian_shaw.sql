@@ -55,11 +55,17 @@ CREATE INDEX "IDX_provider_installation_reservations_integration" ON "provider_i
 CREATE INDEX "IDX_provider_installation_reservations_expires" ON "provider_installation_reservations" USING btree ("expires_at");--> statement-breakpoint
 ALTER TABLE "provider_oauth_attempts" ADD CONSTRAINT "provider_oauth_attempts_completed_integration_id_platform_integrations_id_fk" FOREIGN KEY ("completed_integration_id") REFERENCES "public"."platform_integrations"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "IDX_provider_oauth_attempts_provider_installation" ON "provider_oauth_attempts" USING btree ("provider","provider_installation_id");--> statement-breakpoint
-ALTER TABLE "provider_oauth_attempts" ADD CONSTRAINT "provider_oauth_attempts_status_check" CHECK ("provider_oauth_attempts"."status" IN ('pending', 'activating', 'captured', 'consumed', 'expired'));
+ALTER TABLE "provider_oauth_attempts" ADD CONSTRAINT "provider_oauth_attempts_status_check" CHECK ("provider_oauth_attempts"."status" IN ('pending', 'captured', 'consumed', 'expired'));
 -->  statement-breakpoint
 INSERT INTO "provider_installation_reservations" ("provider", "provider_installation_id", "owned_by_user_id", "owned_by_organization_id", "platform_integration_id", "generation", "active_generation", "status", "expires_at")
 SELECT 'slack', integration."platform_installation_id", integration."owned_by_user_id", integration."owned_by_organization_id", integration."id", 1, 1, 'active', '9999-12-31 23:59:59.999+00'
 FROM "platform_integrations" integration
-WHERE integration."platform" = 'slack' AND integration."integration_status" = 'active' AND integration."platform_installation_id" IS NOT NULL
-AND NOT EXISTS (SELECT 1 FROM "slack_oauth_credentials" credential WHERE credential."platform_integration_id" = integration."id" AND credential."is_enterprise_install" = true)
+WHERE integration."platform" = 'slack'
+  AND integration."integration_status" = 'active'
+  AND integration."platform_installation_id" IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM "slack_oauth_credentials" credential
+    WHERE credential."platform_integration_id" = integration."id"
+      AND credential."is_enterprise_install" = true
+  )
 ON CONFLICT ("provider", "provider_installation_id") DO NOTHING;

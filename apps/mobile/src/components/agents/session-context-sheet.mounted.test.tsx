@@ -14,7 +14,7 @@ const holder = vi.hoisted(() => ({
   instances: [] as unknown[],
   isPending: false,
   copied: [] as string[],
-  copyResult: true,
+  copyResult: true as boolean | Promise<boolean>,
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -162,7 +162,7 @@ describe('SessionContextSheet session id and running on', () => {
     await unmount(renderer);
   });
 
-  it('shows the could-not-copy outcome in the row when the copy fails', async () => {
+  it('shows the could-not-copy outcome and retries from the same row', async () => {
     holder.copyResult = false;
     const renderer = await mountSheet();
     await act(async () => {
@@ -173,6 +173,15 @@ describe('SessionContextSheet session id and running on', () => {
     expect(values).toContain(i18n.t('agents.sessionRow.couldNotCopyId'));
     expect(values).not.toContain(i18n.t('agents.sessionRow.idCopied'));
     expect(values).toContain(i18n.t('agents.sessionRow.copyId'));
+
+    holder.copyResult = true;
+    await act(async () => {
+      pressByTestID(renderer, 'session-context-sheet-copy-id');
+      await Promise.resolve();
+    });
+    expect(holder.copied).toEqual(['ses-123', 'ses-123']);
+    expect(textValues(renderer)).toContain(i18n.t('agents.sessionRow.idCopied'));
+    expect(textValues(renderer)).not.toContain(i18n.t('agents.sessionRow.couldNotCopyId'));
     await unmount(renderer);
   });
 
@@ -191,6 +200,60 @@ describe('SessionContextSheet session id and running on', () => {
     expect(textValues(renderer)).not.toContain(i18n.t('agents.sessionRow.idCopied'));
     await unmount(renderer);
   });
+
+  it.each([
+    { success: true, resolveWhileClosed: true },
+    { success: false, resolveWhileClosed: true },
+    { success: true, resolveWhileClosed: false },
+    { success: false, resolveWhileClosed: false },
+  ])(
+    'ignores a late copy result after closing (success=$success, resolveWhileClosed=$resolveWhileClosed)',
+    async ({ success, resolveWhileClosed }) => {
+      const pendingCopy = Promise.withResolvers<boolean>();
+      holder.copyResult = pendingCopy.promise;
+      const renderer = await mountSheet();
+      await act(async () => {
+        pressByTestID(renderer, 'session-context-sheet-copy-id');
+        await Promise.resolve();
+      });
+      expect(textValues(renderer)).toContain(i18n.t('agents.sessionRow.copyId'));
+      expect(textValues(renderer)).not.toContain(i18n.t('agents.sessionRow.idCopied'));
+      expect(textValues(renderer)).not.toContain(i18n.t('agents.sessionRow.couldNotCopyId'));
+      await act(async () => {
+        renderer.update(sheetElement({ visible: false }));
+        await Promise.resolve();
+      });
+      if (!resolveWhileClosed) {
+        await act(async () => {
+          renderer.update(sheetElement());
+          await Promise.resolve();
+        });
+      }
+      await act(async () => {
+        pendingCopy.resolve(success);
+        await pendingCopy.promise;
+      });
+      if (resolveWhileClosed) {
+        await act(async () => {
+          renderer.update(sheetElement());
+          await Promise.resolve();
+        });
+      }
+      const values = textValues(renderer);
+      expect(values).toContain(i18n.t('agents.sessionRow.copyId'));
+      expect(values).not.toContain(i18n.t('agents.sessionRow.idCopied'));
+      expect(values).not.toContain(i18n.t('agents.sessionRow.couldNotCopyId'));
+
+      holder.copyResult = true;
+      await act(async () => {
+        pressByTestID(renderer, 'session-context-sheet-copy-id');
+        await Promise.resolve();
+      });
+      expect(holder.copied).toEqual(['ses-123', 'ses-123']);
+      expect(textValues(renderer)).toContain(i18n.t('agents.sessionRow.idCopied'));
+      await unmount(renderer);
+    }
+  );
 
   it('shows the owning instance under the picker Run on label for a live CLI session', async () => {
     holder.instances = [

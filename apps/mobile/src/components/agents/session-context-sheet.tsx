@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The context sheet composes the usage ring, token totals, and per-model cost rows. */
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -103,13 +103,18 @@ export function SessionContextSheet({
   const { t } = useTranslation();
   const runningOn = useRunningOnLabel(activeSessionType, ownerConnectionId, visible);
   const [copyState, setCopyState] = useState<CopyFeedbackState>('idle');
+  const copyFeedbackGeneration = useRef(0);
   // sonner toasts render in the app root, behind this Modal's window, so the
   // copy row shows the outcome inline instead of relying on the toast.
-  // Closing the sheet clears the feedback so a reopen starts from the CTA.
+  // Closing the sheet clears feedback and invalidates pending results so a
+  // reopen starts from the CTA even if an earlier copy finishes late.
   useEffect(() => {
     if (!visible) {
       setCopyState('idle');
     }
+    return () => {
+      copyFeedbackGeneration.current += 1;
+    };
   }, [visible]);
   const copyStatus = copyStatusLabel(copyState, t);
   const content = getContextSheetContent(info, totalCostMicrodollars);
@@ -211,8 +216,11 @@ export function SessionContextSheet({
           <Pressable
             onPress={() => {
               void (async () => {
+                const generation = copyFeedbackGeneration.current;
                 const success = await copySessionId(sessionId);
-                setCopyState(success ? 'copied' : 'failed');
+                if (generation === copyFeedbackGeneration.current) {
+                  setCopyState(success ? 'copied' : 'failed');
+                }
               })();
             }}
             accessibilityRole="button"

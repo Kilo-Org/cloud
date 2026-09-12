@@ -17,7 +17,6 @@ export default defineProject({
   test: {
     name: 'mobile-pure',
     environment: 'node',
-    setupFiles: ['./vitest.setup.ts'],
     // Project configs do not inherit the root test options, and this suite
     // runs both projects in parallel: on a loaded host (dev stack, simulator,
     // Appium) workers starve and real-timer tests exceed the 5s default. One

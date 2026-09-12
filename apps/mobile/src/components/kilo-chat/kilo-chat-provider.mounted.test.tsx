@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 /* eslint-disable eslint/max-classes-per-file -- hoisted mock classes for two different packages */
 import { createElement, type ReactElement, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { KiloChatProvider } from './kilo-chat-provider';

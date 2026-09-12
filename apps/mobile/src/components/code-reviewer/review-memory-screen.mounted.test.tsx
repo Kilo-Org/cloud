@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- cohesive mounted suite for the review-memory screen state contract */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 
 // Review-memory screen state contract: loading skeleton, retryable summary and
 // proposals errors, the feature-disabled off-state (enable CTA for billing
@@ -8,7 +7,7 @@
 // layer is mocked so each state is driven directly through the screen JSX.
 
 import { createElement, Fragment, type ReactElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';

@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted Button contract tests. */
 // eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
 import { createRequire } from 'node:module';
 import tailwindcss from '@tailwindcss/postcss';
@@ -7,7 +6,7 @@ import { createElement, type ReactElement, useState } from 'react';
 import { Text as NativeText, Pressable } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Button, type ButtonProps } from './button';

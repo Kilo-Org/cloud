@@ -5,7 +5,7 @@ import { defineProject } from 'vitest/config';
 import { inlineSqlPlugin } from './vitest.sql-plugin';
 
 // Mounted tests: render a real React tree (providers + TanStack Query) with
-// react-test-renderer, which is DOM-free, so a `node` environment is used (no
+// test-renderer, which is DOM-free, so a `node` environment is used (no
 // jsdom). Files match `*.mounted.test.tsx` so they never run in the pure
 // project.
 export default defineProject({
@@ -18,7 +18,6 @@ export default defineProject({
   test: {
     name: 'mobile-mounted',
     environment: 'node',
-    setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.mounted.test.tsx'],
     // Project configs do not inherit the root test options, and this suite
     // runs both projects in parallel: on a loaded host (dev stack, simulator,

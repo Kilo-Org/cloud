@@ -131,7 +131,6 @@
     "@expo/plist": "0.8.1",
     "@sentry/cli": "catalog:",
     "@types/react": "19.2.14",
-    "@types/react-test-renderer": "^19.1.0",
     "@typescript/native-preview": "catalog:",
     "babel-plugin-inline-import": "^3.0.0",
     "babel-preset-expo": "~57.0.7",
@@ -139,7 +138,7 @@
     "eslint-plugin-sonarjs": "4.2.0",
     "knip": "6.32.2",
     "postcss": "8.5.26",
-    "react-test-renderer": "^19.2.8",
+    "test-renderer": "1.2.0",
     "typescript": "~6.0.3",
     "vitest": "catalog:"
   },

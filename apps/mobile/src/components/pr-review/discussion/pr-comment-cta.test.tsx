@@ -1,11 +1,10 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as pr-review-discussion-tab.test.tsx) */
 // The bottom CTA bar: static chrome that wraps a full-width primary Button.
 // Covers the label/icon/role wiring, the press wiring, the safe-area padding
 // while the keyboard is closed, and the keyboard-open lift (the request:
 // bottom action accessible with the keyboard open).
 
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';

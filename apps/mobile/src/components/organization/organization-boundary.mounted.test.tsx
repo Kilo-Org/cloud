@@ -1,5 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); same pattern as src/test/render-with-providers.tsx. */
-
 // Boundary-state regression: three mutually exclusive settled states must map
 // to three distinct copies. A deep-link override that is absent from the member
 // list is access-denied, a fetch failure is a retryable QueryError, and a still
@@ -7,7 +5,7 @@
 // keeps the older "unavailable" copy.
 
 import { type ComponentType, createElement, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';

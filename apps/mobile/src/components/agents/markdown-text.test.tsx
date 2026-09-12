@@ -1,9 +1,9 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- the HTML routing, sanitization, and interaction tests share one React Native module mock harness */
+/* eslint-disable max-lines -- the HTML routing, sanitization, and interaction tests share one React Native module mock harness */
 // eslint-disable-next-line import/no-nodejs-modules -- the real HTML engine needs a React Native stub in the node test environment
 import Module from 'node:module';
 import { type ComponentType, createElement, type ReactElement } from 'react';
 import { type GestureResponderEvent } from 'react-native';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MarkedLexer, useMarkdown } from 'react-native-marked';

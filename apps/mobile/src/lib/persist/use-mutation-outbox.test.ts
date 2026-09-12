@@ -1,8 +1,7 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN hooks under vitest (node env, no jsdom) */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake outbox module factories settle without await */
 /* eslint-disable max-lines -- the key-reuse, write-helper, load-gating, and key-preservation suites share one harness in this file */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type OutboxRow } from '@/lib/persist/mutation-outbox';

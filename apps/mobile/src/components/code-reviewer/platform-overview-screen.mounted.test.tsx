@@ -1,5 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
-
 // actionRequired banner contract: a non-null `actionRequired` on the reviewer
 // config renders a distinct banner (title + description + recovery label)
 // above the enable switch. Null renders no banner — including the
@@ -7,7 +5,7 @@
 // not a banner. This is neither the empty state nor a success check.
 
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-reviews';

@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- cohesive mounted suite for the invoices screen state contract */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 
 // Invoices screen state contract: loading skeleton, first-page error
 // (retryable vs. permanent NOT_FOUND/FORBIDDEN/UNAUTHORIZED no-retry), the empty
@@ -8,7 +7,7 @@
 // is mocked so each state is driven directly through the screen JSX.
 
 import { createElement, Fragment, type ReactElement } from 'react';
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';

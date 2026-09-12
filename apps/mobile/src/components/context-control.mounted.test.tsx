@@ -1,6 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer mounts native presentation with mocked bridges. */
+/* eslint-disable max-lines -- test-renderer mounts native presentation with mocked bridges. */
 import { createElement, type ElementType } from 'react';
-import { act, type ReactTestInstance } from 'react-test-renderer';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';

@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free React Native hook integration */
 import { createElement } from 'react';
 import { onlineManager } from '@tanstack/react-query';
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type CachedActiveSessionsData } from '@/lib/active-sessions-live';

@@ -1,5 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); same pattern as src/test/render-with-providers.tsx. */
-
 // Screen-level empty-state precedence regression: when the member query errors
 // with no data, both member arrays are empty, so the list's empty component
 // must render the QueryError — not "No members yet". The item builder and the

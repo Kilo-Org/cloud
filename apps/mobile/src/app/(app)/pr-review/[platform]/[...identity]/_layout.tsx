@@ -122,6 +122,7 @@ export default function ProviderPrReviewLayout() {
             <Stack.Screen name="review-submit" options={sheetOptions} />
             <Stack.Screen name="merge" options={sheetOptions} />
             <Stack.Screen name="file-navigator" options={sheetOptions} />
+            <Stack.Screen name="conversation-comment" options={sheetOptions} />
           </Stack>
         </PrReviewConnectGate>
       </PendingReviewProvider>

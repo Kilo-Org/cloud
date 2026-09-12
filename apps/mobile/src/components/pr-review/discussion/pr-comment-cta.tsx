@@ -12,7 +12,6 @@
 // owns its own paddingBottom style slot.
 
 import { MessageSquarePlus } from '@/components/ui/icons';
-import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
@@ -24,6 +23,13 @@ import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 type PrCommentCtaProps = Readonly<{
   onPress: () => void;
   /**
+   * The CTA copy. The host resolves the provider's term (GitLab calls the
+   * review object a merge request and has no "Comment on this merge request"
+   * translation, so it sends the composer's provider-neutral "Add comment";
+   * GitHub and Bitbucket send "Comment on this pull request").
+   */
+  label: string;
+  /**
    * Whether the bar may lift above an open keyboard. Only while the
    * Discussion tab is actually focused: the keyboard events are global, and
    * a lift driven by a keyboard the user opened on ANOTHER surface (the
@@ -34,19 +40,14 @@ type PrCommentCtaProps = Readonly<{
   keyboardLift: boolean;
 }>;
 
-export function PrCommentCta({ onPress, keyboardLift }: PrCommentCtaProps) {
-  const { t } = useTranslation();
+export function PrCommentCta({ onPress, label, keyboardLift }: PrCommentCtaProps) {
   const colors = useThemeColors();
   const bottomPadding = useDetailScreenBottomPadding();
   const bar = (
     <View className="px-4 pt-3" style={{ paddingBottom: bottomPadding }}>
-      <Button
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={t('prReview.discussion.addCommentCta')}
-      >
+      <Button onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
         <MessageSquarePlus size={14} color={colors.primaryForeground} />
-        <Text>{t('prReview.discussion.addCommentCta')}</Text>
+        <Text>{label}</Text>
       </Button>
     </View>
   );

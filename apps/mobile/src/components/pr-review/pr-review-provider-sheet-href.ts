@@ -9,7 +9,11 @@ import { type Href } from 'expo-router';
 
 import { type ProviderPrRef, providerPrRouteSegments } from '@/lib/pr-review/provider-pr-ref';
 
-export type ProviderPrSheetRoute = 'comment-composer' | 'review-submit' | 'merge';
+export type ProviderPrSheetRoute =
+  | 'comment-composer'
+  | 'review-submit'
+  | 'merge'
+  | 'conversation-comment';
 
 /**
  * The href for one sheet under the ref's own route. A GitLab `instanceHint`

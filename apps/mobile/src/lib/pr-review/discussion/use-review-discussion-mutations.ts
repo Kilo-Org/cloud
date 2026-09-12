@@ -316,16 +316,41 @@ const PR_COMMENT_UI_DEADLINE_MS = 15_000;
 
 export function useAddPrCommentMutation() {
   const queryClient = useQueryClient();
-  const keys = useGithubDiscussionKeys();
+  const scope = useDiscussionScope();
+  const keys = useDiscussionKeys(scope);
   const { getKey, rotateKey } = useHoistedOperationKey();
 
   return useMutation({
     mutationFn: async (input: AddPrCommentInput) => {
       try {
+        if (scope.ref.platform === 'github') {
+          const result = await withUiDeadline(
+            trpcClient.githubPrReview.addIssueComment.mutate({
+              ...input,
+              operationKey: getKey(prIntentFingerprint('add_pr_comment', input)),
+            }),
+            PR_COMMENT_UI_DEADLINE_MS
+          );
+          rotateKey();
+          return result;
+        }
+        // The provider arm (s3) posts the top-level conversation comment with
+        // no anchor: the same `providerReview.addComment` seam the inline
+        // composer uses, whose unanchored call is a plain note on both
+        // providers. The fingerprint rides the s1 provider identity with the
+        // `create_review_comment` intent and `body` only — an unanchored
+        // conversation comment and the inline composer's no-anchor fallback
+        // are the same server intent, so a retried post dedupes on one key.
         const result = await withUiDeadline(
-          trpcClient.githubPrReview.addIssueComment.mutate({
-            ...input,
-            operationKey: getKey(prIntentFingerprint('add_pr_comment', input)),
+          trpcClient.providerReview.addComment.mutate({
+            ...providerWriteIdentity(scope),
+            body: input.body,
+            operationKey: getKey(
+              prIntentFingerprint(
+                'create_review_comment',
+                providerFingerprintInput(scope.ref, { body: input.body })
+              )
+            ),
           }),
           PR_COMMENT_UI_DEADLINE_MS
         );

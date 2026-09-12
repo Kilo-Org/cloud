@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one file for the durable-draft clear-rule suite, the inline error classification, and the s3 provider draft-key isolation */
 // Clear-rule and state coverage for the conversation (issue) comment
 // composer's durable draft: cleared on a successful post and on a confirmed
 // discard, kept on every failure path and on a keep-editing discard.
@@ -32,6 +33,7 @@ import {
   pressButton,
   pressDiscard,
   pressKeepEditing,
+  providerScope,
   requireByType,
   termsGateMock,
   typeBody,
@@ -42,6 +44,17 @@ import '@/i18n';
 import * as Haptics from 'expo-haptics';
 import { PrConversationCommentComposer } from './pr-conversation-comment-composer';
 import { clearDraft, saveDraft } from '@/lib/persist/drafts';
+import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
+
+// A GitLab self-managed instance with the same project path as a gitlab.com
+// project must never share the composer's durable draft — the s3 suffix
+// isolates one draft per instance.
+const GITLAB_REF: ProviderPrRef = {
+  platform: 'gitlab',
+  projectPath: 'group/sub/app',
+  mrIid: 12,
+  instanceHint: 'https://gl.example.com',
+};
 
 function mountComposer(): React.ReactElement {
   // One render pass per mount call: the cursor restarts at 0 while the boxes
@@ -63,6 +76,7 @@ describe('PrConversationCommentComposer', () => {
     persistenceFailed.value = false;
     ambiguous.value = false;
     connectivity.value = 'online';
+    providerScope.value = null;
     addCommentMocks.mutateAsync.mockReset();
     addCommentMocks.isPending = false;
     addCommentMocks.error = null;
@@ -355,5 +369,45 @@ describe('PrConversationCommentComposer', () => {
 
     const field = requireByType(element, 'CommentBodyField');
     expect((field.props as { defaultValue?: string }).defaultValue).toBe('saved comment');
+  });
+
+  // ── s3: provider draft isolation ─────────────────────────────────────
+
+  it('suffixes the durable draft key with the provider ref on a provider route', () => {
+    // One draft per instance: a self-managed host and gitlab.com with the
+    // same project path get distinct keys (providerPrRefKey folds the
+    // instance origin), so neither reads the other's text.
+    providerScope.value = { ref: GITLAB_REF, organizationId: null };
+    const suffixed = `${DRAFT_KEY}@${providerPrRefKey(GITLAB_REF)}`;
+    const element = mountComposer();
+    typeBody(element, 'hello');
+
+    expect(saveDraft).toHaveBeenCalledWith('u1', suffixed, 'hello');
+    expect(saveDraft).not.toHaveBeenCalledWith('u1', DRAFT_KEY, 'hello');
+  });
+
+  it('keeps the GitHub draft key byte-identical with no provider scope', () => {
+    const element = mountComposer();
+    typeBody(element, 'hello');
+
+    expect(saveDraft).toHaveBeenCalledWith('u1', DRAFT_KEY, 'hello');
+  });
+
+  it('clears the provider-scoped draft on a successful post', async () => {
+    providerScope.value = { ref: GITLAB_REF, organizationId: null };
+    addCommentMocks.mutateAsync.mockResolvedValueOnce({});
+    const element = mountComposer();
+    typeBody(element, 'hello');
+    pressButton(element, 'Comment');
+    await flushMicrotasks();
+
+    expect(addCommentMocks.mutateAsync).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 7,
+      body: 'hello',
+    });
+    expect(clearDraft).toHaveBeenCalledWith('u1', `${DRAFT_KEY}@${providerPrRefKey(GITLAB_REF)}`);
+    expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
   });
 });

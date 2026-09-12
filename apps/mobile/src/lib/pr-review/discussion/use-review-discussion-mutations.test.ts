@@ -17,6 +17,11 @@
 // and resolve carry the ledger key, and the optimistic resolve flips the
 // provider-shaped cache (`resolved`, not `isResolved`). Reactions stay
 // GitHub-only: no provider exposes them through the seam.
+//
+// s3: the conversation-comment composer's post joins the provider arms —
+// `useAddPrCommentMutation` reads the live scope and posts an unanchored
+// `providerReview.addComment` note with the `create_review_comment`
+// fingerprint.
 /* eslint-disable max-lines -- one file for the reply/add-comment wiring, the resolve/unresolve/reaction generation guard + chainSave/scope serialization, the real-MutationCache scope.id serialization suite, and the s6 provider arms */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -99,6 +104,7 @@ const addCommentMutateMock = vi.fn();
 const resolveMutateMock = vi.fn();
 const unresolveMutateMock = vi.fn();
 const providerReplyMutateMock = vi.fn();
+const providerAddCommentMutateMock = vi.fn();
 const providerResolveMutateMock = vi.fn();
 const providerUnresolveMutateMock = vi.fn();
 const invalidateQueriesMock = vi.fn();
@@ -149,6 +155,8 @@ vi.mock('@/lib/trpc', () => ({
     providerReview: {
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       replyToComment: { mutate: (vars: unknown) => providerReplyMutateMock(vars) },
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      addComment: { mutate: (vars: unknown) => providerAddCommentMutateMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       resolveThread: { mutate: (vars: unknown) => providerResolveMutateMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -218,6 +226,7 @@ function resetMocks() {
   resolveMutateMock.mockReset();
   unresolveMutateMock.mockReset();
   providerReplyMutateMock.mockReset();
+  providerAddCommentMutateMock.mockReset();
   providerResolveMutateMock.mockReset();
   providerUnresolveMutateMock.mockReset();
   invalidateQueriesMock.mockReset();
@@ -413,8 +422,12 @@ describe('reply_comment fingerprint (P1-A-08c changed-input)', () => {
 
 describe('useAddPrCommentMutation (regular PR conversation comment wiring)', () => {
   beforeEach(() => {
+    // The hook reads the live provider scope from context (s3); the GitHub
+    // arm's tests must run with no provider scope above, like the route.
+    scopeOverride = null;
     lastCapturedOptions = null;
     addCommentMutateMock.mockReset();
+    providerAddCommentMutateMock.mockReset();
     invalidateQueriesMock.mockReset();
     toastErrorMock.mockReset();
     hoistedAnnounce.announceForA11y.mockClear();
@@ -581,6 +594,91 @@ describe('add_pr_comment fingerprint (changed-input)', () => {
       body: 'a regular comment, edited',
     });
     expect(editedBody).not.toBe(original);
+  });
+});
+
+// s3: the conversation-comment composer posts a provider PR/MR's top-level
+// comment through `providerReview.addComment` with NO anchor (a plain note on
+// both providers), the s1 provider identity, and the `create_review_comment`
+// fingerprint — the same ledger intent the inline composer's no-anchor
+// fallback uses.
+describe('useAddPrCommentMutation (s3 provider arms)', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('gitlab: posts the note through providerReview.addComment with the instance-scoped fingerprint', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useAddPrCommentMutation();
+
+    await expect(lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT)).resolves.toEqual({
+      done: true,
+      replayed: false,
+    });
+    expect(addCommentMutateMock).not.toHaveBeenCalled();
+    // No anchor: a top-level conversation comment, not an inline discussion.
+    expect(providerAddCommentMutateMock).toHaveBeenCalledWith({
+      ...GITLAB_IDENTITY,
+      body: 'a regular comment',
+      operationKey: 'hoisted-op-key',
+    });
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["gitlab","https://gl.example.com","group/sub/app",12],"body":"a regular comment"}'
+    );
+    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('bitbucket: posts the note keyed by workspace with the organization identity', async () => {
+    scopeOverride = { ref: BITBUCKET_REF, organizationId: 'org-9' };
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useAddPrCommentMutation();
+
+    await lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT);
+    expect(providerAddCommentMutateMock).toHaveBeenCalledWith({
+      ...BITBUCKET_IDENTITY,
+      body: 'a regular comment',
+      operationKey: 'hoisted-op-key',
+    });
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["bitbucket","acme","widgets",77],"body":"a regular comment"}'
+    );
+    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the operation key on a retryable failure so the same-key retry dedupes', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    providerAddCommentMutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
+    useAddPrCommentMutation();
+
+    await expect(lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT)).rejects.toMatchObject({
+      message: 'Could not post comment.',
+    });
+    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+  });
+
+  it('onSettled invalidates the provider discussions cache', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    useAddPrCommentMutation();
+
+    await lastCapturedOptions?.onSettled?.();
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith(['providerReview', 'listDiscussions']);
+  });
+
+  it('success announces the posted-comment copy for a11y on the provider arm too', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true });
+    useAddPrCommentMutation();
+
+    await lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT);
+    lastCapturedOptions?.onSuccess?.();
+
+    expect(announceForA11y).toHaveBeenCalledWith('Comment posted');
   });
 });
 

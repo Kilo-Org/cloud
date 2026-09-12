@@ -62,6 +62,7 @@ vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus'
 
 const BASE_PROPS = {
   onPress: vi.fn(() => undefined),
+  label: 'Comment on this pull request',
   keyboardLift: true,
 };
 
@@ -126,6 +127,17 @@ describe('PrCommentCta', () => {
     expect(renderer.root.find(node => String(node.type) === 'MessageSquarePlus')).toBeDefined();
     const label = renderer.root.find(node => String(node.type) === 'Text');
     expect(label.props.children).toBe('Comment on this pull request');
+  });
+
+  it('renders the copy the host resolved, not a hardcoded key', () => {
+    // s3: GitLab calls the review object a merge request, so the tab sends
+    // the provider-neutral "Add comment"; the bar must not translate its own
+    // key or the two providers would share one label.
+    const renderer = mountCta({ label: 'Add comment' });
+    const button = renderer.root.find(node => String(node.type) === 'Button');
+    expect(button.props.accessibilityLabel).toBe('Add comment');
+    const label = renderer.root.find(node => String(node.type) === 'Text');
+    expect(label.props.children).toBe('Add comment');
   });
 
   it('press pushes through the onPress wiring', () => {

@@ -50,6 +50,9 @@ const hoisted = vi.hoisted(() => ({
   // The committed connectivity the submit gate reads. 'online' by default;
   // the offline-gate tests flip it to 'offline'.
   connectivity: { value: 'online' as 'online' | 'offline' | 'unknown' },
+  // The live provider scope the composer reads for the draft-key suffix.
+  // null = no provider route above (GitHub): the base key, byte-identical.
+  providerScope: { value: null as unknown },
 }));
 
 export const hookState = hoisted.hookState;
@@ -62,6 +65,7 @@ export const platformMock = hoisted.platformMock;
 export const persistenceFailed = hoisted.persistenceFailed;
 export const ambiguous = hoisted.ambiguous;
 export const connectivity = hoisted.connectivity;
+export const providerScope = hoisted.providerScope as { value: unknown };
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -98,6 +102,10 @@ vi.mock('react', async () => {
       effect();
     }),
     useCallback: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => fn),
+    // The composer reads the provider scope from context
+    // (useProviderPrScopeOrNull). No renderer mounts here, so the context
+    // read is stubbed to the flippable providerScope box instead.
+    useContext: vi.fn(() => providerScope.value),
   };
 });
 

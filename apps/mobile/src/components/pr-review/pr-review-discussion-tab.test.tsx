@@ -4,9 +4,30 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import {
+  type ProviderPrPlatform,
+  type ProviderPrRef,
+  ProviderPrScopeProvider,
+} from '@/lib/pr-review/provider-pr-ref';
+import type * as ProviderPrRefModule from '@/lib/pr-review/provider-pr-ref';
 
 import { PrReviewDiscussionTab } from './pr-review-discussion-tab';
+
+// s3: the CTA renders from the provider's canCommentConversation capability.
+// The flag is flippable so the gate test can exercise the unsupported arm
+// without editing the capabilities contract.
+const capabilityFlags = vi.hoisted(() => ({ canCommentConversation: true }));
+
+vi.mock('@/lib/pr-review/provider-pr-ref', async importOriginal => {
+  const actual = await importOriginal<typeof ProviderPrRefModule>();
+  return {
+    ...actual,
+    providerPrCapabilities: (platform: ProviderPrPlatform) => ({
+      ...actual.providerPrCapabilities(platform),
+      canCommentConversation: capabilityFlags.canCommentConversation,
+    }),
+  };
+});
 
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
@@ -150,6 +171,7 @@ describe('PrReviewDiscussionTab full-body states', () => {
   beforeEach(() => {
     insetsState.bottom = 0;
     pushMock.mockClear();
+    capabilityFlags.canCommentConversation = true;
     resetState();
   });
 
@@ -299,10 +321,86 @@ describe('PrReviewDiscussionTab full-body states', () => {
     });
   });
 
-  // s1: the provider route's own conversation sheet does not exist yet (it
-  // lands in s3), so a provider tab must not push the GitHub `[owner]` route.
-  it('hides the comment CTA bar on a provider scope', () => {
-    expectCtaPresence(mountTab(GITLAB_REF), false);
+  // s3: the provider arms push the conversation-comment sheet through the
+  // PR's OWN provider route (the sheet must inherit the provider scope and
+  // its `instance` param), with the provider's CTA copy.
+  describe('s3 provider conversation-comment CTA', () => {
+    const GITLAB_SELF_MANAGED_REF: ProviderPrRef = {
+      platform: 'gitlab',
+      projectPath: 'group/sub/repo',
+      mrIid: 12,
+      instanceHint: 'https://gl.example.com',
+    };
+    const BITBUCKET_REF: ProviderPrRef = {
+      platform: 'bitbucket',
+      workspace: 'acme',
+      repoSlug: 'widgets',
+      prId: 77,
+    };
+
+    beforeEach(() => {
+      capabilityFlags.canCommentConversation = true;
+      pushMock.mockClear();
+      resetState();
+      discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    });
+
+    function ctaLabel(scopeRef: ProviderPrRef): string {
+      const renderer = mountTab(scopeRef);
+      const cta = renderer.root.find(node => String(node.type) === 'PrCommentCta');
+      return (cta.props as { label?: string }).label ?? '';
+    }
+
+    it('renders the CTA on a GitLab MR with the provider-neutral Add comment label', () => {
+      // GitLab calls the object a merge request and no translated
+      // "Comment on this merge request" key exists, so the tab sends the
+      // composer's "Add comment" copy.
+      expect(ctaLabel(GITLAB_SELF_MANAGED_REF)).toBe('Add comment');
+    });
+
+    it('renders the CTA on a Bitbucket PR with the pull request label', () => {
+      expect(ctaLabel(BITBUCKET_REF)).toBe('Comment on this pull request');
+    });
+
+    it('pushes the provider sheet route for a GitLab MR, instance hint included', () => {
+      const renderer = mountTab(GITLAB_SELF_MANAGED_REF);
+      const cta = renderer.root.find(node => String(node.type) === 'PrCommentCta');
+      act(() => {
+        (cta.props.onPress as () => void)();
+      });
+      expect(pushMock).toHaveBeenCalledWith(
+        '/(app)/pr-review/gitlab/group/sub/repo/12/conversation-comment?instance=https%3A%2F%2Fgl.example.com'
+      );
+    });
+
+    it('pushes the provider sheet route for a Bitbucket PR', () => {
+      const renderer = mountTab(BITBUCKET_REF);
+      const cta = renderer.root.find(node => String(node.type) === 'PrCommentCta');
+      act(() => {
+        (cta.props.onPress as () => void)();
+      });
+      expect(pushMock).toHaveBeenCalledWith(
+        '/(app)/pr-review/bitbucket/acme/widgets/77/conversation-comment'
+      );
+    });
+
+    it('hides the CTA when the provider cannot post a conversation comment', () => {
+      capabilityFlags.canCommentConversation = false;
+      expectCtaPresence(mountTab(GITLAB_SELF_MANAGED_REF), false);
+      expectCtaPresence(mountTab(BITBUCKET_REF), false);
+      expect(pushMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps the provider CTA off the loading skeleton and terminal states', () => {
+      // The loading view owns its full body only with no loaded content;
+      // a non-empty conversation would render the happy list + bar.
+      discussionState.conversation = [];
+      discussionState.query.isPending = true;
+      expectCtaPresence(mountTab(GITLAB_SELF_MANAGED_REF), false);
+      discussionState.query.isPending = false;
+      discussionState.firstPageErrorState = { kind: 'permission' };
+      expectCtaPresence(mountTab(GITLAB_SELF_MANAGED_REF), false);
+    });
   });
 });
 

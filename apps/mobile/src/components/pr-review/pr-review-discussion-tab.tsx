@@ -35,7 +35,10 @@
 //   - bottom CTA:   the happy and empty views render a static
 //                   "Comment on this pull request" bar under the
 //                   body (`PrCommentCta`) that pushes the
-//                   conversation-comment formSheet. The loading
+//                   conversation-comment formSheet — on the GitHub
+//                   route for GitHub and through the PR's own provider
+//                   route for GitLab/Bitbucket, gated on the provider's
+//                   `canCommentConversation` capability. The loading
 //                   skeleton and the four terminal/error states
 //                   render full-body with no bar.
 //
@@ -84,10 +87,8 @@ import {
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
-import {
-  useProviderPrScope,
-  useProviderPrScopeOrNull,
-} from '@/lib/pr-review/provider-pr-ref';
+import { providerPrCapabilities, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
@@ -126,11 +127,13 @@ export function PrReviewDiscussionTab({
   // alone rather than forking the tab per provider.
   const { ref } = useProviderPrScope({ owner, repo, number });
   const isMergeRequest = ref.platform === 'gitlab';
-  // s1: the provider route's conversation sheet does not exist yet (it lands
-  // in s3), so a provider tab must not push the GitHub `[owner]` route
-  // `.../conversation-comment` (provider-pr-ref.ts:294-296). Render the CTA
-  // only with no provider scope above this tab.
-  const providerScope = useProviderPrScopeOrNull();
+  // s3: the conversation-comment CTA renders only when the provider can post
+  // a top-level conversation comment (the s1 capabilities contract), and the
+  // provider arms push the sheet through the PR's OWN provider route so the
+  // sheet inherits the provider scope and its `instance` param (a GitLab
+  // self-managed host + full nested project path). GitHub keeps its original
+  // three-segment route and params.
+  const canComment = providerPrCapabilities(ref.platform).canCommentConversation;
   const router = useRouter();
 
   const [expansion, setExpansion] = useState<Record<string, boolean>>({});
@@ -270,21 +273,39 @@ export function PrReviewDiscussionTab({
   });
 
   const openConversationComment = () => {
-    const href: Href = {
-      pathname: CONVERSATION_COMMENT_PATH,
-      params: { owner, repo, number },
-    };
-    router.push(href);
+    if (ref.platform === 'github') {
+      const href: Href = {
+        pathname: CONVERSATION_COMMENT_PATH,
+        params: { owner, repo, number },
+      };
+      router.push(href);
+      return;
+    }
+    router.push(providerPrSheetHref(ref, 'conversation-comment'));
   };
 
+  // GitLab calls the review object a merge request and has no translated
+  // "Comment on this merge request" key, so its CTA borrows the composer's
+  // provider-neutral "Add comment"; GitHub and Bitbucket keep the ported
+  // "Comment on this pull request".
+  const commentCtaLabel =
+    ref.platform === 'gitlab'
+      ? t('prReview.composer.addTitle')
+      : t('prReview.discussion.addCommentCta');
+
   // The bottom CTA bar is static chrome for the two content-bearing views
-  // only (happy list + empty). The loading skeleton and the four
-  // terminal/error states render exactly as before — full-body, no bar.
+  // only (happy list + empty), and only when the provider can post a
+  // conversation comment. The loading skeleton and the four terminal/error
+  // states render exactly as before — full-body, no bar.
   const withCommentCta = (body: ReactNode) => (
     <View className="flex-1">
       <View className="flex-1">{body}</View>
-      {providerScope === null ? (
-        <PrCommentCta onPress={openConversationComment} keyboardLift={isFocused} />
+      {canComment ? (
+        <PrCommentCta
+          label={commentCtaLabel}
+          onPress={openConversationComment}
+          keyboardLift={isFocused}
+        />
       ) : null}
     </View>
   );

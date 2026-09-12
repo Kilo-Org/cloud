@@ -32,6 +32,7 @@ import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { providerPrRefKey, useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
 import { useAddPrCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import { i18n } from '@/i18n';
 
@@ -52,9 +53,15 @@ export function PrConversationCommentComposer({
   const addComment = useAddPrCommentMutation();
 
   // Durable comment draft, keyed by account and PR. Nothing is saved or
-  // restored while the user id is unknown.
+  // restored while the user id is unknown. On a provider route the key is
+  // suffixed with the s1 collision-free ref identity (providerPrRefKey), so
+  // one draft per instance: a self-managed GitLab host and gitlab.com with
+  // the same project path never share text. GitHub's route mounts no provider
+  // scope, so its key stays byte-identical.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
-  const commentDraftKey = prConversationCommentDraftKey(owner, repo, number);
+  const providerScope = useProviderPrScopeOrNull();
+  const base = prConversationCommentDraftKey(owner, repo, number);
+  const commentDraftKey = providerScope ? `${base}@${providerPrRefKey(providerScope.ref)}` : base;
   const draft = useFencedDraftLoad({ userId, isIdentityLoading, entityKey: commentDraftKey });
   useDraftFlushOnBackground(userId, commentDraftKey, true);
 

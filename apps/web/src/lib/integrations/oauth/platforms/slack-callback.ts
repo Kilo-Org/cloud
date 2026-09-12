@@ -4,7 +4,6 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
-  activateReservedSlackInstallation,
   SlackWorkspaceAlreadyConnectedError,
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
@@ -20,11 +19,7 @@ import {
   parseOAuthStateOwner,
   cancelMissingCodeProviderOAuthAttempt,
 } from '@/lib/integrations/oauth/common';
-import {
-  adoptLegacySlackReservation,
-  claimSlackProviderInstallation,
-} from '@/lib/integrations/provider-installation-reservations';
-import { exchangeSlackOAuthCode } from '@/lib/integrations/platforms/slack/oauth-exchange';
+import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 
 const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
 
@@ -132,38 +127,30 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
-    // 7. Exchange with Slack before writing provider installation state.
+    if (
+      verified.purpose === 'provider_install' &&
+      !(await consumeProviderOAuthAttempt({
+        actorUserId: user.id,
+        owner,
+        provider: 'slack',
+        state,
+        purpose: 'provider_install',
+      }))
+    ) {
+      throw new Error('Slack OAuth attempt is invalid, expired, or already used');
+    }
+
+    // 7. Let the Chat SDK exchange the code and seed its installation state
     await bot.initialize();
     const slackAdapter = bot.getAdapter('slack');
-    const { teamId, installation, grantedScopes } = await exchangeSlackOAuthCode(
-      code,
-      SLACK_REDIRECT_URI
-    );
+    const url = new URL(request.url);
+    url.searchParams.set('redirect_uri', SLACK_REDIRECT_URI);
+    const patchedRequest = new Request(url, request);
+    const { teamId, installation } = await slackAdapter.handleOAuthCallback(patchedRequest);
 
-    // 8. Store installation in database and activate Chat SDK state for the winning generation.
+    // 8. Store installation in database
     try {
-      if (verified.purpose === 'provider_install') {
-        const claim = await claimSlackProviderInstallation({
-          actorUserId: user.id,
-          owner,
-          state,
-          teamId,
-        });
-        if (!claim) throw new Error('Slack OAuth attempt is invalid, expired, or already used');
-        await activateReservedSlackInstallation({
-          owner,
-          teamId,
-          installation,
-          grantedScopes,
-          claim,
-          setChatSdkInstallation: (id, value) => slackAdapter.setInstallation(id, value),
-          deleteChatSdkInstallation: id => slackAdapter.deleteInstallation(id),
-        });
-      } else {
-        const integration = await upsertSlackInstallation({ owner, teamId, installation });
-        await adoptLegacySlackReservation(owner, integration.id, teamId);
-        await slackAdapter.setInstallation(teamId, installation);
-      }
+      await upsertSlackInstallation({ owner, teamId, installation });
     } catch (error) {
       if (error instanceof SlackWorkspaceAlreadyConnectedError) {
         return NextResponse.redirect(

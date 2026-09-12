@@ -219,7 +219,7 @@ async function getSlackRequesterInfo(
   platformIntegration: PlatformIntegration,
   displayName: string
 ): Promise<RequesterInfo> {
-  const accessToken = await getAccessTokenFromInstallation(platformIntegration);
+  const accessToken = getAccessTokenFromInstallation(platformIntegration);
   if (!accessToken) {
     return { displayName, platform: PLATFORM.SLACK };
   }

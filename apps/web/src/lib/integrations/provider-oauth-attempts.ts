@@ -10,14 +10,13 @@ import {
   platform_integrations,
   provider_oauth_attempts,
 } from '@kilocode/db/schema';
-import { and, eq, gt, lt, ne, or, sql } from 'drizzle-orm';
+import { and, eq, gt, lt, or, sql } from 'drizzle-orm';
 import { PLATFORM } from './core/constants';
 
 export type ReservedOAuthProvider = 'slack' | 'linear' | 'discord';
 const ATTEMPT_TTL_MS = 10 * 60_000;
 
-export const providerOAuthStateHash = (state: string) =>
-  createHash('sha256').update(state).digest('hex');
+const stateHash = (state: string) => createHash('sha256').update(state).digest('hex');
 const ownerCondition = (owner: Owner) =>
   owner.type === 'org'
     ? eq(provider_oauth_attempts.owned_by_organization_id, owner.id)
@@ -44,19 +43,14 @@ export async function lockProviderOAuthOwnerRow(tx: DrizzleTransaction, owner: O
 export async function pruneProviderOAuthAttempts(tx: DrizzleTransaction): Promise<void> {
   const now = new Date().toISOString();
   await tx.execute(
-    sql`WITH expired AS (SELECT id FROM ${provider_oauth_attempts} WHERE status IN ('pending', 'captured', 'consumed') AND expires_at < ${now} ORDER BY expires_at LIMIT 100) UPDATE ${provider_oauth_attempts} attempts SET status = 'expired' FROM expired WHERE attempts.id = expired.id`
+    sql`WITH expired AS (SELECT id FROM ${provider_oauth_attempts} WHERE status IN ('pending', 'consumed') AND expires_at < ${now} ORDER BY expires_at LIMIT 100) UPDATE ${provider_oauth_attempts} attempts SET status = 'expired' FROM expired WHERE attempts.id = expired.id`
   );
   await tx.execute(
     sql`DELETE FROM ${provider_oauth_attempts} WHERE id IN (SELECT id FROM ${provider_oauth_attempts} WHERE status = 'expired' AND expires_at < ${new Date(Date.now() - 24 * 60 * 60_000).toISOString()} ORDER BY expires_at LIMIT 100)`
   );
 }
 
-async function assertOwnerCanUseProvider(
-  tx: DrizzleTransaction,
-  owner: Owner,
-  provider: ReservedOAuthProvider
-) {
-  if (provider === 'slack') return;
+async function assertOwnerHasNoSharedGitHubInstallation(tx: DrizzleTransaction, owner: Owner) {
   const [shared] = await tx
     .select({ id: platform_integrations.id })
     .from(platform_integrations)
@@ -87,7 +81,7 @@ export async function beginProviderOAuthAttempt(input: {
   await db.transaction(async tx => {
     await lockProviderOAuthOwnerRow(tx, input.owner);
     await pruneProviderOAuthAttempts(tx);
-    await assertOwnerCanUseProvider(tx, input.owner, input.provider);
+    await assertOwnerHasNoSharedGitHubInstallation(tx, input.owner);
     const now = new Date().toISOString();
     await tx
       .update(provider_oauth_attempts)
@@ -106,7 +100,7 @@ export async function beginProviderOAuthAttempt(input: {
     await tx.insert(provider_oauth_attempts).values({
       provider: input.provider,
       purpose: input.purpose ?? 'provider_install',
-      state_hash: providerOAuthStateHash(input.state),
+      state_hash: stateHash(input.state),
       initiated_by_user_id: input.actorUserId,
       owned_by_user_id: input.owner.type === 'user' ? input.owner.id : null,
       owned_by_organization_id: input.owner.type === 'org' ? input.owner.id : null,
@@ -125,7 +119,7 @@ export async function consumeProviderOAuthAttempt(input: {
   return db.transaction(async tx => {
     await lockProviderOAuthOwnerRow(tx, input.owner);
     await pruneProviderOAuthAttempts(tx);
-    await assertOwnerCanUseProvider(tx, input.owner, input.provider);
+    await assertOwnerHasNoSharedGitHubInstallation(tx, input.owner);
     const now = new Date().toISOString();
     await tx
       .update(provider_oauth_attempts)
@@ -134,7 +128,6 @@ export async function consumeProviderOAuthAttempt(input: {
         and(
           ownerCondition(input.owner),
           eq(provider_oauth_attempts.provider, input.provider),
-          eq(provider_oauth_attempts.purpose, input.purpose ?? 'provider_install'),
           eq(provider_oauth_attempts.purpose, input.purpose ?? 'provider_install'),
           or(
             eq(provider_oauth_attempts.status, 'pending'),
@@ -151,7 +144,7 @@ export async function consumeProviderOAuthAttempt(input: {
           ownerCondition(input.owner),
           eq(provider_oauth_attempts.provider, input.provider),
           eq(provider_oauth_attempts.initiated_by_user_id, input.actorUserId),
-          eq(provider_oauth_attempts.state_hash, providerOAuthStateHash(input.state)),
+          eq(provider_oauth_attempts.state_hash, stateHash(input.state)),
           eq(provider_oauth_attempts.status, 'pending'),
           gt(provider_oauth_attempts.expires_at, now)
         )
@@ -180,7 +173,7 @@ export async function cancelProviderOAuthAttempt(input: {
           eq(provider_oauth_attempts.provider, input.provider),
           eq(provider_oauth_attempts.purpose, input.purpose),
           eq(provider_oauth_attempts.initiated_by_user_id, input.actorUserId),
-          eq(provider_oauth_attempts.state_hash, providerOAuthStateHash(input.state)),
+          eq(provider_oauth_attempts.state_hash, stateHash(input.state)),
           eq(provider_oauth_attempts.status, 'pending')
         )
       )
@@ -202,7 +195,6 @@ export async function hasPendingProviderOAuthAttempt(
     .where(
       and(
         or(...conditions),
-        ne(provider_oauth_attempts.provider, 'slack'),
         or(
           eq(provider_oauth_attempts.status, 'pending'),
           eq(provider_oauth_attempts.status, 'consumed')
@@ -216,7 +208,6 @@ export async function hasPendingProviderOAuthAttempt(
     .where(
       and(
         or(...conditions),
-        ne(provider_oauth_attempts.provider, 'slack'),
         or(
           eq(provider_oauth_attempts.status, 'pending'),
           eq(provider_oauth_attempts.status, 'consumed')

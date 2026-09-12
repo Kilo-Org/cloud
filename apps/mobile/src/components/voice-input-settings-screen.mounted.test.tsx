@@ -4,6 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { VoiceInputSettingsScreen } from '@/components/voice-input-settings-screen';
+import {
+  findConfigureRow,
+  findGatewaySwitch,
+  findQueryErrors,
+  findTexts,
+} from '@/components/voice-input-settings-screen.test-helpers';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 type SelectionStatus = 'off' | 'loading' | 'error' | 'empty' | 'unavailable' | 'ready';
@@ -17,14 +23,8 @@ type SelectionState = {
   refetch: () => void;
 };
 
-const push = vi.hoisted(() => vi.fn());
-const gatewayTranscription = vi.hoisted(() => ({
-  enabled: false,
-  hasLoaded: true,
-  setEnabled: vi.fn(),
-}));
-const selection = vi.hoisted(() => {
-  const current: SelectionState = {
+function emptySelection(): SelectionState {
+  return {
     status: 'off',
     model: null,
     models: [],
@@ -33,10 +33,18 @@ const selection = vi.hoisted(() => {
     isFetching: false,
     refetch: vi.fn<() => void>(),
   };
-  return { current };
-});
+}
+
+const push = vi.hoisted(() => vi.fn());
+const gatewayTranscription = vi.hoisted(() => ({
+  enabled: false,
+  hasLoaded: true,
+  setEnabled: vi.fn(),
+}));
+const selection = vi.hoisted(() => ({ current: emptySelection() }));
 const selectionArgs = vi.hoisted(() => ({ organizationId: undefined as string | undefined }));
 const organization = vi.hoisted(() => ({ organizationId: 'org-1' as string | null }));
+const voiceLanguage = vi.hoisted(() => ({ chosen: null as string | null, loaded: true }));
 
 vi.mock('react-native', () => ({
   Switch: 'Switch',
@@ -48,6 +56,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   Cpu: 'Cpu',
+  Globe: 'Globe',
   Mic: 'Mic',
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
@@ -56,11 +65,25 @@ vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/voice-test-field', () => ({ VoiceTestField: 'VoiceTestField' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ secondaryForeground: '#000000', mutedForeground: '#000000' }),
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: organization.organizationId }),
+}));
+// The real module resolves endonyms through `@/i18n/resolve-language`, which
+// imports the native localization/recognition modules; stub the native edges
+// so the row's display name runs for real without the device services.
+vi.mock('expo-localization', () => ({
+  getLocales: () => [{ languageTag: 'en-US' }],
+}));
+vi.mock('expo-speech-recognition', () => ({
+  ExpoSpeechRecognitionModule: { getSupportedLocales: vi.fn() },
+}));
+vi.mock('@/lib/voice-input/voice-input-language-preference', () => ({
+  useVoiceInputLanguage: () => voiceLanguage.chosen,
+  useVoiceInputLanguageLoaded: () => voiceLanguage.loaded,
 }));
 vi.mock('@/lib/voice-input/gateway/gateway-transcription-preference', () => ({
   useGatewayTranscriptionPreference: () => ({
@@ -93,41 +116,6 @@ async function mountVoiceInput(): Promise<ReactTestRenderer> {
   });
   return view.renderer;
 }
-function findConfigureRow(renderer: ReactTestRenderer, title: string) {
-  const rows = renderer.root.findAll(
-    node => typeof node.type === 'string' && (node.type as string) === 'ConfigureRow'
-  );
-  const row = rows.find(item => item.props.title === title);
-  if (!row) {
-    throw new Error(`ConfigureRow for ${title} not found`);
-  }
-  return row;
-}
-function findGatewaySwitch(renderer: ReactTestRenderer) {
-  const found = renderer.root.findAll(
-    node => typeof node.type === 'string' && (node.type as string) === 'Switch'
-  );
-  const foundSwitch = found.find(sw => sw.props.accessibilityLabel === 'Gateway transcription');
-  if (!foundSwitch) {
-    throw new Error('Gateway transcription switch not found');
-  }
-  return foundSwitch;
-}
-function findTexts(renderer: ReactTestRenderer): string[] {
-  return renderer.root
-    .findAll(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'Text' &&
-        typeof node.props.children === 'string'
-    )
-    .map(node => node.props.children as string);
-}
-function findQueryErrors(renderer: ReactTestRenderer) {
-  return renderer.root.findAll(
-    node => typeof node.type === 'string' && (node.type as string) === 'QueryError'
-  );
-}
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -136,15 +124,9 @@ beforeEach(() => {
   gatewayTranscription.hasLoaded = true;
   organization.organizationId = 'org-1';
   selectionArgs.organizationId = undefined;
-  selection.current = {
-    status: 'off',
-    model: null,
-    models: [],
-    isLoading: false,
-    isError: false,
-    isFetching: false,
-    refetch: vi.fn<() => void>(),
-  };
+  voiceLanguage.chosen = null;
+  voiceLanguage.loaded = true;
+  selection.current = emptySelection();
 });
 afterEach(() => {
   view?.unmount();
@@ -188,8 +170,11 @@ describe('VoiceInputSettingsScreen', () => {
       icon: 'Cpu',
       subtitle: 'None chosen',
       disabled: true,
-      last: true,
     });
+    // The language row is now the group's final row, so the model row must not
+    // carry the divider-suppressing `last`.
+    expect(findConfigureRow(renderer, 'Transcription model').props.last).toBeUndefined();
+    expect(findConfigureRow(renderer, 'Language').props.last).toBe(true);
   });
 
   it('shows the loading caption disabled while the catalogue settles', async () => {
@@ -318,5 +303,64 @@ describe('VoiceInputSettingsScreen', () => {
     const renderer = await mountVoiceInput();
 
     expect(findGatewaySwitch(renderer).props.disabled).toBe(true);
+  });
+
+  it('shows the automatic language and opens the picker when no choice is stored', async () => {
+    voiceLanguage.chosen = null;
+    const renderer = await mountVoiceInput();
+
+    const row = findConfigureRow(renderer, 'Language');
+    expect(row.props).toMatchObject({
+      icon: 'Globe',
+      subtitle: 'Automatic',
+      disabled: false,
+    });
+
+    act(() => {
+      (row.props.onPress as () => void)();
+    });
+    expect(push).toHaveBeenCalledWith('/(app)/voice-language-picker');
+  });
+
+  it('names the stored voice language by its endonym', async () => {
+    voiceLanguage.chosen = 'de-DE';
+    const renderer = await mountVoiceInput();
+
+    expect(findConfigureRow(renderer, 'Language').props).toMatchObject({
+      subtitle: 'Deutsch',
+      disabled: false,
+    });
+  });
+
+  it('shows the loading caption and disables the language row until the choice has loaded', async () => {
+    voiceLanguage.loaded = false;
+    voiceLanguage.chosen = 'de-DE';
+    const renderer = await mountVoiceInput();
+
+    expect(findConfigureRow(renderer, 'Language').props).toMatchObject({
+      subtitle: 'Loading…',
+      disabled: true,
+    });
+  });
+
+  it('renders the voice testing field below the model states', async () => {
+    const renderer = await mountVoiceInput();
+
+    const fields = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'VoiceTestField'
+    );
+    expect(fields).toHaveLength(1);
+  });
+
+  it('insets the scroll content so the focused test field clears the keyboard', async () => {
+    const renderer = await mountVoiceInput();
+
+    const [scroll] = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'ScrollView'
+    );
+    if (!scroll) {
+      throw new Error('ScrollView not found');
+    }
+    expect(scroll.props.automaticallyAdjustKeyboardInsets).toBe(true);
   });
 });

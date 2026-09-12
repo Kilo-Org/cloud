@@ -45,7 +45,9 @@ vi.mock('@shopify/flash-list', () => ({
     return createElement(
       Fragment,
       null,
-      data.map((item, index) => renderItem({ item, index }))
+      data.map((item, index) =>
+        createElement(Fragment, { key: index }, renderItem({ item, index }))
+      )
     );
   },
 }));

@@ -25,7 +25,7 @@ vi.mock('expo-router', () => ({
 
 vi.mock('@/components/empty-state', () => ({
   EmptyState: (props: { title?: string; description?: ReactNode; action?: ReactNode }) =>
-    createElement('EmptyStateMock', null, [props.title, props.description, props.action]),
+    createElement('EmptyStateMock', null, props.title, props.description, props.action),
 }));
 
 vi.mock('@/components/query-error', () => ({

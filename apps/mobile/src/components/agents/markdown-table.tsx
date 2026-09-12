@@ -3,6 +3,7 @@ import { Table2, X } from '@/components/ui/icons';
 import {
   type ComponentRef,
   type ComponentType,
+  Fragment,
   type ReactElement,
   type ReactNode,
   type RefObject,
@@ -469,7 +470,9 @@ function MarkdownTableBody({
   const cells = elements.length > 0 ? elements : lastCellsRef.current;
 
   if (cells !== null) {
-    return children(cells);
+    // Key each parsed cell: `elements` is a plain array, and rendering it as an
+    // unkeyed child list warns even though the cells never reorder.
+    return children(cells.map((cell, index) => <Fragment key={index}>{cell}</Fragment>));
   }
 
   if (rowCount === 0) {

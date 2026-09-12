@@ -7,7 +7,7 @@
 // loading), and the later-page failure footer (rows kept + Retry). The query layer
 // is mocked so each state is driven directly through the screen JSX.
 
-import { createElement, type ReactElement } from 'react';
+import { createElement, Fragment, type ReactElement } from 'react';
 import { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -153,7 +153,9 @@ vi.mock('react-native', () => ({
     return createElement(
       'View',
       null,
-      data.map((item, index) => props.renderItem?.({ item, index })),
+      data.map((item, index) =>
+        createElement(Fragment, { key: index }, props.renderItem?.({ item, index }))
+      ),
       props.ListFooterComponent ?? null
     );
   },

@@ -6,7 +6,13 @@
 // error selector are unit-tested separately; this proves the loading → error →
 // empty precedence in the screen JSX itself.
 
-import { type ComponentType, createElement, type ReactElement, type ReactNode } from 'react';
+import {
+  type ComponentType,
+  createElement,
+  Fragment,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -48,7 +54,9 @@ vi.mock('@shopify/flash-list', () => ({
       return createElement(
         'FlashList',
         null,
-        data.map((item, index) => props.renderItem?.({ item, index }))
+        data.map((item, index) =>
+          createElement(Fragment, { key: index }, props.renderItem?.({ item, index }))
+        )
       );
     }
     return createElement(

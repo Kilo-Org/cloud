@@ -214,6 +214,7 @@ beforeEach(() => {
   });
   showPicker.mockReset();
   getContextBalanceQueryFn.mockReset();
+  getContextBalanceQueryFn.mockResolvedValue(null);
   personalCreditBlocksQueryFn.mockReset();
   orgCreditBlocksQueryFn.mockReset();
   refetchUserId.mockReset();

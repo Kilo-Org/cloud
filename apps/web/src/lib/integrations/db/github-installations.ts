@@ -10,7 +10,7 @@ import {
   github_installation_webhook_receipts,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, isNull, ne, or, sql } from 'drizzle-orm';
 import {
   canOrganizationCreateSharedGitHubConnection,
   canOrganizationUseMultipleGitHubInstallations,
@@ -126,7 +126,10 @@ export async function connectVerifiedGitHubInstallation(
         .where(
           and(
             eq(platform_integrations.owned_by_organization_id, owner.id),
-            eq(platform_integrations.platform, PLATFORM.GITHUB)
+            eq(platform_integrations.platform, PLATFORM.GITHUB),
+            // A locally disconnected connection has relinquished its slot; it
+            // must not block attaching a different installation.
+            isNull(platform_integrations.github_disconnected_at)
           )
         );
       const hasAnotherInstallation = ownerIntegrations.some(
@@ -474,7 +477,13 @@ export async function uninstallExclusiveGitHubInstallation(input: {
     if (!locked || (locked.canonicalId && locked.sharingMode !== 'exclusive')) {
       throw new Error('GitHub installation must be disconnected locally');
     }
-    const connectedAssociations = await tx
+    // Uninstalling upstream is only safe when no *other* tenant association
+    // still depends on this installation. The target association itself may
+    // be either currently connected or already locally disconnected — either
+    // way it is the one being removed, so its own state must not gate this
+    // check the way it did previously (which made an already-disconnected
+    // association impossible to ever hard-uninstall).
+    const otherConnectedAssociations = await tx
       .select({ id: platform_integrations.id })
       .from(platform_integrations)
       .where(
@@ -486,14 +495,12 @@ export async function uninstallExclusiveGitHubInstallation(input: {
                 eq(platform_integrations.platform_installation_id, identity.installationId),
                 effectiveAppTypeCondition(appType)
               ),
-          isNull(platform_integrations.github_disconnected_at)
+          isNull(platform_integrations.github_disconnected_at),
+          ne(platform_integrations.id, input.integrationId)
         )
       )
       .for('update');
-    if (
-      connectedAssociations.length !== 1 ||
-      connectedAssociations[0]?.id !== input.integrationId
-    ) {
+    if (otherConnectedAssociations.length > 0) {
       throw new Error('GitHub installation must be disconnected locally');
     }
 

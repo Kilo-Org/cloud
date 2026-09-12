@@ -378,27 +378,34 @@ export function OrganizationGitHubInstallations({
                               onSelect={async () => {
                                 const account =
                                   installation.accountLogin ?? 'this GitHub organization';
+                                // A connection that is already locally
+                                // disconnected has nothing left to disconnect;
+                                // offer the real removal (upstream uninstall)
+                                // action instead of a no-op repeat disconnect.
+                                const useUninstall =
+                                  !connectionManagementEnabled ||
+                                  installation.status === 'disconnected';
                                 if (
                                   await confirm({
-                                    title: connectionManagementEnabled
-                                      ? `Disconnect ${account}?`
-                                      : `Uninstall Kilo from ${account}?`,
-                                    description: connectionManagementEnabled
-                                      ? `This disconnects ${account} from this Kilo organization. The GitHub App stays installed and can be reconnected after fresh verification.`
-                                      : `This uninstalls the Kilo GitHub App from ${account}. Kilo will lose access to its repositories.`,
-                                    confirmLabel: connectionManagementEnabled
-                                      ? `Disconnect ${account}`
-                                      : `Uninstall from ${account}`,
+                                    title: useUninstall
+                                      ? `Uninstall Kilo from ${account}?`
+                                      : `Disconnect ${account}?`,
+                                    description: useUninstall
+                                      ? `This uninstalls the Kilo GitHub App from ${account}. Kilo will lose access to its repositories.`
+                                      : `This disconnects ${account} from this Kilo organization. The GitHub App stays installed and can be reconnected after fresh verification.`,
+                                    confirmLabel: useUninstall
+                                      ? `Uninstall from ${account}`
+                                      : `Disconnect ${account}`,
                                     destructive: true,
                                   })
                                 ) {
-                                  if (connectionManagementEnabled) {
-                                    disconnect.mutate({
+                                  if (useUninstall) {
+                                    uninstall.mutate({
                                       organizationId,
                                       integrationId: installation.id,
                                     });
                                   } else {
-                                    uninstall.mutate({
+                                    disconnect.mutate({
                                       organizationId,
                                       integrationId: installation.id,
                                     });
@@ -406,9 +413,10 @@ export function OrganizationGitHubInstallations({
                                 }
                               }}
                             >
-                              {connectionManagementEnabled
-                                ? 'Disconnect from Kilo'
-                                : 'Uninstall GitHub App'}
+                              {!connectionManagementEnabled ||
+                              installation.status === 'disconnected'
+                                ? 'Uninstall GitHub App'
+                                : 'Disconnect from Kilo'}
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>

@@ -188,13 +188,20 @@ export const githubAppsRouter = createTRPCRouter({
         type: 'org',
         id: input.organizationId,
       });
+      // A locally disconnected connection has already relinquished its slot:
+      // it must not keep counting toward "this org already has an
+      // installation" cardinality checks, or the org would be unable to add
+      // or connect anything else after disconnecting.
+      const activeIntegrationCount = integrations.filter(
+        integration => !integration.github_disconnected_at
+      ).length;
       const primaryId = integrations.find(isPlatformIntegrationHealthy)?.id ?? null;
       const canManageModel = canManageOrganizationBilling(role);
       const canManageConnections =
         canManageOrganization(role) && isGitHubConnectionManagementEnabled();
       const sharingApproved = canOrganizationCreateSharedGitHubConnection(input.organizationId);
       const multipleInstallationsApproved =
-        integrations.length === 0 ||
+        activeIntegrationCount === 0 ||
         canOrganizationUseMultipleGitHubInstallations(input.organizationId);
       const existingConnectionAdmission = !canManageConnections
         ? { allowed: false as const, reason: 'not_authorized' as const }
@@ -208,10 +215,7 @@ export const githubAppsRouter = createTRPCRouter({
         connectionManagementEnabled: isGitHubConnectionManagementEnabled(),
         canConnectExisting: existingConnectionAdmission.allowed,
         existingConnectionAdmission,
-        canAdd:
-          canManageOrganization(role) &&
-          (integrations.length === 0 ||
-            canOrganizationUseMultipleGitHubInstallations(input.organizationId)),
+        canAdd: canManageOrganization(role) && multipleInstallationsApproved,
         installations: integrations.map(integration => {
           const repositories = requireNumericPlatformRepositories(integration.repositories) ?? [];
           const status: 'connected' | 'disconnected' | 'pending' | 'suspended' | 'needs_attention' =
@@ -310,7 +314,12 @@ export const githubAppsRouter = createTRPCRouter({
       );
       if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
         const integrations = await githubAppsService.listIntegrations(owner);
-        if (integrations.length > 0) {
+        // A locally disconnected connection has relinquished its slot and
+        // must not block starting a fresh installation.
+        const hasActiveIntegration = integrations.some(
+          integration => !integration.github_disconnected_at
+        );
+        if (hasActiveIntegration) {
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'This organization already has a GitHub installation',

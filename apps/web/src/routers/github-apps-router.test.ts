@@ -379,6 +379,34 @@ describe('githubAppsRouter organization install capability', () => {
     expect(listed.installations).toHaveLength(1);
   });
 
+  it('does not let a locally disconnected connection block adding another installation', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([
+      { ...organizationIntegration(), github_disconnected_at: '2026-01-02T00:00:00.000Z' },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    const listed = await caller.listOrganizationInstallations({ organizationId });
+
+    expect(listed.canAdd).toBe(true);
+    expect(listed.installations).toHaveLength(1);
+    expect(listed.installations[0]).toMatchObject({ status: 'disconnected' });
+  });
+
+  it('does not let a locally disconnected connection block starting a fresh connect-existing flow', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationId;
+    mockListIntegrations.mockResolvedValue([
+      { ...organizationIntegration(), github_disconnected_at: '2026-01-02T00:00:00.000Z' },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    const listed = await caller.listOrganizationInstallations({ organizationId });
+
+    expect(listed.canConnectExisting).toBe(true);
+    expect(listed.existingConnectionAdmission).toEqual({ allowed: true, reason: null });
+  });
+
   it('reports additional installation capability for allowlisted organizations', async () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
     process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = multiInstallationOrganizationId;
@@ -420,6 +448,21 @@ describe('githubAppsRouter organization install capability', () => {
       code: 'FORBIDDEN',
     });
     expect(mockCreateInstallState).not.toHaveBeenCalled();
+  });
+
+  it('mints an install state when the only existing connection is locally disconnected', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([
+      { ...organizationIntegration(), github_disconnected_at: '2026-01-02T00:00:00.000Z' },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(caller.mintInstallState({ organizationId })).resolves.toEqual({
+      token: 'install-token',
+    });
+    expect(mockCreateInstallState).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerId: organizationId })
+    );
   });
 
   it('mints another install state for an allowlisted organization', async () => {

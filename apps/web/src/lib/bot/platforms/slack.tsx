@@ -22,7 +22,6 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getSlackMessagePermalink } from '@/lib/slack-bot/slack-utils';
 import { captureException } from '@sentry/nextjs';
 import { SlackAdapter, type SlackEvent } from '@chat-adapter/slack';
-import { getSlackTeamId } from './slack-webhook';
 import type { PlatformIntegration } from '@kilocode/db';
 import type { HomeView } from '@slack/types';
 import { WebClient } from '@slack/web-api';
@@ -248,7 +247,8 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
     documentationUrl: 'https://kilo.ai/docs/code-with-ai/platforms/slack',
     usesGenericLinkAccountRoute: true,
     async getIdentity({ message }) {
-      const teamId = getSlackTeamId((message as Message<SlackEvent>).raw);
+      const { team_id, team } = (message as Message<SlackEvent>).raw;
+      const teamId = team_id ?? team;
       if (!teamId) {
         throw new Error('Expected a teamId in message.raw');
       }

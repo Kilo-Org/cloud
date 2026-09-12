@@ -11,7 +11,6 @@ import {
 import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
-import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import {
@@ -140,13 +139,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       code,
       SLACK_REDIRECT_URI
     );
-    await completePendingSlackDeletion(
-      teamId,
-      id => slackAdapter.deleteInstallation(id),
-      async id => {
-        await unlinkTeamKiloUsers(bot.getState(), PLATFORM.SLACK, id);
-      }
-    );
+    await completePendingSlackDeletion(teamId, id => slackAdapter.deleteInstallation(id));
 
     // 8. Store installation in database and activate Chat SDK state for the winning generation.
     try {

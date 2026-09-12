@@ -915,7 +915,6 @@ async function cleanupDeactivatedSlackInstallation(
           tags: { component: 'slack-service', op: 'delete-sdk-installation' },
           extra: { integrationId: deactivated.integrationId },
         });
-        return false;
       }
     }
     if (!installationDeleted) return false;
@@ -927,7 +926,6 @@ async function cleanupDeactivatedSlackInstallation(
           tags: { component: 'slack-service', op: 'delete-sdk-identity' },
           extra: { integrationId: deactivated.integrationId },
         });
-        return false;
       }
     }
     await tx
@@ -975,8 +973,7 @@ export async function deleteInstallationByTeamId(
 
 export async function completePendingSlackDeletion(
   teamId: string,
-  deleteChatSdkInstallation: (teamId: string) => Promise<void>,
-  deleteChatSdkIdentityCache?: (teamId: string) => Promise<void>
+  deleteChatSdkInstallation: (teamId: string) => Promise<void>
 ): Promise<boolean> {
   const [reservation] = await db
     .select()
@@ -1012,7 +1009,7 @@ export async function completePendingSlackDeletion(
       generation: reservation.generation,
       cleanupRequiresRevoke: reservation.cleanup_requires_revoke,
     },
-    { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
+    { deleteChatSdkInstallation }
   );
 }
 

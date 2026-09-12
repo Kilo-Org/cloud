@@ -1,7 +1,9 @@
+import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { stopOwnedSandboxFamily } from '../../e2e/lifecycle.js';
 import {
+  computeExclusiveLayout,
   inspectControlPlaneHistory,
   inspectControlPlaneWorkspaceFile,
   stopOwnedControlPlaneSandbox,
@@ -39,6 +41,7 @@ const runtime: ControlPlaneKiloRuntime = {
   kiloSessionId: KILO_SESSION_ID,
   serverUrl: 'http://127.0.0.1:4096',
   directory: '/worktrees/owned',
+  home: '/home/owned',
   processId: 42,
 };
 
@@ -48,6 +51,7 @@ const validDiscovery = {
   kiloSessionId: KILO_SESSION_ID,
   serverUrl: runtime.serverUrl,
   directory: runtime.directory,
+  home: runtime.home,
   processId: runtime.processId,
 };
 
@@ -207,6 +211,30 @@ describe('stopOwnedControlPlaneSandbox best-effort cleanup', () => {
     expect(killedIds).toEqual([ownedPrimary.id, ownedProxy.id]);
   });
 
+  it('forwards scenario-owned allowed directories into the exclusive proof', async () => {
+    const killedIds: string[] = [];
+    const operations: Record<string, unknown>[] = [];
+    const executeDocker = createExecutor({
+      containers: [ownedPrimary],
+      exec: operation => {
+        operations.push(operation);
+        if (operation.action === 'discover') return validDiscovery;
+        return { ok: true, exclusive: true };
+      },
+      onKill: containerId => killedIds.push(containerId),
+    });
+
+    await expect(
+      stopOwnedControlPlaneSandbox(ownedPrimary, KILO_SESSION_ID, executeDocker, [
+        '/worktrees/retired',
+      ])
+    ).resolves.toEqual([ownedPrimary.name]);
+
+    const exclusive = operations.find(operation => operation.action === 'exclusive');
+    expect(exclusive).toMatchObject({ allowedDirectories: ['/worktrees/retired'] });
+    expect(killedIds).toEqual([ownedPrimary.id]);
+  });
+
   it('treats a container that vanishes during the proof as already gone', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const executeDocker = createExecutor({
@@ -234,7 +262,10 @@ describe('stopOwnedSandboxFamily coordinator wrapper', () => {
     });
 
     await expect(
-      stopOwnedSandboxFamily(ownedPrimary, WORKSPACE_SESSION_ID, KILO_SESSION_ID, executeDocker, 0)
+      stopOwnedSandboxFamily(ownedPrimary, WORKSPACE_SESSION_ID, KILO_SESSION_ID, {
+        executeDocker,
+        familyGoneTimeoutMs: 0,
+      })
     ).rejects.toThrow('Cannot prove exclusive ownership of owned-primary-id');
     expect(kill).not.toHaveBeenCalled();
   });
@@ -250,7 +281,7 @@ describe('stopOwnedSandboxFamily coordinator wrapper', () => {
     });
 
     await expect(
-      stopOwnedSandboxFamily(ownedPrimary, WORKSPACE_SESSION_ID, KILO_SESSION_ID, executeDocker)
+      stopOwnedSandboxFamily(ownedPrimary, WORKSPACE_SESSION_ID, KILO_SESSION_ID, { executeDocker })
     ).resolves.toEqual([]);
   });
 });
@@ -317,5 +348,103 @@ describe('control-plane inspection when the container is gone', () => {
         executeDocker
       )
     ).rejects.toThrow('Kilo file returned HTTP 500');
+  });
+});
+
+/** Build `computeExclusiveLayout` input from a directory, its siblings, and listeners. */
+function exclusiveLayoutInput(input: {
+  directory: string;
+  allowedDirectories?: string[];
+  siblings?: string[];
+  listeners?: string[];
+}) {
+  const parent = path.posix.dirname(input.directory);
+  const siblings = input.siblings ?? [path.posix.basename(input.directory)];
+  const directories = new Set(siblings.map(name => path.posix.join(parent, name)));
+  return {
+    directory: input.directory,
+    ...(input.allowedDirectories !== undefined
+      ? { allowedDirectories: input.allowedDirectories }
+      : {}),
+    path: path.posix,
+    fs: {
+      readdirSync: () => siblings,
+      statSync: (filePath: string) => ({ isDirectory: () => directories.has(filePath) }),
+    },
+    listeners: (input.listeners ?? [input.directory]).map(directory => ({ directory })),
+  };
+}
+
+describe('computeExclusiveLayout directory guard', () => {
+  it('accepts the worktrees layout when the target is the only directory', () => {
+    expect(
+      computeExclusiveLayout(
+        exclusiveLayoutInput({ directory: '/workspace/user/worktrees/worktree_1' })
+      )
+    ).toEqual({
+      exclusive: true,
+      directories: ['/workspace/user/worktrees/worktree_1'],
+    });
+  });
+
+  it('accepts the sessions layout when the target is the only directory', () => {
+    expect(
+      computeExclusiveLayout(exclusiveLayoutInput({ directory: '/workspace/user/sessions/workspace_1' }))
+        .exclusive
+    ).toBe(true);
+  });
+
+  it('accepts a scenario-owned sibling directory listed in allowedDirectories', () => {
+    const result = computeExclusiveLayout(
+      exclusiveLayoutInput({
+        directory: '/workspace/user/sessions/workspace_1',
+        siblings: ['workspace_0', 'workspace_1'],
+        allowedDirectories: ['/workspace/user/sessions/workspace_0'],
+      })
+    );
+    expect(result.exclusive).toBe(true);
+    expect(result.directories).toEqual([
+      '/workspace/user/sessions/workspace_0',
+      '/workspace/user/sessions/workspace_1',
+    ]);
+  });
+
+  it('refuses an unknown sibling directory', () => {
+    expect(
+      computeExclusiveLayout(
+        exclusiveLayoutInput({
+          directory: '/workspace/user/sessions/workspace_1',
+          siblings: ['workspace_0', 'workspace_1'],
+        })
+      ).exclusive
+    ).toBe(false);
+  });
+
+  it('refuses a foreign Kilo listener outside the allowed set', () => {
+    expect(
+      computeExclusiveLayout(
+        exclusiveLayoutInput({
+          directory: '/workspace/user/sessions/workspace_1',
+          listeners: ['/workspace/user/sessions/workspace_2'],
+        })
+      ).exclusive
+    ).toBe(false);
+  });
+
+  it('refuses a parent that is neither sessions nor worktrees', () => {
+    expect(computeExclusiveLayout(exclusiveLayoutInput({ directory: '/tmp/owned' })).exclusive).toBe(
+      false
+    );
+  });
+
+  it('refuses when the target directory itself is absent', () => {
+    expect(
+      computeExclusiveLayout(
+        exclusiveLayoutInput({
+          directory: '/workspace/user/sessions/workspace_1',
+          siblings: ['workspace_2'],
+        })
+      ).exclusive
+    ).toBe(false);
   });
 });

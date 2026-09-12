@@ -985,25 +985,17 @@ describe('fake-llm-server HTTP', () => {
     });
   });
 
-  it('tool-stream writes the requested byte count and then reads it back', async () => {
+  it('tool-stream asks Kilo to read the harness-staged file and completes on its result', async () => {
     const h = await start();
     const prompt = '__fake__:tool-stream:streamer:100';
-    const writeCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
-    expect(writeCall).toMatchObject({ name: 'write' });
-    expect((writeCall.arguments.content as string).length).toBe(100);
-
-    const writeHistory = [
-      { role: 'assistant', tool_calls: [{ id: writeCall.id }] },
-      { role: 'tool', tool_call_id: writeCall.id, content: 'File written successfully' },
-    ];
-    const readCall = extractToolCall(
-      await parseSse(await postToolChat(h.url, prompt, writeHistory))
-    );
-    expect(readCall).toMatchObject({ name: 'read' });
+    const readCall = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(readCall).toMatchObject({
+      name: 'read',
+      arguments: { filePath: 'tool-stream-streamer.txt' },
+    });
 
     const completed = await parseSse(
       await postToolChat(h.url, prompt, [
-        ...writeHistory,
         { role: 'assistant', tool_calls: [{ id: readCall.id }] },
         { role: 'tool', tool_call_id: readCall.id, content: 'x'.repeat(100) },
       ])
@@ -1013,8 +1005,8 @@ describe('fake-llm-server HTTP', () => {
     ]);
     const status = await fetch(`${h.url}/test/scenario-status?tag=streamer`);
     await expect(status.json()).resolves.toMatchObject({
-      toolCalls: { write: 1, read: 1, edit: 0, question: 0 },
-      toolResults: { write: 1, read: 1, edit: 0, question: 0 },
+      toolCalls: { write: 0, read: 1, edit: 0, question: 0 },
+      toolResults: { write: 0, read: 1, edit: 0, question: 0 },
     });
   });
 

@@ -43,9 +43,11 @@ import {
   waitForOwnedCompletion,
 } from './worktree-support.js';
 import {
+  addCleanupReport,
   lifecycleColdResume,
   lifecycleLongSession,
   lifecycleMultiSessionCollab,
+  type CleanupResult,
 } from './lifecycle-file-state.js';
 import { CONTINUITY_SCENARIOS } from './lifecycle-continuity.js';
 import { createMessageId } from '../../src/session/message-id.js';
@@ -73,6 +75,25 @@ import {
   type DockerCommandExecutor,
   type SandboxContainer,
 } from './sandbox-control.js';
+
+/**
+ * Lifecycle scenarios that accept `--timeout-ms` and need a body budget beyond
+ * the default 120s. Enrolled the same way as `long-session` /
+ * `recover-same-session`: `run.ts` spreads this map into its long-running
+ * allowlist and passes the default through `LifecycleArgs.timeoutMs`.
+ */
+export const LIFECYCLE_SCENARIO_TIMEOUT_MS: Record<string, number> = {
+  'external-kill': 12 * 60_000,
+  'kill-mid-flight': 12 * 60_000,
+};
+
+/**
+ * Upper bound for a post-kill message that must await replacement recovery.
+ * The DO's prepare path can legitimately spend the full create-settle window
+ * before a replacement is ready, so a fixed 120s is too short; this caps each
+ * such wait at ~5 min instead of the whole scenario deadline.
+ */
+export const RECOVERY_BUDGET_MS = 5 * 60_000;
 
 const execFileAsync = promisify(execFile);
 
@@ -138,18 +159,25 @@ function hasPreparationForMessage(events: StreamEvent[], messageId: string): boo
 async function sandboxOwnsSession(
   containerId: string,
   sessionId: string,
-  kiloSessionId: string
+  kiloSessionId?: string
 ): Promise<boolean> {
-  if (sessionId.startsWith('workspace_')) {
+  if (sessionId.startsWith('workspace_') && kiloSessionId !== undefined) {
     const runtime = await findControlPlaneKiloRuntime(kiloSessionId).catch(() => null);
     return runtime?.container.id === containerId;
   }
   const probe = `
     const fs = require('node:fs');
     const sessionId = process.argv.at(-1);
-    const logs = fs.readdirSync('/tmp').filter(name => /^kilocode-wrapper-agent_.+\\.log$/.test(name));
-    process.exit(logs.length > 0 && logs.every(name =>
-      name.startsWith('kilocode-wrapper-' + sessionId + '-')
+    if (!sessionId.startsWith('workspace_')) {
+      const logs = fs.readdirSync('/tmp').filter(name => /^kilocode-wrapper-agent_.+\\.log$/.test(name));
+      process.exit(logs.length > 0 && logs.every(name =>
+        name.startsWith('kilocode-wrapper-' + sessionId + '-')
+      ) ? 0 : 1);
+    }
+    const log = fs.readFileSync('/tmp/kilocode-control-wrapper.log', 'utf8');
+    const directories = [...log.matchAll(/session\\.attach ready directory=([^\\n]+)/g)];
+    process.exit(directories.length > 0 && directories.every(match =>
+      match[1].trim().split('/').at(-1) === sessionId
     ) ? 0 : 1);
   `;
   try {
@@ -164,7 +192,7 @@ async function sandboxOwnsSession(
 
 async function findOwnedSandboxes(
   sessionId: string,
-  kiloSessionId: string,
+  kiloSessionId: string | undefined,
   knownIds: Set<string>
 ) {
   const candidates = sessionId.startsWith('workspace_')
@@ -196,26 +224,44 @@ async function waitForOwnedSandbox(
   return null;
 }
 
+export type StopOwnedSandboxFamilyOptions = {
+  executeDocker?: DockerCommandExecutor;
+  familyGoneTimeoutMs?: number;
+  /**
+   * Worktree directories the scenario created for this root's prior
+   * incarnations, captured while each was exclusively owned. Passing them lets
+   * cleanup stop a live replacement whose parent also holds the retired
+   * worktree, without weakening the exclusive-ownership proof.
+   */
+  allowedDirectories?: readonly string[];
+};
+
 export async function stopOwnedSandboxFamily(
   sandbox: SandboxContainer,
   sessionId: string,
-  kiloSessionId: string,
-  executeDocker?: DockerCommandExecutor,
-  familyGoneTimeoutMs = 30_000
+  kiloSessionId?: string,
+  options: StopOwnedSandboxFamilyOptions = {}
 ) {
+  const { executeDocker, allowedDirectories = [] } = options;
+  const familyGoneTimeoutMs = options.familyGoneTimeoutMs ?? 30_000;
   const current = (await listSandboxContainers(executeDocker)).find(
     container => container.name === sandbox.name
   );
   if (current && current.id !== sandbox.id)
     throw new Error(`Container identity changed for ${sandbox.name}`);
   let killed: string[];
-  if (current && sessionId.startsWith('workspace_')) {
+  if (current && sessionId.startsWith('workspace_') && kiloSessionId !== undefined) {
     // Root presence is not exclusive ownership; the control-plane stop proves
     // the `exclusive` operation before it kills. The proof can fail merely
     // because the runtime was retired or replaced while the container was
     // winding down, so re-check the family before treating that as failure.
     try {
-      killed = await stopOwnedControlPlaneSandbox(sandbox, kiloSessionId, executeDocker);
+      killed = await stopOwnedControlPlaneSandbox(
+        sandbox,
+        kiloSessionId,
+        executeDocker,
+        allowedDirectories
+      );
     } catch (error) {
       if (!(await waitForSandboxFamilyGone(sandbox, familyGoneTimeoutMs, executeDocker)))
         throw error;
@@ -236,9 +282,53 @@ export async function stopOwnedSandboxFamily(
 
 /** Only tear down sandboxes whose exclusive session ownership can be proven. */
 export async function stopOwnedSessionSandboxes(sessionId: string): Promise<void> {
-  for (const sandbox of await findOwnedSandboxes(sessionId, new Set())) {
+  for (const sandbox of await findOwnedSandboxes(sessionId, undefined, new Set())) {
     await stopOwnedSandboxFamily(sandbox, sessionId);
   }
+}
+
+/**
+ * Discover and stop every sandbox this scenario owns without letting a cleanup
+ * failure replace the scenario result. The exclusive-ownership proof in
+ * `stopOwnedSandboxFamily` is unchanged; a discovery or stop failure is
+ * collected so the caller can report it beside the scenario outcome instead of
+ * throwing over it.
+ */
+async function cleanupOwnedSandboxFamilies(input: {
+  config: DriverConfig;
+  sessionId: string;
+  kiloSessionId: string;
+  knownSandboxIds: Set<string>;
+  ownedFamilies: Map<string, SandboxContainer>;
+  allowedDirectories: readonly string[];
+}): Promise<CleanupResult> {
+  const failures: string[] = [];
+  await interruptSession(input.config, input.sessionId).catch(() => {});
+  try {
+    for (const sandbox of await findOwnedSandboxes(
+      input.sessionId,
+      input.kiloSessionId,
+      input.knownSandboxIds
+    )) {
+      input.ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
+    }
+  } catch (error) {
+    failures.push(
+      `discover-owned-sandboxes: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  for (const sandbox of input.ownedFamilies.values()) {
+    try {
+      await stopOwnedSandboxFamily(sandbox, input.sessionId, input.kiloSessionId, {
+        allowedDirectories: input.allowedDirectories,
+      });
+    } catch (error) {
+      failures.push(
+        `stop-owned-sandbox(${sandbox.name}): ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+  return { failures, uncleanedResource: failures.length > 0 };
 }
 
 async function sendRecoveryTurn(
@@ -1425,13 +1515,23 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
 
 export async function lifecycleExternalKill(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
+  const {
+    config,
+    conversation,
+    timeoutMs = LIFECYCLE_SCENARIO_TIMEOUT_MS['external-kill'],
+    api = 'unified',
+  } = args;
+  // The post-kill message is the one that must wait for a replacement to be
+  // prepared; warmup/gate/discovery keep the scenario deadline.
+  const recoveryBudgetMs = Math.min(timeoutMs, RECOVERY_BUDGET_MS);
   const events: StreamEvent[] = [];
   const streams: ReturnType<typeof openStream>[] = [];
   const ownedFamilies = new Map<string, SandboxContainer>();
+  const ownedDirectories = new Set<string>();
   let knownSandboxIds = new Set<string>();
   let sessionId: string | undefined;
   let kiloSessionId: string | undefined;
+  let result: LifecycleResult;
   try {
     knownSandboxIds = await snapshotSandboxIds();
     const session = await startSession(config, { prompt: fakeDirective('echo:warmup') }, api);
@@ -1447,6 +1547,8 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
     );
     if (!firstSandbox) throw new Error('Could not identify an exclusively owned warmup sandbox');
     ownedFamilies.set(sandboxFamilyKey(firstSandbox), firstSandbox);
+    const firstRuntime = await findControlPlaneKiloRuntime(session.kiloSessionId);
+    if (firstRuntime) ownedDirectories.add(firstRuntime.directory);
     const warmup = await collectUntilTerminal(firstStream, session.messageId, timeoutMs);
     events.push(...warmup.events);
     firstStream.close();
@@ -1465,7 +1567,7 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
       { cloudAgentSessionId: sessionId, prompt: fakeDirective(conversation) },
       api
     );
-    const affectedTurn = await collectUntilTerminal(stream, affected.messageId, timeoutMs);
+    const affectedTurn = await collectUntilTerminal(stream, affected.messageId, recoveryBudgetMs);
     events.push(...affectedTurn.events);
     stream.close();
     const affectedResult = await getMessageResult(config, sessionId, affected.messageId);
@@ -1477,17 +1579,21 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
         isMessageCompleted(affectedTurn.terminal, affected.messageId)
     ) {
       throw new Error(
-        `Post-kill message ${affected.messageId} has no matching durable terminal outcome`
+        `Post-kill message ${affected.messageId} has no matching durable terminal outcome within ${recoveryBudgetMs}ms: ` +
+          `terminal=${affectedTurn.terminal?.streamEventType ?? 'none'}; durable=${affectedResult.status}`
       );
     }
 
-    const recovery = await sendRecoveryTurn(config, sessionId, api, timeoutMs);
+    const recovery = await sendRecoveryTurn(config, sessionId, api, recoveryBudgetMs);
     events.push(...recovery.events);
     if (
       !isMessageCompleted(recovery.terminal, recovery.messageId) ||
       recovery.status !== 'completed'
     ) {
-      throw new Error(`Recovery message ${recovery.messageId} did not complete in ${sessionId}`);
+      throw new Error(
+        `Recovery message ${recovery.messageId} did not complete in ${sessionId} within ${recoveryBudgetMs}ms: ` +
+          `terminal=${recovery.terminal?.streamEventType ?? 'none'}; durable=${recovery.status}`
+      );
     }
     const replacement = await waitForOwnedSandbox(
       sessionId,
@@ -1504,7 +1610,7 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
     ) {
       throw new Error('Recovery reused the retired physical sandbox');
     }
-    return {
+    result = {
       name: 'external-kill',
       conversation,
       ok: true,
@@ -1513,7 +1619,7 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
       durationMs: Date.now() - start,
     };
   } catch (err) {
-    return {
+    result = {
       name: 'external-kill',
       conversation,
       ok: false,
@@ -1521,29 +1627,41 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
       events,
       durationMs: Date.now() - start,
     };
-  } finally {
-    for (const stream of streams) stream.close();
-    if (sessionId && kiloSessionId) {
-      await interruptSession(config, sessionId).catch(() => {});
-      for (const sandbox of await findOwnedSandboxes(sessionId, kiloSessionId, knownSandboxIds)) {
-        ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
-      }
-      for (const sandbox of ownedFamilies.values())
-        await stopOwnedSandboxFamily(sandbox, sessionId, kiloSessionId);
-    }
   }
+  for (const stream of streams) stream.close();
+  if (sessionId && kiloSessionId) {
+    const cleanup = await cleanupOwnedSandboxFamilies({
+      config,
+      sessionId,
+      kiloSessionId,
+      knownSandboxIds,
+      ownedFamilies,
+      allowedDirectories: [...ownedDirectories],
+    });
+    result = addCleanupReport(result, cleanup);
+  }
+  return result;
 }
 
 export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
+  const {
+    config,
+    conversation,
+    timeoutMs = LIFECYCLE_SCENARIO_TIMEOUT_MS['kill-mid-flight'],
+    api = 'unified',
+  } = args;
+  // The recovery turn is the one that can await a replacement allocation.
+  const recoveryBudgetMs = Math.min(timeoutMs, RECOVERY_BUDGET_MS);
   const gateTag = `killmid-${crypto.randomUUID()}`;
   const events: StreamEvent[] = [];
   const ownedFamilies = new Map<string, SandboxContainer>();
+  const ownedDirectories = new Set<string>();
   let knownSandboxIds = new Set<string>();
   let sessionId: string | undefined;
   let kiloSessionId: string | undefined;
   let stream: ReturnType<typeof openStream> | undefined;
+  let result: LifecycleResult;
   try {
     knownSandboxIds = await snapshotSandboxIds();
     const session = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
@@ -1558,6 +1676,8 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
     );
     if (!sandbox) throw new Error('Could not identify an exclusively owned active sandbox');
     ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
+    const firstRuntime = await findControlPlaneKiloRuntime(session.kiloSessionId);
+    if (firstRuntime) ownedDirectories.add(firstRuntime.directory);
     if (!(await waitForGateEngaged(config, gateTag, timeoutMs))) {
       throw new Error(`Gate ${gateTag} did not engage before fault injection`);
     }
@@ -1585,13 +1705,16 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
     }
 
     const beforeRecovery = await snapshotSandboxIds();
-    const recovery = await sendRecoveryTurn(config, sessionId, api, timeoutMs);
+    const recovery = await sendRecoveryTurn(config, sessionId, api, recoveryBudgetMs);
     events.push(...recovery.events);
     if (
       !isMessageCompleted(recovery.terminal, recovery.messageId) ||
       recovery.status !== 'completed'
     ) {
-      throw new Error(`Recovery message ${recovery.messageId} did not complete in ${sessionId}`);
+      throw new Error(
+        `Recovery message ${recovery.messageId} did not complete in ${sessionId} within ${recoveryBudgetMs}ms: ` +
+          `terminal=${recovery.terminal?.streamEventType ?? 'none'}; durable=${recovery.status}`
+      );
     }
     const replacement = await waitForOwnedSandbox(
       sessionId,
@@ -1608,7 +1731,7 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
     ) {
       throw new Error('Recovery reused the retired physical sandbox');
     }
-    return {
+    result = {
       name: 'kill-mid-flight',
       conversation,
       ok: true,
@@ -1617,7 +1740,7 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
       durationMs: Date.now() - start,
     };
   } catch (err) {
-    return {
+    result = {
       name: 'kill-mid-flight',
       conversation,
       ok: false,
@@ -1625,18 +1748,21 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
       events: events.length ? events : [...(stream?.events ?? [])],
       durationMs: Date.now() - start,
     };
-  } finally {
-    stream?.close();
-    await releaseGate(config.fakeLlmUrl, gateTag).catch(() => {});
-    if (sessionId && kiloSessionId) {
-      await interruptSession(config, sessionId).catch(() => {});
-      for (const sandbox of await findOwnedSandboxes(sessionId, kiloSessionId, knownSandboxIds)) {
-        ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
-      }
-      for (const sandbox of ownedFamilies.values())
-        await stopOwnedSandboxFamily(sandbox, sessionId, kiloSessionId);
-    }
   }
+  stream?.close();
+  await releaseGate(config.fakeLlmUrl, gateTag).catch(() => {});
+  if (sessionId && kiloSessionId) {
+    const cleanup = await cleanupOwnedSandboxFamilies({
+      config,
+      sessionId,
+      kiloSessionId,
+      knownSandboxIds,
+      ownedFamilies,
+      allowedDirectories: [...ownedDirectories],
+    });
+    result = addCleanupReport(result, cleanup);
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------

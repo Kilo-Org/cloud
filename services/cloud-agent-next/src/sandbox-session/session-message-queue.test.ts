@@ -10,6 +10,7 @@ import { normalizeCliEvent } from '../../../../packages/cloud-agent-sdk/src/norm
 import { createServiceState } from '../../../../packages/cloud-agent-sdk/src/service-state';
 import { serializeSessionMetadata, type SessionMetadata } from '../persistence/session-metadata.js';
 import { readStep } from '../session/preparation-test-helpers.js';
+import type { Env } from '../types.js';
 import { getPreparationSnapshots, readPreparationAttempt } from '../session/preparation-history.js';
 import type { CallbackJob } from '../callbacks/types.js';
 import type { SandboxControlOutboundRequest } from '../sandbox-control/socket.js';

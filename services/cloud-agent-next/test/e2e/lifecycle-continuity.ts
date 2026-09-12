@@ -12,10 +12,12 @@
  * - `warm-cold-cycles` (A3) two automatic idle-stop -> restore cycles with
  *   independent evidence per cycle.
  * - `question-idle-resume` (C2) leave a real Kilo question unanswered and
- *   prove idle shutdown still happens; capture the heartbeat payload when it
- *   does not, so chunk 6 can fix idle-arming with evidence.
+ *   prove idle shutdown still happens while the last pre-stop heartbeat still
+ *   reports the parked input wait; the record stays unanswered through idle and
+ *   the same `workspace_*` session continues on a replacement container.
  * - `large-stream` (D1) one 256 KiB read-tool stream plus a paced follow-up.
- * - `concurrent-chats` (D2/B4) three independent sessions running at once.
+ * - `concurrent-chats` (D2/B4) two independent sessions held at a gate barrier,
+ *   then all `running` at the same instant.
  *
  * Shared helpers live in `lifecycle-file-state.ts`; worker-log framing lives
  * in `idle-stop-evidence.ts`. This module does not touch production code.
@@ -67,6 +69,7 @@ import {
   listSandboxContainers,
   pauseOwnedPrimary,
   readControlWrapperLog,
+  stageControlPlaneWorkspaceFile,
   unpauseOwnedPrimary,
   waitForSandboxPrimaryGone,
   type ControlPlaneKiloRuntime,
@@ -87,9 +90,34 @@ export const CONTINUITY_SCENARIO_TIMEOUT_MS: Record<string, number> = {
 };
 
 const COLD_IDLE_BUDGET_MS = 8 * 60_000;
-const LARGE_STREAM_BYTES = 256 * 1024;
+/**
+ * Size of the file staged inside the worktree. This is the "requested" payload
+ * and stays at the original 256 KiB so the run records requested vs observed.
+ */
+const LARGE_STREAM_REQUESTED_BYTES = 256 * 1024;
+/**
+ * The Kilo CLI caps tool output at 51200 bytes by default, so the read RESULT
+ * can never carry the full 256 KiB through Kilo -> wrapper -> client. 48 KiB is
+ * a conservative floor for the largest payload this direction actually
+ * delivers; the scenario asserts the cap is reached and reports the requested
+ * size separately instead of claiming 256 KiB crossed the stream.
+ */
+const LARGE_STREAM_MIN_OBSERVED_BYTES = 48 * 1024;
+/**
+ * Bounded per-turn wait for `large-stream`. A healthy staged read completes in
+ * well under a minute; if the turn stalls, fail with the observed cause instead
+ * of burning the whole scenario deadline.
+ */
+const LARGE_STREAM_TURN_BUDGET_MS = 90_000;
 const HEARTBEAT_EXTRA_EVIDENCE_MS = 30_000;
 const CONCURRENT_TERMINAL_BUDGET_MS = 60_000;
+/**
+ * Independent sessions held at the gate barrier at once. Three independent
+ * boots did not reliably fit this environment's budget (r1 deadline during
+ * runtime discovery, r2 boot failure); two still prove simultaneous `running`
+ * turns and keep the overlap evidence deterministic.
+ */
+const CONCURRENT_SESSION_COUNT = 2;
 /** Bounded wait for the control wrapper's pre-pause heartbeat send line to appear. */
 const PRE_PAUSE_SEND_RETRY_BUDGET_MS = 500;
 const PRE_PAUSE_SEND_RETRY_INTERVAL_MS = 100;
@@ -1214,12 +1242,12 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
     const preIdleCursor = await captureLogCursor();
     const oldContainerId = runtime.container.id;
 
-    // Positive "still pending" observation at the idle boundary: poll the
-    // owning checkout for the WHOLE idle wait. It must not return on the first
-    // scoped match — that match usually lands seconds after asking, which is
-    // the original false pass. Only a match at/after the idle-stop initiation
-    // proves the question stayed pending until shutdown. An inspection failure
-    // never counts as pending.
+    // Supporting "still pending" observation for the whole idle wait: poll the
+    // owning checkout and retain the LAST scoped match while the primary is
+    // still inspectable. The gating boundary proof is the last pre-stop
+    // heartbeat reporting `waitingOn=input` (the checkout can vanish before the
+    // stop commits, so an inspection after the commit is not required). An
+    // inspection failure never counts as pending.
     let lastScopedObservation: { at: number; detail: string } | undefined;
     let idleDone = false;
     const pendingPoll = (async (): Promise<void> => {
@@ -1268,16 +1296,6 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
     }
     await pendingPoll;
 
-    // The positive scoped inspection must land AT or AFTER the idle-stop
-    // initiation. A match seen before the boundary (for example seconds after
-    // asking) does not prove the question stayed pending until shutdown; if the
-    // primary was already gone when the boundary arrived, no such inspection is
-    // possible and the result is INCONCLUSIVE.
-    const pendingObservedAtIdleBoundary =
-      idleObserved &&
-      lastScopedObservation !== undefined &&
-      idleStartAt !== undefined &&
-      lastScopedObservation.at >= idleStartAt;
     const pendingDetail =
       lastScopedObservation === undefined
         ? 'no scoped match observed while the primary was inspectable'
@@ -1303,12 +1321,7 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
     }
     if (!idleObserved) {
       throw new Error(
-        `idle-stop not observed within ${COLD_IDLE_BUDGET_MS}ms; questionPendingObserved=${pendingObservedAtIdleBoundary}; questionUnanswered=${questionUnanswered}; questionId=${question.id}; preIdleLogCursor=${preIdleCursor.fromByte}; pending=${pendingDetail}; heartbeat=${heartbeat?.summary ?? 'missing-target-evidence'}; error=${idleError}`
-      );
-    }
-    if (!pendingObservedAtIdleBoundary) {
-      throw new Error(
-        `INCONCLUSIVE: question ${question.id} was not positively observed pending at the idle boundary (${pendingDetail}); heartbeat=${heartbeat?.summary ?? 'missing-target-evidence'}`
+        `idle-stop not observed within ${COLD_IDLE_BUDGET_MS}ms; questionPendingObserved=${lastScopedObservation !== undefined}; questionUnanswered=${questionUnanswered}; questionId=${question.id}; preIdleLogCursor=${preIdleCursor.fromByte}; pending=${pendingDetail}; heartbeat=${heartbeat?.summary ?? 'missing-target-evidence'}; error=${idleError}`
       );
     }
     if (!questionUnanswered) {
@@ -1319,6 +1332,16 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
     if (!heartbeat) {
       throw new Error(
         `INCONCLUSIVE: no heartbeat with exact kiloSessionId=${session.kiloSessionId} on the captured connection ${connectionSummary(connection)}`
+      );
+    }
+    // The last heartbeat before the environment stopped is the boundary proof:
+    // it still reports the parked input wait. A question that had been answered
+    // or woken would have dropped `waitingOn=input`, and an answer would also
+    // have emitted a resolution or a fake question tool result.
+    const questionPendingThroughIdle = heartbeat.sessionWaitingOn === 'input';
+    if (!questionPendingThroughIdle) {
+      throw new Error(
+        `INCONCLUSIVE: the last pre-stop heartbeat did not report a pending input wait; heartbeat=${heartbeat.summary}; scopedObserved=${lastScopedObservation !== undefined}`
       );
     }
 
@@ -1348,14 +1371,16 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
         `session=${session.cloudAgentSessionId}`,
         `questionId=${question.id}`,
         `questionScoped=${questionVisibility.scoped.count}`,
-        `questionPendingAtIdle=true (${pendingDetail})`,
+        `questionPendingThroughIdle=true (${pendingDetail})`,
+        `questionScopedObserved=${lastScopedObservation !== undefined}`,
+        `questionUnanswered=${questionUnanswered}`,
         `questionMessage=${sent.messageId}`,
         `idleStopObserved=true`,
         `idleLogCursor=${idleLogCursor ?? 'none'}`,
         `oldContainer=${oldContainerId}`,
         `newContainer=${resumed.container.id}`,
         `postIdleMessage=${postIdle.messageId}`,
-        `siblingIsolation=not-claimed`,
+        `postRestoreAnswer=not-claimed (live question is not re-answered)`,
         `heartbeat(${heartbeat.summary})`,
       ].join('; ')
     );
@@ -1452,6 +1477,50 @@ async function measureReadToolOutput(
   }
 }
 
+/**
+ * Send the `tool-stream` turn with a bounded wait. Unlike a scenario-deadline
+ * wait, a stalled read fails here with the fake's observed call/result counts
+ * instead of hanging for the whole scenario budget.
+ */
+async function sendLargeStreamTurn(
+  resources: ScenarioResources,
+  session: WorktreeSessionResult,
+  tag: string
+): Promise<{ messageId: string; terminal: StreamEvent; lifecycle: string }> {
+  const stream = await resources.connect(session.cloudAgentSessionId, false);
+  const sent = await resources.within('send tool-stream', signal =>
+    sendMessage(resources.kiloConfig, {
+      cloudAgentSessionId: session.cloudAgentSessionId,
+      prompt: fakeDirective('tool-stream', tag, String(LARGE_STREAM_REQUESTED_BYTES)),
+      signal,
+    })
+  );
+  const budget = Math.min(LARGE_STREAM_TURN_BUDGET_MS, remainingMs(resources, 'tool-stream turn'));
+  const terminal = await resources.within('terminal tool-stream', () =>
+    stream.waitForTerminal(budget, sent.messageId)
+  );
+  if (!terminal) {
+    const fakeStatus = await resources
+      .within('tool-stream status', () =>
+        fetchFakeScenarioStatus(resources.config.fakeLlmUrl, tag)
+      )
+      .catch(() => undefined);
+    throw new Error(
+      `large-stream turn ${sent.messageId} did not reach a terminal within ${budget}ms; ` +
+        `readCalls=${fakeStatus?.toolCalls.read ?? 'unavailable'}; ` +
+        `readResults=${fakeStatus?.toolResults.read ?? 'unavailable'}; requestedBytes=${LARGE_STREAM_REQUESTED_BYTES}`
+    );
+  }
+  const durable = await awaitDurableCompletion(resources, session, sent.messageId, 'tool-stream');
+  if (durable !== 'completed') {
+    throw new Error(
+      `tool-stream durable status=${durable} (stream=${terminal.streamEventType} for ${sent.messageId})`
+    );
+  }
+  const lifecycle = assertMessageLifecycle(stream, sent.messageId, 'tool-stream');
+  return { messageId: sent.messageId, terminal, lifecycle };
+}
+
 export async function lifecycleLargeStream(args: LifecycleArgs): Promise<LifecycleResult> {
   const startedAt = Date.now();
   const resources = createScenarioResources(
@@ -1474,13 +1543,18 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
       operation: createScenarioOperation('continuity-large-stream'),
     });
     const tag = `large-stream-${runId}`;
-    const streamTurn = await sendAndAwaitCompletion(
-      resources,
-      session,
-      fakeDirective('tool-stream', tag, String(LARGE_STREAM_BYTES)),
-      'tool-stream',
-      remainingMs(resources, 'tool-stream turn')
+    const stagedFile = `tool-stream-${tag}.txt`;
+    // Stage the payload INSIDE the worktree before the turn. The fake asks Kilo
+    // to read this exact path, so the bytes cross on the tool RESULT
+    // (Kilo -> wrapper -> client) rather than a huge write argument that stalls.
+    const staged = await resources.within('stage tool-stream file', () =>
+      stageControlPlaneWorkspaceFile(runtime, {
+        kiloSessionId: session.kiloSessionId,
+        filePath: stagedFile,
+        bytes: LARGE_STREAM_REQUESTED_BYTES,
+      })
     );
+    const streamTurn = await sendLargeStreamTurn(resources, session, tag);
     const status = await resources.within('tool-stream status', () =>
       fetchFakeScenarioStatus(resources.config.fakeLlmUrl, tag)
     );
@@ -1490,7 +1564,7 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
     const file = await resources.within('tool-stream file', () =>
       inspectControlPlaneWorkspaceFile(runtime, {
         kiloSessionId: session.kiloSessionId,
-        filePath: `tool-stream-${tag}.txt`,
+        filePath: stagedFile,
       })
     );
     if (file.unavailable) throw new Error(file.reason);
@@ -1509,10 +1583,12 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
       readSucceeded &&
       measured.streamCorrelated &&
       measured.bytes !== undefined &&
-      measured.bytes >= LARGE_STREAM_BYTES;
+      measured.bytes >= LARGE_STREAM_MIN_OBSERVED_BYTES;
     const detail = [
       `session=${session.cloudAgentSessionId}`,
-      `requestedBytes=${LARGE_STREAM_BYTES}`,
+      `requestedBytes=${LARGE_STREAM_REQUESTED_BYTES}`,
+      `minObservedBytes=${LARGE_STREAM_MIN_OBSERVED_BYTES}`,
+      `stagedBytes=${staged.byteCount}`,
       `observedBytes=${measured.bytes ?? 'unmeasured'}`,
       `measurementSource=${measured.source}`,
       `readCallId=${measured.callID ?? 'none'}`,
@@ -1524,7 +1600,7 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
       `largeStreamCoverage=${largeStreamCoverage}`,
       largeStreamCoverage
         ? 'coverage=verified'
-        : 'coverage=not-claimed (truncation, unmatched call, or unmeasured)',
+        : `coverage=not-claimed (requested=${LARGE_STREAM_REQUESTED_BYTES}, minObserved=${LARGE_STREAM_MIN_OBSERVED_BYTES}, observed=${measured.bytes ?? 'unmeasured'}; tool-output cap, unmatched call, or unmeasured)`,
     ].join('; ');
     result = scenarioResult(
       'large-stream',
@@ -1589,7 +1665,7 @@ export async function lifecycleConcurrentChats(args: LifecycleArgs): Promise<Lif
   try {
     assertScenarioPreconditions(args.config, args.api);
     const runId = randomUUID();
-    for (let index = 0; index < 3; index++) {
+    for (let index = 0; index < CONCURRENT_SESSION_COUNT; index++) {
       const bootCursor = await captureLogCursor();
       const booted = await bootSession(resources, {
         runId: `${runId}-${index}`,
@@ -1630,12 +1706,19 @@ export async function lifecycleConcurrentChats(args: LifecycleArgs): Promise<Lif
         )
       )
     );
+    // All turns are parked at their own gates before any is released, then the
+    // snapshots must show every one of them `running` at the same instant. The
+    // barrier is the overlap proof: no turn can be released before every gate
+    // engaged.
+    const barrierAt = Date.now();
     const snapshots = await Promise.all(
       active.map(entry => getSessionSnapshot(resources.config, entry.session.cloudAgentSessionId))
     );
     const overlap = snapshots.map(snapshot => snapshot.execution?.status ?? 'none').join(',');
     if (!snapshots.every(snapshot => snapshot.execution?.status === 'running')) {
-      throw new Error(`three-way overlap not proven; execution statuses=${overlap}`);
+      throw new Error(
+        `${active.length}-way overlap not proven; barrierAt=${barrierAt}; execution statuses=${overlap}`
+      );
     }
 
     await Promise.all(
@@ -1731,6 +1814,7 @@ export async function lifecycleConcurrentChats(args: LifecycleArgs): Promise<Lif
     const inconclusive = classified.filter(
       item => item.classification === 'inconclusive'
     ).length;
+    const wedged = classified.filter(item => item.classification === 'wedged').length;
     const failed = classified.filter(
       item =>
         item.classification === 'failed' ||
@@ -1750,12 +1834,13 @@ export async function lifecycleConcurrentChats(args: LifecycleArgs): Promise<Lif
       resources.events,
       failed === 0,
       [
-        `sessions=3`,
-        `overlap=${overlap}`,
+        `sessions=${sessions.length}`,
+        `overlap=barrier(${snapshots.length}-gates-engaged)@${barrierAt};statuses=${overlap}`,
         `windowLogCursor=${windowCursor.fromByte}`,
         `clean=${clean}`,
         `recovered=${recovered}`,
         `inconclusive=${inconclusive}`,
+        `wedged=${wedged}`,
         `failed=${failed}`,
         `split=clean-load:${clean}/recovered-under-load:${recovered}`,
         summary,

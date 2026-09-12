@@ -138,6 +138,7 @@ type ControlPlaneKiloOperation = {
     | 'prompt'
     | 'completion'
     | 'file'
+    | 'stage-file'
     | 'questions'
     | 'exclusive';
   kiloSessionId: string;
@@ -153,8 +154,72 @@ type ControlPlaneKiloOperation = {
   expectedText?: string;
   userMessageId?: string;
   filePath?: string;
+  bytes?: number;
+  /**
+   * Additional worktree directories the harness itself created for this root
+   * across prior incarnations. Exclusivity still rejects any directory or
+   * listener outside this exact set.
+   */
+  allowedDirectories?: string[];
   questionId?: string;
 };
+
+type ExclusiveLayoutFs = {
+  readdirSync: (directory: string) => string[];
+  statSync: (filePath: string) => { isDirectory: () => boolean };
+};
+
+type ExclusiveLayoutPath = {
+  dirname: (filePath: string) => string;
+  basename: (filePath: string) => string;
+  join: (...segments: string[]) => string;
+};
+
+export type ExclusiveLayoutInput = {
+  directory: string;
+  allowedDirectories?: string[];
+  fs: ExclusiveLayoutFs;
+  path: ExclusiveLayoutPath;
+  listeners: ReadonlyArray<{ directory: string }>;
+};
+
+/**
+ * Decide whether a control-plane Kilo root is the only worktree under its
+ * parent. `sessions/<sessionId>` is the control-plane session workspace and
+ * `worktrees/<worktreeId>` the worktree-sibling layout; both are legitimate.
+ * The guard is the directory count plus the allowlist plus the listener set,
+ * not the parent name: every sibling directory and every Kilo listener must be
+ * the target directory or a harness-supplied `allowedDirectories` entry, so an
+ * unknown directory or a foreign listener still refuses.
+ *
+ * One source of truth: the container `exclusive` operation embeds this function
+ * with `toString()`, and the unit test calls it directly.
+ */
+export function computeExclusiveLayout(input: ExclusiveLayoutInput): {
+  exclusive: boolean;
+  directories: string[];
+} {
+  const { directory, allowedDirectories, fs, path, listeners } = input;
+  const parent = path.dirname(directory);
+  const allowed = new Set([
+    directory,
+    ...(Array.isArray(allowedDirectories) ? allowedDirectories : []),
+  ]);
+  const directories = fs
+    .readdirSync(parent)
+    .filter(name => fs.statSync(path.join(parent, name)).isDirectory())
+    .map(name => path.join(parent, name));
+  const sessionParent =
+    path.basename(parent) === 'worktrees' || path.basename(parent) === 'sessions';
+  return {
+    exclusive:
+      sessionParent &&
+      directories.includes(directory) &&
+      directories.every(candidate => allowed.has(candidate)) &&
+      listeners.every(listener => allowed.has(listener.directory)),
+    directories,
+  };
+}
 
 const CONTROL_PLANE_KILO_SCRIPT = String.raw`
 import { execFileSync } from 'node:child_process';
@@ -162,6 +227,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const request = JSON.parse(process.argv[1] ?? '{}');
+
+// __EXCLUSIVE_LAYOUT__
 
 const KILO_SERVER_BASENAMES = new Set(['kilo', '.kilo']);
 
@@ -315,12 +382,14 @@ async function run() {
   }
 
   if (request.action === 'exclusive') {
-    const parent = path.dirname(request.directory);
-    const directories = fs.readdirSync(parent).filter(name => fs.statSync(path.join(parent, name)).isDirectory());
-    const exclusive = path.basename(parent) === 'worktrees' &&
-      directories.length === 1 && path.join(parent, directories[0]) === request.directory &&
-      kiloListeners().every(listener => listener.directory === request.directory);
-    return { ok: true, exclusive };
+    const verdict = computeExclusiveLayout({
+      directory: request.directory,
+      allowedDirectories: request.allowedDirectories,
+      fs,
+      path,
+      listeners: kiloListeners(),
+    });
+    return { ok: true, exclusive: verdict.exclusive, directories: verdict.directories };
   }
 
   if (request.action === 'inspect') {
@@ -421,6 +490,33 @@ async function run() {
     };
   }
 
+  if (request.action === 'stage-file') {
+    if (
+      typeof request.filePath !== 'string' ||
+      path.isAbsolute(request.filePath) ||
+      !Number.isSafeInteger(request.bytes) ||
+      request.bytes < 0
+    ) {
+      return { ok: false, reason: 'workspace file path and byte count are required' };
+    }
+    const absolutePath = path.resolve(root.directory, request.filePath);
+    if (!absolutePath.startsWith(root.directory + path.sep)) {
+      return { ok: false, reason: 'workspace file path escaped the checkout' };
+    }
+    // Generate the bytes inside the container: the harness only sends the path
+    // and count, so the large payload crosses Kilo -> wrapper -> client on the
+    // read result instead of the (huge) tool-argument request path. Use short
+    // lines so the read tool's per-line handling does not truncate the single
+    // line; the file is still exactly request.bytes bytes.
+    const lineWidth = 99;
+    const line = 'x'.repeat(lineWidth) + '\n';
+    const fullLines = Math.floor(request.bytes / (lineWidth + 1));
+    const remainder = request.bytes - fullLines * (lineWidth + 1);
+    fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+    fs.writeFileSync(absolutePath, line.repeat(fullLines) + 'x'.repeat(remainder));
+    return { ok: true, byteCount: fs.statSync(absolutePath).size };
+  }
+
   if (request.action === 'prompt') {
     const source = await getRoot(request.serverUrl, request.sourceKiloSessionId);
     if (!source || source.directory !== root.directory) {
@@ -515,7 +611,7 @@ run()
       })
     )
   );
-`;
+`.replace('// __EXCLUSIVE_LAYOUT__', computeExclusiveLayout.toString());
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -645,13 +741,18 @@ export async function findControlPlaneKiloRuntime(
  * Prove the control-plane primary for `kiloSessionId` is the only worktree
  * under its Kilo root. `findControlPlaneKiloRuntime` proves a root is PRESENT;
  * exclusivity is the additional `exclusive` operation, which requires the
- * root's parent to hold exactly one worktree and every Kilo listener to belong
- * to it. Presence alone must never authorize a destructive or freezing action.
+ * root's parent to hold only this worktree plus any harness-supplied
+ * `allowedDirectories`, and every Kilo listener to belong to one of those.
+ * `allowedDirectories` are the directories the scenario itself created for the
+ * same root across prior incarnations (captured while each was exclusively
+ * owned); unknown directories and foreign listeners still refuse. Presence
+ * alone must never authorize a destructive or freezing action.
  */
 async function assertExclusiveControlPlaneRuntime(
   runtime: ControlPlaneKiloRuntime,
   kiloSessionId: string,
-  executeDocker: DockerCommandExecutor
+  executeDocker: DockerCommandExecutor,
+  allowedDirectories: readonly string[] = []
 ): Promise<void> {
   let result: Record<string, unknown>;
   try {
@@ -665,6 +766,7 @@ async function assertExclusiveControlPlaneRuntime(
         directory: runtime.directory,
         home: runtime.home,
         processId: runtime.processId,
+        allowedDirectories: [...allowedDirectories],
       },
       executeDocker
     );
@@ -685,14 +787,21 @@ async function assertExclusiveControlPlaneRuntime(
       }`
     );
   }
-  if (result.exclusive !== true)
-    throw new Error('Refusing cleanup of a sandbox with other worktrees');
+  if (result.exclusive !== true) {
+    const directories = Array.isArray(result.directories)
+      ? result.directories.join(',')
+      : 'unknown';
+    throw new Error(
+      `Refusing cleanup of a sandbox with other worktrees: directories=${directories}; allowed=${[runtime.directory, ...allowedDirectories].join(',')}`
+    );
+  }
 }
 
 export async function stopOwnedControlPlaneSandbox(
   sandbox: SandboxContainer,
   kiloSessionId: string,
-  executeDocker: DockerCommandExecutor = executeDockerCommand
+  executeDocker: DockerCommandExecutor = executeDockerCommand,
+  allowedDirectories: readonly string[] = []
 ): Promise<string[]> {
   if (!(await isSandboxContainerRunning(sandbox.id, executeDocker))) {
     // The named container is absent or not running: there is nothing left to
@@ -717,7 +826,7 @@ export async function stopOwnedControlPlaneSandbox(
     throw new Error('Cannot prove the original sandbox still owns the requested root');
   }
   try {
-    await assertExclusiveControlPlaneRuntime(runtime, kiloSessionId, executeDocker);
+    await assertExclusiveControlPlaneRuntime(runtime, kiloSessionId, executeDocker, allowedDirectories);
   } catch (error) {
     if (error instanceof ControlPlaneContainerUnavailableError) {
       console.warn(
@@ -920,6 +1029,40 @@ export async function inspectControlPlaneWorkspaceFile(
     dirty: result.dirty,
     head: result.head,
   };
+}
+
+/**
+ * Stage a file of exactly `bytes` bytes (x-filled short lines) inside the owned
+ * worktree so a fake `read` directive has a real payload to stream back. The
+ * content is generated inside the container, so the large payload crosses
+ * Kilo -> wrapper -> client on the read RESULT instead of the tool-argument
+ * request that stalls.
+ */
+export async function stageControlPlaneWorkspaceFile(
+  runtime: ControlPlaneKiloRuntime,
+  input: { kiloSessionId: string; filePath: string; bytes: number },
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<{ byteCount: number }> {
+  const result = await runControlPlaneKiloOperation(
+    runtime.container.id,
+    {
+      action: 'stage-file',
+      kiloSessionId: input.kiloSessionId,
+      serverUrl: runtime.serverUrl,
+      directory: runtime.directory,
+      processId: runtime.processId,
+      ownerKiloSessionId: runtime.kiloSessionId,
+      filePath: input.filePath,
+      bytes: input.bytes,
+    },
+    executeDocker
+  );
+  if (result.byteCount !== input.bytes) {
+    throw new Error(
+      `staged file ${input.filePath} reported ${String(result.byteCount)} bytes, expected ${input.bytes}`
+    );
+  }
+  return { byteCount: input.bytes };
 }
 
 export async function inspectControlPlaneQuestions(

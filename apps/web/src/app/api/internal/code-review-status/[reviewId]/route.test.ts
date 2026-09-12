@@ -697,6 +697,20 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         })
       ).toBe(false);
     });
+
+    it('flags queue-size omission when the original text was empty', () => {
+      // An empty string enqueued through the omission path yields
+      // `{ originalUtf8ByteLength: 0, retainedUtf8ByteLength: 0 }` — nothing
+      // was actually dropped, so this is still a no-output completion.
+      expect(
+        completedWithoutReviewOutput({
+          lastAssistantMessageTextTruncation: {
+            originalUtf8ByteLength: 0,
+            retainedUtf8ByteLength: 0,
+          },
+        })
+      ).toBe(true);
+    });
   });
 
   describe('completed callbacks without review output', () => {
@@ -712,6 +726,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
     beforeEach(() => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
+      // No summary comment/note exists yet, so the completed callback really
+      // produced no output and the downgrade applies.
+      mockFindKiloReviewComment.mockResolvedValue(null);
+      mockFindKiloReviewNote.mockResolvedValue(null);
     });
 
     it('marks the review failed with the assistant_empty_completion reason', async () => {
@@ -733,12 +751,54 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
     });
 
     it('does not auto-retry a no-output completion', async () => {
+      // Seed a below-threshold session so the usage guard would not skip the
+      // retry on its own: only the unretryable reason must stop the retry.
+      mockGetSessionUsageFromBilling.mockResolvedValue({
+        model: 'anthropic/claude-sonnet-4.6',
+        totalTokensIn: 10_000,
+        totalTokensOut: 10_000,
+        tokensIn: 0,
+        tokensOut: 0,
+        cachedTokens: 0,
+        totalCostMusd: 100,
+      });
+
       await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
 
       // A fresh run with the same model and configuration is likely to repeat
       // the empty completion, so the failure is terminal and the customer sees
       // the failed check instead of a silent retry.
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+    });
+
+    it('keeps the review completed when a summary comment was already published', async () => {
+      // A completed callback may carry no assistant text because the final
+      // message posted the review through provider tools. The published
+      // summary must not be overwritten by a "produced no output" notice.
+      mockFindKiloReviewComment.mockResolvedValue({ commentId: 99, body: 'real summary' });
+
+      await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
+
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'completed',
+        expect.any(Object)
+      );
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ codeReviewId: REVIEW_ID, status: 'completed' })
+      );
+      expect(mockAddReactionToPR).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        1,
+        'hooray',
+        'standard'
+      );
+      expect(mockCaptureMessage).not.toHaveBeenCalledWith(
+        'Code review completed without producing output',
+        expect.anything()
+      );
     });
 
     it('reports the downgrade to Sentry for observability', async () => {

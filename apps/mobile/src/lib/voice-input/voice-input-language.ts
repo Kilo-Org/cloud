@@ -145,6 +145,20 @@ async function fetchVoiceRecognitionLocales(): Promise<{
 }
 
 /**
+ * The recognition service's supported and installed locale lists, memoized for
+ * the session by `fetchVoiceRecognitionLocales`. `null` means the service call
+ * failed (never cached, so a later call retries); a successful call that
+ * reports zero locales is a real "no languages" answer, not an error.
+ */
+export async function getVoiceRecognitionLocales(): Promise<{
+  locales: readonly string[];
+  installedLocales: readonly string[];
+} | null> {
+  const result = await fetchVoiceRecognitionLocales();
+  return result;
+}
+
+/**
  * Resolve the best language tag for voice recognition from the active app
  * language. On first call, fetches and
  * memoizes the supported list; failures are never cached so subsequent calls

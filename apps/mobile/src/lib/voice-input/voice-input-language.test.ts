@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   __resetVoiceInputLanguageTagCacheForTests,
+  getVoiceRecognitionLocales,
   isVoiceInputLanguageInstalledOnDevice,
   pickSupportedVoiceInputLanguageTag,
   resolveVoiceInputStartLanguageTag,
@@ -254,6 +255,59 @@ describe('isVoiceInputLanguageInstalledOnDevice', () => {
     });
 
     expect(await isVoiceInputLanguageInstalledOnDevice('fil-PH')).toBe(true);
+  });
+});
+
+describe('getVoiceRecognitionLocales', () => {
+  beforeEach(() => {
+    __resetVoiceInputLanguageTagCacheForTests();
+    vi.clearAllMocks();
+  });
+
+  it('returns the fetched locale lists', async () => {
+    getSupportedLocalesMock.mockResolvedValue({
+      locales: ['de-DE', 'en-US'],
+      installedLocales: ['en-US'],
+    });
+
+    expect(await getVoiceRecognitionLocales()).toEqual({
+      locales: ['de-DE', 'en-US'],
+      installedLocales: ['en-US'],
+    });
+  });
+
+  it('memoizes a success, so the second call does not re-query the service', async () => {
+    getSupportedLocalesMock.mockResolvedValue({ locales: ['de-DE'], installedLocales: [] });
+
+    const first = await getVoiceRecognitionLocales();
+    const second = await getVoiceRecognitionLocales();
+
+    expect(second).toBe(first);
+    expect(getSupportedLocalesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null when the service rejects, and retries on the next call', async () => {
+    getSupportedLocalesMock.mockRejectedValueOnce(new Error('network failure'));
+
+    expect(await getVoiceRecognitionLocales()).toBeNull();
+
+    getSupportedLocalesMock.mockResolvedValueOnce({
+      locales: ['de-DE'],
+      installedLocales: ['de-DE'],
+    });
+    expect(await getVoiceRecognitionLocales()).toEqual({
+      locales: ['de-DE'],
+      installedLocales: ['de-DE'],
+    });
+    expect(getSupportedLocalesMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns null when the service throws synchronously', async () => {
+    getSupportedLocalesMock.mockImplementationOnce(() => {
+      throw new Error('package not found');
+    });
+
+    expect(await getVoiceRecognitionLocales()).toBeNull();
   });
 });
 

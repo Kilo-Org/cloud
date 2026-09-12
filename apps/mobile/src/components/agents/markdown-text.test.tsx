@@ -277,18 +277,23 @@ describe('MarkdownText HTML routing', () => {
     });
   });
 
-  it('puts the HTML blockquote start rule on the right edge in RTL', async () => {
+  it('leaves the HTML blockquote start rule to RN physical-edge mirroring in RTL', async () => {
     rnStub.I18nManager.isRTL = true;
     try {
       const renderer = await mount(<MarkdownText value="> <strong>quoted</strong>" />);
 
+      // RN mirrors physical left/right padding, margin, and borders under RTL
+      // (`doLeftAndRightSwapInRTL` defaults to true), so the rule stays on the
+      // physical left edge and lands on the right edge of an RTL layout.
+      // Choosing the side from `I18nManager.isRTL` here would double-mirror it
+      // back to the left.
       expect(htmlProps(renderer).tagsStyles.blockquote).toMatchObject({
-        borderRightColor: '#cccccc',
-        borderRightWidth: 3,
-        paddingRight: 12,
+        borderLeftColor: '#cccccc',
+        borderLeftWidth: 3,
+        paddingLeft: 12,
       });
-      expect(htmlProps(renderer).tagsStyles.blockquote).not.toHaveProperty('borderLeftWidth');
-      expect(htmlProps(renderer).tagsStyles.blockquote).not.toHaveProperty('paddingLeft');
+      expect(htmlProps(renderer).tagsStyles.blockquote).not.toHaveProperty('borderRightWidth');
+      expect(htmlProps(renderer).tagsStyles.blockquote).not.toHaveProperty('paddingRight');
     } finally {
       rnStub.I18nManager.isRTL = false;
     }

@@ -181,6 +181,17 @@ describe('ScreenHeader mounted', () => {
     expect(title.props.hitSlop).toEqual({ top: 13, right: 13, bottom: 13, left: 0 });
   });
 
+  it('mirrors the title hit slop onto the free side in RTL', () => {
+    // RN does not mirror hitSlop under RTL: an unchanged physical right slop
+    // reaches across the visually mirrored back control and the title (the
+    // later sibling) wins those taps, so Back opens the title action instead.
+    i18nManager.isRTL = true;
+    const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
+
+    const title = findTitlePressable(renderer.root);
+    expect(title.props.hitSlop).toEqual({ top: 13, right: 0, bottom: 13, left: 13 });
+  });
+
   it('gives the interactive title at least a 44-point reachable target', () => {
     const cases: ScreenHeaderProps[] = [
       { title: 'Sessions', onTitlePress: () => undefined },

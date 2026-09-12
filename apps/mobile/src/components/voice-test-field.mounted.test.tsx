@@ -166,4 +166,18 @@ describe('VoiceTestField', () => {
     const clear = findByLabel(renderer, 'Clear text');
     expect(clear.props.disabled).toBe(true);
   });
+
+  it('gives Clear a 44pt effective touch target distinct from its disabled state', async () => {
+    const renderer = await mountVoiceTestField();
+
+    const clear = findByLabel(renderer, 'Clear text');
+    const className = clear.props.className as string;
+    // DESIGN.md: touch surfaces keep at least a 44px target. 11 * 4px = 44px,
+    // with the compact label centered inside it.
+    expect(className).toContain('min-h-11');
+    expect(className).toContain('min-w-11');
+    expect(className).toContain('items-center');
+    expect(className).toContain('justify-center');
+    expect(className).toContain('disabled:opacity-50');
+  });
 });

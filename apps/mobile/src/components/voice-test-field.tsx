@@ -77,7 +77,10 @@ export function VoiceTestField(): React.ReactElement {
         <Pressable
           accessibilityLabel={t('voiceInput.testClear')}
           accessibilityRole="button"
-          className="ml-auto active:opacity-70"
+          // 44pt effective target (DESIGN.md): the compact text label sits in a
+          // min-h-11/min-w-11 centered box, so the target never shrinks with the
+          // label. disabled:opacity-50 separates the inert state from the live one.
+          className="ml-auto min-h-11 min-w-11 items-center justify-center px-2 active:opacity-70 disabled:opacity-50"
           disabled={clearDisabled}
           onPress={handleClear}
         >

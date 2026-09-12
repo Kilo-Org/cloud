@@ -36,6 +36,7 @@
     "cost": "Xarajat",
     "discard": "Bekor qilish",
     "findings": "Aniqlangan muammolar",
+    "mergeRequest": "merge so‘rovi",
     "notConnected": "Ulanmagan",
     "notifications": "Bildirishnomalar",
     "pullRequest": "pR",
@@ -350,6 +351,7 @@
       "merge": "Birlashtirish",
       "mergeNow": "Hozir birlashtirish",
       "mergePullRequest": "PRni birlashtirish",
+      "mergeTermTitle": "{{term}}ni birlashtirish",
       "enableAutoMerge": "Avtomatik birlashtirishni yoqish",
       "disableAutoMerge": "Avtomatik birlashtirishni o'chirish",
       "autoMergeOn": "Avtomatik birlashtirish yoqilgan",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "Birlashtirishdan keyin tarmoqni o'chirish",
       "noEnabledMethods": "Bu omborda hech bir birlashtirish usuli yoqilmagan. Ombor administratoridan oddiy birlashtirish, kommitlarni jamlash yoki asosni almashtirish usulini yoqishni so'rang.",
       "confirmTitle": "PR birlashtirilsinmi?",
+      "confirmTitleTerm": "{{term}} birlashtirilsinmi?",
       "confirmMessage": "O'zgarishlaringiz asosiy tarmoqqa birlashtiriladi.",
       "enableAutoMergeConfirmTitle": "Avtomatik birlashtirish yoqilsinmi?",
       "enableAutoMergeConfirmMessage": "Barcha majburiy tekshiruvlar muvaffaqiyatli yakunlangach, GitHub bu PRni avtomatik birlashtiradi.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} pipeline muvaffaqiyatli bo‘lgach, avtomatik birlashtiriladi.",
+      "enableAutoMergeDescriptionTerm": "GitLab pipeline muvaffaqiyatli bo‘lgach, ushbu {{term}}ni avtomatik birlashtiradi.",
       "forbidden": "Bu PRni birlashtirishga ruxsatingiz yo'q.",
       "cannotMerge": "Bu PRni hozirgi holatida birlashtirib bo'lmaydi.",
       "couldNotMerge": "PRni birlashtirib bo'lmadi.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Allaqachon birlashtirilgan",
-        "closed": "Bu PR yopilgan"
+        "closed": "Bu PR yopilgan",
+        "closedMergeRequest": "Bu merge so‘rovi yopilgan"
       },
       "partialSuccessBanner": {
         "body": "Tarmoqni o'chirib bo'lmadi: {{reason}}.",
@@ -406,6 +412,18 @@
         "behindDetail": "Manba tarmoq asosiy tarmoqdan ortda qolgan. Birlashtirishdan oldin manba tarmoqni yangilang yoki asosini almashtiring.",
         "notMergeableTitle": "Bu PRni hali birlashtirib bo'lmaydi",
         "notMergeableDetail": "GitHub birlashtirish imkoniyati uchun quyidagi holatni bildirdi: {{state}}."
+      },
+      "restrictions": {
+        "title": "Birlashtirish cheklovlari",
+        "approvalsRequired_one": "{{displayCount}} tasdiq talab qilinadi",
+        "approvalsRequired_other": "{{displayCount}} tasdiq talab qilinadi",
+        "pipelineMustSucceed": "Birlashtirishdan oldin pipeline muvaffaqiyatli bo‘lishi kerak."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline oxirgi kommitda xato bermoqda.",
+        "pendingPipeline": "Pipeline oxirgi kommitda hali ishlayapti.",
+        "permission": "Bu {{term}}ni birlashtirishga ruxsatingiz yo‘q.",
+        "draft": "Birlashtirishdan oldin {{term}}ni ko‘rib chiqishga tayyor deb belgilang."
       },
       "methodLabels": {
         "merge": "Birlashtirish kommitini yaratish",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "Eskirgan: {{lines}}",
         "outdatedOnPath": "Eskirgan: {{path}}"
       },
-      "deletedUser": "o'chirilgan foydalanuvchi"
+      "deletedUser": "o'chirilgan foydalanuvchi",
+      "replyForbiddenTerm": "Bu {{term}}ga javob yozishga ruxsatingiz yo‘q."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ilovasi sozlamalarini ochib bo‘lmadi.",
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "PRni ko'rib chiqish",
     "headLine": "{{counts}} · oxirgi kommit: {{sha}}",
     "entry": {
-      "eyebrow": "PRni URL orqali oching.",
-      "pastePrLink": "PR havolasini joylashtirish",
-      "noRecentPrs": "Oxirgi PRlar yo'q",
-      "noRecentPrsDescription": "Ko'rib chiqishni boshlash uchun yuqoriga PR havolasini joylashtiring — keyingi safar u shu yerda ko'rinadi.",
+      "eyebrow": "PR yoki merge so‘rovini URL orqali oching",
+      "pastePrLink": "PR yoki merge so‘rovi havolasini joylashtirish",
+      "noRecentPrs": "Oxirgi ko‘rib chiqishlar yo‘q",
+      "noRecentPrsDescription": "Ko‘rib chiqishni boshlash uchun yuqoriga havolani joylashtiring — keyingi safar u shu yerda ko‘rinadi.",
       "couldNotLoad": "Yuklab bo'lmadi.",
       "removeFromRecentsTitle": "Oxirgilar ro'yxatidan olib tashlansinmi?",
-      "removeFromRecentsMessage": "Bu PR oxirgilar ro'yxatidan olib tashlanadi.",
+      "removeFromRecentsMessage": "Bu ko‘rib chiqish oxirgilar ro‘yxatidan olib tashlanadi.",
       "removeRecentAccessibility": "{{repo}}ni oxirgilar ro'yxatidan olib tashlash",
-      "urlAccessibility": "GitHubdagi PRning URL manzili",
-      "clearLink": "PR havolasini tozalash",
-      "pasteLink": "PR havolasini joylashtirish",
+      "urlAccessibility": "PR yoki merge so‘rovi URL manzilini kiriting",
+      "urlPlaceholder": "PR yoki merge so‘rovi URL manzili",
+      "openAccessibility": "PR yoki merge so‘rovini ochish",
+      "clearLink": "Havolani tozalash",
+      "pasteLink": "PR yoki merge so‘rovi havolasini joylashtirish",
       "open": "Ochiq"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "GitHub ulanishini tekshirib bo'lmadi.",
       "checkFailedMessage": "Bu ma'lumot yuklanmaguncha hisobga kirish holatini aniqlab bo'lmaydi.",
+      "checkFailedTitleGitLab": "GitLab ulanishini tekshirib bo'lmadi.",
+      "checkFailedTitleBitbucket": "Bitbucket ulanishini tekshirib bo'lmadi.",
+      "providerCheckFailedMessage": "Yuklanmaguncha ulanish holati mavjud emas.",
       "reconnectTitle": "GitHubga qayta ulanish",
       "reconnectDescription": "GitHub ulanishingiz bekor qilingan. Mobil qurilmada PRlarni ko'rib chiqishni davom ettirish uchun qayta ulaning.",
-      "description": "Mobil qurilmada PRlarni ko'rib chiqish uchun GitHub hisobingizni ulang."
+      "description": "Mobil qurilmada PRlarni ko'rib chiqish uchun GitHub hisobingizni ulang.",
+      "gitlabDescription": "Telefonda merge so‘rovlarini ko‘rib chiqish uchun GitLab hisobingizni ulang.",
+      "bitbucketDescription": "Telefonda PRlarni ko‘rib chiqish uchun Bitbucketni ushbu tashkilotga ulang.",
+      "bitbucketOrgOnlyDescription": "Profilida tashkilot tanlang va uning Bitbucket PRlarini ko‘rib chiqing."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub bilan ulanish muddati tugadi.",
-      "message": "GitHub ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi."
+      "message": "GitHub ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
+      "gitlabTitle": "GitLab bilan ulanish muddati tugadi.",
+      "bitbucketTitle": "Bitbucket bilan ulanish muddati tugadi.",
+      "providerMessage": "{{provider}} ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi."
     },
     "eventChips": {
       "comment": "Izoh",
@@ -668,7 +698,7 @@
       "emptyLine": "(bo‘sh)"
     },
     "linkPasteClipboardEmpty": "Nusxalash buferi bo'sh.",
-    "linkPasteNotAPullRequest": "Bu GitHubdagi PR havolasi emas.",
+    "linkPasteNotAPullRequest": "Bu PR yoki merge so‘rovi havolasi emas",
     "announce": {
       "commentPosted": "Izoh joylashtirildi",
       "reviewSubmitted": "Ko'rib chiqish natijasi yuborildi",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "Bu izohni joylashtirib bo'lmaydi. Tanlangan qator o'zgargan yoki PR yangilangan bo'lishi mumkin.",
       "reviewNotSubmitted": "Ko'rib chiqish natijasini hozirgi holatida yuborib bo'lmaydi. PR o'zgargan bo'lishi mumkin yoki siz o'zingiz ochgan PRni ko'rib chiqishga urinyapsiz.",
+      "reviewNotSubmittedTerm": "Ushbu ko'rib chiqish hozirgi holatida yuborilmaydi. {{term}} o'zgargan bo'lishi mumkin yoki o'zingiz yaratgan {{term}}ni ko'rib chiqa olmaysiz.",
       "couldNotPostComment": "Izoh joylashtirib bo'lmadi.",
       "couldNotSubmitReview": "Ko'rib chiqish natijasini yuborib bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "Javob yuborib bo‘lmadi.",
       "couldNotCompleteAction": "Bu amalni yakunlab bo'lmadi.",
       "mergeResultDefaultError": "GitHub birlashtirishni yakunlamadi.",
+      "mergeResultNotCompleted": "{{term}} birlashtirilmadi. Holatini tekshiring va qayta urinib ko‘ring.",
       "ambiguous": "Amal natijasini tasdiqlab bo'lmadi — qayta urinishdan oldin PRni tekshiring.",
       "persistenceFailed": "Bu amalni qayd etib bo'lmadi. Keyinroq qayta urinib ko'ring.",
       "forbidden": "Bu amalni bajarishga ruxsat yo'q."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ushbu provayderda mavjud emas",
+        "accessibility": "Ushbu provayderda mavjud emas: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge so‘rovi",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Merge so‘rovini ulashish",
+      "viewOnProvider": "{{provider}}da ko'rish",
+      "mergeRequestUnavailable": "Merge so‘rovi mavjud emas",
+      "unavailableDescription": "Ehtimol u o‘chirilgan yoki unga kirish huquqingiz yo‘q.",
+      "accessDeniedMergeRequest": "Bu merge so‘rovini ko‘rishga ruxsatingiz yo‘q.",
+      "couldNotLoadMergeRequest": "Merge so‘rovini yuklab bo‘lmadi.",
+      "discussionAccessDenied": "Bu merge so‘rovi muhokamasini ko‘rishga ruxsatingiz yo‘q.",
+      "discussionUnavailableMessage": "Bu merge so‘rovi o‘chirilgan bo‘lishi mumkin.",
+      "noDiscussionDescription": "Bu merge so‘rovida ko‘rib chiqishga oid izohlar zanjiri ham, umumiy izohlar ham yo‘q.",
+      "noFilesChangedDescription": "Bu merge so‘rovida hech bir fayl o‘zgarmagan."
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "Qayta ulanish"
     },
     "newSession": {
+      "recentlyUsed": "Yaqinda ishlatilgan",
+      "couldNotLoadGithubRepositories": "GitHub repozitoriyalarini yuklab bo'lmadi.",
+      "couldNotLoadGitlabRepositories": "GitLab repozitoriyalarini yuklab bo'lmadi.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarini yuklab bo'lmadi.",
       "connectGithubDescription": "Brauzerda GitHub hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
+      "connectGitlabDescription": "Brauzerda GitLab hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
+      "connectBitbucketDescription": "Brauzerda Bitbucket hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
       "openGithub": "GitHub saytini ochish",
+      "openGitlab": "GitLab saytini ochish",
+      "openBitbucket": "Bitbucket saytini ochish",
       "refreshRepositories": "Repozitoriyalarni yangilash",
       "githubConnected": "GitHub ulandi",
+      "gitlabConnected": "GitLab ulandi",
       "noRepositoriesVisible": "Repozitoriyalar ko'rinmayapti. Kilo GitHub ilovasining repozitoriyalarga kirish ruxsatlarini tekshiring, so'ng ro'yxatni yangilang.",
+      "noRepositoriesVisibleGitlab": "Repozitoriyalar ko'rinmayapti. GitLab repozitoriyalariga kirish ruxsatlarini tekshiring, so'ng ro'yxatni yangilang.",
+      "noRepositoriesVisibleBitbucket": "Repozitoriyalar ko'rinmayapti. Bitbucket repozitoriyalariga kirish ruxsatlarini tekshiring, so'ng ro'yxatni yangilang.",
+      "bitbucketOrganizationsOnly": "Bitbucket faqat tashkilotlar uchun mavjud.",
+      "branchPickerTitle": "Tarmoqni tanlash",
+      "branchDefault": "Standart",
+      "branchAccessibility": "Tarmoq: {{label}}",
+      "branchLoading": "Tarmoqlar yuklanmoqda",
+      "branchLoadError": "Tarmoqlarni yuklab bo‘lmadi",
+      "branchUnavailable": "Ushbu repozitoriy uchun tarmoqlar mavjud emas. Provayderdagi kirish huquqingizni tekshiring, so‘ng boshqa repozitoriy tanlang.",
+      "branchEmpty": "Mavjud tarmoqlar yo‘q",
+      "branchPlaceholder": "Tarmoq tanlang",
       "runOnWithTarget": "Ishga tushirish muhiti: {{target}}",
       "environment": "Muhit",
       "couldNotLoadEnvironment": "Muhitingizni yuklab bo'lmadi.",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "Repozitoriyalarni yangilab bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "discardDraftTitle": "Qoralama bekor qilinsinmi?",
       "discardDraftMessage": "Yozgan so'rovingiz yo'qoladi.",
+      "discardWithUploadsMessage": "So'rovingiz va hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi.",
       "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "remoteHint": "Kompyuteringizdagi kilo jarayonini boshqarish uchun `kilo remote` buyrug'ini yoki ishlayotgan CLI sessiyasida `/remote` buyrug'ini bajaring.",
-      "connectBitbucketDescription": "Brauzerda Bitbucket hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
-      "connectGitlabDescription": "Brauzerda GitLab hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarini yuklab bo'lmadi.",
-      "couldNotLoadGithubRepositories": "GitHub repozitoriyalarini yuklab bo'lmadi.",
-      "couldNotLoadGitlabRepositories": "GitLab repozitoriyalarini yuklab bo'lmadi.",
-      "gitlabConnected": "GitLab ulandi",
-      "noRepositoriesVisibleBitbucket": "Repozitoriyalar ko'rinmayapti. Bitbucket repozitoriyalariga kirish ruxsatlarini tekshiring, so'ng ro'yxatni yangilang.",
-      "noRepositoriesVisibleGitlab": "Repozitoriyalar ko'rinmayapti. GitLab repozitoriyalariga kirish ruxsatlarini tekshiring, so'ng ro'yxatni yangilang.",
-      "openBitbucket": "Bitbucket saytini ochish",
-      "openGitlab": "GitLab saytini ochish",
-      "recentlyUsed": "Yaqinda ishlatilgan",
       "continueFrom": "{{title}} sessiyasi davom ettirilmoqda.",
       "importingSession": "Sessiya import qilinmoqda",
       "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent xizmatini yoki boshqa CLI dasturini tanlang.",
-      "importFailed": "Bu sessiyani import qilib bo'lmadi.",
-      "discardWithUploadsMessage": "So'rovingiz va hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi."
+      "importFailed": "Bu sessiyani import qilib bo'lmadi."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi.",

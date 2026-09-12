@@ -4,7 +4,9 @@ import {
   clearRecentPrs,
   getRecentPrs,
   markRecentPrFailed,
+  providerRefFromRecentPr,
   type RecentPr,
+  recentPrKey,
   removeRecentPr,
   upsertRecentPr,
 } from './recent-prs';
@@ -172,5 +174,172 @@ describe('recent-prs', () => {
     await upsertRecentPr(makeRecent({ repo: 'hello', number: 1, title: 'One', lastResult: 'ok' }));
 
     await expect(getRecentPrs()).resolves.toMatchObject([{ number: 1, lastResult: 'ok' }]);
+  });
+
+  it('upsert keeps one row per provider for a same-named repo', async () => {
+    await upsertRecentPr(makeRecent({ number: 1, title: 'GitHub one' }));
+    await upsertRecentPr(
+      makeRecent({
+        number: 1,
+        title: 'GitLab one',
+        platform: 'gitlab',
+        instanceHint: 'https://gitlab.example.com',
+      })
+    );
+    await upsertRecentPr(makeRecent({ number: 1, title: 'Bitbucket one', platform: 'bitbucket' }));
+
+    const recents = await getRecentPrs();
+    expect(recents).toHaveLength(3);
+    expect(recents.map(entry => entry.title)).toEqual([
+      'Bitbucket one',
+      'GitLab one',
+      'GitHub one',
+    ]);
+  });
+
+  it('upsert dedupes a re-opened provider entry by platform and instance', async () => {
+    await upsertRecentPr(
+      makeRecent({
+        number: 1,
+        title: 'Old',
+        platform: 'gitlab',
+        instanceHint: 'https://gitlab.example.com',
+      })
+    );
+    await upsertRecentPr(
+      makeRecent({
+        number: 1,
+        title: 'New',
+        platform: 'gitlab',
+        instanceHint: 'https://gitlab.example.com',
+      })
+    );
+    await upsertRecentPr(
+      makeRecent({
+        number: 1,
+        title: 'Other instance',
+        platform: 'gitlab',
+        instanceHint: 'https://gitlab.other',
+      })
+    );
+
+    const recents = await getRecentPrs();
+    expect(recents).toHaveLength(2);
+    expect(recents[0]).toMatchObject({ title: 'Other instance' });
+    expect(recents[1]).toMatchObject({ title: 'New' });
+  });
+
+  it('a legacy entry (no platform) dedupes with the GitHub identity', async () => {
+    await upsertRecentPr(makeRecent({ number: 1, title: 'Legacy' }));
+    await upsertRecentPr(makeRecent({ number: 1, title: 'Explicit GitHub', platform: 'github' }));
+
+    await expect(getRecentPrs()).resolves.toMatchObject([
+      { number: 1, title: 'Explicit GitHub', platform: 'github' },
+    ]);
+  });
+
+  it('remove and mark-failed target one provider row, not its twins', async () => {
+    await upsertRecentPr(makeRecent({ number: 1, title: 'GitHub one' }));
+    await upsertRecentPr(
+      makeRecent({
+        number: 1,
+        title: 'GitLab one',
+        platform: 'gitlab',
+        instanceHint: 'https://gl.acme.dev',
+      })
+    );
+
+    await removeRecentPr({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 1,
+      platform: 'gitlab',
+      instanceHint: 'https://gl.acme.dev',
+    });
+    await expect(getRecentPrs()).resolves.toMatchObject([{ title: 'GitHub one' }]);
+
+    await upsertRecentPr(
+      makeRecent({
+        number: 1,
+        title: 'GitLab one',
+        platform: 'gitlab',
+        instanceHint: 'https://gl.acme.dev',
+      })
+    );
+    await markRecentPrFailed({ owner: 'octocat', repo: 'hello-world', number: 1 });
+    await expect(getRecentPrs()).resolves.toMatchObject([
+      { title: 'GitLab one', lastResult: 'ok' },
+      { title: 'GitHub one', lastResult: 'failed' },
+    ]);
+  });
+
+  it('parseRecents keeps platform and instanceHint of stored provider entries', async () => {
+    store.set(
+      'pr-review-recents',
+      JSON.stringify([
+        {
+          owner: 'group',
+          repo: 'api',
+          number: 7,
+          title: 'MR',
+          lastOpenedAt: 1_700_000_000_000,
+          platform: 'gitlab',
+          instanceHint: 'https://gitlab.acme.dev',
+        },
+      ])
+    );
+    await expect(getRecentPrs()).resolves.toEqual([
+      {
+        owner: 'group',
+        repo: 'api',
+        number: 7,
+        title: 'MR',
+        lastOpenedAt: 1_700_000_000_000,
+        lastResult: 'ok',
+        platform: 'gitlab',
+        instanceHint: 'https://gitlab.acme.dev',
+      },
+    ]);
+  });
+
+  it('recentPrKey is collision-free across providers and folds case for GitHub', () => {
+    const triple = { owner: 'Acme', repo: 'API', number: 1 };
+    expect(recentPrKey(triple)).not.toBe(recentPrKey({ ...triple, platform: 'gitlab' }));
+    expect(recentPrKey(triple)).toBe(recentPrKey({ ...triple, platform: 'github' }));
+    expect(recentPrKey({ ...triple, owner: 'acme', repo: 'api' })).toBe(recentPrKey(triple));
+    expect(
+      recentPrKey({ ...triple, platform: 'gitlab', instanceHint: 'https://a.example' })
+    ).not.toBe(recentPrKey({ ...triple, platform: 'gitlab', instanceHint: 'https://b.example' }));
+    // The GitLab instance part is the normalized host only, so a scheme or
+    // path on the hint cannot split one instance into two rows.
+    expect(recentPrKey({ ...triple, platform: 'gitlab', instanceHint: 'https://A.example/' })).toBe(
+      recentPrKey({ ...triple, platform: 'gitlab', instanceHint: 'http://a.example' })
+    );
+  });
+
+  it('providerRefFromRecentPr restores each platform ref, legacy entries as GitHub', () => {
+    expect(providerRefFromRecentPr({ owner: 'o', repo: 'r', number: 3 })).toEqual({
+      platform: 'github',
+      owner: 'o',
+      repo: 'r',
+      number: 3,
+    });
+    expect(
+      providerRefFromRecentPr({
+        owner: 'group/sub',
+        repo: 'api',
+        number: 7,
+        platform: 'gitlab',
+        instanceHint: 'https://gl.acme.dev',
+      })
+    ).toEqual({
+      platform: 'gitlab',
+      projectPath: 'group/sub/api',
+      mrIid: 7,
+      instanceHint: 'https://gl.acme.dev',
+    });
+    expect(
+      providerRefFromRecentPr({ owner: 'ws', repo: 'slug', number: 9, platform: 'bitbucket' })
+    ).toEqual({ platform: 'bitbucket', workspace: 'ws', repoSlug: 'slug', prId: 9 });
   });
 });

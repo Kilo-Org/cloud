@@ -12,8 +12,9 @@
 //   * S7a adds diff-line selection: tapping a line runs the pure
 //     `selectLine` reducer; the result is mirrored into the
 //     `diff-selection-bridge` (so the comment composer can read it on
-//     mount) and a floating action bar (`PrDiffFloatingActions`)
-//     hosts the "Comment" and "Finish review" affordances.
+//     mount) and a footer action bar (`PrDiffFloatingActions`) rendered
+//     in-flow below the list hosts the "Comment" and "Finish review"
+//     affordances.
 //
 // Cold first paint: FlashList mounts only after the first page of files is
 // present. The first-load waiting state is a plain skeleton outside the list
@@ -41,6 +42,8 @@ import {
 } from '@/components/pr-review/diff/pr-diff-file-list-header';
 import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
+import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
+import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
 import { EmptyFilesView, TabStateMessage } from '@/components/pr-review/diff/pr-diff-rows';
@@ -91,7 +94,12 @@ export function PrReviewFileList({
     number,
     enabled: true,
   });
-  const viewed = usePrReviewViewedFiles({ owner, repo, number }, headSha);
+  // The live provider scope: the viewed set is keyed by the ref (s6,
+  // identity rule 17), so a GitLab MR and a same-numbered GitHub PR — or
+  // one project on two GitLab instances — never share a set. On the GitHub
+  // route the fallback ref is the triple itself, keeping the legacy bytes.
+  const scope = useProviderPrScope({ owner, repo, number });
+  const viewed = usePrReviewViewedFiles(scope.ref, headSha);
   const fetchToCompletion = useFetchToCompletion(query, changedFiles);
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -121,21 +129,17 @@ export function PrReviewFileList({
     [owner, repo, number]
   );
 
-  // Measured floating-bar height (null until the first layout event).
-  const [barHeight, setBarHeight] = useState<number | null>(null);
+  // The write bar renders on every provider (s6): its two routes — the
+  // comment composer and the review-submit sheet — are siblings of the
+  // GitHub route AND of the provider route, so the bar pushes the sheet
+  // inside the scope its queries run under. The bar is an in-flow footer
+  // below the list (spot check e3), so the list keeps only the fixed footer
+  // gap plus the landscape side insets (which keep rows clear of the sensor
+  // housing).
+  const listContentStyle = usePrDiffListContentPadding(null);
 
-  // Stable callback: ignore sub-one-point noise to avoid unnecessary
-  // re-renders.  Layout events can fire with fractional-pixel deltas.
-  const handleHeightChange = useCallback((height: number) => {
-    setBarHeight(prev => {
-      if (prev !== null && Math.abs(prev - height) < 1) {
-        return prev;
-      }
-      return height;
-    });
-  }, []);
-
-  const contentContainerStyle = usePrDiffListContentPadding(barHeight);
+  // Which provider's words the terminal and empty states use.
+  const copy = usePrDiffStateCopy({ owner, repo, number });
 
   const viewedCount = useMemo(() => {
     let count = 0;
@@ -259,19 +263,11 @@ export function PrReviewFileList({
 
   if (files.length === 0) {
     if (firstPageErrorState?.kind === 'not-found') {
-      return (
-        <TabStateMessage
-          title={t('prReview.pullRequestUnavailable')}
-          message={t('prReview.pullRequestUnavailableDescription')}
-        />
-      );
+      return <TabStateMessage title={copy.unavailableTitle} message={copy.unavailableMessage} />;
     }
     if (firstPageErrorState?.kind === 'permission') {
       return (
-        <TabStateMessage
-          title={t('common.accessDenied')}
-          message={t('prReview.accessDeniedDescription')}
-        />
+        <TabStateMessage title={t('common.accessDenied')} message={copy.accessDeniedMessage} />
       );
     }
     if (firstPageErrorState?.kind === 'reconnect') {
@@ -298,6 +294,7 @@ export function PrReviewFileList({
     return (
       <EmptyFilesView
         changedFiles={changedFiles}
+        noChangesDescription={copy.noChangesDescription}
         onRequestOverview={onRequestOverview}
         refreshControl={
           changedFiles > 0 ? (
@@ -354,7 +351,7 @@ export function PrReviewFileList({
               }
             }}
             onEndReachedThreshold={0.5}
-            contentContainerStyle={contentContainerStyle}
+            contentContainerStyle={listContentStyle}
             ItemSeparatorComponent={null}
           />
         )}
@@ -362,10 +359,10 @@ export function PrReviewFileList({
           owner={owner}
           repo={repo}
           number={number}
+          prRef={scope.ref.platform === 'github' ? undefined : scope.ref}
           viewMode={effectiveViewMode}
           selection={selection}
           onClearSelection={clearSelection}
-          onHeightChange={handleHeightChange}
         />
       </View>
     </DiffFontMetricsContext.Provider>

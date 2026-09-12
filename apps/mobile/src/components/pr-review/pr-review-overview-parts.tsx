@@ -180,7 +180,8 @@ export function PrCountsLine({
   additions,
   deletions,
 }: Readonly<{
-  commits: number;
+  /** Null where the provider reports no commit count; the chip is dropped. */
+  commits: number | null;
   changedFiles: number;
   additions: number;
   deletions: number;
@@ -189,12 +190,15 @@ export function PrCountsLine({
   const { t } = useTranslation();
   return (
     <View className="flex-row flex-wrap items-center gap-x-4 gap-y-1">
-      <View className="flex-row items-center gap-1.5">
-        <GitCommit size={14} color={colors.mutedForeground} />
-        <Text variant="muted" className="text-sm">
-          {formatNumber(commits, i18n.language)} {t('prReview.overview.commit', { count: commits })}
-        </Text>
-      </View>
+      {commits === null ? null : (
+        <View className="flex-row items-center gap-1.5">
+          <GitCommit size={14} color={colors.mutedForeground} />
+          <Text variant="muted" className="text-sm">
+            {formatNumber(commits, i18n.language)}{' '}
+            {t('prReview.overview.commit', { count: commits })}
+          </Text>
+        </View>
+      )}
       <View className="flex-row items-center gap-1.5">
         <GitPullRequest size={14} color={colors.mutedForeground} />
         <Text variant="muted" className="text-sm">

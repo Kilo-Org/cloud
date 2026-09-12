@@ -55,6 +55,7 @@ import {
   useResolveThreadMutation,
   useUnresolveThreadMutation,
 } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
+import { providerPrCapabilities, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -82,6 +83,19 @@ export function DiscussionThread({
   viewerLogin = null,
   onReplyFocus,
 }: Readonly<DiscussionThreadProps>) {
+  // s6: the reply and resolve writes route through the `providerReview` seam
+  // on a GitLab MR / Bitbucket PR (the mutation hooks pick the arm from the
+  // provider scope the layout publishes), so what this card offers is decided
+  // by the capability list, not by the platform. Reactions stay behind the
+  // GitHub write path: the seam has no reaction procedure and no provider
+  // read layer returns reaction data, so a provider comment row renders
+  // read-only — the row shows nothing rather than a dead or failing
+  // affordance.
+  const scope = useProviderPrScope({ owner, repo, number });
+  const capabilities = providerPrCapabilities(scope.ref.platform);
+  const isGithub = scope.ref.platform === 'github';
+  const canReply = capabilities.canComment;
+  const canResolve = capabilities.canResolveThreads;
   const resolve = useResolveThreadMutation();
   const unresolve = useUnresolveThreadMutation();
   const addReaction = useAddReactionMutation(thread.threadId);
@@ -134,11 +148,23 @@ export function DiscussionThread({
     firstTimestamp: firstComment?.createdAt ?? null,
     expanded,
     onToggleResolve,
+    canResolve,
     resolveDisabled: isResolving,
     onToggleExpand,
   } as const;
 
   if (expanded) {
+    // The provider reply target carries the provider-native ids the seam
+    // needs: the thread's discussion/root-comment id and the first comment's
+    // verbatim provider id (kept in `nodeId` by the read layer).
+    const providerReply =
+      !isGithub && firstComment
+        ? {
+            ref: scope.ref,
+            threadId: thread.threadId,
+            commentNodeId: firstComment.nodeId,
+          }
+        : undefined;
     return (
       <View
         accessibilityLabel={t('prReview.discussion.threadAccessibilityLabel', { anchorLabel })}
@@ -152,6 +178,8 @@ export function DiscussionThread({
               <CommentRow
                 comment={comment}
                 reactionsDisabled={isReacting}
+                readOnly={!isGithub}
+                reactionsSupported={capabilities.reactions.supported}
                 viewerLogin={viewerLogin}
                 onToggleReaction={content => {
                   onToggleReaction(comment, content);
@@ -160,13 +188,14 @@ export function DiscussionThread({
             </View>
           ))}
         </View>
-        {firstComment ? (
+        {firstComment && canReply ? (
           <ReplyInput
             owner={owner}
             repo={repo}
             number={number}
             commentId={firstComment.commentId}
             reply={reply}
+            provider={providerReply}
             onInputFocus={onReplyFocus}
           />
         ) : null}
@@ -199,6 +228,8 @@ type ThreadHeaderProps = {
   readonly expanded: boolean;
   readonly onToggleExpand: () => void;
   readonly onToggleResolve: () => void;
+  /** False on a GitLab/Bitbucket scope: the resolve control is withheld. */
+  readonly canResolve: boolean;
   readonly resolveDisabled: boolean;
 };
 
@@ -212,6 +243,7 @@ function ThreadHeader({
   expanded,
   onToggleExpand,
   onToggleResolve,
+  canResolve,
   resolveDisabled,
 }: Readonly<ThreadHeaderProps>) {
   const colors = useThemeColors();
@@ -241,7 +273,9 @@ function ThreadHeader({
             {anchorLabel}
           </Text>
         </LabelRow>
-        <ResolveToggle resolved={resolved} disabled={resolveDisabled} onPress={onToggleResolve} />
+        {canResolve ? (
+          <ResolveToggle resolved={resolved} disabled={resolveDisabled} onPress={onToggleResolve} />
+        ) : null}
       </View>
       <View className="flex-row flex-wrap items-center gap-1.5">
         {resolved ? (

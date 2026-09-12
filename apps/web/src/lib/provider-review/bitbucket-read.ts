@@ -101,6 +101,7 @@ const BitbucketPullRequestDetailSchema = z.object({
   source: BitbucketCommitSideSchema.nullable().optional(),
   destination: BitbucketCommitSideSchema.nullable().optional(),
   task_count: z.number().nullable().optional(),
+  merge_state: z.string().nullable().optional(),
   created_on: z.string().nullable().optional(),
   updated_on: z.string().nullable().optional(),
   links: z
@@ -1122,10 +1123,13 @@ export async function getMergeRestrictions(
 
     const approvalsRequired = readRestrictionNumber(restrictions, 'require_approvals_to_merge');
     const buildsMustPass = hasRestriction(restrictions, 'require_passing_builds_to_merge');
-    // The provider's own conflict verdict: Bitbucket's pull-request detail
-    // carries no merge state, so the documented file-conflicts endpoint
-    // answers whether the branches would clash on merge.
-    const conflicts = await fileConflictsExist(access, detail);
+    // The provider's own merge verdict: an UNCLEAN (or conflict-worded) merge
+    // state means the branches diverged — independent of the restriction list.
+    // The pull-request detail usually carries no merge state at all, so the
+    // documented file-conflicts endpoint answers whether the branches would
+    // clash on merge.
+    const conflicts =
+      isConflictMergeState(detail.merge_state) || (await fileConflictsExist(access, detail));
 
     const blockedReasons: ProviderPrMergeBlockedReason[] = [];
     if (detail.state !== 'OPEN') {
@@ -1243,6 +1247,16 @@ async function fileConflictsExist(
     }
     throw error;
   }
+}
+
+/**
+ * Bitbucket's own merge verdict. `UNCLEAN` (any casing, or provider wording
+ * that names a conflict) means the source and destination branches diverged
+ * and Bitbucket cannot merge them cleanly.
+ */
+function isConflictMergeState(mergeState: string | null | undefined): boolean {
+  const normalized = mergeState?.toUpperCase() ?? '';
+  return normalized === 'UNCLEAN' || normalized.includes('CONFLICT');
 }
 
 function readRestrictionNumber(

@@ -391,10 +391,7 @@ describe('provider OAuth attempts', () => {
     ]);
     if (observationError) throw observationError;
     expect(reservationResult.status).toBe('fulfilled');
-    expect(attachResult).toMatchObject({
-      status: 'fulfilled',
-      value: { ok: false, reason: 'incompatible_workflow' },
-    });
+    expect(attachResult).toMatchObject({ status: 'fulfilled', value: { ok: true } });
   });
 
   it('blocks reservation on the attach owner row until sharing commits', async () => {

@@ -1,6 +1,5 @@
 const mockLimit = jest.fn();
 const mockIsOrganizationMember = jest.fn();
-const mockOwnerHasSharedGitHubInstallation = jest.fn();
 
 jest.mock('@/lib/drizzle', () => ({
   db: {
@@ -17,10 +16,6 @@ jest.mock('@/lib/organizations/organizations', () => ({
   isOrganizationMember: (organizationId: string, kiloUserId: string) =>
     mockIsOrganizationMember(organizationId, kiloUserId),
 }));
-jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
-  ownerHasSharedGitHubInstallation: (...args: unknown[]) =>
-    mockOwnerHasSharedGitHubInstallation(...args),
-}));
 
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -35,24 +30,6 @@ describe('platform helpers', () => {
   beforeEach(() => {
     mockLimit.mockReset();
     mockIsOrganizationMember.mockReset();
-    mockOwnerHasSharedGitHubInstallation.mockReset();
-    mockOwnerHasSharedGitHubInstallation.mockResolvedValue(false);
-  });
-
-  it('requires an exact reservation for a shared Slack owner', async () => {
-    const integration = {
-      id: 'pi_shared',
-      platform: PLATFORM.SLACK,
-      integration_status: 'active',
-      platform_installation_id: 'T_SHARED',
-      owned_by_user_id: 'user-1',
-    };
-    mockOwnerHasSharedGitHubInstallation.mockResolvedValue(true);
-    mockLimit.mockResolvedValueOnce([integration]).mockResolvedValueOnce([]);
-
-    await expect(
-      getPlatformIntegration({ platform: 'slack', teamId: 'T_SHARED', userId: 'U1' })
-    ).resolves.toBeNull();
   });
 
   it('returns the platform integration for a given identity', async () => {
@@ -61,7 +38,6 @@ describe('platform helpers', () => {
       platform: PLATFORM.SLACK,
       integration_status: 'active',
       platform_installation_id: 'T123',
-      owned_by_user_id: 'user-1',
     };
     mockLimit.mockResolvedValue([integration]);
 
@@ -92,7 +68,6 @@ describe('platform helpers', () => {
       platform: PLATFORM.SLACK,
       integration_status: 'active',
       platform_installation_id: 'T123',
-      owned_by_user_id: 'user-1',
     };
     mockLimit.mockResolvedValue([integration]);
 
@@ -115,8 +90,6 @@ describe('platform helpers', () => {
       platform: PLATFORM.SLACK,
       integration_status: 'active',
       metadata: { bot_user_id: 'U_BOT' },
-      platform_installation_id: 'T123',
-      owned_by_user_id: 'user-1',
     };
     mockLimit.mockResolvedValue([integration]);
 

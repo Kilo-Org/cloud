@@ -176,28 +176,6 @@ export async function getInstallationByTeamId(teamId: string): Promise<PlatformI
   return integration || null;
 }
 
-export async function getSlackCleanupState(integration: PlatformIntegration): Promise<{
-  cleanupPending: boolean;
-  cleanupStage: 'revoke' | 'sdk' | 'identity' | null;
-}> {
-  const teamId = integration.platform_installation_id ?? integration.platform_account_id;
-  if (!teamId) return { cleanupPending: false, cleanupStage: null };
-  const [reservation] = await db
-    .select({ stage: provider_installation_reservations.cleanup_stage })
-    .from(provider_installation_reservations)
-    .where(
-      and(
-        eq(provider_installation_reservations.provider_installation_id, teamId),
-        eq(provider_installation_reservations.platform_integration_id, integration.id),
-        eq(provider_installation_reservations.status, 'deleting')
-      )
-    )
-    .limit(1);
-  return reservation
-    ? { cleanupPending: true, cleanupStage: reservation.stage }
-    : { cleanupPending: false, cleanupStage: null };
-}
-
 export async function getActiveSlackInstallationForRuntime(
   teamId: string
 ): Promise<SlackInstallation | null> {

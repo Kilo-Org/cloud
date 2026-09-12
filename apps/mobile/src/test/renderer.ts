@@ -8,7 +8,6 @@ export { act } from './renderer-act';
 // The existing contract tests also inspect provider/component props and identity.
 // Keep those assertions via its documented Fiber escape hatch, not a second
 // reconciler or the deprecated react-test-renderer package.
-export type { JsonElement as ReactTestRendererJSON };
 type FindOptions = { deep?: boolean };
 type Predicate = (node: Instance) => boolean;
 

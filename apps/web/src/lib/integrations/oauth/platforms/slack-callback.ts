@@ -16,7 +16,7 @@ import {
   completeUnsharedSlackOAuthAttempt,
   ownerHasSharedGitHubInstallation,
 } from '@/lib/integrations/provider-oauth-attempts';
-import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
@@ -134,7 +134,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       }
     }
 
-    if (verified.purpose !== 'provider_install') {
+    if (verified.purpose !== 'provider_install' && !isLegacyProviderOAuthState(verified)) {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 

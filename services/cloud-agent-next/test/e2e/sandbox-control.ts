@@ -1375,6 +1375,11 @@ export async function killContainer(
   executeDocker: DockerCommandExecutor = executeDockerCommand
 ): Promise<void> {
   try {
+    // Fault injection must leave the container present-but-stopped: the DO
+    // distinguishes an observed stop from an absent container, and removing it
+    // mid-scenario changes that. Leaked stopped records are instead dropped at
+    // scenario end by the campaign runner and by an explicit cleanup, so this
+    // stays a kill.
     await executeDocker(['kill', idOrName]);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -91,9 +91,13 @@ export const LIFECYCLE_SCENARIO_TIMEOUT_MS: Record<string, number> = {
  * Upper bound for a post-kill message that must await replacement recovery.
  * The DO's prepare path can legitimately spend the full create-settle window
  * before a replacement is ready, so a fixed 120s is too short; this caps each
- * such wait at ~5 min instead of the whole scenario deadline.
+ * such wait below the whole scenario deadline. Local-docker replacement
+ * recovery has been observed at ~230s with variance past 300s (the wrapper
+ * readiness deadline is re-armed per prepare attempt), so 5 min was flaky;
+ * 8 min keeps a bound while leaving headroom under the 12 min scenario
+ * deadline.
  */
-export const RECOVERY_BUDGET_MS = 5 * 60_000;
+export const RECOVERY_BUDGET_MS = 8 * 60_000;
 
 const execFileAsync = promisify(execFile);
 

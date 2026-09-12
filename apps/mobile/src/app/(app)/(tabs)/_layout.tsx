@@ -82,7 +82,7 @@ export default function TabsLayout() {
   const tabBarHorizontalInset = getTabBarHorizontalInset({ left, right });
   const tabIconSize = getTabBarIconSize(fontScale);
   const showKiloClawTab = useKiloClawTabVisible();
-  const showChatTab = useFeatureFlag(FEATURE_FLAG_CHAT, false);
+  const showChatTab = useFeatureFlag(FEATURE_FLAG_CHAT);
   const tabFlags = { showKiloClaw: showKiloClawTab, showChat: showChatTab };
   const tabCount = visibleTabCount(showKiloClawTab, showChatTab);
   const { t } = useTranslation();

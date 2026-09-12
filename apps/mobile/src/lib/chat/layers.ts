@@ -31,34 +31,45 @@ import { chatTools } from './tools';
  */
 
 /**
- * Every relayed model speaks all three gateway shapes, and the best one it
- * really speaks is picked from this list. A model nobody has told us about gets
- * this and no window, which means it never compacts — an honest answer, and one
- * the next catalog read fixes.
+ * The one gateway shape every provider it relays speaks.
+ *
+ * The gateway resolves a model's shapes from the serving provider and does not
+ * publish them, and they are not all three. A model served over
+ * `chat_completions` alone — the local deterministic model is one — is refused
+ * with "This model does not support the messages API" if the session sends any
+ * other shape, which read on screen as a question that failed to deliver. So a
+ * model nothing has told us about is asked over `chat_completions`: it is the
+ * one shape every provider the gateway relays accepts, and the one that keeps
+ * a chat working on the models that speak nothing else. The catalog the app
+ * reads carries no per-model shapes, so this is the answer for every model
+ * until one publishes them.
  */
-const EVERY_SHAPE: ModelFacts = { apiKinds: ['messages', 'responses', 'chat_completions'] };
+export const RELAYED_SHAPE: ModelFacts = { apiKinds: ['chat_completions'] };
 
 /** What the app has been told about each model, replaced as the catalog loads. */
 let known: ReadonlyMap<string, ModelFacts> = new Map();
 
 /**
- * Takes the gateway's model list as the facts a session needs.
+ * The facts for one gateway model: the shape above, and the window it names.
  *
- * Only the window comes from it. The shapes do not: the gateway relays a model
- * from whichever provider serves it and says nothing about which shapes that
- * provider speaks, so the assumption above stands for every model.
+ * Only the window comes from the list. The shapes do not: the gateway relays a
+ * model from whichever provider serves it and says nothing about which shapes
+ * that provider speaks, so the assumption above stands for every model.
  */
+export function modelFactsFor(model: {
+  readonly id: string;
+  readonly context_length?: number | null;
+}): ModelFacts {
+  return model.context_length === null || model.context_length === undefined
+    ? RELAYED_SHAPE
+    : { ...RELAYED_SHAPE, contextWindow: model.context_length };
+}
+
+/** Takes the gateway's model list as the facts a session needs. */
 export function rememberModelFacts(
   models: readonly { readonly id: string; readonly context_length?: number | null }[]
 ): void {
-  known = new Map(
-    models.map(model => [
-      model.id,
-      model.context_length === null || model.context_length === undefined
-        ? EVERY_SHAPE
-        : { ...EVERY_SHAPE, contextWindow: model.context_length },
-    ])
-  );
+  known = new Map(models.map(model => [model.id, modelFactsFor(model)]));
 }
 
 /**
@@ -75,7 +86,7 @@ const layerEntropy = Layer.succeed(EntropySource, {
 
 /** One catalog instance, shared by the session and the gateway as it must be. */
 const layerCatalog = Layer.succeed(ModelCatalog, {
-  facts: (model: string) => Effect.succeed(known.get(model) ?? EVERY_SHAPE),
+  facts: (model: string) => Effect.succeed(known.get(model) ?? RELAYED_SHAPE),
 });
 
 /**

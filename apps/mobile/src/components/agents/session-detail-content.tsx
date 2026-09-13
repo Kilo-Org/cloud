@@ -85,6 +85,7 @@ import {
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import { useSessionSlowLoadPhase } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
   getSessionTranscriptItemKey,
@@ -162,6 +163,8 @@ type SessionDetailContentProps = {
   spawnedMode?: string;
   /** Title the route read from the session-list cache, so the header never blinks to a generic label. */
   cachedTitle?: string;
+  /** Epoch ms the route mounted this open; anchors the slow-load threshold. */
+  openStartedAt?: number;
 };
 
 type CancelQueuedStatus = {
@@ -180,6 +183,7 @@ export function SessionDetailContent({
   autoSend,
   spawnedMode,
   cachedTitle,
+  openStartedAt,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const { t } = useTranslation();
@@ -1141,10 +1145,34 @@ export function SessionDetailContent({
   );
 
   const shouldShowLoading =
-    isLoading ||
-    (fetchedData === null && !statusIndicator && !error) ||
-    (fetchedData !== null && fetchedData.kiloSessionId !== sessionId);
+    messages.length === 0 &&
+    (isLoading ||
+      (fetchedData === null && !statusIndicator && !error) ||
+      (fetchedData !== null && fetchedData.kiloSessionId !== sessionId));
+  const cachedMetadataRefresh = messages.length > 0 && fetchedData === null;
   const shouldBlockMessages = shouldShowLoading;
+  // A stalled open (the skeleton still up, nothing to show, no error and no
+  // progress indicator to watch) must stop looking like progress after the
+  // threshold: the slow phase swaps the skeleton for a message plus Retry.
+  // The threshold is anchored to the route's open, so a slow metadata round
+  // trip before this screen mounts does not restart the clock.
+  const sessionLoadPhase = useSessionSlowLoadPhase({
+    isLoading: shouldShowLoading,
+    hasContent: messages.length > 0,
+    hasError: error !== null,
+    hasStatusIndicator: statusIndicator !== null,
+    openStartedAt,
+  });
+  // Acknowledge a Retry tap from the slow card immediately: while the retry
+  // is in flight the button shows its spinner and is disabled, so the tap
+  // reads as accepted before any content or error arrives. Leaving the slow
+  // state (content, error, or a settled empty) ends the acknowledgment.
+  const [slowRetryPending, setSlowRetryPending] = useState(false);
+  useEffect(() => {
+    if (sessionLoadPhase !== 'slow') {
+      setSlowRetryPending(false);
+    }
+  }, [sessionLoadPhase]);
   // Failed delivery entries must not count as in-flight: after a terminal
   // delivery failure the working spinner and wake lock would otherwise stay on.
   const inFlightMessageCount = useMemo(
@@ -1156,7 +1184,8 @@ export function SessionDetailContent({
     pendingMessageCount: inFlightMessageCount,
   });
   const hasFooterStatusIndicator =
-    statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready');
+    (!cachedMetadataRefresh && statusIndicator !== null) ||
+    (cloudStatus !== null && cloudStatus.type !== 'ready');
   const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
     isAgentWorking: shouldShowWorkingIndicator,
     hasStatusIndicator: hasFooterStatusIndicator,
@@ -1172,7 +1201,7 @@ export function SessionDetailContent({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
-    hasStatusIndicator: statusIndicator !== null,
+    hasStatusIndicator: !cachedMetadataRefresh && statusIndicator !== null,
     messageCount: messages.length,
   });
 
@@ -1407,6 +1436,16 @@ export function SessionDetailContent({
             : {})}
         />
         <SessionConnectionIndicator
+          sessionRefresh={
+            cachedMetadataRefresh
+              ? {
+                  isLoading: statusIndicator === null,
+                  onRetry: () => {
+                    void manager.switchSession(sessionId);
+                  },
+                }
+              : undefined
+          }
           activeSessionType={activeSessionType}
           agentStatusType={agentStatus.type}
         />
@@ -1700,6 +1739,31 @@ export function SessionDetailContent({
                 <Text>{t('agentChat.session.backToSessions')}</Text>
               </Button>
             </View>
+          </View>
+        </CenteredState>
+      );
+    }
+    if (sessionLoadPhase === 'slow') {
+      // The skeleton has outlived the threshold with nothing to show. Occupy
+      // the same flex-1 region (CenteredState) so the header and composer do
+      // not move, and give the user the only useful action: retry.
+      return (
+        <CenteredState>
+          <View className="items-center gap-3 px-6">
+            <Text className="text-center text-sm text-muted-foreground">
+              {t('common.takingLonger')}
+            </Text>
+            <Button
+              variant="outline"
+              accessibilityLabel={t('common.retry')}
+              loading={slowRetryPending}
+              onPress={() => {
+                setSlowRetryPending(true);
+                void manager.switchSession(sessionId);
+              }}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
           </View>
         </CenteredState>
       );

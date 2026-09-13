@@ -41,6 +41,21 @@ import type { RemoteCommandState } from './remote-command-catalog';
 import type { RemoteAttachmentPart } from './transport';
 import type { NormalizedEvent } from './normalizer';
 
+/** ES2022-safe deferred: this package's `lib` target predates `Promise.withResolvers`. */
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: unknown) => void;
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 // ---------------------------------------------------------------------------
 // Mock createCloudAgentSession — prevents real WebSocket connections
 // ---------------------------------------------------------------------------
@@ -658,6 +673,304 @@ describe('createSessionManager', () => {
 
       await promise;
       expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
+    });
+
+    describe('cached initial transcript', () => {
+      // Keep the state-subscription fallback and the mock's automatic connect
+      // callbacks from clearing loading, so only the cached paint or an
+      // explicit replay can. This isolates the new hook's behavior.
+      function silenceReplay(): void {
+        mockSession.state.getActivity.mockReturnValue({
+          type: 'connecting',
+        } as SessionActivity);
+        mockSession.connect.mockImplementationOnce(() => {});
+      }
+
+      function cachedPage(id: string, messageIds: string[]): SessionSnapshotPage {
+        return {
+          info: { id },
+          messages: messageIds.map(messageId => ({
+            info: stubUserMessage({ id: messageId, sessionID: id }),
+            parts: [],
+          })),
+          nextCursor: null,
+          omittedItemCount: 0,
+        };
+      }
+
+      it('leaves loading true until replay when no cached-snapshot hook is provided', async () => {
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+
+        mockSessionCallbacks.onReplayComplete?.();
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
+      });
+
+      it('paints a cached transcript and clears loading before the transport connects', async () => {
+        const readCachedSnapshotPage = jest
+          .fn()
+          .mockResolvedValue(cachedPage('ses-1', ['msg-cache-1', 'msg-cache-2']));
+        const config = createMockConfig({ readCachedSnapshotPage });
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(readCachedSnapshotPage).toHaveBeenCalledWith('ses-1');
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(2);
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
+      });
+
+      it('keeps the skeleton when the cached read returns null', async () => {
+        const config = createMockConfig({
+          readCachedSnapshotPage: jest.fn().mockResolvedValue(null),
+        });
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+      });
+
+      it('paints cached rows while metadata is pending and retains them after a network failure', async () => {
+        const metadata = deferred<FetchedSessionData>();
+        const config = createMockConfig({
+          fetchSession: jest.fn().mockReturnValue(metadata.promise),
+          readCachedSnapshotPage: jest.fn().mockResolvedValue(cachedPage('ses-1', ['cached'])),
+        });
+        const mgr = createSessionManager(config);
+        const opening = mgr.switchSession(kiloId('ses-1'));
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(config.store.get(mgr.atoms.messagesList).map(message => message.info.id)).toEqual([
+          'cached',
+        ]);
+        expect(config.store.get(mgr.atoms.canSend)).toBe(false);
+        expect(mockSession.connect).not.toHaveBeenCalled();
+        metadata.reject(new Error('fetch failed'));
+        await opening;
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(1);
+        expect(config.store.get(mgr.atoms.statusIndicator)?.type).toBe('error');
+      });
+
+      it('defers the error screen until an in-flight cached read settles, then paints its rows', async () => {
+        const cache = deferred<SessionSnapshotPage | null>();
+        const config = createMockConfig({
+          fetchSession: jest.fn().mockRejectedValue(new Error('fetch failed')),
+          readCachedSnapshotPage: () => cache.promise,
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+
+        // The cache read is still in flight: no premature error screen.
+        expect(config.store.get(mgr.atoms.statusIndicator)).toBeNull();
+        expect(config.store.get(mgr.atoms.isLoading)).toBe(true);
+
+        cache.resolve(cachedPage('ses-1', ['cached']));
+        await new Promise(resolve => setImmediate(resolve));
+
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(1);
+        expect(config.store.get(mgr.atoms.isLoading)).toBe(false);
+        expect(config.store.get(mgr.atoms.statusIndicator)?.type).toBe('error');
+      });
+
+      it('surfaces the terminal error once a settled cache read paints nothing', async () => {
+        const cache = deferred<SessionSnapshotPage | null>();
+        const config = createMockConfig({
+          fetchSession: jest.fn().mockRejectedValue(new Error('fetch failed')),
+          readCachedSnapshotPage: () => cache.promise,
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        cache.resolve(null);
+        await new Promise(resolve => setImmediate(resolve));
+
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(0);
+        expect(config.store.get(mgr.atoms.isLoading)).toBe(false);
+        expect(config.store.get(mgr.atoms.statusIndicator)?.type).toBe('error');
+      });
+
+      it('keeps the skeleton when a stalled transport fails with nothing cached to paint', async () => {
+        const config = createMockConfig({
+          fetchSession: jest.fn().mockRejectedValue(new Error('Request timed out after 15000ms')),
+          readCachedSnapshotPage: jest.fn().mockResolvedValue(null),
+          isStalledTransportError: err =>
+            err instanceof Error && err.message.startsWith('Request timed out'),
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise(resolve => setImmediate(resolve));
+
+        // A never-answering transport is a stalled open, not a failed one:
+        // no error indicator, loading stays true so the slow-load state can
+        // surface at its own threshold.
+        expect(config.store.get(mgr.atoms.statusIndicator)).toBeNull();
+        expect(config.store.get(mgr.atoms.isLoading)).toBe(true);
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(0);
+      });
+
+      it('paints cached rows with an inline indicator when a stalled transport fails', async () => {
+        const config = createMockConfig({
+          fetchSession: jest.fn().mockRejectedValue(new Error('Request timed out after 15000ms')),
+          readCachedSnapshotPage: jest
+            .fn()
+            .mockResolvedValue(cachedPage('ses-1', ['cached-stall'])),
+          isStalledTransportError: err =>
+            err instanceof Error && err.message.startsWith('Request timed out'),
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise(resolve => setImmediate(resolve));
+
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(1);
+        expect(config.store.get(mgr.atoms.isLoading)).toBe(false);
+        expect(config.store.get(mgr.atoms.statusIndicator)?.type).toBe('error');
+      });
+
+      it('does not block the live connection on a stalled cache read or apply late stale rows', async () => {
+        const cache = deferred<SessionSnapshotPage | null>();
+        const config = createMockConfig({ readCachedSnapshotPage: () => cache.promise });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        expect(mockSession.connect).toHaveBeenCalledTimes(1);
+        cache.resolve(cachedPage('ses-1', ['stale']));
+        await Promise.resolve();
+        expect(config.store.get(mgr.atoms.messagesList)).toEqual([]);
+      });
+
+      it.each(['NOT_FOUND', 'UNAUTHORIZED', 'FORBIDDEN'])(
+        'retires cached content on authoritative %s even when the cache settles late',
+        async code => {
+          const cache = deferred<SessionSnapshotPage | null>();
+          const config = createMockConfig({
+            fetchSession: jest.fn().mockRejectedValue({ data: { code } }),
+            readCachedSnapshotPage: () => cache.promise,
+          });
+          const mgr = createSessionManager(config);
+          await mgr.switchSession(kiloId('ses-1'));
+          cache.resolve(cachedPage('ses-1', ['private']));
+          await Promise.resolve();
+          expect(config.store.get(mgr.atoms.messagesList)).toEqual([]);
+          expect(config.store.get(mgr.atoms.statusIndicator)?.type).toBe('error');
+          expect(mockSession.connect).not.toHaveBeenCalled();
+        }
+      );
+
+      it('retries on network return without blanking cached rows, and removes recovery listeners', async () => {
+        let online: (() => void) | undefined;
+        const unsubscribe = jest.fn();
+        const metadata = deferred<FetchedSessionData>();
+        const config = createMockConfig({
+          fetchSession: jest
+            .fn()
+            .mockRejectedValueOnce(new Error('fetch failed'))
+            .mockReturnValueOnce(metadata.promise),
+          readCachedSnapshotPage: jest.fn().mockResolvedValue(cachedPage('ses-1', ['cached'])),
+          lifecycleHooks: {
+            onOnline: handler => {
+              online = handler;
+              return unsubscribe;
+            },
+          },
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        const rows = config.store.get(mgr.atoms.messagesList);
+        expect(rows).toHaveLength(1);
+        const counts: number[] = [];
+        const stop = config.store.sub(mgr.atoms.messagesList, () => {
+          counts.push(config.store.get(mgr.atoms.messagesList).length);
+        });
+        expect(online).toBeDefined();
+        online?.();
+        expect(config.store.get(mgr.atoms.messagesList)).toBe(rows);
+        expect(config.fetchSession).toHaveBeenCalledTimes(2);
+        metadata.resolve(defaultFetchedSession);
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(mockSession.connect).toHaveBeenCalledTimes(1);
+        expect(counts).not.toContain(0);
+        expect(unsubscribe).toHaveBeenCalledTimes(1);
+        stop();
+        mgr.destroy();
+        online?.();
+        expect(config.fetchSession).toHaveBeenCalledTimes(2);
+      });
+
+      it('keeps the skeleton when the cached page has no messages', async () => {
+        const config = createMockConfig({
+          readCachedSnapshotPage: jest.fn().mockResolvedValue(cachedPage('ses-1', [])),
+        });
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+      });
+
+      it('ignores a cached page whose session id does not match', async () => {
+        const config = createMockConfig({
+          readCachedSnapshotPage: jest
+            .fn()
+            .mockResolvedValue(cachedPage('ses-other', ['msg-other'])),
+        });
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+      });
+
+      it('keeps the skeleton when the cached read rejects', async () => {
+        const config = createMockConfig({
+          readCachedSnapshotPage: jest.fn().mockRejectedValue(new Error('kv unavailable')),
+        });
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+      });
+
+      it('discards a cached page that resolves after a newer switchSession', async () => {
+        let resolveCached!: (page: SessionSnapshotPage | null) => void;
+        const pending = new Promise<SessionSnapshotPage | null>(resolve => {
+          resolveCached = resolve;
+        });
+        const readCachedSnapshotPage = jest
+          .fn()
+          .mockReturnValueOnce(pending)
+          .mockResolvedValue(null);
+        const config = createMockConfig({ readCachedSnapshotPage });
+        const mgr = createSessionManager(config);
+        mockSession.state.getActivity.mockReturnValue({
+          type: 'connecting',
+        } as SessionActivity);
+
+        const first = mgr.switchSession(kiloId('ses-old'));
+        // Let `ses-old` pass its metadata fetch and park on the cached read.
+        await Promise.resolve();
+        const second = mgr.switchSession(kiloId('ses-new'));
+        resolveCached(cachedPage('ses-old', ['msg-old']));
+        await first;
+        await second;
+
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+      });
     });
 
     it('calls fetchSession with the right kiloSessionId', async () => {

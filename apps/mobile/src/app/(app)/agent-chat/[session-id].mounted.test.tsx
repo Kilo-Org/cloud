@@ -578,40 +578,41 @@ describe('SessionDetailScreen display scope', () => {
           node => propOf(node, 'accessibilityHint') === 'Select account'
         )
       ).toHaveLength(0);
-      if (state !== 'pending') {
-        expect(Boolean(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry'))).toBe(
-          state === 'INTERNAL_SERVER_ERROR'
-        );
+      if (state === 'INTERNAL_SERVER_ERROR') {
+        // A retryable metadata failure hands off to the session, which owns the
+        // recovery action and paints the persisted transcript. The route must
+        // not replace it with its own error screen.
+        expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+        expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+      } else if (state !== 'pending') {
+        expect(Boolean(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry'))).toBe(false);
         const buttonLabels = findByType(renderer.root, 'Button').flatMap(button =>
           findByType(button, 'Text').flatMap(node => node.children)
         );
-        expect(buttonLabels).toEqual(
-          state === 'INTERNAL_SERVER_ERROR'
-            ? ['Retry', 'Copy', 'Back to sessions']
-            : ['Copy', 'Back to sessions']
-        );
+        expect(buttonLabels).toEqual(['Copy', 'Back to sessions']);
       }
       expect(globalContext.organizationId).toBe('global-org');
       expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
     }
   );
 
-  it('resolves scope through the existing session Retry', async () => {
+  it('resolves scope when a failed metadata read later succeeds', async () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
     queryState.data = null;
     queryState.isError = true;
     queryState.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     const renderer = await mountRoute();
-    queryState.refetch.mockImplementation(() => {
-      queryState.isError = false;
-      queryState.error = null;
-      queryState.data = { organization_id: 'org-a' };
+    expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'displayScope')).toEqual({
+      organizationId: null,
+      isResolved: false,
     });
-    act(() => {
-      pressControl(retryControl(renderer));
-    });
+
+    queryState.isError = false;
+    queryState.error = null;
+    queryState.data = { organization_id: 'org-a' };
     await updateRoute(renderer);
-    expect(queryState.refetch).toHaveBeenCalledOnce();
+
+    expect(queryState.refetch).not.toHaveBeenCalled();
     expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'displayScope')).toEqual({
       organizationId: 'org-a',
       isResolved: true,
@@ -623,6 +624,18 @@ describe('SessionDetailScreen display scope', () => {
 });
 
 describe('SessionDetailScreen valid session-id', () => {
+  it('keeps the mounted transcript when a background metadata refresh fails', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    const renderer = await mountRoute();
+    const manager = managers.at(-1)?.manager;
+    queryState.isError = true;
+    queryState.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    await updateRoute(renderer);
+    expect(transcriptText(renderer, 'RootText')).toBe('Account A root row');
+    expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+    expect(managers.at(-1)?.manager).toBe(manager);
+  });
+
   it('renders the session content with the parsed session-id and enables the query', async () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
     const renderer = await mountRoute();
@@ -920,28 +933,18 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     expect(transcriptText(renderer, 'RootText')).toBe('Account B root row');
   });
 
-  it('keeps the existing retry action usable for a temporary metadata failure', async () => {
+  it('mounts the session for a temporary metadata failure so the cached transcript can paint', async () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
     queryState.isError = true;
     queryState.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
-    queryState.refetch.mockImplementation(async () => {
-      queryState.isError = false;
-      queryState.error = null;
-      await Promise.resolve();
-    });
     const renderer = await mountRoute();
-    const error = findByType(renderer.root, 'QueryError')[0];
-    expect(propOf(error, 'variant')).toBe('server');
-    const retry = propOf(error, 'onRetry') as (() => void) | undefined;
-    if (!retry) {
-      throw new Error('temporary error lost its retry action');
-    }
 
-    act(retry);
-    await updateRoute(renderer);
-
+    // A failed metadata refresh must not replace a session the device can still
+    // show from its persisted transcript: the route hands off to the session,
+    // which reads the cached page first and owns the retryable failure.
     expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
-    expect(transcriptText(renderer, 'RootText')).toBe('Account A root row');
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
   });
 
   it.each([
@@ -1022,7 +1025,6 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     { state: 'pending identity', source: 'identity', code: undefined },
     { state: 'retryable identity failure', source: 'identity', code: 'INTERNAL_SERVER_ERROR' },
     { state: 'pending metadata', source: 'metadata', code: undefined },
-    { state: 'retryable metadata failure', source: 'metadata', code: 'INTERNAL_SERVER_ERROR' },
     { state: 'terminal missing session', source: 'metadata', code: 'NOT_FOUND' },
     { state: 'terminal access denial', source: 'metadata', code: 'UNAUTHORIZED' },
   ] as const)('leaves $state without admitting session data', async ({ source, code }) => {
@@ -1037,6 +1039,7 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
         confirmationRequests.getMe.mockRejectedValueOnce(new Error('offline'));
       }
     } else {
+      queryState.data = null;
       queryState.isPending = code === undefined;
       queryState.isError = code !== undefined;
       queryState.error = code ? { data: { code } } : null;

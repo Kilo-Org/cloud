@@ -1,6 +1,7 @@
 /* eslint-disable require-await, @typescript-eslint/require-await -- injectable query/sleep fakes settle without await */
 /* eslint-disable max-lines -- the manager suite pins retry cadence and attachment mints in one file. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { RequestDeadlineError } from '@kilocode/event-service';
 
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
@@ -45,6 +46,13 @@ vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
   fetchMobileSessionSnapshotPage: vi.fn(),
 }));
+// The transcript cache owns the encrypted KV (SQLCipher) chain; this suite is
+// pure and only needs the call seams.
+vi.mock('@/lib/persist/session-transcript-cache', () => ({
+  readSessionTranscriptPage: vi.fn(async () => null),
+  writeSessionTranscriptPage: vi.fn(async () => undefined),
+  clearSessionTranscriptPage: vi.fn(async () => undefined),
+}));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
   CLOUD_AGENT_WS_URL: 'wss://ws.test',
@@ -65,8 +73,16 @@ const mutate = vi.fn();
 const prepareSessionMutate = vi.fn();
 const sendMessageMutate = vi.fn();
 const cancelQueuedMessageMutate = vi.fn();
+const getSessionQuery = vi.fn();
+const getWithRuntimeStateQuery = vi.fn();
+const getSessionMessagesQuery = vi.fn();
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
+    cliSessionsV2: {
+      get: { query: getSessionQuery },
+      getWithRuntimeState: { query: getWithRuntimeStateQuery },
+      getSessionMessages: { query: getSessionMessagesQuery },
+    },
     cloudAgentNext: {
       getAttachmentDownloadUrl: { mutate },
       prepareSession: { mutate: prepareSessionMutate },
@@ -90,6 +106,7 @@ const {
   fetchSessionWithNotFoundRetry,
   isCancelQueuedUpgradeRequired,
   isCloudPrepareRetryableError,
+  isStalledTransportError,
   readFetchSessionErrorCode,
   StreamTicketResponseSchema,
 } = await import('@/components/agents/mobile-session-manager');
@@ -242,6 +259,40 @@ describe('readFetchSessionErrorCode', () => {
   it('returns undefined for non-objects', () => {
     expect(readFetchSessionErrorCode(null)).toBeUndefined();
     expect(readFetchSessionErrorCode('nope')).toBeUndefined();
+  });
+});
+
+describe('isStalledTransportError', () => {
+  it('recognizes a bare deadline error', () => {
+    expect(isStalledTransportError(new RequestDeadlineError(15_000))).toBe(true);
+  });
+
+  it('unwraps the TRPCClientError tRPC layers over the deadline error', () => {
+    const deadline = new RequestDeadlineError(15_000);
+    const wrapped = Object.assign(new Error(deadline.message), { cause: deadline });
+    expect(isStalledTransportError(wrapped)).toBe(true);
+  });
+
+  it('walks a nested cause chain', () => {
+    const deadline = new RequestDeadlineError(15_000);
+    const outer = Object.assign(new Error('outer'), {
+      cause: Object.assign(new Error('inner'), { cause: deadline }),
+    });
+    expect(isStalledTransportError(outer)).toBe(true);
+  });
+
+  it('is false for server-answered failures and plain network errors', () => {
+    expect(isStalledTransportError(withCode('INTERNAL_SERVER_ERROR', 'boom'))).toBe(false);
+    expect(isStalledTransportError(new Error('Network request failed'))).toBe(false);
+    expect(isStalledTransportError(null)).toBe(false);
+  });
+
+  it('bounds the cause walk against cyclic chains', () => {
+    const a = new Error('a');
+    const b = new Error('b');
+    Object.assign(a, { cause: b });
+    Object.assign(b, { cause: a });
+    expect(isStalledTransportError(a)).toBe(false);
   });
 });
 
@@ -583,5 +634,59 @@ describe('isCancelQueuedUpgradeRequired', () => {
 
   it('returns false for an error with no code', () => {
     expect(isCancelQueuedUpgradeRequired(new Error('network'))).toBe(false);
+  });
+});
+
+describe('createMobileAgentSessionManager metadata memo', () => {
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+    getSessionQuery.mockReset();
+    getWithRuntimeStateQuery.mockReset();
+    getSessionMessagesQuery.mockReset();
+  });
+
+  function setup(): SessionManagerConfig {
+    const options = {
+      store: {},
+      userWebConnection: {},
+    };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    return config;
+  }
+
+  it('resolves a cloud-agent session from the fetchSession metadata without a duplicate get', async () => {
+    getWithRuntimeStateQuery.mockResolvedValue({
+      cloud_agent_session_id: 'agent_1',
+      runtimeState: null,
+    });
+    getSessionQuery.mockResolvedValue({ cloud_agent_session_id: 'agent_1' });
+    const config = setup();
+
+    await config.fetchSession(SESSION_ID);
+    const resolved = await config.resolveSession(SESSION_ID);
+
+    expect(getWithRuntimeStateQuery).toHaveBeenCalledTimes(1);
+    expect(resolved).toMatchObject({
+      type: 'cloud-agent',
+      kiloSessionId: SESSION_ID,
+      cloudAgentSessionId: 'agent_1',
+    });
+    expect(getSessionQuery).not.toHaveBeenCalled();
+  });
+
+  it('falls back to cliSessionsV2.get when resolveSession runs without a prior fetchSession', async () => {
+    getSessionQuery.mockResolvedValue({ cloud_agent_session_id: 'agent_1' });
+    const config = setup();
+
+    await expect(config.resolveSession(SESSION_ID)).resolves.toMatchObject({
+      type: 'cloud-agent',
+      cloudAgentSessionId: 'agent_1',
+    });
+    expect(getSessionQuery).toHaveBeenCalledTimes(1);
   });
 });

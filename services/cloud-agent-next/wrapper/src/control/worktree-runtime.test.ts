@@ -14,13 +14,13 @@ import {
 import type { NativeRetirement } from './session-operation-cleanup';
 import { classifyDirectProcessState, type OwnedProcessScope } from './owned-processes';
 import {
-  SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS,
   SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS,
   SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
   sessionMessageOutcomeSchema,
   type SessionEventIdentity,
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol';
+import { KILO_FEED_RECOVERY_MAX_ATTEMPTS } from './sandbox-control-runtime';
 import {
   buildHeartbeatPayload,
   createControlHandlerDeps,
@@ -864,16 +864,18 @@ describe('worktree Kilo runtime registry', () => {
     }
   });
 
-  it.each(['stream-error', 'feed-end', 'reconnect'] as const)(
-    'retires real SDK SSE %s only after bounded observer recovery fails',
+  it.each(['stream-error', 'feed-end'] as const)(
+    'retires real SDK SSE %s only after the connection recovery budget',
     async failure => {
-      const connected = 'data: {"payload":{"type":"server.connected","properties":{}}}\n\n';
       const encoder = new TextEncoder();
       const opened = Promise.withResolvers<ReadableStreamDefaultController<Uint8Array>>();
       const response = new Response(
         new ReadableStream<Uint8Array>({
           start(controller) {
-            controller.enqueue(encoder.encode(connected));
+            controller.enqueue(encoder.encode('retry: 0\n\n'));
+            controller.enqueue(
+              encoder.encode('data: {"payload":{"type":"server.connected","properties":{}}}\n\n')
+            );
             opened.resolve(controller);
           },
         }),
@@ -890,21 +892,18 @@ describe('worktree Kilo runtime registry', () => {
       const failures: unknown[] = [];
       const harness = createRegistry({ onUnexpectedClose: error => failures.push(error) });
       try {
-        const runtime = await harness.registry.ensure(path.join(tmpDir, 'worktree-sse'), auth);
+        const runtime = await harness.registry.ensure(
+          path.join(tmpDir, `worktree-sse-${failure}`),
+          auth
+        );
         const stream = await opened.promise;
         if (failure === 'stream-error') stream.error(new Error('private-stream-credential'));
-        else if (failure === 'feed-end') stream.close();
-        else stream.enqueue(encoder.encode(connected));
+        else stream.close();
         await waitUntil(() => failures.length > 0);
         expect(failures).toEqual([
           expect.objectContaining({
             directory: runtime.directory,
-            reason:
-              failure === 'stream-error'
-                ? 'feed_failed'
-                : failure === 'feed-end'
-                  ? 'feed_ended'
-                  : 'feed_reconnected',
+            reason: failure === 'stream-error' ? 'feed_failed' : 'feed_ended',
             cleanup: 'confirmed',
             runtimeId: expect.any(String),
           }),
@@ -917,13 +916,57 @@ describe('worktree Kilo runtime registry', () => {
             ([request]) =>
               request instanceof Request && new URL(request.url).pathname === '/global/event'
           )
-        ).toHaveLength(1 + SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS);
+        ).toHaveLength(1 + KILO_FEED_RECOVERY_MAX_ATTEMPTS);
       } finally {
         harness.registry.shutdown();
         fetchSpy.mockRestore();
       }
     }
   );
+
+  it('keeps a real SDK SSE reconnect healthy instead of retiring the runtime', async () => {
+    const encoder = new TextEncoder();
+    const opened = Promise.withResolvers<ReadableStreamDefaultController<Uint8Array>>();
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode('data: {"payload":{"type":"server.connected","properties":{}}}\n\n')
+          );
+          opened.resolve(controller);
+        },
+      }),
+      { headers: { 'Content-Type': 'text/event-stream' } }
+    );
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async request => {
+        const url = request instanceof Request ? request.url : String(request);
+        return new URL(url).pathname === '/global/health'
+          ? Response.json({ healthy: true, version: '7.4.20' })
+          : response;
+      })
+    );
+    const failures: unknown[] = [];
+    const harness = createRegistry({ onUnexpectedClose: error => failures.push(error) });
+    try {
+      const runtime = await harness.registry.ensure(
+        path.join(tmpDir, 'worktree-sse-reconnect'),
+        auth
+      );
+      const stream = await opened.promise;
+      stream.enqueue(
+        encoder.encode('data: {"payload":{"type":"server.connected","properties":{}}}\n\n')
+      );
+      await Bun.sleep(50);
+      expect(failures).toEqual([]);
+      expect(runtime.signal.aborted).toBe(false);
+      expect(harness.registry.isHealthy()).toBe(true);
+      expect(harness.registry.get(runtime.directory)).toBe(runtime);
+    } finally {
+      harness.registry.shutdown();
+      fetchSpy.mockRestore();
+    }
+  });
 
   it('refreshes direct credentials only for their identity after intentional old-process shutdown', async () => {
     const received: string[] = [];
@@ -1040,8 +1083,7 @@ describe('worktree Kilo runtime registry', () => {
     expect(harness.closes).toBe(0);
 
     const decision = diagnostics.find(
-      fields =>
-        fields.operation === 'session.attach' && fields.kiloSessionId === 'root_sibling'
+      fields => fields.operation === 'session.attach' && fields.kiloSessionId === 'root_sibling'
     );
     expect(decision?.reason).toBe('reuse:live_entry');
     expect(decision?.detail).toContain('newRoot=1');
@@ -2408,9 +2450,9 @@ describe('worktree attach decision diagnostics', () => {
     // The joining sibling must not rotate the fenced directory incarnation.
     expect(reused.runtimeId).toBe(originalRuntimeId);
     expect(servers).toHaveLength(1);
-    expect(
-      decisionRecords(diagnostics).some(fields => fields.reason === 'refresh:allocated')
-    ).toBe(false);
+    expect(decisionRecords(diagnostics).some(fields => fields.reason === 'refresh:allocated')).toBe(
+      false
+    );
   });
 
   it('reports an env-changed existing-root re-attach as refresh:existing_root_env_changed', async () => {

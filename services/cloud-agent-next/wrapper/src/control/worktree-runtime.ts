@@ -1343,22 +1343,60 @@ export function createWorktreeKiloRuntimes(options: {
       throw new WorktreeKiloRuntimeError('not_ready', 'Worktree cannot refresh credentials', true);
     }
     if (entry.pendingPtys > 0 || !canRefreshCredentials()) throw retry();
+    const startedAt = Date.now();
+    let probeStep: 'session_status' | 'pty' | 'pty_body' = 'session_status';
     try {
       const idle = await withKiloRequestDeadline(async signal => {
+        probeStep = 'session_status';
         const statuses = await client.getSessionStatuses(entry.directory, signal);
         if (Object.values(statuses).some(status => status.type !== 'idle')) return false;
         const url = new URL('/pty', client.serverUrl);
         url.searchParams.set('directory', entry.directory);
+        probeStep = 'pty';
         const response = await fetch(url, { signal });
-        if (!response.ok) throw new Error('Worktree PTY probe failed');
-        const ptys: unknown = await response.json();
-        if (!Array.isArray(ptys)) throw new Error('Worktree PTY probe failed');
+        if (!response.ok) throw new Error(`Worktree PTY probe failed: HTTP ${response.status}`);
+        probeStep = 'pty_body';
+        let ptys: unknown;
+        try {
+          ptys = await response.json();
+        } catch (error) {
+          if (signal.aborted) throw error;
+          throw new Error('Worktree PTY probe failed: invalid payload');
+        }
+        if (!Array.isArray(ptys)) throw new Error('Worktree PTY probe failed: invalid payload');
         return ptys.length === 0;
       }, entry.abort.signal);
       if (!idle || entry.pendingPtys > 0 || !canRefreshCredentials()) throw retry();
     } catch (error) {
       if (error instanceof WorktreeKiloRuntimeError) throw error;
-      throw new WorktreeKiloRuntimeError('not_ready', 'Worktree idle probe failed', true);
+      const elapsedMs = Date.now() - startedAt;
+      const name = (error instanceof Error ? error.name : typeof error).slice(0, 128);
+      const message = (error instanceof Error ? error.message : '').slice(0, 128);
+      const cause =
+        error instanceof Error && error.cause instanceof Error
+          ? `;cause=${error.cause.name.slice(0, 128)}:${error.cause.message.slice(0, 128)}`
+          : '';
+      const target = `${client.serverUrl}${path.basename(entry.directory)}`;
+      logToFile(
+        `worktree idle probe failed step=${probeStep} target=${target} attempt=1 elapsedMs=${elapsedMs} name=${name} message=${message}${cause}`
+      );
+      const failure = new WorktreeKiloRuntimeError(
+        'session_busy',
+        'Worktree idle probe failed',
+        true
+      );
+      options.onDiagnostic?.('control.request', {
+        operation: 'session.attach',
+        phase: 'failed',
+        stage: 'runtime_attach',
+        errorCode: failure.code,
+        retryable: failure.retryable,
+        elapsedMs,
+        attempt: 1,
+        reason: 'idle_probe_failed',
+        detail: `step=${probeStep};name=${name}:${message}`.slice(0, 128),
+      });
+      throw failure;
     }
     const deadlineAt = cleanupDeadline(entry);
     onDestructiveRefresh?.();

@@ -13,6 +13,7 @@ import {
   type SessionManager,
   type SessionSnapshotPageOutcome,
   type SessionStatusIndicator,
+  type StandalonePermission,
   type StoredMessage,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
@@ -23,7 +24,10 @@ import { ChildSessionModelLabel } from '@/components/agents/child-session-model-
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
 import { assistantMessage } from '@/components/agents/message-bubble-test-utils';
+import { PermissionCard } from '@/components/agents/permission-card';
+import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { type SessionMessageList } from '@/components/agents/session-message-list';
 import {
@@ -56,6 +60,8 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
+  Switch: 'Switch',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
@@ -98,6 +104,7 @@ vi.mock('@/lib/navigation/stack-safe-replace', () => ({
 }));
 vi.mock('expo-keep-awake', () => ({ useKeepAwake: vi.fn() }));
 vi.mock('expo-haptics', () => ({
+  selectionAsync: vi.fn(),
   notificationAsync: vi.fn(),
   NotificationFeedbackType: { Error: 'error', Success: 'success' },
 }));
@@ -147,11 +154,8 @@ vi.mock('@/components/agents/preparation-group', () => ({ PreparationGroup: 'Pre
 vi.mock('@/components/agents/session-connection-indicator', () => ({
   SessionConnectionIndicator: 'SessionConnectionIndicator',
 }));
-vi.mock('@/components/agents/session-context-metrics', () => ({
-  SessionContextMetrics: 'SessionContextMetrics',
-}));
-vi.mock('@/components/agents/session-context-sheet', () => ({
-  SessionContextSheet: 'SessionContextSheet',
+vi.mock('@/components/agents/context-usage-ring', () => ({
+  ContextUsageRing: 'ContextUsageRing',
 }));
 vi.mock('@/components/agents/session-pr-badge', () => ({ SessionPrBadge: 'SessionPrBadge' }));
 vi.mock('@/components/agents/session-status-indicator', () => ({
@@ -216,7 +220,29 @@ vi.mock('@/components/agents/use-message-copy', () => ({
   performCopy: vi.fn(),
 }));
 vi.mock('@/components/agents/use-interaction-handlers', () => ({
-  useInteractionHandlers: () => ({}),
+  useInteractionHandlers: ({
+    manager,
+    activePermission,
+  }: {
+    manager: Pick<SessionManager, 'respondToPermission'>;
+    activePermission: { requestId: string } | null;
+  }) => ({
+    isAnswering: false,
+    isRespondingToPermission: false,
+    questionSubmissionError: null,
+    permissionSubmissionError: null,
+    handleAnswerQuestion: vi.fn(),
+    handleRejectQuestion: vi.fn(),
+    // Mirrors the real hook's contract: reply "once" to the active permission
+    // and report the transport outcome the auto-approve hook reacts to.
+    handleRespondToPermission: async (response: 'once' | 'always' | 'reject') => {
+      if (!activePermission) {
+        return 'ok' as const;
+      }
+      await manager.respondToPermission(activePermission.requestId, response);
+      return 'ok' as const;
+    },
+  }),
 }));
 vi.mock('@/components/agents/use-session-config-sync', () => ({
   useSessionConfigSync: () => ({ currentMode: 'code', currentModel: '', currentVariant: '' }),
@@ -611,6 +637,140 @@ describe('session detail bottom strip', () => {
     const spacerStyle = spacer?.props.style as { height: number } | undefined;
     expect(spacerStyle).toEqual({ height: 16 });
     expect(Object.keys(spacerStyle ?? {})).toEqual(['height']);
+  });
+});
+
+describe('session detail per-session auto-approve', () => {
+  // The in-memory toggle store is module-global; clear this session so a
+  // preceding test cannot leave auto-approve on for the next one.
+  beforeEach(() => {
+    setSessionAutoApproveEnabled(ROOT_ID, false);
+  });
+
+  function makeSessionAnswerable(view: Awaited<ReturnType<typeof mountDetails>>) {
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.canSend, true);
+      view.store.set<StandalonePermission | null, [StandalonePermission | null], unknown>(
+        view.manager.atoms.activePermission,
+        {
+          requestId: 'perm-1',
+          permission: 'bash',
+          patterns: [],
+          metadata: {},
+          always: [],
+        }
+      );
+    });
+  }
+
+  function composerNode(renderer: ReactTestRenderer): ReactTestInstance {
+    const found = renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));
+    expect(found).toHaveLength(1);
+    const composer = found[0];
+    if (!composer) {
+      throw new Error('composer was not rendered');
+    }
+    return composer;
+  }
+
+  // The composer's own wrapper is the only node that carries the
+  // `hidden` + `accessibilityElementsHidden` gating in the detail body.
+  function composerWrapper(renderer: ReactTestRenderer): ReactTestInstance {
+    const wrapper = composerNode(renderer).parent?.parent;
+    if (!wrapper) {
+      throw new Error('composer wrapper was not rendered');
+    }
+    return wrapper;
+  }
+
+  it('opens the header sheet before usage arrives and resolves the pending permission through its toggle', async () => {
+    const view = await mountDetails([]);
+    makeSessionAnswerable(view);
+    const respondToPermission = vi
+      .spyOn(view.manager, 'respondToPermission')
+      .mockResolvedValue(undefined);
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(1);
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as { accessibilityRole: string; onPress: () => void };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    act(() => {
+      metricsProps.onPress();
+    });
+    const contextSheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(contextSheet.props.visible).toBe(true);
+    expect(contextSheet.props.info).toBeUndefined();
+    const toggle = view.renderer.root.findByProps({ testID: 'session-auto-approve-switch' });
+    const { onValueChange } = toggle.props as { onValueChange: (enabled: boolean) => void };
+    act(() => {
+      onValueChange(true);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(respondToPermission).toHaveBeenCalledWith('perm-1', 'once');
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(0);
+
+    act(() => {
+      onValueChange(false);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(1);
+    expect(respondToPermission).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the composer mounted, visible, and enabled while the auto-reply is in flight', async () => {
+    const view = await mountDetails([]);
+    makeSessionAnswerable(view);
+    // With the card actually rendered, the wrapper is gated out as before.
+    expect(composerWrapper(view.renderer).props.accessibilityElementsHidden).toBe(true);
+
+    // Hold the reply open so the assertion runs mid-round-trip, not after it.
+    const reply = Promise.withResolvers<undefined>();
+    const respondToPermission = vi
+      .spyOn(view.manager, 'respondToPermission')
+      .mockReturnValue(reply.promise);
+    act(() => {
+      setSessionAutoApproveEnabled(ROOT_ID, true);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(respondToPermission).toHaveBeenCalledWith('perm-1', 'once');
+
+    // The card is suppressed, so nothing on screen blocks the input: the
+    // composer must stay visible and enabled for the whole round trip.
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(0);
+    const wrapper = composerWrapper(view.renderer);
+    expect(wrapper.props.className ?? '').not.toContain('hidden');
+    expect(wrapper.props.accessibilityElementsHidden).toBe(false);
+    expect(composerNode(view.renderer).props.disabled).toBe(false);
+
+    await act(async () => {
+      reply.resolve(undefined);
+      await Promise.resolve();
+    });
+  });
+
+  it('shows the card while the toggle is off without replying', async () => {
+    const view = await mountDetails([]);
+    makeSessionAnswerable(view);
+    const respondToPermission = vi
+      .spyOn(view.manager, 'respondToPermission')
+      .mockResolvedValue(undefined);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(1);
+    expect(respondToPermission).not.toHaveBeenCalled();
   });
 });
 

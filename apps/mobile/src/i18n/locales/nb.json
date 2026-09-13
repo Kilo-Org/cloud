@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} steg",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Automatisk godkjenning",
+      "description": "Godkjenn tillatelsesforespørsler for denne økten automatisk. Verktøy kjører deretter uten en forespørsel.",
+      "unavailable": "Denne økten kan ikke motta tillatelsesforespørsler."
+    },
     "prBadge": {
       "open": "åpne PR",
       "closed": "lukket PR",

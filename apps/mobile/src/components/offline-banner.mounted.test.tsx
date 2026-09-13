@@ -7,8 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { type ConnectivityState } from '@/lib/connectivity-online';
-import { createOfflineBannerStore, type OfflineBannerStore } from '@/lib/offline-banner-state';
-import { OFFLINE_BANNER_HEIGHT } from './offline-banner';
+import {
+  createOfflineBannerStore,
+  OFFLINE_BANNER_HEIGHT,
+  type OfflineBannerStore,
+} from '@/lib/offline-banner-state';
 import { SettingsOverviewScreen } from './security-agent/settings-overview-screen';
 import {
   advanceBy,

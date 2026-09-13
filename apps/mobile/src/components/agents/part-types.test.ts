@@ -7,6 +7,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import {
+  hasNonWhitespaceText,
   isPartStreaming,
   isPatchPart,
   isSnapshotProgressPart,
@@ -144,5 +145,43 @@ describe('shouldRenderReasoningPart', () => {
     const part = makeReasoningPart('thinking');
     delete (part as { text?: unknown }).text;
     expect(shouldRenderReasoningPart(part, false)).toBe(false);
+  });
+});
+
+describe('hasNonWhitespaceText', () => {
+  it('matches String.prototype.trim emptiness for every whitespace class', () => {
+    const samples = [
+      '',
+      ' ',
+      '\t',
+      '\n',
+      '\r',
+      '\f',
+      '\v',
+      ' \t\n\r ',
+      '\u00A0',
+      '\u1680',
+      '\u2003',
+      '\u2028',
+      '\u2029',
+      '\u202F',
+      '\u205F',
+      '\u3000',
+      '\uFEFF',
+      ' \u00A0\u3000\t',
+    ];
+    for (const sample of samples) {
+      expect(hasNonWhitespaceText(sample)).toBe(sample.trim() !== '');
+    }
+  });
+
+  it('is true for ordinary streamed text', () => {
+    expect(hasNonWhitespaceText('thinking')).toBe(true);
+    expect(hasNonWhitespaceText('a')).toBe(true);
+    expect(hasNonWhitespaceText('  leading then text')).toBe(true);
+  });
+
+  it('is false for undefined-equivalent empty input', () => {
+    expect(hasNonWhitespaceText('')).toBe(false);
   });
 });

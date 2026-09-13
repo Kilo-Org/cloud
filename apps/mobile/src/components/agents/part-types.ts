@@ -64,8 +64,19 @@ export function isPartStreaming(part: Part): boolean {
   return false;
 }
 
+/**
+ * `text.trim() !== ''` without allocating the trimmed copy. The transcript
+ * asks this of every part on every streamed publish, and a streamed reasoning
+ * part can hold hundreds of kilobytes, so the allocation-free predicate keeps
+ * the per-publish cost from scaling with the accumulated text.
+ */
+export function hasNonWhitespaceText(text: string): boolean {
+  // `\S` is the exact complement of the whitespace class `String#trim` strips.
+  return /\S/.test(text);
+}
+
 function hasReasoningText(text: string | undefined): boolean {
-  return text != null && text.trim() !== '';
+  return text != null && hasNonWhitespaceText(text);
 }
 
 export function shouldRenderReasoningPart(part: Part, _isStreaming: boolean): boolean {

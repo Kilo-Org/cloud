@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type * as ReactQuery from '@tanstack/react-query';
 import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   type AssistantMessage,
   createSessionManager,
@@ -105,6 +105,12 @@ vi.mock('@/lib/user-web-connection-lifecycle', () => ({
   createNativeUserWebConnectionLifecycleHooks: () => ({}),
 }));
 vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
+// Offline-banner reservation: the hook is stubbed; `offlineHeaderReservation`
+// is the real pure helper from '@/lib/offline-banner-state' (no RN imports).
+const offlineBannerState = vi.hoisted(() => ({ isOffline: false }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useOfflineBannerState: () => offlineBannerState.isOffline,
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
@@ -1420,5 +1426,52 @@ describe('SessionDetailScreen malformed part transcript', () => {
     expect(transcript).toContain('Question about the queue');
     expect(transcript).toContain('Answer visible after broken reasoning');
     expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+  });
+});
+
+describe('SessionDetailScreen offline-banner header reservation (mobile-app e2)', () => {
+  afterEach(() => {
+    offlineBannerState.isOffline = false;
+  });
+
+  function headerReservation(
+    renderer: TestRenderer.ReactTestRenderer
+  ): TestRenderer.ReactTestInstance {
+    const reservations = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        node.children.some(child => typeof child !== 'string' && child.type === ScreenHeader)
+    );
+    const [reservation] = reservations;
+    if (!reservation || reservations.length !== 1) {
+      throw new Error(`expected one header reservation View, got ${reservations.length}`);
+    }
+    return reservation;
+  }
+
+  async function mountHeaderState(state: 'pending' | 'error') {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isPending = state === 'pending';
+    queryState.isError = state === 'error';
+    queryState.error = state === 'error' ? { data: { code: 'INTERNAL_SERVER_ERROR' } } : null;
+    const renderer = await mountRoute();
+    return renderer;
+  }
+
+  it.each(['pending', 'error'] as const)(
+    'reserves the banner height above the %s header while offline',
+    async state => {
+      offlineBannerState.isOffline = true;
+      const renderer = await mountHeaderState(state);
+      expect(propOf(headerReservation(renderer), 'style')).toEqual({ paddingTop: 36 });
+    }
+  );
+
+  it('keeps the header flush while online', async () => {
+    offlineBannerState.isOffline = false;
+    const renderer = await mountHeaderState('pending');
+    expect(propOf(headerReservation(renderer), 'style')).toEqual({ paddingTop: 0 });
   });
 });

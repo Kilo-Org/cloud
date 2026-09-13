@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
 
-import { collectCopyableText } from './collect-copyable-text';
+import { collectCopyableText, hasCopyableText } from './collect-copyable-text';
 
 function makeTextPart(overrides: Partial<TextPart> = {}): TextPart {
   return {
@@ -145,5 +145,63 @@ describe('collectCopyableText', () => {
         message([makeTextPart({ text: 'Hello' }), part, makeTextPart({ text: 'Goodbye' })])
       )
     ).toBe('Hello\n\nGoodbye');
+  });
+});
+
+describe('hasCopyableText', () => {
+  it('agrees with collectCopyableText for every copyable and non-copyable shape', () => {
+    const cases: Part[][] = [
+      [],
+      [makeFilePart()],
+      [makeTextPart({ text: 'Hello' })],
+      [makeTextPart({ text: '' })],
+      [makeTextPart({ text: '⠋ Initializing snapshot…', synthetic: true })],
+      [makeTextPart({ text: 'Note: Initializing snapshot can take a while' })],
+      [makeTextPart({ text: 'User typed this', synthetic: true })],
+      [
+        makeTextPart({ text: 'First' }),
+        makeReasoningPart({ text: 'I should think step by step.' }),
+        makeTextPart({ text: 'Second' }),
+      ],
+      [makeReasoningPart({ text: '' })],
+      [
+        makeToolPart('bash', {
+          status: 'completed',
+          input: { command: 'ls -la' },
+          output: 'total 0',
+          title: 'bash',
+          metadata: {},
+          time: { start: 0, end: 1 },
+        }),
+      ],
+      [
+        makeToolPart('read', {
+          status: 'error',
+          input: { filePath: '/missing.txt' },
+          error: 'No such file or directory',
+          time: { start: 0, end: 1 },
+        }),
+      ],
+      [makeToolPart('pending_tool', { status: 'pending', input: {}, raw: '' })],
+      [
+        makeToolPart('completed_empty', {
+          status: 'completed',
+          input: {},
+          output: '',
+          title: 'completed_empty',
+          metadata: {},
+          time: { start: 0, end: 1 },
+        }),
+      ],
+    ];
+
+    for (const parts of cases) {
+      expect(hasCopyableText(message(parts))).toBe(collectCopyableText(message(parts)).length > 0);
+    }
+  });
+
+  it('is true for a long streamed reasoning part without joining it', () => {
+    const long = 'x'.repeat(250_000);
+    expect(hasCopyableText(message([makeReasoningPart({ text: long })]))).toBe(true);
   });
 });

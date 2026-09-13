@@ -11062,19 +11062,26 @@ describe('SandboxSession control-plane regressions', () => {
       ).resolves.toMatchObject({ success: true, messageId: followUpTurn.id });
       expect(await state.storage.get<SessionMessageRecord[]>('session_messages')).toEqual([
         blocker,
-        createSessionMessageRecord({
-          turn: initialTurn,
-          agent: { mode: 'code', model: 'test' },
-        }),
-        createSessionMessageRecord({
-          turn: {
-            type: 'command',
-            messageId: followUpTurn.id,
-            command: followUpTurn.command,
-            arguments: followUpTurn.arguments,
-          },
-          agent: { mode: 'code', model: 'test' },
-        }),
+        {
+          ...createSessionMessageRecord({
+            turn: initialTurn,
+            agent: { mode: 'code', model: 'test' },
+          }),
+          // Admission now persists a stable queue timestamp for reporting.
+          queuedAt: expect.any(Number),
+        },
+        {
+          ...createSessionMessageRecord({
+            turn: {
+              type: 'command',
+              messageId: followUpTurn.id,
+              command: followUpTurn.command,
+              arguments: followUpTurn.arguments,
+            },
+            agent: { mode: 'code', model: 'test' },
+          }),
+          queuedAt: expect.any(Number),
+        },
       ]);
     });
   });
@@ -13073,16 +13080,18 @@ describe('SandboxSession worktree admission', () => {
               finalization: submission.finalization,
             })
           ).resolves.toMatchObject({ success: true, messageId });
-          expectedMessages.push(
-            createSessionMessageRecord({
+          expectedMessages.push({
+            ...createSessionMessageRecord({
               turn: { type: 'prompt', messageId, prompt: 'follow-up' },
               agent: { mode: 'code', model: 'test-model' },
               finalization: {
                 autoCommit: submission.autoCommit,
                 condenseOnComplete: submission.condenseOnComplete,
               },
-            })
-          );
+            }),
+            // Admission now persists a stable queue timestamp for reporting.
+            queuedAt: expect.any(Number),
+          });
           expect(state.storage.kv.get('session_messages')).toEqual(expectedMessages);
           expect(await instance.getMetadata()).toEqual(metadata);
         }

@@ -3,6 +3,11 @@ import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { getWorktreeWorkspacePath } from '../../src/workspace';
+import { CALLBACK_OUTBOX_PREFIX } from '../../src/sandbox-session/message-callbacks';
+import {
+  REPORT_OUTBOX_PREFIX,
+  parsePendingRunReport,
+} from '../../src/sandbox-session/report-outbox';
 import { events } from '../../src/db/sqlite-schema';
 import {
   generateSandboxCredential,
@@ -993,7 +998,9 @@ describe('worktree deletion in Durable Objects', () => {
     await expect(closed).resolves.toBe(1001);
     await runInDurableObject(stub, async (_instance, state) => {
       expect(await state.storage.get('session_messages')).toMatchObject([{ state: 'cancelled' }]);
-      expect(await state.storage.getAlarm()).toBeNull();
+      // Deletion preserves the interrupted report obligation, so its delivery
+      // alarm is intentionally armed instead of removed.
+      expect(await state.storage.getAlarm()).not.toBeNull();
     });
     await stub.finishWorktreeDeletion(worktreeId);
     await expect(stub.getRuntimeLocation()).resolves.toBeNull();
@@ -1077,6 +1084,7 @@ describe('worktree deletion in Durable Objects', () => {
       const attach = vi.fn();
       const request = vi.fn();
       const original = instance['env'].SANDBOX_CONTROL;
+      const originalReportQueue = instance['env'].CLOUD_AGENT_REPORT_QUEUE;
       const validation = vi
         .spyOn(globalThis, 'fetch')
         .mockImplementation(async () => Response.json({ valid: true }));
@@ -1097,6 +1105,13 @@ describe('worktree deletion in Durable Objects', () => {
             request,
           }),
         },
+        // Keep the reporting obligation pending so deletion's preserved
+        // report-delivery alarm is observable instead of racing a live send.
+        CLOUD_AGENT_REPORT_QUEUE: {
+          send: async () => {
+            throw new Error('report queue unavailable');
+          },
+        },
       });
       try {
         await instance.registerSession(registration(sessionId, sandboxId));
@@ -1110,13 +1125,24 @@ describe('worktree deletion in Durable Objects', () => {
         expect(attach).not.toHaveBeenCalled();
         expect(request).not.toHaveBeenCalled();
         expect(await state.storage.get('session_messages')).toBeUndefined();
-        expect(await state.storage.getAlarm()).toBeNull();
+        // Deletion preserves report delivery state. The alarm must be armed
+        // solely for the interrupted report obligation, not callbacks.
+        expect([
+          ...state.storage.kv.list<unknown>({ prefix: CALLBACK_OUTBOX_PREFIX }),
+        ]).toHaveLength(0);
+        const reportEntries = [...state.storage.kv.list<unknown>({ prefix: REPORT_OUTBOX_PREFIX })];
+        expect(reportEntries).toHaveLength(1);
+        expect(parsePendingRunReport(reportEntries[0]?.[1])?.report.run.status).toBe('interrupted');
+        expect(await state.storage.getAlarm()).not.toBeNull();
       } finally {
         try {
           await instance.beginWorktreeDeletion(deletionInput);
         } finally {
           ready.resolve({ physical: 'running', connection: 'ready' });
-          Object.assign(instance['env'], { SANDBOX_CONTROL: original });
+          Object.assign(instance['env'], {
+            SANDBOX_CONTROL: original,
+            CLOUD_AGENT_REPORT_QUEUE: originalReportQueue,
+          });
           validation.mockRestore();
         }
         await instance.finishWorktreeDeletion(worktreeId);

@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "Hierdie transkripsiemodel is nie beskikbaar nie. Kies 'n ander een in Voorkeure.",
     "gatewayModelUnavailableNotice": "Hierdie model word nie meer aangebied nie. Tik op $t(transcriptionModel.title) om 'n ander een te kies.",
     "gatewaySignInRequired": "Teken in om gateway-transkripsie te gebruik.",
-    "gatewayNoModel": "Kies eers 'n transkripsiemodel in Voorkeure."
+    "gatewayNoModel": "Kies eers 'n transkripsiemodel in Voorkeure.",
+    "testTitle": "Toets steminvoer",
+    "testPlaceholder": "Tik op die mikrofoon en begin praat.",
+    "testClear": "Vee teks uit"
   },
   "share": {
     "title": "Deel met Kilo",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "Geen transkripsiemodelle nie",
     "emptyDescription": "Die Kilo Gateway bied tans geen transkripsiemodelle nie.",
     "loadFailed": "Die transkripsiemodelle kon nie gelaai word nie."
+  },
+  "voiceLanguage": {
+    "title": "Stemtaal",
+    "automatic": "Outomaties",
+    "loadFailed": "Kon nie die tale laai wat hierdie toestel ondersteun nie.",
+    "emptyTitle": "Geen ondersteunde tale",
+    "emptyDescription": "Hierdie toestel se spraakherkenning rapporteer geen ondersteunde tale nie."
   }
 }

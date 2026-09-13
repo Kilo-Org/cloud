@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "Àwòṣe ìyípadà yìí kò sí. Yan òmíràn nínú Àwọn ààyò.",
     "gatewayModelUnavailableNotice": "A kìí ṣe àwòṣe yìí mọ́. Tẹ $t(transcriptionModel.title) láti yan òmíràn.",
     "gatewaySignInRequired": "Wọlé láti lo ìyípadà ohùn sí ọ̀rọ̀ pẹ̀lú Kilo Gateway.",
-    "gatewayNoModel": "Ní àkọ́kọ́, yan àwòṣe ìyípadà ohùn sí ọ̀rọ̀ nínú Àwọn ààyò."
+    "gatewayNoModel": "Ní àkọ́kọ́, yan àwòṣe ìyípadà ohùn sí ọ̀rọ̀ nínú Àwọn ààyò.",
+    "testTitle": "Dán títẹ ọ̀rọ̀ pẹ̀lú ohùn wò",
+    "testPlaceholder": "Tẹ míkírọ́fóònù kí o sì bẹ̀rẹ̀ sí sọ̀rọ̀.",
+    "testClear": "Pa ọ̀rọ̀ rẹ́"
   },
   "share": {
     "title": "Pín sí Kilo",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "Kò sí àwòṣe ìyípadà ohùn sí ọ̀rọ̀",
     "emptyDescription": "Kilo Gateway kò pèsè àwòṣe ìyípadà ohùn sí ọ̀rọ̀ ní báyìí.",
     "loadFailed": "A kò lè gbé àwòṣe ìyípadà ohùn sí ọ̀rọ̀ wọlé."
+  },
+  "voiceLanguage": {
+    "title": "Èdè títẹ ọ̀rọ̀ pẹ̀lú ohùn",
+    "automatic": "Aládàáṣiṣẹ́",
+    "loadFailed": "A kò lè gbé àwọn èdè tí ẹ̀rọ yìí ń ṣe àtìlẹ́yìn fún.",
+    "emptyTitle": "Kò sí èdè tí a ṣe àtìlẹ́yìn fún",
+    "emptyDescription": "Ìdánimọ̀ ọ̀rọ̀-ẹnu ti ẹ̀rọ yìí kò sọ èdè tí a ṣe àtìlẹ́yìn fún kankan."
   }
 }

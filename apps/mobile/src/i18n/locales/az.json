@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "Bu səsin mətnə çevrilməsi modeli əlçatan deyil. Seçimlərdə başqasını seçin.",
     "gatewayModelUnavailableNotice": "Bu model artıq təklif edilmir. Başqasını seçmək üçün $t(transcriptionModel.title) üzərinə toxunun.",
     "gatewaySignInRequired": "Kilo Gateway ilə mətnə çevirməkdən istifadə etmək üçün hesabınıza daxil olun.",
-    "gatewayNoModel": "Əvvəlcə Seçimlərdə bir səsin mətnə çevrilməsi modeli seçin."
+    "gatewayNoModel": "Əvvəlcə Seçimlərdə bir səsin mətnə çevrilməsi modeli seçin.",
+    "testTitle": "Səslə daxiletməni yoxla",
+    "testPlaceholder": "Mikrofona toxunun və danışmağa başlayın.",
+    "testClear": "Mətni təmizlə"
   },
   "share": {
     "title": "Kilo-ya göndər",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "Səsin mətnə çevrilməsi modeli yoxdur",
     "emptyDescription": "Kilo Gateway hazırda səsin mətnə çevrilməsi modeli təklif etmir.",
     "loadFailed": "Səsin mətnə çevrilməsi modellərini yükləmək mümkün olmadı."
+  },
+  "voiceLanguage": {
+    "title": "Səslə daxiletmə dili",
+    "automatic": "Avtomatik",
+    "loadFailed": "Bu cihazın dəstəklədiyi dillər yüklənə bilmədi.",
+    "emptyTitle": "Dəstəklənən dil yoxdur",
+    "emptyDescription": "Bu cihazın nitq tanıma funksiyası heç bir dəstəklənən dil bildirmir."
   }
 }

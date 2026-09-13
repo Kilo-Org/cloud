@@ -6,7 +6,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { SheetHeader } from './sheet-header';
 import '@/i18n';
 
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  StatusBar: { currentHeight: 0 },
+  View: 'View',
+}));
 // SheetHeader reads the landscape side insets; this suite mounts without a
 // device, so the hook gets portrait-zero insets (same pattern as
 // sheet-header.mounted.test.tsx).

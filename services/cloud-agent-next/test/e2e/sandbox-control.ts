@@ -451,13 +451,13 @@ async function run() {
     if (!response.ok) {
       // Keep the failure diagnostic bounded: an HTTP status plus an optional
       // short diagnostic ref token. Never dump the response body.
-      let ref: string | undefined;
+      let ref;
       try {
-        const body: unknown = await response.json();
-        const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : undefined;
+        const body = await response.json();
+        const record = body && typeof body === 'object' ? body : undefined;
         const data =
           record && record.data && typeof record.data === 'object'
-            ? (record.data as Record<string, unknown>)
+            ? record.data
             : undefined;
         const candidate =
           typeof record?.ref === 'string' ? record.ref : typeof data?.ref === 'string' ? data.ref : undefined;

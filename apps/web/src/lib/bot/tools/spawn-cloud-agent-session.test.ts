@@ -172,6 +172,10 @@ describe('spawnCloudAgentSession delegation', () => {
     expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('auth-token', {
       skipBalanceCheck: true,
     });
+    expect(mockGetGitHubIntegrationById).toHaveBeenCalledWith(
+      { type: 'org', id: 'organization-1' },
+      'github-association-1'
+    );
     expect(mockInitiateFromPreparedSession).toHaveBeenCalledWith({
       cloudAgentSessionId: 'cloud-session-1',
     });
@@ -258,6 +262,10 @@ describe('spawnCloudAgentSession delegation', () => {
 
       expect(mockPrepareSession).toHaveBeenCalledWith(
         expect.objectContaining({ createdOnPlatform: origin })
+      );
+      expect(mockGetGitHubIntegrationById).toHaveBeenCalledWith(
+        { type: 'user', id: 'owner-1' },
+        'github-association-1'
       );
     }
   );

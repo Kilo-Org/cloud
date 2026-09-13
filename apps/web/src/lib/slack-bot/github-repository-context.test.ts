@@ -8,6 +8,8 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getAllIntegrationsForOwner: jest.fn(),
 }));
 
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+
 test('lists the healthy sibling while excluding unhealthy GitHub associations', async () => {
   jest.mocked(getAllIntegrationsForOwner).mockResolvedValue([
     {
@@ -112,7 +114,7 @@ test('rejects a repository exposed by multiple associations', async () => {
       github_disconnected_at: null,
       suspended_at: null,
       auth_invalid_at: null,
-      repositories: [{ id: 1, name: 'api', full_name: 'shared/api', private: true }],
+      repositories: [{ id: 1, name: 'api', full_name: 'Shared/API', private: true }],
     },
     {
       id: 'association-b',
@@ -126,8 +128,85 @@ test('rejects a repository exposed by multiple associations', async () => {
   ] as never);
 
   await expect(
-    resolveGitHubRepositoryForOwner({ type: 'org', id: 'organization-1' }, 'shared/api')
+    resolveGitHubRepositoryForOwner({ type: 'org', id: 'organization-1' }, 'SHARED/api')
   ).resolves.toBeNull();
+});
+
+test('matches GitHub repository names case-insensitively', async () => {
+  jest.mocked(getAllIntegrationsForOwner).mockResolvedValue([
+    {
+      id: 'association-a',
+      platform: 'github',
+      integration_status: 'active',
+      github_disconnected_at: null,
+      suspended_at: null,
+      auth_invalid_at: null,
+      repositories: [{ id: 1, name: 'Repo', full_name: 'Acme/Repo', private: true }],
+    },
+  ] as never);
+
+  await expect(
+    resolveGitHubRepositoryForOwner({ type: 'org', id: 'organization-1' }, 'acme/repo')
+  ).resolves.toMatchObject({ githubIntegrationId: 'association-a' });
+});
+
+test('isolates malformed repository caches from healthy sibling associations', async () => {
+  jest.mocked(getAllIntegrationsForOwner).mockResolvedValue([
+    {
+      id: 'association-string-id',
+      platform: 'github',
+      integration_status: 'active',
+      github_disconnected_at: null,
+      suspended_at: null,
+      auth_invalid_at: null,
+      repositories: [{ id: '1', name: 'bad', full_name: 'acme/bad', private: true }],
+    },
+    {
+      id: 'association-non-array',
+      platform: 'github',
+      integration_status: 'active',
+      github_disconnected_at: null,
+      suspended_at: null,
+      auth_invalid_at: null,
+      repositories: { id: 2 },
+    },
+    {
+      id: 'association-null-entry',
+      platform: 'github',
+      integration_status: 'active',
+      github_disconnected_at: null,
+      suspended_at: null,
+      auth_invalid_at: null,
+      repositories: [null],
+    },
+    {
+      id: 'association-malformed-fields',
+      platform: 'github',
+      integration_status: 'active',
+      github_disconnected_at: null,
+      suspended_at: null,
+      auth_invalid_at: null,
+      repositories: [{ id: 3, name: 'bad', full_name: 3, private: 'yes' }],
+    },
+    {
+      id: 'association-healthy',
+      platform: 'github',
+      integration_status: 'active',
+      github_disconnected_at: null,
+      suspended_at: null,
+      auth_invalid_at: null,
+      repositories: [{ id: 4, name: 'good', full_name: 'acme/good', private: true }],
+    },
+  ] as never);
+
+  await expect(getGitHubRepositoryContext({ type: 'org', id: 'organization-1' })).resolves.toEqual({
+    repositories: [
+      expect.objectContaining({
+        full_name: 'acme/good',
+        githubIntegrationId: 'association-healthy',
+      }),
+    ],
+  });
 });
 
 test('keeps the same canonical repository associated to each Kilo owner separately', async () => {

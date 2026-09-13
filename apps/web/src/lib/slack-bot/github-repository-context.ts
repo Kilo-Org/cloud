@@ -1,11 +1,23 @@
-import {
-  requireNumericPlatformRepositories,
-  type Owner,
-  type PlatformRepository,
-} from '@/lib/integrations/core/types';
+import { type Owner, type PlatformRepository } from '@/lib/integrations/core/types';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
+import { captureException } from '@sentry/nextjs';
+import { z } from 'zod';
+
+const GitHubRepositoryCacheSchema = z
+  .array(
+    z
+      .object({
+        id: z.number().int(),
+        name: z.string(),
+        full_name: z.string(),
+        private: z.boolean(),
+        default_branch: z.string().optional(),
+      })
+      .strict()
+  )
+  .nullable();
 
 export type GitHubRepositoryContext = {
   repositories: GitHubRepositoryChoice[] | null;
@@ -27,7 +39,18 @@ export async function getGitHubRepositoryContext(owner: Owner): Promise<GitHubRe
       return [];
     }
 
-    return (requireNumericPlatformRepositories(integration.repositories) ?? []).map(repository => ({
+    const parsedRepositories = GitHubRepositoryCacheSchema.safeParse(
+      integration.repositories ?? null
+    );
+    if (!parsedRepositories.success) {
+      captureException(new Error('Invalid cached GitHub repository inventory'), {
+        tags: { component: 'slack-bot', op: 'parse-github-repository-cache' },
+        extra: { integrationId: integration.id },
+      });
+      return [];
+    }
+
+    return (parsedRepositories.data ?? []).map(repository => ({
       ...repository,
       githubIntegrationId: integration.id,
       githubAppType: integration.github_app_type ?? 'standard',
@@ -42,8 +65,11 @@ export async function resolveGitHubRepositoryForOwner(
   fullName: string
 ): Promise<GitHubRepositoryChoice | null> {
   const context = await getGitHubRepositoryContext(owner);
+  const normalizedFullName = fullName.toLowerCase();
   const matches =
-    context.repositories?.filter(repository => repository.full_name === fullName) ?? [];
+    context.repositories?.filter(
+      repository => repository.full_name.toLowerCase() === normalizedFullName
+    ) ?? [];
 
   return matches.length === 1 ? matches[0] : null;
 }

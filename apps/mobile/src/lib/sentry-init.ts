@@ -64,7 +64,8 @@ export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras
     ? [
         expoRouterIntegration,
         // Attaches a thrown error's own properties (e.g. tRPC `data`) to the
-        // event; `beforeSend`/`scrubEvent` still redacts token-shaped extras.
+        // event under a context named after the error; `beforeSend`/
+        // `scrubEvent` walks that context and redacts token-shaped values.
         Sentry.extraErrorDataIntegration(),
         Sentry.deeplinkIntegration(),
         Sentry.mobileReplayIntegration({

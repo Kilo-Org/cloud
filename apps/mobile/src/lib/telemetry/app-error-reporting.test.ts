@@ -27,9 +27,14 @@ describe('isAlreadyReportedNetworkError', () => {
   it.each([
     { data: { code: 'INTERNAL_SERVER_ERROR' } },
     { shape: { data: { code: 'FORBIDDEN' } } },
-    { code: 'NOT_FOUND' },
   ])('skips a tRPC-shaped error %j', metadata => {
     expect(isAlreadyReportedNetworkError(Object.assign(new Error('trpc'), metadata))).toBe(true);
+  });
+
+  it('does not skip a non-tRPC error that merely carries a top-level code', () => {
+    expect(isAlreadyReportedNetworkError(Object.assign(new Error('fs'), { code: 'ENOENT' }))).toBe(
+      false
+    );
   });
 
   it('skips a react-query CancelledError', () => {
@@ -87,6 +92,12 @@ describe('reportAppError', () => {
       source: 'query',
     });
     expect(events).toEqual([]);
+  });
+
+  it('reports an unrelated error that carries a top-level code', () => {
+    reportAppError(Object.assign(new Error('fs'), { code: 'ENOENT' }), { source: 'query' });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ level: 'error' });
   });
 
   it('does not report a CancelledError', () => {

@@ -21,7 +21,13 @@ const TRPC_PATH = '/api/trpc';
 // upload reported back to Sentry (or a PostHog flush) is an infinite loop.
 const TELEMETRY_HOST_TOKENS = ['posthog', 'sentry', 'appsflyer', 'expo'];
 
-let installed = false;
+// Fast Refresh re-evaluates this module, which would reset a module-local
+// guard and wrap an already-wrapped `globalThis.fetch`, stacking wrappers and
+// duplicating reports. Anchor the guard on `globalThis` instead: Fast Refresh
+// keeps the runtime's globals, so a fresh module instance still sees the
+// install. (Same pattern as session-attention.ts.)
+const INSTALLED_KEY = '__kiloErrorReportingInstalled__';
+const globalScope = globalThis as typeof globalThis & { [INSTALLED_KEY]?: boolean };
 
 function isTelemetryHost(url: string): boolean {
   try {
@@ -86,14 +92,15 @@ function installFetchWrapper(): void {
 }
 
 /**
- * Install the Sentry telemetry sink and the global fetch wrapper. Idempotent:
- * Fast Refresh may call this repeatedly.
+ * Install the Sentry telemetry sink and the global fetch wrapper. Idempotent
+ * across Fast Refresh: the guard lives on `globalThis`, so re-evaluating this
+ * module does not re-wrap an already-wrapped fetch.
  */
 export function installErrorReporting(): void {
-  if (installed) {
+  if (globalScope[INSTALLED_KEY] === true) {
     return;
   }
-  installed = true;
+  globalScope[INSTALLED_KEY] = true;
   installSentrySink();
   installFetchWrapper();
 }

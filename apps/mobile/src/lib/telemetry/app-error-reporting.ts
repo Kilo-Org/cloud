@@ -13,7 +13,6 @@ import { CancelledError } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
-import { readTrpcErrorField } from '@/lib/trpc-error';
 
 type AppErrorSource = 'query' | 'mutation';
 
@@ -29,24 +28,39 @@ const NamedErrorSchema = z.looseObject({ name: z.string() });
 const StringValueSchema = z.string();
 const JsonTextSchema = z.string();
 
+// A tRPC error carries its code inside a `data` envelope (`data.code` for a
+// v11 client error, `shape.data.code` for a server-shaped one). A bare
+// top-level `code` is not tRPC-specific: filesystem, transport, and domain
+// errors carry one too, and treating it as tRPC would silently drop their
+// report.
+const TrpcCodeEnvelopeSchema = z.union([
+  z.looseObject({ data: z.looseObject({ code: z.string() }) }),
+  z.looseObject({ shape: z.looseObject({ data: z.looseObject({ code: z.string() }) }) }),
+]);
+
 function hasErrorName(error: unknown, name: string): boolean {
   const parsed = NamedErrorSchema.safeParse(error);
   return parsed.success && parsed.data.name === name;
 }
 
+function hasTrpcErrorCode(error: unknown): boolean {
+  return TrpcCodeEnvelopeSchema.safeParse(error).success;
+}
+
 /**
  * True when the error is already reported by the network layer: a tRPC client
- * error (by name, or any error carrying a tRPC `code`), a react-query
+ * error (by name, or any error carrying a tRPC `code` envelope), a react-query
  * `CancelledError`, or a request-deadline timeout. These are captured by the
  * tRPC links or the fetch wrapper, so reporting them again would duplicate
- * issues.
+ * issues. A non-tRPC error that merely carries a top-level `code` is not
+ * skipped — that would drop unrelated app errors.
  */
 export function isAlreadyReportedNetworkError(error: unknown): boolean {
   try {
     if (hasErrorName(error, TRPC_CLIENT_ERROR_NAME)) {
       return true;
     }
-    if (readTrpcErrorField(error, 'code') !== undefined) {
+    if (hasTrpcErrorCode(error)) {
       return true;
     }
     if (error instanceof CancelledError) {

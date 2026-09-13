@@ -9,8 +9,8 @@ vi.mock('@sentry/react-native', () => sentryMock);
 
 type InstallFn = () => void;
 
-// Fast Refresh can call installErrorReporting repeatedly, so each test loads a
-// fresh module registry to exercise the module-level idempotency guard.
+// Fast Refresh can re-evaluate the module, so each test loads a fresh module
+// registry to exercise the guard the way a refresh would.
 async function loadInstallErrorReporting(): Promise<InstallFn> {
   vi.resetModules();
   const mod = await import('./install-error-reporting');
@@ -19,11 +19,16 @@ async function loadInstallErrorReporting(): Promise<InstallFn> {
 
 const baseFetch = vi.fn();
 
+// The install guard lives on `globalThis` (Fast Refresh keeps globals), so
+// each test must clear it to exercise a fresh install.
+const INSTALLED_FLAG = '__kiloErrorReportingInstalled__';
+
 beforeEach(() => {
   sentryMock.captureException.mockClear();
   sentryMock.captureMessage.mockClear();
   baseFetch.mockReset();
   vi.stubGlobal('fetch', baseFetch);
+  vi.stubGlobal(INSTALLED_FLAG, undefined);
 });
 
 afterEach(() => {
@@ -153,6 +158,24 @@ describe('installErrorReporting', () => {
 
     baseFetch.mockRejectedValue(new Error('once'));
     await expect(first('https://api.example.com/health')).rejects.toThrow('once');
+
+    expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not stack wrappers when a fresh module instance installs again', async () => {
+    const install = await loadInstallErrorReporting();
+    install();
+    const first = globalThis.fetch;
+
+    // Fast Refresh re-evaluates install-error-reporting.ts; the globalThis
+    // guard must survive the fresh module instance.
+    const installAfterRefresh = await loadInstallErrorReporting();
+    installAfterRefresh();
+
+    expect(globalThis.fetch).toBe(first);
+
+    baseFetch.mockRejectedValue(new Error('refreshed'));
+    await expect(first('https://api.example.com/health')).rejects.toThrow('refreshed');
 
     expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
   });

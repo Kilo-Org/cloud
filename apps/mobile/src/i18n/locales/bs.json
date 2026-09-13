@@ -2966,14 +2966,6 @@
     "revoke": "Povuci povjerenje za {{host}}",
     "backToPreferences": "Nazad na postavke"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Započni razgovor",
-      "description": "Pošalji poruku za razgovor s modelom."
-    },
-    "historyRetry": "Nije moguće učitati historiju razgovora.",
-    "sendError": "Nije moguće poslati poruku. Pokušaj ponovo."
-  },
   "glanceable": {
     "waiting": "Ažuriranje agenata",
     "empty": "Nema zadataka u toku",
@@ -2992,5 +2984,18 @@
     "emptyTitle": "Nema modela za transkripciju",
     "emptyDescription": "Kilo Gateway trenutno ne nudi modele za transkripciju.",
     "loadFailed": "Nije moguće učitati modele za transkripciju."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Započni razgovor",
+      "description": "Pošalji poruku za razgovor s modelom."
+    },
+    "list": {
+      "loadFailed": "Nije moguće učitati istoriju razgovora.",
+      "new": "Novi razgovor",
+      "openHint": "Otvara razgovor. Dugo pritisnite za brisanje.",
+      "deleteTitle": "Izbrisati ovaj razgovor?"
+    },
+    "beta": "Beta"
   }
 }

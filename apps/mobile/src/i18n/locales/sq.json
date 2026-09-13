@@ -2944,14 +2944,6 @@
     "revoke": "Hiq besimin për {{host}}",
     "backToPreferences": "Kthehu te preferencat"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Fillo një bisedë",
-      "description": "Dërgo një mesazh për të biseduar me një model."
-    },
-    "historyRetry": "Nuk u ngarkua historiku i bisedës.",
-    "sendError": "Nuk u dërgua mesazhi. Provo përsëri."
-  },
   "glanceable": {
     "waiting": "Po përditësohen agjentët",
     "empty": "Nuk ka punë në vazhdim",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "Nuk ka modele transkriptimi",
     "emptyDescription": "Kilo Gateway nuk ofron tani asnjë model transkriptimi.",
     "loadFailed": "Modelet e transkriptimit nuk u ngarkuan."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Filloni një bisedë",
+      "description": "Dërgo një mesazh për të biseduar me një model."
+    },
+    "list": {
+      "loadFailed": "Nuk u arrit të ngarkohej historia e bisedës.",
+      "new": "Bisedë e re",
+      "openHint": "Hap bisedën. Shtypni gjatë për ta fshirë.",
+      "deleteTitle": "Ta fshini këtë bisedë?"
+    },
+    "beta": "Beta"
   }
 }

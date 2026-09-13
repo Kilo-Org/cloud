@@ -18,12 +18,11 @@ export default defineProject({
   test: {
     name: 'mobile-mounted',
     environment: 'node',
+    // Mounted suites pay the same loaded-machine import cost as `mobile-pure`
+    // when the gate runs them beside Metro, the simulator, and the local
+    // services; keep one budget for both projects (see vitest.pure.config.ts).
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     include: ['src/**/*.mounted.test.tsx'],
-    // Project configs do not inherit the root test options, and this suite
-    // runs both projects in parallel: on a loaded host (dev stack, simulator,
-    // Appium) workers starve and real-timer mounted renders exceed the 5s
-    // default. Bounded pollers still fail on their own budget, so this only
-    // absorbs starvation.
-    testTimeout: 15_000,
   },
 });

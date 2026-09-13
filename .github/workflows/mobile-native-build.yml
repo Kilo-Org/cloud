@@ -137,6 +137,9 @@ jobs:
       - name: Build trpc types
         run: pnpm --filter @kilocode/trpc run build
 
+      - name: Build harness SDK
+        run: pnpm --filter @kilocode/harness-sdk run build
+
       # A consumer computes the hash on macOS; the gate computed it on
       # Linux. A mismatch would publish an artifact nobody can ever find,
       # so fail loudly instead. Android is checked here too: it builds on
@@ -224,6 +227,9 @@ jobs:
 
       - name: Build trpc types
         run: pnpm --filter @kilocode/trpc run build
+
+      - name: Build harness SDK
+        run: pnpm --filter @kilocode/harness-sdk run build
 
       - name: Expo prebuild
         run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform android

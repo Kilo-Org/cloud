@@ -1,6 +1,7 @@
 import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import {
+  hasNonWhitespaceText,
   isCompactionPart,
   isFilePart,
   isPatchPart,
@@ -26,7 +27,9 @@ export function partRendersContent(part: Part): boolean {
     // blank: markdown draws no ink for it, so counting it as content adds a
     // zero-height row that eats a transcript gap and doubles the visible one.
     return (
-      !isSnapshotProgressPart(part) && part.text.trim() !== '' && !htmlSanitizesToEmpty(part.text)
+      !isSnapshotProgressPart(part) &&
+      hasNonWhitespaceText(part.text) &&
+      !htmlSanitizesToEmpty(part.text)
     );
   }
   if (isToolPart(part)) {

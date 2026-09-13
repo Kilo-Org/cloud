@@ -109,15 +109,12 @@ vi.mock('@/lib/pr-review/merge/merge-result-banner-store', () => ({
   consumeMergePartialSuccess: () => null,
 }));
 
-// The header's offline-banner reservation: the banner visibility and the
-// banner height are stubbed so the tree walk can assert the reserved
-// paddingTop per state.
+// The header's offline-banner reservation: the banner visibility is stubbed;
+// `offlineHeaderReservation` is the real pure helper, so the tree walk
+// asserts the reserved paddingTop per state against the shared contract.
 const offlineBanner = vi.hoisted(() => ({ isOffline: false }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useOfflineBannerState: () => offlineBanner.isOffline,
-}));
-vi.mock('@/components/offline-banner', () => ({
-  OFFLINE_BANNER_HEIGHT: 36,
 }));
 
 vi.mock('@/lib/pr-review/recent-prs', () => ({

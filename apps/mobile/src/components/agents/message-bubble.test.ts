@@ -606,6 +606,29 @@ describe('MessageBubble in-bubble text selection context', () => {
   });
 });
 
+describe('MessageBubble part-row long-press context', () => {
+  it('mounts the message long-press provider on the assistant parts when the details sheet is wired', async () => {
+    const onLongPressDetails = vi.fn<(m: StoredMessage) => void>();
+    const message = assistantMessage('m-long-press');
+    const tree = await renderBubbleWithHandlers(message, { onLongPressDetails });
+
+    const { MessageLongPressProvider } = await import('./message-long-press-context');
+    const provider = findElementByTypeFn(tree, MessageLongPressProvider);
+    expect(provider).not.toBeNull();
+    expect(provider?.props.message).toBe(message);
+    expect(provider?.props.onLongPressDetails).toBe(onLongPressDetails);
+  });
+
+  it('keeps assistant part rows tap-only when no details sheet is wired', async () => {
+    const tree = await renderBubble(assistantMessage('m-long-press-plain'));
+
+    const { MessageLongPressProvider } = await import('./message-long-press-context');
+    const provider = findElementByTypeFn(tree, MessageLongPressProvider);
+    expect(provider).not.toBeNull();
+    expect(provider?.props.onLongPressDetails).toBeUndefined();
+  });
+});
+
 describe('MessageBubble row rhythm', () => {
   // Spacing class contract: two parts of one assistant message sit gap-2
   // apart; two adjacent messages sit py-1 + py-1 apart, the same value; the

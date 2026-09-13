@@ -7,7 +7,7 @@ import { Pressable, Share, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 
 import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-merge-partial-success-banner';
-import { OFFLINE_BANNER_HEIGHT } from '@/components/offline-banner';
+import { offlineHeaderReservation } from '@/lib/offline-banner-state';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { PrReviewDiscussionTab } from '@/components/pr-review/pr-review-discussion-tab';
 import { PrReviewFilesTab } from '@/components/pr-review/pr-review-files-tab';
@@ -61,7 +61,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   // the header while it is visible (uxs2 spot check, e6-offline-hang).
   const isOffline = useOfflineBannerState();
   // 0 while online keeps the header's natural position (no reserved space).
-  const headerTopPadding = isOffline ? OFFLINE_BANNER_HEIGHT : 0;
+  const headerTopPadding = offlineHeaderReservation(isOffline);
 
   // P1-F-46b: push the review-submit route with the same params the
   // Files-tab `PrDiffFloatingActions` uses, so a clean PR (no queued

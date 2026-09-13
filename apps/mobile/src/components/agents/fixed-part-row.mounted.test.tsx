@@ -6,6 +6,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { FixedPartRow } from './fixed-part-row';
+import { MessageLongPressContext } from './message-long-press-context';
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -30,6 +31,31 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 type RowProps = Parameters<typeof FixedPartRow>[0];
+
+async function renderRowInContext(
+  props: RowProps,
+  messageLongPress?: () => void
+): Promise<TestRenderer.ReactTestRenderer> {
+  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+    current: undefined,
+  };
+  const element = messageLongPress
+    ? createElement(
+        MessageLongPressContext.Provider,
+        { value: messageLongPress },
+        createElement(FixedPartRow, props)
+      )
+    : createElement(FixedPartRow, props);
+  await act(async () => {
+    await Promise.resolve();
+    rendererRef.current = TestRenderer.create(element);
+  });
+  const renderer = rendererRef.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
 
 async function renderRow(props: RowProps): Promise<TestRenderer.ReactTestRenderer> {
   const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
@@ -159,6 +185,52 @@ describe('FixedPartRow mounted', () => {
     expect(findHost(renderer.root, 'ActivityIndicator')).toHaveLength(0);
     const labels = findHost(renderer.root, 'Text');
     expect(labels.some(node => node.props.children === 'app.ts')).toBe(true);
+  });
+
+  it('forwards a long press to the message-details handler through the context', async () => {
+    const onPress = vi.fn(() => undefined);
+    const messageLongPress = vi.fn(() => undefined);
+    const renderer = await renderRowInContext(
+      {
+        label: 'Thinking',
+        labelKind: 'eyebrow',
+        variant: 'dashed',
+        onPress,
+        accessibilityLabel: 'Thinking',
+      },
+      messageLongPress
+    );
+
+    const pressable = findHost(renderer.root, 'Pressable')[0];
+    expect(pressable).toBeDefined();
+    if (!pressable) {
+      throw new Error('pressable not found');
+    }
+    expect(pressable.props.onLongPress).toBe(messageLongPress);
+
+    // The row stays enabled for taps: long-press opens the message details,
+    // a plain tap still opens the part detail.
+    expect(pressable.props.disabled).toBe(false);
+    expect(pressable.props.onPress).toBe(onPress);
+  });
+
+  it('keeps tap-only behavior when no message long-press is mounted', async () => {
+    const onPress = vi.fn(() => undefined);
+    const renderer = await renderRowInContext({
+      label: 'Thinking',
+      labelKind: 'eyebrow',
+      variant: 'dashed',
+      onPress,
+      accessibilityLabel: 'Thinking',
+    });
+
+    const pressable = findHost(renderer.root, 'Pressable')[0];
+    expect(pressable).toBeDefined();
+    if (!pressable) {
+      throw new Error('pressable not found');
+    }
+    expect(pressable.props.onLongPress).toBeUndefined();
+    expect(pressable.props.onPress).toBe(onPress);
   });
 
   it('renders no leading slot at all when status is absent (reasoning rows)', async () => {

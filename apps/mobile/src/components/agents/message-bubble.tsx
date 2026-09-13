@@ -13,9 +13,10 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { InMessageBubbleContext } from './bubble-text-selection-context';
 import { ChatMarkdownText } from './chat-markdown-text';
 import { CompactionSeparator } from './compaction-separator';
-import { collectCopyableText } from './collect-copyable-text';
+import { hasCopyableText } from './collect-copyable-text';
 import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
+import { MessageLongPressProvider } from './message-long-press-context';
 import { selectMessageFailure } from './message-failure-state';
 import { partRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
@@ -71,7 +72,7 @@ function MessageBubbleImpl({
   const { copyMessage } = useMessageCopy();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const canCopy = collectCopyableText(message).length > 0;
+  const canCopy = hasCopyableText(message);
   const a11y = buildAgentMessageBubbleAccessibilityProps({
     isUser,
     canCopy,
@@ -260,19 +261,21 @@ function MessageBubbleImpl({
     <View>
       <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
         <InMessageBubbleContext.Provider value>
-          <View className="gap-2">
-            {message.parts.map(part => (
-              <PartRenderer
-                key={part.id}
-                part={part}
-                isStreaming={isStreaming}
-                getChildMessages={getChildMessages}
-                defaultReasoningExpanded={defaultReasoningExpanded}
-                onOpenChildSession={onOpenChildSession}
-                modelOptions={modelOptions}
-              />
-            ))}
-          </View>
+          <MessageLongPressProvider message={message} onLongPressDetails={onLongPressDetails}>
+            <View className="gap-2">
+              {message.parts.map(part => (
+                <PartRenderer
+                  key={part.id}
+                  part={part}
+                  isStreaming={isStreaming}
+                  getChildMessages={getChildMessages}
+                  defaultReasoningExpanded={defaultReasoningExpanded}
+                  onOpenChildSession={onOpenChildSession}
+                  modelOptions={modelOptions}
+                />
+              ))}
+            </View>
+          </MessageLongPressProvider>
         </InMessageBubbleContext.Provider>
         {a11y.accessibilityActions.length > 0 ? (
           <View

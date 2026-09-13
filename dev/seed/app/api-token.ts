@@ -9,8 +9,41 @@ import type { SeedResult } from '../index';
 
 export const usage = '<email> [options]';
 
-const DEFAULT_EXPIRES_DAYS = 7;
+// Five years, matching generateApiToken()'s default in
+// apps/web/src/lib/tokens.ts (FIVE_YEARS_IN_SECONDS). The resource-delegation
+// policy only accepts legacy five-year API tokens for credential exchange
+// (LEGACY_API_TOKEN_LIFETIMES_SECONDS in @kilocode/worker-utils), so a token
+// with any other lifetime is rejected by control-token routes such as
+// cloudAgentNext.prepareSession with 403 "Unsupported legacy credential
+// context".
+export const DEFAULT_EXPIRES_DAYS = 1825;
 const SECONDS_PER_DAY = 24 * 60 * 60;
+
+/**
+ * The exact signing shape `generateApiToken()` mints in production, as the
+ * local dev stack's policy expects it:
+ *
+ * - `expiresInSeconds` must be one of LEGACY_API_TOKEN_LIFETIMES_SECONDS, or
+ *   control-token routes (cloudAgentNext.prepareSession and every other
+ *   createControlTokenForRequest caller) reject the token with 403
+ *   "Unsupported legacy credential context".
+ * - `env` must equal the NODE_ENV of the server that verifies the token. This
+ *   seed only ever feeds the local dev stack, whose server runs `next dev` —
+ *   Next pins its own process.env.NODE_ENV to "development" regardless of
+ *   .env files. The seed process must not copy its own dotenv-loaded NODE_ENV
+ *   (root .env.local carries NODE_ENV="production" for build tooling), or
+ *   getResourceDelegationAuthority rejects every request with 401
+ *   "Unauthorized resource delegation request".
+ */
+export function apiTokenSigningParams(expiresDays: number): {
+  expiresInSeconds: number;
+  env: string;
+} {
+  return {
+    expiresInSeconds: expiresDays * SECONDS_PER_DAY,
+    env: 'development',
+  };
+}
 
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:api-token ${usage}`);
@@ -18,6 +51,12 @@ function printUsage(): void {
   console.log('Mints a Kilo user API bearer token (HS256, version 3) for a local');
   console.log('development user, signed with this worktree NEXTAUTH_SECRET. Use it to');
   console.log('authenticate a local kilo CLI or API client as that user.');
+  console.log('');
+  console.log('The token carries the shape generateApiToken() mints in production: a');
+  console.log('five-year legacy user API token with env="development" — the shape the');
+  console.log('resource-delegation policy accepts for control-token minting on the');
+  console.log('local dev stack. Override the lifetime with --expires-days only when the');
+  console.log('consumer never mints resource control tokens.');
   console.log('');
   console.log('Matches either google_user_email exactly or normalized_email.');
   console.log('');
@@ -136,8 +175,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId: user.userId,
     pepper: user.apiTokenPepper,
     secret,
-    expiresInSeconds: options.expiresDays * SECONDS_PER_DAY,
-    env: process.env.NODE_ENV ?? 'development',
+    ...apiTokenSigningParams(options.expiresDays),
     extra: options.isAdmin || user.isAdmin ? { isAdmin: true } : undefined,
   });
 

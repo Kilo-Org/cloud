@@ -1,3 +1,4 @@
+import { hasNonWhitespaceText } from './part-types';
 import { ChatMarkdownText } from './chat-markdown-text';
 
 type TextPartRendererProps = {
@@ -5,7 +6,7 @@ type TextPartRendererProps = {
 };
 
 export function TextPartRenderer({ text }: Readonly<TextPartRendererProps>) {
-  if (!text.trim()) {
+  if (!hasNonWhitespaceText(text)) {
     return null;
   }
 

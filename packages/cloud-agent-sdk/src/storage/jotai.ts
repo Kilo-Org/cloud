@@ -6,7 +6,7 @@ import type { MessageInfo } from '../types';
 import type { SessionStorage } from './types';
 import {
   EMPTY_PARTS,
-  applyTextDelta,
+  applyTextDeltas,
   clonePart,
   createReadonlyPartView,
   createSeedTextPart,
@@ -53,24 +53,82 @@ function createJotaiStorage(
   const partsSnapshot = new Map<string, Part[] | null>();
   const subscribers = new Map<string, Set<() => void>>();
 
-  // Coalesced delta publication. `applyPartDelta` marks a message id dirty and
-  // schedules one flush; the flush bumps `partsRevisionAtom` once and notifies
-  // once per dirty id. Structural operations flush pending work first.
+  // Coalesced delta publication. `applyPartDelta` buffers the incoming chunk
+  // and schedules one flush; the flush applies every buffered chunk for a part
+  // with a single concatenation, then bumps `partsRevisionAtom` once and
+  // notifies once per dirty id. Structural operations flush pending work first.
   const dirtyPartIds = new Set<string>();
+  // Buffered stream chunks, keyed messageId -> partId -> chunks. Buffering is
+  // what bounds the work per token: a `message.part.delta` costs one array push
+  // here, not a re-copy of the whole accumulated text (which is O(n) per token
+  // and quadratic over a long reasoning/text stream).
+  const pendingTextDeltas = new Map<string, Map<string, string[]>>();
   let flushScheduled = false;
 
   function bumpPartsRevision(): void {
     store.set(partsRevisionAtom, r => r + 1);
   }
 
+  /** Apply one publication's worth of buffered chunks to a single part. */
+  function applyBufferedDeltaBatch(messageId: string, partId: string, chunks: string[]): void {
+    const arr = partsMap.get(messageId);
+    if (!arr) {
+      partsMap.set(messageId, [createSeedTextPart(messageId, partId, chunks.join(''))]);
+      return;
+    }
+    const idx = arr.findIndex(p => p.id === partId);
+    const existing = idx >= 0 ? arr[idx] : undefined;
+    if (!existing) {
+      partsMap.set(
+        messageId,
+        insertPartSorted(arr, createSeedTextPart(messageId, partId, chunks.join('')))
+      );
+      return;
+    }
+    const updatedPart = applyTextDeltas(existing, chunks);
+    if (updatedPart === existing) {
+      return;
+    }
+    const nextArr = [...arr];
+    nextArr[idx] = updatedPart;
+    partsMap.set(messageId, nextArr);
+  }
+
+  /**
+   * Apply and consume the buffered chunks for one message without publishing.
+   * Used by `getParts` so a direct reader sees the deltas already received
+   * (the chat processor's empty-text guard) even though the publication — and
+   * its revision bump / subscriber notify — is still coalesced to the frame.
+   */
+  function applyPendingTextDeltas(messageId: string): boolean {
+    const byPart = pendingTextDeltas.get(messageId);
+    if (!byPart) return false;
+    pendingTextDeltas.delete(messageId);
+    for (const [partId, chunks] of byPart) {
+      applyBufferedDeltaBatch(messageId, partId, chunks);
+    }
+    // The buffered chunks just became part of the parts map, so any cached
+    // snapshot for this message is stale.
+    partsSnapshot.set(messageId, null);
+    return true;
+  }
+
   function flushPendingDeltas(): void {
-    if (!flushScheduled) return;
+    // Clear the scheduled flag unconditionally: a structural operation may
+    // force this flush while a frame is still queued, and the queued frame
+    // must be a harmless no-op rather than a second application of the same
+    // buffered chunks.
     flushScheduled = false;
     const dirty = [...dirtyPartIds];
     dirtyPartIds.clear();
-    if (dirty.length === 0) return;
+    if (dirty.length === 0 && pendingTextDeltas.size === 0) return;
+    const touched = new Set(dirty);
+    for (const messageId of [...pendingTextDeltas.keys()]) {
+      applyPendingTextDeltas(messageId);
+      touched.add(messageId);
+    }
     bumpPartsRevision();
-    for (const messageId of dirty) {
+    for (const messageId of touched) {
       partsSnapshot.set(messageId, null);
       notify(subscribers, `parts:${messageId}`);
     }
@@ -128,31 +186,20 @@ function createJotaiStorage(
         return;
       }
 
-      const arr = partsMap.get(messageId);
-
-      if (!arr) {
-        partsMap.set(messageId, [createSeedTextPart(messageId, partId, delta)]);
-      } else {
-        const idx = arr.findIndex(p => p.id === partId);
-        const existing = idx >= 0 ? arr[idx] : undefined;
-        if (!existing) {
-          partsMap.set(
-            messageId,
-            insertPartSorted(arr, createSeedTextPart(messageId, partId, delta))
-          );
-        } else {
-          const updatedPart = applyTextDelta(existing, delta);
-          if (updatedPart === existing) {
-            return;
-          }
-          const nextArr = [...arr];
-          nextArr[idx] = updatedPart;
-          partsMap.set(messageId, nextArr);
-        }
+      let byPart = pendingTextDeltas.get(messageId);
+      if (!byPart) {
+        byPart = new Map();
+        pendingTextDeltas.set(messageId, byPart);
       }
-      // State write is immediate; publication is coalesced to one flush.
+      const chunks = byPart.get(partId);
+      if (chunks) {
+        chunks.push(delta);
+      } else {
+        byPart.set(partId, [delta]);
+      }
+
       // Invalidate the cached snapshot so a `getParts` before the flush
-      // rebuilds from the freshly written parts instead of the stale cache.
+      // rebuilds from the freshly applied parts instead of the stale cache.
       partsSnapshot.set(messageId, null);
       dirtyPartIds.add(messageId);
       scheduleFlush();
@@ -170,6 +217,11 @@ function createJotaiStorage(
     },
 
     getParts(messageId) {
+      // Buffered stream chunks are not published until the frame flush, but a
+      // direct reader (the chat processor's empty-text guard) must still see
+      // the deltas that already arrived. Consume them into the parts map
+      // without bumping the revision or notifying subscribers.
+      applyPendingTextDeltas(messageId);
       const cached = partsSnapshot.get(messageId);
       if (cached) return cached;
 

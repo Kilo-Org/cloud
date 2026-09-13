@@ -30,6 +30,8 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
+import { offlineHeaderReservation } from '@/lib/offline-banner-state';
 import { shouldRetryNotFoundOnSpawnedRoute } from '@/lib/spawned-not-found-retry';
 import { useTRPC } from '@/lib/trpc';
 
@@ -80,6 +82,12 @@ export default function SessionDetailScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   useRouteForegroundRefresh([[['cliSessionsV2']], [['modelPreferences']]]);
+  // The app-wide offline banner is an absolute overlay at the safe-area top,
+  // so it paints over this screen's header title on the loading and error
+  // states too. Reserve its height above the header while it is visible
+  // (mobile-app spot check, e2).
+  const isOffline = useOfflineBannerState();
+  const headerTopPadding = offlineHeaderReservation(isOffline);
   const sessionQuery = useQuery({
     ...trpc.cliSessionsV2.get.queryOptions(
       { session_id: sessionId ?? '' },
@@ -138,19 +146,21 @@ export default function SessionDetailScreen() {
     // the query resolves. Route title hints are not bound to an account.
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          title={t('agentChat.session.title')}
-          reserveTitleSpace
-          backFallback="/(app)/(tabs)/(2_agents)"
-          headerRight={
-            <SessionContextMetrics
-              info={undefined}
-              totalCostMicrodollars={null}
-              hasMessages={false}
-              loading
-            />
-          }
-        />
+        <View className="bg-background" style={{ paddingTop: headerTopPadding }}>
+          <ScreenHeader
+            title={t('agentChat.session.title')}
+            reserveTitleSpace
+            backFallback="/(app)/(tabs)/(2_agents)"
+            headerRight={
+              <SessionContextMetrics
+                info={undefined}
+                totalCostMicrodollars={null}
+                hasMessages={false}
+                loading
+              />
+            }
+          />
+        </View>
         <SessionConnectionIndicator />
         <SessionSkeletonMessages sessionId={sessionId} />
         <SessionComposerSkeleton />
@@ -190,11 +200,13 @@ export default function SessionDetailScreen() {
     const copyText = buildTerminalErrorCopyText({ sessionId, title, message });
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          title={t('agentChat.session.title')}
-          reserveTitleSpace
-          backFallback="/(app)/(tabs)/(2_agents)"
-        />
+        <View className="bg-background" style={{ paddingTop: headerTopPadding }}>
+          <ScreenHeader
+            title={t('agentChat.session.title')}
+            reserveTitleSpace
+            backFallback="/(app)/(tabs)/(2_agents)"
+          />
+        </View>
         <SessionConnectionIndicator />
         <CenteredState>
           <View className="items-center gap-3 px-6">

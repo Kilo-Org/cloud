@@ -2481,6 +2481,11 @@
       "stepsCount_two": "{{steps}} koraka",
       "stepsCount_few": "{{steps}} koraki"
     },
+    "autoApprove": {
+      "title": "Samodejna odobritev",
+      "description": "Samodejno odobri zahteve za dovoljenje za to sejo. Orodja se nato zaženejo brez poziva.",
+      "unavailable": "Ta seja ne more prejemati zahtev za dovoljenje."
+    },
     "prBadge": {
       "open": "odprta zahteva za združitev",
       "closed": "zaprta zahteva za združitev",

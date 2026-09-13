@@ -2502,6 +2502,11 @@
       "stepsCount_few": "{{steps}} passi",
       "stepsCount_many": "{{steps}}-il pass"
     },
+    "autoApprove": {
+      "title": "Approvazzjoni awtomatika",
+      "description": "Japprova awtomatikament it-talbiet għall-permess ta' din is-sessjoni. L-għodod imbagħad jaħdmu mingħajr talba.",
+      "unavailable": "Din is-sessjoni ma tistax tirċievi talbiet għall-permess."
+    },
     "prBadge": {
       "open": "ftuħ tal-PR",
       "closed": "talba għall-integrazzjoni magħluqa",

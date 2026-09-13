@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} steg",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Automatiskt godkännande",
+      "description": "Godkänn behörighetsförfrågningar för den här sessionen automatiskt. Verktygen körs sedan utan en uppmaning.",
+      "unavailable": "Den här sessionen kan inte ta emot behörighetsförfrågningar."
+    },
     "prBadge": {
       "open": "öppna PR",
       "closed": "stängd PR",

@@ -2460,6 +2460,11 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} pași"
     },
+    "autoApprove": {
+      "title": "Aprobare automată",
+      "description": "Aprobă automat cererile de permisiune pentru această sesiune. Instrumentele rulează apoi fără o solicitare.",
+      "unavailable": "Această sesiune nu poate primi cereri de permisiune."
+    },
     "prBadge": {
       "open": "deschidere PR",
       "closed": "pR închis",

@@ -26,11 +26,19 @@ function printUsage(): void {
     `  --expires-days=<number>   Token lifetime in days (default: ${DEFAULT_EXPIRES_DAYS})`
   );
   console.log('  --admin                   Include isAdmin=true in the token payload');
+  console.log(
+    '  --env=<name>              Environment claim (default: the worktree NODE_ENV). A local'
+  );
+  console.log(
+    '                            Next dev server compiles NODE_ENV=development, so consumers'
+  );
+  console.log('                            that verify the claim need that exact value.');
   console.log('');
   console.log('Examples:');
   console.log('  pnpm dev:seed app:api-token ada@example.com');
   console.log('  pnpm -s dev:seed app:api-token ada@example.com --json | jq -r .token');
   console.log('  pnpm dev:seed app:api-token ada@example.com --expires-days=30 --admin');
+  console.log('  pnpm dev:seed app:api-token ada@example.com --env=development');
 }
 
 function parsePositiveInteger(value: string, flagName: string): number {
@@ -48,6 +56,7 @@ type ApiTokenOptions = {
   email: string;
   expiresDays: number;
   isAdmin: boolean;
+  env: string | undefined;
 };
 
 function parseArgs(args: string[]): ApiTokenOptions {
@@ -62,6 +71,7 @@ function parseArgs(args: string[]): ApiTokenOptions {
 
   let expiresDays = DEFAULT_EXPIRES_DAYS;
   let isAdmin = false;
+  let env: string | undefined;
 
   for (const arg of args.slice(1)) {
     if (arg === '--help' || arg === '-h') {
@@ -79,10 +89,18 @@ function parseArgs(args: string[]): ApiTokenOptions {
       );
       continue;
     }
+    if (arg.startsWith('--env=')) {
+      const value = arg.slice('--env='.length).trim();
+      if (!value) {
+        throw new Error('--env requires a non-empty value');
+      }
+      env = value;
+      continue;
+    }
     throw new Error(`Unknown argument: ${arg}`);
   }
 
-  return { email, expiresDays, isAdmin };
+  return { email, expiresDays, isAdmin, env };
 }
 
 export async function run(...args: string[]): Promise<SeedResult | void> {
@@ -132,12 +150,18 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const [user] = resolvedMatches;
 
+  // The env claim must match the consumer that verifies it. A local Next dev
+  // server compiles NODE_ENV=development, while `.env.local` may set the
+  // worktree NODE_ENV=production for standalone scripts, so callers that hit
+  // Next (e.g. the e2e session helper) pass `--env=development`.
+  const tokenEnv = options.env ?? process.env.NODE_ENV ?? 'development';
+
   const { token, expiresAt } = await signKiloToken({
     userId: user.userId,
     pepper: user.apiTokenPepper,
     secret,
     expiresInSeconds: options.expiresDays * SECONDS_PER_DAY,
-    env: process.env.NODE_ENV ?? 'development',
+    env: tokenEnv,
     extra: options.isAdmin || user.isAdmin ? { isAdmin: true } : undefined,
   });
 
@@ -151,6 +175,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     isAdmin: options.isAdmin || user.isAdmin,
     expiresAt,
     expiresDays: options.expiresDays,
+    env: tokenEnv,
     token,
   };
 }

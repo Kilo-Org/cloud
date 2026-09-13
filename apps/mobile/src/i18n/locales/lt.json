@@ -2481,6 +2481,11 @@
       "stepsCount_few": "{{steps}} žingsniai",
       "stepsCount_many": "{{steps}} žingsnio"
     },
+    "autoApprove": {
+      "title": "Automatinis patvirtinimas",
+      "description": "Automatiškai patvirtinti šios sesijos leidimų prašymus. Tada įrankiai veikia be raginimo.",
+      "unavailable": "Ši sesija negali gauti leidimų prašymų."
+    },
     "prBadge": {
       "open": "atvira pakeitimų užklausa",
       "closed": "uždaryta pakeitimų sujungimo užklausa",

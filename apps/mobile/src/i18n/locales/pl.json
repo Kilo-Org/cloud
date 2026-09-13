@@ -2033,6 +2033,11 @@
       "stepsCount_few": "{{steps}} kroki",
       "stepsCount_many": "{{steps}} kroków"
     },
+    "autoApprove": {
+      "title": "Automatyczne zatwierdzanie",
+      "description": "Automatycznie zatwierdzaj prośby o zgodę dla tej sesji. Narzędzia działają wtedy bez monitu.",
+      "unavailable": "Ta sesja nie może odbierać próśb o zgodę."
+    },
     "prBadge": {
       "open": "otwarty PR",
       "closed": "zamknięty PR",

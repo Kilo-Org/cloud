@@ -2005,6 +2005,11 @@
       "stepsCount_other": "{{steps}} Schritte",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Automatische Genehmigung",
+      "description": "Genehmigt Berechtigungsanfragen für diese Sitzung automatisch. Werkzeuge laufen dann ohne Aufforderung.",
+      "unavailable": "Diese Sitzung kann keine Berechtigungsanfragen empfangen."
+    },
     "prBadge": {
       "open": "pull-Request öffnen",
       "closed": "geschlossener Pull-Request",

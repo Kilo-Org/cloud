@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} ګامونه",
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
     },
+    "autoApprove": {
+      "title": "اتوماتیک تصویب",
+      "description": "د دې ناستې لپاره د اجازې غوښتنې په اتوماتیک ډول تصویب کړئ. بیا وسیلې پرته له غوښتنې کار کوي.",
+      "unavailable": "دا ناسته د اجازې غوښتنې نشي ترلاسه کولی."
+    },
     "prBadge": {
       "open": "پل ریکویسټ پرانیزئ",
       "closed": "تړل شوی PR",

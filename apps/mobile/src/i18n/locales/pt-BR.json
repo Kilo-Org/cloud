@@ -1990,6 +1990,11 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_many": "{{steps}} etapas"
     },
+    "autoApprove": {
+      "title": "Aprovação automática",
+      "description": "Aprovar automaticamente as solicitações de permissão desta sessão. As ferramentas então são executadas sem aviso.",
+      "unavailable": "Esta sessão não pode receber solicitações de permissão."
+    },
     "prBadge": {
       "open": "abrir PR",
       "closed": "pR fechado",

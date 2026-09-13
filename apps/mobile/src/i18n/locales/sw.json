@@ -2439,6 +2439,11 @@
       "stepsCount_other": "Hatua {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Idhinisha kiotomatiki",
+      "description": "Idhinisha maombi ya ruhusa ya kikao hiki kiotomatiki. Zana kisha huendesha bila kidokezo.",
+      "unavailable": "Kikao hiki hakiwezi kupokea maombi ya ruhusa."
+    },
     "prBadge": {
       "open": "fungua ombi la kuunganisha",
       "closed": "ombi la kuunganisha mabadiliko lililofungwa",

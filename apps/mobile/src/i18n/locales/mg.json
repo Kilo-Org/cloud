@@ -2439,6 +2439,11 @@
       "stepsCount_other": "dingana {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Fankatoavana ho azy",
+      "description": "Manankatoava ho azy ny fangatahana alalana ho an'ity fotoam-piasana ity. Avy eo ny fitaovana dia mandeha tsy misy fanontaniana.",
+      "unavailable": "Tsy afaka mandray fangatahana alalana ity fotoam-piasana ity."
+    },
     "prBadge": {
       "open": "sokafy ny PR",
       "closed": "fangatahana fampidirana kaody nakatona",

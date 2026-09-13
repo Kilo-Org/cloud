@@ -146,13 +146,13 @@ type ContextSheetContent = {
 };
 
 export function getContextSheetContent(
-  info: SessionContextInfo,
+  info: SessionContextInfo | undefined,
   totalCostMicrodollars: number | null
 ): ContextSheetContent {
-  const tone = getContextTone(info.percentage);
-  const usedTokens = formatExactTokens(info.contextTokens);
+  const tone = getContextTone(info?.percentage);
+  const usedTokens = info ? formatExactTokens(info.contextTokens) : '-';
   const cost = formatSessionTotalCost(totalCostMicrodollars);
-  if (info.contextWindow === undefined) {
+  if (info?.contextWindow === undefined) {
     return {
       usedTokens,
       windowTokens: null,
@@ -199,7 +199,8 @@ export function getMetricsAccessibilityLabel({
   const tapPart = interactive ? ` ${i18n.t('agentChat.contextUsage.tapToViewDetails')}` : '';
 
   if (!info) {
-    return spoken ? i18n.t('agents.sessionRow.costSpoken', { cost: spoken }) : '';
+    const body = spoken ? i18n.t('agents.sessionRow.costSpoken', { cost: spoken }) : '';
+    return `${body}${tapPart}`.trim();
   }
 
   const costPart = spoken ? i18n.t('agentChat.contextUsage.costSuffix', { cost: spoken }) : '';
@@ -218,30 +219,31 @@ export function getMetricsAccessibilityLabel({
 
 type SheetMountState =
   | { mounted: false }
-  | { mounted: true; visible: boolean; info: SessionContextInfo };
+  | { mounted: true; visible: boolean; info: SessionContextInfo | undefined };
 
 export type ContextSheetIdentity = {
   sessionId: string;
-  providerID: string;
-  modelID: string;
+  providerID?: string;
+  modelID?: string;
 };
 
 /**
  * Controls when the native Modal is mounted and when it is visible. Keeping
- * the sheet mounted while contextInfo exists lets `visible` transition from
- * true → false so the native pageSheet dismissal animation runs.
+ * the sheet mounted while usage or permission controls are available lets
+ * `visible` transition from true → false for native dismissal. Permission
+ * controls belong to the session, not the model reporting the latest usage.
  */
 export function getContextSheetMountState(
   info: SessionContextInfo | undefined,
   openIdentity: ContextSheetIdentity | null,
-  sessionId: string
+  { sessionId, autoApproveAvailable = false }: { sessionId: string; autoApproveAvailable?: boolean }
 ): SheetMountState {
-  if (!info) {
+  if (!info && !autoApproveAvailable) {
     return { mounted: false };
   }
   const visible =
     openIdentity?.sessionId === sessionId &&
-    openIdentity.providerID === info.providerID &&
-    openIdentity.modelID === info.modelID;
+    (autoApproveAvailable ||
+      (openIdentity.providerID === info?.providerID && openIdentity.modelID === info?.modelID));
   return { mounted: true, visible, info };
 }

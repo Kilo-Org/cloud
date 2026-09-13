@@ -2439,6 +2439,11 @@
       "stepsCount_other": "ìgbésẹ̀ {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Ìfọwọ́sí aládàáṣe",
+      "description": "Fọwọ́sí àwọn ìbéèrè ìyọ̀ǹda fún ìgbà iṣẹ́ yìí lọ́nà aládàáṣe. Lẹ́yìn náà àwọn irinṣẹ́ yóò ṣiṣẹ́ láìsí ìbéèrè.",
+      "unavailable": "Ìgbà iṣẹ́ yìí kò lè gba àwọn ìbéèrè ìyọ̀ǹda."
+    },
     "prBadge": {
       "open": "ṣí ìbéèrè àkópọ̀",
       "closed": "ìbéèrè ìṣọ̀kan kóòdù tí a ti pa dé",

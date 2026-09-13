@@ -2019,6 +2019,11 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_two": "{{steps}} שלבים"
     },
+    "autoApprove": {
+      "title": "אישור אוטומטי",
+      "description": "אשר בקשות הרשאה עבור הסשן הזה באופן אוטומטי. לאחר מכן הכלים פועלים ללא בקשה.",
+      "unavailable": "הסשן הזה אינו יכול לקבל בקשות הרשאה."
+    },
     "prBadge": {
       "open": "pR פתוח",
       "closed": "בקשת משיכה שנסגרה",

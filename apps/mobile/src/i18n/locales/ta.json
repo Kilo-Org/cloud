@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} படிகள்",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "தானியங்கி ஒப்புதல்",
+      "description": "இந்த அமர்விற்கான அனுமதி கோரிக்கைகளை தானாக ஒப்புதல் அளிக்கவும். பின்னர் கருவிகள் கேள்வியின்றி இயங்கும்.",
+      "unavailable": "இந்த அமர்வால் அனுமதி கோரிக்கைகளைப் பெற முடியாது."
+    },
     "prBadge": {
       "open": "pR திறப்பு",
       "closed": "மூடப்பட்ட PR",

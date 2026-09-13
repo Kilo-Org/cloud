@@ -2439,6 +2439,11 @@
       "stepsCount_other": "matakai {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Amincewa ta atomatik",
+      "description": "Amince da buƙatun izini na wannan zaman ta atomatik. Sannan kayan aiki suna gudana ba tare da buƙata ba.",
+      "unavailable": "Wannan zaman ba zai iya karɓar buƙatun izini ba."
+    },
     "prBadge": {
       "open": "buɗe buƙatar haɗa canje-canje",
       "closed": "buƙatar haɗa canje-canje da aka rufe",

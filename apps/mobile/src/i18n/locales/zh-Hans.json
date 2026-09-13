@@ -2005,6 +2005,11 @@
       "stepsCount_other": "{{steps}} 步",
       "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}"
     },
+    "autoApprove": {
+      "title": "自动批准",
+      "description": "自动批准此会话的授权请求。随后工具将在无提示的情况下运行。",
+      "unavailable": "此会话无法接收授权请求。"
+    },
     "prBadge": {
       "open": "开启拉取请求",
       "closed": "已关闭的拉取请求",

@@ -2005,6 +2005,11 @@
       "stepsCount_other": "{{steps}} bước",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Tự động phê duyệt",
+      "description": "Tự động phê duyệt các yêu cầu cấp quyền cho phiên này. Sau đó, công cụ chạy mà không cần lời nhắc.",
+      "unavailable": "Phiên này không thể nhận yêu cầu cấp quyền."
+    },
     "prBadge": {
       "open": "mở yêu cầu hợp nhất",
       "closed": "yêu cầu hợp nhất đã đóng",

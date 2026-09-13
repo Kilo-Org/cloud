@@ -2019,6 +2019,11 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_many": "{{steps}} pasos"
     },
+    "autoApprove": {
+      "title": "Aprobación automática",
+      "description": "Aprueba las solicitudes de permiso de esta sesión automáticamente. Después, las herramientas se ejecutan sin aviso.",
+      "unavailable": "Esta sesión no puede recibir solicitudes de permiso."
+    },
     "prBadge": {
       "open": "pR abierta",
       "closed": "solicitud de incorporación de cambios cerrada",

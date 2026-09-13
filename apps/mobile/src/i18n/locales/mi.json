@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} hipanga",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Whakaaetanga aunoa",
+      "description": "Whakaaetia aunoatia ngā tono whakaaetanga mō tēnei wātū. Kātahi ka rere ngā taputapu me te kore pātai.",
+      "unavailable": "Kāore e taea e tēnei wātū te whiwhi tono whakaaetanga."
+    },
     "prBadge": {
       "open": "tuwhera te tono kume",
       "closed": "tono kume kua katia",

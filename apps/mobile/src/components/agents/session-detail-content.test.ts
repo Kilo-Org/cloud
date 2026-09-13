@@ -103,8 +103,9 @@ vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   }),
 }));
 vi.mock('expo-keep-awake', () => ({ useKeepAwake: vi.fn() }));
+const hapticsSelection = vi.hoisted(() => vi.fn());
 vi.mock('expo-haptics', () => ({
-  selectionAsync: vi.fn(),
+  selectionAsync: hapticsSelection,
   notificationAsync: vi.fn(),
   NotificationFeedbackType: { Error: 'error', Success: 'success' },
 }));
@@ -713,6 +714,8 @@ describe('session detail per-session auto-approve', () => {
 
     expect(respondToPermission).toHaveBeenCalledWith('perm-1', 'once');
     expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(0);
+    // One cross-platform selection haptic fires per toggle commit.
+    expect(hapticsSelection).toHaveBeenCalledTimes(1);
 
     act(() => {
       onValueChange(false);
@@ -723,6 +726,7 @@ describe('session detail per-session auto-approve', () => {
 
     expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(1);
     expect(respondToPermission).toHaveBeenCalledTimes(1);
+    expect(hapticsSelection).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the composer mounted, visible, and enabled while the auto-reply is in flight', async () => {

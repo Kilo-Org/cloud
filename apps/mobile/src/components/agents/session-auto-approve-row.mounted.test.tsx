@@ -1,6 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 
-import * as Haptics from 'expo-haptics';
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
@@ -16,7 +15,6 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
@@ -91,7 +89,7 @@ describe('SessionAutoApproveRow', () => {
     );
   });
 
-  it('forwards the next value and fires a selection haptic on change', () => {
+  it('forwards the next value on change', () => {
     const onValueChange = vi.fn<(value: boolean) => void>();
     const root = renderRow('off', onValueChange);
 
@@ -104,6 +102,6 @@ describe('SessionAutoApproveRow', () => {
     });
 
     expect(onValueChange).toHaveBeenCalledWith(true);
-    expect(Haptics.selectionAsync).toHaveBeenCalledTimes(1);
+    expect(onValueChange).toHaveBeenCalledTimes(1);
   });
 });

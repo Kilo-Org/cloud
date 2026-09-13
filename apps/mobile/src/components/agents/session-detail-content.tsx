@@ -1470,6 +1470,9 @@ export function SessionDetailContent({
             modelOptions={modelOptions}
             autoApproveState={autoApproveState}
             onAutoApproveChange={enabled => {
+              // Selection haptic for the commit: a capability iOS and Android
+              // both have, served here by the one cross-platform call.
+              void Haptics.selectionAsync();
               setSessionAutoApproveEnabled(sessionId, enabled);
             }}
             onClose={() => {

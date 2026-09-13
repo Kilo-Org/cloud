@@ -1,4 +1,3 @@
-import * as Haptics from 'expo-haptics';
 import { Switch, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -8,7 +7,10 @@ import { type SessionAutoApproveState } from './session-auto-approve';
 
 /**
  * Per-session auto-approve toggle: title + subtitle on the left, a native
- * `Switch` on the right with a selection haptic on change. Disabled and
+ * `Switch` on the right. A selection haptic is a capability both iOS and
+ * Android have, so there is one implementation: the screen that owns the
+ * session state fires the single `Haptics.selectionAsync()` for the commit,
+ * and this row adds no platform-specific module of its own. Disabled and
  * labelled "unavailable" for a session that cannot receive permission asks.
  */
 export function SessionAutoApproveRow({
@@ -38,10 +40,7 @@ export function SessionAutoApproveRow({
         accessibilityLabel={title}
         value={state === 'on'}
         disabled={state === 'unavailable'}
-        onValueChange={next => {
-          void Haptics.selectionAsync();
-          onValueChange(next);
-        }}
+        onValueChange={onValueChange}
       />
     </View>
   );

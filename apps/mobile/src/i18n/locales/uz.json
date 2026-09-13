@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} qadam",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Avtomatik tasdiqlash",
+      "description": "Ushbu seans uchun ruxsat so'rovlarini avtomatik tasdiqlang. Shundan so'ng vositalar so'rovsiz ishlaydi.",
+      "unavailable": "Ushbu seans ruxsat so'rovlarini qabul qila olmaydi."
+    },
     "prBadge": {
       "open": "ochiq PR",
       "closed": "yopilgan PR",

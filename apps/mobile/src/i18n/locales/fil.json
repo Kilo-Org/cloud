@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} na hakbang",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Auto-apruba",
+      "description": "Awtomatikong aprubahan ang mga kahilingan sa pahintulot para sa sesyong ito. Pagkatapos, tatakbo ang mga tool nang walang prompt.",
+      "unavailable": "Hindi makakatanggap ng mga kahilingan sa pahintulot ang sesyong ito."
+    },
     "prBadge": {
       "open": "buksan ang PR",
       "closed": "nakasarang pull request",

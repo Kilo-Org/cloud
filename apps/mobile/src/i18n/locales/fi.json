@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} vaihetta",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Automaattinen hyväksyntä",
+      "description": "Hyväksy tämän istunnon lupapyynnöt automaattisesti. Työkalut toimivat sen jälkeen ilman kehotetta.",
+      "unavailable": "Tämä istunto ei voi vastaanottaa lupapyyntöjä."
+    },
     "prBadge": {
       "open": "avoin muutospyyntö",
       "closed": "suljettu muutospyyntö",

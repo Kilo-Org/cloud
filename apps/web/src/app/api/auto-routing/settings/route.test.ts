@@ -21,9 +21,6 @@ jest.mock('@/routers/organizations/utils');
 jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/experiments/list-available-experiment-models', () => ({
-  listAvailableExperimentModels: jest.fn(),
-}));
 jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
   getDirectByokModelsForOrganization: jest.fn(),
@@ -39,9 +36,6 @@ jest.mock('@/lib/ai-gateway/models', () => ({
 }));
 
 const { getEnhancedOpenRouterModels } = jest.requireMock('@/lib/ai-gateway/providers/openrouter');
-const { listAvailableExperimentModels } = jest.requireMock(
-  '@/lib/ai-gateway/experiments/list-available-experiment-models'
-);
 const { getDirectByokModelsForUser, getDirectByokModelsForOrganization } = jest.requireMock(
   '@/lib/ai-gateway/providers/direct-byok'
 );
@@ -56,7 +50,6 @@ const mockedRequireActiveSubscriptionOrTrial = jest.mocked(requireActiveSubscrip
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
 const mockedGetEnhanced = jest.mocked(getEnhancedOpenRouterModels);
-const mockedListExperiments = jest.mocked(listAvailableExperimentModels);
 const mockedGetByokUser = jest.mocked(getDirectByokModelsForUser);
 const mockedGetByokOrg = jest.mocked(getDirectByokModelsForOrganization);
 const mockedGetOrgModels = jest.mocked(getAvailableModelsForOrganization);
@@ -131,7 +124,6 @@ describe('/api/auto-routing/settings', () => {
       user: { id: USER_ID, is_admin: false },
       authFailedResponse: null,
     } as never);
-    mockedListExperiments.mockResolvedValue([]);
     mockedGetByokUser.mockResolvedValue([]);
     mockedGetByokOrg.mockResolvedValue([]);
     mockedGetEnhanced.mockResolvedValue({
@@ -444,14 +436,6 @@ describe('/api/auto-routing/settings', () => {
         mockedGetEnhanced.mockResolvedValue({
           data: [model('kilo-auto/efficient')],
         });
-      },
-    },
-    {
-      name: 'experiment model',
-      entry: { model: 'experiment/active', variant: null },
-      reason: 'experiment_model' as const,
-      setup: () => {
-        mockedListExperiments.mockResolvedValue([model('experiment/active')]);
       },
     },
     {

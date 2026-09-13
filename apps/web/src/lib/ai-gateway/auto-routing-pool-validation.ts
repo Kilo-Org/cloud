@@ -9,7 +9,6 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
-import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 import {
   getDirectByokModelsForOrganization,
   getDirectByokModelsForUser,
@@ -21,7 +20,6 @@ import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 export type PoolValidationReason =
   | 'unknown_model'
   | 'virtual_model'
-  | 'experiment_model'
   | 'hidden_model'
   | 'byok_only_model'
   | 'organization_denied_model'
@@ -65,7 +63,6 @@ export type EligibleModelInfo = {
 
 export type EligibleCatalog = {
   byId: ReadonlyMap<string, EligibleModelInfo>;
-  experimentIds: ReadonlySet<string>;
   byokOnlyIds: ReadonlySet<string>;
   /** Managed catalog ids before org filtering (for org-denied classification). */
   managedIds: ReadonlySet<string>;
@@ -77,7 +74,6 @@ export type EligibleCatalog = {
 const REJECTION_MESSAGES: Record<PoolValidationReason, string> = {
   unknown_model: 'Unknown model. Choose a managed model from your catalog.',
   virtual_model: 'Virtual auto-routing models cannot be added to an Efficient pool.',
-  experiment_model: 'Model experiment IDs cannot be added to an Efficient pool.',
   hidden_model: 'This model is not visible in your model picker.',
   byok_only_model: 'Direct BYOK-only models cannot be added to an Efficient pool.',
   organization_denied_model: 'This model is not allowed for the organization.',
@@ -119,9 +115,8 @@ export async function buildEligibleCatalog(params: {
 }): Promise<EligibleCatalog> {
   const { userId, organizationId } = params;
 
-  const [enhanced, experimentModels, byokModels] = await Promise.all([
+  const [enhanced, byokModels] = await Promise.all([
     getEnhancedOpenRouterModels(),
-    listAvailableExperimentModels(),
     organizationId
       ? getDirectByokModelsForOrganization(organizationId)
       : getDirectByokModelsForUser(userId),
@@ -129,7 +124,6 @@ export async function buildEligibleCatalog(params: {
 
   const managedModels = Array.isArray(enhanced.data) ? enhanced.data : [];
   const managedIds = new Set(managedModels.map(model => model.id));
-  const experimentIds = new Set(experimentModels.map(model => model.id));
   const byokOnlyIds = new Set(byokModels.map(model => model.id));
 
   let ownerModels: OpenRouterModel[];
@@ -152,7 +146,6 @@ export async function buildEligibleCatalog(params: {
   for (const model of ownerModels) {
     const id = model.id;
     if (isVirtualAutoModelId(id)) continue;
-    if (experimentIds.has(id)) continue;
     if (byokOnlyIds.has(id)) continue;
     if (isCustomLlmId(id)) continue;
     if (isHiddenExclusiveModel(id)) continue;
@@ -165,7 +158,6 @@ export async function buildEligibleCatalog(params: {
 
   return {
     byId,
-    experimentIds,
     byokOnlyIds,
     managedIds,
     ownerCatalogIds,
@@ -186,7 +178,6 @@ function classifyIneligibleModel(
   | 'empty_pool'
 > {
   if (isVirtualAutoModelId(modelId)) return 'virtual_model';
-  if (catalog.experimentIds.has(modelId)) return 'experiment_model';
   if (catalog.byokOnlyIds.has(modelId)) return 'byok_only_model';
   if (isHiddenExclusiveModel(modelId)) return 'hidden_model';
   if (

@@ -372,10 +372,6 @@ describe('shouldRedactErrorResponse', () => {
     expect(shouldRedactErrorResponse('custom', 'kilo-internal/my-custom-model')).toBe(false);
   });
 
-  test('redacts errors for experiment provider', () => {
-    expect(shouldRedactErrorResponse('experiment', 'some-experiment-model')).toBe(true);
-  });
-
   test('redacts errors for stealth models regardless of provider', () => {
     expect(shouldRedactErrorResponse('openrouter', claude_opus_4_7_stealth_model.public_id)).toBe(
       true
@@ -391,12 +387,6 @@ describe('shouldRedactErrorResponse', () => {
 describe('shouldRedactModelNameInMicrodollarUsage', () => {
   test('redacts model name for custom provider', () => {
     expect(shouldRedactModelNameInMicrodollarUsage('custom', 'kilo-internal/my-custom-model')).toBe(
-      true
-    );
-  });
-
-  test('redacts model name for experiment provider', () => {
-    expect(shouldRedactModelNameInMicrodollarUsage('experiment', 'some-experiment-model')).toBe(
       true
     );
   });

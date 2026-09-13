@@ -49,13 +49,8 @@ jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server
   };
 });
 
-jest.mock('@/lib/ai-gateway/experiments/membership', () => ({
-  isPublicIdExperimented: jest.fn(async () => false),
-}));
-
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { userHasCustomLlmAccess } from '@/lib/ai-gateway/custom-llm/access';
@@ -84,9 +79,6 @@ const mockedGetEnhancedOpenRouterModels =
 const mockedGetProviderSlugsForModel = getProviderSlugsForModel as unknown as jest.MockedFunction<
   typeof getProviderSlugsForModel
 >;
-const mockedIsPublicIdExperimented = isPublicIdExperimented as unknown as jest.MockedFunction<
-  typeof isPublicIdExperimented
->;
 
 describe('organizations settings trpc router', () => {
   beforeEach(() => {
@@ -103,8 +95,6 @@ describe('organizations settings trpc router', () => {
       return provider ? new Set([provider]) : new Set();
     });
     mockedGetEnhancedOpenRouterModels.mockReset();
-    mockedIsPublicIdExperimented.mockReset();
-    mockedIsPublicIdExperimented.mockResolvedValue(false);
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({
       data: [
         makeTestOpenRouterModel('gpt-4'),
@@ -1040,19 +1030,6 @@ describe('organizations settings trpc router', () => {
       expect(result.settings.default_model).toBe('kilo-auto/org');
       expect(result.settings.org_auto_model?.fallback_model).toBe('openai/gpt-4o');
       expect(result.settings.provider_allow_list).toEqual(['openai']);
-    });
-
-    it('rejects active model experiment public IDs as Organization Auto targets', async () => {
-      const caller = await createCallerForUser(owner.id);
-      mockedIsPublicIdExperimented.mockImplementation(async modelId => modelId === 'openai/gpt-4o');
-
-      await expect(
-        caller.organizations.settings.setOrganizationAutoRoute({
-          organizationId: testOrganization.id,
-          mode_slug: 'code',
-          model_id: 'openai/gpt-4o',
-        })
-      ).rejects.toThrow('cannot use an active model experiment');
     });
   });
 

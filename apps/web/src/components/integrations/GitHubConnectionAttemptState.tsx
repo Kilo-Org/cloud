@@ -14,16 +14,23 @@ type Candidate = { installationId: string; accountLogin: string };
  * existing fresh-install mint+redirect path. Neither path nor its
  * authorization changes here.
  */
+/**
+ * The two error variants below are mutually exclusive by construction — a
+ * discriminated union so an invalid "not found, but also not an error"
+ * combination can't be represented at all, rather than relying on caller
+ * discipline to keep two separate booleans in sync.
+ */
+type ConnectionAttemptError = { kind: 'not_found' } | { kind: 'other' };
+
 export function GitHubConnectionAttemptState(props: {
   isLoading: boolean;
-  isError: boolean;
-  /** True only for a confirmed NOT_FOUND response (the attempt genuinely
-   *  expired, was consumed, or never existed). Any other error — network
-   *  failure, a transient server error, etc. — is not known to be expired,
-   *  so it gets a retry instead of a claim that the attempt is gone.
-   *  Callers must derive this as `isError && <confirmed NOT_FOUND>` (never
-   *  independently of `isError`) so the two props can't disagree. */
-  isNotFound: boolean;
+  /** `null` when there is no error. `{ kind: 'not_found' }` only for a
+   *  confirmed NOT_FOUND response (the attempt genuinely expired, was
+   *  consumed, or never existed). Any other error — network failure, a
+   *  transient server error, etc. — is `{ kind: 'other' }`: it's not known
+   *  to be expired, so it gets a retry instead of a claim that the attempt
+   *  is gone. */
+  error: ConnectionAttemptError | null;
   candidates: Candidate[] | undefined;
   isSelecting: boolean;
   isRestarting: boolean;
@@ -42,7 +49,7 @@ export function GitHubConnectionAttemptState(props: {
   if (props.isLoading) {
     return <p className="mt-3 text-sm text-muted-foreground">Loading eligible installations…</p>;
   }
-  if (props.isError && props.isNotFound) {
+  if (props.error?.kind === 'not_found') {
     return (
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <p className="text-sm text-destructive">
@@ -54,7 +61,7 @@ export function GitHubConnectionAttemptState(props: {
       </div>
     );
   }
-  if (props.isError) {
+  if (props.error) {
     return (
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <p className="text-sm text-destructive">Could not load this connection attempt.</p>
@@ -96,7 +103,7 @@ export function GitHubConnectionAttemptState(props: {
           <Button
             key={candidate.installationId}
             variant="outline"
-            className="justify-between"
+            className="min-h-11 justify-between sm:min-h-0"
             onClick={() => props.onSelect(candidate.installationId)}
             disabled={anyActionPending}
             aria-label={`Connect ${candidate.accountLogin}, installation ${candidate.installationId}`}

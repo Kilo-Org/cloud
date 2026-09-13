@@ -272,15 +272,17 @@ export function OrganizationGitHubInstallations({
             </p>
             <GitHubConnectionAttemptState
               isLoading={connectionAttempt.isLoading}
-              isError={connectionAttempt.isError}
+              error={
+                connectionAttempt.isError
+                  ? connectionAttempt.error instanceof TRPCClientError &&
+                    connectionAttempt.error.data?.code === 'NOT_FOUND'
+                    ? { kind: 'not_found' }
+                    : { kind: 'other' }
+                  : null
+              }
               candidates={connectionAttempt.data?.candidates}
               isSelecting={selectConnection.isPending}
               isRestarting={beginConnection.isPending}
-              isNotFound={
-                connectionAttempt.isError &&
-                connectionAttempt.error instanceof TRPCClientError &&
-                connectionAttempt.error.data?.code === 'NOT_FOUND'
-              }
               onRestart={startConnection}
               onRetry={() => void connectionAttempt.refetch()}
               isRetrying={connectionAttempt.isFetching}

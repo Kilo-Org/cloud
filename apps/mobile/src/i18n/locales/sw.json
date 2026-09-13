@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "Modeli hii ya unukuzi haipatikani. Chagua nyingine katika Mapendeleo.",
     "gatewayModelUnavailableNotice": "Modeli hii haitolewi tena. Gusa $t(transcriptionModel.title) kuchagua nyingine.",
     "gatewaySignInRequired": "Ingia ili utumie unukuzi wa Kilo Gateway.",
-    "gatewayNoModel": "Kwanza chagua modeli ya unukuzi katika Mapendeleo."
+    "gatewayNoModel": "Kwanza chagua modeli ya unukuzi katika Mapendeleo.",
+    "testTitle": "Jaribu kuingiza kwa sauti",
+    "testPlaceholder": "Gusa maikrofoni na anza kuzungumza.",
+    "testClear": "Futa maandishi"
   },
   "share": {
     "title": "Kushiriki kwenye Kilo",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "Hakuna modeli za unukuzi",
     "emptyDescription": "Kilo Gateway haina modeli za unukuzi kwa sasa.",
     "loadFailed": "Imeshindikana kupakia modeli za unukuzi."
+  },
+  "voiceLanguage": {
+    "title": "Lugha ya kuingiza kwa sauti",
+    "automatic": "Kiotomatiki",
+    "loadFailed": "Imeshindwa kupakia lugha zinazoauniwa na kifaa hiki.",
+    "emptyTitle": "Hakuna lugha zinazoauniwa",
+    "emptyDescription": "Utambuzi wa usemi wa kifaa hiki hauripoti lugha yoyote inayoauniwa."
   }
 }

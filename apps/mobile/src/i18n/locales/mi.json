@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "Kāore e wātea ana tēnei tauira tuhi ā-reo. Kōwhiria tētahi atu i Ngā manakohanga.",
     "gatewayModelUnavailableNotice": "Kāore tēnei tauira e tukuna ana ināianei. Pāwhiritia $t(transcriptionModel.title) ki te kōwhiri i tētahi atu.",
     "gatewaySignInRequired": "Takiuru kia taea te tuhi ā-reo mā Kilo Gateway.",
-    "gatewayNoModel": "Tuatahi, kōwhiria he tauira tuhi ā-reo i Ngā manakohanga."
+    "gatewayNoModel": "Tuatahi, kōwhiria he tauira tuhi ā-reo i Ngā manakohanga.",
+    "testTitle": "Whakamātautau i te tāuru reo",
+    "testPlaceholder": "Pāwhiritia te hopuoro ka tīmata ki te kōrero.",
+    "testClear": "Ūkui i te tuhinga"
   },
   "share": {
     "title": "Tohatoha ki Kilo",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "Kāore he tauira tuhi ā-reo",
     "emptyDescription": "I tēnei wā, kāore he tauira tuhi ā-reo e wātea ana i te Kilo Gateway.",
     "loadFailed": "Kāore i taea te uta i ngā tauira tuhi ā-reo."
+  },
+  "voiceLanguage": {
+    "title": "Reo o te tāuru reo",
+    "automatic": "Aunoa",
+    "loadFailed": "Kāore i taea ngā reo e tautokona ana e tēnei pūrere te uta.",
+    "emptyTitle": "Kāore he reo e tautokona ana",
+    "emptyDescription": "Kāore te āhukahuka reo o tēnei pūrere e pūrongo i tētahi reo e tautokona ana."
   }
 }

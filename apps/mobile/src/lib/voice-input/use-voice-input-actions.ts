@@ -17,7 +17,7 @@ import {
 import {
   invalidateVoiceRecognitionLocalesCache,
   isVoiceInputLanguageInstalledOnDevice,
-  resolveVoiceInputStartLanguageTag,
+  resolveVoiceInputSessionLanguageTag,
   voiceInputLanguageDisplayName,
 } from './voice-input-language';
 import {
@@ -50,6 +50,7 @@ type VoiceInputActionsConfig = {
   controller: VoiceInputControllerLike;
   getDisabled: () => boolean;
   getDraft: () => string;
+  getLanguageTag?: () => string | null;
   getOnDraftChange: () => (draft: string) => void;
   getOwner: () => string;
   getUserId: () => string | undefined;
@@ -87,7 +88,39 @@ export function runVoiceInputListeningFeedback(
  */
 const VOICE_INPUT_TOAST_ID = 'voice-input-feedback';
 
+/**
+ * Last voice-input feedback, mirrored for surfaces that render it inline.
+ * sonner-native toasts are drawn outside the accessibility hierarchy, so a
+ * toast-only error is invisible to assistive tech (and to the on-device
+ * hierarchy digest the e2 scenario reads). `showFeedback` publishes here as
+ * well as showing the toast, and a voice surface renders the message inline
+ * via `AccessibleStatus` — a real Text node with a live region.
+ */
+let currentFeedback: VoiceInputFeedback | null = null;
+const feedbackListeners = new Set<(feedback: VoiceInputFeedback | null) => void>();
+
+export function publishVoiceInputFeedback(feedback: VoiceInputFeedback | null): void {
+  currentFeedback = feedback;
+  for (const listener of feedbackListeners) {
+    listener(feedback);
+  }
+}
+
+export function readVoiceInputFeedback(): VoiceInputFeedback | null {
+  return currentFeedback;
+}
+
+export function subscribeVoiceInputFeedback(
+  listener: (feedback: VoiceInputFeedback | null) => void
+): () => void {
+  feedbackListeners.add(listener);
+  return () => {
+    feedbackListeners.delete(listener);
+  };
+}
+
 export function showFeedback(feedback: VoiceInputFeedback): void {
+  publishVoiceInputFeedback(feedback);
   const presentation = resolveVoiceInputFeedbackPresentation(feedback);
   if (presentation.kind === 'alert') {
     // The alert is the message now; clear the toast channel with it.
@@ -125,7 +158,15 @@ export function shouldAbortVoiceInputForOwner(
 }
 
 export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceInputActions {
-  const { controller, getDisabled, getDraft, getOnDraftChange, getOwner, getUserId } = config;
+  const {
+    controller,
+    getDisabled,
+    getDraft,
+    getLanguageTag,
+    getOnDraftChange,
+    getOwner,
+    getUserId,
+  } = config;
 
   const abort = async (): Promise<boolean> => {
     const result = await controller.abort(getOwner());
@@ -162,7 +203,16 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
       return;
     }
 
-    const languageTag = await resolveVoiceInputStartLanguageTag(i18n.language);
+    const gatewayMode = isGatewayTranscriptionEnabled();
+    // A persisted tag is reconciled against the active mode's list before it
+    // starts: a tag saved in the other mode (gateway `zh-Hans` in device mode)
+    // matches no option and would fail with `language-not-supported`.
+    const storedTag = getLanguageTag?.() ?? null;
+    const languageTag = await resolveVoiceInputSessionLanguageTag(
+      storedTag,
+      gatewayMode ? 'gateway' : 'device',
+      i18n.language
+    );
 
     const startWith = async (requiresOnDeviceRecognition: boolean): Promise<void> => {
       const startOptions: VoiceInputStartOptions = {
@@ -176,7 +226,7 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
       await controller.start(startOptions);
     };
 
-    if (isGatewayTranscriptionEnabled()) {
+    if (gatewayMode) {
       // Gateway mode: the switch itself is the consent to send the recording
       // to the Kilo gateway, so no OS network-recognition disclosure applies.
       // The chosen model is resolved by the engine (the stored choice, else

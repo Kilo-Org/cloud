@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "Modèl transkripsyon sa a pa disponib. Chwazi yon lòt nan Preferans yo.",
     "gatewayModelUnavailableNotice": "Modèl sa a pa ofri ankò. Tape sou $t(transcriptionModel.title) pou chwazi yon lòt.",
     "gatewaySignInRequired": "Konekte pou sèvi ak transkripsyon Kilo Gateway.",
-    "gatewayNoModel": "Chwazi yon modèl transkripsyon nan Preferans yo an premye."
+    "gatewayNoModel": "Chwazi yon modèl transkripsyon nan Preferans yo an premye.",
+    "testTitle": "Teste dikte",
+    "testPlaceholder": "Tape sou mikwofòn nan epi kòmanse pale.",
+    "testClear": "Efase tèks"
   },
   "share": {
     "title": "Pataj nan Kilo",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "Pa gen modèl transkripsyon",
     "emptyDescription": "Kilo Gateway pa ofri okenn modèl transkripsyon kounye a.",
     "loadFailed": "Nou pa t kapab chaje modèl transkripsyon yo."
+  },
+  "voiceLanguage": {
+    "title": "Lang dikte a",
+    "automatic": "Otomatik",
+    "loadFailed": "Pa t kapab chaje lang aparèy sa a sipòte yo.",
+    "emptyTitle": "Pa gen lang ki sipòte",
+    "emptyDescription": "Rekonesans vwa aparèy sa a pa rapòte okenn lang ki sipòte."
   }
 }

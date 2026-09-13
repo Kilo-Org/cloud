@@ -213,6 +213,15 @@ export default function AppLayout() {
               }}
             />
             <Stack.Screen
+              name="voice-language-picker"
+              options={{
+                presentation: 'formSheet',
+                sheetAllowedDetents: [0.5, fullSheetDetent],
+                sheetGrabberVisible: true,
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
               name="kilo-pass"
               options={{
                 presentation: 'modal',

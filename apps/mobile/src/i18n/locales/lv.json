@@ -2602,7 +2602,10 @@
     "gatewayModelUnavailable": "Šis transkripcijas modelis nav pieejams. Izvēlies citu Lietotāja iestatījumos.",
     "gatewayModelUnavailableNotice": "Šis modelis vairs netiek piedāvāts. Pieskaries $t(transcriptionModel.title), lai izvēlētos citu.",
     "gatewaySignInRequired": "Pieraksties, lai izmantotu transkripciju, izmantojot Kilo Gateway.",
-    "gatewayNoModel": "Vispirms izvēlies transkripcijas modeli Lietotāja iestatījumos."
+    "gatewayNoModel": "Vispirms izvēlies transkripcijas modeli Lietotāja iestatījumos.",
+    "testTitle": "Pārbaudīt balss ievadi",
+    "testPlaceholder": "Pieskarieties mikrofonam un sāciet runāt.",
+    "testClear": "Notīrīt tekstu"
   },
   "share": {
     "title": "Kopīgošana lietotnē Kilo",
@@ -2992,5 +2995,12 @@
     "emptyTitle": "Nav transkripcijas modeļu",
     "emptyDescription": "Pašlaik Kilo Gateway nepiedāvā nevienu transkripcijas modeli.",
     "loadFailed": "Neizdevās ielādēt transkripcijas modeļus."
+  },
+  "voiceLanguage": {
+    "title": "Balss ievades valoda",
+    "automatic": "Automātiska",
+    "loadFailed": "Neizdevās ielādēt šīs ierīces atbalstītās valodas.",
+    "emptyTitle": "Nav atbalstītu valodu",
+    "emptyDescription": "Šīs ierīces runas atpazīšana nenorāda nevienu atbalstītu valodu."
   }
 }

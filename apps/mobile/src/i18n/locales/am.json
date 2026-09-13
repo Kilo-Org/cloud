@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "ይህ የድምጽ ወደ ጽሑፍ ሞዴል አይገኝም። በምርጫዎች ውስጥ ሌላ ይምረጡ።",
     "gatewayModelUnavailableNotice": "ይህ ሞዴል ከእንግዲህ አይቀርብም። ሌላ ለመምረጥ $t(transcriptionModel.title) ይንኩ።",
     "gatewaySignInRequired": "በKilo Gateway ለመቀየር ይግቡ።",
-    "gatewayNoModel": "በምርጫዎች ውስጥ መጀመሪያ የድምጽ ወደ ጽሑፍ ሞዴል ይምረጡ።"
+    "gatewayNoModel": "በምርጫዎች ውስጥ መጀመሪያ የድምጽ ወደ ጽሑፍ ሞዴል ይምረጡ።",
+    "testTitle": "የድምፅ ግብዓትን ይፈትሹ",
+    "testPlaceholder": "ማይክሮፎኑን ነክተው መናገር ይጀምሩ።",
+    "testClear": "ጽሑፉን አጽዳ"
   },
   "share": {
     "title": "ወደ Kilo ማጋራት",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "ምንም የድምጽ ወደ ጽሑፍ ሞዴሎች የሉም",
     "emptyDescription": "Kilo Gateway በአሁኑ ሰዓት ምንም የድምጽ ወደ ጽሑፍ ሞዴሎችን አያቀርብም።",
     "loadFailed": "የድምጽ ወደ ጽሑፍ ሞዴሎችን መጫን አልተቻለም።"
+  },
+  "voiceLanguage": {
+    "title": "የድምፅ ግብዓት ቋንቋ",
+    "automatic": "ራስ-ሰር",
+    "loadFailed": "ይህ መሣሪያ የሚደግፋቸውን ቋንቋዎች መጫን አልተቻለም።",
+    "emptyTitle": "የሚደገፉ ቋንቋዎች የሉም",
+    "emptyDescription": "የዚህ መሣሪያ የድምፅ መለያ የሚደገፍ ቋንቋ አልዘረዘረም።"
   }
 }

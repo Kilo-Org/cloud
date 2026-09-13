@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "Den här transkriberingsmodellen är inte tillgänglig. Välj en annan i Inställningar.",
     "gatewayModelUnavailableNotice": "Den här modellen erbjuds inte längre. Tryck på $t(transcriptionModel.title) för att välja en annan.",
     "gatewaySignInRequired": "Logga in för att använda transkribering via Kilo Gateway.",
-    "gatewayNoModel": "Välj först en transkriberingsmodell i Inställningar."
+    "gatewayNoModel": "Välj först en transkriberingsmodell i Inställningar.",
+    "testTitle": "Testa röstinmatning",
+    "testPlaceholder": "Tryck på mikrofonen och börja prata.",
+    "testClear": "Rensa text"
   },
   "share": {
     "title": "Dela till Kilo",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "Inga transkriberingsmodeller",
     "emptyDescription": "Kilo Gateway erbjuder inga transkriberingsmodeller just nu.",
     "loadFailed": "Det gick inte att läsa in transkriberingsmodellerna."
+  },
+  "voiceLanguage": {
+    "title": "Röstinmatningsspråk",
+    "automatic": "Automatisk",
+    "loadFailed": "Det gick inte att läsa in språken som den här enheten stöder.",
+    "emptyTitle": "Inga språk som stöds",
+    "emptyDescription": "Den här enhetens taligenkänning rapporterar inga språk som stöds."
   }
 }

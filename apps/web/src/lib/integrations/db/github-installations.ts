@@ -246,17 +246,33 @@ export async function connectVerifiedGitHubInstallation(
       return { ok: false, reason: 'installation_unavailable' };
     }
 
+    // A personal (non-org) owner can never share an installation with
+    // another owner. This is unconditional: whether that other owner's own
+    // association happens to be locally disconnected right now doesn't
+    // change that a personal owner is not a valid destination for a
+    // second tenant.
+    if (otherOwnerAssociations.length > 0 && owner.type !== 'org') {
+      return { ok: false, reason: 'claimed_by_other_owner' };
+    }
+
+    // A locally disconnected other-owner association has relinquished the
+    // installation and is no longer an active incumbent tenant, so it must
+    // not force this org through sharing-admission on its own; only an
+    // *actively connected* other owner represents real concurrent sharing
+    // that needs approval and a compatibility check.
+    const activeOtherOwnerAssociations = otherOwnerAssociations.filter(
+      association => association.github_disconnected_at === null
+    );
     const requiresSharingAdmission =
-      otherOwnerAssociations.length > 0 &&
+      activeOtherOwnerAssociations.length > 0 &&
       (!existing ||
         existing.github_disconnected_at !== null ||
         canonical.sharing_mode !== 'web_cloud_agent');
     if (requiresSharingAdmission) {
-      if (owner.type !== 'org') return { ok: false, reason: 'claimed_by_other_owner' };
       if (!canOrganizationCreateSharedGitHubConnection(owner.id)) {
         return { ok: false, reason: 'shared_installation_disabled' };
       }
-      if (otherOwnerAssociations.some(association => !association.github_installation_id)) {
+      if (activeOtherOwnerAssociations.some(association => !association.github_installation_id)) {
         return { ok: false, reason: 'installation_unavailable' };
       }
       const compatibility = await evaluateGitHubSharingCompatibility(tx, canonical.id, owner);
@@ -437,10 +453,8 @@ export async function disconnectGitHubInstallation(
     }
     return cancelled;
   });
-  // Settle the ledger only after the disconnect transaction above has
-  // actually committed: settling writes through the default connection, so
-  // doing it inside the transaction could mark the ledger terminal even if
-  // a later step in that transaction rolled the cancellation back.
+  // Settle only after this transaction has committed — see the
+  // settleCancelledReviews doc comment for why.
   await settleCancelledReviews(cancelledReviews, 'user_cancelled');
 }
 
@@ -540,11 +554,8 @@ export async function uninstallExclusiveGitHubInstallation(input: {
     await tx.delete(platform_integrations).where(eq(platform_integrations.id, input.integrationId));
     return cancelled;
   });
-  // Settle the ledger only after the uninstall transaction above has
-  // actually committed: if deleteUpstream (or anything after it) throws,
-  // the transaction — including this cancellation — rolls back, and this
-  // line is never reached, so the ledger never goes terminal for a
-  // cancellation that didn't actually happen.
+  // Settle only after this transaction has committed — see the
+  // settleCancelledReviews doc comment for why.
   await settleCancelledReviews(cancelledReviews, 'user_cancelled');
 }
 

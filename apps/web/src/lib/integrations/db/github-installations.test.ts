@@ -796,6 +796,38 @@ describe('GitHub installation persistence', () => {
     });
   });
 
+  test('does not require sharing admission for a new, non-allowlisted first tenant after the prior owner disconnects', async () => {
+    const organizationA = await createTestOrganization('First tenant disconnect A', ownerId, 0);
+    const organizationB = await createTestOrganization(
+      'First tenant disconnect B',
+      otherOwnerId,
+      0
+    );
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data('881010')
+    );
+    if (!first.ok) throw new Error('Expected initial connection');
+    await disconnectGitHubInstallation({ type: 'org', id: organizationA.id }, first.integrationId);
+
+    // organizationB is not in GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS.
+    // A fully disconnected prior tenant is no longer an active incumbent,
+    // so this must succeed as an ordinary (non-shared) attach rather than
+    // being forced through sharing admission.
+    expect(process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS).toBeFalsy();
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data('881010'), kiloUserId: otherOwnerId }
+    );
+    expect(second).toEqual({ ok: true, integrationId: expect.any(String) });
+
+    const [canonical] = await db
+      .select({ sharingMode: github_app_installations.sharing_mode })
+      .from(github_app_installations)
+      .where(eq(github_app_installations.installation_id, '881010'));
+    expect(canonical?.sharingMode).toBe('exclusive');
+  });
+
   test('allows uninstalling an already locally disconnected sole association', async () => {
     const organization = await createTestOrganization('Disconnected removal org', ownerId, 0);
     const connected = await connectVerifiedGitHubInstallation(

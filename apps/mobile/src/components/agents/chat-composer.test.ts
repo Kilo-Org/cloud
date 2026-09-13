@@ -806,7 +806,7 @@ describe('ChatComposer slash-command rejection feedback', () => {
     const rejected = await rerender(
       makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
     );
-    expect(statusMessage(rejected)).toBe('/exit does not take arguments.');
+    expect(statusMessage(rejected)).toBe('/quit does not take arguments.');
     expect(onSendMock).not.toHaveBeenCalled();
     expect(showRemoteSessionExitConfirmation).not.toHaveBeenCalled();
   });

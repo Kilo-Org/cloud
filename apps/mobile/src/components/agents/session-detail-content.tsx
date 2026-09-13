@@ -1352,6 +1352,9 @@ export function SessionDetailContent({
         lock,
         settleVoiceInput,
         onRetryableFailure: setExitFailure,
+        onNonRetryableFailure: () => {
+          setExitFailure(null);
+        },
       });
     },
     [manager, router]

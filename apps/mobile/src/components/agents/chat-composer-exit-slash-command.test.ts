@@ -173,7 +173,7 @@ describe.each(['exit', 'quit'])('remote /%s parser — shared exit behavior', co
         sessionType: 'remote',
         remoteCommandState: remoteState(),
       })
-    ).toEqual({ type: 'argument-error', message: '/exit does not take arguments.' });
+    ).toEqual({ type: 'argument-error', message: `/${command} does not take arguments.` });
   });
 
   it.each(['/q', '/quitter', '/quit-now', '/QUIT'])(

@@ -48,6 +48,13 @@ type ExitRemoteSessionWithFeedbackInput = {
    * connectivity outage) passes this; callers that do not keep the toast.
    */
   onRetryableFailure?: (failure: RetryableExitFailure) => void;
+  /**
+   * Called when an exit attempt (including a host-owned retry) fails with a
+   * non-retryable SDK message. A host that renders `onRetryableFailure` inline
+   * must clear that surface here: the retry can never succeed, so keeping the
+   * row would leave a stale message and a permanently failing retry button.
+   */
+  onNonRetryableFailure?: () => void;
 };
 
 const SESSIONS_ROUTE = '/(app)/(tabs)/(2_agents)' as const;
@@ -106,6 +113,7 @@ export async function exitRemoteSessionWithFeedback({
     return true;
   },
   onRetryableFailure,
+  onNonRetryableFailure,
 }: Readonly<ExitRemoteSessionWithFeedbackInput>): Promise<void> {
   const runExit = async (): Promise<void> => {
     try {
@@ -119,8 +127,11 @@ export async function exitRemoteSessionWithFeedback({
       if (isNonRetryableExitError(message)) {
         // Fail-closed: the SDK already signalled "do not send" by rejecting
         // before any wire command. Surface the message with no CTA so the
-        // user sees the upgrade copy but cannot trigger another attempt.
+        // user sees the upgrade copy but cannot trigger another attempt. When
+        // the host owns an inline retry surface, release it: a retry against a
+        // permanent failure would keep failing forever.
         toast.error(shown);
+        onNonRetryableFailure?.();
       } else {
         // Retryable: transport / ACK / heartbeat failure. The draft is
         // preserved by the submit-lock contract; the retry action re-runs

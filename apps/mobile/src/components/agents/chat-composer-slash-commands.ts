@@ -248,7 +248,7 @@ export function parseChatComposerSubmission(
       return {
         type: 'argument-error',
         message: i18n.t('agentChat.slashCommands.argumentError', {
-          command: `/${EXIT_COMMAND_NAME}`,
+          command: `/${commandName}`,
         }),
       };
     }

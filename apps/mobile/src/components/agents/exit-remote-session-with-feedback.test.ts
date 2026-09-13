@@ -234,6 +234,50 @@ describe('exitRemoteSessionWithFeedback — host-owned retryable failure', () =>
     expect(router.dismissTo).not.toHaveBeenCalled();
     expect(lock.current).toBe(false);
   });
+
+  it('clears the host surface when a retry turns non-retryable', async () => {
+    const { onAccepted, router, lock } = createHarness();
+    const exit = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('connection reset'))
+      .mockRejectedValueOnce(
+        new Error('Remote session exit is not supported for the current session')
+      );
+    const onRetryableFailure = vi.fn<(failure: RetryableExitFailure) => void>();
+    const onNonRetryableFailure = vi.fn<() => void>();
+
+    await expect(
+      exitRemoteSessionWithFeedback({
+        exit,
+        onAccepted,
+        router,
+        lock,
+        onRetryableFailure,
+        onNonRetryableFailure,
+      })
+    ).rejects.toThrow('connection reset');
+
+    expect(onRetryableFailure).toHaveBeenCalledTimes(1);
+    expect(onNonRetryableFailure).not.toHaveBeenCalled();
+
+    const failure = onRetryableFailure.mock.calls[0]?.[0];
+    if (!failure) {
+      throw new Error('Expected the retryable failure');
+    }
+    await failure.retry();
+
+    expect(exit).toHaveBeenCalledTimes(2);
+    // A permanent failure must release the durable surface instead of leaving
+    // a stale message and a retry button that can never succeed.
+    expect(onNonRetryableFailure).toHaveBeenCalledTimes(1);
+    expect(onRetryableFailure).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith(
+      'Remote session exit is not supported for the current session'
+    );
+    expect(onAccepted).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(lock.current).toBe(false);
+  });
 });
 
 describe('exitRemoteSessionWithFeedback — non-retryable error', () => {

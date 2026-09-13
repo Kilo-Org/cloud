@@ -8,6 +8,7 @@ import {
 import { selectEffectiveSearchQuery } from '@/components/agents/session-list-search-busy';
 import { SESSION_LIST_SORT } from '@/lib/agent-session-sort';
 import {
+  SESSION_HISTORY_MAX_PAGES,
   useAgentSessions,
   useAgentSessionSearch,
   useRecentAgentRepositories,
@@ -54,6 +55,10 @@ export function useAgentSessionListData(options: {
     // query opts out of React Query's native window-focus refetch (Home and the
     // Share Gate keep the native default through `buildStoredSessionsQueryOptions`).
     refetchOnWindowFocus: false,
+    // Deep-retention opt-in: the shared default front-evicts the oldest page
+    // past five, which this screen can scroll back to. Only this consumer
+    // raises the bound, so Home and the Share Gate keep their small cache.
+    maxPages: SESSION_HISTORY_MAX_PAGES,
   });
   const isSearching = searchQuery.length > 0;
   const search = useAgentSessionSearch({

@@ -119,6 +119,9 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
 vi.mock('@/lib/hooks/use-agent-sessions', async () => {
   const { useQuery } = await import('@tanstack/react-query');
   return {
+    // Mirrors the real module's history retention bound; the mocked hook below
+    // ignores the `maxPages` option it is passed, like the other mocked fields.
+    SESSION_HISTORY_MAX_PAGES: 100,
     useAgentSessions: (options: Parameters<typeof useAgentSessions>[0] = {}) => {
       listState.storedQuery(options);
       const { gitUrl, createdOnPlatform } = options;

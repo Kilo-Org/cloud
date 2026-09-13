@@ -213,6 +213,13 @@ export function AgentSessionListContent({
   // copies are announced by a screen reader. `renderItem` below hides the
   // in-flow copy while this index is pinned, so each pinned date is announced
   // once. Updated only when the pinned header changes (section boundaries).
+  //
+  // `pinnedHeaderIndex` is a `renderItem` dependency, so a pin move produces a
+  // new `renderItem` identity. FlashList 2.x re-renders a mounted cell when
+  // `renderItem` changes even without `extraData`: its `ViewHolder` memo
+  // compares `renderItem` (dist/recyclerview/ViewHolder.js) and recomputes the
+  // rendered children from it, so the newly pinned in-flow header picks up
+  // `hiddenFromA11y`. `extraData` is therefore not needed here.
   const [pinnedHeaderIndex, setPinnedHeaderIndex] = useState(-1);
 
   // Screen-reader status for the in-flight pull on the non-list surfaces:

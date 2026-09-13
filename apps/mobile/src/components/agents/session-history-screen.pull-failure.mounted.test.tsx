@@ -201,6 +201,9 @@ vi.mock('@/components/agents/use-session-search-input', () => ({
 vi.mock('expo-secure-store', () => ({ getItemAsync: vi.fn().mockResolvedValue(null) }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
+  // Mirrors the real module's history retention bound; the mocked hook below
+  // ignores the `maxPages` option it is passed, like the other mocked fields.
+  SESSION_HISTORY_MAX_PAGES: 100,
   useAgentSessions: () => {
     const storedSessions = listState.storedSessions;
     return {

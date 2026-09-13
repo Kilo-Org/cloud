@@ -36,7 +36,11 @@ import {
   DEFAULT_AGENT_SESSION_SORT,
   parseAgentSessionSortBy,
 } from '@/lib/agent-session-sort';
-import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import {
+  INFINITE_QUERY_MAX_PAGES,
+  reconcileFirstPage,
+  withInfiniteRetention,
+} from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { useTRPC } from '@/lib/trpc';
 
@@ -68,6 +72,15 @@ export type UseAgentSessionsOptions = {
    * refetch that bypasses that queue (see `buildStoredSessionsQueryOptions`).
    */
   refetchOnWindowFocus?: boolean;
+  /**
+   * Page-retention bound for the stored-sessions query. Defaults to the
+   * shared `INFINITE_QUERY_MAX_PAGES`, so consumers that never page (Home, the
+   * Share Gate) keep the original small cache and cannot inherit the history
+   * browser's deeper retention. The history browser passes
+   * `SESSION_HISTORY_MAX_PAGES`: it scrolls back over every page it loaded,
+   * and the shared bound would front-evict the oldest page.
+   */
+  maxPages?: number;
 };
 
 type UseRecentAgentRepositoriesOptions = {
@@ -118,14 +131,24 @@ function getUpdatedSince(days: number): string {
  * enough to hold any browsable history (this constant × 30 sessions/page)
  * while still stopping a server that keeps handing out cursors from growing
  * the cache without bound.
+ *
+ * This bound is opt-in. The history browser passes it as `maxPages`; the
+ * shared `buildStoredSessionsQueryOptions` default stays
+ * `INFINITE_QUERY_MAX_PAGES`, so a consumer that never pages (Home, the Share
+ * Gate) cannot inherit the deeper cache or a larger retained-page refetch.
  */
-const SESSION_HISTORY_MAX_PAGES = 100;
+export const SESSION_HISTORY_MAX_PAGES = 100;
 
 /**
  * Build the stored-sessions infinite-query options shared by every stored
  * refetch path on the Agents screen (focus return, pull-to-refresh, retry,
  * departure trigger, backfill). Kept as a pure builder so the query options
  * are executable-tested without mounting the hook.
+ *
+ * The retention bound defaults to the shared `INFINITE_QUERY_MAX_PAGES`; only
+ * a caller that browses deep pages raises it (the history browser passes
+ * `maxPages: SESSION_HISTORY_MAX_PAGES`). The bound is not part of the query
+ * key, so raising it never forks the cache.
  */
 export function buildStoredSessionsQueryOptions(
   trpc: ReturnType<typeof useTRPC>,
@@ -143,7 +166,7 @@ export function buildStoredSessionsQueryOptions(
       // bypasses the operation coordinator shared with backfill and departure.
       refetchOnWindowFocus: options?.refetchOnWindowFocus ?? true,
     }),
-    SESSION_HISTORY_MAX_PAGES
+    options?.maxPages ?? INFINITE_QUERY_MAX_PAGES
   );
 }
 

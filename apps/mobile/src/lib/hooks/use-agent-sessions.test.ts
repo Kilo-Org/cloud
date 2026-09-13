@@ -8,6 +8,7 @@ import {
 import {
   buildAgentSessionSearchQueryOptions,
   buildStoredSessionsQueryOptions,
+  SESSION_HISTORY_MAX_PAGES,
 } from '@/lib/hooks/use-agent-sessions';
 import { INFINITE_QUERY_MAX_PAGES } from '@/lib/query/infinite-retention';
 
@@ -224,9 +225,21 @@ describe('buildStoredSessionsQueryOptions', () => {
     expect(result.maxPages).toBeTypeOf('number');
   });
 
-  it('retains the browsable history past the shared front-eviction bound', () => {
+  it('keeps the shared retention bound for consumers that never page (Home, Share Gate)', () => {
     const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
     const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
+
+    // The history browser's deep bound is opt-in via `maxPages`; the default
+    // must stay the shared bound so a stored consumer that never pages cannot
+    // inherit a larger retained-page cache (and the refetch that walks it).
+    expect(result.maxPages).toBe(INFINITE_QUERY_MAX_PAGES);
+  });
+
+  it('retains the browsable history past the shared front-eviction bound', () => {
+    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
+    const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {
+      maxPages: SESSION_HISTORY_MAX_PAGES,
+    });
 
     // The history browser pages forward and scrolls back over everything it
     // loaded. The shared 5-page bound front-evicts the oldest page on every

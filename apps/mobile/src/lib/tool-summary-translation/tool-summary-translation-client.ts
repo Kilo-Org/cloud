@@ -1,7 +1,7 @@
-import * as SecureStore from 'expo-secure-store';
 import { z } from 'zod';
 
 import { isSupportedLanguage, LANGUAGE_ENDONYMS } from '@/i18n/languages';
+import { readStoredValue } from '@/lib/auth/secure-store-read';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
@@ -11,6 +11,11 @@ import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
  * through the runtime's dynamic import, so this module may carry the native and
  * config imports the pure runtime must avoid. Every failure returns null: the
  * caller keeps the original summary rather than surfacing an error.
+ *
+ * The organization scope is read through the shared SecureStore helper, not a
+ * direct `expo-secure-store` import: expo-secure-store exists on both iOS and
+ * Android, so one entry point covers both platforms and there is no
+ * per-platform storage branch to maintain.
  */
 
 export const TOOL_SUMMARY_TRANSLATION_TIMEOUT_MS = 15_000;
@@ -37,12 +42,6 @@ type TranslationRequestHeaders = {
   'X-KiloCode-OrganizationId'?: string;
 };
 
-/** Read the organization scope the translation is attributed to; null is personal. */
-async function readStoredOrganizationId(): Promise<string | null> {
-  const value = await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
-  return value;
-}
-
 /**
  * Translate one tool summary through the Kilo gateway. Returns the trimmed
  * translation, or null on any failure (no token, non-2xx, malformed body,
@@ -57,7 +56,8 @@ export async function requestToolSummaryTranslation({
   if (!token) {
     return null;
   }
-  const organizationId = await readStoredOrganizationId();
+  // The organization scope the translation is attributed to; null is personal.
+  const organizationId = await readStoredValue(ORGANIZATION_STORAGE_KEY);
 
   const headers: TranslationRequestHeaders = {
     Authorization: `Bearer ${token}`,

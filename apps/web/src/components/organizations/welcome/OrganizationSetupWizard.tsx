@@ -171,12 +171,15 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   // when it regains focus so "Source Control" reflects the current
   // connection state instead of the snapshot cached before the change.
   //
-  // Reads `refetch` through a ref, updated every render, so this effect can
-  // depend on `[]` instead of the whole query result object (which is a new
-  // reference on effectively every render, including ones this very effect
-  // triggers) and avoid needlessly re-subscribing the listeners.
+  // Reads `refetch` through a ref, kept current in its own deps-less
+  // effect, so the listener effect below can depend on `[]` instead of the
+  // whole query result object (which is a new reference on effectively
+  // every render, including ones this very effect triggers) and avoid
+  // needlessly re-subscribing the listeners.
   const checklistRefetchRef = useRef(checklistQuery.refetch);
-  checklistRefetchRef.current = checklistQuery.refetch;
+  useEffect(() => {
+    checklistRefetchRef.current = checklistQuery.refetch;
+  });
   useEffect(() => {
     const refetchOnReturn = () => {
       if (document.visibilityState === 'visible') {

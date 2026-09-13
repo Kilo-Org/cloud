@@ -566,6 +566,48 @@ describe('MarkdownRenderer code override', () => {
     >;
     expect((inner(element).props as { maxLength?: unknown }).maxLength).toBe(cap);
   });
+
+  it('passes an onCopyCode handler through to CodeBlock and omits it otherwise', async () => {
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const copyable = new RendererClass(palette, true, { onCopyCode });
+    const element = copyable.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect((inner(element).props as { onCopyCode?: unknown }).onCopyCode).toBe(onCopyCode);
+
+    const plain = new RendererClass(palette, true, {});
+    const plainElement = plain.code(
+      'const x = 1;',
+      'ts',
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+    expect((inner(plainElement).props as { onCopyCode?: unknown }).onCopyCode).toBeUndefined();
+  });
+
+  it('passes an onLongPressCode handler through to CodeBlock and omits it otherwise', async () => {
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const onLongPressCode = vi.fn<() => void>();
+    const copyable = new RendererClass(palette, true, { onLongPressCode });
+    const element = copyable.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect((inner(element).props as { onLongPressCode?: unknown }).onLongPressCode).toBe(
+      onLongPressCode
+    );
+
+    const plain = new RendererClass(palette, true, {});
+    const plainElement = plain.code(
+      'const x = 1;',
+      'ts',
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+    expect(
+      (inner(plainElement).props as { onLongPressCode?: unknown }).onLongPressCode
+    ).toBeUndefined();
+  });
 });
 
 describe('MarkdownRenderer empty fence mounting', () => {

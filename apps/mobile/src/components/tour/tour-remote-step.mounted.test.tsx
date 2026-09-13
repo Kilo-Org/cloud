@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one render case per tour state (empty, loading, list error, detection error, sticky check, start, start failure, started-connection lock, retry dedupe), each mounting the real tree */
 import { act, createElement, type ElementType } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type UseQueryOptions } from '@tanstack/react-query';
@@ -59,8 +60,20 @@ const fetchInstances = vi.hoisted(() =>
 );
 const spawn = vi.hoisted(() => vi.fn());
 const spawnStatus = vi.hoisted(() => ({ current: { status: 'idle' as string } }));
+// Every organization argument the step passes to the spawn hook, in order.
+const spawnHookArgs = vi.hoisted(() => [] as unknown[]);
+// Distinct per call so a test can tell a kept operation key from a regenerated
+// one (a constant mock would hide the bug the key tests).
+const randomUUID = vi.hoisted(() => {
+  let next = 0;
+  return () => {
+    next += 1;
+    return `op-key-${next}`;
+  };
+});
 const QUERY_KEY = ['tour-remote-instances'];
 
+vi.mock('expo-crypto', () => ({ randomUUID }));
 vi.mock('@/lib/active-sessions-live-sync-mount', async () => {
   const { useSyncExternalStore } = await import('react');
   return {
@@ -82,7 +95,10 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-remote-instance-spawn', () => ({
-  useRemoteInstanceSpawn: () => ({ status: spawnStatus.current, spawn }),
+  useRemoteInstanceSpawn: (organizationId?: unknown) => {
+    spawnHookArgs.push(organizationId);
+    return { status: spawnStatus.current, spawn };
+  },
 }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
@@ -146,6 +162,15 @@ function press(node: { props: unknown }) {
   (node.props as { onPress?: () => void }).onPress?.();
 }
 
+/** The `spawn(connectionId, opts, options)` call arguments at `index`. */
+function spawnCall(index: number): { connectionId: string; operationKey?: string } | undefined {
+  const call = spawn.mock.calls[index] as [string, unknown, { operationKey?: string }?] | undefined;
+  if (!call) {
+    return undefined;
+  }
+  return { connectionId: call[0], operationKey: call[2]?.operationKey };
+}
+
 async function mountStep() {
   const onCompletedChange = vi.fn<(completed: boolean) => void>();
   const mounted = await renderWithProviders(createElement(TourRemoteStep, { onCompletedChange }));
@@ -156,7 +181,9 @@ describe('TourRemoteStep', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     liveSync.reset();
+    spawnHookArgs.length = 0;
     spawnStatus.current = { status: 'idle' };
+    spawn.mockReset().mockResolvedValue({ status: 'ready', sessionID: 'session-1' });
     fetchInstances.mockReset().mockResolvedValue({ instances: [] });
   });
 
@@ -245,6 +272,12 @@ describe('TourRemoteStep', () => {
 
     await waitFor(() => hasText(renderer, 'tour.remoteStart'));
 
+    // The check only follows a session created through the tour's own start.
+    await act(async () => {
+      await Promise.resolve();
+      press(renderer.root.findByType('Button' as ElementType));
+    });
+
     await act(async () => {
       await Promise.resolve();
       liveSync.set({ data: { sessions: [{ id: 'remote-1', connectionId: 'conn-1' }] } });
@@ -278,7 +311,8 @@ describe('TourRemoteStep', () => {
       await Promise.resolve();
       press(renderer.root.findByType('Button' as ElementType));
     });
-    expect(spawn).toHaveBeenCalledWith('conn-1');
+    expect(spawnCall(0)?.connectionId).toBe('conn-1');
+    expect(spawnCall(0)?.operationKey).toEqual(expect.any(String));
     expect(hasText(renderer, 'tour.remoteCheck')).toBe(false);
     expect(onCompletedChange).toHaveBeenLastCalledWith(false);
     unmount();
@@ -292,6 +326,12 @@ describe('TourRemoteStep', () => {
     await waitFor(() => hasText(renderer, 'tour.remoteStart'));
     expect(hasText(renderer, 'tour.remoteCheck')).toBe(false);
     expect(onCompletedChange).toHaveBeenLastCalledWith(false);
+
+    // The row alone never completes: the check requires the tour's own start.
+    await act(async () => {
+      await Promise.resolve();
+      press(renderer.root.findByType('Button' as ElementType));
+    });
 
     await act(async () => {
       await Promise.resolve();
@@ -318,7 +358,8 @@ describe('TourRemoteStep', () => {
       await Promise.resolve();
       press(renderer.root.findByType('Button' as ElementType));
     });
-    expect(spawn).toHaveBeenCalledWith('conn-1');
+    expect(spawnCall(0)?.connectionId).toBe('conn-1');
+    expect(spawnCall(0)?.operationKey).toEqual(expect.any(String));
     expect(hasText(renderer, 'tour.remoteCheck')).toBe(false);
     unmount();
   });
@@ -346,6 +387,97 @@ describe('TourRemoteStep', () => {
       radioRow('laptop', true),
       radioRow('desktop', false),
     ]);
+    unmount();
+  });
+
+  it('spawns in the personal scope, matching the personal session list it detects on', async () => {
+    fetchInstances.mockResolvedValue({ instances: [REMOTE] });
+    liveSync.set({ data: { sessions: [] } });
+    const { renderer, unmount } = await mountStep();
+
+    await waitFor(() => hasText(renderer, 'tour.remoteStart'));
+    // `null` pins the spawn to personal, never the live org context: the check
+    // reads the personal session list, so an org-attributed spawn would never
+    // appear there.
+    expect(spawnHookArgs.length).toBeGreaterThan(0);
+    expect(spawnHookArgs.every(argument => argument === null)).toBe(true);
+    unmount();
+  });
+
+  it('keeps detection on the connection that was actually started, not the current selection', async () => {
+    fetchInstances.mockResolvedValue({ instances: [REMOTE, REMOTE2] });
+    liveSync.set({ data: { sessions: [] } });
+    const { renderer, onCompletedChange, unmount } = await mountStep();
+    await waitFor(() => hasText(renderer, 'tour.remoteStart'));
+
+    // Start on the default (laptop / conn-1).
+    await act(async () => {
+      await Promise.resolve();
+      press(renderer.root.findByType('Button' as ElementType));
+    });
+    expect(spawnCall(0)?.connectionId).toBe('conn-1');
+
+    // Highlight the other computer after starting. Detection must not follow.
+    const rows = renderer.root.findAllByType('Pressable' as ElementType);
+    await act(async () => {
+      await Promise.resolve();
+      press(rows[1] as { props: unknown });
+    });
+
+    // A session on the newly-highlighted computer is not the started one.
+    await act(async () => {
+      await Promise.resolve();
+      liveSync.set({ data: { sessions: [{ id: 'remote-2', connectionId: 'conn-2' }] } });
+    });
+    expect(hasText(renderer, 'tour.remoteCheck')).toBe(false);
+    expect(onCompletedChange).toHaveBeenLastCalledWith(false);
+
+    // The started computer's session does satisfy the check.
+    await act(async () => {
+      await Promise.resolve();
+      liveSync.set({
+        data: {
+          sessions: [
+            { id: 'remote-2', connectionId: 'conn-2' },
+            { id: 'remote-1', connectionId: 'conn-1' },
+          ],
+        },
+      });
+    });
+    await waitFor(() => hasText(renderer, 'tour.remoteCheck'));
+    expect(onCompletedChange).toHaveBeenLastCalledWith(true);
+    unmount();
+  });
+
+  it('keeps one operation key across a retry of the same start intent', async () => {
+    fetchInstances.mockResolvedValue({ instances: [REMOTE] });
+    liveSync.set({ data: { sessions: [] } });
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- returns a settled promise without awaiting; making it async would trip require-await
+    spawn.mockImplementation(() => {
+      spawnStatus.current = { status: 'retryable' };
+      return Promise.resolve({ status: 'retryable', reason: 'offline' });
+    });
+    const { renderer, unmount } = await mountStep();
+    await waitFor(() => hasText(renderer, 'tour.remoteStart'));
+
+    await act(async () => {
+      await Promise.resolve();
+      press(renderer.root.findByType('Button' as ElementType));
+    });
+    await waitFor(() => hasText(renderer, 'tour.retry'));
+
+    // The retry re-runs the same intent and must ride the same key so the
+    // relay dedupes it instead of spawning a second session.
+    await act(async () => {
+      await Promise.resolve();
+      press(renderer.root.findByType('Button' as ElementType));
+    });
+
+    expect(spawn).toHaveBeenCalledTimes(2);
+    const first = spawnCall(0)?.operationKey;
+    const second = spawnCall(1)?.operationKey;
+    expect(first).toEqual(expect.any(String));
+    expect(second).toBe(first);
     unmount();
   });
 });

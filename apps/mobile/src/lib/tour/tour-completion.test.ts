@@ -21,6 +21,9 @@ const { getItemAsync, setItemAsync } = vi.hoisted(() => ({
 
 vi.mock('expo-secure-store', () => ({ getItemAsync, setItemAsync }));
 
+const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
+vi.mock('@sentry/react-native', () => ({ captureException }));
+
 type TourCompletion = ReturnType<typeof useTourCompletion>;
 
 async function flushMicrotasks(): Promise<void> {
@@ -56,6 +59,7 @@ describe('tour completion', () => {
     store.clear();
     getItemAsync.mockReset();
     setItemAsync.mockReset();
+    captureException.mockReset();
     getItemAsync.mockImplementation((key: string) => store.get(key) ?? null);
     setItemAsync.mockImplementation((key: string, value: string) => {
       store.set(key, value);
@@ -103,6 +107,27 @@ describe('tour completion', () => {
 
     await flushMicrotasks();
     expect(setItemAsync).toHaveBeenCalledWith(tourCompletedKey('user-hook'), '1');
+
+    unmount();
+  });
+
+  it('observes a failed persist instead of leaving the record silently dropped', async () => {
+    setItemAsync.mockRejectedValue(new Error('disk full'));
+    const { ref, unmount } = await mountHarness('user-write-fail');
+
+    act(() => {
+      ref.current?.recordCompleted();
+    });
+    expect(ref.current?.isCompleted).toBe(true);
+
+    await flushMicrotasks();
+
+    // The in-memory decision stays authoritative for this session; the failed
+    // write is reported rather than left as an unobserved rejection.
+    expect(ref.current?.isCompleted).toBe(true);
+    expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { 'error.subsystem': 'tour', 'error.operation': 'record_completed' },
+    });
 
     unmount();
   });

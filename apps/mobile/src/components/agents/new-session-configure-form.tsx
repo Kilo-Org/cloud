@@ -297,8 +297,11 @@ export function NewSessionConfigureForm({
         // reserved spot above Start. A retryable rejection carries the retry
         // control; a terminal one says what the server reported instead. The
         // form owns this feedback, so the creator hook stays silent for it.
+        // Cloud-only: the route also clears the failure when the target
+        // changes, and this gate keeps a stale one off a remote target no
+        // matter which path selected it.
       }
-      {cloudCreateError ? (
+      {cloudCreateError && !isRemote ? (
         <NewSessionCloudCreateError
           failure={cloudCreateError}
           onRetry={onRetryCloudCreate}

@@ -234,6 +234,11 @@ export default function AppLayout() {
               options={{
                 presentation: 'modal',
                 headerShown: false,
+                // A swipe-down dismissal would bypass the tour's own dismissal
+                // (which records the per-account decision). Match `onboarding`
+                // and `consent`: the only exits are the tour's own controls and
+                // Android hardware Back, both of which record first.
+                gestureEnabled: false,
               }}
             />
             <Stack.Screen

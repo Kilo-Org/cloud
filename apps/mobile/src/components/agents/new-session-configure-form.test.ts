@@ -87,6 +87,10 @@ vi.mock('@/components/agents/new-session-start-button', () => ({
   NewSessionStartButton: 'NewSessionStartButton',
 }));
 
+vi.mock('@/components/agents/new-session-cloud-create-error', () => ({
+  NewSessionCloudCreateError: 'NewSessionCloudCreateError',
+}));
+
 vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
@@ -718,5 +722,28 @@ describe('NewSessionConfigureForm', () => {
     expect(prompt!.onMoveAttachment).toBe(onMoveAttachment);
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(prompt!.onReorderAttachments).toBe(onReorderAttachments);
+  });
+
+  // ── Case 14: a cloud-create failure belongs to the cloud target only ──
+  it('renders the cloud-create error on the cloud target but not on a remote one', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    const cloudCreateError = { retryable: true, message: 'prepare failed' };
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const cloud = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      cloudCreateError,
+    }) as Node;
+    expect(findElementByType(cloud, 'NewSessionCloudCreateError')).not.toBeNull();
+
+    // Switching the target to a computer must not surface the stale failure.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const remote = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      cloudCreateError,
+    }) as Node;
+    expect(findElementByType(remote, 'NewSessionCloudCreateError')).toBeNull();
   });
 });

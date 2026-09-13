@@ -14,6 +14,7 @@ import { useActiveSessions } from '@/lib/active-sessions-live-sync-mount';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dedupeInstanceLabels } from '@/lib/instance-picker-rows';
+import { useHoistedOperationKey } from '@/lib/operation-key';
 import { captureSessionBaseline, hasNewSession } from '@/lib/tour/session-detection';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -73,16 +74,40 @@ export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepPro
     computers[0] ??
     null;
 
-  const { status: spawnStatus, spawn } = useRemoteInstanceSpawn();
+  // The tour's remote path is personal-scoped, exactly like the cloud path it
+  // forks from (that form opens with no organization param) and the personal
+  // `listInstances` source that discovers the computer. Pin the spawn to
+  // personal (`null`); inheriting the live org context here would attribute the
+  // session to the organization, which this step's personal `useActiveSessions`
+  // never reads, so the check could not appear while an org is active.
+  const { status: spawnStatus, spawn } = useRemoteInstanceSpawn(null);
   const [hasStarted, setHasStarted] = useState(false);
+  // The connection the start action actually targeted, frozen at press time.
+  // Detection must follow this, not the mutable `selected` row: switching the
+  // highlighted computer after starting must not move the check to a machine
+  // that was never started.
+  const [startedConnectionId, setStartedConnectionId] = useState<string | null>(null);
+  // One operation key per start intent: a retry of the same connection keeps
+  // the key so the relay dedupes it instead of spawning a second session.
+  const { getKey, rotateKey } = useHoistedOperationKey();
 
   const handleStart = useCallback(() => {
     if (selected === null) {
       return;
     }
+    const connectionId = selected.connectionId;
     setHasStarted(true);
-    void spawn(selected.connectionId);
-  }, [selected, spawn]);
+    setStartedConnectionId(connectionId);
+    const operationKey = getKey(connectionId);
+    void (async () => {
+      const outcome = await spawn(connectionId, undefined, { operationKey });
+      // A retryable failure keeps the intent (and its key) alive for the retry;
+      // a fresh session or a terminal rejection ends it.
+      if (outcome.status !== 'retryable') {
+        rotateKey();
+      }
+    })();
+  }, [selected, spawn, getKey, rotateKey]);
 
   // Baseline: the ids known the first time the live list resolves. Capturing
   // it on the first data (not on the empty mount) keeps a row that already
@@ -106,8 +131,13 @@ export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepPro
   const detected =
     baselineIds !== null &&
     sessions !== undefined &&
-    selected !== null &&
-    hasNewSession({ sessions, baselineIds, kind: 'remote', connectionId: selected.connectionId });
+    startedConnectionId !== null &&
+    hasNewSession({
+      sessions,
+      baselineIds,
+      kind: 'remote',
+      connectionId: startedConnectionId,
+    });
 
   // Completion is sticky: once the check lands, a later poll failure or a
   // disconnected computer must not take it back and re-disable the tour's Done

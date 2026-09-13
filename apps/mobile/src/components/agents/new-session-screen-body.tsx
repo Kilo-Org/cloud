@@ -462,6 +462,10 @@ export function NewSessionScreenBody() {
       saveRunOn(next?.connectionId ?? null);
       setRemoteOverride(null);
       setCloneImportFailureKey(null);
+      // The inline cloud-create failure belongs to the previous target: it
+      // would render stale above Start after switching to a computer. A fresh
+      // cloud attempt clears it again at press time.
+      setCloudCreateError(null);
       handleRunOnInstanceChange(next);
     },
     [handleRunOnInstanceChange, saveRunOn]

@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-native';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useSyncExternalStore } from 'react';
 
@@ -113,6 +114,25 @@ function startLoad(userId: string): void {
 }
 
 /**
+ * Persists the recorded decision, observing a failure instead of letting it
+ * become an unhandled rejection. The in-memory value is authoritative and
+ * never cleared, so a failed write is not user-actionable, but a silent drop
+ * would let the tour auto-open again after a relaunch.
+ */
+async function persistCompleted(userId: string): Promise<void> {
+  try {
+    await recordTourCompleted(userId);
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: {
+        'error.subsystem': 'tour',
+        'error.operation': 'record_completed',
+      },
+    });
+  }
+}
+
+/**
  * Sets the decision in memory synchronously, then persists it in the
  * background. Never awaited, and never clears an existing decision.
  */
@@ -121,7 +141,7 @@ function recordCompletedInMemory(userId: string): void {
   entry.isCompleted = true;
   entry.isLoaded = true;
   emit();
-  void recordTourCompleted(userId);
+  void persistCompleted(userId);
 }
 
 export function useTourCompletion(userId: string | undefined) {

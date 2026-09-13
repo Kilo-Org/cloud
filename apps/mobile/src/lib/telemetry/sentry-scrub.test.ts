@@ -125,6 +125,35 @@ describe('scrubEvent', () => {
     expect(() => scrubEvent(event)).not.toThrow();
   });
 
+  it('redacts a token nested in a cyclic extra value', () => {
+    const cyclic: Record<string, unknown> = { token: 'abcdefghijklmnopqrst' };
+    cyclic.self = cyclic;
+    const event = { extra: cyclic };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.token).toBe('[redacted]');
+  });
+
+  it('redacts a token reachable through a repeated reference in extra', () => {
+    const shared = { token: 'abcdefghijklmnopqrst' };
+    const event = { extra: { a: shared, b: shared } };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.a.token).toBe('[redacted]');
+    expect(result.extra.b.token).toBe('[redacted]');
+  });
+
+  it('redacts a token reachable through a repeated reference in an array', () => {
+    const shared = { token: 'abcdefghijklmnopqrst' };
+    const event = { extra: { list: [shared, shared] } };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.list.map(item => item.token)).toEqual(['[redacted]', '[redacted]']);
+  });
+
   it('redacts token values in the context extraErrorDataIntegration attaches', () => {
     const event = {
       exception: { values: [{ type: 'TRPCClientError' }] },

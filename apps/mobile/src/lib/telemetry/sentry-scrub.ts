@@ -36,9 +36,11 @@ function isTokenShape(value: unknown): boolean {
 
 /**
  * Redact token-shaped string values at any depth in a value tree, returning a
- * scrubbed copy. The `seen` set bounds a cyclic payload.
+ * scrubbed copy. `seen` maps each visited object to its scrubbed copy so a
+ * repeated reference or a cycle reuses the scrubbed copy instead of leaking the
+ * original (and its nested tokens) through the second reference.
  */
-function redactValue(value: unknown, seen: WeakSet<object>): unknown {
+function redactValue(value: unknown, seen: WeakMap<object, unknown>): unknown {
   if (typeof value === 'string') {
     return isTokenShape(value) ? '[redacted]' : value;
   }
@@ -46,13 +48,18 @@ function redactValue(value: unknown, seen: WeakSet<object>): unknown {
     return value;
   }
   if (seen.has(value)) {
-    return value;
+    return seen.get(value);
   }
-  seen.add(value);
   if (Array.isArray(value)) {
-    return value.map(item => redactValue(item, seen));
+    const result: unknown[] = [];
+    seen.set(value, result);
+    for (const item of value) {
+      result.push(redactValue(item, seen));
+    }
+    return result;
   }
   const result: Record<string, unknown> = {};
+  seen.set(value, result);
   for (const [key, item] of Object.entries(value)) {
     result[key] = redactValue(item, seen);
   }
@@ -66,7 +73,7 @@ function redactTokens(
   if (map == null) {
     return undefined;
   }
-  return redactValue(map, new WeakSet()) as Record<string, unknown>;
+  return redactValue(map, new WeakMap()) as Record<string, unknown>;
 }
 
 /**
@@ -134,7 +141,7 @@ export function scrubEvent<T>(event: T): T {
       }
       for (const name of exceptionContextNames(e)) {
         if (name in ctx) {
-          ctx[name] = redactValue(ctx[name], new WeakSet());
+          ctx[name] = redactValue(ctx[name], new WeakMap());
         }
       }
     }

@@ -26,6 +26,7 @@ vi.mock('@/components/ui/icons', () => ({
   Globe: 'Globe',
   Mic: 'Mic',
   SlidersHorizontal: 'SlidersHorizontal',
+  WandSparkles: 'WandSparkles',
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
@@ -72,13 +73,19 @@ describe('PreferencesScreen hub', () => {
   it('renders one navigation row per settings group with its title and subtitle', async () => {
     const renderer = await mountPreferences();
 
-    expect(hubRows(renderer)).toHaveLength(4);
+    expect(hubRows(renderer)).toHaveLength(5);
     expect(row(renderer, 'General').props).toMatchObject({ icon: 'SlidersHorizontal', last: true });
     expect(row(renderer, 'Voice input').props).toMatchObject({
       icon: 'Mic',
       last: true,
       subtitle:
         "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway.",
+    });
+    expect(row(renderer, 'Translate tool summaries').props).toMatchObject({
+      icon: 'WandSparkles',
+      last: true,
+      subtitle:
+        'Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.',
     });
     expect(row(renderer, 'Account').props).toMatchObject({
       icon: 'Globe',
@@ -95,6 +102,7 @@ describe('PreferencesScreen hub', () => {
   it.each([
     ['General', '/(app)/(tabs)/(3_profile)/general'],
     ['Voice input', '/(app)/(tabs)/(3_profile)/voice-input'],
+    ['Translate tool summaries', '/(app)/(tabs)/(3_profile)/tool-summary-translation'],
     ['Account', '/(app)/(tabs)/(3_profile)/account'],
     ['Notifications', '/(app)/(tabs)/(3_profile)/notifications'],
   ])('pushes the %s subpage from its row', async (title, route) => {

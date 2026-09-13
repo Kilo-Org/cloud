@@ -253,7 +253,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Tras-scríobh tríd an Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Déan an t-ionchur gutha a thras-scríobh le samhail Kilo Gateway in ionad aithint cainte an ghléis. Seoltar do thaifeadadh chuig an Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Aistrigh achoimrí uirlisí",
+    "toolSummaryTranslationSubtitle": "Seol gach achoimre uirlise chuig samhail chun í a aistriú go teanga do aipe. Taispeántar an bunleagan má theipeann ar an aistriúchán.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ní thairgtear an tsamhail seo a thuilleadh. Tapáil $t(common.model) chun ceann eile a roghnú."
   },
   "prReview": {
     "pullRequestUnavailable": "Iarratas tarraingthe gan fáil",

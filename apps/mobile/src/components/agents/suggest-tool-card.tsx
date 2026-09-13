@@ -35,6 +35,7 @@ export function SuggestToolCard({ part }: Readonly<{ part: ToolPart }>) {
     <FixedPartRow
       icon={Sparkles}
       label={label}
+      translatable={suggestion !== null || display.translatable}
       status={part.state.status}
       accessibilityLabel={t('agentChat.toolCard.accessibility', {
         label,

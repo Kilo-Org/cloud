@@ -253,7 +253,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "ការបម្លែងសំឡេងជាអត្ថបទតាម Kilo Gateway",
     "gatewayTranscriptionSubtitle": "បម្លែងការបញ្ចូលដោយសំឡេងទៅជាអត្ថបទដោយប្រើម៉ូដែល Kilo Gateway ជំនួសឱ្យការចាប់សម្ដីរបស់ឧបករណ៍។ ការថតរបស់អ្នកត្រូវបានផ្ញើទៅ Kilo Gateway។",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "បកប្រែសេចក្តីសង្ខេបឧបករណ៍",
+    "toolSummaryTranslationSubtitle": "ផ្ញើសេចក្តីសង្ខេបឧបករណ៍នីមួយៗទៅម៉ូដែលដើម្បីបកប្រែវាទៅជាភាសាកម្មវិធីរបស់អ្នក។ អត្ថបទដើមត្រូវបានបង្ហាញប្រសិនបើការបកប្រែបរាជ័យ។",
+    "toolSummaryTranslationModelUnavailableNotice": "ម៉ូដែលនេះលែងផ្តល់ជូនទៀតទេ។ ចុច $t(common.model) ដើម្បីជ្រើសរើសមួយផ្សេងទៀត។"
   },
   "prReview": {
     "pullRequestUnavailable": "មិនអាចបើកសំណើបញ្ចូលកូដបាន",

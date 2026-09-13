@@ -6,9 +6,20 @@ import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
+import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import { Text as renderText } from '@/components/ui/text';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type ChatComposer } from './chat-composer';
+
+// A remote catalog that advertises safe session detach, so /exit and /quit
+// parse locally instead of short-circuiting to upgrade-required.
+const remoteExitState: RemoteCommandState = {
+  ownerConnectionId: null,
+  refresh: 'idle',
+  commands: [],
+  canExitSession: true,
+};
 
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
 const safeAreaInsets = vi.hoisted(() => ({ bottom: 0, left: 0, right: 0, top: 0 }));
@@ -124,8 +135,12 @@ vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: vi.fn(),
 }));
 
+// Marked so the test can locate the inline status row (slash-command
+// rejections, photo-metadata warning) and assert its message prop.
+const MockAccessibleStatus = () => null;
+
 vi.mock('@/components/ui/accessible-status', () => ({
-  AccessibleStatus: () => null,
+  AccessibleStatus: MockAccessibleStatus,
 }));
 
 vi.mock('react-native-reanimated', () => ({
@@ -761,5 +776,55 @@ describe('ChatComposer landscape side insets', () => {
     // they live inside the padded container.
     expect(findNode(container, type => type === MockChatToolbar)).not.toBeNull();
     expect(findNode(container, type => type === MockInputRow)).not.toBeNull();
+  });
+});
+
+describe('ChatComposer slash-command rejection feedback', () => {
+  // A rejected /quit submission (arguments) must announce its validation
+  // message through the inline status row — the same surface /exit uses —
+  // instead of a transient toast the accessibility tree never exposes
+  // (device round p6: the rejection was invisible to the reader and to the
+  // automation digest while the rejected draft sat in the input).
+  function statusMessage(render: React.ReactElement): unknown {
+    const status = findNode(render, type => type === MockAccessibleStatus);
+    if (status === null) {
+      throw new Error('AccessibleStatus element not found in the composer tree');
+    }
+    return status.props.message;
+  }
+
+  it('renders the argument-error inline and never submits the rejected draft', async () => {
+    const render = await mount(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    expect(statusMessage(render)).toBeNull();
+
+    requireInputRowOnChangeText(render)('/quit now');
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    const rejected = await rerender(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    expect(statusMessage(rejected)).toBe('/exit does not take arguments.');
+    expect(onSendMock).not.toHaveBeenCalled();
+    expect(showRemoteSessionExitConfirmation).not.toHaveBeenCalled();
+  });
+
+  it('clears the rejection once the input is edited', async () => {
+    const render = await mount(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    requireInputRowOnChangeText(render)('/quit now');
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    // Removing the arguments is the fix the message asks for; the stale
+    // rejection must not survive the edit.
+    requireInputRowOnChangeText(render)('/quit');
+    const edited = await rerender(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    expect(statusMessage(edited)).toBeNull();
   });
 });

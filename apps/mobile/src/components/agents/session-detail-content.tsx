@@ -31,7 +31,11 @@ import {
   resolvePinnedAgentModel,
 } from '@/components/agents/mode-normalize';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
-import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
+import {
+  exitRemoteSessionWithFeedback,
+  type RetryableExitFailure,
+} from '@/components/agents/exit-remote-session-with-feedback';
+import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { MessageBubble } from '@/components/agents/message-bubble';
@@ -660,6 +664,11 @@ export function SessionDetailContent({
   const cancelQueuedAttemptRef = useRef(0);
   const cancelingQueuedIdsRef = useRef(new Set<string>());
   const [cancelingQueuedIds, setCancelingQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  // A retryable exit transport failure that must stay actionable while the
+  // transport recovers. The transient toast the helper falls back to is gone
+  // long before connectivity returns, so the host owns the durable retry row.
+  const [exitFailure, setExitFailure] = useState<RetryableExitFailure | null>(null);
+  const [isRetryingExit, setIsRetryingExit] = useState(false);
   // Successful drops stay guarded before React commits and after Restore removes a retained row.
   const canceledQueuedIdsRef = useRef(new Set<string>());
   // The SDK owner ID changes when a replacement CLI connection takes over.
@@ -782,6 +791,8 @@ export function SessionDetailContent({
     setCancelingQueuedIds(EMPTY_IDS);
     canceledQueuedIdsRef.current = new Set();
     cancelQueuedUpgradeRequiredRef.current = null;
+    setExitFailure(null);
+    setIsRetryingExit(false);
   } else {
     const next = nextHeldQueuedIds(heldQueuedIds, pendingMessages, isStreaming);
     if (next !== heldQueuedIds) {
@@ -1328,16 +1339,39 @@ export function SessionDetailContent({
       lock: { current: boolean },
       settleVoiceInput: () => Promise<boolean>
     ) => {
+      // A fresh exit attempt supersedes any failure row the last one left.
+      setExitFailure(null);
+      setIsRetryingExit(false);
       await exitRemoteSessionWithFeedback({
         exit: manager.exitRemoteSession.bind(manager),
-        onAccepted,
+        onAccepted: () => {
+          setExitFailure(null);
+          onAccepted();
+        },
         router,
         lock,
         settleVoiceInput,
+        onRetryableFailure: setExitFailure,
       });
     },
     [manager, router]
   );
+
+  const handleRetryExit = useCallback(() => {
+    if (!exitFailure) {
+      return;
+    }
+    // Keep the row mounted while the retry runs so the spinner replaces the
+    // label instead of the row disappearing and jumping the composer.
+    setIsRetryingExit(true);
+    void (async () => {
+      try {
+        await exitFailure.retry();
+      } finally {
+        setIsRetryingExit(false);
+      }
+    })();
+  }, [exitFailure]);
 
   const handleContinueInNewSession = useCallback(() => {
     router.push(
@@ -1605,6 +1639,19 @@ export function SessionDetailContent({
             accessibilityElementsHidden={hasBlockingInteraction}
             importantForAccessibility={hasBlockingInteraction ? 'no-hide-descendants' : 'auto'}
           >
+            {exitFailure ? (
+              <Animated.View
+                entering={FadeIn.duration(200)}
+                exiting={FadeOut.duration(150)}
+                layout={LinearTransition.duration(150)}
+              >
+                <RemoteSessionExitFailure
+                  message={exitFailure.message}
+                  onRetry={handleRetryExit}
+                  isRetrying={isRetryingExit}
+                />
+              </Animated.View>
+            ) : null}
             <ModelPickerSelectionScopeProvider
               selectionScope={modelPickerSelectionScope}
               isSelectionCurrent={isModelPickerSelectionCurrent}

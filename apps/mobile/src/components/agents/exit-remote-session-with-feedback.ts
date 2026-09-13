@@ -9,6 +9,22 @@ type ExitRemoteSessionRouter = {
   dismissTo: (href: Href) => void;
 };
 
+/**
+ * A retryable exit transport failure, surfaced to the host so it can render a
+ * durable retry affordance. The transient toast the helper uses as a fallback
+ * auto-dismisses before a dropped transport can come back, so a caller that
+ * wants the retry to survive the outage must render this state itself.
+ */
+export type RetryableExitFailure = {
+  /** Copy for the reader, with pinned SDK messages already localized. */
+  message: string;
+  /**
+   * Re-runs the exit mutation under the same SubmitLock the initial send held.
+   * Never shows another confirmation.
+   */
+  retry: () => Promise<void>;
+};
+
 type ExitRemoteSessionWithFeedbackInput = {
   exit: () => Promise<void>;
   onAccepted: () => void;
@@ -26,6 +42,12 @@ type ExitRemoteSessionWithFeedbackInput = {
    * mutation under the lock above.
    */
   settleVoiceInput?: () => Promise<boolean>;
+  /**
+   * Receives a retryable transport failure instead of the helper's transient
+   * toast. A host that renders the failure inline (so the retry survives a
+   * connectivity outage) passes this; callers that do not keep the toast.
+   */
+  onRetryableFailure?: (failure: RetryableExitFailure) => void;
 };
 
 const SESSIONS_ROUTE = '/(app)/(tabs)/(2_agents)' as const;
@@ -83,6 +105,7 @@ export async function exitRemoteSessionWithFeedback({
     await Promise.resolve();
     return true;
   },
+  onRetryableFailure,
 }: Readonly<ExitRemoteSessionWithFeedbackInput>): Promise<void> {
   const runExit = async (): Promise<void> => {
     try {
@@ -102,26 +125,33 @@ export async function exitRemoteSessionWithFeedback({
         // Retryable: transport / ACK / heartbeat failure. The draft is
         // preserved by the submit-lock contract; the retry action re-runs
         // the exit mutation under the same SubmitLock the initial send held.
-        toast.error(shown, {
-          action: {
-            label: i18n.t('common.tryAgain'),
-            onClick: () => {
-              void (async () => {
-                try {
-                  await settleVoiceInputBeforeSubmit({
-                    lock,
-                    settleVoiceInput,
-                    submit: runExit,
-                  });
-                } catch {
-                  // Retry errors are already surfaced by the toast inside
-                  // runExit; swallow them so the async action does not leak
-                  // an unhandled promise rejection.
-                }
-              })();
+        const retry = async (): Promise<void> => {
+          try {
+            await settleVoiceInputBeforeSubmit({
+              lock,
+              settleVoiceInput,
+              submit: runExit,
+            });
+          } catch {
+            // Retry errors are already surfaced by the inline failure or the
+            // toast inside runExit; swallow them so the async action does not
+            // leak an unhandled promise rejection.
+          }
+        };
+        if (onRetryableFailure) {
+          // A host-owned durable surface: the retry stays reachable while the
+          // transport is down, so the reader can restore connectivity first.
+          onRetryableFailure({ message: shown, retry });
+        } else {
+          toast.error(shown, {
+            action: {
+              label: i18n.t('common.tryAgain'),
+              onClick: () => {
+                void retry();
+              },
             },
-          },
-        });
+          });
+        }
       }
       throw error;
     }

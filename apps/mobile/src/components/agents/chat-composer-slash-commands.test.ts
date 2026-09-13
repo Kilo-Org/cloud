@@ -82,7 +82,7 @@ describe('createMobileSlashCommandList', () => {
     expect(createMobileSlashCommandList(null, SAMPLE_COMMANDS, null)).toEqual([]);
   });
 
-  it('includes /new, /exit, and /clear when canExitSession is true', () => {
+  it('includes /new, /exit, /quit, and /clear when canExitSession is true', () => {
     const list = createMobileSlashCommandList(
       'remote',
       SAMPLE_COMMANDS,
@@ -93,6 +93,7 @@ describe('createMobileSlashCommandList', () => {
       'review',
       'new',
       'exit',
+      'quit',
       'clear',
     ]);
   });

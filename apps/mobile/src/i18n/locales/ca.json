@@ -2460,6 +2460,11 @@
       "modelAccessibilityLabel": "Model {{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_many": "{{steps}} passos"
     },
+    "autoApprove": {
+      "title": "Aprovació automàtica",
+      "description": "Aprova automàticament les sol·licituds de permís d'aquesta sessió. Aleshores les eines s'executen sense cap avís.",
+      "unavailable": "Aquesta sessió no pot rebre sol·licituds de permís."
+    },
     "prBadge": {
       "open": "pR oberta",
       "closed": "sol·licitud d'integració tancada",

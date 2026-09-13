@@ -2005,6 +2005,11 @@
       "stepsCount_other": "{{steps}} langkah",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Setujui otomatis",
+      "description": "Setujui permintaan izin untuk sesi ini secara otomatis. Alat kemudian berjalan tanpa perintah.",
+      "unavailable": "Sesi ini tidak dapat menerima permintaan izin."
+    },
     "prBadge": {
       "open": "buka PR",
       "closed": "pR yang ditutup",

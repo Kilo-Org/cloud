@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} hapa",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Miratim automatik",
+      "description": "Mirato automatikisht kërkesat për leje të kësaj seance. Mjetet ekzekutohen më pas pa një kërkesë.",
+      "unavailable": "Kjo seancë nuk mund të marrë kërkesa për leje."
+    },
     "prBadge": {
       "open": "hapja e kërkesës së bashkimit",
       "closed": "kërkesë për bashkim e mbyllur",

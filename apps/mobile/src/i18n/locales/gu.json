@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} પગલાં",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "સ્વયં-મંજૂરી",
+      "description": "આ સત્ર માટે પરવાનગી વિનંતીઓ સ્વયં મંજૂર કરો. પછી સાધનો પ્રોમ્પ્ટ વગર ચાલે છે.",
+      "unavailable": "આ સત્ર પરવાનગી વિનંતીઓ મેળવી શકતું નથી."
+    },
     "prBadge": {
       "open": "પુલ રિક્વેસ્ટ ખોલો",
       "closed": "બંધ થયેલી પુલ રિક્વેસ્ટ",

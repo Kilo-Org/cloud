@@ -2439,6 +2439,11 @@
       "stepsCount_other": "tarkaanfiiwwan {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Hayyama ofumaan",
+      "description": "Gaaffiiwwan hayyamaa turtii kanaaf ofumaan hayyami. Itti aansuun meeshaaleen gaaffii malee hojjatu.",
+      "unavailable": "Turtiin kun gaaffiiwwan hayyamaa fudhachuu hin danda'u."
+    },
     "prBadge": {
       "open": "gaaffii walitti makuu bani",
       "closed": "gaaffii walitti makuu cufame",

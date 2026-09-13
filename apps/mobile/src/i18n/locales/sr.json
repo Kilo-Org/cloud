@@ -2460,6 +2460,11 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} koraka"
     },
+    "autoApprove": {
+      "title": "Automatsko odobravanje",
+      "description": "Automatski odobri zahteve za dozvolu za ovu sesiju. Alatke zatim rade bez upita.",
+      "unavailable": "Ova sesija ne može da prima zahteve za dozvolu."
+    },
     "prBadge": {
       "open": "otvoren PR",
       "closed": "zatvoren zahtev za spajanje",

@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} urrats",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Onespen automatikoa",
+      "description": "Onetsi automatikoki saio honen baimen eskaerak. Ondoren, tresnak gonbitik gabe exekutatzen dira.",
+      "unavailable": "Saio honek ezin ditu baimen eskaerak jaso."
+    },
     "prBadge": {
       "open": "ireki bateratze-eskaera",
       "closed": "bateratze-eskaera itxia",

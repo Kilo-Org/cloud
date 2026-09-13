@@ -2502,6 +2502,11 @@
       "stepsCount_few": "{{steps}} chéim",
       "stepsCount_many": "{{steps}} gcéim"
     },
+    "autoApprove": {
+      "title": "Uath-cheadú",
+      "description": "Ceadaigh iarratais cheada don seisiún seo go huathoibríoch. Ritheann uirlisí ansin gan leid.",
+      "unavailable": "Ní féidir leis an seisiún seo iarratais cheada a fháil."
+    },
     "prBadge": {
       "open": "oscail an t-iarratas tarraingthe",
       "closed": "iarratas tarraingthe dúnta",

@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} trin",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Auto-godkend",
+      "description": "Godkend tilladelsesanmodninger for denne sessionen automatisk. Værktøjer kører derefter uden en prompt.",
+      "unavailable": "Denne session kan ikke modtage tilladelsesanmodninger."
+    },
     "prBadge": {
       "open": "åben PR",
       "closed": "lukket PR",

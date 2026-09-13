@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} مراحل",
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
     },
+    "autoApprove": {
+      "title": "خودکار منظوری",
+      "description": "اس سیشن کی اجازت کی درخواستوں کو خودکار طور پر منظور کریں۔ پھر اوزار بغیر کسی اشارے کے چلتے ہیں۔",
+      "unavailable": "یہ سیشن اجازت کی درخواستیں وصول نہیں کر سکتا۔"
+    },
     "prBadge": {
       "open": "پل ریکویسٹ کھولیں",
       "closed": "بند پل ریکویسٹ",

@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} ขั้นตอน",
       "modelAccessibilityLabel": "{{name}} จาก {{provider}} · {{steps}} · {{cost}}"
     },
+    "autoApprove": {
+      "title": "อนุมัติอัตโนมัติ",
+      "description": "อนุมัติคำขออนุญาตสำหรับเซสชันนี้โดยอัตโนมัติ จากนั้นเครื่องมือจะทำงานโดยไม่มีพรอมป์ต์",
+      "unavailable": "เซสชันนี้ไม่สามารถรับคำขออนุญาตได้"
+    },
     "prBadge": {
       "open": "เปิดพูลรีเควสต์",
       "closed": "pR ที่ปิดแล้ว",

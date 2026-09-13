@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} ຂັ້ນຕອນ",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "ການອະນຸມັດອັດຕະໂນມັດ",
+      "description": "ອະນຸມັດຄຳຮ້ອງຂໍອະນຸຍາດສຳລັບເຊດຊັນນີ້ໂດຍອັດຕະໂນມັດ. ຈາກນັ້ນເຄື່ອງມືຈະເຮັດວຽກໂດຍບໍ່ມີການຖາມ.",
+      "unavailable": "ເຊດຊັນນີ້ບໍ່ສາມາດຮັບຄຳຮ້ອງຂໍອະນຸຍາດໄດ້."
+    },
     "prBadge": {
       "open": "ເປີດຄຳຂໍລວມໂຄ້ດ",
       "closed": "pR ທີ່ປິດແລ້ວ",

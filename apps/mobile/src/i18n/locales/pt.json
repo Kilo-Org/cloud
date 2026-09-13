@@ -2460,6 +2460,11 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_many": "{{steps}} passos"
     },
+    "autoApprove": {
+      "title": "Aprovação automática",
+      "description": "Aprovar automaticamente os pedidos de permissão desta sessão. As ferramentas são então executadas sem aviso.",
+      "unavailable": "Esta sessão não pode receber pedidos de permissão."
+    },
     "prBadge": {
       "open": "abrir PR",
       "closed": "pR fechado",

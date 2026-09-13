@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} እርምጃዎች",
       "modelAccessibilityLabel": "{{name}}፣ {{provider}}፣ {{steps}}፣ {{cost}}"
     },
+    "autoApprove": {
+      "title": "ራስ-ሰር ማጽደቅ",
+      "description": "ለዚህ ክፍለ ጊዜ የፈቃድ ጥያቄዎችን በራስ-ሰር ያጽድቁ። ከዚያ መሣሪያዎች ያለ ጥያቄ ይሠራሉ።",
+      "unavailable": "ይህ ክፍለ ጊዜ የፈቃድ ጥያቄዎችን ማግኘት አይችልም።"
+    },
     "prBadge": {
       "open": "ክፍት የማዋሃድ ጥያቄ",
       "closed": "የተዘጋ የማዋሃድ ጥያቄ",

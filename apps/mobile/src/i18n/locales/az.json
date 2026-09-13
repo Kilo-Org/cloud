@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} addım",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Avtomatik təsdiq",
+      "description": "Bu sessiya üçün icazə sorğularını avtomatik təsdiqləyin. Alətlər sonra sorğu olmadan işləyir.",
+      "unavailable": "Bu sessiya icazə sorğularını qəbul edə bilməz."
+    },
     "prBadge": {
       "open": "açıq birləşdirmə sorğusu",
       "closed": "bağlanmış birləşdirmə sorğusu",

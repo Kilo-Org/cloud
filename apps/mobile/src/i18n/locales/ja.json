@@ -2005,6 +2005,11 @@
       "stepsCount_other": "{{steps}}ステップ",
       "modelAccessibilityLabel": "{{name}}、{{provider}}、{{steps}}、{{cost}}"
     },
+    "autoApprove": {
+      "title": "自動承認",
+      "description": "このセッションの許可リクエストを自動的に承認します。その後、ツールはプロンプトなしで実行されます。",
+      "unavailable": "このセッションは許可リクエストを受信できません。"
+    },
     "prBadge": {
       "open": "プルリクエストを開く",
       "closed": "クローズ済みのプルリクエスト",

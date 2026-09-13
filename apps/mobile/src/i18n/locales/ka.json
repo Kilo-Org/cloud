@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} ნაბიჯი",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "ავტომატური დამტკიცება",
+      "description": "ავტომატურად დაამტკიცეთ ამ სესიის ნებართვის მოთხოვნები. შემდეგ ხელსაწყოები მუშაობს მოთხოვნის გარეშე.",
+      "unavailable": "ეს სესია ვერ მიიღებს ნებართვის მოთხოვნებს."
+    },
     "prBadge": {
       "open": "ღია PR",
       "closed": "დახურული PR",

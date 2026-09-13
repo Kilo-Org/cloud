@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} tallaabo",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Oggolaansho otomaatig ah",
+      "description": "Si otomaatig ah u ogolaanso codsiyada oggolaanshaha ee kalfadhigan. Qalabka ayaa markaas shaqeeya iyada oo aan la waydiin.",
+      "unavailable": "Kalfadhigan ma heli karo codsiyada oggolaanshaha."
+    },
     "prBadge": {
       "open": "codsi isku-darid oo furan",
       "closed": "codsi isku-darid oo xiran",

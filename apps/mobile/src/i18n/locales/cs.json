@@ -2481,6 +2481,11 @@
       "stepsCount_few": "{{steps}} kroky",
       "stepsCount_many": "{{steps}} kroku"
     },
+    "autoApprove": {
+      "title": "Automatické schválení",
+      "description": "Automaticky schvalovat žádosti o oprávnění pro tuto relaci. Nástroje se pak spustí bez výzvy.",
+      "unavailable": "Tato relace nemůže přijímat žádosti o oprávnění."
+    },
     "prBadge": {
       "open": "otevřený PR",
       "closed": "uzavřený PR",

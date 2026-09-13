@@ -2944,14 +2944,6 @@
     "revoke": "{{host}} 신뢰 해제",
     "backToPreferences": "환경설정으로 돌아가기"
   },
-  "quickChat": {
-    "empty": {
-      "title": "채팅 시작하기",
-      "description": "모델과 대화하려면 메시지를 보내세요."
-    },
-    "historyRetry": "채팅 기록을 불러올 수 없습니다.",
-    "sendError": "메시지를 보낼 수 없습니다. 다시 시도하세요."
-  },
   "glanceable": {
     "waiting": "에이전트 상태 업데이트 중",
     "empty": "진행 중인 작업 없음",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "음성 텍스트 변환 모델 없음",
     "emptyDescription": "지금 Kilo Gateway에서 제공하는 음성 텍스트 변환 모델이 없습니다.",
     "loadFailed": "음성 텍스트 변환 모델을 불러오지 못했습니다."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "채팅 시작하기",
+      "description": "모델과 대화하려면 메시지를 보내세요."
+    },
+    "list": {
+      "loadFailed": "채팅 기록을 불러올 수 없습니다.",
+      "new": "새 채팅",
+      "openHint": "채팅을 엽니다. 길게 눌러 삭제합니다.",
+      "deleteTitle": "이 채팅을 삭제할까요?"
+    },
+    "beta": "베타"
   }
 }

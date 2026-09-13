@@ -2988,14 +2988,6 @@
     "revoke": "Odebrat důvěru doméně {{host}}",
     "backToPreferences": "Zpět na předvolby"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Začněte chatovat",
-      "description": "Napište zprávu a začněte chatovat s modelem."
-    },
-    "historyRetry": "Historii chatu se nepodařilo načíst.",
-    "sendError": "Zprávu se nepodařilo odeslat. Zkuste to prosím znovu."
-  },
   "glanceable": {
     "waiting": "Aktualizace agentů",
     "empty": "Žádné probíhající úkoly",
@@ -3014,5 +3006,18 @@
     "emptyTitle": "Žádné modely přepisu",
     "emptyDescription": "Kilo Gateway nyní nenabízí žádné modely přepisu.",
     "loadFailed": "Modely přepisu se nepodařilo načíst."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Začněte chatovat",
+      "description": "Pošlete zprávu, abyste si popovídali s modelem."
+    },
+    "list": {
+      "loadFailed": "Historie chatu se nepodařila načíst.",
+      "new": "Nový chat",
+      "openHint": "Otevře chat. Dlouhým stisknutím smažete.",
+      "deleteTitle": "Smazat tento chat?"
+    },
+    "beta": "Beta"
   }
 }

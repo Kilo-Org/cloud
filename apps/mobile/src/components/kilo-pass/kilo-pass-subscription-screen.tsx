@@ -63,6 +63,53 @@ function formatStorePrice(product: AppStoreKiloPassProduct): string {
   return i18n.t('kiloPass.perMonth', { price: product.displayPrice });
 }
 
+function KiloPassHeaderDescription() {
+  const { t } = useTranslation();
+  return (
+    <Text className="px-1 text-sm leading-5 text-muted-foreground">
+      {t('kiloPass.subscriptionHeaderDescription')}
+    </Text>
+  );
+}
+
+function KiloPassLegalCopy() {
+  const { t } = useTranslation();
+  const [privacyPolicyLink, termsOfUseLink] = getKiloPassLegalLinks(WEB_BASE_URL);
+  return (
+    /* Do not set a leading class here. Android applies the parent line height
+        to each nested link Text and the block grows to many times its size. */
+    <Text className="px-1 pt-1 text-xs text-muted-foreground">
+      {kiloPassLegalDisclosure(Platform.OS)}
+      {t('kiloPass.legalConnectorTerms')}
+      <Text
+        accessibilityRole="link"
+        className="text-xs text-primary underline active:opacity-70"
+        onPress={() => {
+          void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
+        }}
+      >
+        {termsOfUseLink.label}
+      </Text>
+      {t('kiloPass.legalConnectorPrivacy')}
+      <Text
+        accessibilityRole="link"
+        className="text-xs text-primary underline active:opacity-70"
+        onPress={() => {
+          void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
+        }}
+      >
+        {privacyPolicyLink.label}
+      </Text>
+      .
+    </Text>
+  );
+}
+
+/**
+ * The presentation gate's placeholder. It renders the settled sheet's chrome —
+ * description, product-card slots, Restore Purchases row, legal copy — so the
+ * loading→content swap moves nothing.
+ */
 function KiloPassLoadingScreen() {
   const { t } = useTranslation();
   return (
@@ -74,10 +121,23 @@ function KiloPassLoadingScreen() {
           contentContainerClassName="gap-3 px-1"
           showsVerticalScrollIndicator={false}
         >
-          <Skeleton className="h-4 w-64 rounded" />
+          <KiloPassHeaderDescription />
           {[0, 1, 2].map(index => (
-            <Skeleton key={index} className="h-[112px] w-full rounded-xl" />
+            // Product cards render at p-5 + two text rows ≈ 88pt; matching the
+            // placeholder keeps the loading→content swap from shifting layout.
+            <Skeleton key={index} className="h-[88px] w-full rounded-xl" />
           ))}
+          {/* Restoring needs the IAP owner, which mounts only for a settled
+              native_iap presentation, so the reserved row stays disabled. */}
+          <Button
+            accessibilityLabel={t('kiloPass.restorePurchases')}
+            className="self-center px-3"
+            disabled
+            variant="link"
+          >
+            <Text>{t('kiloPass.restorePurchases')}</Text>
+          </Button>
+          <KiloPassLegalCopy />
         </DetailScreenScrollView>
       </View>
     </View>
@@ -214,7 +274,6 @@ function KiloPassNativeIapContent() {
     preflightPurchase.isPending ||
     ownedByAnotherAccount ||
     !ownershipChecked;
-  const [privacyPolicyLink, termsOfUseLink] = getKiloPassLegalLinks(WEB_BASE_URL);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -332,9 +391,7 @@ function KiloPassNativeIapContent() {
           contentContainerClassName="gap-3 px-1"
           showsVerticalScrollIndicator={false}
         >
-          <Text className="px-1 text-sm leading-5 text-muted-foreground">
-            {t('kiloPass.subscriptionHeaderDescription')}
-          </Text>
+          <KiloPassHeaderDescription />
 
           {feedback && (
             <Text
@@ -374,7 +431,9 @@ function KiloPassNativeIapContent() {
 
           {productsIsLoading &&
             [0, 1, 2].map(index => (
-              <Skeleton key={index} className="h-[112px] w-full rounded-xl" />
+              // Reserves the final product card height so the content swap
+              // does not move the rows below (no-layout-shift rule).
+              <Skeleton key={index} className="h-[88px] w-full rounded-xl" />
             ))}
 
           {!productsIsLoading && products.length === 0 && (
@@ -475,32 +534,7 @@ function KiloPassNativeIapContent() {
             }}
           />
 
-          {/* Do not set a leading class here. Android applies the parent line height
-              to each nested link Text and the block grows to many times its size. */}
-          <Text className="px-1 pt-1 text-xs text-muted-foreground">
-            {kiloPassLegalDisclosure(Platform.OS)}
-            {t('kiloPass.legalConnectorTerms')}
-            <Text
-              accessibilityRole="link"
-              className="text-xs text-primary underline active:opacity-70"
-              onPress={() => {
-                void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
-              }}
-            >
-              {termsOfUseLink.label}
-            </Text>
-            {t('kiloPass.legalConnectorPrivacy')}
-            <Text
-              accessibilityRole="link"
-              className="text-xs text-primary underline active:opacity-70"
-              onPress={() => {
-                void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
-              }}
-            >
-              {privacyPolicyLink.label}
-            </Text>
-            .
-          </Text>
+          <KiloPassLegalCopy />
         </DetailScreenScrollView>
 
         {isPending && (

@@ -2988,14 +2988,6 @@
     "revoke": "Prekliči zaupanje gostitelju {{host}}",
     "backToPreferences": "Nazaj na nastavitve"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Začni klepet",
-      "description": "Pošlji sporočilo za pogovor z modelom."
-    },
-    "historyRetry": "Zgodovine klepeta ni bilo mogoče naložiti.",
-    "sendError": "Sporočila ni bilo mogoče poslati. Poskusi znova."
-  },
   "glanceable": {
     "waiting": "Posodabljanje agentov",
     "empty": "Trenutno ni aktivnih nalog",
@@ -3014,5 +3006,18 @@
     "emptyTitle": "Ni modelov za prepisovanje",
     "emptyDescription": "Kilo Gateway trenutno ne ponuja modelov za prepisovanje.",
     "loadFailed": "Modelov za prepisovanje ni bilo mogoče naložiti."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Začni klepet",
+      "description": "Pošlji sporočilo za pogovor z modelom."
+    },
+    "list": {
+      "loadFailed": "Zgodovine klepeta ni bilo mogoče naložiti.",
+      "new": "Nov klepet",
+      "openHint": "Odpre klepet. Pridržite za brisanje.",
+      "deleteTitle": "Izbrišem ta klepet?"
+    },
+    "beta": "Beta"
   }
 }

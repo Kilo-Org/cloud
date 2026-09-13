@@ -24,7 +24,7 @@ const hoisted = vi.hoisted(() => {
   // Mutable so each test can set the build version under test before the
   // module loads. `useFeatureFlag` reads it at read time, not import time.
   const application = {
-    nativeApplicationVersion: '1.0.8' as string | undefined,
+    nativeApplicationVersion: '1.0.11' as string | undefined,
     nativeBuildVersion: '45',
   };
   const controller = {
@@ -100,7 +100,7 @@ async function readFlag(key: string, defaultValue: boolean): Promise<boolean | u
 beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
-  hoisted.application.nativeApplicationVersion = '1.0.8';
+  hoisted.application.nativeApplicationVersion = '1.0.11';
   hoisted.controller.allowsOptional.mockReturnValue(true);
   hoisted.controller.currentGeneration.mockReturnValue(0);
   hoisted.client.getFeatureFlag.mockReset();
@@ -108,44 +108,44 @@ beforeEach(() => {
 
 describe('version-aware feature flags', () => {
   it('an older build falls back to the default for a flag introduced in a newer version', async () => {
-    // Build 1.0.5 predates mobile-quick-chat (minimum 1.0.6): it must not act
+    // Build 1.0.5 predates mobile-chat (minimum 1.0.11): it must not act
     // on the remote value, whatever PostHog returns.
     hoisted.application.nativeApplicationVersion = '1.0.5';
     hoisted.client.getFeatureFlag.mockImplementation(
-      (key: string) => (key === 'mobile-quick-chat' ? true : undefined) as never
+      (key: string) => (key === 'mobile-chat' ? true : undefined) as never
     );
     const { initPostHog } = await import('./posthog');
     initPostHog();
 
-    const probe = await readFlag('mobile-quick-chat', false);
+    const probe = await readFlag('mobile-chat', false);
 
     expect(probe).toBe(false);
   });
 
   it('a build at or above the minimum applies the remote flag value', async () => {
-    // Build 1.0.8 understands mobile-quick-chat (minimum 1.0.6): the remote
-    // value drives the UI in both directions.
+    // This build is at mobile-chat's minimum (1.0.11): the remote value drives
+    // the UI in both directions.
     hoisted.client.getFeatureFlag.mockImplementation(
-      (key: string) => (key === 'mobile-quick-chat' ? true : undefined) as never
+      (key: string) => (key === 'mobile-chat' ? true : undefined) as never
     );
     const { initPostHog } = await import('./posthog');
     initPostHog();
 
-    expect(await readFlag('mobile-quick-chat', false)).toBe(true);
+    expect(await readFlag('mobile-chat', false)).toBe(true);
 
     hoisted.client.getFeatureFlag.mockImplementation(() => false as never);
-    expect(await readFlag('mobile-quick-chat', false)).toBe(false);
+    expect(await readFlag('mobile-chat', false)).toBe(false);
   });
 
   it('a build at exactly the minimum version applies the flag', async () => {
-    hoisted.application.nativeApplicationVersion = '1.0.6';
+    hoisted.application.nativeApplicationVersion = '1.0.11';
     hoisted.client.getFeatureFlag.mockImplementation(
-      (key: string) => (key === 'mobile-quick-chat' ? true : undefined) as never
+      (key: string) => (key === 'mobile-chat' ? true : undefined) as never
     );
     const { initPostHog } = await import('./posthog');
     initPostHog();
 
-    expect(await readFlag('mobile-quick-chat', false)).toBe(true);
+    expect(await readFlag('mobile-chat', false)).toBe(true);
   });
 
   it('keeps the caller default while flags are not loaded', async () => {
@@ -155,7 +155,7 @@ describe('version-aware feature flags', () => {
     posthog.initPostHog();
     hoisted.client.getFeatureFlag.mockImplementation(() => undefined as never);
 
-    expect(await readFlag('mobile-quick-chat', false)).toBe(false);
+    expect(await readFlag('mobile-chat', false)).toBe(false);
     expect(await readFlag('mobile-pr-review', true)).toBe(true);
   });
 
@@ -191,8 +191,8 @@ describe('feature flag statuses (debug surface)', () => {
         loaded: true,
       },
       {
-        key: 'mobile-quick-chat',
-        minAppVersion: '1.0.6',
+        key: 'mobile-chat',
+        minAppVersion: '1.0.11',
         defaultValue: false,
         appVersion: '1.0.5',
         applied: false,
@@ -221,8 +221,8 @@ describe('feature flag statuses (debug surface)', () => {
     const { initPostHog, getFeatureFlagStatuses } = await import('./posthog');
     initPostHog();
 
-    const quickChat = getFeatureFlagStatuses().find(status => status.key === 'mobile-quick-chat');
-    expect(quickChat).toMatchObject({
+    const chat = getFeatureFlagStatuses().find(status => status.key === 'mobile-chat');
+    expect(chat).toMatchObject({
       applied: false,
       reason: 'build-too-old',
       value: false,
@@ -247,7 +247,7 @@ describe('feature flag statuses (debug surface)', () => {
 
     // Remote value arrives for the current build: statuses flip to applied.
     hoisted.client.getFeatureFlag.mockImplementation(
-      (key: string) => (key === 'mobile-quick-chat' ? true : undefined) as never
+      (key: string) => (key === 'mobile-chat' ? true : undefined) as never
     );
     const onChange = hoisted.client.onFeatureFlags.mock.calls[0]?.[0] as () => void;
     act(() => {
@@ -255,8 +255,8 @@ describe('feature flag statuses (debug surface)', () => {
     });
 
     const latest = statuses.at(-1) ?? [];
-    const quickChat = latest.find(status => status.key === 'mobile-quick-chat');
-    expect(quickChat).toMatchObject({ applied: true, value: true, reason: 'applied' });
+    const chat = latest.find(status => status.key === 'mobile-chat');
+    expect(chat).toMatchObject({ applied: true, value: true, reason: 'applied' });
     act(() => {
       renderer?.unmount();
     });

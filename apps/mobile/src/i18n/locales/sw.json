@@ -2944,14 +2944,6 @@
     "revoke": "Ondoa uaminifu kwa {{host}}",
     "backToPreferences": "Rudi kwenye mapendeleo"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Anza mazungumzo",
-      "description": "Tuma ujumbe ili kuzungumza na modeli."
-    },
-    "historyRetry": "Imeshindikana kupakia historia ya mazungumzo.",
-    "sendError": "Imeshindikana kutuma ujumbe. Jaribu tena."
-  },
   "glanceable": {
     "waiting": "Inasasisha mawakala",
     "empty": "Hakuna kazi inayoendelea",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "Hakuna modeli za unukuzi",
     "emptyDescription": "Kilo Gateway haina modeli za unukuzi kwa sasa.",
     "loadFailed": "Imeshindikana kupakia modeli za unukuzi."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Anza mazungumzo",
+      "description": "Tuma ujumbe ili uongee na mfano."
+    },
+    "list": {
+      "loadFailed": "Haikuweza kupakia historia ya mazungumzo.",
+      "new": "Gumzo jipya",
+      "openHint": "Hufungua gumzo. Bonyeza kwa muda mrefu ili kufuta.",
+      "deleteTitle": "Futa gumzo hili?"
+    },
+    "beta": "Beta"
   }
 }

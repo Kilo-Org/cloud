@@ -2944,14 +2944,6 @@
     "revoke": "Fagilé ìgbẹ́kẹ̀lé {{host}}",
     "backToPreferences": "Padà sí àwọn ààyò"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Bẹ̀rẹ̀ ìjíròrò",
-      "description": "Fi ìfiránṣẹ́ ránṣẹ́ láti bá àwòṣe kan sọ̀rọ̀."
-    },
-    "historyRetry": "A kò lè gbé ìtàn ìjíròrò wọlé.",
-    "sendError": "A kò lè fi ìfiránṣẹ́ náà ránṣẹ́. Gbìyànjú lẹ́ẹ̀kan sí i."
-  },
   "glanceable": {
     "waiting": "Ń ṣe ìmúdójúìwọ̀n àwọn aṣojú",
     "empty": "Kò sí iṣẹ́ tó ń lọ",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "Kò sí àwòṣe ìyípadà ohùn sí ọ̀rọ̀",
     "emptyDescription": "Kilo Gateway kò pèsè àwòṣe ìyípadà ohùn sí ọ̀rọ̀ ní báyìí.",
     "loadFailed": "A kò lè gbé àwòṣe ìyípadà ohùn sí ọ̀rọ̀ wọlé."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Bẹ̀rẹ̀ iwiregbe kan",
+      "description": "Fi ifiranṣẹ ranṣẹ láti bá awoṣe kan sọ̀rọ̀."
+    },
+    "list": {
+      "loadFailed": "Kò lè ṣagbewọ ìtàn iwiregbe.",
+      "new": "Ìjíròrò tuntun",
+      "openHint": "Ṣí ìjíròrò náà. Tẹ̀ mọ́lẹ̀ láti pa á rẹ́.",
+      "deleteTitle": "Pa ìjíròrò yìí rẹ́?"
+    },
+    "beta": "Beta"
   }
 }

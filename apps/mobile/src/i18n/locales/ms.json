@@ -2944,14 +2944,6 @@
     "revoke": "Tarik balik kepercayaan terhadap {{host}}",
     "backToPreferences": "Kembali ke keutamaan"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Mulakan sembang",
-      "description": "Hantar mesej untuk bersembang dengan model."
-    },
-    "historyRetry": "Tidak dapat memuatkan sejarah sembang.",
-    "sendError": "Mesej tidak dapat dihantar. Cuba lagi."
-  },
   "glanceable": {
     "waiting": "Mengemas kini ejen",
     "empty": "Tiada kerja yang sedang dijalankan",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "Tiada model transkripsi",
     "emptyDescription": "Kilo Gateway tidak menawarkan model transkripsi pada masa ini.",
     "loadFailed": "Tidak dapat memuatkan model transkripsi."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Mulakan sembang",
+      "description": "Hantar mesej untuk bercakap dengan model."
+    },
+    "list": {
+      "loadFailed": "Tidak dapat memuatkan sejarah sembang.",
+      "new": "Sembang baharu",
+      "openHint": "Membuka sembang. Tekan lama untuk memadam.",
+      "deleteTitle": "Padam sembang ini?"
+    },
+    "beta": "Beta"
   }
 }

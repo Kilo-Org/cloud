@@ -3,9 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   compareAppVersions,
   currentAppVersion,
+  FEATURE_FLAG_CHAT,
   FEATURE_FLAG_DEFINITIONS,
   FEATURE_FLAG_PR_REVIEW,
-  FEATURE_FLAG_QUICK_CHAT,
   getFeatureFlagDefinition,
   isAppVersionAtLeast,
 } from './feature-flags';
@@ -59,15 +59,22 @@ describe('isAppVersionAtLeast', () => {
 });
 
 describe('registry', () => {
-  it('registers both shipped flags with their first release', () => {
+  it('registers every shipped flag with its first release', () => {
     expect(FEATURE_FLAG_DEFINITIONS).toEqual([
       { key: FEATURE_FLAG_PR_REVIEW, minAppVersion: '1.0.4', defaultValue: true },
-      { key: FEATURE_FLAG_QUICK_CHAT, minAppVersion: '1.0.6', defaultValue: false },
+      { key: FEATURE_FLAG_CHAT, minAppVersion: '1.0.11', defaultValue: false },
     ]);
   });
 
+  it('gates the rebuilt chat on a key of its own, not the removed quick chat key', () => {
+    // A shipped build reads `mobile-quick-chat` for the screen this branch
+    // removes; the tab must not share it or enabling the tab enables that one.
+    expect(FEATURE_FLAG_CHAT).toBe('mobile-chat');
+    expect(getFeatureFlagDefinition('mobile-quick-chat')).toBeUndefined();
+  });
+
   it('looks a definition up by key', () => {
-    expect(getFeatureFlagDefinition(FEATURE_FLAG_QUICK_CHAT)?.minAppVersion).toBe('1.0.6');
+    expect(getFeatureFlagDefinition(FEATURE_FLAG_CHAT)?.minAppVersion).toBe('1.0.11');
     expect(getFeatureFlagDefinition('mobile-unknown')).toBeUndefined();
   });
 

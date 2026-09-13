@@ -743,14 +743,6 @@
     "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, tab, {{position}} of {{total}}"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Start a chat",
-      "description": "Send a message to talk to a model."
-    },
-    "historyRetry": "Could not load chat history.",
-    "sendError": "Could not send the message. Try again."
-  },
   "chat": {
     "instancePicker": {
       "switchInstance": "Switch instance",
@@ -2619,7 +2611,7 @@
   },
   "kiloPass": {
     "title": "Kilo Pass",
-    "unavailable": "Kilo Pass unavailable",
+    "unavailable": "Couldn't load Kilo Pass.",
     "couldNotLoad": "Kilo Pass could not be loaded. Try again.",
     "retryLoading": "Retry loading Kilo Pass",
     "tryVerifyingPurchaseAgain": "Try verifying purchase again",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "No transcription models",
     "emptyDescription": "The gateway offers no transcription models right now.",
     "loadFailed": "Couldn't load transcription models."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Start a chat",
+      "description": "Send a message to talk to a model."
+    },
+    "list": {
+      "loadFailed": "Could not load chat history.",
+      "new": "New chat",
+      "openHint": "Opens the chat. Long press to delete.",
+      "deleteTitle": "Delete this chat?"
+    },
+    "beta": "Beta"
   }
 }

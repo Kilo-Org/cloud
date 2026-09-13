@@ -2966,14 +2966,6 @@
     "revoke": "Deixa de confiar en {{host}}",
     "backToPreferences": "Torna a les preferències"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Comença un xat",
-      "description": "Envia un missatge per parlar amb un model."
-    },
-    "historyRetry": "No s'ha pogut carregar l'historial del xat.",
-    "sendError": "No s'ha pogut enviar el missatge. Torna-ho a provar."
-  },
   "glanceable": {
     "waiting": "S'estan actualitzant els agents",
     "empty": "No hi ha cap feina en curs",
@@ -2992,5 +2984,18 @@
     "emptyTitle": "Cap model de transcripció",
     "emptyDescription": "Kilo Gateway no ofereix cap model de transcripció ara mateix.",
     "loadFailed": "No s'han pogut carregar els models de transcripció."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Comença un xat",
+      "description": "Envia un missatge per parlar amb un model."
+    },
+    "list": {
+      "loadFailed": "No s'ha pogut carregar l'historial del xat.",
+      "new": "Xat nou",
+      "openHint": "Obre el xat. Mantén premut per suprimir.",
+      "deleteTitle": "Vols suprimir aquest xat?"
+    },
+    "beta": "Beta"
   }
 }

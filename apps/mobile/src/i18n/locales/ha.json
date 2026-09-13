@@ -231,6 +231,8 @@
     "voiceInput": "Shigar da murya",
     "autoExpandThinking": "Faɗaɗa tunani kai tsaye",
     "autoExpandThinkingSubtitle": "Nuna cikakken tunanin wakilin idan ya gama.",
+    "hideThinking": "Ɓoye bayanan tunani",
+    "hideThinkingSubtitle": "Kada a nuna tunanin wakilin a shafin zaman.",
     "keepScreenOn": "Bar allo a kunne a shafin zaman",
     "keepScreenOnSubtitle": "Bar allo a kunne yayin da aikin zaman ke gudana.",
     "appearance": "Kamanni",

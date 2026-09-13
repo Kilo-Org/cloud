@@ -231,6 +231,8 @@
     "voiceInput": "Entrada de veu",
     "autoExpandThinking": "Desplega automàticament el raonament",
     "autoExpandThinkingSubtitle": "Mostra el raonament de l'agent desplegat quan acaba de raonar.",
+    "hideThinking": "Amaga els detalls del raonament",
+    "hideThinkingSubtitle": "No mostris el raonament de l'agent a la pàgina de la sessió.",
     "keepScreenOn": "Mantén la pantalla encesa mentre vegis la sessió",
     "keepScreenOnSubtitle": "Mantén la pantalla encesa mentre la sessió estigui en execució.",
     "appearance": "Aparença",

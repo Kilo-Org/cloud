@@ -231,6 +231,8 @@
     "voiceInput": "ਵੌਇਸ ਇਨਪੁਟ",
     "autoExpandThinking": "ਸੋਚ ਦਾ ਵੇਰਵਾ ਆਪਣੇ ਆਪ ਖੋਲ੍ਹੋ",
     "autoExpandThinkingSubtitle": "ਏਜੰਟ ਦੇ ਸੋਚਣ ਤੋਂ ਬਾਅਦ ਉਸ ਦੀ ਸੋਚ ਦਾ ਪੂਰਾ ਵੇਰਵਾ ਦਿਖਾਓ।",
+    "hideThinking": "ਸੋਚ ਦਾ ਵੇਰਵਾ ਲੁਕਾਓ",
+    "hideThinkingSubtitle": "ਸੈਸ਼ਨ ਪੰਨੇ 'ਤੇ ਏਜੰਟ ਦੀ ਸੋਚ ਨਾ ਦਿਖਾਓ।",
     "keepScreenOn": "ਸੈਸ਼ਨ ਪੰਨੇ 'ਤੇ ਸਕ੍ਰੀਨ ਚਾਲੂ ਰੱਖੋ",
     "keepScreenOnSubtitle": "ਜਦੋਂ ਸੈਸ਼ਨ ਵਿੱਚ ਕੰਮ ਚੱਲ ਰਿਹਾ ਹੋਵੇ, ਸਕ੍ਰੀਨ ਚਾਲੂ ਰੱਖੋ।",
     "appearance": "ਦਿੱਖ",

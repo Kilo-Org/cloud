@@ -231,6 +231,8 @@
     "voiceInput": "Input tal-vuċi",
     "autoExpandThinking": "Espandi awtomatikament il-ħsieb",
     "autoExpandThinkingSubtitle": "Uri l-ħsieb tal-aġent espandut meta jispiċċa.",
+    "hideThinking": "Aħbi d-dettalji tal-ħsieb",
+    "hideThinkingSubtitle": "Turix il-ħsieb tal-aġent fil-paġna tas-sessjoni.",
     "keepScreenOn": "Żomm l-iskrin mixgħul fil-paġna tas-sessjoni",
     "keepScreenOnSubtitle": "Żomm l-iskrin mixgħul waqt li s-sessjoni tkun qed taħdem.",
     "appearance": "Dehra",

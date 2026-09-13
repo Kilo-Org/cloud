@@ -231,6 +231,8 @@
     "voiceInput": "Introducere vocală",
     "autoExpandThinking": "Extindere automată a raționamentului",
     "autoExpandThinkingSubtitle": "Afișează raționamentul agentului în formă extinsă după finalizarea lui.",
+    "hideThinking": "Ascunde detaliile raționamentului",
+    "hideThinkingSubtitle": "Nu afișa raționamentul agentului pe pagina sesiunii.",
     "keepScreenOn": "Menține ecranul aprins pe pagina sesiunii",
     "keepScreenOnSubtitle": "Menține ecranul aprins cât timp sesiunea rulează.",
     "appearance": "Aspect",

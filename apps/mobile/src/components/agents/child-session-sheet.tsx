@@ -34,6 +34,12 @@ type ChildSessionSheetProps = {
   sessionId: string;
   title: string;
   getChildMessages: (sessionId: string) => StoredMessage[];
+  /**
+   * Resolves the messages that derive the footer working-indicator label.
+   * Defaults to `getChildMessages`. The session page passes the raw transcript
+   * here so hiding thinking rows never changes the spinner status.
+   */
+  getIndicatorMessages?: (sessionId: string) => StoredMessage[];
   hydrationState: ChildSessionHydrationState;
   sessionError: string | null;
   isStreaming: boolean;
@@ -56,6 +62,7 @@ export function ChildSessionSheet({
   sessionId,
   title,
   getChildMessages,
+  getIndicatorMessages = getChildMessages,
   hydrationState,
   sessionError,
   isStreaming,
@@ -72,6 +79,7 @@ export function ChildSessionSheet({
   modelOptions,
 }: Readonly<ChildSessionSheetProps>) {
   const messages = getChildMessages(sessionId);
+  const indicatorMessages = getIndicatorMessages(sessionId);
   const state = getChildSessionSheetState(hydrationState, messages.length, sessionError);
   const modelLabel = getChildSessionModelLabel(messages, modelOptions ?? []);
   const { t } = useTranslation();
@@ -139,7 +147,9 @@ export function ChildSessionSheet({
               </View>
             </MessageErrorBoundary>
           )}
-          ListFooterComponent={<WorkingIndicator messages={messages} isStreaming={isStreaming} />}
+          ListFooterComponent={
+            <WorkingIndicator messages={indicatorMessages} isStreaming={isStreaming} />
+          }
           contentBottomInset={sheetBottomInset}
         />
       </View>

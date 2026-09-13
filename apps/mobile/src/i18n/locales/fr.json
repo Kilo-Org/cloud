@@ -1970,6 +1970,8 @@
     "voiceInput": "Saisie vocale",
     "autoExpandThinking": "Développer automatiquement la réflexion",
     "autoExpandThinkingSubtitle": "Afficher le détail de la réflexion de l'agent une fois celle-ci terminée.",
+    "hideThinking": "Masquer les détails de la réflexion",
+    "hideThinkingSubtitle": "Ne pas afficher la réflexion de l'agent sur la page de la session.",
     "keepScreenOn": "Garder l'écran allumé sur la page de la session",
     "keepScreenOnSubtitle": "Garder l'écran allumé pendant l'exécution de la session.",
     "appearance": "Apparence",

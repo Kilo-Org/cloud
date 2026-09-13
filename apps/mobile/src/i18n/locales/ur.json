@@ -231,6 +231,8 @@
     "voiceInput": "صوتی ان پٹ",
     "autoExpandThinking": "سوچ کی تفصیل خود بخود دکھائیں",
     "autoExpandThinkingSubtitle": "ایجنٹ کی سوچ مکمل ہونے پر اس کی تفصیل کھول کر دکھائیں۔",
+    "hideThinking": "سوچ کی تفصیلات چھپائیں",
+    "hideThinkingSubtitle": "سیشن کے صفحے پر ایجنٹ کی سوچ نہ دکھائیں۔",
     "keepScreenOn": "سیشن کے صفحے پر اسکرین روشن رکھیں",
     "keepScreenOnSubtitle": "سیشن میں کام جاری ہو تو اسکرین روشن رکھیں۔",
     "appearance": "ظاہری شکل",

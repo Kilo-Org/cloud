@@ -107,6 +107,7 @@ vi.mock('@/components/ui/icons', () => ({
   CheckCircle2: 'Icon',
   CornerDownLeft: 'Icon',
   Cpu: 'Icon',
+  EyeOff: 'Icon',
   Gauge: 'Icon',
   Globe: 'Icon',
   Info: 'Icon',

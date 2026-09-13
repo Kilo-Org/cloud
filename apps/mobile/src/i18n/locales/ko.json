@@ -231,6 +231,8 @@
     "voiceInput": "음성 입력",
     "autoExpandThinking": "추론 내용 자동 펼치기",
     "autoExpandThinkingSubtitle": "에이전트의 추론이 끝나면 추론 내용을 펼쳐서 표시합니다.",
+    "hideThinking": "추론 내용 숨기기",
+    "hideThinkingSubtitle": "세션 화면에서 에이전트의 추론을 표시하지 않습니다.",
     "keepScreenOn": "세션 화면에서 화면 켜짐 유지",
     "keepScreenOnSubtitle": "세션이 실행되는 동안 화면이 꺼지지 않도록 합니다.",
     "appearance": "화면 스타일",

@@ -231,6 +231,8 @@
     "voiceInput": "Balss ievade",
     "autoExpandThinking": "Automātiski izvērst domāšanu",
     "autoExpandThinkingSubtitle": "Rādīt aģenta domas izvērstā veidā, kad domāšana ir pabeigta.",
+    "hideThinking": "Slēpt domāšanas informāciju",
+    "hideThinkingSubtitle": "Nerādīt aģenta domāšanu sesijas lapā.",
     "keepScreenOn": "Neizslēgt ekrānu sesijas skatā",
     "keepScreenOnSubtitle": "Neizslēgt ekrānu, kamēr sesija darbojas.",
     "appearance": "Izskats",

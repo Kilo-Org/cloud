@@ -125,6 +125,27 @@ describe('scrubEvent', () => {
     expect(() => scrubEvent(event)).not.toThrow();
   });
 
+  it('redacts token values in an object reachable through two references', () => {
+    const shared = { token: 'abcdefghijklmnopqrst' };
+    const event = { extra: { first: shared, second: shared } };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.first.token).toBe('[redacted]');
+    expect(result.extra.second.token).toBe('[redacted]');
+  });
+
+  it('redacts token values in a cyclic extra value', () => {
+    const cyclic: Record<string, unknown> = { token: 'abcdefghijklmnopqrst' };
+    cyclic.self = cyclic;
+    const event = { extra: cyclic };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.token).toBe('[redacted]');
+    expect((result.extra.self as Record<string, unknown>).token).toBe('[redacted]');
+  });
+
   it('redacts token values in the context extraErrorDataIntegration attaches', () => {
     const event = {
       exception: { values: [{ type: 'TRPCClientError' }] },

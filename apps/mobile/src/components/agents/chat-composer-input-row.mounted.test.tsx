@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as composer-paste-button.mounted.test.tsx) */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatComposerInputRow } from './chat-composer-input-row';
@@ -260,7 +259,7 @@ describe('ChatComposerInputRow mounted — iOS writing-tools lock', () => {
     vi.resetModules();
     const { ChatComposerInputRow: AndroidRow } = await import('./chat-composer-input-row');
     const { createElement: createElementAndroid } = await import('react');
-    const { default: Renderer, act: actFresh } = await import('react-test-renderer');
+    const { TestRenderer: Renderer, act: actFresh } = await import('@/test/renderer');
 
     const renderAndroid = async (props: RenderProps): Promise<TestRenderer.ReactTestRenderer> => {
       const holder: { current?: TestRenderer.ReactTestRenderer } = {};

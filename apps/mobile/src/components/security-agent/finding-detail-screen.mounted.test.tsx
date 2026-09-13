@@ -1,12 +1,10 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
-
 // Finding-detail load/back states and dismiss retry cards. The screen stays
 // mounted while the dismiss sheet is open, so it re-reads the draft on focus.
 
 import { createElement } from 'react';
 import { type SecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { SecurityCommandRetryCard } from './security-command-retry-card';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CenteredState } from '@/components/centered-state';

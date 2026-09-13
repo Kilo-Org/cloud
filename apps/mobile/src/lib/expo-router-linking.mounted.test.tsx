@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm';
 import type * as NativeLinking from 'expo-router/build/fork/useLinking.native';
 import { useThenable } from 'expo-router/build/fork/useThenable';
 import * as React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);

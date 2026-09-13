@@ -1,8 +1,7 @@
 /* oxlint-disable max-lines -- cohesive suite: inert-until-load, viewer routing, and chip/link a11y share one tree-walk harness */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/agents/markdown-renderer.test.ts) */
 import '@/i18n';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearMarkdownImageConfirmMemory, confirmMarkdownImage } from './markdown-image-confirm';

@@ -1,6 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as composer-paste-button.mounted.test.tsx) */
+/* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as composer-paste-button.mounted.test.tsx) */
 import { type ComponentProps, createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ScreenHeader } from './screen-header';
@@ -179,6 +179,17 @@ describe('ScreenHeader mounted', () => {
 
     const title = findTitlePressable(renderer.root);
     expect(title.props.hitSlop).toEqual({ top: 13, right: 13, bottom: 13, left: 0 });
+  });
+
+  it('mirrors the title hit slop onto the free side in RTL', () => {
+    // RN does not mirror hitSlop under RTL: an unchanged physical right slop
+    // reaches across the visually mirrored back control and the title (the
+    // later sibling) wins those taps, so Back opens the title action instead.
+    i18nManager.isRTL = true;
+    const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
+
+    const title = findTitlePressable(renderer.root);
+    expect(title.props.hitSlop).toEqual({ top: 13, right: 0, bottom: 13, left: 13 });
   });
 
   it('gives the interactive title at least a 44-point reachable target', () => {

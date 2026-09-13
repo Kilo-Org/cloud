@@ -112,6 +112,14 @@ export function ScreenHeader({
       ? 'shrink text-[30px] font-bold tracking-tight text-foreground'
       : 'shrink text-lg font-semibold text-foreground';
 
+  // The slop widens the title into the free space beside it. RN does not mirror
+  // hitSlop under RTL, so the physical right slop would reach across the
+  // visually mirrored back control and the title (the later sibling) would win
+  // those taps — spell the free side per direction instead.
+  const titleHitSlop = I18nManager.isRTL
+    ? { top: 13, right: 0, bottom: 13, left: 13 }
+    : { top: 13, right: 13, bottom: 13, left: 0 };
+
   let titleNode: React.ReactNode = null;
   if (title != null) {
     const titleText = titleContent ? (
@@ -146,7 +154,7 @@ export function ScreenHeader({
     titleNode = onTitlePress ? (
       <Pressable
         onPress={onTitlePress}
-        hitSlop={{ top: 13, right: 13, bottom: 13, left: 0 }}
+        hitSlop={titleHitSlop}
         accessibilityRole="button"
         accessibilityLabel={
           onTitlePressAccessibilityLabel ??

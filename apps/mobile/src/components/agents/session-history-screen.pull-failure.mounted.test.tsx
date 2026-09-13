@@ -1,6 +1,6 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- DOM-free mounted repro: the live Agents history screen exercises the REAL AgentSessionListContent and SessionListSearchHeader (pull state, Updating status, inline retry) over a mocked data hook with a controlled failing refetch, mirroring the live-tab pull-failure mount test. */
+/* eslint-disable max-lines -- DOM-free mounted repro: the live Agents history screen exercises the REAL AgentSessionListContent and SessionListSearchHeader (pull state, Updating status, inline retry) over a mocked data hook with a controlled failing refetch, mirroring the live-tab pull-failure mount test. */
 import { createElement, type ReactNode } from 'react';
-import { act, type ReactTestRenderer } from 'react-test-renderer';
+import { act, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';

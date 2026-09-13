@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { planAutoApproveReply } from './session-auto-approve';
+import { planAutoApproveReply, rememberRequestId } from './session-auto-approve';
 
 /** Sends the per-ask "once" reply and reports whether it can be retried. */
 export type SessionAutoApproveRespond = (
@@ -37,6 +37,9 @@ type SessionAutoApproveResult = {
  * answered and ids whose reply failed — so the permission card is gated out on
  * the same frame the ask arrives (never a one-frame flash). A failed reply
  * flips a state counter, re-rendering with the card visible for its Retry CTA.
+ * Both refs remember only the most recent request ids (see
+ * `MAX_REMEMBERED_REQUEST_IDS`), so a long session does not retain every ask it
+ * ever answered.
  */
 export function useSessionAutoApprove({
   enabled,
@@ -68,10 +71,10 @@ export function useSessionAutoApprove({
     if (replyRequestId === null || handledRequestIdsRef.current.has(replyRequestId)) {
       return;
     }
-    handledRequestIdsRef.current.add(replyRequestId);
+    rememberRequestId(handledRequestIdsRef.current, replyRequestId);
     const markFailed = () => {
       handledRequestIdsRef.current.delete(replyRequestId);
-      failedRequestIdsRef.current.add(replyRequestId);
+      rememberRequestId(failedRequestIdsRef.current, replyRequestId);
       setFailedVersion(version => version + 1);
     };
     void (async () => {

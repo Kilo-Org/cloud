@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canAutoApprovePermissions,
+  clearSessionAutoApprove,
   getSessionAutoApproveEnabled,
+  MAX_REMEMBERED_REQUEST_IDS,
   planAutoApproveReply,
+  rememberRequestId,
   resolveSessionAutoApproveState,
   setSessionAutoApproveEnabled,
 } from './session-auto-approve';
@@ -158,5 +161,40 @@ describe('session auto-approve store', () => {
 
     expect(getSessionAutoApproveEnabled('store-session-b')).toBe(false);
     expect(getSessionAutoApproveEnabled('store-session-c')).toBe(false);
+  });
+
+  it('turns every session off on sign-out or account switch', () => {
+    setSessionAutoApproveEnabled('clear-session-a', true);
+    setSessionAutoApproveEnabled('clear-session-b', true);
+
+    clearSessionAutoApprove();
+
+    expect(getSessionAutoApproveEnabled('clear-session-a')).toBe(false);
+    expect(getSessionAutoApproveEnabled('clear-session-b')).toBe(false);
+  });
+});
+
+describe('rememberRequestId', () => {
+  it('evicts the oldest id once the window is full', () => {
+    const remembered = new Set<string>();
+
+    for (let index = 0; index <= MAX_REMEMBERED_REQUEST_IDS; index += 1) {
+      rememberRequestId(remembered, `req-${index}`);
+    }
+
+    expect(remembered.size).toBe(MAX_REMEMBERED_REQUEST_IDS);
+    // The oldest id is evicted first; the newest stays.
+    expect(remembered.has('req-0')).toBe(false);
+    expect(remembered.has(`req-${MAX_REMEMBERED_REQUEST_IDS}`)).toBe(true);
+  });
+
+  it('does not grow past the window for a long run of distinct ids', () => {
+    const remembered = new Set<string>();
+
+    for (let index = 0; index < MAX_REMEMBERED_REQUEST_IDS * 10; index += 1) {
+      rememberRequestId(remembered, `req-${index}`);
+    }
+
+    expect(remembered.size).toBe(MAX_REMEMBERED_REQUEST_IDS);
   });
 });

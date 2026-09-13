@@ -80,6 +80,27 @@ export function planAutoApproveReply(input: {
   };
 }
 
+/**
+ * Most request ids the reply hook remembers per set. A handled id must outlive
+ * its ask so a queue that advances and returns does not answer it twice, and a
+ * failed id must outlive its ask so a failed reply keeps its card. Only the
+ * asks near the head of the queue can be re-shown, so a small window bounds the
+ * memory without changing behavior for any realistic queue depth.
+ */
+export const MAX_REMEMBERED_REQUEST_IDS = 64;
+
+/** Remember one request id, evicting the oldest once the window is full. */
+export function rememberRequestId(remembered: Set<string>, requestId: string): void {
+  remembered.add(requestId);
+  if (remembered.size <= MAX_REMEMBERED_REQUEST_IDS) {
+    return;
+  }
+  const oldest = remembered.values().next().value;
+  if (oldest !== undefined) {
+    remembered.delete(oldest);
+  }
+}
+
 /** Session ids with auto-approve on. Absence means off. */
 const enabledBySession = new Map<string, true>();
 
@@ -105,6 +126,23 @@ export function setSessionAutoApproveEnabled(sessionId: string, enabled: boolean
     enabledBySession.delete(sessionId);
   }
   notifySession(sessionId);
+}
+
+/**
+ * Drop every session's toggle on sign-out or account switch, so a later sign-in
+ * on the same process never inherits the prior account's auto-approve state.
+ * Notifies the subscribers still mounted (a re-render later in the same frame is
+ * how off appears) and does not touch the global auto-approve config.
+ */
+export function clearSessionAutoApprove(): void {
+  if (enabledBySession.size === 0) {
+    return;
+  }
+  const sessionIds = [...enabledBySession.keys()];
+  enabledBySession.clear();
+  for (const sessionId of sessionIds) {
+    notifySession(sessionId);
+  }
 }
 
 /** React binding for the row: subscribes to one session's toggle value. */

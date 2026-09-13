@@ -4,6 +4,7 @@ import TestRenderer, { act, type ReactTestInstance } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type SessionAutoApproveRespond, useSessionAutoApprove } from './use-session-auto-approve';
+import { MAX_REMEMBERED_REQUEST_IDS } from './session-auto-approve';
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
@@ -101,6 +102,28 @@ describe('useSessionAutoApprove', () => {
     await flush();
     expect(respond).toHaveBeenCalledTimes(2);
     expect(suppressed(renderer)).toBe('perm-1');
+  });
+
+  it('re-sends an ask evicted from the remembered window after a long run', async () => {
+    const respond = vi.fn<SessionAutoApproveRespond>().mockResolvedValue('ok');
+    const { renderer, props } = mount({ respond });
+    await flush();
+    expect(respond).toHaveBeenCalledTimes(1);
+
+    // Advance past the remembered window, then return to the first ask.
+    for (let index = 1; index <= MAX_REMEMBERED_REQUEST_IDS; index += 1) {
+      rerender(renderer, { ...props, requestId: `perm-new-${index}` });
+      // eslint-disable-next-line no-await-in-loop -- each ask must commit and flush before the next one
+      await flush();
+    }
+    expect(respond).toHaveBeenCalledTimes(MAX_REMEMBERED_REQUEST_IDS + 1);
+
+    rerender(renderer, { ...props, requestId: 'perm-1' });
+    await flush();
+    // The evicted id was forgotten, so it is answered again; the window is
+    // still bounded, which is the behavior under test.
+    expect(respond).toHaveBeenCalledTimes(MAX_REMEMBERED_REQUEST_IDS + 2);
+    expect(respond).toHaveBeenLastCalledWith('perm-1');
   });
 
   it('un-suppresses a retryable reply so the card can render with its Retry CTA', async () => {

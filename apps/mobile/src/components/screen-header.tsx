@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
+import { OFFLINE_BANNER_HEIGHT, useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -78,9 +79,18 @@ export function ScreenHeader({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const canGoBack = showBackButton ?? (router.canGoBack() || backFallback !== undefined);
+  const isOfflineBannerVisible = useOfflineBannerSpace();
 
   // iOS modals are presented as cards already inset from the status bar
-  const paddingTop = modal && Platform.OS === 'ios' ? 32 : insets.top + 8;
+  const baseTopPadding = modal && Platform.OS === 'ios' ? 32 : insets.top + 8;
+
+  // The offline banner is an absolute overlay pinned at the safe-area top, so a
+  // pinned header must reserve its height while it is visible or the banner
+  // covers the title (gr2 spot check, e6-offline-nav). iOS modals live in a
+  // separate window above the banner, so they never reserve.
+  const reserveOfflineBanner =
+    safeAreaTop && isOfflineBannerVisible && !(Boolean(modal) && Platform.OS === 'ios');
+  const paddingTop = baseTopPadding + (reserveOfflineBanner ? OFFLINE_BANNER_HEIGHT : 0);
 
   // `paddingTop` stays conditional on `safeAreaTop`: a form sheet owns its
   // vertical padding through `className`.

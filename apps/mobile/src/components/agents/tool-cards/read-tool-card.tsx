@@ -113,6 +113,7 @@ export function ReadToolCard({ part }: Readonly<{ part: ToolPart }>) {
     <FixedPartRow
       icon={Eye}
       label={display.subtitle ?? display.title}
+      translatable={display.translatable}
       {...(display.badge ? { badge: display.badge } : {})}
       status={part.state.status}
       accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {

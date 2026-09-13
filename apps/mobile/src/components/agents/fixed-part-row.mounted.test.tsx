@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
+/* eslint-disable max-lines -- one cohesive mounted suite pins every FixedPartRow state through the shared render harness */
 import '@/i18n';
 import { Eye } from '@/components/ui/icons';
 import { createElement } from 'react';
@@ -346,6 +347,28 @@ describe('FixedPartRow tool-summary translation', () => {
 
     expect(rowLabel(renderer)).toBe('Disabled summary');
     expect(rowAccessibilityLabel(renderer)).toBe('Disabled summary tool, completed');
+    expect(requestMock).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the raw label and makes no request for a non-translatable label', async () => {
+    requestMock.mockResolvedValue('Traduit');
+    setConfig({ enabled: true, model: MODEL });
+    const renderer = renderScopedRowSync({
+      icon: Eye,
+      label: 'Read todos',
+      translatable: false,
+      status: 'completed',
+      accessibilityLabel: 'Read todos tool, completed',
+    });
+
+    // The i18n fallback is already in the app language: no gateway request.
+    await settleTranslation();
+
+    expect(rowLabel(renderer)).toBe('Read todos');
+    expect(rowAccessibilityLabel(renderer)).toBe('Read todos tool, completed');
     expect(requestMock).not.toHaveBeenCalled();
     act(() => {
       renderer.unmount();

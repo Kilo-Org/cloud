@@ -25,6 +25,12 @@ type FixedPartRowProps = {
   variant?: 'solid' | 'dashed';
   /** Presence makes the row pressable and adds the chevron and details hint. */
   onPress?: () => void;
+  /**
+   * Whether the label carries tool content worth translating. Defaults to true;
+   * tool cards pass the display projection's `translatable` so a label that is
+   * already-localized UI copy or a raw tool id is never sent to the gateway.
+   */
+  translatable?: boolean;
   accessibilityLabel: string;
 };
 
@@ -42,12 +48,13 @@ export function FixedPartRow({
   status,
   variant = 'solid',
   onPress,
+  translatable = true,
   accessibilityLabel,
 }: Readonly<FixedPartRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const isToolSummaryRow = useIsToolSummaryRow();
-  const shownLabel = useTranslatedToolSummary(label, isToolSummaryRow);
+  const shownLabel = useTranslatedToolSummary(label, isToolSummaryRow && translatable);
   // Keep the spoken summary in step with the visible one without a second
   // translation request: only the embedded label changes.
   const shownAccessibilityLabel =

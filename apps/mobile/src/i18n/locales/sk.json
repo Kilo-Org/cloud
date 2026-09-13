@@ -231,6 +231,8 @@
     "voiceInput": "Hlasový vstup",
     "autoExpandThinking": "Automaticky rozbaliť uvažovanie",
     "autoExpandThinkingSubtitle": "Po dokončení uvažovania agenta sa jeho obsah automaticky rozbalí.",
+    "hideThinking": "Skryť podrobnosti uvažovania",
+    "hideThinkingSubtitle": "Nezobrazovať uvažovanie agenta na stránke relácie.",
     "keepScreenOn": "Ponechať obrazovku zapnutú na stránke relácie",
     "keepScreenOnSubtitle": "Obrazovka zostane zapnutá, kým relácia beží.",
     "appearance": "Vzhľad",

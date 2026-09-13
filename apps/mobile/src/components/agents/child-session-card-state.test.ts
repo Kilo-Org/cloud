@@ -107,7 +107,7 @@ function makeAssistantMessage(parts: Part[], id = 'msg-1'): StoredMessage {
 describe('getChildSessionCardState', () => {
   it.each([
     ['pending', 'Waiting for activity'],
-    ['running', 'Waiting for activity'],
+    ['running', 'Thinking'],
     ['completed', ''],
     ['error', ''],
   ] as const)(

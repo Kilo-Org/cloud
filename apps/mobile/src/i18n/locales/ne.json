@@ -231,6 +231,8 @@
     "voiceInput": "आवाज इनपुट",
     "autoExpandThinking": "सोचको विवरण स्वतः खोल्नुहोस्",
     "autoExpandThinkingSubtitle": "एजेन्टले सोचिसकेपछि त्यसको विवरण पूरा देखाउनुहोस्।",
+    "hideThinking": "सोचको विवरण लुकाउनुहोस्",
+    "hideThinkingSubtitle": "सत्र पृष्ठमा एजेन्टको सोच नदेखाउनुहोस्।",
     "keepScreenOn": "सत्र पृष्ठमा हुँदा स्क्रिन चालू राख्नुहोस्",
     "keepScreenOnSubtitle": "सत्र चलिरहँदा स्क्रिन चालू राख्नुहोस्।",
     "appearance": "रूप",

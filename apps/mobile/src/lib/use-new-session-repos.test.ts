@@ -6,6 +6,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  getNewSessionBranchState,
   getSelectedBranchOverride,
   type NewSessionRepository,
   setNewSessionBranchScope,
@@ -390,5 +391,37 @@ describe('branch overrides across a repository change', () => {
     setSelectedBranchOverride(githubRepo, 'release/2.0');
     expect(getSelectedBranchOverride(githubRepo)).toBe('release/2.0');
     expect(getSelectedBranchOverride({ ...githubRepo, platform: 'gitlab' })).toBeNull();
+  });
+});
+
+describe('useNewSessionRepos published branch scope', () => {
+  it('drops the organization scope on unmount so a remount cannot query the previous screen’s org', () => {
+    const resultRef: { current: ReposResult | null } = { current: null };
+    const renderer: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
+    act(() => {
+      renderer.current = TestRenderer.create(
+        React.createElement(Harness, { organizationId: 'org-1', resultRef })
+      );
+    });
+    expect(getNewSessionBranchState()).toMatchObject({
+      isScopeReady: true,
+      organizationId: 'org-1',
+    });
+
+    act(() => {
+      renderer.current?.unmount();
+    });
+
+    // The scope is "not ready" again, not a stale organization and not an
+    // implicit personal scope: the next screen publishes its own.
+    expect(getNewSessionBranchState()).toMatchObject({
+      isScopeReady: false,
+      organizationId: undefined,
+    });
+
+    mocks.queryCalls.length = 0;
+    const branches = mountBranches(githubRepo);
+    expect(branches.isEnabled).toBe(false);
+    expect(branchQueryOptions().enabled).toBe(false);
   });
 });

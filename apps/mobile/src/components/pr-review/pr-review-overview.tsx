@@ -13,6 +13,7 @@ import { QueryError } from '@/components/query-error';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { PrOverviewMeta } from '@/components/pr-review/pr-review-meta-parts';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
+import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { PrMergeSection } from '@/components/pr-review/merge/pr-merge-section';
 import { PrMergeSectionProvider } from '@/components/pr-review/merge/pr-merge-section-provider';
 import {
@@ -156,6 +157,22 @@ export function PrReviewOverview({
       );
     }
     if (state.kind === 'reconnect') {
+      // GitHub keeps the centered empty state with its connection CTA. A
+      // provider surface reuses the shared reconnect notice instead: it carries
+      // the provider's own title/message and re-checks that provider's
+      // connection, because the GitHub copy and CTA cannot recover a GitLab or
+      // Bitbucket session.
+      if (!isGitHub) {
+        return (
+          <DetailScreenScrollView
+            className="flex-1"
+            contentContainerClassName="p-4"
+            refreshControl={refreshControl}
+          >
+            <PrReviewReconnectNotice />
+          </DetailScreenScrollView>
+        );
+      }
       return (
         <EmptyState
           refreshControl={refreshControl}
@@ -163,17 +180,15 @@ export function PrReviewOverview({
           title={t('prReview.reconnectNotice.title')}
           description={t('prReview.reconnectNotice.message')}
           action={
-            isGitHub ? (
-              <Button
-                className="mt-3 w-full"
-                onPress={() => {
-                  connection.mutate();
-                }}
-                loading={connection.isPending}
-              >
-                <Text>{t('prReview.checkConnection')}</Text>
-              </Button>
-            ) : null
+            <Button
+              className="mt-3 w-full"
+              onPress={() => {
+                connection.mutate();
+              }}
+              loading={connection.isPending}
+            >
+              <Text>{t('prReview.checkConnection')}</Text>
+            </Button>
           }
         />
       );

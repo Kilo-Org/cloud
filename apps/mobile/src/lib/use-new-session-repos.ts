@@ -13,6 +13,7 @@ import {
   type RepositoryGroups,
   repositoryIdentityKey,
   type RepositoryPlatform,
+  resetNewSessionBranchScope,
   resolveBitbucketStatus,
   resolveProviderStatus,
   resolveRepositoryGroups,
@@ -57,8 +58,13 @@ export function useNewSessionRepos({
   // hands this hook the scope already, and `useRepositoryBranches` reads it
   // from the shared new-session branch state rather than from props the
   // repository section is not given.
+  //
+  // Publish on mount and drop it on unmount (and on a scope change): a remount
+  // must not read the previous screen's organization on its first render,
+  // before this effect runs, and issue a branch query under the wrong scope.
   useEffect(() => {
     setNewSessionBranchScope(organizationId);
+    return resetNewSessionBranchScope;
   }, [organizationId]);
 
   const githubQuery = useQuery(

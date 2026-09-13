@@ -7,6 +7,7 @@ import {
   type NewSessionRepository,
   type RepositoryGroup,
   repositoryIdentityKey,
+  resetNewSessionBranchScope,
   resetSelectedBranchOverrides,
   resolveBitbucketStatus,
   resolveProviderStatus,
@@ -304,5 +305,23 @@ describe('new-session branch state', () => {
     });
     setNewSessionBranchScope('org-1');
     expect(getNewSessionBranchState().organizationId).toBe('org-1');
+  });
+
+  it('drops the scope on reset so a remount starts unknown, not on the old organization', () => {
+    setNewSessionBranchScope('org-1');
+    const listener = vi.fn(() => undefined);
+    const unsubscribe = subscribeNewSessionBranchState(listener);
+
+    resetNewSessionBranchScope();
+
+    expect(getNewSessionBranchState()).toMatchObject({
+      isScopeReady: false,
+      organizationId: undefined,
+    });
+    expect(listener).toHaveBeenCalledTimes(1);
+    // A second reset is a no-op: the store is already un-scoped.
+    resetNewSessionBranchScope();
+    expect(listener).toHaveBeenCalledTimes(1);
+    unsubscribe();
   });
 });

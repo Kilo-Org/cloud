@@ -4,6 +4,7 @@ import { RefreshControl } from '@/components/ui/refresh-control';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { type ProviderPrScope, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewOverview } from './pr-review-overview';
 import { PrReviewCommentComposerScreen } from './pr-review-comment-composer-screen';
 import { PrReviewReviewSubmitScreen } from './pr-review-review-submit-screen';
@@ -117,6 +118,7 @@ vi.mock('@/lib/trpc', () => ({
     providerReview: {
       getCapabilities: { queryOptions: () => ({}) },
       getMergeState: { queryOptions: () => ({}) },
+      getPullRequest: { queryOptions: () => ({}) },
     },
   }),
 }));
@@ -169,6 +171,35 @@ describe('PR Overview full-body states', () => {
       unmount();
     }
   );
+
+  it('gives a provider reconnect its own notice and recovery CTA instead of the GitHub empty state', async () => {
+    query.error.data.code = 'PRECONDITION_FAILED';
+    const scope: ProviderPrScope = {
+      ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 },
+      organizationId: null,
+    };
+    const { renderer, unmount } = await renderWithProviders(
+      <ProviderPrScopeProvider value={scope}>
+        {createElement(PrReviewOverview, overviewProps)}
+      </ProviderPrScopeProvider>
+    );
+
+    // Not the GitHub-only centered empty state.
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    const texts = renderer.root
+      .findAllByType('Text' as never)
+      .flatMap(node => node.children)
+      .filter((child): child is string => typeof child === 'string');
+    expect(texts).toContain('GitLab connection expired');
+    // The recovery CTA is present, not hidden behind the GitHub-only arm.
+    expect(
+      renderer.root.findAll(
+        node =>
+          String(node.type) === 'Button' && node.props.accessibilityLabel === 'Check connection'
+      )
+    ).toHaveLength(1);
+    unmount();
+  });
 
   it('keeps cached overview content and its refresh control after a transient failure', async () => {
     query.data = {

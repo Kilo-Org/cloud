@@ -271,6 +271,22 @@ export function setNewSessionBranchScope(organizationId: string | undefined): vo
 }
 
 /**
+ * Drop the published scope when the new-session screen goes away. Without
+ * this, a remount reads the previous screen's organization on its first
+ * render — before the publishing effect runs — and a branch query for the
+ * already-selected repository fires against an organization the user has
+ * left. Going back to "not ready" (rather than publishing a personal scope)
+ * keeps both directions safe: the next screen's first render queries nothing
+ * until its own scope is published.
+ */
+export function resetNewSessionBranchScope(): void {
+  if (!branchSnapshot.isScopeReady) {
+    return;
+  }
+  publishBranchSnapshot({ ...branchSnapshot, isScopeReady: false, organizationId: undefined });
+}
+
+/**
  * Record the branch override for one repository. `null` (the provider default
  * was chosen) drops the entry, so the create body carries no `upstreamBranch`
  * and the server checks out the provider's own default.

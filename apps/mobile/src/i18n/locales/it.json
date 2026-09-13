@@ -2020,6 +2020,10 @@
       "tapToListHint": "Tocca una cartella per visualizzarne il contenuto.",
       "unsupportedDescription": "Questa CLI non può elencare le cartelle. Tocca Fatto per mantenere la cartella di avvio, poi Avvia sessione per avviare la sessione in quella cartella.",
       "unsupportedTitle": "Impossibile elencare le cartelle"
+    },
+    "toolRun": {
+      "sheetTitle": "Chiamate degli strumenti",
+      "condensedLabel": "{{itemCount}} elementi; {{last}}"
     }
   },
   "bootstrap": {
@@ -2057,7 +2061,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Trascrizione con Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Trascrivi la dettatura con un modello Kilo Gateway anziché con il riconoscimento vocale del dispositivo. La registrazione viene inviata a Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Comprimi le chiamate degli strumenti",
+    "condenseToolCallsSubtitle": "Raggruppa le chiamate degli strumenti consecutive in una riga che puoi aprire."
   },
   "addCredits": {
     "cta": "Aggiungi crediti",

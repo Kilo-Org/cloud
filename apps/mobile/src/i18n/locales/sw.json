@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Unukuzi wa sauti kupitia Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Badilisha uingizaji wa sauti kuwa maandishi kwa modeli ya Kilo Gateway badala ya utambuzi wa sauti wa kifaa. Rekodi yako imetumwa kwa Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Finyaza miito ya zana",
+    "condenseToolCallsSubtitle": "Kusanya miito ya zana inayofuatana katika safu moja unayoweza kufungua."
   },
   "prReview": {
     "pullRequestUnavailable": "Ombi la kuunganisha halipatikani",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Gusa folda ili uone yaliyomo.",
       "unsupportedDescription": "CLI hii haiwezi kuorodhesha folda. Ukigusa Maliza, folda ya kuanzia itahifadhiwa. Ukigusa Anza kikao, kikao kitaanza hapo.",
       "unsupportedTitle": "Haiwezekani kuorodhesha folda"
+    },
+    "toolRun": {
+      "sheetTitle": "Miito ya zana",
+      "condensedLabel": "{{itemCount}} vipengee; {{last}}"
     }
   },
   "bootstrap": {

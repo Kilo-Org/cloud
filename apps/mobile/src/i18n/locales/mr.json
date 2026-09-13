@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway द्वारे लिप्यंतरण",
     "gatewayTranscriptionSubtitle": "उपकरणाच्या स्पीच रेकग्निशनऐवजी Kilo Gateway मॉडेल वापरून व्हॉइस इनपुटचे लिप्यंतरण करा. तुमचे रेकॉर्डिंग Kilo Gateway कडे पाठवले जाते.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "साधन कॉल्स संकुचित करा",
+    "condenseToolCallsSubtitle": "सलग साधन कॉल्स एका ओळीत गटबद्ध करा जी तुम्ही उघडू शकता."
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "फोल्डरमधील फाइल्स आणि फोल्डर पाहण्यासाठी त्यावर टॅप करा.",
       "unsupportedDescription": "या CLI मध्ये फोल्डरची यादी दाखवता येत नाही. झाले या बटणावर टॅप केल्यास सुरुवातीचा फोल्डर कायम राहतो. सत्र सुरू करा या बटणावर टॅप केल्यास सत्र त्याच फोल्डरमध्ये सुरू होते.",
       "unsupportedTitle": "फोल्डरची यादी दाखवता येत नाही"
+    },
+    "toolRun": {
+      "sheetTitle": "साधन कॉल्स",
+      "condensedLabel": "{{itemCount}} नोंदी; {{last}}"
     }
   },
   "bootstrap": {

@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Přepis přes Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Přepisujte diktování pomocí modelu Kilo Gateway místo rozpoznávání řeči ve vašem zařízení. Nahraný zvuk se odešle do Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Sbalit volání nástrojů",
+    "condenseToolCallsSubtitle": "Seskupte po sobě jdoucí volání nástrojů do jednoho řádku, který můžete otevřít."
   },
   "prReview": {
     "pullRequestUnavailable": "PR není dostupný",
@@ -2511,6 +2513,10 @@
       "tapToListHint": "Klepnutím na složku zobrazíte její obsah.",
       "unsupportedDescription": "Toto CLI neumí zobrazit seznam složek. Tlačítkem Hotovo ponecháte složku, ze které bylo CLI spuštěno. Relace se spustí v této složce.",
       "unsupportedTitle": "Složky nelze zobrazit"
+    },
+    "toolRun": {
+      "sheetTitle": "Volání nástrojů",
+      "condensedLabel": "{{itemCount}} položek; {{last}}"
     }
   },
   "bootstrap": {

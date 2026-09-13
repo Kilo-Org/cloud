@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Խոսքի տեքստի վերածում Kilo Gateway-ով",
     "gatewayTranscriptionSubtitle": "Ձայնային մուտքագրումը տեքստի վերածեք Kilo Gateway-ի մոդելով՝ սարքի խոսքի ճանաչման փոխարեն։ Ձեր ձայնագրությունը ուղարկվում է Kilo Gateway։",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Խտացնել գործիքների կանչերը",
+    "condenseToolCallsSubtitle": "Խմբավորեք հաջորդական գործիքների կանչերը մեկ տողում, որը կարող եք բացել։"
   },
   "prReview": {
     "pullRequestUnavailable": "Միավորման հարցումը հասանելի չէ",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Հպեք թղթապանակին՝ դրա պարունակությունը տեսնելու համար։",
       "unsupportedDescription": "Այս CLI-ն չի կարող ցուցադրել թղթապանակները։ «Պատրաստ է» կոճակը պահպանում է գործարկման թղթապանակը, իսկ «Սկսել նիստը» կոճակը նիստը սկսում է այդտեղ։",
       "unsupportedTitle": "Հնարավոր չէ ցուցադրել թղթապանակները"
+    },
+    "toolRun": {
+      "sheetTitle": "Գործիքների կանչեր",
+      "condensedLabel": "{{itemCount}} տարր; {{last}}"
     }
   },
   "bootstrap": {

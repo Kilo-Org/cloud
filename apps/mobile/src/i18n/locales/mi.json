@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Tuhi ā-reo mā Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Tuhia te tāuru reo mā tētahi tauira Kilo Gateway, kau mā te mōhio kōrero o te pūrere. Ka tukuna tō pūreko ki te Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Whakapoto i ngā karanga taputapu",
+    "condenseToolCallsSubtitle": "Whakahuihui i ngā karanga taputapu tōmuritahi ki te rārangi kotahi ka taea e koe te whakatuwhera."
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono kume",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Pāwhiria tētahi kōpaki kia kitea ai ōna ihirangi.",
       "unsupportedDescription": "Kāore e taea e tēnei CLI te whakarārangi i ngā kōpaki. Ina whakaū koe, ka puritia te kōpaki whakarewa. Ka tīmata te wātū ki reira.",
       "unsupportedTitle": "Kāore e taea te whakarārangi i ngā kōpaki"
+    },
+    "toolRun": {
+      "sheetTitle": "Ngā karanga taputapu",
+      "condensedLabel": "{{itemCount}} tūemi; {{last}}"
     }
   },
   "bootstrap": {

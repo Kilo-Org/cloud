@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkribering via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribera röstinmatningen med en Kilo Gateway-modell i stället för enhetens taligenkänning. Din inspelning skickas till Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Komprimera verktygsanrop",
+    "condenseToolCallsSubtitle": "Gruppera på varandra följande verktygsanrop i en rad som du kan öppna."
   },
   "prReview": {
     "pullRequestUnavailable": "PR:en är inte tillgänglig",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Tryck på en mapp för att visa innehållet.",
       "unsupportedDescription": "Den här CLI-versionen kan inte visa mappar. Tryck på Klar för att behålla startmappen och på Starta session för att starta där.",
       "unsupportedTitle": "Det går inte att visa mapparna"
+    },
+    "toolRun": {
+      "sheetTitle": "Verktygsanrop",
+      "condensedLabel": "{{itemCount}} poster; {{last}}"
     }
   },
   "bootstrap": {

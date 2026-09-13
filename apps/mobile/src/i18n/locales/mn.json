@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway-р яриаг бичвэр болгох",
     "gatewayTranscriptionSubtitle": "Төхөөрөмжийн яриа танихын оронд Kilo Gateway загвар ашиглан дуугаар оруулж буй зүйлээ бичвэр болгоно уу. Таны бичлэг Kilo Gateway руу илгээгдэнэ.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Хэрэгслийн дуудлагыг шахах",
+    "condenseToolCallsSubtitle": "Дараалсан хэрэгслийн дуудлагыг нээж болох нэг мөрөнд бүлэглэнэ."
   },
   "prReview": {
     "pullRequestUnavailable": "Нэгтгэх хүсэлтийг нээх боломжгүй",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Агуулгыг нь харахын тулд хавтсыг товшино уу.",
       "unsupportedDescription": "Энэ CLI хавтаснуудыг жагсаах боломжгүй. «Болсон» товчийг товшвол эхлүүлсэн хавтас хэвээр үлдэнэ. «Сессийг эхлүүлэх» товчийг товшвол сесс тэнд эхэлнэ.",
       "unsupportedTitle": "Хавтаснуудыг жагсаах боломжгүй"
+    },
+    "toolRun": {
+      "sheetTitle": "Хэрэгслийн дуудлага",
+      "condensedLabel": "{{itemCount}} хэсэг; {{last}}"
     }
   },
   "bootstrap": {

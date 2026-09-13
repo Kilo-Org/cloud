@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway bidezko transkripzioa",
     "gatewayTranscriptionSubtitle": "Transkribatu ahots-sarrera gailuaren hitz-sorgailuaren ordez Kilo Gateway eredu batekin. Zure grabaketa Kilo Gatewayra bidaltzen da.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Tresna-deiak txikitu",
+    "condenseToolCallsSubtitle": "Elkartu jarraian dauden tresna-deiak ireki dezakezun errenkada batean."
   },
   "prReview": {
     "pullRequestUnavailable": "Bateratze-eskaera ez dago eskuragarri",
@@ -2469,6 +2471,10 @@
       "retryableDescription": "Egiaztatu konexioa eta saiatu berriro. Eginda sakatuz gero, karpeta hau hautatuko da hala ere.",
       "unsupportedTitle": "Karpetak ezin dira zerrendatu",
       "unsupportedDescription": "CLI honek ezin ditu karpetak zerrendatu. Eginda sakatuz gero, hasierako karpeta mantenduko da. Hasi saioa sakatuz gero, saioa karpeta horretan hasiko da."
+    },
+    "toolRun": {
+      "sheetTitle": "Tresna-deiak",
+      "condensedLabel": "{{itemCount}} elementu; {{last}}"
     }
   },
   "bootstrap": {

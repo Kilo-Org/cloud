@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Nutqni Kilo Gateway orqali matnga aylantirish",
     "gatewayTranscriptionSubtitle": "Qurilmaning nutqni tanishining o'rniga Kilo Gateway modeli yordamida ovozli kiritishni matnga aylantiring. Yozuvingiz Kilo Gatewayga yuboriladi.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Vosita chaqiruvlarini siqish",
+    "condenseToolCallsSubtitle": "Ketma-ket vosita chaqiruvlarini ochishingiz mumkin bo'lgan bitta qatorga guruhlang."
   },
   "prReview": {
     "pullRequestUnavailable": "PR mavjud emas",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Jild tarkibini ko'rish uchun uni bosing.",
       "unsupportedDescription": "Bu CLI jildlar ro'yxatini ko'rsata olmaydi. Tayyor tugmasi boshlang'ich jildni saqlaydi. Sessiyani boshlash tugmasi sessiyani shu jildda boshlaydi.",
       "unsupportedTitle": "Jildlar ro'yxatini ko'rsatib bo'lmaydi"
+    },
+    "toolRun": {
+      "sheetTitle": "Vosita chaqiruvlari",
+      "condensedLabel": "{{itemCount}} element; {{last}}"
     }
   },
   "bootstrap": {

@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway से आवाज़ को टेक्स्ट में बदलना",
     "gatewayTranscriptionSubtitle": "डिवाइस की स्पीच रिकग्निशन के बजाय Kilo Gateway मॉडल से वॉइस इनपुट को टेक्स्ट में बदलें। आपकी रिकॉर्डिंग Kilo Gateway भेजी जाती है।",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "टूल कॉल संघनित करें",
+    "condenseToolCallsSubtitle": "लगातार टूल कॉल को एक पंक्ति में समूहित करें जिसे आप खोल सकते हैं।"
   },
   "notifications": {
     "liveActivities": "लाइव गतिविधियाँ",
@@ -2035,6 +2037,10 @@
       "tapToListHint": "किसी फ़ोल्डर की सामग्री देखने के लिए उस पर टैप करें।",
       "unsupportedDescription": "यह CLI फ़ोल्डर की सूची नहीं दिखा सकता। ‘हो गया’ पर टैप करने से शुरुआती फ़ोल्डर चुना रहेगा। ‘सत्र शुरू करें’ पर टैप करने से सत्र वहीं शुरू होगा।",
       "unsupportedTitle": "फ़ोल्डर की सूची नहीं दिखाई जा सकती"
+    },
+    "toolRun": {
+      "sheetTitle": "टूल कॉल",
+      "condensedLabel": "{{itemCount}} आइटम; {{last}}"
     }
   },
   "bootstrap": {

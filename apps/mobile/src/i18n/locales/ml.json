@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway വഴിയുള്ള ശബ്ദം ടെക്സ്റ്റാക്കൽ",
     "gatewayTranscriptionSubtitle": "ഉപകരണത്തിന്റെ സ്പീച്ച് റെക്കഗ്നിഷന് പകരം Kilo Gateway മോഡൽ ഉപയോഗിച്ച് ശബ്ദ ഇൻപുട്ട് ടെക്സ്റ്റാക്കുക. നിങ്ങളുടെ റെക്കോർഡിംഗ് Kilo Gateway-ലേക്ക് അയയ്ക്കുന്നു.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ടൂൾ വിളികൾ ചുരുക്കുക",
+    "condenseToolCallsSubtitle": "തുടർച്ചയായ ടൂൾ വിളികളെ നിങ്ങൾക്ക് തുറക്കാവുന്ന ഒരു വരിയിൽ ഗ്രൂപ്പുചെയ്യുക."
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
@@ -2469,6 +2471,10 @@
       "retryableDescription": "കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക. 'പൂർത്തിയായി' അമർത്തി ഈ ഫോൾഡർ തിരഞ്ഞെടുക്കാൻ ഇപ്പോഴും കഴിയും.",
       "unsupportedTitle": "ഫോൾഡറുകൾ പട്ടികപ്പെടുത്താൻ കഴിയില്ല",
       "unsupportedDescription": "ഈ CLI-ക്ക് ഫോൾഡറുകൾ പട്ടികപ്പെടുത്താൻ കഴിയില്ല. 'പൂർത്തിയായി' അമർത്തിയാൽ CLI ആരംഭിച്ച ഫോൾഡർ നിലനിർത്തും. 'സെഷൻ ആരംഭിക്കുക' അമർത്തിയാൽ സെഷൻ അവിടെ ആരംഭിക്കും."
+    },
+    "toolRun": {
+      "sheetTitle": "ടൂൾ വിളികൾ",
+      "condensedLabel": "{{itemCount}} ഇനങ്ങൾ; {{last}}"
     }
   },
   "bootstrap": {

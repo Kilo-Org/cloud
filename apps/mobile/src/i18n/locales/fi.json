@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Puheentunnistus Kilo Gatewayn kautta",
     "gatewayTranscriptionSubtitle": "Muodosta äänisyötteestä teksti Kilo Gateway -mallilla laitteen puheentunnistuksen sijaan. Äänitteesi lähetetään Kilo Gatewayhin.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Tiivistä työkalukutsut",
+    "condenseToolCallsSubtitle": "Ryhmittele peräkkäiset työkalukutsut yhdelle riville, jonka voit avata."
   },
   "prReview": {
     "pullRequestUnavailable": "Muutospyyntö ei ole käytettävissä",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Näet kansion sisällön napauttamalla kansiota.",
       "unsupportedDescription": "Tämä CLI ei tue kansioiden luettelointia. Valmis-painike säilyttää käynnistyskansion. Aloita istunto -painike käynnistää istunnon siinä.",
       "unsupportedTitle": "Kansioluetteloa ei voi näyttää"
+    },
+    "toolRun": {
+      "sheetTitle": "Työkalukutsut",
+      "condensedLabel": "{{itemCount}} kohdetta; {{last}}"
     }
   },
   "bootstrap": {

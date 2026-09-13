@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripsi dengan Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripsikan masukan suara dengan model Kilo Gateway alih-alih pengenalan bicara perangkat. Rekaman Anda dikirim ke Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Padatkan panggilan alat",
+    "condenseToolCallsSubtitle": "Kelompokkan panggilan alat yang berurutan ke dalam satu baris yang dapat Anda buka."
   },
   "notifications": {
     "liveActivities": "Aktivitas langsung",
@@ -2035,6 +2037,10 @@
       "tapToListHint": "Ketuk direktori untuk melihat isinya.",
       "unsupportedDescription": "CLI ini tidak dapat menampilkan daftar direktori. Ketuk Selesai untuk mempertahankan direktori awal, lalu ketuk Mulai sesi untuk memulai di sana.",
       "unsupportedTitle": "Tidak dapat menampilkan daftar direktori"
+    },
+    "toolRun": {
+      "sheetTitle": "Panggilan alat",
+      "condensedLabel": "{{itemCount}} item; {{last}}"
     }
   },
   "bootstrap": {

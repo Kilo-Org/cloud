@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ile sesi metne dönüştürme",
     "gatewayTranscriptionSubtitle": "Sesli girişi cihazın konuşma tanıması yerine bir Kilo Gateway modeliyle metne dönüştürün. Kaydınız Kilo Gateway'e gönderilir.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Araç çağrılarını daralt",
+    "condenseToolCallsSubtitle": "Ardışık araç çağrılarını açabileceğin tek bir satırda grupla."
   },
   "notifications": {
     "liveActivities": "Canlı etkinlikler",
@@ -2035,6 +2037,10 @@
       "tapToListHint": "İçeriğini listelemek için bir klasöre dokun.",
       "unsupportedDescription": "Bu CLI klasörleri listeleyemiyor. “Bitti” düğmesi başlangıç klasörünü korur. “Oturumu başlat” düğmesi oturumu bu klasörde başlatır.",
       "unsupportedTitle": "Klasörler listelenemiyor"
+    },
+    "toolRun": {
+      "sheetTitle": "Araç çağrıları",
+      "condensedLabel": "{{itemCount}} öğe; {{last}}"
     }
   },
   "bootstrap": {

@@ -56,6 +56,7 @@ vi.mock('@/components/ui/icons', () => ({
   Globe: 'Globe',
   MessageSquare: 'MessageSquare',
   Mic: 'Mic',
+  Rows3: 'Rows3',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
 }));
@@ -89,6 +90,16 @@ vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
     hasLoaded: true,
     setReturnSendsMessage: vi.fn(),
   }),
+}));
+// Mutable so one test can hold the preference unloaded and assert the switch
+// stays disabled; every other test resets it to loaded in beforeEach.
+const condensePreference = vi.hoisted(() => ({
+  condenseToolCalls: false,
+  hasLoaded: true,
+  setCondenseToolCalls: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  useCondenseToolCallsPreference: () => condensePreference,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ secondaryForeground: '#000000', mutedForeground: '#000000' }),
@@ -129,6 +140,8 @@ beforeEach(() => {
   native.isEnrolledAsync.mockResolvedValue(true);
   native.getEnrolledLevelAsync.mockResolvedValue(3);
   native.authenticateAsync.mockResolvedValue({ success: true });
+  condensePreference.condenseToolCalls = false;
+  condensePreference.hasLoaded = true;
 });
 afterEach(() => {
   view?.unmount();
@@ -137,7 +150,7 @@ afterEach(() => {
 });
 
 describe('GeneralSettingsScreen', () => {
-  it('renders the five moved settings with their exact titles and subtitles', async () => {
+  it('renders the moved settings and the condense row with their exact titles and subtitles', async () => {
     const renderer = await mountGeneral();
     const rendered = texts(renderer);
 
@@ -151,6 +164,50 @@ describe('GeneralSettingsScreen', () => {
     expect(rendered).toContain('Append a Reviewed via Kilo footer when you submit a review.');
     expect(rendered).toContain('Return key sends message');
     expect(rendered).toContain('When off, Return inserts a newline in agent composers.');
+    expect(rendered).toContain('Condense tool calls');
+    expect(rendered).toContain('Group consecutive tool calls into one row you can open.');
+  });
+
+  it('renders the condense switch off and enabled while the other five rows are unchanged', async () => {
+    const renderer = await mountGeneral();
+
+    const switches = renderer.renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+    );
+    const byLabel = (label: string) => switches.find(sw => sw.props.accessibilityLabel === label);
+
+    expect(byLabel('Condense tool calls')?.props).toMatchObject({ value: false, disabled: false });
+    expect(byLabel('Unlock with biometrics')?.props).toMatchObject({
+      value: false,
+      disabled: false,
+    });
+    expect(byLabel('Auto expand thinking')?.props).toMatchObject({ value: false, disabled: false });
+    expect(byLabel('Keep screen on while on session page')?.props).toMatchObject({
+      value: false,
+      disabled: false,
+    });
+    expect(byLabel('Add app attribution to PR reviews')?.props).toMatchObject({
+      value: true,
+      disabled: false,
+    });
+    expect(byLabel('Return key sends message')?.props).toMatchObject({
+      value: false,
+      disabled: false,
+    });
+  });
+
+  it('disables the condense switch until the preference has loaded', async () => {
+    condensePreference.hasLoaded = false;
+    const renderer = await mountGeneral();
+
+    const switches = renderer.renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+    );
+    const condenseSwitch = switches.find(
+      sw => sw.props.accessibilityLabel === 'Condense tool calls'
+    );
+
+    expect(condenseSwitch?.props).toMatchObject({ value: false, disabled: true });
   });
 
   it('renders the biometric switch off by default without prompting native authentication', async () => {

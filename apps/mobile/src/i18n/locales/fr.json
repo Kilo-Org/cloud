@@ -1955,6 +1955,10 @@
       "tapToListHint": "Touchez un dossier pour afficher son contenu.",
       "unsupportedDescription": "Cette CLI ne permet pas d'afficher les dossiers. Touchez Terminé pour conserver le dossier de lancement, puis Démarrer la session pour démarrer dans ce dossier.",
       "unsupportedTitle": "Impossible d'afficher les dossiers"
+    },
+    "toolRun": {
+      "sheetTitle": "Appels d’outils",
+      "condensedLabel": "{{itemCount}} éléments ; {{last}}"
     }
   },
   "bootstrap": {
@@ -1992,7 +1996,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcription via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcrivez la saisie vocale avec un modèle Kilo Gateway au lieu de la reconnaissance vocale de l'appareil. Votre enregistrement est envoyé à Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Condenser les appels d’outils",
+    "condenseToolCallsSubtitle": "Regroupez les appels d’outils consécutifs dans une ligne que vous pouvez ouvrir."
   },
   "addCredits": {
     "cta": "Ajouter des crédits",

@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Átírás Kilo Gateway-n keresztül",
     "gatewayTranscriptionSubtitle": "Írd át a hangbevitelt egy Kilo Gateway-modell segítségével az eszköz beszédfelismerése helyett. A felvételt elküldjük a Kilo Gateway-nek.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Eszközhívások tömörítése",
+    "condenseToolCallsSubtitle": "Csoportosítsd az egymást követő eszközhívásokat egy sorba, amelyet megnyithatsz."
   },
   "prReview": {
     "pullRequestUnavailable": "A módosítási kérelem nem érhető el",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "A tartalom megtekintéséhez koppints egy mappára.",
       "unsupportedDescription": "Ez a CLI nem tudja listázni a mappákat. A Kész gombbal megtarthatod az indítási mappát. A Munkamenet indítása gombbal ebben a mappában indíthatsz munkamenetet.",
       "unsupportedTitle": "Nem lehet listázni a mappákat"
+    },
+    "toolRun": {
+      "sheetTitle": "Eszközhívások",
+      "condensedLabel": "{{itemCount}} elem; {{last}}"
     }
   },
   "bootstrap": {

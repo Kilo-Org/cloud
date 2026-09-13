@@ -246,6 +246,8 @@
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "returnSendsMessage": "Return key sends message",
     "returnSendsMessageSubtitle": "When off, Return inserts a newline in agent composers.",
+    "condenseToolCalls": "Condense tool calls",
+    "condenseToolCallsSubtitle": "Group consecutive tool calls into one row you can open.",
     "featureFlags": "Feature flags",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2072,6 +2074,10 @@
       "linesBadge": "{{displayCount}} lines",
       "filesBadge": "{{displayCount}} files",
       "matchesBadge": "{{displayCount}} matches"
+    },
+    "toolRun": {
+      "sheetTitle": "Tool calls",
+      "condensedLabel": "{{itemCount}} items; {{last}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "lines {{start}}–{{end}} (truncated)",

@@ -1,8 +1,48 @@
 /* eslint-disable max-lines -- one cohesive pure-projection suite for getToolDisplay and toolPartHasDetails */
 import { type FilePart, type ToolPart } from '@kilocode/cloud-agent-sdk';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { getToolDisplay, type ToolDisplay, toolPartHasDetails } from './tool-card-display';
+import {
+  Cpu,
+  Eye,
+  FileDiff,
+  FilePlus,
+  FileSearch,
+  FolderOpen,
+  Globe,
+  ListTodo,
+  Pencil,
+  Plug,
+  Search,
+  Sparkles,
+  Terminal,
+} from '@/components/ui/icons';
+
+import {
+  getToolDisplay,
+  getToolRowIcon,
+  type ToolDisplay,
+  toolPartHasDetails,
+} from './tool-card-display';
+
+// tool-card-display imports the Lucide icon components; the pure project cannot
+// parse the Flow-sourced react-native runtime, so stub the module with distinct
+// sentinels and assert the exact icon each tool maps to.
+vi.mock('@/components/ui/icons', () => ({
+  Cpu: 'Cpu',
+  Eye: 'Eye',
+  FileDiff: 'FileDiff',
+  FilePlus: 'FilePlus',
+  FileSearch: 'FileSearch',
+  FolderOpen: 'FolderOpen',
+  Globe: 'Globe',
+  ListTodo: 'ListTodo',
+  Pencil: 'Pencil',
+  Plug: 'Plug',
+  Search: 'Search',
+  Sparkles: 'Sparkles',
+  Terminal: 'Terminal',
+}));
 
 function makeToolPart(tool: string, state: ToolPart['state']): ToolPart {
   return {
@@ -473,5 +513,36 @@ describe('toolPartHasDetails', () => {
       attachments: [makeAttachment('image/png')],
     });
     expect(toolPartHasDetails(part)).toBe(true);
+  });
+});
+
+describe('getToolRowIcon mapping', () => {
+  // Every tool named in the ToolPartRenderer switch maps to the exact icon its
+  // card renders.
+  const expectedIcons: [string, unknown][] = [
+    ['read', Eye],
+    ['edit', Pencil],
+    ['write', FilePlus],
+    ['bash', Terminal],
+    ['glob', Search],
+    ['grep', FileSearch],
+    ['list', FolderOpen],
+    ['patch', FileDiff],
+    ['apply_patch', FileDiff],
+    ['todoread', ListTodo],
+    ['todowrite', ListTodo],
+    ['websearch', Globe],
+    ['codesearch', Globe],
+    ['webfetch', Globe],
+    ['task', Cpu],
+    ['suggest', Sparkles],
+  ];
+
+  it.each(expectedIcons)('maps %s to its card icon', (tool, icon) => {
+    expect(getToolRowIcon(tool)).toBe(icon);
+  });
+
+  it('defaults unknown tools to the generic Plug icon', () => {
+    expect(getToolRowIcon('unknown-tool')).toBe(Plug);
   });
 });

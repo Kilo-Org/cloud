@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway арқылы дауысты мәтінге айналдыру",
     "gatewayTranscriptionSubtitle": "Дауыстық енгізуді құрылғының сөзді тануының орнына Kilo Gateway моделі арқылы мәтінге айналдырыңыз. Жазбаңыз Kilo Gateway-ге жіберіледі.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Құрал шақыруларын жинақтау",
+    "condenseToolCallsSubtitle": "Тізбектелген құрал шақыруларын аша алатын бір жолға топтаңыз."
   },
   "prReview": {
     "pullRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Мазмұнын көру үшін қалтаны түртіңіз.",
       "unsupportedDescription": "Бұл CLI қалталар тізімін көрсете алмайды. «Дайын» түймесі іске қосу қалтасын сақтайды, ал «Сессияны бастау» түймесі сессияны сол қалтада бастайды.",
       "unsupportedTitle": "Қалталар тізімін алу мүмкін емес"
+    },
+    "toolRun": {
+      "sheetTitle": "Құрал шақырулары",
+      "condensedLabel": "{{itemCount}} элемент; {{last}}"
     }
   },
   "bootstrap": {

@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "ການຖອດສຽງເປັນຂໍ້ຄວາມຜ່ານ Kilo Gateway",
     "gatewayTranscriptionSubtitle": "ຖອດການປ້ອນຂໍ້ຄວາມດ້ວຍສຽງເປັນຂໍ້ຄວາມດ້ວຍໂມເດວ Kilo Gateway ແທນການຈຳລາສຽງພາຍໃນອຸປະກອນ. ໄຟລ໌ບັນທຶກສຽງຂອງທ່ານຈະຖືກສົ່ງໄປ Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ຫຍໍ້ການເອີ້ນເຄື່ອງມື",
+    "condenseToolCallsSubtitle": "ຈັດກຸ່ມການເອີ້ນເຄື່ອງມືຕິດຕໍ່ກັນໃສ່ແຖວດຽວທີ່ທ່ານສາມາດເປີດໄດ້."
   },
   "prReview": {
     "pullRequestUnavailable": "ບໍ່ສາມາດເປີດຄຳຂໍລວມໂຄດ",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "ແຕະໂຟລເດີເພື່ອເບິ່ງລາຍການຂ້າງໃນ.",
       "unsupportedDescription": "CLI ນີ້ສະແດງລາຍການໂຟລເດີບໍ່ໄດ້. ປຸ່ມສຳເລັດຈະເກັບໂຟລເດີທີ່ໃຊ້ເປີດ CLI ໄວ້ ແລະປຸ່ມເລີ່ມເຊດຊັນຈະເລີ່ມວຽກໃນໂຟລເດີນັ້ນ.",
       "unsupportedTitle": "ສະແດງລາຍການໂຟລເດີບໍ່ໄດ້"
+    },
+    "toolRun": {
+      "sheetTitle": "ການເອີ້ນເຄື່ອງມື",
+      "condensedLabel": "{{itemCount}} ລາຍການ; {{last}}"
     }
   },
   "bootstrap": {

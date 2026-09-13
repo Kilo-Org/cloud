@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Prepis cez Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Prepisujte hlasový vstup modelom Kilo Gateway namiesto rozpoznávania reči v zariadení. Nahrávka sa odošle do Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Zbaliť volania nástrojov",
+    "condenseToolCallsSubtitle": "Zoskupte po sebe idúce volania nástrojov do jedného riadka, ktorý môžete otvoriť."
   },
   "prReview": {
     "pullRequestUnavailable": "Žiadosť o zlúčenie nie je dostupná",
@@ -2511,6 +2513,10 @@
       "tapToListHint": "Klepnutím na priečinok zobrazíš jeho obsah.",
       "unsupportedDescription": "Táto verzia CLI nedokáže zobraziť priečinky. Klepnutím na Hotovo ponecháš priečinok spustenia. Klepnutím na Spustiť reláciu v ňom spustíš reláciu.",
       "unsupportedTitle": "Priečinky sa nedajú zobraziť"
+    },
+    "toolRun": {
+      "sheetTitle": "Volania nástrojov",
+      "condensedLabel": "{{itemCount}} položiek; {{last}}"
     }
   },
   "bootstrap": {

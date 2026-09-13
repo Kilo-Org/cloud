@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway-এ কথা থেকে লেখা",
     "gatewayTranscriptionSubtitle": "ডিভাইসের স্পিচ রিকগনিশনের বদলে Kilo Gateway মডেল ব্যবহার করে ভয়েস ইনপুট থেকে লেখা তৈরি করুন। আপনার রেকর্ডিং Kilo Gateway-এ পাঠানো হবে।",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "টুল কল সংকুচিত করুন",
+    "condenseToolCallsSubtitle": "পরপর টুল কলগুলিকে একটি সারিতে গোষ্ঠীবদ্ধ করুন যা আপনি খুলতে পারেন।"
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট পাওয়া যাচ্ছে না",
@@ -2469,6 +2471,10 @@
       "retryableDescription": "সংযোগ পরীক্ষা করে আবার চেষ্টা করুন। তালিকা না দেখালেও ‘সম্পন্ন’ বোতামে ট্যাপ করে এই ফোল্ডারটি বেছে নিতে পারেন।",
       "unsupportedTitle": "ফোল্ডারের তালিকা দেখানো যাচ্ছে না",
       "unsupportedDescription": "এই CLI ফোল্ডারের তালিকা দেখাতে পারে না। ‘সম্পন্ন’ বোতামে ট্যাপ করলে CLI চালু করার ফোল্ডারটি রাখা হবে। ‘সেশন শুরু করুন’ বোতামে ট্যাপ করলে সেখানেই সেশন শুরু হবে।"
+    },
+    "toolRun": {
+      "sheetTitle": "টুল কল",
+      "condensedLabel": "{{itemCount}}টি আইটেম; {{last}}"
     }
   },
   "bootstrap": {

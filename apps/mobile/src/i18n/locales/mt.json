@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Traskrizzjoni permezz ta' Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Ittraskrivi d-dħul bil-vuċi b'mudell ta' Kilo Gateway minflok ir-rikonoxximent tal-vuċi tal-apparat. Ir-reġistrazzjoni tiegħek tintbagħat lil Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Ikkondensa s-sejħiet tal-għodda",
+    "condenseToolCallsSubtitle": "Iġbor is-sejħiet tal-għodda konsekuttivi f'ringiela waħda li tista' tiftaħ."
   },
   "prReview": {
     "pullRequestUnavailable": "It-talba għall-għaqda mhix disponibbli",
@@ -2532,6 +2534,10 @@
       "tapToListHint": "Tektek direttorju biex tara l-kontenut tiegħu.",
       "unsupportedDescription": "Dan il-CLI ma jistax jelenka d-direttorji. Tektek Lest biex iżżomm id-direttorju tat-tnedija, imbagħad Ibda s-sessjoni biex tibda minn hemm.",
       "unsupportedTitle": "Ma jistgħux jiġu elenkati d-direttorji"
+    },
+    "toolRun": {
+      "sheetTitle": "Sejħiet tal-għodda",
+      "condensedLabel": "{{itemCount}} elementi; {{last}}"
     }
   },
   "bootstrap": {

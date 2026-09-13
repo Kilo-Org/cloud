@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway मार्फत बोलीलाई पाठमा रूपान्तरण",
     "gatewayTranscriptionSubtitle": "यन्त्रको वाणी पहिचानको सट्टा Kilo Gateway मोडेल प्रयोग गरेर भ्वाइस इनपुटलाई पाठमा रूपान्तरण गर्नुहोस्। तपाईंको रेकर्डिङ Kilo Gateway मा पठाइन्छ।",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "उपकरण कलहरू संक्षिप्त गर्नुहोस्",
+    "condenseToolCallsSubtitle": "लगातार उपकरण कलहरूलाई तपाईंले खोल्न सक्ने एउटा पङ्क्तिमा समूहबद्ध गर्नुहोस्।"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट उपलब्ध छैन",
@@ -2469,6 +2471,10 @@
       "retryableDescription": "आफ्नो जडान जाँचेर पुनः प्रयास गर्नुहोस्। ‘सम्पन्न’ मा ट्याप गरेर यो फोल्डर अझै पनि छान्न सक्नुहुन्छ।",
       "unsupportedTitle": "फोल्डरहरू सूचीबद्ध गर्न सकिँदैन",
       "unsupportedDescription": "यो CLI ले फोल्डरहरूको सूची देखाउन सक्दैन। ‘सम्पन्न’ मा ट्याप गर्दा सुरुको फोल्डर नै कायम रहन्छ। ‘सत्र सुरु गर्नुहोस्’ मा ट्याप गर्दा सत्र त्यहीँ सुरु हुन्छ।"
+    },
+    "toolRun": {
+      "sheetTitle": "उपकरण कलहरू",
+      "condensedLabel": "{{itemCount}} सामग्री; {{last}}"
     }
   },
   "bootstrap": {

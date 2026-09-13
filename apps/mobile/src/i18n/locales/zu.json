@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Ukuguqulwa kwenkulumo ibe umbhalo nge-Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Guqula ukufaka ngezwi kube umbhalo usebenzisa imodeli ye-Kilo Gateway kunokubona inkulumo kwedivayisi. Ukuqopha kwakho kuthunyelwa ku-Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Finyeza izingcingo zamathuluzi",
+    "condenseToolCallsSubtitle": "Hlanganisa izingcingo zamathuluzi ezilandelanayo zibe umugqa owodwa ongawuvula."
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokuhlanganisa asitholakali",
@@ -2469,6 +2471,10 @@
       "retryableDescription": "Hlola ukuxhumana kwakho bese uzama futhi. Usengaqinisekisa le folda ngokuqeda ukukhetha.",
       "unsupportedTitle": "Uhlu lwamafolda alukwazi ukuboniswa",
       "unsupportedDescription": "Le CLI ayikwazi ukubonisa uhlu lwamafolda. Uma uqeda ukukhetha, kugcinwa ifolda yokuqalisa. Iseshini izoqala kuleyo folda."
+    },
+    "toolRun": {
+      "sheetTitle": "Izingcingo zamathuluzi",
+      "condensedLabel": "{{itemCount}} izinto; {{last}}"
     }
   },
   "bootstrap": {

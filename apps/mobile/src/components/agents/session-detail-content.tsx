@@ -312,7 +312,7 @@ export function SessionDetailContent({
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
   const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
-  const { hideThinking } = useHideThinkingPreference();
+  const { hideThinking, hasLoaded: hideThinkingLoaded } = useHideThinkingPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
   const { models: gatewayModels, isLoading: gatewayModelsLoading } =
     useAvailableModels(organizationId);
@@ -752,9 +752,13 @@ export function SessionDetailContent({
   // Visibility-only strip for the "Hide thinking details" option. Applied once
   // here so the transcript, the message-details sheet, and the subagent views
   // all lose their thinking rows/text from the same list.
+  // Until the persisted value resolves, reason optimistically that thinking is
+  // hidden: on a cold start with the option on, painting the rows first and
+  // stripping them when the disk read lands would flash the hidden thinking.
+  const hideReasoningRows = !hideThinkingLoaded || hideThinking;
   const displayedMessages = useMemo(
-    () => (hideThinking ? withoutReasoningParts(visibleMessages) : visibleMessages),
-    [visibleMessages, hideThinking]
+    () => (hideReasoningRows ? withoutReasoningParts(visibleMessages) : visibleMessages),
+    [visibleMessages, hideReasoningRows]
   );
 
   // Subagent transcript views resolve their rows through this callback, so the
@@ -762,9 +766,9 @@ export function SessionDetailContent({
   const getDisplayedChildMessages = useCallback(
     (childSessionId: string) => {
       const child = getChildMessages(childSessionId);
-      return hideThinking ? withoutReasoningParts(child) : child;
+      return hideReasoningRows ? withoutReasoningParts(child) : child;
     },
-    [getChildMessages, hideThinking]
+    [getChildMessages, hideReasoningRows]
   );
 
   const detailsMessage = displayedMessages.find(message => message.info.id === detailsMessageId);
@@ -1075,7 +1079,12 @@ export function SessionDetailContent({
           message={item.message}
           isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
           isSessionStreaming={isStreaming}
-          getChildMessages={getDisplayedChildMessages}
+          // Raw child messages: the in-transcript task card derives its activity
+          // label from the child's latest part (child-session-card-state.ts:94-106),
+          // so feeding it the stripped list would turn a reasoning stream into a
+          // stale activity or "Waiting for activity" instead of "Thinking".
+          // The card renders no child rows, so nothing thinking-related leaks.
+          getChildMessages={getChildMessages}
           modelOptions={modelOptions}
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
@@ -1093,7 +1102,7 @@ export function SessionDetailContent({
     [
       lastAssistantMessageId,
       isStreaming,
-      getDisplayedChildMessages,
+      getChildMessages,
       modelOptions,
       reasoningDefaultExpanded,
       handleOpenChildSession,

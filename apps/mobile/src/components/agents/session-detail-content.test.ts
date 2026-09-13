@@ -27,7 +27,7 @@ import { MessageBubble } from '@/components/agents/message-bubble';
 import { assistantMessage } from '@/components/agents/message-bubble-test-utils';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
-import { type SessionMessageList } from '@/components/agents/session-message-list';
+import { SessionMessageList } from '@/components/agents/session-message-list';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import {
   resolveSendAttachmentKind,
@@ -41,7 +41,7 @@ import { i18n } from '@/i18n';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
-const hideThinking = vi.hoisted(() => ({ current: false }));
+const hideThinking = vi.hoisted(() => ({ current: false, loaded: true }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/agents/session-provider', () => ({
@@ -265,7 +265,10 @@ vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
   useReasoningPreference: () => ({ defaultExpanded: false }),
 }));
 vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
-  useHideThinkingPreference: () => ({ hideThinking: hideThinking.current }),
+  useHideThinkingPreference: () => ({
+    hideThinking: hideThinking.current,
+    hasLoaded: hideThinking.loaded,
+  }),
 }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   useKeepScreenOnPreference: () => ({ keepScreenOn: false, hasLoaded: true }),
@@ -386,6 +389,7 @@ beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   openRenameModal.mockClear();
   hideThinking.current = false;
+  hideThinking.loaded = true;
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
 });
@@ -1023,6 +1027,15 @@ describe('hide thinking preference', () => {
     expect(renderedText(view.renderer.root)).toContain('Visible answer');
   });
 
+  it('does not paint thinking before the preference resolves on cold start', async () => {
+    hideThinking.current = false;
+    hideThinking.loaded = false;
+    const view = await mountDetails([reasoningAndTextMessage()]);
+
+    expect(reasoningRenderers(view.renderer)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain('Visible answer');
+  });
+
   it('drops a reasoning-only message from the transcript but keeps it in the working indicator', async () => {
     hideThinking.current = true;
     const message = partMessage('msg-think-only', [
@@ -1099,6 +1112,38 @@ describe('hide thinking preference', () => {
     const sheetText = childSheetText(view);
     expect(sheetText).toContain('Thinking');
     expect(sheetText).not.toContain('hidden chain of thought');
+  });
+
+  it('keeps the in-transcript task card on Thinking while the reasoning row is hidden', async () => {
+    const view = await openRunningChildSheet(true);
+    await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
+
+    expect(renderedText(cardFor(view.renderer, RUNNING_CHILD))).toContain('Thinking');
+  });
+
+  it('renders no empty padded row for a reasoning-only child message', async () => {
+    const view = await openRunningChildSheet(true);
+    await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
+
+    const sheet = view.renderer.root.findByType(ChildSessionSheet);
+    const list = sheet.findByType(SessionMessageList);
+    expect(list.props.items).toHaveLength(0);
+    expect(sheet.findAllByType(EmptyState)).toHaveLength(0);
+    expect(list.props.ListFooterComponent).toBeDefined();
+  });
+
+  it('keeps a nested task card on Thinking while the reasoning row is hidden', async () => {
+    const runningNested = kiloId('ses-nested-running');
+    const view = await openRunningChildSheet(true);
+    const selected = taskMessage(RUNNING_CHILD, [NESTED_ID, runningNested]);
+    selected.parts.push(...childMessage(RUNNING_CHILD, 'Selected child row').parts);
+    await view.respond(RUNNING_CHILD, [selected]);
+
+    pressCard(view.renderer, runningNested);
+    await view.respond(runningNested, [childReasoningMessage(runningNested)]);
+    pressCard(view.renderer, RUNNING_CHILD);
+
+    expect(renderedText(cardFor(view.renderer, runningNested))).toContain('Thinking');
   });
 
   it('shows the subagent reasoning row and the Thinking spinner when the option is off', async () => {

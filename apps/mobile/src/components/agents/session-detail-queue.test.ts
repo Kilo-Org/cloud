@@ -221,7 +221,7 @@ vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
 // the native react-native entry; mock the preference the way the other
 // preference hooks above are mocked so the suite stays DOM/native-free.
 vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
-  useHideThinkingPreference: () => ({ hideThinking: false }),
+  useHideThinkingPreference: () => ({ hideThinking: false, hasLoaded: true }),
 }));
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
   useReasoningPreference: () => ({ defaultExpanded: false }),

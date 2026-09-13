@@ -2439,6 +2439,11 @@
       "stepsCount_other": "tarkaanfiiwwan {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Eeyyama ofumaan",
+      "description": "Gaaffii hayyama seesshinii kanaaf ofumaan eeyyami. Itti aansuun meeshaaleen gaaffii malee hojjetu.",
+      "unavailable": "Seesshiniin kun gaaffii hayyama fudhachuu hin danda'u."
+    },
     "prBadge": {
       "open": "gaaffii walitti makuu bani",
       "closed": "gaaffii walitti makuu cufame",

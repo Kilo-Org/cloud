@@ -2005,6 +2005,11 @@
       "stepsCount_other": "{{steps}}단계",
       "modelAccessibilityLabel": "{{name}}, 제공업체: {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "자동 승인",
+      "description": "이 세션의 권한 요청을 자동으로 승인합니다. 그러면 도구가 프롬프트 없이 실행됩니다.",
+      "unavailable": "이 세션은 권한 요청을 받을 수 없습니다."
+    },
     "prBadge": {
       "open": "풀 리퀘스트 오픈",
       "closed": "닫힌 풀 리퀘스트",

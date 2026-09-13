@@ -2470,6 +2470,11 @@
       "stepsCount_other": "{{steps}} steps",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Auto-approve",
+      "description": "Approve permission asks for this session automatically. Tools then run without a prompt.",
+      "unavailable": "This session cannot receive permission asks."
+    },
     "prBadge": {
       "open": "open pull request",
       "closed": "closed pull request",

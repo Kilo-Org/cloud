@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines -- one tRPC client suite; the link-options, auth-header, deadline, and observed-fetch cases share one hoisted module-mock scaffold */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type TelemetryEvent } from '@/lib/telemetry/error-sink';
@@ -387,12 +388,12 @@ describe('network error reporting', () => {
       {
         error: {
           message: 'forbidden',
-          code: -32003,
+          code: -32_003,
           data: { code: 'FORBIDDEN', httpStatus: 403, path: 'session.list' },
         },
       },
     ];
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(body), { status: 207 }));
+    mockFetch.mockResolvedValue(Response.json(body, { status: 207 }));
     const observedFetch = await loadObservedFetch();
 
     const response = await observedFetch('https://api.example.com/api/trpc/session.list?batch=1');

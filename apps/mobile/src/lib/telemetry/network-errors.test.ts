@@ -130,13 +130,13 @@ describe('readTrpcErrorContext', () => {
 describe('readTrpcResponseError', () => {
   const batchError = {
     message: 'forbidden',
-    code: -32003,
+    code: -32_003,
     data: { code: 'FORBIDDEN', httpStatus: 403, path: 'session.list' },
   };
 
   it('returns the error item from a batched array without consuming the response', async () => {
     const body = [{ result: { data: 'ok' } }, { error: batchError }];
-    const response = new Response(JSON.stringify(body), { status: 207 });
+    const response = Response.json(body, { status: 207 });
 
     await expect(readTrpcResponseError(response)).resolves.toEqual(batchError);
     // The original body is still readable: only the clone was consumed.
@@ -144,13 +144,13 @@ describe('readTrpcResponseError', () => {
   });
 
   it('returns a top-level error object', async () => {
-    const response = new Response(JSON.stringify({ error: batchError }), { status: 500 });
+    const response = Response.json({ error: batchError }, { status: 500 });
 
     await expect(readTrpcResponseError(response)).resolves.toEqual(batchError);
   });
 
   it('returns undefined for a success-only array', async () => {
-    const response = new Response(JSON.stringify([{ result: { data: 'ok' } }]), { status: 200 });
+    const response = Response.json([{ result: { data: 'ok' } }], { status: 200 });
 
     await expect(readTrpcResponseError(response)).resolves.toBeUndefined();
   });
@@ -356,11 +356,11 @@ describe('createNetworkErrorFetch', () => {
   it('(i) reports one warning for a 207 batch with the parsed error and keeps the response', async () => {
     const batchError = {
       message: 'forbidden',
-      code: -32003,
+      code: -32_003,
       data: { code: 'FORBIDDEN', httpStatus: 403, path: 'session.list' },
     };
     const body = [{ result: { data: 'ok' } }, { error: batchError }];
-    const response = new Response(JSON.stringify(body), {
+    const response = Response.json(body, {
       status: 207,
       statusText: 'Multi-Status',
     });
@@ -397,7 +397,7 @@ describe('createNetworkErrorFetch', () => {
 
   it('(j) ignores a 207 when no options opt it in', async () => {
     const body = [{ result: { data: 'ok' } }, { error: { data: { code: 'FORBIDDEN' } } }];
-    const response = new Response(JSON.stringify(body), { status: 207 });
+    const response = Response.json(body, { status: 207 });
     const wrapped = createNetworkErrorFetch(resolvingFetch(response));
 
     const result = await wrapped('https://example.com/api/trpc/session.list?batch=1');

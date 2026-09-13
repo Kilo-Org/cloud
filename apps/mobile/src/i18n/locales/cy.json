@@ -3032,14 +3032,6 @@
     "revoke": "Dirymu ymddiriedaeth yn {{host}}",
     "backToPreferences": "Yn ôl i'r dewisiadau"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Dechrau sgwrs",
-      "description": "Anfonwch neges i siarad â model."
-    },
-    "historyRetry": "Ni ellid llwytho hanes y sgwrs.",
-    "sendError": "Ni ellid anfon y neges. Ceisiwch eto."
-  },
   "glanceable": {
     "waiting": "Yn diweddaru asiantau",
     "empty": "Dim gwaith ar y gweill",
@@ -3058,5 +3050,18 @@
     "emptyTitle": "Dim modelau trawsgrifio",
     "emptyDescription": "Does dim modelau trawsgrifio ar gael gan Kilo Gateway ar hyn o bryd.",
     "loadFailed": "Doedd dim modd llwytho'r modelau trawsgrifio."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Dechrau sgwrs",
+      "description": "Anfonwch neges i siarad â model."
+    },
+    "list": {
+      "loadFailed": "Ni ellid llwytho hanes y sgwrs.",
+      "new": "Sgwrs newydd",
+      "openHint": "Yn agor y sgwrs. Pwyswch yn hir i ddileu.",
+      "deleteTitle": "Dileu'r sgwrs hon?"
+    },
+    "beta": "Beta"
   }
 }

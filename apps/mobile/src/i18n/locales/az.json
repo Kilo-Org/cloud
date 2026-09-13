@@ -2633,7 +2633,7 @@
     "legalConnectorPrivacy": " və bu sənədlə tanış olduğunu təsdiqləyirsən: ",
     "manageFailed": "App Store-da abunəliyin idarə edilməsi səhifəsini açmaq mümkün olmadı.",
     "kiloPassSetup": "Kilo Pass-ın qurulması",
-    "subscriptionHeaderDescription": "Kilo App-də AI kodlaşdırma sessiyalarını.",
+    "subscriptionHeaderDescription": "Kilo App-də AI kodlaşdırma sessiyaları aparmaq üçün Kilo balansınıza kredit əlavə edən aylıq abunəlik.",
     "tierDescription": "Kilo App-dən istifadə üçün hər ay {{price}} dəyərində ödənişli kredit əlavə olunur.",
     "subscribe": "Abunə ol",
     "subscribeDescription": "Aylıq kreditlər və bonus qazanmaq imkanı",
@@ -2944,14 +2944,6 @@
     "revoke": "{{host}} üçün etibarı ləğv et",
     "backToPreferences": "Parametrlərə qayıt"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Söhbətə başla",
-      "description": "Modellə danışmaq üçün mesaj göndər."
-    },
-    "historyRetry": "Söhbət tarixçəsi yüklənə bilmədi.",
-    "sendError": "Mesajı göndərmək mümkün olmadı. Yenidən cəhd et."
-  },
   "glanceable": {
     "waiting": "Agentlər yenilənir",
     "empty": "Davam edən iş yoxdur",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "Səsin mətnə çevrilməsi modeli yoxdur",
     "emptyDescription": "Kilo Gateway hazırda səsin mətnə çevrilməsi modeli təklif etmir.",
     "loadFailed": "Səsin mətnə çevrilməsi modellərini yükləmək mümkün olmadı."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Söhbətə başlayın",
+      "description": "Bir modellə danışmaq üçün mesaj göndərin."
+    },
+    "list": {
+      "loadFailed": "Söhbət tarixçəsi yüklənə bilmədi.",
+      "new": "Yeni söhbət",
+      "openHint": "Söhbəti açır. Silmək üçün basıb saxlayın.",
+      "deleteTitle": "Bu söhbət silinsin?"
+    },
+    "beta": "Beta"
   }
 }

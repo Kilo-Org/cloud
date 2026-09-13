@@ -2633,7 +2633,7 @@
     "legalConnectorPrivacy": " වන අතර, ඔබ පිළිගන්නේ ",
     "manageFailed": "App Store දායකත්ව කළමනාකරණය විවෘත කළ නොහැකි විය.",
     "kiloPassSetup": "Kilo Pass සැකසුම",
-    "subscriptionHeaderDescription": "Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා.",
+    "subscriptionHeaderDescription": "Kilo App තුළ AI කේතීකරණ සැසි පවත්වාගෙන යාම සඳහා ඔබේ Kilo ශේෂයට ක්‍රෙඩිට් එක් කරන මාසික දායකත්වයකි.",
     "tierDescription": "Kilo App භාවිතයට සෑම මසකම {{price}} ක් වටිනා ගෙවූ ක්‍රෙඩිට් එක් කරයි.",
     "subscribe": "දායක වන්න",
     "subscribeDescription": "මාසික ක්‍රෙඩිට් සහ ප්‍රසාද දීමනා කරා ප්‍රගතිය",
@@ -2944,14 +2944,6 @@
     "revoke": "{{host}} වෙත දුන් විශ්වාසය ඉවත් කරන්න",
     "backToPreferences": "මනාප වෙත ආපසු යන්න"
   },
-  "quickChat": {
-    "empty": {
-      "title": "කතාබසක් ආරම්භ කරන්න",
-      "description": "ආකෘතියක් සමඟ කතා කිරීමට පණිවිඩයක් යවන්න."
-    },
-    "historyRetry": "කතාබස් ඉතිහාසය පූරණය කළ නොහැකි විය.",
-    "sendError": "පණිවිඩය යැවිය නොහැකි විය. නැවත උත්සාහ කරන්න."
-  },
   "glanceable": {
     "waiting": "නියෝජිතයන් යාවත්කාලීන කරමින්",
     "empty": "සිදු කෙරෙන වැඩ කිසිවක් නැත",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "හඬ පෙළට හැරවීමේ ආකෘති නොමැත",
     "emptyDescription": "දැනට Kilo Gateway හඬ පෙළට හැරවීමේ ආකෘති ලබා දෙන්නේ නැත.",
     "loadFailed": "හඬ පෙළට හැරවීමේ ආකෘති පූරණය කළ නොහැකි විය."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "කතාවක් ආරම්භ කරන්න",
+      "description": "ආකෘතියක් සමඟ කතා කිරීමට පණිවිඩයක් යවන්න."
+    },
+    "list": {
+      "loadFailed": "සංවාද ඉතිහාසය පූරණය කළ නොහැකි විය.",
+      "new": "නව කතාබහ",
+      "openHint": "කතාබහ විවෘත කරයි. මකා දැමීමට දිගු ලෙස ඔබන්න.",
+      "deleteTitle": "මෙම කතාබහ මකන්නද?"
+    },
+    "beta": "බීටා"
   }
 }

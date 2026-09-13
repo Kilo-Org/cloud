@@ -2944,14 +2944,6 @@
     "revoke": "Herroep vertroue in {{host}}",
     "backToPreferences": "Terug na voorkeure"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Begin 'n klets",
-      "description": "Stuur 'n boodskap om met 'n model te gesels."
-    },
-    "historyRetry": "Kon nie kletsgeskiedenis laai nie.",
-    "sendError": "Kon nie die boodskap stuur nie. Probeer asseblief weer."
-  },
   "glanceable": {
     "waiting": "Besig om agente op te dateer",
     "empty": "Geen werk aan die gang nie",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "Geen transkripsiemodelle nie",
     "emptyDescription": "Die Kilo Gateway bied tans geen transkripsiemodelle nie.",
     "loadFailed": "Die transkripsiemodelle kon nie gelaai word nie."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Begin 'n klets",
+      "description": "Stuur 'n boodskap om met 'n model te gesels."
+    },
+    "list": {
+      "loadFailed": "Kon nie kletsgeskiedenis laai nie.",
+      "new": "Nuwe klets",
+      "openHint": "Maak die klets oop. Hou lank in om te skrap.",
+      "deleteTitle": "Skrap hierdie klets?"
+    },
+    "beta": "Beta"
   }
 }

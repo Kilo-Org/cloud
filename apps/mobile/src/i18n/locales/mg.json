@@ -2944,14 +2944,6 @@
     "revoke": "Foano ny fitokisana ny {{host}}",
     "backToPreferences": "Miverena amin'ny safidy"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Atombohy ny resaka",
-      "description": "Mandefasa hafatra hiresahana amin'ny modely."
-    },
-    "historyRetry": "Tsy nety nampidirina ny tantaran'ny resaka.",
-    "sendError": "Tsy nety nalefa ny hafatra. Andramo indray."
-  },
   "glanceable": {
     "waiting": "Manavao ny mpanatanteraka",
     "empty": "Tsy misy asa mandeha",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "Tsy misy modely fanovana feo ho soratra",
     "emptyDescription": "Tsy manome modely fanovana feo ho soratra amin'izao fotoana izao ny Kilo Gateway.",
     "loadFailed": "Tsy tafiditra ny modely fanovana feo ho soratra."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Atombohy resaka",
+      "description": "Mandefasa hafatra mba hiresaka amin'ny Modely."
+    },
+    "list": {
+      "loadFailed": "Tsy afaka nampidirina ny tantaran'ny resaka.",
+      "new": "Resaka vaovao",
+      "openHint": "Manokatra ny resaka. Tsindrio ela mba hamafana.",
+      "deleteTitle": "Hamafa ity resaka ity?"
+    },
+    "beta": "Beta"
   }
 }

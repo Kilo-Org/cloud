@@ -2944,14 +2944,6 @@
     "revoke": "Soke amincewa da {{host}}",
     "backToPreferences": "Koma ga zaɓuɓɓuka"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Fara tattaunawa",
-      "description": "Aika saƙo don tattaunawa da samfuri."
-    },
-    "historyRetry": "An kasa loda tarihin tattaunawa.",
-    "sendError": "An kasa aika saƙon. Sake gwadawa."
-  },
   "glanceable": {
     "waiting": "Ana sabunta wakilai",
     "empty": "Babu aikin da ke gudana",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "Babu samfuran mayar da magana zuwa rubutu",
     "emptyDescription": "Kilo Gateway bai ba da samfuran mayar da magana zuwa rubutu a halin yanzu.",
     "loadFailed": "An kasa loda samfuran mayar da magana zuwa rubutu."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Fara tattaunawa",
+      "description": "Aika saƙo don tattaunawa da samfurin."
+    },
+    "list": {
+      "loadFailed": "Ba a iya loda tarihin tattaunawa.",
+      "new": "Sabuwar tattaunawa",
+      "openHint": "Yana buɗe tattaunawar. Danna sosai don sharewa.",
+      "deleteTitle": "A share wannan tattaunawar?"
+    },
+    "beta": "Beta"
   }
 }

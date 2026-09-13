@@ -2966,14 +2966,6 @@
     "revoke": "Deixar de confiar em {{host}}",
     "backToPreferences": "Voltar às preferências"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Iniciar um chat",
-      "description": "Envie uma mensagem para conversar com um modelo."
-    },
-    "historyRetry": "Não foi possível carregar o histórico do chat.",
-    "sendError": "Não foi possível enviar a mensagem. Tente novamente."
-  },
   "glanceable": {
     "waiting": "Atualizando agentes",
     "empty": "Nenhuma tarefa em andamento",
@@ -2992,5 +2984,18 @@
     "emptyTitle": "Nenhum modelo de transcrição",
     "emptyDescription": "O Kilo Gateway não oferece modelos de transcrição no momento.",
     "loadFailed": "Não foi possível carregar os modelos de transcrição."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Iniciar um chat",
+      "description": "Envie uma mensagem para conversar com um modelo."
+    },
+    "list": {
+      "loadFailed": "Não foi possível carregar o histórico do chat.",
+      "new": "Nova conversa",
+      "openHint": "Abre a conversa. Toque e segure para excluir.",
+      "deleteTitle": "Excluir esta conversa?"
+    },
+    "beta": "Beta"
   }
 }

@@ -2966,14 +2966,6 @@
     "revoke": "Revoca l'attendibilità di {{host}}",
     "backToPreferences": "Torna alle preferenze"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Avvia una chat",
-      "description": "Invia un messaggio per parlare con un modello."
-    },
-    "historyRetry": "Impossibile caricare la cronologia della chat.",
-    "sendError": "Impossibile inviare il messaggio. Riprova."
-  },
   "glanceable": {
     "waiting": "Aggiornamento degli agenti",
     "empty": "Nessun lavoro in corso",
@@ -2992,5 +2984,18 @@
     "emptyTitle": "Nessun modello di trascrizione",
     "emptyDescription": "Kilo Gateway non offre modelli di trascrizione in questo momento.",
     "loadFailed": "Impossibile caricare i modelli di trascrizione."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Avvia una chat",
+      "description": "Invia un messaggio per parlare con un modello."
+    },
+    "list": {
+      "loadFailed": "Impossibile caricare la cronologia della chat.",
+      "new": "Nuova chat",
+      "openHint": "Apre la chat. Tieni premuto per eliminare.",
+      "deleteTitle": "Eliminare questa chat?"
+    },
+    "beta": "Beta"
   }
 }

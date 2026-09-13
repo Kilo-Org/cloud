@@ -2966,14 +2966,6 @@
     "revoke": "Atsaukt uzticību resursdatoram {{host}}",
     "backToPreferences": "Atpakaļ uz iestatījumiem"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Sāc tērzēt",
-      "description": "Nosūti ziņojumu, lai sarunātos ar modeli."
-    },
-    "historyRetry": "Neizdevās ielādēt tērzēšanas vēsturi.",
-    "sendError": "Neizdevās nosūtīt ziņojumu. Mēģini vēlreiz."
-  },
   "glanceable": {
     "waiting": "Tiek atjaunināta informācija par aģentiem",
     "empty": "Pašlaik nav aktīvu uzdevumu",
@@ -2992,5 +2984,18 @@
     "emptyTitle": "Nav transkripcijas modeļu",
     "emptyDescription": "Pašlaik Kilo Gateway nepiedāvā nevienu transkripcijas modeli.",
     "loadFailed": "Neizdevās ielādēt transkripcijas modeļus."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Sākt tērzēšanu",
+      "description": "Nosūti ziņojumu, lai sarunātos ar modeli."
+    },
+    "list": {
+      "loadFailed": "Neizdevās ielādēt tērzēšanas vēsturi.",
+      "new": "Jauna tērzēšana",
+      "openHint": "Atver tērzēšanu. Turiet nospiestu, lai dzēstu.",
+      "deleteTitle": "Vai dzēst šo tērzēšanu?"
+    },
+    "beta": "Beta"
   }
 }

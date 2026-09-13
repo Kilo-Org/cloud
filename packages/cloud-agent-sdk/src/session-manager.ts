@@ -939,6 +939,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   let retainedHistoryStack: Array<{ cursorBefore: string | null; messageIds: string[] }> = [];
   /**
+   * Omitted-item count contributed by the initial bounded page that has been
+   * applied for the active session (0 when none). The cached first-page replay
+   * and the live `onInitialPageLoaded` page describe the same page, so the
+   * second application replaces this contribution instead of adding to it
+   * (older pages loaded in between still accumulate).
+   */
+  let initialPageOmittedItemCount = 0;
+  /**
    * Last non-empty `mode` from a remote prompt send. Used as agent inheritance
    * fallback when `sessionConfigAtom.mode` is absent/`''`. Reset on switch/destroy.
    */
@@ -1010,6 +1018,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (!preserveTranscript) {
       store.set(hasOlderMessagesAtom, false);
       store.set(olderMessagesOmittedItemCountAtom, 0);
+      initialPageOmittedItemCount = 0;
       olderMessagesCursor = null;
       retainedHistoryStack = [];
     }
@@ -1467,7 +1476,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // and atom updates). Generation-aware: a stale caller's result is
   // discarded silently. Used by both `switchSession` (initial page) and
   // `loadOlderMessages` (subsequent pages).
-  function applyPage(outcome: SessionSnapshotPageOutcome, expectedGeneration: number): boolean {
+  //
+  // `initialPage` marks a replay of the first page. The cached first-page
+  // replay and the live `onInitialPageLoaded` page are both the first page, so
+  // the later one replaces the earlier one's omitted-item contribution instead
+  // of adding to it; older pages keep accumulating on top.
+  function applyPage(
+    outcome: SessionSnapshotPageOutcome,
+    expectedGeneration: number,
+    initialPage = false
+  ): boolean {
     if (expectedGeneration !== loadOlderGeneration) return false;
     if (outcome.kind !== 'success') return false;
 
@@ -1493,10 +1511,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     olderMessagesCursor = outcome.nextCursor;
     store.set(hasOlderMessagesAtom, outcome.nextCursor !== null);
+    const omittedItemCount =
+      store.get(olderMessagesOmittedItemCountAtom) + outcome.omittedItemCount;
     store.set(
       olderMessagesOmittedItemCountAtom,
-      store.get(olderMessagesOmittedItemCountAtom) + outcome.omittedItemCount
+      initialPage ? omittedItemCount - initialPageOmittedItemCount : omittedItemCount
     );
+    if (initialPage) {
+      initialPageOmittedItemCount = outcome.omittedItemCount;
+    }
     store.set(olderMessagesErrorAtom, null);
     return true;
   }
@@ -1675,7 +1698,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         .then(cachedPage => {
           if (!acceptCachedPage || expectedGeneration !== switchGeneration) return;
           if (cachedPage && cachedPage.messages.length > 0) {
-            if (applyPage({ ...cachedPage, kind: 'success' }, initialPageGeneration)) {
+            if (applyPage({ ...cachedPage, kind: 'success' }, initialPageGeneration, true)) {
               store.set(isLoadingAtom, false);
             }
           }
@@ -1772,7 +1795,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // pass the generation check and clobber the active session's cursor
     // and omitted-item count.
     const recordInitialPage = (page: SessionSnapshotPage): void => {
-      applyPage({ ...page, kind: 'success' }, initialPageGeneration);
+      applyPage({ ...page, kind: 'success' }, initialPageGeneration, true);
     };
 
     // Once live replay can start, a slower cache must not overwrite it. Do not

@@ -23,6 +23,7 @@ import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import { trpcClient } from '@/lib/trpc';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
@@ -201,6 +202,11 @@ export function createMobileAgentSessionManager({
     sessionId: KiloSessionId;
     cloudAgentSessionId: CloudAgentSessionId | null;
   } | null = null;
+  // The auth epoch this manager was created under. A transcript-cache write
+  // captured before a sign-out/sign-in must not land in the previous account's
+  // scope, so the write path re-checks this epoch (same fence as the read
+  // cache's persister).
+  const transcriptOwner = { userId, authEpoch: currentAuthEpoch() };
   return createSessionManager({
     store,
     websocketBaseUrl: CLOUD_AGENT_WS_URL,
@@ -317,7 +323,7 @@ export function createMobileAgentSessionManager({
       // messages, which is what a warm open paints before the live refresh.
       // Best effort — the write never affects the returned page.
       if (outcome.kind === 'success' && options.cursor === undefined) {
-        void writeSessionTranscriptPage(userId, id, outcome);
+        void writeSessionTranscriptPage(transcriptOwner, id, outcome);
       }
       return outcome;
     },

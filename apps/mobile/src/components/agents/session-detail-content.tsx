@@ -85,7 +85,10 @@ import {
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
-import { useSessionSlowLoadPhase } from '@/components/agents/session-slow-load';
+import {
+  SESSION_SLOW_LOAD_MS,
+  useSessionSlowLoadPhase,
+} from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
   getSessionTranscriptItemKey,
@@ -1167,12 +1170,25 @@ export function SessionDetailContent({
   // is in flight the button shows its spinner and is disabled, so the tap
   // reads as accepted before any content or error arrives. Leaving the slow
   // state (content, error, or a settled empty) ends the acknowledgment.
+  //
+  // The acknowledgment is also bounded by the slow-load threshold. Once the
+  // initial threshold has passed the phase stays `slow` on its own, so a
+  // retried open that stalls again would otherwise leave the button disabled
+  // with a spinner forever; after one threshold the user gets the Retry
+  // action back.
   const [slowRetryPending, setSlowRetryPending] = useState(false);
   useEffect(() => {
-    if (sessionLoadPhase !== 'slow') {
+    if (sessionLoadPhase !== 'slow' || !slowRetryPending) {
       setSlowRetryPending(false);
+      return undefined;
     }
-  }, [sessionLoadPhase]);
+    const timer = setTimeout(() => {
+      setSlowRetryPending(false);
+    }, SESSION_SLOW_LOAD_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [sessionLoadPhase, slowRetryPending]);
   // Failed delivery entries must not count as in-flight: after a terminal
   // delivery failure the working spinner and wake lock would otherwise stay on.
   const inFlightMessageCount = useMemo(

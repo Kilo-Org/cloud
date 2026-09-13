@@ -719,6 +719,39 @@ describe('session detail slow load', () => {
       vi.useRealTimers();
     }
   });
+
+  it('hands the Retry action back when the retried open also stalls', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails(null);
+      await act(async () => {
+        vi.advanceTimersByTime(SESSION_SLOW_LOAD_MS);
+        await Promise.resolve();
+      });
+      const findRetry = () =>
+        view.renderer.root.find(
+          node =>
+            Object.is(node.type, 'Button') &&
+            node.props.accessibilityLabel === i18n.t('common.retry')
+        );
+      act(() => {
+        (findRetry().props.onPress as () => void)();
+      });
+      expect(findRetry().props.loading).toBe(true);
+
+      // The retried open stalls again: no content and no error arrive. The
+      // acknowledgment is bounded, so after one more threshold the button is
+      // usable again instead of spinning in its disabled state forever.
+      await act(async () => {
+        vi.advanceTimersByTime(SESSION_SLOW_LOAD_MS);
+        await Promise.resolve();
+      });
+      expect(findRetry().props.loading).toBe(false);
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.takingLonger'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('session detail cached metadata refresh', () => {

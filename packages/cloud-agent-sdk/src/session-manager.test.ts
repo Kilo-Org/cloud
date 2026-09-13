@@ -726,6 +726,29 @@ describe('createSessionManager', () => {
         expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
       });
 
+      it('counts the first page omitted items once when the live page repeats the cached page', async () => {
+        const readCachedSnapshotPage = jest.fn().mockResolvedValue({
+          ...cachedPage('ses-1', ['msg-cache-1']),
+          omittedItemCount: 7,
+        });
+        const fetchSnapshotPage = createPageFetchMock(async () =>
+          makePage({
+            kiloSessionId: 'ses-1',
+            messages: [makePageMessage('msg-cache-1', 'ses-1', 'cached')],
+            omittedItemCount: 7,
+          })
+        );
+        const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
+        const mgr = createSessionManager(config);
+
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise<void>(resolve => setImmediate(resolve));
+
+        // The cached replay and the live first page are the same page: the
+        // second must replace the first's contribution, not double it.
+        expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(7);
+      });
+
       it('keeps the skeleton when the cached read returns null', async () => {
         const config = createMockConfig({
           readCachedSnapshotPage: jest.fn().mockResolvedValue(null),

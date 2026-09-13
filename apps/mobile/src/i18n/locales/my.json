@@ -253,7 +253,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ဖြင့် အသံမှစာသားပြောင်းခြင်း",
     "gatewayTranscriptionSubtitle": "စက်၏ အသံခွဲခြားသိရှိမှုအစား Kilo Gateway မော်ဒယ်ဖြင့် အသံထည့်သွင်းမှုကို စာသားပြောင်းပါ။ သင့်အသံသွင်းချက်ကို Kilo Gateway သို့ ပို့ပါမည်။",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "ကိရိယာ အကျဉ်းချုပ်များကို ဘာသာပြန်ပါ",
+    "toolSummaryTranslationSubtitle": "ကိရိယာ အကျဉ်းချုပ် တစ်ခုချင်းစီကို သင့်အက်ပ်၏ ဘာသာစကားသို့ ဘာသာပြန်ရန် မော်ဒယ်တစ်ခုသို့ ပို့ပါ။ ဘာသာပြန်မှု မအောင်မြင်ပါက မူရင်းကို ပြသပါမည်။",
+    "toolSummaryTranslationModelUnavailableNotice": "ဤမော်ဒယ်ကို ပေးအပ်ခြင်း မရှိတော့ပါ။ အခြားတစ်ခု ရွေးချယ်ရန် $t(common.model) ကို နှိပ်ပါ။"
   },
   "prReview": {
     "pullRequestUnavailable": "PR မရနိုင်ပါ",

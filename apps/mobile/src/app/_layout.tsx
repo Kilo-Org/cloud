@@ -46,6 +46,7 @@ import { toast } from 'sonner-native';
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
+import { OfflineBannerSpaceGate } from '@/components/offline-banner';
 import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
 import { QueryError } from '@/components/query-error';
@@ -131,6 +132,7 @@ import {
 } from '@/lib/persist/drafts';
 import { setSentryContext } from '@/lib/sentry-context';
 import { initSentry } from '@/lib/sentry-init';
+import { installErrorReporting } from '@/lib/telemetry/install-error-reporting';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { reapTempFiles } from '@/lib/temp-file-registry';
@@ -139,6 +141,9 @@ import { reapTempFiles } from '@/lib/temp-file-registry';
 installE2EWebSocketLatency();
 
 initSentry(false);
+// Install the Sentry sink and the global fetch wrapper before any other
+// module-scope side effect can start a request.
+installErrorReporting();
 
 // Kick the font load off at module scope so it overlaps JS bootstrap; the
 // same family names make `loadAsync` dedupe with the `useFonts` call in
@@ -1059,15 +1064,20 @@ function RootLayout() {
     <MotionProvider>
       <ShareIntentProvider options={SHARE_INTENT_OPTIONS}>
         <ThemeProvider value={navigationTheme}>
-          <AppRootProviders languageReady={languageReady}>
-            <StatusBar style="auto" />
-            <AppContentReveal>
-              <StateSurface className="flex-1">
-                <RootLayoutNav languageReady={languageReady} setLanguageReady={setLanguageReady} />
-              </StateSurface>
-            </AppContentReveal>
-            <AnimatedSplashOverlay />
-          </AppRootProviders>
+          <OfflineBannerSpaceGate>
+            <AppRootProviders languageReady={languageReady}>
+              <StatusBar style="auto" />
+              <AppContentReveal>
+                <StateSurface className="flex-1">
+                  <RootLayoutNav
+                    languageReady={languageReady}
+                    setLanguageReady={setLanguageReady}
+                  />
+                </StateSurface>
+              </AppContentReveal>
+              <AnimatedSplashOverlay />
+            </AppRootProviders>
+          </OfflineBannerSpaceGate>
         </ThemeProvider>
       </ShareIntentProvider>
     </MotionProvider>

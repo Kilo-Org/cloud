@@ -63,6 +63,9 @@ export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras
   const userIntegrations: SentryIntegration[] = optionalConsented
     ? [
         expoRouterIntegration,
+        // Attaches a thrown error's own properties (e.g. tRPC `data`) to the
+        // event; `beforeSend`/`scrubEvent` still redacts token-shaped extras.
+        Sentry.extraErrorDataIntegration(),
         Sentry.deeplinkIntegration(),
         Sentry.mobileReplayIntegration({
           maskAllText: true,
@@ -76,7 +79,13 @@ export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras
           name: `HermesProfiling#${(profilerRegistrations += 1)}`,
         },
       ]
-    : [expoRouterIntegration, Sentry.deeplinkIntegration()];
+    : [
+        expoRouterIntegration,
+        // Error reporting is mandatory (DEC-02), so extra error data is
+        // attached even before optional consent is decided.
+        Sentry.extraErrorDataIntegration(),
+        Sentry.deeplinkIntegration(),
+      ];
 
   Sentry.init({
     dsn: SENTRY_DSN,

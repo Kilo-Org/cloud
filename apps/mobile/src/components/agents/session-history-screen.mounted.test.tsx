@@ -23,6 +23,9 @@ const listState = vi.hoisted(() => ({
   storedSessions: [] as MockStoredSession[],
   isSearching: false,
   isError: false,
+  storedIsFetching: false,
+  storedFetchedSinceMount: true,
+  storedLoadedPageCount: 1,
   organization: { organizationId: null as string | null, isLoaded: true },
   storedQuery: vi.fn<(options: Parameters<typeof useAgentSessions>[0]) => void>(),
   searchQuery: vi.fn<(options: Parameters<typeof useAgentSessionSearch>[0]) => void>(),
@@ -135,8 +138,9 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         dateGroups: storedSessions.length > 0 ? [{ label: 'Today', sessions: storedSessions }] : [],
         activeIsError: false,
         storedIsError: listState.isError,
-        storedIsFetching: false,
-        storedLoadedPageCount: 1,
+        storedIsFetching: listState.storedIsFetching,
+        storedFetchedSinceMount: listState.storedFetchedSinceMount,
+        storedLoadedPageCount: listState.storedLoadedPageCount,
         hasNextPage: false,
         isFetchingNextPage: false,
         fetchNextPage: vi.fn(),
@@ -258,6 +262,9 @@ describe('SessionHistoryScreen', () => {
     listState.storedSessions = [];
     listState.isSearching = false;
     listState.isError = false;
+    listState.storedIsFetching = false;
+    listState.storedFetchedSinceMount = true;
+    listState.storedLoadedPageCount = 1;
     Object.assign(listState.organization, { organizationId: null, isLoaded: true });
     listState.storedQuery.mockClear();
     listState.searchQuery.mockClear();
@@ -490,6 +497,18 @@ describe('SessionHistoryScreen', () => {
     const renderer = await renderScreen();
 
     expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(0);
+  });
+
+  it('reserves the search header while the first stored page loads', async () => {
+    // Cold open: no rows yet, first page in flight. The header must occupy its
+    // final space now so the loading skeletons sit where the rows will land
+    // instead of shifting down when the header appears with the rows.
+    listState.storedIsFetching = true;
+    listState.storedLoadedPageCount = 0;
+    const renderer = await renderScreen();
+
+    expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(1);
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isLoading).toBe(true);
   });
 
   it('mounts the search header once stored rows exist', async () => {

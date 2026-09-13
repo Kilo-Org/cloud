@@ -9,6 +9,7 @@ const baseProps = {
   onSelect: () => {},
   onRestart: () => {},
   onRetry: () => {},
+  isRetrying: false,
   canInstallNew: false,
   onInstallNew: () => {},
   isInstalling: false,
@@ -34,9 +35,24 @@ test('shows a retry, not an expired claim, for a non-not-found error', () => {
     />
   );
   expect(html).toContain('Could not load this connection attempt');
-  expect(html).toContain('Try again');
+  expect(html).toContain('Reload connection attempt');
   expect(html).not.toContain('expired or is no longer available');
   expect(html).not.toContain('Restart connection');
+});
+
+test('disables the retry action and shows pending copy while retrying', () => {
+  const html = renderToStaticMarkup(
+    <GitHubConnectionAttemptState
+      {...baseProps}
+      isError
+      isNotFound={false}
+      isRetrying
+      candidates={undefined}
+    />
+  );
+  expect(html).toContain('Reloading…');
+  expect(html).toContain('disabled=""');
+  expect(html).not.toContain('Reload connection attempt');
 });
 
 test('shows empty-result copy only after a successful empty result', () => {
@@ -87,6 +103,36 @@ test('surfaces attachable installations alongside the install-new option', () =>
   expect(html).toContain('acme');
   expect(html).toContain('widgets-inc');
   expect(html).toContain('Install on a different GitHub organization');
+});
+
+test('disables the install-new action while a candidate select is in flight', () => {
+  const html = renderToStaticMarkup(
+    <GitHubConnectionAttemptState
+      {...baseProps}
+      isError={false}
+      isSelecting
+      candidates={[{ installationId: '111', accountLogin: 'acme' }]}
+      canInstallNew
+    />
+  );
+  const buttons = html.split('<button');
+  const installNewButton = buttons.find(fragment => fragment.includes('Install on a different'));
+  expect(installNewButton).toContain('disabled=""');
+});
+
+test('disables candidate selection while install-new is in flight', () => {
+  const html = renderToStaticMarkup(
+    <GitHubConnectionAttemptState
+      {...baseProps}
+      isError={false}
+      isInstalling
+      candidates={[{ installationId: '111', accountLogin: 'acme' }]}
+      canInstallNew
+    />
+  );
+  const buttons = html.split('<button');
+  const candidateButton = buttons.find(fragment => fragment.includes('Connect acme'));
+  expect(candidateButton).toContain('disabled=""');
 });
 
 test('does not offer install-new alongside candidates when a fresh install is not permitted', () => {

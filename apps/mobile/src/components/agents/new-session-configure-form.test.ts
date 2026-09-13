@@ -42,11 +42,24 @@ vi.mock('react', async () => {
 });
 
 // ── react-native ───────────────────────────────────────────────────
+const platformState = vi.hoisted(() => ({ OS: 'android' }));
+
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  Platform: platformState,
   ScrollView: 'ScrollView',
   View: 'View',
+}));
+
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
+  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
+}));
+
+const insetsState = vi.hoisted(() => ({ bottom: 0 }));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => insetsState,
 }));
 
 // ── sub-components ─────────────────────────────────────────────────
@@ -60,6 +73,10 @@ vi.mock('@/components/agents/instance-selector', () => ({
 
 vi.mock('@/components/agents/new-session-repository-section', () => ({
   NewSessionRepositorySection: 'NewSessionRepositorySection',
+}));
+
+vi.mock('@/components/agents/new-session-run-target', () => ({
+  NewSessionRunTarget: 'NewSessionRunTarget',
 }));
 
 vi.mock('@/components/agents/folder-selector', () => ({
@@ -208,7 +225,7 @@ function defaultProps() {
 
 describe('NewSessionConfigureForm', () => {
   it.each([false, true])(
-    'refreshes targets while fetching=%s without changing the selection',
+    'passes the target state to the run-target block while fetching=%s',
     async isFetchingInstances => {
       const { NewSessionConfigureForm: renderForm } = await import('./new-session-configure-form');
       const props = {
@@ -218,35 +235,51 @@ describe('NewSessionConfigureForm', () => {
         isFetchingInstances,
       };
       const element = renderForm(props);
-      const button = findElementByType(element, 'Button');
-      expect(button).toMatchObject({
-        accessibilityLabel: 'Refresh',
-        size: 'icon',
-        disabled: isFetchingInstances,
-        loading: isFetchingInstances,
-        onPress: props.onRefreshInstances,
+      const runTarget = findElementByType(element, 'NewSessionRunTarget');
+      expect(runTarget).toMatchObject({
+        showRunOnSelector: true,
+        runOnInstance: INSTANCE,
+        instanceList: [],
+        isLoadingInstances: false,
+        isFetchingInstances,
+        disabled: false,
+        onChangeRunOnInstance: props.onChangeRunOnInstance,
+        onRefreshInstances: props.onRefreshInstances,
       });
-      const selector = findElementByType(element, 'InstanceSelector');
-      expect(selector?.value).toBe(INSTANCE);
-      if (!button) {
-        throw new Error('Missing target refresh button');
-      }
-      if (!isFetchingInstances) {
-        (button.onPress as () => void)();
-        expect(props.onRefreshInstances).toHaveBeenCalledOnce();
-        expect(props.onChangeRunOnInstance).not.toHaveBeenCalled();
+    }
+  );
+
+  it('passes the creation busy flag as the run-target disabled state', async () => {
+    const { NewSessionConfigureForm: renderForm } = await import('./new-session-configure-form');
+    const element = renderForm({ ...defaultProps(), showRunOnSelector: true, isCreating: true });
+    expect(findElementByType(element, 'NewSessionRunTarget')?.disabled).toBe(true);
+  });
+
+  it.each(['android', 'ios'] as const)(
+    'floors the scroll body at the safe-area bottom and lifts it above the IME on %s',
+    async os => {
+      platformState.OS = os;
+      insetsState.bottom = 42;
+      try {
+        const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+        // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+        const element = NewSessionConfigureForm({ ...defaultProps() }) as Node;
+
+        expect(findElementByType(element, 'View')?.style).toEqual({ paddingBottom: 42 });
+        // Neither platform resizes the window for the IME, so the body sits
+        // inside a keyboard-lift view that adds the IME height on top of the
+        // safe area — the same implementation on iOS and Android.
+        expect(findElementByType(element, 'AppAwareKeyboardPaddingView')).not.toBeNull();
+      } finally {
+        insetsState.bottom = 0;
+        platformState.OS = 'android';
       }
     }
   );
 
-  it('disables target refresh during session creation', async () => {
-    const { NewSessionConfigureForm: renderForm } = await import('./new-session-configure-form');
-    const element = renderForm({ ...defaultProps(), showRunOnSelector: true, isCreating: true });
-    expect(findElementByType(element, 'Button')?.disabled).toBe(true);
-  });
-
   // ── Case 1: Cloud, selector shown ──
-  it('renders prompt, repo, and "Run on" label when cloud target with selector shown', async () => {
+  it('renders prompt, repo, and the run-target block when cloud target with selector shown', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -258,8 +291,9 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findElementByType(element, 'NewSessionPrompt')).not.toBeNull();
     expect(findElementByType(element, 'NewSessionRepositorySection')).not.toBeNull();
-    expect(findTextContent(element, t => t === 'Run on')).toBe(true);
-    expect(findTextContent(element, t => t === 'Run on: ')).toBe(false);
+    expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
+      showRunOnSelector: true,
+    });
   });
 
   // ── Case 1b: ordered repository array passes through unchanged ──
@@ -325,7 +359,7 @@ describe('NewSessionConfigureForm', () => {
   });
 
   // ── Case 3: Remote, selector shown ──
-  it('shows prompt and "Run on" label, hides repo section, when remote target with selector shown', async () => {
+  it('shows prompt and the run-target block, hides repo section, when remote target with selector shown', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -337,8 +371,10 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findElementByType(element, 'NewSessionPrompt')).not.toBeNull();
     expect(findElementByType(element, 'NewSessionRepositorySection')).toBeNull();
-    expect(findTextContent(element, t => t === 'Run on')).toBe(true);
-    expect(findTextContent(element, t => t === 'Run on: ')).toBe(false);
+    expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
+      showRunOnSelector: true,
+      runOnInstance: INSTANCE,
+    });
   });
 
   // ── Case 4: Remote, selector hidden ──
@@ -354,7 +390,10 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findElementByType(element, 'NewSessionPrompt')).not.toBeNull();
     expect(findElementByType(element, 'NewSessionRepositorySection')).toBeNull();
-    expect(findTextContent(element, t => t === 'Run on: laptop · kilo')).toBe(true);
+    expect(findElementByType(element, 'NewSessionRunTarget')).toMatchObject({
+      showRunOnSelector: false,
+      runOnInstance: INSTANCE,
+    });
   });
 
   // ── Case 5: Disconnected note — three contracts ──
@@ -445,7 +484,7 @@ describe('NewSessionConfigureForm', () => {
   });
 
   // ── Case 7: remote target keeps its context in the selector value ──
-  it('passes the remote target and loading flag to the selector', async () => {
+  it('passes the remote target and loading flag to the run-target block', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -456,12 +495,12 @@ describe('NewSessionConfigureForm', () => {
       isLoadingInstances: true,
     }) as Node;
 
-    const selector = findElementByType(element, 'InstanceSelector');
-    expect(selector).not.toBeNull();
+    const runTarget = findElementByType(element, 'NewSessionRunTarget');
+    expect(runTarget).not.toBeNull();
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
-    expect(selector!.value).toBe(INSTANCE);
+    expect(runTarget!.runOnInstance).toBe(INSTANCE);
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion
-    expect(selector!.isLoading).toBe(true);
+    expect(runTarget!.isLoadingInstances).toBe(true);
     expect(findElementByType(element, 'NewSessionPrompt')).not.toBeNull();
     expect(findElementByType(element, 'NewSessionRepositorySection')).toBeNull();
   });

@@ -2970,5 +2970,33 @@
     "emptyTitle": "هیچ مۆدێلێکی گۆڕینی دەنگ بۆ دەق نییە",
     "emptyDescription": "Kilo Gateway ئێستا هیچ مۆدێلێکی گۆڕینی دەنگ بۆ دەقی نییە.",
     "loadFailed": "نەتوانرا مۆدێلەکانی گۆڕینی دەنگ بۆ دەق بار بکرێن."
+  },
+  "tour": {
+    "eyebrow": "گەشتێکی خێرا",
+    "forkTitle": "دەتەوێت Kilo لەکوێدا بجێنیتەوە؟",
+    "forkSubtitle": "هەڵبژێرە Kilo بۆ یەکەم دانیشتن لەکوێ کار دەکات.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Kilo لە ژینگەیەکی هەوری داخراودا بجێنەوە، بەبێ ئەوەی هیچ دابمەزرێنیت.",
+    "remoteOptionTitle": "کۆمپیوتەرەکەت",
+    "remoteOptionBody": "Kilo لەسەر ئامێری خۆتدا بە ڕێگای CLI ی `kilo remote` جێبەجێ بکە.",
+    "skip": "گەشتەکە دەربپەڕێ",
+    "tutorialLabel": "فێربوون",
+    "cloudTitle": "یەکەم دانیشتنی هەورییەکەت دەست پێبکە",
+    "cloudBody": "دانیشتنێکی نوێ دروست بکە و Kilo لە هەوردا جێی دەکات.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "چاوەڕوانی دەستپێکردنی دانیشتنی هەورییەکەتم…",
+    "cloudCheck": "یەکەم دانیشتنی هەورییەکەت کار دەکات.",
+    "remoteTitle": "یەکەم دانیشتنی دوورەکەت دەست پێبکە",
+    "remoteBody": "کۆمپیوتەرەکەت پەیوەست بکە، پاشان دانیشتنەکە لێرەوە دەست پێبکە.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "دانیشتنێک لە کۆمپیوتەرەکەت دەست پێبکە",
+    "remoteWaiting": "چاوەڕوانی کۆمپیوتەرەکەتم دانیشتنەکە دەست پێبکات…",
+    "remoteCheck": "یەکەم دانیشتنی دوورەکەت کار دەکات.",
+    "remoteEmptyTitle": "هێشتا کۆمپیوتەرێک پەیوەست نەبووە",
+    "remoteEmptyBody": "بۆ پەیوەستکردنی، `kilo remote` لە کۆمپیوتەرەکەتدا جێبەجێ بکە.",
+    "remoteFound": "کۆمپیوتەر پەیوەست بوو",
+    "checkAgain": "دووبارە پشکنین بکە",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

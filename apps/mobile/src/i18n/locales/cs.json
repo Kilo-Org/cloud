@@ -3014,5 +3014,33 @@
     "emptyTitle": "Žádné modely přepisu",
     "emptyDescription": "Kilo Gateway nyní nenabízí žádné modely přepisu.",
     "loadFailed": "Modely přepisu se nepodařilo načíst."
+  },
+  "tour": {
+    "eyebrow": "Rychlá prohlídka",
+    "forkTitle": "Kde chcete Kilo spustit?",
+    "forkSubtitle": "Vyberte, kde bude Kilo běžet pro vaši první relaci.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Spusťte Kilo v izolovaném cloudovém prostředí, aniž byste něco instalovali.",
+    "remoteOptionTitle": "Váš počítač",
+    "remoteOptionBody": "Spusťte Kilo na vlastním stroji prostřednictvím CLI `kilo remote`.",
+    "skip": "Přeskočit prohlídku",
+    "tutorialLabel": "Návod",
+    "cloudTitle": "Spusťte svou první cloudovou relaci",
+    "cloudBody": "Vytvořte novou relaci a Kilo ji spustí v cloudu.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Čekáme, než vaše cloudová relace začne…",
+    "cloudCheck": "Vaše první cloudová relace běží.",
+    "remoteTitle": "Spusťte svou první vzdálenou relaci",
+    "remoteBody": "Připojte svůj počítač a pak spusťte relaci odtud.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Spustit relaci na počítači",
+    "remoteWaiting": "Čekáme, než váš počítač relaci spustí…",
+    "remoteCheck": "Vaše první vzdálená relace běží.",
+    "remoteEmptyTitle": "Zatím žádný připojený počítač",
+    "remoteEmptyBody": "Chcete-li ho připojit, spusťte na počítači `kilo remote`.",
+    "remoteFound": "Počítač připojen",
+    "checkAgain": "Zkontrolovat znovu",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

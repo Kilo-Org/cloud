@@ -3014,5 +3014,33 @@
     "emptyTitle": "Ni modelov za prepisovanje",
     "emptyDescription": "Kilo Gateway trenutno ne ponuja modelov za prepisovanje.",
     "loadFailed": "Modelov za prepisovanje ni bilo mogoče naložiti."
+  },
+  "tour": {
+    "eyebrow": "Hitri ogled",
+    "forkTitle": "Kje želite pognati Kilo?",
+    "forkSubtitle": "Izberi, kje bo Kilo pognal tvojo prvo sejo.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Zaženi Kilo v izoliranem oblačnem okolju, brez namestitve.",
+    "remoteOptionTitle": "Vaš računalnik",
+    "remoteOptionBody": "Zaženi Kilo na svojem računalniku prek CLI-ja `kilo remote`.",
+    "skip": "Preskoči ogled",
+    "tutorialLabel": "Vodič",
+    "cloudTitle": "Zaženite svojo prvo sejo v oblaku",
+    "cloudBody": "Ustvari novo sejo in Kilo jo pogne v oblaku.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Čakam na zagon seje v oblaku…",
+    "cloudCheck": "Vaša prva seja v oblaku teče.",
+    "remoteTitle": "Zaženite svojo prvo oddaljeno sejo",
+    "remoteBody": "Poveži svoj računalnik, nato pa tu zaženi sejo.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Zaženi sejo na svojem računalniku",
+    "remoteWaiting": "Čakam, da računalnik zažene sejo…",
+    "remoteCheck": "Vaša prva oddaljena seja teče.",
+    "remoteEmptyTitle": "Še ni povezanega računalnika",
+    "remoteEmptyBody": "Če ga želite povezati, zaženite `kilo remote` na svojem računalniku.",
+    "remoteFound": "Računalnik povezan",
+    "checkAgain": "Preveri znova",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

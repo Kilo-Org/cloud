@@ -3058,5 +3058,33 @@
     "emptyTitle": "Dim modelau trawsgrifio",
     "emptyDescription": "Does dim modelau trawsgrifio ar gael gan Kilo Gateway ar hyn o bryd.",
     "loadFailed": "Doedd dim modd llwytho'r modelau trawsgrifio."
+  },
+  "tour": {
+    "eyebrow": "Taith gyflym",
+    "forkTitle": "Ble yr hoffech chi redeg Kilo?",
+    "forkSubtitle": "Dewiswch ble mae Kilo yn rhedeg ar gyfer eich sesiwn gyntaf.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Rhedwch Kilo mewn amgylchedd cwmwl bocsys, heb dim i'w osod.",
+    "remoteOptionTitle": "Eich cyfrifiadur",
+    "remoteOptionBody": "Rhedwch Kilo ar eich peiriant eich hun drwy'r CLI `kilo remote`.",
+    "skip": "Hepgor y daith",
+    "tutorialLabel": "Tiwtorial",
+    "cloudTitle": "Dechreuwch eich sesiwn gwmwl gyntaf",
+    "cloudBody": "Creu sesiwn newydd a bydd Kilo yn ei rhedeg yn y cwmwl.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Wrthi aros i'ch sesiwn gwmwl ddechrau…",
+    "cloudCheck": "Mae'ch sesiwn gwmwl gyntaf yn rhedeg.",
+    "remoteTitle": "Dechreuwch eich sesiwn hirhoedlog gyntaf",
+    "remoteBody": "Cysylltwch eich cyfrifiadur, yna dechreuwch y sesiwn o'r fan hon.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Dechrau sesiwn ar eich cyfrifiadur",
+    "remoteWaiting": "Wrthi aros i'ch cyfrifiadur gychwyn y sesiwn…",
+    "remoteCheck": "Mae'ch sesiwn hirhoedlog gyntaf yn rhedeg.",
+    "remoteEmptyTitle": "Dim cyfrifiadur wedi'i gysylltu eto",
+    "remoteEmptyBody": "I'w gysylltu, rhedwch `kilo remote` ar eich cyfrifiadur.",
+    "remoteFound": "Cyfrifiadur wedi'i gysylltu",
+    "checkAgain": "Gwirio eto",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

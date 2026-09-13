@@ -2970,5 +2970,33 @@
     "emptyTitle": "Səsin mətnə çevrilməsi modeli yoxdur",
     "emptyDescription": "Kilo Gateway hazırda səsin mətnə çevrilməsi modeli təklif etmir.",
     "loadFailed": "Səsin mətnə çevrilməsi modellərini yükləmək mümkün olmadı."
+  },
+  "tour": {
+    "eyebrow": "Sürətli tur",
+    "forkTitle": "Kilo-nu harada işə salmaq istəyirsən?",
+    "forkSubtitle": "İlk sessiyan üçün Kilo-nun harada işləyəcəyini seç.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Kilo-nu heç nə quraşdırmağa ehtiyac olmadan təcrid olunmuş bulud mühitində işə sal.",
+    "remoteOptionTitle": "Kompüterin",
+    "remoteOptionBody": "Kilo-nu `kilo remote` CLI vasitəsilə öz cihazında işə sal.",
+    "skip": "Turu ötür",
+    "tutorialLabel": "Təlimat",
+    "cloudTitle": "İlk bulud sessiyanı başlat",
+    "cloudBody": "Yeni sessiya yarat, Kilo onu buludda işlədəcək.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Bulud sessiyanızın başlaması gözlənilir…",
+    "cloudCheck": "İlk bulud sessiyan işləyir.",
+    "remoteTitle": "İlk uzaq sessiyanı başlat",
+    "remoteBody": "Kompüterini qoş, sonra sessiyanı buradan başlat.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Kompüterində sessiya başlat",
+    "remoteWaiting": "Kompüterinizin sessiyanı başlatması gözlənilir…",
+    "remoteCheck": "İlk uzaq sessiyan işləyir.",
+    "remoteEmptyTitle": "Hələ kompüter qoşulmayıb",
+    "remoteEmptyBody": "Onu qoşmaq üçün kompüterində `kilo remote` əmrini işə sal.",
+    "remoteFound": "Kompüter qoşuldu",
+    "checkAgain": "Yenidən yoxla",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

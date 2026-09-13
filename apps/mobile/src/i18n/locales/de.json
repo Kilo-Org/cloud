@@ -2970,5 +2970,33 @@
     "emptyTitle": "Keine Transkriptionsmodelle",
     "emptyDescription": "Kilo Gateway bietet derzeit keine Transkriptionsmodelle.",
     "loadFailed": "Die Transkriptionsmodelle konnten nicht geladen werden."
+  },
+  "tour": {
+    "eyebrow": "Schnelltour",
+    "forkTitle": "Wo möchtest du Kilo ausführen?",
+    "forkSubtitle": "Wähle aus, wo Kilo für deine erste Sitzung läuft.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Führe Kilo in einer isolierten Cloud-Umgebung aus, ohne etwas installieren zu müssen.",
+    "remoteOptionTitle": "Dein Computer",
+    "remoteOptionBody": "Führe Kilo über die `kilo remote`-CLI auf deinem eigenen Rechner aus.",
+    "skip": "Tour überspringen",
+    "tutorialLabel": "Tutorial",
+    "cloudTitle": "Starte deine erste Cloud-Sitzung",
+    "cloudBody": "Erstelle eine neue Sitzung, und Kilo führt sie in der Cloud aus.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Warte auf den Start deiner Cloud-Sitzung…",
+    "cloudCheck": "Deine erste Cloud-Sitzung läuft.",
+    "remoteTitle": "Starte deine erste Remote-Sitzung",
+    "remoteBody": "Verbinde deinen Computer und starte die Sitzung dann von hier.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Sitzung auf deinem Computer starten",
+    "remoteWaiting": "Warte, bis dein Computer die Sitzung startet…",
+    "remoteCheck": "Deine erste Remote-Sitzung läuft.",
+    "remoteEmptyTitle": "Noch kein Computer verbunden",
+    "remoteEmptyBody": "Um ihn zu verbinden, führe `kilo remote` auf deinem Computer aus.",
+    "remoteFound": "Computer verbunden",
+    "checkAgain": "Erneut prüfen",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

@@ -2992,5 +2992,33 @@
     "emptyTitle": "Nav transkripcijas modeļu",
     "emptyDescription": "Pašlaik Kilo Gateway nepiedāvā nevienu transkripcijas modeli.",
     "loadFailed": "Neizdevās ielādēt transkripcijas modeļus."
+  },
+  "tour": {
+    "eyebrow": "Ātra apskate",
+    "forkTitle": "Kur vēlaties palaist Kilo?",
+    "forkSubtitle": "Izvēlies, kur Kilo darbosies tavā pirmajā sesijā.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Palaid Kilo izolētā mākoņu vidē, neko neinstalējot.",
+    "remoteOptionTitle": "Tavs dators",
+    "remoteOptionBody": "Palaid Kilo savā datorā, izmantojot `kilo remote` CLI.",
+    "skip": "Izlaist apskati",
+    "tutorialLabel": "Apmācība",
+    "cloudTitle": "Sāc savu pirmo mākoņu sesiju",
+    "cloudBody": "Izveido jaunu sesiju, un Kilo to palaidīs mākonī.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Gaidu, kad sāksies tava mākoņu sesija…",
+    "cloudCheck": "Tava pirmā mākoņu sesija darbojas.",
+    "remoteTitle": "Sāc savu pirmo attālināto sesiju",
+    "remoteBody": "Pievieno datoru un tad sāc sesiju šeit.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Sākt sesiju savā datorā",
+    "remoteWaiting": "Gaidu, kad dators uzsāks sesiju…",
+    "remoteCheck": "Tava pirmā attālinātā sesija darbojas.",
+    "remoteEmptyTitle": "Vēl nav pievienota datora",
+    "remoteEmptyBody": "Lai to pievienotu, palaid `kilo remote` savā datorā.",
+    "remoteFound": "Dators pievienots",
+    "checkAgain": "Pārbaudīt vēlreiz",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

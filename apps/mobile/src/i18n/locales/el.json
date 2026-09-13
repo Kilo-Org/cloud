@@ -2970,5 +2970,33 @@
     "emptyTitle": "Δεν υπάρχουν μοντέλα απομαγνητοφώνησης",
     "emptyDescription": "Το Kilo Gateway δεν προσφέρει αυτή τη στιγμή μοντέλα απομαγνητοφώνησης.",
     "loadFailed": "Δεν ήταν δυνατή η φόρτωση των μοντέλων απομαγνητοφώνησης."
+  },
+  "tour": {
+    "eyebrow": "Γρήγορη ξενάγηση",
+    "forkTitle": "Πού θα ήθελες να εκτελέσεις το Kilo;",
+    "forkSubtitle": "Διάλεξε πού θα εκτελείται το Kilo για την πρώτη σου συνεδρία.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Εκτέλεσε το Kilo σε ένα απομονωμένο περιβάλλον cloud χωρίς να εγκαθιστάς τίποτα.",
+    "remoteOptionTitle": "Ο υπολογιστής σου",
+    "remoteOptionBody": "Εκτέλεσε το Kilo στο δικό σου μηχάνημα μέσω του CLI `kilo remote`.",
+    "skip": "Παράλειξη ξενάγησης",
+    "tutorialLabel": "Οδηγός",
+    "cloudTitle": "Ξεκίνα την πρώτη σου συνεδρία cloud",
+    "cloudBody": "Δημιούργησε μια νέα συνεδρία και το Kilo θα την εκτελέσει στο cloud.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Περιμένω να ξεκινήσει η συνεδρία cloud σου…",
+    "cloudCheck": "Η πρώτη σου συνεδρία cloud εκτελείται.",
+    "remoteTitle": "Ξεκίνα την πρώτη απομακρυσμένη συνεδρία σου",
+    "remoteBody": "Σύνδεσε τον υπολογιστή σου και μετά ξεκίνα τη συνεδρία από εδώ.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Έναρξη συνεδρίας στον υπολογιστή σου",
+    "remoteWaiting": "Περιμένω ο υπολογιστής σου να ξεκινήσει τη συνεδρία…",
+    "remoteCheck": "Η πρώτη απομακρυσμένη συνεδρία σου εκτελείται.",
+    "remoteEmptyTitle": "Δεν έχει συνδεθεί υπολογιστής ακόμα",
+    "remoteEmptyBody": "Για να τον συνδέσεις, εκτέλεσε `kilo remote` στον υπολογιστή σου.",
+    "remoteFound": "Ο υπολογιστής συνδέθηκε",
+    "checkAgain": "Έλεγχος ξανά",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

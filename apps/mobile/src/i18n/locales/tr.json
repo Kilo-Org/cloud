@@ -2970,5 +2970,33 @@
     "emptyTitle": "Metne dönüştürme modeli yok",
     "emptyDescription": "Kilo Gateway şu anda metne dönüştürme modeli sunmuyor.",
     "loadFailed": "Metne dönüştürme modelleri yüklenemedi."
+  },
+  "tour": {
+    "eyebrow": "Hızlı tur",
+    "forkTitle": "Kilo'yu nerede çalıştırmak istersin?",
+    "forkSubtitle": "İlk oturumun için Kilo'nun nerede çalışacağını seç.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Hiçbir şey yüklemeden Kilo'yu yalıtılmış bir bulut ortamında çalıştır.",
+    "remoteOptionTitle": "Bilgisayarın",
+    "remoteOptionBody": "Kilo'yu kendi makinende `kilo remote` CLI'si üzerinden çalıştır.",
+    "skip": "Turu atla",
+    "tutorialLabel": "Eğitim",
+    "cloudTitle": "İlk bulut oturumunu başlat",
+    "cloudBody": "Yeni bir oturum oluştur, Kilo onu bulutta çalıştırır.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Bulut oturumunun başlaması bekleniyor…",
+    "cloudCheck": "İlk bulut oturumun çalışıyor.",
+    "remoteTitle": "İlk uzak oturumunu başlat",
+    "remoteBody": "Bilgisayarını bağla, ardından oturumu buradan başlat.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Bilgisayarında bir oturum başlat",
+    "remoteWaiting": "Bilgisayarının oturumu başlatması bekleniyor…",
+    "remoteCheck": "İlk uzak oturumun çalışıyor.",
+    "remoteEmptyTitle": "Henüz bağlı bir bilgisayar yok",
+    "remoteEmptyBody": "Bağlamak için bilgisayarında `kilo remote` komutunu çalıştır.",
+    "remoteFound": "Bilgisayar bağlandı",
+    "checkAgain": "Tekrar kontrol et",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

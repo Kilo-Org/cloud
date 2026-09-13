@@ -2970,5 +2970,33 @@
     "emptyTitle": "Babu samfuran mayar da magana zuwa rubutu",
     "emptyDescription": "Kilo Gateway bai ba da samfuran mayar da magana zuwa rubutu a halin yanzu.",
     "loadFailed": "An kasa loda samfuran mayar da magana zuwa rubutu."
+  },
+  "tour": {
+    "eyebrow": "Kaita gajere",
+    "forkTitle": "Ina kake son ka gudanar da Kilo?",
+    "forkSubtitle": "Zaɓi inda Kilo zai gudanar da zaman ka na farko.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Gudanar da Kilo a cikin yanarin gajimare mai keɓe ba tare da shigar da komai ba.",
+    "remoteOptionTitle": "Kwamfutarka",
+    "remoteOptionBody": "Gudanar da Kilo a na'urarka ta hanyar CLI na `kilo remote`.",
+    "skip": "Tsallake kaita",
+    "tutorialLabel": "Koyarwa",
+    "cloudTitle": "Fara zaman gajimare na farko",
+    "cloudBody": "Ƙirƙiri sabon zama, Kilo kuma zai gudanar da shi a gajimare.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Ana jiran faruwar zaman gajimareka…",
+    "cloudCheck": "Zaman gajimareka na farko yana gudana.",
+    "remoteTitle": "Fara zaman nesa na farko",
+    "remoteBody": "Haɗa kwamfutarka, sai ka fara zaman daga nan.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Fara zama a kwamfutarka",
+    "remoteWaiting": "Ana jiran kwamfutarka ya fara zaman…",
+    "remoteCheck": "Zaman nesa na farko yana gudana.",
+    "remoteEmptyTitle": "Babu kwamfuta da aka haɗa tukuna",
+    "remoteEmptyBody": "Don haɗa shi, gudanar da `kilo remote` a kwamfutarka.",
+    "remoteFound": "An haɗa kwamfuta",
+    "checkAgain": "Sake dubawa",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

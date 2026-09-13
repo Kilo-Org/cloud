@@ -2970,5 +2970,33 @@
     "emptyTitle": "ບໍ່ມີໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
     "emptyDescription": "ຕອນນີ້ Kilo Gateway ບໍ່ມີໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ.",
     "loadFailed": "ບໍ່ສາມາດໂຫຼດໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມໄດ້."
+  },
+  "tour": {
+    "eyebrow": "ການທ່ອງທ່ຽວສັ້ນ",
+    "forkTitle": "ທ່ານຕ້ອງການແລ່ນ Kilo ຢູ່ໃສ?",
+    "forkSubtitle": "ເລືອກສະຖານທີ່ທີ່ Kilo ຈະແລ່ນເຊດຊັນທຳອິດຂອງທ່ານ.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "ແລ່ນ Kilo ໃນສະພາບແວດລ້ອມເມກທີ່ແຍກຕ່າງຫາກ ໂດຍບໍ່ຕ້ອງຕິດຕັ້ງຫຍັງ.",
+    "remoteOptionTitle": "ຄອມພິວເຕີຂອງທ່ານ",
+    "remoteOptionBody": "ແລ່ນ Kilo ໃນເຄື່ອງຂອງທ່ານເອງຜ່ານ CLI `kilo remote`.",
+    "skip": "ຂ້າມການທ່ອງທ່ຽວ",
+    "tutorialLabel": "ຄູ່ມື",
+    "cloudTitle": "ເລີ່ມເຊດຊັນເມກທຳອິດຂອງທ່ານ",
+    "cloudBody": "ສ້າງເຊດຊັນໃໝ່ ແລ້ວ Kilo ຈະແລ່ນມັນຢູ່ເມກ.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "ກຳລັງລໍຖ້າເຊດຊັນເມກຂອງທ່ານເລີ່ມຕົ້ນ…",
+    "cloudCheck": "ເຊດຊັນເມກທຳອິດຂອງທ່ານກຳລັງເຮັດວຽກ.",
+    "remoteTitle": "ເລີ່ມເຊດຊັນໄກທຳອິດຂອງທ່ານ",
+    "remoteBody": "ເຊື່ອມຕໍ່ຄອມພິວເຕີຂອງທ່ານ, ແລ້ວເລີ່ມເຊດຊັນຈາກທີ່ນີ້.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "ເລີ່ມເຊດຊັນຢູ່ຄອມພິວເຕີຂອງທ່ານ",
+    "remoteWaiting": "ກຳລັງລໍຖ້າຄອມພິວເຕີຂອງທ່ານເລີ່ມເຊດຊັນ…",
+    "remoteCheck": "ເຊດຊັນໄກທຳອິດຂອງທ່ານກຳລັງເຮັດວຽກ.",
+    "remoteEmptyTitle": "ຍັງບໍ່ມີຄອມພິວເຕີເຊື່ອມຕໍ່",
+    "remoteEmptyBody": "ເພື່ອເຊື່ອມຕໍ່ມັນ, ໃຫ້ແລ່ນ `kilo remote` ໃນຄອມພິວເຕີຂອງທ່ານ.",
+    "remoteFound": "ຄອມພິວເຕີເຊື່ອມຕໍ່ແລ້ວ",
+    "checkAgain": "ກວດສອບອີກຄັ້ງ",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

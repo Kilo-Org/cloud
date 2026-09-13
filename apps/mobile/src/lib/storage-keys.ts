@@ -87,6 +87,12 @@ export const PICKER_LAUNCH_CONTEXT_KEY = 'picker-launch-context';
  */
 export const VOICE_NETWORK_CONSENT_KEY_PREFIX = 'voice-network-consent-';
 /**
+ * Per-user first-sign-in tour decision (finished or skipped). Not deleted on
+ * sign-out — a per-account decision must survive sign-out and sign-in of the
+ * same account, exactly like `VOICE_NETWORK_CONSENT_KEY_PREFIX`.
+ */
+export const TOUR_COMPLETED_KEY_PREFIX = 'tour-completed-';
+/**
  * Encrypted-KV scope for the durable session-attention ack store (P1-F-48a).
  * Holds one serialized blob of `{ sessionId, raiseId, status, ackedAt,
  * expiresAt }` entries; ids and timestamps only, no secrets.
@@ -95,7 +101,8 @@ export const SESSION_ATTENTION_KEY = 'session-attention';
 
 /**
  * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,
- * no collisions. Shared by the analytics and voice-network consent records.
+ * no collisions. Shared by the analytics, voice-network consent, and
+ * tour-completion records.
  */
 export function encodeStorageKey(prefix: string, userId: string): string {
   return `${prefix}${[...new TextEncoder().encode(userId)]

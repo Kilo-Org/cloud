@@ -2970,5 +2970,33 @@
     "emptyTitle": "Moodeeli sagalee jijjiiru hin jiru",
     "emptyDescription": "Kilo Gateway amma moodeela sagalee gara barreeffamaatti jijjiiru hin dhiyeessu.",
     "loadFailed": "Moodeelota sagalee jijjiiru fe'uun hin danda'amne."
+  },
+  "tour": {
+    "eyebrow": "Daawannoo gabaabaa",
+    "forkTitle": "Kilo irratti hojjachuu barbaaddi?",
+    "forkSubtitle": "Turtii kee jalqabaauf Kilo eessa akka hojjetu filadhu.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Waan hin barbaachifne fe'uun Kilo naannoo duumessa adda bahe keessatti hojjechisi.",
+    "remoteOptionTitle": "Kompiitara kee",
+    "remoteOptionBody": "Kilo kompiitara kee irratti `kilo remote` CLI'n hojjechisi.",
+    "skip": "Daawannoo darbi",
+    "tutorialLabel": "Barnoota",
+    "cloudTitle": "Turtii duumessa jalqabaa kee eegaladhu",
+    "cloudBody": "Turtii haaraa uumi; Kilo'n isaa duumessa keessatti hojjetsa.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Turtiin duumessa kee akka jalqabu eegamaa jira…",
+    "cloudCheck": "Turtiin duumessa kee jalqabaa hojjechaa jira.",
+    "remoteTitle": "Turtii fageenya jalqabaa kee eegaladhu",
+    "remoteBody": "Kompiitara kee walqunnamsiisi, itti aanse turtii kana as irraa eegaladhu.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Turtii kompiitara kee irratti eegaladhu",
+    "remoteWaiting": "Kompiitarni kee turticha eegalutti eegamaa jira…",
+    "remoteCheck": "Turtiin fageenya jalqabaa kee hojjechaa jira.",
+    "remoteEmptyTitle": "Amma kompiitaraan hin walqabate",
+    "remoteEmptyBody": "Walqunnamuuf, kompiitara kee irratti `kilo remote` raawwadhu.",
+    "remoteFound": "Kompiitaraan walqabate",
+    "checkAgain": "Irra deebi'ii ilaali",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

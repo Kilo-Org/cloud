@@ -2970,5 +2970,33 @@
     "emptyTitle": "Inga transkriberingsmodeller",
     "emptyDescription": "Kilo Gateway erbjuder inga transkriberingsmodeller just nu.",
     "loadFailed": "Det gick inte att läsa in transkriberingsmodellerna."
+  },
+  "tour": {
+    "eyebrow": "Snabbguide",
+    "forkTitle": "Var vill du köra Kilo?",
+    "forkSubtitle": "Välj var Kilo kör din första session.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Kör Kilo i en isolerad molnmiljö utan att behöva installera något.",
+    "remoteOptionTitle": "Din dator",
+    "remoteOptionBody": "Kör Kilo på din egen maskin via `kilo remote`-CLI:n.",
+    "skip": "Hoppa över guiden",
+    "tutorialLabel": "Handledning",
+    "cloudTitle": "Starta din första molnsession",
+    "cloudBody": "Skapa en ny session, så kör Kilo den i molnet.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Väntar på att molnsessionen ska starta…",
+    "cloudCheck": "Din första molnsession kör.",
+    "remoteTitle": "Starta din första distanssession",
+    "remoteBody": "Anslut din dator och starta sessionen härifrån.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Starta en session på din dator",
+    "remoteWaiting": "Väntar på att datorn ska starta sessionen…",
+    "remoteCheck": "Din första distanssession kör.",
+    "remoteEmptyTitle": "Ingen dator är ansluten ännu",
+    "remoteEmptyBody": "För att ansluta den, kör `kilo remote` på din dator.",
+    "remoteFound": "Dator ansluten",
+    "checkAgain": "Kontrollera igen",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

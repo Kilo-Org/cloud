@@ -127,7 +127,15 @@ const config: ExpoConfig = {
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-foreground.png',
     },
-    predictiveBackGestureEnabled: true,
+    // Keep the platform's classic back delivery. React Native 0.86 only
+    // installs its OnBackPressedCallback workaround when the device runs
+    // API 36+ (`AndroidVersion.isAtLeastTargetSdk36`), so opting into
+    // predictive back (`android:enableOnBackInvokedCallback="true"`) on an
+    // API 33-35 device routes Back straight to finish() and the JS
+    // `hardwareBackPress` event never fires. API 36 devices enforce
+    // predictive back regardless, where React Native does install the
+    // callback, so `false` is correct on every API level.
+    predictiveBackGestureEnabled: false,
     blockedPermissions: [
       'android.permission.READ_MEDIA_IMAGES',
       'android.permission.READ_MEDIA_VIDEO',

@@ -122,6 +122,8 @@ export type AgentMode = string;
 type PrepareSessionSharedFields = {
   mode: AgentMode;
   model: string;
+  /** Optional cheap same-vendor model for title/aux calls (Code Reviewer). */
+  smallModel?: string;
   variant?: string;
   // GitHub-specific params
   githubRepo?: string;

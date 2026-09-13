@@ -1437,6 +1437,9 @@ export async function sessionCreateIntentFingerprint(
         mode: input.agent.mode,
         model: input.agent.model,
         variant: input.agent.variant || undefined,
+        // Cheap same-vendor aux model is immutable create input: it changes the
+        // materialized session env, so a changed value must not replay.
+        smallModel: input.agent.smallModel || undefined,
         // The DO stores the effective appended system prompt under `agent`;
         // it is immutable create input, so a changed system prompt must never
         // replay or reconcile a prior session.

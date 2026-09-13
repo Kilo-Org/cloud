@@ -33,6 +33,7 @@ type TestRegisterSessionInput = {
   prompt: string;
   mode: AgentMode;
   model: string;
+  smallModel?: string;
   variant?: string;
   kiloSessionId?: string;
   kilocodeToken?: string;
@@ -147,6 +148,7 @@ export function groupedRegisterSessionInput(input: TestRegisterSessionInput): Re
     agent: {
       mode: input.mode,
       model: input.model,
+      smallModel: input.smallModel,
       variant: input.variant,
       appendSystemPrompt: input.appendSystemPrompt,
     },

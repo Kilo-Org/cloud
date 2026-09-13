@@ -272,6 +272,7 @@ describe('session metadata boundary', () => {
       agent: {
         mode: 'reviewer',
         model: 'kilo/gpt-5',
+        smallModel: 'kilo/anthropic/claude-haiku-4.5',
         variant: 'thinking',
         appendSystemPrompt: 'Extra context',
       },

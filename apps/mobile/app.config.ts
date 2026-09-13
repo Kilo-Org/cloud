@@ -161,6 +161,11 @@ const config: ExpoConfig = {
         },
         ios: {
           ccacheEnabled: true,
+          // iOS consumes React Native Core prebuilt by default, so the pnpm patch
+          // over RCTComponentViewFactory.mm would never compile into the app.
+          // The Expo Podfile maps this to ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
+          // (KILO-APP-6H; react/react-native#58299).
+          buildReactNativeFromSource: true,
           // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop
           // (pulled transitively alongside expo-iap's AppCheckCore); those pods don't define
           // modules, so pod install fails unless we force module maps on them. Unconditional

@@ -86,7 +86,9 @@ export type OperationRole =
   | 'continuity-warm-cold'
   | 'continuity-question'
   | 'continuity-large-stream'
-  | 'continuity-concurrent';
+  | 'continuity-concurrent'
+  | 'continuity-feed-stale'
+  | 'continuity-feed-stale-sibling';
 
 export type ScenarioOperation = { label: string; operationKey: string };
 
@@ -161,7 +163,10 @@ export function fakeDirective(scenario: string, ...args: string[]): string {
   return `__fake__:${scenario}${args.length > 0 ? `:${args.join(':')}` : ''}`;
 }
 
-export function assertScenarioPreconditions(config: DriverConfig, api: ApiVersion | undefined): void {
+export function assertScenarioPreconditions(
+  config: DriverConfig,
+  api: ApiVersion | undefined
+): void {
   if ((api ?? 'unified') !== 'unified') {
     throw new Error('file-state lifecycle scenarios require the unified API');
   }
@@ -276,7 +281,7 @@ export function isDockerExecFailureForContainer(error: unknown, containerId: str
   return error.message.startsWith(`Command failed: docker exec ${containerId} `);
 }
 
-function trackSession(resources: ScenarioResources, session: WorktreeSessionResult): void {
+export function trackSession(resources: ScenarioResources, session: WorktreeSessionResult): void {
   resources.sessions.set(session.kiloSessionId, session);
   if (resources.cleanupStarted) resources.lateUncleanedResource = true;
 }
@@ -940,7 +945,9 @@ export async function lifecycleColdResume(args: LifecycleArgs): Promise<Lifecycl
       }
       // Only a confirmed-absent resumed container may rely on the two
       // message-id-specific surfaces: stream completion and durable completion.
-      if (!resumedStream.events.some(event => isMessageCompleted(event, resumedMessage.messageId))) {
+      if (
+        !resumedStream.events.some(event => isMessageCompleted(event, resumedMessage.messageId))
+      ) {
         throw new Error(
           `no streamed cloud.message.completed for ${resumedMessage.messageId} after resumed container ${containerId} disappeared`
         );

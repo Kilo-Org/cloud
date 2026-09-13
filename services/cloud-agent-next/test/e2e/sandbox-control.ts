@@ -443,7 +443,7 @@ async function run() {
         slug: request.kiloSessionId.slice(0, 24),
         directory: source.directory,
         title: 'Cloud Agent Gate 0',
-        version: '7.4.20',
+        version: '7.6.2',
         timeCreated: now,
         timeUpdated: now,
       }),
@@ -873,7 +873,12 @@ export async function stopOwnedControlPlaneSandbox(
     throw new Error('Cannot prove the original sandbox still owns the requested root');
   }
   try {
-    await assertExclusiveControlPlaneRuntime(runtime, kiloSessionId, executeDocker, allowedDirectories);
+    await assertExclusiveControlPlaneRuntime(
+      runtime,
+      kiloSessionId,
+      executeDocker,
+      allowedDirectories
+    );
   } catch (error) {
     if (error instanceof ControlPlaneContainerUnavailableError) {
       console.warn(
@@ -974,6 +979,34 @@ export async function unpauseOwnedPrimary(
   if (paused === 'false') return;
   if (paused !== 'true') throw new Error(`Refusing to unpause ${handle.name}: unknown pause state`);
   await executeDocker(['unpause', handle.containerId]);
+}
+
+/**
+ * Identity of one in-container Kilo server process, captured while the runtime
+ * was discoverable. `feed-stale-recovery` freezes ONLY this process so the
+ * control wrapper and the container stay alive and the inbound `/global/event`
+ * subscriber goes silent without an error.
+ */
+export type KiloServerProcessHandle = {
+  containerId: string;
+  processId: number;
+};
+
+/**
+ * Send a signal to the exact Kilo server process captured earlier. Never
+ * rediscover the process: a STOPPED Kilo server cannot answer a discovery
+ * request, so the captured identity is the only safe handle for `CONT`.
+ *
+ * A `docker exec` that cannot reach the container or the process throws, so a
+ * caller that must not leak a stopped process has to run `CONT` in `finally`
+ * and record the outcome.
+ */
+export async function signalKiloServerProcess(
+  handle: KiloServerProcessHandle,
+  signal: 'STOP' | 'CONT',
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<void> {
+  await executeDocker(['exec', handle.containerId, 'kill', `-${signal}`, String(handle.processId)]);
 }
 
 export async function waitForControlPlaneKiloRuntime(
@@ -1535,7 +1568,10 @@ export async function waitForSandboxPrimaryGone(
 }
 
 /** Run a shell command inside a container and read its stdout; null when absent. */
-async function readContainerFile(containerId: string, shellCommand: string): Promise<string | null> {
+async function readContainerFile(
+  containerId: string,
+  shellCommand: string
+): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync(
       'docker',

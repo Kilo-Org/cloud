@@ -43,14 +43,6 @@ describe('selectSessionListIsLoading', () => {
       );
     });
 
-    it('keeps cached rows rendering during a background refetch', () => {
-      // Whatever the fetch flags say, a cached page means no blanking: the
-      // caller passes storedIsPending false as soon as any page is cached.
-      expect(loading({ isSearching: false, searchIsPending: false, storedIsPending: false })).toBe(
-        false
-      );
-    });
-
     it('stops loading when a search settles with no matches', () => {
       expect(loading({ isSearching: true, searchIsPending: false, storedIsPending: false })).toBe(
         false

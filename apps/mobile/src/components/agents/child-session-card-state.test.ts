@@ -324,6 +324,18 @@ describe('getChildSessionCardState', () => {
     });
   });
 
+  it('reads Thinking while a reasoning part streams behind an empty text placeholder', () => {
+    const part = makeTaskPart('running', { subagent_type: 'Thinker', description: 'Reason' });
+    const messages = [
+      makeAssistantMessage([makeReasoningPart('stepping through the problem'), makeTextPart('')]),
+    ];
+    expect(getChildSessionCardState(part, messages)).toEqual({
+      agentName: 'Thinker',
+      taskName: 'Reason',
+      latestActivity: 'Thinking',
+    });
+  });
+
   it('prefers a newer text part over an older completed tool part', () => {
     const part = makeTaskPart('running', { subagent_type: 'Agent', description: 'Work' });
     const olderTool = makeToolPart('read', {

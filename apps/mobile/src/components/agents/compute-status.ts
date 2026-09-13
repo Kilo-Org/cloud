@@ -50,7 +50,7 @@ export function computeStatus(part: Part): string {
  * spinner would never read "Thinking". Skip empty text placeholders and
  * describe the last part that actually carries activity.
  */
-function lastActivePart(parts: readonly Part[]): Part | undefined {
+export function lastActivePart(parts: readonly Part[]): Part | undefined {
   for (let i = parts.length - 1; i >= 0; i -= 1) {
     const part = parts[i];
     if (part !== undefined && !(part.type === 'text' && part.text === '')) {

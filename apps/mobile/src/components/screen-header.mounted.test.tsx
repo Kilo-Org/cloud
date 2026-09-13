@@ -14,13 +14,14 @@ const routerState = vi.hoisted(() => ({
 }));
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+const platform = vi.hoisted(() => ({ OS: 'ios' as 'ios' | 'android' }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => routerState,
 }));
 vi.mock('react-native', () => ({
   I18nManager: i18nManager,
-  Platform: { OS: 'ios' },
+  Platform: platform,
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -133,6 +134,7 @@ describe('ScreenHeader mounted', () => {
     });
     routerState.canGoBack.mockReset().mockImplementation(() => routerState.routes.length > 1);
     i18nManager.isRTL = false;
+    platform.OS = 'ios';
     Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
   });
 
@@ -455,5 +457,66 @@ describe('ScreenHeader mounted', () => {
     expect(findOuterContainer(renderer.root).props.style).toEqual({
       paddingTop: 8 + OFFLINE_BANNER_HEIGHT,
     });
+  });
+
+  it('pads a modal header by the same value on iOS and Android', () => {
+    const iosStyle = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root).props
+      .style;
+
+    platform.OS = 'android';
+    const androidStyle = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root)
+      .props.style;
+
+    // A zero safe-area top: the sheet's grabber clearance is the floor on both.
+    expect(iosStyle).toEqual({ paddingTop: 32 });
+    expect(androidStyle).toEqual(iosStyle);
+  });
+
+  it('pads a modal by the fixed sheet clearance and a pinned header by the inset, on either platform', () => {
+    safeArea.top = 48;
+    const iosModal = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root).props
+      .style;
+    const iosPinned = findOuterContainer(renderHeader({ title: 'Sessions' }).root).props.style;
+
+    platform.OS = 'android';
+    const androidModal = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root)
+      .props.style;
+    const androidPinned = findOuterContainer(renderHeader({ title: 'Sessions' }).root).props.style;
+
+    // A modal is a native sheet whose own window reports its top inset, so the
+    // header keeps the fixed grabber clearance rather than re-adding the app
+    // window's inset. A pinned header adds the reported inset. Neither branches
+    // on the platform.
+    expect(iosModal).toEqual({ paddingTop: 32 });
+    expect(iosPinned).toEqual({ paddingTop: 56 });
+    expect(androidModal).toEqual(iosModal);
+    expect(androidPinned).toEqual(iosPinned);
+  });
+
+  it('never reserves the offline banner for a modal header on either platform', () => {
+    const renderOfflineModal = () => {
+      const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+      act(() => {
+        ref.current = TestRenderer.create(
+          createElement(
+            OfflineBannerSpaceProvider,
+            { isOffline: true },
+            createElement(ScreenHeader, { title: 'Sessions', modal: true })
+          )
+        );
+      });
+      const renderer = ref.current;
+      if (!renderer) {
+        throw new Error('renderer was not created');
+      }
+      return findOuterContainer(renderer.root).props.style;
+    };
+
+    const iosStyle = renderOfflineModal();
+    platform.OS = 'android';
+    const androidStyle = renderOfflineModal();
+
+    expect(iosStyle).toEqual({ paddingTop: 32 });
+    expect(androidStyle).toEqual(iosStyle);
   });
 });

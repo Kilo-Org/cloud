@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway හරහා හඬ පෙළට හැරවීම",
     "gatewayTranscriptionSubtitle": "උපාංගයේ කථන හඳුනාගැනීම වෙනුවට Kilo Gateway ආකෘතියක් භාවිතයෙන් හඬ ආදානය පෙළ බවට හරින්න. ඔබේ පටිගත කිරීම Kilo Gateway වෙත යවනු ලැබේ.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "මෙවලම් ඇමතුම් සංක්ෂිප්ත කරන්න",
+    "condenseToolCallsSubtitle": "අනුක්‍රමික මෙවලම් ඇමතුම් ඔබට විවෘත කළ හැකි එක් පේළියකට කාණ්ඩ කරන්න."
   },
   "prReview": {
     "pullRequestUnavailable": "පුල් ඉල්ලීම ලබා ගත නොහැක",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "ෆෝල්ඩරයක අන්තර්ගතය බැලීමට එය තට්ටු කරන්න.",
       "unsupportedDescription": "මෙම CLI අනුවාදයට ෆෝල්ඩර ලැයිස්තුගත කළ නොහැක. අවසන් කිරීමේ බොත්තමෙන් මුලින් විවෘත කළ ෆෝල්ඩරය තේරේ. සැසිය ආරම්භ කිරීමේ බොත්තමෙන් සැසිය එම ෆෝල්ඩරයේ ආරම්භ වේ.",
       "unsupportedTitle": "ෆෝල්ඩර ලැයිස්තුගත කළ නොහැක"
+    },
+    "toolRun": {
+      "sheetTitle": "මෙවලම් ඇමතුම්",
+      "condensedLabel": "{{itemCount}} අයිතම; {{last}}"
     }
   },
   "bootstrap": {

@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcriptie via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Zet spraakinvoer om met een Kilo Gateway-model in plaats van de spraakherkenning van het apparaat. Je opname wordt naar Kilo Gateway verzonden.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Tool-aanroepen comprimeren",
+    "condenseToolCallsSubtitle": "Groepeer opeenvolgende tool-aanroepen in één rij die je kunt openen."
   },
   "notifications": {
     "channel": {
@@ -2035,6 +2037,10 @@
       "tapToListHint": "Tik op een map om de inhoud te bekijken.",
       "unsupportedDescription": "Deze CLI kan geen mappen weergeven. Tik op Klaar om de startmap te behouden. Met Sessie starten begin je de sessie in die map.",
       "unsupportedTitle": "Mappen weergeven niet mogelijk"
+    },
+    "toolRun": {
+      "sheetTitle": "Tool-aanroepen",
+      "condensedLabel": "{{itemCount}} items; {{last}}"
     }
   },
   "bootstrap": {

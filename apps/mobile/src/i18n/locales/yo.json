@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Yíyí ohùn sí ọ̀rọ̀ pẹ̀lú Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Yí títẹ ọ̀rọ̀ pẹ̀lú ohùn sí ọ̀rọ̀-kíkọ pẹ̀lú àwòṣe Kilo Gateway dípò mímọ̀ ọ̀rọ̀ ẹ̀rọ náà. A ó fi àkọsílẹ̀ rẹ ránṣẹ́ sí Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Kó àwọn ìpè ohun èlò pọ̀",
+    "condenseToolCallsSubtitle": "Ẹ ṣe àkópọ̀ àwọn ìpè ohun èlò tí ó tẹ̀ léra nínú ìlà kan tí ẹ lè ṣí."
   },
   "prReview": {
     "pullRequestUnavailable": "Ìbéèrè ìṣọ̀kan kò sí",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Tẹ fódà kan láti wo àkójọ àwọn ohun inú rẹ̀.",
       "unsupportedDescription": "CLI yìí kò lè ṣe àkójọ àwọn fódà. Tí o bá tẹ Parí, fódà ìbẹ̀rẹ̀ ni a ó lò. Tí o bá tẹ Bẹ̀rẹ̀ ìgbà iṣẹ́, ibẹ̀ ni iṣẹ́ yóò ti bẹ̀rẹ̀.",
       "unsupportedTitle": "Àkójọ àwọn fódà kò ṣeé fihàn"
+    },
+    "toolRun": {
+      "sheetTitle": "Àwọn ìpè ohun èlò",
+      "condensedLabel": "{{itemCount}} ohun; {{last}}"
     }
   },
   "bootstrap": {

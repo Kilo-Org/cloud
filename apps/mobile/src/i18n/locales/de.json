@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Gateway-Transkription",
     "gatewayTranscriptionSubtitle": "Transkribiere die Spracheingabe mit einem Kilo-Gateway-Modell statt mit der Spracherkennung des Geräts. Deine Aufnahme wird an das Kilo Gateway gesendet.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Tool-Aufrufe komprimieren",
+    "condenseToolCallsSubtitle": "Aufeinanderfolgende Tool-Aufrufe in einer Zeile zusammenfassen, die sich öffnen lässt."
   },
   "notifications": {
     "liveActivities": "Live-Aktivitäten",
@@ -2035,6 +2037,10 @@
       "retryableDescription": "Prüfe deine Verbindung und tippe auf „Erneut versuchen“. Mit „Fertig“ kannst du diesen Ordner trotzdem auswählen.",
       "unsupportedTitle": "Ordner können nicht aufgelistet werden",
       "unsupportedDescription": "Diese CLI kann keine Ordner auflisten. Mit „Fertig“ behältst du den Startordner bei. Mit „Sitzung starten“ beginnt die Sitzung in diesem Ordner."
+    },
+    "toolRun": {
+      "sheetTitle": "Tool-Aufrufe",
+      "condensedLabel": "{{itemCount}} Einträge; {{last}}"
     }
   },
   "bootstrap": {

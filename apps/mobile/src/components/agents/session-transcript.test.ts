@@ -1,11 +1,32 @@
 /* eslint-disable max-lines -- Marker rules need one fixture per state; the file is a single builder harness. */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
+  condenseTranscriptToolRuns,
   getSessionTranscriptItemKey,
   mergeSessionTranscript,
   TRANSCRIPT_TIME_MARKER_GAP_MS,
 } from '@/components/agents/session-transcript';
+
+// `session-transcript` now pulls `session-tool-run`, whose tool-card projection
+// imports the lucide icon barrel. The pure project cannot parse the Flow-sourced
+// react-native runtime, so stub the icon module with sentinels (same set the
+// session-tool-run tests stub).
+vi.mock('@/components/ui/icons', () => ({
+  Cpu: 'Cpu',
+  Eye: 'Eye',
+  FileDiff: 'FileDiff',
+  FilePlus: 'FilePlus',
+  FileSearch: 'FileSearch',
+  FolderOpen: 'FolderOpen',
+  Globe: 'Globe',
+  ListTodo: 'ListTodo',
+  Pencil: 'Pencil',
+  Plug: 'Plug',
+  Search: 'Search',
+  Sparkles: 'Sparkles',
+  Terminal: 'Terminal',
+}));
 
 function message(id: string) {
   return {
@@ -161,6 +182,101 @@ function userMessageWithCreatedAt(id: string, created: number | undefined) {
     base.info.time = { created };
   }
   return base;
+}
+
+function userMessageWithTextAt(id: string, created: number, text: string) {
+  const base = userMessageWithText(id, text);
+  base.info.time = { created };
+  return base;
+}
+
+function toolPart(id: string, tool = 'read') {
+  return {
+    id,
+    sessionID: 'ses_12345678901234567890123456',
+    messageID: 'm0',
+    type: 'tool' as const,
+    callID: `call-${id}`,
+    tool,
+    state: {
+      status: 'completed' as const,
+      input: {},
+      output: '',
+      title: tool,
+      metadata: {},
+      time: { start: 0, end: 1 },
+    },
+  };
+}
+
+function assistantToolOnlyMessageAt(id: string, created: number, partIds: string[]) {
+  return {
+    info: {
+      id,
+      sessionID: 'ses_12345678901234567890123456',
+      role: 'assistant' as const,
+      time: { created },
+      parentID: 'm0',
+      modelID: 'model',
+      providerID: 'kilo',
+      mode: 'code',
+      agent: 'build',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { total: 0, input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    },
+    parts: partIds.map(partId => toolPart(partId)),
+  };
+}
+
+function assistantMixedMessageAt(id: string, created: number, partIds: string[]) {
+  const base = assistantToolOnlyMessageAt(id, created, partIds);
+  return {
+    info: base.info,
+    parts: [
+      ...base.parts,
+      {
+        id: `${id}:text`,
+        sessionID: 'ses_12345678901234567890123456',
+        messageID: id,
+        type: 'text' as const,
+        text: 'visible',
+      },
+    ],
+  };
+}
+
+/** A mixed assistant message whose visible text precedes its tool parts. */
+function assistantTextThenToolsMessageAt(id: string, created: number, partIds: string[]) {
+  const base = assistantToolOnlyMessageAt(id, created, partIds);
+  return {
+    info: base.info,
+    parts: [
+      {
+        id: `${id}:text`,
+        sessionID: 'ses_12345678901234567890123456',
+        messageID: id,
+        type: 'text' as const,
+        text: 'visible',
+      },
+      ...base.parts,
+    ],
+  };
+}
+
+function toolPartCount(items: ReturnType<typeof mergeSessionTranscript>): number {
+  let total = 0;
+  for (const item of items) {
+    if (item.type === 'tool-run') {
+      total += item.parts.length;
+    } else if (item.type === 'message') {
+      // A split message carries the parts it actually renders; a plain message
+      // renders all of its parts. Count exactly what the item would show.
+      const parts = item.parts ?? item.message.parts;
+      total += parts.filter(part => part.type === 'tool').length;
+    }
+  }
+  return total;
 }
 
 function keysOf(items: ReturnType<typeof mergeSessionTranscript>): string[] {
@@ -415,5 +531,265 @@ describe('session transcript', () => {
     );
 
     expect(keysOf(transcript)).toEqual(['time:msg_user', 'msg_user', 'msg_asst']);
+  });
+});
+
+describe('condenseTranscriptToolRuns', () => {
+  it('merges two consecutive tool-only assistant messages into one run in order', () => {
+    const base = 1_000_000_000;
+    const messages = [
+      assistantToolOnlyMessageAt('msg_tool_a', base, ['ta1', 'ta2']),
+      assistantToolOnlyMessageAt('msg_tool_b', base + 1000, ['tb1']),
+    ];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    expect(keysOf(condensed)).toEqual(['time:msg_tool_a', 'tool-run:ta1']);
+    const run = condensed.find(item => item.type === 'tool-run');
+    expect(run?.parts.map(part => part.id)).toEqual(['ta1', 'ta2', 'tb1']);
+  });
+
+  it('splits the run around a user message', () => {
+    const base = 1_000_000_000;
+    const messages = [
+      assistantToolOnlyMessageAt('msg_tool_a', base, ['ta1', 'ta2']),
+      userMessageWithTextAt('msg_user', base + 500, 'between'),
+      assistantToolOnlyMessageAt('msg_tool_b', base + 1000, ['tb1', 'tb2']),
+    ];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    expect(keysOf(condensed)).toEqual([
+      'time:msg_tool_a',
+      'tool-run:ta1',
+      'msg_user',
+      'tool-run:tb1',
+    ]);
+  });
+
+  it('splits the run around a time marker', () => {
+    const base = 1_000_000_000;
+    const messages = [
+      assistantToolOnlyMessageAt('msg_tool_a', base, ['ta1', 'ta2']),
+      assistantToolOnlyMessageAt('msg_tool_b', base + TRANSCRIPT_TIME_MARKER_GAP_MS, [
+        'tb1',
+        'tb2',
+      ]),
+    ];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    expect(keysOf(condensed)).toEqual([
+      'time:msg_tool_a',
+      'tool-run:ta1',
+      'time:msg_tool_b',
+      'tool-run:tb1',
+    ]);
+  });
+
+  it('carries a mixed message trailing tool run into the following message', () => {
+    const base = 1_000_000_000;
+    const messages = [
+      assistantTextThenToolsMessageAt('msg_mixed', base, ['tm1']),
+      assistantToolOnlyMessageAt('msg_tool_b', base + 1000, ['tb1']),
+    ];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    // The text fragment precedes the run: text, read, bash reads as text then a
+    // single "<2> items" row instead of two expanded cards.
+    expect(keysOf(condensed)).toEqual([
+      'time:msg_mixed',
+      'message-parts:msg_mixed:msg_mixed:text',
+      'tool-run:tm1',
+    ]);
+    const run = condensed.find(item => item.type === 'tool-run');
+    expect(run?.parts.map(part => part.id)).toEqual(['tm1', 'tb1']);
+    const fragment = condensed.find(item => item.type === 'message');
+    expect(fragment?.type === 'message' ? fragment.parts?.map(part => part.id) : []).toEqual([
+      'msg_mixed:text',
+    ]);
+  });
+
+  it('prepends a mixed message leading tool run to the preceding run', () => {
+    const base = 1_000_000_000;
+    const messages = [
+      assistantToolOnlyMessageAt('msg_tool_a', base, ['ta1', 'ta2']),
+      // Tools then text: the mixed message's leading tools join the run.
+      assistantMixedMessageAt('msg_mixed', base + 1000, ['tm1']),
+    ];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    expect(keysOf(condensed)).toEqual([
+      'time:msg_tool_a',
+      'tool-run:ta1',
+      'message-parts:msg_mixed:msg_mixed:text',
+    ]);
+    const run = condensed.find(item => item.type === 'tool-run');
+    expect(run?.parts.map(part => part.id)).toEqual(['ta1', 'ta2', 'tm1']);
+  });
+
+  it('splits a mixed assistant message around its text so tool runs stay independent', () => {
+    const base = 1_000_000_000;
+    const messages = [
+      assistantToolOnlyMessageAt('msg_tool_a', base, ['ta1', 'ta2']),
+      assistantMixedMessageAt('msg_mixed', base + 1000, ['tm1', 'tm2']),
+      assistantToolOnlyMessageAt('msg_tool_b', base + 2000, ['tb1', 'tb2']),
+    ];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    expect(keysOf(condensed)).toEqual([
+      'time:msg_tool_a',
+      'tool-run:ta1',
+      'message-parts:msg_mixed:msg_mixed:text',
+      'tool-run:tb1',
+    ]);
+    const runs = condensed.filter(item => item.type === 'tool-run');
+    expect(runs.map(run => run.parts.map(part => part.id))).toEqual([
+      ['ta1', 'ta2', 'tm1', 'tm2'],
+      ['tb1', 'tb2'],
+    ]);
+    const mixed = condensed.find(item => item.type === 'message');
+    expect(mixed?.message.info.id).toBe('msg_mixed');
+    expect(mixed?.type === 'message' ? mixed.parts?.map(part => part.id) : []).toEqual([
+      'msg_mixed:text',
+    ]);
+    expect(toolPartCount(condensed)).toBe(toolPartCount(mergeSessionTranscript(messages, [])));
+  });
+
+  it('keeps a lone mixed-message tool part expanded inside its message', () => {
+    const base = 1_000_000_000;
+    const messages = [assistantTextThenToolsMessageAt('msg_mixed', base, ['tm1'])];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    // A run of one is not condensed, so the message item is unchanged.
+    expect(keysOf(condensed)).toEqual(['time:msg_mixed', 'msg_mixed']);
+    const lone = condensed.find(item => item.type === 'message');
+    expect(lone?.type === 'message' ? lone.parts : undefined).toBeUndefined();
+  });
+
+  it('keeps the original message item for a run of one', () => {
+    const base = 1_000_000_000;
+    const messages = [assistantToolOnlyMessageAt('msg_lone', base, ['t1'])];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    expect(keysOf(condensed)).toEqual(['time:msg_lone', 'msg_lone']);
+    expect(condensed.some(item => item.type === 'tool-run')).toBe(false);
+  });
+
+  it('keeps a failed last tool call in the run so the row can show its status', () => {
+    const base = 1_000_000_000;
+    const failedPart = {
+      ...toolPart('ta2'),
+      state: {
+        status: 'error' as const,
+        input: {},
+        error: 'boom',
+        time: { start: 0, end: 1 },
+      },
+    };
+    const failedMessage = {
+      ...assistantToolOnlyMessageAt('msg_tool_failed', base + 1000, []),
+      parts: [failedPart],
+    };
+
+    const condensed = condenseTranscriptToolRuns(
+      mergeSessionTranscript(
+        [assistantToolOnlyMessageAt('msg_tool_a', base, ['ta1']), failedMessage],
+        []
+      )
+    );
+
+    const run = condensed.find(item => item.type === 'tool-run');
+    expect(run?.parts.map(part => part.id)).toEqual(['ta1', 'ta2']);
+    expect(run?.parts.at(-1)?.state.status).toBe('error');
+  });
+
+  it('excludes hidden plan-mode tool parts from the run and its count', () => {
+    const base = 1_000_000_000;
+    // plan_enter renders nothing on the session page, so the run must count and
+    // list only the visible parts — matching what the off path renders.
+    const planThenRead = {
+      ...assistantToolOnlyMessageAt('msg_plan_a', base, []),
+      parts: [toolPart('tp1', 'plan_enter'), toolPart('ra1')],
+    };
+    const messages = [planThenRead, assistantToolOnlyMessageAt('msg_tool_b', base + 1000, ['tb1'])];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    const run = condensed.find(item => item.type === 'tool-run');
+    expect(run?.parts.map(part => part.id)).toEqual(['ra1', 'tb1']);
+    expect(toolPartCount(condensed)).toBe(2);
+  });
+
+  it('keeps the message item when a run holds only one visible tool part behind hidden ones', () => {
+    const base = 1_000_000_000;
+    const planThenRead = {
+      ...assistantToolOnlyMessageAt('msg_plan_lone', base, []),
+      parts: [toolPart('tp1', 'plan_enter'), toolPart('r1')],
+    };
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript([planThenRead], []));
+
+    expect(keysOf(condensed)).toEqual(['time:msg_plan_lone', 'msg_plan_lone']);
+    expect(condensed.some(item => item.type === 'tool-run')).toBe(false);
+  });
+
+  it('preserves every tool part across the condensed run', () => {
+    const base = 1_000_000_000;
+    const messages = [
+      assistantToolOnlyMessageAt('msg_tool_a', base, ['ta1', 'ta2']),
+      assistantToolOnlyMessageAt('msg_tool_b', base + 1000, ['tb1']),
+    ];
+    const transcript = mergeSessionTranscript(messages, []);
+
+    const condensed = condenseTranscriptToolRuns(transcript);
+
+    expect(toolPartCount(condensed)).toBe(toolPartCount(transcript));
+    expect(toolPartCount(condensed)).toBe(3);
+  });
+
+  it('ends the run at a failed tool-only assistant turn so its failure footer renders', () => {
+    const base = 1_000_000_000;
+    const failed = {
+      ...assistantToolOnlyMessageAt('msg_failed', base + 1000, []),
+      // A message-level failure: the turn renders a failure footer with Retry
+      // instead of a condensed row, so it must split the run.
+      info: {
+        ...assistantToolOnlyMessageAt('msg_failed', base + 1000, []).info,
+        error: {
+          name: 'APIError' as const,
+          data: { message: 'boom', isRetryable: true },
+        },
+      },
+      parts: [toolPart('tf1')],
+    };
+    const messages = [
+      assistantToolOnlyMessageAt('msg_tool_a', base, ['ta1', 'ta2']),
+      failed,
+      assistantToolOnlyMessageAt('msg_tool_c', base + 2000, ['tc1', 'tc2']),
+    ];
+
+    const transcript = mergeSessionTranscript(messages, []);
+    const condensed = condenseTranscriptToolRuns(transcript);
+
+    expect(keysOf(condensed)).toEqual([
+      'time:msg_tool_a',
+      'tool-run:ta1',
+      'msg_failed',
+      'tool-run:tc1',
+    ]);
+    const failedItem = condensed.find(item => keysOf([item])[0] === 'msg_failed');
+    expect(failedItem?.type).toBe('message');
+    for (const item of condensed) {
+      if (item.type === 'tool-run') {
+        expect(item.parts.map(part => part.id)).not.toContain('tf1');
+      }
+    }
+    expect(toolPartCount(condensed)).toBe(toolPartCount(transcript));
   });
 });

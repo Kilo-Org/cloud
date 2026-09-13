@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "تبدیل گفتار به متن با Kilo Gateway",
     "gatewayTranscriptionSubtitle": "ورودی صوتی را به‌جای تشخیص گفتار دستگاه، با یک مدل Kilo Gateway به متن تبدیل کنید. صدای ضبط‌شده شما به Kilo Gateway فرستاده می‌شود.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "فشرده‌کردن فراخوانی‌های ابزار",
+    "condenseToolCallsSubtitle": "فراخوانی‌های متوالی ابزار را در یک ردیف که می‌توانید بازش کنید گروه کنید."
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست ادغام در دسترس نیست",
@@ -2469,6 +2471,10 @@
       "retryableDescription": "اتصال خود را بررسی کنید و دوباره تلاش کنید. با زدن «انجام شد»، همچنان می‌توانید همین پوشه را تأیید کنید.",
       "unsupportedTitle": "نمایش فهرست پوشه‌ها ممکن نیست",
       "unsupportedDescription": "این CLI نمی‌تواند فهرست پوشه‌ها را نمایش دهد. با زدن «انجام شد»، پوشهٔ راه‌اندازی حفظ می‌شود و با زدن «شروع نشست»، نشست در همان پوشه آغاز می‌شود."
+    },
+    "toolRun": {
+      "sheetTitle": "فراخوانی‌های ابزار",
+      "condensedLabel": "{{itemCount}} مورد؛ {{last}}"
     }
   },
   "bootstrap": {

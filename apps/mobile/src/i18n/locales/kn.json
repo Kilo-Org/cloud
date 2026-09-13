@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ಮೂಲಕ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವಿಕೆ",
     "gatewayTranscriptionSubtitle": "ಸಾಧನದ ಮಾತು ಗುರುತಿಸುವಿಕೆಗೆ ಬದಲಾಗಿ Kilo Gateway ಮಾದರಿಯನ್ನು ಬಳಸಿ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಅನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಿ. ನಿಮ್ಮ ಧ್ವನಿಮುದ್ರಣ Kilo Gateway ಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ಸಾಧನ ಕರೆಗಳನ್ನು ಸಂಕ್ಷೇಪಿಸಿ",
+    "condenseToolCallsSubtitle": "ಸತತ ಸಾಧನ ಕರೆಗಳನ್ನು ನೀವು ತೆರೆಯಬಹುದಾದ ಒಂದು ಸಾಲಿನಲ್ಲಿ ಗುಂಪು ಮಾಡಿ."
   },
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
@@ -2469,6 +2471,10 @@
       "retryableDescription": "ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ. ಈಗಲೂ ಮುಗಿದಿದೆ ಬಟನ್ ಮೂಲಕ ಈ ಫೋಲ್ಡರ್ ಅನ್ನು ಆಯ್ಕೆಮಾಡಬಹುದು.",
       "unsupportedTitle": "ಫೋಲ್ಡರ್‌ಗಳನ್ನು ಪಟ್ಟಿ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ",
       "unsupportedDescription": "ಈ CLI ಮೂಲಕ ಫೋಲ್ಡರ್‌ಗಳನ್ನು ಪಟ್ಟಿ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಮುಗಿದಿದೆ ಬಟನ್ ಪ್ರಾರಂಭದ ಫೋಲ್ಡರ್ ಅನ್ನು ಉಳಿಸಿಕೊಳ್ಳುತ್ತದೆ. ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ ಬಟನ್ ಮೂಲಕ ಸೆಶನ್ ಅಲ್ಲಿಯೇ ಪ್ರಾರಂಭವಾಗುತ್ತದೆ."
+    },
+    "toolRun": {
+      "sheetTitle": "ಸಾಧನ ಕರೆಗಳು",
+      "condensedLabel": "{{itemCount}} ಅಂಶಗಳು; {{last}}"
     }
   },
   "bootstrap": {

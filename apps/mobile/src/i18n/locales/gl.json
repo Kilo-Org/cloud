@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcrición con Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcribe o ditado cun modelo de Kilo Gateway no canto do recoñecemento de voz do dispositivo. A túa gravación envíaselle a Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Comprimir chamadas de ferramentas",
+    "condenseToolCallsSubtitle": "Agrupa as chamadas de ferramentas consecutivas nunha fila que poidas abrir."
   },
   "prReview": {
     "pullRequestUnavailable": "Solicitude de integración non dispoñible",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Toca un cartafol para ver o seu contido.",
       "unsupportedDescription": "Este CLI non pode listar cartafoles. Ao tocar Feito, mantense o cartafol de inicio. Ao tocar Iniciar sesión, a sesión comeza nese cartafol.",
       "unsupportedTitle": "Non se poden listar os cartafoles"
+    },
+    "toolRun": {
+      "sheetTitle": "Chamadas de ferramentas",
+      "condensedLabel": "{{itemCount}} elementos; {{last}}"
     }
   },
   "bootstrap": {

@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Распознавание речи через Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Распознавайте голосовой ввод с помощью модели Kilo Gateway вместо распознавания речи на устройстве. Запись отправляется в Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Сжимать вызовы инструментов",
+    "condenseToolCallsSubtitle": "Объединяйте последовательные вызовы инструментов в одну строку, которую можно открыть."
   },
   "notifications": {
     "liveActivities": "Эфир активности",
@@ -2063,6 +2065,10 @@
       "tapToListHint": "Нажмите на папку, чтобы просмотреть её содержимое.",
       "unsupportedDescription": "Этот CLI не поддерживает просмотр списка папок. Нажмите «Готово», чтобы оставить папку запуска, затем «Начать сеанс», чтобы запустить сеанс в ней.",
       "unsupportedTitle": "Не удаётся получить список папок"
+    },
+    "toolRun": {
+      "sheetTitle": "Вызовы инструментов",
+      "condensedLabel": "{{itemCount}} элементов; {{last}}"
     }
   },
   "bootstrap": {

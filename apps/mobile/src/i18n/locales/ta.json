@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway மூலம் பேச்சு உரையாக்கம்",
     "gatewayTranscriptionSubtitle": "சாதனத்தின் பேச்சு அடையாளப்படுத்தலுக்குப் பதிலாக Kilo Gateway மாதிரியைப் பயன்படுத்தி குரல் உள்ளீட்டை உரையாக்குங்கள். உங்கள் பதிவு Kilo Gateway-க்கு அனுப்பப்படுகிறது.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "கருவி அழைப்புகளைச் சுருக்கு",
+    "condenseToolCallsSubtitle": "தொடர்ச்சியான கருவி அழைப்புகளை நீங்கள் திறக்கக்கூடிய ஒரு வரிசையில் தொகுக்கவும்."
   },
   "prReview": {
     "pullRequestUnavailable": "இணைப்புக் கோரிக்கை கிடைக்கவில்லை",
@@ -2469,6 +2471,10 @@
       "retryableDescription": "உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும். முடிந்தது என்பதைத் தட்டினால் இப்போதும் இந்தக் கோப்புறையைத் தேர்ந்தெடுக்கலாம்.",
       "unsupportedTitle": "கோப்புறைகளைப் பட்டியலிட முடியாது",
       "unsupportedDescription": "இந்த CLI-இல் கோப்புறைகளைப் பட்டியலிட முடியாது. முடிந்தது என்பதைத் தட்டினால் தொடக்கக் கோப்புறை தக்கவைக்கப்படும். அமர்வைத் தொடங்கவும் என்பதைத் தட்டினால் அமர்வு அங்கே தொடங்கும்."
+    },
+    "toolRun": {
+      "sheetTitle": "கருவி அழைப்புகள்",
+      "condensedLabel": "{{itemCount}} உருப்படிகள்; {{last}}"
     }
   },
   "bootstrap": {

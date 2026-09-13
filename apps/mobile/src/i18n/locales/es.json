@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcripción con Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcribe el dictado con un modelo de Kilo Gateway en lugar del reconocimiento de voz del dispositivo. Tu grabación se envía a Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Comprimir llamadas de herramientas",
+    "condenseToolCallsSubtitle": "Agrupa las llamadas de herramientas consecutivas en una fila que puedes abrir."
   },
   "notifications": {
     "channel": {
@@ -2049,6 +2051,10 @@
       "tapToListHint": "Toca una carpeta para ver su contenido.",
       "unsupportedDescription": "Esta CLI no puede mostrar las carpetas. Al confirmar, se conservará la carpeta de inicio y la sesión empezará en ella.",
       "unsupportedTitle": "No se pueden mostrar las carpetas"
+    },
+    "toolRun": {
+      "sheetTitle": "Llamadas de herramientas",
+      "condensedLabel": "{{itemCount}} elementos; {{last}}"
     }
   },
   "bootstrap": {

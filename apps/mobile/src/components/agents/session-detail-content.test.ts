@@ -131,6 +131,12 @@ vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'Se
 vi.mock('@/components/agents/part-detail-sheet-host', () => ({
   PartDetailSheetHost: 'PartDetailSheetHost',
 }));
+vi.mock('@/components/agents/tool-run-sheet-host', () => ({
+  ToolRunSheetHost: 'ToolRunSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-rows', () => ({
+  CondensedToolRunRow: 'CondensedToolRunRow',
+}));
 vi.mock('@/components/agents/message-error-boundary', () => ({
   MessageErrorBoundary: 'MessageErrorBoundary',
 }));
@@ -261,6 +267,13 @@ vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
 }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   useKeepScreenOnPreference: () => ({ keepScreenOn: false, hasLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  useCondenseToolCallsPreference: () => ({
+    condenseToolCalls: false,
+    hasLoaded: true,
+    setCondenseToolCalls: vi.fn(),
+  }),
 }));
 vi.mock('@/lib/hooks/use-session-model-options', () => ({
   useSessionModelOptions: () => ({ options: [], selectedValue: '', selectedVariant: '' }),

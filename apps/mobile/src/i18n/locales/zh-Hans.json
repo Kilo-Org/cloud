@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "使用 Kilo Gateway 转写",
     "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型转写语音输入，而不使用设备上的语音识别。您的录音将发送至 Kilo Gateway。",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "精简工具调用",
+    "condenseToolCallsSubtitle": "将连续的工具调用合并为一行，点击即可打开。"
   },
   "notifications": {
     "liveActivities": "实时活动",
@@ -2035,6 +2037,10 @@
       "tapToListHint": "点击文件夹可查看其中的内容。",
       "unsupportedDescription": "此 CLI 无法列出文件夹。点击“完成”可保留启动时的文件夹，再点击“开始会话”即可在该文件夹中启动会话。",
       "unsupportedTitle": "无法列出文件夹"
+    },
+    "toolRun": {
+      "sheetTitle": "工具调用",
+      "condensedLabel": "{{itemCount}} 项; {{last}}"
     }
   },
   "bootstrap": {

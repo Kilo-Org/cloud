@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Ịtụgharị olu ka ọ bụrụ ederede site na Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Ejila njirimaka okwu nke ngwaọrụ ahụ; jiri ihe nlereanya Kilo Gateway tụgharịa ntinye olu ka ọ bụrụ ederede. A na-eziga ndekọ gị na Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Chịkọta oku ngwá ọrụ",
+    "condenseToolCallsSubtitle": "Chịkọta oku ngwá ọrụ so n'usoro n'otu ahịrị ị nwere ike imeghe."
   },
   "prReview": {
     "pullRequestUnavailable": "Arịrịọ njikọta adịghị",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Pịa fọlda ka ị hụ ihe dị n'ime ya.",
       "unsupportedDescription": "CLI a enweghị ike ịdepụta fọlda. Pịa Emechaala iji debe fọlda mmalite. Malite nnọkọ ga-amalite ya n'ebe ahụ.",
       "unsupportedTitle": "Enweghị ike ịdepụta fọlda"
+    },
+    "toolRun": {
+      "sheetTitle": "Oku ngwá ọrụ",
+      "condensedLabel": "{{itemCount}} ihe; {{last}}"
     }
   },
   "bootstrap": {

@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ద్వారా మాటలను వచనంగా మార్చడం",
     "gatewayTranscriptionSubtitle": "పరికరం యొక్క మాటల గుర్తింపుకు బదులు Kilo Gateway మోడల్‌తో వాయిస్ ఇన్‌పుట్‌ను వచనంగా మార్చండి. మీ రికార్డింగ్ Kilo Gatewayకు పంపబడుతుంది.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "టూల్ కాల్స్‌ను కుదించండి",
+    "condenseToolCallsSubtitle": "వరుసగా వచ్చే టూల్ కాల్స్‌ను మీరు తెరవగల ఒక వరుసలో సమూహపరచండి."
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "ఫోల్డర్‌లో ఏముందో చూడటానికి దాన్ని నొక్కండి.",
       "unsupportedDescription": "ఈ CLI ఫోల్డర్‌ల జాబితాను చూపలేదు. ‘పూర్తయింది’ నొక్కితే ప్రారంభ ఫోల్డర్ అలాగే ఉంటుంది. ‘సెషన్ ప్రారంభించండి’ నొక్కితే సెషన్ అక్కడే మొదలవుతుంది.",
       "unsupportedTitle": "ఫోల్డర్‌ల జాబితాను చూపడం సాధ్యం కాదు"
+    },
+    "toolRun": {
+      "sheetTitle": "టూల్ కాల్స్",
+      "condensedLabel": "{{itemCount}} అంశాలు; {{last}}"
     }
   },
   "bootstrap": {

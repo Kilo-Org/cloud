@@ -47,6 +47,14 @@ vi.mock('./chat-markdown-text', () => ({ ChatMarkdownText: 'ChatMarkdownText' })
 vi.mock('./compaction-separator', () => ({ CompactionSeparator: 'CompactionSeparator' }));
 vi.mock('./file-part-renderer', () => ({ FilePartRenderer: 'FilePartRenderer' }));
 vi.mock('./part-renderer', () => ({ PartRenderer: 'PartRenderer' }));
+// The condensed-row module pulls `fixed-part-row` → `activity-indicator` →
+// `a11y/motion` → `expo-battery`, which the pure project cannot load. The a11y
+// harness inspects the element tree, so stand the row in as a sentinel like the
+// sibling `message-bubble.test.ts` harness does.
+vi.mock('./tool-run-rows', () => ({
+  CondensedToolRunRow: 'CondensedToolRunRow',
+  ToolOneLineRow: 'ToolOneLineRow',
+}));
 
 describe.each([
   { role: 'user', makeMessage: userMessage, label: 'User message' },

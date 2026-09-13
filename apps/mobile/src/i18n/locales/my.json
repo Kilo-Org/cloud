@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ဖြင့် အသံမှစာသားပြောင်းခြင်း",
     "gatewayTranscriptionSubtitle": "စက်၏ အသံခွဲခြားသိရှိမှုအစား Kilo Gateway မော်ဒယ်ဖြင့် အသံထည့်သွင်းမှုကို စာသားပြောင်းပါ။ သင့်အသံသွင်းချက်ကို Kilo Gateway သို့ ပို့ပါမည်။",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ကိရိယာခေါ်ဆိုမှုများကို ချုံ့ပါ",
+    "condenseToolCallsSubtitle": "ဆက်တိုက် ကိရိယာခေါ်ဆိုမှုများကို ဖွင့်နိုင်သော အတန်းတစ်ခုအဖြစ် အုပ်စုဖွဲ့ပါ။"
   },
   "prReview": {
     "pullRequestUnavailable": "PR မရနိုင်ပါ",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "ဖိုလ်ဒါအတွင်းရှိ ဖိုင်များနှင့် ဖိုလ်ဒါများကို ကြည့်ရန် ထိုဖိုလ်ဒါကို နှိပ်ပါ။",
       "unsupportedDescription": "ဤ CLI ဖြင့် ဖိုလ်ဒါစာရင်းကို ပြ၍မရပါ။ “ပြီးပါပြီ” ကို နှိပ်လျှင် စတင်ဖွင့်ခဲ့သည့်ဖိုလ်ဒါကို ဆက်သုံးပါမည်။ “စက်ရှင် စတင်ပါ” ကို နှိပ်လျှင် ထိုဖိုလ်ဒါတွင် စက်ရှင်စတင်ပါမည်။",
       "unsupportedTitle": "ဖိုလ်ဒါများကို စာရင်းပြ၍မရပါ"
+    },
+    "toolRun": {
+      "sheetTitle": "ကိရိယာခေါ်ဆိုမှုများ",
+      "condensedLabel": "{{itemCount}} အကြောင်းအရာ; {{last}}"
     }
   },
   "bootstrap": {

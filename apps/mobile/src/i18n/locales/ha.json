@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Mayar da magana zuwa rubutu ta Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Mayar da shigar da murya zuwa rubutu da samfurin Kilo Gateway maimakon gane magana na na'urar. Ana aika rikodinka zuwa Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Haɗa kiran kayan aiki",
+    "condenseToolCallsSubtitle": "Haɗa kiran kayan aiki a jere cikin layi ɗaya da za ka iya buɗewa."
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Danna jaka don jera abubuwan da ke cikinta.",
       "unsupportedDescription": "Wannan CLI ba zai iya jera jakuna ba. Danna An gama don riƙe jakar da aka fara daga gare ta. Danna Fara zama don farawa a can.",
       "unsupportedTitle": "Ba za a iya jera jakuna ba"
+    },
+    "toolRun": {
+      "sheetTitle": "Kiran kayan aiki",
+      "condensedLabel": "{{itemCount}} abubuwa; {{last}}"
     }
   },
   "bootstrap": {

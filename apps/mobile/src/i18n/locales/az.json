@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Səsin Kilo Gateway ilə mətnə çevrilməsi",
     "gatewayTranscriptionSubtitle": "Səslə daxiletməni cihazın nitq tanımasının əvəzinə Kilo Gateway modeli ilə mətnə çevirin. Səs yazınız Kilo Gateway-e göndərilir.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Alət çağırışlarını sıxlaşdır",
+    "condenseToolCallsSubtitle": "Ardıcıl alət çağırışlarını aça biləcəyiniz bir sətirdə qruplaşdırın."
   },
   "prReview": {
     "pullRequestUnavailable": "Birləşdirmə sorğusu əlçatan deyil",
@@ -2469,6 +2471,10 @@
       "retryableDescription": "Bağlantını yoxla və yenidən cəhd et. «Hazırdır» düyməsi ilə bu qovluğu yenə də seçə bilərsən.",
       "unsupportedTitle": "Qovluqların siyahısını göstərmək mümkün deyil",
       "unsupportedDescription": "Bu CLI qovluqların siyahısını göstərə bilmir. «Hazırdır» düyməsi başlanğıc qovluğunu saxlayır, «Sessiyanı başlat» düyməsi isə sessiyanı həmin qovluqda başladır."
+    },
+    "toolRun": {
+      "sheetTitle": "Alət çağırışları",
+      "condensedLabel": "{{itemCount}} element; {{last}}"
     }
   },
   "bootstrap": {

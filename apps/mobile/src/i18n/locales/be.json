@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Распазнаванне маўлення праз Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Пераўтварайце галасавы ўвод у тэкст з дапамогай мадэлі Kilo Gateway замест распазнавання маўлення на самой прыладзе. Ваш запіс адпраўляецца ў Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Сціскаць выклікі інструментаў",
+    "condenseToolCallsSubtitle": "Збірайце паслядоўныя выклікі інструментаў у адзін радок, які можна адкрыць."
   },
   "prReview": {
     "pullRequestUnavailable": "Запыт на зліццё недаступны",
@@ -2511,6 +2513,10 @@
       "tapToListHint": "Націсніце на папку, каб убачыць яе змесціва.",
       "unsupportedDescription": "Гэты CLI не падтрымлівае прагляд папак. Кнопка «Гатова» пакідае папку запуску, а «Пачаць сеанс» запускае ў ёй сеанс.",
       "unsupportedTitle": "Спіс папак недаступны"
+    },
+    "toolRun": {
+      "sheetTitle": "Выклікі інструментаў",
+      "condensedLabel": "{{itemCount}} элементаў; {{last}}"
     }
   },
   "bootstrap": {

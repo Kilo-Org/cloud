@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "د Kilo Gateway له لارې د غږ متن ته بدلول",
     "gatewayTranscriptionSubtitle": "غږیز لیکل د وسیلې د ویې پېژندنې پر ځای د Kilo Gateway ماډل سره متن ته واړوئ. غږیز ریکارډ مو د Kilo Gateway ته لیږل کېږي.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "د وسیلې غوښتنې یوځای کړئ",
+    "condenseToolCallsSubtitle": "پرله‌پسې د وسیلې غوښتنې په یوه کرښه کې یوځای کړئ چې تاسو یې خلاصولی شئ."
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسټ نشته",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "د فولډر د منځپانګې د لیدلو لپاره پرې ټک وکړئ.",
       "unsupportedDescription": "دا CLI د فولډرونو لېست نه شي ښودلی. د «بشپړ شو» تڼۍ د پیل فولډر ساتي او د «ناسته پیل کړئ» تڼۍ ناسته هلته پیلوي.",
       "unsupportedTitle": "د فولډرونو لېست نه شي ښودل کېدای"
+    },
+    "toolRun": {
+      "sheetTitle": "د وسیلې غوښتنې",
+      "condensedLabel": "{{itemCount}} توکي; {{last}}"
     }
   },
   "bootstrap": {

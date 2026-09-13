@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Sagalee interneetiin barreeffamatti jijjiiruu Kilo Gateway'n",
     "gatewayTranscriptionSubtitle": "Sagalee galchuu mallattoo sagalee meeshaa irraa haa ta'u moodeela Kilo Gateway'ttiin barreeffamatti jijjiiri. Sagaleen kee Kilo Gateway'tti ergama.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Waamicha meeshaa walitti qabi",
+    "condenseToolCallsSubtitle": "Waamicha meeshaa walduraa duubaan karaa tokko keessa kan banuu dandeessu walitti qabi."
   },
   "prReview": {
     "pullRequestUnavailable": "Gaaffiin walitti makuu hin argamu",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Qabiyyee galmee tarreessuuf galmicha tuqi.",
       "unsupportedDescription": "CLI kun galmeewwan tarreessuu hin danda'u. Xumuri tuquun galmee jalqabaa eega; Turtii jalqabi tuquun achitti jalqaba.",
       "unsupportedTitle": "Galmeewwan tarreessuun hin danda'amu"
+    },
+    "toolRun": {
+      "sheetTitle": "Waamicha meeshaa",
+      "condensedLabel": "{{itemCount}} wantoota; {{last}}"
     }
   },
   "bootstrap": {

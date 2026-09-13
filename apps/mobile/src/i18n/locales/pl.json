@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkrypcja przez Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkrybuj dyktowanie modelem Kilo Gateway zamiast rozpoznawania mowy na urządzeniu. Twoje nagranie zostanie wysłane do Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Zwiń wywołania narzędzi",
+    "condenseToolCallsSubtitle": "Grupuj kolejne wywołania narzędzi w jednym wierszu, który możesz otworzyć."
   },
   "notifications": {
     "liveActivities": "Aktywności na żywo",
@@ -2063,6 +2065,10 @@
       "tapToListHint": "Dotknij katalogu, aby wyświetlić jego zawartość.",
       "unsupportedDescription": "Ta instancja CLI nie obsługuje wyświetlania katalogów. Przycisk „Gotowe” zachowuje katalog uruchomienia, a „Rozpocznij sesję” uruchamia w nim sesję.",
       "unsupportedTitle": "Nie można wyświetlić katalogów"
+    },
+    "toolRun": {
+      "sheetTitle": "Wywołania narzędzi",
+      "condensedLabel": "{{itemCount}} elementów; {{last}}"
     }
   },
   "bootstrap": {

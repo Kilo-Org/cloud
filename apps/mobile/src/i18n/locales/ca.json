@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcripció amb Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcriu el dictat amb un model de Kilo Gateway en lloc del reconeixement de veu del dispositiu. Enviarem la teva gravació a Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Condensa les crides d'eines",
+    "condenseToolCallsSubtitle": "Agrupa les crides d'eines consecutives en una fila que puguis obrir."
   },
   "prReview": {
     "pullRequestUnavailable": "Sol·licitud d'integració no disponible",
@@ -2490,6 +2492,10 @@
       "tapToListHint": "Toca una carpeta per veure'n el contingut.",
       "unsupportedDescription": "Aquest CLI no pot llistar carpetes. Si confirmes la selecció, es mantindrà la carpeta d'inici i la sessió s'hi iniciarà.",
       "unsupportedTitle": "No es poden llistar les carpetes"
+    },
+    "toolRun": {
+      "sheetTitle": "Crides d'eines",
+      "condensedLabel": "{{itemCount}} elements; {{last}}"
     }
   },
   "bootstrap": {

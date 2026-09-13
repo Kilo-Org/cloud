@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "ការបម្លែងសំឡេងជាអត្ថបទតាម Kilo Gateway",
     "gatewayTranscriptionSubtitle": "បម្លែងការបញ្ចូលដោយសំឡេងទៅជាអត្ថបទដោយប្រើម៉ូដែល Kilo Gateway ជំនួសឱ្យការចាប់សម្ដីរបស់ឧបករណ៍។ ការថតរបស់អ្នកត្រូវបានផ្ញើទៅ Kilo Gateway។",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "បង្រួមការហៅឧបករណ៍",
+    "condenseToolCallsSubtitle": "ដាក់ការហៅឧបករណ៍ជាបន្តបន្ទាប់ចូលក្នុងជួរតែមួយដែលអ្នកអាចបើកបាន។"
   },
   "prReview": {
     "pullRequestUnavailable": "មិនអាចបើកសំណើបញ្ចូលកូដបាន",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "ប៉ះថតមួយ ដើម្បីបង្ហាញអ្វីដែលមាននៅក្នុងថតនោះ។",
       "unsupportedDescription": "CLI នេះមិនអាចបង្ហាញបញ្ជីថតបានទេ។ ប៉ះ រួចរាល់ ដើម្បីរក្សាថតដែលបានប្រើពេលបើក CLI ហើយប៉ះ ចាប់ផ្តើមវគ្គ ដើម្បីចាប់ផ្តើមក្នុងថតនោះ។",
       "unsupportedTitle": "មិនអាចបង្ហាញបញ្ជីថតបានទេ"
+    },
+    "toolRun": {
+      "sheetTitle": "ការហៅឧបករណ៍",
+      "condensedLabel": "{{itemCount}} ធាតុ; {{last}}"
     }
   },
   "bootstrap": {

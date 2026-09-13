@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Транскрипция през Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Преобразувай гласовото въвеждане с модел на Kilo Gateway вместо разпознаването на реч на устройството. Записът ти се изпраща до Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Свиване на извиквания на инструменти",
+    "condenseToolCallsSubtitle": "Групирайте последователни извиквания на инструменти в един ред, който можете да отворите."
   },
   "prReview": {
     "pullRequestUnavailable": "Недостъпна заявка за обединяване",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Докосни папка, за да видиш съдържанието ѝ.",
       "unsupportedDescription": "Този CLI не може да показва списък с папки. С „Готово“ запазваш началната папка, а със „Започни сесия“ стартираш сесията в нея.",
       "unsupportedTitle": "Списъкът с папки е недостъпен"
+    },
+    "toolRun": {
+      "sheetTitle": "Извиквания на инструменти",
+      "condensedLabel": "{{itemCount}} елемента; {{last}}"
     }
   },
   "bootstrap": {

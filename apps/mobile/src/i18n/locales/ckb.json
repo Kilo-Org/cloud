@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "گۆڕینی دەنگ بۆ دەق بە Kilo Gateway",
     "gatewayTranscriptionSubtitle": "دەنگەکانت بە مۆدێلێکی Kilo Gateway بگۆڕە بۆ دەق، نەک بە ناسینەوەی قسەکردنی ئامێرەکەت. تۆمارەکەت بۆ Kilo Gateway دەنێردرێت.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "کورتکردنەوەی بانگەکانی ئامراز",
+    "condenseToolCallsSubtitle": "بانگەکانی ئامرازی یەک لەدوای یەک بخە ناو یەک ڕیز کە دەتوانیت بیکەیتەوە."
   },
   "prReview": {
     "pullRequestUnavailable": "داواکاری ڕاکێشان بەردەست نییە",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "بۆ بینینی ناوەڕۆکی بوخچەیەک، لەسەری بدە.",
       "unsupportedDescription": "ئەم CLI ـیە ناتوانێت بوخچەکان پێرست بکات. بە هەڵبژاردنی «تەواو»، بوخچەی دەستپێک دەمێنێتەوە؛ «دەستپێکردنی سێشن» سێشنەکە لەوێ دەست پێ دەکات.",
       "unsupportedTitle": "ناتوانرێت بوخچەکان پێرست بکرێن"
+    },
+    "toolRun": {
+      "sheetTitle": "بانگەکانی ئامراز",
+      "condensedLabel": "{{itemCount}} بڕگە؛ {{last}}"
     }
   },
   "bootstrap": {

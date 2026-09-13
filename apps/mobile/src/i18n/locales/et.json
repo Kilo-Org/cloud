@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kõnetuvastus Kilo Gateway kaudu",
     "gatewayTranscriptionSubtitle": "Kasuta häälsisestuse tekstiks teisendamiseks seadme kõnetuvastuse asemel Kilo Gateway mudelit. Sinu salvestus saadetakse Kilo Gateway'sse.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Tööriistakutsete koondamine",
+    "condenseToolCallsSubtitle": "Rühmita järjestikused tööriistakutsed ühte ritta, mille saad avada."
   },
   "prReview": {
     "pullRequestUnavailable": "Tõmbetaotlus pole saadaval",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Kausta sisu vaatamiseks puuduta kausta.",
       "unsupportedDescription": "See CLI ei saa kaustu loetleda. Nupp „Valmis“ jätab valituks käivituskausta ja nupp „Alusta seanssi“ käivitab seansi selles kaustas.",
       "unsupportedTitle": "Kaustu ei saa loetleda"
+    },
+    "toolRun": {
+      "sheetTitle": "Tööriistakutsed",
+      "condensedLabel": "{{itemCount}} üksust; {{last}}"
     }
   },
   "bootstrap": {

@@ -87,6 +87,7 @@ import { useSessionConfigSync } from '@/components/agents/use-session-config-syn
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
+  condenseTranscriptToolRuns,
   getSessionTranscriptItemKey,
   getSessionTranscriptItemType,
   mergeSessionTranscript,
@@ -104,6 +105,8 @@ import {
 } from '@/components/agents/child-session-sheet-state';
 import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { PartRenderer } from '@/components/agents/part-renderer';
+import { CondensedToolRunRow } from '@/components/agents/tool-run-rows';
+import { ToolRunSheetHost } from '@/components/agents/tool-run-sheet-host';
 import {
   buildTerminalErrorCopyText,
   resolveSessionTerminalError,
@@ -132,6 +135,7 @@ import { agentComposerDraftKey } from '@/lib/persist/drafts';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
+import { useCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
 import {
   createRemoteModelOverride,
   revalidateLegacyGatewayOverride,
@@ -312,6 +316,7 @@ export function SessionDetailContent({
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
   const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
+  const { condenseToolCalls } = useCondenseToolCallsPreference();
   const { models: gatewayModels, isLoading: gatewayModelsLoading } =
     useAvailableModels(organizationId);
   const sessionModels = useSessionModelOptions({
@@ -759,9 +764,15 @@ export function SessionDetailContent({
   const isCancelingSelected =
     detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
 
-  const transcript = useMemo(
+  const baseTranscript = useMemo(
     () => mergeSessionTranscript(visibleMessages, preparationAttempts, pendingMessages),
     [visibleMessages, preparationAttempts, pendingMessages]
+  );
+  // Condensing is opt-in: with the preference off the derived transcript is the
+  // same array identity, so nothing below re-renders differently.
+  const transcript = useMemo(
+    () => (condenseToolCalls ? condenseTranscriptToolRuns(baseTranscript) : baseTranscript),
+    [condenseToolCalls, baseTranscript]
   );
 
   // Render-phase state adjustment: hold queued ids across queue → dequeue
@@ -1043,6 +1054,15 @@ export function SessionDetailContent({
       if (item.type === 'time') {
         return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
       }
+      if (item.type === 'tool-run') {
+        // Match the inset and row rhythm of a message row so the condensed row
+        // sits flush with its neighbours rather than full-bleed.
+        return (
+          <View className="px-4 py-1">
+            <CondensedToolRunRow parts={item.parts} />
+          </View>
+        );
+      }
       // Delivery events can lag a successful drop. The retained row must expose Restore immediately.
       const deliveryState =
         item.message.info.role === 'user' && !canceledQueuedMessages.has(item.message.info.id)
@@ -1053,6 +1073,7 @@ export function SessionDetailContent({
       return (
         <MessageBubble
           message={item.message}
+          {...(item.parts ? { partsOverride: item.parts } : {})}
           isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
           isSessionStreaming={isStreaming}
           getChildMessages={getChildMessages}
@@ -1067,6 +1088,7 @@ export function SessionDetailContent({
           onRestoreQueued={
             canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
           }
+          condenseToolCalls={condenseToolCalls}
         />
       );
     },
@@ -1085,6 +1107,7 @@ export function SessionDetailContent({
       handleOpenDetails,
       handleRestoreQueued,
       canceledQueuedMessages,
+      condenseToolCalls,
     ]
   );
 
@@ -1391,124 +1414,128 @@ export function SessionDetailContent({
 
   return (
     <PartDetailSheetHost messages={messages}>
-      <View className="flex-1 bg-background">
-        <ScreenHeader
-          title={rename.title}
-          reserveTitleSpace
-          backFallback="/(app)/(tabs)/(2_agents)"
-          headerRight={headerRight}
-          {...(rename.isTitleInteractive
-            ? {
-                onTitlePress: rename.openModal,
-                onTitlePressAccessibilityLabel: t('agentChat.session.renameAccessibility', {
-                  title: rename.title,
-                }),
-              }
-            : {})}
-        />
-        <SessionConnectionIndicator
-          activeSessionType={activeSessionType}
-          agentStatusType={agentStatus.type}
-        />
-        {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
+      <ToolRunSheetHost messages={messages}>
+        <View className="flex-1 bg-background">
+          <ScreenHeader
+            title={rename.title}
+            reserveTitleSpace
+            backFallback="/(app)/(tabs)/(2_agents)"
+            headerRight={headerRight}
+            {...(rename.isTitleInteractive
+              ? {
+                  onTitlePress: rename.openModal,
+                  onTitlePressAccessibilityLabel: t('agentChat.session.renameAccessibility', {
+                    title: rename.title,
+                  }),
+                }
+              : {})}
+          />
+          <SessionConnectionIndicator
+            activeSessionType={activeSessionType}
+            agentStatusType={agentStatus.type}
+          />
+          {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
-        {keyboardContainerKind === 'app-aware-padding' ? (
-          <AppAwareKeyboardPaddingView className="flex-1">
-            {renderKeyboardBody()}
-          </AppAwareKeyboardPaddingView>
-        ) : (
-          <KeyboardAvoidingView className="flex-1" behavior="padding">
-            {renderKeyboardBody()}
-          </KeyboardAvoidingView>
-        )}
+          {keyboardContainerKind === 'app-aware-padding' ? (
+            <AppAwareKeyboardPaddingView className="flex-1">
+              {renderKeyboardBody()}
+            </AppAwareKeyboardPaddingView>
+          ) : (
+            <KeyboardAvoidingView className="flex-1" behavior="padding">
+              {renderKeyboardBody()}
+            </KeyboardAvoidingView>
+          )}
 
-        {isComposerVisible ? (
-          <BlurBar className="border-t-0">
-            <View style={{ height: bottom }} />
-          </BlurBar>
-        ) : (
-          <View style={{ height: bottom }} className="bg-background" />
-        )}
+          {isComposerVisible ? (
+            <BlurBar className="border-t-0">
+              <View style={{ height: bottom }} />
+            </BlurBar>
+          ) : (
+            <View style={{ height: bottom }} className="bg-background" />
+          )}
 
-        {sheetMountState.mounted ? (
-          <SessionContextSheet
-            visible={sheetMountState.visible}
-            info={sheetMountState.info}
-            modelDisplay={contextModelAndProvider.model}
-            providerDisplay={contextModelAndProvider.provider}
-            totalCostMicrodollars={totalMicrodollars}
-            breakdownCostUsd={breakdownCostUsd}
-            messages={messages}
+          {sheetMountState.mounted ? (
+            <SessionContextSheet
+              visible={sheetMountState.visible}
+              info={sheetMountState.info}
+              modelDisplay={contextModelAndProvider.model}
+              providerDisplay={contextModelAndProvider.provider}
+              totalCostMicrodollars={totalMicrodollars}
+              breakdownCostUsd={breakdownCostUsd}
+              messages={messages}
+              modelOptions={modelOptions}
+              onClose={() => {
+                setOpenContextSheetIdentity(null);
+              }}
+            />
+          ) : null}
+
+          <MessageDetailsSheet
+            visible={detailsMessageId !== null}
+            message={detailsMessage ?? null}
             modelOptions={modelOptions}
-            onClose={() => {
-              setOpenContextSheetIdentity(null);
-            }}
+            onClose={handleCloseDetails}
+            canCancelQueued={canCancelSelected}
+            isCancelingQueued={isCancelingSelected}
+            onCancelQueued={handleCancelQueued}
+            cancelQueuedFeedback={
+              cancelQueuedSheetStatus?.messageId === detailsMessageId
+                ? cancelQueuedSheetStatus
+                : null
+            }
+            cancelQueuedGuidance={
+              isQueuedCancellationUnsupported() &&
+              detailsMessage?.info.role === 'user' &&
+              detailsDelivery?.status === 'queued'
+                ? t('agentChat.session.cancelQueuedUpgradeRequired')
+                : null
+            }
           />
-        ) : null}
 
-        <MessageDetailsSheet
-          visible={detailsMessageId !== null}
-          message={detailsMessage ?? null}
-          modelOptions={modelOptions}
-          onClose={handleCloseDetails}
-          canCancelQueued={canCancelSelected}
-          isCancelingQueued={isCancelingSelected}
-          onCancelQueued={handleCancelQueued}
-          cancelQueuedFeedback={
-            cancelQueuedSheetStatus?.messageId === detailsMessageId ? cancelQueuedSheetStatus : null
-          }
-          cancelQueuedGuidance={
-            isQueuedCancellationUnsupported() &&
-            detailsMessage?.info.role === 'user' &&
-            detailsDelivery?.status === 'queued'
-              ? t('agentChat.session.cancelQueuedUpgradeRequired')
-              : null
-          }
-        />
+          {childSessionSheet.sheet ? (
+            <ChildSessionSheet
+              visible={childSessionSheet.visible}
+              sessionId={childSessionSheet.sheet.sessionId}
+              title={childSessionSheet.sheet.title}
+              getChildMessages={getChildMessages}
+              hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
+              sessionError={getChildSessionError(childSessionSheet.sheet.sessionId)}
+              isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
+              hasOlderMessages={childHasOlderMessages}
+              isLoadingOlderMessages={childIsLoadingOlderMessages}
+              olderMessagesError={childOlderMessagesError}
+              olderMessagesOmittedItemCount={childOlderMessagesOmittedItemCount}
+              onLoadOlderMessages={() => {
+                if (openChildSessionId !== null) {
+                  void manager.loadOlderChildMessages(openChildSessionId);
+                }
+              }}
+              renderPart={props => <PartRenderer {...props} />}
+              onOpenChildSession={handleOpenChildSession}
+              onRetry={() => {
+                const openSheet = childSessionSheet.sheet;
+                if (!openSheet) {
+                  return;
+                }
+                void manager.hydrateChildSession(openSheet.sessionId);
+              }}
+              onClose={handleCloseChildSession}
+              onDismiss={handleChildSheetDismiss}
+              modelOptions={modelOptions}
+            />
+          ) : null}
 
-        {childSessionSheet.sheet ? (
-          <ChildSessionSheet
-            visible={childSessionSheet.visible}
-            sessionId={childSessionSheet.sheet.sessionId}
-            title={childSessionSheet.sheet.title}
-            getChildMessages={getChildMessages}
-            hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
-            sessionError={getChildSessionError(childSessionSheet.sheet.sessionId)}
-            isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
-            hasOlderMessages={childHasOlderMessages}
-            isLoadingOlderMessages={childIsLoadingOlderMessages}
-            olderMessagesError={childOlderMessagesError}
-            olderMessagesOmittedItemCount={childOlderMessagesOmittedItemCount}
-            onLoadOlderMessages={() => {
-              if (openChildSessionId !== null) {
-                void manager.loadOlderChildMessages(openChildSessionId);
-              }
-            }}
-            renderPart={props => <PartRenderer {...props} />}
-            onOpenChildSession={handleOpenChildSession}
-            onRetry={() => {
-              const openSheet = childSessionSheet.sheet;
-              if (!openSheet) {
-                return;
-              }
-              void manager.hydrateChildSession(openSheet.sessionId);
-            }}
-            onClose={handleCloseChildSession}
-            onDismiss={handleChildSheetDismiss}
-            modelOptions={modelOptions}
-          />
-        ) : null}
-
-        {rename.isTitleInteractive && rename.isModalOpen ? (
-          <RenameModal
-            title={t('agentChat.session.renameSession')}
-            placeholder={t('agentChat.session.renamePlaceholder')}
-            initialValue={rename.modalInitialValue}
-            onSave={handleRenameSave}
-            onClose={handleRenameClose}
-          />
-        ) : null}
-      </View>
+          {rename.isTitleInteractive && rename.isModalOpen ? (
+            <RenameModal
+              title={t('agentChat.session.renameSession')}
+              placeholder={t('agentChat.session.renamePlaceholder')}
+              initialValue={rename.modalInitialValue}
+              onSave={handleRenameSave}
+              onClose={handleRenameClose}
+            />
+          ) : null}
+        </View>
+      </ToolRunSheetHost>
     </PartDetailSheetHost>
   );
 

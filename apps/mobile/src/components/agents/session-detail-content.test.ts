@@ -997,14 +997,10 @@ describe('session detail exit retry row', () => {
     ) => Promise<void>;
 
     await act(async () => {
-      await onExitSession(
-        vi.fn<() => void>(),
-        { current: false },
-        async () => {
-          await Promise.resolve();
-          return true;
-        }
-      );
+      await onExitSession(vi.fn<() => void>(), { current: false }, async () => {
+        await Promise.resolve();
+        return true;
+      });
     });
     expect(view.renderer.root.findAllByType(RemoteSessionExitFailure)).toHaveLength(1);
 
@@ -1016,4 +1012,3 @@ describe('session detail exit retry row', () => {
     expect(view.renderer.root.findAllByType(RemoteSessionExitFailure)).toHaveLength(0);
   });
 });
-

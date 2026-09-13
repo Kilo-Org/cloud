@@ -422,9 +422,8 @@ export async function disconnectGitHubInstallation(
     if (disconnected.length !== 1) throw new Error('GitHub connection not found');
     // Terminalize this association's own active review work as part of the
     // same disconnect: otherwise a queued/running review keeps its dispatch
-    // reservation and status, which both leaves it stuck and makes
-    // evaluateGitHubSharingCompatibility treat the disconnected association
-    // as still-active incumbent work for a later connect-existing attempt.
+    // reservation and never reaches a terminal status, leaving it (and the
+    // reservation) permanently stuck once the association is gone.
     const cancelled = await cancelActiveCodeReviewsForIntegration(
       { owner, platform: PLATFORM.GITHUB, integrationId },
       tx

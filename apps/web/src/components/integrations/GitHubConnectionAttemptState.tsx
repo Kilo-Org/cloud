@@ -20,7 +20,9 @@ export function GitHubConnectionAttemptState(props: {
   /** True only for a confirmed NOT_FOUND response (the attempt genuinely
    *  expired, was consumed, or never existed). Any other error — network
    *  failure, a transient server error, etc. — is not known to be expired,
-   *  so it gets a retry instead of a claim that the attempt is gone. */
+   *  so it gets a retry instead of a claim that the attempt is gone.
+   *  Callers must derive this as `isError && <confirmed NOT_FOUND>` (never
+   *  independently of `isError`) so the two props can't disagree. */
   isNotFound: boolean;
   candidates: Candidate[] | undefined;
   isSelecting: boolean;
@@ -30,6 +32,7 @@ export function GitHubConnectionAttemptState(props: {
   /** Re-fetches the same attempt, for a non-NOT_FOUND error where the
    *  attempt itself may still be valid. */
   onRetry: () => void;
+  isRetrying: boolean;
   /** Whether a fresh GitHub App install is currently permitted (mirrors the
    *  existing `canAdd` admission check; unchanged authorization). */
   canInstallNew: boolean;
@@ -45,7 +48,7 @@ export function GitHubConnectionAttemptState(props: {
         <p className="text-sm text-destructive">
           This connection attempt expired or is no longer available.
         </p>
-        <Button variant="outline" onClick={props.onRestart} disabled={props.isRestarting}>
+        <Button variant="default" onClick={props.onRestart} disabled={props.isRestarting}>
           Restart connection
         </Button>
       </div>
@@ -55,18 +58,31 @@ export function GitHubConnectionAttemptState(props: {
     return (
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <p className="text-sm text-destructive">Could not load this connection attempt.</p>
-        <Button variant="outline" onClick={props.onRetry}>
-          Try again
+        <Button
+          variant="default"
+          className="min-h-11 sm:min-h-0"
+          onClick={props.onRetry}
+          disabled={props.isRetrying}
+        >
+          {props.isRetrying ? 'Reloading…' : 'Reload connection attempt'}
         </Button>
       </div>
     );
   }
 
+  // Only one action in the picker should ever be in flight at a time:
+  // disable every action here while any one of them is pending, not just
+  // its own action, so a candidate select and "install new" can't race
+  // each other (e.g. selectConnection in flight, install-new still
+  // clickable, before the confirm/select redirect actually navigates away).
+  const anyActionPending = props.isSelecting || props.isInstalling;
+
   const installNewButton = props.canInstallNew && (
     <Button
       variant={props.candidates?.length ? 'outline' : 'default'}
+      className="min-h-11 sm:min-h-0"
       onClick={props.onInstallNew}
-      disabled={props.isInstalling}
+      disabled={anyActionPending}
     >
       <Github className="size-4" />
       {props.isInstalling ? 'Opening GitHub…' : 'Install on a different GitHub organization'}
@@ -82,7 +98,7 @@ export function GitHubConnectionAttemptState(props: {
             variant="outline"
             className="justify-between"
             onClick={() => props.onSelect(candidate.installationId)}
-            disabled={props.isSelecting}
+            disabled={anyActionPending}
             aria-label={`Connect ${candidate.accountLogin}, installation ${candidate.installationId}`}
           >
             {candidate.accountLogin}

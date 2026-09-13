@@ -277,11 +277,13 @@ export function OrganizationGitHubInstallations({
               isSelecting={selectConnection.isPending}
               isRestarting={beginConnection.isPending}
               isNotFound={
+                connectionAttempt.isError &&
                 connectionAttempt.error instanceof TRPCClientError &&
                 connectionAttempt.error.data?.code === 'NOT_FOUND'
               }
               onRestart={startConnection}
               onRetry={() => void connectionAttempt.refetch()}
+              isRetrying={connectionAttempt.isFetching}
               onSelect={confirmConnection}
               canInstallNew={Boolean(query.data?.canAdd)}
               onInstallNew={startInstall}

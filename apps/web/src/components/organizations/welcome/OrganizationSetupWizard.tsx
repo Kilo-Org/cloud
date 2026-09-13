@@ -170,10 +170,17 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   // this wizard tab was left open across that change, refetch the checklist
   // when it regains focus so "Source Control" reflects the current
   // connection state instead of the snapshot cached before the change.
+  //
+  // Reads `refetch` through a ref, updated every render, so this effect can
+  // depend on `[]` instead of the whole query result object (which is a new
+  // reference on effectively every render, including ones this very effect
+  // triggers) and avoid needlessly re-subscribing the listeners.
+  const checklistRefetchRef = useRef(checklistQuery.refetch);
+  checklistRefetchRef.current = checklistQuery.refetch;
   useEffect(() => {
     const refetchOnReturn = () => {
       if (document.visibilityState === 'visible') {
-        void checklistQuery.refetch();
+        void checklistRefetchRef.current();
       }
     };
     window.addEventListener('focus', refetchOnReturn);
@@ -182,7 +189,7 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
       window.removeEventListener('focus', refetchOnReturn);
       document.removeEventListener('visibilitychange', refetchOnReturn);
     };
-  }, [checklistQuery]);
+  }, []);
 
   useEffect(() => {
     if (!requestedScreen) return;

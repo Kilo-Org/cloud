@@ -243,6 +243,26 @@ describe('a chat that moved', () => {
     expect(snapshotOf('s2').failed).toBeNull();
     expect(snapshotOf('s2').sessionId).toBe('s2');
   });
+
+  it('ends the chat it points at when the id it moved off is released', async () => {
+    await say(opened, 'first', 'kilo/one');
+    await settled();
+    await say(opened, 'second', 'kilo/two');
+    await settled();
+
+    finish?.();
+    await settled();
+
+    /* A route or a list row can still name the id the chat moved off. Releasing
+       it ends the chat it became. Both halves are read here: the live chat is
+       gone, and the old id no longer points at it. Left running, the session
+       answers under a screen that let it go; left pointing, the next reader of
+       the old id finds a chat that is gone. */
+    await releaseChat(opened);
+
+    expect(snapshotOf('s2').status).toBe('opening');
+    expect(snapshotOf(opened).sessionId).toBe(opened);
+  });
 });
 
 describe('a chat that could not be opened', () => {

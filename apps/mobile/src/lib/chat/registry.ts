@@ -452,23 +452,28 @@ async function halt(sessionId: string, chat: Chat): Promise<boolean> {
 /**
  * Ends a chat, whether it is being deleted or the account is going. Closing the
  * scope is what tells the store to write down whatever it still holds.
+ *
+ * The id may be one a chat moved off — a route or a list row can still name it.
+ * It resolves to the chat that carried on, or releasing it would leave that
+ * chat running and the old id pointing at one nobody ended.
  */
 export async function releaseChat(sessionId: string): Promise<void> {
-  const chat = chats.get(sessionId);
+  const current = snapshotOf(sessionId).sessionId;
+  const chat = chats.get(current);
   if (chat === undefined) {
     /* Deleting a chat that was never opened still has a state subscribed by the
        row that was tapped, so it is forgotten here too. */
-    forgetState(sessionId);
+    forgetState(current);
     return;
   }
-  await halt(sessionId, chat);
+  await halt(current, chat);
   /* Whatever was still waiting goes with the chat. Asking it now would open a
      round on a session whose scope is closing under it. */
   chat.waiting.length = 0;
   const runtime = await runtimeFor(chat);
   await runtime.runPromise(Scope.close(chat.scope, Exit.void));
-  chats.delete(sessionId);
-  forgetState(sessionId);
+  chats.delete(current);
+  forgetState(current);
 }
 
 /** Ends every chat, which is what signing out does before the wipe. */

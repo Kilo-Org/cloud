@@ -18,7 +18,8 @@ import { renderWithProviders } from '@/test/render-with-providers';
 const state = vi.hoisted(() => ({
   newChat: vi.fn<(place: unknown, model: string) => Promise<string>>(),
   push: vi.fn<(path: string) => void>(),
-  toastError: vi.fn<(message: string) => void>(),
+  toastError: vi.fn<(message: string, options?: unknown) => void>(),
+  toastDismiss: vi.fn<(id?: string | number) => void>(),
 }));
 
 vi.mock('@/lib/chat/use-chat', () => ({
@@ -53,7 +54,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primaryForeground: '#fff' }),
 }));
 vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => 0 }));
-vi.mock('sonner-native', () => ({ toast: { error: state.toastError } }));
+vi.mock('sonner-native', () => ({
+  toast: { error: state.toastError, dismiss: state.toastDismiss },
+}));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -116,15 +119,24 @@ describe('starting a chat from the list', () => {
     expect(state.newChat).toHaveBeenCalledWith(expect.anything(), 'm1');
     expect(state.push).toHaveBeenCalledWith('/(app)/(tabs)/(4_chat)/session-1');
     expect(state.toastError).not.toHaveBeenCalled();
+    // A failure left on screen from an earlier attempt is moot now.
+    expect(state.toastDismiss).toHaveBeenCalledWith('chat-start-failed');
   });
 
-  it('says what went wrong instead of doing nothing when the chat cannot be started', async () => {
+  it('says what went wrong and keeps it on screen when the chat cannot be started', async () => {
     state.newChat.mockRejectedValue(new Error('the store is not open'));
     const tree = await mount();
 
     await pressStart(tree);
 
-    expect(state.toastError).toHaveBeenCalledWith('the store is not open');
+    // A four-second toast was missed by whoever looked away, so the failure
+    // stays until it is dismissed, above the tab bar it must never cover.
+    expect(state.toastError).toHaveBeenCalledWith('the store is not open', {
+      id: 'chat-start-failed',
+      position: 'top-center',
+      duration: Infinity,
+      closeButton: true,
+    });
     expect(state.push).not.toHaveBeenCalled();
   });
 });

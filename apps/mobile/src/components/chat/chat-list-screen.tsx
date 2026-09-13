@@ -89,11 +89,20 @@ function ScopedChatListScreen() {
     void (async () => {
       try {
         const sessionId = await newChat(place, model);
+        // Whatever the last attempt failed with is moot once a chat starts.
+        toast.dismiss('chat-start-failed');
         router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);
       } catch (error) {
         /* Starting the chat or opening its session failed. Saying nothing would
-           read as a button that does not work. */
-        toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'));
+           read as a button that does not work, and a toast that dismissed itself
+           four seconds later was missed by whoever looked away. The reason stays
+           until it is dismissed, at the top so it never covers the tab bar. */
+        toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'), {
+          id: 'chat-start-failed',
+          position: 'top-center',
+          duration: Infinity,
+          closeButton: true,
+        });
       }
     })();
   }, [models, place, router, t]);

@@ -1,0 +1,122 @@
+diff --git a/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm b/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm
+index 226781f27bfff61ecd993be0b4937fb8e4c66465..bcb3e80b4209191b8f03bc46ca31944c22b40701 100644
+--- a/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm
++++ b/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm
+@@ -119,26 +119,28 @@ static NSString *const kRCTLegacyInteropChildIndexKey = @"index";
+ 
+   // Step 3: check if the module has been registered
+   // TODO(T174674274): Implement lazy loading of legacy view managers in the new architecture.
+-  NSArray<Class> *registeredModules = RCTGetModuleClasses();
+   NSMutableDictionary<NSString *, Class> *supportedLegacyViewComponents =
+       [RCTLegacyViewManagerInteropComponentView _supportedLegacyViewComponents];
+-  if (supportedLegacyViewComponents[componentName] != NULL) {
+-    return YES;
+-  }
++  @synchronized(supportedLegacyViewComponents) {
++    NSArray<Class> *registeredModules = RCTGetModuleClasses();
++    if (supportedLegacyViewComponents[componentName] != NULL) {
++      return YES;
++    }
+ 
+-  for (Class moduleClass in registeredModules) {
+-    id<RCTBridgeModule> bridgeModule = (id<RCTBridgeModule>)moduleClass;
+-    NSString *moduleName = [[bridgeModule moduleName] isEqualToString:@""]
+-        ? [NSStringFromClass(moduleClass) stringByReplacingOccurrencesOfString:@"Manager" withString:@""]
+-        : [bridgeModule moduleName];
++    for (Class moduleClass in registeredModules) {
++      id<RCTBridgeModule> bridgeModule = (id<RCTBridgeModule>)moduleClass;
++      NSString *moduleName = [[bridgeModule moduleName] isEqualToString:@""]
++          ? [NSStringFromClass(moduleClass) stringByReplacingOccurrencesOfString:@"Manager" withString:@""]
++          : [bridgeModule moduleName];
+ 
+-    if (supportedLegacyViewComponents[moduleName] == NULL) {
+-      supportedLegacyViewComponents[moduleName] = moduleClass;
+-    }
++      if (supportedLegacyViewComponents[moduleName] == NULL) {
++        supportedLegacyViewComponents[moduleName] = moduleClass;
++      }
+ 
+-    if ([moduleName isEqualToString:componentName] ||
+-        [moduleName isEqualToString:[@"RCT" stringByAppendingString:componentName]]) {
+-      return YES;
++      if ([moduleName isEqualToString:componentName] ||
++          [moduleName isEqualToString:[@"RCT" stringByAppendingString:componentName]]) {
++        return YES;
++      }
+     }
+   }
+ 
+diff --git a/React/Fabric/Mounting/RCTComponentViewFactory.mm b/React/Fabric/Mounting/RCTComponentViewFactory.mm
+index 608d75cadf9243244541ea61cbf8908244d6e0b8..ca2a5b9c51be747e106da2014063dfb228049a33 100644
+--- a/React/Fabric/Mounting/RCTComponentViewFactory.mm
++++ b/React/Fabric/Mounting/RCTComponentViewFactory.mm
+@@ -48,6 +48,7 @@ using namespace facebook::react;
+ @interface RCTComponentViewFactory ()
+ - (void)_registerComponentIfPossible:(const std::string &)name;
+ - (BOOL)_wasComponentRegistered:(const std::string &)name;
++- (void)_registerComponentViewClassLocked:(Class<RCTComponentViewProtocol>)componentViewClass;
+ @end
+ 
+ // Allow JS runtime to register native components as needed. For static view configs.
+@@ -115,12 +116,14 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
+ 
+ - (BOOL)_wasComponentRegistered:(const std::string &)name
+ {
++  std::shared_lock lock(_mutex);
+   auto registrationResult = _registrationStatusMap.find(name);
+   return registrationResult != _registrationStatusMap.end() && (registrationResult->second);
+ }
+ 
+ - (void)_registerComponentIfPossible:(const std::string &)name
+ {
++  std::unique_lock lock(_mutex);
+   if (_registrationStatusMap.find(name) != _registrationStatusMap.end()) {
+     return;
+   }
+@@ -133,7 +136,7 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
+   // Fallback 1: Call provider function for component view class.
+   Class<RCTComponentViewProtocol> klass = RCTComponentViewClassWithName(name.c_str());
+   if (klass != nullptr) {
+-    [self registerComponentViewClass:klass];
++    [self _registerComponentViewClassLocked:klass];
+     return;
+   }
+ 
+@@ -144,7 +147,7 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
+     NSString *objcName = [NSString stringWithCString:name.c_str() encoding:NSUTF8StringEncoding];
+     klass = self.thirdPartyFabricComponentsProvider.thirdPartyFabricComponents[objcName];
+     if (klass != nullptr) {
+-      [self registerComponentViewClass:klass];
++      [self _registerComponentViewClassLocked:klass];
+       return;
+     }
+   }
+@@ -185,7 +188,11 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
+ {
+   RCTAssert(componentViewClass, @"RCTComponentViewFactory: Provided `componentViewClass` is `nil`.");
+   std::unique_lock lock(_mutex);
++  [self _registerComponentViewClassLocked:componentViewClass];
++}
+ 
++- (void)_registerComponentViewClassLocked:(Class<RCTComponentViewProtocol>)componentViewClass
++{
+   auto provider = [componentViewClass componentDescriptorProvider];
+   _componentViewClasses[provider.handle] = [self _componentViewClassDescriptorFromClass:componentViewClass];
+   _providerRegistry.add(provider);
+@@ -209,6 +216,16 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
+       @"ComponentView with componentHandle `%lli` (`%s`) not found.",
+       componentHandle,
+       (char *)componentHandle);
++  if (iterator == _componentViewClasses.end()) {
++    RCTLogError(@"ComponentView with componentHandle `%lli` not found, mounting fallback view.", componentHandle);
++    auto fd = [self _componentViewClassDescriptorFromClass:[RCTUnimplementedViewComponentView class]];
++    return RCTComponentViewDescriptor{
++        .view = [fd.viewClass new],
++        .observesMountingTransactionWillMount = fd.observesMountingTransactionWillMount,
++        .observesMountingTransactionDidMount = fd.observesMountingTransactionDidMount,
++        .shouldBeRecycled = fd.shouldBeRecycled,
++    };
++  }
+   auto componentViewClassDescriptor = iterator->second;
+   Class viewClass = componentViewClassDescriptor.viewClass;
+ 

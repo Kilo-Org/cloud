@@ -4,6 +4,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ScreenHeader } from './screen-header';
+import { OFFLINE_BANNER_HEIGHT, OfflineBannerSpaceProvider } from './offline-banner-space';
 
 const routerState = vi.hoisted(() => ({
   routes: ['previous-screen', 'session-detail'],
@@ -434,5 +435,25 @@ describe('ScreenHeader mounted', () => {
     // header.
     expect(findOuterContainer(renderer.root).props.style).toEqual({ paddingTop: 8 });
     expect(findSideInsetWrapper(renderer.root).props.style).toBeUndefined();
+  });
+
+  it('reserves the offline banner height above a pinned header while offline', () => {
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      ref.current = TestRenderer.create(
+        createElement(
+          OfflineBannerSpaceProvider,
+          { isOffline: true },
+          createElement(ScreenHeader, { title: 'Profile', size: 'large' })
+        )
+      );
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    expect(findOuterContainer(renderer.root).props.style).toEqual({
+      paddingTop: 8 + OFFLINE_BANNER_HEIGHT,
+    });
   });
 });

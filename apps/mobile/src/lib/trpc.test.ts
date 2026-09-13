@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type TelemetryEvent } from '@/lib/telemetry/error-sink';
+
 const httpLinkMock = vi.hoisted(() => vi.fn());
 const httpBatchLinkMock = vi.hoisted(() => vi.fn());
 const createTRPCClientMock = vi.hoisted(() => vi.fn());
@@ -304,5 +306,107 @@ describe('deadlineFetch', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('network error reporting', () => {
+  let events: TelemetryEvent[] = [];
+
+  beforeEach(() => {
+    events = [];
+    mockFetch.mockReset();
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // `vi.resetModules()` (outer afterEach) drops the module registry, so the
+  // error-sink used by the freshly imported trpc.ts must be the same instance
+  // the fake sink is installed on. Import the sink from that registry first.
+  async function loadObservedFetch(): Promise<typeof fetch> {
+    httpLinkMock.mockReturnValue({});
+    httpBatchLinkMock.mockReturnValue({});
+    createTRPCClientMock.mockReturnValue({});
+
+    const { setTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    await import('./trpc');
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    const httpLinkOpts = httpLinkMock.mock.calls[0]?.[0] as { fetch?: typeof fetch } | undefined;
+    if (!httpLinkOpts?.fetch) {
+      throw new Error('fetch option was not captured from httpLink');
+    }
+    return httpLinkOpts.fetch;
+  }
+
+  it('reports one warning tagged error.source trpc carrying the procedure on rejection', async () => {
+    const original = new Error('socket closed');
+    mockFetch.mockRejectedValue(original);
+    const observedFetch = await loadObservedFetch();
+
+    await expect(
+      observedFetch('https://api.example.com/api/trpc/session.list?batch=1')
+    ).rejects.toBe(original);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.tags).toMatchObject({
+      'error.subsystem': 'network',
+      'error.source': 'trpc',
+      'network.outcome': 'failed',
+      'trpc.procedure': 'session.list',
+    });
+    expect(events[0]?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'failed']);
+  });
+
+  it('reports a non-2xx response', async () => {
+    mockFetch.mockResolvedValue(
+      new Response('nope', { status: 503, statusText: 'Service Unavailable' })
+    );
+    const observedFetch = await loadObservedFetch();
+
+    const response = await observedFetch('https://api.example.com/api/trpc/session.list');
+
+    expect(response.status).toBe(503);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.tags).toMatchObject({
+      'error.source': 'trpc',
+      'http.status': 503,
+      'http.status_class': '5xx',
+      'network.outcome': 'http_error',
+    });
+  });
+
+  it('reports a 207 batched response once and still returns it', async () => {
+    const body = [
+      { result: { data: 'ok' } },
+      {
+        error: {
+          message: 'forbidden',
+          code: -32003,
+          data: { code: 'FORBIDDEN', httpStatus: 403, path: 'session.list' },
+        },
+      },
+    ];
+    mockFetch.mockResolvedValue(new Response(JSON.stringify(body), { status: 207 }));
+    const observedFetch = await loadObservedFetch();
+
+    const response = await observedFetch('https://api.example.com/api/trpc/session.list?batch=1');
+
+    expect(response.status).toBe(207);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.tags).toMatchObject({
+      'error.subsystem': 'network',
+      'error.source': 'trpc',
+      'http.status': 207,
+      'network.outcome': 'http_error',
+      'trpc.procedure': 'session.list',
+      'trpc.code': 'FORBIDDEN',
+    });
   });
 });

@@ -302,3 +302,43 @@ describe('CommentRow overflow actions', () => {
     renderer.unmount();
   });
 });
+
+describe('CommentRow reactions capability gate (s6)', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  async function renderWithCapabilities(
+    reactionsSupported: boolean
+  ): Promise<TestRenderer.ReactTestRenderer> {
+    let renderer: TestRenderer.ReactTestRenderer | null = null;
+    await act(async () => {
+      await Promise.resolve();
+      renderer = TestRenderer.create(
+        createElement(CommentRow, {
+          comment: makeComment(),
+          onToggleReaction: vi.fn<() => void>(),
+          readOnly: true,
+          reactionsSupported,
+        })
+      );
+    });
+    // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
+    if (!renderer) {
+      throw new Error('Failed to create test renderer');
+    }
+    return renderer;
+  }
+
+  it('supported (default): renders the reactions row', async () => {
+    const renderer = await renderWithCapabilities(true);
+    expect(renderer.root.findAll(node => (node.type as string) === 'ReactionsRow')).toHaveLength(1);
+    renderer.unmount();
+  });
+
+  it('unsupported: renders no reactions row at all — never an empty or failing one', async () => {
+    const renderer = await renderWithCapabilities(false);
+    expect(renderer.root.findAll(node => (node.type as string) === 'ReactionsRow')).toHaveLength(0);
+    renderer.unmount();
+  });
+});

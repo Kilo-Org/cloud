@@ -36,6 +36,7 @@
     "cost": "Költség",
     "discard": "Elvetés",
     "findings": "Találatok",
+    "mergeRequest": "merge request",
     "notConnected": "Nincs csatlakoztatva",
     "notifications": "Értesítések",
     "pullRequest": "pR",
@@ -350,6 +351,7 @@
       "merge": "Összevonás",
       "mergeNow": "Összevonás most",
       "mergePullRequest": "Módosítási kérelem összevonása",
+      "mergeTermTitle": "{{term}} összevonása",
       "enableAutoMerge": "Automatikus összevonás engedélyezése",
       "disableAutoMerge": "Automatikus összevonás letiltása",
       "autoMergeOn": "Automatikus összevonás bekapcsolva",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "Ág törlése az összevonás után",
       "noEnabledMethods": "Ebben a tárolóban nincs engedélyezett összevonási módszer. Kérd meg a tároló egyik adminisztrátorát, hogy engedélyezze az összevonást, az egyesítést vagy az újraalapozást.",
       "confirmTitle": "Összevonod a módosítási kérelmet?",
+      "confirmTitleTerm": "{{term}} összevonása?",
       "confirmMessage": "Ezzel a módosításaid bekerülnek az alapágba.",
       "enableAutoMergeConfirmTitle": "Engedélyezed az automatikus összevonást?",
       "enableAutoMergeConfirmMessage": "A GitHub automatikusan összevonja ezt a módosítási kérelmet, amint minden kötelező ellenőrzés sikeres.",
+      "enableAutoMergeConfirmMessageTerm": "A pipeline sikeres lefutása után a {{term}} automatikusan összevonásra kerül.",
+      "enableAutoMergeDescriptionTerm": "A GitLab automatikusan elvégzi a {{term}} összevonását, amint a pipeline sikeres.",
       "forbidden": "Nincs jogosultságod a módosítási kérelem összevonásához.",
       "cannotMerge": "Ez a módosítási kérelem a jelenlegi formájában nem vonható össze.",
       "couldNotMerge": "Nem sikerült összevonni a módosítási kérelmet.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Már összevonva",
-        "closed": "A módosítási kérelem lezárva"
+        "closed": "A módosítási kérelem lezárva",
+        "closedMergeRequest": "Ez a merge request le van zárva"
       },
       "partialSuccessBanner": {
         "body": "Nem sikerült törölni az ágat. Az ok: {{reason}}.",
@@ -406,6 +412,18 @@
         "behindDetail": "A forráság le van maradva az alapághoz képest. Az összevonás előtt végezz újraalapozást, vagy frissítsd az ágat.",
         "notMergeableTitle": "Ez a módosítási kérelem még nem vonható össze",
         "notMergeableDetail": "A GitHub által jelzett összevonhatósági állapot: {{state}}."
+      },
+      "restrictions": {
+        "title": "Egyesítési korlátozások",
+        "approvalsRequired_one": "{{displayCount}} jóváhagyás szükséges",
+        "approvalsRequired_other": "{{displayCount}} jóváhagyás szükséges",
+        "pipelineMustSucceed": "A pipeline-nak sikeresnek kell lennie az egyesítés előtt."
+      },
+      "providerBlocked": {
+        "failingPipeline": "A pipeline hibázik a legutóbbi commiton.",
+        "pendingPipeline": "A pipeline még fut a legutóbbi committal.",
+        "permission": "Nincs jogosultságod a {{term}} összevonásához.",
+        "draft": "Az összevonás előtt jelöld a {{term}} kódellenőrzésre késznek."
       },
       "methodLabels": {
         "merge": "Összevonási véglegesítés létrehozása",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "Elavult: {{lines}}",
         "outdatedOnPath": "Elavult: {{path}}"
       },
-      "deletedUser": "törölt felhasználó"
+      "deletedUser": "törölt felhasználó",
+      "replyForbiddenTerm": "Nincs jogosultságod a {{term}} megválaszolására."
     },
     "couldNotOpenGitHubAppSettings": "Nem sikerült megnyitni a GitHub-alkalmazás beállításait.",
     "installKiloGitHubApp": "A Kilo GitHub-alkalmazásának telepítése",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "Módosítási kérelem kódellenőrzése",
     "headLine": "{{counts}} · legutóbbi véglegesítés: {{sha}}",
     "entry": {
-      "eyebrow": "Nyiss meg egy módosítási kérelmet az URL megadásával.",
-      "pastePrLink": "PR-hivatkozás beillesztése",
-      "noRecentPrs": "Nincs nemrég megnyitott PR",
-      "noRecentPrsDescription": "Illessz be fent egy PR-hivatkozást a kódellenőrzés indításához. Legközelebb itt is megtalálod.",
+      "eyebrow": "Nyiss meg egy PR-t vagy merge requestet az URL megadásával",
+      "pastePrLink": "PR- vagy merge request-hivatkozás beillesztése",
+      "noRecentPrs": "Nincs közelmúltbeli kódellenőrzés",
+      "noRecentPrsDescription": "Illessz be fent egy hivatkozást a kódellenőrzés indításához — legközelebb itt fog megjelenni.",
       "couldNotLoad": "Nem sikerült a betöltés.",
       "removeFromRecentsTitle": "Eltávolítod az előzményekből?",
-      "removeFromRecentsMessage": "Ez a módosítási kérelem eltűnik az előzményeidből.",
+      "removeFromRecentsMessage": "Ez a kódellenőrzés eltűnik az előzményeidből.",
       "removeRecentAccessibility": "{{repo}} eltávolítása az előzményekből",
-      "urlAccessibility": "GitHub-módosítási kérelem URL-címe",
-      "clearLink": "Módosítási kérelem hivatkozásának törlése",
-      "pasteLink": "Módosítási kérelem hivatkozásának beillesztése",
+      "urlAccessibility": "Add meg egy PR vagy merge request URL-címét",
+      "urlPlaceholder": "Módosítási kérelem vagy merge request URL",
+      "openAccessibility": "Módosítási kérelem vagy merge request megnyitása",
+      "clearLink": "Hivatkozás törlése",
+      "pasteLink": "PR- vagy merge request-hivatkozás beillesztése",
       "open": "Megnyitás"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "Nem sikerült ellenőrizni a GitHub-kapcsolatot.",
       "checkFailedMessage": "A bejelentkezési állapot csak a betöltés után érhető el.",
+      "checkFailedTitleGitLab": "Nem sikerült ellenőrizni a GitLab-kapcsolatot.",
+      "checkFailedTitleBitbucket": "Nem sikerült ellenőrizni a Bitbucket-kapcsolatot.",
+      "providerCheckFailedMessage": "A kapcsolódási állapot csak a betöltés után érhető el.",
       "reconnectTitle": "Újracsatlakozás a GitHubhoz",
       "reconnectDescription": "Visszavonták a GitHub-kapcsolatod engedélyét. Csatlakozz újra, hogy mobilon is folytathasd a módosítási kérelmek kódellenőrzését.",
-      "description": "Csatlakoztasd a GitHub-fiókodat a módosítási kérelmek mobilos kódellenőrzéséhez."
+      "description": "Csatlakoztasd a GitHub-fiókodat a módosítási kérelmek mobilos kódellenőrzéséhez.",
+      "gitlabDescription": "Csatlakoztasd a GitLab-fiókodat a merge requests kódellenőrzéséhez mobilon.",
+      "bitbucketDescription": "Csatlakoztasd a Bitbucketot ehhez a szervezethez a módosítási kérelmek mobilos kódellenőrzéséhez.",
+      "bitbucketOrgOnlyDescription": "Válassz szervezetet a profilodban, hogy átnézd annak Bitbucket-módosítási kérelmeit."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "A GitHub-kapcsolat lejárt.",
-      "message": "A GitHub-kapcsolatod már nem érvényes. Ellenőrizd újra a kapcsolatot. Ha szükséges, az alkalmazás kérni fogja az újracsatlakozást."
+      "message": "A GitHub-kapcsolatod már nem érvényes. Ellenőrizd újra a kapcsolatot. Ha szükséges, az alkalmazás kérni fogja az újracsatlakozást.",
+      "gitlabTitle": "A GitLab-kapcsolat lejárt.",
+      "bitbucketTitle": "A Bitbucket-kapcsolat lejárt.",
+      "providerMessage": "A {{provider}}-kapcsolatod már nem érvényes. Ellenőrizd újra a kapcsolatot. Ha szükséges, az alkalmazás kérni fogja az újracsatlakozást."
     },
     "eventChips": {
       "comment": "Hozzászólás",
@@ -668,7 +698,7 @@
       "emptyLine": "(üres)"
     },
     "linkPasteClipboardEmpty": "A vágólap üres.",
-    "linkPasteNotAPullRequest": "Ez nem egy GitHub-módosítási kérelem hivatkozása.",
+    "linkPasteNotAPullRequest": "Ez nem egy PR vagy merge request hivatkozása",
     "announce": {
       "commentPosted": "Hozzászólás közzétéve",
       "reviewSubmitted": "Kódellenőrzés elküldve",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "Ez a hozzászólás nem küldhető el. Lehet, hogy a kijelölt sor megváltozott, vagy a PR frissült.",
       "reviewNotSubmitted": "Ez a kódellenőrzés a jelenlegi formájában nem küldhető el. Lehet, hogy a PR megváltozott, vagy a saját módosítási kérelmedet próbálod ellenőrizni, ami nem engedélyezett.",
+      "reviewNotSubmittedTerm": "Ez a kódellenőrzés a jelenlegi formájában nem küldhető el. Lehet, hogy a {{term}} megváltozott, vagy nem ellenőrizheted a saját {{term}}.",
       "couldNotPostComment": "Nem sikerült közzétenni a hozzászólást.",
       "couldNotSubmitReview": "Nem sikerült elküldeni a kódellenőrzést. Ellenőrizd az internetkapcsolatot, és próbáld újra."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "Nem sikerült válaszolni.",
       "couldNotCompleteAction": "Nem sikerült végrehajtani ezt a műveletet.",
       "mergeResultDefaultError": "A GitHub nem fejezte be az összevonást.",
+      "mergeResultNotCompleted": "A {{term}} nem lett összevonva. Ellenőrizd az állapotát, és próbáld újra.",
       "ambiguous": "Nem sikerült megerősíteni a művelet eredményét. Újrapróbálkozás előtt ellenőrizd a PR-t.",
       "persistenceFailed": "Nem sikerült rögzíteni ezt a műveletet. Próbáld újra később.",
       "forbidden": "Nincs jogosultságod ehhez a művelethez."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Nem érhető el ennél a szolgáltatónál",
+        "accessibility": "Nem érhető el ennél a szolgáltatónál: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Merge request megosztása",
+      "viewOnProvider": "Megtekintés itt: {{provider}}",
+      "mergeRequestUnavailable": "A merge request nem érhető el",
+      "unavailableDescription": "Lehet, hogy törölték, vagy nincs hozzáférésed.",
+      "accessDeniedMergeRequest": "Nincs jogosultságod a merge request megtekintéséhez.",
+      "couldNotLoadMergeRequest": "Nem sikerült betölteni a merge request.",
+      "discussionAccessDenied": "Nincs jogosultságod a merge request-hez tartozó beszélgetés megtekintéséhez.",
+      "discussionUnavailableMessage": "Lehet, hogy ezt a merge request eltávolították.",
+      "noDiscussionDescription": "Ehhez a merge request nem tartozik kódellenőrzési beszélgetés vagy hozzászólás.",
+      "noFilesChangedDescription": "Ez a merge request nem tartalmaz fájlmódosításokat."
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "Csatlakozás újrapróbálása"
     },
     "newSession": {
+      "recentlyUsed": "Legutóbb használt",
+      "couldNotLoadGithubRepositories": "Nem sikerült betölteni a GitHub-tárolókat.",
+      "couldNotLoadGitlabRepositories": "Nem sikerült betölteni a GitLab-tárolókat.",
+      "couldNotLoadBitbucketRepositories": "Nem sikerült betölteni a Bitbucket-tárolókat.",
       "connectGithubDescription": "Kapcsold össze a GitHub-fiókodat a böngészőben, majd térj vissza ide, és válassz egy tárolót.",
+      "connectGitlabDescription": "Kapcsold össze a GitLab-fiókodat a böngészőben, majd térj vissza ide, és válassz egy tárolót.",
+      "connectBitbucketDescription": "Kapcsold össze a Bitbucket-fiókodat a böngészőben, majd térj vissza ide, és válassz egy tárolót.",
       "openGithub": "GitHub megnyitása",
+      "openGitlab": "GitLab megnyitása",
+      "openBitbucket": "Bitbucket megnyitása",
       "refreshRepositories": "Tárolók frissítése",
       "githubConnected": "GitHub csatlakoztatva",
+      "gitlabConnected": "GitLab csatlakoztatva",
       "noRepositoriesVisible": "Egyetlen tároló sem látható. Ellenőrizd, hogy a Kilo GitHub-alkalmazás hozzáfér-e a tárolókhoz, majd frissítsd a listát.",
+      "noRepositoriesVisibleGitlab": "Egyetlen tároló sem látható. Ellenőrizd a GitLab-tárolókhoz való hozzáférést, majd frissítsd a listát.",
+      "noRepositoriesVisibleBitbucket": "Egyetlen tároló sem látható. Ellenőrizd a Bitbucket-tárolókhoz való hozzáférést, majd frissítsd a listát.",
+      "bitbucketOrganizationsOnly": "A Bitbucket csak szervezetek számára érhető el.",
+      "branchPickerTitle": "Ág kiválasztása",
+      "branchDefault": "Alapértelmezett",
+      "branchAccessibility": "Ág: {{label}}",
+      "branchLoading": "Ágak betöltése",
+      "branchLoadError": "Nem sikerült betölteni az ágakat",
+      "branchUnavailable": "Ehhez a tárolóhoz nem érhetők el ágak. Ellenőrizd a jogosultságodat a szolgáltatónál, majd válassz másik tárolót.",
+      "branchEmpty": "Nincs elérhető ág",
+      "branchPlaceholder": "Válassz ágat",
       "runOnWithTarget": "Futtatás helye: {{target}}",
       "environment": "Környezet",
       "couldNotLoadEnvironment": "Nem sikerült betölteni a környezetedet.",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "Nem sikerült frissíteni a tárolókat. Próbáld újra.",
       "discardDraftTitle": "Piszkozat elvetése?",
       "discardDraftMessage": "Az utasításod elvész.",
+      "discardWithUploadsMessage": "Az utasításod és az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",
       "discardFailed": "Nem sikerült elvetni a piszkozatot. Próbáld újra.",
       "remoteHint": "A helyi kilo folyamat vezérléséhez futtasd a `kilo remote` parancsot a számítógépeden, vagy a `/remote` parancsot egy futó CLI-munkamenetben.",
-      "connectBitbucketDescription": "Kapcsold össze a Bitbucket-fiókodat a böngészőben, majd térj vissza ide, és válassz egy tárolót.",
-      "connectGitlabDescription": "Kapcsold össze a GitLab-fiókodat a böngészőben, majd térj vissza ide, és válassz egy tárolót.",
-      "couldNotLoadBitbucketRepositories": "Nem sikerült betölteni a Bitbucket-tárolókat.",
-      "couldNotLoadGithubRepositories": "Nem sikerült betölteni a GitHub-tárolókat.",
-      "couldNotLoadGitlabRepositories": "Nem sikerült betölteni a GitLab-tárolókat.",
-      "gitlabConnected": "GitLab csatlakoztatva",
-      "noRepositoriesVisibleBitbucket": "Egyetlen tároló sem látható. Ellenőrizd a Bitbucket-tárolókhoz való hozzáférést, majd frissítsd a listát.",
-      "noRepositoriesVisibleGitlab": "Egyetlen tároló sem látható. Ellenőrizd a GitLab-tárolókhoz való hozzáférést, majd frissítsd a listát.",
-      "openBitbucket": "Bitbucket megnyitása",
-      "openGitlab": "GitLab megnyitása",
-      "recentlyUsed": "Legutóbb használt",
       "continueFrom": "Ezt a munkamenetet folytatod: {{title}}.",
       "importingSession": "Munkamenet importálása…",
       "cliCannotContinue": "Ez a CLI nem támogatja a munkamenetek folytatását. Válaszd a Cloud Agentet vagy egy másik CLI-t.",
-      "importFailed": "Nem sikerült importálni ezt a munkamenetet.",
-      "discardWithUploadsMessage": "Az utasításod és az elküldött üzenetekhez nem csatolt feltöltések törlődnek."
+      "importFailed": "Nem sikerült importálni ezt a munkamenetet."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissült.",

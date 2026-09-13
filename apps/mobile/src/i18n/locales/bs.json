@@ -36,6 +36,7 @@
     "cost": "Trošak",
     "discard": "Odbaci",
     "findings": "Nalazi",
+    "mergeRequest": "merge request",
     "notConnected": "Nije povezano",
     "notifications": "Obavijesti",
     "pullRequest": "zahtjev za spajanje",
@@ -352,6 +353,7 @@
       "merge": "Spajanje",
       "mergeNow": "Spoji sada",
       "mergePullRequest": "Spajanje zahtjeva",
+      "mergeTermTitle": "Spoji {{term}}",
       "enableAutoMerge": "Uključi automatsko spajanje",
       "disableAutoMerge": "Isključi automatsko spajanje",
       "autoMergeOn": "Automatsko spajanje je uključeno",
@@ -370,9 +372,12 @@
       "deleteBranchAfterMerge": "Obriši granu nakon spajanja",
       "noEnabledMethods": "U ovom repozitoriju nije omogućena nijedna metoda spajanja. Zamoli administratora repozitorija da omogući spajanje uz novu reviziju, objedinjavanje revizija ili promjenu osnove.",
       "confirmTitle": "Spojiti zahtjev?",
+      "confirmTitleTerm": "Spojiti {{term}}?",
       "confirmMessage": "Ovim će se tvoje promjene spojiti s osnovnom granom.",
       "enableAutoMergeConfirmTitle": "Uključiti automatsko spajanje?",
       "enableAutoMergeConfirmMessage": "GitHub će automatski spojiti ovaj zahtjev za spajanje kada sve obavezne provjere prođu.",
+      "enableAutoMergeConfirmMessageTerm": "Kada pipeline uspije, {{term}} će se automatski spojiti.",
+      "enableAutoMergeDescriptionTerm": "GitLab automatski spaja ovaj {{term}} kada pipeline uspije.",
       "forbidden": "Nemaš dozvolu za spajanje ovog zahtjeva.",
       "cannotMerge": "Ovaj zahtjev za spajanje ne može se spojiti u trenutnom stanju.",
       "couldNotMerge": "Spajanje zahtjeva nije uspjelo.",
@@ -383,7 +388,8 @@
       },
       "terminal": {
         "alreadyMerged": "Već spojeno",
-        "closed": "Ovaj zahtjev za spajanje je zatvoren"
+        "closed": "Ovaj zahtjev za spajanje je zatvoren",
+        "closedMergeRequest": "Ovaj merge request je zatvoren"
       },
       "partialSuccessBanner": {
         "body": "Brisanje grane nije uspjelo. Razlog: {{reason}}",
@@ -408,6 +414,19 @@
         "behindDetail": "Izvorna grana zaostaje za osnovnom. Prije spajanja promijeni osnovu izvorne grane ili je ažuriraj.",
         "notMergeableTitle": "Ovaj zahtjev za spajanje još se ne može spojiti",
         "notMergeableDetail": "GitHub je prijavio sljedeće stanje spajanja: {{state}}."
+      },
+      "restrictions": {
+        "title": "Ograničenja spajanja",
+        "approvalsRequired_one": "Potrebno je {{displayCount}} odobrenje",
+        "approvalsRequired_other": "Potrebno je {{displayCount}} odobrenja",
+        "pipelineMustSucceed": "Prije spajanja pipeline mora uspjeti.",
+        "approvalsRequired_few": "Potrebna su {{displayCount}} odobrenja"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline ne uspijeva na zadnjem commitu.",
+        "pendingPipeline": "Pipeline je još u toku na zadnjem commitu.",
+        "permission": "Nemaš dozvolu za spajanje ovog {{term}}.",
+        "draft": "Prije spajanja označi {{term}} kao spreman za pregled."
       },
       "methodLabels": {
         "merge": "Kreiraj reviziju spajanja",
@@ -509,7 +528,8 @@
         "outdatedOnLines": "Zastarjelo na {{lines}}",
         "outdatedOnPath": "Zastarjelo na {{path}}"
       },
-      "deletedUser": "obrisani korisnik"
+      "deletedUser": "obrisani korisnik",
+      "replyForbiddenTerm": "Nemaš dozvolu da odgovoriš na ovaj {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Nije moguće otvoriti postavke GitHub aplikacije.",
     "installKiloGitHubApp": "Instaliraj aplikaciju Kilo za GitHub",
@@ -521,17 +541,19 @@
     "reviewPullRequest": "Pregledaj zahtjev za spajanje",
     "headLine": "{{counts}} · najnovija revizija {{sha}}",
     "entry": {
-      "eyebrow": "Otvori zahtjev za spajanje putem URL-a.",
-      "pastePrLink": "Zalijepi poveznicu na PR",
-      "noRecentPrs": "Nema nedavnih PR-ova",
-      "noRecentPrsDescription": "Zalijepi poveznicu na PR iznad da započneš pregled — sljedeći put će se pojaviti ovdje.",
+      "eyebrow": "Otvori zahtjev za spajanje ili merge request putem URL-a",
+      "pastePrLink": "Zalijepi povezanicu na zahtjev za spajanje ili merge request",
+      "noRecentPrs": "Nema nedavnih pregleda",
+      "noRecentPrsDescription": "Da započnete pregled, zalijepite povezanicu gore — sljedeći put će se pojaviti ovdje.",
       "couldNotLoad": "Učitavanje nije uspjelo.",
       "removeFromRecentsTitle": "Ukloniti iz nedavnih zahtjeva?",
-      "removeFromRecentsMessage": "Ovaj zahtjev za spajanje bit će uklonjen s tvoje liste nedavnih zahtjeva.",
+      "removeFromRecentsMessage": "Ovaj pregled će biti uklonjen iz nedavnih.",
       "removeRecentAccessibility": "Ukloni {{repo}} iz nedavnih zahtjeva",
-      "urlAccessibility": "URL zahtjeva za spajanje na GitHubu",
-      "clearLink": "Obriši poveznicu na zahtjev za spajanje",
-      "pasteLink": "Zalijepi poveznicu na zahtjev za spajanje",
+      "urlAccessibility": "Unesite URL zahtjeva za spajanje ili merge requesta",
+      "urlPlaceholder": "URL zahtjeva za spajanje ili merge requesta",
+      "openAccessibility": "Otvori zahtjev za spajanje ili merge request",
+      "clearLink": "Izbriši povezanicu",
+      "pasteLink": "Zalijepi povezanicu na zahtjev za spajanje ili merge request",
       "open": "Otvori"
     },
     "checks": {
@@ -580,9 +602,15 @@
     "connect": {
       "checkFailedTitle": "Provjera veze s GitHubom nije uspjela.",
       "checkFailedMessage": "Status prijave nije dostupan dok se podaci ne učitaju.",
+      "checkFailedTitleGitLab": "Provjera veze s GitLabom nije uspjela.",
+      "checkFailedTitleBitbucket": "Provjera veze s Bitbucketom nije uspjela.",
+      "providerCheckFailedMessage": "Status povezave dostupan je nakon učitavanja.",
       "reconnectTitle": "Ponovo poveži GitHub",
       "reconnectDescription": "Pristup tvom GitHub računu je opozvan. Ponovo poveži račun da nastaviš pregledati zahtjeve za spajanje na mobitelu.",
-      "description": "Poveži svoj GitHub račun da pregledaš zahtjeve za spajanje na mobitelu."
+      "description": "Poveži svoj GitHub račun da pregledaš zahtjeve za spajanje na mobitelu.",
+      "gitlabDescription": "Poveži svoj GitLab račun da pregledaš merge requeste na mobitelu.",
+      "bitbucketDescription": "Poveži Bitbucket s ovom organizacijom da pregledaš zahtjeve za spajanje na mobitelu.",
+      "bitbucketOrgOnlyDescription": "Odaberi organizaciju u svom profilu da pregledaš njene zahtjeve za spajanje na Bitbucketu."
     },
     "screen": {
       "title": "#{{number}}",
@@ -605,7 +633,10 @@
     },
     "reconnectNotice": {
       "title": "Veza s GitHubom je istekla.",
-      "message": "Tvoja veza s GitHubom više ne važi. Ponovo provjeri vezu — po potrebi će se pojaviti zahtjev za ponovno povezivanje."
+      "message": "Tvoja veza s GitHubom više ne važi. Ponovo provjeri vezu — po potrebi će se pojaviti zahtjev za ponovno povezivanje.",
+      "gitlabTitle": "Veza s GitLabom je istekla.",
+      "bitbucketTitle": "Veza s Bitbucketom je istekla.",
+      "providerMessage": "Tvoja veza s {{provider}}om više ne važi. Ponovo provjeri vezu — po potrebi će se pojaviti zahtjev za ponovno povezivanje."
     },
     "eventChips": {
       "comment": "Komentar",
@@ -675,7 +706,7 @@
       "emptyLine": "(prazno)"
     },
     "linkPasteClipboardEmpty": "Međuspremnik je prazan.",
-    "linkPasteNotAPullRequest": "Ovo nije poveznica na zahtjev za spajanje na GitHubu.",
+    "linkPasteNotAPullRequest": "Ovo nije povezanica na zahtjev za spajanje niti merge request",
     "announce": {
       "commentPosted": "Komentar objavljen",
       "reviewSubmitted": "Pregled poslan",
@@ -684,6 +715,7 @@
     "mutationError": {
       "commentNotPosted": "Ovaj komentar se ne može objaviti. Odabrani red je možda promijenjen ili je PR ažuriran.",
       "reviewNotSubmitted": "Ovaj pregled se ne može poslati u trenutnom obliku. PR je možda promijenjen ili pokušavaš pregledati vlastiti zahtjev za spajanje.",
+      "reviewNotSubmittedTerm": "Ovaj pregled se ne može poslati u trenutnom obliku. {{term}} je možda promijenjen ili ne možeš pregledati vlastiti {{term}}.",
       "couldNotPostComment": "Objavljivanje komentara nije uspjelo.",
       "couldNotSubmitReview": "Slanje pregleda nije uspjelo. Provjeri vezu i pokušaj ponovo."
     },
@@ -691,9 +723,31 @@
       "couldNotReply": "Nije moguće poslati odgovor.",
       "couldNotCompleteAction": "Nije moguće dovršiti ovu radnju.",
       "mergeResultDefaultError": "GitHub nije dovršio spajanje.",
+      "mergeResultNotCompleted": "{{term}} nije spojen. Provjeri njegovo stanje i pokušaj ponovo.",
       "ambiguous": "Nije moguće potvrditi ishod radnje — provjeri PR prije ponovnog pokušaja.",
       "persistenceFailed": "Nismo mogli zabilježiti ovu radnju. Pokušaj ponovo kasnije.",
       "forbidden": "Radnja nije dozvoljena."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Nije dostupno kod ovog pružatelja usluga",
+        "accessibility": "Nije dostupno kod ovog pružatelja usluga: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Zahtjev za spajanje",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Podijeli merge request",
+      "viewOnProvider": "Pogledaj na {{provider}}",
+      "mergeRequestUnavailable": "Merge request nije dostupan",
+      "unavailableDescription": "Možda je obrisan ili nemaš pristup njemu.",
+      "accessDeniedMergeRequest": "Nemaš dozvolu za pregled ovog merge requesta.",
+      "couldNotLoadMergeRequest": "Učitavanje merge requesta nije uspjelo.",
+      "discussionAccessDenied": "Nemaš dozvolu za pregled rasprave o ovom merge requestu.",
+      "discussionUnavailableMessage": "Ovaj merge request je možda uklonjen.",
+      "noDiscussionDescription": "Ovaj merge request još nema niti za pregled koda ni komentara u raspravi.",
+      "noFilesChangedDescription": "Ovaj merge request ne sadrži promjene u datotekama."
     }
   },
   "notifications": {
@@ -2013,11 +2067,31 @@
       "retryConnection": "Ponovo se poveži"
     },
     "newSession": {
+      "recentlyUsed": "Nedavno korišteno",
+      "couldNotLoadGithubRepositories": "Nije moguće učitati GitHub repozitorije.",
+      "couldNotLoadGitlabRepositories": "Nije moguće učitati GitLab repozitorije.",
+      "couldNotLoadBitbucketRepositories": "Nije moguće učitati Bitbucket repozitorije.",
       "connectGithubDescription": "Poveži GitHub u pregledniku, zatim se vrati ovdje i odaberi repozitorij.",
+      "connectGitlabDescription": "Poveži GitLab u pregledniku, zatim se vrati ovdje i odaberi repozitorij.",
+      "connectBitbucketDescription": "Poveži Bitbucket u pregledniku, zatim se vrati ovdje i odaberi repozitorij.",
       "openGithub": "Otvori GitHub",
+      "openGitlab": "Otvori GitLab",
+      "openBitbucket": "Otvori Bitbucket",
       "refreshRepositories": "Osvježi repozitorije",
       "githubConnected": "GitHub povezan",
+      "gitlabConnected": "GitLab povezan",
       "noRepositoriesVisible": "Nema vidljivih repozitorija. Provjeri ima li aplikacija Kilo GitHub pristup repozitorijima, zatim osvježi spisak.",
+      "noRepositoriesVisibleGitlab": "Nema vidljivih repozitorija. Provjeri pristup GitLab repozitorijima, zatim osvježi spisak.",
+      "noRepositoriesVisibleBitbucket": "Nema vidljivih repozitorija. Provjeri pristup Bitbucket repozitorijima, zatim osvježi spisak.",
+      "bitbucketOrganizationsOnly": "Bitbucket je dostupan samo za organizacije.",
+      "branchPickerTitle": "Odaberi granu",
+      "branchDefault": "Zadano",
+      "branchAccessibility": "Grana: {{label}}",
+      "branchLoading": "Učitavanje grana",
+      "branchLoadError": "Učitavanje grana nije uspjelo",
+      "branchUnavailable": "Grane nisu dostupne za ovaj repozitorij. Provjeri svoj pristup kod pružatelja usluga, pa odaberi drugi repozitorij.",
+      "branchEmpty": "Nema dostupnih grana",
+      "branchPlaceholder": "Odaberi granu",
       "runOnWithTarget": "Pokreni na: {{target}}",
       "environment": "Okruženje",
       "couldNotLoadEnvironment": "Nije moguće učitati tvoje okruženje.",
@@ -2038,24 +2112,13 @@
       "couldNotRefreshRepositories": "Nije moguće osvježiti repozitorije. Pokušaj ponovo.",
       "discardDraftTitle": "Odbaciti nacrt?",
       "discardDraftMessage": "Tvoj upit će biti izgubljen.",
+      "discardWithUploadsMessage": "Tvoj upit i sve otpremljene datoteke koje nisu priložene poslanim porukama bit će obrisani.",
       "discardFailed": "Nije moguće odbaciti nacrt. Pokušaj ponovo.",
       "remoteHint": "Pokreni `kilo remote` na računaru ili `/remote` u aktivnoj CLI sesiji da upravljaš lokalnim procesom kilo.",
-      "connectBitbucketDescription": "Poveži Bitbucket u pregledniku, zatim se vrati ovdje i odaberi repozitorij.",
-      "connectGitlabDescription": "Poveži GitLab u pregledniku, zatim se vrati ovdje i odaberi repozitorij.",
-      "couldNotLoadBitbucketRepositories": "Nije moguće učitati Bitbucket repozitorije.",
-      "couldNotLoadGithubRepositories": "Nije moguće učitati GitHub repozitorije.",
-      "couldNotLoadGitlabRepositories": "Nije moguće učitati GitLab repozitorije.",
-      "gitlabConnected": "GitLab povezan",
-      "noRepositoriesVisibleBitbucket": "Nema vidljivih repozitorija. Provjeri pristup Bitbucket repozitorijima, zatim osvježi spisak.",
-      "noRepositoriesVisibleGitlab": "Nema vidljivih repozitorija. Provjeri pristup GitLab repozitorijima, zatim osvježi spisak.",
-      "openBitbucket": "Otvori Bitbucket",
-      "openGitlab": "Otvori GitLab",
-      "recentlyUsed": "Nedavno korišteno",
       "continueFrom": "Nastavlja se sesija {{title}}.",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberi Cloud Agent ili drugi CLI.",
-      "importFailed": "Nije moguće uvesti ovu sesiju.",
-      "discardWithUploadsMessage": "Tvoj upit i sve otpremljene datoteke koje nisu priložene poslanim porukama bit će obrisani."
+      "importFailed": "Nije moguće uvesti ovu sesiju."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirana je {{displayCount}} datoteka.",

@@ -36,6 +36,7 @@
     "cost": "Pris",
     "discard": "Kassér",
     "findings": "Fund",
+    "mergeRequest": "merge request",
     "notConnected": "Ikke tilknyttet",
     "notifications": "Notifikationer",
     "pullRequest": "pR",
@@ -350,6 +351,7 @@
       "merge": "Fletning",
       "mergeNow": "Flet nu",
       "mergePullRequest": "Flet pull request",
+      "mergeTermTitle": "Flet {{term}}",
       "enableAutoMerge": "Aktivér automatisk fletning",
       "disableAutoMerge": "Deaktivér automatisk fletning",
       "autoMergeOn": "Automatisk fletning er aktiveret",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "Slet gren efter fletning",
       "noEnabledMethods": "Ingen flettemetoder er aktiveret for dette kodelager. Bed en administrator om at aktivere fletning, sammenlægning af commits eller flytning af basis.",
       "confirmTitle": "Flet pull request?",
+      "confirmTitleTerm": "Flet {{term}}?",
       "confirmMessage": "Dine ændringer flettes ind i målgrenen.",
       "enableAutoMergeConfirmTitle": "Aktivér automatisk fletning?",
       "enableAutoMergeConfirmMessage": "GitHub fletter automatisk denne pull request, når alle påkrævede kontroller er bestået.",
+      "enableAutoMergeConfirmMessageTerm": "Når pipelinen er lykkedes, bliver {{term}} flettet automatisk.",
+      "enableAutoMergeDescriptionTerm": "GitLab fletter automatisk denne {{term}}, når pipelinen er lykkedes.",
       "forbidden": "Du har ikke tilladelse til at flette denne pull request.",
       "cannotMerge": "Denne pull request kan ikke flettes, som den er.",
       "couldNotMerge": "Denne pull request kunne ikke flettes.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Allerede flettet",
-        "closed": "Denne pull request er lukket"
+        "closed": "Denne pull request er lukket",
+        "closedMergeRequest": "Denne merge request er lukket"
       },
       "partialSuccessBanner": {
         "body": "Grenen kunne ikke slettes: {{reason}}.",
@@ -406,6 +412,18 @@
         "behindDetail": "Kildegrenen mangler ændringer fra målgrenen. Flyt grenens basis, eller opdater grenen, før du fletter.",
         "notMergeableTitle": "Denne pull request kan ikke flettes endnu",
         "notMergeableDetail": "GitHub har angivet flettestatussen {{state}}."
+      },
+      "restrictions": {
+        "title": "Fletterestriktioner",
+        "approvalsRequired_one": "{{displayCount}} godkendelse påkrævet",
+        "approvalsRequired_other": "{{displayCount}} godkendelser påkrævet",
+        "pipelineMustSucceed": "Pipelinen skal gennemføres, før der kan flettes."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipelinen fejler ved seneste commit.",
+        "pendingPipeline": "Pipelinen kører stadig ved seneste commit.",
+        "permission": "Du har ikke tilladelse til at flette denne {{term}}.",
+        "draft": "Markér denne {{term}} som klar til gennemgang, før du fletter."
       },
       "methodLabels": {
         "merge": "Opret en flettecommit",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "Forældet på {{lines}}",
         "outdatedOnPath": "Forældet i {{path}}"
       },
-      "deletedUser": "slettet bruger"
+      "deletedUser": "slettet bruger",
+      "replyForbiddenTerm": "Du har ikke tilladelse til at svare på denne {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Indstillingerne for GitHub-appen kunne ikke åbnes.",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "Gennemgå pull request",
     "headLine": "{{counts}} · seneste commit {{sha}}",
     "entry": {
-      "eyebrow": "Åbn en pull request via dens URL.",
-      "pastePrLink": "Indsæt et PR-link",
-      "noRecentPrs": "Ingen seneste PR'er",
-      "noRecentPrsDescription": "Indsæt et PR-link ovenfor for at starte en gennemgang. Denne PR vises her næste gang.",
+      "eyebrow": "Åbn en pull request eller merge request via dens URL",
+      "pastePrLink": "Indsæt et pull request- eller merge request-link",
+      "noRecentPrs": "Ingen seneste gennemgange",
+      "noRecentPrsDescription": "Indsæt et link ovenfor for at starte en gennemgang — den vises her næste gang.",
       "couldNotLoad": "Indholdet kunne ikke indlæses.",
       "removeFromRecentsTitle": "Fjern fra listen over seneste?",
-      "removeFromRecentsMessage": "Denne pull request fjernes fra listen over dine seneste pull requests.",
+      "removeFromRecentsMessage": "Denne gennemgang fjernes fra listen over dine seneste.",
       "removeRecentAccessibility": "Fjern {{repo}} fra listen over seneste",
-      "urlAccessibility": "URL til en pull request på GitHub",
-      "clearLink": "Ryd pull request-link",
-      "pasteLink": "Indsæt et pull request-link",
+      "urlAccessibility": "Indtast en pull request- eller merge request-URL",
+      "urlPlaceholder": "URL på pull request eller merge request",
+      "openAccessibility": "Åbn pull request eller merge request",
+      "clearLink": "Ryd link",
+      "pasteLink": "Indsæt pull request- eller merge request-link",
       "open": "Åbn"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "GitHub-forbindelsen kunne ikke kontrolleres.",
       "checkFailedMessage": "Din loginstatus kan først vises, når indlæsningen er færdig.",
+      "checkFailedTitleGitLab": "GitLab-forbindelsen kunne ikke kontrolleres.",
+      "checkFailedTitleBitbucket": "Bitbucket-forbindelsen kunne ikke kontrolleres.",
+      "providerCheckFailedMessage": "Din forbindelsesstatus kan først vises, når indlæsningen er færdig.",
       "reconnectTitle": "Opret forbindelse til GitHub igen",
       "reconnectDescription": "Adgangen til din GitHub-konto er blevet tilbagekaldt. Opret forbindelse igen for at fortsætte med at gennemgå pull requests på mobilen.",
-      "description": "Tilslut din GitHub-konto for at gennemgå pull requests på mobilen."
+      "description": "Tilslut din GitHub-konto for at gennemgå pull requests på mobilen.",
+      "gitlabDescription": "Tilslut din GitLab-konto for at gennemgå merge requests på mobilen.",
+      "bitbucketDescription": "Tilslut Bitbucket til denne organisation for at gennemgå pull requests på mobilen.",
+      "bitbucketOrgOnlyDescription": "Vælg en organisation i din profil for at gennemgå dens Bitbucket-pull requests."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub-forbindelsen er udløbet.",
-      "message": "Din GitHub-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt."
+      "message": "Din GitHub-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt.",
+      "gitlabTitle": "GitLab-forbindelsen er udløbet.",
+      "bitbucketTitle": "Bitbucket-forbindelsen er udløbet.",
+      "providerMessage": "Din {{provider}}-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt."
     },
     "eventChips": {
       "comment": "Kommentar",
@@ -668,7 +698,7 @@
       "emptyLine": "(tom)"
     },
     "linkPasteClipboardEmpty": "Udklipsholderen er tom.",
-    "linkPasteNotAPullRequest": "Linket fører ikke til en pull request på GitHub.",
+    "linkPasteNotAPullRequest": "Linket fører ikke til en pull request eller merge request",
     "announce": {
       "commentPosted": "Kommentar sendt",
       "reviewSubmitted": "Gennemgang sendt",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "Denne kommentar kan ikke sendes. Den valgte linje kan have ændret sig, eller PR'en kan være blevet opdateret.",
       "reviewNotSubmitted": "Denne gennemgang kan ikke sendes, som den er. PR'en kan være ændret, eller fejlen skyldes, at du ikke kan gennemgå din egen pull request.",
+      "reviewNotSubmittedTerm": "Denne gennemgang kan ikke sendes, som den er. {{term}} kan være ændret, eller også kan du ikke gennemgå din egen {{term}}.",
       "couldNotPostComment": "Kunne ikke sende kommentaren.",
       "couldNotSubmitReview": "Gennemgangen kunne ikke sendes. Tjek din forbindelse, og prøv igen."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "Svaret kunne ikke sendes.",
       "couldNotCompleteAction": "Kunne ikke fuldføre denne handling.",
       "mergeResultDefaultError": "GitHub fuldførte ikke fletningen.",
+      "mergeResultNotCompleted": "{{term}} blev ikke flettet. Tjek dens status, og prøv igen.",
       "ambiguous": "Handlingen kunne ikke bekræftes. Tjek PR'en, før du prøver igen.",
       "persistenceFailed": "Vi kunne ikke registrere denne handling. Prøv igen senere.",
       "forbidden": "Du har ikke tilladelse til denne handling."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ikke tilgængelig hos denne udbyder",
+        "accessibility": "Ikke tilgængelig hos denne udbyder: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Del merge request",
+      "viewOnProvider": "Se på {{provider}}",
+      "mergeRequestUnavailable": "Merge request ikke tilgængelig",
+      "unavailableDescription": "Den er muligvis blevet slettet, eller også har du ikke adgang til den.",
+      "accessDeniedMergeRequest": "Du har ikke tilladelse til at se denne merge request.",
+      "couldNotLoadMergeRequest": "Denne merge request kunne ikke indlæses.",
+      "discussionAccessDenied": "Du har ikke tilladelse til at se diskussionen om denne merge request.",
+      "discussionUnavailableMessage": "Denne merge request kan være fjernet.",
+      "noDiscussionDescription": "Der er endnu ingen tråde med kodegennemgang eller kommentarer i diskussionen om denne merge request.",
+      "noFilesChangedDescription": "Der er ingen filændringer i denne merge request."
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "Prøv at oprette forbindelse igen"
     },
     "newSession": {
+      "recentlyUsed": "Senest brugt",
+      "couldNotLoadGithubRepositories": "Kunne ikke indlæse kodelagre fra GitHub.",
+      "couldNotLoadGitlabRepositories": "Kunne ikke indlæse kodelagre fra GitLab.",
+      "couldNotLoadBitbucketRepositories": "Kunne ikke indlæse kodelagre fra Bitbucket.",
       "connectGithubDescription": "Tilknyt GitHub i din browser og vend tilbage hertil for at vælge et kodelager.",
+      "connectGitlabDescription": "Tilknyt GitLab i din browser og vend tilbage hertil for at vælge et kodelager.",
+      "connectBitbucketDescription": "Tilknyt Bitbucket i din browser og vend tilbage hertil for at vælge et kodelager.",
       "openGithub": "Åbn GitHub",
+      "openGitlab": "Åbn GitLab",
+      "openBitbucket": "Åbn Bitbucket",
       "refreshRepositories": "Opdatér kodelagre",
       "githubConnected": "GitHub tilknyttet",
+      "gitlabConnected": "GitLab tilknyttet",
       "noRepositoriesVisible": "Der er ingen synlige kodelagre. Kontrollér, at Kilos GitHub-app har adgang til dine kodelagre, og opdatér derefter listen.",
+      "noRepositoriesVisibleGitlab": "Der er ingen synlige kodelagre. Kontrollér adgangen til dine kodelagre på GitLab og opdatér derefter listen.",
+      "noRepositoriesVisibleBitbucket": "Der er ingen synlige kodelagre. Kontrollér adgangen til dine kodelagre på Bitbucket og opdatér derefter listen.",
+      "bitbucketOrganizationsOnly": "Bitbucket er kun tilgængeligt for organisationer.",
+      "branchPickerTitle": "Vælg gren",
+      "branchDefault": "Standard",
+      "branchAccessibility": "Gren: {{label}}",
+      "branchLoading": "Indlæser grene",
+      "branchLoadError": "Grene kunne ikke indlæses",
+      "branchUnavailable": "For dette kodelager er der ingen tilgængelige grene. Tjek din adgang hos udbyderen, og vælg et andet kodelager.",
+      "branchEmpty": "Ingen tilgængelige grene",
+      "branchPlaceholder": "Vælg en gren",
       "runOnWithTarget": "Kør på: {{target}}",
       "environment": "Miljø",
       "couldNotLoadEnvironment": "Kunne ikke indlæse dit miljø.",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "Kunne ikke opdatere listen over kodelagre. Prøv igen.",
       "discardDraftTitle": "Kassér kladde?",
       "discardDraftMessage": "Din forespørgsel går tabt.",
+      "discardWithUploadsMessage": "Din forespørgsel og eventuelle uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
       "discardFailed": "Kunne ikke kassere kladden. Prøv igen.",
       "remoteHint": "Kør `kilo remote` på din computer eller `/remote` i en aktiv CLI-session for at styre en lokal kilo-proces.",
-      "connectBitbucketDescription": "Tilknyt Bitbucket i din browser og vend tilbage hertil for at vælge et kodelager.",
-      "connectGitlabDescription": "Tilknyt GitLab i din browser og vend tilbage hertil for at vælge et kodelager.",
-      "couldNotLoadBitbucketRepositories": "Kunne ikke indlæse kodelagre fra Bitbucket.",
-      "couldNotLoadGithubRepositories": "Kunne ikke indlæse kodelagre fra GitHub.",
-      "couldNotLoadGitlabRepositories": "Kunne ikke indlæse kodelagre fra GitLab.",
-      "gitlabConnected": "GitLab tilknyttet",
-      "noRepositoriesVisibleBitbucket": "Der er ingen synlige kodelagre. Kontrollér adgangen til dine kodelagre på Bitbucket og opdatér derefter listen.",
-      "noRepositoriesVisibleGitlab": "Der er ingen synlige kodelagre. Kontrollér adgangen til dine kodelagre på GitLab og opdatér derefter listen.",
-      "openBitbucket": "Åbn Bitbucket",
-      "openGitlab": "Åbn GitLab",
-      "recentlyUsed": "Senest brugt",
-      "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
       "continueFrom": "Sessionen {{title}} fortsættes.",
-      "importFailed": "Kunne ikke importere denne session.",
       "importingSession": "Importerer session",
-      "discardWithUploadsMessage": "Din forespørgsel og eventuelle uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet."
+      "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
+      "importFailed": "Kunne ikke importere denne session."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er opdateret.",

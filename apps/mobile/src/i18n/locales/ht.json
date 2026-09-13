@@ -36,6 +36,7 @@
     "cost": "Pri",
     "discard": "Jete",
     "findings": "Pwoblèm detekte",
+    "mergeRequest": "merge request",
     "notConnected": "Pa konekte",
     "notifications": "Notifikasyon",
     "pullRequest": "demann fizyon",
@@ -350,6 +351,7 @@
       "merge": "Fizyon",
       "mergeNow": "Fizyonnen kounye a",
       "mergePullRequest": "Fizyon demann lan",
+      "mergeTermTitle": "Fizyon {{term}}",
       "enableAutoMerge": "Aktive fizyon otomatik",
       "disableAutoMerge": "Dezaktive fizyon otomatik",
       "autoMergeOn": "Fizyon otomatik aktive",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "Efase branch lan apre fizyon an",
       "noEnabledMethods": "Pa gen metòd fizyon ki aktive nan depo sa a. Mande yon administratè depo a pou aktive fizyon nòmal, fizyon ak gwoupman komit oswa fizyon ak chanjman baz.",
       "confirmTitle": "Fizyonnen demann lan?",
+      "confirmTitleTerm": "Fizyonnen {{term}} lan?",
       "confirmMessage": "Sa ap fizyonnen chanjman ou yo nan branch baz la.",
       "enableAutoMergeConfirmTitle": "Aktive fizyon otomatik?",
       "enableAutoMergeConfirmMessage": "GitHub ap fizyonnen demann sa a otomatikman lè tout verifikasyon obligatwa yo reyisi.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} lan ap fizyone otomatikman lè pipeline li a reyisi.",
+      "enableAutoMergeDescriptionTerm": "GitLab ap fizyone {{term}} sa a otomatikman lè pipeline li a reyisi.",
       "forbidden": "Ou pa gen pèmisyon pou fizyonnen demann sa a.",
       "cannotMerge": "Pa ka fizyonnen demann sa a jan li ye a.",
       "couldNotMerge": "Pa t ka fizyonnen demann lan.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Deja fizyonnen",
-        "closed": "Demann fizyon sa a fèmen"
+        "closed": "Demann fizyon sa a fèmen",
+        "closedMergeRequest": "Merge request sa a fèmen"
       },
       "partialSuccessBanner": {
         "body": "Pa t ka efase branch lan: {{reason}}.",
@@ -406,6 +412,18 @@
         "behindDetail": "Branch sous la anreta sou branch baz la. Chanje baz branch sous la oswa mete li ajou anvan ou fizyonnen li.",
         "notMergeableTitle": "Demann sa a poko ka fizyonnen",
         "notMergeableDetail": "GitHub endike eta {{state}} pou posiblite fizyon an."
+      },
+      "restrictions": {
+        "title": "Restriksyon fizyon",
+        "approvalsRequired_one": "{{displayCount}} apwobasyon obligatwa",
+        "approvalsRequired_other": "{{displayCount}} apwobasyon obligatwa",
+        "pipelineMustSucceed": "Pipeline la dwe reyisi anvan fizyon."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline la ap echwe sou dènye komit la.",
+        "pendingPipeline": "Pipeline la toujou ap kouri sou dènye komit la.",
+        "permission": "Ou pa gen pèmisyon pou fizyonnen {{term}} sa a.",
+        "draft": "Make {{term}} lan kòm pare pou revizyon anvan ou fizyonnen li."
       },
       "methodLabels": {
         "merge": "Kreye yon komit fizyon",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "Pa ajou sou {{lines}}",
         "outdatedOnPath": "Pa ajou sou {{path}}"
       },
-      "deletedUser": "itilizatè ki efase"
+      "deletedUser": "itilizatè ki efase",
+      "replyForbiddenTerm": "Ou pa gen pèmisyon pou reponn {{term}} sa a."
     },
     "couldNotOpenGitHubAppSettings": "Nou pa t kapab louvri paramèt aplikasyon GitHub la.",
     "installKiloGitHubApp": "Enstale aplikasyon Kilo pou GitHub la",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "Revize demann fizyon an",
     "headLine": "{{counts}} · dènye komit {{sha}}",
     "entry": {
-      "eyebrow": "Louvri yon demann fizyon ak URL li.",
-      "pastePrLink": "Kole yon lyen PR",
-      "noRecentPrs": "Pa gen PR resan",
-      "noRecentPrsDescription": "Kole yon lyen PR pi wo a pou kòmanse yon revizyon — l ap parèt isit la pwochen fwa a.",
+      "eyebrow": "Louvri yon demann fizyon oswa yon merge request ak URL li",
+      "pastePrLink": "Kole yon lyen demann fizyon oswa merge request",
+      "noRecentPrs": "Pa gen revizyon resan",
+      "noRecentPrsDescription": "Kole yon lyen pi wo a pou kòmanse yon revizyon — l ap parèt isit la pwochen fwa a.",
       "couldNotLoad": "Pa t ka chaje.",
       "removeFromRecentsTitle": "Retire nan lis PR resan yo?",
-      "removeFromRecentsMessage": "Demann fizyon sa a ap retire nan lis PR resan ou yo.",
+      "removeFromRecentsMessage": "Revizyon sa a ap retire nan lis resan ou yo.",
       "removeRecentAccessibility": "Retire {{repo}} nan lis PR resan yo",
-      "urlAccessibility": "URL demann fizyon GitHub la",
-      "clearLink": "Efase lyen demann fizyon an",
-      "pasteLink": "Kole lyen demann fizyon an",
+      "urlAccessibility": "Antre yon URL demann fizyon oswa merge request",
+      "urlPlaceholder": "URL demann fizyon oswa merge request",
+      "openAccessibility": "Louvri yon demann fizyon oswa yon merge request",
+      "clearLink": "Efase lyen an",
+      "pasteLink": "Kole lyen demann fizyon oswa merge request",
       "open": "Louvri"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "Pa t ka tcheke koneksyon GitHub la.",
       "checkFailedMessage": "Estati koneksyon an pa disponib toutotan done sa yo pa chaje.",
+      "checkFailedTitleGitLab": "Pa t ka tcheke koneksyon GitLab la.",
+      "checkFailedTitleBitbucket": "Pa t ka tcheke koneksyon Bitbucket la.",
+      "providerCheckFailedMessage": "Estati koneksyon an pa disponib jiskaske li chaje.",
       "reconnectTitle": "Rekonekte GitHub",
       "reconnectDescription": "Yo revoke koneksyon GitHub ou a. Rekonekte pou kontinye revize demann fizyon sou mobil.",
-      "description": "Konekte kont GitHub ou a pou revize demann fizyon sou mobil."
+      "description": "Konekte kont GitHub ou a pou revize demann fizyon sou mobil.",
+      "gitlabDescription": "Konekte kont GitLab ou pou w revize merge request sou mobil ou.",
+      "bitbucketDescription": "Konekte Bitbucket ak òganizasyon sa a pou w revize demann fizyon sou mobil ou.",
+      "bitbucketOrgOnlyDescription": "Chwazi yon òganizasyon nan pwofil ou pou w revize demann fizyon Bitbucket li yo."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "Koneksyon ak GitHub la ekspire.",
-      "message": "Koneksyon GitHub ou a pa valab ankò. Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè."
+      "message": "Koneksyon GitHub ou a pa valab ankò. Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè.",
+      "gitlabTitle": "Koneksyon ak GitLab la ekspire.",
+      "bitbucketTitle": "Koneksyon ak Bitbucket la ekspire.",
+      "providerMessage": "Koneksyon {{provider}} ou a pa valab ankò. Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè."
     },
     "eventChips": {
       "comment": "Kòmantè",
@@ -668,7 +698,7 @@
       "emptyLine": "(vid)"
     },
     "linkPasteClipboardEmpty": "Près-papye a vid.",
-    "linkPasteNotAPullRequest": "Sa a pa yon lyen demann fizyon GitHub.",
+    "linkPasteNotAPullRequest": "Sa a pa yon lyen demann fizyon ni merge request",
     "announce": {
       "commentPosted": "Kòmantè pibliye",
       "reviewSubmitted": "Revizyon soumèt",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "Pa ka pibliye kòmantè sa a. Petèt liy ou chwazi a chanje, oswa PR a te mete ajou.",
       "reviewNotSubmitted": "Pa ka soumèt revizyon sa a jan li ye a. Petèt PR a chanje, oswa ou pa ka revize pwòp demann fizyon ou a.",
+      "reviewNotSubmittedTerm": "Yo pa ka voye revizyon sa a jan l ye a. Petèt {{term}} lan chanje, oswa ou pa ka revize pwòp {{term}} ou.",
       "couldNotPostComment": "Pa t ka pibliye kòmantè a.",
       "couldNotSubmitReview": "Pa t ka soumèt revizyon an. Tcheke koneksyon ou epi eseye ankò."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "Nou pa t kapab voye repons lan.",
       "couldNotCompleteAction": "Pa t ka fini aksyon sa a.",
       "mergeResultDefaultError": "GitHub pa t fini fizyon an.",
+      "mergeResultNotCompleted": "Yo pa t fizyone {{term}} lan. Tcheke estati li epi eseye ankò.",
       "ambiguous": "Pa t ka konfime — tcheke PR a anvan ou eseye ankò.",
       "persistenceFailed": "Nou pa t ka anrejistre aksyon sa a. Tanpri eseye ankò pita.",
       "forbidden": "Aksyon sa a entèdi."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Pa disponib pou founisè sa a",
+        "accessibility": "Pa disponib pou founisè sa a: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Demann fizyon",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Pataje merge request la",
+      "viewOnProvider": "Gade sou {{provider}}",
+      "mergeRequestUnavailable": "Merge request la pa disponib",
+      "unavailableDescription": "Petèt yo te efase l, oswa ou pa gen aksè a li.",
+      "accessDeniedMergeRequest": "Ou pa gen pèmisyon pou wè merge request sa a.",
+      "couldNotLoadMergeRequest": "Pa t ka chaje merge request la.",
+      "discussionAccessDenied": "Ou pa gen pèmisyon pou wè diskisyon merge request sa a.",
+      "discussionUnavailableMessage": "Petèt yo te retire merge request sa a.",
+      "noDiscussionDescription": "Pa gen fil diskisyon pou revizyon ni kòmantè nan konvèsasyon merge request sa a.",
+      "noFilesChangedDescription": "Pa gen chanjman nan fichye yo nan merge request sa a."
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "Rekonekte"
     },
     "newSession": {
+      "recentlyUsed": "Itilize dènyèman",
+      "couldNotLoadGithubRepositories": "Nou pa t ka chaje depo GitHub yo.",
+      "couldNotLoadGitlabRepositories": "Nou pa t ka chaje depo GitLab yo.",
+      "couldNotLoadBitbucketRepositories": "Nou pa t ka chaje depo Bitbucket yo.",
       "connectGithubDescription": "Konekte GitHub nan navigatè ou a, epi tounen isit la pou chwazi yon depo.",
+      "connectGitlabDescription": "Konekte GitLab nan navigatè ou a, epi tounen isit la pou chwazi yon depo.",
+      "connectBitbucketDescription": "Konekte Bitbucket nan navigatè ou a, epi tounen isit la pou chwazi yon depo.",
       "openGithub": "Louvri GitHub",
+      "openGitlab": "Louvri GitLab",
+      "openBitbucket": "Louvri Bitbucket",
       "refreshRepositories": "Rafrechi depo yo",
       "githubConnected": "GitHub konekte",
+      "gitlabConnected": "GitLab konekte",
       "noRepositoriesVisible": "Pa gen depo ki parèt. Tcheke si aplikasyon Kilo pou GitHub la gen aksè nan depo yo, epi rafrechi lis la.",
+      "noRepositoriesVisibleGitlab": "Pa gen depo ki parèt. Tcheke aksè nan depo yo pou GitLab, epi rafrechi lis la.",
+      "noRepositoriesVisibleBitbucket": "Pa gen depo ki parèt. Tcheke aksè nan depo yo pou Bitbucket, epi rafrechi lis la.",
+      "bitbucketOrganizationsOnly": "Bitbucket disponib sèlman pou òganizasyon.",
+      "branchPickerTitle": "Chwazi branch",
+      "branchDefault": "Pa defo",
+      "branchAccessibility": "Branch: {{label}}",
+      "branchLoading": "Ap chaje branch yo",
+      "branchLoadError": "Pa t ka chaje branch yo",
+      "branchUnavailable": "Pa gen branch disponib pou depo sa a. Tcheke aksè ou ak founisè a, epi chwazi yon lòt depo.",
+      "branchEmpty": "Pa gen branch disponib",
+      "branchPlaceholder": "Chwazi yon branch",
       "runOnWithTarget": "Egzekite sou: {{target}}",
       "environment": "Anviwònman",
       "couldNotLoadEnvironment": "Nou pa t ka chaje anviwònman ou an.",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "Nou pa t ka rafrechi depo yo. Tanpri eseye ankò.",
       "discardDraftTitle": "Jete bouyon an?",
       "discardDraftMessage": "Ou ap pèdi enstriksyon ou yo.",
+      "discardWithUploadsMessage": "Enstriksyon ou yo ak tout fichye ou voye ki poko atache ak yon mesaj ap efase.",
       "discardFailed": "Nou pa t ka jete bouyon an. Tanpri eseye ankò.",
       "remoteHint": "Egzekite `kilo remote` sou òdinatè ou a, oswa `/remote` nan yon sesyon CLI ki aktif, pou kontwole yon pwosesis kilo lokal.",
-      "connectBitbucketDescription": "Konekte Bitbucket nan navigatè ou a, epi tounen isit la pou chwazi yon depo.",
-      "connectGitlabDescription": "Konekte GitLab nan navigatè ou a, epi tounen isit la pou chwazi yon depo.",
-      "couldNotLoadBitbucketRepositories": "Nou pa t ka chaje depo Bitbucket yo.",
-      "couldNotLoadGithubRepositories": "Nou pa t ka chaje depo GitHub yo.",
-      "couldNotLoadGitlabRepositories": "Nou pa t ka chaje depo GitLab yo.",
-      "gitlabConnected": "GitLab konekte",
-      "noRepositoriesVisibleBitbucket": "Pa gen depo ki parèt. Tcheke aksè nan depo yo pou Bitbucket, epi rafrechi lis la.",
-      "noRepositoriesVisibleGitlab": "Pa gen depo ki parèt. Tcheke aksè nan depo yo pou GitLab, epi rafrechi lis la.",
-      "openBitbucket": "Louvri Bitbucket",
-      "openGitlab": "Louvri GitLab",
-      "recentlyUsed": "Itilize dènyèman",
       "continueFrom": "Nou ap kontinye {{title}}.",
       "importingSession": "Ap enpòte sesyon an",
       "cliCannotContinue": "CLI sa a pa ka kontinye yon sesyon. Chwazi Cloud Agent oswa yon lòt CLI.",
-      "importFailed": "Nou pa t ka enpòte sesyon sa a.",
-      "discardWithUploadsMessage": "Enstriksyon ou yo ak tout fichye ou voye ki poko atache ak yon mesaj ap efase."
+      "importFailed": "Nou pa t ka enpòte sesyon sa a."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nou mete {{displayCount}} fichye ajou.",

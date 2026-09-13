@@ -36,6 +36,7 @@
     "cost": "Farashi",
     "discard": "Yi watsi",
     "findings": "Sakamakon bincike",
+    "mergeRequest": "buƙatar haɗawa",
     "notConnected": "Ba a haɗa ba",
     "notifications": "Sanarwa",
     "pullRequest": "buƙatar haɗa canje-canje",
@@ -350,6 +351,7 @@
       "merge": "Haɗawa",
       "mergeNow": "Haɗa yanzu",
       "mergePullRequest": "Haɗa buƙatar haɗawa",
+      "mergeTermTitle": "Haɗa {{term}}",
       "enableAutoMerge": "Kunna haɗawa ta atomatik",
       "disableAutoMerge": "Kashe haɗawa ta atomatik",
       "autoMergeOn": "Haɗawa ta atomatik tana aiki",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "Share reshe bayan haɗawa",
       "noEnabledMethods": "Ba a kunna wata hanyar haɗawa a wannan ma'ajiyar lamba ba. Nemi mai kula da ita ya kunna haɗawa, dunƙulewa ko sake kafa tushe.",
       "confirmTitle": "A haɗa buƙatar haɗawa?",
+      "confirmTitleTerm": "A haɗa {{term}}?",
       "confirmMessage": "Wannan zai haɗa canje-canjenka cikin reshen tushe.",
       "enableAutoMergeConfirmTitle": "A kunna haɗawa ta atomatik?",
       "enableAutoMergeConfirmMessage": "GitHub zai haɗa wannan buƙatar haɗawa ta atomatik idan duk gwaje-gwajen da ake buƙata sun yi nasara.",
+      "enableAutoMergeConfirmMessageTerm": "Za a haɗa {{term}} ta atomatik da zarar pipeline ɗinta ya yi nasara.",
+      "enableAutoMergeDescriptionTerm": "GitLab zai haɗa wannan {{term}} ta atomatik da zarar pipeline ɗinta ya yi nasara.",
       "forbidden": "Ba ka da izinin haɗa wannan buƙatar haɗawa.",
       "cannotMerge": "Ba za a iya haɗa wannan buƙatar haɗawa yadda take ba.",
       "couldNotMerge": "An kasa haɗa buƙatar haɗawa.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "An riga an haɗa",
-        "closed": "An rufe wannan buƙatar haɗawa"
+        "closed": "An rufe wannan buƙatar haɗawa",
+        "closedMergeRequest": "An rufe wannan buƙatar haɗawa"
       },
       "partialSuccessBanner": {
         "body": "Ba a iya share reshen ba: {{reason}}.",
@@ -406,6 +412,18 @@
         "behindDetail": "Reshen da za a haɗa bai samu sabbin canje-canjen reshen tushe ba. Sake kafa tushensa ko sabunta shi kafin haɗawa.",
         "notMergeableTitle": "Ba za a iya haɗa wannan buƙatar haɗawa ba tukuna",
         "notMergeableDetail": "GitHub ya ba da rahoton matsayin haɗawa: {{state}}."
+      },
+      "restrictions": {
+        "title": "Ƙuntatawan haɗawa",
+        "approvalsRequired_one": "Ana buƙatar amincewa {{displayCount}}",
+        "approvalsRequired_other": "Ana buƙatar amincewa {{displayCount}}",
+        "pipelineMustSucceed": "Dole ne pipeline ya yi nasara kafin haɗawa."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline yana gazaawa a kan rikodin canje-canje na baya-bayan nan.",
+        "pendingPipeline": "Pipeline har yanzu yana aiki a kan rikodin canje-canje na baya-bayan nan.",
+        "permission": "Ba ka da izinin haɗa wannan {{term}}.",
+        "draft": "Sa alamar cewa {{term}} ta shirya don bita kafin haɗawa."
       },
       "methodLabels": {
         "merge": "Ƙirƙiri rikodin haɗawa",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "Bai dace da sabon yanayin {{lines}} ba",
         "outdatedOnPath": "Bai dace da sabon yanayin {{path}} ba"
       },
-      "deletedUser": "mai amfani da aka share"
+      "deletedUser": "mai amfani da aka share",
+      "replyForbiddenTerm": "Ba ka da izinin amsa wannan {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "An kasa buɗe saitunan manhajar GitHub.",
     "installKiloGitHubApp": "Shigar da manhajar Kilo ta GitHub",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "Yi bitar buƙatar haɗawa",
     "headLine": "{{counts}} · rikodin ƙarshe {{sha}}",
     "entry": {
-      "eyebrow": "Buɗe buƙatar haɗawa ta URL.",
-      "pastePrLink": "Manna mahaɗin PR",
-      "noRecentPrs": "Babu PR na kwanan nan",
-      "noRecentPrsDescription": "Manna mahaɗin PR a sama don fara bita — zai bayyana a nan a gaba.",
+      "eyebrow": "Buɗe buƙatar haɗa canje-canje ko buƙatar haɗawa ta URL",
+      "pastePrLink": "Manna mahaɗin buƙatar haɗa canje-canje ko buƙatar haɗawa",
+      "noRecentPrs": "Babu bitutu na baya-bayan nan",
+      "noRecentPrsDescription": "Manna mahaɗi a sama don fara bita — zai bayyana a nan a karo na gaba.",
       "couldNotLoad": "Ba a iya lodawa ba.",
       "removeFromRecentsTitle": "A cire daga jerin na kwanan nan?",
-      "removeFromRecentsMessage": "Za a cire wannan buƙatar haɗawa daga jerin waɗanda ka buɗe kwanan nan.",
+      "removeFromRecentsMessage": "Za a cire wannan bita daga na baya-bayan nan.",
       "removeRecentAccessibility": "Cire {{repo}} daga jerin na kwanan nan",
-      "urlAccessibility": "URL na buƙatar haɗawa a GitHub",
-      "clearLink": "Share mahaɗin buƙatar haɗawa",
-      "pasteLink": "Manna mahaɗin buƙatar haɗawa",
+      "urlAccessibility": "Shigar da URL na buƙatar haɗa canje-canje ko buƙatar haɗawa",
+      "urlPlaceholder": "URL na buƙatar haɗa canje-canje ko buƙatar haɗawa",
+      "openAccessibility": "Buɗe buƙatar haɗa canje-canje ko buƙatar haɗawa",
+      "clearLink": "Share mahaɗi",
+      "pasteLink": "Manna mahaɗin buƙatar haɗa canje-canje ko buƙatar haɗawa",
       "open": "Buɗe"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "Ba a iya duba haɗin GitHub ba.",
       "checkFailedMessage": "Ba za a iya sanin matsayin shiga ba har sai an loda wannan.",
+      "checkFailedTitleGitLab": "Ba a iya duba haɗin GitLab ba.",
+      "checkFailedTitleBitbucket": "Ba a iya duba haɗin Bitbucket ba.",
+      "providerCheckFailedMessage": "Ba a samun yanayin haɗi har sai wannan ya lodu.",
       "reconnectTitle": "Sake haɗa GitHub",
       "reconnectDescription": "An soke haɗinka na GitHub. Sake haɗawa don ci gaba da bitar buƙatun haɗawa a waya.",
-      "description": "Haɗa asusunka na GitHub don yin bitar buƙatun haɗawa a waya."
+      "description": "Haɗa asusunka na GitHub don yin bitar buƙatun haɗawa a waya.",
+      "gitlabDescription": "Haɗa asusun GitLab ɗinka don bita buƙatun haɗawa a wayar hannu.",
+      "bitbucketDescription": "Haɗa Bitbucket da wannan ƙungiya don bita buƙatun haɗa canje-canje a wayar hannu.",
+      "bitbucketOrgOnlyDescription": "Zaɓi ƙungiya a cikin bayanan martabarka don bita buƙatun haɗa canje-canje na Bitbucket na ƙungiyar."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "Wa'adin haɗin GitHub ya ƙare.",
-      "message": "Haɗinka na GitHub ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata."
+      "message": "Haɗinka na GitHub ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
+      "gitlabTitle": "Wa'adin haɗin GitLab ya ƙare.",
+      "bitbucketTitle": "Wa'adin haɗin Bitbucket ya ƙare.",
+      "providerMessage": "Haɗinka na {{provider}} ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata."
     },
     "eventChips": {
       "comment": "Yi tsokaci",
@@ -668,7 +698,7 @@
       "emptyLine": "(marar komai)"
     },
     "linkPasteClipboardEmpty": "Babu komai a allon kwafi.",
-    "linkPasteNotAPullRequest": "Wannan ba mahaɗin buƙatar haɗawa ta GitHub ba ne.",
+    "linkPasteNotAPullRequest": "Ba mahaɗin buƙatar haɗa canje-canje ko buƙatar haɗawa ba ne",
     "announce": {
       "commentPosted": "An wallafa tsokaci",
       "reviewSubmitted": "An aika bita",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "Ba za a iya wallafa wannan tsokacin ba. Wataƙila layin da aka zaɓa ya canza, ko an sabunta PR.",
       "reviewNotSubmitted": "Ba za a iya aika wannan bitar yadda take ba. Wataƙila PR ya canza, ko kuma ba za ka iya yin bitar buƙatar haɗawa da ka buɗe da kanka ba.",
+      "reviewNotSubmittedTerm": "Ba a iya aika wannan bita yadda yake ba. Wataƙila {{term}} ya canza, ko ba za ka iya bita {{term}} ɗinka ba.",
       "couldNotPostComment": "Ba a iya wallafa tsokaci ba.",
       "couldNotSubmitReview": "Ba a iya aika bita ba. Duba haɗinka na intanet ka sake gwadawa."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "An kasa amsawa.",
       "couldNotCompleteAction": "Ba a iya kammala wannan aikin ba.",
       "mergeResultDefaultError": "GitHub bai kammala haɗawa ba.",
+      "mergeResultNotCompleted": "Ba a haɗa {{term}} ba. Duba yanayinsa ka sake gwadawa.",
       "ambiguous": "Ba a iya tabbatarwa ba — duba PR kafin ka sake gwadawa.",
       "persistenceFailed": "Ba mu iya adana wannan aikin ba. Sake gwadawa daga baya.",
       "forbidden": "Ba a ba da izini ba."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ba ya samuwa ga wannan mai ba da sabis",
+        "accessibility": "Ba ya samuwa ga wannan mai ba da sabis: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Buƙatar haɗa canje-canje",
+      "mergeRequest": "Buƙatar haɗawa",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Raba buƙatar haɗawa",
+      "viewOnProvider": "Duba a {{provider}}",
+      "mergeRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
+      "unavailableDescription": "Wataƙila an share shi, ko kuma ba ka da damar shiga.",
+      "accessDeniedMergeRequest": "Ba ka da izinin duba wannan buƙatar haɗawa.",
+      "couldNotLoadMergeRequest": "Ba a iya loda buƙatar haɗawa ba.",
+      "discussionAccessDenied": "Ba ka da izinin duba tattaunawar wannan buƙatar haɗawa.",
+      "discussionUnavailableMessage": "Wataƙila an cire wannan buƙatar haɗawa.",
+      "noDiscussionDescription": "Babu silsilar bita ko tsokacin tattaunawa a wannan buƙatar haɗawa.",
+      "noFilesChangedDescription": "Babu canje-canje ga fayiloli a wannan buƙatar haɗawa."
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "Sake gwada haɗi"
     },
     "newSession": {
+      "recentlyUsed": "An yi amfani da su kwanan nan",
+      "couldNotLoadGithubRepositories": "An kasa loda ma'ajiyoyin GitHub.",
+      "couldNotLoadGitlabRepositories": "An kasa loda ma'ajiyoyin GitLab.",
+      "couldNotLoadBitbucketRepositories": "An kasa loda ma'ajiyoyin Bitbucket.",
       "connectGithubDescription": "Haɗa GitHub a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
+      "connectGitlabDescription": "Haɗa GitLab a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
+      "connectBitbucketDescription": "Haɗa Bitbucket a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
       "openGithub": "Buɗe GitHub",
+      "openGitlab": "Buɗe GitLab",
+      "openBitbucket": "Buɗe Bitbucket",
       "refreshRepositories": "Sabunta ma'ajiyoyi",
       "githubConnected": "An haɗa GitHub",
+      "gitlabConnected": "An haɗa GitLab",
       "noRepositoriesVisible": "Babu ma'ajiyoyi da ake gani. Duba izinin shiga ma'ajiyoyi na manhajar Kilo ta GitHub, sannan ka sabunta.",
+      "noRepositoriesVisibleGitlab": "Babu ma'ajiyoyi da ake gani. Duba izinin shiga ma'ajiyoyi na GitLab, sannan ka sabunta.",
+      "noRepositoriesVisibleBitbucket": "Babu ma'ajiyoyi da ake gani. Duba izinin shiga ma'ajiyoyi na Bitbucket, sannan ka sabunta.",
+      "bitbucketOrganizationsOnly": "Bitbucket yana samuwa ga ƙungiyoyi kawai.",
+      "branchPickerTitle": "Zaɓi reshe",
+      "branchDefault": "Na al'ada",
+      "branchAccessibility": "Reshe: {{label}}",
+      "branchLoading": "Ana loda rasshe",
+      "branchLoadError": "Ba a iya loda rasshe ba",
+      "branchUnavailable": "Rasshe ba su samuwa ga wannan ma'ajiya ba. Duba damar shigarka tare da mai ba da sabis, sannan ka zaɓi wata ma'ajiya.",
+      "branchEmpty": "Babu reshe da ya samu",
+      "branchPlaceholder": "Zaɓi reshe",
       "runOnWithTarget": "Gudanar da aiki a: {{target}}",
       "environment": "Muhallin aiki",
       "couldNotLoadEnvironment": "An kasa loda muhallin aikinka.",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "An kasa sabunta ma'ajiyoyi. Sake gwadawa.",
       "discardDraftTitle": "Watsar da daftari?",
       "discardDraftMessage": "Za a rasa umarnin aikinka.",
+      "discardWithUploadsMessage": "Za a share umarnin aikinka da duk fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
       "discardFailed": "An kasa watsar da daftarin. Sake gwadawa.",
       "remoteHint": "Gudanar da `kilo remote` a kwamfutarka, ko `/remote` a zaman CLI da ke gudana, don sarrafa aikin kilo a kwamfutarka.",
-      "connectBitbucketDescription": "Haɗa Bitbucket a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
-      "connectGitlabDescription": "Haɗa GitLab a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
-      "couldNotLoadBitbucketRepositories": "An kasa loda ma'ajiyoyin Bitbucket.",
-      "couldNotLoadGithubRepositories": "An kasa loda ma'ajiyoyin GitHub.",
-      "couldNotLoadGitlabRepositories": "An kasa loda ma'ajiyoyin GitLab.",
-      "gitlabConnected": "An haɗa GitLab",
-      "noRepositoriesVisibleBitbucket": "Babu ma'ajiyoyi da ake gani. Duba izinin shiga ma'ajiyoyi na Bitbucket, sannan ka sabunta.",
-      "noRepositoriesVisibleGitlab": "Babu ma'ajiyoyi da ake gani. Duba izinin shiga ma'ajiyoyi na GitLab, sannan ka sabunta.",
-      "openBitbucket": "Buɗe Bitbucket",
-      "openGitlab": "Buɗe GitLab",
-      "recentlyUsed": "An yi amfani da su kwanan nan",
-      "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zaman ba. Zaɓi Cloud Agent ko wani CLI.",
       "continueFrom": "Ana ci gaba da {{title}}.",
-      "importFailed": "An kasa shigo da wannan zaman.",
       "importingSession": "Ana shigo da zaman",
-      "discardWithUploadsMessage": "Za a share umarnin aikinka da duk fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba."
+      "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zaman ba. Zaɓi Cloud Agent ko wani CLI.",
+      "importFailed": "An kasa shigo da wannan zaman."
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta fayil {{displayCount}}.",

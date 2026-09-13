@@ -36,6 +36,7 @@
     "cost": "ವೆಚ್ಚ",
     "discard": "ತ್ಯಜಿಸಿ",
     "findings": "ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಗಳು",
+    "mergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್",
     "notConnected": "ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",
     "notifications": "ಅಧಿಸೂಚನೆಗಳು",
     "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್",
@@ -350,6 +351,7 @@
       "merge": "ವಿಲೀನ",
       "mergeNow": "ಈಗ ವಿಲೀನಗೊಳಿಸಿ",
       "mergePullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ವಿಲೀನ",
+      "mergeTermTitle": "{{term}} ವಿಲೀನ",
       "enableAutoMerge": "ಸ್ವಯಂ-ವಿಲೀನವನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ",
       "disableAutoMerge": "ಸ್ವಯಂ-ವಿಲೀನವನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಿ",
       "autoMergeOn": "ಸ್ವಯಂ-ವಿಲೀನ ಸಕ್ರಿಯವಾಗಿದೆ",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "ವಿಲೀನದ ನಂತರ ಶಾಖೆ ಅಳಿಸಿ",
       "noEnabledMethods": "ಈ ರೆಪೊಸಿಟರಿಯಲ್ಲಿ ಯಾವುದೇ ವಿಲೀನ ವಿಧಾನವನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿಲ್ಲ. ವಿಲೀನ, ಸ್ಕ್ವಾಶ್ ಅಥವಾ ರೀಬೇಸ್ ವಿಧಾನವನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಲು ರೆಪೊಸಿಟರಿ ನಿರ್ವಾಹಕರನ್ನು ಕೇಳಿ.",
       "confirmTitle": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ವಿಲೀನಗೊಳಿಸುವುದೇ?",
+      "confirmTitleTerm": "{{term}} ವಿಲೀನಗೊಳಿಸುವುದೇ?",
       "confirmMessage": "ಇದು ನಿಮ್ಮ ಬದಲಾವಣೆಗಳನ್ನು ಮೂಲ ಶಾಖೆಗೆ ವಿಲೀನಗೊಳಿಸುತ್ತದೆ.",
       "enableAutoMergeConfirmTitle": "ಸ್ವಯಂ-ವಿಲೀನ ಸಕ್ರಿಯಗೊಳಿಸುವುದೇ?",
       "enableAutoMergeConfirmMessage": "ಅಗತ್ಯವಿರುವ ಎಲ್ಲಾ ತಪಾಸಣೆಗಳು ಯಶಸ್ವಿಯಾದಾಗ GitHub ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ವಿಲೀನಗೊಳಿಸುತ್ತದೆ.",
+      "enableAutoMergeConfirmMessageTerm": "ಪೈಪ್‌ಲೈನ್ ಯಶಸ್ವಿಯಾದ ಕೂಡಲೇ {{term}} ಸ್ವಯಂಚಾಲಿತವಾಗಿ ವಿಲೀನಗೊಳ್ಳುತ್ತದೆ.",
+      "enableAutoMergeDescriptionTerm": "ಪೈಪ್‌ಲೈನ್ ಯಶಸ್ವಿಯಾದ ಕೂಡಲೇ GitLab ಈ {{term}}ಅನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ವಿಲೀನಗೊಳಿಸುತ್ತದೆ.",
       "forbidden": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ವಿಲೀನಗೊಳಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
       "cannotMerge": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ಈಗಿರುವ ಸ್ಥಿತಿಯಲ್ಲಿ ವಿಲೀನಗೊಳಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
       "couldNotMerge": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ವಿಲೀನಗೊಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "ಈಗಾಗಲೇ ವಿಲೀನಗೊಳಿಸಲಾಗಿದೆ",
-        "closed": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಮುಚ್ಚಲಾಗಿದೆ"
+        "closed": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಮುಚ್ಚಲಾಗಿದೆ",
+        "closedMergeRequest": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಮುಚ್ಚಲಾಗಿದೆ"
       },
       "partialSuccessBanner": {
         "body": "ಶಾಖೆಯನ್ನು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ: {{reason}}.",
@@ -406,6 +412,18 @@
         "behindDetail": "ಹೆಡ್ ಶಾಖೆಯಲ್ಲಿ ಮೂಲ ಶಾಖೆಯ ಇತ್ತೀಚಿನ ಬದಲಾವಣೆಗಳಿಲ್ಲ. ವಿಲೀನಗೊಳಿಸುವ ಮೊದಲು ಶಾಖೆಯನ್ನು ರೀಬೇಸ್ ಮಾಡಿ ಅಥವಾ ನವೀಕರಿಸಿ.",
         "notMergeableTitle": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ಇನ್ನೂ ವಿಲೀನಗೊಳಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ",
         "notMergeableDetail": "GitHub ವಿಲೀನದ ಸ್ಥಿತಿಯನ್ನು {{state}} ಎಂದು ವರದಿ ಮಾಡಿದೆ."
+      },
+      "restrictions": {
+        "title": "ವಿಲೀನ ನಿರ್ಬಂಧಗಳು",
+        "approvalsRequired_one": "{{displayCount}} ಅನುಮೋದನೆ ಅಗತ್ಯ",
+        "approvalsRequired_other": "{{displayCount}} ಅನುಮೋದನೆಗಳು ಅಗತ್ಯ",
+        "pipelineMustSucceed": "ವಿಲೀನಗೊಳಿಸುವ ಮೊದಲು ಪೈಪ್‌ಲೈನ್ ಯಶಸ್ವಿಯಾಗಬೇಕು."
+      },
+      "providerBlocked": {
+        "failingPipeline": "ಕೊನೆಯ ಕಮಿಟ್‌ನಲ್ಲಿ ಪೈಪ್‌ಲೈನ್ ವಿಫಲವಾಗುತ್ತಿದೆ.",
+        "pendingPipeline": "ಕೊನೆಯ ಕಮಿಟ್‌ನಲ್ಲಿ ಪೈಪ್‌ಲೈನ್ ಇನ್ನೂ ನಡೆಯುತ್ತಿದೆ.",
+        "permission": "ಈ {{term}} ವಿಲೀನಗೊಳಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
+        "draft": "ವಿಲೀನಗೊಳಿಸುವ ಮೊದಲು {{term}} ಅನ್ನು ಪರಿಶೀಲನೆಗೆ ಸಿದ್ಧವಾಗಿದೆ ಎಂದು ಗುರುತಿಸಿ."
       },
       "methodLabels": {
         "merge": "ವಿಲೀನ ಕಮಿಟ್ ರಚಿಸಿ",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "{{lines}} — ಹಳೆಯ ಆವೃತ್ತಿಯ ಕಾಮೆಂಟ್",
         "outdatedOnPath": "{{path}} — ಹಳೆಯ ಆವೃತ್ತಿಯ ಕಾಮೆಂಟ್"
       },
-      "deletedUser": "ಅಳಿಸಲಾದ ಬಳಕೆದಾರ"
+      "deletedUser": "ಅಳಿಸಲಾದ ಬಳಕೆದಾರ",
+      "replyForbiddenTerm": "ಈ {{term}}‌ಗೆ ಉತ್ತರಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ಆ್ಯಪ್‌ನ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "installKiloGitHubApp": "Kilo GitHub ಆ್ಯಪ್ ಸ್ಥಾಪಿಸಿ",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಪರಿಶೀಲಿಸಿ",
     "headLine": "{{counts}} · ಹೆಡ್ {{sha}}",
     "entry": {
-      "eyebrow": "URL ಮೂಲಕ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಿರಿ.",
-      "pastePrLink": "PR ಲಿಂಕ್ ಅಂಟಿಸಿ",
-      "noRecentPrs": "ಇತ್ತೀಚಿನ PRಗಳಿಲ್ಲ",
-      "noRecentPrsDescription": "ಪರಿಶೀಲನೆ ಪ್ರಾರಂಭಿಸಲು ಮೇಲೆ PR ಲಿಂಕ್ ಅಂಟಿಸಿ — ಮುಂದಿನ ಬಾರಿ ಅದು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ.",
+      "eyebrow": "URL ಬಳಸಿ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಿರಿ",
+      "pastePrLink": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅನ್ನು ಅಂಟಿಸಿ",
+      "noRecentPrs": "ಇತ್ತೀಚಿನ ಪರಿಶೀಲನೆಗಳಿಲ್ಲ",
+      "noRecentPrsDescription": "ಪರಿಶೀಲನೆ ಪ್ರಾರಂಭಿಸಲು ಮೇಲೆ ಲಿಂಕ್ ಅಂಟಿಸಿ — ಮುಂದಿನ ಸಲ ಅದು ಇಲ್ಲಿ ಕಾಣಿಸಿಕೊಳ್ಳುತ್ತದೆ.",
       "couldNotLoad": "ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "removeFromRecentsTitle": "ಇತ್ತೀಚಿನ ಪಟ್ಟಿಯಿಂದ ತೆಗೆದುಹಾಕುವುದೇ?",
-      "removeFromRecentsMessage": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ನಿಮ್ಮ ಇತ್ತೀಚಿನ ಪಟ್ಟಿಯಿಂದ ತೆಗೆದುಹಾಕಲಾಗುತ್ತದೆ.",
+      "removeFromRecentsMessage": "ಈ ಪರಿಶೀಲನೆಯನ್ನು ನಿಮ್ಮ ಇತ್ತೀಚಿನ ಪಟ್ಟಿಯಿಂದ ತೆಗೆದುಹಾಕಲಾಗುತ್ತದೆ.",
       "removeRecentAccessibility": "{{repo}} ಅನ್ನು ಇತ್ತೀಚಿನ ಪಟ್ಟಿಯಿಂದ ತೆಗೆದುಹಾಕಿ",
-      "urlAccessibility": "GitHub ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ URL",
-      "clearLink": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ತೆರವುಗೊಳಿಸಿ",
-      "pasteLink": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಂಟಿಸಿ",
+      "urlAccessibility": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ URL ನಮೂದಿಸಿ",
+      "urlPlaceholder": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ URL",
+      "openAccessibility": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಿರಿ",
+      "clearLink": "ಲಿಂಕ್ ತೆಗೆದುಹಾಕಿ",
+      "pasteLink": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅನ್ನು ಅಂಟಿಸಿ",
       "open": "ಓಪನ್"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "GitHub ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "checkFailedMessage": "ಇದು ಲೋಡ್ ಆಗುವವರೆಗೆ ಸೈನ್ ಇನ್ ಸ್ಥಿತಿ ಲಭ್ಯವಿಲ್ಲ.",
+      "checkFailedTitleGitLab": "GitLab ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "checkFailedTitleBitbucket": "Bitbucket ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "providerCheckFailedMessage": "ಇದು ಲೋಡ್ ಆಗುವವರೆಗೆ ಸಂಪರ್ಕ ಸ್ಥಿತಿ ಲಭ್ಯವಿಲ್ಲ.",
       "reconnectTitle": "GitHubಗೆ ಮತ್ತೆ ಸಂಪರ್ಕಿಸಿ",
       "reconnectDescription": "ನಿಮ್ಮ GitHub ಸಂಪರ್ಕವನ್ನು ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ. ಮೊಬೈಲ್‌ನಲ್ಲಿ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳ ಪರಿಶೀಲನೆ ಮುಂದುವರಿಸಲು ಮತ್ತೆ ಸಂಪರ್ಕಿಸಿ.",
-      "description": "ಮೊಬೈಲ್‌ನಲ್ಲಿ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ನಿಮ್ಮ GitHub ಖಾತೆಯನ್ನು ಸಂಪರ್ಕಿಸಿ."
+      "description": "ಮೊಬೈಲ್‌ನಲ್ಲಿ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ನಿಮ್ಮ GitHub ಖಾತೆಯನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+      "gitlabDescription": "ಮೊಬೈಲ್‌ನಲ್ಲಿ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ನಿಮ್ಮ GitLab ಖಾತೆಯನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+      "bitbucketDescription": "ಮೊಬೈಲ್‌ನಲ್ಲಿ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಈ ಸಂಸ್ಥೆಯನ್ನು Bitbucketಗೆ ಸಂಪರ್ಕಿಸಿ.",
+      "bitbucketOrgOnlyDescription": "ಅದರ Bitbucket ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ನಿಮ್ಮ ಪ್ರೊಫೈಲ್‌ನಲ್ಲಿ ಸಂಸ್ಥೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub ಸಂಪರ್ಕದ ಅವಧಿ ಮುಗಿದಿದೆ.",
-      "message": "ನಿಮ್ಮ GitHub ಸಂಪರ್ಕ ಈಗ ಮಾನ್ಯವಾಗಿಲ್ಲ. ಸಂಪರ್ಕವನ್ನು ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ — ಅಗತ್ಯವಿದ್ದರೆ ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಸೂಚಿಸಲಾಗುತ್ತದೆ."
+      "message": "ನಿಮ್ಮ GitHub ಸಂಪರ್ಕ ಈಗ ಮಾನ್ಯವಾಗಿಲ್ಲ. ಸಂಪರ್ಕವನ್ನು ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ — ಅಗತ್ಯವಿದ್ದರೆ ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಸೂಚಿಸಲಾಗುತ್ತದೆ.",
+      "gitlabTitle": "GitLab ಸಂಪರ್ಕದ ಅವಧಿ ಮುಗಿದಿದೆ.",
+      "bitbucketTitle": "Bitbucket ಸಂಪರ್ಕದ ಅವಧಿ ಮುಗಿದಿದೆ.",
+      "providerMessage": "ನಿಮ್ಮ {{provider}} ಸಂಪರ್ಕ ಈಗ ಮಾನ್ಯವಾಗಿಲ್ಲ. ಸಂಪರ್ಕವನ್ನು ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ — ಅಗತ್ಯವಿದ್ದರೆ ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಸೂಚಿಸಲಾಗುತ್ತದೆ."
     },
     "eventChips": {
       "comment": "ಟಿಪ್ಪಣಿ",
@@ -668,7 +698,7 @@
       "emptyLine": "(ಖಾಲಿ)"
     },
     "linkPasteClipboardEmpty": "ಕ್ಲಿಪ್‌ಬೋರ್ಡ್ ಖಾಲಿಯಾಗಿದೆ.",
-    "linkPasteNotAPullRequest": "ಇದು GitHub ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಲ್ಲ.",
+    "linkPasteNotAPullRequest": "ಇದು ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಲ್ಲ",
     "announce": {
       "commentPosted": "ಕಾಮೆಂಟ್ ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿದೆ",
       "reviewSubmitted": "ಪರಿಶೀಲನೆ ಸಲ್ಲಿಸಲಾಗಿದೆ",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "ಈ ಕಾಮೆಂಟ್ ಪೋಸ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಆಯ್ಕೆಮಾಡಿದ ಸಾಲು ಬದಲಾಗಿರಬಹುದು ಅಥವಾ PR ನವೀಕೃತವಾಗಿರಬಹುದು.",
       "reviewNotSubmitted": "ಈ ಪರಿಶೀಲನೆಯನ್ನು ಈಗಿರುವ ಸ್ಥಿತಿಯಲ್ಲಿ ಸಲ್ಲಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. PR ಬದಲಾಗಿರಬಹುದು ಅಥವಾ ನಿಮ್ಮದೇ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ಪರಿಶೀಲಿಸಲು ಪ್ರಯತ್ನಿಸುತ್ತಿರಬಹುದು.",
+      "reviewNotSubmittedTerm": "ಈ ಪರಿಶೀಲನೆಯನ್ನು ಹಾಗೆಯೇ ಸಲ್ಲಿಸಲಾಗುವುದಿಲ್ಲ. {{term}} ಬದಲಾಗಿರಬಹುದು, ಅಥವಾ ನಿಮ್ಮ ಸ್ವಂತ {{term}}ಅನ್ನು ನೀವು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
       "couldNotPostComment": "ಕಾಮೆಂಟ್ ಪೋಸ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotSubmitReview": "ಪರಿಶೀಲನೆ ಸಲ್ಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "ಉತ್ತರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotCompleteAction": "ಈ ಕ್ರಿಯೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "mergeResultDefaultError": "GitHub ವಿಲೀನವನ್ನು ಪೂರ್ಣಗೊಳಿಸಲಿಲ್ಲ.",
+      "mergeResultNotCompleted": "{{term}} ವಿಲೀನಗೊಂಡಿಲ್ಲ. ಅದರ ಸ್ಥಿತಿಯನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "ambiguous": "ದೃಢೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ — ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುವ ಮೊದಲು PR ಪರಿಶೀಲಿಸಿ.",
       "persistenceFailed": "ಈ ಕ್ರಿಯೆಯನ್ನು ದಾಖಲಿಸಲು ನಮಗೆ ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "forbidden": "ಇದಕ್ಕೆ ಅನುಮತಿ ಇಲ್ಲ."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "ಈ ಪ್ರೊವೈಡರ್‌ನಲ್ಲಿ ಲಭ್ಯವಿಲ್ಲ",
+        "accessibility": "ಈ ಪ್ರೊವೈಡರ್‌ನಲ್ಲಿ ಲಭ್ಯವಿಲ್ಲ: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್",
+      "mergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಹಂಚಿ",
+      "viewOnProvider": "{{provider}}ನಲ್ಲಿ ವೀಕ್ಷಿಸಿ",
+      "mergeRequestUnavailable": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
+      "unavailableDescription": "ಅದು ಅಳಿಸಲ್ಪಟ್ಟಿರಬಹುದು, ಅಥವಾ ನಿಮಗೆ ಅದಕ್ಕೆ ಪ್ರವೇಶವಿರದಿರಬಹುದು.",
+      "accessDeniedMergeRequest": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ವೀಕ್ಷಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
+      "couldNotLoadMergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "discussionAccessDenied": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ನ ಚರ್ಚೆಯನ್ನು ವೀಕ್ಷಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
+      "discussionUnavailableMessage": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ತೆಗೆದುಹಾಕಿರಬಹುದು.",
+      "noDiscussionDescription": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ನಲ್ಲಿ ಪರಿಶೀಲನೆಗೆ ಸಂಬಂಧಿಸಿದ ಚರ್ಚಾ ಸರಣಿಗಳಾಗಲಿ, ಸಾಮಾನ್ಯ ಕಾಮೆಂಟ್‌ಗಳಾಗಲಿ ಇಲ್ಲ.",
+      "noFilesChangedDescription": "ಈ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ನಲ್ಲಿ ಯಾವುದೇ ಫೈಲ್ ಬದಲಾವಣೆಗಳಿಲ್ಲ."
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಪ್ರಯತ್ನಿಸಿ"
     },
     "newSession": {
+      "recentlyUsed": "ಇತ್ತೀಚೆಗೆ ಬಳಸಿದವು",
+      "couldNotLoadGithubRepositories": "GitHub ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "couldNotLoadGitlabRepositories": "GitLab ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "connectGithubDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ GitHub ಸಂಪರ್ಕಿಸಿ. ನಂತರ ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",
+      "connectGitlabDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ GitLab ಸಂಪರ್ಕಿಸಿ. ನಂತರ ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",
+      "connectBitbucketDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ Bitbucket ಸಂಪರ್ಕಿಸಿ. ನಂತರ ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",
       "openGithub": "GitHub ತೆರೆಯಿರಿ",
+      "openGitlab": "GitLab ತೆರೆಯಿರಿ",
+      "openBitbucket": "Bitbucket ತೆರೆಯಿರಿ",
       "refreshRepositories": "ರೆಪೊಸಿಟರಿಗಳ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ",
       "githubConnected": "GitHub ಸಂಪರ್ಕಗೊಂಡಿದೆ",
+      "gitlabConnected": "GitLab ಸಂಪರ್ಕಗೊಂಡಿದೆ",
       "noRepositoriesVisible": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಕಾಣಿಸುತ್ತಿಲ್ಲ. Kilo GitHub ಅಪ್ಲಿಕೇಶನ್‌ಗೆ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಪ್ರವೇಶಿಸಲು ಅನುಮತಿ ಇದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. ನಂತರ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ.",
+      "noRepositoriesVisibleGitlab": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಕಾಣಿಸುತ್ತಿಲ್ಲ. GitLab ಗೆ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಪ್ರವೇಶಿಸಲು ಅನುಮತಿ ಇದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. ನಂತರ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ.",
+      "noRepositoriesVisibleBitbucket": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಕಾಣಿಸುತ್ತಿಲ್ಲ. Bitbucket ಗೆ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಪ್ರವೇಶಿಸಲು ಅನುಮತಿ ಇದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. ನಂತರ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ.",
+      "bitbucketOrganizationsOnly": "Bitbucket ಸಂಸ್ಥೆಗಳಿಗೆ ಮಾತ್ರ ಲಭ್ಯ.",
+      "branchPickerTitle": "ಶಾಖೆ ಆಯ್ಕೆಮಾಡಿ",
+      "branchDefault": "ಡೀಫಾಲ್ಟ್",
+      "branchAccessibility": "ಶಾಖೆ: {{label}}",
+      "branchLoading": "ಶಾಖೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ",
+      "branchLoadError": "ಶಾಖೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
+      "branchUnavailable": "ಈ ರಿಪೋಜಿಟರಿಗೆ ಶಾಖೆಗಳು ಲಭ್ಯವಿಲ್ಲ. ಪ್ರೊವೈಡರ್ ಬಳಿ ನಿಮ್ಮ ಪ್ರವೇಶವನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ಬೇರೆ ರಿಪೋಜಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+      "branchEmpty": "ಯಾವುದೇ ಶಾಖೆಗಳು ಲಭ್ಯವಿಲ್ಲ",
+      "branchPlaceholder": "ಶಾಖೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
       "runOnWithTarget": "{{target}} ನಲ್ಲಿ ಚಲಾಯಿಸಿ",
       "environment": "ಪರಿಸರ",
       "couldNotLoadEnvironment": "ನಿಮ್ಮ ಪರಿಸರವನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "ರೆಪೊಸಿಟರಿಗಳ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "discardDraftTitle": "ಕರಡನ್ನು ಅಳಿಸಬೇಕೆ?",
       "discardDraftMessage": "ನಿಮ್ಮ ಪ್ರಾಂಪ್ಟ್ ಕಳೆದುಹೋಗುತ್ತದೆ.",
+      "discardWithUploadsMessage": "ನಿಮ್ಮ ಪ್ರಾಂಪ್ಟ್ ಮತ್ತು ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳಿಗೆ ಲಗತ್ತಿಸದ ಯಾವುದೇ ಅಪ್‌ಲೋಡ್‌ಗಳನ್ನು ಅಳಿಸಲಾಗುತ್ತದೆ.",
       "discardFailed": "ಕರಡನ್ನು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "remoteHint": "ಸ್ಥಳೀಯ kilo ಪ್ರಕ್ರಿಯೆಯನ್ನು ನಿಯಂತ್ರಿಸಲು ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್‌ನಲ್ಲಿ `kilo remote` ಚಲಾಯಿಸಿ ಅಥವಾ ಚಾಲನೆಯಲ್ಲಿರುವ CLI ಸೆಶನ್‌ನಲ್ಲಿ `/remote` ಬಳಸಿ.",
-      "connectBitbucketDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ Bitbucket ಸಂಪರ್ಕಿಸಿ. ನಂತರ ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",
-      "connectGitlabDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ GitLab ಸಂಪರ್ಕಿಸಿ. ನಂತರ ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "couldNotLoadGithubRepositories": "GitHub ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "couldNotLoadGitlabRepositories": "GitLab ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "gitlabConnected": "GitLab ಸಂಪರ್ಕಗೊಂಡಿದೆ",
-      "noRepositoriesVisibleBitbucket": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಕಾಣಿಸುತ್ತಿಲ್ಲ. Bitbucket ಗೆ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಪ್ರವೇಶಿಸಲು ಅನುಮತಿ ಇದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. ನಂತರ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ.",
-      "noRepositoriesVisibleGitlab": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಕಾಣಿಸುತ್ತಿಲ್ಲ. GitLab ಗೆ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಪ್ರವೇಶಿಸಲು ಅನುಮತಿ ಇದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. ನಂತರ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ.",
-      "openBitbucket": "Bitbucket ತೆರೆಯಿರಿ",
-      "openGitlab": "GitLab ತೆರೆಯಿರಿ",
-      "recentlyUsed": "ಇತ್ತೀಚೆಗೆ ಬಳಸಿದವು",
       "continueFrom": "{{title}} ಅನ್ನು ಮುಂದುವರಿಸಲಾಗುತ್ತಿದೆ.",
       "importingSession": "ಸೆಶನ್ ಆಮದು ಆಗುತ್ತಿದೆ",
       "cliCannotContinue": "ಈ CLI ಮೂಲಕ ಸೆಶನ್ ಅನ್ನು ಮುಂದುವರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. Cloud Agent ಅಥವಾ ಇನ್ನೊಂದು CLI ಅನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
-      "importFailed": "ಈ ಸೆಶನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "discardWithUploadsMessage": "ನಿಮ್ಮ ಪ್ರಾಂಪ್ಟ್ ಮತ್ತು ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳಿಗೆ ಲಗತ್ತಿಸದ ಯಾವುದೇ ಅಪ್‌ಲೋಡ್‌ಗಳನ್ನು ಅಳಿಸಲಾಗುತ್ತದೆ."
+      "importFailed": "ಈ ಸೆಶನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ಫೈಲ್ ಅನ್ನು ನವೀಕರಿಸಲಾಗಿದೆ.",

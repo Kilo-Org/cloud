@@ -68,7 +68,14 @@ export function PickerSheet({
         {headerContent}
       </View>
       {scrollable && !expired ? (
-        <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }}>{body}</ScrollView>
+        // keyboardShouldPersistTaps keeps a first tap on a row working while
+        // a picker's search field holds the keyboard open.
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: bottom + 16 }}
+        >
+          {body}
+        </ScrollView>
       ) : (
         body
       )}

@@ -19,6 +19,7 @@ import { ensureTermsAcceptedOutcome, ReplyInput } from './reply-input';
 import { clearDraft } from '@/lib/persist/drafts';
 import { PR_OPERATION_AMBIGUOUS_MESSAGE } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
+import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -121,9 +122,13 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 // `ReplyInput` is mounted by calling it as a plain function (no renderer), so
 // the React hook primitives are stubbed to no-op/simple versions, mirroring
 // pr-merge-sheet.test.tsx. The pure `ensureTermsAcceptedOutcome` tests above
-// do not touch these. useState keeps a box per slot (same pattern as the
-// composer test) so a press can flip the inline-error state and the next
-// mount renders it.
+// do not touch these.
+//
+// useState keeps a box per slot (same pattern as the composer test) so a
+// press can flip the inline-error state and the next mount renders it, and it
+// records every setter it hands out so the s6f refused-reply tests can observe
+// the copy the error effect writes even without a re-render.
+const stateSetters = vi.hoisted(() => [] as { mock: { calls: unknown[][] } }[]);
 const hookState = vi.hoisted(() => ({ boxes: [] as unknown[], cursor: 0 }));
 
 vi.mock('react', async () => {
@@ -136,13 +141,14 @@ vi.mock('react', async () => {
       if (hookState.boxes.length <= index) {
         hookState.boxes.push(initial);
       }
-      const write = (value: T) => {
+      const write = vi.fn((value: T) => {
         hookState.boxes[index] =
           typeof value === 'function'
             ? (value as (prev: T) => T)(hookState.boxes[index] as T)
             : value;
-      };
-      return [hookState.boxes[index] as T, write] as [T, (value: T) => void];
+      });
+      stateSetters.push(write as unknown as { mock: { calls: unknown[][] } });
+      return [hookState.boxes[index] as T, write as (value: T) => void] as [T, (value: T) => void];
     }),
     useMemo: vi.fn(<T>(factory: () => T) => factory()),
     useRef: vi.fn(<T>(initial: T) => {
@@ -501,6 +507,82 @@ describe('ReplyInput seeds the field from the settled draft during render', () =
   });
 });
 
+// ── Provider arm (s6) ────────────────────────────────────────────────
+
+const GITLAB_REF: ProviderPrRef = { platform: 'gitlab', projectPath: 'octocat/hello', mrIid: 1 };
+
+describe('ReplyInput provider arm (s6)', () => {
+  beforeEach(() => {
+    alertCalls.length = 0;
+    getTermsStatusMock.mockReset();
+    acceptTermsMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function mountProviderReply(mutate: unknown): void {
+    // eslint-disable-next-line new-cap
+    const element = ReplyInput({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentId: 42,
+      reply: makeReply(mutate),
+      provider: { ref: GITLAB_REF, threadId: 'D-77', commentNodeId: '9001' },
+    });
+    const input = findElement({
+      node: element,
+      type: 'TextInput',
+      prop: 'accessibilityLabel',
+      value: 'Reply body',
+    });
+    if (!input) {
+      throw new Error('Reply body TextInput not found');
+    }
+    (input.props as { onChangeText?: (value: string) => void }).onChangeText?.('hello');
+    const button = findElement({
+      node: element,
+      type: 'Button',
+      prop: 'accessibilityLabel',
+      value: 'Submit reply',
+    });
+    if (!button) {
+      throw new Error('Submit reply Button not found');
+    }
+    (button.props as { onPress?: () => void }).onPress?.();
+  }
+
+  it('posts the seam vars (provider-native ids), never the GitHub-shaped input', async () => {
+    getTermsStatusMock.mockResolvedValue({ accepted: true, currentVersion: 'v1' });
+    const mutate = vi.fn((_input: unknown, options: { onSuccess?: () => void }) => {
+      options.onSuccess?.();
+    });
+    mountProviderReply(mutate);
+    await flush();
+
+    expect(mutate).toHaveBeenCalledWith(
+      { threadId: 'D-77', commentNodeId: '9001', body: 'hello' },
+      expect.anything()
+    );
+  });
+
+  it('folds the provider ref identity into the durable reply draft key', async () => {
+    getTermsStatusMock.mockResolvedValue({ accepted: true, currentVersion: 'v1' });
+    const mutate = vi.fn((_input: unknown, options: { onSuccess?: () => void }) => {
+      options.onSuccess?.();
+    });
+    mountProviderReply(mutate);
+    await flush();
+
+    // The mocked prReplyDraftKey answers 'pr-reply:key'; the provider arm
+    // appends the collision-free ref identity (identity rule 17) so a
+    // same-numbered GitHub PR can never share this reply's draft.
+    expect(clearDraft).toHaveBeenCalledWith('u1', `pr-reply:key@${providerPrRefKey(GITLAB_REF)}`);
+  });
+});
+
 describe('ReplyInput gates input on draft settle', () => {
   beforeEach(() => {
     hookState.boxes = [];
@@ -539,6 +621,66 @@ describe('ReplyInput gates input on draft settle', () => {
         value: 'Reply body',
       })
     ).not.toBeNull();
+  });
+});
+
+// ── s6f: refused-reply wording ───────────────────────────────────────
+
+/** True when the error effect wrote `value` into any state slot. */
+function stateValueWritten(value: string): boolean {
+  return stateSetters.some(setter => setter.mock.calls.some(call => call[0] === value));
+}
+
+function forbiddenError(): Error {
+  return Object.assign(new Error('403 Forbidden'), { data: { code: 'FORBIDDEN' } });
+}
+
+describe('ReplyInput refused-reply wording (s6f)', () => {
+  beforeEach(() => {
+    stateSetters.length = 0;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function mountWithForbiddenError(provider?: {
+    ref: ProviderPrRef;
+    threadId: string;
+    commentNodeId: string;
+  }): void {
+    const errored = {
+      mutate: vi.fn(),
+      isPending: false,
+      error: forbiddenError(),
+    } as unknown as ReplyMutation;
+    // eslint-disable-next-line new-cap
+    ReplyInput({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentId: 42,
+      reply: errored,
+      provider,
+    });
+  }
+
+  it('words a refused provider reply after the merge-request noun', () => {
+    mountWithForbiddenError({ ref: GITLAB_REF, threadId: 'D-77', commentNodeId: '9001' });
+    // The provider 403 must never read "pull request" on a merge request.
+    expect(stateValueWritten("You don't have permission to reply to this merge request.")).toBe(
+      true
+    );
+    expect(stateValueWritten("You don't have permission to reply to this pull request.")).toBe(
+      false
+    );
+  });
+
+  it('keeps the exact pre-s6 forbidden copy on the GitHub arm', () => {
+    mountWithForbiddenError();
+    expect(stateValueWritten("You don't have permission to reply to this pull request.")).toBe(
+      true
+    );
   });
 });
 

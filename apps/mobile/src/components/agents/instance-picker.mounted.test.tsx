@@ -29,6 +29,7 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  StatusBar: { currentHeight: 0 },
   FlatList: <T,>(props: ListProps<T>) =>
     createElement(
       'FlatList',

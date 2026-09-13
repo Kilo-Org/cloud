@@ -8,8 +8,8 @@ export const unstable_settings = {
 
 export default function KiloClawLayout() {
   // Cap the full detent like every other formSheet: PickerSheet's header drops
-  // the Android top clearance ("bottom-form-sheet"), which is only safe when
-  // the sheet cannot reach the status bar.
+  // the top clearance ("bottom-form-sheet") on both platforms, which is only
+  // safe when the sheet cannot reach the status bar.
   const { fullSheetDetent } = useFormSheetDetents();
   return (
     <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>

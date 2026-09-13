@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, StatusBar, View } from 'react-native';
+import { Pressable, StatusBar, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Share } from '@/components/ui/icons';
@@ -13,12 +13,11 @@ import { cn } from '@/lib/utils';
  * - 'always': the surface owns the top of the window (full-screen modals,
  *   pageSheets), so the status-bar inset applies whenever it is non-zero.
  * - 'bottom-form-sheet': a bottom-anchored formSheet never draws under the
- *   status bar. The detent heights are capped just below the top inset
- *   (useFormSheetDetents) and the keyboard expansion reuses that same capped
- *   full detent, so the constant window inset would only be a dead band
- *   above the header (p7) — Android gets no top clearance. iOS insets are
- *   sheet-relative and rise exactly when the sheet reaches the status bar,
- *   so iOS keeps them.
+ *   status bar, so it reserves no top clearance on either platform — the
+ *   window inset would only be a dead band above the header (p7). Android
+ *   caps the detents just below the inset (useFormSheetDetents) and the iOS
+ *   sheet clears the top edge with its grabber, so the same rule holds
+ *   everywhere.
  */
 export type SheetHeaderTopInset = 'always' | 'bottom-form-sheet';
 
@@ -63,10 +62,15 @@ export function SheetHeader({
   // padding. Android can report top: 0 for the frame a freshly presented
   // sheet first lays out (before the insets propagate); fall back to the
   // synchronous status-bar height the same way the form-sheet detents do.
-  const androidStatusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0;
-  const resolvedTopInset = insets.top > 0 ? insets.top : androidStatusBarHeight;
-  const topInsetHeight =
-    topInset === 'bottom-form-sheet' && Platform.OS === 'android' ? 0 : resolvedTopInset;
+  // `StatusBar.currentHeight` is an Android-only API and `undefined` on iOS,
+  // so the nullish fallback yields the status-bar height on both platforms
+  // without branching on Platform.OS.
+  const statusBarHeight = StatusBar.currentHeight ?? 0;
+  const resolvedTopInset = insets.top > 0 ? insets.top : statusBarHeight;
+  // A bottom formSheet is anchored below the status bar on both platforms, so
+  // it reserves no top clearance; any resolved window inset would be a dead
+  // band above the header.
+  const topInsetHeight = topInset === 'bottom-form-sheet' ? 0 : resolvedTopInset;
   const safeAreaStyle =
     topInsetHeight > 0 || insets.left > 0 || insets.right > 0
       ? {

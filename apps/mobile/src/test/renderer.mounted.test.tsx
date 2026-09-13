@@ -1,7 +1,14 @@
+import v8 from 'node:v8';
+import vm from 'node:vm';
+
 import { createElement, Fragment, type ReactElement, useEffect, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestRenderer, TestRenderer } from './renderer';
+
+// The renderer must drop its references on unmount; prove it by collecting.
+v8.setFlagsFromString('--expose-gc');
+const collectGarbage = vm.runInNewContext('gc') as () => void;
 
 const mounted: ReactTestRenderer[] = [];
 
@@ -88,6 +95,19 @@ describe('maintained renderer contract', () => {
     expect(cleanup).not.toHaveBeenCalled();
     renderer.unmount();
     expect(cleanup).toHaveBeenCalledOnce();
+  });
+
+  it('releases the fiber tree it held when unmounted', async () => {
+    const renderer = await render(createElement('Text', null, 'retained'));
+    const weak = new WeakRef(renderer.root.findByType('Text'));
+    renderer.unmount();
+    // A task boundary lets the stack scan forget the temporary wrapper before
+    // the collection, so only the renderer's own references are measured.
+    await new Promise(resolve => {
+      setTimeout(resolve, 0);
+    });
+    collectGarbage();
+    expect(weak.deref()).toBeUndefined();
   });
 });
 

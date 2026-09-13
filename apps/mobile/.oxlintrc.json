@@ -236,6 +236,12 @@
       }
     },
     {
+      "files": ["src/test/renderer.mounted.test.tsx"],
+      "rules": {
+        "import/no-nodejs-modules": "off"
+      }
+    },
+    {
       "files": ["src/components/ui/image.tsx"],
       "rules": {
         "no-restricted-imports": "off"

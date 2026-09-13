@@ -45,7 +45,12 @@ function matchesProps(node: Instance, props: Record<string, unknown>): boolean {
   return Object.entries(props).every(([key, value]) => node.props[key] === value);
 }
 
-function createTree(root: Root): () => Instance {
+type FiberTree = {
+  get: () => Instance;
+  clear: () => void;
+};
+
+function createTree(root: Root): FiberTree {
   const cache = new WeakMap<Fiber, Instance>();
   let currentFibers = new Set<Fiber>();
   let rootState: { current: Fiber } | undefined = undefined;
@@ -132,24 +137,32 @@ function createTree(root: Root): () => Instance {
     return result;
   }
 
-  return () => {
-    const host = root.container.queryAll(() => true)[0];
-    let fiber = host?.unstable_fiber;
-    if (!fiber) {
-      throw new Error('No mounted host instance');
-    }
-    while (fiber.return) {
-      fiber = fiber.return;
-    }
-    rootState = fiber.stateNode as { current: Fiber };
-    refresh();
-    const tree = rootState.current;
-    const nodes = children(tree.child?.child ?? null);
-    const first = nodes[0];
-    if (nodes.length === 1 && first && typeof first !== 'string') {
-      return first;
-    }
-    return wrap(tree);
+  return {
+    get: () => {
+      const host = root.container.queryAll(() => true)[0];
+      let fiber = host?.unstable_fiber;
+      if (!fiber) {
+        throw new Error('No mounted host instance');
+      }
+      while (fiber.return) {
+        fiber = fiber.return;
+      }
+      rootState = fiber.stateNode as { current: Fiber };
+      refresh();
+      const tree = rootState.current;
+      const nodes = children(tree.child?.child ?? null);
+      const first = nodes[0];
+      if (nodes.length === 1 && first && typeof first !== 'string') {
+        return first;
+      }
+      return wrap(tree);
+    },
+    // Release the fibers captured by the last refresh. Without this the
+    // renderer, while still held, keeps the whole unmounted tree alive.
+    clear: () => {
+      currentFibers.clear();
+      rootState = undefined;
+    },
   };
 }
 
@@ -194,13 +207,14 @@ function create(element: ReactElement): Renderer {
   update(element);
   return {
     get root() {
-      return tree();
+      return tree.get();
     },
     update,
     unmount: () => {
       act(() => {
         root.unmount();
       });
+      tree.clear();
     },
     toJSON: () => {
       const anchor = root.container.children[0];

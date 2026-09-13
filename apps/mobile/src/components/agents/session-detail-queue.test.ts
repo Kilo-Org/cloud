@@ -1,9 +1,8 @@
 /* eslint-disable max-lines -- the session test renders the full SessionDetailContent and mocks its RN/expo/SDK surface, so the wiring is long. */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/app/(app)/agent-chat/[session-id].mounted.test.tsx. */
 /* eslint-disable require-await, @typescript-eslint/require-await -- mock factories settle without await because they resolve immediately */
 import { createElement, type ElementType, type ReactElement } from 'react';
 import { Modal, Pressable } from 'react-native';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sdk';

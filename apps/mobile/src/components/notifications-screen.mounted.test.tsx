@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 /* eslint-disable max-lines -- the four preview-row state tests share one mock harness in this file */
 
 // Message-previews row state contract: the switch reflects the server
@@ -8,7 +7,7 @@
 // and an unresolved preference query renders a skeleton with no control.
 
 import { createElement } from 'react';
-import { act, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NotificationsScreen } from './notifications-screen';

@@ -1,11 +1,9 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
-
 // Automation-settings approval-gate contract: the "Require approval before
 // auto-remediation" toggle hydrates from the loaded config, persists through
 // the save patch object, and renders disabled for read-only viewers.
 
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';

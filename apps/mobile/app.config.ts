@@ -183,7 +183,11 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-image',
     'expo-font',
-    'expo-secure-store',
+    // The app owns its Android backup rules (plugins/withAndroidManifestFix.js
+    // writes the union of the SecureStore and AppsFlyer exclusions). Disable the
+    // module's own backup configuration so prebuild does not warn that other
+    // rules are already present.
+    ['expo-secure-store', { configureAndroidBackup: false }],
     [
       'expo-local-authentication',
       { faceIDPermission: 'Allow Kilo to use Face ID to unlock the app.' },
@@ -234,7 +238,11 @@ const config: ExpoConfig = {
       },
     ],
     'expo-apple-authentication',
-    'expo-iap',
+    // Play flavor (the defaults the plugin already applies). The plugin strips
+    // and re-adds the `missingDimensionStrategy "platform", ...` line on every
+    // prebuild, so its "Added missingDimensionStrategy for play flavor" log line
+    // is expected output, not a misconfiguration.
+    ['expo-iap', { isHorizonEnabled: false, isFireOsEnabled: false }],
     [
       'expo-tracking-transparency',
       {

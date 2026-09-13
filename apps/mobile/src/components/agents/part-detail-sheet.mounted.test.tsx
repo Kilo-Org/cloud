@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 /* eslint-disable max-lines -- cohesive mounted suite: mono-control presence and streaming auto-follow share one sheet harness */
 import {
   type Part,
@@ -6,8 +5,14 @@ import {
   type StoredMessage,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
-import { createElement, type ReactElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import {
+  createElement,
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+  useImperativeHandle,
+} from 'react';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, type Mock, vi } from 'vitest';
 
 // Real block, imported before the sheet: the hoisted body-mock factory runs
@@ -20,9 +25,15 @@ import { useOpenPartDetail } from './open-part-detail-context';
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000' }),
 }));
+const scrollMock = vi.hoisted(() => ({
+  scrollToEnd: vi.fn<(params?: { animated?: boolean }) => void>(),
+}));
 vi.mock('react-native', () => ({
   Modal: 'Modal',
-  ScrollView: 'ScrollView',
+  ScrollView: (props: { children?: ReactNode; ref?: Ref<typeof scrollMock> }) => {
+    useImperativeHandle(props.ref, () => scrollMock, []);
+    return createElement('ScrollView', { ...props, ref: undefined });
+  },
   Pressable: 'Pressable',
   View: 'View',
   Platform: { OS: 'ios' },
@@ -186,7 +197,7 @@ function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: strin
   if (!instance) {
     return undefined;
   }
-  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
   return instance.props[key];
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
 }
@@ -246,21 +257,18 @@ async function unmount(renderer: TestRenderer.ReactTestRenderer): Promise<void> 
 }
 
 /**
- * Mounts the sheet with a per-case `createNodeMock` so the sheet ScrollView's
- * ref resolves to a fresh `scrollToEnd` mock. Never reuse the returned mock
- * across cases.
+ * Mounts the sheet with a fresh imperative ScrollView handle for each case.
  */
 async function mountSheetWithScroll(element: ReactElement): Promise<{
   renderer: TestRenderer.ReactTestRenderer;
   scrollToEnd: Mock<(params?: { animated?: boolean }) => void>;
 }> {
   const scrollToEnd = vi.fn<(params?: { animated?: boolean }) => void>();
+  scrollMock.scrollToEnd = scrollToEnd;
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
-    ref.current = TestRenderer.create(element, {
-      createNodeMock: node => (node.type === 'ScrollView' ? { scrollToEnd } : null),
-    });
+    ref.current = TestRenderer.create(element);
   });
   const renderer = ref.current;
   if (!renderer) {

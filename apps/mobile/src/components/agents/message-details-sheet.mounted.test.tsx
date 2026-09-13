@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- The mounted sheet suite shares native boundaries across actions, selection, and announcements. */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import {
   type AssistantMessage,
   type Part,
@@ -9,7 +8,7 @@ import {
 import { type ComponentProps, createElement, type ReactElement } from 'react';
 import { Alert, Modal, ScrollView } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SheetHeader } from '@/components/sheet-header';

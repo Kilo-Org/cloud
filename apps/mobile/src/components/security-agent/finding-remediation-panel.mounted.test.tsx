@@ -1,4 +1,4 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- the mounted remediation timeline shares one native test fixture. */
+/* eslint-disable max-lines -- the mounted remediation timeline shares one native test fixture. */
 
 // Finding-remediation progress timeline: the panel renders the ordered
 // remediation audit events (queued → pr_opened, or a terminal event) above the
@@ -13,7 +13,7 @@ import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FindingRemediationPanel } from './finding-remediation-panel';

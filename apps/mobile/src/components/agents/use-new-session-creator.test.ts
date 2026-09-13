@@ -1,8 +1,7 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/persist/cache-persistence-mount.test.ts */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake mutate factories settle without await because they resolve immediately */
 /* eslint-disable max-lines -- the creator, operation-key, and generation-fenced draft-load suites share one mock harness in this file */
 import * as React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';

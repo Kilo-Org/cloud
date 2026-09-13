@@ -1,10 +1,8 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts native trees without a DOM. */
-
 // eslint-disable-next-line import/no-nodejs-modules -- Load the installed router without the native Expo entry.
 import { createRequire } from 'node:module';
 import type * as StackRouterModule from 'expo-router/build/react-navigation/routers/StackRouter.js';
 import { Children, createElement, isValidElement, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type PushData } from '@kilocode/notifications';

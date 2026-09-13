@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/lib/hooks/use-offline-banner-state.mounted.test.tsx) */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { reportTrpcError } from '@/lib/force-update-signal';
@@ -74,7 +73,7 @@ function textChildren(renderer: TestRenderer.ReactTestRenderer): string[] | null
   if (!json || Array.isArray(json)) {
     return null;
   }
-  return json.children?.filter((child): child is string => typeof child === 'string') ?? null;
+  return json.children.filter((child): child is string => typeof child === 'string');
 }
 
 const mountedRenderers: TestRenderer.ReactTestRenderer[] = [];

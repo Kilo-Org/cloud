@@ -1,12 +1,16 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); same pattern as src/test/render-with-providers.tsx. */
-
 // Screen-level empty-state precedence regression: when the member query errors
 // with no data, both member arrays are empty, so the list's empty component
 // must render the QueryError — not "No members yet". The item builder and the
 // error selector are unit-tested separately; this proves the loading → error →
 // empty precedence in the screen JSX itself.
 
-import { type ComponentType, createElement, type ReactElement, type ReactNode } from 'react';
+import {
+  type ComponentType,
+  createElement,
+  Fragment,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -48,7 +52,9 @@ vi.mock('@shopify/flash-list', () => ({
       return createElement(
         'FlashList',
         null,
-        data.map((item, index) => props.renderItem?.({ item, index }))
+        data.map((item, index) =>
+          createElement(Fragment, { key: index }, props.renderItem?.({ item, index }))
+        )
       );
     }
     return createElement(

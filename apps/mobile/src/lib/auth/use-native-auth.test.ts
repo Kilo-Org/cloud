@@ -1,9 +1,8 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN hooks under vitest (node env, no jsdom) */
 /* eslint-disable max-lines -- the SSO recovery and created-account announcement suites share one hook harness */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 
 import { ADMISSION_CHALLENGE_FAILED, getAdmission } from '@/lib/auth/admission';
 import type * as AdmissionTypes from '@/lib/auth/admission';

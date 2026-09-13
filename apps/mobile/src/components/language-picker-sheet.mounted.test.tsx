@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as image-viewer-modal.mounted.test.tsx) */
 /* eslint-disable max-lines -- the apply and retry suites share one mock harness in this file */
 import { createElement, Fragment, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { toast } from 'sonner-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

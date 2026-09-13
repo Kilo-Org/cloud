@@ -1,7 +1,6 @@
 /* eslint-disable max-lines -- Table semantics and modal tests share the direct-invocation tree-walk harness. */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount RN trees under vitest (same pattern as code-block.test.ts) */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 // eslint-disable-next-line import/no-nodejs-modules -- patching the CJS loader is the only way to stub react-native for the externalized react-native-marked; the library under test stays real
 import Module from 'node:module';

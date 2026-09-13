@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free React Native section tests */
 import { type ComponentProps, createElement } from 'react';
 import * as ReactQuery from '@tanstack/react-query';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';

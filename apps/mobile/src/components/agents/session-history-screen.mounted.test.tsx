@@ -1,6 +1,6 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest; max-lines holds the focus and foreground refetch tests beside the existing render-branch assertions in one mount test. */
+/* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest; max-lines holds the focus and foreground refetch tests beside the existing render-branch assertions in one mount test. */
 import { createElement, type ReactElement } from 'react';
-import { act, type default as TestRenderer } from 'react-test-renderer';
+import { act, type TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -342,7 +342,7 @@ describe('SessionHistoryScreen', () => {
       expect(findNodeByType(renderer, 'SessionListSearchHeader')).toBe(searchHeader);
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
-        tree.children?.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
+        tree.children.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
       ).toEqual(['ScreenHeader', 'SessionListSearchHeader', 'View']);
     }
   });

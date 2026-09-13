@@ -2,9 +2,8 @@
 // array draws no heading, and a reviewer's state picks both its icon and its
 // theme-color token (Lucide icons take `color`, never a Tailwind class).
 
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to test React/RN structure under vitest */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import type * as ReactI18next from 'react-i18next';

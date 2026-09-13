@@ -1,5 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free React Native hook integration */
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';

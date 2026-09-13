@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- cohesive mounted suite for the credit-activity screen state contract */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 
 // Credit-activity screen state contract: loading skeleton, first-page error
 // (retryable vs. permanent NOT_FOUND/FORBIDDEN/UNAUTHORIZED no-retry), the empty
@@ -7,8 +6,8 @@
 // loading), and the later-page failure footer (rows kept + Retry). The query layer
 // is mocked so each state is driven directly through the screen JSX.
 
-import { createElement, type ReactElement } from 'react';
-import { act } from 'react-test-renderer';
+import { createElement, Fragment, type ReactElement } from 'react';
+import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -166,7 +165,9 @@ vi.mock('react-native', () => ({
     return createElement(
       'View',
       null,
-      data.map((item, index) => props.renderItem?.({ item, index })),
+      data.map((item, index) =>
+        createElement(Fragment, { key: index }, props.renderItem?.({ item, index }))
+      ),
       props.ListFooterComponent ?? null
     );
   },

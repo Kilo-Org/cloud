@@ -1423,54 +1423,66 @@ export const cliSessionsV2Router = createTRPCRouter({
       const session = await getSessionWithAccessCheck(input.session_id, ctx);
 
       // Read the event-log watermark from the existing getSession response
-      // before the initial history page, so the transport can use `fromId`
-      // on its first WebSocket connect instead of `replay=false`. Cursor
-      // pages skip the Cloud Agent read — the watermark is only seeded once.
+      // for the initial history page, so the transport can use `fromId` on
+      // its first WebSocket connect instead of `replay=false`. Cursor pages
+      // skip the Cloud Agent read — the watermark is only seeded once.
       // Failures are swallowed and return null so the page endpoint is
-      // never blocked on an optional watermark read.
-      let watermarkEventId: number | null = null;
-      if (!input.cursor && session.cloud_agent_session_id) {
+      // never blocked on an optional watermark read. The page response does
+      // not depend on the watermark, so the read runs concurrently with the
+      // worker page fetch rather than serially ahead of it.
+      const cloudAgentSessionId = !input.cursor ? session.cloud_agent_session_id : null;
+      const watermarkPromise: Promise<number | null> = cloudAgentSessionId
+        ? (async () => {
+            try {
+              const authToken = (
+                await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+                  headers: ctx.headersList,
+                  organizationId: session.organization_id ?? undefined,
+                  tokenSource: 'cloud-agent',
+                })
+              ).token;
+              const client = createCloudAgentNextClient(authToken);
+              const sessionState = await client.getSession(cloudAgentSessionId);
+              return sessionState.latestEventId ?? null;
+            } catch (error) {
+              console.warn(
+                `Failed to fetch watermark for session ${input.session_id}:`,
+                error instanceof Error ? error.message : error
+              );
+              return null;
+            }
+          })()
+        : Promise.resolve(null);
+
+      // Start the page fetch first so it is in flight before the optional
+      // watermark read above resolves.
+      const pagePromise = (async () => {
         try {
-          const authToken = (
-            await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
-              headers: ctx.headersList,
-              organizationId: session.organization_id ?? undefined,
-              tokenSource: 'cloud-agent',
-            })
-          ).token;
-          const client = createCloudAgentNextClient(authToken);
-          const sessionState = await client.getSession(session.cloud_agent_session_id);
-          watermarkEventId = sessionState.latestEventId ?? null;
+          return await fetchSessionMessagesPage(input.session_id, ctx.user.id, {
+            limit: input.limit,
+            ...(input.cursor !== undefined ? { before: input.cursor } : {}),
+          });
         } catch (error) {
-          console.warn(
-            `Failed to fetch watermark for session ${input.session_id}:`,
+          // Match the existing `getSessionMessages` error contract: surface a
+          // stable INTERNAL_SERVER_ERROR so the mobile client can map the
+          // outcome without inferring retry semantics from the worker's
+          // text. The client already calls `captureException`; we do not
+          // double-capture here.
+          console.error(
+            `Failed to fetch session messages page for session ${input.session_id}:`,
             error instanceof Error ? error.message : error
           );
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to fetch session messages page',
+            cause: error,
+          });
         }
-      }
+      })();
 
-      let result;
-      try {
-        result = await fetchSessionMessagesPage(input.session_id, ctx.user.id, {
-          limit: input.limit,
-          ...(input.cursor !== undefined ? { before: input.cursor } : {}),
-        });
-      } catch (error) {
-        // Match the existing `getSessionMessages` error contract: surface a
-        // stable INTERNAL_SERVER_ERROR so the mobile client can map the
-        // outcome without inferring retry semantics from the worker's
-        // text. The client already calls `captureException`; we do not
-        // double-capture here.
-        console.error(
-          `Failed to fetch session messages page for session ${input.session_id}:`,
-          error instanceof Error ? error.message : error
-        );
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch session messages page',
-          cause: error,
-        });
-      }
+      // The watermark promise never rejects (it resolves to null on failure),
+      // so a rejecting page promise cannot leave it as an unhandled rejection.
+      const [result, watermarkEventId] = await Promise.all([pagePromise, watermarkPromise]);
 
       // The worker returns `null` only for sessions the user cannot read; the
       // router's own access check above already enforces this, so the only

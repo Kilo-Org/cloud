@@ -69,6 +69,11 @@ vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
   fetchMobileSessionSnapshotPage: vi.fn(),
 }));
+// Keep the real queue-error classifier without loading the native encrypted KV.
+vi.mock('@/lib/persist/session-transcript-cache', () => ({
+  readSessionTranscriptPage: vi.fn(async () => null),
+  writeSessionTranscriptPage: vi.fn(async () => undefined),
+}));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
   CLOUD_AGENT_WS_URL: 'wss://ws.test',

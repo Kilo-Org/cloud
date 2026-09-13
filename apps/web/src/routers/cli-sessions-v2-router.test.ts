@@ -1086,25 +1086,19 @@ describe('cli-sessions-v2-router', () => {
         expect(result.watermarkEventId).toBeNull();
       });
 
-      it('resolves getSession before fetchSessionMessagesPage starts (deferred-promise order proof)', async () => {
-        // Deferred promise proves the router awaits getSession before calling
-        // fetchSessionMessagesPage. Without this ordering, the watermark
-        // read could race with the page fetch.
-        let getSessionResolved = false;
+      it('starts fetchSessionMessagesPage while getSession is still unresolved (concurrency proof)', async () => {
+        // A deferred getSession proves the router starts the worker page fetch
+        // concurrently with the watermark read instead of awaiting the
+        // watermark round trip first.
         let resolveGetSession!: (value: { latestEventId: number }) => void;
-
         const getSessionPromise = new Promise<{ latestEventId: number }>(resolve => {
           resolveGetSession = resolve;
         });
         mockGetSession.mockReturnValue(getSessionPromise);
 
         let fetchPageCalled = false;
-        let pageResolved = false;
         fetchSessionMessagesPage.mockImplementationOnce(async () => {
           fetchPageCalled = true;
-          // If getSession hasn't resolved yet, the ordering is broken.
-          expect(getSessionResolved).toBe(true);
-          pageResolved = true;
           return {
             kiloSessionId: watermarkSessionId,
             history: { messages: [], nextCursor: null, omittedItemCount: 0 },
@@ -1117,20 +1111,57 @@ describe('cli-sessions-v2-router', () => {
           limit: 50,
         });
 
-        // Let the router reach the getSession call.
-        await new Promise(r => setTimeout(r, 0));
+        // Wait until both operations have started. The watermark read stays
+        // pending (its deferred promise is unresolved), so a serial
+        // implementation would never call fetchSessionMessagesPage here.
+        const deadline = Date.now() + 2000;
+        while (
+          (!fetchPageCalled || mockGetSession.mock.calls.length === 0) &&
+          Date.now() < deadline
+        ) {
+          await new Promise(r => setTimeout(r, 5));
+        }
 
-        // Neither getSession nor fetchPage has resolved yet.
-        expect(getSessionResolved).toBe(false);
-        expect(fetchPageCalled).toBe(false);
+        expect(mockGetSession).toHaveBeenCalledWith(cloudAgentSessionId);
+        expect(fetchPageCalled).toBe(true);
 
-        // Resolve getSession — the router must then call fetchSessionMessagesPage.
-        getSessionResolved = true;
+        // Resolve the watermark read and confirm it is still merged into the
+        // page response.
         resolveGetSession({ latestEventId: 99 });
-
         const result = await resultPromise;
-        expect(result.watermarkEventId).toBe(99);
-        expect(pageResolved).toBe(true);
+        expect(result).toEqual({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+          watermarkEventId: 99,
+        });
+      });
+
+      it('maps a page failure to INTERNAL_SERVER_ERROR while the watermark read is still pending', async () => {
+        // The page fetch rejects while the concurrent watermark read is still
+        // in flight. The error contract must be unchanged, and the pending
+        // watermark read must settle without becoming an unhandled rejection.
+        let resolveGetSession!: (value: { latestEventId: number }) => void;
+        mockGetSession.mockReturnValue(
+          new Promise<{ latestEventId: number }>(resolve => {
+            resolveGetSession = resolve;
+          })
+        );
+        fetchSessionMessagesPage.mockRejectedValueOnce(new Error('worker down'));
+
+        const caller = await createCallerForUser(regularUser.id);
+        const rejection = await caller.cliSessionsV2
+          .getSessionMessagesPage({ session_id: watermarkSessionId, limit: 50 })
+          .catch(err => err);
+
+        expect(rejection).toBeInstanceOf(TRPCError);
+        expect(rejection).toMatchObject({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session messages page',
+        });
+
+        // Let the still-pending watermark read settle cleanly.
+        resolveGetSession({ latestEventId: 7 });
+        await new Promise(r => setTimeout(r, 0));
       });
     });
   });

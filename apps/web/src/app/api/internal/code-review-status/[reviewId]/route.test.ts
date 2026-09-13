@@ -398,12 +398,12 @@ function mockCreatedInfraRetryFlow(
 import type {
   POST as POSTType,
   isWorkspaceCapacityFailure as isWorkspaceCapacityFailureType,
-  completedWithoutReviewOutput as completedWithoutReviewOutputType,
+  isReasoningOnlyLengthCompletion as isReasoningOnlyLengthCompletionType,
 } from './route';
 
 let POST: typeof POSTType;
 let isWorkspaceCapacityFailure: typeof isWorkspaceCapacityFailureType;
-let completedWithoutReviewOutput: typeof completedWithoutReviewOutputType;
+let isReasoningOnlyLengthCompletion: typeof isReasoningOnlyLengthCompletionType;
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -464,7 +464,7 @@ beforeEach(async () => {
   );
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
   mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(null);
-  ({ POST, isWorkspaceCapacityFailure, completedWithoutReviewOutput } = await import('./route'));
+  ({ POST, isWorkspaceCapacityFailure, isReasoningOnlyLengthCompletion } = await import('./route'));
 });
 
 describe('isWorkspaceCapacityFailure', () => {
@@ -671,68 +671,63 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
     });
   });
 
-  describe('completedWithoutReviewOutput', () => {
-    it('flags completed callbacks that carry no assistant text', () => {
-      expect(completedWithoutReviewOutput({})).toBe(true);
-      expect(completedWithoutReviewOutput({ lastAssistantMessageText: '' })).toBe(true);
-      expect(completedWithoutReviewOutput({ lastAssistantMessageText: '   \n  ' })).toBe(true);
+  describe('isReasoningOnlyLengthCompletion', () => {
+    const SDK_WARNING =
+      'The model hit its output limit while reasoning and produced no actionable output. Try disabling reasoning or increasing the output limit.';
+
+    it('flags the reasoning-only length-stop warning', () => {
+      expect(isReasoningOnlyLengthCompletion({ lastAssistantMessageText: SDK_WARNING })).toBe(true);
     });
 
-    it('accepts completed callbacks that carry assistant text', () => {
-      expect(completedWithoutReviewOutput({ lastAssistantMessageText: 'Review complete.' })).toBe(
-        false
-      );
+    it('flags the warning when other assistant text precedes it', () => {
       expect(
-        completedWithoutReviewOutput({ lastAssistantMessageText: ' \nReview complete.\n' })
-      ).toBe(false);
-    });
-
-    it('does not treat queue-size omission as missing output', () => {
-      expect(
-        completedWithoutReviewOutput({
-          lastAssistantMessageTextTruncation: {
-            originalUtf8ByteLength: 200000,
-            retainedUtf8ByteLength: 0,
-          },
-        })
-      ).toBe(false);
-    });
-
-    it('flags queue-size omission when the original text was empty', () => {
-      // An empty string enqueued through the omission path yields
-      // `{ originalUtf8ByteLength: 0, retainedUtf8ByteLength: 0 }` — nothing
-      // was actually dropped, so this is still a no-output completion.
-      expect(
-        completedWithoutReviewOutput({
-          lastAssistantMessageTextTruncation: {
-            originalUtf8ByteLength: 0,
-            retainedUtf8ByteLength: 0,
-          },
+        isReasoningOnlyLengthCompletion({
+          lastAssistantMessageText: `Let me review the diff.\n${SDK_WARNING}`,
         })
       ).toBe(true);
     });
+
+    it('accepts normal assistant text', () => {
+      expect(
+        isReasoningOnlyLengthCompletion({ lastAssistantMessageText: 'Review complete.' })
+      ).toBe(false);
+    });
+
+    it('accepts empty or missing assistant text, which is ambiguous', () => {
+      // Tool-only completions and event-retention gaps also leave the text
+      // empty, so emptiness alone must not be treated as no output.
+      expect(isReasoningOnlyLengthCompletion({})).toBe(false);
+      expect(isReasoningOnlyLengthCompletion({ lastAssistantMessageText: '' })).toBe(false);
+      expect(isReasoningOnlyLengthCompletion({ lastAssistantMessageText: '   \n  ' })).toBe(false);
+    });
+
+    it('accepts the incomplete-output warning that still produced output', () => {
+      expect(
+        isReasoningOnlyLengthCompletion({
+          lastAssistantMessageText:
+            'The model hit its output limit, so this response may be incomplete.',
+        })
+      ).toBe(false);
+    });
   });
 
-  describe('completed callbacks without review output', () => {
-    // A completed callback with no assistant text means the model finished
-    // without producing a review (for example by exhausting its output limit
-    // while reasoning) yet the session still reported success. It must be
-    // downgraded to a failed review instead of leaving a green check run.
+  describe('completed reviews with only the reasoning length warning', () => {
+    // The SDK appends the reasoning-only length-stop warning as an ignored text
+    // part when the model exhausts its output limit while thinking. The session
+    // still reports `completed`, so this used to leave a green check run with no
+    // review on the PR.
     const noOutputRequest = {
       status: 'completed',
       kiloSessionId: 'ses-no-output',
-      lastAssistantMessageText: '',
+      lastAssistantMessageText:
+        'The model hit its output limit while reasoning and produced no actionable output. Try disabling reasoning or increasing the output limit.',
     };
 
     beforeEach(() => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
-      // No summary comment/note exists yet, so the completed callback really
-      // produced no output and the downgrade applies.
-      mockFindKiloReviewComment.mockResolvedValue(null);
-      mockFindKiloReviewNote.mockResolvedValue(null);
     });
 
-    it('marks the review failed with the assistant_empty_completion reason', async () => {
+    it('marks the review failed with the assistant_no_actionable_output reason', async () => {
       const response = await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
 
       expect(response.status).toBe(200);
@@ -740,19 +735,19 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         expect.objectContaining({
           codeReviewId: REVIEW_ID,
           status: 'failed',
-          terminalReason: 'assistant_empty_completion',
+          terminalReason: 'assistant_no_actionable_output',
         })
       );
       expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
         REVIEW_ID,
         'failed',
-        expect.objectContaining({ terminalReason: 'assistant_empty_completion' })
+        expect.objectContaining({ terminalReason: 'assistant_no_actionable_output' })
       );
     });
 
     it('does not auto-retry a no-output completion', async () => {
-      // Seed a below-threshold session so the usage guard would not skip the
-      // retry on its own: only the unretryable reason must stop the retry.
+      // Seed below-threshold usage so the usage guard would let a retry through
+      // on its own: only the unretryable terminal reason must stop it.
       mockGetSessionUsageFromBilling.mockResolvedValue({
         model: 'anthropic/claude-sonnet-4.6',
         totalTokensIn: 10_000,
@@ -771,41 +766,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
     });
 
-    it('keeps the review completed when a summary comment was already published', async () => {
-      // A completed callback may carry no assistant text because the final
-      // message posted the review through provider tools. The published
-      // summary must not be overwritten by a "produced no output" notice.
-      mockFindKiloReviewComment.mockResolvedValue({ commentId: 99, body: 'real summary' });
-
-      await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
-
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
-        REVIEW_ID,
-        'completed',
-        expect.any(Object)
-      );
-      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
-        expect.objectContaining({ codeReviewId: REVIEW_ID, status: 'completed' })
-      );
-      expect(mockAddReactionToPR).toHaveBeenCalledWith(
-        'inst-1',
-        'owner',
-        'repo',
-        1,
-        'hooray',
-        'standard'
-      );
-      expect(mockCaptureMessage).not.toHaveBeenCalledWith(
-        'Code review completed without producing output',
-        expect.anything()
-      );
-    });
-
     it('reports the downgrade to Sentry for observability', async () => {
       await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
 
       expect(mockCaptureMessage).toHaveBeenCalledWith(
-        'Code review completed without producing output',
+        'Code review completed without actionable output',
         expect.objectContaining({
           level: 'warning',
           tags: expect.objectContaining({ source: 'code-review-status-no-output' }),
@@ -902,17 +867,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
-    it('does not downgrade when the assistant text was omitted for queue size', async () => {
-      mockGetCodeReviewById.mockResolvedValue(makeReview());
-
+    it('does not downgrade a completed review with empty assistant text', async () => {
+      // A tool-only final message leaves the text empty; failing it would
+      // overwrite a real review summary with the no-output notice.
       await POST(
-        makeRequest({
-          status: 'completed',
-          lastAssistantMessageTextTruncation: {
-            originalUtf8ByteLength: 200000,
-            retainedUtf8ByteLength: 0,
-          },
-        }),
+        makeRequest({ status: 'completed', lastAssistantMessageText: '' }),
         makeParams(REVIEW_ID)
       );
 

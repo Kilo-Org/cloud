@@ -1,7 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
 import {
   applyCustomPricingToPricing,
@@ -118,56 +117,23 @@ describe('custom model pricing', () => {
     ).toBe(Math.round(262_144 * 0.96));
   });
 
-  test('uses Kimi K3 custom pricing only when market cost is missing', () => {
-    const usage = makeUsage({
-      inputTokens: 100,
-      outputTokens: 10,
-      cacheHitTokens: 20,
-      cacheWriteTokens: 30,
-    });
+  test.each(['z-ai/glm-5.2', 'moonshotai/kimi-k3'])(
+    'does not apply custom pricing to %s',
+    modelId => {
+      const model = makeModel(modelId);
+      const usage = makeUsage({
+        inputTokens: 100,
+        outputTokens: 10,
+        cacheHitTokens: 20,
+        cacheWriteTokens: 30,
+      });
 
-    expect(calculateCustomCost_mUsd(PERPLEXITY_KIMI_PUBLIC_ID, usage)).toBe(
-      Math.round(50 * 3 + 10 * 15 + 20 * 0.3 + 30 * 3)
-    );
-    expect(
-      calculateCustomCost_mUsd(PERPLEXITY_KIMI_PUBLIC_ID, { ...usage, cost_mUsd: 123 })
-    ).toBeUndefined();
-  });
-
-  test('does not apply custom pricing to GLM 5.2', () => {
-    const model = makeModel('z-ai/glm-5.2');
-    const usage = makeUsage({
-      inputTokens: 100,
-      outputTokens: 10,
-      cacheHitTokens: 20,
-      cacheWriteTokens: 30,
-    });
-
-    expect(applyCustomPricingToModel(model)).toBe(model);
-    expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
-    expect(calculateCustomCost_mUsd(model.id, usage)).toBeUndefined();
-    expect(calculateCustomCost_mUsd(model.id, { ...usage, cost_mUsd: 123 })).toBeUndefined();
-  });
-
-  test('uses fallback-only custom pricing in the model list', () => {
-    const model = makeModel(PERPLEXITY_KIMI_PUBLIC_ID);
-
-    expect(applyCustomPricingToModel(model)).toEqual({
-      ...model,
-      pricing: {
-        prompt: '0.000003000000',
-        completion: '0.000015000000',
-        input_cache_read: '0.000000300000',
-        input_cache_write: undefined,
-      },
-    });
-  });
-
-  test('preserves endpoint pricing for fallback-only custom pricing', () => {
-    const model = makeModel(PERPLEXITY_KIMI_PUBLIC_ID);
-
-    expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
-  });
+      expect(applyCustomPricingToModel(model)).toBe(model);
+      expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
+      expect(calculateCustomCost_mUsd(model.id, usage)).toBeUndefined();
+      expect(calculateCustomCost_mUsd(model.id, { ...usage, cost_mUsd: 123 })).toBeUndefined();
+    }
+  );
 
   test('reports invalid negative uncached token counts', () => {
     const captureMessageMock = jest.mocked(captureMessage);

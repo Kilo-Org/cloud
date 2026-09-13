@@ -19,9 +19,12 @@ import {
   isOpus5Model,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
+import {
+  applyMoonshotModelSettings,
+  isKimiModel,
+  KIMI_CURRENT_MODEL_ID,
+} from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import {
   ReasoningDetailsTransform,
@@ -217,7 +220,7 @@ export function applyAnthropicThinkingDefault(
   const defaultsToThinking =
     (isMinimaxModel(requestedModel) && requestedModel.includes('m3')) ||
     requestedModel === 'z-ai/glm-5.2' ||
-    requestedModel === PERPLEXITY_KIMI_PUBLIC_ID;
+    requestedModel === KIMI_CURRENT_MODEL_ID;
   if (
     defaultsToThinking &&
     requestToMutate.kind === 'messages' &&
@@ -235,12 +238,11 @@ export function removeUnsupportedRequestServiceTier(
   kiloExclusiveModel: KiloExclusiveModel | null
 ) {
   const customPricing = getCustomPricing(requestedModel);
-  const reason =
-    customPricing && !customPricing.fallbackOnly
-      ? 'non-fallback custom pricing'
-      : kiloExclusiveModel && !kiloExclusiveModel.flags.includes('flex')
-        ? 'non-Flex Kilo-exclusive model'
-        : null;
+  const reason = customPricing
+    ? 'custom pricing'
+    : kiloExclusiveModel && !kiloExclusiveModel.flags.includes('flex')
+      ? 'non-Flex Kilo-exclusive model'
+      : null;
   const serviceTier = requestToMutate.body.service_tier;
   if (!reason || serviceTier === undefined) {
     return;

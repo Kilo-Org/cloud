@@ -161,6 +161,37 @@ describe('SessionConnectionIndicator mounted', () => {
     expect(findHost(renderer.root, 'WifiOff')).toHaveLength(0);
   });
 
+  it('remounts the row when the cached-metadata label clears so no stale contentDescription survives', async () => {
+    // Regression (p7): Android kept exposing the previous "Connecting…"
+    // contentDescription after the label became undefined, so uiautomator (and
+    // accessibility services) saw a phantom "Connecting…" that never cleared.
+    // The row is keyed on blank/labelled, so clearing the label must mount a
+    // fresh View rather than updating the labelled one in place.
+    const renderer = await mount({
+      activeSessionType: 'read-only',
+      agentStatusType: 'disconnected',
+      sessionRefresh: { isLoading: true, onRetry: vi.fn<() => void>() },
+    });
+    const labelled = findHost(renderer.root, 'View')[0];
+    expect(
+      findHost(renderer.root, 'Text').some(node => node.props.children === 'Connecting…')
+    ).toBe(true);
+
+    // Metadata landed: the read-only transport resolves, so the refresh row
+    // clears. A remounted blank View carries no stale description.
+    await update(renderer, {
+      activeSessionType: 'read-only',
+      agentStatusType: 'disconnected',
+    });
+
+    const blank = findHost(renderer.root, 'View')[0];
+    expect(blank).toBeDefined();
+    expect(blank).not.toBe(labelled);
+    expect(blank?.props.className).toContain('h-6');
+    expect(blank?.props.accessibilityElementsHidden).toBe(true);
+    expect(findHost(renderer.root, 'Text')).toHaveLength(0);
+  });
+
   it('renders Connection lost with a Retry action when reconnects are exhausted', async () => {
     connection.connected = false;
     connection.exhausted = true;
@@ -215,5 +246,46 @@ describe('SessionConnectionIndicator mounted', () => {
     expect(findHost(renderer.root, 'Text')).toHaveLength(0);
     expect(findHost(renderer.root, 'WifiOff')).toHaveLength(0);
     expect(findHost(renderer.root, 'Pressable')).toHaveLength(0);
+  });
+
+  it('reads Connecting without a Retry while a cached-metadata refresh is in flight', async () => {
+    // The transport is healthy; the cached transcript is readable and only the
+    // session-metadata read is outstanding, so no retry is offered yet.
+    const renderer = await mount({
+      activeSessionType: 'remote',
+      agentStatusType: 'idle',
+      sessionRefresh: { isLoading: true, onRetry: vi.fn<() => void>() },
+    });
+
+    const view = findHost(renderer.root, 'View')[0];
+    expect(view?.props.accessibilityElementsHidden).toBe(false);
+    const texts = findHost(renderer.root, 'Text');
+    expect(texts.some(node => node.props.children === 'Connecting…')).toBe(true);
+    expect(findHost(renderer.root, 'Pressable')).toHaveLength(0);
+  });
+
+  it('offers Retry for a failed cached-metadata refresh and routes it to the refresh retry', async () => {
+    const onRetry = vi.fn<() => void>();
+    const renderer = await mount({
+      activeSessionType: 'remote',
+      agentStatusType: 'idle',
+      sessionRefresh: { isLoading: false, onRetry },
+    });
+
+    const texts = findHost(renderer.root, 'Text');
+    expect(texts.some(node => node.props.children === 'Connection lost')).toBe(true);
+    expect(texts.some(node => node.props.children === 'Retry')).toBe(true);
+    const pressable = findHost(renderer.root, 'Pressable')[0];
+    if (!pressable) {
+      throw new Error('pressable not found');
+    }
+
+    await act(async () => {
+      await Promise.resolve();
+      (pressable.props.onPress as () => void)();
+    });
+
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(connection.retryConnection).not.toHaveBeenCalled();
   });
 });

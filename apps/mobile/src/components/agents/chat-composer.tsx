@@ -281,6 +281,13 @@ export function ChatComposer({
   const [characterCount, setCharacterCount] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
+  // Inline validation feedback for a rejected slash-command submission. A
+  // transient toast (sonner-native) renders outside the accessibility /
+  // automation tree and floats over the composer, so the reader cannot see
+  // the message and a device round cannot assert it. Rendering the rejection
+  // inline keeps it visible above the input row, announced, and out of the
+  // send control's way.
+  const [slashCommandFeedback, setSlashCommandFeedback] = useState<string | null>(null);
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -574,6 +581,9 @@ export function ChatComposer({
 
   function handleChangeText(value: string) {
     textRef.current = value;
+    // Any edit clears a stale slash-command rejection: the reader is fixing
+    // the input the message is about.
+    setSlashCommandFeedback(null);
     // Derived state (measure node, hasText, slash command) is coalesced to one
     // publication per frame; the live submit-time ref and the debounced draft
     // write stay synchronous so neither can lag a keystroke.
@@ -893,17 +903,19 @@ export function ChatComposer({
     });
 
     if (submission.type === 'attachment-error') {
-      toast.error(i18n.t('agentChat.composer.attachmentsWithSlashCommands'));
+      setSlashCommandFeedback(i18n.t('agentChat.composer.attachmentsWithSlashCommands'));
       return;
     }
     if (submission.type === 'argument-error') {
-      toast.error(submission.message);
+      setSlashCommandFeedback(submission.message);
       return;
     }
     if (submission.type === 'upgrade-required') {
-      toast.error(submission.message);
+      setSlashCommandFeedback(submission.message);
       return;
     }
+    // Valid submission: drop a rejection left over from an earlier attempt.
+    setSlashCommandFeedback(null);
 
     // The admission lock is owned by `settleVoiceInputBeforeSubmit` for the
     // full settle + submit sequence, so `handleSend` performs validation and
@@ -1204,6 +1216,12 @@ export function ChatComposer({
             />
           </Animated.View>
         ) : null}
+
+        <AccessibleStatus
+          message={slashCommandFeedback}
+          tone="error"
+          className="mb-2 px-4 text-xs"
+        />
 
         <View
           className={cn(

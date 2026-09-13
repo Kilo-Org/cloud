@@ -2373,6 +2373,12 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'assistant_content_filter',
   'assistant_structured_output',
   'assistant_no_reply',
+  // Set by the web status callback when a code-review session reports
+  // 'completed' but produced no assistant output at all (for example the
+  // model exhausted its output limit while reasoning and the SDK yielded an
+  // empty response). Distinct from 'assistant_no_reply', which covers sessions
+  // that ended without any assistant message to attribute.
+  'assistant_empty_completion',
   'wrapper_failed',
   'runtime_startup_failed',
   'sandbox_connection',

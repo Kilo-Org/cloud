@@ -27,6 +27,18 @@ describe('getCodeReviewTerminalReasonCopy', () => {
     });
   });
 
+  it('explains a no-output completion without blaming the model by name', () => {
+    const copy = getCodeReviewTerminalReasonCopy('assistant_empty_completion');
+
+    expect(copy).toMatchObject({
+      label: 'No review produced',
+      checkTitle: 'Kilo Code Review produced no review',
+    });
+    const wording = copy?.summaryBody.replace(/\s+/g, ' ');
+    expect(wording).toContain('produced no output');
+    expect(wording).toContain('output limit while reasoning');
+  });
+
   // The summary body replaces the PR comment in place. Losing the marker would
   // orphan the existing comment and post a duplicate on the next run, because
   // that marker is how the comment is found.

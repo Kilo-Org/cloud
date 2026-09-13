@@ -148,7 +148,10 @@ const StatusUpdatePayloadSchema = z
         payload.lastAssistantMessageText !== undefined &&
         payload.lastAssistantMessageTextTruncation?.retainedUtf8ByteLength === 0
       ),
-    { message: 'Assistant text cannot be present when it was omitted' }
+    {
+      message:
+        'Assistant text cannot be present when it was omitted. Note that a completed review carries no lastAssistantMessageText when the assistant produced no text at all; the route can only distinguish "no output" from "omitted for queue size" when the truncation marker is present.',
+    }
   );
 
 type StatusUpdatePayload = z.infer<typeof StatusUpdatePayloadSchema>;
@@ -289,6 +292,50 @@ function captureRuntimeModelNotFoundDiagnostics(params: {
     sessionId,
     ...extra,
   });
+}
+
+/**
+ * True when a code-review completion callback carries no assistant output.
+ *
+ * This is only a CANDIDATE signal: the review summary and inline comments are
+ * posted through provider tools, and a `completed` callback legitimately omits
+ * `lastAssistantMessageText` when the final assistant message is tool-only
+ * (the final-text contract applies to analytics/council runs only). Text
+ * absence alone therefore cannot prove an empty completion; the caller must
+ * additionally verify that no summary comment/note was published before
+ * treating the run as an empty completion.
+ *
+ * When no text is retained, the classic cause is output-limit exhaustion
+ * during reasoning, where the SDK yields an empty response yet the session
+ * still idles out and reports `completed`.
+ *
+ * Queue-size omission is a separate signal: when the payload text was dropped
+ * to fit the callback queue, `lastAssistantMessageTextTruncation` carries
+ * `retainedUtf8ByteLength: 0`, which means the text existed but was stripped.
+ * That must not count as "no output" — unless the original text was itself
+ * empty (`originalUtf8ByteLength: 0`), in which case nothing was dropped and
+ * there is no review output to preserve.
+ */
+export function completedWithoutReviewOutput(
+  payload: Pick<
+    StatusUpdatePayload,
+    'lastAssistantMessageText' | 'lastAssistantMessageTextTruncation'
+  >
+): boolean {
+  const assistantTextPresent =
+    typeof payload.lastAssistantMessageText === 'string' &&
+    payload.lastAssistantMessageText.trim().length > 0;
+  const truncation = payload.lastAssistantMessageTextTruncation;
+  // Queue-size omission only proves the text existed when something was
+  // actually dropped. An empty string enqueued through the omission path
+  // yields `{ originalUtf8ByteLength: 0, retainedUtf8ByteLength: 0 }`, which
+  // carried no review output at all and must not be treated as "text existed".
+  const assistantTextWasOmitted =
+    payload.lastAssistantMessageText === undefined &&
+    truncation !== undefined &&
+    truncation.retainedUtf8ByteLength === 0 &&
+    truncation.originalUtf8ByteLength > 0;
+  return !assistantTextPresent && !assistantTextWasOmitted;
 }
 
 /**
@@ -484,6 +531,11 @@ function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalRe
     terminalReason === 'user_cancelled' ||
     terminalReason === 'superseded' ||
     terminalReason === 'interrupted' ||
+    // No assistant output was produced, so a retry with the same model and
+    // configuration is likely to repeat. The check is failed and the PR gets
+    // an authored notice instead of a silent retry; the customer can re-run
+    // the review or adjust the reasoning/output settings.
+    terminalReason === 'assistant_empty_completion' ||
     // The customer's own provider quota is exhausted, so an immediate retry
     // burns a second review against the same closed door. hasKnownUnretryableFailureMessage
     // below already tries to catch this, but only by matching the raw '[BYOK] Your
@@ -1083,6 +1135,61 @@ async function updatePRGateCheck(
   }
 }
 
+/**
+ * Whether a completed callback with no assistant text still produced a review.
+ *
+ * A `completed` callback legitimately omits `lastAssistantMessageText` when the
+ * final assistant message posted the review through provider tools: the review
+ * summary and inline comments are tool calls, not a closing text response, and
+ * only analytics/council runs carry a final-text contract. Text absence alone
+ * therefore cannot prove an empty completion. Returns true when the review's
+ * summary comment/note already exists on the provider — i.e. output was
+ * published and the completion must stay 'completed'.
+ */
+async function reviewPublishedOutputForDowngrade(
+  review: CloudAgentCodeReview,
+  shouldPublishToProvider: boolean
+): Promise<boolean> {
+  if (!shouldPublishToProvider || !review.platform_integration_id) return false;
+  const platform = parseCodeReviewPlatform(review.platform);
+  if (platform === PLATFORM.BITBUCKET) return false;
+
+  const integration = await getIntegrationById(review.platform_integration_id).catch(() => null);
+  if (!integration) return false;
+
+  const [repoOwner, repoName] = review.repo_full_name.split('/');
+  try {
+    if (platform === PLATFORM.GITHUB && integration.platform_installation_id) {
+      const summary = await findKiloReviewComment(
+        integration.platform_installation_id,
+        repoOwner,
+        repoName,
+        review.pr_number,
+        integration.github_app_type ?? 'standard'
+      );
+      return summary !== null;
+    }
+    if (platform === PLATFORM.GITLAB) {
+      const instanceUrl = getGitLabInstanceUrl(integration);
+      const accessToken = await resolveGitLabAccessToken(integration, review.platform_project_id);
+      const note = await findKiloReviewNote(
+        accessToken,
+        review.repo_full_name,
+        review.pr_number,
+        instanceUrl
+      );
+      return note !== null;
+    }
+  } catch (error) {
+    logExceptInTest('[code-review-status] Failed to verify published review output', {
+      reviewId: review.id,
+      platform,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+  return false;
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ reviewId: string }> }
@@ -1111,10 +1218,22 @@ export async function POST(
 
     const rawPayload = parsedPayload.data;
     const attemptId = callbackAttemptId || undefined;
-    const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult, failure } =
-      normalizePayload(rawPayload);
+    const normalizedPayload = normalizePayload(rawPayload);
+    const { sessionId, cliSessionId, gateResult, failure } = normalizedPayload;
+    let { status, errorMessage, terminalReason } = normalizedPayload;
     const executionId = rawPayload.executionId;
     const validGateResult = gateResult;
+
+    // A 'completed' callback with no assistant text is a candidate for the
+    // no-output downgrade, but it is NOT applied here. A completed callback
+    // legitimately omits `lastAssistantMessageText` when the final assistant
+    // message posted the review through provider tools (only analytics/council
+    // runs have a final-text contract), so text absence alone cannot prove an
+    // empty completion. The candidate is verified below — after the review is
+    // loaded — by checking whether a summary comment/note was actually
+    // published; only then is the run downgraded to failed.
+    const noOutputDowngradeCandidate =
+      status === 'completed' && completedWithoutReviewOutput(rawPayload);
 
     const loggableErrorMessage = getLoggableStatusErrorMessage(errorMessage, terminalReason);
     logExceptInTest('[code-review-status] Received status update', {
@@ -1138,6 +1257,34 @@ export async function POST(
     const manualConfig = getManualCodeReviewConfig(review);
     const isManualReview = manualConfig !== null;
     const shouldPublishToProvider = shouldPublishCodeReviewToProvider(review);
+
+    // Apply the no-output downgrade only when the review published no summary
+    // comment/note. A completed callback may carry no assistant text because
+    // the final message posted the review through provider tools; failing such
+    // a review would overwrite its real summary with a "produced no output"
+    // notice. Downgrading gives the run a failure conclusion, a confused
+    // reaction, an authored failure notice on the PR thread, and an attributed
+    // terminal reason instead of silently passing.
+    if (
+      noOutputDowngradeCandidate &&
+      !(await reviewPublishedOutputForDowngrade(review, shouldPublishToProvider))
+    ) {
+      logExceptInTest(
+        '[code-review-status] Completed callback carried no review output; downgrading to failed',
+        { reviewId, attemptId, sessionId, cliSessionId }
+      );
+      captureMessage('Code review completed without producing output', {
+        level: 'warning',
+        tags: {
+          source: 'code-review-status-no-output',
+          review_id: reviewId,
+          cloud_agent_session_id: sessionId ?? '',
+        },
+      });
+      status = 'failed';
+      terminalReason = 'assistant_empty_completion';
+      errorMessage = 'The review session completed without producing a review summary or comments.';
+    }
 
     const callbackCompletedAt = new Date();
     let attempt: CloudAgentCodeReviewAttempt;

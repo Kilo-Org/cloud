@@ -21,6 +21,10 @@ let openedWith: { readonly tools?: readonly string[] } | undefined = undefined;
 let finish: (() => void) | undefined = undefined;
 /** A session id whose reopen fails, so the failed-open path can be exercised. */
 let failOpenFor: string | undefined = undefined;
+/** A session id whose history read fails, so the half-open path can be exercised. */
+let failHistoryFor: string | undefined = undefined;
+/** Every session whose scope was closed, so a leaked one can be told from one released. */
+const released: string[] = [];
 
 /** One stored turn, so a state that still holds turns can be told from an empty one. */
 const TURN = {
@@ -43,8 +47,17 @@ const handleFor = (id: string) => ({
         return Effect.void;
       })
     ),
-  history: Effect.succeed([TURN]),
+  history:
+    failHistoryFor === id ? Effect.fail(new Error('history unreadable')) : Effect.succeed([TURN]),
 });
+
+/** Opens a session that is released when the scope holding it closes. */
+const openInScope = (id: string) =>
+  Effect.acquireRelease(Effect.succeed(handleFor(id)), () =>
+    Effect.sync(() => {
+      released.push(id);
+    })
+  );
 
 vi.mock('@kilocode/harness-sdk', () => ({
   openSession: (options: { readonly tools?: readonly string[] }) => {
@@ -52,7 +65,9 @@ vi.mock('@kilocode/harness-sdk', () => ({
     return Effect.succeed(handleFor('s1'));
   },
   continueSession: (id: string) =>
-    failOpenFor === id ? Effect.fail(new Error('no such session')) : Effect.succeed(handleFor(id)),
+    failOpenFor === id
+      ? openInScope(id).pipe(Effect.andThen(Effect.fail(new Error('no such session'))))
+      : openInScope(id),
   cloneSession: () => Effect.succeed(handleFor('s2')),
 }));
 vi.mock('./layers', () => ({ chatLayers: () => Layer.empty }));
@@ -86,7 +101,7 @@ vi.mock('./store', () => ({
 }));
 
 const { enterChat, releaseChat, say, startChat, stopChat } = await import('./registry');
-const { change, NOTHING, snapshotOf } = await import('./state');
+const { change, snapshotOf } = await import('./state');
 const { chatPlaceOf } = await import('./use-chat');
 
 const place = { chatScope: 'me:personal', org: { kind: 'personal' } } as const;
@@ -104,9 +119,16 @@ const settled = async () => {
 let opened = '';
 
 beforeEach(async () => {
+  /* A test that moved a chat leaves its old id pointing at the new session;
+     releasing it clears the pointer so the next test's `s1` starts fresh. */
+  if (opened !== '') {
+    await releaseChat(opened);
+  }
   asked.length = 0;
+  released.length = 0;
   finish = undefined;
   failOpenFor = undefined;
+  failHistoryFor = undefined;
   opened = await startChat(place, 'kilo/one');
   await settled();
 });
@@ -186,7 +208,7 @@ describe('a chat that moved', () => {
     expect(snapshotOf(opened).sessionId).toBe('s2');
   });
 
-  it('moves the turns with the chat rather than keeping a copy on the one it left', async () => {
+  it('keeps the transcript on screen while the screen follows the chat it became', async () => {
     await say(opened, 'first', 'kilo/one');
     await settled();
     await say(opened, 'second', 'kilo/two');
@@ -195,12 +217,31 @@ describe('a chat that moved', () => {
     finish?.();
     await settled();
 
-    /* The pointer is all the old chat keeps. A second copy of its turns would
-       leak one conversation per model switch, and the copy would then go stale
-       against the session that actually carried them. */
+    /* Reading the id the chat moved off resolves to the session that carried
+       on, so the transcript is never cleared between the move and the screen
+       following, and the moved chat is not copied under the old id. */
+    expect(snapshotOf(opened)).toBe(snapshotOf('s2'));
+    expect(snapshotOf(opened).turns).toEqual([TURN]);
     expect(snapshotOf(opened).sessionId).toBe('s2');
-    expect(snapshotOf(opened).turns).toBe(NOTHING.turns);
-    expect(snapshotOf('s2').turns).toEqual([TURN]);
+  });
+
+  it('follows a route still naming the moved-off id instead of failing on it', async () => {
+    await say(opened, 'first', 'kilo/one');
+    await settled();
+    await say(opened, 'second', 'kilo/two');
+    await settled();
+
+    finish?.();
+    await settled();
+
+    /* The route keeps the id the chat was opened on. Opening it must follow to
+       the chat that carried on, not reopen the session the move deleted and
+       report its failure onto the live chat. */
+    failOpenFor = opened;
+    await enterChat(place, opened);
+
+    expect(snapshotOf('s2').failed).toBeNull();
+    expect(snapshotOf('s2').sessionId).toBe('s2');
   });
 });
 
@@ -212,6 +253,25 @@ describe('a chat that could not be opened', () => {
 
     expect(snapshotOf('missing').status).toBe('idle');
     expect(snapshotOf('missing').failed).toContain('no such session');
+  });
+
+  it('closes the scope it opened rather than leaking the session', async () => {
+    failOpenFor = 'missing';
+
+    await enterChat(place, 'missing');
+
+    /* The open failed after the scope was made; with nothing holding it, only
+       closing it runs the finalizers the half-open session registered. */
+    expect(released).toContain('missing');
+  });
+
+  it('closes the scope when the history cannot be read', async () => {
+    failHistoryFor = 'unreadable';
+
+    await enterChat(place, 'unreadable');
+
+    expect(snapshotOf('unreadable').status).toBe('idle');
+    expect(released).toContain('unreadable');
   });
 });
 

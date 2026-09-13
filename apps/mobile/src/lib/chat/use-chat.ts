@@ -2,9 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
-import { chatScope } from './scope';
+import { type ChatPlace, chatPlaceOf } from './scope';
 import {
-  type ChatPlace,
   enterChat,
   prepareChats,
   releaseChat,
@@ -25,38 +24,8 @@ import { type ChatSummary, deleteChat, listChats } from './store';
  * whatever it says.
  */
 
-/**
- * Where a chat belongs, from the account and organization a screen reads.
- *
- * The same inputs answer with the same object. A screen calls this on every
- * render, and a fresh object each time would re-run `useChat`'s open effect on
- * every render — reopening a chat a model switch had just moved off. The shape
- * is readonly, so one instance can be shared.
- */
-const places = new Map<string, ChatPlace>();
-
-export function chatPlaceOf(
-  userId: string | null | undefined,
-  organizationId: string | null | undefined
-): ChatPlace | null {
-  if (userId === null || userId === undefined || userId === '') {
-    return null;
-  }
-  const key = `${userId}\u0000${organizationId ?? ''}`;
-  const held = places.get(key);
-  if (held !== undefined) {
-    return held;
-  }
-  const made: ChatPlace = {
-    chatScope: chatScope(userId, organizationId),
-    org:
-      organizationId === null || organizationId === undefined || organizationId === ''
-        ? { kind: 'personal' }
-        : { kind: 'organization', id: organizationId },
-  };
-  places.set(key, made);
-  return made;
-}
+/** Re-exported so a screen reads where a chat belongs from the hook module. */
+export { chatPlaceOf };
 
 const listKey = (scope: string) => ['chats', scope] as const;
 

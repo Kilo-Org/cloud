@@ -9,8 +9,9 @@ import {
 import { type SQLiteDatabase } from 'expo-sqlite';
 
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
-import { change, forgetState, NOTHING, snapshotOf } from './state';
+import { change, forgetState, moveState, NOTHING, snapshotOf } from './state';
 import { chatLayers, type ChatOrg } from './layers';
+import { type ChatPlace } from './scope';
 import { askedIn, forgetAsked, moveAsked, rememberAsked } from './pending';
 import { CHAT_TOOL_NAMES } from './tools';
 import { forgetSession, modelOfSession, moveChat, rememberChat, touchChat } from './store';
@@ -56,12 +57,6 @@ type Chat = {
   readonly org: ChatOrg;
 };
 
-/** Where a chat belongs, which every call needs and no chat holds before it opens. */
-export type ChatPlace = {
-  readonly chatScope: string;
-  readonly org: ChatOrg;
-};
-
 const chats = new Map<string, Chat>();
 
 /** One open at a time per chat, so entering a screen twice opens one session. */
@@ -102,8 +97,16 @@ async function inOwnScope<E>(
   opened: Effect.Effect<SessionHandle, E, ChatContext | Scope.Scope>
 ): Promise<{ readonly handle: SessionHandle; readonly scope: Scope.CloseableScope }> {
   const scope = await runtime.runPromise(Scope.make());
-  const handle = await runtime.runPromise(Scope.extend(opened, scope));
-  return { handle, scope };
+  try {
+    const handle = await runtime.runPromise(Scope.extend(opened, scope));
+    return { handle, scope };
+  } catch (error) {
+    /* Opening the session failed after the scope was made, and every caller
+       releases a chat by closing the scope it got. Nobody got one, so the
+       finalizers the half-open session registered would never run. */
+    await runtime.runPromise(Scope.close(scope, Exit.void));
+    throw error;
+  }
 }
 
 /**
@@ -153,6 +156,14 @@ export async function startChat(place: ChatPlace, model: string): Promise<string
  * must not open two sessions onto one conversation.
  */
 export async function enterChat(place: ChatPlace, sessionId: string): Promise<void> {
+  /* A route can name the id a chat moved off, and reading it resolves to the
+     chat that carried on. Opening the moved-off id would reopen a session the
+     move already deleted and report its failure onto the live chat. */
+  const followed = snapshotOf(sessionId).sessionId;
+  if (followed !== sessionId) {
+    await enterChat(place, followed);
+    return;
+  }
   if (chats.has(sessionId)) {
     return;
   }
@@ -181,16 +192,26 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
 async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   const runtime = await runtimeFor(place);
   const { handle, scope } = await inOwnScope(runtime, continueSession(sessionId));
-  const turns = await runtime.runPromise(handle.history);
-  const asked = await askedIn(sessionId);
-  chats.set(sessionId, { handle, scope, answering: undefined, waiting: [], ...place });
-  change(sessionId, {
-    ...NOTHING,
-    model: modelOfSession(await open(), sessionId) ?? '',
-    turns,
-    status: 'idle',
-    asked,
-  });
+  try {
+    const turns = await runtime.runPromise(handle.history);
+    const asked = await askedIn(sessionId);
+    const model = modelOfSession(await open(), sessionId) ?? '';
+    chats.set(sessionId, { handle, scope, answering: undefined, waiting: [], ...place });
+    change(sessionId, {
+      ...NOTHING,
+      model,
+      turns,
+      status: 'idle',
+      asked,
+    });
+  } catch (error) {
+    /* Reading the history or the pending question failed after the session
+       opened. The screen settles idle with the reason, so entering the chat
+       again is possible — but the session this open made is not one anything
+       holds, so its scope is closed here or it leaks. */
+    await runtime.runPromise(Scope.close(scope, Exit.void));
+    throw error;
+  }
 }
 
 /**
@@ -382,10 +403,10 @@ async function ontoModel(sessionId: string, model: string): Promise<string> {
   /* The chat it moved off is left pointing at the one it became, rather than
      forgotten. Whoever asked for the move is not always the screen — a question
      queued on another model moves the chat from inside the registry — so the
-     state is what says where the conversation went. It is only the pointer:
-     the turns and everything else belong to the session that carried on, and
-     keeping a second copy here would leak one conversation per model switch. */
-  change(sessionId, { ...NOTHING, sessionId: handle.id, model: held.model });
+     state is what says where the conversation went. It is only the pointer: a
+     screen reading the old id resolves to the session that carried on, so the
+     transcript is never cleared and no second copy is kept. */
+  moveState(sessionId, handle.id);
   await runtime.runPromise(Scope.close(chat.scope, Exit.void));
   forgetSession(database, sessionId);
   return handle.id;

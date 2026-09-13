@@ -47,6 +47,33 @@ const states = new Map<string, ChatState>();
 const watchers = new Map<string, Set<() => void>>();
 
 /**
+ * Where a chat that moved points, so a screen watching the one it left follows
+ * to the one it became.
+ *
+ * Kept apart from the states, and carrying no copy of the conversation: a
+ * screen reading the id it left has to see the moved chat's turns, not an
+ * empty transcript, without a second copy of them being held per model switch.
+ */
+const movedTo = new Map<string, string>();
+
+/** Follows a chain of moves to the chat a screen should read now. */
+function resolve(sessionId: string): string {
+  const seen = new Set<string>();
+  let current = sessionId;
+  while (!seen.has(current)) {
+    seen.add(current);
+    const next = movedTo.get(current);
+    if (next === undefined) {
+      return current;
+    }
+    current = next;
+  }
+  // A cycle cannot happen — a chat only ever moves onto a new session — but a
+  // malformed one must not spin, so the id it came back to is the answer.
+  return current;
+}
+
+/**
  * Whoever draws the list of chats, rather than one of them.
  *
  * A chat writes its turns when the answer ends, and the title of a row is the
@@ -81,8 +108,14 @@ function publish(sessionId: string): void {
 
 /** Changes what a chat looks like, and tells whoever is watching. */
 export function change(sessionId: string, into: Partial<ChatState>): void {
-  states.set(sessionId, { ...snapshotOf(sessionId), ...into });
-  publish(sessionId);
+  const target = resolve(sessionId);
+  states.set(target, { ...snapshotOf(target), ...into });
+  publish(target);
+  if (target !== sessionId) {
+    // A screen still watching the id the chat moved off reads the state above,
+    // so it is told even though the state now lives under the new id.
+    publish(sessionId);
+  }
   // Only when a chat starts or stops working: every word of an answer is a
   // change too, and a list that read the database once per word would read it
   // hundreds of times for one answer.
@@ -93,14 +126,28 @@ export function change(sessionId: string, into: Partial<ChatState>): void {
   }
 }
 
+/**
+ * Points a chat that moved at the one it became, and drops the state it left.
+ *
+ * The state is not kept as a second copy under the old id: a screen reading it
+ * resolves to the chat that carried on, so the transcript is never cleared, and
+ * one conversation never becomes one copy per model switch.
+ */
+export function moveState(from: string, to: string): void {
+  movedTo.set(from, to);
+  states.delete(from);
+  publish(from);
+}
+
 /** The state a screen draws, whether or not the chat has opened yet. */
 export function snapshotOf(sessionId: string): ChatState {
-  const held = states.get(sessionId);
+  const target = resolve(sessionId);
+  const held = states.get(target);
   if (held !== undefined) {
     return held;
   }
-  const fresh: ChatState = { sessionId, model: '', status: 'opening', ...NOTHING };
-  states.set(sessionId, fresh);
+  const fresh: ChatState = { sessionId: target, model: '', status: 'opening', ...NOTHING };
+  states.set(target, fresh);
   return fresh;
 }
 
@@ -120,5 +167,17 @@ export function watch(sessionId: string, watcher: () => void): () => void {
 
 /** Forgets a chat, which is what closing or deleting one does. */
 export function forgetState(sessionId: string): void {
+  /* A chat nothing points at any more needs no pointer to it: left behind, it
+     would resolve a stale id onto a chat that no longer exists. The pointers
+     are read before any is removed, so a chain resolves as it was. */
+  const stale: string[] = [];
+  for (const from of movedTo.keys()) {
+    if (resolve(from) === sessionId) {
+      stale.push(from);
+    }
+  }
+  for (const from of stale) {
+    movedTo.delete(from);
+  }
   states.delete(sessionId);
 }

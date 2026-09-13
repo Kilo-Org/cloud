@@ -1,5 +1,6 @@
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 import { releaseEveryChat } from './registry';
+import { forgetChatPlaces } from './scope';
 import { wipeChats } from './store';
 
 /**
@@ -11,6 +12,7 @@ import { wipeChats } from './store';
  */
 export async function clearChatsForSignOut(userId: string | null): Promise<void> {
   await releaseEveryChat();
+  forgetChatPlaces();
   wipeChats(await encryptedDatabase(), userId);
 }
 
@@ -20,8 +22,10 @@ export async function clearChatsForSignOut(userId: string | null): Promise<void>
  * The rows stay: they are scoped to the account that made them, the way the
  * read cache on disk is, and the next account never lists them. What must not
  * stay is a live session belonging to the account that left — it would go on
- * writing under whoever is signed in now.
+ * writing under whoever is signed in now — nor the places remembered for its
+ * scope.
  */
 export async function releaseChatsForAccountSwitch(): Promise<void> {
   await releaseEveryChat();
+  forgetChatPlaces();
 }

@@ -51,6 +51,7 @@ const prDetail = {
   draft: false,
   summary: { raw: 'Adds collision-free retry fingerprints.' },
   task_count: 1,
+  merge_state: 'open',
   author: {
     uuid: '{author-uuid}',
     nickname: 'alice',
@@ -1127,6 +1128,36 @@ describe('getMergeRestrictions', () => {
 
     // The range spec is the PR's own source and destination commits.
     expect(conflictSpecs).toEqual(['abc123def4567890..bd4567890abcdef12']);
+    expect(state.conflicts).toBe(true);
+    expect(state.blockedReasons).toContainEqual({
+      code: 'conflicts',
+      message: 'The pull request has conflicts that must be resolved.',
+    });
+    expect(state.canMerge).toBe(false);
+  });
+
+  it('reports a conflicted pull request from the provider merge_state', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const pathname = new URL(full).pathname;
+      if (pathname.endsWith('/pullrequests/12')) {
+        return jsonResponse({ ...prDetail, merge_state: 'UNCLEAN', task_count: 0 });
+      }
+      if (pathname.endsWith('/statuses')) {
+        return jsonResponse({
+          pagelen: 10,
+          values: [{ state: 'SUCCESSFUL', key: 'pipeline.build', name: 'Build', url: null }],
+          next: null,
+        });
+      }
+      return jsonResponse({ pagelen: 10, values: [], next: null });
+    });
+
+    const state = await getMergeRestrictions(ORG_OWNER, 'acme', 'repo', 12);
+
     expect(state.conflicts).toBe(true);
     expect(state.blockedReasons).toContainEqual({
       code: 'conflicts',

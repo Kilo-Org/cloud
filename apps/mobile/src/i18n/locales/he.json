@@ -4,6 +4,8 @@
     "done": "סיום",
     "retry": "ניסיון חוזר",
     "tryAgain": "ניסיון נוסף",
+    "continue": "המשך",
+    "notNow": "לא עכשיו",
     "language": "שפה",
     "device": "מכשיר",
     "share": "שיתוף {{title}}",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "לא ניתן היה להעתיק ללוח ההעתקה.",
     "required": "חובה",
     "error": "שגיאה: {{error}}",
-    "notNow": "לא עכשיו",
-    "continue": "המשך",
     "back": "חזרה",
     "somethingWentWrong": "משהו השתבש.",
     "couldNotOpen": "לא ניתן היה לפתוח את {{label}}.",
@@ -36,6 +36,7 @@
     "cost": "עלות",
     "discard": "ויתור על השינויים",
     "findings": "ממצאים",
+    "mergeRequest": "בקשת מיזוג",
     "notConnected": "לא מחובר",
     "notifications": "התראות",
     "pullRequest": "pR",
@@ -1572,11 +1573,31 @@
       "retryConnection": "ניסיון התחברות נוסף"
     },
     "newSession": {
+      "recentlyUsed": "בשימוש לאחרונה",
+      "couldNotLoadGithubRepositories": "לא ניתן היה לטעון את המאגרים מ-GitHub.",
+      "couldNotLoadGitlabRepositories": "לא ניתן היה לטעון את המאגרים מ-GitLab.",
+      "couldNotLoadBitbucketRepositories": "לא ניתן היה לטעון את המאגרים מ-Bitbucket.",
       "connectGithubDescription": "חבר את חשבון GitHub דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר.",
+      "connectGitlabDescription": "חבר את חשבון GitLab דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר.",
+      "connectBitbucketDescription": "חבר את חשבון Bitbucket דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר.",
       "openGithub": "פתיחת GitHub",
+      "openGitlab": "פתיחת GitLab",
+      "openBitbucket": "פתיחת Bitbucket",
       "refreshRepositories": "רענון המאגרים",
       "githubConnected": "GitHub מחובר",
+      "gitlabConnected": "GitLab מחובר",
       "noRepositoriesVisible": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים של אפליקציית Kilo ב-GitHub, ואז רענן את הרשימה.",
+      "noRepositoriesVisibleGitlab": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים ב-GitLab, ואז רענן את הרשימה.",
+      "noRepositoriesVisibleBitbucket": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים ב-Bitbucket, ואז רענן את הרשימה.",
+      "bitbucketOrganizationsOnly": "Bitbucket זמין לארגונים בלבד.",
+      "branchPickerTitle": "בחירת ענף",
+      "branchDefault": "ברירת מחדל",
+      "branchAccessibility": "ענף: {{label}}",
+      "branchLoading": "טוען ענפים",
+      "branchLoadError": "לא ניתן היה לטעון את הענפים",
+      "branchUnavailable": "הענפים אינם זמינים למאגר הזה. בדקו את הגישה שלך מול הספק, ואז בחרו מאגר אחר.",
+      "branchEmpty": "אין ענפים זמינים",
+      "branchPlaceholder": "בחרו ענף",
       "runOnWithTarget": "יעד ההרצה: {{target}}",
       "environment": "סביבה",
       "couldNotLoadEnvironment": "לא ניתן היה לטעון את הסביבה שלך.",
@@ -1595,26 +1616,15 @@
       "couldNotReadPendingSessions": "לא ניתן היה לקרוא את הסשנים הממתינים. נסה שוב.",
       "failedToCreate": "לא ניתן היה ליצור סשן.",
       "couldNotRefreshRepositories": "לא ניתן היה לרענן מאגרים. נסה שוב.",
-      "discardDraftMessage": "ההנחיה שלך תימחק.",
       "discardDraftTitle": "למחוק את הטיוטה?",
+      "discardDraftMessage": "ההנחיה שלך תימחק.",
+      "discardWithUploadsMessage": "ההנחיה שלך וכל הקבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
       "discardFailed": "לא ניתן היה למחוק את הטיוטה. נסה שוב.",
       "remoteHint": "הרץ `kilo remote` במחשב שלך, או `/remote` בסשן CLI פעיל, כדי לשלוט בתהליך kilo מקומי.",
-      "connectBitbucketDescription": "חבר את חשבון Bitbucket דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר.",
-      "connectGitlabDescription": "חבר את חשבון GitLab דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר.",
-      "couldNotLoadBitbucketRepositories": "לא ניתן היה לטעון את המאגרים מ-Bitbucket.",
-      "couldNotLoadGithubRepositories": "לא ניתן היה לטעון את המאגרים מ-GitHub.",
-      "couldNotLoadGitlabRepositories": "לא ניתן היה לטעון את המאגרים מ-GitLab.",
-      "gitlabConnected": "GitLab מחובר",
-      "noRepositoriesVisibleBitbucket": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים ב-Bitbucket, ואז רענן את הרשימה.",
-      "noRepositoriesVisibleGitlab": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים ב-GitLab, ואז רענן את הרשימה.",
-      "openBitbucket": "פתיחת Bitbucket",
-      "openGitlab": "פתיחת GitLab",
-      "recentlyUsed": "בשימוש לאחרונה",
-      "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
       "continueFrom": "ממשיך את הסשן {{title}}.",
-      "importFailed": "לא ניתן היה לייבא את הסשן הזה.",
       "importingSession": "מייבא סשן…",
-      "discardWithUploadsMessage": "ההנחיה שלך וכל הקבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו."
+      "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
+      "importFailed": "לא ניתן היה לייבא את הסשן הזה."
     },
     "partRenderer": {
       "updatedFileCount_one": "מספר הקבצים שעודכנו הוא {{displayCount}}.",
@@ -2378,11 +2388,17 @@
       "tapDiffLineToSuggest": "הקש על שורה בהשוואת השינויים כדי להוסיף הצעה."
     },
     "connect": {
-      "checkFailedMessage": "מצב ההתחברות אינו זמין עד לסיום הטעינה.",
       "checkFailedTitle": "לא ניתן היה לבדוק את החיבור ל-GitHub.",
-      "description": "חבר את חשבון ה-GitHub שלך כדי לסקור בקשות משיכה בנייד.",
+      "checkFailedMessage": "מצב ההתחברות אינו זמין עד לסיום הטעינה.",
+      "checkFailedTitleGitLab": "לא ניתן היה לבדוק את החיבור ל-GitLab.",
+      "checkFailedTitleBitbucket": "לא ניתן היה לבדוק את החיבור ל-Bitbucket.",
+      "providerCheckFailedMessage": "מצב החיבור אינו זמין עד לסיום הטעימה.",
+      "reconnectTitle": "חיבור מחדש ל-GitHub",
       "reconnectDescription": "החיבור שלך ל-GitHub בוטל. התחבר מחדש כדי להמשיך לסקור בקשות משיכה בנייד.",
-      "reconnectTitle": "חיבור מחדש ל-GitHub"
+      "description": "חבר את חשבון ה-GitHub שלך כדי לסקור בקשות משיכה בנייד.",
+      "gitlabDescription": "חברו את חשבון GitLab שלכם כדי לסקור בקשות מיזוג בנייד.",
+      "bitbucketDescription": "חברו את Bitbucket לארגון הזה כדי לסקור בקשות משיכה בנייד.",
+      "bitbucketOrgOnlyDescription": "בחרו ארגון בפרופיל שלכם כדי לסקור את בקשות המשיכה של Bitbucket שלו."
     },
     "connectionExpired": "פג תוקף החיבור ל-GitHub.",
     "couldNotLoadPullRequest": "לא ניתן היה לטעון את בקשת המשיכה.",
@@ -2477,21 +2493,24 @@
         "outdatedOnLines": "לא עדכני: {{lines}}",
         "outdatedOnPath": "לא עדכני: {{path}}"
       },
-      "deletedUser": "משתמש שנמחק"
+      "deletedUser": "משתמש שנמחק",
+      "replyForbiddenTerm": "אין לך הרשאה להשיב ל-{{term}} הזה."
     },
     "entry": {
-      "clearLink": "ניקוי הקישור לבקשת המשיכה",
+      "eyebrow": "אפשר לפתוח בקשת משיכה או בקשת מיזוג באמצעות כתובת URL.",
+      "pastePrLink": "הדבקת קישור לבקשת משיכה או מיזוג",
+      "noRecentPrs": "אין סקירות לאחרונה",
+      "noRecentPrsDescription": "הדבקו קישור למעלה כדי להתחיל סקירה — הוא יופיע כאן בפעם הבאה.",
       "couldNotLoad": "לא ניתן היה לטעון את הנתונים.",
-      "eyebrow": "אפשר לפתוח בקשת משיכה באמצעות כתובת URL.",
-      "noRecentPrs": "אין פריטי PR אחרונים",
-      "noRecentPrsDescription": "הדבק למעלה קישור ל-PR כדי להתחיל סקירה — הוא יופיע כאן בפעם הבאה.",
-      "open": "פתוח",
-      "pasteLink": "הדבקת קישור לבקשת משיכה",
-      "pastePrLink": "הדבקת קישור ל-PR",
-      "removeFromRecentsMessage": "בקשת המשיכה הזו תוסר מרשימת הבקשות האחרונות שלך.",
       "removeFromRecentsTitle": "להסיר מהבקשות האחרונות?",
+      "removeFromRecentsMessage": "הסקירה הזו תוסר מרשימת האחרונות שלך.",
       "removeRecentAccessibility": "הסרת {{repo}} מרשימת הבקשות האחרונות",
-      "urlAccessibility": "כתובת URL של בקשת משיכה ב-GitHub"
+      "urlAccessibility": "הזנת כתובת URL של בקשת משיכה או מיזוג",
+      "urlPlaceholder": "כתובת URL של בקשת משיכה או בקשת מיזוג",
+      "openAccessibility": "פתיחת בקשת משיכה או בקשת מיזוג",
+      "clearLink": "ניקוי הקישור",
+      "pasteLink": "הדבקת קישור לבקשת משיכה או מיזוג",
+      "open": "פתוח"
     },
     "eventChips": {
       "comment": "תגובה",
@@ -2586,47 +2605,52 @@
     },
     "installKiloGitHubApp": "התקנת אפליקציית Kilo ל-GitHub",
     "merge": {
-      "autoMergeDescription": "GitHub ימזג את בקשת המשיכה הזו אוטומטית כשכל הבדיקות הנדרשות יעברו (שיטה: {{method}}).",
-      "autoMergeOn": "מיזוג אוטומטי מופעל",
-      "blockedTitle": "למה עדיין אי אפשר למזג",
-      "cannotMerge": "לא ניתן למזג את בקשת המשיכה הזו כפי שהיא.",
-      "checking": "בודקים אם אפשר למזג…",
-      "commitMessage": "הודעת הקומיט",
-      "commitMessagePlaceholder": "תיאור לקומיט המיזוג (לא חובה)",
-      "commitTitle": "כותרת הקומיט",
-      "confirmMessage": "פעולה זו תמזג את השינויים שלך לענף הבסיס.",
-      "confirmTitle": "למזג את בקשת המשיכה?",
-      "couldNotDetermine": "לא ניתן היה לקבוע אם אפשר למזג.",
-      "couldNotMerge": "לא ניתן היה למזג את בקשת המשיכה.",
-      "deleteBranch": "מחיקת הענף",
-      "deleteBranchAfterMerge": "מחיקת הענף לאחר המיזוג",
-      "disableAutoMerge": "השבתת מיזוג אוטומטי",
-      "enableAutoMerge": "הפעלת מיזוג אוטומטי",
-      "enableAutoMergeConfirmMessage": "GitHub ימזג את בקשת המשיכה הזו אוטומטית כשכל הבדיקות הנדרשות יעברו.",
-      "enableAutoMergeConfirmTitle": "להפעיל מיזוג אוטומטי?",
-      "forbidden": "אין לך הרשאה למזג את בקשת המשיכה הזו.",
-      "loadFailedTitle": "לא ניתן היה לטעון את אפשרויות המיזוג.",
       "merge": "מיזוג",
       "mergeNow": "מיזוג עכשיו",
       "mergePullRequest": "מיזוג בקשת משיכה",
+      "mergeTermTitle": "מיזוג {{term}}",
+      "enableAutoMerge": "הפעלת מיזוג אוטומטי",
+      "disableAutoMerge": "השבתת מיזוג אוטומטי",
+      "autoMergeOn": "מיזוג אוטומטי מופעל",
+      "autoMergeDescription": "GitHub ימזג את בקשת המשיכה הזו אוטומטית כשכל הבדיקות הנדרשות יעברו (שיטה: {{method}}).",
+      "checking": "בודקים אם אפשר למזג…",
+      "couldNotDetermine": "לא ניתן היה לקבוע אם אפשר למזג.",
+      "refreshMergeability": "בדיקה חוזרת אם אפשר למזג",
+      "blockedTitle": "למה עדיין אי אפשר למזג",
+      "updateBranch": "עדכון הענף",
+      "updateBranchFromBase": "עדכון הענף מענף הבסיס",
       "methodLabel": "שיטה",
+      "commitTitle": "כותרת הקומיט",
+      "commitMessage": "הודעת הקומיט",
+      "commitMessagePlaceholder": "תיאור לקומיט המיזוג (לא חובה)",
+      "deleteBranch": "מחיקת הענף",
+      "deleteBranchAfterMerge": "מחיקת הענף לאחר המיזוג",
+      "noEnabledMethods": "אין שיטות מיזוג פעילות במאגר הזה. בקש ממנהל המאגר להפעיל מיזוג רגיל, מיזוג עם איחוד קומיטים או מיזוג עם ריבייס.",
+      "confirmTitle": "למזג את בקשת המשיכה?",
+      "confirmTitleTerm": "למזג את ה-{{term}}?",
+      "confirmMessage": "פעולה זו תמזג את השינויים שלך לענף הבסיס.",
+      "enableAutoMergeConfirmTitle": "להפעיל מיזוג אוטומטי?",
+      "enableAutoMergeConfirmMessage": "GitHub ימזג את בקשת המשיכה הזו אוטומטית כשכל הבדיקות הנדרשות יעברו.",
+      "enableAutoMergeConfirmMessageTerm": "ה-{{term}} ימוזג אוטומטית לאחר שהצנרת תעבור בהצלחה.",
+      "enableAutoMergeDescriptionTerm": "GitLab ימזג את ה-{{term}} הזה אוטומטית לאחר שהצנרת תעבור בהצלחה.",
+      "forbidden": "אין לך הרשאה למזג את בקשת המשיכה הזו.",
+      "cannotMerge": "לא ניתן למזג את בקשת המשיכה הזו כפי שהיא.",
+      "couldNotMerge": "לא ניתן היה למזג את בקשת המשיכה.",
       "methods": {
         "merge": "מיזוג",
         "rebase": "ריבייס",
         "squash": "איחוד קומיטים"
       },
-      "noEnabledMethods": "אין שיטות מיזוג פעילות במאגר הזה. בקש ממנהל המאגר להפעיל מיזוג רגיל, מיזוג עם איחוד קומיטים או מיזוג עם ריבייס.",
+      "terminal": {
+        "alreadyMerged": "כבר מוזגה",
+        "closed": "בקשת המשיכה הזו סגורה",
+        "closedMergeRequest": "בקשת המיזוג הזו סגורה"
+      },
       "partialSuccessBanner": {
         "accessibility": "המיזוג הושלם. לא ניתן היה למחוק את הענף: {{reason}}",
         "body": "לא ניתן היה למחוק את הענף: {{reason}}."
       },
-      "refreshMergeability": "בדיקה חוזרת אם אפשר למזג",
-      "terminal": {
-        "alreadyMerged": "כבר מוזגה",
-        "closed": "בקשת המשיכה הזו סגורה"
-      },
-      "updateBranch": "עדכון הענף",
-      "updateBranchFromBase": "עדכון הענף מענף הבסיס",
+      "loadFailedTitle": "לא ניתן היה לטעון את אפשרויות המיזוג.",
       "blocked": {
         "unknownStateTitle": "GitHub עדיין לא דיווח שאפשר למזג",
         "unknownStateDetail": "נסה לרענן את הסקירה הכללית בעוד רגע.",
@@ -2645,6 +2669,19 @@
         "behindDetail": "בענף המקור חסרים עדכונים מענף הבסיס. בצע ריבייס או עדכן את הענף לפני המיזוג.",
         "notMergeableTitle": "עדיין לא ניתן למזג את בקשת המשיכה הזו",
         "notMergeableDetail": "מצב אפשרות המיזוג שדווח על ידי GitHub: {{state}}."
+      },
+      "restrictions": {
+        "title": "הגבלות מיזוג",
+        "approvalsRequired_one": "נדרש אישור {{displayCount}}",
+        "approvalsRequired_other": "נדרשים {{displayCount}} אישורים",
+        "pipelineMustSucceed": "יש צורך שהצנרת תעבור בהצלחה לפני המיזוג.",
+        "approvalsRequired_two": "נדרשים {{displayCount}} אישורים"
+      },
+      "providerBlocked": {
+        "failingPipeline": "הצנרת נכשלת בקומיט האחרון.",
+        "pendingPipeline": "הצנרת עדיין פועלת בקומיט האחרון.",
+        "permission": "אין לך הרשאה למזג את ה-{{term}} הזה.",
+        "draft": "סמן את ה-{{term}} כמוכן לסקירה לפני המיזוג."
       },
       "methodLabels": {
         "merge": "יצירת קומיט מיזוג",
@@ -2705,8 +2742,11 @@
     "pullRequestUnavailable": "בקשת המשיכה אינה זמינה",
     "pullRequestUnavailableDescription": "לא ניתן לפתוח את ה-PR הזה. ייתכן שהוא נמחק, שהמאגר פרטי או שאפליקציית Kilo ל-GitHub אינה מותקנת במאגר.",
     "reconnectNotice": {
+      "title": "פג תוקף החיבור ל-GitHub.",
       "message": "החיבור שלך ל-GitHub אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
-      "title": "פג תוקף החיבור ל-GitHub."
+      "gitlabTitle": "פג תוקף החיבור ל-GitLab.",
+      "bitbucketTitle": "פג תוקף החיבור ל-Bitbucket.",
+      "providerMessage": "החיבור שלך ל-{{provider}} אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך."
     },
     "review": "סקירה",
     "reviewPullRequest": "סקירת בקשת המשיכה",
@@ -2758,7 +2798,7 @@
       "emptyLine": "(ריק)"
     },
     "linkPasteClipboardEmpty": "לוח ההעתקה ריק.",
-    "linkPasteNotAPullRequest": "זה לא קישור לבקשת משיכה ב-GitHub.",
+    "linkPasteNotAPullRequest": "זה לא קישור לבקשת משיכה או מיזוג",
     "announce": {
       "commentPosted": "התגובה פורסמה",
       "reviewSubmitted": "הסקירה נשלחה",
@@ -2767,6 +2807,7 @@
     "mutationError": {
       "commentNotPosted": "לא ניתן לפרסם את התגובה הזו. ייתכן שהשורה שנבחרה השתנתה או שה-PR עודכן.",
       "reviewNotSubmitted": "לא ניתן לשלוח את הסקירה הזו כפי שהיא. ייתכן שה-PR השתנה, או שזו בקשת משיכה שלך ואינך יכול לסקור אותה.",
+      "reviewNotSubmittedTerm": "לא ניתן לשלוח את הסקירה הזו כמות שהיא. ייתכן שה-{{term}} השתנה, או שלא ניתן לסקור את ה-{{term}} שלך בעצמך.",
       "couldNotPostComment": "לא ניתן היה לפרסם תגובה.",
       "couldNotSubmitReview": "לא ניתן היה לשלוח את הסקירה. בדוק את החיבור ונסה שוב."
     },
@@ -2774,9 +2815,31 @@
       "couldNotReply": "לא הצלחנו לשלוח את התשובה.",
       "couldNotCompleteAction": "לא ניתן היה להשלים פעולה זו.",
       "mergeResultDefaultError": "GitHub לא השלים את המיזוג.",
+      "mergeResultNotCompleted": "ה-{{term}} לא מוזג. בדקו את המצב שלו ונסו שוב.",
       "ambiguous": "לא ניתן היה לוודא שהפעולה הושלמה — בדוק את ה-PR לפני שתנסה שוב.",
       "persistenceFailed": "לא הצלחנו לתעד את הפעולה הזו. נסה שוב מאוחר יותר.",
       "forbidden": "אין הרשאה לפעולה הזו."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "לא זמין אצל הספק הזה",
+        "accessibility": "לא זמין אצל הספק הזה: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "בקשת מיזוג",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "שיתוף בקשת המיזוג",
+      "viewOnProvider": "הצגה ב-{{provider}}",
+      "mergeRequestUnavailable": "בקשת המיזוג אינה זמינה",
+      "unavailableDescription": "ייתכן שנמחק, או שייתכן שאין לך גישה אליו.",
+      "accessDeniedMergeRequest": "אין לך הרשאה לצפות בבקשת המיזוג הזו.",
+      "couldNotLoadMergeRequest": "לא ניתן היה לטעון את בקשת המיזוג.",
+      "discussionAccessDenied": "אין לך הרשאה לצפות בדיון של בקשת המיזוג הזו.",
+      "discussionUnavailableMessage": "ייתכן שבקשת המיזוג הזו הוסרה.",
+      "noDiscussionDescription": "אין שרשורי סקירה או תגובות בדיון של בקשת המיזוג הזו.",
+      "noFilesChangedDescription": "אין שינויים בקבצים בבקשת המיזוג הזו."
     }
   },
   "organization": {

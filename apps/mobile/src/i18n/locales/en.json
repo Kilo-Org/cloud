@@ -36,6 +36,7 @@
     "cost": "Cost",
     "discard": "Discard",
     "findings": "Findings",
+    "mergeRequest": "merge request",
     "notConnected": "Not connected",
     "notifications": "Notifications",
     "pullRequest": "pull request",
@@ -350,6 +351,7 @@
       "merge": "Merge",
       "mergeNow": "Merge now",
       "mergePullRequest": "Merge pull request",
+      "mergeTermTitle": "Merge {{term}}",
       "enableAutoMerge": "Enable auto-merge",
       "disableAutoMerge": "Disable auto-merge",
       "autoMergeOn": "Auto-merge is on",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "Delete branch after merge",
       "noEnabledMethods": "This repository has no enabled merge methods. Ask a repository admin to enable merge, squash, or rebase merging.",
       "confirmTitle": "Merge pull request?",
+      "confirmTitleTerm": "Merge {{term}}?",
       "confirmMessage": "This will merge your changes into the base branch.",
       "enableAutoMergeConfirmTitle": "Enable auto-merge?",
       "enableAutoMergeConfirmMessage": "GitHub will merge this pull request automatically when all required checks pass.",
+      "enableAutoMergeConfirmMessageTerm": "The {{term}} will merge automatically once its pipeline succeeds.",
+      "enableAutoMergeDescriptionTerm": "GitLab merges this {{term}} automatically once its pipeline succeeds.",
       "forbidden": "You don't have permission to merge this pull request.",
       "cannotMerge": "This pull request cannot be merged as is.",
       "couldNotMerge": "Could not merge pull request.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Already merged",
-        "closed": "This pull request is closed"
+        "closed": "This pull request is closed",
+        "closedMergeRequest": "This merge request is closed"
       },
       "partialSuccessBanner": {
         "body": "Couldn't delete the branch: {{reason}}",
@@ -406,6 +412,18 @@
         "behindDetail": "The head branch is behind the base. Rebase or update the branch before merging.",
         "notMergeableTitle": "This pull request is not mergeable yet",
         "notMergeableDetail": "GitHub reported a {{state}} mergeable state."
+      },
+      "restrictions": {
+        "title": "Merge restrictions",
+        "approvalsRequired_one": "{{displayCount}} approval required",
+        "approvalsRequired_other": "{{displayCount}} approvals required",
+        "pipelineMustSucceed": "The pipeline must succeed before merging."
+      },
+      "providerBlocked": {
+        "failingPipeline": "The pipeline is failing on the latest commit.",
+        "pendingPipeline": "The pipeline is still running on the latest commit.",
+        "permission": "You don't have permission to merge this {{term}}.",
+        "draft": "Mark the {{term}} as ready for review before merging."
       },
       "methodLabels": {
         "merge": "Create a merge commit",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "Outdated on {{lines}}",
         "outdatedOnPath": "Outdated on {{path}}"
       },
-      "deletedUser": "deleted user"
+      "deletedUser": "deleted user",
+      "replyForbiddenTerm": "You don't have permission to reply to this {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Could not open GitHub App settings",
     "installKiloGitHubApp": "Install the Kilo GitHub App",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "Review pull request",
     "headLine": "{{counts}} · head {{sha}}",
     "entry": {
-      "eyebrow": "Open a pull request by URL",
-      "pastePrLink": "Paste a PR link",
-      "noRecentPrs": "No recent PRs",
-      "noRecentPrsDescription": "Paste a PR link above to start a review — it'll show up here next time.",
+      "eyebrow": "Open a pull request or merge request by URL",
+      "pastePrLink": "Paste a pull request or merge request link",
+      "noRecentPrs": "No recent reviews",
+      "noRecentPrsDescription": "Paste a link above to start a review — it'll show up here next time.",
       "couldNotLoad": "Couldn't load",
       "removeFromRecentsTitle": "Remove from recents?",
-      "removeFromRecentsMessage": "This pull request will be removed from your recents.",
+      "removeFromRecentsMessage": "This review will be removed from your recents.",
       "removeRecentAccessibility": "Remove {{repo}} from recents",
-      "urlAccessibility": "GitHub pull request URL",
-      "clearLink": "Clear pull request link",
-      "pasteLink": "Paste pull request link",
+      "urlAccessibility": "Enter a pull request or merge request URL",
+      "urlPlaceholder": "Pull request or merge request URL",
+      "openAccessibility": "Open pull request or merge request",
+      "clearLink": "Clear link",
+      "pasteLink": "Paste pull request or merge request link",
       "open": "Open"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "Could not check GitHub connection",
       "checkFailedMessage": "Sign-in status is unavailable until this loads.",
+      "checkFailedTitleGitLab": "Could not check GitLab connection",
+      "checkFailedTitleBitbucket": "Could not check Bitbucket connection",
+      "providerCheckFailedMessage": "Connection status is unavailable until this loads.",
       "reconnectTitle": "Reconnect GitHub",
       "reconnectDescription": "Your GitHub connection was revoked. Reconnect to keep reviewing pull requests on mobile.",
-      "description": "Connect your GitHub account to review pull requests on mobile."
+      "description": "Connect your GitHub account to review pull requests on mobile.",
+      "gitlabDescription": "Connect your GitLab account to review merge requests on mobile.",
+      "bitbucketDescription": "Connect Bitbucket to this organization to review pull requests on mobile.",
+      "bitbucketOrgOnlyDescription": "Select an organization in your profile to review its Bitbucket pull requests."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub connection expired",
-      "message": "Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed."
+      "message": "Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed.",
+      "gitlabTitle": "GitLab connection expired",
+      "bitbucketTitle": "Bitbucket connection expired",
+      "providerMessage": "Your {{provider}} connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed."
     },
     "eventChips": {
       "comment": "Comment",
@@ -668,7 +698,7 @@
       "emptyLine": "(empty)"
     },
     "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link",
+    "linkPasteNotAPullRequest": "Not a pull request or merge request link",
     "announce": {
       "commentPosted": "Comment posted",
       "reviewSubmitted": "Review submitted",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "This comment can't be posted. The selected line may have changed, or the PR may have been updated.",
       "reviewNotSubmitted": "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request.",
+      "reviewNotSubmittedTerm": "This review can't be submitted as is. The {{term}} may have changed, or you can't review your own {{term}}.",
       "couldNotPostComment": "Could not post comment.",
       "couldNotSubmitReview": "Could not submit review. Check your connection and try again."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "Could not reply.",
       "couldNotCompleteAction": "Could not complete this action.",
       "mergeResultDefaultError": "GitHub did not complete the merge.",
+      "mergeResultNotCompleted": "The {{term}} was not merged. Check its state and try again.",
       "ambiguous": "Couldn't confirm — check the PR before retrying.",
       "persistenceFailed": "We could not record this action. Please try again later.",
       "forbidden": "Forbidden"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Not available on this provider",
+        "accessibility": "Not available on this provider: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Pull request",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "Merge request !{{number}}",
+      "shareMergeRequest": "Share merge request",
+      "viewOnProvider": "View on {{provider}}",
+      "mergeRequestUnavailable": "Merge request unavailable",
+      "unavailableDescription": "It may have been deleted, or you may not have access to it.",
+      "accessDeniedMergeRequest": "You don't have permission to view this merge request.",
+      "couldNotLoadMergeRequest": "Could not load merge request",
+      "discussionAccessDenied": "You don't have permission to view this merge request's discussion.",
+      "discussionUnavailableMessage": "This merge request may have been removed.",
+      "noDiscussionDescription": "No review threads or conversation comments on this merge request.",
+      "noFilesChangedDescription": "This merge request has no file changes."
     }
   },
   "notifications": {
@@ -2021,6 +2074,15 @@
       "noRepositoriesVisible": "No repositories visible. Check repository access for the Kilo GitHub App, then refresh.",
       "noRepositoriesVisibleGitlab": "No repositories visible. Check repository access for GitLab, then refresh.",
       "noRepositoriesVisibleBitbucket": "No repositories visible. Check repository access for Bitbucket, then refresh.",
+      "bitbucketOrganizationsOnly": "Bitbucket is available for organizations only.",
+      "branchPickerTitle": "Select branch",
+      "branchDefault": "Default",
+      "branchAccessibility": "Branch: {{label}}",
+      "branchLoading": "Loading branches",
+      "branchLoadError": "Couldn't load branches",
+      "branchUnavailable": "Branches aren't available for this repository. Check your access with the provider, then pick another repository.",
+      "branchEmpty": "No branches available",
+      "branchPlaceholder": "Select a branch",
       "runOnWithTarget": "Run on: {{target}}",
       "environment": "Environment",
       "couldNotLoadEnvironment": "Couldn't load your environment",

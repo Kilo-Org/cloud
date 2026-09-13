@@ -9,6 +9,7 @@ import {
   pendingReviewDraftKey,
   type PendingReviewItem,
   PendingReviewProvider,
+  providerPendingReviewDraftKey,
   usePendingReview,
 } from './pending-review-provider';
 
@@ -399,5 +400,82 @@ describe('PendingReviewProvider persistence', () => {
       }
     });
     expect(draftsMock.flushDraft).toHaveBeenCalledWith('u1', 'pr-review:acme/kilo#42');
+  });
+});
+
+describe('providerPendingReviewDraftKey (s6, identity rule 17)', () => {
+  it('keeps the legacy GitHub bytes unchanged for a github ref (migration)', () => {
+    expect(
+      providerPendingReviewDraftKey({
+        platform: 'github',
+        owner: 'octocat',
+        repo: 'hello',
+        number: 42,
+      })
+    ).toBe(pendingReviewDraftKey('octocat', 'hello', 42));
+    expect(
+      providerPendingReviewDraftKey({
+        platform: 'github',
+        owner: 'Kilo-Org',
+        repo: 'Cloud',
+        number: 42,
+      })
+    ).toBe('pr-review:kilo-org/cloud#42');
+  });
+
+  it('separates a GitLab MR from a same-triple GitHub PR queue', () => {
+    const github = providerPendingReviewDraftKey({
+      platform: 'github',
+      owner: 'group',
+      repo: 'app',
+      number: 7,
+    });
+    const gitlab = providerPendingReviewDraftKey({
+      platform: 'gitlab',
+      projectPath: 'group/app',
+      mrIid: 7,
+      instanceHint: 'https://gitlab.example.com',
+    });
+    expect(gitlab).not.toBe(github);
+    expect(gitlab.startsWith(`${github}@`)).toBe(true);
+  });
+
+  it('separates one GitLab project reached on two instances', () => {
+    const atGitlab = providerPendingReviewDraftKey({
+      platform: 'gitlab',
+      projectPath: 'group/app',
+      mrIid: 7,
+      instanceHint: 'https://gitlab.com',
+    });
+    const atSelfManaged = providerPendingReviewDraftKey({
+      platform: 'gitlab',
+      projectPath: 'group/app',
+      mrIid: 7,
+      instanceHint: 'https://gitlab.example.com',
+    });
+    const withoutHint = providerPendingReviewDraftKey({
+      platform: 'gitlab',
+      projectPath: 'group/app',
+      mrIid: 7,
+    });
+    expect(atGitlab).not.toBe(atSelfManaged);
+    // An absent hint folds to '' — deliberately NOT equal to the SaaS host.
+    expect(withoutHint).not.toBe(atGitlab);
+  });
+
+  it('separates same-numbered Bitbucket PRs across workspaces', () => {
+    const one = providerPendingReviewDraftKey({
+      platform: 'bitbucket',
+      workspace: 'acme',
+      repoSlug: 'app',
+      prId: 7,
+    });
+    const other = providerPendingReviewDraftKey({
+      platform: 'bitbucket',
+      workspace: 'other',
+      repoSlug: 'app',
+      prId: 7,
+    });
+    expect(one).not.toBe(other);
   });
 });

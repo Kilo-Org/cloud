@@ -1,6 +1,12 @@
 import * as SecureStore from 'expo-secure-store';
 import { z } from 'zod';
 
+import {
+  gitlabInstanceOrigin,
+  type ProviderPrPlatform,
+  type ProviderPrRef,
+} from '@kilocode/app-shared/provider-review';
+
 import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { PR_REVIEW_RECENTS_KEY } from '@/lib/storage-keys';
 
@@ -16,6 +22,19 @@ export type RecentPr = {
    * missing field on a legacy stored entry) marks a successful load.
    */
   lastResult?: 'ok' | 'failed';
+  /**
+   * The provider this entry belongs to. Entries stored before the
+   * multi-provider recents (s7) carry no platform and read as `'github'` —
+   * they were only ever written by the GitHub backfill.
+   */
+  platform?: ProviderPrPlatform;
+  /**
+   * GitLab only: the origin of the instance the entry was opened on.
+   * Identity/recents only — the server re-derives the authoritative
+   * instance (s2), so a stale hint never redirects, it only keeps one row
+   * per instance.
+   */
+  instanceHint?: string;
 };
 
 const recentPrSchema = z.object({
@@ -25,18 +44,60 @@ const recentPrSchema = z.object({
   title: z.string(),
   lastOpenedAt: z.number(),
   lastResult: z.enum(['ok', 'failed']).optional(),
+  platform: z.enum(['github', 'gitlab', 'bitbucket']).optional(),
+  instanceHint: z.string().optional(),
 });
 
 const RECENT_PR_LIMIT = 10;
 
-type RecentPrRef = {
+/** The identity one recents entry is stored, keyed, removed and marked under. */
+export type RecentPrRef = {
   owner: string;
   repo: string;
   number: number;
+  platform?: ProviderPrPlatform;
+  instanceHint?: string;
 };
 
-function recentPrKey(item: RecentPrRef): string {
-  return `${item.owner.toLowerCase()}/${item.repo.toLowerCase()}#${item.number}`;
+/**
+ * The collision-free recents key: platform, the GitLab instance origin, and
+ * the lowercased repository path plus number. The bare `owner/repo#number`
+ * triple collided across providers — the same-named repository on GitHub,
+ * GitLab and Bitbucket is three separate rows, and one GitLab project on two
+ * instances is two rows. GitHub paths keep their existing case-fold so a
+ * differently cased paste of the same PR still dedupes.
+ */
+export function recentPrKey(item: RecentPrRef): string {
+  const platform = item.platform ?? 'github';
+  const instance = platform === 'gitlab' ? gitlabInstanceOrigin(item.instanceHint) : '';
+  return `${platform}|${instance}|${item.owner.toLowerCase()}/${item.repo.toLowerCase()}#${item.number}`;
+}
+
+/**
+ * The provider ref a recents row navigates with. The entry's writers store
+ * the `owner`/`repo`/`number` triple exactly as `providerPrTriple` splits
+ * the provider path at its last separator, so folding it back with the
+ * platform (legacy entries: GitHub) restores the ref losslessly.
+ */
+export function providerRefFromRecentPr(entry: RecentPrRef): ProviderPrRef {
+  const platform: ProviderPrPlatform = entry.platform ?? 'github';
+  if (platform === 'gitlab') {
+    return {
+      platform: 'gitlab',
+      projectPath: `${entry.owner}/${entry.repo}`,
+      mrIid: entry.number,
+      ...(entry.instanceHint ? { instanceHint: entry.instanceHint } : {}),
+    };
+  }
+  if (platform === 'bitbucket') {
+    return {
+      platform: 'bitbucket',
+      workspace: entry.owner,
+      repoSlug: entry.repo,
+      prId: entry.number,
+    };
+  }
+  return { platform: 'github', owner: entry.owner, repo: entry.repo, number: entry.number };
 }
 
 function parseRecents(raw: string | null): RecentPr[] {
@@ -54,7 +115,9 @@ function parseRecents(raw: string | null): RecentPr[] {
         return [];
       }
       // Legacy entries predate `lastResult`; read a missing field as 'ok'
-      // so an installed app's existing recents survive the upgrade.
+      // so an installed app's existing recents survive the upgrade. A
+      // missing `platform` (s7) reads as GitHub, which is the only provider
+      // the pre-s7 writers could have stored.
       return [
         { ...result.data, lastResult: result.data.lastResult === 'failed' ? 'failed' : 'ok' },
       ];

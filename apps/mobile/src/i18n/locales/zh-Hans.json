@@ -4,6 +4,8 @@
     "done": "完成",
     "retry": "重试",
     "tryAgain": "再试一次",
+    "continue": "继续",
+    "notNow": "暂时不用",
     "language": "语言",
     "device": "设备",
     "share": "分享 {{title}}",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "无法复制到剪贴板。",
     "required": "必填",
     "error": "错误：{{error}}",
-    "notNow": "暂时不用",
-    "continue": "继续",
     "back": "返回",
     "somethingWentWrong": "出了点问题。",
     "couldNotOpen": "无法打开 {{label}}。",
@@ -36,6 +36,7 @@
     "cost": "费用",
     "discard": "放弃",
     "findings": "问题",
+    "mergeRequest": "合并请求",
     "notConnected": "未连接",
     "notifications": "通知",
     "pullRequest": "拉取请求",
@@ -1563,11 +1564,31 @@
       "retryConnection": "重新连接"
     },
     "newSession": {
+      "recentlyUsed": "最近使用",
+      "couldNotLoadGithubRepositories": "无法加载 GitHub 仓库。",
+      "couldNotLoadGitlabRepositories": "无法加载 GitLab 仓库。",
+      "couldNotLoadBitbucketRepositories": "无法加载 Bitbucket 仓库。",
       "connectGithubDescription": "在浏览器中连接 GitHub，然后返回此处选择仓库。",
+      "connectGitlabDescription": "在浏览器中连接 GitLab，然后返回此处选择仓库。",
+      "connectBitbucketDescription": "在浏览器中连接 Bitbucket，然后返回此处选择仓库。",
       "openGithub": "打开 GitHub",
+      "openGitlab": "打开 GitLab",
+      "openBitbucket": "打开 Bitbucket",
       "refreshRepositories": "刷新仓库",
       "githubConnected": "GitHub 已连接",
+      "gitlabConnected": "GitLab 已连接",
       "noRepositoriesVisible": "未显示任何仓库。请检查 Kilo GitHub 应用的仓库访问权限，然后刷新。",
+      "noRepositoriesVisibleGitlab": "未显示任何仓库。请检查 GitLab 的仓库访问权限，然后刷新。",
+      "noRepositoriesVisibleBitbucket": "未显示任何仓库。请检查 Bitbucket 的仓库访问权限，然后刷新。",
+      "bitbucketOrganizationsOnly": "Bitbucket 仅对组织可用。",
+      "branchPickerTitle": "选择分支",
+      "branchDefault": "默认",
+      "branchAccessibility": "分支: {{label}}",
+      "branchLoading": "正在加载分支",
+      "branchLoadError": "无法加载分支",
+      "branchUnavailable": "此仓库没有可用的分支。检查你在提供商处的访问权限，然后选择另一个仓库。",
+      "branchEmpty": "没有可用的分支",
+      "branchPlaceholder": "选择一个分支",
       "runOnWithTarget": "运行位置：{{target}}",
       "environment": "环境",
       "couldNotLoadEnvironment": "无法加载你的环境。",
@@ -1586,26 +1607,15 @@
       "couldNotReadPendingSessions": "无法读取待处理的会话。请重试。",
       "failedToCreate": "创建会话失败。",
       "couldNotRefreshRepositories": "无法刷新仓库。请重试。",
-      "discardDraftMessage": "你输入的提示词将丢失。",
       "discardDraftTitle": "丢弃草稿？",
+      "discardDraftMessage": "你输入的提示词将丢失。",
+      "discardWithUploadsMessage": "你输入的提示词和已上传但尚未用于发送消息的文件将被删除。",
       "discardFailed": "无法丢弃草稿。请重试。",
       "remoteHint": "在电脑上运行 `kilo remote`，或在正在运行的 CLI 会话中执行 `/remote`，即可控制本地 kilo 进程。",
-      "connectBitbucketDescription": "在浏览器中连接 Bitbucket，然后返回此处选择仓库。",
-      "connectGitlabDescription": "在浏览器中连接 GitLab，然后返回此处选择仓库。",
-      "couldNotLoadBitbucketRepositories": "无法加载 Bitbucket 仓库。",
-      "couldNotLoadGithubRepositories": "无法加载 GitHub 仓库。",
-      "couldNotLoadGitlabRepositories": "无法加载 GitLab 仓库。",
-      "gitlabConnected": "GitLab 已连接",
-      "noRepositoriesVisibleBitbucket": "未显示任何仓库。请检查 Bitbucket 的仓库访问权限，然后刷新。",
-      "noRepositoriesVisibleGitlab": "未显示任何仓库。请检查 GitLab 的仓库访问权限，然后刷新。",
-      "openBitbucket": "打开 Bitbucket",
-      "openGitlab": "打开 GitLab",
-      "recentlyUsed": "最近使用",
       "continueFrom": "正在继续会话“{{title}}”。",
       "importingSession": "正在导入会话",
       "cliCannotContinue": "此 CLI 无法继续会话。请选择 Cloud Agent 或其他 CLI。",
-      "importFailed": "无法导入此会话。",
-      "discardWithUploadsMessage": "你输入的提示词和已上传但尚未用于发送消息的文件将被删除。"
+      "importFailed": "无法导入此会话。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件。",
@@ -2364,11 +2374,17 @@
       "tapDiffLineToSuggest": "点按差异中的一行，即可添加代码建议。"
     },
     "connect": {
-      "checkFailedMessage": "加载完成前，无法确认登录状态。",
       "checkFailedTitle": "无法检查 GitHub 连接。",
-      "description": "连接 GitHub 账号，即可在手机上审查拉取请求。",
+      "checkFailedMessage": "加载完成前，无法确认登录状态。",
+      "checkFailedTitleGitLab": "无法检查 GitLab 连接。",
+      "checkFailedTitleBitbucket": "无法检查 Bitbucket 连接。",
+      "providerCheckFailedMessage": "加载完成前无法获取连接状态。",
+      "reconnectTitle": "重新连接 GitHub",
       "reconnectDescription": "GitHub 连接授权已被撤销。请重新连接，继续在手机上审查拉取请求。",
-      "reconnectTitle": "重新连接 GitHub"
+      "description": "连接 GitHub 账号，即可在手机上审查拉取请求。",
+      "gitlabDescription": "连接你的 GitLab 账户，以便在移动端审查合并请求。",
+      "bitbucketDescription": "将 Bitbucket 连接到此组织，以便在移动端审查拉取请求。",
+      "bitbucketOrgOnlyDescription": "在你的个人资料中选择一个组织，以审查其 Bitbucket 拉取请求。"
     },
     "connectionExpired": "GitHub 连接已过期。",
     "couldNotLoadPullRequest": "无法加载拉取请求。",
@@ -2461,21 +2477,24 @@
         "outdatedOnLines": "{{lines}}（已过时）",
         "outdatedOnPath": "{{path}}（已过时）"
       },
-      "deletedUser": "已删除的用户"
+      "deletedUser": "已删除的用户",
+      "replyForbiddenTerm": "你无权回复此{{term}}。"
     },
     "entry": {
-      "clearLink": "清除拉取请求链接",
+      "eyebrow": "通过 URL 打开拉取请求或合并请求",
+      "pastePrLink": "粘贴拉取请求或合并请求链接",
+      "noRecentPrs": "暂无最近审查",
+      "noRecentPrsDescription": "在上方粘贴链接即可开始审查，下次就能在这里找到它。",
       "couldNotLoad": "无法加载。",
-      "eyebrow": "通过 URL 打开拉取请求。",
-      "noRecentPrs": "暂无最近查看的 PR",
-      "noRecentPrsDescription": "在上方粘贴 PR 链接即可开始审查，下次就能在这里找到它。",
-      "open": "开启",
-      "pasteLink": "粘贴拉取请求链接",
-      "pastePrLink": "粘贴 PR 链接",
-      "removeFromRecentsMessage": "此拉取请求将从你的最近记录中移除。",
       "removeFromRecentsTitle": "从最近记录中移除？",
+      "removeFromRecentsMessage": "此审查将从你的最近记录中移除。",
       "removeRecentAccessibility": "从最近记录中移除 {{repo}}",
-      "urlAccessibility": "GitHub 拉取请求 URL"
+      "urlAccessibility": "输入拉取请求或合并请求 URL",
+      "urlPlaceholder": "拉取请求或合并请求 URL",
+      "openAccessibility": "打开拉取请求或合并请求",
+      "clearLink": "清除链接",
+      "pasteLink": "粘贴拉取请求或合并请求链接",
+      "open": "开启"
     },
     "eventChips": {
       "comment": "评论",
@@ -2568,47 +2587,52 @@
     },
     "installKiloGitHubApp": "安装 Kilo GitHub 应用",
     "merge": {
-      "autoMergeDescription": "所有必需检查通过后，GitHub 会自动合并此拉取请求（合并方式：{{method}}）。",
-      "autoMergeOn": "自动合并已开启",
-      "blockedTitle": "暂时无法合并的原因",
-      "cannotMerge": "此拉取请求目前无法合并。",
-      "checking": "正在检查是否可以合并…",
-      "commitMessage": "提交说明",
-      "commitMessagePlaceholder": "合并提交说明（可选）",
-      "commitTitle": "提交标题",
-      "confirmMessage": "这会将你的更改合并到基础分支。",
-      "confirmTitle": "合并拉取请求？",
-      "couldNotDetermine": "无法确定是否可以合并。",
-      "couldNotMerge": "无法合并拉取请求。",
-      "deleteBranch": "删除分支",
-      "deleteBranchAfterMerge": "合并后删除分支",
-      "disableAutoMerge": "关闭自动合并",
-      "enableAutoMerge": "开启自动合并",
-      "enableAutoMergeConfirmMessage": "所有必需检查通过后，GitHub 会自动合并此拉取请求。",
-      "enableAutoMergeConfirmTitle": "开启自动合并？",
-      "forbidden": "你无权合并此拉取请求。",
-      "loadFailedTitle": "无法加载合并选项。",
       "merge": "合并",
       "mergeNow": "立即合并",
       "mergePullRequest": "合并拉取请求",
+      "mergeTermTitle": "合并{{term}}",
+      "enableAutoMerge": "开启自动合并",
+      "disableAutoMerge": "关闭自动合并",
+      "autoMergeOn": "自动合并已开启",
+      "autoMergeDescription": "所有必需检查通过后，GitHub 会自动合并此拉取请求（合并方式：{{method}}）。",
+      "checking": "正在检查是否可以合并…",
+      "couldNotDetermine": "无法确定是否可以合并。",
+      "refreshMergeability": "重新检查是否可以合并",
+      "blockedTitle": "暂时无法合并的原因",
+      "updateBranch": "更新分支",
+      "updateBranchFromBase": "用基础分支的最新内容更新当前分支",
       "methodLabel": "合并方式",
+      "commitTitle": "提交标题",
+      "commitMessage": "提交说明",
+      "commitMessagePlaceholder": "合并提交说明（可选）",
+      "deleteBranch": "删除分支",
+      "deleteBranchAfterMerge": "合并后删除分支",
+      "noEnabledMethods": "此仓库尚未启用任何合并方式。请联系仓库管理员启用普通合并、压缩合并或变基合并。",
+      "confirmTitle": "合并拉取请求？",
+      "confirmTitleTerm": "合并{{term}}？",
+      "confirmMessage": "这会将你的更改合并到基础分支。",
+      "enableAutoMergeConfirmTitle": "开启自动合并？",
+      "enableAutoMergeConfirmMessage": "所有必需检查通过后，GitHub 会自动合并此拉取请求。",
+      "enableAutoMergeConfirmMessageTerm": "流水线成功后，{{term}}将自动合并。",
+      "enableAutoMergeDescriptionTerm": "流水线成功后，GitLab 会自动合并此{{term}}。",
+      "forbidden": "你无权合并此拉取请求。",
+      "cannotMerge": "此拉取请求目前无法合并。",
+      "couldNotMerge": "无法合并拉取请求。",
       "methods": {
         "merge": "合并",
         "rebase": "变基",
         "squash": "压缩合并"
       },
-      "noEnabledMethods": "此仓库尚未启用任何合并方式。请联系仓库管理员启用普通合并、压缩合并或变基合并。",
+      "terminal": {
+        "alreadyMerged": "已合并",
+        "closed": "此拉取请求已关闭",
+        "closedMergeRequest": "此合并请求已关闭"
+      },
       "partialSuccessBanner": {
         "accessibility": "已合并。无法删除分支：{{reason}}",
         "body": "无法删除分支：{{reason}}。"
       },
-      "refreshMergeability": "重新检查是否可以合并",
-      "terminal": {
-        "alreadyMerged": "已合并",
-        "closed": "此拉取请求已关闭"
-      },
-      "updateBranch": "更新分支",
-      "updateBranchFromBase": "用基础分支的最新内容更新当前分支",
+      "loadFailedTitle": "无法加载合并选项。",
       "blocked": {
         "unknownStateTitle": "GitHub 尚未返回合并状态",
         "unknownStateDetail": "请稍后刷新概览。",
@@ -2627,6 +2651,18 @@
         "behindDetail": "源分支落后于基础分支。合并前，请进行变基或更新分支。",
         "notMergeableTitle": "此拉取请求暂时无法合并",
         "notMergeableDetail": "GitHub 返回的合并状态为 {{state}}。"
+      },
+      "restrictions": {
+        "title": "合并限制",
+        "approvalsRequired_one": "需要 {{displayCount}} 个批准",
+        "approvalsRequired_other": "需要 {{displayCount}} 个批准",
+        "pipelineMustSucceed": "合并前流水线必须成功。"
+      },
+      "providerBlocked": {
+        "failingPipeline": "流水线在最新提交上失败。",
+        "pendingPipeline": "流水线在最新提交上仍在运行。",
+        "permission": "你无权合并此{{term}}。",
+        "draft": "合并前，请将{{term}}标记为可供审查。"
       },
       "methodLabels": {
         "merge": "创建合并提交",
@@ -2685,8 +2721,11 @@
     "pullRequestUnavailable": "无法打开拉取请求",
     "pullRequestUnavailableDescription": "无法打开此 PR。可能是 PR 已被删除、仓库为私有仓库，或仓库尚未安装 Kilo GitHub 应用。",
     "reconnectNotice": {
+      "title": "GitHub 连接已过期。",
       "message": "GitHub 连接已失效。请重新检查连接；如需重新连接，系统会提示你。",
-      "title": "GitHub 连接已过期。"
+      "gitlabTitle": "GitLab 连接已过期。",
+      "bitbucketTitle": "Bitbucket 连接已过期。",
+      "providerMessage": "{{provider}} 连接已失效。请重新检查连接；如需重新连接，系统会提示你。"
     },
     "review": "审查",
     "reviewPullRequest": "审查拉取请求",
@@ -2737,7 +2776,7 @@
       "emptyLine": "（空）"
     },
     "linkPasteClipboardEmpty": "剪贴板为空。",
-    "linkPasteNotAPullRequest": "这不是 GitHub 拉取请求链接。",
+    "linkPasteNotAPullRequest": "不是拉取请求或合并请求链接",
     "announce": {
       "commentPosted": "评论已发布",
       "reviewSubmitted": "审查已提交",
@@ -2746,6 +2785,7 @@
     "mutationError": {
       "commentNotPosted": "无法发布此评论。所选行可能已更改，或 PR 可能已更新。",
       "reviewNotSubmitted": "当前无法提交此审查。可能是 PR 已有更新，或你正在审查自己创建的拉取请求。",
+      "reviewNotSubmittedTerm": "此审查无法按现状提交。{{term}}可能已变更，或者你不能审查自己的{{term}}。",
       "couldNotPostComment": "无法发布评论。",
       "couldNotSubmitReview": "无法提交审查。请检查网络连接后重试。"
     },
@@ -2753,9 +2793,31 @@
       "couldNotReply": "无法回复。",
       "couldNotCompleteAction": "无法完成此操作。",
       "mergeResultDefaultError": "GitHub 未完成合并。",
+      "mergeResultNotCompleted": "{{term}}未合并。检查其状态后重试。",
       "ambiguous": "无法确认操作结果，请先检查 PR 再重试。",
       "persistenceFailed": "无法记录此操作。请稍后重试。",
       "forbidden": "无权执行此操作。"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "此提供商不支持",
+        "accessibility": "此提供商不支持: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "拉取请求",
+      "mergeRequest": "合并请求",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "分享合并请求",
+      "viewOnProvider": "在 {{provider}} 上查看",
+      "mergeRequestUnavailable": "无法打开合并请求",
+      "unavailableDescription": "它可能已被删除，或者你可能没有访问权限。",
+      "accessDeniedMergeRequest": "你无权查看此合并请求。",
+      "couldNotLoadMergeRequest": "无法加载合并请求。",
+      "discussionAccessDenied": "你无权查看此合并请求的讨论。",
+      "discussionUnavailableMessage": "此合并请求可能已被删除。",
+      "noDiscussionDescription": "此合并请求暂无审查讨论串或评论。",
+      "noFilesChangedDescription": "此合并请求不包含文件变更。"
     }
   },
   "organization": {

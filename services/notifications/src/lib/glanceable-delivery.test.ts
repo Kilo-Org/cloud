@@ -1776,7 +1776,8 @@ describe('buildGlanceableExpoMessages', () => {
         { token: 'ExponentPushToken[aaa]', locale: null },
         { token: 'ExponentPushToken[bbb]', locale: 'es' },
       ],
-      snapshot
+      snapshot,
+      'default'
     );
 
     expect(messages).toHaveLength(2);
@@ -1791,6 +1792,28 @@ describe('buildGlanceableExpoMessages', () => {
       expect(message.tag).toBe('deadbeef');
     }
     expect(messages.map(m => m.to)).toEqual(['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]']);
+  });
+
+  it('builds the iOS wake at default priority and the Android wake at high priority', () => {
+    const iosMessages = buildGlanceableExpoMessages(
+      [{ token: 'ExponentPushToken[ios]', locale: null }],
+      snapshot,
+      'default'
+    );
+    const androidMessages = buildGlanceableExpoMessages(
+      [{ token: 'ExponentPushToken[android]', locale: null }],
+      snapshot,
+      'high'
+    );
+
+    expect(iosMessages[0].priority).toBe('default');
+    expect(androidMessages[0].priority).toBe('high');
+    // Only the transport priority and destination token differ between platforms.
+    expect(androidMessages[0]).toEqual({
+      ...iosMessages[0],
+      to: 'ExponentPushToken[android]',
+      priority: 'high',
+    });
   });
 });
 
@@ -1890,6 +1913,7 @@ describe('deliverGlanceableSnapshot', () => {
     expect(calls.expoSends[0][0].to).toBe('ExponentPushToken[aaa]');
     expect(calls.expoSends[0][0].tag).toBe('deadbeef');
     expect(calls.expoSends[0][0]._contentAvailable).toBe(true);
+    expect(calls.expoSends[0][0].priority).toBe('high');
   });
 
   it('sends nothing on Android when the user has no Expo tokens even with an ongoing token', async () => {
@@ -1962,6 +1986,7 @@ describe('deliverGlanceableSnapshot', () => {
     expect(calls.expoSends[0]).toHaveLength(1);
     expect(calls.expoSends[0][0].to).toBe('ExponentPushToken[ios]');
     expect(calls.expoSends[0][0]._contentAvailable).toBe(true);
+    expect(calls.expoSends[0][0].priority).toBe('default');
     expect(calls.expoSends[0][0].title).toBeUndefined();
     expect(calls.expoSends[0][0].body).toBeUndefined();
   });

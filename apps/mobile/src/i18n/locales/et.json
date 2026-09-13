@@ -253,7 +253,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kõnetuvastus Kilo Gateway kaudu",
     "gatewayTranscriptionSubtitle": "Kasuta häälsisestuse tekstiks teisendamiseks seadme kõnetuvastuse asemel Kilo Gateway mudelit. Sinu salvestus saadetakse Kilo Gateway'sse.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Tõlgi tööriistade kokkuvõtted",
+    "toolSummaryTranslationSubtitle": "Saada iga tööriista kokkuvõte mudelile, et see sinu rakenduse keelde tõlkida. Tõlke ebaõnnestumisel kuvatakse originaal.",
+    "toolSummaryTranslationModelUnavailableNotice": "Seda mudelit enam ei pakuta. Puuduta $t(common.model), et valida teine."
   },
   "prReview": {
     "pullRequestUnavailable": "Tõmbetaotlus pole saadaval",

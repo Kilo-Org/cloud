@@ -253,7 +253,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripsi dengan Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripsikan input suara dengan model Kilo Gateway dan bukan pengecaman pertuturan peranti. Rakaman anda dihantar ke Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Terjemah ringkasan alat",
+    "toolSummaryTranslationSubtitle": "Hantar setiap ringkasan alat kepada model untuk menterjemahkannya ke dalam bahasa aplikasi anda. Yang asal dipaparkan jika terjemahan gagal.",
+    "toolSummaryTranslationModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketik $t(common.model) untuk memilih yang lain."
   },
   "prReview": {
     "pullRequestUnavailable": "Permintaan tarik tidak tersedia",

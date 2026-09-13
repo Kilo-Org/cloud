@@ -253,7 +253,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkrypcja przez Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkrybuj dyktowanie modelem Kilo Gateway zamiast rozpoznawania mowy na urządzeniu. Twoje nagranie zostanie wysłane do Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Tłumacz podsumowania narzędzi",
+    "toolSummaryTranslationSubtitle": "Wyślij każde podsumowanie narzędzia do modelu, aby przetłumaczył je na język Twojej aplikacji. Jeśli tłumaczenie się nie powiedzie, wyświetlany jest oryginał.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ten model nie jest już oferowany. Dotknij $t(common.model), aby wybrać inny."
   },
   "notifications": {
     "liveActivities": "Aktywności na żywo",

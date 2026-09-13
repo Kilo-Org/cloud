@@ -253,7 +253,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkribering via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribera röstinmatningen med en Kilo Gateway-modell i stället för enhetens taligenkänning. Din inspelning skickas till Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Översätt verktygssammanfattningar",
+    "toolSummaryTranslationSubtitle": "Skicka varje verktygssammanfattning till en modell för att översätta den till appens språk. Originalet visas om översättningen misslyckas.",
+    "toolSummaryTranslationModelUnavailableNotice": "Den här modellen erbjuds inte längre. Tryck på $t(common.model) för att välja en annan."
   },
   "prReview": {
     "pullRequestUnavailable": "PR:en är inte tillgänglig",

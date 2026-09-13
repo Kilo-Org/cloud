@@ -7,6 +7,9 @@ import { useTranslation } from 'react-i18next';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
+
+import { useIsToolSummaryRow } from './tool-summary-translation-scope';
 
 type FixedPartRowProps = {
   /** Tool icon, shown in the completed slot. Never passed for reasoning rows. */
@@ -43,6 +46,14 @@ export function FixedPartRow({
 }: Readonly<FixedPartRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const isToolSummaryRow = useIsToolSummaryRow();
+  const shownLabel = useTranslatedToolSummary(label, isToolSummaryRow);
+  // Keep the spoken summary in step with the visible one without a second
+  // translation request: only the embedded label changes.
+  const shownAccessibilityLabel =
+    label !== '' && shownLabel !== label
+      ? accessibilityLabel.split(label).join(shownLabel)
+      : accessibilityLabel;
 
   return (
     <View
@@ -57,7 +68,7 @@ export function FixedPartRow({
         onPress={onPress}
         disabled={!onPress}
         accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
+        accessibilityLabel={shownAccessibilityLabel}
         accessibilityHint={onPress ? t('agentChat.partDetail.showDetails') : undefined}
         accessibilityState={{ disabled: !onPress }}
       >
@@ -70,11 +81,11 @@ export function FixedPartRow({
         <View className="flex-1 flex-row items-center gap-1.5">
           {labelKind === 'eyebrow' ? (
             <Eyebrow className="shrink" numberOfLines={1}>
-              {label}
+              {shownLabel}
             </Eyebrow>
           ) : (
             <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
-              {label}
+              {shownLabel}
             </Text>
           )}
           {badge ? (

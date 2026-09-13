@@ -10,6 +10,7 @@ import { TrustedHostsScreen } from './trusted-hosts-screen';
 const query = vi.hoisted(() => ({
   data: undefined as DeviceSession[] | undefined,
   isLoading: false,
+  isPending: false,
   isError: false,
   isFetching: false,
   refetch: vi.fn(),
@@ -63,6 +64,7 @@ vi.mock('@/lib/format', () => ({ formatDate: () => 'Date' }));
 beforeEach(() => {
   query.data = undefined;
   query.isLoading = false;
+  query.isPending = false;
   query.isError = false;
   query.refetch.mockClear();
   hosts.hasLoaded = true;
@@ -110,11 +112,25 @@ describe('account surface states', () => {
   });
 
   it('keeps device loading ahead of error and empty states', async () => {
-    query.isLoading = true;
+    query.isPending = true;
     query.isError = true;
     const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(12);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    unmount();
+  });
+
+  // Regression: React Query v5's `isLoading` is false on the first render
+  // before the observer starts fetching. The very first frame of a cold open
+  // must still be the skeleton, not the empty state.
+  it('shows the skeleton on the cold-open render before the request settles', async () => {
+    query.isPending = true;
+    query.isLoading = false;
+    query.isError = false;
+    query.data = undefined;
+    const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(12);
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     unmount();
   });

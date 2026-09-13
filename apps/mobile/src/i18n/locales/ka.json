@@ -231,6 +231,8 @@
     "voiceInput": "ხმოვანი შეყვანა",
     "autoExpandThinking": "მსჯელობის ავტომატურად გაშლა",
     "autoExpandThinkingSubtitle": "აგენტის მსჯელობა დასრულებისთანავე გაშლილად გამოჩნდება.",
+    "hideThinking": "მსჯელობის დეტალების დამალვა",
+    "hideThinkingSubtitle": "არ აჩვენო აგენტის მსჯელობა სესიის გვერდზე.",
     "keepScreenOn": "სესიის გვერდზე ეკრანის ჩართულად დატოვება",
     "keepScreenOnSubtitle": "სესიის მუშაობისას ეკრანი ჩართული დარჩება.",
     "appearance": "იერსახე",

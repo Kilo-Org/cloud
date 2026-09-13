@@ -231,6 +231,8 @@
     "voiceInput": "غږیز ننوتل",
     "autoExpandThinking": "د فکر برخه په اوتومات ډول پرانیزئ",
     "autoExpandThinkingSubtitle": "کله چې د ایجنټ فکر بشپړ شي، د فکر برخه پرانیستې وښیئ.",
+    "hideThinking": "د فکر جزئیات پټ کړئ",
+    "hideThinkingSubtitle": "د ایجنټ فکر د ناستې په پاڼه کې ونه ښیئ.",
     "keepScreenOn": "د ناستې پر پاڼه سکرین روښانه وساتئ",
     "keepScreenOnSubtitle": "تر هغه چې ناسته روانه وي، سکرین روښانه وساتئ.",
     "appearance": "بڼه",

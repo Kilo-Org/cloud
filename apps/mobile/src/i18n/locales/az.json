@@ -231,6 +231,8 @@
     "voiceInput": "Səsli daxiletmə",
     "autoExpandThinking": "Düşüncə bölməsini avtomatik aç",
     "autoExpandThinkingSubtitle": "Agent düşünməni bitirdikdə düşüncə bölməsini açıq göstər.",
+    "hideThinking": "Düşüncə təfərrüatlarını gizlət",
+    "hideThinkingSubtitle": "Agentin düşüncəsini sessiya səhifəsində göstərmə.",
     "keepScreenOn": "Sessiya səhifəsində ikən ekranı açıq saxla",
     "keepScreenOnSubtitle": "Sessiya işləyərkən ekranı açıq saxla.",
     "appearance": "Görünüş",

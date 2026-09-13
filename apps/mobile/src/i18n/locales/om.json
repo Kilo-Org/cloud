@@ -231,6 +231,8 @@
     "voiceInput": "Galtee sagalee",
     "autoExpandThinking": "Xiinxala ofumaan bal'isi",
     "autoExpandThinkingSubtitle": "Yeroo ergamaan xiinxala isaa xumuru, bal'isiitii agarsiisi.",
+    "hideThinking": "Bal'ina xiinxala dhoksi",
+    "hideThinkingSubtitle": "Fuula turtii irratti xiinxala ergamaa hin agarsiisi.",
     "keepScreenOn": "Fuula turtii irra yeroo jirtu iskiriiniin akka hin dhaamne godhi",
     "keepScreenOnSubtitle": "Hanga turtiin hojjechaa jirutti iskiriiniin akka hin dhaamne godhi.",
     "appearance": "Bifa",

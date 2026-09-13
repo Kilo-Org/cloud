@@ -2,15 +2,19 @@ import {
   type FilePart,
   type PatchPart,
   type ReasoningPart,
+  type StoredMessage,
   type TextPart,
+  type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
+import { assistantMessage } from './message-bubble-test-utils';
 import {
   isPartStreaming,
   isPatchPart,
   isSnapshotProgressPart,
   shouldRenderReasoningPart,
+  withoutReasoningParts,
 } from './part-types';
 
 function makeReasoningPart(text: string, ended = true): ReasoningPart {
@@ -37,6 +41,29 @@ function makeTextPart(text: string, synthetic?: boolean): TextPart {
     part.synthetic = synthetic;
   }
   return part;
+}
+
+function makeToolPart(): ToolPart {
+  return {
+    id: 'tool-1',
+    sessionID: 's1',
+    messageID: 'm1',
+    type: 'tool',
+    tool: 'read',
+    callID: 'call-1',
+    state: {
+      status: 'completed',
+      input: { filePath: 'src/a.ts' },
+      output: 'contents',
+      title: 'Read',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    },
+  };
+}
+
+function storedMessage(id: string, parts: StoredMessage['parts']): StoredMessage {
+  return { info: assistantMessage(id).info, parts };
 }
 
 describe('isSnapshotProgressPart', () => {
@@ -144,5 +171,39 @@ describe('shouldRenderReasoningPart', () => {
     const part = makeReasoningPart('thinking');
     delete (part as { text?: unknown }).text;
     expect(shouldRenderReasoningPart(part, false)).toBe(false);
+  });
+});
+
+describe('withoutReasoningParts', () => {
+  it('removes reasoning while keeping text and tool parts', () => {
+    const text = makeTextPart('answer');
+    const tool = makeToolPart();
+    const message = storedMessage('m1', [makeReasoningPart('thinking'), text, tool]);
+
+    const result = withoutReasoningParts([message]);
+
+    expect(result[0]?.parts).toEqual([text, tool]);
+    expect(result[0]?.parts.some(part => part.type === 'reasoning')).toBe(false);
+  });
+
+  it('returns the same array reference when no message has reasoning', () => {
+    const messages: StoredMessage[] = [
+      storedMessage('m1', [makeTextPart('a')]),
+      storedMessage('m2', [makeToolPart()]),
+    ];
+
+    expect(withoutReasoningParts(messages)).toBe(messages);
+  });
+
+  it('keeps message identity for unchanged messages', () => {
+    const unchanged = storedMessage('m1', [makeTextPart('a')]);
+    const changed = storedMessage('m2', [makeReasoningPart('thinking'), makeTextPart('b')]);
+
+    const result = withoutReasoningParts([unchanged, changed]);
+
+    expect(result[0]).toBe(unchanged);
+    expect(result[1]).not.toBe(changed);
+    expect(result[1]?.info).toBe(changed.info);
+    expect(result[1]?.parts.map(part => part.type)).toEqual(['text']);
   });
 });

@@ -53,7 +53,7 @@ import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
-import { firstHumanText, isFilePart } from './part-types';
+import { firstHumanText, isFilePart, withoutReasoningParts } from './part-types';
 import {
   buildRemoteAttachmentPartsWithRetryableFeedback,
   resolveSendAttachmentKind,
@@ -131,6 +131,7 @@ import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
+import { useHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import {
   createRemoteModelOverride,
@@ -311,6 +312,7 @@ export function SessionDetailContent({
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
   const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
+  const { hideThinking } = useHideThinkingPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
   const { models: gatewayModels, isLoading: gatewayModelsLoading } =
     useAvailableModels(organizationId);
@@ -747,7 +749,25 @@ export function SessionDetailContent({
     });
   }, [messages, droppedQueuedIds, canceledQueuedMessages]);
 
-  const detailsMessage = visibleMessages.find(message => message.info.id === detailsMessageId);
+  // Visibility-only strip for the "Hide thinking details" option. Applied once
+  // here so the transcript, the message-details sheet, and the subagent views
+  // all lose their thinking rows/text from the same list.
+  const displayedMessages = useMemo(
+    () => (hideThinking ? withoutReasoningParts(visibleMessages) : visibleMessages),
+    [visibleMessages, hideThinking]
+  );
+
+  // Subagent transcript views resolve their rows through this callback, so the
+  // same option hides thinking inside an opened child session.
+  const getDisplayedChildMessages = useCallback(
+    (childSessionId: string) => {
+      const child = getChildMessages(childSessionId);
+      return hideThinking ? withoutReasoningParts(child) : child;
+    },
+    [getChildMessages, hideThinking]
+  );
+
+  const detailsMessage = displayedMessages.find(message => message.info.id === detailsMessageId);
   const detailsDelivery =
     detailsMessageId === null ? undefined : pendingMessages.get(detailsMessageId);
   const detailsBusy = detailsMessageId !== null && cancelingQueuedIds.has(detailsMessageId);
@@ -760,8 +780,8 @@ export function SessionDetailContent({
     detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
 
   const transcript = useMemo(
-    () => mergeSessionTranscript(visibleMessages, preparationAttempts, pendingMessages),
-    [visibleMessages, preparationAttempts, pendingMessages]
+    () => mergeSessionTranscript(displayedMessages, preparationAttempts, pendingMessages),
+    [displayedMessages, preparationAttempts, pendingMessages]
   );
 
   // Render-phase state adjustment: hold queued ids across queue → dequeue
@@ -1055,7 +1075,7 @@ export function SessionDetailContent({
           message={item.message}
           isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
           isSessionStreaming={isStreaming}
-          getChildMessages={getChildMessages}
+          getChildMessages={getDisplayedChildMessages}
           modelOptions={modelOptions}
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
@@ -1073,7 +1093,7 @@ export function SessionDetailContent({
     [
       lastAssistantMessageId,
       isStreaming,
-      getChildMessages,
+      getDisplayedChildMessages,
       modelOptions,
       reasoningDefaultExpanded,
       handleOpenChildSession,
@@ -1471,7 +1491,8 @@ export function SessionDetailContent({
             visible={childSessionSheet.visible}
             sessionId={childSessionSheet.sheet.sessionId}
             title={childSessionSheet.sheet.title}
-            getChildMessages={getChildMessages}
+            getChildMessages={getDisplayedChildMessages}
+            getIndicatorMessages={getChildMessages}
             hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
             sessionError={getChildSessionError(childSessionSheet.sheet.sessionId)}
             isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
@@ -1545,6 +1566,11 @@ export function SessionDetailContent({
             exiting={FadeOut.duration(150)}
             layout={LinearTransition.duration(150)}
           >
+            {/* Raw list on purpose: working-indicator.tsx:50-59 derives the
+                label from the last assistant part, and compute-status.ts:33-35
+                maps a reasoning part to agentChat.partDetail.thinking, so the
+                spinner reads Thinking during a reasoning stream in both modes.
+                Feeding it displayedMessages would drop that label. */}
             <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
             {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
           </Animated.View>

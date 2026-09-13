@@ -231,6 +231,8 @@
     "voiceInput": "හඬ ආදානය",
     "autoExpandThinking": "සිතීමේ විස්තර ස්වයංක්‍රීයව විහිදුවන්න",
     "autoExpandThinkingSubtitle": "නියෝජිතයා සිතීම අවසන් කළ විට එහි විස්තර විහිදුවා පෙන්වන්න.",
+    "hideThinking": "සිතීමේ විස්තර සඟවන්න",
+    "hideThinkingSubtitle": "සැසි පිටුවේ නියෝජිතයාගේ සිතීම නොපෙන්වන්න.",
     "keepScreenOn": "සැසි පිටුවේ සිටින විට තිරය දැල්වී තබන්න",
     "keepScreenOnSubtitle": "සැසිය ක්‍රියාත්මක වන අතරතුර තිරය දැල්වී තබන්න.",
     "appearance": "පෙනුම",

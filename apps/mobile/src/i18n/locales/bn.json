@@ -231,6 +231,8 @@
     "voiceInput": "ভয়েস ইনপুট",
     "autoExpandThinking": "চিন্তাভাবনার বিস্তারিত নিজে থেকে দেখান",
     "autoExpandThinkingSubtitle": "এজেন্টের চিন্তাভাবনা শেষ হলে তার বিস্তারিত দেখান।",
+    "hideThinking": "চিন্তাভাবনার বিস্তারিত লুকান",
+    "hideThinkingSubtitle": "সেশনের পৃষ্ঠায় এজেন্টের চিন্তাভাবনা দেখাবেন না।",
     "keepScreenOn": "সেশনের পৃষ্ঠায় থাকাকালীন স্ক্রিন চালু রাখুন",
     "keepScreenOnSubtitle": "সেশনে কাজ চলার সময় স্ক্রিন চালু রাখুন।",
     "appearance": "থিম",

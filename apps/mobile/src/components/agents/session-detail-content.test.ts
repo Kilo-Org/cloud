@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Keep the detail trigger and real SDK request regressions with their shared screen fixture. */
 /* eslint-disable typescript-eslint/no-deprecated -- The repository uses react-test-renderer for DOM-free native component tests. */
-import { type ComponentProps, createElement, Fragment } from 'react';
+import { type ComponentProps, createElement, Fragment, type ReactNode } from 'react';
 import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
@@ -10,6 +10,7 @@ import {
   createSessionManager,
   createUserWebConnection,
   type KiloSessionId,
+  type ReasoningPart,
   type SessionManager,
   type SessionSnapshotPageOutcome,
   type SessionStatusIndicator,
@@ -22,10 +23,12 @@ import { ChildSessionSection } from '@/components/agents/child-session-section';
 import { ChildSessionModelLabel } from '@/components/agents/child-session-model-label';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
+import { MessageBubble } from '@/components/agents/message-bubble';
 import { assistantMessage } from '@/components/agents/message-bubble-test-utils';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { type SessionMessageList } from '@/components/agents/session-message-list';
+import { WorkingIndicator } from '@/components/agents/working-indicator';
 import {
   resolveSendAttachmentKind,
   shouldRefuseSilentAttachmentDrop,
@@ -38,6 +41,7 @@ import { i18n } from '@/i18n';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
+const hideThinking = vi.hoisted(() => ({ current: false }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/agents/session-provider', () => ({
@@ -163,13 +167,13 @@ vi.mock('@/components/agents/session-detail-skeleton', () => ({
 vi.mock('@/components/agents/transcript-time-marker', () => ({
   TranscriptTimeMarker: 'TranscriptTimeMarker',
 }));
-vi.mock('@/components/agents/working-indicator', () => ({ WorkingIndicator: 'WorkingIndicator' }));
 vi.mock('@/components/agents/compaction-separator', () => ({
   CompactionSeparator: 'CompactionSeparator',
 }));
 vi.mock('@/components/agents/file-part-renderer', () => ({ FilePartRenderer: 'FilePartRenderer' }));
 vi.mock('@/components/agents/reasoning-part-renderer', () => ({
-  ReasoningPartRenderer: 'ReasoningPartRenderer',
+  ReasoningPartRenderer: ({ text }: { text: string }) =>
+    createElement('ReasoningPartRenderer', null, createElement('Text', null, text)),
 }));
 vi.mock('@/components/agents/text-part-renderer', () => ({
   TextPartRenderer: ({ text }: { text: string }) => createElement('Text', null, text),
@@ -190,7 +194,8 @@ vi.mock('@/components/agents/session-message-list', () => ({
           { key: props.keyExtractor(item) },
           props.renderItem({ item, index, target: 'Cell' })
         )
-      )
+      ),
+      props.ListFooterComponent as ReactNode
     );
   },
 }));
@@ -258,6 +263,9 @@ vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
 }));
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
   useReasoningPreference: () => ({ defaultExpanded: false }),
+}));
+vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
+  useHideThinkingPreference: () => ({ hideThinking: hideThinking.current }),
 }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   useKeepScreenOnPreference: () => ({ keepScreenOn: false, hasLoaded: true }),
@@ -377,6 +385,7 @@ function page(sessionId: KiloSessionId, messages: StoredMessage[]): SessionSnaps
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   openRenameModal.mockClear();
+  hideThinking.current = false;
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
 });
@@ -525,6 +534,10 @@ function renderedText(node: ReactTestInstance) {
     .findAll(child => typeof child.type === 'string' && (child.type as string) === 'Text')
     .flatMap(child => child.children.filter(value => typeof value === 'string'))
     .join('\n');
+}
+
+function reasoningRenderers(renderer: ReactTestRenderer) {
+  return renderer.root.findAll(node => Object.is(node.type, 'ReasoningPartRenderer'));
 }
 
 function pressHeaderBack(renderer: ReactTestRenderer) {
@@ -968,4 +981,144 @@ describe('child transcript requests', () => {
     expect(view.renderer.root.findAllByType(ChildSessionSheet)).toHaveLength(0);
     expect(view.requestedIds()).toEqual([ROOT_ID]);
   });
+});
+
+describe('hide thinking preference', () => {
+  function partMessage(id: string, parts: StoredMessage['parts']): StoredMessage {
+    return { info: { ...assistantMessage(id).info, sessionID: ROOT_ID }, parts };
+  }
+
+  function reasoningPart(id: string, messageID: string): ReasoningPart {
+    return {
+      id,
+      sessionID: ROOT_ID,
+      messageID,
+      type: 'reasoning',
+      text: 'hidden chain of thought',
+      time: { start: 1, end: 2 },
+    };
+  }
+
+  function reasoningAndTextMessage(): StoredMessage {
+    const id = 'msg-think';
+    return partMessage(id, [
+      reasoningPart('reasoning-1', id),
+      stubTextPart({ id: `text-${id}`, sessionID: ROOT_ID, messageID: id, text: 'Visible answer' }),
+    ]);
+  }
+
+  it('renders thinking when the option is off', async () => {
+    hideThinking.current = false;
+    const view = await mountDetails([reasoningAndTextMessage()]);
+
+    expect(reasoningRenderers(view.renderer)).toHaveLength(1);
+    expect(renderedText(view.renderer.root)).toContain('Visible answer');
+  });
+
+  it('hides thinking but keeps the text when the option is on', async () => {
+    hideThinking.current = true;
+    const view = await mountDetails([reasoningAndTextMessage()]);
+
+    expect(reasoningRenderers(view.renderer)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain('Visible answer');
+  });
+
+  it('drops a reasoning-only message from the transcript but keeps it in the working indicator', async () => {
+    hideThinking.current = true;
+    const message = partMessage('msg-think-only', [
+      reasoningPart('reasoning-only', 'msg-think-only'),
+    ]);
+    const view = await mountDetails([message]);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'info', message: 'Session status', timestamp: 0 }
+      );
+    });
+
+    expect(reasoningRenderers(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findAllByType(MessageBubble)).toHaveLength(0);
+    expect(
+      view.renderer.root.findAll(node => Object.is(node.type, 'TranscriptTimeMarker'))
+    ).toHaveLength(0);
+    expect(view.renderer.root.findAllByType(EmptyState)).toHaveLength(0);
+
+    const indicator = view.renderer.root.findByType(WorkingIndicator);
+    const indicatorMessages = indicator.props.messages as StoredMessage[];
+    expect(indicatorMessages.some(candidate => candidate.info.id === 'msg-think-only')).toBe(true);
+    expect(
+      indicatorMessages.some(candidate => candidate.parts.some(part => part.type === 'reasoning'))
+    ).toBe(true);
+  });
+
+  // The running child's sheet is the surface the composer spinner rule also
+  // covers: the option hides the thinking row inside the sheet without changing
+  // the spinner label, which still derives from the reasoning part.
+  const RUNNING_CHILD = kiloId('ses-sibling-0');
+
+  function childReasoningMessage(sessionId: KiloSessionId): StoredMessage {
+    const id = `msg-${sessionId}`;
+    return {
+      info: { ...assistantMessage(id).info, sessionID: sessionId },
+      parts: [
+        {
+          id: `reasoning-${sessionId}`,
+          sessionID: sessionId,
+          messageID: id,
+          type: 'reasoning',
+          text: 'hidden chain of thought',
+          time: { start: 1, end: 2 },
+        },
+      ],
+    };
+  }
+
+  function childTextMessage(sessionId: KiloSessionId, text: string): StoredMessage {
+    const id = `msg-${sessionId}`;
+    return {
+      info: { ...assistantMessage(id).info, sessionID: sessionId },
+      parts: [stubTextPart({ id: `text-${sessionId}`, sessionID: sessionId, messageID: id, text })],
+    };
+  }
+
+  async function openRunningChildSheet(hide: boolean) {
+    hideThinking.current = hide;
+    const view = await mountDetails();
+    pressCard(view.renderer, RUNNING_CHILD);
+    return view;
+  }
+
+  function childSheetText(view: Awaited<ReturnType<typeof mountDetails>>) {
+    return renderedText(view.renderer.root.findByType(ChildSessionSheet));
+  }
+
+  it('keeps the subagent sheet spinner on Thinking while the reasoning row is hidden', async () => {
+    const view = await openRunningChildSheet(true);
+    await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
+
+    const sheetText = childSheetText(view);
+    expect(sheetText).toContain('Thinking');
+    expect(sheetText).not.toContain('hidden chain of thought');
+  });
+
+  it('shows the subagent reasoning row and the Thinking spinner when the option is off', async () => {
+    const view = await openRunningChildSheet(false);
+    await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
+
+    const sheetText = childSheetText(view);
+    expect(sheetText).toContain('Thinking');
+    expect(sheetText).toContain('hidden chain of thought');
+  });
+
+  it.each([true, false])(
+    'shows no reasoning row and the non-thinking spinner label in the subagent sheet (option %s)',
+    async hide => {
+      const view = await openRunningChildSheet(hide);
+      await view.respond(RUNNING_CHILD, [childTextMessage(RUNNING_CHILD, 'Only text')]);
+
+      const sheetText = childSheetText(view);
+      expect(sheetText).not.toContain('hidden chain of thought');
+      expect(sheetText).toContain('Writing response');
+    }
+  );
 });

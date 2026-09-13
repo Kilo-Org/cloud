@@ -114,12 +114,17 @@ function getUpdatedSince(days: number): string {
  * `INFINITE_QUERY_MAX_PAGES` (5) trims the oldest page from the front on every
  * forward fetch (`addToEnd(..., max)` slices index 0), so past five pages the
  * top of the history is evicted and the list can never scroll back to it: the
- * pinned oldest date header becomes the top of the list. Keep a bound high
- * enough to hold any browsable history (this constant × 30 sessions/page)
- * while still stopping a server that keeps handing out cursors from growing
- * the cache without bound.
+ * pinned oldest date header becomes the top of the list. This bound holds the
+ * e2e history (8 pages of 30 sessions) with headroom while still stopping a
+ * server that keeps handing out cursors from growing the cache without bound.
+ *
+ * `maxPages` also bounds a single refetch: React Query re-requests every page
+ * retained in the cache on `refetch()`, and the history list refetches on focus
+ * return and app foreground. Staying near the browsable requirement (instead of
+ * a 100-page bound) keeps one focus/foreground refetch to a small, bounded
+ * number of page requests, matching `INBOX_MAX_PAGES`.
  */
-const SESSION_HISTORY_MAX_PAGES = 100;
+const SESSION_HISTORY_MAX_PAGES = 20;
 
 /**
  * Build the stored-sessions infinite-query options shared by every stored

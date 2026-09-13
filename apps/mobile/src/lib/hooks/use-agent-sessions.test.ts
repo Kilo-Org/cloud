@@ -236,6 +236,18 @@ describe('buildStoredSessionsQueryOptions', () => {
     expect(result.maxPages).toBeGreaterThan(INFINITE_QUERY_MAX_PAGES);
     expect(result.maxPages).toBeGreaterThanOrEqual(8);
   });
+
+  it('caps retention so one focus/foreground refetch stays bounded', () => {
+    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
+    const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
+
+    // React Query re-requests every page retained in the cache on `refetch()`
+    // (see the fan-out test in `infinite-retention.test.ts`), and the history
+    // list refetches on focus return and app foreground. `maxPages` is
+    // therefore also the refetch fan-out, so it stays near the browsable
+    // requirement instead of letting one refetch issue 100 page requests.
+    expect(result.maxPages).toBeLessThanOrEqual(20);
+  });
 });
 
 describe('buildAgentSessionSearchQueryOptions', () => {

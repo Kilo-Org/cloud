@@ -582,7 +582,12 @@ export async function exchangeGitHubOAuthCode(
     throw new Error(`GitHub OAuth code exchange failed (${response.status})`);
   }
 
-  const responseBody: unknown = await response.json();
+  let responseBody: unknown;
+  try {
+    responseBody = await response.json();
+  } catch {
+    throw new Error('GitHub OAuth code exchange returned a non-JSON response');
+  }
   // GitHub's token endpoint returns HTTP 200 with an `error` body for OAuth
   // failures like invalid_grant (missing/invalid code_verifier, expired or
   // already-used code), not a non-2xx status.

@@ -101,4 +101,12 @@ describe('exchangeGitHubOAuthCode', () => {
       'GitHub OAuth code exchange failed (502)'
     );
   });
+
+  it('rejects with a clear, attributed error when GitHub responds 2xx with a non-JSON body', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(new Response('not json', { status: 200 }));
+
+    await expect(exchangeGitHubOAuthCode('auth-code', 'standard')).rejects.toThrow(
+      'GitHub OAuth code exchange returned a non-JSON response'
+    );
+  });
 });

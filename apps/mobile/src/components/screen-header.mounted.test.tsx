@@ -358,9 +358,7 @@ describe('ScreenHeader mounted', () => {
       }
       if (props.modal || props.centerTitle) {
         expect(title.props.className).toContain('text-center');
-        // The centered title shares one row with the leading control, so the
-        // control lines up with the title instead of drawing on its own row.
-        expect(title.parent?.parent?.parent).toBe(back.parent);
+        expect(title.parent?.parent).toBe(back.parent);
       }
     }
   });
@@ -380,6 +378,43 @@ describe('ScreenHeader mounted', () => {
     expect(title.parent?.parent).toBe(back.parent);
     expect(renderer.root.props.style).toBeUndefined();
     expect(renderer.root.props.className).toContain('pt-3');
+  });
+
+  it('keeps the modal close control on the centered title row with a mirroring spacer', () => {
+    const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
+
+    const back = findBackPressable(renderer.root);
+    const row = back.parent;
+    if (!row || typeof row.props.className !== 'string') {
+      throw new Error('back control row not found');
+    }
+    expect(row.props.className).toContain('flex-row items-center');
+    expect(row.props.className).toContain('min-h-11');
+
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.className).toContain('text-center');
+    expect(title.parent?.parent).toBe(back.parent);
+
+    const spacer = row.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        node.props.className === 'h-11 w-11 shrink-0'
+    );
+    expect(spacer).toBeDefined();
+  });
+
+  it('omits the mirroring spacer when the centered header has no back control', () => {
+    routerState.canGoBack.mockReturnValue(false);
+    const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
+
+    const spacers = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        node.props.className === 'h-11 w-11 shrink-0'
+    );
+    expect(spacers).toHaveLength(0);
   });
 
   it('pads the sheet header by the landscape side insets even when it skips the safe-area top', () => {

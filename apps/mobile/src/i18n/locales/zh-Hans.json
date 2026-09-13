@@ -2944,14 +2944,6 @@
     "revoke": "撤销对 {{host}} 的信任",
     "backToPreferences": "返回偏好设置"
   },
-  "quickChat": {
-    "empty": {
-      "title": "开始聊天",
-      "description": "发送一条消息，即可与模型对话。"
-    },
-    "historyRetry": "无法加载历史聊天记录。",
-    "sendError": "无法发送消息。请重试。"
-  },
   "glanceable": {
     "waiting": "正在更新智能体状态",
     "empty": "暂无进行中的任务",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "没有转写模型",
     "emptyDescription": "Kilo Gateway 当前没有提供转写模型。",
     "loadFailed": "无法加载转写模型。"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "开始聊天",
+      "description": "发送消息以与模型对话。"
+    },
+    "list": {
+      "loadFailed": "无法加载聊天历史。",
+      "new": "新对话",
+      "openHint": "打开对话。长按可删除。",
+      "deleteTitle": "删除这个对话？"
+    },
+    "beta": "测试版"
   }
 }

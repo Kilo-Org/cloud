@@ -2944,14 +2944,6 @@
     "revoke": "Cabut kepercayaan untuk {{host}}",
     "backToPreferences": "Kembali ke preferensi"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Mulai obrolan",
-      "description": "Kirim pesan untuk mengobrol dengan model."
-    },
-    "historyRetry": "Tidak dapat memuat riwayat obrolan.",
-    "sendError": "Tidak dapat mengirim pesan. Coba lagi."
-  },
   "glanceable": {
     "waiting": "Memperbarui agen",
     "empty": "Tidak ada tugas yang sedang berjalan",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "Tidak ada model transkripsi",
     "emptyDescription": "Kilo Gateway tidak menawarkan model transkripsi saat ini.",
     "loadFailed": "Tidak dapat memuat model transkripsi."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Mulai obrolan",
+      "description": "Kirim pesan untuk berbicara dengan model."
+    },
+    "list": {
+      "loadFailed": "Tidak dapat memuat riwayat obrolan.",
+      "new": "Obrolan baru",
+      "openHint": "Membuka obrolan. Tekan lama untuk menghapus.",
+      "deleteTitle": "Hapus obrolan ini?"
+    },
+    "beta": "Beta"
   }
 }

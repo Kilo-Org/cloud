@@ -2944,14 +2944,6 @@
     "revoke": "撤銷對 {{host}} 的信任",
     "backToPreferences": "返回偏好設定"
   },
-  "quickChat": {
-    "empty": {
-      "title": "開始聊天",
-      "description": "傳送訊息，即可與模型對話。"
-    },
-    "historyRetry": "無法載入聊天記錄。",
-    "sendError": "無法傳送訊息。請再試一次。"
-  },
   "glanceable": {
     "waiting": "正在更新代理程式狀態",
     "empty": "沒有進行中的工作",
@@ -2970,5 +2962,18 @@
     "emptyTitle": "沒有轉錄模型",
     "emptyDescription": "Kilo Gateway 目前沒有提供轉錄模型。",
     "loadFailed": "無法載入轉錄模型。"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "開始聊天",
+      "description": "傳送訊息以與模型對話。"
+    },
+    "list": {
+      "loadFailed": "無法載入聊天記錄。",
+      "new": "新對話",
+      "openHint": "開啟對話。長按可刪除。",
+      "deleteTitle": "刪除這個對話？"
+    },
+    "beta": "測試版"
   }
 }

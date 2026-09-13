@@ -3010,14 +3010,6 @@
     "revoke": "Bain {{host}} de na hóstaigh iontaofa",
     "backToPreferences": "Ar ais go dtí na roghanna"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Tosaigh comhrá",
-      "description": "Seol teachtaireacht chun labhairt le samhail."
-    },
-    "historyRetry": "Níorbh fhéidir stair an chomhrá a lódáil.",
-    "sendError": "Níorbh fhéidir an teachtaireacht a sheoladh. Bain triail as arís."
-  },
   "glanceable": {
     "waiting": "Gníomhairí á nuashonrú",
     "empty": "Níl aon obair ar siúl",
@@ -3036,5 +3028,18 @@
     "emptyTitle": "Níl samhail tras-scríobh ar bith ann",
     "emptyDescription": "Níl aon shamhail tras-scríobh ar fáil ón Kilo Gateway faoi láthair.",
     "loadFailed": "Níorbh fhéidir na samhlacha tras-scríobh a lódáil."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Tosaigh comhrá",
+      "description": "Seol teachtaireacht chun labhairt le samhail."
+    },
+    "list": {
+      "loadFailed": "Níorbh fhéidir stair an chomhrá a lódáil.",
+      "new": "Comhrá nua",
+      "openHint": "Osclaíonn sé an comhrá. Brúigh go fada chun scriosadh.",
+      "deleteTitle": "An comhrá seo a scriosadh?"
+    },
+    "beta": "Béite"
   }
 }

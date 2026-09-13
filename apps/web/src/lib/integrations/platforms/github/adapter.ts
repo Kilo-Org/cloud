@@ -1,6 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
-import { exchangeWebFlowCode } from '@octokit/oauth-methods';
+import { z } from 'zod';
 import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
 import crypto from 'crypto';
@@ -527,10 +527,31 @@ export async function replyToReviewComment(
   });
 }
 
+const GitHubOAuthErrorResponseSchema = z.object({
+  error: z.string().min(1),
+  error_description: z.string().optional(),
+});
+const GitHubOAuthTokenResponseSchema = z.object({
+  access_token: z.string().min(1),
+});
+
 /**
  * Exchange GitHub OAuth code for user information
  * Used during installation request flow to identify the GitHub user
  * @param appType - The type of GitHub App to use (defaults to 'standard')
+ * @param codeVerifier - The PKCE code verifier, required when the
+ *   authorization request that produced `code` included a code_challenge
+ *   (as `beginConnection` does). GitHub rejects redemption of such a code
+ *   with `invalid_grant` if the verifier isn't sent.
+ *
+ * Exchanges directly with GitHub's token endpoint rather than through
+ * `@octokit/oauth-methods`' `exchangeWebFlowCode`: that library never
+ * forwards a supplied `codeVerifier` to GitHub for `clientType:
+ * 'github-app'` (confirmed against the installed package — no
+ * code_verifier/codeVerifier reference exists anywhere in it), which
+ * silently broke every PKCE-bound exchange. This mirrors
+ * `exchangeGitHubUserAuthorizationCode` in `user-authorization.ts`, which
+ * already exchanges directly and already works correctly.
  */
 export async function exchangeGitHubOAuthCode(
   code: string,
@@ -547,19 +568,38 @@ export async function exchangeGitHubOAuthCode(
     throw new Error(`Missing GitHub ${appType} App credentials`);
   }
 
-  const { authentication } = await exchangeWebFlowCode({
-    clientId: credentials.clientId,
-    clientSecret: credentials.clientSecret,
-    clientType: 'github-app',
-    code,
-    ...(codeVerifier ? { codeVerifier } : {}),
+  const response = await fetch('https://github.com/login/oauth/access_token', {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: credentials.clientId,
+      client_secret: credentials.clientSecret,
+      code,
+      ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
+    }),
   });
-
-  if (!authentication.token) {
-    throw new Error(`Token exchange failed`);
+  if (!response.ok) {
+    throw new Error(`GitHub OAuth code exchange failed (${response.status})`);
   }
 
-  const accessToken = authentication.token;
+  const responseBody: unknown = await response.json();
+  // GitHub's token endpoint returns HTTP 200 with an `error` body for OAuth
+  // failures like invalid_grant (missing/invalid code_verifier, expired or
+  // already-used code), not a non-2xx status.
+  const errorBody = GitHubOAuthErrorResponseSchema.safeParse(responseBody);
+  if (errorBody.success) {
+    throw new Error(
+      `GitHub OAuth code exchange failed: ${errorBody.data.error}${
+        errorBody.data.error_description ? ` (${errorBody.data.error_description})` : ''
+      }`
+    );
+  }
+  const parsedToken = GitHubOAuthTokenResponseSchema.safeParse(responseBody);
+  if (!parsedToken.success) {
+    throw new Error('GitHub OAuth code exchange returned an invalid token response');
+  }
+
+  const accessToken = parsedToken.data.access_token;
 
   const octokit = new Octokit({
     auth: accessToken,

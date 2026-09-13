@@ -347,6 +347,12 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // vs "keep showing stale data") should use these instead of `isError`.
     storedIsError: stored.isError,
     storedIsSuccess: stored.isSuccess,
+    // React Query v5's `isLoading` is `isPending && isFetching`, so it is false
+    // on the first render (the observer has not started the fetch yet) and
+    // while a query is paused (offline). `isPending` stays true until the query
+    // settles, so the list surfaces must key "no data yet" off this flag — a
+    // cached list has `isPending: false` and keeps rendering during a refetch.
+    storedIsPending: stored.isPending,
     // Any stored-list fetch in flight (initial load, refetch, next page),
     // used by the backfill selector to serialize automatic fetches behind
     // user- or focus-driven refetches on the same infinite query. The selector

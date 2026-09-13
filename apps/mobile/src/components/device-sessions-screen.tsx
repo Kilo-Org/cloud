@@ -84,13 +84,16 @@ export function DeviceSessionsScreen() {
   const trpc = useTRPC();
   const { t } = useTranslation();
 
-  const { data, isLoading, isError, isFetching, refetch } = useQuery({
+  const { data, isPending, isError, isFetching, refetch } = useQuery({
     ...trpc.user.listDeviceSessions.queryOptions(),
     enabled: token != null,
   });
 
   const state = classifyDeviceSessionsState({
-    isLoading,
+    // `isPending`, not `isLoading`: React Query v5's `isLoading` is
+    // `isPending && isFetching`, so it is false on the first render before the
+    // fetch starts and the cold open would classify as `empty`.
+    isPending,
     isError: isError && data === undefined,
     data,
   });

@@ -96,13 +96,19 @@ export function getChildSessionCardState(
       return '';
     }
     const latestPart = findLatestAssistantPart(childMessages);
-    if (!latestPart) {
-      return i18n.t('agentChat.childSession.waitingForActivity');
+    if (latestPart) {
+      if (isToolPart(latestPart)) {
+        return { tool: latestPart.tool, context: getToolContext(latestPart) };
+      }
+      return computeStatus(latestPart);
     }
-    if (isToolPart(latestPart)) {
-      return { tool: latestPart.tool, context: getToolContext(latestPart) };
-    }
-    return computeStatus(latestPart);
+    // A running subagent without a loaded child transcript is still working, so
+    // the card shows the same "Thinking" label the composer spinner uses while
+    // it streams reasoning. A pending task has no child session yet; it is
+    // queued and genuinely waiting to start.
+    return part.state.status === 'running'
+      ? i18n.t('agentChat.partDetail.thinking')
+      : i18n.t('agentChat.childSession.waitingForActivity');
   })();
 
   return { agentName, taskName, latestActivity };

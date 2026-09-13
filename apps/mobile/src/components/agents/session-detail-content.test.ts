@@ -751,25 +751,25 @@ describe('child transcript requests', () => {
       status: 'completed',
       text: 'Researcher\nTask ses-selected\ncompleted',
       textRows: 3,
-      waiting: false,
+      activity: null,
     },
     {
       sessionId: kiloId('ses-sibling-0'),
       status: 'running',
-      text: 'Researcher\nTask ses-sibling-0\nWaiting for activity\nrunning',
+      text: 'Researcher\nTask ses-sibling-0\nThinking\nrunning',
       textRows: 4,
-      waiting: true,
+      activity: 'Thinking',
     },
     {
       sessionId: kiloId('ses-sibling-1'),
       status: 'error',
       text: 'Researcher\nTask ses-sibling-1\nerror',
       textRows: 3,
-      waiting: false,
+      activity: null,
     },
   ] as const)(
     'renders the $status card without fetching a child transcript for labels',
-    async ({ sessionId, status, text, textRows, waiting }) => {
+    async ({ sessionId, status, text, textRows, activity }) => {
       const view = await mountDetails();
       const card = cardFor(view.renderer, sessionId);
       const button = card.findByProps({ accessibilityRole: 'button' }).props as ComponentProps<
@@ -787,7 +787,10 @@ describe('child transcript requests', () => {
       expect(button.accessibilityLabel).toContain('Researcher');
       expect(button.accessibilityLabel).toContain(`Task ${sessionId}`);
       expect(button.accessibilityLabel).toContain(status);
-      expect(button.accessibilityLabel?.includes('Waiting for activity')).toBe(waiting);
+      expect(button.accessibilityLabel?.includes('Waiting for activity')).toBe(false);
+      if (activity) {
+        expect(button.accessibilityLabel).toContain(activity);
+      }
       expect(view.renderer.root.findAllByType(ChildSessionModelLabel)).toHaveLength(0);
       expect(view.requestedIds()).toEqual([ROOT_ID]);
     }
@@ -832,7 +835,7 @@ describe('child transcript requests', () => {
       expect(selectedCard.findAllByType(ChildSessionModelLabel)).toHaveLength(1);
       const nestedCard = cardFor(view.renderer, nestedId);
       expect(renderedText(nestedCard)).toBe(
-        `Researcher\nTask ${nestedId}${isRunning ? '\nWaiting for activity' : ''}\n${status}`
+        `Researcher\nTask ${nestedId}${isRunning ? '\nThinking' : ''}\n${status}`
       );
       expect(nestedCard.findAll(node => (node.type as string) === 'Text')).toHaveLength(
         isRunning ? 4 : 3
@@ -846,7 +849,10 @@ describe('child transcript requests', () => {
       });
       expect(nestedButton.accessibilityLabel).toContain(`Task ${nestedId}`);
       expect(nestedButton.accessibilityLabel).toContain(status);
-      expect(nestedButton.accessibilityLabel?.includes('Waiting for activity')).toBe(isRunning);
+      expect(nestedButton.accessibilityLabel?.includes('Waiting for activity')).toBe(false);
+      if (isRunning) {
+        expect(nestedButton.accessibilityLabel).toContain('Thinking');
+      }
       expect(view.requestedIds()).toEqual([ROOT_ID, selectedId]);
 
       pressCard(view.renderer, nestedId);

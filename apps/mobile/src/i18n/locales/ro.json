@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcriere cu Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcrie dictarea cu un model Kilo Gateway în loc de recunoașterea vocală a dispozitivului. Înregistrarea este trimisă către Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Condensează apelurile instrumentelor",
+    "condenseToolCallsSubtitle": "Grupează apelurile consecutive ale instrumentelor într-un singur rând pe care îl poți deschide."
   },
   "prReview": {
     "pullRequestUnavailable": "PR indisponibil",
@@ -2490,6 +2492,10 @@
       "tapToListHint": "Atinge un dosar pentru a-i vedea conținutul.",
       "unsupportedDescription": "Acest CLI nu poate afișa dosarele. Atinge „Gata” pentru a păstra dosarul de pornire, apoi „Începe sesiunea” pentru a porni sesiunea în acel dosar.",
       "unsupportedTitle": "Dosarele nu pot fi afișate"
+    },
+    "toolRun": {
+      "sheetTitle": "Apeluri ale instrumentelor",
+      "condensedLabel": "{{itemCount}} elemente; {{last}}"
     }
   },
   "bootstrap": {

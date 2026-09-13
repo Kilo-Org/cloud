@@ -228,12 +228,17 @@ vi.mock('@/lib/hooks/use-persisted-run-on-destination', () => ({
   clearRunOnDestinationPreference: vi.fn(),
 }));
 
-const { clearKeepScreenOnPreference, clearReasoningPreference, clearPrReviewFooterPreference } =
-  vi.hoisted(() => ({
-    clearKeepScreenOnPreference: vi.fn(),
-    clearReasoningPreference: vi.fn(),
-    clearPrReviewFooterPreference: vi.fn(),
-  }));
+const {
+  clearKeepScreenOnPreference,
+  clearReasoningPreference,
+  clearPrReviewFooterPreference,
+  clearCondenseToolCallsPreference,
+} = vi.hoisted(() => ({
+  clearKeepScreenOnPreference: vi.fn(),
+  clearReasoningPreference: vi.fn(),
+  clearPrReviewFooterPreference: vi.fn(),
+  clearCondenseToolCallsPreference: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({ clearKeepScreenOnPreference }));
 vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
   clearLiveActivityPreference: vi.fn(),
@@ -272,6 +277,10 @@ vi.mock('@/lib/temp-file-registry', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({ clearPrReviewFooterPreference }));
+
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  clearCondenseToolCallsPreference,
+}));
 
 vi.mock('@/lib/last-active-instance', () => ({
   clearLastActiveInstance: vi.fn().mockResolvedValue(undefined),
@@ -633,6 +642,7 @@ describe('sign-out teardown ordering', () => {
     expect(clearKeepScreenOnPreference).toHaveBeenCalled();
     expect(clearReasoningPreference).toHaveBeenCalled();
     expect(clearPrReviewFooterPreference).toHaveBeenCalled();
+    expect(clearCondenseToolCallsPreference).toHaveBeenCalled();
     const { clearRunOnDestinationPreference } =
       await import('@/lib/hooks/use-persisted-run-on-destination');
     expect(clearRunOnDestinationPreference).toHaveBeenCalled();

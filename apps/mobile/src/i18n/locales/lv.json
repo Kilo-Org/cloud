@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripcija, izmantojot Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribē balss ievadi, izmantojot Kilo Gateway modeli, nevis ierīces runas atpazīšanu. Ieraksts tiek nosūtīts uz Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Saspiest rīku izsaukumus",
+    "condenseToolCallsSubtitle": "Grupējiet secīgus rīku izsaukumus vienā rindā, ko varat atvērt."
   },
   "prReview": {
     "pullRequestUnavailable": "Izmaiņu pieprasījums nav pieejams",
@@ -2490,6 +2492,10 @@
       "tapToListHint": "Pieskaries mapei, lai skatītu tās saturu.",
       "unsupportedDescription": "Šis CLI nevar parādīt mapju sarakstu. Poga „Gatavs” saglabā sākotnējo mapi, un poga „Sākt sesiju” sāk sesiju šajā mapē.",
       "unsupportedTitle": "Mapju saraksts nav pieejams"
+    },
+    "toolRun": {
+      "sheetTitle": "Rīku izsaukumi",
+      "condensedLabel": "{{itemCount}} vienumu; {{last}}"
     }
   },
   "bootstrap": {

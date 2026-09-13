@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "使用 Kilo Gateway 轉錄",
     "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型將語音輸入轉錄成文字，而不使用裝置上的語音辨識。您的錄音將傳送至 Kilo Gateway。",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "精簡工具呼叫",
+    "condenseToolCallsSubtitle": "將連續的工具呼叫合併為一列，點擊即可開啟。"
   },
   "notifications": {
     "liveActivities": "即時動態",
@@ -2035,6 +2037,10 @@
       "tapToListHint": "點一下資料夾，即可查看其中的內容。",
       "unsupportedDescription": "此 CLI 無法列出資料夾。點一下「完成」會保留啟動時的資料夾，再點一下「開始工作階段」即可從該資料夾開始。",
       "unsupportedTitle": "無法列出資料夾"
+    },
+    "toolRun": {
+      "sheetTitle": "工具呼叫",
+      "condensedLabel": "{{itemCount}} 個項目; {{last}}"
     }
   },
   "bootstrap": {

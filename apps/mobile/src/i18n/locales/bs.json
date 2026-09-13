@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripcija putem Kilo Gatewaya",
     "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gatewaya umjesto prepoznavanja govora na uređaju. Snimka se šalje na Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Sažmi pozive alata",
+    "condenseToolCallsSubtitle": "Grupiši uzastopne pozive alata u jedan red koji možeš otvoriti."
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtjev za spajanje nije dostupan",
@@ -2490,6 +2492,10 @@
       "retryableDescription": "Provjeri vezu i pokušaj ponovo. Dodirom na „Gotovo“ i dalje možeš potvrditi ovu mapu.",
       "unsupportedTitle": "Ne mogu se prikazati mape",
       "unsupportedDescription": "Ovaj CLI ne može prikazati mape. Dodirom na „Gotovo“ zadržavaš početnu mapu, a dodirom na „Započni sesiju“ pokrećeš sesiju u njoj."
+    },
+    "toolRun": {
+      "sheetTitle": "Pozivi alata",
+      "condensedLabel": "{{itemCount}} stavki; {{last}}"
     }
   },
   "bootstrap": {

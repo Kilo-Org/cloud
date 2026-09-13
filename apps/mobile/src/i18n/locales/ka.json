@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "ტრანსკრიფცია Kilo Gateway-ით",
     "gatewayTranscriptionSubtitle": "ხმოვანი შეყვანა აქციეთ ტექსტად Kilo Gateway-ის მოდელით, მოწყობილობის მეტყველების ამოცნობის ნაცვლად. თქვენი ჩანაწერი იგზავნება Kilo Gateway-ში.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ინსტრუმენტის გამოძახებების შეკუმშვა",
+    "condenseToolCallsSubtitle": "დააჯგუფეთ ზედიზედ ინსტრუმენტის გამოძახებები ერთ რიგში, რომლის გახსნაც შეგიძლიათ."
   },
   "prReview": {
     "pullRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "შიგთავსის სანახავად შეეხეთ საქაღალდეს.",
       "unsupportedDescription": "ამ CLI-ს საქაღალდეების სიის ჩვენება არ შეუძლია. ღილაკით „მზადაა“ გაშვების საქაღალდე შენარჩუნდება, ხოლო ღილაკით „სესიის დაწყება“ სესია ამ საქაღალდეში დაიწყება.",
       "unsupportedTitle": "საქაღალდეების სიის ჩვენება შეუძლებელია"
+    },
+    "toolRun": {
+      "sheetTitle": "ინსტრუმენტის გამოძახებები",
+      "condensedLabel": "{{itemCount}} ელემენტი; {{last}}"
     }
   },
   "bootstrap": {

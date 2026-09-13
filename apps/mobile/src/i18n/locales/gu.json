@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway દ્વારા અવાજને લખાણમાં ફેરવવું",
     "gatewayTranscriptionSubtitle": "ઉપકરણની સ્પીચ રિકગ્નિશનને બદલે Kilo Gateway મોડેલ વડે વૉઇસ ઇનપુટને લખાણમાં ફેરવો. તમારું રેકોર્ડિંગ Kilo Gateway પર મોકલાય છે.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ટૂલ કૉલ્સ સંકોચો",
+    "condenseToolCallsSubtitle": "સતત ટૂલ કૉલ્સને એક પંક્તિમાં જૂથબદ્ધ કરો જે તમે ખોલી શકો."
   },
   "prReview": {
     "pullRequestUnavailable": "પુલ રિક્વેસ્ટ ઉપલબ્ધ નથી",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "ફોલ્ડરની સામગ્રી જોવા તેના પર ટેપ કરો.",
       "unsupportedDescription": "આ CLI ફોલ્ડરની યાદી બતાવી શકતું નથી. “થઈ ગયું” પર ટેપ કરવાથી શરૂઆતનું ફોલ્ડર જ પસંદ રહેશે. “સત્ર શરૂ કરો” પર ટેપ કરવાથી સત્ર ત્યાં શરૂ થશે.",
       "unsupportedTitle": "ફોલ્ડરની યાદી બતાવી શકાતી નથી"
+    },
+    "toolRun": {
+      "sheetTitle": "ટૂલ કૉલ્સ",
+      "condensedLabel": "{{itemCount}} વસ્તુઓ; {{last}}"
     }
   },
   "bootstrap": {

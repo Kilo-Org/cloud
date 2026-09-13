@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkriptim me Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripto diktimin me një model Kilo Gateway në vend të njohjes së të folurit të pajisjes. Regjistrimi yt dërgohet te Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Kondenso thirrjet e mjeteve",
+    "condenseToolCallsSubtitle": "Grupo thirrjet e njëpasnjëshme të mjeteve në një rresht që mund ta hapësh."
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa për bashkim nuk është e disponueshme",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Prek një dosje për të parë përmbajtjen e saj.",
       "unsupportedDescription": "Ky CLI nuk mund të shfaqë listën e dosjeve. «U krye» ruan dosjen e nisjes dhe «Nis seancën» e nis seancën aty.",
       "unsupportedTitle": "Lista e dosjeve nuk mund të shfaqet"
+    },
+    "toolRun": {
+      "sheetTitle": "Thirrjet e mjeteve",
+      "condensedLabel": "{{itemCount}} elemente; {{last}}"
     }
   },
   "bootstrap": {

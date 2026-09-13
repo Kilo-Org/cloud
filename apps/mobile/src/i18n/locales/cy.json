@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Trawsgrifio drwy Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Trawsgrifiwch fewnbwn llais â model Kilo Gateway yn lle adnabod lleferydd y ddyfais. Anfonir eich recordiad i Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Crynhoi galwadau offer",
+    "condenseToolCallsSubtitle": "Grwpio galwadau offer yn olynol i un rhes y gallwch ei hagor."
   },
   "prReview": {
     "pullRequestUnavailable": "Cais tynnu ddim ar gael",
@@ -2553,6 +2555,10 @@
       "tapToListHint": "Tapiwch ffolder i weld ei gynnwys.",
       "unsupportedDescription": "Ni all y CLI hwn restru ffolderi. Mae Wedi'i wneud yn cadw'r ffolder cychwyn. Mae Dechrau sesiwn yn dechrau'r sesiwn yno.",
       "unsupportedTitle": "Ni ellir rhestru ffolderi"
+    },
+    "toolRun": {
+      "sheetTitle": "Galwadau offer",
+      "condensedLabel": "{{itemCount}} eitem; {{last}}"
     }
   },
   "bootstrap": {

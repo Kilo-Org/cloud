@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Chuyển giọng nói thành văn bản qua Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Sử dụng mô hình Kilo Gateway để chuyển nội dung nhập bằng giọng nói thành văn bản thay vì nhận dạng giọng nói của thiết bị. Bản ghi của bạn được gửi tới Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Nén các lệnh gọi công cụ",
+    "condenseToolCallsSubtitle": "Nhóm các lệnh gọi công cụ liên tiếp vào một hàng mà bạn có thể mở."
   },
   "notifications": {
     "liveActivities": "Hoạt động trực tiếp",
@@ -2035,6 +2037,10 @@
       "tapToListHint": "Chạm vào thư mục để xem nội dung bên trong.",
       "unsupportedDescription": "CLI này không hỗ trợ liệt kê thư mục. Chạm vào Xong để giữ thư mục khởi chạy, rồi chạm vào Bắt đầu phiên để chạy phiên tại đó.",
       "unsupportedTitle": "Không hỗ trợ liệt kê thư mục"
+    },
+    "toolRun": {
+      "sheetTitle": "Lệnh gọi công cụ",
+      "condensedLabel": "{{itemCount}} mục; {{last}}"
     }
   },
   "bootstrap": {

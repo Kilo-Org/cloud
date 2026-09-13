@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripsyon ak Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripte dikte a ak yon modèl Kilo Gateway olye rekonesans vokal aparèy la. Yo voye anrejistrman ou a bay Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Kondanse apèl zouti yo",
+    "condenseToolCallsSubtitle": "Gwoupe apèl zouti youn apre lòt nan yon sèl liy ou ka louvri."
   },
   "prReview": {
     "pullRequestUnavailable": "Demann fizyon an pa disponib",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Peze yon katab pou wè sa li genyen.",
       "unsupportedDescription": "CLI sa a pa ka afiche lis katab yo. Peze Fèt pou kenbe katab lansman an, epi peze Kòmanse sesyon an pou kòmanse ladan l.",
       "unsupportedTitle": "Nou pa ka afiche lis katab yo"
+    },
+    "toolRun": {
+      "sheetTitle": "Apèl zouti",
+      "condensedLabel": "{{itemCount}} eleman; {{last}}"
     }
   },
   "bootstrap": {

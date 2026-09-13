@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "التفريغ الصوتي عبر Kilo Gateway",
     "gatewayTranscriptionSubtitle": "حوّل الإدخال الصوتي إلى نص باستخدام أحد نماذج Kilo Gateway بدلاً من التعرف على الكلام في جهازك. يُرسل تسجيلك إلى Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ضغط استدعاءات الأدوات",
+    "condenseToolCallsSubtitle": "جمّع استدعاءات الأدوات المتتالية في صف واحد يمكنك فتحه."
   },
   "notifications": {
     "liveActivities": "الأنشطة المباشرة",
@@ -2091,6 +2093,10 @@
       "tapToListHint": "اضغط على مجلد لعرض محتوياته.",
       "unsupportedDescription": "إصدار CLI هذا لا يدعم عرض المجلدات. اضغط على «تم» للاحتفاظ بمجلد بدء التشغيل، ثم على «بدء الجلسة» لبدء الجلسة فيه.",
       "unsupportedTitle": "لا يمكن عرض المجلدات"
+    },
+    "toolRun": {
+      "sheetTitle": "استدعاءات الأدوات",
+      "condensedLabel": "{{itemCount}} عناصر؛ {{last}}"
     }
   },
   "bootstrap": {

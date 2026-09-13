@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Prepisovanje prek Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Glasovni vnos prepiši z modelom Kilo Gateway namesto prepoznavanja govora naprave. Posnetje se pošlje v Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Strni klice orodij",
+    "condenseToolCallsSubtitle": "Združi zaporedne klice orodij v eno vrstico, ki jo lahko odpreš."
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtevek za združitev ni na voljo",
@@ -2511,6 +2513,10 @@
       "tapToListHint": "Tapni mapo, da prikažeš njeno vsebino.",
       "unsupportedDescription": "Ta CLI ne more prikazati map. Z gumbom »Končano« ohraniš začetno mapo, z gumbom »Začni sejo« pa v njej zaženeš sejo.",
       "unsupportedTitle": "Map ni mogoče prikazati"
+    },
+    "toolRun": {
+      "sheetTitle": "Klici orodij",
+      "condensedLabel": "{{itemCount}} elementov; {{last}}"
     }
   },
   "bootstrap": {

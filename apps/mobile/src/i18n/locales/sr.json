@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripcija preko Kilo Gateway-a",
     "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gateway-a umesto prepoznavanja govora na uređaju. Snimak se šalje na Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Sažmi pozive alata",
+    "condenseToolCallsSubtitle": "Grupiši uzastopne pozive alata u jedan red koji možeš da otvoriš."
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtev za spajanje nije dostupan",
@@ -2490,6 +2492,10 @@
       "retryableDescription": "Proveri vezu i pokušaj ponovo. I dalje možeš da potvrdiš ovu fasciklu dodirom na „Gotovo“.",
       "unsupportedTitle": "Prikaz spiska fascikli nije podržan",
       "unsupportedDescription": "Ovaj CLI ne može da prikaže spisak fascikli. Dugme „Gotovo“ zadržava početnu fasciklu, a dugme „Pokreni sesiju“ pokreće sesiju u njoj."
+    },
+    "toolRun": {
+      "sheetTitle": "Pozivi alata",
+      "condensedLabel": "{{itemCount}} stavki; {{last}}"
     }
   },
   "bootstrap": {

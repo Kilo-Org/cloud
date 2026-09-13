@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripsjon via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribér diktering med en Kilo Gateway-modell i stedet for enhetens stemmgjenkjenning. Opptaket ditt sendes til Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Komprimer verktøykall",
+    "condenseToolCallsSubtitle": "Grupper påfølgende verktøykall i én rad du kan åpne."
   },
   "prReview": {
     "pullRequestUnavailable": "PR-en er utilgjengelig",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Trykk på en mappe for å se innholdet.",
       "unsupportedDescription": "Denne CLI-en kan ikke vise mapper. Trykk på Ferdig for å beholde oppstartsmappen. Trykk deretter på Start økt for å starte der.",
       "unsupportedTitle": "Kan ikke vise mapper"
+    },
+    "toolRun": {
+      "sheetTitle": "Verktøykall",
+      "condensedLabel": "{{itemCount}} elementer; {{last}}"
     }
   },
   "bootstrap": {

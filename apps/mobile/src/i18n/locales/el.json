@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Απομαγνητοφώνηση μέσω Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Η φωνητική πληκτρολόγηση μετατρέπεται σε κείμενο με ένα μοντέλο του Kilo Gateway αντί για την αναγνώριση ομιλίας της συσκευής. Η ηχογράφηση αποστέλλεται στο Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Συμπίεση κλήσεων εργαλείων",
+    "condenseToolCallsSubtitle": "Ομαδοποιήστε διαδοχικές κλήσεις εργαλείων σε μία γραμμή που μπορείτε να ανοίξετε."
   },
   "prReview": {
     "pullRequestUnavailable": "Μη διαθέσιμο αίτημα ενσωμάτωσης",
@@ -2469,6 +2471,10 @@
       "retryableDescription": "Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά. Μπορείς ακόμα να πατήσεις «Τέλος» για να επιλέξεις αυτόν τον φάκελο.",
       "unsupportedTitle": "Δεν είναι δυνατή η εμφάνιση των φακέλων",
       "unsupportedDescription": "Αυτό το CLI δεν μπορεί να εμφανίσει τους φακέλους. Πάτησε «Τέλος» για να κρατήσεις τον φάκελο εκκίνησης και «Έναρξη συνεδρίας» για να ξεκινήσεις εκεί."
+    },
+    "toolRun": {
+      "sheetTitle": "Κλήσεις εργαλείων",
+      "condensedLabel": "{{itemCount}} στοιχεία; {{last}}"
     }
   },
   "bootstrap": {

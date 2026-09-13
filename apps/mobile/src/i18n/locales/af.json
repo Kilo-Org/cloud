@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Gateway-transkripsie",
     "gatewayTranscriptionSubtitle": "Transkribeer steminvoer met 'n Kilo Gateway-model in plaas van die toestel se spraakherkenning. Jou opname word na die Kilo Gateway gestuur.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Kondenseer nutsmiddel-oproepe",
+    "condenseToolCallsSubtitle": "Groepeer opeenvolgende nutsmiddel-oproepe in een ry wat jy kan oopmaak."
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "Tik op 'n map om die inhoud daarvan te wys.",
       "unsupportedDescription": "Hierdie CLI kan nie mappe lys nie. Tik op Klaar om die beginmap te behou. Die sessie sal in daardie map begin.",
       "unsupportedTitle": "Kan nie mappe lys nie"
+    },
+    "toolRun": {
+      "sheetTitle": "Nutsmiddel-oproepe",
+      "condensedLabel": "{{itemCount}} items; {{last}}"
     }
   },
   "bootstrap": {

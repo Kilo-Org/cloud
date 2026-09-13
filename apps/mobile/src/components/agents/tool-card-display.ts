@@ -2,6 +2,22 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { z } from 'zod';
 
 import { i18n } from '@/i18n';
+import {
+  Cpu,
+  Eye,
+  FileDiff,
+  FilePlus,
+  FileSearch,
+  FolderOpen,
+  Globe,
+  ListTodo,
+  type LucideIcon,
+  Pencil,
+  Plug,
+  Search,
+  Sparkles,
+  Terminal,
+} from '@/components/ui/icons';
 import { formatList, formatNumber } from '@/lib/format';
 import { getToolFileAttachments, getToolImageAttachments } from './tool-card-attachments';
 import {
@@ -212,6 +228,58 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       const stateTitle =
         status === 'running' || status === 'completed' ? part.state.title : undefined;
       return { title: part.tool, subtitle: getGenericToolTitle(part.tool, stateTitle, input) };
+    }
+  }
+}
+
+/**
+ * The exact leading icon the tool's card renders. Each tool maps to the icon
+ * its card passes to `FixedPartRow`; unknown tools use the generic card's Plug.
+ */
+export function getToolRowIcon(tool: string): LucideIcon {
+  switch (tool) {
+    case 'read': {
+      return Eye;
+    }
+    case 'edit': {
+      return Pencil;
+    }
+    case 'write': {
+      return FilePlus;
+    }
+    case 'bash': {
+      return Terminal;
+    }
+    case 'glob': {
+      return Search;
+    }
+    case 'grep': {
+      return FileSearch;
+    }
+    case 'list': {
+      return FolderOpen;
+    }
+    case 'patch':
+    case 'apply_patch': {
+      return FileDiff;
+    }
+    case 'todoread':
+    case 'todowrite': {
+      return ListTodo;
+    }
+    case 'websearch':
+    case 'codesearch':
+    case 'webfetch': {
+      return Globe;
+    }
+    case 'task': {
+      return Cpu;
+    }
+    case 'suggest': {
+      return Sparkles;
+    }
+    default: {
+      return Plug;
     }
   }
 }

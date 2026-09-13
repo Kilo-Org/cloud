@@ -45,6 +45,8 @@ export const GATEWAY_TRANSCRIPTION_MODEL_KEY = 'gateway-transcription-model';
 /** Revocable per-host list of markdown link hosts that open without an Alert. */
 export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';
+/** Group consecutive tool calls on the session page into one condensed row. */
+export const CONDENSE_TOOL_CALLS_KEY = 'condense-tool-calls';
 /** Master switch for the glanceable Active Agents surfaces (widgets, Live Activity,
  * Android ongoing). Off blanks every surface and unregisters its push tokens. */
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */

@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "การถอดเสียงผ่าน Kilo Gateway",
     "gatewayTranscriptionSubtitle": "ถอดเสียงจากการพิมพ์ด้วยเสียงด้วยโมเดลของ Kilo Gateway แทนการรู้จำเสียงของอุปกรณ์ ระบบจะส่งการบันทึกเสียงของคุณไปยัง Kilo Gateway",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ย่อการเรียกเครื่องมือ",
+    "condenseToolCallsSubtitle": "จัดกลุ่มการเรียกเครื่องมือที่ต่อเนื่องกันเป็นแถวเดียวที่คุณเปิดได้"
   },
   "prReview": {
     "pullRequestUnavailable": "เปิด PR ไม่ได้",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "แตะโฟลเดอร์เพื่อแสดงเนื้อหา",
       "unsupportedDescription": "CLI นี้แสดงรายการโฟลเดอร์ไม่ได้ แตะเสร็จสิ้นเพื่อใช้โฟลเดอร์ที่เปิด CLI ไว้ แล้วแตะเริ่มเซสชันเพื่อเริ่มทำงานในโฟลเดอร์นั้น",
       "unsupportedTitle": "ไม่สามารถแสดงรายการโฟลเดอร์ได้"
+    },
+    "toolRun": {
+      "sheetTitle": "การเรียกเครื่องมือ",
+      "condensedLabel": "{{itemCount}} รายการ; {{last}}"
     }
   },
   "bootstrap": {

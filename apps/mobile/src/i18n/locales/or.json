@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ମାଧ୍ୟମରେ କଥାକୁ ଲେଖାରେ ବଦଳାଇବା",
     "gatewayTranscriptionSubtitle": "ଡିଭାଇସ୍‌ର ସ୍ପିଚ୍ ରେକଗ୍ନିସନ୍ ପରିବର୍ତ୍ତେ Kilo Gateway ମଡେଲ୍ ବ୍ୟବହାର କରି କହି ଲେଖିବାକୁ ଲେଖାରେ ବଦଳାନ୍ତୁ। ଆପଣଙ୍କ ରେକର୍ଡିଂ Kilo Gateway ପଠାଯାଏ।",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ଟୁଲ୍ କଲ୍ ସଂକ୍ଷିପ୍ତ କରନ୍ତୁ",
+    "condenseToolCallsSubtitle": "କ୍ରମାଗତ ଟୁଲ୍ କଲ୍‌ଗୁଡ଼ିକୁ ଏକ ଧାଡ଼ିରେ ଗୋଷ୍ଠୀବଦ୍ଧ କରନ୍ତୁ ଯାହାକୁ ଆପଣ ଖୋଲିପାରିବେ।"
   },
   "prReview": {
     "pullRequestUnavailable": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଉପଲବ୍ଧ ନାହିଁ",
@@ -2469,6 +2471,10 @@
       "tapToListHint": "ଫୋଲ୍ଡର୍ ଭିତରେ କ'ଣ ଅଛି ଦେଖିବାକୁ ତାହାକୁ ଟାପ୍ କରନ୍ତୁ।",
       "unsupportedDescription": "ଏହି CLI ଫୋଲ୍ଡର୍ ତାଲିକା ଦେଖାଇପାରେ ନାହିଁ। “ସମ୍ପନ୍ନ” ଟାପ୍ କଲେ CLI ଆରମ୍ଭ ହୋଇଥିବା ଫୋଲ୍ଡର୍ ରହିବ। “ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ” ଟାପ୍ କଲେ ସେଠାରେ ସେସନ୍ ଆରମ୍ଭ ହେବ।",
       "unsupportedTitle": "ଫୋଲ୍ଡର୍ ତାଲିକା ଦେଖାଇ ହେଉନାହିଁ"
+    },
+    "toolRun": {
+      "sheetTitle": "ଟୁଲ୍ କଲ୍",
+      "condensedLabel": "{{itemCount}}ଟି ଆଇଟମ୍; {{last}}"
     }
   },
   "bootstrap": {

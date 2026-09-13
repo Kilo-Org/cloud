@@ -2020,6 +2020,10 @@
       "tapToListHint": "Toque em uma pasta para ver seu conteúdo.",
       "unsupportedDescription": "Esta CLI não permite listar pastas. Toque em Concluído para manter a pasta de inicialização. Ao tocar em Iniciar sessão, a sessão começará nessa pasta.",
       "unsupportedTitle": "Não é possível listar pastas"
+    },
+    "toolRun": {
+      "sheetTitle": "Chamadas de ferramentas",
+      "condensedLabel": "{{itemCount}} itens; {{last}}"
     }
   },
   "bootstrap": {
@@ -2057,7 +2061,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcrição com Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcreva a digitação por voz com um modelo do Kilo Gateway em vez do reconhecimento de fala do dispositivo. Sua gravação é enviada para o Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Condensar chamadas de ferramentas",
+    "condenseToolCallsSubtitle": "Agrupe chamadas de ferramentas consecutivas em uma linha que você pode abrir."
   },
   "addCredits": {
     "cta": "Adicionar créditos",

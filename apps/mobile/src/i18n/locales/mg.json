@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Fanovana feo ho soratra amin'ny Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Aova ho soratra amin'ny modely Kilo Gateway ny fampidirana amin'ny feo fa tsy ny famantarana ny feon'ny fitaovana. Alefa amin'ny Kilo Gateway ny rakitra nosoronanao.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Atambatra ny antson'ny fitaovana",
+    "condenseToolCallsSubtitle": "Vondrono ho andalana iray azo sokafana ny antson'ny fitaovana mifanesy."
   },
   "prReview": {
     "pullRequestUnavailable": "Tsy azo sokafana ny fangatahana fampiraisana",
@@ -2469,6 +2471,10 @@
       "retryableDescription": "Hamarino ny fifandraisanao ary tsindrio ny Andramo indray. Mbola afaka manamarina ity lahatahiry ity amin'ny Vita ianao.",
       "unsupportedTitle": "Tsy azo tanisaina ny lahatahiry",
       "unsupportedDescription": "Tsy afaka mitanisa lahatahiry ity CLI ity. Ny Vita dia mitazona ny lahatahiry fanombohana, ary ny Atombohy ny fotoam-piasana dia manomboka ao."
+    },
+    "toolRun": {
+      "sheetTitle": "Antson'ny fitaovana",
+      "condensedLabel": "{{itemCount}} singa; {{last}}"
     }
   },
   "bootstrap": {

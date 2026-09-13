@@ -70,6 +70,9 @@ vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
   clearPrReviewFooterPreference: vi.fn(),
 }));
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  clearCondenseToolCallsPreference: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference: vi.fn() }));
 vi.mock('@/lib/kiloclaw-tab-ownership', () => ({
   gateKiloClawOwned: vi.fn(),

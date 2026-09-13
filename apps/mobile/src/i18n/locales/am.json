@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "በKilo Gateway ድምጽን ወደ ጽሑፍ መቀየር",
     "gatewayTranscriptionSubtitle": "የድምፅ ግብዓትን በመሣሪያው የንግግር ማውቂያ ምትክ በKilo Gateway ሞዴል ወደ ጽሑፍ ቀይሩ። ቀረጻዎ ወደ Kilo Gateway ይላካል።",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "የመሳሪያ ጥሪዎችን መጨመቅ",
+    "condenseToolCallsSubtitle": "ተከታታይ የመሳሪያ ጥሪዎችን መክፈት በሚችሉት አንድ ረድፍ ውስጥ ይሰብስቡ።"
   },
   "prReview": {
     "pullRequestUnavailable": "የማዋሃድ ጥያቄው አይገኝም",
@@ -2469,6 +2471,10 @@
       "retryableDescription": "ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ። ይህን አቃፊ ለማረጋገጥ አሁንም «ተከናውኗል»ን መንካት ይችላሉ።",
       "unsupportedTitle": "አቃፊዎችን መዘርዘር አይቻልም",
       "unsupportedDescription": "ይህ CLI አቃፊዎችን መዘርዘር አይችልም። «ተከናውኗል»ን ሲነኩ የመነሻ አቃፊው እንዳለ ይቆያል። «ክፍለ ጊዜውን ያስጀምሩ»ን ሲነኩ ክፍለ ጊዜው በዚያው ይጀምራል።"
+    },
+    "toolRun": {
+      "sheetTitle": "የመሳሪያ ጥሪዎች",
+      "condensedLabel": "{{itemCount}} ንጥሎች; {{last}}"
     }
   },
   "bootstrap": {

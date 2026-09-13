@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkribavimas per Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribuok balso įvestį Kilo Gateway modeliu vietoj įrenginio kalbos atpažinimo. Įrašas siunčiamas į Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Sutraukti įrankių iškvietimus",
+    "condenseToolCallsSubtitle": "Sugrupuokite vienas po kito einančius įrankių iškvietimus į vieną eilutę, kurią galite atidaryti."
   },
   "prReview": {
     "pullRequestUnavailable": "Pakeitimų užklausa nepasiekiama",
@@ -2511,6 +2513,10 @@
       "tapToListHint": "Bakstelėkite aplanką, kad pamatytumėte jo turinį.",
       "unsupportedDescription": "Ši CLI negali parodyti aplankų. Patvirtinus pasirinkimą, liks paleidimo aplankas. Nauja sesija bus pradėta jame.",
       "unsupportedTitle": "Negalima parodyti aplankų"
+    },
+    "toolRun": {
+      "sheetTitle": "Įrankių iškvietimai",
+      "condensedLabel": "{{itemCount}} elementų; {{last}}"
     }
   },
   "bootstrap": {

@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcrição com Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcreva o ditado com um modelo do Kilo Gateway em vez do reconhecimento de fala do dispositivo. A sua gravação é enviada para o Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Condensar chamadas de ferramentas",
+    "condenseToolCallsSubtitle": "Agrupar as chamadas de ferramentas consecutivas numa linha que pode abrir."
   },
   "prReview": {
     "pullRequestUnavailable": "PR indisponível",
@@ -2490,6 +2492,10 @@
       "tapToListHint": "Toque numa pasta para ver o seu conteúdo.",
       "unsupportedDescription": "Esta CLI não permite listar pastas. Ao concluir, mantém a pasta de arranque. A sessão será iniciada nessa pasta.",
       "unsupportedTitle": "Não é possível listar as pastas"
+    },
+    "toolRun": {
+      "sheetTitle": "Chamadas de ferramentas",
+      "condensedLabel": "{{itemCount}} itens; {{last}}"
     }
   },
   "bootstrap": {

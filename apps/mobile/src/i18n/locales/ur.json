@@ -253,7 +253,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway کے ذریعے آواز کو متن میں بدلنا",
     "gatewayTranscriptionSubtitle": "ڈیوائس کی آواز کی پہچان کے بجائے Kilo Gateway ماڈل کے ذریعے آواز سے لکھنے کو متن میں بدلیں۔ آپ کی ریکارڈنگ Kilo Gateway کو بھیجی جاتی ہے۔",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ٹول کالز کو مختصر کریں",
+    "condenseToolCallsSubtitle": "مسلسل ٹول کالز کو ایک قطار میں گروپ کریں جسے آپ کھول سکتے ہیں۔"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
@@ -2469,6 +2471,10 @@
       "retryableDescription": "اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔ آپ اب بھی «ہو گیا» پر ٹیپ کر کے یہی فولڈر منتخب کر سکتے ہیں۔",
       "unsupportedTitle": "فولڈرز کی فہرست نہیں مل سکتی",
       "unsupportedDescription": "یہ CLI فولڈرز کی فہرست نہیں دکھا سکتا۔ «ہو گیا» پر ٹیپ کرنے سے ابتدائی فولڈر برقرار رہے گا۔ «سیشن شروع کریں» پر ٹیپ کرنے سے سیشن اسی فولڈر میں شروع ہو گا۔"
+    },
+    "toolRun": {
+      "sheetTitle": "ٹول کالز",
+      "condensedLabel": "{{itemCount}} اندراجات; {{last}}"
     }
   },
   "bootstrap": {

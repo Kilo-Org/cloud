@@ -231,6 +231,8 @@
     "voiceInput": "Antre vwa",
     "autoExpandThinking": "Montre refleksyon yo otomatikman",
     "autoExpandThinkingSubtitle": "Montre tout refleksyon ajan an lè li fin reflechi.",
+    "hideThinking": "Kache detay refleksyon yo",
+    "hideThinkingSubtitle": "Pa montre refleksyon ajan an sou paj sesyon an.",
     "keepScreenOn": "Kenbe ekran an limen sou paj sesyon an",
     "keepScreenOnSubtitle": "Kenbe ekran an limen pandan sesyon an ap travay.",
     "appearance": "Aparans",

@@ -231,6 +231,8 @@
     "voiceInput": "Ionchur gutha",
     "autoExpandThinking": "Leathnaigh an machnamh go huathoibríoch",
     "autoExpandThinkingSubtitle": "Taispeáin machnamh an ghníomhaire ina iomláine nuair a chríochnaíonn sé.",
+    "hideThinking": "Folaigh sonraí an mhachnaimh",
+    "hideThinkingSubtitle": "Ná taispeáin machnamh an ghníomhaire ar leathanach an tseisiúin.",
     "keepScreenOn": "Coinnigh an scáileán ar siúl ar leathanach an tseisiúin",
     "keepScreenOnSubtitle": "Coinnigh an scáileán ar siúl fad a bhíonn an seisiún ag obair.",
     "appearance": "Dealramh",

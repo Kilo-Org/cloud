@@ -231,6 +231,8 @@
     "voiceInput": "語音輸入",
     "autoExpandThinking": "自動展開思考內容",
     "autoExpandThinkingSubtitle": "智慧代理完成思考後，自動展開思考內容。",
+    "hideThinking": "隱藏思考詳情",
+    "hideThinkingSubtitle": "不在工作階段頁面顯示智慧代理的思考內容。",
     "keepScreenOn": "在工作階段頁面保持螢幕亮起",
     "keepScreenOnSubtitle": "工作階段執行期間，保持螢幕亮起。",
     "appearance": "外觀",

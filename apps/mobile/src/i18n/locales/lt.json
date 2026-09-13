@@ -231,6 +231,8 @@
     "voiceInput": "Balso įvestis",
     "autoExpandThinking": "Automatiškai išskleisti mąstymą",
     "autoExpandThinkingSubtitle": "Baigus mąstyti, automatiškai išskleisti agento mąstymo tekstą.",
+    "hideThinking": "Slėpti mąstymo informaciją",
+    "hideThinkingSubtitle": "Nerodyti agento mąstymo sesijos puslapyje.",
     "keepScreenOn": "Neišjungti ekrano sesijos puslapyje",
     "keepScreenOnSubtitle": "Neišjungti ekrano, kol sesija vykdoma.",
     "appearance": "Išvaizda",

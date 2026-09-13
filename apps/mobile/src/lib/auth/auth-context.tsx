@@ -50,6 +50,7 @@ import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-pref
 import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
+import { clearHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
 import { clearSessionScopedState } from '@/lib/auth/session-scoped-state';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
@@ -479,6 +480,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearAgentModelPreference();
           clearRunOnDestinationPreference();
           clearReasoningPreference();
+          clearHideThinkingPreference();
           clearKeepScreenOnPreference();
           clearLiveActivityPreference();
           clearSessionScopedState();

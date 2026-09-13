@@ -2035,6 +2035,8 @@
     "voiceInput": "Entrada de voz",
     "autoExpandThinking": "Expandir raciocínio automaticamente",
     "autoExpandThinkingSubtitle": "Mostrar o raciocínio do agente expandido quando ele terminar de pensar.",
+    "hideThinking": "Ocultar os detalhes do raciocínio",
+    "hideThinkingSubtitle": "Não mostrar o raciocínio do agente na página da sessão.",
     "keepScreenOn": "Manter a tela ligada durante a sessão",
     "keepScreenOnSubtitle": "Manter a tela ligada enquanto a sessão estiver em execução.",
     "appearance": "Aparência",

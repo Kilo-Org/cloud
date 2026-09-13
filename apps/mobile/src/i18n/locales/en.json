@@ -231,6 +231,8 @@
     "biometricUnlockSubtitle": "Unlock at launch and after five minutes in the background.",
     "autoExpandThinking": "Auto expand thinking",
     "autoExpandThinkingSubtitle": "Show the agent's thinking expanded when it finishes.",
+    "hideThinking": "Hide thinking details",
+    "hideThinkingSubtitle": "Don't show the agent's thinking on the session page.",
     "keepScreenOn": "Keep screen on while on session page",
     "keepScreenOnSubtitle": "Hold the screen awake while the session is working.",
     "appearance": "Appearance",

@@ -231,6 +231,8 @@
     "voiceInput": "Wprowadzanie głosu",
     "autoExpandThinking": "Automatycznie rozwijaj tok rozumowania",
     "autoExpandThinkingSubtitle": "Rozwijaj tok rozumowania agenta po jego zakończeniu.",
+    "hideThinking": "Ukryj szczegóły rozumowania",
+    "hideThinkingSubtitle": "Nie pokazuj rozumowania agenta na stronie sesji.",
     "keepScreenOn": "Nie wygaszaj ekranu podczas wyświetlania sesji",
     "keepScreenOnSubtitle": "Nie wygaszaj ekranu, gdy trwa sesja.",
     "appearance": "Wygląd",

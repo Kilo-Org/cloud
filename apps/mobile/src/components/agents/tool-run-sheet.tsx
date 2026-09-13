@@ -7,6 +7,7 @@ import { CenteredState } from '@/components/centered-state';
 import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
 
+import { MessageErrorBoundary } from './message-error-boundary';
 import { SessionPageSheet } from './session-page-sheet';
 import { ToolOneLineRow } from './tool-run-rows';
 
@@ -46,13 +47,14 @@ export function ToolRunSheet({ visible, parts, onClose, onOpenPart }: Readonly<T
       ) : (
         <ScrollView className="flex-1" contentContainerClassName="gap-2 px-4 pb-6 pt-3">
           {parts.map(part => (
-            <ToolOneLineRow
-              key={part.id}
-              part={part}
-              onPress={() => {
-                onOpenPart(part.id);
-              }}
-            />
+            <MessageErrorBoundary key={part.id}>
+              <ToolOneLineRow
+                part={part}
+                onPress={() => {
+                  onOpenPart(part.id);
+                }}
+              />
+            </MessageErrorBoundary>
           ))}
         </ScrollView>
       )}

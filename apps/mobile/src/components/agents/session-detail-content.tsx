@@ -36,6 +36,7 @@ import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
+import { MessageErrorBoundary } from '@/components/agents/message-error-boundary';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
@@ -1059,7 +1060,9 @@ export function SessionDetailContent({
         // sits flush with its neighbours rather than full-bleed.
         return (
           <View className="px-4 py-1">
-            <CondensedToolRunRow parts={item.parts} />
+            <MessageErrorBoundary>
+              <CondensedToolRunRow parts={item.parts} />
+            </MessageErrorBoundary>
           </View>
         );
       }

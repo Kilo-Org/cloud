@@ -20,6 +20,7 @@ import { CompactionSeparator } from './compaction-separator';
 import { collectCopyableText } from './collect-copyable-text';
 import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
+import { MessageErrorBoundary } from './message-error-boundary';
 import { selectMessageFailure } from './message-failure-state';
 import { partRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
@@ -296,7 +297,9 @@ function MessageBubbleImpl({
             {condenseToolCalls
               ? groupMessageParts(parts, { condense: true }).map(group =>
                   group.kind === 'tool-run' ? (
-                    <CondensedToolRunRow key={group.parts[0]?.id} parts={group.parts} />
+                    <MessageErrorBoundary key={group.parts[0]?.id}>
+                      <CondensedToolRunRow parts={group.parts} />
+                    </MessageErrorBoundary>
                   ) : (
                     group.parts.map(renderPart)
                   )

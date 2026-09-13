@@ -82,6 +82,15 @@ const PARTS: ToolPart[] = [
   makePart('t3', 'write', { filePath: 'new-file.ts' }),
 ];
 
+/** A tool part whose untrusted input is not an object: `getToolDisplay` throws. */
+function malformedPart(id: string): ToolPart {
+  const part = makePart(id, 'read', {});
+  return {
+    ...part,
+    state: { ...part.state, input: null as unknown as Record<string, unknown> },
+  };
+}
+
 async function mountSheet(
   parts: readonly ToolPart[],
   onOpenPart: (partId: string) => void = vi.fn()
@@ -150,6 +159,22 @@ describe('ToolRunSheet mounted', () => {
 
     expect(onOpenPart).toHaveBeenCalledTimes(1);
     expect(onOpenPart).toHaveBeenCalledWith('t2');
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the sheet alive when one row cannot render', async () => {
+    const renderer = await mountSheet([
+      makePart('t1', 'read', { filePath: '/repo/app.ts' }),
+      malformedPart('bad'),
+      makePart('t3', 'write', { filePath: 'new-file.ts' }),
+    ]);
+
+    expect(renderer.root.findAllByType(FixedPartRow)).toHaveLength(2);
+    expect(textsOf(renderer.root)).toContain('Failed to render content');
 
     await act(async () => {
       await Promise.resolve();

@@ -2439,6 +2439,11 @@
       "stepsCount_other": "{{steps}} گام",
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
     },
+    "autoApprove": {
+      "title": "تأیید خودکار",
+      "description": "درخواست‌های مجوز این نشست را به‌صورت خودکار تأیید کنید. سپس ابزارها بدون درخواست اجرا می‌شوند.",
+      "unavailable": "این نشست نمی‌تواند درخواست‌های مجوز را دریافت کند."
+    },
     "prBadge": {
       "open": "پول ریکوئست باز",
       "closed": "درخواست ادغام بسته‌شده",

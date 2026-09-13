@@ -2439,6 +2439,11 @@
       "stepsCount_other": "පියවර {{steps}}ක්",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "ස්වයංක්‍රීය අනුමැතිය",
+      "description": "මෙම සැසිය සඳහා අවසර ඉල්ලීම් ස්වයංක්‍රීයව අනුමත කරන්න. පසුව මෙවලම් විමසුමකින් තොරව ක්‍රියාත්මක වේ.",
+      "unavailable": "මෙම සැසියට අවසර ඉල්ලීම් ලබා ගත නොහැක."
+    },
     "prBadge": {
       "open": "විවෘත PR",
       "closed": "වසා දැමූ PR",

@@ -1935,12 +1935,19 @@ async function cancelActiveCodeReviewsByIdWithDatabase(
   return result.rows.map(mapCancelledReviewRow);
 }
 
+/**
+ * Deliberately narrower than this module's own `Owner` type (which also
+ * requires an acting `userId` for review-creation purposes): this is a
+ * system/background cancellation with no acting user, and only the
+ * owner's type/id is ever used, to build the ownership WHERE clause below.
+ * Named (rather than left inline) so it's distinct at a glance from both
+ * this module's `Owner` and the unrelated `Owner` in
+ * `@/lib/integrations/core/types`.
+ */
+type ReviewOwnerRef = { type: 'org' | 'user'; id: string };
+
 type IntegrationReviewCancellationInput = {
-  // Deliberately narrower than the core `Owner` type (which also requires an
-  // acting `userId` for review-creation purposes): this is a
-  // system/background cancellation with no acting user, and only the
-  // owner's type/id is ever used, to build the ownership WHERE clause below.
-  owner: { type: 'org' | 'user'; id: string };
+  owner: ReviewOwnerRef;
   platform: CodeReviewPlatform;
   integrationId: string;
 };
@@ -2048,15 +2055,10 @@ export async function cancelActiveCodeReviewsForIntegration(
   input: IntegrationReviewCancellationInput,
   /** Run the cancellation query inside a caller-owned transaction (for
    *  example, alongside a disconnect/uninstall update under the same
-   *  advisory-lock ordering) instead of the default connection.
-   *
-   *  When a transaction is supplied, ledger settling is skipped here: the
-   *  caller must call `settleCancelledReviews` itself, only after its own
-   *  transaction has committed. Settling always writes through the default
-   *  `db` connection, so settling before commit would let the ledger go
-   *  terminal even if the caller's transaction later rolls back (for
-   *  example, disconnect/uninstall failing a later step and rolling back
-   *  this very cancellation). Without a transaction, settling runs
+   *  advisory-lock ordering) instead of the default connection. When a
+   *  transaction is supplied, ledger settling is skipped here — see the
+   *  `settleCancelledReviews` doc comment above for why, and for what the
+   *  caller must do instead. Without a transaction, settling runs
    *  immediately, best-effort, matching prior standalone-call semantics. */
   transaction?: DrizzleTransaction
 ): Promise<CancelledReviewRow[]> {

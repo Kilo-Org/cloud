@@ -803,6 +803,31 @@ export async function findPendingInstallationByKiloUserId(kiloUserId: string) {
 }
 
 /**
+ * Builds the `github_authorized_*` provenance columns for a
+ * `platform_integrations` row, or an empty object if either identity is
+ * missing. Shared by every writer that records who authorized a GitHub
+ * connection, so the shape can't drift between them.
+ */
+function buildGitHubAuthorizationProvenance(
+  kiloUserId: string | undefined,
+  githubUserId: string | undefined,
+  authorizedAt: string = new Date().toISOString()
+):
+  | {
+      github_authorized_by_user_id: string;
+      github_authorized_user_id: string;
+      github_authorized_at: string;
+    }
+  | Record<string, never> {
+  if (!kiloUserId || !githubUserId) return {};
+  return {
+    github_authorized_by_user_id: kiloUserId,
+    github_authorized_user_id: githubUserId,
+    github_authorized_at: authorizedAt,
+  };
+}
+
+/**
  * Auto-complete a pending installation
  */
 export async function autoCompleteInstallation({
@@ -843,16 +868,10 @@ export async function autoCompleteInstallation({
   // rather than leaving provenance null. This can misattribute completion
   // if a different GitHub org admin approves someone else's request; there
   // is no stronger identity available on this path to resolve that.
-  const requesterKiloUserId = pendingApproval?.requester?.kilo_user_id;
-  const requesterGithubUserId = pendingApproval?.github_requester?.id;
-  const authorizationProvenance =
-    requesterKiloUserId && requesterGithubUserId
-      ? {
-          github_authorized_by_user_id: requesterKiloUserId,
-          github_authorized_user_id: requesterGithubUserId,
-          github_authorized_at: new Date().toISOString(),
-        }
-      : {};
+  const authorizationProvenance = buildGitHubAuthorizationProvenance(
+    pendingApproval?.requester?.kilo_user_id,
+    pendingApproval?.github_requester?.id
+  );
 
   await db
     .update(platform_integrations)
@@ -1068,14 +1087,11 @@ export async function upsertPlatformIntegrationForOwner(
 ): Promise<UpsertPlatformIntegrationResult> {
   const appType = data.githubAppType ?? 'standard';
   const now = new Date().toISOString();
-  const authorizationProvenance =
-    data.kiloUserId && data.githubUserId
-      ? {
-          github_authorized_by_user_id: data.kiloUserId,
-          github_authorized_user_id: data.githubUserId,
-          github_authorized_at: now,
-        }
-      : {};
+  const authorizationProvenance = buildGitHubAuthorizationProvenance(
+    data.kiloUserId,
+    data.githubUserId,
+    now
+  );
 
   // Build values object used for both insert paths.
   const values = {

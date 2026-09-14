@@ -23,7 +23,9 @@ import { artifactName } from './mobile-remote-native';
 // pull_request trigger, a native-input run publishes the plain
 // mobile-native-<platform>-<nativeHash> artifact a host installs, a
 // workflow-file run keeps the PR-scoped prefix hosts never install, and a
-// platform whose artifact exists is skipped.
+// platform whose artifact exists is skipped. A push run only skips on a
+// durable artifact: the one-day pull_request artifact must not stop main from
+// publishing its own build.
 
 type WorkflowStep = {
   id?: string;
@@ -230,6 +232,43 @@ test('a push always publishes the plain, installable name', () => {
   assert.deepEqual(gate, { prefix: '', needIos: true, needAndroid: true });
 });
 
+test('a push run asks for a durable artifact so a one-day one cannot skip it', () => {
+  const requested: boolean[] = [];
+  decideNativeBuildGate({
+    eventName: 'push',
+    platform: 'all',
+    prNumber: '',
+    workflowHash: '',
+    changedFiles: [],
+    iosHash: 'ioshash',
+    androidHash: 'androidhash',
+    artifactExists: (_name, options) => {
+      requested.push(options.requireDurable);
+      // A one-day artifact is live but not durable, so the push still builds.
+      return false;
+    },
+  });
+  assert.deepEqual(requested, [true, true]);
+});
+
+test('a pull_request run accepts the artifact it publishes itself', () => {
+  const requested: boolean[] = [];
+  decideNativeBuildGate({
+    eventName: 'pull_request',
+    platform: 'all',
+    prNumber: '6115',
+    workflowHash: 'abc12345',
+    changedFiles: ['patches/react-native.patch'],
+    iosHash: 'ioshash',
+    androidHash: 'androidhash',
+    artifactExists: (_name, options) => {
+      requested.push(options.requireDurable);
+      return false;
+    },
+  });
+  assert.deepEqual(requested, [false, false]);
+});
+
 test('the platform input gates a single platform and skips its artifact lookup', () => {
   const queried: string[] = [];
   const gate = decideNativeBuildGate({
@@ -252,7 +291,20 @@ test('the platform input gates a single platform and skips its artifact lookup',
 // Run the shipped gate CLI with a stub `gh` so the workflow wiring (env in,
 // GITHUB_OUTPUT out, artifact lookups) is exercised, not just the pure
 // decision.
-function runGateCli(options: { changedFiles: string[]; artifactsExist: boolean }): {
+function artifact(createdDaysAgo: number, retentionDays: number): string {
+  const created = Date.now() - createdDaysAgo * 24 * 60 * 60 * 1000;
+  return JSON.stringify({
+    expired: false,
+    created_at: new Date(created).toISOString(),
+    expires_at: new Date(created + retentionDays * 24 * 60 * 60 * 1000).toISOString(),
+  });
+}
+
+function runGateCli(options: {
+  eventName?: string;
+  changedFiles?: string[];
+  artifacts?: string[];
+}): {
   outputs: Record<string, string>;
   ghLog: string;
 } {
@@ -262,7 +314,10 @@ function runGateCli(options: { changedFiles: string[]; artifactsExist: boolean }
   const ghLog = path.join(dir, 'gh.log');
   const output = path.join(dir, 'github_output');
   fs.writeFileSync(output, '');
-  const changed = options.changedFiles.map(file => `'${file}'`).join(' ');
+  const changed = (options.changedFiles ?? []).map(file => `'${file}'`).join(' ');
+  const artifacts = JSON.stringify({
+    artifacts: (options.artifacts ?? []).map(item => JSON.parse(item)),
+  });
   fs.writeFileSync(
     path.join(bin, 'gh'),
     [
@@ -271,7 +326,7 @@ function runGateCli(options: { changedFiles: string[]; artifactsExist: boolean }
       `echo "$@" >> "${ghLog}"`,
       'case "$*" in',
       `  *"/pulls/"*) printf '%s\\n' ${changed} ;;`,
-      `  *"/actions/artifacts?name="*) printf '${options.artifactsExist ? '1' : '0'}\\n' ;;`,
+      `  *"/actions/artifacts?name="*) printf '%s\\n' '${artifacts}' ;;`,
       '  *) echo "unexpected gh args: $*" >&2; exit 1 ;;',
       'esac',
       '',
@@ -287,7 +342,7 @@ function runGateCli(options: { changedFiles: string[]; artifactsExist: boolean }
         env: {
           ...process.env,
           PATH: `${bin}:${process.env.PATH ?? ''}`,
-          GITHUB_EVENT_NAME: 'pull_request',
+          GITHUB_EVENT_NAME: options.eventName ?? 'pull_request',
           GITHUB_REPOSITORY: 'Kilo-Org/kilocode',
           PR_NUMBER: '6115',
           PLATFORM: 'all',
@@ -314,11 +369,48 @@ function runGateCli(options: { changedFiles: string[]; artifactsExist: boolean }
 test('the gate CLI skips both platforms and keeps the plain name when artifacts exist', () => {
   const { outputs, ghLog } = runGateCli({
     changedFiles: ['patches/react-native.patch', 'apps/mobile/app.config.ts'],
-    artifactsExist: true,
+    artifacts: [artifact(0, 1)],
   });
   assert.deepEqual(outputs, { prefix: '', need_ios: 'false', need_android: 'false' });
   assert.ok(ghLog.includes('name=mobile-native-ios-ioshash'), ghLog);
   assert.ok(ghLog.includes('name=mobile-native-android-androidhash'), ghLog);
+});
+
+// The finding this pins: the gate lists every non-expired artifact under the
+// plain name, so before the fix a push run skipped main's durable build when
+// the only artifact was the one-day one a pull_request run published.
+test('a push run does not skip on the one-day pull_request artifact', () => {
+  const { outputs, ghLog } = runGateCli({
+    eventName: 'push',
+    artifacts: [artifact(0, 1)],
+  });
+  assert.deepEqual(outputs, { prefix: '', need_ios: 'true', need_android: 'true' });
+  assert.ok(ghLog.includes('name=mobile-native-ios-ioshash'), ghLog);
+  assert.ok(ghLog.includes('name=mobile-native-android-androidhash'), ghLog);
+});
+
+test('a push run skips on the durable artifact main published', () => {
+  const { outputs } = runGateCli({
+    eventName: 'push',
+    artifacts: [artifact(0, 90)],
+  });
+  assert.deepEqual(outputs, { prefix: '', need_ios: 'false', need_android: 'false' });
+});
+
+test('a push run skips when a durable artifact sits beside the one-day one', () => {
+  const { outputs } = runGateCli({
+    eventName: 'push',
+    artifacts: [artifact(0, 1), artifact(0, 90)],
+  });
+  assert.deepEqual(outputs, { prefix: '', need_ios: 'false', need_android: 'false' });
+});
+
+test('a workflow_dispatch run does not skip on the one-day pull_request artifact', () => {
+  const { outputs } = runGateCli({
+    eventName: 'workflow_dispatch',
+    artifacts: [artifact(0, 1)],
+  });
+  assert.deepEqual(outputs, { prefix: '', need_ios: 'true', need_android: 'true' });
 });
 
 test('the gate CLI keeps an edited workflow out of the installed namespace', () => {
@@ -328,7 +420,6 @@ test('the gate CLI keeps an edited workflow out of the installed namespace', () 
     .slice(0, 8);
   const { outputs, ghLog } = runGateCli({
     changedFiles: ['patches/react-native.patch', NATIVE_WORKFLOW_PATH],
-    artifactsExist: false,
   });
   assert.deepEqual(outputs, {
     prefix: `pr6115-${workflowHash}-`,

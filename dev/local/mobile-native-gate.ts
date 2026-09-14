@@ -8,6 +8,9 @@
 // file as well, so each revision of it builds once and a re-push skips.
 // Every other pull_request run exists because a native input changed: it
 // publishes the plain name a fleet host installs instead of compiling.
+// A run that publishes a durable artifact (push, workflow_dispatch) skips only
+// on a durable artifact, so the one-day pull_request artifact cannot leave
+// main without the build it keeps for hosts.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -18,6 +21,17 @@ import { artifactName } from './mobile-remote-native';
 export const NATIVE_WORKFLOW_PATH = '.github/workflows/mobile-native-build.yml';
 
 type Platform = 'ios' | 'android';
+
+// The workflow gives a pull_request artifact one day and a push or
+// workflow_dispatch artifact the durable 90 (retention-days in
+// .github/workflows/mobile-native-build.yml). A pull_request run publishes the
+// plain name for hosts to install, but a run that publishes a durable artifact
+// must not let that one-day artifact satisfy its skip: once it expires main
+// has no durable build for the nativeHash and every host falls back to
+// compiling.
+const PULL_REQUEST_ARTIFACT_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+export type ArtifactLookupOptions = { requireDurable: boolean };
 
 // A pull request only gets the out-of-namespace prefix when it changes the
 // workflow file; the prefix keys on the workflow revision so re-pushing the
@@ -39,7 +53,7 @@ export function decideNativeBuildGate(input: {
   changedFiles: readonly string[];
   iosHash: string;
   androidHash: string;
-  artifactExists: (artifactName: string) => boolean;
+  artifactExists: (artifactName: string, options: ArtifactLookupOptions) => boolean;
 }): { prefix: string; needIos: boolean; needAndroid: boolean } {
   const prefix =
     input.eventName === 'pull_request'
@@ -49,11 +63,16 @@ export function decideNativeBuildGate(input: {
           changedFiles: input.changedFiles,
         })
       : '';
+  // Only a pull_request run publishes the short-lived artifact; a push or
+  // dispatch run publishes the durable one, so it may only skip on a durable
+  // artifact (a pull_request artifact expires in a day and would leave main
+  // without a build).
+  const requireDurable = input.eventName !== 'pull_request';
   const need = (platform: Platform, hash: string): boolean => {
     if (input.platform !== 'all' && input.platform !== platform) return false;
     // Same name a host looks up (dev/local/mobile-remote-native.ts), so a
     // published artifact is installable and an existing one is skipped.
-    return !input.artifactExists(`${prefix}${artifactName(platform, hash)}`);
+    return !input.artifactExists(`${prefix}${artifactName(platform, hash)}`, { requireDurable });
   };
   return {
     prefix,
@@ -66,18 +85,29 @@ function gh(args: string[]): string {
   return execFileSync('gh', args, { encoding: 'utf8' });
 }
 
-function artifactExists(repository: string, name: string): boolean {
-  const raw = gh([
-    'api',
-    `repos/${repository}/actions/artifacts?name=${name}&per_page=10`,
-    '--jq',
-    '[.artifacts[] | select(.expired | not)] | length',
-  ]);
-  const count = Number.parseInt(raw.trim(), 10);
-  if (!Number.isInteger(count)) {
-    throw new Error(`unexpected artifact count for ${name}: ${raw.trim()}`);
+type ArtifactRecord = { created_at?: string; expires_at?: string; expired?: boolean };
+
+// An artifact exists when the API lists a non-expired one under the name. A
+// run that publishes a durable artifact needs one whose own lifetime is the
+// durable one: the pull_request run's one-day artifact (retention-days: 1)
+// must not make a push skip the build main keeps for 90 days.
+function artifactExists(
+  repository: string,
+  name: string,
+  options: ArtifactLookupOptions
+): boolean {
+  const raw = gh(['api', `repos/${repository}/actions/artifacts?name=${name}&per_page=10`]);
+  const parsed = JSON.parse(raw) as { artifacts?: ArtifactRecord[] };
+  if (!Array.isArray(parsed.artifacts)) {
+    throw new Error(`unexpected artifact listing for ${name}: ${raw.trim()}`);
   }
-  return count > 0;
+  const live = parsed.artifacts.filter(artifact => artifact.expired !== true);
+  if (!options.requireDurable) return live.length > 0;
+  return live.some(
+    artifact =>
+      Date.parse(artifact.expires_at ?? '') - Date.parse(artifact.created_at ?? '') >
+      PULL_REQUEST_ARTIFACT_RETENTION_MS
+  );
 }
 
 // The API lists the PR's changed files against its base; a workflow-file edit
@@ -132,8 +162,8 @@ function main(): void {
     changedFiles: eventName === 'pull_request' ? changedPullRequestFiles(repository, prNumber) : [],
     iosHash,
     androidHash,
-    artifactExists: name => {
-      const exists = artifactExists(repository, name);
+    artifactExists: (name, options) => {
+      const exists = artifactExists(repository, name, options);
       if (exists) process.stderr.write(`artifact ${name} already exists\n`);
       return exists;
     },

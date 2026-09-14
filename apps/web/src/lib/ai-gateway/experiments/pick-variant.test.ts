@@ -45,15 +45,29 @@ beforeAll(async () => {
   ({ createCallerForUser } = await import('@/routers/test-utils'));
   ({ isPublicIdExperimented } = await import('./membership'));
   ({ pickModelExperimentVariant } = await import('./pick-variant'));
-});
+  // kilocode_change - `@/routers/test-utils` resolves the whole root-router
+  // graph on this dynamic import's first hit, and the provider-review layer
+  // added GitLab and Bitbucket routers plus their read/write/authorization
+  // libraries to that graph. On a cold transform it takes ~6.1s (measured)
+  // and ~3.7s with a warm transform, which is past Jest's default 5s hook
+  // budget once the full suite runs four workers in parallel. Give it real
+  // headroom rather than a fragile default, like
+  // active-sessions-router.test.ts does for the same reason.
+}, 30_000);
 
 beforeEach(async () => {
+  // kilocode_change - the first hook of a file pays a fresh pool connection
+  // (POSTGRES_CONNECT_TIMEOUT is 10s under .env.test) and then TRUNCATEs every
+  // public table; the admin insert is another round trip. Each step is fast in
+  // isolation, but on the shared Postgres service with four jest workers in
+  // parallel they can spike past Jest's default 5s hook budget, which is how
+  // this file's first test failed in CI. Budget for the spike, not the median.
   await cleanupDbForTest();
   admin = await insertTestUser({
     google_user_email: `admin-${Math.random()}@admin.example.com`,
     is_admin: true,
   });
-});
+}, 30_000);
 
 async function clearRoutingCaches() {
   mockRedisStore.delete(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);

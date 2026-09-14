@@ -219,6 +219,22 @@ import {
   type SessionMessageRecord,
 } from './session-message-queue.js';
 import { createMessageCallbacks, type MessageCallbacks } from './message-callbacks.js';
+import {
+  createReportOutbox,
+  readReportAnchor,
+  writeReportAnchor,
+  type ReportAnchor,
+  type ReportOutbox,
+} from './report-outbox.js';
+import {
+  CloudAgentQueueReportSchema,
+  DIAGNOSTIC_RETENTION_MS,
+  type CloudAgentQueueReport,
+  type CloudAgentRunStateReport,
+} from '@kilocode/worker-utils/cloud-agent-queue-report';
+import { buildRunStateReport, FAILED_RUN_DIAGNOSTIC_MESSAGES } from '../telemetry/queue-reports.js';
+import { classifyControlPlaneFailure } from '../telemetry/control-plane-failure.js';
+import { classifyCloudAgentFailure } from '@kilocode/worker-utils/cloud-agent-failure';
 import { PENDING_SESSION_MESSAGE_LIMIT } from '../session/pending-messages.js';
 import {
   commitSessionOperationResult,
@@ -324,6 +340,7 @@ export class SandboxSession extends DurableObject<Env> {
   private readonly sessionId: SessionId | undefined;
   private readonly eventQueries: EventQueries;
   private readonly messageCallbacks: MessageCallbacks;
+  private readonly reportOutbox: ReportOutbox;
   private readonly terminalLifecycle: ReturnType<typeof createSandboxTerminalLifecycle>;
   private readonly terminalBridge: ReturnType<typeof createSandboxTerminalBridge>;
   private readonly dispatches = new Map<string, Promise<void>>();
@@ -336,6 +353,7 @@ export class SandboxSession extends DurableObject<Env> {
   private readonly worktreeChanges: ReturnType<typeof createWorktreeChanges>;
   private readonly interactionRefresh: InteractionRefresh;
   private callbackRepairRequired = false;
+  private reportRepairRequired = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -378,6 +396,10 @@ export class SandboxSession extends DurableObject<Env> {
           kiloSessionId,
           parentMessageId
         ),
+    });
+    this.reportOutbox = createReportOutbox({
+      storage: ctx.storage,
+      getQueue: () => env.CLOUD_AGENT_REPORT_QUEUE,
     });
     this.worktreeChanges = createWorktreeChanges({
       storage: ctx.storage,
@@ -2035,9 +2057,14 @@ export class SandboxSession extends DurableObject<Env> {
       this.snapshotDeletedMessages(metadata);
     });
     if (this.messageCallbacks.pendingCallbackCount() > 0) this.scheduleCallbackRepair();
+    if (this.reportOutbox.pendingCount() > 0) this.scheduleReportRepair();
     this.deletedWorktreeId = worktreeId;
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
-    if (this.messageCallbacks.pendingCallbackCount() === 0) await this.ctx.storage.deleteAlarm();
+    if (
+      this.messageCallbacks.pendingCallbackCount() === 0 &&
+      this.reportOutbox.pendingCount() === 0
+    )
+      await this.ctx.storage.deleteAlarm();
     if (!metadata) return null;
     return cloudAgentWorktreeLocationSchema.parse({
       sandboxId: metadata.workspace?.sandboxId,
@@ -2109,7 +2136,8 @@ export class SandboxSession extends DurableObject<Env> {
     }
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
     const callbacksPending = this.messageCallbacks.pendingCallbackCount() > 0;
-    if (!callbacksPending) await this.ctx.storage.deleteAlarm();
+    const reportsPending = this.reportOutbox.pendingCount() > 0;
+    if (!callbacksPending && !reportsPending) await this.ctx.storage.deleteAlarm();
     const db = drizzle(this.ctx.storage, { logger: false });
     this.ctx.storage.transactionSync(() => {
       db.delete(events).where(eq(events.session_id, this.requireSessionId())).run();
@@ -2119,8 +2147,13 @@ export class SandboxSession extends DurableObject<Env> {
       this.ctx.storage.kv.put(DELETED_WORKTREE_KEY, worktreeId);
       this.ctx.storage.kv.put(DELETION_COMPLETED_KEY, true);
     });
-    if (callbacksPending) {
-      await this.armQueueRetry(this.messageCallbacks.nextCallbackDueAt() ?? Date.now());
+    if (callbacksPending || reportsPending) {
+      await this.armQueueRetry(
+        Math.min(
+          this.messageCallbacks.nextCallbackDueAt() ?? Date.now(),
+          this.reportOutbox.nextDueAt() ?? Date.now()
+        )
+      );
     }
   }
 
@@ -2129,12 +2162,153 @@ export class SandboxSession extends DurableObject<Env> {
     return operation.finally(() => this.activeOperations.delete(operation));
   }
 
+  private ensureReportAnchor(
+    metadata: SessionMetadata,
+    firstMessageId: string,
+    isFirstMessage: boolean
+  ): ReportAnchor | undefined {
+    const existing = readReportAnchor(this.ctx.storage);
+    if (existing) return existing;
+    // Never fabricate a first message or creation time for a session that
+    // already had messages; the anchor may only be written by the first admission.
+    if (!isFirstMessage) return undefined;
+    // Public `start` already has a reporting parent created by registration.
+    if (metadata.initialMessage?.id !== undefined) return undefined;
+    const kiloSessionId = metadata.auth.kiloSessionId;
+    if (kiloSessionId === undefined || !/^ses_.{26}$/.test(kiloSessionId)) return undefined;
+    const createdAt = Date.now();
+    const anchor: ReportAnchor = {
+      version: 1,
+      kiloSessionId,
+      initialMessageId: firstMessageId,
+      createdAt,
+    };
+    writeReportAnchor(this.ctx.storage, {
+      kiloSessionId,
+      initialMessageId: firstMessageId,
+      createdAt,
+    });
+    return anchor;
+  }
+
+  private buildMessageReport(
+    message: SessionMessageRecord,
+    anchor: ReportAnchor | undefined,
+    acceptanceObserved: boolean
+  ): CloudAgentQueueReport | undefined {
+    const sessionId = this.sessionId;
+    if (!sessionId) return undefined;
+    const status: CloudAgentRunStateReport['run']['status'] =
+      message.state === 'cancelled' ? 'interrupted' : message.state;
+    // `applyMessageOutcome` fills an inferred `acceptedAt` for a terminal
+    // outcome that arrived before the ACK. Only a transition out of the
+    // accepted state is observable dispatch acceptance.
+    const dispatchAcceptedAt =
+      acceptanceObserved && message.acceptedAt !== undefined ? message.acceptedAt : undefined;
+    const run: CloudAgentRunStateReport['run'] = {
+      messageId: message.messageId,
+      status,
+      ...(message.queuedAt === undefined
+        ? {}
+        : { queuedAt: new Date(message.queuedAt).toISOString() }),
+      ...(dispatchAcceptedAt === undefined
+        ? {}
+        : { dispatchAcceptedAt: new Date(dispatchAcceptedAt).toISOString() }),
+      ...(message.terminalAt === undefined
+        ? {}
+        : { terminalAt: new Date(message.terminalAt).toISOString() }),
+    };
+    if (status === 'failed' || status === 'interrupted') {
+      const dispatchState = acceptanceObserved ? ('accepted' as const) : ('pre_dispatch' as const);
+      // Coordinator failures carry a bounded cause. Wrapper outcomes and
+      // operation results copy arbitrary text, so they are not treated as a
+      // known coordinator cause.
+      const coordinatorOriginated =
+        message.terminalSource === undefined || message.terminalSource === 'coordinator';
+      const classification = classifyControlPlaneFailure(
+        coordinatorOriginated ? message.failedReason : undefined,
+        dispatchState,
+        status
+      );
+      run.failureStage = classification.stage;
+      run.failureCode = classification.code;
+      if (status === 'failed') {
+        const orchestrator = classifyCloudAgentFailure({
+          source: 'run',
+          stage: classification.stage,
+          code: classification.code,
+        });
+        run.failureResponsibility = orchestrator.responsibility;
+        run.failureReason = orchestrator.reason;
+        if (message.terminalAt !== undefined) {
+          run.diagnostic = {
+            errorMessageRedacted:
+              FAILED_RUN_DIAGNOSTIC_MESSAGES[classification.code] ??
+              'Run failed without a classified cause',
+            errorExpiresAt: new Date(message.terminalAt + DIAGNOSTIC_RETENTION_MS).toISOString(),
+          };
+        }
+      }
+    }
+    const report = buildRunStateReport({
+      cloudAgentSessionId: sessionId,
+      ...(anchor === undefined
+        ? {}
+        : {
+            anchor: {
+              kiloSessionId: anchor.kiloSessionId,
+              initialMessageId: anchor.initialMessageId,
+              reportingCreatedAt: new Date(anchor.createdAt).toISOString(),
+            },
+          }),
+      run,
+      occurredAt: Date.now(),
+    });
+    const parsed = CloudAgentQueueReportSchema.safeParse(report);
+    if (!parsed.success) {
+      logger
+        .withFields({ sessionId: this.sessionId, messageId: message.messageId, status })
+        .error('Invalid Cloud Agent report snapshot aborts the lifecycle commit');
+      return undefined;
+    }
+    return parsed.data;
+  }
+
+  /**
+   * Persists the local report obligation for a committed transition. This runs
+   * inside the caller's state-write transaction: an unbuildable snapshot or a
+   * failed KV write must abort it rather than be swallowed, so message state
+   * and obligation commit atomically. Transport/downstream failures remain
+   * asynchronous and nonfatal in the outbox repair path.
+   */
+  private recordMessageReport(message: SessionMessageRecord, acceptanceObserved: boolean): void {
+    const report = this.buildMessageReport(
+      message,
+      readReportAnchor(this.ctx.storage),
+      acceptanceObserved
+    );
+    if (!report) {
+      throw new Error(
+        `Could not build Cloud Agent report obligation for message ${message.messageId} (${message.state})`
+      );
+    }
+    this.reportOutbox.record(report);
+  }
+
   private snapshotDeletedMessages(metadata: SessionMetadata | null): void {
     const messages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
+    const now = Date.now();
     const cancelled = messages.map(message => {
       if (message.state !== 'queued' && message.state !== 'accepted') return message;
-      const next = { ...message, state: 'cancelled' as const };
+      const acceptanceObserved = message.state === 'accepted';
+      const next = {
+        ...message,
+        state: 'cancelled' as const,
+        terminalAt: now,
+        terminalSource: 'coordinator' as const,
+      };
       this.messageCallbacks.persistTerminalCallback(next, metadata);
+      this.recordMessageReport(next, acceptanceObserved);
       return next;
     });
     this.ctx.storage.kv.put(MESSAGES_KEY, cancelled);
@@ -2188,6 +2362,7 @@ export class SandboxSession extends DurableObject<Env> {
       return records;
     });
     if (this.messageCallbacks.pendingCallbackCount() > 0) this.scheduleCallbackRepair();
+    if (this.reportOutbox.pendingCount() > 0) this.scheduleReportRepair();
     for (const ws of this.ctx.getWebSockets('stream')) {
       ws.close(1000, 'session access revoked');
     }
@@ -2197,7 +2372,8 @@ export class SandboxSession extends DurableObject<Env> {
     await this.ingestPublicationChain.catch(() => undefined);
     if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     const callbacksPending = this.messageCallbacks.pendingCallbackCount() > 0;
-    if (!callbacksPending) await this.ctx.storage.deleteAlarm();
+    const reportsPending = this.reportOutbox.pendingCount() > 0;
+    if (!callbacksPending && !reportsPending) await this.ctx.storage.deleteAlarm();
     this.ctx.storage.transactionSync(() => {
       if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const pendingCleanup = this.pendingRuntimeCleanup();
@@ -2206,8 +2382,13 @@ export class SandboxSession extends DurableObject<Env> {
       if (pendingCleanup) this.ctx.storage.kv.put(PENDING_RUNTIME_CLEANUP_KEY, pendingCleanup);
     });
     if (this.pendingRuntimeCleanup()) await this.armQueueRetry();
-    else if (callbacksPending)
-      await this.armQueueRetry(this.messageCallbacks.nextCallbackDueAt() ?? Date.now());
+    else if (callbacksPending || reportsPending)
+      await this.armQueueRetry(
+        Math.min(
+          this.messageCallbacks.nextCallbackDueAt() ?? Date.now(),
+          this.reportOutbox.nextDueAt() ?? Date.now()
+        )
+      );
   }
 
   async registerSession(input: SandboxSessionRegistrationInput): Promise<OperationResult> {
@@ -2554,8 +2735,13 @@ export class SandboxSession extends DurableObject<Env> {
     for (const stop of this.stopLifecycle.pending())
       void this.scheduleStopProgress(stop.request.operationId);
     await this.messageCallbacks.repair();
+    await this.reportOutbox.repair();
     const callbackDueAt = this.messageCallbacks.nextCallbackDueAt();
-    if (callbackDueAt !== undefined) await this.armQueueRetry(callbackDueAt);
+    const reportDueAt = this.reportOutbox.nextDueAt();
+    if (callbackDueAt !== undefined || reportDueAt !== undefined)
+      await this.armQueueRetry(
+        Math.min(callbackDueAt ?? Number.MAX_SAFE_INTEGER, reportDueAt ?? Number.MAX_SAFE_INTEGER)
+      );
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null || this.deletedWorktreeId) return;
     const now = Date.now();
@@ -2819,7 +3005,11 @@ export class SandboxSession extends DurableObject<Env> {
         latestMetadata.agent,
         latestMetadata.workspace?.worktreeId ? latestMetadata.finalization : undefined
       );
-      nextMessages.push(createSessionMessageRecord(intent));
+      const queuedMessage: SessionMessageRecord = {
+        ...createSessionMessageRecord(intent),
+        queuedAt: Date.now(),
+      };
+      nextMessages.push(queuedMessage);
       const nextMetadata =
         intent.agent.model === undefined
           ? null
@@ -2831,6 +3021,10 @@ export class SandboxSession extends DurableObject<Env> {
       if (nextMetadata) {
         this.ctx.storage.kv.put(METADATA_KEY, serializeSessionMetadata(nextMetadata));
       }
+      // Local obligation persistence is part of this transaction: a throw here
+      // rolls back the message/metadata writes and fails admission.
+      this.ensureReportAnchor(latestMetadata, messageId, latestMessages.length === 0);
+      this.recordMessageReport(queuedMessage, false);
       admitted = true;
       return { success: true, outcome: 'queued', messageId, compatibilityDelivery: 'queued' };
     });
@@ -3796,25 +3990,44 @@ export class SandboxSession extends DurableObject<Env> {
     this.ctx.waitUntil(this.messageCallbacks.repair());
   }
 
+  private scheduleReportRepair(): void {
+    this.ctx.waitUntil(this.armQueueRetry());
+    this.ctx.waitUntil(this.reportOutbox.repair());
+  }
+
   private scheduleCallbackRepairIfRequired(): void {
-    if (!this.callbackRepairRequired) return;
-    this.callbackRepairRequired = false;
-    this.scheduleCallbackRepair();
+    if (this.callbackRepairRequired) {
+      this.callbackRepairRequired = false;
+      this.scheduleCallbackRepair();
+    }
+    if (this.reportRepairRequired) {
+      this.reportRepairRequired = false;
+      this.scheduleReportRepair();
+    }
   }
 
   private async armQueueRetry(when = Date.now() + QUEUE_RETRY_MS): Promise<void> {
     const epoch = this.terminalLifecycle.captureEpoch();
     const hasPendingStop = this.stopLifecycle.pending().length > 0;
     const callbackDueAt = this.messageCallbacks.nextCallbackDueAt();
+    const reportDueAt = this.reportOutbox.nextDueAt();
     const hasPendingCallbacks = callbackDueAt !== undefined;
-    if (epoch === null && !this.pendingRuntimeCleanup() && !hasPendingStop && !hasPendingCallbacks)
+    const hasPendingReports = reportDueAt !== undefined;
+    if (
+      epoch === null &&
+      !this.pendingRuntimeCleanup() &&
+      !hasPendingStop &&
+      !hasPendingCallbacks &&
+      !hasPendingReports
+    )
       return;
     const existing = await this.ctx.storage.getAlarm();
     if (
       (epoch === null || !this.terminalLifecycle.isCurrent(epoch)) &&
       !this.pendingRuntimeCleanup() &&
       !hasPendingStop &&
-      !hasPendingCallbacks
+      !hasPendingCallbacks &&
+      !hasPendingReports
     )
       return;
     const requested = Math.min(when, callbackDueAt ?? Number.MAX_SAFE_INTEGER);
@@ -4490,6 +4703,7 @@ export class SandboxSession extends DurableObject<Env> {
     const events: StoredEvent[] = [];
     const committed: ControlDiagnosticFields[] = [];
     let callbackPersisted = false;
+    let reportPersisted = false;
     let persisted = false;
     let disposition: ControlEventDisposition = 'epoch_changed';
     const write = () => {
@@ -4511,6 +4725,8 @@ export class SandboxSession extends DurableObject<Env> {
           if (previous?.state !== 'accepted') {
             const event = this.persistMessageLifecycleEvent(message);
             if (event) events.push(event);
+            this.recordMessageReport(message, true);
+            reportPersisted = true;
             committed.push({
               messageId: message.messageId,
               wrapperInstanceId: message.wrapperInstanceId,
@@ -4537,6 +4753,8 @@ export class SandboxSession extends DurableObject<Env> {
         const event = this.persistMessageLifecycleEvent(terminal);
         if (event) events.push(event);
         if (this.messageCallbacks.persistTerminalCallback(terminal)) callbackPersisted = true;
+        this.recordMessageReport(terminal, previous?.state === 'accepted');
+        reportPersisted = true;
         committed.push({
           messageId: terminal.messageId,
           wrapperInstanceId: terminal.wrapperInstanceId,
@@ -4576,6 +4794,10 @@ export class SandboxSession extends DurableObject<Env> {
     if (callbackPersisted) {
       if (scheduleCallbackRepair) this.scheduleCallbackRepair();
       else this.callbackRepairRequired = true;
+    }
+    if (reportPersisted) {
+      if (scheduleCallbackRepair) this.scheduleReportRepair();
+      else this.reportRepairRequired = true;
     }
     for (const fields of committed) {
       logControlDiagnostic('session_message_committed', {

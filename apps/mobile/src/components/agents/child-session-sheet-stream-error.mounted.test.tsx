@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildProps,
   createRecoverySource,
+  historyPage,
   host,
   makeAssistantMessage,
   renderSheet,
@@ -17,6 +18,7 @@ import {
   type SessionManagerConfig,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
+import { HELD_CHILD_LOAD_RETRY_MS } from './child-session-sheet';
 import { i18n } from '@/i18n';
 import { QueryError } from '@/components/query-error';
 
@@ -35,10 +37,12 @@ const CHILD_ID = 'child-1' as KiloSessionId;
  * row arrives, then the banner above live rows). Pass `[]` to keep storage
  * empty so the error renders full-screen.
  */
-async function mountFailingChildLoad(messages: StoredMessage[] = [makeAssistantMessage()]) {
-  const fetchPage = vi
+async function mountFailingChildLoad(
+  messages: StoredMessage[] = [makeAssistantMessage()],
+  fetchPage = vi
     .fn<NonNullable<SessionManagerConfig['fetchSnapshotPage']>>()
-    .mockRejectedValue(new Error('Service is unavailable right now. Please try again.'));
+    .mockRejectedValue(new Error('Service is unavailable right now. Please try again.'))
+) {
   const { manager, store, storage } = await createRecoverySource(fetchPage);
 
   let pending = manager.hydrateChildSession(CHILD_ID);
@@ -85,8 +89,17 @@ async function mountFailingChildLoad(messages: StoredMessage[] = [makeAssistantM
     await pending;
     await sync();
   }
+  // Advance past the sheet's held-load retry cadence and let the re-issued
+  // load settle, then re-render with the store's latest hydration state.
+  async function advanceRetry() {
+    await act(async () => {
+      vi.advanceTimersByTime(HELD_CHILD_LOAD_RETRY_MS);
+      await pending;
+    });
+    await sync();
+  }
 
-  return { renderer, fetchPage, receive, sync, retry, settle };
+  return { renderer, fetchPage, receive, sync, retry, settle, advanceRetry };
 }
 
 describe('ChildSessionSheet streamed session load error', () => {
@@ -157,5 +170,32 @@ describe('ChildSessionSheet streamed session load error', () => {
       i18n.t('agentChat.childSessionSheet.couldNotLoad')
     );
     expect(retryButton(sheet.renderer.root).props.disabled).toBe(false);
+  });
+
+  it('re-issues the held load while streaming and shows the rows when they land', async () => {
+    const fetchPage = vi
+      .fn<NonNullable<SessionManagerConfig['fetchSnapshotPage']>>()
+      .mockRejectedValueOnce(new Error('Service is unavailable right now. Please try again.'))
+      .mockResolvedValueOnce(historyPage([makeAssistantMessage('m2', 'Restored row')]));
+    const sheet = await mountFailingChildLoad([], fetchPage);
+
+    // The first page failed before any row landed and the child is streaming:
+    // the sheet holds loading and shows no error.
+    await sheet.sync({ isStreaming: true });
+    expect(textValues(sheet.renderer.root)).toContain(
+      i18n.t('agentChat.childSessionSheet.loading')
+    );
+    expect(sheet.renderer.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(sheet.fetchPage).toHaveBeenCalledTimes(1);
+
+    // The held load re-issues on its cadence; this time the fetch recovers,
+    // so the rows land and replace the loading state.
+    await sheet.advanceRetry();
+
+    expect(sheet.fetchPage).toHaveBeenCalledTimes(2);
+    expect(textValues(host(sheet.renderer.root, 'FlashList'))).toEqual(['Restored row']);
+    expect(textValues(sheet.renderer.root)).not.toContain(
+      i18n.t('agentChat.childSessionSheet.loading')
+    );
   });
 });

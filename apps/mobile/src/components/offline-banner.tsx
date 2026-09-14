@@ -34,7 +34,7 @@ export function OfflineBannerSpaceGate({ children }: Readonly<{ children: ReactN
  * position; `pointerEvents="none"` passes every touch to the header below.
  * Surfaces with a pinned top header reserve `OFFLINE_BANNER_HEIGHT` above the
  * header while the banner is visible so it never covers the title (see
- * `offlineHeaderReservation`).
+ * `offline-banner-space`).
  */
 export function OfflineBanner() {
   const isOffline = useOfflineBannerState();

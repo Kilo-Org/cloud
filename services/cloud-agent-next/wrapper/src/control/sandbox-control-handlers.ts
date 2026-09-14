@@ -45,8 +45,8 @@ import { gateResultFromProperties } from '../../../src/shared/kilo-event-propert
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import type { materializeMessageAttachments } from '../session-bootstrap.js';
 import type { runAutoCommit } from '../auto-commit.js';
-import { captureWorktreeState, discardWorktreeState, logWorktreeState } from '../worktree-state.js';
-import { WORKTREE_STATE_CAPTURE_BUDGET_MS } from '../../../src/shared/worktree-state.js';
+import type { captureWorktreeState } from '../worktree-state.js';
+import { discardWorktreeState } from '../worktree-state.js';
 import {
   forgetWorktreeStateEndpoint,
   worktreeStateEndpointFor,
@@ -1132,6 +1132,7 @@ function handlePrompt(
       runtime,
       materializeAttachments: deps.materializeAttachments,
       runAutoCommit: deps.runAutoCommit,
+      captureWorktreeState: deps.captureWorktreeState,
     },
     operationEffects(session, deps)
   );

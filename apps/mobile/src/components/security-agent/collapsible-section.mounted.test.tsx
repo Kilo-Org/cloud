@@ -7,8 +7,9 @@
 // 200ms chevron timing, 200ms layout transition, and 150ms fade stay.
 
 import { type ComponentProps, type ElementType, type ReactNode } from 'react';
-import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
 import { CollapsibleSection } from './collapsible-section';
 

@@ -1,6 +1,6 @@
 {
-  "id": "fe9a756d-6d1e-4b96-9dd4-b97f4923f709",
-  "prevId": "81d02f7f-5695-44a5-90ad-cdfb24cb43c3",
+  "id": "776ac7a8-7d4c-4955-bffe-3d2a841533cd",
+  "prevId": "8a7ac4ae-fdaf-482e-9743-2d6b278695a7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -12587,6 +12587,10 @@
         "github_app_installations_lifecycle_state_check": {
           "name": "github_app_installations_lifecycle_state_check",
           "value": "\"github_app_installations\".\"lifecycle_state\" IN ('unknown', 'active', 'suspended', 'deleted')"
+        },
+        "github_app_installations_sharing_mode_check": {
+          "name": "github_app_installations_sharing_mode_check",
+          "value": "\"github_app_installations\".\"sharing_mode\" IN ('exclusive', 'web_cloud_agent')"
         }
       },
       "isRLSEnabled": false
@@ -13091,6 +13095,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'completed'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -13140,7 +13151,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "github_installation_webhook_receipts_status_check": {
+          "name": "github_installation_webhook_receipts_status_check",
+          "value": "\"github_installation_webhook_receipts\".\"status\" IN ('processing', 'completed')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.http_ip": {
@@ -30133,37 +30149,59 @@
           "method": "btree",
           "with": {}
         },
-        "UQ_platform_integrations_github_platform_inst": {
-          "name": "UQ_platform_integrations_github_platform_inst",
+        "UQ_platform_integrations_github_org_canonical": {
+          "name": "UQ_platform_integrations_github_org_canonical",
           "columns": [
             {
-              "expression": "platform",
+              "expression": "owned_by_organization_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "github_app_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "platform_installation_id",
+              "expression": "github_installation_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"platform_installation_id\" IS NOT NULL",
+          "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"owned_by_organization_id\" IS NOT NULL AND \"platform_integrations\".\"github_installation_id\" IS NOT NULL",
           "concurrently": true,
           "method": "btree",
           "with": {}
         },
-        "UQ_platform_integrations_github_pending_target": {
-          "name": "UQ_platform_integrations_github_pending_target",
+        "UQ_platform_integrations_github_user_canonical": {
+          "name": "UQ_platform_integrations_github_user_canonical",
           "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "github_installation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"owned_by_user_id\" IS NOT NULL AND \"platform_integrations\".\"github_installation_id\" IS NOT NULL",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_platform_integrations_github_org_pending_target": {
+          "name": "UQ_platform_integrations_github_org_pending_target",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
             {
               "expression": "platform",
               "isExpression": false,
@@ -30184,8 +30222,42 @@
             }
           ],
           "isUnique": true,
-          "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"integration_status\" = 'pending' AND \"platform_integrations\".\"platform_installation_id\" IS NULL AND \"platform_integrations\".\"platform_account_id\" IS NOT NULL",
-          "concurrently": false,
+          "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"owned_by_organization_id\" IS NOT NULL AND \"platform_integrations\".\"integration_status\" = 'pending' AND \"platform_integrations\".\"platform_installation_id\" IS NULL AND \"platform_integrations\".\"platform_account_id\" IS NOT NULL",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_platform_integrations_github_user_pending_target": {
+          "name": "UQ_platform_integrations_github_user_pending_target",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "github_app_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"owned_by_user_id\" IS NOT NULL AND \"platform_integrations\".\"integration_status\" = 'pending' AND \"platform_integrations\".\"platform_installation_id\" IS NULL AND \"platform_integrations\".\"platform_account_id\" IS NOT NULL",
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },

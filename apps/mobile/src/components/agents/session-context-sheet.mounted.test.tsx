@@ -1,9 +1,8 @@
 /* eslint-disable max-lines -- The sheet's two concerns (the auto-approve row and the session identity rows) each carry their own mock harness and assertions; splitting them would duplicate the renderer setup. */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 
 import { type ComponentProps, createElement, type ReactElement } from 'react';
 import type * as ReactI18next from 'react-i18next';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Text } from '@/components/ui/text';

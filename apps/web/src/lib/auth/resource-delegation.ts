@@ -116,8 +116,34 @@ export function isDelegableResource(value: unknown): value is DelegableResource 
   );
 }
 
-export function canIssueLegacyOrganizationToken(requestHeaders: Headers): boolean {
-  return !requestHeaders.has('authorization');
+export async function canIssueLegacyOrganizationToken(
+  requestHeaders: Headers,
+  user: Pick<User, 'id' | 'api_token_pepper'>
+): Promise<boolean> {
+  // Organization authorization has already authenticated the session or bearer.
+  if (!requestHeaders.get('authorization')) return true;
+  const bearer = tokenFromHeaders(requestHeaders);
+  if (!bearer) return false;
+  try {
+    const verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
+      audience: KILO_API_AUDIENCE,
+      mode: 'allow-legacy',
+    });
+    if (
+      verified.userId !== user.id ||
+      verified.claims.env !== process.env.NODE_ENV ||
+      verified.claims.apiTokenPepper !== user.api_token_pepper ||
+      hasUnsafeLegacyClaims(verified.claimNames)
+    ) {
+      return false;
+    }
+    if (verified.claims.deviceSessionId !== undefined) {
+      await assertActiveDeviceSession(verified.claims.deviceSessionId, user.id);
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function tokenFromHeaders(requestHeaders: Headers): string | null {

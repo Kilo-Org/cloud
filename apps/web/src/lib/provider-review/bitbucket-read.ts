@@ -32,6 +32,7 @@ import {
   type BitbucketRepositoryAccess,
   type BitbucketReviewOwner,
 } from './bitbucket-authorization';
+import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
 
 const BITBUCKET_API_ORIGIN = 'https://api.bitbucket.org';
 const BITBUCKET_PAGE_SIZE = 50;
@@ -659,7 +660,10 @@ export async function getFileLines(
     );
     const allLines = text.split('\n');
     const start = Math.max(1, Math.min(startLine, allLines.length));
-    const end = Math.max(start, Math.min(endLine, allLines.length));
+    // Bound the window by the same shared cap the GitHub adapter applies, so
+    // the transport response cap is not the only limit on the returned slice.
+    const cappedEnd = Math.min(endLine, startLine + FILE_LINES_MAX - 1);
+    const end = Math.max(start, Math.min(cappedEnd, allLines.length));
     return { lines: allLines.slice(start - 1, end), totalLines: allLines.length };
   } catch (error) {
     throw classifyBitbucketError(error);

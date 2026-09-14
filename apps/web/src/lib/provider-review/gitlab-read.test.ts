@@ -5,6 +5,7 @@ import { PassThrough } from 'stream';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
 import { GitLabInstanceUrlError } from '@/lib/integrations/platforms/gitlab/instance-url';
+import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
 import {
   getFileLines,
   getMergeRequest,
@@ -394,6 +395,18 @@ describe('getFileLines', () => {
     await expect(
       getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'gone.txt', 1, 5)
     ).rejects.toMatchObject({ kind: 'not_found', retryable: false });
+  });
+
+  it('caps the returned window at the shared FILE_LINES_MAX', async () => {
+    const content = Array.from({ length: 600 }, (_, index) => `line ${index + 1}`).join('\n');
+    mockFetchGitLabRootTextFileAtRef.mockResolvedValue(content);
+
+    const result = await getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 600);
+
+    expect(result.totalLines).toBe(600);
+    expect(result.lines).toHaveLength(FILE_LINES_MAX);
+    expect(result.lines[0]).toBe('line 1');
+    expect(result.lines.at(-1)).toBe(`line ${FILE_LINES_MAX}`);
   });
 });
 

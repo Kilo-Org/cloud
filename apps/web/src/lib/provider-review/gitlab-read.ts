@@ -37,6 +37,7 @@ import {
   resolveGitLabUrlSafely,
   type GitLabResolvedUrl,
 } from '@/lib/integrations/platforms/gitlab/instance-url';
+import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
 import {
   authorizeOwner,
   authorizeProject,
@@ -514,7 +515,11 @@ export async function getFileLines(
     }
     const allLines = text.split('\n');
     const start = Math.max(1, Math.min(startLine, allLines.length));
-    const end = Math.max(start, Math.min(endLine, allLines.length));
+    // The window is bounded by the same shared cap the GitHub adapter applies,
+    // so a caller cannot pull an unbounded slice of the file as comment
+    // context (the response transport cap is not a window cap).
+    const cappedEnd = Math.min(endLine, startLine + FILE_LINES_MAX - 1);
+    const end = Math.max(start, Math.min(cappedEnd, allLines.length));
     return { lines: allLines.slice(start - 1, end), totalLines: allLines.length };
   } catch (error) {
     throw classifyGitLabError(error);

@@ -1313,6 +1313,26 @@
     ],
     "searchBlob": "cloudAgentNext.getComputeBillingStatus Get billing status and compute usage information for a cloud agent session. cloudagentnext getcomputebillingstatus cloudagentsessionid cloudAgentSessionId"
   },
+  "cloudAgentNext.getSandboxSelectionOptions": {
+    "path": "cloudAgentNext.getSandboxSelectionOptions",
+    "kind": "query",
+    "summary": "Returns the sandbox selection capabilities (enabled flag, default destination, and selectable sandbox options) for a new cloud agent session in personal context.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "devcontainer": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tags": [
+      "cloudagentnext",
+      "getsandboxselectionoptions",
+      "devcontainer"
+    ],
+    "searchBlob": "cloudAgentNext.getSandboxSelectionOptions Returns the sandbox selection capabilities (enabled flag, default destination, and selectable sandbox options) for a new cloud agent session in personal context. cloudagentnext getsandboxselectionoptions devcontainer devcontainer"
+  },
   "cloudAgentNext.getSandboxStatus": {
     "path": "cloudAgentNext.getSandboxStatus",
     "kind": "query",
@@ -1473,6 +1493,51 @@
       "forcerefresh"
     ],
     "searchBlob": "cloudAgentNext.listGitLabRepositories List the user's GitLab repositories available for cloud agent use, with optional refresh. cloudagentnext listgitlabrepositories forcerefresh forceRefresh"
+  },
+  "cloudAgentNext.listRepositoryBranches": {
+    "path": "cloudAgentNext.listRepositoryBranches",
+    "kind": "query",
+    "summary": "Lists a repository's branches and its default branch for the new-session flow in personal context; GitHub and GitLab use the caller's own connection, and Bitbucket reports the explicit organization-only unavailable state.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "github",
+            "gitlab",
+            "bitbucket"
+          ]
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "fullName": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[A-Za-z0-9._-]+(?:\\/[A-Za-z0-9._-]+)+$"
+            }
+          },
+          "required": [
+            "fullName"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "platform",
+        "repository"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "cloudagentnext",
+      "listrepositorybranches",
+      "platform",
+      "repository"
+    ],
+    "searchBlob": "cloudAgentNext.listRepositoryBranches Lists a repository's branches and its default branch for the new-session flow in personal context; GitHub and GitLab use the caller's own connection, and Bitbucket reports the explicit organization-only unavailable state. cloudagentnext listrepositorybranches platform repository platform repository"
   },
   "codeIndexing.admin.getClusterStatus": {
     "path": "codeIndexing.admin.getClusterStatus",
@@ -5077,6 +5142,32 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getComputeBillingStatus Get the compute billing status for an organization's cloud agent session. organizations cloudagentnext getcomputebillingstatus organizationid organizationId"
   },
+  "organizations.cloudAgentNext.getSandboxSelectionOptions": {
+    "path": "organizations.cloudAgentNext.getSandboxSelectionOptions",
+    "kind": "query",
+    "summary": "Returns the sandbox selection capabilities (enabled flag, default destination, and selectable sandbox options) for a new cloud agent session in an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getsandboxselectionoptions",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getSandboxSelectionOptions Returns the sandbox selection capabilities (enabled flag, default destination, and selectable sandbox options) for a new cloud agent session in an organization. organizations cloudagentnext getsandboxselectionoptions organizationid organizationId"
+  },
   "organizations.cloudAgentNext.getSandboxStatus": {
     "path": "organizations.cloudAgentNext.getSandboxStatus",
     "kind": "query",
@@ -5272,6 +5363,32 @@
       "organizationid"
     ],
     "searchBlob": "organizations.cloudAgentNext.listGitLabRepositories List GitLab repositories available to the organization for Cloud Agent, ordered by recent usage. organizations cloudagentnext listgitlabrepositories organizationid organizationId"
+  },
+  "organizations.cloudAgentNext.listRepositoryBranches": {
+    "path": "organizations.cloudAgentNext.listRepositoryBranches",
+    "kind": "query",
+    "summary": "Lists a repository's branches and its default branch for the new-session flow in organization context, using the organization's connected GitHub, GitLab, or Bitbucket integration.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "listrepositorybranches",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.listRepositoryBranches Lists a repository's branches and its default branch for the new-session flow in organization context, using the organization's connected GitHub, GitLab, or Bitbucket integration. organizations cloudagentnext listrepositorybranches organizationid organizationId"
   },
   "organizations.creditTransactions": {
     "path": "organizations.creditTransactions",
@@ -8090,6 +8207,762 @@
       "organizationid"
     ],
     "searchBlob": "platformIntegrations.listSetupStatus Check which platform integrations (e.g. GitHub, GitLab, Bitbucket) are already configured or missing so you know what setup steps remain for an organization. platformintegrations listsetupstatus organizationid organizationId"
+  },
+  "providerReview.getCapabilities": {
+    "path": "providerReview.getCapabilities",
+    "kind": "query",
+    "summary": "Returns the provider's review capability vocabulary: which write operations (comment, reply, review, resolve, merge, auto-merge) the connected provider exposes.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "gitlab"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "instanceHint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          },
+          "required": [
+            "platform"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "bitbucket"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "platform",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "providerreview",
+      "getcapabilities"
+    ],
+    "searchBlob": "providerReview.getCapabilities Returns the provider's review capability vocabulary: which write operations (comment, reply, review, resolve, merge, auto-merge) the connected provider exposes. providerreview getcapabilities"
+  },
+  "providerReview.getFileLines": {
+    "path": "providerReview.getFileLines",
+    "kind": "query",
+    "summary": "Returns a slice of a changed file's diff lines and surrounding context for one path in the provider pull request.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "gitlab"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "projectPath": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)+$"
+            },
+            "mrIid": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "instanceHint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "ref": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "startLine": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "endLine": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "platform",
+            "projectPath",
+            "mrIid",
+            "ref",
+            "path",
+            "startLine",
+            "endLine"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "bitbucket"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "workspace": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "repoSlug": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "prId": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "ref": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "startLine": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "endLine": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "platform",
+            "organizationId",
+            "workspace",
+            "repoSlug",
+            "prId",
+            "ref",
+            "path",
+            "startLine",
+            "endLine"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "providerreview",
+      "getfilelines"
+    ],
+    "searchBlob": "providerReview.getFileLines Returns a slice of a changed file's diff lines and surrounding context for one path in the provider pull request. providerreview getfilelines"
+  },
+  "providerReview.getMergeState": {
+    "path": "providerReview.getMergeState",
+    "kind": "query",
+    "summary": "Returns the merge gate state for the provider pull request: mergeability, conflicts, required approvals, failing or pending builds, drafts, and unresolved discussions, worded by the provider.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "gitlab"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "projectPath": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)+$"
+            },
+            "mrIid": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "instanceHint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          },
+          "required": [
+            "platform",
+            "projectPath",
+            "mrIid"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "bitbucket"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "workspace": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "repoSlug": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "prId": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "platform",
+            "organizationId",
+            "workspace",
+            "repoSlug",
+            "prId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "providerreview",
+      "getmergestate"
+    ],
+    "searchBlob": "providerReview.getMergeState Returns the merge gate state for the provider pull request: mergeability, conflicts, required approvals, failing or pending builds, drafts, and unresolved discussions, worded by the provider. providerreview getmergestate"
+  },
+  "providerReview.getPullRequest": {
+    "path": "providerReview.getPullRequest",
+    "kind": "query",
+    "summary": "Returns the provider pull request detail (title, body, state, head, base, author, and review-relevant counts) for the given provider review ref.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "gitlab"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "projectPath": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)+$"
+            },
+            "mrIid": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "instanceHint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          },
+          "required": [
+            "platform",
+            "projectPath",
+            "mrIid"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "bitbucket"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "workspace": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "repoSlug": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "prId": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "platform",
+            "organizationId",
+            "workspace",
+            "repoSlug",
+            "prId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "providerreview",
+      "getpullrequest"
+    ],
+    "searchBlob": "providerReview.getPullRequest Returns the provider pull request detail (title, body, state, head, base, author, and review-relevant counts) for the given provider review ref. providerreview getpullrequest"
+  },
+  "providerReview.listChecks": {
+    "path": "providerReview.listChecks",
+    "kind": "query",
+    "summary": "Lists the CI check runs (name, status, conclusion, and details URL) reported on the provider pull request head.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "gitlab"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "projectPath": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)+$"
+            },
+            "mrIid": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "instanceHint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          },
+          "required": [
+            "platform",
+            "projectPath",
+            "mrIid"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "bitbucket"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "workspace": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "repoSlug": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "prId": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "platform",
+            "organizationId",
+            "workspace",
+            "repoSlug",
+            "prId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "providerreview",
+      "listchecks"
+    ],
+    "searchBlob": "providerReview.listChecks Lists the CI check runs (name, status, conclusion, and details URL) reported on the provider pull request head. providerreview listchecks"
+  },
+  "providerReview.listDiscussions": {
+    "path": "providerReview.listDiscussions",
+    "kind": "query",
+    "summary": "Lists the review discussions (threads) of the provider pull request, including their comments, resolution state, and inline diff anchors.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "gitlab"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "projectPath": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)+$"
+            },
+            "mrIid": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "instanceHint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "cursor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "forward",
+                "backward"
+              ]
+            }
+          },
+          "required": [
+            "platform",
+            "projectPath",
+            "mrIid"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "bitbucket"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "workspace": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "repoSlug": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "prId": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "cursor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "forward",
+                "backward"
+              ]
+            }
+          },
+          "required": [
+            "platform",
+            "organizationId",
+            "workspace",
+            "repoSlug",
+            "prId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "providerreview",
+      "listdiscussions"
+    ],
+    "searchBlob": "providerReview.listDiscussions Lists the review discussions (threads) of the provider pull request, including their comments, resolution state, and inline diff anchors. providerreview listdiscussions"
+  },
+  "providerReview.listFiles": {
+    "path": "providerReview.listFiles",
+    "kind": "query",
+    "summary": "Lists the changed files of the provider pull request with their status, additions, deletions, and patch availability.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "gitlab"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "projectPath": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)+$"
+            },
+            "mrIid": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "instanceHint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "cursor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "forward",
+                "backward"
+              ]
+            }
+          },
+          "required": [
+            "platform",
+            "projectPath",
+            "mrIid"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "bitbucket"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "workspace": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "repoSlug": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "prId": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "cursor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "forward",
+                "backward"
+              ]
+            }
+          },
+          "required": [
+            "platform",
+            "organizationId",
+            "workspace",
+            "repoSlug",
+            "prId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "providerreview",
+      "listfiles"
+    ],
+    "searchBlob": "providerReview.listFiles Lists the changed files of the provider pull request with their status, additions, deletions, and patch availability. providerreview listfiles"
+  },
+  "providerReview.listInbox": {
+    "path": "providerReview.listInbox",
+    "kind": "query",
+    "summary": "Lists the review inbox for the organization: open pull requests awaiting review, with the provider-correct review term and the viewer's review state.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "gitlab"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "instanceHint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "cursor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "forward",
+                "backward"
+              ]
+            }
+          },
+          "required": [
+            "platform"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "const": "bitbucket"
+            },
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "cursor": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "forward",
+                "backward"
+              ]
+            }
+          },
+          "required": [
+            "platform",
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "providerreview",
+      "listinbox"
+    ],
+    "searchBlob": "providerReview.listInbox Lists the review inbox for the organization: open pull requests awaiting review, with the provider-correct review term and the viewer's review state. providerreview listinbox"
   },
   "quickChat.listMessages": {
     "path": "quickChat.listMessages",

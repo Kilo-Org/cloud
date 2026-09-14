@@ -82,7 +82,7 @@ further. Any inline comments below are from an earlier review.`,
       message: "The review exceeded the model's context window.",
       checkTitle: 'Kilo Code Review exceeded the context window',
       checkSummary:
-        "The review was larger than the model's context window, so the model could not read the whole change.",
+        "The review needed more context than the model's context window allows, so the model could not finish reading the change.",
       summaryBody: `${KILO_REVIEW_MARKER}
 ## Code Review Summary
 

@@ -380,19 +380,51 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
         'This request is no longer valid. Close this tab and retry from your MCP client.'
       );
     }
-    const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
-      request: record.authRequest,
-      userId: record.kiloUserId,
-      metadata: { clientName },
-      scope: [MCP_SCOPE],
-      props: {
-        kiloUserId: record.kiloUserId,
-        organizationId,
-        kiloToken: record.kiloToken,
+    let redirectTo: string;
+    try {
+      ({ redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
+        request: record.authRequest,
+        userId: record.kiloUserId,
+        metadata: { clientName },
+        scope: [MCP_SCOPE],
+        props: {
+          kiloUserId: record.kiloUserId,
+          organizationId,
+          kiloToken: record.kiloToken,
+          clientId: record.authRequest.clientId,
+        },
+      }));
+    } catch {
+      // Provider completion is a recoverable failure: reopen the record so the
+      // SAME request can be retried, and never redirect as if it had completed.
+      await deps.store.revertPendingAuthorization(id, nowIso);
+      deps.analytics?.oauthSignIn({
+        phase: 'failed',
+        identity: null,
         clientId: record.authRequest.clientId,
-      },
-    });
-    await deps.store.completePendingAuthorization(id, nowIso);
+        reason: 'completion_failed',
+      });
+      return errorPage(
+        'temporarily_unavailable',
+        'Kilo could not complete the sign-in. Wait a moment, then retry from your MCP client.',
+        503
+      );
+    }
+    const completed = await deps.store.completePendingAuthorization(id, nowIso);
+    if (!completed) {
+      // The expiry guard rejected the transition: the record was not marked
+      // completed, so never redirect or emit success as if it had been.
+      deps.analytics?.oauthSignIn({
+        phase: 'failed',
+        identity: null,
+        clientId: record.authRequest.clientId,
+        reason: 'completion_rejected',
+      });
+      return errorPage(
+        'invalid_request',
+        'This request is no longer valid. Close this tab and retry from your MCP client.'
+      );
+    }
     // The library owns the token endpoint, so its tokenExchangeCallback hook
     // runs without deps and cannot see this per-request emitter (index.ts wires
     // it with no ProviderHookDeps). Emit the one sign-in success here, after the

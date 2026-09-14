@@ -103,6 +103,13 @@ export interface OAuthStoreApi {
   /** Terminal transition: approved -> completed once the library issues the code (s2). */
   completePendingAuthorization(id: string, nowIso: string): Promise<boolean>;
   /**
+   * approved -> pending when the provider could not complete (s2): reopens the
+   * retry path instead of stranding the request in the non-retryable approved
+   * state. Guarded by the current status and the record's own expiry, so a
+   * completed/denied/expired record is never reopened.
+   */
+  revertPendingAuthorization(id: string, nowIso: string): Promise<boolean>;
+  /**
    * Housekeeping: drop pending-authorization rows past their own expiry.
    * Returns the deleted row count.
    */
@@ -249,6 +256,24 @@ export class KiloMcpOAuthStore
     const row = this.db
       .update(oauthPendingAuthorizations)
       .set({ status: 'completed' })
+      .where(
+        and(
+          eq(oauthPendingAuthorizations.id, id),
+          eq(oauthPendingAuthorizations.status, 'approved'),
+          gt(oauthPendingAuthorizations.expires_at, nowIso)
+        )
+      )
+      .returning({ id: oauthPendingAuthorizations.id })
+      .get();
+    return row !== undefined;
+  }
+
+  async revertPendingAuthorization(id: string, nowIso: string): Promise<boolean> {
+    // Same single-writer guard as every other transition: only a live approved
+    // record is reopened, so a concurrent completion/denial/expiry wins.
+    const row = this.db
+      .update(oauthPendingAuthorizations)
+      .set({ status: 'pending', organization_id: null })
       .where(
         and(
           eq(oauthPendingAuthorizations.id, id),

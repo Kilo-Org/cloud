@@ -65,9 +65,12 @@ function clientInfo(): ClientInfo {
 
 /**
  * In-memory OAuthStoreApi. The methods the consent routes reach are real; the
- * rest throw so a new dependency fails loudly.
+ * rest throw so a new dependency fails loudly. `rejectCompletion` injects the
+ * provider-side guard rejecting the approved -> completed transition.
  */
-function createFakeStore(): OAuthStoreApi & { pending: Map<string, PendingAuthorization> } {
+function createFakeStore(
+  options: { rejectCompletion?: boolean } = {}
+): OAuthStoreApi & { pending: Map<string, PendingAuthorization> } {
   const pending = new Map<string, PendingAuthorization>();
   const unused = (): never => {
     throw new Error('not reachable from these tests');
@@ -154,9 +157,16 @@ function createFakeStore(): OAuthStoreApi & { pending: Map<string, PendingAuthor
       return false;
     },
     completePendingAuthorization: async (id, nowIso) => {
+      if (options.rejectCompletion) return false;
       const record = pending.get(id);
       if (!record || record.status !== 'approved' || record.expiresAt <= nowIso) return false;
       pending.set(id, { ...record, status: 'completed' });
+      return true;
+    },
+    revertPendingAuthorization: async (id, nowIso) => {
+      const record = pending.get(id);
+      if (!record || record.status !== 'approved' || record.expiresAt <= nowIso) return false;
+      pending.set(id, { ...record, status: 'pending', organizationId: null });
       return true;
     },
     purgeExpired: unused,
@@ -796,6 +806,74 @@ describe('GET/POST /authorize/org', () => {
     // The success event fires once, after the approved guard: the lost second
     // submit emits nothing.
     expect(calls.filter(call => call.phase === 'succeeded')).toHaveLength(1);
+  });
+
+  it('reopens the record and answers retryably when provider completion fails', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    let attempts = 0;
+    const helpers = {
+      async lookupClient() {
+        return clientInfo();
+      },
+      async completeAuthorization() {
+        attempts += 1;
+        if (attempts === 1) throw new Error('provider unavailable');
+        return { redirectTo: `${REDIRECT}?code=lib-code` };
+      },
+    } as unknown as OAuthHelpers;
+    const { analytics, calls } = fakeAnalytics();
+    const handler = createDefaultHandler(deps(store, flowFetch(), { analytics }));
+    const env = envWith(helpers);
+    const post = () =>
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/org?id=${id}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+        }),
+        env
+      );
+
+    const failed = await post();
+    expect(failed.status).toBe(503);
+    expect(await failed.text()).toMatch(/could not complete the sign-in/);
+    // The record is reopened for retry, never stranded in the terminal
+    // approved state, and no success was reported.
+    expect(store.pending.get(id)).toMatchObject({
+      status: 'pending',
+      organizationId: null,
+      kiloUserId: 'u-1',
+      kiloToken: 'kilo-tok-1',
+    });
+    expect(calls.filter(call => call.phase === 'succeeded')).toHaveLength(0);
+
+    // A retry of the SAME request completes it.
+    const retried = await post();
+    expect(retried.status).toBe(302);
+    expect(store.pending.get(id)?.status).toBe('completed');
+    expect(calls.filter(call => call.phase === 'succeeded')).toHaveLength(1);
+  });
+
+  it('does not redirect or report success when the completion guard rejects the transition', async () => {
+    const store = createFakeStore({ rejectCompletion: true });
+    const id = await seedPaired(store);
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const { analytics, calls } = fakeAnalytics();
+    const handler = createDefaultHandler(deps(store, flowFetch(), { analytics }));
+    const response = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(400);
+    expect(completes).toHaveLength(1);
+    expect(calls.filter(call => call.phase === 'succeeded')).toHaveLength(0);
   });
 
   it('rejects unknown/expired/denied records with an error page', async () => {

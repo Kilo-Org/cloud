@@ -84,6 +84,49 @@ function expectHiddenReservedBox(root: React.ReactElement): void {
 }
 
 describe('SessionContextMetrics', () => {
+  it.each([
+    { hasMessages: true, cost: null },
+    { hasMessages: true, cost: 150_000 },
+    { hasMessages: false, cost: null },
+  ])('opens permission controls without usage: $hasMessages / $cost', ({ hasMessages, cost }) => {
+    const onPress = vi.fn<() => void>();
+    const root = render({
+      info: undefined,
+      totalCostMicrodollars: cost,
+      hasMessages,
+      autoApproveAvailable: true,
+      onPress,
+    });
+    expect(root.type).toBe('Pressable');
+    const props = root.props as {
+      accessibilityRole: string;
+      accessibilityLabel: string;
+      onPress: () => void;
+      className: string;
+    };
+    expect(props.accessibilityRole).toBe('button');
+    expect(props.accessibilityLabel).toContain('Tap to view context details.');
+    expect(props.className).not.toContain('opacity-0');
+    for (const token of PILL_LAYOUT_TOKENS) {
+      expect(props.className).toContain(token);
+    }
+    props.onPress();
+    expect(onPress).toHaveBeenCalledOnce();
+  });
+
+  it('does not expose permission controls while the session is loading', () => {
+    expectHiddenReservedBox(
+      render({
+        info: undefined,
+        totalCostMicrodollars: null,
+        hasMessages: true,
+        autoApproveAvailable: true,
+        loading: true,
+        onPress: vi.fn<() => void>(),
+      })
+    );
+  });
+
   it('empty session is invisible and a11y-hidden', () => {
     const root = render({
       info: undefined,

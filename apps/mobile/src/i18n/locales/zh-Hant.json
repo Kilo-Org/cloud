@@ -4,6 +4,8 @@
     "done": "完成",
     "retry": "再試一次",
     "tryAgain": "再試一次",
+    "continue": "繼續",
+    "notNow": "稍後再說",
     "language": "語言",
     "device": "裝置",
     "share": "分享 {{title}}",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "無法複製到剪貼簿。",
     "required": "必填",
     "error": "錯誤：{{error}}",
-    "notNow": "稍後再說",
-    "continue": "繼續",
     "back": "返回",
     "somethingWentWrong": "發生錯誤。",
     "couldNotOpen": "無法開啟 {{label}}。",
@@ -36,6 +36,7 @@
     "cost": "費用",
     "discard": "捨棄",
     "findings": "問題",
+    "mergeRequest": "合併請求",
     "notConnected": "未連結",
     "notifications": "通知",
     "pullRequest": "提取要求",
@@ -1563,11 +1564,31 @@
       "retryConnection": "重新連線"
     },
     "newSession": {
+      "recentlyUsed": "最近使用",
+      "couldNotLoadGithubRepositories": "無法載入 GitHub 儲存庫。",
+      "couldNotLoadGitlabRepositories": "無法載入 GitLab 儲存庫。",
+      "couldNotLoadBitbucketRepositories": "無法載入 Bitbucket 儲存庫。",
       "connectGithubDescription": "請在瀏覽器中連結 GitHub，再回到這裡選取儲存庫。",
+      "connectGitlabDescription": "請在瀏覽器中連結 GitLab，再回到這裡選取儲存庫。",
+      "connectBitbucketDescription": "請在瀏覽器中連結 Bitbucket，再回到這裡選取儲存庫。",
       "openGithub": "開啟 GitHub",
+      "openGitlab": "開啟 GitLab",
+      "openBitbucket": "開啟 Bitbucket",
       "refreshRepositories": "重新整理儲存庫",
       "githubConnected": "已連結 GitHub",
+      "gitlabConnected": "已連結 GitLab",
       "noRepositoriesVisible": "沒有可顯示的儲存庫。請檢查 Kilo GitHub 應用程式的儲存庫存取權限，再重新整理。",
+      "noRepositoriesVisibleGitlab": "沒有可顯示的儲存庫。請檢查 GitLab 的儲存庫存取權限，再重新整理。",
+      "noRepositoriesVisibleBitbucket": "沒有可顯示的儲存庫。請檢查 Bitbucket 的儲存庫存取權限，再重新整理。",
+      "bitbucketOrganizationsOnly": "Bitbucket 僅供組織使用。",
+      "branchPickerTitle": "選取分支",
+      "branchDefault": "預設",
+      "branchAccessibility": "分支: {{label}}",
+      "branchLoading": "正在載入分支",
+      "branchLoadError": "無法載入分支",
+      "branchUnavailable": "此存放庫沒有可用的分支。檢查你在供應商處的存取權限，然後選取另一個存放庫。",
+      "branchEmpty": "沒有可用的分支",
+      "branchPlaceholder": "選取一個分支",
       "runOnWithTarget": "執行環境：{{target}}",
       "environment": "環境",
       "couldNotLoadEnvironment": "無法載入你的環境。",
@@ -1586,26 +1607,15 @@
       "couldNotReadPendingSessions": "無法讀取待處理的工作階段。請再試一次。",
       "failedToCreate": "無法建立工作階段。",
       "couldNotRefreshRepositories": "無法重新整理儲存庫。請再試一次。",
-      "discardDraftMessage": "你輸入的提示詞將不會保留。",
       "discardDraftTitle": "捨棄草稿？",
+      "discardDraftMessage": "你輸入的提示詞將不會保留。",
+      "discardWithUploadsMessage": "你輸入的提示詞與尚未附加至已傳送訊息的上傳檔案都會刪除。",
       "discardFailed": "無法捨棄草稿。請再試一次。",
       "remoteHint": "在電腦上執行 `kilo remote`，或在執行中的 CLI 工作階段執行 `/remote`，即可控制本機的 kilo 程序。",
-      "connectBitbucketDescription": "請在瀏覽器中連結 Bitbucket，再回到這裡選取儲存庫。",
-      "connectGitlabDescription": "請在瀏覽器中連結 GitLab，再回到這裡選取儲存庫。",
-      "couldNotLoadBitbucketRepositories": "無法載入 Bitbucket 儲存庫。",
-      "couldNotLoadGithubRepositories": "無法載入 GitHub 儲存庫。",
-      "couldNotLoadGitlabRepositories": "無法載入 GitLab 儲存庫。",
-      "gitlabConnected": "已連結 GitLab",
-      "noRepositoriesVisibleBitbucket": "沒有可顯示的儲存庫。請檢查 Bitbucket 的儲存庫存取權限，再重新整理。",
-      "noRepositoriesVisibleGitlab": "沒有可顯示的儲存庫。請檢查 GitLab 的儲存庫存取權限，再重新整理。",
-      "openBitbucket": "開啟 Bitbucket",
-      "openGitlab": "開啟 GitLab",
-      "recentlyUsed": "最近使用",
       "continueFrom": "正在接續 {{title}}。",
       "importingSession": "匯入工作階段中",
       "cliCannotContinue": "此 CLI 無法繼續工作階段。請選擇 Cloud Agent 或其他 CLI。",
-      "importFailed": "無法匯入此工作階段。",
-      "discardWithUploadsMessage": "你輸入的提示詞與尚未附加至已傳送訊息的上傳檔案都會刪除。"
+      "importFailed": "無法匯入此工作階段。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 個檔案。",
@@ -2364,11 +2374,17 @@
       "tapDiffLineToSuggest": "點一下差異中的任一行，即可啟用建議功能。"
     },
     "connect": {
-      "checkFailedMessage": "載入完成前，無法確認登入狀態。",
       "checkFailedTitle": "無法檢查 GitHub 連線。",
-      "description": "連結你的 GitHub 帳戶，即可在行動裝置上審查提取請求。",
+      "checkFailedMessage": "載入完成前，無法確認登入狀態。",
+      "checkFailedTitleGitLab": "無法檢查 GitLab 連線。",
+      "checkFailedTitleBitbucket": "無法檢查 Bitbucket 連線。",
+      "providerCheckFailedMessage": "載入完成前無法取得連線狀態。",
+      "reconnectTitle": "重新連線至 GitHub",
       "reconnectDescription": "你的 GitHub 連線授權已撤銷。請重新連線，以繼續在行動裝置上審查提取請求。",
-      "reconnectTitle": "重新連線至 GitHub"
+      "description": "連結你的 GitHub 帳戶，即可在行動裝置上審查提取請求。",
+      "gitlabDescription": "連結你的 GitLab 帳戶，以便在行動裝置上審查合併請求。",
+      "bitbucketDescription": "將 Bitbucket 連結到此組織，以便在行動裝置上審查提取請求。",
+      "bitbucketOrgOnlyDescription": "在你的個人資料中選取一個組織，以審查其 Bitbucket 提取請求。"
     },
     "connectionExpired": "GitHub 連線已過期。",
     "couldNotLoadPullRequest": "無法載入提取請求。",
@@ -2461,21 +2477,24 @@
         "outdatedOnLines": "{{lines}} 的留言已過時",
         "outdatedOnPath": "{{path}} 的留言已過時"
       },
-      "deletedUser": "已刪除的使用者"
+      "deletedUser": "已刪除的使用者",
+      "replyForbiddenTerm": "你沒有權限回覆此{{term}}。"
     },
     "entry": {
-      "clearLink": "清除提取請求連結",
+      "eyebrow": "透過 URL 開啟提取請求或合併請求",
+      "pastePrLink": "貼上提取請求或合併請求連結",
+      "noRecentPrs": "尚無最近審查",
+      "noRecentPrsDescription": "在上方貼上連結即可開始審查，下次就會在這裡看到。",
       "couldNotLoad": "無法載入。",
-      "eyebrow": "透過 URL 開啟提取請求。",
-      "noRecentPrs": "尚無最近開啟的 PR",
-      "noRecentPrsDescription": "在上方貼上 PR 連結即可開始審查，下次就會在這裡看到這個 PR。",
-      "open": "開啟",
-      "pasteLink": "貼上提取請求連結",
-      "pastePrLink": "貼上 PR 連結",
-      "removeFromRecentsMessage": "此提取請求將從你的最近項目中移除。",
       "removeFromRecentsTitle": "要從最近項目移除嗎？",
+      "removeFromRecentsMessage": "此審查將從你的最近項目中移除。",
       "removeRecentAccessibility": "從最近項目移除 {{repo}}",
-      "urlAccessibility": "GitHub 提取請求 URL"
+      "urlAccessibility": "輸入提取請求或合併請求 URL",
+      "urlPlaceholder": "提取請求或合併請求 URL",
+      "openAccessibility": "開啟提取請求或合併請求",
+      "clearLink": "清除連結",
+      "pasteLink": "貼上提取請求或合併請求連結",
+      "open": "開啟"
     },
     "eventChips": {
       "comment": "留言",
@@ -2568,47 +2587,52 @@
     },
     "installKiloGitHubApp": "安裝 Kilo GitHub App",
     "merge": {
-      "autoMergeDescription": "所有必要檢查通過後，GitHub 會自動合併此提取請求（合併方式：{{method}}）。",
-      "autoMergeOn": "已啟用自動合併",
-      "blockedTitle": "目前無法合併的原因",
-      "cannotMerge": "此提取請求目前無法合併。",
-      "checking": "正在檢查可否合併…",
-      "commitMessage": "提交訊息",
-      "commitMessagePlaceholder": "合併提交的說明（非必填）",
-      "commitTitle": "提交標題",
-      "confirmMessage": "這會將你的變更合併到基礎分支。",
-      "confirmTitle": "要合併提取請求嗎？",
-      "couldNotDetermine": "無法判斷可否合併。",
-      "couldNotMerge": "無法合併提取請求。",
-      "deleteBranch": "刪除分支",
-      "deleteBranchAfterMerge": "合併後刪除分支",
-      "disableAutoMerge": "停用自動合併",
-      "enableAutoMerge": "啟用自動合併",
-      "enableAutoMergeConfirmMessage": "所有必要檢查通過後，GitHub 會自動合併此提取請求。",
-      "enableAutoMergeConfirmTitle": "要啟用自動合併嗎？",
-      "forbidden": "你沒有權限合併此提取請求。",
-      "loadFailedTitle": "無法載入合併選項。",
       "merge": "合併",
       "mergeNow": "立即合併",
       "mergePullRequest": "合併提取請求",
+      "mergeTermTitle": "合併{{term}}",
+      "enableAutoMerge": "啟用自動合併",
+      "disableAutoMerge": "停用自動合併",
+      "autoMergeOn": "已啟用自動合併",
+      "autoMergeDescription": "所有必要檢查通過後，GitHub 會自動合併此提取請求（合併方式：{{method}}）。",
+      "checking": "正在檢查可否合併…",
+      "couldNotDetermine": "無法判斷可否合併。",
+      "refreshMergeability": "重新整理合併狀態",
+      "blockedTitle": "目前無法合併的原因",
+      "updateBranch": "更新分支",
+      "updateBranchFromBase": "以基礎分支的內容更新此分支",
       "methodLabel": "合併方式",
+      "commitTitle": "提交標題",
+      "commitMessage": "提交訊息",
+      "commitMessagePlaceholder": "合併提交的說明（非必填）",
+      "deleteBranch": "刪除分支",
+      "deleteBranchAfterMerge": "合併後刪除分支",
+      "noEnabledMethods": "此存放庫未啟用任何合併方式。請存放庫管理員啟用一般合併、壓縮合併或變基合併。",
+      "confirmTitle": "要合併提取請求嗎？",
+      "confirmTitleTerm": "要合併{{term}}嗎？",
+      "confirmMessage": "這會將你的變更合併到基礎分支。",
+      "enableAutoMergeConfirmTitle": "要啟用自動合併嗎？",
+      "enableAutoMergeConfirmMessage": "所有必要檢查通過後，GitHub 會自動合併此提取請求。",
+      "enableAutoMergeConfirmMessageTerm": "管線成功後，{{term}}將自動合併。",
+      "enableAutoMergeDescriptionTerm": "管線成功後，GitLab 會自動合併此{{term}}。",
+      "forbidden": "你沒有權限合併此提取請求。",
+      "cannotMerge": "此提取請求目前無法合併。",
+      "couldNotMerge": "無法合併提取請求。",
       "methods": {
         "merge": "合併",
         "rebase": "變基",
         "squash": "壓縮"
       },
-      "noEnabledMethods": "此存放庫未啟用任何合併方式。請存放庫管理員啟用一般合併、壓縮合併或變基合併。",
+      "terminal": {
+        "alreadyMerged": "已合併",
+        "closed": "此提取請求已關閉",
+        "closedMergeRequest": "此合併請求已關閉"
+      },
       "partialSuccessBanner": {
         "accessibility": "已合併。無法刪除分支：{{reason}}",
         "body": "無法刪除分支：{{reason}}。"
       },
-      "refreshMergeability": "重新整理合併狀態",
-      "terminal": {
-        "alreadyMerged": "已合併",
-        "closed": "此提取請求已關閉"
-      },
-      "updateBranch": "更新分支",
-      "updateBranchFromBase": "以基礎分支的內容更新此分支",
+      "loadFailedTitle": "無法載入合併選項。",
       "blocked": {
         "unknownStateTitle": "GitHub 尚未確認是否可合併",
         "unknownStateDetail": "請稍後再重新整理總覽。",
@@ -2627,6 +2651,18 @@
         "behindDetail": "來源分支落後於基礎分支。合併前，請先進行變基或更新來源分支。",
         "notMergeableTitle": "此提取請求尚無法合併",
         "notMergeableDetail": "GitHub 回報的合併狀態為 {{state}}。"
+      },
+      "restrictions": {
+        "title": "合併限制",
+        "approvalsRequired_one": "需要 {{displayCount}} 個核准",
+        "approvalsRequired_other": "需要 {{displayCount}} 個核准",
+        "pipelineMustSucceed": "合併前管線必須成功。"
+      },
+      "providerBlocked": {
+        "failingPipeline": "管線在最新提交上失敗。",
+        "pendingPipeline": "管線在最新提交上仍在執行。",
+        "permission": "你沒有權限合併此{{term}}。",
+        "draft": "合併前，請先將{{term}}標記為可供審查。"
       },
       "methodLabels": {
         "merge": "建立合併提交",
@@ -2685,8 +2721,11 @@
     "pullRequestUnavailable": "無法開啟提取請求",
     "pullRequestUnavailableDescription": "無法開啟此 PR。可能是 PR 已刪除、存放庫設為私人，或存放庫尚未安裝 Kilo GitHub App。",
     "reconnectNotice": {
+      "title": "GitHub 連線已過期。",
       "message": "你的 GitHub 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。",
-      "title": "GitHub 連線已過期。"
+      "gitlabTitle": "GitLab 連線已過期。",
+      "bitbucketTitle": "Bitbucket 連線已過期。",
+      "providerMessage": "你的 {{provider}} 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。"
     },
     "review": "審查",
     "reviewPullRequest": "審查提取請求",
@@ -2737,7 +2776,7 @@
       "emptyLine": "（空白）"
     },
     "linkPasteClipboardEmpty": "剪貼簿沒有內容。",
-    "linkPasteNotAPullRequest": "這不是 GitHub 提取請求連結。",
+    "linkPasteNotAPullRequest": "不是提取請求或合併請求連結",
     "announce": {
       "commentPosted": "留言已發佈",
       "reviewSubmitted": "審查已送出",
@@ -2746,6 +2785,7 @@
     "mutationError": {
       "commentNotPosted": "無法發佈此留言。選取的行可能已變更，或 PR 已更新。",
       "reviewNotSubmitted": "目前無法送出此審查。可能是 PR 已更新，或你正在審查自己的提取請求。",
+      "reviewNotSubmittedTerm": "此審查無法依現況提交。{{term}}可能已變更，或者你不能審查自己的{{term}}。",
       "couldNotPostComment": "無法發佈留言。",
       "couldNotSubmitReview": "無法送出審查。請檢查連線後再試一次。"
     },
@@ -2753,9 +2793,31 @@
       "couldNotReply": "無法回覆。",
       "couldNotCompleteAction": "無法完成此操作。",
       "mergeResultDefaultError": "GitHub 未完成合併。",
+      "mergeResultNotCompleted": "{{term}}未合併。檢查其狀態後重試。",
       "ambiguous": "無法確認操作結果。請先檢查 PR，再試一次。",
       "persistenceFailed": "無法記錄此操作。請稍後再試。",
       "forbidden": "沒有執行此操作的權限。"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "此供應商不支援",
+        "accessibility": "此供應商不支援: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "提取要求",
+      "mergeRequest": "合併請求",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "分享合併請求",
+      "viewOnProvider": "在 {{provider}} 上檢視",
+      "mergeRequestUnavailable": "無法開啟合併請求",
+      "unavailableDescription": "它可能已被移除，或者你可能沒有存取權限。",
+      "accessDeniedMergeRequest": "你沒有權限檢視此合併請求。",
+      "couldNotLoadMergeRequest": "無法載入合併請求。",
+      "discussionAccessDenied": "你沒有權限檢視此合併請求的討論。",
+      "discussionUnavailableMessage": "此合併請求可能已移除。",
+      "noDiscussionDescription": "此合併請求尚無審查討論串或留言。",
+      "noFilesChangedDescription": "此合併請求沒有檔案變更。"
     }
   },
   "organization": {

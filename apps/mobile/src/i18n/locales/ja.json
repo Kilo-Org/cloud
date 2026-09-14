@@ -4,6 +4,8 @@
     "done": "完了",
     "retry": "再試行",
     "tryAgain": "再試行",
+    "continue": "続行",
+    "notNow": "後で",
     "language": "言語",
     "device": "デバイス",
     "share": "{{title}}を共有",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "クリップボードにコピーできませんでした。",
     "required": "必須",
     "error": "エラー: {{error}}",
-    "notNow": "後で",
-    "continue": "続行",
     "back": "戻る",
     "somethingWentWrong": "問題が発生しました。",
     "couldNotOpen": "{{label}}を開けませんでした。",
@@ -36,6 +36,7 @@
     "cost": "コスト",
     "discard": "破棄",
     "findings": "検出事項",
+    "mergeRequest": "マージリクエスト",
     "notConnected": "未連携",
     "notifications": "通知",
     "pullRequest": "プルリクエスト",
@@ -1563,11 +1564,31 @@
       "retryConnection": "接続を再試行"
     },
     "newSession": {
+      "recentlyUsed": "最近使用した項目",
+      "couldNotLoadGithubRepositories": "GitHubのリポジトリを読み込めませんでした。",
+      "couldNotLoadGitlabRepositories": "GitLabのリポジトリを読み込めませんでした。",
+      "couldNotLoadBitbucketRepositories": "Bitbucketのリポジトリを読み込めませんでした。",
       "connectGithubDescription": "ブラウザーでGitHubと連携し、この画面に戻ってリポジトリを選択してください。",
+      "connectGitlabDescription": "ブラウザーでGitLabと連携し、この画面に戻ってリポジトリを選択してください。",
+      "connectBitbucketDescription": "ブラウザーでBitbucketと連携し、この画面に戻ってリポジトリを選択してください。",
       "openGithub": "GitHubを開く",
+      "openGitlab": "GitLabを開く",
+      "openBitbucket": "Bitbucketを開く",
       "refreshRepositories": "リポジトリを更新",
       "githubConnected": "GitHubと連携済み",
+      "gitlabConnected": "GitLabと連携済み",
       "noRepositoriesVisible": "表示できるリポジトリがありません。KiloのGitHubアプリがリポジトリにアクセスできるか確認してから、一覧を更新してください。",
+      "noRepositoriesVisibleGitlab": "表示できるリポジトリがありません。GitLabのリポジトリへのアクセス権を確認してから、一覧を更新してください。",
+      "noRepositoriesVisibleBitbucket": "表示できるリポジトリがありません。Bitbucketのリポジトリへのアクセス権を確認してから、一覧を更新してください。",
+      "bitbucketOrganizationsOnly": "Bitbucketは組織でのみ利用できます。",
+      "branchPickerTitle": "ブランチを選択",
+      "branchDefault": "デフォルト",
+      "branchAccessibility": "ブランチ: {{label}}",
+      "branchLoading": "ブランチを読み込み中",
+      "branchLoadError": "ブランチを読み込めませんでした",
+      "branchUnavailable": "このリポジトリではブランチが利用できません。プロバイダーでのアクセスを確認し、別のリポジトリを選択してください。",
+      "branchEmpty": "利用可能なブランチがありません",
+      "branchPlaceholder": "ブランチを選択",
       "runOnWithTarget": "実行先：{{target}}",
       "environment": "環境",
       "couldNotLoadEnvironment": "環境を読み込めませんでした。",
@@ -1586,26 +1607,15 @@
       "couldNotReadPendingSessions": "保留中のセッションを読み取れませんでした。もう一度お試しください。",
       "failedToCreate": "セッションを作成できませんでした。",
       "couldNotRefreshRepositories": "リポジトリを更新できませんでした。もう一度お試しください。",
-      "discardDraftMessage": "入力したプロンプトが削除されます。",
       "discardDraftTitle": "下書きを破棄しますか？",
+      "discardDraftMessage": "入力したプロンプトが削除されます。",
+      "discardWithUploadsMessage": "プロンプトと、送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
       "discardFailed": "下書きを破棄できませんでした。もう一度お試しください。",
       "remoteHint": "ローカルのkiloプロセスを操作するには、コンピューターで`kilo remote`を実行するか、実行中のCLIセッションで`/remote`を実行してください。",
-      "connectBitbucketDescription": "ブラウザーでBitbucketと連携し、この画面に戻ってリポジトリを選択してください。",
-      "connectGitlabDescription": "ブラウザーでGitLabと連携し、この画面に戻ってリポジトリを選択してください。",
-      "couldNotLoadBitbucketRepositories": "Bitbucketのリポジトリを読み込めませんでした。",
-      "couldNotLoadGithubRepositories": "GitHubのリポジトリを読み込めませんでした。",
-      "couldNotLoadGitlabRepositories": "GitLabのリポジトリを読み込めませんでした。",
-      "gitlabConnected": "GitLabと連携済み",
-      "noRepositoriesVisibleBitbucket": "表示できるリポジトリがありません。Bitbucketのリポジトリへのアクセス権を確認してから、一覧を更新してください。",
-      "noRepositoriesVisibleGitlab": "表示できるリポジトリがありません。GitLabのリポジトリへのアクセス権を確認してから、一覧を更新してください。",
-      "openBitbucket": "Bitbucketを開く",
-      "openGitlab": "GitLabを開く",
-      "recentlyUsed": "最近使用した項目",
-      "cliCannotContinue": "このCLIではセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
       "continueFrom": "{{title}}を続行しています。",
-      "importFailed": "このセッションをインポートできませんでした。",
       "importingSession": "セッションをインポート中",
-      "discardWithUploadsMessage": "プロンプトと、送信済みメッセージに添付されていないアップロード済みファイルは削除されます。"
+      "cliCannotContinue": "このCLIではセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
+      "importFailed": "このセッションをインポートできませんでした。"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました。",
@@ -2364,11 +2374,17 @@
       "tapDiffLineToSuggest": "修正提案を入力するには、差分の行をタップしてください。"
     },
     "connect": {
-      "checkFailedMessage": "読み込みが完了するまで、サインイン状態を確認できません。",
       "checkFailedTitle": "GitHubとの接続を確認できませんでした。",
-      "description": "モバイルでプルリクエストをレビューするには、GitHubアカウントを接続してください。",
+      "checkFailedMessage": "読み込みが完了するまで、サインイン状態を確認できません。",
+      "checkFailedTitleGitLab": "GitLabとの接続を確認できませんでした。",
+      "checkFailedTitleBitbucket": "Bitbucketとの接続を確認できませんでした。",
+      "providerCheckFailedMessage": "読み込みが完了するまで接続状態は利用できません。",
+      "reconnectTitle": "GitHubに再接続",
       "reconnectDescription": "GitHubとの接続が解除されました。モバイルでプルリクエストのレビューを続けるには、再接続してください。",
-      "reconnectTitle": "GitHubに再接続"
+      "description": "モバイルでプルリクエストをレビューするには、GitHubアカウントを接続してください。",
+      "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
+      "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
+      "bitbucketOrgOnlyDescription": "プロフィールで組織を選択すると、そのBitbucketプルリクエストをレビューできます。"
     },
     "connectionExpired": "GitHubとの連携が期限切れになりました。",
     "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",
@@ -2461,21 +2477,24 @@
         "outdatedOnLines": "{{lines}}（変更前のコードへのコメント）",
         "outdatedOnPath": "{{path}}（変更前のコードへのコメント）"
       },
-      "deletedUser": "削除されたユーザー"
+      "deletedUser": "削除されたユーザー",
+      "replyForbiddenTerm": "この{{term}}に返信する権限がありません。"
     },
     "entry": {
-      "clearLink": "プルリクエストのリンクをクリア",
+      "eyebrow": "URLからプルリクエストまたはマージリクエストを開く",
+      "pastePrLink": "プルリクエストまたはマージリクエストのリンクを貼り付け",
+      "noRecentPrs": "最近のレビューはありません",
+      "noRecentPrsDescription": "上にリンクを貼り付けてレビューを始めると、次からはここに表示されます。",
       "couldNotLoad": "読み込めませんでした。",
-      "eyebrow": "URLからプルリクエストを開けます。",
-      "noRecentPrs": "最近のPRはありません",
-      "noRecentPrsDescription": "上の欄にPRのリンクを貼り付けてレビューを始めてください。次回からはここに表示されます。",
-      "open": "オープン",
-      "pasteLink": "プルリクエストのリンクを貼り付け",
-      "pastePrLink": "PRのリンクを貼り付け",
-      "removeFromRecentsMessage": "このプルリクエストは最近の履歴から削除されます。",
       "removeFromRecentsTitle": "最近の履歴から削除しますか？",
+      "removeFromRecentsMessage": "このレビューは最近の履歴から削除されます。",
       "removeRecentAccessibility": "{{repo}}を最近の履歴から削除",
-      "urlAccessibility": "GitHubのプルリクエストのURL"
+      "urlAccessibility": "プルリクエストまたはマージリクエストのURLを入力",
+      "urlPlaceholder": "プルリクエストまたはマージリクエストのURL",
+      "openAccessibility": "プルリクエストまたはマージリクエストを開く",
+      "clearLink": "リンクをクリア",
+      "pasteLink": "プルリクエストまたはマージリクエストのリンクを貼り付け",
+      "open": "オープン"
     },
     "eventChips": {
       "comment": "コメント",
@@ -2568,47 +2587,52 @@
     },
     "installKiloGitHubApp": "Kilo GitHub Appをインストール",
     "merge": {
-      "autoMergeDescription": "必須チェックがすべて成功すると、GitHubがこのプルリクエストを自動でマージします（方法：{{method}}）。",
-      "autoMergeOn": "自動マージ有効",
-      "blockedTitle": "まだマージできない理由",
-      "cannotMerge": "このプルリクエストは現状ではマージできません。",
-      "checking": "マージできるか確認中…",
-      "commitMessage": "コミットメッセージ",
-      "commitMessagePlaceholder": "マージコミットの説明（任意）",
-      "commitTitle": "コミットのタイトル",
-      "confirmMessage": "変更をベースブランチにマージします。",
-      "confirmTitle": "プルリクエストをマージしますか？",
-      "couldNotDetermine": "マージできるか確認できませんでした。",
-      "couldNotMerge": "プルリクエストをマージできませんでした。",
-      "deleteBranch": "ブランチを削除",
-      "deleteBranchAfterMerge": "マージ後にブランチを削除",
-      "disableAutoMerge": "自動マージを無効にする",
-      "enableAutoMerge": "自動マージを有効にする",
-      "enableAutoMergeConfirmMessage": "必須チェックがすべて成功すると、GitHubがこのプルリクエストを自動でマージします。",
-      "enableAutoMergeConfirmTitle": "自動マージを有効にしますか？",
-      "forbidden": "このプルリクエストをマージする権限がありません。",
-      "loadFailedTitle": "マージの設定を読み込めませんでした。",
       "merge": "マージ",
       "mergeNow": "今すぐマージ",
       "mergePullRequest": "プルリクエストのマージ",
+      "mergeTermTitle": "{{term}}のマージ",
+      "enableAutoMerge": "自動マージを有効にする",
+      "disableAutoMerge": "自動マージを無効にする",
+      "autoMergeOn": "自動マージ有効",
+      "autoMergeDescription": "必須チェックがすべて成功すると、GitHubがこのプルリクエストを自動でマージします（方法：{{method}}）。",
+      "checking": "マージできるか確認中…",
+      "couldNotDetermine": "マージできるか確認できませんでした。",
+      "refreshMergeability": "マージできるか再確認",
+      "blockedTitle": "まだマージできない理由",
+      "updateBranch": "ブランチを更新",
+      "updateBranchFromBase": "ベースブランチの変更を取り込んで更新",
       "methodLabel": "マージ方法",
+      "commitTitle": "コミットのタイトル",
+      "commitMessage": "コミットメッセージ",
+      "commitMessagePlaceholder": "マージコミットの説明（任意）",
+      "deleteBranch": "ブランチを削除",
+      "deleteBranchAfterMerge": "マージ後にブランチを削除",
+      "noEnabledMethods": "このリポジトリではマージ方法が有効になっていません。リポジトリの管理者に、通常のマージ、スカッシュマージ、リベースマージのいずれかを有効にするよう依頼してください。",
+      "confirmTitle": "プルリクエストをマージしますか？",
+      "confirmTitleTerm": "{{term}}をマージしますか？",
+      "confirmMessage": "変更をベースブランチにマージします。",
+      "enableAutoMergeConfirmTitle": "自動マージを有効にしますか？",
+      "enableAutoMergeConfirmMessage": "必須チェックがすべて成功すると、GitHubがこのプルリクエストを自動でマージします。",
+      "enableAutoMergeConfirmMessageTerm": "パイプラインが成功すると、{{term}}は自動的にマージされます。",
+      "enableAutoMergeDescriptionTerm": "パイプラインが成功すると、GitLabはこの{{term}}を自動的にマージします。",
+      "forbidden": "このプルリクエストをマージする権限がありません。",
+      "cannotMerge": "このプルリクエストは現状ではマージできません。",
+      "couldNotMerge": "プルリクエストをマージできませんでした。",
       "methods": {
         "merge": "マージ",
         "rebase": "リベース",
         "squash": "スカッシュ"
       },
-      "noEnabledMethods": "このリポジトリではマージ方法が有効になっていません。リポジトリの管理者に、通常のマージ、スカッシュマージ、リベースマージのいずれかを有効にするよう依頼してください。",
+      "terminal": {
+        "alreadyMerged": "マージ済み",
+        "closed": "プルリクエストはクローズ済み",
+        "closedMergeRequest": "マージリクエストはクローズ済み"
+      },
       "partialSuccessBanner": {
         "accessibility": "マージしました。ブランチを削除できませんでした。理由：{{reason}}",
         "body": "ブランチを削除できませんでした。理由：{{reason}}"
       },
-      "refreshMergeability": "マージできるか再確認",
-      "terminal": {
-        "alreadyMerged": "マージ済み",
-        "closed": "プルリクエストはクローズ済み"
-      },
-      "updateBranch": "ブランチを更新",
-      "updateBranchFromBase": "ベースブランチの変更を取り込んで更新",
+      "loadFailedTitle": "マージの設定を読み込めませんでした。",
       "blocked": {
         "unknownStateTitle": "GitHubからマージ可能との情報が届いていません",
         "unknownStateDetail": "しばらくしてから概要を更新してください。",
@@ -2627,6 +2651,18 @@
         "behindDetail": "マージ元のブランチにベースブランチの最新の変更が反映されていません。マージする前に、リベースするか、ブランチを更新してください。",
         "notMergeableTitle": "このプルリクエストはまだマージできません",
         "notMergeableDetail": "GitHubから報告されたマージの状態は「{{state}}」です。"
+      },
+      "restrictions": {
+        "title": "マージの制限",
+        "approvalsRequired_one": "{{displayCount}}件の承認が必要",
+        "approvalsRequired_other": "{{displayCount}}件の承認が必要",
+        "pipelineMustSucceed": "マージする前にパイプラインが成功する必要があります。"
+      },
+      "providerBlocked": {
+        "failingPipeline": "最新コミットでパイプラインが失敗しています。",
+        "pendingPipeline": "最新コミットでパイプラインはまだ実行中です。",
+        "permission": "この{{term}}をマージする権限がありません。",
+        "draft": "マージする前に、{{term}}をレビュー可能な状態に変更してください。"
       },
       "methodLabels": {
         "merge": "マージコミットを作成",
@@ -2685,8 +2721,11 @@
     "pullRequestUnavailable": "プルリクエストを開けません",
     "pullRequestUnavailableDescription": "このPRを開けません。PRが削除されたか、リポジトリが非公開になっているか、リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
     "reconnectNotice": {
+      "title": "GitHubとの連携が期限切れになりました。",
       "message": "GitHubとの接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
-      "title": "GitHubとの連携が期限切れになりました。"
+      "gitlabTitle": "GitLabとの連携が期限切れになりました。",
+      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。",
+      "providerMessage": "{{provider}}との接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。"
     },
     "review": "レビュー",
     "reviewPullRequest": "プルリクエストをレビュー",
@@ -2737,7 +2776,7 @@
       "emptyLine": "（空）"
     },
     "linkPasteClipboardEmpty": "クリップボードが空です。",
-    "linkPasteNotAPullRequest": "GitHubのプルリクエストのリンクではありません。",
+    "linkPasteNotAPullRequest": "プルリクエストまたはマージリクエストのリンクではありません",
     "announce": {
       "commentPosted": "コメントを投稿しました",
       "reviewSubmitted": "レビューを送信しました",
@@ -2746,6 +2785,7 @@
     "mutationError": {
       "commentNotPosted": "このコメントは投稿できません。選択した行が変更されたか、PRが更新された可能性があります。",
       "reviewNotSubmitted": "このレビューはこのままでは送信できません。PRが更新されていないか、自分が作成したプルリクエストではないか確認してください。",
+      "reviewNotSubmittedTerm": "このレビューはそのまま送信できません。{{term}}が変更されたか、自分の{{term}}はレビューできません。",
       "couldNotPostComment": "コメントを投稿できませんでした。",
       "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。"
     },
@@ -2753,9 +2793,31 @@
       "couldNotReply": "返信できませんでした。",
       "couldNotCompleteAction": "この操作を完了できませんでした。",
       "mergeResultDefaultError": "GitHubでマージが完了しませんでした。",
+      "mergeResultNotCompleted": "{{term}}はマージされませんでした。状態を確認して再試行してください。",
       "ambiguous": "操作の結果を確認できませんでした。再試行する前にPRを確認してください。",
       "persistenceFailed": "この操作を記録できませんでした。しばらくしてからもう一度お試しください。",
       "forbidden": "この操作を行う権限がありません。"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "このプロバイダーでは利用できません",
+        "accessibility": "このプロバイダーでは利用できません: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "プルリクエスト",
+      "mergeRequest": "マージリクエスト",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "マージリクエストを共有",
+      "viewOnProvider": "{{provider}}で表示",
+      "mergeRequestUnavailable": "マージリクエストを開けません",
+      "unavailableDescription": "削除されたか、アクセス権がない可能性があります。",
+      "accessDeniedMergeRequest": "このマージリクエストを表示する権限がありません。",
+      "couldNotLoadMergeRequest": "マージリクエストを読み込めませんでした。",
+      "discussionAccessDenied": "このマージリクエストのディスカッションを表示する権限がありません。",
+      "discussionUnavailableMessage": "このマージリクエストは削除された可能性があります。",
+      "noDiscussionDescription": "このマージリクエストには、レビュースレッドもコメントもまだありません。",
+      "noFilesChangedDescription": "このマージリクエストにはファイルの変更がありません。"
     }
   },
   "organization": {

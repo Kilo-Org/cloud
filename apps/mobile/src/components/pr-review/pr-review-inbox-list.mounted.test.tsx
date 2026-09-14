@@ -92,8 +92,23 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getPrReviewPath: (owner: string, repo: string, number: number) => `/${owner}/${repo}/${number}`,
 }));
-vi.mock('@/lib/pr-review/use-pr-inbox', () => ({
-  usePrInbox: () => inboxState,
+// `PrReviewInboxList` reads the provider-aware hook; adapt the GitHub-shaped
+// inboxState rows to the merged `ProviderInboxRow` shape it renders.
+vi.mock('@/lib/pr-review/use-provider-inbox', () => ({
+  useProviderInbox: () => ({
+    ...inboxState.query,
+    githubNeedsReconnect: false,
+    retryFailedPages: vi.fn(),
+    items: inboxState.items.map(item => ({
+      ref: { platform: 'github' as const, owner: item.owner, repo: item.repo, number: item.number },
+      key: `${item.owner}/${item.repo}#${item.number}`,
+      title: item.title,
+      isDraft: item.isDraft,
+      updatedAt: item.updatedAt,
+    })),
+    firstPageErrorState: inboxState.firstPageErrorState,
+    laterPageError: inboxState.laterPageError,
+  }),
 }));
 // `@/lib/utils` initializes real i18n; the row only needs timestamp shaping.
 vi.mock('@/lib/utils', () => ({

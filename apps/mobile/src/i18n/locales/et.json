@@ -36,6 +36,7 @@
     "cost": "Kulu",
     "discard": "Loobu",
     "findings": "Leiud",
+    "mergeRequest": "liitmistaotlus",
     "notConnected": "Pole ühendatud",
     "notifications": "Teavitused",
     "pullRequest": "tõmbetaotlus",
@@ -350,6 +351,7 @@
       "merge": "Mestimine",
       "mergeNow": "Ühenda kohe",
       "mergePullRequest": "Tõmbetaotluse ühendamine",
+      "mergeTermTitle": "{{term}}e ühendamine",
       "enableAutoMerge": "Luba automaatne ühendamine",
       "disableAutoMerge": "Keela automaatne ühendamine",
       "autoMergeOn": "Automaatne ühendamine on sisse lülitatud",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "Kustuta haru pärast ühendamist",
       "noEnabledMethods": "Selles hoidlas pole ükski ühendamismeetod lubatud. Palu hoidla administraatoril lubada ühendamine ühendamiskommiti, kommitite koondamise või ümberbaseerimise abil.",
       "confirmTitle": "Kas ühendada tõmbetaotlus?",
+      "confirmTitleTerm": "Kas ühendada {{term}}?",
       "confirmMessage": "Sinu muudatused ühendatakse alusharuga.",
       "enableAutoMergeConfirmTitle": "Kas lubada automaatne ühendamine?",
       "enableAutoMergeConfirmMessage": "GitHub ühendab selle tõmbetaotluse automaatselt, kui kõik nõutud kontrollid on edukalt läbitud.",
+      "enableAutoMergeConfirmMessageTerm": "Kui pipeline õnnestub, liidetakse {{term}} automaatselt.",
+      "enableAutoMergeDescriptionTerm": "GitLab liidab {{term}} automaatselt, kui pipeline õnnestub.",
       "forbidden": "Sul pole õigust seda tõmbetaotlust ühendada.",
       "cannotMerge": "Seda tõmbetaotlust ei saa praegusel kujul ühendada.",
       "couldNotMerge": "Tõmbetaotlust ei õnnestunud ühendada.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Juba ühendatud",
-        "closed": "See tõmbetaotlus on suletud"
+        "closed": "See tõmbetaotlus on suletud",
+        "closedMergeRequest": "See liitmistaotlus on suletud"
       },
       "partialSuccessBanner": {
         "body": "Haru ei õnnestunud kustutada. Põhjus: {{reason}}",
@@ -406,6 +412,18 @@
         "behindDetail": "Lähteharus puuduvad alusharu uusimad muudatused. Enne ühendamist baseeri haru ümber või värskenda seda.",
         "notMergeableTitle": "Seda tõmbetaotlust ei saa veel ühendada",
         "notMergeableDetail": "GitHub teatas ühendatavuse olekust {{state}}."
+      },
+      "restrictions": {
+        "title": "Liitmise tingimused",
+        "approvalsRequired_one": "Vajalik on {{displayCount}} heakskiit",
+        "approvalsRequired_other": "Vajalikud on {{displayCount}} heakskiitu",
+        "pipelineMustSucceed": "Enne liitmist peab pipeline õnnestuma."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline ebaõnnestub viimase commitiga.",
+        "pendingPipeline": "Pipeline on viimase commitiga veel käimas.",
+        "permission": "Sul pole õigust seda {{term}}t ühendada.",
+        "draft": "Märgi {{term}} enne ühendamist ülevaatuseks valmis."
       },
       "methodLabels": {
         "merge": "Loo ühendamiskommit",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "Aegunud: {{lines}}",
         "outdatedOnPath": "Aegunud: {{path}}"
       },
-      "deletedUser": "kustutatud kasutaja"
+      "deletedUser": "kustutatud kasutaja",
+      "replyForbiddenTerm": "Sul pole õigust sellele {{term}}ele vastata."
     },
     "couldNotOpenGitHubAppSettings": "GitHubi rakenduse seadeid ei õnnestunud avada.",
     "installKiloGitHubApp": "Installi Kilo GitHubi rakendus",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "Vaata tõmbetaotlus üle",
     "headLine": "{{counts}} · uusim kommit: {{sha}}",
     "entry": {
-      "eyebrow": "Ava tõmbetaotlus URL-i kaudu.",
-      "pastePrLink": "Kleebi PR-i link",
-      "noRecentPrs": "Hiljutisi PR-e pole",
-      "noRecentPrsDescription": "Ülevaatuse alustamiseks kleebi PR-i link ülalolevale väljale — järgmisel korral leiad selle siit.",
+      "eyebrow": "Ava tõmbetaotlus või liitmistaotlus URL-i kaudu",
+      "pastePrLink": "Kleebi tõmbetaotluse või liitmistaotluse link",
+      "noRecentPrs": "Hiljutisi ülevaatusi pole",
+      "noRecentPrsDescription": "Ülevaatuse alustamiseks kleebi link ülalpool — järgmisel korral ilmub see siin.",
       "couldNotLoad": "Laadimine ebaõnnestus.",
       "removeFromRecentsTitle": "Kas eemaldada hiljutiste hulgast?",
-      "removeFromRecentsMessage": "See tõmbetaotlus eemaldatakse sinu hiljutiste loendist.",
+      "removeFromRecentsMessage": "See ülevaatus eemaldatakse hiljutiste nimekirjast.",
       "removeRecentAccessibility": "Eemalda {{repo}} hiljutiste hulgast",
-      "urlAccessibility": "GitHubi tõmbetaotluse URL",
-      "clearLink": "Eemalda tõmbetaotluse link",
-      "pasteLink": "Kleebi tõmbetaotluse link",
+      "urlAccessibility": "Sisesta tõmbetaotluse või liitmistaotluse URL",
+      "urlPlaceholder": "Tõmbetaotluse või liitmistaotluse URL",
+      "openAccessibility": "Ava tõmbetaotlus või liitmistaotlus",
+      "clearLink": "Eemalda link",
+      "pasteLink": "Kleibi tõmbetaotluse või liitmistaotluse link",
       "open": "Ava"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "GitHubi ühendust ei õnnestunud kontrollida.",
       "checkFailedMessage": "Sisselogimisolekut saab näha alles pärast laadimise lõppu.",
+      "checkFailedTitleGitLab": "GitLabi ühendust ei õnnestunud kontrollida.",
+      "checkFailedTitleBitbucket": "Bitbucketi ühendust ei õnnestunud kontrollida.",
+      "providerCheckFailedMessage": "Ühenduse olekut saab näha alles pärast laadimise lõppu.",
       "reconnectTitle": "Ühenda GitHub uuesti",
       "reconnectDescription": "Sinu GitHubi ühendus on tühistatud. Taasta ühendus, et jätkata tõmbetaotluste ülevaatamist mobiilis.",
-      "description": "Ühenda oma GitHubi konto, et tõmbetaotlusi mobiilis üle vaadata."
+      "description": "Ühenda oma GitHubi konto, et tõmbetaotlusi mobiilis üle vaadata.",
+      "gitlabDescription": "Ühenda oma GitLab konto, et liitmistaotlusi mobiilis üle vaadata.",
+      "bitbucketDescription": "Ühenda Bitbucket selle organisatsiooniga, et tõmbetaotlusi mobiilis üle vaadata.",
+      "bitbucketOrgOnlyDescription": "Vali oma profiilis organisatsioon, et vaadata selle Bitbucketi tõmbetaotlusi."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "GitHubi ühendus aegus.",
-      "message": "Sinu GitHubi ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada."
+      "message": "Sinu GitHubi ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada.",
+      "gitlabTitle": "GitLabi ühendus aegus.",
+      "bitbucketTitle": "Bitbucketi ühendus aegus.",
+      "providerMessage": "Sinu {{provider}}i ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada."
     },
     "eventChips": {
       "comment": "Kommenteeri",
@@ -668,7 +698,7 @@
       "emptyLine": "(tühi)"
     },
     "linkPasteClipboardEmpty": "Lõikelaud on tühi.",
-    "linkPasteNotAPullRequest": "See pole GitHubi tõmbetaotluse link.",
+    "linkPasteNotAPullRequest": "See pole tõmbetaotluse ega liitmistaotluse link",
     "announce": {
       "commentPosted": "Kommentaar on postitatud",
       "reviewSubmitted": "Ülevaatus on esitatud",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "Seda kommentaari ei saa postitada. Valitud rida võib olla muutunud või PR-i võib olla värskendatud.",
       "reviewNotSubmitted": "Seda ülevaatust ei saa praegusel kujul esitada. PR võib olla muutunud või proovid üle vaadata enda tõmbetaotlust, mis pole lubatud.",
+      "reviewNotSubmittedTerm": "Seda ülevaatust ei saa praegusel kujul esitada. {{term}} võib olla muutunud või ei tohi omaenda {{term}} üle vaadata.",
       "couldNotPostComment": "Kommentaari ei õnnestunud postitada.",
       "couldNotSubmitReview": "Ülevaatuse esitamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "Vastamine ebaõnnestus.",
       "couldNotCompleteAction": "Seda toimingut ei õnnestunud lõpule viia.",
       "mergeResultDefaultError": "GitHub ei lõpetanud ühendamist.",
+      "mergeResultNotCompleted": "{{term}} ei liidetud. Kontrolli olekut ja proovi uuesti.",
       "ambiguous": "Toimingu õnnestumist ei õnnestunud kinnitada — kontrolli PR-i enne uuesti proovimist.",
       "persistenceFailed": "Seda toimingut ei õnnestunud salvestada. Proovi hiljem uuesti.",
       "forbidden": "See toiming pole lubatud."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Selle pakkuja juures pole saadaval",
+        "accessibility": "Selle pakkuja juures pole saadaval: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Tõmbetaotlus",
+      "mergeRequest": "Liitmistaotlus",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Jaga liitmistaotlust",
+      "viewOnProvider": "Kuva {{provider}}",
+      "mergeRequestUnavailable": "Liitmistaotlus pole saadaval",
+      "unavailableDescription": "See võib olla kustutatud või sul puudub ligipääs.",
+      "accessDeniedMergeRequest": "Sul pole õigust seda liitmistaotlust vaadata.",
+      "couldNotLoadMergeRequest": "Liitmistaotlust ei õnnestunud laadida.",
+      "discussionAccessDenied": "Sul puudub õigus selle liitmistaotluse arutelu vaadata.",
+      "discussionUnavailableMessage": "See liitmistaotlus võib olla eemaldatud.",
+      "noDiscussionDescription": "Selle liitmistaotluse juures pole veel ülevaatuslõime ega arutelukommentaare.",
+      "noFilesChangedDescription": "See liitmistaotlus ei sisalda failimuudatusi."
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "Proovi uuesti ühenduda"
     },
     "newSession": {
+      "recentlyUsed": "Hiljuti kasutatud",
+      "couldNotLoadGithubRepositories": "GitHubi hoidlate laadimine ebaõnnestus.",
+      "couldNotLoadGitlabRepositories": "GitLabi hoidlate laadimine ebaõnnestus.",
+      "couldNotLoadBitbucketRepositories": "Bitbucketi hoidlate laadimine ebaõnnestus.",
       "connectGithubDescription": "Ühenda GitHub brauseris ja naase siia, et valida hoidla.",
+      "connectGitlabDescription": "Ühenda GitLab brauseris ja naase siia, et valida hoidla.",
+      "connectBitbucketDescription": "Ühenda Bitbucket brauseris ja naase siia, et valida hoidla.",
       "openGithub": "Ava GitHub",
+      "openGitlab": "Ava GitLab",
+      "openBitbucket": "Ava Bitbucket",
       "refreshRepositories": "Värskenda hoidlaid",
       "githubConnected": "GitHub on ühendatud",
+      "gitlabConnected": "GitLab on ühendatud",
       "noRepositoriesVisible": "Hoidlaid pole näha. Kontrolli, kas Kilo GitHubi rakendusel on hoidlatele juurdepääs, ja värskenda seejärel loendit.",
+      "noRepositoriesVisibleGitlab": "Hoidlaid pole näha. Kontrolli GitLabi hoidlate juurdepääsuõigusi ja värskenda seejärel loendit.",
+      "noRepositoriesVisibleBitbucket": "Hoidlaid pole näha. Kontrolli Bitbucketi hoidlate juurdepääsuõigusi ja värskenda seejärel loendit.",
+      "bitbucketOrganizationsOnly": "Bitbucket on saadaval ainult organisatsioonidele.",
+      "branchPickerTitle": "Vali haru",
+      "branchDefault": "Vaikimisi",
+      "branchAccessibility": "Haru: {{label}}",
+      "branchLoading": "Harude laadimine",
+      "branchLoadError": "Harude laadimine ebaõnnestus",
+      "branchUnavailable": "Selle hoidla harud pole saadaval. Kontrolli oma õigusi pakkujas ja vali mõni teine hoidla.",
+      "branchEmpty": "Ühtegi haru pole saadaval",
+      "branchPlaceholder": "Vali haru",
       "runOnWithTarget": "Käivituskoht: {{target}}",
       "environment": "Keskkond",
       "couldNotLoadEnvironment": "Sinu keskkonna laadimine ebaõnnestus.",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "Hoidlate värskendamine ebaõnnestus. Proovi uuesti.",
       "discardDraftTitle": "Kas loobuda mustandist?",
       "discardDraftMessage": "Sinu viip läheb kaotsi.",
+      "discardWithUploadsMessage": "Sinu viip ja üles laaditud failid, mida pole ühegi saadetud sõnumiga seotud, kustutatakse.",
       "discardFailed": "Mustandist loobumine ebaõnnestus. Proovi uuesti.",
       "remoteHint": "Kohaliku kilo protsessi juhtimiseks käivita arvutis `kilo remote` või töötavas CLI-seansis `/remote`.",
-      "connectBitbucketDescription": "Ühenda Bitbucket brauseris ja naase siia, et valida hoidla.",
-      "connectGitlabDescription": "Ühenda GitLab brauseris ja naase siia, et valida hoidla.",
-      "couldNotLoadBitbucketRepositories": "Bitbucketi hoidlate laadimine ebaõnnestus.",
-      "couldNotLoadGithubRepositories": "GitHubi hoidlate laadimine ebaõnnestus.",
-      "couldNotLoadGitlabRepositories": "GitLabi hoidlate laadimine ebaõnnestus.",
-      "gitlabConnected": "GitLab on ühendatud",
-      "noRepositoriesVisibleBitbucket": "Hoidlaid pole näha. Kontrolli Bitbucketi hoidlate juurdepääsuõigusi ja värskenda seejärel loendit.",
-      "noRepositoriesVisibleGitlab": "Hoidlaid pole näha. Kontrolli GitLabi hoidlate juurdepääsuõigusi ja värskenda seejärel loendit.",
-      "openBitbucket": "Ava Bitbucket",
-      "openGitlab": "Ava GitLab",
-      "recentlyUsed": "Hiljuti kasutatud",
-      "cliCannotContinue": "See CLI ei saa seanssi jätkata. Vali Cloud Agent või mõni muu CLI.",
       "continueFrom": "Jätkub seanss „{{title}}“.",
-      "importFailed": "Seda seanssi ei õnnestunud importida.",
       "importingSession": "Imporditakse seanssi",
-      "discardWithUploadsMessage": "Sinu viip ja üles laaditud failid, mida pole ühegi saadetud sõnumiga seotud, kustutatakse."
+      "cliCannotContinue": "See CLI ei saa seanssi jätkata. Vali Cloud Agent või mõni muu CLI.",
+      "importFailed": "Seda seanssi ei õnnestunud importida."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendati {{displayCount}} fail.",

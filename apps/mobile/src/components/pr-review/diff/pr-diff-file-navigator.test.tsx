@@ -16,6 +16,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
+import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
@@ -30,6 +31,11 @@ const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }))
 const rowRenders = vi.hoisted(
   () => [] as { path: string; onSelect: () => void; onToggleViewed: () => void }[]
 );
+
+// Records every (ref, headSha) the navigator hands to the viewed-files hook,
+// so the provider-scoped keying (s6, identity rule 17) is proven at the call
+// site rather than only in the store's unit tests.
+const viewedFilesCalls = vi.hoisted(() => [] as unknown[][]);
 
 // Captures the latest FlashList props so tests can read `onEndReached`.
 const flashListProps = vi.hoisted(() => ({ current: null as null | Record<string, unknown> }));
@@ -153,7 +159,10 @@ let fetchAllResult: FetchAllResult = {
 
 vi.mock('@/lib/pr-review/diff/pr-review-file-list-state', () => ({
   usePrReviewFileListQuery: () => listQueryResult,
-  usePrReviewViewedFiles: () => viewedResult,
+  usePrReviewViewedFiles: (...args: unknown[]) => {
+    viewedFilesCalls.push(args);
+    return viewedResult;
+  },
   useFetchToCompletion: () => fetchAllResult,
 }));
 
@@ -569,5 +578,62 @@ describe('PrDiffFileNavigator list bottom inset (plan §6)', () => {
     await mountNavigator();
 
     expect(listContentStyle()).toEqual({ paddingBottom: 66, paddingTop: 8 });
+  });
+});
+
+// s6 (identity rule 17): the sheet toggling a file here and the diff list
+// behind it share the viewed store, so both must key it by the LIVE provider
+// ref. A bare triple would silently collide across providers and GitLab
+// instances; the store only folds the collision-free key when it receives
+// the ref.
+describe('PrDiffFileNavigator viewed-set provider keying (s6)', () => {
+  const GITLAB_REF: ProviderPrRef = {
+    platform: 'gitlab',
+    projectPath: 'group/sub/repo',
+    mrIid: 12,
+  };
+
+  beforeEach(() => {
+    viewedFilesCalls.length = 0;
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [makeFile('src/a.ts')],
+      firstPageErrorState: null,
+      laterPageError: false,
+    };
+    viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
+    fetchAllResult = {
+      run: fetchAllRunMock,
+      isRunning: false,
+      loadedFiles: 0,
+      totalFiles: null,
+      error: null,
+    };
+  });
+
+  it('keys the viewed set by the provider ref under the provider scope', async () => {
+    await renderWithProviders(
+      <ProviderPrScopeProvider value={{ ref: GITLAB_REF, organizationId: null }}>
+        <PrDiffFileNavigator {...BASE_PROPS} />
+      </ProviderPrScopeProvider>
+    );
+
+    expect(viewedFilesCalls[0]).toEqual([GITLAB_REF, 'sha']);
+  });
+
+  it('falls back to the GitHub ref triple on the GitHub route', async () => {
+    await renderWithProviders(<PrDiffFileNavigator {...BASE_PROPS} />);
+
+    expect(viewedFilesCalls[0]).toEqual([
+      { platform: 'github', owner: 'octocat', repo: 'hello-world', number: 7 },
+      'sha',
+    ]);
   });
 });

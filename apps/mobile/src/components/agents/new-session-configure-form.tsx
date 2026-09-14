@@ -1,7 +1,6 @@
 import { type ReactNode, type RefObject } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-
 import { InstanceSelector } from '@/components/agents/instance-selector';
 import { LaunchFolderField } from '@/components/agents/folder-selector';
 import { renderProfileRow } from '@/components/agents/new-session-profile-row';
@@ -30,6 +29,7 @@ import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 type NewSessionConfigureFormProps = {
   // Prompt / model / attachments (Cloud Agent only).
@@ -165,6 +165,10 @@ export function NewSessionConfigureForm({
 }: Readonly<NewSessionConfigureFormProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  // Clears the system navigation bar under the scroll content. Without it the
+  // primary Start action can sit in the bar's translucent region a formSheet
+  // leaves exposed below itself (the picker's bottom strip showed its sliver).
+  const bottomClearance = useDetailScreenBottomPadding();
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
   const runOnNote =
@@ -214,9 +218,10 @@ export function NewSessionConfigureForm({
   return (
     <ScrollView
       className="flex-1"
-      contentContainerClassName="flex-grow px-4 pb-8 pt-4"
+      contentContainerClassName="flex-grow px-4 pt-4"
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="on-drag"
     >
       <NewSessionPrompt
         attachments={attachments}
@@ -309,6 +314,8 @@ export function NewSessionConfigureForm({
         isStarting={isStarting}
         onStartSession={onStartSession}
       />
+
+      <View style={{ height: bottomClearance }} pointerEvents="none" />
     </ScrollView>
   );
 }

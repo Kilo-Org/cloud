@@ -36,6 +36,7 @@
     "cost": "Import",
     "discard": "Descarta",
     "findings": "Problemes",
+    "mergeRequest": "sol·licitud de fusió",
     "notConnected": "No connectat",
     "notifications": "Notificacions",
     "pullRequest": "pR",
@@ -352,6 +353,7 @@
       "merge": "Fusió",
       "mergeNow": "Fusiona ara",
       "mergePullRequest": "Fusió de la sol·licitud d'integració",
+      "mergeTermTitle": "Fusió de la {{term}}",
       "enableAutoMerge": "Activa la fusió automàtica",
       "disableAutoMerge": "Desactiva la fusió automàtica",
       "autoMergeOn": "Fusió automàtica activada",
@@ -370,9 +372,12 @@
       "deleteBranchAfterMerge": "Elimina la branca després de fusionar",
       "noEnabledMethods": "Aquest repositori no té cap mètode de fusió activat. Demana a un administrador del repositori que activi la fusió, l'agrupació de comissions o el canvi de base.",
       "confirmTitle": "Vols fusionar la sol·licitud d'integració?",
+      "confirmTitleTerm": "Vols fusionar la {{term}}?",
       "confirmMessage": "Això fusionarà els teus canvis a la branca base.",
       "enableAutoMergeConfirmTitle": "Vols activar la fusió automàtica?",
       "enableAutoMergeConfirmMessage": "GitHub fusionarà aquesta sol·licitud d'integració automàticament quan se superin totes les comprovacions obligatòries.",
+      "enableAutoMergeConfirmMessageTerm": "La {{term}} es fusionarà automàticament un cop la seva pipeline tingui èxit.",
+      "enableAutoMergeDescriptionTerm": "El GitLab fusiona automàticament aquesta {{term}} un cop la seva pipeline té èxit.",
       "forbidden": "No tens permís per fusionar aquesta sol·licitud d'integració.",
       "cannotMerge": "Aquesta sol·licitud d'integració no es pot fusionar tal com està.",
       "couldNotMerge": "No s'ha pogut fusionar la sol·licitud d'integració.",
@@ -383,7 +388,8 @@
       },
       "terminal": {
         "alreadyMerged": "Ja fusionada",
-        "closed": "Sol·licitud d'integració tancada"
+        "closed": "Sol·licitud d'integració tancada",
+        "closedMergeRequest": "Sol·licitud de fusió tancada"
       },
       "partialSuccessBanner": {
         "body": "No s'ha pogut eliminar la branca: {{reason}}.",
@@ -408,6 +414,19 @@
         "behindDetail": "A la branca d'origen li falten canvis de la branca base. Canvia'n la base o actualitza-la abans de fusionar.",
         "notMergeableTitle": "Aquesta sol·licitud d'integració encara no es pot fusionar",
         "notMergeableDetail": "GitHub indica aquest estat de fusió: {{state}}."
+      },
+      "restrictions": {
+        "title": "Restriccions de fusió",
+        "approvalsRequired_one": "{{displayCount}} aprovació necessària",
+        "approvalsRequired_other": "{{displayCount}} aprovacions necessàries",
+        "pipelineMustSucceed": "La pipeline ha de tenir èxit abans de fusionar.",
+        "approvalsRequired_many": "{{displayCount}} d'aprovacions necessàries"
+      },
+      "providerBlocked": {
+        "failingPipeline": "La pipeline falla a la darrera comissió.",
+        "pendingPipeline": "La pipeline encara s'està executant a la darrera comissió.",
+        "permission": "No tens permís per fusionar aquesta {{term}}.",
+        "draft": "Marca la {{term}} com a preparada per a la revisió abans de fusionar-la."
       },
       "methodLabels": {
         "merge": "Crea una comissió de fusió",
@@ -509,7 +528,8 @@
         "outdatedOnLines": "Desactualitzat a {{lines}}",
         "outdatedOnPath": "Desactualitzat a {{path}}"
       },
-      "deletedUser": "usuari eliminat"
+      "deletedUser": "usuari eliminat",
+      "replyForbiddenTerm": "No tens permís per respondre a aquesta {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "No s'ha pogut obrir la configuració de l'aplicació de GitHub.",
     "installKiloGitHubApp": "Instal·la l'aplicació de Kilo per a GitHub",
@@ -521,17 +541,19 @@
     "reviewPullRequest": "Revisa la sol·licitud d'integració",
     "headLine": "{{counts}} · última comissió {{sha}}",
     "entry": {
-      "eyebrow": "Obre una sol·licitud d'integració amb el seu URL.",
-      "pastePrLink": "Enganxa l'enllaç d'una PR",
-      "noRecentPrs": "Cap PR recent",
-      "noRecentPrsDescription": "Enganxa l'enllaç d'una PR al camp de dalt per començar una revisió. La propera vegada apareixerà aquí.",
+      "eyebrow": "Obre una sol·licitud d'integració o de fusió amb el seu URL",
+      "pastePrLink": "Enganxa l'enllaç d'una sol·licitud d'integració o de fusió",
+      "noRecentPrs": "Cap revisió recent",
+      "noRecentPrsDescription": "Enganxa un enllaç a dalt per començar una revisió — la propera vegada apareixerà aquí.",
       "couldNotLoad": "No s'ha pogut carregar.",
       "removeFromRecentsTitle": "Vols eliminar-la de la llista de recents?",
-      "removeFromRecentsMessage": "Aquesta sol·licitud d'integració s'eliminarà de la llista de recents.",
+      "removeFromRecentsMessage": "Aquesta revisió s'eliminarà de la llista de recents.",
       "removeRecentAccessibility": "Elimina {{repo}} de la llista de recents",
-      "urlAccessibility": "URL de la sol·licitud d'integració de GitHub",
-      "clearLink": "Esborra l'enllaç de la sol·licitud d'integració",
-      "pasteLink": "Enganxa l'enllaç de la sol·licitud d'integració",
+      "urlAccessibility": "Introdueix l'URL d'una sol·licitud d'integració o de fusió",
+      "urlPlaceholder": "URL d'una sol·licitud d'integració o de fusió",
+      "openAccessibility": "Obre una sol·licitud d'integració o de fusió",
+      "clearLink": "Esborra l'enllaç",
+      "pasteLink": "Enganxa l'enllaç de la sol·licitud d'integració o de fusió",
       "open": "Obertura"
     },
     "checks": {
@@ -580,9 +602,15 @@
     "connect": {
       "checkFailedTitle": "No s'ha pogut comprovar la connexió amb GitHub.",
       "checkFailedMessage": "No es pot saber si has iniciat la sessió fins que es carregui aquesta informació.",
+      "checkFailedTitleGitLab": "No s'ha pogut comprovar la connexió amb GitLab.",
+      "checkFailedTitleBitbucket": "No s'ha pogut comprovar la connexió amb Bitbucket.",
+      "providerCheckFailedMessage": "L'estat de la connexió no està disponible fins que es carregui.",
       "reconnectTitle": "Torna a connectar GitHub",
       "reconnectDescription": "S'ha revocat la teva connexió amb GitHub. Torna a connectar-te per continuar revisant sol·licituds d'integració al mòbil.",
-      "description": "Connecta el teu compte de GitHub per revisar sol·licituds d'integració al mòbil."
+      "description": "Connecta el teu compte de GitHub per revisar sol·licituds d'integració al mòbil.",
+      "gitlabDescription": "Connecta el teu compte de GitLab per revisar sol·licituds de fusió des del mòbil.",
+      "bitbucketDescription": "Connecta Bitbucket a aquesta organització per revisar sol·licituds d'integració des del mòbil.",
+      "bitbucketOrgOnlyDescription": "Selecciona una organització al teu perfil per revisar-ne les sol·licituds d'integració de Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -605,7 +633,10 @@
     },
     "reconnectNotice": {
       "title": "La connexió amb GitHub ha caducat.",
-      "message": "La teva connexió amb GitHub ja no és vàlida. Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar."
+      "message": "La teva connexió amb GitHub ja no és vàlida. Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar.",
+      "gitlabTitle": "La connexió amb GitLab ha caducat.",
+      "bitbucketTitle": "La connexió amb Bitbucket ha caducat.",
+      "providerMessage": "La teva connexió amb {{provider}} ja no és vàlida. Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar."
     },
     "eventChips": {
       "comment": "Comentari",
@@ -675,7 +706,7 @@
       "emptyLine": "(buit)"
     },
     "linkPasteClipboardEmpty": "El porta-retalls és buit.",
-    "linkPasteNotAPullRequest": "No és un enllaç a una sol·licitud d'integració de GitHub.",
+    "linkPasteNotAPullRequest": "No és un enllaç a una sol·licitud d'integració o de fusió",
     "announce": {
       "commentPosted": "Comentari publicat",
       "reviewSubmitted": "Revisió enviada",
@@ -684,6 +715,7 @@
     "mutationError": {
       "commentNotPosted": "Aquest comentari no es pot publicar. Pot ser que la línia seleccionada hagi canviat o que la PR s'hagi actualitzat.",
       "reviewNotSubmitted": "Aquesta revisió no es pot enviar tal com està. Pot ser que la PR hagi canviat o que estiguis intentant revisar la teva pròpia sol·licitud d'integració.",
+      "reviewNotSubmittedTerm": "Aquesta revisió no es pot enviar tal com està. Pot ser que la {{term}} hagi canviat o que no puguis revisar la teva pròpia {{term}}.",
       "couldNotPostComment": "No s'ha pogut publicar el comentari.",
       "couldNotSubmitReview": "No s'ha pogut enviar la revisió. Comprova la connexió i torna-ho a provar."
     },
@@ -691,9 +723,31 @@
       "couldNotReply": "No s'ha pogut respondre.",
       "couldNotCompleteAction": "No s'ha pogut completar aquesta acció.",
       "mergeResultDefaultError": "GitHub no ha completat la fusió.",
+      "mergeResultNotCompleted": "La {{term}} no s'ha fusionat. Comprova-ne l'estat i torna-ho a provar.",
       "ambiguous": "No s'ha pogut confirmar l'acció. Comprova la PR abans de tornar-ho a provar.",
       "persistenceFailed": "No s'ha pogut registrar aquesta acció. Torna-ho a provar més tard.",
       "forbidden": "No tens permís per fer aquesta acció."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "No està disponible amb aquest proveïdor",
+        "accessibility": "No està disponible amb aquest proveïdor: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Sol·licitud de fusió",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Comparteix la sol·licitud de fusió",
+      "viewOnProvider": "Mostra-ho a {{provider}}",
+      "mergeRequestUnavailable": "Sol·licitud de fusió no disponible",
+      "unavailableDescription": "Pot ser que l'hagin eliminat o que no hi tinguis accés.",
+      "accessDeniedMergeRequest": "No tens permís per veure aquesta sol·licitud de fusió.",
+      "couldNotLoadMergeRequest": "No s'ha pogut carregar la sol·licitud de fusió.",
+      "discussionAccessDenied": "No tens permís per veure la discussió d'aquesta sol·licitud de fusió.",
+      "discussionUnavailableMessage": "Pot ser que aquesta sol·licitud de fusió s'hagi eliminat.",
+      "noDiscussionDescription": "Aquesta sol·licitud de fusió encara no té cap fil de revisió ni cap comentari a la conversa.",
+      "noFilesChangedDescription": "Aquesta sol·licitud de fusió no modifica cap fitxer."
     }
   },
   "notifications": {
@@ -2013,11 +2067,31 @@
       "retryConnection": "Torna a provar la connexió"
     },
     "newSession": {
+      "recentlyUsed": "Utilitzats recentment",
+      "couldNotLoadGithubRepositories": "No s'han pogut carregar els repositoris de GitHub.",
+      "couldNotLoadGitlabRepositories": "No s'han pogut carregar els repositoris de GitLab.",
+      "couldNotLoadBitbucketRepositories": "No s'han pogut carregar els repositoris de Bitbucket.",
       "connectGithubDescription": "Connecta GitHub al navegador i torna aquí per triar un repositori.",
+      "connectGitlabDescription": "Connecta GitLab al navegador i torna aquí per triar un repositori.",
+      "connectBitbucketDescription": "Connecta Bitbucket al navegador i torna aquí per triar un repositori.",
       "openGithub": "Obre GitHub",
+      "openGitlab": "Obre GitLab",
+      "openBitbucket": "Obre Bitbucket",
       "refreshRepositories": "Actualitza els repositoris",
       "githubConnected": "GitHub connectat",
+      "gitlabConnected": "GitLab connectat",
       "noRepositoriesVisible": "No hi ha cap repositori visible. Comprova que l'aplicació de Kilo per a GitHub tingui accés als repositoris i actualitza la llista.",
+      "noRepositoriesVisibleGitlab": "No hi ha cap repositori visible. Comprova l'accés als repositoris de GitLab i actualitza la llista.",
+      "noRepositoriesVisibleBitbucket": "No hi ha cap repositori visible. Comprova l'accés als repositoris de Bitbucket i actualitza la llista.",
+      "bitbucketOrganizationsOnly": "Bitbucket només està disponible per a organitzacions.",
+      "branchPickerTitle": "Selecciona una branca",
+      "branchDefault": "Per defecte",
+      "branchAccessibility": "Branca: {{label}}",
+      "branchLoading": "Carregant branques",
+      "branchLoadError": "No s'han pogut carregar les branques",
+      "branchUnavailable": "No hi ha branques disponibles per a aquest repositori. Comprova el teu accés amb el proveïdor i tria un altre repositori.",
+      "branchEmpty": "No hi ha branques disponibles",
+      "branchPlaceholder": "Selecciona una branca",
       "runOnWithTarget": "Execució a: {{target}}",
       "environment": "Entorn",
       "couldNotLoadEnvironment": "No s'ha pogut carregar el teu entorn.",
@@ -2038,24 +2112,13 @@
       "couldNotRefreshRepositories": "No s'han pogut actualitzar els repositoris. Torna-ho a provar.",
       "discardDraftTitle": "Vols descartar l'esborrany?",
       "discardDraftMessage": "Es perdrà el teu missatge.",
+      "discardWithUploadsMessage": "S'eliminaran el teu missatge i els fitxers penjats que no s'hagin adjuntat a missatges enviats.",
       "discardFailed": "No s'ha pogut descartar l'esborrany. Torna-ho a provar.",
       "remoteHint": "Executa `kilo remote` a l'ordinador, o `/remote` en una sessió activa del CLI, per controlar un procés local de kilo.",
-      "connectBitbucketDescription": "Connecta Bitbucket al navegador i torna aquí per triar un repositori.",
-      "connectGitlabDescription": "Connecta GitLab al navegador i torna aquí per triar un repositori.",
-      "couldNotLoadBitbucketRepositories": "No s'han pogut carregar els repositoris de Bitbucket.",
-      "couldNotLoadGithubRepositories": "No s'han pogut carregar els repositoris de GitHub.",
-      "couldNotLoadGitlabRepositories": "No s'han pogut carregar els repositoris de GitLab.",
-      "gitlabConnected": "GitLab connectat",
-      "noRepositoriesVisibleBitbucket": "No hi ha cap repositori visible. Comprova l'accés als repositoris de Bitbucket i actualitza la llista.",
-      "noRepositoriesVisibleGitlab": "No hi ha cap repositori visible. Comprova l'accés als repositoris de GitLab i actualitza la llista.",
-      "openBitbucket": "Obre Bitbucket",
-      "openGitlab": "Obre GitLab",
-      "recentlyUsed": "Utilitzats recentment",
-      "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Tria Cloud Agent o un altre CLI.",
       "continueFrom": "S'està continuant la sessió {{title}}.",
-      "importFailed": "No s'ha pogut importar aquesta sessió.",
       "importingSession": "Important la sessió…",
-      "discardWithUploadsMessage": "S'eliminaran el teu missatge i els fitxers penjats que no s'hagin adjuntat a missatges enviats."
+      "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Tria Cloud Agent o un altre CLI.",
+      "importFailed": "No s'ha pogut importar aquesta sessió."
     },
     "partRenderer": {
       "updatedFileCount_one": "S'ha actualitzat {{displayCount}} fitxer.",

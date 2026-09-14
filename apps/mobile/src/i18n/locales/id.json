@@ -4,6 +4,8 @@
     "done": "Selesai",
     "retry": "Coba lagi",
     "tryAgain": "Coba lagi",
+    "continue": "Lanjutkan",
+    "notNow": "Nanti saja",
     "language": "Bahasa",
     "device": "Perangkat",
     "share": "Bagikan {{title}}",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "Tidak dapat menyalin ke papan klip.",
     "required": "wajib diisi",
     "error": "kesalahan: {{error}}",
-    "notNow": "Nanti saja",
-    "continue": "Lanjutkan",
     "back": "Kembali",
     "somethingWentWrong": "Terjadi kesalahan.",
     "couldNotOpen": "Tidak dapat membuka {{label}}.",
@@ -36,6 +36,7 @@
     "cost": "Biaya",
     "discard": "Buang",
     "findings": "Temuan",
+    "mergeRequest": "merge request",
     "notConnected": "Tidak terhubung",
     "notifications": "Notifikasi",
     "pullRequest": "pR",
@@ -1563,11 +1564,31 @@
       "retryConnection": "Coba sambungkan kembali"
     },
     "newSession": {
+      "recentlyUsed": "Terakhir digunakan",
+      "couldNotLoadGithubRepositories": "Tidak dapat memuat repositori GitHub.",
+      "couldNotLoadGitlabRepositories": "Tidak dapat memuat repositori GitLab.",
+      "couldNotLoadBitbucketRepositories": "Tidak dapat memuat repositori Bitbucket.",
       "connectGithubDescription": "Hubungkan GitHub melalui peramban, lalu kembali ke sini untuk memilih repositori.",
+      "connectGitlabDescription": "Hubungkan GitLab melalui peramban, lalu kembali ke sini untuk memilih repositori.",
+      "connectBitbucketDescription": "Hubungkan Bitbucket melalui peramban, lalu kembali ke sini untuk memilih repositori.",
       "openGithub": "Buka GitHub",
+      "openGitlab": "Buka GitLab",
+      "openBitbucket": "Buka Bitbucket",
       "refreshRepositories": "Muat ulang repositori",
       "githubConnected": "GitHub terhubung",
+      "gitlabConnected": "GitLab terhubung",
       "noRepositoriesVisible": "Tidak ada repositori yang ditampilkan. Periksa akses repositori untuk aplikasi Kilo di GitHub, lalu muat ulang.",
+      "noRepositoriesVisibleGitlab": "Tidak ada repositori yang ditampilkan. Periksa akses repositori untuk GitLab, lalu muat ulang.",
+      "noRepositoriesVisibleBitbucket": "Tidak ada repositori yang ditampilkan. Periksa akses repositori untuk Bitbucket, lalu muat ulang.",
+      "bitbucketOrganizationsOnly": "Bitbucket hanya tersedia untuk organisasi.",
+      "branchPickerTitle": "Pilih cabang",
+      "branchDefault": "Bawaan",
+      "branchAccessibility": "Cabang: {{label}}",
+      "branchLoading": "Memuat cabang",
+      "branchLoadError": "Tidak dapat memuat cabang",
+      "branchUnavailable": "Cabang tidak tersedia untuk repositori ini. Periksa aksesmu ke penyedia, lalu pilih repositori lain.",
+      "branchEmpty": "Tidak ada cabang yang tersedia",
+      "branchPlaceholder": "Pilih cabang",
       "runOnWithTarget": "Jalankan di: {{target}}",
       "environment": "Lingkungan",
       "couldNotLoadEnvironment": "Tidak dapat memuat lingkunganmu.",
@@ -1586,26 +1607,15 @@
       "couldNotReadPendingSessions": "Tidak dapat membaca sesi yang menunggu diproses. Coba lagi.",
       "failedToCreate": "Gagal membuat sesi.",
       "couldNotRefreshRepositories": "Tidak dapat memuat ulang repositori. Coba lagi.",
-      "discardDraftMessage": "Instruksimu akan hilang.",
       "discardDraftTitle": "Buang draf?",
+      "discardDraftMessage": "Instruksimu akan hilang.",
+      "discardWithUploadsMessage": "Instruksimu dan unggahan yang belum dilampirkan ke pesan terkirim akan dihapus.",
       "discardFailed": "Tidak dapat membuang draf. Coba lagi.",
       "remoteHint": "Jalankan `kilo remote` di komputermu, atau `/remote` dalam sesi CLI yang sedang berjalan, untuk mengendalikan proses kilo lokal.",
-      "connectBitbucketDescription": "Hubungkan Bitbucket melalui peramban, lalu kembali ke sini untuk memilih repositori.",
-      "connectGitlabDescription": "Hubungkan GitLab melalui peramban, lalu kembali ke sini untuk memilih repositori.",
-      "couldNotLoadBitbucketRepositories": "Tidak dapat memuat repositori Bitbucket.",
-      "couldNotLoadGithubRepositories": "Tidak dapat memuat repositori GitHub.",
-      "couldNotLoadGitlabRepositories": "Tidak dapat memuat repositori GitLab.",
-      "gitlabConnected": "GitLab terhubung",
-      "noRepositoriesVisibleBitbucket": "Tidak ada repositori yang ditampilkan. Periksa akses repositori untuk Bitbucket, lalu muat ulang.",
-      "noRepositoriesVisibleGitlab": "Tidak ada repositori yang ditampilkan. Periksa akses repositori untuk GitLab, lalu muat ulang.",
-      "openBitbucket": "Buka Bitbucket",
-      "openGitlab": "Buka GitLab",
-      "recentlyUsed": "Terakhir digunakan",
       "continueFrom": "Melanjutkan sesi {{title}}.",
       "importingSession": "Mengimpor sesi",
       "cliCannotContinue": "CLI ini tidak dapat melanjutkan sesi. Pilih Cloud Agent atau CLI lain.",
-      "importFailed": "Tidak dapat mengimpor sesi ini.",
-      "discardWithUploadsMessage": "Instruksimu dan unggahan yang belum dilampirkan ke pesan terkirim akan dihapus."
+      "importFailed": "Tidak dapat mengimpor sesi ini."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} berkas telah diperbarui.",
@@ -2364,11 +2374,17 @@
       "tapDiffLineToSuggest": "Ketuk baris perbedaan kode untuk mengaktifkan saran."
     },
     "connect": {
-      "checkFailedMessage": "Status masuk belum tersedia sampai data ini selesai dimuat.",
       "checkFailedTitle": "Tidak dapat memeriksa koneksi GitHub.",
-      "description": "Hubungkan akun GitHub kamu untuk meninjau PR di ponsel.",
+      "checkFailedMessage": "Status masuk belum tersedia sampai data ini selesai dimuat.",
+      "checkFailedTitleGitLab": "Tidak dapat memeriksa koneksi GitLab.",
+      "checkFailedTitleBitbucket": "Tidak dapat memeriksa koneksi Bitbucket.",
+      "providerCheckFailedMessage": "Status koneksi tidak tersedia hingga bagian ini termuat.",
+      "reconnectTitle": "Hubungkan ulang GitHub",
       "reconnectDescription": "Akses ke akun GitHub kamu telah dicabut. Hubungkan ulang untuk terus meninjau PR di ponsel.",
-      "reconnectTitle": "Hubungkan ulang GitHub"
+      "description": "Hubungkan akun GitHub kamu untuk meninjau PR di ponsel.",
+      "gitlabDescription": "Hubungkan akun GitLab kamu untuk meninjau merge request di ponsel.",
+      "bitbucketDescription": "Hubungkan Bitbucket ke organisasi ini untuk meninjau PR di ponsel.",
+      "bitbucketOrgOnlyDescription": "Pilih organisasi di profilmu untuk meninjau PR Bitbucket-nya."
     },
     "connectionExpired": "Koneksi GitHub kedaluwarsa.",
     "couldNotLoadPullRequest": "Tidak dapat memuat PR.",
@@ -2461,21 +2477,24 @@
         "outdatedOnLines": "Sudah tidak sesuai di {{lines}}",
         "outdatedOnPath": "Sudah tidak sesuai di {{path}}"
       },
-      "deletedUser": "pengguna yang dihapus"
+      "deletedUser": "pengguna yang dihapus",
+      "replyForbiddenTerm": "Kamu tidak memiliki izin untuk membalas {{term}} ini."
     },
     "entry": {
-      "clearLink": "Hapus tautan PR",
+      "eyebrow": "Buka PR atau merge request melalui URL",
+      "pastePrLink": "Tempel tautan PR atau merge request",
+      "noRecentPrs": "Belum ada riwayat tinjauan",
+      "noRecentPrsDescription": "Tempel tautan di atas untuk mulai meninjau — akan muncul di sini saat kamu kembali.",
       "couldNotLoad": "Tidak dapat memuat data.",
-      "eyebrow": "Buka PR melalui URL.",
-      "noRecentPrs": "Belum ada riwayat PR",
-      "noRecentPrsDescription": "Tempel tautan PR di atas untuk mulai meninjau. PR tersebut akan muncul di sini saat kamu kembali.",
-      "open": "Buka",
-      "pasteLink": "Tempel tautan PR",
-      "pastePrLink": "Tempel tautan PR",
-      "removeFromRecentsMessage": "PR ini akan dihapus dari riwayatmu.",
       "removeFromRecentsTitle": "Hapus dari riwayat?",
+      "removeFromRecentsMessage": "Tinjauan ini akan dihapus dari riwayatmu.",
       "removeRecentAccessibility": "Hapus {{repo}} dari riwayat",
-      "urlAccessibility": "URL PR GitHub"
+      "urlAccessibility": "Masukkan URL PR atau merge request",
+      "urlPlaceholder": "URL PR atau merge request",
+      "openAccessibility": "Buka PR atau merge request",
+      "clearLink": "Hapus tautan",
+      "pasteLink": "Tempel tautan PR atau merge request",
+      "open": "Buka"
     },
     "eventChips": {
       "comment": "Komentar",
@@ -2568,47 +2587,52 @@
     },
     "installKiloGitHubApp": "Pasang aplikasi Kilo untuk GitHub",
     "merge": {
-      "autoMergeDescription": "GitHub akan menggabungkan PR ini secara otomatis setelah semua pemeriksaan wajib lulus (metode: {{method}}).",
-      "autoMergeOn": "Penggabungan otomatis aktif",
-      "blockedTitle": "Alasan PR belum dapat digabungkan",
-      "cannotMerge": "PR ini tidak dapat digabungkan dalam kondisi saat ini.",
-      "checking": "Memeriksa apakah PR dapat digabungkan…",
-      "commitMessage": "Pesan commit",
-      "commitMessagePlaceholder": "Deskripsi opsional untuk commit penggabungan",
-      "commitTitle": "Judul commit",
-      "confirmMessage": "Perubahanmu akan digabungkan ke cabang tujuan.",
-      "confirmTitle": "Gabungkan PR?",
-      "couldNotDetermine": "Tidak dapat menentukan apakah PR dapat digabungkan.",
-      "couldNotMerge": "Tidak dapat menggabungkan PR.",
-      "deleteBranch": "Hapus cabang",
-      "deleteBranchAfterMerge": "Hapus cabang setelah digabungkan",
-      "disableAutoMerge": "Nonaktifkan penggabungan otomatis",
-      "enableAutoMerge": "Aktifkan penggabungan otomatis",
-      "enableAutoMergeConfirmMessage": "GitHub akan menggabungkan PR ini secara otomatis setelah semua pemeriksaan wajib lulus.",
-      "enableAutoMergeConfirmTitle": "Aktifkan penggabungan otomatis?",
-      "forbidden": "Kamu tidak memiliki izin untuk menggabungkan PR ini.",
-      "loadFailedTitle": "Tidak dapat memuat opsi penggabungan.",
       "merge": "Penggabungan",
       "mergeNow": "Gabungkan sekarang",
       "mergePullRequest": "Gabungkan PR",
+      "mergeTermTitle": "Gabungkan {{term}}",
+      "enableAutoMerge": "Aktifkan penggabungan otomatis",
+      "disableAutoMerge": "Nonaktifkan penggabungan otomatis",
+      "autoMergeOn": "Penggabungan otomatis aktif",
+      "autoMergeDescription": "GitHub akan menggabungkan PR ini secara otomatis setelah semua pemeriksaan wajib lulus (metode: {{method}}).",
+      "checking": "Memeriksa apakah PR dapat digabungkan…",
+      "couldNotDetermine": "Tidak dapat menentukan apakah PR dapat digabungkan.",
+      "refreshMergeability": "Periksa ulang apakah PR dapat digabungkan",
+      "blockedTitle": "Alasan PR belum dapat digabungkan",
+      "updateBranch": "Perbarui cabang",
+      "updateBranchFromBase": "Perbarui cabang dari cabang tujuan",
       "methodLabel": "Metode",
+      "commitTitle": "Judul commit",
+      "commitMessage": "Pesan commit",
+      "commitMessagePlaceholder": "Deskripsi opsional untuk commit penggabungan",
+      "deleteBranch": "Hapus cabang",
+      "deleteBranchAfterMerge": "Hapus cabang setelah digabungkan",
+      "noEnabledMethods": "Belum ada metode penggabungan yang aktif di repositori ini. Minta admin repositori mengaktifkan penggabungan dengan commit penggabungan, peringkasan commit, atau perubahan basis.",
+      "confirmTitle": "Gabungkan PR?",
+      "confirmTitleTerm": "Gabungkan {{term}}?",
+      "confirmMessage": "Perubahanmu akan digabungkan ke cabang tujuan.",
+      "enableAutoMergeConfirmTitle": "Aktifkan penggabungan otomatis?",
+      "enableAutoMergeConfirmMessage": "GitHub akan menggabungkan PR ini secara otomatis setelah semua pemeriksaan wajib lulus.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} akan digabungkan secara otomatis setelah pipeline berhasil.",
+      "enableAutoMergeDescriptionTerm": "GitLab menggabungkan {{term}} ini secara otomatis setelah pipeline berhasil.",
+      "forbidden": "Kamu tidak memiliki izin untuk menggabungkan PR ini.",
+      "cannotMerge": "PR ini tidak dapat digabungkan dalam kondisi saat ini.",
+      "couldNotMerge": "Tidak dapat menggabungkan PR.",
       "methods": {
         "merge": "Penggabungan",
         "rebase": "Ubah basis",
         "squash": "Ringkas"
       },
-      "noEnabledMethods": "Belum ada metode penggabungan yang aktif di repositori ini. Minta admin repositori mengaktifkan penggabungan dengan commit penggabungan, peringkasan commit, atau perubahan basis.",
+      "terminal": {
+        "alreadyMerged": "Sudah digabungkan",
+        "closed": "PR ini sudah ditutup",
+        "closedMergeRequest": "Merge request ini sudah ditutup"
+      },
       "partialSuccessBanner": {
         "accessibility": "Sudah digabungkan. Tidak dapat menghapus cabang: {{reason}}",
         "body": "Tidak dapat menghapus cabang: {{reason}}."
       },
-      "refreshMergeability": "Periksa ulang apakah PR dapat digabungkan",
-      "terminal": {
-        "alreadyMerged": "Sudah digabungkan",
-        "closed": "PR ini sudah ditutup"
-      },
-      "updateBranch": "Perbarui cabang",
-      "updateBranchFromBase": "Perbarui cabang dari cabang tujuan",
+      "loadFailedTitle": "Tidak dapat memuat opsi penggabungan.",
       "blocked": {
         "unknownStateTitle": "GitHub belum menyatakan bahwa PR dapat digabungkan",
         "unknownStateDetail": "Coba muat ulang ringkasan sebentar lagi.",
@@ -2627,6 +2651,18 @@
         "behindDetail": "Cabang sumber tertinggal dari cabang tujuan. Ubah basis atau perbarui cabang sebelum menggabungkannya.",
         "notMergeableTitle": "PR ini belum dapat digabungkan",
         "notMergeableDetail": "GitHub melaporkan status penggabungan: {{state}}."
+      },
+      "restrictions": {
+        "title": "Pembatasan penggabungan",
+        "approvalsRequired_one": "{{displayCount}} persetujuan diperlukan",
+        "approvalsRequired_other": "{{displayCount}} persetujuan diperlukan",
+        "pipelineMustSucceed": "Pipeline harus berhasil sebelum penggabungan."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline gagal pada commit terbaru.",
+        "pendingPipeline": "Pipeline masih berjalan pada commit terbaru.",
+        "permission": "Kamu tidak memiliki izin untuk menggabungkan {{term}} ini.",
+        "draft": "Tandai {{term}} sebagai siap ditinjau sebelum menggabungkannya."
       },
       "methodLabels": {
         "merge": "Buat commit penggabungan",
@@ -2685,8 +2721,11 @@
     "pullRequestUnavailable": "PR tidak tersedia",
     "pullRequestUnavailableDescription": "PR ini tidak dapat dibuka. PR ini mungkin sudah dihapus, repositorinya bersifat privat, atau aplikasi Kilo untuk GitHub belum dipasang di repositori tersebut.",
     "reconnectNotice": {
+      "title": "Koneksi GitHub kedaluwarsa.",
       "message": "Koneksi GitHub kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu.",
-      "title": "Koneksi GitHub kedaluwarsa."
+      "gitlabTitle": "Koneksi GitLab kedaluwarsa.",
+      "bitbucketTitle": "Koneksi Bitbucket kedaluwarsa.",
+      "providerMessage": "Koneksi {{provider}} kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu."
     },
     "review": "Tinjauan",
     "reviewPullRequest": "Tinjau PR",
@@ -2737,7 +2776,7 @@
       "emptyLine": "(kosong)"
     },
     "linkPasteClipboardEmpty": "Papan klip kosong.",
-    "linkPasteNotAPullRequest": "Ini bukan tautan PR GitHub.",
+    "linkPasteNotAPullRequest": "Ini bukan tautan PR atau merge request",
     "announce": {
       "commentPosted": "Komentar terkirim",
       "reviewSubmitted": "Tinjauan terkirim",
@@ -2746,6 +2785,7 @@
     "mutationError": {
       "commentNotPosted": "Komentar ini tidak dapat dikirim. Baris yang dipilih mungkin telah berubah, atau PR mungkin telah diperbarui.",
       "reviewNotSubmitted": "Tinjauan ini tidak dapat dikirim dalam kondisi saat ini. PR mungkin sudah berubah, atau kamu mencoba meninjau PR milikmu sendiri.",
+      "reviewNotSubmittedTerm": "Tinjauan ini tidak dapat dikirim seperti adanya. {{term}} mungkin telah berubah, atau kamu tidak dapat meninjau {{term}} milikmu sendiri.",
       "couldNotPostComment": "Tidak dapat mengirim komentar.",
       "couldNotSubmitReview": "Tidak dapat mengirim tinjauan. Periksa koneksimu dan coba lagi."
     },
@@ -2753,9 +2793,31 @@
       "couldNotReply": "Tidak dapat membalas.",
       "couldNotCompleteAction": "Tidak dapat menyelesaikan tindakan ini.",
       "mergeResultDefaultError": "GitHub tidak menyelesaikan penggabungan.",
+      "mergeResultNotCompleted": "{{term}} tidak digabungkan. Periksa statusnya lalu coba lagi.",
       "ambiguous": "Hasil tindakan belum dapat dipastikan. Periksa PR sebelum mencoba lagi.",
       "persistenceFailed": "Kami tidak dapat mencatat tindakan ini. Silakan coba lagi nanti.",
       "forbidden": "Akses tidak diizinkan."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Tidak tersedia di penyedia ini",
+        "accessibility": "Tidak tersedia di penyedia ini: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Bagikan merge request",
+      "viewOnProvider": "Lihat di {{provider}}",
+      "mergeRequestUnavailable": "Merge request tidak tersedia",
+      "unavailableDescription": "Mungkin sudah dihapus, atau kamu tidak punya akses ke sana.",
+      "accessDeniedMergeRequest": "Kamu tidak memiliki izin untuk melihat merge request ini.",
+      "couldNotLoadMergeRequest": "Tidak dapat memuat merge request.",
+      "discussionAccessDenied": "Kamu tidak memiliki izin untuk melihat diskusi merge request ini.",
+      "discussionUnavailableMessage": "Merge request ini mungkin sudah dihapus.",
+      "noDiscussionDescription": "Belum ada utas tinjauan atau komentar diskusi pada merge request ini.",
+      "noFilesChangedDescription": "Tidak ada perubahan file dalam merge request ini."
     }
   },
   "organization": {

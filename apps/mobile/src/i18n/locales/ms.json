@@ -36,6 +36,7 @@
     "cost": "Kos",
     "discard": "Buang",
     "findings": "Dapatan",
+    "mergeRequest": "permintaan gabungan",
     "notConnected": "Tidak disambungkan",
     "notifications": "Pemberitahuan",
     "pullRequest": "pR",
@@ -350,6 +351,7 @@
       "merge": "Gabungan",
       "mergeNow": "Gabungkan sekarang",
       "mergePullRequest": "Gabungkan permintaan tarik",
+      "mergeTermTitle": "Gabungkan {{term}}",
       "enableAutoMerge": "Dayakan penggabungan automatik",
       "disableAutoMerge": "Nyahdayakan penggabungan automatik",
       "autoMergeOn": "Penggabungan automatik aktif",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "Padam cabang selepas penggabungan",
       "noEnabledMethods": "Tiada kaedah penggabungan yang didayakan untuk repositori ini. Minta pentadbir repositori mendayakan penggabungan biasa, pemadatan komit, atau pengasasan semula.",
       "confirmTitle": "Gabungkan permintaan tarik?",
+      "confirmTitleTerm": "Gabungkan {{term}}?",
       "confirmMessage": "Perubahan anda akan digabungkan ke dalam cabang asas.",
       "enableAutoMergeConfirmTitle": "Dayakan penggabungan automatik?",
       "enableAutoMergeConfirmMessage": "GitHub akan menggabungkan permintaan tarik ini secara automatik apabila semua pemeriksaan wajib lulus.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} akan digabungkan secara automatik setelah pipeline berjaya.",
+      "enableAutoMergeDescriptionTerm": "GitLab menggabungkan {{term}} ini secara automatik setelah pipeline berjaya.",
       "forbidden": "Anda tidak mempunyai kebenaran untuk menggabungkan permintaan tarik ini.",
       "cannotMerge": "Permintaan tarik ini tidak boleh digabungkan dalam keadaan sekarang.",
       "couldNotMerge": "Tidak dapat menggabungkan permintaan tarik.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Sudah digabungkan",
-        "closed": "Permintaan tarik ini telah ditutup"
+        "closed": "Permintaan tarik ini telah ditutup",
+        "closedMergeRequest": "Permintaan gabungan ini telah ditutup"
       },
       "partialSuccessBanner": {
         "body": "Tidak dapat memadam cabang: {{reason}}.",
@@ -406,6 +412,18 @@
         "behindDetail": "Cabang sumber belum mempunyai perubahan terkini daripada cabang asas. Asaskan semula atau kemas kini cabang sebelum membuat penggabungan.",
         "notMergeableTitle": "Permintaan tarik ini belum boleh digabungkan",
         "notMergeableDetail": "GitHub melaporkan status kebolehgabungan: {{state}}."
+      },
+      "restrictions": {
+        "title": "Sekatan penggabungan",
+        "approvalsRequired_one": "{{displayCount}} kelulusan diperlukan",
+        "approvalsRequired_other": "{{displayCount}} kelulusan diperlukan",
+        "pipelineMustSucceed": "Pipeline mesti berjaya sebelum penggabungan."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline gagal pada komit terbaharu.",
+        "pendingPipeline": "Pipeline masih berjalan pada komit terbaharu.",
+        "permission": "Anda tidak mempunyai kebenaran untuk menggabungkan {{term}} ini.",
+        "draft": "Tandakan {{term}} sebagai sedia untuk disemak sebelum membuat penggabungan."
       },
       "methodLabels": {
         "merge": "Cipta komit gabungan",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "Tidak lagi terkini pada {{lines}}",
         "outdatedOnPath": "Tidak lagi terkini pada {{path}}"
       },
-      "deletedUser": "pengguna yang telah dipadam"
+      "deletedUser": "pengguna yang telah dipadam",
+      "replyForbiddenTerm": "Anda tidak mempunyai kebenaran untuk membalas {{term}} ini."
     },
     "couldNotOpenGitHubAppSettings": "Tidak dapat membuka tetapan apl GitHub.",
     "installKiloGitHubApp": "Pasang apl GitHub Kilo",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "Semak permintaan tarik",
     "headLine": "{{counts}} · komit terkini {{sha}}",
     "entry": {
-      "eyebrow": "Buka permintaan tarik melalui URL.",
-      "pastePrLink": "Tampal pautan PR",
-      "noRecentPrs": "Tiada PR terkini",
-      "noRecentPrsDescription": "Tampal pautan PR di atas untuk memulakan semakan. PR itu akan muncul di sini selepas ini.",
+      "eyebrow": "Buka permintaan tarik atau permintaan gabungan melalui URL",
+      "pastePrLink": "Tampal pautan permintaan tarik atau permintaan gabungan",
+      "noRecentPrs": "Tiada semakan terkini",
+      "noRecentPrsDescription": "Tampal pautan di atas untuk memulakan semakan — ia akan muncul di sini pada kali berikutnya.",
       "couldNotLoad": "Tidak dapat memuatkan data.",
       "removeFromRecentsTitle": "Alih keluar daripada senarai terkini?",
-      "removeFromRecentsMessage": "Permintaan tarik ini akan dialih keluar daripada senarai terkini anda.",
+      "removeFromRecentsMessage": "Semakan ini akan dialih keluar daripada senarai terkini anda.",
       "removeRecentAccessibility": "Alih keluar {{repo}} daripada senarai terkini",
-      "urlAccessibility": "URL permintaan tarik GitHub",
-      "clearLink": "Kosongkan pautan permintaan tarik",
-      "pasteLink": "Tampal pautan permintaan tarik",
+      "urlAccessibility": "Masukkan URL permintaan tarik atau permintaan gabungan",
+      "urlPlaceholder": "URL permintaan tarik atau permintaan gabungan",
+      "openAccessibility": "Buka permintaan tarik atau permintaan gabungan",
+      "clearLink": "Kosongkan pautan",
+      "pasteLink": "Tampal pautan permintaan tarik atau permintaan gabungan",
       "open": "Buka"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "Tidak dapat menyemak sambungan GitHub.",
       "checkFailedMessage": "Status log masuk hanya tersedia selepas data ini dimuatkan.",
+      "checkFailedTitleGitLab": "Tidak dapat menyemak sambungan GitLab.",
+      "checkFailedTitleBitbucket": "Tidak dapat menyemak sambungan Bitbucket.",
+      "providerCheckFailedMessage": "Status sambungan tidak tersedia sehingga ia dimuatkan.",
       "reconnectTitle": "Sambung semula ke GitHub",
       "reconnectDescription": "Sambungan GitHub anda telah dibatalkan. Sambung semula untuk terus menyemak permintaan tarik pada peranti mudah alih.",
-      "description": "Sambungkan akaun GitHub anda untuk menyemak permintaan tarik pada peranti mudah alih."
+      "description": "Sambungkan akaun GitHub anda untuk menyemak permintaan tarik pada peranti mudah alih.",
+      "gitlabDescription": "Sambungkan akaun GitLab anda untuk menyemak permintaan gabungan pada mudah alih.",
+      "bitbucketDescription": "Sambungkan Bitbucket ke organisasi ini untuk menyemak permintaan tarik pada mudah alih.",
+      "bitbucketOrgOnlyDescription": "Pilih organisasi dalam profil anda untuk menyemak permintaan tarik Bitbucketnya."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "Sambungan GitHub telah tamat tempoh.",
-      "message": "Sambungan GitHub anda tidak lagi sah. Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu."
+      "message": "Sambungan GitHub anda tidak lagi sah. Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu.",
+      "gitlabTitle": "Sambungan GitLab telah tamat tempoh.",
+      "bitbucketTitle": "Sambungan Bitbucket telah tamat tempoh.",
+      "providerMessage": "Sambungan {{provider}} anda tidak lagi sah. Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu."
     },
     "eventChips": {
       "comment": "Komen",
@@ -668,7 +698,7 @@
       "emptyLine": "(kosong)"
     },
     "linkPasteClipboardEmpty": "Papan keratan kosong.",
-    "linkPasteNotAPullRequest": "Ini bukan pautan permintaan tarik GitHub.",
+    "linkPasteNotAPullRequest": "Ini bukan pautan permintaan tarik atau permintaan gabungan",
     "announce": {
       "commentPosted": "Komen disiarkan",
       "reviewSubmitted": "Semakan dihantar",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "Komen ini tidak boleh disiarkan. Baris yang dipilih mungkin telah berubah, atau PR mungkin telah dikemas kini.",
       "reviewNotSubmitted": "Semakan ini tidak dapat dihantar dalam keadaan sekarang. PR mungkin telah berubah, atau anda cuba menyemak permintaan tarik anda sendiri.",
+      "reviewNotSubmittedTerm": "Semakan ini tidak dapat dihantar seperti sedia ada. {{term}} mungkin telah berubah, atau anda tidak boleh menyemak {{term}} anda sendiri.",
       "couldNotPostComment": "Tidak dapat menyiarkan komen.",
       "couldNotSubmitReview": "Tidak dapat menghantar semakan. Semak sambungan anda dan cuba lagi."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "Tidak dapat membalas.",
       "couldNotCompleteAction": "Tidak dapat menyelesaikan tindakan ini.",
       "mergeResultDefaultError": "GitHub tidak menyelesaikan penggabungan.",
+      "mergeResultNotCompleted": "{{term}} tidak digabungkan. Semak keadaannya dan cuba lagi.",
       "ambiguous": "Tidak dapat mengesahkan hasil tindakan. Semak PR sebelum mencuba lagi.",
       "persistenceFailed": "Kami tidak dapat merekodkan tindakan ini. Sila cuba lagi kemudian.",
       "forbidden": "Tindakan ini tidak dibenarkan."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Tidak tersedia pada penyedia ini",
+        "accessibility": "Tidak tersedia pada penyedia ini: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Permintaan gabungan",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Kongsi permintaan gabungan",
+      "viewOnProvider": "Lihat pada {{provider}}",
+      "mergeRequestUnavailable": "Permintaan gabungan tidak tersedia",
+      "unavailableDescription": "Ia mungkin telah dipadamkan, atau anda tiada akses kepadanya.",
+      "accessDeniedMergeRequest": "Anda tidak mempunyai kebenaran untuk melihat permintaan gabungan ini.",
+      "couldNotLoadMergeRequest": "Tidak dapat memuatkan permintaan gabungan.",
+      "discussionAccessDenied": "Anda tidak mempunyai kebenaran untuk melihat perbincangan permintaan gabungan ini.",
+      "discussionUnavailableMessage": "Permintaan gabungan ini mungkin telah dialih keluar.",
+      "noDiscussionDescription": "Belum ada rantaian semakan atau komen perbualan pada permintaan gabungan ini.",
+      "noFilesChangedDescription": "Tiada perubahan pada fail dalam permintaan gabungan ini."
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "Cuba sambung semula"
     },
     "newSession": {
+      "recentlyUsed": "Digunakan baru-baru ini",
+      "couldNotLoadGithubRepositories": "Tidak dapat memuatkan repositori GitHub.",
+      "couldNotLoadGitlabRepositories": "Tidak dapat memuatkan repositori GitLab.",
+      "couldNotLoadBitbucketRepositories": "Tidak dapat memuatkan repositori Bitbucket.",
       "connectGithubDescription": "Sambungkan GitHub dalam pelayar anda, kemudian kembali ke sini untuk memilih repositori.",
+      "connectGitlabDescription": "Sambungkan GitLab dalam pelayar anda, kemudian kembali ke sini untuk memilih repositori.",
+      "connectBitbucketDescription": "Sambungkan Bitbucket dalam pelayar anda, kemudian kembali ke sini untuk memilih repositori.",
       "openGithub": "Buka GitHub",
+      "openGitlab": "Buka GitLab",
+      "openBitbucket": "Buka Bitbucket",
       "refreshRepositories": "Muat semula repositori",
       "githubConnected": "GitHub disambungkan",
+      "gitlabConnected": "GitLab disambungkan",
       "noRepositoriesVisible": "Tiada repositori dipaparkan. Semak akses repositori untuk apl GitHub Kilo, kemudian muat semula.",
+      "noRepositoriesVisibleGitlab": "Tiada repositori dipaparkan. Semak akses repositori untuk GitLab, kemudian muat semula.",
+      "noRepositoriesVisibleBitbucket": "Tiada repositori dipaparkan. Semak akses repositori untuk Bitbucket, kemudian muat semula.",
+      "bitbucketOrganizationsOnly": "Bitbucket hanya tersedia untuk organisasi.",
+      "branchPickerTitle": "Pilih cabang",
+      "branchDefault": "Lalai",
+      "branchAccessibility": "Cabang: {{label}}",
+      "branchLoading": "Memuatkan cabang",
+      "branchLoadError": "Tidak dapat memuatkan cabang",
+      "branchUnavailable": "Cabang tidak tersedia untuk repositori ini. Semak akses anda dengan penyedia, kemudian pilih repositori lain.",
+      "branchEmpty": "Tiada cabang tersedia",
+      "branchPlaceholder": "Pilih satu cabang",
       "runOnWithTarget": "Jalankan pada: {{target}}",
       "environment": "Persekitaran",
       "couldNotLoadEnvironment": "Tidak dapat memuatkan persekitaran anda.",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "Tidak dapat memuatkan semula repositori. Sila cuba semula.",
       "discardDraftTitle": "Buang draf?",
       "discardDraftMessage": "Gesaan anda akan hilang.",
+      "discardWithUploadsMessage": "Gesaan anda dan fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam.",
       "discardFailed": "Tidak dapat membuang draf. Sila cuba semula.",
       "remoteHint": "Jalankan `kilo remote` pada komputer anda, atau `/remote` dalam sesi CLI yang berjalan, untuk mengawal proses kilo tempatan.",
-      "connectBitbucketDescription": "Sambungkan Bitbucket dalam pelayar anda, kemudian kembali ke sini untuk memilih repositori.",
-      "connectGitlabDescription": "Sambungkan GitLab dalam pelayar anda, kemudian kembali ke sini untuk memilih repositori.",
-      "couldNotLoadBitbucketRepositories": "Tidak dapat memuatkan repositori Bitbucket.",
-      "couldNotLoadGithubRepositories": "Tidak dapat memuatkan repositori GitHub.",
-      "couldNotLoadGitlabRepositories": "Tidak dapat memuatkan repositori GitLab.",
-      "gitlabConnected": "GitLab disambungkan",
-      "noRepositoriesVisibleBitbucket": "Tiada repositori dipaparkan. Semak akses repositori untuk Bitbucket, kemudian muat semula.",
-      "noRepositoriesVisibleGitlab": "Tiada repositori dipaparkan. Semak akses repositori untuk GitLab, kemudian muat semula.",
-      "openBitbucket": "Buka Bitbucket",
-      "openGitlab": "Buka GitLab",
-      "recentlyUsed": "Digunakan baru-baru ini",
-      "cliCannotContinue": "CLI ini tidak dapat meneruskan sesi. Pilih Cloud Agent atau CLI lain.",
       "continueFrom": "Sesi {{title}} diteruskan.",
-      "importFailed": "Tidak dapat mengimport sesi ini.",
       "importingSession": "Mengimport sesi",
-      "discardWithUploadsMessage": "Gesaan anda dan fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam."
+      "cliCannotContinue": "CLI ini tidak dapat meneruskan sesi. Pilih Cloud Agent atau CLI lain.",
+      "importFailed": "Tidak dapat mengimport sesi ini."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fail telah dikemas kini.",

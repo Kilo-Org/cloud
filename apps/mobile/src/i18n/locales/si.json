@@ -36,6 +36,7 @@
     "cost": "පිරිවැය",
     "discard": "ඉවතලන්න",
     "findings": "හඳුනාගත් ගැටලු",
+    "mergeRequest": "මර්ජ ඉල්ලීම",
     "notConnected": "සම්බන්ධ නැත",
     "notifications": "දැනුම්දීම්",
     "pullRequest": "pR",
@@ -350,6 +351,7 @@
       "merge": "ඒකාබද්ධ කිරීම",
       "mergeNow": "දැන් ඒකාබද්ධ කරන්න",
       "mergePullRequest": "පුල් ඉල්ලීම ඒකාබද්ධ කිරීම",
+      "mergeTermTitle": "{{term}} ඒකාබද්ධ කරන්න",
       "enableAutoMerge": "ස්වයංක්‍රීය ඒකාබද්ධ කිරීම සක්‍රීය කරන්න",
       "disableAutoMerge": "ස්වයංක්‍රීය ඒකාබද්ධ කිරීම අක්‍රීය කරන්න",
       "autoMergeOn": "ස්වයංක්‍රීය ඒකාබද්ධ කිරීම ක්‍රියාත්මකයි",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "ඒකාබද්ධ කිරීමෙන් පසු ශාඛාව මකන්න",
       "noEnabledMethods": "මෙම ගබඩාවේ කිසිදු ඒකාබද්ධ කිරීමේ ක්‍රමයක් සක්‍රීය කර නොමැත. සාමාන්‍ය ඒකාබද්ධ කිරීම, ස්ක්වොෂ් කිරීම හෝ රීබේස් කිරීම සක්‍රීය කරන ලෙස ගබඩාවේ පරිපාලකයෙකුගෙන් ඉල්ලන්න.",
       "confirmTitle": "පුල් ඉල්ලීම ඒකාබද්ධ කරන්නද?",
+      "confirmTitleTerm": "{{term}} ඒකාබද්ධ කරන්නද?",
       "confirmMessage": "මෙයින් ඔබේ වෙනස්කම් මූලික ශාඛාවට ඒකාබද්ධ වේ.",
       "enableAutoMergeConfirmTitle": "ස්වයංක්‍රීය ඒකාබද්ධ කිරීම සක්‍රීය කරන්නද?",
       "enableAutoMergeConfirmMessage": "අනිවාර්ය පරීක්ෂණ සියල්ල සමත් වූ විට GitHub මෙම පුල් ඉල්ලීම ස්වයංක්‍රීයව ඒකාබද්ධ කරයි.",
+      "enableAutoMergeConfirmMessageTerm": "පයිප්ලයින් සාර්ථක වූ පසු {{term}} ස්වයංක්‍රීයව ඒකාබද්ධ වේ.",
+      "enableAutoMergeDescriptionTerm": "GitLab මෙම {{term}} පයිප්ලයින් සාර්ථක වූ පසු ස්වයංක්‍රීයව ඒකාබද්ධ කරයි.",
       "forbidden": "මෙම පුල් ඉල්ලීම ඒකාබද්ධ කිරීමට ඔබට අවසර නොමැත.",
       "cannotMerge": "මෙම පුල් ඉල්ලීම පවතින තත්ත්වයෙන් ඒකාබද්ධ කළ නොහැක.",
       "couldNotMerge": "පුල් ඉල්ලීම ඒකාබද්ධ කිරීමට නොහැකි විය.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "දැනටමත් ඒකාබද්ධ කර ඇත",
-        "closed": "මෙම පුල් ඉල්ලීම වසා ඇත"
+        "closed": "මෙම පුල් ඉල්ලීම වසා ඇත",
+        "closedMergeRequest": "මෙම මර්ජ ඉල්ලීම වසා ඇත"
       },
       "partialSuccessBanner": {
         "body": "ශාඛාව මැකීමට නොහැකි විය: {{reason}}.",
@@ -406,6 +412,18 @@
         "behindDetail": "මූලාශ්‍ර ශාඛාවේ මූලික ශාඛාවේ නවතම වෙනස්කම් නොමැත. ඒකාබද්ධ කිරීමට පෙර ශාඛාව රීබේස් කරන්න හෝ යාවත්කාලීන කරන්න.",
         "notMergeableTitle": "මෙම පුල් ඉල්ලීම තවමත් ඒකාබද්ධ කළ නොහැක",
         "notMergeableDetail": "GitHub වාර්තා කළ ඒකාබද්ධ කිරීමේ හැකියාව පිළිබඳ තත්ත්වය: {{state}}."
+      },
+      "restrictions": {
+        "title": "ඒකාබද්ධ කිරීමේ සීමාවන්",
+        "approvalsRequired_one": "අනුමැතිය {{displayCount}}ක් අවශ්‍යයි",
+        "approvalsRequired_other": "අනුමැතීන් {{displayCount}}ක් අවශ්‍යයි",
+        "pipelineMustSucceed": "ඒකාබද්ධ කිරීමට පෙර පයිප්ලයින් සාර්ථක විය යුතුය."
+      },
+      "providerBlocked": {
+        "failingPipeline": "අවසන් කමිට් එකේ පයිප්ලයින් අසාර්ථක වෙමින් පවතී.",
+        "pendingPipeline": "අවසන් කමිට් එකේ පයිප්ලයින් තවම ක්‍රියාත්මක වෙමින් පවතී.",
+        "permission": "මෙම {{term}} ඒකාබද්ධ කිරීමට ඔබට අවසර නොමැත.",
+        "draft": "ඒකාබද්ධ කිරීමට පෙර {{term}} සමාලෝචනයට සූදානම් බව සලකුණු කරන්න."
       },
       "methodLabels": {
         "merge": "ඒකාබද්ධ කමිට් එකක් සාදන්න",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "{{lines}} — යල් පැන ඇත",
         "outdatedOnPath": "{{path}} — යල් පැන ඇත"
       },
-      "deletedUser": "මකා දැමූ පරිශීලකයා"
+      "deletedUser": "මකා දැමූ පරිශීලකයා",
+      "replyForbiddenTerm": "මෙම {{term}}ට පිළිතුරු දීමට ඔබට අවසර නොමැත."
     },
     "couldNotOpenGitHubAppSettings": "GitHub යෙදුමේ සැකසුම් විවෘත කළ නොහැකි විය.",
     "installKiloGitHubApp": "Kilo GitHub යෙදුම ස්ථාපනය කරන්න",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "පුල් ඉල්ලීම සමාලෝචනය කරන්න",
     "headLine": "{{counts}} · නවතම කමිට් එක {{sha}}",
     "entry": {
-      "eyebrow": "URL එකකින් පුල් ඉල්ලීමක් විවෘත කරන්න.",
-      "pastePrLink": "PR සබැඳියක් අලවන්න",
-      "noRecentPrs": "මෑත PR නොමැත",
-      "noRecentPrsDescription": "සමාලෝචනයක් ආරම්භ කිරීමට ඉහළින් PR සබැඳියක් අලවන්න — ඊළඟ වතාවේ එය මෙහි දිස්වේ.",
+      "eyebrow": "URL මගින් පුල් ඉල්ලීමක් හෝ මර්ජ ඉල්ලීමක් විවෘත කරන්න",
+      "pastePrLink": "පුල් ඉල්ලීමක හෝ මර්ජ ඉල්ලීමක සබැඳිය අලවන්න",
+      "noRecentPrs": "මෑත සමාලෝචන නොමැත",
+      "noRecentPrsDescription": "සමාලෝචනයක් අරඹන්න ඉහත සබැඳියක් අලවා — ඊළඟ වරට මෙතැනින් පෙනේ.",
       "couldNotLoad": "පූරණය කිරීමට නොහැකි විය.",
       "removeFromRecentsTitle": "මෑත ඉල්ලීම් ලැයිස්තුවෙන් ඉවත් කරන්නද?",
-      "removeFromRecentsMessage": "මෙම පුල් ඉල්ලීම ඔබේ මෑත ඉල්ලීම් ලැයිස්තුවෙන් ඉවත් කෙරේ.",
+      "removeFromRecentsMessage": "මෙම සමාලෝචනය ඔබේ මෑත සමාලෝචන ලැයිස්තුවෙන් ඉවත් කෙරේ.",
       "removeRecentAccessibility": "මෑත ඉල්ලීම් ලැයිස්තුවෙන් {{repo}} ඉවත් කරන්න",
-      "urlAccessibility": "GitHub පුල් ඉල්ලීමේ URL එක",
-      "clearLink": "පුල් ඉල්ලීමේ සබැඳිය ඉවත් කරන්න",
-      "pasteLink": "පුල් ඉල්ලීමේ සබැඳිය අලවන්න",
+      "urlAccessibility": "පුල් ඉල්ලීමක හෝ මර්ජ ඉල්ලීමක URL ඇතුළත් කරන්න",
+      "urlPlaceholder": "පුල් ඉල්ලීම හෝ මර්ජ ඉල්ලීම URL",
+      "openAccessibility": "පුල් ඉල්ලීම හෝ මර්ජ ඉල්ලීම විවෘත කරන්න",
+      "clearLink": "සබැඳිය හිස් කරන්න",
+      "pasteLink": "පුල් ඉල්ලීමේ හෝ මර්ජ ඉල්ලීමේ සබැඳිය අලවන්න",
       "open": "විවෘත"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "GitHub සම්බන්ධතාවය පරීක්ෂා කිරීමට නොහැකි විය.",
       "checkFailedMessage": "මෙය පූරණය වන තුරු පිවිසුම් තත්ත්වය දැනගත නොහැක.",
+      "checkFailedTitleGitLab": "GitLab සම්බන්ධතාවය පරීක්ෂා කිරීමට නොහැකි විය.",
+      "checkFailedTitleBitbucket": "Bitbucket සම්බන්ධතාවය පරීක්ෂා කිරීමට නොහැකි විය.",
+      "providerCheckFailedMessage": "මෙය පූරණය වන තුරු සම්බන්ධතා තත්ත්වය ලබා ගත නොහැක.",
       "reconnectTitle": "GitHub නැවත සම්බන්ධ කරන්න",
       "reconnectDescription": "ඔබේ GitHub සම්බන්ධතාවය අවලංගු කර ඇත. ජංගම දුරකථනයෙන් පුල් ඉල්ලීම් සමාලෝචනය දිගටම කිරීමට නැවත සම්බන්ධ වන්න.",
-      "description": "ජංගම දුරකථනයෙන් පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඔබේ GitHub ගිණුම සම්බන්ධ කරන්න."
+      "description": "ජංගම දුරකථනයෙන් පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඔබේ GitHub ගිණුම සම්බන්ධ කරන්න.",
+      "gitlabDescription": "ජංගම දුරකථනයෙන් මර්ජ ඉල්ලීම් සමාලෝචනය කිරීමට ඔබේ GitLab ගිණුම සම්බන්ධ කරන්න.",
+      "bitbucketDescription": "ජංගම දුරකථනයෙන් පුල් ඉල්ලීම් සමාලෝචනය කිරීමට Bitbucket මෙම සංවිධානයට සම්බන්ධ කරන්න.",
+      "bitbucketOrgOnlyDescription": "එහි Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඔබේ පැතිකඩේ සංවිධානයක් තෝරන්න."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub සම්බන්ධතාව කල් ඉකුත් වී ඇත.",
-      "message": "ඔබේ GitHub සම්බන්ධතාවය තවදුරටත් වලංගු නොවේ. ඔබේ සම්බන්ධතාවය නැවත පරීක්ෂා කරන්න — අවශ්‍ය නම් නැවත සම්බන්ධ වීමට ඔබෙන් අසනු ඇත."
+      "message": "ඔබේ GitHub සම්බන්ධතාවය තවදුරටත් වලංගු නොවේ. ඔබේ සම්බන්ධතාවය නැවත පරීක්ෂා කරන්න — අවශ්‍ය නම් නැවත සම්බන්ධ වීමට ඔබෙන් අසනු ඇත.",
+      "gitlabTitle": "GitLab සම්බන්ධතාව කල් ඉකුත් වී ඇත.",
+      "bitbucketTitle": "Bitbucket සම්බන්ධතාව කල් ඉකුත් වී ඇත.",
+      "providerMessage": "ඔබේ {{provider}} සම්බන්ධතාවය තවදුරටත් වලංගු නොවේ. ඔබේ සම්බන්ධතාවය නැවත පරීක්ෂා කරන්න — අවශ්‍ය නම් නැවත සම්බන්ධ වීමට ඔබෙන් අසනු ඇත."
     },
     "eventChips": {
       "comment": "අදහස් දැක්වීම",
@@ -668,7 +698,7 @@
       "emptyLine": "(හිස්)"
     },
     "linkPasteClipboardEmpty": "පසුරු පුවරුව හිස්ය.",
-    "linkPasteNotAPullRequest": "මෙය GitHub පුල් ඉල්ලීමක සබැඳියක් නොවේ.",
+    "linkPasteNotAPullRequest": "මෙය පුල් ඉල්ලීමක හෝ මර්ජ ඉල්ලීමක සබැඳියක් නොවේ",
     "announce": {
       "commentPosted": "අදහස පළ කරන ලදී",
       "reviewSubmitted": "සමාලෝචනය ඉදිරිපත් කරන ලදී",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "මෙම අදහස පළ කළ නොහැක. තෝරාගත් පේළිය වෙනස් වී තිබිය හැක, නැතහොත් PR යාවත්කාලීන කර තිබිය හැක.",
       "reviewNotSubmitted": "මෙම සමාලෝචනය පවතින තත්ත්වයෙන් ඉදිරිපත් කළ නොහැක. PR වෙනස් වී තිබිය හැක, නැතහොත් මෙය ඔබේම පුල් ඉල්ලීමක් නිසා ඔබට එය සමාලෝචනය කළ නොහැක.",
+      "reviewNotSubmittedTerm": "මෙම සමාලෝචනය එලෙසම ඉදිරිපත් කළ නොහැක. {{term}} වෙනස් වී තිබිය හැකිය, නැතහොත් ඔබට ඔබේම {{term}} සමාලෝචනය කළ නොහැක.",
       "couldNotPostComment": "අදහස පළ කිරීමට නොහැකි විය.",
       "couldNotSubmitReview": "සමාලෝචනය ඉදිරිපත් කිරීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "පිළිතුරු දීමට නොහැකි විය.",
       "couldNotCompleteAction": "මෙම ක්‍රියාව සම්පූර්ණ කිරීමට නොහැකි විය.",
       "mergeResultDefaultError": "GitHub ඒකාබද්ධ කිරීම සම්පූර්ණ කළේ නැත.",
+      "mergeResultNotCompleted": "{{term}} ඒකාබද්ධ කර නොමැත. එහි තත්ත්වය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "ambiguous": "තහවුරු කිරීමට නොහැකි විය — නැවත උත්සාහ කිරීමට පෙර PR එක පරීක්ෂා කරන්න.",
       "persistenceFailed": "මෙම ක්‍රියාව වාර්තා කිරීමට නොහැකි විය. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
       "forbidden": "මෙයට අවසර නොමැත."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "මෙම සැපයුම්කරු සඳහා නොමැත",
+        "accessibility": "මෙම සැපයුම්කරු සඳහා නොමැත: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "මර්ජ ඉල්ලීම",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "මර්ජ ඉල්ලීම බෙදාගන්න",
+      "viewOnProvider": "{{provider}} මත බලන්න",
+      "mergeRequestUnavailable": "මර්ජ ඉල්ලීම ලබා ගත නොහැක",
+      "unavailableDescription": "එය මකා දමා තිබිය හැකිය, නැතහොත් ඔබට එයට ප්‍රවේශය නොමැති විය හැකිය.",
+      "accessDeniedMergeRequest": "මෙම මර්ජ ඉල්ලීම බැලීමට ඔබට අවසර නොමැත.",
+      "couldNotLoadMergeRequest": "මර්ජ ඉල්ලීම පූරණය කිරීමට නොහැකි විය.",
+      "discussionAccessDenied": "මෙම මර්ජ ඉල්ලීමේ සාකච්ඡාව බැලීමට ඔබට අවසර නොමැත.",
+      "discussionUnavailableMessage": "මෙම මර්ජ ඉල්ලීම ඉවත් කර තිබිය හැක.",
+      "noDiscussionDescription": "මෙම මර්ජ ඉල්ලීමේ සමාලෝචන සාකච්ඡා පෙළවල් හෝ සංවාද අදහස් නොමැත.",
+      "noFilesChangedDescription": "මෙම මර්ජ ඉල්ලීමේ ගොනු වෙනස්කම් නොමැත."
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "නැවත සම්බන්ධ වීමට උත්සාහ කරන්න"
     },
     "newSession": {
+      "recentlyUsed": "මෑතකදී භාවිතා කළ",
+      "couldNotLoadGithubRepositories": "GitHub ගබඩා පූරණය කළ නොහැකි විය.",
+      "couldNotLoadGitlabRepositories": "GitLab ගබඩා පූරණය කළ නොහැකි විය.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ගබඩා පූරණය කළ නොහැකි විය.",
       "connectGithubDescription": "ඔබේ බ්‍රවුසරයෙන් GitHub සම්බන්ධ කරන්න. ඉන්පසු ගබඩාවක් තෝරා ගැනීමට මෙහි ආපසු එන්න.",
+      "connectGitlabDescription": "ඔබේ බ්‍රවුසරයෙන් GitLab සම්බන්ධ කරන්න. ඉන්පසු ගබඩාවක් තෝරා ගැනීමට මෙහි ආපසු එන්න.",
+      "connectBitbucketDescription": "ඔබේ බ්‍රවුසරයෙන් Bitbucket සම්බන්ධ කරන්න. ඉන්පසු ගබඩාවක් තෝරා ගැනීමට මෙහි ආපසු එන්න.",
       "openGithub": "GitHub විවෘත කරන්න",
+      "openGitlab": "GitLab විවෘත කරන්න",
+      "openBitbucket": "Bitbucket විවෘත කරන්න",
       "refreshRepositories": "ගබඩා නැවුම් කරන්න",
       "githubConnected": "GitHub සම්බන්ධයි",
+      "gitlabConnected": "GitLab සම්බන්ධයි",
       "noRepositoriesVisible": "ගබඩා නොපෙනේ. Kilo GitHub යෙදුමට ගබඩා වෙත ප්‍රවේශ වීමට අවසර තිබේදැයි පරීක්ෂා කර නැවුම් කරන්න.",
+      "noRepositoriesVisibleGitlab": "ගබඩා නොපෙනේ. GitLab ගබඩා වෙත ප්‍රවේශ වීමට අවසර තිබේදැයි පරීක්ෂා කර නැවුම් කරන්න.",
+      "noRepositoriesVisibleBitbucket": "ගබඩා නොපෙනේ. Bitbucket ගබඩා වෙත ප්‍රවේශ වීමට අවසර තිබේදැයි පරීක්ෂා කර නැවුම් කරන්න.",
+      "bitbucketOrganizationsOnly": "සංවිධාන සඳහා පමණක් Bitbucket ලබා ගත හැක.",
+      "branchPickerTitle": "ශාඛාව තෝරන්න",
+      "branchDefault": "පෙරනිමිය",
+      "branchAccessibility": "ශාඛාව: {{label}}",
+      "branchLoading": "ශාඛා පූරණය වෙමින්",
+      "branchLoadError": "ශාඛා පූරණය කළ නොහැකි විය",
+      "branchUnavailable": "මෙම ගබඩාව සඳහා ශාඛා ලබා ගත නොහැක. සැපයුම්කරු සමඟ ඔබේ ප්‍රවේශය පරීක්ෂා කර, පසුව තවත් ගබඩාවක් තෝරන්න.",
+      "branchEmpty": "ශාඛා නොමැත",
+      "branchPlaceholder": "ශාඛාවක් තෝරන්න",
       "runOnWithTarget": "ධාවනය වන ස්ථානය: {{target}}",
       "environment": "පරිසරය",
       "couldNotLoadEnvironment": "ඔබේ පරිසරය පූරණය කළ නොහැකි විය.",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "ගබඩා නැවුම් කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
       "discardDraftTitle": "කටු සටහන ඉවතලන්නද?",
       "discardDraftMessage": "ඔබේ ඉල්ලීම අහිමි වනු ඇත.",
+      "discardWithUploadsMessage": "ඔබේ ඉල්ලීම සහ යැවූ පණිවිඩවලට අමුණා නැති උඩුගත කළ ගොනු මකා දමනු ඇත.",
       "discardFailed": "කටු සටහන ඉවත දැමිය නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
       "remoteHint": "ඔබේ පරිගණකයේ kilo ක්‍රියාවලියක් පාලනය කිරීමට එම පරිගණකයේ `kilo remote` ධාවනය කරන්න, නැතහොත් ක්‍රියාත්මක CLI සැසියක `/remote` ධාවනය කරන්න.",
-      "connectBitbucketDescription": "ඔබේ බ්‍රවුසරයෙන් Bitbucket සම්බන්ධ කරන්න. ඉන්පසු ගබඩාවක් තෝරා ගැනීමට මෙහි ආපසු එන්න.",
-      "connectGitlabDescription": "ඔබේ බ්‍රවුසරයෙන් GitLab සම්බන්ධ කරන්න. ඉන්පසු ගබඩාවක් තෝරා ගැනීමට මෙහි ආපසු එන්න.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket ගබඩා පූරණය කළ නොහැකි විය.",
-      "couldNotLoadGithubRepositories": "GitHub ගබඩා පූරණය කළ නොහැකි විය.",
-      "couldNotLoadGitlabRepositories": "GitLab ගබඩා පූරණය කළ නොහැකි විය.",
-      "gitlabConnected": "GitLab සම්බන්ධයි",
-      "noRepositoriesVisibleBitbucket": "ගබඩා නොපෙනේ. Bitbucket ගබඩා වෙත ප්‍රවේශ වීමට අවසර තිබේදැයි පරීක්ෂා කර නැවුම් කරන්න.",
-      "noRepositoriesVisibleGitlab": "ගබඩා නොපෙනේ. GitLab ගබඩා වෙත ප්‍රවේශ වීමට අවසර තිබේදැයි පරීක්ෂා කර නැවුම් කරන්න.",
-      "openBitbucket": "Bitbucket විවෘත කරන්න",
-      "openGitlab": "GitLab විවෘත කරන්න",
-      "recentlyUsed": "මෑතකදී භාවිතා කළ",
-      "cliCannotContinue": "මෙම CLI අනුවාදයට සැසියක් දිගටම කරගෙන යා නොහැක. Cloud Agent හෝ වෙනත් CLI එකක් තෝරන්න.",
       "continueFrom": "{{title}} සැසිය දිගටම කරගෙන යමින් පවතී.",
-      "importFailed": "මෙම සැසිය ආයාත කළ නොහැකි විය.",
       "importingSession": "සැසිය ආයාත කරමින්",
-      "discardWithUploadsMessage": "ඔබේ ඉල්ලීම සහ යැවූ පණිවිඩවලට අමුණා නැති උඩුගත කළ ගොනු මකා දමනු ඇත."
+      "cliCannotContinue": "මෙම CLI අනුවාදයට සැසියක් දිගටම කරගෙන යා නොහැක. Cloud Agent හෝ වෙනත් CLI එකක් තෝරන්න.",
+      "importFailed": "මෙම සැසිය ආයාත කළ නොහැකි විය."
     },
     "partRenderer": {
       "updatedFileCount_one": "ගොනු {{displayCount}} ක් යාවත්කාලීන කර ඇත.",

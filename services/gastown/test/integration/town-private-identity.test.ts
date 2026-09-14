@@ -188,6 +188,37 @@ describe('runtime renewal on real Durable Object storage', () => {
     };
   }
 
+  it.each(['active', 'revoked'] as const)(
+    'rejects plain admission over an existing %s grant during work',
+    async grantState => {
+      await runInDurableObject(town(), async (instance, state) => {
+        const { context, authorization } = await fixture(instance, state.storage);
+        const previous = { ...authorization, state: grantState };
+        await state.storage.put(RUNTIME_AUTHORIZATION_KEY, previous);
+        const oldConfig = await instance.getTownConfig();
+        const oldIdentity = await state.storage.get(TOWN_IDENTITY_KEY);
+        const create = vi.spyOn(admission, 'createRuntimeAuthorization').mockResolvedValue({
+          authorization,
+          token: 'replacement-token',
+          expiresAt: '2026-09-14T01:00:00Z',
+        });
+
+        expect(
+          await createRuntimeAuthorization(
+            { ...context, hasActiveWork: () => true },
+            'control-token',
+            identity.ownerUserId
+          )
+        ).toBeUndefined();
+
+        expect(create).not.toHaveBeenCalled();
+        expect(await state.storage.get(RUNTIME_AUTHORIZATION_KEY)).toEqual(previous);
+        expect(await state.storage.get(TOWN_IDENTITY_KEY)).toEqual(oldIdentity);
+        expect(await instance.getTownConfig()).toEqual(oldConfig);
+      });
+    }
+  );
+
   it('commits only the token and preserves configuration and private identity', async () => {
     await runInDurableObject(town(), async (instance, state) => {
       const { context, authorization } = await fixture(instance, state.storage);

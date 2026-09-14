@@ -136,6 +136,9 @@ export async function createRuntimeAuthorization(
   )
     return undefined;
   const previousAuthorization = await ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY);
+  // Existing grants must pass reauthorization's work/container and snapshot checks.
+  if (previousAuthorization !== undefined && expectedAuthorization === undefined) return undefined;
+
   if (
     expectedAuthorization !== undefined &&
     JSON.stringify(RuntimeAuthorizationSchema.safeParse(previousAuthorization).data) !==

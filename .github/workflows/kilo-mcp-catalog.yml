@@ -143,10 +143,19 @@ jobs:
           WEB_API_BASE_URL: https://app.kilo.ai
         run: |
           set -euo pipefail
-          response="$(curl -fsS -X POST "$WEB_API_BASE_URL/api/internal/mcp-catalog/token" \
+          # `curl -f` discards the response body on an HTTP error, which turned
+          # a diagnosable 404 into a bare "curl: (22)". Capture the status and
+          # surface the body so the next failure names its cause.
+          status="$(curl -sS -o /tmp/catalog-mint.json -w '%{http_code}' \
+            -X POST "$WEB_API_BASE_URL/api/internal/mcp-catalog/token" \
             -H "Authorization: Bearer $MCP_CATALOG_TOKEN_SECRET" \
             -H 'content-type: application/json' \
             -d '{}')"
+          if [ "$status" != "200" ]; then
+            echo "::error::The catalog token mint returned HTTP $status: $(cat /tmp/catalog-mint.json)"
+            exit 1
+          fi
+          response="$(cat /tmp/catalog-mint.json)"
           token="$(printf '%s' "$response" | jq -r '.token')"
           org="$(printf '%s' "$response" | jq -r '.organizationId')"
           if [ -z "$token" ] || [ "$token" = "null" ]; then
@@ -328,10 +337,19 @@ jobs:
           WEB_API_BASE_URL: https://app.kilo.ai
         run: |
           set -euo pipefail
-          response="$(curl -fsS -X POST "$WEB_API_BASE_URL/api/internal/mcp-catalog/token" \
+          # `curl -f` discards the response body on an HTTP error, which turned
+          # a diagnosable 404 into a bare "curl: (22)". Capture the status and
+          # surface the body so the next failure names its cause.
+          status="$(curl -sS -o /tmp/catalog-mint.json -w '%{http_code}' \
+            -X POST "$WEB_API_BASE_URL/api/internal/mcp-catalog/token" \
             -H "Authorization: Bearer $MCP_CATALOG_TOKEN_SECRET" \
             -H 'content-type: application/json' \
             -d '{}')"
+          if [ "$status" != "200" ]; then
+            echo "::error::The catalog token mint returned HTTP $status: $(cat /tmp/catalog-mint.json)"
+            exit 1
+          fi
+          response="$(cat /tmp/catalog-mint.json)"
           token="$(printf '%s' "$response" | jq -r '.token')"
           org="$(printf '%s' "$response" | jq -r '.organizationId')"
           if [ -z "$token" ] || [ "$token" = "null" ]; then

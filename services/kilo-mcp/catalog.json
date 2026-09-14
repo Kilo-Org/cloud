@@ -1316,7 +1316,7 @@
   "cloudAgentNext.getSandboxSelectionOptions": {
     "path": "cloudAgentNext.getSandboxSelectionOptions",
     "kind": "query",
-    "summary": "Returns the sandbox selection capabilities (enabled flag, default destination, and selectable sandbox options) for a new cloud agent session in personal context.",
+    "summary": "List the sandbox selection options and capabilities available for a cloud agent, optionally filtered for devcontainer support. Use this to find which sandbox types a user can choose when starting an agent.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -1331,7 +1331,7 @@
       "getsandboxselectionoptions",
       "devcontainer"
     ],
-    "searchBlob": "cloudAgentNext.getSandboxSelectionOptions Returns the sandbox selection capabilities (enabled flag, default destination, and selectable sandbox options) for a new cloud agent session in personal context. cloudagentnext getsandboxselectionoptions devcontainer devcontainer"
+    "searchBlob": "cloudAgentNext.getSandboxSelectionOptions List the sandbox selection options and capabilities available for a cloud agent, optionally filtered for devcontainer support. Use this to find which sandbox types a user can choose when starting an agent. cloudagentnext getsandboxselectionoptions devcontainer devcontainer"
   },
   "cloudAgentNext.getSandboxStatus": {
     "path": "cloudAgentNext.getSandboxStatus",
@@ -5145,7 +5145,7 @@
   "organizations.cloudAgentNext.getSandboxSelectionOptions": {
     "path": "organizations.cloudAgentNext.getSandboxSelectionOptions",
     "kind": "query",
-    "summary": "Returns the sandbox selection capabilities (enabled flag, default destination, and selectable sandbox options) for a new cloud agent session in an organization.",
+    "summary": "List the sandbox options available for a cloud agent, such as selectable environments and container capabilities. Use this to find which sandbox choices an agent can pick for an organization.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -5166,7 +5166,7 @@
       "getsandboxselectionoptions",
       "organizationid"
     ],
-    "searchBlob": "organizations.cloudAgentNext.getSandboxSelectionOptions Returns the sandbox selection capabilities (enabled flag, default destination, and selectable sandbox options) for a new cloud agent session in an organization. organizations cloudagentnext getsandboxselectionoptions organizationid organizationId"
+    "searchBlob": "organizations.cloudAgentNext.getSandboxSelectionOptions List the sandbox options available for a cloud agent, such as selectable environments and container capabilities. Use this to find which sandbox choices an agent can pick for an organization. organizations cloudagentnext getsandboxselectionoptions organizationid organizationId"
   },
   "organizations.cloudAgentNext.getSandboxStatus": {
     "path": "organizations.cloudAgentNext.getSandboxStatus",

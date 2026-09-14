@@ -1,5 +1,9 @@
 import { memo, useCallback } from 'react';
-import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import {
+  type MessageDeliveryState,
+  type Part,
+  type StoredMessage,
+} from '@kilocode/cloud-agent-sdk';
 import { Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -16,11 +20,14 @@ import { CompactionSeparator } from './compaction-separator';
 import { hasCopyableText } from './collect-copyable-text';
 import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
+import { MessageErrorBoundary } from './message-error-boundary';
 import { MessageLongPressProvider } from './message-long-press-context';
 import { selectMessageFailure } from './message-failure-state';
 import { partRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
 import { firstHumanText, isFilePart, isTextPart } from './part-types';
+import { groupMessageParts } from './session-tool-run';
+import { CondensedToolRunRow } from './tool-run-rows';
 import { useMessageCopy } from './use-message-copy';
 import { type OpenChildSession } from './child-session-section';
 
@@ -29,6 +36,12 @@ const QUEUED_CONTROL_MIN_HEIGHT = Platform.OS === 'android' ? 'min-h-12' : 'min-
 
 type MessageBubbleProps = {
   message: StoredMessage;
+  /**
+   * Renders only this subset of `message.parts`, in order. Set by the transcript
+   * when a condensed run split the message around its visible parts; omitted for
+   * an unchanged message, whose full part list is rendered.
+   */
+  partsOverride?: readonly Part[];
   isLastAssistantMessage?: boolean;
   isSessionStreaming?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
@@ -51,10 +64,17 @@ type MessageBubbleProps = {
   onCopyToComposer?: (text: string) => void;
   /** Restores a canceled queued message's prompt back into the composer. */
   onRestoreQueued?: (message: StoredMessage) => void;
+  /**
+   * When true, consecutive tool parts of an assistant message render as one
+   * condensed run row. Off (or omitted) keeps the per-part rendering exactly as
+   * it was.
+   */
+  condenseToolCalls?: boolean;
 };
 
 function MessageBubbleImpl({
   message,
+  partsOverride,
   isLastAssistantMessage,
   isSessionStreaming,
   getChildMessages,
@@ -67,8 +87,10 @@ function MessageBubbleImpl({
   onRetryMessage,
   onCopyToComposer,
   onRestoreQueued,
+  condenseToolCalls,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
+  const parts = partsOverride ?? message.parts;
   const { copyMessage } = useMessageCopy();
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -98,8 +120,8 @@ function MessageBubbleImpl({
   };
 
   // Compaction-only message renders as a separator
-  const firstPart = message.parts[0];
-  if (message.parts.length === 1 && firstPart?.type === 'compaction') {
+  const firstPart = parts[0];
+  if (parts.length === 1 && firstPart?.type === 'compaction') {
     return (
       <View className="px-4">
         <CompactionSeparator />
@@ -116,15 +138,15 @@ function MessageBubbleImpl({
       ? onRetryMessage !== undefined || onCopyToComposer !== undefined
       : onRetryMessage !== undefined;
   const userTextContent = isUser
-    ? message.parts
-        .filter(isTextPart)
+    ? parts
+        .filter(part => isTextPart(part))
         .map(p => p.text)
         .join('\n\n')
     : '';
   // Copy-to-composer re-sends only the first human-authored text part, so a
   // synthesized attachment notice is not copied and a file-only row hides the
   // button entirely.
-  const copyText = isUser ? firstHumanText(message.parts) : '';
+  const copyText = isUser ? firstHumanText(parts) : '';
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
       <View className="gap-1 px-4 py-1">
@@ -174,7 +196,7 @@ function MessageBubbleImpl({
     // Composer, queued-message synthesis, and slash commands emit exactly one
     // human-authored text part, so the separator separates it from synthesized
     // attachment notices.
-    const fileParts = message.parts.filter(isFilePart);
+    const fileParts = parts.filter(part => isFilePart(part));
     const isQueued = deliveryState?.status === 'queued';
     const hasBadgeSlot = isQueued || holdQueuedSlot;
 
@@ -268,6 +290,20 @@ function MessageBubbleImpl({
   // same value as the gap-2 between parts of one message and the user
   // wrapper's py-1 — every adjacent transcript row pair sits one gap apart.
   const isStreaming = isLastAssistantMessage && isSessionStreaming;
+  const renderPart = (part: (typeof message.parts)[number]) => (
+    <PartRenderer
+      key={part.id}
+      part={part}
+      isStreaming={isStreaming}
+      getChildMessages={getChildMessages}
+      defaultReasoningExpanded={defaultReasoningExpanded}
+      onOpenChildSession={onOpenChildSession}
+      modelOptions={modelOptions}
+      // Markdown text parts forward this into the code-fence copy
+      // trigger so a long press still opens message details.
+      onLongPressCode={onLongPressDetails ? handleLongPress : undefined}
+    />
+  );
 
   return (
     <View>
@@ -275,20 +311,17 @@ function MessageBubbleImpl({
         <InMessageBubbleContext.Provider value>
           <MessageLongPressProvider message={message} onLongPressDetails={onLongPressDetails}>
             <View className="gap-2">
-              {message.parts.map(part => (
-                <PartRenderer
-                  key={part.id}
-                  part={part}
-                  isStreaming={isStreaming}
-                  getChildMessages={getChildMessages}
-                  defaultReasoningExpanded={defaultReasoningExpanded}
-                  onOpenChildSession={onOpenChildSession}
-                  modelOptions={modelOptions}
-                  // Markdown text parts forward this into the code-fence copy
-                  // trigger so a long press still opens message details.
-                  onLongPressCode={onLongPressDetails ? handleLongPress : undefined}
-                />
-              ))}
+              {condenseToolCalls
+                ? groupMessageParts(parts, { condense: true }).map(group =>
+                    group.kind === 'tool-run' ? (
+                      <MessageErrorBoundary key={group.parts[0]?.id}>
+                        <CondensedToolRunRow parts={group.parts} />
+                      </MessageErrorBoundary>
+                    ) : (
+                      group.parts.map(renderPart)
+                    )
+                  )
+                : parts.map(part => renderPart(part))}
             </View>
           </MessageLongPressProvider>
         </InMessageBubbleContext.Provider>

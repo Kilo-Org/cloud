@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive mounted suite for the part-detail sheet host lifecycle */
 import {
   type Part,
   type ReasoningPart,
@@ -34,6 +35,23 @@ const cachedUri = vi.hoisted(() => ({ value: undefined as string | undefined }))
 vi.mock('./tool-card-image-cache', () => ({ useToolCardImageUri: () => cachedUri.value }));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
+}));
+// `tool-card-display` imports the Lucide icon components; the node project cannot
+// parse their Flow-sourced react-native runtime, so stub the icon module.
+vi.mock('@/components/ui/icons', () => ({
+  Cpu: 'Cpu',
+  Eye: 'Eye',
+  FileDiff: 'FileDiff',
+  FilePlus: 'FilePlus',
+  FileSearch: 'FileSearch',
+  FolderOpen: 'FolderOpen',
+  Globe: 'Globe',
+  ListTodo: 'ListTodo',
+  Pencil: 'Pencil',
+  Plug: 'Plug',
+  Search: 'Search',
+  Sparkles: 'Sparkles',
+  Terminal: 'Terminal',
 }));
 vi.mock('@/components/ui/text', async () => {
   const React = await import('react');

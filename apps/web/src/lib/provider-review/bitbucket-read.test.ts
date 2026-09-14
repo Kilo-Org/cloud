@@ -527,6 +527,61 @@ describe('listDiscussions', () => {
     });
   });
 
+  it('attaches replies whose root sits on an earlier provider page', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname.endsWith('/pullrequests/12/comments')) {
+        // The flat comment collection can split a thread across provider
+        // pages: the root lands on page 1, its reply on page 2.
+        return parsed.searchParams.get('page') === '2'
+          ? jsonResponse({
+              pagelen: 50,
+              values: [
+                {
+                  id: 102,
+                  parent: { id: 101 },
+                  content: { raw: 'Reply from the author' },
+                  created_on: '2026-09-02T11:00:00.000000+00:00',
+                  user: { uuid: '{author-uuid}', nickname: 'alice', display_name: 'Alice' },
+                  deleted: false,
+                },
+              ],
+              next: null,
+            })
+          : jsonResponse({
+              pagelen: 50,
+              values: [
+                {
+                  id: 101,
+                  content: { raw: 'General remark' },
+                  created_on: '2026-09-02T10:00:00.000000+00:00',
+                  user: { uuid: '{reviewer-uuid}', nickname: 'bob', display_name: 'Bob' },
+                  deleted: false,
+                },
+              ],
+              next: 'https://api.bitbucket.org/2.0/repositories/acme/repo/pullrequests/12/comments?pagelen=50&page=2',
+            });
+      }
+      if (parsed.pathname.endsWith('/pullrequests/12/tasks')) {
+        return jsonResponse({ pagelen: 100, values: [], next: null });
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const result = await listDiscussions(ORG_OWNER, 'acme', 'repo', 12);
+
+    expect(result.threads).toHaveLength(1);
+    expect(result.threads[0]?.comments.map(comment => comment.body)).toEqual([
+      'General remark',
+      'Reply from the author',
+    ]);
+    expect(result.nextCursor).toBeNull();
+  });
+
   it('marks a thread resolved when its only task is resolved', async () => {
     fetchMock.mockImplementation(async (url: string | URL) => {
       const full = url.toString();

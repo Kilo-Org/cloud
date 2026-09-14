@@ -61,6 +61,10 @@ type GitLabMergeRequestDetail = GitLabMergeRequest & {
   merge_status?: string;
   head_pipeline?: { id: number; sha: string; ref: string; status: string; web_url: string } | null;
   references?: { full?: string };
+  // GitLab's own total changed-file count for the whole MR. A string, and
+  // capped at "1000+" once the diff exceeds its limit; absent while the diff
+  // is still being built.
+  changes_count?: string;
   // GitLab omits or nulls diff_refs on merge requests without a diff (for
   // example an empty repository or an unresolved merge ref), so it cannot be
   // trusted the way the adapter's non-optional type claims.
@@ -319,6 +323,22 @@ function diffLineCounts(diff: string): { additions: number; deletions: number } 
   return { additions, deletions };
 }
 
+/**
+ * The summary's changed-file count. The provider's own `changes_count` is the
+ * whole-MR total, so it stays correct past the 3-page diff cap the line counts
+ * are read under; GitLab caps the field at "1000+" (read as that floor) and
+ * omits it while the diff is not ready, so an absent or unparseable value
+ * falls back to the files actually read.
+ */
+function changedFileCount(detail: GitLabMergeRequestDetail, filesRead: number): number {
+  const raw = detail.changes_count;
+  if (typeof raw !== 'string') return filesRead;
+  const match = /^(\d+)\+?$/.exec(raw.trim());
+  if (!match) return filesRead;
+  const total = Number(match[1]);
+  return Number.isSafeInteger(total) && total > 0 ? Math.max(total, filesRead) : filesRead;
+}
+
 function mapDiffToFile(diff: GitLabDiff): ProviderPrFile {
   const { additions, deletions } = diffLineCounts(diff.diff ?? '');
   const status = diff.new_file
@@ -376,7 +396,8 @@ export async function getMergeRequest(
       }),
       getMRHeadCommit(access.accessToken, access.projectPath, mrIid, access.instanceUrl),
     ]);
-    // Counts come from the diffs; cap the pages so one MR detail load can
+    // Line counts come from the diffs, and the changed-file total from the
+    // MR's own `changes_count`. Cap the diff pages so one MR detail load can
     // never fan out into an unbounded crawl on a huge merge request.
     const files: GitLabDiff[] = [];
     for (let page = 1; page <= 3; page++) {
@@ -414,7 +435,7 @@ export async function getMergeRequest(
       // The diff head sha is the fence every write compares against; fall
       // back to the detail sha only when diff_refs is absent.
       headSha: detail.diff_refs?.head_sha || headSha || detail.sha,
-      changedFiles: files.length,
+      changedFiles: changedFileCount(detail, files.length),
       additions,
       deletions,
       webUrl: detail.web_url,
@@ -552,12 +573,16 @@ export async function listDiscussions(
 }
 
 const FINISHED_PIPELINE_STATUSES = new Set(['success', 'failed', 'canceled']);
+/** The MR-pipeline walk bound: check the whole listing up to this many pages. */
+const MAX_MR_PIPELINE_PAGES = 10;
 
 /**
  * The pipelines OF the merge request, as the shared checks DTO. The MR
  * pipelines endpoint is the only listing that includes the MR's merge-ref
  * pipelines: they run on the merge result sha, so the project-wide
- * pipelines-by-sha listing never reports them.
+ * pipelines-by-sha listing never reports them. The listing is paginated, so
+ * every page is read (up to the walk bound) — reading only the first page
+ * under-reports the MR's checks.
  */
 export async function listChecks(
   owner: GitLabReviewOwner,
@@ -567,11 +592,16 @@ export async function listChecks(
 ): Promise<ProviderPrChecksResult> {
   const access = await authorizeProject(owner, projectPath, instanceHint);
   try {
-    const pipelines = await requestGitLabJson<GitLabPipeline[]>(
-      access,
-      `/api/v4/projects/${projectSegment(access)}/merge_requests/${mrIid}/pipelines`,
-      { query: { per_page: GITLAB_PAGE_SIZE } }
-    );
+    const pipelines: GitLabPipeline[] = [];
+    for (let page = 1; page <= MAX_MR_PIPELINE_PAGES; page += 1) {
+      const batch = await requestGitLabJson<GitLabPipeline[]>(
+        access,
+        `/api/v4/projects/${projectSegment(access)}/merge_requests/${mrIid}/pipelines`,
+        { query: { per_page: GITLAB_PAGE_SIZE, page } }
+      );
+      pipelines.push(...batch);
+      if (batch.length < GITLAB_PAGE_SIZE) break;
+    }
     return {
       checks: pipelines.map(pipeline => ({
         name: pipeline.name || pipeline.ref,

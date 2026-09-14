@@ -238,6 +238,33 @@ describe('getMergeRequest', () => {
     expect(summary.headSha).toBe('sha-head');
     expect(mockGetMRDiffRefs).not.toHaveBeenCalled();
   });
+
+  it('reports the provider changed-file total past the diff page cap', async () => {
+    // A full page on every request: the detail load stops at its 3-page cap
+    // with 150 diffs read, far short of the MR's 420 changed files.
+    const fullDiffPage = Array.from({ length: 50 }, (_, index) => ({
+      old_path: `f${index}.ts`,
+      new_path: `f${index}.ts`,
+      new_file: false,
+      renamed_file: false,
+      deleted_file: false,
+      diff: '+x\n',
+    }));
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse(fullDiffPage)));
+    mockFetchGitLabMergeRequest.mockResolvedValue({ ...mrFixture, changes_count: '420' });
+
+    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
+
+    expect(summary.changedFiles).toBe(420);
+  });
+
+  it('reads a capped changes_count ("1000+") as its floor', async () => {
+    mockFetchGitLabMergeRequest.mockResolvedValue({ ...mrFixture, changes_count: '1000+' });
+
+    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
+
+    expect(summary.changedFiles).toBe(1000);
+  });
 });
 
 describe('listChangedFiles', () => {
@@ -502,6 +529,35 @@ describe('listChecks', () => {
         detailsUrl: `${INSTANCE_URL}/group/sub/repo/-/pipelines/42`,
       },
     ]);
+  });
+
+  it('reads every page of MR pipelines, not only the first', async () => {
+    const pipelinePage = (offset: number, count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: offset + index,
+        sha: `sha-${offset + index}`,
+        ref: 'feature/deploy',
+        status: 'success',
+        web_url: `${INSTANCE_URL}/-/pipelines/${offset + index}`,
+        name: `run-${offset + index}`,
+      }));
+    fetchMock.mockImplementation(url => {
+      const parsed = new URL(String(url));
+      if (parsed.pathname.endsWith('/pipelines')) {
+        return parsed.searchParams.get('page') === '2'
+          ? Promise.resolve(jsonResponse(pipelinePage(51, 1)))
+          : Promise.resolve(jsonResponse(pipelinePage(1, 50)));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const result = await listChecks(OWNER, PROJECT_PATH, 12);
+
+    expect(result.checks).toHaveLength(51);
+    expect(result.checks[50]?.name).toBe('run-51');
+    expect(
+      fetchMock.mock.calls.filter(call => new URL(String(call[0])).pathname.endsWith('/pipelines'))
+    ).toHaveLength(2);
   });
 });
 

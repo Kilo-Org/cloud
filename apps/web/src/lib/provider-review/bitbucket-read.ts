@@ -64,6 +64,15 @@ const MAX_INBOX_PROVIDER_PAGES = 10;
  * load can never crawl an unbounded collection.
  */
 const MAX_TASK_COLLECTION_PAGES = 10;
+/**
+ * The comment-collection page bound for the discussion walk. Bitbucket's
+ * comment collection is flat — a reply is its own item that names its root by
+ * id — so a page boundary can fall between a root and its replies. Mapping
+ * threads from a single provider page therefore drops every reply whose root
+ * sits on an earlier page, so the walk reads the whole collection (the same
+ * bounded walk the task evidence uses) and returns complete threads.
+ */
+const MAX_DISCUSSION_COMMENT_PAGES = 10;
 
 const BitbucketUserSchema = z.object({
   uuid: z.string().min(1),
@@ -680,7 +689,7 @@ export type BitbucketDiscussionsPage = {
 };
 
 /**
- * Build threads from one flat page of comments: top-level comments are the
+ * Build threads from a flat comment collection: top-level comments are the
  * thread roots, replies attach to their parent. Both the resolved flag and
  * the task count come from the task evidence the caller supplies — Bitbucket
  * never sends task fields on comments: a thread is resolved when a task
@@ -792,7 +801,12 @@ async function fetchTaskEvidence(
   return { commentIds, unresolvedCommentIds, taskCounts };
 }
 
-/** One page of discussions (threads and replies) with their diff anchors. */
+/**
+ * The PR's discussion threads (with their diff anchors) as a complete,
+ * non-overlapping set: the flat comment collection is read to its end (or the
+ * bounded page cap) so no thread is split across the provider's page boundary.
+ * `nextCursor` is set only when the collection exceeded the page cap.
+ */
 export async function listDiscussions(
   owner: BitbucketReviewOwner,
   workspaceSlug: string,
@@ -803,22 +817,30 @@ export async function listDiscussions(
   const access = await authorizeRepository(owner, workspaceSlug, repoSlug);
   try {
     const identity = `bitbucket-comments:${access.repository.fullName}#${prId}`;
-    const page = await fetchPage(
-      access,
-      `/2.0/repositories/${repositorySegment(access.repository)}/pullrequests/${prId}/comments`,
-      identity,
-      cursor,
-      repositoryPathGuard(access)
-    );
+    const commentPath = `/2.0/repositories/${repositorySegment(access.repository)}/pullrequests/${prId}/comments`;
+    // Read the whole (bounded) collection before mapping: a reply can sit a
+    // provider page away from its root, and a thread must be built from both.
     const comments: z.infer<typeof BitbucketCommentSchema>[] = [];
-    for (const value of page.values) {
-      const parsed = BitbucketCommentSchema.safeParse(value);
-      if (parsed.success) comments.push(parsed.data);
+    let nextCursor: string | null = null;
+    for (let pageIndex = 0; pageIndex < MAX_DISCUSSION_COMMENT_PAGES; pageIndex++) {
+      const page = await fetchPage(
+        access,
+        commentPath,
+        identity,
+        nextCursor ?? cursor,
+        repositoryPathGuard(access)
+      );
+      for (const value of page.values) {
+        const parsed = BitbucketCommentSchema.safeParse(value);
+        if (parsed.success) comments.push(parsed.data);
+      }
+      nextCursor = page.nextCursor;
+      if (!nextCursor) break;
     }
     const taskEvidence = await fetchTaskEvidence(access, prId);
     return {
       threads: buildThreadsFromComments(comments, taskEvidence),
-      nextCursor: page.nextCursor,
+      nextCursor,
     };
   } catch (error) {
     throw classifyBitbucketError(error);

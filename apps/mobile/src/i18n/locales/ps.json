@@ -3003,5 +3003,33 @@
     "loadFailed": "د دې وسیلې ملاتړ شوې ژبې بار نشوې.",
     "emptyTitle": "ملاتړ شوې ژبې نشته",
     "emptyDescription": "د دې وسیلې د وینا پېژندنه کومه ملاتړ شوې ژبه نه ښیې."
+  },
+  "tour": {
+    "eyebrow": "چټک سفر",
+    "forkTitle": "Kilo په چیرې چلول غواړئ?",
+    "forkSubtitle": "خپل لومړۍ ناستې لپاره وټاکئ چې Kilo چیرې چلیږي.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Kilo په یوه جلا شوي کلاوډ چاپېریال کې وچلوه، پرته له دې چې څه نصب کړئ.",
+    "remoteOptionTitle": "ستاسو کمپیوټر",
+    "remoteOptionBody": "Kilo په خپل کمپیوټر کې د `kilo remote` CLI له لارې وچلوه.",
+    "skip": "سفر پرېږدئ",
+    "tutorialLabel": "زده کړه",
+    "cloudTitle": "خپله لومړۍ کلاوډ ناسته پیل کړئ",
+    "cloudBody": "نوې ناسته جوړه کړئ او Kilo هغه په کلاوډ کې چلوي.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "د ستاسو د کلاوډ ناستې د پیل انتظار کوي…",
+    "cloudCheck": "ستاسو لومړۍ کلاوډ ناسته روانه ده.",
+    "remoteTitle": "خپله لومړۍ لرې ناسته پیل کړئ",
+    "remoteBody": "خپل کمپیوټر ونښلول، بیا ناسته له دې ځای څخه پیل کړئ.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "په خپل کمپیوټر کې ناسته پیل کړئ",
+    "remoteWaiting": "ستاسو کمپیوټر د ناستې د پیل انتظار کوي…",
+    "remoteCheck": "ستاسو لومړۍ لرې ناسته روانه ده.",
+    "remoteEmptyTitle": "تر دې دمه هیڅ کمپیوټر نه دی نښلول شوی",
+    "remoteEmptyBody": "د هغه د نښلولو لپاره په خپل کمپیوټر کې `kilo remote` وچلوه.",
+    "remoteFound": "کمپیوټر وڌل شو",
+    "checkAgain": "بیا وګورئ",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

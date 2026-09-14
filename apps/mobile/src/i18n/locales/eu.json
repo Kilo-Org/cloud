@@ -3003,5 +3003,33 @@
     "loadFailed": "Ezin izan dira gailu honek onartzen dituen hizkuntzak kargatu.",
     "emptyTitle": "Ez dago hizkuntza onarturik",
     "emptyDescription": "Gailu honen ahots-ezagutzak ez du onartutako hizkuntzarik jakinarazten."
+  },
+  "tour": {
+    "eyebrow": "Bira azkarra",
+    "forkTitle": "Non nahi duzu Kilo exekutatu?",
+    "forkSubtitle": "Aukeratu Kilo non exekutatuko den zure lehen saioan.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Exekutatu Kilo isolatutako hodei-ingurune batean, ezer instalatu gabe.",
+    "remoteOptionTitle": "Zure ordenagailua",
+    "remoteOptionBody": "Exekutatu Kilo zure makinean `kilo remote` CLIaren bidez.",
+    "skip": "Baztertu bira",
+    "tutorialLabel": "Tutorial-a",
+    "cloudTitle": "Hasi zure lehen hodei-saioa",
+    "cloudBody": "Sortu saio berri bat eta Kilok hodeian exekatuko du.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Zure hodei-saioa hasten den artean itxaroten…",
+    "cloudCheck": "Zure lehen hodei-saioa exekutatzen ari da.",
+    "remoteTitle": "Hasi zure lehen urruneko saioa",
+    "remoteBody": "Konektatu zure ordenagailua, eta gero hasi saioa hemendik.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Hasi saioa zure ordenagailuan",
+    "remoteWaiting": "Zure ordenagailuak saioa hasten duen artean itxaroten…",
+    "remoteCheck": "Zure lehen urruneko saioa exekutatzen ari da.",
+    "remoteEmptyTitle": "Oraindik ez dago ordenagailurik konektatuta",
+    "remoteEmptyBody": "Konektatzeko, exekutatu `kilo remote` zure ordenagailuan.",
+    "remoteFound": "Ordenagailua konektatuta",
+    "checkAgain": "Egiaztatu berriro",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

@@ -3003,5 +3003,33 @@
     "loadFailed": "ამ მოწყობილობის მხარდაჭერილი ენები ვერ ჩაიტვირთა.",
     "emptyTitle": "მხარდაჭერილი ენები არ არის",
     "emptyDescription": "ამ მოწყობილობის მეტყველების ამოცნობა მხარდაჭერილ ენებს არ აცნობებს."
+  },
+  "tour": {
+    "eyebrow": "სწრაფი ტური",
+    "forkTitle": "სად გინდათ გაუშვათ Kilo?",
+    "forkSubtitle": "აირჩიეთ, სად გაუშვას Kilo-მ თქვენმა პირველმა სესიამ.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "გაუშვით Kilo იზოლირებულ ღრუბლოვან გარემოში, არაფრის დაყენების გარეშე.",
+    "remoteOptionTitle": "თქვენი კომპიუტერი",
+    "remoteOptionBody": "გაუშვით Kilo თქვენს საკუთარ მანქანაზე `kilo remote` CLI-ს საშუალებით.",
+    "skip": "ტურის გამოტოვება",
+    "tutorialLabel": "სასწავლო",
+    "cloudTitle": "დაიწყეთ თქვენი პირველი ღრუბლოვანი სესია",
+    "cloudBody": "შექმენით ახალი სესია და Kilo მას ღრუბელში გაუშვებს.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "ველოდებით, თქვენი ღრუბლოვანი სესია დაიწყოს…",
+    "cloudCheck": "თქვენი პირველი ღრუბლოვანი სესია მუშაობს.",
+    "remoteTitle": "დაიწყეთ თქვენი პირველი დაშორებული სესია",
+    "remoteBody": "მიავლეთ თქვენს კომპიუტერს და შემდეგ აქედან დაიწყეთ სესია.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "სესიის დაწყება თქვენს კომპიუტერზე",
+    "remoteWaiting": "ველოდებით, სანამ თქვენმა კომპიუტერმა სესია დაიწყოს…",
+    "remoteCheck": "თქვენი პირველი დაშორებული სესია მუშაობს.",
+    "remoteEmptyTitle": "ჯერ კომპიუტერი არ არის მიერთებული",
+    "remoteEmptyBody": "დასამაგრებლად, გაუშვით `kilo remote` თქვენს კომპიუტერზე.",
+    "remoteFound": "კომპიუტერი მიერთებულია",
+    "checkAgain": "ხელახლა შემოწმება",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

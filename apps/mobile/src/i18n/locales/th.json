@@ -3003,5 +3003,33 @@
     "loadFailed": "ไม่สามารถโหลดภาษาที่อุปกรณ์นี้รองรับได้",
     "emptyTitle": "ไม่มีภาษาที่รองรับ",
     "emptyDescription": "การรู้จำเสียงพูดของอุปกรณ์นี้ไม่รายงานภาษาที่รองรับ"
+  },
+  "tour": {
+    "eyebrow": "ทัวร์ด่วน",
+    "forkTitle": "คุณต้องการรัน Kilo ที่ไหน?",
+    "forkSubtitle": "เลือกตำแหน่งที่ Kilo จะรันเซสชันแรกของคุณ",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "รัน Kilo ในสภาพแวดล้อมคลาวด์ที่แยกออกมาโดยไม่ต้องติดตั้งอะไรเลย",
+    "remoteOptionTitle": "คอมพิวเตอร์ของคุณ",
+    "remoteOptionBody": "รัน Kilo บนเครื่องของคุณเองผ่าน CLI `kilo remote`",
+    "skip": "ข้ามทัวร์",
+    "tutorialLabel": "บทช่วยสอน",
+    "cloudTitle": "เริ่มเซสชันคลาวด์แรกของคุณ",
+    "cloudBody": "สร้างเซสชันใหม่ แล้ว Kilo จะรันมันบนคลาวด์",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "กำลังรอเซสชันคลาวด์ของคุณเริ่มทำงาน…",
+    "cloudCheck": "เซสชันคลาวด์แรกของคุณกำลังทำงาน",
+    "remoteTitle": "เริ่มเซสชันทางไกลแรกของคุณ",
+    "remoteBody": "เชื่อมต่อคอมพิวเตอร์ของคุณ แล้วเริ่มเซสชันจากที่นี่",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "เริ่มเซสชันบนคอมพิวเตอร์ของคุณ",
+    "remoteWaiting": "กำลังรอให้คอมพิวเตอร์ของคุณเริ่มเซสชัน…",
+    "remoteCheck": "เซสชันทางไกลแรกของคุณกำลังทำงาน",
+    "remoteEmptyTitle": "ยังไม่มีคอมพิวเตอร์เชื่อมต่อ",
+    "remoteEmptyBody": "หากต้องการเชื่อมต่อ ให้รัน `kilo remote` บนคอมพิวเตอร์ของคุณ",
+    "remoteFound": "เชื่อมต่อคอมพิวเตอร์แล้ว",
+    "checkAgain": "ตรวจสอบอีกครั้ง",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

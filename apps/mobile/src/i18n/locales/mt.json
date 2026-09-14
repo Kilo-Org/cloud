@@ -3069,5 +3069,33 @@
     "loadFailed": "Il-lingwi li jappoġġja dan l-apparat ma setgħux jitgħabbu.",
     "emptyTitle": "L-ebda lingwa appoġġjata",
     "emptyDescription": "Ir-rikonoxximent tal-kitba ta' dan l-apparat ma jirrapporta l-ebda lingwa appoġġjata."
+  },
+  "tour": {
+    "eyebrow": "Żjara mgħaġġla",
+    "forkTitle": "Fejn trid tħaddem lil Kilo?",
+    "forkSubtitle": "Agħżel fejn Kilo jaħdem għall-ewwel sessjoni tiegħek.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Ħaddem Kilo f'ambjent cloud iżolat, mingħajr xejn x'tinstalla.",
+    "remoteOptionTitle": "Il-kompjuter tiegħek",
+    "remoteOptionBody": "Ħaddem Kilo fuq il-magna tiegħek permezz tal-CLI `kilo remote`.",
+    "skip": "Aqbeż it-tour",
+    "tutorialLabel": "Tutorial",
+    "cloudTitle": "Ibda l-ewwel sessjoni cloud tiegħek",
+    "cloudBody": "Ħolloq sessjoni ġdida u Kilo se ħaddimha fil-cloud.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Qed nistennew biex tibda s-sessjoni cloud…",
+    "cloudCheck": "L-ewwel sessjoni cloud tiegħek qed taħdem.",
+    "remoteTitle": "Ibda l-ewwel sessjoni remota tiegħek",
+    "remoteBody": "Ikkonetta l-kompjuter tiegħek, imbagħad ibda s-sessjoni minn hawn.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Ibda sessjoni fuq il-kompjuter tiegħek",
+    "remoteWaiting": "Qed nistennew biex il-kompjuter tiegħek jibda s-sessjoni…",
+    "remoteCheck": "L-ewwel sessjoni remota tiegħek qed taħdem.",
+    "remoteEmptyTitle": "Għad m'hemmx kompjuter konness",
+    "remoteEmptyBody": "Biex tikkonnettjah, ħaddem `kilo remote` fuq il-kompjuter tiegħek.",
+    "remoteFound": "Kompjuter konness",
+    "checkAgain": "Iċċekkja mill-ġdid",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

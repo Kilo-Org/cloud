@@ -3025,5 +3025,33 @@
     "loadFailed": "Impossible de charger les langues prises en charge par cet appareil.",
     "emptyTitle": "Aucune langue prise en charge",
     "emptyDescription": "La reconnaissance vocale de cet appareil ne signale aucune langue prise en charge."
+  },
+  "tour": {
+    "eyebrow": "Visite rapide",
+    "forkTitle": "Où souhaitez-vous exécuter Kilo ?",
+    "forkSubtitle": "Choisissez où Kilo exécute votre première session.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Exécutez Kilo dans un environnement cloud isolé, sans rien installer.",
+    "remoteOptionTitle": "Votre ordinateur",
+    "remoteOptionBody": "Exécutez Kilo sur votre propre machine via le CLI `kilo remote`.",
+    "skip": "Passer la visite",
+    "tutorialLabel": "Tutoriel",
+    "cloudTitle": "Démarrez votre première session cloud",
+    "cloudBody": "Créez une nouvelle session et Kilo l'exécute dans le cloud.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "En attente du démarrage de votre session cloud…",
+    "cloudCheck": "Votre première session cloud est en cours d'exécution.",
+    "remoteTitle": "Démarrez votre première session à distance",
+    "remoteBody": "Connectez votre ordinateur, puis démarrez la session depuis ici.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Démarrer une session sur votre ordinateur",
+    "remoteWaiting": "En attente du démarrage de la session par votre ordinateur…",
+    "remoteCheck": "Votre première session à distance est en cours d'exécution.",
+    "remoteEmptyTitle": "Aucun ordinateur connecté pour le moment",
+    "remoteEmptyBody": "Pour le connecter, exécutez `kilo remote` sur votre ordinateur.",
+    "remoteFound": "Ordinateur connecté",
+    "checkAgain": "Vérifier à nouveau",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

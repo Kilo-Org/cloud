@@ -3003,5 +3003,33 @@
     "loadFailed": "આ ઉપકરણ સમર્થન આપે છે તે ભાષાઓ લોડ કરી શકાઈ નથી.",
     "emptyTitle": "કોઈ સમર્થિત ભાષા નથી",
     "emptyDescription": "આ ઉપકરણની વાણી ઓળખ કોઈ સમર્થિત ભાષા નોંધાવતી નથી."
+  },
+  "tour": {
+    "eyebrow": "ઝડપી ટૂર",
+    "forkTitle": "તમે Kilo ક્યાં ચલાવવા માંગો છો?",
+    "forkSubtitle": "તમારા પ્રથમ સત્ર માટે Kilo ક્યાં ચાલે તે પસંદ કરો.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "કંઈ ઇન્સ્ટોલ કર્યા વગર Kilo ને સૅન્ડબૉક્સ કરેલા ક્લાઉડ પર્યાવરણમાં ચલાવો.",
+    "remoteOptionTitle": "તમારું કમ્પ્યુટર",
+    "remoteOptionBody": "તમારા પોતાના મશીન પર `kilo remote` CLI દ્વારા Kilo ચલાવો.",
+    "skip": "ટૂર છોડી દો",
+    "tutorialLabel": "ટ્યુટોરિયલ",
+    "cloudTitle": "તમારી પહેલી ક્લાઉડ સત્ર શરૂ કરો",
+    "cloudBody": "નવું સત્ર બનાવો અને Kilo તેને ક્લાઉડમાં ચલાવશે.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "તમારું ક્લાઉડ સત્ર શરૂ થાય તેની રાહ જોવાઈ રહી છે…",
+    "cloudCheck": "તમારી પહેલી ક્લાઉડ સત્ર ચાલી રહી છે.",
+    "remoteTitle": "તમારી પહેલી રિમોટ સત્ર શરૂ કરો",
+    "remoteBody": "તમારું કમ્પ્યુટર કનેક્ટ કરો, પછી અહીંથી સત્ર શરૂ કરો.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "તમારા કમ્પ્યુટર પર સત્ર શરૂ કરો",
+    "remoteWaiting": "તમારા કમ્પ્યુટર દ્વારા સત્ર શરૂ થાય તેની રાહ જોવાઈ રહી છે…",
+    "remoteCheck": "તમારી પહેલી રિમોટ સત્ર ચાલી રહી છે.",
+    "remoteEmptyTitle": "હજુ કોઈ કમ્પ્યુટર કનેક્ટ થયું નથી",
+    "remoteEmptyBody": "તેને કનેક્ટ કરવા તમારા કમ્પ્યુટર પર `kilo remote` ચલાવો.",
+    "remoteFound": "કમ્પ્યુટર કનેક્ટ થયું",
+    "checkAgain": "ફરી તપાસો",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

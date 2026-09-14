@@ -48,9 +48,9 @@ describe('getCodeReviewTerminalReasonCopy', () => {
 
   it('tells the customer how to recover from each model-limit failure', () => {
     const remedies: Record<string, string> = {
-      assistant_output_limit: 'reasoning effort',
+      assistant_output_limit: 'thinking effort',
       assistant_context_limit: 'split the change',
-      assistant_content_filter: 'content filter',
+      assistant_content_filter: 'different model',
       assistant_structured_output: 'different model',
     };
 

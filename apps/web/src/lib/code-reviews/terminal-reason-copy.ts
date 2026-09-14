@@ -71,7 +71,7 @@ const COPY_BY_TERMINAL_REASON = new Map<CodeReviewTerminalReason, CodeReviewTerm
 
 **This review did not finish.** The model reached its output limit before it
 could write the review — a reasoning model can spend the whole budget thinking.
-Re-run the review, or lower the model's reasoning effort, and it should get
+Re-run the review, or lower the model's thinking effort, and it should get
 further. Any inline comments below are from an earlier review.`,
     },
   ],
@@ -86,10 +86,10 @@ further. Any inline comments below are from an earlier review.`,
       summaryBody: `${KILO_REVIEW_MARKER}
 ## Code Review Summary
 
-**This review did not finish.** The change was larger than the model's context
-window, so the model could not read the whole diff. Try a model with a larger
-context window, or split the change into smaller pull requests. Any inline
-comments below are from an earlier review.`,
+**This review did not finish.** The review needed more context than the model's
+context window allows, so the model could not finish reading the change. Try a
+model with a larger context window, or split the change into smaller pull
+requests. Any inline comments below are from an earlier review.`,
     },
   ],
   [

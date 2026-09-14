@@ -231,6 +231,8 @@
     "voiceInput": "Nhập bằng giọng nói",
     "autoExpandThinking": "Tự động mở phần suy luận",
     "autoExpandThinkingSubtitle": "Hiển thị toàn bộ nội dung suy luận của tác nhân sau khi suy luận xong.",
+    "hideThinking": "Ẩn chi tiết suy luận",
+    "hideThinkingSubtitle": "Không hiển thị suy luận của tác nhân trên trang phiên.",
     "keepScreenOn": "Giữ màn hình sáng khi xem phiên",
     "keepScreenOnSubtitle": "Giữ màn hình sáng khi phiên đang chạy.",
     "appearance": "Giao diện",
@@ -2020,6 +2022,11 @@
       "stepsCount": "{{steps}} bước",
       "stepsCount_other": "{{steps}} bước",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "Tự động phê duyệt",
+      "description": "Tự động phê duyệt các yêu cầu cấp quyền cho phiên này. Sau đó, các công cụ chạy mà không cần nhắc.",
+      "unavailable": "Phiên này không thể nhận yêu cầu cấp quyền."
     },
     "prBadge": {
       "open": "mở yêu cầu hợp nhất",

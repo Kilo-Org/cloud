@@ -243,8 +243,8 @@ const toolActivities: [string, Record<string, unknown>, string][] = [
   ].map(tool => [tool, {}, tool] satisfies [string, Record<string, unknown>, string]),
 ];
 const activityHistories: [string, StoredMessage[], string][] = [
-  ['empty history', [], 'Waiting for activity'],
-  ['incomplete history', [makeStoredMessage()], 'Waiting for activity'],
+  ['empty history', [], 'Thinking'],
+  ['incomplete history', [makeStoredMessage()], 'Thinking'],
   [
     'delayed latest parts',
     [makeStoredMessage([textPart]), makeStoredMessage()],

@@ -231,6 +231,8 @@
     "voiceInput": "Галасавы ўвод",
     "autoExpandThinking": "Аўтаматычна разгортваць развагі",
     "autoExpandThinkingSubtitle": "Паказваць развагі агента разгорнутымі пасля іх завяршэння.",
+    "hideThinking": "Хаваць падрабязнасці разваг",
+    "hideThinkingSubtitle": "Не паказваць развагі агента на старонцы сеанса.",
     "keepScreenOn": "Не выключаць экран на старонцы сеанса",
     "keepScreenOnSubtitle": "Не выключаць экран, пакуль сеанс актыўны.",
     "appearance": "Знешні выгляд",
@@ -2496,6 +2498,11 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} крокі",
       "stepsCount_many": "{{steps}} крокаў"
+    },
+    "autoApprove": {
+      "title": "Аўтаматычнае адабрэнне",
+      "description": "Аўтаматычна ўхваляць запыты на дазвол для гэтага сеансу. Пасля гэтага інструменты запускаюцца без запыту.",
+      "unavailable": "Гэты сеанс не можа атрымліваць запыты на дазвол."
     },
     "prBadge": {
       "open": "адкрыты запыт на зліццё",

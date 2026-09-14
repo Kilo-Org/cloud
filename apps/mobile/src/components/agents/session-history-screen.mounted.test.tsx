@@ -23,13 +23,14 @@ const listState = vi.hoisted(() => ({
   storedSessions: [] as MockStoredSession[],
   isSearching: false,
   isError: false,
-  organization: { organizationId: null as string | null, isLoaded: true },
   // Mirrors the real hook's stored-query flags so the screen's loading
   // decision can be exercised on the first render, before the request
   // settles (isFetching false, isPending true).
   storedIsPending: false,
   storedIsFetching: false,
+  storedFetchedSinceMount: true,
   storedLoadedPageCount: 1,
+  organization: { organizationId: null as string | null, isLoaded: true },
   storedQuery: vi.fn<(options: Parameters<typeof useAgentSessions>[0]) => void>(),
   searchQuery: vi.fn<(options: Parameters<typeof useAgentSessionSearch>[0]) => void>(),
   repositoryQuery: vi.fn<(options: Parameters<typeof useRecentAgentRepositories>[0]) => void>(),
@@ -143,6 +144,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         storedIsError: listState.isError,
         storedIsPending: listState.storedIsPending,
         storedIsFetching: listState.storedIsFetching,
+        storedFetchedSinceMount: listState.storedFetchedSinceMount,
         storedLoadedPageCount: listState.storedLoadedPageCount,
         hasNextPage: false,
         isFetchingNextPage: false,
@@ -267,6 +269,7 @@ describe('SessionHistoryScreen', () => {
     listState.isError = false;
     listState.storedIsPending = false;
     listState.storedIsFetching = false;
+    listState.storedFetchedSinceMount = true;
     listState.storedLoadedPageCount = 1;
     Object.assign(listState.organization, { organizationId: null, isLoaded: true });
     listState.storedQuery.mockClear();
@@ -544,6 +547,19 @@ describe('SessionHistoryScreen', () => {
     const renderer = await renderScreen();
 
     expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(0);
+  });
+
+  it('reserves the search header while the first stored page loads', async () => {
+    // Cold open: no rows yet, first page in flight. The header must occupy its
+    // final space now so the loading skeletons sit where the rows will land
+    // instead of shifting down when the header appears with the rows. The
+    // merged loading decision keys "no data yet" off `storedIsPending`.
+    listState.storedIsPending = true;
+    listState.storedLoadedPageCount = 0;
+    const renderer = await renderScreen();
+
+    expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(1);
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isLoading).toBe(true);
   });
 
   it('mounts the search header once stored rows exist', async () => {

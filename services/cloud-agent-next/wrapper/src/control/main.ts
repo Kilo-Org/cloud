@@ -189,6 +189,8 @@ function main(
         controlUrl: controlConfig.SANDBOX_CONTROL_URL,
         wrapperInstanceId: controlConfig.wrapperInstanceId,
         getKiloRuntime: identity => kiloRuntimes.get(identity),
+        getRetainedKiloRuntime: identity =>
+          kiloRuntimes.getRetained?.(typeof identity === 'string' ? identity : identity.directory),
       })
     : undefined;
   const deps = createControlHandlerDeps({

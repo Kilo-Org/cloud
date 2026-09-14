@@ -32,12 +32,13 @@ import {
 } from './auth.js';
 import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
 import { isControlPlaneOwner, isWorktreeOwner } from '../../src/session-plane.js';
-import { LIFECYCLE_SCENARIOS, type LifecycleResult } from './lifecycle.js';
+import { LIFECYCLE_SCENARIOS, LIFECYCLE_SCENARIO_TIMEOUT_MS, type LifecycleResult } from './lifecycle.js';
 import { FILE_STATE_SCENARIO_TIMEOUT_MS } from './lifecycle-file-state.js';
 import { CONTINUITY_SCENARIO_TIMEOUT_MS } from './lifecycle-continuity.js';
 
 /** Every scenario that accepts an explicit `--timeout-ms` and runs long. */
 const LONG_RUNNING_SCENARIO_TIMEOUT_MS: Record<string, number> = {
+  ...LIFECYCLE_SCENARIO_TIMEOUT_MS,
   ...FILE_STATE_SCENARIO_TIMEOUT_MS,
   ...CONTINUITY_SCENARIO_TIMEOUT_MS,
 };

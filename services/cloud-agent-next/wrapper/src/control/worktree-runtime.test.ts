@@ -2001,7 +2001,7 @@ describe('worktree Kilo runtime registry', () => {
       ).toEqual({
         ok: false,
         error: {
-          code: 'not_ready',
+          code: 'session_busy',
           message: 'Native feed recovery is in progress',
           retryable: true,
           admission: 'not-admitted',

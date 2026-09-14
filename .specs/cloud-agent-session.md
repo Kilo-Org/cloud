@@ -99,6 +99,11 @@ repository.
    session. The repository MUST remain the one chosen at start.
 8. The user MAY change model and mode for later turns. When a profile or agent
    pins the model, the picker MUST be disabled and MUST say why.
+9. A turn that makes no real agent progress for five minutes MUST fail, MUST
+   tell the user the turn did not complete, MUST re-enable the composer, and
+   MUST leave the session usable for a later message. Retry and offline status
+   are not real progress. A stop during a retry MUST still end the turn
+   immediately (rule 6).
 
 ### Composer
 
@@ -327,6 +332,9 @@ asks questions, and opens more chats -- and the chat stays usable throughout.
 5. Sustained load -- many turns, several chats at once, high token rates, or
    large streamed tool output -- MUST NOT by itself make a chat unrecoverable.
    A liveness lapse caused by load is a defect to fix, not an expected failure.
+6. When the environment winds down while a question or permission awaits an
+   answer, the parked turn MUST settle; it MUST NOT remain in progress after the
+   environment is gone.
 
 ### Errors
 
@@ -371,6 +379,14 @@ The following use SHOULD and are not enforced today:
    ready with setup half-done.)
 
 ## Changelog
+
+### 2026-09-12 -- Bounded turn inactivity
+
+- Added Turn rule 9: a turn with no real agent progress for five minutes fails
+  with "Turn did not complete", re-enables the composer, and leaves the session
+  usable. Retry and offline status are not progress. Added Continuity rule 6:
+  a turn parked on an unanswered question or permission must settle when the
+  environment winds down.
 
 ### 2026-09-11 -- Session continuity
 

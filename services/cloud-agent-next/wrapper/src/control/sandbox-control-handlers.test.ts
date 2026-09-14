@@ -727,14 +727,31 @@ describe('handleControlRequest', () => {
     const runtimes = handlerDeps.kiloRuntimes;
     if (!runtimes) throw new Error('Expected Kilo runtimes');
     runtimes.prepareForNewWork = () => false;
+    runtimes.feedRecovering = () => true;
 
     expect(
       await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
     ).toEqual({
       ok: false,
       error: {
-        code: 'not_ready',
+        code: 'session_busy',
         message: 'Native feed recovery is in progress',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+    expect(
+      await handleControlRequest(
+        'session.terminal.create',
+        session,
+        { operationId: '11111111-1111-4111-8111-111111111111' },
+        handlerDeps
+      )
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        message: 'Kilo worktree is not available',
         retryable: true,
         admission: 'not-admitted',
       },
@@ -755,6 +772,147 @@ describe('handleControlRequest', () => {
       ok: true,
       result: { status: 'already_idle' },
     });
+  });
+
+  it('defers a prompt while the native feed is recovering', async () => {
+    const handlerDeps = deps();
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Expected Kilo runtimes');
+    runtimes.prepareForNewWork = () => false;
+    runtimes.feedRecovering = () => true;
+
+    expect(
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'session_busy',
+        message: 'Native feed recovery is in progress',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+  });
+
+  it('reports an unavailable worktree as not_ready rather than feed recovery', async () => {
+    const handlerDeps = deps();
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Expected Kilo runtimes');
+    runtimes.prepareForNewWork = () => false;
+    runtimes.feedRecovering = () => false;
+
+    expect(
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        message: 'Kilo worktree is not available',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+    expect(
+      await handleControlRequest(
+        'session.terminal.create',
+        session,
+        { operationId: '11111111-1111-4111-8111-111111111111' },
+        handlerDeps
+      )
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        message: 'Kilo worktree is not available',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+  });
+
+  it('defers an authorized prompt before admission during feed recovery without retaining a receipt', async () => {
+    const started = Promise.withResolvers<void>();
+    const finished = Promise.withResolvers<Completion>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return finished.promise;
+        },
+      }),
+    });
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Expected Kilo runtimes');
+    runtimes.prepareForNewWork = () => false;
+    runtimes.feedRecovering = () => true;
+    const authorization = {
+      operation: 'session.prompt' as const,
+      operationId: promptPayload.messageId,
+      messageId: promptPayload.messageId,
+      session: { ...session },
+      wrapperInstanceId: crypto.randomUUID(),
+      dispatchDeadlineAt: Date.now() + 60_000,
+    };
+
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        promptPayload,
+        handlerDeps,
+        authorization
+      )
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'session_busy',
+        message: 'Native feed recovery is in progress',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+    expect(handlerDeps.operations.counts()).toEqual({ active: 0, retained: 0, archived: 0 });
+    expect(handlerDeps.operations.active(session.kiloSessionId)).toBeUndefined();
+    expect(handlerDeps.operations.retained()).toEqual([]);
+
+    runtimes.prepareForNewWork = () => true;
+    runtimes.feedRecovering = () => false;
+    try {
+      expect(
+        await handleControlRequest(
+          'session.prompt',
+          session,
+          promptPayload,
+          handlerDeps,
+          authorization
+        )
+      ).toEqual({
+        ok: true,
+        result: {
+          messageId: promptPayload.messageId,
+          status: 'accepted',
+          executionDeadlineAt: expect.any(Number),
+        },
+      });
+      await started.promise;
+      expect(handlerDeps.operations.retained()).toHaveLength(1);
+      expect(
+        await handleControlRequest(
+          'session.prompt',
+          session,
+          promptPayload,
+          handlerDeps,
+          authorization
+        )
+      ).toMatchObject({
+        ok: true,
+        result: { messageId: promptPayload.messageId, status: 'existing' },
+      });
+      expect(handlerDeps.operations.retained()).toHaveLength(1);
+    } finally {
+      finished.resolve(completion());
+      await waitForTasks(handlerDeps);
+    }
   });
 
   it('does not send an unfenced abort when the wrapper owns no work', async () => {

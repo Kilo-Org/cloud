@@ -78,9 +78,7 @@ export function diagnosticEventType(value: string): string {
 export function diagnosticCause(value: string): string {
   return CAUSES.has(value)
     ? value.replaceAll(' ', '_')
-    : value
-        .replace(/[^a-zA-Z0-9_.:-]/g, '_')
-        .slice(0, CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH);
+    : value.replace(/[^a-zA-Z0-9_.:-]/g, '_').slice(0, CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH);
 }
 
 const DELTA_PROGRESS_EVENTS = new Set([

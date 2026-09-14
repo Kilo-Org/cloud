@@ -3,8 +3,10 @@ import { stat } from 'node:fs/promises';
 import {
   createWorktreeChat,
   fetchFakeScenarioStatus,
+  getMessageResult,
   getSessionSnapshot,
   interruptSession,
+  isMessageCompleted,
   prepareBrowserSession,
   releaseGate,
   sendMessage,
@@ -15,10 +17,12 @@ import {
   type WorktreeSessionResult,
 } from './client.js';
 import {
+  ControlPlaneContainerUnavailableError,
   findControlPlaneKiloRuntime,
   inspectControlPlaneHistory,
   inspectControlPlaneKiloRoot,
   inspectControlPlaneWorkspaceFile,
+  isSandboxPrimaryGone,
   listSandboxContainers,
   sandboxFamilyKey,
   stopOwnedControlPlaneSandbox,
@@ -258,6 +262,20 @@ function remaining(resources: ScenarioResources, label: string): number {
   return timeoutMs;
 }
 
+/**
+ * True only for a raw Docker-exec failure aimed at this exact container. The
+ * message must begin with the command prefix `Command failed: docker exec
+ * <id> `; a substring match would also fire on an assertion that merely
+ * mentions the command, or on another container's command that embeds this id.
+ * The typed unavailable error is never a raw Docker-exec failure and is
+ * excluded.
+ */
+export function isDockerExecFailureForContainer(error: unknown, containerId: string): boolean {
+  if (error instanceof ControlPlaneContainerUnavailableError) return false;
+  if (!(error instanceof Error)) return false;
+  return error.message.startsWith(`Command failed: docker exec ${containerId} `);
+}
+
 function trackSession(resources: ScenarioResources, session: WorktreeSessionResult): void {
   resources.sessions.set(session.kiloSessionId, session);
   if (resources.cleanupStarted) resources.lateUncleanedResource = true;
@@ -396,6 +414,7 @@ export async function runGatedFileTurn(
       filePath: input.expectedFile.path,
     })
   );
+  if (file.unavailable) throw new Error(file.reason);
   if (!file.exists || file.contents !== input.expectedFile.contents || !file.dirty) {
     throw new Error(
       `file ${input.expectedFile.path} mismatch: exists=${file.exists}; dirty=${file.dirty}; contents=${JSON.stringify(file.contents)}`
@@ -762,6 +781,7 @@ export async function lifecycleColdResume(args: LifecycleArgs): Promise<Lifecycl
         filePath: sentinelPath,
       })
     );
+    if (preColdState.unavailable) throw new Error(preColdState.reason);
     if (!preColdState.exists || preColdState.contents === undefined || !preColdState.dirty) {
       throw new Error('pre-cold sentinel was not captured as a dirty file');
     }
@@ -844,6 +864,7 @@ export async function lifecycleColdResume(args: LifecycleArgs): Promise<Lifecycl
         assistantMarker: `done-${preColdGateTag}`,
       })
     );
+    if (history.unavailable) throw new Error(history.reason);
     if (!history.userEntryFound || !history.assistantEntryFound) {
       throw new Error(
         `resumed history missing pre-cold entries: user=${history.userEntryFound}; assistant=${history.assistantEntryFound}`
@@ -860,9 +881,13 @@ export async function lifecycleColdResume(args: LifecycleArgs): Promise<Lifecycl
           filePath: sentinelPath,
         })
       );
-      const exactMatch =
-        resumedFile.exists && resumedFile.dirty && resumedFile.contents === capturedContents;
-      fileSurvivalObservation = `fileSurvived=${exactMatch} (observed, exact-equality)`;
+      if (resumedFile.unavailable) {
+        fileSurvivalObservation = `fileSurvived=unavailable:${resumedFile.reason}`;
+      } else {
+        const exactMatch =
+          resumedFile.exists && resumedFile.dirty && resumedFile.contents === capturedContents;
+        fileSurvivalObservation = `fileSurvived=${exactMatch} (observed, exact-equality)`;
+      }
     } catch (error) {
       fileSurvivalObservation = `fileSurvived=error:${errorMessage(error)}`;
     }
@@ -870,29 +895,128 @@ export async function lifecycleColdResume(args: LifecycleArgs): Promise<Lifecycl
       releaseGate(resources.config.fakeLlmUrl, resumedPromptTag, signal)
     );
     resources.ownedGateTags.delete(resumedPromptTag);
-    await resources.within('gate-only resume completion', () =>
-      waitForOwnedCompletion(
-        resumedRuntime,
-        session,
-        resumedMessage.messageId,
-        `done-${resumedPromptTag}`,
-        remaining(resources, 'gate-only resume completion')
-      )
+    const resumedContainerId = resumedRuntime.container.id;
+    // Docker is a live oracle only while a runtime is discoverable NOW. A
+    // final probe must not spend the scenario budget waiting, so use one-shot
+    // `findControlPlaneKiloRuntime` (may return null) instead of
+    // `waitForOwnedRuntime` (which waits and throws on absence).
+    const ABSENCE_RECONFIRM_RESERVE_MS = 2_000;
+    // Bounded absence re-confirm for a reap that is still in flight. The poll
+    // budget is strictly less than the scenario remaining so the one-shot
+    // recheck and the durable `getMessageResult` read below still fit; the
+    // `resources.within` wrapper is the hard wall-clock cutoff. Absence only
+    // observed at that cutoff is a failure, not a pass.
+    const pollForAbsence = async (container: SandboxContainer): Promise<void> => {
+      const budgetMs = resources.deadlineAt - Date.now();
+      if (budgetMs <= ABSENCE_RECONFIRM_RESERVE_MS) {
+        throw new Error(
+          `insufficient scenario budget to re-confirm ${container.id} absence before the durable completion read`
+        );
+      }
+      const gone = await resources.within('post-resume absence reconfirm', () =>
+        waitForSandboxPrimaryGone(container, budgetMs - ABSENCE_RECONFIRM_RESERVE_MS)
+      );
+      if (!gone) {
+        throw new Error(
+          `resumed container ${container.id} is still listed after the absence re-confirm window`
+        );
+      }
+      if (resources.deadlineAt - Date.now() <= 0) {
+        throw new Error(
+          `scenario budget exhausted after confirming ${container.id} absence; refusing to skip the durable completion read`
+        );
+      }
+    };
+    const assertCompletedAfterDisappearance = async (containerId: string): Promise<void> => {
+      const containers = await resources.within('post-resume container absence check', () =>
+        listSandboxContainers()
+      );
+      if (!isSandboxPrimaryGone(containers, containerId)) {
+        // Running but its Kilo runtime is not discoverable: running-but-unproven
+        // is a failure, never a stream/durable fallback.
+        throw new Error(
+          `resumed container ${containerId} is still running but its Kilo runtime was not discoverable`
+        );
+      }
+      // Only a confirmed-absent resumed container may rely on the two
+      // message-id-specific surfaces: stream completion and durable completion.
+      if (!resumedStream.events.some(event => isMessageCompleted(event, resumedMessage.messageId))) {
+        throw new Error(
+          `no streamed cloud.message.completed for ${resumedMessage.messageId} after resumed container ${containerId} disappeared`
+        );
+      }
+      const durable = await resources.within('post-resume durable completion', () =>
+        getMessageResult(resources.config, session.cloudAgentSessionId, resumedMessage.messageId)
+      );
+      if (durable.status !== 'completed') {
+        throw new Error(
+          `resumed message ${resumedMessage.messageId} durable status=${durable.status} after container disappearance; expected completed`
+        );
+      }
+    };
+
+    const runtimeNow = await resources.within('post-resume runtime discovery', () =>
+      findControlPlaneKiloRuntime(session.kiloSessionId)
     );
-    const finalFile = await resources.within('post-resume head check', () =>
-      inspectControlPlaneWorkspaceFile(resumedRuntime, {
-        kiloSessionId: session.kiloSessionId,
-        filePath: sentinelPath,
-      })
-    );
-    if (finalFile.head !== sentinelHead) throw new Error('resume unexpectedly changed git head');
+    if (runtimeNow) {
+      recordOwnedRuntime(resources, session.kiloSessionId, runtimeNow.container);
+    }
+    let headStable = false;
+    if (runtimeNow) {
+      try {
+        await resources.within('gate-only resume completion', () =>
+          waitForOwnedCompletion(
+            runtimeNow,
+            session,
+            resumedMessage.messageId,
+            `done-${resumedPromptTag}`,
+            remaining(resources, 'gate-only resume completion')
+          )
+        );
+        const finalFile = await resources.within('post-resume head check', () =>
+          inspectControlPlaneWorkspaceFile(runtimeNow, {
+            kiloSessionId: session.kiloSessionId,
+            filePath: sentinelPath,
+          })
+        );
+        if (finalFile.unavailable) {
+          // The file probe classifies a mid-exec disappearance itself and
+          // returns `{ unavailable: true }` rather than throwing. Route that
+          // result through the same confirmed-absent completion path.
+          await assertCompletedAfterDisappearance(runtimeNow.container.id);
+        } else {
+          if (finalFile.head !== sentinelHead) {
+            throw new Error('resume unexpectedly changed git head');
+          }
+          headStable = true;
+        }
+      } catch (error) {
+        if (error instanceof ControlPlaneContainerUnavailableError) {
+          await assertCompletedAfterDisappearance(runtimeNow.container.id);
+        } else if (isDockerExecFailureForContainer(error, runtimeNow.container.id)) {
+          // The reaper is in flight: `docker ps` still lists the container
+          // while a Docker-exec against exactly this runtime failed. Give the
+          // stop a bounded window to settle, then require confirmed-absent.
+          await pollForAbsence(runtimeNow.container);
+          await assertCompletedAfterDisappearance(runtimeNow.container.id);
+        } else {
+          // Discovery, Kilo identity/HTTP, and assertion failures stay failures.
+          throw error;
+        }
+      }
+    } else {
+      // Discovery returned null; the previously proven resumed container may
+      // still be reaping, so re-confirm its absence under the same bound.
+      await pollForAbsence(resumedRuntime.container);
+      await assertCompletedAfterDisappearance(resumedContainerId);
+    }
     result = scenarioResult(
       'cold-resume',
       args,
       startedAt,
       resources.events,
       true,
-      `coldAt=${idleEvidence.elapsedMs}; resumed=${resumedRuntime.container.id}; ${fileSurvivalObservation}; historySurvived=true (asserted, pre-cold user messageId + marker); headStable=true; exportHadSentinelDiff=${exportHadSentinelDiff} (observed)`
+      `coldAt=${idleEvidence.elapsedMs}; resumed=${resumedRuntime.container.id}; ${fileSurvivalObservation}; historySurvived=true (asserted, pre-cold user messageId + marker); ${headStable ? 'headStable=true' : 'head stability unverified after disappearance'}; exportHadSentinelDiff=${exportHadSentinelDiff} (observed)`
     );
   } catch (error) {
     if (resumedAdmissionReconciled && resumedAdmission) {
@@ -939,14 +1063,14 @@ export async function lifecycleMultiSessionCollab(args: LifecycleArgs): Promise<
     });
     const planPath = `plan-${runId}.md`;
     const planContents = `plan-token-${runId}`;
-    const initialHead = (
-      await resources.within('initial planner HEAD capture', () =>
-        inspectControlPlaneWorkspaceFile(runtime, {
-          kiloSessionId: planner.kiloSessionId,
-          filePath: planPath,
-        })
-      )
-    ).head;
+    const initialFile = await resources.within('initial planner HEAD capture', () =>
+      inspectControlPlaneWorkspaceFile(runtime, {
+        kiloSessionId: planner.kiloSessionId,
+        filePath: planPath,
+      })
+    );
+    if (initialFile.unavailable) throw new Error(initialFile.reason);
+    const initialHead = initialFile.head;
     const ownership = await resources.within('planner worktree ownership', () =>
       readWorktreeOwnership(args.config, [planner.kiloSessionId])
     );
@@ -1102,6 +1226,7 @@ export async function lifecycleMultiSessionCollab(args: LifecycleArgs): Promise<
     );
     if (
       files.some((file, index) => {
+        if (file.unavailable) throw new Error(file.reason);
         const expected = [planContents, implementationContents, reviewContents][index];
         return (
           !file.exists || !file.dirty || file.contents !== expected || file.head !== initialHead

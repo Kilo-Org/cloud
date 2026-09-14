@@ -59,7 +59,8 @@ export async function handleCreateTown(c: Context<GastownEnv>, params: { userId:
 }
 
 export async function handleListTowns(c: Context<GastownEnv>, params: { userId: string }) {
-  if (c.get('kiloUserId') !== params.userId) return c.json(resError('Forbidden'), 403);
+  if (c.get('kiloUserId') !== params.userId && !c.get('kiloIsAdmin'))
+    return c.json(resError('Forbidden'), 403);
   const townDO = getGastownUserStub(c.env, params.userId);
   const towns = await townDO.listTowns();
   return c.json(resSuccess(towns));
@@ -69,7 +70,8 @@ export async function handleGetTown(
   c: Context<GastownEnv>,
   params: { userId: string; townId: string }
 ) {
-  if (c.get('kiloUserId') !== params.userId) return c.json(resError('Forbidden'), 403);
+  if (c.get('kiloUserId') !== params.userId && !c.get('kiloIsAdmin'))
+    return c.json(resError('Forbidden'), 403);
   const townDO = getGastownUserStub(c.env, params.userId);
   const town = await townDO.getTownAsync(params.townId);
   if (!town) return c.json(resError('Town not found'), 404);
@@ -133,7 +135,8 @@ export async function handleGetRig(
   c: Context<GastownEnv>,
   params: { userId: string; rigId: string }
 ) {
-  if (c.get('kiloUserId') !== params.userId) return c.json(resError('Forbidden'), 403);
+  if (c.get('kiloUserId') !== params.userId && !c.get('kiloIsAdmin'))
+    return c.json(resError('Forbidden'), 403);
   const townDO = getGastownUserStub(c.env, params.userId);
   const rig = await townDO.getRigAsync(params.rigId);
   if (!rig) return c.json(resError('Rig not found'), 404);
@@ -144,7 +147,8 @@ export async function handleListRigs(
   c: Context<GastownEnv>,
   params: { userId: string; townId: string }
 ) {
-  if (c.get('kiloUserId') !== params.userId) return c.json(resError('Forbidden'), 403);
+  if (c.get('kiloUserId') !== params.userId && !c.get('kiloIsAdmin'))
+    return c.json(resError('Forbidden'), 403);
   const townDO = getGastownUserStub(c.env, params.userId);
   const rigs = await townDO.listRigs(params.townId);
   return c.json(resSuccess(rigs));

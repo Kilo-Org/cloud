@@ -56,7 +56,7 @@ describe('authorizeTown', () => {
   });
 
   it('allows a current active admin', async () => {
-    rows([{ pepper: 'pepper', blockedAt: null, blockedReason: null, isAdmin: true }]);
+    rows([{ pepper: 'pepper', blockedAt: null, blockedReason: null, isAdmin: true }], []);
     await expect(
       authorizeTown(
         { HYPERDRIVE: { connectionString: 'postgres://' } } as Env,
@@ -65,6 +65,41 @@ describe('authorizeTown', () => {
         'pepper'
       )
     ).resolves.toEqual({ type: 'admin' });
+  });
+
+  it.each([
+    ['owner', 'user'],
+    ['other-admin', 'admin'],
+  ])('preserves personal ownership before admin fallback for %s', async (userId, type) => {
+    rows([{ pepper: 'pepper', blockedAt: null, blockedReason: null, isAdmin: true }]);
+    await expect(
+      authorizeTown(
+        { HYPERDRIVE: { connectionString: 'postgres://' } } as Env,
+        { ...identity, ownerType: 'user', organizationId: undefined },
+        userId,
+        'pepper'
+      )
+    ).resolves.toEqual({ type });
+  });
+
+  it.each([
+    ['owner', { type: 'org', organizationId: 'org-1', role: 'owner' }],
+    ['member', { type: 'org', organizationId: 'org-1', role: 'member' }],
+    ['billing_manager', { type: 'admin' }],
+    [null, { type: 'admin' }],
+  ])('preserves current org role %j before admin inspection fallback', async (role, expected) => {
+    rows(
+      [{ pepper: 'pepper', blockedAt: null, blockedReason: null, isAdmin: true }],
+      role ? [{ role }] : []
+    );
+    await expect(
+      authorizeTown(
+        { HYPERDRIVE: { connectionString: 'postgres://' } } as Env,
+        identity,
+        'user',
+        'pepper'
+      )
+    ).resolves.toEqual(expected);
   });
 
   it('reports a personal-town authority database failure as unavailable', async () => {

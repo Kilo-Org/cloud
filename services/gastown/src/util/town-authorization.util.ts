@@ -51,7 +51,6 @@ export async function authorizeOrganization(
     ) {
       return null;
     }
-    if (options?.allowAdmin && principal.isAdmin) return { isAdmin: true };
 
     const [membership] = await db
       .select({ role: organization_memberships.role })
@@ -66,8 +65,8 @@ export async function authorizeOrganization(
       )
       .limit(1);
 
-    if (!membership || membership.role === 'billing_manager') return null;
-    return membership;
+    if (membership && membership.role !== 'billing_manager') return membership;
+    return options?.allowAdmin && principal.isAdmin ? { isAdmin: true } : null;
   } catch (error) {
     if (error instanceof TownAuthorizationUnavailableError) throw error;
     throw new TownAuthorizationUnavailableError();
@@ -136,6 +135,6 @@ export async function authorizeTown(
     return null;
   }
 
-  if (principal.isAdmin) return { type: 'admin' };
-  return identity.ownerUserId === userId ? { type: 'user' } : null;
+  if (identity.ownerUserId === userId) return { type: 'user' };
+  return principal.isAdmin ? { type: 'admin' } : null;
 }

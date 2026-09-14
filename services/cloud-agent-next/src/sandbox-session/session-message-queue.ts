@@ -345,6 +345,39 @@ export function releaseCompletedRetryableAttach(
   });
 }
 
+export function rotateLostPreparationAttempt(
+  messages: readonly SessionMessageRecord[],
+  messageId: string,
+  retryNotBefore: number
+): SessionMessageRecord[] | undefined {
+  const message = messages.find(item => item.messageId === messageId);
+  if (
+    !message ||
+    message.state !== 'queued' ||
+    message.preparationAttemptId === undefined ||
+    message.unresolvedDispatch ||
+    message.operations?.attach?.dispatched === true ||
+    message.operations?.prompt?.dispatched === true
+  )
+    return undefined;
+  return messages.map(item => {
+    if (item.messageId !== messageId) return item;
+    const operations = { ...item.operations };
+    // Drop only definitively unadmitted proofs (dispatched === false after an
+    // authoritative not-admitted rejection). Retain retiredAttach: it is consulted
+    // only for late results of the old authorization and cannot block re-dispatch.
+    if (operations.attach?.dispatched !== true) delete operations.attach;
+    if (operations.prompt?.dispatched !== true) delete operations.prompt;
+    return {
+      ...item,
+      preparationAttemptId: undefined,
+      deliveryRetryScope: undefined,
+      retryNotBefore,
+      ...(Object.keys(operations).length > 0 ? { operations } : { operations: undefined }),
+    };
+  });
+}
+
 export function incrementDeliveryFailure(
   messages: readonly SessionMessageRecord[],
   messageId: string,

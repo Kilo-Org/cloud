@@ -11,7 +11,10 @@ import {
 } from '../container-usage-context.js';
 import type { Env } from '../types.js';
 import type { VercelSandboxCreateEnvelope } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
-import type { SandboxHeartbeatPayload } from '../shared/sandbox-control-protocol.js';
+import {
+  isSandboxAcquisitionLostError,
+  type SandboxHeartbeatPayload,
+} from '../shared/sandbox-control-protocol.js';
 import type {
   SandboxControlConnectionIdentity,
   SandboxControlOutboundRequest,
@@ -173,6 +176,18 @@ async function harness(
   let transactionTail: Promise<unknown> = Promise.resolve();
   let transactionActive = false;
   const storage = {
+    kv: {
+      get: <T = unknown>(key: string): T | undefined =>
+        structuredClone(records.get(key)) as T | undefined,
+      put: <T>(key: string, value: T): void => {
+        records.set(key, structuredClone(value));
+      },
+      delete: (key: string): boolean => records.delete(key),
+      list: <T = unknown>(options?: SyncKvListOptions): Iterable<[string, T]> =>
+        [...records.entries()]
+          .filter(([key]) => key.startsWith(options?.prefix ?? ''))
+          .map(([key, value]) => [key, structuredClone(value) as T]),
+    },
     async get<T>(key: string): Promise<T | undefined> {
       return structuredClone(records.get(key)) as T | undefined;
     },
@@ -306,6 +321,7 @@ async function harness(
     ),
     getControlState: vi.fn().mockResolvedValue(null),
     receiveSandboxControlEvent: vi.fn().mockResolvedValue({ applied: true }),
+    receiveSandboxControlEventBatch: vi.fn().mockResolvedValue({ outcomes: [] }),
     receiveSandboxControlPreparing: vi.fn().mockResolvedValue({ applied: true }),
     failWaitingMessages: vi.fn().mockResolvedValue(undefined),
     invalidateTerminalRuntime: vi.fn().mockResolvedValue(undefined),
@@ -329,6 +345,7 @@ async function harness(
     closeProvisionalSockets: vi.fn(),
     supportsOperationResults: () => true,
     supportsNativeRuntimeRetirement: () => true,
+    pendingControlRequests: () => 0,
     sendRequest,
   } as unknown as SandboxControlSocketHandler;
   mocks.socket.mockImplementation(
@@ -1283,7 +1300,11 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
     expect(h.runtime(original.providerInstanceId)?.state.running).toBe(false);
     await h.evict();
-    await expect(h.acquire(acquisition)).rejects.toThrow('no longer owns this allocation');
+    const lostPromise = h.acquire(acquisition);
+    await expect(lostPromise).rejects.toThrow('no longer owns this allocation');
+    const lost = await lostPromise.catch(error => error);
+    expect(isSandboxAcquisitionLostError(lost)).toBe(true);
+    expect(lost).toMatchObject({ message: 'Sandbox acquisition no longer owns this allocation' });
     expect(mocks.providerCreate).toHaveBeenCalledOnce();
     expect(h.allocations.size).toBe(1);
     await h.acquire({ ...acquisition, id: 'attempt_b' });
@@ -1320,10 +1341,43 @@ describe('SandboxControl lifecycle boundaries', () => {
     const replacement = await h.ready();
     billing.resolve();
     await expect(acquiring).rejects.toThrow('runtime changed during billing admission');
+    const changed = await acquiring.catch(error => error);
+    expect(isSandboxAcquisitionLostError(changed)).toBe(true);
+    expect(changed).toMatchObject({ message: 'Sandbox runtime changed during billing admission' });
     await h.evict();
     await expect(h.acquire(acquisition)).rejects.toThrow('no longer owns this allocation');
     expect((await h.control.getPhysicalRecord()).providerRef).toBe(replacement.providerInstanceId);
     expect(h.allocations.size).toBe(2);
+  });
+
+  it('keeps the synthetic tombstone-free same-allocation billing transition generic', async () => {
+    const h = await harness();
+    await h.create();
+    const original = await h.ready();
+    const runtime = h.runtime(original.providerInstanceId);
+    if (!runtime) throw new Error('Missing runtime');
+    const billing = deferred<void>();
+    const entered = deferred<void>();
+    runtime.configureBilling.mockImplementationOnce(() => {
+      entered.resolve();
+      return billing.promise;
+    });
+    const acquisition = {
+      id: 'attempt_synthetic',
+      deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+    };
+    const acquiring = h.acquire(acquisition);
+    await entered.promise;
+    const physical = await h.control.getPhysicalRecord();
+    // Synthetic defensive fixture: no production transition was established to produce this record.
+    h.records.set('physical_record', { ...physical, state: 'unknown', stopTombstone: null });
+    billing.resolve();
+    const changed = await acquiring.then(
+      () => new Error('Expected a billing admission state rejection'),
+      error => error
+    );
+    expect(changed).toMatchObject({ message: 'Sandbox runtime changed during billing admission' });
+    expect(isSandboxAcquisitionLostError(changed)).toBe(false);
   });
 
   it('prunes expired receipts on demand without reviving an expired acquisition or adding receipt alarms', async () => {
@@ -3909,6 +3963,187 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
   });
 
+  describe('event batch forwarding', () => {
+    const batchSession = {
+      directory: ROUTE.directory,
+      kiloSessionId: ROUTE.kiloSessionId,
+      rootKiloSessionId: ROUTE.kiloSessionId,
+      nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+    };
+
+    function batchItems() {
+      return [1, 2].map(sequence => ({
+        event: 'session.event' as const,
+        session: batchSession,
+        payload: {
+          type: 'session.updated',
+          properties: { info: { id: ROUTE.kiloSessionId, title: `batch ${sequence}` } },
+        },
+        receiptId: crypto.randomUUID(),
+        sequence,
+      }));
+    }
+
+    it('forwards one batch as a single session call and returns per-item outcomes', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const items = batchItems();
+      const outcomes = items.map((item, index) =>
+        index === 0
+          ? { receiptId: item.receiptId, status: 'applied' }
+          : { receiptId: item.receiptId, status: 'rejected', retryable: true }
+      );
+      h.session.receiveSandboxControlEventBatch.mockResolvedValueOnce({ outcomes });
+
+      await expect(h.hooks.onSessionEventBatch?.({ items }, connection)).resolves.toEqual({
+        outcomes,
+      });
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledExactlyOnceWith({
+        items,
+        wrapperInstanceId: connection.wrapperInstanceId,
+      });
+    });
+
+    it('rejects a batch that crosses root or native identity boundaries without forwarding', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const [first] = batchItems();
+      const items = [
+        first,
+        {
+          ...first,
+          receiptId: crypto.randomUUID(),
+          sequence: 2,
+          session: { ...batchSession, nativeRuntimeId: '22222222-2222-4222-8222-222222222222' },
+        },
+      ];
+
+      const result = await h.hooks.onSessionEventBatch?.(
+        { items } as Parameters<NonNullable<typeof h.hooks.onSessionEventBatch>>[0],
+        connection
+      );
+      expect(result?.outcomes.map(outcome => outcome.status)).toEqual(['rejected', 'rejected']);
+      expect(h.session.receiveSandboxControlEventBatch).not.toHaveBeenCalled();
+    });
+
+    it('reports unknown outcomes when the session batch RPC is attempted but fails', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const items = batchItems();
+      const forwarding = deferred<{ outcomes: never[] }>();
+      h.session.receiveSandboxControlEventBatch.mockReturnValue(forwarding.promise);
+
+      const pending = h.hooks.onSessionEventBatch?.(
+        { items } as Parameters<NonNullable<typeof h.hooks.onSessionEventBatch>>[0],
+        connection
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledOnce();
+      forwarding.reject(new Error('Session transport failed'));
+
+      await expect(pending).resolves.toEqual({
+        outcomes: items.map(item => ({
+          receiptId: item.receiptId,
+          status: 'unknown',
+          retryable: true,
+        })),
+      });
+    });
+
+    it('reports unattempted when the batch is rejected before the RPC', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const items = batchItems();
+
+      const result = await h.hooks.onSessionEventBatch?.(
+        { items } as Parameters<NonNullable<typeof h.hooks.onSessionEventBatch>>[0],
+        { ...connection, connectionId: 'stale_connection' }
+      );
+
+      expect(result?.outcomes.map(outcome => outcome.status)).toEqual([
+        'unattempted',
+        'unattempted',
+      ]);
+      expect(h.session.receiveSandboxControlEventBatch).not.toHaveBeenCalled();
+    });
+
+    it('does not report an aggregate applied result for an entirely rejected batch', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const items = batchItems();
+      h.session.receiveSandboxControlEventBatch.mockResolvedValueOnce({
+        outcomes: items.map(item => ({
+          receiptId: item.receiptId,
+          status: 'rejected',
+          retryable: true,
+        })),
+      });
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.hooks.onSessionEventBatch?.(
+          { items } as Parameters<NonNullable<typeof h.hooks.onSessionEventBatch>>[0],
+          connection
+        );
+        expect(withFields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'forward_result',
+            operation: 'receiveSandboxControlEventBatch',
+            result: 'delivered',
+            applied: false,
+          })
+        );
+      } finally {
+        withFields.mockRestore();
+      }
+    });
+
+    it('serializes a later batch behind an unsettled earlier batch RPC', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const firstItems = batchItems();
+      const secondItems = batchItems().map((item, index) => ({ ...item, sequence: 3 + index }));
+      const first = deferred<{ outcomes: Array<{ receiptId: string; status: string }> }>();
+      const second = deferred<{ outcomes: Array<{ receiptId: string; status: string }> }>();
+      h.session.receiveSandboxControlEventBatch
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValueOnce(second.promise);
+      const applied = (items: typeof firstItems) => ({
+        outcomes: items.map(item => ({ receiptId: item.receiptId, status: 'applied' })),
+      });
+
+      const pendingFirst = h.hooks.onSessionEventBatch?.(
+        { items: firstItems } as Parameters<NonNullable<typeof h.hooks.onSessionEventBatch>>[0],
+        connection
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledTimes(1);
+
+      const pendingSecond = h.hooks.onSessionEventBatch?.(
+        { items: secondItems } as Parameters<NonNullable<typeof h.hooks.onSessionEventBatch>>[0],
+        connection
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledTimes(1);
+
+      first.resolve(applied(firstItems));
+      await expect(pendingFirst).resolves.toEqual(applied(firstItems));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledTimes(2);
+      expect(h.session.receiveSandboxControlEventBatch.mock.calls[1]?.[0]).toMatchObject({
+        items: secondItems,
+      });
+
+      second.resolve(applied(secondItems));
+      await expect(pendingSecond).resolves.toEqual(applied(secondItems));
+    });
+  });
+
   describe('receipt-backed session forwarding', () => {
     it('preserves pending native attach retryability through Control and the publication socket', async () => {
       const h = await harness();
@@ -4444,7 +4679,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     );
   });
 
-  it('forwards raw events and preparation with the runtime fence, then quarantines an exhausted delivery', async () => {
+  it('forwards raw events and preparation with the runtime fence, then keeps the runtime usable after a failed delivery', async () => {
     const h = await harness();
     await h.create();
     const connection = await h.ready();
@@ -4480,11 +4715,171 @@ describe('SandboxControl lifecycle boundaries', () => {
     h.session.receiveSandboxControlEvent.mockRejectedValue(new Error('session offline'));
     await h.hooks.onSessionEvent?.(identity, payload, connection);
     await h.flush();
-    expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
-      'session_delivery_failed',
-      connection.wrapperInstanceId
+    expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+    expect(h.runtime(connection.providerInstanceId)?.state.running).toBe(true);
+    expect(h.socket.getConnectionIdentity()).toEqual(connection);
+  });
+
+  it('serializes forwarding for one canonical destination across session aliases', async () => {
+    const pending = deferred<{ applied: boolean }>();
+    const h = await harness();
+    await h.create();
+    const connection = await h.ready();
+    h.session.receiveSandboxControlEvent.mockReturnValueOnce(pending.promise);
+    const payload = {
+      type: 'session.message.outcome',
+      properties: { messageId: 'msg_1', status: 'completed' },
+    };
+    const directoryOnly = { directory: ROUTE.directory };
+    const identified = { directory: ROUTE.directory, kiloSessionId: ROUTE.kiloSessionId };
+    await h.hooks.onSessionEvent?.(directoryOnly, payload, connection);
+    await h.hooks.onSessionEvent?.(identified, payload, connection);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+    pending.resolve({ applied: true });
+    await h.flush();
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(2);
+    expect(h.session.receiveSandboxControlEvent.mock.calls[0]?.[0]).toMatchObject({
+      identity: directoryOnly,
+    });
+    expect(h.session.receiveSandboxControlEvent.mock.calls[1]?.[0]).toMatchObject({
+      identity: identified,
+    });
+  });
+
+  it('drops a queued publication whose canonical destination changed before forwarding', async () => {
+    const pending = deferred<{ applied: boolean }>();
+    const h = await harness();
+    await h.create();
+    const connection = await h.ready();
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.session.receiveSandboxControlEvent.mockReturnValueOnce(pending.promise);
+    const payload = {
+      type: 'session.message.outcome',
+      properties: { messageId: 'msg_1', status: 'completed' },
+    };
+    const first = h.hooks.onSessionEvent?.(
+      { directory: route.directory, kiloSessionId: route.kiloSessionId },
+      payload,
+      connection,
+      '33333333-3333-4333-8333-333333333333',
+      1
     );
-    expect(h.runtime(connection.providerInstanceId)?.state.running).toBe(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+    const queued = h.hooks.onSessionEvent?.(
+      { directory: route.directory },
+      payload,
+      connection,
+      '44444444-4444-4444-8444-444444444444',
+      2
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+
+    h.records.set('session_routes', [
+      {
+        ...route,
+        sessionId: 'workspace_22222222-2222-4222-8222-222222222222',
+        kiloSessionId: 'ses_22222222222222222222222222',
+        nativeRuntimeId,
+      },
+    ]);
+    pending.resolve({ applied: true });
+    await expect(queued).resolves.toEqual({ applied: false });
+    await expect(first).resolves.toMatchObject({ applied: false });
+    await h.flush();
+    expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('withholds a late publication until settlement, then reports delivered-late evidence and releases the lane', async () => {
+    const h = await harness();
+    await h.create();
+    const connection = await h.ready();
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    const late = deferred<{ applied: boolean }>();
+    const queued = deferred<{ applied: boolean }>();
+    h.session.receiveSandboxControlEvent
+      .mockReturnValueOnce(late.promise)
+      .mockReturnValueOnce(queued.promise);
+    const payload = {
+      type: 'session.message.outcome',
+      properties: { messageId: 'msg_1', status: 'completed' },
+    };
+    const identity = {
+      directory: route.directory,
+      kiloSessionId: route.kiloSessionId,
+      nativeRuntimeId,
+    };
+    try {
+      const first = h.hooks.onSessionEvent?.(
+        identity,
+        payload,
+        connection,
+        '33333333-3333-4333-8333-333333333333',
+        1
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+      let settled = false;
+      void Promise.resolve(first).then(() => {
+        settled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt + 1);
+      expect(settled).toBe(false);
+      expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+      expect(withFields).toHaveBeenCalledWith(
+        expect.objectContaining({
+          diagnosticEvent: 'forward_response_timeout',
+          operation: 'receiveSandboxControlEvent',
+        })
+      );
+
+      const second = h.hooks.onSessionEvent?.(
+        identity,
+        payload,
+        connection,
+        '44444444-4444-4444-8444-444444444444',
+        2
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
+
+      expect(withFields).not.toHaveBeenCalledWith(
+        expect.objectContaining({ diagnosticEvent: 'forward_result' })
+      );
+      expect(withFields).not.toHaveBeenCalledWith(
+        expect.objectContaining({ diagnosticEvent: 'forward_settled' })
+      );
+
+      late.resolve({ applied: true });
+      await expect(first).resolves.toEqual({ applied: false, retryable: true });
+      expect(withFields).toHaveBeenCalledWith(
+        expect.objectContaining({
+          diagnosticEvent: 'forward_result',
+          result: 'delivered_late',
+          applied: true,
+        })
+      );
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(2);
+      queued.resolve({ applied: true });
+      await expect(second).resolves.toEqual({ applied: true });
+      await h.flush();
+    } finally {
+      late.resolve({ applied: true });
+      queued.resolve({ applied: true });
+      withFields.mockRestore();
+    }
   });
 
   it('does not quarantine a route detached while its forwarding acknowledgement was pending', async () => {
@@ -5061,4 +5456,602 @@ describe('SandboxControl lifecycle boundaries', () => {
       ).resolves.toEqual({ allowed: false, reason: 'billing_runtime_mismatch' });
     }
   );
+
+  describe('heartbeat lapse observation', () => {
+    const OBSERVATION_KEY = 'wrapper_heartbeat_observation';
+    const readObservation = (h: { records: Map<string, unknown> }) =>
+      h.records.get(OBSERVATION_KEY) as Record<string, unknown> | undefined;
+
+    async function readyWithAcceptedHeartbeat() {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+      return { h, identity };
+    }
+
+    it('keeps the accepted observation across eviction for the heartbeat expiry snapshot', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const acceptedAt = readObservation(h)?.lastAcceptedAt;
+      expect(acceptedAt).toEqual(expect.any(Number));
+
+      await h.evict();
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.fireAlarm();
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'deadline_fired',
+            deadlineId: 'heartbeatExpiry',
+            lastReceivedHeartbeatAt: acceptedAt,
+            lastAcceptedHeartbeatAt: acceptedAt,
+            armedAt: acceptedAt,
+            armedExpiryAt: (acceptedAt as number) + DEADLINE_MS.heartbeatExpiry,
+            heartbeatArmedBasis: 'heartbeat_receipt',
+            lastDecision: 'accepted',
+            observationConnectionId: identity.connectionId,
+            pendingControlRequests: 0,
+          })
+        );
+      } finally {
+        fields.mockRestore();
+      }
+      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+        'heartbeat_expired',
+        identity.wrapperInstanceId
+      );
+      expect(h.runtime(identity.providerInstanceId)?.state.running).toBe(false);
+    });
+
+    it('keeps the observation for a passive eviction followed directly by alarm', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const acceptedAt = readObservation(h)?.lastAcceptedAt;
+      await h.evict(true);
+
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.fireAlarm();
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'deadline_fired',
+            deadlineId: 'heartbeatExpiry',
+            lastReceivedHeartbeatAt: acceptedAt,
+            heartbeatArmedBasis: 'heartbeat_receipt',
+            lastDecision: 'accepted',
+            pendingControlRequests: 0,
+          })
+        );
+      } finally {
+        fields.mockRestore();
+      }
+      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+        'heartbeat_expired',
+        identity.wrapperInstanceId
+      );
+    });
+
+    it('records a current-connection reject without clearing retained accept history', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const acceptedAt = readObservation(h)?.lastAcceptedAt as number;
+      const runtime = h.records.get('active_wrapper_runtime') as Record<string, unknown>;
+      h.records.set('active_wrapper_runtime', {
+        ...runtime,
+        readyConnectionId: 'replaced-connection',
+      });
+      await h.evict();
+      vi.setSystemTime(acceptedAt + 5_000);
+
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'heartbeat',
+            decision: 'runtime_not_ready',
+            connectionId: identity.connectionId,
+          })
+        );
+      } finally {
+        fields.mockRestore();
+      }
+      expect(readObservation(h)).toMatchObject({
+        connectionId: identity.connectionId,
+        lastDecision: 'runtime_not_ready',
+        armedBasis: 'heartbeat_receipt',
+        lastAcceptedAt: acceptedAt,
+        lastReceivedAt: acceptedAt + 5_000,
+      });
+
+      const expiryFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.fireAlarm();
+        expect(expiryFields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'deadline_fired',
+            deadlineId: 'heartbeatExpiry',
+            lastReceivedHeartbeatAt: acceptedAt + 5_000,
+            lastAcceptedHeartbeatAt: acceptedAt,
+            lastDecision: 'runtime_not_ready',
+          })
+        );
+      } finally {
+        expiryFields.mockRestore();
+      }
+      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+        'heartbeat_expired',
+        identity.wrapperInstanceId
+      );
+    });
+
+    it('does not let a stale connection overwrite the armed connection observation', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const before = readObservation(h);
+      expect(before).toMatchObject({
+        connectionId: identity.connectionId,
+        lastDecision: 'accepted',
+      });
+
+      const staleIdentity = { ...identity, connectionId: crypto.randomUUID() };
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.hooks.onHeartbeat?.(activeHeartbeat, staleIdentity);
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'heartbeat',
+            decision: 'stale_connection',
+            connectionId: staleIdentity.connectionId,
+          })
+        );
+      } finally {
+        fields.mockRestore();
+      }
+      expect(readObservation(h)).toEqual(before);
+    });
+
+    it('omits stored snapshot fields when the observation belongs to another connection', async () => {
+      const { h } = await readyWithAcceptedHeartbeat();
+      const observation = readObservation(h) as Record<string, unknown>;
+      h.records.set(OBSERVATION_KEY, { ...observation, connectionId: 'other-connection' });
+
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.fireAlarm();
+        const deadline = fields.mock.calls
+          .map(([value]) => value as Record<string, unknown>)
+          .find(
+            value =>
+              value.diagnosticEvent === 'deadline_fired' && value.deadlineId === 'heartbeatExpiry'
+          );
+        expect(deadline).toBeDefined();
+        expect(deadline).not.toHaveProperty('lastAcceptedHeartbeatAt');
+        expect(deadline).not.toHaveProperty('lastReceivedHeartbeatAt');
+        expect(deadline).not.toHaveProperty('observationConnectionId');
+      } finally {
+        fields.mockRestore();
+      }
+    });
+
+    it('emits retained arm history on kilo_unhealthy and still quarantines', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const acceptedAt = readObservation(h)?.lastAcceptedAt;
+
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      const put = vi.spyOn(h.storage, 'put');
+      try {
+        await h.hooks.onHeartbeat?.(
+          { ...activeHeartbeat, kilo: { ready: false, reason: 'feed_stale' } },
+          identity
+        );
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'heartbeat',
+            decision: 'kilo_unhealthy',
+            reason: 'feed_stale',
+            lastReceivedHeartbeatAt: expect.any(Number),
+            lastAcceptedHeartbeatAt: acceptedAt,
+            heartbeatArmedBasis: 'heartbeat_receipt',
+            lastDecision: 'accepted',
+            observationConnectionId: identity.connectionId,
+          })
+        );
+        // The bounded matching-identity overlay runs before quarantine; the
+        // stop transition may then delete the observation, so the write itself
+        // is the durable evidence.
+        expect(put).toHaveBeenCalledWith(
+          OBSERVATION_KEY,
+          expect.objectContaining({
+            lastDecision: 'kilo_unhealthy',
+            lastAcceptedAt: acceptedAt,
+            armedBasis: 'heartbeat_receipt',
+          })
+        );
+      } finally {
+        fields.mockRestore();
+        warn.mockRestore();
+        put.mockRestore();
+      }
+      await h.flush();
+      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+        'kilo_unhealthy',
+        identity.wrapperInstanceId
+      );
+    });
+
+    it('records wrapper_ready on ready and repair, and heartbeat_receipt on accept', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const readyObservation = readObservation(h);
+      expect(readyObservation).toMatchObject({
+        connectionId: identity.connectionId,
+        armedBasis: 'wrapper_ready',
+      });
+      expect(readyObservation).not.toHaveProperty('lastDecision');
+      expect(readyObservation).not.toHaveProperty('lastAcceptedAt');
+
+      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+      const acceptedAt = readObservation(h)?.lastAcceptedAt as number;
+      expect(readObservation(h)).toMatchObject({
+        armedBasis: 'heartbeat_receipt',
+        lastDecision: 'accepted',
+        lastAcceptedAt: acceptedAt,
+      });
+      expect(acceptedAt).toEqual(expect.any(Number));
+
+      h.records.delete('deadlines');
+      await h.evict();
+      expect(readObservation(h)).toMatchObject({
+        armedBasis: 'wrapper_ready',
+        lastDecision: 'accepted',
+        lastAcceptedAt: acceptedAt,
+        armedAt: h.records.get('wrapper_ready_at'),
+      });
+
+      h.session.failWaitingMessages.mockClear();
+      await h.fireAlarm();
+      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+        'heartbeat_expired',
+        identity.wrapperInstanceId
+      );
+    });
+  });
+
+  describe('heartbeat diagnostic resilience', () => {
+    const OBSERVATION_KEY = 'wrapper_heartbeat_observation';
+    const readObservation = (h: { records: Map<string, unknown> }) =>
+      h.records.get(OBSERVATION_KEY) as Record<string, unknown> | undefined;
+
+    async function readyWithAcceptedHeartbeat() {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+      return { h, identity };
+    }
+
+    // Diagnostic reads are report-only; a rejection must not cancel the
+    // lifecycle action that follows (quarantine or deadline handling).
+    it('continues heartbeat expiry handling when the observation read rejects', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const storage = h.storage as unknown as { get: (key: string) => Promise<unknown> };
+      const originalGet = storage.get.bind(storage);
+      storage.get = async (key: string) => {
+        if (key === OBSERVATION_KEY) throw new Error('observation read failed');
+        return originalGet(key);
+      };
+      try {
+        await h.fireAlarm();
+        expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+          'heartbeat_expired',
+          identity.wrapperInstanceId
+        );
+      } finally {
+        storage.get = originalGet;
+      }
+    });
+
+    it('quarantines when the observation overlay write rejects', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const storage = h.storage as unknown as {
+        put: (key: unknown, value?: unknown) => Promise<void>;
+      };
+      const originalPut = storage.put.bind(storage);
+      storage.put = async (key: unknown, value?: unknown) => {
+        if (key === OBSERVATION_KEY) throw new Error('overlay write failed');
+        return originalPut(key, value);
+      };
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        await h.hooks.onHeartbeat?.(
+          { ...activeHeartbeat, kilo: { ready: false, reason: 'feed_stale' } },
+          identity
+        );
+        await h.flush();
+        expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+          'kilo_unhealthy',
+          identity.wrapperInstanceId
+        );
+      } finally {
+        storage.put = originalPut;
+        warn.mockRestore();
+      }
+    });
+
+    it('leaves the stored observation unchanged when the apply transaction rolls back', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const before = readObservation(h);
+      expect(before).toMatchObject({ lastDecision: 'accepted' });
+      vi.setSystemTime((before?.lastAcceptedAt as number) + 10_000);
+
+      vi.spyOn(h.storage, 'setAlarm').mockRejectedValueOnce(new Error('alarm write failed'));
+      await expect(h.hooks.onHeartbeat?.(activeHeartbeat, identity)).rejects.toThrow(
+        'alarm write failed'
+      );
+      expect(readObservation(h)).toEqual(before);
+    });
+
+    // Time advances between ready, acceptance and repair, so the repair basis
+    // can only match `readyAt` and not the repair-time `Date.now()`.
+    it('repairs the heartbeat deadline from readyAt after time has advanced', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const readyAt = h.records.get('wrapper_ready_at') as number;
+      expect(readyAt).toBe(Date.now());
+
+      vi.setSystemTime(readyAt + 30_000);
+      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+      expect(readObservation(h)).toMatchObject({
+        armedBasis: 'heartbeat_receipt',
+        armedAt: readyAt + 30_000,
+        lastAcceptedAt: readyAt + 30_000,
+      });
+
+      h.records.delete('deadlines');
+      vi.setSystemTime(readyAt + 60_000);
+      await h.evict();
+      expect(readObservation(h)).toMatchObject({
+        connectionId: identity.connectionId,
+        armedBasis: 'wrapper_ready',
+        armedAt: readyAt,
+        armedExpiryAt: readyAt + DEADLINE_MS.heartbeatExpiry,
+        lastAcceptedAt: readyAt + 30_000,
+        lastDecision: 'accepted',
+      });
+    });
+  });
+
+  describe('recovery outcome evidence', () => {
+    async function readyWithAcceptedHeartbeat(recoveryCapable = false) {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready(
+        recoveryCapable ? { wrapperVersion: null, recoveryCapable: true } : undefined
+      );
+      await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+      await h.flush();
+      return { h, identity };
+    }
+
+    // Recovery-capable readiness arms its own retry/readiness deadlines; drop
+    // everything except the heartbeat expiry so this alarm exercises that path.
+    async function fireHeartbeatExpiry(h: Awaited<ReturnType<typeof harness>>) {
+      const deadlines = { ...(h.records.get('deadlines') as Record<string, unknown>) };
+      for (const id of [
+        'recoveryRetry',
+        'idleStop',
+        'recoveryExpiry',
+        'wrapperReadiness',
+        'startup',
+      ]) {
+        delete deadlines[id];
+      }
+      h.records.set('deadlines', deadlines);
+      vi.setSystemTime(deadlines.heartbeatExpiry as number);
+      await h.control.alarm();
+      await h.flush();
+    }
+
+    it('emits recovery_outcome started when heartbeat expiry commits recovery', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat(true);
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const closeHandshaken = vi.spyOn(h.socket, 'closeHandshakenSockets');
+      try {
+        await fireHeartbeatExpiry(h);
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'recovery_outcome',
+            cause: 'heartbeat_expired',
+            outcome: 'started',
+            deadlineId: 'heartbeatExpiry',
+            connectionId: identity.connectionId,
+            wrapperInstanceId: identity.wrapperInstanceId,
+            committedAt: expect.any(Number),
+          })
+        );
+        expect(closeHandshaken).toHaveBeenCalledWith(4002, 'application_report_expired');
+      } finally {
+        fields.mockRestore();
+        closeHandshaken.mockRestore();
+      }
+    });
+
+    it('emits recovery_outcome skipped when recovery cannot commit', async () => {
+      const { h } = await readyWithAcceptedHeartbeat(true);
+      const physical = h.records.get('physical_record') as Record<string, unknown>;
+      h.records.set('physical_record', { ...physical, state: 'stopped' });
+
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await fireHeartbeatExpiry(h);
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'recovery_outcome',
+            cause: 'heartbeat_expired',
+            outcome: 'skipped',
+          })
+        );
+        expect(fields).not.toHaveBeenCalledWith(
+          expect.objectContaining({ diagnosticEvent: 'recovery_outcome', outcome: 'started' })
+        );
+      } finally {
+        fields.mockRestore();
+      }
+    });
+
+    it('emits recovery_outcome started when quarantine commits and skipped when it cannot', async () => {
+      const started = await readyWithAcceptedHeartbeat();
+      const startedFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await fireHeartbeatExpiry(started.h);
+        expect(startedFields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'recovery_outcome',
+            cause: 'heartbeat_expired',
+            outcome: 'started',
+            deadlineId: 'heartbeatExpiry',
+            connectionId: started.identity.connectionId,
+          })
+        );
+      } finally {
+        startedFields.mockRestore();
+      }
+
+      const skipped = await readyWithAcceptedHeartbeat();
+      const physical = skipped.h.records.get('physical_record') as Record<string, unknown>;
+      skipped.h.records.set('physical_record', { ...physical, state: 'stopped' });
+      const skippedFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await fireHeartbeatExpiry(skipped.h);
+        expect(skippedFields).toHaveBeenCalledWith(
+          expect.objectContaining({ diagnosticEvent: 'quarantine_skipped' })
+        );
+        expect(skippedFields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'recovery_outcome',
+            cause: 'heartbeat_expired',
+            outcome: 'skipped',
+          })
+        );
+      } finally {
+        skippedFields.mockRestore();
+      }
+    });
+
+    // A throwing logger must not cancel the recovery it was reporting on.
+    it('keeps quarantining when the recovery_outcome emit throws', async () => {
+      const { h, identity } = await readyWithAcceptedHeartbeat();
+      const emitted: Record<string, unknown>[] = [];
+      const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+        emitted.push(fields as Record<string, unknown>);
+        return {
+          ...logger,
+          info: () => {
+            throw new Error('logger unavailable');
+          },
+        } as unknown as typeof logger;
+      });
+      try {
+        await fireHeartbeatExpiry(h);
+      } finally {
+        withFields.mockRestore();
+      }
+      expect(
+        emitted.some(
+          fields => fields.diagnosticEvent === 'recovery_outcome' && fields.outcome === 'started'
+        )
+      ).toBe(true);
+      expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+        'heartbeat_expired',
+        identity.wrapperInstanceId
+      );
+    });
+  });
+
+  describe('per-session heartbeat evidence', () => {
+    const heartbeatCall = (
+      calls: unknown[][],
+      decision: string
+    ): Record<string, unknown> | undefined =>
+      calls
+        .map(args => args[0] as Record<string, unknown>)
+        .find(value => value.diagnosticEvent === 'heartbeat' && value.decision === decision);
+
+    it('logs a bounded sessionReport and the single-route payload row', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+        const log = heartbeatCall(fields.mock.calls, 'accepted');
+        expect(log).toMatchObject({
+          reportedState: 'active',
+          kiloSessionId: ROUTE.kiloSessionId,
+          sessionState: 'active',
+          sessionWaitingOn: 'model',
+          sessionReport: `${ROUTE.kiloSessionId}:active:model`,
+        });
+        expect(typeof log?.sessionReport).toBe('string');
+        const report = log?.sessionReport;
+        expect((report as string).length).toBeLessThanOrEqual(128);
+      } finally {
+        fields.mockRestore();
+      }
+    });
+
+    it('omits whole sessionReport entries to stay within 128 characters', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const first = `ses_${'a'.repeat(70)}`;
+      const second = `ses_${'b'.repeat(70)}`;
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.hooks.onHeartbeat?.(
+          {
+            ...activeHeartbeat,
+            sessions: [
+              { kiloSessionId: first, state: 'active', idleForMs: 0, waitingOn: 'model' },
+              { kiloSessionId: second, state: 'idle', idleForMs: 0 },
+            ],
+          },
+          identity
+        );
+        const report = heartbeatCall(fields.mock.calls, 'accepted')?.sessionReport;
+        expect(typeof report).toBe('string');
+        expect((report as string).length).toBeLessThanOrEqual(128);
+        expect(report).toBe(`${first}:active:model`);
+        expect(report).not.toContain(second);
+      } finally {
+        fields.mockRestore();
+      }
+    });
+
+    it('omits the single-route fields when the payload has no exact route match', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      try {
+        await h.hooks.onHeartbeat?.(
+          {
+            ...activeHeartbeat,
+            sessions: [
+              { kiloSessionId: 'ses_other', state: 'active', idleForMs: 0, waitingOn: 'tool' },
+            ],
+          },
+          identity
+        );
+        const log = heartbeatCall(fields.mock.calls, 'accepted');
+        expect(log).not.toHaveProperty('kiloSessionId');
+        expect(log).not.toHaveProperty('sessionState');
+        expect(log).not.toHaveProperty('sessionWaitingOn');
+        expect(log?.sessionReport).toBe('ses_other:active:tool');
+      } finally {
+        fields.mockRestore();
+      }
+    });
+  });
 });

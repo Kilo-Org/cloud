@@ -15,7 +15,8 @@ requirements remain in force.
 ## Status
 
 Draft -- created 2026-08-24, revised 2026-08-27 to define the passive sandbox
-status contract alongside shared worktree navigation and durability.
+status contract alongside shared worktree navigation and durability; revised
+2026-09-11 to add the continuity contract for long-lived, recoverable chats.
 
 ## Conventions
 
@@ -303,6 +304,30 @@ repository.
    Uncommitted files are not guaranteed to survive replacement of the shared
    physical environment.
 
+### Continuity
+
+A chat MUST behave like a colleague across a working relationship: the user
+starts work, takes it across many turns, walks away, comes back, interrupts,
+asks questions, and opens more chats -- and the chat stays usable throughout.
+
+1. Any transient failure -- environment loss, wrapper restart, delivery lapse,
+   or connection stall -- MUST be recoverable by sending another message in the
+   SAME chat. Requiring a new chat to continue the same work is NOT acceptable
+   except for a narrow, documented set of genuinely unrecoverable causes.
+2. A turn that fails, or is interrupted, MUST leave the chat usable; a
+   subsequent message MUST continue in the same chat and, while the environment
+   is still warm, in the same environment.
+3. An unanswered question MUST NOT pin the environment awake. The idle timeout
+   MAY wind the environment down while a question awaits an answer; the user
+   MUST be able to return, answer or send another message, and continue after
+   the environment is restored.
+4. Questions MUST work independently per chat: a question raised in one chat
+   MUST be answerable in that chat and MUST NOT be answerable from, or leak
+   into, a sibling chat that shares the same worktree.
+5. Sustained load -- many turns, several chats at once, high token rates, or
+   large streamed tool output -- MUST NOT by itself make a chat unrecoverable.
+   A liveness lapse caused by load is a defect to fix, not an expected failure.
+
 ### Errors
 
 1. A failed send MUST restore the prompt into the composer and say why.
@@ -346,6 +371,12 @@ The following use SHOULD and are not enforced today:
    ready with setup half-done.)
 
 ## Changelog
+
+### 2026-09-11 -- Session continuity
+
+- Added the Continuity rules: transient failures recover in the same chat, an
+  interrupted turn leaves the chat usable, unanswered questions do not pin the
+  environment awake, questions stay per-chat, and load must not wedge a chat.
 
 ### 2026-09-02 -- Structured sandbox details
 

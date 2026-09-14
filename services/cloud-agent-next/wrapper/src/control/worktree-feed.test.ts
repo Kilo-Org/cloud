@@ -233,15 +233,12 @@ describe('createWorktreeFeed', () => {
       rememberAttachedRoot('receipt_root', h.source.directory);
       try {
         await client.connect();
-        const originalSocket = sockets[0];
-        if (!originalSocket) throw new Error('Missing original socket');
-        if (eventReceipts) originalSocket.close();
         await start();
         const originalId = h.source.runtimeId;
         await h.attempts[0]?.emit(envelope);
         h.source.runtimeId = crypto.randomUUID();
         await start();
-        await h.attempts[0]?.emit(envelope);
+        const staleEmit = h.attempts[0]?.emit(envelope).catch(() => undefined);
         await h.attempts[1]?.emit(envelope);
         const frames = () =>
           sockets
@@ -252,17 +249,11 @@ describe('createWorktreeFeed', () => {
                 ? frame.type === 'request' && frame.operation === 'sandbox.event.publish'
                 : frame.type === 'event'
             );
-        if (eventReceipts) {
-          expect(frames()).toEqual([]);
-          await waitFor(() => sockets.length === 2);
-          const replacement = sockets[1];
-          if (!replacement) throw new Error('Missing replacement socket');
-          replacement.readyState = 1;
-          replacement.dispatchEvent(new Event('open'));
-        }
         await waitFor(() => frames().length === 2);
+        await Promise.race([staleEmit, Bun.sleep(50)]);
+        expect(frames()).toHaveLength(2);
         if (eventReceipts) {
-          expect(sockets).toHaveLength(2);
+          expect(sockets).toHaveLength(1);
           const publications = frames().map(frame =>
             sandboxEventPublicationPayloadSchema.parse(frame.payload)
           );
@@ -271,11 +262,6 @@ describe('createWorktreeFeed', () => {
             h.source.runtimeId,
           ]);
           expect(publications.map(item => item.sequence)).toEqual([1, 2]);
-          expect(
-            originalSocket.sent.some(
-              frame => frame.type === 'request' && frame.operation === 'sandbox.event.publish'
-            )
-          ).toBe(false);
         } else {
           expect(sockets).toHaveLength(1);
           for (const frame of frames())

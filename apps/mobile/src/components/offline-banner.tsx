@@ -5,14 +5,12 @@ import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  OFFLINE_BANNER_HEIGHT,
-  OfflineBannerSpaceProvider,
-} from '@/components/offline-banner-space';
+import { OfflineBannerSpaceProvider } from '@/components/offline-banner-space';
 import { Text } from '@/components/ui/text';
 import { announceForA11y } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
+import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
 
 /**
  * Publishes the banner's visibility to every pinned `ScreenHeader`. Mounted by

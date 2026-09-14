@@ -8,8 +8,10 @@ const OFFLINE_BANNER_SHOW_DELAY_MS = 5000;
  * pinned at `top: insets.top`, so a surface whose header starts at the
  * safe-area top must reserve this height while the banner is visible or the
  * overlay covers the header title (uxs2 spot check, e6-offline-hang; mobile-app
- * spot check, e2). `OfflineBanner` renders at exactly this height (no vertical
- * padding) so the constant cannot drift from the painted row.
+ * spot check, e2). `OfflineBanner` imports this constant and paints the row at
+ * exactly this height (no vertical padding), and `ScreenHeader` reserves it via
+ * `offlineHeaderReservation`, so the painted row and the reserved space cannot
+ * drift. This is the single source of truth for that height.
  */
 export const OFFLINE_BANNER_HEIGHT = 36;
 

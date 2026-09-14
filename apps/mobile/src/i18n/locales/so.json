@@ -256,6 +256,8 @@
     "gatewayTranscription": "Qoraal u beddelidda codka ee Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Codka ku beddel qoraal moodeelka Kilo Gateway adigoo aan isticmaalayn aqoonsiga hadalka ee qalabka. Duubistaada waxaa loo diraa Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Soo koob wicitaannada qalabka",
+    "condenseToolCallsSubtitle": "Koox koox u geli wicitaannada qalabka ee isxigxiga hal saf oo aad furi karto.",
     "toolSummaryTranslation": "Turjun koobabka qalabka",
     "toolSummaryTranslationSubtitle": "Dir koob kasta oo qalab ah moodel si uu ugu turjumo luqadda abkaaga. Waxaa la muujiyaa asalka haddii turjumaadda ay fashilanto.",
     "toolSummaryTranslationModelUnavailableNotice": "Moodeelkan lama bixiyo mar dambe. Taabo $t(common.model) si aad u dooratid mid kale."
@@ -2495,6 +2497,10 @@
       "tapToListHint": "Taabo gal si aad u aragto waxa ku jira.",
       "unsupportedDescription": "CLI-kan ma soo bandhigi karo liiska gallada. Dhammay wuxuu hayaa galkii laga bilaabay. Bilow kalfadhiga wuxuu halkaas ka bilaabaa kalfadhiga.",
       "unsupportedTitle": "Liiska gallada lama soo bandhigi karo"
+    },
+    "toolRun": {
+      "sheetTitle": "Wicitaannada qalabka",
+      "condensedLabel": "{{itemCount}} qaybood; {{last}}"
     }
   },
   "bootstrap": {

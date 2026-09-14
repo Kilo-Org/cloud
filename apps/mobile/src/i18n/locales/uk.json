@@ -256,6 +256,8 @@
     "gatewayTranscription": "Розпізнавання мовлення через Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Розпізнайте голосове введення за допомогою моделі Kilo Gateway замість розпізнавання мовлення на пристрої. Запис надсилається до Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Стискати виклики інструментів",
+    "condenseToolCallsSubtitle": "Об'єднуйте послідовні виклики інструментів в один рядок, який можна відкрити.",
     "toolSummaryTranslation": "Перекладати підсумки інструментів",
     "toolSummaryTranslationSubtitle": "Надсилай кожен підсумок інструмента моделі, щоб перекласти його мовою твого застосунку. Якщо переклад не вдасться, показується оригінал.",
     "toolSummaryTranslationModelUnavailableNotice": "Ця модель більше не пропонується. Натисніть $t(common.model), щоб вибрати іншу."
@@ -2089,6 +2091,10 @@
       "tapToListHint": "Торкніться папки, щоб переглянути її вміст.",
       "unsupportedDescription": "Цей CLI не підтримує перегляд списку папок. Натисніть «Готово», щоб залишити папку запуску, а потім «Розпочати сеанс», щоб розпочати сеанс у ній.",
       "unsupportedTitle": "Неможливо отримати список папок"
+    },
+    "toolRun": {
+      "sheetTitle": "Виклики інструментів",
+      "condensedLabel": "{{itemCount}} елементів; {{last}}"
     }
   },
   "bootstrap": {

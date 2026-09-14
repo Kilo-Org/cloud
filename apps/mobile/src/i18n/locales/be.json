@@ -256,6 +256,8 @@
     "gatewayTranscription": "Распазнаванне маўлення праз Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Пераўтварайце галасавы ўвод у тэкст з дапамогай мадэлі Kilo Gateway замест распазнавання маўлення на самой прыладзе. Ваш запіс адпраўляецца ў Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Сціскаць выклікі інструментаў",
+    "condenseToolCallsSubtitle": "Збірайце паслядоўныя выклікі інструментаў у адзін радок, які можна адкрыць.",
     "toolSummaryTranslation": "Перакласці зводкі інструментаў",
     "toolSummaryTranslationSubtitle": "Адпраўляйце кожную зводку інструмента мадэлі, каб перакласці яе на мову вашай праграмы. Калі пераклад не ўдасца, паказваецца арыгінал.",
     "toolSummaryTranslationModelUnavailableNotice": "Гэта мадэль больш не прапануецца. Націсніце $t(common.model), каб выбраць іншую."
@@ -2537,6 +2539,10 @@
       "tapToListHint": "Націсніце на папку, каб убачыць яе змесціва.",
       "unsupportedDescription": "Гэты CLI не падтрымлівае прагляд папак. Кнопка «Гатова» пакідае папку запуску, а «Пачаць сеанс» запускае ў ёй сеанс.",
       "unsupportedTitle": "Спіс папак недаступны"
+    },
+    "toolRun": {
+      "sheetTitle": "Выклікі інструментаў",
+      "condensedLabel": "{{itemCount}} элементаў; {{last}}"
     }
   },
   "bootstrap": {

@@ -256,6 +256,8 @@
     "gatewayTranscription": "Խոսքի տեքստի վերածում Kilo Gateway-ով",
     "gatewayTranscriptionSubtitle": "Ձայնային մուտքագրումը տեքստի վերածեք Kilo Gateway-ի մոդելով՝ սարքի խոսքի ճանաչման փոխարեն։ Ձեր ձայնագրությունը ուղարկվում է Kilo Gateway։",
     "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Խտացնել գործիքների կանչերը",
+    "condenseToolCallsSubtitle": "Խմբավորեք հաջորդական գործիքների կանչերը մեկ տողում, որը կարող եք բացել։",
     "toolSummaryTranslation": "Թարգմանել գործիքների ամփոփումները",
     "toolSummaryTranslationSubtitle": "Ուղարկեք յուրաքանչյուր գործիքի ամփոփում մոդելին՝ այն ձեր հավելվածի լեզվով թարգմանելու համար։ Թարգմանության ձախողման դեպքում ցուցադրվում է բնօրինակը։",
     "toolSummaryTranslationModelUnavailableNotice": "Այս մոդելը այլևս չի առաջարկվում։ Մեկ այլ ընտրելու համար հպեք $t(common.model)։"
@@ -2495,6 +2497,10 @@
       "tapToListHint": "Հպեք թղթապանակին՝ դրա պարունակությունը տեսնելու համար։",
       "unsupportedDescription": "Այս CLI-ն չի կարող ցուցադրել թղթապանակները։ «Պատրաստ է» կոճակը պահպանում է գործարկման թղթապանակը, իսկ «Սկսել նիստը» կոճակը նիստը սկսում է այդտեղ։",
       "unsupportedTitle": "Հնարավոր չէ ցուցադրել թղթապանակները"
+    },
+    "toolRun": {
+      "sheetTitle": "Գործիքների կանչեր",
+      "condensedLabel": "{{itemCount}} տարր; {{last}}"
     }
   },
   "bootstrap": {

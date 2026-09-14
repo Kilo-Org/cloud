@@ -256,6 +256,8 @@
     "gatewayTranscription": "Transcrición con Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcribe o ditado cun modelo de Kilo Gateway no canto do recoñecemento de voz do dispositivo. A túa gravación envíaselle a Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Comprimir chamadas de ferramentas",
+    "condenseToolCallsSubtitle": "Agrupa as chamadas de ferramentas consecutivas nunha fila que poidas abrir.",
     "toolSummaryTranslation": "Traduce os resumos de ferramentas",
     "toolSummaryTranslationSubtitle": "Envía cada resumo de ferramenta a un modelo para traducilo á lingua da túa aplicación. Móstrase o orixinal se a tradución falla.",
     "toolSummaryTranslationModelUnavailableNotice": "Este modelo xa non se ofrece. Toca $t(common.model) para escoller outro."
@@ -2495,6 +2497,10 @@
       "tapToListHint": "Toca un cartafol para ver o seu contido.",
       "unsupportedDescription": "Este CLI non pode listar cartafoles. Ao tocar Feito, mantense o cartafol de inicio. Ao tocar Iniciar sesión, a sesión comeza nese cartafol.",
       "unsupportedTitle": "Non se poden listar os cartafoles"
+    },
+    "toolRun": {
+      "sheetTitle": "Chamadas de ferramentas",
+      "condensedLabel": "{{itemCount}} elementos; {{last}}"
     }
   },
   "bootstrap": {

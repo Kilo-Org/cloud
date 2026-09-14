@@ -256,6 +256,8 @@
     "gatewayTranscription": "Ukuguqulwa kwenkulumo ibe umbhalo nge-Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Guqula ukufaka ngezwi kube umbhalo usebenzisa imodeli ye-Kilo Gateway kunokubona inkulumo kwedivayisi. Ukuqopha kwakho kuthunyelwa ku-Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Finyeza izingcingo zamathuluzi",
+    "condenseToolCallsSubtitle": "Hlanganisa izingcingo zamathuluzi ezilandelanayo zibe umugqa owodwa ongawuvula.",
     "toolSummaryTranslation": "Humusha izifinyezo zamathuluzi",
     "toolSummaryTranslationSubtitle": "Thumela isifinyezo sethuluzi ngasinye kumodeli ukuze siyihumushele olimini lohlelo lwakho. Okwangempela kuyaboniswa uma ukuhumusha kwehluleka.",
     "toolSummaryTranslationModelUnavailableNotice": "Le modeli ayisanikezwa. Thepha $t(common.model) ukukhetha enye."
@@ -2495,6 +2497,10 @@
       "retryableDescription": "Hlola ukuxhumana kwakho bese uzama futhi. Usengaqinisekisa le folda ngokuqeda ukukhetha.",
       "unsupportedTitle": "Uhlu lwamafolda alukwazi ukuboniswa",
       "unsupportedDescription": "Le CLI ayikwazi ukubonisa uhlu lwamafolda. Uma uqeda ukukhetha, kugcinwa ifolda yokuqalisa. Iseshini izoqala kuleyo folda."
+    },
+    "toolRun": {
+      "sheetTitle": "Izingcingo zamathuluzi",
+      "condensedLabel": "{{itemCount}} izinto; {{last}}"
     }
   },
   "bootstrap": {

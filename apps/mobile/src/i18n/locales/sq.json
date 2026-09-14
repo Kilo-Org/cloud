@@ -231,6 +231,8 @@
     "voiceInput": "Hyrje me zë",
     "autoExpandThinking": "Zgjero automatikisht arsyetimin",
     "autoExpandThinkingSubtitle": "Shfaq arsyetimin e plotë të agjentit pasi të përfundojë.",
+    "hideThinking": "Fshih detajet e arsyetimit",
+    "hideThinkingSubtitle": "Mos shfaq arsyetimin e agjentit në faqen e seancës.",
     "keepScreenOn": "Mbaje ekranin ndezur në faqen e seancës",
     "keepScreenOnSubtitle": "Mbaje ekranin ndezur gjatë ekzekutimit të seancës.",
     "appearance": "Pamja",

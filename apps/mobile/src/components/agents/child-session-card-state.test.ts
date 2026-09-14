@@ -107,7 +107,7 @@ function makeAssistantMessage(parts: Part[], id = 'msg-1'): StoredMessage {
 describe('getChildSessionCardState', () => {
   it.each([
     ['pending', 'Waiting for activity'],
-    ['running', 'Waiting for activity'],
+    ['running', 'Thinking'],
     ['completed', ''],
     ['error', ''],
   ] as const)(
@@ -317,6 +317,18 @@ describe('getChildSessionCardState', () => {
   it('shows live reasoning activity when the latest assistant part is a reasoning part', () => {
     const part = makeTaskPart('running', { subagent_type: 'Thinker', description: 'Reason' });
     const messages = [makeAssistantMessage([makeReasoningPart('stepping through the problem')])];
+    expect(getChildSessionCardState(part, messages)).toEqual({
+      agentName: 'Thinker',
+      taskName: 'Reason',
+      latestActivity: 'Thinking',
+    });
+  });
+
+  it('reads Thinking while a reasoning part streams behind an empty text placeholder', () => {
+    const part = makeTaskPart('running', { subagent_type: 'Thinker', description: 'Reason' });
+    const messages = [
+      makeAssistantMessage([makeReasoningPart('stepping through the problem'), makeTextPart('')]),
+    ];
     expect(getChildSessionCardState(part, messages)).toEqual({
       agentName: 'Thinker',
       taskName: 'Reason',

@@ -22,6 +22,7 @@ import {
 import { getChildSessionModelLabel } from './child-session-model';
 import { ChildSessionModelLabel } from './child-session-model-label';
 import { MessageErrorBoundary } from './message-error-boundary';
+import { partRendersContent } from './message-visibility';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
 import { getChildSessionSheetState } from './child-session-sheet-state';
 import { SessionMessageList } from './session-message-list';
@@ -34,6 +35,13 @@ type ChildSessionSheetProps = {
   sessionId: string;
   title: string;
   getChildMessages: (sessionId: string) => StoredMessage[];
+  /**
+   * Resolves the messages that derive status indicators: the footer
+   * working-indicator label and the nested task cards' activity label.
+   * Defaults to `getChildMessages`. The session page passes the raw transcript
+   * here so hiding thinking rows never changes "Thinking".
+   */
+  getIndicatorMessages?: (sessionId: string) => StoredMessage[];
   hydrationState: ChildSessionHydrationState;
   sessionError: string | null;
   isStreaming: boolean;
@@ -56,6 +64,7 @@ export function ChildSessionSheet({
   sessionId,
   title,
   getChildMessages,
+  getIndicatorMessages = getChildMessages,
   hydrationState,
   sessionError,
   isStreaming,
@@ -72,6 +81,11 @@ export function ChildSessionSheet({
   modelOptions,
 }: Readonly<ChildSessionSheetProps>) {
   const messages = getChildMessages(sessionId);
+  const indicatorMessages = getIndicatorMessages(sessionId);
+  // A reasoning-only message keeps its place in `messages` so the sheet stays in
+  // the content state and the footer spinner reads "Thinking", but it renders no
+  // row. Drop it from the list so its padded wrapper cannot leave an empty row.
+  const rowMessages = messages.filter(message => message.parts.some(partRendersContent));
   const state = getChildSessionSheetState(hydrationState, messages.length, sessionError);
   const modelLabel = getChildSessionModelLabel(messages, modelOptions ?? []);
   const { t } = useTranslation();
@@ -118,7 +132,7 @@ export function ChildSessionSheet({
         ) : null}
         <SessionMessageList
           sessionId={sessionId}
-          items={messages}
+          items={rowMessages}
           keyExtractor={message => message.info.id}
           hasOlderMessages={hasOlderMessages}
           isLoadingOlderMessages={isLoadingOlderMessages}
@@ -131,7 +145,10 @@ export function ChildSessionSheet({
                 <ChildSessionMessage
                   message={item}
                   depth={0}
-                  getChildMessages={getChildMessages}
+                  // Nested task cards are status indicators too: resolve their
+                  // activity from the raw list so a reasoning stream reads
+                  // "Thinking" instead of a stale activity.
+                  getChildMessages={getIndicatorMessages}
                   renderPart={renderPart}
                   onOpenChildSession={onOpenChildSession}
                   modelOptions={modelOptions}
@@ -139,7 +156,9 @@ export function ChildSessionSheet({
               </View>
             </MessageErrorBoundary>
           )}
-          ListFooterComponent={<WorkingIndicator messages={messages} isStreaming={isStreaming} />}
+          ListFooterComponent={
+            <WorkingIndicator messages={indicatorMessages} isStreaming={isStreaming} />
+          }
           contentBottomInset={sheetBottomInset}
         />
       </View>

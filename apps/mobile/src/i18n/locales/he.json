@@ -231,6 +231,8 @@
     "voiceInput": "קלט קולי",
     "autoExpandThinking": "הרחבה אוטומטית של תהליך החשיבה",
     "autoExpandThinkingSubtitle": "הצג את תהליך החשיבה המלא של הסוכן בסיומו.",
+    "hideThinking": "הסתרת פרטי החשיבה",
+    "hideThinkingSubtitle": "לא להציג את החשיבה של הסוכן במסך הסשן.",
     "keepScreenOn": "השארת המסך דלוק במסך הסשן",
     "keepScreenOnSubtitle": "השאר את המסך דלוק כשהסשן פעיל.",
     "appearance": "מראה",

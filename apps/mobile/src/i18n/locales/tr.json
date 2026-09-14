@@ -231,6 +231,8 @@
     "voiceInput": "Sesli giriş",
     "autoExpandThinking": "Düşünce bölümünü otomatik genişlet",
     "autoExpandThinkingSubtitle": "Ajan düşünmeyi bitirdiğinde düşünce bölümünü genişletilmiş olarak göster.",
+    "hideThinking": "Düşünce ayrıntılarını gizle",
+    "hideThinkingSubtitle": "Ajanın düşüncesini oturum sayfasında gösterme.",
     "keepScreenOn": "Oturum sayfasındayken ekranı açık tut",
     "keepScreenOnSubtitle": "Oturum çalışırken ekranı açık tut.",
     "appearance": "Görünüm",

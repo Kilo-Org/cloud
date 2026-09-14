@@ -231,6 +231,8 @@
     "voiceInput": "ଭଏସ ଇନପୁଟ",
     "autoExpandThinking": "ଚିନ୍ତନର ବିବରଣୀ ଆପେ ଖୋଲନ୍ତୁ",
     "autoExpandThinkingSubtitle": "ଏଜେଣ୍ଟର ଚିନ୍ତନ ଶେଷ ହେଲେ ଏହାର ବିବରଣୀ ଖୋଲି ଦେଖାନ୍ତୁ।",
+    "hideThinking": "ଚିନ୍ତନର ବିବରଣୀ ଲୁଚାନ୍ତୁ",
+    "hideThinkingSubtitle": "ସେସନ୍ ପୃଷ୍ଠାରେ ଏଜେଣ୍ଟର ଚିନ୍ତନ ଦେଖାନ୍ତୁ ନାହିଁ।",
     "keepScreenOn": "ସେସନ୍ ପୃଷ୍ଠାରେ ଥିବା ସମୟରେ ସ୍କ୍ରିନ୍ ଚାଲୁ ରଖନ୍ତୁ",
     "keepScreenOnSubtitle": "ସେସନରେ କାମ ଚାଲିଥିବା ବେଳେ ସ୍କ୍ରିନ୍ ଚାଲୁ ରଖନ୍ତୁ।",
     "appearance": "ଦେଖାଶୁଣା",

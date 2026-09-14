@@ -376,36 +376,10 @@ describe('resource delegation authority', () => {
     });
 
     shared.enabled = false;
-    await expect(
-      createControlTokenForRequest(current, 'gastown', { headers })
-    ).rejects.toMatchObject({
-      status: 503,
-      delegationCode: 'MIGRATION_UNAVAILABLE',
-    });
-    shared.enabled = true;
-    shared.family = 'cloud-agent-next';
-    await expect(
-      createControlTokenForRequest(current, 'gastown', { headers })
-    ).rejects.toMatchObject({
-      status: 503,
-      delegationCode: 'MIGRATION_UNAVAILABLE',
-    });
-    shared.family = 'gastown';
-    const enabledGastown = await createControlTokenForRequest(current, 'gastown', { headers });
-    expect(jwt.verify(enabledGastown.token, secret)).toMatchObject({
-      aud: 'gastown',
-      tokenPurpose: 'device-access',
-    });
-    shared.enabled = false;
-    const wasteland = await createControlTokenForRequest(current, 'wasteland', { headers });
-    expect(jwt.verify(wasteland.token, secret)).toMatchObject({
-      aud: 'wasteland',
-      tokenPurpose: 'device-access',
-    });
-    const rollback = await createControlTokenForRequest(current, 'cloud-agent-next', { headers });
+    const rollback = await createControlTokenForRequest(current, 'gastown', { headers });
     const claims = jwt.verify(rollback.token, secret) as jwt.JwtPayload;
     expect(claims).toMatchObject({
-      aud: 'cloud-agent-next',
+      aud: 'gastown',
       tokenPurpose: 'device-access',
       credentialExchange: false,
       deviceSessionId: session.id,

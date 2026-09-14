@@ -1,11 +1,9 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
-import {
-  createControlTokenForRequest,
-  TypedResourceDelegationError,
-} from '@/lib/auth/resource-delegation';
+import { generateApiToken } from '@/lib/tokens';
 import { isGastownEnabled } from '@/lib/gastown/feature-flags';
+import { getUserOrgMemberships } from '@/lib/organizations/organizations';
 import { recordKiloAdminElevationForRequest, serviceTarget } from '@/lib/admin/admin-access-log';
 
 const ONE_HOUR_SECONDS = 60 * 60;
@@ -22,11 +20,11 @@ const ONE_HOUR_SECONDS = 60 * 60;
  *
  * Access is controlled by the `gastown-access` PostHog feature flag.
  * The JWT includes `gastownAccess`, `isAdmin`, `apiTokenPepper`, and
- * `orgMemberships`; the worker also checks current account and organization
- * authorization against the primary database.
+ * `orgMemberships` so the worker can enforce access and check org
+ * membership without DB round-trips.
  */
 export async function POST() {
-  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+  const { user, authFailedResponse, tokenSource } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse) return authFailedResponse;
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -36,29 +34,26 @@ export async function POST() {
     return NextResponse.json({ error: 'Gastown access denied' }, { status: 403 });
   }
 
-  try {
-    const result = await createControlTokenForRequest(user, 'gastown', {
-      tokenSource: 'gastown',
-      expiresIn: 55 * 60,
-      legacyExpiresIn: ONE_HOUR_SECONDS,
-      extra: { isAdmin: user.is_admin, gastownAccess: true },
+  if (user.is_admin) {
+    // The minted token carries `isAdmin`, so the elevation is exercised inside
+    // the Gastown worker where this app emits nothing. Correlate on
+    // `kiloUserId` within the token's lifetime below.
+    await recordKiloAdminElevationForRequest({
+      user,
+      tokenSource,
+      reason: 'service_token_mint',
+      target: serviceTarget('gastown'),
     });
-    if (result.user.is_admin) {
-      await recordKiloAdminElevationForRequest({
-        user: result.user,
-        tokenSource: result.tokenSource,
-        reason: 'service_token_mint',
-        target: serviceTarget('gastown'),
-      });
-    }
-    return NextResponse.json({ token: result.token, expiresAt: result.expiresAt });
-  } catch (error) {
-    if (error instanceof TypedResourceDelegationError) {
-      return NextResponse.json(
-        { error: error.message, code: error.delegationCode },
-        { status: error.status }
-      );
-    }
-    throw error;
   }
+
+  const orgMemberships = await getUserOrgMemberships(user.id);
+
+  const token = generateApiToken(
+    user,
+    { isAdmin: user.is_admin, gastownAccess: true, orgMemberships },
+    { expiresIn: ONE_HOUR_SECONDS }
+  );
+  const expiresAt = new Date(Date.now() + 55 * 60 * 1000).toISOString();
+
+  return NextResponse.json({ token, expiresAt });
 }

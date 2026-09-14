@@ -378,11 +378,7 @@ export async function createControlTokenForRequest(
   }
   if (!isResourceTokenIssuanceEnabled(resource)) {
     if (authority.isModern) {
-      if (
-        resource !== 'gastown' &&
-        authority.credentialKind === 'device-access' &&
-        authority.deviceSessionId
-      ) {
+      if (authority.credentialKind === 'device-access' && authority.deviceSessionId) {
         return await createModernControlToken(authority, resource, options);
       }
       throw new TypedResourceDelegationError(

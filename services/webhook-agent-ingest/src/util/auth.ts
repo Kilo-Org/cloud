@@ -10,7 +10,6 @@ import { createMiddleware } from 'hono/factory';
 import type { HonoContext } from '../index';
 import { logger } from './logger';
 import { resError } from '@kilocode/worker-utils';
-import { getSecretValue } from './secret';
 
 /** Header name for internal API key */
 export const INTERNAL_API_KEY_HEADER = 'X-Internal-API-Key';
@@ -52,7 +51,7 @@ export const internalApiMiddleware = createMiddleware<HonoContext>(async (c, nex
   }
 
   const apiKeyHeader = c.req.header(INTERNAL_API_KEY_HEADER);
-  const secret = await getSecretValue(c.env.INTERNAL_API_SECRET);
+  const secret = await c.env.INTERNAL_API_SECRET.get();
 
   if (!secret) {
     logger.error('INTERNAL_API_SECRET not configured');

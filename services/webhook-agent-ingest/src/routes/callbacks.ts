@@ -5,7 +5,6 @@ import { logger } from '../util/logger';
 import { resError, resSuccess, verifyCallbackToken } from '@kilocode/worker-utils';
 import { CloudAgentCallbackFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import { withDORetry } from '../util/do-retry';
-import { getSecretValue } from '../util/secret';
 
 const callbacks = new Hono<HonoContext>();
 
@@ -34,7 +33,7 @@ callbacks.post('/execution', async c => {
     return c.json(resError('Missing webhook identification headers'), 400);
   }
 
-  const callbackTokenSecret = await getSecretValue(c.env.CALLBACK_TOKEN_SECRET);
+  const callbackTokenSecret = await c.env.CALLBACK_TOKEN_SECRET.get();
   if (!callbackTokenSecret) {
     logger.error('Callback authentication secret not configured');
     return c.json(resError('Internal server error'), 500);

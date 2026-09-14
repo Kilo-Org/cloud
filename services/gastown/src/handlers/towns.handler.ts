@@ -27,7 +27,6 @@ const CreateRigBody = z.object({
  */
 
 export async function handleCreateTown(c: Context<GastownEnv>, params: { userId: string }) {
-  if (c.get('kiloUserId') !== params.userId) return c.json(resError('Forbidden'), 403);
   const parsed = CreateTownBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
     return c.json(
@@ -38,28 +37,10 @@ export async function handleCreateTown(c: Context<GastownEnv>, params: { userId:
 
   const townDO = getGastownUserStub(c.env, params.userId);
   const town = await townDO.createTown({ name: parsed.data.name, owner_user_id: params.userId });
-  const townStub = getTownDOStub(c.env, town.id);
-  await townStub.setTownId(town.id);
-  const runtime = await townStub.initializeTownIdentityAndRuntimeAuthorization(
-    {
-      ownerType: 'user',
-      ownerUserId: params.userId,
-      createdByUserId: params.userId,
-      runtimeMode: 'legacy',
-    },
-    c.get('kiloControlToken')
-  );
-  if (runtime.modernControl && !runtime.runtimeToken) {
-    await townDO.deleteTown(town.id);
-    return c.json(resError('A current Gastown control token is required'), 403);
-  }
-  if (runtime.runtimeToken)
-    await townStub.updateTownConfig({ kilocode_token: runtime.runtimeToken });
   return c.json(resSuccess(town), 201);
 }
 
 export async function handleListTowns(c: Context<GastownEnv>, params: { userId: string }) {
-  if (c.get('kiloUserId') !== params.userId) return c.json(resError('Forbidden'), 403);
   const townDO = getGastownUserStub(c.env, params.userId);
   const towns = await townDO.listTowns();
   return c.json(resSuccess(towns));
@@ -69,7 +50,6 @@ export async function handleGetTown(
   c: Context<GastownEnv>,
   params: { userId: string; townId: string }
 ) {
-  if (c.get('kiloUserId') !== params.userId) return c.json(resError('Forbidden'), 403);
   const townDO = getGastownUserStub(c.env, params.userId);
   const town = await townDO.getTownAsync(params.townId);
   if (!town) return c.json(resError('Town not found'), 404);
@@ -77,7 +57,6 @@ export async function handleGetTown(
 }
 
 export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: string }) {
-  if (c.get('kiloUserId') !== params.userId) return c.json(resError('Forbidden'), 403);
   const parsed = CreateRigBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
     console.error(`${TOWNS_LOG} handleCreateRig: invalid body`, parsed.error.issues);
@@ -91,8 +70,6 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
   );
 
   const townDO = getGastownUserStub(c.env, params.userId);
-  const ownedTown = await townDO.getTownAsync(parsed.data.town_id);
-  if (!ownedTown) return c.json(resError('Town not found'), 404);
   const rig = await townDO.createRig(parsed.data);
   console.log(`${TOWNS_LOG} handleCreateRig: rig created id=${rig.id}, now configuring Rig DO`);
 
@@ -133,7 +110,6 @@ export async function handleGetRig(
   c: Context<GastownEnv>,
   params: { userId: string; rigId: string }
 ) {
-  if (c.get('kiloUserId') !== params.userId) return c.json(resError('Forbidden'), 403);
   const townDO = getGastownUserStub(c.env, params.userId);
   const rig = await townDO.getRigAsync(params.rigId);
   if (!rig) return c.json(resError('Rig not found'), 404);
@@ -144,7 +120,6 @@ export async function handleListRigs(
   c: Context<GastownEnv>,
   params: { userId: string; townId: string }
 ) {
-  if (c.get('kiloUserId') !== params.userId) return c.json(resError('Forbidden'), 403);
   const townDO = getGastownUserStub(c.env, params.userId);
   const rigs = await townDO.listRigs(params.townId);
   return c.json(resSuccess(rigs));
@@ -154,7 +129,6 @@ export async function handleDeleteTown(
   c: Context<GastownEnv>,
   params: { userId: string; townId: string }
 ) {
-  if (c.get('kiloUserId') !== params.userId) return c.json(resError('Forbidden'), 403);
   const townDO = getGastownUserStub(c.env, params.userId);
 
   // Destroy the Town DO (handles all rigs, agents, and mayor cleanup)
@@ -175,7 +149,6 @@ export async function handleDeleteRig(
   c: Context<GastownEnv>,
   params: { userId: string; rigId: string }
 ) {
-  if (c.get('kiloUserId') !== params.userId) return c.json(resError('Forbidden'), 403);
   const userDO = getGastownUserStub(c.env, params.userId);
   const rig = await userDO.getRigAsync(params.rigId);
   if (!rig) return c.json(resError('Rig not found'), 404);

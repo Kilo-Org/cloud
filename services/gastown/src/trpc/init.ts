@@ -11,8 +11,6 @@ export type TRPCContext = {
   apiTokenPepper: string | null;
   gastownAccess: boolean;
   orgMemberships: JwtOrgMembership[];
-  controlToken: string;
-  usesModernToken: boolean;
 };
 
 const t = initTRPC.context<TRPCContext>().create();

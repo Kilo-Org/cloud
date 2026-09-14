@@ -3003,5 +3003,33 @@
     "loadFailed": "このデバイスがサポートする言語を読み込めませんでした。",
     "emptyTitle": "サポートされている言語がありません",
     "emptyDescription": "このデバイスの音声認識は、サポートされている言語を報告しません。"
+  },
+  "tour": {
+    "eyebrow": "クイックツアー",
+    "forkTitle": "Kilo をどこで実行しますか？",
+    "forkSubtitle": "最初のセッションの実行場所を選択してください。",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "インストール不要で、サンドボックス化されたクラウド環境で Kilo を実行できます。",
+    "remoteOptionTitle": "お使いのコンピューター",
+    "remoteOptionBody": "`kilo remote` CLI を使って自分のコンピューターで Kilo を実行します。",
+    "skip": "ツアーをスキップ",
+    "tutorialLabel": "チュートリアル",
+    "cloudTitle": "最初のクラウドセッションを開始",
+    "cloudBody": "新しいセッションを作成すると、Kilo がクラウド上で実行します。",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "クラウドセッションの開始を待っています…",
+    "cloudCheck": "最初のクラウドセッションが実行中です。",
+    "remoteTitle": "最初のリモートセッションを開始",
+    "remoteBody": "コンピューターを接続してから、ここでセッションを開始してください。",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "コンピューターでセッションを開始",
+    "remoteWaiting": "コンピューターでのセッション開始を待っています…",
+    "remoteCheck": "最初のリモートセッションが実行中です。",
+    "remoteEmptyTitle": "接続済みのコンピューターはありません",
+    "remoteEmptyBody": "接続するには、コンピューターで `kilo remote` を実行してください。",
+    "remoteFound": "コンピューターが接続されました",
+    "checkAgain": "再チェック",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

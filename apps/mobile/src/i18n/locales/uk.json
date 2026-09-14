@@ -3047,5 +3047,33 @@
     "loadFailed": "Не вдалося завантажити мови, які підтримує цей пристрій.",
     "emptyTitle": "Немає підтримуваних мов",
     "emptyDescription": "Розпізнавання мовлення цього пристрою не повідомляє про підтримувані мови."
+  },
+  "tour": {
+    "eyebrow": "Швидкий огляд",
+    "forkTitle": "Де ви хочете запустити Kilo?",
+    "forkSubtitle": "Виберіть, де Kilo запустить ваш перший сеанс.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Запустіть Kilo в ізольованому хмарному середовищі, нічого не встановлюючи.",
+    "remoteOptionTitle": "Ваш комп'ютер",
+    "remoteOptionBody": "Запустіть Kilo на власній машині через CLI `kilo remote`.",
+    "skip": "Пропустити огляд",
+    "tutorialLabel": "Навчання",
+    "cloudTitle": "Запустіть свій перший хмарний сеанс",
+    "cloudBody": "Створіть новий сеанс, і Kilo запустить його в хмарі.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Чекаємо на запуск хмарного сеанса…",
+    "cloudCheck": "Ваш перший хмарний сеанс запущено.",
+    "remoteTitle": "Запустіть свій перший віддалений сеанс",
+    "remoteBody": "Підключіть свій комп'ютер, а потім запустіть сеанс звідси.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Запустити сеанс на вашому комп'ютері",
+    "remoteWaiting": "Чекаємо, коли ваш комп'ютер запустить сеанс…",
+    "remoteCheck": "Ваш перший віддалений сеанс запущено.",
+    "remoteEmptyTitle": "Комп'ютер ще не підключено",
+    "remoteEmptyBody": "Щоб підключити його, виконайте `kilo remote` на своєму комп'ютері.",
+    "remoteFound": "Комп'ютер підключено",
+    "checkAgain": "Перевірити ще раз",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

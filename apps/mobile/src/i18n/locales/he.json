@@ -3025,5 +3025,33 @@
     "loadFailed": "לא ניתן היה לטעון את השפות שהמכשיר הזה תומך בהן.",
     "emptyTitle": "אין שפות נתמכות",
     "emptyDescription": "זיהוי הדיבור של המכשיר הזה אינו מדווח על שפות נתמכות."
+  },
+  "tour": {
+    "eyebrow": "סיור מהיר",
+    "forkTitle": "היכן תרצה להריץ את Kilo?",
+    "forkSubtitle": "בחר היכן Kilo יריץ את הסשן הראשון שלך.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "הרץ את Kilo בסביבת ענן מבודדת, בלי להתקין כלום.",
+    "remoteOptionTitle": "המחשב שלך",
+    "remoteOptionBody": "הרץ את Kilo על המחשב שלך באמצעות ה-CLI של `kilo remote`.",
+    "skip": "דלג על הסיור",
+    "tutorialLabel": "מדריך",
+    "cloudTitle": "התחל את הסשן בענן הראשון שלך",
+    "cloudBody": "צור סשן חדש ו-Kilo יריץ אותו בענן.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "ממתין לסשן בענן שלך להתחיל…",
+    "cloudCheck": "הסשן בענן הראשון שלך פועל.",
+    "remoteTitle": "התחל את הסשן המרוחק הראשון שלך",
+    "remoteBody": "חבר את המחשב שלך, ואז התחל את הסשן מכאן.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "התחל סשן במחשב שלך",
+    "remoteWaiting": "ממתין שהמחשב שלך יתחיל את הסשן…",
+    "remoteCheck": "הסשן המרוחק הראשון שלך פועל.",
+    "remoteEmptyTitle": "עדיין לא חובר מחשב",
+    "remoteEmptyBody": "כדי לחבר אותו, הרץ `kilo remote` במחשב שלך.",
+    "remoteFound": "המחשב חובר",
+    "checkAgain": "בדוק שוב",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

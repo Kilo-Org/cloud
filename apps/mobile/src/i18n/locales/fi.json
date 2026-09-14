@@ -3003,5 +3003,33 @@
     "loadFailed": "Tämän laitteen tukemia kieliä ei voitu ladata.",
     "emptyTitle": "Ei tuettuja kieliä",
     "emptyDescription": "Tämän laitteen puheentunnistus ei ilmoita tuettuja kieliä."
+  },
+  "tour": {
+    "eyebrow": "Nopea esittely",
+    "forkTitle": "Missä haluat suorittaa Kilon?",
+    "forkSubtitle": "Valitse, missä Kilo suorittaa ensimmäisen istuntosi.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Suorita Kilo eristetyssä pilviympäristössä ilman asennuksia.",
+    "remoteOptionTitle": "Tietokoneesi",
+    "remoteOptionBody": "Suorita Kilo omalla koneellasi `kilo remote` -CLI:n kautta.",
+    "skip": "Ohita esittely",
+    "tutorialLabel": "Käyttöopas",
+    "cloudTitle": "Aloita ensimmäinen pilvi-istuntosi",
+    "cloudBody": "Luo uusi istunto, niin Kilo suorittaa sen pilvessä.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Odotetaan pilvi-istuntosi käynnistymistä…",
+    "cloudCheck": "Ensimmäinen pilvi-istuntosi on käynnissä.",
+    "remoteTitle": "Aloita ensimmäinen etäistuntosi",
+    "remoteBody": "Yhdistä tietokoneesi ja käynnistä istunto täältä.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Käynnistä istunto tietokoneellasi",
+    "remoteWaiting": "Odotetaan, että tietokoneesi käynnistää istunnon…",
+    "remoteCheck": "Ensimmäinen etäistuntosi on käynnissä.",
+    "remoteEmptyTitle": "Tietokonetta ei ole vielä yhdistetty",
+    "remoteEmptyBody": "Yhdistääksesi sen, suorita `kilo remote` tietokoneellasi.",
+    "remoteFound": "Tietokone yhdistetty",
+    "checkAgain": "Tarkista uudelleen",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

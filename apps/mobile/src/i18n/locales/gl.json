@@ -3003,5 +3003,33 @@
     "loadFailed": "Non se puideron cargar os idiomas que admite este dispositivo.",
     "emptyTitle": "Non hai idiomas compatibles",
     "emptyDescription": "O recoñecemento de voz deste dispositivo non informa de ningún idioma compatible."
+  },
+  "tour": {
+    "eyebrow": "Tour rápido",
+    "forkTitle": "Onde queres executar Kilo?",
+    "forkSubtitle": "Escolle onde executa Kilo a túa primeira sesión.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Executa Kilo nun contorno de nube illado, sen nada que instalar.",
+    "remoteOptionTitle": "O teu computador",
+    "remoteOptionBody": "Executa Kilo na túa propia máquina mediante a CLI `kilo remote`.",
+    "skip": "Omitir o tour",
+    "tutorialLabel": "Titorial",
+    "cloudTitle": "Inicia a túa primeira sesión na nube",
+    "cloudBody": "Crea unha nova sesión e Kilo execúaa na nube.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Esperando a que comece a túa sesión na nube…",
+    "cloudCheck": "A túa primeira sesión na nube está a executarse.",
+    "remoteTitle": "Inicia a túa primeira sesión remota",
+    "remoteBody": "Conecta o teu computador e despois inicia a sesión desde aquí.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Iniciar unha sesión no teu computador",
+    "remoteWaiting": "Esperando a que o teu computador inicie a sesión…",
+    "remoteCheck": "A túa primeira sesión remota está a executarse.",
+    "remoteEmptyTitle": "Ningún computador conectado aínda",
+    "remoteEmptyBody": "Para conectalo, executa `kilo remote` no teu computador.",
+    "remoteFound": "Computador conectado",
+    "checkAgain": "Comprobar de novo",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

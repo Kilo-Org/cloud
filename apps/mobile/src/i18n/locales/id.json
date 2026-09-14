@@ -1565,6 +1565,22 @@
       "connectionLost": "Koneksi terputus",
       "retryConnection": "Coba sambungkan kembali"
     },
+    "goal": {
+      "title": "Tujuan",
+      "statusActive": "Tujuan aktif",
+      "statusPaused": "Tujuan dijeda",
+      "statusComplete": "Tujuan selesai",
+      "statusBlocked": "Tujuan diblokir",
+      "edit": "Edit tujuan",
+      "remove": "Hapus tujuan",
+      "pause": "Jeda tujuan",
+      "resume": "Lanjutkan tujuan",
+      "editPlaceholder": "Jelaskan tujuan",
+      "removeConfirmTitle": "Hapus tujuan?",
+      "removeConfirmMessage": "CLI menghapus tujuan sesi ini.",
+      "updateFailed": "Tujuan tidak dapat diperbarui.",
+      "sectionAccessibility": "{{status}}. Tujuan: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Hubungkan GitHub melalui peramban, lalu kembali ke sini untuk memilih repositori.",
       "openGithub": "Buka GitHub",
@@ -2150,7 +2166,10 @@
     "gatewayModelUnavailable": "Model transkripsi ini tidak tersedia. Pilih yang lain di Preferensi.",
     "gatewayModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketuk $t(transcriptionModel.title) untuk memilih yang lain.",
     "gatewaySignInRequired": "Masuk untuk menggunakan transkripsi Kilo Gateway.",
-    "gatewayNoModel": "Pilih model transkripsi di Preferensi terlebih dahulu."
+    "gatewayNoModel": "Pilih model transkripsi di Preferensi terlebih dahulu.",
+    "testTitle": "Uji masukan suara",
+    "testPlaceholder": "Ketuk mikrofon dan mulai berbicara.",
+    "testClear": "Hapus teks"
   },
   "share": {
     "title": "Bagikan ke Kilo",
@@ -2973,5 +2992,12 @@
     "emptyTitle": "Tidak ada model transkripsi",
     "emptyDescription": "Kilo Gateway tidak menawarkan model transkripsi saat ini.",
     "loadFailed": "Tidak dapat memuat model transkripsi."
+  },
+  "voiceLanguage": {
+    "title": "Bahasa masukan suara",
+    "automatic": "Otomatis",
+    "loadFailed": "Tidak dapat memuat bahasa yang didukung perangkat ini.",
+    "emptyTitle": "Tidak ada bahasa yang didukung",
+    "emptyDescription": "Pengenalan suara perangkat ini tidak melaporkan bahasa yang didukung."
   }
 }

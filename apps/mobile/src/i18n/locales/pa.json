@@ -1999,6 +1999,22 @@
       "connectionLost": "ਕਨੈਕਸ਼ਨ ਟੁੱਟ ਗਿਆ",
       "retryConnection": "ਮੁੜ ਕਨੈਕਟ ਕਰਨ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ"
     },
+    "goal": {
+      "title": "ਟੀਚਾ",
+      "statusActive": "ਸਰਗਰਮ ਟੀਚਾ",
+      "statusPaused": "ਰੋਕਿਆ ਟੀਚਾ",
+      "statusComplete": "ਟੀਚਾ ਪੂਰਾ ਹੋਇਆ",
+      "statusBlocked": "ਟੀਚਾ ਰੋਕਿਆ ਗਿਆ",
+      "edit": "ਟੀਚਾ ਸੰਪਾਦਿਤ ਕਰੋ",
+      "remove": "ਟੀਚਾ ਹਟਾਓ",
+      "pause": "ਟੀਚਾ ਰੋਕੋ",
+      "resume": "ਟੀਚਾ ਮੁੜ ਸ਼ੁਰੂ ਕਰੋ",
+      "editPlaceholder": "ਟੀਚੇ ਦਾ ਵਰਣਨ ਕਰੋ",
+      "removeConfirmTitle": "ਟੀਚਾ ਹਟਾਉਣਾ?",
+      "removeConfirmMessage": "CLI ਇਸ ਸੈਸ਼ਨ ਦਾ ਟੀਚਾ ਮਿਟਾਉਂਦਾ ਹੈ।",
+      "updateFailed": "ਟੀਚਾ ਅੱਪਡੇਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+      "sectionAccessibility": "{{status}}। ਟੀਚਾ: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ GitHub ਨੂੰ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
       "openGithub": "GitHub ਖੋਲ੍ਹੋ",
@@ -2584,7 +2600,10 @@
     "gatewayModelUnavailable": "ਇਹ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਤਰਜੀਹਾਂ ਵਿੱਚ ਕੋਈ ਹੋਰ ਚੁਣੋ।",
     "gatewayModelUnavailableNotice": "ਇਹ ਮਾਡਲ ਹੁਣ ਪੇਸ਼ ਨਹੀਂ ਕੀਤਾ ਜਾਂਦਾ। ਹੋਰ ਚੁਣਨ ਲਈ $t(transcriptionModel.title) 'ਤੇ ਟੈਪ ਕਰੋ।",
     "gatewaySignInRequired": "Kilo Gateway ਬਦਲੀ ਵਰਤਣ ਲਈ ਸਾਈਨ ਇਨ ਕਰੋ।",
-    "gatewayNoModel": "ਪਹਿਲਾਂ ਤਰਜੀਹਾਂ ਵਿੱਚ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਚੁਣੋ।"
+    "gatewayNoModel": "ਪਹਿਲਾਂ ਤਰਜੀਹਾਂ ਵਿੱਚ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਚੁਣੋ।",
+    "testTitle": "ਵੌਇਸ ਇਨਪੁਟ ਦੀ ਜਾਂਚ ਕਰੋ",
+    "testPlaceholder": "ਮਾਈਕ੍ਰੋਫ਼ੋਨ 'ਤੇ ਟੈਪ ਕਰੋ ਅਤੇ ਬੋਲਣਾ ਸ਼ੁਰੂ ਕਰੋ।",
+    "testClear": "ਲਿਖਤ ਸਾਫ਼ ਕਰੋ"
   },
   "share": {
     "title": "Kilo ਵਿੱਚ ਸਾਂਝਾ ਕਰਨਾ",
@@ -2973,5 +2992,12 @@
     "emptyTitle": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਲਈ ਕੋਈ ਮਾਡਲ ਨਹੀਂ",
     "emptyDescription": "Kilo Gateway ਹੁਣ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਲਈ ਕੋਈ ਮਾਡਲ ਨਹੀਂ ਦੇ ਰਿਹਾ।",
     "loadFailed": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲੇ ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।"
+  },
+  "voiceLanguage": {
+    "title": "ਵੌਇਸ ਇਨਪੁਟ ਦੀ ਭਾਸ਼ਾ",
+    "automatic": "ਆਟੋ",
+    "loadFailed": "ਇਸ ਡਿਵਾਈਸ ਦੁਆਰਾ ਸਮਰਥਿਤ ਭਾਸ਼ਾਵਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
+    "emptyTitle": "ਕੋਈ ਸਮਰਥਿਤ ਭਾਸ਼ਾ ਨਹੀਂ",
+    "emptyDescription": "ਇਸ ਡਿਵਾਈਸ ਦੀ ਬੋਲੀ ਪਛਾਣ ਕੋਈ ਸਮਰਥਿਤ ਭਾਸ਼ਾ ਨਹੀਂ ਦੱਸਦੀ।"
   }
 }

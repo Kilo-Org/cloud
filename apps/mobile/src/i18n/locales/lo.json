@@ -1999,6 +1999,22 @@
       "connectionLost": "ການເຊື່ອມຕໍ່ຂາດ",
       "retryConnection": "ລອງເຊື່ອມຕໍ່ໃໝ່"
     },
+    "goal": {
+      "title": "ເປົ້າໝາຍ",
+      "statusActive": "ເປົ້າໝາຍທີ່ເຄື່ອນໄຫວ",
+      "statusPaused": "ເປົ້າໝາຍທີ່ຢຸດຊົ່ວຄາວ",
+      "statusComplete": "ເປົ້າໝາຍສຳເລັດ",
+      "statusBlocked": "ເປົ້າໝາຍຖືກສະກັດ",
+      "edit": "ແກ້ໄຂເປົ້າໝາຍ",
+      "remove": "ລຶບເປົ້າໝາຍ",
+      "pause": "ຢຸດເປົ້າໝາຍຊົ່ວຄາວ",
+      "resume": "ສືບຕໍ່ເປົ້າໝາຍ",
+      "editPlaceholder": "ອະທິບາຍເປົ້າໝາຍ",
+      "removeConfirmTitle": "ລຶບເປົ້າໝາຍບໍ?",
+      "removeConfirmMessage": "CLI ລຶບເປົ້າໝາຍຂອງເຊດຊັນນີ້.",
+      "updateFailed": "ບໍ່ສາມາດອັບເດດເປົ້າໝາຍໄດ້.",
+      "sectionAccessibility": "{{status}}. ເປົ້າໝາຍ: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ເຊື່ອມຕໍ່ GitHub ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",
       "openGithub": "ເປີດ GitHub",
@@ -2584,7 +2600,10 @@
     "gatewayModelUnavailable": "ໂມເດວຖອດສຽງນີ້ບໍ່ມີໃຫ້ໃຊ້. ເລືອກໂມເດວອື່ນໃນການຕັ້ງຄ່າສ່ວນຕົວ.",
     "gatewayModelUnavailableNotice": "ໂມເດວນີ້ບໍ່ໄດ້ສະເໜີອີກຕໍ່ໄປ. ແຕະ $t(transcriptionModel.title) ເພື່ອເລືອກອັນອື່ນ.",
     "gatewaySignInRequired": "ເຂົ້າສູ່ລະບົບເພື່ອໃຊ້ການຖອດສຽງຜ່ານ Kilo Gateway.",
-    "gatewayNoModel": "ເລືອກໂມເດວຖອດສຽງໃນການຕັ້ງຄ່າສ່ວນຕົວກ່ອນ."
+    "gatewayNoModel": "ເລືອກໂມເດວຖອດສຽງໃນການຕັ້ງຄ່າສ່ວນຕົວກ່ອນ.",
+    "testTitle": "ທົດສອບການປ້ອນດ້ວຍສຽງ",
+    "testPlaceholder": "ແຕະໄມໂຄຣໂຟນ ແລ້ວເລີ່ມເວົ້າ.",
+    "testClear": "ລ້າງຂໍ້ຄວາມ"
   },
   "share": {
     "title": "ແບ່ງປັນໄປທີ່ Kilo",
@@ -2973,5 +2992,12 @@
     "emptyTitle": "ບໍ່ມີໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
     "emptyDescription": "ຕອນນີ້ Kilo Gateway ບໍ່ມີໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ.",
     "loadFailed": "ບໍ່ສາມາດໂຫຼດໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມໄດ້."
+  },
+  "voiceLanguage": {
+    "title": "ພາສາຂອງການປ້ອນດ້ວຍສຽງ",
+    "automatic": "ອັດຕະໂນມັດ",
+    "loadFailed": "ບໍ່ສາມາດໂຫຼດພາສາທີ່ອຸປະກອນນີ້ຮອງຮັບໄດ້.",
+    "emptyTitle": "ບໍ່ມີພາສາທີ່ຮອງຮັບ",
+    "emptyDescription": "ການຮັບຮູ້ສຽງເວົ້າຂອງອຸປະກອນນີ້ບໍ່ລາຍງານພາສາທີ່ຮອງຮັບໃດໆ."
   }
 }

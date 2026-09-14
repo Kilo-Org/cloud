@@ -1999,6 +1999,22 @@
       "connectionLost": "Perdeuse a conexión",
       "retryConnection": "Volver tentar a conexión"
     },
+    "goal": {
+      "title": "Obxectivo",
+      "statusActive": "Obxectivo activo",
+      "statusPaused": "Obxectivo en pausa",
+      "statusComplete": "Obxectivo completado",
+      "statusBlocked": "Obxectivo bloqueado",
+      "edit": "Editar o obxectivo",
+      "remove": "Eliminar o obxectivo",
+      "pause": "Pausar o obxectivo",
+      "resume": "Retomar o obxectivo",
+      "editPlaceholder": "Describe o obxectivo",
+      "removeConfirmTitle": "Eliminar o obxectivo?",
+      "removeConfirmMessage": "O CLI borra o obxectivo desta sesión.",
+      "updateFailed": "Non se puido actualizar o obxectivo.",
+      "sectionAccessibility": "{{status}}. Obxectivo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Conecta GitHub no teu navegador e despois volve aquí para escoller un repositorio.",
       "openGithub": "Abrir GitHub",
@@ -2584,7 +2600,10 @@
     "gatewayModelUnavailable": "Este modelo de transcrición non está dispoñible. Escolle outro en Preferencias.",
     "gatewayModelUnavailableNotice": "Este modelo xa non se ofrece. Toca $t(transcriptionModel.title) para escoller outro.",
     "gatewaySignInRequired": "Inicia sesión para usar a transcrición con Kilo Gateway.",
-    "gatewayNoModel": "Escolle primeiro un modelo de transcrición en Preferencias."
+    "gatewayNoModel": "Escolle primeiro un modelo de transcrición en Preferencias.",
+    "testTitle": "Probar o ditado",
+    "testPlaceholder": "Toca o micrófono e comeza a falar.",
+    "testClear": "Borrar texto"
   },
   "share": {
     "title": "Compartir en Kilo",
@@ -2973,5 +2992,12 @@
     "emptyTitle": "Non hai modelos de transcrición",
     "emptyDescription": "Kilo Gateway non ofrece modelos de transcrición neste momento.",
     "loadFailed": "Non se puideron cargar os modelos de transcrición."
+  },
+  "voiceLanguage": {
+    "title": "Idioma do ditado",
+    "automatic": "Automático",
+    "loadFailed": "Non se puideron cargar os idiomas que admite este dispositivo.",
+    "emptyTitle": "Non hai idiomas compatibles",
+    "emptyDescription": "O recoñecemento de voz deste dispositivo non informa de ningún idioma compatible."
   }
 }

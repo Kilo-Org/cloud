@@ -1999,6 +1999,22 @@
       "connectionLost": "Прекъсната връзка",
       "retryConnection": "Опитай да се свържеш отново"
     },
+    "goal": {
+      "title": "Цел",
+      "statusActive": "Активна цел",
+      "statusPaused": "Цел на пауза",
+      "statusComplete": "Целта е изпълнена",
+      "statusBlocked": "Целта е блокирана",
+      "edit": "Редактиране на целта",
+      "remove": "Премахване на целта",
+      "pause": "Пауза на целта",
+      "resume": "Продължаване на целта",
+      "editPlaceholder": "Опишете целта",
+      "removeConfirmTitle": "Премахване на целта?",
+      "removeConfirmMessage": "CLI изчиства целта на тази сесия.",
+      "updateFailed": "Целта не можа да се обнови.",
+      "sectionAccessibility": "{{status}}. Цел: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Свържи GitHub в браузъра си, след което се върни тук, за да избереш хранилище.",
       "openGithub": "Отвори GitHub",
@@ -2584,7 +2600,10 @@
     "gatewayModelUnavailable": "Този модел за транскрипция не е наличен. Избери друг в Предпочитания.",
     "gatewayModelUnavailableNotice": "Този модел вече не се предлага. Докосни $t(transcriptionModel.title), за да избереш друг.",
     "gatewaySignInRequired": "Влез, за да използваш транскрипция през Kilo Gateway.",
-    "gatewayNoModel": "Първо избери модел за транскрипция в Предпочитания."
+    "gatewayNoModel": "Първо избери модел за транскрипция в Предпочитания.",
+    "testTitle": "Тестване на гласовото въвеждане",
+    "testPlaceholder": "Докоснете микрофона и започнете да говорите.",
+    "testClear": "Изчистване на текста"
   },
   "share": {
     "title": "Споделяне в Kilo",
@@ -2973,5 +2992,12 @@
     "emptyTitle": "Няма модели за транскрипция",
     "emptyDescription": "Kilo Gateway в момента не предлага модели за транскрипция.",
     "loadFailed": "Моделите за транскрипция не се заредиха."
+  },
+  "voiceLanguage": {
+    "title": "Език на гласовото въвеждане",
+    "automatic": "Автоматично",
+    "loadFailed": "Езиците, поддържани от това устройство, не можаха да се заредят.",
+    "emptyTitle": "Няма поддържани езици",
+    "emptyDescription": "Разпознаването на реч на това устройство не отчита поддържани езици."
   }
 }

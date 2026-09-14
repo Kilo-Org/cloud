@@ -1565,6 +1565,22 @@
       "connectionLost": "接続切断",
       "retryConnection": "接続を再試行"
     },
+    "goal": {
+      "title": "ゴール",
+      "statusActive": "アクティブなゴール",
+      "statusPaused": "一時停止中のゴール",
+      "statusComplete": "ゴール完了",
+      "statusBlocked": "ゴールがブロックされました",
+      "edit": "ゴールを編集",
+      "remove": "ゴールを削除",
+      "pause": "ゴールを一時停止",
+      "resume": "ゴールを再開",
+      "editPlaceholder": "ゴールを説明",
+      "removeConfirmTitle": "ゴールを削除しますか？",
+      "removeConfirmMessage": "CLI がこのセッションのゴールを消去します。",
+      "updateFailed": "ゴールを更新できませんでした。",
+      "sectionAccessibility": "{{status}}。ゴール: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ブラウザーでGitHubと連携し、この画面に戻ってリポジトリを選択してください。",
       "openGithub": "GitHubを開く",
@@ -2150,7 +2166,10 @@
     "gatewayModelUnavailable": "この文字起こしモデルは利用できません。設定で別のモデルを選択してください。",
     "gatewayModelUnavailableNotice": "このモデルは提供が終了しました。別のモデルを選ぶには$t(transcriptionModel.title)をタップしてください。",
     "gatewaySignInRequired": "Kilo Gatewayの文字起こしを使うにはサインインしてください。",
-    "gatewayNoModel": "まず設定で文字起こしモデルを選択してください。"
+    "gatewayNoModel": "まず設定で文字起こしモデルを選択してください。",
+    "testTitle": "音声入力をテスト",
+    "testPlaceholder": "マイクをタップして話し始めてください。",
+    "testClear": "テキストを消去"
   },
   "share": {
     "title": "Kiloに共有",
@@ -2973,5 +2992,12 @@
     "emptyTitle": "文字起こしモデルがありません",
     "emptyDescription": "現在、Kilo Gatewayは文字起こしモデルを提供していません。",
     "loadFailed": "文字起こしモデルを読み込めませんでした。"
+  },
+  "voiceLanguage": {
+    "title": "音声入力の言語",
+    "automatic": "自動",
+    "loadFailed": "このデバイスがサポートする言語を読み込めませんでした。",
+    "emptyTitle": "サポートされている言語がありません",
+    "emptyDescription": "このデバイスの音声認識は、サポートされている言語を報告しません。"
   }
 }

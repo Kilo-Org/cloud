@@ -1583,6 +1583,22 @@
       "connectionLost": "Utracono połączenie",
       "retryConnection": "Połącz ponownie"
     },
+    "goal": {
+      "title": "Cel",
+      "statusActive": "Aktywny cel",
+      "statusPaused": "Wstrzymany cel",
+      "statusComplete": "Cel ukończony",
+      "statusBlocked": "Cel zablokowany",
+      "edit": "Edytuj cel",
+      "remove": "Usuń cel",
+      "pause": "Wstrzymaj cel",
+      "resume": "Wznów cel",
+      "editPlaceholder": "Opisz cel",
+      "removeConfirmTitle": "Usunąć cel?",
+      "removeConfirmMessage": "CLI czyści cel tej sesji.",
+      "updateFailed": "Nie udało się zaktualizować celu.",
+      "sectionAccessibility": "{{status}}. Cel: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Połącz konto GitHub w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
       "openGithub": "Otwórz GitHub",
@@ -2178,7 +2194,10 @@
     "gatewayModelUnavailable": "Ten model transkrypcji jest niedostępny. Wybierz inny w Preferencjach.",
     "gatewayModelUnavailableNotice": "Ten model nie jest już oferowany. Dotknij $t(transcriptionModel.title), aby wybrać inny.",
     "gatewaySignInRequired": "Zaloguj się, aby korzystać z transkrypcji przez Kilo Gateway.",
-    "gatewayNoModel": "Najpierw wybierz model transkrypcji w Preferencjach."
+    "gatewayNoModel": "Najpierw wybierz model transkrypcji w Preferencjach.",
+    "testTitle": "Testuj dyktowanie",
+    "testPlaceholder": "Dotknij mikrofonu i zacznij mówić.",
+    "testClear": "Wyczyść tekst"
   },
   "share": {
     "title": "Udostępnianie w Kilo",
@@ -3017,5 +3036,12 @@
     "emptyTitle": "Brak modeli transkrypcji",
     "emptyDescription": "Kilo Gateway nie oferuje teraz żadnych modeli transkrypcji.",
     "loadFailed": "Nie udało się wczytać modeli transkrypcji."
+  },
+  "voiceLanguage": {
+    "title": "Język dyktowania",
+    "automatic": "Automatyczny",
+    "loadFailed": "Nie udało się załadować języków obsługiwanych przez to urządzenie.",
+    "emptyTitle": "Brak obsługiwanych języków",
+    "emptyDescription": "Rozpoznawanie mowy tego urządzenia nie zgłasza żadnych obsługiwanych języków."
   }
 }

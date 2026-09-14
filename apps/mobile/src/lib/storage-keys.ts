@@ -46,6 +46,8 @@ export const GATEWAY_TRANSCRIPTION_MODEL_KEY = 'gateway-transcription-model';
 export const TOOL_SUMMARY_TRANSLATION_ENABLED_KEY = 'tool-summary-translation-enabled';
 /** Persisted `{ id, name }` of the chosen tool-summary translation model (defaults to Auto Small). */
 export const TOOL_SUMMARY_TRANSLATION_MODEL_KEY = 'tool-summary-translation-model';
+/** Persisted BCP-47 tag of the chosen voice-input language (empty = auto from the app/device language). */
+export const VOICE_INPUT_LANGUAGE_KEY = 'voice-input-language';
 /** Revocable per-host list of markdown link hosts that open without an Alert. */
 export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';

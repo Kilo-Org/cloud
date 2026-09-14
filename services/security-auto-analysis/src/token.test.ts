@@ -79,9 +79,6 @@ describe('security analysis token issuance', () => {
     const control = await generateControlToken(user, secret, 'production', true, organizationId);
 
     expect(decodeJwt(control)).toMatchObject({ organizationId });
-    expect(decodeJwt(control)).not.toMatchObject({
-      organizationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-    });
   });
 
   it('includes only the requested organization in modern triage assertions', async () => {
@@ -91,9 +88,6 @@ describe('security analysis token issuance', () => {
     expect(decodeJwt(triage)).toMatchObject({
       aud: 'kilo-gateway',
       organizationId,
-    });
-    expect(decodeJwt(triage)).not.toMatchObject({
-      organizationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
     });
   });
 });

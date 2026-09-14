@@ -111,7 +111,6 @@ type StartSecurityAnalysisParams = {
   triageModel: string;
   analysisModel: string;
   analysisMode: AnalysisMode;
-  organizationId?: string;
   nextAuthSecret: string;
   internalApiSecret: string;
   callbackTokenSecret: string;

@@ -240,7 +240,6 @@ export async function processManualAnalysisStart(params: {
       triageModel,
       analysisModel,
       analysisMode: config.analysis_mode,
-      organizationId: owner.type === 'org' ? owner.id : undefined,
       nextAuthSecret,
       internalApiSecret,
       callbackTokenSecret,

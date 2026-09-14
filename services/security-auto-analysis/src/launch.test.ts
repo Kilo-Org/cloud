@@ -141,7 +141,6 @@ function createParams(retrySandboxOnly: boolean, cloudAgentFetch: typeof fetch, 
     triageModel: 'triage/model',
     analysisModel: 'analysis/model',
     analysisMode: 'auto' as const,
-    organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     nextAuthSecret: 'next-auth-secret',
     internalApiSecret: 'internal-api-secret',
     callbackTokenSecret: CALLBACK_SECRET,
@@ -288,12 +287,14 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
           })
         )
         .mockResolvedValueOnce(
-          Response.json({ result: { data: { executionId: 'exec-123' } } })
+          Response.json({ result: { data: { executionId: 'exec-123', status: 'running' } } })
         ) as never
     );
-    params.organizationId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
-    await startSecurityAnalysis(params);
+    await expect(startSecurityAnalysis(params)).resolves.toEqual({
+      started: true,
+      triageOnly: false,
+    });
 
     expect(generateControlToken).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'user-123' }),

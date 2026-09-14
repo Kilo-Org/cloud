@@ -386,7 +386,11 @@ export async function resolveThread(
     }
     await requestBitbucketJson(access, `${prPath(access, target.prId)}/tasks/${task.id}`, {
       method: 'PUT',
-      body: { resolved: true },
+      // Bitbucket expresses task resolution through the `state` enum, not a
+      // boolean: `PUT .../tasks/{id}` silently ignores an unknown `resolved`
+      // key and still answers 200, so `{ resolved: true }` was a no-op that
+      // reported success while the task stayed open.
+      body: { state: 'RESOLVED' },
     });
     return { done: true, replayed: false };
   } catch (error) {
@@ -437,7 +441,9 @@ export async function unresolveThread(
     }
     await requestBitbucketJson(access, `${prPath(access, target.prId)}/tasks/${task.id}`, {
       method: 'PUT',
-      body: { resolved: false },
+      // Reopening is the mirror of resolution: Bitbucket only reads `state`,
+      // so `{ resolved: false }` left the task resolved while reporting done.
+      body: { state: 'UNRESOLVED' },
     });
     return { done: true, replayed: false };
   } catch (error) {

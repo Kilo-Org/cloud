@@ -220,6 +220,14 @@ export type BitbucketWorkspaceAccessTokenReleaseResult = z.infer<
   typeof BitbucketWorkspaceAccessTokenReleaseResultSchema
 >;
 
+/**
+ * Read the release response with a hard byte cap. The `Content-Length` guard
+ * only runs when the header is present, so a chunked response — or one whose
+ * header understates its body — would otherwise buffer the whole body before
+ * the size check, leaving the cap unenforced. The body is streamed with the
+ * cap counted per chunk and the reader cancelled on breach, the same bounded
+ * read the Bitbucket transport and the git-token-service request reader use.
+ */
 async function readBoundedReleaseJson(response: Response): Promise<unknown> {
   if (!response.body) throw new Error('invalid_response');
   const contentType = response.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase();
@@ -232,11 +240,35 @@ async function readBoundedReleaseJson(response: Response): Promise<unknown> {
   ) {
     throw new Error('invalid_response');
   }
-  const text = await response.text();
-  if (text.length > BITBUCKET_WORKSPACE_ACCESS_TOKEN_RESPONSE_MAX_BYTES) {
-    throw new Error('invalid_response');
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!(value instanceof Uint8Array)) throw new Error('invalid_response');
+      totalBytes += value.byteLength;
+      if (totalBytes > BITBUCKET_WORKSPACE_ACCESS_TOKEN_RESPONSE_MAX_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The read remains rejected when cancellation itself fails.
+        }
+        throw new Error('invalid_response');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
   }
-  return JSON.parse(text);
+  const merged = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return JSON.parse(new TextDecoder().decode(merged));
 }
 
 /**

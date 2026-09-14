@@ -1,0 +1,30 @@
+{
+  "name": "kilo-mcp",
+  "private": true,
+  "type": "module",
+  "description": "Kilo remote MCP worker: catalog search + tRPC call proxy over MCP Streamable HTTP",
+  "scripts": {
+    "dev": "wrangler dev --env dev",
+    "deploy": "wrangler deploy",
+    "cf-typegen": "wrangler types",
+    "catalog:ensure-index": "node scripts/embed-catalog.ts ensure-index",
+    "catalog:embed": "node scripts/embed-catalog.ts",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/kilo-mcp/src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "drizzle-orm": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "drizzle-kit": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

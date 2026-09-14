@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "SSO perusahaan"
   },
   "preferences": {
+    "general": "Umum",
+    "voiceInput": "Input suara",
     "autoExpandThinking": "Tampilkan pemikiran secara otomatis",
     "autoExpandThinkingSubtitle": "Buka bagian pemikiran agen secara otomatis setelah agen selesai berpikir.",
+    "hideThinking": "Sembunyikan detail pemikiran",
+    "hideThinkingSubtitle": "Jangan tampilkan pemikiran agen di halaman sesi.",
     "keepScreenOn": "Biarkan layar tetap menyala di halaman sesi",
     "keepScreenOnSubtitle": "Biarkan layar tetap menyala saat sesi berjalan.",
     "appearance": "Tampilan",
@@ -237,6 +241,7 @@
     "appearanceLight": "Terang",
     "appearanceDark": "Gelap",
     "account": "Akun",
+    "accountSubtitle": "Bahasa, host tepercaya, dan sesi perangkat",
     "prReviewAttribution": "Tambahkan atribusi aplikasi ke tinjauan PR",
     "prReviewAttributionSubtitle": "Tambahkan keterangan Ditinjau melalui Kilo di bagian bawah saat kamu mengirim tinjauan.",
     "returnSendsMessage": "Tombol Enter mengirim pesan",
@@ -1559,6 +1564,22 @@
       "connectionLost": "Koneksi terputus",
       "retryConnection": "Coba sambungkan kembali"
     },
+    "goal": {
+      "title": "Tujuan",
+      "statusActive": "Tujuan aktif",
+      "statusPaused": "Tujuan dijeda",
+      "statusComplete": "Tujuan selesai",
+      "statusBlocked": "Tujuan diblokir",
+      "edit": "Edit tujuan",
+      "remove": "Hapus tujuan",
+      "pause": "Jeda tujuan",
+      "resume": "Lanjutkan tujuan",
+      "editPlaceholder": "Jelaskan tujuan",
+      "removeConfirmTitle": "Hapus tujuan?",
+      "removeConfirmMessage": "CLI menghapus tujuan sesi ini.",
+      "updateFailed": "Tujuan tidak dapat diperbarui.",
+      "sectionAccessibility": "{{status}}. Tujuan: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Hubungkan GitHub melalui peramban, lalu kembali ke sini untuk memilih repositori.",
       "openGithub": "Buka GitHub",
@@ -2002,6 +2023,11 @@
       "stepsCount_other": "{{steps}} langkah",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Setujui otomatis",
+      "description": "Setujui permintaan izin untuk sesi ini secara otomatis. Alat kemudian berjalan tanpa perintah.",
+      "unavailable": "Sesi ini tidak dapat menerima permintaan izin."
+    },
     "prBadge": {
       "open": "buka PR",
       "closed": "pR yang ditutup",
@@ -2142,8 +2168,12 @@
     "gatewayUnreachable": "Tidak dapat menghubungi Kilo Gateway. Periksa koneksi Anda dan coba lagi.",
     "gatewayTimeout": "Transkripsi terlalu lama. Coba lagi.",
     "gatewayModelUnavailable": "Model transkripsi ini tidak tersedia. Pilih yang lain di Preferensi.",
+    "gatewayModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketuk $t(transcriptionModel.title) untuk memilih yang lain.",
     "gatewaySignInRequired": "Masuk untuk menggunakan transkripsi Kilo Gateway.",
-    "gatewayNoModel": "Pilih model transkripsi di Preferensi terlebih dahulu."
+    "gatewayNoModel": "Pilih model transkripsi di Preferensi terlebih dahulu.",
+    "testTitle": "Uji masukan suara",
+    "testPlaceholder": "Ketuk mikrofon dan mulai berbicara.",
+    "testClear": "Hapus teks"
   },
   "share": {
     "title": "Bagikan ke Kilo",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "Tidak ada model transkripsi",
     "emptyDescription": "Kilo Gateway tidak menawarkan model transkripsi saat ini.",
     "loadFailed": "Tidak dapat memuat model transkripsi."
+  },
+  "voiceLanguage": {
+    "title": "Bahasa masukan suara",
+    "automatic": "Otomatis",
+    "loadFailed": "Tidak dapat memuat bahasa yang didukung perangkat ini.",
+    "emptyTitle": "Tidak ada bahasa yang didukung",
+    "emptyDescription": "Pengenalan suara perangkat ini tidak melaporkan bahasa yang didukung."
   }
 }

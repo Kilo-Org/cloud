@@ -7,6 +7,7 @@ import Stripe from 'stripe';
 
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { isValidEmail } from '../lib/users';
 import { createSeedStripeCustomer, deleteSeedStripeCustomer } from '../lib/stripe';
 import type { SeedResult } from '../index';
 
@@ -61,10 +62,6 @@ function printUsage(): void {
   console.log('');
   console.log('Examples:');
   console.log('  pnpm dev:seed app:kilo-pass-stripe e2e-w4b-android-stripe@example.com');
-}
-
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 async function deleteSeedStripeSubscription(subscriptionId: string): Promise<void> {

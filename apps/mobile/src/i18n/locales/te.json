@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "ఎంటర్‌ప్రైజ్ SSO"
   },
   "preferences": {
+    "general": "సాధారణం",
+    "voiceInput": "వాయిస్ ఇన్‌పుట్",
     "autoExpandThinking": "ఆలోచనను స్వయంచాలకంగా విస్తరించండి",
     "autoExpandThinkingSubtitle": "ఏజెంట్ ఆలోచించడం పూర్తయినప్పుడు ఆ వివరాలను విస్తరించి చూపించండి.",
+    "hideThinking": "ఆలోచన వివరాలను దాచండి",
+    "hideThinkingSubtitle": "సెషన్ పేజీలో ఏజెంట్ ఆలోచనను చూపించవద్దు.",
     "keepScreenOn": "సెషన్ పేజీలో ఉన్నంతసేపు స్క్రీన్ ఆన్‌లో ఉంచండి",
     "keepScreenOnSubtitle": "సెషన్ పని చేస్తున్నప్పుడు స్క్రీన్ ఆఫ్ కాకుండా ఉంచండి.",
     "appearance": "రూపం",
@@ -237,6 +241,7 @@
     "appearanceLight": "లైట్",
     "appearanceDark": "డార్క్",
     "account": "ఖాతా",
+    "accountSubtitle": "భాష, విశ్వసించిన హోస్ట్‌లు, పరికర సెషన్‌లు",
     "prReviewAttribution": "PR సమీక్షల్లో యాప్ పేరును చేర్చండి",
     "prReviewAttributionSubtitle": "సమీక్షను సమర్పించినప్పుడు చివరలో ‘Kilo ద్వారా సమీక్షించబడింది’ అని జోడించండి.",
     "returnSendsMessage": "రిటర్న్ కీ సందేశాన్ని పంపుతుంది",
@@ -1993,6 +1998,22 @@
       "connectionLost": "కనెక్షన్ తెగిపోయింది",
       "retryConnection": "కనెక్ట్ చేయడానికి మళ్లీ ప్రయత్నించండి"
     },
+    "goal": {
+      "title": "లక్ష్యం",
+      "statusActive": "క్రియాశీల లక్ష్యం",
+      "statusPaused": "నిలిపివేసిన లక్ష్యం",
+      "statusComplete": "లక్ష్యం పూర్తయింది",
+      "statusBlocked": "లక్ష్యం నిరోధించబడింది",
+      "edit": "లక్ష్యాన్ని సవరించండి",
+      "remove": "లక్ష్యాన్ని తీసివేయండి",
+      "pause": "లక్ష్యాన్ని నిలిపివేయండి",
+      "resume": "లక్ష్యాన్ని కొనసాగించండి",
+      "editPlaceholder": "లక్ష్యాన్ని వివరించండి",
+      "removeConfirmTitle": "లక్ష్యాన్ని తీసివేయాలా?",
+      "removeConfirmMessage": "ఈ సెషన్ లక్ష్యాన్ని CLI క్లియర్ చేస్తుంది.",
+      "updateFailed": "లక్ష్యాన్ని నవీకరించలేకపోయాము.",
+      "sectionAccessibility": "{{status}}. లక్ష్యం: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "మీ బ్రౌజర్‌లో GitHubను కనెక్ట్ చేయండి. తర్వాత రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడికి తిరిగి రండి.",
       "openGithub": "GitHub తెరవండి",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "{{steps}} దశలు",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "స్వయంచాలక ఆమోదం",
+      "description": "ఈ సెషన్ కోసం అనుమతి అభ్యర్థనలను స్వయంచాలకంగా ఆమోదించండి. ఆ తర్వాత సాధనాలు ఎటువంటి ప్రాంప్ట్ లేకుండా నడుస్తాయి.",
+      "unavailable": "ఈ సెషన్ అనుమతి అభ్యర్థనలను స్వీకరించజాలదు."
+    },
     "prBadge": {
       "open": "ఓపెన్ పుల్ రిక్వెస్ట్",
       "closed": "మూసివేయబడిన పుల్ రిక్వెస్ట్",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "Kilo Gatewayను చేరుకోలేకపోయాం. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
     "gatewayTimeout": "వచనంగా మార్చడానికి చాలా సమయం పట్టింది. మళ్లీ ప్రయత్నించండి.",
     "gatewayModelUnavailable": "ఈ వచన మార్పిడి మోడల్ అందుబాటులో లేదు. ప్రాధాన్యతలలో మరొకదాన్ని ఎంచుకోండి.",
+    "gatewayModelUnavailableNotice": "ఈ మోడల్ ఇకపై అందించబడదు. మరొకదాన్ని ఎంచుకోవడానికి $t(transcriptionModel.title) ని నొక్కండి.",
     "gatewaySignInRequired": "Kilo Gateway మార్పిడిని ఉపయోగించడానికి సైన్ ఇన్ చేయండి.",
-    "gatewayNoModel": "ముందుగా ప్రాధాన్యతలలో వచనంగా మార్చే మోడల్‌ను ఎంచుకోండి."
+    "gatewayNoModel": "ముందుగా ప్రాధాన్యతలలో వచనంగా మార్చే మోడల్‌ను ఎంచుకోండి.",
+    "testTitle": "వాయిస్ ఇన్‌పుట్‌ను పరీక్షించండి",
+    "testPlaceholder": "మైక్రోఫోన్‌ను నొక్కి మాట్లాడటం ప్రారంభించండి.",
+    "testClear": "వచనాన్ని తీసివేయండి"
   },
   "share": {
     "title": "Kiloలో పంచుకోవడం",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "వచనంగా మార్చే మోడల్లు లేవు",
     "emptyDescription": "Kilo Gateway ప్రస్తుతం వచనంగా మార్చే మోడల్లను అందించడం లేదు.",
     "loadFailed": "వచనంగా మార్చే మోడల్లను లోడ్ చేయలేకపోయాం."
+  },
+  "voiceLanguage": {
+    "title": "వాయిస్ ఇన్‌పుట్ భాష",
+    "automatic": "ఆటో",
+    "loadFailed": "ఈ పరికరం మద్దతిచ్చే భాషలను లోడ్ చేయలేకపోయాము.",
+    "emptyTitle": "మద్దతిచ్చే భాషలు లేవు",
+    "emptyDescription": "ఈ పరికరం యొక్క ప్రసంగ గుర్తింపు మద్దతిచ్చే భాషలను నివేదించదు."
   }
 }

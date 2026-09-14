@@ -83,6 +83,12 @@ export async function beginProviderOAuthAttempt(input: {
     await pruneProviderOAuthAttempts(tx);
     await assertOwnerHasNoSharedGitHubInstallation(tx, input.owner);
     const now = new Date().toISOString();
+    // A new attempt supersedes any existing pending attempt for this owner+provider,
+    // even if it hasn't expired yet. Without this, an abandoned-but-unexpired pending
+    // row would collide with the partial unique index on (owner, provider, status =
+    // 'pending') and block a fresh attempt for up to ATTEMPT_TTL_MS. Consumed rows are
+    // only expired once they've actually passed their TTL, since they don't hold that
+    // unique slot and this is otherwise routine retention cleanup.
     await tx
       .update(provider_oauth_attempts)
       .set({ status: 'expired' })
@@ -92,9 +98,11 @@ export async function beginProviderOAuthAttempt(input: {
           eq(provider_oauth_attempts.provider, input.provider),
           or(
             eq(provider_oauth_attempts.status, 'pending'),
-            eq(provider_oauth_attempts.status, 'consumed')
-          ),
-          lt(provider_oauth_attempts.expires_at, now)
+            and(
+              eq(provider_oauth_attempts.status, 'consumed'),
+              lt(provider_oauth_attempts.expires_at, now)
+            )
+          )
         )
       );
     await tx.insert(provider_oauth_attempts).values({

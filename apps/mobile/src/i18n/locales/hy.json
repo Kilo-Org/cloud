@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "Կորպորատիվ SSO"
   },
   "preferences": {
+    "general": "Ընդհանուր",
+    "voiceInput": "Ձայնային մուտք",
     "autoExpandThinking": "Ինքնաշխատ բացել մտածման բաժինը",
     "autoExpandThinkingSubtitle": "Մտածումն ավարտվելուց հետո բացել գործակալի մտածման բաժինը։",
+    "hideThinking": "Թաքցնել մտածման մանրամասները",
+    "hideThinkingSubtitle": "Չցուցադրել գործակալի մտածումը նիստի էջում։",
     "keepScreenOn": "Նիստի էջում էկրանը միացված պահել",
     "keepScreenOnSubtitle": "Էկրանը միացված պահել, քանի դեռ նիստն աշխատում է։",
     "appearance": "Արտաքին տեսք",
@@ -237,6 +241,7 @@
     "appearanceLight": "Բաց",
     "appearanceDark": "Մուգ",
     "account": "Հաշիվ",
+    "accountSubtitle": "Լեզու, վստահելի կայքեր և սարքերի աշխատաշրջաններ",
     "prReviewAttribution": "PR ստուգումներում նշել հավելվածը",
     "prReviewAttributionSubtitle": "Ստուգումն ուղարկելիս վերջում ավելացնել «Ստուգվել է Kilo-ի միջոցով» նշումը։",
     "returnSendsMessage": "Մուտքի ստեղնն ուղարկում է հաղորդագրությունը",
@@ -1993,6 +1998,22 @@
       "connectionLost": "Կապը կորել է",
       "retryConnection": "Կրկին փորձել միանալ"
     },
+    "goal": {
+      "title": "Նպատակ",
+      "statusActive": "Ակտիվ նպատակ",
+      "statusPaused": "Դադարեցված նպատակ",
+      "statusComplete": "Նպատակն ավարտված է",
+      "statusBlocked": "Նպատակն արգելափակված է",
+      "edit": "Խմբագրել նպատակը",
+      "remove": "Հեռացնել նպատակը",
+      "pause": "Դադարեցնել նպատակը",
+      "resume": "Շարունակել նպատակը",
+      "editPlaceholder": "Նկարագրեք նպատակը",
+      "removeConfirmTitle": "Հեռացնե՞լ նպատակը",
+      "removeConfirmMessage": "CLI-ն մաքրում է այս նստաշրջանի նպատակը։",
+      "updateFailed": "Չհաջողվեց թարմացնել նպատակը։",
+      "sectionAccessibility": "{{status}}։ Նպատակ՝ {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Միացրեք GitHub-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
       "openGithub": "Բացել GitHub-ը",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "{{steps}} քայլ",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Ավտոմատ հաստատում",
+      "description": "Ավտոմատ կերպով հաստատեք այս նստաշրջանի թույլտվության հարցումները։ Գործիքներն այնուհետև աշխատում են առանց հարցման։",
+      "unavailable": "Այս նստաշրջանը չի կարող ստանալ թույլտվության հարցումներ։"
+    },
     "prBadge": {
       "open": "բաց միավորման հարցում",
       "closed": "փակված միավորման հարցում",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "Հնարավոր չեղավ կապ հաստատել Kilo Gateway-ի հետ։ Ստուգեք կապը և կրկին փորձեք։",
     "gatewayTimeout": "Տեքստի վերածումը չափազանց երկար տևեց։ Կրկին փորձեք։",
     "gatewayModelUnavailable": "Այս տեքստի վերածման մոդելը հասանելի չէ։ Ընտրեք մեկ այլ՝ Նախապատվություններում։",
+    "gatewayModelUnavailableNotice": "Այս մոդելը այլևս չի առաջարկվում։ Մեկ այլ ընտրելու համար հպեք $t(transcriptionModel.title)։",
     "gatewaySignInRequired": "Մուտք գործեք՝ Kilo Gateway-ի վերածումն օգտագործելու համար։",
-    "gatewayNoModel": "Նախ ընտրեք տեքստի վերածման մոդել՝ Նախապատվություններում։"
+    "gatewayNoModel": "Նախ ընտրեք տեքստի վերածման մոդել՝ Նախապատվություններում։",
+    "testTitle": "Փորձարկել ձայնային մուտքագրումը",
+    "testPlaceholder": "Հպեք խոսափողին և սկսեք խոսել:",
+    "testClear": "Մաքրել տեքստը"
   },
   "share": {
     "title": "Ուղարկում Kilo-ին",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "Տեքստի վերածման մոդելներ չկան",
     "emptyDescription": "Kilo Gateway-ը հիմա տեքստի վերածման մոդելներ չի առաջարկում։",
     "loadFailed": "Չհաջողվեց բեռնել տեքստի վերածման մոդելները։"
+  },
+  "voiceLanguage": {
+    "title": "Ձայնային մուտքագրման լեզու",
+    "automatic": "Ավտոմատ",
+    "loadFailed": "Չհաջողվեց բեռնել այս սարքի աջակցվող լեզուները:",
+    "emptyTitle": "Աջակցվող լեզուներ չկան",
+    "emptyDescription": "Այս սարքի խոսքի ճանաչումը ոչ մի աջակցվող լեզու չի հաղորդում:"
   }
 }

@@ -65,7 +65,7 @@ export async function fetchTranscriptionModels(organizationId?: string): Promise
  * narrow to the caller, and the picker renders that as its empty state.
  */
 export function useTranscriptionModels(organizationId?: string) {
-  const { data, isLoading, isError, error, refetch } = useQuery({
+  const { data, isLoading, isError, isFetching, error, refetch } = useQuery({
     queryKey: ['transcription-models', organizationId] as const,
     queryFn: fetchTranscriptionModels.bind(null, organizationId),
     staleTime: 60_000,
@@ -74,5 +74,5 @@ export function useTranscriptionModels(organizationId?: string) {
 
   const models = useMemo(() => data ?? [], [data]);
 
-  return { models, isLoading, isError, error, refetch };
+  return { models, isLoading, isError, isFetching, error, refetch };
 }

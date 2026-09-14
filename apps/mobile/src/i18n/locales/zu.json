@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "SSO yebhizinisi"
   },
   "preferences": {
+    "general": "Okujwayelekile",
+    "voiceInput": "Ukufaka ngezwi",
     "autoExpandThinking": "Nweba ukucabanga ngokuzenzakalelayo",
     "autoExpandThinkingSubtitle": "Bonisa ukucabanga komenzeli kunwetshiwe uma eseqedile ukucabanga.",
+    "hideThinking": "Fihla imininingwane yokucabanga",
+    "hideThinkingSubtitle": "Ungakubonisi ukucabanga komenzeli ekhasini leseshini.",
     "keepScreenOn": "Gcina isikrini sivuliwe ngenkathi usekhasini leseshini",
     "keepScreenOnSubtitle": "Gcina isikrini sivuliwe ngenkathi iseshini isebenza.",
     "appearance": "Ukubukeka",
@@ -237,6 +241,7 @@
     "appearanceLight": "Okukhanyayo",
     "appearanceDark": "Okumnyama",
     "account": "I-akhawunti",
+    "accountSubtitle": "Ulimi, abasingathi abathenjwayo namaseshini edivayisi",
     "prReviewAttribution": "Veza uhlelo lokusebenza ekuhlolweni kwe-PR",
     "prReviewAttributionSubtitle": "Faka umbhalo ongezansi othi kuhlolwe nge-Kilo uma uthumela ukuhlolwa.",
     "returnSendsMessage": "Inkinobho yokubuyela ithumela umlayezo",
@@ -1993,6 +1998,22 @@
       "connectionLost": "Ukuxhumana kunqamukile",
       "retryConnection": "Zama ukuxhuma futhi"
     },
+    "goal": {
+      "title": "Umgomo",
+      "statusActive": "Umgomo osebenzayo",
+      "statusPaused": "Umgomo omisiwe",
+      "statusComplete": "Umgomo uqediwe",
+      "statusBlocked": "Umgomo uvinjiwe",
+      "edit": "Hlela umgomo",
+      "remove": "Susa umgomo",
+      "pause": "Misa umgomo",
+      "resume": "Qhubeka nomgomo",
+      "editPlaceholder": "Chaza umgomo",
+      "removeConfirmTitle": "Susa umgomo?",
+      "removeConfirmMessage": "I-CLI isusa umgomo wale seshini.",
+      "updateFailed": "Ayikwazanga ukubuyekeza umgomo.",
+      "sectionAccessibility": "{{status}}. Umgomo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Xhuma i-GitHub esipheqululini sakho, bese ubuyela lapha ukuze ukhethe inqolobane yekhodi.",
       "openGithub": "Vula i-GitHub",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "Izinyathelo ezingu-{{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Ukuvumela okuzenzakalelayo",
+      "description": "Vumela ngokuzenzakalelayo izicelo zemvume zalesi sikhathi. Amathuluzi abe esebenza ngaphandle kwesicelo.",
+      "unavailable": "Lesi sikhathi asikwazi ukwamukela izicelo zemvume."
+    },
     "prBadge": {
       "open": "vula i-PR",
       "closed": "isicelo sokuhlanganisa ikhodi esivaliwe",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "I-Kilo Gateway ayifinyelelwanga. Hlola ukuxhumana kwakho bese uzama futhi.",
     "gatewayTimeout": "Ukuguqula inkulumo kuthathe isikhathi eside kakhulu. Zama futhi.",
     "gatewayModelUnavailable": "Le modeli yokuguqula inkulumo ayitholakali. Khetha enye Ku-Okuncamelayo.",
+    "gatewayModelUnavailableNotice": "Le modeli ayisanikezwa. Thepha $t(transcriptionModel.title) ukukhetha enye.",
     "gatewaySignInRequired": "Ngena ngemvume ukuze usebenzise ukuguqula inkulumo nge-Kilo Gateway.",
-    "gatewayNoModel": "Okokuqala, khetha imodeli yokuguqula inkulumo Ku-Okuncamelayo."
+    "gatewayNoModel": "Okokuqala, khetha imodeli yokuguqula inkulumo Ku-Okuncamelayo.",
+    "testTitle": "Hlola ukufaka ngezwi",
+    "testPlaceholder": "Thepha imakrofoni bese uqala ukukhuluma.",
+    "testClear": "Sula umbhalo"
   },
   "share": {
     "title": "Yabelana ku-Kilo",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "Azikho izimodeli zokuguqula inkulumo",
     "emptyDescription": "I-Kilo Gateway ayinikezi zimodeli zokuguqula inkulumo okwamanje.",
     "loadFailed": "Azikwazanga ukulayisha izimodeli zokuguqula inkulumo."
+  },
+  "voiceLanguage": {
+    "title": "Ulimi lokufaka ngezwi",
+    "automatic": "Okuzenzakalelayo",
+    "loadFailed": "Izilimi ezisekelwa yile divayisi azikwazanga ukulayishwa.",
+    "emptyTitle": "Azikho izilimi ezisekelwayo",
+    "emptyDescription": "Ukubona inkulumo kwale divayisi akubiki zilimi ezisekelwayo."
   }
 }

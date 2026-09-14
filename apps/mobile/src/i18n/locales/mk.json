@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "Деловно SSO"
   },
   "preferences": {
+    "general": "Општо",
+    "voiceInput": "Гласовен внес",
     "autoExpandThinking": "Автоматски прикажувај го размислувањето",
     "autoExpandThinkingSubtitle": "Прикажи го целото размислување на агентот кога ќе заврши.",
+    "hideThinking": "Скриј ги деталите за размислувањето",
+    "hideThinkingSubtitle": "Не го прикажувај размислувањето на агентот на страницата на сесијата.",
     "keepScreenOn": "Задржи го екранот вклучен додека ја гледаш сесијата",
     "keepScreenOnSubtitle": "Задржи го екранот вклучен додека работи сесијата.",
     "appearance": "Изглед",
@@ -237,6 +241,7 @@
     "appearanceLight": "Светло",
     "appearanceDark": "Темно",
     "account": "Сметка",
+    "accountSubtitle": "Јазик, доверливи хостови и сесии на уреди",
     "prReviewAttribution": "Додај потпис од апликацијата во прегледите на PR",
     "prReviewAttributionSubtitle": "Додај го потписот „Прегледано преку Kilo“ на крајот кога испраќаш преглед.",
     "returnSendsMessage": "Копчето за нов ред испраќа порака",
@@ -1993,6 +1998,22 @@
       "connectionLost": "Прекината врска",
       "retryConnection": "Поврзи се повторно"
     },
+    "goal": {
+      "title": "Цел",
+      "statusActive": "Активна цел",
+      "statusPaused": "Паузирана цел",
+      "statusComplete": "Целта е завршена",
+      "statusBlocked": "Целта е блокирана",
+      "edit": "Уреди цел",
+      "remove": "Отстрани цел",
+      "pause": "Паузирај цел",
+      "resume": "Продолжи цел",
+      "editPlaceholder": "Опишете ја целта",
+      "removeConfirmTitle": "Да се отстрани целта?",
+      "removeConfirmMessage": "CLI ја брише целта на оваа сесија.",
+      "updateFailed": "Целта не можеше да се ажурира.",
+      "sectionAccessibility": "{{status}}. Цел: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Поврзи го GitHub преку прелистувачот, па врати се тука за да избереш репозиториум.",
       "openGithub": "Отвори GitHub",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "{{steps}} чекори",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Автоматско одобрување",
+      "description": "Автоматски одобрувај ги барањата за дозвола за оваа сесија. Потоа алатките работат без потсетник.",
+      "unavailable": "Оваа сесија не може да прима барања за дозвола."
+    },
     "prBadge": {
       "open": "отворен PR",
       "closed": "затворено барање за спојување",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "Не може да се достигне Kilo Gateway. Провери ја врската и обиди се повторно.",
     "gatewayTimeout": "Транскрипцијата трае предолго. Обиди се повторно.",
     "gatewayModelUnavailable": "Овој модел за транскрипција не е достапен. Одбери друг во Лични поставки.",
+    "gatewayModelUnavailableNotice": "Овој модел веќе не се нуди. Допрете $t(transcriptionModel.title) за да изберете друг.",
     "gatewaySignInRequired": "Најави се за да користиш транскрипција преку Kilo Gateway.",
-    "gatewayNoModel": "Прво одбери модел за транскрипција во Лични поставки."
+    "gatewayNoModel": "Прво одбери модел за транскрипција во Лични поставки.",
+    "testTitle": "Тестирај гласовен внес",
+    "testPlaceholder": "Допрете го микрофонот и започнете да зборувате.",
+    "testClear": "Исчисти текст"
   },
   "share": {
     "title": "Споделување во Kilo",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "Нема модели за транскрипција",
     "emptyDescription": "Kilo Gateway моментално не нуди модели за транскрипција.",
     "loadFailed": "Моделите за транскрипција не се вчитаа."
+  },
+  "voiceLanguage": {
+    "title": "Јазик на гласовниот внес",
+    "automatic": "Автоматски",
+    "loadFailed": "Не можеа да се вчитаат јазиците што ги поддржува овој уред.",
+    "emptyTitle": "Нема поддржани јазици",
+    "emptyDescription": "Препознавањето говор на овој уред не пријавува поддржани јазици."
   }
 }

@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "Корпоративтік SSO"
   },
   "preferences": {
+    "general": "Жалпы",
+    "voiceInput": "Дауыспен енгізу",
     "autoExpandThinking": "Ойлау барысын автоматты түрде ашу",
     "autoExpandThinkingSubtitle": "Агент ойлануды аяқтағанда, оның ойлау барысын толық көрсету.",
+    "hideThinking": "Ойлау мәліметтерін жасыру",
+    "hideThinkingSubtitle": "Сессия бетінде агенттің ойлауын көрсетпеу.",
     "keepScreenOn": "Сессия бетінде экранды қосулы ұстау",
     "keepScreenOnSubtitle": "Сессия орындалып жатқанда экранды өшірмеу.",
     "appearance": "Көрініс",
@@ -237,6 +241,7 @@
     "appearanceLight": "Ашық",
     "appearanceDark": "Күңгірт",
     "account": "Тіркелгі",
+    "accountSubtitle": "Тіл, сенімді хосттар және құрылғылардағы сессиялар",
     "prReviewAttribution": "PR тексерулеріне қолданба атауын қосу",
     "prReviewAttributionSubtitle": "Тексеру нәтижесін жібергенде, соңына «Kilo арқылы тексерілді» деген жазу қосу.",
     "returnSendsMessage": "Enter пернесімен хабарлама жіберу",
@@ -1993,6 +1998,22 @@
       "connectionLost": "Қосылым үзілді",
       "retryConnection": "Қайта қосылу"
     },
+    "goal": {
+      "title": "Мақсат",
+      "statusActive": "Белсенді мақсат",
+      "statusPaused": "Тоқтатылған мақсат",
+      "statusComplete": "Мақсат орындалды",
+      "statusBlocked": "Мақсат бұғатталды",
+      "edit": "Мақсатты өңдеу",
+      "remove": "Мақсатты жою",
+      "pause": "Мақсатты тоқтату",
+      "resume": "Мақсатты жалғастыру",
+      "editPlaceholder": "Мақсатты сипаттаңыз",
+      "removeConfirmTitle": "Мақсат жойылсын ба?",
+      "removeConfirmMessage": "CLI осы сеанстың мақсатын тазалайды.",
+      "updateFailed": "Мақсатты жаңарту мүмкін болмады.",
+      "sectionAccessibility": "{{status}}. Мақсат: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Браузерде GitHub тіркелгісін байланыстырып, репозиторий таңдау үшін осында оралыңыз.",
       "openGithub": "GitHub-ты ашу",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "{{steps}} қадам",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Автоматты мақұлдау",
+      "description": "Осы сессияның рұқсат сұрауларын автоматты түрде мақұлдаңыз. Содан кейін құралдар сұраусыз іске қосылады.",
+      "unavailable": "Бұл сессия рұқсат сұрауларын қабылдай алмайды."
+    },
     "prBadge": {
       "open": "біріктіру сұрауын ашу",
       "closed": "жабылған біріктіру сұрауы",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "Kilo Gateway-ге қосылу мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
     "gatewayTimeout": "Дауысты мәтінге айналдыру тым ұзақ созылды. Қайталап көріңіз.",
     "gatewayModelUnavailable": "Бұл дауысты мәтінге айналдыру моделі қолжетімсіз. Параметрлерден басқасын таңдаңыз.",
+    "gatewayModelUnavailableNotice": "Бұл модель енді ұсынылмайды. Басқасын таңдау үшін $t(transcriptionModel.title) түртіңіз.",
     "gatewaySignInRequired": "Kilo Gateway арқылы айналдыруды қолдану үшін жүйеге кіріңіз.",
-    "gatewayNoModel": "Алдымен Параметрлерден дауысты мәтінге айналдыру моделін таңдаңыз."
+    "gatewayNoModel": "Алдымен Параметрлерден дауысты мәтінге айналдыру моделін таңдаңыз.",
+    "testTitle": "Дауыстық енгізуді тексеру",
+    "testPlaceholder": "Микрофонды түртіп, сөйлеуді бастаңыз.",
+    "testClear": "Мәтінді тазалау"
   },
   "share": {
     "title": "Kilo-ға жіберу",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "Дауысты мәтінге айналдыру модельдері жоқ",
     "emptyDescription": "Kilo Gateway қазір дауысты мәтінге айналдыру модельдерін ұсынбайды.",
     "loadFailed": "Дауысты мәтінге айналдыру модельдерін жүктеу мүмкін болмады."
+  },
+  "voiceLanguage": {
+    "title": "Дауыстық енгізу тілі",
+    "automatic": "Авто",
+    "loadFailed": "Осы құрылғы қолдайтын тілдер жүктелмеді.",
+    "emptyTitle": "Қолдау көрсетілетін тілдер жоқ",
+    "emptyDescription": "Бұл құрылғының сөйлеуді тануы қолдау көрсетілетін тілдер туралы хабарламайды."
   }
 }

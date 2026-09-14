@@ -181,7 +181,7 @@ export async function handleGitHubWebhook(
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
       }
       const response = await dispatch();
-      if (receipt !== 'missing_canonical') {
+      if (receipt !== 'missing_canonical' && response.ok) {
         await recordCompletedGitHubInstallationDelivery({
           installationId,
           appType,

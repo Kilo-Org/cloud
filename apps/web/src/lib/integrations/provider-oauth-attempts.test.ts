@@ -90,6 +90,43 @@ describe('provider OAuth attempts', () => {
     ).resolves.toBe(false);
   });
 
+  it('supersedes an unexpired pending attempt when a new attempt starts', async () => {
+    const actor = await insertTestUser();
+    const owner = { type: 'user' as const, id: actor.id };
+    await beginProviderOAuthAttempt({
+      actorUserId: actor.id,
+      owner,
+      provider: 'slack',
+      state: 'abandoned-state',
+    });
+
+    await expect(
+      beginProviderOAuthAttempt({
+        actorUserId: actor.id,
+        owner,
+        provider: 'slack',
+        state: 'fresh-state',
+      })
+    ).resolves.toBeUndefined();
+
+    await expect(
+      consumeProviderOAuthAttempt({
+        actorUserId: actor.id,
+        owner,
+        provider: 'slack',
+        state: 'abandoned-state',
+      })
+    ).resolves.toBe(false);
+    await expect(
+      consumeProviderOAuthAttempt({
+        actorUserId: actor.id,
+        owner,
+        provider: 'slack',
+        state: 'fresh-state',
+      })
+    ).resolves.toBe(true);
+  });
+
   it('serializes provider start before shared GitHub attach', async () => {
     const incumbent = await insertTestUser();
     const destinationUser = await insertTestUser();

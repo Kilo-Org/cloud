@@ -30,7 +30,7 @@ import {
   selectAutoFreeCandidate,
 } from '@/lib/ai-gateway/models';
 import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { tryGetProviderById } from '@/lib/ai-gateway/providers/provider-definitions';
+import { tryGetProviderById } from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import {
   getOrganizationAutoRoute,

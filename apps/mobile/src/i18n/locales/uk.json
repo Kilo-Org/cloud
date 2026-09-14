@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "Корпоративний SSO"
   },
   "preferences": {
+    "general": "Загальні",
+    "voiceInput": "Голосове введення",
     "autoExpandThinking": "Автоматично розгортати міркування",
     "autoExpandThinkingSubtitle": "Показувати міркування агента в розгорнутому вигляді після їх завершення.",
+    "hideThinking": "Приховати подробиці міркувань",
+    "hideThinkingSubtitle": "Не показувати міркування агента на сторінці сеансу.",
     "keepScreenOn": "Не вимикати екран на сторінці сеансу",
     "keepScreenOnSubtitle": "Не вимикати екран, поки триває сеанс.",
     "appearance": "Зовнішній вигляд",
@@ -237,6 +241,7 @@
     "appearanceLight": "Світла",
     "appearanceDark": "Темна",
     "account": "Обліковий запис",
+    "accountSubtitle": "Мова, довірені хости та сеанси на пристроях",
     "prReviewAttribution": "Додавати згадку про застосунок до перевірок PR",
     "prReviewAttributionSubtitle": "Додавати підпис «Перевірено через Kilo» в кінці перевірки під час надсилання.",
     "returnSendsMessage": "Клавіша вводу надсилає повідомлення",
@@ -1577,6 +1582,22 @@
       "connectionLost": "З'єднання втрачено",
       "retryConnection": "Повторити підключення"
     },
+    "goal": {
+      "title": "Ціль",
+      "statusActive": "Активна ціль",
+      "statusPaused": "Призупинена ціль",
+      "statusComplete": "Ціль досягнуто",
+      "statusBlocked": "Ціль заблоковано",
+      "edit": "Редагувати ціль",
+      "remove": "Видалити ціль",
+      "pause": "Призупинити ціль",
+      "resume": "Відновити ціль",
+      "editPlaceholder": "Опишіть ціль",
+      "removeConfirmTitle": "Видалити ціль?",
+      "removeConfirmMessage": "CLI очищає ціль цього сеансу.",
+      "updateFailed": "Не вдалося оновити ціль.",
+      "sectionAccessibility": "{{status}}. Ціль: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Підключіть GitHub у браузері, а потім поверніться сюди, щоб вибрати репозиторій.",
       "openGithub": "Відкрити GitHub",
@@ -2030,6 +2051,11 @@
       "stepsCount_few": "{{steps}} кроки",
       "stepsCount_many": "{{steps}} кроків"
     },
+    "autoApprove": {
+      "title": "Автосхвалення",
+      "description": "Автоматично схвалювати запити на дозвіл для цього сеансу. Потім інструменти запускаються без запиту.",
+      "unavailable": "Цей сеанс не може отримувати запити на дозвіл."
+    },
     "prBadge": {
       "open": "відкритий запит на злиття",
       "closed": "закритий запит на злиття",
@@ -2170,8 +2196,12 @@
     "gatewayUnreachable": "Не вдалося зв'язатися з Kilo Gateway. Перевірте з'єднання та спробуйте ще раз.",
     "gatewayTimeout": "Розпізнавання тривало задовго. Спробуйте ще раз.",
     "gatewayModelUnavailable": "Ця модель розпізнавання мовлення недоступна. Виберіть іншу в Налаштуваннях.",
+    "gatewayModelUnavailableNotice": "Ця модель більше не пропонується. Натисніть $t(transcriptionModel.title), щоб вибрати іншу.",
     "gatewaySignInRequired": "Увійдіть, щоб використовувати розпізнавання через Kilo Gateway.",
-    "gatewayNoModel": "Спершу виберіть модель розпізнавання мовлення в Налаштуваннях."
+    "gatewayNoModel": "Спершу виберіть модель розпізнавання мовлення в Налаштуваннях.",
+    "testTitle": "Перевірити голосове введення",
+    "testPlaceholder": "Торкніться мікрофона й почніть говорити.",
+    "testClear": "Очистити текст"
   },
   "share": {
     "title": "Надсилання в Kilo",
@@ -3010,5 +3040,12 @@
     "emptyTitle": "Немає моделей розпізнавання мовлення",
     "emptyDescription": "Зараз Kilo Gateway не пропонує моделей розпізнавання мовлення.",
     "loadFailed": "Не вдалося завантажити моделі розпізнавання мовлення."
+  },
+  "voiceLanguage": {
+    "title": "Мова голосового введення",
+    "automatic": "Авто",
+    "loadFailed": "Не вдалося завантажити мови, які підтримує цей пристрій.",
+    "emptyTitle": "Немає підтримуваних мов",
+    "emptyDescription": "Розпізнавання мовлення цього пристрою не повідомляє про підтримувані мови."
   }
 }

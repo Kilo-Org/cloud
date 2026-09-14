@@ -7,6 +7,7 @@ import { and, eq, or } from 'drizzle-orm';
 import type { SeedResult } from '../index';
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { isValidEmail } from '../lib/users';
 import {
   buildAssistantMessageItem,
   buildSessionItem,
@@ -39,10 +40,6 @@ function printUsage(): void {
   console.log('Examples:');
   console.log('  pnpm dev:seed app:paged-history evgeny@kilocode.ai');
   console.log('  pnpm -s dev:seed app:paged-history evgeny@kilocode.ai --json');
-}
-
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function sleep(ms: number): Promise<void> {

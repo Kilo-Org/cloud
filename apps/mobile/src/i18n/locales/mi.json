@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "SSO umanga"
   },
   "preferences": {
+    "general": "Whānui",
+    "voiceInput": "Tāuru reo",
     "autoExpandThinking": "Whakawhānuitia aunoa te whakaaro",
     "autoExpandThinkingSubtitle": "Whakaaturia katoatia ngā whakaaro o te māngai ina oti tana whakaaro.",
+    "hideThinking": "Hunaia ngā taipitopito o te whakaaro",
+    "hideThinkingSubtitle": "Kaua e whakaatu ngā whakaaro o te māngai i te whārangi wātū.",
     "keepScreenOn": "Whakakā tonutia te mata i te whārangi wātū",
     "keepScreenOnSubtitle": "Whakakā tonutia te mata i te wā e haere ana te wātū.",
     "appearance": "Te āhua",
@@ -237,6 +241,7 @@
     "appearanceLight": "Mārama",
     "appearanceDark": "Pōuri",
     "account": "Pūkete",
+    "accountSubtitle": "Reo, ngā paetukutuku whirinaki me ngā wātū pūrere",
     "prReviewAttribution": "Tāpirihia te ingoa taupānga ki ngā arotake PR",
     "prReviewAttributionSubtitle": "Tāpirihia he hiku e mea ana 'Kua arotakengia mā Kilo' ina tuku koe i tētahi arotake.",
     "returnSendsMessage": "Ka tukuna te karere mā te pātuhi tāuru",
@@ -1993,6 +1998,22 @@
       "connectionLost": "Kua motu te hononga",
       "retryConnection": "Whakamātau ki te hono anō"
     },
+    "goal": {
+      "title": "Whāinga",
+      "statusActive": "Whāinga hohe",
+      "statusPaused": "Whāinga kua whakatārewa",
+      "statusComplete": "Kua oti te whāinga",
+      "statusBlocked": "Kua āraia te whāinga",
+      "edit": "Whakatika whāinga",
+      "remove": "Tango whāinga",
+      "pause": "Whakatārewa whāinga",
+      "resume": "Haere tonu te whāinga",
+      "editPlaceholder": "Whakamārama te whāinga",
+      "removeConfirmTitle": "Tango whāinga?",
+      "removeConfirmMessage": "Ka muru te CLI i te whāinga o tēnei wātū.",
+      "updateFailed": "Kāore i taea te whakahōu te whāinga.",
+      "sectionAccessibility": "{{status}}. Whāinga: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Honohia a GitHub mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere.",
       "openGithub": "Whakatuwheratia a GitHub",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "{{steps}} hipanga",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Whakaae aunoa",
+      "description": "Whakaaetia aunoatia ngā tono whakaaetanga mō tēnei wātū. Kātahi ka rere ngā taputapu me te kore pātai.",
+      "unavailable": "Kāore e taea e tēnei wātū te whiwhi tono whakaaetanga."
+    },
     "prBadge": {
       "open": "tuwhera te tono kume",
       "closed": "tono kume kua katia",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "Kāore i taea te tae ki te Kilo Gateway. Tirohia tō hononga, kātahi ka whakamātau anō.",
     "gatewayTimeout": "He roa rawa te tuhi ā-reo. Whakamātau anō.",
     "gatewayModelUnavailable": "Kāore e wātea ana tēnei tauira tuhi ā-reo. Kōwhiria tētahi atu i Ngā manakohanga.",
+    "gatewayModelUnavailableNotice": "Kāore tēnei tauira e tukuna ana ināianei. Pāwhiritia $t(transcriptionModel.title) ki te kōwhiri i tētahi atu.",
     "gatewaySignInRequired": "Takiuru kia taea te tuhi ā-reo mā Kilo Gateway.",
-    "gatewayNoModel": "Tuatahi, kōwhiria he tauira tuhi ā-reo i Ngā manakohanga."
+    "gatewayNoModel": "Tuatahi, kōwhiria he tauira tuhi ā-reo i Ngā manakohanga.",
+    "testTitle": "Whakamātautau i te tāuru reo",
+    "testPlaceholder": "Pāwhiritia te hopuoro ka tīmata ki te kōrero.",
+    "testClear": "Ūkui i te tuhinga"
   },
   "share": {
     "title": "Tohatoha ki Kilo",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "Kāore he tauira tuhi ā-reo",
     "emptyDescription": "I tēnei wā, kāore he tauira tuhi ā-reo e wātea ana i te Kilo Gateway.",
     "loadFailed": "Kāore i taea te uta i ngā tauira tuhi ā-reo."
+  },
+  "voiceLanguage": {
+    "title": "Reo o te tāuru reo",
+    "automatic": "Aunoa",
+    "loadFailed": "Kāore i taea ngā reo e tautokona ana e tēnei pūrere te uta.",
+    "emptyTitle": "Kāore he reo e tautokona ana",
+    "emptyDescription": "Kāore te āhukahuka reo o tēnei pūrere e pūrongo i tētahi reo e tautokona ana."
   }
 }

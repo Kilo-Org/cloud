@@ -22,8 +22,8 @@ const ONE_HOUR_SECONDS = 60 * 60;
  *
  * Access is controlled by the `gastown-access` PostHog feature flag.
  * The JWT includes `gastownAccess`, `isAdmin`, `apiTokenPepper`, and
- * `orgMemberships` so the worker can enforce access and check org
- * membership without DB round-trips.
+ * `orgMemberships`; the worker also checks current account and organization
+ * authorization against the primary database.
  */
 export async function POST() {
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });

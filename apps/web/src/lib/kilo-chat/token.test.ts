@@ -10,6 +10,7 @@ import {
   NOTIFICATIONS_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { createKiloChatTokenResponse } from './token';
+import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 
 jest.mock('@/lib/auth/resource-delegation', () => ({ getResourceDelegationAuthority: jest.fn() }));
 jest.mock('@/lib/config.server', () => ({
@@ -17,6 +18,7 @@ jest.mock('@/lib/config.server', () => ({
   isResourceTokenIssuanceEnabled: jest.fn(),
 }));
 jest.mock('@/lib/tokens', () => ({ generateApiToken: jest.fn() }));
+jest.mock('@kilocode/db/client', () => ({ getWorkerDb: jest.fn() }));
 
 const now = 1_800_000_000;
 const user = { id: 'oauth/chat-user', api_token_pepper: 'test-pepper' } as User;
@@ -50,6 +52,45 @@ beforeEach(() => {
   mockLegacyToken.mockReturnValue('legacy-token');
 });
 afterEach(() => jest.useRealTimers());
+
+it.each([
+  [false, false],
+  [false, true],
+  [true, true],
+])(
+  'passes downstream Chat/Event/Notifications auth (gate=%s, modern=%s)',
+  async (enabled, modern) => {
+    mockFlag.mockReturnValue(enabled);
+    if (!modern) {
+      mockAuthority.mockResolvedValue(authority({ isModern: false }));
+      mockLegacyToken.mockImplementation(
+        jest.requireActual<{ generateApiToken: typeof generateApiToken }>('@/lib/tokens')
+          .generateApiToken
+      );
+    }
+    const { token } = await createKiloChatTokenResponse(user);
+    if (!modern) expect(jwt.decode(token)).not.toHaveProperty('aud');
+    for (const audience of [KILO_CHAT_AUDIENCE, EVENT_SERVICE_AUDIENCE, NOTIFICATIONS_AUDIENCE]) {
+      const params = {
+        token,
+        nextAuthSecret: NEXTAUTH_SECRET,
+        workerEnv: 'test',
+        connectionString: 'unused',
+        resourceAudience: { audience, mode: 'allow-legacy' as const },
+        getUserPepper: async () => ({ pepper: user.api_token_pepper, blockedReason: null }),
+      };
+      await expect(verifyKiloBearerAgainstCurrentPepper(params)).resolves.toEqual({
+        userId: user.id,
+      });
+      await expect(
+        verifyKiloBearerAgainstCurrentPepper({
+          ...params,
+          getUserPepper: async () => ({ pepper: 'rotated', blockedReason: null }),
+        })
+      ).resolves.toBeNull();
+    }
+  }
+);
 
 it.each([
   [false, 600, 600],

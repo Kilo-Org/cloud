@@ -38,6 +38,12 @@ export async function POST(request: NextRequest) {
       { status: 403 }
     );
   }
+  if (resource === 'attribution') {
+    return NextResponse.json(
+      { error: 'Attribution requires an organization resource token' },
+      { status: 403 }
+    );
+  }
   try {
     const result = await createDelegatedResourceToken(user, resource, {
       headers: request.headers,

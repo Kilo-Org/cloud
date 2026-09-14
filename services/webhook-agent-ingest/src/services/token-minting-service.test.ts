@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
+import { createRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import { TokenMintingService } from './token-minting-service.js';
 
 const { findUserForToken, organizationExists, ensureBotUserForOrg } = vi.hoisted(() => ({
@@ -133,5 +135,53 @@ describe('webhook token minting', () => {
     await expect(
       service(true).mintToken({ orgId: 'org-1', triggerId: 'trigger-1' })
     ).rejects.toThrow('Webhook bot user is blocked');
+  });
+});
+
+describe('null-pepper personal webhook compatibility', () => {
+  it.each([false, true])('preserves null pepper with shared resource tokens %s', async enabled => {
+    findUserForToken.mockResolvedValue({
+      id: 'oauth/personal',
+      api_token_pepper: null,
+      blocked_at: null,
+      blocked_reason: null,
+    });
+    const { token } = await service(enabled).mintToken({
+      userId: 'oauth/personal',
+      triggerId: 'trigger-1',
+    });
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        token,
+        nextAuthSecret: secret,
+        connectionString: 'unused',
+        resourceAudience: { audience: 'cloud-agent-next', mode: 'allow-legacy' },
+        getUserPepper: async () => ({ pepper: null, blockedReason: null }),
+      })
+    ).resolves.toEqual({ userId: 'oauth/personal' });
+    expect(decodeJwt(token).apiTokenPepper).toBeNull();
+    if (enabled) {
+      const runtime = await createRuntimeAuthorization({
+        token,
+        secret,
+        connectionString: 'unused',
+        resourceKind: 'cloud-agent-next',
+        resourceId: 'session-1',
+        adapters: {
+          getPrincipal: async () => ({
+            id: 'oauth/personal',
+            apiTokenPepper: null,
+            blockedAt: null,
+            blockedReason: null,
+            isBot: false,
+          }),
+        },
+      });
+      expect(decodeJwt(runtime.token)).toMatchObject({
+        apiTokenPepper: null,
+        aud: ['kilo-api', 'kilo-gateway', 'session-ingest'],
+        tokenPurpose: 'delegated-workload',
+      });
+    }
   });
 });

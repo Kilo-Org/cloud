@@ -47,6 +47,15 @@ vi.mock('@/components/ui/text', async () => {
 vi.mock('@/components/ui/selectable-text', () => ({
   SelectableText: 'SelectableText',
 }));
+// Captures the `enabled` flag the sheet passes to the shared hook. The mock
+// returns the title unchanged, matching the real hook while the runtime
+// preference is off, so the layout and auto-follow assertions are unaffected.
+const { useTranslatedToolSummaryMock } = vi.hoisted(() => ({
+  useTranslatedToolSummaryMock: vi.fn((text: string) => text),
+}));
+vi.mock('@/lib/tool-summary-translation/use-translated-tool-summary', () => ({
+  useTranslatedToolSummary: useTranslatedToolSummaryMock,
+}));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
 }));
@@ -168,6 +177,25 @@ function makeReasoningPart(
     type: 'reasoning',
     text,
     time: { start: 1, end: streaming ? undefined : 2 },
+  };
+}
+
+function makeReadPart(id: string, input: Record<string, unknown>): ToolPart {
+  return {
+    id,
+    sessionID: 's1',
+    messageID: 'm1',
+    type: 'tool',
+    callID: `call-${id}`,
+    tool: 'read',
+    state: {
+      status: 'completed',
+      input,
+      output: '',
+      title: 'read',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    },
   };
 }
 
@@ -516,6 +544,24 @@ describe('PartDetailSheet mounted', () => {
     );
     expect(unavailable).toHaveLength(1);
     await unmount(nullPart);
+  });
+
+  it('gates header translation on the display projection translatable flag', async () => {
+    useTranslatedToolSummaryMock.mockClear();
+    const fallback = await mountSheet(makeReadPart('read-empty', {}));
+    try {
+      expect(useTranslatedToolSummaryMock).toHaveBeenCalledWith('read: read', false);
+    } finally {
+      await unmount(fallback);
+    }
+
+    useTranslatedToolSummaryMock.mockClear();
+    const withPath = await mountSheet(makeReadPart('read-path', { filePath: '/repo/src/auth.ts' }));
+    try {
+      expect(useTranslatedToolSummaryMock).toHaveBeenCalledWith('read: auth.ts', true);
+    } finally {
+      await unmount(withPath);
+    }
   });
 });
 

@@ -79,9 +79,12 @@ function renderPartContent(part: Part | null): ReactNode {
 export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const partTitle = part ? getPartDetailTitle(part) : null;
+  // Gate on the display projection's `translatable`: already-localized fallback
+  // labels ("read: read", "todoread: Read todos") and raw tool ids stay as-is.
   const shownTitle = useTranslatedToolSummary(
-    part ? getPartDetailTitle(part) : t('common.details'),
-    part !== null && isToolPart(part)
+    partTitle?.title ?? t('common.details'),
+    partTitle?.translatable ?? false
   );
   const [textMode, setTextMode] = useState<MonoScrollTextMode>('wrap');
   const [monoCount, setMonoCount] = useState(0);

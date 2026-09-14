@@ -60,6 +60,16 @@ vi.mock('./tool-cards', () => ({
   WriteToolCard: 'WriteToolCard',
 }));
 
+// Captures the `enabled` flag the child card passes to the shared hook. The
+// mock returns the label unchanged, matching the real hook while the runtime
+// preference is off, so the routing and activity assertions below are unaffected.
+const { useTranslatedToolSummaryMock } = vi.hoisted(() => ({
+  useTranslatedToolSummaryMock: vi.fn((text: string) => text),
+}));
+vi.mock('@/lib/tool-summary-translation/use-translated-tool-summary', () => ({
+  useTranslatedToolSummary: useTranslatedToolSummaryMock,
+}));
+
 const completedState: Extract<ToolPart['state'], { status: 'completed' }> = {
   status: 'completed',
   input: { command: 'echo hi' },
@@ -462,5 +472,47 @@ describe('ToolPartRenderer child navigation seam', () => {
       throw new Error('expected ChildSessionSection');
     }
     expect(section.props).toMatchObject({ modelOptions });
+  });
+});
+
+describe('ChildSessionSection task translation gating', () => {
+  const fallbackTaskState: ToolPart['state'] = {
+    status: 'pending',
+    input: { subagent_type: 'General' },
+    raw: '',
+  };
+
+  it('never asks the hook to translate the already-localized fallback task label', async () => {
+    useTranslatedToolSummaryMock.mockClear();
+    const { unmount } = await renderWithProviders(
+      React.createElement(ChildSessionSection, {
+        part: makeToolPart('task', fallbackTaskState),
+        childMessages: [],
+        onOpenChildSession: vi.fn<(sessionId: string, title: string) => void>(),
+        modelOptions,
+      })
+    );
+    try {
+      expect(useTranslatedToolSummaryMock).toHaveBeenCalledWith('Task', false);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('enables the hook for a content-bearing task label', async () => {
+    useTranslatedToolSummaryMock.mockClear();
+    const { unmount } = await renderWithProviders(
+      React.createElement(ChildSessionSection, {
+        part: makeToolPart('task', taskCompletedState),
+        childMessages: [],
+        onOpenChildSession: vi.fn<(sessionId: string, title: string) => void>(),
+        modelOptions,
+      })
+    );
+    try {
+      expect(useTranslatedToolSummaryMock).toHaveBeenCalledWith('child task', true);
+    } finally {
+      unmount();
+    }
   });
 });

@@ -102,21 +102,35 @@ export function findPartById(messages: readonly StoredMessage[], partId: string)
 }
 
 /**
- * Sheet header title for a part. Tools follow the same display projection the
- * fixed row uses so the title updates live with the part. Reasoning shows the
- * stream state; anything else is an unreachable fallback.
+ * Sheet header title for a part, with the provenance the translation hook
+ * needs. Tools follow the same display projection the fixed row uses so the
+ * title updates live with the part, including the projection's `translatable`
+ * flag: a fallback or raw-tool label must never reach the gateway. Reasoning
+ * shows the stream state; anything else is an unreachable fallback.
  */
-export function getPartDetailTitle(part: Part): string {
+export type PartDetailTitle = {
+  title: string;
+  /** Whether `title` carries tool content worth translating. */
+  translatable: boolean;
+};
+
+export function getPartDetailTitle(part: Part): PartDetailTitle {
   if (isReasoningPart(part)) {
-    return isPartStreaming(part)
-      ? i18n.t('agentChat.partDetail.thinking')
-      : i18n.t('agentChat.partDetail.thought');
+    return {
+      title: isPartStreaming(part)
+        ? i18n.t('agentChat.partDetail.thinking')
+        : i18n.t('agentChat.partDetail.thought'),
+      translatable: false,
+    };
   }
   if (isToolPart(part)) {
     const display = getToolDisplay(part);
-    return display.subtitle ? `${display.title}: ${display.subtitle}` : display.title;
+    return {
+      title: display.subtitle ? `${display.title}: ${display.subtitle}` : display.title,
+      translatable: display.translatable,
+    };
   }
-  return i18n.t('common.details');
+  return { title: i18n.t('common.details'), translatable: false };
 }
 
 /**

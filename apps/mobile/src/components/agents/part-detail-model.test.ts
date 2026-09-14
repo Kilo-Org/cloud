@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the title/translatable matrix plus the centering cases exceed the default cap */
 import {
   type Part,
   type ReasoningPart,
@@ -103,26 +104,46 @@ describe('getPartDetailTitle', () => {
     getToolDisplay.mockReset();
   });
 
-  it('combines the display title and subtitle for tools', () => {
-    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: 'echo hi' });
-    expect(getPartDetailTitle(makeToolPart())).toBe('bash: echo hi');
+  it('combines the display title and subtitle for tools and carries translatable', () => {
+    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: 'echo hi', translatable: true });
+    expect(getPartDetailTitle(makeToolPart())).toEqual({
+      title: 'bash: echo hi',
+      translatable: true,
+    });
   });
 
   it('uses the display title alone when the tool has no subtitle', () => {
-    getToolDisplay.mockReturnValue({ title: 'glob' });
-    expect(getPartDetailTitle(makeToolPart({ tool: 'glob' }))).toBe('glob');
+    getToolDisplay.mockReturnValue({ title: 'glob', translatable: false });
+    expect(getPartDetailTitle(makeToolPart({ tool: 'glob' }))).toEqual({
+      title: 'glob',
+      translatable: false,
+    });
   });
 
-  it('labels streaming reasoning as Thinking', () => {
-    expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toBe('Thinking');
+  it('keeps the projection non-translatable flag for fallback tool titles', () => {
+    getToolDisplay.mockReturnValue({ title: 'read', subtitle: 'read', translatable: false });
+    expect(getPartDetailTitle(makeToolPart({ tool: 'read' }))).toEqual({
+      title: 'read: read',
+      translatable: false,
+    });
   });
 
-  it('labels completed reasoning as Thought', () => {
-    expect(getPartDetailTitle(makeReasoningPart('reasoning', true))).toBe('Thought');
+  it('labels streaming reasoning as Thinking without translating it', () => {
+    expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toEqual({
+      title: 'Thinking',
+      translatable: false,
+    });
   });
 
-  it('falls back to Details for other part types', () => {
-    expect(getPartDetailTitle(makeTextPart())).toBe('Details');
+  it('labels completed reasoning as Thought without translating it', () => {
+    expect(getPartDetailTitle(makeReasoningPart('reasoning', true))).toEqual({
+      title: 'Thought',
+      translatable: false,
+    });
+  });
+
+  it('falls back to Details for other part types without translating it', () => {
+    expect(getPartDetailTitle(makeTextPart())).toEqual({ title: 'Details', translatable: false });
   });
 });
 

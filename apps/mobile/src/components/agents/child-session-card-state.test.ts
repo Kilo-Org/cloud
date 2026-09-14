@@ -122,17 +122,19 @@ describe('getChildSessionCardState', () => {
         expect(getChildSessionCardState(part, messages)).toEqual({
           agentName: 'Researcher',
           taskName: 'Review access rules',
+          taskNameTranslatable: true,
           latestActivity,
         });
       }
     }
   );
 
-  it('falls back to Subagent / Task / Waiting for activity for a pending task with empty input', () => {
+  it('falls back to the non-translatable Subagent / Task / Waiting for activity for an empty input', () => {
     const part = makeTaskPart('pending');
     expect(getChildSessionCardState(part, [])).toEqual({
       agentName: 'Subagent',
       taskName: 'Task',
+      taskNameTranslatable: false,
       latestActivity: 'Waiting for activity',
     });
   });
@@ -142,14 +144,16 @@ describe('getChildSessionCardState', () => {
     expect(getChildSessionCardState(part, [])).toEqual({
       agentName: 'Coder',
       taskName: 'Refactor auth',
+      taskNameTranslatable: true,
       latestActivity: 'Waiting for activity',
     });
   });
 
-  it('truncates prompt when description is absent', () => {
+  it('truncates prompt when description is absent and marks it translatable', () => {
     const part = makeTaskPart('pending', { prompt: 'a'.repeat(100) });
     const state = getChildSessionCardState(part, []);
     expect(state.taskName).toBe(`${'a'.repeat(60)}\u2026`);
+    expect(state.taskNameTranslatable).toBe(true);
   });
 
   it.each(['running', 'completed', 'error'] as const)(
@@ -172,6 +176,7 @@ describe('getChildSessionCardState', () => {
       expect(state).toEqual({
         agentName: 'Researcher',
         taskName: 'Check spec',
+        taskNameTranslatable: true,
         latestActivity: status === 'running' ? { tool: 'read', context: 'spec.md' } : '',
       });
       expect(getChildSessionActivityLabel(state.latestActivity)).toBe(
@@ -200,6 +205,7 @@ describe('getChildSessionCardState', () => {
     expect(getChildSessionCardState(part, messages)).toEqual({
       agentName: 'Builder',
       taskName: 'Fix bug',
+      taskNameTranslatable: true,
       latestActivity: { tool: 'edit', context: 'auth.ts' },
     });
   });
@@ -222,6 +228,7 @@ describe('getChildSessionCardState', () => {
     expect(getChildSessionCardState(part, messages)).toEqual({
       agentName: 'Tester',
       taskName: 'Run tests',
+      taskNameTranslatable: true,
       latestActivity: { tool: 'glob', context: '**/*.test.tsx' },
     });
   });
@@ -249,6 +256,7 @@ describe('getChildSessionCardState', () => {
     expect(getChildSessionCardState(part, messages)).toEqual({
       agentName: 'Agent',
       taskName: 'Find files',
+      taskNameTranslatable: true,
       latestActivity: { tool: 'grep', context: 'handler' },
     });
   });
@@ -309,6 +317,7 @@ describe('getChildSessionCardState', () => {
       expect(getChildSessionCardState(part, messages)).toEqual({
         agentName: 'Writer',
         taskName: 'Draft reply',
+        taskNameTranslatable: true,
         latestActivity: status === 'running' ? 'Writing response' : '',
       });
     }
@@ -320,6 +329,7 @@ describe('getChildSessionCardState', () => {
     expect(getChildSessionCardState(part, messages)).toEqual({
       agentName: 'Thinker',
       taskName: 'Reason',
+      taskNameTranslatable: true,
       latestActivity: 'Thinking',
     });
   });
@@ -339,6 +349,7 @@ describe('getChildSessionCardState', () => {
     expect(getChildSessionCardState(part, messages)).toEqual({
       agentName: 'Agent',
       taskName: 'Work',
+      taskNameTranslatable: true,
       latestActivity: 'Writing response',
     });
   });
@@ -354,6 +365,7 @@ describe('getChildSessionCardState', () => {
     expect(getChildSessionCardState(part, messages)).toEqual({
       agentName: 'Agent',
       taskName: 'Stream',
+      taskNameTranslatable: true,
       latestActivity: 'Writing response',
     });
   });
@@ -374,6 +386,7 @@ describe('getChildSessionCardState', () => {
     expect(getChildSessionCardState(part, [userMessage])).toEqual({
       agentName: 'Helper',
       taskName: 'Help',
+      taskNameTranslatable: true,
       latestActivity: 'Waiting for activity',
     });
   });
@@ -436,7 +449,12 @@ describe.each(['completed', 'error'] as const)('terminal %s parent activity', st
 
   it.each(histories)('omits activity for %s without removing task metadata', (_name, messages) => {
     const state = getChildSessionCardState(part, messages);
-    expect(state).toEqual({ agentName: 'Researcher', taskName: 'Check spec', latestActivity: '' });
+    expect(state).toEqual({
+      agentName: 'Researcher',
+      taskName: 'Check spec',
+      taskNameTranslatable: true,
+      latestActivity: '',
+    });
     expect(getChildSessionActivityLabel(state.latestActivity)).toBe('');
   });
 });

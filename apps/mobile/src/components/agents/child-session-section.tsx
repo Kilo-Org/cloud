@@ -57,11 +57,9 @@ export function ChildSessionSection({
   const colors = useThemeColors();
   const { t } = useTranslation();
 
-  const { agentName, taskName, latestActivity }: ChildSessionCardState = getChildSessionCardState(
-    part,
-    childMessages
-  );
-  const shownTaskName = useTranslatedToolSummary(taskName);
+  const { agentName, taskName, taskNameTranslatable, latestActivity }: ChildSessionCardState =
+    getChildSessionCardState(part, childMessages);
+  const shownTaskName = useTranslatedToolSummary(taskName, taskNameTranslatable);
   const latestActivityLabel = getChildSessionActivityLabel(latestActivity);
   const modelLabel = getChildSessionModelLabel(childMessages, modelOptions ?? []);
 

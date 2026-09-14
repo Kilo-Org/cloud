@@ -5,14 +5,18 @@ import { fileURLToPath } from 'node:url';
 import { ENV_KEYS } from '../src/lib/env-keys.js';
 
 // Contract values mirrored from app.config.ts (bundle id, package, scheme,
-// orientation, associated domain, blocked permissions, and Sentry plugin). ENV_KEYS is
-// imported live from src/lib/env-keys.js. The script runs the full evaluated
-// config, so these must match the resolved build-time output, not the raw
-// app.config.ts source.
+// orientation, associated domain, app name, blocked permissions, and Sentry
+// plugin). ENV_KEYS is imported live from src/lib/env-keys.js. The script runs
+// the full evaluated config, so these must match the resolved build-time
+// output, not the raw app.config.ts source.
 const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
 const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
 const SCHEME = 'kiloapp';
 const ASSOCIATED_DOMAIN = 'applinks:app.kilo.ai';
+// The app name (app.config.ts `name`). `$(PRODUCT_NAME)` resolves to this in
+// the base Info.plist, but `.lproj/InfoPlist.strings` is compiled verbatim, so
+// the localized copy has to spell it out.
+const APP_NAME = 'Kilo';
 const BLOCKED_PERMISSIONS = [
   'android.permission.READ_MEDIA_IMAGES',
   'android.permission.READ_MEDIA_VIDEO',
@@ -20,6 +24,13 @@ const BLOCKED_PERMISSIONS = [
 ];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+const PERMISSION_PROMPT_PLIST_KEYS = [
+  'NSMicrophoneUsageDescription',
+  'NSSpeechRecognitionUsageDescription',
+  'NSFaceIDUsageDescription',
+  'NSLocationWhenInUseUsageDescription',
+  'NSUserTrackingUsageDescription',
+];
 
 const mobileDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -81,6 +92,41 @@ check(
   blockedPermissionsMatch,
   `android.blockedPermissions must equal exactly [${BLOCKED_PERMISSIONS.join(', ')}]`
 );
+
+// iOS permission prompts: Expo's built-in `withLocales` reads the top-level
+// `locales` field at prebuild and writes one InfoPlist.strings per tag. The
+// evaluated config is the integration guard the unit test cannot give: it
+// exercises app.config.ts's real module resolution and the JSON import.
+const localizations = config.ios?.infoPlist?.CFBundleLocalizations ?? [];
+const locales = config.locales ?? {};
+check(
+  Object.keys(locales).length === localizations.length,
+  `top-level locales must cover every CFBundleLocalization (${localizations.length})`
+);
+for (const tag of localizations) {
+  check(
+    Boolean(locales[tag]?.ios) && typeof locales[tag].ios === 'object',
+    `locales["${tag}"].ios must be an object`
+  );
+  for (const key of PERMISSION_PROMPT_PLIST_KEYS) {
+    const value = locales[tag]?.ios?.[key];
+    check(
+      typeof value === 'string' && value.length > 0,
+      `locales["${tag}"].ios["${key}"] must be a non-empty string`
+    );
+  }
+  // `.lproj/InfoPlist.strings` is compiled verbatim — Xcode expands
+  // `$(PRODUCT_NAME)` only in Info.plist — so the localized copy must name the
+  // app instead of keeping the variable, or the prompt shows it literally.
+  check(
+    locales[tag]?.ios?.NSLocationWhenInUseUsageDescription?.includes('$(PRODUCT_NAME)') === false,
+    `locales["${tag}"].ios.NSLocationWhenInUseUsageDescription must not keep $(PRODUCT_NAME)`
+  );
+  check(
+    locales[tag]?.ios?.NSLocationWhenInUseUsageDescription?.includes(APP_NAME) === true,
+    `locales["${tag}"].ios.NSLocationWhenInUseUsageDescription must name the app "${APP_NAME}"`
+  );
+}
 
 const pluginNames = (config.plugins ?? []).map(plugin =>
   Array.isArray(plugin) ? plugin[0] : plugin

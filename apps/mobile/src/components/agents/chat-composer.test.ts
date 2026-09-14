@@ -5,11 +5,21 @@ import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
+import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import { Text as renderText } from '@/components/ui/text';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
-import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import { type ChatComposer } from './chat-composer';
+
+// A remote catalog that advertises safe session detach, so /exit and /quit
+// parse locally instead of short-circuiting to upgrade-required.
+const remoteExitState: RemoteCommandState = {
+  ownerConnectionId: null,
+  refresh: 'idle',
+  commands: [],
+  canExitSession: true,
+};
 
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
 const safeAreaInsets = vi.hoisted(() => ({ bottom: 0, left: 0, right: 0, top: 0 }));
@@ -125,10 +135,12 @@ vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: vi.fn(),
 }));
 
-// Identity-matched so a test can read the goal compose hint's message. The
-// real component owns the announcement channel; the composer only needs to
-// render it with the right message. Deliberately not `__testMarker`-tagged so
-// `findInputRowProps` cannot mistake it for the input row.
+// Identity-matched so tests can read the inline status row's message prop
+// (slash-command rejections, photo-metadata warning) and the goal compose
+// hint. The real component owns the announcement channel; the composer only
+// needs to render it with the right message. Deliberately not
+// `__testMarker`-tagged so `findInputRowProps` cannot mistake it for the
+// input row.
 const MockAccessibleStatus = () => null;
 
 vi.mock('@/components/ui/accessible-status', () => ({
@@ -675,12 +687,23 @@ describe('ChatComposer goal compose mode', () => {
     return rerender(props);
   }
 
+  // The composer renders the goal objective hint (tone "status") alongside the
+  // always-present slash-command rejection row and the photo-metadata warning,
+  // both tone "error". Match the hint by tone so the always-present error row
+  // is not mistaken for the goal hint.
+  function goalHint(render: React.ReactElement): { props: Record<string, unknown> } | null {
+    return findNode(
+      render,
+      (type, props) => type === MockAccessibleStatus && props.tone === 'status'
+    );
+  }
+
   it('enters goal compose mode and shows the objective hint on a bare /goal send', async () => {
     const onSendCommand = vi.fn(async () => true);
     const props = remoteGoalProps({ onSendCommand });
     const after = await enterGoalComposeMode(props);
 
-    const hint = findNode(after, type => type === MockAccessibleStatus);
+    const hint = goalHint(after);
     expect(hint?.props).toMatchObject({ message: 'Describe the goal', tone: 'status' });
     // The draft is kept so the user can complete the goal command.
     expect(refSlots.slots[0]?.current).toBe('/goal ');
@@ -718,7 +741,7 @@ describe('ChatComposer goal compose mode', () => {
 
     expect(onSendCommand).toHaveBeenCalledWith('goal', 'Ship it');
     const after = await rerender(props);
-    expect(findNode(after, type => type === MockAccessibleStatus)).toBeNull();
+    expect(goalHint(after)).toBeNull();
   });
 
   it('drops the hint when the draft is no longer the goal command', async () => {
@@ -727,7 +750,7 @@ describe('ChatComposer goal compose mode', () => {
 
     requireInputRowOnChangeText(render)('write the docs');
     const after = await rerender(props);
-    expect(findNode(after, type => type === MockAccessibleStatus)).toBeNull();
+    expect(goalHint(after)).toBeNull();
   });
 });
 
@@ -852,5 +875,55 @@ describe('ChatComposer landscape side insets', () => {
     // they live inside the padded container.
     expect(findNode(container, type => type === MockChatToolbar)).not.toBeNull();
     expect(findNode(container, type => type === MockInputRow)).not.toBeNull();
+  });
+});
+
+describe('ChatComposer slash-command rejection feedback', () => {
+  // A rejected /quit submission (arguments) must announce its validation
+  // message through the inline status row — the same surface /exit uses —
+  // instead of a transient toast the accessibility tree never exposes
+  // (device round p6: the rejection was invisible to the reader and to the
+  // automation digest while the rejected draft sat in the input).
+  function statusMessage(render: React.ReactElement): unknown {
+    const status = findNode(render, type => type === MockAccessibleStatus);
+    if (status === null) {
+      throw new Error('AccessibleStatus element not found in the composer tree');
+    }
+    return status.props.message;
+  }
+
+  it('renders the argument-error inline and never submits the rejected draft', async () => {
+    const render = await mount(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    expect(statusMessage(render)).toBeNull();
+
+    requireInputRowOnChangeText(render)('/quit now');
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    const rejected = await rerender(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    expect(statusMessage(rejected)).toBe('/quit does not take arguments.');
+    expect(onSendMock).not.toHaveBeenCalled();
+    expect(showRemoteSessionExitConfirmation).not.toHaveBeenCalled();
+  });
+
+  it('clears the rejection once the input is edited', async () => {
+    const render = await mount(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    requireInputRowOnChangeText(render)('/quit now');
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    // Removing the arguments is the fix the message asks for; the stale
+    // rejection must not survive the edit.
+    requireInputRowOnChangeText(render)('/quit');
+    const edited = await rerender(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    expect(statusMessage(edited)).toBeNull();
   });
 });

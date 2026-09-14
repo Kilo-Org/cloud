@@ -26,6 +26,11 @@ import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { assistantMessage } from '@/components/agents/message-bubble-test-utils';
+import {
+  exitRemoteSessionWithFeedback,
+  type RetryableExitFailure,
+} from '@/components/agents/exit-remote-session-with-feedback';
+import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
@@ -1241,6 +1246,44 @@ describe('SessionDetailContent condensed tool runs', () => {
     const runRows = view.renderer.root.findAll(node => Object.is(node.type, 'CondensedToolRunRow'));
     expect(runRows).toHaveLength(1);
     expect(runRows[0]?.parent?.type).toBe('MessageErrorBoundary');
+  });
+});
+
+describe('session detail exit retry row', () => {
+  it('drops the row when a retry fails with a non-retryable SDK message', async () => {
+    const failureHandlers: {
+      retryable?: (failure: RetryableExitFailure) => void;
+      nonRetryable?: () => void;
+    } = {};
+    vi.mocked(exitRemoteSessionWithFeedback).mockImplementation(async input => {
+      failureHandlers.retryable = input.onRetryableFailure;
+      failureHandlers.nonRetryable = input.onNonRetryableFailure;
+      input.onRetryableFailure?.({ message: 'connection reset', retry: vi.fn() });
+      await Promise.resolve();
+    });
+
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    const onExitSession = composer.props.onExitSession as (
+      onAccepted: () => void,
+      lock: { current: boolean },
+      settleVoiceInput: () => Promise<boolean>
+    ) => Promise<void>;
+
+    await act(async () => {
+      await onExitSession(vi.fn<() => void>(), { current: false }, async () => {
+        await Promise.resolve();
+        return true;
+      });
+    });
+    expect(view.renderer.root.findAllByType(RemoteSessionExitFailure)).toHaveLength(1);
+
+    // A retry that lands on a permanent SDK error must release the durable row
+    // instead of leaving a stale message and a retry that can never succeed.
+    act(() => {
+      failureHandlers.nonRetryable?.();
+    });
+    expect(view.renderer.root.findAllByType(RemoteSessionExitFailure)).toHaveLength(0);
   });
 });
 

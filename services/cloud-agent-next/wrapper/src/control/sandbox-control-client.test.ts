@@ -14,6 +14,7 @@ import {
 import { unfilteredKiloEvents } from './feed';
 import { acknowledgeOperation, operationAuthorization } from './control-test-fixtures';
 import { createControlEventFailureHandler } from './control-event-transport';
+import { resetSessionDirectoryState } from './session-directories';
 import {
   MAX_CONTROL_EVENT_OUTBOX_BYTES,
   type ControlEventOutboxFailure,
@@ -1369,10 +1370,12 @@ describe('createSandboxControlClient', () => {
   });
 
   it('keeps reconnect readiness, attach, maintenance and sealed results independent of a failed event publication', async () => {
+    resetSessionDirectoryState();
     const startedAt = Date.now();
     const failure = mock();
     const retire = mock();
     const currentRuntime = { runtimeId: crypto.randomUUID() };
+    const kiloSessionId = `kilo_reconnect_${crypto.randomUUID()}`;
     const handleFailure = createControlEventFailureHandler({
       getRuntime: () => currentRuntime,
       onFailure: retire,
@@ -1396,8 +1399,8 @@ describe('createSandboxControlClient', () => {
     };
     const identity = {
       directory: '/workspace',
-      kiloSessionId: 'kilo_1',
-      rootKiloSessionId: 'kilo_1',
+      kiloSessionId,
+      rootKiloSessionId: kiloSessionId,
       nativeRuntimeId: currentRuntime.runtimeId,
     };
     const delivery: SessionOperationDelivery = {

@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "سازماني SSO"
   },
   "preferences": {
+    "general": "عمومي",
+    "voiceInput": "غږیز ننوتل",
     "autoExpandThinking": "د فکر برخه په اوتومات ډول پرانیزئ",
     "autoExpandThinkingSubtitle": "کله چې د ایجنټ فکر بشپړ شي، د فکر برخه پرانیستې وښیئ.",
+    "hideThinking": "د فکر جزئیات پټ کړئ",
+    "hideThinkingSubtitle": "د ایجنټ فکر د ناستې په پاڼه کې ونه ښیئ.",
     "keepScreenOn": "د ناستې پر پاڼه سکرین روښانه وساتئ",
     "keepScreenOnSubtitle": "تر هغه چې ناسته روانه وي، سکرین روښانه وساتئ.",
     "appearance": "بڼه",
@@ -237,6 +241,7 @@
     "appearanceLight": "روښانه",
     "appearanceDark": "تیاره",
     "account": "حساب",
+    "accountSubtitle": "ژبه، باوري کوربه‌ګان او د وسیلو ناستې",
     "prReviewAttribution": "د PR په بیاکتنو کې د اپلیکیشن نوم زیات کړئ",
     "prReviewAttributionSubtitle": "کله چې بیاکتنه لېږئ، په پای کې یې «د Kilo له لارې بیاکتل شوی» ورزیات کړئ.",
     "returnSendsMessage": "د انټر کیلي پیغام لېږي",
@@ -1993,6 +1998,22 @@
       "connectionLost": "اړیکه پرې شوه",
       "retryConnection": "بیا د نښلېدو هڅه وکړئ"
     },
+    "goal": {
+      "title": "هدف",
+      "statusActive": "فعال هدف",
+      "statusPaused": "ځنډول شوی هدف",
+      "statusComplete": "هدف بشپړ شو",
+      "statusBlocked": "هدف بند شو",
+      "edit": "هدف سمول",
+      "remove": "هدف لرې کول",
+      "pause": "هدف ځنډول",
+      "resume": "هدف بیا پیلول",
+      "editPlaceholder": "هدف تشریح کړئ",
+      "removeConfirmTitle": "هدف لرې کړو؟",
+      "removeConfirmMessage": "CLI د دې غونډې هدف پاکوي.",
+      "updateFailed": "هدف نشو کولای تازه شي.",
+      "sectionAccessibility": "{{status}}. هدف: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "په خپل براوزر کې GitHub ونښلوئ، بیا دلته راشئ او یو زېرمتون غوره کړئ.",
       "openGithub": "GitHub پرانیزئ",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "{{steps}} ګامونه",
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
     },
+    "autoApprove": {
+      "title": "اتوماتیک تصویب",
+      "description": "د دې غونډې لپاره د اجازې غوښتنې په اتوماتیک ډول تصویب کړئ. بیا وسیلې پرته له غوښتنې چلیږي.",
+      "unavailable": "دا غونډه د اجازې غوښتنې ترلاسه کولی نشي."
+    },
     "prBadge": {
       "open": "پل ریکویسټ پرانیزئ",
       "closed": "تړل شوی PR",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "له Kilo Gateway سره اړیکه نشو ټینګېدلی. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
     "gatewayTimeout": "د غږ بدلول ډېر وخت ونیو. بیا هڅه وکړئ.",
     "gatewayModelUnavailable": "دا ماډل شتون نلري. په غوره توبونو کې بل وټاکئ.",
+    "gatewayModelUnavailableNotice": "دا ماډل نور وړاندې نه کېږي. د بل غوره کولو لپاره $t(transcriptionModel.title) ته ټک ووهئ.",
     "gatewaySignInRequired": "د Kilo Gateway بدلولو کارولو لپاره ننوځئ.",
-    "gatewayNoModel": "لومړی په غوره توبونو کې یو ماډل وټاکئ."
+    "gatewayNoModel": "لومړی په غوره توبونو کې یو ماډل وټاکئ.",
+    "testTitle": "د غږیز لیکل ازموینه",
+    "testPlaceholder": "مایکروفون ته ټېپ وکړئ او خبرې پیل کړئ.",
+    "testClear": "متن پاک کړئ"
   },
   "share": {
     "title": "له Kilo سره شریکول",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "د غږ د متن ته بدلولو هیڅ ماډل نشته",
     "emptyDescription": "Kilo Gateway اوس مهال د غږ د متن ته بدلولو هیڅ ماډل نه وړاندې کوي.",
     "loadFailed": "د غږ د متن ته بدلولو ماډلونه بار نه شول."
+  },
+  "voiceLanguage": {
+    "title": "د غږیز لیکل ژبه",
+    "automatic": "اتومات",
+    "loadFailed": "د دې وسیلې ملاتړ شوې ژبې بار نشوې.",
+    "emptyTitle": "ملاتړ شوې ژبې نشته",
+    "emptyDescription": "د دې وسیلې د وینا پېژندنه کومه ملاتړ شوې ژبه نه ښیې."
   }
 }

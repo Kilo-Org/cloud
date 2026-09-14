@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "Байгууллагын SSO"
   },
   "preferences": {
+    "general": "Ерөнхий",
+    "voiceInput": "Дуут оруулга",
     "autoExpandThinking": "Бодлыг автоматаар дэлгэх",
     "autoExpandThinkingSubtitle": "Дууссаны дараа агентын бодлыг дэлгэсэн байдлаар харуулна.",
+    "hideThinking": "Бодлын дэлгэрэнгүйг нуух",
+    "hideThinkingSubtitle": "Сессийн хуудсан дээр агентын бодлыг харуулахгүй.",
     "keepScreenOn": "Сессийн дэлгэц дээр байх үед дэлгэцийг асаалттай байлгах",
     "keepScreenOnSubtitle": "Сесс ажиллаж байх үед дэлгэцийг унтраахгүй байлгах.",
     "appearance": "Харагдах байдал",
@@ -237,6 +241,7 @@
     "appearanceLight": "Цайвар",
     "appearanceDark": "Бараан",
     "account": "Бүртгэл",
+    "accountSubtitle": "Хэл, итгэмжлэгдсэн хостууд, төхөөрөмжийн сессүүд",
     "prReviewAttribution": "PR-ийн хяналтад аппын нэрийг нэмэх",
     "prReviewAttributionSubtitle": "Хяналтын дүнг илгээхдээ төгсгөлд нь «Kilo ашиглан хянасан» гэсэн тэмдэглэл нэмнэ.",
     "returnSendsMessage": "Мөр шилжүүлэх товч мессеж илгээнэ",
@@ -1993,6 +1998,22 @@
       "connectionLost": "Холболт тасарсан",
       "retryConnection": "Дахин холбогдох"
     },
+    "goal": {
+      "title": "Зорилго",
+      "statusActive": "Идэвхтэй зорилго",
+      "statusPaused": "Түр зогссон зорилго",
+      "statusComplete": "Зорилго биелэв",
+      "statusBlocked": "Зорилго хаагдсан",
+      "edit": "Зорилгыг засах",
+      "remove": "Зорилгыг устгах",
+      "pause": "Зорилгыг түр зогсоох",
+      "resume": "Зорилгыг үргэлжлүүлэх",
+      "editPlaceholder": "Зорилгыг тайлбарлана уу",
+      "removeConfirmTitle": "Зорилгыг устгах уу?",
+      "removeConfirmMessage": "CLI энэ сессийн зорилгыг арилгана.",
+      "updateFailed": "Зорилгыг шинэчлэх боломжгүй.",
+      "sectionAccessibility": "{{status}}. Зорилго: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Хөтөч дээрээ GitHub-ыг холбоод, энд буцаж ирж кодын сангаа сонгоно уу.",
       "openGithub": "GitHub-ыг нээх",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "{{steps}} алхам",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Автомат зөвшөөрөл",
+      "description": "Энэ сессийн зөвшөөрлийн хүсэлтүүдийг автоматаар зөвшөөрнө үү. Дараа нь хэрэгслүүд асуултгүйгээр ажиллана.",
+      "unavailable": "Энэ сесс зөвшөөрлийн хүсэлт хүлээн авч чадахгүй."
+    },
     "prBadge": {
       "open": "нэгтгэх хүсэлт нээх",
       "closed": "хаасан өөрчлөлт нэгтгэх хүсэлт",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "Kilo Gateway-д холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
     "gatewayTimeout": "Яриаг бичвэр болгох хэт удаан үргэлжиллээ. Дахин оролдоно уу.",
     "gatewayModelUnavailable": "Энэ яриаг бичвэр болгох загвар боломжгүй. Тохиргооноос өөр загвар сонгоно уу.",
+    "gatewayModelUnavailableNotice": "Энэ загварыг цаашид санал болгохгүй. Өөр загвар сонгохын тулд $t(transcriptionModel.title)-г товшино уу.",
     "gatewaySignInRequired": "Kilo Gateway-р бичвэр болгохыг ашиглахын тулд нэвтэрнэ үү.",
-    "gatewayNoModel": "Эхлээд Тохиргооноос яриаг бичвэр болгох загвар сонгоно уу."
+    "gatewayNoModel": "Эхлээд Тохиргооноос яриаг бичвэр болгох загвар сонгоно уу.",
+    "testTitle": "Дуугаар оруулахыг турших",
+    "testPlaceholder": "Микрофоныг товшоод ярьж эхэлнэ үү.",
+    "testClear": "Текстийг арилгах"
   },
   "share": {
     "title": "Kilo руу хуваалцах",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "Яриаг бичвэр болгох загвар байхгүй",
     "emptyDescription": "Kilo Gateway одоогоор яриаг бичвэр болгох загвар санал болгохгүй байна.",
     "loadFailed": "Яриаг бичвэр болгох загваруудыг ачаалж чадсангүй."
+  },
+  "voiceLanguage": {
+    "title": "Дуугаар оруулах хэл",
+    "automatic": "Авто",
+    "loadFailed": "Энэ төхөөрөмжийн дэмждэг хэлүүдийг ачаалж чадсангүй.",
+    "emptyTitle": "Дэмжигддэг хэл байхгүй",
+    "emptyDescription": "Энэ төхөөрөмжийн яриа таних нь дэмжигддэг хэл гэж мэдээлэхгүй."
   }
 }

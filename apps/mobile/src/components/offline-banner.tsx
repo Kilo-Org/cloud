@@ -1,24 +1,33 @@
 import { WifiOff } from '@/components/ui/icons';
-import { useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  OFFLINE_BANNER_HEIGHT,
+  OfflineBannerSpaceProvider,
+} from '@/components/offline-banner-space';
 import { Text } from '@/components/ui/text';
 import { announceForA11y } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 
+// Re-exported for existing callers/tests; the constant is defined in the leaf
+// `offline-banner-space` module so `ScreenHeader` can reserve the height
+// without loading this component's dependencies.
+export { OFFLINE_BANNER_HEIGHT };
+
 /**
- * Fixed height of the banner row. The banner is an absolute overlay pinned at
- * `top: insets.top`, so a surface whose header starts at the safe-area top
- * must reserve this height while the banner is visible or the overlay covers
- * the header title (uxs2 spot check, e6-offline-hang). The banner renders at
- * exactly this height (no vertical padding) so the constant cannot drift from
- * the painted row.
+ * Publishes the banner's visibility to every pinned `ScreenHeader`. Mounted by
+ * the root layout above the navigation tree; the header then reserves the
+ * overlay's height without importing the connectivity stack itself.
  */
-export const OFFLINE_BANNER_HEIGHT = 36;
+export function OfflineBannerSpaceGate({ children }: Readonly<{ children: ReactNode }>) {
+  const isOffline = useOfflineBannerState();
+  return <OfflineBannerSpaceProvider isOffline={isOffline}>{children}</OfflineBannerSpaceProvider>;
+}
 
 /**
  * App-wide offline banner. Absolute overlay, so app content keeps its layout

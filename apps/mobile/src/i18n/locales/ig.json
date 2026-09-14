@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "SSO ụlọ ọrụ"
   },
   "preferences": {
+    "general": "Izugbe",
+    "voiceInput": "Ntinye olu",
     "autoExpandThinking": "Gbasaa echiche na-akpaghị aka",
     "autoExpandThinkingSubtitle": "Gosi echiche onye nnọchi anya n'ụzọ zuru ezu mgbe ọ mechara iche echiche.",
+    "hideThinking": "Zoo nkọwa echiche",
+    "hideThinkingSubtitle": "Eg osi echiche onye nnọchi anya na ibe nnọkọ.",
     "keepScreenOn": "Hapụ ihuenyo ka ọ na-enwu n'ibe nnọkọ",
     "keepScreenOnSubtitle": "Hapụ ihuenyo ka ọ na-enwu mgbe nnọkọ na-arụ ọrụ.",
     "appearance": "Ọdịdị",
@@ -237,6 +241,7 @@
     "appearanceLight": "Ìhè",
     "appearanceDark": "Ọchịchịrị",
     "account": "Akaụntụ",
+    "accountSubtitle": "Asụsụ, saịtị a tụkwasịrị obi na nnọkọ ngwaọrụ",
     "prReviewAttribution": "Tinye aha ngwa na nyocha PR",
     "prReviewAttributionSubtitle": "Tinye ahịrị E nyochara site na Kilo n'ala mgbe ị zigara nyocha.",
     "returnSendsMessage": "Igodo nloghachi na-eziga ozi",
@@ -1993,6 +1998,22 @@
       "connectionLost": "Njikọ akwụsịla",
       "retryConnection": "Nwaa njikọ ọzọ"
     },
+    "goal": {
+      "title": "Ebumnuche",
+      "statusActive": "Ebumnuche na-arụ ọrụ",
+      "statusPaused": "Ebumnuche a kwụsịrị",
+      "statusComplete": "Ebumnuche zuru ezu",
+      "statusBlocked": "Ebumnuche egbochiri",
+      "edit": "Dezie ebumnuche",
+      "remove": "Wepu ebumnuche",
+      "pause": "Kwụsị ebumnuche",
+      "resume": "Maliteghachi ebumnuche",
+      "editPlaceholder": "Kọwaa ebumnuche",
+      "removeConfirmTitle": "Wepu ebumnuche?",
+      "removeConfirmMessage": "CLI na-ehichapụ ebumnuche nke nnọkọ a.",
+      "updateFailed": "Enweghị ike imelite ebumnuche.",
+      "sectionAccessibility": "{{status}}. Ebumnuche: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Jikọọ GitHub n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu.",
       "openGithub": "Mepee GitHub",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "nzọụkwụ {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Nkwenye akpaka",
+      "description": "Kwenye arịrịọ ikike maka nnọkọ a na-akpaghị aka. Ngwa na-agba mgbe ahụ n'enweghị arịrịọ.",
+      "unavailable": "Nnọkọ a enweghị ike ịnata arịrịọ ikike."
+    },
     "prBadge": {
       "open": "meghe arịrịọ ijikọ koodu",
       "closed": "arịrịọ njikọta koodu emechiri",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "Enweghị ike iru Kilo Gateway. Lelee njikọ gị ma nwaa ọzọ.",
     "gatewayTimeout": "Ịtụgharị okwu were oge karịrị akarị. Nwaa ọzọ.",
     "gatewayModelUnavailable": "Ihe nlereanya a maka ịtụgharị okwu adịghị. Họrọ ọzọ na Mmasị.",
+    "gatewayModelUnavailableNotice": "A naghịzi enye ihe nlereanya a. Pịa $t(transcriptionModel.title) iji họrọ ọzọ.",
     "gatewaySignInRequired": "Banye ka i jiri ịtụgharị okwu site na Kilo Gateway.",
-    "gatewayNoModel": "Họrọ ihe nlereanya maka ịtụgharị okwu na Mmasị ụzọ."
+    "gatewayNoModel": "Họrọ ihe nlereanya maka ịtụgharị okwu na Mmasị ụzọ.",
+    "testTitle": "Nwalee ntinye olu",
+    "testPlaceholder": "Pịa igwe okwu wee malite ikwu okwu.",
+    "testClear": "Hichapụ ederede"
   },
   "share": {
     "title": "Kekọrịta na Kilo",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "Enweghị ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",
     "emptyDescription": "Kilo Gateway enyeghị ihe nlereanya ọ bụla maka ịtụgharị okwu ugbu a.",
     "loadFailed": "Enweghị ike ibudata ihe nlereanya maka ịtụgharị okwu."
+  },
+  "voiceLanguage": {
+    "title": "Asụsụ ntinye olu",
+    "automatic": "Akpaaka",
+    "loadFailed": "Enweghị ike ibudata asụsụ ngwaọrụ a na-akwado.",
+    "emptyTitle": "Enweghị asụsụ akwadoro",
+    "emptyDescription": "Nchọpụta okwu nke ngwaọrụ a anaghị ekwupụta asụsụ ọ bụla akwadoro."
   }
 }

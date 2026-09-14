@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "SSO empresarial"
   },
   "preferences": {
+    "general": "Xeral",
+    "voiceInput": "Entrada de voz",
     "autoExpandThinking": "Despregar o razoamento automaticamente",
     "autoExpandThinkingSubtitle": "Mostrar o razoamento do axente despregado cando remate.",
+    "hideThinking": "Ocultar os detalles do razoamento",
+    "hideThinkingSubtitle": "Non mostrar o razoamento do axente na páxina da sesión.",
     "keepScreenOn": "Manter a pantalla acesa ao ver a sesión",
     "keepScreenOnSubtitle": "Manter a pantalla acesa mentres a sesión está en execución.",
     "appearance": "Aparencia",
@@ -237,6 +241,7 @@
     "appearanceLight": "Claro",
     "appearanceDark": "Escuro",
     "account": "Conta",
+    "accountSubtitle": "Idioma, dominios de confianza e sesións nos dispositivos",
     "prReviewAttribution": "Engadir unha mención á aplicación nas revisións de PR",
     "prReviewAttributionSubtitle": "Ao enviar unha revisión, engadir unha nota ao pé que indique que se fixo con Kilo.",
     "returnSendsMessage": "A tecla Intro envía a mensaxe",
@@ -1993,6 +1998,22 @@
       "connectionLost": "Perdeuse a conexión",
       "retryConnection": "Volver tentar a conexión"
     },
+    "goal": {
+      "title": "Obxectivo",
+      "statusActive": "Obxectivo activo",
+      "statusPaused": "Obxectivo en pausa",
+      "statusComplete": "Obxectivo completado",
+      "statusBlocked": "Obxectivo bloqueado",
+      "edit": "Editar o obxectivo",
+      "remove": "Eliminar o obxectivo",
+      "pause": "Pausar o obxectivo",
+      "resume": "Retomar o obxectivo",
+      "editPlaceholder": "Describe o obxectivo",
+      "removeConfirmTitle": "Eliminar o obxectivo?",
+      "removeConfirmMessage": "O CLI borra o obxectivo desta sesión.",
+      "updateFailed": "Non se puido actualizar o obxectivo.",
+      "sectionAccessibility": "{{status}}. Obxectivo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Conecta GitHub no teu navegador e despois volve aquí para escoller un repositorio.",
       "openGithub": "Abrir GitHub",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "{{steps}} pasos",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Aprobación automática",
+      "description": "Aproba automaticamente as solicitudes de permiso desta sesión. Despois, as ferramentas execútanse sen aviso.",
+      "unavailable": "Esta sesión non pode recibir solicitudes de permiso."
+    },
     "prBadge": {
       "open": "apertura da solicitude de cambios",
       "closed": "solicitude de integración pechada",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "Non se puido conectar con Kilo Gateway. Comproba a conexión e téntao de novo.",
     "gatewayTimeout": "A transcrición tardou demasiado. Téntao de novo.",
     "gatewayModelUnavailable": "Este modelo de transcrición non está dispoñible. Escolle outro en Preferencias.",
+    "gatewayModelUnavailableNotice": "Este modelo xa non se ofrece. Toca $t(transcriptionModel.title) para escoller outro.",
     "gatewaySignInRequired": "Inicia sesión para usar a transcrición con Kilo Gateway.",
-    "gatewayNoModel": "Escolle primeiro un modelo de transcrición en Preferencias."
+    "gatewayNoModel": "Escolle primeiro un modelo de transcrición en Preferencias.",
+    "testTitle": "Probar o ditado",
+    "testPlaceholder": "Toca o micrófono e comeza a falar.",
+    "testClear": "Borrar texto"
   },
   "share": {
     "title": "Compartir en Kilo",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "Non hai modelos de transcrición",
     "emptyDescription": "Kilo Gateway non ofrece modelos de transcrición neste momento.",
     "loadFailed": "Non se puideron cargar os modelos de transcrición."
+  },
+  "voiceLanguage": {
+    "title": "Idioma do ditado",
+    "automatic": "Automático",
+    "loadFailed": "Non se puideron cargar os idiomas que admite este dispositivo.",
+    "emptyTitle": "Non hai idiomas compatibles",
+    "emptyDescription": "O recoñecemento de voz deste dispositivo non informa de ningún idioma compatible."
   }
 }

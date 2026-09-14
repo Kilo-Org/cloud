@@ -7,8 +7,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
+import { OFFLINE_BANNER_HEIGHT, useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+
+/**
+ * Top padding a modal header keeps above the native sheet's edge, clear of the
+ * grabber. A sheet is its own window: the OS reports the inset it needs there
+ * (zero for an inset card, the status-bar height for an edge-to-edge sheet), so
+ * the header keeps this fixed clearance on iOS and Android alike instead of
+ * re-adding the app window's safe-area inset.
+ */
+const MODAL_HEADER_TOP_PADDING = 32;
 
 type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
@@ -78,9 +88,21 @@ export function ScreenHeader({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const canGoBack = showBackButton ?? (router.canGoBack() || backFallback !== undefined);
+  const isOfflineBannerVisible = useOfflineBannerSpace();
 
-  // iOS modals are presented as cards already inset from the status bar
-  const paddingTop = modal && Platform.OS === 'ios' ? 32 : insets.top + 8;
+  // A modal is a native sheet that owns its own top inset; the header keeps the
+  // fixed grabber clearance on both platforms. A pinned header adds the app
+  // window's safe-area top inset plus the standard 8. One expression, no
+  // platform branch: both platforms have the same native-sheet capability.
+  const baseTopPadding = modal ? MODAL_HEADER_TOP_PADDING : insets.top + 8;
+
+  // The offline banner is an absolute overlay pinned at the safe-area top of
+  // the app window, so a pinned header must reserve its height while it is
+  // visible or the banner covers the title (gr2 spot check, e6-offline-nav). A
+  // modal is a separate native sheet window above the banner, so a modal header
+  // never reserves.
+  const reserveOfflineBanner = safeAreaTop && isOfflineBannerVisible && !modal;
+  const paddingTop = baseTopPadding + (reserveOfflineBanner ? OFFLINE_BANNER_HEIGHT : 0);
 
   // `paddingTop` stays conditional on `safeAreaTop`: a form sheet owns its
   // vertical padding through `className`.

@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "SSO antrepriz"
   },
   "preferences": {
+    "general": "Jeneral",
+    "voiceInput": "Antre vwa",
     "autoExpandThinking": "Montre refleksyon yo otomatikman",
     "autoExpandThinkingSubtitle": "Montre tout refleksyon ajan an lè li fin reflechi.",
+    "hideThinking": "Kache detay refleksyon yo",
+    "hideThinkingSubtitle": "Pa montre refleksyon ajan an sou paj sesyon an.",
     "keepScreenOn": "Kenbe ekran an limen sou paj sesyon an",
     "keepScreenOnSubtitle": "Kenbe ekran an limen pandan sesyon an ap travay.",
     "appearance": "Aparans",
@@ -237,6 +241,7 @@
     "appearanceLight": "Klè",
     "appearanceDark": "Fonse",
     "account": "Kont",
+    "accountSubtitle": "Lang, domèn ou fè konfyans ak sesyon aparèy",
     "prReviewAttribution": "Mansyone aplikasyon an nan revizyon PR yo",
     "prReviewAttributionSubtitle": "Ajoute mansyon Revize atravè Kilo nan pye chak revizyon ou soumèt.",
     "returnSendsMessage": "Bouton retou a voye mesaj",
@@ -1993,6 +1998,22 @@
       "connectionLost": "Koneksyon an koupe",
       "retryConnection": "Rekonekte"
     },
+    "goal": {
+      "title": "Objektif",
+      "statusActive": "Objektif aktif",
+      "statusPaused": "Objektif an pòz",
+      "statusComplete": "Objektif fini",
+      "statusBlocked": "Objektif bloke",
+      "edit": "Modifye objektif la",
+      "remove": "Retire objektif la",
+      "pause": "Mete objektif la an pòz",
+      "resume": "Rekòmanse objektif la",
+      "editPlaceholder": "Dekri objektif la",
+      "removeConfirmTitle": "Retire objektif la?",
+      "removeConfirmMessage": "CLI a efase objektif sesyon sa a.",
+      "updateFailed": "Pa t kapab mete objektif la ajou.",
+      "sectionAccessibility": "{{status}}. Objektif: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Konekte GitHub nan navigatè ou a, epi tounen isit la pou chwazi yon depo.",
       "openGithub": "Louvri GitHub",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "{{steps}} etap",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Apwobasyon otomatik",
+      "description": "Apwouve demann pèmisyon pou sesyon sa a otomatikman. Zouti yo kouri apre sa san yo pa mande.",
+      "unavailable": "Sesyon sa a pa ka resevwa demann pèmisyon."
+    },
     "prBadge": {
       "open": "louvri demann fizyon an",
       "closed": "demann entegrasyon ki fèmen",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "Nou pa t ka rive nan Kilo Gateway. Tcheke koneksyon ou a epi eseye ankò.",
     "gatewayTimeout": "Transkripsyon an te pran twòp tan. Eseye ankò.",
     "gatewayModelUnavailable": "Modèl transkripsyon sa a pa disponib. Chwazi yon lòt nan Preferans yo.",
+    "gatewayModelUnavailableNotice": "Modèl sa a pa ofri ankò. Tape sou $t(transcriptionModel.title) pou chwazi yon lòt.",
     "gatewaySignInRequired": "Konekte pou sèvi ak transkripsyon Kilo Gateway.",
-    "gatewayNoModel": "Chwazi yon modèl transkripsyon nan Preferans yo an premye."
+    "gatewayNoModel": "Chwazi yon modèl transkripsyon nan Preferans yo an premye.",
+    "testTitle": "Teste dikte",
+    "testPlaceholder": "Tape sou mikwofòn nan epi kòmanse pale.",
+    "testClear": "Efase tèks"
   },
   "share": {
     "title": "Pataj nan Kilo",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "Pa gen modèl transkripsyon",
     "emptyDescription": "Kilo Gateway pa ofri okenn modèl transkripsyon kounye a.",
     "loadFailed": "Nou pa t kapab chaje modèl transkripsyon yo."
+  },
+  "voiceLanguage": {
+    "title": "Lang dikte a",
+    "automatic": "Otomatik",
+    "loadFailed": "Pa t kapab chaje lang aparèy sa a sipòte yo.",
+    "emptyTitle": "Pa gen lang ki sipòte",
+    "emptyDescription": "Rekonesans vwa aparèy sa a pa rapòte okenn lang ki sipòte."
   }
 }

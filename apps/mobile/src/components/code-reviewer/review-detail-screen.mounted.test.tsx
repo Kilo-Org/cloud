@@ -78,6 +78,9 @@ vi.mock('react-native', () => ({
   },
   Pressable: 'Pressable',
   Platform: nativePlatform,
+  // SheetHeader reads the synchronous Android status-bar height the same way
+  // the form-sheet detents do (src/lib/form-sheet.ts).
+  StatusBar: { currentHeight: 24 },
   AppState: { addEventListener: () => ({ remove: vi.fn() }) },
   Alert: { alert: vi.fn() },
 }));

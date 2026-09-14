@@ -231,6 +231,8 @@
     "voiceInput": "Input suara",
     "autoExpandThinking": "Tampilkan pemikiran secara otomatis",
     "autoExpandThinkingSubtitle": "Buka bagian pemikiran agen secara otomatis setelah agen selesai berpikir.",
+    "hideThinking": "Sembunyikan detail pemikiran",
+    "hideThinkingSubtitle": "Jangan tampilkan pemikiran agen di halaman sesi.",
     "keepScreenOn": "Biarkan layar tetap menyala di halaman sesi",
     "keepScreenOnSubtitle": "Biarkan layar tetap menyala saat sesi berjalan.",
     "appearance": "Tampilan",

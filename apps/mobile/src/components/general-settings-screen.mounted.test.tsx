@@ -53,6 +53,7 @@ vi.mock('@/components/ui/icons', () => ({
   Brain: 'Brain',
   CornerDownLeft: 'CornerDownLeft',
   Cpu: 'Cpu',
+  EyeOff: 'EyeOff',
   Globe: 'Globe',
   MessageSquare: 'MessageSquare',
   Mic: 'Mic',
@@ -62,6 +63,13 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
+  useHideThinkingPreference: () => ({
+    hideThinking: false,
+    hasLoaded: true,
+    setHideThinking: vi.fn(),
+  }),
+}));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   useKeepScreenOnPreference: () => ({
     keepScreenOn: false,
@@ -137,7 +145,7 @@ afterEach(() => {
 });
 
 describe('GeneralSettingsScreen', () => {
-  it('renders the five moved settings with their exact titles and subtitles', async () => {
+  it('renders the six settings with their exact titles and subtitles', async () => {
     const renderer = await mountGeneral();
     const rendered = texts(renderer);
 
@@ -145,6 +153,8 @@ describe('GeneralSettingsScreen', () => {
     expect(rendered).toContain('Unlock at launch and after five minutes in the background.');
     expect(rendered).toContain('Auto expand thinking');
     expect(rendered).toContain("Show the agent's thinking expanded when it finishes.");
+    expect(rendered).toContain('Hide thinking details');
+    expect(rendered).toContain("Don't show the agent's thinking on the session page.");
     expect(rendered).toContain('Keep screen on while on session page');
     expect(rendered).toContain('Hold the screen awake while the session is working.');
     expect(rendered).toContain('Add app attribution to PR reviews');
@@ -166,5 +176,19 @@ describe('GeneralSettingsScreen', () => {
     expect(biometricSwitch).toBeDefined();
     expect(biometricSwitch?.props).toMatchObject({ value: false, disabled: false });
     expect(native.authenticateAsync).not.toHaveBeenCalled();
+  });
+
+  it('mounts the hide-thinking switch off and enabled once the preference load settles', async () => {
+    const renderer = await mountGeneral();
+
+    const switches = renderer.renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Switch'
+    );
+    const hideThinkingSwitch = switches.find(
+      sw => sw.props.accessibilityLabel === 'Hide thinking details'
+    );
+
+    expect(hideThinkingSwitch).toBeDefined();
+    expect(hideThinkingSwitch?.props).toMatchObject({ value: false, disabled: false });
   });
 });

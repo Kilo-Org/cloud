@@ -231,6 +231,8 @@
     "voiceInput": "Ahots-sarrera",
     "autoExpandThinking": "Zabaldu pentsamendua automatikoki",
     "autoExpandThinkingSubtitle": "Erakutsi agentearen pentsamendua zabalduta amaitzen denean.",
+    "hideThinking": "Ezkutatu pentsamenduaren xehetasunak",
+    "hideThinkingSubtitle": "Ez erakutsi agentearen pentsamendua saio-orrian.",
     "keepScreenOn": "Mantendu pantaila piztuta saio-orrian",
     "keepScreenOnSubtitle": "Mantendu pantaila piztuta saioa lanean ari den bitartean.",
     "appearance": "Itxura",

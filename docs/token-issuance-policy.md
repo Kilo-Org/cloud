@@ -187,7 +187,7 @@ Workflow issuance reads the existing primary user pepper, including explicit `nu
 
 ## Remaining-family deployment and activation
 
-Merging deploys the affected Web and Worker services independently. This PR covers native/mobile, Chat, Wasteland, explicit delegation, and benchmark. Gastown, Webhook Agent Ingest, and Security Auto Analysis are handled separately. No additional issuance flag defaults on. Existing Cloud Agent settings can remain enabled; enabling the Web shared master does not enable the remaining families. Confirm production settings have not already opted a family in before deployment.
+Merging deploys the affected Web and Worker services independently. This PR covers native/mobile, Chat, Wasteland, and benchmark. Gastown, Webhook Agent Ingest, Security Auto Analysis, and explicit resource delegation are handled separately. No additional issuance flag defaults on. Existing Cloud Agent settings can remain enabled; enabling the Web shared master does not enable the remaining families. Confirm production settings have not already opted a family in before deployment.
 
 ### Settings
 
@@ -197,7 +197,6 @@ All Web settings below require the exact string `true` and Web `SHARED_RESOURCE_
 |---|---|---|
 | Web / Vercel | `CLOUD_AGENT_RESOURCE_TOKENS_ENABLED` | Preserve the existing Cloud Agent rollout decision |
 | Web / Vercel | `CHAT_RESOURCE_TOKENS_ENABLED` | Leave off; verify Chat, Events, and Notifications together before enabling |
-| Web / Vercel | `DELEGATED_RESOURCE_TOKENS_ENABLED` | Leave off; verify explicit personal/organization resource requests before enabling |
 | Web / Vercel | `BENCHMARK_RESOURCE_TOKENS_ENABLED` | Leave off; verify the built benchmark CLI/container before enabling |
 | Web / Vercel | `NATIVE_RESOURCE_TOKENS_ENABLED` | Leave off; retain the existing mobile token flow |
 | Web / Vercel | `WASTELAND_RESOURCE_TOKENS_ENABLED` | Leave off until its browser/server consumer chain is verified |
@@ -214,13 +213,13 @@ Native activation requires compatible API and gateway readers plus physical iOS/
 
 Adoption flags control token issuance; they do not gate every authorization check. Gastown, Webhook Ingest, and Security Auto Analysis behavior is unchanged by this PR.
 
-Chat and control-token minting also validate the source credential before delegation. Explicit resource-token requests fail with migration-unavailable while their gate is off. Personal attribution requests are unsupported; attribution requires an organization-authorized resource token. These checks must not be described as a deployment with no behavior changes.
+Chat and control-token minting also validate the source credential before delegation. These checks must not be described as a deployment with no behavior changes.
 
 ### Activation blockers and consumer coverage
 
 See [the consumer audit](token-consumer-audit.md) for request paths, credential selection, verification and remaining limits.
 
-Gastown, Webhook Ingest, and Security Auto Analysis activation is handled separately. Their implementation and test results are not part of this PR. Native adoption remains off until the physical-device matrix is verified.
+Gastown, Webhook Ingest, Security Auto Analysis, and explicit delegation activation is handled separately. Their implementation and test results are not part of this PR. Native adoption remains off until the physical-device matrix is verified.
 
 Enable other eligible families one at a time only after all their receiving deployments are healthy and their real consumer chain is exercised. Record Web and each Worker activation separately. Watch authentication failures, retries, session continuity and callback completion before expanding. No complete physical-device, built CLI/container, or live-provider smoke matrix is claimed by the automated tests.
 

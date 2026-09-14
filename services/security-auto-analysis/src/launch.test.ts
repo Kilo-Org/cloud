@@ -10,7 +10,7 @@ import {
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { buildSecurityAnalysisCallbackTarget, startSecurityAnalysis } from './launch.js';
-import { generateApiToken } from './token.js';
+import { generateControlToken, generateTriageToken } from './token.js';
 import { triageSecurityFinding } from './triage.js';
 
 vi.mock('./db/queries.js', () => ({
@@ -21,7 +21,7 @@ vi.mock('./db/queries.js', () => ({
   tryAcquireAnalysisStartLease: vi.fn(),
 }));
 vi.mock('./analysis-start-lifecycle.js', () => ({ transitionAnalysisStartLifecycle: vi.fn() }));
-vi.mock('./token.js', () => ({ generateApiToken: vi.fn() }));
+vi.mock('./token.js', () => ({ generateControlToken: vi.fn(), generateTriageToken: vi.fn() }));
 vi.mock('./triage.js', () => ({ triageSecurityFinding: vi.fn() }));
 
 const CALLBACK_SECRET = 'test-callback-token-secret';
@@ -225,7 +225,8 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(tryAcquireAnalysisStartLease).mockResolvedValue(true);
-    vi.mocked(generateApiToken).mockResolvedValue('auth-token');
+    vi.mocked(generateControlToken).mockResolvedValue('control-token');
+    vi.mocked(generateTriageToken).mockResolvedValue('triage-token');
     vi.mocked(getSecurityAgentConfigForOwner).mockResolvedValue({
       auto_dismiss_enabled: true,
       auto_dismiss_confidence_threshold: 'high',
@@ -270,6 +271,45 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     expect(prepareBody).not.toMatchObject({
       callbackTarget: { headers: { 'X-Internal-Secret': expect.any(String) } },
     });
+  });
+
+  it('passes the prepareSession organization to the modern control token', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
+    const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+    const params = createParams(
+      false,
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          Response.json({
+            result: { data: { cloudAgentSessionId: 'agent-session', kiloSessionId: 'ses-123' } },
+          })
+        )
+        .mockResolvedValueOnce(
+          Response.json({ result: { data: { executionId: 'exec-123' } } })
+        ) as never
+    );
+    params.organizationId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+    await startSecurityAnalysis(params);
+
+    expect(generateControlToken).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-123' }),
+      'next-auth-secret',
+      'development',
+      undefined,
+      organizationId
+    );
+    expect(generateTriageToken).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-123' }),
+      'next-auth-secret',
+      'development',
+      undefined,
+      organizationId
+    );
+    expect(triageSecurityFinding).toHaveBeenCalledWith(expect.objectContaining({ organizationId }));
   });
 
   it('reuses existing triage and launches sandbox without retriaging', async () => {

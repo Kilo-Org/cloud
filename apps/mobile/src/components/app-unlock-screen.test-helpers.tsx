@@ -260,9 +260,11 @@ vi.mock('@/lib/picker-bridge', () => ({ setLanguagePickerBridge: vi.fn() }));
 // The preferences screen mounts the feature-flag debug surface, which reads
 // PostHog flag statuses; the real module pulls in expo-application's native
 // chain, which no mounted test loads. An empty registry keeps the section
-// out of these scenes.
+// out of these scenes. `subscribeToPostHogReady` is a module-load side effect
+// of `@/lib/consent`, which the (app) layout's tour auto-open imports.
 vi.mock('@/lib/analytics/posthog', () => ({
   useFeatureFlagStatuses: () => [],
+  subscribeToPostHogReady: () => () => undefined,
 }));
 
 function Draft() {

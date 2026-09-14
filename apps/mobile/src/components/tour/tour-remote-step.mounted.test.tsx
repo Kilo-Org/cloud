@@ -318,6 +318,31 @@ describe('TourRemoteStep', () => {
     unmount();
   });
 
+  // The baseline must be frozen before the tour offers its start control: a
+  // session created while the live list is still resolving would otherwise be
+  // part of the baseline that arrives afterwards, and the check could never
+  // land for that run.
+  it('withholds the start control until the session baseline is frozen', async () => {
+    fetchInstances.mockResolvedValue({ instances: [REMOTE] });
+    // The live session list has not resolved yet (the default snapshot has no
+    // data), so no baseline exists.
+    const { renderer, onCompletedChange, unmount } = await mountStep();
+
+    await waitFor(() => hasText(renderer, 'tour.remoteFound'));
+    expect(hasText(renderer, 'tour.remoteStart')).toBe(false);
+    expect(hasText(renderer, 'tour.remoteCheck')).toBe(false);
+    expect(onCompletedChange).toHaveBeenLastCalledWith(false);
+
+    // Once the list resolves the baseline freezes, and only then does Start
+    // become available.
+    await act(async () => {
+      await Promise.resolve();
+      liveSync.set({ data: { sessions: [] } });
+    });
+    await waitFor(() => hasText(renderer, 'tour.remoteStart'));
+    unmount();
+  });
+
   it('renders the check and completes only after a remote session appears after the baseline', async () => {
     fetchInstances.mockResolvedValue({ instances: [REMOTE] });
     liveSync.set({ data: { sessions: [] } });

@@ -33,8 +33,9 @@ type TourRemoteStepProps = {
  * the instance picker reads, and the check is gated on a REAL remote session:
  * it captures the active-session ids present when the live list first resolves
  * and only a remote row that appears afterwards, on the selected computer's
- * connection, satisfies it. A connected computer with no session never
- * completes the path.
+ * connection, satisfies it. The start control is withheld until that baseline
+ * is frozen, so the session it spawns can only ever land after it. A connected
+ * computer with no session never completes the path.
  */
 export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepProps>) {
   const { t } = useTranslation();
@@ -111,9 +112,11 @@ export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepPro
 
   // Baseline: the ids known the first time the live list resolves. Capturing
   // it on the first data (not on the empty mount) keeps a row that already
-  // existed before the tour from counting as new. The error/retry members are
-  // read too: this detection query is what makes the ✓ land, so its failure
-  // must surface a retry rather than leaving Done disabled forever.
+  // existed before the tour from counting as new, and the start control is
+  // withheld until this baseline exists (see `baselineIds === null` below), so
+  // the tour's own session can never be absorbed into it. The error/retry
+  // members are read too: this detection query is what makes the ✓ land, so
+  // its failure must surface a retry rather than leaving Done disabled forever.
   const {
     data: sessionsData,
     isError: isSessionsError,
@@ -269,6 +272,18 @@ export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepPro
           <Button size="lg" className="w-full" onPress={handleStart}>
             <Text className="text-base">{t('tour.remoteStart')}</Text>
           </Button>
+        </View>
+      );
+    } else if (baselineIds === null) {
+      // The session list has not resolved yet, so the baseline is not frozen.
+      // Offering Start now could make the tour's own session part of a baseline
+      // that arrives after the spawn, which would leave the check unable to
+      // land. Hold the action slot — the discovered rows above stay visible —
+      // until the baseline exists.
+      outcome = (
+        <View className="h-5 flex-row items-center gap-2">
+          <Skeleton className="h-[18px] w-[18px] rounded-full" />
+          <Skeleton className="h-4 w-52" />
         </View>
       );
     } else if (isSpawning || hasStarted) {

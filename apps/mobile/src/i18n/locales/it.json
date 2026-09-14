@@ -1542,6 +1542,22 @@
       "connectionLost": "Connessione persa",
       "retryConnection": "Riprova a connetterti"
     },
+    "goal": {
+      "title": "Obiettivo",
+      "statusActive": "Obiettivo attivo",
+      "statusPaused": "Obiettivo in pausa",
+      "statusComplete": "Obiettivo completato",
+      "statusBlocked": "Obiettivo bloccato",
+      "edit": "Modifica obiettivo",
+      "remove": "Rimuovi obiettivo",
+      "pause": "Metti in pausa l'obiettivo",
+      "resume": "Riprendi l'obiettivo",
+      "editPlaceholder": "Descrivi l'obiettivo",
+      "removeConfirmTitle": "Rimuovere l'obiettivo?",
+      "removeConfirmMessage": "Il CLI cancella l'obiettivo di questa sessione.",
+      "updateFailed": "Impossibile aggiornare l'obiettivo.",
+      "sectionAccessibility": "{{status}}. Obiettivo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Collega GitHub nel browser, poi torna qui per scegliere un repository.",
       "openGithub": "Apri GitHub",
@@ -2163,7 +2179,10 @@
     "gatewayModelUnavailable": "Questo modello di trascrizione non è disponibile. Scegline un altro in Preferenze.",
     "gatewayModelUnavailableNotice": "Questo modello non è più offerto. Tocca $t(transcriptionModel.title) per sceglierne un altro.",
     "gatewaySignInRequired": "Accedi per usare la trascrizione con Kilo Gateway.",
-    "gatewayNoModel": "Scegli prima un modello di trascrizione in Preferenze."
+    "gatewayNoModel": "Scegli prima un modello di trascrizione in Preferenze.",
+    "testTitle": "Prova la dettatura",
+    "testPlaceholder": "Tocca il microfono e inizia a parlare.",
+    "testClear": "Cancella testo"
   },
   "share": {
     "title": "Condivisione su Kilo",
@@ -2994,5 +3013,12 @@
     "emptyTitle": "Nessun modello di trascrizione",
     "emptyDescription": "Kilo Gateway non offre modelli di trascrizione in questo momento.",
     "loadFailed": "Impossibile caricare i modelli di trascrizione."
+  },
+  "voiceLanguage": {
+    "title": "Lingua della dettatura",
+    "automatic": "Automatico",
+    "loadFailed": "Impossibile caricare le lingue supportate da questo dispositivo.",
+    "emptyTitle": "Nessuna lingua supportata",
+    "emptyDescription": "Il riconoscimento vocale di questo dispositivo non segnala lingue supportate."
   }
 }

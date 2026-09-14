@@ -1998,6 +1998,22 @@
       "connectionLost": "Xiriirku wuu go'ay",
       "retryConnection": "Mar kale isku day inaad ku xirmato"
     },
+    "goal": {
+      "title": "Hadaf",
+      "statusActive": "Hadaf firfircoon",
+      "statusPaused": "Hadaf la hakiyay",
+      "statusComplete": "Hadafka waa dhammaaday",
+      "statusBlocked": "Hadafka waa la xiray",
+      "edit": "Tafatir hadafka",
+      "remove": "Ka saar hadafka",
+      "pause": "Hakiso hadafka",
+      "resume": "Sii wad hadafka",
+      "editPlaceholder": "Sharax hadafka",
+      "removeConfirmTitle": "Ka saar hadafka?",
+      "removeConfirmMessage": "CLI wuxuu tirtiraa hadafka kulankan.",
+      "updateFailed": "Hadafka lama cusboonaysiin karin.",
+      "sectionAccessibility": "{{status}}. Hadaf: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "GitHub ku xiriiri biraawsarkaaga, ka dibna halkan ku soo noqo si aad kayd u doorato.",
       "openGithub": "Fur GitHub",
@@ -2583,7 +2599,10 @@
     "gatewayModelUnavailable": "Moodeelkan qoraal u beddelidda lagama heli karo. Mid kale ka dooro Dookhyada.",
     "gatewayModelUnavailableNotice": "Moodeelkan lama bixiyo mar dambe. Taabo $t(transcriptionModel.title) si aad u dooratid mid kale.",
     "gatewaySignInRequired": "Soo gal si aad u isticmaasho qoraal u beddelidda Kilo Gateway.",
-    "gatewayNoModel": "Marka hore moodeel qoraal u beddelidda ka dooro Dookhyada."
+    "gatewayNoModel": "Marka hore moodeel qoraal u beddelidda ka dooro Dookhyada.",
+    "testTitle": "Tijaabi gelinta codka",
+    "testPlaceholder": "Taabo makarafoonka oo bilow hadalka.",
+    "testClear": "Nadiifi qoraalka"
   },
   "share": {
     "title": "U wadaag Kilo",
@@ -2972,5 +2991,12 @@
     "emptyTitle": "Ma jiraan moodeello qoraal u beddelid",
     "emptyDescription": "Kilo Gateway hadda ma bixiyo moodeello qoraal u beddelid.",
     "loadFailed": "Moodeellada qoraal u beddelidda lama soo rari karin."
+  },
+  "voiceLanguage": {
+    "title": "Luqadda gelinta codka",
+    "automatic": "Otomaatig",
+    "loadFailed": "Luqadaha qalabkani taageerto lama soo dejisan karin.",
+    "emptyTitle": "Ma jiraan luqado la taageeray",
+    "emptyDescription": "Aqoonsiga hadalka qalabkani ma soo sheego wax luqado la taageeray ah."
   }
 }

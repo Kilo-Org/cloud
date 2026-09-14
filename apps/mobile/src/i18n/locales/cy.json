@@ -2062,6 +2062,22 @@
       "connectionLost": "Cysylltiad wedi'i golli",
       "retryConnection": "Ceisio cysylltu eto"
     },
+    "goal": {
+      "title": "Nod",
+      "statusActive": "Nod gweithredol",
+      "statusPaused": "Nod wedi'i phasio",
+      "statusComplete": "Nod wedi'i chwblhau",
+      "statusBlocked": "Nod wedi'i blocio",
+      "edit": "Golygu'r nod",
+      "remove": "Tynnu'r nod",
+      "pause": "Oedi'r nod",
+      "resume": "Ailddechrau'r nod",
+      "editPlaceholder": "Disgrifiwch y nod",
+      "removeConfirmTitle": "Tynnu'r nod?",
+      "removeConfirmMessage": "Mae'r CLI yn clirio nod y sesiwn hon.",
+      "updateFailed": "Methwyd diweddaru'r nod.",
+      "sectionAccessibility": "{{status}}. Nod: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Cysylltwch â GitHub yn eich porwr, yna dewch yn ôl yma i ddewis ystorfa.",
       "openGithub": "Agor GitHub",
@@ -2667,7 +2683,10 @@
     "gatewayModelUnavailable": "Nid yw'r model trawsgrifio hwn ar gael. Dewiswch un arall yn y Dewisiadau.",
     "gatewayModelUnavailableNotice": "Nid yw'r model hwn yn cael ei gynnig mwyach. Tapiwch $t(transcriptionModel.title) i ddewis un arall.",
     "gatewaySignInRequired": "Mewngofnodwch i ddefnyddio trawsgrifio drwy Kilo Gateway.",
-    "gatewayNoModel": "Dewiswch fodel trawsgrifio yn y Dewisiadau yn gyntaf."
+    "gatewayNoModel": "Dewiswch fodel trawsgrifio yn y Dewisiadau yn gyntaf.",
+    "testTitle": "Profwch fewnbwn llais",
+    "testPlaceholder": "Tapiwch y meicroffon a dechreuwch siarad.",
+    "testClear": "Clirio'r testun"
   },
   "share": {
     "title": "Rhannu â Kilo",
@@ -3060,5 +3079,12 @@
     "emptyTitle": "Dim modelau trawsgrifio",
     "emptyDescription": "Does dim modelau trawsgrifio ar gael gan Kilo Gateway ar hyn o bryd.",
     "loadFailed": "Doedd dim modd llwytho'r modelau trawsgrifio."
+  },
+  "voiceLanguage": {
+    "title": "Iaith mewnbwn llais",
+    "automatic": "Awtomatig",
+    "loadFailed": "Methwyd llwytho'r ieithoedd y mae'r ddyfais hon yn eu cefnogi.",
+    "emptyTitle": "Dim ieithoedd wedi'u cefnogi",
+    "emptyDescription": "Nid yw adnabyddiaeth lafar y ddyfais hon yn nodi unrhyw iaith a gefnogir."
   }
 }

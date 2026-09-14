@@ -1,5 +1,6 @@
 import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { sandboxSelectionCapabilitiesSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   createCloudAgentNextClient,
   createCloudAgentNextClientForModel,
@@ -145,6 +146,16 @@ async function createCloudAgentControlToken(user: User, headersList?: Headers): 
  * separately via WebSocket connection.
  */
 export const cloudAgentNextRouter = createTRPCRouter({
+  getSandboxSelectionOptions: baseProcedure
+    .input(z.object({ devcontainer: z.boolean().optional() }))
+    .output(sandboxSelectionCapabilitiesSchema)
+    .query(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({
+        ...(input.devcontainer !== undefined ? { devcontainer: input.devcontainer } : {}),
+      });
+    }),
+
   /**
    * Prepare a new cloud agent session.
    *

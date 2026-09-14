@@ -1564,6 +1564,22 @@
       "connectionLost": "連線中斷",
       "retryConnection": "重新連線"
     },
+    "goal": {
+      "title": "目標",
+      "statusActive": "進行中的目標",
+      "statusPaused": "已暫停的目標",
+      "statusComplete": "目標已完成",
+      "statusBlocked": "目標已封鎖",
+      "edit": "編輯目標",
+      "remove": "移除目標",
+      "pause": "暫停目標",
+      "resume": "繼續目標",
+      "editPlaceholder": "描述目標",
+      "removeConfirmTitle": "移除目標？",
+      "removeConfirmMessage": "CLI 會清除此工作階段的目標。",
+      "updateFailed": "無法更新目標。",
+      "sectionAccessibility": "{{status}}。目標：{{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "請在瀏覽器中連結 GitHub，再回到這裡選取儲存庫。",
       "openGithub": "開啟 GitHub",
@@ -2149,7 +2165,10 @@
     "gatewayModelUnavailable": "這個轉錄模型無法使用。請在偏好設定中選擇其他模型。",
     "gatewayModelUnavailableNotice": "這個模型已不再提供。點一下$t(transcriptionModel.title)選擇另一個。",
     "gatewaySignInRequired": "登入後即可使用 Kilo Gateway 轉錄。",
-    "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。"
+    "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。",
+    "testTitle": "測試語音輸入",
+    "testPlaceholder": "點按麥克風並開始說話。",
+    "testClear": "清除文字"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2972,5 +2991,12 @@
     "emptyTitle": "沒有轉錄模型",
     "emptyDescription": "Kilo Gateway 目前沒有提供轉錄模型。",
     "loadFailed": "無法載入轉錄模型。"
+  },
+  "voiceLanguage": {
+    "title": "語音輸入語言",
+    "automatic": "自動",
+    "loadFailed": "無法載入此裝置支援的語言。",
+    "emptyTitle": "沒有支援的語言",
+    "emptyDescription": "此裝置的語音辨識未回報任何支援的語言。"
   }
 }

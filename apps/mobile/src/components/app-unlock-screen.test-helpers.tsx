@@ -72,6 +72,7 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platform,
+  StatusBar: { currentHeight: 0 },
   I18nManager: { isRTL: false },
   AccessibilityInfo: { announceForAccessibility: announcements },
   AppState: {

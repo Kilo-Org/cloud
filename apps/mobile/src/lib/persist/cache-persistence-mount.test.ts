@@ -1,8 +1,7 @@
 /* eslint-disable max-lines -- cohesive mount suite for identity resolution, mismatch recovery, and persister lifecycle */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree. See src/app/(app)/(tabs)/(2_agents)/index.mounted.test.tsx. */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV and SecureStore factories settle without await because they resolve immediately */
 import { createElement, useSyncExternalStore } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { type Mutation } from '@tanstack/react-query';
 import { type PersistedQueryClientSaveOptions } from '@tanstack/react-query-persist-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

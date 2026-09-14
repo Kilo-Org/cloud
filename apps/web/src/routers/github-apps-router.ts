@@ -8,6 +8,7 @@ import {
   getGitHubIntegrationById,
   upsertPlatformIntegrationForOwner,
   updateRepositoriesForIntegration,
+  syncIntegrationInstallationDetails,
 } from '@/lib/integrations/db/platform-integrations';
 import {
   fetchGitHubInstallationDetails,
@@ -706,6 +707,17 @@ export const githubAppsRouter = createTRPCRouter({
         integrationId: integration.id,
         installationId,
         appType,
+      });
+      // Keep this association's own cached account/permissions/scopes fields
+      // fresh too: `githubAppsService.getInstallation`/`listIntegrations` read
+      // them straight off `platform_integrations`, not the canonical row.
+      await syncIntegrationInstallationDetails(integration.id, {
+        platformAccountId: installationDetails.account.id.toString(),
+        platformAccountLogin: installationDetails.account.login,
+        permissions: installationDetails.permissions,
+        scopes: installationDetails.events,
+        repositoryAccess: installationDetails.repository_selection,
+        installedAt: installationDetails.created_at,
       });
       const repositories = await fetchGitHubRepositories(installationId, appType, integration.id);
       await updateRepositoriesForIntegration(integration.id, repositories);

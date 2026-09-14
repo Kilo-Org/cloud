@@ -231,6 +231,8 @@
     "voiceInput": "Häälsisestus",
     "autoExpandThinking": "Ava mõttekäik automaatselt",
     "autoExpandThinkingSubtitle": "Näita agendi mõttekäiku avatuna, kui mõtlemine lõpeb.",
+    "hideThinking": "Peida mõttekäigu üksikasjad",
+    "hideThinkingSubtitle": "Ära näita agendi mõttekäiku seansi lehel.",
     "keepScreenOn": "Hoia ekraan seansi lehel sisselülitatuna",
     "keepScreenOnSubtitle": "Hoia ekraan sisselülitatuna, kuni seanss töötab.",
     "appearance": "Välimus",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kõnetuvastus Kilo Gateway kaudu",
     "gatewayTranscriptionSubtitle": "Kasuta häälsisestuse tekstiks teisendamiseks seadme kõnetuvastuse asemel Kilo Gateway mudelit. Sinu salvestus saadetakse Kilo Gateway'sse.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Tööriistakutsete koondamine",
+    "condenseToolCallsSubtitle": "Rühmita järjestikused tööriistakutsed ühte ritta, mille saad avada."
   },
   "prReview": {
     "pullRequestUnavailable": "Tõmbetaotlus pole saadaval",
@@ -1996,6 +2000,22 @@
       "connectionLost": "Ühendus katkes",
       "retryConnection": "Proovi uuesti ühenduda"
     },
+    "goal": {
+      "title": "Eesmärk",
+      "statusActive": "Aktiivne eesmärk",
+      "statusPaused": "Peatatud eesmärk",
+      "statusComplete": "Eesmärk täidetud",
+      "statusBlocked": "Eesmärk blokeeritud",
+      "edit": "Muuda eesmärki",
+      "remove": "Eemalda eesmärk",
+      "pause": "Peata eesmärk",
+      "resume": "Jätka eesmärki",
+      "editPlaceholder": "Kirjelda eesmärki",
+      "removeConfirmTitle": "Eemaldada eesmärk?",
+      "removeConfirmMessage": "CLI tühjendab selle seansi eesmärgi.",
+      "updateFailed": "Eesmärki ei saanud värskendada.",
+      "sectionAccessibility": "{{status}}. Eesmärk: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Ühenda GitHub brauseris ja naase siia, et valida hoidla.",
       "openGithub": "Ava GitHub",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "{{steps}} sammu",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Automaatne kinnitamine",
+      "description": "Kinnita selle seansi loaduste taotlused automaatselt. Tööriistad käivituvad seejärel ilma küsimuseta.",
+      "unavailable": "See seanss ei saa loaduste taotlusi vastu võtta."
+    },
     "prBadge": {
       "open": "avatud tõmbetaotlus",
       "closed": "suletud liitmistaotlus",
@@ -2469,6 +2494,10 @@
       "tapToListHint": "Kausta sisu vaatamiseks puuduta kausta.",
       "unsupportedDescription": "See CLI ei saa kaustu loetleda. Nupp „Valmis“ jätab valituks käivituskausta ja nupp „Alusta seanssi“ käivitab seansi selles kaustas.",
       "unsupportedTitle": "Kaustu ei saa loetleda"
+    },
+    "toolRun": {
+      "sheetTitle": "Tööriistakutsed",
+      "condensedLabel": "{{itemCount}} üksust; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "Seda kõnetuvastuse mudelit pole saadaval. Vali Eelistustes mõni teine.",
     "gatewayModelUnavailableNotice": "Seda mudelit enam ei pakuta. Puuduta $t(transcriptionModel.title), et valida teine.",
     "gatewaySignInRequired": "Logi sisse, et kasutada Kilo Gateway kõnetuvastust.",
-    "gatewayNoModel": "Vali kõigepealt Eelistustes kõnetuvastuse mudel."
+    "gatewayNoModel": "Vali kõigepealt Eelistustes kõnetuvastuse mudel.",
+    "testTitle": "Testi häälsisestust",
+    "testPlaceholder": "Puuduta mikrofoni ja hakka rääkima.",
+    "testClear": "Tühjenda tekst"
   },
   "share": {
     "title": "Kilosse jagamine",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "Kõnetuvastuse mudelid puuduvad",
     "emptyDescription": "Kilo Gateway ei paku praegu ühtegi kõnetuvastuse mudelit.",
     "loadFailed": "Kõnetuvastuse mudeleid ei õnnestunud laadida."
+  },
+  "voiceLanguage": {
+    "title": "Häälsisestuse keel",
+    "automatic": "Automaatne",
+    "loadFailed": "Selle seadme toetatavaid keeli ei õnnestunud laadida.",
+    "emptyTitle": "Toetatud keeli pole",
+    "emptyDescription": "Selle seadme kõnetuvastus ei teata ühtegi toetatud keelt."
   }
 }

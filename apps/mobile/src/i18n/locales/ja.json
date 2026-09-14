@@ -231,6 +231,8 @@
     "voiceInput": "音声入力",
     "autoExpandThinking": "思考を自動展開",
     "autoExpandThinkingSubtitle": "エージェントの思考が終了したときに展開して表示します。",
+    "hideThinking": "思考の詳細を非表示",
+    "hideThinkingSubtitle": "セッション画面でエージェントの思考を表示しません。",
     "keepScreenOn": "セッション画面で画面を常時オン",
     "keepScreenOnSubtitle": "セッションの実行中は画面が消えないようにします。",
     "appearance": "外観",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gatewayによる文字起こし",
     "gatewayTranscriptionSubtitle": "デバイスの音声認識の代わりにKilo Gatewayのモデルで音声入力を文字起こしします。録音はKilo Gatewayに送信されます。",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ツール呼び出しをまとめる",
+    "condenseToolCallsSubtitle": "連続するツール呼び出しを、開ける1つの行にまとめます。"
   },
   "notifications": {
     "liveActivities": "ライブアクティビティ",
@@ -1562,6 +1566,22 @@
       "connectionLost": "接続切断",
       "retryConnection": "接続を再試行"
     },
+    "goal": {
+      "title": "ゴール",
+      "statusActive": "アクティブなゴール",
+      "statusPaused": "一時停止中のゴール",
+      "statusComplete": "ゴール完了",
+      "statusBlocked": "ゴールがブロックされました",
+      "edit": "ゴールを編集",
+      "remove": "ゴールを削除",
+      "pause": "ゴールを一時停止",
+      "resume": "ゴールを再開",
+      "editPlaceholder": "ゴールを説明",
+      "removeConfirmTitle": "ゴールを削除しますか？",
+      "removeConfirmMessage": "CLI がこのセッションのゴールを消去します。",
+      "updateFailed": "ゴールを更新できませんでした。",
+      "sectionAccessibility": "{{status}}。ゴール: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ブラウザーでGitHubと連携し、この画面に戻ってリポジトリを選択してください。",
       "openGithub": "GitHubを開く",
@@ -2005,6 +2025,11 @@
       "stepsCount_other": "{{steps}}ステップ",
       "modelAccessibilityLabel": "{{name}}、{{provider}}、{{steps}}、{{cost}}"
     },
+    "autoApprove": {
+      "title": "自動承認",
+      "description": "このセッションの権限リクエストを自動的に承認します。その後、ツールは確認なしで実行されます。",
+      "unavailable": "このセッションは権限リクエストを受信できません。"
+    },
     "prBadge": {
       "open": "プルリクエストを開く",
       "closed": "クローズ済みのプルリクエスト",
@@ -2035,6 +2060,10 @@
       "tapToListHint": "フォルダをタップすると、内容を一覧表示できます。",
       "unsupportedDescription": "このCLIはフォルダの一覧表示に対応していません。「完了」をタップすると起動時のフォルダが選択され、「セッションを開始」をタップするとそのフォルダでセッションが始まります。",
       "unsupportedTitle": "フォルダを一覧表示できません"
+    },
+    "toolRun": {
+      "sheetTitle": "ツール呼び出し",
+      "condensedLabel": "{{itemCount}}件の項目; {{last}}"
     }
   },
   "bootstrap": {
@@ -2147,7 +2176,10 @@
     "gatewayModelUnavailable": "この文字起こしモデルは利用できません。設定で別のモデルを選択してください。",
     "gatewayModelUnavailableNotice": "このモデルは提供が終了しました。別のモデルを選ぶには$t(transcriptionModel.title)をタップしてください。",
     "gatewaySignInRequired": "Kilo Gatewayの文字起こしを使うにはサインインしてください。",
-    "gatewayNoModel": "まず設定で文字起こしモデルを選択してください。"
+    "gatewayNoModel": "まず設定で文字起こしモデルを選択してください。",
+    "testTitle": "音声入力をテスト",
+    "testPlaceholder": "マイクをタップして話し始めてください。",
+    "testClear": "テキストを消去"
   },
   "share": {
     "title": "Kiloに共有",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "文字起こしモデルがありません",
     "emptyDescription": "現在、Kilo Gatewayは文字起こしモデルを提供していません。",
     "loadFailed": "文字起こしモデルを読み込めませんでした。"
+  },
+  "voiceLanguage": {
+    "title": "音声入力の言語",
+    "automatic": "自動",
+    "loadFailed": "このデバイスがサポートする言語を読み込めませんでした。",
+    "emptyTitle": "サポートされている言語がありません",
+    "emptyDescription": "このデバイスの音声認識は、サポートされている言語を報告しません。"
   }
 }

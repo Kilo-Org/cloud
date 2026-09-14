@@ -231,6 +231,8 @@
     "voiceInput": "Raddinntak",
     "autoExpandThinking": "Opna hugsunarferlið sjálfkrafa",
     "autoExpandThinkingSubtitle": "Sýna allt hugsunarferli fulltrúans þegar því er lokið.",
+    "hideThinking": "Fela upplýsingar um hugsun",
+    "hideThinkingSubtitle": "Ekki sýna hugsun fulltrúans á lotusíðunni.",
     "keepScreenOn": "Halda skjánum kveiktum á lotusíðunni",
     "keepScreenOnSubtitle": "Halda skjánum kveiktum meðan lotan er í gangi.",
     "appearance": "Útlit",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Umritun í gegnum Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Umritið raddinnsláttinn með Kilo Gateway líkani í stað talaþekkingar tækisins. Upptakan er send í Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Þjappa tólaköllum",
+    "condenseToolCallsSubtitle": "Flokkaðu samfelld tólaköll í eina röð sem þú getur opnað."
   },
   "prReview": {
     "pullRequestUnavailable": "Sameiningarbeiðni ekki tiltæk",
@@ -1996,6 +2000,22 @@
       "connectionLost": "Tenging rofnaði",
       "retryConnection": "Reyna að tengjast aftur"
     },
+    "goal": {
+      "title": "Markmið",
+      "statusActive": "Virkt markmið",
+      "statusPaused": "Markmið í bið",
+      "statusComplete": "Markmiði lokið",
+      "statusBlocked": "Markmið læst",
+      "edit": "Breyta markmiði",
+      "remove": "Fjarlægja markmið",
+      "pause": "Setja markmið í bið",
+      "resume": "Halda markmiði áfram",
+      "editPlaceholder": "Lýstu markmiðinu",
+      "removeConfirmTitle": "Fjarlægja markmið?",
+      "removeConfirmMessage": "CLI hreinsar markmið þessarar lotu.",
+      "updateFailed": "Ekki tókst að uppfæra markmiðið.",
+      "sectionAccessibility": "{{status}}. Markmið: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Tengdu GitHub í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn.",
       "openGithub": "Opna GitHub",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "{{steps}} skref",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Sjálfvirk samþykkt",
+      "description": "Samþykktu leyfisbeiðnir fyrir þessa lotu sjálfkrafa. Verkfæri keyra síðan án beiðni.",
+      "unavailable": "Þessi lota getur ekki tekið við leyfisbeiðnum."
+    },
     "prBadge": {
       "open": "opna samrunabeiðni",
       "closed": "lokuð samrunabeiðni",
@@ -2469,6 +2494,10 @@
       "tapToListHint": "Ýttu á möppu til að sjá innihald hennar.",
       "unsupportedDescription": "Þetta CLI getur ekki birt möppur. Ýttu á Lokið til að halda ræsimöppunni. Næsta lota hefst þar.",
       "unsupportedTitle": "Ekki er hægt að birta möppur"
+    },
+    "toolRun": {
+      "sheetTitle": "Tólaköll",
+      "condensedLabel": "{{itemCount}} atriði; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "Þetta umritunarlíkan er ekki í boði. Veldu annað í Kjörstillingum.",
     "gatewayModelUnavailableNotice": "Þetta líkan er ekki lengur í boði. Ýttu á $t(transcriptionModel.title) til að velja annað.",
     "gatewaySignInRequired": "Skráðu þig inn til að nota umritun í gegnum Kilo Gateway.",
-    "gatewayNoModel": "Veldu fyrst umritunarlíkan í Kjörstillingum."
+    "gatewayNoModel": "Veldu fyrst umritunarlíkan í Kjörstillingum.",
+    "testTitle": "Prófa raddinnslátt",
+    "testPlaceholder": "Ýttu á hljóðnemann og byrjaðu að tala.",
+    "testClear": "Hreinsa texta"
   },
   "share": {
     "title": "Deila með Kilo",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "Engin umritunarlíkan",
     "emptyDescription": "Kilo Gateway býður ekki upp á umritunarlíkan um þessar mundir.",
     "loadFailed": "Ekki tókst að sækja umritunarlíkin."
+  },
+  "voiceLanguage": {
+    "title": "Tungumál raddinnsláttar",
+    "automatic": "Sjálfvirkt",
+    "loadFailed": "Ekki tókst að hlaða tungumálunum sem þetta tæki styður.",
+    "emptyTitle": "Engin studd tungumál",
+    "emptyDescription": "Talgreining þessa tækis tilkynnir engin studd tungumál."
   }
 }

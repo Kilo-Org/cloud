@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to test React/RN structure under vitest */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CommentRow, moderationFailure } from './comment-row';
@@ -298,6 +297,20 @@ describe('CommentRow overflow actions', () => {
     openOverflow(renderer);
 
     expect(disabledButtonIndices()).toEqual([1, 2, 3]);
+
+    renderer.unmount();
+  });
+});
+
+describe('CommentRow avatar recycling', () => {
+  it('sets recyclingKey to the author avatar URL so a recycled row clears the previous image', async () => {
+    const avatarUrl = 'https://example.com/alice.png';
+    const renderer = await render(makeComment({ author: { login: 'alice', avatarUrl } }));
+
+    const image = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'Image'
+    );
+    expect((image.props as Record<string, unknown>).recyclingKey).toBe(avatarUrl);
 
     renderer.unmount();
   });

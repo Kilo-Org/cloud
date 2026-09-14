@@ -231,6 +231,8 @@
     "voiceInput": "Pag-input ng boses",
     "autoExpandThinking": "Awtomatikong ipakita ang buong pag-iisip",
     "autoExpandThinkingSubtitle": "Ipakita nang buo ang pag-iisip ng ahente kapag natapos ito.",
+    "hideThinking": "Itago ang mga detalye ng pag-iisip",
+    "hideThinkingSubtitle": "Huwag ipakita ang pag-iisip ng ahente sa pahina ng sesyon.",
     "keepScreenOn": "Panatilihing bukas ang screen sa pahina ng sesyon",
     "keepScreenOnSubtitle": "Panatilihing bukas ang screen habang tumatakbo ang sesyon.",
     "appearance": "Hitsura",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Pagsasalin ng boses sa teksto gamit ang Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Gamitin ang modelong Kilo Gateway sa pagsasalin ng boses sa teksto imbes na ang pagkilala sa tinig ng device. Ipinapadala sa Kilo Gateway ang iyong recording.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Pagsama-samahin ang tawag ng kagamitan",
+    "condenseToolCallsSubtitle": "Pagsama-samahin ang magkakasunod na tawag ng kagamitan sa isang hilera na mabubuksan mo."
   },
   "prReview": {
     "pullRequestUnavailable": "Hindi mabuksan ang pull request",
@@ -1996,6 +2000,22 @@
       "connectionLost": "Nawala ang koneksyon",
       "retryConnection": "Subukang kumonekta muli"
     },
+    "goal": {
+      "title": "Layunin",
+      "statusActive": "Aktibong layunin",
+      "statusPaused": "Nakapausang layunin",
+      "statusComplete": "Kumpleto ang layunin",
+      "statusBlocked": "Naharang ang layunin",
+      "edit": "I-edit ang layunin",
+      "remove": "Alisin ang layunin",
+      "pause": "I-pause ang layunin",
+      "resume": "Ipagpatuloy ang layunin",
+      "editPlaceholder": "Ilarawan ang layunin",
+      "removeConfirmTitle": "Alisin ang layunin?",
+      "removeConfirmMessage": "Kinaklaro ng CLI ang layunin ng session na ito.",
+      "updateFailed": "Hindi na-update ang layunin.",
+      "sectionAccessibility": "{{status}}. Layunin: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Ikonekta ang GitHub sa iyong browser, saka bumalik dito para pumili ng imbakan ng code.",
       "openGithub": "Buksan ang GitHub",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "{{steps}} na hakbang",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Auto-apruba",
+      "description": "Awtomatikong aprubahan ang mga kahilingan sa pahintulot para sa sesyong ito. Pagkatapos, tatakbo ang mga tool nang walang prompt.",
+      "unavailable": "Hindi makakatanggap ng mga kahilingan sa pahintulot ang sesyong ito."
+    },
     "prBadge": {
       "open": "buksan ang PR",
       "closed": "nakasarang pull request",
@@ -2469,6 +2494,10 @@
       "tapToListHint": "I-tap ang isang direktoryo para makita ang mga laman nito.",
       "unsupportedDescription": "Hindi kayang maglista ng mga direktoryo ang CLI na ito. I-tap ang Tapos para panatilihin ang panimulang direktoryo, saka ang Simulan ang sesyon para magsimula roon.",
       "unsupportedTitle": "Hindi mailista ang mga direktoryo"
+    },
+    "toolRun": {
+      "sheetTitle": "Mga tawag ng kagamitan",
+      "condensedLabel": "{{itemCount}} item; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "Hindi magagamit ang modelong ito para sa pagsasalin ng boses sa teksto. Pumili ng iba sa Mga kagustuhan.",
     "gatewayModelUnavailableNotice": "Hindi na inaalok ang modelong ito. I-tap ang $t(transcriptionModel.title) para pumili ng iba.",
     "gatewaySignInRequired": "Mag-sign in para gamitin ang pagsasalin ng boses sa teksto gamit ang Kilo Gateway.",
-    "gatewayNoModel": "Pumili muna ng modelo para sa pagsasalin ng boses sa teksto sa Mga kagustuhan."
+    "gatewayNoModel": "Pumili muna ng modelo para sa pagsasalin ng boses sa teksto sa Mga kagustuhan.",
+    "testTitle": "Subukan ang pagdikta",
+    "testPlaceholder": "I-tap ang mikropono at magsimulang magsalita.",
+    "testClear": "I-clear ang text"
   },
   "share": {
     "title": "Pagbabahagi sa Kilo",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "Walang modelo para sa pagsasalin ng boses sa teksto",
     "emptyDescription": "Walang iniaalok na modelo para sa pagsasalin ng boses sa teksto ang Kilo Gateway ngayon.",
     "loadFailed": "Hindi ma-load ang mga modelo para sa pagsasalin ng boses sa teksto."
+  },
+  "voiceLanguage": {
+    "title": "Wika ng pagdikta",
+    "automatic": "Awtomatiko",
+    "loadFailed": "Hindi ma-load ang mga wikang sinusuportahan ng device na ito.",
+    "emptyTitle": "Walang sinusuportahang wika",
+    "emptyDescription": "Walang sinusuportahang wikang iniuulat ng pagkilala sa pagsasalita ng device na ito."
   }
 }

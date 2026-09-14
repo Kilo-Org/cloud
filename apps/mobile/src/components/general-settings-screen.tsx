@@ -1,4 +1,12 @@
-import { Brain, CornerDownLeft, MessageSquare, Shield, Smartphone } from '@/components/ui/icons';
+import {
+  Brain,
+  CornerDownLeft,
+  EyeOff,
+  MessageSquare,
+  Rows3,
+  Shield,
+  Smartphone,
+} from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -7,6 +15,8 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { useAppUnlock } from '@/lib/app-unlock-context';
+import { useCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
+import { useHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
@@ -26,6 +36,11 @@ export function GeneralSettingsScreen() {
     setDefaultExpanded,
   } = useReasoningPreference();
   const {
+    hideThinking,
+    hasLoaded: hideThinkingLoaded,
+    setHideThinking,
+  } = useHideThinkingPreference();
+  const {
     keepScreenOn,
     hasLoaded: keepScreenOnLoaded,
     setKeepScreenOn,
@@ -37,6 +52,11 @@ export function GeneralSettingsScreen() {
   } = usePrReviewFooterPreference();
   const { returnSendsMessage, hasLoaded, setReturnSendsMessage } =
     useReturnSendsMessagePreference();
+  const {
+    condenseToolCalls,
+    hasLoaded: condenseToolCallsLoaded,
+    setCondenseToolCalls,
+  } = useCondenseToolCallsPreference();
   const { t } = useTranslation();
 
   return (
@@ -66,6 +86,22 @@ export function GeneralSettingsScreen() {
           value={defaultExpanded}
           disabled={!reasoningLoaded}
           onValueChange={setDefaultExpanded}
+        />
+        <PreferenceRow
+          icon={EyeOff}
+          title={t('preferences.hideThinking')}
+          subtitle={t('preferences.hideThinkingSubtitle')}
+          value={hideThinking}
+          disabled={!hideThinkingLoaded}
+          onValueChange={setHideThinking}
+        />
+        <PreferenceRow
+          icon={Rows3}
+          title={t('preferences.condenseToolCalls')}
+          subtitle={t('preferences.condenseToolCallsSubtitle')}
+          value={condenseToolCalls}
+          disabled={!condenseToolCallsLoaded}
+          onValueChange={setCondenseToolCalls}
         />
         <PreferenceRow
           icon={Smartphone}

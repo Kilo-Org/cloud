@@ -231,6 +231,8 @@
     "voiceInput": "إدخال صوتي",
     "autoExpandThinking": "عرض تفاصيل التفكير تلقائيًا",
     "autoExpandThinkingSubtitle": "عرض تفاصيل تفكير الوكيل عند انتهائه.",
+    "hideThinking": "إخفاء تفاصيل التفكير",
+    "hideThinkingSubtitle": "عدم عرض تفكير الوكيل في صفحة الجلسة.",
     "keepScreenOn": "إبقاء الشاشة مضاءة في صفحة الجلسة",
     "keepScreenOnSubtitle": "إبقاء الشاشة مضاءة أثناء تشغيل الجلسة.",
     "appearance": "المظهر",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "التفريغ الصوتي عبر Kilo Gateway",
     "gatewayTranscriptionSubtitle": "حوّل الإدخال الصوتي إلى نص باستخدام أحد نماذج Kilo Gateway بدلاً من التعرف على الكلام في جهازك. يُرسل تسجيلك إلى Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ضغط استدعاءات الأدوات",
+    "condenseToolCallsSubtitle": "جمّع استدعاءات الأدوات المتتالية في صف واحد يمكنك فتحه."
   },
   "notifications": {
     "liveActivities": "الأنشطة المباشرة",
@@ -1598,6 +1602,22 @@
       "connectionLost": "انقطع الاتصال",
       "retryConnection": "إعادة محاولة الاتصال"
     },
+    "goal": {
+      "title": "الهدف",
+      "statusActive": "هدف نشط",
+      "statusPaused": "هدف متوقف مؤقتًا",
+      "statusComplete": "اكتمل الهدف",
+      "statusBlocked": "الهدف محظور",
+      "edit": "تعديل الهدف",
+      "remove": "إزالة الهدف",
+      "pause": "إيقاف الهدف مؤقتًا",
+      "resume": "استئناف الهدف",
+      "editPlaceholder": "صف الهدف",
+      "removeConfirmTitle": "إزالة الهدف؟",
+      "removeConfirmMessage": "يمسح CLI هدف هذه الجلسة.",
+      "updateFailed": "تعذّر تحديث الهدف.",
+      "sectionAccessibility": "{{status}}. الهدف: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "اربط حسابك على GitHub من المتصفح، ثم عد إلى هنا لاختيار مستودع.",
       "openGithub": "فتح GitHub",
@@ -2061,6 +2081,11 @@
       "stepsCount_few": "{{steps}} خطوات",
       "stepsCount_many": "{{steps}} خطوةً"
     },
+    "autoApprove": {
+      "title": "الموافقة التلقائية",
+      "description": "الموافقة على طلبات الإذن لهذه الجلسة تلقائيًا. عندئذٍ تعمل الأدوات دون طلب.",
+      "unavailable": "لا يمكن لهذه الجلسة استقبال طلبات الإذن."
+    },
     "prBadge": {
       "open": "فتح طلب السحب",
       "closed": "طلب سحب مغلق",
@@ -2091,6 +2116,10 @@
       "tapToListHint": "اضغط على مجلد لعرض محتوياته.",
       "unsupportedDescription": "إصدار CLI هذا لا يدعم عرض المجلدات. اضغط على «تم» للاحتفاظ بمجلد بدء التشغيل، ثم على «بدء الجلسة» لبدء الجلسة فيه.",
       "unsupportedTitle": "لا يمكن عرض المجلدات"
+    },
+    "toolRun": {
+      "sheetTitle": "استدعاءات الأدوات",
+      "condensedLabel": "{{itemCount}} عناصر؛ {{last}}"
     }
   },
   "bootstrap": {
@@ -2203,7 +2232,10 @@
     "gatewayModelUnavailable": "نموذج التفريغ الصوتي هذا غير متاح. اختر نموذجًا آخر من التفضيلات.",
     "gatewayModelUnavailableNotice": "لم يعد هذا النموذج معروضًا. اضغط على $t(transcriptionModel.title) لاختيار نموذج آخر.",
     "gatewaySignInRequired": "سجّل الدخول لاستخدام التفريغ الصوتي عبر Kilo Gateway.",
-    "gatewayNoModel": "اختر نموذج التفريغ الصوتي في التفضيلات أولًا."
+    "gatewayNoModel": "اختر نموذج التفريغ الصوتي في التفضيلات أولًا.",
+    "testTitle": "اختبار الإدخال الصوتي",
+    "testPlaceholder": "اضغط على الميكروفون وابدأ التحدث.",
+    "testClear": "مسح النص"
   },
   "share": {
     "title": "المشاركة مع Kilo",
@@ -3058,5 +3090,12 @@
     "emptyTitle": "لا توجد نماذج تفريغ صوتي",
     "emptyDescription": "لا يقدّم Kilo Gateway أي نماذج تفريغ صوتي في الوقت الحالي.",
     "loadFailed": "تعذّر تحميل نماذج التفريغ الصوتي."
+  },
+  "voiceLanguage": {
+    "title": "لغة الإدخال الصوتي",
+    "automatic": "تلقائي",
+    "loadFailed": "تعذّر تحميل اللغات التي يدعمها هذا الجهاز.",
+    "emptyTitle": "لا توجد لغات مدعومة",
+    "emptyDescription": "لا يفيد التعرّف على الكلام في هذا الجهاز بأي لغة مدعومة."
   }
 }

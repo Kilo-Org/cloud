@@ -2,9 +2,8 @@
 // visible without opening the tab. No count (the PR query is still loading) and
 // a zero count both draw nothing — a "0" badge is noise, not information.
 
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to test React/RN structure under vitest */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import type * as ReactI18next from 'react-i18next';

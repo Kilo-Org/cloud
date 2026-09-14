@@ -231,6 +231,8 @@
     "voiceInput": "Φωνητική εισαγωγή",
     "autoExpandThinking": "Αυτόματη ανάπτυξη σκέψης",
     "autoExpandThinkingSubtitle": "Εμφανίζει ολόκληρη τη σκέψη του πράκτορα μόλις ολοκληρωθεί.",
+    "hideThinking": "Απόκρυψη λεπτομερειών σκέψης",
+    "hideThinkingSubtitle": "Να μην εμφανίζεται η σκέψη του πράκτορα στη σελίδα συνεδρίας.",
     "keepScreenOn": "Διατήρηση ενεργής οθόνης στη σελίδα συνεδρίας",
     "keepScreenOnSubtitle": "Διατηρεί την οθόνη ενεργή όσο εκτελείται η συνεδρία.",
     "appearance": "Εμφάνιση",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Απομαγνητοφώνηση μέσω Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Η φωνητική πληκτρολόγηση μετατρέπεται σε κείμενο με ένα μοντέλο του Kilo Gateway αντί για την αναγνώριση ομιλίας της συσκευής. Η ηχογράφηση αποστέλλεται στο Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Συμπίεση κλήσεων εργαλείων",
+    "condenseToolCallsSubtitle": "Ομαδοποιήστε διαδοχικές κλήσεις εργαλείων σε μία γραμμή που μπορείτε να ανοίξετε."
   },
   "prReview": {
     "pullRequestUnavailable": "Μη διαθέσιμο αίτημα ενσωμάτωσης",
@@ -1996,6 +2000,22 @@
       "connectionLost": "Χάθηκε η σύνδεση",
       "retryConnection": "Επανάληψη σύνδεσης"
     },
+    "goal": {
+      "title": "Στόχος",
+      "statusActive": "Ενεργός στόχος",
+      "statusPaused": "Στόχος σε παύση",
+      "statusComplete": "Ο στόχος ολοκληρώθηκε",
+      "statusBlocked": "Ο στόχος μπλοκαρίστηκε",
+      "edit": "Επεξεργασία στόχου",
+      "remove": "Αφαίρεση στόχου",
+      "pause": "Παύση στόχου",
+      "resume": "Συνέχιση στόχου",
+      "editPlaceholder": "Περιγράψτε τον στόχο",
+      "removeConfirmTitle": "Αφαίρεση στόχου;",
+      "removeConfirmMessage": "Το CLI καθαρίζει τον στόχο αυτής της συνεδρίας.",
+      "updateFailed": "Δεν ήταν δυνατή η ενημέρωση του στόχου.",
+      "sectionAccessibility": "{{status}}. Στόχος: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Σύνδεσε το GitHub από το πρόγραμμα περιήγησης και μετά επέστρεψε εδώ για να επιλέξεις ένα αποθετήριο.",
       "openGithub": "Άνοιγμα GitHub",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "{{steps}} βήματα",
       "modelAccessibilityLabel": "Μοντέλο {{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Αυτόματη έγκριση",
+      "description": "Αυτόματη έγκριση των αιτημάτων άδειας για αυτή τη συνεδρία. Στη συνέχεια, τα εργαλεία εκτελούνται χωρίς προτροπή.",
+      "unavailable": "Αυτή η συνεδρία δεν μπορεί να λαμβάνει αιτήματα άδειας."
+    },
     "prBadge": {
       "open": "άνοιγμα αιτήματος ενσωμάτωσης",
       "closed": "κλειστό αίτημα ενσωμάτωσης",
@@ -2469,6 +2494,10 @@
       "retryableDescription": "Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά. Μπορείς ακόμα να πατήσεις «Τέλος» για να επιλέξεις αυτόν τον φάκελο.",
       "unsupportedTitle": "Δεν είναι δυνατή η εμφάνιση των φακέλων",
       "unsupportedDescription": "Αυτό το CLI δεν μπορεί να εμφανίσει τους φακέλους. Πάτησε «Τέλος» για να κρατήσεις τον φάκελο εκκίνησης και «Έναρξη συνεδρίας» για να ξεκινήσεις εκεί."
+    },
+    "toolRun": {
+      "sheetTitle": "Κλήσεις εργαλείων",
+      "condensedLabel": "{{itemCount}} στοιχεία; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "Αυτό το μοντέλο απομαγνητοφώνησης δεν είναι διαθέσιμο. Διάλεξε άλλο στις Προτιμήσεις.",
     "gatewayModelUnavailableNotice": "Αυτό το μοντέλο δεν προσφέρεται πλέον. Πατήστε $t(transcriptionModel.title) για να διαλέξετε άλλο.",
     "gatewaySignInRequired": "Συνδέσου για να χρησιμοποιήσεις την απομαγνητοφώνηση μέσω Kilo Gateway.",
-    "gatewayNoModel": "Διάλεξε πρώτα ένα μοντέλο απομαγνητοφώνησης στις Προτιμήσεις."
+    "gatewayNoModel": "Διάλεξε πρώτα ένα μοντέλο απομαγνητοφώνησης στις Προτιμήσεις.",
+    "testTitle": "Δοκιμή φωνητικής πληκτρολόγησης",
+    "testPlaceholder": "Πατήστε το μικρόφωνο και αρχίστε να μιλάτε.",
+    "testClear": "Εκκαθάριση κειμένου"
   },
   "share": {
     "title": "Κοινοποίηση στο Kilo",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "Δεν υπάρχουν μοντέλα απομαγνητοφώνησης",
     "emptyDescription": "Το Kilo Gateway δεν προσφέρει αυτή τη στιγμή μοντέλα απομαγνητοφώνησης.",
     "loadFailed": "Δεν ήταν δυνατή η φόρτωση των μοντέλων απομαγνητοφώνησης."
+  },
+  "voiceLanguage": {
+    "title": "Γλώσσα φωνητικής πληκτρολόγησης",
+    "automatic": "Αυτόματη",
+    "loadFailed": "Δεν ήταν δυνατή η φόρτωση των γλωσσών που υποστηρίζει αυτή η συσκευή.",
+    "emptyTitle": "Καμία υποστηριζόμενη γλώσσα",
+    "emptyDescription": "Η αναγνώριση ομιλίας αυτής της συσκευής δεν αναφέρει καμία υποστηριζόμενη γλώσσα."
   }
 }

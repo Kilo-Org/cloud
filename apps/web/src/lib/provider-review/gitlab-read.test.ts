@@ -288,6 +288,37 @@ describe('getMergeRequest', () => {
     expect(summary.additions).toBe(50 * 3 + 2);
     expect(summary.deletions).toBe(50 * 3 + 1);
   });
+
+  it('folds each page into the counters as it arrives and stops at the page bound', async () => {
+    // Every page is full, so the walk runs to the bound instead of ending
+    // early. The counts must cover all of them even though no page is kept:
+    // the fold reads a page once and drops it before fetching the next.
+    const fullPage = Array.from({ length: 50 }, (_, index) => ({
+      old_path: `src/${index}.ts`,
+      new_path: `src/${index}.ts`,
+      new_file: false,
+      renamed_file: false,
+      deleted_file: false,
+      diff: '@@ -1 +1 @@\n-old\n+new\n',
+    }));
+    const requestedPages: string[] = [];
+    fetchMock.mockImplementation(url => {
+      const parsed = new URL(String(url));
+      if (parsed.pathname.endsWith('/diffs')) {
+        requestedPages.push(parsed.searchParams.get('page') ?? '');
+        return Promise.resolve(jsonResponse(fullPage));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
+
+    expect(requestedPages).toHaveLength(20);
+    expect(requestedPages[19]).toBe('20');
+    expect(summary.additions).toBe(50 * 20);
+    expect(summary.deletions).toBe(50 * 20);
+    expect(summary.changedFiles).toBe(1000);
+  });
 });
 
 describe('listChangedFiles', () => {

@@ -408,23 +408,25 @@ export async function getMergeRequest(
     // Counts come from the diffs. Fold every page GitLab will serve — it caps
     // a merge request's diff collection at the project's `diff_max_files`
     // (1000 by default), which the page bound covers — so a large merge
-    // request reports complete totals instead of its first 150 files.
-    const files: GitLabDiff[] = [];
-    for (let page = 1; page <= MAX_SUMMARY_DIFFSTAT_PAGES; page++) {
-      const diffs = await fetchDiffPage(access, mrIid, page);
-      files.push(...diffs);
-      if (diffs.length < GITLAB_PAGE_SIZE) break;
-    }
+    // request reports complete totals instead of its first 150 files. Each page
+    // is folded into the running counters the moment it arrives and dropped, so
+    // the walk never holds the parsed diff text it only reads once.
+    let diffFileCount = 0;
     let additions = 0;
     let deletions = 0;
-    for (const file of files) {
-      const counts = diffLineCounts(file.diff ?? '');
-      additions += counts.additions;
-      deletions += counts.deletions;
+    for (let page = 1; page <= MAX_SUMMARY_DIFFSTAT_PAGES; page++) {
+      const diffs = await fetchDiffPage(access, mrIid, page);
+      for (const file of diffs) {
+        const counts = diffLineCounts(file.diff ?? '');
+        additions += counts.additions;
+        deletions += counts.deletions;
+      }
+      diffFileCount += diffs.length;
+      if (diffs.length < GITLAB_PAGE_SIZE) break;
     }
     // Prefer the MR's own total: the diff walk is capped even after the page
     // bound is raised, and `changes_count` covers every file GitLab counted.
-    const changedFiles = Math.max(parseChangesCount(detail.changes_count) ?? 0, files.length);
+    const changedFiles = Math.max(parseChangesCount(detail.changes_count) ?? 0, diffFileCount);
     return {
       ref: {
         platform: 'gitlab',

@@ -8,9 +8,8 @@
 //      fetch-to-completion loads the remaining pages.
 
 /* eslint-disable max-lines -- cohesive component-test suite for the navigator fetch rules */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import { createElement, Fragment, type ReactElement } from 'react';
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -45,7 +44,9 @@ vi.mock('@shopify/flash-list', () => ({
     return createElement(
       Fragment,
       null,
-      data.map((item, index) => renderItem({ item, index }))
+      data.map((item, index) =>
+        createElement(Fragment, { key: index }, renderItem({ item, index }))
+      )
     );
   },
 }));

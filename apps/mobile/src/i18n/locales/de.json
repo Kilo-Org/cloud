@@ -231,6 +231,8 @@
     "voiceInput": "Spracheingabe",
     "autoExpandThinking": "Denkprozess automatisch aufklappen",
     "autoExpandThinkingSubtitle": "Den Denkprozess des Agenten nach Abschluss aufgeklappt anzeigen.",
+    "hideThinking": "Denkdetails ausblenden",
+    "hideThinkingSubtitle": "Den Denkprozess des Agenten nicht auf der Sitzungsseite anzeigen.",
     "keepScreenOn": "Bildschirm in der Sitzungsansicht eingeschaltet lassen",
     "keepScreenOnSubtitle": "Den Bildschirm eingeschaltet lassen, solange die Sitzung läuft.",
     "appearance": "Erscheinungsbild",
@@ -1561,6 +1563,22 @@
       "reconnecting": "Verbindung wird wiederhergestellt…",
       "connectionLost": "Verbindung unterbrochen",
       "retryConnection": "Erneut verbinden"
+    },
+    "goal": {
+      "title": "Ziel",
+      "statusActive": "Aktives Ziel",
+      "statusPaused": "Pausiertes Ziel",
+      "statusComplete": "Ziel abgeschlossen",
+      "statusBlocked": "Ziel blockiert",
+      "edit": "Ziel bearbeiten",
+      "remove": "Ziel entfernen",
+      "pause": "Ziel pausieren",
+      "resume": "Ziel fortsetzen",
+      "editPlaceholder": "Ziel beschreiben",
+      "removeConfirmTitle": "Ziel entfernen?",
+      "removeConfirmMessage": "Die CLI löscht das Ziel dieser Sitzung.",
+      "updateFailed": "Das Ziel konnte nicht aktualisiert werden.",
+      "sectionAccessibility": "{{status}}. Ziel: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Verbinde GitHub in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",

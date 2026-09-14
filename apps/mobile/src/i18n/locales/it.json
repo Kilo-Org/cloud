@@ -1542,6 +1542,22 @@
       "connectionLost": "Connessione persa",
       "retryConnection": "Riprova a connetterti"
     },
+    "goal": {
+      "title": "Obiettivo",
+      "statusActive": "Obiettivo attivo",
+      "statusPaused": "Obiettivo in pausa",
+      "statusComplete": "Obiettivo completato",
+      "statusBlocked": "Obiettivo bloccato",
+      "edit": "Modifica obiettivo",
+      "remove": "Rimuovi obiettivo",
+      "pause": "Metti in pausa l'obiettivo",
+      "resume": "Riprendi l'obiettivo",
+      "editPlaceholder": "Descrivi l'obiettivo",
+      "removeConfirmTitle": "Rimuovere l'obiettivo?",
+      "removeConfirmMessage": "Il CLI cancella l'obiettivo di questa sessione.",
+      "updateFailed": "Impossibile aggiornare l'obiettivo.",
+      "sectionAccessibility": "{{status}}. Obiettivo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Collega GitHub nel browser, poi torna qui per scegliere un repository.",
       "openGithub": "Apri GitHub",
@@ -2035,6 +2051,8 @@
     "voiceInput": "Input vocale",
     "autoExpandThinking": "Espandi automaticamente il ragionamento",
     "autoExpandThinkingSubtitle": "Mostra il ragionamento completo dell'agente al termine dell'elaborazione.",
+    "hideThinking": "Nascondi i dettagli del ragionamento",
+    "hideThinkingSubtitle": "Non mostrare il ragionamento dell'agente nella schermata della sessione.",
     "keepScreenOn": "Mantieni lo schermo acceso nella schermata della sessione",
     "keepScreenOnSubtitle": "Mantieni lo schermo acceso mentre la sessione è in esecuzione.",
     "appearance": "Aspetto",

@@ -231,6 +231,8 @@
     "voiceInput": "Fampidirana feo",
     "autoExpandThinking": "Velaro ho azy ny fisainana",
     "autoExpandThinkingSubtitle": "Asehoy mivelatra ny fisainan'ny mpanampy rehefa vita izany.",
+    "hideThinking": "Afeno ny antsipirian'ny fisainana",
+    "hideThinkingSubtitle": "Aza aseho ny fisainan'ny mpanampy eo amin'ny pejin'ny fotoam-piasana.",
     "keepScreenOn": "Avelao hirehitra ny efijery eo amin'ny pejin'ny fotoam-piasana",
     "keepScreenOnSubtitle": "Avelao hirehitra ny efijery raha mbola mandeha ny fotoam-piasana.",
     "appearance": "Bika",
@@ -1995,6 +1997,22 @@
       "reconnecting": "Mampifandray indray…",
       "connectionLost": "Tapaka ny fifandraisana",
       "retryConnection": "Andramo mifandray indray"
+    },
+    "goal": {
+      "title": "Tanjona",
+      "statusActive": "Tanjona mavitrika",
+      "statusPaused": "Tanjona mihajanona",
+      "statusComplete": "Tanjona vita",
+      "statusBlocked": "Tanjona voasakana",
+      "edit": "Ovay ny tanjona",
+      "remove": "Esory ny tanjona",
+      "pause": "Ajanony ny tanjona",
+      "resume": "Tohizo ny tanjona",
+      "editPlaceholder": "Farano ny tanjona",
+      "removeConfirmTitle": "Esorina ny tanjona?",
+      "removeConfirmMessage": "Mamafa ny tanjon'ity session ity ny CLI.",
+      "updateFailed": "Tsy afaka nanavao ny tanjona.",
+      "sectionAccessibility": "{{status}}. Tanjona: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Ampifandraiso ny GitHub ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody.",

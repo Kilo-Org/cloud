@@ -231,6 +231,8 @@
     "voiceInput": "Galtee sagalee",
     "autoExpandThinking": "Xiinxala ofumaan bal'isi",
     "autoExpandThinkingSubtitle": "Yeroo ergamaan xiinxala isaa xumuru, bal'isiitii agarsiisi.",
+    "hideThinking": "Bal'ina xiinxala dhoksi",
+    "hideThinkingSubtitle": "Fuula turtii irratti xiinxala ergamaa hin agarsiisi.",
     "keepScreenOn": "Fuula turtii irra yeroo jirtu iskiriiniin akka hin dhaamne godhi",
     "keepScreenOnSubtitle": "Hanga turtiin hojjechaa jirutti iskiriiniin akka hin dhaamne godhi.",
     "appearance": "Bifa",
@@ -1995,6 +1997,22 @@
       "reconnecting": "Deebi'ee walqabsiisaa jira…",
       "connectionLost": "Walqabannaan citeera",
       "retryConnection": "Deebi'ii walqabsiisuuf yaali"
+    },
+    "goal": {
+      "title": "Kaayyoo",
+      "statusActive": "Kaayyoo socho'aa",
+      "statusPaused": "Kaayyoo dhaabbate",
+      "statusComplete": "Kaayyoon xumurame",
+      "statusBlocked": "Kaayyoon cufame",
+      "edit": "Kaayyoo gulaali",
+      "remove": "Kaayyoo haqi",
+      "pause": "Kaayyoo dhaabi",
+      "resume": "Kaayyoo itti fufi",
+      "editPlaceholder": "Kaayyoo ibsi",
+      "removeConfirmTitle": "Kaayyoo haquu?",
+      "removeConfirmMessage": "CLI kaayyoo seesshinii kanaa haqa.",
+      "updateFailed": "Kaayyoo haaromsuun hin danda'amne.",
+      "sectionAccessibility": "{{status}}. Kaayyoo: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "GitHub biraawzarii kee keessatti walqabsiisi, sana booda kuusaa koodii filachuuf asitti deebi'i.",

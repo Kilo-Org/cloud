@@ -231,6 +231,8 @@
     "voiceInput": "Taleinndata",
     "autoExpandThinking": "Vis resonnering automatisk",
     "autoExpandThinkingSubtitle": "Vis hele agentens resonnement når det er ferdig.",
+    "hideThinking": "Skjul detaljer om resonnering",
+    "hideThinkingSubtitle": "Ikke vis agentens resonnering i øktvisningen.",
     "keepScreenOn": "Hold skjermen på i øktvisningen",
     "keepScreenOnSubtitle": "Hold skjermen på mens økten kjører.",
     "appearance": "Utseende",
@@ -1995,6 +1997,22 @@
       "reconnecting": "Kobler til på nytt…",
       "connectionLost": "Tilkoblingen er brutt",
       "retryConnection": "Prøv å koble til på nytt"
+    },
+    "goal": {
+      "title": "Mål",
+      "statusActive": "Aktivt mål",
+      "statusPaused": "Pauset mål",
+      "statusComplete": "Mål fullført",
+      "statusBlocked": "Mål blokkert",
+      "edit": "Rediger mål",
+      "remove": "Fjern mål",
+      "pause": "Sett målet på pause",
+      "resume": "Gjenoppta mål",
+      "editPlaceholder": "Beskriv målet",
+      "removeConfirmTitle": "Fjern mål?",
+      "removeConfirmMessage": "CLI sletter målet for denne økten.",
+      "updateFailed": "Målet kunne ikke oppdateres.",
+      "sectionAccessibility": "{{status}}. Mål: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Koble til GitHub i nettleseren. Gå deretter tilbake hit for å velge et kodelager.",

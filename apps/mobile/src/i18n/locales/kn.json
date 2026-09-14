@@ -231,6 +231,8 @@
     "voiceInput": "ಧ್ವನಿ ಇನ್ಪುಟ್",
     "autoExpandThinking": "ಯೋಚನೆಯನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ವಿಸ್ತರಿಸಿ",
     "autoExpandThinkingSubtitle": "ಏಜೆಂಟ್ ಯೋಚಿಸುವುದನ್ನು ಮುಗಿಸಿದಾಗ ಅದರ ಯೋಚನೆಯನ್ನು ವಿಸ್ತರಿಸಿ ತೋರಿಸಿ.",
+    "hideThinking": "ಯೋಚನೆಯ ವಿವರಗಳನ್ನು ಮರೆಮಾಡಿ",
+    "hideThinkingSubtitle": "ಸೆಶನ್ ಪುಟದಲ್ಲಿ ಏಜೆಂಟ್‌ನ ಯೋಚನೆಯನ್ನು ತೋರಿಸಬೇಡಿ.",
     "keepScreenOn": "ಸೆಶನ್ ಪುಟದಲ್ಲಿರುವಾಗ ಪರದೆಯನ್ನು ಆನ್ ಆಗಿರಿಸಿ",
     "keepScreenOnSubtitle": "ಸೆಶನ್ ಕಾರ್ಯನಿರ್ವಹಿಸುವಾಗ ಪರದೆ ಆಫ್ ಆಗದಂತೆ ಇರಿಸಿ.",
     "appearance": "ನೋಟ",
@@ -1995,6 +1997,22 @@
       "reconnecting": "ಮರುಸಂಪರ್ಕಿಸುತ್ತಿದೆ…",
       "connectionLost": "ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದೆ",
       "retryConnection": "ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಪ್ರಯತ್ನಿಸಿ"
+    },
+    "goal": {
+      "title": "ಗುರಿ",
+      "statusActive": "ಸಕ್ರಿಯ ಗುರಿ",
+      "statusPaused": "ವಿರಾಮಗೊಳಿಸಿದ ಗುರಿ",
+      "statusComplete": "ಗುರಿ ಪೂರ್ಣಗೊಂಡಿದೆ",
+      "statusBlocked": "ಗುರಿ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",
+      "edit": "ಗುರಿ ಸಂಪಾದಿಸಿ",
+      "remove": "ಗುರಿ ತೆಗೆದುಹಾಕಿ",
+      "pause": "ಗುರಿ ವಿರಾಮಗೊಳಿಸಿ",
+      "resume": "ಗುರಿ ಪುನರಾರಂಭಿಸಿ",
+      "editPlaceholder": "ಗುರಿಯನ್ನು ವಿವರಿಸಿ",
+      "removeConfirmTitle": "ಗುರಿ ತೆಗೆದುಹಾಕಬೇಕೆ?",
+      "removeConfirmMessage": "CLI ಈ ಅಧಿವೇಶನದ ಗುರಿಯನ್ನು ಅಳಿಸುತ್ತದೆ.",
+      "updateFailed": "ಗುರಿಯನ್ನು ನವೀಕರಿಸಲಾಗಲಿಲ್ಲ.",
+      "sectionAccessibility": "{{status}}. ಗುರಿ: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ GitHub ಸಂಪರ್ಕಿಸಿ. ನಂತರ ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",

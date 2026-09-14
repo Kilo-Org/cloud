@@ -231,6 +231,8 @@
     "voiceInput": "Glasovni vnos",
     "autoExpandThinking": "Samodejno razširi razmišljanje",
     "autoExpandThinkingSubtitle": "Ko agent konča razmišljanje, prikaži njegovo celotno vsebino.",
+    "hideThinking": "Skrij podrobnosti razmišljanja",
+    "hideThinkingSubtitle": "Ne prikazuj razmišljanja agenta na strani seje.",
     "keepScreenOn": "Ohrani zaslon vklopljen med ogledom seje",
     "keepScreenOnSubtitle": "Ohrani zaslon vklopljen med izvajanjem seje.",
     "appearance": "Videz",
@@ -2027,6 +2029,22 @@
       "reconnecting": "Ponovno povezovanje…",
       "connectionLost": "Povezava prekinjena",
       "retryConnection": "Znova vzpostavi povezavo"
+    },
+    "goal": {
+      "title": "Cilj",
+      "statusActive": "Aktivni cilj",
+      "statusPaused": "Zaustavljeni cilj",
+      "statusComplete": "Cilj dokončan",
+      "statusBlocked": "Cilj blokiran",
+      "edit": "Uredi cilj",
+      "remove": "Odstrani cilj",
+      "pause": "Zaustavi cilj",
+      "resume": "Nadaljuj cilj",
+      "editPlaceholder": "Opišite cilj",
+      "removeConfirmTitle": "Odstranim cilj?",
+      "removeConfirmMessage": "CLI izbriše cilj te seje.",
+      "updateFailed": "Cilja ni bilo mogoče posodobiti.",
+      "sectionAccessibility": "{{status}}. Cilj: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Poveži GitHub v brskalniku, nato se vrni sem in izberi skladišče.",

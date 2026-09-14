@@ -231,6 +231,8 @@
     "voiceInput": "Hlasový vstup",
     "autoExpandThinking": "Automaticky rozbaliť uvažovanie",
     "autoExpandThinkingSubtitle": "Po dokončení uvažovania agenta sa jeho obsah automaticky rozbalí.",
+    "hideThinking": "Skryť podrobnosti uvažovania",
+    "hideThinkingSubtitle": "Nezobrazovať uvažovanie agenta na stránke relácie.",
     "keepScreenOn": "Ponechať obrazovku zapnutú na stránke relácie",
     "keepScreenOnSubtitle": "Obrazovka zostane zapnutá, kým relácia beží.",
     "appearance": "Vzhľad",
@@ -2027,6 +2029,22 @@
       "reconnecting": "Znovu sa pripája…",
       "connectionLost": "Pripojenie sa prerušilo",
       "retryConnection": "Znova sa pripojiť"
+    },
+    "goal": {
+      "title": "Cieľ",
+      "statusActive": "Aktívny cieľ",
+      "statusPaused": "Pozastavený cieľ",
+      "statusComplete": "Cieľ dokončený",
+      "statusBlocked": "Cieľ zablokovaný",
+      "edit": "Upraviť cieľ",
+      "remove": "Odstrániť cieľ",
+      "pause": "Pozastaviť cieľ",
+      "resume": "Obnoviť cieľ",
+      "editPlaceholder": "Opíšte cieľ",
+      "removeConfirmTitle": "Odstrániť cieľ?",
+      "removeConfirmMessage": "CLI vymaže cieľ tejto relácie.",
+      "updateFailed": "Cieľ sa nepodarilo aktualizovať.",
+      "sectionAccessibility": "{{status}}. Cieľ: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Pripoj GitHub v prehliadači, potom sa sem vráť a vyber repozitár.",

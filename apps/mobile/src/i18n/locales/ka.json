@@ -231,6 +231,8 @@
     "voiceInput": "ხმოვანი შეყვანა",
     "autoExpandThinking": "მსჯელობის ავტომატურად გაშლა",
     "autoExpandThinkingSubtitle": "აგენტის მსჯელობა დასრულებისთანავე გაშლილად გამოჩნდება.",
+    "hideThinking": "მსჯელობის დეტალების დამალვა",
+    "hideThinkingSubtitle": "არ აჩვენო აგენტის მსჯელობა სესიის გვერდზე.",
     "keepScreenOn": "სესიის გვერდზე ეკრანის ჩართულად დატოვება",
     "keepScreenOnSubtitle": "სესიის მუშაობისას ეკრანი ჩართული დარჩება.",
     "appearance": "იერსახე",
@@ -1995,6 +1997,22 @@
       "reconnecting": "ხელახლა დაკავშირება…",
       "connectionLost": "კავშირი გაწყდა",
       "retryConnection": "ხელახლა დაკავშირება"
+    },
+    "goal": {
+      "title": "მიზანი",
+      "statusActive": "აქტიური მიზანი",
+      "statusPaused": "შეჩერებული მიზანი",
+      "statusComplete": "მიზანი დასრულებულია",
+      "statusBlocked": "მიზანი დაბლოკილია",
+      "edit": "მიზნის რედაქტირება",
+      "remove": "მიზნის წაშლა",
+      "pause": "მიზნის შეჩერება",
+      "resume": "მიზნის გაგრძელება",
+      "editPlaceholder": "აღწერეთ მიზანი",
+      "removeConfirmTitle": "წავშალოთ მიზანი?",
+      "removeConfirmMessage": "CLI ასუფთავებს ამ სესიის მიზანს.",
+      "updateFailed": "მიზნის განახლება ვერ მოხერხდა.",
+      "sectionAccessibility": "{{status}}. მიზანი: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "ბრაუზერში დააკავშირეთ GitHub-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",

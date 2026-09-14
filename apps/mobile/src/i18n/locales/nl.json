@@ -231,6 +231,8 @@
     "voiceInput": "Spraakinvoer",
     "autoExpandThinking": "Gedachtegang automatisch uitvouwen",
     "autoExpandThinkingSubtitle": "Toon de volledige gedachtegang van de agent zodra die klaar is met nadenken.",
+    "hideThinking": "Details van gedachtegang verbergen",
+    "hideThinkingSubtitle": "Toon de gedachtegang van de agent niet op de sessiepagina.",
     "keepScreenOn": "Scherm aanhouden op de sessiepagina",
     "keepScreenOnSubtitle": "Houd het scherm aan zolang de sessie actief is.",
     "appearance": "Weergave",
@@ -1561,6 +1563,22 @@
       "reconnecting": "Opnieuw verbinden…",
       "connectionLost": "Verbinding verbroken",
       "retryConnection": "Opnieuw verbinden"
+    },
+    "goal": {
+      "title": "Doel",
+      "statusActive": "Actief doel",
+      "statusPaused": "Gepauzeerd doel",
+      "statusComplete": "Doel voltooid",
+      "statusBlocked": "Doel geblokkeerd",
+      "edit": "Doel bewerken",
+      "remove": "Doel verwijderen",
+      "pause": "Doel pauzeren",
+      "resume": "Doel hervatten",
+      "editPlaceholder": "Beschrijf het doel",
+      "removeConfirmTitle": "Doel verwijderen?",
+      "removeConfirmMessage": "De CLI wist het doel van deze sessie.",
+      "updateFailed": "Het doel kon niet worden bijgewerkt.",
+      "sectionAccessibility": "{{status}}. Doel: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Koppel GitHub in je browser en kom hier terug om een repository te kiezen.",

@@ -231,6 +231,8 @@
     "voiceInput": "Antre vwa",
     "autoExpandThinking": "Montre refleksyon yo otomatikman",
     "autoExpandThinkingSubtitle": "Montre tout refleksyon ajan an lè li fin reflechi.",
+    "hideThinking": "Kache detay refleksyon yo",
+    "hideThinkingSubtitle": "Pa montre refleksyon ajan an sou paj sesyon an.",
     "keepScreenOn": "Kenbe ekran an limen sou paj sesyon an",
     "keepScreenOnSubtitle": "Kenbe ekran an limen pandan sesyon an ap travay.",
     "appearance": "Aparans",
@@ -1995,6 +1997,22 @@
       "reconnecting": "Ap rekonekte…",
       "connectionLost": "Koneksyon an koupe",
       "retryConnection": "Rekonekte"
+    },
+    "goal": {
+      "title": "Objektif",
+      "statusActive": "Objektif aktif",
+      "statusPaused": "Objektif an pòz",
+      "statusComplete": "Objektif fini",
+      "statusBlocked": "Objektif bloke",
+      "edit": "Modifye objektif la",
+      "remove": "Retire objektif la",
+      "pause": "Mete objektif la an pòz",
+      "resume": "Rekòmanse objektif la",
+      "editPlaceholder": "Dekri objektif la",
+      "removeConfirmTitle": "Retire objektif la?",
+      "removeConfirmMessage": "CLI a efase objektif sesyon sa a.",
+      "updateFailed": "Pa t kapab mete objektif la ajou.",
+      "sectionAccessibility": "{{status}}. Objektif: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Konekte GitHub nan navigatè ou a, epi tounen isit la pou chwazi yon depo.",

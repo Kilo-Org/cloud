@@ -231,6 +231,8 @@
     "voiceInput": "Голосовой ввод",
     "autoExpandThinking": "Автоматически раскрывать рассуждения",
     "autoExpandThinkingSubtitle": "Показывать рассуждения агента целиком, когда он закончит обдумывание.",
+    "hideThinking": "Скрыть подробности рассуждений",
+    "hideThinkingSubtitle": "Не показывать рассуждения агента на странице сеанса.",
     "keepScreenOn": "Не выключать экран на странице сеанса",
     "keepScreenOnSubtitle": "Не выключать экран, пока сеанс выполняется.",
     "appearance": "Внешний вид",
@@ -1579,6 +1581,22 @@
       "reconnecting": "Переподключение…",
       "connectionLost": "Соединение прервано",
       "retryConnection": "Повторить подключение"
+    },
+    "goal": {
+      "title": "Цель",
+      "statusActive": "Активная цель",
+      "statusPaused": "Цель на паузе",
+      "statusComplete": "Цель достигнута",
+      "statusBlocked": "Цель заблокирована",
+      "edit": "Изменить цель",
+      "remove": "Удалить цель",
+      "pause": "Приостановить цель",
+      "resume": "Возобновить цель",
+      "editPlaceholder": "Опишите цель",
+      "removeConfirmTitle": "Удалить цель?",
+      "removeConfirmMessage": "CLI очищает цель этой сессии.",
+      "updateFailed": "Не удалось обновить цель.",
+      "sectionAccessibility": "{{status}}. Цель: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Подключите GitHub в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",

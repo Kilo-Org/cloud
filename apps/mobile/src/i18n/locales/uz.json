@@ -231,6 +231,8 @@
     "voiceInput": "Ovozli kiritish",
     "autoExpandThinking": "Fikrlash matnini avtomatik ochish",
     "autoExpandThinkingSubtitle": "Agent fikrlashni tugatgach, fikrlash matnini to'liq ko'rsatish.",
+    "hideThinking": "Fikrlash tafsilotlarini yashirish",
+    "hideThinkingSubtitle": "Agentning fikrlashini sessiya sahifasida ko'rsatmaslik.",
     "keepScreenOn": "Sessiya sahifasida ekranni o'chirmaslik",
     "keepScreenOnSubtitle": "Sessiya ishlayotganda ekranni yoqilgan holda saqlash.",
     "appearance": "Ko'rinish",

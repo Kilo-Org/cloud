@@ -231,6 +231,8 @@
     "voiceInput": "वॉइस इनपुट",
     "autoExpandThinking": "विचार प्रक्रिया अपने आप खोलें",
     "autoExpandThinkingSubtitle": "एजेंट की विचार प्रक्रिया पूरी होने पर उसका पूरा विवरण दिखाएँ।",
+    "hideThinking": "विचार प्रक्रिया का विवरण छिपाएँ",
+    "hideThinkingSubtitle": "सत्र पेज पर एजेंट की विचार प्रक्रिया न दिखाएँ।",
     "keepScreenOn": "सत्र पेज पर स्क्रीन चालू रखें",
     "keepScreenOnSubtitle": "सत्र में काम चलने के दौरान स्क्रीन चालू रखें।",
     "appearance": "दिखावट",

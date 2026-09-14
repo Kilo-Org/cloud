@@ -231,6 +231,8 @@
     "voiceInput": "Gelitaanka codka",
     "autoExpandThinking": "Si toos ah u ballaari fikirka",
     "autoExpandThinkingSubtitle": "Muuji qoraalka fikirka wakiilka oo fidsan marka uu dhammaado.",
+    "hideThinking": "Qari faahfaahinta fikirka",
+    "hideThinkingSubtitle": "Ha muujin fikirka wakiilka bogga kalfadhiga.",
     "keepScreenOn": "Shaashadda shid inta bogga kalfadhigu furan yahay",
     "keepScreenOnSubtitle": "Shaashadda shid inta kalfadhigu shaqaynayo.",
     "appearance": "Muuqaal",

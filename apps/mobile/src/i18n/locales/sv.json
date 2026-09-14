@@ -2976,14 +2976,6 @@
     "revoke": "Sluta lita på {{host}}",
     "backToPreferences": "Tillbaka till inställningarna"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Starta en chatt",
-      "description": "Skicka ett meddelande för att prata med en modell."
-    },
-    "historyRetry": "Kunde inte läsa in chatthistoriken.",
-    "sendError": "Kunde inte skicka meddelandet. Försök igen."
-  },
   "glanceable": {
     "waiting": "Uppdaterar agenter",
     "empty": "Inget arbete pågår",
@@ -3009,5 +3001,18 @@
     "loadFailed": "Det gick inte att läsa in språken som den här enheten stöder.",
     "emptyTitle": "Inga språk som stöds",
     "emptyDescription": "Den här enhetens taligenkänning rapporterar inga språk som stöds."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Starta en chatt",
+      "description": "Skicka ett meddelande för att prata med en modell."
+    },
+    "list": {
+      "loadFailed": "Det gick inte att läsa in chatthistoriken.",
+      "new": "Ny chatt",
+      "openHint": "Öppnar chatten. Tryck länge för att ta bort.",
+      "deleteTitle": "Ta bort den här chatten?"
+    },
+    "beta": "Beta"
   }
 }

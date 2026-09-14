@@ -3020,14 +3020,6 @@
     "revoke": "Prekliči zaupanje gostitelju {{host}}",
     "backToPreferences": "Nazaj na nastavitve"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Začni klepet",
-      "description": "Pošlji sporočilo za pogovor z modelom."
-    },
-    "historyRetry": "Zgodovine klepeta ni bilo mogoče naložiti.",
-    "sendError": "Sporočila ni bilo mogoče poslati. Poskusi znova."
-  },
   "glanceable": {
     "waiting": "Posodabljanje agentov",
     "empty": "Trenutno ni aktivnih nalog",
@@ -3053,5 +3045,18 @@
     "loadFailed": "Jezikov, ki jih podpira ta naprava, ni bilo mogoče naložiti.",
     "emptyTitle": "Ni podprtih jezikov",
     "emptyDescription": "Prepoznavanje govora te naprave ne poroča o podprtih jezikih."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Začni klepet",
+      "description": "Pošlji sporočilo za pogovor z modelom."
+    },
+    "list": {
+      "loadFailed": "Zgodovine klepeta ni bilo mogoče naložiti.",
+      "new": "Nov klepet",
+      "openHint": "Odpre klepet. Pridržite za brisanje.",
+      "deleteTitle": "Izbrišem ta klepet?"
+    },
+    "beta": "Beta"
   }
 }

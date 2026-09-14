@@ -3020,14 +3020,6 @@
     "revoke": "Zrušiť dôveru serveru {{host}}",
     "backToPreferences": "Späť na predvoľby"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Začnite chat",
-      "description": "Pošlite správu a porozprávajte sa s modelom."
-    },
-    "historyRetry": "Históriu chatu sa nepodarilo načítať.",
-    "sendError": "Nepodarilo sa odoslať správu. Skúste to znova."
-  },
   "glanceable": {
     "waiting": "Aktualizujú sa údaje o agentoch",
     "empty": "Žiadne rozpracované úlohy",
@@ -3053,5 +3045,18 @@
     "loadFailed": "Nepodarilo sa načítať jazyky, ktoré toto zariadenie podporuje.",
     "emptyTitle": "Žiadne podporované jazyky",
     "emptyDescription": "Rozpoznávanie reči tohto zariadenia nehlási žiadne podporované jazyky."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Začať chat",
+      "description": "Pošlite správu a porozprávajte sa s modelom."
+    },
+    "list": {
+      "loadFailed": "Históriu chatu sa nepodarilo načítať.",
+      "new": "Nový chat",
+      "openHint": "Otvorí chat. Dlhým stlačením odstránite.",
+      "deleteTitle": "Odstrániť tento chat?"
+    },
+    "beta": "Beta"
   }
 }

@@ -2976,14 +2976,6 @@
     "revoke": "Trekk tilbake godkjenningen av {{host}}",
     "backToPreferences": "Tilbake til innstillinger"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Start en chat",
-      "description": "Send en melding for å snakke med en modell."
-    },
-    "historyRetry": "Kunne ikke laste inn chathistorikken.",
-    "sendError": "Kunne ikke sende meldingen. Prøv igjen."
-  },
   "glanceable": {
     "waiting": "Oppdaterer agenter",
     "empty": "Ingen oppgaver pågår",
@@ -3009,5 +3001,18 @@
     "loadFailed": "Kunne ikke laste inn språkene denne enheten støtter.",
     "emptyTitle": "Ingen støttede språk",
     "emptyDescription": "Talegjenkjenningen på denne enheten rapporterer ingen støttede språk."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Start en chat",
+      "description": "Send en melding for å snakke med en modell."
+    },
+    "list": {
+      "loadFailed": "Kunne ikke laste inn chathistorikken.",
+      "new": "Ny chat",
+      "openHint": "Åpner chatten. Trykk og hold for å slette.",
+      "deleteTitle": "Slette denne chatten?"
+    },
+    "beta": "Beta"
   }
 }

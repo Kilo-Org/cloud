@@ -2976,14 +2976,6 @@
     "revoke": "Cabut kepercayaan untuk {{host}}",
     "backToPreferences": "Kembali ke preferensi"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Mulai obrolan",
-      "description": "Kirim pesan untuk mengobrol dengan model."
-    },
-    "historyRetry": "Tidak dapat memuat riwayat obrolan.",
-    "sendError": "Tidak dapat mengirim pesan. Coba lagi."
-  },
   "glanceable": {
     "waiting": "Memperbarui agen",
     "empty": "Tidak ada tugas yang sedang berjalan",
@@ -3009,5 +3001,18 @@
     "loadFailed": "Tidak dapat memuat bahasa yang didukung perangkat ini.",
     "emptyTitle": "Tidak ada bahasa yang didukung",
     "emptyDescription": "Pengenalan suara perangkat ini tidak melaporkan bahasa yang didukung."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Mulai obrolan",
+      "description": "Kirim pesan untuk berbicara dengan model."
+    },
+    "list": {
+      "loadFailed": "Tidak dapat memuat riwayat obrolan.",
+      "new": "Obrolan baru",
+      "openHint": "Membuka obrolan. Tekan lama untuk menghapus.",
+      "deleteTitle": "Hapus obrolan ini?"
+    },
+    "beta": "Beta"
   }
 }

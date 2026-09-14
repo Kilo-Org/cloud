@@ -67,6 +67,7 @@ full contract | `PLANNED` not written | `BLOCKED` needs an enabler.
 | D2 | `concurrent-sessions` | several sessions each doing turns at once; no heartbeat expiry, no failed messages | PARTIAL -- `concurrent-chats` classifies each of three sessions `completed_clean`/`completed_after_recovery`/`wedged`/`failed` from matched `recovery_outcome` evidence, sends a same-chat follow-up where the turn did not complete, and reports the clean-vs-recovered split. Proven: no session wedges or fails without a completed same-chat follow-up. Not proven: the exact load level that triggers recovery, or a clean run with zero expiries every time |
 | D3 | `long-slow-turn` | one long streamed turn; heartbeat keeps flowing; turn completes | PARTIAL -- `interrupt-mid-stream`/`hang` cover abort, not sustained length |
 | D4 | `stall-injection` | deterministically stall the wrapper; the worker recovers the SAME session | PARTIAL -- `recover-same-session` freezes the owned primary with `docker pause` and requires the identity-matched heartbeat-expiry recovery chain; a generic `control_disconnected` outcome proves same-session recovery, not heartbeat-lapse coverage |
+| D5 | `feed-stale-recovery` | freeze only the Kilo server of a SHARED worktree runtime so its inbound `/global/event` feed goes silent; the wrapper/container stay alive and the feed recovers without retiring the runtime | PASS (observed) -- `feed-stale-recovery` opens two chats in one worktree, asserts the sibling attached with `reuse reason=live_entry` to the shared Kilo process, `kill -STOP`s only that PID (never the container), observes `phase=stale`/`phase=recovering reason=feed_stale`, verifies the outbound wrapper heartbeat still advances while the feed is silent, releases before the 120s episode deadline, then requires no `Kilo worktree retired reason=feed_stale`, a `phase=recovered` feed line carrying the ORIGINAL native runtime id, chat A's follow-up on that surviving runtime, and chat B's follow-up plus convergence of both roots on one worktree runtime in the original container. In local dev (credential containment off) the sibling re-attach refreshes its session credentials and rotates the shared entry's native runtime; the scenario treats that refresh as an orthogonal product action, not a feed-stale retirement. On pre-change code the retirement is logged ~30-40s in and the scenario fails fast on the `Kilo worktree retired` line |
 
 ### E. Delivery correctness
 
@@ -100,6 +101,10 @@ fails the scenario when the sentinel is missing.
 2. **Fault injection (test-only seams)**
    - `pauseOwnedPrimary`/`unpauseOwnedPrimary` (chunk 2) freeze and unfreeze the
      exact owned primary; `recover-same-session` uses this to lapse heartbeats.
+   - `signalKiloServerProcess` freezes/unfreezes the exact in-container Kilo
+     server PID with `docker exec kill -STOP`/`kill -CONT` while the container
+     and wrapper stay alive; `feed-stale-recovery` uses this to silence only the
+     inbound `/global/event` feed.
    - Force a wrapper process exit / reconnect (A5) -- still uses existing kill paths.
    - Reuse existing `external-kill` / `kill-mid-flight` loss paths, but fix their
      cleanup ownership probe first (it currently throws on restore paths).
@@ -150,17 +155,18 @@ concurrent chats) on the run, and never treat "a fresh run passed" as recovery.
 `unknown-model`, `waiters-clean`, `callback-completion`,
 `callback-batch-followup`, `callback-interrupt`, `gate-0`, plus the continuity
 scenarios: `recover-same-session`, `interrupt-then-continue`,
-`warm-cold-cycles`, `question-idle-resume`, `large-stream`, `concurrent-chats`.
+`warm-cold-cycles`, `question-idle-resume`, `large-stream`, `concurrent-chats`,
+`feed-stale-recovery`.
 
 Continuity scenario default timeouts (`CONTINUITY_SCENARIO_TIMEOUT_MS` in
-`lifecycle-continuity.ts`): 8, 6, 25, 20, 10, and 15 minutes in the order above.
-All six require the unified API, `kilo/fake-deterministic`, and control-plane +
-worktree enrollment, like the file-state scenarios.
+`lifecycle-continuity.ts`): 8, 6, 25, 20, 10, 15, and 10 minutes in the order
+above. All seven require the unified API, `kilo/fake-deterministic`, and
+control-plane + worktree enrollment, like the file-state scenarios.
 
-Status gaps: the six continuity scenarios exercise the same-session recovery core
-(A3/A4/A5/C2/D1/D2/D4), but A5/D4 remain PARTIAL: a run attributed to
-`heartbeat_expiry` proves heartbeat-lapse recovery for the captured connection,
-while a `control_disconnected` run proves only generic same-session recovery.
-A3/A4/A5/C2/D1/D2/D4 are not a live pass claim until the scenario is run and
-observed green; that result is recorded per run, not asserted here. Remaining
-gaps are E1/E3 and repeat/flake counts.
+Status gaps: the seven continuity scenarios exercise the same-session recovery
+core (A3/A4/A5/C2/D1/D2/D4) plus the silent-feed recovery path (D5), but A5/D4
+remain PARTIAL: a run attributed to `heartbeat_expiry` proves heartbeat-lapse
+recovery for the captured connection, while a `control_disconnected` run proves
+only generic same-session recovery. A3/A4/A5/C2/D1/D2/D4/D5 are not a live pass
+claim until the scenario is run and observed green; that result is recorded per
+run, not asserted here. Remaining gaps are E1/E3 and repeat/flake counts.

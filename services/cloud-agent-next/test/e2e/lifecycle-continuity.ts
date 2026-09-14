@@ -18,14 +18,21 @@
  * - `large-stream` (D1) one 256 KiB read-tool stream plus a paced follow-up.
  * - `concurrent-chats` (D2/B4) two independent sessions held at a gate barrier,
  *   then all `running` at the same instant.
+ * - `feed-stale-recovery` (D4) freeze only the Kilo server of a shared worktree
+ *   runtime so the inbound `/global/event` feed goes silent, prove the wrapper
+ *   and container stay alive, and require the feed to recover plus a follow-up
+ *   in each of the two chats on the same runtime without a feed_stale
+ *   retirement.
  *
  * Shared helpers live in `lifecycle-file-state.ts`; worker-log framing lives
  * in `idle-stop-evidence.ts`. This module does not touch production code.
  */
 
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { createKiloClient, type Part } from '@kilocode/sdk/v2';
 import {
+  createWorktreeChat,
   fetchFakeScenarioStatus,
   getMessageResult,
   getSessionSnapshot,
@@ -40,6 +47,7 @@ import {
 import { mintApiToken } from './auth.js';
 import {
   addCleanupReport,
+  acquireTracked,
   assertScenarioPreconditions,
   bootSession,
   captureLogCursor,
@@ -51,6 +59,7 @@ import {
   recordOwnedRuntime,
   runGatedFileTurn,
   scenarioResult,
+  trackSession,
   waitForOwnedRuntime,
   withinCleanupBudget,
   type ScenarioResources,
@@ -66,19 +75,27 @@ import {
   ControlPlaneContainerUnavailableError,
   findControlPlaneKiloRuntime,
   inspectControlPlaneHistory,
+  inspectControlPlaneKiloRoot,
   inspectControlPlaneQuestions,
   inspectControlPlaneWorkspaceFile,
   listSandboxContainers,
   pauseOwnedPrimary,
   readControlWrapperLog,
+  signalKiloServerProcess,
   stageControlPlaneWorkspaceFile,
   unpauseOwnedPrimary,
   waitForSandboxPrimaryGone,
   type ControlPlaneKiloRuntime,
+  type KiloServerProcessHandle,
   type OwnedPrimaryHandle,
   type SandboxContainer,
 } from './sandbox-control.js';
-import { requireWorktreeGate, waitForOwnedCompletion } from './worktree-support.js';
+import {
+  readWorktreeOwnership,
+  requireWorktreeGate,
+  requireWorktreeSessionIdentity,
+  waitForOwnedCompletion,
+} from './worktree-support.js';
 import { DEADLINE_MS } from '../../src/sandbox-control/deadlines.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 
@@ -89,6 +106,7 @@ export const CONTINUITY_SCENARIO_TIMEOUT_MS: Record<string, number> = {
   'question-idle-resume': 20 * 60_000,
   'large-stream': 10 * 60_000,
   'concurrent-chats': 15 * 60_000,
+  'feed-stale-recovery': 10 * 60_000,
 };
 
 const COLD_IDLE_BUDGET_MS = 8 * 60_000;
@@ -123,6 +141,16 @@ const CONCURRENT_SESSION_COUNT = 2;
 /** Bounded wait for the control wrapper's pre-pause heartbeat send line to appear. */
 const PRE_PAUSE_SEND_RETRY_BUDGET_MS = 500;
 const PRE_PAUSE_SEND_RETRY_INTERVAL_MS = 100;
+
+/**
+ * `feed-stale-recovery` bounds. The product's inbound feed marks itself stale
+ * after 30s without bytes and then opens a 120s recovery episode; these waits
+ * only observe those transitions, they never trigger them.
+ */
+const FEED_LOG_POLL_MS = 2_000;
+const FEED_STALE_DETECTION_BUDGET_MS = 75_000;
+const FEED_RECOVERY_BUDGET_MS = 90_000;
+const FEED_FOLLOWUP_TURN_BUDGET_MS = 90_000;
 
 const CONTROL_LOG_TAG = 'sandbox_control';
 
@@ -195,7 +223,9 @@ function assertMessageLifecycle(
     (type, index) => type === 'cloud.message.completed' && index > sentIndex
   );
   if (sentIndex === -1) {
-    throw new Error(`${label} has no cloud.message.sent for ${messageId}: ${types.join('>') || 'none'}`);
+    throw new Error(
+      `${label} has no cloud.message.sent for ${messageId}: ${types.join('>') || 'none'}`
+    );
   }
   if (completedIndex === -1) {
     throw new Error(
@@ -208,9 +238,7 @@ function assertMessageLifecycle(
     );
   }
   if (queuedIndex > sentIndex) {
-    throw new Error(
-      `${label} queued did not precede sent for ${messageId}: ${types.join('>')}`
-    );
+    throw new Error(`${label} queued did not precede sent for ${messageId}: ${types.join('>')}`);
   }
   return types.join('>');
 }
@@ -398,7 +426,9 @@ async function captureConnectionIdentity(
 
 function lastWrapperHeartbeatSend(log: string | null): WrapperSendLine | undefined {
   if (!log) return undefined;
-  const matches = [...log.matchAll(/control heartbeat phase=(\S+) sequence=(\d+) lastSentAt=(\d+)/g)];
+  const matches = [
+    ...log.matchAll(/control heartbeat phase=(\S+) sequence=(\d+) lastSentAt=(\d+)/g),
+  ];
   const last = matches.at(-1);
   if (!last) return undefined;
   return {
@@ -467,7 +497,8 @@ export function classifyFault(
   const cause = typeof started.cause === 'string' ? started.cause : 'unknown';
   if (cause === 'heartbeat_expired') {
     const deadlineIndex = matched.findIndex(
-      record => record.diagnosticEvent === 'deadline_fired' && record.deadlineId === 'heartbeatExpiry'
+      record =>
+        record.diagnosticEvent === 'deadline_fired' && record.deadlineId === 'heartbeatExpiry'
     );
     if (deadlineIndex === -1 || deadlineIndex > firstStartedIndex) {
       return {
@@ -514,7 +545,10 @@ async function waitForEngagedFault(
   if (fault.kind === 'none' || fault.kind === 'inconclusive') {
     const late = await waitForWorkerLogEvidence({
       fromByte: input.fromByte,
-      budgetMs: Math.min(HEARTBEAT_EXTRA_EVIDENCE_MS, remainingMs(resources, 'late fault evidence')),
+      budgetMs: Math.min(
+        HEARTBEAT_EXTRA_EVIDENCE_MS,
+        remainingMs(resources, 'late fault evidence')
+      ),
       match: record =>
         isControlRecord(record) &&
         record.diagnosticEvent === 'recovery_outcome' &&
@@ -612,7 +646,12 @@ async function resumeSameSession(
     throw new Error(`resume reused the pre-idle container id ${input.oldContainerId}`);
   }
   await resources.within(`resume gate ${input.tag}`, () =>
-    requireWorktreeGate(resources.config, input.tag, remainingMs(resources, `resume gate ${input.tag}`), stream)
+    requireWorktreeGate(
+      resources.config,
+      input.tag,
+      remainingMs(resources, `resume gate ${input.tag}`),
+      stream
+    )
   );
   const history = await resources.within(`resume history ${input.tag}`, () =>
     inspectControlPlaneHistory(resumed, {
@@ -670,9 +709,8 @@ async function resumeSameSession(
         `insufficient scenario budget to re-confirm ${selectedContainer.id} absence before durable completion`
       );
     }
-    const gone = await resources.within(
-      `resume completion ${input.tag} absence reconfirm`,
-      () => waitForSandboxPrimaryGone(selectedContainer, budgetMs - ABSENCE_RECONFIRM_RESERVE_MS)
+    const gone = await resources.within(`resume completion ${input.tag} absence reconfirm`, () =>
+      waitForSandboxPrimaryGone(selectedContainer, budgetMs - ABSENCE_RECONFIRM_RESERVE_MS)
     );
     if (!gone) {
       throw new Error(
@@ -713,7 +751,12 @@ async function resumeSameSession(
   if (completionAfterDisappearance) {
     await reconfirmAbsence();
   }
-  const status = await awaitDurableCompletion(resources, input.session, sent.messageId, `resume ${input.tag}`);
+  const status = await awaitDurableCompletion(
+    resources,
+    input.session,
+    sent.messageId,
+    `resume ${input.tag}`
+  );
   if (status !== 'completed') {
     throw new Error(`resume ${input.tag} durable status=${status} for ${sent.messageId}`);
   }
@@ -935,7 +978,9 @@ export async function lifecycleRecoverSameSession(args: LifecycleArgs): Promise<
           wrapperSend = lastWrapperHeartbeatSend(log);
           if (wrapperSend) break;
           if (Date.now() >= deadline) {
-            throw new Error('INCONCLUSIVE: wrapper last-send heartbeat line not found before pause');
+            throw new Error(
+              'INCONCLUSIVE: wrapper last-send heartbeat line not found before pause'
+            );
           }
           await new Promise(resolve => setTimeout(resolve, PRE_PAUSE_SEND_RETRY_INTERVAL_MS));
         }
@@ -1033,7 +1078,9 @@ export async function lifecycleRecoverSameSession(args: LifecycleArgs): Promise<
 // interrupt-then-continue (A4)
 // ---------------------------------------------------------------------------
 
-export async function lifecycleInterruptThenContinue(args: LifecycleArgs): Promise<LifecycleResult> {
+export async function lifecycleInterruptThenContinue(
+  args: LifecycleArgs
+): Promise<LifecycleResult> {
   const startedAt = Date.now();
   const resources = createScenarioResources(
     args.config,
@@ -1081,9 +1128,7 @@ export async function lifecycleInterruptThenContinue(args: LifecycleArgs): Promi
         remainingMs(resources, 'interrupted terminal')
       )
     );
-    const data = failed?.data as
-      | { reason?: string; payload?: { reason?: string } }
-      | undefined;
+    const data = failed?.data as { reason?: string; payload?: { reason?: string } } | undefined;
     const reason = data?.reason ?? data?.payload?.reason;
     if (reason !== 'interrupted') {
       throw new Error(
@@ -1127,7 +1172,14 @@ export async function lifecycleInterruptThenContinue(args: LifecycleArgs): Promi
       ].join('; ')
     );
   } catch (error) {
-    result = scenarioResult('interrupt-then-continue', args, startedAt, resources.events, false, errorMessage(error));
+    result = scenarioResult(
+      'interrupt-then-continue',
+      args,
+      startedAt,
+      resources.events,
+      false,
+      errorMessage(error)
+    );
   } finally {
     if (gateTag) {
       await releaseGate(resources.config.fakeLlmUrl, gateTag).catch(() => undefined);
@@ -1199,7 +1251,9 @@ export async function lifecycleWarmColdCycles(args: LifecycleArgs): Promise<Life
         await resources.within('post-idle container list', () => listSandboxContainers())
       ).some(container => container.id === oldContainerId);
       if (stillPresent) {
-        throw new Error(`pre-idle container ${oldContainerId} is still running after cycle ${cycle}`);
+        throw new Error(
+          `pre-idle container ${oldContainerId} is still running after cycle ${cycle}`
+        );
       }
       cycleEvidence.push(
         [
@@ -1465,7 +1519,14 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
       ].join('; ')
     );
   } catch (error) {
-    result = scenarioResult('question-idle-resume', args, startedAt, resources.events, false, errorMessage(error));
+    result = scenarioResult(
+      'question-idle-resume',
+      args,
+      startedAt,
+      resources.events,
+      false,
+      errorMessage(error)
+    );
   } finally {
     const cleanup = await cleanupScenario(resources);
     result = addCleanupReport(result, cleanup);
@@ -1630,9 +1691,7 @@ async function sendLargeStreamTurn(
   );
   if (!terminal) {
     const fakeStatus = await resources
-      .within('tool-stream status', () =>
-        fetchFakeScenarioStatus(resources.config.fakeLlmUrl, tag)
-      )
+      .within('tool-stream status', () => fetchFakeScenarioStatus(resources.config.fakeLlmUrl, tag))
       .catch(() => undefined);
     throw new Error(
       `large-stream turn ${sent.messageId} did not reach a terminal within ${budget}ms; ` +
@@ -1951,9 +2010,7 @@ export async function lifecycleConcurrentChats(args: LifecycleArgs): Promise<Lif
     const recovered = classified.filter(
       item => item.classification === 'completed_after_recovery'
     ).length;
-    const inconclusive = classified.filter(
-      item => item.classification === 'inconclusive'
-    ).length;
+    const inconclusive = classified.filter(item => item.classification === 'inconclusive').length;
     const wedged = classified.filter(item => item.classification === 'wedged').length;
     const failed = classified.filter(
       item =>
@@ -1987,8 +2044,430 @@ export async function lifecycleConcurrentChats(args: LifecycleArgs): Promise<Lif
       ].join('; ')
     );
   } catch (error) {
-    result = scenarioResult('concurrent-chats', args, startedAt, resources.events, false, errorMessage(error));
+    result = scenarioResult(
+      'concurrent-chats',
+      args,
+      startedAt,
+      resources.events,
+      false,
+      errorMessage(error)
+    );
   } finally {
+    const cleanup = await cleanupScenario(resources);
+    result = addCleanupReport(result, cleanup);
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// feed-stale-recovery (silent /global/event subscriber incident)
+// ---------------------------------------------------------------------------
+
+type ControlLogPollResult = { line: string; log: string };
+
+/**
+ * Poll the control wrapper log inside the container until `match` returns a
+ * line, then return that line and the snapshot it came from. `match` may throw
+ * to fail fast (for example when a retirement line proves the runtime is gone).
+ * The poll only observes; it never fires the wrapper watchdog itself.
+ */
+async function pollControlWrapperLog(
+  containerId: string,
+  match: (log: string) => string | undefined,
+  timeoutMs: number,
+  label: string
+): Promise<ControlLogPollResult> {
+  const deadline = Date.now() + timeoutMs;
+  let logBytes = 0;
+  for (;;) {
+    const log = (await readControlWrapperLog(containerId)) ?? '';
+    logBytes = log.length;
+    const line = match(log);
+    if (line) return { line, log };
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `${label} did not appear in the control wrapper log within ${timeoutMs}ms (logBytes=${logBytes})`
+      );
+    }
+    await new Promise(resolve => setTimeout(resolve, FEED_LOG_POLL_MS));
+  }
+}
+
+/**
+ * Find one `control feed` line for exactly `directoryName` carrying `needle`.
+ * The feed line prefixes its identity (`scopeId`, `runtimeId`, `directory`), so
+ * scoping by directory keeps a sibling runtime's transition out.
+ */
+function findFeedLine(
+  log: string | null,
+  directoryName: string,
+  needle: string
+): string | undefined {
+  if (!log) return undefined;
+  const marker = `directory=${directoryName} `;
+  return log.split('\n').find(line => line.includes(marker) && line.includes(needle));
+}
+
+function countLogMatches(log: string | null, needle: string): number {
+  if (!log || needle.length === 0) return 0;
+  let count = 0;
+  let index = log.indexOf(needle);
+  while (index !== -1) {
+    count += 1;
+    index = log.indexOf(needle, index + needle.length);
+  }
+  return count;
+}
+
+/**
+ * Reproduce the incident where one worktree runtime's inbound
+ * `/global/event` subscriber went silent for 30s while the wrapper and
+ * container stayed alive. Two chats share one worktree runtime; only the Kilo
+ * server process is frozen with `docker exec kill -STOP`, never the container.
+ *
+ * The scenario must pass only when the feed's own recovery budget survives:
+ * the runtime is not retired, the feed reconnects/reports recovery, and a
+ * follow-up in EACH chat completes on the same runtime. On the pre-change
+ * wrapper the frozen feed is destroyed ~30-40s in, so the retirement line is
+ * observed before the process is released and the scenario fails fast.
+ */
+export async function lifecycleFeedStaleRecovery(args: LifecycleArgs): Promise<LifecycleResult> {
+  const startedAt = Date.now();
+  const resources = createScenarioResources(
+    args.config,
+    args.timeoutMs ?? CONTINUITY_SCENARIO_TIMEOUT_MS['feed-stale-recovery'] ?? 10 * 60_000
+  );
+  let result = scenarioResult(
+    'feed-stale-recovery',
+    args,
+    startedAt,
+    resources.events,
+    false,
+    'scenario did not start'
+  );
+  const evidence: string[] = [];
+  const record = (line: string): void => {
+    evidence.push(line);
+  };
+  let frozen: KiloServerProcessHandle | undefined;
+  try {
+    assertScenarioPreconditions(args.config, args.api);
+    const runId = randomUUID();
+    const {
+      session: chatA,
+      runtime,
+      sandboxId,
+    } = await bootSession(resources, {
+      runId,
+      operation: createScenarioOperation('continuity-feed-stale'),
+    });
+    const directoryName = path.basename(runtime.directory);
+    record(`sessionA=${chatA.cloudAgentSessionId}`);
+    record(`rootA=${chatA.kiloSessionId}`);
+    record(`sandbox=${sandboxId}`);
+    record(`container=${runtime.container.id}`);
+    record(`directory=${directoryName}`);
+    record(`kiloPid=${runtime.processId}`);
+
+    const siblingOperation = createScenarioOperation('continuity-feed-stale-sibling');
+    const chatB = await acquireTracked(
+      resources,
+      `create sibling chat (${siblingOperation.label})`,
+      signal =>
+        createWorktreeChat(
+          resources.kiloConfig,
+          {
+            sourceKiloSessionId: chatA.kiloSessionId,
+            sourceCloudAgentSessionId: chatA.cloudAgentSessionId,
+            operationKey: siblingOperation.operationKey,
+          },
+          signal
+        ),
+      value => trackSession(resources, value),
+      { operationKey: siblingOperation.operationKey, uncertainOnFailure: true }
+    );
+    requireWorktreeSessionIdentity(chatB, 'sibling chat');
+    if (chatB.kiloSessionId === chatA.kiloSessionId) {
+      throw new Error('sibling chat reused the first chat Kilo root');
+    }
+    record(`sessionB=${chatB.cloudAgentSessionId}`);
+    record(`rootB=${chatB.kiloSessionId}`);
+
+    const ownership = await resources.within('shared worktree ownership', () =>
+      readWorktreeOwnership(resources.config, [chatA.kiloSessionId, chatB.kiloSessionId])
+    );
+    const rootARow = ownership.find(row => row.sessionId === chatA.kiloSessionId);
+    const rootBRow = ownership.find(row => row.sessionId === chatB.kiloSessionId);
+    if (!rootARow?.worktreeId || rootBRow?.worktreeId !== rootARow.worktreeId) {
+      throw new Error('sibling chat did not retain the first chat worktree');
+    }
+    record(`worktree=${rootARow.worktreeId}`);
+
+    // Attach the sibling to the shared worktree runtime and complete a turn so
+    // both chats own roots in one Kilo process before the fault.
+    const attach = await sendAndAwaitCompletion(
+      resources,
+      chatB,
+      fakeDirective('echo', `attach-${runId}`),
+      'sibling attach',
+      Math.min(FEED_FOLLOWUP_TURN_BUDGET_MS, remainingMs(resources, 'sibling attach'))
+    );
+    record(`siblingAttachMessage=${attach.messageId}`);
+
+    const rootA = await resources.within('shared root A', () =>
+      inspectControlPlaneKiloRoot(runtime, chatA.kiloSessionId)
+    );
+    const rootB = await resources.within('shared root B', () =>
+      inspectControlPlaneKiloRoot(runtime, chatB.kiloSessionId)
+    );
+    if (
+      rootA.processId !== runtime.processId ||
+      rootB.processId !== runtime.processId ||
+      rootA.directory !== runtime.directory ||
+      rootB.directory !== runtime.directory
+    ) {
+      throw new Error(
+        `chats did not share one Kilo runtime: A=${rootA.processId}@${rootA.directory}; B=${rootB.processId}@${rootB.directory}; expected=${runtime.processId}@${runtime.directory}`
+      );
+    }
+
+    const logBeforeInjection = (await readControlWrapperLog(runtime.container.id)) ?? '';
+    const attachLine = logBeforeInjection
+      .split('\n')
+      .find(
+        line =>
+          line.includes('worktree runtime attach decision') &&
+          line.includes(`directory=${directoryName} `) &&
+          line.includes(`kiloSessionId=${chatB.kiloSessionId}`)
+      );
+    if (!attachLine) {
+      throw new Error('control wrapper log has no attach decision for the sibling chat');
+    }
+    const attachAction = /action=(\S+)/.exec(attachLine)?.[1];
+    const attachReason = /reason=(\S+)/.exec(attachLine)?.[1];
+    if (attachAction !== 'reuse' || attachReason !== 'live_entry') {
+      throw new Error(
+        `sibling chat did not reuse the live shared runtime: action=${attachAction ?? 'unknown'} reason=${attachReason ?? 'unknown'}; ${attachLine}`
+      );
+    }
+    const nativeRuntimeId = /runtimeId=([0-9a-fA-F-]{36})/.exec(attachLine)?.[1];
+    if (!nativeRuntimeId) {
+      throw new Error(`sibling attach decision carried no native runtime id: ${attachLine}`);
+    }
+    const heartbeatBefore = countLogMatches(logBeforeInjection, 'control heartbeat phase=sent');
+    const retiredBefore = countLogMatches(logBeforeInjection, 'Kilo worktree retired');
+    record(`siblingAttachReason=${attachReason}`);
+    record(`nativeRuntimeId=${nativeRuntimeId}`);
+    record(`heartbeatBeforeFreeze=${heartbeatBefore}`);
+    record(`retiredBeforeFreeze=${retiredBefore}`);
+
+    // Freeze ONLY the Kilo server: the control wrapper and container stay
+    // alive, so the outbound heartbeat keeps running while the inbound feed
+    // goes silent exactly like the incident.
+    const handle: KiloServerProcessHandle = {
+      containerId: runtime.container.id,
+      processId: runtime.processId,
+    };
+    frozen = handle;
+    await resources.within('freeze kilo server', () => signalKiloServerProcess(handle, 'STOP'));
+    const stoppedAt = Date.now();
+    record(`frozenContainer=${handle.containerId}; frozenKiloPid=${handle.processId}`);
+    record(`stoppedAt=${stoppedAt}`);
+
+    const containersAfterStop = await resources.within('container alive after freeze', () =>
+      listSandboxContainers()
+    );
+    if (!containersAfterStop.some(container => container.id === runtime.container.id)) {
+      throw new Error('sandbox container disappeared after freezing only the Kilo server');
+    }
+
+    const stale = await pollControlWrapperLog(
+      runtime.container.id,
+      log => {
+        const retired = log
+          .split('\n')
+          .find(
+            line =>
+              line.includes('Kilo worktree retired') &&
+              line.includes(`runtimeId=${nativeRuntimeId}`)
+          );
+        if (retired) {
+          throw new Error(
+            `worktree runtime was retired during the silent feed (pre-change behavior): ${retired.trim()}`
+          );
+        }
+        return (
+          findFeedLine(log, directoryName, 'phase=recovering reason=feed_stale') ??
+          findFeedLine(log, directoryName, 'phase=stale')
+        );
+      },
+      Math.min(FEED_STALE_DETECTION_BUDGET_MS, remainingMs(resources, 'feed-stale detection')),
+      `feed-stale transition for directory=${directoryName}`
+    );
+    const staleDetectedAt = Date.now();
+    record(`feedStale=${stale.line.trim()}`);
+    record(`staleDetectedAfterFreezeMs=${staleDetectedAt - stoppedAt}`);
+
+    const heartbeatDuringSilence = countLogMatches(stale.log, 'control heartbeat phase=sent');
+    if (heartbeatDuringSilence <= heartbeatBefore) {
+      throw new Error(
+        'control wrapper heartbeat did not advance while the Kilo feed was silent; wrapper liveness not proven'
+      );
+    }
+    record(`heartbeatDuringSilenceAdvanced=${heartbeatDuringSilence - heartbeatBefore}`);
+
+    // Release the Kilo server well before the 120s recovery-episode deadline.
+    await signalKiloServerProcess(handle, 'CONT');
+    frozen = undefined;
+    const continuedAt = Date.now();
+    record(`continuedAt=${continuedAt}`);
+    record(`silenceMs=${continuedAt - stoppedAt}`);
+
+    // A follow-up in chat A must complete on the SAME runtime that survived the
+    // silent feed. A's credentials own the entry env, so this attach is a
+    // reuse and must not rotate the native runtime. This is the strongest
+    // "same runtime after recovery" evidence for the incident.
+    const followA = await sendAndAwaitCompletion(
+      resources,
+      chatA,
+      fakeDirective('echo', `post-a-${runId}`),
+      'post-recovery A',
+      Math.min(FEED_FOLLOWUP_TURN_BUDGET_MS, remainingMs(resources, 'post-recovery A'))
+    );
+    record(`postRecoveryA=${followA.messageId} lifecycle=${followA.lifecycle}`);
+    const rootAAfter = await resources.within('post-recovery root A', () =>
+      inspectControlPlaneKiloRoot(runtime, chatA.kiloSessionId)
+    );
+    if (rootAAfter.processId !== runtime.processId || rootAAfter.directory !== runtime.directory) {
+      throw new Error(
+        `chat A did not reuse the runtime that survived the silent feed: now=${rootAAfter.processId}@${rootAAfter.directory}; expected=${runtime.processId}@${runtime.directory}`
+      );
+    }
+
+    // The feed must report recovery while still carrying the original native
+    // runtime id: the outage may not rotate or retire the runtime.
+    const recovered = await pollControlWrapperLog(
+      runtime.container.id,
+      log =>
+        log
+          .split('\n')
+          .find(
+            line =>
+              line.includes(`directory=${directoryName} `) &&
+              line.includes(`runtimeId=${nativeRuntimeId}`) &&
+              line.includes('phase=recovered')
+          ),
+      Math.min(FEED_RECOVERY_BUDGET_MS, remainingMs(resources, 'feed recovery evidence')),
+      'feed recovery transition'
+    );
+    record(`feedRecovered=${recovered.line.trim()}`);
+
+    const retiredAfter = countLogMatches(recovered.log, 'Kilo worktree retired');
+    if (retiredAfter !== retiredBefore) {
+      throw new Error(
+        `worktree runtime was retired during the feed outage (before=${retiredBefore} after=${retiredAfter})`
+      );
+    }
+    if (recovered.log.includes('Kilo worktree retired reason=feed_stale')) {
+      throw new Error('control wrapper log shows a feed_stale worktree retirement');
+    }
+
+    // The sibling chat owns different session credentials, so in local dev
+    // (credential containment off) its re-attach performs a credential refresh
+    // that rotates the shared entry's native runtime. That refresh is not a
+    // feed-stale retirement. Require chat B's follow-up to complete and both
+    // roots to converge on ONE worktree runtime in the original container.
+    const followB = await sendAndAwaitCompletion(
+      resources,
+      chatB,
+      fakeDirective('echo', `post-b-${runId}`),
+      'post-recovery B',
+      Math.min(FEED_FOLLOWUP_TURN_BUDGET_MS, remainingMs(resources, 'post-recovery B'))
+    );
+    record(`postRecoveryB=${followB.messageId} lifecycle=${followB.lifecycle}`);
+
+    const [runtimeA, runtimeB] = await Promise.all([
+      resources.within('post-recovery runtime A', () =>
+        findControlPlaneKiloRuntime(chatA.kiloSessionId)
+      ),
+      resources.within('post-recovery runtime B', () =>
+        findControlPlaneKiloRuntime(chatB.kiloSessionId)
+      ),
+    ]);
+    if (
+      !runtimeA ||
+      !runtimeB ||
+      runtimeA.processId !== runtimeB.processId ||
+      runtimeA.directory !== runtimeB.directory
+    ) {
+      throw new Error(
+        `chats did not converge on one worktree runtime after recovery: A=${runtimeA?.processId ?? 'missing'}@${runtimeA?.directory ?? 'missing'}; B=${runtimeB?.processId ?? 'missing'}@${runtimeB?.directory ?? 'missing'}`
+      );
+    }
+    if (
+      runtimeA.container.id !== runtime.container.id ||
+      runtimeA.directory !== runtime.directory
+    ) {
+      throw new Error(
+        `post-recovery work left the original worktree container/checkout: container=${runtimeA.container.id} directory=${runtimeA.directory}; expected=${runtime.container.id}/${runtime.directory}`
+      );
+    }
+    // Only a feed-stale retirement is a defect. The sibling's credential
+    // refresh (documented above) intentionally rotates the shared entry's
+    // native runtime and legitimately logs a retirement with a different
+    // reason, so counting every `Kilo worktree retired` line here would fail an
+    // allowed rotation. Anchor on the incident reason instead.
+    const finalLog = (await readControlWrapperLog(runtime.container.id)) ?? '';
+    const finalFeedStaleRetirement = finalLog
+      .split('\n')
+      .find(line => line.includes('Kilo worktree retired reason=feed_stale'));
+    if (finalFeedStaleRetirement) {
+      throw new Error(
+        `control wrapper log shows a feed_stale worktree retirement after recovery: ${finalFeedStaleRetirement.trim()}`
+      );
+    }
+    record(`postRecoveryRuntimeId=${runtimeA.processId}@${directoryName}`);
+    record(`runtimeConverged=true`);
+
+    result = scenarioResult(
+      'feed-stale-recovery',
+      args,
+      startedAt,
+      resources.events,
+      true,
+      [
+        ...evidence,
+        'retired=false',
+        `feedEventNativeRuntimeIdUnchanged=${nativeRuntimeId}`,
+        'chatAReusedSurvivingRuntime=true',
+        'chatsConvergedOneRuntime=true',
+      ].join('; ')
+    );
+  } catch (error) {
+    result = scenarioResult(
+      'feed-stale-recovery',
+      args,
+      startedAt,
+      resources.events,
+      false,
+      [errorMessage(error), ...evidence].join('; ')
+    );
+  } finally {
+    if (frozen) {
+      const frozenHandle = frozen;
+      frozen = undefined;
+      let release = 'unknown';
+      try {
+        await signalKiloServerProcess(frozenHandle, 'CONT');
+        release = `cont@${Date.now()}`;
+      } catch (error) {
+        release = `cont-failed:${errorMessage(error)}`;
+      }
+      result = {
+        ...result,
+        message: `${result.message}; frozenRelease=${release}; frozenContainer=${frozenHandle.containerId}; frozenKiloPid=${frozenHandle.processId}`,
+      };
+    }
     const cleanup = await cleanupScenario(resources);
     result = addCleanupReport(result, cleanup);
   }
@@ -2005,4 +2484,5 @@ export const CONTINUITY_SCENARIOS: Record<
   'question-idle-resume': lifecycleQuestionIdleResume,
   'large-stream': lifecycleLargeStream,
   'concurrent-chats': lifecycleConcurrentChats,
+  'feed-stale-recovery': lifecycleFeedStaleRecovery,
 };

@@ -102,7 +102,7 @@ file writes/reads, native tool overlap, Stop isolation, and post-Stop follow-ups
 Private reports and transcripts are retained; chats and sandboxes are not deleted
 automatically. See the known CLI 7.4.20 limitation under Troubleshooting.
 
-Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.4.20`):
+Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.6.2`):
 
 ```bash
 pnpm --filter cloud-agent-next exec tsx test/e2e/sdk-basic-chat.ts

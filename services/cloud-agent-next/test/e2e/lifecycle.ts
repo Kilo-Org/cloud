@@ -91,9 +91,13 @@ export const LIFECYCLE_SCENARIO_TIMEOUT_MS: Record<string, number> = {
  * Upper bound for a post-kill message that must await replacement recovery.
  * The DO's prepare path can legitimately spend the full create-settle window
  * before a replacement is ready, so a fixed 120s is too short; this caps each
- * such wait at ~5 min instead of the whole scenario deadline.
+ * such wait below the whole scenario deadline. Local-docker replacement
+ * recovery has been observed at ~230s with variance past 300s (the wrapper
+ * readiness deadline is re-armed per prepare attempt), so 5 min was flaky;
+ * 8 min keeps a bound while leaving headroom under the 12 min scenario
+ * deadline.
  */
-export const RECOVERY_BUDGET_MS = 5 * 60_000;
+export const RECOVERY_BUDGET_MS = 8 * 60_000;
 
 const execFileAsync = promisify(execFile);
 
@@ -2814,6 +2818,24 @@ function callbackPayloadsForSession(
 }
 
 /**
+ * Diagnostic detail for a gate that never engaged. The boolean wait alone
+ * cannot distinguish "the model request was never sent" (requests=0, a sandbox
+ * or startup stall) from "the model answered without running the gate tool"
+ * (requests>0), so report the fake-server counters too.
+ */
+async function gateEngagementDetail(
+  config: DriverConfig,
+  tag: string,
+  timeoutMs: number
+): Promise<string> {
+  const status = await fetchFakeScenarioStatus(config.fakeLlmUrl, tag).catch(() => null);
+  const detail = status
+    ? `requests=${status.requests}; toolCalls=${JSON.stringify(status.toolCalls)}; toolResults=${JSON.stringify(status.toolResults)}`
+    : 'fake scenario status unavailable';
+  return `gate:${tag} did not engage within ${timeoutMs}ms; ${detail}`;
+}
+
+/**
  * callback-completion: exercise the `callbackTarget` path end-to-end.
  *
  * 1. Spin up a local HTTP sink on an ephemeral port.
@@ -2935,7 +2957,7 @@ export async function lifecycleCallbackBatchFollowup(
   const start = Date.now();
   const { config, timeoutMs = 120_000, api = 'unified' } = args;
   const scenarioName = 'callback-batch-followup';
-  const gateTag = 'callback-batch';
+  const gateTag = `callback-batch-${randomUUID()}`;
   let sink: CallbackServerHandle | null = null;
   let cleanupSessionId: string | undefined;
   let batchCompleted = false;
@@ -2966,7 +2988,8 @@ export async function lifecycleCallbackBatchFollowup(
       };
     }
 
-    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
+    const gateWaitMs = 120_000;
+    const engaged = await waitForGateEngaged(config, gateTag, gateWaitMs);
     if (!engaged) {
       const events = [...stream.events];
       stream.close();
@@ -2974,7 +2997,7 @@ export async function lifecycleCallbackBatchFollowup(
         name: scenarioName,
         conversation: `gate:${gateTag}`,
         ok: false,
-        message: `gate:${gateTag} did not engage within 90s`,
+        message: await gateEngagementDetail(config, gateTag, gateWaitMs),
         events,
         durationMs: Date.now() - start,
       };
@@ -3180,7 +3203,7 @@ export async function lifecycleCallbackInterrupt(args: LifecycleArgs): Promise<L
   const start = Date.now();
   const { config, timeoutMs = 120_000, api = 'unified' } = args;
   const scenarioName = 'callback-interrupt';
-  const gateTag = 'callback-interrupt';
+  const gateTag = `callback-interrupt-${randomUUID()}`;
   let sink: CallbackServerHandle | null = null;
   try {
     sink = await startCallbackServer();
@@ -3208,14 +3231,15 @@ export async function lifecycleCallbackInterrupt(args: LifecycleArgs): Promise<L
       };
     }
 
-    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
+    const gateWaitMs = 120_000;
+    const engaged = await waitForGateEngaged(config, gateTag, gateWaitMs);
     if (!engaged) {
       stream.close();
       return {
         name: scenarioName,
         conversation: `gate:${gateTag}`,
         ok: false,
-        message: `gate:${gateTag} did not engage within 90s`,
+        message: await gateEngagementDetail(config, gateTag, gateWaitMs),
         events: [...stream.events],
         durationMs: Date.now() - start,
       };

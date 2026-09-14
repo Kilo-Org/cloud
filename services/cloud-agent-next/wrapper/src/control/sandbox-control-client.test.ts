@@ -1710,6 +1710,99 @@ describe('createSandboxControlClient', () => {
     client.close();
   });
 
+  it('preserves a publishSessionEvent queued in a handshake gap and delivers it once after reconnect', async () => {
+    const failures: ControlEventOutboxFailure[] = [];
+    const { client, sockets } = createClientFixture({
+      onEventReceiptFailure: failure => failures.push(failure),
+    });
+    const identity = {
+      directory: '/workspace',
+      kiloSessionId: 'ses_root',
+      rootKiloSessionId: 'ses_root',
+      nativeRuntimeId: crypto.randomUUID(),
+    };
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      await handshake(sockets[0], helloResult({ connectionRecovery: true, eventReceipts: true }));
+      await connecting;
+
+      sockets[0]?.close();
+      await waitForReconnect();
+      expect(sockets).toHaveLength(2);
+      expect(sockets[1]?.readyState).toBe(0);
+
+      expect(
+        await client.publishSessionEvent?.(
+          { type: 'question.asked', properties: { id: 'question_1' } },
+          identity
+        )
+      ).toBe(true);
+
+      await waitForReconnect();
+      expect(publishedEventFrames(sockets[1])).toHaveLength(0);
+      expect(failures).toHaveLength(0);
+
+      await handshake(sockets[1], helloResult({ connectionRecovery: true, eventReceipts: true }));
+      await waitForPublishedEvent(sockets[1], 'question.asked');
+      expect(
+        publishedEventFrames(sockets[1]).filter(
+          frame => frame.eventType === 'question.asked'
+        )
+      ).toHaveLength(1);
+      expect(failures).toHaveLength(0);
+    } finally {
+      client.close();
+    }
+  });
+
+  it('preserves a sendEvent queued in a handshake gap and delivers it once after reconnect', async () => {
+    const failures: ControlEventOutboxFailure[] = [];
+    const { client, sockets } = createClientFixture({
+      onEventReceiptFailure: failure => failures.push(failure),
+    });
+    const identity = {
+      directory: '/workspace',
+      kiloSessionId: 'ses_root',
+      rootKiloSessionId: 'ses_root',
+      nativeRuntimeId: crypto.randomUUID(),
+    };
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      await handshake(sockets[0], helloResult({ connectionRecovery: true, eventReceipts: true }));
+      await connecting;
+
+      sockets[0]?.close();
+      await waitForReconnect();
+      expect(sockets).toHaveLength(2);
+      expect(sockets[1]?.readyState).toBe(0);
+
+      expect(
+        client.sendEvent?.(
+          'session.event',
+          { type: 'question.asked', properties: { id: 'question_1' } },
+          identity
+        )
+      ).toBe(true);
+
+      await waitForReconnect();
+      expect(publishedEventFrames(sockets[1])).toHaveLength(0);
+      expect(failures).toHaveLength(0);
+
+      await handshake(sockets[1], helloResult({ connectionRecovery: true, eventReceipts: true }));
+      await waitForPublishedEvent(sockets[1], 'question.asked');
+      expect(
+        publishedEventFrames(sockets[1]).filter(
+          frame => frame.eventType === 'question.asked'
+        )
+      ).toHaveLength(1);
+      expect(failures).toHaveLength(0);
+    } finally {
+      client.close();
+    }
+  });
+
   it('retries a failed sandbox.hello until handshake succeeds', async () => {
     const sockets: FakeWebSocket[] = [];
     const client = createSandboxControlClient({
@@ -2877,4 +2970,35 @@ async function waitForReconnect(): Promise<void> {
   await new Promise<void>(resolve => {
     setTimeout(resolve, 0);
   });
+}
+
+function publishedEventFrames(socket: FakeWebSocket | undefined) {
+  return (socket?.sent ?? [])
+    .map(
+      data =>
+        JSON.parse(data) as {
+          operation?: string;
+          payload?: { receiptId?: string; payload?: { type?: string } };
+        }
+    )
+    .filter(frame => frame.operation === 'sandbox.event.publish')
+    .map(frame => ({
+      receiptId: frame.payload?.receiptId,
+      eventType: frame.payload?.payload?.type,
+    }));
+}
+
+async function waitForPublishedEvent(
+  socket: FakeWebSocket | undefined,
+  type: string
+): Promise<void> {
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    if (publishedEventFrames(socket).some(frame => frame.eventType === type)) return;
+    await Bun.sleep(1);
+  }
+  throw new Error(
+    `Timed out waiting for a ${type} publication: ${JSON.stringify(
+      (socket?.sent ?? []).map(data => (JSON.parse(data) as { operation?: string }).operation)
+    )}`
+  );
 }

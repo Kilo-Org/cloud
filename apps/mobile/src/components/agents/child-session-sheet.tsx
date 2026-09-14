@@ -106,7 +106,11 @@ export function ChildSessionSheet({
             indicator={{ type: 'error', message: sessionError, timestamp: 0 }}
           />
         ) : null}
-        {hydrationError !== null ? (
+        {hydrationError !== null && !isStreaming ? (
+          // A streaming child is proof the session loaded; its rows are the
+          // live truth, so a stale first-page load failure must not sit above
+          // them. The manager drops the stored error on the next child chat
+          // event; this guard covers the gap before that event arrives.
           <QueryError
             title={t('agentChat.childSessionSheet.couldNotLoad')}
             message={hydrationError}

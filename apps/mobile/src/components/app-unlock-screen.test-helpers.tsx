@@ -72,6 +72,7 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platform,
+  StatusBar: { currentHeight: 0 },
   I18nManager: { isRTL: false },
   AccessibilityInfo: { announceForAccessibility: announcements },
   AppState: {
@@ -107,6 +108,7 @@ vi.mock('@/components/ui/icons', () => ({
   CheckCircle2: 'Icon',
   CornerDownLeft: 'Icon',
   Cpu: 'Icon',
+  EyeOff: 'Icon',
   Gauge: 'Icon',
   Globe: 'Icon',
   Info: 'Icon',

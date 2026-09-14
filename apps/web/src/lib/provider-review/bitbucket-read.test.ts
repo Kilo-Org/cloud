@@ -10,6 +10,7 @@ import {
   listInbox,
 } from './bitbucket-read';
 import { BitbucketReviewError } from './bitbucket-authorization';
+import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
 
 const mockGetBitbucketWorkspaceAccessTokenStatus = jest.fn();
 const mockReadCachedRepositories = jest.fn();
@@ -493,6 +494,37 @@ describe('getFileLines', () => {
     expect(error).toBeInstanceOf(BitbucketReviewError);
     expect(error.kind).toBe('not_found');
     expect(error.retryable).toBe(false);
+  });
+
+  it('caps the returned window at the shared FILE_LINES_MAX', async () => {
+    // 600 lines is well past the cap: the returned slice must stop at the
+    // shared limit instead of handing back the whole file as context.
+    const content = Array.from({ length: 600 }, (_, index) => `line ${index + 1}`).join('\n');
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      if (full.includes('/src/')) {
+        return new Response(content, { status: 200, headers: { 'content-type': 'text/plain' } });
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const result = await getFileLines(
+      ORG_OWNER,
+      'acme',
+      'repo',
+      'abc123def4567890',
+      'src/retry.ts',
+      1,
+      600
+    );
+
+    expect(result.totalLines).toBe(600);
+    expect(result.lines).toHaveLength(FILE_LINES_MAX);
+    expect(result.lines[0]).toBe('line 1');
+    expect(result.lines.at(-1)).toBe(`line ${FILE_LINES_MAX}`);
   });
 });
 

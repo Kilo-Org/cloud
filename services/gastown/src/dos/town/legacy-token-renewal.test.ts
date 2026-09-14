@@ -54,12 +54,12 @@ describe('isLegacyTownTokenRenewalAuthorized', () => {
     ).resolves.toBe(false);
   });
 
-  it('rejects a null token pepper even when the current user is unpeppered', async () => {
+  it('allows an explicit null token pepper matching the current unpeppered user', async () => {
     rows([{ pepper: null, blockedAt: null, blockedReason: null }]);
 
     await expect(
       isLegacyTownTokenRenewalAuthorized(env, personalIdentity, 'user-1', null)
-    ).resolves.toBe(false);
+    ).resolves.toBe(true);
   });
 
   it('rejects an org token after membership is removed and re-added for another identity', async () => {
@@ -128,5 +128,41 @@ describe('isLegacyTownTokenRenewalAuthorized', () => {
         payload.apiTokenPepper as string
       )
     ).resolves.toBe(true);
+  });
+});
+
+describe('legacy renewal explicit pepper equality', () => {
+  it.each([
+    [null, null, true],
+    [null, 'rotated', false],
+    ['old', null, false],
+    [undefined, null, false],
+    [undefined, 'current', false],
+    [undefined, undefined, false],
+    ['', '', false],
+    [null, undefined, false],
+  ])('actor token %j against current DB %j', async (tokenPepper, pepper, allowed) => {
+    rows([{ pepper, blockedAt: null, blockedReason: null }], [{ role: 'owner' }]);
+    await expect(
+      resolveLegacyTownTokenOwner(env, orgIdentity, {
+        id: 'user-1',
+        apiTokenPepper: tokenPepper as string | null,
+      })
+    ).resolves.toEqual(allowed ? { id: 'user-1', api_token_pepper: null } : null);
+  });
+
+  it('retains a null-pepper owner when a current org member requests manual renewal', async () => {
+    rows(
+      [{ pepper: null, blockedAt: null, blockedReason: null }],
+      [{ role: 'member' }],
+      [{ pepper: null, blockedAt: null, blockedReason: null }],
+      [{ role: 'owner' }]
+    );
+    await expect(
+      resolveLegacyTownTokenOwner(env, orgIdentity, {
+        id: 'member',
+        apiTokenPepper: null,
+      })
+    ).resolves.toEqual({ id: 'user-1', api_token_pepper: null });
   });
 });

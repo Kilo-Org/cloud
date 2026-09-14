@@ -16,7 +16,11 @@ import { isLegacyTownTokenRenewalAuthorized } from './legacy-token-renewal';
 // purpose, device, environment, org, or workload restrictions by renewing another class.
 const legacyTownPayload = kiloTokenPayload
   .pick({ version: true, kiloUserId: true, apiTokenPepper: true, iat: true, exp: true })
-  .extend({ apiTokenPepper: z.string().min(1), iat: z.number().int(), exp: z.number().int() })
+  .extend({
+    apiTokenPepper: z.string().min(1).nullable(),
+    iat: z.number().int(),
+    exp: z.number().int(),
+  })
   .strict();
 
 async function resolveRegistryIdentity(

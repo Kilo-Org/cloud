@@ -1,3 +1,4 @@
+import { isTokenPepper } from './token-pepper.util';
 import { getWorkerDb } from '@kilocode/db/client';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -44,8 +45,8 @@ export async function authorizeOrganization(
       !principal ||
       principal.blockedAt !== null ||
       principal.blockedReason !== null ||
-      !apiTokenPepper ||
-      !principal.pepper ||
+      !isTokenPepper(apiTokenPepper) ||
+      !isTokenPepper(principal.pepper) ||
       principal.pepper !== apiTokenPepper
     ) {
       return null;
@@ -128,8 +129,8 @@ export async function authorizeTown(
     !principal ||
     principal.blockedAt !== null ||
     principal.blockedReason !== null ||
-    !apiTokenPepper ||
-    !principal.pepper ||
+    !isTokenPepper(apiTokenPepper) ||
+    !isTokenPepper(principal.pepper) ||
     principal.pepper !== apiTokenPepper
   ) {
     return null;

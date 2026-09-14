@@ -280,7 +280,6 @@ export class TownDO extends DurableObject<Env> {
       env: this.env,
       townId: this.townId,
       hasActiveWork: () => this.hasActiveWork(),
-      updateTownConfig: update => this.updateTownConfig(update),
     };
   }
 

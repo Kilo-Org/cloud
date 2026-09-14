@@ -11,7 +11,6 @@ import { decodeJwt } from 'jose';
 import { getTownContainerStub } from '../TownContainer.do';
 import * as config from './config';
 import { resolveSecret } from '../../util/secret.util';
-import type { TownConfig, TownConfigUpdate } from '../../types';
 
 export const RUNTIME_AUTHORIZATION_KEY = 'town:private:runtime-authorization';
 export const TOWN_IDENTITY_KEY = 'town:private:identity';
@@ -34,7 +33,6 @@ type RuntimeAuthorizationContext = {
   env: Env;
   townId: string;
   hasActiveWork: () => boolean;
-  updateTownConfig: (update: TownConfigUpdate) => Promise<TownConfig>;
   now?: () => Date;
 };
 
@@ -249,52 +247,62 @@ export async function reauthorizeRuntime(
 export async function renewRuntimeAuthorization(
   ctx: RuntimeAuthorizationContext
 ): Promise<string | undefined> {
-  const raw = await ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY);
-  if (!raw || !ctx.env.NEXTAUTH_SECRET || !ctx.env.HYPERDRIVE) return undefined;
-  const authorization = RuntimeAuthorizationSchema.safeParse(raw);
-  if (!authorization.success || authorization.data.state !== 'active') return undefined;
+  if (!ctx.env.NEXTAUTH_SECRET || !ctx.env.HYPERDRIVE) return undefined;
+  const snapshot = await ctx.storage.transaction(async txn => {
+    const identityState = await getTownIdentityState(txn, ctx.townId);
+    if (identityState.type !== 'modern') return undefined;
+    const authorization = RuntimeAuthorizationSchema.safeParse(
+      await txn.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (!authorization.success || authorization.data.state !== 'active') return undefined;
+    return {
+      identityState,
+      authorization: authorization.data,
+    };
+  });
+  if (!snapshot) return undefined;
   const secret = await resolveSecret(ctx.env.NEXTAUTH_SECRET);
   if (!secret) return undefined;
+
+  const matchesSnapshot = async (txn: DurableObjectTransaction): Promise<boolean> => {
+    const current = RuntimeAuthorizationSchema.safeParse(
+      await txn.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    return (
+      current.success &&
+      JSON.stringify(current.data) === JSON.stringify(snapshot.authorization) &&
+      JSON.stringify(await getTownIdentityState(txn, ctx.townId)) ===
+        JSON.stringify(snapshot.identityState)
+    );
+  };
+
   try {
     const renewed = await renewAuthorization({
-      authorization: authorization.data,
+      authorization: snapshot.authorization,
       secret,
       connectionString: ctx.env.HYPERDRIVE.connectionString,
       now: ctx.now?.(),
     });
-    const current = RuntimeAuthorizationSchema.safeParse(
-      await ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-    );
-    if (
-      !current.success ||
-      current.data.id !== authorization.data.id ||
-      current.data.state !== 'active'
-    ) {
-      return undefined;
-    }
-    await ctx.updateTownConfig({ kilocode_token: renewed.token });
-    return renewed.token;
+    // Keep the authorization fence and token publication in the same storage
+    // transaction. The TownDO config wrapper also performs external billing I/O.
+    const committed = await ctx.storage.transaction(async txn => {
+      if (!(await matchesSnapshot(txn))) return false;
+      await config.updateTownConfig(txn, { kilocode_token: renewed.token });
+      return true;
+    });
+    return committed ? renewed.token : undefined;
   } catch (error) {
     if (
       error instanceof RuntimeAuthorizationRevokedError ||
       error instanceof RuntimeAuthorizationExpiredError
     ) {
-      // A concurrent reauthorization may have replaced this record while the
-      // database renewal was in flight. Never let the old request revoke the
-      // newly-issued authorization.
-      const current = RuntimeAuthorizationSchema.safeParse(
-        await ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-      );
-      if (
-        current.success &&
-        current.data.id === authorization.data.id &&
-        current.data.state === 'active'
-      ) {
-        await ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, {
-          ...current.data,
+      await ctx.storage.transaction(async txn => {
+        if (!(await matchesSnapshot(txn))) return;
+        await txn.put(RUNTIME_AUTHORIZATION_KEY, {
+          ...snapshot.authorization,
           state: 'revoked',
         } satisfies RuntimeAuthorization);
-      }
+      });
     }
     return undefined;
   }

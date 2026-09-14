@@ -163,3 +163,25 @@ describe('authorizeOrganization', () => {
     ).rejects.toBeInstanceOf(TownAuthorizationUnavailableError);
   });
 });
+
+describe('current null-pepper organization authority', () => {
+  it.each([
+    [null, null, true],
+    [null, 'rotated', false],
+    ['old', null, false],
+    [undefined, null, false],
+    [undefined, undefined, false],
+    ['', '', false],
+    [null, undefined, false],
+  ])('token %j against current DB %j', async (tokenPepper, pepper, allowed) => {
+    rows([{ pepper, blockedAt: null, blockedReason: null }], [{ role: 'member' }]);
+    await expect(
+      authorizeOrganization(
+        { HYPERDRIVE: { connectionString: 'postgres://' } } as Env,
+        'org-1',
+        'oauth/user',
+        tokenPepper as string | null
+      )
+    ).resolves.toEqual(allowed ? { role: 'member' } : null);
+  });
+});

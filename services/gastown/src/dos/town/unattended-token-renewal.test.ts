@@ -131,6 +131,25 @@ beforeEach(() => {
 });
 
 describe('unattended legacy town renewal entry', () => {
+  it.each([false, true])('renews an explicitly null-pepper town (org=%s)', async org => {
+    mocks.select.mockImplementation(() => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => [{ pepper: null, blockedAt: null, blockedReason: null }],
+        }),
+        innerJoin: () => ({ where: () => ({ limit: async () => [{ role: 'owner' }] }) }),
+      }),
+    }));
+    const t = await town(org, await token({ apiTokenPepper: null }));
+    await t.renew();
+    const renewed = (await config.getTownConfig(t.store)).kilocode_token;
+    expect(renewed).not.toBe(t.oldToken);
+    const { payload } = await jwtVerify(renewed!, new TextEncoder().encode(secret));
+    expect(payload.apiTokenPepper).toBeNull();
+    expect(payload.kiloUserId).toBe(identity.ownerUserId);
+    expect(t.sync).toHaveBeenCalledOnce();
+  });
+
   it.each([false, true])(
     'adopts and renews a pre-PR town (org=%s) without UI refresh',
     async org => {
@@ -199,6 +218,8 @@ describe('unattended legacy town renewal entry', () => {
     { nbf: Math.floor(Date.now() / 1000) + 86400 },
     { iat: Math.floor(Date.now() / 1000) + 100 },
     { apiTokenPepper: null },
+    { apiTokenPepper: undefined },
+    { apiTokenPepper: '' },
     { apiTokenPepper: 'rotated' },
   ])('does not launder token claims %j', async claims => {
     const t = await town(false, await token(claims));

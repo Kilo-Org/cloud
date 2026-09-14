@@ -255,40 +255,45 @@ describe('resolveTownOwnership', () => {
     expect(mocks.syncConfigToContainer).toHaveBeenCalledOnce();
   });
 
-  it('migrates a personal legacy town before minting with its current owner pepper', async () => {
-    const identity = {
-      ownerType: 'user' as const,
-      ownerUserId: 'cached-admin',
-      createdByUserId: 'cached-admin',
-      runtimeMode: 'legacy' as const,
-    };
-    mocks.getTownIdentityState
-      .mockResolvedValueOnce({ type: 'legacy', identity: null })
-      .mockResolvedValueOnce({ type: 'legacy', identity: null })
-      .mockResolvedValueOnce({ type: 'legacy', identity });
-    mocks.getTownAsync.mockResolvedValue({ id: 'town-1', owner_user_id: 'cached-admin' });
-    mocks.refreshRuntimeAuthorizationForManualRefresh.mockResolvedValue('legacy');
-    mocks.resolveLegacyTownTokenOwner.mockResolvedValue({
-      id: 'cached-admin',
-      api_token_pepper: 'owner-current',
-    });
-    mocks.generateKiloApiToken.mockResolvedValue('new-token');
+  it.each(['owner-current', null])(
+    'migrates a personal legacy town with current pepper %j',
+    async pepper => {
+      const identity = {
+        ownerType: 'user' as const,
+        ownerUserId: 'cached-admin',
+        createdByUserId: 'cached-admin',
+        runtimeMode: 'legacy' as const,
+      };
+      mocks.getTownIdentityState
+        .mockResolvedValueOnce({ type: 'legacy', identity: null })
+        .mockResolvedValueOnce({ type: 'legacy', identity: null })
+        .mockResolvedValueOnce({ type: 'legacy', identity });
+      mocks.getTownAsync.mockResolvedValue({ id: 'town-1', owner_user_id: 'cached-admin' });
+      mocks.refreshRuntimeAuthorizationForManualRefresh.mockResolvedValue('legacy');
+      mocks.resolveLegacyTownTokenOwner.mockResolvedValue({
+        id: 'cached-admin',
+        api_token_pepper: pepper,
+      });
+      mocks.generateKiloApiToken.mockResolvedValue('new-token');
 
-    await expect(
-      gastownRouter.createCaller(ctx).refreshContainerToken({
-        townId: '00000000-0000-4000-8000-000000000001',
-      })
-    ).resolves.toBeUndefined();
-    expect(mocks.initializePrivateTownIdentity).toHaveBeenCalledWith(identity);
-    expect(mocks.resolveLegacyTownTokenOwner).toHaveBeenCalledWith(env, identity, {
-      id: 'cached-admin',
-      apiTokenPepper: 'pepper',
-    });
-    expect(mocks.generateKiloApiToken).toHaveBeenCalledWith(
-      { id: 'cached-admin', api_token_pepper: 'owner-current' },
-      'secret'
-    );
-  });
+      await expect(
+        gastownRouter
+          .createCaller({ ...ctx, usesModernToken: false, apiTokenPepper: pepper })
+          .refreshContainerToken({
+            townId: '00000000-0000-4000-8000-000000000001',
+          })
+      ).resolves.toBeUndefined();
+      expect(mocks.initializePrivateTownIdentity).toHaveBeenCalledWith(identity);
+      expect(mocks.resolveLegacyTownTokenOwner).toHaveBeenCalledWith(env, identity, {
+        id: 'cached-admin',
+        apiTokenPepper: pepper,
+      });
+      expect(mocks.generateKiloApiToken).toHaveBeenCalledWith(
+        { id: 'cached-admin', api_token_pepper: pepper },
+        'secret'
+      );
+    }
+  );
 
   it('migrates an org legacy town from its owner registry record', async () => {
     const identity = {

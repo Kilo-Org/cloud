@@ -24,7 +24,9 @@ vi.mock('jose', async importOriginal => {
 vi.mock('../TownContainer.do', () => ({
   getTownContainerStub: () => ({ getState: mocks.getState }),
 }));
-vi.mock('./config', () => ({ updateTownConfig: mocks.updateConfig }));
+vi.mock('./config', () => ({
+  updateTownConfig: mocks.updateConfig,
+}));
 vi.mock('../../util/secret.util', () => ({ resolveSecret: vi.fn(() => 'secret') }));
 
 import {
@@ -102,7 +104,6 @@ function context(store: DurableObjectStorage) {
     } as unknown as Env,
     townId: 'town-1',
     hasActiveWork: () => false,
-    updateTownConfig: mocks.updateConfig,
   };
 }
 
@@ -174,18 +175,58 @@ describe('runtime authorization persistence', () => {
     await expect(getTownIdentityState(store, 'town-1')).resolves.toEqual({ type: 'invalid' });
   });
 
+  it.each([
+    ['missing identity', undefined, {}],
+    ['legacy identity', identity, {}],
+    ['different town', { ...identity, runtimeMode: 'modern' }, { resourceId: 'other-town' }],
+    ['different owner', { ...identity, runtimeMode: 'modern' }, { userId: 'other-user' }],
+    [
+      'different resource',
+      { ...identity, runtimeMode: 'modern' },
+      { resourceKind: 'cloud-agent-next' },
+    ],
+  ])('does not renew a runtime record with %s', async (_label, storedIdentity, overrides) => {
+    const store = storage();
+    if (storedIdentity) await store.put(TOWN_IDENTITY_KEY, storedIdentity);
+    await store.put(RUNTIME_AUTHORIZATION_KEY, { ...authorization(), ...overrides });
+    mocks.renew.mockResolvedValue({ token: 'wrong-runtime-token' });
+
+    await expect(renewRuntimeAuthorization(context(store))).resolves.toBeUndefined();
+    expect(mocks.renew).not.toHaveBeenCalled();
+    expect(mocks.updateConfig).not.toHaveBeenCalled();
+  });
+
+  it('does not publish a token if the private identity changes during renewal', async () => {
+    const store = storage();
+    await store.put(TOWN_IDENTITY_KEY, { ...identity, runtimeMode: 'modern' });
+    await store.put(RUNTIME_AUTHORIZATION_KEY, authorization());
+    mocks.renew.mockImplementation(async () => {
+      await store.put(TOWN_IDENTITY_KEY, {
+        ...identity,
+        ownerUserId: 'other-user',
+        runtimeMode: 'modern',
+      });
+      return { token: 'stale-runtime-token' };
+    });
+
+    await expect(renewRuntimeAuthorization(context(store))).resolves.toBeUndefined();
+    expect(mocks.updateConfig).not.toHaveBeenCalled();
+  });
+
   it('renews an active authorization and retains active state', async () => {
     const store = storage();
+    await store.put(TOWN_IDENTITY_KEY, { ...identity, runtimeMode: 'modern' });
     await store.put(RUNTIME_AUTHORIZATION_KEY, authorization());
     mocks.renew.mockResolvedValue({ token: 'runtime-token' });
 
     await expect(renewRuntimeAuthorization(context(store))).resolves.toBe('runtime-token');
     await expect(getRuntimeAuthorizationState(store)).resolves.toBe('active');
-    expect(mocks.updateConfig).toHaveBeenCalledWith({ kilocode_token: 'runtime-token' });
+    expect(mocks.updateConfig).toHaveBeenCalledWith(store, { kilocode_token: 'runtime-token' });
   });
 
   it('persists revoked state and does not return a replacement token', async () => {
     const store = storage();
+    await store.put(TOWN_IDENTITY_KEY, { ...identity, runtimeMode: 'modern' });
     await store.put(RUNTIME_AUTHORIZATION_KEY, authorization());
     mocks.renew.mockRejectedValue(new RuntimeAuthorizationRevokedError());
 
@@ -196,6 +237,7 @@ describe('runtime authorization persistence', () => {
 
   it('persists expiry as revoked without updating the town token', async () => {
     const store = storage();
+    await store.put(TOWN_IDENTITY_KEY, { ...identity, runtimeMode: 'modern' });
     await store.put(RUNTIME_AUTHORIZATION_KEY, authorization());
     mocks.renew.mockRejectedValue(new RuntimeAuthorizationExpiredError());
 
@@ -206,6 +248,7 @@ describe('runtime authorization persistence', () => {
 
   it('does not revoke a newer authorization when an in-flight renewal is rejected', async () => {
     const store = storage();
+    await store.put(TOWN_IDENTITY_KEY, { ...identity, runtimeMode: 'modern' });
     const oldAuthorization = authorization();
     const replacementAuthorization = {
       ...authorization(),
@@ -228,6 +271,20 @@ describe('runtime authorization persistence', () => {
       RUNTIME_AUTHORIZATION_KEY,
       expect.objectContaining({ id: oldAuthorization.id, state: 'revoked' })
     );
+  });
+
+  it('does not revoke a changed record with the same ID after a rejected renewal', async () => {
+    const store = storage();
+    await store.put(TOWN_IDENTITY_KEY, { ...identity, runtimeMode: 'modern' });
+    const original = authorization();
+    const replacement = { ...original, source: { ...original.source, tokenSource: 'replacement' } };
+    await store.put(RUNTIME_AUTHORIZATION_KEY, original);
+    mocks.renew.mockImplementation(async () => {
+      await store.put(RUNTIME_AUTHORIZATION_KEY, replacement);
+      throw new RuntimeAuthorizationRevokedError();
+    });
+    await expect(renewRuntimeAuthorization(context(store))).resolves.toBeUndefined();
+    expect(await store.get(RUNTIME_AUTHORIZATION_KEY)).toEqual(replacement);
   });
 
   it('reauthorizes only a stopped town with a revoked authorization', async () => {

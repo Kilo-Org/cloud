@@ -1,3 +1,4 @@
+import { isTokenPepper } from '../../util/token-pepper.util';
 import { getWorkerDb } from '@kilocode/db/client';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -15,7 +16,7 @@ type LegacyTokenActor = {
 
 export type LegacyTokenOwner = {
   id: string;
-  api_token_pepper: string;
+  api_token_pepper: string | null;
 };
 
 export class LegacyTownTokenRenewalUnavailableError extends Error {}
@@ -27,15 +28,17 @@ function isCurrentAccount(
         blockedAt: Date | string | null;
         blockedReason: string | null;
       }
-    | undefined,
-  tokenPepper?: string | null
-): user is { pepper: string; blockedAt: Date | string | null; blockedReason: string | null } {
+    | undefined
+): user is {
+  pepper: string | null;
+  blockedAt: Date | string | null;
+  blockedReason: string | null;
+} {
   return (
     user !== undefined &&
     user.blockedAt === null &&
     user.blockedReason === null &&
-    user.pepper !== null &&
-    (tokenPepper === undefined || (tokenPepper !== null && user.pepper === tokenPepper))
+    isTokenPepper(user.pepper)
   );
 }
 
@@ -58,7 +61,12 @@ export async function resolveLegacyTownTokenOwner(
       .where(eq(kilocode_users.id, actor.id))
       .limit(1);
 
-    if (!isCurrentAccount(principal, actor.apiTokenPepper)) return null;
+    if (
+      !isCurrentAccount(principal) ||
+      !isTokenPepper(actor.apiTokenPepper) ||
+      principal.pepper !== actor.apiTokenPepper
+    )
+      return null;
     if (identity.ownerType === 'user' && identity.ownerUserId !== actor.id) return null;
 
     const isEligibleMember = async (userId: string): Promise<boolean> => {

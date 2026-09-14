@@ -230,7 +230,14 @@ function stripPromptContext(value: string): string {
 function directiveTag(directive: Directive | null): string | undefined {
   if (
     directive === null ||
-    !['gate', 'write-then-gate', 'read-edit-then-gate', 'question'].includes(directive.scenario)
+    ![
+      'gate',
+      'write-then-gate',
+      'read-edit-then-gate',
+      'read-then-write',
+      'tool-stream',
+      'question',
+    ].includes(directive.scenario)
   ) {
     return undefined;
   }
@@ -268,7 +275,7 @@ function advertisedTools(body: unknown): AdvertisedTool[] {
   return tools;
 }
 
-function toolCallId(tag: string, kind: ToolKind): string {
+export function toolCallId(tag: string, kind: ToolKind): string {
   const fingerprint = createHash('sha256').update(tag).digest('hex').slice(0, 12);
   return `call_${fingerprint}_${kind}`;
 }
@@ -496,6 +503,7 @@ type ToolCallDelta = {
 type ChunkDelta = {
   role?: string;
   content?: string;
+  reasoning?: string;
   tool_calls?: ToolCallDelta[];
 };
 
@@ -624,6 +632,38 @@ function emitEcho(ctx: ScenarioContext, text: string): void {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export const MAX_REALISTIC_CHARS = 4000;
+export const MAX_REALISTIC_PIECES = 512;
+
+/**
+ * Upper bound for the `tool-stream:<tag>:<bytes>` request. The directive asks
+ * Kilo to write exactly `bytes` of file content, so this caps the *request*,
+ * not the emitted payload: a larger request is an invalid directive (HTTP 402)
+ * rather than a silently smaller stream.
+ */
+export const MAX_TOOL_STREAM_BYTES = 1024 * 1024;
+
+export function buildRealisticReasoning(text: string): string[] {
+  const fingerprint = createHash('sha256').update(text).digest('hex').slice(0, 16);
+  const reasoningSeed = `input=${fingerprint} chars=${text.length}`;
+  return [
+    `Analyzing ${reasoningSeed}.`,
+    `Planning ${reasoningSeed}.`,
+    `Preparing ${reasoningSeed}.`,
+  ];
+}
+
+export function splitRealisticContent(text: string): string[] {
+  const cappedText = text.slice(0, MAX_REALISTIC_CHARS);
+  const splitPieces = cappedText.split(/(\s+)/).filter(piece => piece.length > 0);
+  if (splitPieces.length <= MAX_REALISTIC_PIECES) return splitPieces;
+  // Keep the full capped text while bounding the number of streamed chunks.
+  return [
+    ...splitPieces.slice(0, MAX_REALISTIC_PIECES - 1),
+    splitPieces.slice(MAX_REALISTIC_PIECES - 1).join(''),
+  ];
 }
 
 function writeAssistantResponse(ctx: ScenarioContext, content: string): void {
@@ -767,6 +807,24 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     emitEcho(ctx, text);
   },
 
+  async realistic(args, ctx) {
+    const text = stripPromptContext(args[0] ?? '');
+    const contentPieces = splitRealisticContent(text);
+    const reasoningPieces = buildRealisticReasoning(text);
+
+    writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { role: 'assistant' }));
+    for (const [index, reasoning] of reasoningPieces.entries()) {
+      if (index > 0) await sleep(120);
+      writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { reasoning }));
+    }
+    for (const [index, piece] of contentPieces.entries()) {
+      if (index > 0) await sleep(80);
+      writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { content: piece }));
+    }
+    writeFinish(ctx.res, ctx.id, ctx.model, contentPieces.join('').length);
+    ctx.res.end();
+  },
+
   async slow(args, ctx) {
     const raw = args[0] ?? '';
     const parts = raw.split(':');
@@ -899,6 +957,85 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
       return;
     }
     parkGate(ctx, tag, `done-${tag}`);
+  },
+
+  'read-then-write'(args, ctx) {
+    const parsed = stripPromptContext(args[0] ?? '').match(
+      /^([A-Za-z0-9_-]+):([^:]+):([^:]+):([\s\S]+)$/
+    );
+    if (!parsed?.[1] || !parsed[2] || !parsed[3] || parsed[4] === undefined) {
+      writeJsonError(
+        ctx.res,
+        402,
+        'read-then-write directive requires tag, srcPath, destPath, and prefix',
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag, srcPath, destPath, prefix] = parsed;
+    if (ctx.tools.length === 0) {
+      writeAssistantResponse(ctx, `done-${tag}`);
+      return;
+    }
+    const results = toolResults(ctx.body, tag, ctx.state);
+    const readResult = results.find(result => result.id === toolCallId(tag, 'read'));
+    if (!readResult) {
+      runToolScenario(ctx, tag, 'read', { path: srcPath });
+      return;
+    }
+    if (!results.some(result => result.id === toolCallId(tag, 'write'))) {
+      const contents = stripPromptContext(readFileContents(readResult.content));
+      if (!contents) {
+        writeJsonError(ctx.res, 422, 'read tool returned no file contents', 'invalid_tool_result');
+        return;
+      }
+      runToolScenario(ctx, tag, 'write', {
+        path: destPath,
+        contents: `${prefix}\n${contents}`,
+      });
+      return;
+    }
+    parkGate(ctx, tag, `done-${tag}`);
+  },
+
+  'tool-stream'(args, ctx) {
+    const parsed = stripPromptContext(args[0] ?? '').match(/^([A-Za-z0-9_-]+):(\d+)$/);
+    if (!parsed?.[1] || parsed[2] === undefined) {
+      writeJsonError(
+        ctx.res,
+        402,
+        'tool-stream directive requires a tag and a byte count',
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag, rawBytes] = parsed;
+    const bytes = Number.parseInt(rawBytes, 10);
+    if (bytes > MAX_TOOL_STREAM_BYTES) {
+      writeJsonError(
+        ctx.res,
+        402,
+        `tool-stream byte request ${bytes} exceeds maximum ${MAX_TOOL_STREAM_BYTES}`,
+        'invalid_request'
+      );
+      return;
+    }
+    if (ctx.tools.length === 0) {
+      writeAssistantResponse(ctx, `done-${tag}`);
+      return;
+    }
+    const path = `tool-stream-${tag}.txt`;
+    const results = toolResults(ctx.body, tag, ctx.state);
+    if (!results.some(result => result.id === toolCallId(tag, 'write'))) {
+      // Ask Kilo to write exactly the requested bytes, then read the file back.
+      runToolScenario(ctx, tag, 'write', { path, contents: 'x'.repeat(bytes) });
+      return;
+    }
+    if (!results.some(result => result.id === toolCallId(tag, 'read'))) {
+      runToolScenario(ctx, tag, 'read', { path });
+      return;
+    }
+    writeAssistantResponse(ctx, `done-${tag}`);
   },
 
   question(args, ctx) {

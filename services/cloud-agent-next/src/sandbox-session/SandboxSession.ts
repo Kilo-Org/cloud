@@ -157,12 +157,16 @@ import {
   sessionQuestionResolveResultSchema,
   sessionAbortResultSchema,
   sameSessionOperation,
+  isSandboxAcquisitionLostError,
   wrapperInstanceIdSchema,
   type SessionAttachPayload,
   type SessionOperationAck,
   type SessionOperationAuthorization,
   type SessionRequestIdentity,
   type SessionSyncResult,
+  type SandboxEventBatchItemOutcome,
+  type SandboxEventBatchResult,
+  type SandboxEventPublicationPayload,
   type SessionEventIdentity,
   type SessionPreparingPayload,
 } from '../shared/sandbox-control-protocol.js';
@@ -212,6 +216,7 @@ import {
   recordAcceptedMessageActivity,
   releaseCompletedRetryableAttach,
   releaseUnadmittedWaitingMessages,
+  rotateLostPreparationAttempt,
   resolveSessionMessageIntent,
   streamCloudStatus,
   streamQueuedSnapshots,
@@ -878,6 +883,65 @@ export class SandboxSession extends DurableObject<Env> {
     }
     const applied = this.terminalLifecycle.isCurrent(epoch);
     return result(applied, applied ? 'applied' : 'epoch_changed');
+  }
+
+  receiveSandboxControlEventBatch(input: {
+    items: SandboxEventPublicationPayload[];
+    wrapperInstanceId?: string;
+  }): Promise<SandboxEventBatchResult> {
+    return this.trackOperation(this.applySandboxControlEventBatch(input));
+  }
+
+  private async applySandboxControlEventBatch(input: {
+    items: SandboxEventPublicationPayload[];
+    wrapperInstanceId?: string;
+  }): Promise<SandboxEventBatchResult> {
+    const outcomes: SandboxEventBatchItemOutcome[] = [];
+    let halted = false;
+    for (const item of input.items) {
+      if (halted) {
+        outcomes.push({ receiptId: item.receiptId, status: 'unattempted' });
+        continue;
+      }
+      try {
+        let applied = false;
+        let retryable: boolean | undefined;
+        if (item.event === 'session.event') {
+          const result = await this.applySandboxControlEvent({
+            identity: item.session,
+            payload: item.payload,
+            receiptId: item.receiptId,
+            sequence: item.sequence,
+            wrapperInstanceId: input.wrapperInstanceId,
+          });
+          applied = result.applied;
+          retryable = result.retryable;
+        } else {
+          applied = (
+            await this.receiveSandboxControlPreparing({
+              identity: item.session,
+              payload: item.payload,
+              wrapperInstanceId: input.wrapperInstanceId,
+              receiptId: item.receiptId,
+              sequence: item.sequence,
+            })
+          ).applied;
+        }
+        outcomes.push(
+          applied
+            ? { receiptId: item.receiptId, status: 'applied' }
+            : {
+                receiptId: item.receiptId,
+                status: 'rejected',
+                ...(retryable === true ? { retryable: true } : {}),
+              }
+        );
+      } catch {
+        outcomes.push({ receiptId: item.receiptId, status: 'unknown' });
+        halted = true;
+      }
+    }
+    return { outcomes };
   }
 
   async receiveSandboxControlPreparing(input: {
@@ -3662,6 +3726,7 @@ export class SandboxSession extends DurableObject<Env> {
         deadlineAt,
         error,
         attachInPreparation,
+        hadAcquisition: acquisition !== undefined,
       });
     } finally {
       this.worktreeChanges.finishPreparation(preparationGeneration);
@@ -3700,6 +3765,7 @@ export class SandboxSession extends DurableObject<Env> {
     epoch: number;
     phase: DispatchPhase;
     attachInPreparation: boolean;
+    hadAcquisition: boolean;
     wrapperInstanceId?: string;
     deadlineAt: number;
     error: unknown;
@@ -3708,6 +3774,24 @@ export class SandboxSession extends DurableObject<Env> {
       input;
     const message = this.queuedMessage(messageId, epoch, wrapperInstanceId);
     if (!message) return;
+    if (input.hadAcquisition && isSandboxAcquisitionLostError(error)) {
+      if (Date.now() >= deadlineAt) {
+        await this.failDelivery(
+          messageId,
+          'preparation_timeout',
+          wrapperInstanceId,
+          message.deliveryRetryScope
+        );
+        return;
+      }
+      const retryNotBefore = Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS);
+      const rotated = rotateLostPreparationAttempt(this.loadMessages(), messageId, retryNotBefore);
+      if (rotated) {
+        if (this.saveMessages(rotated, epoch)) await this.armQueueRetry(retryNotBefore);
+        return;
+      }
+      // Dispatched or unresolved proofs exist: fall through to the existing terminal handling.
+    }
     const rejection = error instanceof ControlRequestError && error.rejectionReceived === true;
     const retryableRejection =
       rejection && error instanceof ControlRequestError && error.code !== 'runtime_unhealthy';
@@ -4116,6 +4200,7 @@ export class SandboxSession extends DurableObject<Env> {
     );
     return {
       expectedWrapperInstanceId,
+      fencePresent: fence.success,
       fenceWrapperInstanceId: fence.success ? fence.data.wrapperInstanceId : undefined,
       nativeRuntimeId: input.identity.nativeRuntimeId,
       fenceNativeRuntimeId: fence.success ? fence.data.nativeRuntimeId : undefined,

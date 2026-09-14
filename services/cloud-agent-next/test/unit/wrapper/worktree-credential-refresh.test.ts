@@ -22,6 +22,7 @@ import {
   type HandlerDeps,
 } from '../../../wrapper/src/control/sandbox-control-handlers.js';
 import { startSandboxControlEventFeed } from '../../../wrapper/src/control/sandbox-control-runtime.js';
+import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type * as ControlRuntimeModule from '../../../wrapper/src/control/sandbox-control-runtime.js';
 import type * as KiloApiModule from '../../../wrapper/src/kilo-api.js';
 import type * as UtilsModule from '../../../wrapper/src/utils.js';
@@ -111,11 +112,13 @@ function fixture() {
     };
   });
   const onUnexpectedClose = vi.fn();
+  const diagnostics: ControlDiagnosticFields[] = [];
   const registry = createWorktreeKiloRuntimes({
     homeRoot: '/test-homes',
     inheritedEnv: {},
     startServer,
     onUnexpectedClose,
+    onDiagnostic: (_event, fields) => diagnostics.push(fields),
   });
   registries.push(registry);
   async function attach(
@@ -133,7 +136,17 @@ function fixture() {
       attachment.release();
     }
   }
-  return { registry, attach, startServer, close, statuses, createPty, clients, onUnexpectedClose };
+  return {
+    registry,
+    attach,
+    startServer,
+    close,
+    statuses,
+    createPty,
+    clients,
+    onUnexpectedClose,
+    diagnostics,
+  };
 }
 
 beforeEach(() => {
@@ -185,6 +198,21 @@ describe('direct worktree credential refresh', () => {
     expect(directoryForSession(sibling.kiloSessionId)).toBe(identity.directory);
     expect(f.registry.get(identity.directory)).toBe(refreshed);
     expect(f.onUnexpectedClose).not.toHaveBeenCalled();
+
+    // Shared existing-root renewal: the sibling is still committed when the
+    // existing root re-attaches with changed env, so the reason must not claim
+    // it was the sole root.
+    const renewal = f.diagnostics.find(
+      fields => fields.reason === 'refresh:existing_root_env_changed'
+    );
+    expect(renewal).toMatchObject({
+      reason: 'refresh:existing_root_env_changed',
+      kiloSessionId: identity.kiloSessionId,
+      sessionCount: 2,
+    });
+    expect(renewal?.detail).toContain('newRoot=0');
+    expect(renewal?.detail).toContain('tc=1');
+
     await f.attach(rotated, env, sibling);
     expect(f.startServer).toHaveBeenCalledTimes(2);
   });
@@ -436,7 +464,7 @@ describe('direct worktree credential refresh', () => {
     }
   );
 
-  it('waits for confirmed old process exit before launching the refreshed process', async () => {
+  it('refreshes without waiting for the old process close', async () => {
     const f = fixture();
     const stopped = Promise.withResolvers<void>();
     f.startServer.mockImplementationOnce(async options => {
@@ -450,14 +478,12 @@ describe('direct worktree credential refresh', () => {
       { ...originalEnv, GH_TOKEN: 'github-renewed' },
       () => true
     );
-    await vi.waitFor(() => expect(f.close).toHaveBeenCalledTimes(1));
-    expect(f.startServer).toHaveBeenCalledTimes(1);
-    expect(f.registry.get(identity.directory)).toBeUndefined();
-    stopped.resolve();
     expect(await attachment.ready).toBe(runtime);
     attachment.commit();
     attachment.release();
     expect(f.startServer).toHaveBeenCalledTimes(2);
+    expect(f.close).toHaveBeenCalledTimes(1);
+    stopped.resolve();
   });
 
   it.each(['server-start', 'feed-start', 'feed-timeout', 'process-stop-timeout'] as const)(
@@ -491,7 +517,7 @@ describe('direct worktree credential refresh', () => {
       expect(runtime.signal.aborted).toBe(true);
       expect(f.registry.get(identity.directory)).toBeUndefined();
       await vi.waitFor(() => expect(f.onUnexpectedClose).toHaveBeenCalledTimes(1));
-      expect(f.registry.isHealthy()).toBe(failure !== 'process-stop-timeout');
+      expect(f.registry.isHealthy()).toBe(true);
       expect(f.onUnexpectedClose.mock.calls[0]?.[0]).toMatchObject({
         directory: identity.directory,
         reason: 'credential_refresh_failed',
@@ -508,21 +534,26 @@ describe('direct worktree credential refresh', () => {
     }
   );
 
-  it('does not report intentional shutdown during a pending destructive refresh as unexpected', async () => {
+  it('does not report intentional shutdown while a destructive refresh is pending', async () => {
     const f = fixture();
-    const stopped = Promise.withResolvers<void>();
+    const stopResult = Promise.withResolvers<boolean>();
     f.startServer.mockImplementationOnce(async options => {
-      options.onProcessScope?.({ stop: async () => true, verify: async () => true } as never);
-      return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+      options.onProcessScope?.({ stop: async () => stopResult.promise } as never);
+      return {
+        url: 'http://127.0.0.1:10000',
+        close: f.close,
+        stopped: new Promise<void>(() => {}),
+      };
     });
-    await f.attach();
+    const runtime = await f.attach();
     const outcome = f
       .attach(auth, { ...originalEnv, GH_TOKEN: 'github-renewed' })
       .catch(error => error);
     await vi.waitFor(() => expect(f.close).toHaveBeenCalledTimes(1));
     f.registry.shutdown();
-    expect(await outcome).toMatchObject({ code: 'runtime_unhealthy' });
-    stopped.resolve();
+    stopResult.resolve(true);
+    expect(await outcome).toMatchObject({ code: 'runtime_unhealthy', retryable: true });
+    expect(runtime.signal.aborted).toBe(true);
     expect(f.startServer).toHaveBeenCalledTimes(1);
     expect(f.onUnexpectedClose).not.toHaveBeenCalled();
   });

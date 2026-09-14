@@ -1,6 +1,40 @@
 import { withTimeoutAndAbort } from '../utils.js';
-import type { OwnedProcessScope } from './owned-processes.js';
+import {
+  OWNED_PROCESS_OBSERVATION_TIMEOUT_MS,
+  type DirectProcessObserver,
+  type OwnedProcessScope,
+} from './owned-processes.js';
 import type { NativeOperationTarget, NativeRetirement } from './session-operation-cleanup.js';
+
+export function stopWithinCleanupBudget(
+  processes: OwnedProcessScope | undefined,
+  processIssued: boolean,
+  deadlineAt: number
+): Promise<boolean> {
+  if (!processes) return Promise.resolve(processIssued !== true);
+  const now = Date.now();
+  const observationReserve = Math.min(
+    OWNED_PROCESS_OBSERVATION_TIMEOUT_MS,
+    Math.max(0, (deadlineAt - now) / 2)
+  );
+  const stopDeadlineAt = Math.max(now, deadlineAt - observationReserve);
+  return processes.stop(stopDeadlineAt);
+}
+
+export async function settleNativeCleanup(options: {
+  processes: OwnedProcessScope | undefined;
+  processIssued: boolean;
+  deadlineAt: number;
+  observeDirect: (deadlineAt: number) => Promise<boolean>;
+}): Promise<boolean> {
+  const stopped = stopWithinCleanupBudget(
+    options.processes,
+    options.processIssued,
+    options.deadlineAt
+  );
+  if (await stopped) return true;
+  return options.observeDirect(options.deadlineAt);
+}
 
 export type RuntimeCleanupEntry<Root> = {
   directory: string;
@@ -9,6 +43,7 @@ export type RuntimeCleanupEntry<Root> = {
   roots: Set<Root>;
   kiloClient?: NativeOperationTarget['client'];
   processes?: OwnedProcessScope;
+  processObserver?: DirectProcessObserver;
   processIssued?: boolean;
   starting?: Promise<unknown>;
   stopped?: Promise<void>;
@@ -24,6 +59,7 @@ export function retireWorktreeRuntime<Entry extends RuntimeCleanupEntry<Root>, R
     cleanupDeadline: (entry: Entry, requested?: number) => number;
     unregisterRoot: (root: Root) => void;
     removeEntry: (entry: Entry) => void;
+    unverifiedCleanup: (entry: Entry, deadlineAt: number) => Promise<boolean>;
   }
 ): Promise<NativeRetirement> {
   if (
@@ -34,22 +70,24 @@ export function retireWorktreeRuntime<Entry extends RuntimeCleanupEntry<Root>, R
     return Promise.resolve('stale');
   const deadlineAt = deps.cleanupDeadline(entry, requested);
   if (entry.retiring) {
-    void entry.processes?.stop(deadlineAt);
+    void stopWithinCleanupBudget(entry.processes, entry.processIssued === true, deadlineAt);
     return entry.retiring;
   }
   const completion = Promise.withResolvers<NativeRetirement>();
   entry.retiring = completion.promise;
-  const processes =
-    entry.processes?.stop(deadlineAt) ??
-    entry.stopped?.then(() => true) ??
-    Promise.resolve(entry.processIssued !== true);
   entry.abort.abort();
   for (const root of [...entry.roots]) deps.unregisterRoot(root);
   const cleanup = async (): Promise<NativeRetirement> => {
     const starting = entry.starting;
     await Promise.resolve(starting).catch(() => undefined);
     if (starting !== undefined && Date.now() >= deps.cleanupDeadline(entry)) return 'unconfirmed';
-    if (!(await processes)) return 'unconfirmed';
+    const settled = await settleNativeCleanup({
+      processes: entry.processes,
+      processIssued: entry.processIssued === true,
+      deadlineAt,
+      observeDirect: innerDeadlineAt => deps.unverifiedCleanup(entry, innerDeadlineAt),
+    });
+    if (!settled) return 'unconfirmed';
     deps.removeEntry(entry);
     return 'retired';
   };

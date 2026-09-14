@@ -15,10 +15,21 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * Upper bound for any single Docker CLI call. `docker pause`/`unpause` on a
+ * wedged daemon otherwise never resolves, which leaves the harness unable to
+ * retain or clean up the frozen container's identity. A timed-out call is an
+ * uncertain acknowledgement, not a no-op.
+ */
+export const DOCKER_COMMAND_TIMEOUT_MS = 30_000;
+
 export type DockerCommandExecutor = (args: string[]) => Promise<{ stdout: string }>;
 
 const executeDockerCommand: DockerCommandExecutor = async args => {
-  const { stdout } = await execFileAsync('docker', args);
+  const { stdout } = await execFileAsync('docker', args, {
+    timeout: DOCKER_COMMAND_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
+  });
   return { stdout };
 };
 
@@ -27,6 +38,36 @@ export type SandboxContainer = {
   name: string;
   image: string;
   isProxy: boolean;
+};
+
+/**
+ * Immutable identity of an exclusively owned control-plane primary, captured
+ * while it is still reachable. `unpauseOwnedPrimary` never rediscoveries the
+ * runtime from Kilo: a paused container may reject `docker exec`, so it acts on
+ * this exact captured identity only.
+ */
+export type OwnedPrimaryHandle = {
+  containerId: string;
+  name: string;
+  kiloSessionId: string;
+  image: string;
+};
+
+export type PauseOwnedPrimaryOptions = {
+  /**
+   * Runs as soon as exclusive ownership is proven and the immutable handle is
+   * captured, BEFORE `docker pause` is issued. Callers must retain this handle
+   * so a hung or uncertain pause can still be cleaned up in `finally`.
+   */
+  onCaptured?: (handle: OwnedPrimaryHandle) => void;
+  /**
+   * Runs after exclusive ownership is proven and before `docker pause`. Use it
+   * to capture state that must be read while the container is still runnable
+   * (for example the wrapper's last heartbeat send line).
+   */
+  beforePause?: (handle: OwnedPrimaryHandle) => Promise<void>;
+  /** Docker executor override for tests. */
+  executeDocker?: DockerCommandExecutor;
 };
 
 export type ControlPlaneKiloRuntime = {
@@ -86,6 +127,7 @@ type ControlPlaneKiloOperation = {
   gateTag?: string;
   model?: string;
   expectedText?: string;
+  userMessageId?: string;
   filePath?: string;
   questionId?: string;
 };
@@ -96,6 +138,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const request = JSON.parse(process.argv[1] ?? '{}');
+
+const KILO_SERVER_BASENAMES = new Set(['kilo', '.kilo']);
+
+/**
+ * Rosetta re-execs the CLI as: node --no-opt -r /proc/.reset <kilo> serve, so
+ * /proc/<pid>/exe resolves to the Rosetta loader and the Kilo entrypoint may
+ * not be argv[0]. Match a Kilo-named argv element with serve immediately
+ * after it, scanning all argv. getRoot remains the authoritative ownership
+ * proof: the socket must have a single owner and the session must report this
+ * exact directory.
+ */
+function isKiloServeArgv(argv) {
+  return argv.some(
+    (arg, index) =>
+      KILO_SERVER_BASENAMES.has(path.basename(arg)) && argv[index + 1] === 'serve'
+  );
+}
 
 function kiloListeners() {
   const sockets = new Map();
@@ -139,17 +198,15 @@ function kiloListeners() {
     if (owners.size !== 1) continue;
     const [processId] = owners;
     try {
-      if (path.basename(fs.readlinkSync('/proc/' + processId + '/exe')) !== 'kilo') continue;
       const argv = fs.readFileSync('/proc/' + processId + '/cmdline', 'utf8').split('\0');
-      if (path.basename(argv[0]) !== 'kilo' || argv[1] !== 'serve') continue;
+      if (!isKiloServeArgv(argv)) continue;
       const cwd = fs.readlinkSync('/proc/' + processId + '/cwd');
       const directory = fs.realpathSync(cwd);
       if (!path.isAbsolute(cwd) || cwd !== directory) continue;
-      if (!fs.existsSync(path.join(directory, '.kilo-bootstrap-complete'))) continue;
-       const environment = fs.readFileSync('/proc/' + processId + '/environ', 'utf8');
-       const home = environment.split('\0').find(value => value.startsWith('HOME='))?.slice(5);
-       if (!home || !path.isAbsolute(home) || fs.realpathSync(home) !== home) continue;
-       listeners.push({ serverUrl, processId, directory, home });
+      const environment = fs.readFileSync('/proc/' + processId + '/environ', 'utf8');
+      const home = environment.split('\0').find(value => value.startsWith('HOME='))?.slice(5);
+      if (!home || !path.isAbsolute(home) || fs.realpathSync(home) !== home) continue;
+      listeners.push({ serverUrl, processId, directory, home });
     } catch {
       continue;
     }
@@ -393,7 +450,19 @@ async function run() {
           .join('')
       : '';
     const assistant = assistants.find(entry => assistantText(entry).includes(expectedText)) ?? assistants.at(-1);
-    if (!assistant) return { ok: true, found: false };
+    if (!assistant)
+      return { ok: true, found: false, userEntryFound: false, assistantEntryFound: false };
+    const userEntry = entries.find(
+      entry =>
+        entry?.info?.role === 'user' &&
+        entry.info.id === (request.userMessageId ?? request.messageId) &&
+        entry.info.sessionID === request.kiloSessionId
+    );
+    const assistantEntryFound =
+      assistant.info.sessionID === request.kiloSessionId &&
+      assistant.info.parentID === request.messageId &&
+      typeof assistant.info.time?.completed === 'number' &&
+      assistantText(assistant).includes(expectedText);
     return {
       ok: true,
       found: true,
@@ -403,6 +472,8 @@ async function run() {
       completed: typeof assistant.info.time?.completed === 'number',
       failed: assistant.info.error !== undefined,
       expectedText: assistantText(assistant).includes(expectedText),
+      userEntryFound: userEntry !== undefined,
+      assistantEntryFound,
     };
   }
 
@@ -526,17 +597,20 @@ export async function findControlPlaneKiloRuntime(
   return runtime;
 }
 
-export async function stopOwnedControlPlaneSandbox(
-  sandbox: SandboxContainer,
+/**
+ * Prove the control-plane primary for `kiloSessionId` is the only worktree
+ * under its Kilo root. `findControlPlaneKiloRuntime` proves a root is PRESENT;
+ * exclusivity is the additional `exclusive` operation, which requires the
+ * root's parent to hold exactly one worktree and every Kilo listener to belong
+ * to it. Presence alone must never authorize a destructive or freezing action.
+ */
+async function assertExclusiveControlPlaneRuntime(
+  runtime: ControlPlaneKiloRuntime,
   kiloSessionId: string,
-  executeDocker: DockerCommandExecutor = executeDockerCommand
+  executeDocker: DockerCommandExecutor
 ): Promise<void> {
-  const runtime = await findControlPlaneKiloRuntime(kiloSessionId, executeDocker);
-  if (!runtime || runtime.container.id !== sandbox.id || runtime.container.name !== sandbox.name) {
-    throw new Error('Cannot prove the original sandbox still owns the requested root');
-  }
   const result = await runControlPlaneKiloOperation(
-    sandbox.id,
+    runtime.container.id,
     {
       action: 'exclusive',
       kiloSessionId,
@@ -550,7 +624,109 @@ export async function stopOwnedControlPlaneSandbox(
   );
   if (result.exclusive !== true)
     throw new Error('Refusing cleanup of a sandbox with other worktrees');
-  await killSandboxFamily(sandbox, executeDocker);
+}
+
+export async function stopOwnedControlPlaneSandbox(
+  sandbox: SandboxContainer,
+  kiloSessionId: string,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<string[]> {
+  const runtime = await findControlPlaneKiloRuntime(kiloSessionId, executeDocker);
+  if (!runtime || runtime.container.id !== sandbox.id || runtime.container.name !== sandbox.name) {
+    throw new Error('Cannot prove the original sandbox still owns the requested root');
+  }
+  await assertExclusiveControlPlaneRuntime(runtime, kiloSessionId, executeDocker);
+  return killSandboxFamily(sandbox, executeDocker);
+}
+
+/**
+ * Prove exclusive ownership of `kiloSessionId`'s control-plane primary, then
+ * freeze it with `docker pause`. Returns the captured identity that
+ * `unpauseOwnedPrimary` must use; never unpause by re-discovering the Kilo
+ * runtime, because a paused container may reject `docker exec`.
+ *
+ * The optional `beforePause` hook runs after the ownership proof and before the
+ * freeze, so callers can capture live container state (wrapper heartbeat send
+ * line) that is unavailable once the container is paused.
+ */
+export async function pauseOwnedPrimary(
+  kiloSessionId: string,
+  options: PauseOwnedPrimaryOptions = {}
+): Promise<OwnedPrimaryHandle> {
+  const executeDocker = options.executeDocker ?? executeDockerCommand;
+  const runtime = await findControlPlaneKiloRuntime(kiloSessionId, executeDocker);
+  if (!runtime) {
+    throw new Error(`Cannot prove an exclusively owned control-plane primary for ${kiloSessionId}`);
+  }
+  if (runtime.container.isProxy || runtime.container.name.endsWith('-proxy')) {
+    throw new Error('Refusing to pause a sandbox proxy container');
+  }
+  await assertExclusiveControlPlaneRuntime(runtime, kiloSessionId, executeDocker);
+  const handle: OwnedPrimaryHandle = {
+    containerId: runtime.container.id,
+    name: runtime.container.name,
+    kiloSessionId,
+    image: runtime.container.image,
+  };
+  // Retain the identity before the freeze. A hung pause ack must not be able to
+  // strand a frozen container that the caller cannot name.
+  options.onCaptured?.(handle);
+  await options.beforePause?.(handle);
+  try {
+    await executeDocker(['pause', handle.containerId]);
+  } catch (error) {
+    // A failed or timed-out pause ack must not leave a frozen container behind.
+    let cleanupFailure: string | undefined;
+    try {
+      await unpauseOwnedPrimary(handle, executeDocker);
+    } catch (cleanupError) {
+      cleanupFailure = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+    }
+    if (cleanupFailure !== undefined) {
+      throw new Error(
+        `docker pause ${handle.name} failed (${error instanceof Error ? error.message : String(error)}); identity cleanup also failed (${cleanupFailure}); container ${handle.containerId} may be frozen`
+      );
+    }
+    throw error;
+  }
+  return handle;
+}
+
+/**
+ * Unfreeze the exact container captured by `pauseOwnedPrimary`.
+ *
+ * Acts only on the captured identity, verified with Docker metadata rather than
+ * a live Kilo runtime lookup. Idempotent: an already-unpaused or already-gone
+ * container is a no-op, so callers can put this in `finally` without masking
+ * the original failure.
+ */
+export async function unpauseOwnedPrimary(
+  handle: OwnedPrimaryHandle,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<void> {
+  if (handle.name.endsWith('-proxy')) {
+    throw new Error('Refusing to unpause a sandbox proxy container');
+  }
+  let stdout: string;
+  try {
+    ({ stdout } = await executeDocker([
+      'inspect',
+      '--format',
+      '{{.Id}}\t{{.Name}}\t{{.State.Paused}}',
+      handle.containerId,
+    ]));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('No such container')) return;
+    throw error;
+  }
+  const [id, rawName, paused] = stdout.trim().split('\t');
+  if (!id || !id.startsWith(handle.containerId) || rawName?.replace(/^\//, '') !== handle.name) {
+    throw new Error(`Refusing to unpause: container identity no longer matches ${handle.name}`);
+  }
+  if (paused === 'false') return;
+  if (paused !== 'true') throw new Error(`Refusing to unpause ${handle.name}: unknown pause state`);
+  await executeDocker(['unpause', handle.containerId]);
 }
 
 export async function waitForControlPlaneKiloRuntime(
@@ -757,6 +933,49 @@ export async function waitForControlPlaneKiloCompletion(
   throw new Error(`Kilo root ${input.kiloSessionId} did not complete within ${input.timeoutMs}ms`);
 }
 
+export type ControlPlaneHistoryInspection = {
+  ok: boolean;
+  found: boolean;
+  userEntryFound: boolean;
+  assistantEntryFound: boolean;
+};
+
+/**
+ * Inspect both sides of a completed user turn in the live Kilo history. The
+ * completion operation retains the existing assistant lookup used by
+ * waitForControlPlaneKiloCompletion and additionally reports exact user-entry
+ * and completed-assistant matches for this test-only oracle.
+ */
+export async function inspectControlPlaneHistory(
+  runtime: ControlPlaneKiloRuntime,
+  input: { kiloSessionId: string; userMessageId: string; assistantMarker: string }
+): Promise<ControlPlaneHistoryInspection> {
+  const result = await runControlPlaneKiloOperation(runtime.container.id, {
+    action: 'completion',
+    kiloSessionId: input.kiloSessionId,
+    serverUrl: runtime.serverUrl,
+    directory: runtime.directory,
+    processId: runtime.processId,
+    ownerKiloSessionId: runtime.kiloSessionId,
+    messageId: input.userMessageId,
+    userMessageId: input.userMessageId,
+    expectedText: input.assistantMarker,
+  });
+  if (
+    typeof result.found !== 'boolean' ||
+    typeof result.userEntryFound !== 'boolean' ||
+    typeof result.assistantEntryFound !== 'boolean'
+  ) {
+    throw new Error('Kilo history inspection returned invalid entry matches');
+  }
+  return {
+    ok: result.ok === true,
+    found: result.found,
+    userEntryFound: result.userEntryFound,
+    assistantEntryFound: result.assistantEntryFound,
+  };
+}
+
 /**
  * List running sandbox containers. Returns proxy containers separately so
  * callers can kill them together with their primary.
@@ -919,6 +1138,50 @@ export async function waitForSandboxFamilyGone(
 }
 
 /**
+ * True when the owned primary container is absent. Proxy sidecars are ignored:
+ * the cold-resume absence predicate only requires the primary sandbox to be
+ * gone, and a `-proxy` sibling may outlive it.
+ */
+export function isSandboxPrimaryGone(containers: SandboxContainer[], primaryId: string): boolean {
+  return !containers.some(container => container.id === primaryId);
+}
+
+/**
+ * Block until the owned primary sandbox is gone. Unlike
+ * `waitForSandboxFamilyGone`, a lingering `-proxy` sidecar does not keep the
+ * primary alive.
+ */
+export async function waitForSandboxPrimaryGone(
+  sandbox: SandboxContainer,
+  timeoutMs: number,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const containers = await listSandboxContainers(executeDocker);
+    if (isSandboxPrimaryGone(containers, sandbox.id)) return true;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return false;
+}
+
+/** Run a shell command inside a container and read its stdout; null when absent. */
+async function readContainerFile(containerId: string, shellCommand: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync(
+      'docker',
+      ['exec', containerId, 'sh', '-c', shellCommand],
+      { timeout: DOCKER_COMMAND_TIMEOUT_MS, killSignal: 'SIGKILL' }
+    );
+    return stdout || null;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('No such container') || msg.includes('is not running')) return null;
+    throw err;
+  }
+}
+
+/**
  * Read the wrapper log file inside a running sandbox container. Used for
  * smoke tests to assert "using fake kilo client" is present after boot.
  *
@@ -926,20 +1189,22 @@ export async function waitForSandboxFamilyGone(
  * `/tmp/kilocode-wrapper-*.log`, so we glob for the newest file.
  */
 export async function readWrapperLog(containerId: string): Promise<string | null> {
-  try {
-    const { stdout } = await execFileAsync('docker', [
-      'exec',
-      containerId,
-      'sh',
-      '-c',
-      'ls -t /tmp/kilocode-wrapper-*.log 2>/dev/null | head -n 1 | xargs -r cat',
-    ]);
-    return stdout || null;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('No such container') || msg.includes('is not running')) return null;
-    throw err;
-  }
+  return readContainerFile(
+    containerId,
+    'ls -t /tmp/kilocode-wrapper-*.log 2>/dev/null | head -n 1 | xargs -r cat'
+  );
+}
+
+/**
+ * Read the control wrapper log file inside a running sandbox container.
+ *
+ * The control wrapper (`kilocode-control-wrapper.js`) writes to the fixed
+ * `/tmp/kilocode-control-wrapper.log` path (`src/sandbox-control/cloudflare-provider.ts`),
+ * unlike the per-worktree agent wrapper's `/tmp/kilocode-wrapper-*.log`. It
+ * carries the control-plane `control heartbeat` send lines.
+ */
+export async function readControlWrapperLog(containerId: string): Promise<string | null> {
+  return readContainerFile(containerId, 'cat /tmp/kilocode-control-wrapper.log 2>/dev/null');
 }
 
 /**
@@ -951,13 +1216,17 @@ export async function readWrapperLog(containerId: string): Promise<string | null
  */
 export async function readKiloCliLog(containerId: string): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync('docker', [
-      'exec',
-      containerId,
-      'sh',
-      '-c',
-      'ls -t /home/agent_*/.local/share/kilo/log/*.log 2>/dev/null | head -n 1 | xargs -r cat',
-    ]);
+    const { stdout } = await execFileAsync(
+      'docker',
+      [
+        'exec',
+        containerId,
+        'sh',
+        '-c',
+        'ls -t /home/agent_*/.local/share/kilo/log/*.log 2>/dev/null | head -n 1 | xargs -r cat',
+      ],
+      { timeout: DOCKER_COMMAND_TIMEOUT_MS, killSignal: 'SIGKILL' }
+    );
     return stdout || null;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

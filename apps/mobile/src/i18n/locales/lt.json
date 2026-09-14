@@ -231,6 +231,8 @@
     "voiceInput": "Balso įvestis",
     "autoExpandThinking": "Automatiškai išskleisti mąstymą",
     "autoExpandThinkingSubtitle": "Baigus mąstyti, automatiškai išskleisti agento mąstymo tekstą.",
+    "hideThinking": "Slėpti mąstymo informaciją",
+    "hideThinkingSubtitle": "Nerodyti agento mąstymo sesijos puslapyje.",
     "keepScreenOn": "Neišjungti ekrano sesijos puslapyje",
     "keepScreenOnSubtitle": "Neišjungti ekrano, kol sesija vykdoma.",
     "appearance": "Išvaizda",
@@ -2498,6 +2500,11 @@
       "modelAccessibilityLabel": "Modelis {{name}}, teikėjas {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} žingsniai",
       "stepsCount_many": "{{steps}} žingsnio"
+    },
+    "autoApprove": {
+      "title": "Automatinis tvirtinimas",
+      "description": "Automatiškai tvirtinti šios sesijos leidimų prašymus. Tada įrankiai veikia be raginimo.",
+      "unavailable": "Ši sesija negali gauti leidimų prašymų."
     },
     "prBadge": {
       "open": "atvira pakeitimų užklausa",

@@ -231,6 +231,8 @@
     "voiceInput": "Input suara",
     "autoExpandThinking": "Kembangkan pemikiran secara automatik",
     "autoExpandThinkingSubtitle": "Paparkan pemikiran ejen sepenuhnya setelah ejen selesai berfikir.",
+    "hideThinking": "Sembunyikan butiran pemikiran",
+    "hideThinkingSubtitle": "Jangan paparkan pemikiran ejen pada halaman sesi.",
     "keepScreenOn": "Kekalkan skrin hidup pada halaman sesi",
     "keepScreenOnSubtitle": "Kekalkan skrin hidup semasa sesi berjalan.",
     "appearance": "Penampilan",
@@ -2456,6 +2458,11 @@
       "stepsCount": "{{steps}} langkah",
       "stepsCount_other": "{{steps}} langkah",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "Lulus automatik",
+      "description": "Luluskan permintaan kebenaran untuk sesi ini secara automatik. Alat kemudian berjalan tanpa gesaan.",
+      "unavailable": "Sesi ini tidak boleh menerima permintaan kebenaran."
     },
     "prBadge": {
       "open": "buka PR",

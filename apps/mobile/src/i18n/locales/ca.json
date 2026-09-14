@@ -231,6 +231,8 @@
     "voiceInput": "Entrada de veu",
     "autoExpandThinking": "Desplega automàticament el raonament",
     "autoExpandThinkingSubtitle": "Mostra el raonament de l'agent desplegat quan acaba de raonar.",
+    "hideThinking": "Amaga els detalls del raonament",
+    "hideThinkingSubtitle": "No mostris el raonament de l'agent a la pàgina de la sessió.",
     "keepScreenOn": "Mantén la pantalla encesa mentre vegis la sessió",
     "keepScreenOnSubtitle": "Mantén la pantalla encesa mentre la sessió estigui en execució.",
     "appearance": "Aparença",
@@ -2477,6 +2479,11 @@
       "stepsCount_other": "{{steps}} passos",
       "modelAccessibilityLabel": "Model {{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_many": "{{steps}} passos"
+    },
+    "autoApprove": {
+      "title": "Aprovació automàtica",
+      "description": "Aprova automàticament les sol·licituds de permís d'aquesta sessió. Aleshores les eines s'executen sense cap indicació.",
+      "unavailable": "Aquesta sessió no pot rebre sol·licituds de permís."
     },
     "prBadge": {
       "open": "pR oberta",

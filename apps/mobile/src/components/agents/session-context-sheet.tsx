@@ -19,6 +19,8 @@ import { type SessionContextInfo } from '@/lib/session-context-info';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useTRPC } from '@/lib/trpc';
 
+import { type SessionAutoApproveState } from './session-auto-approve';
+import { SessionAutoApproveRow } from './session-auto-approve-row';
 import { ContextUsageRing } from './context-usage-ring';
 import {
   type ContextTone,
@@ -42,7 +44,7 @@ import { copySessionId } from './session-row-actions';
 
 type SessionContextSheetProps = {
   visible: boolean;
-  info: SessionContextInfo;
+  info: SessionContextInfo | undefined;
   sessionId: string;
   sessionTitle: string;
   activeSessionType: ResolvedSession['type'] | null;
@@ -54,6 +56,8 @@ type SessionContextSheetProps = {
   messages: StoredMessage[];
   modelOptions: SessionModelOption[];
   onClose: () => void;
+  autoApproveState: SessionAutoApproveState;
+  onAutoApproveChange: (enabled: boolean) => void;
 };
 
 const SHEET_RING_SIZE = 96;
@@ -98,6 +102,8 @@ export function SessionContextSheet({
   messages,
   modelOptions,
   onClose,
+  autoApproveState,
+  onAutoApproveChange,
 }: Readonly<SessionContextSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
@@ -118,8 +124,8 @@ export function SessionContextSheet({
   }, [visible]);
   const copyStatus = copyStatusLabel(copyState, t);
   const content = getContextSheetContent(info, totalCostMicrodollars);
-  const tone = getContextTone(info.percentage);
-  const arcFraction = getArcFraction(info.percentage);
+  const tone = getContextTone(info?.percentage);
+  const arcFraction = getArcFraction(info?.percentage);
   const breakdown = useMemo<SessionCostBreakdown>(
     () => getSessionCostBreakdown(messages, breakdownCostUsd),
     [messages, breakdownCostUsd]
@@ -140,6 +146,12 @@ export function SessionContextSheet({
     <SessionPageSheet visible={visible} onClose={onClose}>
       <SheetHeader title={t('agentChat.contextUsage.title')} onDone={onClose} />
 
+      {/* First row of the sheet body, outside the ScrollView so it stays
+          visible while the context details scroll. */}
+      <View className="px-6 pb-2 pt-2">
+        <SessionAutoApproveRow state={autoApproveState} onValueChange={onAutoApproveChange} />
+      </View>
+
       {/* Rows below are exposed individually to screen readers; collapsing
           them behind a single ScrollView accessibilityLabel would shadow the
           natural read order. */}
@@ -152,15 +164,17 @@ export function SessionContextSheet({
             tone={tone}
             testID="session-context-sheet-ring"
           />
-          {content.percentage ? (
-            <Text className={cn('text-2xl font-semibold tabular-nums', toneTextClass(tone))}>
-              {content.percentage}
-            </Text>
-          ) : (
-            <Text className="text-base text-muted-foreground">
-              {content.windowUnavailableLabel}
-            </Text>
-          )}
+          <View className="min-h-[32px] justify-center">
+            {content.percentage ? (
+              <Text className={cn('text-2xl font-semibold tabular-nums', toneTextClass(tone))}>
+                {content.percentage}
+              </Text>
+            ) : (
+              <Text className="text-base text-muted-foreground">
+                {content.windowUnavailableLabel}
+              </Text>
+            )}
+          </View>
         </View>
 
         <View className="mt-6 gap-4">
@@ -181,26 +195,28 @@ export function SessionContextSheet({
             </Text>
           </Row>
 
-          {content.capacityKnown ? (
+          {content.capacityKnown || autoApproveState !== 'unavailable' ? (
             <Row label={t('common.remaining')}>
               <Text className="text-base font-medium text-foreground tabular-nums">
-                {content.remainingTokens}
-                <Text className="text-sm text-muted-foreground">
-                  {' '}
-                  {t('agentChat.contextUsage.tokensWithPercentage', {
-                    percentage: content.remainingPercentage ?? '',
-                  })}
-                </Text>
+                {content.remainingTokens ?? '-'}
+                {content.capacityKnown ? (
+                  <Text className="text-sm text-muted-foreground">
+                    {' '}
+                    {t('agentChat.contextUsage.tokensWithPercentage', {
+                      percentage: content.remainingPercentage ?? '',
+                    })}
+                  </Text>
+                ) : null}
               </Text>
             </Row>
           ) : null}
 
           <Row label={t('common.model')}>
-            <Text className="text-base font-medium text-foreground">{modelDisplay}</Text>
+            <Text className="text-base font-medium text-foreground">{modelDisplay || '-'}</Text>
           </Row>
 
           <Row label={t('agentChat.contextUsage.provider')}>
-            <Text className="text-base font-medium text-foreground">{providerDisplay}</Text>
+            <Text className="text-base font-medium text-foreground">{providerDisplay || '-'}</Text>
           </Row>
 
           {/* Identity group: which session this sheet describes, its id, and
@@ -259,10 +275,10 @@ export function SessionContextSheet({
             </Row>
           ) : null}
 
-          {content.cost !== null ? (
+          {content.cost !== null || autoApproveState !== 'unavailable' ? (
             <Row label={t('agentChat.contextUsage.totalCost')}>
               <Text className="text-base font-medium text-foreground tabular-nums">
-                {content.cost}
+                {content.cost ?? '-'}
               </Text>
             </Row>
           ) : null}

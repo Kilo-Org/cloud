@@ -2,7 +2,7 @@
 import '@/i18n';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { FixedPartRow } from './fixed-part-row';

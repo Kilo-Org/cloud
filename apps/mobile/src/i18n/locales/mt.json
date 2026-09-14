@@ -231,6 +231,8 @@
     "voiceInput": "Input tal-vuċi",
     "autoExpandThinking": "Espandi awtomatikament il-ħsieb",
     "autoExpandThinkingSubtitle": "Uri l-ħsieb tal-aġent espandut meta jispiċċa.",
+    "hideThinking": "Aħbi d-dettalji tal-ħsieb",
+    "hideThinkingSubtitle": "Turix il-ħsieb tal-aġent fil-paġna tas-sessjoni.",
     "keepScreenOn": "Żomm l-iskrin mixgħul fil-paġna tas-sessjoni",
     "keepScreenOnSubtitle": "Żomm l-iskrin mixgħul waqt li s-sessjoni tkun qed taħdem.",
     "appearance": "Dehra",
@@ -2519,6 +2521,11 @@
       "stepsCount_two": "{{steps}} passi",
       "stepsCount_few": "{{steps}} passi",
       "stepsCount_many": "{{steps}}-il pass"
+    },
+    "autoApprove": {
+      "title": "Approvazzjoni awtomatika",
+      "description": "Approva awtomatikament it-talbiet għall-permess għal din is-sessjoni. L-għodda mbagħad taħdem mingħajr talba.",
+      "unavailable": "Din is-sessjoni ma tistax tirċievi talbiet għall-permess."
     },
     "prBadge": {
       "open": "ftuħ tal-PR",

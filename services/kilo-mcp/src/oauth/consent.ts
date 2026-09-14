@@ -40,6 +40,10 @@ import { PERSONAL_ORG_ID, consentPage, orgPickerPage, type OrgOption } from './p
 /** Pending records are short-lived: 10 minutes to complete sign-in. */
 export const PENDING_TTL_SECONDS = 600;
 
+/** Operator-facing copy for a record that can no longer be acted on. */
+const STALE_REQUEST_MESSAGE =
+  'This request is no longer valid. Close this tab and retry from your MCP client.';
+
 export type ConsentDeps = {
   store: OAuthStoreApi;
   /** apps/web base URL — the user-identity provider. */
@@ -330,10 +334,7 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
     record.status === 'completed' ||
     record.status === 'approved'
   ) {
-    return errorPage(
-      'invalid_request',
-      'This request is no longer valid. Close this tab and retry from your MCP client.'
-    );
+    return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
   }
 
   const client: ClientInfo | null = await env.OAUTH_PROVIDER.lookupClient(
@@ -365,7 +366,10 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
     });
 
   /** Bind the chosen context and complete the authorize; stops on a lost race. */
-  const approveAndRedirect = async (organizationId: string | null): Promise<Response> => {
+  const approveAndRedirect = async (
+    organizationId: string | null,
+    renderRetry: (message: string) => Response
+  ): Promise<Response> => {
     const approved = await deps.store.approvePendingAuthorization(
       record.deviceAuthCode,
       { kiloUserId: record.kiloUserId, organizationId },
@@ -375,24 +379,42 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
       // Lost the race to a concurrent submit or an expiry: stop, do not
       // complete. The store's pending->approved guard makes a re-completion
       // impossible.
-      return errorPage(
-        'invalid_request',
-        'This request is no longer valid. Close this tab and retry from your MCP client.'
-      );
+      return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
     }
-    const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
-      request: record.authRequest,
-      userId: record.kiloUserId,
-      metadata: { clientName },
-      scope: [MCP_SCOPE],
-      props: {
-        kiloUserId: record.kiloUserId,
-        organizationId,
-        kiloToken: record.kiloToken,
-        clientId: record.authRequest.clientId,
-      },
-    });
-    await deps.store.completePendingAuthorization(id, nowIso);
+    let redirectTo: string;
+    try {
+      ({ redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
+        request: record.authRequest,
+        userId: record.kiloUserId,
+        metadata: { clientName },
+        scope: [MCP_SCOPE],
+        props: {
+          kiloUserId: record.kiloUserId,
+          organizationId,
+          kiloToken: record.kiloToken,
+          clientId: record.authRequest.clientId,
+        },
+      }));
+    } catch {
+      // The library could not mint the code. The record is 'approved' and would
+      // reject every future picker submit, so release it back to retryable
+      // 'pending' (keeping the paired identity) and let the same user retry.
+      // A concurrent completion/denial/expiry wins the guard: then the request
+      // really is over and the terminal error page is correct.
+      const released = await deps.store.releasePendingAuthorization(id, nowIso);
+      return released
+        ? renderRetry(
+            'Could not finish connecting to Kilo right now. Choose the account again to retry.'
+          )
+        : errorPage('invalid_request', STALE_REQUEST_MESSAGE);
+    }
+    const completed = await deps.store.completePendingAuthorization(id, nowIso);
+    if (!completed) {
+      // The terminal transition (approved -> completed) was rejected: the
+      // record expired or a concurrent submit completed it first. Never
+      // redirect or emit a success event for a transition that did not happen.
+      return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
+    }
     // The library owns the token endpoint, so its tokenExchangeCallback hook
     // runs without deps and cannot see this per-request emitter (index.ts wires
     // it with no ProviderHookDeps). Emit the one sign-in success here, after the
@@ -441,7 +463,7 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
   }
   const submitted = parsedForm.data.organization_id;
   if (submitted === PERSONAL_ORG_ID) {
-    return approveAndRedirect(null);
+    return approveAndRedirect(null, message => personalOnlyPage(message));
   }
   // Concrete orgs stay validated against the freshly-fetched membership list:
   // a client cannot authorize an org it is not a member of by editing the form.
@@ -462,7 +484,9 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
       error: 'That organization is not available for this account.',
     });
   }
-  return approveAndRedirect(chosen.id === PERSONAL_ORG_ID ? null : chosen.id);
+  return approveAndRedirect(chosen.id === PERSONAL_ORG_ID ? null : chosen.id, message =>
+    orgPickerPage({ clientName, actionUrl, options, error: message })
+  );
 }
 
 /**

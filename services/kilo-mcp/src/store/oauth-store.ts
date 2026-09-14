@@ -103,6 +103,14 @@ export interface OAuthStoreApi {
   /** Terminal transition: approved -> completed once the library issues the code (s2). */
   completePendingAuthorization(id: string, nowIso: string): Promise<boolean>;
   /**
+   * approved -> pending after the library's `completeAuthorization` failed:
+   * releases the record so the user can retry the picker instead of being
+   * stranded on a terminal 'approved'. Guarded on the record still being
+   * approved, so a concurrent completion/denial/expiry wins and is left alone.
+   * The recorded Kilo pairing is kept, so the retry does not repeat sign-in.
+   */
+  releasePendingAuthorization(id: string, nowIso: string): Promise<boolean>;
+  /**
    * Housekeeping: drop pending-authorization rows past their own expiry.
    * Returns the deleted row count.
    */
@@ -249,6 +257,22 @@ export class KiloMcpOAuthStore
     const row = this.db
       .update(oauthPendingAuthorizations)
       .set({ status: 'completed' })
+      .where(
+        and(
+          eq(oauthPendingAuthorizations.id, id),
+          eq(oauthPendingAuthorizations.status, 'approved'),
+          gt(oauthPendingAuthorizations.expires_at, nowIso)
+        )
+      )
+      .returning({ id: oauthPendingAuthorizations.id })
+      .get();
+    return row !== undefined;
+  }
+
+  async releasePendingAuthorization(id: string, nowIso: string): Promise<boolean> {
+    const row = this.db
+      .update(oauthPendingAuthorizations)
+      .set({ status: 'pending', organization_id: null })
       .where(
         and(
           eq(oauthPendingAuthorizations.id, id),

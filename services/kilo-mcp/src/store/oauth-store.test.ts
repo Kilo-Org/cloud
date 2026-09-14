@@ -323,6 +323,44 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       expect((await store.getPendingAuthorization('pa-complete-exp'))?.status).toBe('approved');
     });
 
+    it('releases an approved authorization back to retryable pending, exactly once', async () => {
+      await store.createPendingAuthorization(
+        pendingInput({ id: 'pa-release', deviceAuthCode: 'PAIR-PA-REL' })
+      );
+      // Still pending: nothing to release.
+      expect(await store.releasePendingAuthorization('pa-release', NOW)).toBe(false);
+      expect(
+        await store.approvePendingAuthorization(
+          'PAIR-PA-REL',
+          { kiloUserId: 'u-rel', organizationId: 'o-rel' },
+          NOW
+        )
+      ).toBe(true);
+      expect(await store.releasePendingAuthorization('pa-release', NOW)).toBe(true);
+      // The pairing is kept (the retry must not repeat sign-in) but the org
+      // choice is dropped with the non-terminal status.
+      expect(await store.getPendingAuthorization('pa-release')).toMatchObject({
+        status: 'pending',
+        kiloUserId: 'u-rel',
+        organizationId: null,
+      });
+      expect(await store.releasePendingAuthorization('pa-release', NOW)).toBe(false);
+      expect(await store.releasePendingAuthorization('pa-ghost', NOW)).toBe(false);
+    });
+
+    it('refuses to release an approved authorization after expiry', async () => {
+      await store.createPendingAuthorization(
+        pendingInput({ id: 'pa-release-exp', deviceAuthCode: 'PAIR-PA-REX', expiresAt: LATER })
+      );
+      await store.approvePendingAuthorization(
+        'PAIR-PA-REX',
+        { kiloUserId: 'u', organizationId: null },
+        NOW
+      );
+      expect(await store.releasePendingAuthorization('pa-release-exp', LATER)).toBe(false);
+      expect((await store.getPendingAuthorization('pa-release-exp'))?.status).toBe('approved');
+    });
+
     it('denies a pending authorization exactly once', async () => {
       await store.createPendingAuthorization(
         pendingInput({ id: 'pa-deny', deviceAuthCode: 'PAIR-PA-DENY' })

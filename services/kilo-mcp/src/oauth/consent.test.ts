@@ -159,6 +159,12 @@ function createFakeStore(): OAuthStoreApi & { pending: Map<string, PendingAuthor
       pending.set(id, { ...record, status: 'completed' });
       return true;
     },
+    releasePendingAuthorization: async (id, nowIso) => {
+      const record = pending.get(id);
+      if (!record || record.status !== 'approved' || record.expiresAt <= nowIso) return false;
+      pending.set(id, { ...record, status: 'pending', organizationId: null });
+      return true;
+    },
     purgeExpired: unused,
   };
 }
@@ -193,6 +199,8 @@ function fakeHelpers(config: {
   client?: ClientInfo | null;
   parseError?: unknown;
   redirectTo?: string;
+  /** Injected provider-completion failure (the library owns that call). */
+  completeError?: unknown;
 }): { helpers: OAuthHelpers; completes: CompleteAuthorizationOptions[] } {
   const completes: CompleteAuthorizationOptions[] = [];
   const helpers = {
@@ -205,6 +213,7 @@ function fakeHelpers(config: {
       return config.client ?? null;
     },
     async completeAuthorization(options: CompleteAuthorizationOptions) {
+      if (config.completeError !== undefined) throw config.completeError;
       completes.push(options);
       return { redirectTo: config.redirectTo ?? `${REDIRECT}?code=lib-code` };
     },
@@ -796,6 +805,73 @@ describe('GET/POST /authorize/org', () => {
     // The success event fires once, after the approved guard: the lost second
     // submit emits nothing.
     expect(calls.filter(call => call.phase === 'succeeded')).toHaveLength(1);
+  });
+
+  it('reverts an approved record to pending when the provider completion fails (retryable)', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const failing = fakeHelpers({ client: clientInfo(), completeError: new Error('kv down') });
+    const { analytics, calls } = fakeAnalytics();
+    const handler = createDefaultHandler(deps(store, flowFetch(), { analytics }));
+    const submit = (env: Env) =>
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/org?id=${id}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+        }),
+        env
+      );
+
+    const failed = await submit(envWith(failing.helpers));
+    // The record is released, never stranded in a terminal 'approved' state.
+    expect(store.pending.get(id)?.status).toBe('pending');
+    expect(store.pending.get(id)?.kiloToken).toBe('kilo-tok-1');
+    expect(calls.filter(call => call.phase === 'succeeded')).toHaveLength(0);
+    expect(failed.status).toBe(200);
+    expect(await failed.text()).toMatch(/Could not finish connecting/);
+
+    // The consent poll sends the same tab back to the picker, so the user can
+    // retry without restarting from the MCP client.
+    const status = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/status?id=${id}`),
+      envWith(fakeHelpers({}).helpers)
+    );
+    await expect(status.json()).resolves.toEqual({
+      status: 'needs_org',
+      picker_url: `/authorize/org?id=${id}`,
+    });
+
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const retried = await submit(envWith(helpers));
+    expect(retried.status).toBe(302);
+    expect(retried.headers.get('Location')).toBe(`${REDIRECT}?code=lib-code`);
+    expect(completes).toHaveLength(1);
+    expect(store.pending.get(id)?.status).toBe('completed');
+  });
+
+  it('does not redirect or emit success when the terminal transition is rejected', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    // The store's expiry/race guard rejects the transition after the library
+    // already issued the code: the response must not claim success.
+    store.completePendingAuthorization = async () => false;
+    const { helpers } = fakeHelpers({ client: clientInfo() });
+    const { analytics, calls } = fakeAnalytics();
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch(), { analytics })),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(400);
+    expect(response.headers.get('Location')).toBeNull();
+    expect(calls.filter(call => call.phase === 'succeeded')).toHaveLength(0);
   });
 
   it('rejects unknown/expired/denied records with an error page', async () => {

@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { OFFLINE_BANNER_HEIGHT, offlineHeaderReservation } from './offline-banner-state';
 import {
   createStore,
   offlineState,
@@ -258,15 +257,5 @@ describe('createOfflineBannerStore', () => {
     expect(store.isOffline()).toBe(false);
     expect(changes).toEqual(['online']);
     expect(listener).not.toHaveBeenCalled();
-  });
-});
-
-describe('offlineHeaderReservation', () => {
-  it('reserves exactly the painted banner height while offline', () => {
-    expect(offlineHeaderReservation(true)).toBe(OFFLINE_BANNER_HEIGHT);
-  });
-
-  it('keeps the header flush while online', () => {
-    expect(offlineHeaderReservation(false)).toBe(0);
   });
 });

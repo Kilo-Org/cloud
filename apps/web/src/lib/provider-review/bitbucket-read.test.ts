@@ -678,6 +678,93 @@ describe('listDiscussions', () => {
       )
     ).toHaveLength(10);
   });
+
+  it('degrades to no task evidence when a followed task page answers 404', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname.endsWith('/pullrequests/12/comments'))
+        return jsonResponse(commentFixture);
+      if (parsed.pathname.endsWith('/pullrequests/12/tasks')) {
+        // Page 1 resolves comment 101 and points at page 2, and the followed
+        // page is unreadable. The documented degradation (an unreadable task
+        // collection leaves no evidence) must apply on a cursor-followed page
+        // too, not only on the first.
+        if (parsed.searchParams.get('page') === '2') return new Response(null, { status: 404 });
+        return jsonResponse({
+          pagelen: 100,
+          values: [
+            { id: 7, resolved_on: '2026-09-04T00:00:00.000000+00:00', comment: { id: 101 } },
+          ],
+          next: 'https://api.bitbucket.org/2.0/repositories/acme/repo/pullrequests/12/tasks?pagelen=100&page=2',
+        });
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const result = await listDiscussions(ORG_OWNER, 'acme', 'repo', 12);
+
+    expect(result.threads).toHaveLength(2);
+    expect(result.threads.every(thread => thread.resolved === false)).toBe(true);
+    expect(result.threads.every(thread => thread.taskCount === 0)).toBe(true);
+  });
+
+  it('surfaces a reply whose root sits on an earlier comments page', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname.endsWith('/pullrequests/12/comments')) {
+        // The page starts on a reply: its root (900) was served by the
+        // previous comments page and is not present in this page.
+        return jsonResponse({
+          pagelen: 50,
+          values: [
+            {
+              id: 901,
+              parent: { id: 900 },
+              content: { raw: 'Reply on a root from the previous page' },
+              created_on: '2026-09-02T13:00:00.000000+00:00',
+              user: { uuid: '{author-uuid}', nickname: 'alice', display_name: 'Alice' },
+              deleted: false,
+            },
+            {
+              id: 902,
+              content: { raw: 'Second page root' },
+              created_on: '2026-09-02T14:00:00.000000+00:00',
+              user: { uuid: '{reviewer-uuid}', nickname: 'bob', display_name: 'Bob' },
+              deleted: false,
+            },
+          ],
+          next: null,
+        });
+      }
+      if (parsed.pathname.endsWith('/pullrequests/12/tasks'))
+        return jsonResponse({ pagelen: 100, values: [], next: null });
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const result = await listDiscussions(ORG_OWNER, 'acme', 'repo', 12);
+
+    // The orphan reply is keyed by its true root id, not the reply id, so a
+    // resolve action still targets the root it belongs to.
+    const orphan = result.threads.find(thread => thread.threadId === '900');
+    expect(orphan?.comments.map(comment => comment.body)).toEqual([
+      'Reply on a root from the previous page',
+    ]);
+    const secondRoot = result.threads.find(thread => thread.threadId === '902');
+    expect(secondRoot?.comments.map(comment => comment.body)).toEqual(['Second page root']);
+    // Every comment on the page is surfaced exactly once.
+    const bodies = result.threads
+      .flatMap(thread => thread.comments.map(comment => comment.body))
+      .sort();
+    expect(bodies).toEqual(['Reply on a root from the previous page', 'Second page root']);
+  });
 });
 
 describe('listChecks', () => {

@@ -467,9 +467,10 @@ export async function fetchPage(
       });
       payload = text ? JSON.parse(text) : {};
     } catch (error) {
-      if (error instanceof BitbucketReviewError || error instanceof BitbucketApiStatusError) {
-        throw error;
-      }
+      // Classify exactly like the first-page branch: the callers that degrade
+      // on an unreadable collection (task evidence, branch restrictions, file
+      // conflicts) match on a classified `BitbucketReviewError` kind, so a raw
+      // `BitbucketApiStatusError` from a followed page must not skip them.
       throw classifyBitbucketError(error);
     }
   } else {
@@ -678,23 +679,62 @@ export type BitbucketDiscussionsPage = {
   nextCursor: string | null;
 };
 
+type BitbucketComment = z.infer<typeof BitbucketCommentSchema>;
+
+type BitbucketTaskEvidence = {
+  commentIds: ReadonlySet<number>;
+  unresolvedCommentIds: ReadonlySet<number>;
+  taskCounts: ReadonlyMap<number, number>;
+};
+
+/**
+ * Map one thread onto the shared DTO. `rootId` is the root comment's id — for
+ * a thread whose root was read on an earlier page it is an identity, not a
+ * comment in `threadComments`, so resolution and task counts still key off it.
+ */
+function mapThread(
+  rootId: number,
+  inline: BitbucketComment['inline'],
+  threadComments: BitbucketComment[],
+  taskEvidence: BitbucketTaskEvidence
+): BitbucketDiscussionThread {
+  const anchorLine = inline?.to ?? inline?.from ?? null;
+  return {
+    threadId: String(rootId),
+    resolved:
+      taskEvidence.commentIds.has(rootId) && !taskEvidence.unresolvedCommentIds.has(rootId),
+    path: inline?.path ?? null,
+    line: anchorLine,
+    side: inline ? (inline.to != null ? 'RIGHT' : 'LEFT') : null,
+    comments: threadComments.map(comment => ({
+      commentId: String(comment.id),
+      author: mapUser(comment.user),
+      body: comment.content?.raw ?? '',
+      createdAt: comment.created_on ?? '',
+    })),
+    taskCount: taskEvidence.taskCounts.get(rootId) ?? 0,
+  };
+}
+
 /**
  * Build threads from one flat page of comments: top-level comments are the
  * thread roots, replies attach to their parent. Both the resolved flag and
  * the task count come from the task evidence the caller supplies — Bitbucket
  * never sends task fields on comments: a thread is resolved when a task
  * exists for its root comment and no task on it is unresolved.
+ *
+ * The collection is flat and creation-ordered, so a page can start on a reply
+ * whose root sits on an earlier page. Such a reply can never attach to a root
+ * here: it is surfaced as its own thread keyed by its true root id, using the
+ * reply's own inline anchor when Bitbucket sends one. Nothing is dropped, and
+ * thread actions still target the root the reply belongs to.
  */
 function buildThreadsFromComments(
-  comments: z.infer<typeof BitbucketCommentSchema>[],
-  taskEvidence: {
-    commentIds: ReadonlySet<number>;
-    unresolvedCommentIds: ReadonlySet<number>;
-    taskCounts: ReadonlyMap<number, number>;
-  }
+  comments: BitbucketComment[],
+  taskEvidence: BitbucketTaskEvidence
 ): BitbucketDiscussionThread[] {
   const roots = comments.filter(comment => !comment.parent && comment.deleted !== true);
-  const repliesByParent = new Map<number, z.infer<typeof BitbucketCommentSchema>[]>();
+  const repliesByParent = new Map<number, BitbucketComment[]>();
   for (const comment of comments) {
     if (comment.parent && comment.deleted !== true) {
       const existing = repliesByParent.get(comment.parent.id) ?? [];
@@ -702,26 +742,20 @@ function buildThreadsFromComments(
       repliesByParent.set(comment.parent.id, existing);
     }
   }
-  return roots.map(root => {
-    const inline = root.inline ?? null;
-    const anchorLine = inline?.to ?? inline?.from ?? null;
-    const taskCount = taskEvidence.taskCounts.get(root.id) ?? 0;
-    return {
-      threadId: String(root.id),
-      resolved:
-        taskEvidence.commentIds.has(root.id) && !taskEvidence.unresolvedCommentIds.has(root.id),
-      path: inline?.path ?? null,
-      line: anchorLine,
-      side: inline ? (inline.to != null ? 'RIGHT' : 'LEFT') : null,
-      comments: [root, ...(repliesByParent.get(root.id) ?? [])].map(comment => ({
-        commentId: String(comment.id),
-        author: mapUser(comment.user),
-        body: comment.content?.raw ?? '',
-        createdAt: comment.created_on ?? '',
-      })),
-      taskCount,
-    };
-  });
+  const threads = roots.map(root =>
+    mapThread(
+      root.id,
+      root.inline ?? null,
+      [root, ...(repliesByParent.get(root.id) ?? [])],
+      taskEvidence
+    )
+  );
+  const rootIds = new Set(roots.map(root => root.id));
+  for (const [parentId, replies] of repliesByParent) {
+    if (rootIds.has(parentId)) continue;
+    threads.push(mapThread(parentId, replies[0]?.inline ?? null, replies, taskEvidence));
+  }
+  return threads;
 }
 
 /**

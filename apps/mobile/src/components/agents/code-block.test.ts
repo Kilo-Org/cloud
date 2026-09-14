@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- token-color, truncation, and copy/long-press suites share the direct-invocation CodeBlock harness. */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); same pattern as tool-diff-preview.test.ts */
 import * as React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -19,6 +20,7 @@ const { useMonoScrollSheetMock } = vi.hoisted(() => ({
 // RNGH ships Flow source that the node project cannot parse, so the horizontal
 // ScrollView becomes a string element.
 vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
   View: 'View',
   Text: 'RNText',
 }));
@@ -86,6 +88,58 @@ function truncatedMarkers(root: TestRenderer.ReactTestInstance): TestRenderer.Re
       (node.type as string) === 'Text' &&
       propOf(node, 'accessibilityLabel') === 'Content truncated'
   );
+}
+
+function byTestId(
+  root: TestRenderer.ReactTestInstance,
+  testID: string
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => propOf(node, 'testID') === testID);
+}
+
+function firstByTestId(
+  root: TestRenderer.ReactTestInstance,
+  testID: string
+): TestRenderer.ReactTestInstance {
+  const first = byTestId(root, testID)[0];
+  if (!first) {
+    throw new TypeError(`expected a node with testID ${testID}`);
+  }
+  return first;
+}
+
+function press(instance: TestRenderer.ReactTestInstance): void {
+  const onPress = propOf(instance, 'onPress');
+  if (typeof onPress !== 'function') {
+    throw new TypeError('expected an onPress handler');
+  }
+  (onPress as () => void)();
+}
+
+function longPress(instance: TestRenderer.ReactTestInstance): void {
+  const onLongPress = propOf(instance, 'onLongPress');
+  if (typeof onLongPress !== 'function') {
+    throw new TypeError('expected an onLongPress handler');
+  }
+  (onLongPress as () => void)();
+}
+
+function layout(instance: TestRenderer.ReactTestInstance, width: number, height: number): void {
+  const onLayout = propOf(instance, 'onLayout');
+  if (typeof onLayout !== 'function') {
+    throw new TypeError('expected an onLayout handler');
+  }
+  (
+    onLayout as (event: {
+      nativeEvent: { layout: { x: number; y: number; width: number; height: number } };
+    }) => void
+  )({
+    nativeEvent: { layout: { x: 0, y: 0, width, height } },
+  });
+}
+
+function pressables(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => isMockedStringElement(node, 'Pressable'));
 }
 
 async function mount(element: React.ReactElement): Promise<TestRenderer.ReactTestRenderer> {
@@ -217,6 +271,249 @@ describe('CodeBlock', () => {
     const parent = codeParent(renderer.root);
     expect(parent).toBeDefined();
     expect(propOf(parent, 'selectable')).toBe(false);
+    await unmount(renderer);
+  });
+});
+
+describe('CodeBlock copy action', () => {
+  it('renders no copy affordance without an onCopyCode handler', async () => {
+    const renderer = await mount(blockElement());
+    expect(byTestId(renderer.root, 'code-block-copy-trigger')).toHaveLength(0);
+    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('reveals the copy action on a single tap and hands back the full source', async () => {
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const renderer = await mount(blockElement({ code: 'const x = 1;', onCopyCode }));
+
+    expect(byTestId(renderer.root, 'code-block-copy-trigger')).toHaveLength(1);
+    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
+
+    act(() => {
+      press(firstByTestId(renderer.root, 'code-block-copy-trigger'));
+    });
+    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(1);
+
+    act(() => {
+      press(firstByTestId(renderer.root, 'code-block-copy-action'));
+    });
+    expect(onCopyCode).toHaveBeenCalledWith('const x = 1;');
+    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('anchors the revealed action to the tap, so a tall fence shows it in view', async () => {
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const renderer = await mount(blockElement({ code: 'x'.repeat(5000), onCopyCode }));
+    const trigger = firstByTestId(renderer.root, 'code-block-copy-trigger');
+    const onPress = propOf(trigger, 'onPress') as (event: {
+      nativeEvent: { locationY: number };
+    }) => void;
+
+    act(() => {
+      onPress({ nativeEvent: { locationY: 1234 } });
+    });
+
+    const action = firstByTestId(renderer.root, 'code-block-copy-action');
+    expect(propOf(action, 'style')).toEqual({ top: 1234 });
+    await unmount(renderer);
+  });
+
+  it('falls back to the block top for a synthetic press with no coordinates', async () => {
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const renderer = await mount(blockElement({ onCopyCode }));
+
+    act(() => {
+      press(firstByTestId(renderer.root, 'code-block-copy-trigger'));
+    });
+
+    const action = firstByTestId(renderer.root, 'code-block-copy-action');
+    expect(propOf(action, 'style')).toEqual({ top: 0 });
+    await unmount(renderer);
+  });
+
+  it('reserves the measured action width as a right gutter on the copy trigger', async () => {
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const renderer = await mount(blockElement({ onCopyCode }));
+    const trigger = firstByTestId(renderer.root, 'code-block-copy-trigger');
+    expect(propOf(trigger, 'style')).toBeUndefined();
+
+    act(() => {
+      layout(firstByTestId(renderer.root, 'code-block-copy-measure'), 96, 28);
+    });
+
+    expect(propOf(firstByTestId(renderer.root, 'code-block-copy-trigger'), 'style')).toEqual({
+      paddingRight: 104,
+    });
+    await unmount(renderer);
+  });
+
+  it('measures the label without leaking a hidden copy button to assistive tech', async () => {
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const renderer = await mount(blockElement({ onCopyCode }));
+    const measure = firstByTestId(renderer.root, 'code-block-copy-measure');
+    expect(propOf(measure, 'accessibilityElementsHidden')).toBe(true);
+    expect(propOf(measure, 'importantForAccessibility')).toBe('no-hide-descendants');
+    expect(propOf(measure, 'pointerEvents')).toBe('none');
+    await unmount(renderer);
+  });
+
+  it('leaves the code at full width without a copy handler', async () => {
+    const renderer = await mount(blockElement());
+    expect(byTestId(renderer.root, 'code-block-copy-measure')).toHaveLength(0);
+    expect(byTestId(renderer.root, 'code-block-copy-trigger')).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('reserves the measured gutter on the scroll-mode trigger so the action clears the glyphs', async () => {
+    const track = vi.fn(() => () => undefined);
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const renderer = await mount(withSheet('scroll', track, blockElement({ onCopyCode })));
+
+    act(() => {
+      layout(firstByTestId(renderer.root, 'code-block-copy-measure'), 72, 28);
+    });
+
+    expect(propOf(firstByTestId(renderer.root, 'code-block-copy-trigger'), 'style')).toEqual({
+      paddingRight: 80,
+    });
+    await unmount(renderer);
+  });
+
+  it('right-aligns the revealed action inside the reserved gutter', async () => {
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const renderer = await mount(blockElement({ onCopyCode }));
+
+    act(() => {
+      press(firstByTestId(renderer.root, 'code-block-copy-trigger'));
+    });
+
+    const action = firstByTestId(renderer.root, 'code-block-copy-action');
+    expect(propOf(action, 'className')).toContain('right-0');
+    await unmount(renderer);
+  });
+
+  it('copies the source before the display cap, not the truncated slice', async () => {
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const full = 'x'.repeat(300);
+    const renderer = await mount(blockElement({ code: full, maxLength: 50, onCopyCode }));
+
+    act(() => {
+      press(firstByTestId(renderer.root, 'code-block-copy-trigger'));
+    });
+    act(() => {
+      press(firstByTestId(renderer.root, 'code-block-copy-action'));
+    });
+    expect(onCopyCode).toHaveBeenCalledWith(full);
+    await unmount(renderer);
+  });
+
+  it('exposes a copy accessibility action on the code text', async () => {
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const renderer = await mount(blockElement({ onCopyCode }));
+    const parent = codeParent(renderer.root);
+    expect(parent).toBeDefined();
+    const onAccessibilityAction = propOf(parent, 'onAccessibilityAction');
+    expect(typeof onAccessibilityAction).toBe('function');
+
+    act(() => {
+      (onAccessibilityAction as (event: { nativeEvent: { actionName: string } }) => void)({
+        nativeEvent: { actionName: 'copyCode' },
+      });
+    });
+    expect(onCopyCode).toHaveBeenCalledWith('const x = 1;');
+    await unmount(renderer);
+  });
+
+  it('offers no copy action for an empty fence', async () => {
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const renderer = await mount(blockElement({ code: '', onCopyCode }));
+    expect(byTestId(renderer.root, 'code-block-copy-trigger')).toHaveLength(0);
+    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('hides a revealed action when the code changes', async () => {
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const renderer = await mount(blockElement({ code: 'first', onCopyCode }));
+    act(() => {
+      press(firstByTestId(renderer.root, 'code-block-copy-trigger'));
+    });
+    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(1);
+
+    act(() => {
+      renderer.update(blockElement({ code: 'second', onCopyCode }));
+    });
+    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
+    await unmount(renderer);
+  });
+});
+
+describe('CodeBlock copy trigger long-press forwarding', () => {
+  it('forwards a long press on the trigger instead of revealing the action', async () => {
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const onLongPressCode = vi.fn<() => void>();
+    const renderer = await mount(blockElement({ onCopyCode, onLongPressCode }));
+    const trigger = firstByTestId(renderer.root, 'code-block-copy-trigger');
+
+    act(() => {
+      longPress(trigger);
+    });
+
+    expect(onLongPressCode).toHaveBeenCalledTimes(1);
+    expect(onCopyCode).not.toHaveBeenCalled();
+    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('hides a revealed action when a long press opens message details', async () => {
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const onLongPressCode = vi.fn<() => void>();
+    const renderer = await mount(blockElement({ onCopyCode, onLongPressCode }));
+    const trigger = firstByTestId(renderer.root, 'code-block-copy-trigger');
+
+    act(() => {
+      press(trigger);
+    });
+    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(1);
+
+    act(() => {
+      longPress(trigger);
+    });
+
+    expect(onLongPressCode).toHaveBeenCalledTimes(1);
+    expect(byTestId(renderer.root, 'code-block-copy-action')).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('mounts no responder wrapper without a copy handler', async () => {
+    const renderer = await mount(blockElement());
+    expect(pressables(renderer.root)).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('mounts no responder wrapper without a copy handler in sheet scroll mode', async () => {
+    const track = vi.fn(() => () => undefined);
+    const renderer = await mount(withSheet('scroll', track, blockElement()));
+    expect(pressables(renderer.root)).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('forwards a long press on the scroll-mode trigger', async () => {
+    const track = vi.fn(() => () => undefined);
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const onLongPressCode = vi.fn<() => void>();
+    const renderer = await mount(
+      withSheet('scroll', track, blockElement({ onCopyCode, onLongPressCode }))
+    );
+    const trigger = firstByTestId(renderer.root, 'code-block-copy-trigger');
+
+    act(() => {
+      longPress(trigger);
+    });
+
+    expect(onLongPressCode).toHaveBeenCalledTimes(1);
     await unmount(renderer);
   });
 });

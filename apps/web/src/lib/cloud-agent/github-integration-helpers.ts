@@ -60,6 +60,26 @@ const mapRepositories = (
   }));
 };
 
+// Repositories are intentionally listed once per granting installation: two
+// installations that both grant access to the same repo resolve to different
+// tokens/permissions at session start, so the UI (NewSessionPanel) keys and
+// selects rows by `(platformIntegrationId, id)`, not by repo id alone. This
+// only removes exact duplicate entries within the same installation's own
+// repository list (for example, a corrupted or duplicated cache), which would
+// otherwise silently double-count that installation's repo count in callers
+// like `hasGitHubRepository`.
+const dedupeRepositories = (
+  repositories: GitHubRepositoriesResult['repositories']
+): GitHubRepositoriesResult['repositories'] => {
+  const seen = new Set<string>();
+  return repositories.filter(repo => {
+    const key = `${repo.platformIntegrationId ?? ''}:${repo.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 const missingIntegrationResponse = (message: string): GitHubRepositoriesResult => ({
   integrationInstalled: false,
   repositories: [],
@@ -245,7 +265,7 @@ async function fetchRepositoriesForIntegrations(
     }
     return {
       integrationInstalled: true,
-      repositories: results.flatMap(result => result.repositories),
+      repositories: dedupeRepositories(results.flatMap(result => result.repositories)),
       syncedAt: results
         .map(result => result.syncedAt)
         .filter((value): value is string => value !== null)

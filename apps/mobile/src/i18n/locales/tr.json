@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "Kurumsal SSO"
   },
   "preferences": {
+    "general": "Genel",
+    "voiceInput": "Sesli giriş",
     "autoExpandThinking": "Düşünce bölümünü otomatik genişlet",
     "autoExpandThinkingSubtitle": "Ajan düşünmeyi bitirdiğinde düşünce bölümünü genişletilmiş olarak göster.",
+    "hideThinking": "Düşünce ayrıntılarını gizle",
+    "hideThinkingSubtitle": "Ajanın düşüncesini oturum sayfasında gösterme.",
     "keepScreenOn": "Oturum sayfasındayken ekranı açık tut",
     "keepScreenOnSubtitle": "Oturum çalışırken ekranı açık tut.",
     "appearance": "Görünüm",
@@ -237,6 +241,7 @@
     "appearanceLight": "Açık",
     "appearanceDark": "Koyu",
     "account": "Hesap",
+    "accountSubtitle": "Dil, güvenilen sunucular ve cihaz oturumları",
     "prReviewAttribution": "PR incelemelerine uygulama bilgisi ekle",
     "prReviewAttributionSubtitle": "İnceleme gönderdiğinde sonuna “Kilo ile incelendi” notunu ekle.",
     "returnSendsMessage": "Enter tuşu mesaj gönderir",
@@ -1559,6 +1564,22 @@
       "connectionLost": "Bağlantı koptu",
       "retryConnection": "Yeniden bağlanmayı dene"
     },
+    "goal": {
+      "title": "Hedef",
+      "statusActive": "Etkin hedef",
+      "statusPaused": "Duraklatılmış hedef",
+      "statusComplete": "Hedef tamamlandı",
+      "statusBlocked": "Hedef engellendi",
+      "edit": "Hedefi düzenle",
+      "remove": "Hedefi kaldır",
+      "pause": "Hedefi duraklat",
+      "resume": "Hedefe devam et",
+      "editPlaceholder": "Hedefi açıklayın",
+      "removeConfirmTitle": "Hedef kaldırılsın mı?",
+      "removeConfirmMessage": "CLI bu oturumun hedefini temizler.",
+      "updateFailed": "Hedef güncellenemedi.",
+      "sectionAccessibility": "{{status}}. Hedef: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Tarayıcında GitHub hesabını bağla, ardından bir depo seçmek için buraya dön.",
       "openGithub": "GitHub'ı aç",
@@ -2002,6 +2023,11 @@
       "stepsCount_other": "{{steps}} adım",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Otomatik onayla",
+      "description": "Bu oturum için izin isteklerini otomatik olarak onayla. Araçlar ardından istem olmadan çalışır.",
+      "unavailable": "Bu oturum izin isteklerini alamaz."
+    },
     "prBadge": {
       "open": "açık çekme isteği",
       "closed": "kapatılmış çekme isteği",
@@ -2142,8 +2168,12 @@
     "gatewayUnreachable": "Kilo Gateway'e ulaşılamadı. Bağlantını kontrol et ve tekrar dene.",
     "gatewayTimeout": "Metne dönüştürme çok uzun sürdü. Tekrar dene.",
     "gatewayModelUnavailable": "Bu metne dönüştürme modeli kullanılamıyor. Tercihler'den başkasını seç.",
+    "gatewayModelUnavailableNotice": "Bu model artık sunulmuyor. Başka bir tane seçmek için $t(transcriptionModel.title) öğesine dokun.",
     "gatewaySignInRequired": "Kilo Gateway ile dönüştürmeyi kullanmak için oturum açın.",
-    "gatewayNoModel": "Önce Tercihler'den bir metne dönüştürme modeli seçin."
+    "gatewayNoModel": "Önce Tercihler'den bir metne dönüştürme modeli seçin.",
+    "testTitle": "Sesli girişi test et",
+    "testPlaceholder": "Mikrofona dokunun ve konuşmaya başlayın.",
+    "testClear": "Metni temizle"
   },
   "share": {
     "title": "Kilo ile paylaş",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "Metne dönüştürme modeli yok",
     "emptyDescription": "Kilo Gateway şu anda metne dönüştürme modeli sunmuyor.",
     "loadFailed": "Metne dönüştürme modelleri yüklenemedi."
+  },
+  "voiceLanguage": {
+    "title": "Sesli giriş dili",
+    "automatic": "Otomatik",
+    "loadFailed": "Bu cihazın desteklediği diller yüklenemedi.",
+    "emptyTitle": "Desteklenen dil yok",
+    "emptyDescription": "Bu cihazın konuşma tanıması desteklenen bir dil bildirmiyor."
   }
 }

@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "SSO për ndërmarrje"
   },
   "preferences": {
+    "general": "Të përgjithshme",
+    "voiceInput": "Hyrje me zë",
     "autoExpandThinking": "Zgjero automatikisht arsyetimin",
     "autoExpandThinkingSubtitle": "Shfaq arsyetimin e plotë të agjentit pasi të përfundojë.",
+    "hideThinking": "Fshih detajet e arsyetimit",
+    "hideThinkingSubtitle": "Mos shfaq arsyetimin e agjentit në faqen e seancës.",
     "keepScreenOn": "Mbaje ekranin ndezur në faqen e seancës",
     "keepScreenOnSubtitle": "Mbaje ekranin ndezur gjatë ekzekutimit të seancës.",
     "appearance": "Pamja",
@@ -237,6 +241,7 @@
     "appearanceLight": "E çelët",
     "appearanceDark": "E errët",
     "account": "Llogaria",
+    "accountSubtitle": "Gjuha, serverët e besuar dhe sesionet në pajisje",
     "prReviewAttribution": "Përmend aplikacionin në rishikimet e PR",
     "prReviewAttributionSubtitle": "Shto shënimin «Rishikuar përmes Kilo» në fund kur dërgon një rishikim.",
     "returnSendsMessage": "Tasti Enter dërgon mesazhin",
@@ -1993,6 +1998,22 @@
       "connectionLost": "Lidhja u humb",
       "retryConnection": "Provo të lidhesh përsëri"
     },
+    "goal": {
+      "title": "Qëllimi",
+      "statusActive": "Qëllim aktiv",
+      "statusPaused": "Qëllim i ndalur",
+      "statusComplete": "Qëllimi u përfundua",
+      "statusBlocked": "Qëllimi u bllokua",
+      "edit": "Redakto qëllimin",
+      "remove": "Hiq qëllimin",
+      "pause": "Ndalo qëllimin",
+      "resume": "Vazhdo qëllimin",
+      "editPlaceholder": "Përshkruaj qëllimin",
+      "removeConfirmTitle": "Të hiqet qëllimi?",
+      "removeConfirmMessage": "CLI fshin qëllimin e këtij sesioni.",
+      "updateFailed": "Qëllimi nuk mund të përditësohej.",
+      "sectionAccessibility": "{{status}}. Qëllim: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Lidh llogarinë e GitHub në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
       "openGithub": "Hap GitHub",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "{{steps}} hapa",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Miratim automatik",
+      "description": "Mirato automatikisht kërkesat për leje për këtë sesion. Mjetet ekzekutohen më pas pa një kërkesë.",
+      "unavailable": "Ky sesion nuk mund të marrë kërkesa për leje."
+    },
     "prBadge": {
       "open": "hapja e kërkesës së bashkimit",
       "closed": "kërkesë për bashkim e mbyllur",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "Kilo Gateway nuk u arrit dot. Kontrollo lidhjen dhe provo përsëri.",
     "gatewayTimeout": "Transkriptimi zgjati tepër. Provo përsëri.",
     "gatewayModelUnavailable": "Ky model transkriptimi nuk është i disponueshëm. Zgjidh një tjetër te Preferencat.",
+    "gatewayModelUnavailableNotice": "Ky model nuk ofrohet më. Trokit $t(transcriptionModel.title) për të zgjedhur një tjetër.",
     "gatewaySignInRequired": "Hyr për të përdorur transkriptimin me Kilo Gateway.",
-    "gatewayNoModel": "Së pari zgjidh një model transkriptimi te Preferencat."
+    "gatewayNoModel": "Së pari zgjidh një model transkriptimi te Preferencat.",
+    "testTitle": "Testo diktimin",
+    "testPlaceholder": "Prek mikrofonin dhe fillo të flasësh.",
+    "testClear": "Pastro tekstin"
   },
   "share": {
     "title": "Ndarja në Kilo",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "Nuk ka modele transkriptimi",
     "emptyDescription": "Kilo Gateway nuk ofron tani asnjë model transkriptimi.",
     "loadFailed": "Modelet e transkriptimit nuk u ngarkuan."
+  },
+  "voiceLanguage": {
+    "title": "Gjuha e diktimit",
+    "automatic": "Automatik",
+    "loadFailed": "Nuk u ngarkuan dot gjuhët që mbështet kjo pajisje.",
+    "emptyTitle": "Asnjë gjuhë e mbështetur",
+    "emptyDescription": "Njohja e të folurit e kësaj pajisjeje nuk raporton asnjë gjuhë të mbështetur."
   }
 }

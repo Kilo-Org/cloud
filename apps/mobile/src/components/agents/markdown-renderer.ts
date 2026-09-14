@@ -39,6 +39,21 @@ export type MarkdownLinkLongPressHandler = (href: string, event?: GestureRespond
 
 export type MarkdownLinkPressHandler = (href: string) => boolean;
 
+/**
+ * Invoked when the reader taps a rendered code fence's inline "Copy" action.
+ * The renderer only reveals the action when this handler is supplied, so
+ * markdown hosts that do not offer code copying keep the static block.
+ */
+export type MarkdownCopyCodeHandler = (code: string) => void;
+
+/**
+ * Invoked when the reader press-and-holds a rendered code fence's copy
+ * trigger. Transcript hosts forward their message-details long-press here so a
+ * long press on a fence still opens details instead of being swallowed by the
+ * copy trigger. Optional: hosts without a long-press destination omit it.
+ */
+export type MarkdownCodeLongPressHandler = () => void;
+
 // Fenced code blocks are highlighted by the shared CodeBlock; a huge pasted
 // fence must not threaten the transcript's scroll performance, so the code
 // payload is capped and the hit shows the shared Truncated marker.
@@ -120,6 +135,8 @@ function containsMeaningfulNonImageText(nodes: ReactNode[]): boolean {
 type MarkdownRendererHandlers = {
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
+  onCopyCode?: MarkdownCopyCodeHandler;
+  onLongPressCode?: MarkdownCodeLongPressHandler;
 };
 
 export class MarkdownRenderer extends Renderer {
@@ -127,6 +144,8 @@ export class MarkdownRenderer extends Renderer {
   private readonly selectable: boolean;
   private readonly onLongPressLink?: MarkdownLinkLongPressHandler;
   private readonly onPressLink?: MarkdownLinkPressHandler;
+  private readonly onCopyCode?: MarkdownCopyCodeHandler;
+  private readonly onLongPressCode?: MarkdownCodeLongPressHandler;
   // Ordinal host key: the parser builds every header/body cell (each consuming
   // getKey()) before table() returns, so a slugger-based host key would shift
   // as rows/cells grow. A fresh renderer per parse restarts this counter, so
@@ -140,6 +159,8 @@ export class MarkdownRenderer extends Renderer {
     this.selectable = selectable;
     this.onLongPressLink = handlers.onLongPressLink;
     this.onPressLink = handlers.onPressLink;
+    this.onCopyCode = handlers.onCopyCode;
+    this.onLongPressCode = handlers.onLongPressCode;
   }
 
   private textNode(
@@ -196,6 +217,8 @@ export class MarkdownRenderer extends Renderer {
         selectable: this.selectable,
         baseColor: this.palette.textColor,
         maxLength: MARKDOWN_CODE_CHARACTER_CAP,
+        onCopyCode: this.onCopyCode,
+        onLongPressCode: this.onLongPressCode,
       })
     );
   }

@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "ଏଣ୍ଟରପ୍ରାଇଜ୍ SSO"
   },
   "preferences": {
+    "general": "ସାଧାରଣ",
+    "voiceInput": "ଭଏସ ଇନପୁଟ",
     "autoExpandThinking": "ଚିନ୍ତନର ବିବରଣୀ ଆପେ ଖୋଲନ୍ତୁ",
     "autoExpandThinkingSubtitle": "ଏଜେଣ୍ଟର ଚିନ୍ତନ ଶେଷ ହେଲେ ଏହାର ବିବରଣୀ ଖୋଲି ଦେଖାନ୍ତୁ।",
+    "hideThinking": "ଚିନ୍ତନର ବିବରଣୀ ଲୁଚାନ୍ତୁ",
+    "hideThinkingSubtitle": "ସେସନ୍ ପୃଷ୍ଠାରେ ଏଜେଣ୍ଟର ଚିନ୍ତନ ଦେଖାନ୍ତୁ ନାହିଁ।",
     "keepScreenOn": "ସେସନ୍ ପୃଷ୍ଠାରେ ଥିବା ସମୟରେ ସ୍କ୍ରିନ୍ ଚାଲୁ ରଖନ୍ତୁ",
     "keepScreenOnSubtitle": "ସେସନରେ କାମ ଚାଲିଥିବା ବେଳେ ସ୍କ୍ରିନ୍ ଚାଲୁ ରଖନ୍ତୁ।",
     "appearance": "ଦେଖାଶୁଣା",
@@ -237,6 +241,7 @@
     "appearanceLight": "ହାଲୁକା",
     "appearanceDark": "ଗାଢ଼",
     "account": "ଆକାଉଣ୍ଟ",
+    "accountSubtitle": "ଭାଷା, ବିଶ୍ୱସ୍ତ ହୋଷ୍ଟଗୁଡ଼ିକ ଏବଂ ଉପକରଣର ସେସନ୍",
     "prReviewAttribution": "PR ସମୀକ୍ଷାରେ ଆପ୍‌ର ନାମ ଯୋଡ଼ନ୍ତୁ",
     "prReviewAttributionSubtitle": "ସମୀକ୍ଷା ଦାଖଲ କଲେ ଶେଷରେ “Kilo ମାଧ୍ୟମରେ ସମୀକ୍ଷା ହୋଇଛି” ଯୋଡ଼ନ୍ତୁ।",
     "returnSendsMessage": "ରିଟର୍ନ କି ବାର୍ତ୍ତା ପଠାଏ",
@@ -1993,6 +1998,22 @@
       "connectionLost": "ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ",
       "retryConnection": "ପୁଣି ସଂଯୋଗ କରନ୍ତୁ"
     },
+    "goal": {
+      "title": "ଲକ୍ଷ୍ୟ",
+      "statusActive": "ସକ୍ରିୟ ଲକ୍ଷ୍ୟ",
+      "statusPaused": "ବିରତ ଲକ୍ଷ୍ୟ",
+      "statusComplete": "ଲକ୍ଷ୍ୟ ସମ୍ପୂର୍ଣ୍ଣ",
+      "statusBlocked": "ଲକ୍ଷ୍ୟ ଅବରୋଧିତ",
+      "edit": "ଲକ୍ଷ୍ୟ ସମ୍ପାଦନ କରନ୍ତୁ",
+      "remove": "ଲକ୍ଷ୍ୟ ହଟାନ୍ତୁ",
+      "pause": "ଲକ୍ଷ୍ୟ ବିରତ କରନ୍ତୁ",
+      "resume": "ଲକ୍ଷ୍ୟ ପୁନଃ ଆରମ୍ଭ କରନ୍ତୁ",
+      "editPlaceholder": "ଲକ୍ଷ୍ୟ ବର୍ଣ୍ଣନା କରନ୍ତୁ",
+      "removeConfirmTitle": "ଲକ୍ଷ୍ୟ ହଟାଇବେ?",
+      "removeConfirmMessage": "CLI ଏହି ସେସନର ଲକ୍ଷ୍ୟ ଲିଭାଇଦିଏ।",
+      "updateFailed": "ଲକ୍ଷ୍ୟ ଅପଡେଟ୍ କରାଯାଇପାରିଲା ନାହିଁ।",
+      "sectionAccessibility": "{{status}}। ଲକ୍ଷ୍ୟ: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitHub ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
       "openGithub": "GitHub ଖୋଲନ୍ତୁ",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "{{steps}}ଟି ପର୍ଯ୍ୟାୟ",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "ସ୍ୱଚାଳିତ ଅନୁମୋଦନ",
+      "description": "ଏହି ସେସନ୍ ପାଇଁ ଅନୁମତି ଅନୁରୋଧଗୁଡ଼ିକୁ ସ୍ୱଚାଳିତ ଭାବରେ ଅନୁମୋଦନ କରନ୍ତୁ। ତାପରେ ଉପକରଣଗୁଡ଼ିକ କୌଣସି ପ୍ରମ୍ପ୍ଟ ବିନା ଚାଲିବ।",
+      "unavailable": "ଏହି ସେସନ୍ ଅନୁମତି ଅନୁରୋଧ ଗ୍ରହଣ କରିପାରିବ ନାହିଁ।"
+    },
     "prBadge": {
       "open": "ଖୋଲା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
       "closed": "ବନ୍ଦ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "Kilo Gateway ପର୍ଯ୍ୟନ୍ତ ପହଞ୍ଚି ହୋଇନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "gatewayTimeout": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାରେ ଅଧିକ ସମୟ ଲାଗିଲା। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "gatewayModelUnavailable": "ଏହି ଲେଖା ବଦଳ ମଡେଲ୍ ଉପଲବ୍ଧ ନୁହେଁ। ପସନ୍ଦରେ ଅନ୍ୟ ଏକ ମଡେଲ୍ ବାଛନ୍ତୁ।",
+    "gatewayModelUnavailableNotice": "ଏହି ମଡେଲ୍ ଆଉ ଦିଆଯାଉନାହିଁ। ଅନ୍ୟଟିଏ ବାଛିବାକୁ $t(transcriptionModel.title) ଟ୍ୟାପ୍ କରନ୍ତୁ।",
     "gatewaySignInRequired": "Kilo Gateway ଲେଖା ବଦଳ ବ୍ୟବହାର ପାଇଁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
-    "gatewayNoModel": "ପ୍ରଥମେ ପସନ୍ଦରେ ଏକ ଲେଖା ବଦଳ ମଡେଲ୍ ବାଛନ୍ତୁ।"
+    "gatewayNoModel": "ପ୍ରଥମେ ପସନ୍ଦରେ ଏକ ଲେଖା ବଦଳ ମଡେଲ୍ ବାଛନ୍ତୁ।",
+    "testTitle": "କହି ଲେଖିବା ପରୀକ୍ଷା କରନ୍ତୁ",
+    "testPlaceholder": "ମାଇକ୍ରୋଫୋନ୍‌ରେ ଟ୍ୟାପ୍ କରନ୍ତୁ ଏବଂ କହିବା ଆରମ୍ଭ କରନ୍ତୁ।",
+    "testClear": "ଲେଖା ସଫା କରନ୍ତୁ"
   },
   "share": {
     "title": "Kilo କୁ ସେୟାର",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର କୌଣସି ମଡେଲ୍ ନାହିଁ",
     "emptyDescription": "Kilo Gateway ବର୍ତ୍ତମାନ କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର କୌଣସି ମଡେଲ୍ ଦେଉନାହିଁ।",
     "loadFailed": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର ମଡେଲ୍ ଗୁଡ଼ିକୁ ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ।"
+  },
+  "voiceLanguage": {
+    "title": "କହି ଲେଖିବାର ଭାଷା",
+    "automatic": "ସ୍ୱୟଂଚାଳିତ",
+    "loadFailed": "ଏହି ଡିଭାଇସ୍ ସମର୍ଥନ କରୁଥିବା ଭାଷାଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "emptyTitle": "କୌଣସି ସମର୍ଥିତ ଭାଷା ନାହିଁ",
+    "emptyDescription": "ଏହି ଡିଭାଇସ୍‌ର ବାକ୍ ଚିହ୍ନଟ କୌଣସି ସମର୍ଥିତ ଭାଷା ଜଣାଏ ନାହିଁ।"
   }
 }

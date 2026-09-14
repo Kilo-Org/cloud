@@ -4,6 +4,7 @@ import { eq, or } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { isValidEmail } from '../lib/users';
 import type { SeedResult } from '../index';
 
 export const usage = '<email> [options]';
@@ -30,11 +31,6 @@ function printUsage(): void {
   console.log('  pnpm dev:seed app:api-token ada@example.com');
   console.log('  pnpm -s dev:seed app:api-token ada@example.com --json | jq -r .token');
   console.log('  pnpm dev:seed app:api-token ada@example.com --expires-days=30 --admin');
-}
-
-function isValidEmail(email: string): boolean {
-  // Intentionally permissive; we only guard against obvious nonsense in dev.
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function parsePositiveInteger(value: string, flagName: string): number {

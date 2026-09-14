@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "SSO สำหรับองค์กร"
   },
   "preferences": {
+    "general": "ทั่วไป",
+    "voiceInput": "การป้อนเสียง",
     "autoExpandThinking": "ขยายกระบวนการคิดอัตโนมัติ",
     "autoExpandThinkingSubtitle": "ขยายรายละเอียดกระบวนการคิดของเอเจนต์เมื่อคิดเสร็จ",
+    "hideThinking": "ซ่อนรายละเอียดการคิด",
+    "hideThinkingSubtitle": "ไม่แสดงการคิดของเอเจนต์ในหน้าเซสชัน",
     "keepScreenOn": "เปิดหน้าจอค้างไว้ขณะอยู่ในหน้าเซสชัน",
     "keepScreenOnSubtitle": "เปิดหน้าจอค้างไว้ขณะที่เซสชันกำลังทำงาน",
     "appearance": "รูปแบบการแสดงผล",
@@ -237,6 +241,7 @@
     "appearanceLight": "สว่าง",
     "appearanceDark": "มืด",
     "account": "บัญชี",
+    "accountSubtitle": "ภาษา โฮสต์ที่เชื่อถือ และเซสชันบนอุปกรณ์",
     "prReviewAttribution": "ระบุแอปที่ใช้ในการตรวจสอบ PR",
     "prReviewAttributionSubtitle": "เพิ่มข้อความท้ายการตรวจสอบว่าตรวจสอบผ่าน Kilo เมื่อคุณส่งผลการตรวจสอบ",
     "returnSendsMessage": "ปุ่มขึ้นบรรทัดใหม่ใช้ส่งข้อความ",
@@ -1993,6 +1998,22 @@
       "connectionLost": "การเชื่อมต่อขาดหาย",
       "retryConnection": "ลองเชื่อมต่อใหม่"
     },
+    "goal": {
+      "title": "เป้าหมาย",
+      "statusActive": "เป้าหมายที่ใช้งานอยู่",
+      "statusPaused": "เป้าหมายที่หยุดชั่วคราว",
+      "statusComplete": "เป้าหมายเสร็จสมบูรณ์",
+      "statusBlocked": "เป้าหมายถูกบล็อก",
+      "edit": "แก้ไขเป้าหมาย",
+      "remove": "ลบเป้าหมาย",
+      "pause": "หยุดเป้าหมายชั่วคราว",
+      "resume": "ดำเนินการเป้าหมายต่อ",
+      "editPlaceholder": "อธิบายเป้าหมาย",
+      "removeConfirmTitle": "ลบเป้าหมายหรือไม่",
+      "removeConfirmMessage": "CLI จะล้างเป้าหมายของเซสชันนี้",
+      "updateFailed": "ไม่สามารถอัปเดตเป้าหมายได้",
+      "sectionAccessibility": "{{status}} เป้าหมาย: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "เชื่อมต่อ GitHub ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
       "openGithub": "เปิด GitHub",
@@ -2436,6 +2457,11 @@
       "stepsCount_other": "{{steps}} ขั้นตอน",
       "modelAccessibilityLabel": "{{name}} จาก {{provider}} · {{steps}} · {{cost}}"
     },
+    "autoApprove": {
+      "title": "อนุมัติอัตโนมัติ",
+      "description": "อนุมัติคำขออนุญาตสำหรับเซสชันนี้อัตโนมัติ จากนั้นเครื่องมือจะทำงานโดยไม่มีการสอบถาม",
+      "unavailable": "เซสชันนี้ไม่สามารถรับคำขออนุญาตได้"
+    },
     "prBadge": {
       "open": "เปิดพูลรีเควสต์",
       "closed": "pR ที่ปิดแล้ว",
@@ -2576,8 +2602,12 @@
     "gatewayUnreachable": "ไม่สามารถเชื่อมต่อ Kilo Gateway ได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
     "gatewayTimeout": "การถอดเสียงใช้เวลานานเกินไป ลองอีกครั้ง",
     "gatewayModelUnavailable": "โมเดลถอดเสียงนี้ไม่พร้อมใช้งาน เลือกโมเดลอื่นในการตั้งค่า",
+    "gatewayModelUnavailableNotice": "โมเดลนี้ไม่ให้บริการแล้ว แตะ $t(transcriptionModel.title) เพื่อเลือกโมเดลอื่น",
     "gatewaySignInRequired": "เข้าสู่ระบบเพื่อใช้การถอดเสียงผ่าน Kilo Gateway",
-    "gatewayNoModel": "เลือกโมเดลถอดเสียงในการตั้งค่าก่อน"
+    "gatewayNoModel": "เลือกโมเดลถอดเสียงในการตั้งค่าก่อน",
+    "testTitle": "ทดสอบการพิมพ์ด้วยเสียง",
+    "testPlaceholder": "แตะไมโครโฟนแล้วเริ่มพูด",
+    "testClear": "ล้างข้อความ"
   },
   "share": {
     "title": "แชร์ไปยัง Kilo",
@@ -2966,5 +2996,12 @@
     "emptyTitle": "ไม่มีโมเดลถอดเสียง",
     "emptyDescription": "ขณะนี้ Kilo Gateway ไม่มีโมเดลถอดเสียงให้บริการ",
     "loadFailed": "ไม่สามารถโหลดโมเดลถอดเสียงได้"
+  },
+  "voiceLanguage": {
+    "title": "ภาษาของการพิมพ์ด้วยเสียง",
+    "automatic": "อัตโนมัติ",
+    "loadFailed": "ไม่สามารถโหลดภาษาที่อุปกรณ์นี้รองรับได้",
+    "emptyTitle": "ไม่มีภาษาที่รองรับ",
+    "emptyDescription": "การรู้จำเสียงพูดของอุปกรณ์นี้ไม่รายงานภาษาที่รองรับ"
   }
 }

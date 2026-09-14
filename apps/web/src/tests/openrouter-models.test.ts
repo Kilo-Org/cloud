@@ -283,14 +283,18 @@ describe('GET /api/openrouter/models', () => {
     expect(Array.isArray(responseData.data)).toBe(true);
   });
 
-  test('excludes unavailable free Gemma models advertised upstream while retaining paid Gemma', async () => {
+  test('excludes unavailable free models advertised upstream while retaining paid Gemma', async () => {
     const original = mockOpenRouterModels.data.find(model => model.id === 'some-other-model');
     if (!original) throw new Error('Expected catalog fixture');
     const upstream = {
       data: [
         ...mockOpenRouterModels.data,
         { ...original, id: 'google/gemma-4-31b-it', name: 'Google: Gemma 4 31B IT' },
-        ...['google/gemma-4-26b-a4b-it:free', 'google/gemma-4-31b-it:free'].map(id => ({
+        ...[
+          'google/gemma-4-26b-a4b-it:free',
+          'google/gemma-4-31b-it:free',
+          'thinkingmachines/inkling:free',
+        ].map(id => ({
           ...original,
           id,
           name: id,
@@ -310,6 +314,7 @@ describe('GET /api/openrouter/models', () => {
     expect(response.status).toBe(200);
     expect(modelIds).not.toContain('google/gemma-4-26b-a4b-it:free');
     expect(modelIds).not.toContain('google/gemma-4-31b-it:free');
+    expect(modelIds).not.toContain('thinkingmachines/inkling:free');
     expect(modelIds).toContain('google/gemma-4-31b-it');
   });
 

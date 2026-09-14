@@ -4245,7 +4245,13 @@ export const platform_integrations = pgTable(
     // GitHub App type (for GitHub platform only)
     // 'standard' = full KiloConnect app, 'lite' = read-only KiloConnect-Lite app
     github_app_type: text().$type<'standard' | 'lite'>().default('standard'),
-    github_installation_id: uuid().references(() => github_app_installations.id),
+    // Canonical installations are soft-deleted (lifecycle_state/deleted_at), never hard-deleted,
+    // except by the account-anonymization path in `anonymizeCloudUserData`, which already guards
+    // with a `NOT EXISTS` check against remaining associations before deleting. `restrict` makes
+    // that invariant explicit at the database level instead of relying on the implicit default.
+    github_installation_id: uuid().references(() => github_app_installations.id, {
+      onDelete: 'restrict',
+    }),
     github_disconnected_at: timestamp({ withTimezone: true, mode: 'string' }),
     github_authorized_by_user_id: text(),
     github_authorized_user_id: text(),

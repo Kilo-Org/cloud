@@ -14,6 +14,7 @@ import {
 
 const COMPACT: SlashCommandInfo = { name: 'compact', description: 'Compact', hints: [] };
 const REVIEW: SlashCommandInfo = { name: 'review', description: 'Review', hints: [] };
+const GOAL: SlashCommandInfo = { name: 'goal', description: 'Goal', hints: [] };
 const SAMPLE_COMMANDS: SlashCommandInfo[] = [COMPACT, REVIEW];
 
 function remoteState(overrides: Partial<RemoteCommandState> = {}): RemoteCommandState {
@@ -75,6 +76,11 @@ describe('createMobileSlashCommandList', () => {
   it('returns the live catalog verbatim for cloud-agent sessions without injecting /new', () => {
     const list = createMobileSlashCommandList('cloud-agent', SAMPLE_COMMANDS, null);
     expect(list).toBe(SAMPLE_COMMANDS);
+  });
+
+  it('does not strip a CLI-reported /goal from a remote catalog', () => {
+    const list = createMobileSlashCommandList('remote', [GOAL], remoteState({ commands: [GOAL] }));
+    expect(list.map(command => command.name)).toEqual(['goal', 'new']);
   });
 
   it('exposes no commands for read-only, unresolved, or other noninteractive session types', () => {

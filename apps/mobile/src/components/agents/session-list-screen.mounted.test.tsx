@@ -299,6 +299,13 @@ function headerAction(testID = 'agents-view-history') {
   }
   return button;
 }
+function filterButtonProps() {
+  const button = nodes('Pressable').find(node => node.props.testID === 'agents-open-filters');
+  if (!button) {
+    throw new Error('Missing filter button');
+  }
+  return button.props as { accessibilityLabel?: string; accessibilityValue?: unknown };
+}
 function applyFilters(projectFilter: string[], platformFilter: string[]) {
   act(() => {
     headerAction('agents-open-filters').props.onPress();
@@ -1294,6 +1301,9 @@ describe('AgentSessionListScreen live filtering', () => {
     const emptyState = renderer.root.findByType(EmptyState);
     expect(emptyState.props.title).toBe('No sessions match');
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
+    // The accessibly-named count matches the visible badge while narrowed.
+    expect(filterButtonProps().accessibilityLabel).toBe('Filter sessions, 1');
+    expect(filterButtonProps().accessibilityValue).toBeUndefined();
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(header().props.eyebrow).toBe('1 LIVE');
 
@@ -1303,6 +1313,9 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(nodes('FlatList')).toHaveLength(1);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(0);
+    // Clearing drops the count from the accessible name too: no stale "1"
+    // survives in the native content description after the badge unmounts.
+    expect(filterButtonProps().accessibilityLabel).toBe('Filter sessions');
     expect(nodes('ScrollView')).toHaveLength(0);
   });
 });

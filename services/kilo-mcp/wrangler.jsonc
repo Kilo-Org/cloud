@@ -59,6 +59,11 @@
 
   "vars": {
     "WEB_BASE_URL": "https://app.kilo.ai",
+    // Server-side PostHog capture key (src/analytics.ts). It is a worker var,
+    // never a client bundle, and it is deliberately absent from the `env.dev`
+    // vars below so local/dev runs do not send (the web non-production
+    // opt-out convention, apps/web/src/components/PostHogProvider.tsx:52-57).
+    "NEXT_PUBLIC_POSTHOG_KEY": "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z",
   },
 
   // ============================================

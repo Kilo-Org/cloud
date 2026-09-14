@@ -301,6 +301,14 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       expect(await store.denyCode('PAIR-DENY', NOW)).toBe(false);
       expect(await store.denyCode('PAIR-GHOST', NOW)).toBe(false);
     });
+
+    it('markCodeExpired moves a pending pairing to expired exactly once', async () => {
+      await store.createCode({ ...pairInput, code: 's6-expire', deviceAuthCode: 'PAIR-EXP' });
+      expect(await store.markCodeExpired('PAIR-EXP', NOW)).toBe(true);
+      expect((await store.getCode('s6-expire'))?.status).toBe('expired');
+      expect(await store.markCodeExpired('PAIR-EXP', NOW)).toBe(false);
+      expect(await store.markCodeExpired('PAIR-GHOST', NOW)).toBe(false);
+    });
   });
 
   describe('getKiloToken (forwarding credential, s6)', () => {

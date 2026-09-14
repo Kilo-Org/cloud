@@ -27,6 +27,7 @@ import {
   htmlResponse,
   PAIRING_POLL_INTERVAL_MS,
 } from '../auth/http';
+import type { McpAnalytics } from '../analytics';
 import type { OAuthStoreApi } from '../store/oauth-store';
 
 export type PairingStatusDeps = {
@@ -35,6 +36,8 @@ export type PairingStatusDeps = {
   webBaseUrl: string;
   fetchImpl?: typeof fetch;
   now?: () => Date;
+  /** Best-effort sign-in analytics; never awaited and never allowed to throw. */
+  analytics?: McpAnalytics;
 };
 
 /**
@@ -173,7 +176,15 @@ export async function handlePairingStatus(
     return authJsonResponse({ status: 'unknown' } satisfies PairingStatus);
   }
   if (record.status === 'denied') {
+    // Terminal state, and the transition already recorded the failure once
+    // (`denyCode` is only ever called just before that emit). A later poll of
+    // the same record must answer denied without re-emitting.
     return authJsonResponse({ status: 'denied' } satisfies PairingStatus);
+  }
+  if (record.status === 'expired') {
+    // Terminal state, recorded when the first poll learned of the upstream
+    // expiry; later polls answer expired without re-emitting.
+    return authJsonResponse({ status: 'expired' } satisfies PairingStatus);
   }
   if (record.status === 'approved') {
     return clientRedirect(record);
@@ -190,11 +201,33 @@ export async function handlePairingStatus(
       // Transient upstream failure keeps the page waiting; its next poll retries.
       return authJsonResponse({ status: 'pending' } satisfies PairingStatus);
     case 'denied': {
-      await deps.store.denyCode(record.deviceAuthCode, nowIso);
+      // Emit only when THIS request won the pending -> denied transition;
+      // a concurrent poll that lost the race must not double-count.
+      const transitioned = await deps.store.denyCode(record.deviceAuthCode, nowIso);
+      if (transitioned) {
+        deps.analytics?.oauthSignIn({
+          phase: 'failed',
+          identity: null,
+          clientId: record.clientId,
+          reason: 'denied',
+        });
+      }
       return authJsonResponse({ status: 'denied' } satisfies PairingStatus);
     }
-    case 'expired':
+    case 'expired': {
+      // Persist the terminal expiry so every later poll answers from the
+      // record instead of re-emitting the failure.
+      const transitioned = await deps.store.markCodeExpired(record.deviceAuthCode, nowIso);
+      if (transitioned) {
+        deps.analytics?.oauthSignIn({
+          phase: 'failed',
+          identity: null,
+          clientId: record.clientId,
+          reason: 'expired',
+        });
+      }
       return authJsonResponse({ status: 'expired' } satisfies PairingStatus);
+    }
     case 'approved': {
       // Persist BEFORE any further poll: the upstream answer is single-use.
       await deps.store.recordPairingApproval(

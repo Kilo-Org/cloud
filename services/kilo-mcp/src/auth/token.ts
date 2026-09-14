@@ -19,6 +19,7 @@
 import { signJwt } from './jwt';
 import { base64UrlEncode, isValidCodeVerifier, verifyPkceS256 } from './pkce';
 import { MCP_SCOPE, oauthErrorResponse, authJsonResponse } from './http';
+import type { McpAnalytics } from '../analytics';
 import type { OAuthStoreApi } from '../store/oauth-store';
 
 export type TokenDeps = {
@@ -28,6 +29,8 @@ export type TokenDeps = {
   /** This worker's origin for the current request — the JWT `iss`. */
   issuer: string;
   now?: () => Date;
+  /** Best-effort sign-in analytics; never awaited and never allowed to throw. */
+  analytics?: McpAnalytics;
 };
 
 /** Access tokens are short-lived; revocation is via the jti registry. */
@@ -264,6 +267,15 @@ async function exchangeAuthorizationCode(
     opaqueToken(48),
     now
   );
+  // First point where both the user and the organization are known.
+  deps.analytics?.oauthSignIn({
+    phase: 'succeeded',
+    identity: {
+      kiloUserId: consumed.kiloUserId ?? record.kiloUserId,
+      organizationId: consumed.organizationId,
+    },
+    clientId,
+  });
   return authJsonResponse(pair, 200, { 'Cache-Control': 'no-store' });
 }
 
@@ -397,16 +409,41 @@ export async function handleToken(request: Request, deps: TokenDeps): Promise<Re
     );
   }
   const now = deps.now?.() ?? new Date();
-  switch (params['grant_type']) {
-    case 'authorization_code':
-      return exchangeAuthorizationCode(deps, params, now);
-    case 'refresh_token':
-      return redeemRefreshToken(deps, params, now);
-    default:
-      return oauthErrorResponse(
-        400,
-        'unsupported_grant_type',
-        'Only authorization_code and refresh_token grants are supported.'
-      );
+  const grantType = params['grant_type'];
+  const response = await (async (): Promise<Response> => {
+    switch (grantType) {
+      case 'authorization_code':
+        return exchangeAuthorizationCode(deps, params, now);
+      case 'refresh_token':
+        return redeemRefreshToken(deps, params, now);
+      default:
+        return oauthErrorResponse(
+          400,
+          'unsupported_grant_type',
+          'Only authorization_code and refresh_token grants are supported.'
+        );
+    }
+  })();
+
+  // A failed authorization_code exchange is a sign-in failure. A failed
+  // refresh is not (the user already signed in), so it stays silent.
+  if (grantType === 'authorization_code' && !response.ok) {
+    const body: unknown = await response
+      .clone()
+      .json()
+      .catch(() => null);
+    const reason =
+      typeof body === 'object' &&
+      body !== null &&
+      typeof (body as { error?: unknown }).error === 'string'
+        ? (body as { error: string }).error
+        : 'invalid_request';
+    deps.analytics?.oauthSignIn({
+      phase: 'failed',
+      identity: null,
+      clientId: params['client_id'],
+      reason,
+    });
   }
+  return response;
 }

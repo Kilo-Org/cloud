@@ -103,15 +103,16 @@ index 608d75cadf9243244541ea61cbf8908244d6e0b8..ca2a5b9c51be747e106da2014063dfb2
    auto provider = [componentViewClass componentDescriptorProvider];
    _componentViewClasses[provider.handle] = [self _componentViewClassDescriptorFromClass:componentViewClass];
    _providerRegistry.add(provider);
-@@ -209,6 +216,16 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
+@@ -209,6 +216,17 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
        @"ComponentView with componentHandle `%lli` (`%s`) not found.",
        componentHandle,
        (char *)componentHandle);
 +  if (iterator == _componentViewClasses.end()) {
 +    RCTLogError(@"ComponentView with componentHandle `%lli` not found, mounting fallback view.", componentHandle);
 +    auto fd = [self _componentViewClassDescriptorFromClass:[RCTUnimplementedViewComponentView class]];
++    Class viewClass = fd.viewClass;
 +    return RCTComponentViewDescriptor{
-+        .view = [fd.viewClass new],
++        .view = [viewClass new],
 +        .observesMountingTransactionWillMount = fd.observesMountingTransactionWillMount,
 +        .observesMountingTransactionDidMount = fd.observesMountingTransactionDidMount,
 +        .shouldBeRecycled = fd.shouldBeRecycled,

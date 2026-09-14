@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -16,7 +17,15 @@ const mobileRoot = path.join(repoRoot, 'apps', 'mobile');
 const patchRelativePath = 'patches/react-native@0.86.3.patch';
 const patchPath = path.join(repoRoot, patchRelativePath);
 const workspacePath = path.join(repoRoot, 'pnpm-workspace.yaml');
+const lockfilePath = path.join(repoRoot, 'pnpm-lock.yaml');
 const appConfigPath = path.join(mobileRoot, 'app.config.ts');
+
+// `createComponentViewWithComponentHandle:` stores the view class in a
+// protocol-qualified `Class<RCTComponentViewProtocol>` field. Sending `new` to
+// that field fails to compile ("class method 'new' not found"), so the fallback
+// must launder it through a plain `Class` first.
+const PLAIN_CLASS_NEW = /Class viewClass = fd\.viewClass;/;
+const PROTOCOL_CLASS_NEW = /\[fd\.viewClass new\]/;
 
 const mobileRequire = createRequire(path.join(mobileRoot, 'package.json'));
 const reactNativeRoot = path.dirname(mobileRequire.resolve('react-native/package.json'));
@@ -53,6 +62,16 @@ test('the react-native patch contains the registration-lock and fallback-guard h
     'patch must add the createComponentViewWithComponentHandle fallback view'
   );
   assert.match(patch, /@synchronized/, 'patch must synchronize the LegacyViewManagerInterop cache');
+  assert.match(
+    patch,
+    PLAIN_CLASS_NEW,
+    'patch must copy the fallback class into a plain Class before calling -new'
+  );
+  assert.doesNotMatch(
+    patch,
+    PROTOCOL_CLASS_NEW,
+    'patch must not send -new to the protocol-qualified Class field; clang fails with "class method new not found"'
+  );
 });
 
 test('the installed RCTComponentViewFactory takes the lock and guards a registration miss', () => {
@@ -64,6 +83,37 @@ test('the installed RCTComponentViewFactory takes the lock and guards a registra
     /RCTUnimplementedViewComponentView class/,
     'a missed component handle must mount the unimplemented fallback view instead of dereferencing end()'
   );
+  assert.match(
+    source,
+    PLAIN_CLASS_NEW,
+    'the installed fallback must instantiate its view through a plain Class (compile fix)'
+  );
+  assert.doesNotMatch(
+    source,
+    PROTOCOL_CLASS_NEW,
+    'the installed fallback must not send -new to a protocol-qualified Class field'
+  );
+});
+
+test('pnpm-lock.yaml records the sha256 of the react-native patch', () => {
+  const lockfile = fs.readFileSync(lockfilePath, 'utf8');
+  const hash = createHash('sha256').update(fs.readFileSync(patchPath)).digest('hex');
+
+  assert.match(
+    lockfile,
+    new RegExp(`^ {2}react-native@0\\.86\\.3: ${hash}$`, 'm'),
+    'patchedDependencies must pin the patch file sha256 so pnpm applies the same patch CI installs'
+  );
+
+  const recorded = lockfile.match(/react-native@0\.86\.3\(patch_hash=[0-9a-f]+/g) ?? [];
+  assert.ok(recorded.length > 0, 'the lockfile must reference the patched react-native');
+  for (const entry of recorded) {
+    assert.equal(
+      entry,
+      `react-native@0.86.3(patch_hash=${hash}`,
+      'every locked react-native reference must use the current patch hash'
+    );
+  }
 });
 
 test('the installed LegacyViewManagerInterop cache is synchronized', () => {

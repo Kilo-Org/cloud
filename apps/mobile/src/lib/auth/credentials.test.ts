@@ -74,6 +74,9 @@ vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
   clearCondenseToolCallsPreference: vi.fn(),
 }));
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference: vi.fn() }));
+vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
+  clearHideThinkingPreference: vi.fn(),
+}));
 vi.mock('@/lib/kiloclaw-tab-ownership', () => ({
   gateKiloClawOwned: vi.fn(),
   clearKiloClawOwned: vi.fn(),

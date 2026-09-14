@@ -227,6 +227,12 @@ vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
     setCondenseToolCalls: vi.fn(),
   }),
 }));
+// The real hook reaches SecureStore via `@sentry/react-native`, which imports
+// the native react-native entry; mock the preference the way the other
+// preference hooks above are mocked so the suite stays DOM/native-free.
+vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
+  useHideThinkingPreference: () => ({ hideThinking: false, hasLoaded: true }),
+}));
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
   useReasoningPreference: () => ({ defaultExpanded: false }),
 }));

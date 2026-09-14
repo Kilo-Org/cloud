@@ -1959,27 +1959,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   private async runtimeProxyFence(): Promise<RuntimeProxyFence | null> {
-    const [metadata, runtime, lease] = await Promise.all([
+    const [metadata, lease] = await Promise.all([
       this.getMetadata(),
-      getWrapperRuntimeState(this.ctx.storage),
       getWrapperLease(this.ctx.storage),
     ]);
-    if (
-      !metadata ||
-      !metadata.workspace?.sandboxId ||
-      !runtime.wrapperRunId ||
-      !runtime.wrapperConnectionId ||
-      lease.state !== 'owns_wrapper' ||
-      lease.instance.instanceGeneration !== runtime.wrapperGeneration
-    ) {
+    if (!metadata || !metadata.workspace?.sandboxId || lease.state !== 'owns_wrapper') {
       return null;
     }
     return {
       plane: 'legacy',
-      generation: runtime.wrapperGeneration,
       allocationId: lease.instance.instanceId,
-      wrapperRunId: runtime.wrapperRunId,
-      wrapperConnectionId: runtime.wrapperConnectionId,
+      instanceGeneration: lease.instance.instanceGeneration,
     };
   }
 
@@ -1988,41 +1978,57 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     wrapperGeneration: number;
     wrapperConnectionId: string;
   }): Promise<string | null> {
-    const currentFence = await this.runtimeProxyFence();
-    if (
-      !currentFence ||
-      currentFence.plane !== 'legacy' ||
-      currentFence.wrapperRunId !== fence.wrapperRunId ||
-      currentFence.generation !== fence.wrapperGeneration ||
-      currentFence.wrapperConnectionId !== fence.wrapperConnectionId
-    ) {
-      return null;
-    }
+    const readDeliveryFence = async (): Promise<{
+      metadata: SessionMetadata | null;
+      physical: RuntimeProxyFence | null;
+    }> => {
+      const [metadata, runtime, lease] = await Promise.all([
+        this.getMetadata(),
+        getWrapperRuntimeState(this.ctx.storage),
+        getWrapperLease(this.ctx.storage),
+      ]);
+      if (
+        !metadata ||
+        !metadata.workspace?.sandboxId ||
+        lease.state !== 'owns_wrapper' ||
+        !runtime.wrapperRunId ||
+        !runtime.wrapperConnectionId ||
+        runtime.wrapperRunId !== fence.wrapperRunId ||
+        runtime.wrapperConnectionId !== fence.wrapperConnectionId ||
+        runtime.wrapperGeneration !== fence.wrapperGeneration ||
+        lease.instance.instanceGeneration !== runtime.wrapperGeneration
+      ) {
+        return { metadata, physical: null };
+      }
+      return {
+        metadata,
+        physical: {
+          plane: 'legacy',
+          allocationId: lease.instance.instanceId,
+          instanceGeneration: lease.instance.instanceGeneration,
+        },
+      };
+    };
+
+    const before = await readDeliveryFence();
+    if (!before.physical) return null;
     const token = await this.getRuntimeToken();
-    const [metadata, storedAuthorization, latestFence] = await Promise.all([
-      this.getMetadata(),
-      this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
-      this.runtimeProxyFence(),
-    ]);
-    if (
-      !latestFence ||
-      latestFence.plane !== 'legacy' ||
-      latestFence.wrapperRunId !== fence.wrapperRunId ||
-      latestFence.generation !== fence.wrapperGeneration ||
-      latestFence.wrapperConnectionId !== fence.wrapperConnectionId
-    ) {
-      return null;
-    }
-    const authorization = RuntimeAuthorizationSchema.safeParse(storedAuthorization);
+    const after = await readDeliveryFence();
+    if (!after.physical) return null;
+    const authorization = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
     return issuePersistedRuntimeProxyGrant({
       env: this.env,
       storage: this.ctx.storage,
-      metadata,
+      metadata: after.metadata,
       authorization: authorization.success ? authorization.data : null,
-      fence: latestFence,
+      fence: after.physical,
       token,
       mode:
-        metadata && getEffectiveCredentialContainment(metadata).kilocode ? 'contained' : 'direct',
+        after.metadata && getEffectiveCredentialContainment(after.metadata).kilocode
+          ? 'contained'
+          : 'direct',
     });
   }
 

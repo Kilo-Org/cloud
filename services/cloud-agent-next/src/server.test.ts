@@ -779,10 +779,8 @@ describe('server runtime credential proxy', () => {
         userId: 'usr_proxy',
         orgId: 'org_proxy',
         mode: 'contained',
-        generation: 1,
         allocationId: 'allocation_proxy',
-        wrapperRunId: 'run_proxy',
-        wrapperConnectionId: 'connection_proxy',
+        instanceGeneration: 1,
         leaseExpiresAt: Date.now() + 60_000,
         state: 'active',
       })

@@ -445,6 +445,53 @@ describe('publication budget', () => {
   });
 });
 
+describe('bounded serialization', () => {
+  it('serializes the blob once per throttle window, not once per cache change', async () => {
+    const { kv, scopes } = createFakeKv();
+    const queryClient = makeAuthoritativeQueryClient('u1');
+
+    // Build the burst clients before the spy so the fixture's own serialization
+    // is not counted.
+    const burst: PersistedClient[] = Array.from({ length: 5 }, () =>
+      makePersistedClient({ id: 'u1' })
+    );
+    // The spy is installed before the persister so the library's `serialize`
+    // default (`JSON.stringify`) captures it.
+    const stringify = vi.spyOn(JSON, 'stringify');
+    // `JSON.stringify` is also how TanStack Query hashes the query key in the
+    // publication fence, so count only the blob serializations: the argument of
+    // a read-cache blob is the `PersistedClient` itself.
+    const blobSerializations = () =>
+      stringify.mock.calls.filter(([value]) => {
+        const candidate = value as { clientState?: unknown } | null;
+        return typeof candidate === 'object' && candidate !== null && 'clientState' in candidate;
+      }).length;
+    try {
+      const persister = createReadCachePersister({
+        queryClient,
+        userId: 'u1',
+        epoch: currentAuthEpoch(),
+      });
+
+      // Five query-cache changes inside one throttle window. The un-throttled
+      // wrapper path must serialize none of them: only the throttled save
+      // already running has serialized, exactly once for the whole burst.
+      const inFlight = burst.map(client => persister.persistClient(client));
+      expect(blobSerializations()).toBe(1);
+
+      await Promise.all(inFlight);
+
+      // The coalesced trailing save serializes at most once more, so the count
+      // is bounded by the throttle window, never by the number of changes.
+      expect(blobSerializations()).toBeLessThanOrEqual(2);
+      expect(kv.setItem).toHaveBeenCalledTimes(2);
+      expect(scopes.get('cache:u1:1')?.get('read-cache')).toBeDefined();
+    } finally {
+      stringify.mockRestore();
+    }
+  });
+});
+
 describe('publication fence', () => {
   it('skips publication when the auth epoch moved after persister creation', async () => {
     const { kv } = createFakeKv();

@@ -78,6 +78,69 @@ test('the installed LegacyViewManagerInterop cache is synchronized', () => {
   );
 });
 
+// A `Class<Protocol>` receiver only exposes the class methods the protocol
+// declares. `RCTComponentViewClassDescriptor.viewClass` is
+// `Class<RCTComponentViewProtocol>`, which declares `componentDescriptorProvider`
+// and `supplementalComponentDescriptorProviders` but not `+new`, so messaging the
+// member straight off the descriptor fails the iOS build:
+//   RCTComponentViewFactory.mm:223:31: error: class method 'new' not found
+// The fallback must bind an unqualified `Class` first, the way the successful
+// lookup below already does.
+const PROTOCOL_QUALIFIED_CLASS_RECEIVER = (member: string) =>
+  new RegExp(String.raw`\[\s*[\w.]+\.${member}\s+\w+`, 'g');
+
+function protocolQualifiedClassMemberNames(): string[] {
+  const header = readInstalledReactNative(
+    'React/Fabric/Mounting/RCTComponentViewClassDescriptor.h'
+  );
+  const names = [...header.matchAll(/Class<[^>]+>\s+(\w+)\s*;/g)].map(match => match[1]);
+
+  assert.ok(
+    names.length > 0,
+    'RCTComponentViewClassDescriptor must declare its view class as a protocol-qualified `Class<...>`'
+  );
+  return names;
+}
+
+function assertNoProtocolQualifiedClassSend(source: string, label: string): void {
+  for (const member of protocolQualifiedClassMemberNames()) {
+    const sends = [...source.matchAll(PROTOCOL_QUALIFIED_CLASS_RECEIVER(member))].map(
+      match => match[0]
+    );
+
+    assert.deepEqual(
+      sends,
+      [],
+      `${label} must not send a class method (e.g. \`+new\`) to the protocol-qualified \`${member}\` member; bind an unqualified \`Class\` first`
+    );
+  }
+}
+
+test('the react-native patch never messages the protocol-qualified viewClass member', () => {
+  const patch = fs.readFileSync(patchPath, 'utf8');
+  const addedLines = patch
+    .split('\n')
+    .filter(line => line.startsWith('+') && !line.startsWith('+++'))
+    .join('\n');
+
+  assertNoProtocolQualifiedClassSend(addedLines, 'the patched ObjC');
+});
+
+test('the installed RCTComponentViewFactory never messages the protocol-qualified viewClass member', () => {
+  const source = readInstalledReactNative('React/Fabric/Mounting/RCTComponentViewFactory.mm');
+
+  assertNoProtocolQualifiedClassSend(source, 'the installed RCTComponentViewFactory');
+
+  const fallbackStart = source.indexOf('if (iterator == _componentViewClasses.end())');
+  assert.ok(fallbackStart >= 0, 'the registration-miss fallback must be present');
+  const fallbackBlock = source.slice(fallbackStart, source.indexOf('\n  }', fallbackStart));
+  assert.match(
+    fallbackBlock,
+    /Class\s+\w+\s*=\s*\w+\.viewClass;/,
+    'the fallback must bind the descriptor view class to an unqualified `Class` before instantiating it'
+  );
+});
+
 test('iOS builds React Native core from source so the patch is compiled in', () => {
   const appConfig = fs.readFileSync(appConfigPath, 'utf8');
 

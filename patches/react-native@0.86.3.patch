@@ -47,7 +47,7 @@ index 226781f27bfff61ecd993be0b4937fb8e4c66465..bcb3e80b4209191b8f03bc46ca31944c
    }
  
 diff --git a/React/Fabric/Mounting/RCTComponentViewFactory.mm b/React/Fabric/Mounting/RCTComponentViewFactory.mm
-index 608d75cadf9243244541ea61cbf8908244d6e0b8..ca2a5b9c51be747e106da2014063dfb228049a33 100644
+index 608d75cadf9243244541ea61cbf8908244d6e0b8..d92680ecea9024f6c85b7e7d235afc8f34fb9c3e 100644
 --- a/React/Fabric/Mounting/RCTComponentViewFactory.mm
 +++ b/React/Fabric/Mounting/RCTComponentViewFactory.mm
 @@ -48,6 +48,7 @@ using namespace facebook::react;
@@ -103,15 +103,18 @@ index 608d75cadf9243244541ea61cbf8908244d6e0b8..ca2a5b9c51be747e106da2014063dfb2
    auto provider = [componentViewClass componentDescriptorProvider];
    _componentViewClasses[provider.handle] = [self _componentViewClassDescriptorFromClass:componentViewClass];
    _providerRegistry.add(provider);
-@@ -209,6 +216,16 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
+@@ -209,6 +216,19 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
        @"ComponentView with componentHandle `%lli` (`%s`) not found.",
        componentHandle,
        (char *)componentHandle);
 +  if (iterator == _componentViewClasses.end()) {
 +    RCTLogError(@"ComponentView with componentHandle `%lli` not found, mounting fallback view.", componentHandle);
 +    auto fd = [self _componentViewClassDescriptorFromClass:[RCTUnimplementedViewComponentView class]];
++    // `fd.viewClass` is `Class<RCTComponentViewProtocol>`, which exposes only the protocol's
++    // class methods and therefore cannot receive `+new`; bind it to an unqualified `Class` first.
++    Class fallbackViewClass = fd.viewClass;
 +    return RCTComponentViewDescriptor{
-+        .view = [fd.viewClass new],
++        .view = [fallbackViewClass new],
 +        .observesMountingTransactionWillMount = fd.observesMountingTransactionWillMount,
 +        .observesMountingTransactionDidMount = fd.observesMountingTransactionDidMount,
 +        .shouldBeRecycled = fd.shouldBeRecycled,

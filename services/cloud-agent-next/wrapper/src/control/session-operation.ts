@@ -30,6 +30,9 @@ import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-ap
 import { STABLE_ROOT_IDLE_MS } from '../lifecycle.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
 import { runAutoCommit, type AutoCommitResult } from '../auto-commit.js';
+import { captureWorktreeState, logWorktreeState } from '../worktree-state.js';
+import { WORKTREE_STATE_CAPTURE_BUDGET_MS } from '../../../src/shared/worktree-state.js';
+import { worktreeStateEndpointFor } from './worktree-state-endpoints.js';
 import { withTimeoutAndAbort } from '../utils.js';
 import type { ApplyAttachDeps, AttachPreparingEmitter } from './apply-attach.js';
 import { createOwnedProcessScope, type OwnedProcessScope } from './owned-processes.js';
@@ -102,6 +105,7 @@ export type SessionOperationWork =
       runtime: WorktreeKiloRuntime;
       materializeAttachments?: typeof materializeMessageAttachments;
       runAutoCommit?: typeof runAutoCommit;
+      captureWorktreeState?: typeof captureWorktreeState;
     };
 
 export type SessionOperationDependencies = {
@@ -1193,6 +1197,21 @@ export class SessionOperation {
     const gateResult = this.deps.consumeGateResult?.();
     if (outcome.status === 'completed' && gateResult !== undefined) {
       outcome = { ...outcome, gateResult };
+    }
+    // The sandbox becomes eligible for the idle stop as soon as this turn is
+    // reported, so the worktree is captured first — including after a cancelled
+    // or failed turn, where the partial work is exactly what would be lost.
+    const worktreeStateEndpoint = worktreeStateEndpointFor(session.directory);
+    if (worktreeStateEndpoint) {
+      diagnostic('worktree_state_capture_started');
+      const captured = await (work.captureWorktreeState ?? captureWorktreeState)({
+        directory: session.directory,
+        endpoint: worktreeStateEndpoint,
+        env,
+        signal: AbortSignal.timeout(WORKTREE_STATE_CAPTURE_BUDGET_MS),
+      });
+      logWorktreeState('capture', session.directory, captured);
+      diagnostic('worktree_state_capture_completed');
     }
     this.outcome = sessionMessageOutcomeSchema.parse(outcome);
     if (!this.authorization) {

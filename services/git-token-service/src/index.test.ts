@@ -667,6 +667,119 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
       })
     ).resolves.toEqual({ success: false, reason: 'invalid_upstream_url' });
   });
+
+  it('redeems a REST API request into a Bearer header', async () => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'GET',
+        requestUrl: 'https://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests/42',
+      })
+    ).resolves.toEqual({
+      success: true,
+      headers: { authorization: 'Bearer ATCT-runtime-token' },
+    });
+  });
+
+  it('redeems a REST API sub-resource request into a Bearer header', async () => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'POST',
+        requestUrl:
+          'https://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests/42/comments',
+      })
+    ).resolves.toEqual({
+      success: true,
+      headers: { authorization: 'Bearer ATCT-runtime-token' },
+    });
+  });
+
+  it.each([
+    [
+      'a different repository',
+      'https://api.bitbucket.org/2.0/repositories/acme/other/pullrequests/42',
+    ],
+    [
+      'a different workspace',
+      'https://api.bitbucket.org/2.0/repositories/other/widgets/pullrequests/42',
+    ],
+    [
+      'a repository name that is only a prefix of a path segment',
+      'https://api.bitbucket.org/2.0/repositories/acme/widgetsextra/pullrequests/42',
+    ],
+  ] as const)('rejects a REST API request for %s', async (_description, requestUrl) => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'GET',
+        requestUrl,
+      })
+    ).resolves.toEqual({ success: false, reason: 'repository_mismatch' });
+  });
+
+  it.each([
+    ['http scheme', 'http://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests/42'],
+    [
+      'credentials in URL',
+      'https://user:pass@api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests/42',
+    ],
+    ['fragment', 'https://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests/42#frag'],
+    [
+      'path traversal',
+      'https://api.bitbucket.org/2.0/repositories/acme/widgets/../other/pullrequests/42',
+    ],
+    ['encoded slash', 'https://api.bitbucket.org/2.0/repositories/acme%2fwidgets/pullrequests/42'],
+    [
+      'encoded traversal',
+      'https://api.bitbucket.org/2.0/repositories/acme/widgets/%2e%2e/pullrequests/42',
+    ],
+  ] as const)('rejects a malformed REST API request URL (%s)', async (_description, requestUrl) => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'GET',
+        requestUrl,
+      })
+    ).resolves.toEqual({ success: false, reason: 'invalid_upstream_url' });
+  });
+
+  it('rejects a REST API request to an unapproved origin', async () => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'GET',
+        requestUrl: 'https://evil.example.com/2.0/repositories/acme/widgets/pullrequests/42',
+      })
+    ).resolves.toEqual({ success: false, reason: 'upstream_origin_not_allowed' });
+  });
+
+  it('still redeems a git smart-HTTP request into Basic auth', async () => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'GET',
+        requestUrl: 'https://bitbucket.org/acme/widgets.git/info/refs?service=git-upload-pack',
+      })
+    ).resolves.toEqual({
+      success: true,
+      headers: {
+        authorization: `Basic ${Buffer.from('x-token-auth:ATCT-runtime-token').toString('base64')}`,
+      },
+    });
+  });
 });
 
 describe('GitTokenRPCEntrypoint Bitbucket runtime authorization', () => {

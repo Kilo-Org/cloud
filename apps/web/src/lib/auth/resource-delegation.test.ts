@@ -9,7 +9,7 @@ import {
 import { eq, inArray } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { POST as personalResourcePost } from '@/app/api/auth/resource-token/route';
 import { POST as organizationResourcePost } from '@/app/api/organizations/[id]/user-tokens/route';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
@@ -487,3 +487,40 @@ test.each(['cloud-agent-next', 'gastown', 'wasteland'] as const)(
     expect(isResourceTokenIssuanceEnabled).toHaveBeenLastCalledWith('delegated-resource');
   }
 );
+
+describe('explicit delegated organization authority', () => {
+  test.each(['missing', 'different-user', 'different-role'] as const)(
+    'fails closed for %s organization authority',
+    async state => {
+      const current = await user();
+      const organization = await organizationFor(current.id);
+      const other = await user();
+      jest.mocked(getUserFromSessionForCredentialIssuance).mockResolvedValue({
+        user: current,
+        authFailedResponse: null,
+      });
+      jest.mocked(getAuthorizedOrgContext).mockResolvedValue(
+        state === 'missing'
+          ? {
+              success: false,
+              nextResponse: NextResponse.json({ error: 'Organization not found' }, { status: 404 }),
+            }
+          : {
+              success: true,
+              data: {
+                user: { ...(state === 'different-user' ? other : current), role: 'member' },
+                organization,
+              },
+            }
+      );
+      await expect(
+        createDelegatedResourceToken(current, 'api', {
+          headers: new Headers(),
+          organizationId: organization.id,
+          organizationRole: state === 'different-role' ? 'owner' : 'member',
+        })
+      ).rejects.toMatchObject({ status: 403, delegationCode: 'FORBIDDEN' });
+      expect(getAuthorizedOrgContext).toHaveBeenCalledWith(organization.id);
+    }
+  );
+});

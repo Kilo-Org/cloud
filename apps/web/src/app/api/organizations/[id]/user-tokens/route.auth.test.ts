@@ -23,12 +23,22 @@ import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { generateApiToken } from '@/lib/tokens';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { canIssueLegacyOrganizationToken } from '@/lib/auth/resource-delegation';
+import {
+  canIssueLegacyOrganizationToken,
+  createControlTokenForRequest,
+} from '@/lib/auth/resource-delegation';
 import { POST } from './route';
+jest.mock('../../../../../../../../services/ai-attribution/src/util/logger', () => ({
+  logger: {},
+}));
+const { validateKiloToken } = jest.requireActual<{
+  validateKiloToken: (header: string, secret: string) => Promise<{ success: boolean }>;
+}>('../../../../../../../../services/ai-attribution/src/util/auth');
 
 let user: User;
 let orgId: string;
 const userIds: string[] = [];
+const parentIds: string[] = [];
 const originalShared = process.env.SHARED_RESOURCE_TOKENS_ENABLED;
 const originalFamily = process.env.DELEGATED_RESOURCE_TOKENS_ENABLED;
 
@@ -63,6 +73,13 @@ afterEach(async () => {
     .delete(organization_memberships)
     .where(eq(organization_memberships.organization_id, orgId));
   await db.delete(organizations).where(eq(organizations.id, orgId));
+  if (parentIds.length) {
+    await db
+      .delete(organization_memberships)
+      .where(inArray(organization_memberships.organization_id, parentIds));
+    await db.delete(organizations).where(inArray(organizations.id, parentIds));
+    parentIds.length = 0;
+  }
   await db.delete(kilocode_users).where(inArray(kilocode_users.id, userIds));
   userIds.length = 0;
   if (originalShared === undefined) delete process.env.SHARED_RESOURCE_TOKENS_ENABLED;
@@ -352,3 +369,139 @@ for (const enabled of [false, true]) {
     });
   });
 }
+
+describe('explicit organization access', () => {
+  beforeEach(() => setIssuance(true));
+
+  async function inherited(role: 'owner' | 'admin' | 'member' | 'billing_manager') {
+    const [parent] = await db
+      .insert(organizations)
+      .values({ name: 'Delegation parent', require_seats: false })
+      .returning();
+    parentIds.push(parent.id);
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, orgId));
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, orgId));
+    await db
+      .insert(organization_memberships)
+      .values({ organization_id: parent.id, kilo_user_id: user.id, role });
+  }
+
+  test.each(['owner', 'admin'] as const)(
+    'issues child organization tokens for inherited %s',
+    async role => {
+      await inherited(role);
+      for (const headers of [new Headers(), bearer(generateApiToken(user))]) {
+        const response = await request(headers, '{"resource":"api"}');
+        expect(response.status).toBe(200);
+        const claims = jwt.verify((await response.json()).token, NEXTAUTH_SECRET) as jwt.JwtPayload;
+        expect(claims).toMatchObject({
+          organizationId: orgId,
+          organizationRole: role,
+          aud: 'kilo-api',
+          tokenPurpose: 'delegated-workload',
+          credentialExchange: false,
+        });
+        expect(claims.exp! - claims.iat!).toBe(900);
+      }
+      expect(await auditLogs()).toHaveLength(2);
+    }
+  );
+
+  test.each(['member', 'billing_manager'] as const)(
+    'denies inherited %s explicit issuance',
+    async role => {
+      await inherited(role);
+      const response = await request(new Headers(), '{"resource":"api"}');
+      expect(response.status).toBe(role === 'member' ? 404 : 403);
+      expect(await auditLogs()).toEqual([]);
+    }
+  );
+
+  test('denies unrelated organizations', async () => {
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, orgId));
+    expect((await request(bearer(generateApiToken(user)), '{"resource":"api"}')).status).toBe(404);
+    expect(await auditLogs()).toEqual([]);
+  });
+
+  test.each([false, true])('denies deleted organizations for global admin %s', async isAdmin => {
+    await inherited('owner');
+    await db
+      .update(kilocode_users)
+      .set({ is_admin: isAdmin })
+      .where(eq(kilocode_users.id, user.id));
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, orgId));
+    expect((await request(new Headers(), '{"resource":"api"}')).status).toBe(404);
+    expect(await auditLogs()).toEqual([]);
+  });
+
+  test('retains global-admin explicit issuance without membership', async () => {
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, orgId));
+    await db.update(kilocode_users).set({ is_admin: true }).where(eq(kilocode_users.id, user.id));
+    for (const headers of [new Headers(), bearer(generateApiToken(user))]) {
+      const response = await request(headers, '{"resource":"api"}');
+      expect(response.status).toBe(200);
+      expect(jwt.verify((await response.json()).token, NEXTAUTH_SECRET)).toMatchObject({
+        organizationId: orgId,
+        organizationRole: 'owner',
+      });
+    }
+  });
+
+  test.each(['owner', 'admin'] as const)(
+    'preserves inherited %s attribution policy',
+    async role => {
+      await inherited(role);
+      const response = await request(new Headers(), '{"resource":"attribution"}');
+      expect(response.status).toBe(role === 'owner' ? 200 : 403);
+      if (role === 'owner') {
+        const { token } = await response.json();
+        expect(jwt.verify(token, NEXTAUTH_SECRET)).toMatchObject({
+          organizationRole: 'owner',
+          aud: 'ai-attribution',
+        });
+        expect(await validateKiloToken(`Bearer ${token}`, NEXTAUTH_SECRET)).toMatchObject({
+          success: true,
+          organizationId: orgId,
+          organizationRole: 'owner',
+        });
+      }
+    }
+  );
+
+  test('does not widen runtime control-token organization authorization', async () => {
+    await inherited('owner');
+    await expect(
+      createControlTokenForRequest(user, 'cloud-agent-next', {
+        headers: bearer(generateApiToken(user)),
+        organizationId: orgId,
+      })
+    ).rejects.toThrow('Unauthorized resource delegation request');
+  });
+
+  test('still rejects scoped credentials for inherited access', async () => {
+    await inherited('owner');
+    const headers = bearer(
+      signedClaims({
+        aud: 'kilo-api',
+        tokenPurpose: 'human-api',
+        credentialExchange: false,
+        organizationId: orgId,
+      })
+    );
+    const response = await request(headers, '{"resource":"api"}');
+    expect([401, 403]).toContain(response.status);
+    expect(await auditLogs()).toEqual([]);
+  });
+});

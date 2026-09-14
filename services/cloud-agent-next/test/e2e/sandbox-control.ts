@@ -654,10 +654,119 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+/**
+ * Read-only control-plane probes may be retried once:
+ * - a transient fetch `TimeoutError` under Docker contention is not a terminal
+ *   verdict;
+ * - a `Owned Kilo listener identity did not match` for a read-only probe means
+ *   the native runtime rotated (idle stop/wake, credential refresh) after the
+ *   harness captured its `{serverUrl, processId}`. Re-discovering the same root
+ *   in the same container and retrying with the fresh identity observes the
+ *   same session+directory, so it cannot mask a real ownership divergence.
+ *
+ * Mutating actions (`prompt`, `import`) are never retried, because a timed-out
+ * submission may already have landed; `exclusive` is never re-anchored, because
+ * its callers already discover a fresh runtime before the destructive proof.
+ */
+const RETRYABLE_PROBE_ACTIONS: ReadonlySet<ControlPlaneKiloOperation['action']> = new Set([
+  'discover',
+  'inspect',
+  'exists',
+  'completion',
+  'file',
+  'stage-file',
+  'questions',
+  'exclusive',
+]);
+
+const REANCHORABLE_PROBE_ACTIONS: ReadonlySet<ControlPlaneKiloOperation['action']> = new Set([
+  'inspect',
+  'exists',
+  'completion',
+  'file',
+  'stage-file',
+  'questions',
+]);
+
+const PROBE_RETRY_DELAY_MS = 250;
+const PROBE_MAX_ATTEMPTS = 2;
+
+function isTransientProbeTimeout(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('failed (TimeoutError)');
+}
+
+function isStaleListenerIdentity(error: unknown): boolean {
+  return (
+    error instanceof Error && error.message.includes('Owned Kilo listener identity did not match')
+  );
+}
+
+/**
+ * Re-discover the operation's root and return an operation bound to the current
+ * listener identity, or null when the container itself changed (the caller's
+ * sandbox handle is stale and discovery, not a probe retry, is required).
+ */
+async function reanchorControlPlaneKiloOperation(
+  containerId: string,
+  operation: ControlPlaneKiloOperation,
+  executeDocker: DockerCommandExecutor
+): Promise<ControlPlaneKiloOperation | null> {
+  const rootKiloSessionId = operation.ownerKiloSessionId ?? operation.kiloSessionId;
+  const fresh = await findControlPlaneKiloRuntime(rootKiloSessionId, executeDocker).catch(
+    () => null
+  );
+  if (!fresh || fresh.container.id !== containerId) return null;
+  // A changed worktree directory is a divergent owner, not a rotated listener.
+  if (fresh.directory !== operation.directory) return null;
+  if (
+    fresh.serverUrl === operation.serverUrl &&
+    fresh.processId === operation.processId &&
+    fresh.home === operation.home
+  ) {
+    return null;
+  }
+  return {
+    ...operation,
+    serverUrl: fresh.serverUrl,
+    processId: fresh.processId,
+    directory: fresh.directory,
+    home: fresh.home,
+  };
+}
+
 async function runControlPlaneKiloOperation(
   containerId: string,
   operation: ControlPlaneKiloOperation,
   executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<Record<string, unknown>> {
+  const maxAttempts = RETRYABLE_PROBE_ACTIONS.has(operation.action) ? PROBE_MAX_ATTEMPTS : 1;
+  let current = operation;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await runControlPlaneKiloOperationOnce(containerId, current, executeDocker);
+    } catch (error) {
+      if (attempt >= maxAttempts) throw error;
+      if (REANCHORABLE_PROBE_ACTIONS.has(operation.action) && isStaleListenerIdentity(error)) {
+        const reanchored = await reanchorControlPlaneKiloOperation(
+          containerId,
+          current,
+          executeDocker
+        );
+        if (reanchored) {
+          current = reanchored;
+          continue;
+        }
+      }
+      if (!isTransientProbeTimeout(error)) throw error;
+      await new Promise(resolve => setTimeout(resolve, PROBE_RETRY_DELAY_MS));
+    }
+  }
+}
+
+async function runControlPlaneKiloOperationOnce(
+  containerId: string,
+  operation: ControlPlaneKiloOperation,
+  executeDocker: DockerCommandExecutor
 ): Promise<Record<string, unknown>> {
   let stdout: string;
   try {

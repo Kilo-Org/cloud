@@ -486,31 +486,39 @@ export async function uninstallExclusiveGitHubInstallation(input: {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${identity.installationId}`}))`
     );
-    const [locked] = await tx
-      .select({
-        canonicalId: platform_integrations.github_installation_id,
-        sharingMode: github_app_installations.sharing_mode,
-      })
+    const [lockedTarget] = await tx
+      .select({ id: platform_integrations.id })
       .from(platform_integrations)
-      .leftJoin(
-        github_app_installations,
-        eq(platform_integrations.github_installation_id, github_app_installations.id)
-      )
       .where(
         and(
           eq(platform_integrations.id, input.integrationId),
-          ownerCondition(input.owner),
-          or(
-            isNull(platform_integrations.github_installation_id),
-            and(
-              eq(github_app_installations.installation_id, identity.installationId),
-              eq(github_app_installations.github_app_type, appType)
-            )
-          )
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          ownerCondition(input.owner)
         )
       )
-      .for('update', { of: platform_integrations });
-    if (!locked || (locked.canonicalId && locked.sharingMode !== 'exclusive')) {
+      .for('update');
+    if (!lockedTarget) throw new Error('GitHub connection not found');
+    // Resolve the canonical installation by its stable identity
+    // (github_app_type, installation_id) rather than through the target
+    // row's own binding. A legacy association may be unbound
+    // (github_installation_id IS NULL) — the canonical backfill skipped rows
+    // that were already disconnected or suspended — and reading the sharing
+    // mode only from a bound target would let such a row skip the
+    // shared-installation guard entirely.
+    const [canonical] = await tx
+      .select({
+        id: github_app_installations.id,
+        sharingMode: github_app_installations.sharing_mode,
+      })
+      .from(github_app_installations)
+      .where(
+        and(
+          eq(github_app_installations.installation_id, identity.installationId),
+          eq(github_app_installations.github_app_type, appType)
+        )
+      )
+      .for('update');
+    if (canonical && canonical.sharingMode !== 'exclusive') {
       throw new Error('GitHub installation must be disconnected locally');
     }
     // Uninstalling upstream is only safe when no *other* tenant association
@@ -518,19 +526,19 @@ export async function uninstallExclusiveGitHubInstallation(input: {
     // be either currently connected or already locally disconnected — either
     // way it is the one being removed, so its own state must not gate this
     // check the way it did previously (which made an already-disconnected
-    // association impossible to ever hard-uninstall).
+    // association impossible to ever hard-uninstall). Siblings are matched by
+    // the stable installation identity, not by the target's binding mode:
+    // matching on the binding would make an unbound legacy row invisible to a
+    // bound, actively connected sibling and delete the upstream installation
+    // out from under that sibling's tenant.
     const otherConnectedAssociations = await tx
       .select({ id: platform_integrations.id })
       .from(platform_integrations)
       .where(
         and(
-          locked.canonicalId
-            ? eq(platform_integrations.github_installation_id, locked.canonicalId)
-            : and(
-                isNull(platform_integrations.github_installation_id),
-                eq(platform_integrations.platform_installation_id, identity.installationId),
-                effectiveAppTypeCondition(appType)
-              ),
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          eq(platform_integrations.platform_installation_id, identity.installationId),
+          effectiveAppTypeCondition(appType),
           isNull(platform_integrations.github_disconnected_at),
           ne(platform_integrations.id, input.integrationId)
         )

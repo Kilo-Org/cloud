@@ -11,7 +11,7 @@ import {
   operation_ledgers,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { assertGitHubAutomationCanBeEnabled } from '../github/sharing-compatibility';
 import {
@@ -56,6 +56,23 @@ const data = (installationId = '123456') => ({
   kiloUserId: ownerId,
   githubUserId: '1234',
   accountType: 'Organization' as const,
+});
+
+/**
+ * Models a legacy association that was already locally disconnected when the
+ * canonical backfill ran, so it stayed unbound (github_installation_id NULL)
+ * and never received a canonical row.
+ */
+const legacyUnboundDisconnectedAssociation = (organizationId: string, installationId: string) => ({
+  owned_by_organization_id: organizationId,
+  platform: 'github',
+  integration_type: 'app',
+  platform_installation_id: installationId,
+  github_app_type: 'standard' as const,
+  integration_status: 'suspended' as const,
+  suspended_by: 'local_disconnect',
+  github_disconnected_at: new Date().toISOString(),
+  repository_access: 'all',
 });
 
 describe('GitHub installation persistence', () => {
@@ -983,6 +1000,114 @@ describe('GitHub installation persistence', () => {
         },
       })
     ).rejects.toThrow('GitHub installation must be disconnected locally');
+  });
+
+  test('refuses to uninstall an unbound legacy association while another tenant is actively connected', async () => {
+    const organizationA = await createTestOrganization('Legacy unbound removal A', ownerId, 0);
+    const organizationB = await createTestOrganization('Legacy unbound removal B', otherOwnerId, 0);
+
+    const inserted = await db
+      .insert(platform_integrations)
+      .values(legacyUnboundDisconnectedAssociation(organizationA.id, '993001'))
+      .returning();
+    const legacy = inserted[0];
+    if (!legacy) throw new Error('Expected legacy association');
+
+    const sibling = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data('993001'), kiloUserId: otherOwnerId }
+    );
+    if (!sibling.ok) throw new Error('Expected the sibling tenant to connect');
+
+    let deleteUpstreamCalled = false;
+    await expect(
+      uninstallExclusiveGitHubInstallation({
+        owner: { type: 'org', id: organizationA.id },
+        integrationId: legacy.id,
+        deleteUpstream: async () => {
+          deleteUpstreamCalled = true;
+        },
+      })
+    ).rejects.toThrow('GitHub installation must be disconnected locally');
+    expect(deleteUpstreamCalled).toBe(false);
+
+    // The sibling tenant must be untouched: no upstream delete, no
+    // github_deleted suspension cascade.
+    const [siblingRow] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, sibling.integrationId));
+    expect(siblingRow).toMatchObject({ integration_status: 'active', suspended_at: null });
+  });
+
+  test('allows uninstalling an unbound legacy disconnected association with no connected sibling', async () => {
+    const organization = await createTestOrganization('Legacy unbound sole removal', ownerId, 0);
+    const inserted = await db
+      .insert(platform_integrations)
+      .values(legacyUnboundDisconnectedAssociation(organization.id, '993002'))
+      .returning();
+    const legacy = inserted[0];
+    if (!legacy) throw new Error('Expected legacy association');
+
+    let deleteUpstreamCalled = false;
+    await uninstallExclusiveGitHubInstallation({
+      owner: { type: 'org', id: organization.id },
+      integrationId: legacy.id,
+      deleteUpstream: async () => {
+        deleteUpstreamCalled = true;
+      },
+    });
+    expect(deleteUpstreamCalled).toBe(true);
+    await expect(
+      db.select().from(platform_integrations).where(eq(platform_integrations.id, legacy.id))
+    ).resolves.toHaveLength(0);
+  });
+
+  test('refuses to uninstall an unbound legacy association whose canonical installation is shared', async () => {
+    const organizationA = await createTestOrganization('Legacy shared removal A', ownerId, 0);
+    const organizationB = await createTestOrganization('Legacy shared removal B', otherOwnerId, 0);
+
+    const inserted = await db
+      .insert(platform_integrations)
+      .values(legacyUnboundDisconnectedAssociation(organizationA.id, '993003'))
+      .returning();
+    const legacy = inserted[0];
+    if (!legacy) throw new Error('Expected legacy association');
+
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data('993003'), kiloUserId: otherOwnerId }
+    );
+    if (!connected.ok) throw new Error('Expected the sibling tenant to connect');
+    await disconnectGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      connected.integrationId
+    );
+
+    // Force the canonical into a non-exclusive sharing mode with no connected
+    // sibling remaining, isolating the shared-mode guard: it must be read via
+    // the installation identity, not the unbound target's missing binding.
+    await db
+      .update(github_app_installations)
+      .set({ sharing_mode: 'web_cloud_agent' })
+      .where(
+        and(
+          eq(github_app_installations.installation_id, '993003'),
+          eq(github_app_installations.github_app_type, 'standard')
+        )
+      );
+
+    let deleteUpstreamCalled = false;
+    await expect(
+      uninstallExclusiveGitHubInstallation({
+        owner: { type: 'org', id: organizationA.id },
+        integrationId: legacy.id,
+        deleteUpstream: async () => {
+          deleteUpstreamCalled = true;
+        },
+      })
+    ).rejects.toThrow('GitHub installation must be disconnected locally');
+    expect(deleteUpstreamCalled).toBe(false);
   });
 
   test('disconnect terminalizes active review work, clears its dispatch reservation, leaves unrelated work untouched, and unblocks connect-existing', async () => {

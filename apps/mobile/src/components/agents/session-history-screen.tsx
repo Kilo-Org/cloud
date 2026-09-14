@@ -78,6 +78,7 @@ export function SessionHistoryScreen() {
     storedSessions,
     activeSessionIds,
     storedIsPending,
+    storedFetchedSinceMount,
     paging,
     handleRetry,
     handleRefetch,
@@ -170,6 +171,13 @@ export function SessionHistoryScreen() {
     storedIsPending,
   });
 
+  // Reserve the search header through the initial load too: the cold-open
+  // skeletons must sit in the same space the rows will land in, so the header
+  // (and the search input) cannot appear above the list only when the first
+  // rows arrive — that shifts the whole reserved area mid-swap. A genuinely
+  // empty account still drops the header once loading settles.
+  const showSearchHeader = hasAnySessions || isLoading;
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -187,7 +195,7 @@ export function SessionHistoryScreen() {
           />
         }
       />
-      {hasAnySessions ? (
+      {showSearchHeader ? (
         <SessionListSearchHeader
           inputRef={searchInputRef}
           hasText={hasText}
@@ -206,6 +214,7 @@ export function SessionHistoryScreen() {
           hasAnySessions={hasAnySessions}
           isLoading={isLoading}
           isError={contentIsError}
+          hasFreshHistory={storedFetchedSinceMount}
           isFetchingNextPage={paging.isFetchingNextPage}
           refetch={handleRefetch}
           onRetry={handleRetry}

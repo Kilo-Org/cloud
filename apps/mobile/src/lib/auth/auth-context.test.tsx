@@ -1,9 +1,8 @@
 /// <reference lib="es2024.promise" />
-/* oxlint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom) */
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable max-lines -- one cohesive auth-context suite: sign-out teardown ordering and stale sign-in fencing share the provider mount and the SecureStore mock */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
@@ -618,10 +617,13 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
-  it('clears the trusted hosts and image confirmations on sign-in', async () => {
+  it('clears the session-scoped state on sign-in (account switch)', async () => {
     const { ctx, unmount } = await mountAndGetContext();
     const trustedHosts = await import('@/lib/hooks/use-trusted-hosts');
     const imageConfirm = await import('@/components/agents/markdown-image-confirm');
+    const { getSessionAutoApproveEnabled, setSessionAutoApproveEnabled } =
+      await import('@/components/agents/session-auto-approve');
+    setSessionAutoApproveEnabled('switch-session-a', true);
 
     await act(async () => {
       await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
@@ -629,6 +631,8 @@ describe('sign-out teardown ordering', () => {
 
     expect(trustedHosts.clearTrustedHosts).toHaveBeenCalled();
     expect(imageConfirm.clearMarkdownImageConfirmMemory).toHaveBeenCalled();
+    // A per-session auto-approve flag must not survive the account boundary.
+    expect(getSessionAutoApproveEnabled('switch-session-a')).toBe(false);
 
     unmount();
   });

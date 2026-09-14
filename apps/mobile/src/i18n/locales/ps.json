@@ -2457,6 +2457,11 @@
       "stepsCount_other": "{{steps}} ګامونه",
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
     },
+    "autoApprove": {
+      "title": "اتوماتیک تصویب",
+      "description": "د دې غونډې لپاره د اجازې غوښتنې په اتوماتیک ډول تصویب کړئ. بیا وسیلې پرته له غوښتنې چلیږي.",
+      "unavailable": "دا غونډه د اجازې غوښتنې ترلاسه کولی نشي."
+    },
     "prBadge": {
       "open": "پل ریکویسټ پرانیزئ",
       "closed": "تړل شوی PR",

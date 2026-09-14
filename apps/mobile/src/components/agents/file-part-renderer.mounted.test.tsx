@@ -1,8 +1,7 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 /* eslint-disable max-lines -- cohesive mounted suite: all FilePart tap/preview/share states share one harness */
 import { type FilePart } from '@kilocode/cloud-agent-sdk';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ShareRemoteFileError } from '@/lib/share-remote-file';

@@ -66,6 +66,62 @@ test('the installed RCTComponentViewFactory takes the lock and guards a registra
   );
 });
 
+// The iOS build failure this guards (CI runs 34766965172, 34767975981, 34769368771):
+//   RCTComponentViewFactory.mm:223:31: error: class method 'new' not found ; did you mean 'now'?
+// `RCTComponentViewClassDescriptor.viewClass` is `Class<RCTComponentViewProtocol>` and that
+// protocol declares no `+new`, so `[<descriptor>.viewClass new]` does not compile. React Native's
+// own construction copies the value into an untyped `Class` first, where `+new` resolves against
+// NSObject. The fallback added by this patch must do the same.
+const protocolQualifiedNewSend = /\[\s*[A-Za-z_][A-Za-z0-9_]*\.viewClass\s+new\s*\]/;
+
+test('RCTComponentViewProtocol declares no +new, so a protocol-qualified viewClass cannot be sent new', () => {
+  const protocol = readInstalledReactNative('React/Fabric/Mounting/RCTComponentViewProtocol.h');
+  assert.doesNotMatch(
+    protocol,
+    /^\s*\+\s*\([^)]*\)\s*new\b/m,
+    'the compile error relies on RCTComponentViewProtocol not declaring +new'
+  );
+
+  const descriptor = readInstalledReactNative(
+    'React/Fabric/Mounting/RCTComponentViewClassDescriptor.h'
+  );
+  assert.match(
+    descriptor,
+    /Class<RCTComponentViewProtocol>\s+viewClass;/,
+    'RCTComponentViewClassDescriptor.viewClass is protocol-qualified, which restricts +new lookup'
+  );
+});
+
+test('the installed fallback copies viewClass into an untyped Class before sending new', () => {
+  const source = readInstalledReactNative('React/Fabric/Mounting/RCTComponentViewFactory.mm');
+
+  assert.doesNotMatch(
+    source,
+    protocolQualifiedNewSend,
+    'no `[<descriptor>.viewClass new]` send may remain; it is the iOS compile error from CI'
+  );
+  assert.match(
+    source,
+    /Class fallbackViewClass = fallbackDescriptor\.viewClass;/,
+    'the fallback must copy viewClass into an untyped Class before new, as the registered path does'
+  );
+});
+
+test('the patch adds the untyped-Class fallback and no protocol-qualified new send', () => {
+  const patch = fs.readFileSync(patchPath, 'utf8');
+
+  assert.doesNotMatch(
+    patch,
+    protocolQualifiedNewSend,
+    'the patch must not add a protocol-qualified +new send'
+  );
+  assert.match(
+    patch,
+    /Class fallbackViewClass = fallbackDescriptor\.viewClass;/,
+    'the patch must add the untyped-Class fallback'
+  );
+});
+
 test('the installed LegacyViewManagerInterop cache is synchronized', () => {
   const source = readInstalledReactNative(
     'React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm'

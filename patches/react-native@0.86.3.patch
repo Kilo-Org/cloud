@@ -47,7 +47,7 @@ index 226781f27bfff61ecd993be0b4937fb8e4c66465..bcb3e80b4209191b8f03bc46ca31944c
    }
  
 diff --git a/React/Fabric/Mounting/RCTComponentViewFactory.mm b/React/Fabric/Mounting/RCTComponentViewFactory.mm
-index 608d75cadf9243244541ea61cbf8908244d6e0b8..ca2a5b9c51be747e106da2014063dfb228049a33 100644
+index 608d75cadf9243244541ea61cbf8908244d6e0b8..9b144205c8a98743fb6184f59fb2bea6a8b34a04 100644
 --- a/React/Fabric/Mounting/RCTComponentViewFactory.mm
 +++ b/React/Fabric/Mounting/RCTComponentViewFactory.mm
 @@ -48,6 +48,7 @@ using namespace facebook::react;
@@ -103,18 +103,22 @@ index 608d75cadf9243244541ea61cbf8908244d6e0b8..ca2a5b9c51be747e106da2014063dfb2
    auto provider = [componentViewClass componentDescriptorProvider];
    _componentViewClasses[provider.handle] = [self _componentViewClassDescriptorFromClass:componentViewClass];
    _providerRegistry.add(provider);
-@@ -209,6 +216,16 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
+@@ -209,6 +216,20 @@ static Class<RCTComponentViewProtocol> RCTComponentViewClassWithName(const char
        @"ComponentView with componentHandle `%lli` (`%s`) not found.",
        componentHandle,
        (char *)componentHandle);
 +  if (iterator == _componentViewClasses.end()) {
 +    RCTLogError(@"ComponentView with componentHandle `%lli` not found, mounting fallback view.", componentHandle);
-+    auto fd = [self _componentViewClassDescriptorFromClass:[RCTUnimplementedViewComponentView class]];
++    auto fallbackDescriptor = [self _componentViewClassDescriptorFromClass:[RCTUnimplementedViewComponentView class]];
++    // `RCTComponentViewClassDescriptor.viewClass` is `Class<RCTComponentViewProtocol>`; the
++    // protocol declares no `+new`, so sending `new` to the qualified class expression is a
++    // compile error. Copy it into an untyped `Class` first, as the lookup below does.
++    Class fallbackViewClass = fallbackDescriptor.viewClass;
 +    return RCTComponentViewDescriptor{
-+        .view = [fd.viewClass new],
-+        .observesMountingTransactionWillMount = fd.observesMountingTransactionWillMount,
-+        .observesMountingTransactionDidMount = fd.observesMountingTransactionDidMount,
-+        .shouldBeRecycled = fd.shouldBeRecycled,
++        .view = [fallbackViewClass new],
++        .observesMountingTransactionWillMount = fallbackDescriptor.observesMountingTransactionWillMount,
++        .observesMountingTransactionDidMount = fallbackDescriptor.observesMountingTransactionDidMount,
++        .shouldBeRecycled = fallbackDescriptor.shouldBeRecycled,
 +    };
 +  }
    auto componentViewClassDescriptor = iterator->second;

@@ -148,7 +148,10 @@ export function ChildSessionSheet({
         />
       </View>
     );
-  } else if (state === 'error') {
+  } else if (state === 'error' && !(isStreaming && hydrationState.status === 'error')) {
+    // A streaming child must not take over the full-screen surface with the
+    // same stale load error; fall through to the loading state until its rows
+    // arrive. A non-streaming load failure and a child stream error still show.
     content =
       hydrationState.status === 'error' ? (
         <QueryError

@@ -3486,6 +3486,36 @@ describe('createSessionManager', () => {
       expect(readState()('child-streams')).toEqual({ status: 'idle' });
     });
 
+    it('drops a first-page hydration error that lands after a live child chat event', async () => {
+      let resolvePage: (outcome: SessionSnapshotPageOutcome) => void = () => {};
+      const fetchSnapshotPage = createPageFetchMock(
+        () =>
+          new Promise<SessionSnapshotPageOutcome>(resolve => {
+            resolvePage = resolve;
+          })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      const pending = mgr.hydrateChildSession(kiloId('child-live-first'));
+
+      // The child streams before the first page resolves: the failure that
+      // lands afterwards is stale and must not be stored, or it would sit
+      // above the live transcript and reappear once the child stops.
+      const liveMessage = createStoredMessage('msg-live-first', 'child-live-first', 'assistant');
+      mockSessionCallbacks.onEvent?.({ type: 'message.updated', info: liveMessage.info });
+
+      resolvePage({ kind: 'retryable_failure' });
+      await pending;
+
+      const state = atomValue<(childSessionId: string) => { status: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      expect(state('child-live-first')).toEqual({ status: 'idle' });
+    });
+
     it('keeps a stored first-page hydration error while no child chat event arrives', async () => {
       const fetchSnapshotPage = createPageFetchMock(async () => ({
         kind: 'retryable_failure' as const,

@@ -178,6 +178,26 @@ describe('ChildSessionSheet mounted', () => {
     const errors = renderer.root.findAllByType(QueryError);
     expect(errors).toHaveLength(1);
   });
+
+  it('hides the full-screen load error and shows the loading state while the child streams', async () => {
+    const renderer = await renderSheet({
+      ...buildProps({
+        getChildMessages: () => [],
+        hydrationState: errorState,
+      }),
+      isStreaming: true,
+    });
+
+    const texts = textValues(renderer.root);
+    expect(texts).toContain(i18n.t('agentChat.childSessionSheet.loading'));
+    expect(texts).not.toContain(i18n.t('agentChat.childSessionSheet.couldNotLoad'));
+    expect(renderer.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(
+      renderer.root.findAll(
+        node => (node.type as string) === 'Pressable' && node.props.accessibilityLabel === 'Retry'
+      )
+    ).toHaveLength(0);
+  });
 });
 
 describe('ChildSessionSheet sheet surface', () => {

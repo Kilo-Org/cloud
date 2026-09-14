@@ -2457,6 +2457,11 @@
       "stepsCount_other": "{{steps}} skref",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Sjálfvirk samþykkt",
+      "description": "Samþykktu leyfisbeiðnir fyrir þessa lotu sjálfkrafa. Verkfæri keyra síðan án beiðni.",
+      "unavailable": "Þessi lota getur ekki tekið við leyfisbeiðnum."
+    },
     "prBadge": {
       "open": "opna samrunabeiðni",
       "closed": "lokuð samrunabeiðni",

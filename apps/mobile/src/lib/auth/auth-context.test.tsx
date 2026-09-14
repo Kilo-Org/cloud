@@ -618,10 +618,13 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
-  it('clears the trusted hosts and image confirmations on sign-in', async () => {
+  it('clears the session-scoped state on sign-in (account switch)', async () => {
     const { ctx, unmount } = await mountAndGetContext();
     const trustedHosts = await import('@/lib/hooks/use-trusted-hosts');
     const imageConfirm = await import('@/components/agents/markdown-image-confirm');
+    const { getSessionAutoApproveEnabled, setSessionAutoApproveEnabled } =
+      await import('@/components/agents/session-auto-approve');
+    setSessionAutoApproveEnabled('switch-session-a', true);
 
     await act(async () => {
       await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
@@ -629,6 +632,8 @@ describe('sign-out teardown ordering', () => {
 
     expect(trustedHosts.clearTrustedHosts).toHaveBeenCalled();
     expect(imageConfirm.clearMarkdownImageConfirmMemory).toHaveBeenCalled();
+    // A per-session auto-approve flag must not survive the account boundary.
+    expect(getSessionAutoApproveEnabled('switch-session-a')).toBe(false);
 
     unmount();
   });

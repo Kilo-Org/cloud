@@ -98,9 +98,11 @@ export function useInteractionHandlers({
   }, [manager, kiloSessionId, activeQuestion, surface]);
 
   const handleRespondToPermission = useCallback(
-    async (response: 'once' | 'always' | 'reject'): Promise<boolean> => {
+    async (response: 'once' | 'always' | 'reject'): Promise<'ok' | 'retryable' | 'terminal'> => {
       if (!activePermission) {
-        return false;
+        // Nothing to answer: treat it as handled so a caller cannot retry a
+        // request that is no longer on screen.
+        return 'ok';
       }
       const requestId = activePermission.requestId;
       setPermissionSubmissionError(null);
@@ -109,7 +111,7 @@ export function useInteractionHandlers({
         await manager.respondToPermission(requestId, response);
         ackSessionAttention(kiloSessionId);
         captureEvent(PERMISSION_RESPONDED_EVENT, { surface, response });
-        return true;
+        return 'ok';
       } catch (error) {
         const submissionError = classifyBlockingSubmissionError(error, 'permission', 'respond');
         setPermissionSubmissionError({
@@ -118,7 +120,7 @@ export function useInteractionHandlers({
         });
         announceForA11y(submissionError.message);
         toast.error(submissionError.message);
-        return false;
+        return submissionError.kind === 'non-retryable' ? 'terminal' : 'retryable';
       } finally {
         setRespondingRequestId(current => (current === requestId ? null : current));
       }

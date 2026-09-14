@@ -1,9 +1,8 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/lib/auth/auth-context.test.tsx) */
 /* eslint-disable max-lines -- the Row 3.3 hook FSM suite shares this single owned test file with the pure upload-contract helpers */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as ImageManipulator from 'expo-image-manipulator';
+import { type ImageResult } from 'expo-image-manipulator';
 
 import { AGENT_ATTACHMENT_MAX_BYTES } from './constants';
 import {
@@ -34,6 +33,7 @@ const hoisted = vi.hoisted(() => {
     announceForA11y: vi.fn(),
     announcingToastError: vi.fn(),
     measureLocalSize: vi.fn(),
+    manipulateAsync: vi.fn<() => Promise<ImageResult>>(),
     cancel: vi.fn<() => void>(),
     fileDelete: vi.fn(),
     captureException: vi.fn(),
@@ -45,7 +45,7 @@ vi.mock('expo-crypto', () => ({ randomUUID: hoisted.randomUUID }));
 vi.mock('@sentry/react-native', () => ({ captureException: hoisted.captureException }));
 vi.mock('expo-image-manipulator', () => ({
   SaveFormat: { PNG: 'png', WEBP: 'webp', JPEG: 'jpeg' },
-  manipulateAsync: vi.fn(),
+  manipulateAsync: hoisted.manipulateAsync,
 }));
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
@@ -442,10 +442,10 @@ describe('addCandidates uploads documents at selection (Step 2)', () => {
   });
 
   it('never uploads a strip-failed image and marks it a terminal chip', async () => {
-    vi.mocked(ImageManipulator.manipulateAsync).mockReset();
+    hoisted.manipulateAsync.mockReset();
     // A strip failure returns the original URI, which the hook reads as
     // metadataStripFailed.
-    vi.mocked(ImageManipulator.manipulateAsync).mockResolvedValue({
+    hoisted.manipulateAsync.mockResolvedValue({
       uri: 'file:///cache/IMG_0001.HEIC',
       width: 100,
       height: 100,
@@ -912,8 +912,8 @@ describe('selection-time image upload (Step 2)', () => {
     hoisted.announcingToastError.mockReset();
     hoisted.measureLocalSize.mockReset();
     hoisted.measureLocalSize.mockResolvedValue(1024);
-    vi.mocked(ImageManipulator.manipulateAsync).mockReset();
-    vi.mocked(ImageManipulator.manipulateAsync).mockResolvedValue({
+    hoisted.manipulateAsync.mockReset();
+    hoisted.manipulateAsync.mockResolvedValue({
       uri: 'file:///cache/stripped.jpg',
       width: 100,
       height: 100,

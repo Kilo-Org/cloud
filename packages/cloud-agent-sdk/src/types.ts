@@ -64,6 +64,16 @@ export type ProcessedMessage = {
   parts: Part[];
 };
 
+/** Goal status reported by the CLI in session metadata. */
+export type SessionGoalStatus = 'active' | 'complete' | 'blocked' | 'paused';
+
+/** Session goal projected from CLI metadata under `kilo.goal`. */
+export type SessionGoal = {
+  text: string;
+  status: SessionGoalStatus;
+  reason?: string | undefined;
+};
+
 /** Minimal session metadata — only the fields the SDK actually reads. */
 export type SessionInfo = {
   id: string;
@@ -75,6 +85,7 @@ export type SessionInfo = {
         variant?: string | undefined;
       }
     | undefined;
+  goal?: SessionGoal | undefined;
 };
 
 export type SessionPhase =

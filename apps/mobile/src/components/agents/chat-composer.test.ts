@@ -10,6 +10,7 @@ import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-se
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import { Text as renderText } from '@/components/ui/text';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { type ChatComposer } from './chat-composer';
 
 // A remote catalog that advertises safe session detach, so /exit and /quit
@@ -135,8 +136,12 @@ vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: vi.fn(),
 }));
 
-// Marked so the test can locate the inline status row (slash-command
-// rejections, photo-metadata warning) and assert its message prop.
+// Identity-matched so tests can read the inline status row's message prop
+// (slash-command rejections, photo-metadata warning) and the goal compose
+// hint. The real component owns the announcement channel; the composer only
+// needs to render it with the right message. Deliberately not
+// `__testMarker`-tagged so `findInputRowProps` cannot mistake it for the
+// input row.
 const MockAccessibleStatus = () => null;
 
 vi.mock('@/components/ui/accessible-status', () => ({
@@ -652,6 +657,101 @@ describe('ChatComposer return-sends wiring', () => {
 
     expect(refSlots.slots[0]?.current).toBe('\n');
     expect(onSendMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChatComposer goal compose mode', () => {
+  const GOAL_COMMAND: SlashCommandInfo = { name: 'goal', description: 'Goal', hints: [] };
+
+  function remoteGoalProps(overrides: Partial<ComposerProps> = {}): ComposerProps {
+    const commandState: RemoteCommandState = {
+      ownerConnectionId: 'conn-1',
+      refresh: 'idle',
+      commands: [GOAL_COMMAND],
+    };
+    return makeProps({
+      activeSessionType: 'remote',
+      commandState,
+      ...overrides,
+    });
+  }
+
+  async function enterGoalComposeMode(
+    props: ComposerProps,
+    draft = '/goal '
+  ): Promise<React.ReactElement> {
+    const render = await mount(props);
+    requireInputRowOnChangeText(render)(draft);
+    await settle();
+    requireInputRowOnSubmit(render)();
+    await settle();
+    return rerender(props);
+  }
+
+  // The composer renders the goal objective hint (tone "status") alongside the
+  // always-present slash-command rejection row and the photo-metadata warning,
+  // both tone "error". Match the hint by tone so the always-present error row
+  // is not mistaken for the goal hint.
+  function goalHint(render: React.ReactElement): { props: Record<string, unknown> } | null {
+    return findNode(
+      render,
+      (type, props) => type === MockAccessibleStatus && props.tone === 'status'
+    );
+  }
+
+  it('enters goal compose mode and shows the objective hint on a bare /goal send', async () => {
+    const onSendCommand = vi.fn(async () => true);
+    const props = remoteGoalProps({ onSendCommand });
+    const after = await enterGoalComposeMode(props);
+
+    const hint = goalHint(after);
+    expect(hint?.props).toMatchObject({ message: 'Describe the goal', tone: 'status' });
+    // The draft is kept so the user can complete the goal command.
+    expect(refSlots.slots[0]?.current).toBe('/goal ');
+    expect(onSendCommand).not.toHaveBeenCalled();
+    expect(onSendMock).not.toHaveBeenCalled();
+  });
+
+  it('normalizes a separator-less /goal draft so the next keystroke stays a goal command', async () => {
+    const onSendCommand = vi.fn(async () => true);
+    const props = remoteGoalProps({ onSendCommand });
+    const after = await enterGoalComposeMode(props, '/goal');
+
+    // The retained draft ends with the separator, so the next keystroke
+    // continues the goal command instead of producing `/goalShip it`.
+    const retained = refSlots.slots[0]?.current as string;
+    expect(retained).toBe('/goal ');
+
+    requireInputRowOnChangeText(after)(`${retained}Ship it`);
+    await settle();
+    requireInputRowOnSubmit(after)();
+    await settle();
+
+    expect(onSendCommand).toHaveBeenCalledWith('goal', 'Ship it');
+  });
+
+  it('forwards the objective and leaves compose mode on the next send', async () => {
+    const onSendCommand = vi.fn(async () => true);
+    const props = remoteGoalProps({ onSendCommand });
+    const render = await enterGoalComposeMode(props);
+
+    requireInputRowOnChangeText(render)('/goal Ship it');
+    await settle();
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(onSendCommand).toHaveBeenCalledWith('goal', 'Ship it');
+    const after = await rerender(props);
+    expect(goalHint(after)).toBeNull();
+  });
+
+  it('drops the hint when the draft is no longer the goal command', async () => {
+    const props = remoteGoalProps();
+    const render = await enterGoalComposeMode(props);
+
+    requireInputRowOnChangeText(render)('write the docs');
+    const after = await rerender(props);
+    expect(goalHint(after)).toBeNull();
   });
 });
 

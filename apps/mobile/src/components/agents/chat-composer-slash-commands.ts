@@ -47,6 +47,7 @@ const NEW_COMMAND_NAME = 'new';
 const EXIT_COMMAND_NAME = 'exit';
 const QUIT_COMMAND_NAME = 'quit';
 const CLEAR_COMMAND_NAME = 'clear';
+const GOAL_COMMAND_NAME = 'goal';
 const LOCAL_COMMAND_NAMES = new Set([
   NEW_COMMAND_NAME,
   EXIT_COMMAND_NAME,
@@ -68,6 +69,10 @@ const SLASH_FULL_PATTERN = /^\/([\w.-]+)(?:\s+([\s\S]*))?$/;
  * `/clear` is intentionally gated — it needs both create_session and
  * exit_cli and must surface the upgrade message instead of falling through
  * as a prompt.
+ *
+ * `/goal ...` is included so that on a remote CLI that reports
+ * `refresh: 'upgrade-required'` the mobile composer returns the upgrade
+ * message instead of forwarding goal text as an ordinary prompt.
  */
 const RESERVED_UPGRADE_REQUIRED_COMMANDS = new Set([
   'compact',
@@ -75,6 +80,7 @@ const RESERVED_UPGRADE_REQUIRED_COMMANDS = new Set([
   EXIT_COMMAND_NAME,
   QUIT_COMMAND_NAME,
   CLEAR_COMMAND_NAME,
+  GOAL_COMMAND_NAME,
 ]);
 
 type ChatComposerParseContext = {
@@ -89,6 +95,7 @@ export type ChatComposerParseResult =
   | { type: 'create-session' }
   | { type: 'exit-session' }
   | { type: 'restart-session' }
+  | { type: 'goal-compose' }
   | { type: 'attachment-error' }
   | { type: 'argument-error'; message: string }
   | { type: 'upgrade-required'; message: string };
@@ -141,6 +148,16 @@ export function createMobileSlashCommandList(
  */
 export function getSlashCommandCandidate(input: string): string | null {
   return SLASH_PREFIX_PATTERN.test(input) ? input : null;
+}
+
+/**
+ * True while `input` is still the `/goal` compose draft (bare `/goal` or
+ * `/goal <objective>`). The composer uses this to keep its goal compose mode
+ * alive as the user types the objective and to drop it the moment the draft is
+ * no longer about the goal command.
+ */
+export function isGoalCommandDraft(input: string): boolean {
+  return /^\/goal(?:\s|$)/.test(input);
 }
 
 /**
@@ -279,6 +296,32 @@ export function parseChatComposerSubmission(
       };
     }
     return { type: 'restart-session' };
+  }
+
+  if (
+    commandName === GOAL_COMMAND_NAME &&
+    (context.sessionType === 'remote' || context.sessionType === 'cloud-agent')
+  ) {
+    // /goal is only supported when the session's catalog advertises it. Fail
+    // closed on a session that does not, so goal text is never sent as
+    // ordinary chat; the existing fail-closed copy is reused so no new i18n
+    // key is introduced. `null` and `read-only` sessions are excluded above
+    // and keep their existing prompt behavior.
+    if (!findCommand(commands, GOAL_COMMAND_NAME)) {
+      return {
+        type: 'upgrade-required',
+        message: i18n.t('agentChat.slashCommands.upgradeRequiredFallback'),
+      };
+    }
+    if (context.hasAttachments) {
+      return { type: 'attachment-error' };
+    }
+    if (argumentsText === '') {
+      // Bare `/goal` enters compose mode; selecting `/goal` from the
+      // suggestion list inserts `/goal ` and lands here.
+      return { type: 'goal-compose' };
+    }
+    return { type: 'command', command: GOAL_COMMAND_NAME, arguments: argumentsText };
   }
 
   if (commandName && findCommand(commands, commandName)) {

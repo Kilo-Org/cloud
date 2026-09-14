@@ -294,7 +294,6 @@ function classifyAdmissionFailure(
 const OWNERSHIP_DEPENDENT_ASSISTANT_LIMITS = {
   invalid_request: 'assistant_invalid_request',
   context_limit: 'assistant_context_limit',
-  output_limit: 'assistant_output_limit',
 } as const;
 
 function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClassification {
@@ -332,11 +331,14 @@ function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClas
       ? classified('unknown', 'provider_unavailable')
       : classified('unknown', 'provider_ownership_unknown');
   }
-  if (
-    input.assistantReason === 'invalid_request' ||
-    input.assistantReason === 'context_limit' ||
-    input.assistantReason === 'output_limit'
-  ) {
+  // An output limit is a property of the request's own scope (prompt, task and
+  // model configuration), not of the runtime. Whose credential ran the model
+  // does not change that the user must narrow the request or raise the limit,
+  // so it is user action in every ownership case.
+  if (input.assistantReason === 'output_limit') {
+    return classified('user', 'assistant_output_limit');
+  }
+  if (input.assistantReason === 'invalid_request' || input.assistantReason === 'context_limit') {
     const responsibility =
       input.providerOwnership === 'byok'
         ? 'user'

@@ -231,6 +231,8 @@
     "voiceInput": "Ukufaka ngezwi",
     "autoExpandThinking": "Nweba ukucabanga ngokuzenzakalelayo",
     "autoExpandThinkingSubtitle": "Bonisa ukucabanga komenzeli kunwetshiwe uma eseqedile ukucabanga.",
+    "hideThinking": "Fihla imininingwane yokucabanga",
+    "hideThinkingSubtitle": "Ungakubonisi ukucabanga komenzeli ekhasini leseshini.",
     "keepScreenOn": "Gcina isikrini sivuliwe ngenkathi usekhasini leseshini",
     "keepScreenOnSubtitle": "Gcina isikrini sivuliwe ngenkathi iseshini isebenza.",
     "appearance": "Ukubukeka",
@@ -2454,6 +2456,11 @@
       "stepsCount": "Izinyathelo ezingu-{{steps}}",
       "stepsCount_other": "Izinyathelo ezingu-{{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "Ukuvumela okuzenzakalelayo",
+      "description": "Vumela ngokuzenzakalelayo izicelo zemvume zalesi sikhathi. Amathuluzi abe esebenza ngaphandle kwesicelo.",
+      "unavailable": "Lesi sikhathi asikwazi ukwamukela izicelo zemvume."
     },
     "prBadge": {
       "open": "vula i-PR",

@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts the React Native tree without a device */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SessionMessageList } from './session-message-list';

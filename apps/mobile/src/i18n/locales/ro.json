@@ -231,6 +231,8 @@
     "voiceInput": "Introducere vocală",
     "autoExpandThinking": "Extindere automată a raționamentului",
     "autoExpandThinkingSubtitle": "Afișează raționamentul agentului în formă extinsă după finalizarea lui.",
+    "hideThinking": "Ascunde detaliile raționamentului",
+    "hideThinkingSubtitle": "Nu afișa raționamentul agentului pe pagina sesiunii.",
     "keepScreenOn": "Menține ecranul aprins pe pagina sesiunii",
     "keepScreenOnSubtitle": "Menține ecranul aprins cât timp sesiunea rulează.",
     "appearance": "Aspect",
@@ -2475,6 +2477,11 @@
       "stepsCount_other": "{{steps}} de pași",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} pași"
+    },
+    "autoApprove": {
+      "title": "Aprobare automată",
+      "description": "Aprobă automat solicitările de permisiune pentru această sesiune. Uneltele rulează apoi fără o solicitare.",
+      "unavailable": "Această sesiune nu poate primi solicitări de permisiune."
     },
     "prBadge": {
       "open": "deschidere PR",

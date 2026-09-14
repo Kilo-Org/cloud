@@ -231,6 +231,8 @@
     "voiceInput": "การป้อนเสียง",
     "autoExpandThinking": "ขยายกระบวนการคิดอัตโนมัติ",
     "autoExpandThinkingSubtitle": "ขยายรายละเอียดกระบวนการคิดของเอเจนต์เมื่อคิดเสร็จ",
+    "hideThinking": "ซ่อนรายละเอียดการคิด",
+    "hideThinkingSubtitle": "ไม่แสดงการคิดของเอเจนต์ในหน้าเซสชัน",
     "keepScreenOn": "เปิดหน้าจอค้างไว้ขณะอยู่ในหน้าเซสชัน",
     "keepScreenOnSubtitle": "เปิดหน้าจอค้างไว้ขณะที่เซสชันกำลังทำงาน",
     "appearance": "รูปแบบการแสดงผล",
@@ -2454,6 +2456,11 @@
       "stepsCount": "{{steps}} ขั้นตอน",
       "stepsCount_other": "{{steps}} ขั้นตอน",
       "modelAccessibilityLabel": "{{name}} จาก {{provider}} · {{steps}} · {{cost}}"
+    },
+    "autoApprove": {
+      "title": "อนุมัติอัตโนมัติ",
+      "description": "อนุมัติคำขออนุญาตสำหรับเซสชันนี้อัตโนมัติ จากนั้นเครื่องมือจะทำงานโดยไม่มีการสอบถาม",
+      "unavailable": "เซสชันนี้ไม่สามารถรับคำขออนุญาตได้"
     },
     "prBadge": {
       "open": "เปิดพูลรีเควสต์",

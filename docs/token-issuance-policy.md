@@ -184,3 +184,49 @@ Gastown/Wasteland control issuers are deferred with their delegation adapters: c
 This PR does not retire legacy native exchange, shorten user credentials, change global pepper/session semantics, or remove ordinary legacy resource access.
 
 Workflow issuance reads the existing primary user pepper, including explicit `null`, without initializing or rotating it. Modern workflow tokens retain their audience, purpose, exchange restrictions, and bounded lifetime. This requires no migration and must not reset already initialized peppers; genuine pepper rotation continues to revoke previously issued credentials.
+
+## Remaining-family deployment and activation
+
+Merging deploys the affected Web and Worker services independently. This PR covers native/mobile and Chat/Events/Notifications. Gastown/Wasteland, benchmark, Webhook Agent Ingest, Security Auto Analysis, and explicit resource delegation are handled separately. No additional issuance flag defaults on. Existing Cloud Agent settings can remain enabled; enabling the Web shared master does not enable the remaining families. Confirm production settings have not already opted a family in before deployment.
+
+### Settings
+
+All Web settings below require the exact string `true` and Web `SHARED_RESOURCE_TOKENS_ENABLED=true`. Unset, `false`, or any other value keeps fresh adoption off. Worker-local settings are independent of the Web master.
+
+| Where | Setting | Initial action |
+|---|---|---|
+| Web / Vercel | `CLOUD_AGENT_RESOURCE_TOKENS_ENABLED` | Preserve the existing Cloud Agent rollout decision |
+| Web / Vercel | `CHAT_RESOURCE_TOKENS_ENABLED` | Leave off; verify Chat, Events, and Notifications together before enabling |
+| Web / Vercel | `NATIVE_RESOURCE_TOKENS_ENABLED` | Leave off; retain the existing mobile token flow |
+
+The Cloud Agent Worker already configures `RUNTIME_ISOLATION_ENABLED=true`. No additional Cloud Agent Worker setting is required by this rollout. Keep the existing runtime, proof readers, and renewal support available for issued credentials and active workloads.
+
+### Mobile compatibility with native adoption off
+
+With `NATIVE_RESOURCE_TOKENS_ENABLED` unset or false, native login, legacy exchange, device authorization and refresh retain legacy access-token responses, including when the Web shared master is on. Clients that do not negotiate the new format retain their existing response format even when native adoption is enabled. The new client must accept legacy responses and retain the legacy storage and request-authentication path. Do not initialize or rotate a user's pepper to enroll them.
+
+Native activation requires compatible API and gateway readers plus physical iOS/Android checks for login, cold restore, refresh, model discovery, balance, voice, chat, Cloud Agent stream/reconnect, and rollback. Automated route/storage tests do not replace that device coverage. A downgrade from an installed client that stored a modern bundle may require sign-in; this does not affect users who have never adopted a bundle.
+
+### Behavior that is active at deployment
+
+Adoption flags control token issuance; they do not gate every authorization check. Gastown/Wasteland, benchmark, Webhook Ingest, and Security Auto Analysis behavior is unchanged by this PR.
+
+Chat token minting also validates the source credential before delegation. These checks must not be described as a deployment with no behavior changes.
+
+### Activation blockers and consumer coverage
+
+See [the consumer audit](token-consumer-audit.md) for request paths, credential selection, verification and remaining limits.
+
+Gastown, Webhook Ingest, Security Auto Analysis, and explicit delegation activation is handled separately. Their implementation and test results are not part of this PR. Native adoption remains off until the physical-device matrix is verified.
+
+Enable other eligible families one at a time only after all their receiving deployments are healthy and their real consumer chain is exercised. Record Web and each Worker activation separately. Watch authentication failures, retries, session continuity and callback completion before expanding. No complete physical-device, built CLI/container, or live-provider smoke matrix is claimed by the automated tests.
+
+### Rollback
+
+Disable the relevant producer flag and redeploy its service to stop fresh adoption. Web's shared master can stop multiple Web families together; it does not change Worker-local settings. Producer shutdown does not convert persisted runtimes, invalidate cached credentials or remove existing modern state.
+
+Keep modern readers, proof verification, runtime containment and renewal/recovery support deployed until outstanding credentials and workloads have drained or been safely migrated. In particular, stopping Web Cloud Agent issuance does not require disabling `RUNTIME_ISOLATION_ENABLED`; existing scoped credentials still need admission support.
+
+A current, owned modern device credential can still receive bounded Cloud Agent/Wasteland control and Chat/Events/Notifications credentials after producer shutdown. The bridge rechecks device ownership, account, pepper and applicable membership and caps the child at one hour and the parent's remaining lifetime. Other modern credential kinds cannot use this bridge to obtain legacy tokens. Native refresh uses its separate opaque refresh-session authority and may return the supported legacy response when native adoption is off.
+
+Never reset peppers, rotate global signing keys, weaken audience checks, or issue unrestricted fallback credentials as a rollout workaround. Existing Cloud Agent transport lifecycle issues are handled independently of this remaining-family rollout.

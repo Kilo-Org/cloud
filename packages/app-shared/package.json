@@ -20,7 +20,8 @@
     "./pr-review": "./src/pr-review/index.ts",
     "./commerce": "./src/commerce/index.ts",
     "./moderation": "./src/moderation/index.ts",
-    "./glanceable-agents-snapshot": "./src/glanceable-agents-snapshot.ts"
+    "./glanceable-agents-snapshot": "./src/glanceable-agents-snapshot.ts",
+    "./native-auth": "./src/native-auth.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",

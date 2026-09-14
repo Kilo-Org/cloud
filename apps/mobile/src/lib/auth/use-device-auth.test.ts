@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getDeviceAuth429Message } from '@/lib/auth/poll-response';
 import {
+  API_GATEWAY_CREDENTIAL_FORMAT,
   buildDeviceAuthPollRequest,
   parseDeviceAuthTokenResponse,
 } from '@/lib/auth/native-auth-contract';
@@ -55,6 +56,7 @@ describe('device-auth polling request', () => {
     expect(buildDeviceAuthPollRequest('device-secret')).toEqual({
       deviceCode: 'device-secret',
       supportsRefresh: true,
+      credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT,
     });
   });
 });

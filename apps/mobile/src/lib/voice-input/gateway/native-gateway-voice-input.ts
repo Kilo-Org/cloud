@@ -2,7 +2,7 @@ import { AudioModule, AudioQuality, RecordingPresets, setAudioModeAsync } from '
 import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 
-import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
+import { getGatewayAuthTokenForRequest } from '@/lib/auth/credentials';
 import { fetchTranscriptionModels } from '@/lib/hooks/use-transcription-models';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
@@ -117,7 +117,7 @@ export const gatewayVoiceInputNative = createGatewayVoiceInputEngine({
     };
   },
   readModelId: resolveGatewayTranscriptionModelId,
-  readAuthToken: getAuthTokenForRequest,
+  readAuthToken: getGatewayAuthTokenForRequest,
   readOrganizationId: readStoredOrganizationId,
   deleteRecording: (uri: string) => {
     // `release()` frees the native object, not the file: delete the recording

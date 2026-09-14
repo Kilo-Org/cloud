@@ -36,7 +36,7 @@ export default defineProject({
       'src/lib/agent-attachments/**/*.test.ts',
       'src/lib/analytics/**/*.test.ts',
       'src/lib/auth/**/*.test.ts',
-      'src/lib/auth/**/*.test.tsx',
+      'src/lib/auth/**/!(*.mounted).test.tsx',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',
       'src/lib/glanceable/**/*.test.ts',

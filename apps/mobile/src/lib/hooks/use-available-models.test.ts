@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  fetchModels,
+  fetchOrgDefaults,
   OpenRouterModelsResponseSchema,
   OrganizationDefaultsResponseSchema,
   toModelOptions,
@@ -12,6 +14,22 @@ vi.mock('expo-secure-store', () => ({}));
 vi.mock('@tanstack/react-query', () => ({}));
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
 vi.mock('@/lib/storage-keys', () => ({ AUTH_TOKEN_KEY: 'mock-token' }));
+const getAuthTokenForRequest = vi.hoisted(() => vi.fn());
+const getGatewayAuthTokenForRequest = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/auth/token-owner', () => ({
+  getAuthTokenForRequest,
+}));
+vi.mock('@/lib/auth/credentials', () => ({ getGatewayAuthTokenForRequest }));
+
+beforeEach(() => {
+  getAuthTokenForRequest.mockReset().mockResolvedValue('api-token');
+  getGatewayAuthTokenForRequest.mockReset().mockResolvedValue('gateway-token');
+  vi.stubGlobal('fetch', vi.fn());
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('toModelOptions', () => {
   it('passes pricing through to the ModelOption', () => {
@@ -86,5 +104,35 @@ describe('OrganizationDefaultsResponseSchema', () => {
     expect(OrganizationDefaultsResponseSchema.parse({ defaultModel: 'm', extra: true })).toEqual({
       defaultModel: 'm',
     });
+  });
+});
+
+describe('model request credentials', () => {
+  it('uses the refresh-capable gateway credential for personal models', async () => {
+    vi.mocked(fetch).mockResolvedValue(Response.json({ data: [] }));
+
+    await fetchModels(undefined);
+
+    expect(getGatewayAuthTokenForRequest).toHaveBeenCalledOnce();
+    expect(getAuthTokenForRequest).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.example.com/api/openrouter/models',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer gateway-token' }),
+      })
+    );
+  });
+
+  it('uses the API credential for organization models and defaults', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(Response.json({ data: [] }))
+      .mockResolvedValueOnce(Response.json({ defaultModel: 'model' }));
+
+    await fetchModels('org-1');
+    await fetchOrgDefaults('org-1');
+
+    expect(getAuthTokenForRequest).toHaveBeenNthCalledWith(1, 'api');
+    expect(getAuthTokenForRequest).toHaveBeenNthCalledWith(2, 'api');
+    expect(getGatewayAuthTokenForRequest).not.toHaveBeenCalled();
   });
 });

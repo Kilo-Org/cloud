@@ -5,6 +5,10 @@ import { eq, and, lt, lte, gt, isNull, isNotNull, sql } from 'drizzle-orm';
 import { generateApiToken } from '@/lib/tokens';
 import { randomInt, createHash, randomBytes } from 'node:crypto';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import type {
+  NativeCredentialFormat,
+  NativeSessionCredentials,
+} from '@kilocode/app-shared/native-auth';
 
 const CODE_LENGTH = 8;
 const CODE_EXPIRATION_MINUTES = 10;
@@ -215,12 +219,13 @@ export async function denyDeviceAuthRequest(code: string): Promise<void> {
  */
 export async function consumeDeviceAuthByDeviceCode(
   deviceCode: string,
-  options?: { supportsRefresh?: boolean }
+  options?: { supportsRefresh?: boolean; credentialFormat?: NativeCredentialFormat }
 ): Promise<{
   status: 'pending' | 'approved' | 'denied' | 'expired' | 'consumed';
   token?: string;
   refreshToken?: string;
   expiresIn?: number;
+  metadata?: NativeSessionCredentials['metadata'];
   userId?: string;
   userEmail?: string;
 }> {
@@ -296,12 +301,14 @@ export async function consumeDeviceAuthByDeviceCode(
         userAgent: consumed.user_agent ?? undefined,
         deviceAuthRequestId: consumed.id,
       });
-      const pair = await issueSessionCredentials(user, sessionId);
+      const pair = options.credentialFormat
+        ? await issueSessionCredentials(user, sessionId, {
+            credentialFormat: options.credentialFormat,
+          })
+        : await issueSessionCredentials(user, sessionId);
       return {
         status: 'approved',
-        token: pair.token,
-        refreshToken: pair.refreshToken,
-        expiresIn: pair.expiresIn,
+        ...credentialResponse(pair),
         userId: user.id,
         userEmail: user.google_user_email,
       };
@@ -327,6 +334,17 @@ export async function consumeDeviceAuthByDeviceCode(
       );
     throw err;
   }
+}
+
+function credentialResponse(credentials: NativeSessionCredentials) {
+  return {
+    token: credentials.token,
+    refreshToken: credentials.refreshToken,
+    expiresIn: credentials.expiresIn,
+    ...('metadata' in credentials && credentials.metadata
+      ? { metadata: credentials.metadata }
+      : {}),
+  };
 }
 
 /**

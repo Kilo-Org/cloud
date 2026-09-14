@@ -3,9 +3,14 @@ import { db } from '@/lib/drizzle';
 import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { eq, and, isNull, gt } from 'drizzle-orm';
-import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { TOKEN_EXPIRY } from '@/lib/tokens';
 import { createHash, randomBytes } from 'node:crypto';
 import { persistAttestedKeyTx, type VerifyAdmissionOk } from './native-admission';
+import { generateNativeAccessCredentials } from './native-access-credentials';
+import type {
+  NativeCredentialFormat,
+  NativeSessionCredentials,
+} from '@kilocode/app-shared/native-auth';
 
 const REFRESH_TOKEN_BYTES = 32;
 
@@ -48,12 +53,13 @@ export async function createDeviceSession(params: {
  */
 export async function issueSessionCredentials(
   user: User,
-  deviceSessionId: string
-): Promise<{ token: string; refreshToken: string; expiresIn: number }> {
-  const accessToken = generateApiToken(
+  deviceSessionId: string,
+  options?: { credentialFormat?: NativeCredentialFormat }
+): Promise<NativeSessionCredentials> {
+  const accessCredentials = generateNativeAccessCredentials(
     user,
-    { deviceSessionId },
-    { expiresIn: TOKEN_EXPIRY.oneHour }
+    deviceSessionId,
+    options?.credentialFormat
   );
 
   const refreshToken = generateRefreshToken();
@@ -67,7 +73,7 @@ export async function issueSessionCredentials(
   });
 
   return {
-    token: accessToken,
+    ...accessCredentials,
     refreshToken,
     expiresIn: TOKEN_EXPIRY.oneHour,
   };
@@ -92,9 +98,10 @@ export async function issueSessionCredentials(
  * usable instead of leaving the client with a permanently dead refresh path.
  */
 export async function rotateRefreshToken(
-  refreshToken: string
+  refreshToken: string,
+  options?: { credentialFormat?: NativeCredentialFormat }
 ): Promise<
-  | { ok: true; token: string; refreshToken: string; expiresIn: number }
+  | ({ ok: true } & NativeSessionCredentials)
   | { ok: false; error: 'INVALID_REFRESH_TOKEN' | 'SESSION_REVOKED' | 'USER_BLOCKED' }
 > {
   const tokenHash = hashToken(refreshToken);
@@ -223,10 +230,10 @@ export async function rotateRefreshToken(
       .where(eq(device_sessions.id, consumed.device_session_id));
 
     // Step 8: Issue the replacement pair in the same transaction.
-    const accessToken = generateApiToken(
+    const accessCredentials = generateNativeAccessCredentials(
       fullUser,
-      { deviceSessionId: lockedSession.id },
-      { expiresIn: TOKEN_EXPIRY.oneHour }
+      lockedSession.id,
+      options?.credentialFormat
     );
 
     const newRefreshToken = generateRefreshToken();
@@ -240,7 +247,11 @@ export async function rotateRefreshToken(
 
     return {
       kind: 'ok',
-      pair: { token: accessToken, refreshToken: newRefreshToken, expiresIn: TOKEN_EXPIRY.oneHour },
+      pair: {
+        ...accessCredentials,
+        refreshToken: newRefreshToken,
+        expiresIn: TOKEN_EXPIRY.oneHour,
+      },
     } as const;
   });
 
@@ -269,7 +280,8 @@ export async function createDeviceSessionWithAttestedKey(params: {
   userAgent?: string;
   user: User;
   verification: VerifyAdmissionOk;
-}): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }> {
+  credentialFormat?: NativeCredentialFormat;
+}): Promise<NativeSessionCredentials & { sessionId: string }> {
   return await db.transaction(async tx => {
     // Persist the attested key inside the transaction
     await persistAttestedKeyTx(tx, params.userId, params.verification);
@@ -288,10 +300,10 @@ export async function createDeviceSessionWithAttestedKey(params: {
     }
 
     // Issue credentials
-    const accessToken = generateApiToken(
+    const accessCredentials = generateNativeAccessCredentials(
       params.user,
-      { deviceSessionId: session.id },
-      { expiresIn: TOKEN_EXPIRY.oneHour }
+      session.id,
+      params.credentialFormat
     );
 
     const refreshToken = generateRefreshToken();
@@ -305,7 +317,7 @@ export async function createDeviceSessionWithAttestedKey(params: {
     });
 
     return {
-      token: accessToken,
+      ...accessCredentials,
       refreshToken,
       expiresIn: TOKEN_EXPIRY.oneHour,
       sessionId: session.id,

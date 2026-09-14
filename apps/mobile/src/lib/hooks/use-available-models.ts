@@ -4,6 +4,7 @@ import * as z from 'zod';
 
 import { API_BASE_URL } from '@/lib/config';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
+import { getGatewayAuthTokenForRequest } from '@/lib/auth/credentials';
 import { i18n } from '@/i18n';
 import { collator } from '@/lib/intl-cache';
 
@@ -144,8 +145,10 @@ export const OpenRouterModelsResponseSchema = z.object({
  */
 export const OrganizationDefaultsResponseSchema = z.object({ defaultModel: z.string() });
 
-async function fetchModels(organizationId: string | undefined): Promise<ModelResponse> {
-  const token = await getAuthTokenForRequest();
+export async function fetchModels(organizationId: string | undefined): Promise<ModelResponse> {
+  const token = organizationId
+    ? await getAuthTokenForRequest('api')
+    : await getGatewayAuthTokenForRequest();
   const url = organizationId
     ? `${API_BASE_URL}/api/organizations/${organizationId}/models`
     : `${API_BASE_URL}/api/openrouter/models`;
@@ -181,8 +184,8 @@ async function fetchModels(organizationId: string | undefined): Promise<ModelRes
   }
 }
 
-async function fetchOrgDefaults(organizationId: string): Promise<{ defaultModel: string }> {
-  const token = await getAuthTokenForRequest();
+export async function fetchOrgDefaults(organizationId: string): Promise<{ defaultModel: string }> {
+  const token = await getAuthTokenForRequest('api');
   const response = await fetch(`${API_BASE_URL}/api/organizations/${organizationId}/defaults`, {
     headers: {
       Accept: 'application/json',

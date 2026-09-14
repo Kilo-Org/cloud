@@ -115,9 +115,8 @@ vi.mock('@/lib/utils', () => ({
 vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => ({ authEpoch: authEpoch.value, token: 'token' }),
 }));
-vi.mock('@/lib/auth/token-owner', () => ({
-  getAuthTokenForRequest: () => 'token-1',
-}));
+vi.mock('@/lib/auth/token-owner', () => ({}));
+vi.mock('@/lib/auth/credentials', () => ({ getGatewayAuthTokenForRequest: () => 'token-1' }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({
     organizationId: organizationId.value,

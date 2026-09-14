@@ -24,9 +24,10 @@ const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
 
 describe('POST /api/auth/native/exchange', () => {
-  const createRequest = (headers: Record<string, string> = {}) =>
+  const createRequest = (headers: Record<string, string> = {}, body?: string) =>
     new NextRequest('http://localhost:3000/api/auth/native/exchange', {
       method: 'POST',
+      ...(body === undefined ? {} : { body }),
       headers: { 'Content-Type': 'application/json', ...headers },
     });
 
@@ -79,6 +80,50 @@ describe('POST /api/auth/native/exchange', () => {
     expect(mockGetUserFromSession).not.toHaveBeenCalled();
     expect(mockCreateDeviceSession).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed nonempty bodies after bearer authentication without issuing', async () => {
+    mockGetUserFromBearer.mockResolvedValue({ user: fakeUser, authFailedResponse: null });
+
+    const response = await POST(createRequest(bearerHeaders, '{'));
+
+    expect(response.status).toBe(400);
+    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+  });
+
+  it('propagates a negotiated credential format and tagged bundle', async () => {
+    mockGetUserFromBearer.mockResolvedValue({ user: fakeUser, authFailedResponse: null });
+    mockCreateDeviceSession.mockResolvedValue('session-1');
+    mockIssueSessionCredentials.mockResolvedValue({
+      token: 'short-jwt',
+      refreshToken: 'refresh-abc',
+      expiresIn: 3600,
+      metadata: {
+        credentialFormat: 'api-gateway-v1',
+        gatewayToken: 'gateway-token',
+        expiresAt: '2026-09-02T22:00:00.000Z',
+      },
+    });
+
+    const response = await POST(
+      createRequest(bearerHeaders, JSON.stringify({ credentialFormat: 'api-gateway-v1' }))
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      token: 'short-jwt',
+      refreshToken: 'refresh-abc',
+      expiresIn: 3600,
+      metadata: {
+        credentialFormat: 'api-gateway-v1',
+        gatewayToken: 'gateway-token',
+        expiresAt: '2026-09-02T22:00:00.000Z',
+      },
+    });
+    expect(mockIssueSessionCredentials).toHaveBeenCalledWith(fakeUser, 'session-1', {
+      credentialFormat: 'api-gateway-v1',
+    });
   });
 
   it('does not issue credentials when the bearer user is blocked', async () => {

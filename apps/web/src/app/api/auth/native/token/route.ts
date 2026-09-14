@@ -39,6 +39,11 @@ import {
   issueSessionCredentials,
   createDeviceSessionWithAttestedKey,
 } from '@/lib/auth/device-sessions';
+import {
+  nativeCredentialFormatSchema,
+  type NativeCredentialFormat,
+  type NativeSessionCredentials,
+} from '@kilocode/app-shared/native-auth';
 import { captureMessage } from '@sentry/nextjs';
 import PostHogClient from '@/lib/posthog';
 import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
@@ -84,32 +89,70 @@ async function checkExistingProviderAccount(
   return eligibility.ok ? undefined : eligibilityResponse(eligibility);
 }
 
-const requestSchema = z.discriminatedUnion('provider', [
-  z.object({
-    provider: z.literal('apple'),
-    idToken: z.string(),
-    fullName: z.string().optional(),
-    nonce: z.string().optional(),
-    supportsRefresh: z.boolean().optional(),
-    admission: z.unknown().optional(),
-  }),
-  z.object({
-    provider: z.literal('google'),
-    idToken: z.string().optional(),
-    serverAuthCode: z.string().optional(),
-    googleClientId: z.string().optional(),
-    supportsRefresh: z.boolean().optional(),
-    admission: z.unknown().optional(),
-  }),
-  z.object({
-    provider: z.literal('email'),
-    email: z.string().email(),
-    code: z.string(),
-    challengeId: z.string().uuid().optional(),
-    supportsRefresh: z.boolean().optional(),
-    admission: z.unknown().optional(),
-  }),
-]);
+const requestSchema = z
+  .discriminatedUnion('provider', [
+    z.object({
+      provider: z.literal('apple'),
+      idToken: z.string(),
+      fullName: z.string().optional(),
+      nonce: z.string().optional(),
+      supportsRefresh: z.boolean().optional(),
+      credentialFormat: nativeCredentialFormatSchema.optional(),
+      admission: z.unknown().optional(),
+    }),
+    z.object({
+      provider: z.literal('google'),
+      idToken: z.string().optional(),
+      serverAuthCode: z.string().optional(),
+      googleClientId: z.string().optional(),
+      supportsRefresh: z.boolean().optional(),
+      credentialFormat: nativeCredentialFormatSchema.optional(),
+      admission: z.unknown().optional(),
+    }),
+    z.object({
+      provider: z.literal('email'),
+      email: z.string().email(),
+      code: z.string(),
+      challengeId: z.string().uuid().optional(),
+      supportsRefresh: z.boolean().optional(),
+      credentialFormat: nativeCredentialFormatSchema.optional(),
+      admission: z.unknown().optional(),
+    }),
+  ])
+  .superRefine((data, context) => {
+    if (data.credentialFormat && !data.supportsRefresh) {
+      context.addIssue({
+        code: 'custom',
+        path: ['supportsRefresh'],
+        message: 'supportsRefresh is required when credentialFormat is specified',
+      });
+    }
+  });
+
+function credentialResponse(credentials: NativeSessionCredentials) {
+  return {
+    token: credentials.token,
+    refreshToken: credentials.refreshToken,
+    expiresIn: credentials.expiresIn,
+    ...('metadata' in credentials && credentials.metadata
+      ? { metadata: credentials.metadata }
+      : {}),
+  };
+}
+
+function credentialOptions(credentialFormat?: NativeCredentialFormat) {
+  return credentialFormat ? { credentialFormat } : undefined;
+}
+
+function issueCredentials(
+  user: Parameters<typeof issueSessionCredentials>[0],
+  sessionId: string,
+  credentialFormat?: NativeCredentialFormat
+) {
+  return credentialFormat
+    ? issueSessionCredentials(user, sessionId, { credentialFormat })
+    : issueSessionCredentials(user, sessionId);
+}
 
 /**
  * Native (mobile) sign-in token exchange. Verifies an Apple/Google ID token or an
@@ -348,9 +391,7 @@ export async function POST(request: NextRequest) {
       // Must run BEFORE code commit so a key collision under enforce does
       // not burn the sign-in code without issuing a credential.
       let sessionId: string | undefined;
-      let refreshCredentials:
-        | { token: string; refreshToken: string; expiresIn: number }
-        | undefined;
+      let refreshCredentials: NativeSessionCredentials | undefined;
 
       if (admissionVerification && data.supportsRefresh) {
         // Bind key persistence and session creation in one transaction.
@@ -360,13 +401,10 @@ export async function POST(request: NextRequest) {
             userAgent: request.headers.get('user-agent') ?? undefined,
             user: result.user,
             verification: admissionVerification,
+            ...credentialOptions(data.credentialFormat),
           });
           sessionId = combined.sessionId;
-          refreshCredentials = {
-            token: combined.token,
-            refreshToken: combined.refreshToken,
-            expiresIn: combined.expiresIn,
-          };
+          refreshCredentials = combined;
         } catch (err) {
           if (err instanceof KeyCollisionError) {
             captureMessage('native_attested_key_cross_user_collision');
@@ -418,9 +456,7 @@ export async function POST(request: NextRequest) {
       if (refreshCredentials) {
         return NextResponse.json(
           {
-            token: refreshCredentials.token,
-            refreshToken: refreshCredentials.refreshToken,
-            expiresIn: refreshCredentials.expiresIn,
+            ...credentialResponse(refreshCredentials),
             created: result.isNew,
           },
           { status: 200 }
@@ -434,12 +470,10 @@ export async function POST(request: NextRequest) {
             userId: result.user.id,
             userAgent: request.headers.get('user-agent') ?? undefined,
           }));
-        const pair = await issueSessionCredentials(result.user, sid);
+        const pair = await issueCredentials(result.user, sid, data.credentialFormat);
         return NextResponse.json(
           {
-            token: pair.token,
-            refreshToken: pair.refreshToken,
-            expiresIn: pair.expiresIn,
+            ...credentialResponse(pair),
             created: result.isNew,
           },
           { status: 200 }
@@ -526,7 +560,7 @@ export async function POST(request: NextRequest) {
 
   // ── Step 7: Persist attested key after settlement ────────────────────────
   let sessionId: string | undefined;
-  let refreshCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
+  let refreshCredentials: NativeSessionCredentials | undefined;
 
   if (admissionVerification) {
     if (data.supportsRefresh) {
@@ -537,13 +571,10 @@ export async function POST(request: NextRequest) {
           userAgent: request.headers.get('user-agent') ?? undefined,
           user: result.user,
           verification: admissionVerification,
+          ...credentialOptions(data.credentialFormat),
         });
         sessionId = combined.sessionId;
-        refreshCredentials = {
-          token: combined.token,
-          refreshToken: combined.refreshToken,
-          expiresIn: combined.expiresIn,
-        };
+        refreshCredentials = combined;
       } catch (err) {
         if (err instanceof KeyCollisionError) {
           captureMessage('native_attested_key_cross_user_collision');
@@ -580,9 +611,7 @@ export async function POST(request: NextRequest) {
   if (refreshCredentials) {
     return NextResponse.json(
       {
-        token: refreshCredentials.token,
-        refreshToken: refreshCredentials.refreshToken,
-        expiresIn: refreshCredentials.expiresIn,
+        ...credentialResponse(refreshCredentials),
         created: result.isNew,
       },
       { status: 200 }
@@ -596,12 +625,10 @@ export async function POST(request: NextRequest) {
         userId: result.user.id,
         userAgent: request.headers.get('user-agent') ?? undefined,
       }));
-    const pair = await issueSessionCredentials(result.user, sid);
+    const pair = await issueCredentials(result.user, sid, data.credentialFormat);
     return NextResponse.json(
       {
-        token: pair.token,
-        refreshToken: pair.refreshToken,
-        expiresIn: pair.expiresIn,
+        ...credentialResponse(pair),
         created: result.isNew,
       },
       { status: 200 }

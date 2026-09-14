@@ -3080,22 +3080,13 @@
     "remoteOptionBody": "Rith Kilo ar do mheicín féin tríd an CLI `kilo remote`.",
     "skip": "Scipeáil an turas",
     "tutorialLabel": "Treoir",
-    "cloudTitle": "Tosaigh do chéad seisiún scamall",
-    "cloudBody": "Cruthaigh seisiún nua agus rithfidh Kilo sa scamall é.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Ag fanacht le do sheisiún scamall…",
-    "cloudCheck": "Tá do chéad seisiún scamall ar siúl.",
     "remoteTitle": "Tosaigh do chéad seisiún ciar",
     "remoteBody": "Ceangail do ríomhaire, ansin tosaigh an seisiún anseo.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Tosaigh seisiún ar do ríomhaire",
-    "remoteWaiting": "Ag fanacht go dtosóidh do ríomhaire an seisiún…",
-    "remoteCheck": "Tá do chéad seisiún ciar ar siúl.",
     "remoteEmptyTitle": "Níl ríomhaire ceangailte fós",
     "remoteEmptyBody": "Chun é a cheangal, rith `kilo remote` ar do ríomhaire.",
     "remoteFound": "Ríomhaire ceangailte",
     "checkAgain": "Seiceáil arís",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

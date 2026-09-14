@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "ដំណើរការ Kilo លើម៉ាស៊ីនរបស់អ្នកតាមរយៈ CLI `kilo remote`។",
     "skip": "រំលងដំណើរ",
     "tutorialLabel": "ការណែនាំ",
-    "cloudTitle": "ចាប់ផ្តើមវគ្គមេឃដំបូងរបស់អ្នក",
-    "cloudBody": "បង្កើតវគ្គថ្មី ហើយ Kilo នឹងដំណើរការវានៅលើមេឃ។",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "កំពុងរង់ចាំវគ្គមេឃរបស់អ្នកចាប់ផ្តើម…",
-    "cloudCheck": "វគ្គមេឃដំបូងរបស់អ្នកកំពុងដំណើរការ។",
     "remoteTitle": "ចាប់ផ្តើមវគ្គចម្ងាយដំបូងរបស់អ្នក",
     "remoteBody": "ភ្ជាប់កុំព្យូទ័ររបស់អ្នក បន្ទាប់មកចាប់ផ្តើមវគ្គពីទីនេះ។",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "ចាប់ផ្តើមវគ្គលើកុំព្យូទ័ររបស់អ្នក",
-    "remoteWaiting": "កំពុងរង់ចាំកុំព្យូទ័ររបស់អ្នកចាប់ផ្តើមវគ្គ…",
-    "remoteCheck": "វគ្គចម្ងាយដំបូងរបស់អ្នកកំពុងដំណើរការ។",
     "remoteEmptyTitle": "មិនទាន់មានកុំព្យូទ័របានភ្ជាប់ទេ",
     "remoteEmptyBody": "ដើម្បីភ្ជាប់វា ចូលដំណើរការ `kilo remote` លើកុំព្យូទ័ររបស់អ្នក។",
     "remoteFound": "បានភ្ជាប់កុំព្យូទ័រ",
     "checkAgain": "ពិនិត្យម្តងទៀត",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

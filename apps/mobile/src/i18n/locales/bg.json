@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "Стартирай Kilo на собствената си машина през `kilo remote` CLI.",
     "skip": "Пропусни тура",
     "tutorialLabel": "Ръководство",
-    "cloudTitle": "Стартирай първата си облачна сесия",
-    "cloudBody": "Създай нова сесия и Kilo я изпълнява в облака.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Изчакваме облачната ти сесия да стартира…",
-    "cloudCheck": "Първата ти облачна сесия работи.",
     "remoteTitle": "Стартирай първата си отдалечена сесия",
     "remoteBody": "Свържи компютъра си, после стартирай сесията оттук.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Стартирай сесия на компютъра си",
-    "remoteWaiting": "Изчакваме компютърът ти да стартира сесията…",
-    "remoteCheck": "Първата ти отдалечена сесия работи.",
     "remoteEmptyTitle": "Все още няма свързан компютър",
     "remoteEmptyBody": "За да го свържеш, изпълни `kilo remote` на компютъра си.",
     "remoteFound": "Компютърът е свързан",
     "checkAgain": "Провери отново",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

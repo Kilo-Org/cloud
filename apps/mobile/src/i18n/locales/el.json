@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "Εκτέλεσε το Kilo στο δικό σου μηχάνημα μέσω του CLI `kilo remote`.",
     "skip": "Παράλειξη ξενάγησης",
     "tutorialLabel": "Οδηγός",
-    "cloudTitle": "Ξεκίνα την πρώτη σου συνεδρία cloud",
-    "cloudBody": "Δημιούργησε μια νέα συνεδρία και το Kilo θα την εκτελέσει στο cloud.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Περιμένω να ξεκινήσει η συνεδρία cloud σου…",
-    "cloudCheck": "Η πρώτη σου συνεδρία cloud εκτελείται.",
     "remoteTitle": "Ξεκίνα την πρώτη απομακρυσμένη συνεδρία σου",
     "remoteBody": "Σύνδεσε τον υπολογιστή σου και μετά ξεκίνα τη συνεδρία από εδώ.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Έναρξη συνεδρίας στον υπολογιστή σου",
-    "remoteWaiting": "Περιμένω ο υπολογιστής σου να ξεκινήσει τη συνεδρία…",
-    "remoteCheck": "Η πρώτη απομακρυσμένη συνεδρία σου εκτελείται.",
     "remoteEmptyTitle": "Δεν έχει συνδεθεί υπολογιστής ακόμα",
     "remoteEmptyBody": "Για να τον συνδέσεις, εκτέλεσε `kilo remote` στον υπολογιστή σου.",
     "remoteFound": "Ο υπολογιστής συνδέθηκε",
     "checkAgain": "Έλεγχος ξανά",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

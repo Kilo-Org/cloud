@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "Ekzekuto Kilo në makinën tënde përmes CLI-së `kilo remote`.",
     "skip": "Kapërce turin",
     "tutorialLabel": "Tutoriali",
-    "cloudTitle": "Nis sesionin tënd të parë re",
-    "cloudBody": "Krijo një sesion të ri dhe Kilo e ekzekuton në ret.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Duke pritur që sesioni yt re të nisë…",
-    "cloudCheck": "Sesioni yt i parë re po ekzekutohet.",
     "remoteTitle": "Nis sesionin tënd të parë në distancë",
     "remoteBody": "Lidh kompjuterin tënd, pastaj nis sesionin nga këtu.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Nis një sesion në kompjuterin tënd",
-    "remoteWaiting": "Duke pritur që kompjuteri yt të nis sesionin…",
-    "remoteCheck": "Sesioni yt i parë në distancë po ekzekutohet.",
     "remoteEmptyTitle": "Ende pa kompjuter të lidhur",
     "remoteEmptyBody": "Për ta lidhur, ekzekuto `kilo remote` në kompjuterin tënd.",
     "remoteFound": "Kompjuteri u lidh",
     "checkAgain": "Kontrollo përsëri",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

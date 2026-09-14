@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "Sebenzisa i-Kilo ekhompyutheni yakho ngokusebenzisa i-CLI ethi `kilo remote`.",
     "skip": "Qeda uhambo",
     "tutorialLabel": "Uqeqesho",
-    "cloudTitle": "Qala iseshini yakho yokuqala yefu",
-    "cloudBody": "Dala iseshini entsha bese i-Kilo iyisebenza efwini.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Sulinda ukuthi iseshini yefu iqale…",
-    "cloudCheck": "Iseshini yakho yokuqala yefu isebenza.",
     "remoteTitle": "Qala iseshini yakho yokuqala ekude",
     "remoteBody": "Xhuma ikhompyutha yakho, bese uqala iseshini lapha.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Qala iseshini ekhompyutheni yakho",
-    "remoteWaiting": "Sulinda ikhompyutha yakho iqale iseshini…",
-    "remoteCheck": "Iseshini yakho yokuqala ekude isebenza.",
     "remoteEmptyTitle": "Akukho khompyutha exhunyiwe okwamanje",
     "remoteEmptyBody": "Ukuze uyixhume, qalisa `kilo remote` ekhompyutheni yakho.",
     "remoteFound": "Ikhompyutha ixhunyiwe",
     "checkAgain": "Phinda uhlole",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

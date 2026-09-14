@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "Whakahaere i te Kilo ki tō ake mīhini mā te CLI `kilo remote`.",
     "skip": "Waiho te haere",
     "tutorialLabel": "Akoranga",
-    "cloudTitle": "Tīmata tō wātū kapua tuatahi",
-    "cloudBody": "Waihanga he wātū hōu, ā, ka whakahaere a Kilo i a ia ki te kapua.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "E tatari ana kia tīmata te wātū kapua…",
-    "cloudCheck": "E rere ana tō wātū kapua tuatahi.",
     "remoteTitle": "Tīmata tō wātū tawhiti tuatahi",
     "remoteBody": "Honoa tō rorohiko, kātahi ka tīmata te wātū mai i konei.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Tīmata he wātū ki tō rorohiko",
-    "remoteWaiting": "E tatari ana kia tīmata te rorohiko i te wātū…",
-    "remoteCheck": "E rere ana tō wātū tawhiti tuatahi.",
     "remoteEmptyTitle": "Kāore anō kia honoa he rorohiko",
     "remoteEmptyBody": "Hei hono i a ia, whakahaeretia `kilo remote` ki tō rorohiko.",
     "remoteFound": "Kua honoa te rorohiko",
     "checkAgain": "Tirohia anō",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

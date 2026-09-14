@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "আপনার নিজের মেশিনে `kilo remote` CLI-এর মাধ্যমে Kilo চালান।",
     "skip": "ট্যুর বাদ দিন",
     "tutorialLabel": "টিউটোরিয়াল",
-    "cloudTitle": "আপনার প্রথম ক্লাউড সেশন শুরু করুন",
-    "cloudBody": "একটি নতুন সেশন তৈরি করুন, Kilo সেটি ক্লাউডে চালাবে।",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "আপনার ক্লাউড সেশন শুরু হওয়ার অপেক্ষায়…",
-    "cloudCheck": "আপনার প্রথম ক্লাউড সেশন চলছে।",
     "remoteTitle": "আপনার প্রথম রিমোট সেশন শুরু করুন",
     "remoteBody": "আপনার কম্পিউটার সংযোগ করুন, তারপর এখান থেকে সেশন শুরু করুন।",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "আপনার কম্পিউটারে সেশন শুরু করুন",
-    "remoteWaiting": "আপনার কম্পিউটারের সেশন শুরু হওয়ার অপেক্ষায়…",
-    "remoteCheck": "আপনার প্রথম রিমোট সেশন চলছে।",
     "remoteEmptyTitle": "এখনো কোনো কম্পিউটার সংযুক্ত হয়নি",
     "remoteEmptyBody": "সংযোগ করতে আপনার কম্পিউটারে `kilo remote` চালান।",
     "remoteFound": "কম্পিউটার সংযুক্ত",
     "checkAgain": "আবার যাচাই করুন",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

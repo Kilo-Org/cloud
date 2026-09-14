@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "உங்கள் சொந்த இயந்திரத்தில் `kilo remote` CLI மூலம் Kilo-ஐ இயக்கவும்.",
     "skip": "சுற்றுலாவைத் தவிர்",
     "tutorialLabel": "பயிற்சி",
-    "cloudTitle": "உங்கள் முதல் மேக அமர்வைத் தொடங்கு",
-    "cloudBody": "ஒரு புதிய அமர்வை உருவாக்கவும், Kilo அதை மேகத்தில் இயக்கும்.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "உங்கள் மேக அமர்வு தொடங்கும் வரை காத்திருக்கிறது…",
-    "cloudCheck": "உங்கள் முதல் மேக அமர்வு இயங்குகிறது.",
     "remoteTitle": "உங்கள் முதல் தொலை அமர்வைத் தொடங்கு",
     "remoteBody": "உங்கள் கணினியை இணைத்து, பின்னர் இங்கிருந்து அமர்வைத் தொடங்கு.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "உங்கள் கணினியில் அமர்வைத் தொடங்கு",
-    "remoteWaiting": "உங்கள் கணினி அமர்வைத் தொடங்கும் வரை காத்திருக்கிறது…",
-    "remoteCheck": "உங்கள் முதல் தொலை அமர்வு இயங்குகிறது.",
     "remoteEmptyTitle": "இதுவரை எந்தக் கணினியும் இணைக்கப்படவில்லை",
     "remoteEmptyBody": "அதை இணைக்க உங்கள் கணினியில் `kilo remote`-ஐ இயக்கவும்.",
     "remoteFound": "கணினி இணைக்கப்பட்டது",
     "checkAgain": "மீண்டும் சரிபார்",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

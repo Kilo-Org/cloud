@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "ನಿಮ್ಮ ಸ್ವಂತ ಯಂತ್ರದಲ್ಲಿ `kilo remote` CLI ಮೂಲಕ Kilo ಚಲಾಯಿಸಿ.",
     "skip": "ಪ್ರವಾಸ ಬಿಡಿ",
     "tutorialLabel": "ಟ್ಯುಟೋರಿಯಲ್",
-    "cloudTitle": "ನಿಮ್ಮ ಮೊದಲ ಕ್ಲೌಡ್ ಸೆಶನ್ ಆರಂಭಿಸಿ",
-    "cloudBody": "ಹೊಸ ಸೆಶನ್ ರಚಿಸಿ, Kilo ಅದನ್ನು ಕ್ಲೌಡ್‌ನಲ್ಲಿ ಚಲಾಯಿಸುತ್ತದೆ.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "ನಿಮ್ಮ ಕ್ಲೌಡ್ ಸೆಶನ್ ಆರಂಭವಾಗುವುದನ್ನು ನಿರೀಕ್ಷಿಸಲಾಗಿದೆ…",
-    "cloudCheck": "ನಿಮ್ಮ ಮೊದಲ ಕ್ಲೌಡ್ ಸೆಶನ್ ಚಾಲನೆಯಲ್ಲಿದೆ.",
     "remoteTitle": "ನಿಮ್ಮ ಮೊದಲ ರಿಮೋಟ್ ಸೆಶನ್ ಆರಂಭಿಸಿ",
     "remoteBody": "ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್ ಅನ್ನು ಸಂಪರ್ಕಿಸಿ, ನಂತರ ಇಲ್ಲಿಂದ ಸೆಶನ್ ಆರಂಭಿಸಿ.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್‌ನಲ್ಲಿ ಸೆಶನ್ ಆರಂಭಿಸಿ",
-    "remoteWaiting": "ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್ ಸೆಶನ್ ಆರಂಭಿಸುವುದನ್ನು ನಿರೀಕ್ಷಿಸಲಾಗಿದೆ…",
-    "remoteCheck": "ನಿಮ್ಮ ಮೊದಲ ರಿಮೋಟ್ ಸೆಶನ್ ಚಾಲನೆಯಲ್ಲಿದೆ.",
     "remoteEmptyTitle": "ಇನ್ನೂ ಯಾವುದೇ ಕಂಪ್ಯೂಟರ್ ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",
     "remoteEmptyBody": "ಅದನ್ನು ಸಂಪರ್ಕಿಸಲು ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್‌ನಲ್ಲಿ `kilo remote` ಚಲಾಯಿಸಿ.",
     "remoteFound": "ಕಂಪ್ಯೂಟರ್ ಸಂಪರ್ಕಗೊಂಡಿದೆ",
     "checkAgain": "ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

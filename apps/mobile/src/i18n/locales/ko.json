@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "`kilo remote` CLI로 내 컴퓨터에서 Kilo를 실행하세요.",
     "skip": "투어 건너뛰기",
     "tutorialLabel": "튜토리얼",
-    "cloudTitle": "첫 클라우드 세션 시작하기",
-    "cloudBody": "새 세션을 만들면 Kilo가 클라우드에서 실행합니다.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "클라우드 세션 시작을 기다리는 중…",
-    "cloudCheck": "첫 클라우드 세션이 실행 중입니다.",
     "remoteTitle": "첫 리모트 세션 시작하기",
     "remoteBody": "컴퓨터를 연결한 뒤 여기서 세션을 시작하세요.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "내 컴퓨터에서 세션 시작",
-    "remoteWaiting": "컴퓨터에서 세션을 시작할 때까지 기다리는 중…",
-    "remoteCheck": "첫 리모트 세션이 실행 중입니다.",
     "remoteEmptyTitle": "연결된 컴퓨터가 없습니다",
     "remoteEmptyBody": "연결하려면 컴퓨터에서 `kilo remote`를 실행하세요.",
     "remoteFound": "컴퓨터 연결됨",
     "checkAgain": "다시 확인",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

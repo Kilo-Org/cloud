@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "Kilo لەسەر ئامێری خۆتدا بە ڕێگای CLI ی `kilo remote` جێبەجێ بکە.",
     "skip": "گەشتەکە دەربپەڕێ",
     "tutorialLabel": "فێربوون",
-    "cloudTitle": "یەکەم دانیشتنی هەورییەکەت دەست پێبکە",
-    "cloudBody": "دانیشتنێکی نوێ دروست بکە و Kilo لە هەوردا جێی دەکات.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "چاوەڕوانی دەستپێکردنی دانیشتنی هەورییەکەتم…",
-    "cloudCheck": "یەکەم دانیشتنی هەورییەکەت کار دەکات.",
     "remoteTitle": "یەکەم دانیشتنی دوورەکەت دەست پێبکە",
     "remoteBody": "کۆمپیوتەرەکەت پەیوەست بکە، پاشان دانیشتنەکە لێرەوە دەست پێبکە.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "دانیشتنێک لە کۆمپیوتەرەکەت دەست پێبکە",
-    "remoteWaiting": "چاوەڕوانی کۆمپیوتەرەکەتم دانیشتنەکە دەست پێبکات…",
-    "remoteCheck": "یەکەم دانیشتنی دوورەکەت کار دەکات.",
     "remoteEmptyTitle": "هێشتا کۆمپیوتەرێک پەیوەست نەبووە",
     "remoteEmptyBody": "بۆ پەیوەستکردنی، `kilo remote` لە کۆمپیوتەرەکەتدا جێبەجێ بکە.",
     "remoteFound": "کۆمپیوتەر پەیوەست بوو",
     "checkAgain": "دووبارە پشکنین بکە",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

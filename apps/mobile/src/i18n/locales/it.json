@@ -3036,22 +3036,13 @@
     "remoteOptionBody": "Esegui Kilo sulla tua macchina tramite la CLI `kilo remote`.",
     "skip": "Salta tour",
     "tutorialLabel": "Tutorial",
-    "cloudTitle": "Avvia la tua prima sessione cloud",
-    "cloudBody": "Crea una nuova sessione e Kilo la eseguirà nel cloud.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "In attesa che la tua sessione cloud abbia inizio…",
-    "cloudCheck": "La tua prima sessione cloud è in esecuzione.",
     "remoteTitle": "Avvia la tua prima sessione remota",
     "remoteBody": "Collega il tuo computer e poi avvia la sessione da qui.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Avvia una sessione sul tuo computer",
-    "remoteWaiting": "In attesa che il tuo computer avvii la sessione…",
-    "remoteCheck": "La tua prima sessione remota è in esecuzione.",
     "remoteEmptyTitle": "Nessun computer ancora connesso",
     "remoteEmptyBody": "Per connetterlo, esegui `kilo remote` sul tuo computer.",
     "remoteFound": "Computer connesso",
     "checkAgain": "Controlla di nuovo",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

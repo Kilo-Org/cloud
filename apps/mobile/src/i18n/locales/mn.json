@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "Өөрийн машинаасаа `kilo remote` CLI-ээр Kilo-г ажиллуул.",
     "skip": "Танилцуулгыг алгасах",
     "tutorialLabel": "Заавар",
-    "cloudTitle": "Эхний үүлсийн сессээ эхлүүл",
-    "cloudBody": "Шинэ сесс үүсгээрэй, Kilo үүнийг үүлсэнд ажиллуулна.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Үүлсийн сесс эхлэхийг хүлээж байна…",
-    "cloudCheck": "Таны эхний үүлсийн сесс ажиллаж байна.",
     "remoteTitle": "Эхний зайн сессээ эхлүүл",
     "remoteBody": "Компьютерээ холбоод, эндээс сессээ эхлүүлээрэй.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Компьютер дээрээ сесс эхлүүлэх",
-    "remoteWaiting": "Компьютер тань сесс эхлэхийг хүлээж байна…",
-    "remoteCheck": "Таны эхний зайн сесс ажиллаж байна.",
     "remoteEmptyTitle": "Одоогоор компьютер холбогдоогүй байна",
     "remoteEmptyBody": "Холбохын тулд компьютер дээрээ `kilo remote` командыг ажиллуулна уу.",
     "remoteFound": "Компьютер холбогдлоо",
     "checkAgain": "Дахин шалгах",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

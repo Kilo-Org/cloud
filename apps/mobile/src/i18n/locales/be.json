@@ -3058,22 +3058,13 @@
     "remoteOptionBody": "Запускайце Kilo на ўласнай машыне праз CLI `kilo remote`.",
     "skip": "Прапусціць агляд",
     "tutorialLabel": "Навучанне",
-    "cloudTitle": "Пачніце свой першы воблачны сеанс",
-    "cloudBody": "Стварыце новы сеанс, і Kilo выканае яго ў воблаку.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Чакаем, калі ваш воблачны сеанс пачнецца…",
-    "cloudCheck": "Ваш першы воблачны сеанс працуе.",
     "remoteTitle": "Пачніце свой першы аддалены сеанс",
     "remoteBody": "Падключыце свой камп'ютар, а затым пачніце сеанс адсюль.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Пачаць сеанс на вашым камп'ютары",
-    "remoteWaiting": "Чакаем, калі ваш камп'ютар пачне сеанс…",
-    "remoteCheck": "Ваш першы аддалены сеанс працуе.",
     "remoteEmptyTitle": "Яшчэ няма падключанага камп'ютара",
     "remoteEmptyBody": "Каб падключыць яго, выканайце `kilo remote` на сваім камп'ютары.",
     "remoteFound": "Камп'ютар падключаны",
     "checkAgain": "Праверыць яшчэ раз",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "Futtasd a Kilót a saját gépeden a `kilo remote` CLI-n keresztül.",
     "skip": "Bemutató kihagyása",
     "tutorialLabel": "Oktatóprogram",
-    "cloudTitle": "Indítsd el az első felhős munkamenetedet",
-    "cloudBody": "Hozz létre egy új munkamenetet, és a Kilo a felhőben futtatja.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Várjuk, hogy a felhős munkameneted elinduljon…",
-    "cloudCheck": "Az első felhős munkameneted fut.",
     "remoteTitle": "Indítsd el az első távoli munkameneted",
     "remoteBody": "Csatlakoztasd a számítógéped, majd indítsd innen a munkamenetet.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Munkamenet indítása a számítógépeden",
-    "remoteWaiting": "Várjuk, hogy a számítógéped elindítsa a munkamenetet…",
-    "remoteCheck": "Az első távoli munkameneted fut.",
     "remoteEmptyTitle": "Még nincs számítógép csatlakoztatva",
     "remoteEmptyBody": "A csatlakoztatáshoz futtasd a `kilo remote` parancsot a számítógépeden.",
     "remoteFound": "Számítógép csatlakoztatva",
     "checkAgain": "Ellenőrzés újra",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

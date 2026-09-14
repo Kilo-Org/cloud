@@ -3014,22 +3014,13 @@
     "remoteOptionBody": "Keyrðu Kilo á eigin tölvu í gegnum `kilo remote` CLI-ið.",
     "skip": "Sleppa kynningu",
     "tutorialLabel": "Leiðbeiningar",
-    "cloudTitle": "Hafðu uppi fyrstu skýjalotu þína",
-    "cloudBody": "Búðu til nýja lotu og Kilo keyrir hana í skýjunum.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Bíð eftir að skýjalotan þín hefjist…",
-    "cloudCheck": "Fyrsta skýjalotan þín er í gangi.",
     "remoteTitle": "Hafðu uppi fyrstu fjarlotu þína",
     "remoteBody": "Tengdu tölvuna þína og vertu svo að byrja lotuna héðan.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Hefja lotu á tölvunni þinni",
-    "remoteWaiting": "Bíð eftir að tölvan þín hefji lotuna…",
-    "remoteCheck": "Fyrsta fjarlotan þín er í gangi.",
     "remoteEmptyTitle": "Engin tölva tengd ennþá",
     "remoteEmptyBody": "Til að tengja hana skaltu keyra `kilo remote` á tölvunni þinni.",
     "remoteFound": "Tölva tengd",
     "checkAgain": "Athuga aftur",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

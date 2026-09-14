@@ -3058,22 +3058,13 @@
     "remoteOptionBody": "Запустите Kilo на своём компьютере через CLI `kilo remote`.",
     "skip": "Пропустить тур",
     "tutorialLabel": "Обучение",
-    "cloudTitle": "Запустите свой первый облачный сеанс",
-    "cloudBody": "Создайте новый сеанс, и Kilo запустит его в облаке.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Ждём запуска облачного сеанса…",
-    "cloudCheck": "Ваш первый облачный сеанс запущен.",
     "remoteTitle": "Запустите свой первый удалённый сеанс",
     "remoteBody": "Подключите свой компьютер, а затем запустите сеанс отсюда.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Запустить сеанс на вашем компьютере",
-    "remoteWaiting": "Ждём, когда ваш компьютер запустит сеанс…",
-    "remoteCheck": "Ваш первый удалённый сеанс запущен.",
     "remoteEmptyTitle": "Компьютер ещё не подключён",
     "remoteEmptyBody": "Чтобы подключить его, выполните `kilo remote` на своём компьютере.",
     "remoteFound": "Компьютер подключён",
     "checkAgain": "Проверить ещё раз",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

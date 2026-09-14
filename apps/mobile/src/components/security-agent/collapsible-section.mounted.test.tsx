@@ -1,5 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
-
 // Reduce-motion gate for the security-agent CollapsibleSection. When
 // `useMotionPolicy()` reports reduced motion the chevron must jump to its
 // target angle (no `withTiming`) and the panel must drop the `LinearTransition`
@@ -7,7 +5,7 @@
 // 200ms chevron timing, 200ms layout transition, and 150ms fade stay.
 
 import { type ComponentProps, type ElementType, type ReactNode } from 'react';
-import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
+import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CollapsibleSection } from './collapsible-section';

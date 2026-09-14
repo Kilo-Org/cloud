@@ -239,30 +239,84 @@ describe('getMergeRequest', () => {
     expect(mockGetMRDiffRefs).not.toHaveBeenCalled();
   });
 
-  it('reports the provider changed-file total past the diff page cap', async () => {
-    // A full page on every request: the detail load stops at its 3-page cap
-    // with 150 diffs read, far short of the MR's 420 changed files.
-    const fullDiffPage = Array.from({ length: 50 }, (_, index) => ({
-      old_path: `f${index}.ts`,
-      new_path: `f${index}.ts`,
-      new_file: false,
-      renamed_file: false,
-      deleted_file: false,
-      diff: '+x\n',
-    }));
-    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse(fullDiffPage)));
-    mockFetchGitLabMergeRequest.mockResolvedValue({ ...mrFixture, changes_count: '420' });
-
-    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
-
-    expect(summary.changedFiles).toBe(420);
-  });
-
-  it('reads a capped changes_count ("1000+") as its floor', async () => {
+  it("reports the merge request's own changed-file total on a large MR", async () => {
     mockFetchGitLabMergeRequest.mockResolvedValue({ ...mrFixture, changes_count: '1000+' });
 
     const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
 
+    // The diff walk is capped by GitLab's own diff collection, so the total
+    // comes from the MR instead of the truncated walk.
+    expect(summary.changedFiles).toBe(1000);
+  });
+
+  it('falls back to the folded diff count while the MR total is still empty', async () => {
+    mockFetchGitLabMergeRequest.mockResolvedValue({ ...mrFixture, changes_count: '' });
+
+    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
+
+    expect(summary.changedFiles).toBe(2);
+  });
+
+  it('folds diff pages past the old three-page cap so the counts are complete', async () => {
+    const fullPage = Array.from({ length: 50 }, (_, index) => ({
+      old_path: `src/${index}.ts`,
+      new_path: `src/${index}.ts`,
+      new_file: false,
+      renamed_file: false,
+      deleted_file: false,
+      diff: '@@ -1 +1 @@\n-old\n+new\n',
+    }));
+    mockFetchGitLabMergeRequest.mockResolvedValue({ ...mrFixture, changes_count: '201' });
+    fetchMock.mockImplementation(url => {
+      const parsed = new URL(String(url));
+      if (parsed.pathname.endsWith('/diffs')) {
+        // Three full pages then a short fourth: the old fold stopped at page
+        // three and reported 150 files as the total.
+        if (parsed.searchParams.get('page') === '4') {
+          return Promise.resolve(
+            jsonResponse([{ ...fullPage[0], diff: '@@ -1 +1,2 @@\n-old\n+new\n+extra\n' }])
+          );
+        }
+        return Promise.resolve(jsonResponse(fullPage));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
+
+    expect(summary.changedFiles).toBe(201);
+    expect(summary.additions).toBe(50 * 3 + 2);
+    expect(summary.deletions).toBe(50 * 3 + 1);
+  });
+
+  it('folds each page into the counters as it arrives and stops at the page bound', async () => {
+    // Every page is full, so the walk runs to the bound instead of ending
+    // early. The counts must cover all of them even though no page is kept:
+    // the fold reads a page once and drops it before fetching the next.
+    const fullPage = Array.from({ length: 50 }, (_, index) => ({
+      old_path: `src/${index}.ts`,
+      new_path: `src/${index}.ts`,
+      new_file: false,
+      renamed_file: false,
+      deleted_file: false,
+      diff: '@@ -1 +1 @@\n-old\n+new\n',
+    }));
+    const requestedPages: string[] = [];
+    fetchMock.mockImplementation(url => {
+      const parsed = new URL(String(url));
+      if (parsed.pathname.endsWith('/diffs')) {
+        requestedPages.push(parsed.searchParams.get('page') ?? '');
+        return Promise.resolve(jsonResponse(fullPage));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const summary = await getMergeRequest(OWNER, PROJECT_PATH, 12);
+
+    expect(requestedPages).toHaveLength(20);
+    expect(requestedPages[19]).toBe('20');
+    expect(summary.additions).toBe(50 * 20);
+    expect(summary.deletions).toBe(50 * 20);
     expect(summary.changedFiles).toBe(1000);
   });
 });
@@ -531,33 +585,49 @@ describe('listChecks', () => {
     ]);
   });
 
-  it('reads every page of MR pipelines, not only the first', async () => {
-    const pipelinePage = (offset: number, count: number) =>
-      Array.from({ length: count }, (_, index) => ({
-        id: offset + index,
-        sha: `sha-${offset + index}`,
-        ref: 'feature/deploy',
-        status: 'success',
-        web_url: `${INSTANCE_URL}/-/pipelines/${offset + index}`,
-        name: `run-${offset + index}`,
-      }));
+  it('folds every page of MR pipelines, not only the first', async () => {
+    const pageOne = Array.from({ length: 50 }, (_, index) => ({
+      id: index + 1,
+      sha: 'sha-head',
+      ref: 'refs/merge-requests/12/merge',
+      status: 'success',
+      web_url: `${INSTANCE_URL}/-/pipelines/${index + 1}`,
+      name: `pipeline-${index + 1}`,
+    }));
+    const failing = {
+      id: 51,
+      sha: 'sha-head',
+      ref: 'feature/deploy',
+      status: 'failed',
+      web_url: `${INSTANCE_URL}/-/pipelines/51`,
+      name: 'failing-overtime',
+    };
     fetchMock.mockImplementation(url => {
       const parsed = new URL(String(url));
       if (parsed.pathname.endsWith('/pipelines')) {
-        return parsed.searchParams.get('page') === '2'
-          ? Promise.resolve(jsonResponse(pipelinePage(51, 1)))
-          : Promise.resolve(jsonResponse(pipelinePage(1, 50)));
+        return Promise.resolve(
+          jsonResponse(parsed.searchParams.get('page') === '2' ? [failing] : pageOne)
+        );
       }
       return Promise.resolve(jsonResponse([]));
     });
 
     const result = await listChecks(OWNER, PROJECT_PATH, 12);
 
+    // The failing pipeline lives on page 2: the checks rollup exists to show
+    // it, so the listing must be folded past the first page.
     expect(result.checks).toHaveLength(51);
-    expect(result.checks[50]?.name).toBe('run-51');
-    expect(
-      fetchMock.mock.calls.filter(call => new URL(String(call[0])).pathname.endsWith('/pipelines'))
-    ).toHaveLength(2);
+    expect(result.checks[50]).toEqual({
+      name: 'failing-overtime',
+      status: 'failed',
+      conclusion: 'failed',
+      detailsUrl: `${INSTANCE_URL}/-/pipelines/51`,
+    });
+    const pages = fetchMock.mock.calls
+      .map(call => new URL(String(call[0])))
+      .filter(url => url.pathname.endsWith('/pipelines'))
+      .map(url => url.searchParams.get('page'));
+    expect(pages).toEqual(['1', '2']);
   });
 });
 

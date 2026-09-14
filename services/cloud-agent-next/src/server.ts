@@ -76,6 +76,7 @@ import {
   widgetApprovalKeyRequestSchema,
   type WidgetApproval,
 } from './widget-approval-key.js';
+import { registerWorktreeStateRoutes } from './sandbox-control/worktree-state-routes.js';
 
 const app = new Hono<HonoContext>();
 
@@ -293,6 +294,7 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 }
 
 registerControlLogRoutes(app);
+registerWorktreeStateRoutes(app);
 
 app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
   return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');

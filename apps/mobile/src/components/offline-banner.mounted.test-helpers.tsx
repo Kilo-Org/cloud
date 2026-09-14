@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts React/RN trees without a DOM */
 // Shared mount harness for offline-banner.mounted.test.tsx. The mutable refs
 // below are reset by that suite's beforeEach/afterEach; keeping them here lets
 // the suite stay under the max-lines budget without duplicating the provider
@@ -8,7 +7,7 @@
 import { type ReactElement } from 'react';
 import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createTRPCClient, httpLink } from '@trpc/client';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { vi } from 'vitest';
 
 import { type ConnectivityState, isOnline } from '@/lib/connectivity-online';

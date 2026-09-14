@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- the attachment send-admission suite shares one owned test file with the attachment-only send contract */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/persist/cache-persistence-mount.test.ts */
 /* eslint-disable new-cap -- ChatComposer is called as a plain function, matching repo test convention */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake hooks and handlers settle without await because they resolve immediately */
 import * as React from 'react';

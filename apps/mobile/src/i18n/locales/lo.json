@@ -231,6 +231,8 @@
     "voiceInput": "ການປ້ອນສຽງ",
     "autoExpandThinking": "ຂະຫຍາຍສ່ວນການຄິດອັດຕະໂນມັດ",
     "autoExpandThinkingSubtitle": "ຂະຫຍາຍສ່ວນການຄິດຂອງຕົວແທນໃຫ້ເຫັນທັງໝົດເມື່ອຄິດສຳເລັດ.",
+    "hideThinking": "ເຊື່ອງລາຍລະອຽດການຄິດ",
+    "hideThinkingSubtitle": "ບໍ່ສະແດງການຄິດຂອງຕົວແທນໃນໜ້າເຊສຊັນ.",
     "keepScreenOn": "ເປີດໜ້າຈໍໄວ້ໃນຂະນະຢູ່ໜ້າເຊສຊັນ",
     "keepScreenOnSubtitle": "ເປີດໜ້າຈໍໄວ້ຕະຫຼອດຂະນະທີ່ເຊສຊັນກຳລັງເຮັດວຽກ.",
     "appearance": "ຮູບລັກສະນະ",
@@ -2456,6 +2458,11 @@
       "stepsCount": "{{steps}} ຂັ້ນຕອນ",
       "stepsCount_other": "{{steps}} ຂັ້ນຕອນ",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "ການອະນຸມັດອັດຕະໂນມັດ",
+      "description": "ອະນຸມັດຄຳຮ້ອງຂໍສິດສຳລັບເຊສຊັນນີ້ໂດຍອັດຕະໂນມັດ. ຫຼັງຈາກນັ້ນ ເຄື່ອງມືຈະເຮັດວຽກໂດຍບໍ່ມີການຖາມ.",
+      "unavailable": "ເຊສຊັນນີ້ບໍ່ສາມາດຮັບຄຳຮ້ອງຂໍສິດໄດ້."
     },
     "prBadge": {
       "open": "ເປີດຄຳຂໍລວມໂຄ້ດ",

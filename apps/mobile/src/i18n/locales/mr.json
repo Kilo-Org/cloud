@@ -231,6 +231,8 @@
     "voiceInput": "व्हॉइस इनपुट",
     "autoExpandThinking": "विचारप्रक्रिया आपोआप उघडून दाखवा",
     "autoExpandThinkingSubtitle": "एजंटची विचारप्रक्रिया पूर्ण झाल्यावर तिचा संपूर्ण मजकूर दाखवा.",
+    "hideThinking": "विचारप्रक्रियेचे तपशील लपवा",
+    "hideThinkingSubtitle": "सत्र पृष्ठावर एजंटची विचारप्रक्रिया दाखवू नका.",
     "keepScreenOn": "सत्र पृष्ठावर असताना स्क्रीन चालू ठेवा",
     "keepScreenOnSubtitle": "सत्रात काम सुरू असताना स्क्रीन चालू ठेवा.",
     "appearance": "स्वरूप",
@@ -2456,6 +2458,11 @@
       "stepsCount": "{{steps}} टप्पे",
       "stepsCount_other": "{{steps}} टप्पे",
       "modelAccessibilityLabel": "मॉडेल: {{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "स्वयं-मंजूरी",
+      "description": "या सत्रासाठी परवानगी विनंत्या स्वयंचलितपणे मंजूर करा. त्यानंतर साधने कोणत्याही सूचनेशिवाय चालतात.",
+      "unavailable": "हे सत्र परवानगी विनंत्या प्राप्त करू शकत नाही."
     },
     "prBadge": {
       "open": "पुल रिक्वेस्ट उघडा",

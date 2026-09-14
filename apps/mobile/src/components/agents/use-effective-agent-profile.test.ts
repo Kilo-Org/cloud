@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN hooks under vitest (node env, no jsdom); see src/components/agents/use-new-session-creator.test.ts */
 import * as React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 import { useQuery } from '@tanstack/react-query';
 

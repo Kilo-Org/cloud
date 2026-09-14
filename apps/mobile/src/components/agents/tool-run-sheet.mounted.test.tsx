@@ -1,8 +1,7 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import '@/i18n';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { FixedPartRow } from './fixed-part-row';
@@ -115,7 +114,7 @@ async function mountSheet(
 }
 
 function propOf(instance: TestRenderer.ReactTestInstance, key: string): unknown {
-  /* eslint-disable-next-line typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  /* eslint-disable-next-line typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
   return instance.props[key];
 }
 

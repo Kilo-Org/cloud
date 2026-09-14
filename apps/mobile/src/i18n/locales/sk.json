@@ -231,6 +231,8 @@
     "voiceInput": "Hlasový vstup",
     "autoExpandThinking": "Automaticky rozbaliť uvažovanie",
     "autoExpandThinkingSubtitle": "Po dokončení uvažovania agenta sa jeho obsah automaticky rozbalí.",
+    "hideThinking": "Skryť podrobnosti uvažovania",
+    "hideThinkingSubtitle": "Nezobrazovať uvažovanie agenta na stránke relácie.",
     "keepScreenOn": "Ponechať obrazovku zapnutú na stránke relácie",
     "keepScreenOnSubtitle": "Obrazovka zostane zapnutá, kým relácia beží.",
     "appearance": "Vzhľad",
@@ -2498,6 +2500,11 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} kroky",
       "stepsCount_many": "{{steps}} kroku"
+    },
+    "autoApprove": {
+      "title": "Automatické schvaľovanie",
+      "description": "Automaticky schvaľovať žiadosti o povolenie pre túto reláciu. Nástroje sa potom spustia bez výzvy.",
+      "unavailable": "Táto relácia nemôže prijímať žiadosti o povolenie."
     },
     "prBadge": {
       "open": "otvoriť PR",

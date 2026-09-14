@@ -398,11 +398,21 @@ describe('control terminal PTY ownership', () => {
 
     worktrees.delete(firstSession.directory);
     expect(
-      await terminalFailure(runtime.resize(firstSession, { ptyId: created.pty.id, cols: 100, rows: 30 }))
-    ).toMatchObject({ code: 'not_ready', message: 'Kilo worktree is not available', retryable: true });
+      await terminalFailure(
+        runtime.resize(firstSession, { ptyId: created.pty.id, cols: 100, rows: 30 })
+      )
+    ).toMatchObject({
+      code: 'not_ready',
+      message: 'Kilo worktree is not available',
+      retryable: true,
+    });
     expect(
       await terminalFailure(runtime.close(firstSession, { ptyId: created.pty.id }))
-    ).toMatchObject({ code: 'not_ready', message: 'Kilo worktree is not available', retryable: true });
+    ).toMatchObject({
+      code: 'not_ready',
+      message: 'Kilo worktree is not available',
+      retryable: true,
+    });
   });
 
   it('uses the retained runtime for detach cleanup while the current lookup is starting', async () => {
@@ -435,8 +445,14 @@ describe('control terminal PTY ownership', () => {
     // the current lookup.
     starting = true;
     expect(
-      await terminalFailure(runtime.resize(firstSession, { ptyId: created.pty.id, cols: 100, rows: 30 }))
-    ).toMatchObject({ code: 'not_ready', message: 'Kilo worktree is not available', retryable: true });
+      await terminalFailure(
+        runtime.resize(firstSession, { ptyId: created.pty.id, cols: 100, rows: 30 })
+      )
+    ).toMatchObject({
+      code: 'not_ready',
+      message: 'Kilo worktree is not available',
+      retryable: true,
+    });
     await runtime.detachSession(firstSession);
     expect(deleted).toEqual([created.pty.id]);
   });

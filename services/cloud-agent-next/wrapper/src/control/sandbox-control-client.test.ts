@@ -1746,9 +1746,7 @@ describe('createSandboxControlClient', () => {
       await handshake(sockets[1], helloResult({ connectionRecovery: true, eventReceipts: true }));
       await waitForPublishedEvent(sockets[1], 'question.asked');
       expect(
-        publishedEventFrames(sockets[1]).filter(
-          frame => frame.eventType === 'question.asked'
-        )
+        publishedEventFrames(sockets[1]).filter(frame => frame.eventType === 'question.asked')
       ).toHaveLength(1);
       expect(failures).toHaveLength(0);
     } finally {
@@ -1793,9 +1791,7 @@ describe('createSandboxControlClient', () => {
       await handshake(sockets[1], helloResult({ connectionRecovery: true, eventReceipts: true }));
       await waitForPublishedEvent(sockets[1], 'question.asked');
       expect(
-        publishedEventFrames(sockets[1]).filter(
-          frame => frame.eventType === 'question.asked'
-        )
+        publishedEventFrames(sockets[1]).filter(frame => frame.eventType === 'question.asked')
       ).toHaveLength(1);
       expect(failures).toHaveLength(0);
     } finally {

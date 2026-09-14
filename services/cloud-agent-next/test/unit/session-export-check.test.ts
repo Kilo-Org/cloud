@@ -209,4 +209,3 @@ describe('bestEffortExportDiagnostic three-way result', () => {
     ).resolves.toBe(true);
   });
 });
-

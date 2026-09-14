@@ -1786,8 +1786,7 @@ describe('control event outbox disconnected hold', () => {
     const outbox = createControlEventOutbox({
       publish: async (publication, deadlineAt) => {
         delivered.push({ publication, deadlineAt });
-        if (attempts++ === 0)
-          throw new ControlDeliveryError('disconnected', true, 'disconnected');
+        if (attempts++ === 0) throw new ControlDeliveryError('disconnected', true, 'disconnected');
       },
       onFailure: failure => failures.push(failure),
     });
@@ -1819,8 +1818,7 @@ describe('control event outbox disconnected hold', () => {
     const outbox = createControlEventOutbox({
       publish: async publication => {
         delivered.push(publication);
-        if (attempts++ === 0)
-          throw new ControlDeliveryError('overflow', true, 'socket_overflow');
+        if (attempts++ === 0) throw new ControlDeliveryError('overflow', true, 'socket_overflow');
       },
       onFailure: failure => failures.push(failure),
     });
@@ -1947,8 +1945,7 @@ describe('control event outbox disconnected hold', () => {
     const outbox = createControlEventOutbox({
       publish: async publication => {
         delivered.push(publication);
-        if (attempts++ === 0)
-          throw new ControlDeliveryError('disconnected', true, 'disconnected');
+        if (attempts++ === 0) throw new ControlDeliveryError('disconnected', true, 'disconnected');
       },
       onFailure: failure => failures.push(failure),
     });
@@ -2001,8 +1998,7 @@ describe('control event outbox disconnected hold', () => {
       },
       publishBatch: async (publications, deadlineAt) => {
         batches.push({ publications, deadlineAt });
-        if (attempts++ === 0)
-          throw new ControlDeliveryError('disconnected', true, 'disconnected');
+        if (attempts++ === 0) throw new ControlDeliveryError('disconnected', true, 'disconnected');
       },
       supportsBatches: () => true,
       onFailure: failure => failures.push(failure),

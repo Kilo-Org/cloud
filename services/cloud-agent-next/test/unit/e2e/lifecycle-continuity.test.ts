@@ -21,11 +21,7 @@ function heartbeat(sandboxId: string, connectionId: string, wrapperInstanceId: s
   return control({ diagnosticEvent: 'heartbeat', sandboxId, connectionId, wrapperInstanceId });
 }
 
-function deadline(
-  sandboxId: string,
-  connectionId: string,
-  wrapperInstanceId: string
-): LogRecord {
+function deadline(sandboxId: string, connectionId: string, wrapperInstanceId: string): LogRecord {
   return control({
     diagnosticEvent: 'deadline_fired',
     deadlineId: 'heartbeatExpiry',
@@ -62,7 +58,10 @@ describe('matchesConnection', () => {
     expect(matchesConnection(partial, TARGET)).toBe(false);
     expect(matchesConnection(heartbeat(TARGET.sandboxId, 'other', 'other'), TARGET)).toBe(false);
     expect(
-      matchesConnection(heartbeat(TARGET.sandboxId, TARGET.connectionId, TARGET.wrapperInstanceId), TARGET)
+      matchesConnection(
+        heartbeat(TARGET.sandboxId, TARGET.connectionId, TARGET.wrapperInstanceId),
+        TARGET
+      )
     ).toBe(true);
   });
 });
@@ -72,8 +71,10 @@ describe('classifyFault recovery-outcome chain', () => {
     expect(classifyFault([], TARGET).kind).toBe('none');
     // Heartbeats are not failure evidence.
     expect(
-      classifyFault([heartbeat(TARGET.sandboxId, TARGET.connectionId, TARGET.wrapperInstanceId)], TARGET)
-        .kind
+      classifyFault(
+        [heartbeat(TARGET.sandboxId, TARGET.connectionId, TARGET.wrapperInstanceId)],
+        TARGET
+      ).kind
     ).toBe('none');
   });
 

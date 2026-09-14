@@ -767,8 +767,7 @@ function currentRuntimeMatchesTarget(
 ): boolean {
   if (!target) return false;
   const runtime =
-    deps.kiloRuntimes?.getRetained?.(session, target.runtimeId) ??
-    deps.kiloRuntimes?.get(session);
+    deps.kiloRuntimes?.getRetained?.(session, target.runtimeId) ?? deps.kiloRuntimes?.get(session);
   return (
     runtime !== undefined &&
     runtime.runtimeId === target.runtimeId &&
@@ -1127,10 +1126,7 @@ async function handleAbort(
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
   const scopedCleanupResultGranted = supportsScopedCleanupResult(deps);
   if (parsed.data.nativeRuntimeId) {
-    const runtime = deps.kiloRuntimes?.getRetained?.(
-      session,
-      parsed.data.nativeRuntimeId
-    );
+    const runtime = deps.kiloRuntimes?.getRetained?.(session, parsed.data.nativeRuntimeId);
     if (!runtime || runtime.runtimeId !== parsed.data.nativeRuntimeId) {
       return ok({
         status: 'aborted',

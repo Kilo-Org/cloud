@@ -389,8 +389,9 @@ describe('computeExclusiveLayout directory guard', () => {
 
   it('accepts the sessions layout when the target is the only directory', () => {
     expect(
-      computeExclusiveLayout(exclusiveLayoutInput({ directory: '/workspace/user/sessions/workspace_1' }))
-        .exclusive
+      computeExclusiveLayout(
+        exclusiveLayoutInput({ directory: '/workspace/user/sessions/workspace_1' })
+      ).exclusive
     ).toBe(true);
   });
 
@@ -432,9 +433,9 @@ describe('computeExclusiveLayout directory guard', () => {
   });
 
   it('refuses a parent that is neither sessions nor worktrees', () => {
-    expect(computeExclusiveLayout(exclusiveLayoutInput({ directory: '/tmp/owned' })).exclusive).toBe(
-      false
-    );
+    expect(
+      computeExclusiveLayout(exclusiveLayoutInput({ directory: '/tmp/owned' })).exclusive
+    ).toBe(false);
   });
 
   it('refuses when the target directory itself is absent', () => {

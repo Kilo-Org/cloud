@@ -2415,7 +2415,10 @@ export async function lifecycleLlmError(args: LifecycleArgs): Promise<LifecycleR
       session.cloudAgentSessionId,
       followUp.messageId
     );
-    if (!isMessageCompleted(followTerminal, followUp.messageId) || followStatus.status !== 'completed') {
+    if (
+      !isMessageCompleted(followTerminal, followUp.messageId) ||
+      followStatus.status !== 'completed'
+    ) {
       return {
         name: 'llm-error',
         conversation,

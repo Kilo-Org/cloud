@@ -85,10 +85,7 @@ export function collectExportDiffs(data: unknown): ExportDiff[] {
  * is also present and matches; `after` is consulted only when there is no
  * non-empty patch. (Reconstructibility of a patch is never validated here.)
  */
-export function inspectSentinelDiff(
-  data: unknown,
-  input: SentinelDiffInput
-): SentinelDiffStatus {
+export function inspectSentinelDiff(data: unknown, input: SentinelDiffInput): SentinelDiffStatus {
   const diff = collectExportDiffs(data).find(entry => entry.file === input.sentinelPath);
   if (!diff) return 'missing';
   const patch = typeof diff.patch === 'string' ? diff.patch : undefined;
@@ -188,10 +185,7 @@ export async function bestEffortExportDiagnostic(
 ): Promise<boolean | 'unknown'> {
   try {
     return await resources.within('session-export diagnostic', async signal => {
-      const bounded = AbortSignal.any([
-        signal,
-        AbortSignal.timeout(EXPORT_DIAGNOSTIC_TIMEOUT_MS),
-      ]);
+      const bounded = AbortSignal.any([signal, AbortSignal.timeout(EXPORT_DIAGNOSTIC_TIMEOUT_MS)]);
       const data = await fetchSessionExport(resources, input.kiloSessionId, bounded);
       if (data === null) return 'unknown' as const;
       if (!exportContainsTurn(data, input)) return false;

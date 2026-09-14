@@ -297,6 +297,54 @@ describe('github-integration-helpers', () => {
       ]);
     });
 
+    it('drops exact duplicate entries within a single installation without touching cross-installation duplicates', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          platform_account_login: 'acme-core',
+          repositories: [
+            { id: 1, name: 'api', full_name: 'acme-core/api', private: true },
+            // Duplicate entry within the same installation's own cached list
+            // (for example, a corrupted or duplicated cache) should collapse.
+            { id: 1, name: 'api', full_name: 'acme-core/api', private: true },
+            { id: 2, name: 'shared', full_name: 'acme-core/shared', private: false },
+          ],
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          platform_account_login: 'acme-labs',
+          repositories: [
+            // Same repository as integration-1's "shared" repo, granted through
+            // a different installation: this association is kept, not deduped.
+            { id: 2, name: 'shared', full_name: 'acme-core/shared', private: false },
+          ],
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          id: 1,
+          fullName: 'acme-core/api',
+          platformIntegrationId: 'integration-1',
+        }),
+        expect.objectContaining({
+          id: 2,
+          fullName: 'acme-core/shared',
+          platformIntegrationId: 'integration-1',
+        }),
+        expect.objectContaining({
+          id: 2,
+          fullName: 'acme-core/shared',
+          platformIntegrationId: 'integration-2',
+        }),
+      ]);
+    });
+
     it('returns repositories from healthy installations when a sibling fetch fails', async () => {
       mockGetIntegrationsByOrganization.mockResolvedValue([
         buildIntegration({

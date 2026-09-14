@@ -26,6 +26,11 @@ import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { assistantMessage } from '@/components/agents/message-bubble-test-utils';
+import {
+  exitRemoteSessionWithFeedback,
+  type RetryableExitFailure,
+} from '@/components/agents/exit-remote-session-with-feedback';
+import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
@@ -146,6 +151,12 @@ vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/agents/part-detail-sheet-host', () => ({
   PartDetailSheetHost: 'PartDetailSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-sheet-host', () => ({
+  ToolRunSheetHost: 'ToolRunSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-rows', () => ({
+  CondensedToolRunRow: 'CondensedToolRunRow',
 }));
 vi.mock('@/components/agents/message-error-boundary', () => ({
   MessageErrorBoundary: 'MessageErrorBoundary',
@@ -309,6 +320,14 @@ vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   useKeepScreenOnPreference: () => ({ keepScreenOn: false, hasLoaded: true }),
 }));
+const condensePreference = vi.hoisted(() => ({ value: false }));
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  useCondenseToolCallsPreference: () => ({
+    condenseToolCalls: condensePreference.value,
+    hasLoaded: true,
+    setCondenseToolCalls: vi.fn(),
+  }),
+}));
 vi.mock('@/lib/hooks/use-session-model-options', () => ({
   useSessionModelOptions: () => ({ options: [], selectedValue: '', selectedVariant: '' }),
 }));
@@ -428,6 +447,35 @@ function childMessage(sessionId: KiloSessionId, text: string): StoredMessage {
   };
 }
 
+/** An assistant message of consecutive `read` tool parts that condense into one run. */
+function toolRunMessage(
+  sessionId: KiloSessionId,
+  messageId: string,
+  partIds: readonly string[]
+): StoredMessage {
+  const message = assistantMessage(messageId);
+  message.info = { ...message.info, sessionID: sessionId };
+  message.parts = partIds.map(
+    (partId, index): ToolPart => ({
+      id: partId,
+      sessionID: sessionId,
+      messageID: messageId,
+      type: 'tool',
+      callID: `call-${partId}`,
+      tool: 'read',
+      state: {
+        status: 'completed',
+        input: { filePath: `/repo/${partId}.ts` },
+        output: '',
+        title: 'read',
+        metadata: {},
+        time: { start: index, end: index + 1 },
+      },
+    })
+  );
+  return message;
+}
+
 function page(
   sessionId: KiloSessionId,
   messages: StoredMessage[],
@@ -450,6 +498,7 @@ beforeEach(() => {
   goalMountOptions = {};
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
+  condensePreference.value = false;
 });
 
 type MountDetailsOptions = {
@@ -1368,6 +1417,55 @@ describe('child transcript requests', () => {
     expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(0);
     expect(view.renderer.root.findAllByType(ChildSessionSheet)).toHaveLength(0);
     expect(view.requestedIds()).toEqual([ROOT_ID]);
+  });
+});
+
+describe('SessionDetailContent condensed tool runs', () => {
+  it('wraps the condensed run row in MessageErrorBoundary like the per-part path', async () => {
+    condensePreference.value = true;
+    const view = await mountDetails([toolRunMessage(ROOT_ID, 'm-tool-run', ['t1', 't2'])]);
+
+    const runRows = view.renderer.root.findAll(node => Object.is(node.type, 'CondensedToolRunRow'));
+    expect(runRows).toHaveLength(1);
+    expect(runRows[0]?.parent?.type).toBe('MessageErrorBoundary');
+  });
+});
+
+describe('session detail exit retry row', () => {
+  it('drops the row when a retry fails with a non-retryable SDK message', async () => {
+    const failureHandlers: {
+      retryable?: (failure: RetryableExitFailure) => void;
+      nonRetryable?: () => void;
+    } = {};
+    vi.mocked(exitRemoteSessionWithFeedback).mockImplementation(async input => {
+      failureHandlers.retryable = input.onRetryableFailure;
+      failureHandlers.nonRetryable = input.onNonRetryableFailure;
+      input.onRetryableFailure?.({ message: 'connection reset', retry: vi.fn() });
+      await Promise.resolve();
+    });
+
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    const onExitSession = composer.props.onExitSession as (
+      onAccepted: () => void,
+      lock: { current: boolean },
+      settleVoiceInput: () => Promise<boolean>
+    ) => Promise<void>;
+
+    await act(async () => {
+      await onExitSession(vi.fn<() => void>(), { current: false }, async () => {
+        await Promise.resolve();
+        return true;
+      });
+    });
+    expect(view.renderer.root.findAllByType(RemoteSessionExitFailure)).toHaveLength(1);
+
+    // A retry that lands on a permanent SDK error must release the durable row
+    // instead of leaving a stale message and a retry that can never succeed.
+    act(() => {
+      failureHandlers.nonRetryable?.();
+    });
+    expect(view.renderer.root.findAllByType(RemoteSessionExitFailure)).toHaveLength(0);
   });
 });
 

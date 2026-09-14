@@ -115,6 +115,7 @@ vi.mock('@/components/ui/icons', () => ({
   Loader: 'Icon',
   MessageSquare: 'Icon',
   Mic: 'Icon',
+  Rows3: 'Icon',
   Shield: 'Icon',
   Smartphone: 'Icon',
   TriangleAlert: 'Icon',

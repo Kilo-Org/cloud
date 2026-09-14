@@ -132,8 +132,6 @@ import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
-import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
-import { offlineHeaderReservation } from '@/lib/offline-banner-state';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import {
   createRemoteModelOverride,
@@ -249,12 +247,6 @@ export function SessionDetailContent({
   const detailsMessageIdRef = useRef<string | null>(null);
 
   const { bottom } = useSafeAreaInsets();
-
-  // The app-wide offline banner is an absolute overlay at the safe-area top,
-  // so it paints over this screen's header title. Reserve its height above
-  // the header while it is visible (mobile-app spot check, e2).
-  const isOffline = useOfflineBannerState();
-  const headerTopPadding = offlineHeaderReservation(isOffline);
 
   // Durable composer draft. The composer renders immediately — typing must
   // never wait on the `user.getMe` query — and the draft load settles behind
@@ -1421,22 +1413,20 @@ export function SessionDetailContent({
   return (
     <PartDetailSheetHost messages={messages}>
       <View className="flex-1 bg-background">
-        <View className="bg-background" style={{ paddingTop: headerTopPadding }}>
-          <ScreenHeader
-            title={rename.title}
-            reserveTitleSpace
-            backFallback="/(app)/(tabs)/(2_agents)"
-            headerRight={headerRight}
-            {...(rename.isTitleInteractive
-              ? {
-                  onTitlePress: rename.openModal,
-                  onTitlePressAccessibilityLabel: t('agentChat.session.renameAccessibility', {
-                    title: rename.title,
-                  }),
-                }
-              : {})}
-          />
-        </View>
+        <ScreenHeader
+          title={rename.title}
+          reserveTitleSpace
+          backFallback="/(app)/(tabs)/(2_agents)"
+          headerRight={headerRight}
+          {...(rename.isTitleInteractive
+            ? {
+                onTitlePress: rename.openModal,
+                onTitlePressAccessibilityLabel: t('agentChat.session.renameAccessibility', {
+                  title: rename.title,
+                }),
+              }
+            : {})}
+        />
         <SessionConnectionIndicator
           activeSessionType={activeSessionType}
           agentStatusType={agentStatus.type}
@@ -1465,6 +1455,10 @@ export function SessionDetailContent({
           <SessionContextSheet
             visible={sheetMountState.visible}
             info={sheetMountState.info}
+            sessionId={sessionId}
+            sessionTitle={rename.title}
+            activeSessionType={activeSessionType}
+            ownerConnectionId={remoteModelState.ownerConnectionId}
             modelDisplay={contextModelAndProvider.model}
             providerDisplay={contextModelAndProvider.provider}
             totalCostMicrodollars={totalMicrodollars}

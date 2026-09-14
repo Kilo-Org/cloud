@@ -9,6 +9,7 @@ import { createGunzip } from 'node:zlib';
 import {
   WORKTREE_STATE_BUNDLE_VERSION,
   WORKTREE_STATE_MAX_BYTES,
+  WORKTREE_STATE_MAX_UNTRACKED_FILES,
   WORKTREE_STATE_META_ENTRY,
   WORKTREE_STATE_PATCH_ENTRY,
   WORKTREE_STATE_UNTRACKED_PREFIX,
@@ -186,12 +187,16 @@ async function writableParent(root: string, destination: string): Promise<string
 export async function captureWorktreeState(
   options: WorktreeStateOptions
 ): Promise<WorktreeStateCaptureResult> {
-  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'kilo-worktree-state-'));
-  // The archive is written outside the staged tree so it can never become one
-  // of its own entries.
-  const stage = path.join(workspace, 'stage');
-  const bundlePath = path.join(workspace, 'bundle.tar.gz');
+  // Created inside the try: an unusable temp directory has to degrade to a
+  // skip like every other failure, because the caller awaits this before the
+  // turn's outcome is emitted.
+  let workspace: string | undefined;
   try {
+    workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'kilo-worktree-state-'));
+    // The archive is written outside the staged tree so it can never become
+    // one of its own entries.
+    const stage = path.join(workspace, 'stage');
+    const bundlePath = path.join(workspace, 'bundle.tar.gz');
     await fs.mkdir(stage, { recursive: true });
     const head = await headCommit(options);
     if (!head) return { status: 'skipped', reason: 'unreadable_head' };
@@ -217,6 +222,10 @@ export async function captureWorktreeState(
     const copied: string[] = [];
     let staged = patchBytes;
     for (const relative of untracked) {
+      // The copy loop is the one unabortable stretch of the capture, and it
+      // runs before the turn's outcome is reported, so it honours the budget
+      // itself rather than only at the subprocess boundaries.
+      options.signal?.throwIfAborted();
       const source = path.resolve(options.directory, relative);
       if (!isContainedPath(options.directory, source)) continue;
       // `lstat`, not `stat`: an untracked symlink would otherwise be captured
@@ -226,6 +235,12 @@ export async function captureWorktreeState(
       if (!stats?.isFile()) continue;
       staged += stats.size;
       if (staged > MAX_STAGED_BYTES) return { status: 'skipped', reason: 'too_large' };
+      // Checked before copying, not after: the bundle schema caps this list, so
+      // without the guard the copies would all be paid for and then thrown away
+      // when the metadata failed to parse — every turn, forever.
+      if (copied.length >= WORKTREE_STATE_MAX_UNTRACKED_FILES) {
+        return { status: 'skipped', reason: 'too_many_files' };
+      }
       const destination = path.join(stage, WORKTREE_STATE_UNTRACKED_PREFIX, relative);
       await fs.mkdir(path.dirname(destination), { recursive: true });
       await fs.copyFile(source, destination);
@@ -282,15 +297,19 @@ export async function captureWorktreeState(
   } catch {
     return { status: 'skipped', reason: 'capture_failed' };
   } finally {
-    await fs.rm(workspace, { recursive: true, force: true }).catch(() => undefined);
+    if (workspace) await fs.rm(workspace, { recursive: true, force: true }).catch(() => undefined);
   }
 }
 
 export async function restoreWorktreeState(
   options: WorktreeStateOptions
 ): Promise<WorktreeStateRestoreResult> {
-  const stage = await fs.mkdtemp(path.join(os.tmpdir(), 'kilo-worktree-restore-'));
+  // Created inside the try for the same reason as the capture, and more
+  // sharply: this runs inside session attachment, which must not fail because
+  // a restore could not be attempted.
+  let stage: string | undefined;
   try {
+    stage = await fs.mkdtemp(path.join(os.tmpdir(), 'kilo-worktree-restore-'));
     const response = await fetch(options.endpoint.url, {
       headers: { Authorization: `Bearer ${options.endpoint.grant}` },
       signal: AbortSignal.any(
@@ -341,13 +360,15 @@ export async function restoreWorktreeState(
 
     if (meta.hasPatch) {
       const patchPath = path.join(extracted, WORKTREE_STATE_PATCH_ENTRY);
-      let applied = await runGit(['apply', '--whitespace=nowarn', patchPath], options);
-      if (applied.exitCode !== 0) {
-        applied = await runGit(['apply', '--3way', '--whitespace=nowarn', patchPath], options);
-        // `--3way` stages what it resolves; unstage so the restored worktree
-        // looks the way the agent left it.
-        if (applied.exitCode === 0) await runGit(['reset', '--quiet'], options);
-      }
+      // Plain `git apply` is all-or-nothing: it refuses the whole patch unless
+      // every hunk applies, so a failure leaves the prepared worktree exactly
+      // as the rebuild left it. `--3way` is deliberately not used as a
+      // fallback — it half-applies, writes conflict markers and leaves
+      // unmerged index entries, which the agent would then start working in
+      // and the next auto-commit would commit. With HEAD already proven equal,
+      // the only patches it could rescue are ones a setup command conflicts
+      // with, which is precisely the case that must be skipped.
+      const applied = await runGit(['apply', '--whitespace=nowarn', patchPath], options);
       if (applied.exitCode !== 0) return { status: 'skipped', reason: 'patch_failed' };
     }
 
@@ -384,7 +405,7 @@ export async function restoreWorktreeState(
   } catch {
     return { status: 'skipped', reason: 'restore_failed' };
   } finally {
-    await fs.rm(stage, { recursive: true, force: true }).catch(() => undefined);
+    if (stage) await fs.rm(stage, { recursive: true, force: true }).catch(() => undefined);
   }
 }
 

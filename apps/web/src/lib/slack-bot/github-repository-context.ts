@@ -7,15 +7,13 @@ import { z } from 'zod';
 
 const GitHubRepositoryCacheSchema = z
   .array(
-    z
-      .object({
-        id: z.number().int(),
-        name: z.string(),
-        full_name: z.string(),
-        private: z.boolean(),
-        default_branch: z.string().optional(),
-      })
-      .strict()
+    z.object({
+      id: z.number().int(),
+      name: z.string(),
+      full_name: z.string(),
+      private: z.boolean(),
+      default_branch: z.string().optional(),
+    })
   )
   .nullable();
 

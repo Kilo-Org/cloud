@@ -1,3 +1,4 @@
+import { captureException } from '@sentry/nextjs';
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import {
   getGitHubRepositoryContext,
@@ -9,6 +10,10 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
 }));
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+
+const mockCaptureException = jest.mocked(captureException);
+
+beforeEach(() => mockCaptureException.mockClear());
 
 test('lists the healthy sibling while excluding unhealthy GitHub associations', async () => {
   jest.mocked(getAllIntegrationsForOwner).mockResolvedValue([
@@ -189,6 +194,15 @@ test('isolates malformed repository caches from healthy sibling associations', a
       repositories: [{ id: 3, name: 'bad', full_name: 3, private: 'yes' }],
     },
     {
+      id: 'association-missing-id',
+      platform: 'github',
+      integration_status: 'active',
+      github_disconnected_at: null,
+      suspended_at: null,
+      auth_invalid_at: null,
+      repositories: [{ name: 'bad', full_name: 'acme/bad2', private: true }],
+    },
+    {
       id: 'association-healthy',
       platform: 'github',
       integration_status: 'active',
@@ -206,6 +220,53 @@ test('isolates malformed repository caches from healthy sibling associations', a
         githubIntegrationId: 'association-healthy',
       }),
     ],
+  });
+  expect(mockCaptureException).toHaveBeenCalledTimes(5);
+});
+
+test('retains the real adapter-written repository cache shape', async () => {
+  jest.mocked(getAllIntegrationsForOwner).mockResolvedValue([
+    {
+      id: 'association-adapter',
+      platform: 'github',
+      integration_status: 'active',
+      github_app_type: 'standard',
+      github_disconnected_at: null,
+      suspended_at: null,
+      auth_invalid_at: null,
+      repositories: [
+        {
+          id: 42,
+          name: 'cloud',
+          full_name: 'Kilo-Org/cloud',
+          private: true,
+          created_at: '2024-01-02T03:04:05Z',
+          future_cache_field: 'ignored',
+        },
+      ],
+    },
+  ] as never);
+
+  await expect(getGitHubRepositoryContext({ type: 'org', id: 'organization-1' })).resolves.toEqual({
+    repositories: [
+      {
+        id: 42,
+        name: 'cloud',
+        full_name: 'Kilo-Org/cloud',
+        private: true,
+        githubIntegrationId: 'association-adapter',
+        githubAppType: 'standard',
+      },
+    ],
+  });
+  expect(mockCaptureException).not.toHaveBeenCalled();
+
+  await expect(
+    resolveGitHubRepositoryForOwner({ type: 'org', id: 'organization-1' }, 'kilo-org/cloud')
+  ).resolves.toMatchObject({
+    id: 42,
+    githubIntegrationId: 'association-adapter',
+    githubAppType: 'standard',
   });
 });
 

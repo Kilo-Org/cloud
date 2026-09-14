@@ -364,6 +364,19 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
       error,
     });
 
+  /** Re-render the picker so a failed provider completion can be retried. */
+  const completionRetryPage = async (error: string): Promise<Response> => {
+    let options: OrgOption[] | null = null;
+    try {
+      options = await fetchOrgOptions(deps, kiloToken);
+    } catch {
+      options = null;
+    }
+    return options
+      ? orgPickerPage({ clientName, actionUrl, options, error })
+      : personalOnlyPage(error);
+  };
+
   /** Bind the chosen context and complete the authorize; stops on a lost race. */
   const approveAndRedirect = async (organizationId: string | null): Promise<Response> => {
     const approved = await deps.store.approvePendingAuthorization(
@@ -380,19 +393,48 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
         'This request is no longer valid. Close this tab and retry from your MCP client.'
       );
     }
-    const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
-      request: record.authRequest,
-      userId: record.kiloUserId,
-      metadata: { clientName },
-      scope: [MCP_SCOPE],
-      props: {
-        kiloUserId: record.kiloUserId,
-        organizationId,
-        kiloToken: record.kiloToken,
+    let redirectTo: string;
+    try {
+      ({ redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
+        request: record.authRequest,
+        userId: record.kiloUserId,
+        metadata: { clientName },
+        scope: [MCP_SCOPE],
+        props: {
+          kiloUserId: record.kiloUserId,
+          organizationId,
+          kiloToken: record.kiloToken,
+          clientId: record.authRequest.clientId,
+        },
+      }));
+    } catch {
+      // Provider completion is fallible (KV/network) and is the only step after
+      // the approved claim. Revert to pending so the picker POST can be retried
+      // instead of stranding the request in an `approved` state no route
+      // recovers from. The revert is guarded on status='approved', so a
+      // concurrent completion is never unwound.
+      await deps.store.revertPendingAuthorization(id, nowIso);
+      deps.analytics?.oauthSignIn({
+        phase: 'failed',
+        identity: { kiloUserId: record.kiloUserId, organizationId },
         clientId: record.authRequest.clientId,
-      },
-    });
-    await deps.store.completePendingAuthorization(id, nowIso);
+        reason: 'completion_failed',
+      });
+      return completionRetryPage(
+        'Kilo could not finish connecting. Choose an account to try again.'
+      );
+    }
+    const completed = await deps.store.completePendingAuthorization(id, nowIso);
+    if (!completed) {
+      // The approved -> completed guard rejected the transition (expired while
+      // the provider minted the code). Do not redirect or report success for an
+      // authorization we could not record; the unexchanged code expires with
+      // the request.
+      return errorPage(
+        'invalid_request',
+        'This request is no longer valid. Close this tab and retry from your MCP client.'
+      );
+    }
     // The library owns the token endpoint, so its tokenExchangeCallback hook
     // runs without deps and cannot see this per-request emitter (index.ts wires
     // it with no ProviderHookDeps). Emit the one sign-in success here, after the

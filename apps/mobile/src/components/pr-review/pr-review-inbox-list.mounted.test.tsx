@@ -212,4 +212,13 @@ describe('PrReviewInboxList side insets (landscape)', () => {
     });
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
   });
+
+  it('shows the retryable failure instead of the empty state when a provider failed', () => {
+    inboxState.items = [];
+    inboxState.laterPageError = true;
+    const renderer = mountInboxList();
+
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(1);
+  });
 });

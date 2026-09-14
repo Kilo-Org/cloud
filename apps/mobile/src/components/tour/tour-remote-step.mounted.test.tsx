@@ -343,6 +343,33 @@ describe('TourRemoteStep', () => {
     unmount();
   });
 
+  it('completes when the detection list first resolves already carrying the started session', async () => {
+    // The detection list has never resolved when the person reaches Start: the
+    // baseline can only be captured afterwards, and on a fast relay the first
+    // capture can already contain the session the tour itself created. That
+    // row is the tour's own proof, never a pre-existing session.
+    fetchInstances.mockResolvedValue({ instances: [REMOTE] });
+    const { renderer, onCompletedChange, unmount } = await mountStep();
+
+    await waitFor(() => hasText(renderer, 'tour.remoteStart'));
+
+    // Start before the detection list ever resolved; the spawn succeeds.
+    await act(async () => {
+      await Promise.resolve();
+      press(renderer.root.findByType('Button' as ElementType));
+    });
+
+    // The live list's FIRST data already carries the tour's own session.
+    await act(async () => {
+      await Promise.resolve();
+      liveSync.set({ data: { sessions: [{ id: 'session-1', connectionId: 'conn-1' }] } });
+    });
+
+    await waitFor(() => hasText(renderer, 'tour.remoteCheck'));
+    expect(onCompletedChange).toHaveBeenLastCalledWith(true);
+    unmount();
+  });
+
   it('shows a working retry when the start action fails retryably and does not complete', async () => {
     fetchInstances.mockResolvedValue({ instances: [REMOTE] });
     spawnStatus.current = { status: 'retryable' };

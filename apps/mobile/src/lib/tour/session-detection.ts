@@ -31,21 +31,28 @@ export function captureSessionBaseline(sessions: readonly TourSession[]): Set<st
  *   sentinel); when `connectionId` is passed it must match that instance.
  *
  * Any id present in `baselineIds` is ignored, so a pre-existing session can
- * never satisfy the check.
+ * never satisfy the check — except `ownSessionId`, the session this flow
+ * created through its own action: when the baseline was captured after the
+ * create (the live list was still unresolved at press time), that first
+ * capture absorbs the flow's own row, and it must still count as the proof it
+ * is. A pre-existing session can never share that id.
  */
 export function hasNewSession({
   sessions,
   baselineIds,
   kind,
   connectionId,
+  ownSessionId,
 }: {
   sessions: readonly TourSession[];
   baselineIds: ReadonlySet<string>;
   kind: TourSessionKind;
   connectionId?: string;
+  /** The session this flow created itself, if its action reported one. */
+  ownSessionId?: string;
 }): boolean {
   return sessions.some(session => {
-    if (baselineIds.has(session.id)) {
+    if (baselineIds.has(session.id) && session.id !== ownSessionId) {
       return false;
     }
     if (kind === 'cloud') {

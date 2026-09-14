@@ -32,9 +32,11 @@ type TourRemoteStepProps = {
  * The step discovers connected computers from the same `listInstances` source
  * the instance picker reads, and the check is gated on a REAL remote session:
  * it captures the active-session ids present when the live list first resolves
- * and only a remote row that appears afterwards, on the selected computer's
- * connection, satisfies it. A connected computer with no session never
- * completes the path.
+ * and only a remote row that appears afterwards, on the started computer's
+ * connection, satisfies it. The session the start action itself created is
+ * exempt from that baseline: the capture can land after the create (the list
+ * was still unresolved at press time) and would otherwise absorb it. A
+ * connected computer with no session never completes the path.
  */
 export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepProps>) {
   const { t } = useTranslation();
@@ -87,6 +89,12 @@ export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepPro
   // highlighted computer after starting must not move the check to a machine
   // that was never started.
   const [startedConnectionId, setStartedConnectionId] = useState<string | null>(null);
+  // The session the tour's own start action created, when the spawn reported
+  // it. Detection exempts this id from the baseline below: the baseline is
+  // captured on the live list's first data, and when that list was still
+  // unresolved at press time the capture can land after the create and absorb
+  // the tour's own row — which must still count as the proof it is.
+  const [spawnedSessionId, setSpawnedSessionId] = useState<string | null>(null);
   // One operation key per start intent: a retry of the same connection keeps
   // the key so the relay dedupes it instead of spawning a second session.
   const { getKey, rotateKey } = useHoistedOperationKey();
@@ -101,6 +109,9 @@ export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepPro
     const operationKey = getKey(connectionId);
     void (async () => {
       const outcome = await spawn(connectionId, undefined, { operationKey });
+      if (outcome.status === 'ready') {
+        setSpawnedSessionId(outcome.sessionID);
+      }
       // A retryable failure keeps the intent (and its key) alive for the retry;
       // a fresh session or a terminal rejection ends it.
       if (outcome.status !== 'retryable') {
@@ -137,6 +148,7 @@ export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepPro
       baselineIds,
       kind: 'remote',
       connectionId: startedConnectionId,
+      ownSessionId: spawnedSessionId ?? undefined,
     });
 
   // Completion is sticky: once the check lands, a later poll failure or a

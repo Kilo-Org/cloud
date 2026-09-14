@@ -28,6 +28,41 @@ describe('hasNewSession', () => {
     ).toBe(false);
   });
 
+  it('counts the flow-own session even when the baseline absorbed it, but never another pre-existing one', () => {
+    // The baseline was captured after the create (the live list was still
+    // unresolved at press time) and absorbed the flow's own row.
+    const baselineIds = captureSessionBaseline([
+      { id: 'own', connectionId: CLI },
+      { id: 'old', connectionId: CLI },
+    ]);
+
+    expect(
+      hasNewSession({
+        sessions: [
+          { id: 'own', connectionId: CLI },
+          { id: 'old', connectionId: CLI },
+        ],
+        baselineIds,
+        kind: 'remote',
+        connectionId: CLI,
+        ownSessionId: 'own',
+      })
+    ).toBe(true);
+    // The same list without the own-session id proves nothing: both rows are
+    // baseline-absorbed pre-existing sessions.
+    expect(
+      hasNewSession({
+        sessions: [
+          { id: 'own', connectionId: CLI },
+          { id: 'old', connectionId: CLI },
+        ],
+        baselineIds,
+        kind: 'remote',
+        connectionId: CLI,
+      })
+    ).toBe(false);
+  });
+
   it('counts a new cloud session only with the cloud sentinel connection id', () => {
     const baselineIds = new Set<string>();
 

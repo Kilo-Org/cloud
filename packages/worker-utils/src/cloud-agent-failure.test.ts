@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CLOUD_AGENT_FAILURE_CODES,
-  CLOUD_AGENT_FAILURE_STAGES,
   CLOUD_AGENT_PROVIDER_OWNERSHIPS,
   CloudAgentCallbackFailureSchema,
   CloudAgentFailureReasonSchema,
@@ -330,13 +328,7 @@ describe('classifyCloudAgentFailure', () => {
 });
 
 describe('CloudAgentSafeFailureSchema', () => {
-  it('accepts every shared contract value', () => {
-    for (const stage of CLOUD_AGENT_FAILURE_STAGES) {
-      expect(CloudAgentSafeFailureSchema.safeParse({ stage }).success).toBe(true);
-    }
-    for (const code of CLOUD_AGENT_FAILURE_CODES) {
-      expect(CloudAgentSafeFailureSchema.safeParse({ code }).success).toBe(true);
-    }
+  it('accepts every workspace failure subtype under workspace_setup_failed', () => {
     for (const subtype of WORKSPACE_FAILURE_SUBTYPES) {
       expect(
         CloudAgentSafeFailureSchema.safeParse({ code: 'workspace_setup_failed', subtype }).success

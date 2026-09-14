@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Səsin Kilo Gateway ilə mətnə çevrilməsi",
     "gatewayTranscriptionSubtitle": "Səslə daxiletməni cihazın nitq tanımasının əvəzinə Kilo Gateway modeli ilə mətnə çevirin. Səs yazınız Kilo Gateway-e göndərilir.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Alət xülasələrini tərcümə et",
+    "toolSummaryTranslationSubtitle": "Hər alət xülasəsini tətbiq dilinə tərcümə etmək üçün modelə göndərin. Tərcümə uğursuz olarsa, orijinal göstərilir.",
+    "toolSummaryTranslationModelUnavailableNotice": "Bu model artıq təklif edilmir. Başqasını seçmək üçün $t(common.model) üzərinə toxunun."
   },
   "prReview": {
     "pullRequestUnavailable": "Birləşdirmə sorğusu əlçatan deyil",

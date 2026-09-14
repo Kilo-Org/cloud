@@ -2015,7 +2015,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcription via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcrivez la saisie vocale avec un modèle Kilo Gateway au lieu de la reconnaissance vocale de l'appareil. Votre enregistrement est envoyé à Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Traduire les résumés d'outils",
+    "toolSummaryTranslationSubtitle": "Envoyez chaque résumé d'outil à un modèle pour le traduire dans la langue de votre application. L'original s'affiche si la traduction échoue.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ce modèle n'est plus proposé. Touchez $t(common.model) pour en choisir un autre."
   },
   "addCredits": {
     "cta": "Ajouter des crédits",

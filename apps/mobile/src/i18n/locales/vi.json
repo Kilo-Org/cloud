@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Chuyển giọng nói thành văn bản qua Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Sử dụng mô hình Kilo Gateway để chuyển nội dung nhập bằng giọng nói thành văn bản thay vì nhận dạng giọng nói của thiết bị. Bản ghi của bạn được gửi tới Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Dịch tóm tắt công cụ",
+    "toolSummaryTranslationSubtitle": "Gửi từng tóm tắt công cụ đến một mô hình để dịch sang ngôn ngữ ứng dụng của bạn. Bản gốc sẽ hiển thị nếu dịch thất bại.",
+    "toolSummaryTranslationModelUnavailableNotice": "Mô hình này không còn được cung cấp nữa. Nhấn $t(common.model) để chọn mô hình khác."
   },
   "notifications": {
     "liveActivities": "Hoạt động trực tiếp",

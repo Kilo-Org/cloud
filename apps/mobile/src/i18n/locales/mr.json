@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway द्वारे लिप्यंतरण",
     "gatewayTranscriptionSubtitle": "उपकरणाच्या स्पीच रेकग्निशनऐवजी Kilo Gateway मॉडेल वापरून व्हॉइस इनपुटचे लिप्यंतरण करा. तुमचे रेकॉर्डिंग Kilo Gateway कडे पाठवले जाते.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "टूल सारांशांचे भाषांतर करा",
+    "toolSummaryTranslationSubtitle": "प्रत्येक टूल सारांश तुमच्या ॲपच्या भाषेत भाषांतरित करण्यासाठी मॉडेलकडे पाठवा. भाषांतर अयशस्वी झाल्यास मूळ दर्शविले जाते.",
+    "toolSummaryTranslationModelUnavailableNotice": "हे मॉडेल आता उपलब्ध नाही. दुसरे निवडण्यासाठी $t(common.model) वर टॅप करा."
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",

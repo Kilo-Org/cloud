@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gatewayによる文字起こし",
     "gatewayTranscriptionSubtitle": "デバイスの音声認識の代わりにKilo Gatewayのモデルで音声入力を文字起こしします。録音はKilo Gatewayに送信されます。",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "ツールの概要を翻訳",
+    "toolSummaryTranslationSubtitle": "各ツールの概要をモデルに送信して、アプリの言語に翻訳します。翻訳に失敗した場合は元のテキストが表示されます。",
+    "toolSummaryTranslationModelUnavailableNotice": "このモデルは提供が終了しました。別のモデルを選ぶには$t(common.model)をタップしてください。"
   },
   "notifications": {
     "liveActivities": "ライブアクティビティ",

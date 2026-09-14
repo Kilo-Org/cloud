@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Tuhi ā-reo mā Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Tuhia te tāuru reo mā tētahi tauira Kilo Gateway, kau mā te mōhio kōrero o te pūrere. Ka tukuna tō pūreko ki te Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Whakamāoritia ngā whakarāpopototanga taputapu",
+    "toolSummaryTranslationSubtitle": "Tukuna ia whakarāpopototanga taputapu ki tētahi tauira hei whakamāori ki te reo o tō taupānga. Ka whakaatuhia te taketake mena ka rahua te whakamāoritanga.",
+    "toolSummaryTranslationModelUnavailableNotice": "Kāore tēnei tauira e tukuna ana ināianei. Pāwhiritia $t(common.model) ki te kōwhiri i tētahi atu."
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono kume",

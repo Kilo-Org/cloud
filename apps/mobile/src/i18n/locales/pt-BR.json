@@ -2080,7 +2080,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcrição com Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcreva a digitação por voz com um modelo do Kilo Gateway em vez do reconhecimento de fala do dispositivo. Sua gravação é enviada para o Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Traduzir resumos de ferramentas",
+    "toolSummaryTranslationSubtitle": "Envie cada resumo de ferramenta para um modelo traduzi-lo para o idioma do seu app. O original é mostrado se a tradução falhar.",
+    "toolSummaryTranslationModelUnavailableNotice": "Este modelo não é mais oferecido. Toque em $t(common.model) para escolher outro."
   },
   "addCredits": {
     "cta": "Adicionar créditos",

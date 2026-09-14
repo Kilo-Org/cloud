@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "使用 Kilo Gateway 轉錄",
     "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型將語音輸入轉錄成文字，而不使用裝置上的語音辨識。您的錄音將傳送至 Kilo Gateway。",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "翻譯工具摘要",
+    "toolSummaryTranslationSubtitle": "將每個工具摘要傳送給模型，翻譯成你的應用程式語言。翻譯失敗時會顯示原文。",
+    "toolSummaryTranslationModelUnavailableNotice": "這個模型已不再提供。點一下$t(common.model)選擇另一個。"
   },
   "notifications": {
     "liveActivities": "即時動態",

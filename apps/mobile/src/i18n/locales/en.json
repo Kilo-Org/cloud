@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Gateway transcription",
     "gatewayTranscriptionSubtitle": "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Translate tool summaries",
+    "toolSummaryTranslationSubtitle": "Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.",
+    "toolSummaryTranslationModelUnavailableNotice": "This model is no longer offered. Tap $t(common.model) to choose another."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",

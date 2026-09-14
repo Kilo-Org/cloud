@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Ukuguqulwa kwenkulumo ibe umbhalo nge-Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Guqula ukufaka ngezwi kube umbhalo usebenzisa imodeli ye-Kilo Gateway kunokubona inkulumo kwedivayisi. Ukuqopha kwakho kuthunyelwa ku-Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Humusha izifinyezo zamathuluzi",
+    "toolSummaryTranslationSubtitle": "Thumela isifinyezo sethuluzi ngasinye kumodeli ukuze siyihumushele olimini lohlelo lwakho. Okwangempela kuyaboniswa uma ukuhumusha kwehluleka.",
+    "toolSummaryTranslationModelUnavailableNotice": "Le modeli ayisanikezwa. Thepha $t(common.model) ukukhetha enye."
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokuhlanganisa asitholakali",

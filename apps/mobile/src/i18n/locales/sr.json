@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripcija preko Kilo Gateway-a",
     "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gateway-a umesto prepoznavanja govora na uređaju. Snimak se šalje na Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Prevedi rezimee alata",
+    "toolSummaryTranslationSubtitle": "Pošalji svaki rezime alatke modelu da ga prevede na jezik tvoje aplikacije. Ako prevod ne uspe, prikazuje se original.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ovaj model se više ne nudi. Dodirni $t(common.model) da izabereš drugi."
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtev za spajanje nije dostupan",

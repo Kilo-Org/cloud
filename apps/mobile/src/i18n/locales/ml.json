@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway വഴിയുള്ള ശബ്ദം ടെക്സ്റ്റാക്കൽ",
     "gatewayTranscriptionSubtitle": "ഉപകരണത്തിന്റെ സ്പീച്ച് റെക്കഗ്നിഷന് പകരം Kilo Gateway മോഡൽ ഉപയോഗിച്ച് ശബ്ദ ഇൻപുട്ട് ടെക്സ്റ്റാക്കുക. നിങ്ങളുടെ റെക്കോർഡിംഗ് Kilo Gateway-ലേക്ക് അയയ്ക്കുന്നു.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "ടൂൾ സംഗ്രഹങ്ങൾ വിവർത്തനം ചെയ്യുക",
+    "toolSummaryTranslationSubtitle": "ഓരോ ടൂൾ സംഗ്രഹവും നിങ്ങളുടെ ആപ്പിന്റെ ഭാഷയിലേക്ക് വിവർത്തനം ചെയ്യാൻ ഒരു മോഡലിലേക്ക് അയയ്ക്കുക. വിവർത്തനം പരാജയപ്പെട്ടാൽ യഥാർത്ഥ പാഠം കാണിക്കും.",
+    "toolSummaryTranslationModelUnavailableNotice": "ഈ മോഡൽ ഇനി ലഭ്യമല്ല. മറ്റൊന്ന് തിരഞ്ഞെടുക്കാൻ $t(common.model) ടാപ്പ് ചെയ്യുക."
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",

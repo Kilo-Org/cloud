@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ద్వారా మాటలను వచనంగా మార్చడం",
     "gatewayTranscriptionSubtitle": "పరికరం యొక్క మాటల గుర్తింపుకు బదులు Kilo Gateway మోడల్‌తో వాయిస్ ఇన్‌పుట్‌ను వచనంగా మార్చండి. మీ రికార్డింగ్ Kilo Gatewayకు పంపబడుతుంది.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "టూల్ సారాంశాలను అనువదించండి",
+    "toolSummaryTranslationSubtitle": "ప్రతి టూల్ సారాంశాన్ని మీ యాప్ భాషలోకి అనువదించడానికి మోడల్‌కు పంపండి. అనువాదం విఫలమైతే అసలైనది చూపబడుతుంది.",
+    "toolSummaryTranslationModelUnavailableNotice": "ఈ మోడల్ ఇకపై అందించబడదు. మరొకదాన్ని ఎంచుకోవడానికి $t(common.model) ని నొక్కండి."
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",

@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkribavimas per Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribuok balso įvestį Kilo Gateway modeliu vietoj įrenginio kalbos atpažinimo. Įrašas siunčiamas į Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Išversti įrankių suvestines",
+    "toolSummaryTranslationSubtitle": "Siųsk kiekvieną įrankio suvestinę modeliui, kad ji būtų išversta į tavo programėlės kalbą. Jei vertimas nepavyksta, rodomas originalas.",
+    "toolSummaryTranslationModelUnavailableNotice": "Šis modelis nebeteikiamas. Palieskite $t(common.model), kad pasirinktumėte kitą."
   },
   "prReview": {
     "pullRequestUnavailable": "Pakeitimų užklausa nepasiekiama",

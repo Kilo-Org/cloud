@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway से आवाज़ को टेक्स्ट में बदलना",
     "gatewayTranscriptionSubtitle": "डिवाइस की स्पीच रिकग्निशन के बजाय Kilo Gateway मॉडल से वॉइस इनपुट को टेक्स्ट में बदलें। आपकी रिकॉर्डिंग Kilo Gateway भेजी जाती है।",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "टूल सारांश का अनुवाद करें",
+    "toolSummaryTranslationSubtitle": "हर टूल सारांश को मॉडल पर भेजें ताकि उसका अनुवाद आपके ऐप की भाषा में हो सके। अनुवाद विफल होने पर मूल दिखाया जाता है।",
+    "toolSummaryTranslationModelUnavailableNotice": "यह मॉडल अब पेश नहीं किया जाता। दूसरा चुनने के लिए $t(common.model) पर टैप करें।"
   },
   "notifications": {
     "liveActivities": "लाइव गतिविधियाँ",

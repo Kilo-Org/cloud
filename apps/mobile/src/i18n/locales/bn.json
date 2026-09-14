@@ -255,7 +255,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway-এ কথা থেকে লেখা",
     "gatewayTranscriptionSubtitle": "ডিভাইসের স্পিচ রিকগনিশনের বদলে Kilo Gateway মডেল ব্যবহার করে ভয়েস ইনপুট থেকে লেখা তৈরি করুন। আপনার রেকর্ডিং Kilo Gateway-এ পাঠানো হবে।",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "টুলের সারসংক্ষেপ অনুবাদ করুন",
+    "toolSummaryTranslationSubtitle": "প্রতিটি টুলের সারসংক্ষেপ আপনার অ্যাপের ভাষায় অনুবাদ করতে একটি মডেলে পাঠান। অনুবাদ ব্যর্থ হলে মূলটি দেখানো হয়।",
+    "toolSummaryTranslationModelUnavailableNotice": "এই মডেলটি আর দেওয়া হয় না। অন্য একটি বেছে নিতে $t(common.model) স্পর্শ করুন।"
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট পাওয়া যাচ্ছে না",

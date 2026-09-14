@@ -401,7 +401,6 @@ async function createLightweightWorkspace(label: string, rigId: string): Promise
   const { mkdir: mkdirAsync } = await import('node:fs/promises');
   const { existsSync } = await import('node:fs');
   const path = await import('node:path');
-  // Validate to prevent path traversal
   // eslint-disable-next-line no-control-regex
   if (!rigId || /\.\.[/\\]|[/\\]\.\.|^\.\.$/.test(rigId) || /[\x00-\x1f]/.test(rigId)) {
     throw new Error(`Invalid rigId for lightweight workspace: ${rigId}`);
@@ -607,10 +606,8 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
       gitUrl: request.gitUrl,
     });
 
-    // Set up git credentials so the agent can push
     await configureGitCredentials(workdir, request.gitUrl, envVars);
 
-    // Pre-flight: verify git credentials can authenticate against the remote.
     await verifyGitCredentials(workdir, request.gitUrl, envVars);
 
     log.info('agent.startup_phase', {

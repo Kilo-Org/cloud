@@ -1,5 +1,11 @@
 /* eslint-disable max-lines -- Keep the detail trigger and real SDK request regressions with their shared screen fixture. */
-import { type ComponentProps, createElement, Fragment, type ReactNode } from 'react';
+import {
+  type ComponentProps,
+  createElement,
+  Fragment,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
@@ -44,6 +50,7 @@ import {
   shouldRefuseSilentAttachmentDrop,
 } from '@/components/agents/session-detail-send-attachment';
 import { ContextControl } from '@/components/context-control';
+import { type Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -67,6 +74,12 @@ vi.mock('@/components/agents/session-provider', () => ({
 // rendering and unrelated composer, account, model-picker, and router dependencies.
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+// The header's offline-banner reservation reads the committed connectivity
+// hook; these states are online, and the hook module pulls NetInfo (unmocked
+// in the pure project).
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useOfflineBannerState: () => false,
+}));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
@@ -434,15 +447,23 @@ function childMessage(sessionId: KiloSessionId, text: string): StoredMessage {
 function page(
   sessionId: KiloSessionId,
   messages: StoredMessage[],
-  goal?: SessionGoal
+  options: { goal?: SessionGoal; nextCursor?: string | null } = {}
 ): SessionSnapshotPageOutcome {
   return {
     kind: 'success',
-    info: { id: sessionId, ...(goal ? { goal } : {}) },
+    info: { id: sessionId, ...(options.goal ? { goal: options.goal } : {}) },
     messages,
-    nextCursor: null,
+    nextCursor: options.nextCursor ?? null,
     omittedItemCount: 0,
   };
+}
+
+// Set before `mountDetails` by the zero-render guard tests; the root page
+// resolves with this cursor instead of the default `null`.
+let rootPageNextCursor: string | null = null;
+
+function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
+  return renderer.root.findAll(node => Object.is(node.type, 'MessageList'));
 }
 
 beforeEach(() => {
@@ -453,6 +474,7 @@ beforeEach(() => {
   goalMountOptions = {};
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
+  rootPageNextCursor = null;
 });
 
 async function mountDetails(
@@ -487,7 +509,12 @@ async function mountDetails(
       requests.push({ id, response });
       const messages = rootPages.get(id);
       if (messages) {
-        response.resolve(page(id, messages, goalMountOptions.goal));
+        // Serve only the first request per id; a re-fetch (e.g. the older-page
+        // load a zero-render transcript triggers) stays pending for `respond`.
+        rootPages.delete(id);
+        response.resolve(
+          page(id, messages, { goal: goalMountOptions.goal, nextCursor: rootPageNextCursor })
+        );
       }
       const outcome = await response.promise;
       return outcome;
@@ -551,7 +578,13 @@ async function mountDetails(
     requestedIds: () => requests.map(request => request.id),
     respond: async (id: KiloSessionId, messages: StoredMessage[]) => {
       await act(async () => {
-        requestFor(id).resolve(page(id, messages, goalMountOptions.goal));
+        requestFor(id).resolve(page(id, messages, { goal: goalMountOptions.goal }));
+        await Promise.resolve();
+      });
+    },
+    respondOutcome: async (id: KiloSessionId, outcome: SessionSnapshotPageOutcome) => {
+      await act(async () => {
+        requestFor(id).resolve(outcome);
         await Promise.resolve();
       });
     },
@@ -1191,6 +1224,78 @@ describe('child transcript requests', () => {
     expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(0);
     expect(view.renderer.root.findAllByType(ChildSessionSheet)).toHaveLength(0);
     expect(view.requestedIds()).toEqual([ROOT_ID]);
+  });
+});
+
+describe('session detail zero-render transcript guard (mobile-app e2-open)', () => {
+  function blankAssistantMessage(id: string): StoredMessage {
+    const message = assistantMessage(id);
+    return { info: { ...message.info, sessionID: ROOT_ID }, parts: [] };
+  }
+
+  it('shows the empty state instead of a zero-item list when no stored message renders', async () => {
+    const view = await mountDetails([blankAssistantMessage('msg-blank')]);
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyTitle'),
+    });
+    expect(view.requestedIds()).toEqual([ROOT_ID]);
+  });
+
+  it('pages older messages into the reserved skeleton while a zero-render transcript has a cursor', async () => {
+    rootPageNextCursor = 'older-cursor';
+    const view = await mountDetails([blankAssistantMessage('msg-blank')]);
+    // Old defect: the blank zero-item list mounted here (no loading, no empty
+    // state). New: the skeleton holds the space and the host pages older rows.
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.requestedIds()).toEqual([ROOT_ID, ROOT_ID]);
+    // The older page renders nothing either: the cursor ends, the defined
+    // empty state takes over.
+    await view.respond(ROOT_ID, [blankAssistantMessage('msg-blank-older')]);
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyTitle'),
+    });
+  });
+
+  it('mounts the pagination Retry when a zero-render transcript fails to page older history', async () => {
+    rootPageNextCursor = 'older-cursor';
+    const view = await mountDetails([blankAssistantMessage('msg-blank')]);
+    expect(view.requestedIds()).toEqual([ROOT_ID, ROOT_ID]);
+    // Old defect: the retryable failure collapsed into the action-less empty
+    // state. New: the body keeps the empty title but carries a working Retry.
+    await view.fail(ROOT_ID, new Error('fetch failed'));
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    const empty = view.renderer.root.findByType(EmptyState);
+    expect(empty.props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyTitle'),
+    });
+    // The action mounts on the EmptyState (the component is a test stub, so
+    // the Retry button is inspected through the prop element).
+    const action = (empty.props.action as ReactElement<ComponentProps<typeof Button>>).props;
+    expect(action.accessibilityLabel).toBe(i18n.t('common.retry'));
+    expect(action.accessibilityHint).toBe(i18n.t('agentChat.olderMessages.retryHint'));
+    await act(async () => {
+      (action.onPress as () => void)();
+      await Promise.resolve();
+    });
+    // Retry reissues the older-page load through the manager.
+    expect(view.requestedIds()).toEqual([ROOT_ID, ROOT_ID, ROOT_ID]);
+  });
+
+  it('keeps the action-less empty state when the zero-render transcript pages into a terminal outcome', async () => {
+    rootPageNextCursor = 'older-cursor';
+    const view = await mountDetails([blankAssistantMessage('msg-blank')]);
+    await view.respondOutcome(ROOT_ID, { kind: 'invalid_data' });
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    const empty = view.renderer.root.findByType(EmptyState);
+    expect(empty.props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyTitle'),
+    });
+    expect(empty.props.action).toBeUndefined();
   });
 });
 

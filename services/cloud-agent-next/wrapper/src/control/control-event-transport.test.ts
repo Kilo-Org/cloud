@@ -573,3 +573,37 @@ describe('legacy publication admission reporting', () => {
     }
   });
 });
+
+describe('receipt-backed producer admission', () => {
+  it('holds a producer enqueue while paused and publishes it on resume', async () => {
+    const published: ControlEventPublication[] = [];
+    const transport = createControlEventTransport({
+      supportsReceipts: () => true,
+      prepare: input => input,
+      publish: async publication => {
+        published.push(publication);
+      },
+      sendLegacy: () => ({ sent: false, reason: 'send_failed' }),
+      onFailure: () => {},
+    });
+    try {
+      transport.pause();
+      expect(await transport.publishSessionEvent(payload, session)).toBe(true);
+      expect(published).toHaveLength(0);
+
+      expect(await transport.resume()).toBe(true);
+      expect(published).toHaveLength(1);
+      expect(published[0]).toMatchObject({
+        event: 'session.event',
+        receiptId: expect.any(String),
+        sequence: 1,
+        session,
+        payload,
+      });
+      expect(await transport.resume()).toBe(true);
+      expect(published).toHaveLength(1);
+    } finally {
+      transport.close();
+    }
+  });
+});

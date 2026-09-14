@@ -113,19 +113,7 @@ export function createControlEventTransport(options: {
 
   return {
     async publishSessionEvent(payload: unknown, session: SessionEventIdentity): Promise<boolean> {
-      if (!options.supportsReceipts())
-        return sendLegacyPublication('session.event', payload, session);
-      try {
-        const publication = outbox.prepare(
-          options.prepare({ event: 'session.event', session, payload })
-        );
-        if (!outbox.enqueue(publication)) return false;
-        void outbox.resume().catch(() => undefined);
-        return true;
-      } catch {
-        reportAdmissionFailure('session.event', session, 'prepare_failed');
-        return false;
-      }
+      return enqueue('session.event', payload, session);
     },
     enqueue,
     pause: () => outbox.pause(),

@@ -494,6 +494,12 @@ export function createControlEventOutbox(options: {
     active.wakeSignaled = false;
   };
 
+  const pauseOutbox = (): void => {
+    paused = true;
+    for (const lane of lanes.values()) scheduleWakeup(lane);
+    signalCycle();
+  };
+
   const runAttempt = async (lane: Lane, entry: PreparedControlEventPublication): Promise<void> => {
     if (closed || paused || lane.entries[0] !== entry) return;
     if (Date.now() >= entry.deadlineAt) {
@@ -538,8 +544,16 @@ export function createControlEventOutbox(options: {
         removeHead(lane, entry);
         return;
       }
-      if (removeHead(lane, entry))
-        reportFailure(entry, publicationFailureReason(result.error), false, 1, result.error);
+      if (Date.now() >= entry.deadlineAt) {
+        if (removeHead(lane, entry)) reportFailure(entry, 'expired', false, 0);
+        return;
+      }
+      const reason = publicationFailureReason(result.error);
+      if (reason === 'disconnected') {
+        pauseOutbox();
+        return;
+      }
+      if (removeHead(lane, entry)) reportFailure(entry, reason, false, 1, result.error);
     } finally {
       clearTimeout(timeout);
     }
@@ -574,7 +588,15 @@ export function createControlEventOutbox(options: {
       await published;
       for (const entry of batch) removeHead(lane, entry);
     } catch (error) {
+      if (Date.now() >= head.deadlineAt) {
+        if (removeHead(lane, head)) reportFailure(head, 'expired', false, 0);
+        return;
+      }
       const reason = publicationFailureReason(error);
+      if (reason === 'disconnected') {
+        pauseOutbox();
+        return;
+      }
       for (const entry of batch) {
         if (removeHead(lane, entry)) reportFailure(entry, reason, false, 1, error);
       }
@@ -723,9 +745,7 @@ export function createControlEventOutbox(options: {
       return true;
     },
     pause() {
-      paused = true;
-      for (const lane of lanes.values()) scheduleWakeup(lane);
-      signalCycle();
+      pauseOutbox();
     },
     resume() {
       paused = false;

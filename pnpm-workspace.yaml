@@ -195,6 +195,11 @@ patchedDependencies:
   expo-task-manager@57.0.16: patches/expo-task-manager@57.0.16.patch
   expo-widgets@57.0.18: patches/expo-widgets@57.0.18.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
+  # Bounds-guard the unmountChildComponentView assert message. Without it a
+  # stale Fabric child index throws NSRangeException while the assert is being
+  # formatted, which SIGABRTs release builds that link the assert-enabled
+  # prebuilt React core (Kilo-Org/kilocode#14065; react/react-native#57865).
+  react-native@0.86.3: patches/react-native@0.86.3.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

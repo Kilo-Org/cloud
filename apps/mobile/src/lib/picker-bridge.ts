@@ -75,6 +75,20 @@ export type RepoPickerBridge = {
   onSelect: (repo: string) => void;
 };
 
+/**
+ * Bridge for the new-session branch picker. `onSelect` receives the picked
+ * branch NAME; the trigger's closure decides default-vs-override, so the
+ * route stays display-only.
+ */
+export type BranchPickerBridge = {
+  branches: string[];
+  /** The provider's default branch; its row carries the "Default" label. */
+  defaultBranch: string | null;
+  /** The branch the trigger row shows as selected (override or default). */
+  selectedBranch: string | null;
+  onSelect: (branch: string) => void;
+};
+
 /** The complete normalized router row, including all advertised capabilities. */
 export type InstancePickerInstance =
   inferRouterOutputs<MobileRouter>['activeSessions']['listInstances']['instances'][number];

@@ -36,6 +36,7 @@
     "cost": "Cena",
     "discard": "Zahodiť",
     "findings": "Zistenia",
+    "mergeRequest": "merge request",
     "notConnected": "Nepripojené",
     "notifications": "Upozornenia",
     "pullRequest": "pR",
@@ -354,6 +355,7 @@
       "merge": "Zlúčenie",
       "mergeNow": "Zlúčiť teraz",
       "mergePullRequest": "Zlúčenie žiadosti",
+      "mergeTermTitle": "Zlúčiť {{term}}",
       "enableAutoMerge": "Zapnúť automatické zlúčenie",
       "disableAutoMerge": "Vypnúť automatické zlúčenie",
       "autoMergeOn": "Automatické zlúčenie je zapnuté",
@@ -372,9 +374,12 @@
       "deleteBranchAfterMerge": "Odstrániť vetvu po zlúčení",
       "noEnabledMethods": "V tomto repozitári nie je povolená žiadna metóda zlúčenia. Požiadaj správcu, aby povolil zlučovací commit, zlúčenie commitov do jedného alebo presadenie commitov.",
       "confirmTitle": "Zlúčiť žiadosť?",
+      "confirmTitleTerm": "Zlúčiť {{term}}?",
       "confirmMessage": "Tvoje zmeny sa zlúčia do cieľovej vetvy.",
       "enableAutoMergeConfirmTitle": "Zapnúť automatické zlúčenie?",
       "enableAutoMergeConfirmMessage": "GitHub automaticky zlúči túto žiadosť, keď všetky povinné kontroly úspešne prebehnú.",
+      "enableAutoMergeConfirmMessageTerm": "Po úspešnom behu pipeline sa {{term}} automaticky zlúči.",
+      "enableAutoMergeDescriptionTerm": "GitLab automaticky zlúči tento {{term}}, keď pipeline prebehne úspešne.",
       "forbidden": "Nemáš oprávnenie zlúčiť túto žiadosť.",
       "cannotMerge": "Táto žiadosť o zlúčenie sa v súčasnom stave nedá zlúčiť.",
       "couldNotMerge": "Žiadosť sa nepodarilo zlúčiť.",
@@ -385,7 +390,8 @@
       },
       "terminal": {
         "alreadyMerged": "Už zlúčené",
-        "closed": "Táto žiadosť o zlúčenie je uzavretá"
+        "closed": "Táto žiadosť o zlúčenie je uzavretá",
+        "closedMergeRequest": "Tento merge request je uzavretý"
       },
       "partialSuccessBanner": {
         "body": "Vetvu sa nepodarilo odstrániť: {{reason}}.",
@@ -410,6 +416,20 @@
         "behindDetail": "Zdrojová vetva neobsahuje najnovšie zmeny z cieľovej vetvy. Pred zlúčením presaď jej commity na cieľovú vetvu alebo ju aktualizuj.",
         "notMergeableTitle": "Táto žiadosť sa ešte nedá zlúčiť",
         "notMergeableDetail": "GitHub oznámil tento stav možnosti zlúčenia: {{state}}."
+      },
+      "restrictions": {
+        "title": "Obmedzenia zlúčenia",
+        "approvalsRequired_one": "Vyžaduje sa {{displayCount}} schválenie",
+        "approvalsRequired_other": "Vyžaduje sa {{displayCount}} schválenia",
+        "pipelineMustSucceed": "Pred zlúčením musí pipeline prebehnúť úspešne.",
+        "approvalsRequired_many": "Vyžaduje sa {{displayCount}} schválení",
+        "approvalsRequired_few": "Vyžadujú sa {{displayCount}} schválenia"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline na najnovšom commite zlyháva.",
+        "pendingPipeline": "Pipeline na najnovšom commite stále beží.",
+        "permission": "Nemáš oprávnenie zlúčiť tento {{term}}.",
+        "draft": "Pred zlúčením označ {{term}} ako pripravený na kontrolu kódu."
       },
       "methodLabels": {
         "merge": "Vytvoriť zlučovací commit",
@@ -513,7 +533,8 @@
         "outdatedOnLines": "Neaktuálne: {{lines}}",
         "outdatedOnPath": "Neaktuálne: {{path}}"
       },
-      "deletedUser": "odstránený používateľ"
+      "deletedUser": "odstránený používateľ",
+      "replyForbiddenTerm": "Nemáš oprávnenie odpovedať na tento {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Nepodarilo sa otvoriť nastavenia aplikácie GitHub.",
     "installKiloGitHubApp": "Nainštalovať aplikáciu Kilo pre GitHub",
@@ -525,17 +546,19 @@
     "reviewPullRequest": "Skontrolovať žiadosť o zlúčenie",
     "headLine": "{{counts}} · najnovší commit {{sha}}",
     "entry": {
-      "eyebrow": "Otvor žiadosť o zlúčenie pomocou URL.",
-      "pastePrLink": "Vložiť odkaz na PR",
-      "noRecentPrs": "Žiadne nedávne PR",
-      "noRecentPrsDescription": "Vlož odkaz na PR vyššie a začni kontrolu kódu. Nabudúce sa PR zobrazí tu.",
+      "eyebrow": "Otvorte PR alebo merge request pomocou URL",
+      "pastePrLink": "Vložiť odkaz na PR alebo merge request",
+      "noRecentPrs": "Žiadne nedávne recenzie",
+      "noRecentPrsDescription": "Ak chcete začať recenziu, vložte vyššie odkaz — nabudúce sa zobrazí tu.",
       "couldNotLoad": "Nepodarilo sa načítať.",
       "removeFromRecentsTitle": "Odstrániť z nedávnych žiadostí?",
-      "removeFromRecentsMessage": "Táto žiadosť o zlúčenie sa odstráni z tvojho zoznamu nedávnych žiadostí.",
+      "removeFromRecentsMessage": "Táto recenzia sa odstráni z nedávnych.",
       "removeRecentAccessibility": "Odstrániť {{repo}} zo zoznamu nedávnych žiadostí",
-      "urlAccessibility": "URL žiadosti o zlúčenie na GitHub",
-      "clearLink": "Vymazať odkaz na žiadosť o zlúčenie",
-      "pasteLink": "Vložiť odkaz na žiadosť o zlúčenie",
+      "urlAccessibility": "Zadajte URL adresu PR alebo merge requestu",
+      "urlPlaceholder": "URL žiadosti o zlúčenie alebo merge requestu",
+      "openAccessibility": "Otvoriť žiadosť o zlúčenie alebo merge request",
+      "clearLink": "Vymazať odkaz",
+      "pasteLink": "Vložiť odkaz na PR alebo merge request",
       "open": "Otvorené"
     },
     "checks": {
@@ -584,9 +607,15 @@
     "connect": {
       "checkFailedTitle": "Pripojenie k službe GitHub sa nepodarilo skontrolovať.",
       "checkFailedMessage": "Stav prihlásenia bude dostupný až po načítaní údajov.",
+      "checkFailedTitleGitLab": "Pripojenie k službe GitLab sa nepodarilo skontrolovať.",
+      "checkFailedTitleBitbucket": "Pripojenie k službe Bitbucket sa nepodarilo skontrolovať.",
+      "providerCheckFailedMessage": "Stav pripojenia bude dostupný po načítaní.",
       "reconnectTitle": "Opätovné pripojenie k službe GitHub",
       "reconnectDescription": "Prístup k tvojmu účtu GitHub bol odvolaný. Znova pripoj účet, aby si mohol pokračovať v kontrole žiadostí o zlúčenie v mobile.",
-      "description": "Pripoj svoj účet GitHub a kontroluj žiadosti o zlúčenie v mobile."
+      "description": "Pripoj svoj účet GitHub a kontroluj žiadosti o zlúčenie v mobile.",
+      "gitlabDescription": "Pripoj svoj účet GitLab a kontroluj merge requesty v mobile.",
+      "bitbucketDescription": "Pripoj Bitbucket k tejto organizácii a kontroluj žiadosti o zlúčenie v mobile.",
+      "bitbucketOrgOnlyDescription": "Vyber organizáciu vo svojom profile a kontroluj jej Bitbucket žiadosti o zlúčenie."
     },
     "screen": {
       "title": "#{{number}}",
@@ -610,7 +639,10 @@
     },
     "reconnectNotice": {
       "title": "Platnosť pripojenia k službe GitHub vypršala.",
-      "message": "Tvoje pripojenie k službe GitHub už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie."
+      "message": "Tvoje pripojenie k službe GitHub už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie.",
+      "gitlabTitle": "Platnosť pripojenia k službe GitLab vypršala.",
+      "bitbucketTitle": "Platnosť pripojenia k službe Bitbucket vypršala.",
+      "providerMessage": "Tvoje pripojenie k službe {{provider}} už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie."
     },
     "eventChips": {
       "comment": "Komentár",
@@ -682,7 +714,7 @@
       "emptyLine": "(prázdne)"
     },
     "linkPasteClipboardEmpty": "Schránka je prázdna.",
-    "linkPasteNotAPullRequest": "Toto nie je odkaz na žiadosť o zlúčenie na GitHub.",
+    "linkPasteNotAPullRequest": "Nie je to odkaz na PR ani merge request",
     "announce": {
       "commentPosted": "Komentár bol odoslaný",
       "reviewSubmitted": "Kontrola kódu bola odoslaná",
@@ -691,6 +723,7 @@
     "mutationError": {
       "commentNotPosted": "Tento komentár sa nedá odoslať. Vybraný riadok sa mohol zmeniť alebo bol PR aktualizovaný.",
       "reviewNotSubmitted": "Túto kontrolu kódu nemožno odoslať v tejto podobe. PR sa mohol zmeniť alebo ide o tvoju vlastnú žiadosť o zlúčenie, ktorú nemôžeš posúdiť.",
+      "reviewNotSubmittedTerm": "Túto kontrolu kódu nemožno odoslať v tejto podobe. {{term}} sa mohol zmeniť alebo nemôžeš posúdiť svoj vlastný {{term}}.",
       "couldNotPostComment": "Komentár sa nepodarilo odoslať.",
       "couldNotSubmitReview": "Kontrolu kódu sa nepodarilo odoslať. Skontroluj pripojenie a skús to znova."
     },
@@ -698,9 +731,31 @@
       "couldNotReply": "Nepodarilo sa odpovedať.",
       "couldNotCompleteAction": "Túto akciu sa nepodarilo dokončiť.",
       "mergeResultDefaultError": "GitHub nedokončil zlúčenie.",
+      "mergeResultNotCompleted": "{{term}} nebol zlúčený. Skontroluj jeho stav a skús to znova.",
       "ambiguous": "Výsledok sa nepodarilo potvrdiť. Pred ďalším pokusom skontroluj PR.",
       "persistenceFailed": "Túto akciu sa nepodarilo zaznamenať. Skús to neskôr.",
       "forbidden": "Na túto akciu nemáš oprávnenie."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Nie je dostupné u tohto poskytovateľa",
+        "accessibility": "Nie je dostupné u tohto poskytovateľa: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Zdieľať merge request",
+      "viewOnProvider": "Zobraziť v {{provider}}",
+      "mergeRequestUnavailable": "Merge request nie je dostupný",
+      "unavailableDescription": "Bol možná odstránený, alebo k nemu nemáš prístup.",
+      "accessDeniedMergeRequest": "Nemáš oprávnenie zobraziť tento merge request.",
+      "couldNotLoadMergeRequest": "Merge request sa nepodarilo načítať.",
+      "discussionAccessDenied": "Nemáš oprávnenie zobraziť diskusiu k tomuto merge request.",
+      "discussionUnavailableMessage": "Tento merge request bol možná odstránený.",
+      "noDiscussionDescription": "Tento merge request zatiaľ nemá žiadne vlákna ku kontrole kódu ani komentáre v diskusii.",
+      "noFilesChangedDescription": "Tento merge request neobsahuje žiadne zmeny súborov."
     }
   },
   "notifications": {
@@ -2029,11 +2084,31 @@
       "retryConnection": "Znova sa pripojiť"
     },
     "newSession": {
+      "recentlyUsed": "Naposledy použité",
+      "couldNotLoadGithubRepositories": "Repozitáre zo služby GitHub sa nepodarilo načítať.",
+      "couldNotLoadGitlabRepositories": "Repozitáre zo služby GitLab sa nepodarilo načítať.",
+      "couldNotLoadBitbucketRepositories": "Repozitáre zo služby Bitbucket sa nepodarilo načítať.",
       "connectGithubDescription": "Pripoj GitHub v prehliadači, potom sa sem vráť a vyber repozitár.",
+      "connectGitlabDescription": "Pripoj GitLab v prehliadači, potom sa sem vráť a vyber repozitár.",
+      "connectBitbucketDescription": "Pripoj Bitbucket v prehliadači, potom sa sem vráť a vyber repozitár.",
       "openGithub": "Otvoriť GitHub",
+      "openGitlab": "Otvoriť GitLab",
+      "openBitbucket": "Otvoriť Bitbucket",
       "refreshRepositories": "Obnoviť repozitáre",
       "githubConnected": "GitHub pripojený",
+      "gitlabConnected": "GitLab pripojený",
       "noRepositoriesVisible": "Nezobrazujú sa žiadne repozitáre. Skontroluj prístup aplikácie Kilo k repozitárom v službe GitHub a potom obnov zoznam.",
+      "noRepositoriesVisibleGitlab": "Nezobrazujú sa žiadne repozitáre. Skontroluj prístup k repozitárom v službe GitLab a potom obnov zoznam.",
+      "noRepositoriesVisibleBitbucket": "Nezobrazujú sa žiadne repozitáre. Skontroluj prístup k repozitárom v službe Bitbucket a potom obnov zoznam.",
+      "bitbucketOrganizationsOnly": "Bitbucket je dostupný len pre organizácie.",
+      "branchPickerTitle": "Vybrať vetvu",
+      "branchDefault": "Predvolená",
+      "branchAccessibility": "Vetva: {{label}}",
+      "branchLoading": "Načítavajú sa vetvy",
+      "branchLoadError": "Vetvy sa nepodarilo načítať",
+      "branchUnavailable": "Pre tento repozitár nie sú vetvy dostupné. Skontroluj svoj prístup u poskytovateľa a vyber iný repozitár.",
+      "branchEmpty": "Žiadne dostupné vetvy",
+      "branchPlaceholder": "Vybrať vetvu",
       "runOnWithTarget": "Spustiť na: {{target}}",
       "environment": "Prostredie",
       "couldNotLoadEnvironment": "Tvoje prostredie sa nepodarilo načítať.",
@@ -2054,24 +2129,13 @@
       "couldNotRefreshRepositories": "Repozitáre sa nepodarilo obnoviť. Skús to znova.",
       "discardDraftTitle": "Zahodiť koncept?",
       "discardDraftMessage": "Tvoje zadanie sa stratí.",
+      "discardWithUploadsMessage": "Tvoje zadanie a všetky nahrané súbory nepriložené k odoslaným správam sa odstránia.",
       "discardFailed": "Koncept sa nepodarilo zahodiť. Skús to znova.",
       "remoteHint": "Ak chceš ovládať lokálny proces kilo, spusti `kilo remote` na počítači alebo `/remote` v spustenej relácii CLI.",
-      "connectBitbucketDescription": "Pripoj Bitbucket v prehliadači, potom sa sem vráť a vyber repozitár.",
-      "connectGitlabDescription": "Pripoj GitLab v prehliadači, potom sa sem vráť a vyber repozitár.",
-      "couldNotLoadBitbucketRepositories": "Repozitáre zo služby Bitbucket sa nepodarilo načítať.",
-      "couldNotLoadGithubRepositories": "Repozitáre zo služby GitHub sa nepodarilo načítať.",
-      "couldNotLoadGitlabRepositories": "Repozitáre zo služby GitLab sa nepodarilo načítať.",
-      "gitlabConnected": "GitLab pripojený",
-      "noRepositoriesVisibleBitbucket": "Nezobrazujú sa žiadne repozitáre. Skontroluj prístup k repozitárom v službe Bitbucket a potom obnov zoznam.",
-      "noRepositoriesVisibleGitlab": "Nezobrazujú sa žiadne repozitáre. Skontroluj prístup k repozitárom v službe GitLab a potom obnov zoznam.",
-      "openBitbucket": "Otvoriť Bitbucket",
-      "openGitlab": "Otvoriť GitLab",
-      "recentlyUsed": "Naposledy použité",
       "continueFrom": "Pokračuje sa v relácii {{title}}.",
       "importingSession": "Importuje sa relácia",
       "cliCannotContinue": "Táto verzia CLI nepodporuje pokračovanie v relácii. Vyber službu Cloud Agent alebo inú inštanciu CLI.",
-      "importFailed": "Túto reláciu sa nepodarilo importovať.",
-      "discardWithUploadsMessage": "Tvoje zadanie a všetky nahrané súbory nepriložené k odoslaným správam sa odstránia."
+      "importFailed": "Túto reláciu sa nepodarilo importovať."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizoval sa {{displayCount}} súbor.",

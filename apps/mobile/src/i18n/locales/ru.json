@@ -4,6 +4,8 @@
     "done": "Готово",
     "retry": "Повторить",
     "tryAgain": "Попробовать снова",
+    "continue": "Продолжить",
+    "notNow": "Не сейчас",
     "language": "Язык",
     "device": "Устройство",
     "share": "Поделиться: {{title}}",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "Не удалось скопировать в буфер обмена.",
     "required": "обязательно",
     "error": "ошибка: {{error}}",
-    "notNow": "Не сейчас",
-    "continue": "Продолжить",
     "back": "Назад",
     "somethingWentWrong": "Что-то пошло не так.",
     "couldNotOpen": "Не удалось открыть {{label}}.",
@@ -36,6 +36,7 @@
     "cost": "Стоимость",
     "discard": "Отменить",
     "findings": "Замечания",
+    "mergeRequest": "запрос на слияние",
     "notConnected": "Не подключено",
     "notifications": "Уведомления",
     "pullRequest": "пул-реквест",
@@ -1581,11 +1582,31 @@
       "retryConnection": "Повторить подключение"
     },
     "newSession": {
+      "recentlyUsed": "Недавно использованные",
+      "couldNotLoadGithubRepositories": "Не удалось загрузить репозитории GitHub.",
+      "couldNotLoadGitlabRepositories": "Не удалось загрузить репозитории GitLab.",
+      "couldNotLoadBitbucketRepositories": "Не удалось загрузить репозитории Bitbucket.",
       "connectGithubDescription": "Подключите GitHub в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
+      "connectGitlabDescription": "Подключите GitLab в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
+      "connectBitbucketDescription": "Подключите Bitbucket в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
       "openGithub": "Открыть GitHub",
+      "openGitlab": "Открыть GitLab",
+      "openBitbucket": "Открыть Bitbucket",
       "refreshRepositories": "Обновить список репозиториев",
       "githubConnected": "GitHub подключён",
+      "gitlabConnected": "GitLab подключён",
       "noRepositoriesVisible": "Репозитории не отображаются. Проверьте доступ приложения Kilo к репозиториям GitHub и обновите список.",
+      "noRepositoriesVisibleGitlab": "Репозитории не отображаются. Проверьте доступ к репозиториям GitLab и обновите список.",
+      "noRepositoriesVisibleBitbucket": "Репозитории не отображаются. Проверьте доступ к репозиториям Bitbucket и обновите список.",
+      "bitbucketOrganizationsOnly": "Bitbucket доступен только для организаций.",
+      "branchPickerTitle": "Выбрать ветку",
+      "branchDefault": "По умолчанию",
+      "branchAccessibility": "Ветка: {{label}}",
+      "branchLoading": "Загрузка веток",
+      "branchLoadError": "Не удалось загрузить ветки",
+      "branchUnavailable": "Ветки недоступны для этого репозитория. Проверьте доступ у провайдера, затем выберите другой репозиторий.",
+      "branchEmpty": "Нет доступных веток",
+      "branchPlaceholder": "Выберите ветку",
       "runOnWithTarget": "Место запуска: {{target}}",
       "environment": "Окружение",
       "couldNotLoadEnvironment": "Не удалось загрузить ваше окружение.",
@@ -1604,26 +1625,15 @@
       "couldNotReadPendingSessions": "Не удалось прочитать данные сеансов в очереди. Попробуйте снова.",
       "failedToCreate": "Не удалось создать сеанс.",
       "couldNotRefreshRepositories": "Не удалось обновить список репозиториев. Попробуйте снова.",
-      "discardDraftMessage": "Ваш запрос будет удалён.",
       "discardDraftTitle": "Удалить черновик?",
+      "discardDraftMessage": "Ваш запрос будет удалён.",
+      "discardWithUploadsMessage": "Ваш запрос и все загруженные файлы, не прикреплённые к отправленным сообщениям, будут удалены.",
       "discardFailed": "Не удалось удалить черновик. Попробуйте снова.",
       "remoteHint": "Выполните `kilo remote` на компьютере или `/remote` в текущем сеансе CLI, чтобы управлять локальным процессом kilo.",
-      "connectBitbucketDescription": "Подключите Bitbucket в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
-      "connectGitlabDescription": "Подключите GitLab в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
-      "couldNotLoadBitbucketRepositories": "Не удалось загрузить репозитории Bitbucket.",
-      "couldNotLoadGithubRepositories": "Не удалось загрузить репозитории GitHub.",
-      "couldNotLoadGitlabRepositories": "Не удалось загрузить репозитории GitLab.",
-      "gitlabConnected": "GitLab подключён",
-      "noRepositoriesVisibleBitbucket": "Репозитории не отображаются. Проверьте доступ к репозиториям Bitbucket и обновите список.",
-      "noRepositoriesVisibleGitlab": "Репозитории не отображаются. Проверьте доступ к репозиториям GitLab и обновите список.",
-      "openBitbucket": "Открыть Bitbucket",
-      "openGitlab": "Открыть GitLab",
-      "recentlyUsed": "Недавно использованные",
-      "cliCannotContinue": "Этот CLI не поддерживает продолжение сеанса. Выберите Cloud Agent или другой CLI.",
       "continueFrom": "Продолжаем сеанс «{{title}}».",
-      "importFailed": "Не удалось импортировать этот сеанс.",
       "importingSession": "Импорт сеанса",
-      "discardWithUploadsMessage": "Ваш запрос и все загруженные файлы, не прикреплённые к отправленным сообщениям, будут удалены."
+      "cliCannotContinue": "Этот CLI не поддерживает продолжение сеанса. Выберите Cloud Agent или другой CLI.",
+      "importFailed": "Не удалось импортировать этот сеанс."
     },
     "partRenderer": {
       "updatedFileCount_one": "Обновлён {{displayCount}} файл.",
@@ -2392,11 +2402,17 @@
       "tapDiffLineToSuggest": "Нажмите на строку в изменениях, чтобы предложить правку."
     },
     "connect": {
-      "checkFailedMessage": "Пока данные не загрузятся, статус входа будет недоступен.",
       "checkFailedTitle": "Не удалось проверить подключение к GitHub.",
-      "description": "Подключите аккаунт GitHub, чтобы проводить ревью запросов на слияние в мобильном приложении.",
+      "checkFailedMessage": "Пока данные не загрузятся, статус входа будет недоступен.",
+      "checkFailedTitleGitLab": "Не удалось проверить подключение к GitLab",
+      "checkFailedTitleBitbucket": "Не удалось проверить подключение к Bitbucket",
+      "providerCheckFailedMessage": "Статус подключения недоступен до загрузки.",
+      "reconnectTitle": "Подключить GitHub снова",
       "reconnectDescription": "Доступ к вашему аккаунту GitHub отозван. Подключитесь снова, чтобы продолжить ревью запросов на слияние в мобильном приложении.",
-      "reconnectTitle": "Подключить GitHub снова"
+      "description": "Подключите аккаунт GitHub, чтобы проводить ревью запросов на слияние в мобильном приложении.",
+      "gitlabDescription": "Подключите аккаунт GitLab, чтобы просматривать запросы на слияние с мобильного.",
+      "bitbucketDescription": "Подключите Bitbucket к этой организации, чтобы просматривать пул-реквесты с мобильного.",
+      "bitbucketOrgOnlyDescription": "Выберите организацию в профиле, чтобы просматривать её пул-реквесты Bitbucket."
     },
     "connectionExpired": "Срок действия подключения к GitHub истёк.",
     "couldNotLoadPullRequest": "Не удалось загрузить запрос на слияние.",
@@ -2493,21 +2509,24 @@
         "outdatedOnLines": "Устаревший комментарий: {{lines}}",
         "outdatedOnPath": "Устаревший комментарий: {{path}}"
       },
-      "deletedUser": "удалённый пользователь"
+      "deletedUser": "удалённый пользователь",
+      "replyForbiddenTerm": "У вас нет прав для ответа в {{term}}."
     },
     "entry": {
-      "clearLink": "Удалить ссылку на запрос на слияние",
+      "eyebrow": "Откройте пул-реквест или запрос на слияние по URL",
+      "pastePrLink": "Вставьте ссылку на пул-реквест или запрос на слияние",
+      "noRecentPrs": "Нет недавних ревью",
+      "noRecentPrsDescription": "Вставьте ссылку выше, чтобы начать ревью. В следующий раз оно появится здесь.",
       "couldNotLoad": "Не удалось загрузить данные.",
-      "eyebrow": "Откройте запрос на слияние по URL.",
-      "noRecentPrs": "Нет недавних PR",
-      "noRecentPrsDescription": "Вставьте ссылку на PR выше, чтобы начать ревью. В следующий раз этот PR появится здесь.",
-      "open": "Открыть",
-      "pasteLink": "Вставить ссылку на запрос на слияние",
-      "pastePrLink": "Вставить ссылку на PR",
-      "removeFromRecentsMessage": "Этот запрос на слияние будет удалён из списка недавних.",
       "removeFromRecentsTitle": "Удалить из недавних?",
+      "removeFromRecentsMessage": "Это ревью будет удалено из списка недавних.",
       "removeRecentAccessibility": "Удалить {{repo}} из недавних",
-      "urlAccessibility": "URL запроса на слияние на GitHub"
+      "urlAccessibility": "Введите URL пул-реквеста или запроса на слияние",
+      "urlPlaceholder": "URL пул-реквеста или запроса на слияние",
+      "openAccessibility": "Открыть пул-реквест или запрос на слияние",
+      "clearLink": "Очистить ссылку",
+      "pasteLink": "Вставить ссылку на пул-реквест или запрос на слияние",
+      "open": "Открыть"
     },
     "eventChips": {
       "comment": "Комментарий",
@@ -2604,47 +2623,52 @@
     },
     "installKiloGitHubApp": "Установить приложение Kilo для GitHub",
     "merge": {
-      "autoMergeDescription": "GitHub автоматически выполнит слияние этого запроса после успешного завершения всех обязательных проверок (способ: {{method}}).",
-      "autoMergeOn": "Автослияние включено",
-      "blockedTitle": "Причины блокировки слияния",
-      "cannotMerge": "Слияние этого запроса в текущем виде невозможно.",
-      "checking": "Проверка возможности слияния…",
-      "commitMessage": "Сообщение коммита",
-      "commitMessagePlaceholder": "Необязательное описание коммита слияния",
-      "commitTitle": "Заголовок коммита",
-      "confirmMessage": "Ваши изменения будут добавлены в базовую ветку.",
-      "confirmTitle": "Выполнить слияние запроса?",
-      "couldNotDetermine": "Не удалось определить возможность слияния.",
-      "couldNotMerge": "Не удалось выполнить слияние запроса.",
-      "deleteBranch": "Удалить ветку",
-      "deleteBranchAfterMerge": "Удалить ветку после слияния",
-      "disableAutoMerge": "Отключить автослияние",
-      "enableAutoMerge": "Включить автослияние",
-      "enableAutoMergeConfirmMessage": "GitHub автоматически выполнит слияние этого запроса после успешного завершения всех обязательных проверок.",
-      "enableAutoMergeConfirmTitle": "Включить автослияние?",
-      "forbidden": "У вас нет прав на слияние этого запроса.",
-      "loadFailedTitle": "Не удалось загрузить параметры слияния.",
       "merge": "Объединение",
       "mergeNow": "Выполнить слияние сейчас",
       "mergePullRequest": "Слияние запроса",
+      "mergeTermTitle": "Слить {{term}}",
+      "enableAutoMerge": "Включить автослияние",
+      "disableAutoMerge": "Отключить автослияние",
+      "autoMergeOn": "Автослияние включено",
+      "autoMergeDescription": "GitHub автоматически выполнит слияние этого запроса после успешного завершения всех обязательных проверок (способ: {{method}}).",
+      "checking": "Проверка возможности слияния…",
+      "couldNotDetermine": "Не удалось определить возможность слияния.",
+      "refreshMergeability": "Повторно проверить возможность слияния",
+      "blockedTitle": "Причины блокировки слияния",
+      "updateBranch": "Обновить ветку",
+      "updateBranchFromBase": "Обновить ветку из базовой",
       "methodLabel": "Способ слияния",
+      "commitTitle": "Заголовок коммита",
+      "commitMessage": "Сообщение коммита",
+      "commitMessagePlaceholder": "Необязательное описание коммита слияния",
+      "deleteBranch": "Удалить ветку",
+      "deleteBranchAfterMerge": "Удалить ветку после слияния",
+      "noEnabledMethods": "В этом репозитории отключены все способы слияния. Попросите администратора разрешить обычное слияние, объединение коммитов или перебазирование.",
+      "confirmTitle": "Выполнить слияние запроса?",
+      "confirmTitleTerm": "Слить {{term}}?",
+      "confirmMessage": "Ваши изменения будут добавлены в базовую ветку.",
+      "enableAutoMergeConfirmTitle": "Включить автослияние?",
+      "enableAutoMergeConfirmMessage": "GitHub автоматически выполнит слияние этого запроса после успешного завершения всех обязательных проверок.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} будет автоматически слит после успешного выполнения конвейера.",
+      "enableAutoMergeDescriptionTerm": "GitLab автоматически сольёт этот {{term}} после успешного выполнения конвейера.",
+      "forbidden": "У вас нет прав на слияние этого запроса.",
+      "cannotMerge": "Слияние этого запроса в текущем виде невозможно.",
+      "couldNotMerge": "Не удалось выполнить слияние запроса.",
       "methods": {
         "merge": "Объединение",
         "rebase": "Перебазирование",
         "squash": "Объединение"
       },
-      "noEnabledMethods": "В этом репозитории отключены все способы слияния. Попросите администратора разрешить обычное слияние, объединение коммитов или перебазирование.",
+      "terminal": {
+        "alreadyMerged": "Слияние уже выполнено",
+        "closed": "Запрос на слияние закрыт",
+        "closedMergeRequest": "Этот запрос на слияние закрыт"
+      },
       "partialSuccessBanner": {
         "accessibility": "Слияние выполнено. Не удалось удалить ветку: {{reason}}",
         "body": "Не удалось удалить ветку. Причина: {{reason}}"
       },
-      "refreshMergeability": "Повторно проверить возможность слияния",
-      "terminal": {
-        "alreadyMerged": "Слияние уже выполнено",
-        "closed": "Запрос на слияние закрыт"
-      },
-      "updateBranch": "Обновить ветку",
-      "updateBranchFromBase": "Обновить ветку из базовой",
+      "loadFailedTitle": "Не удалось загрузить параметры слияния.",
       "blocked": {
         "unknownStateTitle": "GitHub не подтвердил возможность слияния",
         "unknownStateDetail": "Попробуйте обновить обзор чуть позже.",
@@ -2663,6 +2687,20 @@
         "behindDetail": "Исходная ветка отстаёт от базовой. Перед слиянием выполните перебазирование или обновите ветку.",
         "notMergeableTitle": "Слияние этого запроса пока невозможно",
         "notMergeableDetail": "GitHub сообщил о состоянии слияния: {{state}}."
+      },
+      "restrictions": {
+        "title": "Ограничения на слияние",
+        "approvalsRequired_one": "Требуется {{displayCount}} одобрение",
+        "approvalsRequired_other": "Требуется {{displayCount}} одобрений",
+        "pipelineMustSucceed": "Перед слиянием конвейер должен завершиться успешно.",
+        "approvalsRequired_many": "Требуется {{displayCount}} одобрений",
+        "approvalsRequired_few": "Требуется {{displayCount}} одобрения"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Конвейер завершается ошибкой на последнем коммите.",
+        "pendingPipeline": "Конвейер все еще выполняется на последнем коммите.",
+        "permission": "У вас нет прав на слияние {{term}}.",
+        "draft": "Перед слиянием переведите {{term}} в состояние готовности к ревью."
       },
       "methodLabels": {
         "merge": "Создать коммит слияния",
@@ -2725,8 +2763,11 @@
     "pullRequestUnavailable": "Запрос на слияние недоступен",
     "pullRequestUnavailableDescription": "Не удаётся открыть этот PR. Возможно, он удалён, репозиторий закрытый или в нём не установлено приложение Kilo для GitHub.",
     "reconnectNotice": {
+      "title": "Срок действия подключения к GitHub истёк.",
       "message": "Подключение к GitHub больше не действует. Проверьте его снова — при необходимости появится предложение подключиться заново.",
-      "title": "Срок действия подключения к GitHub истёк."
+      "gitlabTitle": "Срок действия подключения к GitLab истёк",
+      "bitbucketTitle": "Срок действия подключения к Bitbucket истёк",
+      "providerMessage": "Ваше подключение к {{provider}} больше не действительно. Повторно проверьте подключение — при необходимости вам предложат подключиться заново."
     },
     "review": "Проверка",
     "reviewPullRequest": "Провести ревью запроса на слияние",
@@ -2779,7 +2820,7 @@
       "emptyLine": "(пусто)"
     },
     "linkPasteClipboardEmpty": "Буфер обмена пуст.",
-    "linkPasteNotAPullRequest": "Это не ссылка на запрос на слияние на GitHub.",
+    "linkPasteNotAPullRequest": "Это не ссылка на пул-реквест или запрос на слияние",
     "announce": {
       "commentPosted": "Комментарий опубликован",
       "reviewSubmitted": "Ревью отправлено",
@@ -2788,6 +2829,7 @@
     "mutationError": {
       "commentNotPosted": "Не удаётся опубликовать комментарий. Возможно, выбранная строка изменилась или PR обновлён.",
       "reviewNotSubmitted": "Не удаётся отправить ревью в текущем виде. Возможно, PR изменился или вы пытаетесь провести ревью собственного запроса на слияние.",
+      "reviewNotSubmittedTerm": "Это ревью невозможно отправить как есть. {{term}} мог измениться, или вы не можете ревьюить свой собственный {{term}}.",
       "couldNotPostComment": "Не удалось отправить комментарий.",
       "couldNotSubmitReview": "Не удалось отправить ревью. Проверьте подключение и попробуйте снова."
     },
@@ -2795,9 +2837,31 @@
       "couldNotReply": "Не удалось ответить.",
       "couldNotCompleteAction": "Не удалось выполнить это действие.",
       "mergeResultDefaultError": "GitHub не завершил слияние.",
+      "mergeResultNotCompleted": "{{term}} не был слит. Проверьте его состояние и повторите попытку.",
       "ambiguous": "Не удалось подтвердить результат — проверьте PR перед повторной попыткой.",
       "persistenceFailed": "Не удалось записать это действие. Повторите попытку позже.",
       "forbidden": "Доступ запрещён."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Недоступно у этого провайдера",
+        "accessibility": "Недоступно у этого провайдера: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Пул-реквест",
+      "mergeRequest": "Запрос на слияние",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Поделиться запросом на слияние",
+      "viewOnProvider": "Открыть в {{provider}}",
+      "mergeRequestUnavailable": "Запрос на слияние недоступен",
+      "unavailableDescription": "Возможно, он был удалён или у вас нет к нему доступа.",
+      "accessDeniedMergeRequest": "У вас нет прав на просмотр этого запроса на слияние.",
+      "couldNotLoadMergeRequest": "Не удалось загрузить запрос на слияние",
+      "discussionAccessDenied": "У вас нет прав на просмотр обсуждения этого запроса на слияние.",
+      "discussionUnavailableMessage": "Этот запрос на слияние мог быть удалён.",
+      "noDiscussionDescription": "В этом запросе на слияние нет веток ревью или комментариев.",
+      "noFilesChangedDescription": "В этом запросе на слияние нет изменений файлов."
     }
   },
   "organization": {

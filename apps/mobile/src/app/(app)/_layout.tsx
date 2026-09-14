@@ -159,6 +159,15 @@ export default function AppLayout() {
               }}
             />
             <Stack.Screen
+              name="agent-chat/branch-picker"
+              options={{
+                presentation: 'formSheet',
+                sheetAllowedDetents: [0.5, fullSheetDetent],
+                sheetGrabberVisible: true,
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
               name="agent-chat/mode-picker"
               options={{
                 presentation: 'formSheet',

@@ -4,6 +4,8 @@
     "done": "Готово",
     "retry": "Повторити",
     "tryAgain": "Спробувати ще раз",
+    "continue": "Продовжити",
+    "notNow": "Не зараз",
     "language": "Мова",
     "device": "Пристрій",
     "share": "Поділитися: {{title}}",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "Не вдалося скопіювати в буфер обміну.",
     "required": "обов'язково",
     "error": "помилка: {{error}}",
-    "notNow": "Не зараз",
-    "continue": "Продовжити",
     "back": "Назад",
     "somethingWentWrong": "Сталася помилка.",
     "couldNotOpen": "Не вдалося відкрити {{label}}.",
@@ -36,6 +36,7 @@
     "cost": "Вартість",
     "discard": "Відкинути",
     "findings": "Виявлені проблеми",
+    "mergeRequest": "merge-запит",
     "notConnected": "Не підключено",
     "notifications": "Сповіщення",
     "pullRequest": "запит на злиття",
@@ -1581,11 +1582,31 @@
       "retryConnection": "Повторити підключення"
     },
     "newSession": {
+      "recentlyUsed": "Нещодавно використані",
+      "couldNotLoadGithubRepositories": "Не вдалося завантажити репозиторії GitHub.",
+      "couldNotLoadGitlabRepositories": "Не вдалося завантажити репозиторії GitLab.",
+      "couldNotLoadBitbucketRepositories": "Не вдалося завантажити репозиторії Bitbucket.",
       "connectGithubDescription": "Підключіть GitHub у браузері, а потім поверніться сюди, щоб вибрати репозиторій.",
+      "connectGitlabDescription": "Підключіть GitLab у браузері, а потім поверніться сюди, щоб вибрати репозиторій.",
+      "connectBitbucketDescription": "Підключіть Bitbucket у браузері, а потім поверніться сюди, щоб вибрати репозиторій.",
       "openGithub": "Відкрити GitHub",
+      "openGitlab": "Відкрити GitLab",
+      "openBitbucket": "Відкрити Bitbucket",
       "refreshRepositories": "Оновити список репозиторіїв",
       "githubConnected": "GitHub підключено",
+      "gitlabConnected": "GitLab підключено",
       "noRepositoriesVisible": "Репозиторії не відображаються. Перевірте доступ застосунку Kilo до репозиторіїв GitHub, а потім оновіть список.",
+      "noRepositoriesVisibleGitlab": "Репозиторії не відображаються. Перевірте доступ до репозиторіїв GitLab, а потім оновіть список.",
+      "noRepositoriesVisibleBitbucket": "Репозиторії не відображаються. Перевірте доступ до репозиторіїв Bitbucket, а потім оновіть список.",
+      "bitbucketOrganizationsOnly": "Bitbucket доступний лише для організацій.",
+      "branchPickerTitle": "Вибрати гілку",
+      "branchDefault": "Типова",
+      "branchAccessibility": "Гілка: {{label}}",
+      "branchLoading": "Завантаження гілок",
+      "branchLoadError": "Не вдалося завантажити гілки",
+      "branchUnavailable": "Гілки недоступні для цього репозиторію. Перевірте доступ у провайдера, потім виберіть інший репозиторій.",
+      "branchEmpty": "Немає доступних гілок",
+      "branchPlaceholder": "Виберіть гілку",
       "runOnWithTarget": "Середовище запуску: {{target}}",
       "environment": "Середовище",
       "couldNotLoadEnvironment": "Не вдалося завантажити ваше середовище.",
@@ -1604,26 +1625,15 @@
       "couldNotReadPendingSessions": "Не вдалося прочитати дані сеансів у черзі. Спробуйте ще раз.",
       "failedToCreate": "Не вдалося створити сеанс.",
       "couldNotRefreshRepositories": "Не вдалося оновити список репозиторіїв. Спробуйте ще раз.",
-      "discardDraftMessage": "Ваш запит буде втрачено.",
       "discardDraftTitle": "Видалити чернетку?",
+      "discardDraftMessage": "Ваш запит буде втрачено.",
+      "discardWithUploadsMessage": "Ваш запит і всі завантажені файли, не прикріплені до надісланих повідомлень, буде видалено.",
       "discardFailed": "Не вдалося видалити чернетку. Спробуйте ще раз.",
       "remoteHint": "Виконайте `kilo remote` на своєму комп'ютері або `/remote` у запущеному сеансі CLI, щоб керувати локальним процесом kilo.",
-      "connectBitbucketDescription": "Підключіть Bitbucket у браузері, а потім поверніться сюди, щоб вибрати репозиторій.",
-      "connectGitlabDescription": "Підключіть GitLab у браузері, а потім поверніться сюди, щоб вибрати репозиторій.",
-      "couldNotLoadBitbucketRepositories": "Не вдалося завантажити репозиторії Bitbucket.",
-      "couldNotLoadGithubRepositories": "Не вдалося завантажити репозиторії GitHub.",
-      "couldNotLoadGitlabRepositories": "Не вдалося завантажити репозиторії GitLab.",
-      "gitlabConnected": "GitLab підключено",
-      "noRepositoriesVisibleBitbucket": "Репозиторії не відображаються. Перевірте доступ до репозиторіїв Bitbucket, а потім оновіть список.",
-      "noRepositoriesVisibleGitlab": "Репозиторії не відображаються. Перевірте доступ до репозиторіїв GitLab, а потім оновіть список.",
-      "openBitbucket": "Відкрити Bitbucket",
-      "openGitlab": "Відкрити GitLab",
-      "recentlyUsed": "Нещодавно використані",
-      "cliCannotContinue": "Цей CLI не підтримує продовження сеансів. Виберіть Cloud Agent або інший CLI.",
       "continueFrom": "Продовжується сеанс «{{title}}».",
-      "importFailed": "Не вдалося імпортувати цей сеанс.",
       "importingSession": "Імпортування сеансу",
-      "discardWithUploadsMessage": "Ваш запит і всі завантажені файли, не прикріплені до надісланих повідомлень, буде видалено."
+      "cliCannotContinue": "Цей CLI не підтримує продовження сеансів. Виберіть Cloud Agent або інший CLI.",
+      "importFailed": "Не вдалося імпортувати цей сеанс."
     },
     "partRenderer": {
       "updatedFileCount_one": "Оновлено {{displayCount}} файл.",
@@ -2392,11 +2402,17 @@
       "tapDiffLineToSuggest": "Торкніться рядка змін, щоб увімкнути пропозиції."
     },
     "connect": {
-      "checkFailedMessage": "Статус входу стане доступним після завантаження даних.",
       "checkFailedTitle": "Не вдалося перевірити підключення до GitHub.",
-      "description": "Підключіть обліковий запис GitHub, щоб перевіряти запити на злиття в мобільному застосунку.",
+      "checkFailedMessage": "Статус входу стане доступним після завантаження даних.",
+      "checkFailedTitleGitLab": "Не вдалося перевірити підключення до GitLab",
+      "checkFailedTitleBitbucket": "Не вдалося перевірити підключення до Bitbucket",
+      "providerCheckFailedMessage": "Стан підключення недоступний, доки це завантажиться.",
+      "reconnectTitle": "Підключити GitHub знову",
       "reconnectDescription": "Доступ до GitHub відкликано. Підключіться знову, щоб і далі перевіряти запити на злиття в мобільному застосунку.",
-      "reconnectTitle": "Підключити GitHub знову"
+      "description": "Підключіть обліковий запис GitHub, щоб перевіряти запити на злиття в мобільному застосунку.",
+      "gitlabDescription": "Підключіть обліковий запис GitLab, щоб переглядати merge-запити з мобільного.",
+      "bitbucketDescription": "Підключіть Bitbucket до цієї організації, щоб переглядати запити на злиття з мобільного.",
+      "bitbucketOrgOnlyDescription": "Виберіть організацію у профілі, щоб переглядати її запити на злиття Bitbucket."
     },
     "connectionExpired": "Термін дії підключення до GitHub минув.",
     "couldNotLoadPullRequest": "Не вдалося завантажити запит на злиття.",
@@ -2493,21 +2509,24 @@
         "outdatedOnLines": "Неактуально: {{lines}}",
         "outdatedOnPath": "Неактуально: {{path}}"
       },
-      "deletedUser": "видалений користувач"
+      "deletedUser": "видалений користувач",
+      "replyForbiddenTerm": "У вас немає дозволу відповідати в {{term}}."
     },
     "entry": {
-      "clearLink": "Очистити посилання на запит на злиття",
+      "eyebrow": "Відкрийте запит на злиття або merge-запит за URL",
+      "pastePrLink": "Вставте посилання на запит на злиття або merge-запит",
+      "noRecentPrs": "Немає нещодавніх рев'ю",
+      "noRecentPrsDescription": "Щоб розпочати рев'ю, вставте посилання вище — наступного разу воно з'явиться тут.",
       "couldNotLoad": "Не вдалося завантажити дані.",
-      "eyebrow": "Відкрийте запит на злиття за URL-адресою.",
-      "noRecentPrs": "Нещодавніх PR немає",
-      "noRecentPrsDescription": "Вставте посилання на PR вище, щоб почати перевірку коду. Наступного разу цей PR з'явиться тут.",
-      "open": "Відкрити",
-      "pasteLink": "Вставити посилання на запит на злиття",
-      "pastePrLink": "Вставити посилання на PR",
-      "removeFromRecentsMessage": "Цей запит на злиття буде видалено зі списку нещодавніх.",
       "removeFromRecentsTitle": "Видалити з нещодавніх?",
+      "removeFromRecentsMessage": "Це рев'ю буде видалено зі списку нещодавніх.",
       "removeRecentAccessibility": "Видалити {{repo}} з нещодавніх",
-      "urlAccessibility": "URL-адреса запиту на злиття на GitHub"
+      "urlAccessibility": "Введіть URL запиту на злиття або merge-запиту",
+      "urlPlaceholder": "URL запиту на злиття або merge-запиту",
+      "openAccessibility": "Відкрити запит на злиття або merge-запит",
+      "clearLink": "Очистити посилання",
+      "pasteLink": "Вставити посилання на запит на злиття або merge-запит",
+      "open": "Відкрити"
     },
     "eventChips": {
       "comment": "Коментувати",
@@ -2604,47 +2623,52 @@
     },
     "installKiloGitHubApp": "Установити застосунок Kilo для GitHub",
     "merge": {
-      "autoMergeDescription": "GitHub автоматично виконає злиття цього запиту, коли всі обов'язкові перевірки завершаться успішно (спосіб: {{method}}).",
-      "autoMergeOn": "Автоматичне злиття ввімкнено",
-      "blockedTitle": "Що перешкоджає злиттю",
-      "cannotMerge": "Цей запит поки не можна злити без додаткових змін.",
-      "checking": "Перевірка можливості злиття…",
-      "commitMessage": "Повідомлення коміту",
-      "commitMessagePlaceholder": "Необов'язковий опис коміту злиття",
-      "commitTitle": "Заголовок коміту",
-      "confirmMessage": "Ваші зміни буде злито в базову гілку.",
-      "confirmTitle": "Виконати злиття запиту?",
-      "couldNotDetermine": "Не вдалося визначити можливість злиття.",
-      "couldNotMerge": "Не вдалося виконати злиття запиту.",
-      "deleteBranch": "Видалити гілку",
-      "deleteBranchAfterMerge": "Видалити гілку після злиття",
-      "disableAutoMerge": "Вимкнути автоматичне злиття",
-      "enableAutoMerge": "Увімкнути автоматичне злиття",
-      "enableAutoMergeConfirmMessage": "GitHub автоматично виконає злиття цього запиту, коли всі обов'язкові перевірки завершаться успішно.",
-      "enableAutoMergeConfirmTitle": "Увімкнути автоматичне злиття?",
-      "forbidden": "У вас немає дозволу на злиття цього запиту.",
-      "loadFailedTitle": "Не вдалося завантажити параметри злиття.",
       "merge": "Злиття",
       "mergeNow": "Виконати злиття",
       "mergePullRequest": "Злиття запиту",
+      "mergeTermTitle": "Злити {{term}}",
+      "enableAutoMerge": "Увімкнути автоматичне злиття",
+      "disableAutoMerge": "Вимкнути автоматичне злиття",
+      "autoMergeOn": "Автоматичне злиття ввімкнено",
+      "autoMergeDescription": "GitHub автоматично виконає злиття цього запиту, коли всі обов'язкові перевірки завершаться успішно (спосіб: {{method}}).",
+      "checking": "Перевірка можливості злиття…",
+      "couldNotDetermine": "Не вдалося визначити можливість злиття.",
+      "refreshMergeability": "Повторно перевірити можливість злиття",
+      "blockedTitle": "Що перешкоджає злиттю",
+      "updateBranch": "Оновити гілку",
+      "updateBranchFromBase": "Оновити гілку змінами з базової гілки",
       "methodLabel": "Спосіб злиття",
+      "commitTitle": "Заголовок коміту",
+      "commitMessage": "Повідомлення коміту",
+      "commitMessagePlaceholder": "Необов'язковий опис коміту злиття",
+      "deleteBranch": "Видалити гілку",
+      "deleteBranchAfterMerge": "Видалити гілку після злиття",
+      "noEnabledMethods": "У цьому репозиторії не ввімкнено жодного способу злиття. Попросіть адміністратора ввімкнути злиття зі створенням коміту злиття, об'єднанням комітів або перебазуванням.",
+      "confirmTitle": "Виконати злиття запиту?",
+      "confirmTitleTerm": "Злити {{term}}?",
+      "confirmMessage": "Ваші зміни буде злито в базову гілку.",
+      "enableAutoMergeConfirmTitle": "Увімкнути автоматичне злиття?",
+      "enableAutoMergeConfirmMessage": "GitHub автоматично виконає злиття цього запиту, коли всі обов'язкові перевірки завершаться успішно.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} буде автоматично злито після успішного виконання конвеєра.",
+      "enableAutoMergeDescriptionTerm": "GitLab автоматично злить цей {{term}} після успішного виконання конвеєра.",
+      "forbidden": "У вас немає дозволу на злиття цього запиту.",
+      "cannotMerge": "Цей запит поки не можна злити без додаткових змін.",
+      "couldNotMerge": "Не вдалося виконати злиття запиту.",
       "methods": {
         "merge": "Злиття",
         "rebase": "Перебазування",
         "squash": "Об'єднання"
       },
-      "noEnabledMethods": "У цьому репозиторії не ввімкнено жодного способу злиття. Попросіть адміністратора ввімкнути злиття зі створенням коміту злиття, об'єднанням комітів або перебазуванням.",
+      "terminal": {
+        "alreadyMerged": "Уже злито",
+        "closed": "Цей запит на злиття закрито",
+        "closedMergeRequest": "Цей merge-запит закрито"
+      },
       "partialSuccessBanner": {
         "accessibility": "Злито. Не вдалося видалити гілку: {{reason}}",
         "body": "Не вдалося видалити гілку: {{reason}}."
       },
-      "refreshMergeability": "Повторно перевірити можливість злиття",
-      "terminal": {
-        "alreadyMerged": "Уже злито",
-        "closed": "Цей запит на злиття закрито"
-      },
-      "updateBranch": "Оновити гілку",
-      "updateBranchFromBase": "Оновити гілку змінами з базової гілки",
+      "loadFailedTitle": "Не вдалося завантажити параметри злиття.",
       "blocked": {
         "unknownStateTitle": "GitHub не повідомив про можливість злиття",
         "unknownStateDetail": "Спробуйте оновити огляд трохи згодом.",
@@ -2663,6 +2687,20 @@
         "behindDetail": "Вихідна гілка відстає від базової. Перш ніж виконати злиття, перебазуйте або оновіть її.",
         "notMergeableTitle": "Цей запит ще не можна злити",
         "notMergeableDetail": "GitHub повідомив про такий стан готовності до злиття: {{state}}."
+      },
+      "restrictions": {
+        "title": "Обмеження на злиття",
+        "approvalsRequired_one": "Потрібне {{displayCount}} затвердження",
+        "approvalsRequired_other": "Потрібно {{displayCount}} затверджень",
+        "pipelineMustSucceed": "Перед злиттям конвеєр має завершитися успішно.",
+        "approvalsRequired_many": "Потрібно {{displayCount}} затверджень",
+        "approvalsRequired_few": "Потрібні {{displayCount}} затвердження"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Конвеєр завершується помилкою на останньому коміті.",
+        "pendingPipeline": "Конвеєр ще виконується на останньому коміті.",
+        "permission": "У вас немає дозволу на злиття {{term}}.",
+        "draft": "Перед злиттям переведіть {{term}} у стан готовності до рев'ю."
       },
       "methodLabels": {
         "merge": "Створити коміт злиття",
@@ -2725,8 +2763,11 @@
     "pullRequestUnavailable": "Запит на злиття недоступний",
     "pullRequestUnavailableDescription": "Не вдалося відкрити цей PR. Можливо, його видалено, репозиторій приватний або для нього не встановлено застосунок Kilo для GitHub.",
     "reconnectNotice": {
+      "title": "Термін дії підключення до GitHub минув.",
       "message": "Підключення до GitHub більше не діє. Перевірте його стан — за потреби застосунок запропонує підключитися знову.",
-      "title": "Термін дії підключення до GitHub минув."
+      "gitlabTitle": "Термін дії підключення до GitLab минув",
+      "bitbucketTitle": "Термін дії підключення до Bitbucket минув",
+      "providerMessage": "Ваше підключення до {{provider}} більше не є дійсним. Перевірте підключення ще раз — за потреби вам запропонують підключитися знову."
     },
     "review": "Перевірка",
     "reviewPullRequest": "Перевірити запит на злиття",
@@ -2779,7 +2820,7 @@
       "emptyLine": "(порожньо)"
     },
     "linkPasteClipboardEmpty": "Буфер обміну порожній.",
-    "linkPasteNotAPullRequest": "Це не посилання на запит на злиття на GitHub.",
+    "linkPasteNotAPullRequest": "Це не посилання на запит на злиття або merge-запит",
     "announce": {
       "commentPosted": "Коментар опубліковано",
       "reviewSubmitted": "Результат перевірки коду надіслано",
@@ -2788,6 +2829,7 @@
     "mutationError": {
       "commentNotPosted": "Цей коментар неможливо опублікувати. Можливо, виділений рядок змінився або PR було оновлено.",
       "reviewNotSubmitted": "Цей результат перевірки коду неможливо надіслати в поточному вигляді. Можливо, PR змінився або ви намагаєтеся перевірити власний запит на злиття.",
+      "reviewNotSubmittedTerm": "Це рев'ю неможливо надіслати як є. {{term}} міг змінитися, або ви не можете ревіювати власний {{term}}.",
       "couldNotPostComment": "Не вдалося опублікувати коментар.",
       "couldNotSubmitReview": "Не вдалося надіслати результат перевірки коду. Перевірте з'єднання та спробуйте ще раз."
     },
@@ -2795,9 +2837,31 @@
       "couldNotReply": "Не вдалося відповісти.",
       "couldNotCompleteAction": "Не вдалося виконати цю дію.",
       "mergeResultDefaultError": "GitHub не завершив злиття.",
+      "mergeResultNotCompleted": "{{term}} не було злито. Перевірте його стан і спробуйте ще раз.",
       "ambiguous": "Не вдалося підтвердити — перевірте PR, перш ніж повторювати спробу.",
       "persistenceFailed": "Не вдалося зафіксувати цю дію. Спробуйте ще раз пізніше.",
       "forbidden": "Доступ заборонено."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Недоступно в цього провайдера",
+        "accessibility": "Недоступно в цього провайдера: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Запит на злиття",
+      "mergeRequest": "Merge-запит",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Поділитися merge-запитом",
+      "viewOnProvider": "Відкрити в {{provider}}",
+      "mergeRequestUnavailable": "Merge-запит недоступний",
+      "unavailableDescription": "Можливо, його було видалено або в вас немає до нього доступу.",
+      "accessDeniedMergeRequest": "У вас немає дозволу переглядати цей merge-запит.",
+      "couldNotLoadMergeRequest": "Не вдалося завантажити merge-запит",
+      "discussionAccessDenied": "У вас немає дозволу переглядати обговорення цього merge-запиту.",
+      "discussionUnavailableMessage": "Цей merge-запит міг бути видалений.",
+      "noDiscussionDescription": "У цьому merge-запиті немає гілок рев'ю чи коментарів розмови.",
+      "noFilesChangedDescription": "У цьому merge-запиті немає змін файлів."
     }
   },
   "organization": {

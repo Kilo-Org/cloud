@@ -4,6 +4,8 @@
     "done": "Gotowe",
     "retry": "Spróbuj ponownie",
     "tryAgain": "Spróbuj ponownie",
+    "continue": "Kontynuuj",
+    "notNow": "Nie teraz",
     "language": "Język",
     "device": "Urządzenie",
     "share": "Udostępnij {{title}}",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "Nie udało się skopiować do schowka.",
     "required": "wymagane",
     "error": "błąd: {{error}}",
-    "notNow": "Nie teraz",
-    "continue": "Kontynuuj",
     "back": "Wstecz",
     "somethingWentWrong": "Coś poszło nie tak.",
     "couldNotOpen": "Nie udało się otworzyć: {{label}}.",
@@ -36,6 +36,7 @@
     "cost": "Koszt",
     "discard": "Odrzuć",
     "findings": "Wykryte problemy",
+    "mergeRequest": "merge request",
     "notConnected": "Brak połączenia",
     "notifications": "Powiadomienia",
     "pullRequest": "pR",
@@ -1581,11 +1582,31 @@
       "retryConnection": "Połącz ponownie"
     },
     "newSession": {
+      "recentlyUsed": "Ostatnio używane",
+      "couldNotLoadGithubRepositories": "Nie udało się wczytać repozytoriów z GitHub.",
+      "couldNotLoadGitlabRepositories": "Nie udało się wczytać repozytoriów z GitLab.",
+      "couldNotLoadBitbucketRepositories": "Nie udało się wczytać repozytoriów z Bitbucket.",
       "connectGithubDescription": "Połącz konto GitHub w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
+      "connectGitlabDescription": "Połącz konto GitLab w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
+      "connectBitbucketDescription": "Połącz konto Bitbucket w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
       "openGithub": "Otwórz GitHub",
+      "openGitlab": "Otwórz GitLab",
+      "openBitbucket": "Otwórz Bitbucket",
       "refreshRepositories": "Odśwież repozytoria",
       "githubConnected": "Połączono z GitHub",
+      "gitlabConnected": "Połączono z GitLab",
       "noRepositoriesVisible": "Nie widać żadnych repozytoriów. Sprawdź, czy aplikacja Kilo w GitHub ma do nich dostęp, a następnie odśwież listę.",
+      "noRepositoriesVisibleGitlab": "Nie widać żadnych repozytoriów. Sprawdź uprawnienia dostępu do repozytoriów w GitLab, a następnie odśwież listę.",
+      "noRepositoriesVisibleBitbucket": "Nie widać żadnych repozytoriów. Sprawdź uprawnienia dostępu do repozytoriów w Bitbucket, a następnie odśwież listę.",
+      "bitbucketOrganizationsOnly": "Bitbucket jest dostępny tylko dla organizacji.",
+      "branchPickerTitle": "Wybierz gałąź",
+      "branchDefault": "Domyślna",
+      "branchAccessibility": "Gałąź: {{label}}",
+      "branchLoading": "Wczytywanie gałęzi",
+      "branchLoadError": "Nie udało się wczytać gałęzi",
+      "branchUnavailable": "Gałęzie nie są dostępne dla tego repozytorium. Sprawdź swój dostęp u dostawcy, a potem wybierz inne repozytorium.",
+      "branchEmpty": "Brak dostępnych gałęzi",
+      "branchPlaceholder": "Wybierz gałąź",
       "runOnWithTarget": "Miejsce uruchomienia: {{target}}",
       "environment": "Środowisko",
       "couldNotLoadEnvironment": "Nie udało się wczytać twojego środowiska.",
@@ -1604,26 +1625,15 @@
       "couldNotReadPendingSessions": "Nie udało się odczytać oczekujących sesji. Spróbuj ponownie.",
       "failedToCreate": "Nie udało się utworzyć sesji.",
       "couldNotRefreshRepositories": "Nie udało się odświeżyć repozytoriów. Spróbuj ponownie.",
-      "discardDraftMessage": "Twoje polecenie zostanie usunięte.",
       "discardDraftTitle": "Odrzucić szkic?",
+      "discardDraftMessage": "Twoje polecenie zostanie usunięte.",
+      "discardWithUploadsMessage": "Twoje polecenie i wszystkie przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte.",
       "discardFailed": "Nie udało się odrzucić szkicu. Spróbuj ponownie.",
       "remoteHint": "Uruchom `kilo remote` na swoim komputerze lub `/remote` w działającej sesji CLI, aby sterować lokalnym procesem kilo.",
-      "connectBitbucketDescription": "Połącz konto Bitbucket w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
-      "connectGitlabDescription": "Połącz konto GitLab w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
-      "couldNotLoadBitbucketRepositories": "Nie udało się wczytać repozytoriów z Bitbucket.",
-      "couldNotLoadGithubRepositories": "Nie udało się wczytać repozytoriów z GitHub.",
-      "couldNotLoadGitlabRepositories": "Nie udało się wczytać repozytoriów z GitLab.",
-      "gitlabConnected": "Połączono z GitLab",
-      "noRepositoriesVisibleBitbucket": "Nie widać żadnych repozytoriów. Sprawdź uprawnienia dostępu do repozytoriów w Bitbucket, a następnie odśwież listę.",
-      "noRepositoriesVisibleGitlab": "Nie widać żadnych repozytoriów. Sprawdź uprawnienia dostępu do repozytoriów w GitLab, a następnie odśwież listę.",
-      "openBitbucket": "Otwórz Bitbucket",
-      "openGitlab": "Otwórz GitLab",
-      "recentlyUsed": "Ostatnio używane",
       "continueFrom": "Kontynuujesz sesję {{title}}.",
       "importingSession": "Importowanie sesji",
       "cliCannotContinue": "Ta instancja CLI nie obsługuje kontynuowania sesji. Wybierz Cloud Agent lub inną instancję CLI.",
-      "importFailed": "Nie udało się zaimportować tej sesji.",
-      "discardWithUploadsMessage": "Twoje polecenie i wszystkie przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte."
+      "importFailed": "Nie udało się zaimportować tej sesji."
     },
     "partRenderer": {
       "updatedFileCount_one": "Zaktualizowano {{displayCount}} plik.",
@@ -2392,11 +2402,17 @@
       "tapDiffLineToSuggest": "Dotknij wiersza w widoku różnic, aby włączyć sugestie."
     },
     "connect": {
-      "checkFailedMessage": "Status logowania będzie dostępny dopiero po wczytaniu danych.",
       "checkFailedTitle": "Nie udało się sprawdzić połączenia z kontem GitHub.",
-      "description": "Połącz konto GitHub, aby przeglądać PR na telefonie.",
+      "checkFailedMessage": "Status logowania będzie dostępny dopiero po wczytaniu danych.",
+      "checkFailedTitleGitLab": "Nie udało się sprawdzić połączenia z kontem GitLab.",
+      "checkFailedTitleBitbucket": "Nie udało się sprawdzić połączenia z kontem Bitbucket.",
+      "providerCheckFailedMessage": "Status połączenia będzie dostępny po wczytaniu danych.",
+      "reconnectTitle": "Połącz ponownie konto GitHub",
       "reconnectDescription": "Cofnięto dostęp do konta GitHub. Połącz je ponownie, aby nadal przeglądać PR na telefonie.",
-      "reconnectTitle": "Połącz ponownie konto GitHub"
+      "description": "Połącz konto GitHub, aby przeglądać PR na telefonie.",
+      "gitlabDescription": "Połącz konto GitLab, aby przeglądać merge requesty na telefonie.",
+      "bitbucketDescription": "Połącz Bitbucket z tą organizacją, aby przeglądać PR-y na telefonie.",
+      "bitbucketOrgOnlyDescription": "Wybierz organizację w swoim profilu, aby przeglądać jej PR-y na Bitbucket."
     },
     "connectionExpired": "Połączenie z serwisem GitHub wygasło.",
     "couldNotLoadPullRequest": "Nie udało się wczytać PR.",
@@ -2493,21 +2509,24 @@
         "outdatedOnLines": "Nieaktualny: {{lines}}",
         "outdatedOnPath": "Nieaktualny: {{path}}"
       },
-      "deletedUser": "usunięty użytkownik"
+      "deletedUser": "usunięty użytkownik",
+      "replyForbiddenTerm": "Nie masz uprawnień do odpowiadania w tym {{term}}."
     },
     "entry": {
-      "clearLink": "Wyczyść odnośnik do PR",
+      "eyebrow": "Otwórz PR lub merge request za pomocą adresu URL",
+      "pastePrLink": "Wklej odnośnik do PR lub merge requestu",
+      "noRecentPrs": "Brak ostatnich recenzji",
+      "noRecentPrsDescription": "Wklej powyżej odnośnik, aby rozpocząć recenzję — następnym razem pojawi się tutaj.",
       "couldNotLoad": "Nie udało się wczytać danych.",
-      "eyebrow": "Otwórz PR za pomocą adresu URL.",
-      "noRecentPrs": "Brak ostatnio otwieranych PR",
-      "noRecentPrsDescription": "Wklej powyżej odnośnik do PR, aby rozpocząć przegląd. Przy następnym otwarciu tej listy znajdziesz go tutaj.",
-      "open": "Otwórz",
-      "pasteLink": "Wklej odnośnik do PR",
-      "pastePrLink": "Wklej odnośnik do PR",
-      "removeFromRecentsMessage": "Ten PR zniknie z listy ostatnio otwieranych PR.",
       "removeFromRecentsTitle": "Usunąć z listy ostatnio otwieranych?",
+      "removeFromRecentsMessage": "Ta recenzja zostanie usunięta z listy ostatnich.",
       "removeRecentAccessibility": "Usuń {{repo}} z listy ostatnio otwieranych",
-      "urlAccessibility": "Adres URL PR w serwisie GitHub"
+      "urlAccessibility": "Wpisz adres URL PR lub merge requestu",
+      "urlPlaceholder": "URL PR lub merge requesta",
+      "openAccessibility": "Otwórz PR lub merge request",
+      "clearLink": "Wyczyść odnośnik",
+      "pasteLink": "Wklej odnośnik do PR lub merge requestu",
+      "open": "Otwórz"
     },
     "eventChips": {
       "comment": "Komentarz",
@@ -2604,47 +2623,52 @@
     },
     "installKiloGitHubApp": "Zainstaluj aplikację Kilo dla GitHub",
     "merge": {
-      "autoMergeDescription": "GitHub automatycznie scali ten PR, gdy wszystkie wymagane kontrole zakończą się pomyślnie (metoda: {{method}}).",
-      "autoMergeOn": "Automatyczne scalanie włączone",
-      "blockedTitle": "Przyczyny blokady scalania",
-      "cannotMerge": "Nie można scalić tego PR w obecnej postaci.",
-      "checking": "Sprawdzanie możliwości scalenia…",
-      "commitMessage": "Komunikat commita",
-      "commitMessagePlaceholder": "Opcjonalny opis commita scalającego",
-      "commitTitle": "Tytuł commita",
-      "confirmMessage": "Twoje zmiany zostaną scalone z gałęzią bazową.",
-      "confirmTitle": "Scalić PR?",
-      "couldNotDetermine": "Nie udało się ustalić, czy można scalić ten PR.",
-      "couldNotMerge": "Nie udało się scalić PR.",
-      "deleteBranch": "Usuń gałąź",
-      "deleteBranchAfterMerge": "Usuń gałąź po scaleniu",
-      "disableAutoMerge": "Wyłącz automatyczne scalanie",
-      "enableAutoMerge": "Włącz automatyczne scalanie",
-      "enableAutoMergeConfirmMessage": "GitHub automatycznie scali ten PR, gdy wszystkie wymagane kontrole zakończą się pomyślnie.",
-      "enableAutoMergeConfirmTitle": "Włączyć automatyczne scalanie?",
-      "forbidden": "Nie masz uprawnień do scalenia tego PR.",
-      "loadFailedTitle": "Nie udało się wczytać opcji scalania.",
       "merge": "Scalanie",
       "mergeNow": "Scal teraz",
       "mergePullRequest": "Scalanie PR",
+      "mergeTermTitle": "Scalanie {{term}}",
+      "enableAutoMerge": "Włącz automatyczne scalanie",
+      "disableAutoMerge": "Wyłącz automatyczne scalanie",
+      "autoMergeOn": "Automatyczne scalanie włączone",
+      "autoMergeDescription": "GitHub automatycznie scali ten PR, gdy wszystkie wymagane kontrole zakończą się pomyślnie (metoda: {{method}}).",
+      "checking": "Sprawdzanie możliwości scalenia…",
+      "couldNotDetermine": "Nie udało się ustalić, czy można scalić ten PR.",
+      "refreshMergeability": "Sprawdź ponownie możliwość scalenia",
+      "blockedTitle": "Przyczyny blokady scalania",
+      "updateBranch": "Zaktualizuj gałąź",
+      "updateBranchFromBase": "Zaktualizuj gałąź na podstawie gałęzi bazowej",
       "methodLabel": "Metoda",
+      "commitTitle": "Tytuł commita",
+      "commitMessage": "Komunikat commita",
+      "commitMessagePlaceholder": "Opcjonalny opis commita scalającego",
+      "deleteBranch": "Usuń gałąź",
+      "deleteBranchAfterMerge": "Usuń gałąź po scaleniu",
+      "noEnabledMethods": "W tym repozytorium nie włączono żadnej metody scalania. Poproś administratora o włączenie scalania z commitem scalającym, połączeniem commitów lub zmianą bazy.",
+      "confirmTitle": "Scalić PR?",
+      "confirmTitleTerm": "Scalić {{term}}?",
+      "confirmMessage": "Twoje zmiany zostaną scalone z gałęzią bazową.",
+      "enableAutoMergeConfirmTitle": "Włączyć automatyczne scalanie?",
+      "enableAutoMergeConfirmMessage": "GitHub automatycznie scali ten PR, gdy wszystkie wymagane kontrole zakończą się pomyślnie.",
+      "enableAutoMergeConfirmMessageTerm": "Po pomyślnym przejściu pipeline {{term}} zostanie automatycznie scalony.",
+      "enableAutoMergeDescriptionTerm": "GitLab scala ten {{term}} automatycznie, gdy pipeline zakończy się sukcesem.",
+      "forbidden": "Nie masz uprawnień do scalenia tego PR.",
+      "cannotMerge": "Nie można scalić tego PR w obecnej postaci.",
+      "couldNotMerge": "Nie udało się scalić PR.",
       "methods": {
         "merge": "Scalanie",
         "rebase": "Zmiana bazy",
         "squash": "Połączenie commitów"
       },
-      "noEnabledMethods": "W tym repozytorium nie włączono żadnej metody scalania. Poproś administratora o włączenie scalania z commitem scalającym, połączeniem commitów lub zmianą bazy.",
+      "terminal": {
+        "alreadyMerged": "Już scalono",
+        "closed": "PR zamknięty",
+        "closedMergeRequest": "Merge request zamknięty"
+      },
       "partialSuccessBanner": {
         "accessibility": "Scalono. Nie udało się usunąć gałęzi: {{reason}}",
         "body": "Nie udało się usunąć gałęzi: {{reason}}."
       },
-      "refreshMergeability": "Sprawdź ponownie możliwość scalenia",
-      "terminal": {
-        "alreadyMerged": "Już scalono",
-        "closed": "PR zamknięty"
-      },
-      "updateBranch": "Zaktualizuj gałąź",
-      "updateBranchFromBase": "Zaktualizuj gałąź na podstawie gałęzi bazowej",
+      "loadFailedTitle": "Nie udało się wczytać opcji scalania.",
       "blocked": {
         "unknownStateTitle": "GitHub nie potwierdził możliwości scalenia",
         "unknownStateDetail": "Spróbuj za chwilę odświeżyć podsumowanie.",
@@ -2663,6 +2687,20 @@
         "behindDetail": "Gałąź źródłowa nie zawiera najnowszych zmian z gałęzi bazowej. Przed scaleniem zmień jej bazę lub ją zaktualizuj.",
         "notMergeableTitle": "Nie można jeszcze scalić tego PR",
         "notMergeableDetail": "GitHub zgłosił status scalania: {{state}}."
+      },
+      "restrictions": {
+        "title": "Ograniczenia scalania",
+        "approvalsRequired_one": "Wymagane jest {{displayCount}} zatwierdzenie",
+        "approvalsRequired_other": "Wymagane jest {{displayCount}} zatwierdzeń",
+        "pipelineMustSucceed": "Pipeline musi zakończyć się sukcesem przed scaleniem.",
+        "approvalsRequired_many": "Wymaganych jest {{displayCount}} zatwierdzeń",
+        "approvalsRequired_few": "Wymagane są {{displayCount}} zatwierdzenia"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline na najnowszym commicie się nie powiódł.",
+        "pendingPipeline": "Pipeline na najnowszym commicie nadal się wykonuje.",
+        "permission": "Nie masz uprawnień do scalenia tego {{term}}.",
+        "draft": "Przed scaleniem oznacz {{term}} jako gotowy do przeglądu."
       },
       "methodLabels": {
         "merge": "Utwórz commit scalający",
@@ -2725,8 +2763,11 @@
     "pullRequestUnavailable": "PR niedostępny",
     "pullRequestUnavailableDescription": "Nie można otworzyć tego PR. Być może został usunięty, repozytorium jest prywatne lub nie zainstalowano w nim aplikacji Kilo dla GitHub.",
     "reconnectNotice": {
+      "title": "Połączenie z serwisem GitHub wygasło.",
       "message": "Połączenie z kontem GitHub wygasło. Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie.",
-      "title": "Połączenie z serwisem GitHub wygasło."
+      "gitlabTitle": "Połączenie z serwisem GitLab wygasło.",
+      "bitbucketTitle": "Połączenie z serwisem Bitbucket wygasło.",
+      "providerMessage": "Połączenie z kontem {{provider}} wygasło. Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie."
     },
     "review": "Przegląd",
     "reviewPullRequest": "Przejrzyj PR",
@@ -2779,7 +2820,7 @@
       "emptyLine": "(brak treści)"
     },
     "linkPasteClipboardEmpty": "Schowek jest pusty.",
-    "linkPasteNotAPullRequest": "To nie jest odnośnik do PR w serwisie GitHub.",
+    "linkPasteNotAPullRequest": "To nie jest odnośnik do PR ani merge requestu",
     "announce": {
       "commentPosted": "Opublikowano komentarz",
       "reviewSubmitted": "Wysłano przegląd",
@@ -2788,6 +2829,7 @@
     "mutationError": {
       "commentNotPosted": "Nie można opublikować tego komentarza. Wybrany wiersz mógł się zmienić lub PR mógł zostać zaktualizowany.",
       "reviewNotSubmitted": "Nie można wysłać tego przeglądu w obecnej postaci. PR mógł się zmienić albo jest to twój własny PR, którego nie możesz przeglądać w ten sposób.",
+      "reviewNotSubmittedTerm": "Nie można wysłać tego przeglądu w obecnej postaci. {{term}} mógł się zmienić albo nie możesz przeglądać własnego {{term}}.",
       "couldNotPostComment": "Nie udało się opublikować komentarza.",
       "couldNotSubmitReview": "Nie udało się wysłać przeglądu. Sprawdź połączenie i spróbuj ponownie."
     },
@@ -2795,9 +2837,31 @@
       "couldNotReply": "Nie udało się odpowiedzieć.",
       "couldNotCompleteAction": "Nie udało się wykonać tej operacji.",
       "mergeResultDefaultError": "GitHub nie ukończył scalania.",
+      "mergeResultNotCompleted": "{{term}} nie został scalony. Sprawdź jego stan i spróbuj ponownie.",
       "ambiguous": "Nie udało się potwierdzić wyniku — sprawdź PR przed ponowną próbą.",
       "persistenceFailed": "Nie udało się zapisać tej operacji. Spróbuj ponownie później.",
       "forbidden": "Nie masz uprawnień do tej operacji."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Niedostępne u tego dostawcy",
+        "accessibility": "Niedostępne u tego dostawcy: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Udostępnij merge request",
+      "viewOnProvider": "Zobacz w {{provider}}",
+      "mergeRequestUnavailable": "Merge request niedostępny",
+      "unavailableDescription": "Mógł zostać usunięty albo nie masz do niego dostępu.",
+      "accessDeniedMergeRequest": "Nie masz uprawnień do wyświetlenia tego merge request.",
+      "couldNotLoadMergeRequest": "Nie udało się wczytać merge request.",
+      "discussionAccessDenied": "Nie masz uprawnień do wyświetlenia dyskusji w tym merge request.",
+      "discussionUnavailableMessage": "Ten merge request mógł zostać usunięty.",
+      "noDiscussionDescription": "W tym merge request nie ma jeszcze wątków przeglądu ani komentarzy w dyskusji.",
+      "noFilesChangedDescription": "Ten merge request nie zawiera zmian w plikach."
     }
   },
   "organization": {

@@ -36,6 +36,7 @@
     "cost": "Y gost",
     "discard": "Gwaredu",
     "findings": "Canfyddiadau",
+    "mergeRequest": "cais uno",
     "notConnected": "Heb gysylltu",
     "notifications": "Hysbysiadau",
     "pullRequest": "cais tynnu",
@@ -358,6 +359,7 @@
       "merge": "Cyfuno",
       "mergeNow": "Cyfuno nawr",
       "mergePullRequest": "Cyfuno cais tynnu",
+      "mergeTermTitle": "Cyfuno {{term}}",
       "enableAutoMerge": "Galluogi cyfuno awtomatig",
       "disableAutoMerge": "Analluogi cyfuno awtomatig",
       "autoMergeOn": "Mae cyfuno awtomatig ymlaen",
@@ -376,9 +378,12 @@
       "deleteBranchAfterMerge": "Dileu'r gangen ar ôl cyfuno",
       "noEnabledMethods": "Nid oes dulliau cyfuno wedi'u galluogi yn yr ystorfa hon. Gofynnwch i weinyddwr yr ystorfa alluogi cyfuno, cywasgu neu ailsylfaenu.",
       "confirmTitle": "Cyfuno cais tynnu?",
+      "confirmTitleTerm": "Cyfuno {{term}}?",
       "confirmMessage": "Bydd hyn yn cyfuno'ch newidiadau â'r gangen sylfaen.",
       "enableAutoMergeConfirmTitle": "Galluogi cyfuno awtomatig?",
       "enableAutoMergeConfirmMessage": "Bydd GitHub yn cyfuno'r cais tynnu hwn yn awtomatig pan fydd pob gwiriad gofynnol yn pasio.",
+      "enableAutoMergeConfirmMessageTerm": "Bydd y {{term}} yn uno'n awtomatig pan fydd ei bipline yn llwyddo.",
+      "enableAutoMergeDescriptionTerm": "Mae GitLab yn uno'r {{term}} hwn yn awtomatig pan fydd ei bipline yn llwyddo.",
       "forbidden": "Nid oes gennych ganiatâd i gyfuno'r cais tynnu hwn.",
       "cannotMerge": "Ni ellir cyfuno'r cais tynnu hwn fel y mae.",
       "couldNotMerge": "Ni lwyddwyd i gyfuno'r cais tynnu.",
@@ -389,7 +394,8 @@
       },
       "terminal": {
         "alreadyMerged": "Eisoes wedi'i gyfuno",
-        "closed": "Mae'r cais tynnu hwn ar gau"
+        "closed": "Mae'r cais tynnu hwn ar gau",
+        "closedMergeRequest": "Mae'r cais uno hwn ar gau"
       },
       "partialSuccessBanner": {
         "body": "Ni lwyddwyd i ddileu'r gangen: {{reason}}.",
@@ -414,6 +420,22 @@
         "behindDetail": "Mae'r gangen ffynhonnell ar ei hôl hi o gymharu â'r gangen sylfaen. Ailsylfaenwch neu ddiweddarwch y gangen cyn cyfuno.",
         "notMergeableTitle": "Ni ellir cyfuno'r cais tynnu hwn eto",
         "notMergeableDetail": "Yn ôl GitHub, y statws cyfuno yw {{state}}."
+      },
+      "restrictions": {
+        "title": "Cyfyngiadau uno",
+        "approvalsRequired_one": "Angen {{displayCount}} cymeradwyaeth",
+        "approvalsRequired_other": "Angen {{displayCount}} o gymeradwyaethau",
+        "pipelineMustSucceed": "Rhaid i'r pipline lwyddo cyn uno.",
+        "approvalsRequired_many": "Angen {{displayCount}} o gymeradwyaethau",
+        "approvalsRequired_few": "Angen {{displayCount}} o gymeradwyaethau",
+        "approvalsRequired_two": "Angen {{displayCount}} gymeradwyaeth",
+        "approvalsRequired_zero": "Angen {{displayCount}} o gymeradwyaethau"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Mae'r pipline yn methu ar y cofnod newid diweddaraf.",
+        "pendingPipeline": "Mae'r pipline yn dal i redeg ar y cofnod newid diweddaraf.",
+        "permission": "Nid oes gennych ganiatâd i gyfuno'r {{term}} hwn.",
+        "draft": "Marciwch y {{term}} yn barod i'w adolygu cyn cyfuno."
       },
       "methodLabels": {
         "merge": "Creu ymrwymiad cyfuno",
@@ -521,7 +543,8 @@
         "outdatedOnLines": "Wedi dyddio ar {{lines}}",
         "outdatedOnPath": "Wedi dyddio ar {{path}}"
       },
-      "deletedUser": "defnyddiwr wedi'i ddileu"
+      "deletedUser": "defnyddiwr wedi'i ddileu",
+      "replyForbiddenTerm": "Nid oes gennych ganiatâd i ateb y {{term}} hwn."
     },
     "couldNotOpenGitHubAppSettings": "Doedd dim modd agor gosodiadau ap GitHub.",
     "installKiloGitHubApp": "Gosod ap GitHub Kilo",
@@ -533,17 +556,19 @@
     "reviewPullRequest": "Adolygu cais tynnu",
     "headLine": "{{counts}} · ymrwymiad diweddaraf {{sha}}",
     "entry": {
-      "eyebrow": "Agorwch gais tynnu drwy ei URL.",
-      "pastePrLink": "Gludo dolen PR",
-      "noRecentPrs": "Dim PR diweddar",
-      "noRecentPrsDescription": "Gludwch ddolen PR uchod i ddechrau adolygiad — bydd yn ymddangos yma y tro nesaf.",
+      "eyebrow": "Agorwch gais tynnu neu gais uno drwy URL",
+      "pastePrLink": "Gludo dolen cais tynnu neu gais uno",
+      "noRecentPrs": "Dim adolygiadau diweddar",
+      "noRecentPrsDescription": "Gludwch ddolen uchod i ddechrau adolygiad — bydd yn ymddangos yma y tro nesaf.",
       "couldNotLoad": "Ni lwyddwyd i lwytho.",
       "removeFromRecentsTitle": "Tynnu o'r rhestr ddiweddar?",
-      "removeFromRecentsMessage": "Bydd y cais tynnu hwn yn cael ei dynnu o'ch rhestr ddiweddar.",
+      "removeFromRecentsMessage": "Bydd yr adolygiad hwn yn cael ei dynnu o'ch rhestr ddiweddar.",
       "removeRecentAccessibility": "Tynnu {{repo}} o'r rhestr ddiweddar",
-      "urlAccessibility": "URL cais tynnu GitHub",
-      "clearLink": "Clirio dolen cais tynnu",
-      "pasteLink": "Gludo dolen cais tynnu",
+      "urlAccessibility": "Rhowch URL cais tynnu neu gais uno",
+      "urlPlaceholder": "URL cais tynnu neu gais uno",
+      "openAccessibility": "Agor cais tynnu neu gais uno",
+      "clearLink": "Clirio dolen",
+      "pasteLink": "Gludo dolen cais tynnu neu gais uno",
       "open": "Agor"
     },
     "checks": {
@@ -592,9 +617,15 @@
     "connect": {
       "checkFailedTitle": "Ni lwyddwyd i wirio'r cysylltiad GitHub.",
       "checkFailedMessage": "Ni fydd y statws mewngofnodi ar gael nes bod hyn wedi llwytho.",
+      "checkFailedTitleGitLab": "Ni lwyddwyd i wirio'r cysylltiad GitLab.",
+      "checkFailedTitleBitbucket": "Ni lwyddwyd i wirio'r cysylltiad Bitbucket.",
+      "providerCheckFailedMessage": "Nid yw statws y cysylltiad ar gael nes iddo lwytho.",
       "reconnectTitle": "Ailgysylltu â GitHub",
       "reconnectDescription": "Dirymwyd eich cysylltiad GitHub. Ailgysylltwch i barhau i adolygu ceisiadau tynnu ar eich ffôn.",
-      "description": "Cysylltwch eich cyfrif GitHub i adolygu ceisiadau tynnu ar eich ffôn."
+      "description": "Cysylltwch eich cyfrif GitHub i adolygu ceisiadau tynnu ar eich ffôn.",
+      "gitlabDescription": "Cysylltwch eich cyfrif GitLab i adolygu ceisiadau uno ar y dyfais symudol.",
+      "bitbucketDescription": "Cysylltwch Bitbucket â'r sefydliad hwn i adolygu ceisiadau tynnu ar y dyfais symudol.",
+      "bitbucketOrgOnlyDescription": "Dewiswch sefydliad yn eich proffil i adolygu ei geisiadau tynnu Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -620,7 +651,10 @@
     },
     "reconnectNotice": {
       "title": "Mae'r cysylltiad â GitHub wedi dod i ben.",
-      "message": "Nid yw'ch cysylltiad GitHub yn ddilys mwyach. Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen."
+      "message": "Nid yw'ch cysylltiad GitHub yn ddilys mwyach. Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen.",
+      "gitlabTitle": "Mae'r cysylltiad â GitLab wedi dod i ben.",
+      "bitbucketTitle": "Mae'r cysylltiad â Bitbucket wedi dod i ben.",
+      "providerMessage": "Nid yw'ch cysylltiad {{provider}} yn ddilys mwyach. Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen."
     },
     "eventChips": {
       "comment": "Sylwadu",
@@ -696,7 +730,7 @@
       "emptyLine": "(gwag)"
     },
     "linkPasteClipboardEmpty": "Mae'r clipfwrdd yn wag.",
-    "linkPasteNotAPullRequest": "Nid dolen cais tynnu GitHub yw hon.",
+    "linkPasteNotAPullRequest": "Nid dolen cais tynnu neu gais uno yw hon",
     "announce": {
       "commentPosted": "Sylw wedi'i bostio",
       "reviewSubmitted": "Adolygiad wedi'i gyflwyno",
@@ -705,6 +739,7 @@
     "mutationError": {
       "commentNotPosted": "Ni ellir postio'r sylw hwn. Efallai fod y llinell a ddewiswyd wedi newid, neu fod y PR wedi'i ddiweddaru.",
       "reviewNotSubmitted": "Ni ellir cyflwyno'r adolygiad hwn fel y mae. Efallai fod y PR wedi newid, neu mai'ch cais tynnu eich hun ydyw, ac ni allwch ei adolygu.",
+      "reviewNotSubmittedTerm": "Ni ellir cyflwyno'r adolygiad hwn fel y mae. Efallai bod y {{term}} wedi newid, neu ni allwch adolygu eich {{term}} eich hun.",
       "couldNotPostComment": "Ni lwyddwyd i bostio'r sylw.",
       "couldNotSubmitReview": "Ni lwyddwyd i gyflwyno'r adolygiad. Gwiriwch eich cysylltiad a rhowch gynnig eto."
     },
@@ -712,9 +747,31 @@
       "couldNotReply": "Doedd dim modd ateb.",
       "couldNotCompleteAction": "Ni lwyddwyd i gwblhau'r weithred hon.",
       "mergeResultDefaultError": "Ni chwblhaodd GitHub y cyfuno.",
+      "mergeResultNotCompleted": "Ni chafodd y {{term}} ei uno. Gwiriwch ei gyflwr a rhoi cynnig arall arni.",
       "ambiguous": "Ni lwyddwyd i gadarnhau'r canlyniad — gwiriwch y PR cyn rhoi cynnig eto.",
       "persistenceFailed": "Ni lwyddwyd i gofnodi'r weithred hon. Rhowch gynnig eto yn nes ymlaen.",
       "forbidden": "Ni chaniateir hyn."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ddim ar gael ar y darparwr hwn",
+        "accessibility": "Ddim ar gael ar y darparwr hwn: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Cais tynnu",
+      "mergeRequest": "Cais uno",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Rhannu cais uno",
+      "viewOnProvider": "Gweld ar {{provider}}",
+      "mergeRequestUnavailable": "Cais uno ddim ar gael",
+      "unavailableDescription": "Efallai ei fod wedi'i ddileu, neu efallai nad oes gennych fynediad ato.",
+      "accessDeniedMergeRequest": "Nid oes gennych ganiatâd i weld y cais uno hwn.",
+      "couldNotLoadMergeRequest": "Ni lwyddwyd i lwytho'r cais uno.",
+      "discussionAccessDenied": "Nid oes gennych ganiatâd i weld trafodaeth y cais uno hwn.",
+      "discussionUnavailableMessage": "Efallai fod y cais uno hwn wedi'i ddileu.",
+      "noDiscussionDescription": "Nid oes edafedd adolygu na sylwadau trafod ar y cais uno hwn.",
+      "noFilesChangedDescription": "Nid oes unrhyw ffeiliau wedi'u newid yn y cais uno hwn."
     }
   },
   "notifications": {
@@ -2061,11 +2118,31 @@
       "retryConnection": "Ceisio cysylltu eto"
     },
     "newSession": {
+      "recentlyUsed": "Defnyddiwyd yn ddiweddar",
+      "couldNotLoadGithubRepositories": "Methu llwytho ystorfeydd GitHub.",
+      "couldNotLoadGitlabRepositories": "Methu llwytho ystorfeydd GitLab.",
+      "couldNotLoadBitbucketRepositories": "Methu llwytho ystorfeydd Bitbucket.",
       "connectGithubDescription": "Cysylltwch â GitHub yn eich porwr, yna dewch yn ôl yma i ddewis ystorfa.",
+      "connectGitlabDescription": "Cysylltwch â GitLab yn eich porwr, yna dewch yn ôl yma i ddewis ystorfa.",
+      "connectBitbucketDescription": "Cysylltwch â Bitbucket yn eich porwr, yna dewch yn ôl yma i ddewis ystorfa.",
       "openGithub": "Agor GitHub",
+      "openGitlab": "Agor GitLab",
+      "openBitbucket": "Agor Bitbucket",
       "refreshRepositories": "Adnewyddu ystorfeydd",
       "githubConnected": "GitHub wedi'i gysylltu",
+      "gitlabConnected": "GitLab wedi'i gysylltu",
       "noRepositoriesVisible": "Nid oes ystorfeydd i'w gweld. Gwiriwch fod gan ap GitHub Kilo fynediad i'r ystorfeydd, yna adnewyddwch.",
+      "noRepositoriesVisibleGitlab": "Nid oes ystorfeydd i'w gweld. Gwiriwch y caniatâd i gyrchu ystorfeydd GitLab, yna adnewyddwch.",
+      "noRepositoriesVisibleBitbucket": "Nid oes ystorfeydd i'w gweld. Gwiriwch y caniatâd i gyrchu ystorfeydd Bitbucket, yna adnewyddwch.",
+      "bitbucketOrganizationsOnly": "Mae Bitbucket ar gael i sefydliadau yn unig.",
+      "branchPickerTitle": "Dewis cangen",
+      "branchDefault": "Rhagosodedig",
+      "branchAccessibility": "Cangen: {{label}}",
+      "branchLoading": "Yn llwytho ceangau",
+      "branchLoadError": "Ni lwyddwyd i lwytho ceangau",
+      "branchUnavailable": "Nid yw ceangau ar gael ar gyfer yr ystorfa hon. Gwiriwch eich mynediad gyda'r darparwr, yna dewiswch ystorfa arall.",
+      "branchEmpty": "Dim ceangau ar gael",
+      "branchPlaceholder": "Dewiswch gangen",
       "runOnWithTarget": "Rhedeg ar: {{target}}",
       "environment": "Amgylchedd",
       "couldNotLoadEnvironment": "Methu llwytho'ch amgylchedd.",
@@ -2086,24 +2163,13 @@
       "couldNotRefreshRepositories": "Methu adnewyddu'r ystorfeydd. Ceisiwch eto.",
       "discardDraftTitle": "Dileu'r drafft?",
       "discardDraftMessage": "Byddwch yn colli'ch anogiad.",
+      "discardWithUploadsMessage": "Bydd eich anogiad ac unrhyw ffeiliau a uwchlwythwyd ond sydd heb eu defnyddio yn cael eu dileu.",
       "discardFailed": "Methu dileu'r drafft. Ceisiwch eto.",
       "remoteHint": "Rhedwch `kilo remote` ar eich cyfrifiadur, neu `/remote` mewn sesiwn CLI sy'n rhedeg, i reoli proses kilo leol.",
-      "connectBitbucketDescription": "Cysylltwch â Bitbucket yn eich porwr, yna dewch yn ôl yma i ddewis ystorfa.",
-      "connectGitlabDescription": "Cysylltwch â GitLab yn eich porwr, yna dewch yn ôl yma i ddewis ystorfa.",
-      "couldNotLoadBitbucketRepositories": "Methu llwytho ystorfeydd Bitbucket.",
-      "couldNotLoadGithubRepositories": "Methu llwytho ystorfeydd GitHub.",
-      "couldNotLoadGitlabRepositories": "Methu llwytho ystorfeydd GitLab.",
-      "gitlabConnected": "GitLab wedi'i gysylltu",
-      "noRepositoriesVisibleBitbucket": "Nid oes ystorfeydd i'w gweld. Gwiriwch y caniatâd i gyrchu ystorfeydd Bitbucket, yna adnewyddwch.",
-      "noRepositoriesVisibleGitlab": "Nid oes ystorfeydd i'w gweld. Gwiriwch y caniatâd i gyrchu ystorfeydd GitLab, yna adnewyddwch.",
-      "openBitbucket": "Agor Bitbucket",
-      "openGitlab": "Agor GitLab",
-      "recentlyUsed": "Defnyddiwyd yn ddiweddar",
       "continueFrom": "Yn parhau â {{title}}.",
       "importingSession": "Yn mewnforio sesiwn",
       "cliCannotContinue": "Ni all y CLI hwn barhau â sesiwn. Dewiswch Cloud Agent neu CLI arall.",
-      "importFailed": "Methu mewnforio'r sesiwn hon.",
-      "discardWithUploadsMessage": "Bydd eich anogiad ac unrhyw ffeiliau a uwchlwythwyd ond sydd heb eu defnyddio yn cael eu dileu."
+      "importFailed": "Methu mewnforio'r sesiwn hon."
     },
     "partRenderer": {
       "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil.",

@@ -61,6 +61,9 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The section's loading card renders the UI skeleton; the real one reaches
+// expo-linear-gradient and the reanimated worklets, which stay unmocked here.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: (key: string) => key } }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/format', () => ({

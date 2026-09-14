@@ -4,6 +4,8 @@
     "done": "완료",
     "retry": "다시 시도",
     "tryAgain": "다시 시도",
+    "continue": "계속하기",
+    "notNow": "나중에",
     "language": "언어",
     "device": "기기",
     "share": "{{title}} 공유",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "클립보드에 복사하지 못했습니다.",
     "required": "필수",
     "error": "오류: {{error}}",
-    "notNow": "나중에",
-    "continue": "계속하기",
     "back": "뒤로",
     "somethingWentWrong": "문제가 발생했습니다.",
     "couldNotOpen": "{{label}}을(를) 열지 못했습니다.",
@@ -36,6 +36,7 @@
     "cost": "비용",
     "discard": "버리기",
     "findings": "진단 결과",
+    "mergeRequest": "머지 요청",
     "notConnected": "연결 안 됨",
     "notifications": "알림",
     "pullRequest": "풀 리퀘스트",
@@ -1563,11 +1564,31 @@
       "retryConnection": "연결 다시 시도"
     },
     "newSession": {
+      "recentlyUsed": "최근 사용",
+      "couldNotLoadGithubRepositories": "GitHub 저장소를 불러올 수 없습니다.",
+      "couldNotLoadGitlabRepositories": "GitLab 저장소를 불러올 수 없습니다.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket 저장소를 불러올 수 없습니다.",
       "connectGithubDescription": "브라우저에서 GitHub를 연결한 후 여기로 돌아와 저장소를 선택하세요.",
+      "connectGitlabDescription": "브라우저에서 GitLab을 연결한 후 여기로 돌아와 저장소를 선택하세요.",
+      "connectBitbucketDescription": "브라우저에서 Bitbucket을 연결한 후 여기로 돌아와 저장소를 선택하세요.",
       "openGithub": "GitHub 열기",
+      "openGitlab": "GitLab 열기",
+      "openBitbucket": "Bitbucket 열기",
       "refreshRepositories": "저장소 새로고침",
       "githubConnected": "GitHub 연결됨",
+      "gitlabConnected": "GitLab 연결됨",
       "noRepositoriesVisible": "표시할 저장소가 없습니다. Kilo GitHub 앱의 저장소 접근 권한을 확인한 후 새로고침하세요.",
+      "noRepositoriesVisibleGitlab": "표시할 저장소가 없습니다. GitLab의 저장소 접근 권한을 확인한 후 새로고침하세요.",
+      "noRepositoriesVisibleBitbucket": "표시할 저장소가 없습니다. Bitbucket의 저장소 접근 권한을 확인한 후 새로고침하세요.",
+      "bitbucketOrganizationsOnly": "Bitbucket은 조직에서만 사용할 수 있습니다.",
+      "branchPickerTitle": "브랜치 선택",
+      "branchDefault": "기본값",
+      "branchAccessibility": "브랜치: {{label}}",
+      "branchLoading": "브랜치 불러오는 중",
+      "branchLoadError": "브랜치를 불러오지 못했습니다",
+      "branchUnavailable": "이 저장소에서는 브랜치를 사용할 수 없습니다. 공급업체에서의 접근 권한을 확인한 후 다른 저장소를 선택하세요.",
+      "branchEmpty": "사용 가능한 브랜치가 없습니다",
+      "branchPlaceholder": "브랜치 선택",
       "runOnWithTarget": "실행 위치: {{target}}",
       "environment": "환경",
       "couldNotLoadEnvironment": "환경을 불러올 수 없습니다.",
@@ -1586,26 +1607,15 @@
       "couldNotReadPendingSessions": "대기 중인 세션을 불러올 수 없습니다. 다시 시도하세요.",
       "failedToCreate": "세션을 만들지 못했습니다.",
       "couldNotRefreshRepositories": "저장소를 새로고침하지 못했습니다. 다시 시도하세요.",
-      "discardDraftMessage": "프롬프트가 사라집니다.",
       "discardDraftTitle": "초안을 삭제할까요?",
+      "discardDraftMessage": "프롬프트가 사라집니다.",
+      "discardWithUploadsMessage": "프롬프트와 보낸 메시지에 첨부되지 않은 모든 업로드 파일이 삭제됩니다.",
       "discardFailed": "초안을 삭제할 수 없습니다. 다시 시도하세요.",
       "remoteHint": "컴퓨터에서 `kilo remote`를 실행하거나 실행 중인 CLI 세션에서 `/remote`를 사용하여 로컬 kilo 프로세스를 제어하세요.",
-      "connectBitbucketDescription": "브라우저에서 Bitbucket을 연결한 후 여기로 돌아와 저장소를 선택하세요.",
-      "connectGitlabDescription": "브라우저에서 GitLab을 연결한 후 여기로 돌아와 저장소를 선택하세요.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket 저장소를 불러올 수 없습니다.",
-      "couldNotLoadGithubRepositories": "GitHub 저장소를 불러올 수 없습니다.",
-      "couldNotLoadGitlabRepositories": "GitLab 저장소를 불러올 수 없습니다.",
-      "gitlabConnected": "GitLab 연결됨",
-      "noRepositoriesVisibleBitbucket": "표시할 저장소가 없습니다. Bitbucket의 저장소 접근 권한을 확인한 후 새로고침하세요.",
-      "noRepositoriesVisibleGitlab": "표시할 저장소가 없습니다. GitLab의 저장소 접근 권한을 확인한 후 새로고침하세요.",
-      "openBitbucket": "Bitbucket 열기",
-      "openGitlab": "GitLab 열기",
-      "recentlyUsed": "최근 사용",
       "continueFrom": "{{title}} 세션을 이어서 진행합니다.",
       "importingSession": "세션 가져오는 중",
       "cliCannotContinue": "이 CLI에서는 세션을 이어서 진행할 수 없습니다. Cloud Agent 또는 다른 CLI를 선택하세요.",
-      "importFailed": "이 세션을 가져올 수 없습니다.",
-      "discardWithUploadsMessage": "프롬프트와 보낸 메시지에 첨부되지 않은 모든 업로드 파일이 삭제됩니다."
+      "importFailed": "이 세션을 가져올 수 없습니다."
     },
     "partRenderer": {
       "updatedFileCount_one": "파일 {{displayCount}}개를 업데이트했습니다.",
@@ -2364,11 +2374,17 @@
       "tapDiffLineToSuggest": "코드 제안을 사용하려면 변경 내용에서 줄을 탭하세요."
     },
     "connect": {
-      "checkFailedMessage": "정보를 불러올 때까지 로그인 상태를 확인할 수 없습니다.",
       "checkFailedTitle": "GitHub 연결을 확인하지 못했습니다.",
-      "description": "모바일에서 풀 리퀘스트를 리뷰하려면 GitHub 계정을 연결하세요.",
+      "checkFailedMessage": "정보를 불러올 때까지 로그인 상태를 확인할 수 없습니다.",
+      "checkFailedTitleGitLab": "GitLab 연결을 확인하지 못했습니다.",
+      "checkFailedTitleBitbucket": "Bitbucket 연결을 확인하지 못했습니다.",
+      "providerCheckFailedMessage": "로드될 때까지 연결 상태를 사용할 수 없습니다.",
+      "reconnectTitle": "GitHub 다시 연결",
       "reconnectDescription": "GitHub 연결이 해제되었습니다. 모바일에서 풀 리퀘스트를 계속 리뷰하려면 다시 연결하세요.",
-      "reconnectTitle": "GitHub 다시 연결"
+      "description": "모바일에서 풀 리퀘스트를 리뷰하려면 GitHub 계정을 연결하세요.",
+      "gitlabDescription": "모바일에서 머지 요청을 검토하려면 GitLab 계정을 연결하세요.",
+      "bitbucketDescription": "모바일에서 풀 리퀘스트를 검토하려면 이 조직을 Bitbucket에 연결하세요.",
+      "bitbucketOrgOnlyDescription": "프로필에서 조직을 선택하면 해당 조직의 Bitbucket 풀 리퀘스트를 검토할 수 있습니다."
     },
     "connectionExpired": "GitHub 연결이 만료되었습니다.",
     "couldNotLoadPullRequest": "풀 리퀘스트를 불러오지 못했습니다.",
@@ -2461,21 +2477,24 @@
         "outdatedOnLines": "{{lines}} · 이전 버전",
         "outdatedOnPath": "{{path}} · 이전 버전"
       },
-      "deletedUser": "삭제된 사용자"
+      "deletedUser": "삭제된 사용자",
+      "replyForbiddenTerm": "이 {{term}}에 답글을 달 권한이 없습니다."
     },
     "entry": {
-      "clearLink": "풀 리퀘스트 링크 지우기",
+      "eyebrow": "URL로 풀 리퀘스트 또는 머지 요청 열기",
+      "pastePrLink": "풀 리퀘스트 또는 머지 요청 링크 붙여넣기",
+      "noRecentPrs": "최근 리뷰 없음",
+      "noRecentPrsDescription": "위에 링크를 붙여넣어 리뷰를 시작하세요. 다음부터는 여기에 표시됩니다.",
       "couldNotLoad": "불러오지 못했습니다.",
-      "eyebrow": "URL로 풀 리퀘스트를 여세요.",
-      "noRecentPrs": "최근 PR 없음",
-      "noRecentPrsDescription": "위에 PR 링크를 붙여넣어 리뷰를 시작하세요. 다음부터는 여기에 표시됩니다.",
-      "open": "오픈",
-      "pasteLink": "풀 리퀘스트 링크 붙여넣기",
-      "pastePrLink": "PR 링크 붙여넣기",
-      "removeFromRecentsMessage": "이 풀 리퀘스트가 최근 항목에서 제거됩니다.",
       "removeFromRecentsTitle": "최근 항목에서 제거할까요?",
+      "removeFromRecentsMessage": "이 리뷰는 최근 항목에서 제거됩니다.",
       "removeRecentAccessibility": "최근 항목에서 {{repo}} 제거",
-      "urlAccessibility": "GitHub 풀 리퀘스트 URL"
+      "urlAccessibility": "풀 리퀘스트 또는 머지 요청 URL 입력",
+      "urlPlaceholder": "풀 리퀘스트 또는 머지 요청 URL",
+      "openAccessibility": "풀 리퀘스트 또는 머지 요청 열기",
+      "clearLink": "링크 지우기",
+      "pasteLink": "풀 리퀘스트 또는 머지 요청 링크 붙여넣기",
+      "open": "오픈"
     },
     "eventChips": {
       "comment": "댓글",
@@ -2568,47 +2587,52 @@
     },
     "installKiloGitHubApp": "Kilo GitHub 앱 설치",
     "merge": {
-      "autoMergeDescription": "필수 검사를 모두 통과하면 GitHub에서 이 풀 리퀘스트를 자동으로 병합합니다(방식: {{method}}).",
-      "autoMergeOn": "자동 병합 켜짐",
-      "blockedTitle": "아직 병합할 수 없는 이유",
-      "cannotMerge": "이 풀 리퀘스트는 현재 상태로 병합할 수 없습니다.",
-      "checking": "병합 가능 여부 확인 중…",
-      "commitMessage": "커밋 메시지",
-      "commitMessagePlaceholder": "병합 커밋 설명(선택 사항)",
-      "commitTitle": "커밋 제목",
-      "confirmMessage": "변경 사항이 기준 브랜치에 병합됩니다.",
-      "confirmTitle": "풀 리퀘스트를 병합할까요?",
-      "couldNotDetermine": "병합 가능 여부를 확인할 수 없습니다.",
-      "couldNotMerge": "풀 리퀘스트를 병합하지 못했습니다.",
-      "deleteBranch": "브랜치 삭제",
-      "deleteBranchAfterMerge": "병합 후 브랜치 삭제",
-      "disableAutoMerge": "자동 병합 끄기",
-      "enableAutoMerge": "자동 병합 켜기",
-      "enableAutoMergeConfirmMessage": "필수 검사를 모두 통과하면 GitHub에서 이 풀 리퀘스트를 자동으로 병합합니다.",
-      "enableAutoMergeConfirmTitle": "자동 병합을 켤까요?",
-      "forbidden": "이 풀 리퀘스트를 병합할 권한이 없습니다.",
-      "loadFailedTitle": "병합 옵션을 불러오지 못했습니다.",
       "merge": "병합",
       "mergeNow": "지금 병합",
       "mergePullRequest": "풀 리퀘스트 병합",
+      "mergeTermTitle": "{{term}} 병합",
+      "enableAutoMerge": "자동 병합 켜기",
+      "disableAutoMerge": "자동 병합 끄기",
+      "autoMergeOn": "자동 병합 켜짐",
+      "autoMergeDescription": "필수 검사를 모두 통과하면 GitHub에서 이 풀 리퀘스트를 자동으로 병합합니다(방식: {{method}}).",
+      "checking": "병합 가능 여부 확인 중…",
+      "couldNotDetermine": "병합 가능 여부를 확인할 수 없습니다.",
+      "refreshMergeability": "병합 가능 여부 새로고침",
+      "blockedTitle": "아직 병합할 수 없는 이유",
+      "updateBranch": "브랜치 업데이트",
+      "updateBranchFromBase": "기준 브랜치의 변경 사항으로 브랜치 업데이트",
       "methodLabel": "병합 방식",
+      "commitTitle": "커밋 제목",
+      "commitMessage": "커밋 메시지",
+      "commitMessagePlaceholder": "병합 커밋 설명(선택 사항)",
+      "deleteBranch": "브랜치 삭제",
+      "deleteBranchAfterMerge": "병합 후 브랜치 삭제",
+      "noEnabledMethods": "이 저장소에는 활성화된 병합 방식이 없습니다. 저장소 관리자에게 병합, 스쿼시 또는 리베이스 병합을 활성화해 달라고 요청하세요.",
+      "confirmTitle": "풀 리퀘스트를 병합할까요?",
+      "confirmTitleTerm": "{{term}}를 병합할까요?",
+      "confirmMessage": "변경 사항이 기준 브랜치에 병합됩니다.",
+      "enableAutoMergeConfirmTitle": "자동 병합을 켤까요?",
+      "enableAutoMergeConfirmMessage": "필수 검사를 모두 통과하면 GitHub에서 이 풀 리퀘스트를 자동으로 병합합니다.",
+      "enableAutoMergeConfirmMessageTerm": "파이프라인이 성공하면 {{term}}이(가) 자동으로 병합됩니다.",
+      "enableAutoMergeDescriptionTerm": "파이프라인이 성공하면 GitLab이 이 {{term}}을(를) 자동으로 병합합니다.",
+      "forbidden": "이 풀 리퀘스트를 병합할 권한이 없습니다.",
+      "cannotMerge": "이 풀 리퀘스트는 현재 상태로 병합할 수 없습니다.",
+      "couldNotMerge": "풀 리퀘스트를 병합하지 못했습니다.",
       "methods": {
         "merge": "병합",
         "rebase": "리베이스",
         "squash": "스쿼시"
       },
-      "noEnabledMethods": "이 저장소에는 활성화된 병합 방식이 없습니다. 저장소 관리자에게 병합, 스쿼시 또는 리베이스 병합을 활성화해 달라고 요청하세요.",
+      "terminal": {
+        "alreadyMerged": "이미 병합됨",
+        "closed": "풀 리퀘스트 닫힘",
+        "closedMergeRequest": "머지 요청 닫힘"
+      },
       "partialSuccessBanner": {
         "accessibility": "병합을 완료했습니다. 브랜치를 삭제하지 못했습니다. 사유: {{reason}}",
         "body": "브랜치를 삭제하지 못했습니다. 사유: {{reason}}"
       },
-      "refreshMergeability": "병합 가능 여부 새로고침",
-      "terminal": {
-        "alreadyMerged": "이미 병합됨",
-        "closed": "풀 리퀘스트 닫힘"
-      },
-      "updateBranch": "브랜치 업데이트",
-      "updateBranchFromBase": "기준 브랜치의 변경 사항으로 브랜치 업데이트",
+      "loadFailedTitle": "병합 옵션을 불러오지 못했습니다.",
       "blocked": {
         "unknownStateTitle": "GitHub에서 병합 가능 여부를 아직 확인하지 못함",
         "unknownStateDetail": "잠시 후 개요를 새로고침해 보세요.",
@@ -2627,6 +2651,18 @@
         "behindDetail": "현재 브랜치에 기준 브랜치의 최신 변경 사항이 반영되지 않았습니다. 병합 전에 브랜치를 리베이스하거나 업데이트하세요.",
         "notMergeableTitle": "아직 병합할 수 없는 풀 리퀘스트",
         "notMergeableDetail": "GitHub에서 확인한 병합 가능 상태는 {{state}}입니다."
+      },
+      "restrictions": {
+        "title": "병합 제한",
+        "approvalsRequired_one": "{{displayCount}}개의 승인 필요",
+        "approvalsRequired_other": "{{displayCount}}개의 승인 필요",
+        "pipelineMustSucceed": "병합하기 전에 파이프라인이 성공해야 합니다."
+      },
+      "providerBlocked": {
+        "failingPipeline": "최신 커밋에서 파이프라인이 실패하고 있습니다.",
+        "pendingPipeline": "최신 커밋에서 파이프라인이 아직 실행 중입니다.",
+        "permission": "이 {{term}}를 병합할 권한이 없습니다.",
+        "draft": "병합 전에 {{term}}를 리뷰 준비 완료로 표시하세요."
       },
       "methodLabels": {
         "merge": "병합 커밋 만들기",
@@ -2685,8 +2721,11 @@
     "pullRequestUnavailable": "풀 리퀘스트를 열 수 없음",
     "pullRequestUnavailableDescription": "이 PR을 열 수 없습니다. PR이 삭제되었거나 저장소가 비공개이거나 해당 저장소에 Kilo GitHub 앱이 설치되지 않았을 수 있습니다.",
     "reconnectNotice": {
+      "title": "GitHub 연결이 만료되었습니다.",
       "message": "GitHub 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다.",
-      "title": "GitHub 연결이 만료되었습니다."
+      "gitlabTitle": "GitLab 연결이 만료되었습니다.",
+      "bitbucketTitle": "Bitbucket 연결이 만료되었습니다.",
+      "providerMessage": "{{provider}} 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다."
     },
     "review": "리뷰",
     "reviewPullRequest": "풀 리퀘스트 리뷰",
@@ -2737,7 +2776,7 @@
       "emptyLine": "(비어 있음)"
     },
     "linkPasteClipboardEmpty": "클립보드가 비어 있습니다.",
-    "linkPasteNotAPullRequest": "GitHub 풀 리퀘스트 링크가 아닙니다.",
+    "linkPasteNotAPullRequest": "풀 리퀘스트 또는 머지 요청 링크가 아닙니다",
     "announce": {
       "commentPosted": "댓글이 게시되었습니다",
       "reviewSubmitted": "리뷰가 제출되었습니다",
@@ -2746,6 +2785,7 @@
     "mutationError": {
       "commentNotPosted": "이 댓글은 게시할 수 없습니다. 선택한 줄이 변경되었거나 PR이 업데이트되었을 수 있습니다.",
       "reviewNotSubmitted": "이 리뷰는 현재 상태로 제출할 수 없습니다. PR이 변경되었거나 본인이 작성한 풀 리퀘스트여서 리뷰할 수 없는 경우일 수 있습니다.",
+      "reviewNotSubmittedTerm": "이 리뷰는 그대로 제출할 수 없습니다. {{term}}이(가) 변경되었거나, 자신의 {{term}}은(는) 검토할 수 없습니다.",
       "couldNotPostComment": "댓글을 게시하지 못했습니다.",
       "couldNotSubmitReview": "리뷰를 제출하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요."
     },
@@ -2753,9 +2793,31 @@
       "couldNotReply": "답글을 달 수 없습니다.",
       "couldNotCompleteAction": "이 작업을 완료하지 못했습니다.",
       "mergeResultDefaultError": "GitHub가 병합을 완료하지 않았습니다.",
+      "mergeResultNotCompleted": "{{term}}이(가) 병합되지 않았습니다. 상태를 확인하고 다시 시도하세요.",
       "ambiguous": "작업 결과를 확인하지 못했습니다. 다시 시도하기 전에 PR을 확인하세요.",
       "persistenceFailed": "이 작업을 기록하지 못했습니다. 나중에 다시 시도하세요.",
       "forbidden": "이 작업을 수행할 권한이 없습니다."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "이 공급업체에서 사용할 수 없음",
+        "accessibility": "이 공급업체에서 사용할 수 없음: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "풀 리퀘스트",
+      "mergeRequest": "머지 요청",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "머지 요청 공유",
+      "viewOnProvider": "{{provider}}에서 보기",
+      "mergeRequestUnavailable": "머지 요청를 열 수 없음",
+      "unavailableDescription": "삭제되었거나 접근 권한이 없을 수 있습니다.",
+      "accessDeniedMergeRequest": "이 머지 요청를 볼 권한이 없습니다.",
+      "couldNotLoadMergeRequest": "머지 요청를 불러오지 못했습니다.",
+      "discussionAccessDenied": "이 머지 요청의 토론을 볼 권한이 없습니다.",
+      "discussionUnavailableMessage": "이 머지 요청가 삭제되었을 수 있습니다.",
+      "noDiscussionDescription": "이 머지 요청에는 아직 리뷰 스레드나 댓글이 없습니다.",
+      "noFilesChangedDescription": "이 머지 요청에는 변경된 파일이 없습니다."
     }
   },
   "organization": {

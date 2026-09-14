@@ -36,6 +36,7 @@
     "cost": "ຄ່າໃຊ້ຈ່າຍ",
     "discard": "ຖິ້ມ",
     "findings": "ບັນຫາທີ່ກວດພົບ",
+    "mergeRequest": "merge request",
     "notConnected": "ຍັງບໍ່ເຊື່ອມຕໍ່",
     "notifications": "ການແຈ້ງເຕືອນ",
     "pullRequest": "ຄຳຂໍລວມໂຄ້ດ",
@@ -350,6 +351,7 @@
       "merge": "ລວມໂຄ້ດ",
       "mergeNow": "ລວມດຽວນີ້",
       "mergePullRequest": "ລວມຄຳຂໍລວມໂຄດ",
+      "mergeTermTitle": "ລວມ{{term}}",
       "enableAutoMerge": "ເປີດການລວມອັດຕະໂນມັດ",
       "disableAutoMerge": "ປິດການລວມອັດຕະໂນມັດ",
       "autoMergeOn": "ເປີດການລວມອັດຕະໂນມັດຢູ່",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "ລຶບສາຂາຫຼັງຈາກລວມ",
       "noEnabledMethods": "ຄັງໂຄດນີ້ຍັງບໍ່ໄດ້ເປີດໃຊ້ວິທີລວມໃດໆ. ຂໍໃຫ້ຜູ້ດູແລຄັງໂຄດເປີດໃຊ້ການລວມແບບສ້າງຄອມມິດການລວມ, ຍຸບຄອມມິດເປັນໜຶ່ງ ຫຼື ປ່ຽນຖານ.",
       "confirmTitle": "ລວມຄຳຂໍລວມໂຄດບໍ?",
+      "confirmTitleTerm": "ລວມ{{term}}ນີ້ບໍ?",
       "confirmMessage": "ການດຳເນີນການນີ້ຈະລວມການປ່ຽນແປງຂອງທ່ານເຂົ້າໃນສາຂາຖານ.",
       "enableAutoMergeConfirmTitle": "ເປີດການລວມອັດຕະໂນມັດບໍ?",
       "enableAutoMergeConfirmMessage": "GitHub ຈະລວມຄຳຂໍລວມໂຄດນີ້ອັດຕະໂນມັດ ເມື່ອຜ່ານການກວດສອບທີ່ບັງຄັບທັງໝົດ.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} ຈະລວມໂດຍອັດຕະໂນມັດເມື່ອໄປບລາຍນ໌ສຳເລັດ",
+      "enableAutoMergeDescriptionTerm": "GitLab ຈະລວມ {{term}} ນີ້ໂດຍອັດຕະໂນມັດເມື່ອໄປບລາຍນ໌ສຳເລັດ",
       "forbidden": "ທ່ານບໍ່ມີສິດລວມຄຳຂໍລວມໂຄດນີ້.",
       "cannotMerge": "ຍັງບໍ່ສາມາດລວມຄຳຂໍລວມໂຄດນີ້ໃນສະພາບປັດຈຸບັນໄດ້.",
       "couldNotMerge": "ບໍ່ສາມາດລວມຄຳຂໍລວມໂຄດໄດ້.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "ລວມແລ້ວ",
-        "closed": "ປິດຄຳຂໍລວມໂຄດນີ້ແລ້ວ"
+        "closed": "ປິດຄຳຂໍລວມໂຄດນີ້ແລ້ວ",
+        "closedMergeRequest": "ປິດ merge request ນີ້ແລ້ວ"
       },
       "partialSuccessBanner": {
         "body": "ບໍ່ສາມາດລຶບສາຂາໄດ້: {{reason}}.",
@@ -406,6 +412,18 @@
         "behindDetail": "ສາຂາຕົ້ນທາງຍັງບໍ່ມີການປ່ຽນແປງຫຼ້າສຸດຈາກສາຂາຖານ. ປ່ຽນຖານ ຫຼື ອັບເດດສາຂາກ່ອນລວມ.",
         "notMergeableTitle": "ຍັງລວມຄຳຂໍລວມໂຄດນີ້ບໍ່ໄດ້",
         "notMergeableDetail": "GitHub ລາຍງານສະຖານະຄວາມພ້ອມໃນການລວມເປັນ {{state}}."
+      },
+      "restrictions": {
+        "title": "ຂໍ້ຈຳກັດການລວມ",
+        "approvalsRequired_one": "ຕ້ອງການການອະນຸມັດ {{displayCount}} ຄັ້ງ",
+        "approvalsRequired_other": "ຕ້ອງການການອະນຸມັດ {{displayCount}} ຄັ້ງ",
+        "pipelineMustSucceed": "ໄປບລາຍນ໌ຕ້ອງສຳເລັດກ່ອນການລວມ"
+      },
+      "providerBlocked": {
+        "failingPipeline": "ໄປບລາຍນ໌ລົ້ມເຫຼວໃນຄອມມິດຫຼ້າສຸດ",
+        "pendingPipeline": "ໄປບລາຍນ໌ຍັງກຳລັງເຮັດວຽກຢູ່ໃນຄອມມິດຫຼ້າສຸດ",
+        "permission": "ທ່ານບໍ່ມີສິດລວມ{{term}}ນີ້.",
+        "draft": "ໝາຍ{{term}}ວ່າພ້ອມໃຫ້ກວດທານກ່ອນລວມ."
       },
       "methodLabels": {
         "merge": "ສ້າງຄອມມິດການລວມ",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "ອ້າງອີງໂຄດເກົ່າໃນ {{lines}}",
         "outdatedOnPath": "ອ້າງອີງໂຄດເກົ່າໃນ {{path}}"
       },
-      "deletedUser": "ຜູ້ໃຊ້ທີ່ຖືກລຶບ"
+      "deletedUser": "ຜູ້ໃຊ້ທີ່ຖືກລຶບ",
+      "replyForbiddenTerm": "ທ່ານບໍ່ມີສິດຕອບໃນ{{term}}ນີ້."
     },
     "couldNotOpenGitHubAppSettings": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າແອັບ GitHub ໄດ້.",
     "installKiloGitHubApp": "ຕິດຕັ້ງແອັບ Kilo ສຳລັບ GitHub",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "ກວດທານຄຳຂໍລວມໂຄດ",
     "headLine": "{{counts}} · ຄອມມິດຫຼ້າສຸດ {{sha}}",
     "entry": {
-      "eyebrow": "ເປີດຄຳຂໍລວມໂຄດດ້ວຍ URL.",
-      "pastePrLink": "ວາງລິງ PR",
-      "noRecentPrs": "ບໍ່ມີ PR ທີ່ເປີດຫຼ້າສຸດ",
-      "noRecentPrsDescription": "ວາງລິງ PR ຂ້າງເທິງເພື່ອເລີ່ມກວດທານ — PR ນັ້ນຈະປາກົດຢູ່ທີ່ນີ້ໃນຄັ້ງຕໍ່ໄປ.",
+      "eyebrow": "ເປີດຄຳຂໍລວມໂຄ້ດ ຫຼື merge request ດ້ວຍ URL",
+      "pastePrLink": "ວາງລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
+      "noRecentPrs": "ຍັງບໍ່ມີການກວດທານຫຼ້າສຸດ",
+      "noRecentPrsDescription": "ວາງລິ້ງຂ້າງເທິງເພື່ອເລີ່ມການກວດທານ — ຄັ້ງໜ້າມັນຈະສະແດງຢູ່ນີ້",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດໄດ້.",
       "removeFromRecentsTitle": "ເອົາອອກຈາກລາຍການທີ່ເປີດຫຼ້າສຸດບໍ?",
-      "removeFromRecentsMessage": "ຄຳຂໍລວມໂຄດນີ້ຈະຖືກເອົາອອກຈາກລາຍການທີ່ທ່ານເປີດຫຼ້າສຸດ.",
+      "removeFromRecentsMessage": "ການກວດທານນີ້ຈະຖືກລຶບອອກຈາກລາຍການຫຼ້າສຸດຂອງທ່ານ",
       "removeRecentAccessibility": "ເອົາ {{repo}} ອອກຈາກລາຍການທີ່ເປີດຫຼ້າສຸດ",
-      "urlAccessibility": "URL ຂອງຄຳຂໍລວມໂຄດໃນ GitHub",
-      "clearLink": "ລ້າງລິງຄຳຂໍລວມໂຄດ",
-      "pasteLink": "ວາງລິງຄຳຂໍລວມໂຄດ",
+      "urlAccessibility": "ປ້ອນ URL ຂອງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
+      "urlPlaceholder": "URL ຂອງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
+      "openAccessibility": "ເປີດຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
+      "clearLink": "ລ້າງລິ້ງ",
+      "pasteLink": "ວາງລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
       "open": "ເປີດ"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "ບໍ່ສາມາດກວດສອບການເຊື່ອມຕໍ່ GitHub ໄດ້.",
       "checkFailedMessage": "ຍັງບໍ່ສາມາດສະແດງສະຖານະການເຂົ້າສູ່ລະບົບໄດ້ຈົນກວ່າຈະໂຫຼດຂໍ້ມູນນີ້ສຳເລັດ.",
+      "checkFailedTitleGitLab": "ບໍ່ສາມາດກວດສອບການເຊື່ອມຕໍ່ GitLab ໄດ້.",
+      "checkFailedTitleBitbucket": "ບໍ່ສາມາດກວດສອບການເຊື່ອມຕໍ່ Bitbucket ໄດ້.",
+      "providerCheckFailedMessage": "ສະຖານະການເຊື່ອມຕໍ່ຈະບໍ່ພ້ອມໃຊ້ຈົນກວ່າຈະໂຫຼດເສັຣຈ",
       "reconnectTitle": "ເຊື່ອມຕໍ່ GitHub ໃໝ່",
       "reconnectDescription": "ສິດການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານຖືກຖອນແລ້ວ. ເຊື່ອມຕໍ່ໃໝ່ເພື່ອກວດທານຄຳຂໍລວມໂຄດໃນມືຖືຕໍ່ໄປ.",
-      "description": "ເຊື່ອມຕໍ່ບັນຊີ GitHub ຂອງທ່ານເພື່ອກວດທານຄຳຂໍລວມໂຄດໃນມືຖື."
+      "description": "ເຊື່ອມຕໍ່ບັນຊີ GitHub ຂອງທ່ານເພື່ອກວດທານຄຳຂໍລວມໂຄດໃນມືຖື.",
+      "gitlabDescription": "ເຊື່ອມຕໍ່ບັນຊີ GitLab ຂອງທ່ານເພື່ອກວດທານ merge request ເທິງມືຖື",
+      "bitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ກັບອົງກອນນີ້ເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດເທິງມືຖື",
+      "bitbucketOrgOnlyDescription": "ເລືອກອົງກອນໃນໂປຣຟາຍຂອງທ່ານເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງອົງກອນນັ້ນ"
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "ການເຊື່ອມຕໍ່ GitHub ໝົດອາຍຸແລ້ວ.",
-      "message": "ການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານໃຊ້ບໍ່ໄດ້ແລ້ວ. ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ."
+      "message": "ການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານໃຊ້ບໍ່ໄດ້ແລ້ວ. ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ.",
+      "gitlabTitle": "ການເຊື່ອມຕໍ່ GitLab ໝົດອາຍຸແລ້ວ.",
+      "bitbucketTitle": "ການເຊື່ອມຕໍ່ Bitbucket ໝົດອາຍຸແລ້ວ.",
+      "providerMessage": "ການເຊື່ອມຕໍ່ {{provider}} ຂອງທ່ານໃຊ້ບໍ່ໄດ້ແລ້ວ. ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ."
     },
     "eventChips": {
       "comment": "ສະແດງຄຳເຫັນ",
@@ -668,7 +698,7 @@
       "emptyLine": "(ວ່າງເປົ່າ)"
     },
     "linkPasteClipboardEmpty": "ຄລິບບອດວ່າງເປົ່າ.",
-    "linkPasteNotAPullRequest": "ນີ້ບໍ່ແມ່ນລິງຄຳຂໍລວມໂຄດໃນ GitHub.",
+    "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
     "announce": {
       "commentPosted": "ໂພດຄຳເຫັນແລ້ວ",
       "reviewSubmitted": "ສົ່ງຜົນການກວດທານແລ້ວ",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "ບໍ່ສາມາດໂພດຄຳເຫັນນີ້ໄດ້. ບັນທັດທີ່ເລືອກອາດມີການປ່ຽນແປງ ຫຼື PR ອາດມີການອັບເດດແລ້ວ.",
       "reviewNotSubmitted": "ຍັງບໍ່ສາມາດສົ່ງຜົນການກວດທານນີ້ໄດ້. PR ອາດມີການປ່ຽນແປງ ຫຼື ທ່ານບໍ່ມີສິດກວດທານຄຳຂໍລວມໂຄດຂອງຕົນເອງ.",
+      "reviewNotSubmittedTerm": "ສົ່ງການກວດທານນີ້ຕາມເດີມບໍ່ໄດ້. {{term}} ອາດປ່ຽນແປງໄປແລ້ວ, ຫຼື ທ່ານກວດທານ {{term}} ຂອງຕົນເອງບໍ່ໄດ້.",
       "couldNotPostComment": "ບໍ່ສາມາດໂພດຄຳເຫັນໄດ້.",
       "couldNotSubmitReview": "ບໍ່ສາມາດສົ່ງຜົນການກວດທານໄດ້. ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງອີກຄັ້ງ."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "ບໍ່ສາມາດຕອບໄດ້.",
       "couldNotCompleteAction": "ບໍ່ສາມາດດຳເນີນການນີ້ໃຫ້ສຳເລັດໄດ້.",
       "mergeResultDefaultError": "GitHub ລວມບໍ່ສຳເລັດ.",
+      "mergeResultNotCompleted": "{{term}} ຍັງບໍ່ຖືກລວມ. ກວດສອບສະຖານະຂອງມັນແລ້ວລອງໃໝ່.",
       "ambiguous": "ບໍ່ສາມາດຢືນຢັນໄດ້ — ກວດເບິ່ງ PR ກ່ອນລອງໃໝ່.",
       "persistenceFailed": "ບໍ່ສາມາດບັນທຶກການດຳເນີນການນີ້ໄດ້. ກະລຸນາລອງອີກຄັ້ງພາຍຫຼັງ.",
       "forbidden": "ບໍ່ມີສິດດຳເນີນການນີ້."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "ບໍ່ພ້ອມໃຊ້ໃນຜູ້ໃຫ້ບໍລິການນີ້",
+        "accessibility": "ບໍ່ພ້ອມໃຊ້ໃນຜູ້ໃຫ້ບໍລິການນີ້: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "ຄຳຂໍລວມໂຄ້ດ",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "ແບ່ງປັນ merge request",
+      "viewOnProvider": "ເບິ່ງເທິງ {{provider}}",
+      "mergeRequestUnavailable": "ບໍ່ສາມາດເປີດ merge request",
+      "unavailableDescription": "ມັນອາດຖືກລຶບໄປແລ້ວ ຫຼື ທ່ານອາດບໍ່ມີສິດເຂົ້າເຖິງ",
+      "accessDeniedMergeRequest": "ທ່ານບໍ່ມີສິດເບິ່ງ merge request ນີ້.",
+      "couldNotLoadMergeRequest": "ບໍ່ສາມາດໂຫຼດ merge request ໄດ້.",
+      "discussionAccessDenied": "ທ່ານບໍ່ມີສິດເບິ່ງການສົນທະນາຂອງ merge request ນີ້.",
+      "discussionUnavailableMessage": "merge request ນີ້ອາດຖືກລຶບໄປແລ້ວ.",
+      "noDiscussionDescription": "merge request ນີ້ຍັງບໍ່ມີເທຣດການກວດທານ ຫຼື ຄຳເຫັນການສົນທະນາ.",
+      "noFilesChangedDescription": "merge request ນີ້ບໍ່ມີການປ່ຽນແປງເຟົ້ມ."
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "ລອງເຊື່ອມຕໍ່ໃໝ່"
     },
     "newSession": {
+      "recentlyUsed": "ໃຊ້ຫຼ້າສຸດ",
+      "couldNotLoadGithubRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ GitHub ໄດ້.",
+      "couldNotLoadGitlabRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ GitLab ໄດ້.",
+      "couldNotLoadBitbucketRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ Bitbucket ໄດ້.",
       "connectGithubDescription": "ເຊື່ອມຕໍ່ GitHub ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",
+      "connectGitlabDescription": "ເຊື່ອມຕໍ່ GitLab ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",
+      "connectBitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",
       "openGithub": "ເປີດ GitHub",
+      "openGitlab": "ເປີດ GitLab",
+      "openBitbucket": "ເປີດ Bitbucket",
       "refreshRepositories": "ໂຫຼດລາຍການຄັງໂຄດໃໝ່",
       "githubConnected": "ເຊື່ອມຕໍ່ GitHub ແລ້ວ",
+      "gitlabConnected": "ເຊື່ອມຕໍ່ GitLab ແລ້ວ",
       "noRepositoriesVisible": "ບໍ່ພົບຄັງໂຄດ. ກວດເບິ່ງສິດເຂົ້າເຖິງຄັງໂຄດຂອງແອັບ Kilo ໃນ GitHub ແລ້ວໂຫຼດໃໝ່.",
+      "noRepositoriesVisibleGitlab": "ບໍ່ພົບຄັງໂຄດ. ກວດເບິ່ງສິດເຂົ້າເຖິງຄັງໂຄດໃນ GitLab ແລ້ວໂຫຼດໃໝ່.",
+      "noRepositoriesVisibleBitbucket": "ບໍ່ພົບຄັງໂຄດ. ກວດເບິ່ງສິດເຂົ້າເຖິງຄັງໂຄດໃນ Bitbucket ແລ້ວໂຫຼດໃໝ່.",
+      "bitbucketOrganizationsOnly": "Bitbucket ພ້ອມໃຊ້ສຳລັບອົງກອນເທົ່ານັ້ນ",
+      "branchPickerTitle": "ເລືອກສາຂາໂຄ້ດ",
+      "branchDefault": "ຄ່າເລີ່ມຕົ້ນ",
+      "branchAccessibility": "ສາຂາໂຄ້ດ: {{label}}",
+      "branchLoading": "ກຳລັງໂຫຼດສາຂາໂຄ້ດ",
+      "branchLoadError": "ໂຫຼດສາຂາໂຄ້ດບໍ່ໄດ້",
+      "branchUnavailable": "ບໍ່ມີສາຂາໂຄ້ດພ້ອມໃຊ້ສຳລັບຄັງໂຄ້ດນີ້. ກວດສອບສິດເຂົ້າເຖິງຂອງທ່ານກັບຜູ້ໃຫ້ບໍລິການ, ແລ້ວເລືອກຄັງໂຄ້ດອື່ນ.",
+      "branchEmpty": "ບໍ່ມີສາຂາໂຄ້ດພ້ອມໃຊ້",
+      "branchPlaceholder": "ເລືອກສາຂາໂຄ້ດໜຶ່ງ",
       "runOnWithTarget": "ເຮັດວຽກເທິງ: {{target}}",
       "environment": "ສະພາບແວດລ້ອມ",
       "couldNotLoadEnvironment": "ບໍ່ສາມາດໂຫຼດສະພາບແວດລ້ອມຂອງເຈົ້າໄດ້.",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "ບໍ່ສາມາດໂຫຼດລາຍການຄັງໂຄດໃໝ່ໄດ້. ກະລຸນາລອງໃໝ່.",
       "discardDraftTitle": "ລຶບຂໍ້ຄວາມຮ່າງບໍ?",
       "discardDraftMessage": "ຂໍ້ຄວາມທີ່ເຈົ້າຮ່າງໄວ້ຈະຖືກລຶບ.",
+      "discardWithUploadsMessage": "ຂໍ້ຄວາມທີ່ເຈົ້າຮ່າງໄວ້ ແລະໄຟລ໌ທີ່ອັບໂຫຼດໄວ້ແຕ່ຍັງບໍ່ໄດ້ໃຊ້ຈະຖືກລຶບ.",
       "discardFailed": "ບໍ່ສາມາດລຶບຂໍ້ຄວາມຮ່າງໄດ້. ກະລຸນາລອງໃໝ່.",
       "remoteHint": "ໃຊ້ຄຳສັ່ງ `kilo remote` ໃນຄອມພິວເຕີຂອງເຈົ້າ ຫຼື `/remote` ໃນເຊດຊັນ CLI ທີ່ກຳລັງເຮັດວຽກຢູ່ ເພື່ອຄວບຄຸມ kilo ທີ່ເຮັດວຽກຢູ່ໃນເຄື່ອງ.",
-      "connectBitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",
-      "connectGitlabDescription": "ເຊື່ອມຕໍ່ GitLab ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",
-      "couldNotLoadBitbucketRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ Bitbucket ໄດ້.",
-      "couldNotLoadGithubRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ GitHub ໄດ້.",
-      "couldNotLoadGitlabRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ GitLab ໄດ້.",
-      "gitlabConnected": "ເຊື່ອມຕໍ່ GitLab ແລ້ວ",
-      "noRepositoriesVisibleBitbucket": "ບໍ່ພົບຄັງໂຄດ. ກວດເບິ່ງສິດເຂົ້າເຖິງຄັງໂຄດໃນ Bitbucket ແລ້ວໂຫຼດໃໝ່.",
-      "noRepositoriesVisibleGitlab": "ບໍ່ພົບຄັງໂຄດ. ກວດເບິ່ງສິດເຂົ້າເຖິງຄັງໂຄດໃນ GitLab ແລ້ວໂຫຼດໃໝ່.",
-      "openBitbucket": "ເປີດ Bitbucket",
-      "openGitlab": "ເປີດ GitLab",
-      "recentlyUsed": "ໃຊ້ຫຼ້າສຸດ",
       "continueFrom": "ກຳລັງເຮັດວຽກຕໍ່ຈາກ {{title}}.",
       "importingSession": "ກຳລັງນຳເຂົ້າເຊດຊັນ",
       "cliCannotContinue": "CLI ນີ້ບໍ່ສາມາດເຮັດວຽກຕໍ່ຈາກເຊດຊັນໄດ້. ເລືອກ Cloud Agent ຫຼື CLI ອື່ນ.",
-      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້.",
-      "discardWithUploadsMessage": "ຂໍ້ຄວາມທີ່ເຈົ້າຮ່າງໄວ້ ແລະໄຟລ໌ທີ່ອັບໂຫຼດໄວ້ແຕ່ຍັງບໍ່ໄດ້ໃຊ້ຈະຖືກລຶບ."
+      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້."
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດໄຟລ໌ແລ້ວ {{displayCount}} ໄຟລ໌.",

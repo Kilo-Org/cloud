@@ -36,6 +36,7 @@
     "cost": "Արժեք",
     "discard": "Հրաժարվել",
     "findings": "Հայտնաբերված խնդիրներ",
+    "mergeRequest": "միաձուլման հարցում",
     "notConnected": "Միացված չէ",
     "notifications": "Ծանուցումներ",
     "pullRequest": "միավորման հարցում",
@@ -350,6 +351,7 @@
       "merge": "Միավորում",
       "mergeNow": "Միավորել հիմա",
       "mergePullRequest": "Միավորման հարցման միավորում",
+      "mergeTermTitle": "Միավորել {{term}}-ը",
       "enableAutoMerge": "Միացնել ավտոմատ միավորումը",
       "disableAutoMerge": "Անջատել ավտոմատ միավորումը",
       "autoMergeOn": "Ավտոմատ միավորումը միացված է",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "Ջնջել ճյուղը միավորումից հետո",
       "noEnabledMethods": "Այս պահոցում միավորման ոչ մի մեթոդ միացված չէ։ Խնդրիր պահոցի ադմինիստրատորին միացնել սովորական միավորումը, կոմիտների համախմբումը կամ վերաբազավորումը։",
       "confirmTitle": "Միավորե՞լ միավորման հարցումը",
+      "confirmTitleTerm": "Միավորե՞լ {{term}}ը",
       "confirmMessage": "Քո փոփոխությունները կմիավորվեն բազային ճյուղին։",
       "enableAutoMergeConfirmTitle": "Միացնե՞լ ավտոմատ միավորումը",
       "enableAutoMergeConfirmMessage": "GitHub-ն ավտոմատ կմիավորի այս միավորման հարցումը, երբ բոլոր պարտադիր ստուգումները հաջողությամբ ավարտվեն։",
+      "enableAutoMergeConfirmMessageTerm": "{{term}}-ը կմիավորվի ավտոմատ, երբ դրա կոնվեյերը հաջողությամբ ավարտվի։",
+      "enableAutoMergeDescriptionTerm": "GitLab-ը ավտոմատ կմիավորի այս {{term}}-ը, երբ դրա կոնվեյերը հաջողությամբ ավարտվի։",
       "forbidden": "Այս միավորման հարցումը միավորելու թույլտվություն չունես։",
       "cannotMerge": "Այս միավորման հարցումը հնարավոր չէ միավորել ներկայիս տեսքով։",
       "couldNotMerge": "Չհաջողվեց միավորել միավորման հարցումը։",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Արդեն միավորված է",
-        "closed": "Այս միավորման հարցումը փակ է"
+        "closed": "Այս միավորման հարցումը փակ է",
+        "closedMergeRequest": "Այս միաձուլման հարցումը փակ է"
       },
       "partialSuccessBanner": {
         "body": "Չհաջողվեց ջնջել ճյուղը՝ {{reason}}։",
@@ -406,6 +412,18 @@
         "behindDetail": "Աղբյուրի ճյուղը հետ է մնում բազային ճյուղից։ Միավորելուց առաջ վերաբազավորիր կամ թարմացրու այն։",
         "notMergeableTitle": "Այս միավորման հարցումը դեռ հնարավոր չէ միավորել",
         "notMergeableDetail": "GitHub-ը հայտնել է միավորման հետևյալ կարգավիճակը՝ {{state}}։"
+      },
+      "restrictions": {
+        "title": "Միավորման սահմանափակումներ",
+        "approvalsRequired_one": "Պահանջվում է {{displayCount}} հավանություն",
+        "approvalsRequired_other": "Պահանջվում է {{displayCount}} հավանություն",
+        "pipelineMustSucceed": "Միավորելուց առաջ կոնվեյերը պետք է հաջողությամբ ավարտվի։"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Կոնվեյերը ձախողվում է վերջին կոմիտում։",
+        "pendingPipeline": "Կոնվեյերը դեռ աշխատում է վերջին կոմիտում։",
+        "permission": "Այս {{term}}ը միավորելու թույլտվություն չունես։",
+        "draft": "Միավորելուց առաջ նշիր {{term}}ը որպես վերանայման պատրաստ։"
       },
       "methodLabels": {
         "merge": "Ստեղծել միավորման կոմիտ",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "Հնացած՝ {{lines}}",
         "outdatedOnPath": "Հնացած՝ {{path}}"
       },
-      "deletedUser": "ջնջված օգտատեր"
+      "deletedUser": "ջնջված օգտատեր",
+      "replyForbiddenTerm": "Այս {{term}}-ին պատասխանելու թույլտվություն չունես։"
     },
     "couldNotOpenGitHubAppSettings": "Չհաջողվեց բացել GitHub հավելվածի կարգավորումները։",
     "installKiloGitHubApp": "Տեղադրել Kilo GitHub հավելվածը",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "Վերանայել միավորման հարցումը",
     "headLine": "{{counts}} · վերջին կոմիտ՝ {{sha}}",
     "entry": {
-      "eyebrow": "Բացիր միավորման հարցումը URL-ով։",
-      "pastePrLink": "Տեղադրել PR-ի հղումը",
-      "noRecentPrs": "Վերջերս բացված PR-եր չկան",
-      "noRecentPrsDescription": "Վերևում տեղադրիր PR-ի հղումը՝ վերանայում սկսելու համար։ Հաջորդ անգամ այն կհայտնվի այստեղ։",
+      "eyebrow": "Բացեք միավորման կամ միաձուլման հարցում URL-ով",
+      "pastePrLink": "Տեղադրեք միավորման կամ միաձուլման հարցման հղում",
+      "noRecentPrs": "Վերջերս վերանայումներ չկան",
+      "noRecentPrsDescription": "Վերանայում սկսելու համար վերևում տեղադրեք հղում — հաջորդ անգամ այն կհայտնվի այստեղ։",
       "couldNotLoad": "Չհաջողվեց բեռնել։",
       "removeFromRecentsTitle": "Հեռացնե՞լ վերջերս բացվածների ցանկից",
-      "removeFromRecentsMessage": "Այս միավորման հարցումը կհեռացվի վերջերս բացվածների քո ցանկից։",
+      "removeFromRecentsMessage": "Այս վերանայումը կհեռացվի Ձեր վերջերսի ցանկից։",
       "removeRecentAccessibility": "Հեռացնել {{repo}}-ն վերջերս բացվածների ցանկից",
-      "urlAccessibility": "GitHub-ի միավորման հարցման URL",
-      "clearLink": "Մաքրել միավորման հարցման հղումը",
-      "pasteLink": "Տեղադրել միավորման հարցման հղումը",
+      "urlAccessibility": "Մուտքագրեք միավորման կամ միաձուլման հարցման URL",
+      "urlPlaceholder": "Միավորման կամ միաձուլման հարցման URL",
+      "openAccessibility": "Բացել միավորման կամ միաձուլման հարցումը",
+      "clearLink": "Մաքրել հղումը",
+      "pasteLink": "Տեղադրեք միավորման կամ միաձուլման հարցման հղում",
       "open": "Բաց"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "Չհաջողվեց ստուգել GitHub-ի հետ կապը։",
       "checkFailedMessage": "Մուտքի կարգավիճակը հասանելի կլինի բեռնումն ավարտվելուց հետո։",
+      "checkFailedTitleGitLab": "Չհաջողվեց ստուգել GitLab-ի հետ կապը։",
+      "checkFailedTitleBitbucket": "Չհաջողվեց ստուգել Bitbucket-ի հետ կապը։",
+      "providerCheckFailedMessage": "Միացման կարգավիճակը հասանելի չէ մինչև բեռնվելը։",
       "reconnectTitle": "Կրկին միացում GitHub-ին",
       "reconnectDescription": "GitHub-ի հետ կապիդ թույլտվությունը չեղարկվել է։ Կրկին միացիր՝ հեռախոսով միավորման հարցումների վերանայումը շարունակելու համար։",
-      "description": "Միացրու GitHub-ի քո հաշիվը՝ հեռախոսով միավորման հարցումներ վերանայելու համար։"
+      "description": "Միացրու GitHub-ի քո հաշիվը՝ հեռախոսով միավորման հարցումներ վերանայելու համար։",
+      "gitlabDescription": "Միացրեք Ձեր GitLab հաշիվը՝ միաձուլման հարցումները բջջայինում վերանայելու համար։",
+      "bitbucketDescription": "Միացրեք Bitbucket-ը այս կազմակերպությանը՝ միավորման հարցումները բջջայինում վերանայելու համար։",
+      "bitbucketOrgOnlyDescription": "Ընտրեք կազմակերպություն Ձեր պրոֆիլում՝ դրա Bitbucket միավորման հարցումները վերանայելու համար։"
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub-ի հետ կապի ժամկետը լրացել է։",
-      "message": "GitHub-ի հետ կապդ այլևս վավեր չէ։ Կրկին ստուգիր կապը։ Անհրաժեշտության դեպքում քեզ կառաջարկվի նորից միանալ։"
+      "message": "GitHub-ի հետ կապդ այլևս վավեր չէ։ Կրկին ստուգիր կապը։ Անհրաժեշտության դեպքում քեզ կառաջարկվի նորից միանալ։",
+      "gitlabTitle": "GitLab-ի հետ կապի ժամկետը լրացել է։",
+      "bitbucketTitle": "Bitbucket-ի հետ կապի ժամկետը լրացել է։",
+      "providerMessage": "{{provider}}-ի հետ կապդ այլևս վավեր չէ։ Կրկին ստուգիր կապը։ Անհրաժեշտության դեպքում քեզ կառաջարկվի նորից միանալ։"
     },
     "eventChips": {
       "comment": "Մեկնաբանություն",
@@ -668,7 +698,7 @@
       "emptyLine": "(դատարկ)"
     },
     "linkPasteClipboardEmpty": "Սեղմատախտակը դատարկ է։",
-    "linkPasteNotAPullRequest": "Սա GitHub-ի միավորման հարցման հղում չէ։",
+    "linkPasteNotAPullRequest": "Սա միավորման կամ միաձուլման հարցման հղում չէ",
     "announce": {
       "commentPosted": "Մեկնաբանությունը հրապարակվել է",
       "reviewSubmitted": "Վերանայումն ուղարկվել է",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "Այս մեկնաբանությունը հնարավոր չէ հրապարակել։ Հնարավոր է՝ ընտրված տողը փոխվել է, կամ PR-ը թարմացվել է։",
       "reviewNotSubmitted": "Այս վերանայումը հնարավոր չէ ուղարկել ներկայիս տեսքով։ Հնարավոր է՝ PR-ը փոխվել է, կամ փորձում ես վերանայել սեփական միավորման հարցումդ։",
+      "reviewNotSubmittedTerm": "Այս վերանայումը հնարավոր չէ ուղարկել ինչպես կա։ Հնարավոր է՝ {{term}}-ը փոխվել է, կամ դուք չեք կարող վերանայել Ձեր սեփական {{term}}-ը։",
       "couldNotPostComment": "Չհաջողվեց հրապարակել մեկնաբանությունը։",
       "couldNotSubmitReview": "Չհաջողվեց ուղարկել վերանայումը։ Ստուգիր կապդ և կրկին փորձիր։"
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "Չհաջողվեց պատասխանել։",
       "couldNotCompleteAction": "Չհաջողվեց կատարել այս գործողությունը։",
       "mergeResultDefaultError": "GitHub-ը չավարտեց միավորումը։",
+      "mergeResultNotCompleted": "{{term}}-ը չմիավորվեց։ Ստուգեք դրա վիճակը և փորձեք կրկին։",
       "ambiguous": "Չհաջողվեց հաստատել արդյունքը։ Կրկին փորձելուց առաջ ստուգիր PR-ը։",
       "persistenceFailed": "Չհաջողվեց գրանցել այս գործողությունը։ Կրկին փորձիր ավելի ուշ։",
       "forbidden": "Այս գործողությունն արգելված է։"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Հասանելի չէ այս մատակարարի մոտ",
+        "accessibility": "Հասանելի չէ այս մատակարարի մոտ՝ {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Միավորման հարցում",
+      "mergeRequest": "Միաձուլման հարցում",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Կիսվել միաձուլման հարցմամբ",
+      "viewOnProvider": "Դիտել {{provider}}-ում",
+      "mergeRequestUnavailable": "Միաձուլման հարցումը հասանելի չէ",
+      "unavailableDescription": "Հնարավոր է՝ այն ջնջվել է, կամ դուք հասանելիություն չունեք դրան։",
+      "accessDeniedMergeRequest": "Այս միաձուլման հարցումը դիտելու թույլտվություն չունես։",
+      "couldNotLoadMergeRequest": "Չհաջողվեց բեռնել միաձուլման հարցումը։",
+      "discussionAccessDenied": "Այս միաձուլման հարցման քննարկումը դիտելու թույլտվություն չունես։",
+      "discussionUnavailableMessage": "Հնարավոր է՝ այս միաձուլման հարցումը հեռացվել է։",
+      "noDiscussionDescription": "Այս միաձուլման հարցման մեջ դեռ չկան վերանայման քննարկումներ կամ ընդհանուր մեկնաբանություններ։",
+      "noFilesChangedDescription": "Այս միաձուլման հարցման մեջ ֆայլերի փոփոխություններ չկան։"
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "Կրկին փորձել միանալ"
     },
     "newSession": {
+      "recentlyUsed": "Վերջերս օգտագործված",
+      "couldNotLoadGithubRepositories": "Չհաջողվեց բեռնել GitHub-ի պահոցները։",
+      "couldNotLoadGitlabRepositories": "Չհաջողվեց բեռնել GitLab-ի պահոցները։",
+      "couldNotLoadBitbucketRepositories": "Չհաջողվեց բեռնել Bitbucket-ի պահոցները։",
       "connectGithubDescription": "Միացրեք GitHub-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
+      "connectGitlabDescription": "Միացրեք GitLab-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
+      "connectBitbucketDescription": "Միացրեք Bitbucket-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
       "openGithub": "Բացել GitHub-ը",
+      "openGitlab": "Բացել GitLab-ը",
+      "openBitbucket": "Բացել Bitbucket-ը",
       "refreshRepositories": "Թարմացնել պահոցները",
       "githubConnected": "GitHub-ը միացված է",
+      "gitlabConnected": "GitLab-ը միացված է",
       "noRepositoriesVisible": "Պահոցներ չեն երևում։ Ստուգեք Kilo-ի GitHub հավելվածի՝ պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
+      "noRepositoriesVisibleGitlab": "Պահոցներ չեն երևում։ Ստուգեք GitLab-ի պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
+      "noRepositoriesVisibleBitbucket": "Պահոցներ չեն երևում։ Ստուգեք Bitbucket-ի պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
+      "bitbucketOrganizationsOnly": "Bitbucket-ը հասանելի է միայն կազմակերպությունների համար։",
+      "branchPickerTitle": "Ընտրել ճյուղը",
+      "branchDefault": "Կանխադրված",
+      "branchAccessibility": "Ճյուղ՝ {{label}}",
+      "branchLoading": "Բեռնվում են ճյուղերը",
+      "branchLoadError": "Չհաջողվեց բեռնել ճյուղերը",
+      "branchUnavailable": "Այս պահոցի համար ճյուղեր հասանելի չեն։ Ստուգեք Ձեր հասանելիությունը մատակարարի մոտ, ապա ընտրեք այլ պահոց։",
+      "branchEmpty": "Ճյուղեր հասանելի չեն",
+      "branchPlaceholder": "Ընտրեք ճյուղ",
       "runOnWithTarget": "Գործարկման միջավայր՝ {{target}}",
       "environment": "Միջավայր",
       "couldNotLoadEnvironment": "Չհաջողվեց բեռնել ձեր միջավայրը։",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "Չհաջողվեց թարմացնել պահոցները։ Կրկին փորձեք։",
       "discardDraftTitle": "Ջնջե՞լ սևագիրը",
       "discardDraftMessage": "Ձեր հուշումը կկորչի։",
+      "discardWithUploadsMessage": "Ձեր հուշումը և ուղարկված հաղորդագրություններին չկցված վերբեռնված բոլոր ֆայլերը կջնջվեն։",
       "discardFailed": "Չհաջողվեց ջնջել սևագիրը։ Կրկին փորձեք։",
       "remoteHint": "Տեղական kilo գործընթացը կառավարելու համար ձեր համակարգչում գործարկեք `kilo remote` կամ գործող CLI նիստում՝ `/remote`։",
-      "connectBitbucketDescription": "Միացրեք Bitbucket-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
-      "connectGitlabDescription": "Միացրեք GitLab-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
-      "couldNotLoadBitbucketRepositories": "Չհաջողվեց բեռնել Bitbucket-ի պահոցները։",
-      "couldNotLoadGithubRepositories": "Չհաջողվեց բեռնել GitHub-ի պահոցները։",
-      "couldNotLoadGitlabRepositories": "Չհաջողվեց բեռնել GitLab-ի պահոցները։",
-      "gitlabConnected": "GitLab-ը միացված է",
-      "noRepositoriesVisibleBitbucket": "Պահոցներ չեն երևում։ Ստուգեք Bitbucket-ի պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
-      "noRepositoriesVisibleGitlab": "Պահոցներ չեն երևում։ Ստուգեք GitLab-ի պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
-      "openBitbucket": "Բացել Bitbucket-ը",
-      "openGitlab": "Բացել GitLab-ը",
-      "recentlyUsed": "Վերջերս օգտագործված",
       "continueFrom": "Շարունակվում է «{{title}}» նիստը։",
       "importingSession": "Նիստը ներմուծվում է",
       "cliCannotContinue": "Այս CLI-ն չի կարող շարունակել նիստը։ Ընտրեք Cloud Agent-ը կամ մեկ այլ CLI։",
-      "importFailed": "Չհաջողվեց ներմուծել այս նիստը։",
-      "discardWithUploadsMessage": "Ձեր հուշումը և ուղարկված հաղորդագրություններին չկցված վերբեռնված բոլոր ֆայլերը կջնջվեն։"
+      "importFailed": "Չհաջողվեց ներմուծել այս նիստը։"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ։",

@@ -36,6 +36,7 @@
     "cost": "Koste",
     "discard": "Gooi weg",
     "findings": "Bevindings",
+    "mergeRequest": "merge request",
     "notConnected": "Nie gekoppel nie",
     "notifications": "Kennisgewings",
     "pullRequest": "trekversoek",
@@ -350,6 +351,7 @@
       "merge": "Samevoeging",
       "mergeNow": "Voeg nou saam",
       "mergePullRequest": "Voeg trekversoek saam",
+      "mergeTermTitle": "Voeg {{term}} saam",
       "enableAutoMerge": "Aktiveer outomatiese samevoeging",
       "disableAutoMerge": "Deaktiveer outomatiese samevoeging",
       "autoMergeOn": "Outomatiese samevoeging is aan",
@@ -368,9 +370,12 @@
       "deleteBranchAfterMerge": "Skrap die tak ná samevoeging",
       "noEnabledMethods": "Geen samevoegingsmetodes is vir hierdie bewaarplek geaktiveer nie. Vra 'n administrateur van die bewaarplek om gewone samevoeging, saampersing of herbasering te aktiveer.",
       "confirmTitle": "Voeg trekversoek saam?",
+      "confirmTitleTerm": "Voeg {{term}} saam?",
       "confirmMessage": "Dit sal jou veranderings met die basistak saamvoeg.",
       "enableAutoMergeConfirmTitle": "Aktiveer outomatiese samevoeging?",
       "enableAutoMergeConfirmMessage": "GitHub sal hierdie trekversoek outomaties saamvoeg wanneer alle vereiste kontroles slaag.",
+      "enableAutoMergeConfirmMessageTerm": "Sodra die pipeline slaag, word die {{term}} outomaties saamgevoeg.",
+      "enableAutoMergeDescriptionTerm": "GitLab voeg hierdie {{term}} outomaties saam sodra die pipeline slaag.",
       "forbidden": "Jy het nie toestemming om hierdie trekversoek saam te voeg nie.",
       "cannotMerge": "Hierdie trekversoek kan nie in sy huidige vorm saamgevoeg word nie.",
       "couldNotMerge": "Kon nie die trekversoek saamvoeg nie.",
@@ -381,7 +386,8 @@
       },
       "terminal": {
         "alreadyMerged": "Reeds saamgevoeg",
-        "closed": "Hierdie trekversoek is gesluit"
+        "closed": "Hierdie trekversoek is gesluit",
+        "closedMergeRequest": "Hierdie merge request is gesluit"
       },
       "partialSuccessBanner": {
         "body": "Kon nie die tak skrap nie: {{reason}}.",
@@ -406,6 +412,18 @@
         "behindDetail": "Die brontak is agter die basistak. Herbaseer die tak of werk dit by voordat jy saamvoeg.",
         "notMergeableTitle": "Hierdie trekversoek kan nog nie saamgevoeg word nie",
         "notMergeableDetail": "GitHub het die samevoegingstatus as {{state}} aangegee."
+      },
+      "restrictions": {
+        "title": "Saamvoegbeperkings",
+        "approvalsRequired_one": "{{displayCount}} goedkeuring vereis",
+        "approvalsRequired_other": "{{displayCount}} goedkeurings vereis",
+        "pipelineMustSucceed": "Die pipeline moet slaag voordat saamgevoeg kan word."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Die pipeline misluk by die laaste commit.",
+        "pendingPipeline": "Die pipeline hardloop nog by die laaste commit.",
+        "permission": "Jy het nie toestemming om hierdie {{term}} saam te voeg nie.",
+        "draft": "Merk die {{term}} as gereed vir hersiening voordat jy saamvoeg."
       },
       "methodLabels": {
         "merge": "Skep 'n samevoegingsvaslegging",
@@ -505,7 +523,8 @@
         "outdatedOnLines": "Verouderd op {{lines}}",
         "outdatedOnPath": "Verouderd op {{path}}"
       },
-      "deletedUser": "geskrapte gebruiker"
+      "deletedUser": "geskrapte gebruiker",
+      "replyForbiddenTerm": "Jy het nie toestemming om op hierdie {{term}} te antwoord nie."
     },
     "couldNotOpenGitHubAppSettings": "Die GitHub-toepassing se instellings kon nie oopgemaak word nie.",
     "installKiloGitHubApp": "Installeer die Kilo GitHub-toep",
@@ -517,17 +536,19 @@
     "reviewPullRequest": "Hersien trekversoek",
     "headLine": "{{counts}} · jongste vaslegging {{sha}}",
     "entry": {
-      "eyebrow": "Maak 'n trekversoek met sy URL oop.",
-      "pastePrLink": "Plak 'n PR-skakel",
-      "noRecentPrs": "Geen onlangse PR's nie",
-      "noRecentPrsDescription": "Plak hierbo 'n PR-skakel om 'n hersiening te begin — dit sal volgende keer hier verskyn.",
+      "eyebrow": "Maak 'n trekversoek of merge request met sy URL oop",
+      "pastePrLink": "Plak 'n trekversoek- of merge request-skakel",
+      "noRecentPrs": "Geen onlangse hersieninge nie",
+      "noRecentPrsDescription": "Plak hierbo 'n skakel om 'n hersiening te begin — dit sal volgende keer hier verskyn.",
       "couldNotLoad": "Kon nie laai nie.",
       "removeFromRecentsTitle": "Verwyder uit onlangse trekversoeke?",
-      "removeFromRecentsMessage": "Hierdie trekversoek sal uit jou lys van onlangse trekversoeke verwyder word.",
+      "removeFromRecentsMessage": "Hierdie hersiening sal uit jou onlangse lys verwyder word.",
       "removeRecentAccessibility": "Verwyder {{repo}} uit onlangse trekversoeke",
-      "urlAccessibility": "GitHub-trekversoek-URL",
-      "clearLink": "Vee die trekversoekskakel uit",
-      "pasteLink": "Plak trekversoekskakel",
+      "urlAccessibility": "Voer 'n trekversoek- of merge request-URL in",
+      "urlPlaceholder": "Trekversoek- of merge request-URL",
+      "openAccessibility": "Maak trekversoek of merge request oop",
+      "clearLink": "Vee die skakel uit",
+      "pasteLink": "Plak trekversoek- of merge request-skakel",
       "open": "Oop"
     },
     "checks": {
@@ -576,9 +597,15 @@
     "connect": {
       "checkFailedTitle": "Kon nie die GitHub-verbinding kontroleer nie.",
       "checkFailedMessage": "Die aanmeldstatus is nie beskikbaar voordat hierdie inligting gelaai is nie.",
+      "checkFailedTitleGitLab": "Kon nie die GitLab-verbinding kontroleer nie.",
+      "checkFailedTitleBitbucket": "Kon nie die Bitbucket-verbinding kontroleer nie.",
+      "providerCheckFailedMessage": "Verbindingsstatus is nie beskikbaar voordat die laai voltooi is nie.",
       "reconnectTitle": "Koppel GitHub weer",
       "reconnectDescription": "Jou GitHub-verbinding is herroep. Koppel weer om steeds trekversoeke op jou foon te kan hersien.",
-      "description": "Koppel jou GitHub-rekening om trekversoeke op jou foon te hersien."
+      "description": "Koppel jou GitHub-rekening om trekversoeke op jou foon te hersien.",
+      "gitlabDescription": "Koppel jou GitLab-rekening om merge requests op jou foon te hersien.",
+      "bitbucketDescription": "Koppel Bitbucket aan hierdie organisasie om trekversoeke op jou foon te hersien.",
+      "bitbucketOrgOnlyDescription": "Kies 'n organisasie in jou profiel om sy Bitbucket-trekversoeke te hersien."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +627,10 @@
     },
     "reconnectNotice": {
       "title": "Die GitHub-verbinding het verval.",
-      "message": "Jou GitHub-verbinding is nie meer geldig nie. Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig."
+      "message": "Jou GitHub-verbinding is nie meer geldig nie. Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig.",
+      "gitlabTitle": "Die GitLab-verbinding het verval.",
+      "bitbucketTitle": "Die Bitbucket-verbinding het verval.",
+      "providerMessage": "Jou {{provider}}-verbinding is nie meer geldig nie. Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig."
     },
     "eventChips": {
       "comment": "Kommentaar",
@@ -668,7 +698,7 @@
       "emptyLine": "(leeg)"
     },
     "linkPasteClipboardEmpty": "Die knipbord is leeg.",
-    "linkPasteNotAPullRequest": "Dit is nie 'n skakel na 'n GitHub-trekversoek nie.",
+    "linkPasteNotAPullRequest": "Dit is nie 'n skakel na 'n trekversoek of merge request nie",
     "announce": {
       "commentPosted": "Kommentaar geplaas",
       "reviewSubmitted": "Hersiening ingedien",
@@ -677,6 +707,7 @@
     "mutationError": {
       "commentNotPosted": "Hierdie kommentaar kan nie geplaas word nie. Die gekose reël het dalk verander, of die PR is dalk bygewerk.",
       "reviewNotSubmitted": "Hierdie hersiening kan nie in sy huidige vorm ingedien word nie. Die PR het dalk verander, of jy probeer dalk jou eie trekversoek hersien, wat nie toegelaat word nie.",
+      "reviewNotSubmittedTerm": "Hierdie hersiening kan nie in sy huidige vorm ingedien word nie. Die {{term}} het dalk verander, of jy kan nie jou eie {{term}} hersien nie.",
       "couldNotPostComment": "Kon nie kommentaar plaas nie.",
       "couldNotSubmitReview": "Kon nie die hersiening indien nie. Kontroleer jou verbinding en probeer weer."
     },
@@ -684,9 +715,31 @@
       "couldNotReply": "Die antwoord kon nie gestuur word nie.",
       "couldNotCompleteAction": "Kon nie hierdie aksie voltooi nie.",
       "mergeResultDefaultError": "GitHub het nie die samevoeging voltooi nie.",
+      "mergeResultNotCompleted": "Die {{term}} is nie saamgevoeg nie. Gaan sy status na en probeer weer.",
       "ambiguous": "Kon nie bevestig nie — kyk na die PR voordat jy weer probeer.",
       "persistenceFailed": "Ons kon nie hierdie aksie aanteken nie. Probeer asseblief later weer.",
       "forbidden": "Toegang is verbode."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Nie beskikbaar by hierdie verskaffer nie",
+        "accessibility": "Nie beskikbaar by hierdie verskaffer nie: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Trekversoek",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Deel merge request",
+      "viewOnProvider": "Bekyk op {{provider}}",
+      "mergeRequestUnavailable": "Merge request onbeskikbaar",
+      "unavailableDescription": "Dit is dalk uitgevee, of jy het nie toegang daartoe nie.",
+      "accessDeniedMergeRequest": "Jy het nie toestemming om hierdie merge request te bekyk nie.",
+      "couldNotLoadMergeRequest": "Kon nie die merge request laai nie.",
+      "discussionAccessDenied": "Jy het nie toestemming om hierdie merge request se bespreking te bekyk nie.",
+      "discussionUnavailableMessage": "Hierdie merge request is dalk verwyder.",
+      "noDiscussionDescription": "Daar is nog geen hersieningsdrade of gesprekskommentare op hierdie merge request nie.",
+      "noFilesChangedDescription": "Hierdie merge request het geen lêerveranderings nie."
     }
   },
   "notifications": {
@@ -1997,11 +2050,31 @@
       "retryConnection": "Probeer weer koppel"
     },
     "newSession": {
+      "recentlyUsed": "Onlangs gebruik",
+      "couldNotLoadGithubRepositories": "Die GitHub-bewaarplekke kon nie gelaai word nie.",
+      "couldNotLoadGitlabRepositories": "Die GitLab-bewaarplekke kon nie gelaai word nie.",
+      "couldNotLoadBitbucketRepositories": "Die Bitbucket-bewaarplekke kon nie gelaai word nie.",
       "connectGithubDescription": "Koppel GitHub in jou blaaier en kom dan hierheen terug om 'n bewaarplek te kies.",
+      "connectGitlabDescription": "Koppel GitLab in jou blaaier en kom dan hierheen terug om 'n bewaarplek te kies.",
+      "connectBitbucketDescription": "Koppel Bitbucket in jou blaaier en kom dan hierheen terug om 'n bewaarplek te kies.",
       "openGithub": "Maak GitHub oop",
+      "openGitlab": "Maak GitLab oop",
+      "openBitbucket": "Maak Bitbucket oop",
       "refreshRepositories": "Verfris bewaarplekke",
       "githubConnected": "GitHub gekoppel",
+      "gitlabConnected": "GitLab gekoppel",
       "noRepositoriesVisible": "Geen bewaarplekke is sigbaar nie. Gaan die Kilo GitHub-toep se toegang tot bewaarplekke na en verfris dan die lys.",
+      "noRepositoriesVisibleGitlab": "Geen bewaarplekke is sigbaar nie. Gaan GitLab se toegang tot bewaarplekke na en verfris dan die lys.",
+      "noRepositoriesVisibleBitbucket": "Geen bewaarplekke is sigbaar nie. Gaan Bitbucket se toegang tot bewaarplekke na en verfris dan die lys.",
+      "bitbucketOrganizationsOnly": "Bitbucket is slegs vir organisasies beskikbaar.",
+      "branchPickerTitle": "Kies tak",
+      "branchDefault": "Verstek",
+      "branchAccessibility": "Tak: {{label}}",
+      "branchLoading": "Takke word gelaai",
+      "branchLoadError": "Takke kon nie gelaai word nie",
+      "branchUnavailable": "Takke is nie beskikbaar vir hierdie bewaarplek nie. Gaan jou toegang by die verskaffer na en kies 'n ander bewaarplek.",
+      "branchEmpty": "Geen takke beskikbaar nie",
+      "branchPlaceholder": "Kies 'n tak",
       "runOnWithTarget": "Voer uit op: {{target}}",
       "environment": "Omgewing",
       "couldNotLoadEnvironment": "Jou omgewing kon nie gelaai word nie.",
@@ -2022,24 +2095,13 @@
       "couldNotRefreshRepositories": "Die bewaarplekke kon nie verfris word nie. Probeer asseblief weer.",
       "discardDraftTitle": "Konsep weggooi?",
       "discardDraftMessage": "Jou opdrag sal verlore gaan.",
+      "discardWithUploadsMessage": "Jou opdrag en enige opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word.",
       "discardFailed": "Die konsep kon nie weggegooi word nie. Probeer asseblief weer.",
       "remoteHint": "Voer `kilo remote` op jou rekenaar uit, of `/remote` in 'n aktiewe CLI-sessie, om 'n plaaslike kilo-proses te beheer.",
-      "connectBitbucketDescription": "Koppel Bitbucket in jou blaaier en kom dan hierheen terug om 'n bewaarplek te kies.",
-      "connectGitlabDescription": "Koppel GitLab in jou blaaier en kom dan hierheen terug om 'n bewaarplek te kies.",
-      "couldNotLoadBitbucketRepositories": "Die Bitbucket-bewaarplekke kon nie gelaai word nie.",
-      "couldNotLoadGithubRepositories": "Die GitHub-bewaarplekke kon nie gelaai word nie.",
-      "couldNotLoadGitlabRepositories": "Die GitLab-bewaarplekke kon nie gelaai word nie.",
-      "gitlabConnected": "GitLab gekoppel",
-      "noRepositoriesVisibleBitbucket": "Geen bewaarplekke is sigbaar nie. Gaan Bitbucket se toegang tot bewaarplekke na en verfris dan die lys.",
-      "noRepositoriesVisibleGitlab": "Geen bewaarplekke is sigbaar nie. Gaan GitLab se toegang tot bewaarplekke na en verfris dan die lys.",
-      "openBitbucket": "Maak Bitbucket oop",
-      "openGitlab": "Maak GitLab oop",
-      "recentlyUsed": "Onlangs gebruik",
       "continueFrom": "Die sessie {{title}} word voortgesit.",
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortsit nie. Kies Cloud Agent of 'n ander CLI.",
-      "importFailed": "Hierdie sessie kon nie ingevoer word nie.",
-      "discardWithUploadsMessage": "Jou opdrag en enige opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word."
+      "importFailed": "Hierdie sessie kon nie ingevoer word nie."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer is bygewerk.",

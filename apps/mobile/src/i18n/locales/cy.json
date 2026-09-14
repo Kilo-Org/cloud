@@ -2541,6 +2541,11 @@
       "stepsCount_few": "{{steps}} cham",
       "stepsCount_many": "{{steps}} cham"
     },
+    "autoApprove": {
+      "title": "Cymeradwyo'n awtomatig",
+      "description": "Cymeradwywch geisiadau caniatâd ar gyfer y sesiwn hon yn awtomatig. Yna mae offer yn rhedeg heb anogiad.",
+      "unavailable": "Ni all y sesiwn hon dderbyn ceisiadau caniatâd."
+    },
     "prBadge": {
       "open": "agor cais tynnu",
       "closed": "cais tynnu wedi'i gau",

@@ -58,6 +58,12 @@ import {
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import {
+  canAutoApprovePermissions,
+  resolveSessionAutoApproveState,
+  setSessionAutoApproveEnabled,
+  useSessionAutoApproveEnabled,
+} from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
@@ -92,6 +98,7 @@ import {
   useCliSessionPresence,
 } from '@/components/kilo-chat/hooks/use-cli-session-presence';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
+import { useSessionAutoApprove } from '@/components/agents/use-session-auto-approve';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
@@ -247,6 +254,11 @@ export function SessionDetailContent({
   const getChildSessionError = useAtomValue(manager.atoms.childSessionError);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
+  // Per-session auto-approve lives in an in-memory store keyed by session id.
+  // Availability follows the transport (and the read-only flag); an unresolved
+  // transport is unavailable, so the row shows disabled without a fetch.
+  const autoApproveEnabled = useSessionAutoApproveEnabled(sessionId);
+  const autoApproveAvailable = canAutoApprovePermissions({ activeSessionType, isReadOnly });
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
@@ -322,6 +334,22 @@ export function SessionDetailContent({
     surface: analyticsSurface,
   });
 
+  const autoApproveState = resolveSessionAutoApproveState({
+    enabled: autoApproveEnabled,
+    available: autoApproveAvailable,
+  });
+  // Per-ask auto-reply for the head permission. Only permission request ids
+  // reach the hook, so a clarification question is never auto-answered.
+  const { suppressedRequestId } = useSessionAutoApprove({
+    enabled: autoApproveState === 'on',
+    available: autoApproveAvailable,
+    requestId: activePermission?.requestId ?? null,
+    respond: async () => {
+      const outcome = await handleRespondToPermission('once');
+      return outcome;
+    },
+  });
+
   const organizationId = fetchedData?.organizationId ?? undefined;
 
   const presenceSessionId = resolveLoadedCliSessionPresenceId(
@@ -370,11 +398,11 @@ export function SessionDetailContent({
         (contextInfo.providerID === 'kilo' ? 'Kilo' : contextInfo.providerID),
     };
   }, [contextInfo, sessionModels.options]);
-  const sheetMountState = getContextSheetMountState(
-    contextInfo,
-    openContextSheetIdentity,
-    sessionId
-  );
+  const sheetMountState = getContextSheetMountState(contextInfo, openContextSheetIdentity, {
+    sessionId,
+    autoApproveAvailable,
+  });
+  const contextSheetVisible = sheetMountState.mounted && sheetMountState.visible;
   const catalogGenerationIdentity =
     remoteModelState.protocol === 'v1' ? (remoteModelState.catalog ?? null) : gatewayModels;
   const modelPickerSelectionScope = useMemo<ModelPickerSelectionScope>(
@@ -588,19 +616,10 @@ export function SessionDetailContent({
   );
 
   useEffect(() => {
-    setOpenContextSheetIdentity(openIdentity => {
-      if (
-        !openIdentity ||
-        (contextInfo &&
-          openIdentity.sessionId === sessionId &&
-          openIdentity.providerID === contextInfo.providerID &&
-          openIdentity.modelID === contextInfo.modelID)
-      ) {
-        return openIdentity;
-      }
-      return null;
-    });
-  }, [contextInfo, sessionId]);
+    if (!contextSheetVisible) {
+      setOpenContextSheetIdentity(null);
+    }
+  }, [contextSheetVisible]);
 
   useEffect(() => {
     if (
@@ -1265,14 +1284,15 @@ export function SessionDetailContent({
         info={contextInfo}
         totalCostMicrodollars={totalMicrodollars}
         hasMessages={messages.length > 0}
+        autoApproveAvailable={autoApproveAvailable}
         loading={shouldShowLoading}
         onPress={
-          contextInfo
+          contextInfo || autoApproveAvailable
             ? () => {
                 setOpenContextSheetIdentity({
                   sessionId,
-                  providerID: contextInfo.providerID,
-                  modelID: contextInfo.modelID,
+                  providerID: contextInfo?.providerID,
+                  modelID: contextInfo?.modelID,
                 });
               }
             : undefined
@@ -1281,7 +1301,15 @@ export function SessionDetailContent({
     </View>
   );
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
-  const hasBlockingInteraction = blockingInteraction !== 'none';
+  // A pending permission ask that the auto-reply is already answering is
+  // suppressed: the card is gated out below (`suppressedRequestId`). Blocking
+  // the composer on that same ask would blank both the card and the input for
+  // the whole reply round trip, so only the actually-rendered card counts as
+  // blocking — the composer (and its in-flight progress) stays put while the
+  // auto-reply resolves.
+  const permissionSuppressed =
+    blockingInteraction === 'permission' && activePermission?.requestId === suppressedRequestId;
+  const hasBlockingInteraction = blockingInteraction !== 'none' && !permissionSuppressed;
   // One number for both kinds: the user must see every waiting request, not
   // only the ones of the kind currently on screen.
   const blockingRequestCount = pendingQuestions.length + pendingPermissions.length;
@@ -1391,8 +1419,11 @@ export function SessionDetailContent({
       return cleared;
     }
     if (blockingInteraction === 'permission') {
-      const cleared = await handleRespondToPermission('reject');
-      return cleared;
+      // The permission handler reports a tri-state transport outcome; the goal
+      // flow only needs to know whether the request was cleared, which is the
+      // "ok" reply. A retryable or terminal failure leaves it pending.
+      const outcome = await handleRespondToPermission('reject');
+      return outcome === 'ok';
     }
     return true;
   }, [blockingInteraction, handleRejectQuestion, handleRespondToPermission]);
@@ -1650,6 +1681,13 @@ export function SessionDetailContent({
             breakdownCostUsd={breakdownCostUsd}
             messages={messages}
             modelOptions={modelOptions}
+            autoApproveState={autoApproveState}
+            onAutoApproveChange={enabled => {
+              // Selection haptic for the commit: a capability iOS and Android
+              // both have, served here by the one cross-platform call.
+              void Haptics.selectionAsync();
+              setSessionAutoApproveEnabled(sessionId, enabled);
+            }}
             onClose={() => {
               setOpenContextSheetIdentity(null);
             }}
@@ -1796,7 +1834,9 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        {blockingInteraction === 'permission' && activePermission ? (
+        {blockingInteraction === 'permission' &&
+        activePermission &&
+        activePermission.requestId !== suppressedRequestId ? (
           <PermissionCard
             key={activePermission.requestId}
             permission={activePermission.permission}

@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/persist/cache-persistence-mount.test.ts */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake drafts factories settle without await because they resolve immediately */
 /* eslint-disable max-lines -- the persistence, hydration-race, and submit-retention suites share one drafts-mock harness in this file */
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {

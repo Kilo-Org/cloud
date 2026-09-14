@@ -20,6 +20,13 @@ const BLOCKED_PERMISSIONS = [
 ];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+const PERMISSION_PROMPT_PLIST_KEYS = [
+  'NSMicrophoneUsageDescription',
+  'NSSpeechRecognitionUsageDescription',
+  'NSFaceIDUsageDescription',
+  'NSLocationWhenInUseUsageDescription',
+  'NSUserTrackingUsageDescription',
+];
 
 const mobileDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -81,6 +88,34 @@ check(
   blockedPermissionsMatch,
   `android.blockedPermissions must equal exactly [${BLOCKED_PERMISSIONS.join(', ')}]`
 );
+
+// iOS permission prompts: Expo's built-in `withLocales` reads the top-level
+// `locales` field at prebuild and writes one InfoPlist.strings per tag. The
+// evaluated config is the integration guard the unit test cannot give: it
+// exercises app.config.ts's real module resolution and the JSON import.
+const localizations = config.ios?.infoPlist?.CFBundleLocalizations ?? [];
+const locales = config.locales ?? {};
+check(
+  Object.keys(locales).length === localizations.length,
+  `top-level locales must cover every CFBundleLocalization (${localizations.length})`
+);
+for (const tag of localizations) {
+  check(
+    Boolean(locales[tag]?.ios) && typeof locales[tag].ios === 'object',
+    `locales["${tag}"].ios must be an object`
+  );
+  for (const key of PERMISSION_PROMPT_PLIST_KEYS) {
+    const value = locales[tag]?.ios?.[key];
+    check(
+      typeof value === 'string' && value.length > 0,
+      `locales["${tag}"].ios["${key}"] must be a non-empty string`
+    );
+  }
+  check(
+    locales[tag]?.ios?.NSLocationWhenInUseUsageDescription?.includes('$(PRODUCT_NAME)') === true,
+    `locales["${tag}"].ios.NSLocationWhenInUseUsageDescription must keep $(PRODUCT_NAME)`
+  );
+}
 
 const pluginNames = (config.plugins ?? []).map(plugin =>
   Array.isArray(plugin) ? plugin[0] : plugin

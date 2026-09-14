@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
+import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
 import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
 import { TourStepHeader } from '@/components/tour/tour-step-header';
@@ -61,65 +62,13 @@ export function TourRemoteStep({ onChooseComputer }: Readonly<TourRemoteStepProp
   );
 
   let content: ReactNode = null;
-  if (isInstancesError) {
-    // Retryable list failure: a real network error, distinct from the
-    // successful zero-computer response below. Keep the step chrome mounted
-    // and render the error into the reserved content slot, so a mid-tour
-    // failure never blanks the path and Retry restores it in place.
-    content = (
-      <QueryError
-        placement="top"
-        className="pt-0"
-        message={t('tour.networkError')}
-        onRetry={() => {
-          void refetchInstances();
-        }}
-        isRetrying={isRefetching}
-      />
-    );
-  } else if (isLoadingInstances) {
-    // Content-shaped skeleton rows sized like the discovered-computer list, so
-    // resolving the query does not move the surrounding layout.
-    content = (
-      <View className="w-full gap-3">
-        {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-          <View key={index} className="rounded-xl border border-border bg-card px-4 py-3">
-            <Skeleton className="h-5 w-2/3 rounded-md" />
-            <Skeleton className="mt-2 h-4 w-1/3 rounded-md" />
-          </View>
-        ))}
-      </View>
-    );
-  } else if (computers.length === 0) {
-    // Discovered nothing: a successful empty response, not an error. Show the
-    // start instructions and a refetch, never a dead end.
-    content = (
-      <View className="items-center gap-4">
-        <View className="items-center gap-1">
-          <Text variant="large" className="text-center">
-            {t('tour.remoteEmptyTitle')}
-          </Text>
-          <Text variant="muted" className="text-center">
-            {t('tour.remoteEmptyBody')}
-          </Text>
-        </View>
-        <Text variant="mono" className="text-center">
-          {t('tour.remoteRunHint')}
-        </Text>
-        <Button
-          variant="outline"
-          onPress={() => {
-            void refetchInstances();
-          }}
-          loading={isRefetching}
-        >
-          <Text>{t('tour.checkAgain')}</Text>
-        </Button>
-      </View>
-    );
-  } else {
+  if (computers.length > 0) {
     // Detected: one hand-off row per computer, plus the start instructions so
-    // the person can connect another machine while they decide.
+    // the person can connect another machine while they decide. The list owns
+    // the slot whenever it has rows: TanStack Query keeps `data` on a failed
+    // background refetch (`status: 'error'`, `hasData: true`), so a 10s poll
+    // that drops mid-tour must keep the detected computers tappable rather
+    // than replace them with the full-slot network-error screen.
     content = (
       <View className="w-full gap-4">
         <View className="w-full gap-2">
@@ -145,9 +94,80 @@ export function TourRemoteStep({ onChooseComputer }: Readonly<TourRemoteStepProp
             </Pressable>
           ))}
         </View>
+        {
+          // Reserved status line: a refresh failure that arrives while the
+          // rows are on screen fills this space instead of pushing the list or
+          // the hint, and a failed poll never blanks what is already detected.
+          // `busy` stays false so a background poll cannot hide the inline
+          // error (the empty and full-error branches own their own loading).
+        }
+        <View className="min-h-5">
+          <SessionListRefreshStatus
+            busy={false}
+            failed={isInstancesError}
+            onRetry={() => {
+              void refetchInstances();
+            }}
+          />
+        </View>
         <Text variant="mono" className="text-center">
           {t('tour.remoteRunHint')}
         </Text>
+      </View>
+    );
+  } else if (isInstancesError) {
+    // Nothing to show and the list failed: only here does the error replace the
+    // reserved slot. Keep the step chrome mounted and render the error into the
+    // slot, so Retry restores the path in place.
+    content = (
+      <QueryError
+        placement="top"
+        className="pt-0"
+        message={t('tour.networkError')}
+        onRetry={() => {
+          void refetchInstances();
+        }}
+        isRetrying={isRefetching}
+      />
+    );
+  } else if (isLoadingInstances) {
+    // Content-shaped skeleton rows sized like the discovered-computer list, so
+    // resolving the query does not move the surrounding layout.
+    content = (
+      <View className="w-full gap-3">
+        {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
+          <View key={index} className="rounded-xl border border-border bg-card px-4 py-3">
+            <Skeleton className="h-5 w-2/3 rounded-md" />
+            <Skeleton className="mt-2 h-4 w-1/3 rounded-md" />
+          </View>
+        ))}
+      </View>
+    );
+  } else {
+    // Discovered nothing: a successful empty response, not an error. Show the
+    // start instructions and a refetch, never a dead end.
+    content = (
+      <View className="items-center gap-4">
+        <View className="items-center gap-1">
+          <Text variant="large" className="text-center">
+            {t('tour.remoteEmptyTitle')}
+          </Text>
+          <Text variant="muted" className="text-center">
+            {t('tour.remoteEmptyBody')}
+          </Text>
+        </View>
+        <Text variant="mono" className="text-center">
+          {t('tour.remoteRunHint')}
+        </Text>
+        <Button
+          variant="outline"
+          onPress={() => {
+            void refetchInstances();
+          }}
+          loading={isRefetching}
+        >
+          <Text>{t('tour.checkAgain')}</Text>
+        </Button>
       </View>
     );
   }

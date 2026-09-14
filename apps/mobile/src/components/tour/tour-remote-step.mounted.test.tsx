@@ -210,6 +210,56 @@ describe('TourRemoteStep', () => {
     unmount();
   });
 
+  it('keeps the detected computers and shows a compact inline retry when a background refresh fails', async () => {
+    // First load succeeds so the rows are on screen; every later poll fails,
+    // exactly as a 10s refetch does when the network drops mid-tour.
+    fetchInstances
+      .mockResolvedValueOnce({ instances: [REMOTE] })
+      .mockRejectedValue(new Error('offline'));
+    const { renderer, queryClient, onChooseComputer, unmount } = await mountStep();
+
+    await waitFor(() => hasText(renderer, 'tour.remoteFound'));
+    expect(layoutSlot(renderer).findAllByType('Pressable' as ElementType)).toHaveLength(1);
+
+    // Force the failing background refetch to settle while the rows are visible.
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: QUERY_KEY });
+    });
+
+    // The failure must not blank the list: the detected computer stays
+    // tappable and the failure surfaces as a compact inline status with Retry,
+    // never the full-slot network-error screen.
+    const slot = layoutSlot(renderer);
+    expect(hasTextIn(slot, 'tour.remoteFound')).toBe(true);
+    expect(hasTextIn(slot, 'tour.networkError')).toBe(false);
+
+    const pressables = slot.findAllByType('Pressable' as ElementType);
+    const row = pressables.find(node => node.props.accessibilityLabel === 'laptop');
+    if (!row) {
+      throw new Error('detected computer row not found');
+    }
+    // The person can still act on the detected computer mid-failure.
+    act(() => {
+      press(row);
+    });
+    expect(onChooseComputer).toHaveBeenCalledWith('conn-1');
+
+    const retry = pressables.find(node => node.props.accessibilityLabel === 'common.retry');
+    if (!retry) {
+      throw new Error('inline retry not found');
+    }
+    expect(hasTextIn(slot, 'agents.sessionList.couldNotRefresh')).toBe(true);
+
+    const before = fetchInstances.mock.calls.length;
+    await act(async () => {
+      await Promise.resolve();
+      press(retry);
+    });
+    await waitFor(() => fetchInstances.mock.calls.length > before);
+
+    unmount();
+  });
+
   it('lists one labelled hand-off row and the start instructions per detected computer', async () => {
     fetchInstances.mockResolvedValue({ instances: [REMOTE, REMOTE2] });
     const { renderer, unmount } = await mountStep();

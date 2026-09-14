@@ -79,6 +79,7 @@ function startInputToSessionCreateRequest(
     },
     agent: input.agent,
     repository,
+    ...(input.runtime ? { runtime: input.runtime } : {}),
     profile: profile
       ? {
           id: profile.id,

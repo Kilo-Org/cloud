@@ -135,18 +135,11 @@ export function MonthlySpendingAlertEditor({
   return (
     <div className="flex min-h-full flex-col">
       <div className="grid flex-1 content-start gap-5 p-5">
-        <Alert>
-          <Info />
-          <AlertTitle>This alert only notifies people</AlertTitle>
-          <AlertDescription>
-            <p>
-              Kilo emails the recipients below when the measured AI usage spend of whatever this
-              alert measures reaches your amount during a UTC calendar month. It does not stop
-              usage, block models, or cap charges, and the amount excludes seats, Kilo Pass,
-              KiloClaw compute, Exa, and Coding Plans.
-            </p>
-          </AlertDescription>
-        </Alert>
+        <p className="type-body text-muted-foreground">
+          Kilo emails alert recipients when the measured AI usage spend reaches the specified amount
+          during a UTC calendar month. It does not stop usage, block models, or cap charges, and the
+          amount excludes seats, Kilo Pass, KiloClaw compute, Exa, and Coding Plans.
+        </p>
 
         {error && (
           <Alert variant="destructive">
@@ -211,7 +204,7 @@ export function MonthlySpendingAlertEditor({
             <SelectTrigger id={SCOPE_ID} className="w-full">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[70]">
               <SelectItem value="organization">Whole organization</SelectItem>
               <SelectItem value="group">A specific group</SelectItem>
             </SelectContent>
@@ -239,7 +232,7 @@ export function MonthlySpendingAlertEditor({
                 >
                   <SelectValue placeholder="Choose a group" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[70]">
                   {groupOptions?.map(group => (
                     <SelectItem key={group.id} value={group.id}>
                       {group.name}

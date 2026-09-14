@@ -1,9 +1,8 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 /* eslint-disable max-lines -- one cohesive mounted suite pins every FixedPartRow state through the shared render harness */
 import '@/i18n';
 import { Eye } from '@/components/ui/icons';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';

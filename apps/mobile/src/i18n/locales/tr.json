@@ -231,6 +231,8 @@
     "voiceInput": "Sesli giriş",
     "autoExpandThinking": "Düşünce bölümünü otomatik genişlet",
     "autoExpandThinkingSubtitle": "Ajan düşünmeyi bitirdiğinde düşünce bölümünü genişletilmiş olarak göster.",
+    "hideThinking": "Düşünce ayrıntılarını gizle",
+    "hideThinkingSubtitle": "Ajanın düşüncesini oturum sayfasında gösterme.",
     "keepScreenOn": "Oturum sayfasındayken ekranı açık tut",
     "keepScreenOnSubtitle": "Oturum çalışırken ekranı açık tut.",
     "appearance": "Görünüm",
@@ -2023,6 +2025,11 @@
       "stepsCount": "{{steps}} adım",
       "stepsCount_other": "{{steps}} adım",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "Otomatik onayla",
+      "description": "Bu oturum için izin isteklerini otomatik olarak onayla. Araçlar ardından istem olmadan çalışır.",
+      "unavailable": "Bu oturum izin isteklerini alamaz."
     },
     "prBadge": {
       "open": "açık çekme isteği",

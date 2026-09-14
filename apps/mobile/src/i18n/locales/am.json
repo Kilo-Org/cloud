@@ -231,6 +231,8 @@
     "voiceInput": "የድምጽ ግቤት",
     "autoExpandThinking": "አስተሳሰቡን በራስ ሰር ያስፉ",
     "autoExpandThinkingSubtitle": "ወኪሉ ማሰቡን ሲጨርስ አስተሳሰቡን ተዘርግቶ ያሳዩ።",
+    "hideThinking": "የአስተሳሰብ ዝርዝሮችን ደብቅ",
+    "hideThinkingSubtitle": "የወኪሉን አስተሳሰብ በክፍለ ጊዜ ገጽ ላይ አታሳዩ።",
     "keepScreenOn": "በክፍለ ጊዜ ገጽ ላይ ሲሆኑ ማያ ገጹን እንደበራ ያቆዩ",
     "keepScreenOnSubtitle": "ክፍለ ጊዜው እየሠራ እያለ ማያ ገጹን እንደበራ ያቆዩ።",
     "appearance": "መልክ",
@@ -2457,6 +2459,11 @@
       "stepsCount": "{{steps}} እርምጃዎች",
       "stepsCount_other": "{{steps}} እርምጃዎች",
       "modelAccessibilityLabel": "{{name}}፣ {{provider}}፣ {{steps}}፣ {{cost}}"
+    },
+    "autoApprove": {
+      "title": "ራስ-ሰር ማጽደቅ",
+      "description": "የዚህ ክፍለ ጊዜ የፈቃድ ጥያቄዎችን በራስ-ሰር ያጽድቁ። በኋላም መሣሪያዎች ያለ ጥያቄ ይሠራሉ።",
+      "unavailable": "ይህ ክፍለ ጊዜ የፈቃድ ጥያቄዎችን ማግኘት አይችልም።"
     },
     "prBadge": {
       "open": "ክፍት የማዋሃድ ጥያቄ",

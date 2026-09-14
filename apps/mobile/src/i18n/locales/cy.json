@@ -231,6 +231,8 @@
     "voiceInput": "Mewnbwn llais",
     "autoExpandThinking": "Ehangu meddwl yn awtomatig",
     "autoExpandThinkingSubtitle": "Dangos meddwl yr asiant yn llawn pan fydd wedi gorffen meddwl.",
+    "hideThinking": "Cuddio manylion meddwl",
+    "hideThinkingSubtitle": "Peidio â dangos meddwl yr asiant ar dudalen y sesiwn.",
     "keepScreenOn": "Cadw'r sgrin ymlaen ar dudalen y sesiwn",
     "keepScreenOnSubtitle": "Cadw'r sgrin ymlaen tra bydd y sesiwn yn rhedeg.",
     "appearance": "Ymddangosiad",
@@ -2541,6 +2543,11 @@
       "stepsCount_two": "{{steps}} gam",
       "stepsCount_few": "{{steps}} cham",
       "stepsCount_many": "{{steps}} cham"
+    },
+    "autoApprove": {
+      "title": "Cymeradwyo'n awtomatig",
+      "description": "Cymeradwywch geisiadau caniatâd ar gyfer y sesiwn hon yn awtomatig. Yna mae offer yn rhedeg heb anogiad.",
+      "unavailable": "Ni all y sesiwn hon dderbyn ceisiadau caniatâd."
     },
     "prBadge": {
       "open": "agor cais tynnu",

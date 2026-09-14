@@ -1,9 +1,8 @@
 /* eslint-disable max-lines -- the mocked native surface needs one mock block per bridge */
 /* eslint-disable require-await, @typescript-eslint/require-await -- mock factories settle without await, matching chat-composer.test.ts */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as chat-composer-input-row.mounted.test.tsx) */
 import * as React from 'react';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatComposer } from './chat-composer';

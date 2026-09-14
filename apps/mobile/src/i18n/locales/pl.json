@@ -231,6 +231,8 @@
     "voiceInput": "Wprowadzanie głosu",
     "autoExpandThinking": "Automatycznie rozwijaj tok rozumowania",
     "autoExpandThinkingSubtitle": "Rozwijaj tok rozumowania agenta po jego zakończeniu.",
+    "hideThinking": "Ukryj szczegóły rozumowania",
+    "hideThinkingSubtitle": "Nie pokazuj rozumowania agenta na stronie sesji.",
     "keepScreenOn": "Nie wygaszaj ekranu podczas wyświetlania sesji",
     "keepScreenOnSubtitle": "Nie wygaszaj ekranu, gdy trwa sesja.",
     "appearance": "Wygląd",
@@ -2051,6 +2053,11 @@
       "modelAccessibilityLabel": "Model {{name}}, dostawca {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} kroki",
       "stepsCount_many": "{{steps}} kroków"
+    },
+    "autoApprove": {
+      "title": "Automatyczne zatwierdzanie",
+      "description": "Automatycznie zatwierdzaj prośby o uprawnienia dla tej sesji. Narzędzia będą potem działać bez monitu.",
+      "unavailable": "Ta sesja nie może odbierać próśb o uprawnienia."
     },
     "prBadge": {
       "open": "otwarty PR",

@@ -1,6 +1,6 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- the four history paths and recovery controls share one native list harness; react-test-renderer mounts it without a DOM. */
+/* eslint-disable max-lines -- the four history paths and recovery controls share one native list harness; test-renderer mounts it without a DOM. */
 import { createElement, type ReactElement, type ReactNode, type Ref } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';

@@ -38,6 +38,8 @@ const mockUpsertPlatformIntegrationForOwner =
   >();
 const mockUpdateRepositoriesForIntegration =
   jest.fn<(integrationId: string, repositories: unknown[]) => Promise<void>>();
+const mockSyncIntegrationInstallationDetails =
+  jest.fn<(integrationId: string, details: Record<string, unknown>) => Promise<void>>();
 const mockFetchGitHubInstallationDetails =
   jest.fn<(installationId: string, appType: GitHubAppType) => Promise<InstallationDetails>>();
 const mockFetchGitHubRepositories =
@@ -165,6 +167,8 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     installationId: string,
     appType: GitHubAppType
   ) => mockFindIntegrationByInstallationId(platform, installationId, appType),
+  syncIntegrationInstallationDetails: (integrationId: string, details: Record<string, unknown>) =>
+    mockSyncIntegrationInstallationDetails(integrationId, details),
 }));
 jest.mock('@/lib/integrations/db/github-installations', () => ({
   disconnectGitHubInstallation: jest.fn(),
@@ -575,6 +579,7 @@ describe('githubAppsRouter.refreshInstallation', () => {
     mockFetchGitHubRepositories.mockResolvedValue([]);
     mockUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
     mockUpdateRepositoriesForIntegration.mockResolvedValue(undefined);
+    mockSyncIntegrationInstallationDetails.mockResolvedValue(undefined);
   });
 
   it('refreshes the selected association through canonical installation state', async () => {
@@ -594,6 +599,18 @@ describe('githubAppsRouter.refreshInstallation', () => {
       installationId: '98765',
       appType: 'standard',
     });
+    // The association row itself must also be refreshed, since
+    // `githubAppsService.getInstallation`/`listIntegrations` read account,
+    // permissions, scopes, and repository-access fields straight off
+    // `platform_integrations`, not the canonical `github_app_installations` row.
+    expect(mockSyncIntegrationInstallationDetails).toHaveBeenCalledWith('integration-1', {
+      platformAccountId: '123',
+      platformAccountLogin: 'renamed-owner',
+      permissions: {},
+      scopes: [],
+      repositoryAccess: 'all',
+      installedAt: '2026-01-01T00:00:00.000Z',
+    });
     expect(mockFetchGitHubRepositories).toHaveBeenCalledWith('98765', 'standard', 'integration-1');
   });
 
@@ -612,6 +629,7 @@ describe('githubAppsRouter.refreshInstallation', () => {
     );
 
     expect(mockObserveGitHubInstallationLifecycle).not.toHaveBeenCalled();
+    expect(mockSyncIntegrationInstallationDetails).not.toHaveBeenCalled();
     expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
   });

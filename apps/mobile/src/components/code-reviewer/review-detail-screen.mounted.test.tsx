@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 /* eslint-disable max-lines -- the spectator describe adds a transcript-state suite on top of the existing outcome-first contract; they share one mock harness */
 
 // Outcome-first detail-screen contract: the screen leads with the conclusion
@@ -7,7 +6,7 @@
 // (NOT_FOUND/FORBIDDEN/UNAUTHORIZED) shows no Retry; a transient error does.
 
 import { createElement, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ReviewDetailScreen } from './review-detail-screen';

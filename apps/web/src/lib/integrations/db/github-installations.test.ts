@@ -20,12 +20,17 @@ import {
   updateCodeReviewStatus,
 } from '@/lib/code-reviews/db/code-reviews';
 import {
+  bindGitHubIntegrationToCanonicalInstallation,
+  claimGitHubInstallationDelivery,
+  completeGitHubInstallationDelivery,
   connectVerifiedGitHubInstallation,
+  GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS,
   getGitHubInstallationDeliveryStatus,
   materializeGitHubInstallationIdentity,
   disconnectGitHubInstallation,
   observeGitHubInstallationLifecycle,
   recordCompletedGitHubInstallationDelivery,
+  releaseGitHubInstallationDelivery,
   uninstallExclusiveGitHubInstallation,
   updateGitHubInstallationRepositories,
   updateGitHubInstallationAccountIdentity,
@@ -166,6 +171,272 @@ describe('GitHub installation persistence', () => {
       })
     ).resolves.toBe('completed');
     await expect(db.select().from(github_installation_webhook_receipts)).resolves.toHaveLength(1);
+  });
+
+  test('claims a shared delivery exactly once until it completes', async () => {
+    await materializeGitHubInstallationIdentity({ installationId: '910001', appType: 'standard' });
+    const input = {
+      installationId: '910001',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-claim',
+      eventType: 'installation.deleted',
+    };
+    const delivered = {
+      installationId: '910001',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-claim',
+    };
+
+    const first = await claimGitHubInstallationDelivery(input);
+    expect(first).toEqual({ status: 'claimed', githubInstallationId: expect.any(String) });
+    if (first.status !== 'claimed') throw new Error('Expected first claim to win');
+    await expect(getGitHubInstallationDeliveryStatus(delivered)).resolves.toBe('processing');
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({
+      status: 'processing',
+    });
+
+    await completeGitHubInstallationDelivery({
+      githubInstallationId: first.githubInstallationId,
+      deliveryId: 'delivery-claim',
+    });
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({ status: 'completed' });
+    await expect(getGitHubInstallationDeliveryStatus(delivered)).resolves.toBe('completed');
+    await expect(db.select().from(github_installation_webhook_receipts)).resolves.toHaveLength(1);
+  });
+
+  test('keeps a fresh processing claim as a duplicate instead of reclaiming it', async () => {
+    await materializeGitHubInstallationIdentity({ installationId: '910003', appType: 'standard' });
+    const input = {
+      installationId: '910003',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-fresh',
+      eventType: 'installation.deleted',
+    };
+
+    const first = await claimGitHubInstallationDelivery(input);
+    if (first.status !== 'claimed') throw new Error('Expected first claim to win');
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({ status: 'processing' });
+    await expect(
+      getGitHubInstallationDeliveryStatus({
+        installationId: '910003',
+        appType: 'standard',
+        deliveryId: 'delivery-fresh',
+      })
+    ).resolves.toBe('processing');
+  });
+
+  test('reclaims a stale processing claim left by a killed dispatch', async () => {
+    await materializeGitHubInstallationIdentity({ installationId: '910004', appType: 'standard' });
+    const input = {
+      installationId: '910004',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-stale',
+      eventType: 'installation.deleted',
+    };
+
+    const first = await claimGitHubInstallationDelivery(input);
+    if (first.status !== 'claimed') throw new Error('Expected first claim to win');
+    await db
+      .update(github_installation_webhook_receipts)
+      .set({
+        created_at: new Date(
+          Date.now() - GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS - 60_000
+        ).toISOString(),
+      })
+      .where(eq(github_installation_webhook_receipts.delivery_id, 'delivery-stale'));
+
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({
+      status: 'claimed',
+      githubInstallationId: first.githubInstallationId,
+    });
+    // The reclaim refreshes the claim timestamp, so a second attempt is a duplicate again.
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({ status: 'processing' });
+  });
+
+  test('keeps a completed receipt terminal for its delivery id', async () => {
+    await materializeGitHubInstallationIdentity({ installationId: '910005', appType: 'standard' });
+    const input = {
+      installationId: '910005',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-terminal',
+      eventType: 'installation.deleted',
+    };
+
+    const first = await claimGitHubInstallationDelivery(input);
+    if (first.status !== 'claimed') throw new Error('Expected first claim to win');
+    await completeGitHubInstallationDelivery({
+      githubInstallationId: first.githubInstallationId,
+      deliveryId: 'delivery-terminal',
+    });
+    await db
+      .update(github_installation_webhook_receipts)
+      .set({
+        created_at: new Date(
+          Date.now() - GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS - 60_000
+        ).toISOString(),
+      })
+      .where(eq(github_installation_webhook_receipts.delivery_id, 'delivery-terminal'));
+
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({ status: 'completed' });
+  });
+
+  test('lets only one concurrent redelivery reclaim a stale processing claim', async () => {
+    await materializeGitHubInstallationIdentity({ installationId: '910006', appType: 'standard' });
+    const input = {
+      installationId: '910006',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-concurrent-reclaim',
+      eventType: 'installation.deleted',
+    };
+
+    const first = await claimGitHubInstallationDelivery(input);
+    if (first.status !== 'claimed') throw new Error('Expected first claim to win');
+    await db
+      .update(github_installation_webhook_receipts)
+      .set({
+        created_at: new Date(
+          Date.now() - GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS - 60_000
+        ).toISOString(),
+      })
+      .where(eq(github_installation_webhook_receipts.delivery_id, 'delivery-concurrent-reclaim'));
+
+    // Hold the receipt row open so both contenders fully acquire and then
+    // block on the same row, guaranteeing genuine contention on the reclaim
+    // update rather than incidental serialization.
+    let releaseHolder: (() => void) | undefined;
+    const holderRelease = new Promise<void>(resolve => {
+      releaseHolder = resolve;
+    });
+    let reportHolderPid: ((pid: number) => void) | undefined;
+    const holderReady = new Promise<number>(resolve => {
+      reportHolderPid = resolve;
+    });
+    const holder = db.transaction(async tx => {
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      await tx.execute(
+        sql`SELECT id FROM github_installation_webhook_receipts WHERE delivery_id = ${'delivery-concurrent-reclaim'} FOR UPDATE`
+      );
+      reportHolderPid?.(backend.rows[0]!.pid);
+      await holderRelease;
+    });
+
+    const holderPid = await githubTestTimeout(holderReady, 'reclaim holder readiness');
+    const contenders = [
+      claimGitHubInstallationDelivery(input),
+      claimGitHubInstallationDelivery(input),
+    ];
+    try {
+      await githubTestTimeout(
+        waitForBlockedGitHubDeliveryLock(holderPid, 2),
+        'reclaim contender blocking'
+      );
+    } finally {
+      releaseHolder?.();
+    }
+    await holder;
+
+    const results = await Promise.all(contenders);
+    expect(results.filter(result => result.status === 'claimed')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'processing')).toHaveLength(1);
+  });
+
+  test('releases a failed claim so redelivery can reprocess', async () => {
+    await materializeGitHubInstallationIdentity({ installationId: '910002', appType: 'standard' });
+    const input = {
+      installationId: '910002',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-release',
+      eventType: 'installation.deleted',
+    };
+
+    const first = await claimGitHubInstallationDelivery(input);
+    if (first.status !== 'claimed') throw new Error('Expected first claim to win');
+    await releaseGitHubInstallationDelivery({
+      githubInstallationId: first.githubInstallationId,
+      deliveryId: 'delivery-release',
+    });
+
+    await expect(
+      getGitHubInstallationDeliveryStatus({
+        installationId: '910002',
+        appType: 'standard',
+        deliveryId: 'delivery-release',
+      })
+    ).resolves.toBe('not_completed');
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({
+      status: 'claimed',
+      githubInstallationId: first.githubInstallationId,
+    });
+  });
+
+  test('refuses to bind an association to a non-active canonical installation', async () => {
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('773003')
+    );
+    if (!connected.ok) throw new Error('Expected canonical connection');
+    await observeGitHubInstallationLifecycle({
+      installationId: '773003',
+      appType: 'standard',
+      state: 'suspended',
+    });
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, 'github'),
+          eq(platform_integrations.platform_installation_id, '773003')
+        )
+      )
+      .limit(1);
+    if (!integration) throw new Error('Expected GitHub association');
+
+    await expect(
+      bindGitHubIntegrationToCanonicalInstallation({
+        integrationId: integration.id,
+        installationId: '773003',
+        appType: 'standard',
+      })
+    ).rejects.toThrow('Canonical GitHub installation is not active');
+  });
+
+  test('treats a malformed persisted repository cache as empty during webhook updates', async () => {
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('773004')
+    );
+    if (!connected.ok) throw new Error('Expected canonical connection');
+    const [canonical] = await db
+      .select()
+      .from(github_app_installations)
+      .where(
+        and(
+          eq(github_app_installations.github_app_type, 'standard'),
+          eq(github_app_installations.installation_id, '773004')
+        )
+      )
+      .limit(1);
+    if (!canonical) throw new Error('Expected canonical installation');
+    await db
+      .update(github_app_installations)
+      .set({ repositories: { not: 'an array' } as never })
+      .where(eq(github_app_installations.id, canonical.id));
+
+    await expect(
+      updateGitHubInstallationRepositories({
+        installationId: '773004',
+        appType: 'standard',
+        repositoriesAdded: [{ id: 5, name: 'ok', full_name: 'acme/ok', private: true }],
+      })
+    ).resolves.toBeUndefined();
+    const [refreshed] = await db
+      .select()
+      .from(github_app_installations)
+      .where(eq(github_app_installations.id, canonical.id));
+    expect(refreshed.repositories).toEqual([
+      { id: 5, name: 'ok', full_name: 'acme/ok', private: true },
+    ]);
   });
 
   test('serializes shared attach commit before a concurrent agent enable recheck', async () => {
@@ -1748,6 +2019,26 @@ async function waitForBlockedGitHubOwnerLock(
     await new Promise<void>(resolve => setImmediate(resolve));
   }
   throw new Error(`Expected contender blocked on advisory lock ${expectedLockKey}`);
+}
+
+async function waitForBlockedGitHubDeliveryLock(
+  _holderPid: number,
+  expected: number
+): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    // Count every backend blocked while updating the receipt row. The first
+    // contender blocks on the holder's row lock and the second queues behind
+    // the first, so only one directly lists the holder in pg_blocking_pids.
+    const result = await db.execute<{ blocked: number }>(sql`
+      SELECT count(*)::int AS blocked FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND wait_event_type = 'Lock'
+        AND query LIKE '%github_installation_webhook_receipts%'
+    `);
+    if ((result.rows[0]?.blocked ?? 0) >= expected) return;
+    await new Promise<void>(resolve => setImmediate(resolve));
+  }
+  throw new Error('Expected delivery-claim contenders blocked on the receipt row');
 }
 
 async function githubTestTimeout<T>(promise: Promise<T>, label: string): Promise<T> {

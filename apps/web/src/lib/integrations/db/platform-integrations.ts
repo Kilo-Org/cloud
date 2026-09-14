@@ -512,6 +512,42 @@ export async function updateIntegrationAccountIdentity(
 }
 
 /**
+ * Syncs freshly-fetched GitHub installation details (account identity,
+ * permissions, scopes, repository access, and install date) onto a single
+ * association row, scoped by its own id.
+ *
+ * Unlike `upsertPlatformIntegrationForOwner`, this never inspects sibling
+ * rows for the same installation, so it is safe to call for an association
+ * that shares its canonical installation with other owners
+ * (`sharing_mode = 'web_cloud_agent'`); it only ever touches the one row
+ * identified by `integrationId`.
+ */
+export async function syncIntegrationInstallationDetails(
+  integrationId: string,
+  data: {
+    platformAccountId: string;
+    platformAccountLogin: string;
+    permissions?: IntegrationPermissions | null;
+    scopes?: string[];
+    repositoryAccess: string;
+    installedAt?: string;
+  }
+) {
+  await db
+    .update(platform_integrations)
+    .set({
+      platform_account_id: data.platformAccountId,
+      platform_account_login: data.platformAccountLogin,
+      permissions: data.permissions ?? null,
+      scopes: data.scopes ?? null,
+      repository_access: data.repositoryAccess,
+      ...(data.installedAt ? { installed_at: data.installedAt } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integrationId));
+}
+
+/**
  * Suspends a platform integration.
  *
  * GitHub rows are unique per `(platform, github_app_type, installation_id)`,

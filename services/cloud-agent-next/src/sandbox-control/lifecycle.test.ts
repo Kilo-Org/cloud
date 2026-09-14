@@ -1720,6 +1720,24 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(Object.values(worktreeState ?? {})).not.toContain(secret);
   });
 
+  it('resolves the signing secret once per readiness pass', async () => {
+    let lookups = 0;
+    const h = await harness({
+      env: {
+        NEXTAUTH_SECRET: {
+          get: async () => {
+            lookups += 1;
+            return 'test-worktree-state-signing-secret';
+          },
+        },
+      },
+    });
+    // One pass mints both the diagnostic launch grant and the worktree-state
+    // grant, and must not pay for the lookup twice.
+    expect((await h.create()).attachment?.worktreeState).toBeDefined();
+    expect(lookups).toBe(1);
+  });
+
   it('omits the worktree-state grant when the signing secret is unavailable', async () => {
     const h = await harness({ env: { NEXTAUTH_SECRET: undefined } });
     expect((await h.create()).attachment?.worktreeState).toBeUndefined();

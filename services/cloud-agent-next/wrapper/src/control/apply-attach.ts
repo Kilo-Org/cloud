@@ -61,6 +61,7 @@ import {
   restoreWorktreeState,
   type WorktreeStateRestoreResult,
 } from '../worktree-state.js';
+import { WORKTREE_STATE_RESTORE_BUDGET_MS } from '../../../src/shared/worktree-state.js';
 
 const BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
 const SETUP_COMMAND_INACTIVITY_TIMEOUT_MS = 4 * 60_000;
@@ -607,7 +608,12 @@ async function executeSessionAttach(
               directory,
               endpoint: attach.worktreeState,
               env,
-              signal,
+              // Composed with the attach signal so the restore cannot spend the
+              // attachment deadline it is only a best-effort step of.
+              signal: AbortSignal.any([
+                signal,
+                AbortSignal.timeout(WORKTREE_STATE_RESTORE_BUDGET_MS),
+              ]),
             });
             logWorktreeState('restore', directory, restored);
             signal.throwIfAborted();

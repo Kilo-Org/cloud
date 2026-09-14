@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { captureWorktreeState, restoreWorktreeState } from './worktree-state';
+import { WORKTREE_STATE_MAX_UNTRACKED_FILES } from '../../src/shared/worktree-state';
 
 const endpoint = { url: 'https://worker.test/worktree-state/usr/scope', grant: 'test-grant' };
 
@@ -239,6 +240,86 @@ describe('worktree state capture and restore', () => {
       reason: 'too_large',
     });
     expect(fs.readFileSync(path.join(rebuilt, 'tracked.txt'), 'utf8')).toBe('original\n');
+  });
+
+  it('leaves the worktree untouched when a setup change conflicts with the patch', async () => {
+    const source = repository(root);
+    fs.writeFileSync(path.join(source, 'tracked.txt'), 'agent edit\n');
+    await captureWorktreeState({ directory: source, endpoint, env: gitEnv });
+
+    // The rebuild's setup command rewrote the same tracked file, so the patch
+    // cannot apply. The checkout must not be left half-patched or conflicted.
+    const rebuilt = path.join(root, 'rebuilt');
+    git(root, 'clone', '--quiet', source, rebuilt);
+    fs.writeFileSync(path.join(rebuilt, 'tracked.txt'), 'setup output\n');
+
+    expect(await restoreWorktreeState({ directory: rebuilt, endpoint, env: gitEnv })).toEqual({
+      status: 'skipped',
+      reason: 'patch_failed',
+    });
+    const content = fs.readFileSync(path.join(rebuilt, 'tracked.txt'), 'utf8');
+    expect(content).toBe('setup output\n');
+    expect(content).not.toContain('<<<<<<<');
+    // No unmerged index entries were left behind either.
+    const status = spawnSync('git', ['status', '--porcelain'], {
+      cwd: rebuilt,
+      env: gitEnv,
+      encoding: 'utf8',
+    }).stdout;
+    expect(status).toBe(' M tracked.txt\n');
+    expect(status).not.toContain('UU');
+  });
+
+  it('skips a worktree carrying more untracked files than a bundle may hold', async () => {
+    const source = repository(root);
+    const many = path.join(source, 'generated');
+    fs.mkdirSync(many, { recursive: true });
+    for (let index = 0; index <= WORKTREE_STATE_MAX_UNTRACKED_FILES; index += 1) {
+      fs.writeFileSync(path.join(many, `f${index}.txt`), 'x');
+    }
+    expect(await captureWorktreeState({ directory: source, endpoint, env: gitEnv })).toEqual({
+      status: 'skipped',
+      reason: 'too_many_files',
+    });
+    expect(net.stored.bundle).toBeUndefined();
+  });
+
+  it('degrades to a skip rather than throwing when the capture budget is spent', async () => {
+    const source = repository(root);
+    fs.writeFileSync(path.join(source, 'untracked.txt'), 'work\n');
+    // The caller awaits this before emitting the turn outcome, so an expired
+    // budget must never surface as a rejection.
+    const spent = AbortSignal.abort();
+    expect(
+      await captureWorktreeState({ directory: source, endpoint, env: gitEnv, signal: spent })
+    ).toMatchObject({ status: 'skipped' });
+    expect(net.stored.bundle).toBeUndefined();
+  });
+
+  it('degrades to a skip when no temp directory can be created', async () => {
+    const source = repository(root);
+    fs.writeFileSync(path.join(source, 'tracked.txt'), 'edited\n');
+    // Store a real bundle first, so the restore below fails on the temp
+    // directory rather than trivially reporting an absent one.
+    expect(await captureWorktreeState({ directory: source, endpoint, env: gitEnv })).toMatchObject({
+      status: 'captured',
+    });
+    const previous = process.env.TMPDIR;
+    process.env.TMPDIR = path.join(root, 'no', 'such', 'place');
+    try {
+      // Neither side may reject: a capture rejection would strand the turn
+      // without an outcome, and a restore rejection would fail the attach.
+      expect(
+        await captureWorktreeState({ directory: source, endpoint, env: gitEnv })
+      ).toMatchObject({ status: 'skipped' });
+      expect(await restoreWorktreeState({ directory: source, endpoint, env: gitEnv })).toEqual({
+        status: 'skipped',
+        reason: 'restore_failed',
+      });
+    } finally {
+      if (previous === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = previous;
+    }
   });
 
   it('reports an absent bundle instead of failing the attach', async () => {

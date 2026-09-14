@@ -68,11 +68,26 @@ export function writeToolSummaryTranslationModel(next: ToolSummaryTranslationMod
 }
 
 /**
+ * True only once both disk reads have settled. The runtime must stay disabled
+ * until then: the enabled preference can resolve before the persisted model, and
+ * enabling on the default model would translate with a model the user did not
+ * choose.
+ */
+function hasLoadedPreferences(): boolean {
+  return enabledStore.getHasLoaded() && modelStore.getHasLoaded();
+}
+
+/**
  * The only bridge from disk to the pure runtime: both stores push the loaded or
  * changed preference into the runtime, which covers the app-start case too
- * because the module-scope preload emits when the reads settle.
+ * because the module-scope preload emits when the reads settle. The first read
+ * to settle cannot enable the runtime on its own — `hasLoadedPreferences` keeps
+ * it off until the model is known too.
  */
 function syncRuntime(): void {
+  if (!hasLoadedPreferences()) {
+    return;
+  }
   setConfig({
     enabled: isToolSummaryTranslationEnabled(),
     model: readToolSummaryTranslationModel(),

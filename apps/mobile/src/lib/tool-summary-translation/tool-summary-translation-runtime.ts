@@ -25,6 +25,8 @@ type QueueItem = {
   text: string;
   language: string;
   model: { id: string; name: string };
+  /** The configuration generation this work was queued under. */
+  generation: number;
 };
 
 const CACHE_CAP = 500;
@@ -36,10 +38,21 @@ let config: ToolSummaryTranslationConfig = {
 };
 // Insertion order is oldest-first, so eviction is `keys().next()`.
 const cache = new Map<string, string>();
-const inFlight = new Map<string, Promise<void>>();
+// Each running request stores a unique token so its `finally` can tell whether
+// the entry is still its own. A config change clears the map, so a stale run
+// must not delete the entry its replacement just stored.
+const inFlight = new Map<string, symbol>();
 const queue: QueueItem[] = [];
 let active = 0;
 let version = 0;
+/**
+ * Bumped whenever the opt-in or the selected model changes. Queued and active
+ * work captures the generation it was created under, so `setConfig` drops
+ * queued items and `run` discards results that resolve after the change: a
+ * summary queued before the user disabled translation or switched models must
+ * never reach the gateway.
+ */
+let generation = 0;
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -77,6 +90,15 @@ export function setConfig(next: ToolSummaryTranslationConfig): void {
     return;
   }
   config = { enabled: next.enabled, model: { id: next.model.id, name: next.model.name } };
+  // Any queued work was captured under the previous opt-in/model; dropping it
+  // here (and skipping the mismatched generation in `pump`) stops translations
+  // the user just turned off or moved to another model. In-flight entries are
+  // cleared too: their result is discarded by `run`, and leaving them would make
+  // `ensureTranslation` dedupe a fresh request against a summary that will never
+  // resolve, so the row would stay untranslated.
+  generation += 1;
+  queue.length = 0;
+  inFlight.clear();
   version += 1;
   emit();
 }
@@ -102,7 +124,7 @@ function remember(key: string, translated: string): void {
 }
 
 /** Fallback contract: nothing thrown here may reach a transcript row. */
-async function run(item: QueueItem): Promise<void> {
+async function run(item: QueueItem, token: symbol): Promise<void> {
   try {
     const { requestToolSummaryTranslation } = await import('./tool-summary-translation-client');
     const translated = await requestToolSummaryTranslation({
@@ -110,14 +132,18 @@ async function run(item: QueueItem): Promise<void> {
       targetLanguage: item.language,
       model: item.model.id,
     });
-    if (translated !== null) {
+    if (translated !== null && item.generation === generation) {
       remember(item.key, translated);
     }
   } catch {
     // Leave it uncached; the original summary stays visible (layout is fixed).
   } finally {
     active -= 1;
-    inFlight.delete(item.key);
+    // Delete only this request's entry: a config change clears the map and a
+    // replacement request for the same key may already own the slot.
+    if (inFlight.get(item.key) === token) {
+      inFlight.delete(item.key);
+    }
     pump();
   }
 }
@@ -128,11 +154,15 @@ function pump(): void {
     if (item === undefined) {
       return;
     }
+    // Work queued before the last configuration change (opt-in off or model
+    // switch) is stale and must not be sent, same as a cached or in-flight key.
+    const isStale = item.generation !== generation;
     const isDuplicate = cache.has(item.key) || inFlight.has(item.key);
-    if (!isDuplicate) {
+    if (!isStale && !isDuplicate) {
       active += 1;
-      const promise = run(item);
-      inFlight.set(item.key, promise);
+      const token = Symbol(item.key);
+      inFlight.set(item.key, token);
+      void run(item, token);
     }
   }
 }
@@ -154,6 +184,6 @@ export function ensureTranslation(input: {
   if (cache.has(key) || inFlight.has(key)) {
     return;
   }
-  queue.push({ key, text, language, model });
+  queue.push({ key, text, language, model, generation });
   pump();
 }

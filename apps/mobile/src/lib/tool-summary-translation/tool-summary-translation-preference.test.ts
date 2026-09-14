@@ -2,6 +2,8 @@ import type * as toolSummaryTranslationPreference from './tool-summary-translati
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = vi.hoisted(() => new Map<string, string>());
+/** Gate the model disk read so a test can let the enabled read settle first. */
+const modelReadGate = vi.hoisted(() => ({ current: Promise.withResolvers<undefined>() }));
 const { captureException, toastError } = vi.hoisted(() => ({
   captureException: vi.fn(),
   toastError: vi.fn(),
@@ -10,6 +12,9 @@ const { captureException, toastError } = vi.hoisted(() => ({
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(async (key: string) => {
     await Promise.resolve();
+    if (key === 'tool-summary-translation-model') {
+      await modelReadGate.current.promise;
+    }
     return store.get(key) ?? null;
   }),
   setItemAsync: vi.fn(async (key: string, value: string) => {
@@ -51,6 +56,9 @@ function importPreferenceModule(): Promise<typeof toolSummaryTranslationPreferen
 
 beforeEach(() => {
   store.clear();
+  // Default: the model read is unblocked; individual tests replace the gate.
+  modelReadGate.current = Promise.withResolvers<undefined>();
+  modelReadGate.current.resolve(undefined);
   vi.resetModules();
   captureException.mockReset();
   toastError.mockReset();
@@ -147,5 +155,30 @@ describe('tool summary translation model', () => {
 
     const runtime = await import('./tool-summary-translation-runtime');
     expect(runtime.getConfig()).toEqual({ enabled: true, model: DEFAULT_MODEL });
+  });
+});
+
+describe('cold-start hydration ordering', () => {
+  it('keeps the runtime disabled until the persisted model read also settles', async () => {
+    const persistedModel = { id: 'kilo-auto/frontier', name: 'Auto Frontier' };
+    store.set(ENABLED_KEY, 'true');
+    store.set(MODEL_KEY, JSON.stringify(persistedModel));
+    // Block the model read so the enabled preference settles first.
+    modelReadGate.current = Promise.withResolvers<undefined>();
+
+    await importPreferenceModule();
+    await flushPreferences();
+
+    const runtime = await import('./tool-summary-translation-runtime');
+    // The enabled preference has settled, the persisted model has not: the
+    // runtime must stay disabled so no summary is translated on the default
+    // model the user did not choose.
+    expect(runtime.getConfig()).toEqual({ enabled: false, model: DEFAULT_MODEL });
+
+    modelReadGate.current.resolve(undefined);
+    await flushPreferences();
+
+    // Once both reads settle, the config lands atomically with the persisted model.
+    expect(runtime.getConfig()).toEqual({ enabled: true, model: persistedModel });
   });
 });

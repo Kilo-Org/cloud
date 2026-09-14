@@ -79,9 +79,10 @@ function renderPartContent(part: Part | null): ReactNode {
 export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const detailTitle = part ? getPartDetailTitle(part) : null;
   const shownTitle = useTranslatedToolSummary(
-    part ? getPartDetailTitle(part) : t('common.details'),
-    part !== null && isToolPart(part)
+    detailTitle?.title ?? t('common.details'),
+    detailTitle?.translatable ?? false
   );
   const [textMode, setTextMode] = useState<MonoScrollTextMode>('wrap');
   const [monoCount, setMonoCount] = useState(0);

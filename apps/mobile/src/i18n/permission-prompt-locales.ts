@@ -24,6 +24,14 @@ type PermissionPromptEntry = { ios: Record<PermissionPlistKey, string> };
 /** The Expo top-level `locales` map: one `ios` entry per supported language. */
 export type PermissionPromptLocales = Record<SupportedLanguage, PermissionPromptEntry>;
 
+/**
+ * Xcode expands build settings such as `$(PRODUCT_NAME)` when it processes
+ * Info.plist. It copies `<tag>.lproj/InfoPlist.strings` verbatim, so the same
+ * token would be drawn literally in the prompt. The copy carries the resolved
+ * app name instead; a build setting here fails the prebuild.
+ */
+const BUILD_SETTING = /\$\([^)]+\)/;
+
 function readPrompt(
   copy: Partial<Record<PermissionPlistKey, string>>,
   tag: string,
@@ -32,6 +40,13 @@ function readPrompt(
   const value = copy[key];
   if (value === undefined || value.trim().length === 0) {
     throw new Error(`Missing or empty permission prompt copy for ${tag}.${key}`);
+  }
+  const buildSetting = BUILD_SETTING.exec(value)?.[0];
+  if (buildSetting) {
+    throw new Error(
+      `Permission prompt copy for ${tag}.${key} keeps the build setting ${buildSetting}; ` +
+        'iOS copies InfoPlist.strings verbatim and does not expand it.'
+    );
   }
   return value;
 }
@@ -43,7 +58,8 @@ function readPrompt(
  * holding `NS*` keys.
  *
  * Throws when a supported language or any of the five keys is missing or
- * empty, so a prebuild fails loudly instead of shipping an English prompt.
+ * empty, and when a value keeps an unexpanded build setting, so a prebuild
+ * fails loudly instead of shipping a prompt iOS cannot render.
  */
 export function buildPermissionPromptLocales(copy: PermissionPromptCopy): PermissionPromptLocales {
   const entries: [SupportedLanguage, PermissionPromptEntry][] = [];

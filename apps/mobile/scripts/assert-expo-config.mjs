@@ -20,6 +20,7 @@ const BLOCKED_PERMISSIONS = [
 ];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+const APP_DISPLAY_NAME = 'Kilo';
 const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSMicrophoneUsageDescription',
   'NSSpeechRecognitionUsageDescription',
@@ -110,10 +111,16 @@ for (const tag of localizations) {
       typeof value === 'string' && value.length > 0,
       `locales["${tag}"].ios["${key}"] must be a non-empty string`
     );
+    // Xcode expands build settings in Info.plist but copies
+    // `.lproj/InfoPlist.strings` verbatim, so `$(…)` here renders literally.
+    check(
+      typeof value !== 'string' || !value.includes('$('),
+      `locales["${tag}"].ios["${key}"] must not keep a build setting like $(PRODUCT_NAME)`
+    );
   }
   check(
-    locales[tag]?.ios?.NSLocationWhenInUseUsageDescription?.includes('$(PRODUCT_NAME)') === true,
-    `locales["${tag}"].ios.NSLocationWhenInUseUsageDescription must keep $(PRODUCT_NAME)`
+    locales[tag]?.ios?.NSLocationWhenInUseUsageDescription?.includes(APP_DISPLAY_NAME) === true,
+    `locales["${tag}"].ios.NSLocationWhenInUseUsageDescription must name "${APP_DISPLAY_NAME}"`
   );
 }
 

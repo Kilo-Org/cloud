@@ -11,7 +11,7 @@ import { TourScreen } from './tour-screen';
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
 const routerBack = vi.hoisted(() => vi.fn());
-const routerPush = vi.hoisted(() => vi.fn());
+const routerReplace = vi.hoisted(() => vi.fn());
 const recordCompleted = vi.hoisted(() => vi.fn());
 const completionState = vi.hoisted(() => ({ isLoaded: true, isCompleted: false }));
 // Models React Native's BackHandler as a set of live subscriptions so a test
@@ -57,7 +57,7 @@ vi.mock('expo-router', async () => {
     useEffect: (effect: () => undefined | (() => void), deps: readonly unknown[]) => void;
   }>('react');
   return {
-    useRouter: () => ({ back: routerBack, push: routerPush }),
+    useRouter: () => ({ back: routerBack, replace: routerReplace }),
     // `useFocusEffect` runs the callback while the route is focused and tears
     // it down on blur, matching React Navigation.
     useFocusEffect: (effect: () => undefined | (() => void)) => {
@@ -107,10 +107,9 @@ vi.mock('@/components/ui/icons', () => ({
   Sparkles: 'Sparkles',
 }));
 
-// The chosen path's step is replaced with a controllable stub that exposes
-// `onCompletedChange`, so the shell contract is tested without the step's
-// network behavior.
-vi.mock('./tour-cloud-step', () => ({ TourCloudStep: 'TourCloudStep' }));
+// The computer instructions page is replaced with a controllable stub that
+// exposes `onChooseComputer`, so the shell's hand-off contract is tested
+// without the step's network behavior.
 vi.mock('./tour-remote-step', () => ({ TourRemoteStep: 'TourRemoteStep' }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -154,10 +153,11 @@ function pressControl(renderer: Renderer, type: string, label: string): void {
   });
 }
 
-function reportCompletion(renderer: Renderer, type: string, completed: boolean): void {
-  const step = renderer.root.findByType(type as ElementType);
+/** Drive the computer step's hand-off the way a row tap does. */
+function chooseComputer(renderer: Renderer, connectionId: string): void {
+  const step = renderer.root.findByType('TourRemoteStep' as ElementType);
   act(() => {
-    (step.props as { onCompletedChange: (value: boolean) => void }).onCompletedChange(completed);
+    (step.props as { onChooseComputer: (value: string) => void }).onChooseComputer(connectionId);
   });
 }
 
@@ -182,7 +182,7 @@ function rerenderTour(mounted: MountedTour): void {
 describe('TourScreen', () => {
   beforeEach(() => {
     routerBack.mockReset();
-    routerPush.mockReset();
+    routerReplace.mockReset();
     recordCompleted.mockReset();
     backHandler.reset();
     focusState.active = true;
@@ -197,7 +197,6 @@ describe('TourScreen', () => {
     expect(hasText(renderer, 'tour.forkSubtitle')).toBe(true);
     expect(hasText(renderer, 'tour.cloudOptionTitle')).toBe(true);
     expect(hasText(renderer, 'tour.remoteOptionTitle')).toBe(true);
-    expect(renderer.root.findAllByType('TourCloudStep' as ElementType)).toHaveLength(0);
     expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(0);
 
     unmount();
@@ -206,22 +205,56 @@ describe('TourScreen', () => {
   it('renders the fork body inside a scroll container so it stays above the action bar', async () => {
     const { renderer, unmount } = await mountTour();
 
-    // The header and the Skip/Done bar are outside the step's scroll area; the
-    // fork body must live in the scrolling CenteredState so a short screen or a
+    // The header and the Skip bar are outside the step's scroll area; the fork
+    // body must live in the scrolling CenteredState so a short screen or a
     // large system font scrolls instead of covering them.
     expect(renderer.root.findAllByType('CenteredState' as ElementType)).toHaveLength(1);
 
     unmount();
   });
 
-  it('renders the matching step after a card is chosen', async () => {
+  it('hands off to the new-session page with Cloud Agent preselected', async () => {
     const { renderer, unmount } = await mountTour();
 
     pressControl(renderer, 'ChoiceRow', 'tour.cloudOptionTitle');
 
-    expect(renderer.root.findAllByType('TourCloudStep' as ElementType)).toHaveLength(1);
+    // The Cloud card does not open a step: it completes the tour by handing
+    // straight to the form, and it never pops the tour.
+    expect(recordCompleted).toHaveBeenCalledTimes(1);
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+    expect(routerReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=cloud');
+    expect(routerBack).not.toHaveBeenCalled();
     expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('opens the computer instructions page when the computer card is chosen', async () => {
+    const { renderer, unmount } = await mountTour();
+
+    pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
+
+    expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(1);
     expect(hasText(renderer, 'tour.forkTitle')).toBe(false);
+    // Opening the page is not a decision: nothing is recorded until a
+    // computer is tapped or the person skips.
+    expect(recordCompleted).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(routerBack).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('hands off the chosen computer to the new-session page', async () => {
+    const { renderer, unmount } = await mountTour();
+
+    pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
+    chooseComputer(renderer, 'conn-1');
+
+    expect(recordCompleted).toHaveBeenCalledTimes(1);
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+    expect(routerReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=conn-1');
+    expect(routerBack).not.toHaveBeenCalled();
 
     unmount();
   });
@@ -233,31 +266,7 @@ describe('TourScreen', () => {
 
     expect(recordCompleted).toHaveBeenCalledTimes(1);
     expect(routerBack).toHaveBeenCalledTimes(1);
-
-    unmount();
-  });
-
-  it('keeps Skip available and Done disabled until the step reports completion', async () => {
-    const { renderer, unmount } = await mountTour();
-
-    pressControl(renderer, 'ChoiceRow', 'tour.cloudOptionTitle');
-
-    // Skip stays available on the chosen path even before completion.
-    expect(findControl(renderer, 'Button', 'tour.skip')).toBeDefined();
-    expect(requireControl(renderer, 'Button', 'common.done').props).toMatchObject({
-      disabled: true,
-    });
-
-    reportCompletion(renderer, 'TourCloudStep', true);
-
-    expect(requireControl(renderer, 'Button', 'common.done').props).toMatchObject({
-      disabled: false,
-    });
-    expect(recordCompleted).not.toHaveBeenCalled();
-
-    pressControl(renderer, 'Button', 'common.done');
-    expect(recordCompleted).toHaveBeenCalledTimes(1);
-    expect(routerBack).toHaveBeenCalledTimes(1);
+    expect(routerReplace).not.toHaveBeenCalled();
 
     unmount();
   });
@@ -278,13 +287,12 @@ describe('TourScreen', () => {
     unmount();
   });
 
-  it('stops intercepting Back once a step pushes its own screen on top', async () => {
+  it('stops intercepting Back once the tour route loses focus', async () => {
     const mounted = await mountTour();
     const { unmount } = mounted;
 
-    // The cloud step's New-session form pushes on top of the tour: the tour
-    // route blurs, so its Back interception must be released. Back on that
-    // form is the form's, and cancelling it is not a tour dismissal.
+    // The hand-off replaces the tour route and Skip pops it, so the tour blurs:
+    // its Back interception must be released with the route.
     focusState.active = false;
     rerenderTour(mounted);
 
@@ -321,10 +329,8 @@ describe('TourScreen', () => {
     pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
     expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(1);
 
-    reportCompletion(renderer, 'TourRemoteStep', true);
-    expect(requireControl(renderer, 'Button', 'common.done').props).toMatchObject({
-      disabled: false,
-    });
+    chooseComputer(renderer, 'conn-1');
+    expect(routerReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=conn-1');
 
     unmount();
   });

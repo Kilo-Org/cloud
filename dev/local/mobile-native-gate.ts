@@ -91,11 +91,7 @@ type ArtifactRecord = { created_at?: string; expires_at?: string; expired?: bool
 // run that publishes a durable artifact needs one whose own lifetime is the
 // durable one: the pull_request run's one-day artifact (retention-days: 1)
 // must not make a push skip the build main keeps for 90 days.
-function artifactExists(
-  repository: string,
-  name: string,
-  options: ArtifactLookupOptions
-): boolean {
+function artifactExists(repository: string, name: string, options: ArtifactLookupOptions): boolean {
   const raw = gh(['api', `repos/${repository}/actions/artifacts?name=${name}&per_page=10`]);
   const parsed = JSON.parse(raw) as { artifacts?: ArtifactRecord[] };
   if (!Array.isArray(parsed.artifacts)) {

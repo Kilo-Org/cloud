@@ -231,6 +231,8 @@
     "voiceInput": "Stemmeinput",
     "autoExpandThinking": "Fold ræsonnementer ud automatisk",
     "autoExpandThinkingSubtitle": "Vis agentens ræsonnement foldet ud, når det er færdigt.",
+    "hideThinking": "Skjul detaljer om ræsonnement",
+    "hideThinkingSubtitle": "Vis ikke agentens ræsonnement på sessionssiden.",
     "keepScreenOn": "Hold skærmen tændt på sessionssiden",
     "keepScreenOnSubtitle": "Hold skærmen tændt, mens sessionen kører.",
     "appearance": "Udseende",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transskription via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transskribér stemmeinput med en Kilo Gateway-model i stedet for enhedens stemmegenkendelse. Din optagelse sendes til Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Komprimer værktøjskald",
+    "condenseToolCallsSubtitle": "Gruppér fortløbende værktøjskald i én række, du kan åbne."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ikke tilgængelig",
@@ -1996,6 +2000,22 @@
       "connectionLost": "Forbindelsen er afbrudt",
       "retryConnection": "Prøv at oprette forbindelse igen"
     },
+    "goal": {
+      "title": "Mål",
+      "statusActive": "Aktivt mål",
+      "statusPaused": "Mål sat på pause",
+      "statusComplete": "Mål fuldført",
+      "statusBlocked": "Mål blokeret",
+      "edit": "Rediger mål",
+      "remove": "Fjern mål",
+      "pause": "Sæt mål på pause",
+      "resume": "Genoptag mål",
+      "editPlaceholder": "Beskriv målet",
+      "removeConfirmTitle": "Fjern mål?",
+      "removeConfirmMessage": "CLI rydder dette sessions mål.",
+      "updateFailed": "Målet kunne ikke opdateres.",
+      "sectionAccessibility": "{{status}}. Mål: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Tilknyt GitHub i din browser og vend tilbage hertil for at vælge et kodelager.",
       "openGithub": "Åbn GitHub",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "{{steps}} trin",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Automatisk godkendelse",
+      "description": "Godkend tilladelsesanmodninger for denne session automatisk. Værktøjer kører derefter uden en prompt.",
+      "unavailable": "Denne session kan ikke modtage tilladelsesanmodninger."
+    },
     "prBadge": {
       "open": "åben PR",
       "closed": "lukket PR",
@@ -2469,6 +2494,10 @@
       "retryableDescription": "Kontrollér forbindelsen og tryk på Prøv igen. Du kan stadig vælge denne mappe ved at trykke på Færdig.",
       "unsupportedTitle": "Kan ikke vise mapper",
       "unsupportedDescription": "Denne CLI kan ikke vise mapper. Tryk på Færdig for at beholde startmappen. Sessionen starter i denne mappe, når du trykker på Start en session."
+    },
+    "toolRun": {
+      "sheetTitle": "Værktøjskald",
+      "condensedLabel": "{{itemCount}} elementer; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "Denne transskriptionsmodel er ikke tilgængelig. Vælg en anden under Indstillinger.",
     "gatewayModelUnavailableNotice": "Denne model tilbydes ikke længere. Tryk på $t(transcriptionModel.title) for at vælge en anden.",
     "gatewaySignInRequired": "Log ind for at bruge transskription via Kilo Gateway.",
-    "gatewayNoModel": "Vælg først en transskriptionsmodel under Indstillinger."
+    "gatewayNoModel": "Vælg først en transskriptionsmodel under Indstillinger.",
+    "testTitle": "Test diktering",
+    "testPlaceholder": "Tryk på mikrofonen, og begynd at tale.",
+    "testClear": "Ryd tekst"
   },
   "share": {
     "title": "Del med Kilo",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "Ingen transskriptionsmodeller",
     "emptyDescription": "Kilo Gateway tilbyder ikke nogen transskriptionsmodeller lige nu.",
     "loadFailed": "Transskriptionsmodellerne kunne ikke indlæses."
+  },
+  "voiceLanguage": {
+    "title": "Dikteringssprog",
+    "automatic": "Automatisk",
+    "loadFailed": "Kunne ikke indlæse de sprog, denne enhed understøtter.",
+    "emptyTitle": "Ingen understøttede sprog",
+    "emptyDescription": "Denne enheds talegenkendelse rapporterer ingen understøttede sprog."
   }
 }

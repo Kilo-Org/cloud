@@ -216,11 +216,27 @@ export function LiveSessionFeedback({
           </Button>
         )}
       </View>
-      <AccessibleStatus
-        message={content === 'pending' ? t('common.loading') : null}
-        tone="status"
-        className="absolute size-px overflow-hidden"
-      />
+      {refresh && content === 'rows' ? (
+        // The live tab's reserved status line: screen-reader Updating while
+        // the pull is in flight, visible "Couldn't refresh" + Retry when it
+        // failed. It takes the slot of the (layout-free) loading status so the
+        // column has the same children either way, and its height is allocated
+        // whenever rows are shown: a failure that arrives while the kept rows
+        // are on screen replaces empty space instead of pushing the rows down.
+        <View className="min-h-5">
+          <SessionListRefreshStatus
+            busy={refresh.busy}
+            failed={refresh.failed}
+            onRetry={handleRefreshRetry}
+          />
+        </View>
+      ) : (
+        <AccessibleStatus
+          message={content === 'pending' ? t('common.loading') : null}
+          tone="status"
+          className="absolute size-px overflow-hidden"
+        />
+      )}
       {content === 'rows' && sessions.isFetching && !sessions.isPaused && !refresh?.busy && (
         <AccessibleStatus
           message={t('agents.sessionList.updating')}
@@ -228,17 +244,6 @@ export function LiveSessionFeedback({
           className="absolute size-px overflow-hidden"
         />
       )}
-      {/* The live tab's reserved status line: screen-reader Updating while
-          the pull is in flight, visible "Couldn't refresh" + Retry when it
-          failed. Home passes no refresh state and keeps its a11y-only
-          announcement. */}
-      {refresh && content === 'rows' ? (
-        <SessionListRefreshStatus
-          busy={refresh.busy}
-          failed={refresh.failed}
-          onRetry={handleRefreshRetry}
-        />
-      ) : null}
       {failure}
     </View>
   );

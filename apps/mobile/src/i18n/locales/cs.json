@@ -231,6 +231,8 @@
     "voiceInput": "Hlasový vstup",
     "autoExpandThinking": "Automaticky rozbalovat uvažování",
     "autoExpandThinkingSubtitle": "Po dokončení uvažování agenta zobrazí jeho obsah rozbalený.",
+    "hideThinking": "Skrýt podrobnosti uvažování",
+    "hideThinkingSubtitle": "Nezobrazovat uvažování agenta na stránce relace.",
     "keepScreenOn": "Nezhasínat obrazovku v relaci",
     "keepScreenOnSubtitle": "Obrazovka zůstane zapnutá, dokud relace běží.",
     "appearance": "Vzhled",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Přepis přes Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Přepisujte diktování pomocí modelu Kilo Gateway místo rozpoznávání řeči ve vašem zařízení. Nahraný zvuk se odešle do Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Sbalit volání nástrojů",
+    "condenseToolCallsSubtitle": "Seskupte po sobě jdoucí volání nástrojů do jednoho řádku, který můžete otevřít."
   },
   "prReview": {
     "pullRequestUnavailable": "PR není dostupný",
@@ -2028,6 +2032,22 @@
       "connectionLost": "Připojení přerušeno",
       "retryConnection": "Znovu se připojit"
     },
+    "goal": {
+      "title": "Cíl",
+      "statusActive": "Aktivní cíl",
+      "statusPaused": "Pozastavený cíl",
+      "statusComplete": "Cíl dokončen",
+      "statusBlocked": "Cíl zablokován",
+      "edit": "Upravit cíl",
+      "remove": "Odebrat cíl",
+      "pause": "Pozastavit cíl",
+      "resume": "Obnovit cíl",
+      "editPlaceholder": "Popište cíl",
+      "removeConfirmTitle": "Odebrat cíl?",
+      "removeConfirmMessage": "CLI vymaže cíl této relace.",
+      "updateFailed": "Cíl se nepodařilo aktualizovat.",
+      "sectionAccessibility": "{{status}}. Cíl: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Připojte GitHub v prohlížeči. Pak se sem vraťte a vyberte repozitář.",
       "openGithub": "Otevřít GitHub",
@@ -2481,6 +2501,11 @@
       "stepsCount_few": "{{steps}} kroky",
       "stepsCount_many": "{{steps}} kroku"
     },
+    "autoApprove": {
+      "title": "Automatické schvalování",
+      "description": "Automaticky schvalovat žádosti o oprávnění pro tuto relaci. Nástroje se pak spustí bez výzvy.",
+      "unavailable": "Tato relace nemůže přijímat žádosti o oprávnění."
+    },
     "prBadge": {
       "open": "otevřený PR",
       "closed": "uzavřený PR",
@@ -2511,6 +2536,10 @@
       "tapToListHint": "Klepnutím na složku zobrazíte její obsah.",
       "unsupportedDescription": "Toto CLI neumí zobrazit seznam složek. Tlačítkem Hotovo ponecháte složku, ze které bylo CLI spuštěno. Relace se spustí v této složce.",
       "unsupportedTitle": "Složky nelze zobrazit"
+    },
+    "toolRun": {
+      "sheetTitle": "Volání nástrojů",
+      "condensedLabel": "{{itemCount}} položek; {{last}}"
     }
   },
   "bootstrap": {
@@ -2623,7 +2652,10 @@
     "gatewayModelUnavailable": "Tento model přepisu není dostupný. Vyberte jiný v Předvolbách.",
     "gatewayModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(transcriptionModel.title) vyberte jiný.",
     "gatewaySignInRequired": "Pro použití přepisu přes Kilo Gateway se přihlaste.",
-    "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách."
+    "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách.",
+    "testTitle": "Otestovat diktování",
+    "testPlaceholder": "Klepněte na mikrofon a začněte mluvit.",
+    "testClear": "Vymazat text"
   },
   "share": {
     "title": "Sdílení do Kilo",
@@ -3014,5 +3046,12 @@
     "emptyTitle": "Žádné modely přepisu",
     "emptyDescription": "Kilo Gateway nyní nenabízí žádné modely přepisu.",
     "loadFailed": "Modely přepisu se nepodařilo načíst."
+  },
+  "voiceLanguage": {
+    "title": "Jazyk diktování",
+    "automatic": "Automaticky",
+    "loadFailed": "Nepodařilo se načíst jazyky, které toto zařízení podporuje.",
+    "emptyTitle": "Žádné podporované jazyky",
+    "emptyDescription": "Rozpoznávání řeči tohoto zařízení nehlásí žádné podporované jazyky."
   }
 }

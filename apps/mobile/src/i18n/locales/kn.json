@@ -231,6 +231,8 @@
     "voiceInput": "ಧ್ವನಿ ಇನ್ಪುಟ್",
     "autoExpandThinking": "ಯೋಚನೆಯನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ವಿಸ್ತರಿಸಿ",
     "autoExpandThinkingSubtitle": "ಏಜೆಂಟ್ ಯೋಚಿಸುವುದನ್ನು ಮುಗಿಸಿದಾಗ ಅದರ ಯೋಚನೆಯನ್ನು ವಿಸ್ತರಿಸಿ ತೋರಿಸಿ.",
+    "hideThinking": "ಯೋಚನೆಯ ವಿವರಗಳನ್ನು ಮರೆಮಾಡಿ",
+    "hideThinkingSubtitle": "ಸೆಶನ್ ಪುಟದಲ್ಲಿ ಏಜೆಂಟ್‌ನ ಯೋಚನೆಯನ್ನು ತೋರಿಸಬೇಡಿ.",
     "keepScreenOn": "ಸೆಶನ್ ಪುಟದಲ್ಲಿರುವಾಗ ಪರದೆಯನ್ನು ಆನ್ ಆಗಿರಿಸಿ",
     "keepScreenOnSubtitle": "ಸೆಶನ್ ಕಾರ್ಯನಿರ್ವಹಿಸುವಾಗ ಪರದೆ ಆಫ್ ಆಗದಂತೆ ಇರಿಸಿ.",
     "appearance": "ನೋಟ",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ಮೂಲಕ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವಿಕೆ",
     "gatewayTranscriptionSubtitle": "ಸಾಧನದ ಮಾತು ಗುರುತಿಸುವಿಕೆಗೆ ಬದಲಾಗಿ Kilo Gateway ಮಾದರಿಯನ್ನು ಬಳಸಿ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಅನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಿ. ನಿಮ್ಮ ಧ್ವನಿಮುದ್ರಣ Kilo Gateway ಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ಸಾಧನ ಕರೆಗಳನ್ನು ಸಂಕ್ಷೇಪಿಸಿ",
+    "condenseToolCallsSubtitle": "ಸತತ ಸಾಧನ ಕರೆಗಳನ್ನು ನೀವು ತೆರೆಯಬಹುದಾದ ಒಂದು ಸಾಲಿನಲ್ಲಿ ಗುಂಪು ಮಾಡಿ."
   },
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
@@ -1996,6 +2000,22 @@
       "connectionLost": "ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದೆ",
       "retryConnection": "ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಪ್ರಯತ್ನಿಸಿ"
     },
+    "goal": {
+      "title": "ಗುರಿ",
+      "statusActive": "ಸಕ್ರಿಯ ಗುರಿ",
+      "statusPaused": "ವಿರಾಮಗೊಳಿಸಿದ ಗುರಿ",
+      "statusComplete": "ಗುರಿ ಪೂರ್ಣಗೊಂಡಿದೆ",
+      "statusBlocked": "ಗುರಿ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",
+      "edit": "ಗುರಿ ಸಂಪಾದಿಸಿ",
+      "remove": "ಗುರಿ ತೆಗೆದುಹಾಕಿ",
+      "pause": "ಗುರಿ ವಿರಾಮಗೊಳಿಸಿ",
+      "resume": "ಗುರಿ ಪುನರಾರಂಭಿಸಿ",
+      "editPlaceholder": "ಗುರಿಯನ್ನು ವಿವರಿಸಿ",
+      "removeConfirmTitle": "ಗುರಿ ತೆಗೆದುಹಾಕಬೇಕೆ?",
+      "removeConfirmMessage": "CLI ಈ ಅಧಿವೇಶನದ ಗುರಿಯನ್ನು ಅಳಿಸುತ್ತದೆ.",
+      "updateFailed": "ಗುರಿಯನ್ನು ನವೀಕರಿಸಲಾಗಲಿಲ್ಲ.",
+      "sectionAccessibility": "{{status}}. ಗುರಿ: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ GitHub ಸಂಪರ್ಕಿಸಿ. ನಂತರ ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",
       "openGithub": "GitHub ತೆರೆಯಿರಿ",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "{{steps}} ಹಂತಗಳು",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "ಸ್ವಯಂ ಅನುಮೋದನೆ",
+      "description": "ಈ ಸೆಷನ್‌ನ ಅನುಮತಿ ವಿನಂತಿಗಳನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಅನುಮೋದಿಸಿ. ನಂತರ ಉಪಕರಣಗಳು ಯಾವುದೇ ಪ್ರಾಂಪ್ಟ್ ಇಲ್ಲದೆ ಚಲಿಸುತ್ತವೆ.",
+      "unavailable": "ಈ ಸೆಷನ್ ಅನುಮತಿ ವಿನಂತಿಗಳನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ."
+    },
     "prBadge": {
       "open": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಿರಿ",
       "closed": "ಮುಚ್ಚಿದ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್",
@@ -2469,6 +2494,10 @@
       "retryableDescription": "ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ. ಈಗಲೂ ಮುಗಿದಿದೆ ಬಟನ್ ಮೂಲಕ ಈ ಫೋಲ್ಡರ್ ಅನ್ನು ಆಯ್ಕೆಮಾಡಬಹುದು.",
       "unsupportedTitle": "ಫೋಲ್ಡರ್‌ಗಳನ್ನು ಪಟ್ಟಿ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ",
       "unsupportedDescription": "ಈ CLI ಮೂಲಕ ಫೋಲ್ಡರ್‌ಗಳನ್ನು ಪಟ್ಟಿ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಮುಗಿದಿದೆ ಬಟನ್ ಪ್ರಾರಂಭದ ಫೋಲ್ಡರ್ ಅನ್ನು ಉಳಿಸಿಕೊಳ್ಳುತ್ತದೆ. ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ ಬಟನ್ ಮೂಲಕ ಸೆಶನ್ ಅಲ್ಲಿಯೇ ಪ್ರಾರಂಭವಾಗುತ್ತದೆ."
+    },
+    "toolRun": {
+      "sheetTitle": "ಸಾಧನ ಕರೆಗಳು",
+      "condensedLabel": "{{itemCount}} ಅಂಶಗಳು; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "ಈ ಪರಿವರ್ತನಾ ಮಾದರಿ ಲಭ್ಯವಿಲ್ಲ. ಆದ್ಯತೆಗಳಲ್ಲಿ ಇನ್ನೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
     "gatewayModelUnavailableNotice": "ಈ ಮಾದರಿಯನ್ನು ಇನ್ನು ಮುಂದೆ ನೀಡಲಾಗುವುದಿಲ್ಲ. ಇನ್ನೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಲು $t(transcriptionModel.title) ಅನ್ನು ಟ್ಯಾಪ್ ಮಾಡಿ.",
     "gatewaySignInRequired": "Kilo Gateway ಪರಿವರ್ತನೆಯನ್ನು ಬಳಸಲು ಸೈನ್ ಇನ್ ಮಾಡಿ.",
-    "gatewayNoModel": "ಮೊದಲು ಆದ್ಯತೆಗಳಲ್ಲಿ ಪರಿವರ್ತನಾ ಮಾದರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ."
+    "gatewayNoModel": "ಮೊದಲು ಆದ್ಯತೆಗಳಲ್ಲಿ ಪರಿವರ್ತನಾ ಮಾದರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+    "testTitle": "ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಪರೀಕ್ಷಿಸಿ",
+    "testPlaceholder": "ಮೈಕ್ರೋಫೋನ್ ಟ್ಯಾಪ್ ಮಾಡಿ ಮತ್ತು ಮಾತನಾಡಲು ಪ್ರಾರಂಭಿಸಿ.",
+    "testClear": "ಪಠ್ಯ ತೆರವುಗೊಳಿಸಿ"
   },
   "share": {
     "title": "Kiloಗೆ ಹಂಚಿಕೆ",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಯಾವುದೇ ಮಾದರಿಗಳಿಲ್ಲ",
     "emptyDescription": "Kilo Gateway ಪ್ರಸ್ತುತ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಯಾವುದೇ ಮಾದರಿಗಳನ್ನು ಒದಗಿಸುತ್ತಿಲ್ಲ.",
     "loadFailed": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
+  },
+  "voiceLanguage": {
+    "title": "ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಭಾಷೆ",
+    "automatic": "ಸ್ವಯಂ",
+    "loadFailed": "ಈ ಸಾಧನವು ಬೆಂಬಲಿಸುವ ಭಾಷೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ.",
+    "emptyTitle": "ಬೆಂಬಲಿತ ಭಾಷೆಗಳಿಲ್ಲ",
+    "emptyDescription": "ಈ ಸಾಧನದ ಮಾತು ಗುರುತಿಸುವಿಕೆ ಯಾವುದೇ ಬೆಂಬಲಿತ ಭಾಷೆಗಳನ್ನು ವರದಿ ಮಾಡುವುದಿಲ್ಲ."
   }
 }

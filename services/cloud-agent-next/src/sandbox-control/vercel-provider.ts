@@ -144,6 +144,7 @@ export function createVercelProviderAdapter(deps: {
         snapshotId: config.snapshotId,
         runtime: config.runtime,
         timeoutMs: config.initialTimeoutMs,
+        ...(config.resources === undefined ? {} : { resources: config.resources }),
         ...(intent.networkPolicy === undefined ? {} : { networkPolicy: intent.networkPolicy }),
       });
       return { providerRef: encodeVercelProviderRef(created.runtime) };
@@ -178,6 +179,7 @@ export function createVercelProviderAdapter(deps: {
           runtimeBuildId: config.runtimeBuildId,
           snapshotId: config.snapshotId,
           runtime: config.runtime,
+          ...(config.resources === undefined ? {} : { resources: config.resources }),
         });
         if (!inspected) {
           return {

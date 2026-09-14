@@ -231,6 +231,8 @@
     "voiceInput": "Spraakinvoer",
     "autoExpandThinking": "Gedachtegang automatisch uitvouwen",
     "autoExpandThinkingSubtitle": "Toon de volledige gedachtegang van de agent zodra die klaar is met nadenken.",
+    "hideThinking": "Details van gedachtegang verbergen",
+    "hideThinkingSubtitle": "Toon de gedachtegang van de agent niet op de sessiepagina.",
     "keepScreenOn": "Scherm aanhouden op de sessiepagina",
     "keepScreenOnSubtitle": "Houd het scherm aan zolang de sessie actief is.",
     "appearance": "Weergave",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcriptie via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Zet spraakinvoer om met een Kilo Gateway-model in plaats van de spraakherkenning van het apparaat. Je opname wordt naar Kilo Gateway verzonden.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Tool-aanroepen comprimeren",
+    "condenseToolCallsSubtitle": "Groepeer opeenvolgende tool-aanroepen in één rij die je kunt openen."
   },
   "notifications": {
     "channel": {
@@ -1562,6 +1566,22 @@
       "connectionLost": "Verbinding verbroken",
       "retryConnection": "Opnieuw verbinden"
     },
+    "goal": {
+      "title": "Doel",
+      "statusActive": "Actief doel",
+      "statusPaused": "Gepauzeerd doel",
+      "statusComplete": "Doel voltooid",
+      "statusBlocked": "Doel geblokkeerd",
+      "edit": "Doel bewerken",
+      "remove": "Doel verwijderen",
+      "pause": "Doel pauzeren",
+      "resume": "Doel hervatten",
+      "editPlaceholder": "Beschrijf het doel",
+      "removeConfirmTitle": "Doel verwijderen?",
+      "removeConfirmMessage": "De CLI wist het doel van deze sessie.",
+      "updateFailed": "Het doel kon niet worden bijgewerkt.",
+      "sectionAccessibility": "{{status}}. Doel: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Koppel GitHub in je browser en kom hier terug om een repository te kiezen.",
       "openGithub": "GitHub openen",
@@ -2005,6 +2025,11 @@
       "stepsCount_other": "{{steps}} stappen",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Automatisch goedkeuren",
+      "description": "Keur toestemmingsverzoeken voor deze sessie automatisch goed. Tools worden daarna zonder prompt uitgevoerd.",
+      "unavailable": "Deze sessie kan geen toestemmingsverzoeken ontvangen."
+    },
     "prBadge": {
       "open": "pR openen",
       "closed": "gesloten PR",
@@ -2035,6 +2060,10 @@
       "tapToListHint": "Tik op een map om de inhoud te bekijken.",
       "unsupportedDescription": "Deze CLI kan geen mappen weergeven. Tik op Klaar om de startmap te behouden. Met Sessie starten begin je de sessie in die map.",
       "unsupportedTitle": "Mappen weergeven niet mogelijk"
+    },
+    "toolRun": {
+      "sheetTitle": "Tool-aanroepen",
+      "condensedLabel": "{{itemCount}} items; {{last}}"
     }
   },
   "bootstrap": {
@@ -2147,7 +2176,10 @@
     "gatewayModelUnavailable": "Dit transcriptiemodel is niet beschikbaar. Kies een ander model bij Voorkeuren.",
     "gatewayModelUnavailableNotice": "Dit model wordt niet meer aangeboden. Tik op $t(transcriptionModel.title) om een ander te kiezen.",
     "gatewaySignInRequired": "Meld je aan om transcriptie via Kilo Gateway te gebruiken.",
-    "gatewayNoModel": "Kies eerst een transcriptiemodel bij Voorkeuren."
+    "gatewayNoModel": "Kies eerst een transcriptiemodel bij Voorkeuren.",
+    "testTitle": "Spraakinvoer testen",
+    "testPlaceholder": "Tik op de microfoon en begin te spreken.",
+    "testClear": "Tekst wissen"
   },
   "share": {
     "title": "Delen met Kilo",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "Geen transcriptiemodellen",
     "emptyDescription": "Kilo Gateway biedt op dit moment geen transcriptiemodellen.",
     "loadFailed": "De transcriptiemodellen konden niet worden geladen."
+  },
+  "voiceLanguage": {
+    "title": "Taal van spraakinvoer",
+    "automatic": "Automatisch",
+    "loadFailed": "Kan de talen die dit apparaat ondersteunt niet laden.",
+    "emptyTitle": "Geen ondersteunde talen",
+    "emptyDescription": "De spraakherkenning van dit apparaat meldt geen ondersteunde talen."
   }
 }

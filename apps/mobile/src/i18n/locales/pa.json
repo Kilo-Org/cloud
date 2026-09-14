@@ -231,6 +231,8 @@
     "voiceInput": "ਵੌਇਸ ਇਨਪੁਟ",
     "autoExpandThinking": "ਸੋਚ ਦਾ ਵੇਰਵਾ ਆਪਣੇ ਆਪ ਖੋਲ੍ਹੋ",
     "autoExpandThinkingSubtitle": "ਏਜੰਟ ਦੇ ਸੋਚਣ ਤੋਂ ਬਾਅਦ ਉਸ ਦੀ ਸੋਚ ਦਾ ਪੂਰਾ ਵੇਰਵਾ ਦਿਖਾਓ।",
+    "hideThinking": "ਸੋਚ ਦਾ ਵੇਰਵਾ ਲੁਕਾਓ",
+    "hideThinkingSubtitle": "ਸੈਸ਼ਨ ਪੰਨੇ 'ਤੇ ਏਜੰਟ ਦੀ ਸੋਚ ਨਾ ਦਿਖਾਓ।",
     "keepScreenOn": "ਸੈਸ਼ਨ ਪੰਨੇ 'ਤੇ ਸਕ੍ਰੀਨ ਚਾਲੂ ਰੱਖੋ",
     "keepScreenOnSubtitle": "ਜਦੋਂ ਸੈਸ਼ਨ ਵਿੱਚ ਕੰਮ ਚੱਲ ਰਿਹਾ ਹੋਵੇ, ਸਕ੍ਰੀਨ ਚਾਲੂ ਰੱਖੋ।",
     "appearance": "ਦਿੱਖ",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ਰਾਹੀਂ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣਾ",
     "gatewayTranscriptionSubtitle": "ਡਿਵਾਈਸ ਦੀ ਸਪੀਚ ਰੈਕਗਨੀਸ਼ਨ ਦੀ ਥਾਂ Kilo Gateway ਮਾਡਲ ਨਾਲ ਵੌਇਸ ਇਨਪੁਟ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲੋ। ਤੁਹਾਡੀ ਰਿਕਾਰਡਿੰਗ Kilo Gateway ਨੂੰ ਭੇਜੀ ਜਾਂਦੀ ਹੈ।",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ਟੂਲ ਕਾਲਾਂ ਨੂੰ ਸੰਘਣਾ ਕਰੋ",
+    "condenseToolCallsSubtitle": "ਲਗਾਤਾਰ ਟੂਲ ਕਾਲਾਂ ਨੂੰ ਇੱਕ ਕਤਾਰ ਵਿੱਚ ਸਮੂਹਬੱਧ ਕਰੋ ਜਿਸਨੂੰ ਤੁਸੀਂ ਖੋਲ੍ਹ ਸਕਦੇ ਹੋ।"
   },
   "prReview": {
     "pullRequestUnavailable": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
@@ -1996,6 +2000,22 @@
       "connectionLost": "ਕਨੈਕਸ਼ਨ ਟੁੱਟ ਗਿਆ",
       "retryConnection": "ਮੁੜ ਕਨੈਕਟ ਕਰਨ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ"
     },
+    "goal": {
+      "title": "ਟੀਚਾ",
+      "statusActive": "ਸਰਗਰਮ ਟੀਚਾ",
+      "statusPaused": "ਰੋਕਿਆ ਟੀਚਾ",
+      "statusComplete": "ਟੀਚਾ ਪੂਰਾ ਹੋਇਆ",
+      "statusBlocked": "ਟੀਚਾ ਰੋਕਿਆ ਗਿਆ",
+      "edit": "ਟੀਚਾ ਸੰਪਾਦਿਤ ਕਰੋ",
+      "remove": "ਟੀਚਾ ਹਟਾਓ",
+      "pause": "ਟੀਚਾ ਰੋਕੋ",
+      "resume": "ਟੀਚਾ ਮੁੜ ਸ਼ੁਰੂ ਕਰੋ",
+      "editPlaceholder": "ਟੀਚੇ ਦਾ ਵਰਣਨ ਕਰੋ",
+      "removeConfirmTitle": "ਟੀਚਾ ਹਟਾਉਣਾ?",
+      "removeConfirmMessage": "CLI ਇਸ ਸੈਸ਼ਨ ਦਾ ਟੀਚਾ ਮਿਟਾਉਂਦਾ ਹੈ।",
+      "updateFailed": "ਟੀਚਾ ਅੱਪਡੇਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+      "sectionAccessibility": "{{status}}। ਟੀਚਾ: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ GitHub ਨੂੰ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
       "openGithub": "GitHub ਖੋਲ੍ਹੋ",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "{{steps}} ਕਦਮ",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "ਆਟੋ-ਪ੍ਰਵਾਨਗੀ",
+      "description": "ਇਸ ਸੈਸ਼ਨ ਲਈ ਇਜਾਜ਼ਤ ਬੇਨਤੀਆਂ ਨੂੰ ਆਪਣੇ ਆਪ ਪ੍ਰਵਾਨ ਕਰੋ। ਫਿਰ ਟੂਲ ਬਿਨਾਂ ਕਿਸੇ ਪ੍ਰੋਂਪਟ ਦੇ ਚੱਲਦੇ ਹਨ।",
+      "unavailable": "ਇਹ ਸੈਸ਼ਨ ਇਜਾਜ਼ਤ ਬੇਨਤੀਆਂ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ।"
+    },
     "prBadge": {
       "open": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੋ",
       "closed": "ਬੰਦ ਪੁੱਲ ਰਿਕਵੈਸਟ",
@@ -2469,6 +2494,10 @@
       "retryableDescription": "ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ। ‘ਹੋ ਗਿਆ’ 'ਤੇ ਟੈਪ ਕਰਕੇ ਅਜੇ ਵੀ ਇਸ ਫੋਲਡਰ ਦੀ ਚੋਣ ਦੀ ਪੁਸ਼ਟੀ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।",
       "unsupportedTitle": "ਫੋਲਡਰਾਂ ਦੀ ਸੂਚੀ ਨਹੀਂ ਦਿਖਾਈ ਜਾ ਸਕਦੀ",
       "unsupportedDescription": "ਇਹ CLI ਫੋਲਡਰਾਂ ਦੀ ਸੂਚੀ ਨਹੀਂ ਦਿਖਾ ਸਕਦਾ। ‘ਹੋ ਗਿਆ’ 'ਤੇ ਟੈਪ ਕਰਨ ਨਾਲ ਸ਼ੁਰੂਆਤੀ ਫੋਲਡਰ ਹੀ ਚੁਣਿਆ ਰਹੇਗਾ। ‘ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ’ 'ਤੇ ਟੈਪ ਕਰਨ ਨਾਲ ਸੈਸ਼ਨ ਉਸੇ ਫੋਲਡਰ ਵਿੱਚ ਸ਼ੁਰੂ ਹੋਵੇਗਾ।"
+    },
+    "toolRun": {
+      "sheetTitle": "ਟੂਲ ਕਾਲਾਂ",
+      "condensedLabel": "{{itemCount}} ਆਈਟਮਾਂ; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "ਇਹ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਤਰਜੀਹਾਂ ਵਿੱਚ ਕੋਈ ਹੋਰ ਚੁਣੋ।",
     "gatewayModelUnavailableNotice": "ਇਹ ਮਾਡਲ ਹੁਣ ਪੇਸ਼ ਨਹੀਂ ਕੀਤਾ ਜਾਂਦਾ। ਹੋਰ ਚੁਣਨ ਲਈ $t(transcriptionModel.title) 'ਤੇ ਟੈਪ ਕਰੋ।",
     "gatewaySignInRequired": "Kilo Gateway ਬਦਲੀ ਵਰਤਣ ਲਈ ਸਾਈਨ ਇਨ ਕਰੋ।",
-    "gatewayNoModel": "ਪਹਿਲਾਂ ਤਰਜੀਹਾਂ ਵਿੱਚ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਚੁਣੋ।"
+    "gatewayNoModel": "ਪਹਿਲਾਂ ਤਰਜੀਹਾਂ ਵਿੱਚ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਚੁਣੋ।",
+    "testTitle": "ਵੌਇਸ ਇਨਪੁਟ ਦੀ ਜਾਂਚ ਕਰੋ",
+    "testPlaceholder": "ਮਾਈਕ੍ਰੋਫ਼ੋਨ 'ਤੇ ਟੈਪ ਕਰੋ ਅਤੇ ਬੋਲਣਾ ਸ਼ੁਰੂ ਕਰੋ।",
+    "testClear": "ਲਿਖਤ ਸਾਫ਼ ਕਰੋ"
   },
   "share": {
     "title": "Kilo ਵਿੱਚ ਸਾਂਝਾ ਕਰਨਾ",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਲਈ ਕੋਈ ਮਾਡਲ ਨਹੀਂ",
     "emptyDescription": "Kilo Gateway ਹੁਣ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਲਈ ਕੋਈ ਮਾਡਲ ਨਹੀਂ ਦੇ ਰਿਹਾ।",
     "loadFailed": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲੇ ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।"
+  },
+  "voiceLanguage": {
+    "title": "ਵੌਇਸ ਇਨਪੁਟ ਦੀ ਭਾਸ਼ਾ",
+    "automatic": "ਆਟੋ",
+    "loadFailed": "ਇਸ ਡਿਵਾਈਸ ਦੁਆਰਾ ਸਮਰਥਿਤ ਭਾਸ਼ਾਵਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
+    "emptyTitle": "ਕੋਈ ਸਮਰਥਿਤ ਭਾਸ਼ਾ ਨਹੀਂ",
+    "emptyDescription": "ਇਸ ਡਿਵਾਈਸ ਦੀ ਬੋਲੀ ਪਛਾਣ ਕੋਈ ਸਮਰਥਿਤ ਭਾਸ਼ਾ ਨਹੀਂ ਦੱਸਦੀ।"
   }
 }

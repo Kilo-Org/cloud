@@ -17,6 +17,15 @@ import type {
   personalPrepareSessionNextSchema,
   SandboxStatusSnapshot,
 } from '@/routers/cloud-agent-next-schemas';
+import {
+  getSandboxAllocationRequest,
+  SELECTABLE_SANDBOX_ALLOCATIONS,
+  type SandboxAllocationInput,
+  type SandboxSelectionCapabilities,
+  type SelectableSandboxAllocation,
+  type SelectableSandboxAllocationRequest,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import type { GetSandboxSelectionOptionsInput } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { TRPCError } from '@trpc/server';
 import type { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 
@@ -26,6 +35,7 @@ const mockPrepareSession = jest.fn<
   (input: {
     githubRepo?: string;
     devcontainer?: boolean;
+    sandboxAllocation?: SandboxAllocationInput;
     attachments?: AttachmentReference;
   }) => Promise<{
     cloudAgentSessionId: string;
@@ -84,7 +94,11 @@ const mockGetWorktreeFile =
     (input: WorktreeFileQuery & { cloudAgentSessionId: string }) => Promise<GetWorktreeFileOutput>
   >();
 
+const mockGetSandboxSelectionOptions =
+  jest.fn<(input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>>();
+
 const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
+  getSandboxSelectionOptions: mockGetSandboxSelectionOptions,
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
@@ -203,7 +217,10 @@ jest.mock('@/lib/cloud-agent/session-ownership', () => ({
 }));
 
 let createCaller: (ctx: { user: User; headersList?: Headers }) => {
-  prepareSession: (input: z.infer<typeof personalPrepareSessionNextSchema>) => Promise<{
+  getSandboxSelectionOptions: (input: {
+    devcontainer?: boolean;
+  }) => Promise<SandboxSelectionCapabilities>;
+  prepareSession: (input: z.input<typeof personalPrepareSessionNextSchema>) => Promise<{
     cloudAgentSessionId: string;
     kiloSessionId: string;
   }>;
@@ -854,6 +871,50 @@ describe('cloudAgentNextRouter helper procedures', () => {
   });
 });
 
+describe('cloudAgentNextRouter.getSandboxSelectionOptions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('forwards personal capability discovery with the caller token', async () => {
+    const capabilities: SandboxSelectionCapabilities = {
+      enabled: true,
+      defaultDestination: getSandboxAllocationRequest('cloudflare-single'),
+      options: [{ allocation: getSandboxAllocationRequest('cloudflare-single') }],
+    };
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce(capabilities);
+    const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
+
+    await expect(caller.getSandboxSelectionOptions({})).resolves.toEqual(capabilities);
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
+    expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({});
+  });
+
+  it.each([false, true])(
+    'forwards explicit personal devcontainer context %s',
+    async devcontainer => {
+      mockGetSandboxSelectionOptions.mockResolvedValueOnce({ enabled: false, options: [] });
+      const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
+
+      await expect(caller.getSandboxSelectionOptions({ devcontainer })).resolves.toEqual({
+        enabled: false,
+        options: [],
+      });
+      expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({ devcontainer });
+    }
+  );
+
+  it('propagates Worker-disabled selection without granting a capability', async () => {
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce({ enabled: false, options: [] });
+    const caller = createCaller({ user: { id: 'admin-user', is_admin: true } as User });
+
+    await expect(caller.getSandboxSelectionOptions({})).resolves.toEqual({
+      enabled: false,
+      options: [],
+    });
+  });
+});
+
 describe('cloudAgentNextRouter.prepareSession', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -979,6 +1040,81 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
     expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
+  const sandboxInput = {
+    prompt: 'Test prompt',
+    mode: 'code',
+    model: 'kilo/test-model',
+    githubRepo: 'acme/repo',
+  };
+
+  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
+    'forwards the normalized legacy personal sandbox preset %s',
+    async sandboxAllocation => {
+      const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+      await caller.prepareSession({ ...sandboxInput, sandboxAllocation });
+
+      expect(mockPrepareSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sandboxAllocation: getSandboxAllocationRequest(sandboxAllocation),
+        })
+      );
+    }
+  );
+
+  it.each([
+    ...SELECTABLE_SANDBOX_ALLOCATIONS.map(allocation => getSandboxAllocationRequest(allocation)),
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'large' },
+  ] satisfies SelectableSandboxAllocationRequest[])(
+    'forwards a structured personal sandbox destination without changing its account: %j',
+    async sandboxAllocation => {
+      const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+      await caller.prepareSession({ ...sandboxInput, sandboxAllocation });
+
+      expect(mockPrepareSession).toHaveBeenCalledWith(
+        expect.objectContaining({ sandboxAllocation })
+      );
+      expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps Default omitted on personal prepares', async () => {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await caller.prepareSession(sandboxInput);
+
+    expect(mockPrepareSession).toHaveBeenCalledTimes(1);
+    expect(mockPrepareSession.mock.calls[0][0]).not.toHaveProperty('sandboxAllocation');
+  });
+
+  it('rejects an invalid personal preset before calling the Worker', async () => {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(
+      caller.prepareSession({
+        ...sandboxInput,
+        sandboxAllocation: 'vercel-medium' as SelectableSandboxAllocation,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects explicit personal presets with dev containers before calling the Worker', async () => {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(
+      caller.prepareSession({
+        ...sandboxInput,
+        sandboxAllocation: 'cloudflare-single',
+        devcontainer: true,
+      })
+    ).rejects.toThrow('Sandbox selection is not available with dev containers');
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
   });
 
   it('forwards devcontainer sessions when the feature flag is enabled', async () => {

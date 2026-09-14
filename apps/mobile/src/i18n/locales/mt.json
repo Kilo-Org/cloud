@@ -231,6 +231,8 @@
     "voiceInput": "Input tal-vuċi",
     "autoExpandThinking": "Espandi awtomatikament il-ħsieb",
     "autoExpandThinkingSubtitle": "Uri l-ħsieb tal-aġent espandut meta jispiċċa.",
+    "hideThinking": "Aħbi d-dettalji tal-ħsieb",
+    "hideThinkingSubtitle": "Turix il-ħsieb tal-aġent fil-paġna tas-sessjoni.",
     "keepScreenOn": "Żomm l-iskrin mixgħul fil-paġna tas-sessjoni",
     "keepScreenOnSubtitle": "Żomm l-iskrin mixgħul waqt li s-sessjoni tkun qed taħdem.",
     "appearance": "Dehra",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Traskrizzjoni permezz ta' Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Ittraskrivi d-dħul bil-vuċi b'mudell ta' Kilo Gateway minflok ir-rikonoxximent tal-vuċi tal-apparat. Ir-reġistrazzjoni tiegħek tintbagħat lil Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Ikkondensa s-sejħiet tal-għodda",
+    "condenseToolCallsSubtitle": "Iġbor is-sejħiet tal-għodda konsekuttivi f'ringiela waħda li tista' tiftaħ."
   },
   "prReview": {
     "pullRequestUnavailable": "It-talba għall-għaqda mhix disponibbli",
@@ -2044,6 +2048,22 @@
       "connectionLost": "Il-konnessjoni ntilfet",
       "retryConnection": "Erġa' pprova taqbad"
     },
+    "goal": {
+      "title": "Għan",
+      "statusActive": "Għan attiv",
+      "statusPaused": "Għan imwaqqaf",
+      "statusComplete": "Għan komplut",
+      "statusBlocked": "Għan imblukkat",
+      "edit": "Editja l-għan",
+      "remove": "Neħħi l-għan",
+      "pause": "Waqqaf l-għan",
+      "resume": "Ibda l-għan mill-ġdid",
+      "editPlaceholder": "Iddeskrivi l-għan",
+      "removeConfirmTitle": "Neħħi l-għan?",
+      "removeConfirmMessage": "Il-CLI iħassar l-għan ta' din is-sessjoni.",
+      "updateFailed": "Ma setax jiġi aġġornat l-għan.",
+      "sectionAccessibility": "{{status}}. Għan: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Qabbad GitHub fil-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju.",
       "openGithub": "Iftaħ GitHub",
@@ -2502,6 +2522,11 @@
       "stepsCount_few": "{{steps}} passi",
       "stepsCount_many": "{{steps}}-il pass"
     },
+    "autoApprove": {
+      "title": "Approvazzjoni awtomatika",
+      "description": "Approva awtomatikament it-talbiet għall-permess għal din is-sessjoni. L-għodda mbagħad taħdem mingħajr talba.",
+      "unavailable": "Din is-sessjoni ma tistax tirċievi talbiet għall-permess."
+    },
     "prBadge": {
       "open": "ftuħ tal-PR",
       "closed": "talba għall-integrazzjoni magħluqa",
@@ -2532,6 +2557,10 @@
       "tapToListHint": "Tektek direttorju biex tara l-kontenut tiegħu.",
       "unsupportedDescription": "Dan il-CLI ma jistax jelenka d-direttorji. Tektek Lest biex iżżomm id-direttorju tat-tnedija, imbagħad Ibda s-sessjoni biex tibda minn hemm.",
       "unsupportedTitle": "Ma jistgħux jiġu elenkati d-direttorji"
+    },
+    "toolRun": {
+      "sheetTitle": "Sejħiet tal-għodda",
+      "condensedLabel": "{{itemCount}} elementi; {{last}}"
     }
   },
   "bootstrap": {
@@ -2644,7 +2673,10 @@
     "gatewayModelUnavailable": "Dan il-mudell ta' traskrizzjoni mhux disponibbli. Agħżel ieħor fil-Preferenzi.",
     "gatewayModelUnavailableNotice": "Dan il-mudell m'għadux disponibbli. Agħfas $t(transcriptionModel.title) biex tagħżel ieħor.",
     "gatewaySignInRequired": "Idħol biex tuża t-traskrizzjoni permezz ta' Kilo Gateway.",
-    "gatewayNoModel": "L-ewwel agħżel mudell ta' traskrizzjoni fil-Preferenzi."
+    "gatewayNoModel": "L-ewwel agħżel mudell ta' traskrizzjoni fil-Preferenzi.",
+    "testTitle": "Ittestja d-dħul bil-vuċi",
+    "testPlaceholder": "Ikketti l-mikrofonu u ibda tkellem.",
+    "testClear": "Neħħi t-test"
   },
   "share": {
     "title": "Aqsam ma' Kilo",
@@ -3036,5 +3068,12 @@
     "emptyTitle": "L-ebda mudell ta' traskrizzjoni",
     "emptyDescription": "Kilo Gateway bħalissa ma joffri l-ebda mudell ta' traskrizzjoni.",
     "loadFailed": "Ma setgħetx titgħabba l-mudelli ta' traskrizzjoni."
+  },
+  "voiceLanguage": {
+    "title": "Lingwa tad-dħul bil-vuċi",
+    "automatic": "Awtomatika",
+    "loadFailed": "Il-lingwi li jappoġġja dan l-apparat ma setgħux jitgħabbu.",
+    "emptyTitle": "L-ebda lingwa appoġġjata",
+    "emptyDescription": "Ir-rikonoxximent tal-kitba ta' dan l-apparat ma jirrapporta l-ebda lingwa appoġġjata."
   }
 }

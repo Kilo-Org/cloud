@@ -1542,6 +1542,22 @@
       "connectionLost": "Connessione persa",
       "retryConnection": "Riprova a connetterti"
     },
+    "goal": {
+      "title": "Obiettivo",
+      "statusActive": "Obiettivo attivo",
+      "statusPaused": "Obiettivo in pausa",
+      "statusComplete": "Obiettivo completato",
+      "statusBlocked": "Obiettivo bloccato",
+      "edit": "Modifica obiettivo",
+      "remove": "Rimuovi obiettivo",
+      "pause": "Metti in pausa l'obiettivo",
+      "resume": "Riprendi l'obiettivo",
+      "editPlaceholder": "Descrivi l'obiettivo",
+      "removeConfirmTitle": "Rimuovere l'obiettivo?",
+      "removeConfirmMessage": "Il CLI cancella l'obiettivo di questa sessione.",
+      "updateFailed": "Impossibile aggiornare l'obiettivo.",
+      "sectionAccessibility": "{{status}}. Obiettivo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Collega GitHub nel browser, poi torna qui per scegliere un repository.",
       "openGithub": "Apri GitHub",
@@ -1990,6 +2006,11 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_many": "{{steps}} passaggi"
     },
+    "autoApprove": {
+      "title": "Approvazione automatica",
+      "description": "Approva automaticamente le richieste di autorizzazione per questa sessione. Gli strumenti vengono poi eseguiti senza richiesta.",
+      "unavailable": "Questa sessione non può ricevere richieste di autorizzazione."
+    },
     "prBadge": {
       "open": "apri la PR",
       "closed": "pull request chiusa",
@@ -2020,6 +2041,10 @@
       "tapToListHint": "Tocca una cartella per visualizzarne il contenuto.",
       "unsupportedDescription": "Questa CLI non può elencare le cartelle. Tocca Fatto per mantenere la cartella di avvio, poi Avvia sessione per avviare la sessione in quella cartella.",
       "unsupportedTitle": "Impossibile elencare le cartelle"
+    },
+    "toolRun": {
+      "sheetTitle": "Chiamate degli strumenti",
+      "condensedLabel": "{{itemCount}} elementi; {{last}}"
     }
   },
   "bootstrap": {
@@ -2035,6 +2060,8 @@
     "voiceInput": "Input vocale",
     "autoExpandThinking": "Espandi automaticamente il ragionamento",
     "autoExpandThinkingSubtitle": "Mostra il ragionamento completo dell'agente al termine dell'elaborazione.",
+    "hideThinking": "Nascondi i dettagli del ragionamento",
+    "hideThinkingSubtitle": "Non mostrare il ragionamento dell'agente nella schermata della sessione.",
     "keepScreenOn": "Mantieni lo schermo acceso nella schermata della sessione",
     "keepScreenOnSubtitle": "Mantieni lo schermo acceso mentre la sessione è in esecuzione.",
     "appearance": "Aspetto",
@@ -2057,7 +2084,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Trascrizione con Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Trascrivi la dettatura con un modello Kilo Gateway anziché con il riconoscimento vocale del dispositivo. La registrazione viene inviata a Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Comprimi le chiamate degli strumenti",
+    "condenseToolCallsSubtitle": "Raggruppa le chiamate degli strumenti consecutive in una riga che puoi aprire."
   },
   "addCredits": {
     "cta": "Aggiungi crediti",
@@ -2161,7 +2190,10 @@
     "gatewayModelUnavailable": "Questo modello di trascrizione non è disponibile. Scegline un altro in Preferenze.",
     "gatewayModelUnavailableNotice": "Questo modello non è più offerto. Tocca $t(transcriptionModel.title) per sceglierne un altro.",
     "gatewaySignInRequired": "Accedi per usare la trascrizione con Kilo Gateway.",
-    "gatewayNoModel": "Scegli prima un modello di trascrizione in Preferenze."
+    "gatewayNoModel": "Scegli prima un modello di trascrizione in Preferenze.",
+    "testTitle": "Prova la dettatura",
+    "testPlaceholder": "Tocca il microfono e inizia a parlare.",
+    "testClear": "Cancella testo"
   },
   "share": {
     "title": "Condivisione su Kilo",
@@ -2992,5 +3024,12 @@
     "emptyTitle": "Nessun modello di trascrizione",
     "emptyDescription": "Kilo Gateway non offre modelli di trascrizione in questo momento.",
     "loadFailed": "Impossibile caricare i modelli di trascrizione."
+  },
+  "voiceLanguage": {
+    "title": "Lingua della dettatura",
+    "automatic": "Automatico",
+    "loadFailed": "Impossibile caricare le lingue supportate da questo dispositivo.",
+    "emptyTitle": "Nessuna lingua supportata",
+    "emptyDescription": "Il riconoscimento vocale di questo dispositivo non segnala lingue supportate."
   }
 }

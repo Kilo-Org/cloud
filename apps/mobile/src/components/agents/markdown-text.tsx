@@ -12,6 +12,8 @@ import {
   type MarkdownVariant,
 } from './markdown-palette';
 import {
+  type MarkdownCodeLongPressHandler,
+  type MarkdownCopyCodeHandler,
   type MarkdownLinkLongPressHandler,
   type MarkdownLinkPressHandler,
   MarkdownRenderer,
@@ -31,6 +33,17 @@ export type MarkdownTextProps = {
    * caller has fully handled the press and the default open should be skipped.
    */
   onPressLink?: MarkdownLinkPressHandler;
+  /**
+   * Optional handler that hands a rendered code fence's source to the caller.
+   * When omitted, fences render statically with no copy affordance.
+   */
+  onCopyCode?: MarkdownCopyCodeHandler;
+  /**
+   * Optional long-press handler for a code fence's copy trigger. Transcript
+   * hosts forward their message-details long-press here so press-and-hold on a
+   * fence still opens details. Ignored when `onCopyCode` is omitted.
+   */
+  onLongPressCode?: MarkdownCodeLongPressHandler;
 };
 
 export function MarkdownText({
@@ -39,6 +52,8 @@ export function MarkdownText({
   selectable = true,
   onLongPressLink,
   onPressLink,
+  onCopyCode,
+  onLongPressCode,
 }: Readonly<MarkdownTextProps>) {
   const colors = useThemeColors();
 
@@ -69,6 +84,8 @@ export function MarkdownText({
             selectable={selectable}
             onLongPressLink={onLongPressLink}
             onPressLink={onPressLink}
+            onCopyCode={onCopyCode}
+            onLongPressCode={onLongPressCode}
           />
         )
       )}
@@ -86,6 +103,8 @@ function MarkdownContent({
   selectable = true,
   onLongPressLink,
   onPressLink,
+  onCopyCode,
+  onLongPressCode,
 }: Readonly<MarkdownContentProps>) {
   // Tables are extracted before any renderer runs: each table becomes a chip
   // (parsed on open), and the remaining markdown runs render through useMarkdown.
@@ -119,6 +138,8 @@ function MarkdownContent({
             selectable={selectable}
             onLongPressLink={onLongPressLink}
             onPressLink={onPressLink}
+            onCopyCode={onCopyCode}
+            onLongPressCode={onLongPressCode}
           />
         )
       )}
@@ -132,6 +153,8 @@ type MarkdownSegmentProps = {
   selectable: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
+  onCopyCode?: MarkdownCopyCodeHandler;
+  onLongPressCode?: MarkdownCodeLongPressHandler;
 };
 
 function MarkdownSegment({
@@ -140,6 +163,8 @@ function MarkdownSegment({
   selectable,
   onLongPressLink,
   onPressLink,
+  onCopyCode,
+  onLongPressCode,
 }: Readonly<MarkdownSegmentProps>) {
   const colorScheme = useColorScheme();
 
@@ -164,9 +189,15 @@ function MarkdownSegment({
   // identical parse prefixes, so element state survives while streaming
   // updates flow in as props.
   const renderer = useMemo(
-    () => new MarkdownRenderer(palette, selectable, { onLongPressLink, onPressLink }),
+    () =>
+      new MarkdownRenderer(palette, selectable, {
+        onLongPressLink,
+        onPressLink,
+        onCopyCode,
+        onLongPressCode,
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `value` intentionally recreates the renderer per markdown-source change so element keys stay stable across streaming re-parses
-    [palette, selectable, onLongPressLink, onPressLink, value]
+    [palette, selectable, onLongPressLink, onPressLink, onCopyCode, onLongPressCode, value]
   );
 
   const elements = useMarkdown(value, {

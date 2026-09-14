@@ -1,6 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as permission-card.mounted.test.tsx) */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { MockTextInput } from '@/test/native-input.test-helpers';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { QuestionCard } from './question-card';
@@ -16,7 +16,7 @@ vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
-  TextInput: 'TextInput',
+  TextInput: MockTextInput,
   View: 'View',
 }));
 vi.mock('expo-haptics', () => ({

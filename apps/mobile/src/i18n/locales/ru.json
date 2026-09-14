@@ -231,6 +231,8 @@
     "voiceInput": "Голосовой ввод",
     "autoExpandThinking": "Автоматически раскрывать рассуждения",
     "autoExpandThinkingSubtitle": "Показывать рассуждения агента целиком, когда он закончит обдумывание.",
+    "hideThinking": "Скрыть подробности рассуждений",
+    "hideThinkingSubtitle": "Не показывать рассуждения агента на странице сеанса.",
     "keepScreenOn": "Не выключать экран на странице сеанса",
     "keepScreenOnSubtitle": "Не выключать экран, пока сеанс выполняется.",
     "appearance": "Внешний вид",
@@ -2050,6 +2052,11 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} шага",
       "stepsCount_many": "{{steps}} шагов"
+    },
+    "autoApprove": {
+      "title": "Автоодобрение",
+      "description": "Автоматически одобрять запросы разрешений для этого сеанса. Затем инструменты запускаются без запроса.",
+      "unavailable": "Этот сеанс не может получать запросы разрешений."
     },
     "prBadge": {
       "open": "открытый pull request",

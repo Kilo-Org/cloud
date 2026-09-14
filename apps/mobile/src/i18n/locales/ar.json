@@ -231,6 +231,8 @@
     "voiceInput": "إدخال صوتي",
     "autoExpandThinking": "عرض تفاصيل التفكير تلقائيًا",
     "autoExpandThinkingSubtitle": "عرض تفاصيل تفكير الوكيل عند انتهائه.",
+    "hideThinking": "إخفاء تفاصيل التفكير",
+    "hideThinkingSubtitle": "عدم عرض تفكير الوكيل في صفحة الجلسة.",
     "keepScreenOn": "إبقاء الشاشة مضاءة في صفحة الجلسة",
     "keepScreenOnSubtitle": "إبقاء الشاشة مضاءة أثناء تشغيل الجلسة.",
     "appearance": "المظهر",
@@ -2078,6 +2080,11 @@
       "stepsCount_two": "خطوتان ({{steps}})",
       "stepsCount_few": "{{steps}} خطوات",
       "stepsCount_many": "{{steps}} خطوةً"
+    },
+    "autoApprove": {
+      "title": "الموافقة التلقائية",
+      "description": "الموافقة على طلبات الإذن لهذه الجلسة تلقائيًا. عندئذٍ تعمل الأدوات دون طلب.",
+      "unavailable": "لا يمكن لهذه الجلسة استقبال طلبات الإذن."
     },
     "prBadge": {
       "open": "فتح طلب السحب",

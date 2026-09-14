@@ -62,8 +62,11 @@ vi.mock('./message-error-boundary', () => ({
 }));
 // Two cases below invoke `ChildSessionSection` directly (outside React); stub the
 // translation hook so the direct call does not trip the rules of hooks.
+const { translationHookMock } = vi.hoisted(() => ({
+  translationHookMock: vi.fn((text: string, _enabled?: boolean) => text),
+}));
 vi.mock('@/lib/tool-summary-translation/use-translated-tool-summary', () => ({
-  useTranslatedToolSummary: (text: string) => text,
+  useTranslatedToolSummary: translationHookMock,
 }));
 
 const taskCompletedState: Extract<ToolPart['state'], { status: 'completed' }> = {
@@ -379,5 +382,37 @@ describe('ChildSessionSection model label', () => {
       throw new Error('expected ChildSessionSection');
     }
     expect(section.props).toMatchObject({ modelOptions: [modelOption] });
+  });
+});
+
+describe('ChildSessionSection translation gating', () => {
+  it('enables translation for a content-bearing task name and disables it for the fallback label', () => {
+    const onOpenChildSession = vi.fn<(sessionId: string, title: string) => void>();
+
+    translationHookMock.mockClear();
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    ChildSessionSection({
+      part: makeToolPart('task', taskCompletedState),
+      childMessages: [],
+      onOpenChildSession,
+    });
+    expect(translationHookMock).toHaveBeenCalledWith('child task', true);
+
+    translationHookMock.mockClear();
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    ChildSessionSection({
+      part: makeToolPart('task', {
+        status: 'completed',
+        input: {},
+        output: '',
+        title: 'task',
+        metadata: { sessionId: 'child-1' },
+        time: { start: 1, end: 2 },
+      }),
+      childMessages: [],
+      onOpenChildSession,
+    });
+    // The fallback label is already in the app language: no gateway request.
+    expect(translationHookMock).toHaveBeenCalledWith('Task', false);
   });
 });

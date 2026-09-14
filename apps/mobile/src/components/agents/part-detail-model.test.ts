@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   findPartById,
-  getPartDetailTitle,
+  getPartDetailHeader,
   shouldAutoFollowPartDetail,
   shouldCenterPartDetail,
 } from './part-detail-model';
@@ -98,31 +98,32 @@ describe('findPartById', () => {
   });
 });
 
-describe('getPartDetailTitle', () => {
+describe('getPartDetailHeader', () => {
   beforeEach(() => {
     getToolDisplay.mockReset();
   });
 
   it('combines the display title and subtitle for tools', () => {
-    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: 'echo hi' });
-    expect(getPartDetailTitle(makeToolPart())).toBe('bash: echo hi');
+    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: 'echo hi', translatable: true });
+    expect(getPartDetailHeader(makeToolPart())).toEqual({
+      title: 'bash: echo hi',
+      translatable: true,
+    });
   });
 
-  it('uses the display title alone when the tool has no subtitle', () => {
-    getToolDisplay.mockReturnValue({ title: 'glob' });
-    expect(getPartDetailTitle(makeToolPart({ tool: 'glob' }))).toBe('glob');
+  it('uses the display title alone and passes the translatable flag through', () => {
+    getToolDisplay.mockReturnValue({ title: 'read', subtitle: 'read', translatable: false });
+    expect(getPartDetailHeader(makeToolPart({ tool: 'read' }))).toEqual({
+      title: 'read: read',
+      translatable: false,
+    });
   });
 
-  it('labels streaming reasoning as Thinking', () => {
-    expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toBe('Thinking');
-  });
-
-  it('labels completed reasoning as Thought', () => {
-    expect(getPartDetailTitle(makeReasoningPart('reasoning', true))).toBe('Thought');
-  });
-
-  it('falls back to Details for other part types', () => {
-    expect(getPartDetailTitle(makeTextPart())).toBe('Details');
+  it('never translates reasoning or the non-tool fallback', () => {
+    expect(getPartDetailHeader(makeReasoningPart('reasoning', false)).title).toBe('Thinking');
+    expect(getPartDetailHeader(makeReasoningPart('reasoning', true)).title).toBe('Thought');
+    expect(getPartDetailHeader(makeTextPart())).toEqual({ title: 'Details', translatable: false });
+    expect(getPartDetailHeader(null)).toEqual({ title: 'Details', translatable: false });
   });
 });
 

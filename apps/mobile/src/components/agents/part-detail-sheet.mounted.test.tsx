@@ -13,7 +13,7 @@ import {
   useImperativeHandle,
 } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { describe, expect, it, type Mock, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 // Real block, imported before the sheet: the hoisted body-mock factory runs
 // while the sheet module loads, so its binding must already be initialized.
@@ -27,6 +27,14 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 const scrollMock = vi.hoisted(() => ({
   scrollToEnd: vi.fn<(params?: { animated?: boolean }) => void>(),
+}));
+// The sheet's gating is the unit under test: capture the `enabled` argument the
+// sheet passes for each header so a non-translatable header proves no request.
+const { translationHookMock } = vi.hoisted(() => ({
+  translationHookMock: vi.fn((text: string, _enabled?: boolean) => text),
+}));
+vi.mock('@/lib/tool-summary-translation/use-translated-tool-summary', () => ({
+  useTranslatedToolSummary: translationHookMock,
 }));
 vi.mock('react-native', () => ({
   Modal: 'Modal',
@@ -672,5 +680,54 @@ describe('PartDetailSheet auto-follow', () => {
     expect(scrollToEnd).toHaveBeenCalled();
 
     await unmount(renderer);
+  });
+});
+
+describe('PartDetailSheet header translation gating', () => {
+  beforeEach(() => {
+    translationHookMock.mockClear();
+  });
+
+  it('enables translation for a content-bearing tool header', async () => {
+    const renderer = await mountSheet(makeBashPart('b1', 'echo hi'));
+
+    expect(translationHookMock).toHaveBeenCalledWith('bash: echo hi', true);
+
+    await unmount(renderer);
+  });
+
+  it('never translates an already-localized fallback tool header', async () => {
+    const todoReadPart: ToolPart = {
+      id: 't1',
+      sessionID: 's1',
+      messageID: 'm1',
+      type: 'tool',
+      callID: 'call-t1',
+      tool: 'todoread',
+      state: {
+        status: 'completed',
+        input: {},
+        output: '',
+        title: 'todoread',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      },
+    };
+    const renderer = await mountSheet(todoReadPart);
+
+    expect(translationHookMock).toHaveBeenCalledWith('todoread: Read todos', false);
+
+    await unmount(renderer);
+  });
+
+  it('never translates a reasoning header or the non-tool fallback', async () => {
+    const reasoning = await mountSheet(makeReasoningPart('r1', 'thought'));
+    expect(translationHookMock).toHaveBeenCalledWith('Thought', false);
+    await unmount(reasoning);
+
+    translationHookMock.mockClear();
+    const empty = await mountSheet(null);
+    expect(translationHookMock).toHaveBeenCalledWith('Details', false);
+    await unmount(empty);
   });
 });

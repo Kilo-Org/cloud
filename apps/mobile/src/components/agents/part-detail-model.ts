@@ -101,22 +101,42 @@ export function findPartById(messages: readonly StoredMessage[], partId: string)
   return null;
 }
 
+export type PartDetailHeader = {
+  title: string;
+  /**
+   * Whether the header copy carries tool content worth translating. Reasoning
+   * labels and the non-tool fallback are already-localized UI copy, and the
+   * projection marks fallback tool rows non-translatable, so the sheet never
+   * sends copy that is already in the app language.
+   */
+  translatable: boolean;
+};
+
 /**
- * Sheet header title for a part. Tools follow the same display projection the
- * fixed row uses so the title updates live with the part. Reasoning shows the
- * stream state; anything else is an unreachable fallback.
+ * Sheet header for a part. Tools follow the same display projection the fixed
+ * row uses so the title updates live with the part. Reasoning shows the stream
+ * state; anything else is an unreachable fallback.
  */
-export function getPartDetailTitle(part: Part): string {
+export function getPartDetailHeader(part: Part | null): PartDetailHeader {
+  if (part === null) {
+    return { title: i18n.t('common.details'), translatable: false };
+  }
   if (isReasoningPart(part)) {
-    return isPartStreaming(part)
-      ? i18n.t('agentChat.partDetail.thinking')
-      : i18n.t('agentChat.partDetail.thought');
+    return {
+      title: isPartStreaming(part)
+        ? i18n.t('agentChat.partDetail.thinking')
+        : i18n.t('agentChat.partDetail.thought'),
+      translatable: false,
+    };
   }
   if (isToolPart(part)) {
     const display = getToolDisplay(part);
-    return display.subtitle ? `${display.title}: ${display.subtitle}` : display.title;
+    return {
+      title: display.subtitle ? `${display.title}: ${display.subtitle}` : display.title,
+      translatable: display.translatable,
+    };
   }
-  return i18n.t('common.details');
+  return { title: i18n.t('common.details'), translatable: false };
 }
 
 /**

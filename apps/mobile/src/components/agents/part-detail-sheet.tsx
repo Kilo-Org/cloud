@@ -16,7 +16,7 @@ import { MONO_SCROLL_TEXT_MODE_OPTIONS, type MonoScrollTextMode } from './mono-s
 import { MonoScrollSheetProvider } from './mono-scroll-block';
 import { SessionPageSheet } from './session-page-sheet';
 import {
-  getPartDetailTitle,
+  getPartDetailHeader,
   shouldAutoFollowPartDetail,
   shouldCenterPartDetail,
 } from './part-detail-model';
@@ -79,10 +79,8 @@ function renderPartContent(part: Part | null): ReactNode {
 export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const shownTitle = useTranslatedToolSummary(
-    part ? getPartDetailTitle(part) : t('common.details'),
-    part !== null && isToolPart(part)
-  );
+  const { title, translatable } = getPartDetailHeader(part);
+  const shownTitle = useTranslatedToolSummary(title, translatable);
   const [textMode, setTextMode] = useState<MonoScrollTextMode>('wrap');
   const [monoCount, setMonoCount] = useState(0);
   const [failedImage, setFailedImage] = useState<{ partId: string; uri: string } | null>(null);

@@ -16,6 +16,12 @@ export type ChildSessionActivity = { tool: string; context?: string };
 export type ChildSessionCardState = {
   agentName: string;
   taskName: string;
+  /**
+   * Whether `taskName` carries tool content worth translating. The fallback
+   * label is already-localized UI copy, so the card never sends it to the
+   * gateway.
+   */
+  translatable: boolean;
   latestActivity: ChildSessionActivity | string;
 };
 
@@ -83,6 +89,7 @@ export function getChildSessionCardState(
     getStringProperty(input, 'subagent_type') ?? i18n.t('agentChat.childSession.subagent');
   const description = getStringProperty(input, 'description');
   const prompt = getStringProperty(input, 'prompt');
+  const translatable = description !== undefined || Boolean(prompt);
   const taskName =
     description ?? (prompt ? truncateText(prompt, 60) : i18n.t('agentChat.childSession.task'));
 
@@ -109,7 +116,7 @@ export function getChildSessionCardState(
       : i18n.t('agentChat.childSession.waitingForActivity');
   })();
 
-  return { agentName, taskName, latestActivity };
+  return { agentName, taskName, translatable, latestActivity };
 }
 
 export function getChildSessionActivityLabel(activity: ChildSessionActivity | string): string {

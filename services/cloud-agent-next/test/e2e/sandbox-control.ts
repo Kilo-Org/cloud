@@ -443,7 +443,7 @@ async function run() {
         slug: request.kiloSessionId.slice(0, 24),
         directory: source.directory,
         title: 'Cloud Agent Gate 0',
-        version: '7.4.20',
+        version: '7.6.2',
         timeCreated: now,
         timeUpdated: now,
       }),
@@ -654,10 +654,116 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+/**
+ * Read-only control-plane probes may be retried once:
+ * - a transient fetch `TimeoutError` under Docker contention is not a terminal
+ *   verdict;
+ * - a `Owned Kilo listener identity did not match` for a read-only probe means
+ *   the native runtime rotated (idle stop/wake, credential refresh) after the
+ *   harness captured its `{serverUrl, processId}`. Re-discovering the same root
+ *   in the same container and retrying with the fresh identity observes the
+ *   same session+directory, so it cannot mask a real ownership divergence.
+ *
+ * Mutating actions (`prompt`, `import`) are never retried, because a timed-out
+ * submission may already have landed; `exclusive` is never re-anchored, because
+ * its callers already discover a fresh runtime before the destructive proof.
+ */
+const RETRYABLE_PROBE_ACTIONS: ReadonlySet<ControlPlaneKiloOperation['action']> = new Set([
+  'discover',
+  'inspect',
+  'exists',
+  'completion',
+  'file',
+  'stage-file',
+  'questions',
+  'exclusive',
+]);
+
+const REANCHORABLE_PROBE_ACTIONS: ReadonlySet<ControlPlaneKiloOperation['action']> = new Set([
+  'inspect',
+  'exists',
+  'completion',
+  'file',
+  'stage-file',
+  'questions',
+]);
+
+const PROBE_RETRY_DELAY_MS = 250;
+const PROBE_MAX_ATTEMPTS = 2;
+
+function isTransientProbeTimeout(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('failed (TimeoutError)');
+}
+
+function isStaleListenerIdentity(error: unknown): boolean {
+  return (
+    error instanceof Error && error.message.includes('Owned Kilo listener identity did not match')
+  );
+}
+
+/**
+ * Re-discover the operation's root and return an operation bound to the current
+ * listener identity, or null when the container itself changed (the caller's
+ * sandbox handle is stale and discovery, not a probe retry, is required).
+ */
+async function reanchorControlPlaneKiloOperation(
+  containerId: string,
+  operation: ControlPlaneKiloOperation,
+  executeDocker: DockerCommandExecutor
+): Promise<ControlPlaneKiloOperation | null> {
+  const rootKiloSessionId = operation.ownerKiloSessionId ?? operation.kiloSessionId;
+  const fresh = await findControlPlaneKiloRuntime(rootKiloSessionId, executeDocker).catch(
+    () => null
+  );
+  if (!fresh || fresh.container.id !== containerId) return null;
+  if (
+    fresh.serverUrl === operation.serverUrl &&
+    fresh.processId === operation.processId &&
+    fresh.directory === operation.directory
+  ) {
+    return null;
+  }
+  return {
+    ...operation,
+    serverUrl: fresh.serverUrl,
+    processId: fresh.processId,
+    directory: fresh.directory,
+  };
+}
+
 async function runControlPlaneKiloOperation(
   containerId: string,
   operation: ControlPlaneKiloOperation,
   executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<Record<string, unknown>> {
+  const maxAttempts = RETRYABLE_PROBE_ACTIONS.has(operation.action) ? PROBE_MAX_ATTEMPTS : 1;
+  let current = operation;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await runControlPlaneKiloOperationOnce(containerId, current, executeDocker);
+    } catch (error) {
+      if (attempt >= maxAttempts) throw error;
+      if (REANCHORABLE_PROBE_ACTIONS.has(operation.action) && isStaleListenerIdentity(error)) {
+        const reanchored = await reanchorControlPlaneKiloOperation(
+          containerId,
+          current,
+          executeDocker
+        );
+        if (reanchored) {
+          current = reanchored;
+          continue;
+        }
+      }
+      if (!isTransientProbeTimeout(error)) throw error;
+      await new Promise(resolve => setTimeout(resolve, PROBE_RETRY_DELAY_MS));
+    }
+  }
+}
+
+async function runControlPlaneKiloOperationOnce(
+  containerId: string,
+  operation: ControlPlaneKiloOperation,
+  executeDocker: DockerCommandExecutor
 ): Promise<Record<string, unknown>> {
   let stdout: string;
   try {
@@ -870,7 +976,12 @@ export async function stopOwnedControlPlaneSandbox(
     throw new Error('Cannot prove the original sandbox still owns the requested root');
   }
   try {
-    await assertExclusiveControlPlaneRuntime(runtime, kiloSessionId, executeDocker, allowedDirectories);
+    await assertExclusiveControlPlaneRuntime(
+      runtime,
+      kiloSessionId,
+      executeDocker,
+      allowedDirectories
+    );
   } catch (error) {
     if (error instanceof ControlPlaneContainerUnavailableError) {
       console.warn(
@@ -971,6 +1082,34 @@ export async function unpauseOwnedPrimary(
   if (paused === 'false') return;
   if (paused !== 'true') throw new Error(`Refusing to unpause ${handle.name}: unknown pause state`);
   await executeDocker(['unpause', handle.containerId]);
+}
+
+/**
+ * Identity of one in-container Kilo server process, captured while the runtime
+ * was discoverable. `feed-stale-recovery` freezes ONLY this process so the
+ * control wrapper and the container stay alive and the inbound `/global/event`
+ * subscriber goes silent without an error.
+ */
+export type KiloServerProcessHandle = {
+  containerId: string;
+  processId: number;
+};
+
+/**
+ * Send a signal to the exact Kilo server process captured earlier. Never
+ * rediscover the process: a STOPPED Kilo server cannot answer a discovery
+ * request, so the captured identity is the only safe handle for `CONT`.
+ *
+ * A `docker exec` that cannot reach the container or the process throws, so a
+ * caller that must not leak a stopped process has to run `CONT` in `finally`
+ * and record the outcome.
+ */
+export async function signalKiloServerProcess(
+  handle: KiloServerProcessHandle,
+  signal: 'STOP' | 'CONT',
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<void> {
+  await executeDocker(['exec', handle.containerId, 'kill', `-${signal}`, String(handle.processId)]);
 }
 
 export async function waitForControlPlaneKiloRuntime(
@@ -1365,6 +1504,11 @@ export async function killContainer(
   executeDocker: DockerCommandExecutor = executeDockerCommand
 ): Promise<void> {
   try {
+    // Fault injection must leave the container present-but-stopped: the DO
+    // distinguishes an observed stop from an absent container, and removing it
+    // mid-scenario changes that. Leaked stopped records are instead dropped at
+    // scenario end by the campaign runner and by an explicit cleanup, so this
+    // stays a kill.
     await executeDocker(['kill', idOrName]);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -1520,7 +1664,10 @@ export async function waitForSandboxPrimaryGone(
 }
 
 /** Run a shell command inside a container and read its stdout; null when absent. */
-async function readContainerFile(containerId: string, shellCommand: string): Promise<string | null> {
+async function readContainerFile(
+  containerId: string,
+  shellCommand: string
+): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync(
       'docker',

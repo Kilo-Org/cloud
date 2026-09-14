@@ -1586,7 +1586,6 @@ export function createSandboxControlClient(
         if (eventReceipts) {
           try {
             const accepted = eventTransport.enqueue(event, payload, session);
-            if (accepted) void eventTransport.resume().catch(() => undefined);
             return accepted;
           } catch {
             reportUntrackedPublicationFailure(event, session, 'send_failed', payload);

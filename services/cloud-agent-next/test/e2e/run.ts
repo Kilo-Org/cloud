@@ -12,6 +12,7 @@
  *   tsx test/e2e/run.ts queue-while-busy gate1
  *   tsx test/e2e/run.ts queue-overflow _
  *   tsx test/e2e/run.ts callback-completion echo:done
+ *   tsx test/e2e/run.ts feed-stale-recovery _
  *   tsx test/e2e/run.ts --api=legacy hot echo:hi
  *
  * The stack must be running (`pnpm dev:start cloud-agent`). Leave
@@ -32,7 +33,11 @@ import {
 } from './auth.js';
 import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
 import { isControlPlaneOwner, isWorktreeOwner } from '../../src/session-plane.js';
-import { LIFECYCLE_SCENARIOS, LIFECYCLE_SCENARIO_TIMEOUT_MS, type LifecycleResult } from './lifecycle.js';
+import {
+  LIFECYCLE_SCENARIOS,
+  LIFECYCLE_SCENARIO_TIMEOUT_MS,
+  type LifecycleResult,
+} from './lifecycle.js';
 import { FILE_STATE_SCENARIO_TIMEOUT_MS } from './lifecycle-file-state.js';
 import { CONTINUITY_SCENARIO_TIMEOUT_MS } from './lifecycle-continuity.js';
 

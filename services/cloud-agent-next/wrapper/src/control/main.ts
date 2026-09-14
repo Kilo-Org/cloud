@@ -152,7 +152,9 @@ function main(
       }
     },
     onUnexpectedClose: failure => {
-      logToFile(`Kilo worktree retired reason=${failure.reason} directory=${failure.directory}`);
+      logToFile(
+        `Kilo worktree retired reason=${failure.reason} directory=${failure.directory} runtimeId=${failure.runtimeId}`
+      );
       const stillCurrent = () => {
         const current = kiloRuntimes.get(failure.identity);
         return current === undefined || current.runtimeId === failure.runtimeId;

@@ -3,6 +3,7 @@ import { ControlDeliveryError } from './sandbox-control-client';
 import {
   CONTROL_EVENT_BATCH_WINDOW_MS,
   createControlEventOutbox,
+  type ControlEventOutboxFailure,
   type ControlEventPublication,
   type PreparedControlEventPublication,
 } from './control-event-outbox';
@@ -1753,6 +1754,320 @@ describe('control event outbox batch scheduling', () => {
       outbox.close();
       setTimer.mockRestore();
       clearTimer.mockRestore();
+    }
+  });
+});
+
+describe('control event outbox disconnected hold', () => {
+  function progressPublication(index: number) {
+    return {
+      event: 'session.event' as const,
+      session,
+      payload: { type: 'session.updated', properties: { marker: `progress_${index}` } },
+    };
+  }
+
+  function questionAsked(id: string) {
+    return {
+      event: 'session.event' as const,
+      session,
+      payload: { type: 'question.asked', properties: { id } },
+    };
+  }
+
+  async function flushMicrotasks(): Promise<void> {
+    for (let attempt = 0; attempt < 20; attempt += 1) await Promise.resolve();
+  }
+
+  it('retains a disconnected head and republishes the same identity on resume', async () => {
+    const failures: ControlEventOutboxFailure[] = [];
+    const delivered: Array<{ publication: ControlEventPublication; deadlineAt: number }> = [];
+    let attempts = 0;
+    const outbox = createControlEventOutbox({
+      publish: async (publication, deadlineAt) => {
+        delivered.push({ publication, deadlineAt });
+        if (attempts++ === 0)
+          throw new ControlDeliveryError('disconnected', true, 'disconnected');
+      },
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const head = outbox.prepare(progressPublication(0));
+      expect(outbox.enqueue(head)).toBe(true);
+      expect(await outbox.resume()).toBe(false);
+      expect(failures).toHaveLength(0);
+      expect(await outbox.resume()).toBe(true);
+      expect(failures).toHaveLength(0);
+      expect(delivered).toHaveLength(2);
+      expect(delivered[1]).toMatchObject({
+        publication: {
+          receiptId: head.receiptId,
+          sequence: head.sequence,
+          payload: head.payload,
+        },
+        deadlineAt: head.deadlineAt,
+      });
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('drops a socket_overflow head and keeps publishing without a hold', async () => {
+    const failures: ControlEventOutboxFailure[] = [];
+    const delivered: ControlEventPublication[] = [];
+    let attempts = 0;
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        delivered.push(publication);
+        if (attempts++ === 0)
+          throw new ControlDeliveryError('overflow', true, 'socket_overflow');
+      },
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const head = outbox.prepare(progressPublication(0));
+      expect(outbox.enqueue(head)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({ reason: 'socket_overflow' });
+
+      const later = outbox.prepare(progressPublication(1));
+      expect(outbox.enqueue(later)).toBe(true);
+      await flushMicrotasks();
+      expect(delivered).toHaveLength(2);
+      expect(delivered[1]?.receiptId).toBe(later.receiptId);
+      expect(failures).toHaveLength(1);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('does not spin retrying a disconnected head without a resume', async () => {
+    const publish = mock(async () => {
+      throw new ControlDeliveryError('disconnected', true, 'disconnected');
+    });
+    const outbox = createControlEventOutbox({ publish, onFailure: mock() });
+    try {
+      outbox.enqueue(outbox.prepare(progressPublication(0)));
+      expect(await outbox.resume()).toBe(false);
+      expect(publish).toHaveBeenCalledTimes(1);
+      await flushMicrotasks();
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(await outbox.resume()).toBe(false);
+      expect(publish).toHaveBeenCalledTimes(2);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('expires a retained disconnected head at its original deadline', async () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(1_000);
+    const timers = spyOn(globalThis, 'setTimeout');
+    const failures: ControlEventOutboxFailure[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {
+        throw new ControlDeliveryError('disconnected', true, 'disconnected');
+      },
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const head = outbox.prepare(progressPublication(0));
+      expect(head.deadlineAt).toBe(31_000);
+      expect(outbox.enqueue(head)).toBe(true);
+      expect(await outbox.resume()).toBe(false);
+      expect(failures).toHaveLength(0);
+      await flushMicrotasks();
+
+      const wakeup = timers.mock.calls.at(-1);
+      const handle = timers.mock.results.at(-1)?.value as ReturnType<typeof setTimeout> | undefined;
+      expect(wakeup?.[1]).toBe(30_000);
+      clock.mockReturnValue(head.deadlineAt);
+      clearTimeout(handle);
+      const callback = wakeup?.[0];
+      if (typeof callback !== 'function') throw new Error('Missing publication deadline');
+      callback();
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({
+        reason: 'expired',
+        publication: { receiptId: head.receiptId },
+      });
+
+      await flushMicrotasks();
+      expect(failures).toHaveLength(1);
+    } finally {
+      outbox.close();
+      timers.mockRestore();
+      clock.mockRestore();
+    }
+  });
+
+  it('expires a disconnected rejection at the deadline without holding', async () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(1_000);
+    const failures: ControlEventOutboxFailure[] = [];
+    const delivered: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async (publication, deadlineAt) => {
+        delivered.push(publication);
+        if (delivered.length === 1) {
+          clock.mockReturnValue(deadlineAt);
+          throw new ControlDeliveryError('disconnected', true, 'disconnected');
+        }
+      },
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const head = outbox.prepare(progressPublication(0));
+      expect(outbox.enqueue(head)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({
+        reason: 'expired',
+        publication: { receiptId: head.receiptId },
+      });
+
+      const later = outbox.prepare(progressPublication(1));
+      expect(later.deadlineAt).toBeGreaterThan(head.deadlineAt);
+      expect(outbox.enqueue(later)).toBe(true);
+      await flushMicrotasks();
+      expect(delivered).toHaveLength(2);
+      expect(delivered[1]?.receiptId).toBe(later.receiptId);
+      expect(failures).toHaveLength(1);
+    } finally {
+      outbox.close();
+      clock.mockRestore();
+    }
+  });
+
+  it('expires a retained head at its deadline so a later urgent event is not blocked', async () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(1_000);
+    const timers = spyOn(globalThis, 'setTimeout');
+    const failures: ControlEventOutboxFailure[] = [];
+    const delivered: ControlEventPublication[] = [];
+    let attempts = 0;
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        delivered.push(publication);
+        if (attempts++ === 0)
+          throw new ControlDeliveryError('disconnected', true, 'disconnected');
+      },
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const head = outbox.prepare(progressPublication(0));
+      expect(outbox.enqueue(head)).toBe(true);
+      clock.mockReturnValue(1_001);
+      expect(await outbox.resume()).toBe(false);
+      expect(failures).toHaveLength(0);
+      await flushMicrotasks();
+
+      const urgent = outbox.prepare(questionAsked('question_1'));
+      expect(urgent.preparedAt).toBe(1_001);
+      expect(urgent.deadlineAt).toBeGreaterThan(head.deadlineAt);
+      expect(outbox.enqueue(urgent)).toBe(true);
+
+      const wakeup = timers.mock.calls.at(-1);
+      const handle = timers.mock.results.at(-1)?.value as ReturnType<typeof setTimeout> | undefined;
+      expect(wakeup?.[1]).toBe(head.deadlineAt - 1_001);
+
+      clock.mockReturnValue(head.deadlineAt);
+      clearTimeout(handle);
+      const callback = wakeup?.[0];
+      if (typeof callback !== 'function') throw new Error('Missing publication deadline');
+      callback();
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({
+        reason: 'expired',
+        publication: { receiptId: head.receiptId },
+      });
+
+      expect(await outbox.resume()).toBe(true);
+      expect(delivered).toHaveLength(2);
+      expect(delivered[1]?.receiptId).toBe(urgent.receiptId);
+      expect(failures).toHaveLength(1);
+    } finally {
+      outbox.close();
+      timers.mockRestore();
+      clock.mockRestore();
+    }
+  });
+
+  it('retains a disconnected batch and republishes the same identities on resume', async () => {
+    const failures: ControlEventOutboxFailure[] = [];
+    const batches: Array<{ publications: ControlEventPublication[]; deadlineAt: number }> = [];
+    let attempts = 0;
+    const outbox = createControlEventOutbox({
+      publish: async () => {
+        throw new Error('single publication must not be used in batch mode');
+      },
+      publishBatch: async (publications, deadlineAt) => {
+        batches.push({ publications, deadlineAt });
+        if (attempts++ === 0)
+          throw new ControlDeliveryError('disconnected', true, 'disconnected');
+      },
+      supportsBatches: () => true,
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const first = outbox.prepare(progressPublication(0));
+      const second = outbox.prepare(questionAsked('question_1'));
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(outbox.enqueue(second)).toBe(true);
+
+      expect(await outbox.resume()).toBe(false);
+      expect(failures).toHaveLength(0);
+      expect(await outbox.resume()).toBe(true);
+      expect(failures).toHaveLength(0);
+      expect(batches).toHaveLength(2);
+      const expectedReceiptIds = [first.receiptId, second.receiptId];
+      const expectedSequences = [first.sequence, second.sequence];
+      for (const batch of batches) {
+        expect(batch.publications.map(entry => entry.receiptId)).toEqual(expectedReceiptIds);
+        expect(batch.publications.map(entry => entry.sequence)).toEqual(expectedSequences);
+        expect(batch.deadlineAt).toBe(first.deadlineAt);
+      }
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('expires only the batch head at its deadline and keeps later entries queued', async () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(1_000);
+    const failures: ControlEventOutboxFailure[] = [];
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {
+        throw new Error('single publication must not be used in batch mode');
+      },
+      publishBatch: async (publications, deadlineAt) => {
+        batches.push(publications);
+        if (batches.length === 1) {
+          clock.mockReturnValue(deadlineAt);
+          throw new ControlDeliveryError('disconnected', true, 'disconnected');
+        }
+      },
+      supportsBatches: () => true,
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const head = outbox.prepare(progressPublication(0));
+      expect(outbox.enqueue(head)).toBe(true);
+      clock.mockReturnValue(1_001);
+      const later = outbox.prepare(questionAsked('question_1'));
+      expect(later.deadlineAt).toBeGreaterThan(head.deadlineAt);
+      expect(outbox.enqueue(later)).toBe(true);
+
+      expect(await outbox.resume()).toBe(true);
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({
+        reason: 'expired',
+        publication: { receiptId: head.receiptId },
+      });
+      expect(batches).toHaveLength(2);
+      expect(batches[0]?.map(entry => entry.receiptId)).toEqual([head.receiptId, later.receiptId]);
+      expect(batches[1]?.map(entry => entry.receiptId)).toEqual([later.receiptId]);
+    } finally {
+      outbox.close();
+      clock.mockRestore();
     }
   });
 });

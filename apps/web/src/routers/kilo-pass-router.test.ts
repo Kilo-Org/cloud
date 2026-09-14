@@ -110,7 +110,6 @@ type StripeMock = {
       expire: ReturnType<typeof jest.fn>;
       list: ReturnType<typeof jest.fn>;
       retrieve: ReturnType<typeof jest.fn>;
-      expire: ReturnType<typeof jest.fn>;
       listLineItems: ReturnType<typeof jest.fn>;
     };
   };
@@ -489,7 +488,6 @@ jest.mock('@/lib/stripe-client', () => {
         expire: jest.fn(),
         list: jest.fn(),
         retrieve: jest.fn(),
-        expire: jest.fn(),
         listLineItems: jest.fn(),
       },
     },
@@ -849,7 +847,6 @@ describe('kiloPassRouter', () => {
     stripeMock.checkout.sessions.list.mockReset();
     stripeMock.checkout.sessions.list.mockResolvedValue({ data: [] });
     stripeMock.checkout.sessions.retrieve.mockReset();
-    stripeMock.checkout.sessions.expire.mockReset();
     stripeMock.checkout.sessions.listLineItems.mockReset();
     stripeMock.billingPortal.sessions.create.mockReset();
     stripeMock.invoices.list.mockReset();

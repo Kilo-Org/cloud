@@ -33,6 +33,28 @@ const executeDockerCommand: DockerCommandExecutor = async args => {
   return { stdout };
 };
 
+/**
+ * A control-plane Docker operation could not reach its container because the
+ * container no longer exists or is not running. This is deliberately distinct
+ * from "the container is running but ownership could not be proven": only a
+ * gone container may be treated as a best-effort cleanup no-op, and only
+ * "gone" produces this error.
+ */
+export class ControlPlaneContainerUnavailableError extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+    this.name = 'ControlPlaneContainerUnavailableError';
+  }
+}
+
+const DOCKER_CONTAINER_GONE_MARKERS = ['No such container', 'is not running', 'No such object'];
+
+/** True when a Docker CLI error means the named container is absent or stopped. */
+export function isDockerContainerGoneError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return DOCKER_CONTAINER_GONE_MARKERS.some(marker => message.includes(marker));
+}
+
 export type SandboxContainer = {
   id: string;
   name: string;
@@ -93,12 +115,14 @@ export type ControlPlaneKiloCompletion = {
   assistantMessageId: string;
 };
 
-export type ControlPlaneWorkspaceFile = {
-  exists: boolean;
-  contents?: string;
-  dirty: boolean;
-  head: string;
-};
+/**
+ * Result of a workspace-file inspection. `unavailable` means the container was
+ * already gone, so the file state could not be observed at all — callers must
+ * not read that as "the file does not exist".
+ */
+export type ControlPlaneWorkspaceFile =
+  | { unavailable: true; reason: string }
+  | { unavailable?: false; exists: boolean; contents?: string; dirty: boolean; head: string };
 
 export type ControlPlaneQuestionVisibility = {
   unscoped: { status: number; count: number; matchingQuestion: boolean };
@@ -114,6 +138,7 @@ type ControlPlaneKiloOperation = {
     | 'prompt'
     | 'completion'
     | 'file'
+    | 'stage-file'
     | 'questions'
     | 'exclusive';
   kiloSessionId: string;
@@ -129,8 +154,72 @@ type ControlPlaneKiloOperation = {
   expectedText?: string;
   userMessageId?: string;
   filePath?: string;
+  bytes?: number;
+  /**
+   * Additional worktree directories the harness itself created for this root
+   * across prior incarnations. Exclusivity still rejects any directory or
+   * listener outside this exact set.
+   */
+  allowedDirectories?: string[];
   questionId?: string;
 };
+
+type ExclusiveLayoutFs = {
+  readdirSync: (directory: string) => string[];
+  statSync: (filePath: string) => { isDirectory: () => boolean };
+};
+
+type ExclusiveLayoutPath = {
+  dirname: (filePath: string) => string;
+  basename: (filePath: string) => string;
+  join: (...segments: string[]) => string;
+};
+
+export type ExclusiveLayoutInput = {
+  directory: string;
+  allowedDirectories?: string[];
+  fs: ExclusiveLayoutFs;
+  path: ExclusiveLayoutPath;
+  listeners: ReadonlyArray<{ directory: string }>;
+};
+
+/**
+ * Decide whether a control-plane Kilo root is the only worktree under its
+ * parent. `sessions/<sessionId>` is the control-plane session workspace and
+ * `worktrees/<worktreeId>` the worktree-sibling layout; both are legitimate.
+ * The guard is the directory count plus the allowlist plus the listener set,
+ * not the parent name: every sibling directory and every Kilo listener must be
+ * the target directory or a harness-supplied `allowedDirectories` entry, so an
+ * unknown directory or a foreign listener still refuses.
+ *
+ * One source of truth: the container `exclusive` operation embeds this function
+ * with `toString()`, and the unit test calls it directly.
+ */
+export function computeExclusiveLayout(input: ExclusiveLayoutInput): {
+  exclusive: boolean;
+  directories: string[];
+} {
+  const { directory, allowedDirectories, fs, path, listeners } = input;
+  const parent = path.dirname(directory);
+  const allowed = new Set([
+    directory,
+    ...(Array.isArray(allowedDirectories) ? allowedDirectories : []),
+  ]);
+  const directories = fs
+    .readdirSync(parent)
+    .filter(name => fs.statSync(path.join(parent, name)).isDirectory())
+    .map(name => path.join(parent, name));
+  const sessionParent =
+    path.basename(parent) === 'worktrees' || path.basename(parent) === 'sessions';
+  return {
+    exclusive:
+      sessionParent &&
+      directories.includes(directory) &&
+      directories.every(candidate => allowed.has(candidate)) &&
+      listeners.every(listener => allowed.has(listener.directory)),
+    directories,
+  };
+}
 
 const CONTROL_PLANE_KILO_SCRIPT = String.raw`
 import { execFileSync } from 'node:child_process';
@@ -138,6 +227,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const request = JSON.parse(process.argv[1] ?? '{}');
+
+// __EXCLUSIVE_LAYOUT__
 
 const KILO_SERVER_BASENAMES = new Set(['kilo', '.kilo']);
 
@@ -291,12 +382,14 @@ async function run() {
   }
 
   if (request.action === 'exclusive') {
-    const parent = path.dirname(request.directory);
-    const directories = fs.readdirSync(parent).filter(name => fs.statSync(path.join(parent, name)).isDirectory());
-    const exclusive = path.basename(parent) === 'worktrees' &&
-      directories.length === 1 && path.join(parent, directories[0]) === request.directory &&
-      kiloListeners().every(listener => listener.directory === request.directory);
-    return { ok: true, exclusive };
+    const verdict = computeExclusiveLayout({
+      directory: request.directory,
+      allowedDirectories: request.allowedDirectories,
+      fs,
+      path,
+      listeners: kiloListeners(),
+    });
+    return { ok: true, exclusive: verdict.exclusive, directories: verdict.directories };
   }
 
   if (request.action === 'inspect') {
@@ -317,6 +410,26 @@ async function run() {
     if (await getRoot(request.serverUrl, request.kiloSessionId)) {
       return { ok: false, reason: 'new Kilo root already exists' };
     }
+    // Production ensureSession imports under the live current project id, not a
+    // hardcoded one. A non-2xx here is reported with its HTTP status only; the
+    // response body is never dumped.
+    const projectEndpoint = new URL('/project/current', request.serverUrl);
+    projectEndpoint.searchParams.set('directory', source.directory);
+    const projectResponse = await fetch(projectEndpoint, { signal: AbortSignal.timeout(5_000) });
+    if (!projectResponse.ok) {
+      return { ok: false, reason: 'Kilo project lookup returned HTTP ' + projectResponse.status };
+    }
+    const project = await projectResponse.json();
+    const projectId =
+      project && typeof project === 'object' && typeof project.id === 'string' && project.id.length > 0
+        ? project.id
+        : null;
+    if (!projectId) {
+      return {
+        ok: false,
+        reason: 'Kilo project lookup returned no project id (HTTP ' + projectResponse.status + ')',
+      };
+    }
     const now = Date.now();
     const endpoint = new URL('/kilocode/session-import/session', request.serverUrl);
     endpoint.searchParams.set('directory', source.directory);
@@ -326,7 +439,7 @@ async function run() {
       signal: AbortSignal.timeout(8_000),
       body: JSON.stringify({
         id: request.kiloSessionId,
-        projectID: 'global',
+        projectID: projectId,
         slug: request.kiloSessionId.slice(0, 24),
         directory: source.directory,
         title: 'Cloud Agent Gate 0',
@@ -336,7 +449,24 @@ async function run() {
       }),
     });
     if (!response.ok) {
-      return { ok: false, reason: 'Kilo session import returned HTTP ' + response.status };
+      // Keep the failure diagnostic bounded: an HTTP status plus an optional
+      // short diagnostic ref token. Never dump the response body.
+      let ref;
+      try {
+        const body = await response.json();
+        const record = body && typeof body === 'object' ? body : undefined;
+        const data =
+          record && record.data && typeof record.data === 'object'
+            ? record.data
+            : undefined;
+        const candidate =
+          typeof record?.ref === 'string' ? record.ref : typeof data?.ref === 'string' ? data.ref : undefined;
+        if (candidate !== undefined && /^[A-Za-z0-9_-]{1,64}$/.test(candidate)) ref = candidate;
+      } catch {}
+      return {
+        ok: false,
+        reason: 'Kilo session import returned HTTP ' + response.status + (ref ? ' ref=' + ref : ''),
+      };
     }
     const root = await getRoot(request.serverUrl, request.kiloSessionId);
     if (!root || root.directory !== source.directory) {
@@ -395,6 +525,33 @@ async function run() {
       dirty: status.trim().length > 0,
       head,
     };
+  }
+
+  if (request.action === 'stage-file') {
+    if (
+      typeof request.filePath !== 'string' ||
+      path.isAbsolute(request.filePath) ||
+      !Number.isSafeInteger(request.bytes) ||
+      request.bytes < 0
+    ) {
+      return { ok: false, reason: 'workspace file path and byte count are required' };
+    }
+    const absolutePath = path.resolve(root.directory, request.filePath);
+    if (!absolutePath.startsWith(root.directory + path.sep)) {
+      return { ok: false, reason: 'workspace file path escaped the checkout' };
+    }
+    // Generate the bytes inside the container: the harness only sends the path
+    // and count, so the large payload crosses Kilo -> wrapper -> client on the
+    // read result instead of the (huge) tool-argument request path. Use short
+    // lines so the read tool's per-line handling does not truncate the single
+    // line; the file is still exactly request.bytes bytes.
+    const lineWidth = 99;
+    const line = 'x'.repeat(lineWidth) + '\n';
+    const fullLines = Math.floor(request.bytes / (lineWidth + 1));
+    const remainder = request.bytes - fullLines * (lineWidth + 1);
+    fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+    fs.writeFileSync(absolutePath, line.repeat(fullLines) + 'x'.repeat(remainder));
+    return { ok: true, byteCount: fs.statSync(absolutePath).size };
   }
 
   if (request.action === 'prompt') {
@@ -491,7 +648,7 @@ run()
       })
     )
   );
-`;
+`.replace('// __EXCLUSIVE_LAYOUT__', computeExclusiveLayout.toString());
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -502,14 +659,36 @@ async function runControlPlaneKiloOperation(
   operation: ControlPlaneKiloOperation,
   executeDocker: DockerCommandExecutor = executeDockerCommand
 ): Promise<Record<string, unknown>> {
-  const { stdout } = await executeDocker([
-    'exec',
-    containerId,
-    'bun',
-    '-e',
-    CONTROL_PLANE_KILO_SCRIPT,
-    JSON.stringify(operation),
-  ]);
+  let stdout: string;
+  try {
+    ({ stdout } = await executeDocker([
+      'exec',
+      containerId,
+      'bun',
+      '-e',
+      CONTROL_PLANE_KILO_SCRIPT,
+      JSON.stringify(operation),
+    ]));
+  } catch (error) {
+    // Surface a gone container as a readable, typed error instead of the
+    // opaque `Command failed: docker exec ...` from the CLI.
+    if (isDockerContainerGoneError(error)) {
+      throw new ControlPlaneContainerUnavailableError(
+        `Kilo ${operation.action} could not reach ${containerId}: the container is gone`
+      );
+    }
+    // A marker-less mid-exec death must be classified against the exact
+    // container at this operation boundary. A running container keeps the
+    // original throw; only a confirmed-absent one becomes typed-gone.
+    const unavailable = await unavailableIfContainerGone(
+      containerId,
+      error,
+      executeDocker,
+      `Kilo ${operation.action} could not reach ${containerId}: the container is gone`
+    );
+    if (unavailable) throw unavailable;
+    throw error;
+  }
   const result: unknown = JSON.parse(stdout.trim());
   if (!isRecord(result)) {
     throw new Error(`Kilo ${operation.action} returned an invalid result`);
@@ -560,8 +739,16 @@ export async function findControlPlaneKiloRuntime(
         executeDocker
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes('No such container') || message.includes('is not running')) continue;
+      // Discovery can fail because the container died mid-exec without a
+      // recognised gone marker. Treat that as gone only when the exact
+      // container is confirmed absent; otherwise preserve the failure.
+      const unavailable = await unavailableIfContainerGone(
+        container.id,
+        error,
+        executeDocker,
+        `Kilo discover could not reach ${container.id}: the container is gone`
+      );
+      if (unavailable) continue;
       throw error;
     }
     if (result.matched !== true) continue;
@@ -601,41 +788,98 @@ export async function findControlPlaneKiloRuntime(
  * Prove the control-plane primary for `kiloSessionId` is the only worktree
  * under its Kilo root. `findControlPlaneKiloRuntime` proves a root is PRESENT;
  * exclusivity is the additional `exclusive` operation, which requires the
- * root's parent to hold exactly one worktree and every Kilo listener to belong
- * to it. Presence alone must never authorize a destructive or freezing action.
+ * root's parent to hold only this worktree plus any harness-supplied
+ * `allowedDirectories`, and every Kilo listener to belong to one of those.
+ * `allowedDirectories` are the directories the scenario itself created for the
+ * same root across prior incarnations (captured while each was exclusively
+ * owned); unknown directories and foreign listeners still refuse. Presence
+ * alone must never authorize a destructive or freezing action.
  */
 async function assertExclusiveControlPlaneRuntime(
   runtime: ControlPlaneKiloRuntime,
   kiloSessionId: string,
-  executeDocker: DockerCommandExecutor
+  executeDocker: DockerCommandExecutor,
+  allowedDirectories: readonly string[] = []
 ): Promise<void> {
-  const result = await runControlPlaneKiloOperation(
-    runtime.container.id,
-    {
-      action: 'exclusive',
-      kiloSessionId,
-      ownerKiloSessionId: kiloSessionId,
-      serverUrl: runtime.serverUrl,
-      directory: runtime.directory,
-      home: runtime.home,
-      processId: runtime.processId,
-    },
-    executeDocker
-  );
-  if (result.exclusive !== true)
-    throw new Error('Refusing cleanup of a sandbox with other worktrees');
+  let result: Record<string, unknown>;
+  try {
+    result = await runControlPlaneKiloOperation(
+      runtime.container.id,
+      {
+        action: 'exclusive',
+        kiloSessionId,
+        ownerKiloSessionId: kiloSessionId,
+        serverUrl: runtime.serverUrl,
+        directory: runtime.directory,
+        home: runtime.home,
+        processId: runtime.processId,
+        allowedDirectories: [...allowedDirectories],
+      },
+      executeDocker
+    );
+  } catch (error) {
+    const unavailable = await unavailableIfContainerGone(
+      runtime.container.id,
+      error,
+      executeDocker,
+      `Kilo exclusive could not reach ${runtime.container.id}: the container is gone`
+    );
+    if (unavailable) throw unavailable;
+    throw new Error(
+      `Cannot prove exclusive ownership of ${runtime.container.id}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+  if (result.exclusive !== true) {
+    const directories = Array.isArray(result.directories)
+      ? result.directories.join(',')
+      : 'unknown';
+    throw new Error(
+      `Refusing cleanup of a sandbox with other worktrees: directories=${directories}; allowed=${[runtime.directory, ...allowedDirectories].join(',')}`
+    );
+  }
 }
 
 export async function stopOwnedControlPlaneSandbox(
   sandbox: SandboxContainer,
   kiloSessionId: string,
-  executeDocker: DockerCommandExecutor = executeDockerCommand
+  executeDocker: DockerCommandExecutor = executeDockerCommand,
+  allowedDirectories: readonly string[] = []
 ): Promise<string[]> {
+  if (!(await isSandboxContainerRunning(sandbox.id, executeDocker))) {
+    // The named container is absent or not running: there is nothing left to
+    // stop. After a scenario kills or the wrapper retires the runtime this is
+    // the expected state, so cleanup records a no-op instead of failing.
+    console.warn(
+      `stop-owned-sandbox(${kiloSessionId}): ${sandbox.name} is already gone; no stop issued`
+    );
+    return [];
+  }
   const runtime = await findControlPlaneKiloRuntime(kiloSessionId, executeDocker);
   if (!runtime || runtime.container.id !== sandbox.id || runtime.container.name !== sandbox.name) {
+    // The runtime proof vanished mid-flight. If the container is gone too, the
+    // stop is already moot; a still-running container with no provable owner
+    // must keep failing closed.
+    if (!(await isSandboxContainerRunning(sandbox.id, executeDocker))) {
+      console.warn(
+        `stop-owned-sandbox(${kiloSessionId}): ${sandbox.name} vanished before ownership proof; no stop issued`
+      );
+      return [];
+    }
     throw new Error('Cannot prove the original sandbox still owns the requested root');
   }
-  await assertExclusiveControlPlaneRuntime(runtime, kiloSessionId, executeDocker);
+  try {
+    await assertExclusiveControlPlaneRuntime(runtime, kiloSessionId, executeDocker, allowedDirectories);
+  } catch (error) {
+    if (error instanceof ControlPlaneContainerUnavailableError) {
+      console.warn(
+        `stop-owned-sandbox(${kiloSessionId}): ${sandbox.name} vanished during exclusive proof; no stop issued`
+      );
+      return [];
+    }
+    throw error;
+  }
   return killSandboxFamily(sandbox, executeDocker);
 }
 
@@ -784,18 +1028,35 @@ export async function controlPlaneKiloRootExists(
 
 export async function inspectControlPlaneWorkspaceFile(
   runtime: ControlPlaneKiloRuntime,
-  input: { kiloSessionId: string; filePath: string }
+  input: { kiloSessionId: string; filePath: string },
+  executeDocker: DockerCommandExecutor = executeDockerCommand
 ): Promise<ControlPlaneWorkspaceFile> {
-  const result = await runControlPlaneKiloOperation(runtime.container.id, {
-    action: 'file',
-    kiloSessionId: input.kiloSessionId,
-    serverUrl: runtime.serverUrl,
-    directory: runtime.directory,
-    home: runtime.home,
-    processId: runtime.processId,
-    ownerKiloSessionId: runtime.kiloSessionId,
-    filePath: input.filePath,
-  });
+  let result: Record<string, unknown>;
+  try {
+    result = await runControlPlaneKiloOperation(
+      runtime.container.id,
+      {
+        action: 'file',
+        kiloSessionId: input.kiloSessionId,
+        serverUrl: runtime.serverUrl,
+        directory: runtime.directory,
+        home: runtime.home,
+        processId: runtime.processId,
+        ownerKiloSessionId: runtime.kiloSessionId,
+        filePath: input.filePath,
+      },
+      executeDocker
+    );
+  } catch (error) {
+    const unavailable = await unavailableIfContainerGone(
+      runtime.container.id,
+      error,
+      executeDocker,
+      `Kilo file could not reach ${runtime.container.id}: the container is gone`
+    );
+    if (unavailable) return { unavailable: true, reason: unavailable.reason };
+    throw error;
+  }
   if (
     typeof result.exists !== 'boolean' ||
     typeof result.dirty !== 'boolean' ||
@@ -810,6 +1071,40 @@ export async function inspectControlPlaneWorkspaceFile(
     dirty: result.dirty,
     head: result.head,
   };
+}
+
+/**
+ * Stage a file of exactly `bytes` bytes (x-filled short lines) inside the owned
+ * worktree so a fake `read` directive has a real payload to stream back. The
+ * content is generated inside the container, so the large payload crosses
+ * Kilo -> wrapper -> client on the read RESULT instead of the tool-argument
+ * request that stalls.
+ */
+export async function stageControlPlaneWorkspaceFile(
+  runtime: ControlPlaneKiloRuntime,
+  input: { kiloSessionId: string; filePath: string; bytes: number },
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<{ byteCount: number }> {
+  const result = await runControlPlaneKiloOperation(
+    runtime.container.id,
+    {
+      action: 'stage-file',
+      kiloSessionId: input.kiloSessionId,
+      serverUrl: runtime.serverUrl,
+      directory: runtime.directory,
+      processId: runtime.processId,
+      ownerKiloSessionId: runtime.kiloSessionId,
+      filePath: input.filePath,
+      bytes: input.bytes,
+    },
+    executeDocker
+  );
+  if (result.byteCount !== input.bytes) {
+    throw new Error(
+      `staged file ${input.filePath} reported ${String(result.byteCount)} bytes, expected ${input.bytes}`
+    );
+  }
+  return { byteCount: input.bytes };
 }
 
 export async function inspectControlPlaneQuestions(
@@ -898,17 +1193,26 @@ export async function waitForControlPlaneKiloCompletion(
 ): Promise<ControlPlaneKiloCompletion> {
   const deadline = Date.now() + input.timeoutMs;
   while (Date.now() < deadline) {
-    const result = await runControlPlaneKiloOperation(runtime.container.id, {
-      action: 'completion',
-      kiloSessionId: input.kiloSessionId,
-      serverUrl: runtime.serverUrl,
-      directory: runtime.directory,
-      home: runtime.home,
-      processId: runtime.processId,
-      ownerKiloSessionId: runtime.kiloSessionId,
-      messageId: input.messageId,
-      ...(input.expectedText ? { expectedText: input.expectedText } : {}),
-    });
+    let result: Record<string, unknown>;
+    try {
+      result = await runControlPlaneKiloOperation(runtime.container.id, {
+        action: 'completion',
+        kiloSessionId: input.kiloSessionId,
+        serverUrl: runtime.serverUrl,
+        directory: runtime.directory,
+        home: runtime.home,
+        processId: runtime.processId,
+        ownerKiloSessionId: runtime.kiloSessionId,
+        messageId: input.messageId,
+        ...(input.expectedText ? { expectedText: input.expectedText } : {}),
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('completion failed (TimeoutError)')) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        continue;
+      }
+      throw error;
+    }
     if (result.found === true) {
       if (result.failed === true) {
         throw new Error(`Kilo root ${input.kiloSessionId} finished with an assistant error`);
@@ -933,12 +1237,15 @@ export async function waitForControlPlaneKiloCompletion(
   throw new Error(`Kilo root ${input.kiloSessionId} did not complete within ${input.timeoutMs}ms`);
 }
 
-export type ControlPlaneHistoryInspection = {
-  ok: boolean;
-  found: boolean;
-  userEntryFound: boolean;
-  assistantEntryFound: boolean;
-};
+export type ControlPlaneHistoryInspection =
+  | { unavailable: true; reason: string }
+  | {
+      unavailable?: false;
+      ok: boolean;
+      found: boolean;
+      userEntryFound: boolean;
+      assistantEntryFound: boolean;
+    };
 
 /**
  * Inspect both sides of a completed user turn in the live Kilo history. The
@@ -948,19 +1255,38 @@ export type ControlPlaneHistoryInspection = {
  */
 export async function inspectControlPlaneHistory(
   runtime: ControlPlaneKiloRuntime,
-  input: { kiloSessionId: string; userMessageId: string; assistantMarker: string }
+  input: { kiloSessionId: string; userMessageId: string; assistantMarker: string },
+  executeDocker: DockerCommandExecutor = executeDockerCommand
 ): Promise<ControlPlaneHistoryInspection> {
-  const result = await runControlPlaneKiloOperation(runtime.container.id, {
-    action: 'completion',
-    kiloSessionId: input.kiloSessionId,
-    serverUrl: runtime.serverUrl,
-    directory: runtime.directory,
-    processId: runtime.processId,
-    ownerKiloSessionId: runtime.kiloSessionId,
-    messageId: input.userMessageId,
-    userMessageId: input.userMessageId,
-    expectedText: input.assistantMarker,
-  });
+  let result: Record<string, unknown>;
+  try {
+    result = await runControlPlaneKiloOperation(
+      runtime.container.id,
+      {
+        action: 'completion',
+        kiloSessionId: input.kiloSessionId,
+        serverUrl: runtime.serverUrl,
+        directory: runtime.directory,
+        processId: runtime.processId,
+        ownerKiloSessionId: runtime.kiloSessionId,
+        messageId: input.userMessageId,
+        userMessageId: input.userMessageId,
+        expectedText: input.assistantMarker,
+      },
+      executeDocker
+    );
+  } catch (error) {
+    // A mid-exec death can surface without a gone marker. Only report the
+    // history as unavailable once the exact container is confirmed absent.
+    const unavailable = await unavailableIfContainerGone(
+      runtime.container.id,
+      error,
+      executeDocker,
+      `Kilo completion could not reach ${runtime.container.id}: the container is gone`
+    );
+    if (unavailable) return { unavailable: true, reason: unavailable.reason };
+    throw error;
+  }
   if (
     typeof result.found !== 'boolean' ||
     typeof result.userEntryFound !== 'boolean' ||
@@ -1001,6 +1327,33 @@ export async function listSandboxContainers(
     result.push({ id, name, image, isProxy: name.endsWith('-proxy') });
   }
   return result;
+}
+
+/** True when this exact container id is currently present and running. */
+async function isSandboxContainerRunning(
+  containerId: string,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<boolean> {
+  const containers = await listSandboxContainers(executeDocker);
+  return containers.some(container => container.id === containerId);
+}
+
+/**
+ * Classify a failed control-plane operation against the exact container it
+ * targeted. Returns an unavailable error only when the container is confirmed
+ * absent or stopped. A container that is running again returns `undefined`, so
+ * the caller keeps a hard failure: a running container must never be treated as
+ * an already-gone cleanup target.
+ */
+async function unavailableIfContainerGone(
+  containerId: string,
+  error: unknown,
+  executeDocker: DockerCommandExecutor,
+  fallbackReason: string
+): Promise<ControlPlaneContainerUnavailableError | undefined> {
+  if (await isSandboxContainerRunning(containerId, executeDocker)) return undefined;
+  if (error instanceof ControlPlaneContainerUnavailableError) return error;
+  return new ControlPlaneContainerUnavailableError(fallbackReason);
 }
 
 /**
@@ -1125,14 +1478,15 @@ export async function killSandboxFamily(
 /** Block until a sandbox container and its proxy sibling are gone. */
 export async function waitForSandboxFamilyGone(
   sandbox: SandboxContainer,
-  timeoutMs: number
+  timeoutMs: number,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
 ): Promise<boolean> {
   const familyNames = sandboxFamilyNames(sandbox);
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const containers = await listSandboxContainers();
+    const containers = await listSandboxContainers(executeDocker);
     if (!containers.some(container => familyNames.has(container.name))) return true;
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
   return false;
 }

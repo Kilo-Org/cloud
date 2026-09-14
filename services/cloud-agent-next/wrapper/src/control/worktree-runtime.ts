@@ -163,6 +163,7 @@ export type WorktreeKiloRuntimes = {
   isCurrent?(runtime: WorktreeKiloRuntime): boolean;
   getEntryRuntimeId?(directory: string, root?: string): string | undefined;
   prepareForNewWork?(directory: string): boolean;
+  feedRecovering?(directory: string): boolean;
   recordRootPublicationDiagnostic?(
     identity: SessionEventIdentity,
     fields: ControlDiagnosticFields
@@ -1837,6 +1838,15 @@ export function createWorktreeKiloRuntimes(options: {
         entries.get(entryKey(runtime.identity, runtime.isolation ?? 'directory-shared'))
           ?.runtime === runtime &&
         !runtime.signal.aborted
+      );
+    },
+    feedRecovering(directory) {
+      const entry = entries.get(directory);
+      return (
+        entry !== undefined &&
+        !entry.abort.signal.aborted &&
+        entry.runtime !== undefined &&
+        entry.feed?.isRecovering() === true
       );
     },
     recordRootPublicationDiagnostic,

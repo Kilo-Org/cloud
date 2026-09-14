@@ -257,7 +257,7 @@ describe('control terminal PTY ownership', () => {
     );
   });
 
-  it('names unavailable, replaced, and conflicting terminal attachment runtimes', () => {
+  it('names unavailable and conflicting terminal attachment runtimes', () => {
     const unavailable = createControlTerminalRuntime({
       controlUrl: 'ws://127.0.0.1:1/sandbox-control/unavailable',
       wrapperInstanceId,
@@ -269,34 +269,211 @@ describe('control terminal PTY ownership', () => {
       'Terminal session runtime unavailable'
     );
 
-    const initial: WorktreeKiloRuntime = {
+    const conflicting = createRuntime(fakeKilo());
+    attach(conflicting, firstSession);
+
+    rememberAttachedRoot('kilo_other', firstSession.directory);
+    expect(() =>
+      conflicting.rememberAttachedSession({ ...firstSession, kiloSessionId: 'kilo_other' })
+    ).toThrow('Terminal session belongs to another session');
+    expect(() =>
+      conflicting.rememberAttachedSession({ ...firstSession, directory: '/workspace/other' })
+    ).toThrow('Terminal session belongs to another session');
+    expect(() => attach(conflicting, { ...firstSession, sessionId: 'workspace_other' })).toThrow(
+      'Terminal session belongs to another session'
+    );
+  });
+
+  it('reattaches the same session to a replacement runtime and uses its client', async () => {
+    const staleCalls: string[] = [];
+    const currentCalls: string[] = [];
+    const staleRuntime: WorktreeKiloRuntime = {
       runtimeId: 'native_initial',
       scopeId: firstSession.directory,
       directory: firstSession.directory,
       env: {},
-      kiloClient: fakeKilo(),
       signal: new AbortController().signal,
+      kiloClient: fakeKilo({
+        createPty: async input => {
+          staleCalls.push('create');
+          return makePty(input.cwd, 'pty_stale');
+        },
+        resizePty: async (ptyId, _size, directory) => {
+          staleCalls.push('resize');
+          return makePty(directory ?? '', ptyId);
+        },
+        deletePty: async () => {
+          staleCalls.push('delete');
+          return true;
+        },
+      }),
     };
-    let current = initial;
-    const replaced = createControlTerminalRuntime({
+    const currentRuntime: WorktreeKiloRuntime = {
+      ...staleRuntime,
+      runtimeId: 'native_replacement',
+      kiloClient: fakeKilo({
+        createPty: async input => {
+          currentCalls.push('create');
+          return makePty(input.cwd, 'pty_current');
+        },
+        resizePty: async (ptyId, _size, directory) => {
+          currentCalls.push('resize');
+          return makePty(directory ?? '', ptyId);
+        },
+        deletePty: async () => {
+          currentCalls.push('delete');
+          return true;
+        },
+      }),
+    };
+    let current = staleRuntime;
+    const runtime = createControlTerminalRuntime({
       controlUrl: 'ws://127.0.0.1:1/sandbox-control/replaced',
       wrapperInstanceId,
       getKiloRuntime: () => current,
     });
-    activeRuntimes.add(replaced);
+    activeRuntimes.add(runtime);
     rememberAttachedRoot(firstSession.kiloSessionId, firstSession.directory);
-    replaced.rememberAttachedSession(firstSession);
-    current = { ...initial, runtimeId: 'native_replacement' };
-    expect(() => replaced.rememberAttachedSession(firstSession)).toThrow(
-      'Terminal session runtime was replaced'
-    );
+    runtime.rememberAttachedSession(firstSession);
 
-    const otherSession = { ...firstSession, sessionId: 'workspace_other' };
-    const conflicting = createRuntime(fakeKilo());
-    attach(conflicting, firstSession);
-    expect(() => attach(conflicting, otherSession)).toThrow(
-      'Terminal session belongs to another session'
+    // A PTY that already exists when the native runtime is swapped.
+    expect(await runtime.create(firstSession, creationPayload())).toEqual({
+      pty: makePty(firstSession.directory, 'pty_stale'),
+    });
+    expect(staleCalls).toEqual(['create']);
+
+    current = currentRuntime;
+    expect(() => runtime.rememberAttachedSession(firstSession)).not.toThrow();
+
+    // New work and every operation on the pre-existing PTY use the replacement.
+    expect(await runtime.create(firstSession, creationPayload(secondOperationId))).toEqual({
+      pty: makePty(firstSession.directory, 'pty_current'),
+    });
+    await runtime.resize(firstSession, { ptyId: 'pty_stale', cols: 100, rows: 30 });
+    expect(await runtime.close(firstSession, { ptyId: 'pty_stale' })).toEqual({ success: true });
+
+    expect(staleCalls).toEqual(['create']);
+    expect(currentCalls).toEqual(['create', 'resize', 'delete']);
+  });
+
+  it('does not cancel a pending PTY creation when the same session re-attaches', async () => {
+    const release = Promise.withResolvers<void>();
+    const runtime = createRuntime(
+      fakeKilo({
+        createPty: async input => {
+          await release.promise;
+          return makePty(input.cwd);
+        },
+      })
     );
+    attach(runtime, firstSession);
+
+    const creation = runtime.create(firstSession, creationPayload());
+    await Promise.resolve();
+    runtime.rememberAttachedSession(firstSession);
+    release.resolve();
+
+    expect(await creation).toEqual({ pty: makePty(firstSession.directory) });
+  });
+
+  it('returns a retryable not_ready when the runtime is missing at use time', async () => {
+    const worktrees = new Map<string, WorktreeKiloRuntime>();
+    worktrees.set(firstSession.directory, {
+      runtimeId: 'native_initial',
+      scopeId: firstSession.directory,
+      directory: firstSession.directory,
+      env: {},
+      signal: new AbortController().signal,
+      kiloClient: fakeKilo(),
+    });
+    const runtime = createControlTerminalRuntime({
+      controlUrl: 'ws://127.0.0.1:1/sandbox-control/missing',
+      wrapperInstanceId,
+      getKiloRuntime: directory => worktrees.get(directory),
+    });
+    activeRuntimes.add(runtime);
+    attach(runtime, firstSession);
+    const created = await runtime.create(firstSession, creationPayload());
+    expect(created).toEqual({ pty: makePty(firstSession.directory) });
+
+    worktrees.delete(firstSession.directory);
+    expect(
+      await terminalFailure(runtime.resize(firstSession, { ptyId: created.pty.id, cols: 100, rows: 30 }))
+    ).toMatchObject({ code: 'not_ready', message: 'Kilo worktree is not available', retryable: true });
+    expect(
+      await terminalFailure(runtime.close(firstSession, { ptyId: created.pty.id }))
+    ).toMatchObject({ code: 'not_ready', message: 'Kilo worktree is not available', retryable: true });
+  });
+
+  it('uses the retained runtime for detach cleanup while the current lookup is starting', async () => {
+    const deleted: string[] = [];
+    const liveRuntime: WorktreeKiloRuntime = {
+      runtimeId: 'native_initial',
+      scopeId: firstSession.directory,
+      directory: firstSession.directory,
+      env: {},
+      signal: new AbortController().signal,
+      kiloClient: fakeKilo({
+        deletePty: async ptyId => {
+          deleted.push(ptyId);
+          return true;
+        },
+      }),
+    };
+    let starting = false;
+    const runtime = createControlTerminalRuntime({
+      controlUrl: 'ws://127.0.0.1:1/sandbox-control/starting',
+      wrapperInstanceId,
+      getKiloRuntime: () => (starting ? undefined : liveRuntime),
+      getRetainedKiloRuntime: () => liveRuntime,
+    });
+    activeRuntimes.add(runtime);
+    attach(runtime, firstSession);
+    const created = await runtime.create(firstSession, creationPayload());
+
+    // The runtime is still alive, but a credential-refresh probe hides it from
+    // the current lookup.
+    starting = true;
+    expect(
+      await terminalFailure(runtime.resize(firstSession, { ptyId: created.pty.id, cols: 100, rows: 30 }))
+    ).toMatchObject({ code: 'not_ready', message: 'Kilo worktree is not available', retryable: true });
+    await runtime.detachSession(firstSession);
+    expect(deleted).toEqual([created.pty.id]);
+  });
+
+  it('detaches with best-effort cleanup when the worktree is truly retired', async () => {
+    let deleted = 0;
+    let retained: WorktreeKiloRuntime | undefined = {
+      runtimeId: 'native_initial',
+      scopeId: firstSession.directory,
+      directory: firstSession.directory,
+      env: {},
+      signal: new AbortController().signal,
+      kiloClient: fakeKilo({
+        deletePty: async () => {
+          deleted += 1;
+          return true;
+        },
+      }),
+    };
+    const runtime = createControlTerminalRuntime({
+      controlUrl: 'ws://127.0.0.1:1/sandbox-control/retired',
+      wrapperInstanceId,
+      getKiloRuntime: () => retained,
+      getRetainedKiloRuntime: () => retained,
+    });
+    activeRuntimes.add(runtime);
+    attach(runtime, firstSession);
+    await runtime.create(firstSession, creationPayload());
+
+    // Both lookups are empty: the server is genuinely retired, nothing to delete.
+    retained = undefined;
+    await runtime.detachSession(firstSession);
+    expect(deleted).toBe(0);
+    expect(await terminalFailure(runtime.create(firstSession, creationPayload()))).toMatchObject({
+      code: 'not_ready',
+      message: 'Terminal session is not attached',
+    });
   });
 
   it('creates an idempotent directory-scoped PTY with its worktree environment', async () => {

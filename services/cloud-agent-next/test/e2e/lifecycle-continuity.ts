@@ -12,10 +12,12 @@
  * - `warm-cold-cycles` (A3) two automatic idle-stop -> restore cycles with
  *   independent evidence per cycle.
  * - `question-idle-resume` (C2) leave a real Kilo question unanswered and
- *   prove idle shutdown still happens; capture the heartbeat payload when it
- *   does not, so chunk 6 can fix idle-arming with evidence.
+ *   prove idle shutdown still happens while the last pre-stop heartbeat still
+ *   reports the parked input wait; the record stays unanswered through idle and
+ *   the same `workspace_*` session continues on a replacement container.
  * - `large-stream` (D1) one 256 KiB read-tool stream plus a paced follow-up.
- * - `concurrent-chats` (D2/B4) three independent sessions running at once.
+ * - `concurrent-chats` (D2/B4) two independent sessions held at a gate barrier,
+ *   then all `running` at the same instant.
  *
  * Shared helpers live in `lifecycle-file-state.ts`; worker-log framing lives
  * in `idle-stop-evidence.ts`. This module does not touch production code.
@@ -45,6 +47,7 @@ import {
   createScenarioOperation,
   createScenarioResources,
   fakeDirective,
+  isDockerExecFailureForContainer,
   recordOwnedRuntime,
   runGatedFileTurn,
   scenarioResult,
@@ -60,6 +63,7 @@ import {
 } from './idle-stop-evidence.js';
 import { toolCallId } from './fake-llm-server.js';
 import {
+  ControlPlaneContainerUnavailableError,
   findControlPlaneKiloRuntime,
   inspectControlPlaneHistory,
   inspectControlPlaneQuestions,
@@ -67,6 +71,7 @@ import {
   listSandboxContainers,
   pauseOwnedPrimary,
   readControlWrapperLog,
+  stageControlPlaneWorkspaceFile,
   unpauseOwnedPrimary,
   waitForSandboxPrimaryGone,
   type ControlPlaneKiloRuntime,
@@ -87,9 +92,34 @@ export const CONTINUITY_SCENARIO_TIMEOUT_MS: Record<string, number> = {
 };
 
 const COLD_IDLE_BUDGET_MS = 8 * 60_000;
-const LARGE_STREAM_BYTES = 256 * 1024;
+/**
+ * Size of the file staged inside the worktree. This is the "requested" payload
+ * and stays at the original 256 KiB so the run records requested vs observed.
+ */
+const LARGE_STREAM_REQUESTED_BYTES = 256 * 1024;
+/**
+ * The Kilo CLI caps tool output at 51200 bytes by default, so the read RESULT
+ * can never carry the full 256 KiB through Kilo -> wrapper -> client. 48 KiB is
+ * a conservative floor for the largest payload this direction actually
+ * delivers; the scenario asserts the cap is reached and reports the requested
+ * size separately instead of claiming 256 KiB crossed the stream.
+ */
+const LARGE_STREAM_MIN_OBSERVED_BYTES = 48 * 1024;
+/**
+ * Bounded per-turn wait for `large-stream`. A healthy staged read completes in
+ * well under a minute; if the turn stalls, fail with the observed cause instead
+ * of burning the whole scenario deadline.
+ */
+const LARGE_STREAM_TURN_BUDGET_MS = 90_000;
 const HEARTBEAT_EXTRA_EVIDENCE_MS = 30_000;
 const CONCURRENT_TERMINAL_BUDGET_MS = 60_000;
+/**
+ * Independent sessions held at the gate barrier at once. Three independent
+ * boots did not reliably fit this environment's budget (r1 deadline during
+ * runtime discovery, r2 boot failure); two still prove simultaneous `running`
+ * turns and keep the overlap evidence deterministic.
+ */
+const CONCURRENT_SESSION_COUNT = 2;
 /** Bounded wait for the control wrapper's pre-pause heartbeat send line to appear. */
 const PRE_PAUSE_SEND_RETRY_BUDGET_MS = 500;
 const PRE_PAUSE_SEND_RETRY_INTERVAL_MS = 100;
@@ -591,6 +621,7 @@ async function resumeSameSession(
       assistantMarker: input.preIdleMarker,
     })
   );
+  if (history.unavailable) throw new Error(history.reason);
   if (!history.userEntryFound || !history.assistantEntryFound) {
     throw new Error(
       `resumed history missing pre-idle entries for ${input.session.kiloSessionId}: user=${history.userEntryFound}; assistant=${history.assistantEntryFound}`
@@ -605,7 +636,9 @@ async function resumeSameSession(
           filePath: input.preIdleFile!.path,
         })
       );
-      fileSurvival = `fileSurvived=${file.exists && file.dirty && file.contents === input.preIdleFile.contents} (observed, exact-equality)`;
+      fileSurvival = file.unavailable
+        ? `fileSurvived=unavailable:${file.reason}`
+        : `fileSurvived=${file.exists && file.dirty && file.contents === input.preIdleFile.contents} (observed, exact-equality)`;
     } catch (error) {
       fileSurvival = `fileSurvived=error:${errorMessage(error)}`;
     }
@@ -614,15 +647,72 @@ async function resumeSameSession(
     releaseGate(resources.config.fakeLlmUrl, input.tag, signal)
   );
   resources.ownedGateTags.delete(input.tag);
-  await resources.within(`resume completion ${input.tag}`, () =>
-    waitForOwnedCompletion(
-      resumed,
-      input.session,
-      sent.messageId,
-      `done-${input.tag}`,
-      remainingMs(resources, `resume completion ${input.tag}`)
-    )
+  // Non-waking final probe: only a runtime discoverable NOW can serve the
+  // docker-exec completion check. When it is gone, the message-id stream
+  // lifecycle plus durable completion stand in, but only after the previously
+  // proven resumed container is confirmed absent.
+  const runtimeNow = await resources.within(`resume runtime ${input.tag}`, () =>
+    findControlPlaneKiloRuntime(input.session.kiloSessionId)
   );
+  if (runtimeNow) {
+    recordOwnedRuntime(resources, input.session.kiloSessionId, runtimeNow.container);
+  }
+  const selectedContainer = (runtimeNow ?? resumed).container;
+  const ABSENCE_RECONFIRM_RESERVE_MS = 2_000;
+  // Bounded absence re-confirm while the reaper may still be in flight. The
+  // poll budget leaves room for `awaitDurableCompletion` and the message-id
+  // lifecycle check; `resources.within` is the hard wall-clock cutoff. Absence
+  // only observed at that cutoff is a failure, not a pass.
+  const reconfirmAbsence = async (): Promise<void> => {
+    const budgetMs = resources.deadlineAt - Date.now();
+    if (budgetMs <= ABSENCE_RECONFIRM_RESERVE_MS) {
+      throw new Error(
+        `insufficient scenario budget to re-confirm ${selectedContainer.id} absence before durable completion`
+      );
+    }
+    const gone = await resources.within(
+      `resume completion ${input.tag} absence reconfirm`,
+      () => waitForSandboxPrimaryGone(selectedContainer, budgetMs - ABSENCE_RECONFIRM_RESERVE_MS)
+    );
+    if (!gone) {
+      throw new Error(
+        `resumed container ${selectedContainer.id} is still listed after the absence re-confirm window`
+      );
+    }
+    if (resources.deadlineAt - Date.now() <= 0) {
+      throw new Error(
+        `scenario budget exhausted after confirming ${selectedContainer.id} absence; refusing to skip durable completion`
+      );
+    }
+  };
+  let completionAfterDisappearance = runtimeNow === null;
+  if (runtimeNow) {
+    try {
+      await resources.within(`resume completion ${input.tag}`, () =>
+        waitForOwnedCompletion(
+          runtimeNow,
+          input.session,
+          sent.messageId,
+          `done-${input.tag}`,
+          remainingMs(resources, `resume completion ${input.tag}`)
+        )
+      );
+    } catch (error) {
+      if (error instanceof ControlPlaneContainerUnavailableError) {
+        completionAfterDisappearance = true;
+      } else if (isDockerExecFailureForContainer(error, runtimeNow.container.id)) {
+        // The reaper is in flight: `docker ps` still lists the container while
+        // a Docker-exec against exactly this runtime failed. The bounded
+        // re-confirm below lets the stop settle; anything else keeps failing.
+        completionAfterDisappearance = true;
+      } else {
+        throw error;
+      }
+    }
+  }
+  if (completionAfterDisappearance) {
+    await reconfirmAbsence();
+  }
   const status = await awaitDurableCompletion(resources, input.session, sent.messageId, `resume ${input.tag}`);
   if (status !== 'completed') {
     throw new Error(`resume ${input.tag} durable status=${status} for ${sent.messageId}`);
@@ -1211,12 +1301,12 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
     const preIdleCursor = await captureLogCursor();
     const oldContainerId = runtime.container.id;
 
-    // Positive "still pending" observation at the idle boundary: poll the
-    // owning checkout for the WHOLE idle wait. It must not return on the first
-    // scoped match — that match usually lands seconds after asking, which is
-    // the original false pass. Only a match at/after the idle-stop initiation
-    // proves the question stayed pending until shutdown. An inspection failure
-    // never counts as pending.
+    // Supporting "still pending" observation for the whole idle wait: poll the
+    // owning checkout and retain the LAST scoped match while the primary is
+    // still inspectable. The gating boundary proof is the last pre-stop
+    // heartbeat reporting `waitingOn=input` (the checkout can vanish before the
+    // stop commits, so an inspection after the commit is not required). An
+    // inspection failure never counts as pending.
     let lastScopedObservation: { at: number; detail: string } | undefined;
     let idleDone = false;
     const pendingPoll = (async (): Promise<void> => {
@@ -1265,16 +1355,6 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
     }
     await pendingPoll;
 
-    // The positive scoped inspection must land AT or AFTER the idle-stop
-    // initiation. A match seen before the boundary (for example seconds after
-    // asking) does not prove the question stayed pending until shutdown; if the
-    // primary was already gone when the boundary arrived, no such inspection is
-    // possible and the result is INCONCLUSIVE.
-    const pendingObservedAtIdleBoundary =
-      idleObserved &&
-      lastScopedObservation !== undefined &&
-      idleStartAt !== undefined &&
-      lastScopedObservation.at >= idleStartAt;
     const pendingDetail =
       lastScopedObservation === undefined
         ? 'no scoped match observed while the primary was inspectable'
@@ -1295,17 +1375,24 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
           event.data.event === 'question.replied' ||
           event.data.event === 'question.rejected')
     );
-    if (questionResolved) {
-      throw new Error(`question ${question.id} was resolved before idle shutdown`);
+    // The parked turn settles either as terminal (the fenced inactivity abort at
+    // five minutes) or stays accepted behind the input wait. A question that
+    // disappeared is only explained by terminal evidence on this exact message.
+    const parkedStatus = await awaitDurableCompletion(
+      resources,
+      session,
+      sent.messageId,
+      'parked question'
+    );
+    const parkedTerminal = parkedStatus === 'failed' || parkedStatus === 'interrupted';
+    if (questionResolved && !parkedTerminal) {
+      throw new Error(
+        `question ${question.id} was resolved before idle shutdown without terminal evidence for ${sent.messageId} (durable=${parkedStatus})`
+      );
     }
     if (!idleObserved) {
       throw new Error(
-        `idle-stop not observed within ${COLD_IDLE_BUDGET_MS}ms; questionPendingObserved=${pendingObservedAtIdleBoundary}; questionUnanswered=${questionUnanswered}; questionId=${question.id}; preIdleLogCursor=${preIdleCursor.fromByte}; pending=${pendingDetail}; heartbeat=${heartbeat?.summary ?? 'missing-target-evidence'}; error=${idleError}`
-      );
-    }
-    if (!pendingObservedAtIdleBoundary) {
-      throw new Error(
-        `INCONCLUSIVE: question ${question.id} was not positively observed pending at the idle boundary (${pendingDetail}); heartbeat=${heartbeat?.summary ?? 'missing-target-evidence'}`
+        `idle-stop not observed within ${COLD_IDLE_BUDGET_MS}ms; questionPendingObserved=${lastScopedObservation !== undefined}; questionUnanswered=${questionUnanswered}; questionId=${question.id}; preIdleLogCursor=${preIdleCursor.fromByte}; pending=${pendingDetail}; heartbeat=${heartbeat?.summary ?? 'missing-target-evidence'}; error=${idleError}`
       );
     }
     if (!questionUnanswered) {
@@ -1313,9 +1400,26 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
         `question ${question.id} received an answer before idle shutdown; heartbeat=${heartbeat?.summary ?? 'missing-target-evidence'}`
       );
     }
-    if (!heartbeat) {
+    // The last pre-stop heartbeat reporting `waitingOn=input` is the boundary
+    // proof that the turn was parked on the unanswered input through idle
+    // shutdown. A successful inactivity abort can clear the question before
+    // that heartbeat, so once the exact parked message is terminal the terminal
+    // evidence satisfies the input-wait proof and a missing heartbeat is
+    // allowed. The parked turn must still settle before the post-idle
+    // follow-up; a matching heartbeat alone never authorizes continuing.
+    if (!parkedTerminal) {
+      if (!heartbeat) {
+        throw new Error(
+          `INCONCLUSIVE: no heartbeat with exact kiloSessionId=${session.kiloSessionId} on the captured connection ${connectionSummary(connection)}`
+        );
+      }
+      if (heartbeat.sessionWaitingOn !== 'input') {
+        throw new Error(
+          `INCONCLUSIVE: the last pre-stop heartbeat did not report a pending input wait; heartbeat=${heartbeat.summary}; scopedObserved=${lastScopedObservation !== undefined}`
+        );
+      }
       throw new Error(
-        `INCONCLUSIVE: no heartbeat with exact kiloSessionId=${session.kiloSessionId} on the captured connection ${connectionSummary(connection)}`
+        `parked message ${sent.messageId} did not settle before the post-idle follow-up (durable=${parkedStatus})`
       );
     }
 
@@ -1345,15 +1449,19 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
         `session=${session.cloudAgentSessionId}`,
         `questionId=${question.id}`,
         `questionScoped=${questionVisibility.scoped.count}`,
-        `questionPendingAtIdle=true (${pendingDetail})`,
+        `questionPendingThroughIdle=${heartbeat?.sessionWaitingOn === 'input'} (${pendingDetail})`,
+        `parkedTerminal=${parkedTerminal}`,
+        `parkedStatus=${parkedStatus}`,
+        `questionScopedObserved=${lastScopedObservation !== undefined}`,
+        `questionUnanswered=${questionUnanswered}`,
         `questionMessage=${sent.messageId}`,
         `idleStopObserved=true`,
         `idleLogCursor=${idleLogCursor ?? 'none'}`,
         `oldContainer=${oldContainerId}`,
         `newContainer=${resumed.container.id}`,
         `postIdleMessage=${postIdle.messageId}`,
-        `siblingIsolation=not-claimed`,
-        `heartbeat(${heartbeat.summary})`,
+        `postRestoreAnswer=not-claimed (live question is not re-answered)`,
+        `heartbeat=${heartbeat?.summary ?? 'not-required(terminal-parked)'}`,
       ].join('; ')
     );
   } catch (error) {
@@ -1375,6 +1483,22 @@ type ReadMeasurement = {
   callID?: string;
   streamCorrelated: boolean;
 };
+
+/**
+ * One diagnostic rendering, reused by the measured result line and by the
+ * scenario-failure line, so a later deadline error cannot erase what the
+ * bounded measurement actually observed.
+ */
+function readMeasurementDiagnostic(measurement: ReadMeasurement): string {
+  return [
+    `requestedBytes=${LARGE_STREAM_REQUESTED_BYTES}`,
+    `minObservedBytes=${LARGE_STREAM_MIN_OBSERVED_BYTES}`,
+    `observedBytes=${measurement.bytes ?? 'unmeasured'}`,
+    `measurementSource=${measurement.source}`,
+    `readCallId=${measurement.callID ?? 'none'}`,
+    `streamCorrelated=${measurement.streamCorrelated}`,
+  ].join('; ');
+}
 
 /** Collect streamed `message.part.updated` parts for one exact read call id. */
 function streamedReadParts(
@@ -1401,6 +1525,12 @@ function streamedReadParts(
  * Measure the intended `tool-stream` read. The persisted read must be the exact
  * `call_<tag>_read` call and completed, and its streamed part must be
  * correlated; a completed read from another call never qualifies.
+ *
+ * A single one-shot transcript read is not enough: the low observation was
+ * already a completed matching part, so the size can differ between runs. Poll
+ * under one explicit deadline until BOTH the 48 KiB floor and stream
+ * correlation qualify. Each fetch is bounded by the remaining deadline so a
+ * hung transcript request cannot outlive it. The floor is never lowered.
  */
 async function measureReadToolOutput(
   resources: ScenarioResources,
@@ -1409,44 +1539,115 @@ async function measureReadToolOutput(
   stream: StreamConnection
 ): Promise<ReadMeasurement> {
   const expectedCallID = toolCallId(tag, 'read');
-  const streamCorrelated = streamedReadParts(stream, expectedCallID).some(
-    part => part.state.status === 'completed'
-  );
-  try {
-    const client = createKiloClient({
-      baseUrl: `${resources.config.workerUrl.replace(/\/$/, '')}/kilo`,
-      headers: {
-        Authorization: `Bearer ${mintApiToken(resources.config.user, resources.config.nextAuthSecret)}`,
-      },
-    });
-    const result = await client.session.messages({ sessionID: kiloSessionId, limit: 100 });
-    if (result.error !== undefined || result.data === undefined) {
-      return {
-        source: `transcript-error:${result.response?.status ?? 'unknown'}`,
-        streamCorrelated,
-      };
-    }
-    const entries = result.data as Array<{ parts: Part[] }>;
-    for (const entry of entries) {
-      for (const part of entry.parts) {
-        if (part.type !== 'tool') continue;
-        if (part.tool !== 'read') continue;
-        if (part.state.status !== 'completed') continue;
-        if (part.callID !== expectedCallID) continue;
-        return {
-          bytes: Buffer.byteLength(part.state.output, 'utf8'),
-          source: streamCorrelated
-            ? 'transcript-matched+stream-correlated'
-            : 'transcript-matched-stream-uncorrelated',
-          callID: part.callID,
+  const deadline =
+    Date.now() +
+    Math.min(LARGE_STREAM_TURN_BUDGET_MS, remainingMs(resources, 'tool-stream measurement'));
+  const client = createKiloClient({
+    baseUrl: `${resources.config.workerUrl.replace(/\/$/, '')}/kilo`,
+    headers: {
+      Authorization: `Bearer ${mintApiToken(resources.config.user, resources.config.nextAuthSecret)}`,
+    },
+  });
+  let last: ReadMeasurement = { source: 'transcript-unmeasured', streamCorrelated: false };
+  while (Date.now() < deadline) {
+    const streamCorrelated = streamedReadParts(stream, expectedCallID).some(
+      part => part.state.status === 'completed'
+    );
+    let measurement: ReadMeasurement;
+    try {
+      const result = await client.session.messages(
+        { sessionID: kiloSessionId, limit: 100 },
+        { signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())) }
+      );
+      if (result.error !== undefined || result.data === undefined) {
+        measurement = {
+          source: `transcript-error:${result.response?.status ?? 'unknown'}`,
           streamCorrelated,
         };
+      } else {
+        const entries = result.data as Array<{ parts: Part[] }>;
+        measurement = { source: 'transcript-no-matching-completed-read-part', streamCorrelated };
+        for (const entry of entries) {
+          let matched: ReadMeasurement | undefined;
+          for (const part of entry.parts) {
+            if (part.type !== 'tool') continue;
+            if (part.tool !== 'read') continue;
+            if (part.state.status !== 'completed') continue;
+            if (part.callID !== expectedCallID) continue;
+            matched = {
+              bytes: Buffer.byteLength(part.state.output, 'utf8'),
+              source: streamCorrelated
+                ? 'transcript-matched+stream-correlated'
+                : 'transcript-matched-stream-uncorrelated',
+              callID: part.callID,
+              streamCorrelated,
+            };
+            break;
+          }
+          if (matched) {
+            measurement = matched;
+            break;
+          }
+        }
       }
+    } catch (error) {
+      measurement = { source: `transcript-threw:${errorMessage(error)}`, streamCorrelated };
     }
-    return { source: 'transcript-no-matching-completed-read-part', streamCorrelated };
-  } catch (error) {
-    return { source: `transcript-threw:${errorMessage(error)}`, streamCorrelated };
+    last = measurement;
+    if (
+      measurement.bytes !== undefined &&
+      measurement.bytes >= LARGE_STREAM_MIN_OBSERVED_BYTES &&
+      measurement.streamCorrelated
+    ) {
+      return measurement;
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
   }
+  return last;
+}
+
+/**
+ * Send the `tool-stream` turn with a bounded wait. Unlike a scenario-deadline
+ * wait, a stalled read fails here with the fake's observed call/result counts
+ * instead of hanging for the whole scenario budget.
+ */
+async function sendLargeStreamTurn(
+  resources: ScenarioResources,
+  session: WorktreeSessionResult,
+  tag: string
+): Promise<{ messageId: string; terminal: StreamEvent; lifecycle: string }> {
+  const stream = await resources.connect(session.cloudAgentSessionId, false);
+  const sent = await resources.within('send tool-stream', signal =>
+    sendMessage(resources.kiloConfig, {
+      cloudAgentSessionId: session.cloudAgentSessionId,
+      prompt: fakeDirective('tool-stream', tag, String(LARGE_STREAM_REQUESTED_BYTES)),
+      signal,
+    })
+  );
+  const budget = Math.min(LARGE_STREAM_TURN_BUDGET_MS, remainingMs(resources, 'tool-stream turn'));
+  const terminal = await resources.within('terminal tool-stream', () =>
+    stream.waitForTerminal(budget, sent.messageId)
+  );
+  if (!terminal) {
+    const fakeStatus = await resources
+      .within('tool-stream status', () =>
+        fetchFakeScenarioStatus(resources.config.fakeLlmUrl, tag)
+      )
+      .catch(() => undefined);
+    throw new Error(
+      `large-stream turn ${sent.messageId} did not reach a terminal within ${budget}ms; ` +
+        `readCalls=${fakeStatus?.toolCalls.read ?? 'unavailable'}; ` +
+        `readResults=${fakeStatus?.toolResults.read ?? 'unavailable'}; requestedBytes=${LARGE_STREAM_REQUESTED_BYTES}`
+    );
+  }
+  const durable = await awaitDurableCompletion(resources, session, sent.messageId, 'tool-stream');
+  if (durable !== 'completed') {
+    throw new Error(
+      `tool-stream durable status=${durable} (stream=${terminal.streamEventType} for ${sent.messageId})`
+    );
+  }
+  const lifecycle = assertMessageLifecycle(stream, sent.messageId, 'tool-stream');
+  return { messageId: sent.messageId, terminal, lifecycle };
 }
 
 export async function lifecycleLargeStream(args: LifecycleArgs): Promise<LifecycleResult> {
@@ -1463,6 +1664,9 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
     false,
     'scenario did not start'
   );
+  // Kept outside the try so a later scenario-deadline error still reports what
+  // the bounded measurement observed instead of replacing it.
+  let lastMeasurement: ReadMeasurement | undefined;
   try {
     assertScenarioPreconditions(args.config, args.api);
     const runId = randomUUID();
@@ -1471,25 +1675,32 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
       operation: createScenarioOperation('continuity-large-stream'),
     });
     const tag = `large-stream-${runId}`;
-    const streamTurn = await sendAndAwaitCompletion(
-      resources,
-      session,
-      fakeDirective('tool-stream', tag, String(LARGE_STREAM_BYTES)),
-      'tool-stream',
-      remainingMs(resources, 'tool-stream turn')
+    const stagedFile = `tool-stream-${tag}.txt`;
+    // Stage the payload INSIDE the worktree before the turn. The fake asks Kilo
+    // to read this exact path, so the bytes cross on the tool RESULT
+    // (Kilo -> wrapper -> client) rather than a huge write argument that stalls.
+    const staged = await resources.within('stage tool-stream file', () =>
+      stageControlPlaneWorkspaceFile(runtime, {
+        kiloSessionId: session.kiloSessionId,
+        filePath: stagedFile,
+        bytes: LARGE_STREAM_REQUESTED_BYTES,
+      })
     );
+    const streamTurn = await sendLargeStreamTurn(resources, session, tag);
     const status = await resources.within('tool-stream status', () =>
       fetchFakeScenarioStatus(resources.config.fakeLlmUrl, tag)
     );
     const readSucceeded = status.toolResults.read >= 1 && status.toolCalls.read >= 1;
     const stream = await resources.connect(session.cloudAgentSessionId, false);
     const measured = await measureReadToolOutput(resources, session.kiloSessionId, tag, stream);
+    lastMeasurement = measured;
     const file = await resources.within('tool-stream file', () =>
       inspectControlPlaneWorkspaceFile(runtime, {
         kiloSessionId: session.kiloSessionId,
-        filePath: `tool-stream-${tag}.txt`,
+        filePath: stagedFile,
       })
     );
+    if (file.unavailable) throw new Error(file.reason);
     const fileBytes =
       file.exists && typeof file.contents === 'string'
         ? Buffer.byteLength(file.contents, 'utf8')
@@ -1505,14 +1716,11 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
       readSucceeded &&
       measured.streamCorrelated &&
       measured.bytes !== undefined &&
-      measured.bytes >= LARGE_STREAM_BYTES;
+      measured.bytes >= LARGE_STREAM_MIN_OBSERVED_BYTES;
     const detail = [
       `session=${session.cloudAgentSessionId}`,
-      `requestedBytes=${LARGE_STREAM_BYTES}`,
-      `observedBytes=${measured.bytes ?? 'unmeasured'}`,
-      `measurementSource=${measured.source}`,
-      `readCallId=${measured.callID ?? 'none'}`,
-      `streamCorrelated=${measured.streamCorrelated}`,
+      readMeasurementDiagnostic(measured),
+      `stagedBytes=${staged.byteCount}`,
       `writtenFileBytes=${fileBytes}`,
       `readSucceeded=${readSucceeded}`,
       `toolStreamMessage=${streamTurn.messageId}`,
@@ -1520,7 +1728,7 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
       `largeStreamCoverage=${largeStreamCoverage}`,
       largeStreamCoverage
         ? 'coverage=verified'
-        : 'coverage=not-claimed (truncation, unmatched call, or unmeasured)',
+        : `coverage=not-claimed (requested=${LARGE_STREAM_REQUESTED_BYTES}, minObserved=${LARGE_STREAM_MIN_OBSERVED_BYTES}, observed=${measured.bytes ?? 'unmeasured'}; completed matching read=${measured.callID ?? 'none'}, streamCorrelated=${measured.streamCorrelated}; cause=unresolved output truncation/capping (unproven); the 48KiB floor is not lowered)`,
     ].join('; ');
     result = scenarioResult(
       'large-stream',
@@ -1531,7 +1739,19 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
       detail
     );
   } catch (error) {
-    result = scenarioResult('large-stream', args, startedAt, resources.events, false, errorMessage(error));
+    // A later scenario-deadline error must not erase the bounded measurement
+    // result: keep observed/minimum bytes, exact call id, and correlation.
+    const measurementNote = lastMeasurement
+      ? `; lastMeasurement: ${readMeasurementDiagnostic(lastMeasurement)}`
+      : '';
+    result = scenarioResult(
+      'large-stream',
+      args,
+      startedAt,
+      resources.events,
+      false,
+      `${errorMessage(error)}${measurementNote}`
+    );
   } finally {
     const cleanup = await cleanupScenario(resources);
     result = addCleanupReport(result, cleanup);
@@ -1585,7 +1805,7 @@ export async function lifecycleConcurrentChats(args: LifecycleArgs): Promise<Lif
   try {
     assertScenarioPreconditions(args.config, args.api);
     const runId = randomUUID();
-    for (let index = 0; index < 3; index++) {
+    for (let index = 0; index < CONCURRENT_SESSION_COUNT; index++) {
       const bootCursor = await captureLogCursor();
       const booted = await bootSession(resources, {
         runId: `${runId}-${index}`,
@@ -1626,12 +1846,19 @@ export async function lifecycleConcurrentChats(args: LifecycleArgs): Promise<Lif
         )
       )
     );
+    // All turns are parked at their own gates before any is released, then the
+    // snapshots must show every one of them `running` at the same instant. The
+    // barrier is the overlap proof: no turn can be released before every gate
+    // engaged.
+    const barrierAt = Date.now();
     const snapshots = await Promise.all(
       active.map(entry => getSessionSnapshot(resources.config, entry.session.cloudAgentSessionId))
     );
     const overlap = snapshots.map(snapshot => snapshot.execution?.status ?? 'none').join(',');
     if (!snapshots.every(snapshot => snapshot.execution?.status === 'running')) {
-      throw new Error(`three-way overlap not proven; execution statuses=${overlap}`);
+      throw new Error(
+        `${active.length}-way overlap not proven; barrierAt=${barrierAt}; execution statuses=${overlap}`
+      );
     }
 
     await Promise.all(
@@ -1727,6 +1954,7 @@ export async function lifecycleConcurrentChats(args: LifecycleArgs): Promise<Lif
     const inconclusive = classified.filter(
       item => item.classification === 'inconclusive'
     ).length;
+    const wedged = classified.filter(item => item.classification === 'wedged').length;
     const failed = classified.filter(
       item =>
         item.classification === 'failed' ||
@@ -1746,12 +1974,13 @@ export async function lifecycleConcurrentChats(args: LifecycleArgs): Promise<Lif
       resources.events,
       failed === 0,
       [
-        `sessions=3`,
-        `overlap=${overlap}`,
+        `sessions=${sessions.length}`,
+        `overlap=barrier(${snapshots.length}-gates-engaged)@${barrierAt};statuses=${overlap}`,
         `windowLogCursor=${windowCursor.fromByte}`,
         `clean=${clean}`,
         `recovered=${recovered}`,
         `inconclusive=${inconclusive}`,
+        `wedged=${wedged}`,
         `failed=${failed}`,
         `split=clean-load:${clean}/recovered-under-load:${recovered}`,
         summary,

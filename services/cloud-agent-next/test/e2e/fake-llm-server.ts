@@ -638,10 +638,12 @@ export const MAX_REALISTIC_CHARS = 4000;
 export const MAX_REALISTIC_PIECES = 512;
 
 /**
- * Upper bound for the `tool-stream:<tag>:<bytes>` request. The directive asks
- * Kilo to write exactly `bytes` of file content, so this caps the *request*,
- * not the emitted payload: a larger request is an invalid directive (HTTP 402)
- * rather than a silently smaller stream.
+ * Upper bound for the `tool-stream:<tag>:<bytes>` request. The harness stages a
+ * file of exactly `bytes` inside the worktree and the directive asks Kilo to
+ * read `tool-stream-<tag>.txt`; the bytes therefore cross the Kilo -> wrapper ->
+ * client direction as a tool RESULT. This caps the *request*, not the emitted
+ * payload: a larger request is an invalid directive (HTTP 402) rather than a
+ * silently smaller stream.
  */
 export const MAX_TOOL_STREAM_BYTES = 1024 * 1024;
 
@@ -1026,12 +1028,10 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     }
     const path = `tool-stream-${tag}.txt`;
     const results = toolResults(ctx.body, tag, ctx.state);
-    if (!results.some(result => result.id === toolCallId(tag, 'write'))) {
-      // Ask Kilo to write exactly the requested bytes, then read the file back.
-      runToolScenario(ctx, tag, 'write', { path, contents: 'x'.repeat(bytes) });
-      return;
-    }
     if (!results.some(result => result.id === toolCallId(tag, 'read'))) {
+      // The harness stages exactly `bytes` at this path before the turn; ask
+      // Kilo to read it so the payload crosses as a tool result. No huge tool
+      // argument is ever emitted.
       runToolScenario(ctx, tag, 'read', { path });
       return;
     }

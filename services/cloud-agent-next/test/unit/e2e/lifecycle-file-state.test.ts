@@ -6,8 +6,10 @@ import {
   cleanupScenario,
   createScenarioOperation,
   createScenarioResources,
+  isDockerExecFailureForContainer,
   type OperationRole,
 } from '../../e2e/lifecycle-file-state.js';
+import { ControlPlaneContainerUnavailableError } from '../../e2e/sandbox-control.js';
 import type { DriverConfig } from '../../e2e/client.js';
 
 const config: DriverConfig = {
@@ -64,5 +66,42 @@ describe('file-state scenario operation keys', () => {
   it('generates a distinct key for each call', () => {
     const keys = operationRoles.map(role => createScenarioOperation(role).operationKey);
     expect(new Set(keys).size).toBe(operationRoles.length);
+  });
+});
+
+describe('isDockerExecFailureForContainer', () => {
+  const selected = 'abc123def456';
+  const other = 'ffffffffffff';
+
+  it('matches the exact failed docker-exec command for the selected container', () => {
+    const error = new Error(`Command failed: docker exec ${selected} bun -e \nrun()`);
+
+    expect(isDockerExecFailureForContainer(error, selected)).toBe(true);
+  });
+
+  it('rejects a docker-exec command for a different container', () => {
+    const error = new Error(`Command failed: docker exec ${other} bun -e run()`);
+
+    expect(isDockerExecFailureForContainer(error, selected)).toBe(false);
+  });
+
+  it('rejects a different container command that embeds the selected id', () => {
+    const error = new Error(`Command failed: docker exec ${other} docker exec ${selected} nested`);
+
+    expect(isDockerExecFailureForContainer(error, selected)).toBe(false);
+  });
+
+  it('rejects a non-Docker assertion that merely mentions the command', () => {
+    const error = new Error(`assertion failed: unexpected docker exec ${selected} command`);
+
+    expect(isDockerExecFailureForContainer(error, selected)).toBe(false);
+  });
+
+  it('rejects the typed container-unavailable error', () => {
+    const error = new ControlPlaneContainerUnavailableError(
+      `Kilo completion could not reach ${selected}: the container is gone`
+    );
+
+    expect(isDockerExecFailureForContainer(error, selected)).toBe(false);
   });
 });

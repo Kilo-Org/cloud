@@ -1,10 +1,9 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts RN trees without a DOM. */
 import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { securityConfigFixture } from './security-config.test-fixture';
 import { onlineManager, QueryClient } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { createElement } from 'react';
-import { act, type default as TestRenderer } from 'react-test-renderer';
+import { act, type TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';

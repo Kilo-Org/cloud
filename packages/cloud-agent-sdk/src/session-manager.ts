@@ -20,6 +20,7 @@ import type {
   RemoteModelState,
 } from './remote-model-catalog';
 import type { RemoteCommandState } from './remote-command-catalog';
+import type { NormalizedEvent } from './normalizer';
 import { atom } from 'jotai';
 import type { Atom, WritableAtom } from 'jotai';
 import {
@@ -212,6 +213,25 @@ function computeCreateRemoteSessionInheritance(args: {
     input.orgId = args.organizationId;
   }
   return input;
+}
+
+/**
+ * The session id a chat event belongs to, or null for a service event. A live
+ * chat event for a child session is proof the child is producing output, which
+ * is what makes a stored "could not load" hydration failure stale.
+ */
+function chatEventSessionId(event: NormalizedEvent): string | null {
+  switch (event.type) {
+    case 'message.updated':
+      return event.info.sessionID;
+    case 'message.part.updated':
+      return event.part.sessionID;
+    case 'message.part.delta':
+    case 'message.part.removed':
+      return event.sessionId;
+    default:
+      return null;
+  }
 }
 
 type AssociatedPrData = {
@@ -1002,6 +1022,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   ): void {
     const next = new Map(store.get(childSessionHydrationStatesAtom));
     next.set(childSessionId, state);
+    store.set(childSessionHydrationStatesAtom, next);
+  }
+
+  /**
+   * Drop a stored first-page hydration failure for a child session once a live
+   * chat event for it arrives. The child is producing output, so "could not
+   * load subagent session" is no longer the truth and must not outlive the
+   * condition it reports. Only an `error` is cleared: a `ready` child has
+   * nothing to report, and an in-flight `loading` request owns its own outcome.
+   */
+  function clearStaleChildSessionHydrationError(childSessionId: string): void {
+    const states = store.get(childSessionHydrationStatesAtom);
+    if (states.get(childSessionId)?.status !== 'error') return;
+    const next = new Map(states);
+    next.delete(childSessionId);
     store.set(childSessionHydrationStatesAtom, next);
   }
 
@@ -1840,6 +1875,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onEvent: event => {
         if (expectedGeneration !== switchGeneration) return;
+        const eventSessionId = chatEventSessionId(event);
+        if (eventSessionId !== null) clearStaleChildSessionHydrationError(eventSessionId);
         if (event.type === 'worktree.changes.ready' || event.type === 'connected') {
           const cloudSessionId = store.get(sessionIdAtom);
           if (!cloudSessionId || event.cloudSessionId !== cloudSessionId) return;

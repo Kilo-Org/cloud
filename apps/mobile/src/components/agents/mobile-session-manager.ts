@@ -6,6 +6,7 @@ import {
   type FetchedSessionData,
   type JotaiStore,
   type KiloSessionId,
+  projectSessionGoal,
   type ResolvedSession,
   type SessionManager,
   type SessionSnapshot,
@@ -19,10 +20,13 @@ import {
 import { RequestDeadlineError } from '@kilocode/event-service';
 import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
 import { type AgentMode } from '@/components/agents/mode-normalize';
-import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
+import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
+import {
+  fetchCloudAgentStreamTicket,
+  StreamTicketResponseSchema,
+} from '@/lib/cloud-agent-stream-ticket';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import { trpcClient } from '@/lib/trpc';
-import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
@@ -33,8 +37,9 @@ import {
   writeSessionTranscriptPage,
 } from '@/lib/persist/session-transcript-cache';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
-import * as z from 'zod';
 import { i18n } from '@/i18n';
+
+export { StreamTicketResponseSchema };
 
 type SessionWithRuntimeState =
   inferRouterOutputs<MobileRouter>['cliSessionsV2']['getWithRuntimeState'];
@@ -82,18 +87,6 @@ const CLOUD_PREPARE_TRANSIENT_CODES = new Set([
 
 /** Stable message the ledger returns on a same-key in-flight duplicate (plan P1-A-08b). */
 const CLOUD_PREPARE_IN_PROGRESS_MESSAGE = 'creation_in_progress';
-
-/**
- * Wire contract for the cloud-agent stream-ticket endpoint. `expiresAt` is the
- * Unix-epoch number `signStreamTicket` returns. All fields are optional here;
- * the required-field check below rejects an otherwise-valid object missing
- * `ticket` or `expiresAt`.
- */
-export const StreamTicketResponseSchema = z.object({
-  ticket: z.string().optional(),
-  expiresAt: z.number().optional(),
-  error: z.string().optional(),
-});
 
 /**
  * True when a `prepareSession` failure may be retried with the SAME
@@ -272,33 +265,8 @@ export function createMobileAgentSessionManager({
       sessionId: CloudAgentSessionId
     ): Promise<{ ticket: string; expiresAt: number }> => {
       const result = await withCloudAgentDiagnostics('getTicket', organizationId, async () => {
-        const token = await getAuthTokenForRequest();
-        const body = {
-          cloudAgentSessionId: sessionId,
-          ...(organizationId ? { organizationId } : {}),
-        };
-        const response = await fetch(
-          `${API_BASE_URL}/api/cloud-agent-next/sessions/stream-ticket`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify(body),
-          }
-        );
-        const data = StreamTicketResponseSchema.parse(await response.json());
-        if (!response.ok) {
-          throw new Error(data.error ?? 'Failed to get stream ticket');
-        }
-        if (!data.ticket) {
-          throw new Error('Missing ticket in stream-ticket response');
-        }
-        if (data.expiresAt === undefined) {
-          throw new Error('Missing expiresAt in stream-ticket response');
-        }
-        return { ticket: data.ticket, expiresAt: data.expiresAt };
+        const ticket = await fetchCloudAgentStreamTicket(sessionId, organizationId);
+        return ticket;
       });
       return result;
     },
@@ -307,12 +275,19 @@ export function createMobileAgentSessionManager({
         trpcClient.cliSessionsV2.get.query({ session_id: id }),
         trpcClient.cliSessionsV2.getSessionMessages.query({ session_id: id }),
       ]);
-      const snapshotInfo = messagesResult.info as Partial<SessionSnapshot['info']>;
+      const snapshotInfo = messagesResult.info as Partial<SessionSnapshot['info']> & {
+        metadata?: unknown;
+      };
+      // The goal lives in the session metadata; project it into `info` so the
+      // fixed goal section survives a snapshot replay (which would otherwise
+      // clobber the goal carried by the live session state).
+      const goal = projectSessionGoal(snapshotInfo.metadata);
       return {
         info: {
           id: snapshotInfo.id ?? sessionData.session_id,
           parentID: snapshotInfo.parentID ?? sessionData.parent_session_id ?? undefined,
           ...(snapshotInfo.model ? { model: snapshotInfo.model } : {}),
+          ...(goal === undefined ? {} : { goal }),
         },
         messages: messagesResult.messages as SessionSnapshot['messages'],
       };

@@ -738,6 +738,29 @@ describe('cli-sessions-v2-router', () => {
       });
     });
 
+    it('projects the session goal from the snapshot metadata and never leaks the raw metadata', async () => {
+      const goal = { text: 'Ship p7 objective', status: 'paused' as const };
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        sessionMetadata: { 'kilo.goal': goal, 'kilo.somethingPrivate': '/srv/secret' },
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getSessionMessagesPage({
+        session_id: sessionId,
+        limit: 50,
+      });
+
+      expect(result).toEqual({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        watermarkEventId: null,
+        sessionGoal: goal,
+      });
+      expect(result).not.toHaveProperty('sessionMetadata');
+    });
+
     it('preserves retryable_failure so the UI can offer Retry', async () => {
       const history = {
         kind: 'retryable_failure' as const,

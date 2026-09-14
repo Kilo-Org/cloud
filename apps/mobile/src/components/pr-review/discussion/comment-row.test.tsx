@@ -302,3 +302,17 @@ describe('CommentRow overflow actions', () => {
     renderer.unmount();
   });
 });
+
+describe('CommentRow avatar recycling', () => {
+  it('sets recyclingKey to the author avatar URL so a recycled row clears the previous image', async () => {
+    const avatarUrl = 'https://example.com/alice.png';
+    const renderer = await render(makeComment({ author: { login: 'alice', avatarUrl } }));
+
+    const image = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'Image'
+    );
+    expect((image.props as Record<string, unknown>).recyclingKey).toBe(avatarUrl);
+
+    renderer.unmount();
+  });
+});

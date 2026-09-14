@@ -46,6 +46,7 @@ import {
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
+import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
@@ -1496,17 +1497,25 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
+      // Project the session goal from the snapshot metadata so clients can
+      // restore the fixed goal section on open and on reconnect. The raw
+      // session metadata stays server-side; only the validated goal is
+      // returned, so no private CLI metadata leaks to the client.
+      const { sessionMetadata, ...pageResult } = result;
+      const sessionGoal = projectSessionGoal(sessionMetadata);
+
       return {
         ...(session.cloud_agent_worktree_id
           ? projectGroupedSessionTranscript(
-              result,
+              pageResult,
               input.session_id,
-              result.history && 'messages' in result.history
-                ? result.history.messages.map(message => message.info)
+              pageResult.history && 'messages' in pageResult.history
+                ? pageResult.history.messages.map(message => message.info)
                 : []
             )
-          : result),
+          : pageResult),
         watermarkEventId,
+        ...(sessionGoal === undefined ? {} : { sessionGoal }),
       };
     }),
 

@@ -308,6 +308,54 @@ describe('PrReviewDiscussionTab full-body states', () => {
   });
 });
 
+// The bottom CTA bar opens the conversation-comment sheet. GitHub keeps the
+// object-form push PR 6023 shipped; a GitLab MR / Bitbucket PR opens the
+// sheet inside its own provider layout so the provider scope is published
+// and the post reaches the right provider (PR 6023 parity).
+describe('PrReviewDiscussionTab comment CTA routing by provider', () => {
+  const GITLAB_REF: ProviderPrRef = {
+    platform: 'gitlab',
+    projectPath: 'group/sub/repo',
+    mrIid: 12,
+  };
+  const BITBUCKET_REF: ProviderPrRef = {
+    platform: 'bitbucket',
+    workspace: 'acme',
+    repoSlug: 'widgets',
+    prId: 77,
+  };
+
+  function pressCta(scopeRef?: ProviderPrRef): void {
+    const renderer = mountTab(scopeRef);
+    act(() => {
+      const cta = renderer.root.find(node => String(node.type) === 'PrCommentCta');
+      (cta.props.onPress as () => void)();
+    });
+  }
+
+  it('keeps GitHub on the legacy conversation-comment route', () => {
+    pressCta();
+    expect(pushMock).toHaveBeenCalledWith({
+      pathname: '/(app)/pr-review/[owner]/[repo]/[number]/conversation-comment',
+      params: { owner: 'octocat', repo: 'hello-world', number: 7 },
+    });
+  });
+
+  it('opens the GitLab conversation-comment sheet inside the provider layout', () => {
+    pressCta(GITLAB_REF);
+    expect(pushMock).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/group/sub/repo/12/conversation-comment'
+    );
+  });
+
+  it('opens the Bitbucket conversation-comment sheet inside the provider layout', () => {
+    pressCta(BITBUCKET_REF);
+    expect(pushMock).toHaveBeenCalledWith(
+      '/(app)/pr-review/bitbucket/acme/widgets/77/conversation-comment'
+    );
+  });
+});
+
 // The keyboard-lift gating and the viewport-anchored reply scroll wiring
 // (uxs3 spot check: e4-confirm-discard — a foreign sheet's keyboard lifted
 // the bar behind it and clipped the last thread's reply field; e7-typed —

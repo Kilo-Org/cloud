@@ -18,8 +18,9 @@
 // provider-shaped cache (`resolved`, not `isResolved`). Reactions stay
 // GitHub-only: no provider exposes them through the seam.
 //
-// The regular PR conversation comment (`useAddPrCommentMutation`) is
-// GitHub-only and is covered in the add-comment wiring suite below.
+// The regular PR conversation comment (`useAddPrCommentMutation`) posts an
+// issue comment on GitHub and a plain top-level note on GitLab/Bitbucket; its
+// GitHub wiring is covered below and its s6 provider arms in their own suite.
 /* eslint-disable max-lines -- one file for the reply/add-comment wiring, the resolve/unresolve/reaction generation guard + chainSave/scope serialization, the real-MutationCache scope.id serialization suite, and the s6 provider arms */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -102,6 +103,7 @@ const addCommentMutateMock = vi.fn();
 const resolveMutateMock = vi.fn();
 const unresolveMutateMock = vi.fn();
 const providerReplyMutateMock = vi.fn();
+const providerAddCommentMutateMock = vi.fn();
 const providerResolveMutateMock = vi.fn();
 const providerUnresolveMutateMock = vi.fn();
 const invalidateQueriesMock = vi.fn();
@@ -152,6 +154,8 @@ vi.mock('@/lib/trpc', () => ({
     providerReview: {
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       replyToComment: { mutate: (vars: unknown) => providerReplyMutateMock(vars) },
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      addComment: { mutate: (vars: unknown) => providerAddCommentMutateMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       resolveThread: { mutate: (vars: unknown) => providerResolveMutateMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -417,7 +421,11 @@ describe('reply_comment fingerprint (P1-A-08c changed-input)', () => {
 describe('useAddPrCommentMutation (regular PR conversation comment wiring)', () => {
   beforeEach(() => {
     lastCapturedOptions = null;
+    // The hook resolves its provider from the live scope now; clear any
+    // override a previous describe left set so this suite stays on GitHub.
+    scopeOverride = null;
     addCommentMutateMock.mockReset();
+    providerAddCommentMutateMock.mockReset();
     invalidateQueriesMock.mockReset();
     toastErrorMock.mockReset();
     hoistedAnnounce.announceForA11y.mockClear();
@@ -571,6 +579,110 @@ describe('useAddPrCommentMutation (regular PR conversation comment wiring)', () 
     await lastCapturedOptions?.onSettled?.();
 
     expect(invalidateQueriesMock).toHaveBeenCalledWith(['githubPrReview', 'listReviewThreads']);
+  });
+});
+
+describe('useAddPrCommentMutation (s6 provider arms)', () => {
+  beforeEach(() => {
+    resetMocks();
+    providerAddCommentMutateMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('gitlab: posts a plain no-anchor note through providerReview.addComment', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useAddPrCommentMutation(GITLAB_REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT)).resolves.toEqual({
+      done: true,
+      replayed: false,
+    });
+    expect(addCommentMutateMock).not.toHaveBeenCalled();
+    // No `anchor` field: the server posts a top-level MR note.
+    expect(providerAddCommentMutateMock).toHaveBeenCalledWith({
+      ...GITLAB_IDENTITY,
+      body: 'a regular comment',
+      operationKey: 'hoisted-op-key',
+    });
+    expect(providerAddCommentMutateMock.mock.calls[0]?.[0]).not.toHaveProperty('anchor');
+    // The server ledgers the note under its own `create_review_comment`
+    // intent (the no-anchor body folds into the same provider-split
+    // fingerprint the inline comment uses), so the mobile key must match.
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["gitlab","https://gl.example.com","group/sub/app",12],"body":"a regular comment"}'
+    );
+  });
+
+  it('bitbucket: posts a plain no-anchor pull request comment keyed by workspace', async () => {
+    scopeOverride = { ref: BITBUCKET_REF, organizationId: 'org-9' };
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useAddPrCommentMutation(BITBUCKET_REF);
+
+    await lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT);
+    expect(providerAddCommentMutateMock).toHaveBeenCalledWith({
+      ...BITBUCKET_IDENTITY,
+      body: 'a regular comment',
+      operationKey: 'hoisted-op-key',
+    });
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["bitbucket","acme","widgets",77],"body":"a regular comment"}'
+    );
+  });
+
+  it('reads the live provider scope when no ref is passed (in-sheet context)', async () => {
+    // The composer passes its ref explicitly, but the hook still resolves the
+    // provider from the live scope so a caller that omits it posts to the
+    // right provider instead of GitHub.
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useAddPrCommentMutation();
+
+    await lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT);
+    expect(addCommentMutateMock).not.toHaveBeenCalled();
+    expect(providerAddCommentMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ platform: 'gitlab', mrIid: 12 })
+    );
+  });
+
+  it('regenerates the key after a successful provider post', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useAddPrCommentMutation(GITLAB_REF);
+
+    await lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT);
+
+    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('onSettled invalidates the provider discussions cache', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    useAddPrCommentMutation(GITLAB_REF);
+
+    await lastCapturedOptions?.onSettled?.();
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith(['providerReview', 'listDiscussions']);
+  });
+
+  it('success announces the posted-comment copy for a11y', async () => {
+    scopeOverride = { ref: BITBUCKET_REF, organizationId: 'org-9' };
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useAddPrCommentMutation(BITBUCKET_REF);
+
+    await lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT);
+    lastCapturedOptions?.onSuccess?.();
+
+    expect(announceForA11y).toHaveBeenCalledWith('Comment posted');
+  });
+
+  it('toasts the retryable comment copy for a generic provider failure', () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    useAddPrCommentMutation(GITLAB_REF);
+    lastCapturedOptions?.onError?.(new Error('boom'));
+    expect(toastErrorMock).toHaveBeenCalledWith('Could not post comment.');
   });
 });
 

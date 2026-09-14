@@ -522,7 +522,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
 
     for (const connectionId of staleConnectionIds) {
-      // Find and close the stale CLI WebSocket
       for (const ws of this.ctx.getWebSockets('cli')) {
         const att = ws.deserializeAttachment() as WSAttachment | null;
         if (att?.role === 'cli' && att.connectionId === connectionId) {
@@ -533,17 +532,11 @@ export class UserConnectionDO extends DurableObject<Env> {
           break;
         }
       }
-      // handleCliDisconnect will clean up connectionSessions/sessionOwners/lastHeartbeatAt
-      // via the webSocketClose callback
     }
 
     this.scheduleNextAlarm(now);
     this.scheduleDurablePendingAlarm();
   }
-
-  // ---------------------------------------------------------------------------
-  // CLI message handling
-  // ---------------------------------------------------------------------------
 
   private handleCliMessage(
     ws: WebSocket,
@@ -618,7 +611,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     this.connectionCapabilities.set(connectionId, capabilities);
     this.scheduleNextAlarm(now);
 
-    // Remove sessions this connection previously owned but no longer reports
     const previousSessions = this.connectionSessions.get(connectionId) ?? [];
     const currentIds = new Set(sessions.map(s => s.id));
     for (const prev of previousSessions) {
@@ -635,7 +627,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    // Update ownership
     this.connectionSessions.set(connectionId, sessions);
     for (const session of sessions) {
       const previousOwner = this.sessionOwners.get(session.id);
@@ -672,7 +663,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       })
     );
 
-    // Replay existing subscriptions for sessions newly owned by this CLI
     const previousIds = new Set(previousSessions.map(s => s.id));
     for (const session of sessions) {
       if (!previousIds.has(session.id) && this.webSubscriptions.has(session.id)) {
@@ -680,7 +670,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    // Persist to attachment for hibernation recovery
     const updatedAttachment: WSAttachment = {
       role: 'cli',
       connectionId,
@@ -987,7 +976,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     let rehydratedDurable: PendingCommandEntry | undefined;
     let ownsReservation = false;
 
-    // Step 24: on in-memory miss, try to load the durable entry (D8 case 1).
     if (!entry) {
       // Synchronously reserve the correlationId before the async durable
       // read so a concurrent duplicate CLI reply cannot also process the
@@ -1020,7 +1008,6 @@ export class UserConnectionDO extends DurableObject<Env> {
           return;
         }
 
-        // Validate the responding CLI by attachment connectionId.
         const respondingAttachment = respondingWs.deserializeAttachment() as WSAttachment | null;
         if (
           respondingAttachment?.role !== 'cli' ||
@@ -1031,7 +1018,6 @@ export class UserConnectionDO extends DurableObject<Env> {
           return;
         }
 
-        // Resolve the originating web socket by persisted webConnectionId.
         const webWs = this.findWebByConnectionId(durable.webConnectionId);
         if (!webWs) {
           // D8 case 2: web socket is gone. Shape the terminal outcome
@@ -1059,7 +1045,6 @@ export class UserConnectionDO extends DurableObject<Env> {
           return;
         }
 
-        // Build an in-memory entry so the rest of handleCliResponse works.
         entry = {
           ws: webWs,
           sessionId: durable.sessionId,
@@ -1075,13 +1060,11 @@ export class UserConnectionDO extends DurableObject<Env> {
         // after terminal storage.put succeeds (catalog guard and normal
         // path) or on any throw.
       } catch (error: unknown) {
-        // Clean reservation on unexpected error during rehydration.
         this.completedCorrelationIds.delete(id);
         ownsReservation = false;
         throw error;
       }
     } else if (entry.targetCliWs !== respondingWs) {
-      // Strict socket-identity check for an entry still in memory.
       return;
     }
 
@@ -1091,7 +1074,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     // a throw.
     try {
       if (entry.sessionId && this.isSessionDeleted(entry.sessionId)) return;
-      // Validate catalog result size for rehydrated entries too.
       if (CATALOG_DEDUPE_COMMANDS.has(entry.command) && result !== undefined) {
         const serializedResult = JSON.stringify(result);
         const resultBytes = new TextEncoder().encode(serializedResult).byteLength;
@@ -1157,7 +1139,6 @@ export class UserConnectionDO extends DurableObject<Env> {
           this.completedCorrelationIds.delete(id);
           ownsReservation = false;
 
-          // Send the live response now that the durable entry is stored.
           if (!rehydrated) {
             this.sendToWeb(entry.ws, {
               type: 'response',
@@ -1274,7 +1255,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       ownsReservation = false;
 
       if (!rehydrated) {
-        // Send the live response now that the durable entry is safely stored.
         this.sendToWeb(entry.ws, {
           type: 'response',
           id: entry.originalId,
@@ -1288,8 +1268,6 @@ export class UserConnectionDO extends DurableObject<Env> {
                 : {}),
         });
       } else {
-        // Rehydrated entry: re-resolve the web socket by the persisted id
-        // and send the response now.
         const targetWebWs = this.findWebByConnectionId(webConnectionId ?? 'unknown');
         if (targetWebWs) {
           this.sendToWeb(targetWebWs, {
@@ -1312,10 +1290,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Web message handling
-  // ---------------------------------------------------------------------------
 
   private async handleWebMessage(
     ws: WebSocket,
@@ -1374,7 +1348,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
     subs.add(ws);
 
-    // Persist subscription in attachment for hibernation recovery
     if (!attachment.subscribedSessions.includes(sessionId)) {
       attachment.subscribedSessions.push(sessionId);
       ws.serializeAttachment(attachment);
@@ -1409,7 +1382,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     if (subs) {
       subs.delete(ws);
 
-      // If no more subscribers, tell CLI to stop forwarding
       if (subs.size === 0) {
         this.webSubscriptions.delete(sessionId);
         const cliWs = this.findCliForSession(sessionId);
@@ -1419,7 +1391,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    // Update attachment
     const idx = attachment.subscribedSessions.indexOf(sessionId);
     if (idx !== -1) {
       attachment.subscribedSessions.splice(idx, 1);
@@ -1498,7 +1469,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    // Find target CLI
     let targetCli: WebSocket | undefined;
 
     if (msg.sessionId && msg.connectionId) {
@@ -1516,7 +1486,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     } else if (msg.sessionId) {
       targetCli = this.findCliForSession(msg.sessionId);
     } else {
-      // Fall back to first available CLI
       const cliSockets = this.ctx.getWebSockets('cli');
       targetCli = cliSockets[0];
     }
@@ -1536,14 +1505,12 @@ export class UserConnectionDO extends DurableObject<Env> {
       msg.sessionId && msg.connectionId ? msg.connectionId : undefined;
     const targetConnectionId = targetAttachment.connectionId;
 
-    // Resolve the originating web socket's connectionId from its attachment.
     const webAttachment = ws.deserializeAttachment() as WSAttachment | null;
     const webConnectionId =
       webAttachment?.role === 'web' && webAttachment.connectionId
         ? webAttachment.connectionId
         : 'unknown';
 
-    // In-memory dedupe for catalog commands from the same web socket
     if (
       !msg.mutationId &&
       CATALOG_DEDUPE_COMMANDS.has(msg.command) &&
@@ -1605,7 +1572,6 @@ export class UserConnectionDO extends DurableObject<Env> {
           try {
             const durable = await this.getDurablePendingCommand(mutationId);
             if (!durable) {
-              // No existing entry: check cap (counts both in-memory and durable entries).
               const durableCount = await this.countDurablePendingCommands();
               const total = this.pendingCommands.size + durableCount;
               if (total >= UserConnectionDO.MAX_PENDING_COMMANDS) {
@@ -1639,7 +1605,6 @@ export class UserConnectionDO extends DurableObject<Env> {
               return;
             }
 
-            // Entry is 'pending': dedupe.
             if (CATALOG_DEDUPE_COMMANDS.has(msg.command)) {
               this.sendToWeb(ws, {
                 type: 'response',
@@ -1665,7 +1630,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
-    // In-memory cap check for the common path.
     if (this.pendingCommands.size >= UserConnectionDO.MAX_PENDING_COMMANDS) {
       this.sendToWeb(ws, {
         type: 'response',
@@ -1835,10 +1799,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Disconnect handling
-  // ---------------------------------------------------------------------------
-
   private async handleCliDisconnect(
     disconnectedWs: WebSocket,
     attachment: WSAttachment & { role: 'cli' }
@@ -1868,7 +1828,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
-    // Collect owned sessions before removing ownership
     const sessions = this.connectionSessions.get(connectionId) ?? [];
     const ownedSessions = new Set<string>();
     for (const session of sessions) {
@@ -1989,10 +1948,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       remainingWebSockets: this.ctx.getWebSockets('web').length,
     });
   }
-
-  // ---------------------------------------------------------------------------
-  // RPC
-  // ---------------------------------------------------------------------------
 
   getActiveSessions(): Array<
     HeartbeatSession & {
@@ -2176,9 +2131,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     return this.findCliForSession(sessionId) !== undefined;
   }
 
-  // ---------------------------------------------------------------------------
   // Helpers
-  // ---------------------------------------------------------------------------
 
   private sendToCli(ws: WebSocket, msg: CLIInboundMessage): void {
     try {
@@ -2496,9 +2449,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // Command error shaping
-  // ---------------------------------------------------------------------------
 
   /**
    * Compute the shaped terminal outcome for a command reply.
@@ -2579,9 +2530,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     );
   }
 
-  // ---------------------------------------------------------------------------
   // Durable pending command storage (D8)
-  // ---------------------------------------------------------------------------
 
   private async getDurablePendingCommand(
     correlationId: string

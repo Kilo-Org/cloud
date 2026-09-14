@@ -9,38 +9,7 @@ import {
   type WorktreeStateIdentity,
 } from '../shared/worktree-state.js';
 import { validateWorktreeStateGrant } from './worktree-state-grant.js';
-
-/**
- * Reads the body with a hard ceiling instead of trusting `Content-Length`,
- * which is a forbidden header the client's fetch layer may rewrite or drop.
- * Returns undefined once the ceiling is passed, so an oversized stream is
- * abandoned rather than buffered.
- */
-async function readBoundedBody(request: Request): Promise<Uint8Array | undefined> {
-  const stream: ReadableStream<Uint8Array> | null = request.body;
-  if (!stream) return new Uint8Array();
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let length = 0;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      length += value.byteLength;
-      if (length > WORKTREE_STATE_MAX_BYTES) return undefined;
-      chunks.push(value);
-    }
-  } finally {
-    void reader.cancel().catch(() => undefined);
-  }
-  const body = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return body;
-}
+import { declaredLength, readBoundedBytes } from './bounded-body.js';
 
 function routeIdentity(c: Context<HonoContext>) {
   return worktreeStateIdentitySchema.safeParse({
@@ -75,11 +44,13 @@ export function registerWorktreeStateRoutes(app: Hono<HonoContext>): void {
     const authorized = await authorize(c);
     if (authorized instanceof Response) return authorized;
 
-    const declaredLength = c.req.header('Content-Length');
-    if (declaredLength && !/^\d+$/.test(declaredLength)) return c.text('Invalid length', 400);
-    if (Number(declaredLength) > WORKTREE_STATE_MAX_BYTES) return c.text('Body too large', 413);
+    const length = declaredLength(c.req.header('Content-Length'));
+    if (length === 'invalid') return c.text('Invalid length', 400);
+    if (length !== undefined && length > WORKTREE_STATE_MAX_BYTES) {
+      return c.text('Body too large', 413);
+    }
 
-    const body = await readBoundedBody(c.req.raw);
+    const body = await readBoundedBytes(c.req.raw, WORKTREE_STATE_MAX_BYTES);
     if (body === undefined) return c.text('Body too large', 413);
     if (body.byteLength === 0) return c.text('Missing request body', 400);
 

@@ -160,15 +160,20 @@ export function createKiloRuntimeLifecycle(
   }
 
   async function updateEnvironment(env: Record<string, string>): Promise<void> {
+    const currentEnv = deps.captureEnv();
+    const environmentChanged = Object.entries(env).some(
+      ([name, value]) => currentEnv[name] !== value
+    );
     deps.assignProcessEnv(env);
     const workspacePath = runtimeWorkspacePath;
     if (!workspacePath) return;
-    if (kiloClient) return;
+    if (kiloClient && !environmentChanged) return;
 
     await enqueue(() =>
       doStart({
         workspacePath,
         expectedSessionId: deps.getKiloSessionId() || undefined,
+        forceRestart: true,
       })
     );
   }

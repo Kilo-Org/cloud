@@ -239,19 +239,14 @@ describe('KiloRuntimeLifecycle start', () => {
 
   it('reuses the live child when the delivered credential changed', async () => {
     const harness = createHarness();
-    const firstStart: KiloRuntimeStartInput & { deliveredEnv: Record<string, string> } = {
+    const start: KiloRuntimeStartInput = {
       workspacePath: WORKSPACE,
       expectedSessionId: CREATED_SESSION_ID,
-      deliveredEnv: { KILOCODE_TOKEN: 'A' },
-    };
-    const secondStart: KiloRuntimeStartInput & { deliveredEnv: Record<string, string> } = {
-      workspacePath: WORKSPACE,
-      expectedSessionId: CREATED_SESSION_ID,
-      deliveredEnv: { KILOCODE_TOKEN: 'B' },
     };
 
-    await harness.lifecycle.start(firstStart);
-    await harness.lifecycle.start(secondStart);
+    await harness.lifecycle.start(start);
+    harness.captureEnvRecord.KILOCODE_TOKEN = 'B';
+    await harness.lifecycle.start(start);
 
     expect(harness.inheritedEnvs).toHaveLength(1);
     expect(harness.inheritedEnvs[0]).toEqual({
@@ -396,23 +391,33 @@ describe('KiloRuntimeLifecycle failures', () => {
 });
 
 describe('KiloRuntimeLifecycle updateEnvironment', () => {
-  it('does not restart the live child when the delivered credential changed', async () => {
-    const harness = createHarness();
-    await harness.lifecycle.start({
-      workspacePath: WORKSPACE,
-    });
-    expect(harness.inheritedEnvs).toHaveLength(1);
-    const readyBefore = harness.readyCount;
-    const teardownBefore = harness.teardownCount;
+  it.each(['KILOCODE_TOKEN', 'GH_TOKEN'])(
+    'restarts the devcontainer child with refreshed %s and retains its session',
+    async name => {
+      const harness = createHarness({ platform: 'devcontainer', env: { [name]: 'A' } });
+      await harness.lifecycle.start({
+        workspacePath: WORKSPACE,
+        expectedSessionId: CREATED_SESSION_ID,
+      });
+      expect(harness.inheritedEnvs).toHaveLength(1);
+      const readyBefore = harness.readyCount;
+      const teardownBefore = harness.teardownCount;
 
-    harness.captureEnvRecord.KILOCODE_TOKEN = 'B';
-    await harness.lifecycle.updateEnvironment({ KILOCODE_TOKEN: 'B' });
+      await harness.lifecycle.updateEnvironment({ [name]: 'B' });
 
-    expect(harness.captureEnvRecord.KILOCODE_TOKEN).toBe('B');
-    expect(harness.inheritedEnvs).toHaveLength(1);
-    expect(harness.teardownCount).toBe(teardownBefore);
-    expect(harness.readyCount).toBe(readyBefore);
-  });
+      expect(harness.captureEnvRecord[name]).toBe('B');
+      expect(harness.inheritedEnvs).toEqual([
+        { HOME: '/home/test', [name]: 'A' },
+        { HOME: '/home/test', [name]: 'B' },
+      ]);
+      expect(harness.events.filter(event => event === 'closeServer')).toHaveLength(1);
+      expect(harness.clients[1]?.getSessionCalls).toEqual([CREATED_SESSION_ID]);
+      expect(harness.clients[1]?.createSessionCalls).toEqual([]);
+      expect(harness.getKiloSessionId()).toBe(CREATED_SESSION_ID);
+      expect(harness.teardownCount).toBe(teardownBefore + 1);
+      expect(harness.readyCount).toBe(readyBefore + 1);
+    }
+  );
 
   it('is silent for an identical environment update', async () => {
     const harness = createHarness();

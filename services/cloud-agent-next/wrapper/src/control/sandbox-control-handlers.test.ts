@@ -214,6 +214,7 @@ function runtimeDeps(kiloClient: WrapperKiloClient, rootScope?: 'shared' | 'sole
         applyAttach: base.applyAttach,
         materializeAttachments: base.materializeAttachments,
         runAutoCommit: base.runAutoCommit,
+        captureWorktreeState: base.captureWorktreeState,
         collectWorktreeChanges: base.collectWorktreeChanges,
         onDiagnostic: base.onDiagnostic,
         onShutdown: base.onShutdown,
@@ -2218,6 +2219,7 @@ describe('production worktree deletion routes', () => {
     );
     const runtimes = handlerDeps.kiloRuntimes;
     if (!runtimes) throw new Error('Expected worktree runtimes');
+    runtimes.getAll = () => [];
     runtimes.get = () => undefined;
     runtimes.deleteDirectory = async () => {};
     try {

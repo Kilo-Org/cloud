@@ -588,11 +588,52 @@ api.get('/session/:sessionId/messages', async c => {
   );
   const history = persistedKiloSdkMessageHistorySchema.nullable().safeParse(rawHistory);
 
+  // Session-level state travels with the bounded message page so a client can
+  // restore it on open and on reconnect without a second snapshot round trip.
+  // The CLI goal lives in `session.info.metadata`, so only the metadata is
+  // forwarded (never the whole session info). Only the initial page (no
+  // cursor) carries it: older-message pages never rebuild the session header.
+  // Best-effort: a snapshot read failure must not fail the message page; the
+  // live session events still carry goal updates.
+  let sessionMetadata: Record<string, unknown> | null = null;
+  if (inputParse.data.before === undefined) {
+    try {
+      const rawSessionInfo = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+        () =>
+          getSessionIngestDO(c.env, {
+            kiloUserId,
+            sessionId: inputParse.data.kiloSessionId,
+          }),
+        stub => stub.readKiloSdkSessionSnapshot(),
+        'SessionIngestDO.readKiloSdkSessionSnapshot'
+      );
+      if (
+        typeof rawSessionInfo === 'object' &&
+        rawSessionInfo !== null &&
+        (rawSessionInfo as { kind?: unknown }).kind === 'value'
+      ) {
+        const info = (rawSessionInfo as { info?: unknown }).info;
+        if (typeof info === 'object' && info !== null) {
+          const metadata = (info as { metadata?: unknown }).metadata;
+          if (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) {
+            sessionMetadata = metadata as Record<string, unknown>;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(
+        `Failed to fetch session snapshot for session ${inputParse.data.kiloSessionId}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
+  }
+
   return c.json(
     {
       success: true,
       kiloSessionId: inputParse.data.kiloSessionId,
       history: history.success ? history.data : { kind: 'invalid_data' },
+      sessionMetadata,
     },
     200
   );

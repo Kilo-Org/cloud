@@ -1996,6 +1996,22 @@
       "connectionLost": "Tenging rofnaði",
       "retryConnection": "Reyna að tengjast aftur"
     },
+    "goal": {
+      "title": "Markmið",
+      "statusActive": "Virkt markmið",
+      "statusPaused": "Markmið í bið",
+      "statusComplete": "Markmiði lokið",
+      "statusBlocked": "Markmið læst",
+      "edit": "Breyta markmiði",
+      "remove": "Fjarlægja markmið",
+      "pause": "Setja markmið í bið",
+      "resume": "Halda markmiði áfram",
+      "editPlaceholder": "Lýstu markmiðinu",
+      "removeConfirmTitle": "Fjarlægja markmið?",
+      "removeConfirmMessage": "CLI hreinsar markmið þessarar lotu.",
+      "updateFailed": "Ekki tókst að uppfæra markmiðið.",
+      "sectionAccessibility": "{{status}}. Markmið: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Tengdu GitHub í vafranum þínum og komdu svo aftur hingað til að velja kóðasafn.",
       "openGithub": "Opna GitHub",
@@ -2581,7 +2597,10 @@
     "gatewayModelUnavailable": "Þetta umritunarlíkan er ekki í boði. Veldu annað í Kjörstillingum.",
     "gatewayModelUnavailableNotice": "Þetta líkan er ekki lengur í boði. Ýttu á $t(transcriptionModel.title) til að velja annað.",
     "gatewaySignInRequired": "Skráðu þig inn til að nota umritun í gegnum Kilo Gateway.",
-    "gatewayNoModel": "Veldu fyrst umritunarlíkan í Kjörstillingum."
+    "gatewayNoModel": "Veldu fyrst umritunarlíkan í Kjörstillingum.",
+    "testTitle": "Prófa raddinnslátt",
+    "testPlaceholder": "Ýttu á hljóðnemann og byrjaðu að tala.",
+    "testClear": "Hreinsa texta"
   },
   "share": {
     "title": "Deila með Kilo",
@@ -2970,5 +2989,12 @@
     "emptyTitle": "Engin umritunarlíkan",
     "emptyDescription": "Kilo Gateway býður ekki upp á umritunarlíkan um þessar mundir.",
     "loadFailed": "Ekki tókst að sækja umritunarlíkin."
+  },
+  "voiceLanguage": {
+    "title": "Tungumál raddinnsláttar",
+    "automatic": "Sjálfvirkt",
+    "loadFailed": "Ekki tókst að hlaða tungumálunum sem þetta tæki styður.",
+    "emptyTitle": "Engin studd tungumál",
+    "emptyDescription": "Talgreining þessa tækis tilkynnir engin studd tungumál."
   }
 }

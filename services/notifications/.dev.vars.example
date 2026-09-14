@@ -9,3 +9,11 @@ WORKER_ENV=development
 # Set to `log` here to enable; leave unset / empty to keep the real Expo
 # send path.
 PUSH_SINK_MODE=
+
+# Base origin of the web app for the internal glanceable-agents-snapshot
+# route (see ENVIRONMENT.md). Production pins `https://app.kilo.ai` in
+# wrangler.jsonc, which is single-config; the local dev override points the
+# worker at the local Next.js server so the route answers with the shared
+# INTERNAL_API_SECRET instead of a cross-environment 401.
+# @url nextjs
+KILO_WEB_API_BASE_URL=https://app.kilo.ai

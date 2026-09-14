@@ -231,6 +231,8 @@
     "voiceInput": "Spracheingabe",
     "autoExpandThinking": "Denkprozess automatisch aufklappen",
     "autoExpandThinkingSubtitle": "Den Denkprozess des Agenten nach Abschluss aufgeklappt anzeigen.",
+    "hideThinking": "Denkdetails ausblenden",
+    "hideThinkingSubtitle": "Den Denkprozess des Agenten nicht auf der Sitzungsseite anzeigen.",
     "keepScreenOn": "Bildschirm in der Sitzungsansicht eingeschaltet lassen",
     "keepScreenOnSubtitle": "Den Bildschirm eingeschaltet lassen, solange die Sitzung läuft.",
     "appearance": "Erscheinungsbild",
@@ -2020,6 +2022,11 @@
       "stepsCount": "{{steps}} Schritte",
       "stepsCount_other": "{{steps}} Schritte",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "Automatisch genehmigen",
+      "description": "Berechtigungsanfragen für diese Sitzung automatisch genehmigen. Tools werden danach ohne Nachfrage ausgeführt.",
+      "unavailable": "Diese Sitzung kann keine Berechtigungsanfragen empfangen."
     },
     "prBadge": {
       "open": "pull-Request öffnen",

@@ -1,11 +1,10 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom). */
 /* eslint-disable max-lines -- keep the real SDK lifecycle probes with the route's shared mounted fixture. */
 import { createElement, type ReactElement, useEffect } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type * as ReactQuery from '@tanstack/react-query';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   type AssistantMessage,
@@ -312,7 +311,7 @@ function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: strin
   if (!instance) {
     return undefined;
   }
-  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
   return instance.props[key];
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
 }

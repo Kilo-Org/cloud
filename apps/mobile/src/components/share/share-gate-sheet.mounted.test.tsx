@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx), and this suite's per-state spawn wiring cases exceed the line cap (same carve-out as share-gate-sheet.tsx) */
+/* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx), and this suite's per-state spawn wiring cases exceed the line cap (same carve-out as share-gate-sheet.tsx) */
 // P1-A-08b: the share gate must attach one hoisted `operationKey` per
 // share-spawn intent (share + instance) to the `spawn` call, keep it across
 // retryable outcomes (the relay dedupes the same-key retry), and rotate it
@@ -8,7 +8,7 @@
 // the spawn via the list's captured `onSpawnInstance` prop.
 
 import { createElement, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {

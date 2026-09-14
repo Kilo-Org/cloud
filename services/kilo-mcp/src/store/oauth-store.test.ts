@@ -323,6 +323,53 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       expect((await store.getPendingAuthorization('pa-complete-exp'))?.status).toBe('approved');
     });
 
+    it('reverts an approved authorization back to pending for a retry, exactly once', async () => {
+      await store.createPendingAuthorization(
+        pendingInput({ id: 'pa-revert', deviceAuthCode: 'PAIR-PA-REVERT' })
+      );
+      // Only an approved record is releasable.
+      expect(await store.revertApprovedPendingAuthorization('pa-revert', NOW)).toBe(false);
+      await store.approvePendingAuthorization(
+        'PAIR-PA-REVERT',
+        { kiloUserId: 'u', organizationId: 'o-old' },
+        NOW
+      );
+      expect(await store.revertApprovedPendingAuthorization('pa-revert', NOW)).toBe(true);
+      expect(await store.getPendingAuthorization('pa-revert')).toMatchObject({
+        status: 'pending',
+        kiloUserId: 'u',
+        organizationId: null,
+      });
+      // Nothing is approved now, so a second release changes nothing.
+      expect(await store.revertApprovedPendingAuthorization('pa-revert', NOW)).toBe(false);
+      // The released record can be approved again with the new choice.
+      expect(
+        await store.approvePendingAuthorization(
+          'PAIR-PA-REVERT',
+          { kiloUserId: 'u', organizationId: 'o-new' },
+          NOW
+        )
+      ).toBe(true);
+      expect(await store.getPendingAuthorization('pa-revert')).toMatchObject({
+        status: 'approved',
+        organizationId: 'o-new',
+      });
+      expect(await store.revertApprovedPendingAuthorization('pa-ghost', NOW)).toBe(false);
+    });
+
+    it('refuses to revert an approved authorization after expiry', async () => {
+      await store.createPendingAuthorization(
+        pendingInput({ id: 'pa-revert-exp', deviceAuthCode: 'PAIR-PA-REXP', expiresAt: LATER })
+      );
+      await store.approvePendingAuthorization(
+        'PAIR-PA-REXP',
+        { kiloUserId: 'u', organizationId: null },
+        NOW
+      );
+      expect(await store.revertApprovedPendingAuthorization('pa-revert-exp', LATER)).toBe(false);
+      expect((await store.getPendingAuthorization('pa-revert-exp'))?.status).toBe('approved');
+    });
+
     it('denies a pending authorization exactly once', async () => {
       await store.createPendingAuthorization(
         pendingInput({ id: 'pa-deny', deviceAuthCode: 'PAIR-PA-DENY' })

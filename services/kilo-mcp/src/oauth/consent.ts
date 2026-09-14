@@ -366,6 +366,12 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
 
   /** Bind the chosen context and complete the authorize; stops on a lost race. */
   const approveAndRedirect = async (organizationId: string | null): Promise<Response> => {
+    /** The record left a non-actionable state; the user must restart the flow. */
+    const noLongerValid = (): Response =>
+      errorPage(
+        'invalid_request',
+        'This request is no longer valid. Close this tab and retry from your MCP client.'
+      );
     const approved = await deps.store.approvePendingAuthorization(
       record.deviceAuthCode,
       { kiloUserId: record.kiloUserId, organizationId },
@@ -375,28 +381,59 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
       // Lost the race to a concurrent submit or an expiry: stop, do not
       // complete. The store's pending->approved guard makes a re-completion
       // impossible.
+      return noLongerValid();
+    }
+
+    let redirectTo: string;
+    try {
+      ({ redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
+        request: record.authRequest,
+        userId: record.kiloUserId,
+        metadata: { clientName },
+        scope: [MCP_SCOPE],
+        props: {
+          kiloUserId: record.kiloUserId,
+          organizationId,
+          kiloToken: record.kiloToken,
+          clientId: record.authRequest.clientId,
+        },
+      }));
+    } catch {
+      // The provider issued no code. Release the approval back to pending so
+      // this record is retryable instead of stranding in a terminal state; a
+      // concurrent completion cannot be rolled back (the revert is guarded on
+      // approved) and a request that expired meanwhile is not resurrected.
+      const released = await deps.store.revertApprovedPendingAuthorization(id, nowIso);
+      if (!released) return noLongerValid();
+      deps.analytics?.oauthSignIn({
+        phase: 'failed',
+        identity: null,
+        clientId: record.authRequest.clientId,
+        reason: 'completion_failed',
+      });
       return errorPage(
-        'invalid_request',
-        'This request is no longer valid. Close this tab and retry from your MCP client.'
+        'temporarily_unavailable',
+        'Kilo could not finish connecting your account. Submit the form again to retry.',
+        503
       );
     }
-    const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
-      request: record.authRequest,
-      userId: record.kiloUserId,
-      metadata: { clientName },
-      scope: [MCP_SCOPE],
-      props: {
-        kiloUserId: record.kiloUserId,
-        organizationId,
-        kiloToken: record.kiloToken,
+
+    const completed = await deps.store.completePendingAuthorization(id, nowIso);
+    if (!completed) {
+      // The store's expiry/single-use guard rejected the terminal transition:
+      // never report a completed sign-in the store did not record.
+      deps.analytics?.oauthSignIn({
+        phase: 'failed',
+        identity: null,
         clientId: record.authRequest.clientId,
-      },
-    });
-    await deps.store.completePendingAuthorization(id, nowIso);
+        reason: 'completion_rejected',
+      });
+      return noLongerValid();
+    }
     // The library owns the token endpoint, so its tokenExchangeCallback hook
     // runs without deps and cannot see this per-request emitter (index.ts wires
     // it with no ProviderHookDeps). Emit the one sign-in success here, after the
-    // approved guard, so a repeated submit neither completes nor emits again.
+    // completed guard, so a repeated submit neither completes nor emits again.
     deps.analytics?.oauthSignIn({
       phase: 'succeeded',
       identity: { kiloUserId: record.kiloUserId, organizationId },

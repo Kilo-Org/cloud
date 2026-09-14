@@ -159,6 +159,12 @@ function createFakeStore(): OAuthStoreApi & { pending: Map<string, PendingAuthor
       pending.set(id, { ...record, status: 'completed' });
       return true;
     },
+    revertApprovedPendingAuthorization: async (id, nowIso) => {
+      const record = pending.get(id);
+      if (!record || record.status !== 'approved' || record.expiresAt <= nowIso) return false;
+      pending.set(id, { ...record, status: 'pending', organizationId: null });
+      return true;
+    },
     purgeExpired: unused,
   };
 }
@@ -768,6 +774,86 @@ describe('GET/POST /authorize/org', () => {
     expect(await response.text()).toMatch(/not available for this account/);
     expect(completes).toHaveLength(0);
     expect(store.pending.get(id)?.status).toBe('pending');
+  });
+
+  it('releases an approval the provider could not complete so a retry succeeds', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const { helpers } = fakeHelpers({ client: clientInfo() });
+    const { analytics, calls } = fakeAnalytics();
+    let attempts = 0;
+    const completeAuthorization = vi.fn(async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('provider completion failed');
+      return { redirectTo: `${REDIRECT}?code=lib-code` };
+    });
+    const env = envWith({
+      ...(helpers as unknown as Record<string, unknown>),
+      completeAuthorization,
+    } as unknown as OAuthHelpers);
+    const handler = createDefaultHandler(deps(store, flowFetch(), { analytics }));
+    const post = () =>
+      run(
+        handler,
+        new Request(`${ISSUER}/authorize/org?id=${id}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+        }),
+        env
+      );
+
+    const failed = await post();
+    // The provider never issued a code: the request stays usable instead of
+    // stranding in a terminal approved state.
+    expect(failed.status).toBe(503);
+    expect(await failed.text()).toMatch(/could not finish connecting your account/);
+    expect(store.pending.get(id)?.status).toBe('pending');
+    expect(calls.filter(call => call.phase === 'succeeded')).toHaveLength(0);
+    expect(calls).toContainEqual({
+      phase: 'failed',
+      identity: null,
+      clientId: CLIENT_ID,
+      reason: 'completion_failed',
+    });
+
+    const retried = await post();
+    expect(retried.status).toBe(302);
+    expect(retried.headers.get('Location')).toBe(`${REDIRECT}?code=lib-code`);
+    expect(attempts).toBe(2);
+    expect(store.pending.get(id)?.status).toBe('completed');
+    expect(calls.filter(call => call.phase === 'succeeded')).toHaveLength(1);
+  });
+
+  it('does not redirect or report success when the completion transition is rejected', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const { helpers } = fakeHelpers({ client: clientInfo() });
+    const { analytics, calls } = fakeAnalytics();
+    const handler = createDefaultHandler(
+      deps({ ...store, completePendingAuthorization: async () => false }, flowFetch(), {
+        analytics,
+      })
+    );
+    const response = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(400);
+    expect(response.headers.get('Location')).toBeNull();
+    expect(store.pending.get(id)?.status).toBe('approved');
+    expect(calls.filter(call => call.phase === 'succeeded')).toHaveLength(0);
+    expect(calls).toContainEqual({
+      phase: 'failed',
+      identity: null,
+      clientId: CLIENT_ID,
+      reason: 'completion_rejected',
+    });
   });
 
   it('guards a double complete: the second submit cannot complete twice', async () => {

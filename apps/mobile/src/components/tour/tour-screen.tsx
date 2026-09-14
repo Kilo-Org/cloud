@@ -15,6 +15,7 @@ import { Cloud, type LucideIcon, Monitor, Sparkles } from '@/components/ui/icons
 import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { dismissTour } from '@/lib/tour/tour-dismiss';
 import { useTourCompletion } from '@/lib/tour/tour-completion';
 
 /**
@@ -25,7 +26,8 @@ import { useTourCompletion } from '@/lib/tour/tour-completion';
  * through `onCompletedChange`. Skip and Android hardware Back are one decision
  * — record the per-account decision the instant the person dismisses, then pop
  * back to the screen that opened the tour (Home on auto-open, Profile on the
- * Tutorial replay). Nothing here ever clears the decision.
+ * Tutorial replay); a tour with nothing beneath it lands on Home instead (see
+ * `dismissTour`). Nothing here ever clears the decision.
  */
 
 type TourPath = 'fork' | 'cloud' | 'remote';
@@ -116,10 +118,13 @@ export function TourScreen() {
 
   // One dismissal decision: record it synchronously (the hook flips its
   // in-memory state before returning and persists in the background), then
-  // return to whoever opened the tour.
+  // leave the tour. The navigation half is guarded (see `dismissTour`): a tour
+  // opened as the app's first route has nothing beneath it, and an unguarded
+  // `router.back()` there would leave the modal up behind a development-only
+  // GO_BACK banner instead of dismissing.
   const dismiss = useCallback(() => {
     recordCompleted();
-    router.back();
+    dismissTour(router);
   }, [recordCompleted, router]);
 
   const choosePath = useCallback((next: Exclude<TourPath, 'fork'>) => {

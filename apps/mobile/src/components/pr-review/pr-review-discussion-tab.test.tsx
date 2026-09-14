@@ -1,139 +1,23 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as screen-header.mounted.test.tsx) */
-import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+// The module-mock harness and render helpers live in
+// pr-review-discussion-tab.test-helpers. That import MUST stay first: the
+// helpers register the module mocks while they are evaluated.
+import {
+  BASE_PROPS,
+  bottomPaddedViews,
+  discussionState,
+  expectCtaPresence,
+  focusState,
+  insetsState,
+  mountTab,
+  pushMock,
+  replyScrollFns,
+  resetState,
+} from './pr-review-discussion-tab.test-helpers';
+import { act, type ReactTestRenderer } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
-
-import { PrReviewDiscussionTab } from './pr-review-discussion-tab';
-
-const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
-
-const pushMock = vi.hoisted(() => vi.fn());
-
-// The tab's screen focus drives the CTA bar's keyboard lift (a foreign
-// surface's keyboard must not lift the bar behind it — uxs3, e4-confirm-
-// discard). Flippable so the suite can mount the tab unfocused.
-const focusState = vi.hoisted(() => ({ value: true }));
-
-const replyScrollFns = vi.hoisted(() => ({
-  markFocus: vi.fn(),
-  onViewportLayout: vi.fn(),
-  invalidate: vi.fn(),
-}));
-
-const discussionState = vi.hoisted(() => ({
-  query: {
-    isPending: false,
-    isFetching: false,
-    isPaused: false,
-    hasNextPage: false,
-    isFetchingNextPage: false,
-    fetchNextPage: vi.fn(),
-    refetch: vi.fn(),
-  },
-  threads: [] as unknown[],
-  conversation: [] as unknown[],
-  firstPageErrorState: null as { kind: string } | null,
-  laterPageError: false,
-}));
-
-vi.mock('react-native', () => ({
-  View: 'View',
-  Platform: { OS: 'ios' },
-}));
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: pushMock }),
-  useIsFocused: () => focusState.value,
-}));
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => insetsState,
-}));
-vi.mock('@/lib/pr-review/discussion/use-pr-review-discussion-threads', () => ({
-  usePrReviewDiscussionThreads: () => discussionState,
-}));
-vi.mock('@/lib/pr-review/discussion/use-reply-focus-scroll', () => ({
-  // The tab-level focus scroll is covered by use-reply-focus-scroll.test.ts;
-  // here it is inert so the tab body states stay the subject.
-  useReplyFocusScroll: () => replyScrollFns,
-}));
-vi.mock('@/lib/a11y/motion', () => ({
-  useMotionPolicy: () => ({ scrollAnimated: false }),
-}));
-vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
-  PrReviewReconnectNotice: 'PrReviewReconnectNotice',
-}));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus' }));
-vi.mock('@/components/pr-review/discussion/pr-review-discussion-list', () => ({
-  PrReviewDiscussionList: 'PrReviewDiscussionList',
-}));
-vi.mock('@/components/pr-review/discussion/pr-comment-cta', () => ({
-  PrCommentCta: 'PrCommentCta',
-}));
-
-const BASE_PROPS = {
-  owner: 'octocat',
-  repo: 'hello-world',
-  number: 7,
-  onRequestFiles: vi.fn(() => undefined),
-};
-
-/** Mounts the tab, optionally under a provider scope (no scope = GitHub). */
-function mountTab(scopeRef?: ProviderPrRef): TestRenderer.ReactTestRenderer {
-  const tab = createElement(PrReviewDiscussionTab, BASE_PROPS);
-  const tree = scopeRef ? (
-    <ProviderPrScopeProvider value={{ ref: scopeRef, organizationId: null }}>
-      {tab}
-    </ProviderPrScopeProvider>
-  ) : (
-    tab
-  );
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  act(() => {
-    ref.current = TestRenderer.create(tree);
-  });
-  const renderer = ref.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
-
-function bottomPaddedViews(
-  renderer: TestRenderer.ReactTestRenderer
-): TestRenderer.ReactTestInstance[] {
-  return renderer.root.findAll(
-    node =>
-      typeof node.type === 'string' &&
-      (node.type as string) === 'View' &&
-      node.props.style != null &&
-      typeof node.props.style === 'object' &&
-      'paddingBottom' in (node.props.style as Record<string, unknown>)
-  );
-}
-
-function resetState(): void {
-  discussionState.query.isPending = false;
-  discussionState.query.isFetching = false;
-  discussionState.query.isPaused = false;
-  discussionState.query.hasNextPage = false;
-  discussionState.query.isFetchingNextPage = false;
-  discussionState.threads = [];
-  discussionState.conversation = [];
-  discussionState.firstPageErrorState = null;
-  discussionState.laterPageError = false;
-}
-
-function expectCtaPresence(renderer: TestRenderer.ReactTestRenderer, present: boolean): void {
-  const ctas = renderer.root.findAll(node => String(node.type) === 'PrCommentCta');
-  expect(ctas.length > 0).toBe(present);
-}
+import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 
 beforeEach(() => {
   insetsState.bottom = 0;
@@ -367,7 +251,7 @@ describe('PrReviewDiscussionTab keyboard-lift gating and reply-scroll wiring', (
     focusState.value = true;
   });
 
-  function mountHappyList(): TestRenderer.ReactTestRenderer {
+  function mountHappyList(): ReactTestRenderer {
     discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
     return mountTab();
   }

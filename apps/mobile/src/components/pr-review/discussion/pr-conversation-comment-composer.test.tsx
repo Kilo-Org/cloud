@@ -44,12 +44,12 @@ import { PrConversationCommentComposer } from './pr-conversation-comment-compose
 import { clearDraft, saveDraft } from '@/lib/persist/drafts';
 import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 
-function mountComposer(): React.ReactElement {
+function mountComposer(overrides?: { prRef?: ProviderPrRef }): React.ReactElement {
   // One render pass per mount call: the cursor restarts at 0 while the boxes
   // persist, mirroring React's state-across-renders semantics.
   hookState.cursor = 0;
   // eslint-disable-next-line new-cap
-  return PrConversationCommentComposer(baseProps);
+  return PrConversationCommentComposer({ ...baseProps, ...overrides });
 }
 
 describe('PrConversationCommentComposer', () => {
@@ -160,8 +160,7 @@ describe('PrConversationCommentComposer', () => {
     };
     const refKey = `${DRAFT_KEY}@${providerPrRefKey(gitlabRef)}`;
 
-    hookState.cursor = 0;
-    const element = PrConversationCommentComposer({ ...baseProps, prRef: gitlabRef });
+    const element = mountComposer({ prRef: gitlabRef });
     typeBody(element, 'hello');
     expect(saveDraft).toHaveBeenCalledWith('u1', refKey, 'hello');
 

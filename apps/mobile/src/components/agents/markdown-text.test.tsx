@@ -1,9 +1,9 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- the HTML routing, sanitization, and interaction tests share one React Native module mock harness */
+/* eslint-disable max-lines -- the HTML routing, sanitization, and interaction tests share one React Native module mock harness */
 // eslint-disable-next-line import/no-nodejs-modules -- the real HTML engine needs a React Native stub in the node test environment
 import Module from 'node:module';
 import { type ComponentType, createElement, type ReactElement } from 'react';
 import { type GestureResponderEvent } from 'react-native';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MarkedLexer, useMarkdown } from 'react-native-marked';
@@ -271,10 +271,32 @@ describe('MarkdownText HTML routing', () => {
 
     expect(htmlProps(renderer).tagsStyles).toMatchObject({
       a: { color: '#111111', textDecorationLine: 'underline' },
-      blockquote: { borderStartColor: '#cccccc', borderStartWidth: 3, paddingStart: 12 },
+      blockquote: { borderLeftColor: '#cccccc', borderLeftWidth: 3, paddingLeft: 12 },
       p: { marginVertical: 2, paddingVertical: 0 },
       strong: { color: '#111111', fontWeight: '700' },
     });
+  });
+
+  it('leaves the HTML blockquote start rule to RN physical-edge mirroring in RTL', async () => {
+    rnStub.I18nManager.isRTL = true;
+    try {
+      const renderer = await mount(<MarkdownText value="> <strong>quoted</strong>" />);
+
+      // RN mirrors physical left/right padding, margin, and borders under RTL
+      // (`doLeftAndRightSwapInRTL` defaults to true), so the rule stays on the
+      // physical left edge and lands on the right edge of an RTL layout.
+      // Choosing the side from `I18nManager.isRTL` here would double-mirror it
+      // back to the left.
+      expect(htmlProps(renderer).tagsStyles.blockquote).toMatchObject({
+        borderLeftColor: '#cccccc',
+        borderLeftWidth: 3,
+        paddingLeft: 12,
+      });
+      expect(htmlProps(renderer).tagsStyles.blockquote).not.toHaveProperty('borderRightWidth');
+      expect(htmlProps(renderer).tagsStyles.blockquote).not.toHaveProperty('paddingRight');
+    } finally {
+      rnStub.I18nManager.isRTL = false;
+    }
   });
 
   it('does not match raw HTML inside a preceding code span', async () => {

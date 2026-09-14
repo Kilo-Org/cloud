@@ -18,12 +18,8 @@ import {
   Terminal,
 } from '@/components/ui/icons';
 
-import {
-  getToolDisplay,
-  getToolRowIcon,
-  type ToolDisplay,
-  toolPartHasDetails,
-} from './tool-card-display';
+import { getToolDisplay, type ToolDisplay, toolPartHasDetails } from './tool-card-display';
+import { getToolRowIcon } from './tool-row-icon';
 
 // tool-card-display imports the Lucide icon components; the pure project cannot
 // parse the Flow-sourced react-native runtime, so stub the module with distinct

@@ -33,8 +33,7 @@ export function OfflineBannerSpaceGate({ children }: Readonly<{ children: ReactN
  * App-wide offline banner. Absolute overlay, so app content keeps its layout
  * position; `pointerEvents="none"` passes every touch to the header below.
  * Surfaces with a pinned top header reserve `OFFLINE_BANNER_HEIGHT` above the
- * header while the banner is visible so it never covers the title (see
- * `offlineHeaderReservation`).
+ * header while the banner is visible so it never covers the title.
  */
 export function OfflineBanner() {
   const isOffline = useOfflineBannerState();

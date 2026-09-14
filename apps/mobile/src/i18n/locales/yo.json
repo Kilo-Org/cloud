@@ -231,6 +231,8 @@
     "voiceInput": "Ìwọlé ohùn",
     "autoExpandThinking": "Ṣí ìrònú sílẹ̀ láìfọwọ́yí",
     "autoExpandThinkingSubtitle": "Fi ìrònú aṣojú hàn ní kíkún nígbà tí ó bá parí.",
+    "hideThinking": "Fi àwọn kúlẹ̀kúlẹ̀ ìrònú pamọ́",
+    "hideThinkingSubtitle": "Má ṣe fi ìrònú aṣojú hàn ní ojú ìwé ìgbà iṣẹ́.",
     "keepScreenOn": "Jẹ́ kí iboju máa tàn ní ojú ìwé ìgbà iṣẹ́",
     "keepScreenOnSubtitle": "Jẹ́ kí iboju máa tàn bí ìgbà iṣẹ́ ṣe ń ṣiṣẹ́.",
     "appearance": "Ìrísí",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Yíyí ohùn sí ọ̀rọ̀ pẹ̀lú Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Yí títẹ ọ̀rọ̀ pẹ̀lú ohùn sí ọ̀rọ̀-kíkọ pẹ̀lú àwòṣe Kilo Gateway dípò mímọ̀ ọ̀rọ̀ ẹ̀rọ náà. A ó fi àkọsílẹ̀ rẹ ránṣẹ́ sí Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Kó àwọn ìpè ohun èlò pọ̀",
+    "condenseToolCallsSubtitle": "Ẹ ṣe àkópọ̀ àwọn ìpè ohun èlò tí ó tẹ̀ léra nínú ìlà kan tí ẹ lè ṣí."
   },
   "prReview": {
     "pullRequestUnavailable": "Ìbéèrè ìṣọ̀kan kò sí",
@@ -1996,6 +2000,22 @@
       "connectionLost": "Àsopọ̀ ti já",
       "retryConnection": "Gbìyànjú láti tún sopọ̀"
     },
+    "goal": {
+      "title": "Àfojúsùn",
+      "statusActive": "Àfojúsùn tí ń ṣiṣẹ́",
+      "statusPaused": "Àfojúsùn tí a dá dúró",
+      "statusComplete": "Àfojúsùn ti parí",
+      "statusBlocked": "Àfojúsùn ti dí",
+      "edit": "Ṣàtúnṣe àfojúsùn",
+      "remove": "Yọ àfojúsùn kuro",
+      "pause": "Dá àfojúsùn dúró",
+      "resume": "Tẹ̀síwájú àfojúsùn",
+      "editPlaceholder": "Ṣàpèjúwe àfojúsùn",
+      "removeConfirmTitle": "Yọ àfojúsùn kuro?",
+      "removeConfirmMessage": "CLI ń pa àfojúsùn ìpàdé yìí rẹ́.",
+      "updateFailed": "A kò lè ṣàtúnṣe àfojúsùn.",
+      "sectionAccessibility": "{{status}}. Àfojúsùn: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "So GitHub pọ̀ nínú aṣàwákiri rẹ, lẹ́yìn náà padà síbí láti yan ibi ìpamọ́ kóòdù.",
       "openGithub": "Ṣí GitHub",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "ìgbésẹ̀ {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Ìfọwọ́sí aládàáṣiṣẹ́",
+      "description": "Fọwọ́sí àwọn ìbéèrè ìyọ̀ǹda fún ìpàdé yìí lọ́nà aládàáṣiṣẹ́. Lẹ́yìn náà àwọn irinṣẹ́ máa ṣiṣẹ́ láìsí ìbéèrè.",
+      "unavailable": "Ìpàdé yìí kò lè gba àwọn ìbéèrè ìyọ̀ǹda."
+    },
     "prBadge": {
       "open": "ṣí ìbéèrè àkópọ̀",
       "closed": "ìbéèrè ìṣọ̀kan kóòdù tí a ti pa dé",
@@ -2469,6 +2494,10 @@
       "tapToListHint": "Tẹ fódà kan láti wo àkójọ àwọn ohun inú rẹ̀.",
       "unsupportedDescription": "CLI yìí kò lè ṣe àkójọ àwọn fódà. Tí o bá tẹ Parí, fódà ìbẹ̀rẹ̀ ni a ó lò. Tí o bá tẹ Bẹ̀rẹ̀ ìgbà iṣẹ́, ibẹ̀ ni iṣẹ́ yóò ti bẹ̀rẹ̀.",
       "unsupportedTitle": "Àkójọ àwọn fódà kò ṣeé fihàn"
+    },
+    "toolRun": {
+      "sheetTitle": "Àwọn ìpè ohun èlò",
+      "condensedLabel": "{{itemCount}} ohun; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "Àwòṣe ìyípadà yìí kò sí. Yan òmíràn nínú Àwọn ààyò.",
     "gatewayModelUnavailableNotice": "A kìí ṣe àwòṣe yìí mọ́. Tẹ $t(transcriptionModel.title) láti yan òmíràn.",
     "gatewaySignInRequired": "Wọlé láti lo ìyípadà ohùn sí ọ̀rọ̀ pẹ̀lú Kilo Gateway.",
-    "gatewayNoModel": "Ní àkọ́kọ́, yan àwòṣe ìyípadà ohùn sí ọ̀rọ̀ nínú Àwọn ààyò."
+    "gatewayNoModel": "Ní àkọ́kọ́, yan àwòṣe ìyípadà ohùn sí ọ̀rọ̀ nínú Àwọn ààyò.",
+    "testTitle": "Dán títẹ ọ̀rọ̀ pẹ̀lú ohùn wò",
+    "testPlaceholder": "Tẹ míkírọ́fóònù kí o sì bẹ̀rẹ̀ sí sọ̀rọ̀.",
+    "testClear": "Pa ọ̀rọ̀ rẹ́"
   },
   "share": {
     "title": "Pín sí Kilo",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "Kò sí àwòṣe ìyípadà ohùn sí ọ̀rọ̀",
     "emptyDescription": "Kilo Gateway kò pèsè àwòṣe ìyípadà ohùn sí ọ̀rọ̀ ní báyìí.",
     "loadFailed": "A kò lè gbé àwòṣe ìyípadà ohùn sí ọ̀rọ̀ wọlé."
+  },
+  "voiceLanguage": {
+    "title": "Èdè títẹ ọ̀rọ̀ pẹ̀lú ohùn",
+    "automatic": "Aládàáṣiṣẹ́",
+    "loadFailed": "A kò lè gbé àwọn èdè tí ẹ̀rọ yìí ń ṣe àtìlẹ́yìn fún.",
+    "emptyTitle": "Kò sí èdè tí a ṣe àtìlẹ́yìn fún",
+    "emptyDescription": "Ìdánimọ̀ ọ̀rọ̀-ẹnu ti ẹ̀rọ yìí kò sọ èdè tí a ṣe àtìlẹ́yìn fún kankan."
   }
 }

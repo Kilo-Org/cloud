@@ -2,6 +2,7 @@ import { SlidersHorizontal } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { filterButtonAccessibilityLabel } from '@/components/agents/session-filter-button-label';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -32,10 +33,12 @@ export function SessionFilterButton({
       // left slop capped against the 16px gap, right slop reaches 44pt wide
       hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
       accessibilityRole="button"
-      accessibilityLabel={t('agentChat.sessionFilter.title')}
-      // The count is spoken as the button's value, so no new translated string
-      // is needed to announce "Filter sessions, 2".
-      accessibilityValue={isActive ? { text: String(activeCount) } : undefined}
+      // The count is spoken as part of the name, so no new translated string is
+      // needed to announce "Filter sessions, 2".
+      accessibilityLabel={filterButtonAccessibilityLabel(
+        t('agentChat.sessionFilter.title'),
+        activeCount
+      )}
       testID={testID}
       className="active:opacity-70"
     >

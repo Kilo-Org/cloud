@@ -231,6 +231,8 @@
     "voiceInput": "குரல் உள்ளீடு",
     "autoExpandThinking": "சிந்தனையைத் தானாக விரிக்கவும்",
     "autoExpandThinkingSubtitle": "ஏஜென்ட் சிந்தித்து முடித்ததும் அதன் சிந்தனையை விரித்துக் காட்டவும்.",
+    "hideThinking": "சிந்தனை விவரங்களை மறைக்கவும்",
+    "hideThinkingSubtitle": "அமர்வுப் பக்கத்தில் ஏஜென்ட்டின் சிந்தனையைக் காட்ட வேண்டாம்.",
     "keepScreenOn": "அமர்வுப் பக்கத்தில் இருக்கும்போது திரை அணையாமல் வைக்கவும்",
     "keepScreenOnSubtitle": "அமர்வு இயங்கும்போது திரை அணையாமல் வைக்கவும்.",
     "appearance": "தோற்றம்",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway மூலம் பேச்சு உரையாக்கம்",
     "gatewayTranscriptionSubtitle": "சாதனத்தின் பேச்சு அடையாளப்படுத்தலுக்குப் பதிலாக Kilo Gateway மாதிரியைப் பயன்படுத்தி குரல் உள்ளீட்டை உரையாக்குங்கள். உங்கள் பதிவு Kilo Gateway-க்கு அனுப்பப்படுகிறது.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "கருவி அழைப்புகளைச் சுருக்கு",
+    "condenseToolCallsSubtitle": "தொடர்ச்சியான கருவி அழைப்புகளை நீங்கள் திறக்கக்கூடிய ஒரு வரிசையில் தொகுக்கவும்."
   },
   "prReview": {
     "pullRequestUnavailable": "இணைப்புக் கோரிக்கை கிடைக்கவில்லை",
@@ -1996,6 +2000,22 @@
       "connectionLost": "இணைப்பு துண்டிக்கப்பட்டது",
       "retryConnection": "மீண்டும் இணைக்க முயற்சிக்கவும்"
     },
+    "goal": {
+      "title": "இலக்கு",
+      "statusActive": "செயலில் உள்ள இலக்கு",
+      "statusPaused": "இடைநிறுத்தப்பட்ட இலக்கு",
+      "statusComplete": "இலக்கு நிறைவடைந்தது",
+      "statusBlocked": "இலக்கு தடுக்கப்பட்டது",
+      "edit": "இலக்கைத் திருத்து",
+      "remove": "இலக்கை அகற்று",
+      "pause": "இலக்கை இடைநிறுத்து",
+      "resume": "இலக்கை மீண்டும் தொடங்கு",
+      "editPlaceholder": "இலக்கை விவரிக்கவும்",
+      "removeConfirmTitle": "இலக்கை அகற்றவா?",
+      "removeConfirmMessage": "இந்த அமர்வின் இலக்கை CLI அழிக்கிறது.",
+      "updateFailed": "இலக்கைப் புதுப்பிக்க முடியவில்லை.",
+      "sectionAccessibility": "{{status}}. இலக்கு: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "உலாவியில் GitHub-ஐ இணைக்கவும். பின்னர் களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
       "openGithub": "GitHub-ஐத் திறக்கவும்",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "{{steps}} படிகள்",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "தானியங்கி ஒப்புதல்",
+      "description": "இந்த அமர்விற்கான அனுமதிக் கோரிக்கைகளை தானாக ஒப்புதல் அளிக்கவும். பின்னர் கருவிகள் வினவல் இல்லாமல் இயங்கும்.",
+      "unavailable": "இந்த அமர்வால் அனுமதிக் கோரிக்கைகளைப் பெற முடியாது."
+    },
     "prBadge": {
       "open": "pR திறப்பு",
       "closed": "மூடப்பட்ட PR",
@@ -2469,6 +2494,10 @@
       "retryableDescription": "உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும். முடிந்தது என்பதைத் தட்டினால் இப்போதும் இந்தக் கோப்புறையைத் தேர்ந்தெடுக்கலாம்.",
       "unsupportedTitle": "கோப்புறைகளைப் பட்டியலிட முடியாது",
       "unsupportedDescription": "இந்த CLI-இல் கோப்புறைகளைப் பட்டியலிட முடியாது. முடிந்தது என்பதைத் தட்டினால் தொடக்கக் கோப்புறை தக்கவைக்கப்படும். அமர்வைத் தொடங்கவும் என்பதைத் தட்டினால் அமர்வு அங்கே தொடங்கும்."
+    },
+    "toolRun": {
+      "sheetTitle": "கருவி அழைப்புகள்",
+      "condensedLabel": "{{itemCount}} உருப்படிகள்; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "இந்த உரையாக்க மாதிரி கிடைக்கவில்லை. விருப்பத்தேர்வுகளில் வேறொன்றைத் தேர்ந்தெடுக்கவும்.",
     "gatewayModelUnavailableNotice": "இந்த மாதிரி இனி வழங்கப்படாது. வேறொன்றைத் தேர்ந்தெடுக்க $t(transcriptionModel.title) தட்டவும்.",
     "gatewaySignInRequired": "Kilo Gateway உரையாக்கத்தைப் பயன்படுத்த உள்நுழையவும்.",
-    "gatewayNoModel": "முதலில் விருப்பத்தேர்வுகளில் உரையாக்க மாதிரியைத் தேர்ந்தெடுக்கவும்."
+    "gatewayNoModel": "முதலில் விருப்பத்தேர்வுகளில் உரையாக்க மாதிரியைத் தேர்ந்தெடுக்கவும்.",
+    "testTitle": "குரல் உள்ளீட்டைச் சோதிக்கவும்",
+    "testPlaceholder": "மைக்ரோஃபோனைத் தட்டி பேசத் தொடங்கவும்.",
+    "testClear": "உரையை அழிக்கவும்"
   },
   "share": {
     "title": "Kilo-வுக்குப் பகிர்தல்",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "உரையாக்க மாதிரிகள் இல்லை",
     "emptyDescription": "Kilo Gateway தற்போது உரையாக்க மாதிரிகளை வழங்கவில்லை.",
     "loadFailed": "உரையாக்க மாதிரிகளை ஏற்ற முடியவில்லை."
+  },
+  "voiceLanguage": {
+    "title": "குரல் உள்ளீட்டு மொழி",
+    "automatic": "தானியங்கி",
+    "loadFailed": "இந்தச் சாதனம் ஆதரிக்கும் மொழிகளை ஏற்ற முடியவில்லை.",
+    "emptyTitle": "ஆதரிக்கப்படும் மொழிகள் இல்லை",
+    "emptyDescription": "இந்தச் சாதனத்தின் பேச்சு அறிதல் ஆதரிக்கப்படும் மொழிகள் எதையும் தெரிவிக்கவில்லை."
   }
 }

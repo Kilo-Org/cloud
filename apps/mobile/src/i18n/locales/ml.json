@@ -231,6 +231,8 @@
     "voiceInput": "ശബ്ദ ഇൻപുട്ട്",
     "autoExpandThinking": "ചിന്തയുടെ വിശദാംശങ്ങൾ സ്വയമേവ കാണിക്കുക",
     "autoExpandThinkingSubtitle": "ഏജന്റ് ചിന്തിച്ച് കഴിയുമ്പോൾ അതിന്റെ വിശദാംശങ്ങൾ പൂർണ്ണമായി കാണിക്കുക.",
+    "hideThinking": "ചിന്തയുടെ വിശദാംശങ്ങൾ മറയ്ക്കുക",
+    "hideThinkingSubtitle": "സെഷൻ പേജിൽ ഏജന്റിന്റെ ചിന്ത കാണിക്കരുത്.",
     "keepScreenOn": "സെഷൻ പേജിലായിരിക്കുമ്പോൾ സ്ക്രീൻ ഓണാക്കി നിർത്തുക",
     "keepScreenOnSubtitle": "സെഷൻ പ്രവർത്തിക്കുമ്പോൾ സ്ക്രീൻ ഓണാക്കി നിർത്തുക.",
     "appearance": "ദൃശ്യരൂപം",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway വഴിയുള്ള ശബ്ദം ടെക്സ്റ്റാക്കൽ",
     "gatewayTranscriptionSubtitle": "ഉപകരണത്തിന്റെ സ്പീച്ച് റെക്കഗ്നിഷന് പകരം Kilo Gateway മോഡൽ ഉപയോഗിച്ച് ശബ്ദ ഇൻപുട്ട് ടെക്സ്റ്റാക്കുക. നിങ്ങളുടെ റെക്കോർഡിംഗ് Kilo Gateway-ലേക്ക് അയയ്ക്കുന്നു.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ടൂൾ വിളികൾ ചുരുക്കുക",
+    "condenseToolCallsSubtitle": "തുടർച്ചയായ ടൂൾ വിളികളെ നിങ്ങൾക്ക് തുറക്കാവുന്ന ഒരു വരിയിൽ ഗ്രൂപ്പുചെയ്യുക."
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
@@ -1996,6 +2000,22 @@
       "connectionLost": "കണക്ഷൻ നഷ്ടപ്പെട്ടു",
       "retryConnection": "വീണ്ടും കണക്റ്റ് ചെയ്യാൻ ശ്രമിക്കുക"
     },
+    "goal": {
+      "title": "ലക്ഷ്യം",
+      "statusActive": "സജീവ ലക്ഷ്യം",
+      "statusPaused": "താൽക്കാലികമായി നിർത്തിയ ലക്ഷ്യം",
+      "statusComplete": "ലക്ഷ്യം പൂർത്തിയായി",
+      "statusBlocked": "ലക്ഷ്യം തടഞ്ഞു",
+      "edit": "ലക്ഷ്യം എഡിറ്റ് ചെയ്യുക",
+      "remove": "ലക്ഷ്യം നീക്കുക",
+      "pause": "ലക്ഷ്യം താൽക്കാലികമായി നിർത്തുക",
+      "resume": "ലക്ഷ്യം തുടരുക",
+      "editPlaceholder": "ലക്ഷ്യം വിവരിക്കുക",
+      "removeConfirmTitle": "ലക്ഷ്യം നീക്കണോ?",
+      "removeConfirmMessage": "ഈ സെഷന്റെ ലക്ഷ്യം CLI മായ്ക്കുന്നു.",
+      "updateFailed": "ലക്ഷ്യം അപ്ഡേറ്റ് ചെയ്യാനായില്ല.",
+      "sectionAccessibility": "{{status}}. ലക്ഷ്യം: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ബ്രൗസറിൽ GitHub കണക്റ്റ് ചെയ്യുക. തുടർന്ന് ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കാൻ ഇവിടെ മടങ്ങിയെത്തുക.",
       "openGithub": "GitHub തുറക്കുക",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "{{steps}} ഘട്ടങ്ങൾ",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "സ്വയം അനുമതി",
+      "description": "ഈ സെഷനിലെ അനുമതി അഭ്യർത്ഥനകൾ സ്വയമേവ അംഗീകരിക്കുക. തുടർന്ന് ഉപകരണങ്ങൾ ഒരു പ്രോംപ്റ്റ് ഇല്ലാതെ പ്രവർത്തിക്കും.",
+      "unavailable": "ഈ സെഷന് അനുമതി അഭ്യർത്ഥനകൾ സ്വീകരിക്കാനാവില്ല."
+    },
     "prBadge": {
       "open": "തുറന്ന പുൾ റിക്വസ്റ്റ്",
       "closed": "അടച്ച പുൾ റിക്വസ്റ്റ്",
@@ -2469,6 +2494,10 @@
       "retryableDescription": "കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക. 'പൂർത്തിയായി' അമർത്തി ഈ ഫോൾഡർ തിരഞ്ഞെടുക്കാൻ ഇപ്പോഴും കഴിയും.",
       "unsupportedTitle": "ഫോൾഡറുകൾ പട്ടികപ്പെടുത്താൻ കഴിയില്ല",
       "unsupportedDescription": "ഈ CLI-ക്ക് ഫോൾഡറുകൾ പട്ടികപ്പെടുത്താൻ കഴിയില്ല. 'പൂർത്തിയായി' അമർത്തിയാൽ CLI ആരംഭിച്ച ഫോൾഡർ നിലനിർത്തും. 'സെഷൻ ആരംഭിക്കുക' അമർത്തിയാൽ സെഷൻ അവിടെ ആരംഭിക്കും."
+    },
+    "toolRun": {
+      "sheetTitle": "ടൂൾ വിളികൾ",
+      "condensedLabel": "{{itemCount}} ഇനങ്ങൾ; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "ഈ ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ ലഭ്യമല്ല. മുൻഗണനകളിൽ മറ്റൊന്ന് തിരഞ്ഞെടുക്കുക.",
     "gatewayModelUnavailableNotice": "ഈ മോഡൽ ഇനി ലഭ്യമല്ല. മറ്റൊന്ന് തിരഞ്ഞെടുക്കാൻ $t(transcriptionModel.title) ടാപ്പ് ചെയ്യുക.",
     "gatewaySignInRequired": "Kilo Gateway വഴിയുള്ള ടെക്സ്റ്റാക്കൽ ഉപയോഗിക്കാൻ സൈൻ ഇൻ ചെയ്യുക.",
-    "gatewayNoModel": "ആദ്യം മുൻഗണനകളിൽ ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ തിരഞ്ഞെടുക്കുക."
+    "gatewayNoModel": "ആദ്യം മുൻഗണനകളിൽ ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ തിരഞ്ഞെടുക്കുക.",
+    "testTitle": "ശബ്ദ ഇൻപുട്ട് പരിശോധിക്കുക",
+    "testPlaceholder": "മൈക്രോഫോൺ ടാപ്പ് ചെയ്ത് സംസാരിക്കാൻ തുടങ്ങുക.",
+    "testClear": "ടെക്സ്റ്റ് മായ്ക്കുക"
   },
   "share": {
     "title": "Kilo-യിലേക്ക് പങ്കിടുക",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "ശബ്ദം ടെക്സ്റ്റാക്കാൻ മോഡലുകളില്ല",
     "emptyDescription": "Kilo Gateway ഇപ്പോൾ ശബ്ദം ടെക്സ്റ്റാക്കാൻ മോഡലുകൾ നൽകുന്നില്ല.",
     "loadFailed": "ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡലുകൾ ലോഡ് ചെയ്യാനായില്ല."
+  },
+  "voiceLanguage": {
+    "title": "ശബ്ദ ഇൻപുട്ടിന്റെ ഭാഷ",
+    "automatic": "ഓട്ടോ",
+    "loadFailed": "ഈ ഉപകരണം പിന്തുണയ്ക്കുന്ന ഭാഷകൾ ലോഡ് ചെയ്യാനായില്ല.",
+    "emptyTitle": "പിന്തുണയ്ക്കുന്ന ഭാഷകളില്ല",
+    "emptyDescription": "ഈ ഉപകരണത്തിന്റെ ശബ്ദ തിരിച്ചറിയൽ പിന്തുണയ്ക്കുന്ന ഭാഷകളൊന്നും റിപ്പോർട്ട് ചെയ്യുന്നില്ല."
   }
 }

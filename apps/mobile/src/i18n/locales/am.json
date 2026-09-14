@@ -231,6 +231,8 @@
     "voiceInput": "የድምጽ ግቤት",
     "autoExpandThinking": "አስተሳሰቡን በራስ ሰር ያስፉ",
     "autoExpandThinkingSubtitle": "ወኪሉ ማሰቡን ሲጨርስ አስተሳሰቡን ተዘርግቶ ያሳዩ።",
+    "hideThinking": "የአስተሳሰብ ዝርዝሮችን ደብቅ",
+    "hideThinkingSubtitle": "የወኪሉን አስተሳሰብ በክፍለ ጊዜ ገጽ ላይ አታሳዩ።",
     "keepScreenOn": "በክፍለ ጊዜ ገጽ ላይ ሲሆኑ ማያ ገጹን እንደበራ ያቆዩ",
     "keepScreenOnSubtitle": "ክፍለ ጊዜው እየሠራ እያለ ማያ ገጹን እንደበራ ያቆዩ።",
     "appearance": "መልክ",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "በKilo Gateway ድምጽን ወደ ጽሑፍ መቀየር",
     "gatewayTranscriptionSubtitle": "የድምፅ ግብዓትን በመሣሪያው የንግግር ማውቂያ ምትክ በKilo Gateway ሞዴል ወደ ጽሑፍ ቀይሩ። ቀረጻዎ ወደ Kilo Gateway ይላካል።",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "የመሳሪያ ጥሪዎችን መጨመቅ",
+    "condenseToolCallsSubtitle": "ተከታታይ የመሳሪያ ጥሪዎችን መክፈት በሚችሉት አንድ ረድፍ ውስጥ ይሰብስቡ።"
   },
   "prReview": {
     "pullRequestUnavailable": "የማዋሃድ ጥያቄው አይገኝም",
@@ -1996,6 +2000,22 @@
       "connectionLost": "ግንኙነቱ ተቋርጧል",
       "retryConnection": "እንደገና ለመገናኘት ይሞክሩ"
     },
+    "goal": {
+      "title": "ግብ",
+      "statusActive": "ንቁ ግብ",
+      "statusPaused": "የቆመ ግብ",
+      "statusComplete": "ግብ ተጠናቅቋል",
+      "statusBlocked": "ግብ ተዘግቷል",
+      "edit": "ግብን አርትዕ",
+      "remove": "ግብን አስወግድ",
+      "pause": "ግብን አቁም",
+      "resume": "ግብን ቀጥል",
+      "editPlaceholder": "ግቡን ይግለጹ",
+      "removeConfirmTitle": "ግብ ይወገድ?",
+      "removeConfirmMessage": "CLI የዚህን ክፍለ ጊዜ ግብ ያጸዳል።",
+      "updateFailed": "ግቡን ማዘመን አልተቻለም።",
+      "sectionAccessibility": "{{status}}። ግብ፦ {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "GitHubን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
       "openGithub": "GitHubን ይክፈቱ",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "{{steps}} እርምጃዎች",
       "modelAccessibilityLabel": "{{name}}፣ {{provider}}፣ {{steps}}፣ {{cost}}"
     },
+    "autoApprove": {
+      "title": "ራስ-ሰር ማጽደቅ",
+      "description": "የዚህ ክፍለ ጊዜ የፈቃድ ጥያቄዎችን በራስ-ሰር ያጽድቁ። በኋላም መሣሪያዎች ያለ ጥያቄ ይሠራሉ።",
+      "unavailable": "ይህ ክፍለ ጊዜ የፈቃድ ጥያቄዎችን ማግኘት አይችልም።"
+    },
     "prBadge": {
       "open": "ክፍት የማዋሃድ ጥያቄ",
       "closed": "የተዘጋ የማዋሃድ ጥያቄ",
@@ -2469,6 +2494,10 @@
       "retryableDescription": "ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ። ይህን አቃፊ ለማረጋገጥ አሁንም «ተከናውኗል»ን መንካት ይችላሉ።",
       "unsupportedTitle": "አቃፊዎችን መዘርዘር አይቻልም",
       "unsupportedDescription": "ይህ CLI አቃፊዎችን መዘርዘር አይችልም። «ተከናውኗል»ን ሲነኩ የመነሻ አቃፊው እንዳለ ይቆያል። «ክፍለ ጊዜውን ያስጀምሩ»ን ሲነኩ ክፍለ ጊዜው በዚያው ይጀምራል።"
+    },
+    "toolRun": {
+      "sheetTitle": "የመሳሪያ ጥሪዎች",
+      "condensedLabel": "{{itemCount}} ንጥሎች; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "ይህ የድምጽ ወደ ጽሑፍ ሞዴል አይገኝም። በምርጫዎች ውስጥ ሌላ ይምረጡ።",
     "gatewayModelUnavailableNotice": "ይህ ሞዴል ከእንግዲህ አይቀርብም። ሌላ ለመምረጥ $t(transcriptionModel.title) ይንኩ።",
     "gatewaySignInRequired": "በKilo Gateway ለመቀየር ይግቡ።",
-    "gatewayNoModel": "በምርጫዎች ውስጥ መጀመሪያ የድምጽ ወደ ጽሑፍ ሞዴል ይምረጡ።"
+    "gatewayNoModel": "በምርጫዎች ውስጥ መጀመሪያ የድምጽ ወደ ጽሑፍ ሞዴል ይምረጡ።",
+    "testTitle": "የድምፅ ግብዓትን ይፈትሹ",
+    "testPlaceholder": "ማይክሮፎኑን ነክተው መናገር ይጀምሩ።",
+    "testClear": "ጽሑፉን አጽዳ"
   },
   "share": {
     "title": "ወደ Kilo ማጋራት",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "ምንም የድምጽ ወደ ጽሑፍ ሞዴሎች የሉም",
     "emptyDescription": "Kilo Gateway በአሁኑ ሰዓት ምንም የድምጽ ወደ ጽሑፍ ሞዴሎችን አያቀርብም።",
     "loadFailed": "የድምጽ ወደ ጽሑፍ ሞዴሎችን መጫን አልተቻለም።"
+  },
+  "voiceLanguage": {
+    "title": "የድምፅ ግብዓት ቋንቋ",
+    "automatic": "ራስ-ሰር",
+    "loadFailed": "ይህ መሣሪያ የሚደግፋቸውን ቋንቋዎች መጫን አልተቻለም።",
+    "emptyTitle": "የሚደገፉ ቋንቋዎች የሉም",
+    "emptyDescription": "የዚህ መሣሪያ የድምፅ መለያ የሚደገፍ ቋንቋ አልዘረዘረም።"
   }
 }

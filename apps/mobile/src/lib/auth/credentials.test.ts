@@ -1,7 +1,6 @@
-/* oxlint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom) */
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, string>();
@@ -70,7 +69,13 @@ vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
   clearPrReviewFooterPreference: vi.fn(),
 }));
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  clearCondenseToolCallsPreference: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference: vi.fn() }));
+vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
+  clearHideThinkingPreference: vi.fn(),
+}));
 vi.mock('@/lib/kiloclaw-tab-ownership', () => ({
   gateKiloClawOwned: vi.fn(),
   clearKiloClawOwned: vi.fn(),

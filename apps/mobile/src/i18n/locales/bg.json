@@ -231,6 +231,8 @@
     "voiceInput": "Гласово въвеждане",
     "autoExpandThinking": "Автоматично разгъване на разсъжденията",
     "autoExpandThinkingSubtitle": "Показвай разсъжденията на агента разгънати, след като приключат.",
+    "hideThinking": "Скриване на подробностите за разсъжденията",
+    "hideThinkingSubtitle": "Да не се показват разсъжденията на агента на страницата на сесията.",
     "keepScreenOn": "Дръж екрана включен при отворена сесия",
     "keepScreenOnSubtitle": "Дръж екрана включен, докато сесията работи.",
     "appearance": "Изглед",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Транскрипция през Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Преобразувай гласовото въвеждане с модел на Kilo Gateway вместо разпознаването на реч на устройството. Записът ти се изпраща до Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Свиване на извиквания на инструменти",
+    "condenseToolCallsSubtitle": "Групирайте последователни извиквания на инструменти в един ред, който можете да отворите."
   },
   "prReview": {
     "pullRequestUnavailable": "Недостъпна заявка за обединяване",
@@ -1996,6 +2000,22 @@
       "connectionLost": "Прекъсната връзка",
       "retryConnection": "Опитай да се свържеш отново"
     },
+    "goal": {
+      "title": "Цел",
+      "statusActive": "Активна цел",
+      "statusPaused": "Цел на пауза",
+      "statusComplete": "Целта е изпълнена",
+      "statusBlocked": "Целта е блокирана",
+      "edit": "Редактиране на целта",
+      "remove": "Премахване на целта",
+      "pause": "Пауза на целта",
+      "resume": "Продължаване на целта",
+      "editPlaceholder": "Опишете целта",
+      "removeConfirmTitle": "Премахване на целта?",
+      "removeConfirmMessage": "CLI изчиства целта на тази сесия.",
+      "updateFailed": "Целта не можа да се обнови.",
+      "sectionAccessibility": "{{status}}. Цел: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Свържи GitHub в браузъра си, след което се върни тук, за да избереш хранилище.",
       "openGithub": "Отвори GitHub",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "{{steps}} стъпки",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Автоматично одобряване",
+      "description": "Автоматично одобряване на заявките за разрешение за тази сесия. След това инструментите работят без подкана.",
+      "unavailable": "Тази сесия не може да получава заявки за разрешение."
+    },
     "prBadge": {
       "open": "отваряне на заявка за сливане",
       "closed": "затворена заявка за сливане",
@@ -2469,6 +2494,10 @@
       "tapToListHint": "Докосни папка, за да видиш съдържанието ѝ.",
       "unsupportedDescription": "Този CLI не може да показва списък с папки. С „Готово“ запазваш началната папка, а със „Започни сесия“ стартираш сесията в нея.",
       "unsupportedTitle": "Списъкът с папки е недостъпен"
+    },
+    "toolRun": {
+      "sheetTitle": "Извиквания на инструменти",
+      "condensedLabel": "{{itemCount}} елемента; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "Този модел за транскрипция не е наличен. Избери друг в Предпочитания.",
     "gatewayModelUnavailableNotice": "Този модел вече не се предлага. Докосни $t(transcriptionModel.title), за да избереш друг.",
     "gatewaySignInRequired": "Влез, за да използваш транскрипция през Kilo Gateway.",
-    "gatewayNoModel": "Първо избери модел за транскрипция в Предпочитания."
+    "gatewayNoModel": "Първо избери модел за транскрипция в Предпочитания.",
+    "testTitle": "Тестване на гласовото въвеждане",
+    "testPlaceholder": "Докоснете микрофона и започнете да говорите.",
+    "testClear": "Изчистване на текста"
   },
   "share": {
     "title": "Споделяне в Kilo",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "Няма модели за транскрипция",
     "emptyDescription": "Kilo Gateway в момента не предлага модели за транскрипция.",
     "loadFailed": "Моделите за транскрипция не се заредиха."
+  },
+  "voiceLanguage": {
+    "title": "Език на гласовото въвеждане",
+    "automatic": "Автоматично",
+    "loadFailed": "Езиците, поддържани от това устройство, не можаха да се заредят.",
+    "emptyTitle": "Няма поддържани езици",
+    "emptyDescription": "Разпознаването на реч на това устройство не отчита поддържани езици."
   }
 }

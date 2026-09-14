@@ -1,6 +1,7 @@
 import { createServiceState } from './service-state';
 import type { ServiceStateConfig } from './service-state';
 import type { Session, QuestionInfo } from '@kilocode/app-shared/opencode';
+import type { SessionGoal } from './types';
 
 function makeConfig(overrides?: Partial<ServiceStateConfig>): ServiceStateConfig {
   return { rootSessionId: 'root-1', ...overrides };
@@ -454,6 +455,55 @@ describe('createServiceState', () => {
 
       expect(onSessionUpdated).toHaveBeenCalledWith(childInfo);
       expect(state.getSessionInfo()).toBe(rootInfo);
+    });
+  });
+
+  describe('goal reason preservation', () => {
+    const completeGoal: SessionGoal = {
+      text: 'Report the goal finished with a reason',
+      status: 'complete',
+      reason: 'Reported by the working model, not independently verified.',
+    };
+
+    it('keeps a known reason when a later update for the same goal omits it', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'session.created', info: { id: 'root-1', goal: completeGoal } });
+      state.process({
+        type: 'session.updated',
+        info: { id: 'root-1', goal: { text: completeGoal.text, status: 'complete' } },
+      });
+
+      expect(state.getSessionInfo()?.goal).toEqual(completeGoal);
+    });
+
+    it('drops the reason when the goal status changes (resume)', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'session.created', info: { id: 'root-1', goal: completeGoal } });
+      state.process({
+        type: 'session.updated',
+        info: { id: 'root-1', goal: { text: completeGoal.text, status: 'active' } },
+      });
+
+      expect(state.getSessionInfo()?.goal).toEqual({ text: completeGoal.text, status: 'active' });
+    });
+
+    it('drops the reason when the goal text changes (edit)', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'session.created', info: { id: 'root-1', goal: completeGoal } });
+      state.process({
+        type: 'session.updated',
+        info: { id: 'root-1', goal: { text: 'New objective', status: 'complete' } },
+      });
+
+      expect(state.getSessionInfo()?.goal).toEqual({ text: 'New objective', status: 'complete' });
+    });
+
+    it('does not carry a reason across a different session', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'session.created', info: { id: 'root-1', goal: completeGoal } });
+      state.process({ type: 'session.created', info: { id: 'root-2' } });
+
+      expect(state.getSessionInfo()).toEqual({ id: 'root-2' });
     });
   });
 

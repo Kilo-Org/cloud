@@ -1,6 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts the native tree without a DOM. */
+/* eslint-disable max-lines -- the full react-native mock harness (FlatList, Platform for SheetHeader) stays inline so the picker contract reads as one screen */
 import { createElement, type EffectCallback, Fragment, type ReactNode, useEffect } from 'react';
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { type UseQueryOptions } from '@tanstack/react-query';
 
@@ -27,6 +27,8 @@ type ListProps<T> = {
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  StatusBar: { currentHeight: 0 },
   FlatList: <T,>(props: ListProps<T>) =>
     createElement(
       'FlatList',

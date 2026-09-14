@@ -1,5 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
-
 // Finding-analysis completion-copy gate: sandbox/triage evidence is
 // authoritative only once the analysis reached a terminal sandbox/triage
 // state. A stale result left behind by a failed retry must not read as
@@ -15,7 +13,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FindingAnalysisPanel } from './finding-analysis-panel';

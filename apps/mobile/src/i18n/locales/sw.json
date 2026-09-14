@@ -231,6 +231,8 @@
     "voiceInput": "Uingizaji wa sauti",
     "autoExpandThinking": "Panua mawazo kiotomatiki",
     "autoExpandThinkingSubtitle": "Onyesha mawazo ya wakala yakiwa yamepanuliwa anapomaliza kufikiri.",
+    "hideThinking": "Ficha maelezo ya mawazo",
+    "hideThinkingSubtitle": "Usionyeshe mawazo ya wakala kwenye ukurasa wa kikao.",
     "keepScreenOn": "Acha skrini iwake ukiwa kwenye ukurasa wa kikao",
     "keepScreenOnSubtitle": "Acha skrini iwake wakati kikao kinaendelea.",
     "appearance": "Mwonekano",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Unukuzi wa sauti kupitia Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Badilisha uingizaji wa sauti kuwa maandishi kwa modeli ya Kilo Gateway badala ya utambuzi wa sauti wa kifaa. Rekodi yako imetumwa kwa Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Finyaza miito ya zana",
+    "condenseToolCallsSubtitle": "Kusanya miito ya zana inayofuatana katika safu moja unayoweza kufungua."
   },
   "prReview": {
     "pullRequestUnavailable": "Ombi la kuunganisha halipatikani",
@@ -1996,6 +2000,22 @@
       "connectionLost": "Muunganisho umekatika",
       "retryConnection": "Jaribu kuunganisha tena"
     },
+    "goal": {
+      "title": "Lengo",
+      "statusActive": "Lengo amilifu",
+      "statusPaused": "Lengo lililositishwa",
+      "statusComplete": "Lengo limekamilika",
+      "statusBlocked": "Lengo limezuiwa",
+      "edit": "Hariri lengo",
+      "remove": "Ondoa lengo",
+      "pause": "Sitisha lengo",
+      "resume": "Endeleza lengo",
+      "editPlaceholder": "Eleza lengo",
+      "removeConfirmTitle": "Ondoa lengo?",
+      "removeConfirmMessage": "CLI hufuta lengo la kikao hiki.",
+      "updateFailed": "Lengo halikuweza kusasishwa.",
+      "sectionAccessibility": "{{status}}. Lengo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Unganisha GitHub kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
       "openGithub": "Fungua GitHub",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "Hatua {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Kuidhinisha kiotomatiki",
+      "description": "Idhinisha kiotomatiki maombi ya ruhusa kwa kipindi hiki. Zana kisha huendesha bila ombi.",
+      "unavailable": "Kipindi hiki hakiwezi kupokea maombi ya ruhusa."
+    },
     "prBadge": {
       "open": "fungua ombi la kuunganisha",
       "closed": "ombi la kuunganisha mabadiliko lililofungwa",
@@ -2469,6 +2494,10 @@
       "tapToListHint": "Gusa folda ili uone yaliyomo.",
       "unsupportedDescription": "CLI hii haiwezi kuorodhesha folda. Ukigusa Maliza, folda ya kuanzia itahifadhiwa. Ukigusa Anza kikao, kikao kitaanza hapo.",
       "unsupportedTitle": "Haiwezekani kuorodhesha folda"
+    },
+    "toolRun": {
+      "sheetTitle": "Miito ya zana",
+      "condensedLabel": "{{itemCount}} vipengee; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "Modeli hii ya unukuzi haipatikani. Chagua nyingine katika Mapendeleo.",
     "gatewayModelUnavailableNotice": "Modeli hii haitolewi tena. Gusa $t(transcriptionModel.title) kuchagua nyingine.",
     "gatewaySignInRequired": "Ingia ili utumie unukuzi wa Kilo Gateway.",
-    "gatewayNoModel": "Kwanza chagua modeli ya unukuzi katika Mapendeleo."
+    "gatewayNoModel": "Kwanza chagua modeli ya unukuzi katika Mapendeleo.",
+    "testTitle": "Jaribu kuingiza kwa sauti",
+    "testPlaceholder": "Gusa maikrofoni na anza kuzungumza.",
+    "testClear": "Futa maandishi"
   },
   "share": {
     "title": "Kushiriki kwenye Kilo",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "Hakuna modeli za unukuzi",
     "emptyDescription": "Kilo Gateway haina modeli za unukuzi kwa sasa.",
     "loadFailed": "Imeshindikana kupakia modeli za unukuzi."
+  },
+  "voiceLanguage": {
+    "title": "Lugha ya kuingiza kwa sauti",
+    "automatic": "Kiotomatiki",
+    "loadFailed": "Imeshindwa kupakia lugha zinazoauniwa na kifaa hiki.",
+    "emptyTitle": "Hakuna lugha zinazoauniwa",
+    "emptyDescription": "Utambuzi wa usemi wa kifaa hiki hauripoti lugha yoyote inayoauniwa."
   }
 }

@@ -231,6 +231,8 @@
     "voiceInput": "Glasovni vnos",
     "autoExpandThinking": "Samodejno razširi razmišljanje",
     "autoExpandThinkingSubtitle": "Ko agent konča razmišljanje, prikaži njegovo celotno vsebino.",
+    "hideThinking": "Skrij podrobnosti razmišljanja",
+    "hideThinkingSubtitle": "Ne prikazuj razmišljanja agenta na strani seje.",
     "keepScreenOn": "Ohrani zaslon vklopljen med ogledom seje",
     "keepScreenOnSubtitle": "Ohrani zaslon vklopljen med izvajanjem seje.",
     "appearance": "Videz",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Prepisovanje prek Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Glasovni vnos prepiši z modelom Kilo Gateway namesto prepoznavanja govora naprave. Posnetje se pošlje v Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Strni klice orodij",
+    "condenseToolCallsSubtitle": "Združi zaporedne klice orodij v eno vrstico, ki jo lahko odpreš."
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtevek za združitev ni na voljo",
@@ -2028,6 +2032,22 @@
       "connectionLost": "Povezava prekinjena",
       "retryConnection": "Znova vzpostavi povezavo"
     },
+    "goal": {
+      "title": "Cilj",
+      "statusActive": "Aktivni cilj",
+      "statusPaused": "Zaustavljeni cilj",
+      "statusComplete": "Cilj dokončan",
+      "statusBlocked": "Cilj blokiran",
+      "edit": "Uredi cilj",
+      "remove": "Odstrani cilj",
+      "pause": "Zaustavi cilj",
+      "resume": "Nadaljuj cilj",
+      "editPlaceholder": "Opišite cilj",
+      "removeConfirmTitle": "Odstranim cilj?",
+      "removeConfirmMessage": "CLI izbriše cilj te seje.",
+      "updateFailed": "Cilja ni bilo mogoče posodobiti.",
+      "sectionAccessibility": "{{status}}. Cilj: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Poveži GitHub v brskalniku, nato se vrni sem in izberi skladišče.",
       "openGithub": "Odpri GitHub",
@@ -2481,6 +2501,11 @@
       "stepsCount_two": "{{steps}} koraka",
       "stepsCount_few": "{{steps}} koraki"
     },
+    "autoApprove": {
+      "title": "Samodejna odobritev",
+      "description": "Samodejno odobri zahteve za dovoljenje za to sejo. Orodja se nato zaženejo brez poziva.",
+      "unavailable": "Ta seja ne more prejemati zahtev za dovoljenje."
+    },
     "prBadge": {
       "open": "odprta zahteva za združitev",
       "closed": "zaprta zahteva za združitev",
@@ -2511,6 +2536,10 @@
       "tapToListHint": "Tapni mapo, da prikažeš njeno vsebino.",
       "unsupportedDescription": "Ta CLI ne more prikazati map. Z gumbom »Končano« ohraniš začetno mapo, z gumbom »Začni sejo« pa v njej zaženeš sejo.",
       "unsupportedTitle": "Map ni mogoče prikazati"
+    },
+    "toolRun": {
+      "sheetTitle": "Klici orodij",
+      "condensedLabel": "{{itemCount}} elementov; {{last}}"
     }
   },
   "bootstrap": {
@@ -2623,7 +2652,10 @@
     "gatewayModelUnavailable": "Ta model za prepisovanje ni na voljo. Izberite drugega v Nastavitvah.",
     "gatewayModelUnavailableNotice": "Ta model se ne ponuja več. Dotaknite se $t(transcriptionModel.title) in izberite drugega.",
     "gatewaySignInRequired": "Prijavite se za uporabo prepisovanja prek Kilo Gateway.",
-    "gatewayNoModel": "Najprej izberite model za prepisovanje v Nastavitvah."
+    "gatewayNoModel": "Najprej izberite model za prepisovanje v Nastavitvah.",
+    "testTitle": "Preizkusite glasovni vnos",
+    "testPlaceholder": "Dotaknite se mikrofona in začnite govoriti.",
+    "testClear": "Počisti besedilo"
   },
   "share": {
     "title": "Deljenje v Kilo",
@@ -3014,5 +3046,12 @@
     "emptyTitle": "Ni modelov za prepisovanje",
     "emptyDescription": "Kilo Gateway trenutno ne ponuja modelov za prepisovanje.",
     "loadFailed": "Modelov za prepisovanje ni bilo mogoče naložiti."
+  },
+  "voiceLanguage": {
+    "title": "Jezik glasovnega vnosa",
+    "automatic": "Samodejno",
+    "loadFailed": "Jezikov, ki jih podpira ta naprava, ni bilo mogoče naložiti.",
+    "emptyTitle": "Ni podprtih jezikov",
+    "emptyDescription": "Prepoznavanje govora te naprave ne poroča o podprtih jezikih."
   }
 }

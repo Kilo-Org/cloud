@@ -24,6 +24,7 @@ import type {
   ProviderPrSummary,
   ProviderPrThread,
 } from '@kilocode/app-shared/provider-review';
+import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
 import {
   fetchGitLabMergeRequest,
   fetchGitLabRootTextFileAtRef,
@@ -513,8 +514,12 @@ export async function getFileLines(
       throw new GitLabReviewError('not_found', 'The file was not found at this ref.');
     }
     const allLines = text.split('\n');
+    // Same window cap as the GitHub path (github-pr-review-router.ts:1637):
+    // a caller can never request more than FILE_LINES_MAX lines of context in
+    // one call, whatever endLine it sends.
+    const cappedEnd = Math.min(endLine, startLine + FILE_LINES_MAX - 1);
     const start = Math.max(1, Math.min(startLine, allLines.length));
-    const end = Math.max(start, Math.min(endLine, allLines.length));
+    const end = Math.max(start, Math.min(cappedEnd, allLines.length));
     return { lines: allLines.slice(start - 1, end), totalLines: allLines.length };
   } catch (error) {
     throw classifyGitLabError(error);

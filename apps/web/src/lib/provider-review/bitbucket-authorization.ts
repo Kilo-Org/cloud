@@ -232,11 +232,39 @@ async function readBoundedReleaseJson(response: Response): Promise<unknown> {
   ) {
     throw new Error('invalid_response');
   }
-  const text = await response.text();
-  if (text.length > BITBUCKET_WORKSPACE_ACCESS_TOKEN_RESPONSE_MAX_BYTES) {
-    throw new Error('invalid_response');
+  // Stream the body with the byte cap enforced per chunk: the Content-Length
+  // guard above only runs when the header is present, so buffering the whole
+  // body first would let a chunked response (or an understated header) exceed
+  // the bound. Same bounded-reader rule as the read layer's fetchBoundedText.
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!(value instanceof Uint8Array)) throw new Error('invalid_response');
+      totalBytes += value.byteLength;
+      if (totalBytes > BITBUCKET_WORKSPACE_ACCESS_TOKEN_RESPONSE_MAX_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The bounded read remains failed if cancellation itself fails.
+        }
+        throw new Error('invalid_response');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
   }
-  return JSON.parse(text);
+  const merged = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return JSON.parse(new TextDecoder().decode(merged));
 }
 
 /**

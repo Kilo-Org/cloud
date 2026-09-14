@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from '@jest/globals';
+import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
 import {
   getMergeRestrictions,
   getPullRequest,
@@ -465,6 +466,33 @@ describe('getFileLines', () => {
     expect(result.totalLines).toBe(3);
   });
 
+  it('caps the requested window at the shared FILE_LINES_MAX', async () => {
+    const body = Array.from({ length: 600 }, (_, index) => `line ${index + 1}`).join('\n');
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      if (full.includes('/src/')) {
+        return new Response(body, { status: 200, headers: { 'content-type': 'text/plain' } });
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const result = await getFileLines(
+      ORG_OWNER,
+      'acme',
+      'repo',
+      'abc123def4567890',
+      'src/big.ts',
+      1,
+      600
+    );
+
+    expect(result.lines).toHaveLength(FILE_LINES_MAX);
+    expect(result.totalLines).toBe(600);
+  });
+
   it('refuses a non-commit ref before any Bitbucket API request', async () => {
     await expect(
       getFileLines(ORG_OWNER, 'acme', 'repo', '../../etc/passwd', 'src/retry.ts', 1, 2)
@@ -764,6 +792,72 @@ describe('listDiscussions', () => {
       .flatMap(thread => thread.comments.map(comment => comment.body))
       .sort();
     expect(bodies).toEqual(['Reply on a root from the previous page', 'Second page root']);
+  });
+
+  it('emits a thread split across comment pages once, complete, with no duplicate threadId', async () => {
+    const roots = Array.from({ length: 60 }, (_, index) => ({
+      id: index + 1,
+      content: { raw: `Root ${index + 1}` },
+      created_on: '2026-09-02T10:00:00.000000+00:00',
+      user: { uuid: '{author-uuid}', nickname: 'alice', display_name: 'Alice' },
+      deleted: false,
+    }));
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname.endsWith('/pullrequests/12/comments')) {
+        if (parsed.searchParams.get('page') === '2') {
+          // The reply to root 1 lands on the next comment page: folding only
+          // one page would surface it as a second thread keyed `1`.
+          return jsonResponse({
+            pagelen: 50,
+            values: [
+              {
+                id: 1001,
+                parent: { id: 1 },
+                content: { raw: 'Reply split onto page 2' },
+                created_on: '2026-09-02T11:00:00.000000+00:00',
+                user: { uuid: '{author-uuid}', nickname: 'alice', display_name: 'Alice' },
+                deleted: false,
+              },
+            ],
+            next: null,
+          });
+        }
+        return jsonResponse({
+          pagelen: 50,
+          values: roots,
+          next: 'https://api.bitbucket.org/2.0/repositories/acme/repo/pullrequests/12/comments?pagelen=50&page=2',
+        });
+      }
+      if (parsed.pathname.endsWith('/pullrequests/12/tasks')) {
+        return jsonResponse({ pagelen: 100, values: [], next: null });
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const first = await listDiscussions(ORG_OWNER, 'acme', 'repo', 12);
+    const second = await listDiscussions(
+      ORG_OWNER,
+      'acme',
+      'repo',
+      12,
+      first.nextCursor ?? undefined
+    );
+
+    const firstIds = first.threads.map(thread => thread.threadId);
+    const secondIds = second.threads.map(thread => thread.threadId);
+    expect(firstIds).toHaveLength(50);
+    expect(secondIds).toHaveLength(10);
+    // No `threadId` is served on more than one page.
+    expect(new Set([...firstIds, ...secondIds]).size).toBe(60);
+    // The split thread carries its root and the reply from the next page.
+    expect(
+      first.threads.find(thread => thread.threadId === '1')?.comments.map(comment => comment.body)
+    ).toEqual(['Root 1', 'Reply split onto page 2']);
   });
 });
 

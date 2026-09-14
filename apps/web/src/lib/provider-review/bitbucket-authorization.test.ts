@@ -240,6 +240,36 @@ describe('fetchBitbucketWorkspaceAccessToken — release contract', () => {
       'git-token-service:bitbucket-workspace-access-token'
     );
   });
+
+  it('stops reading a chunked release body at the byte cap instead of buffering it', async () => {
+    // No Content-Length header, so only the streamed byte cap can bound the
+    // read. The body is eight 8 KiB chunks (64 KiB) against a 16 KiB cap.
+    const totalChunks = 8;
+    let chunksPulled = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (chunksPulled >= totalChunks) {
+          controller.close();
+          return;
+        }
+        chunksPulled += 1;
+        controller.enqueue(new Uint8Array(8_192));
+      },
+    });
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(stream, {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+
+    const result = await fetchBitbucketWorkspaceAccessToken(releaseInput);
+
+    expect(result.status).toBe('temporarily_unavailable');
+    // The reader cancels on breach, so the whole body is never pulled.
+    expect(chunksPulled).toBeLessThan(totalChunks);
+  });
 });
 
 describe('authorizeRepository — identity resolution', () => {

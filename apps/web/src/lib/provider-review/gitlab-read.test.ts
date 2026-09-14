@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import * as https from 'https';
 import { PassThrough } from 'stream';
 import type { PlatformIntegration } from '@kilocode/db/schema';
+import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
 import type { Owner } from '@/lib/integrations/core/types';
 import { GitLabInstanceUrlError } from '@/lib/integrations/platforms/gitlab/instance-url';
 import {
@@ -394,6 +395,17 @@ describe('getFileLines', () => {
     await expect(
       getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'gone.txt', 1, 5)
     ).rejects.toMatchObject({ kind: 'not_found', retryable: false });
+  });
+
+  it('caps the requested window at the shared FILE_LINES_MAX', async () => {
+    mockFetchGitLabRootTextFileAtRef.mockResolvedValue(
+      Array.from({ length: 600 }, (_, index) => `line ${index + 1}`).join('\n')
+    );
+
+    const result = await getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'big.txt', 1, 600);
+
+    expect(result.lines).toHaveLength(FILE_LINES_MAX);
+    expect(result.totalLines).toBe(600);
   });
 });
 

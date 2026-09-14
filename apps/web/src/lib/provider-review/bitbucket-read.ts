@@ -23,6 +23,7 @@ import type {
   ProviderPrSummary,
   ProviderPrThread,
 } from '@kilocode/app-shared/provider-review';
+import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
 import {
   authorizeRepository,
   authorizeWorkspace,
@@ -64,6 +65,19 @@ const MAX_INBOX_PROVIDER_PAGES = 10;
  * load can never crawl an unbounded collection.
  */
 const MAX_TASK_COLLECTION_PAGES = 10;
+/**
+ * The comment-page bound for one discussion load. The comments collection is
+ * flat and creation-ordered, and a thread's root and some of its replies can
+ * land on different provider pages. Folding the whole guarded collection
+ * before building threads lets each thread be emitted once, with its whole
+ * comment set, instead of once per page under the same `threadId`; the bound
+ * keeps one load from crawling an unbounded collection. Comments past the
+ * bound are not folded, so threads living entirely beyond it are not served —
+ * the same bounded-walk rule the task and inbox collections use.
+ */
+const MAX_DISCUSSION_COMMENT_PAGES = 10;
+/** Threads served per discussions page, so one response stays bounded. */
+const BITBUCKET_THREAD_PAGE_SIZE = 50;
 
 const BitbucketUserSchema = z.object({
   uuid: z.string().min(1),
@@ -658,8 +672,11 @@ export async function getFileLines(
       `/2.0/repositories/${repositorySegment(access.repository)}/src/${encodeURIComponent(ref)}/${encodedPath}`
     );
     const allLines = text.split('\n');
+    // Same window cap as the GitLab read layer and the GitHub path: a caller
+    // can never request more than FILE_LINES_MAX lines of context in one call.
+    const cappedEnd = Math.min(endLine, startLine + FILE_LINES_MAX - 1);
     const start = Math.max(1, Math.min(startLine, allLines.length));
-    const end = Math.max(start, Math.min(endLine, allLines.length));
+    const end = Math.max(start, Math.min(cappedEnd, allLines.length));
     return { lines: allLines.slice(start - 1, end), totalLines: allLines.length };
   } catch (error) {
     throw classifyBitbucketError(error);
@@ -716,17 +733,19 @@ function mapThread(
 }
 
 /**
- * Build threads from one flat page of comments: top-level comments are the
- * thread roots, replies attach to their parent. Both the resolved flag and
+ * Build threads from the folded comments collection: top-level comments are
+ * the thread roots, replies attach to their parent. Both the resolved flag and
  * the task count come from the task evidence the caller supplies — Bitbucket
  * never sends task fields on comments: a thread is resolved when a task
  * exists for its root comment and no task on it is unresolved.
  *
- * The collection is flat and creation-ordered, so a page can start on a reply
- * whose root sits on an earlier page. Such a reply can never attach to a root
- * here: it is surfaced as its own thread keyed by its true root id, using the
- * reply's own inline anchor when Bitbucket sends one. Nothing is dropped, and
- * thread actions still target the root the reply belongs to.
+ * The caller folds every guarded comment page first, so a reply attaches to
+ * the root it belongs to even when the provider split them across pages. A
+ * reply whose root is absent from the whole bounded collection (a deleted root
+ * or a collection past the page bound) is surfaced as its own thread keyed by
+ * its true root id, using the reply's own inline anchor when Bitbucket sends
+ * one. Nothing is dropped, thread actions still target the root the reply
+ * belongs to, and every `threadId` is emitted exactly once.
  */
 function buildThreadsFromComments(
   comments: BitbucketComment[],
@@ -824,7 +843,69 @@ async function fetchTaskEvidence(
   return { commentIds, unresolvedCommentIds, taskCounts };
 }
 
-/** One page of discussions (threads and replies) with their diff anchors. */
+/**
+ * The discussions cursor is a plain thread-page counter: one page serves
+ * threads [(N-1)·size, N·size) of the complete, creation-ordered thread list.
+ * A cursor minted for another pull request (or the old provider-next-URL
+ * shape) decodes to page 1, so a cursor can never change the collection a
+ * request reads.
+ */
+function encodeThreadPageCursor(identity: string, page: number): string {
+  return Buffer.from(JSON.stringify({ identity, page })).toString('base64url');
+}
+
+function decodeThreadPageCursor(cursor: string | undefined, identity: string): number {
+  if (!cursor) return 1;
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as {
+      identity?: unknown;
+      page?: unknown;
+    };
+    if (parsed.identity !== identity || !Number.isInteger(parsed.page)) return 1;
+    return Math.max(1, parsed.page as number);
+  } catch {
+    return 1;
+  }
+}
+
+/**
+ * Fold the PR's comments across every guarded provider page before threads
+ * are built, so a thread the provider split across a page boundary is
+ * assembled once, with its whole comment set. Without the fold the page
+ * holding the root and the page holding its orphaned replies would each emit
+ * a thread under the same `threadId`.
+ */
+async function fetchAllDiscussionComments(
+  access: BitbucketRepositoryAccess,
+  prId: number,
+  identity: string
+): Promise<z.infer<typeof BitbucketCommentSchema>[]> {
+  const comments: z.infer<typeof BitbucketCommentSchema>[] = [];
+  let cursor: string | undefined = undefined;
+  for (let pageIndex = 0; pageIndex < MAX_DISCUSSION_COMMENT_PAGES; pageIndex++) {
+    const page = await fetchPage(
+      access,
+      `/2.0/repositories/${repositorySegment(access.repository)}/pullrequests/${prId}/comments`,
+      identity,
+      cursor,
+      repositoryPathGuard(access)
+    );
+    for (const value of page.values) {
+      const parsed = BitbucketCommentSchema.safeParse(value);
+      if (parsed.success) comments.push(parsed.data);
+    }
+    if (!page.nextCursor) break;
+    cursor = page.nextCursor;
+  }
+  return comments;
+}
+
+/**
+ * One page of discussions (threads and replies) with their diff anchors. The
+ * whole guarded comments collection is folded first, so a thread split across
+ * provider pages is emitted once, complete, and pagination windows over the
+ * thread list never repeat a `threadId`.
+ */
 export async function listDiscussions(
   owner: BitbucketReviewOwner,
   workspaceSlug: string,
@@ -835,22 +916,16 @@ export async function listDiscussions(
   const access = await authorizeRepository(owner, workspaceSlug, repoSlug);
   try {
     const identity = `bitbucket-comments:${access.repository.fullName}#${prId}`;
-    const page = await fetchPage(
-      access,
-      `/2.0/repositories/${repositorySegment(access.repository)}/pullrequests/${prId}/comments`,
-      identity,
-      cursor,
-      repositoryPathGuard(access)
-    );
-    const comments: z.infer<typeof BitbucketCommentSchema>[] = [];
-    for (const value of page.values) {
-      const parsed = BitbucketCommentSchema.safeParse(value);
-      if (parsed.success) comments.push(parsed.data);
-    }
+    const page = decodeThreadPageCursor(cursor, identity);
+    const comments = await fetchAllDiscussionComments(access, prId, identity);
     const taskEvidence = await fetchTaskEvidence(access, prId);
+    const threads = buildThreadsFromComments(comments, taskEvidence);
+    const skip = (page - 1) * BITBUCKET_THREAD_PAGE_SIZE;
+    const window = threads.slice(skip, skip + BITBUCKET_THREAD_PAGE_SIZE);
     return {
-      threads: buildThreadsFromComments(comments, taskEvidence),
-      nextCursor: page.nextCursor,
+      threads: window,
+      nextCursor:
+        skip + window.length < threads.length ? encodeThreadPageCursor(identity, page + 1) : null,
     };
   } catch (error) {
     throw classifyBitbucketError(error);

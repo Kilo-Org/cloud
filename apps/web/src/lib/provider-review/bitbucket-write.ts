@@ -386,7 +386,9 @@ export async function resolveThread(
     }
     await requestBitbucketJson(access, `${prPath(access, target.prId)}/tasks/${task.id}`, {
       method: 'PUT',
-      body: { resolved: true },
+      // The task update endpoint expresses resolution as `state`, not a
+      // `resolved` boolean, and rejects/ignores unknown keys.
+      body: { state: 'RESOLVED' },
     });
     return { done: true, replayed: false };
   } catch (error) {
@@ -437,7 +439,8 @@ export async function unresolveThread(
     }
     await requestBitbucketJson(access, `${prPath(access, target.prId)}/tasks/${task.id}`, {
       method: 'PUT',
-      body: { resolved: false },
+      // Mirror of resolveThread: reopening is `state: 'UNRESOLVED'`.
+      body: { state: 'UNRESOLVED' },
     });
     return { done: true, replayed: false };
   } catch (error) {

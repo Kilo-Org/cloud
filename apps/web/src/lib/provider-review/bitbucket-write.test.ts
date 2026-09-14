@@ -10,6 +10,7 @@ import {
   replyToComment,
   resolveThread,
   submitReview,
+  unresolveThread,
 } from './bitbucket-write';
 import { BitbucketReviewError } from './bitbucket-authorization';
 
@@ -605,7 +606,7 @@ describe('resolveThread', () => {
     expect(result).toEqual({ done: true, replayed: false });
     const put = bitbucketCalls().find(call => call.init.method === 'PUT');
     expect(put?.url.pathname).toBe('/2.0/repositories/acme/repo/pullrequests/12/tasks/7');
-    expect(JSON.parse(String(put?.init.body))).toEqual({ resolved: true });
+    expect(JSON.parse(String(put?.init.body))).toEqual({ state: 'RESOLVED' });
   });
 
   it('refuses a thread without a task with the capability reason', async () => {
@@ -783,7 +784,7 @@ describe('resolveThread', () => {
     expect(result).toEqual({ done: true, replayed: false });
     const put = bitbucketCalls().find(call => call.init.method === 'PUT');
     expect(put?.url.pathname).toBe('/2.0/repositories/acme/repo/pullrequests/12/tasks/7');
-    expect(JSON.parse(String(put?.init.body))).toEqual({ resolved: true });
+    expect(JSON.parse(String(put?.init.body))).toEqual({ state: 'RESOLVED' });
     // The collection was followed to page 2 before the task resolved.
     expect(bitbucketCalls().filter(call => call.url.pathname.endsWith('/tasks'))).toHaveLength(2);
   });
@@ -847,6 +848,63 @@ describe('resolveThread', () => {
 
     expect(error.kind).toBe('not_found');
     expect(bitbucketCalls()).toEqual([]);
+  });
+});
+
+describe('unresolveThread', () => {
+  it('reopens the comment task with the state field Bitbucket reads', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({
+          status: 'available',
+          token: 'at-mock-token',
+          workspace: WORKSPACE,
+        });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname.endsWith('/comments/101')) return jsonResponse({ id: 101 });
+      if (parsed.pathname.endsWith('/tasks')) {
+        return jsonResponse({
+          pagelen: 100,
+          values: [
+            {
+              id: 7,
+              resolved_on: '2026-09-06T00:00:00.000Z',
+              comment: { id: 101 },
+            },
+          ],
+          next: null,
+        });
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const result = await unresolveThread({
+      owner: ORG_OWNER,
+      workspace: 'acme',
+      repoSlug: 'repo',
+      prId: 12,
+      threadId: '101',
+    });
+
+    expect(result).toEqual({ done: true, replayed: false });
+    const put = bitbucketCalls().find(call => call.init.method === 'PUT');
+    expect(put?.url.pathname).toBe('/2.0/repositories/acme/repo/pullrequests/12/tasks/7');
+    expect(JSON.parse(String(put?.init.body))).toEqual({ state: 'UNRESOLVED' });
+  });
+
+  it('reports replayed when no task of the comment is resolved', async () => {
+    const result = await unresolveThread({
+      owner: ORG_OWNER,
+      workspace: 'acme',
+      repoSlug: 'repo',
+      prId: 12,
+      threadId: '101',
+    });
+
+    expect(result).toEqual({ done: true, replayed: true });
+    expect(bitbucketCalls().some(call => call.init.method === 'PUT')).toBe(false);
   });
 });
 

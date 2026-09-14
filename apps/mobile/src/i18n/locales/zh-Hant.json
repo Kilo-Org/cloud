@@ -231,6 +231,8 @@
     "voiceInput": "語音輸入",
     "autoExpandThinking": "自動展開思考內容",
     "autoExpandThinkingSubtitle": "智慧代理完成思考後，自動展開思考內容。",
+    "hideThinking": "隱藏思考詳情",
+    "hideThinkingSubtitle": "不在工作階段頁面顯示智慧代理的思考內容。",
     "keepScreenOn": "在工作階段頁面保持螢幕亮起",
     "keepScreenOnSubtitle": "工作階段執行期間，保持螢幕亮起。",
     "appearance": "外觀",
@@ -1561,6 +1563,22 @@
       "reconnecting": "重新連線中…",
       "connectionLost": "連線中斷",
       "retryConnection": "重新連線"
+    },
+    "goal": {
+      "title": "目標",
+      "statusActive": "進行中的目標",
+      "statusPaused": "已暫停的目標",
+      "statusComplete": "目標已完成",
+      "statusBlocked": "目標已封鎖",
+      "edit": "編輯目標",
+      "remove": "移除目標",
+      "pause": "暫停目標",
+      "resume": "繼續目標",
+      "editPlaceholder": "描述目標",
+      "removeConfirmTitle": "移除目標？",
+      "removeConfirmMessage": "CLI 會清除此工作階段的目標。",
+      "updateFailed": "無法更新目標。",
+      "sectionAccessibility": "{{status}}。目標：{{text}}"
     },
     "newSession": {
       "connectGithubDescription": "請在瀏覽器中連結 GitHub，再回到這裡選取儲存庫。",

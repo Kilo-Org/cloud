@@ -231,6 +231,8 @@
     "voiceInput": "Uingizaji wa sauti",
     "autoExpandThinking": "Panua mawazo kiotomatiki",
     "autoExpandThinkingSubtitle": "Onyesha mawazo ya wakala yakiwa yamepanuliwa anapomaliza kufikiri.",
+    "hideThinking": "Ficha maelezo ya mawazo",
+    "hideThinkingSubtitle": "Usionyeshe mawazo ya wakala kwenye ukurasa wa kikao.",
     "keepScreenOn": "Acha skrini iwake ukiwa kwenye ukurasa wa kikao",
     "keepScreenOnSubtitle": "Acha skrini iwake wakati kikao kinaendelea.",
     "appearance": "Mwonekano",
@@ -1995,6 +1997,22 @@
       "reconnecting": "Inaunganisha tena…",
       "connectionLost": "Muunganisho umekatika",
       "retryConnection": "Jaribu kuunganisha tena"
+    },
+    "goal": {
+      "title": "Lengo",
+      "statusActive": "Lengo amilifu",
+      "statusPaused": "Lengo lililositishwa",
+      "statusComplete": "Lengo limekamilika",
+      "statusBlocked": "Lengo limezuiwa",
+      "edit": "Hariri lengo",
+      "remove": "Ondoa lengo",
+      "pause": "Sitisha lengo",
+      "resume": "Endeleza lengo",
+      "editPlaceholder": "Eleza lengo",
+      "removeConfirmTitle": "Ondoa lengo?",
+      "removeConfirmMessage": "CLI hufuta lengo la kikao hiki.",
+      "updateFailed": "Lengo halikuweza kusasishwa.",
+      "sectionAccessibility": "{{status}}. Lengo: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Unganisha GitHub kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",

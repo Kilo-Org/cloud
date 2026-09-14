@@ -6,6 +6,7 @@ import {
   type FetchedSessionData,
   type JotaiStore,
   type KiloSessionId,
+  projectSessionGoal,
   type ResolvedSession,
   type SessionManager,
   type SessionSnapshot,
@@ -212,12 +213,19 @@ export function createMobileAgentSessionManager({
         trpcClient.cliSessionsV2.get.query({ session_id: id }),
         trpcClient.cliSessionsV2.getSessionMessages.query({ session_id: id }),
       ]);
-      const snapshotInfo = messagesResult.info as Partial<SessionSnapshot['info']>;
+      const snapshotInfo = messagesResult.info as Partial<SessionSnapshot['info']> & {
+        metadata?: unknown;
+      };
+      // The goal lives in the session metadata; project it into `info` so the
+      // fixed goal section survives a snapshot replay (which would otherwise
+      // clobber the goal carried by the live session state).
+      const goal = projectSessionGoal(snapshotInfo.metadata);
       return {
         info: {
           id: snapshotInfo.id ?? sessionData.session_id,
           parentID: snapshotInfo.parentID ?? sessionData.parent_session_id ?? undefined,
           ...(snapshotInfo.model ? { model: snapshotInfo.model } : {}),
+          ...(goal === undefined ? {} : { goal }),
         },
         messages: messagesResult.messages as SessionSnapshot['messages'],
       };

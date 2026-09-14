@@ -231,6 +231,8 @@
     "voiceInput": "音声入力",
     "autoExpandThinking": "思考を自動展開",
     "autoExpandThinkingSubtitle": "エージェントの思考が終了したときに展開して表示します。",
+    "hideThinking": "思考の詳細を非表示",
+    "hideThinkingSubtitle": "セッション画面でエージェントの思考を表示しません。",
     "keepScreenOn": "セッション画面で画面を常時オン",
     "keepScreenOnSubtitle": "セッションの実行中は画面が消えないようにします。",
     "appearance": "外観",
@@ -1561,6 +1563,22 @@
       "reconnecting": "再接続中…",
       "connectionLost": "接続切断",
       "retryConnection": "接続を再試行"
+    },
+    "goal": {
+      "title": "ゴール",
+      "statusActive": "アクティブなゴール",
+      "statusPaused": "一時停止中のゴール",
+      "statusComplete": "ゴール完了",
+      "statusBlocked": "ゴールがブロックされました",
+      "edit": "ゴールを編集",
+      "remove": "ゴールを削除",
+      "pause": "ゴールを一時停止",
+      "resume": "ゴールを再開",
+      "editPlaceholder": "ゴールを説明",
+      "removeConfirmTitle": "ゴールを削除しますか？",
+      "removeConfirmMessage": "CLI がこのセッションのゴールを消去します。",
+      "updateFailed": "ゴールを更新できませんでした。",
+      "sectionAccessibility": "{{status}}。ゴール: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "ブラウザーでGitHubと連携し、この画面に戻ってリポジトリを選択してください。",

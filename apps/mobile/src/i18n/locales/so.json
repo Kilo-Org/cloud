@@ -231,6 +231,8 @@
     "voiceInput": "Gelitaanka codka",
     "autoExpandThinking": "Si toos ah u ballaari fikirka",
     "autoExpandThinkingSubtitle": "Muuji qoraalka fikirka wakiilka oo fidsan marka uu dhammaado.",
+    "hideThinking": "Qari faahfaahinta fikirka",
+    "hideThinkingSubtitle": "Ha muujin fikirka wakiilka bogga kalfadhiga.",
     "keepScreenOn": "Shaashadda shid inta bogga kalfadhigu furan yahay",
     "keepScreenOnSubtitle": "Shaashadda shid inta kalfadhigu shaqaynayo.",
     "appearance": "Muuqaal",
@@ -1995,6 +1997,22 @@
       "reconnecting": "Dib ayaa loo xiriirinayaa…",
       "connectionLost": "Xiriirku wuu go'ay",
       "retryConnection": "Mar kale isku day inaad ku xirmato"
+    },
+    "goal": {
+      "title": "Hadaf",
+      "statusActive": "Hadaf firfircoon",
+      "statusPaused": "Hadaf la hakiyay",
+      "statusComplete": "Hadafka waa dhammaaday",
+      "statusBlocked": "Hadafka waa la xiray",
+      "edit": "Tafatir hadafka",
+      "remove": "Ka saar hadafka",
+      "pause": "Hakiso hadafka",
+      "resume": "Sii wad hadafka",
+      "editPlaceholder": "Sharax hadafka",
+      "removeConfirmTitle": "Ka saar hadafka?",
+      "removeConfirmMessage": "CLI wuxuu tirtiraa hadafka kulankan.",
+      "updateFailed": "Hadafka lama cusboonaysiin karin.",
+      "sectionAccessibility": "{{status}}. Hadaf: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "GitHub ku xiriiri biraawsarkaaga, ka dibna halkan ku soo noqo si aad kayd u doorato.",

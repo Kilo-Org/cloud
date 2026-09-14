@@ -1655,6 +1655,9 @@ importers:
 
   packages/trpc:
     dependencies:
+      '@kilocode/cloud-agent-sdk':
+        specifier: workspace:*
+        version: link:../cloud-agent-sdk
       '@kilocode/kilo-chat':
         specifier: workspace:*
         version: link:../kilo-chat

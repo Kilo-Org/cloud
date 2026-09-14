@@ -231,6 +231,8 @@
     "voiceInput": "Äänisyöte",
     "autoExpandThinking": "Avaa päättely automaattisesti",
     "autoExpandThinkingSubtitle": "Näytä agentin päättely kokonaan, kun päättely valmistuu.",
+    "hideThinking": "Piilota päättelyn tiedot",
+    "hideThinkingSubtitle": "Älä näytä agentin päättelyä istuntosivulla.",
     "keepScreenOn": "Pidä näyttö päällä istuntosivulla",
     "keepScreenOnSubtitle": "Pidä näyttö päällä istunnon suorituksen aikana.",
     "appearance": "Ulkoasu",
@@ -1995,6 +1997,22 @@
       "reconnecting": "Yhdistetään uudelleen…",
       "connectionLost": "Yhteys katkesi",
       "retryConnection": "Yhdistä uudelleen"
+    },
+    "goal": {
+      "title": "Tavoite",
+      "statusActive": "Aktiivinen tavoite",
+      "statusPaused": "Keskeytetty tavoite",
+      "statusComplete": "Tavoite valmis",
+      "statusBlocked": "Tavoite estetty",
+      "edit": "Muokkaa tavoitetta",
+      "remove": "Poista tavoite",
+      "pause": "Keskeytä tavoite",
+      "resume": "Jatka tavoitetta",
+      "editPlaceholder": "Kuvaile tavoite",
+      "removeConfirmTitle": "Poistetaanko tavoite?",
+      "removeConfirmMessage": "CLI tyhjentää tämän istunnon tavoitteen.",
+      "updateFailed": "Tavoitetta ei voitu päivittää.",
+      "sectionAccessibility": "{{status}}. Tavoite: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Yhdistä GitHub selaimessa ja palaa sitten tänne valitsemaan repositorio.",

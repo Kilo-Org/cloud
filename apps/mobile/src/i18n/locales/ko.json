@@ -231,6 +231,8 @@
     "voiceInput": "음성 입력",
     "autoExpandThinking": "추론 내용 자동 펼치기",
     "autoExpandThinkingSubtitle": "에이전트의 추론이 끝나면 추론 내용을 펼쳐서 표시합니다.",
+    "hideThinking": "추론 내용 숨기기",
+    "hideThinkingSubtitle": "세션 화면에서 에이전트의 추론을 표시하지 않습니다.",
     "keepScreenOn": "세션 화면에서 화면 켜짐 유지",
     "keepScreenOnSubtitle": "세션이 실행되는 동안 화면이 꺼지지 않도록 합니다.",
     "appearance": "화면 스타일",
@@ -1561,6 +1563,22 @@
       "reconnecting": "다시 연결 중…",
       "connectionLost": "연결 끊김",
       "retryConnection": "연결 다시 시도"
+    },
+    "goal": {
+      "title": "목표",
+      "statusActive": "활성 목표",
+      "statusPaused": "일시 중지된 목표",
+      "statusComplete": "목표 완료",
+      "statusBlocked": "목표 차단됨",
+      "edit": "목표 편집",
+      "remove": "목표 제거",
+      "pause": "목표 일시 중지",
+      "resume": "목표 재개",
+      "editPlaceholder": "목표 설명",
+      "removeConfirmTitle": "목표를 제거할까요?",
+      "removeConfirmMessage": "CLI가 이 세션의 목표를 지웁니다.",
+      "updateFailed": "목표를 업데이트할 수 없습니다.",
+      "sectionAccessibility": "{{status}}. 목표: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "브라우저에서 GitHub를 연결한 후 여기로 돌아와 저장소를 선택하세요.",

@@ -231,6 +231,8 @@
     "voiceInput": "वॉइस इनपुट",
     "autoExpandThinking": "विचार प्रक्रिया अपने आप खोलें",
     "autoExpandThinkingSubtitle": "एजेंट की विचार प्रक्रिया पूरी होने पर उसका पूरा विवरण दिखाएँ।",
+    "hideThinking": "विचार प्रक्रिया का विवरण छिपाएँ",
+    "hideThinkingSubtitle": "सत्र पेज पर एजेंट की विचार प्रक्रिया न दिखाएँ।",
     "keepScreenOn": "सत्र पेज पर स्क्रीन चालू रखें",
     "keepScreenOnSubtitle": "सत्र में काम चलने के दौरान स्क्रीन चालू रखें।",
     "appearance": "दिखावट",
@@ -1549,6 +1551,22 @@
       "connectionLost": "कनेक्शन टूट गया",
       "reconnecting": "फिर से कनेक्ट हो रहा है…",
       "retryConnection": "फिर से कनेक्ट करें"
+    },
+    "goal": {
+      "title": "लक्ष्य",
+      "statusActive": "सक्रिय लक्ष्य",
+      "statusPaused": "रुका हुआ लक्ष्य",
+      "statusComplete": "लक्ष्य पूर्ण",
+      "statusBlocked": "लक्ष्य अवरुद्ध",
+      "edit": "लक्ष्य संपादित करें",
+      "remove": "लक्ष्य हटाएँ",
+      "pause": "लक्ष्य रोकें",
+      "resume": "लक्ष्य फिर से शुरू करें",
+      "editPlaceholder": "लक्ष्य का वर्णन करें",
+      "removeConfirmTitle": "लक्ष्य हटाएँ?",
+      "removeConfirmMessage": "CLI इस सत्र का लक्ष्य साफ़ कर देता है।",
+      "updateFailed": "लक्ष्य अपडेट नहीं किया जा सका।",
+      "sectionAccessibility": "{{status}}। लक्ष्य: {{text}}"
     },
     "remoteSession": {
       "failedToCreate": "रिमोट सत्र नहीं बन सका।",

@@ -231,6 +231,8 @@
     "voiceInput": "Дуут оруулга",
     "autoExpandThinking": "Бодлыг автоматаар дэлгэх",
     "autoExpandThinkingSubtitle": "Дууссаны дараа агентын бодлыг дэлгэсэн байдлаар харуулна.",
+    "hideThinking": "Бодлын дэлгэрэнгүйг нуух",
+    "hideThinkingSubtitle": "Сессийн хуудсан дээр агентын бодлыг харуулахгүй.",
     "keepScreenOn": "Сессийн дэлгэц дээр байх үед дэлгэцийг асаалттай байлгах",
     "keepScreenOnSubtitle": "Сесс ажиллаж байх үед дэлгэцийг унтраахгүй байлгах.",
     "appearance": "Харагдах байдал",
@@ -1995,6 +1997,22 @@
       "reconnecting": "Дахин холбогдож байна…",
       "connectionLost": "Холболт тасарсан",
       "retryConnection": "Дахин холбогдох"
+    },
+    "goal": {
+      "title": "Зорилго",
+      "statusActive": "Идэвхтэй зорилго",
+      "statusPaused": "Түр зогссон зорилго",
+      "statusComplete": "Зорилго биелэв",
+      "statusBlocked": "Зорилго хаагдсан",
+      "edit": "Зорилгыг засах",
+      "remove": "Зорилгыг устгах",
+      "pause": "Зорилгыг түр зогсоох",
+      "resume": "Зорилгыг үргэлжлүүлэх",
+      "editPlaceholder": "Зорилгыг тайлбарлана уу",
+      "removeConfirmTitle": "Зорилгыг устгах уу?",
+      "removeConfirmMessage": "CLI энэ сессийн зорилгыг арилгана.",
+      "updateFailed": "Зорилгыг шинэчлэх боломжгүй.",
+      "sectionAccessibility": "{{status}}. Зорилго: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Хөтөч дээрээ GitHub-ыг холбоод, энд буцаж ирж кодын сангаа сонгоно уу.",

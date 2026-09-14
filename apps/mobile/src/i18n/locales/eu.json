@@ -231,6 +231,8 @@
     "voiceInput": "Ahots-sarrera",
     "autoExpandThinking": "Zabaldu pentsamendua automatikoki",
     "autoExpandThinkingSubtitle": "Erakutsi agentearen pentsamendua zabalduta amaitzen denean.",
+    "hideThinking": "Ezkutatu pentsamenduaren xehetasunak",
+    "hideThinkingSubtitle": "Ez erakutsi agentearen pentsamendua saio-orrian.",
     "keepScreenOn": "Mantendu pantaila piztuta saio-orrian",
     "keepScreenOnSubtitle": "Mantendu pantaila piztuta saioa lanean ari den bitartean.",
     "appearance": "Itxura",
@@ -1995,6 +1997,22 @@
       "reconnecting": "Berriro konektatzen…",
       "connectionLost": "Konexioa galdu da",
       "retryConnection": "Saiatu berriro konektatzen"
+    },
+    "goal": {
+      "title": "Helburua",
+      "statusActive": "Helburu aktiboa",
+      "statusPaused": "Gelditutako helburua",
+      "statusComplete": "Helburua osatuta",
+      "statusBlocked": "Helburua blokeatuta",
+      "edit": "Editatu helburua",
+      "remove": "Kendu helburua",
+      "pause": "Eten helburua",
+      "resume": "Berrekin helburuari",
+      "editPlaceholder": "Deskribatu helburua",
+      "removeConfirmTitle": "Helburua kendu?",
+      "removeConfirmMessage": "CLI-k saio honen helburua ezabatzen du.",
+      "updateFailed": "Ezin izan da helburua eguneratu.",
+      "sectionAccessibility": "{{status}}. Helburua: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Konektatu GitHub zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",

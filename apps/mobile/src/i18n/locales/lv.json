@@ -231,6 +231,8 @@
     "voiceInput": "Balss ievade",
     "autoExpandThinking": "Automātiski izvērst domāšanu",
     "autoExpandThinkingSubtitle": "Rādīt aģenta domas izvērstā veidā, kad domāšana ir pabeigta.",
+    "hideThinking": "Slēpt domāšanas informāciju",
+    "hideThinkingSubtitle": "Nerādīt aģenta domāšanu sesijas lapā.",
     "keepScreenOn": "Neizslēgt ekrānu sesijas skatā",
     "keepScreenOnSubtitle": "Neizslēgt ekrānu, kamēr sesija darbojas.",
     "appearance": "Izskats",
@@ -2011,6 +2013,22 @@
       "reconnecting": "Savienojas atkārtoti…",
       "connectionLost": "Savienojums pārtrūcis",
       "retryConnection": "Izveidot savienojumu vēlreiz"
+    },
+    "goal": {
+      "title": "Mērķis",
+      "statusActive": "Aktīvs mērķis",
+      "statusPaused": "Apturēts mērķis",
+      "statusComplete": "Mērķis izpildīts",
+      "statusBlocked": "Mērķis bloķēts",
+      "edit": "Rediģēt mērķi",
+      "remove": "Noņemt mērķi",
+      "pause": "Apturēt mērķi",
+      "resume": "Turpināt mērķi",
+      "editPlaceholder": "Aprakstiet mērķi",
+      "removeConfirmTitle": "Noņemt mērķi?",
+      "removeConfirmMessage": "CLI notīra šīs sesijas mērķi.",
+      "updateFailed": "Mērķi neizdevās atjaunināt.",
+      "sectionAccessibility": "{{status}}. Mērķis: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Pievieno GitHub kontu pārlūkā, pēc tam atgriezies šeit, lai izvēlētos repozitoriju.",

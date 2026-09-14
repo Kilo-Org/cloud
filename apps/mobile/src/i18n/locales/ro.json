@@ -231,6 +231,8 @@
     "voiceInput": "Introducere vocală",
     "autoExpandThinking": "Extindere automată a raționamentului",
     "autoExpandThinkingSubtitle": "Afișează raționamentul agentului în formă extinsă după finalizarea lui.",
+    "hideThinking": "Ascunde detaliile raționamentului",
+    "hideThinkingSubtitle": "Nu afișa raționamentul agentului pe pagina sesiunii.",
     "keepScreenOn": "Menține ecranul aprins pe pagina sesiunii",
     "keepScreenOnSubtitle": "Menține ecranul aprins cât timp sesiunea rulează.",
     "appearance": "Aspect",
@@ -2011,6 +2013,22 @@
       "reconnecting": "Se reconectează…",
       "connectionLost": "Conexiune pierdută",
       "retryConnection": "Încearcă din nou conectarea"
+    },
+    "goal": {
+      "title": "Obiectiv",
+      "statusActive": "Obiectiv activ",
+      "statusPaused": "Obiectiv în pauză",
+      "statusComplete": "Obiectiv finalizat",
+      "statusBlocked": "Obiectiv blocat",
+      "edit": "Editează obiectivul",
+      "remove": "Elimină obiectivul",
+      "pause": "Pune obiectivul pe pauză",
+      "resume": "Reia obiectivul",
+      "editPlaceholder": "Descrie obiectivul",
+      "removeConfirmTitle": "Elimini obiectivul?",
+      "removeConfirmMessage": "CLI șterge obiectivul acestei sesiuni.",
+      "updateFailed": "Obiectivul nu a putut fi actualizat.",
+      "sectionAccessibility": "{{status}}. Obiectiv: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Conectează contul GitHub în browser, apoi revino aici pentru a alege un depozit.",

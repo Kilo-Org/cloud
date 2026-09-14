@@ -231,6 +231,8 @@
     "voiceInput": "Hangbevitel",
     "autoExpandThinking": "Gondolkodás automatikus kibontása",
     "autoExpandThinkingSubtitle": "Az ügynök gondolatmenete automatikusan megjelenik kibontva, amint elkészül.",
+    "hideThinking": "Gondolkodás részleteinek elrejtése",
+    "hideThinkingSubtitle": "Ne jelenjen meg az ügynök gondolkodása a munkamenet oldalán.",
     "keepScreenOn": "Képernyő bekapcsolva tartása a munkamenet oldalán",
     "keepScreenOnSubtitle": "A képernyő bekapcsolva marad, amíg a munkamenet fut.",
     "appearance": "Megjelenés",
@@ -1995,6 +1997,22 @@
       "reconnecting": "Újracsatlakozás…",
       "connectionLost": "Megszakadt a kapcsolat",
       "retryConnection": "Csatlakozás újrapróbálása"
+    },
+    "goal": {
+      "title": "Cél",
+      "statusActive": "Aktív cél",
+      "statusPaused": "Szüneteltetett cél",
+      "statusComplete": "Cél teljesítve",
+      "statusBlocked": "Cél blokkolva",
+      "edit": "Cél szerkesztése",
+      "remove": "Cél eltávolítása",
+      "pause": "Cél szüneteltetése",
+      "resume": "Cél folytatása",
+      "editPlaceholder": "Írja le a célt",
+      "removeConfirmTitle": "Eltávolítja a célt?",
+      "removeConfirmMessage": "A CLI törli a munkamenet célját.",
+      "updateFailed": "A célt nem sikerült frissíteni.",
+      "sectionAccessibility": "{{status}}. Cél: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Kapcsold össze a GitHub-fiókodat a böngészőben, majd térj vissza ide, és válassz egy tárolót.",

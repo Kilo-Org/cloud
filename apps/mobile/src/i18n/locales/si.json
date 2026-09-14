@@ -231,6 +231,8 @@
     "voiceInput": "හඬ ආදානය",
     "autoExpandThinking": "සිතීමේ විස්තර ස්වයංක්‍රීයව විහිදුවන්න",
     "autoExpandThinkingSubtitle": "නියෝජිතයා සිතීම අවසන් කළ විට එහි විස්තර විහිදුවා පෙන්වන්න.",
+    "hideThinking": "සිතීමේ විස්තර සඟවන්න",
+    "hideThinkingSubtitle": "සැසි පිටුවේ නියෝජිතයාගේ සිතීම නොපෙන්වන්න.",
     "keepScreenOn": "සැසි පිටුවේ සිටින විට තිරය දැල්වී තබන්න",
     "keepScreenOnSubtitle": "සැසිය ක්‍රියාත්මක වන අතරතුර තිරය දැල්වී තබන්න.",
     "appearance": "පෙනුම",
@@ -1995,6 +1997,22 @@
       "reconnecting": "නැවත සම්බන්ධ වෙමින්…",
       "connectionLost": "සම්බන්ධතාව බිඳ වැටුණි",
       "retryConnection": "නැවත සම්බන්ධ වීමට උත්සාහ කරන්න"
+    },
+    "goal": {
+      "title": "ඉලක්කය",
+      "statusActive": "සක්‍රීය ඉලක්කය",
+      "statusPaused": "විරාමිත ඉලක්කය",
+      "statusComplete": "ඉලක්කය සම්පූර්ණයි",
+      "statusBlocked": "ඉලක්කය අවහිර කර ඇත",
+      "edit": "ඉලක්කය සංස්කරණය කරන්න",
+      "remove": "ඉලක්කය ඉවත් කරන්න",
+      "pause": "ඉලක්කය විරාම කරන්න",
+      "resume": "ඉලක්කය නැවත අරඹන්න",
+      "editPlaceholder": "ඉලක්කය විස්තර කරන්න",
+      "removeConfirmTitle": "ඉලක්කය ඉවත් කරන්නද?",
+      "removeConfirmMessage": "CLI මෙම සැසියේ ඉලක්කය මකා දමයි.",
+      "updateFailed": "ඉලක්කය යාවත්කාලීන කළ නොහැකි විය.",
+      "sectionAccessibility": "{{status}}. ඉලක්කය: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "ඔබේ බ්‍රවුසරයෙන් GitHub සම්බන්ධ කරන්න. ඉන්පසු ගබඩාවක් තෝරා ගැනීමට මෙහි ආපසු එන්න.",

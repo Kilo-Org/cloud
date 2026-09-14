@@ -42,6 +42,9 @@ const hoisted = vi.hoisted(() => {
 // Mock every RN / Expo / SDK side-effect import that `mobile-session-manager.ts`
 // and `session-detail-content.tsx` pull in transitively before loading either
 // module.
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 // The header's offline-banner reservation reads the committed connectivity
@@ -222,6 +225,12 @@ vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
 }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   useKeepScreenOnPreference: () => ({ hasLoaded: true, keepScreenOn: false }),
+}));
+// The real hook reaches SecureStore via `@sentry/react-native`, which imports
+// the native react-native entry; mock the preference the way the other
+// preference hooks above are mocked so the suite stays DOM/native-free.
+vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
+  useHideThinkingPreference: () => ({ hideThinking: false, hasLoaded: true }),
 }));
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
   useReasoningPreference: () => ({ defaultExpanded: false }),
@@ -503,6 +512,7 @@ function makeManager() {
       remoteModelOverride: { value: null },
       cloudAgentModelOverride: { value: null },
       availableCommands: { value: [] },
+      sessionInfo: { value: null },
       remoteCommandState: { value: null },
       contextUsage: { value: null },
       hasOlderMessages: { value: false },

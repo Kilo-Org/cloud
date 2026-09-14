@@ -231,6 +231,8 @@
     "voiceInput": "ການປ້ອນສຽງ",
     "autoExpandThinking": "ຂະຫຍາຍສ່ວນການຄິດອັດຕະໂນມັດ",
     "autoExpandThinkingSubtitle": "ຂະຫຍາຍສ່ວນການຄິດຂອງຕົວແທນໃຫ້ເຫັນທັງໝົດເມື່ອຄິດສຳເລັດ.",
+    "hideThinking": "ເຊື່ອງລາຍລະອຽດການຄິດ",
+    "hideThinkingSubtitle": "ບໍ່ສະແດງການຄິດຂອງຕົວແທນໃນໜ້າເຊສຊັນ.",
     "keepScreenOn": "ເປີດໜ້າຈໍໄວ້ໃນຂະນະຢູ່ໜ້າເຊສຊັນ",
     "keepScreenOnSubtitle": "ເປີດໜ້າຈໍໄວ້ຕະຫຼອດຂະນະທີ່ເຊສຊັນກຳລັງເຮັດວຽກ.",
     "appearance": "ຮູບລັກສະນະ",
@@ -1995,6 +1997,22 @@
       "reconnecting": "ກຳລັງເຊື່ອມຕໍ່ໃໝ່…",
       "connectionLost": "ການເຊື່ອມຕໍ່ຂາດ",
       "retryConnection": "ລອງເຊື່ອມຕໍ່ໃໝ່"
+    },
+    "goal": {
+      "title": "ເປົ້າໝາຍ",
+      "statusActive": "ເປົ້າໝາຍທີ່ເຄື່ອນໄຫວ",
+      "statusPaused": "ເປົ້າໝາຍທີ່ຢຸດຊົ່ວຄາວ",
+      "statusComplete": "ເປົ້າໝາຍສຳເລັດ",
+      "statusBlocked": "ເປົ້າໝາຍຖືກສະກັດ",
+      "edit": "ແກ້ໄຂເປົ້າໝາຍ",
+      "remove": "ລຶບເປົ້າໝາຍ",
+      "pause": "ຢຸດເປົ້າໝາຍຊົ່ວຄາວ",
+      "resume": "ສືບຕໍ່ເປົ້າໝາຍ",
+      "editPlaceholder": "ອະທິບາຍເປົ້າໝາຍ",
+      "removeConfirmTitle": "ລຶບເປົ້າໝາຍບໍ?",
+      "removeConfirmMessage": "CLI ລຶບເປົ້າໝາຍຂອງເຊດຊັນນີ້.",
+      "updateFailed": "ບໍ່ສາມາດອັບເດດເປົ້າໝາຍໄດ້.",
+      "sectionAccessibility": "{{status}}. ເປົ້າໝາຍ: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "ເຊື່ອມຕໍ່ GitHub ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",

@@ -231,6 +231,8 @@
     "voiceInput": "Tāuru reo",
     "autoExpandThinking": "Whakawhānuitia aunoa te whakaaro",
     "autoExpandThinkingSubtitle": "Whakaaturia katoatia ngā whakaaro o te māngai ina oti tana whakaaro.",
+    "hideThinking": "Hunaia ngā taipitopito o te whakaaro",
+    "hideThinkingSubtitle": "Kaua e whakaatu ngā whakaaro o te māngai i te whārangi wātū.",
     "keepScreenOn": "Whakakā tonutia te mata i te whārangi wātū",
     "keepScreenOnSubtitle": "Whakakā tonutia te mata i te wā e haere ana te wātū.",
     "appearance": "Te āhua",
@@ -1995,6 +1997,22 @@
       "reconnecting": "Kei te hono anō…",
       "connectionLost": "Kua motu te hononga",
       "retryConnection": "Whakamātau ki te hono anō"
+    },
+    "goal": {
+      "title": "Whāinga",
+      "statusActive": "Whāinga hohe",
+      "statusPaused": "Whāinga kua whakatārewa",
+      "statusComplete": "Kua oti te whāinga",
+      "statusBlocked": "Kua āraia te whāinga",
+      "edit": "Whakatika whāinga",
+      "remove": "Tango whāinga",
+      "pause": "Whakatārewa whāinga",
+      "resume": "Haere tonu te whāinga",
+      "editPlaceholder": "Whakamārama te whāinga",
+      "removeConfirmTitle": "Tango whāinga?",
+      "removeConfirmMessage": "Ka muru te CLI i te whāinga o tēnei wātū.",
+      "updateFailed": "Kāore i taea te whakahōu te whāinga.",
+      "sectionAccessibility": "{{status}}. Whāinga: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "Honohia a GitHub mā tō pūtirotiro, kātahi ka hoki mai ki konei ki te kōwhiri i tētahi putunga waehere.",

@@ -231,6 +231,8 @@
     "voiceInput": "ورودی صوتی",
     "autoExpandThinking": "باز کردن خودکار بخش تفکر",
     "autoExpandThinkingSubtitle": "پس از پایان تفکر عامل، محتوای آن را به‌صورت بازشده نمایش دهید.",
+    "hideThinking": "پنهان کردن جزئیات تفکر",
+    "hideThinkingSubtitle": "تفکر عامل در صفحهٔ نشست نمایش داده نشود.",
     "keepScreenOn": "روشن نگه داشتن صفحه در صفحهٔ نشست",
     "keepScreenOnSubtitle": "تا زمانی که نشست در حال کار است، صفحه را روشن نگه دارید.",
     "appearance": "ظاهر",
@@ -1995,6 +1997,22 @@
       "reconnecting": "در حال اتصال مجدد…",
       "connectionLost": "اتصال قطع شد",
       "retryConnection": "تلاش دوباره برای اتصال"
+    },
+    "goal": {
+      "title": "هدف",
+      "statusActive": "هدف فعال",
+      "statusPaused": "هدف متوقفشده",
+      "statusComplete": "هدف تکمیل شد",
+      "statusBlocked": "هدف مسدود شد",
+      "edit": "ویرایش هدف",
+      "remove": "حذف هدف",
+      "pause": "توقف هدف",
+      "resume": "ادامه هدف",
+      "editPlaceholder": "هدف را توصیف کنید",
+      "removeConfirmTitle": "هدف حذف شود؟",
+      "removeConfirmMessage": "CLI هدف این جلسه را پاک میکند.",
+      "updateFailed": "هدف بهروزرسانی نشد.",
+      "sectionAccessibility": "{{status}}. هدف: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "حساب GitHub خود را از طریق مرورگر متصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",

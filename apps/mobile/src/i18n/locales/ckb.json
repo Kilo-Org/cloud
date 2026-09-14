@@ -231,6 +231,8 @@
     "voiceInput": "داخڵکردنی دەنگ",
     "autoExpandThinking": "کردنەوەی خۆکاری بەشی بیرکردنەوە",
     "autoExpandThinkingSubtitle": "کاتێک بیرکردنەوەی ئەجێنتەکە تەواو دەبێت، بەشەکە بە کراوەیی نیشان بدە.",
+    "hideThinking": "شاردنەوەی وردەکارییەکانی بیرکردنەوە",
+    "hideThinkingSubtitle": "بیرکردنەوەی ئەجێنتەکە لە پەڕەی سێشن نیشان مەدە.",
     "keepScreenOn": "ڕووناکهێشتنەوەی شاشە لە پەڕەی سێشن",
     "keepScreenOnSubtitle": "تا سێشنەکە کار دەکات، شاشەکە ڕووناک ڕابگرە.",
     "appearance": "ڕووکار",
@@ -1995,6 +1997,22 @@
       "reconnecting": "دووبارە پەیوەندیکردن…",
       "connectionLost": "پەیوەندییەکە پچڕا",
       "retryConnection": "دووبارە هەوڵدان بۆ پەیوەندیکردن"
+    },
+    "goal": {
+      "title": "ئامانج",
+      "statusActive": "ئامانجی چالاک",
+      "statusPaused": "ئامانجی وەستاو",
+      "statusComplete": "ئامانج تەواو بوو",
+      "statusBlocked": "ئامانج بلۆک کراوە",
+      "edit": "دەستکاری ئامانج بکە",
+      "remove": "ئامانج لابەرە",
+      "pause": "ئامانج ڕابگرە",
+      "resume": "ئامانج بەردەوام بکە",
+      "editPlaceholder": "ئامانجەکە باس بکە",
+      "removeConfirmTitle": "ئامانج لاببرێت؟",
+      "removeConfirmMessage": "CLI ئامانجی ئەم دانیشتنە دەسڕێتەوە.",
+      "updateFailed": "نەتوانرا ئامانج نوێ بکرێتەوە.",
+      "sectionAccessibility": "{{status}}. ئامانج: {{text}}"
     },
     "newSession": {
       "connectGithubDescription": "لە وێبگەڕەکەتدا هەژماری GitHub ببەستەرەوە، پاشان بگەڕێوە ئێرە و کۆگایەک هەڵبژێرە.",

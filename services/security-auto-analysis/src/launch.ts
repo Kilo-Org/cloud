@@ -15,7 +15,7 @@ import {
   type AnalysisStartLifecycleClaim,
 } from './analysis-start-lifecycle.js';
 import { logger } from './logger.js';
-import { generateControlToken, generateTriageToken } from './token.js';
+import { generateApiToken } from './token.js';
 import { triageSecurityFinding } from './triage.js';
 import { maybeAutoDismissCompletedAnalysis } from './auto-dismiss.js';
 import type { AnalysisMode, SecurityFindingAnalysis } from './types.js';
@@ -196,30 +196,15 @@ export async function startSecurityAnalysis(
 
   try {
     const environment = params.env.ENVIRONMENT === 'production' ? 'production' : 'development';
-    const [controlToken, triageToken] = await Promise.all([
-      generateControlToken(
-        params.actorUser,
-        params.nextAuthSecret,
-        environment,
-        params.env.SHARED_RESOURCE_TOKENS_ENABLED,
-        finding.owned_by_organization_id ?? undefined
-      ),
-      generateTriageToken(
-        params.actorUser,
-        params.nextAuthSecret,
-        environment,
-        params.env.SHARED_RESOURCE_TOKENS_ENABLED,
-        finding.owned_by_organization_id ?? undefined
-      ),
-    ]);
+    const authToken = await generateApiToken(params.actorUser, params.nextAuthSecret, environment);
     const triage = skipTriage
       ? existingTriage
       : await triageSecurityFinding({
           finding,
-          authToken: triageToken,
+          authToken,
           model: params.triageModel,
           backendBaseUrl: params.env.KILOCODE_BACKEND_BASE_URL,
-          organizationId: finding.owned_by_organization_id ?? undefined,
+          organizationId: params.organizationId,
         });
 
     const runSandbox =
@@ -288,7 +273,7 @@ export async function startSecurityAnalysis(
       model: params.analysisModel,
       githubRepo: finding.repo_full_name,
       githubToken: params.githubToken,
-      kilocodeOrganizationId: finding.owned_by_organization_id ?? undefined,
+      kilocodeOrganizationId: params.organizationId,
       createdOnPlatform: 'security-agent',
       callbackTarget,
     };
@@ -298,7 +283,7 @@ export async function startSecurityAnalysis(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${controlToken}`,
+          Authorization: `Bearer ${authToken}`,
           'x-internal-api-key': params.internalApiSecret,
         },
         body: JSON.stringify(prepareInput),
@@ -338,7 +323,7 @@ export async function startSecurityAnalysis(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${controlToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({ cloudAgentSessionId }),
       })

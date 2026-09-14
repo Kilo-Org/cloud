@@ -6,6 +6,7 @@ import { useFocusEffect, useNavigation } from 'expo-router';
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
+import { selectSessionListIsLoading } from '@/components/agents/session-list-loading';
 import { selectShowSearchBusy } from '@/components/agents/session-list-search-busy';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
@@ -76,9 +77,8 @@ export function SessionHistoryScreen() {
   const {
     storedSessions,
     activeSessionIds,
-    storedIsFetching,
+    storedIsPending,
     storedFetchedSinceMount,
-    storedLoadedPageCount,
     paging,
     handleRetry,
     handleRefetch,
@@ -164,8 +164,12 @@ export function SessionHistoryScreen() {
     clearFilters();
   }, [clearSearchInput, searchController, clearFilters, isSearching]);
 
-  const isLoading =
-    !ready || (isSearching ? search.isPending : storedIsFetching && storedLoadedPageCount === 0);
+  const isLoading = selectSessionListIsLoading({
+    ready,
+    isSearching,
+    searchIsPending: search.isPending,
+    storedIsPending,
+  });
 
   // Reserve the search header through the initial load too: the cold-open
   // skeletons must sit in the same space the rows will land in, so the header

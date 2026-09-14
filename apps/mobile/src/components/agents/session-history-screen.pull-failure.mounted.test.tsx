@@ -16,6 +16,7 @@ type MockStoredSession = Pick<StoredSession, 'session_id' | 'organization_id'> &
 const listState = vi.hoisted(() => ({
   storedSessions: [] as MockStoredSession[],
   isError: false,
+  storedIsPending: false,
   storedIsFetching: false,
 }));
 
@@ -209,6 +210,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
       dateGroups: storedSessions.length > 0 ? [{ label: 'Today', sessions: storedSessions }] : [],
       activeIsError: false,
       storedIsError: listState.isError,
+      storedIsPending: listState.storedIsPending,
       storedIsFetching: listState.storedIsFetching,
       storedFetchedSinceMount: true,
       storedLoadedPageCount: 1,
@@ -305,6 +307,7 @@ beforeEach(() => {
     },
   ];
   listState.isError = false;
+  listState.storedIsPending = false;
   listState.storedIsFetching = false;
 });
 

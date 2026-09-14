@@ -23,6 +23,10 @@ const listState = vi.hoisted(() => ({
   storedSessions: [] as MockStoredSession[],
   isSearching: false,
   isError: false,
+  // Mirrors the real hook's stored-query flags so the screen's loading
+  // decision can be exercised on the first render, before the request
+  // settles (isFetching false, isPending true).
+  storedIsPending: false,
   storedIsFetching: false,
   storedFetchedSinceMount: true,
   storedLoadedPageCount: 1,
@@ -138,6 +142,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         dateGroups: storedSessions.length > 0 ? [{ label: 'Today', sessions: storedSessions }] : [],
         activeIsError: false,
         storedIsError: listState.isError,
+        storedIsPending: listState.storedIsPending,
         storedIsFetching: listState.storedIsFetching,
         storedFetchedSinceMount: listState.storedFetchedSinceMount,
         storedLoadedPageCount: listState.storedLoadedPageCount,
@@ -262,6 +267,7 @@ describe('SessionHistoryScreen', () => {
     listState.storedSessions = [];
     listState.isSearching = false;
     listState.isError = false;
+    listState.storedIsPending = false;
     listState.storedIsFetching = false;
     listState.storedFetchedSinceMount = true;
     listState.storedLoadedPageCount = 1;
@@ -467,6 +473,50 @@ describe('SessionHistoryScreen', () => {
     }
   );
 
+  // Regression: the empty state ("No past sessions") must not flash on the
+  // cold-open render. React Query v5 reports `isFetching: false` until the
+  // observer subscribes and starts the first fetch, while `isPending` stays
+  // true until the query settles — the screen must treat that first frame as
+  // loading, not as a settled empty list.
+  it('shows loading on the cold-open render before the request settles', async () => {
+    listState.storedSessions = [];
+    listState.storedIsPending = true;
+    listState.storedIsFetching = false;
+    listState.storedLoadedPageCount = 0;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isLoading).toBe(true);
+    expect(content.props.hasAnySessions).toBe(false);
+  });
+
+  it('stops loading and renders cached rows during a background refetch', async () => {
+    listState.storedSessions = [{ session_id: 'cached', organization_id: null }];
+    listState.storedIsPending = false;
+    listState.storedIsFetching = true;
+    listState.storedLoadedPageCount = 1;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isLoading).toBe(false);
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.sections).toHaveLength(1);
+  });
+
+  it('shows the settled empty state once the request completes with no rows', async () => {
+    listState.storedSessions = [];
+    listState.storedIsPending = false;
+    listState.storedIsFetching = false;
+    listState.storedLoadedPageCount = 1;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isLoading).toBe(false);
+    expect(content.props.hasAnySessions).toBe(false);
+  });
+
   it('renders the agents title with a back button and default header size', async () => {
     const renderer = await renderScreen();
     const header = findNodeByType(renderer, 'ScreenHeader');
@@ -502,8 +552,9 @@ describe('SessionHistoryScreen', () => {
   it('reserves the search header while the first stored page loads', async () => {
     // Cold open: no rows yet, first page in flight. The header must occupy its
     // final space now so the loading skeletons sit where the rows will land
-    // instead of shifting down when the header appears with the rows.
-    listState.storedIsFetching = true;
+    // instead of shifting down when the header appears with the rows. The
+    // merged loading decision keys "no data yet" off `storedIsPending`.
+    listState.storedIsPending = true;
     listState.storedLoadedPageCount = 0;
     const renderer = await renderScreen();
 

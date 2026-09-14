@@ -256,6 +256,8 @@
     "gatewayTranscription": "Transskription via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transskribér stemmeinput med en Kilo Gateway-model i stedet for enhedens stemmegenkendelse. Din optagelse sendes til Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Komprimer værktøjskald",
+    "condenseToolCallsSubtitle": "Gruppér fortløbende værktøjskald i én række, du kan åbne.",
     "toolSummaryTranslation": "Oversæt værktøjssammendrag",
     "toolSummaryTranslationSubtitle": "Send hvert værktøjssammendrag til en model for at oversætte det til dit appsprog. Originalen vises, hvis oversættelsen mislykkes.",
     "toolSummaryTranslationModelUnavailableNotice": "Denne model tilbydes ikke længere. Tryk på $t(common.model) for at vælge en anden."
@@ -2495,6 +2497,10 @@
       "retryableDescription": "Kontrollér forbindelsen og tryk på Prøv igen. Du kan stadig vælge denne mappe ved at trykke på Færdig.",
       "unsupportedTitle": "Kan ikke vise mapper",
       "unsupportedDescription": "Denne CLI kan ikke vise mapper. Tryk på Færdig for at beholde startmappen. Sessionen starter i denne mappe, når du trykker på Start en session."
+    },
+    "toolRun": {
+      "sheetTitle": "Værktøjskald",
+      "condensedLabel": "{{itemCount}} elementer; {{last}}"
     }
   },
   "bootstrap": {

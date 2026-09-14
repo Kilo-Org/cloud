@@ -256,6 +256,8 @@
     "gatewayTranscription": "Transkripsi dengan Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripsikan input suara dengan model Kilo Gateway dan bukan pengecaman pertuturan peranti. Rakaman anda dihantar ke Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Padatkan panggilan alat",
+    "condenseToolCallsSubtitle": "Kumpulkan panggilan alat berturut-turut dalam satu baris yang boleh anda buka.",
     "toolSummaryTranslation": "Terjemah ringkasan alat",
     "toolSummaryTranslationSubtitle": "Hantar setiap ringkasan alat kepada model untuk menterjemahkannya ke dalam bahasa aplikasi anda. Yang asal dipaparkan jika terjemahan gagal.",
     "toolSummaryTranslationModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketik $t(common.model) untuk memilih yang lain."
@@ -2495,6 +2497,10 @@
       "tapToListHint": "Ketik direktori untuk melihat kandungannya.",
       "unsupportedDescription": "CLI ini tidak dapat menyenaraikan direktori. Ketik Selesai untuk mengekalkan direktori pelancaran, kemudian ketik Mulakan sesi untuk bermula di situ.",
       "unsupportedTitle": "Tidak dapat menyenaraikan direktori"
+    },
+    "toolRun": {
+      "sheetTitle": "Panggilan alat",
+      "condensedLabel": "{{itemCount}} item; {{last}}"
     }
   },
   "bootstrap": {

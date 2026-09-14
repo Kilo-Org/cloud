@@ -256,6 +256,8 @@
     "gatewayTranscription": "التفريغ الصوتي عبر Kilo Gateway",
     "gatewayTranscriptionSubtitle": "حوّل الإدخال الصوتي إلى نص باستخدام أحد نماذج Kilo Gateway بدلاً من التعرف على الكلام في جهازك. يُرسل تسجيلك إلى Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ضغط استدعاءات الأدوات",
+    "condenseToolCallsSubtitle": "جمّع استدعاءات الأدوات المتتالية في صف واحد يمكنك فتحه.",
     "toolSummaryTranslation": "ترجمة ملخصات الأدوات",
     "toolSummaryTranslationSubtitle": "أرسل كل ملخص أداة إلى نموذج لترجمته إلى لغة تطبيقك. يظهر النص الأصلي إذا فشلت الترجمة.",
     "toolSummaryTranslationModelUnavailableNotice": "لم يعد هذا النموذج معروضًا. اضغط على $t(common.model) لاختيار نموذج آخر."
@@ -2117,6 +2119,10 @@
       "tapToListHint": "اضغط على مجلد لعرض محتوياته.",
       "unsupportedDescription": "إصدار CLI هذا لا يدعم عرض المجلدات. اضغط على «تم» للاحتفاظ بمجلد بدء التشغيل، ثم على «بدء الجلسة» لبدء الجلسة فيه.",
       "unsupportedTitle": "لا يمكن عرض المجلدات"
+    },
+    "toolRun": {
+      "sheetTitle": "استدعاءات الأدوات",
+      "condensedLabel": "{{itemCount}} عناصر؛ {{last}}"
     }
   },
   "bootstrap": {

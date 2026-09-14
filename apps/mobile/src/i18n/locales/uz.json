@@ -256,6 +256,8 @@
     "gatewayTranscription": "Nutqni Kilo Gateway orqali matnga aylantirish",
     "gatewayTranscriptionSubtitle": "Qurilmaning nutqni tanishining o'rniga Kilo Gateway modeli yordamida ovozli kiritishni matnga aylantiring. Yozuvingiz Kilo Gatewayga yuboriladi.",
     "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Vosita chaqiruvlarini siqish",
+    "condenseToolCallsSubtitle": "Ketma-ket vosita chaqiruvlarini ochishingiz mumkin bo'lgan bitta qatorga guruhlang.",
     "toolSummaryTranslation": "Vosita xulosalarini tarjima qilish",
     "toolSummaryTranslationSubtitle": "Har bir vosita xulosasini ilova tilingizga tarjima qilish uchun modelga yuboring. Tarjima muvaffaqiyatsiz bo'lsa, asl nusxa ko'rsatiladi.",
     "toolSummaryTranslationModelUnavailableNotice": "Bu model endi taklif etilmaydi. Boshqasini tanlash uchun $t(common.model) ga teging."
@@ -2495,6 +2497,10 @@
       "tapToListHint": "Jild tarkibini ko'rish uchun uni bosing.",
       "unsupportedDescription": "Bu CLI jildlar ro'yxatini ko'rsata olmaydi. Tayyor tugmasi boshlang'ich jildni saqlaydi. Sessiyani boshlash tugmasi sessiyani shu jildda boshlaydi.",
       "unsupportedTitle": "Jildlar ro'yxatini ko'rsatib bo'lmaydi"
+    },
+    "toolRun": {
+      "sheetTitle": "Vosita chaqiruvlari",
+      "condensedLabel": "{{itemCount}} element; {{last}}"
     }
   },
   "bootstrap": {

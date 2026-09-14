@@ -335,6 +335,17 @@ async function findCommentTask(
 }
 
 /**
+ * The root comment id a thread action targets. A thread id is the root
+ * comment's id; a reply fragment whose root was served on an earlier comments
+ * page is namespaced `root:firstReplyId` (see bitbucket-read), so the id
+ * stays unique across pages while the action still resolves the root.
+ */
+function threadRootCommentId(threadId: string): number | null {
+  const root = Number(threadId.split(':', 1)[0]);
+  return Number.isInteger(root) && root > 0 ? root : null;
+}
+
+/**
  * Resolve a thread by resolving the root comment's task. Bitbucket comments
  * carry no task count, so the decision comes from the task-collection walk
  * alone: an unresolved task on the comment is resolved, a fully resolved set
@@ -344,8 +355,8 @@ async function findCommentTask(
 export async function resolveThread(
   target: BitbucketPrTarget & { threadId: string } & BitbucketMutationInput
 ): Promise<BitbucketMutationResult> {
-  const commentId = Number(target.threadId);
-  if (!Number.isInteger(commentId) || commentId <= 0) {
+  const commentId = threadRootCommentId(target.threadId);
+  if (commentId === null) {
     throw new BitbucketReviewError('not_found', 'This discussion thread could not be found.');
   }
   const access = await targetAccess(target);
@@ -407,8 +418,8 @@ export async function resolveThread(
 export async function unresolveThread(
   target: BitbucketPrTarget & { threadId: string } & BitbucketMutationInput
 ): Promise<BitbucketMutationResult> {
-  const commentId = Number(target.threadId);
-  if (!Number.isInteger(commentId) || commentId <= 0) {
+  const commentId = threadRootCommentId(target.threadId);
+  if (commentId === null) {
     throw new BitbucketReviewError('not_found', 'This discussion thread could not be found.');
   }
   const access = await targetAccess(target);

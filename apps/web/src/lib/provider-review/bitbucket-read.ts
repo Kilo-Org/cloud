@@ -692,20 +692,25 @@ type BitbucketTaskEvidence = {
 };
 
 /**
- * Map one thread onto the shared DTO. `rootId` is the root comment's id — for
- * a thread whose root was read on an earlier page it is an identity, not a
- * comment in `threadComments`, so resolution and task counts still key off it.
+ * Map one thread onto the shared DTO. `threadId` is the id consumers key
+ * rows and per-thread state on; `rootCommentId` is the root comment's id,
+ * which drives the resolved flag and the task count — for a fragment whose
+ * root was read on an earlier page it is an identity, not a comment in
+ * `threadComments`, so resolution and task counts still key off it.
  */
 function mapThread(
-  rootId: number,
+  threadId: string,
+  rootCommentId: number,
   inline: BitbucketComment['inline'],
   threadComments: BitbucketComment[],
   taskEvidence: BitbucketTaskEvidence
 ): BitbucketDiscussionThread {
   const anchorLine = inline?.to ?? inline?.from ?? null;
   return {
-    threadId: String(rootId),
-    resolved: taskEvidence.commentIds.has(rootId) && !taskEvidence.unresolvedCommentIds.has(rootId),
+    threadId,
+    resolved:
+      taskEvidence.commentIds.has(rootCommentId) &&
+      !taskEvidence.unresolvedCommentIds.has(rootCommentId),
     path: inline?.path ?? null,
     line: anchorLine,
     side: inline ? (inline.to != null ? 'RIGHT' : 'LEFT') : null,
@@ -715,7 +720,7 @@ function mapThread(
       body: comment.content?.raw ?? '',
       createdAt: comment.created_on ?? '',
     })),
-    taskCount: taskEvidence.taskCounts.get(rootId) ?? 0,
+    taskCount: taskEvidence.taskCounts.get(rootCommentId) ?? 0,
   };
 }
 
@@ -728,9 +733,11 @@ function mapThread(
  *
  * The collection is flat and creation-ordered, so a page can start on a reply
  * whose root sits on an earlier page. Such a reply can never attach to a root
- * here: it is surfaced as its own thread keyed by its true root id, using the
- * reply's own inline anchor when Bitbucket sends one. Nothing is dropped, and
- * thread actions still target the root the reply belongs to.
+ * here: it is surfaced as its own thread keyed `root:firstReplyId` — namespaced
+ * so it cannot repeat the root thread's id the earlier page already served
+ * (consumers key rows and state by threadId), while the root comment id still
+ * drives the resolved flag, the task count, and every thread action. Nothing
+ * is dropped, and thread actions still target the root the reply belongs to.
  */
 function buildThreadsFromComments(
   comments: BitbucketComment[],
@@ -747,6 +754,7 @@ function buildThreadsFromComments(
   }
   const threads = roots.map(root =>
     mapThread(
+      String(root.id),
       root.id,
       root.inline ?? null,
       [root, ...(repliesByParent.get(root.id) ?? [])],
@@ -756,7 +764,15 @@ function buildThreadsFromComments(
   const rootIds = new Set(roots.map(root => root.id));
   for (const [parentId, replies] of repliesByParent) {
     if (rootIds.has(parentId)) continue;
-    threads.push(mapThread(parentId, replies[0]?.inline ?? null, replies, taskEvidence));
+    threads.push(
+      mapThread(
+        `${parentId}:${String(replies[0].id)}`,
+        parentId,
+        replies[0]?.inline ?? null,
+        replies,
+        taskEvidence
+      )
+    );
   }
   return threads;
 }

@@ -783,9 +783,11 @@ describe('listDiscussions', () => {
 
     const result = await listDiscussions(ORG_OWNER, 'acme', 'repo', 12);
 
-    // The orphan reply is keyed by its true root id, not the reply id, so a
-    // resolve action still targets the root it belongs to.
-    const orphan = result.threads.find(thread => thread.threadId === '900');
+    // The orphan reply is keyed `root:firstReplyId` — namespaced so it cannot
+    // repeat the root thread's id the previous page served — and the root id
+    // still leads the id, so a resolve action still targets the root it
+    // belongs to.
+    const orphan = result.threads.find(thread => thread.threadId === '900:901');
     expect(orphan?.comments.map(comment => comment.body)).toEqual([
       'Reply on a root from the previous page',
     ]);
@@ -796,6 +798,71 @@ describe('listDiscussions', () => {
       .flatMap(thread => thread.comments.map(comment => comment.body))
       .sort();
     expect(bodies).toEqual(['Reply on a root from the previous page', 'Second page root']);
+  });
+
+  it('never repeats a root thread id on a later comments page', async () => {
+    // Root 900 is served on comments page 1; its reply 901 spills onto page
+    // 2 (the flat collection is creation-ordered). The continuation page must
+    // not emit a thread keyed by the bare root id: consumers key rows and
+    // per-thread state by threadId across the whole paginated collection.
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname.endsWith('/pullrequests/12/comments')) {
+        if (parsed.searchParams.get('page') === '2') {
+          return jsonResponse({
+            pagelen: 50,
+            values: [
+              {
+                id: 901,
+                parent: { id: 900 },
+                content: { raw: 'Reply continuing the split thread' },
+                created_on: '2026-09-02T13:00:00.000000+00:00',
+                user: { uuid: '{author-uuid}', nickname: 'alice', display_name: 'Alice' },
+                deleted: false,
+              },
+            ],
+            next: null,
+          });
+        }
+        return jsonResponse({
+          pagelen: 50,
+          values: [
+            {
+              id: 900,
+              content: { raw: 'Root of the split thread' },
+              created_on: '2026-09-02T12:00:00.000000+00:00',
+              user: { uuid: '{reviewer-uuid}', nickname: 'bob', display_name: 'Bob' },
+              deleted: false,
+            },
+          ],
+          next: 'https://api.bitbucket.org/2.0/repositories/acme/repo/pullrequests/12/comments?pagelen=50&page=2',
+        });
+      }
+      if (parsed.pathname.endsWith('/pullrequests/12/tasks'))
+        return jsonResponse({ pagelen: 100, values: [], next: null });
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const firstPage = await listDiscussions(ORG_OWNER, 'acme', 'repo', 12);
+    expect(firstPage.threads.map(thread => thread.threadId)).toEqual(['900']);
+
+    const secondPage = await listDiscussions(
+      ORG_OWNER,
+      'acme',
+      'repo',
+      12,
+      firstPage.nextCursor ?? undefined
+    );
+    const pageIds = [...firstPage.threads, ...secondPage.threads].map(thread => thread.threadId);
+    // The fragment keeps its own identity (root:firstReplyId) and never
+    // repeats the root thread's id, while still carrying the root id for
+    // thread actions.
+    expect(new Set(pageIds).size).toBe(pageIds.length);
+    expect(secondPage.threads.map(thread => thread.threadId)).toEqual(['900:901']);
   });
 });
 

@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer types for the mounted-test finders (same pattern as the sibling mounted tests) */
 import { createElement } from 'react';
-import { act, type ReactTestRenderer } from 'react-test-renderer';
+import { act, type ReactTestRenderer } from '@/test/renderer';
 import { vi } from 'vitest';
 
 import { VoiceInputSettingsScreen } from '@/components/voice-input-settings-screen';

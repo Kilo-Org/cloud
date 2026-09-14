@@ -1,5 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/ui/selectable-text.mounted.test.tsx) */
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import {

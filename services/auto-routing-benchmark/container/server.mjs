@@ -73,7 +73,6 @@ function runCase({ model, prompt, kiloToken, kiloApiUrl, orgId, timeoutMs, varia
             },
           }),
           KILO_API_URL: kiloApiUrl,
-          KILO_DISABLE_SESSION_INGEST: '1',
           ...(resolvedOrgId ? { KILO_ORG_ID: resolvedOrgId } : {}),
           NO_COLOR: '1',
         },

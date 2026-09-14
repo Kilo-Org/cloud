@@ -3,7 +3,8 @@ import type { User } from '@kilocode/db/schema';
 import { createTRPCClient, httpLink } from '@trpc/client';
 import type { WrappedWastelandRouter } from '@/lib/wasteland/types/router';
 import { WASTELAND_URL } from '@/lib/constants';
-import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
+import { generateApiToken } from '@/lib/tokens';
+import { getUserOrgMemberships } from '@/lib/organizations/organizations';
 import { recordKiloAdminElevationForRequest, serviceTarget } from '@/lib/admin/admin-access-log';
 import { parseDolthubUpstream } from '@/lib/wasteland/upstream';
 
@@ -27,22 +28,21 @@ export async function resolveWastelandUpstreamForUser(
   if (!WASTELAND_URL) return null;
 
   try {
-    const control = await createControlTokenForRequest(user, 'wasteland', {
-      expiresIn: 60 * 5,
-      legacyExpiresIn: 60 * 5,
-      extra: { isAdmin: user.is_admin },
-    });
-    const signedUser = control.user;
-    if (signedUser.is_admin) {
+    if (user.is_admin) {
       // Same elevation as POST /api/wasteland/token: the minted token carries
       // `isAdmin` into the worker, which emits nothing back here.
       await recordKiloAdminElevationForRequest({
-        user: signedUser,
+        user,
         reason: 'service_token_mint',
         target: serviceTarget('wasteland'),
       });
     }
-    const token = control.token;
+    const orgMemberships = await getUserOrgMemberships(user.id);
+    const token = generateApiToken(
+      user,
+      { isAdmin: user.is_admin, orgMemberships },
+      { expiresIn: 60 * 5 }
+    );
 
     const client = createTRPCClient<WrappedWastelandRouter>({
       links: [

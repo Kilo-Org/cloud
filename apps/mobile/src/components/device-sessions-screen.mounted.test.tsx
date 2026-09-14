@@ -105,7 +105,16 @@ describe('account surface states', () => {
     const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'Pressable')).toHaveLength(1);
+    const signOut = renderer.root.findAll(node => String(node.type) === 'Pressable');
+    expect(signOut).toHaveLength(1);
+    // The native rem is 14pt, so `min-h-11`/`min-w-11` is only 38.5pt — below
+    // the app's 44pt minimum. The px form (what button.tsx and the image viewer
+    // use) makes the visible box itself 44pt; hitSlop 8 keeps the effective
+    // area larger still. The loading skeleton reserves this same box (asserted
+    // below), so the taller control does not jump the list when rows arrive.
+    expect(signOut[0]?.props.className).toContain('min-h-[44px]');
+    expect(signOut[0]?.props.className).toContain('min-w-[44px]');
+    expect(signOut[0]?.props.hitSlop).toBe(8);
     unmount();
   });
 
@@ -114,6 +123,15 @@ describe('account surface states', () => {
     query.isError = true;
     const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(12);
+    // Every skeleton row reserves the sign-out control's final 44x44pt box, so
+    // the loaded rows are the same height and the list does not jump on load.
+    const reserved = renderer.root.findAll(
+      node =>
+        String(node.type) === 'View' &&
+        String(node.props.className).includes('min-h-[44px]') &&
+        String(node.props.className).includes('min-w-[44px]')
+    );
+    expect(reserved).toHaveLength(3);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     unmount();

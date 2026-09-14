@@ -70,7 +70,7 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
             ? t('deviceSessions.signOutThisDevice')
             : t('deviceSessions.signOutThisSession')
         }
-        className="shrink-0 active:opacity-70"
+        className="min-h-[44px] min-w-[44px] shrink-0 items-center justify-center active:opacity-70"
       >
         <LogOut size={16} color={colors.destructive} />
       </Pressable>
@@ -187,7 +187,12 @@ export function DeviceSessionsScreen() {
                   <Skeleton className="h-5 w-28" />
                   <Skeleton className="h-4 w-48" />
                 </View>
-                <Skeleton className="h-4 w-4 rounded" />
+                {/* Reserve the sign-out control's final 44x44pt box so the
+                    loaded row is the same height as its skeleton and the list
+                    does not jump when sessions arrive. The glyph stays 16pt. */}
+                <View className="min-h-[44px] min-w-[44px] items-center justify-center">
+                  <Skeleton className="h-4 w-4 rounded" />
+                </View>
               </View>
             ))}
           </View>

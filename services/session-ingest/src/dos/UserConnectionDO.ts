@@ -114,7 +114,6 @@ export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
 // payload for most retry scenarios.
 export const MAX_DURABLE_RESULT_BYTES = 120 * 1024;
 
-// Maximum allowed mutationId length used as a durable storage key prefix.
 const MAX_MUTATION_ID_LENGTH = 128;
 
 // Viewer command allowlist. Anything outside this set is rejected by the relay
@@ -522,7 +521,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
 
     for (const connectionId of staleConnectionIds) {
-      // Find and close the stale CLI WebSocket
       for (const ws of this.ctx.getWebSockets('cli')) {
         const att = ws.deserializeAttachment() as WSAttachment | null;
         if (att?.role === 'cli' && att.connectionId === connectionId) {
@@ -540,10 +538,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     this.scheduleNextAlarm(now);
     this.scheduleDurablePendingAlarm();
   }
-
-  // ---------------------------------------------------------------------------
-  // CLI message handling
-  // ---------------------------------------------------------------------------
 
   private handleCliMessage(
     ws: WebSocket,
@@ -618,7 +612,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     this.connectionCapabilities.set(connectionId, capabilities);
     this.scheduleNextAlarm(now);
 
-    // Remove sessions this connection previously owned but no longer reports
     const previousSessions = this.connectionSessions.get(connectionId) ?? [];
     const currentIds = new Set(sessions.map(s => s.id));
     for (const prev of previousSessions) {
@@ -635,7 +628,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    // Update ownership
     this.connectionSessions.set(connectionId, sessions);
     for (const session of sessions) {
       const previousOwner = this.sessionOwners.get(session.id);
@@ -672,7 +664,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       })
     );
 
-    // Replay existing subscriptions for sessions newly owned by this CLI
     const previousIds = new Set(previousSessions.map(s => s.id));
     for (const session of sessions) {
       if (!previousIds.has(session.id) && this.webSubscriptions.has(session.id)) {
@@ -1313,10 +1304,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Web message handling
-  // ---------------------------------------------------------------------------
-
   private async handleWebMessage(
     ws: WebSocket,
     attachment: WSAttachment & { role: 'web' },
@@ -1409,7 +1396,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     if (subs) {
       subs.delete(ws);
 
-      // If no more subscribers, tell CLI to stop forwarding
       if (subs.size === 0) {
         this.webSubscriptions.delete(sessionId);
         const cliWs = this.findCliForSession(sessionId);
@@ -1419,7 +1405,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    // Update attachment
     const idx = attachment.subscribedSessions.indexOf(sessionId);
     if (idx !== -1) {
       attachment.subscribedSessions.splice(idx, 1);
@@ -1498,7 +1483,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    // Find target CLI
     let targetCli: WebSocket | undefined;
 
     if (msg.sessionId && msg.connectionId) {
@@ -1516,7 +1500,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     } else if (msg.sessionId) {
       targetCli = this.findCliForSession(msg.sessionId);
     } else {
-      // Fall back to first available CLI
       const cliSockets = this.ctx.getWebSockets('cli');
       targetCli = cliSockets[0];
     }
@@ -1536,7 +1519,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       msg.sessionId && msg.connectionId ? msg.connectionId : undefined;
     const targetConnectionId = targetAttachment.connectionId;
 
-    // Resolve the originating web socket's connectionId from its attachment.
     const webAttachment = ws.deserializeAttachment() as WSAttachment | null;
     const webConnectionId =
       webAttachment?.role === 'web' && webAttachment.connectionId
@@ -1639,7 +1621,6 @@ export class UserConnectionDO extends DurableObject<Env> {
               return;
             }
 
-            // Entry is 'pending': dedupe.
             if (CATALOG_DEDUPE_COMMANDS.has(msg.command)) {
               this.sendToWeb(ws, {
                 type: 'response',
@@ -1665,7 +1646,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
-    // In-memory cap check for the common path.
     if (this.pendingCommands.size >= UserConnectionDO.MAX_PENDING_COMMANDS) {
       this.sendToWeb(ws, {
         type: 'response',
@@ -1835,10 +1815,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Disconnect handling
-  // ---------------------------------------------------------------------------
-
   private async handleCliDisconnect(
     disconnectedWs: WebSocket,
     attachment: WSAttachment & { role: 'cli' }
@@ -1868,7 +1844,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
-    // Collect owned sessions before removing ownership
     const sessions = this.connectionSessions.get(connectionId) ?? [];
     const ownedSessions = new Set<string>();
     for (const session of sessions) {
@@ -1953,7 +1928,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     const attachment = ws.deserializeAttachment() as WSAttachment | null;
     const connectionId = attachment?.role === 'web' ? attachment.connectionId : 'unknown';
 
-    // Remove from all subscription sets
     let droppedSubscriptions = 0;
     for (const [sessionId, subs] of this.webSubscriptions) {
       if (!subs.has(ws)) continue;
@@ -1962,7 +1936,6 @@ export class UserConnectionDO extends DurableObject<Env> {
 
       if (subs.size === 0) {
         this.webSubscriptions.delete(sessionId);
-        // Tell owning CLI to stop forwarding
         const cliWs = this.findCliForSession(sessionId);
         if (cliWs) {
           this.sendToCli(cliWs, { type: 'unsubscribe', sessionId });
@@ -1989,10 +1962,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       remainingWebSockets: this.ctx.getWebSockets('web').length,
     });
   }
-
-  // ---------------------------------------------------------------------------
-  // RPC
-  // ---------------------------------------------------------------------------
 
   getActiveSessions(): Array<
     HeartbeatSession & {
@@ -2176,10 +2145,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     return this.findCliForSession(sessionId) !== undefined;
   }
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-
   private sendToCli(ws: WebSocket, msg: CLIInboundMessage): void {
     try {
       ws.send(JSON.stringify(msg));
@@ -2209,7 +2174,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
   }
 
-  /** Close a stale CLI socket that has the same connectionId (from a previous connection). Returns true if one was found. */
   private closeStaleSocket(connectionId: string): boolean {
     for (const ws of this.ctx.getWebSockets('cli')) {
       const att = ws.deserializeAttachment() as WSAttachment | null;
@@ -2496,10 +2460,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Command error shaping
-  // ---------------------------------------------------------------------------
-
   /**
    * Compute the shaped terminal outcome for a command reply.
    * Applies catalog size guard and error normalization (CLI_UPGRADE_REQUIRED
@@ -2578,10 +2538,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       (value as Record<string, unknown>)._truncated === true
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // Durable pending command storage (D8)
-  // ---------------------------------------------------------------------------
 
   private async getDurablePendingCommand(
     correlationId: string
@@ -2883,7 +2839,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     // emitted. Hoist the child's needs-input status onto its root so the
     // session list shows NEEDS INPUT. Derived per call, so it clears when
     // the child resolves.
-    // ponytail: one level deep; iterate to a fixed point if the CLI ever nests deeper.
     const hoistedStatus = new Map<string, string>();
     for (const [connectionId, sessions] of this.connectionSessions) {
       if (!liveConnectionIds.has(connectionId)) continue;

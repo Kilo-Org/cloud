@@ -1183,7 +1183,7 @@ export function NewSessionPanel({
       setShowRepositoryRequiredMessage(true);
       return;
     }
-    if (selectedPlatform === 'github' && !selectedGitHubIntegrationId) {
+    if (organizationId && selectedPlatform === 'github' && !selectedGitHubIntegrationId) {
       toast.error('Select the GitHub repository again.');
       return;
     }

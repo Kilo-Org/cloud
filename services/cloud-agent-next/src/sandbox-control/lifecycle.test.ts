@@ -37,6 +37,7 @@ import { WORKTREE_CREDENTIAL_CONTAINMENT } from './physical-lifecycle.js';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
 import { logger } from '../logger.js';
 import { validateControlLogUploadGrant } from './log-upload-grant.js';
+import { validateWorktreeStateGrant } from './worktree-state-grant.js';
 import { summarizeHeartbeatIdle } from './status-projection.js';
 
 const mocks = vi.hoisted(() => ({
@@ -1090,6 +1091,25 @@ describe('SandboxControl lifecycle boundaries', () => {
       expect(h.sendRequest).not.toHaveBeenCalled();
     }
   );
+
+  it('hands the wrapper a worktree-state grant scoped to the session it attaches', async () => {
+    const secret = 'test-worktree-state-signing-secret';
+    const h = await harness({ env: { NEXTAUTH_SECRET: { get: async () => secret } } });
+    const worktreeState = (await h.create()).attachment?.worktreeState;
+    expect(worktreeState?.url).toBe(
+      `https://example.test/worktree-state/${OWNER}/${ROUTE.sessionId}`
+    );
+    expect(validateWorktreeStateGrant(`Bearer ${worktreeState?.grant}`, secret)).toEqual({
+      userId: OWNER,
+      scopeId: ROUTE.sessionId,
+    });
+    expect(Object.values(worktreeState ?? {})).not.toContain(secret);
+  });
+
+  it('omits the worktree-state grant when the signing secret is unavailable', async () => {
+    const h = await harness({ env: { NEXTAUTH_SECRET: undefined } });
+    expect((await h.create()).attachment?.worktreeState).toBeUndefined();
+  });
 
   it('launches the wrapper with an upload-only grant scoped to its physical allocation', async () => {
     const secret = 'test-log-upload-signing-secret';

@@ -292,38 +292,6 @@ function captureRuntimeModelNotFoundDiagnostics(params: {
 }
 
 /**
- * Fragments of the Kilo SDK's reasoning-only length-stop warning. When the model
- * exhausts its output limit while thinking, the SDK appends this warning as an
- * `ignored` text part and the response contains nothing actionable. The session
- * still idles out and reports `completed`, so the review used to be marked
- * successful with no review on the PR.
- *
- * Matched as two phrases rather than the exact sentence so minor SDK wording
- * changes do not silently break detection. Mirrors `REASONING_LENGTH_WARNING`
- * in the Kilo CLI session processor.
- */
-const REASONING_LENGTH_WARNING_FRAGMENTS = ['output limit', 'while reasoning'] as const;
-
-/**
- * True when a completed review's assistant output is only the reasoning-only
- * length-stop warning, which means the model produced no review.
- *
- * This is deliberately narrow. It does NOT treat an empty or missing assistant
- * text as no output: tool-only completions and event-retention gaps also leave
- * the text empty, and failing those would overwrite real review summaries. Only
- * the explicit "no actionable output" warning is a reliable signal that no
- * review was produced.
- */
-export function isReasoningOnlyLengthCompletion(
-  payload: Pick<StatusUpdatePayload, 'lastAssistantMessageText'>
-): boolean {
-  const text = payload.lastAssistantMessageText;
-  if (typeof text !== 'string') return false;
-  const normalized = text.toLowerCase();
-  return REASONING_LENGTH_WARNING_FRAGMENTS.every(fragment => normalized.includes(fragment));
-}
-
-/**
  * Normalize a payload from either the orchestrator or cloud-agent-next callback
  * into the common format expected by the update logic.
  */
@@ -516,12 +484,6 @@ function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalRe
     terminalReason === 'user_cancelled' ||
     terminalReason === 'superseded' ||
     terminalReason === 'interrupted' ||
-    // The model produced no actionable output (it exhausted its output limit
-    // while reasoning), so a retry with the same model and configuration is
-    // likely to repeat. The check is failed and the PR gets an authored notice
-    // instead of a silent retry; the customer can re-run the review or adjust
-    // the reasoning/output settings.
-    terminalReason === 'assistant_no_actionable_output' ||
     // The customer's own provider quota is exhausted, so an immediate retry
     // burns a second review against the same closed door. hasKnownUnretryableFailureMessage
     // below already tries to catch this, but only by matching the raw '[BYOK] Your
@@ -1149,35 +1111,10 @@ export async function POST(
 
     const rawPayload = parsedPayload.data;
     const attemptId = callbackAttemptId || undefined;
-    const normalizedPayload = normalizePayload(rawPayload);
-    const { sessionId, cliSessionId, gateResult, failure } = normalizedPayload;
-    let { status, errorMessage, terminalReason } = normalizedPayload;
+    const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult, failure } =
+      normalizePayload(rawPayload);
     const executionId = rawPayload.executionId;
     const validGateResult = gateResult;
-
-    // A 'completed' callback whose only assistant output is the reasoning-only
-    // length-stop warning is a failure, not a success. Reporting success here is
-    // what lets a model that exhausts its output limit while reasoning leave a
-    // green check run with no review on the PR. Downgrade so the run gets a
-    // failure conclusion, a confused reaction, an authored failure notice on the
-    // PR thread, and an attributed terminal reason instead of silently passing.
-    if (status === 'completed' && isReasoningOnlyLengthCompletion(rawPayload)) {
-      logExceptInTest(
-        '[code-review-status] Completed review produced no actionable output; downgrading to failed',
-        { reviewId, attemptId, sessionId, cliSessionId }
-      );
-      captureMessage('Code review completed without actionable output', {
-        level: 'warning',
-        tags: {
-          source: 'code-review-status-no-output',
-          review_id: reviewId,
-          cloud_agent_session_id: sessionId ?? '',
-        },
-      });
-      status = 'failed';
-      terminalReason = 'assistant_no_actionable_output';
-      errorMessage = 'The review session completed without producing a review summary or comments.';
-    }
 
     const loggableErrorMessage = getLoggableStatusErrorMessage(errorMessage, terminalReason);
     logExceptInTest('[code-review-status] Received status update', {

@@ -117,7 +117,6 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   assistant_structured_output: 'Assistant Structured Output',
   assistant_failed: 'Assistant Error',
   assistant_no_reply: 'Assistant No Reply',
-  assistant_no_actionable_output: 'Assistant No Actionable Output',
   wrapper_failed: 'Agent Wrapper Failure',
   runtime_startup_failed: 'Runtime Startup Failure',
   delivery_failed: 'Delivery Failure',

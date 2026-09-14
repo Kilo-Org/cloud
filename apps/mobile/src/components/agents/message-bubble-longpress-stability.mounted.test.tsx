@@ -31,6 +31,14 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('./compaction-separator', () => ({ CompactionSeparator: 'CompactionSeparator' }));
 vi.mock('./file-part-renderer', () => ({ FilePartRenderer: 'FilePartRenderer' }));
 vi.mock('./part-renderer', () => ({ PartRenderer: 'PartRenderer' }));
+// MessageBubble's condensed-run branch pulls in FixedPartRow → ActivityIndicator
+// → a11y/motion → expo-battery, which the node-mounted project cannot load
+// (expo-modules-core reads `__DEV__`). Mock the row module as the sibling
+// message-bubble.test.ts does so the import chain never reaches it.
+vi.mock('./tool-run-rows', () => ({
+  CondensedToolRunRow: 'CondensedToolRunRow',
+  ToolOneLineRow: 'ToolOneLineRow',
+}));
 vi.mock('./use-message-copy', () => ({ useMessageCopy: () => ({ copyMessage: vi.fn() }) }));
 vi.mock('./chat-markdown-text', () => ({
   ChatMarkdownText: (props: Record<string, unknown>) => {

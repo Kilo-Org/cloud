@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Når dette er av, setter returtasten inn et linjeskift i agentenes meldingsfelt.",
     "biometricUnlock": "Lås opp med biometri",
     "biometricUnlockSubtitle": "Lås opp appen ved oppstart og etter fem minutter i bakgrunnen.",
+    "hideThinking": "Skjul detaljer om tenkning",
+    "hideThinkingSubtitle": "Ikke vis agentens tenkning på øktsiden.",
     "featureFlags": "Funksjonsflagg",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Tilkoblingen er brutt",
       "retryConnection": "Prøv å koble til på nytt"
     },
+    "goal": {
+      "title": "Mål",
+      "statusActive": "Aktivt mål",
+      "statusPaused": "Mål satt på pause",
+      "statusComplete": "Målet er fullført",
+      "statusBlocked": "Målet er blokkert",
+      "edit": "Rediger mål",
+      "remove": "Fjern mål",
+      "pause": "Sett mål på pause",
+      "resume": "Fortsett mål",
+      "editPlaceholder": "Beskriv målet",
+      "removeConfirmTitle": "Fjerne mål?",
+      "removeConfirmMessage": "CLI-en tømmer målet for denne økten.",
+      "updateFailed": "Målet kunne ikke oppdateres.",
+      "sectionAccessibility": "{{status}}. Mål: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Nylig brukt",
       "couldNotLoadGithubRepositories": "Kunne ikke laste inn kodelagre fra GitHub.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "Trykk på en mappe for å se innholdet.",
       "unsupportedDescription": "Denne CLI-en kan ikke vise mapper. Trykk på Ferdig for å beholde oppstartsmappen. Trykk deretter på Start økt for å starte der.",
       "unsupportedTitle": "Kan ikke vise mapper"
+    },
+    "autoApprove": {
+      "title": "Automatisk godkjenning",
+      "description": "Godkjenn tillatelsesforespørsler for denne økten automatisk. Deretter kjører verktøy uten en forespørsel.",
+      "unavailable": "Denne økten kan ikke motta tillatelsesforespørsler."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Denne transkripsjonsmodellen er ikke tilgjengelig. Velg en annen under Innstillinger.",
     "gatewayModelUnavailableNotice": "Denne modellen tilbys ikke lenger. Trykk på $t(transcriptionModel.title) for å velge en annen.",
     "gatewaySignInRequired": "Logg inn for å bruke transkripsjon via Kilo Gateway.",
-    "gatewayNoModel": "Velg en transkripsjonsmodell under Innstillinger først."
+    "gatewayNoModel": "Velg en transkripsjonsmodell under Innstillinger først.",
+    "testTitle": "Test taleinndata",
+    "testPlaceholder": "Trykk på mikrofonen og begynn å snakke.",
+    "testClear": "Tøm tekst"
   },
   "share": {
     "title": "Del med Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Ingen transkripsjonsmodeller",
     "emptyDescription": "Kilo Gateway tilbyr ingen transkripsjonsmodeller akkurat nå.",
     "loadFailed": "Kunne ikke laste inn transkripsjonsmodellene."
+  },
+  "voiceLanguage": {
+    "title": "Talespråk",
+    "automatic": "Automatisk",
+    "loadFailed": "Kunne ikke laste inn språkene denne enheten støtter.",
+    "emptyTitle": "Ingen støttede språk",
+    "emptyDescription": "Talegjenkjenningen på denne enheten rapporterer ingen støttede språk."
   }
 }

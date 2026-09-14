@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Als dit uitstaat, voegt Return een nieuwe regel toe in het berichtveld van de agent.",
     "biometricUnlock": "Ontgrendelen met biometrie",
     "biometricUnlockSubtitle": "Ontgrendelen is vereist bij het starten van de app en nadat de app vijf minuten op de achtergrond heeft gestaan.",
+    "hideThinking": "Denkdetails verbergen",
+    "hideThinkingSubtitle": "Toon de gedachtegang van de agent niet op de sessiepagina.",
     "featureFlags": "Functievlaggen",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -1563,6 +1565,22 @@
       "connectionLost": "Verbinding verbroken",
       "retryConnection": "Opnieuw verbinden"
     },
+    "goal": {
+      "title": "Doel",
+      "statusActive": "Actief doel",
+      "statusPaused": "Doel gepauzeerd",
+      "statusComplete": "Doel voltooid",
+      "statusBlocked": "Doel geblokkeerd",
+      "edit": "Doel bewerken",
+      "remove": "Doel verwijderen",
+      "pause": "Doel pauzeren",
+      "resume": "Doel hervatten",
+      "editPlaceholder": "Beschrijf het doel",
+      "removeConfirmTitle": "Doel verwijderen?",
+      "removeConfirmMessage": "De CLI wist het doel van deze sessie.",
+      "updateFailed": "Het doel kon niet worden bijgewerkt.",
+      "sectionAccessibility": "{{status}}. Doel: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Recent gebruikt",
       "couldNotLoadGithubRepositories": "De GitHub-repositories konden niet worden geladen.",
@@ -2045,6 +2063,11 @@
       "tapToListHint": "Tik op een map om de inhoud te bekijken.",
       "unsupportedDescription": "Deze CLI kan geen mappen weergeven. Tik op Klaar om de startmap te behouden. Met Sessie starten begin je de sessie in die map.",
       "unsupportedTitle": "Mappen weergeven niet mogelijk"
+    },
+    "autoApprove": {
+      "title": "Automatisch goedkeuren",
+      "description": "Keur toestemmingsverzoeken voor deze sessie automatisch goed. Daarna draaien hulpmiddelen zonder verzoek.",
+      "unavailable": "Deze sessie kan geen toestemmingsverzoeken ontvangen."
     }
   },
   "bootstrap": {
@@ -2157,7 +2180,10 @@
     "gatewayModelUnavailable": "Dit transcriptiemodel is niet beschikbaar. Kies een ander model bij Voorkeuren.",
     "gatewayModelUnavailableNotice": "Dit model wordt niet meer aangeboden. Tik op $t(transcriptionModel.title) om een ander te kiezen.",
     "gatewaySignInRequired": "Meld je aan om transcriptie via Kilo Gateway te gebruiken.",
-    "gatewayNoModel": "Kies eerst een transcriptiemodel bij Voorkeuren."
+    "gatewayNoModel": "Kies eerst een transcriptiemodel bij Voorkeuren.",
+    "testTitle": "Spraakinvoer testen",
+    "testPlaceholder": "Tik op de microfoon en begin te praten.",
+    "testClear": "Tekst wissen"
   },
   "share": {
     "title": "Delen met Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Geen transcriptiemodellen",
     "emptyDescription": "Kilo Gateway biedt op dit moment geen transcriptiemodellen.",
     "loadFailed": "De transcriptiemodellen konden niet worden geladen."
+  },
+  "voiceLanguage": {
+    "title": "Taal voor spraak",
+    "automatic": "Automatisch",
+    "loadFailed": "De talen die dit apparaat ondersteunt, konden niet worden geladen.",
+    "emptyTitle": "Geen ondersteunde talen",
+    "emptyDescription": "De spraakherkenning van dit apparaat meldt geen ondersteunde talen."
   }
 }

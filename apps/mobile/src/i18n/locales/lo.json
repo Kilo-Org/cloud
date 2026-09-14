@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "ເມື່ອປິດຕົວເລືອກນີ້ ປຸ່ມຂຶ້ນແຖວໃໝ່ຈະແຊກແຖວໃໝ່ໃນຊ່ອງຂຽນຂໍ້ຄວາມຫາຕົວແທນ.",
     "biometricUnlock": "ປົດລັອກດ້ວຍຂໍ້ມູນຊີວະມິຕິ",
     "biometricUnlockSubtitle": "ຕ້ອງປົດລັອກເມື່ອເປີດແອັບ ແລະ ຫຼັງຈາກແອັບຢູ່ໃນພື້ນຫຼັງເປັນເວລາຫ້ານາທີ.",
+    "hideThinking": "ເຊື່ອງລາຍລະອຽດການຄິດ",
+    "hideThinkingSubtitle": "ບໍ່ສະແດງການຄິດຂອງຕົວແທນໃນໜ້າເຊດຊັນ.",
     "featureFlags": "ທຸງຄຸນສົມບັດ",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "ການເຊື່ອມຕໍ່ຂາດ",
       "retryConnection": "ລອງເຊື່ອມຕໍ່ໃໝ່"
     },
+    "goal": {
+      "title": "ເປົ້າໝາຍ",
+      "statusActive": "ເປົ້າໝາຍທີ່ເຄື່ອນໄຫວ",
+      "statusPaused": "ເປົ້າໝາຍທີ່ຢຸດຊົ່ວຄາວ",
+      "statusComplete": "ເປົ້າໝາຍສຳເລັດ",
+      "statusBlocked": "ເປົ້າໝາຍຖືກຂັດຂວາງ",
+      "edit": "ແກ້ໄຂເປົ້າໝາຍ",
+      "remove": "ເອົາເປົ້າໝາຍອອກ",
+      "pause": "ຢຸດເປົ້າໝາຍຊົ່ວຄາວ",
+      "resume": "ສືບຕໍ່ເປົ້າໝາຍ",
+      "editPlaceholder": "ອະທິບາຍເປົ້າໝາຍ",
+      "removeConfirmTitle": "ເອົາເປົ້າໝາຍອອກບໍ?",
+      "removeConfirmMessage": "CLI ລຶບເປົ້າໝາຍຂອງເຊດຊັນນີ້.",
+      "updateFailed": "ບໍ່ສາມາດອັບເດດເປົ້າໝາຍໄດ້.",
+      "sectionAccessibility": "{{status}}. ເປົ້າໝາຍ: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "ໃຊ້ຫຼ້າສຸດ",
       "couldNotLoadGithubRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ GitHub ໄດ້.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "ແຕະໂຟລເດີເພື່ອເບິ່ງລາຍການຂ້າງໃນ.",
       "unsupportedDescription": "CLI ນີ້ສະແດງລາຍການໂຟລເດີບໍ່ໄດ້. ປຸ່ມສຳເລັດຈະເກັບໂຟລເດີທີ່ໃຊ້ເປີດ CLI ໄວ້ ແລະປຸ່ມເລີ່ມເຊດຊັນຈະເລີ່ມວຽກໃນໂຟລເດີນັ້ນ.",
       "unsupportedTitle": "ສະແດງລາຍການໂຟລເດີບໍ່ໄດ້"
+    },
+    "autoApprove": {
+      "title": "ການອະນຸມັດອັດຕະໂນມັດ",
+      "description": "ອະນຸມັດຄຳຮ້ອງຂໍສິດສຳລັບເຊດຊັນນີ້ແບບອັດຕະໂນມັດ. ຈາກນັ້ນ ເຄື່ອງມືຈະເຮັດວຽກໂດຍບໍ່ຖາມ.",
+      "unavailable": "ເຊດຊັນນີ້ບໍ່ສາມາດຮັບຄຳຮ້ອງຂໍສິດໄດ້."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "ໂມເດວຖອດສຽງນີ້ບໍ່ມີໃຫ້ໃຊ້. ເລືອກໂມເດວອື່ນໃນການຕັ້ງຄ່າສ່ວນຕົວ.",
     "gatewayModelUnavailableNotice": "ໂມເດວນີ້ບໍ່ໄດ້ສະເໜີອີກຕໍ່ໄປ. ແຕະ $t(transcriptionModel.title) ເພື່ອເລືອກອັນອື່ນ.",
     "gatewaySignInRequired": "ເຂົ້າສູ່ລະບົບເພື່ອໃຊ້ການຖອດສຽງຜ່ານ Kilo Gateway.",
-    "gatewayNoModel": "ເລືອກໂມເດວຖອດສຽງໃນການຕັ້ງຄ່າສ່ວນຕົວກ່ອນ."
+    "gatewayNoModel": "ເລືອກໂມເດວຖອດສຽງໃນການຕັ້ງຄ່າສ່ວນຕົວກ່ອນ.",
+    "testTitle": "ທົດສອບການປ້ອນສຽງ",
+    "testPlaceholder": "ແຕະໄມໂຄຣໂຟນ ແລ້ວເລີ່ມເວົ້າ.",
+    "testClear": "ລ້າງຂໍ້ຄວາມ"
   },
   "share": {
     "title": "ແບ່ງປັນໄປທີ່ Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "ບໍ່ມີໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
     "emptyDescription": "ຕອນນີ້ Kilo Gateway ບໍ່ມີໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ.",
     "loadFailed": "ບໍ່ສາມາດໂຫຼດໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມໄດ້."
+  },
+  "voiceLanguage": {
+    "title": "ພາສາສຽງ",
+    "automatic": "ອັດຕະໂນມັດ",
+    "loadFailed": "ບໍ່ສາມາດໂຫລດພາສາທີ່ອຸປະກອນນີ້ຮອງຮັບໄດ້.",
+    "emptyTitle": "ບໍ່ມີພາສາທີ່ຮອງຮັບ",
+    "emptyDescription": "ການຮັບຮູ້ສຽງເວົ້າຂອງອຸປະກອນນີ້ບໍ່ລາຍງານພາສາທີ່ຮອງຮັບ."
   }
 }

@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Meta din l-għażla tkun mitfija, it-tast tar-ritorn idaħħal linja ġdida fil-qasam tal-messaġġ lill-aġent.",
     "biometricUnlock": "Żblokka bil-bijometrija",
     "biometricUnlockSubtitle": "Żblokka l-applikazzjoni meta titnieda u wara ħames minuti fl-isfond.",
+    "hideThinking": "Aħbi d-dettalji tal-ħsieb",
+    "hideThinkingSubtitle": "Turix il-ħsieb tal-aġent fil-paġna tas-sessjoni.",
     "featureFlags": "Flags tal-karatteristiċi",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2100,6 +2102,22 @@
       "connectionLost": "Il-konnessjoni ntilfet",
       "retryConnection": "Erġa' pprova taqbad"
     },
+    "goal": {
+      "title": "Għan",
+      "statusActive": "Għan attiv",
+      "statusPaused": "Għan fil-pawża",
+      "statusComplete": "Għan lest",
+      "statusBlocked": "Għan imblukkat",
+      "edit": "Editja l-għan",
+      "remove": "Neħħi l-għan",
+      "pause": "Ippawża l-għan",
+      "resume": "Kompli l-għan",
+      "editPlaceholder": "Iddeskrivi l-għan",
+      "removeConfirmTitle": "Neħħi l-għan?",
+      "removeConfirmMessage": "Il-CLI jnaddaf l-għan ta' din is-sessjoni.",
+      "updateFailed": "L-għan ma setax jiġi aġġornat.",
+      "sectionAccessibility": "{{status}}. Għan: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Użati reċentement",
       "couldNotLoadGithubRepositories": "Ma setgħux jitgħabbew ir-repożitorji ta' GitHub.",
@@ -2597,6 +2615,11 @@
       "tapToListHint": "Tektek direttorju biex tara l-kontenut tiegħu.",
       "unsupportedDescription": "Dan il-CLI ma jistax jelenka d-direttorji. Tektek Lest biex iżżomm id-direttorju tat-tnedija, imbagħad Ibda s-sessjoni biex tibda minn hemm.",
       "unsupportedTitle": "Ma jistgħux jiġu elenkati d-direttorji"
+    },
+    "autoApprove": {
+      "title": "Approvazzjoni awtomatika",
+      "description": "Approva awtomatikament it-talbiet għall-permess ta' din is-sessjoni. Imbagħad l-għodod jaħdmu mingħajr talba.",
+      "unavailable": "Din is-sessjoni ma tistax tirċievi talbiet għall-permess."
     }
   },
   "bootstrap": {
@@ -2709,7 +2732,10 @@
     "gatewayModelUnavailable": "Dan il-mudell ta' traskrizzjoni mhux disponibbli. Agħżel ieħor fil-Preferenzi.",
     "gatewayModelUnavailableNotice": "Dan il-mudell m'għadux disponibbli. Agħfas $t(transcriptionModel.title) biex tagħżel ieħor.",
     "gatewaySignInRequired": "Idħol biex tuża t-traskrizzjoni permezz ta' Kilo Gateway.",
-    "gatewayNoModel": "L-ewwel agħżel mudell ta' traskrizzjoni fil-Preferenzi."
+    "gatewayNoModel": "L-ewwel agħżel mudell ta' traskrizzjoni fil-Preferenzi.",
+    "testTitle": "Ittestja l-input tal-vuċi",
+    "testPlaceholder": "Tektek il-mikrofonu u ibda tkellem.",
+    "testClear": "Ħassar it-test"
   },
   "share": {
     "title": "Aqsam ma' Kilo",
@@ -3101,5 +3127,12 @@
     "emptyTitle": "L-ebda mudell ta' traskrizzjoni",
     "emptyDescription": "Kilo Gateway bħalissa ma joffri l-ebda mudell ta' traskrizzjoni.",
     "loadFailed": "Ma setgħetx titgħabba l-mudelli ta' traskrizzjoni."
+  },
+  "voiceLanguage": {
+    "title": "Lingwa tal-vuċi",
+    "automatic": "Awtomatiku",
+    "loadFailed": "Il-lingwi li jappoġġja dan l-apparat ma setgħux jitgħabbu.",
+    "emptyTitle": "L-ebda lingwa appoġġjata",
+    "emptyDescription": "Ir-rikonoxximent tal-kelliem ta' dan l-apparat ma jirrappurtax lingwi appoġġjati."
   }
 }

@@ -1478,6 +1478,22 @@
       "connectionLost": "Connexion perdue",
       "retryConnection": "Réessayer de se connecter"
     },
+    "goal": {
+      "title": "Objectif",
+      "statusActive": "Objectif actif",
+      "statusPaused": "Objectif en pause",
+      "statusComplete": "Objectif atteint",
+      "statusBlocked": "Objectif bloqué",
+      "edit": "Modifier l'objectif",
+      "remove": "Supprimer l'objectif",
+      "pause": "Mettre l'objectif en pause",
+      "resume": "Reprendre l'objectif",
+      "editPlaceholder": "Décrivez l'objectif",
+      "removeConfirmTitle": "Supprimer l'objectif ?",
+      "removeConfirmMessage": "Le CLI efface l'objectif de cette session.",
+      "updateFailed": "Impossible de mettre à jour l'objectif.",
+      "sectionAccessibility": "{{status}}. Objectif : {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Utilisés récemment",
       "couldNotLoadGithubRepositories": "Impossible de charger les dépôts GitHub.",
@@ -1965,6 +1981,11 @@
       "tapToListHint": "Touchez un dossier pour afficher son contenu.",
       "unsupportedDescription": "Cette CLI ne permet pas d'afficher les dossiers. Touchez Terminé pour conserver le dossier de lancement, puis Démarrer la session pour démarrer dans ce dossier.",
       "unsupportedTitle": "Impossible d'afficher les dossiers"
+    },
+    "autoApprove": {
+      "title": "Approbation automatique",
+      "description": "Approuver automatiquement les demandes d'autorisation de cette session. Les outils s'exécutent ensuite sans invite.",
+      "unavailable": "Cette session ne peut pas recevoir de demandes d'autorisation."
     }
   },
   "bootstrap": {
@@ -1995,6 +2016,8 @@
     "returnSendsMessageSubtitle": "Si cette option est désactivée, la touche Entrée insère un saut de ligne dans les champs de saisie des agents.",
     "biometricUnlock": "Déverrouillage biométrique",
     "biometricUnlockSubtitle": "Déverrouillage requis au lancement et après cinq minutes en arrière-plan.",
+    "hideThinking": "Masquer les détails du raisonnement",
+    "hideThinkingSubtitle": "Ne pas afficher le raisonnement de l'agent sur la page de session.",
     "featureFlags": "Indicateurs de fonctionnalités",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2102,7 +2125,10 @@
     "gatewayModelUnavailable": "Ce modèle de transcription n'est pas disponible. Choisissez-en un autre dans les Préférences.",
     "gatewayModelUnavailableNotice": "Ce modèle n'est plus proposé. Touchez $t(transcriptionModel.title) pour en choisir un autre.",
     "gatewaySignInRequired": "Connectez-vous pour utiliser la transcription via Kilo Gateway.",
-    "gatewayNoModel": "Choisissez d'abord un modèle de transcription dans les Préférences."
+    "gatewayNoModel": "Choisissez d'abord un modèle de transcription dans les Préférences.",
+    "testTitle": "Tester la saisie vocale",
+    "testPlaceholder": "Touchez le microphone et commencez à parler.",
+    "testClear": "Effacer le texte"
   },
   "share": {
     "title": "Partager avec Kilo",
@@ -3055,5 +3081,12 @@
     "emptyTitle": "Aucun modèle de transcription",
     "emptyDescription": "Kilo Gateway ne propose actuellement aucun modèle de transcription.",
     "loadFailed": "Impossible de charger les modèles de transcription."
+  },
+  "voiceLanguage": {
+    "title": "Langue de la voix",
+    "automatic": "Automatique",
+    "loadFailed": "Impossible de charger les langues prises en charge par cet appareil.",
+    "emptyTitle": "Aucune langue prise en charge",
+    "emptyDescription": "La reconnaissance vocale de cet appareil ne signale aucune langue prise en charge."
   }
 }

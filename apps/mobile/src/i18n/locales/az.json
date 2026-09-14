@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Bu seçim deaktiv olduqda sətirsonu düyməsi agentin mesaj sahəsinə yeni sətir əlavə edir.",
     "biometricUnlock": "Biometrik məlumatlarla kilidi aç",
     "biometricUnlockSubtitle": "Tətbiq başladıqda və arxa planda beş dəqiqə qaldıqdan sonra kilidi açmaq tələb olunur.",
+    "hideThinking": "Düşünmə təfərrüatlarını gizlət",
+    "hideThinkingSubtitle": "Agentin düşünməsini sessiya səhifəsində göstərmə.",
     "featureFlags": "Funksiya bayroqları",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Bağlantı kəsildi",
       "retryConnection": "Yenidən qoşul"
     },
+    "goal": {
+      "title": "Məqsəd",
+      "statusActive": "Aktiv məqsəd",
+      "statusPaused": "Dayandırılmış məqsəd",
+      "statusComplete": "Məqsəd tamamlandı",
+      "statusBlocked": "Məqsəd bloklandı",
+      "edit": "Məqsədi redaktə et",
+      "remove": "Məqsədi sil",
+      "pause": "Məqsədi dayandır",
+      "resume": "Məqsədə davam et",
+      "editPlaceholder": "Məqsədi təsvir et",
+      "removeConfirmTitle": "Məqsəd silinsin?",
+      "removeConfirmMessage": "CLI bu sessiyanın məqsədini təmizləyir.",
+      "updateFailed": "Məqsəd yenilənə bilmədi.",
+      "sectionAccessibility": "{{status}}. Məqsəd: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Son istifadə edilənlər",
       "couldNotLoadGithubRepositories": "GitHub repozitoriyalarını yükləmək mümkün olmadı.",
@@ -2531,6 +2549,11 @@
       "retryableDescription": "Bağlantını yoxla və yenidən cəhd et. «Hazırdır» düyməsi ilə bu qovluğu yenə də seçə bilərsən.",
       "unsupportedTitle": "Qovluqların siyahısını göstərmək mümkün deyil",
       "unsupportedDescription": "Bu CLI qovluqların siyahısını göstərə bilmir. «Hazırdır» düyməsi başlanğıc qovluğunu saxlayır, «Sessiyanı başlat» düyməsi isə sessiyanı həmin qovluqda başladır."
+    },
+    "autoApprove": {
+      "title": "Avtomatik təsdiq",
+      "description": "Bu sessiya üçün icazə sorğularını avtomatik təsdiqlə. Sonra alətlər sorğusuz işləyir.",
+      "unavailable": "Bu sessiya icazə sorğuları qəbul edə bilmir."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Bu səsin mətnə çevrilməsi modeli əlçatan deyil. Seçimlərdə başqasını seçin.",
     "gatewayModelUnavailableNotice": "Bu model artıq təklif edilmir. Başqasını seçmək üçün $t(transcriptionModel.title) üzərinə toxunun.",
     "gatewaySignInRequired": "Kilo Gateway ilə mətnə çevirməkdən istifadə etmək üçün hesabınıza daxil olun.",
-    "gatewayNoModel": "Əvvəlcə Seçimlərdə bir səsin mətnə çevrilməsi modeli seçin."
+    "gatewayNoModel": "Əvvəlcə Seçimlərdə bir səsin mətnə çevrilməsi modeli seçin.",
+    "testTitle": "Səsli daxiletməni yoxla",
+    "testPlaceholder": "Mikrofona toxun və danışmağa başla.",
+    "testClear": "Mətni təmizlə"
   },
   "share": {
     "title": "Kilo-ya göndər",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Səsin mətnə çevrilməsi modeli yoxdur",
     "emptyDescription": "Kilo Gateway hazırda səsin mətnə çevrilməsi modeli təklif etmir.",
     "loadFailed": "Səsin mətnə çevrilməsi modellərini yükləmək mümkün olmadı."
+  },
+  "voiceLanguage": {
+    "title": "Səs dili",
+    "automatic": "Avtomatik",
+    "loadFailed": "Bu cihazın dəstəklədiyi dillər yüklənə bilmədi.",
+    "emptyTitle": "Dəstəklənən dil yoxdur",
+    "emptyDescription": "Bu cihazın nitq tanıması heç bir dəstəklənən dil bildirmir."
   }
 }

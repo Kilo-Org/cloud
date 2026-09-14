@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "เมื่อปิด ปุ่มขึ้นบรรทัดใหม่จะแทรกบรรทัดใหม่ในช่องป้อนข้อความของเอเจนต์",
     "biometricUnlock": "ปลดล็อกด้วยข้อมูลชีวมิติ",
     "biometricUnlockSubtitle": "ต้องปลดล็อกเมื่อเปิดแอปและเมื่อกลับมาใช้งานหลังจากแอปอยู่เบื้องหลังครบห้านาที",
+    "hideThinking": "ซ่อนรายละเอียดการคิด",
+    "hideThinkingSubtitle": "อย่าแสดงการคิดของเอเจนต์ในหน้าเซสชัน",
     "featureFlags": "แฟล็กฟีเจอร์",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "การเชื่อมต่อขาดหาย",
       "retryConnection": "ลองเชื่อมต่อใหม่"
     },
+    "goal": {
+      "title": "เป้าหมาย",
+      "statusActive": "เป้าหมายที่ใช้งานอยู่",
+      "statusPaused": "เป้าหมายที่หยุดชั่วคราว",
+      "statusComplete": "เป้าหมายสำเร็จ",
+      "statusBlocked": "เป้าหมายถูกบล็อก",
+      "edit": "แก้ไขเป้าหมาย",
+      "remove": "ลบเป้าหมาย",
+      "pause": "หยุดเป้าหมายชั่วคราว",
+      "resume": "ดำเนินการเป้าหมายต่อ",
+      "editPlaceholder": "อธิบายเป้าหมาย",
+      "removeConfirmTitle": "ลบเป้าหมายหรือไม่",
+      "removeConfirmMessage": "CLI จะล้างเป้าหมายของเซสชันนี้",
+      "updateFailed": "อัปเดตเป้าหมายไม่ได้",
+      "sectionAccessibility": "{{status}} เป้าหมาย: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "ที่ใช้ล่าสุด",
       "couldNotLoadGithubRepositories": "ไม่สามารถโหลดคลังโค้ดจาก GitHub ได้",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "แตะโฟลเดอร์เพื่อแสดงเนื้อหา",
       "unsupportedDescription": "CLI นี้แสดงรายการโฟลเดอร์ไม่ได้ แตะเสร็จสิ้นเพื่อใช้โฟลเดอร์ที่เปิด CLI ไว้ แล้วแตะเริ่มเซสชันเพื่อเริ่มทำงานในโฟลเดอร์นั้น",
       "unsupportedTitle": "ไม่สามารถแสดงรายการโฟลเดอร์ได้"
+    },
+    "autoApprove": {
+      "title": "อนุมัติอัตโนมัติ",
+      "description": "อนุมัติคำขอสิทธิ์สำหรับเซสชันนี้โดยอัตโนมัติ จากนั้นเครื่องมือจะทำงานโดยไม่มีการถาม",
+      "unavailable": "เซสชันนี้ไม่สามารถรับคำขอสิทธิ์ได้"
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "โมเดลถอดเสียงนี้ไม่พร้อมใช้งาน เลือกโมเดลอื่นในการตั้งค่า",
     "gatewayModelUnavailableNotice": "โมเดลนี้ไม่ให้บริการแล้ว แตะ $t(transcriptionModel.title) เพื่อเลือกโมเดลอื่น",
     "gatewaySignInRequired": "เข้าสู่ระบบเพื่อใช้การถอดเสียงผ่าน Kilo Gateway",
-    "gatewayNoModel": "เลือกโมเดลถอดเสียงในการตั้งค่าก่อน"
+    "gatewayNoModel": "เลือกโมเดลถอดเสียงในการตั้งค่าก่อน",
+    "testTitle": "ทดสอบการป้อนเสียง",
+    "testPlaceholder": "แตะไมโครโฟนแล้วเริ่มพูด",
+    "testClear": "ล้างข้อความ"
   },
   "share": {
     "title": "แชร์ไปยัง Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "ไม่มีโมเดลถอดเสียง",
     "emptyDescription": "ขณะนี้ Kilo Gateway ไม่มีโมเดลถอดเสียงให้บริการ",
     "loadFailed": "ไม่สามารถโหลดโมเดลถอดเสียงได้"
+  },
+  "voiceLanguage": {
+    "title": "ภาษาของเสียง",
+    "automatic": "อัตโนมัติ",
+    "loadFailed": "โหลดภาษาที่อุปกรณ์นี้รองรับไม่ได้",
+    "emptyTitle": "ไม่มีภาษาที่รองรับ",
+    "emptyDescription": "การรู้จำเสียงพูดของอุปกรณ์นี้ไม่รายงานภาษาที่รองรับ"
   }
 }

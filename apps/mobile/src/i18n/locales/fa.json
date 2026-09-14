@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "اگر این گزینه غیرفعال باشد، کلید اینتر در کادر پیام عامل یک خط جدید ایجاد می‌کند.",
     "biometricUnlock": "باز کردن قفل با احراز هویت زیست‌سنجی",
     "biometricUnlockSubtitle": "هنگام راه‌اندازی برنامه و پس از پنج دقیقه ماندن آن در پس‌زمینه، باز کردن قفل الزامی است.",
+    "hideThinking": "پنهان کردن جزئیات تفکر",
+    "hideThinkingSubtitle": "تفکر عامل را در صفحه نشست نشان نده.",
     "featureFlags": "پرچم‌های ویژگی",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "اتصال قطع شد",
       "retryConnection": "تلاش دوباره برای اتصال"
     },
+    "goal": {
+      "title": "هدف",
+      "statusActive": "هدف فعال",
+      "statusPaused": "هدف متوقف‌شده",
+      "statusComplete": "هدف کامل شد",
+      "statusBlocked": "هدف مسدود شد",
+      "edit": "ویرایش هدف",
+      "remove": "حذف هدف",
+      "pause": "توقف هدف",
+      "resume": "ادامه هدف",
+      "editPlaceholder": "هدف را توصیف کنید",
+      "removeConfirmTitle": "هدف حذف شود؟",
+      "removeConfirmMessage": "CLI هدف این نشست را پاک می‌کند.",
+      "updateFailed": "به‌روزرسانی هدف ممکن نشد.",
+      "sectionAccessibility": "{{status}}. هدف: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "موارد استفاده‌شدهٔ اخیر",
       "couldNotLoadGithubRepositories": "بارگذاری مخزن‌های GitHub ممکن نشد.",
@@ -2531,6 +2549,11 @@
       "retryableDescription": "اتصال خود را بررسی کنید و دوباره تلاش کنید. با زدن «انجام شد»، همچنان می‌توانید همین پوشه را تأیید کنید.",
       "unsupportedTitle": "نمایش فهرست پوشه‌ها ممکن نیست",
       "unsupportedDescription": "این CLI نمی‌تواند فهرست پوشه‌ها را نمایش دهد. با زدن «انجام شد»، پوشهٔ راه‌اندازی حفظ می‌شود و با زدن «شروع نشست»، نشست در همان پوشه آغاز می‌شود."
+    },
+    "autoApprove": {
+      "title": "تأیید خودکار",
+      "description": "درخواست‌های مجوز این نشست را به‌صورت خودکار تأیید کن. سپس ابزارها بدون پرسش اجرا می‌شوند.",
+      "unavailable": "این نشست نمی‌تواند درخواست‌های مجوز دریافت کند."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "این مدل تبدیل گفتار به متن در دسترس نیست. در تنظیمات دلخواه مدل دیگری انتخاب کنید.",
     "gatewayModelUnavailableNotice": "این مدل دیگر ارائه نمی‌شود. برای انتخاب مدل دیگر روی $t(transcriptionModel.title) ضربه بزنید.",
     "gatewaySignInRequired": "برای استفاده از تبدیل گفتار به متن با Kilo Gateway وارد شوید.",
-    "gatewayNoModel": "ابتدا در تنظیمات دلخواه یک مدل تبدیل گفتار به متن انتخاب کنید."
+    "gatewayNoModel": "ابتدا در تنظیمات دلخواه یک مدل تبدیل گفتار به متن انتخاب کنید.",
+    "testTitle": "آزمایش ورودی صوتی",
+    "testPlaceholder": "روی میکروفون ضربه بزن و شروع به صحبت کن.",
+    "testClear": "پاک کردن متن"
   },
   "share": {
     "title": "اشتراک‌گذاری با Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "مدل تبدیل گفتار به متن وجود ندارد",
     "emptyDescription": "Kilo Gateway در حال حاضر مدلی برای تبدیل گفتار به متن ارائه نمی‌دهد.",
     "loadFailed": "بارگذاری مدل‌های تبدیل گفتار به متن ناموفق بود."
+  },
+  "voiceLanguage": {
+    "title": "زبان صدا",
+    "automatic": "خودکار",
+    "loadFailed": "زبان‌هایی که این دستگاه پشتیبانی می‌کند بارگذاری نشد.",
+    "emptyTitle": "زبان پشتیبانی‌شده‌ای وجود ندارد",
+    "emptyDescription": "تشخیص گفتار این دستگاه هیچ زبان پشتیبانی‌شده‌ای گزارش نمی‌کند."
   }
 }

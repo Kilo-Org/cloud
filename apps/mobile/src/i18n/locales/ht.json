@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Lè opsyon sa a dezaktive, bouton retou a ajoute yon nouvo liy nan chan mesaj ajan yo.",
     "biometricUnlock": "Debloke ak byometri",
     "biometricUnlockSubtitle": "Debloke aplikasyon an lè li kòmanse ak apre li pase senk minit an aryèplan.",
+    "hideThinking": "Kache detay refleksyon yo",
+    "hideThinkingSubtitle": "Pa montre refleksyon ajan an sou paj sesyon an.",
     "featureFlags": "Drapo fonksyon",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Koneksyon an koupe",
       "retryConnection": "Rekonekte"
     },
+    "goal": {
+      "title": "Objektif",
+      "statusActive": "Objektif aktif",
+      "statusPaused": "Objektif an poz",
+      "statusComplete": "Objektif fini",
+      "statusBlocked": "Objektif bloke",
+      "edit": "Modifye objektif la",
+      "remove": "Retire objektif la",
+      "pause": "Mete objektif la an poz",
+      "resume": "Reprann objektif la",
+      "editPlaceholder": "Dekri objektif la",
+      "removeConfirmTitle": "Retire objektif la?",
+      "removeConfirmMessage": "CLI a efase objektif sesyon sa a.",
+      "updateFailed": "Pa t kapab mete objektif la ajou.",
+      "sectionAccessibility": "{{status}}. Objektif: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Itilize dènyèman",
       "couldNotLoadGithubRepositories": "Nou pa t ka chaje depo GitHub yo.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "Peze yon katab pou wè sa li genyen.",
       "unsupportedDescription": "CLI sa a pa ka afiche lis katab yo. Peze Fèt pou kenbe katab lansman an, epi peze Kòmanse sesyon an pou kòmanse ladan l.",
       "unsupportedTitle": "Nou pa ka afiche lis katab yo"
+    },
+    "autoApprove": {
+      "title": "Apwobasyon otomatik",
+      "description": "Apwouve demann pèmisyon pou sesyon sa a otomatikman. Apre sa, zouti yo kouri san yo pa mande.",
+      "unavailable": "Sesyon sa a pa ka resevwa demann pèmisyon."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Modèl transkripsyon sa a pa disponib. Chwazi yon lòt nan Preferans yo.",
     "gatewayModelUnavailableNotice": "Modèl sa a pa ofri ankò. Tape sou $t(transcriptionModel.title) pou chwazi yon lòt.",
     "gatewaySignInRequired": "Konekte pou sèvi ak transkripsyon Kilo Gateway.",
-    "gatewayNoModel": "Chwazi yon modèl transkripsyon nan Preferans yo an premye."
+    "gatewayNoModel": "Chwazi yon modèl transkripsyon nan Preferans yo an premye.",
+    "testTitle": "Teste antre vwa",
+    "testPlaceholder": "Peze mikwofòn nan epi kòmanse pale.",
+    "testClear": "Efase tèks la"
   },
   "share": {
     "title": "Pataj nan Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Pa gen modèl transkripsyon",
     "emptyDescription": "Kilo Gateway pa ofri okenn modèl transkripsyon kounye a.",
     "loadFailed": "Nou pa t kapab chaje modèl transkripsyon yo."
+  },
+  "voiceLanguage": {
+    "title": "Lang vwa a",
+    "automatic": "Otomatik",
+    "loadFailed": "Pa t kapab chaje lang aparèy sa a sipòte yo.",
+    "emptyTitle": "Pa gen lang ki sipòte",
+    "emptyDescription": "Rekonesans lapawòl aparèy sa a pa rapòte okenn lang ki sipòte."
   }
 }

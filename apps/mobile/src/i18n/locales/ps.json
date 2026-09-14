@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "که دا تنظیم بند وي، د انټر کیلي د ایجنټ د پیغام لیکلو په ځای کې نوې کرښه زیاتوي.",
     "biometricUnlock": "د بایومیټریک له لارې د قلف خلاصول",
     "biometricUnlockSubtitle": "د اپلیکیشن د پیل پر مهال او په شالید کې له پنځو دقیقو تېرولو وروسته قلف خلاص کړئ.",
+    "hideThinking": "د فکر تفصیلات پټ کړئ",
+    "hideThinkingSubtitle": "د اجنټ فکر د ناستې په پاڼه کې مه ښایاست.",
     "featureFlags": "د ځانګړتیاوو بیرغونه",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "اړیکه پرې شوه",
       "retryConnection": "بیا د نښلېدو هڅه وکړئ"
     },
+    "goal": {
+      "title": "هدف",
+      "statusActive": "فعال هدف",
+      "statusPaused": "تم شوی هدف",
+      "statusComplete": "هدف بشپړ شو",
+      "statusBlocked": "هدف بند شو",
+      "edit": "هدف سمول",
+      "remove": "هدف لرې کول",
+      "pause": "هدف تمول",
+      "resume": "هدف دوامول",
+      "editPlaceholder": "هدف بیان کړئ",
+      "removeConfirmTitle": "هدف لرې کړو؟",
+      "removeConfirmMessage": "CLI د دې ناستې هدف پاکوي.",
+      "updateFailed": "هدف نوی نشو.",
+      "sectionAccessibility": "{{status}}. هدف: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "په دې وروستیو کې کارول شوي",
       "couldNotLoadGithubRepositories": "د GitHub زېرمتونونه بار نه شول.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "د فولډر د منځپانګې د لیدلو لپاره پرې ټک وکړئ.",
       "unsupportedDescription": "دا CLI د فولډرونو لېست نه شي ښودلی. د «بشپړ شو» تڼۍ د پیل فولډر ساتي او د «ناسته پیل کړئ» تڼۍ ناسته هلته پیلوي.",
       "unsupportedTitle": "د فولډرونو لېست نه شي ښودل کېدای"
+    },
+    "autoApprove": {
+      "title": "اتوماتیک تصویب",
+      "description": "د دې ناستې د اجازې غوښتنې په اتوماتیک ډول تصویب کړئ. بیا وسیلې پرته له پوښتنې چلیږي.",
+      "unavailable": "دا ناسته د اجازې غوښتنې نشي ترلاسه کولی."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "دا ماډل شتون نلري. په غوره توبونو کې بل وټاکئ.",
     "gatewayModelUnavailableNotice": "دا ماډل نور وړاندې نه کېږي. د بل غوره کولو لپاره $t(transcriptionModel.title) ته ټک ووهئ.",
     "gatewaySignInRequired": "د Kilo Gateway بدلولو کارولو لپاره ننوځئ.",
-    "gatewayNoModel": "لومړی په غوره توبونو کې یو ماډل وټاکئ."
+    "gatewayNoModel": "لومړی په غوره توبونو کې یو ماډل وټاکئ.",
+    "testTitle": "د غږیز ننوتلو ازموینه",
+    "testPlaceholder": "مایکروفون ته ټک وکړئ او خبرې پیل کړئ.",
+    "testClear": "متن پاک کړئ"
   },
   "share": {
     "title": "له Kilo سره شریکول",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "د غږ د متن ته بدلولو هیڅ ماډل نشته",
     "emptyDescription": "Kilo Gateway اوس مهال د غږ د متن ته بدلولو هیڅ ماډل نه وړاندې کوي.",
     "loadFailed": "د غږ د متن ته بدلولو ماډلونه بار نه شول."
+  },
+  "voiceLanguage": {
+    "title": "د غږ ژبه",
+    "automatic": "اتوماتیک",
+    "loadFailed": "هغه ژبې چې دا وسیله یې ملاتړ کوي بار نشوې.",
+    "emptyTitle": "هیڅ ملاتړشوې ژبه نشته",
+    "emptyDescription": "د دې وسیلې د وینا پېژندنه کومه ملاتړشوې ژبه نه ښیي."
   }
 }

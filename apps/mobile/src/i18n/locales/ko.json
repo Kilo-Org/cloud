@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "끄면 에이전트의 메시지 입력란에서 리턴 키로 줄바꿈을 삽입합니다.",
     "biometricUnlock": "생체 인증으로 잠금 해제",
     "biometricUnlockSubtitle": "앱을 실행할 때와 백그라운드에서 5분이 지난 후에는 잠금을 해제해야 합니다.",
+    "hideThinking": "사고 과정 세부정보 숨기기",
+    "hideThinkingSubtitle": "세션 페이지에 에이전트의 사고 과정을 표시하지 않습니다.",
     "featureFlags": "기능 플래그",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -1563,6 +1565,22 @@
       "connectionLost": "연결 끊김",
       "retryConnection": "연결 다시 시도"
     },
+    "goal": {
+      "title": "목표",
+      "statusActive": "활성 목표",
+      "statusPaused": "일시중지된 목표",
+      "statusComplete": "목표 완료",
+      "statusBlocked": "목표 차단됨",
+      "edit": "목표 편집",
+      "remove": "목표 제거",
+      "pause": "목표 일시중지",
+      "resume": "목표 재개",
+      "editPlaceholder": "목표 설명",
+      "removeConfirmTitle": "목표를 제거할까요?",
+      "removeConfirmMessage": "CLI가 이 세션의 목표를 지웁니다.",
+      "updateFailed": "목표를 업데이트하지 못했습니다.",
+      "sectionAccessibility": "{{status}}. 목표: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "최근 사용",
       "couldNotLoadGithubRepositories": "GitHub 저장소를 불러올 수 없습니다.",
@@ -2045,6 +2063,11 @@
       "tapToListHint": "폴더를 누르면 내용을 볼 수 있습니다.",
       "unsupportedDescription": "이 CLI에서는 폴더 목록을 표시할 수 없습니다. 완료를 누르면 CLI를 실행한 폴더가 유지됩니다. 세션 시작을 누르면 해당 폴더에서 세션이 시작됩니다.",
       "unsupportedTitle": "폴더 목록을 표시할 수 없습니다"
+    },
+    "autoApprove": {
+      "title": "자동 승인",
+      "description": "이 세션의 권한 요청을 자동으로 승인합니다. 그러면 도구가 확인 없이 실행됩니다.",
+      "unavailable": "이 세션은 권한 요청을 받을 수 없습니다."
     }
   },
   "bootstrap": {
@@ -2157,7 +2180,10 @@
     "gatewayModelUnavailable": "이 음성 텍스트 변환 모델은 사용할 수 없습니다. 환경설정에서 다른 모델을 선택하세요.",
     "gatewayModelUnavailableNotice": "이 모델은 더 이상 제공되지 않습니다. 다른 모델을 선택하려면 $t(transcriptionModel.title)을 탭하세요.",
     "gatewaySignInRequired": "Kilo Gateway 변환을 사용하려면 로그인하세요.",
-    "gatewayNoModel": "먼저 환경설정에서 음성 텍스트 변환 모델을 선택하세요."
+    "gatewayNoModel": "먼저 환경설정에서 음성 텍스트 변환 모델을 선택하세요.",
+    "testTitle": "음성 입력 테스트",
+    "testPlaceholder": "마이크를 탭하고 말하기 시작하세요.",
+    "testClear": "텍스트 지우기"
   },
   "share": {
     "title": "Kilo로 공유",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "음성 텍스트 변환 모델 없음",
     "emptyDescription": "지금 Kilo Gateway에서 제공하는 음성 텍스트 변환 모델이 없습니다.",
     "loadFailed": "음성 텍스트 변환 모델을 불러오지 못했습니다."
+  },
+  "voiceLanguage": {
+    "title": "음성 언어",
+    "automatic": "자동",
+    "loadFailed": "이 기기가 지원하는 언어를 불러오지 못했습니다.",
+    "emptyTitle": "지원되는 언어 없음",
+    "emptyDescription": "이 기기의 음성 인식은 지원되는 언어를 보고하지 않습니다."
   }
 }

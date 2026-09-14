@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "När detta är avstängt infogar returtangenten en radbrytning i agenternas meddelandefält.",
     "biometricUnlock": "Lås upp med biometri",
     "biometricUnlockSubtitle": "Upplåsning krävs när appen startas och efter fem minuter i bakgrunden.",
+    "hideThinking": "Dölj detaljer om tänkande",
+    "hideThinkingSubtitle": "Visa inte agentens tänkande på sessionssidan.",
     "featureFlags": "Funktionsflaggor",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Anslutningen bröts",
       "retryConnection": "Försök ansluta igen"
     },
+    "goal": {
+      "title": "Mål",
+      "statusActive": "Aktivt mål",
+      "statusPaused": "Pausat mål",
+      "statusComplete": "Målet är slutfört",
+      "statusBlocked": "Målet är blockerat",
+      "edit": "Redigera mål",
+      "remove": "Ta bort mål",
+      "pause": "Pausa mål",
+      "resume": "Återuppta mål",
+      "editPlaceholder": "Beskriv målet",
+      "removeConfirmTitle": "Ta bort mål?",
+      "removeConfirmMessage": "CLI:t rensar målet för den här sessionen.",
+      "updateFailed": "Målet kunde inte uppdateras.",
+      "sectionAccessibility": "{{status}}. Mål: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Nyligen använda",
       "couldNotLoadGithubRepositories": "Det gick inte att läsa in kodarkiven från GitHub.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "Tryck på en mapp för att visa innehållet.",
       "unsupportedDescription": "Den här CLI-versionen kan inte visa mappar. Tryck på Klar för att behålla startmappen och på Starta session för att starta där.",
       "unsupportedTitle": "Det går inte att visa mapparna"
+    },
+    "autoApprove": {
+      "title": "Automatiskt godkännande",
+      "description": "Godkänn behörighetsbegäranden för den här sessionen automatiskt. Sedan körs verktyg utan begäran.",
+      "unavailable": "Den här sessionen kan inte ta emot behörighetsbegäranden."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Den här transkriberingsmodellen är inte tillgänglig. Välj en annan i Inställningar.",
     "gatewayModelUnavailableNotice": "Den här modellen erbjuds inte längre. Tryck på $t(transcriptionModel.title) för att välja en annan.",
     "gatewaySignInRequired": "Logga in för att använda transkribering via Kilo Gateway.",
-    "gatewayNoModel": "Välj först en transkriberingsmodell i Inställningar."
+    "gatewayNoModel": "Välj först en transkriberingsmodell i Inställningar.",
+    "testTitle": "Testa röstinmatning",
+    "testPlaceholder": "Tryck på mikrofonen och börja prata.",
+    "testClear": "Rensa text"
   },
   "share": {
     "title": "Dela till Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Inga transkriberingsmodeller",
     "emptyDescription": "Kilo Gateway erbjuder inga transkriberingsmodeller just nu.",
     "loadFailed": "Det gick inte att läsa in transkriberingsmodellerna."
+  },
+  "voiceLanguage": {
+    "title": "Röstspråk",
+    "automatic": "Automatiskt",
+    "loadFailed": "Det gick inte att läsa in språken som enheten stöder.",
+    "emptyTitle": "Inga språk stöds",
+    "emptyDescription": "Enhetens taligenkänning rapporterar inga språk som stöds."
   }
 }

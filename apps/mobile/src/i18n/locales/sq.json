@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Kur ky opsion është i çaktivizuar, tasti Enter shton një rresht të ri në fushën e mesazhit për agjentin.",
     "biometricUnlock": "Zhbllokim me biometri",
     "biometricUnlockSubtitle": "Zhbllokimi kërkohet kur hap aplikacionin dhe pasi ai qëndron pesë minuta në sfond.",
+    "hideThinking": "Fshih detajet e arsyetimit",
+    "hideThinkingSubtitle": "Mos e shfaq arsyetimin e agjentit në faqen e seancës.",
     "featureFlags": "Flamujt e veçorive",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Lidhja u humb",
       "retryConnection": "Provo të lidhesh përsëri"
     },
+    "goal": {
+      "title": "Qëllimi",
+      "statusActive": "Qëllim aktiv",
+      "statusPaused": "Qëllim në pauzë",
+      "statusComplete": "Qëllimi u përfundua",
+      "statusBlocked": "Qëllimi u bllokua",
+      "edit": "Modifiko qëllimin",
+      "remove": "Hiq qëllimin",
+      "pause": "Vendos qëllimin në pauzë",
+      "resume": "Rifillo qëllimin",
+      "editPlaceholder": "Përshkruaj qëllimin",
+      "removeConfirmTitle": "Të hiqet qëllimi?",
+      "removeConfirmMessage": "CLI pastron qëllimin e kësaj seance.",
+      "updateFailed": "Qëllimi nuk mund të përditësohej.",
+      "sectionAccessibility": "{{status}}. Qëllimi: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Të përdorura së fundmi",
       "couldNotLoadGithubRepositories": "Nuk u ngarkuan depot nga GitHub.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "Prek një dosje për të parë përmbajtjen e saj.",
       "unsupportedDescription": "Ky CLI nuk mund të shfaqë listën e dosjeve. «U krye» ruan dosjen e nisjes dhe «Nis seancën» e nis seancën aty.",
       "unsupportedTitle": "Lista e dosjeve nuk mund të shfaqet"
+    },
+    "autoApprove": {
+      "title": "Miratim automatik",
+      "description": "Mirato automatikisht kërkesat për leje për këtë seancë. Më pas mjetet ekzekutohen pa kërkesë.",
+      "unavailable": "Kjo seancë nuk mund të marrë kërkesa për leje."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Ky model transkriptimi nuk është i disponueshëm. Zgjidh një tjetër te Preferencat.",
     "gatewayModelUnavailableNotice": "Ky model nuk ofrohet më. Trokit $t(transcriptionModel.title) për të zgjedhur një tjetër.",
     "gatewaySignInRequired": "Hyr për të përdorur transkriptimin me Kilo Gateway.",
-    "gatewayNoModel": "Së pari zgjidh një model transkriptimi te Preferencat."
+    "gatewayNoModel": "Së pari zgjidh një model transkriptimi te Preferencat.",
+    "testTitle": "Testo hyrjen me zë",
+    "testPlaceholder": "Prek mikrofonin dhe fillo të flasësh.",
+    "testClear": "Pastro tekstin"
   },
   "share": {
     "title": "Ndarja në Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Nuk ka modele transkriptimi",
     "emptyDescription": "Kilo Gateway nuk ofron tani asnjë model transkriptimi.",
     "loadFailed": "Modelet e transkriptimit nuk u ngarkuan."
+  },
+  "voiceLanguage": {
+    "title": "Gjuha e zërit",
+    "automatic": "Automatik",
+    "loadFailed": "Gjuhët që mbështet kjo pajisje nuk mund të ngarkoheshin.",
+    "emptyTitle": "Asnjë gjuhë e mbështetur",
+    "emptyDescription": "Njohja e të folurit e kësaj pajisjeje nuk raporton asnjë gjuhë të mbështetur."
   }
 }

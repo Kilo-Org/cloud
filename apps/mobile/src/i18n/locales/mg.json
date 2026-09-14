@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Raha tsy mandeha ity safidy ity, dia mampiditra andalana vaovao ao amin'ny faritra fanoratana hafatra ho an'ny mpanampy ny bokotra fampidirana.",
     "biometricUnlock": "Vahao amin'ny biometrika ny hidy",
     "biometricUnlockSubtitle": "Ilaina ny mamaha ny hidy rehefa manomboka ny rindranasa sy rehefa tsy naseho nandritra ny dimy minitra.",
+    "hideThinking": "Afeno ny antsipirian'ny fisainana",
+    "hideThinkingSubtitle": "Aza aseho ny fisainan'ny mpanampy ao amin'ny pejin'ny fotoam-piasana.",
     "featureFlags": "Saina endri-javatra",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Tapaka ny fifandraisana",
       "retryConnection": "Andramo mifandray indray"
     },
+    "goal": {
+      "title": "Tanjona",
+      "statusActive": "Tanjona mavitrika",
+      "statusPaused": "Tanjona najanona",
+      "statusComplete": "Vita ny tanjona",
+      "statusBlocked": "Voasakana ny tanjona",
+      "edit": "Ovay ny tanjona",
+      "remove": "Esory ny tanjona",
+      "pause": "Ajanony ny tanjona",
+      "resume": "Tohizo ny tanjona",
+      "editPlaceholder": "Farano ny tanjona",
+      "removeConfirmTitle": "Esorina ny tanjona?",
+      "removeConfirmMessage": "Fafan'ny CLI ny tanjon'ity fotoam-piasana ity.",
+      "updateFailed": "Tsy afaka nanavao ny tanjona.",
+      "sectionAccessibility": "{{status}}. Tanjona: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Nampiasaina vao haingana",
       "couldNotLoadGithubRepositories": "Tsy voaray ny tahirin-kaody ao amin'ny GitHub.",
@@ -2531,6 +2549,11 @@
       "retryableDescription": "Hamarino ny fifandraisanao ary tsindrio ny Andramo indray. Mbola afaka manamarina ity lahatahiry ity amin'ny Vita ianao.",
       "unsupportedTitle": "Tsy azo tanisaina ny lahatahiry",
       "unsupportedDescription": "Tsy afaka mitanisa lahatahiry ity CLI ity. Ny Vita dia mitazona ny lahatahiry fanombohana, ary ny Atombohy ny fotoam-piasana dia manomboka ao."
+    },
+    "autoApprove": {
+      "title": "Fankatoavana ho azy",
+      "description": "Katoavy ho azy ny fangatahana alalana ho an'ity fotoam-piasana ity. Avy eo dia mandeha tsy misy fanontaniana ny fitaovana.",
+      "unavailable": "Tsy afaka mandray fangatahana alalana ity fotoam-piasana ity."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Tsy azo ampiasaina ity modely fanovana feo ho soratra ity. Safidio ny hafa ao amin'ny Safidy.",
     "gatewayModelUnavailableNotice": "Tsy atolotra intsony ity modely ity. Tsindrio $t(transcriptionModel.title) hisafidianana ny hafa.",
     "gatewaySignInRequired": "Midira mba hampiasa ny fanovana feo ho soratra amin'ny Kilo Gateway.",
-    "gatewayNoModel": "Safidio aloha ny modely fanovana feo ho soratra ao amin'ny Safidy."
+    "gatewayNoModel": "Safidio aloha ny modely fanovana feo ho soratra ao amin'ny Safidy.",
+    "testTitle": "Andramo ny fampidirana feo",
+    "testPlaceholder": "Tsindrio ny mikrô ary manomboka miteny.",
+    "testClear": "Fafao ny lahatsoratra"
   },
   "share": {
     "title": "Fizarana amin'ny Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Tsy misy modely fanovana feo ho soratra",
     "emptyDescription": "Tsy manome modely fanovana feo ho soratra amin'izao fotoana izao ny Kilo Gateway.",
     "loadFailed": "Tsy tafiditra ny modely fanovana feo ho soratra."
+  },
+  "voiceLanguage": {
+    "title": "Fitenin'ny feo",
+    "automatic": "Ho azy",
+    "loadFailed": "Tsy afaka naka ny fiteny tohanan'ity fitaovana ity.",
+    "emptyTitle": "Tsy misy fiteny tohana",
+    "emptyDescription": "Tsy mitatitra fiteny tohana ny fanekena feo amin'ity fitaovana ity."
   }
 }

@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "オフの場合、リターンキーでエージェントのメッセージ入力欄に改行を挿入します。",
     "biometricUnlock": "生体認証でロック解除",
     "biometricUnlockSubtitle": "アプリの起動時と、バックグラウンドで5分経過した後は、ロック解除が必要です。",
+    "hideThinking": "思考の詳細を非表示",
+    "hideThinkingSubtitle": "セッションページにエージェントの思考を表示しません。",
     "featureFlags": "機能フラグ",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -1563,6 +1565,22 @@
       "connectionLost": "接続切断",
       "retryConnection": "接続を再試行"
     },
+    "goal": {
+      "title": "ゴール",
+      "statusActive": "ゴール進行中",
+      "statusPaused": "ゴール一時停止",
+      "statusComplete": "ゴール完了",
+      "statusBlocked": "ゴール停止",
+      "edit": "ゴールを編集",
+      "remove": "ゴールを削除",
+      "pause": "ゴールを一時停止",
+      "resume": "ゴールを再開",
+      "editPlaceholder": "ゴールを入力",
+      "removeConfirmTitle": "ゴールを削除しますか？",
+      "removeConfirmMessage": "CLI がこのセッションのゴールを消去します。",
+      "updateFailed": "ゴールを更新できませんでした。",
+      "sectionAccessibility": "{{status}}。ゴール: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "最近使用した項目",
       "couldNotLoadGithubRepositories": "GitHubのリポジトリを読み込めませんでした。",
@@ -2045,6 +2063,11 @@
       "tapToListHint": "フォルダをタップすると、内容を一覧表示できます。",
       "unsupportedDescription": "このCLIはフォルダの一覧表示に対応していません。「完了」をタップすると起動時のフォルダが選択され、「セッションを開始」をタップするとそのフォルダでセッションが始まります。",
       "unsupportedTitle": "フォルダを一覧表示できません"
+    },
+    "autoApprove": {
+      "title": "自動承認",
+      "description": "このセッションの権限リクエストを自動で承認します。その後、ツールは確認なしで実行されます。",
+      "unavailable": "このセッションは権限リクエストを受け取れません。"
     }
   },
   "bootstrap": {
@@ -2157,7 +2180,10 @@
     "gatewayModelUnavailable": "この文字起こしモデルは利用できません。設定で別のモデルを選択してください。",
     "gatewayModelUnavailableNotice": "このモデルは提供が終了しました。別のモデルを選ぶには$t(transcriptionModel.title)をタップしてください。",
     "gatewaySignInRequired": "Kilo Gatewayの文字起こしを使うにはサインインしてください。",
-    "gatewayNoModel": "まず設定で文字起こしモデルを選択してください。"
+    "gatewayNoModel": "まず設定で文字起こしモデルを選択してください。",
+    "testTitle": "音声入力をテスト",
+    "testPlaceholder": "マイクをタップして話し始めてください。",
+    "testClear": "テキストを消去"
   },
   "share": {
     "title": "Kiloに共有",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "文字起こしモデルがありません",
     "emptyDescription": "現在、Kilo Gatewayは文字起こしモデルを提供していません。",
     "loadFailed": "文字起こしモデルを読み込めませんでした。"
+  },
+  "voiceLanguage": {
+    "title": "音声の言語",
+    "automatic": "自動",
+    "loadFailed": "このデバイスが対応する言語を読み込めませんでした。",
+    "emptyTitle": "対応言語がありません",
+    "emptyDescription": "このデバイスの音声認識は対応言語を報告していません。"
   }
 }

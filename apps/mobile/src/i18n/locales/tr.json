@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Kapalıyken Enter tuşu, ajanla konuşurken mesaj alanına yeni satır ekler.",
     "biometricUnlock": "Biyometrik doğrulama ile kilit açma",
     "biometricUnlockSubtitle": "Uygulama başlatıldığında ve arka planda beş dakika kaldıktan sonra kilidin açılması gerekir.",
+    "hideThinking": "Düşünme ayrıntılarını gizle",
+    "hideThinkingSubtitle": "Ajanın düşünmesini oturum sayfasında gösterme.",
     "featureFlags": "Özellik bayrakları",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -1563,6 +1565,22 @@
       "connectionLost": "Bağlantı koptu",
       "retryConnection": "Yeniden bağlanmayı dene"
     },
+    "goal": {
+      "title": "Hedef",
+      "statusActive": "Etkin hedef",
+      "statusPaused": "Duraklatılmış hedef",
+      "statusComplete": "Hedef tamamlandı",
+      "statusBlocked": "Hedef engellendi",
+      "edit": "Hedefi düzenle",
+      "remove": "Hedefi kaldır",
+      "pause": "Hedefi duraklat",
+      "resume": "Hedefe devam et",
+      "editPlaceholder": "Hedefi açıkla",
+      "removeConfirmTitle": "Hedef kaldırılsın mı?",
+      "removeConfirmMessage": "CLI bu oturumun hedefini temizler.",
+      "updateFailed": "Hedef güncellenemedi.",
+      "sectionAccessibility": "{{status}}. Hedef: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Son kullanılanlar",
       "couldNotLoadGithubRepositories": "GitHub depoları yüklenemedi.",
@@ -2045,6 +2063,11 @@
       "tapToListHint": "İçeriğini listelemek için bir klasöre dokun.",
       "unsupportedDescription": "Bu CLI klasörleri listeleyemiyor. “Bitti” düğmesi başlangıç klasörünü korur. “Oturumu başlat” düğmesi oturumu bu klasörde başlatır.",
       "unsupportedTitle": "Klasörler listelenemiyor"
+    },
+    "autoApprove": {
+      "title": "Otomatik onay",
+      "description": "Bu oturum için izin isteklerini otomatik olarak onayla. Ardından araçlar soru sorulmadan çalışır.",
+      "unavailable": "Bu oturum izin isteği alamaz."
     }
   },
   "bootstrap": {
@@ -2157,7 +2180,10 @@
     "gatewayModelUnavailable": "Bu metne dönüştürme modeli kullanılamıyor. Tercihler'den başkasını seç.",
     "gatewayModelUnavailableNotice": "Bu model artık sunulmuyor. Başka bir tane seçmek için $t(transcriptionModel.title) öğesine dokun.",
     "gatewaySignInRequired": "Kilo Gateway ile dönüştürmeyi kullanmak için oturum açın.",
-    "gatewayNoModel": "Önce Tercihler'den bir metne dönüştürme modeli seçin."
+    "gatewayNoModel": "Önce Tercihler'den bir metne dönüştürme modeli seçin.",
+    "testTitle": "Sesli girişi test et",
+    "testPlaceholder": "Mikrofona dokun ve konuşmaya başla.",
+    "testClear": "Metni temizle"
   },
   "share": {
     "title": "Kilo ile paylaş",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Metne dönüştürme modeli yok",
     "emptyDescription": "Kilo Gateway şu anda metne dönüştürme modeli sunmuyor.",
     "loadFailed": "Metne dönüştürme modelleri yüklenemedi."
+  },
+  "voiceLanguage": {
+    "title": "Ses dili",
+    "automatic": "Otomatik",
+    "loadFailed": "Bu cihazın desteklediği diller yüklenemedi.",
+    "emptyTitle": "Desteklenen dil yok",
+    "emptyDescription": "Bu cihazın konuşma tanıma özelliği desteklenen dil bildirmiyor."
   }
 }

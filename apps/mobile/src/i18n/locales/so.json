@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Marka la damiyo, furaha gelintu wuxuu sadar cusub ku daraa goobaha farriimaha wakiilka lagu qoro.",
     "biometricUnlock": "Ku fur aqoonsiga astaamaha jirka",
     "biometricUnlockSubtitle": "Fur marka barnaamijku bilaabmo iyo marka uu shan daqiiqo gadaal ka shaqaynayay.",
+    "hideThinking": "Qari faahfaahinta fikirka",
+    "hideThinkingSubtitle": "Ha muujin fikirka wakiilka bogga kalfadhiga.",
     "featureFlags": "Calaamadaha sifooyinka",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Xiriirku wuu go'ay",
       "retryConnection": "Mar kale isku day inaad ku xirmato"
     },
+    "goal": {
+      "title": "Hadaf",
+      "statusActive": "Hadaf firfircoon",
+      "statusPaused": "Hadaf la hakiyay",
+      "statusComplete": "Hadafka wuu dhammaaday",
+      "statusBlocked": "Hadafka waa la xannibay",
+      "edit": "Tafatir hadafka",
+      "remove": "Ka saar hadafka",
+      "pause": "Hakii hadafka",
+      "resume": "Sii wad hadafka",
+      "editPlaceholder": "Sharax hadafka",
+      "removeConfirmTitle": "Ka saar hadafka?",
+      "removeConfirmMessage": "CLI wuxuu tirtiraa hadafka kalfadhigan.",
+      "updateFailed": "Hadafka lama cusboonaysiin karin.",
+      "sectionAccessibility": "{{status}}. Hadaf: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Dhawaan la isticmaalay",
       "couldNotLoadGithubRepositories": "Kaydadka GitHub lama soo shubi karin.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "Taabo gal si aad u aragto waxa ku jira.",
       "unsupportedDescription": "CLI-kan ma soo bandhigi karo liiska gallada. Dhammay wuxuu hayaa galkii laga bilaabay. Bilow kalfadhiga wuxuu halkaas ka bilaabaa kalfadhiga.",
       "unsupportedTitle": "Liiska gallada lama soo bandhigi karo"
+    },
+    "autoApprove": {
+      "title": "Ansixin otomaatig ah",
+      "description": "Si otomaatig ah u ansixi codsiyada ogolaanshaha kalfadhigan. Ka dib, qalabku waxay shaqeeyaan iyagoon weydiin.",
+      "unavailable": "Kalfadhigan ma heli karo codsiyada ogolaanshaha."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Moodeelkan qoraal u beddelidda lagama heli karo. Mid kale ka dooro Dookhyada.",
     "gatewayModelUnavailableNotice": "Moodeelkan lama bixiyo mar dambe. Taabo $t(transcriptionModel.title) si aad u dooratid mid kale.",
     "gatewaySignInRequired": "Soo gal si aad u isticmaasho qoraal u beddelidda Kilo Gateway.",
-    "gatewayNoModel": "Marka hore moodeel qoraal u beddelidda ka dooro Dookhyada."
+    "gatewayNoModel": "Marka hore moodeel qoraal u beddelidda ka dooro Dookhyada.",
+    "testTitle": "Tijaabi gelinta codka",
+    "testPlaceholder": "Taabo makarafoonka oo bilaab hadal.",
+    "testClear": "Nadiifi qoraalka"
   },
   "share": {
     "title": "U wadaag Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Ma jiraan moodeello qoraal u beddelid",
     "emptyDescription": "Kilo Gateway hadda ma bixiyo moodeello qoraal u beddelid.",
     "loadFailed": "Moodeellada qoraal u beddelidda lama soo rari karin."
+  },
+  "voiceLanguage": {
+    "title": "Luqadda codka",
+    "automatic": "Otomaatig",
+    "loadFailed": "Luqadaha qalabkani taageero lama soo gelin karin.",
+    "emptyTitle": "Ma jiro luqad la taageeray",
+    "emptyDescription": "Aqoonsiga hadalka qalabkani ma soo sheego wax luqad la taageeray ah."
   }
 }

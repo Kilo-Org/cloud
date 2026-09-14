@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Keď je táto možnosť vypnutá, kláves Enter vloží nový riadok do poľa na správu agentovi.",
     "biometricUnlock": "Odomknúť pomocou biometrie",
     "biometricUnlockSubtitle": "Odomknutie sa vyžaduje pri spustení aplikácie a po piatich minútach na pozadí.",
+    "hideThinking": "Skryť podrobnosti uvažovania",
+    "hideThinkingSubtitle": "Nezobrazovať uvažovanie agenta na stránke relácie.",
     "featureFlags": "Príznaky funkcií",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2083,6 +2085,22 @@
       "connectionLost": "Pripojenie sa prerušilo",
       "retryConnection": "Znova sa pripojiť"
     },
+    "goal": {
+      "title": "Cieľ",
+      "statusActive": "Aktívny cieľ",
+      "statusPaused": "Pozastavený cieľ",
+      "statusComplete": "Cieľ splnený",
+      "statusBlocked": "Cieľ zablokovaný",
+      "edit": "Upraviť cieľ",
+      "remove": "Odstrániť cieľ",
+      "pause": "Pozastaviť cieľ",
+      "resume": "Pokračovať v cieli",
+      "editPlaceholder": "Opíšte cieľ",
+      "removeConfirmTitle": "Odstrániť cieľ?",
+      "removeConfirmMessage": "CLI vymaže cieľ tejto relácie.",
+      "updateFailed": "Cieľ sa nepodarilo aktualizovať.",
+      "sectionAccessibility": "{{status}}. Cieľ: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Naposledy použité",
       "couldNotLoadGithubRepositories": "Repozitáre zo služby GitHub sa nepodarilo načítať.",
@@ -2575,6 +2593,11 @@
       "tapToListHint": "Klepnutím na priečinok zobrazíš jeho obsah.",
       "unsupportedDescription": "Táto verzia CLI nedokáže zobraziť priečinky. Klepnutím na Hotovo ponecháš priečinok spustenia. Klepnutím na Spustiť reláciu v ňom spustíš reláciu.",
       "unsupportedTitle": "Priečinky sa nedajú zobraziť"
+    },
+    "autoApprove": {
+      "title": "Automatické schvaľovanie",
+      "description": "Automaticky schvaľovať žiadosti o povolenie pre túto reláciu. Nástroje sa potom spustia bez výzvy.",
+      "unavailable": "Táto relácia nemôže prijímať žiadosti o povolenie."
     }
   },
   "bootstrap": {
@@ -2687,7 +2710,10 @@
     "gatewayModelUnavailable": "Tento model prepisu nie je dostupný. Vyberte iný v Predvoľbách.",
     "gatewayModelUnavailableNotice": "Tento model sa už neponúka. Klepnutím na $t(transcriptionModel.title) vyberte iný.",
     "gatewaySignInRequired": "Prihláste sa, aby ste mohli používať prepis cez Kilo Gateway.",
-    "gatewayNoModel": "Najprv vyberte model prepisu v Predvoľbách."
+    "gatewayNoModel": "Najprv vyberte model prepisu v Predvoľbách.",
+    "testTitle": "Vyskúšať hlasový vstup",
+    "testPlaceholder": "Klepnite na mikrofón a začnite hovoriť.",
+    "testClear": "Vymazať text"
   },
   "share": {
     "title": "Zdieľanie do aplikácie Kilo",
@@ -3078,5 +3104,12 @@
     "emptyTitle": "Žiadne modely prepisu",
     "emptyDescription": "Kilo Gateway teraz neponúka žiadne modely prepisu.",
     "loadFailed": "Nepodarilo sa načítať modely prepisu."
+  },
+  "voiceLanguage": {
+    "title": "Jazyk hlasu",
+    "automatic": "Automaticky",
+    "loadFailed": "Nepodarilo sa načítať jazyky, ktoré toto zariadenie podporuje.",
+    "emptyTitle": "Žiadne podporované jazyky",
+    "emptyDescription": "Rozpoznávanie reči tohto zariadenia neuvádza žiadne podporované jazyky."
   }
 }

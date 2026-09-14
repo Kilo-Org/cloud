@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Nuair atá sé seo as, cuireann an eochair aisfhillte líne nua isteach i mboscaí teachtaireachta na ngníomhairí.",
     "biometricUnlock": "Díghlasáil le bithmhéadracht",
     "biometricUnlockSubtitle": "Ní mór an aip a dhíghlasáil nuair a sheoltar í agus tar éis di cúig nóiméad a chaitheamh sa chúlra.",
+    "hideThinking": "Folaigh sonraí na smaointeoireachta",
+    "hideThinkingSubtitle": "Ná taispeáin smaointeoireacht an ghníomhaire ar leathanach an tseisiúin.",
     "featureFlags": "Bratacha gnéithe",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2100,6 +2102,22 @@
       "connectionLost": "Cailleadh an nasc",
       "retryConnection": "Bain triail eile as nascadh"
     },
+    "goal": {
+      "title": "Sprioc",
+      "statusActive": "Sprioc ghníomhach",
+      "statusPaused": "Sprioc curtha ar sos",
+      "statusComplete": "Sprioc críochnaithe",
+      "statusBlocked": "Sprioc faoi bhac",
+      "edit": "Cuir an sprioc in eagar",
+      "remove": "Bain an sprioc",
+      "pause": "Cuir an sprioc ar sos",
+      "resume": "Atosaigh an sprioc",
+      "editPlaceholder": "Déan cur síos ar an sprioc",
+      "removeConfirmTitle": "Bain an sprioc?",
+      "removeConfirmMessage": "Glanann an CLI sprioc an tseisiúin seo.",
+      "updateFailed": "Níorbh fhéidir an sprioc a nuashonrú.",
+      "sectionAccessibility": "{{status}}. Sprioc: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "A úsáideadh le déanaí",
       "couldNotLoadGithubRepositories": "Níorbh fhéidir stórtha GitHub a lódáil.",
@@ -2597,6 +2615,11 @@
       "retryableDescription": "Seiceáil do nasc agus bain triail as arís. Is féidir leat Déanta a thapáil fós chun an fillteán seo a roghnú.",
       "unsupportedTitle": "Ní féidir fillteáin a liostú",
       "unsupportedDescription": "Ní féidir leis an CLI seo fillteáin a liostú. Coinníonn Déanta an fillteán tosaigh. Tosaíonn an seisiún san fhillteán sin nuair a thapálann tú Tosaigh seisiún."
+    },
+    "autoApprove": {
+      "title": "Formheas uathoibríoch",
+      "description": "Formheas iarratais cheada don seisiún seo go huathoibríoch. Ansin ritheann uirlisí gan leid.",
+      "unavailable": "Ní féidir leis an seisiún seo iarratais cheada a fháil."
     }
   },
   "bootstrap": {
@@ -2709,7 +2732,10 @@
     "gatewayModelUnavailable": "Níl an samhail tras-scríobh seo ar fáil. Roghnaigh ceann eile sna Roghanna.",
     "gatewayModelUnavailableNotice": "Ní thairgtear an tsamhail seo a thuilleadh. Tapáil $t(transcriptionModel.title) chun ceann eile a roghnú.",
     "gatewaySignInRequired": "Sínigh isteach chun tras-scríobh tríd an Kilo Gateway a úsáid.",
-    "gatewayNoModel": "Roghnaigh samhail tras-scríobh sna Roghanna ar dtús."
+    "gatewayNoModel": "Roghnaigh samhail tras-scríobh sna Roghanna ar dtús.",
+    "testTitle": "Tástáil ionchur gutha",
+    "testPlaceholder": "Tapáil an micreafón agus tosaigh ag caint.",
+    "testClear": "Glan an téacs"
   },
   "share": {
     "title": "Comhroinnt le Kilo",
@@ -3101,5 +3127,12 @@
     "emptyTitle": "Níl samhail tras-scríobh ar bith ann",
     "emptyDescription": "Níl aon shamhail tras-scríobh ar fáil ón Kilo Gateway faoi láthair.",
     "loadFailed": "Níorbh fhéidir na samhlacha tras-scríobh a lódáil."
+  },
+  "voiceLanguage": {
+    "title": "Teanga an ghutha",
+    "automatic": "Uathoibríoch",
+    "loadFailed": "Níorbh fhéidir na teangacha a thacaíonn an gléas seo leo a lódáil.",
+    "emptyTitle": "Níl aon teanga thacaithe ann",
+    "emptyDescription": "Ní thuairiscíonn aithint cainte an ghléis seo aon teanga thacaithe."
   }
 }

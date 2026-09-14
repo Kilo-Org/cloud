@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Při vypnutí této volby klávesa Enter vloží nový řádek do pole pro zprávu agentovi.",
     "biometricUnlock": "Biometrické odemykání",
     "biometricUnlockSubtitle": "Vyžaduje odemknutí při spuštění aplikace a po pěti minutách na pozadí.",
+    "hideThinking": "Skrýt podrobnosti uvažování",
+    "hideThinkingSubtitle": "Nezobrazovat uvažování agenta na stránce relace.",
     "featureFlags": "Příznaky funkcí",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2083,6 +2085,22 @@
       "connectionLost": "Připojení přerušeno",
       "retryConnection": "Znovu se připojit"
     },
+    "goal": {
+      "title": "Cíl",
+      "statusActive": "Aktivní cíl",
+      "statusPaused": "Pozastavený cíl",
+      "statusComplete": "Cíl splněn",
+      "statusBlocked": "Cíl zablokován",
+      "edit": "Upravit cíl",
+      "remove": "Odebrat cíl",
+      "pause": "Pozastavit cíl",
+      "resume": "Pokračovat v cíli",
+      "editPlaceholder": "Popište cíl",
+      "removeConfirmTitle": "Odebrat cíl?",
+      "removeConfirmMessage": "CLI vymaže cíl této relace.",
+      "updateFailed": "Cíl se nepodařilo aktualizovat.",
+      "sectionAccessibility": "{{status}}. Cíl: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Nedávno použité",
       "couldNotLoadGithubRepositories": "Repozitáře ze služby GitHub se nepodařilo načíst.",
@@ -2575,6 +2593,11 @@
       "tapToListHint": "Klepnutím na složku zobrazíte její obsah.",
       "unsupportedDescription": "Toto CLI neumí zobrazit seznam složek. Tlačítkem Hotovo ponecháte složku, ze které bylo CLI spuštěno. Relace se spustí v této složce.",
       "unsupportedTitle": "Složky nelze zobrazit"
+    },
+    "autoApprove": {
+      "title": "Automatické schvalování",
+      "description": "Automaticky schvalovat žádosti o oprávnění pro tuto relaci. Nástroje se pak spustí bez výzvy.",
+      "unavailable": "Tato relace nemůže přijímat žádosti o oprávnění."
     }
   },
   "bootstrap": {
@@ -2687,7 +2710,10 @@
     "gatewayModelUnavailable": "Tento model přepisu není dostupný. Vyberte jiný v Předvolbách.",
     "gatewayModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(transcriptionModel.title) vyberte jiný.",
     "gatewaySignInRequired": "Pro použití přepisu přes Kilo Gateway se přihlaste.",
-    "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách."
+    "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách.",
+    "testTitle": "Vyzkoušet hlasový vstup",
+    "testPlaceholder": "Klepněte na mikrofon a začněte mluvit.",
+    "testClear": "Vymazat text"
   },
   "share": {
     "title": "Sdílení do Kilo",
@@ -3078,5 +3104,12 @@
     "emptyTitle": "Žádné modely přepisu",
     "emptyDescription": "Kilo Gateway nyní nenabízí žádné modely přepisu.",
     "loadFailed": "Modely přepisu se nepodařilo načíst."
+  },
+  "voiceLanguage": {
+    "title": "Jazyk hlasu",
+    "automatic": "Automaticky",
+    "loadFailed": "Nepodařilo se načíst jazyky, které toto zařízení podporuje.",
+    "emptyTitle": "Žádné podporované jazyky",
+    "emptyDescription": "Rozpoznávání řeči tohoto zařízení neuvádí žádné podporované jazyky."
   }
 }

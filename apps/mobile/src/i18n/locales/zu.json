@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Uma lokhu kuvaliwe, inkinobho yokubuyela ifaka umugqa omusha ezindaweni zokubhalela abenzeli.",
     "biometricUnlock": "Vula ngebhayomethrikhi",
     "biometricUnlockSubtitle": "Vula uhlelo lokusebenza lapho luqala nangemva kokuba selunemizuzu emihlanu lusebenza ngemuva.",
+    "hideThinking": "Fihla imininingwane yokucabanga",
+    "hideThinkingSubtitle": "Ungakubonisi ukucabanga komenzeli ekhasini leseshini.",
     "featureFlags": "Amaflagi ezici",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Ukuxhumana kunqamukile",
       "retryConnection": "Zama ukuxhuma futhi"
     },
+    "goal": {
+      "title": "Inhloso",
+      "statusActive": "Inhloso esebenzayo",
+      "statusPaused": "Inhloso emisiwe",
+      "statusComplete": "Inhloso iqediwe",
+      "statusBlocked": "Inhloso ivinjiwe",
+      "edit": "Hlela inhloso",
+      "remove": "Susa inhloso",
+      "pause": "Misa inhloso",
+      "resume": "Qhubeka nenhloso",
+      "editPlaceholder": "Chaza inhloso",
+      "removeConfirmTitle": "Susa inhloso?",
+      "removeConfirmMessage": "I-CLI isula inhloso yaleli seshini.",
+      "updateFailed": "Inhloso ayikwazanga ukubuyekezwa.",
+      "sectionAccessibility": "{{status}}. Inhloso: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Okusetshenziswe muva nje",
       "couldNotLoadGithubRepositories": "Asikwazanga ukulayisha izinqolobane zekhodi ze-GitHub.",
@@ -2531,6 +2549,11 @@
       "retryableDescription": "Hlola ukuxhumana kwakho bese uzama futhi. Usengaqinisekisa le folda ngokuqeda ukukhetha.",
       "unsupportedTitle": "Uhlu lwamafolda alukwazi ukuboniswa",
       "unsupportedDescription": "Le CLI ayikwazi ukubonisa uhlu lwamafolda. Uma uqeda ukukhetha, kugcinwa ifolda yokuqalisa. Iseshini izoqala kuleyo folda."
+    },
+    "autoApprove": {
+      "title": "Ukuvuma okuzenzakalelayo",
+      "description": "Vuma ngokuzenzakalelayo izicelo zemvume zalesi seshini. Ngemva kwalokho amathuluzi asebenza ngaphandle kokubuza.",
+      "unavailable": "Leli seshini alikwazi ukuthola izicelo zemvume."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Le modeli yokuguqula inkulumo ayitholakali. Khetha enye Ku-Okuncamelayo.",
     "gatewayModelUnavailableNotice": "Le modeli ayisanikezwa. Thepha $t(transcriptionModel.title) ukukhetha enye.",
     "gatewaySignInRequired": "Ngena ngemvume ukuze usebenzise ukuguqula inkulumo nge-Kilo Gateway.",
-    "gatewayNoModel": "Okokuqala, khetha imodeli yokuguqula inkulumo Ku-Okuncamelayo."
+    "gatewayNoModel": "Okokuqala, khetha imodeli yokuguqula inkulumo Ku-Okuncamelayo.",
+    "testTitle": "Hlola ukufaka ngezwi",
+    "testPlaceholder": "Thepha imakrofoni bese uqala ukukhuluma.",
+    "testClear": "Sula umbhalo"
   },
   "share": {
     "title": "Yabelana ku-Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Azikho izimodeli zokuguqula inkulumo",
     "emptyDescription": "I-Kilo Gateway ayinikezi zimodeli zokuguqula inkulumo okwamanje.",
     "loadFailed": "Azikwazanga ukulayisha izimodeli zokuguqula inkulumo."
+  },
+  "voiceLanguage": {
+    "title": "Ulimi lwezwi",
+    "automatic": "Okuzenzakalelayo",
+    "loadFailed": "Izilimi ezisekelwa yile divayisi azikwazanga ukulayishwa.",
+    "emptyTitle": "Azikho izilimi ezisekelwayo",
+    "emptyDescription": "Ukubona inkulumo kwale divayisi akubiki zilimi ezisekelwayo."
   }
 }

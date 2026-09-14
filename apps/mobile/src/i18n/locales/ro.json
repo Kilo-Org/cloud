@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Când opțiunea este dezactivată, tasta Enter inserează o linie nouă în câmpurile de mesaj ale agenților.",
     "biometricUnlock": "Deblocare prin autentificare biometrică",
     "biometricUnlockSubtitle": "Deblocarea este necesară la pornirea aplicației și după cinci minute în fundal.",
+    "hideThinking": "Ascunde detaliile raționamentului",
+    "hideThinkingSubtitle": "Nu afișa raționamentul agentului pe pagina sesiunii.",
     "featureFlags": "Fanioane de funcții",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2066,6 +2068,22 @@
       "connectionLost": "Conexiune pierdută",
       "retryConnection": "Încearcă din nou conectarea"
     },
+    "goal": {
+      "title": "Obiectiv",
+      "statusActive": "Obiectiv activ",
+      "statusPaused": "Obiectiv în pauză",
+      "statusComplete": "Obiectiv finalizat",
+      "statusBlocked": "Obiectiv blocat",
+      "edit": "Editează obiectivul",
+      "remove": "Elimină obiectivul",
+      "pause": "Pune obiectivul în pauză",
+      "resume": "Reia obiectivul",
+      "editPlaceholder": "Descrie obiectivul",
+      "removeConfirmTitle": "Elimini obiectivul?",
+      "removeConfirmMessage": "CLI șterge obiectivul acestei sesiuni.",
+      "updateFailed": "Obiectivul nu a putut fi actualizat.",
+      "sectionAccessibility": "{{status}}. Obiectiv: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Folosite recent",
       "couldNotLoadGithubRepositories": "Nu s-au putut încărca depozitele GitHub.",
@@ -2553,6 +2571,11 @@
       "tapToListHint": "Atinge un dosar pentru a-i vedea conținutul.",
       "unsupportedDescription": "Acest CLI nu poate afișa dosarele. Atinge „Gata” pentru a păstra dosarul de pornire, apoi „Începe sesiunea” pentru a porni sesiunea în acel dosar.",
       "unsupportedTitle": "Dosarele nu pot fi afișate"
+    },
+    "autoApprove": {
+      "title": "Aprobare automată",
+      "description": "Aprobă automat cererile de permisiune pentru această sesiune. Apoi instrumentele rulează fără solicitare.",
+      "unavailable": "Această sesiune nu poate primi cereri de permisiune."
     }
   },
   "bootstrap": {
@@ -2665,7 +2688,10 @@
     "gatewayModelUnavailable": "Acest model de transcriere nu este disponibil. Alege altul în Preferințe.",
     "gatewayModelUnavailableNotice": "Acest model nu mai este oferit. Atinge $t(transcriptionModel.title) pentru a alege altul.",
     "gatewaySignInRequired": "Autentifică-te pentru a folosi transcrierea cu Kilo Gateway.",
-    "gatewayNoModel": "Alege mai întâi un model de transcriere în Preferințe."
+    "gatewayNoModel": "Alege mai întâi un model de transcriere în Preferințe.",
+    "testTitle": "Testează introducerea vocală",
+    "testPlaceholder": "Atinge microfonul și începe să vorbești.",
+    "testClear": "Șterge textul"
   },
   "share": {
     "title": "Distribuire către Kilo",
@@ -3055,5 +3081,12 @@
     "emptyTitle": "Nu există modele de transcriere",
     "emptyDescription": "Kilo Gateway nu oferă modele de transcriere în acest moment.",
     "loadFailed": "Nu s-au putut încărca modelele de transcriere."
+  },
+  "voiceLanguage": {
+    "title": "Limba vocii",
+    "automatic": "Automat",
+    "loadFailed": "Limbile acceptate de acest dispozitiv nu au putut fi încărcate.",
+    "emptyTitle": "Nicio limbă acceptată",
+    "emptyDescription": "Recunoașterea vocală a acestui dispozitiv nu raportează nicio limbă acceptată."
   }
 }

@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "O'chirilganda Enter tugmasi agentga xabar kiritish maydonida yangi qator ochadi.",
     "biometricUnlock": "Biometriya yordamida qulfni ochish",
     "biometricUnlockSubtitle": "Ilova ishga tushirilganda va fonda besh daqiqa turgandan keyin qulfni ochish talab qilinadi.",
+    "hideThinking": "Fikrlash tafsilotlarini yashirish",
+    "hideThinkingSubtitle": "Agentning fikrlashini sessiya sahifasida ko'rsatmaslik.",
     "featureFlags": "Funksiya bayroqlari",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Ulanish uzildi",
       "retryConnection": "Qayta ulanish"
     },
+    "goal": {
+      "title": "Maqsad",
+      "statusActive": "Faol maqsad",
+      "statusPaused": "To‘xtatilgan maqsad",
+      "statusComplete": "Maqsad bajarildi",
+      "statusBlocked": "Maqsad bloklandi",
+      "edit": "Maqsadni tahrirlash",
+      "remove": "Maqsadni olib tashlash",
+      "pause": "Maqsadni to‘xtatish",
+      "resume": "Maqsadni davom ettirish",
+      "editPlaceholder": "Maqsadni tavsiflang",
+      "removeConfirmTitle": "Maqsad olib tashlansinmi?",
+      "removeConfirmMessage": "CLI bu sessiyaning maqsadini tozalaydi.",
+      "updateFailed": "Maqsadni yangilab bo‘lmadi.",
+      "sectionAccessibility": "{{status}}. Maqsad: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Yaqinda ishlatilgan",
       "couldNotLoadGithubRepositories": "GitHub repozitoriyalarini yuklab bo'lmadi.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "Jild tarkibini ko'rish uchun uni bosing.",
       "unsupportedDescription": "Bu CLI jildlar ro'yxatini ko'rsata olmaydi. Tayyor tugmasi boshlang'ich jildni saqlaydi. Sessiyani boshlash tugmasi sessiyani shu jildda boshlaydi.",
       "unsupportedTitle": "Jildlar ro'yxatini ko'rsatib bo'lmaydi"
+    },
+    "autoApprove": {
+      "title": "Avtomatik tasdiqlash",
+      "description": "Bu sessiya uchun ruxsat so‘rovlarini avtomatik tasdiqla. Keyin asboblar so‘rovsiz ishlaydi.",
+      "unavailable": "Bu sessiya ruxsat so‘rovlarini qabul qila olmaydi."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Ushbu matnga aylantirish modeli mavjud emas. Shaxsiy sozlamalardan boshqasini tanlang.",
     "gatewayModelUnavailableNotice": "Bu model endi taklif etilmaydi. Boshqasini tanlash uchun $t(transcriptionModel.title) ga teging.",
     "gatewaySignInRequired": "Kilo Gateway orqali aylantirishdan foydalanish uchun tizimga kiring.",
-    "gatewayNoModel": "Avval Shaxsiy sozlamalardan matnga aylantirish modelini tanlang."
+    "gatewayNoModel": "Avval Shaxsiy sozlamalardan matnga aylantirish modelini tanlang.",
+    "testTitle": "Ovozli kiritishni sinash",
+    "testPlaceholder": "Mikrofonni bosing va gapirishni boshlang.",
+    "testClear": "Matnni tozalash"
   },
   "share": {
     "title": "Kiloga yuborish",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Matnga aylantirish modellari yo'q",
     "emptyDescription": "Kilo Gateway hozircha matnga aylantirish modellarini taklif qilmayapti.",
     "loadFailed": "Matnga aylantirish modellarini yuklab bo'lmadi."
+  },
+  "voiceLanguage": {
+    "title": "Ovoz tili",
+    "automatic": "Avtomatik",
+    "loadFailed": "Bu qurilma qo‘llab-quvvatlaydigan tillarni yuklab bo‘lmadi.",
+    "emptyTitle": "Qo‘llab-quvvatlanadigan til yo‘q",
+    "emptyDescription": "Bu qurilmaning nutqni aniqlash xususiyati qo‘llab-quvvatlanadigan tillar haqida xabar bermaydi."
   }
 }

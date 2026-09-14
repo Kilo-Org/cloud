@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "આ બંધ હોય ત્યારે રિટર્ન કી એજન્ટના સંદેશના ખાનામાં નવી પંક્તિ ઉમેરે છે.",
     "biometricUnlock": "બાયોમેટ્રિક્સથી અનલૉક કરો",
     "biometricUnlockSubtitle": "એપ શરૂ કરતી વખતે અને પૃષ્ઠભૂમિમાં પાંચ મિનિટ રહ્યા પછી અનલૉક કરવું જરૂરી છે.",
+    "hideThinking": "વિચારની વિગતો છુપાવો",
+    "hideThinkingSubtitle": "સત્ર પૃષ્ઠ પર એજન્ટનું વિચારવું બતાવશો નહીં.",
     "featureFlags": "ફીચર ફ્લેગ",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "કનેક્શન તૂટી ગયું",
       "retryConnection": "કનેક્ટ કરવા ફરી પ્રયાસ કરો"
     },
+    "goal": {
+      "title": "લક્ષ્ય",
+      "statusActive": "સક્રિય લક્ષ્ય",
+      "statusPaused": "થોભાવેલું લક્ષ્ય",
+      "statusComplete": "લક્ષ્ય પૂર્ણ",
+      "statusBlocked": "લક્ષ્ય અવરોધિત",
+      "edit": "લક્ષ્ય સંપાદિત કરો",
+      "remove": "લક્ષ્ય દૂર કરો",
+      "pause": "લક્ષ્ય થોભાવો",
+      "resume": "લક્ષ્ય ફરી શરૂ કરો",
+      "editPlaceholder": "લક્ષ્ય વર્ણવો",
+      "removeConfirmTitle": "લક્ષ્ય દૂર કરવું?",
+      "removeConfirmMessage": "CLI આ સત્રનું લક્ષ્ય સાફ કરે છે.",
+      "updateFailed": "લક્ષ્ય અપડેટ કરી શકાયું નહીં.",
+      "sectionAccessibility": "{{status}}. લક્ષ્ય: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું",
       "couldNotLoadGithubRepositories": "GitHub રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "ફોલ્ડરની સામગ્રી જોવા તેના પર ટેપ કરો.",
       "unsupportedDescription": "આ CLI ફોલ્ડરની યાદી બતાવી શકતું નથી. “થઈ ગયું” પર ટેપ કરવાથી શરૂઆતનું ફોલ્ડર જ પસંદ રહેશે. “સત્ર શરૂ કરો” પર ટેપ કરવાથી સત્ર ત્યાં શરૂ થશે.",
       "unsupportedTitle": "ફોલ્ડરની યાદી બતાવી શકાતી નથી"
+    },
+    "autoApprove": {
+      "title": "સ્વયં મંજૂરી",
+      "description": "આ સત્ર માટે પરવાનગીની વિનંતીઓને સ્વયંભૂ મંજૂર કરો. પછી ટૂલ્સ પૂછપરછ વગર ચાલે છે.",
+      "unavailable": "આ સત્ર પરવાનગીની વિનંતીઓ મેળવી શકતું નથી."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "અવાજને લખાણમાં ફેરવતું આ મોડેલ ઉપલબ્ધ નથી. પસંદગીઓમાં બીજું પસંદ કરો.",
     "gatewayModelUnavailableNotice": "આ મોડેલ હવે ઑફર કરવામાં આવતું નથી. બીજું પસંદ કરવા $t(transcriptionModel.title) પર ટૅપ કરો.",
     "gatewaySignInRequired": "Kilo Gateway દ્વારા લખાણ વાપરવા સાઇન ઇન કરો.",
-    "gatewayNoModel": "પહેલા પસંદગીઓમાં અવાજને લખાણમાં ફેરવતું મોડેલ પસંદ કરો."
+    "gatewayNoModel": "પહેલા પસંદગીઓમાં અવાજને લખાણમાં ફેરવતું મોડેલ પસંદ કરો.",
+    "testTitle": "વૉઇસ ઇનપુટ ચકાસો",
+    "testPlaceholder": "માઇક્રોફોન પર ટેપ કરો અને બોલવાનું શરૂ કરો.",
+    "testClear": "ટેક્સ્ટ સાફ કરો"
   },
   "share": {
     "title": "Kilo પર શેર",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "અવાજને લખાણમાં ફેરવતાં કોઈ મોડેલ નથી",
     "emptyDescription": "Kilo Gateway હાલમાં અવાજને લખાણમાં ફેરવતાં કોઈ મોડેલ આપતું નથી.",
     "loadFailed": "અવાજને લખાણમાં ફેરવતાં મોડેલ લોડ કરી શકાયાં નહીં."
+  },
+  "voiceLanguage": {
+    "title": "અવાજની ભાષા",
+    "automatic": "સ્વયંચાલિત",
+    "loadFailed": "આ ઉપકરણ સમર્થન કરે તે ભાષાઓ લોડ થઈ શકી નહીં.",
+    "emptyTitle": "કોઈ સમર્થિત ભાષા નથી",
+    "emptyDescription": "આ ઉપકરણની બોલી ઓળખ કોઈ સમર્થિત ભાષા જણાવતી નથી."
   }
 }

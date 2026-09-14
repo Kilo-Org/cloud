@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Kun asetus on pois päältä, Enter lisää rivinvaihdon agenttien viestikenttiin.",
     "biometricUnlock": "Avaa lukitus biometrisellä tunnistuksella",
     "biometricUnlockSubtitle": "Lukitus on avattava sovelluksen käynnistyessä ja sen oltua taustalla viisi minuuttia.",
+    "hideThinking": "Piilota ajattelun tiedot",
+    "hideThinkingSubtitle": "Älä näytä agentin ajattelua istunnon sivulla.",
     "featureFlags": "Ominaisuusliput",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Yhteys katkesi",
       "retryConnection": "Yhdistä uudelleen"
     },
+    "goal": {
+      "title": "Tavoite",
+      "statusActive": "Aktiivinen tavoite",
+      "statusPaused": "Keskeytetty tavoite",
+      "statusComplete": "Tavoite valmis",
+      "statusBlocked": "Tavoite estetty",
+      "edit": "Muokkaa tavoitetta",
+      "remove": "Poista tavoite",
+      "pause": "Keskeytä tavoite",
+      "resume": "Jatka tavoitetta",
+      "editPlaceholder": "Kuvaile tavoite",
+      "removeConfirmTitle": "Poistetaanko tavoite?",
+      "removeConfirmMessage": "CLI tyhjentää tämän istunnon tavoitteen.",
+      "updateFailed": "Tavoitetta ei voitu päivittää.",
+      "sectionAccessibility": "{{status}}. Tavoite: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Äskettäin käytetyt",
       "couldNotLoadGithubRepositories": "GitHub-repositorioiden lataus epäonnistui.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "Näet kansion sisällön napauttamalla kansiota.",
       "unsupportedDescription": "Tämä CLI ei tue kansioiden luettelointia. Valmis-painike säilyttää käynnistyskansion. Aloita istunto -painike käynnistää istunnon siinä.",
       "unsupportedTitle": "Kansioluetteloa ei voi näyttää"
+    },
+    "autoApprove": {
+      "title": "Automaattinen hyväksyntä",
+      "description": "Hyväksy tämän istunnon lupapyynnöt automaattisesti. Sen jälkeen työkalut toimivat ilman kysymystä.",
+      "unavailable": "Tämä istunto ei voi vastaanottaa lupapyyntöjä."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Tätä puheentunnistusmallia ei ole käytettävissä. Valitse toinen Asetuksissa.",
     "gatewayModelUnavailableNotice": "Tätä mallia ei enää tarjota. Valitse toinen napauttamalla $t(transcriptionModel.title).",
     "gatewaySignInRequired": "Kirjaudu sisään käyttääksesi Kilo Gatewayn puheentunnistusta.",
-    "gatewayNoModel": "Valitse ensin puheentunnistusmalli Asetuksissa."
+    "gatewayNoModel": "Valitse ensin puheentunnistusmalli Asetuksissa.",
+    "testTitle": "Testaa äänisyötettä",
+    "testPlaceholder": "Napauta mikrofonia ja ala puhua.",
+    "testClear": "Tyhjennä teksti"
   },
   "share": {
     "title": "Jaa Kiloon",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Ei puheentunnistusmalleja",
     "emptyDescription": "Kilo Gateway ei juuri nyt tarjoa puheentunnistusmalleja.",
     "loadFailed": "Puheentunnistusmallien lataaminen epäonnistui."
+  },
+  "voiceLanguage": {
+    "title": "Äänen kieli",
+    "automatic": "Automaattinen",
+    "loadFailed": "Tämän laitteen tukemia kieliä ei voitu ladata.",
+    "emptyTitle": "Ei tuettuja kieliä",
+    "emptyDescription": "Tämän laitteen puheentunnistus ei ilmoita tuettuja kieliä."
   }
 }

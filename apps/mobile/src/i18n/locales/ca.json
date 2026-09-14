@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Quan està desactivat, la tecla de retorn insereix un salt de línia als camps de missatge dels agents.",
     "biometricUnlock": "Desbloqueja amb biometria",
     "biometricUnlockSubtitle": "Cal desbloquejar l'aplicació en iniciar-la i després de cinc minuts en segon pla.",
+    "hideThinking": "Amaga els detalls del raonament",
+    "hideThinkingSubtitle": "No mostris el raonament de l'agent a la pàgina de la sessió.",
     "featureFlags": "Indicadors de funcions",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2066,6 +2068,22 @@
       "connectionLost": "Connexió perduda",
       "retryConnection": "Torna a provar la connexió"
     },
+    "goal": {
+      "title": "Objectiu",
+      "statusActive": "Objectiu actiu",
+      "statusPaused": "Objectiu en pausa",
+      "statusComplete": "Objectiu completat",
+      "statusBlocked": "Objectiu bloquejat",
+      "edit": "Edita l'objectiu",
+      "remove": "Elimina l'objectiu",
+      "pause": "Pausa l'objectiu",
+      "resume": "Reprèn l'objectiu",
+      "editPlaceholder": "Descriu l'objectiu",
+      "removeConfirmTitle": "Eliminar l'objectiu?",
+      "removeConfirmMessage": "El CLI esborra l'objectiu d'aquesta sessió.",
+      "updateFailed": "No s'ha pogut actualitzar l'objectiu.",
+      "sectionAccessibility": "{{status}}. Objectiu: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Utilitzats recentment",
       "couldNotLoadGithubRepositories": "No s'han pogut carregar els repositoris de GitHub.",
@@ -2553,6 +2571,11 @@
       "tapToListHint": "Toca una carpeta per veure'n el contingut.",
       "unsupportedDescription": "Aquest CLI no pot llistar carpetes. Si confirmes la selecció, es mantindrà la carpeta d'inici i la sessió s'hi iniciarà.",
       "unsupportedTitle": "No es poden llistar les carpetes"
+    },
+    "autoApprove": {
+      "title": "Aprovació automàtica",
+      "description": "Aprova automàticament les sol·licituds de permís d'aquesta sessió. Després, les eines s'executen sense cap sol·licitud.",
+      "unavailable": "Aquesta sessió no pot rebre sol·licituds de permís."
     }
   },
   "bootstrap": {
@@ -2665,7 +2688,10 @@
     "gatewayModelUnavailable": "Aquest model de transcripció no està disponible. Tria'n un altre a les Preferències.",
     "gatewayModelUnavailableNotice": "Aquest model ja no s'ofereix. Toca $t(transcriptionModel.title) per triar-ne un altre.",
     "gatewaySignInRequired": "Inicia la sessió per utilitzar la transcripció amb Kilo Gateway.",
-    "gatewayNoModel": "Primer tria un model de transcripció a les Preferències."
+    "gatewayNoModel": "Primer tria un model de transcripció a les Preferències.",
+    "testTitle": "Prova l'entrada de veu",
+    "testPlaceholder": "Toca el micròfon i comença a parlar.",
+    "testClear": "Esborra el text"
   },
   "share": {
     "title": "Compartir amb Kilo",
@@ -3055,5 +3081,12 @@
     "emptyTitle": "Cap model de transcripció",
     "emptyDescription": "Kilo Gateway no ofereix cap model de transcripció ara mateix.",
     "loadFailed": "No s'han pogut carregar els models de transcripció."
+  },
+  "voiceLanguage": {
+    "title": "Idioma de veu",
+    "automatic": "Automàtic",
+    "loadFailed": "No s'han pogut carregar els idiomes que admet aquest dispositiu.",
+    "emptyTitle": "Cap idioma admès",
+    "emptyDescription": "El reconeixement de veu d'aquest dispositiu no indica cap idioma admès."
   }
 }

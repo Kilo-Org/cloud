@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Ko je možnost izklopljena, tipka Enter vstavi novo vrstico v polja za vnos sporočil agentom.",
     "biometricUnlock": "Odklepanje z biometrijo",
     "biometricUnlockSubtitle": "Odklepanje je obvezno ob zagonu aplikacije in po petih minutah v ozadju.",
+    "hideThinking": "Skrij podrobnosti razmišljanja",
+    "hideThinkingSubtitle": "Ne prikazuj razmišljanja agenta na strani seje.",
     "featureFlags": "Zastavice funkcij",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2083,6 +2085,22 @@
       "connectionLost": "Povezava prekinjena",
       "retryConnection": "Znova vzpostavi povezavo"
     },
+    "goal": {
+      "title": "Cilj",
+      "statusActive": "Aktivni cilj",
+      "statusPaused": "Zaustavljeni cilj",
+      "statusComplete": "Cilj dokončan",
+      "statusBlocked": "Cilj blokiran",
+      "edit": "Uredi cilj",
+      "remove": "Odstrani cilj",
+      "pause": "Zaustavi cilj",
+      "resume": "Nadaljuj cilj",
+      "editPlaceholder": "Opiši cilj",
+      "removeConfirmTitle": "Odstranim cilj?",
+      "removeConfirmMessage": "CLI počisti cilj te seje.",
+      "updateFailed": "Cilja ni bilo mogoče posodobiti.",
+      "sectionAccessibility": "{{status}}. Cilj: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Nedavno uporabljeno",
       "couldNotLoadGithubRepositories": "Skladišč na GitHub ni bilo mogoče naložiti.",
@@ -2575,6 +2593,11 @@
       "tapToListHint": "Tapni mapo, da prikažeš njeno vsebino.",
       "unsupportedDescription": "Ta CLI ne more prikazati map. Z gumbom »Končano« ohraniš začetno mapo, z gumbom »Začni sejo« pa v njej zaženeš sejo.",
       "unsupportedTitle": "Map ni mogoče prikazati"
+    },
+    "autoApprove": {
+      "title": "Samodejna odobritev",
+      "description": "Samodejno odobri zahteve za dovoljenje za to sejo. Orodja se nato izvajajo brez poziva.",
+      "unavailable": "Ta seja ne more prejemati zahtev za dovoljenje."
     }
   },
   "bootstrap": {
@@ -2687,7 +2710,10 @@
     "gatewayModelUnavailable": "Ta model za prepisovanje ni na voljo. Izberite drugega v Nastavitvah.",
     "gatewayModelUnavailableNotice": "Ta model se ne ponuja več. Dotaknite se $t(transcriptionModel.title) in izberite drugega.",
     "gatewaySignInRequired": "Prijavite se za uporabo prepisovanja prek Kilo Gateway.",
-    "gatewayNoModel": "Najprej izberite model za prepisovanje v Nastavitvah."
+    "gatewayNoModel": "Najprej izberite model za prepisovanje v Nastavitvah.",
+    "testTitle": "Preizkusi glasovni vnos",
+    "testPlaceholder": "Tapni mikrofon in začni govoriti.",
+    "testClear": "Počisti besedilo"
   },
   "share": {
     "title": "Deljenje v Kilo",
@@ -3078,5 +3104,12 @@
     "emptyTitle": "Ni modelov za prepisovanje",
     "emptyDescription": "Kilo Gateway trenutno ne ponuja modelov za prepisovanje.",
     "loadFailed": "Modelov za prepisovanje ni bilo mogoče naložiti."
+  },
+  "voiceLanguage": {
+    "title": "Jezik glasu",
+    "automatic": "Samodejno",
+    "loadFailed": "Jezikov, ki jih podpira ta naprava, ni bilo mogoče naložiti.",
+    "emptyTitle": "Ni podprtih jezikov",
+    "emptyDescription": "Prepoznavanje govora te naprave ne navaja podprtih jezikov."
   }
 }

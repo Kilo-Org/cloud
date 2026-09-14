@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "عند تعطيل هذا الخيار، يُدرج مفتاح الإدخال سطرًا جديدًا في حقول رسائل الوكلاء.",
     "biometricUnlock": "فتح القفل بالقياسات الحيوية",
     "biometricUnlockSubtitle": "يلزم فتح القفل عند تشغيل التطبيق وبعد بقائه في الخلفية لمدة خمس دقائق.",
+    "hideThinking": "إخفاء تفاصيل التفكير",
+    "hideThinkingSubtitle": "لا تعرض تفكير الوكيل في صفحة الجلسة.",
     "featureFlags": "أعلام الميزات",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -1599,6 +1601,22 @@
       "connectionLost": "انقطع الاتصال",
       "retryConnection": "إعادة محاولة الاتصال"
     },
+    "goal": {
+      "title": "الهدف",
+      "statusActive": "هدف نشط",
+      "statusPaused": "هدف متوقف مؤقتًا",
+      "statusComplete": "اكتمل الهدف",
+      "statusBlocked": "هدف متعطّل",
+      "edit": "تعديل الهدف",
+      "remove": "إزالة الهدف",
+      "pause": "إيقاف الهدف مؤقتًا",
+      "resume": "استئناف الهدف",
+      "editPlaceholder": "صِف الهدف",
+      "removeConfirmTitle": "إزالة الهدف؟",
+      "removeConfirmMessage": "يمسح CLI هدف هذه الجلسة.",
+      "updateFailed": "تعذّر تحديث الهدف.",
+      "sectionAccessibility": "{{status}}. الهدف: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "المستخدمة مؤخرًا",
       "couldNotLoadGithubRepositories": "تعذّر تحميل مستودعات GitHub.",
@@ -2101,6 +2119,11 @@
       "tapToListHint": "اضغط على مجلد لعرض محتوياته.",
       "unsupportedDescription": "إصدار CLI هذا لا يدعم عرض المجلدات. اضغط على «تم» للاحتفاظ بمجلد بدء التشغيل، ثم على «بدء الجلسة» لبدء الجلسة فيه.",
       "unsupportedTitle": "لا يمكن عرض المجلدات"
+    },
+    "autoApprove": {
+      "title": "الموافقة التلقائية",
+      "description": "وافق تلقائيًا على طلبات الأذونات لهذه الجلسة. ثم تعمل الأدوات دون طلب.",
+      "unavailable": "لا يمكن لهذه الجلسة استقبال طلبات الأذونات."
     }
   },
   "bootstrap": {
@@ -2213,7 +2236,10 @@
     "gatewayModelUnavailable": "نموذج التفريغ الصوتي هذا غير متاح. اختر نموذجًا آخر من التفضيلات.",
     "gatewayModelUnavailableNotice": "لم يعد هذا النموذج معروضًا. اضغط على $t(transcriptionModel.title) لاختيار نموذج آخر.",
     "gatewaySignInRequired": "سجّل الدخول لاستخدام التفريغ الصوتي عبر Kilo Gateway.",
-    "gatewayNoModel": "اختر نموذج التفريغ الصوتي في التفضيلات أولًا."
+    "gatewayNoModel": "اختر نموذج التفريغ الصوتي في التفضيلات أولًا.",
+    "testTitle": "اختبار الإدخال الصوتي",
+    "testPlaceholder": "اضغط على الميكروفون وابدأ التحدث.",
+    "testClear": "مسح النص"
   },
   "share": {
     "title": "المشاركة مع Kilo",
@@ -3124,5 +3150,12 @@
     "emptyTitle": "لا توجد نماذج تفريغ صوتي",
     "emptyDescription": "لا يقدّم Kilo Gateway أي نماذج تفريغ صوتي في الوقت الحالي.",
     "loadFailed": "تعذّر تحميل نماذج التفريغ الصوتي."
+  },
+  "voiceLanguage": {
+    "title": "لغة الصوت",
+    "automatic": "تلقائي",
+    "loadFailed": "تعذّر تحميل اللغات التي يدعمها هذا الجهاز.",
+    "emptyTitle": "لا توجد لغات مدعومة",
+    "emptyDescription": "لا يفيد التعرّف على الكلام في هذا الجهاز بأي لغات مدعومة."
   }
 }

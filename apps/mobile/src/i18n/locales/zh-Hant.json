@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "關閉後，在智慧代理的訊息輸入框中按換行鍵只會換行。",
     "biometricUnlock": "使用生物辨識解鎖",
     "biometricUnlockSubtitle": "啟動應用程式時，以及在背景停留五分鐘後返回時，都需要解鎖。",
+    "hideThinking": "隱藏思考詳細資料",
+    "hideThinkingSubtitle": "不在工作階段頁面顯示智慧代理的思考內容。",
     "featureFlags": "功能旗標",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -1563,6 +1565,22 @@
       "connectionLost": "連線中斷",
       "retryConnection": "重新連線"
     },
+    "goal": {
+      "title": "目標",
+      "statusActive": "進行中的目標",
+      "statusPaused": "已暫停的目標",
+      "statusComplete": "目標已完成",
+      "statusBlocked": "目標受阻",
+      "edit": "編輯目標",
+      "remove": "移除目標",
+      "pause": "暫停目標",
+      "resume": "繼續目標",
+      "editPlaceholder": "描述目標",
+      "removeConfirmTitle": "移除目標？",
+      "removeConfirmMessage": "CLI 會清除此工作階段的目標。",
+      "updateFailed": "無法更新目標。",
+      "sectionAccessibility": "{{status}}。目標：{{text}}"
+    },
     "newSession": {
       "recentlyUsed": "最近使用",
       "couldNotLoadGithubRepositories": "無法載入 GitHub 儲存庫。",
@@ -2045,6 +2063,11 @@
       "tapToListHint": "點一下資料夾，即可查看其中的內容。",
       "unsupportedDescription": "此 CLI 無法列出資料夾。點一下「完成」會保留啟動時的資料夾，再點一下「開始工作階段」即可從該資料夾開始。",
       "unsupportedTitle": "無法列出資料夾"
+    },
+    "autoApprove": {
+      "title": "自動核准",
+      "description": "自動核准此工作階段的權限要求。之後工具將無須詢問即可執行。",
+      "unavailable": "此工作階段無法接收權限要求。"
     }
   },
   "bootstrap": {
@@ -2157,7 +2180,10 @@
     "gatewayModelUnavailable": "這個轉錄模型無法使用。請在偏好設定中選擇其他模型。",
     "gatewayModelUnavailableNotice": "這個模型已不再提供。點一下$t(transcriptionModel.title)選擇另一個。",
     "gatewaySignInRequired": "登入後即可使用 Kilo Gateway 轉錄。",
-    "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。"
+    "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。",
+    "testTitle": "測試語音輸入",
+    "testPlaceholder": "點按麥克風並開始說話。",
+    "testClear": "清除文字"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "沒有轉錄模型",
     "emptyDescription": "Kilo Gateway 目前沒有提供轉錄模型。",
     "loadFailed": "無法載入轉錄模型。"
+  },
+  "voiceLanguage": {
+    "title": "語音語言",
+    "automatic": "自動",
+    "loadFailed": "無法載入此裝置支援的語言。",
+    "emptyTitle": "沒有支援的語言",
+    "emptyDescription": "此裝置的語音辨識未回報任何支援的語言。"
   }
 }

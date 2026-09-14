@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Kapag naka-off, naglalagay ang Return ng bagong linya sa mga sulatan ng mensahe para sa ahente.",
     "biometricUnlock": "I-unlock gamit ang biometriko",
     "biometricUnlockSubtitle": "I-unlock ang app sa pagbukas at matapos ang limang minuto sa background.",
+    "hideThinking": "Itago ang mga detalye ng pag-iisip",
+    "hideThinkingSubtitle": "Huwag ipakita ang pag-iisip ng ahente sa pahina ng sesyon.",
     "featureFlags": "Mga feature flag",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Nawala ang koneksyon",
       "retryConnection": "Subukang kumonekta muli"
     },
+    "goal": {
+      "title": "Layunin",
+      "statusActive": "Aktibong layunin",
+      "statusPaused": "Naka-pausang layunin",
+      "statusComplete": "Tapos na ang layunin",
+      "statusBlocked": "Naka-block ang layunin",
+      "edit": "I-edit ang layunin",
+      "remove": "Alisin ang layunin",
+      "pause": "I-pause ang layunin",
+      "resume": "Ipagpatuloy ang layunin",
+      "editPlaceholder": "Ilarawan ang layunin",
+      "removeConfirmTitle": "Alisin ang layunin?",
+      "removeConfirmMessage": "Kinaklaro ng CLI ang layunin ng sesyong ito.",
+      "updateFailed": "Hindi na-update ang layunin.",
+      "sectionAccessibility": "{{status}}. Layunin: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Mga ginamit kamakailan",
       "couldNotLoadGithubRepositories": "Hindi ma-load ang mga imbakan ng code sa GitHub.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "I-tap ang isang direktoryo para makita ang mga laman nito.",
       "unsupportedDescription": "Hindi kayang maglista ng mga direktoryo ang CLI na ito. I-tap ang Tapos para panatilihin ang panimulang direktoryo, saka ang Simulan ang sesyon para magsimula roon.",
       "unsupportedTitle": "Hindi mailista ang mga direktoryo"
+    },
+    "autoApprove": {
+      "title": "Awtomatikong pag-apruba",
+      "description": "Awtomatikong aprubahan ang mga kahilingan sa pahintulot para sa sesyong ito. Pagkatapos, tatakbo ang mga tool nang walang tanong.",
+      "unavailable": "Hindi makakatanggap ng mga kahilingan sa pahintulot ang sesyong ito."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Hindi magagamit ang modelong ito para sa pagsasalin ng boses sa teksto. Pumili ng iba sa Mga kagustuhan.",
     "gatewayModelUnavailableNotice": "Hindi na inaalok ang modelong ito. I-tap ang $t(transcriptionModel.title) para pumili ng iba.",
     "gatewaySignInRequired": "Mag-sign in para gamitin ang pagsasalin ng boses sa teksto gamit ang Kilo Gateway.",
-    "gatewayNoModel": "Pumili muna ng modelo para sa pagsasalin ng boses sa teksto sa Mga kagustuhan."
+    "gatewayNoModel": "Pumili muna ng modelo para sa pagsasalin ng boses sa teksto sa Mga kagustuhan.",
+    "testTitle": "Subukan ang voice input",
+    "testPlaceholder": "I-tap ang mikropono at magsimulang magsalita.",
+    "testClear": "I-clear ang teksto"
   },
   "share": {
     "title": "Pagbabahagi sa Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Walang modelo para sa pagsasalin ng boses sa teksto",
     "emptyDescription": "Walang iniaalok na modelo para sa pagsasalin ng boses sa teksto ang Kilo Gateway ngayon.",
     "loadFailed": "Hindi ma-load ang mga modelo para sa pagsasalin ng boses sa teksto."
+  },
+  "voiceLanguage": {
+    "title": "Wika ng boses",
+    "automatic": "Awtomatiko",
+    "loadFailed": "Hindi na-load ang mga wikang sinusuportahan ng aparatong ito.",
+    "emptyTitle": "Walang suportadong wika",
+    "emptyDescription": "Walang iniuulat na suportadong wika ang speech recognition ng aparatong ito."
   }
 }

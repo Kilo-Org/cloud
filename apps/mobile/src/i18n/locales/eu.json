@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Desgaituta dagoenean, Sartu teklak lerro-jauzia txertatzen du agenteen mezu-eremuetan.",
     "biometricUnlock": "Desblokeatu biometriarekin",
     "biometricUnlockSubtitle": "Desblokeatu aplikazioa abiaraztean eta atzeko planoan bost minutu igaro ondoren.",
+    "hideThinking": "Ezkutatu pentsamenduaren xehetasunak",
+    "hideThinkingSubtitle": "Ez erakutsi agentearen pentsamendua saioaren orrian.",
     "featureFlags": "Funtzio-bandera",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Konexioa galdu da",
       "retryConnection": "Saiatu berriro konektatzen"
     },
+    "goal": {
+      "title": "Helburua",
+      "statusActive": "Helburu aktiboa",
+      "statusPaused": "Helburua pausatuta",
+      "statusComplete": "Helburua osatuta",
+      "statusBlocked": "Helburua blokeatuta",
+      "edit": "Editatu helburua",
+      "remove": "Kendu helburua",
+      "pause": "Pausatu helburua",
+      "resume": "Berrekin helburuari",
+      "editPlaceholder": "Deskribatu helburua",
+      "removeConfirmTitle": "Helburua kendu?",
+      "removeConfirmMessage": "CLIk saio honen helburua ezabatzen du.",
+      "updateFailed": "Ezin izan da helburua eguneratu.",
+      "sectionAccessibility": "{{status}}. Helburua: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Duela gutxi erabiliak",
       "couldNotLoadGithubRepositories": "Ezin izan dira GitHub-eko biltegiak kargatu.",
@@ -2531,6 +2549,11 @@
       "retryableDescription": "Egiaztatu konexioa eta saiatu berriro. Eginda sakatuz gero, karpeta hau hautatuko da hala ere.",
       "unsupportedTitle": "Karpetak ezin dira zerrendatu",
       "unsupportedDescription": "CLI honek ezin ditu karpetak zerrendatu. Eginda sakatuz gero, hasierako karpeta mantenduko da. Hasi saioa sakatuz gero, saioa karpeta horretan hasiko da."
+    },
+    "autoApprove": {
+      "title": "Onespen automatikoa",
+      "description": "Onetsi saio honen baimen-eskaerak automatikoki. Ondoren, tresnak eskatu gabe exekutatzen dira.",
+      "unavailable": "Saio honek ezin ditu baimen-eskaerak jaso."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Transkripzio-eredu hau ez dago erabilgarri. Hautatu besteren bat Hobespenetan.",
     "gatewayModelUnavailableNotice": "Eredu hau jada ez da eskaintzen. Sakatu $t(transcriptionModel.title) beste bat hautatzeko.",
     "gatewaySignInRequired": "Hasi saioa Kilo Gateway bidezko transkripzioa erabiltzeko.",
-    "gatewayNoModel": "Hautatu lehenik transkripzio-eredu bat Hobespenetan."
+    "gatewayNoModel": "Hautatu lehenik transkripzio-eredu bat Hobespenetan.",
+    "testTitle": "Probatu ahots-sarrera",
+    "testPlaceholder": "Sakatu mikrofonoa eta hasi hitz egiten.",
+    "testClear": "Garbitu testua"
   },
   "share": {
     "title": "Partekatu Kilo-n",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Ez dago transkripzio-eredurik",
     "emptyDescription": "Kilo Gateway-k ez du transkripzio-eredurik eskaintzen oraintxe.",
     "loadFailed": "Ezin izan dira transkripzio-ereduak kargatu."
+  },
+  "voiceLanguage": {
+    "title": "Ahotsaren hizkuntza",
+    "automatic": "Automatikoa",
+    "loadFailed": "Ezin izan dira gailu honek onartzen dituen hizkuntzak kargatu.",
+    "emptyTitle": "Ez dago hizkuntza onarturik",
+    "emptyDescription": "Gailu honen hizketaren ezagutzeak ez du hizkuntza onarturik adierazten."
   }
 }

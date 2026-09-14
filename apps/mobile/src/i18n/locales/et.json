@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Kui see on välja lülitatud, lisab sisestusklahv agentide sõnumi sisestusväljadel reavahetuse.",
     "biometricUnlock": "Biomeetriline lukust avamine",
     "biometricUnlockSubtitle": "Rakendus tuleb lukust avada käivitamisel ja pärast viit minutit taustal olemist.",
+    "hideThinking": "Peida mõtlemise üksikasjad",
+    "hideThinkingSubtitle": "Ära näita agendi mõtlemist sessiooni lehel.",
     "featureFlags": "Funktsioonilipud",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Ühendus katkes",
       "retryConnection": "Proovi uuesti ühenduda"
     },
+    "goal": {
+      "title": "Eesmärk",
+      "statusActive": "Aktiivne eesmärk",
+      "statusPaused": "Peatatud eesmärk",
+      "statusComplete": "Eesmärk täidetud",
+      "statusBlocked": "Eesmärk blokeeritud",
+      "edit": "Muuda eesmärki",
+      "remove": "Eemalda eesmärk",
+      "pause": "Peata eesmärk",
+      "resume": "Jätka eesmärki",
+      "editPlaceholder": "Kirjelda eesmärki",
+      "removeConfirmTitle": "Eemaldada eesmärk?",
+      "removeConfirmMessage": "CLI kustutab selle sessiooni eesmärgi.",
+      "updateFailed": "Eesmärki ei õnnestunud uuendada.",
+      "sectionAccessibility": "{{status}}. Eesmärk: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Hiljuti kasutatud",
       "couldNotLoadGithubRepositories": "GitHubi hoidlate laadimine ebaõnnestus.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "Kausta sisu vaatamiseks puuduta kausta.",
       "unsupportedDescription": "See CLI ei saa kaustu loetleda. Nupp „Valmis“ jätab valituks käivituskausta ja nupp „Alusta seanssi“ käivitab seansi selles kaustas.",
       "unsupportedTitle": "Kaustu ei saa loetleda"
+    },
+    "autoApprove": {
+      "title": "Automaatne kinnitamine",
+      "description": "Kinnita selle sessiooni loataotlused automaatselt. Seejärel töötavad tööriistad ilma küsimuseta.",
+      "unavailable": "See sessioon ei saa loataotlusi vastu võtta."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Seda kõnetuvastuse mudelit pole saadaval. Vali Eelistustes mõni teine.",
     "gatewayModelUnavailableNotice": "Seda mudelit enam ei pakuta. Puuduta $t(transcriptionModel.title), et valida teine.",
     "gatewaySignInRequired": "Logi sisse, et kasutada Kilo Gateway kõnetuvastust.",
-    "gatewayNoModel": "Vali kõigepealt Eelistustes kõnetuvastuse mudel."
+    "gatewayNoModel": "Vali kõigepealt Eelistustes kõnetuvastuse mudel.",
+    "testTitle": "Testi häälsisestust",
+    "testPlaceholder": "Puuduta mikrofoni ja hakka rääkima.",
+    "testClear": "Tühjenda tekst"
   },
   "share": {
     "title": "Kilosse jagamine",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Kõnetuvastuse mudelid puuduvad",
     "emptyDescription": "Kilo Gateway ei paku praegu ühtegi kõnetuvastuse mudelit.",
     "loadFailed": "Kõnetuvastuse mudeleid ei õnnestunud laadida."
+  },
+  "voiceLanguage": {
+    "title": "Hääle keel",
+    "automatic": "Automaatne",
+    "loadFailed": "Selle seadme toetatavaid keeli ei õnnestunud laadida.",
+    "emptyTitle": "Toetatud keeli pole",
+    "emptyDescription": "Selle seadme kõnetuvastus ei teata ühtegi toetatud keelt."
   }
 }

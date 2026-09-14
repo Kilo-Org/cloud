@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Cando está desactivado, Intro insire un salto de liña nos campos de mensaxe dos axentes.",
     "biometricUnlock": "Desbloquear con biometría",
     "biometricUnlockSubtitle": "Solicitar o desbloqueo ao abrir a aplicación e despois de cinco minutos en segundo plano.",
+    "hideThinking": "Ocultar os detalles do razoamento",
+    "hideThinkingSubtitle": "Non mostrar o razoamento do axente na páxina da sesión.",
     "featureFlags": "Bandeiras de funcións",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Perdeuse a conexión",
       "retryConnection": "Volver tentar a conexión"
     },
+    "goal": {
+      "title": "Obxectivo",
+      "statusActive": "Obxectivo activo",
+      "statusPaused": "Obxectivo en pausa",
+      "statusComplete": "Obxectivo completado",
+      "statusBlocked": "Obxectivo bloqueado",
+      "edit": "Editar obxectivo",
+      "remove": "Eliminar obxectivo",
+      "pause": "Pausar obxectivo",
+      "resume": "Retomar obxectivo",
+      "editPlaceholder": "Describe o obxectivo",
+      "removeConfirmTitle": "Eliminar o obxectivo?",
+      "removeConfirmMessage": "O CLI borra o obxectivo desta sesión.",
+      "updateFailed": "Non se puido actualizar o obxectivo.",
+      "sectionAccessibility": "{{status}}. Obxectivo: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Usados recentemente",
       "couldNotLoadGithubRepositories": "Non se puideron cargar os repositorios de GitHub.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "Toca un cartafol para ver o seu contido.",
       "unsupportedDescription": "Este CLI non pode listar cartafoles. Ao tocar Feito, mantense o cartafol de inicio. Ao tocar Iniciar sesión, a sesión comeza nese cartafol.",
       "unsupportedTitle": "Non se poden listar os cartafoles"
+    },
+    "autoApprove": {
+      "title": "Aprobación automática",
+      "description": "Aproba automaticamente as solicitudes de permiso desta sesión. Despois, as ferramentas execútanse sen preguntar.",
+      "unavailable": "Esta sesión non pode recibir solicitudes de permiso."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Este modelo de transcrición non está dispoñible. Escolle outro en Preferencias.",
     "gatewayModelUnavailableNotice": "Este modelo xa non se ofrece. Toca $t(transcriptionModel.title) para escoller outro.",
     "gatewaySignInRequired": "Inicia sesión para usar a transcrición con Kilo Gateway.",
-    "gatewayNoModel": "Escolle primeiro un modelo de transcrición en Preferencias."
+    "gatewayNoModel": "Escolle primeiro un modelo de transcrición en Preferencias.",
+    "testTitle": "Probar a entrada de voz",
+    "testPlaceholder": "Toca o micrófono e comeza a falar.",
+    "testClear": "Borrar o texto"
   },
   "share": {
     "title": "Compartir en Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Non hai modelos de transcrición",
     "emptyDescription": "Kilo Gateway non ofrece modelos de transcrición neste momento.",
     "loadFailed": "Non se puideron cargar os modelos de transcrición."
+  },
+  "voiceLanguage": {
+    "title": "Idioma de voz",
+    "automatic": "Automático",
+    "loadFailed": "Non se puideron cargar os idiomas que admite este dispositivo.",
+    "emptyTitle": "Non hai idiomas admitidos",
+    "emptyDescription": "O recoñecemento de voz deste dispositivo non informa de ningún idioma admitido."
   }
 }

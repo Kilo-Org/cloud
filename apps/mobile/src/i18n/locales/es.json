@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Si está desactivado, Intro inserta un salto de línea en los campos de mensaje del agente.",
     "biometricUnlock": "Desbloqueo biométrico",
     "biometricUnlockSubtitle": "Se requiere desbloquear la aplicación al iniciarla y después de cinco minutos en segundo plano.",
+    "hideThinking": "Ocultar los detalles del razonamiento",
+    "hideThinkingSubtitle": "No mostrar el razonamiento del agente en la página de la sesión.",
     "featureFlags": "Indicadores de funciones",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -1572,6 +1574,22 @@
       "connectionLost": "Conexión perdida",
       "retryConnection": "Reintentar la conexión"
     },
+    "goal": {
+      "title": "Objetivo",
+      "statusActive": "Objetivo activo",
+      "statusPaused": "Objetivo en pausa",
+      "statusComplete": "Objetivo completado",
+      "statusBlocked": "Objetivo bloqueado",
+      "edit": "Editar objetivo",
+      "remove": "Eliminar objetivo",
+      "pause": "Pausar objetivo",
+      "resume": "Reanudar objetivo",
+      "editPlaceholder": "Describe el objetivo",
+      "removeConfirmTitle": "¿Eliminar el objetivo?",
+      "removeConfirmMessage": "El CLI borra el objetivo de esta sesión.",
+      "updateFailed": "No se pudo actualizar el objetivo.",
+      "sectionAccessibility": "{{status}}. Objetivo: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Usados recientemente",
       "couldNotLoadGithubRepositories": "No se pudieron cargar los repositorios de GitHub.",
@@ -2059,6 +2077,11 @@
       "tapToListHint": "Toca una carpeta para ver su contenido.",
       "unsupportedDescription": "Esta CLI no puede mostrar las carpetas. Al confirmar, se conservará la carpeta de inicio y la sesión empezará en ella.",
       "unsupportedTitle": "No se pueden mostrar las carpetas"
+    },
+    "autoApprove": {
+      "title": "Aprobación automática",
+      "description": "Aprueba automáticamente las solicitudes de permiso de esta sesión. Después, las herramientas se ejecutan sin preguntar.",
+      "unavailable": "Esta sesión no puede recibir solicitudes de permiso."
     }
   },
   "bootstrap": {
@@ -2171,7 +2194,10 @@
     "gatewayModelUnavailable": "Este modelo de transcripción no está disponible. Elige otro en Preferencias.",
     "gatewayModelUnavailableNotice": "Este modelo ya no se ofrece. Toca $t(transcriptionModel.title) para elegir otro.",
     "gatewaySignInRequired": "Inicia sesión para usar la transcripción con Kilo Gateway.",
-    "gatewayNoModel": "Elige primero un modelo de transcripción en Preferencias."
+    "gatewayNoModel": "Elige primero un modelo de transcripción en Preferencias.",
+    "testTitle": "Probar la entrada de voz",
+    "testPlaceholder": "Toca el micrófono y empieza a hablar.",
+    "testClear": "Borrar texto"
   },
   "share": {
     "title": "Compartir en Kilo",
@@ -3055,5 +3081,12 @@
     "emptyTitle": "No hay modelos de transcripción",
     "emptyDescription": "Kilo Gateway no ofrece modelos de transcripción en este momento.",
     "loadFailed": "No se pudieron cargar los modelos de transcripción."
+  },
+  "voiceLanguage": {
+    "title": "Idioma de voz",
+    "automatic": "Automático",
+    "loadFailed": "No se pudieron cargar los idiomas que admite este dispositivo.",
+    "emptyTitle": "No hay idiomas admitidos",
+    "emptyDescription": "El reconocimiento de voz de este dispositivo no informa de ningún idioma admitido."
   }
 }

@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Išjungus šią parinktį, įvesties klavišas agentų žinučių įvesties laukuose įterpia naują eilutę.",
     "biometricUnlock": "Atrakinti naudojant biometrinius duomenis",
     "biometricUnlockSubtitle": "Paleidus programėlę ir jai penkias minutes išbuvus fone, reikia ją atrakinti.",
+    "hideThinking": "Slėpti mąstymo išsamią informaciją",
+    "hideThinkingSubtitle": "Nerodyti agento mąstymo sesijos puslapyje.",
     "featureFlags": "Funkcijų vėliavėlės",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2083,6 +2085,22 @@
       "connectionLost": "Ryšys nutrūko",
       "retryConnection": "Bandyti prisijungti iš naujo"
     },
+    "goal": {
+      "title": "Tikslas",
+      "statusActive": "Aktyvus tikslas",
+      "statusPaused": "Pristabdytas tikslas",
+      "statusComplete": "Tikslas pasiektas",
+      "statusBlocked": "Tikslas užblokuotas",
+      "edit": "Redaguoti tikslą",
+      "remove": "Pašalinti tikslą",
+      "pause": "Pristabdyti tikslą",
+      "resume": "Tęsti tikslą",
+      "editPlaceholder": "Aprašykite tikslą",
+      "removeConfirmTitle": "Pašalinti tikslą?",
+      "removeConfirmMessage": "CLI išvalo šios sesijos tikslą.",
+      "updateFailed": "Nepavyko atnaujinti tikslo.",
+      "sectionAccessibility": "{{status}}. Tikslas: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Neseniai naudota",
       "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų.",
@@ -2575,6 +2593,11 @@
       "tapToListHint": "Bakstelėkite aplanką, kad pamatytumėte jo turinį.",
       "unsupportedDescription": "Ši CLI negali parodyti aplankų. Patvirtinus pasirinkimą, liks paleidimo aplankas. Nauja sesija bus pradėta jame.",
       "unsupportedTitle": "Negalima parodyti aplankų"
+    },
+    "autoApprove": {
+      "title": "Automatinis tvirtinimas",
+      "description": "Automatiškai tvirtinti šios sesijos leidimų užklausas. Tada įrankiai veikia be užklausos.",
+      "unavailable": "Ši sesija negali gauti leidimų užklausų."
     }
   },
   "bootstrap": {
@@ -2687,7 +2710,10 @@
     "gatewayModelUnavailable": "Šis transkribavimo modelis nepasiekiamas. Pasirinkite kitą Nuostatose.",
     "gatewayModelUnavailableNotice": "Šis modelis nebeteikiamas. Palieskite $t(transcriptionModel.title), kad pasirinktumėte kitą.",
     "gatewaySignInRequired": "Prisijunkite, kad naudotumėte transkribavimą per Kilo Gateway.",
-    "gatewayNoModel": "Pirmiausia pasirinkite transkribavimo modelį Nuostatose."
+    "gatewayNoModel": "Pirmiausia pasirinkite transkribavimo modelį Nuostatose.",
+    "testTitle": "Išbandyti balso įvestį",
+    "testPlaceholder": "Bakstelėkite mikrofoną ir pradėkite kalbėti.",
+    "testClear": "Išvalyti tekstą"
   },
   "share": {
     "title": "Bendrinimas su Kilo",
@@ -3078,5 +3104,12 @@
     "emptyTitle": "Nėra transkribavimo modelių",
     "emptyDescription": "Šiuo metu Kilo Gateway neteikia jokių transkribavimo modelių.",
     "loadFailed": "Nepavyko įkelti transkribavimo modelių."
+  },
+  "voiceLanguage": {
+    "title": "Balso kalba",
+    "automatic": "Automatinis",
+    "loadFailed": "Nepavyko įkelti šio įrenginio palaikomų kalbų.",
+    "emptyTitle": "Nėra palaikomų kalbų",
+    "emptyDescription": "Šio įrenginio kalbos atpažinimas nepraneša palaikomų kalbų."
   }
 }

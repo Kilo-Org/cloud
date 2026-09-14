@@ -247,6 +247,8 @@
     "returnSendsMessageSubtitle": "Yoo cufame, furtuun galchii iddoo ergaa ergamaa barreessuu keessatti sarara haaraa galchiti.",
     "biometricUnlock": "Baayoometirikisiin qulfii bani",
     "biometricUnlockSubtitle": "Appilikeeshinichi yeroo jalqabamu fi duubbee keessatti daqiiqaa shan erga turee booda qulfii bani.",
+    "hideThinking": "Ibsa xiinxalaa dhoksi",
+    "hideThinkingSubtitle": "Xiinxala ergamaa fuula turtii irratti hin agarsiisin.",
     "featureFlags": "Albaasa amalaa",
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
@@ -2049,6 +2051,22 @@
       "connectionLost": "Walqabannaan citeera",
       "retryConnection": "Deebi'ii walqabsiisuuf yaali"
     },
+    "goal": {
+      "title": "Kaayyoo",
+      "statusActive": "Kaayyoo sochii qabu",
+      "statusPaused": "Kaayyoo dhaabate",
+      "statusComplete": "Kaayyoon xumurame",
+      "statusBlocked": "Kaayyoon dhorkame",
+      "edit": "Kaayyoo gulaali",
+      "remove": "Kaayyoo balleessi",
+      "pause": "Kaayyoo dhaabi",
+      "resume": "Kaayyoo itti fufi",
+      "editPlaceholder": "Kaayyoo ibsi",
+      "removeConfirmTitle": "Kaayyoo balleessuu?",
+      "removeConfirmMessage": "CLI kaayyoo turtii kanaa haqa.",
+      "updateFailed": "Kaayyoo haaromsuun hin danda'amne.",
+      "sectionAccessibility": "{{status}}. Kaayyoo: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Dhiheenya itti fayyadamte",
       "couldNotLoadGithubRepositories": "Kuusaawwan koodii GitHub fe'uu hin danda'amne.",
@@ -2531,6 +2549,11 @@
       "tapToListHint": "Qabiyyee galmee tarreessuuf galmicha tuqi.",
       "unsupportedDescription": "CLI kun galmeewwan tarreessuu hin danda'u. Xumuri tuquun galmee jalqabaa eega; Turtii jalqabi tuquun achitti jalqaba.",
       "unsupportedTitle": "Galmeewwan tarreessuun hin danda'amu"
+    },
+    "autoApprove": {
+      "title": "Hayyama ofumaan",
+      "description": "Gaaffii hayyama turtii kanaaf ofumaan mirkaneessi. Sana booda meeshaalli gaaffii malee hojjetu.",
+      "unavailable": "Turtiin kun gaaffii hayyama fudhachuu hin danda'u."
     }
   },
   "bootstrap": {
@@ -2643,7 +2666,10 @@
     "gatewayModelUnavailable": "Moodeeli sagalee jijjiiru kun hin jiru. Filannoowwan keessaa kan biroo filadhu.",
     "gatewayModelUnavailableNotice": "Moodeeli kun hin dhiyaatu. Kan biraa filachuuf $t(transcriptionModel.title) tuqi.",
     "gatewaySignInRequired": "Jijjiirraa sagalee Kilo Gateway'tti fayyadamuuf seeni.",
-    "gatewayNoModel": "Dursee Filannoowwan keessatti moodeela sagalee jijjiiru filadhu."
+    "gatewayNoModel": "Dursee Filannoowwan keessatti moodeela sagalee jijjiiru filadhu.",
+    "testTitle": "Galtee sagalee yaali",
+    "testPlaceholder": "Maayikirofoonii tuqiitii dubbachuu jalqabi.",
+    "testClear": "Barruu haqi"
   },
   "share": {
     "title": "Gara Kilo qoodi",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "Moodeeli sagalee jijjiiru hin jiru",
     "emptyDescription": "Kilo Gateway amma moodeela sagalee gara barreeffamaatti jijjiiru hin dhiyeessu.",
     "loadFailed": "Moodeelota sagalee jijjiiru fe'uun hin danda'amne."
+  },
+  "voiceLanguage": {
+    "title": "Afaan sagalee",
+    "automatic": "Ofumaan",
+    "loadFailed": "Afaanota meeshaan kun deeggartu fe'uun hin danda'amne.",
+    "emptyTitle": "Afaan deeggarame hin jiru",
+    "emptyDescription": "Beekumsi dubbii meeshaa kanaa afaan deeggarame hin gabaasu."
   }
 }

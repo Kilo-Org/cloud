@@ -35,7 +35,13 @@ export function showRenamePrompt(currentTitle: string, onRename: (newTitle: stri
   );
 }
 
-export async function copySessionId(sessionId: string) {
+/**
+ * Copies and reports the outcome through the app-root toast. Returns whether
+ * the copy succeeded — a caller inside a full-window Modal (the sheet is one
+ * on Android) gets an invisible toast, so it renders its own inline feedback
+ * from this result.
+ */
+export async function copySessionId(sessionId: string): Promise<boolean> {
   try {
     const copied = await Clipboard.setStringAsync(sessionId);
     if (!copied) {
@@ -43,8 +49,10 @@ export async function copySessionId(sessionId: string) {
     }
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     toast.success(i18n.t('agents.sessionRow.idCopied'));
+    return true;
   } catch {
     toast.error(i18n.t('agents.sessionRow.couldNotCopyId'));
+    return false;
   }
 }
 

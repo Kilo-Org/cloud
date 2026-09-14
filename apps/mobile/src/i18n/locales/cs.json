@@ -2030,6 +2030,22 @@
       "connectionLost": "Připojení přerušeno",
       "retryConnection": "Znovu se připojit"
     },
+    "goal": {
+      "title": "Cíl",
+      "statusActive": "Aktivní cíl",
+      "statusPaused": "Pozastavený cíl",
+      "statusComplete": "Cíl dokončen",
+      "statusBlocked": "Cíl zablokován",
+      "edit": "Upravit cíl",
+      "remove": "Odebrat cíl",
+      "pause": "Pozastavit cíl",
+      "resume": "Obnovit cíl",
+      "editPlaceholder": "Popište cíl",
+      "removeConfirmTitle": "Odebrat cíl?",
+      "removeConfirmMessage": "CLI vymaže cíl této relace.",
+      "updateFailed": "Cíl se nepodařilo aktualizovat.",
+      "sectionAccessibility": "{{status}}. Cíl: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Připojte GitHub v prohlížeči. Pak se sem vraťte a vyberte repozitář.",
       "openGithub": "Otevřít GitHub",
@@ -2629,7 +2645,10 @@
     "gatewayModelUnavailable": "Tento model přepisu není dostupný. Vyberte jiný v Předvolbách.",
     "gatewayModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(transcriptionModel.title) vyberte jiný.",
     "gatewaySignInRequired": "Pro použití přepisu přes Kilo Gateway se přihlaste.",
-    "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách."
+    "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách.",
+    "testTitle": "Otestovat diktování",
+    "testPlaceholder": "Klepněte na mikrofon a začněte mluvit.",
+    "testClear": "Vymazat text"
   },
   "share": {
     "title": "Sdílení do Kilo",
@@ -3020,5 +3039,12 @@
     "emptyTitle": "Žádné modely přepisu",
     "emptyDescription": "Kilo Gateway nyní nenabízí žádné modely přepisu.",
     "loadFailed": "Modely přepisu se nepodařilo načíst."
+  },
+  "voiceLanguage": {
+    "title": "Jazyk diktování",
+    "automatic": "Automaticky",
+    "loadFailed": "Nepodařilo se načíst jazyky, které toto zařízení podporuje.",
+    "emptyTitle": "Žádné podporované jazyky",
+    "emptyDescription": "Rozpoznávání řeči tohoto zařízení nehlásí žádné podporované jazyky."
   }
 }

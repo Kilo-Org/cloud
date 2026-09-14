@@ -2014,6 +2014,22 @@
       "connectionLost": "Connexió perduda",
       "retryConnection": "Torna a provar la connexió"
     },
+    "goal": {
+      "title": "Objectiu",
+      "statusActive": "Objectiu actiu",
+      "statusPaused": "Objectiu en pausa",
+      "statusComplete": "Objectiu completat",
+      "statusBlocked": "Objectiu bloquejat",
+      "edit": "Edita l'objectiu",
+      "remove": "Elimina l'objectiu",
+      "pause": "Posa en pausa l'objectiu",
+      "resume": "Reprèn l'objectiu",
+      "editPlaceholder": "Descriu l'objectiu",
+      "removeConfirmTitle": "Eliminar l'objectiu?",
+      "removeConfirmMessage": "El CLI esborra l'objectiu d'aquesta sessió.",
+      "updateFailed": "No s'ha pogut actualitzar l'objectiu.",
+      "sectionAccessibility": "{{status}}. Objectiu: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Connecta GitHub al navegador i torna aquí per triar un repositori.",
       "openGithub": "Obre GitHub",
@@ -2608,7 +2624,10 @@
     "gatewayModelUnavailable": "Aquest model de transcripció no està disponible. Tria'n un altre a les Preferències.",
     "gatewayModelUnavailableNotice": "Aquest model ja no s'ofereix. Toca $t(transcriptionModel.title) per triar-ne un altre.",
     "gatewaySignInRequired": "Inicia la sessió per utilitzar la transcripció amb Kilo Gateway.",
-    "gatewayNoModel": "Primer tria un model de transcripció a les Preferències."
+    "gatewayNoModel": "Primer tria un model de transcripció a les Preferències.",
+    "testTitle": "Prova el dictat",
+    "testPlaceholder": "Toca el micròfon i comença a parlar.",
+    "testClear": "Esborra el text"
   },
   "share": {
     "title": "Compartir amb Kilo",
@@ -2998,5 +3017,12 @@
     "emptyTitle": "Cap model de transcripció",
     "emptyDescription": "Kilo Gateway no ofereix cap model de transcripció ara mateix.",
     "loadFailed": "No s'han pogut carregar els models de transcripció."
+  },
+  "voiceLanguage": {
+    "title": "Idioma del dictat",
+    "automatic": "Automàtic",
+    "loadFailed": "No s'han pogut carregar els idiomes que admet aquest dispositiu.",
+    "emptyTitle": "Cap idioma admès",
+    "emptyDescription": "El reconeixement de veu d'aquest dispositiu no indica cap idioma admès."
   }
 }

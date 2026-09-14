@@ -1998,6 +1998,22 @@
       "connectionLost": "Konexioa galdu da",
       "retryConnection": "Saiatu berriro konektatzen"
     },
+    "goal": {
+      "title": "Helburua",
+      "statusActive": "Helburu aktiboa",
+      "statusPaused": "Gelditutako helburua",
+      "statusComplete": "Helburua osatuta",
+      "statusBlocked": "Helburua blokeatuta",
+      "edit": "Editatu helburua",
+      "remove": "Kendu helburua",
+      "pause": "Eten helburua",
+      "resume": "Berrekin helburuari",
+      "editPlaceholder": "Deskribatu helburua",
+      "removeConfirmTitle": "Helburua kendu?",
+      "removeConfirmMessage": "CLI-k saio honen helburua ezabatzen du.",
+      "updateFailed": "Ezin izan da helburua eguneratu.",
+      "sectionAccessibility": "{{status}}. Helburua: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Konektatu GitHub zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
       "openGithub": "Ireki GitHub",
@@ -2587,7 +2603,10 @@
     "gatewayModelUnavailable": "Transkripzio-eredu hau ez dago erabilgarri. Hautatu besteren bat Hobespenetan.",
     "gatewayModelUnavailableNotice": "Eredu hau jada ez da eskaintzen. Sakatu $t(transcriptionModel.title) beste bat hautatzeko.",
     "gatewaySignInRequired": "Hasi saioa Kilo Gateway bidezko transkripzioa erabiltzeko.",
-    "gatewayNoModel": "Hautatu lehenik transkripzio-eredu bat Hobespenetan."
+    "gatewayNoModel": "Hautatu lehenik transkripzio-eredu bat Hobespenetan.",
+    "testTitle": "Probatu ahots-sarrera",
+    "testPlaceholder": "Sakatu mikrofonoa eta hasi hitz egiten.",
+    "testClear": "Garbitu testua"
   },
   "share": {
     "title": "Partekatu Kilo-n",
@@ -2976,5 +2995,12 @@
     "emptyTitle": "Ez dago transkripzio-eredurik",
     "emptyDescription": "Kilo Gateway-k ez du transkripzio-eredurik eskaintzen oraintxe.",
     "loadFailed": "Ezin izan dira transkripzio-ereduak kargatu."
+  },
+  "voiceLanguage": {
+    "title": "Ahots-sarreraren hizkuntza",
+    "automatic": "Automatikoa",
+    "loadFailed": "Ezin izan dira gailu honek onartzen dituen hizkuntzak kargatu.",
+    "emptyTitle": "Ez dago hizkuntza onarturik",
+    "emptyDescription": "Gailu honen ahots-ezagutzak ez du onartutako hizkuntzarik jakinarazten."
   }
 }

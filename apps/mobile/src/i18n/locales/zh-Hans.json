@@ -1564,6 +1564,22 @@
       "connectionLost": "连接已断开",
       "retryConnection": "重新连接"
     },
+    "goal": {
+      "title": "目标",
+      "statusActive": "进行中的目标",
+      "statusPaused": "已暂停的目标",
+      "statusComplete": "目标已完成",
+      "statusBlocked": "目标已阻塞",
+      "edit": "编辑目标",
+      "remove": "移除目标",
+      "pause": "暂停目标",
+      "resume": "继续目标",
+      "editPlaceholder": "描述目标",
+      "removeConfirmTitle": "移除目标？",
+      "removeConfirmMessage": "CLI 会清除此会话的目标。",
+      "updateFailed": "无法更新目标。",
+      "sectionAccessibility": "{{status}}。目标：{{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "在浏览器中连接 GitHub，然后返回此处选择仓库。",
       "openGithub": "打开 GitHub",
@@ -2153,7 +2169,10 @@
     "gatewayModelUnavailable": "此转写模型不可用。请在偏好设置中选择其他模型。",
     "gatewayModelUnavailableNotice": "此模型已不再提供。点按$t(transcriptionModel.title)选择其他模型。",
     "gatewaySignInRequired": "登录后可使用 Kilo Gateway 转写。",
-    "gatewayNoModel": "请先在偏好设置中选择转写模型。"
+    "gatewayNoModel": "请先在偏好设置中选择转写模型。",
+    "testTitle": "测试语音输入",
+    "testPlaceholder": "点按麦克风并开始说话。",
+    "testClear": "清除文本"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2976,5 +2995,12 @@
     "emptyTitle": "没有转写模型",
     "emptyDescription": "Kilo Gateway 当前没有提供转写模型。",
     "loadFailed": "无法加载转写模型。"
+  },
+  "voiceLanguage": {
+    "title": "语音输入语言",
+    "automatic": "自动",
+    "loadFailed": "无法加载此设备支持的语言。",
+    "emptyTitle": "没有支持的语言",
+    "emptyDescription": "此设备的语音识别未报告任何支持的语言。"
   }
 }

@@ -1229,6 +1229,7 @@ function sessionFixture(
     WORKER_URL: 'https://worker.example.test',
     NEXTAUTH_SECRET: 'test-secret',
     CALLBACK_QUEUE: callbackQueue,
+    CLOUD_AGENT_REPORT_QUEUE: { send: async () => undefined },
     CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
     CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org_1',
     CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: 'user_1',
@@ -1854,6 +1855,41 @@ describe('SandboxSession orchestration', () => {
         restoreEpochCheck();
         fields.mockRestore();
       }
+    }
+  );
+
+  it.each([
+    ['vercel-small', { vcpus: 2, memory: 4096 }],
+    ['vercel-large', { vcpus: 4, memory: 8192 }],
+  ] as const)(
+    'forwards persisted %s resources through readiness after a session reset',
+    async (sandboxAllocation, resources) => {
+      const fixture = sessionFixture({
+        identity: {
+          sessionId: SESSION_ID,
+          userId: 'user_1',
+          orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        },
+        workspace: {
+          sandboxId: SANDBOX_ID,
+          workspacePath: DIRECTORY,
+          sandboxProvider: 'vercel',
+          sandboxAllocation,
+        },
+      });
+      const signing = deferred<[]>();
+      orchestrationMocks.signedAttachments.mockImplementationOnce(() => signing.promise);
+      await fixture.admit('sized');
+      await fixture.flush();
+      expect(fixture.control.ensureReady).not.toHaveBeenCalled();
+      fixture.reload();
+      await fixture.fireAlarm();
+      expect(fixture.control.ensureReady).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'vercel', resources })
+      );
+      expect(fixture.record('sized')?.state).toBe('accepted');
+      signing.resolve([]);
+      await fixture.flush();
     }
   );
 

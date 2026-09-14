@@ -16,6 +16,7 @@
     }
   },
   "dependencies": {
+    "@kilocode/cloud-agent-sdk": "workspace:*",
     "@kilocode/kilo-chat": "workspace:*",
     "@kilocode/kiloclaw-instance-tiers": "workspace:*",
     "@kilocode/kiloclaw-secret-catalog": "workspace:*",

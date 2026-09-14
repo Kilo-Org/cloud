@@ -2014,6 +2014,22 @@
       "connectionLost": "Conexiune pierdută",
       "retryConnection": "Încearcă din nou conectarea"
     },
+    "goal": {
+      "title": "Obiectiv",
+      "statusActive": "Obiectiv activ",
+      "statusPaused": "Obiectiv în pauză",
+      "statusComplete": "Obiectiv finalizat",
+      "statusBlocked": "Obiectiv blocat",
+      "edit": "Editează obiectivul",
+      "remove": "Elimină obiectivul",
+      "pause": "Pune obiectivul pe pauză",
+      "resume": "Reia obiectivul",
+      "editPlaceholder": "Descrie obiectivul",
+      "removeConfirmTitle": "Elimini obiectivul?",
+      "removeConfirmMessage": "CLI șterge obiectivul acestei sesiuni.",
+      "updateFailed": "Obiectivul nu a putut fi actualizat.",
+      "sectionAccessibility": "{{status}}. Obiectiv: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Conectează contul GitHub în browser, apoi revino aici pentru a alege un depozit.",
       "openGithub": "Deschide GitHub",
@@ -2608,7 +2624,10 @@
     "gatewayModelUnavailable": "Acest model de transcriere nu este disponibil. Alege altul în Preferințe.",
     "gatewayModelUnavailableNotice": "Acest model nu mai este oferit. Atinge $t(transcriptionModel.title) pentru a alege altul.",
     "gatewaySignInRequired": "Autentifică-te pentru a folosi transcrierea cu Kilo Gateway.",
-    "gatewayNoModel": "Alege mai întâi un model de transcriere în Preferințe."
+    "gatewayNoModel": "Alege mai întâi un model de transcriere în Preferințe.",
+    "testTitle": "Testează dictarea",
+    "testPlaceholder": "Atinge microfonul și începe să vorbești.",
+    "testClear": "Șterge textul"
   },
   "share": {
     "title": "Distribuire către Kilo",
@@ -2998,5 +3017,12 @@
     "emptyTitle": "Nu există modele de transcriere",
     "emptyDescription": "Kilo Gateway nu oferă modele de transcriere în acest moment.",
     "loadFailed": "Nu s-au putut încărca modelele de transcriere."
+  },
+  "voiceLanguage": {
+    "title": "Limba dictării",
+    "automatic": "Automat",
+    "loadFailed": "Limbile acceptate de acest dispozitiv nu au putut fi încărcate.",
+    "emptyTitle": "Nicio limbă acceptată",
+    "emptyDescription": "Recunoașterea vocală a acestui dispozitiv nu raportează nicio limbă acceptată."
   }
 }

@@ -2046,6 +2046,22 @@
       "connectionLost": "Il-konnessjoni ntilfet",
       "retryConnection": "Erġa' pprova taqbad"
     },
+    "goal": {
+      "title": "Għan",
+      "statusActive": "Għan attiv",
+      "statusPaused": "Għan imwaqqaf",
+      "statusComplete": "Għan komplut",
+      "statusBlocked": "Għan imblukkat",
+      "edit": "Editja l-għan",
+      "remove": "Neħħi l-għan",
+      "pause": "Waqqaf l-għan",
+      "resume": "Ibda l-għan mill-ġdid",
+      "editPlaceholder": "Iddeskrivi l-għan",
+      "removeConfirmTitle": "Neħħi l-għan?",
+      "removeConfirmMessage": "Il-CLI iħassar l-għan ta' din is-sessjoni.",
+      "updateFailed": "Ma setax jiġi aġġornat l-għan.",
+      "sectionAccessibility": "{{status}}. Għan: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Qabbad GitHub fil-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju.",
       "openGithub": "Iftaħ GitHub",
@@ -2650,7 +2666,10 @@
     "gatewayModelUnavailable": "Dan il-mudell ta' traskrizzjoni mhux disponibbli. Agħżel ieħor fil-Preferenzi.",
     "gatewayModelUnavailableNotice": "Dan il-mudell m'għadux disponibbli. Agħfas $t(transcriptionModel.title) biex tagħżel ieħor.",
     "gatewaySignInRequired": "Idħol biex tuża t-traskrizzjoni permezz ta' Kilo Gateway.",
-    "gatewayNoModel": "L-ewwel agħżel mudell ta' traskrizzjoni fil-Preferenzi."
+    "gatewayNoModel": "L-ewwel agħżel mudell ta' traskrizzjoni fil-Preferenzi.",
+    "testTitle": "Ittestja d-dħul bil-vuċi",
+    "testPlaceholder": "Ikketti l-mikrofonu u ibda tkellem.",
+    "testClear": "Neħħi t-test"
   },
   "share": {
     "title": "Aqsam ma' Kilo",
@@ -3042,5 +3061,12 @@
     "emptyTitle": "L-ebda mudell ta' traskrizzjoni",
     "emptyDescription": "Kilo Gateway bħalissa ma joffri l-ebda mudell ta' traskrizzjoni.",
     "loadFailed": "Ma setgħetx titgħabba l-mudelli ta' traskrizzjoni."
+  },
+  "voiceLanguage": {
+    "title": "Lingwa tad-dħul bil-vuċi",
+    "automatic": "Awtomatika",
+    "loadFailed": "Il-lingwi li jappoġġja dan l-apparat ma setgħux jitgħabbu.",
+    "emptyTitle": "L-ebda lingwa appoġġjata",
+    "emptyDescription": "Ir-rikonoxximent tal-kitba ta' dan l-apparat ma jirrapporta l-ebda lingwa appoġġjata."
   }
 }

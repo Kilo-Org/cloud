@@ -1998,6 +1998,22 @@
       "connectionLost": "সংযোগ বিচ্ছিন্ন",
       "retryConnection": "আবার সংযোগের চেষ্টা করুন"
     },
+    "goal": {
+      "title": "লক্ষ্য",
+      "statusActive": "সক্রিয় লক্ষ্য",
+      "statusPaused": "বিরত থাকা লক্ষ্য",
+      "statusComplete": "লক্ষ্য সম্পন্ন",
+      "statusBlocked": "লক্ষ্য অবরুদ্ধ",
+      "edit": "লক্ষ্য সম্পাদনা করুন",
+      "remove": "লক্ষ্য সরান",
+      "pause": "লক্ষ্য বিরত করুন",
+      "resume": "লক্ষ্য পুনরায় শুরু করুন",
+      "editPlaceholder": "লক্ষ্য বর্ণনা করুন",
+      "removeConfirmTitle": "লক্ষ্য সরাবেন?",
+      "removeConfirmMessage": "CLI এই সেশনের লক্ষ্য মুছে দেবে।",
+      "updateFailed": "লক্ষ্য আপডেট করা যায়নি।",
+      "sectionAccessibility": "{{status}}। লক্ষ্য: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "আপনার ব্রাউজারে GitHub সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
       "openGithub": "GitHub খুলুন",
@@ -2587,7 +2603,10 @@
     "gatewayModelUnavailable": "কথা থেকে লেখার এই মডেলটি পাওয়া যাচ্ছে না। পছন্দের সেটিংস থেকে আরেকটি বেছে নিন।",
     "gatewayModelUnavailableNotice": "এই মডেলটি আর দেওয়া হয় না। অন্য একটি বেছে নিতে $t(transcriptionModel.title) স্পর্শ করুন।",
     "gatewaySignInRequired": "Kilo Gateway দিয়ে কথা থেকে লেখা ব্যবহার করতে সাইন ইন করুন।",
-    "gatewayNoModel": "প্রথমে পছন্দের সেটিংস থেকে কথা থেকে লেখার একটি মডেল বেছে নিন।"
+    "gatewayNoModel": "প্রথমে পছন্দের সেটিংস থেকে কথা থেকে লেখার একটি মডেল বেছে নিন।",
+    "testTitle": "ভয়েস ইনপুট পরীক্ষা করুন",
+    "testPlaceholder": "মাইক্রোফোনে ট্যাপ করুন এবং কথা বলা শুরু করুন।",
+    "testClear": "লেখা মুছুন"
   },
   "share": {
     "title": "Kilo-তে শেয়ার",
@@ -2976,5 +2995,12 @@
     "emptyTitle": "কথা থেকে লেখার কোনো মডেল নেই",
     "emptyDescription": "Kilo Gateway এই মুহূর্তে কথা থেকে লেখার কোনো মডেল দিচ্ছে না।",
     "loadFailed": "কথা থেকে লেখার মডেল লোড করা যায়নি।"
+  },
+  "voiceLanguage": {
+    "title": "ভয়েস ইনপুটের ভাষা",
+    "automatic": "স্বয়ংক্রিয়",
+    "loadFailed": "এই ডিভাইস সমর্থন করে এমন ভাষাগুলি লোড করা যায়নি।",
+    "emptyTitle": "কোনও সমর্থিত ভাষা নেই",
+    "emptyDescription": "এই ডিভাইসের বাক্‌ শনাক্তকরণ কোনও সমর্থিত ভাষা জানায় না।"
   }
 }

@@ -1998,6 +1998,22 @@
       "connectionLost": "ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ",
       "retryConnection": "ପୁଣି ସଂଯୋଗ କରନ୍ତୁ"
     },
+    "goal": {
+      "title": "ଲକ୍ଷ୍ୟ",
+      "statusActive": "ସକ୍ରିୟ ଲକ୍ଷ୍ୟ",
+      "statusPaused": "ବିରତ ଲକ୍ଷ୍ୟ",
+      "statusComplete": "ଲକ୍ଷ୍ୟ ସମ୍ପୂର୍ଣ୍ଣ",
+      "statusBlocked": "ଲକ୍ଷ୍ୟ ଅବରୋଧିତ",
+      "edit": "ଲକ୍ଷ୍ୟ ସମ୍ପାଦନ କରନ୍ତୁ",
+      "remove": "ଲକ୍ଷ୍ୟ ହଟାନ୍ତୁ",
+      "pause": "ଲକ୍ଷ୍ୟ ବିରତ କରନ୍ତୁ",
+      "resume": "ଲକ୍ଷ୍ୟ ପୁନଃ ଆରମ୍ଭ କରନ୍ତୁ",
+      "editPlaceholder": "ଲକ୍ଷ୍ୟ ବର୍ଣ୍ଣନା କରନ୍ତୁ",
+      "removeConfirmTitle": "ଲକ୍ଷ୍ୟ ହଟାଇବେ?",
+      "removeConfirmMessage": "CLI ଏହି ସେସନର ଲକ୍ଷ୍ୟ ଲିଭାଇଦିଏ।",
+      "updateFailed": "ଲକ୍ଷ୍ୟ ଅପଡେଟ୍ କରାଯାଇପାରିଲା ନାହିଁ।",
+      "sectionAccessibility": "{{status}}। ଲକ୍ଷ୍ୟ: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitHub ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
       "openGithub": "GitHub ଖୋଲନ୍ତୁ",
@@ -2587,7 +2603,10 @@
     "gatewayModelUnavailable": "ଏହି ଲେଖା ବଦଳ ମଡେଲ୍ ଉପଲବ୍ଧ ନୁହେଁ। ପସନ୍ଦରେ ଅନ୍ୟ ଏକ ମଡେଲ୍ ବାଛନ୍ତୁ।",
     "gatewayModelUnavailableNotice": "ଏହି ମଡେଲ୍ ଆଉ ଦିଆଯାଉନାହିଁ। ଅନ୍ୟଟିଏ ବାଛିବାକୁ $t(transcriptionModel.title) ଟ୍ୟାପ୍ କରନ୍ତୁ।",
     "gatewaySignInRequired": "Kilo Gateway ଲେଖା ବଦଳ ବ୍ୟବହାର ପାଇଁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
-    "gatewayNoModel": "ପ୍ରଥମେ ପସନ୍ଦରେ ଏକ ଲେଖା ବଦଳ ମଡେଲ୍ ବାଛନ୍ତୁ।"
+    "gatewayNoModel": "ପ୍ରଥମେ ପସନ୍ଦରେ ଏକ ଲେଖା ବଦଳ ମଡେଲ୍ ବାଛନ୍ତୁ।",
+    "testTitle": "କହି ଲେଖିବା ପରୀକ୍ଷା କରନ୍ତୁ",
+    "testPlaceholder": "ମାଇକ୍ରୋଫୋନ୍‌ରେ ଟ୍ୟାପ୍ କରନ୍ତୁ ଏବଂ କହିବା ଆରମ୍ଭ କରନ୍ତୁ।",
+    "testClear": "ଲେଖା ସଫା କରନ୍ତୁ"
   },
   "share": {
     "title": "Kilo କୁ ସେୟାର",
@@ -2976,5 +2995,12 @@
     "emptyTitle": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର କୌଣସି ମଡେଲ୍ ନାହିଁ",
     "emptyDescription": "Kilo Gateway ବର୍ତ୍ତମାନ କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର କୌଣସି ମଡେଲ୍ ଦେଉନାହିଁ।",
     "loadFailed": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର ମଡେଲ୍ ଗୁଡ଼ିକୁ ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ।"
+  },
+  "voiceLanguage": {
+    "title": "କହି ଲେଖିବାର ଭାଷା",
+    "automatic": "ସ୍ୱୟଂଚାଳିତ",
+    "loadFailed": "ଏହି ଡିଭାଇସ୍ ସମର୍ଥନ କରୁଥିବା ଭାଷାଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "emptyTitle": "କୌଣସି ସମର୍ଥିତ ଭାଷା ନାହିଁ",
+    "emptyDescription": "ଏହି ଡିଭାଇସ୍‌ର ବାକ୍ ଚିହ୍ନଟ କୌଣସି ସମର୍ଥିତ ଭାଷା ଜଣାଏ ନାହିଁ।"
   }
 }

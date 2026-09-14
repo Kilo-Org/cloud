@@ -1998,6 +1998,22 @@
       "connectionLost": "Muunganisho umekatika",
       "retryConnection": "Jaribu kuunganisha tena"
     },
+    "goal": {
+      "title": "Lengo",
+      "statusActive": "Lengo amilifu",
+      "statusPaused": "Lengo lililositishwa",
+      "statusComplete": "Lengo limekamilika",
+      "statusBlocked": "Lengo limezuiwa",
+      "edit": "Hariri lengo",
+      "remove": "Ondoa lengo",
+      "pause": "Sitisha lengo",
+      "resume": "Endeleza lengo",
+      "editPlaceholder": "Eleza lengo",
+      "removeConfirmTitle": "Ondoa lengo?",
+      "removeConfirmMessage": "CLI hufuta lengo la kikao hiki.",
+      "updateFailed": "Lengo halikuweza kusasishwa.",
+      "sectionAccessibility": "{{status}}. Lengo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Unganisha GitHub kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
       "openGithub": "Fungua GitHub",
@@ -2587,7 +2603,10 @@
     "gatewayModelUnavailable": "Modeli hii ya unukuzi haipatikani. Chagua nyingine katika Mapendeleo.",
     "gatewayModelUnavailableNotice": "Modeli hii haitolewi tena. Gusa $t(transcriptionModel.title) kuchagua nyingine.",
     "gatewaySignInRequired": "Ingia ili utumie unukuzi wa Kilo Gateway.",
-    "gatewayNoModel": "Kwanza chagua modeli ya unukuzi katika Mapendeleo."
+    "gatewayNoModel": "Kwanza chagua modeli ya unukuzi katika Mapendeleo.",
+    "testTitle": "Jaribu kuingiza kwa sauti",
+    "testPlaceholder": "Gusa maikrofoni na anza kuzungumza.",
+    "testClear": "Futa maandishi"
   },
   "share": {
     "title": "Kushiriki kwenye Kilo",
@@ -2976,5 +2995,12 @@
     "emptyTitle": "Hakuna modeli za unukuzi",
     "emptyDescription": "Kilo Gateway haina modeli za unukuzi kwa sasa.",
     "loadFailed": "Imeshindikana kupakia modeli za unukuzi."
+  },
+  "voiceLanguage": {
+    "title": "Lugha ya kuingiza kwa sauti",
+    "automatic": "Kiotomatiki",
+    "loadFailed": "Imeshindwa kupakia lugha zinazoauniwa na kifaa hiki.",
+    "emptyTitle": "Hakuna lugha zinazoauniwa",
+    "emptyDescription": "Utambuzi wa usemi wa kifaa hiki hauripoti lugha yoyote inayoauniwa."
   }
 }

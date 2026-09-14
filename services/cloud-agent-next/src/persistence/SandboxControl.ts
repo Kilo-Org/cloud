@@ -40,6 +40,8 @@ import {
   vercelSandboxResourcesSchema,
   type VercelSandboxResources,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import { mintWorktreeStateGrant } from '../sandbox-control/worktree-state-grant.js';
+import { worktreeStateEndpointUrl, worktreeStateIdentitySchema } from '../shared/worktree-state.js';
 import { z } from 'zod';
 import type { Env } from '../types.js';
 import { resolveSecret } from '../auth.js';
@@ -573,6 +575,12 @@ export class SandboxControl extends DurableObject<Env> {
     promise: Promise<AllocationRecord>;
   } | null = null;
   private vercelLocator: VercelProviderLocator | undefined;
+  /**
+   * Resolved once per instance: the signing secret is needed by both the
+   * diagnostic launch env and the worktree-state grant, and a stalled lookup
+   * must not be paid for twice on the session-delivery path.
+   */
+  private signingSecretLookup: Promise<string | null> | null = null;
   private readonly deletingWorktrees = new Set<string>();
   private exclusiveDeletionWorktreeId: string | undefined;
   private runtimeDeleted = false;
@@ -1490,6 +1498,9 @@ export class SandboxControl extends DurableObject<Env> {
     input: Parameters<SandboxControl['ensureReady']>[0]
   ): Promise<SandboxControlStatus & { attachment?: SessionAttachPayload }> {
     await this.ensureOperationalInitialized();
+    // Scope the memoized lookup to this pass so a transient failure is retried
+    // on the next one rather than disabling the grants for the whole instance.
+    this.signingSecretLookup = null;
     this.assertWorktreeAdmission(input.worktreeId);
     const acquisition =
       input.acquisition === undefined
@@ -1762,7 +1773,11 @@ export class SandboxControl extends DurableObject<Env> {
       }
       return this.statusForAllocation(current, this.allocationIncarnationOf(current));
     });
-    return { ...status, attachment };
+    // Decorated here rather than during credential preparation: the grant is
+    // only read once the wrapper is attached, so minting it must not sit in
+    // front of the sandbox launch.
+    const worktreeState = await this.worktreeStateAttachment(metadata);
+    return { ...status, attachment: worktreeState ? { ...attachment, worktreeState } : attachment };
   }
 
   private async acquireCanonicalAllocation(
@@ -3489,15 +3504,47 @@ export class SandboxControl extends DurableObject<Env> {
     return billing;
   }
 
+  private signingSecret(): Promise<string | null> {
+    this.signingSecretLookup ??= withTimeout(
+      resolveSecret(this.env.NEXTAUTH_SECRET),
+      1_000,
+      'Signing secret lookup timed out'
+    ).catch(() => null);
+    return this.signingSecretLookup;
+  }
+
+  /**
+   * Endpoint and grant the wrapper uses to persist this worktree's uncommitted
+   * changes and put them back on a rebuilt sandbox. Absent when the worker
+   * cannot issue one, which leaves the wrapper on its prior behaviour.
+   */
+  private async worktreeStateAttachment(
+    metadata: SessionMetadata
+  ): Promise<SessionAttachPayload['worktreeState']> {
+    const workerUrl = this.env.WORKER_URL;
+    if (!workerUrl) return undefined;
+    const secret = await this.signingSecret();
+    if (!secret) return undefined;
+    const parsed = worktreeStateIdentitySchema.safeParse({
+      userId: metadata.identity.userId,
+      scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
+    });
+    if (!parsed.success) return undefined;
+    try {
+      return {
+        url: worktreeStateEndpointUrl(workerUrl, parsed.data),
+        grant: mintWorktreeStateGrant(parsed.data, secret),
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
   private async wrapperLaunchEnv(
     credential: string,
     allocationId: string
   ): Promise<Record<string, string>> {
-    const signingSecret = await withTimeout(
-      resolveSecret(this.env.NEXTAUTH_SECRET),
-      1_000,
-      'Diagnostic signing secret lookup timed out'
-    ).catch(() => null);
+    const signingSecret = await this.signingSecret();
     const workloadCgroup = (this.env as { CONTROL_WORKLOAD_CGROUP?: unknown })
       .CONTROL_WORKLOAD_CGROUP;
     const launchEnv = buildControlWrapperLaunchEnv({

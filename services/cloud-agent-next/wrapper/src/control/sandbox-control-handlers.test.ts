@@ -47,6 +47,11 @@ import {
   fenceDirectoryOperations,
   resetDirectoryOperationState,
 } from './worktree-operations';
+import {
+  rememberWorktreeStateEndpoint,
+  resetWorktreeStateEndpoints,
+  worktreeStateEndpointFor,
+} from './worktree-state-endpoints';
 import { KILO_CONTROL_REQUEST_TIMEOUT_MS } from './sandbox-control-runtime';
 import {
   ControlTerminalRuntimeError,
@@ -264,6 +269,7 @@ const promptPayload = {
 beforeEach(() => {
   resetSessionDirectoryState();
   resetDirectoryOperationState();
+  resetWorktreeStateEndpoints();
   rememberAttachedRoot(session.kiloSessionId, session.directory);
   homeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'control-handlers-test-'));
 });
@@ -2371,6 +2377,41 @@ describe('production worktree deletion routes', () => {
     }
   });
 
+  it('discards the stored worktree state when the worktree itself is deleted', async () => {
+    const filesystem = protectCheckout();
+    const endpoint = { url: 'https://worker.test/worktree-state/usr/w', grant: 'grant' };
+    rememberWorktreeStateEndpoint(directory, endpoint);
+    rememberWorktreeStateEndpoint(siblingDirectory, { ...endpoint, grant: 'sibling' });
+    const first = identity(1);
+    rememberAttachedRoot(first.kiloSessionId, first.directory);
+    const discarded: Array<{ url: string; grant: string }> = [];
+    const handlerDeps = deps(
+      {
+        sessions: [{ kiloSessionId: first.kiloSessionId, lastActivityAt: 100 }],
+        discardWorktreeState: async target => {
+          discarded.push({ url: target.url, grant: target.grant });
+          return true;
+        },
+      },
+      first
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Expected worktree runtimes');
+    runtimes.get = () => undefined;
+    runtimes.deleteDirectory = async () => {};
+    try {
+      expect(
+        await handleControlRequest('worktree.delete', undefined, input, handlerDeps)
+      ).toMatchObject({ ok: true });
+      expect(discarded).toEqual([endpoint]);
+      // A sibling worktree keeps its own capture.
+      expect(worktreeStateEndpointFor(directory)).toBeUndefined();
+      expect(worktreeStateEndpointFor(siblingDirectory)).toMatchObject({ grant: 'sibling' });
+    } finally {
+      filesystem.restore();
+    }
+  });
+
   it('idempotently prepares and deletes an absent runtime without global lookup, startup, or credentials', async () => {
     const filesystem = protectCheckout();
     const first = identity(1);
@@ -3915,6 +3956,42 @@ describe('control finalization and compact', () => {
     },
     20_000
   );
+
+  it('captures the worktree before reporting a turn, so the idle stop cannot outrun it', async () => {
+    const endpoint = { url: 'https://worker.test/worktree-state/usr/w', grant: 'grant' };
+    rememberWorktreeStateEndpoint(session.directory, endpoint);
+    const order: string[] = [];
+    const captures: Array<{ directory: string; url: string }> = [];
+    const handlerDeps = deps({
+      captureWorktreeState: async options => {
+        order.push('capture');
+        captures.push({ directory: options.directory, url: options.endpoint.url });
+        return { status: 'captured', bytes: 128, files: 1 };
+      },
+      emitSessionEvent: (_session, event) => order.push(event.type),
+    });
+    expect(
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+    ).toMatchObject({ ok: true });
+    await waitForTasks(handlerDeps);
+    expect(captures).toEqual([{ directory: session.directory, url: endpoint.url }]);
+    expect(order.indexOf('capture')).toBeLessThan(order.indexOf('session.message.outcome'));
+  });
+
+  it('skips the capture when the worktree was never granted an endpoint', async () => {
+    let called = false;
+    const handlerDeps = deps({
+      captureWorktreeState: async () => {
+        called = true;
+        return { status: 'skipped', reason: 'absent' };
+      },
+    });
+    expect(
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+    ).toMatchObject({ ok: true });
+    await waitForTasks(handlerDeps);
+    expect(called).toBe(false);
+  });
 
   it('finishes an in-flight auto-commit, waits for a new seal, then re-commits the enlarged set', async () => {
     const commits: Array<PromiseWithResolvers<{ success: boolean }>> = [];

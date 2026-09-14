@@ -64,6 +64,7 @@ import {
   RUNTIME_PROXY_ATTESTATION_HEADER,
   type RuntimeProxyAttestationAudience,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
+import { registerWorktreeStateRoutes } from './sandbox-control/worktree-state-routes.js';
 
 const app = new Hono<HonoContext>();
 
@@ -281,6 +282,7 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 }
 
 registerControlLogRoutes(app);
+registerWorktreeStateRoutes(app);
 
 app.post('/internal/sandbox-control/seed', async (c: Context<HonoContext>) => {
   const unauthorized = requireInternalApi(c);

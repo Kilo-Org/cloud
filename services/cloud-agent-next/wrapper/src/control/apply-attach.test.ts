@@ -381,6 +381,61 @@ describe('applySessionAttach', () => {
       expect((await runGit(['rev-parse', 'HEAD'], directory)).stdout.trim()).toBe(commit);
     });
 
+    it('restores the previous sandbox uncommitted work into a freshly bootstrapped checkout', async () => {
+      const restores: Array<{ directory: string; url: string; grant: string }> = [];
+      const worktreeState = { url: 'https://worker.test/worktree-state/usr/w', grant: 'g' };
+      const stateDeps: ApplyAttachDeps = {
+        ...deps,
+        restoreWorktreeState: async options => {
+          restores.push({
+            directory: options.directory,
+            url: options.endpoint.url,
+            grant: options.endpoint.grant,
+          });
+          fs.writeFileSync(path.join(options.directory, 'recovered.txt'), 'rebuilt work');
+          return { status: 'restored', files: 1 };
+        },
+      };
+      expect(
+        (
+          await applySessionAttach(
+            { ...session, directory },
+            { ...payload, worktreeState },
+            stateDeps
+          )
+        ).ok
+      ).toBe(true);
+      expect(restores).toEqual([{ directory, url: worktreeState.url, grant: worktreeState.grant }]);
+      expect(fs.readFileSync(path.join(directory, 'recovered.txt'), 'utf8')).toBe('rebuilt work');
+
+      // A warm checkout still holds the work, so nothing is replayed onto it.
+      expect(
+        (
+          await applySessionAttach(
+            { ...siblingSession, directory },
+            { ...payload, worktreeState },
+            stateDeps
+          )
+        ).ok
+      ).toBe(true);
+      expect(restores).toHaveLength(1);
+    });
+
+    it('attaches successfully when no worktree state endpoint was granted', async () => {
+      let called = false;
+      const stateDeps: ApplyAttachDeps = {
+        ...deps,
+        restoreWorktreeState: async () => {
+          called = true;
+          return { status: 'skipped', reason: 'absent' };
+        },
+      };
+      expect((await applySessionAttach({ ...session, directory }, payload, stateDeps)).ok).toBe(
+        true
+      );
+      expect(called).toBe(false);
+    });
+
     it('does not switch a warm sibling away from a user-selected branch or discard edits', async () => {
       expect((await applySessionAttach({ ...session, directory }, payload, deps)).ok).toBe(true);
       expect((await runGit(['checkout', '-b', 'user-selected'], directory)).exitCode).toBe(0);

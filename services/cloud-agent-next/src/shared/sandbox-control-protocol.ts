@@ -498,6 +498,17 @@ export const sessionAttachPayloadSchema = z
       })
       .strict()
       .optional(),
+    /**
+     * Endpoint and grant for the durable capture of this worktree's uncommitted
+     * changes, so a rebuilt sandbox can restore them instead of discarding them.
+     */
+    worktreeState: z
+      .object({
+        url: z.string().min(1).max(4096),
+        grant: z.string().min(1).max(4096),
+      })
+      .strict()
+      .optional(),
     env: z.record(z.string().max(256), z.string().max(8192)).optional(),
     setupCommands: z.array(z.string().max(500)).max(20).optional(),
     runtimeIsolation: z.enum(['per-session']).optional(),

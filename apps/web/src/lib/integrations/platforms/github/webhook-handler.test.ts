@@ -611,6 +611,44 @@ describe('handleGitHubWebhook', () => {
     expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
   });
 
+  it('does not record a completion receipt when the dispatched response is not ok', async () => {
+    mockIsSharedGitHubInstallation.mockResolvedValue(true);
+    mockHandleInstallationDeleted.mockResolvedValueOnce(
+      Response.json({ error: 'upstream failure' }, { status: 502 })
+    );
+    const payload = { action: 'deleted', installation: { id: 98765 } };
+
+    const failed = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+    const retried = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(failed.status).toBe(502);
+    expect(await retried.json()).toEqual({ message: 'Installation removed' });
+    expect(mockHandleInstallationDeleted).toHaveBeenCalledTimes(2);
+    expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
+  });
+
+  it('records a completion receipt when the dispatched response is ok', async () => {
+    mockIsSharedGitHubInstallation.mockResolvedValue(true);
+    mockHandleInstallationDeleted.mockResolvedValueOnce(
+      Response.json({ message: 'Installation removed' }, { status: 200 })
+    );
+    const payload = { action: 'deleted', installation: { id: 98765 } };
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
+  });
+
   it('dispatches lifecycle when a canonical receipt cannot be resolved', async () => {
     mockIsSharedGitHubInstallation.mockResolvedValue(true);
     mockRecordSharedGitHubInstallationDelivery.mockResolvedValue('missing_canonical');

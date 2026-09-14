@@ -275,10 +275,42 @@ describe('GitHub installation persistence', () => {
       })
       .where(eq(github_installation_webhook_receipts.delivery_id, 'delivery-concurrent-reclaim'));
 
-    const results = await Promise.all([
+    // Hold the receipt row open so both contenders fully acquire and then
+    // block on the same row, guaranteeing genuine contention on the reclaim
+    // update rather than incidental serialization.
+    let releaseHolder: (() => void) | undefined;
+    const holderRelease = new Promise<void>(resolve => {
+      releaseHolder = resolve;
+    });
+    let reportHolderPid: ((pid: number) => void) | undefined;
+    const holderReady = new Promise<number>(resolve => {
+      reportHolderPid = resolve;
+    });
+    const holder = db.transaction(async tx => {
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      await tx.execute(
+        sql`SELECT id FROM github_installation_webhook_receipts WHERE delivery_id = ${'delivery-concurrent-reclaim'} FOR UPDATE`
+      );
+      reportHolderPid?.(backend.rows[0]!.pid);
+      await holderRelease;
+    });
+
+    const holderPid = await githubTestTimeout(holderReady, 'reclaim holder readiness');
+    const contenders = [
       claimGitHubInstallationDelivery(input),
       claimGitHubInstallationDelivery(input),
-    ]);
+    ];
+    try {
+      await githubTestTimeout(
+        waitForBlockedGitHubDeliveryLock(holderPid, 2),
+        'reclaim contender blocking'
+      );
+    } finally {
+      releaseHolder?.();
+    }
+    await holder;
+
+    const results = await Promise.all(contenders);
     expect(results.filter(result => result.status === 'claimed')).toHaveLength(1);
     expect(results.filter(result => result.status === 'processing')).toHaveLength(1);
   });
@@ -1388,6 +1420,26 @@ async function waitForBlockedGitHubOwnerLock(
     await new Promise<void>(resolve => setImmediate(resolve));
   }
   throw new Error(`Expected contender blocked on advisory lock ${expectedLockKey}`);
+}
+
+async function waitForBlockedGitHubDeliveryLock(
+  _holderPid: number,
+  expected: number
+): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    // Count every backend blocked while updating the receipt row. The first
+    // contender blocks on the holder's row lock and the second queues behind
+    // the first, so only one directly lists the holder in pg_blocking_pids.
+    const result = await db.execute<{ blocked: number }>(sql`
+      SELECT count(*)::int AS blocked FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND wait_event_type = 'Lock'
+        AND query LIKE '%github_installation_webhook_receipts%'
+    `);
+    if ((result.rows[0]?.blocked ?? 0) >= expected) return;
+    await new Promise<void>(resolve => setImmediate(resolve));
+  }
+  throw new Error('Expected delivery-claim contenders blocked on the receipt row');
 }
 
 async function githubTestTimeout<T>(promise: Promise<T>, label: string): Promise<T> {

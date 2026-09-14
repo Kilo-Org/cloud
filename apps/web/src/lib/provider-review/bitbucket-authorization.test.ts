@@ -205,6 +205,36 @@ describe('fetchBitbucketWorkspaceAccessToken — release contract', () => {
     expect(result.status).toBe('temporarily_unavailable');
   });
 
+  it('enforces the byte cap while streaming a chunked release body', async () => {
+    // A chunked response carries no Content-Length, so the header guard cannot
+    // fire: the cap must be counted per chunk and the reader cancelled on
+    // breach, instead of buffering the whole body before the size check.
+    const chunkSize = 4096;
+    const chunk = new Uint8Array(chunkSize).fill(0x20);
+    let pulled = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        if (pulled > 64) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(chunk);
+      },
+    });
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(stream, { status: 200, headers: { 'content-type': 'application/json' } })
+    );
+
+    const result = await fetchBitbucketWorkspaceAccessToken(releaseInput);
+
+    expect(result.status).toBe('temporarily_unavailable');
+    // 16 KiB cap at 4 KiB per chunk trips on the fifth chunk; buffering the
+    // whole 256 KiB body would pull all 64.
+    expect(pulled).toBeLessThanOrEqual(6);
+  });
+
   it('degrades a non-2xx release response to temporarily_unavailable', async () => {
     fetchMock.mockImplementation(async () => jsonResponse({ error: 'unauthorized' }, 401));
 

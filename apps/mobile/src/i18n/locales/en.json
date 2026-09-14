@@ -232,6 +232,8 @@
     "biometricUnlockSubtitle": "Unlock at launch and after five minutes in the background.",
     "autoExpandThinking": "Auto expand thinking",
     "autoExpandThinkingSubtitle": "Show the agent's thinking expanded when it finishes.",
+    "hideThinking": "Hide thinking details",
+    "hideThinkingSubtitle": "Don't show the agent's thinking on the session page.",
     "keepScreenOn": "Keep screen on while on session page",
     "keepScreenOnSubtitle": "Hold the screen awake while the session is working.",
     "appearance": "Appearance",
@@ -2057,6 +2059,22 @@
       "connectionLost": "Connection lost",
       "retryConnection": "Retry connection"
     },
+    "goal": {
+      "title": "Goal",
+      "statusActive": "Active goal",
+      "statusPaused": "Paused goal",
+      "statusComplete": "Goal complete",
+      "statusBlocked": "Goal blocked",
+      "edit": "Edit goal",
+      "remove": "Remove goal",
+      "pause": "Pause goal",
+      "resume": "Resume goal",
+      "editPlaceholder": "Describe the goal",
+      "removeConfirmTitle": "Remove goal?",
+      "removeConfirmMessage": "The CLI clears this session's goal.",
+      "updateFailed": "Could not update the goal.",
+      "sectionAccessibility": "{{status}}. Goal: {{text}}"
+    },
     "newSession": {
       "recentlyUsed": "Recently used",
       "couldNotLoadGithubRepositories": "Couldn't load GitHub repositories",
@@ -2532,6 +2550,11 @@
       "stepsCount_other": "{{steps}} steps",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Auto-approve",
+      "description": "Approve permission asks for this session automatically. Tools then run without a prompt.",
+      "unavailable": "This session cannot receive permission asks."
+    },
     "prBadge": {
       "open": "open pull request",
       "closed": "closed pull request",
@@ -2659,7 +2682,10 @@
     "gatewayModelUnavailable": "This transcription model isn't available. Pick another one in Preferences.",
     "gatewayModelUnavailableNotice": "This model is no longer offered. Tap $t(transcriptionModel.title) to choose another.",
     "gatewaySignInRequired": "Sign in to use gateway transcription.",
-    "gatewayNoModel": "Choose a transcription model in Preferences first."
+    "gatewayNoModel": "Choose a transcription model in Preferences first.",
+    "testTitle": "Test voice input",
+    "testPlaceholder": "Tap the microphone and start speaking.",
+    "testClear": "Clear text"
   },
   "share": {
     "title": "Share to Kilo",
@@ -3032,5 +3058,12 @@
     "emptyTitle": "No transcription models",
     "emptyDescription": "The gateway offers no transcription models right now.",
     "loadFailed": "Couldn't load transcription models."
+  },
+  "voiceLanguage": {
+    "title": "Voice language",
+    "automatic": "Automatic",
+    "loadFailed": "Couldn't load the languages this device supports.",
+    "emptyTitle": "No supported languages",
+    "emptyDescription": "This device's speech recognition reports no supported languages."
   }
 }

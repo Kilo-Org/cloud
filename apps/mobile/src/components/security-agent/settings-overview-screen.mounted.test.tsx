@@ -1,7 +1,7 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- the mounted settings states share one native test fixture. */
+/* eslint-disable max-lines -- the mounted settings states share one native test fixture. */
 import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { onlineManager, QueryClient } from '@tanstack/react-query';
-import { act, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';

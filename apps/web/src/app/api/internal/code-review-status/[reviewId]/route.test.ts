@@ -398,12 +398,10 @@ function mockCreatedInfraRetryFlow(
 import type {
   POST as POSTType,
   isWorkspaceCapacityFailure as isWorkspaceCapacityFailureType,
-  isReasoningOnlyLengthCompletion as isReasoningOnlyLengthCompletionType,
 } from './route';
 
 let POST: typeof POSTType;
 let isWorkspaceCapacityFailure: typeof isWorkspaceCapacityFailureType;
-let isReasoningOnlyLengthCompletion: typeof isReasoningOnlyLengthCompletionType;
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -464,7 +462,7 @@ beforeEach(async () => {
   );
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
   mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(null);
-  ({ POST, isWorkspaceCapacityFailure, isReasoningOnlyLengthCompletion } = await import('./route'));
+  ({ POST, isWorkspaceCapacityFailure } = await import('./route'));
 });
 
 describe('isWorkspaceCapacityFailure', () => {
@@ -668,226 +666,6 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockAddReactionToPR).not.toHaveBeenCalled();
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('isReasoningOnlyLengthCompletion', () => {
-    const SDK_WARNING =
-      'The model hit its output limit while reasoning and produced no actionable output. Try disabling reasoning or increasing the output limit.';
-
-    it('flags the reasoning-only length-stop warning', () => {
-      expect(isReasoningOnlyLengthCompletion({ lastAssistantMessageText: SDK_WARNING })).toBe(true);
-    });
-
-    it('flags the warning when other assistant text precedes it', () => {
-      expect(
-        isReasoningOnlyLengthCompletion({
-          lastAssistantMessageText: `Let me review the diff.\n${SDK_WARNING}`,
-        })
-      ).toBe(true);
-    });
-
-    it('accepts normal assistant text', () => {
-      expect(
-        isReasoningOnlyLengthCompletion({ lastAssistantMessageText: 'Review complete.' })
-      ).toBe(false);
-    });
-
-    it('accepts empty or missing assistant text, which is ambiguous', () => {
-      // Tool-only completions and event-retention gaps also leave the text
-      // empty, so emptiness alone must not be treated as no output.
-      expect(isReasoningOnlyLengthCompletion({})).toBe(false);
-      expect(isReasoningOnlyLengthCompletion({ lastAssistantMessageText: '' })).toBe(false);
-      expect(isReasoningOnlyLengthCompletion({ lastAssistantMessageText: '   \n  ' })).toBe(false);
-    });
-
-    it('accepts the incomplete-output warning that still produced output', () => {
-      expect(
-        isReasoningOnlyLengthCompletion({
-          lastAssistantMessageText:
-            'The model hit its output limit, so this response may be incomplete.',
-        })
-      ).toBe(false);
-    });
-  });
-
-  describe('completed reviews with only the reasoning length warning', () => {
-    // The SDK appends the reasoning-only length-stop warning as an ignored text
-    // part when the model exhausts its output limit while thinking. The session
-    // still reports `completed`, so this used to leave a green check run with no
-    // review on the PR.
-    const noOutputRequest = {
-      status: 'completed',
-      kiloSessionId: 'ses-no-output',
-      lastAssistantMessageText:
-        'The model hit its output limit while reasoning and produced no actionable output. Try disabling reasoning or increasing the output limit.',
-    };
-
-    beforeEach(() => {
-      mockGetCodeReviewById.mockResolvedValue(makeReview());
-    });
-
-    it('marks the review failed with the assistant_no_actionable_output reason', async () => {
-      const response = await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
-
-      expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          codeReviewId: REVIEW_ID,
-          status: 'failed',
-          terminalReason: 'assistant_no_actionable_output',
-        })
-      );
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
-        REVIEW_ID,
-        'failed',
-        expect.objectContaining({ terminalReason: 'assistant_no_actionable_output' })
-      );
-    });
-
-    it('does not auto-retry a no-output completion', async () => {
-      // Seed below-threshold usage so the usage guard would let a retry through
-      // on its own: only the unretryable terminal reason must stop it.
-      mockGetSessionUsageFromBilling.mockResolvedValue({
-        model: 'anthropic/claude-sonnet-4.6',
-        totalTokensIn: 10_000,
-        totalTokensOut: 10_000,
-        tokensIn: 0,
-        tokensOut: 0,
-        cachedTokens: 0,
-        totalCostMusd: 100,
-      });
-
-      await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
-
-      // A fresh run with the same model and configuration is likely to repeat
-      // the empty completion, so the failure is terminal and the customer sees
-      // the failed check instead of a silent retry.
-      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
-    });
-
-    it('reports the downgrade to Sentry for observability', async () => {
-      await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
-
-      expect(mockCaptureMessage).toHaveBeenCalledWith(
-        'Code review completed without actionable output',
-        expect.objectContaining({
-          level: 'warning',
-          tags: expect.objectContaining({ source: 'code-review-status-no-output' }),
-        })
-      );
-    });
-
-    it('fails the GitHub check run instead of reporting success', async () => {
-      await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
-
-      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
-        'inst-1',
-        'owner',
-        'repo',
-        12345,
-        expect.objectContaining({
-          status: 'completed',
-          conclusion: 'failure',
-          output: expect.objectContaining({
-            title: 'Kilo Code Review produced no review',
-          }),
-        }),
-        'standard'
-      );
-    });
-
-    it('posts an authored failure notice and a confused reaction, not the celebration', async () => {
-      mockFindKiloReviewComment.mockResolvedValue(null);
-
-      await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
-
-      expect(mockAddReactionToPR).toHaveBeenCalledWith(
-        'inst-1',
-        'owner',
-        'repo',
-        1,
-        'confused',
-        'standard'
-      );
-      expect(mockAddReactionToPR).not.toHaveBeenCalledWith(
-        'inst-1',
-        'owner',
-        'repo',
-        1,
-        'hooray',
-        'standard'
-      );
-      expect(mockCreatePRComment).toHaveBeenCalledWith(
-        'inst-1',
-        'owner',
-        'repo',
-        1,
-        expect.stringContaining('<!-- kilo-review -->'),
-        'standard'
-      );
-      const notice = mockCreatePRComment.mock.calls[0]?.[4] as string;
-      expect(notice).toContain('This review produced no output');
-    });
-
-    it('skips the analytics completion path even when analytics is enrolled', async () => {
-      mockGetLatestCodeReviewAttempt.mockResolvedValue(
-        makeAttempt({ analytics_enabled_at_dispatch: true })
-      );
-
-      await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
-
-      expect(mockFinalizeCompletedCodeReviewWithAnalytics).not.toHaveBeenCalled();
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
-        REVIEW_ID,
-        'failed',
-        expect.any(Object)
-      );
-    });
-
-    it('fails the GitLab commit status for a no-output completion', async () => {
-      mockGetCodeReviewById.mockResolvedValue(
-        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
-      );
-      mockGetIntegrationById.mockResolvedValue(
-        makeIntegration({ platform: 'gitlab', platform_installation_id: null })
-      );
-
-      await POST(makeRequest(noOutputRequest), makeParams(REVIEW_ID));
-
-      expect(mockSetCommitStatus).toHaveBeenCalledWith(
-        'mock-token',
-        42,
-        'abc123',
-        'failed',
-        expect.objectContaining({
-          description: expect.stringContaining('without producing a review'),
-        }),
-        'https://gitlab.com'
-      );
-    });
-
-    it('does not downgrade a completed review with empty assistant text', async () => {
-      // A tool-only final message leaves the text empty; failing it would
-      // overwrite a real review summary with the no-output notice.
-      await POST(
-        makeRequest({ status: 'completed', lastAssistantMessageText: '' }),
-        makeParams(REVIEW_ID)
-      );
-
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
-        REVIEW_ID,
-        'completed',
-        expect.any(Object)
-      );
-      expect(mockAddReactionToPR).toHaveBeenCalledWith(
-        'inst-1',
-        'owner',
-        'repo',
-        1,
-        'hooray',
-        'standard'
-      );
     });
   });
 
@@ -1548,12 +1326,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
     it('handles missing terminalReason gracefully', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
-      // The assistant text is present, so this is a legitimate completion and
-      // it must stay 'completed' even though no terminal reason is sent.
-      await POST(
-        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
-        makeParams(REVIEW_ID)
-      );
+
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
       expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
         REVIEW_ID,
@@ -2908,11 +2682,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       });
 
       const response = await POST(
-        makeRequest({
-          status: 'completed',
-          gateResult: 'fail',
-          lastAssistantMessageText: 'Review complete.',
-        }),
+        makeRequest({ status: 'completed', gateResult: 'fail' }),
         makeParams(REVIEW_ID)
       );
 
@@ -2952,11 +2722,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       });
 
       const response = await POST(
-        makeRequest({
-          status: 'completed',
-          gateResult: 'fail',
-          lastAssistantMessageText: 'Review complete.',
-        }),
+        makeRequest({ status: 'completed', gateResult: 'fail' }),
         makeParams(REVIEW_ID)
       );
 
@@ -3819,10 +3585,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetCodeReviewById.mockResolvedValue(review);
       mockAppendPreviousReviewSummaryHistory.mockReturnValue('body with history');
 
-      await POST(
-        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
-        makeParams(REVIEW_ID)
-      );
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
       expect(mockAppendPreviousReviewSummaryHistory).toHaveBeenCalledWith(
         'existing body',
@@ -3856,10 +3619,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockAppendPreviousReviewSummaryHistory.mockReturnValue('body with bounded history');
       mockAppendReviewSummaryFooter.mockReturnValue('x'.repeat(65_537));
 
-      await POST(
-        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
-        makeParams(REVIEW_ID)
-      );
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
       expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
         'inst-1',
@@ -3893,10 +3653,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         totalCostMusd: 100,
       });
 
-      await POST(
-        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
-        makeParams(REVIEW_ID)
-      );
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
       expect(mockFindKiloReviewComment).toHaveBeenCalledWith(
         'inst-1',
@@ -3954,10 +3711,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       });
       mockGetCodeReviewById.mockResolvedValue(review);
 
-      await POST(
-        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
-        makeParams(REVIEW_ID)
-      );
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
       expect(mockFindKiloReviewNote).toHaveBeenCalledWith(
         'mock-token',
@@ -3995,10 +3749,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       });
       mockGetCodeReviewById.mockResolvedValue(review);
 
-      await POST(
-        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
-        makeParams(REVIEW_ID)
-      );
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
       expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing body', {
         usage: undefined,
@@ -4018,10 +3769,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       });
       mockGetCodeReviewById.mockResolvedValue(review);
 
-      await POST(
-        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
-        makeParams(REVIEW_ID)
-      );
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
       expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing body', {
         usage: undefined,
@@ -4149,10 +3897,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
     it('writes nothing on a successful review', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
-      await POST(
-        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
-        makeParams(REVIEW_ID)
-      );
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
       expect(mockCreatePRComment).not.toHaveBeenCalled();
     });
@@ -4230,10 +3975,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       await admitReview();
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
-      const response = await POST(
-        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
-        makeParams(REVIEW_ID)
-      );
+      const response = await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
       expect(response.status).toBe(200);
       const rows = await db.select().from(analytics_event_outbox);

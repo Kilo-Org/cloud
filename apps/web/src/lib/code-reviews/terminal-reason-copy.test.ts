@@ -27,16 +27,40 @@ describe('getCodeReviewTerminalReasonCopy', () => {
     });
   });
 
-  it('explains a no-output completion without blaming the model by name', () => {
-    const copy = getCodeReviewTerminalReasonCopy('assistant_no_actionable_output');
-
-    expect(copy).toMatchObject({
-      label: 'No review produced',
-      checkTitle: 'Kilo Code Review produced no review',
+  it('explains the model-limitation reasons', () => {
+    expect(getCodeReviewTerminalReasonCopy('assistant_output_limit')).toMatchObject({
+      label: 'Output limit reached',
+      checkTitle: 'Kilo Code Review hit the output limit',
     });
-    const wording = copy?.summaryBody.replace(/\s+/g, ' ');
-    expect(wording).toContain('produced no output');
-    expect(wording).toContain('output limit while reasoning');
+    expect(getCodeReviewTerminalReasonCopy('assistant_context_limit')).toMatchObject({
+      label: 'Context limit reached',
+      checkTitle: 'Kilo Code Review exceeded the context window',
+    });
+    expect(getCodeReviewTerminalReasonCopy('assistant_content_filter')).toMatchObject({
+      label: 'Blocked by content filter',
+      checkTitle: 'Kilo Code Review blocked by content filter',
+    });
+    expect(getCodeReviewTerminalReasonCopy('assistant_structured_output')).toMatchObject({
+      label: 'Unexpected model output',
+      checkTitle: 'Kilo Code Review produced unusable output',
+    });
+  });
+
+  it('tells the customer how to recover from each model-limit failure', () => {
+    const remedies: Record<string, string> = {
+      assistant_output_limit: 'reasoning effort',
+      assistant_context_limit: 'split the change',
+      assistant_content_filter: 'content filter',
+      assistant_structured_output: 'different model',
+    };
+
+    for (const [reason, remedy] of Object.entries(remedies)) {
+      const wording = getCodeReviewTerminalReasonCopy(reason)?.summaryBody.replace(/\s+/g, ' ');
+      // Inline comments survive the notice, so each summary has to say they are
+      // stale rather than let them read as current findings.
+      expect(wording).toContain('inline comments');
+      expect(wording).toContain(remedy);
+    }
   });
 
   // The summary body replaces the PR comment in place. Losing the marker would

@@ -2374,13 +2374,6 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'assistant_content_filter',
   'assistant_structured_output',
   'assistant_no_reply',
-  // Set by the web status callback when a code-review session reports
-  // 'completed' but produced no actionable output: the Kilo SDK appended only
-  // its reasoning-only length-stop warning (the model exhausted its output
-  // limit while thinking). Distinct from 'assistant_no_reply', which covers
-  // sessions that ended without any assistant message to attribute, and from
-  // 'assistant_output_limit', which is a classified assistant error.
-  'assistant_no_actionable_output',
   'wrapper_failed',
   'runtime_startup_failed',
   'sandbox_connection',

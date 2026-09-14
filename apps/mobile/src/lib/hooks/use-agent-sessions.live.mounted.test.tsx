@@ -1,7 +1,7 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free React Native hook integration */
+/* eslint-disable max-lines -- DOM-free React Native hook integration; the mount gate matrix exceeds the default line limit */
 import { createElement } from 'react';
 import { onlineManager } from '@tanstack/react-query';
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type CachedActiveSessionsData } from '@/lib/active-sessions-live';
@@ -58,7 +58,12 @@ vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
 vi.mock('@/components/agents/user-web-connection-provider', () => ({
   useUserWebConnection: () => connection,
 }));
-vi.mock('react-native', () => ({ InteractionManager: { runAfterInteractions: vi.fn() } }));
+// The app-level mount subscribes to foreground transitions; the mock exposes
+// the same subscribe/remove contract as React Native.
+vi.mock('react-native', () => ({
+  InteractionManager: { runAfterInteractions: vi.fn() },
+  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+}));
 
 let client = makeTestQueryClient();
 let connection = makeConnection();

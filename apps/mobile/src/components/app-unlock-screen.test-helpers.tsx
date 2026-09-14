@@ -1,7 +1,7 @@
-/* eslint-disable typescript-eslint/no-deprecated, max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the five layouts reach. */
+/* eslint-disable max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the five layouts reach. */
 import { createElement, type ElementType, type ReactElement, useState } from 'react';
 import { type AppStateStatus } from 'react-native';
-import { act, type ReactTestInstance } from 'react-test-renderer';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { expect, vi } from 'vitest';
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { AppRootProviders } from '@/components/app-root-providers';
@@ -72,6 +72,7 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platform,
+  StatusBar: { currentHeight: 0 },
   I18nManager: { isRTL: false },
   AccessibilityInfo: { announceForAccessibility: announcements },
   AppState: {
@@ -107,6 +108,7 @@ vi.mock('@/components/ui/icons', () => ({
   CheckCircle2: 'Icon',
   CornerDownLeft: 'Icon',
   Cpu: 'Icon',
+  EyeOff: 'Icon',
   Gauge: 'Icon',
   Globe: 'Icon',
   Info: 'Icon',

@@ -52,6 +52,11 @@ export function AgentSessionListScreen() {
   const content = liveSessionContent(context, sessions);
   const hasLiveRows = content === 'rows';
   const showFab = context.isReady && content !== 'empty';
+  // A failed foreground refresh keeps the cached rows on screen. That failure
+  // must speak through the reserved status line (one inline "Couldn't refresh"
+  // with Retry) instead of the load-failure block, which would push the kept
+  // rows down. Treat it exactly like a failed pull when rows are still shown.
+  const retryableRowsFailure = hasLiveRows && sessions.terminalError?.kind === 'retryable';
 
   const query = useLiveSessionQuery(activeSessions);
   const { visibleSessions, isSearching } = query;
@@ -76,8 +81,25 @@ export function AgentSessionListScreen() {
   // fetch cannot pin the spinner with no next action.
   const pull = usePullRefresh(refetchRequest);
   const handleRefresh = pull.startPull;
-  const { markSettled } = pull;
+  const { markSettled, startRetry } = pull;
   const refreshControl = <RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />;
+
+  // The reserved status line's Retry replaces the removed in-flow failure
+  // block, so it inherits that block's idempotence: a second tap before the
+  // first refetch settles must not start a second one.
+  const retryLock = useRef(false);
+  useEffect(() => {
+    if (!pull.busy && !pull.refreshing) {
+      retryLock.current = false;
+    }
+  }, [pull.busy, pull.refreshing]);
+  const handleRefreshRetry = useCallback(() => {
+    if (retryLock.current) {
+      return;
+    }
+    retryLock.current = true;
+    startRetry();
+  }, [startRetry]);
 
   // Focus return and app-foreground refreshes run outside the pull lifecycle.
   // A failed pull leaves the reserved line on "Couldn't refresh" + Retry; when
@@ -262,6 +284,12 @@ export function AgentSessionListScreen() {
         <ScreenHeader
           title={t('common.agents')}
           eyebrow={
+            // The count is an assertion about the current snapshot, so it is
+            // withheld whenever that snapshot cannot be confirmed: while the
+            // list is unresolved (loading or membership unknown) and while the
+            // live query is in an error state, exactly as the tab badge is.
+            // The cached rows themselves stay on screen, so a failed refresh
+            // never blanks the list it kept.
             !sessions.isLoading && !sessions.isError && (hasLiveRows || content === 'empty')
               ? t('agents.liveCount', { count: activeSessions.length })
               : undefined
@@ -292,8 +320,8 @@ export function AgentSessionListScreen() {
             centered={query.hasLoaded && content === 'error'}
             refresh={{
               busy: pull.refreshing || pull.busy,
-              failed: pull.failed,
-              onRetry: pull.startRetry,
+              failed: pull.failed || retryableRowsFailure,
+              onRetry: handleRefreshRetry,
             }}
             refreshControl={refreshControl}
           />

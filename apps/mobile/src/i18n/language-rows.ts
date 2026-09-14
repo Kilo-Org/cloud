@@ -1,3 +1,4 @@
+import { foldForSearch } from './fold-for-search';
 import {
   LANGUAGE_ENDONYMS,
   LANGUAGE_ENGLISH_NAMES,
@@ -24,13 +25,6 @@ export type LanguagePickerItem =
  * Fold case and strip diacritics so a search for "espanol" finds "Español"
  * and "turkce" finds "Türkçe".
  */
-function foldForSearch(value: string): string {
-  return value
-    .normalize('NFD')
-    .replaceAll(/\p{Diacritic}/gu, '')
-    .toLocaleLowerCase();
-}
-
 const ALL_ROWS: readonly LanguageRow[] = SUPPORTED_LANGUAGES.map(tag => ({
   tag,
   endonym: LANGUAGE_ENDONYMS[tag],

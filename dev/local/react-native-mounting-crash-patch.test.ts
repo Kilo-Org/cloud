@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -16,6 +17,7 @@ const mobileRoot = path.join(repoRoot, 'apps', 'mobile');
 const patchRelativePath = 'patches/react-native@0.86.3.patch';
 const patchPath = path.join(repoRoot, patchRelativePath);
 const workspacePath = path.join(repoRoot, 'pnpm-workspace.yaml');
+const lockfilePath = path.join(repoRoot, 'pnpm-lock.yaml');
 const appConfigPath = path.join(mobileRoot, 'app.config.ts');
 
 const mobileRequire = createRequire(path.join(mobileRoot, 'package.json'));
@@ -142,4 +144,25 @@ test('iOS builds React Native core from source so the patch is compiled in', () 
     /buildReactNativeFromSource\s*:\s*true/,
     'expo-build-properties ios.buildReactNativeFromSource must be true'
   );
+});
+
+test('pnpm-lock.yaml records the sha256 of the react-native patch', () => {
+  const lockfile = fs.readFileSync(lockfilePath, 'utf8');
+  const hash = createHash('sha256').update(fs.readFileSync(patchPath)).digest('hex');
+
+  assert.match(
+    lockfile,
+    new RegExp(`^ {2}react-native@0\\.86\\.3: ${hash}$`, 'm'),
+    'patchedDependencies must pin the patch file sha256 so pnpm applies the same patch CI installs'
+  );
+
+  const recorded = lockfile.match(/react-native@0\.86\.3\(patch_hash=[0-9a-f]+/g) ?? [];
+  assert.ok(recorded.length > 0, 'the lockfile must reference the patched react-native');
+  for (const entry of recorded) {
+    assert.equal(
+      entry,
+      `react-native@0.86.3(patch_hash=${hash}`,
+      'every locked react-native reference must use the current patch hash'
+    );
+  }
 });

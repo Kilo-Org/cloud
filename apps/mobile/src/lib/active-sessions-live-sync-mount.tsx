@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { AppState } from 'react-native';
 import { type QueryFunction, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
@@ -113,7 +114,18 @@ function useActiveSessionsLiveSync(): void {
       return undefined;
     }
     const sync = new ActiveSessionsLiveSync({ connection, queryClient, queryKey, queryFn });
-    return sync.attach();
+    const detach = sync.attach();
+    // One refresh per foreground transition. `change` fires on the transition
+    // only, so this rides an existing wakeup instead of adding a poll.
+    const appStateSubscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active' && !isSignOutActive()) {
+        sync.scheduleRefresh('foreground');
+      }
+    });
+    return () => {
+      appStateSubscription.remove();
+      detach();
+    };
   }, [connection, enabled, authEpoch, queryClient, queryFn, queryKey]);
 }
 

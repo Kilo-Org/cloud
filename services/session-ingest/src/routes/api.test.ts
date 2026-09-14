@@ -1376,6 +1376,77 @@ describe('api routes', () => {
     expect(readKiloSdkMessages).toHaveBeenCalledWith({ limit: 50, before: undefined });
   });
 
+  it('GET /session/:sessionId/messages forwards the ingest snapshot metadata alongside the page', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const sessionMetadata = { 'kilo.goal': { text: 'Ship p7 objective', status: 'paused' } };
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    const readKiloSdkSessionSnapshot = vi.fn(async () => ({
+      kind: 'value',
+      info: { id: 'ses_12345678901234567890123456', metadata: sessionMetadata },
+      byteLength: 64,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages,
+      readKiloSdkSessionSnapshot,
+    } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      success: true,
+      kiloSessionId: 'ses_12345678901234567890123456',
+      sessionMetadata,
+    });
+  });
+
+  it('GET /session/:sessionId/messages degrades to null metadata when the snapshot read fails', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    const readKiloSdkSessionSnapshot = vi.fn(async () => {
+      throw new Error('snapshot unavailable');
+    });
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages,
+      readKiloSdkSessionSnapshot,
+    } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      success: true,
+      kiloSessionId: 'ses_12345678901234567890123456',
+      sessionMetadata: null,
+    });
+  });
+
   it('GET /session/:sessionId/messages defaults an omitted limit to the shared page size', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);

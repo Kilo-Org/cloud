@@ -6,10 +6,12 @@
  * `beforeBreadcrumb` drops the event silently, which would hide crashes.
  */
 
-/* oxlint-disable anti-slop/no-runtime-typeof -- Sentry event/breadcrumb payloads are
+/* oxlint-disable anti-slop/no-runtime-typeof, anti-slop/no-unknown-returns,
+ * anti-slop/no-known-value-widening -- Sentry event/breadcrumb payloads are
  * external, arbitrarily shaped, and must never throw on a malformed shape; a
  * zod schema for the full Sentry Event/Breadcrumb type would risk silently
- * dropping fields this walker isn't meant to know about. */
+ * dropping fields this walker isn't meant to know about. The scrubbers must
+ * therefore accept and return opaque values. */
 
 /** Strip the query string from a URL. Returns empty string if parsing fails. */
 function stripQuery(url: unknown): string {
@@ -32,18 +34,74 @@ function isTokenShape(value: unknown): boolean {
   return /[A-Za-z0-9_-]{20,}/.test(value);
 }
 
-/** Redact every token-shaped value in a flat key-value map. */
+/**
+ * Redact token-shaped string values at any depth in a value tree, returning a
+ * scrubbed copy. `seen` maps each visited object to its scrubbed copy, so a
+ * repeated or aliased reference resolves to that copy rather than the original
+ * (returning the original would leak its unredacted values) and a cycle is
+ * bounded.
+ */
+function redactValue(value: unknown, seen: WeakMap<object, unknown>): unknown {
+  if (typeof value === 'string') {
+    return isTokenShape(value) ? '[redacted]' : value;
+  }
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (seen.has(value)) {
+    return seen.get(value);
+  }
+  if (Array.isArray(value)) {
+    const result: unknown[] = [];
+    seen.set(value, result);
+    for (const item of value) {
+      result.push(redactValue(item, seen));
+    }
+    return result;
+  }
+  const result: Record<string, unknown> = {};
+  seen.set(value, result);
+  for (const [key, item] of Object.entries(value)) {
+    result[key] = redactValue(item, seen);
+  }
+  return result;
+}
+
+/** Redact every token-shaped value at any depth in a key-value map. */
 function redactTokens(
   map: Record<string, unknown> | undefined | null
 ): Record<string, unknown> | undefined {
   if (map == null) {
     return undefined;
   }
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(map)) {
-    result[key] = isTokenShape(value) ? '[redacted]' : value;
+  return redactValue(map, new WeakMap()) as Record<string, unknown>;
+}
+
+/**
+ * Names of the thrown errors in an event, i.e. the context keys that
+ * `extraErrorDataIntegration` writes a thrown error's own properties under
+ * (see lib/sentry-init.ts). Its data is free-form and must be token-scrubbed;
+ * Sentry's structured contexts (device, trace, our `network`) are not.
+ */
+function exceptionContextNames(event: Record<string, unknown>): string[] {
+  const exception = event.exception;
+  if (exception == null || typeof exception !== 'object') {
+    return [];
   }
-  return result;
+  const values = (exception as Record<string, unknown>).values;
+  if (!Array.isArray(values)) {
+    return [];
+  }
+  const names: string[] = [];
+  for (const value of values) {
+    if (value != null && typeof value === 'object') {
+      const type = (value as Record<string, unknown>).type;
+      if (typeof type === 'string' && type.length > 0) {
+        names.push(type);
+      }
+    }
+  }
+  return names;
 }
 
 /**
@@ -51,8 +109,11 @@ function redactTokens(
  *
  * - Strips query strings from request URL and contexts.response URL.
  * - Deletes `user.email`, `user.username`, and `user.ip_address`.
- * - Redacts token-shaped values (20+ base64url chars or `Bearer ` prefix)
- *   in `event.extra` and `event.tags`.
+ * - Redacts token-shaped values (20+ base64url chars or `Bearer ` prefix) at
+ *   any depth in `event.extra`, `event.tags`, and the exception-name context
+ *   `extraErrorDataIntegration` attaches. Sentry's structured contexts are
+ *   left intact: their identifiers trip the token heuristic without holding
+ *   secrets.
  */
 export function scrubEvent<T>(event: T): T {
   try {
@@ -77,6 +138,11 @@ export function scrubEvent<T>(event: T): T {
         const resp = ctx.response as Record<string, unknown>;
         if ('url' in resp) {
           resp.url = stripQuery(resp.url);
+        }
+      }
+      for (const name of exceptionContextNames(e)) {
+        if (name in ctx) {
+          ctx[name] = redactValue(ctx[name], new WeakMap());
         }
       }
     }

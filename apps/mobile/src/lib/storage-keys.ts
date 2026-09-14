@@ -19,6 +19,7 @@ export const LAST_RUN_ON_DESTINATION_KEY = 'last-run-on-destination';
 export const CONSENT_USER_KEY_PREFIX = 'consent-accepted-';
 export const AGENT_MODEL_PREFERENCE_KEY = 'agent-model-preference';
 export const REASONING_DEFAULT_EXPANDED_KEY = 'agent-reasoning-default-expanded';
+export const HIDE_THINKING_KEY = 'agent-hide-thinking-details';
 export const REVIEW_REQUESTED_AT_KEY = 'store-review-requested-at';
 /** One-time gate for the neutral post-success feedback prompt. */
 export const FEEDBACK_LAST_ASKED_AT_KEY = 'feedback-last-asked-at';
@@ -42,6 +43,8 @@ export const RETURN_SENDS_MESSAGE_KEY = 'return-sends-message';
 export const GATEWAY_TRANSCRIPTION_ENABLED_KEY = 'gateway-transcription-enabled';
 /** Persisted `{ id, name }` of the chosen gateway transcription model (null = none chosen). */
 export const GATEWAY_TRANSCRIPTION_MODEL_KEY = 'gateway-transcription-model';
+/** Persisted BCP-47 tag of the chosen voice-input language (empty = auto from the app/device language). */
+export const VOICE_INPUT_LANGUAGE_KEY = 'voice-input-language';
 /** Revocable per-host list of markdown link hosts that open without an Alert. */
 export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';

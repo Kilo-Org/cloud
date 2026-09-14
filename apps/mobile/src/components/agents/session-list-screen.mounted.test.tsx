@@ -1,6 +1,6 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- DOM-free live-list matrix and focus/navigation regressions share one mounted fixture. */
+/* eslint-disable max-lines -- DOM-free live-list matrix and focus/navigation regressions share one mounted fixture. */
 import { createElement, Fragment, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -299,6 +299,13 @@ function headerAction(testID = 'agents-view-history') {
   }
   return button;
 }
+function filterButtonProps() {
+  const button = nodes('Pressable').find(node => node.props.testID === 'agents-open-filters');
+  if (!button) {
+    throw new Error('Missing filter button');
+  }
+  return button.props as { accessibilityLabel?: string; accessibilityValue?: unknown };
+}
 function applyFilters(projectFilter: string[], platformFilter: string[]) {
   act(() => {
     headerAction('agents-open-filters').props.onPress();
@@ -426,7 +433,12 @@ describe('AgentSessionListScreen live presentation', () => {
       expect(listSkeletons()[0]?.props.className).toContain('h-[76px]');
     }
     expect(text().includes('Nothing running right now')).toBe(Boolean(test.empty));
-    expect(text().includes('Could not load active sessions')).toBe(Boolean(test.error));
+    // With cached rows on screen, a retryable failure is a refresh failure and
+    // speaks through the reserved status line, not the load-failure block.
+    expect(text().includes('Could not load active sessions')).toBe(
+      Boolean(test.error) && !test.rows
+    );
+    expect(text().includes("Couldn't refresh")).toBe(Boolean(test.error) && Boolean(test.rows));
     expect(text().includes('Updating')).toBe(Boolean(test.updating));
     expect(text().includes('Loading…')).toBe(Boolean(test.skeleton));
     expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
@@ -584,17 +596,30 @@ describe('AgentSessionListScreen live presentation', () => {
       const pending = Promise.withResolvers<boolean>();
       state.refetch.mockReturnValue(pending.promise);
       await renderScreen();
-      act(() => {
-        press('Retry');
-        press('Retry');
-      });
-      expect(action('Retry').props.disabled).toBe(true);
-      expect(action('Retry').props.accessibilityState).toMatchObject({
-        busy: true,
-        disabled: true,
-      });
+      if (cached) {
+        // With cached rows the reserved status line owns the retry: no
+        // disabled button, and the second tap must not start a second fetch.
+        expect(text()).toContain("Couldn't refresh");
+        act(() => {
+          press('Retry');
+          press('Retry');
+        });
+        expect(state.refetch).toHaveBeenCalledTimes(1);
+        expect(state.announcements).toContain('Updating');
+      } else {
+        act(() => {
+          press('Retry');
+          press('Retry');
+        });
+        expect(action('Retry').props.disabled).toBe(true);
+        expect(action('Retry').props.accessibilityState).toMatchObject({
+          busy: true,
+          disabled: true,
+        });
+        expect(state.refetch).toHaveBeenCalledTimes(1);
+      }
       expect(action('Retry connection').props.disabled).toBe(false);
-      const queryRetry = action('Retry');
+      const queryRetry = cached ? undefined : action('Retry');
       const socketRetry = action('Retry connection');
       expect(
         nodes('View').filter(
@@ -603,13 +628,22 @@ describe('AgentSessionListScreen live presentation', () => {
             view.findAll(node => node === queryRetry || node === socketRetry).length > 0
         )
       ).toHaveLength(0);
-      expect(state.refetch).toHaveBeenCalledTimes(1);
       await act(async () => {
         pending.resolve(false);
         await pending.promise;
       });
-      expect(action('Retry').props.disabled).toBe(false);
-      expect(text()).toContain('Could not load active sessions');
+      if (cached) {
+        // A rejected pull holds the in-flight feedback through the anti-flicker
+        // beat before the failure line takes over.
+        await act(async () => {
+          await new Promise(resolve => {
+            setTimeout(resolve, PULL_FEEDBACK_MIN_BEAT_MS + 100);
+          });
+        });
+      } else {
+        expect(action('Retry').props.disabled).toBe(false);
+      }
+      expect(text()).toContain(cached ? "Couldn't refresh" : 'Could not load active sessions');
       state.refetch.mockImplementation(async () => {
         await Promise.resolve();
         state.live.terminalError = null;
@@ -621,6 +655,7 @@ describe('AgentSessionListScreen live presentation', () => {
       });
       await renderScreen();
       expect(text()).not.toContain('Could not load active sessions');
+      expect(text()).not.toContain("Couldn't refresh");
       expect(nodes('FlatList')).toHaveLength(cached ? 1 : 0);
       state.socketRetry.mockImplementation(() => {
         state.connection.reconnectExhausted = false;
@@ -639,8 +674,9 @@ describe('AgentSessionListScreen live presentation', () => {
     state.live.hasAcceptedSuccess = false;
     state.live.terminalError = failure;
     await renderScreen();
-    const message = 'Could not load active sessions';
-    expect(text()).toContain(message);
+    const loadFailure = 'Could not load active sessions';
+    const refreshFailure = "Couldn't refresh";
+    expect(text()).toContain(loadFailure);
     expect(nodes('CenteredState')).toHaveLength(1);
 
     async function updateSocketRows(activeSessions: ActiveSession[]) {
@@ -648,8 +684,9 @@ describe('AgentSessionListScreen live presentation', () => {
       await renderScreen();
       expect(nodes('RemoteSessionRow')).toHaveLength(activeSessions.length);
       expect(nodes('CenteredState')).toHaveLength(activeSessions.length === 0 ? 1 : 0);
+      const message = activeSessions.length === 0 ? loadFailure : refreshFailure;
       expect(text()).toContain(message);
-      expect(state.announcements).toEqual([message]);
+      expect(state.announcements).toContain(message);
       await act(async () => {
         press('Retry');
         await Promise.resolve();
@@ -966,6 +1003,22 @@ describe('AgentSessionListScreen live counts', () => {
     expect(reserved?.props.accessibilityElementsHidden).toBe(true);
     expect(nodes('FlatList')).toHaveLength(orgLoaded ? 1 : 0);
   });
+
+  it('keeps the retained count and rows through a retryable refresh failure', async () => {
+    state.live.activeSessions = [row];
+    state.live.terminalError = failure;
+    await renderScreen();
+
+    // The last snapshot stays legible: the count is not blanked, and the
+    // failure cannot grow an in-flow block that pushes the kept rows down.
+    expect(header().props.eyebrow).toBe('1 LIVE');
+    expect(nodes('FlatList')).toHaveLength(1);
+    expect(nodes('RemoteSessionRow')).toHaveLength(1);
+    expect(nodes('CenteredState')).toHaveLength(0);
+    expect(text()).toContain("Couldn't refresh");
+    expect(text()).not.toContain('Could not load active sessions');
+    expect(nodes('View').filter(node => node.props.className === 'min-h-5')).toHaveLength(1);
+  });
 });
 
 describe('AgentSessionListScreen live filtering', () => {
@@ -1140,7 +1193,7 @@ describe('AgentSessionListScreen live filtering', () => {
       expect(header().parent?.children[0]).toBe(header());
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
-        tree.children?.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
+        tree.children.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
       ).toEqual(['View', 'SessionListSearchHeader', 'View', 'FlatList']);
     }
   });
@@ -1248,6 +1301,9 @@ describe('AgentSessionListScreen live filtering', () => {
     const emptyState = renderer.root.findByType(EmptyState);
     expect(emptyState.props.title).toBe('No sessions match');
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
+    // The accessibly-named count matches the visible badge while narrowed.
+    expect(filterButtonProps().accessibilityLabel).toBe('Filter sessions, 1');
+    expect(filterButtonProps().accessibilityValue).toBeUndefined();
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(header().props.eyebrow).toBe('1 LIVE');
 
@@ -1257,6 +1313,9 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(nodes('FlatList')).toHaveLength(1);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(0);
+    // Clearing drops the count from the accessible name too: no stale "1"
+    // survives in the native content description after the badge unmounts.
+    expect(filterButtonProps().accessibilityLabel).toBe('Filter sessions');
     expect(nodes('ScrollView')).toHaveLength(0);
   });
 });

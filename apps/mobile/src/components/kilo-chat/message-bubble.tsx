@@ -1,6 +1,6 @@
 import { type ExecApprovalDecision, type KiloChatClient, type Message } from '@kilocode/kilo-chat';
 import { Reply } from '@/components/ui/icons';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -102,7 +102,9 @@ function MessageBubbleComponent({
     longPressHighlight.value = withTiming(feedback.highlightOpacity, { duration: 180 });
   }
 
-  function handleLongPress() {
+  // Stable identity so forwarding it into the markdown code fences' copy
+  // trigger does not rebuild the markdown renderer on every bubble render.
+  const handleLongPress = useCallback(() => {
     const feedback = resolveLongPressFeedback({ pressed: true, longPressed: true });
     pressScale.value = withSequence(
       withTiming(feedback.scale, { duration: 90, easing: Easing.out(Easing.cubic) }),
@@ -113,7 +115,7 @@ function MessageBubbleComponent({
       withTiming(0, { duration: 260 })
     );
     onLongPress?.(message);
-  }
+  }, [longPressHighlight, message, onLongPress, pressScale]);
 
   // Mirror the long-press (action menu) and swipe-reply gestures as
   // accessibility custom actions so VoiceOver / TalkBack rotor users
@@ -248,6 +250,9 @@ function MessageBubbleComponent({
               pendingActionGroupId={pendingActionGroupId}
               replyToMessage={replyToMessage}
               onExecuteAction={onExecuteAction}
+              // The copy trigger is a nested Pressable that would otherwise
+              // swallow the bubble's long-press, so forward it into code fences.
+              onLongPressCode={onLongPress ? handleLongPress : undefined}
             />
 
             {!showAuthor && timestamp !== null && (

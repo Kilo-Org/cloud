@@ -52,6 +52,7 @@ export type SessionOperationProof = {
 type SessionMessageLifecycle = {
   messageId: string;
   state: SessionMessageState;
+  queuedAt?: number;
   acceptedAt?: number;
   lastActivityAt?: number;
   deliveryDeadlineAt?: number;

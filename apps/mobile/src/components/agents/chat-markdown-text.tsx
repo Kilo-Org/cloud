@@ -17,8 +17,12 @@ import {
 } from './chat-link-actions';
 import { formatLinkHost } from './markdown-link-confirm';
 import { MarkdownText, type MarkdownTextProps } from './markdown-text';
+import { performCopy } from './use-message-copy';
 
-type ChatMarkdownTextProps = Omit<MarkdownTextProps, 'onLongPressLink' | 'onPressLink'>;
+type ChatMarkdownTextProps = Omit<
+  MarkdownTextProps,
+  'onLongPressLink' | 'onPressLink' | 'onCopyCode'
+>;
 
 /** Sheet message: host then full href, so the host is visible above the URL. */
 function sheetMessage(href: string): string {
@@ -120,7 +124,18 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
     [bottom, prReviewEnabled, router, showActionSheetWithOptions, t]
   );
 
+  // Code fences in the transcript copy through the shared clipboard helper, so
+  // success/failure feedback (haptic + toast) matches every other copy action.
+  const handleCopyCode = useCallback((code: string) => {
+    void performCopy(code);
+  }, []);
+
   return (
-    <MarkdownText {...props} onLongPressLink={handleLongPressLink} onPressLink={handlePressLink} />
+    <MarkdownText
+      {...props}
+      onLongPressLink={handleLongPressLink}
+      onPressLink={handlePressLink}
+      onCopyCode={handleCopyCode}
+    />
   );
 }

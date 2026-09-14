@@ -7,7 +7,7 @@ import {
 
 import { i18n } from '@/i18n';
 
-import { computeStatus } from './compute-status';
+import { computeStatus, lastActivePart } from './compute-status';
 import { isToolPart } from './part-types';
 import { getFilename, truncateText } from './tool-card-utils';
 
@@ -64,16 +64,11 @@ function getToolContext(p: ToolPart): string | undefined {
   return undefined;
 }
 
-function findLatestAssistantPart(messages: StoredMessage[]): Part | undefined {
+function findLatestAssistantParts(messages: StoredMessage[]): readonly Part[] | undefined {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const msg = messages[i];
-    if (msg?.info.role === 'assistant') {
-      for (let j = msg.parts.length - 1; j >= 0; j -= 1) {
-        const part = msg.parts[j];
-        if (part) {
-          return part;
-        }
-      }
+    if (msg?.info.role === 'assistant' && msg.parts.length > 0) {
+      return msg.parts;
     }
   }
   return undefined;
@@ -95,14 +90,23 @@ export function getChildSessionCardState(
     if (part.state.status === 'completed' || part.state.status === 'error') {
       return '';
     }
-    const latestPart = findLatestAssistantPart(childMessages);
-    if (!latestPart) {
-      return i18n.t('agentChat.childSession.waitingForActivity');
+    const assistantParts = findLatestAssistantParts(childMessages);
+    if (assistantParts) {
+      const latestPart = lastActivePart(assistantParts);
+      if (latestPart) {
+        if (isToolPart(latestPart)) {
+          return { tool: latestPart.tool, context: getToolContext(latestPart) };
+        }
+        return computeStatus(latestPart);
+      }
     }
-    if (isToolPart(latestPart)) {
-      return { tool: latestPart.tool, context: getToolContext(latestPart) };
-    }
-    return computeStatus(latestPart);
+    // A running subagent without a loaded child transcript is still working, so
+    // the card shows the same "Thinking" label the composer spinner uses while
+    // it streams reasoning. A pending task has no child session yet; it is
+    // queued and genuinely waiting to start.
+    return part.state.status === 'running'
+      ? i18n.t('agentChat.partDetail.thinking')
+      : i18n.t('agentChat.childSession.waitingForActivity');
   })();
 
   return { agentName, taskName, latestActivity };

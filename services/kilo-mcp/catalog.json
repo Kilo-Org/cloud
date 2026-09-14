@@ -1313,6 +1313,26 @@
     ],
     "searchBlob": "cloudAgentNext.getComputeBillingStatus Get billing status and compute usage information for a cloud agent session. cloudagentnext getcomputebillingstatus cloudagentsessionid cloudAgentSessionId"
   },
+  "cloudAgentNext.getSandboxSelectionOptions": {
+    "path": "cloudAgentNext.getSandboxSelectionOptions",
+    "kind": "query",
+    "summary": "List the sandbox selection options and capabilities available for a cloud agent, optionally filtered for devcontainer support. Use this to find which sandbox types a user can choose when starting an agent.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "devcontainer": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tags": [
+      "cloudagentnext",
+      "getsandboxselectionoptions",
+      "devcontainer"
+    ],
+    "searchBlob": "cloudAgentNext.getSandboxSelectionOptions List the sandbox selection options and capabilities available for a cloud agent, optionally filtered for devcontainer support. Use this to find which sandbox types a user can choose when starting an agent. cloudagentnext getsandboxselectionoptions devcontainer devcontainer"
+  },
   "cloudAgentNext.getSandboxStatus": {
     "path": "cloudAgentNext.getSandboxStatus",
     "kind": "query",
@@ -5076,6 +5096,32 @@
       "organizationid"
     ],
     "searchBlob": "organizations.cloudAgentNext.getComputeBillingStatus Get the compute billing status for an organization's cloud agent session. organizations cloudagentnext getcomputebillingstatus organizationid organizationId"
+  },
+  "organizations.cloudAgentNext.getSandboxSelectionOptions": {
+    "path": "organizations.cloudAgentNext.getSandboxSelectionOptions",
+    "kind": "query",
+    "summary": "List the sandbox options available for a cloud agent, such as selectable environments and container capabilities. Use this to find which sandbox choices an agent can pick for an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getsandboxselectionoptions",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getSandboxSelectionOptions List the sandbox options available for a cloud agent, such as selectable environments and container capabilities. Use this to find which sandbox choices an agent can pick for an organization. organizations cloudagentnext getsandboxselectionoptions organizationid organizationId"
   },
   "organizations.cloudAgentNext.getSandboxStatus": {
     "path": "organizations.cloudAgentNext.getSandboxStatus",

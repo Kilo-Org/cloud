@@ -701,8 +701,7 @@ function mapThread(
   const anchorLine = inline?.to ?? inline?.from ?? null;
   return {
     threadId: String(rootId),
-    resolved:
-      taskEvidence.commentIds.has(rootId) && !taskEvidence.unresolvedCommentIds.has(rootId),
+    resolved: taskEvidence.commentIds.has(rootId) && !taskEvidence.unresolvedCommentIds.has(rootId),
     path: inline?.path ?? null,
     line: anchorLine,
     side: inline ? (inline.to != null ? 'RIGHT' : 'LEFT') : null,

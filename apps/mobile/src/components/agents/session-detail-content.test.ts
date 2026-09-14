@@ -10,6 +10,7 @@ import {
   createSessionManager,
   createUserWebConnection,
   type KiloSessionId,
+  type SessionGoal,
   type SessionManager,
   type SessionSnapshotPageOutcome,
   type SessionStatusIndicator,
@@ -28,6 +29,7 @@ import { PermissionCard } from '@/components/agents/permission-card';
 import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { type SessionMessageList } from '@/components/agents/session-message-list';
 import {
@@ -116,6 +118,7 @@ vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   ChevronDown: 'ChevronDown',
+  CircleDot: 'CircleDot',
   Clock: 'Clock',
   Loader2: 'Loader2',
   MessageSquare: 'MessageSquare',
@@ -158,6 +161,11 @@ vi.mock('@/components/agents/session-connection-indicator', () => ({
 vi.mock('@/components/agents/context-usage-ring', () => ({
   ContextUsageRing: 'ContextUsageRing',
 }));
+// The real context sheet (rendered so the auto-approve row can be asserted)
+// reaches `copySessionId`, which imports the native `expo-clipboard` module that
+// cannot load in this DOM-free node suite. Mock the boundary, as the mounted
+// context-sheet suite does.
+vi.mock('@/components/agents/session-row-actions', () => ({ copySessionId: vi.fn() }));
 vi.mock('@/components/agents/session-pr-badge', () => ({ SessionPrBadge: 'SessionPrBadge' }));
 vi.mock('@/components/agents/session-status-indicator', () => ({
   SessionStatusIndicator: 'SessionStatusIndicator',
@@ -312,6 +320,18 @@ vi.mock('@/lib/trpc', () => ({
         }),
       },
     },
+    // The real context sheet resolves the "running on" row from the connected
+    // CLI instances; the row is inert here, so an empty instance list keeps the
+    // sheet rendering without a network read.
+    activeSessions: {
+      listInstances: {
+        queryOptions: () => ({
+          queryKey: ['activeSessions', 'listInstances'],
+          queryFn: () => ({ instances: [] }),
+          initialData: { instances: [] },
+        }),
+      },
+    },
   }),
 }));
 vi.mock('@expo/react-native-action-sheet', () => ({
@@ -328,6 +348,11 @@ const globalContext = vi.hoisted(() => ({
 vi.mock('@/lib/organization-context', () => ({ useOrganization: () => globalContext }));
 
 const PERSONAL_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
+/**
+ * Goal/type overrides for the goal-visibility tests. A module-level slot keeps
+ * the shared `mountDetails` fixture at its existing three-parameter signature.
+ */
+let goalMountOptions: { goal?: SessionGoal; resolvedType?: 'read-only' | 'remote' } = {};
 const ROOT_ID = kiloId('ses-root');
 const NEXT_ROOT_ID = kiloId('ses-next-root');
 const SELECTED_ID = kiloId('ses-selected');
@@ -391,10 +416,14 @@ function childMessage(sessionId: KiloSessionId, text: string): StoredMessage {
   };
 }
 
-function page(sessionId: KiloSessionId, messages: StoredMessage[]): SessionSnapshotPageOutcome {
+function page(
+  sessionId: KiloSessionId,
+  messages: StoredMessage[],
+  goal?: SessionGoal
+): SessionSnapshotPageOutcome {
   return {
     kind: 'success',
-    info: { id: sessionId },
+    info: { id: sessionId, ...(goal ? { goal } : {}) },
     messages,
     nextCursor: null,
     omittedItemCount: 0,
@@ -404,6 +433,7 @@ function page(sessionId: KiloSessionId, messages: StoredMessage[]): SessionSnaps
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   openRenameModal.mockClear();
+  goalMountOptions = {};
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
 });
@@ -428,6 +458,9 @@ async function mountDetails(
     userWebConnection: connection,
     resolveSession: async id => {
       await Promise.resolve();
+      if (goalMountOptions.resolvedType === 'remote') {
+        return { type: 'remote', kiloSessionId: id };
+      }
       return { type: 'read-only', kiloSessionId: id };
     },
     getTicket: vi.fn(),
@@ -437,7 +470,7 @@ async function mountDetails(
       requests.push({ id, response });
       const messages = rootPages.get(id);
       if (messages) {
-        response.resolve(page(id, messages));
+        response.resolve(page(id, messages, goalMountOptions.goal));
       }
       const outcome = await response.promise;
       return outcome;
@@ -501,7 +534,7 @@ async function mountDetails(
     requestedIds: () => requests.map(request => request.id),
     respond: async (id: KiloSessionId, messages: StoredMessage[]) => {
       await act(async () => {
-        requestFor(id).resolve(page(id, messages));
+        requestFor(id).resolve(page(id, messages, goalMountOptions.goal));
         await Promise.resolve();
       });
     },
@@ -1131,5 +1164,23 @@ describe('child transcript requests', () => {
     expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(0);
     expect(view.renderer.root.findAllByType(ChildSessionSheet)).toHaveLength(0);
     expect(view.requestedIds()).toEqual([ROOT_ID]);
+  });
+});
+
+describe('SessionDetailContent goal visibility', () => {
+  const pausedGoal: SessionGoal = { text: 'Ship p7 objective', status: 'paused' };
+
+  it('shows the fixed goal row for a live session whose snapshot carries a goal', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    const view = await mountDetails([], undefined, PERSONAL_DISPLAY_SCOPE);
+    const section = view.renderer.root.findAllByType(SessionGoalSection);
+    expect(section).toHaveLength(1);
+    expect(section[0]?.props.goal).toEqual(pausedGoal);
+  });
+
+  it('hides the fixed goal row for a read-only session whose snapshot carries a goal', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'read-only' };
+    const view = await mountDetails([], undefined, PERSONAL_DISPLAY_SCOPE);
+    expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
   });
 });

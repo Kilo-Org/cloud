@@ -22,6 +22,24 @@ import type {
   PreparationStepSnapshot,
 } from './types';
 
+/**
+ * Keep a known goal reason when a later update for the same session carries the
+ * same goal without one. The CLI reports a terminal goal (complete/blocked)
+ * with a reason, but a snapshot replay or a partial event can omit it; without
+ * this, replacing the session info would drop copy the metadata already
+ * provided. Text and status must match, so a resume (status change) or an edit
+ * (text change) still clears the reason.
+ */
+function preserveGoalReason(previous: SessionInfo | null, next: SessionInfo): SessionInfo {
+  const nextGoal = next.goal;
+  const previousGoal = previous?.goal;
+  if (nextGoal === undefined || previousGoal === undefined) return next;
+  if (previous?.id !== next.id) return next;
+  if (nextGoal.reason !== undefined || previousGoal.reason === undefined) return next;
+  if (nextGoal.text !== previousGoal.text || nextGoal.status !== previousGoal.status) return next;
+  return { ...next, goal: { ...nextGoal, reason: previousGoal.reason } };
+}
+
 type ServiceStateConfig = {
   /** The root session ID we're tracking (to detect child sessions). */
   rootSessionId: string;
@@ -254,18 +272,22 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       rootSessionId = event.info.id;
     }
     // Only track root session info
+    let info = event.info;
     if (isRootSession(event.info.id)) {
-      sessionInfo = event.info;
+      info = preserveGoalReason(sessionInfo, event.info);
+      sessionInfo = info;
     }
-    config.onSessionCreated?.(event.info);
+    config.onSessionCreated?.(info);
     notify();
   }
 
   function processSessionUpdated(event: Extract<ServiceEvent, { type: 'session.updated' }>): void {
+    let info = event.info;
     if (isRootSession(event.info.id)) {
-      sessionInfo = event.info;
+      info = preserveGoalReason(sessionInfo, event.info);
+      sessionInfo = info;
     }
-    config.onSessionUpdated?.(event.info);
+    config.onSessionUpdated?.(info);
     notify();
   }
 

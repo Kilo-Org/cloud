@@ -89,6 +89,7 @@ describe('Expo Router provider review routes', () => {
     expect(screens.map(screen => screen.route.route)).toEqual([
       'index',
       'comment-composer',
+      'conversation-comment',
       'review-submit',
       'merge',
       'file-navigator',

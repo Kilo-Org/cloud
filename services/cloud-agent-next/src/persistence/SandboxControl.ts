@@ -298,6 +298,12 @@ const acquisitionReceiptsSchema = z.array(
 
 export type SandboxAcquisition = z.infer<typeof sandboxAcquisitionSchema>;
 
+/** Runs `factory` at most once, handing every caller the same in-flight promise. */
+function memoize<T>(factory: () => Promise<T>): () => Promise<T> {
+  let pending: Promise<T> | undefined;
+  return () => (pending ??= factory());
+}
+
 function assertAcquisitionDeadline(acquisition: SandboxAcquisition): void {
   if (Date.now() >= acquisition.deadlineAt) throw new Error('Sandbox acquisition expired');
 }
@@ -448,12 +454,6 @@ export class SandboxControl extends DurableObject<Env> {
     promise: Promise<StopResult>;
   } | null = null;
   private vercelLocator: VercelProviderLocator | undefined;
-  /**
-   * Resolved once per instance: the signing secret is needed by both the
-   * diagnostic launch env and the worktree-state grant, and a stalled lookup
-   * must not be paid for twice on the session-delivery path.
-   */
-  private signingSecretLookup: Promise<string | null> | null = null;
   private readonly deletingWorktrees = new Set<string>();
   private exclusiveDeletionWorktreeId: string | undefined;
   private runtimeDeleted = false;
@@ -1694,9 +1694,18 @@ export class SandboxControl extends DurableObject<Env> {
     input: Parameters<SandboxControl['ensureReady']>[0]
   ): Promise<SandboxControlStatus & { attachment?: SessionAttachPayload }> {
     await this.ensureOperationalInitialized();
-    // Scope the memoized lookup to this pass so a transient failure is retried
-    // on the next one rather than disabling the grants for the whole instance.
-    this.signingSecretLookup = null;
+    // One lookup per readiness pass, shared by the diagnostic launch env and
+    // the worktree-state grant. Deliberately a local rather than instance
+    // state: passes run concurrently, so an instance-wide memo would let one
+    // pass reset another's and reintroduce the double lookup it exists to
+    // avoid, while a transient failure still retries on the next pass.
+    const signingSecret = memoize(() =>
+      withTimeout(
+        resolveSecret(this.env.NEXTAUTH_SECRET),
+        1_000,
+        'Signing secret lookup timed out'
+      ).catch(() => null)
+    );
     this.assertWorktreeAdmission(input.worktreeId);
     const acquisition =
       input.acquisition === undefined
@@ -1927,7 +1936,7 @@ export class SandboxControl extends DurableObject<Env> {
           durationMs: Date.now() - startedAt,
         });
         if ('providerRef' in created) {
-          const launchEnv = await this.wrapperLaunchEnv(credential, intent.intentId);
+          const launchEnv = await this.wrapperLaunchEnv(credential, intent.intentId, signingSecret);
           const current = await loadPhysicalRecord(this.ctx.storage);
           if (!sameAllocation(current, physical)) return currentStatus();
           if (current.stopTombstone) {
@@ -2017,7 +2026,7 @@ export class SandboxControl extends DurableObject<Env> {
     // Decorated here rather than during credential preparation: the grant is
     // only read once the wrapper is attached, so minting it must not sit in
     // front of the sandbox launch.
-    const worktreeState = await this.worktreeStateAttachment(metadata);
+    const worktreeState = await this.worktreeStateAttachment(metadata, signingSecret);
     return { ...status, attachment: worktreeState ? { ...attachment, worktreeState } : attachment };
   }
 
@@ -3442,26 +3451,18 @@ export class SandboxControl extends DurableObject<Env> {
     return billing;
   }
 
-  private signingSecret(): Promise<string | null> {
-    this.signingSecretLookup ??= withTimeout(
-      resolveSecret(this.env.NEXTAUTH_SECRET),
-      1_000,
-      'Signing secret lookup timed out'
-    ).catch(() => null);
-    return this.signingSecretLookup;
-  }
-
   /**
    * Endpoint and grant the wrapper uses to persist this worktree's uncommitted
    * changes and put them back on a rebuilt sandbox. Absent when the worker
    * cannot issue one, which leaves the wrapper on its prior behaviour.
    */
   private async worktreeStateAttachment(
-    metadata: SessionMetadata
+    metadata: SessionMetadata,
+    signingSecret: () => Promise<string | null>
   ): Promise<SessionAttachPayload['worktreeState']> {
     const workerUrl = this.env.WORKER_URL;
     if (!workerUrl) return undefined;
-    const secret = await this.signingSecret();
+    const secret = await signingSecret();
     if (!secret) return undefined;
     const parsed = worktreeStateIdentitySchema.safeParse({
       userId: metadata.identity.userId,
@@ -3480,9 +3481,10 @@ export class SandboxControl extends DurableObject<Env> {
 
   private async wrapperLaunchEnv(
     credential: string,
-    allocationId: string
+    allocationId: string,
+    resolveSigningSecret: () => Promise<string | null>
   ): Promise<Record<string, string>> {
-    const signingSecret = await this.signingSecret();
+    const signingSecret = await resolveSigningSecret();
     const launchEnv = buildControlWrapperLaunchEnv({
       workerUrl: this.env.WORKER_URL,
       sandboxId: this.sandboxId,

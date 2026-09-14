@@ -1040,6 +1040,41 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(childSessionHydrationStatesAtom, next);
   }
 
+  /**
+   * Whether the child already has messages in the active storage. A stored
+   * child row is proof the session loaded — the same truth a live chat
+   * event's clear relies on.
+   */
+  function childHasStoredMessages(storage: JotaiSessionStorage, childSessionId: string): boolean {
+    for (const id of storage.getMessageIds()) {
+      if (storage.getMessageInfo(id)?.sessionID === childSessionId) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Store a first-page hydration failure unless the child already streamed
+   * rows into storage. The clear above only fires when an event arrives after
+   * the failure, so a load settling after the last child event (the child
+   * stops streaming) would store an error nothing clears, and the "could not
+   * load" banner would reappear over a transcript the stream already
+   * delivered. The rows are the truth: the entry (this request's `loading`)
+   * is dropped, the next sheet open retries the load.
+   */
+  function storeChildHydrationFailure(
+    storage: JotaiSessionStorage,
+    childSessionId: KiloSessionId,
+    message: string
+  ): void {
+    if (childHasStoredMessages(storage, childSessionId)) {
+      const next = new Map(store.get(childSessionHydrationStatesAtom));
+      next.delete(childSessionId);
+      store.set(childSessionHydrationStatesAtom, next);
+      return;
+    }
+    setChildSessionHydrationState(childSessionId, { status: 'error', message });
+  }
+
   function isCurrentChildSessionHydration(
     generation: number,
     rootSessionId: KiloSessionId,
@@ -1100,17 +1135,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           // A null page (worker 404) or any typed failure on the first page is
           // a terminal hydration error for this child.
           if (page === null) {
-            setChildSessionHydrationState(childSessionId, {
-              status: 'error',
-              message: CHILD_SESSION_NOT_FOUND_MESSAGE,
-            });
+            storeChildHydrationFailure(storage, childSessionId, CHILD_SESSION_NOT_FOUND_MESSAGE);
             return;
           }
           if (page.kind !== 'success') {
-            setChildSessionHydrationState(childSessionId, {
-              status: 'error',
-              message: formatError(page),
-            });
+            storeChildHydrationFailure(storage, childSessionId, formatError(page));
             return;
           }
 
@@ -1141,10 +1170,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       } catch (err) {
         if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
-        setChildSessionHydrationState(childSessionId, {
-          status: 'error',
-          message: formatError(err),
-        });
+        storeChildHydrationFailure(storage, childSessionId, formatError(err));
       }
     })();
 

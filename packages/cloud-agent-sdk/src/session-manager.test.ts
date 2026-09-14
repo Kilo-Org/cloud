@@ -3507,6 +3507,33 @@ describe('createSessionManager', () => {
       expect(state('child-silent')).toEqual(expect.objectContaining({ status: 'error' }));
     });
 
+    it('does not store a first-page hydration error once the child already streamed rows', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () => ({
+        kind: 'retryable_failure' as const,
+      }));
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      // A live child chat event already arrived: its row landed in storage
+      // before the first-page fetch settles.
+      const liveMessage = createStoredMessage('msg-child-live', 'child-live', 'assistant');
+      latestStorage.upsertMessage(liveMessage.info);
+      mockSessionCallbacks.onEvent?.({ type: 'message.updated', info: liveMessage.info });
+
+      await mgr.hydrateChildSession(kiloId('child-live'));
+
+      const state = atomValue<(childSessionId: string) => { status: string; message?: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      // The streamed rows are the truth: the failure must not become a stored
+      // "could not load" error that reappears once the child stops streaming.
+      expect(state('child-live')).not.toEqual(expect.objectContaining({ status: 'error' }));
+    });
+
     it('loadOlderChildMessages pages by the child cursor and updates only per-child state', async () => {
       const firstMessage = createStoredMessage('msg-child-old-1', 'child-old', 'assistant');
       const secondMessage = createStoredMessage('msg-child-old-2', 'child-old', 'assistant');

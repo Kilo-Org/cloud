@@ -86,7 +86,16 @@ export function ChildSessionSheet({
   // the content state and the footer spinner reads "Thinking", but it renders no
   // row. Drop it from the list so its padded wrapper cannot leave an empty row.
   const rowMessages = messages.filter(message => message.parts.some(partRendersContent));
-  const state = getChildSessionSheetState(hydrationState, messages.length, sessionError);
+  const sheetState = getChildSessionSheetState(hydrationState, messages.length, sessionError);
+  // A streaming child is proof the session is live: its first rows are in
+  // flight, so the stored first-page failure must not render — not as the
+  // banner above rows (guarded below) and not full-screen before the first row
+  // lands. Hold the loading state; the next child event clears the stored
+  // error in the manager.
+  const state =
+    sheetState === 'error' && isStreaming && hydrationState.status === 'error'
+      ? 'loading'
+      : sheetState;
   const modelLabel = getChildSessionModelLabel(messages, modelOptions ?? []);
   const { t } = useTranslation();
   // Hydration drops its error while retrying. Retain this child's copy so

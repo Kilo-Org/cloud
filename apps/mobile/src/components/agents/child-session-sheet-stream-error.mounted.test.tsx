@@ -28,23 +28,28 @@ vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshCont
 const CHILD_ID = 'child-1' as KiloSessionId;
 
 /**
- * A child session whose first-page load always fails, with one cached row so
- * the sheet renders its content branch (the banner above live rows) rather than
- * the full-screen error.
+ * A child session whose first-page load always fails. Hydration runs before
+ * any row lands — with rows already in storage the manager treats the stream
+ * as the truth and keeps the load in-flight instead of storing the failure —
+ * so the stored error is real and the sheet renders it (full-screen until a
+ * row arrives, then the banner above live rows). Pass `[]` to keep storage
+ * empty so the error renders full-screen.
  */
-async function mountFailingChildLoad() {
+async function mountFailingChildLoad(messages: StoredMessage[] = [makeAssistantMessage()]) {
   const fetchPage = vi
     .fn<NonNullable<SessionManagerConfig['fetchSnapshotPage']>>()
     .mockRejectedValue(new Error('Service is unavailable right now. Please try again.'));
   const { manager, store, storage } = await createRecoverySource(fetchPage);
-  const seed = makeAssistantMessage();
-  storage.upsertMessage(seed.info);
-  for (const part of seed.parts) {
-    storage.upsertPart(seed.info.id, part);
-  }
 
   let pending = manager.hydrateChildSession(CHILD_ID);
   await pending;
+  for (const message of messages) {
+    storage.upsertMessage(message.info);
+    for (const part of message.parts) {
+      storage.upsertPart(message.info.id, part);
+    }
+  }
+
   const props = {
     ...buildProps({
       getChildMessages: store.get(manager.atoms.childMessages),
@@ -108,7 +113,10 @@ describe('ChildSessionSheet streamed session load error', () => {
   });
 
   it('keeps the load error banner and Retry when nothing streams', async () => {
-    const sheet = await mountFailingChildLoad();
+    // Storage stays empty: with rows present the manager treats the stream as
+    // the truth and drops the error instead, so the persisting banner across a
+    // failed Retry needs a child that never streamed.
+    const sheet = await mountFailingChildLoad([]);
     expect(textValues(sheet.renderer.root)).toContain(
       i18n.t('agentChat.childSessionSheet.couldNotLoad')
     );
@@ -122,5 +130,32 @@ describe('ChildSessionSheet streamed session load error', () => {
       i18n.t('agentChat.childSessionSheet.couldNotLoad')
     );
     expect(sheet.renderer.root.findAllByType(QueryError)).toHaveLength(1);
+  });
+
+  it('holds the loading state instead of the full-screen load error while streaming', async () => {
+    const sheet = await mountFailingChildLoad([]);
+    // No row has landed yet, so the failed first page renders full-screen.
+    expect(textValues(sheet.renderer.root)).toContain(
+      i18n.t('agentChat.childSessionSheet.couldNotLoad')
+    );
+
+    // The child task turns streaming before its first row lands: the sheet
+    // must hold the loading state, not the load error.
+    await sheet.sync({ isStreaming: true });
+    expect(textValues(sheet.renderer.root)).not.toContain(
+      i18n.t('agentChat.childSessionSheet.couldNotLoad')
+    );
+    expect(textValues(sheet.renderer.root)).toContain(
+      i18n.t('agentChat.childSessionSheet.loading')
+    );
+    expect(sheet.renderer.root.findAllByType(QueryError)).toHaveLength(0);
+
+    // When the stream stops without ever delivering a row, the load error is
+    // the truth again and Retry returns.
+    await sheet.sync({ isStreaming: false });
+    expect(textValues(sheet.renderer.root)).toContain(
+      i18n.t('agentChat.childSessionSheet.couldNotLoad')
+    );
+    expect(retryButton(sheet.renderer.root).props.disabled).toBe(false);
   });
 });

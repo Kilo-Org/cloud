@@ -574,7 +574,12 @@ function validateBitbucketCapabilityUpstream(
   // deliberately differs from validateGitLabCapabilityUpstream, which must allow
   // %2f because GitLab addresses projects by encoded path (e.g.
   // /api/v4/projects/group%2Fproject); do not "reconcile" the two.
-  if (/%2f|%5c/i.test(requestUrl) || /\/(?:(?:\.|%2e){1,2})(?:\/|$)/i.test(requestUrl)) {
+  // Only the path is scanned: a query string may legitimately carry %2f data, such
+  // as a branch name with a slash in `bb pr current`'s q= filter, and it cannot
+  // change how the path resolves against the repository prefix checked below.
+  const queryStart = requestUrl.search(/[?#]/);
+  const requestPath = queryStart === -1 ? requestUrl : requestUrl.slice(0, queryStart);
+  if (/%2f|%5c/i.test(requestPath) || /\/(?:(?:\.|%2e){1,2})(?:\/|$)/i.test(requestPath)) {
     return { failure: 'invalid_upstream_url', authSurface: 'git' };
   }
   let url: URL;

@@ -780,6 +780,27 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
       },
     });
   });
+
+  it('allows an encoded slash in a REST API query string', async () => {
+    const capability = await issueCapability();
+    // Mirrors bb pr current: the branch name lives in the q= filter, so a branch
+    // with a slash arrives percent-encoded in the query, never in the path.
+    const params = new URLSearchParams({
+      q: 'source.branch.name = "feature/widgets" AND state = "OPEN"',
+      pagelen: '50',
+    });
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'GET',
+        requestUrl: `https://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests?${params.toString()}`,
+      })
+    ).resolves.toEqual({
+      success: true,
+      headers: { authorization: 'Bearer ATCT-runtime-token' },
+    });
+  });
 });
 
 describe('GitTokenRPCEntrypoint Bitbucket runtime authorization', () => {

@@ -282,6 +282,13 @@ export function ChatComposer({
   const [characterCount, setCharacterCount] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
+  // Inline validation feedback for a rejected slash-command submission. A
+  // transient toast (sonner-native) renders outside the accessibility /
+  // automation tree and floats over the composer, so the reader cannot see
+  // the message and a device round cannot assert it. Rendering the rejection
+  // inline keeps it visible above the input row, announced, and out of the
+  // send control's way.
+  const [slashCommandFeedback, setSlashCommandFeedback] = useState<string | null>(null);
   // True after a bare `/goal` submission: the composer is collecting the goal
   // objective. Keeps the `/goal ` draft and surfaces the objective hint so the
   // next step is explicit instead of the send silently doing nothing.
@@ -585,6 +592,9 @@ export function ChatComposer({
 
   function handleChangeText(value: string) {
     textRef.current = value;
+    // Any edit clears a stale slash-command rejection: the reader is fixing
+    // the input the message is about.
+    setSlashCommandFeedback(null);
     // A draft that is no longer the `/goal` command ends goal compose mode, so
     // the objective hint never outlives the text it describes. A no-op when the
     // mode is already off.
@@ -911,17 +921,20 @@ export function ChatComposer({
     });
 
     if (submission.type === 'attachment-error') {
-      toast.error(i18n.t('agentChat.composer.attachmentsWithSlashCommands'));
+      setSlashCommandFeedback(i18n.t('agentChat.composer.attachmentsWithSlashCommands'));
       return;
     }
     if (submission.type === 'argument-error') {
-      toast.error(submission.message);
+      setSlashCommandFeedback(submission.message);
       return;
     }
     if (submission.type === 'upgrade-required') {
-      toast.error(submission.message);
+      setSlashCommandFeedback(submission.message);
       return;
     }
+    // Valid submission: drop a rejection left over from an earlier attempt.
+    setSlashCommandFeedback(null);
+
     if (submission.type === 'goal-compose') {
       // Bare `/goal` is a compose mode: keep the draft, mark the composer so the
       // objective hint appears, and focus the input so the user can type the
@@ -1237,6 +1250,12 @@ export function ChatComposer({
             />
           </Animated.View>
         ) : null}
+
+        <AccessibleStatus
+          message={slashCommandFeedback}
+          tone="error"
+          className="mb-2 px-4 text-xs"
+        />
 
         <View
           className={cn(

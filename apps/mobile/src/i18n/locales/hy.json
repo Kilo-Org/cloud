@@ -253,7 +253,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Խոսքի տեքստի վերածում Kilo Gateway-ով",
     "gatewayTranscriptionSubtitle": "Ձայնային մուտքագրումը տեքստի վերածեք Kilo Gateway-ի մոդելով՝ սարքի խոսքի ճանաչման փոխարեն։ Ձեր ձայնագրությունը ուղարկվում է Kilo Gateway։",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Թարգմանել գործիքների ամփոփումները",
+    "toolSummaryTranslationSubtitle": "Ուղարկեք յուրաքանչյուր գործիքի ամփոփում մոդելին՝ այն ձեր հավելվածի լեզվով թարգմանելու համար։ Թարգմանության ձախողման դեպքում ցուցադրվում է բնօրինակը։",
+    "toolSummaryTranslationModelUnavailableNotice": "Այս մոդելը այլևս չի առաջարկվում։ Մեկ այլ ընտրելու համար հպեք $t(common.model)։"
   },
   "prReview": {
     "pullRequestUnavailable": "Միավորման հարցումը հասանելի չէ",

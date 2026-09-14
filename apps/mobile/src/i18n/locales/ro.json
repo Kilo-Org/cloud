@@ -253,7 +253,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcriere cu Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcrie dictarea cu un model Kilo Gateway în loc de recunoașterea vocală a dispozitivului. Înregistrarea este trimisă către Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Tradu rezumatele instrumentelor",
+    "toolSummaryTranslationSubtitle": "Trimite fiecare rezumat de instrument unui model pentru a-l traduce în limba aplicației tale. Originalul este afișat dacă traducerea eșuează.",
+    "toolSummaryTranslationModelUnavailableNotice": "Acest model nu mai este oferit. Atinge $t(common.model) pentru a alege altul."
   },
   "prReview": {
     "pullRequestUnavailable": "PR indisponibil",

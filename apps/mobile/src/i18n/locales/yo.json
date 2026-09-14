@@ -253,7 +253,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Yíyí ohùn sí ọ̀rọ̀ pẹ̀lú Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Yí títẹ ọ̀rọ̀ pẹ̀lú ohùn sí ọ̀rọ̀-kíkọ pẹ̀lú àwòṣe Kilo Gateway dípò mímọ̀ ọ̀rọ̀ ẹ̀rọ náà. A ó fi àkọsílẹ̀ rẹ ránṣẹ́ sí Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Tumọ̀ àwọn àkópọ̀ irinṣẹ́",
+    "toolSummaryTranslationSubtitle": "Fi àkópọ̀ irinṣẹ́ kọ̀ọ̀kan ránṣẹ́ sí àwòṣe kan láti tumọ̀ rẹ̀ sí èdè áàpù rẹ. A ó fi èyí tí ó wà níbẹ̀rẹ̀ hàn tí ìtumọ̀ bá kùnà.",
+    "toolSummaryTranslationModelUnavailableNotice": "A kìí ṣe àwòṣe yìí mọ́. Tẹ $t(common.model) láti yan òmíràn."
   },
   "prReview": {
     "pullRequestUnavailable": "Ìbéèrè ìṣọ̀kan kò sí",

@@ -253,7 +253,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Розпізнавання мовлення через Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Розпізнайте голосове введення за допомогою моделі Kilo Gateway замість розпізнавання мовлення на пристрої. Запис надсилається до Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Перекладати підсумки інструментів",
+    "toolSummaryTranslationSubtitle": "Надсилай кожен підсумок інструмента моделі, щоб перекласти його мовою твого застосунку. Якщо переклад не вдасться, показується оригінал.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ця модель більше не пропонується. Натисніть $t(common.model), щоб вибрати іншу."
   },
   "notifications": {
     "liveActivities": "Дії наживо",

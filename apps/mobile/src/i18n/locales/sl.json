@@ -253,7 +253,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Prepisovanje prek Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Glasovni vnos prepiši z modelom Kilo Gateway namesto prepoznavanja govora naprave. Posnetje se pošlje v Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "Prevedi povzetke orodij",
+    "toolSummaryTranslationSubtitle": "Pošlji vsak povzetek orodja modelu, da ga prevede v jezik tvoje aplikacije. Če prevajanje ne uspe, se prikaže izvirnik.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ta model se ne ponuja več. Dotaknite se $t(common.model) in izberite drugega."
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtevek za združitev ni na voljo",

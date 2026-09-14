@@ -253,7 +253,10 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ಮೂಲಕ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವಿಕೆ",
     "gatewayTranscriptionSubtitle": "ಸಾಧನದ ಮಾತು ಗುರುತಿಸುವಿಕೆಗೆ ಬದಲಾಗಿ Kilo Gateway ಮಾದರಿಯನ್ನು ಬಳಸಿ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಅನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಿ. ನಿಮ್ಮ ಧ್ವನಿಮುದ್ರಣ Kilo Gateway ಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "toolSummaryTranslation": "ಸಾಧನ ಸಾರಾಂಶಗಳನ್ನು ಅನುವಾದಿಸಿ",
+    "toolSummaryTranslationSubtitle": "ಪ್ರತಿ ಸಾಧನ ಸಾರಾಂಶವನ್ನು ನಿಮ್ಮ ಆ್ಯಪ್ ಭಾಷೆಗೆ ಅನುವಾದಿಸಲು ಮಾದರಿಗೆ ಕಳುಹಿಸಿ. ಅನುವಾದ ವಿಫಲವಾದರೆ ಮೂಲವನ್ನು ತೋರಿಸಲಾಗುತ್ತದೆ.",
+    "toolSummaryTranslationModelUnavailableNotice": "ಈ ಮಾದರಿಯನ್ನು ಇನ್ನು ಮುಂದೆ ನೀಡಲಾಗುವುದಿಲ್ಲ. ಇನ್ನೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಲು $t(common.model) ಅನ್ನು ಟ್ಯಾಪ್ ಮಾಡಿ."
   },
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",

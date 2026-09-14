@@ -44,6 +44,7 @@ import {
 } from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
+import { clearCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
 import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
@@ -323,6 +324,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearLiveActivityPreference();
           clearSessionScopedState();
           clearPrReviewFooterPreference();
+          clearCondenseToolCallsPreference();
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

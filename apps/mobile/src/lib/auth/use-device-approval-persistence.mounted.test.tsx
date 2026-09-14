@@ -1,6 +1,5 @@
-/* oxlint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts hooks in the node Vitest environment */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type NativeTokenPair } from '@kilocode/app-shared/native-auth';
 
@@ -31,7 +30,7 @@ function Harness({ signIn, resultRef, credentials: approvedCredentials }: Harnes
 
 async function mountPersistence(signIn: (pair: NativeTokenPair) => Promise<boolean>) {
   const resultRef: { current: Persistence | null } = { current: null };
-  let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+  let renderer: ReactTestRenderer | undefined = undefined;
   await act(async () => {
     renderer = TestRenderer.create(createElement(Harness, { signIn, resultRef, credentials }));
     await Promise.resolve();

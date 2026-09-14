@@ -1,10 +1,9 @@
 /// <reference lib="es2024.promise" />
-/* oxlint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom) */
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable max-lines -- one cohesive auth-context suite: sign-out teardown ordering and stale sign-in fencing share the provider mount and the SecureStore mock */
 import { type NativeTokenPair } from '@kilocode/app-shared/native-auth';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
@@ -245,11 +244,13 @@ const {
   clearKeepScreenOnPreference,
   clearReasoningPreference,
   clearPrReviewFooterPreference,
+  clearCondenseToolCallsPreference,
 } = vi.hoisted(() => ({
   clearHideThinkingPreference: vi.fn(),
   clearKeepScreenOnPreference: vi.fn(),
   clearReasoningPreference: vi.fn(),
   clearPrReviewFooterPreference: vi.fn(),
+  clearCondenseToolCallsPreference: vi.fn(),
 }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({ clearKeepScreenOnPreference }));
 vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
@@ -294,6 +295,10 @@ vi.mock('@/lib/temp-file-registry', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({ clearPrReviewFooterPreference }));
+
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  clearCondenseToolCallsPreference,
+}));
 
 vi.mock('@/lib/last-active-instance', () => ({
   clearLastActiveInstance: vi.fn().mockResolvedValue(undefined),
@@ -674,6 +679,7 @@ describe('sign-out teardown ordering', () => {
     expect(clearReasoningPreference).toHaveBeenCalled();
     expect(clearHideThinkingPreference).toHaveBeenCalled();
     expect(clearPrReviewFooterPreference).toHaveBeenCalled();
+    expect(clearCondenseToolCallsPreference).toHaveBeenCalled();
     const { clearRunOnDestinationPreference } =
       await import('@/lib/hooks/use-persisted-run-on-destination');
     expect(clearRunOnDestinationPreference).toHaveBeenCalled();

@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts the hook without a DOM or React Native. */
 import { createElement } from 'react';
-import TestRenderer, { act, type ReactTestInstance } from 'react-test-renderer';
+import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type SessionAutoApproveRespond, useSessionAutoApprove } from './use-session-auto-approve';

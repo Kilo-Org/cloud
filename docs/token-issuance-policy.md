@@ -185,109 +185,61 @@ This PR does not retire legacy native exchange, shorten user credentials, change
 
 Workflow issuance reads the existing primary user pepper, including explicit `null`, without initializing or rotating it. Modern workflow tokens retain their audience, purpose, exchange restrictions, and bounded lifetime. This requires no migration and must not reset already initialized peppers; genuine pepper rotation continues to revoke previously issued credentials.
 
-## Phase 5.2 merge, automatic deployment, and activation
+## Remaining-family deployment and activation
 
-### Deployment model and implementation status
+Merging deploys the affected Web and Worker services independently. No additional issuance flag defaults on. Existing Cloud Agent settings can remain enabled; enabling the Web shared master does not enable the remaining families. Confirm production settings have not already opted a family in before deployment.
 
-Phase 5.2 is available as an ordered stack: foundation (#5974), Cloud Agent (#5975), then remaining families (#5976). The original combined PR #5857 remains unchanged. Wait for each preceding PR's deployments to become healthy before merging the next; components within one PR still deploy independently.
+### Settings
 
-The Cloud Agent PR configures `RUNTIME_ISOLATION_ENABLED=true` in production and development. This permits modern workspace admission; it does not issue modern tokens or migrate legacy sessions. Missing or non-`true` values still reject new modern workspace admission. The wrapper must advertise isolation support. **Resolve the outstanding Cloud Agent smoke failures before merging that PR.** Readiness for review is not deployment approval.
+All Web settings below require the exact string `true` and Web `SHARED_RESOURCE_TOKENS_ENABLED=true`. Unset, `false`, or any other value keeps fresh adoption off. Worker-local settings are independent of the Web master.
 
-Keep web issuance off through the Cloud Agent deployment. Once the actual Worker/wrapper chain is healthy and verified, enable web `SHARED_RESOURCE_TOKENS_ENABLED` and `CLOUD_AGENT_RESOURCE_TOKENS_ENABLED`. This activation does not need to wait for the remaining-family PR. That PR keeps every additional producer flag off, even if the shared web master is already on.
-
-Merge readiness, feature activation, and completeness of real-environment smoke coverage are separate decisions. A missing production recovery path was a code defect; unavailable Vercel/device coverage is a separately recorded validation risk.
-
-1. Cloud Agent's 24-hour recovery is implemented for both session planes through the public send preflight, including legacy V2 and SDK prompt adapters. A fresh authenticated credential authorizes recovery of the same session. Recovery refuses queued/active work and live PTYs, retires the old transport before replacing authority, clears stale grants/attachment state, and lets normal dispatch attach a fresh handle. Workspace retirement is acknowledged and root-scoped; agent-plane retirement requires authoritative physical absence. Durable recovery IDs survive retries, and explicit revocation never becomes natural-expiry recovery. Real Durable Object integration tests cover successful recovery, lost acknowledgement, subsequent attach/prompt, queued-work rejection, and active-PTY rejection.
-2. The latest recorded original-branch sandbox smoke matrix passed 9/13 scenarios after the harness corrections. CLI/container startup and recovery failures remain; SDK cold-wake also failed during replacement startup. The stack extraction and readiness-default change do not resolve those failures or establish complete real-provider coverage. Rerun the affected end-to-end paths before merging the Cloud Agent PR.
-
-### Merge and automatic deployment, producers disabled
-
-The automatic deployment wave includes these units. Retain all legacy readers and wire defaults throughout mixed-version overlap:
-
-| Deployment unit | Required compatibility | Adoption settings |
+| Where | Setting | Initial action |
 |---|---|---|
-| Web API/gateway receiving deployments, including `app.kilo.ai` and `api.kilo.ai` | Legacy and modern audience readers; runtime-proof verification; native negotiation and bounded rollback bridge | Shared and native issuance off |
-| Session Ingest Worker | Legacy and modern audience readers; runtime-proof verification; unchanged dedicated ticket/deletion contracts | No new runtime issuers |
-| Cloud Agent Worker and its wrapper/container images | Optional isolation attachment selection and explicit wrapper hello capability; omitted selection remains directory-shared | `RUNTIME_ISOLATION_ENABLED=true` in the Cloud Agent PR; issuance remains off |
-| Gastown and Wasteland receiving Workers | Existing supported tokens and current owner/membership checks; fail-closed modern runtime state | No new modern control issuance |
-| Security Auto Analysis and Webhook Agent Ingest Workers | Legacy defaults, scoped modern issuance available but inactive, compatible callback/result readers | Their own shared-issuance settings off |
-| Native application | Negotiation, bundle storage, API/gateway routing, legacy responses | Server-side native adoption off |
+| Web / Vercel | `CLOUD_AGENT_RESOURCE_TOKENS_ENABLED` | Preserve the existing Cloud Agent rollout decision |
+| Web / Vercel | `CHAT_RESOURCE_TOKENS_ENABLED` | Leave off; verify Chat, Events, and Notifications together before enabling |
+| Web / Vercel | `DELEGATED_RESOURCE_TOKENS_ENABLED` | Leave off; verify explicit personal/organization resource requests before enabling |
+| Web / Vercel | `WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED` | Leave off; verify a real automation job before enabling |
+| Web / Vercel | `BENCHMARK_RESOURCE_TOKENS_ENABLED` | Leave off; verify the built benchmark CLI/container before enabling |
+| Web / Vercel | `NATIVE_RESOURCE_TOKENS_ENABLED` | Leave off; retain the existing mobile token flow |
+| Web / Vercel | `GASTOWN_RESOURCE_TOKENS_ENABLED` | Leave off; implementation blockers remain below |
+| Web / Vercel | `WASTELAND_RESOURCE_TOKENS_ENABLED` | Leave off until its browser/server consumer chain is verified |
+| Security Auto Analysis Worker | `SHARED_RESOURCE_TOKENS_ENABLED` | Keep the configured `false`; activate only after its job/result/callback chain is verified |
+| Webhook Agent Ingest Worker | `SHARED_RESOURCE_TOKENS_ENABLED` | Keep the configured `false`; activate only after its prepare/initiate/callback chain is verified |
 
-Cloud Agent Worker and wrapper support is additive: an old wrapper omits the hello capability and can still receive legacy attachments; a new Worker refuses to forward an isolated attachment to a wrapper that has not advertised support. Existing modern authorization is a durable adoption marker, so its attachment stays isolated even when the admission flag is later disabled. Do not remove that support during rollback.
+The Cloud Agent Worker already configures `RUNTIME_ISOLATION_ENABLED=true`. No additional Cloud Agent Worker setting is required by this rollout. Keep the existing runtime, proof readers, and renewal support available for issued credentials and active workloads.
 
-Compatibility checks and validation limits:
+### Mobile compatibility with native adoption off
 
-- Legacy unit/wrapper behavior and the additive protocol are tested. The real legacy smoke limitation above remains recorded; do not weaken assertions to conceal workspace rebuilding or missing turns, or describe partial execution as a passing full matrix.
-- Old-client requests remain accepted, including native requests without `credentialFormat` and benchmark legacy six-hour tokens.
-- New Worker with old-wrapper hello is tested in legacy mode; isolated dispatch is rejected before forwarding. New wrapper with old/missing attachment selection retains legacy directory sharing.
-- Existing Gastown organization routes are checked with current legacy credentials and a database-unavailable case. Fresh authorization reads are an intentional availability dependency even with issuance flags off.
+With `NATIVE_RESOURCE_TOKENS_ENABLED` unset or false, native login, legacy exchange, device authorization and refresh retain legacy access-token responses, including when the Web shared master is on. Clients that do not negotiate the new format retain their existing response format even when native adoption is enabled. The new client must accept legacy responses and retain the legacy storage and request-authentication path. Do not initialize or rotate a user's pepper to enroll them.
 
-Existing Gastown towns without private identity metadata adopt that metadata lazily through unattended token renewal. The stored token must be a signed, unrestricted legacy town credential; its user and the mutable configuration only locate a canonical personal/organization town-registry record. The registry must bind the exact town to that owner or organization creator, and current account, pepper, organization, and membership checks must pass before renewal. A correctly signed expired legacy token can locate this existing authority; expiration never establishes authority itself. The private identity and replacement token are installed together only if the original configuration and private state are unchanged. Missing ownership, corrupt or modern private state, revocation, and restricted tokens cannot fall back through this migration. Transient registry/database failures retry on the next alarm, without requiring a manual UI refresh.
+Native activation requires compatible API and gateway readers plus physical iOS/Android checks for login, cold restore, refresh, model discovery, balance, voice, chat, Cloud Agent stream/reconnect, and rollback. Automated route/storage tests do not replace that device coverage. A downgrade from an installed client that stored a modern bundle may require sign-in; this does not affect users who have never adopted a bundle.
 
-### Implemented runtime transport recovery
+### Behavior that is active at deployment
 
-Foreground recovery follows these invariants:
+Adoption flags control token issuance; they do not gate every authorization check. Gastown organization routes use current account, pepper and membership data, including for legacy credentials. Matching explicit null peppers are valid; missing or mismatched credentials, blocked users and lost membership fail closed. Database unavailability can return a retryable authorization error. Existing towns adopt private identity metadata lazily through authorized legacy renewal; registry ownership, current authority and unchanged stored state must all be checked before committing the identity and replacement token.
 
-1. Explicit authenticated demand supplies a fresh control credential. Revalidate current user, pepper, organization membership, and exact session ownership; never derive replacement authority from an expired runtime JWT.
-2. Distinguish natural expiry from explicit revocation. Expiry remains unusable but does not itself persist an explicit revocation. A revoked record must not be silently resurrected.
-3. Verify the target root is idle, with no active/finalizing work or live terminal. Preserve sibling roots.
-4. Use an acknowledged, incarnation-fenced root transport retirement/replacement operation. A local registry update or auth-record CAS without a wrapper acknowledgment is insufficient.
-5. Install the fresh sealed authority only with the expected old authorization and transport fences. Clear the stale attachment/grant only at the corresponding committed lifecycle transition.
-6. Attach the replacement transport with its new session-scoped handle, then admit the original user turn exactly once. Fail closed on ambiguous retirement; do not replay completed work.
+Chat and control-token minting also validate the source credential before delegation. Explicit resource-token requests fail with migration-unavailable while their gate is off. Personal attribution requests are unsupported; attribution requires an organization-authorized resource token. These checks must not be described as a deployment with no behavior changes.
 
-Routine backing-JWT renewal remains transparent to active streaming: no `auth.set`, process restart, or prompt replay. Idle transport replacement after an absolute delegation deadline is a separate, explicitly authorized operation. Durable Object integration tests exercise `agent_*` and `workspace_*` recovery, and unified, legacy V2, and SDK prompt adapters share the foreground preflight. This is not a claim that a complete real-provider smoke matrix has passed.
+### Activation blockers and consumer coverage
 
-Additional real-environment validation matrix (not fully executed):
+See [the consumer audit](token-consumer-audit.md) for request paths, credential selection, verification and remaining limits.
 
-| Scenario | Required evidence |
-|---|---|
-| Legacy/direct cold, hot, and restore | Real packaged CLI, expected output and exact terminal message IDs, workspace/setup reuse on hot turns |
-| Modern direct and Cloudflare containment | Real facade request accepted by API, gateway, and Session Ingest with the correct proof and session scope |
-| Vercel containment | Real provider policy behavior, no backing JWT in policy, old/new wrapper compatibility; local mocks are not equivalent |
-| Streaming across ordinary renewal | Same live process and stream, renewed backing token, no prompt replay |
-| Absolute expiry and user-authorized recovery | Same session ID, acknowledged replacement transport, new handle succeeds, old handle denied |
-| Explicit revocation | In-flight final reread denies revoked authority; no background reactivation |
-| Two same-worktree roots | Correct process mode, isolated credentials when selected, sibling-safe detach, documented behavior when one process fails |
-| Rollback with an issued native bundle | Active owned device receives a bounded control token; revoked/pepper-mismatched device is denied; no five-year fallback |
+Modern Gastown activation remains blocked by all of the following:
 
-No production-only testing bypass or arbitrary token/state mutation endpoint should be added to make these tests pass. Use bounded fixture clocks for unit/Workers races and an authorized test setup for actual runtime acceptance. A local fake LLM replaces inference only, not the Worker, DO, sandbox, wrapper, or CLI. Real Vercel policy and physical-device validation require their respective environments.
+- Runtime tokens lack the Session Ingest audience required by the CLI.
+- Organization towns need an organization-bound mint/admission path.
+- Updating town/container configuration does not safely renew credentials already embedded in a running CLI/provider client.
 
-### Activate flags after the automatic deployment wave
+Keep Gastown issuance off. Its disabled gate also refuses modern device control issuance rather than admitting an unsupported runtime or minting an unrestricted legacy replacement. Re-enabling this family requires resolving its implementation blockers, not just a healthy deployment.
 
-Web adoption requires `SHARED_RESOURCE_TOKENS_ENABLED=true` **and** the applicable producer flag below. Every web issuance flag defaults off and recognizes only the exact value `true`. The shared switch alone does not activate a producer. These are server-side deployment settings, not client-controlled request options.
+Enable other eligible families one at a time only after all their receiving deployments are healthy and their real consumer chain is exercised. Record Web and each Worker activation separately. Watch authentication failures, retries, session continuity and callback completion before expanding. No complete physical-device, built CLI/container, or live-provider smoke matrix is claimed by the automated tests.
 
-| Producer | Additional web flag | Initial shipping decision |
-|---|---|---|
-| Cloud Agent user controls and workflow admission | `CLOUD_AGENT_RESOURCE_TOKENS_ENABLED` | Activate only after isolation and the actual Worker/wrapper consumer chain are verified |
-| Chat, events, and notification fanout | `CHAT_RESOURCE_TOKENS_ENABLED` | Independent rollout after all three readers are deployed |
-| Gastown control | `GASTOWN_RESOURCE_TOKENS_ENABLED` | Keep off; modern runtime delivery remains deferred |
-| Wasteland control | `WASTELAND_RESOURCE_TOKENS_ENABLED` | Keep off until its consumer chain is verified independently |
-| Explicit API, gateway, attribution, and HTML delegation | `DELEGATED_RESOURCE_TOKENS_ENABLED` | Independent opt-in rollout |
-| Workflow gateway credentials | `WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED` | Independent opt-in rollout |
-| Auto-routing benchmark credentials | `BENCHMARK_RESOURCE_TOKENS_ENABLED` | Independent opt-in rollout |
-| Negotiated native API/gateway bundles | `NATIVE_RESOURCE_TOKENS_ENABLED` | Keep off; mobile and CLI clients continue receiving legacy credentials |
+### Rollback
 
-No additional producer in the remaining-family PR defaults on. Chat changes an existing token shared by Chat, Events, and Notifications; verify all three consumers together. Workflow gateway and the two Worker-local switches alter automation credentials and require a real job/callback round trip. Benchmark issuance changes the CLI credential contract and account/organization eligibility checks; verify a real benchmark container run. Explicit delegation is opt-in and leaves non-negotiating callers on their existing path, making it a good early rollout candidate, but enabling it still creates usable API/gateway/attribution/HTML credentials and should follow consumer-path verification. Native, Gastown, and Wasteland retain the blockers listed above and below.
+Disable the relevant producer flag and redeploy its service to stop fresh adoption. Web's shared master can stop multiple Web families together; it does not change Worker-local settings. Producer shutdown does not convert persisted runtimes, invalidate cached credentials or remove existing modern state.
 
-Unsupported CLI/native clients retain legacy issuance regardless of these adoption settings. Security Auto Analysis and Webhook Agent Ingest keep their existing Worker-local shared switches; a web setting does not activate those separately deployed producers. Bounded internal assertions retain their separate Phase 5.1 switch.
+Keep modern readers, proof verification, runtime containment and renewal/recovery support deployed until outstanding credentials and workloads have drained or been safely migrated. In particular, stopping Web Cloud Agent issuance does not require disabling `RUNTIME_ISOLATION_ENABLED`; existing scoped credentials still need admission support.
 
-**Gastown modern activation is blocked by known implementation gaps**, not merely missing smoke evidence. Its runtime JWT does not include Session Ingest even though the CLI uses it there, and updating the town/container configuration does not establish safe credential renewal in an already-running CLI/provider client. Keep Gastown's producer off until both the complete consumer audience contract and uninterrupted active-runtime renewal are implemented and tested. Do not add an audience without verifying the full delivery path, restart active work to rotate credentials, or disable reader checks. This PR retains the modern implementation and existing modern-state validation, but does not certify that path for activation.
+A current, owned modern device credential can still receive bounded Cloud Agent/Wasteland control and Chat/Events/Notifications credentials after producer shutdown. The bridge rechecks device ownership, account, pepper and applicable membership and caps the child at one hour and the parent's remaining lifetime. Gastown has no disabled-gate exception. Other modern credential kinds cannot use this bridge to obtain legacy tokens. Native refresh uses its separate opaque refresh-session authority and may return the supported legacy response when native adoption is off.
 
-Once all receiving deployments are healthy, activate progressively while recording any accepted real-environment coverage risks:
-
-1. Confirm the exact deployed revisions for every receiver a producer calls, including both web receiving aliases, Session Ingest, Cloud Agent Worker, and the actual wrapper image. Verify the wrapper hello capability rather than inferring it from an image tag.
-2. Verify runtime isolation admission is enabled by the Cloud Agent deployment configuration and the connected wrapper advertises support. This environment boolean is deployment-scoped, not itself a per-user allowlist; use an existing cohort/staging deployment for limited exposure.
-3. Enable the shared web prerequisite and one eligible producer-family flag at a time. Web and Worker-local settings are separate; record each activation independently. Leave Gastown and native adoption off for this shipping stage. Do not assume enabling web updates Security Auto Analysis or Webhook Agent Ingest.
-4. Exercise the producer's real consumer chain and observe auth failures, renewal latency, sandbox restarts, child-process count, memory, and queue retries before expanding.
-5. Enable native adoption last, after device and downgrade validation. Fresh bundles require both native and shared web readiness settings.
-
-### Rollback is producer shutdown, not receiver removal
-
-- Stop native adoption first. Turning the native flag off changes subsequent issuance/refresh responses, not credentials already held on a device.
-- Stop new modern adoption at each web/Worker producer independently. Already-issued modern device bearers may still obtain bounded control and three-audience chat tokens while their current owned device session, pepper, and requested organization membership remain valid. This compatibility bridge intentionally operates with the master and family switches off, caps tokens at the parent's remaining lifetime and one hour, and never mints an unrestricted legacy replacement. Other modern credential kinds do not receive this device exception.
-- Keep Cloud Agent isolation admission available while outstanding modern control/device credentials still need to create sessions. Turning it off immediately intentionally refuses new modern workspace creation; it is not a seamless rollback for those callers.
-- After outstanding admission credentials drain, disable new isolation adoption. Existing modern sessions retain their isolated attachment selection and supported transport.
-- Keep compatible readers, proof verification, wrapper capabilities, and renewal/recovery support deployed until the corresponding credential and workload populations have drained or been safely migrated. Existing Cloud Agent and Gastown delegation bounds differ; do not use one global wait interval.
-- Never rotate global keys, reset all peppers, remove audience checks, or fall back to unrestricted legacy credentials to recover availability.
-
-Keep new producer issuance off during each automatic deployment wave. The Cloud Agent PR enables runtime isolation admission, but merge does not activate modern issuance. Record incomplete physical-device, real-provider, and full sandbox smoke coverage as validation risks rather than presenting them as missing recovery implementation or claiming unperformed tests passed.
+Never reset peppers, rotate global signing keys, weaken audience checks, or issue unrestricted fallback credentials as a rollout workaround. Existing Cloud Agent transport lifecycle issues are handled independently of this remaining-family rollout.

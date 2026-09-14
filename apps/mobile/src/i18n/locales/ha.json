@@ -2976,14 +2976,6 @@
     "revoke": "Soke amincewa da {{host}}",
     "backToPreferences": "Koma ga zaɓuɓɓuka"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Fara tattaunawa",
-      "description": "Aika saƙo don tattaunawa da samfuri."
-    },
-    "historyRetry": "An kasa loda tarihin tattaunawa.",
-    "sendError": "An kasa aika saƙon. Sake gwadawa."
-  },
   "glanceable": {
     "waiting": "Ana sabunta wakilai",
     "empty": "Babu aikin da ke gudana",
@@ -3009,5 +3001,18 @@
     "loadFailed": "An kasa loda harsunan da wannan na'urar ke goyan baya.",
     "emptyTitle": "Babu harsunan da ake goyan baya",
     "emptyDescription": "Fahimtar magana ta wannan na'urar ba ta bayar da wani harshe da ake goyan baya ba."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Fara tattaunawa",
+      "description": "Aika saƙo don tattaunawa da samfurin."
+    },
+    "list": {
+      "loadFailed": "Ba a iya loda tarihin tattaunawa.",
+      "new": "Sabuwar tattaunawa",
+      "openHint": "Yana buɗe tattaunawar. Danna sosai don sharewa.",
+      "deleteTitle": "A share wannan tattaunawar?"
+    },
+    "beta": "Beta"
   }
 }

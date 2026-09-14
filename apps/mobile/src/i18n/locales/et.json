@@ -2976,14 +2976,6 @@
     "revoke": "Lõpeta hosti {{host}} usaldamine",
     "backToPreferences": "Tagasi eelistuste juurde"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Alusta vestlust",
-      "description": "Mudeliga vestlemiseks saada sõnum."
-    },
-    "historyRetry": "Vestluse ajaloo laadimine ei õnnestunud.",
-    "sendError": "Sõnumi saatmine ebaõnnestus. Proovi uuesti."
-  },
   "glanceable": {
     "waiting": "Agentide oleku värskendamine",
     "empty": "Ühtegi tööd pole pooleli",
@@ -3009,5 +3001,18 @@
     "loadFailed": "Selle seadme toetatavaid keeli ei õnnestunud laadida.",
     "emptyTitle": "Toetatud keeli pole",
     "emptyDescription": "Selle seadme kõnetuvastus ei teata ühtegi toetatud keelt."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Alusta vestlust",
+      "description": "Mudeliga vestlemiseks saada sõnum."
+    },
+    "list": {
+      "loadFailed": "Vestluse ajaloo laadimine ei õnnestunud.",
+      "new": "Uus vestlus",
+      "openHint": "Avab vestluse. Kustutamiseks hoia all.",
+      "deleteTitle": "Kas kustutada see vestlus?"
+    },
+    "beta": "Beeta"
   }
 }

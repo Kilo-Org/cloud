@@ -2976,14 +2976,6 @@
     "revoke": "Fjern tillid til {{host}}",
     "backToPreferences": "Tilbage til indstillinger"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Start en chat",
-      "description": "Send en besked for at tale med en model."
-    },
-    "historyRetry": "Chathistorikken kunne ikke indlæses.",
-    "sendError": "Kunne ikke sende beskeden. Prøv igen."
-  },
   "glanceable": {
     "waiting": "Opdaterer agenter",
     "empty": "Intet arbejde i gang",
@@ -3009,5 +3001,18 @@
     "loadFailed": "Kunne ikke indlæse de sprog, denne enhed understøtter.",
     "emptyTitle": "Ingen understøttede sprog",
     "emptyDescription": "Denne enheds talegenkendelse rapporterer ingen understøttede sprog."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Start en chat",
+      "description": "Send en besked for at tale med en model."
+    },
+    "list": {
+      "loadFailed": "Kunne ikke indlæse chathistorik.",
+      "new": "Ny chat",
+      "openHint": "Åbner chatten. Tryk og hold for at slette.",
+      "deleteTitle": "Slet denne chat?"
+    },
+    "beta": "Beta"
   }
 }

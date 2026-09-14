@@ -2998,14 +2998,6 @@
     "revoke": "Retirer {{host}} des sites de confiance",
     "backToPreferences": "Retour aux préférences"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Démarrer une discussion",
-      "description": "Envoyez un message pour discuter avec un modèle."
-    },
-    "historyRetry": "Impossible de charger l'historique de la conversation.",
-    "sendError": "Impossible d'envoyer le message. Réessayez."
-  },
   "glanceable": {
     "waiting": "Actualisation des agents",
     "empty": "Aucun travail en cours",
@@ -3031,5 +3023,18 @@
     "loadFailed": "Impossible de charger les langues prises en charge par cet appareil.",
     "emptyTitle": "Aucune langue prise en charge",
     "emptyDescription": "La reconnaissance vocale de cet appareil ne signale aucune langue prise en charge."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Démarrer une discussion",
+      "description": "Envoyez un message pour discuter avec un modèle."
+    },
+    "list": {
+      "loadFailed": "Impossible de charger l'historique de la conversation.",
+      "new": "Nouvelle discussion",
+      "openHint": "Ouvre la discussion. Appui long pour supprimer.",
+      "deleteTitle": "Supprimer cette discussion ?"
+    },
+    "beta": "Bêta"
   }
 }

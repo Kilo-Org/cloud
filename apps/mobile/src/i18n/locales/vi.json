@@ -2976,14 +2976,6 @@
     "revoke": "Bỏ tin cậy {{host}}",
     "backToPreferences": "Quay lại cài đặt"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Bắt đầu trò chuyện",
-      "description": "Gửi tin nhắn để trò chuyện với mô hình AI."
-    },
-    "historyRetry": "Không thể tải lịch sử trò chuyện.",
-    "sendError": "Không thể gửi tin nhắn. Vui lòng thử lại."
-  },
   "glanceable": {
     "waiting": "Đang cập nhật tác nhân",
     "empty": "Không có tác vụ đang chạy",
@@ -3009,5 +3001,18 @@
     "loadFailed": "Không thể tải các ngôn ngữ mà thiết bị này hỗ trợ.",
     "emptyTitle": "Không có ngôn ngữ được hỗ trợ",
     "emptyDescription": "Tính năng nhận dạng giọng nói của thiết bị này không báo cáo ngôn ngữ được hỗ trợ nào."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Bắt đầu trò chuyện",
+      "description": "Gửi tin nhắn để trò chuyện với mô hình."
+    },
+    "list": {
+      "loadFailed": "Không thể tải lịch sử trò chuyện.",
+      "new": "Cuộc trò chuyện mới",
+      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để xóa.",
+      "deleteTitle": "Xóa cuộc trò chuyện này?"
+    },
+    "beta": "Beta"
   }
 }

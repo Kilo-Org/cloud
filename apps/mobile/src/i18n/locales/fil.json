@@ -2976,14 +2976,6 @@
     "revoke": "Bawiin ang tiwala sa {{host}}",
     "backToPreferences": "Bumalik sa mga setting"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Magsimula ng chat",
-      "description": "Magpadala ng mensahe para makipag-usap sa isang modelo."
-    },
-    "historyRetry": "Hindi ma-load ang kasaysayan ng chat.",
-    "sendError": "Hindi maipadala ang mensahe. Subukang muli."
-  },
   "glanceable": {
     "waiting": "Ina-update ang mga agent",
     "empty": "Walang kasalukuyang gawain",
@@ -3009,5 +3001,18 @@
     "loadFailed": "Hindi ma-load ang mga wikang sinusuportahan ng device na ito.",
     "emptyTitle": "Walang sinusuportahang wika",
     "emptyDescription": "Walang sinusuportahang wikang iniuulat ng pagkilala sa pagsasalita ng device na ito."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Magsimula ng chat",
+      "description": "Magpadala ng mensahe para makipag-usap sa isang modelo."
+    },
+    "list": {
+      "loadFailed": "Hindi ma-load ang kasaysayan ng chat.",
+      "new": "Bagong chat",
+      "openHint": "Binubuksan ang chat. Pindutin nang matagal para burahin.",
+      "deleteTitle": "Burahin ang chat na ito?"
+    },
+    "beta": "Beta"
   }
 }

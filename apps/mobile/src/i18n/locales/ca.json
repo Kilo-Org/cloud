@@ -2998,14 +2998,6 @@
     "revoke": "Deixa de confiar en {{host}}",
     "backToPreferences": "Torna a les preferències"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Comença un xat",
-      "description": "Envia un missatge per parlar amb un model."
-    },
-    "historyRetry": "No s'ha pogut carregar l'historial del xat.",
-    "sendError": "No s'ha pogut enviar el missatge. Torna-ho a provar."
-  },
   "glanceable": {
     "waiting": "S'estan actualitzant els agents",
     "empty": "No hi ha cap feina en curs",
@@ -3031,5 +3023,18 @@
     "loadFailed": "No s'han pogut carregar els idiomes que admet aquest dispositiu.",
     "emptyTitle": "Cap idioma admès",
     "emptyDescription": "El reconeixement de veu d'aquest dispositiu no indica cap idioma admès."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Comença un xat",
+      "description": "Envia un missatge per parlar amb un model."
+    },
+    "list": {
+      "loadFailed": "No s'ha pogut carregar l'historial del xat.",
+      "new": "Xat nou",
+      "openHint": "Obre el xat. Mantén premut per suprimir.",
+      "deleteTitle": "Vols suprimir aquest xat?"
+    },
+    "beta": "Beta"
   }
 }

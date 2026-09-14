@@ -58,7 +58,12 @@ import {
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
-import { resolvePersistedRunOn, shouldRestorePersistedRunOn } from '@/lib/run-on-destination';
+import {
+  PRESELECT_CLOUD_RUN_ON,
+  readPreselectRunOn,
+  resolvePersistedRunOn,
+  shouldRestorePersistedRunOn,
+} from '@/lib/run-on-destination';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { peekSharePayload } from '@/lib/share-payload';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
@@ -103,6 +108,11 @@ export function NewSessionScreenBody() {
   const cloneFromKiloSessionId = readCloneFromKiloSessionId(searchParams);
   const cloneSourceTitle = readCloneSourceTitle(searchParams);
   const isCloneEntry = cloneFromKiloSessionId !== '';
+  // The route's explicit Run-on preselection: the tour's cloud path names the
+  // Cloud Agent sentinel, the computer path names the tapped connection id.
+  const preselectRunOn = readPreselectRunOn(searchParams.preselectRunOn);
+  const preselectConnectionId =
+    preselectRunOn !== null && preselectRunOn !== PRESELECT_CLOUD_RUN_ON ? preselectRunOn : null;
 
   const [runOnInstance, setRunOnInstance] = useState<InstancePickerInstance | null>(null);
   const [remoteOverride, setRemoteOverride] = useState<RemoteModelOverride | null>(null);
@@ -281,11 +291,23 @@ export function NewSessionScreenBody() {
     if (runOnRestoredRef.current || runOnUserPickedRef.current) {
       return;
     }
+    // The tour's computer path names a connection id: wait for the live
+    // instance list, then bind the real row (a disconnected id falls back to
+    // Cloud Agent, exactly like the stored-preference path). The stored
+    // preference is never consulted — the tour must not touch it.
+    if (preselectConnectionId !== null) {
+      if (instancesData === undefined) {
+        return;
+      }
+      runOnRestoredRef.current = true;
+      setRunOnInstance(resolvePersistedRunOn(preselectConnectionId, instanceList));
+      return;
+    }
     // The tour's cloud path asks for the Cloud Agent target explicitly: start
     // with no remote target so the form opens on Cloud Agent, and never restore
     // the stored preference (which the tour must not touch). `runOnUserPickedRef`
     // still lets a deliberate in-form choice persist normally.
-    if (!shouldRestorePersistedRunOn(searchParams.preselectRunOn)) {
+    if (!shouldRestorePersistedRunOn(preselectRunOn ?? undefined)) {
       runOnRestoredRef.current = true;
       return;
     }
@@ -299,7 +321,8 @@ export function NewSessionScreenBody() {
     instanceList,
     instancesData,
     storedConnectionId,
-    searchParams.preselectRunOn,
+    preselectConnectionId,
+    preselectRunOn,
   ]);
 
   // A successful session creation owns clearing the new-session draft; a

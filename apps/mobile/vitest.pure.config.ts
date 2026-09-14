@@ -26,6 +26,11 @@ export default defineProject({
     // in a single test file.
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    // encrypted-kv.test.ts imports node:sqlite on purpose (it is the only way
+    // to run real SQL semantics under Node), and Node prints an
+    // ExperimentalWarning for that API on every worker start. Pass the warning
+    // class down to the workers so the suite prints no warnings.
+    execArgv: ['--disable-warning=ExperimentalWarning'],
     include: [
       'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',

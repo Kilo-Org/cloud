@@ -3,7 +3,14 @@ import { getLocales } from 'expo-localization';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from './languages';
 
 function normalizeLocale(tag: string): string {
-  return tag.toLowerCase().replaceAll('_', '-');
+  // Android's speech service names Mandarin with the ISO 639-3 code `cmn`
+  // (`cmn-Hans-CN`), the app ships it as `zh-Hans`/`zh-Hant`. Canonicalizing
+  // the primary subtag here makes every comparison below treat the two
+  // spellings as one language.
+  return tag
+    .toLowerCase()
+    .replaceAll('_', '-')
+    .replace(/^cmn(?=-|$)/, 'zh');
 }
 
 /**

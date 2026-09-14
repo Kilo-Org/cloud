@@ -7,8 +7,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
-import { OFFLINE_BANNER_HEIGHT, useOfflineBannerSpace } from '@/components/offline-banner-space';
+import { useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { offlineHeaderReservation } from '@/lib/offline-banner-state';
 import { cn } from '@/lib/utils';
 
 /**
@@ -102,7 +103,7 @@ export function ScreenHeader({
   // modal is a separate native sheet window above the banner, so a modal header
   // never reserves.
   const reserveOfflineBanner = safeAreaTop && isOfflineBannerVisible && !modal;
-  const paddingTop = baseTopPadding + (reserveOfflineBanner ? OFFLINE_BANNER_HEIGHT : 0);
+  const paddingTop = baseTopPadding + offlineHeaderReservation(reserveOfflineBanner);
 
   // `paddingTop` stays conditional on `safeAreaTop`: a form sheet owns its
   // vertical padding through `className`.

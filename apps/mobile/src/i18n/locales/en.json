@@ -255,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Gateway transcription",
     "gatewayTranscriptionSubtitle": "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Condense tool calls",
+    "condenseToolCallsSubtitle": "Group consecutive tool calls into one row you can open."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",
@@ -2500,6 +2502,10 @@
       "draft": "draft pull request",
       "updating": "Updating, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
+    },
+    "toolRun": {
+      "sheetTitle": "Tool calls",
+      "condensedLabel": "{{itemCount}} items; {{last}}"
     }
   },
   "bootstrap": {

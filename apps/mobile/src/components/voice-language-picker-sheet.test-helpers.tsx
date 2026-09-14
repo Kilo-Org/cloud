@@ -1,6 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest; this one harness mocks every native module the sheet reaches. */
+/* eslint-disable max-lines -- this one harness mocks every native module the sheet reaches. */
 import { createElement, Fragment, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { vi } from 'vitest';
 
 import '@/i18n';

@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- Renderer routing, patch-summary, and mounted diff-line tests share the direct-invocation harness. */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/test/render-with-providers.tsx */
 import {
   type PatchPart,
   type ReasoningPart,
@@ -7,7 +6,7 @@ import {
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
 import * as React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';

@@ -1,7 +1,7 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- the child-session suites share this mounted native fixture. */
-import { type ComponentProps, createElement, type ReactNode } from 'react';
+/* eslint-disable max-lines -- the child-session suites share this mounted native fixture. */
+import { type ComponentProps, createElement, type ReactNode, type Ref } from 'react';
 import { type FlashListProps } from '@shopify/flash-list';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, vi } from 'vitest';
 
 import {
@@ -81,10 +81,24 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@shopify/flash-list', async () => {
   const React = await import('react');
   return {
-    FlashList: (props: FlashListProps<StoredMessage>) =>
-      React.createElement(
+    FlashList: (
+      props: FlashListProps<StoredMessage> & { ref?: Ref<{ scrollToEnd: () => void }> }
+    ) => {
+      React.useImperativeHandle(
+        props.ref,
+        () => {
+          viewport.offset = 0;
+          return {
+            scrollToEnd: () => {
+              viewport.offset = 2000;
+            },
+          };
+        },
+        []
+      );
+      return React.createElement(
         'FlashList',
-        props,
+        { ...props, ref: undefined },
         props.ListHeaderComponent as ReactNode,
         props.data?.map((item, index) =>
           React.createElement(
@@ -94,7 +108,8 @@ vi.mock('@shopify/flash-list', async () => {
           )
         ),
         props.ListFooterComponent as ReactNode
-      ),
+      );
+    },
   };
 });
 vi.mock('./part-detail-sheet-host', () => ({
@@ -258,19 +273,7 @@ export async function renderSheet(props: SheetProps) {
   };
   await act(async () => {
     await Promise.resolve();
-    rendererRef.current = TestRenderer.create(createElement(ChildSessionSheet, props), {
-      createNodeMock: element => {
-        if (element.type !== 'FlashList') {
-          return null;
-        }
-        viewport.offset = 0;
-        return {
-          scrollToEnd: () => {
-            viewport.offset = 2000;
-          },
-        };
-      },
-    });
+    rendererRef.current = TestRenderer.create(createElement(ChildSessionSheet, props));
   });
   const renderer = rendererRef.current;
   if (!renderer) {

@@ -2623,7 +2623,10 @@
     "gatewayModelUnavailable": "Tento model prepisu nie je dostupný. Vyberte iný v Predvoľbách.",
     "gatewayModelUnavailableNotice": "Tento model sa už neponúka. Klepnutím na $t(transcriptionModel.title) vyberte iný.",
     "gatewaySignInRequired": "Prihláste sa, aby ste mohli používať prepis cez Kilo Gateway.",
-    "gatewayNoModel": "Najprv vyberte model prepisu v Predvoľbách."
+    "gatewayNoModel": "Najprv vyberte model prepisu v Predvoľbách.",
+    "testTitle": "Otestovať hlasový vstup",
+    "testPlaceholder": "Klepnite na mikrofón a začnite hovoriť.",
+    "testClear": "Vymazať text"
   },
   "share": {
     "title": "Zdieľanie do aplikácie Kilo",
@@ -3014,5 +3017,12 @@
     "emptyTitle": "Žiadne modely prepisu",
     "emptyDescription": "Kilo Gateway teraz neponúka žiadne modely prepisu.",
     "loadFailed": "Nepodarilo sa načítať modely prepisu."
+  },
+  "voiceLanguage": {
+    "title": "Jazyk hlasového vstupu",
+    "automatic": "Automaticky",
+    "loadFailed": "Nepodarilo sa načítať jazyky, ktoré toto zariadenie podporuje.",
+    "emptyTitle": "Žiadne podporované jazyky",
+    "emptyDescription": "Rozpoznávanie reči tohto zariadenia nehlási žiadne podporované jazyky."
   }
 }

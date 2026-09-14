@@ -889,4 +889,89 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
       renderer.unmount();
     });
   });
+
+  it('threads the MarkdownText onCopyCode handler down to the code fence', async () => {
+    const { MarkdownText } = await import('./markdown-text');
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(
+        createElement(MarkdownText, { value: '```ts\nconst x = 1;\n```', onCopyCode })
+      );
+    });
+    const renderer = rendererRef.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+
+    const blocks = renderer.root.findAll(node => (node.type as unknown) === 'CodeBlock');
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.props.onCopyCode).toBe(onCopyCode);
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.unmount();
+    });
+  });
+
+  it('leaves the code fence static without an onCopyCode handler', async () => {
+    const { MarkdownText } = await import('./markdown-text');
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(
+        createElement(MarkdownText, { value: '```ts\nconst x = 1;\n```' })
+      );
+    });
+    const renderer = rendererRef.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+
+    const blocks = renderer.root.findAll(node => (node.type as unknown) === 'CodeBlock');
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.props.onCopyCode).toBeUndefined();
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.unmount();
+    });
+  });
+
+  it('threads the MarkdownText onLongPressCode handler down to the code fence', async () => {
+    const { MarkdownText } = await import('./markdown-text');
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const onLongPressCode = vi.fn<() => void>();
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(
+        createElement(MarkdownText, {
+          value: '```ts\nconst x = 1;\n```',
+          onCopyCode,
+          onLongPressCode,
+        })
+      );
+    });
+    const renderer = rendererRef.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+
+    const blocks = renderer.root.findAll(node => (node.type as unknown) === 'CodeBlock');
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.props.onLongPressCode).toBe(onLongPressCode);
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.unmount();
+    });
+  });
 });

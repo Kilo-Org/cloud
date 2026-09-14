@@ -2623,7 +2623,10 @@
     "gatewayModelUnavailable": "Ta model za prepisovanje ni na voljo. Izberite drugega v Nastavitvah.",
     "gatewayModelUnavailableNotice": "Ta model se ne ponuja več. Dotaknite se $t(transcriptionModel.title) in izberite drugega.",
     "gatewaySignInRequired": "Prijavite se za uporabo prepisovanja prek Kilo Gateway.",
-    "gatewayNoModel": "Najprej izberite model za prepisovanje v Nastavitvah."
+    "gatewayNoModel": "Najprej izberite model za prepisovanje v Nastavitvah.",
+    "testTitle": "Preizkusite glasovni vnos",
+    "testPlaceholder": "Dotaknite se mikrofona in začnite govoriti.",
+    "testClear": "Počisti besedilo"
   },
   "share": {
     "title": "Deljenje v Kilo",
@@ -3014,5 +3017,12 @@
     "emptyTitle": "Ni modelov za prepisovanje",
     "emptyDescription": "Kilo Gateway trenutno ne ponuja modelov za prepisovanje.",
     "loadFailed": "Modelov za prepisovanje ni bilo mogoče naložiti."
+  },
+  "voiceLanguage": {
+    "title": "Jezik glasovnega vnosa",
+    "automatic": "Samodejno",
+    "loadFailed": "Jezikov, ki jih podpira ta naprava, ni bilo mogoče naložiti.",
+    "emptyTitle": "Ni podprtih jezikov",
+    "emptyDescription": "Prepoznavanje govora te naprave ne poroča o podprtih jezikih."
   }
 }

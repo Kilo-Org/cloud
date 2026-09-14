@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "دا ماډل شتون نلري. په غوره توبونو کې بل وټاکئ.",
     "gatewayModelUnavailableNotice": "دا ماډل نور وړاندې نه کېږي. د بل غوره کولو لپاره $t(transcriptionModel.title) ته ټک ووهئ.",
     "gatewaySignInRequired": "د Kilo Gateway بدلولو کارولو لپاره ننوځئ.",
-    "gatewayNoModel": "لومړی په غوره توبونو کې یو ماډل وټاکئ."
+    "gatewayNoModel": "لومړی په غوره توبونو کې یو ماډل وټاکئ.",
+    "testTitle": "د غږیز لیکل ازموینه",
+    "testPlaceholder": "مایکروفون ته ټېپ وکړئ او خبرې پیل کړئ.",
+    "testClear": "متن پاک کړئ"
   },
   "share": {
     "title": "له Kilo سره شریکول",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "د غږ د متن ته بدلولو هیڅ ماډل نشته",
     "emptyDescription": "Kilo Gateway اوس مهال د غږ د متن ته بدلولو هیڅ ماډل نه وړاندې کوي.",
     "loadFailed": "د غږ د متن ته بدلولو ماډلونه بار نه شول."
+  },
+  "voiceLanguage": {
+    "title": "د غږیز لیکل ژبه",
+    "automatic": "اتومات",
+    "loadFailed": "د دې وسیلې ملاتړ شوې ژبې بار نشوې.",
+    "emptyTitle": "ملاتړ شوې ژبې نشته",
+    "emptyDescription": "د دې وسیلې د وینا پېژندنه کومه ملاتړ شوې ژبه نه ښیې."
   }
 }

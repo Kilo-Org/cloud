@@ -1,8 +1,7 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import '@/i18n';
 import { Eye } from '@/components/ui/icons';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { FixedPartRow } from './fixed-part-row';
@@ -51,6 +50,27 @@ function findHost(
   type: string
 ): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => node.type === type);
+}
+
+/** The inner row that carries the label and, when present, the badge. */
+function findContentRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  const row = findHost(root, 'View').find(
+    node =>
+      typeof node.props.className === 'string' &&
+      node.props.className.includes('flex-1') &&
+      node.props.className.includes('flex-row')
+  );
+  if (!row) {
+    throw new Error('label/badge content row not found');
+  }
+  return row;
+}
+
+function textWithContent(
+  root: TestRenderer.ReactTestInstance,
+  content: string
+): TestRenderer.ReactTestInstance[] {
+  return findHost(root, 'Text').filter(node => node.props.children === content);
 }
 
 describe('FixedPartRow mounted', () => {
@@ -211,5 +231,70 @@ describe('FixedPartRow mounted', () => {
     expect(className).toContain('border-dashed');
     expect(className).not.toContain('rounded-xl');
     expect(className).not.toContain('border-[1.5px]');
+  });
+});
+
+describe('FixedPartRow label and detail alignment', () => {
+  it('shares one baseline between the tool name and its detail', async () => {
+    const renderer = await renderRow({
+      icon: Eye,
+      label: 'fleet.py',
+      badge: 'L2600 i redova: 75',
+      status: 'completed',
+      accessibilityLabel: 'fleet.py tool, completed',
+    });
+
+    const content = findContentRow(renderer.root);
+    expect(content.props.className).toContain('items-baseline');
+    expect(content.props.className).not.toContain('items-center');
+
+    const label = textWithContent(renderer.root, 'fleet.py');
+    const badge = textWithContent(renderer.root, 'L2600 i redova: 75');
+    expect(label).toHaveLength(1);
+    expect(badge).toHaveLength(1);
+    // The two pieces keep their existing styles and truncation.
+    expect(label[0]?.props.className).toContain('text-sm');
+    expect(label[0]?.props.className).toContain('text-muted-foreground');
+    expect(badge[0]?.props.className).toContain('text-xs');
+    expect(label[0]?.props.numberOfLines).toBe(1);
+    expect(badge[0]?.props.numberOfLines).toBe(1);
+  });
+
+  it('keeps the alignment for a long name and a long detail', async () => {
+    const renderer = await renderRow({
+      icon: Eye,
+      label: 'a-very-long-tool-name-that-should-truncate-at-the-tail.tsx',
+      badge: 'L1234567890 i redova: 999999',
+      status: 'completed',
+      accessibilityLabel: 'long tool, completed',
+    });
+
+    const content = findContentRow(renderer.root);
+    expect(content.props.className).toContain('items-baseline');
+  });
+
+  it('keeps the alignment for a row with no detail', async () => {
+    const renderer = await renderRow({
+      icon: Eye,
+      label: 'fleet.py',
+      status: 'completed',
+      accessibilityLabel: 'fleet.py tool, completed',
+    });
+
+    const content = findContentRow(renderer.root);
+    expect(content.props.className).toContain('items-baseline');
+    expect(textWithContent(renderer.root, 'fleet.py')).toHaveLength(1);
+  });
+
+  it('keeps the alignment for an eyebrow label', async () => {
+    const renderer = await renderRow({
+      label: 'Thought',
+      labelKind: 'eyebrow',
+      badge: '3',
+      accessibilityLabel: 'Thought',
+    });
+
+    const content = findContentRow(renderer.root);
+    expect(content.props.className).toContain('items-baseline');
   });
 });

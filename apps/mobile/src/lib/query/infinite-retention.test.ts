@@ -147,3 +147,42 @@ describe('reconcileFirstPage', () => {
     unsubscribe();
   });
 });
+
+describe('infinite-query refetch fan-out', () => {
+  it('re-requests every retained page, so maxPages bounds a single refetch', async () => {
+    const queryClient = new QueryClient();
+    let calls = 0;
+    const observer = new InfiniteQueryObserver(queryClient, {
+      queryKey: ['refetch-fanout'],
+      // eslint-disable-next-line require-await -- the recipe pins an async queryFn; the body needs no await.
+      queryFn: async ({ pageParam }: { pageParam: number }) => {
+        calls += 1;
+        return page([{ id: String(pageParam), title: 'x' }]);
+      },
+      initialPageParam: 0,
+      getNextPageParam: (_last, pages) => pages.length,
+      maxPages: 3,
+      staleTime: Infinity,
+      retry: false,
+    });
+    // eslint-disable-next-line no-empty-function -- a real listener is required to activate the observer; the body is intentionally empty.
+    const unsubscribe = observer.subscribe(() => {});
+
+    await observer.refetch();
+    for (let loaded = 1; loaded < 3; loaded += 1) {
+      // eslint-disable-next-line no-await-in-loop -- each page's cursor is the previous page's result.
+      await observer.fetchNextPage();
+    }
+    expect(observer.getCurrentResult().data?.pages).toHaveLength(3);
+
+    calls = 0;
+    await observer.refetch();
+
+    // `refetch()` walks every page still in the cache: a focus/foreground
+    // refetch of the session history issues one request per retained page, so
+    // `maxPages` is the fan-out cap, not just a memory bound.
+    expect(calls).toBe(3);
+
+    unsubscribe();
+  });
+});

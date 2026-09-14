@@ -231,6 +231,8 @@
     "voiceInput": "Input suara",
     "autoExpandThinking": "Kembangkan pemikiran secara automatik",
     "autoExpandThinkingSubtitle": "Paparkan pemikiran ejen sepenuhnya setelah ejen selesai berfikir.",
+    "hideThinking": "Sembunyikan butiran pemikiran",
+    "hideThinkingSubtitle": "Jangan paparkan pemikiran ejen pada halaman sesi.",
     "keepScreenOn": "Kekalkan skrin hidup pada halaman sesi",
     "keepScreenOnSubtitle": "Kekalkan skrin hidup semasa sesi berjalan.",
     "appearance": "Penampilan",
@@ -1996,6 +1998,22 @@
       "connectionLost": "Sambungan terputus",
       "retryConnection": "Cuba sambung semula"
     },
+    "goal": {
+      "title": "Matlamat",
+      "statusActive": "Matlamat aktif",
+      "statusPaused": "Matlamat dijeda",
+      "statusComplete": "Matlamat selesai",
+      "statusBlocked": "Matlamat disekat",
+      "edit": "Edit matlamat",
+      "remove": "Buang matlamat",
+      "pause": "Jeda matlamat",
+      "resume": "Sambung matlamat",
+      "editPlaceholder": "Terangkan matlamat",
+      "removeConfirmTitle": "Buang matlamat?",
+      "removeConfirmMessage": "CLI menghapuskan matlamat sesi ini.",
+      "updateFailed": "Matlamat tidak dapat dikemas kini.",
+      "sectionAccessibility": "{{status}}. Matlamat: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Sambungkan GitHub dalam pelayar anda, kemudian kembali ke sini untuk memilih repositori.",
       "openGithub": "Buka GitHub",
@@ -2439,6 +2457,11 @@
       "stepsCount_other": "{{steps}} langkah",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Lulus automatik",
+      "description": "Luluskan permintaan kebenaran untuk sesi ini secara automatik. Alat kemudian berjalan tanpa gesaan.",
+      "unavailable": "Sesi ini tidak boleh menerima permintaan kebenaran."
+    },
     "prBadge": {
       "open": "buka PR",
       "closed": "permintaan tarik yang ditutup",
@@ -2581,7 +2604,10 @@
     "gatewayModelUnavailable": "Model transkripsi ini tidak tersedia. Pilih yang lain dalam Keutamaan.",
     "gatewayModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketik $t(transcriptionModel.title) untuk memilih yang lain.",
     "gatewaySignInRequired": "Log masuk untuk menggunakan transkripsi Kilo Gateway.",
-    "gatewayNoModel": "Pilih model transkripsi dalam Keutamaan terlebih dahulu."
+    "gatewayNoModel": "Pilih model transkripsi dalam Keutamaan terlebih dahulu.",
+    "testTitle": "Uji input suara",
+    "testPlaceholder": "Ketik mikrofon dan mula bercakap.",
+    "testClear": "Kosongkan teks"
   },
   "share": {
     "title": "Kongsi ke Kilo",
@@ -2970,5 +2996,12 @@
     "emptyTitle": "Tiada model transkripsi",
     "emptyDescription": "Kilo Gateway tidak menawarkan model transkripsi pada masa ini.",
     "loadFailed": "Tidak dapat memuatkan model transkripsi."
+  },
+  "voiceLanguage": {
+    "title": "Bahasa input suara",
+    "automatic": "Automatik",
+    "loadFailed": "Bahasa yang disokong peranti ini tidak dapat dimuatkan.",
+    "emptyTitle": "Tiada bahasa yang disokong",
+    "emptyDescription": "Pengecaman pertuturan peranti ini tidak melaporkan sebarang bahasa yang disokong."
   }
 }

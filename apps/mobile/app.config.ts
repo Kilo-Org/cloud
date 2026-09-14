@@ -1,6 +1,11 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
 import { SUPPORTED_LANGUAGES } from './src/i18n/languages.ts';
+import { buildPermissionPromptLocales } from './src/i18n/permission-prompt-locales.ts';
+// Prebuild-time native copy, not app copy — see the widget gallery precedent in
+// plugins/withWidgetLocalizations.js. Kept in plugins/ so the runtime i18next
+// catalogs (src/i18n/locales) stay free of non-runtime strings.
+import PERMISSION_PROMPT_COPY from './plugins/permission-prompt-copy.json';
 // The widget gallery's own copy. Native bundle metadata, not app copy — see
 // plugins/withWidgetLocalizations.js.
 import WIDGET_GALLERY_COPY from './plugins/widget-gallery-copy.json';
@@ -76,6 +81,14 @@ const config: ExpoConfig = {
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
   userInterfaceStyle: 'automatic',
+  // Per-locale Info.plist overrides for the five iOS permission usage
+  // descriptions. Expo's built-in `withLocales` writes a
+  // `<tag>.lproj/InfoPlist.strings` per tag at prebuild; the plugin options
+  // below stay as the base Info.plist value. `ios`-nested so Android's
+  // `withLocales` resolves each tag to nothing. The location copy spells the
+  // app name out: `.lproj` strings are not build-expanded, so the upstream
+  // `$(PRODUCT_NAME)` would render literally there.
+  locales: buildPermissionPromptLocales(PERMISSION_PROMPT_COPY),
   ios: {
     // iOS 18+ appearance variants. `light` is the existing icon unchanged; `dark` keeps the
     // canonical mobile brand yellow on a dark backdrop; `tinted` is grayscale because iOS
@@ -188,7 +201,11 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-image',
     'expo-font',
-    'expo-secure-store',
+    // The app owns its Android backup rules (plugins/withAndroidManifestFix.js
+    // writes the union of the SecureStore and AppsFlyer exclusions). Disable the
+    // module's own backup configuration so prebuild does not warn that other
+    // rules are already present.
+    ['expo-secure-store', { configureAndroidBackup: false }],
     [
       'expo-local-authentication',
       { faceIDPermission: 'Allow Kilo to use Face ID to unlock the app.' },
@@ -239,7 +256,11 @@ const config: ExpoConfig = {
       },
     ],
     'expo-apple-authentication',
-    'expo-iap',
+    // Play flavor (the defaults the plugin already applies). The plugin strips
+    // and re-adds the `missingDimensionStrategy "platform", ...` line on every
+    // prebuild, so its "Added missingDimensionStrategy for play flavor" log line
+    // is expected output, not a misconfiguration.
+    ['expo-iap', { isHorizonEnabled: false, isFireOsEnabled: false }],
     [
       'expo-tracking-transparency',
       {

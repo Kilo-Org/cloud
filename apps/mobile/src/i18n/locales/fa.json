@@ -231,6 +231,8 @@
     "voiceInput": "ورودی صوتی",
     "autoExpandThinking": "باز کردن خودکار بخش تفکر",
     "autoExpandThinkingSubtitle": "پس از پایان تفکر عامل، محتوای آن را به‌صورت بازشده نمایش دهید.",
+    "hideThinking": "پنهان کردن جزئیات تفکر",
+    "hideThinkingSubtitle": "تفکر عامل در صفحهٔ نشست نمایش داده نشود.",
     "keepScreenOn": "روشن نگه داشتن صفحه در صفحهٔ نشست",
     "keepScreenOnSubtitle": "تا زمانی که نشست در حال کار است، صفحه را روشن نگه دارید.",
     "appearance": "ظاهر",
@@ -1996,6 +1998,22 @@
       "connectionLost": "اتصال قطع شد",
       "retryConnection": "تلاش دوباره برای اتصال"
     },
+    "goal": {
+      "title": "هدف",
+      "statusActive": "هدف فعال",
+      "statusPaused": "هدف متوقفشده",
+      "statusComplete": "هدف تکمیل شد",
+      "statusBlocked": "هدف مسدود شد",
+      "edit": "ویرایش هدف",
+      "remove": "حذف هدف",
+      "pause": "توقف هدف",
+      "resume": "ادامه هدف",
+      "editPlaceholder": "هدف را توصیف کنید",
+      "removeConfirmTitle": "هدف حذف شود؟",
+      "removeConfirmMessage": "CLI هدف این جلسه را پاک میکند.",
+      "updateFailed": "هدف بهروزرسانی نشد.",
+      "sectionAccessibility": "{{status}}. هدف: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "حساب GitHub خود را از طریق مرورگر متصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",
       "openGithub": "باز کردن GitHub",
@@ -2439,6 +2457,11 @@
       "stepsCount_other": "{{steps}} گام",
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
     },
+    "autoApprove": {
+      "title": "تأیید خودکار",
+      "description": "درخواست‌های مجوز این نشست را به‌صورت خودکار تأیید کنید. سپس ابزارها بدون درخواست اجرا می‌شوند.",
+      "unavailable": "این نشست نمی‌تواند درخواست‌های مجوز را دریافت کند."
+    },
     "prBadge": {
       "open": "پول ریکوئست باز",
       "closed": "درخواست ادغام بسته‌شده",
@@ -2581,7 +2604,10 @@
     "gatewayModelUnavailable": "این مدل تبدیل گفتار به متن در دسترس نیست. در تنظیمات دلخواه مدل دیگری انتخاب کنید.",
     "gatewayModelUnavailableNotice": "این مدل دیگر ارائه نمی‌شود. برای انتخاب مدل دیگر روی $t(transcriptionModel.title) ضربه بزنید.",
     "gatewaySignInRequired": "برای استفاده از تبدیل گفتار به متن با Kilo Gateway وارد شوید.",
-    "gatewayNoModel": "ابتدا در تنظیمات دلخواه یک مدل تبدیل گفتار به متن انتخاب کنید."
+    "gatewayNoModel": "ابتدا در تنظیمات دلخواه یک مدل تبدیل گفتار به متن انتخاب کنید.",
+    "testTitle": "آزمایش ورودی صوتی",
+    "testPlaceholder": "میکروفون را لمس کنید و شروع به صحبت کنید.",
+    "testClear": "پاک کردن متن"
   },
   "share": {
     "title": "اشتراک‌گذاری با Kilo",
@@ -2970,5 +2996,12 @@
     "emptyTitle": "مدل تبدیل گفتار به متن وجود ندارد",
     "emptyDescription": "Kilo Gateway در حال حاضر مدلی برای تبدیل گفتار به متن ارائه نمی‌دهد.",
     "loadFailed": "بارگذاری مدل‌های تبدیل گفتار به متن ناموفق بود."
+  },
+  "voiceLanguage": {
+    "title": "زبان ورودی صوتی",
+    "automatic": "خودکار",
+    "loadFailed": "زبان‌هایی که این دستگاه پشتیبانی می‌کند بارگذاری نشدند.",
+    "emptyTitle": "هیچ زبان پشتیبانی‌شده‌ای نیست",
+    "emptyDescription": "تشخیص گفتار این دستگاه هیچ زبان پشتیبانی‌شده‌ای گزارش نمی‌کند."
   }
 }

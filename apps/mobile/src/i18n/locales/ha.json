@@ -231,6 +231,8 @@
     "voiceInput": "Shigar da murya",
     "autoExpandThinking": "Faɗaɗa tunani kai tsaye",
     "autoExpandThinkingSubtitle": "Nuna cikakken tunanin wakilin idan ya gama.",
+    "hideThinking": "Ɓoye bayanan tunani",
+    "hideThinkingSubtitle": "Kada a nuna tunanin wakilin a shafin zaman.",
     "keepScreenOn": "Bar allo a kunne a shafin zaman",
     "keepScreenOnSubtitle": "Bar allo a kunne yayin da aikin zaman ke gudana.",
     "appearance": "Kamanni",
@@ -1996,6 +1998,22 @@
       "connectionLost": "Haɗi ya katse",
       "retryConnection": "Sake gwada haɗi"
     },
+    "goal": {
+      "title": "Manufa",
+      "statusActive": "Manufa mai aiki",
+      "statusPaused": "Manufar da aka dakatar",
+      "statusComplete": "An kammala manufa",
+      "statusBlocked": "An toshe manufa",
+      "edit": "Gyara manufa",
+      "remove": "Cire manufa",
+      "pause": "Dakatar da manufa",
+      "resume": "Ci gaba da manufa",
+      "editPlaceholder": "Bayyana manufa",
+      "removeConfirmTitle": "Cire manufa?",
+      "removeConfirmMessage": "CLI yana share manufar wannan zaman.",
+      "updateFailed": "Ba a iya sabunta manufar ba.",
+      "sectionAccessibility": "{{status}}. Manufa: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Haɗa GitHub a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
       "openGithub": "Buɗe GitHub",
@@ -2439,6 +2457,11 @@
       "stepsCount_other": "matakai {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Amincewa ta atomatik",
+      "description": "Amince buƙatun izini na wannan zaman ta atomatik. Sannan kayan aikin suna gudana ba tare da buƙata ba.",
+      "unavailable": "Wannan zaman ba zai iya karɓar buƙatun izini ba."
+    },
     "prBadge": {
       "open": "buɗe buƙatar haɗa canje-canje",
       "closed": "buƙatar haɗa canje-canje da aka rufe",
@@ -2581,7 +2604,10 @@
     "gatewayModelUnavailable": "Wannan samfurin mayar da magana zuwa rubutu ba ya nan. Zaɓi wani a Zaɓuɓɓuka.",
     "gatewayModelUnavailableNotice": "Ba a ƙara ba da wannan samfuri ba. Matsa $t(transcriptionModel.title) don zaɓar wani.",
     "gatewaySignInRequired": "Shiga don amfani da mayar da magana ta Kilo Gateway.",
-    "gatewayNoModel": "Da farko zaɓi samfurin mayar da magana zuwa rubutu a Zaɓuɓɓuka."
+    "gatewayNoModel": "Da farko zaɓi samfurin mayar da magana zuwa rubutu a Zaɓuɓɓuka.",
+    "testTitle": "Gwada shigar da murya",
+    "testPlaceholder": "Danna makirufo ka fara magana.",
+    "testClear": "Share rubutu"
   },
   "share": {
     "title": "Raba zuwa Kilo",
@@ -2970,5 +2996,12 @@
     "emptyTitle": "Babu samfuran mayar da magana zuwa rubutu",
     "emptyDescription": "Kilo Gateway bai ba da samfuran mayar da magana zuwa rubutu a halin yanzu.",
     "loadFailed": "An kasa loda samfuran mayar da magana zuwa rubutu."
+  },
+  "voiceLanguage": {
+    "title": "Harshen shigar da murya",
+    "automatic": "Na atomatik",
+    "loadFailed": "An kasa loda harsunan da wannan na'urar ke goyan baya.",
+    "emptyTitle": "Babu harsunan da ake goyan baya",
+    "emptyDescription": "Fahimtar magana ta wannan na'urar ba ta bayar da wani harshe da ake goyan baya ba."
   }
 }

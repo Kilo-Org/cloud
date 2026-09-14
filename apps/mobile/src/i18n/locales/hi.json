@@ -231,6 +231,8 @@
     "voiceInput": "वॉइस इनपुट",
     "autoExpandThinking": "विचार प्रक्रिया अपने आप खोलें",
     "autoExpandThinkingSubtitle": "एजेंट की विचार प्रक्रिया पूरी होने पर उसका पूरा विवरण दिखाएँ।",
+    "hideThinking": "विचार प्रक्रिया का विवरण छिपाएँ",
+    "hideThinkingSubtitle": "सत्र पेज पर एजेंट की विचार प्रक्रिया न दिखाएँ।",
     "keepScreenOn": "सत्र पेज पर स्क्रीन चालू रखें",
     "keepScreenOnSubtitle": "सत्र में काम चलने के दौरान स्क्रीन चालू रखें।",
     "appearance": "दिखावट",
@@ -1550,6 +1552,22 @@
       "reconnecting": "फिर से कनेक्ट हो रहा है…",
       "retryConnection": "फिर से कनेक्ट करें"
     },
+    "goal": {
+      "title": "लक्ष्य",
+      "statusActive": "सक्रिय लक्ष्य",
+      "statusPaused": "रुका हुआ लक्ष्य",
+      "statusComplete": "लक्ष्य पूर्ण",
+      "statusBlocked": "लक्ष्य अवरुद्ध",
+      "edit": "लक्ष्य संपादित करें",
+      "remove": "लक्ष्य हटाएँ",
+      "pause": "लक्ष्य रोकें",
+      "resume": "लक्ष्य फिर से शुरू करें",
+      "editPlaceholder": "लक्ष्य का वर्णन करें",
+      "removeConfirmTitle": "लक्ष्य हटाएँ?",
+      "removeConfirmMessage": "CLI इस सत्र का लक्ष्य साफ़ कर देता है।",
+      "updateFailed": "लक्ष्य अपडेट नहीं किया जा सका।",
+      "sectionAccessibility": "{{status}}। लक्ष्य: {{text}}"
+    },
     "remoteSession": {
       "failedToCreate": "रिमोट सत्र नहीं बन सका।",
       "failedToExit": "सत्र से बाहर नहीं निकल सके।",
@@ -2005,6 +2023,11 @@
       "filesBadge": "{{displayCount}} फ़ाइलें",
       "matchesBadge": "{{displayCount}} मिलान"
     },
+    "autoApprove": {
+      "title": "स्वतः अनुमोदन",
+      "description": "इस सत्र के लिए अनुमति अनुरोधों को स्वचालित रूप से स्वीकार करें। इसके बाद टूल बिना किसी संकेत के चलते हैं।",
+      "unavailable": "यह सत्र अनुमति अनुरोध प्राप्त नहीं कर सकता।"
+    },
     "prBadge": {
       "open": "पुल रिक्वेस्ट खोलें",
       "closed": "बंद पुल रिक्वेस्ट",
@@ -2147,7 +2170,10 @@
     "gatewayModelUnavailable": "आवाज़ को टेक्स्ट में बदलने का यह मॉडल उपलब्ध नहीं है। पसंद में दूसरा चुनें।",
     "gatewayModelUnavailableNotice": "यह मॉडल अब पेश नहीं किया जाता। दूसरा चुनने के लिए $t(transcriptionModel.title) पर टैप करें।",
     "gatewaySignInRequired": "Kilo Gateway से आवाज़ को टेक्स्ट में बदलने के लिए साइन इन करें।",
-    "gatewayNoModel": "पहले पसंद में आवाज़ को टेक्स्ट में बदलने का मॉडल चुनें।"
+    "gatewayNoModel": "पहले पसंद में आवाज़ को टेक्स्ट में बदलने का मॉडल चुनें।",
+    "testTitle": "वॉइस इनपुट का परीक्षण करें",
+    "testPlaceholder": "माइक्रोफ़ोन पर टैप करें और बोलना शुरू करें।",
+    "testClear": "टेक्स्ट साफ़ करें"
   },
   "share": {
     "title": "Kilo पर साझा करें",
@@ -2970,5 +2996,12 @@
     "emptyTitle": "आवाज़ को टेक्स्ट में बदलने का कोई मॉडल नहीं",
     "emptyDescription": "Kilo Gateway फिलहाल आवाज़ को टेक्स्ट में बदलने के लिए कोई मॉडल नहीं दे रहा।",
     "loadFailed": "आवाज़ को टेक्स्ट में बदलने वाले मॉडल लोड नहीं हो सके।"
+  },
+  "voiceLanguage": {
+    "title": "वॉइस इनपुट की भाषा",
+    "automatic": "स्वचालित",
+    "loadFailed": "इस डिवाइस द्वारा समर्थित भाषाएँ लोड नहीं हो सकीं।",
+    "emptyTitle": "कोई समर्थित भाषा नहीं",
+    "emptyDescription": "इस डिवाइस की वाक् पहचान कोई समर्थित भाषा नहीं बताती।"
   }
 }

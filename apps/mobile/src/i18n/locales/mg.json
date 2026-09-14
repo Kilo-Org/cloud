@@ -231,6 +231,8 @@
     "voiceInput": "Fampidirana feo",
     "autoExpandThinking": "Velaro ho azy ny fisainana",
     "autoExpandThinkingSubtitle": "Asehoy mivelatra ny fisainan'ny mpanampy rehefa vita izany.",
+    "hideThinking": "Afeno ny antsipirian'ny fisainana",
+    "hideThinkingSubtitle": "Aza aseho ny fisainan'ny mpanampy eo amin'ny pejin'ny fotoam-piasana.",
     "keepScreenOn": "Avelao hirehitra ny efijery eo amin'ny pejin'ny fotoam-piasana",
     "keepScreenOnSubtitle": "Avelao hirehitra ny efijery raha mbola mandeha ny fotoam-piasana.",
     "appearance": "Bika",
@@ -1996,6 +1998,22 @@
       "connectionLost": "Tapaka ny fifandraisana",
       "retryConnection": "Andramo mifandray indray"
     },
+    "goal": {
+      "title": "Tanjona",
+      "statusActive": "Tanjona mavitrika",
+      "statusPaused": "Tanjona mihajanona",
+      "statusComplete": "Tanjona vita",
+      "statusBlocked": "Tanjona voasakana",
+      "edit": "Ovay ny tanjona",
+      "remove": "Esory ny tanjona",
+      "pause": "Ajanony ny tanjona",
+      "resume": "Tohizo ny tanjona",
+      "editPlaceholder": "Farano ny tanjona",
+      "removeConfirmTitle": "Esorina ny tanjona?",
+      "removeConfirmMessage": "Mamafa ny tanjon'ity session ity ny CLI.",
+      "updateFailed": "Tsy afaka nanavao ny tanjona.",
+      "sectionAccessibility": "{{status}}. Tanjona: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Ampifandraiso ny GitHub ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody.",
       "openGithub": "Sokafy ny GitHub",
@@ -2439,6 +2457,11 @@
       "stepsCount_other": "dingana {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Fankatoavana ho azy",
+      "description": "Maneke ho azy ny fangatahana alalana ho an'ity sesiona ity. Avy eo ny fitaovana dia mandeha tsy misy fanontaniana.",
+      "unavailable": "Tsy afaka mandray fangatahana alalana ity sesiona ity."
+    },
     "prBadge": {
       "open": "sokafy ny PR",
       "closed": "fangatahana fampidirana kaody nakatona",
@@ -2581,7 +2604,10 @@
     "gatewayModelUnavailable": "Tsy azo ampiasaina ity modely fanovana feo ho soratra ity. Safidio ny hafa ao amin'ny Safidy.",
     "gatewayModelUnavailableNotice": "Tsy atolotra intsony ity modely ity. Tsindrio $t(transcriptionModel.title) hisafidianana ny hafa.",
     "gatewaySignInRequired": "Midira mba hampiasa ny fanovana feo ho soratra amin'ny Kilo Gateway.",
-    "gatewayNoModel": "Safidio aloha ny modely fanovana feo ho soratra ao amin'ny Safidy."
+    "gatewayNoModel": "Safidio aloha ny modely fanovana feo ho soratra ao amin'ny Safidy.",
+    "testTitle": "Andramo ny fampidirana amin'ny feo",
+    "testPlaceholder": "Tsindrio ny mikrô ary manomboka miteny.",
+    "testClear": "Fafao ny soratra"
   },
   "share": {
     "title": "Fizarana amin'ny Kilo",
@@ -2970,5 +2996,12 @@
     "emptyTitle": "Tsy misy modely fanovana feo ho soratra",
     "emptyDescription": "Tsy manome modely fanovana feo ho soratra amin'izao fotoana izao ny Kilo Gateway.",
     "loadFailed": "Tsy tafiditra ny modely fanovana feo ho soratra."
+  },
+  "voiceLanguage": {
+    "title": "Fitenin'ny fampidirana amin'ny feo",
+    "automatic": "Ho azy",
+    "loadFailed": "Tsy afaka naka ny fiteny tohanan'ity fitaovana ity.",
+    "emptyTitle": "Tsy misy fiteny tohana",
+    "emptyDescription": "Ny fanekena feo amin'ity fitaovana ity dia tsy mitatitra fiteny tohana."
   }
 }

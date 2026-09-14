@@ -71,6 +71,20 @@ describe('resolveLanguageTag', () => {
   it('resolves zh to zh-Hans', () => {
     expect(resolveLanguageTag([{ languageTag: 'zh' }])).toBe('zh-Hans');
   });
+
+  it('resolves the Android speech tag cmn-Hans-CN to zh-Hans', () => {
+    // Android's speech service names Mandarin with the ISO 639-3 code `cmn`;
+    // the app ships it as the zh scripts (p16, p4).
+    expect(resolveSupportedLanguageTag([{ languageTag: 'cmn-Hans-CN' }])).toBe('zh-Hans');
+  });
+
+  it('resolves the Android speech tag cmn-Hant-TW to zh-Hant', () => {
+    expect(resolveSupportedLanguageTag([{ languageTag: 'cmn-Hant-TW' }])).toBe('zh-Hant');
+  });
+
+  it('resolves a bare cmn tag to zh-Hans', () => {
+    expect(resolveSupportedLanguageTag([{ languageTag: 'cmn' }])).toBe('zh-Hans');
+  });
 });
 
 describe('resolveSupportedLanguageTag', () => {

@@ -231,6 +231,8 @@
     "voiceInput": "Spracheingabe",
     "autoExpandThinking": "Denkprozess automatisch aufklappen",
     "autoExpandThinkingSubtitle": "Den Denkprozess des Agenten nach Abschluss aufgeklappt anzeigen.",
+    "hideThinking": "Denkdetails ausblenden",
+    "hideThinkingSubtitle": "Den Denkprozess des Agenten nicht auf der Sitzungsseite anzeigen.",
     "keepScreenOn": "Bildschirm in der Sitzungsansicht eingeschaltet lassen",
     "keepScreenOnSubtitle": "Den Bildschirm eingeschaltet lassen, solange die Sitzung läuft.",
     "appearance": "Erscheinungsbild",
@@ -1562,6 +1564,22 @@
       "connectionLost": "Verbindung unterbrochen",
       "retryConnection": "Erneut verbinden"
     },
+    "goal": {
+      "title": "Ziel",
+      "statusActive": "Aktives Ziel",
+      "statusPaused": "Pausiertes Ziel",
+      "statusComplete": "Ziel abgeschlossen",
+      "statusBlocked": "Ziel blockiert",
+      "edit": "Ziel bearbeiten",
+      "remove": "Ziel entfernen",
+      "pause": "Ziel pausieren",
+      "resume": "Ziel fortsetzen",
+      "editPlaceholder": "Ziel beschreiben",
+      "removeConfirmTitle": "Ziel entfernen?",
+      "removeConfirmMessage": "Die CLI löscht das Ziel dieser Sitzung.",
+      "updateFailed": "Das Ziel konnte nicht aktualisiert werden.",
+      "sectionAccessibility": "{{status}}. Ziel: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Verbinde GitHub in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
       "openGithub": "GitHub öffnen",
@@ -2005,6 +2023,11 @@
       "stepsCount_other": "{{steps}} Schritte",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Automatisch genehmigen",
+      "description": "Berechtigungsanfragen für diese Sitzung automatisch genehmigen. Tools werden danach ohne Nachfrage ausgeführt.",
+      "unavailable": "Diese Sitzung kann keine Berechtigungsanfragen empfangen."
+    },
     "prBadge": {
       "open": "pull-Request öffnen",
       "closed": "geschlossener Pull-Request",
@@ -2147,7 +2170,10 @@
     "gatewayModelUnavailable": "Dieses Transkriptionsmodell ist nicht verfügbar. Wähle ein anderes in den Einstellungen.",
     "gatewayModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(transcriptionModel.title), um ein anderes zu wählen.",
     "gatewaySignInRequired": "Melde dich an, um die Gateway-Transkription zu nutzen.",
-    "gatewayNoModel": "Wähle zuerst in den Einstellungen ein Transkriptionsmodell."
+    "gatewayNoModel": "Wähle zuerst in den Einstellungen ein Transkriptionsmodell.",
+    "testTitle": "Spracheingabe testen",
+    "testPlaceholder": "Tippe auf das Mikrofon und sprich.",
+    "testClear": "Text löschen"
   },
   "share": {
     "title": "Mit Kilo teilen",
@@ -2970,5 +2996,12 @@
     "emptyTitle": "Keine Transkriptionsmodelle",
     "emptyDescription": "Kilo Gateway bietet derzeit keine Transkriptionsmodelle.",
     "loadFailed": "Die Transkriptionsmodelle konnten nicht geladen werden."
+  },
+  "voiceLanguage": {
+    "title": "Sprache der Spracheingabe",
+    "automatic": "Automatisch",
+    "loadFailed": "Die von diesem Gerät unterstützten Sprachen konnten nicht geladen werden.",
+    "emptyTitle": "Keine unterstützten Sprachen",
+    "emptyDescription": "Die Spracherkennung dieses Geräts meldet keine unterstützten Sprachen."
   }
 }

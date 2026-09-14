@@ -231,6 +231,8 @@
     "voiceInput": "Entrada de voz",
     "autoExpandThinking": "Expandir el razonamiento automáticamente",
     "autoExpandThinkingSubtitle": "Mostrar el razonamiento del agente expandido cuando termine.",
+    "hideThinking": "Ocultar los detalles del razonamiento",
+    "hideThinkingSubtitle": "No mostrar el razonamiento del agente en la página de la sesión.",
     "keepScreenOn": "Mantener la pantalla encendida durante la sesión",
     "keepScreenOnSubtitle": "Mantener la pantalla encendida mientras la sesión está en curso.",
     "appearance": "Apariencia",
@@ -1571,6 +1573,22 @@
       "connectionLost": "Conexión perdida",
       "retryConnection": "Reintentar la conexión"
     },
+    "goal": {
+      "title": "Objetivo",
+      "statusActive": "Objetivo activo",
+      "statusPaused": "Objetivo en pausa",
+      "statusComplete": "Objetivo completado",
+      "statusBlocked": "Objetivo bloqueado",
+      "edit": "Editar objetivo",
+      "remove": "Eliminar objetivo",
+      "pause": "Pausar objetivo",
+      "resume": "Reanudar objetivo",
+      "editPlaceholder": "Describe el objetivo",
+      "removeConfirmTitle": "¿Eliminar objetivo?",
+      "removeConfirmMessage": "El CLI borra el objetivo de esta sesión.",
+      "updateFailed": "No se pudo actualizar el objetivo.",
+      "sectionAccessibility": "{{status}}. Objetivo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Conecta GitHub en tu navegador y vuelve aquí para elegir un repositorio.",
       "openGithub": "Abrir GitHub",
@@ -2019,6 +2037,11 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_many": "{{steps}} pasos"
     },
+    "autoApprove": {
+      "title": "Aprobación automática",
+      "description": "Aprueba automáticamente las solicitudes de permiso de esta sesión. Después, las herramientas se ejecutan sin aviso.",
+      "unavailable": "Esta sesión no puede recibir solicitudes de permiso."
+    },
     "prBadge": {
       "open": "pR abierta",
       "closed": "solicitud de incorporación de cambios cerrada",
@@ -2161,7 +2184,10 @@
     "gatewayModelUnavailable": "Este modelo de transcripción no está disponible. Elige otro en Preferencias.",
     "gatewayModelUnavailableNotice": "Este modelo ya no se ofrece. Toca $t(transcriptionModel.title) para elegir otro.",
     "gatewaySignInRequired": "Inicia sesión para usar la transcripción con Kilo Gateway.",
-    "gatewayNoModel": "Elige primero un modelo de transcripción en Preferencias."
+    "gatewayNoModel": "Elige primero un modelo de transcripción en Preferencias.",
+    "testTitle": "Probar el dictado",
+    "testPlaceholder": "Toca el micrófono y empieza a hablar.",
+    "testClear": "Borrar texto"
   },
   "share": {
     "title": "Compartir en Kilo",
@@ -2992,5 +3018,12 @@
     "emptyTitle": "No hay modelos de transcripción",
     "emptyDescription": "Kilo Gateway no ofrece modelos de transcripción en este momento.",
     "loadFailed": "No se pudieron cargar los modelos de transcripción."
+  },
+  "voiceLanguage": {
+    "title": "Idioma del dictado",
+    "automatic": "Automático",
+    "loadFailed": "No se pudieron cargar los idiomas que admite este dispositivo.",
+    "emptyTitle": "No hay idiomas compatibles",
+    "emptyDescription": "El reconocimiento de voz de este dispositivo no informa de ningún idioma compatible."
   }
 }

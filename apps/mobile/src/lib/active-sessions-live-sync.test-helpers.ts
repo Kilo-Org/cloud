@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted query fixtures */
 import { createElement, type ReactNode } from 'react';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { createKiloAppQueryClient } from '@/lib/query-client';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';

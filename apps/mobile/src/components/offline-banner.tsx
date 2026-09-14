@@ -14,11 +14,6 @@ import { announceForA11y } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 
-// Re-exported for existing callers/tests; the constant is defined in the leaf
-// `offline-banner-space` module so `ScreenHeader` can reserve the height
-// without loading this component's dependencies.
-export { OFFLINE_BANNER_HEIGHT };
-
 /**
  * Publishes the banner's visibility to every pinned `ScreenHeader`. Mounted by
  * the root layout above the navigation tree; the header then reserves the

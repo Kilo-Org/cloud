@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "SSO dhaabbataa"
   },
   "preferences": {
+    "general": "Waliigalaa",
+    "voiceInput": "Galtee sagalee",
     "autoExpandThinking": "Xiinxala ofumaan bal'isi",
     "autoExpandThinkingSubtitle": "Yeroo ergamaan xiinxala isaa xumuru, bal'isiitii agarsiisi.",
+    "hideThinking": "Bal'ina xiinxala dhoksi",
+    "hideThinkingSubtitle": "Fuula turtii irratti xiinxala ergamaa hin agarsiisi.",
     "keepScreenOn": "Fuula turtii irra yeroo jirtu iskiriiniin akka hin dhaamne godhi",
     "keepScreenOnSubtitle": "Hanga turtiin hojjechaa jirutti iskiriiniin akka hin dhaamne godhi.",
     "appearance": "Bifa",
@@ -237,6 +241,7 @@
     "appearanceLight": "Ifa",
     "appearanceDark": "Dukkana",
     "account": "Herrega",
+    "accountSubtitle": "Afaan, keessummeessitoota amanaman fi turtiiwwan meeshaalee",
     "prReviewAttribution": "Maqaa appilikeeshinii sakatta'iinsa PR irratti dabali",
     "prReviewAttributionSubtitle": "Yeroo sakatta'iinsa ergitu, barruu jalaa Kilo dhaan sakatta'ame jedhu dabali.",
     "returnSendsMessage": "Furtuun galchii ergaa ergiti",
@@ -1993,6 +1998,22 @@
       "connectionLost": "Walqabannaan citeera",
       "retryConnection": "Deebi'ii walqabsiisuuf yaali"
     },
+    "goal": {
+      "title": "Kaayyoo",
+      "statusActive": "Kaayyoo socho'aa",
+      "statusPaused": "Kaayyoo dhaabbate",
+      "statusComplete": "Kaayyoon xumurame",
+      "statusBlocked": "Kaayyoon cufame",
+      "edit": "Kaayyoo gulaali",
+      "remove": "Kaayyoo haqi",
+      "pause": "Kaayyoo dhaabi",
+      "resume": "Kaayyoo itti fufi",
+      "editPlaceholder": "Kaayyoo ibsi",
+      "removeConfirmTitle": "Kaayyoo haquu?",
+      "removeConfirmMessage": "CLI kaayyoo seesshinii kanaa haqa.",
+      "updateFailed": "Kaayyoo haaromsuun hin danda'amne.",
+      "sectionAccessibility": "{{status}}. Kaayyoo: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "GitHub biraawzarii kee keessatti walqabsiisi, sana booda kuusaa koodii filachuuf asitti deebi'i.",
       "openGithub": "GitHub bani",
@@ -2576,8 +2597,12 @@
     "gatewayUnreachable": "Kilo Gateway'tti quhamuun hin danda'amne. Walqabannaa kee ilaaliitii deebi'ii yaali.",
     "gatewayTimeout": "Sagalee barreeffamatti jijjiiruun yeroo dheeraa fudhate. Irra deebi'ii yaali.",
     "gatewayModelUnavailable": "Moodeeli sagalee jijjiiru kun hin jiru. Filannoowwan keessaa kan biroo filadhu.",
+    "gatewayModelUnavailableNotice": "Moodeeli kun hin dhiyaatu. Kan biraa filachuuf $t(transcriptionModel.title) tuqi.",
     "gatewaySignInRequired": "Jijjiirraa sagalee Kilo Gateway'tti fayyadamuuf seeni.",
-    "gatewayNoModel": "Dursee Filannoowwan keessatti moodeela sagalee jijjiiru filadhu."
+    "gatewayNoModel": "Dursee Filannoowwan keessatti moodeela sagalee jijjiiru filadhu.",
+    "testTitle": "Sagaleen galchuu qori",
+    "testPlaceholder": "Maayikirofoon tuqiitii dubbachuu jalqabi.",
+    "testClear": "Barreeffama haqi"
   },
   "share": {
     "title": "Gara Kilo qoodi",
@@ -2966,5 +2991,12 @@
     "emptyTitle": "Moodeeli sagalee jijjiiru hin jiru",
     "emptyDescription": "Kilo Gateway amma moodeela sagalee gara barreeffamaatti jijjiiru hin dhiyeessu.",
     "loadFailed": "Moodeelota sagalee jijjiiru fe'uun hin danda'amne."
+  },
+  "voiceLanguage": {
+    "title": "Afaan sagaleen galchuu",
+    "automatic": "Ofumaan",
+    "loadFailed": "Afaan meeshaan kun deeggartu fe'amuu hin dandeenye.",
+    "emptyTitle": "Afaan deeggarame hin jiru",
+    "emptyDescription": "Meeshaan kun beekumsa sagalee afaan deeggarame hin ibsu."
   }
 }

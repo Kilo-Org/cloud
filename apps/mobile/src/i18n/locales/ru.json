@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "Корпоративный SSO"
   },
   "preferences": {
+    "general": "Общие",
+    "voiceInput": "Голосовой ввод",
     "autoExpandThinking": "Автоматически раскрывать рассуждения",
     "autoExpandThinkingSubtitle": "Показывать рассуждения агента целиком, когда он закончит обдумывание.",
+    "hideThinking": "Скрыть подробности рассуждений",
+    "hideThinkingSubtitle": "Не показывать рассуждения агента на странице сеанса.",
     "keepScreenOn": "Не выключать экран на странице сеанса",
     "keepScreenOnSubtitle": "Не выключать экран, пока сеанс выполняется.",
     "appearance": "Внешний вид",
@@ -237,6 +241,7 @@
     "appearanceLight": "Светлая",
     "appearanceDark": "Тёмная",
     "account": "Аккаунт",
+    "accountSubtitle": "Язык, доверенные сайты и сеансы на устройствах",
     "prReviewAttribution": "Указывать приложение в проверках PR",
     "prReviewAttributionSubtitle": "Добавлять подпись «Проверено с помощью Kilo» в конце проверки при её отправке.",
     "returnSendsMessage": "Отправлять сообщение клавишей ввода",
@@ -1577,6 +1582,22 @@
       "connectionLost": "Соединение прервано",
       "retryConnection": "Повторить подключение"
     },
+    "goal": {
+      "title": "Цель",
+      "statusActive": "Активная цель",
+      "statusPaused": "Цель на паузе",
+      "statusComplete": "Цель достигнута",
+      "statusBlocked": "Цель заблокирована",
+      "edit": "Изменить цель",
+      "remove": "Удалить цель",
+      "pause": "Приостановить цель",
+      "resume": "Возобновить цель",
+      "editPlaceholder": "Опишите цель",
+      "removeConfirmTitle": "Удалить цель?",
+      "removeConfirmMessage": "CLI очищает цель этой сессии.",
+      "updateFailed": "Не удалось обновить цель.",
+      "sectionAccessibility": "{{status}}. Цель: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Подключите GitHub в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
       "openGithub": "Открыть GitHub",
@@ -2170,8 +2191,12 @@
     "gatewayUnreachable": "Не удалось связаться с Kilo Gateway. Проверьте подключение и попробуйте снова.",
     "gatewayTimeout": "Распознавание заняло слишком много времени. Попробуйте снова.",
     "gatewayModelUnavailable": "Эта модель распознавания речи недоступна. Выберите другую в настройках.",
+    "gatewayModelUnavailableNotice": "Эта модель больше не предлагается. Нажмите $t(transcriptionModel.title), чтобы выбрать другую.",
     "gatewaySignInRequired": "Войдите, чтобы использовать распознавание речи через Kilo Gateway.",
-    "gatewayNoModel": "Сначала выберите модель распознавания речи в настройках."
+    "gatewayNoModel": "Сначала выберите модель распознавания речи в настройках.",
+    "testTitle": "Проверить голосовой ввод",
+    "testPlaceholder": "Коснитесь микрофона и начните говорить.",
+    "testClear": "Очистить текст"
   },
   "share": {
     "title": "Отправка в Kilo",
@@ -3010,5 +3035,12 @@
     "emptyTitle": "Нет моделей распознавания речи",
     "emptyDescription": "Сейчас Kilo Gateway не предлагает моделей распознавания речи.",
     "loadFailed": "Не удалось загрузить модели распознавания речи."
+  },
+  "voiceLanguage": {
+    "title": "Язык голосового ввода",
+    "automatic": "Авто",
+    "loadFailed": "Не удалось загрузить языки, поддерживаемые этим устройством.",
+    "emptyTitle": "Нет поддерживаемых языков",
+    "emptyDescription": "Распознавание речи этого устройства не сообщает о поддерживаемых языках."
   }
 }

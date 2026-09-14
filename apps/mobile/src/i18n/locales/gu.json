@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "એન્ટરપ્રાઇઝ SSO"
   },
   "preferences": {
+    "general": "સામાન્ય",
+    "voiceInput": "વૉઇસ ઇનપુટ",
     "autoExpandThinking": "વિચારપ્રક્રિયા આપમેળે ખોલો",
     "autoExpandThinkingSubtitle": "એજન્ટની વિચારપ્રક્રિયા પૂરી થાય ત્યારે તેની વિગતો ખોલીને બતાવો.",
+    "hideThinking": "વિચારપ્રક્રિયાની વિગતો છુપાવો",
+    "hideThinkingSubtitle": "સત્ર પૃષ્ઠ પર એજન્ટની વિચારપ્રક્રિયા બતાવશો નહીં.",
     "keepScreenOn": "સત્ર પૃષ્ઠ પર હોય ત્યારે સ્ક્રીન ચાલુ રાખો",
     "keepScreenOnSubtitle": "સત્રમાં કામ ચાલુ હોય ત્યાં સુધી સ્ક્રીન ચાલુ રાખો.",
     "appearance": "દેખાવ",
@@ -237,6 +241,7 @@
     "appearanceLight": "લાઇટ",
     "appearanceDark": "ડાર્ક",
     "account": "એકાઉન્ટ",
+    "accountSubtitle": "ભાષા, વિશ્વસનીય હોસ્ટ અને ઉપકરણનાં સત્રો",
     "prReviewAttribution": "PR સમીક્ષાઓમાં એપનો ઉલ્લેખ ઉમેરો",
     "prReviewAttributionSubtitle": "સમીક્ષા મોકલો ત્યારે અંતે “Kilo દ્વારા સમીક્ષા કરેલી” લખાણ ઉમેરો.",
     "returnSendsMessage": "રિટર્ન કી સંદેશ મોકલે છે",
@@ -1993,6 +1998,22 @@
       "connectionLost": "કનેક્શન તૂટી ગયું",
       "retryConnection": "કનેક્ટ કરવા ફરી પ્રયાસ કરો"
     },
+    "goal": {
+      "title": "ધ્યેય",
+      "statusActive": "સક્રિય ધ્યેય",
+      "statusPaused": "થોભેલું ધ્યેય",
+      "statusComplete": "ધ્યેય પૂર્ણ",
+      "statusBlocked": "ધ્યેય અવરોધિત",
+      "edit": "ધ્યેય સંપાદિત કરો",
+      "remove": "ધ્યેય દૂર કરો",
+      "pause": "ધ્યેય થોભાવો",
+      "resume": "ધ્યેય ફરી શરૂ કરો",
+      "editPlaceholder": "ધ્યેયનું વર્ણન કરો",
+      "removeConfirmTitle": "ધ્યેય દૂર કરવું?",
+      "removeConfirmMessage": "CLI આ સત્રનું ધ્યેય સાફ કરે છે.",
+      "updateFailed": "ધ્યેય અપડેટ કરી શકાયું નહીં.",
+      "sectionAccessibility": "{{status}}. ધ્યેય: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "તમારા બ્રાઉઝરમાં GitHub કનેક્ટ કરો, પછી રિપોઝિટરી પસંદ કરવા અહીં પાછા આવો.",
       "openGithub": "GitHub ખોલો",
@@ -2576,8 +2597,12 @@
     "gatewayUnreachable": "Kilo Gateway સાથે સંપર્ક થઈ શક્યો નથી. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
     "gatewayTimeout": "અવાજને લખાણમાં ફેરવવામાં બહુ સમય લાગ્યો. ફરી પ્રયાસ કરો.",
     "gatewayModelUnavailable": "અવાજને લખાણમાં ફેરવતું આ મોડેલ ઉપલબ્ધ નથી. પસંદગીઓમાં બીજું પસંદ કરો.",
+    "gatewayModelUnavailableNotice": "આ મોડેલ હવે ઑફર કરવામાં આવતું નથી. બીજું પસંદ કરવા $t(transcriptionModel.title) પર ટૅપ કરો.",
     "gatewaySignInRequired": "Kilo Gateway દ્વારા લખાણ વાપરવા સાઇન ઇન કરો.",
-    "gatewayNoModel": "પહેલા પસંદગીઓમાં અવાજને લખાણમાં ફેરવતું મોડેલ પસંદ કરો."
+    "gatewayNoModel": "પહેલા પસંદગીઓમાં અવાજને લખાણમાં ફેરવતું મોડેલ પસંદ કરો.",
+    "testTitle": "વૉઇસ ઇનપુટનું પરીક્ષણ કરો",
+    "testPlaceholder": "માઇક્રોફોન પર ટૅપ કરો અને બોલવાનું શરૂ કરો.",
+    "testClear": "લખાણ સાફ કરો"
   },
   "share": {
     "title": "Kilo પર શેર",
@@ -2966,5 +2991,12 @@
     "emptyTitle": "અવાજને લખાણમાં ફેરવતાં કોઈ મોડેલ નથી",
     "emptyDescription": "Kilo Gateway હાલમાં અવાજને લખાણમાં ફેરવતાં કોઈ મોડેલ આપતું નથી.",
     "loadFailed": "અવાજને લખાણમાં ફેરવતાં મોડેલ લોડ કરી શકાયાં નહીં."
+  },
+  "voiceLanguage": {
+    "title": "વૉઇસ ઇનપુટની ભાષા",
+    "automatic": "આપમેળે",
+    "loadFailed": "આ ઉપકરણ સમર્થન આપે છે તે ભાષાઓ લોડ કરી શકાઈ નથી.",
+    "emptyTitle": "કોઈ સમર્થિત ભાષા નથી",
+    "emptyDescription": "આ ઉપકરણની વાણી ઓળખ કોઈ સમર્થિત ભાષા નોંધાવતી નથી."
   }
 }

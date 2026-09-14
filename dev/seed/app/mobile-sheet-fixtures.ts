@@ -6,6 +6,7 @@ import { and, eq, inArray, or } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { isValidEmail } from '../lib/users';
 import {
   normalizedGitHubUrl,
   readFixtureIntegration,
@@ -55,11 +56,6 @@ function printUsage(): void {
   console.log(
     '  pnpm -s dev:seed app:mobile-sheet-fixtures ada@example.com --child-performance --json'
   );
-}
-
-function isValidEmail(email: string): boolean {
-  // Intentionally permissive; we only guard against obvious nonsense in dev.
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function sleep(ms: number): Promise<void> {

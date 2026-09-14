@@ -240,18 +240,28 @@ vi.mock('@/lib/hooks/use-persisted-run-on-destination', () => ({
   clearRunOnDestinationPreference: vi.fn(),
 }));
 
-const { clearKeepScreenOnPreference, clearReasoningPreference, clearPrReviewFooterPreference } =
-  vi.hoisted(() => ({
-    clearKeepScreenOnPreference: vi.fn(),
-    clearReasoningPreference: vi.fn(),
-    clearPrReviewFooterPreference: vi.fn(),
-  }));
+const {
+  clearHideThinkingPreference,
+  clearKeepScreenOnPreference,
+  clearReasoningPreference,
+  clearPrReviewFooterPreference,
+} = vi.hoisted(() => ({
+  clearHideThinkingPreference: vi.fn(),
+  clearKeepScreenOnPreference: vi.fn(),
+  clearReasoningPreference: vi.fn(),
+  clearPrReviewFooterPreference: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({ clearKeepScreenOnPreference }));
 vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
   clearLiveActivityPreference: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference }));
+
+// Like use-trusted-hosts below: the real module pulls secure-store-preference
+// -> sonner-native -> react-native (Flow `import typeof`), which crashes the
+// node test environment. Mock it to keep sign-out teardown under test.
+vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({ clearHideThinkingPreference }));
 
 // These imported session-clear modules pull in native bindings that crash the
 // node test environment: use-trusted-hosts -> secure-store-preference ->
@@ -657,6 +667,7 @@ describe('sign-out teardown ordering', () => {
 
     expect(clearKeepScreenOnPreference).toHaveBeenCalled();
     expect(clearReasoningPreference).toHaveBeenCalled();
+    expect(clearHideThinkingPreference).toHaveBeenCalled();
     expect(clearPrReviewFooterPreference).toHaveBeenCalled();
     const { clearRunOnDestinationPreference } =
       await import('@/lib/hooks/use-persisted-run-on-destination');

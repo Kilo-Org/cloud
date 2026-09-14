@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "የድርጅት SSO"
   },
   "preferences": {
+    "general": "አጠቃላይ",
+    "voiceInput": "የድምጽ ግቤት",
     "autoExpandThinking": "አስተሳሰቡን በራስ ሰር ያስፉ",
     "autoExpandThinkingSubtitle": "ወኪሉ ማሰቡን ሲጨርስ አስተሳሰቡን ተዘርግቶ ያሳዩ።",
+    "hideThinking": "የአስተሳሰብ ዝርዝሮችን ደብቅ",
+    "hideThinkingSubtitle": "የወኪሉን አስተሳሰብ በክፍለ ጊዜ ገጽ ላይ አታሳዩ።",
     "keepScreenOn": "በክፍለ ጊዜ ገጽ ላይ ሲሆኑ ማያ ገጹን እንደበራ ያቆዩ",
     "keepScreenOnSubtitle": "ክፍለ ጊዜው እየሠራ እያለ ማያ ገጹን እንደበራ ያቆዩ።",
     "appearance": "መልክ",
@@ -237,6 +241,7 @@
     "appearanceLight": "ብሩህ",
     "appearanceDark": "ጨለማ",
     "account": "መለያ",
+    "accountSubtitle": "ቋንቋ፣ የታመኑ አስተናጋጆች እና የመሣሪያ ክፍለ ጊዜዎች",
     "prReviewAttribution": "በPR ግምገማዎች ላይ የመተግበሪያውን ስም ያክሉ",
     "prReviewAttributionSubtitle": "ግምገማ ሲያስገቡ «በKilo ተገምግሟል» የሚል ግርጌ ያክሉ።",
     "returnSendsMessage": "የመመለሻ ቁልፍ መልእክት ይልካል",
@@ -1993,6 +1998,22 @@
       "connectionLost": "ግንኙነቱ ተቋርጧል",
       "retryConnection": "እንደገና ለመገናኘት ይሞክሩ"
     },
+    "goal": {
+      "title": "ግብ",
+      "statusActive": "ንቁ ግብ",
+      "statusPaused": "የቆመ ግብ",
+      "statusComplete": "ግብ ተጠናቅቋል",
+      "statusBlocked": "ግብ ተዘግቷል",
+      "edit": "ግብን አርትዕ",
+      "remove": "ግብን አስወግድ",
+      "pause": "ግብን አቁም",
+      "resume": "ግብን ቀጥል",
+      "editPlaceholder": "ግቡን ይግለጹ",
+      "removeConfirmTitle": "ግብ ይወገድ?",
+      "removeConfirmMessage": "CLI የዚህን ክፍለ ጊዜ ግብ ያጸዳል።",
+      "updateFailed": "ግቡን ማዘመን አልተቻለም።",
+      "sectionAccessibility": "{{status}}። ግብ፦ {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "GitHubን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
       "openGithub": "GitHubን ይክፈቱ",
@@ -2576,8 +2597,12 @@
     "gatewayUnreachable": "Kilo Gateway ማግኘት አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
     "gatewayTimeout": "ድምጽን ወደ ጽሑፍ መቀየር ረጅም ጊዜ አስፈልጎታል። እንደገና ይሞክሩ።",
     "gatewayModelUnavailable": "ይህ የድምጽ ወደ ጽሑፍ ሞዴል አይገኝም። በምርጫዎች ውስጥ ሌላ ይምረጡ።",
+    "gatewayModelUnavailableNotice": "ይህ ሞዴል ከእንግዲህ አይቀርብም። ሌላ ለመምረጥ $t(transcriptionModel.title) ይንኩ።",
     "gatewaySignInRequired": "በKilo Gateway ለመቀየር ይግቡ።",
-    "gatewayNoModel": "በምርጫዎች ውስጥ መጀመሪያ የድምጽ ወደ ጽሑፍ ሞዴል ይምረጡ።"
+    "gatewayNoModel": "በምርጫዎች ውስጥ መጀመሪያ የድምጽ ወደ ጽሑፍ ሞዴል ይምረጡ።",
+    "testTitle": "የድምፅ ግብዓትን ይፈትሹ",
+    "testPlaceholder": "ማይክሮፎኑን ነክተው መናገር ይጀምሩ።",
+    "testClear": "ጽሑፉን አጽዳ"
   },
   "share": {
     "title": "ወደ Kilo ማጋራት",
@@ -2966,5 +2991,12 @@
     "emptyTitle": "ምንም የድምጽ ወደ ጽሑፍ ሞዴሎች የሉም",
     "emptyDescription": "Kilo Gateway በአሁኑ ሰዓት ምንም የድምጽ ወደ ጽሑፍ ሞዴሎችን አያቀርብም።",
     "loadFailed": "የድምጽ ወደ ጽሑፍ ሞዴሎችን መጫን አልተቻለም።"
+  },
+  "voiceLanguage": {
+    "title": "የድምፅ ግብዓት ቋንቋ",
+    "automatic": "ራስ-ሰር",
+    "loadFailed": "ይህ መሣሪያ የሚደግፋቸውን ቋንቋዎች መጫን አልተቻለም።",
+    "emptyTitle": "የሚደገፉ ቋንቋዎች የሉም",
+    "emptyDescription": "የዚህ መሣሪያ የድምፅ መለያ የሚደገፍ ቋንቋ አልዘረዘረም።"
   }
 }

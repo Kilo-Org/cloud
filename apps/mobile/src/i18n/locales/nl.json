@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "SSO voor bedrijven"
   },
   "preferences": {
+    "general": "Algemeen",
+    "voiceInput": "Spraakinvoer",
     "autoExpandThinking": "Gedachtegang automatisch uitvouwen",
     "autoExpandThinkingSubtitle": "Toon de volledige gedachtegang van de agent zodra die klaar is met nadenken.",
+    "hideThinking": "Details van gedachtegang verbergen",
+    "hideThinkingSubtitle": "Toon de gedachtegang van de agent niet op de sessiepagina.",
     "keepScreenOn": "Scherm aanhouden op de sessiepagina",
     "keepScreenOnSubtitle": "Houd het scherm aan zolang de sessie actief is.",
     "appearance": "Weergave",
@@ -237,6 +241,7 @@
     "appearanceLight": "Licht",
     "appearanceDark": "Donker",
     "account": "Gebruikersaccount",
+    "accountSubtitle": "Taal, vertrouwde hosts en apparaatsessies",
     "prReviewAttribution": "De app vermelden bij PR-beoordelingen",
     "prReviewAttributionSubtitle": "Voeg bij het indienen van een beoordeling een voettekst toe die vermeldt dat je de beoordeling via Kilo hebt gedaan.",
     "returnSendsMessage": "Return-toets verzendt bericht",
@@ -1559,6 +1564,22 @@
       "connectionLost": "Verbinding verbroken",
       "retryConnection": "Opnieuw verbinden"
     },
+    "goal": {
+      "title": "Doel",
+      "statusActive": "Actief doel",
+      "statusPaused": "Gepauzeerd doel",
+      "statusComplete": "Doel voltooid",
+      "statusBlocked": "Doel geblokkeerd",
+      "edit": "Doel bewerken",
+      "remove": "Doel verwijderen",
+      "pause": "Doel pauzeren",
+      "resume": "Doel hervatten",
+      "editPlaceholder": "Beschrijf het doel",
+      "removeConfirmTitle": "Doel verwijderen?",
+      "removeConfirmMessage": "De CLI wist het doel van deze sessie.",
+      "updateFailed": "Het doel kon niet worden bijgewerkt.",
+      "sectionAccessibility": "{{status}}. Doel: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Koppel GitHub in je browser en kom hier terug om een repository te kiezen.",
       "openGithub": "GitHub openen",
@@ -2142,8 +2163,12 @@
     "gatewayUnreachable": "Kilo Gateway kon niet worden bereikt. Controleer je verbinding en probeer het opnieuw.",
     "gatewayTimeout": "De transcriptie duurde te lang. Probeer het opnieuw.",
     "gatewayModelUnavailable": "Dit transcriptiemodel is niet beschikbaar. Kies een ander model bij Voorkeuren.",
+    "gatewayModelUnavailableNotice": "Dit model wordt niet meer aangeboden. Tik op $t(transcriptionModel.title) om een ander te kiezen.",
     "gatewaySignInRequired": "Meld je aan om transcriptie via Kilo Gateway te gebruiken.",
-    "gatewayNoModel": "Kies eerst een transcriptiemodel bij Voorkeuren."
+    "gatewayNoModel": "Kies eerst een transcriptiemodel bij Voorkeuren.",
+    "testTitle": "Spraakinvoer testen",
+    "testPlaceholder": "Tik op de microfoon en begin te spreken.",
+    "testClear": "Tekst wissen"
   },
   "share": {
     "title": "Delen met Kilo",
@@ -2966,5 +2991,12 @@
     "emptyTitle": "Geen transcriptiemodellen",
     "emptyDescription": "Kilo Gateway biedt op dit moment geen transcriptiemodellen.",
     "loadFailed": "De transcriptiemodellen konden niet worden geladen."
+  },
+  "voiceLanguage": {
+    "title": "Taal van spraakinvoer",
+    "automatic": "Automatisch",
+    "loadFailed": "Kan de talen die dit apparaat ondersteunt niet laden.",
+    "emptyTitle": "Geen ondersteunde talen",
+    "emptyDescription": "De spraakherkenning van dit apparaat meldt geen ondersteunde talen."
   }
 }

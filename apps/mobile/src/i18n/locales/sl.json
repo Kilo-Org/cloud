@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "SSO za podjetja"
   },
   "preferences": {
+    "general": "Splošno",
+    "voiceInput": "Glasovni vnos",
     "autoExpandThinking": "Samodejno razširi razmišljanje",
     "autoExpandThinkingSubtitle": "Ko agent konča razmišljanje, prikaži njegovo celotno vsebino.",
+    "hideThinking": "Skrij podrobnosti razmišljanja",
+    "hideThinkingSubtitle": "Ne prikazuj razmišljanja agenta na strani seje.",
     "keepScreenOn": "Ohrani zaslon vklopljen med ogledom seje",
     "keepScreenOnSubtitle": "Ohrani zaslon vklopljen med izvajanjem seje.",
     "appearance": "Videz",
@@ -237,6 +241,7 @@
     "appearanceLight": "Svetlo",
     "appearanceDark": "Temno",
     "account": "Račun",
+    "accountSubtitle": "Jezik, zaupanja vredni gostitelji in seje v napravah",
     "prReviewAttribution": "Dodaj navedbo aplikacije k pregledom PR",
     "prReviewAttributionSubtitle": "Ob oddaji pregleda dodaj vrstico »Pregledano prek aplikacije Kilo«.",
     "returnSendsMessage": "Tipka Enter pošlje sporočilo",
@@ -2025,6 +2030,22 @@
       "connectionLost": "Povezava prekinjena",
       "retryConnection": "Znova vzpostavi povezavo"
     },
+    "goal": {
+      "title": "Cilj",
+      "statusActive": "Aktivni cilj",
+      "statusPaused": "Zaustavljeni cilj",
+      "statusComplete": "Cilj dokončan",
+      "statusBlocked": "Cilj blokiran",
+      "edit": "Uredi cilj",
+      "remove": "Odstrani cilj",
+      "pause": "Zaustavi cilj",
+      "resume": "Nadaljuj cilj",
+      "editPlaceholder": "Opišite cilj",
+      "removeConfirmTitle": "Odstranim cilj?",
+      "removeConfirmMessage": "CLI izbriše cilj te seje.",
+      "updateFailed": "Cilja ni bilo mogoče posodobiti.",
+      "sectionAccessibility": "{{status}}. Cilj: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Poveži GitHub v brskalniku, nato se vrni sem in izberi skladišče.",
       "openGithub": "Odpri GitHub",
@@ -2618,8 +2639,12 @@
     "gatewayUnreachable": "Kilo Gateway ni dosegljiv. Preveri povezavo in poskusi znova.",
     "gatewayTimeout": "Prepisovanje je predolgo trajalo. Poskusi znova.",
     "gatewayModelUnavailable": "Ta model za prepisovanje ni na voljo. Izberite drugega v Nastavitvah.",
+    "gatewayModelUnavailableNotice": "Ta model se ne ponuja več. Dotaknite se $t(transcriptionModel.title) in izberite drugega.",
     "gatewaySignInRequired": "Prijavite se za uporabo prepisovanja prek Kilo Gateway.",
-    "gatewayNoModel": "Najprej izberite model za prepisovanje v Nastavitvah."
+    "gatewayNoModel": "Najprej izberite model za prepisovanje v Nastavitvah.",
+    "testTitle": "Preizkusite glasovni vnos",
+    "testPlaceholder": "Dotaknite se mikrofona in začnite govoriti.",
+    "testClear": "Počisti besedilo"
   },
   "share": {
     "title": "Deljenje v Kilo",
@@ -3010,5 +3035,12 @@
     "emptyTitle": "Ni modelov za prepisovanje",
     "emptyDescription": "Kilo Gateway trenutno ne ponuja modelov za prepisovanje.",
     "loadFailed": "Modelov za prepisovanje ni bilo mogoče naložiti."
+  },
+  "voiceLanguage": {
+    "title": "Jezik glasovnega vnosa",
+    "automatic": "Samodejno",
+    "loadFailed": "Jezikov, ki jih podpira ta naprava, ni bilo mogoče naložiti.",
+    "emptyTitle": "Ni podprtih jezikov",
+    "emptyDescription": "Prepoznavanje govora te naprave ne poroča o podprtih jezikih."
   }
 }

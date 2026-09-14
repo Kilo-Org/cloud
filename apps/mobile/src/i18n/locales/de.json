@@ -227,8 +227,12 @@
     "providerEnterpriseSso": "Unternehmens-SSO"
   },
   "preferences": {
+    "general": "Allgemein",
+    "voiceInput": "Spracheingabe",
     "autoExpandThinking": "Denkprozess automatisch aufklappen",
     "autoExpandThinkingSubtitle": "Den Denkprozess des Agenten nach Abschluss aufgeklappt anzeigen.",
+    "hideThinking": "Denkdetails ausblenden",
+    "hideThinkingSubtitle": "Den Denkprozess des Agenten nicht auf der Sitzungsseite anzeigen.",
     "keepScreenOn": "Bildschirm in der Sitzungsansicht eingeschaltet lassen",
     "keepScreenOnSubtitle": "Den Bildschirm eingeschaltet lassen, solange die Sitzung läuft.",
     "appearance": "Erscheinungsbild",
@@ -237,6 +241,7 @@
     "appearanceLight": "Hell",
     "appearanceDark": "Dunkel",
     "account": "Konto",
+    "accountSubtitle": "Sprache, vertrauenswürdige Hosts und Gerätesitzungen",
     "prReviewAttribution": "App-Hinweis zu PR-Prüfungen hinzufügen",
     "prReviewAttributionSubtitle": "Beim Einreichen einer Prüfung die Fußzeile „Mit Kilo geprüft“ hinzufügen.",
     "returnSendsMessage": "Eingabetaste sendet Nachricht",
@@ -1559,6 +1564,22 @@
       "connectionLost": "Verbindung unterbrochen",
       "retryConnection": "Erneut verbinden"
     },
+    "goal": {
+      "title": "Ziel",
+      "statusActive": "Aktives Ziel",
+      "statusPaused": "Pausiertes Ziel",
+      "statusComplete": "Ziel abgeschlossen",
+      "statusBlocked": "Ziel blockiert",
+      "edit": "Ziel bearbeiten",
+      "remove": "Ziel entfernen",
+      "pause": "Ziel pausieren",
+      "resume": "Ziel fortsetzen",
+      "editPlaceholder": "Ziel beschreiben",
+      "removeConfirmTitle": "Ziel entfernen?",
+      "removeConfirmMessage": "Die CLI löscht das Ziel dieser Sitzung.",
+      "updateFailed": "Das Ziel konnte nicht aktualisiert werden.",
+      "sectionAccessibility": "{{status}}. Ziel: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Verbinde GitHub in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
       "openGithub": "GitHub öffnen",
@@ -2142,8 +2163,12 @@
     "gatewayUnreachable": "Das Kilo Gateway konnte nicht erreicht werden. Prüfe deine Verbindung und versuche es erneut.",
     "gatewayTimeout": "Die Transkription hat zu lange gedauert. Versuche es erneut.",
     "gatewayModelUnavailable": "Dieses Transkriptionsmodell ist nicht verfügbar. Wähle ein anderes in den Einstellungen.",
+    "gatewayModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(transcriptionModel.title), um ein anderes zu wählen.",
     "gatewaySignInRequired": "Melde dich an, um die Gateway-Transkription zu nutzen.",
-    "gatewayNoModel": "Wähle zuerst in den Einstellungen ein Transkriptionsmodell."
+    "gatewayNoModel": "Wähle zuerst in den Einstellungen ein Transkriptionsmodell.",
+    "testTitle": "Spracheingabe testen",
+    "testPlaceholder": "Tippe auf das Mikrofon und sprich.",
+    "testClear": "Text löschen"
   },
   "share": {
     "title": "Mit Kilo teilen",
@@ -2966,5 +2991,12 @@
     "emptyTitle": "Keine Transkriptionsmodelle",
     "emptyDescription": "Kilo Gateway bietet derzeit keine Transkriptionsmodelle.",
     "loadFailed": "Die Transkriptionsmodelle konnten nicht geladen werden."
+  },
+  "voiceLanguage": {
+    "title": "Sprache der Spracheingabe",
+    "automatic": "Automatisch",
+    "loadFailed": "Die von diesem Gerät unterstützten Sprachen konnten nicht geladen werden.",
+    "emptyTitle": "Keine unterstützten Sprachen",
+    "emptyDescription": "Die Spracherkennung dieses Geräts meldet keine unterstützten Sprachen."
   }
 }

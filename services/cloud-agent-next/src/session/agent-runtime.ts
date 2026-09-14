@@ -357,10 +357,13 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
       (allocatedPhysicalInstance || requiresFreshRunFence) &&
       (previousRuntimeState.wrapperConnectionId || previousRuntimeState.wrapperRunId)
     ) {
-      await clearWrapperRuntimeIdentity(storage, {}, { incrementGeneration: true });
+      await clearWrapperRuntimeIdentity(storage);
     }
-    const { state: wrapperRuntimeState, allocatedNewIdentity } =
-      await allocateWrapperRuntimeState(storage);
+    const { state: wrapperRuntimeState, allocatedNewIdentity } = await allocateWrapperRuntimeState(
+      storage,
+      Date.now(),
+      leasedInstance.instanceGeneration
+    );
     logger
       .withFields({
         sessionId,

@@ -4,13 +4,14 @@ import {
   type MessageDeliveryState,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Haptics from 'expo-haptics';
-import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -47,13 +48,21 @@ import {
 } from '@/components/agents/context-usage-display';
 import { resolveSessionComposerDisabled } from '@/components/agents/session-composer-disabled';
 import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
+import {
+  type GoalAction,
+  goalClearsBlockingAfterSend,
+  goalCommandArguments,
+  resolveGoalActions,
+  selectVisibleGoal,
+} from '@/components/agents/session-goal-actions';
+import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
-import { firstHumanText, isFilePart } from './part-types';
+import { firstHumanText, isFilePart, withoutReasoningParts } from './part-types';
 import {
   buildRemoteAttachmentPartsWithRetryableFeedback,
   resolveSendAttachmentKind,
@@ -131,6 +140,7 @@ import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
+import { useHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import {
   createRemoteModelOverride,
@@ -149,6 +159,13 @@ import {
 } from '@/lib/picker-bridge';
 import { trpcClient } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
+
+const GOAL_ACTION_LABEL_KEY = {
+  edit: 'agentChat.goal.edit',
+  pause: 'agentChat.goal.pause',
+  resume: 'agentChat.goal.resume',
+  remove: 'agentChat.goal.remove',
+} as const satisfies Record<GoalAction, string>;
 
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
@@ -234,6 +251,8 @@ export function SessionDetailContent({
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
   const cloudAgentModelOverride = useAtomValue(manager.atoms.cloudAgentModelOverride);
   const availableCommands = useAtomValue(manager.atoms.availableCommands);
+  const sessionInfo = useAtomValue(manager.atoms.sessionInfo);
+  const sessionGoal = selectVisibleGoal(sessionInfo, isReadOnly);
   const remoteCommandState = useAtomValue(manager.atoms.remoteCommandState);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
   const hasOlderMessages = useAtomValue(manager.atoms.hasOlderMessages);
@@ -244,8 +263,10 @@ export function SessionDetailContent({
     useState<ContextSheetIdentity | null>(null);
   const [detailsMessageId, setDetailsMessageId] = useState<string | null>(null);
   const detailsMessageIdRef = useRef<string | null>(null);
+  const [isGoalEditOpen, setIsGoalEditOpen] = useState(false);
 
   const { bottom } = useSafeAreaInsets();
+  const { showActionSheetWithOptions } = useActionSheet();
 
   // Durable composer draft. The composer renders immediately — typing must
   // never wait on the `user.getMe` query — and the draft load settles behind
@@ -311,6 +332,7 @@ export function SessionDetailContent({
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
   const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
+  const { hideThinking, hasLoaded: hideThinkingLoaded } = useHideThinkingPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
   const { models: gatewayModels, isLoading: gatewayModelsLoading } =
     useAvailableModels(organizationId);
@@ -747,7 +769,29 @@ export function SessionDetailContent({
     });
   }, [messages, droppedQueuedIds, canceledQueuedMessages]);
 
-  const detailsMessage = visibleMessages.find(message => message.info.id === detailsMessageId);
+  // Visibility-only strip for the "Hide thinking details" option. Applied once
+  // here so the transcript, the message-details sheet, and the subagent views
+  // all lose their thinking rows/text from the same list.
+  // Until the persisted value resolves, reason optimistically that thinking is
+  // hidden: on a cold start with the option on, painting the rows first and
+  // stripping them when the disk read lands would flash the hidden thinking.
+  const hideReasoningRows = !hideThinkingLoaded || hideThinking;
+  const displayedMessages = useMemo(
+    () => (hideReasoningRows ? withoutReasoningParts(visibleMessages) : visibleMessages),
+    [visibleMessages, hideReasoningRows]
+  );
+
+  // Subagent transcript views resolve their rows through this callback, so the
+  // same option hides thinking inside an opened child session.
+  const getDisplayedChildMessages = useCallback(
+    (childSessionId: string) => {
+      const child = getChildMessages(childSessionId);
+      return hideReasoningRows ? withoutReasoningParts(child) : child;
+    },
+    [getChildMessages, hideReasoningRows]
+  );
+
+  const detailsMessage = displayedMessages.find(message => message.info.id === detailsMessageId);
   const detailsDelivery =
     detailsMessageId === null ? undefined : pendingMessages.get(detailsMessageId);
   const detailsBusy = detailsMessageId !== null && cancelingQueuedIds.has(detailsMessageId);
@@ -760,8 +804,8 @@ export function SessionDetailContent({
     detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
 
   const transcript = useMemo(
-    () => mergeSessionTranscript(visibleMessages, preparationAttempts, pendingMessages),
-    [visibleMessages, preparationAttempts, pendingMessages]
+    () => mergeSessionTranscript(displayedMessages, preparationAttempts, pendingMessages),
+    [displayedMessages, preparationAttempts, pendingMessages]
   );
 
   // Render-phase state adjustment: hold queued ids across queue → dequeue
@@ -1055,6 +1099,11 @@ export function SessionDetailContent({
           message={item.message}
           isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
           isSessionStreaming={isStreaming}
+          // Raw child messages: the in-transcript task card derives its activity
+          // label from the child's latest part (child-session-card-state.ts:94-106),
+          // so feeding it the stripped list would turn a reasoning stream into a
+          // stale activity or "Waiting for activity" instead of "Thinking".
+          // The card renders no child rows, so nothing thinking-related leaks.
           getChildMessages={getChildMessages}
           modelOptions={modelOptions}
           defaultReasoningExpanded={reasoningDefaultExpanded}
@@ -1287,6 +1336,133 @@ export function SessionDetailContent({
     [manager]
   );
 
+  // Goal controls ride the same `manager.send()` command pipeline as the
+  // composer's slash commands. The manager is the sole transport-toast owner,
+  // so a failed send surfaces exactly one error toast from `onSendFailed` and
+  // this helper never adds a second. Edit throws instead, so the RenameModal
+  // shows the failure inline and the user can correct the objective. One
+  // helper keeps the `/goal` payload shape in one place.
+  const sendGoalAction = useCallback(
+    async (action: GoalAction, objective = ''): Promise<boolean> => {
+      const sent = await manager.send({
+        payload: {
+          type: 'command',
+          command: 'goal',
+          arguments: goalCommandArguments(action, objective),
+        },
+      });
+      return sent;
+    },
+    [manager]
+  );
+
+  // The CLI rejects `/goal resume` and `/goal <objective>` while a question or
+  // permission is pending, and it records a *rejected* request as a blocked
+  // goal while a goal is running. Pause and clear are accepted while a request
+  // is pending, so they clear it after the goal stops (the stopped goal no
+  // longer observes the rejection); resume and edit clear it before sending.
+  // Without this a paused goal's pending request is stranded and Resume
+  // silently no-ops. The interaction handlers own their own failure toast, so
+  // a failed clear only aborts the goal command.
+  const clearGoalBlockingInteraction = useCallback(async (): Promise<boolean> => {
+    if (blockingInteraction === 'question') {
+      const cleared = await handleRejectQuestion();
+      return cleared;
+    }
+    if (blockingInteraction === 'permission') {
+      const cleared = await handleRespondToPermission('reject');
+      return cleared;
+    }
+    return true;
+  }, [blockingInteraction, handleRejectQuestion, handleRespondToPermission]);
+
+  const runGoalAction = useCallback(
+    async (action: GoalAction) => {
+      if (!hasBlockingInteraction) {
+        await sendGoalAction(action);
+        return;
+      }
+      if (goalClearsBlockingAfterSend(action)) {
+        // Pause/clear first: the CLI accepts them while a request is pending,
+        // and stopping the goal keeps the later rejection from marking it
+        // blocked.
+        const sent = await sendGoalAction(action);
+        if (sent) {
+          await clearGoalBlockingInteraction();
+        }
+        return;
+      }
+      // Resume/edit are rejected until the request is cleared.
+      if (!(await clearGoalBlockingInteraction())) {
+        return;
+      }
+      await sendGoalAction(action);
+    },
+    [hasBlockingInteraction, clearGoalBlockingInteraction, sendGoalAction]
+  );
+
+  const handleOpenGoalActions = useCallback(() => {
+    if (!sessionGoal) {
+      return;
+    }
+    const actions = resolveGoalActions(sessionGoal);
+    const options = [
+      ...actions.map(action => t(GOAL_ACTION_LABEL_KEY[action])),
+      t('common.cancel'),
+    ];
+    const removeIndex = actions.indexOf('remove');
+    showActionSheetWithOptions(
+      {
+        title: t('agentChat.goal.title'),
+        options,
+        cancelButtonIndex: options.length - 1,
+        destructiveButtonIndex: removeIndex === -1 ? undefined : removeIndex,
+        containerStyle: { paddingBottom: bottom },
+      },
+      index => {
+        const action = index === undefined ? undefined : actions[index];
+        if (!action) {
+          return;
+        }
+        if (action === 'edit') {
+          setIsGoalEditOpen(true);
+          return;
+        }
+        if (action === 'remove') {
+          Alert.alert(
+            t('agentChat.goal.removeConfirmTitle'),
+            t('agentChat.goal.removeConfirmMessage'),
+            [
+              { text: t('common.cancel'), style: 'cancel' },
+              {
+                text: t('agentChat.goal.remove'),
+                style: 'destructive',
+                onPress: () => {
+                  void runGoalAction('remove');
+                },
+              },
+            ]
+          );
+          return;
+        }
+        void runGoalAction(action);
+      }
+    );
+  }, [sessionGoal, t, showActionSheetWithOptions, bottom, runGoalAction]);
+
+  const handleGoalEditSave = useCallback(
+    async (objective: string) => {
+      if (!(await clearGoalBlockingInteraction())) {
+        throw new Error(t('agentChat.goal.updateFailed'));
+      }
+      const sent = await sendGoalAction('edit', objective);
+      if (!sent) {
+        throw new Error(t('agentChat.goal.updateFailed'));
+      }
+    },
+    [clearGoalBlockingInteraction, sendGoalAction, t]
+  );
+
   const handleCreateSession = useCallback(async () => {
     // The orchestrator surfaces exactly one actionable toast on failure and
     // calls `router.replace` to the new session route on success — the
@@ -1410,6 +1586,15 @@ export function SessionDetailContent({
           activeSessionType={activeSessionType}
           agentStatusType={agentStatus.type}
         />
+        {sessionGoal ? (
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(150)}
+            layout={LinearTransition.duration(150)}
+          >
+            <SessionGoalSection goal={sessionGoal} onPress={handleOpenGoalActions} />
+          </Animated.View>
+        ) : null}
         {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
         {keyboardContainerKind === 'app-aware-padding' ? (
@@ -1434,6 +1619,10 @@ export function SessionDetailContent({
           <SessionContextSheet
             visible={sheetMountState.visible}
             info={sheetMountState.info}
+            sessionId={sessionId}
+            sessionTitle={rename.title}
+            activeSessionType={activeSessionType}
+            ownerConnectionId={remoteModelState.ownerConnectionId}
             modelDisplay={contextModelAndProvider.model}
             providerDisplay={contextModelAndProvider.provider}
             totalCostMicrodollars={totalMicrodollars}
@@ -1471,7 +1660,8 @@ export function SessionDetailContent({
             visible={childSessionSheet.visible}
             sessionId={childSessionSheet.sheet.sessionId}
             title={childSessionSheet.sheet.title}
-            getChildMessages={getChildMessages}
+            getChildMessages={getDisplayedChildMessages}
+            getIndicatorMessages={getChildMessages}
             hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
             sessionError={getChildSessionError(childSessionSheet.sheet.sessionId)}
             isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
@@ -1506,6 +1696,19 @@ export function SessionDetailContent({
             initialValue={rename.modalInitialValue}
             onSave={handleRenameSave}
             onClose={handleRenameClose}
+          />
+        ) : null}
+
+        {sessionGoal && isGoalEditOpen ? (
+          <RenameModal
+            title={t('agentChat.goal.edit')}
+            placeholder={t('agentChat.goal.editPlaceholder')}
+            initialValue={sessionGoal.text}
+            maxLength={500}
+            onSave={handleGoalEditSave}
+            onClose={() => {
+              setIsGoalEditOpen(false);
+            }}
           />
         ) : null}
       </View>
@@ -1545,6 +1748,11 @@ export function SessionDetailContent({
             exiting={FadeOut.duration(150)}
             layout={LinearTransition.duration(150)}
           >
+            {/* Raw list on purpose: working-indicator.tsx:50-59 derives the
+                label from the last assistant part, and compute-status.ts:33-35
+                maps a reasoning part to agentChat.partDetail.thinking, so the
+                spinner reads Thinking during a reasoning stream in both modes.
+                Feeding it displayedMessages would drop that label. */}
             <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
             {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
           </Animated.View>

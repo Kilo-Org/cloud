@@ -2597,7 +2597,10 @@
     "gatewayModelUnavailable": "This transcription model isn't available. Pick another one in Preferences.",
     "gatewayModelUnavailableNotice": "This model is no longer offered. Tap $t(transcriptionModel.title) to choose another.",
     "gatewaySignInRequired": "Sign in to use gateway transcription.",
-    "gatewayNoModel": "Choose a transcription model in Preferences first."
+    "gatewayNoModel": "Choose a transcription model in Preferences first.",
+    "testTitle": "Test voice input",
+    "testPlaceholder": "Tap the microphone and start speaking.",
+    "testClear": "Clear text"
   },
   "share": {
     "title": "Share to Kilo",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "No transcription models",
     "emptyDescription": "The gateway offers no transcription models right now.",
     "loadFailed": "Couldn't load transcription models."
+  },
+  "voiceLanguage": {
+    "title": "Voice language",
+    "automatic": "Automatic",
+    "loadFailed": "Couldn't load the languages this device supports.",
+    "emptyTitle": "No supported languages",
+    "emptyDescription": "This device's speech recognition reports no supported languages."
   }
 }

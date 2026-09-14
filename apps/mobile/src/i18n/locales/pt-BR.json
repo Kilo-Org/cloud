@@ -2161,7 +2161,10 @@
     "gatewayModelUnavailable": "Este modelo de transcrição não está disponível. Escolha outro em Preferências.",
     "gatewayModelUnavailableNotice": "Este modelo não é mais oferecido. Toque em $t(transcriptionModel.title) para escolher outro.",
     "gatewaySignInRequired": "Entre para usar a transcrição com Kilo Gateway.",
-    "gatewayNoModel": "Escolha primeiro um modelo de transcrição em Preferências."
+    "gatewayNoModel": "Escolha primeiro um modelo de transcrição em Preferências.",
+    "testTitle": "Testar digitação por voz",
+    "testPlaceholder": "Toque no microfone e comece a falar.",
+    "testClear": "Limpar texto"
   },
   "share": {
     "title": "Compartilhar com o Kilo",
@@ -2992,5 +2995,12 @@
     "emptyTitle": "Nenhum modelo de transcrição",
     "emptyDescription": "O Kilo Gateway não oferece modelos de transcrição no momento.",
     "loadFailed": "Não foi possível carregar os modelos de transcrição."
+  },
+  "voiceLanguage": {
+    "title": "Idioma da digitação por voz",
+    "automatic": "Automático",
+    "loadFailed": "Não foi possível carregar os idiomas compatíveis com este dispositivo.",
+    "emptyTitle": "Nenhum idioma compatível",
+    "emptyDescription": "O reconhecimento de fala deste dispositivo não informa nenhum idioma compatível."
   }
 }

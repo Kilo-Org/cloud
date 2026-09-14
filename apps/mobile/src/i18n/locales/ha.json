@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "Wannan samfurin mayar da magana zuwa rubutu ba ya nan. Zaɓi wani a Zaɓuɓɓuka.",
     "gatewayModelUnavailableNotice": "Ba a ƙara ba da wannan samfuri ba. Matsa $t(transcriptionModel.title) don zaɓar wani.",
     "gatewaySignInRequired": "Shiga don amfani da mayar da magana ta Kilo Gateway.",
-    "gatewayNoModel": "Da farko zaɓi samfurin mayar da magana zuwa rubutu a Zaɓuɓɓuka."
+    "gatewayNoModel": "Da farko zaɓi samfurin mayar da magana zuwa rubutu a Zaɓuɓɓuka.",
+    "testTitle": "Gwada shigar da murya",
+    "testPlaceholder": "Danna makirufo ka fara magana.",
+    "testClear": "Share rubutu"
   },
   "share": {
     "title": "Raba zuwa Kilo",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "Babu samfuran mayar da magana zuwa rubutu",
     "emptyDescription": "Kilo Gateway bai ba da samfuran mayar da magana zuwa rubutu a halin yanzu.",
     "loadFailed": "An kasa loda samfuran mayar da magana zuwa rubutu."
+  },
+  "voiceLanguage": {
+    "title": "Harshen shigar da murya",
+    "automatic": "Na atomatik",
+    "loadFailed": "An kasa loda harsunan da wannan na'urar ke goyan baya.",
+    "emptyTitle": "Babu harsunan da ake goyan baya",
+    "emptyDescription": "Fahimtar magana ta wannan na'urar ba ta bayar da wani harshe da ake goyan baya ba."
   }
 }

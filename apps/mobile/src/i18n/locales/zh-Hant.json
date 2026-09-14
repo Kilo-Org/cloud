@@ -2147,7 +2147,10 @@
     "gatewayModelUnavailable": "這個轉錄模型無法使用。請在偏好設定中選擇其他模型。",
     "gatewayModelUnavailableNotice": "這個模型已不再提供。點一下$t(transcriptionModel.title)選擇另一個。",
     "gatewaySignInRequired": "登入後即可使用 Kilo Gateway 轉錄。",
-    "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。"
+    "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。",
+    "testTitle": "測試語音輸入",
+    "testPlaceholder": "點按麥克風並開始說話。",
+    "testClear": "清除文字"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "沒有轉錄模型",
     "emptyDescription": "Kilo Gateway 目前沒有提供轉錄模型。",
     "loadFailed": "無法載入轉錄模型。"
+  },
+  "voiceLanguage": {
+    "title": "語音輸入語言",
+    "automatic": "自動",
+    "loadFailed": "無法載入此裝置支援的語言。",
+    "emptyTitle": "沒有支援的語言",
+    "emptyDescription": "此裝置的語音辨識未回報任何支援的語言。"
   }
 }

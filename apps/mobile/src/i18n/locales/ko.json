@@ -2147,7 +2147,10 @@
     "gatewayModelUnavailable": "이 음성 텍스트 변환 모델은 사용할 수 없습니다. 환경설정에서 다른 모델을 선택하세요.",
     "gatewayModelUnavailableNotice": "이 모델은 더 이상 제공되지 않습니다. 다른 모델을 선택하려면 $t(transcriptionModel.title)을 탭하세요.",
     "gatewaySignInRequired": "Kilo Gateway 변환을 사용하려면 로그인하세요.",
-    "gatewayNoModel": "먼저 환경설정에서 음성 텍스트 변환 모델을 선택하세요."
+    "gatewayNoModel": "먼저 환경설정에서 음성 텍스트 변환 모델을 선택하세요.",
+    "testTitle": "음성 입력 테스트",
+    "testPlaceholder": "마이크를 탭하고 말하기 시작하세요.",
+    "testClear": "텍스트 지우기"
   },
   "share": {
     "title": "Kilo로 공유",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "음성 텍스트 변환 모델 없음",
     "emptyDescription": "지금 Kilo Gateway에서 제공하는 음성 텍스트 변환 모델이 없습니다.",
     "loadFailed": "음성 텍스트 변환 모델을 불러오지 못했습니다."
+  },
+  "voiceLanguage": {
+    "title": "음성 입력 언어",
+    "automatic": "자동",
+    "loadFailed": "이 기기가 지원하는 언어를 로드하지 못했습니다.",
+    "emptyTitle": "지원하는 언어 없음",
+    "emptyDescription": "이 기기의 음성 인식은 지원하는 언어를 보고하지 않습니다."
   }
 }

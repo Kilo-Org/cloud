@@ -26,8 +26,21 @@ export const WORKTREE_STATE_GRANT_SECONDS = 12 * 60 * 60;
  * wait on it.
  */
 export const WORKTREE_STATE_CAPTURE_BUDGET_MS = 30_000;
+/**
+ * Total budget for one restore. Session attachment already spends most of its
+ * deadline on cloning and setup commands, so a slow restore must give up
+ * rather than turn a skippable step into a failed attach.
+ */
+export const WORKTREE_STATE_RESTORE_BUDGET_MS = 60_000;
 /** Upper bound on the compressed bundle. Larger dirty state is not captured. */
 export const WORKTREE_STATE_MAX_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Ceiling on how many untracked files one bundle may carry. Shared by the
+ * producer and the bundle schema so a worktree can never build a bundle its
+ * own schema would reject.
+ */
+export const WORKTREE_STATE_MAX_UNTRACKED_FILES = 4096;
 
 export const WORKTREE_STATE_BUNDLE_VERSION = 1;
 export const WORKTREE_STATE_PATCH_ENTRY = 'tracked.patch';
@@ -57,7 +70,7 @@ export const worktreeStateMetaSchema = z
     head: z.string().regex(/^[a-f0-9]{40,64}$/),
     capturedAt: z.number().int().nonnegative(),
     hasPatch: z.boolean(),
-    untracked: z.array(z.string().min(1).max(4096)).max(4096),
+    untracked: z.array(z.string().min(1).max(4096)).max(WORKTREE_STATE_MAX_UNTRACKED_FILES),
   })
   .strict();
 

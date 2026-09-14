@@ -22,6 +22,13 @@ jest.mock('@/lib/redis', () => ({
   },
 }));
 
+// The setup hooks lazy-load `@/routers/test-utils` — the whole root router, which
+// now carries the provider-review surface — and the per-worker database cleanup
+// truncates every table before each test. A cold transform of that graph has been
+// measured over Jest's 5s default on CI's parallel workers, which timed the hook
+// out before the suite could run.
+jest.setTimeout(30_000);
+
 let cleanupDbForTest: typeof DrizzleLib.cleanupDbForTest;
 let db: typeof DrizzleLib.db;
 let insertTestUser: typeof UserHelper.insertTestUser;

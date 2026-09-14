@@ -125,6 +125,9 @@ const SessionMessagesPageResponseSchema = z.object({
   success: z.literal(true),
   kiloSessionId: z.string().min(1),
   history: kiloSdkMessageHistorySchema.nullable(),
+  // Session-level metadata (records keyed by `kilo.<feature>`, e.g.
+  // `kilo.goal`). Optional so an older worker response stays parseable.
+  sessionMetadata: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 export type SessionMessagesPageOptions = {
@@ -137,6 +140,8 @@ export type SessionMessagesPageOptions = {
 export type SessionMessagesPageResult = {
   kiloSessionId: string;
   history: KiloSdkMessageHistory | null;
+  /** Session-level metadata from the ingest snapshot, when available. */
+  sessionMetadata?: Record<string, unknown> | null;
   watermarkEventId?: number | null;
 };
 
@@ -209,7 +214,13 @@ export async function fetchSessionMessagesPage(
     throw error;
   }
 
-  return { kiloSessionId: parsed.data.kiloSessionId, history: parsed.data.history };
+  return {
+    kiloSessionId: parsed.data.kiloSessionId,
+    history: parsed.data.history,
+    ...(parsed.data.sessionMetadata === undefined
+      ? {}
+      : { sessionMetadata: parsed.data.sessionMetadata }),
+  };
 }
 
 // ---------------------------------------------------------------------------

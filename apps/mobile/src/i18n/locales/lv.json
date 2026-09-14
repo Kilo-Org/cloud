@@ -231,6 +231,8 @@
     "voiceInput": "Balss ievade",
     "autoExpandThinking": "Automātiski izvērst domāšanu",
     "autoExpandThinkingSubtitle": "Rādīt aģenta domas izvērstā veidā, kad domāšana ir pabeigta.",
+    "hideThinking": "Slēpt domāšanas informāciju",
+    "hideThinkingSubtitle": "Nerādīt aģenta domāšanu sesijas lapā.",
     "keepScreenOn": "Neizslēgt ekrānu sesijas skatā",
     "keepScreenOnSubtitle": "Neizslēgt ekrānu, kamēr sesija darbojas.",
     "appearance": "Izskats",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkripcija, izmantojot Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkribē balss ievadi, izmantojot Kilo Gateway modeli, nevis ierīces runas atpazīšanu. Ieraksts tiek nosūtīts uz Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Saspiest rīku izsaukumus",
+    "condenseToolCallsSubtitle": "Grupējiet secīgus rīku izsaukumus vienā rindā, ko varat atvērt."
   },
   "prReview": {
     "pullRequestUnavailable": "Izmaiņu pieprasījums nav pieejams",
@@ -2012,6 +2016,22 @@
       "connectionLost": "Savienojums pārtrūcis",
       "retryConnection": "Izveidot savienojumu vēlreiz"
     },
+    "goal": {
+      "title": "Mērķis",
+      "statusActive": "Aktīvs mērķis",
+      "statusPaused": "Apturēts mērķis",
+      "statusComplete": "Mērķis izpildīts",
+      "statusBlocked": "Mērķis bloķēts",
+      "edit": "Rediģēt mērķi",
+      "remove": "Noņemt mērķi",
+      "pause": "Apturēt mērķi",
+      "resume": "Turpināt mērķi",
+      "editPlaceholder": "Aprakstiet mērķi",
+      "removeConfirmTitle": "Noņemt mērķi?",
+      "removeConfirmMessage": "CLI notīra šīs sesijas mērķi.",
+      "updateFailed": "Mērķi neizdevās atjaunināt.",
+      "sectionAccessibility": "{{status}}. Mērķis: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "Pievieno GitHub kontu pārlūkā, pēc tam atgriezies šeit, lai izvēlētos repozitoriju.",
       "openGithub": "Atvērt GitHub",
@@ -2460,6 +2480,11 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_zero": "{{steps}} soļu"
     },
+    "autoApprove": {
+      "title": "Automātiska apstiprināšana",
+      "description": "Automātiski apstiprināt šīs sesijas atļauju pieprasījumus. Pēc tam rīki darbojas bez vaicājuma.",
+      "unavailable": "Šī sesija nevar saņemt atļauju pieprasījumus."
+    },
     "prBadge": {
       "open": "atvērt izmaiņu pieprasījumu",
       "closed": "slēgts izmaiņu pieprasījums",
@@ -2490,6 +2515,10 @@
       "tapToListHint": "Pieskaries mapei, lai skatītu tās saturu.",
       "unsupportedDescription": "Šis CLI nevar parādīt mapju sarakstu. Poga „Gatavs” saglabā sākotnējo mapi, un poga „Sākt sesiju” sāk sesiju šajā mapē.",
       "unsupportedTitle": "Mapju saraksts nav pieejams"
+    },
+    "toolRun": {
+      "sheetTitle": "Rīku izsaukumi",
+      "condensedLabel": "{{itemCount}} vienumu; {{last}}"
     }
   },
   "bootstrap": {
@@ -2602,7 +2631,10 @@
     "gatewayModelUnavailable": "Šis transkripcijas modelis nav pieejams. Izvēlies citu Lietotāja iestatījumos.",
     "gatewayModelUnavailableNotice": "Šis modelis vairs netiek piedāvāts. Pieskaries $t(transcriptionModel.title), lai izvēlētos citu.",
     "gatewaySignInRequired": "Pieraksties, lai izmantotu transkripciju, izmantojot Kilo Gateway.",
-    "gatewayNoModel": "Vispirms izvēlies transkripcijas modeli Lietotāja iestatījumos."
+    "gatewayNoModel": "Vispirms izvēlies transkripcijas modeli Lietotāja iestatījumos.",
+    "testTitle": "Pārbaudīt balss ievadi",
+    "testPlaceholder": "Pieskarieties mikrofonam un sāciet runāt.",
+    "testClear": "Notīrīt tekstu"
   },
   "share": {
     "title": "Kopīgošana lietotnē Kilo",
@@ -2992,5 +3024,12 @@
     "emptyTitle": "Nav transkripcijas modeļu",
     "emptyDescription": "Pašlaik Kilo Gateway nepiedāvā nevienu transkripcijas modeli.",
     "loadFailed": "Neizdevās ielādēt transkripcijas modeļus."
+  },
+  "voiceLanguage": {
+    "title": "Balss ievades valoda",
+    "automatic": "Automātiska",
+    "loadFailed": "Neizdevās ielādēt šīs ierīces atbalstītās valodas.",
+    "emptyTitle": "Nav atbalstītu valodu",
+    "emptyDescription": "Šīs ierīces runas atpazīšana nenorāda nevienu atbalstītu valodu."
   }
 }

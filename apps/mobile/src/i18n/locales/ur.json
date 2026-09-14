@@ -231,6 +231,8 @@
     "voiceInput": "صوتی ان پٹ",
     "autoExpandThinking": "سوچ کی تفصیل خود بخود دکھائیں",
     "autoExpandThinkingSubtitle": "ایجنٹ کی سوچ مکمل ہونے پر اس کی تفصیل کھول کر دکھائیں۔",
+    "hideThinking": "سوچ کی تفصیلات چھپائیں",
+    "hideThinkingSubtitle": "سیشن کے صفحے پر ایجنٹ کی سوچ نہ دکھائیں۔",
     "keepScreenOn": "سیشن کے صفحے پر اسکرین روشن رکھیں",
     "keepScreenOnSubtitle": "سیشن میں کام جاری ہو تو اسکرین روشن رکھیں۔",
     "appearance": "ظاہری شکل",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway کے ذریعے آواز کو متن میں بدلنا",
     "gatewayTranscriptionSubtitle": "ڈیوائس کی آواز کی پہچان کے بجائے Kilo Gateway ماڈل کے ذریعے آواز سے لکھنے کو متن میں بدلیں۔ آپ کی ریکارڈنگ Kilo Gateway کو بھیجی جاتی ہے۔",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ٹول کالز کو مختصر کریں",
+    "condenseToolCallsSubtitle": "مسلسل ٹول کالز کو ایک قطار میں گروپ کریں جسے آپ کھول سکتے ہیں۔"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
@@ -1996,6 +2000,22 @@
       "connectionLost": "کنکشن ٹوٹ گیا",
       "retryConnection": "کنکشن دوبارہ قائم کرنے کی کوشش کریں"
     },
+    "goal": {
+      "title": "ہدف",
+      "statusActive": "فعال ہدف",
+      "statusPaused": "روکا گیا ہدف",
+      "statusComplete": "ہدف مکمل ہو گیا",
+      "statusBlocked": "ہدف مسدود ہے",
+      "edit": "ہدف میں ترمیم کریں",
+      "remove": "ہدف ہٹائیں",
+      "pause": "ہدف روکیں",
+      "resume": "ہدف دوبارہ شروع کریں",
+      "editPlaceholder": "ہدف بیان کریں",
+      "removeConfirmTitle": "ہدف ہٹائیں؟",
+      "removeConfirmMessage": "CLI اس سیشن کا ہدف صاف کر دیتا ہے۔",
+      "updateFailed": "ہدف اپ ڈیٹ نہیں ہو سکا۔",
+      "sectionAccessibility": "{{status}}. ہدف: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "اپنے براؤزر میں GitHub کو منسلک کریں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
       "openGithub": "GitHub کھولیں",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "{{steps}} مراحل",
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
     },
+    "autoApprove": {
+      "title": "خودکار منظوری",
+      "description": "اس سیشن کے اجازت کی درخواستوں کو خودکار طور پر منظور کریں۔ اس کے بعد ٹولز بغیر درخواست کے چلتے ہیں۔",
+      "unavailable": "یہ سیشن اجازت کی درخواستیں موصول نہیں کر سکتا۔"
+    },
     "prBadge": {
       "open": "پل ریکویسٹ کھولیں",
       "closed": "بند پل ریکویسٹ",
@@ -2469,6 +2494,10 @@
       "retryableDescription": "اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔ آپ اب بھی «ہو گیا» پر ٹیپ کر کے یہی فولڈر منتخب کر سکتے ہیں۔",
       "unsupportedTitle": "فولڈرز کی فہرست نہیں مل سکتی",
       "unsupportedDescription": "یہ CLI فولڈرز کی فہرست نہیں دکھا سکتا۔ «ہو گیا» پر ٹیپ کرنے سے ابتدائی فولڈر برقرار رہے گا۔ «سیشن شروع کریں» پر ٹیپ کرنے سے سیشن اسی فولڈر میں شروع ہو گا۔"
+    },
+    "toolRun": {
+      "sheetTitle": "ٹول کالز",
+      "condensedLabel": "{{itemCount}} اندراجات; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "یہ ماڈل دستیاب نہیں ہے۔ ترجیحات میں دوسرا منتخب کریں۔",
     "gatewayModelUnavailableNotice": "یہ ماڈل اب پیش نہیں کیا جاتا۔ کوئی دوسرا منتخب کرنے کے لیے $t(transcriptionModel.title) پر ٹیپ کریں۔",
     "gatewaySignInRequired": "Kilo Gateway کی تبدیلی استعمال کرنے کے لیے سائن ان کریں۔",
-    "gatewayNoModel": "پہلے ترجیحات میں متن میں بدلنے کا ماڈل منتخب کریں۔"
+    "gatewayNoModel": "پہلے ترجیحات میں متن میں بدلنے کا ماڈل منتخب کریں۔",
+    "testTitle": "آواز سے لکھنے کی جانچ کریں",
+    "testPlaceholder": "مائیکروفون پر ٹیپ کریں اور بولنا شروع کریں۔",
+    "testClear": "متن صاف کریں"
   },
   "share": {
     "title": "Kilo پر شیئر کریں",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "متن میں بدلنے کا کوئی ماڈل موجود نہیں",
     "emptyDescription": "Kilo Gateway فی الحال متن میں بدلنے کا کوئی ماڈل نہیں دیتا۔",
     "loadFailed": "متن میں بدلنے والے ماڈلز لوڈ نہیں ہو سکے۔"
+  },
+  "voiceLanguage": {
+    "title": "آواز سے لکھنے کی زبان",
+    "automatic": "خودکار",
+    "loadFailed": "اس ڈیوائس کے معاون زبانوں کو لوڈ نہیں کیا جا سکا۔",
+    "emptyTitle": "کوئی معاون زبان نہیں",
+    "emptyDescription": "اس ڈیوائس کی تقریر کی شناخت کسی معاون زبان کی اطلاع نہیں دیتی۔"
   }
 }

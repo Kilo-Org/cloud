@@ -231,6 +231,8 @@
     "voiceInput": "व्हॉइस इनपुट",
     "autoExpandThinking": "विचारप्रक्रिया आपोआप उघडून दाखवा",
     "autoExpandThinkingSubtitle": "एजंटची विचारप्रक्रिया पूर्ण झाल्यावर तिचा संपूर्ण मजकूर दाखवा.",
+    "hideThinking": "विचारप्रक्रियेचे तपशील लपवा",
+    "hideThinkingSubtitle": "सत्र पृष्ठावर एजंटची विचारप्रक्रिया दाखवू नका.",
     "keepScreenOn": "सत्र पृष्ठावर असताना स्क्रीन चालू ठेवा",
     "keepScreenOnSubtitle": "सत्रात काम सुरू असताना स्क्रीन चालू ठेवा.",
     "appearance": "स्वरूप",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway द्वारे लिप्यंतरण",
     "gatewayTranscriptionSubtitle": "उपकरणाच्या स्पीच रेकग्निशनऐवजी Kilo Gateway मॉडेल वापरून व्हॉइस इनपुटचे लिप्यंतरण करा. तुमचे रेकॉर्डिंग Kilo Gateway कडे पाठवले जाते.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "साधन कॉल्स संकुचित करा",
+    "condenseToolCallsSubtitle": "सलग साधन कॉल्स एका ओळीत गटबद्ध करा जी तुम्ही उघडू शकता."
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",
@@ -1996,6 +2000,22 @@
       "connectionLost": "कनेक्शन तुटले",
       "retryConnection": "पुन्हा कनेक्ट करण्याचा प्रयत्न करा"
     },
+    "goal": {
+      "title": "ध्येय",
+      "statusActive": "सक्रिय ध्येय",
+      "statusPaused": "थांबवलेले ध्येय",
+      "statusComplete": "ध्येय पूर्ण",
+      "statusBlocked": "ध्येय अवरोधित",
+      "edit": "ध्येय संपादित करा",
+      "remove": "ध्येय काढा",
+      "pause": "ध्येय थांबवा",
+      "resume": "ध्येय पुन्हा सुरू करा",
+      "editPlaceholder": "ध्येयाचे वर्णन करा",
+      "removeConfirmTitle": "ध्येय काढायचे?",
+      "removeConfirmMessage": "CLI या सत्राचे ध्येय साफ करते.",
+      "updateFailed": "ध्येय अपडेट करता आले नाही.",
+      "sectionAccessibility": "{{status}}. ध्येय: {{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "तुमच्या ब्राउझरमध्ये GitHub कनेक्ट करा, नंतर रिपॉझिटरी निवडण्यासाठी येथे परत या.",
       "openGithub": "GitHub उघडा",
@@ -2439,6 +2459,11 @@
       "stepsCount_other": "{{steps}} टप्पे",
       "modelAccessibilityLabel": "मॉडेल: {{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "स्वयं-मंजूरी",
+      "description": "या सत्रासाठी परवानगी विनंत्या स्वयंचलितपणे मंजूर करा. त्यानंतर साधने कोणत्याही सूचनेशिवाय चालतात.",
+      "unavailable": "हे सत्र परवानगी विनंत्या प्राप्त करू शकत नाही."
+    },
     "prBadge": {
       "open": "पुल रिक्वेस्ट उघडा",
       "closed": "बंद केलेली पुल रिक्वेस्ट",
@@ -2469,6 +2494,10 @@
       "tapToListHint": "फोल्डरमधील फाइल्स आणि फोल्डर पाहण्यासाठी त्यावर टॅप करा.",
       "unsupportedDescription": "या CLI मध्ये फोल्डरची यादी दाखवता येत नाही. झाले या बटणावर टॅप केल्यास सुरुवातीचा फोल्डर कायम राहतो. सत्र सुरू करा या बटणावर टॅप केल्यास सत्र त्याच फोल्डरमध्ये सुरू होते.",
       "unsupportedTitle": "फोल्डरची यादी दाखवता येत नाही"
+    },
+    "toolRun": {
+      "sheetTitle": "साधन कॉल्स",
+      "condensedLabel": "{{itemCount}} नोंदी; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2610,10 @@
     "gatewayModelUnavailable": "हे लिप्यंतरण मॉडेल उपलब्ध नाही. प्राधान्यांमध्ये दुसरे निवडा.",
     "gatewayModelUnavailableNotice": "हे मॉडेल आता उपलब्ध नाही. दुसरे निवडण्यासाठी $t(transcriptionModel.title) वर टॅप करा.",
     "gatewaySignInRequired": "Kilo Gateway लिप्यंतरण वापरण्यासाठी साइन इन करा.",
-    "gatewayNoModel": "प्राधान्यांमध्ये आधी लिप्यंतरण मॉडेल निवडा."
+    "gatewayNoModel": "प्राधान्यांमध्ये आधी लिप्यंतरण मॉडेल निवडा.",
+    "testTitle": "व्हॉइस इनपुटची चाचणी करा",
+    "testPlaceholder": "मायक्रोफोनवर टॅप करा आणि बोलण्यास सुरुवात करा.",
+    "testClear": "मजकूर साफ करा"
   },
   "share": {
     "title": "Kilo वर शेअर करा",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "लिप्यंतरणासाठी मॉडेल्स नाहीत",
     "emptyDescription": "Kilo Gateway सध्या लिप्यंतरणासाठी कोणतीही मॉडेल्स देत नाही.",
     "loadFailed": "लिप्यंतरण मॉडेल्स लोड करता आली नाहीत."
+  },
+  "voiceLanguage": {
+    "title": "व्हॉइस इनपुटची भाषा",
+    "automatic": "स्वयंचलित",
+    "loadFailed": "हे उपकरण समर्थित करते त्या भाषा लोड करता आल्या नाहीत.",
+    "emptyTitle": "कोणतीही समर्थित भाषा नाही",
+    "emptyDescription": "या उपकरणाची वाक् ओळख कोणतीही समर्थित भाषा नोंदवत नाही."
   }
 }

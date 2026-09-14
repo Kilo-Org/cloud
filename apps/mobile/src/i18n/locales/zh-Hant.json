@@ -231,6 +231,8 @@
     "voiceInput": "語音輸入",
     "autoExpandThinking": "自動展開思考內容",
     "autoExpandThinkingSubtitle": "智慧代理完成思考後，自動展開思考內容。",
+    "hideThinking": "隱藏思考詳情",
+    "hideThinkingSubtitle": "不在工作階段頁面顯示智慧代理的思考內容。",
     "keepScreenOn": "在工作階段頁面保持螢幕亮起",
     "keepScreenOnSubtitle": "工作階段執行期間，保持螢幕亮起。",
     "appearance": "外觀",
@@ -253,7 +255,9 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "使用 Kilo Gateway 轉錄",
     "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型將語音輸入轉錄成文字，而不使用裝置上的語音辨識。您的錄音將傳送至 Kilo Gateway。",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "精簡工具呼叫",
+    "condenseToolCallsSubtitle": "將連續的工具呼叫合併為一列，點擊即可開啟。"
   },
   "notifications": {
     "liveActivities": "即時動態",
@@ -1562,6 +1566,22 @@
       "connectionLost": "連線中斷",
       "retryConnection": "重新連線"
     },
+    "goal": {
+      "title": "目標",
+      "statusActive": "進行中的目標",
+      "statusPaused": "已暫停的目標",
+      "statusComplete": "目標已完成",
+      "statusBlocked": "目標已封鎖",
+      "edit": "編輯目標",
+      "remove": "移除目標",
+      "pause": "暫停目標",
+      "resume": "繼續目標",
+      "editPlaceholder": "描述目標",
+      "removeConfirmTitle": "移除目標？",
+      "removeConfirmMessage": "CLI 會清除此工作階段的目標。",
+      "updateFailed": "無法更新目標。",
+      "sectionAccessibility": "{{status}}。目標：{{text}}"
+    },
     "newSession": {
       "connectGithubDescription": "請在瀏覽器中連結 GitHub，再回到這裡選取儲存庫。",
       "openGithub": "開啟 GitHub",
@@ -2005,6 +2025,11 @@
       "stepsCount_other": "{{steps}} 個步驟",
       "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}"
     },
+    "autoApprove": {
+      "title": "自動核准",
+      "description": "自動核准此工作階段的權限要求。工具隨後會在不提示的情況下執行。",
+      "unavailable": "此工作階段無法接收權限要求。"
+    },
     "prBadge": {
       "open": "開啟提取要求",
       "closed": "已關閉的 PR",
@@ -2035,6 +2060,10 @@
       "tapToListHint": "點一下資料夾，即可查看其中的內容。",
       "unsupportedDescription": "此 CLI 無法列出資料夾。點一下「完成」會保留啟動時的資料夾，再點一下「開始工作階段」即可從該資料夾開始。",
       "unsupportedTitle": "無法列出資料夾"
+    },
+    "toolRun": {
+      "sheetTitle": "工具呼叫",
+      "condensedLabel": "{{itemCount}} 個項目; {{last}}"
     }
   },
   "bootstrap": {
@@ -2147,7 +2176,10 @@
     "gatewayModelUnavailable": "這個轉錄模型無法使用。請在偏好設定中選擇其他模型。",
     "gatewayModelUnavailableNotice": "這個模型已不再提供。點一下$t(transcriptionModel.title)選擇另一個。",
     "gatewaySignInRequired": "登入後即可使用 Kilo Gateway 轉錄。",
-    "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。"
+    "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。",
+    "testTitle": "測試語音輸入",
+    "testPlaceholder": "點按麥克風並開始說話。",
+    "testClear": "清除文字"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2970,5 +3002,12 @@
     "emptyTitle": "沒有轉錄模型",
     "emptyDescription": "Kilo Gateway 目前沒有提供轉錄模型。",
     "loadFailed": "無法載入轉錄模型。"
+  },
+  "voiceLanguage": {
+    "title": "語音輸入語言",
+    "automatic": "自動",
+    "loadFailed": "無法載入此裝置支援的語言。",
+    "emptyTitle": "沒有支援的語言",
+    "emptyDescription": "此裝置的語音辨識未回報任何支援的語言。"
   }
 }

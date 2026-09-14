@@ -47,9 +47,9 @@ export function useInteractionHandlers({
   } | null>(null);
 
   const handleAnswerQuestion = useCallback(
-    async (answers: string[][]) => {
+    async (answers: string[][]): Promise<boolean> => {
       if (!activeQuestion) {
-        return;
+        return false;
       }
       const requestId = activeQuestion.requestId;
       setQuestionSubmissionError(null);
@@ -58,11 +58,13 @@ export function useInteractionHandlers({
         await manager.answerQuestion(requestId, answers);
         ackSessionAttention(kiloSessionId);
         captureEvent(QUESTION_ANSWERED_EVENT, { surface, skipped: false });
+        return true;
       } catch (error) {
         const submissionError = classifyBlockingSubmissionError(error, 'question', 'answer');
         setQuestionSubmissionError({ requestId, error: submissionError });
         announceForA11y(submissionError.message);
         toast.error(submissionError.message);
+        return false;
       } finally {
         // Guarded clear. The head can advance mid-flight, the user can submit the
         // next request, and this late `finally` must not drop that newer spinner.
@@ -72,9 +74,9 @@ export function useInteractionHandlers({
     [manager, kiloSessionId, activeQuestion, surface]
   );
 
-  const handleRejectQuestion = useCallback(async () => {
+  const handleRejectQuestion = useCallback(async (): Promise<boolean> => {
     if (!activeQuestion) {
-      return;
+      return false;
     }
     const requestId = activeQuestion.requestId;
     setQuestionSubmissionError(null);
@@ -83,20 +85,24 @@ export function useInteractionHandlers({
       await manager.rejectQuestion(requestId);
       ackSessionAttention(kiloSessionId);
       captureEvent(QUESTION_ANSWERED_EVENT, { surface, skipped: true });
+      return true;
     } catch (error) {
       const submissionError = classifyBlockingSubmissionError(error, 'question', 'reject');
       setQuestionSubmissionError({ requestId, error: submissionError });
       announceForA11y(submissionError.message);
       toast.error(submissionError.message);
+      return false;
     } finally {
       setAnsweringRequestId(current => (current === requestId ? null : current));
     }
   }, [manager, kiloSessionId, activeQuestion, surface]);
 
   const handleRespondToPermission = useCallback(
-    async (response: 'once' | 'always' | 'reject') => {
+    async (response: 'once' | 'always' | 'reject'): Promise<'ok' | 'retryable' | 'terminal'> => {
       if (!activePermission) {
-        return;
+        // Nothing to answer: treat it as handled so a caller cannot retry a
+        // request that is no longer on screen.
+        return 'ok';
       }
       const requestId = activePermission.requestId;
       setPermissionSubmissionError(null);
@@ -105,6 +111,7 @@ export function useInteractionHandlers({
         await manager.respondToPermission(requestId, response);
         ackSessionAttention(kiloSessionId);
         captureEvent(PERMISSION_RESPONDED_EVENT, { surface, response });
+        return 'ok';
       } catch (error) {
         const submissionError = classifyBlockingSubmissionError(error, 'permission', 'respond');
         setPermissionSubmissionError({
@@ -113,6 +120,7 @@ export function useInteractionHandlers({
         });
         announceForA11y(submissionError.message);
         toast.error(submissionError.message);
+        return submissionError.kind === 'non-retryable' ? 'terminal' : 'retryable';
       } finally {
         setRespondingRequestId(current => (current === requestId ? null : current));
       }

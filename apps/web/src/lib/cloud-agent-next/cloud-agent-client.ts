@@ -3,6 +3,11 @@ import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import {
+  sandboxSelectionCapabilitiesSchema,
+  type SandboxAllocationInput,
+  type SandboxSelectionCapabilities,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import type { EncryptedEnvelope } from '@/lib/encryption';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
@@ -171,6 +176,7 @@ type PrepareSessionSharedFields = {
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
   /** When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes */
   devcontainer?: boolean;
+  sandboxAllocation?: SandboxAllocationInput;
 };
 
 /** Non-clone prepare input: required `prompt` and the current optional initial fields. */
@@ -194,6 +200,11 @@ export type PrepareSessionCloneInput = PrepareSessionSharedFields & {
 
 /** Input for prepareSession procedure */
 export type PrepareSessionInput = PrepareSessionNonCloneInput | PrepareSessionCloneInput;
+
+export type GetSandboxSelectionOptionsInput = {
+  kilocodeOrganizationId?: string;
+  devcontainer?: boolean;
+};
 
 /** Output from prepareSession procedure */
 export type PrepareSessionOutput = {
@@ -610,6 +621,9 @@ type CloudAgentNextTRPCClient = {
   getComputeBillingStatus: {
     query: (input: GetSessionInput) => Promise<ComputeBillingStatus>;
   };
+  getSandboxSelectionOptions: {
+    query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
+  };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
   };
@@ -920,6 +934,14 @@ export class CloudAgentNextClient {
       });
       throw error;
     }
+  }
+
+  async getSandboxSelectionOptions(
+    input: GetSandboxSelectionOptionsInput
+  ): Promise<SandboxSelectionCapabilities> {
+    return sandboxSelectionCapabilitiesSchema.parse(
+      await this.client.getSandboxSelectionOptions.query(input)
+    );
   }
 
   /**

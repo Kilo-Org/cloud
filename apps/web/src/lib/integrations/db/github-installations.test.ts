@@ -16,6 +16,7 @@ import {
   claimGitHubInstallationDelivery,
   completeGitHubInstallationDelivery,
   connectVerifiedGitHubInstallation,
+  GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS,
   getGitHubInstallationDeliveryStatus,
   materializeGitHubInstallationIdentity,
   disconnectGitHubInstallation,
@@ -176,6 +177,110 @@ describe('GitHub installation persistence', () => {
     await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({ status: 'completed' });
     await expect(getGitHubInstallationDeliveryStatus(delivered)).resolves.toBe('completed');
     await expect(db.select().from(github_installation_webhook_receipts)).resolves.toHaveLength(1);
+  });
+
+  test('keeps a fresh processing claim as a duplicate instead of reclaiming it', async () => {
+    await materializeGitHubInstallationIdentity({ installationId: '910003', appType: 'standard' });
+    const input = {
+      installationId: '910003',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-fresh',
+      eventType: 'installation.deleted',
+    };
+
+    const first = await claimGitHubInstallationDelivery(input);
+    if (first.status !== 'claimed') throw new Error('Expected first claim to win');
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({ status: 'processing' });
+    await expect(
+      getGitHubInstallationDeliveryStatus({
+        installationId: '910003',
+        appType: 'standard',
+        deliveryId: 'delivery-fresh',
+      })
+    ).resolves.toBe('processing');
+  });
+
+  test('reclaims a stale processing claim left by a killed dispatch', async () => {
+    await materializeGitHubInstallationIdentity({ installationId: '910004', appType: 'standard' });
+    const input = {
+      installationId: '910004',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-stale',
+      eventType: 'installation.deleted',
+    };
+
+    const first = await claimGitHubInstallationDelivery(input);
+    if (first.status !== 'claimed') throw new Error('Expected first claim to win');
+    await db
+      .update(github_installation_webhook_receipts)
+      .set({
+        created_at: new Date(
+          Date.now() - GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS - 60_000
+        ).toISOString(),
+      })
+      .where(eq(github_installation_webhook_receipts.delivery_id, 'delivery-stale'));
+
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({
+      status: 'claimed',
+      githubInstallationId: first.githubInstallationId,
+    });
+    // The reclaim refreshes the claim timestamp, so a second attempt is a duplicate again.
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({ status: 'processing' });
+  });
+
+  test('keeps a completed receipt terminal for its delivery id', async () => {
+    await materializeGitHubInstallationIdentity({ installationId: '910005', appType: 'standard' });
+    const input = {
+      installationId: '910005',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-terminal',
+      eventType: 'installation.deleted',
+    };
+
+    const first = await claimGitHubInstallationDelivery(input);
+    if (first.status !== 'claimed') throw new Error('Expected first claim to win');
+    await completeGitHubInstallationDelivery({
+      githubInstallationId: first.githubInstallationId,
+      deliveryId: 'delivery-terminal',
+    });
+    await db
+      .update(github_installation_webhook_receipts)
+      .set({
+        created_at: new Date(
+          Date.now() - GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS - 60_000
+        ).toISOString(),
+      })
+      .where(eq(github_installation_webhook_receipts.delivery_id, 'delivery-terminal'));
+
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({ status: 'completed' });
+  });
+
+  test('lets only one concurrent redelivery reclaim a stale processing claim', async () => {
+    await materializeGitHubInstallationIdentity({ installationId: '910006', appType: 'standard' });
+    const input = {
+      installationId: '910006',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-concurrent-reclaim',
+      eventType: 'installation.deleted',
+    };
+
+    const first = await claimGitHubInstallationDelivery(input);
+    if (first.status !== 'claimed') throw new Error('Expected first claim to win');
+    await db
+      .update(github_installation_webhook_receipts)
+      .set({
+        created_at: new Date(
+          Date.now() - GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS - 60_000
+        ).toISOString(),
+      })
+      .where(eq(github_installation_webhook_receipts.delivery_id, 'delivery-concurrent-reclaim'));
+
+    const results = await Promise.all([
+      claimGitHubInstallationDelivery(input),
+      claimGitHubInstallationDelivery(input),
+    ]);
+    expect(results.filter(result => result.status === 'claimed')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'processing')).toHaveLength(1);
   });
 
   test('releases a failed claim so redelivery can reprocess', async () => {

@@ -10,7 +10,7 @@ import {
   github_installation_webhook_receipts,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import {
   canOrganizationCreateSharedGitHubConnection,
   canOrganizationUseMultipleGitHubInstallations,
@@ -849,6 +849,11 @@ export type GitHubInstallationDeliveryClaim =
   | { status: 'claimed'; githubInstallationId: string }
   | { status: 'completed' | 'processing' | 'missing_canonical' };
 
+// A dispatch is bounded by the webhook function timeout (well under 5 minutes), so a
+// processing receipt older than this window can only belong to a killed request and
+// may be safely reclaimed instead of suppressing GitHub's redelivery forever.
+export const GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS = 10 * 60_000;
+
 export async function claimGitHubInstallationDelivery(input: {
   installationId: string;
   appType: 'standard' | 'lite';
@@ -896,7 +901,29 @@ export async function claimGitHubInstallationDelivery(input: {
       )
     )
     .limit(1);
-  return { status: receipt?.status === 'completed' ? 'completed' : 'processing' };
+  if (!receipt) return { status: 'processing' };
+  if (receipt.status === 'completed') return { status: 'completed' };
+
+  // created_at is the claim timestamp: it is set on insert and refreshed on reclaim.
+  // The conditional update plus row lock lets exactly one concurrent redelivery win.
+  const staleBefore = new Date(
+    Date.now() - GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS
+  ).toISOString();
+  const reclaimed = await db
+    .update(github_installation_webhook_receipts)
+    .set({ created_at: new Date().toISOString() })
+    .where(
+      and(
+        eq(github_installation_webhook_receipts.github_installation_id, installation.id),
+        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId),
+        eq(github_installation_webhook_receipts.status, 'processing'),
+        lt(github_installation_webhook_receipts.created_at, staleBefore)
+      )
+    )
+    .returning({ id: github_installation_webhook_receipts.id });
+  return reclaimed.length === 1
+    ? { status: 'claimed', githubInstallationId: installation.id }
+    : { status: 'processing' };
 }
 
 export async function completeGitHubInstallationDelivery(input: {

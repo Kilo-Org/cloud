@@ -10,7 +10,24 @@ import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { device_refresh_tokens, device_sessions, native_attested_keys } from '@kilocode/db/schema';
+import {
+  device_refresh_tokens,
+  device_sessions,
+  native_attested_keys,
+  kilocode_users,
+} from '@kilocode/db/schema';
+
+jest.mock('@/lib/config.server', () => ({
+  ...jest.requireActual('@/lib/config.server'),
+  GOOGLE_CLIENT_ID: 'native-flagoff-client-id',
+}));
+
+jest.mock('@/lib/auth/native-id-tokens', () => ({
+  ...jest.requireActual('@/lib/auth/native-id-tokens'),
+  verifyNativeAppleIdToken: jest.fn(),
+  verifyNativeGoogleIdToken: jest.fn(),
+  exchangeNativeGoogleAuthCode: jest.fn(),
+}));
 
 jest.mock('@/lib/redis', () => ({ redisClient: { get: jest.fn(async () => null) } }));
 jest.mock('@/lib/user', () => ({
@@ -42,6 +59,13 @@ jest.mock('@/lib/posthog', () => ({
 }));
 
 import { POST } from './route';
+import { POST as refresh } from '../refresh/route';
+import {
+  verifyNativeAppleIdToken,
+  verifyNativeGoogleIdToken,
+  exchangeNativeGoogleAuthCode,
+} from '@/lib/auth/native-id-tokens';
+import { GOOGLE_CLIENT_ID } from '@/lib/config.server';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import {
   checkNativeAdmission,
@@ -150,6 +174,88 @@ describe('POST /api/auth/native/token credential issuance', () => {
     expect(pair?.refreshToken).toBeDefined();
   });
 
+  describe.each([undefined, 'false'])('native flag=%s with shared master enabled', nativeFlag => {
+    test.each(['apple', 'google', 'google-legacy', 'email'] as const)(
+      'keeps %s negotiated and old-client login/refresh responses legacy',
+      async provider => {
+        process.env[sharedResourceTokensKey] = 'true';
+        if (nativeFlag === undefined) delete process.env[nativeResourceTokensKey];
+        else process.env[nativeResourceTokensKey] = nativeFlag;
+        const user = await insertTestUser({ api_token_pepper: null });
+        mockCreateOrUpdateUser.mockResolvedValue({ success: true, user, isNew: false });
+        const identity = {
+          sub: user.id,
+          email: user.google_user_email,
+          name: 'Native user',
+          picture: '',
+        };
+        jest.mocked(verifyNativeAppleIdToken).mockResolvedValue(identity);
+        jest.mocked(verifyNativeGoogleIdToken).mockResolvedValue(identity);
+        jest.mocked(exchangeNativeGoogleAuthCode).mockResolvedValue(identity);
+        const providerInput =
+          provider === 'email'
+            ? { provider, email: user.google_user_email, code: '123456' }
+            : provider === 'google'
+              ? { provider, serverAuthCode: 'verified-code', googleClientId: GOOGLE_CLIENT_ID }
+              : {
+                  provider: provider === 'google-legacy' ? 'google' : provider,
+                  idToken: 'verified-id-token',
+                };
+
+        for (const negotiation of [
+          { supportsRefresh: true, credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT },
+          { supportsRefresh: true },
+          {},
+        ]) {
+          const response = await POST(
+            request({ ...providerInput, ...negotiation }, 'native-flagoff')
+          );
+          expect(response.status).toBe(200);
+          const raw: unknown = await response.json();
+          expect(raw).not.toHaveProperty('metadata');
+          const pair = parseNativeTokenPair(raw);
+          if (!pair) {
+            throw new Error('Expected a legacy native response');
+          }
+          const claims = jwt.verify(pair.token, NEXTAUTH_SECRET) as jwt.JwtPayload;
+          expect(claims).toMatchObject({ kiloUserId: user.id, apiTokenPepper: null });
+          expect(claims).not.toHaveProperty('aud');
+          expect(claims).not.toHaveProperty('tokenPurpose');
+          expect(claims.exp! - claims.iat!).toBe(
+            'supportsRefresh' in negotiation ? 3600 : 5 * 365 * 24 * 3600
+          );
+          if (pair.refreshToken) {
+            expect(pair.expiresIn).toBe(3600);
+            const rotated = await refresh(
+              new NextRequest('http://localhost/api/auth/native/refresh', {
+                method: 'POST',
+                body: JSON.stringify({ refreshToken: pair.refreshToken, ...negotiation }),
+              })
+            );
+            expect(rotated.status).toBe(200);
+            const rotatedRaw: unknown = await rotated.json();
+            expect(rotatedRaw).not.toHaveProperty('metadata');
+            const next = parseNativeTokenPair(rotatedRaw);
+            if (!next) {
+              throw new Error('Expected a legacy refresh response');
+            }
+            expect(next.refreshToken).not.toBe(pair.refreshToken);
+            expect(next.expiresIn).toBe(3600);
+            expect(jwt.verify(next.token, NEXTAUTH_SECRET)).toMatchObject({ apiTokenPepper: null });
+            expect(jwt.verify(next.token, NEXTAUTH_SECRET)).not.toHaveProperty('aud');
+          } else {
+            expect(raw).not.toHaveProperty('refreshToken');
+          }
+        }
+        const [storedUser] = await db
+          .select()
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, user.id));
+        expect(storedUser?.api_token_pepper).toBeNull();
+      }
+    );
+  });
+
   test('issues signed API and gateway credentials and persists a device session', async () => {
     setNativeResourceTokens(true);
     const userAgent = 'native-token-resource-integration';
@@ -169,7 +275,9 @@ describe('POST /api/auth/native/token credential issuance', () => {
         and(eq(device_sessions.kilo_user_id, user.id), eq(device_sessions.user_agent, userAgent))
       );
     expect(session).toBeDefined();
-    if (!session) throw new Error('Expected device session');
+    if (!session) {
+      throw new Error('Expected device session');
+    }
 
     const refreshTokens = await db
       .select()
@@ -224,7 +332,9 @@ describe('POST /api/auth/native/token credential issuance', () => {
       .from(device_sessions)
       .where(eq(device_sessions.kilo_user_id, user.id));
     expect(session).toBeDefined();
-    if (!session) throw new Error('Expected attested device session');
+    if (!session) {
+      throw new Error('Expected attested device session');
+    }
     const refreshTokens = await db
       .select()
       .from(device_refresh_tokens)

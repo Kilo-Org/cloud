@@ -89,6 +89,18 @@ describe('generateNativeAccessCredentials', () => {
     expect(jwt.decode(unnegotiated.token)).toMatchObject({ deviceSessionId: 'device-session' });
   });
 
+  test('keeps non-negotiating clients legacy even when both issuance gates are enabled', () => {
+    config.enabled = true;
+    config.sharedReady = true;
+    const result = generateNativeAccessCredentials(user, 'old-client-session');
+    expect(result).not.toHaveProperty('metadata');
+    const claims = jwt.verify(result.token, 'native-access-credentials-secret') as jwt.JwtPayload;
+    expect(claims).toMatchObject({ deviceSessionId: 'old-client-session', apiTokenPepper: null });
+    expect(claims).not.toHaveProperty('aud');
+    expect(claims).not.toHaveProperty('tokenPurpose');
+    expect(claims.exp! - claims.iat!).toBe(3600);
+  });
+
   test('does not adopt resource credentials until the shared control issuer is ready', () => {
     config.sharedReady = false;
     const result = generateNativeAccessCredentials(

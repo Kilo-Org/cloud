@@ -9,8 +9,8 @@ vi.mock('expo-secure-store', () => ({}));
 vi.mock('@tanstack/react-query', () => ({}));
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
 
-const getAuthTokenForRequest = vi.hoisted(() => vi.fn<() => Promise<string | null>>());
-vi.mock('@/lib/auth/token-owner', () => ({ getAuthTokenForRequest }));
+const getGatewayAuthTokenForRequest = vi.hoisted(() => vi.fn<() => Promise<string | null>>());
+vi.mock('@/lib/auth/credentials', () => ({ getGatewayAuthTokenForRequest }));
 
 const fetchMock = vi.hoisted(() => vi.fn<typeof fetch>());
 vi.stubGlobal('fetch', fetchMock);
@@ -28,8 +28,8 @@ const GATEWAY_BODY = {
 
 beforeEach(() => {
   fetchMock.mockReset();
-  getAuthTokenForRequest.mockReset();
-  getAuthTokenForRequest.mockResolvedValue('token-1');
+  getGatewayAuthTokenForRequest.mockReset();
+  getGatewayAuthTokenForRequest.mockResolvedValue('gateway-token');
 });
 
 afterEach(() => {
@@ -41,6 +41,7 @@ describe('fetchTranscriptionModels', () => {
     fetchMock.mockResolvedValue(Response.json(GATEWAY_BODY));
 
     const models = await fetchTranscriptionModels();
+    expect(getGatewayAuthTokenForRequest).toHaveBeenCalledTimes(1);
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.com/api/gateway/transcription-models',
@@ -85,7 +86,7 @@ describe('fetchTranscriptionModels', () => {
     const call = fetchMock.mock.calls[0];
     expect(call?.[1]?.headers).toEqual({
       Accept: 'application/json',
-      Authorization: 'Bearer token-1',
+      Authorization: 'Bearer gateway-token',
       'X-KiloCode-OrganizationId': 'org-1',
     });
 
@@ -93,10 +94,10 @@ describe('fetchTranscriptionModels', () => {
     const anonymousCall = fetchMock.mock.calls[1];
     expect(anonymousCall?.[1]?.headers).toEqual({
       Accept: 'application/json',
-      Authorization: 'Bearer token-1',
+      Authorization: 'Bearer gateway-token',
     });
 
-    getAuthTokenForRequest.mockResolvedValue(null);
+    getGatewayAuthTokenForRequest.mockResolvedValue(null);
     await fetchTranscriptionModels();
     const unauthenticatedCall = fetchMock.mock.calls[2];
     expect(unauthenticatedCall?.[1]?.headers).toEqual({ Accept: 'application/json' });

@@ -10,6 +10,15 @@ import {
 } from './native-gateway-voice-input';
 
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
+const upload = vi.hoisted(() =>
+  vi.fn(() => ({
+    uploadAsync: async () => ({ status: 200, body: JSON.stringify({ text: 'hello' }) }),
+    cancel: vi.fn(),
+  }))
+);
+const gatewayCredential = vi.hoisted(() =>
+  vi.fn(async (): Promise<string | null> => 'gateway-token')
+);
 vi.mock('expo-file-system', () => ({
   UploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
   File: class {
@@ -17,10 +26,11 @@ vi.mock('expo-file-system', () => ({
     constructor(uri: string) {
       this.uri = uri;
     }
+    createUploadTask = upload;
   },
 }));
-vi.mock('@/lib/auth/token-owner', () => ({
-  getAuthTokenForRequest: vi.fn(async (): Promise<string | null> => 'token-1'),
+vi.mock('@/lib/auth/credentials', () => ({
+  getGatewayAuthTokenForRequest: gatewayCredential,
 }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(async (): Promise<string | null> => null),
@@ -315,5 +325,27 @@ describe('resolveGatewayTranscriptionModelId', () => {
 
     await expect(resolveGatewayTranscriptionModelId()).resolves.toBeNull();
     expect(writeTranscriptionModel).not.toHaveBeenCalled();
+  });
+});
+
+describe('native transcription credential routing', () => {
+  it('uploads with the gateway credential and selected language', async () => {
+    gatewayVoiceInputNative.abort();
+    await flush();
+    upload.mockClear();
+    gatewayCredential.mockClear();
+    storedModel.current = { id: 'transcribe-model', name: 'Transcribe' };
+    gatewayVoiceInputNative.start({ ...START_OPTIONS, lang: 'de-DE' });
+    await flush();
+    gatewayVoiceInputNative.stop();
+    await flush();
+    expect(gatewayCredential).toHaveBeenCalledTimes(1);
+    expect(upload).toHaveBeenCalledWith(
+      'https://api.example.com/api/gateway/audio/transcriptions',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer gateway-token' }),
+        parameters: expect.objectContaining({ model: 'transcribe-model', language: 'de-DE' }),
+      })
+    );
   });
 });

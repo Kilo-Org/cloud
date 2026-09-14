@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
+import { getGatewayAuthTokenForRequest } from '@/lib/auth/credentials';
 import { API_BASE_URL } from '@/lib/config';
 import {
   type ModelOption,
@@ -22,7 +22,7 @@ const TRANSCRIPTION_MODELS_PATH = '/api/gateway/transcription-models';
  * model list in the app.
  */
 export async function fetchTranscriptionModels(organizationId?: string): Promise<ModelOption[]> {
-  const token = await getAuthTokenForRequest();
+  const token = await getGatewayAuthTokenForRequest();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
     controller.abort();

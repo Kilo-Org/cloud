@@ -13,7 +13,6 @@ import {
   getActiveTokenSnapshot,
   getAuthTokenForRequest,
   isSignOutTeardownActive,
-  publishActiveTokenExpiry,
   setActiveToken,
 } from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
@@ -309,22 +308,12 @@ export async function getGatewayAuthTokenForRequest(): Promise<string | null> {
   if (!token || !owner || owner.epoch !== epoch || !isCurrentAuthEpoch(epoch)) {
     return null;
   }
-  let expiresAtMs = owner.expiresAtMs;
-  if (expiresAtMs === null && !owner.bundle) {
-    const expiresAt = await readStoredValueWithRetry(TOKEN_EXPIRES_AT_KEY);
-    if (!isCurrentAuthEpoch(epoch)) {
-      return null;
-    }
-    const current = getActiveTokenSnapshot();
-    if (!current || current.epoch !== epoch || current.token !== owner.token) {
-      return getAuthTokenForRequest('gateway');
-    }
-    const parsedExpiry = expiresAt ? Number(expiresAt) : null;
-    expiresAtMs = parsedExpiry !== null && Number.isFinite(parsedExpiry) ? parsedExpiry : null;
-    if (expiresAtMs !== null) {
-      publishActiveTokenExpiry(current, expiresAtMs);
-    }
+  // Legacy callers retain main's direct bearer behavior; only negotiated bundles
+  // need this resource-specific refresh path.
+  if (!owner.bundle) {
+    return token;
   }
+  const expiresAtMs = owner.expiresAtMs;
   if (expiresAtMs !== null && shouldRefresh(expiresAtMs)) {
     const refreshed = await performRefresh();
     if (!refreshed.ok || !isCurrentAuthEpoch(epoch) || refreshed.sessionVersion !== epoch) {

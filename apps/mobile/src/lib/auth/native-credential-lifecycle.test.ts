@@ -3,6 +3,7 @@ import {
   API_GATEWAY_CREDENTIAL_FORMAT,
   type NativeCredentialBundleMetadata,
   type NativeSessionCredentials,
+  parseNativeTokenPair,
 } from '@kilocode/app-shared/native-auth';
 import * as SecureStore from 'expo-secure-store';
 import { bumpAuthEpoch } from './auth-epoch';
@@ -200,5 +201,53 @@ describe('native credential bundle lifecycle', () => {
     gate.resolve(undefined);
     await expect(pending).resolves.toBeNull();
     await expect(getGatewayAuthTokenForRequest()).resolves.toBe('gateway-new');
+  });
+});
+
+describe('legacy responses with native adoption disabled', () => {
+  it.each([
+    { token: 'legacy-long-lived' },
+    { token: 'legacy-session', refreshToken: 'legacy-refresh', expiresIn: 3600 },
+  ])('stores and cold-restores the main-compatible legacy response %j', async response => {
+    const pair = parseNativeTokenPair(response);
+    if (!pair) {
+      throw new Error('Expected compatible legacy response');
+    }
+    await expect(setCredentials(pair)).resolves.toBe(true);
+    expect(store.get(AUTH_TOKEN_KEY)).toBe(response.token);
+    expect(store.has(NATIVE_CREDENTIAL_BUNDLE_KEY)).toBe(false);
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe(response.refreshToken);
+    expect(store.has(TOKEN_EXPIRES_AT_KEY)).toBe(response.refreshToken !== undefined);
+    clearActiveToken();
+    await expect(getAuthTokenForRequest()).resolves.toBe(response.token);
+    await expect(getGatewayAuthTokenForRequest()).resolves.toBe(response.token);
+  });
+
+  it('does not add a refresh dependency to a still-valid legacy gateway request', async () => {
+    await setCredentials({ token: 'legacy-session', refreshToken: 'refresh', expiresIn: 60 });
+    const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new Error('refresh unavailable'));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(getGatewayAuthTokenForRequest()).resolves.toBe('legacy-session');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rotates a legacy session and keeps the response usable by both resources', async () => {
+    await setCredentials({ token: 'legacy-old', refreshToken: 'refresh-old', expiresIn: 3600 });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValue(
+        Response.json({
+          token: 'legacy-new',
+          refreshToken: 'refresh-new',
+          expiresIn: 3600,
+        })
+      )
+    );
+    await expect(performRefresh()).resolves.toMatchObject({ ok: true, token: 'legacy-new' });
+    expect(store.has(NATIVE_CREDENTIAL_BUNDLE_KEY)).toBe(false);
+    expect(store.get(REFRESH_TOKEN_KEY)).toBe('refresh-new');
+    clearActiveToken();
+    await expect(getAuthTokenForRequest()).resolves.toBe('legacy-new');
+    await expect(getGatewayAuthTokenForRequest()).resolves.toBe('legacy-new');
   });
 });

@@ -219,6 +219,13 @@ vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   useKeepScreenOnPreference: () => ({ hasLoaded: true, keepScreenOn: false }),
 }));
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  useCondenseToolCallsPreference: () => ({
+    condenseToolCalls: false,
+    hasLoaded: true,
+    setCondenseToolCalls: vi.fn(),
+  }),
+}));
 // The real hook reaches SecureStore via `@sentry/react-native`, which imports
 // the native react-native entry; mock the preference the way the other
 // preference hooks above are mocked so the suite stays DOM/native-free.
@@ -422,6 +429,12 @@ vi.mock('@/components/agents/child-session-sheet', () => ({
 }));
 vi.mock('@/components/agents/part-detail-sheet-host', () => ({
   PartDetailSheetHost: 'PartDetailSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-sheet-host', () => ({
+  ToolRunSheetHost: 'ToolRunSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-rows', () => ({
+  CondensedToolRunRow: 'CondensedToolRunRow',
 }));
 vi.mock('@/components/agents/part-renderer', () => ({
   PartRenderer: 'PartRenderer',

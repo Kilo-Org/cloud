@@ -67,7 +67,9 @@ export function FixedPartRow({
         {status === 'error' ? <XCircle size={16} color={colors.destructive} /> : null}
         {status === 'completed' && Icon ? <Icon size={16} color={colors.mutedForeground} /> : null}
 
-        <View className="flex-1 flex-row items-center gap-1.5">
+        {/* Baseline, not center: the label is text-sm and the badge text-xs, so
+            centering the line boxes drops the badge below the label. */}
+        <View className="flex-1 flex-row items-baseline gap-1.5">
           {labelKind === 'eyebrow' ? (
             <Eyebrow className="shrink" numberOfLines={1}>
               {label}

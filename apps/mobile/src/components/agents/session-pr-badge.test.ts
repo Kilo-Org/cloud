@@ -1,7 +1,7 @@
-/* eslint-disable typescript-eslint/no-deprecated, typescript-eslint/no-unsafe-call -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as fixed-part-row.mounted.test.tsx) */
+/* eslint-disable typescript-eslint/no-unsafe-call -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as fixed-part-row.mounted.test.tsx) */
 import { type AssociatedPrData } from '@kilocode/cloud-agent-sdk';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SessionPrBadge } from './session-pr-badge';

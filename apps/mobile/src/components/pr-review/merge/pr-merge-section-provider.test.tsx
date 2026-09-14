@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as comment-row.test.tsx) */
 // The provider merge section (s6): the overview's merge affordance on a
 // GitLab MR / Bitbucket PR. The merge CTA always pushes the ref's own sheet
 // route (the sheet renders the s2/s3 restrictions); the auto-merge row
@@ -8,7 +7,7 @@
 
 import * as React from 'react';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';

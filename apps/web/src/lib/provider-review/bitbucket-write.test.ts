@@ -609,6 +609,43 @@ describe('resolveThread', () => {
     expect(JSON.parse(String(put?.init.body))).toEqual({ state: 'RESOLVED' });
   });
 
+  it('resolves the root comment task for a page-split fragment id', async () => {
+    // A reply fragment whose root was served on an earlier comments page
+    // carries the namespaced id `root:firstReplyId` (bitbucket-read); the
+    // action must still resolve the ROOT comment's task, not the reply's.
+    const result = await resolveThread({
+      owner: ORG_OWNER,
+      workspace: 'acme',
+      repoSlug: 'repo',
+      prId: 12,
+      threadId: '101:901',
+    });
+
+    expect(result).toEqual({ done: true, replayed: false });
+    // The existence check and the task walk both key off the root comment.
+    expect(bitbucketCalls().some(call => String(call.url.pathname).endsWith('/comments/101'))).toBe(
+      true
+    );
+    const put = bitbucketCalls().find(call => call.init.method === 'PUT');
+    expect(put?.url.pathname).toBe('/2.0/repositories/acme/repo/pullrequests/12/tasks/7');
+    expect(JSON.parse(String(put?.init.body))).toEqual({ state: 'RESOLVED' });
+  });
+
+  it('refuses a thread id that is not a comment id', async () => {
+    const error = await captureRejection(
+      resolveThread({
+        owner: ORG_OWNER,
+        workspace: 'acme',
+        repoSlug: 'repo',
+        prId: 12,
+        threadId: 'not-a-thread',
+      })
+    );
+
+    expect(error.kind).toBe('not_found');
+    expect(bitbucketCalls().some(call => call.init.method === 'PUT')).toBe(false);
+  });
+
   it('refuses a thread without a task with the capability reason', async () => {
     fetchMock.mockImplementation(async (url: string | URL) => {
       const full = url.toString();

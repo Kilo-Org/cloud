@@ -24,6 +24,11 @@ export default defineProject({
     // through the file. Bounded pollers (settleBootstrap's 4s budget) still
     // fail on their own budget, so this only absorbs starvation.
     testTimeout: 15_000,
+    // encrypted-kv.test.ts imports node:sqlite on purpose (it is the only way
+    // to run real SQL semantics under Node), and Node prints an
+    // ExperimentalWarning for that API on every worker start. Pass the warning
+    // class down to the workers so the suite prints no warnings.
+    execArgv: ['--disable-warning=ExperimentalWarning'],
     include: [
       'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',

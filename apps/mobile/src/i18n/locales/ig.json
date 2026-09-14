@@ -231,6 +231,8 @@
     "voiceInput": "Ntinye olu",
     "autoExpandThinking": "Gbasaa echiche na-akpaghị aka",
     "autoExpandThinkingSubtitle": "Gosi echiche onye nnọchi anya n'ụzọ zuru ezu mgbe ọ mechara iche echiche.",
+    "hideThinking": "Zoo nkọwa echiche",
+    "hideThinkingSubtitle": "Eg osi echiche onye nnọchi anya na ibe nnọkọ.",
     "keepScreenOn": "Hapụ ihuenyo ka ọ na-enwu n'ibe nnọkọ",
     "keepScreenOnSubtitle": "Hapụ ihuenyo ka ọ na-enwu mgbe nnọkọ na-arụ ọrụ.",
     "appearance": "Ọdịdị",
@@ -2457,6 +2459,11 @@
       "stepsCount": "nzọụkwụ {{steps}}",
       "stepsCount_other": "nzọụkwụ {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "Nkwenye akpaka",
+      "description": "Kwenye arịrịọ ikike maka nnọkọ a na-akpaghị aka. Ngwa na-agba mgbe ahụ n'enweghị arịrịọ.",
+      "unavailable": "Nnọkọ a enweghị ike ịnata arịrịọ ikike."
     },
     "prBadge": {
       "open": "meghe arịrịọ ijikọ koodu",

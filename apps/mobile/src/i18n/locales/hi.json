@@ -231,6 +231,8 @@
     "voiceInput": "वॉइस इनपुट",
     "autoExpandThinking": "विचार प्रक्रिया अपने आप खोलें",
     "autoExpandThinkingSubtitle": "एजेंट की विचार प्रक्रिया पूरी होने पर उसका पूरा विवरण दिखाएँ।",
+    "hideThinking": "विचार प्रक्रिया का विवरण छिपाएँ",
+    "hideThinkingSubtitle": "सत्र पेज पर एजेंट की विचार प्रक्रिया न दिखाएँ।",
     "keepScreenOn": "सत्र पेज पर स्क्रीन चालू रखें",
     "keepScreenOnSubtitle": "सत्र में काम चलने के दौरान स्क्रीन चालू रखें।",
     "appearance": "दिखावट",
@@ -2023,6 +2025,11 @@
       "linesBadge": "{{displayCount}} पंक्तियाँ",
       "filesBadge": "{{displayCount}} फ़ाइलें",
       "matchesBadge": "{{displayCount}} मिलान"
+    },
+    "autoApprove": {
+      "title": "स्वतः अनुमोदन",
+      "description": "इस सत्र के लिए अनुमति अनुरोधों को स्वचालित रूप से स्वीकार करें। इसके बाद टूल बिना किसी संकेत के चलते हैं।",
+      "unavailable": "यह सत्र अनुमति अनुरोध प्राप्त नहीं कर सकता।"
     },
     "prBadge": {
       "open": "पुल रिक्वेस्ट खोलें",

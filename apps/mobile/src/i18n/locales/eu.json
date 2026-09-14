@@ -231,6 +231,8 @@
     "voiceInput": "Ahots-sarrera",
     "autoExpandThinking": "Zabaldu pentsamendua automatikoki",
     "autoExpandThinkingSubtitle": "Erakutsi agentearen pentsamendua zabalduta amaitzen denean.",
+    "hideThinking": "Ezkutatu pentsamenduaren xehetasunak",
+    "hideThinkingSubtitle": "Ez erakutsi agentearen pentsamendua saio-orrian.",
     "keepScreenOn": "Mantendu pantaila piztuta saio-orrian",
     "keepScreenOnSubtitle": "Mantendu pantaila piztuta saioa lanean ari den bitartean.",
     "appearance": "Itxura",
@@ -2457,6 +2459,11 @@
       "stepsCount": "{{steps}} urrats",
       "stepsCount_other": "{{steps}} urrats",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "Onespen automatikoa",
+      "description": "Onetsi automatikoki saio honetako baimen-eskaerak. Tresnak gero abisurik gabe exekutatzen dira.",
+      "unavailable": "Saio honek ezin ditu baimen-eskaerak jaso."
     },
     "prBadge": {
       "open": "ireki bateratze-eskaera",

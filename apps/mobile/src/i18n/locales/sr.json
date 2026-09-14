@@ -231,6 +231,8 @@
     "voiceInput": "Glasovni unos",
     "autoExpandThinking": "Automatski prikaži razmišljanje",
     "autoExpandThinkingSubtitle": "Prikaži ceo tok razmišljanja agenta kada završi.",
+    "hideThinking": "Sakrij detalje razmišljanja",
+    "hideThinkingSubtitle": "Ne prikazuj razmišljanje agenta na ekranu sesije.",
     "keepScreenOn": "Zadrži ekran uključenim na ekranu sesije",
     "keepScreenOnSubtitle": "Ne isključuj ekran dok je sesija aktivna.",
     "appearance": "Izgled",
@@ -2478,6 +2480,11 @@
       "stepsCount_other": "{{steps}} koraka",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} koraka"
+    },
+    "autoApprove": {
+      "title": "Automatsko odobravanje",
+      "description": "Automatski odobri zahteve za dozvolu za ovu sesiju. Alati zatim rade bez upita.",
+      "unavailable": "Ova sesija ne može da prima zahteve za dozvolu."
     },
     "prBadge": {
       "open": "otvoren PR",

@@ -231,6 +231,8 @@
     "voiceInput": "ხმოვანი შეყვანა",
     "autoExpandThinking": "მსჯელობის ავტომატურად გაშლა",
     "autoExpandThinkingSubtitle": "აგენტის მსჯელობა დასრულებისთანავე გაშლილად გამოჩნდება.",
+    "hideThinking": "მსჯელობის დეტალების დამალვა",
+    "hideThinkingSubtitle": "არ აჩვენო აგენტის მსჯელობა სესიის გვერდზე.",
     "keepScreenOn": "სესიის გვერდზე ეკრანის ჩართულად დატოვება",
     "keepScreenOnSubtitle": "სესიის მუშაობისას ეკრანი ჩართული დარჩება.",
     "appearance": "იერსახე",
@@ -2457,6 +2459,11 @@
       "stepsCount": "{{steps}} ნაბიჯი",
       "stepsCount_other": "{{steps}} ნაბიჯი",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "ავტომატური დადასტურება",
+      "description": "ავტომატურად დაადასტურეთ ამ სესიის ნებართვის მოთხოვნები. შემდეგ ხელსაწყოები მუშაობს მოთხოვნის გარეშე.",
+      "unavailable": "ამ სესიას არ შეუძლია ნებართვის მოთხოვნების მიღება."
     },
     "prBadge": {
       "open": "ღია PR",

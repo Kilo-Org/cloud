@@ -231,6 +231,8 @@
     "voiceInput": "Uingizaji wa sauti",
     "autoExpandThinking": "Panua mawazo kiotomatiki",
     "autoExpandThinkingSubtitle": "Onyesha mawazo ya wakala yakiwa yamepanuliwa anapomaliza kufikiri.",
+    "hideThinking": "Ficha maelezo ya mawazo",
+    "hideThinkingSubtitle": "Usionyeshe mawazo ya wakala kwenye ukurasa wa kikao.",
     "keepScreenOn": "Acha skrini iwake ukiwa kwenye ukurasa wa kikao",
     "keepScreenOnSubtitle": "Acha skrini iwake wakati kikao kinaendelea.",
     "appearance": "Mwonekano",
@@ -2457,6 +2459,11 @@
       "stepsCount": "Hatua {{steps}}",
       "stepsCount_other": "Hatua {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "Kuidhinisha kiotomatiki",
+      "description": "Idhinisha kiotomatiki maombi ya ruhusa kwa kipindi hiki. Zana kisha huendesha bila ombi.",
+      "unavailable": "Kipindi hiki hakiwezi kupokea maombi ya ruhusa."
     },
     "prBadge": {
       "open": "fungua ombi la kuunganisha",

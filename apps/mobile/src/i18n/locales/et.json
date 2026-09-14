@@ -231,6 +231,8 @@
     "voiceInput": "Häälsisestus",
     "autoExpandThinking": "Ava mõttekäik automaatselt",
     "autoExpandThinkingSubtitle": "Näita agendi mõttekäiku avatuna, kui mõtlemine lõpeb.",
+    "hideThinking": "Peida mõttekäigu üksikasjad",
+    "hideThinkingSubtitle": "Ära näita agendi mõttekäiku seansi lehel.",
     "keepScreenOn": "Hoia ekraan seansi lehel sisselülitatuna",
     "keepScreenOnSubtitle": "Hoia ekraan sisselülitatuna, kuni seanss töötab.",
     "appearance": "Välimus",
@@ -2457,6 +2459,11 @@
       "stepsCount": "{{steps}} sammu",
       "stepsCount_other": "{{steps}} sammu",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "Automaatne kinnitamine",
+      "description": "Kinnita selle seansi loaduste taotlused automaatselt. Tööriistad käivituvad seejärel ilma küsimuseta.",
+      "unavailable": "See seanss ei saa loaduste taotlusi vastu võtta."
     },
     "prBadge": {
       "open": "avatud tõmbetaotlus",

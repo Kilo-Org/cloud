@@ -231,6 +231,8 @@
     "voiceInput": "Galtee sagalee",
     "autoExpandThinking": "Xiinxala ofumaan bal'isi",
     "autoExpandThinkingSubtitle": "Yeroo ergamaan xiinxala isaa xumuru, bal'isiitii agarsiisi.",
+    "hideThinking": "Bal'ina xiinxala dhoksi",
+    "hideThinkingSubtitle": "Fuula turtii irratti xiinxala ergamaa hin agarsiisi.",
     "keepScreenOn": "Fuula turtii irra yeroo jirtu iskiriiniin akka hin dhaamne godhi",
     "keepScreenOnSubtitle": "Hanga turtiin hojjechaa jirutti iskiriiniin akka hin dhaamne godhi.",
     "appearance": "Bifa",
@@ -2457,6 +2459,11 @@
       "stepsCount": "tarkaanfiiwwan {{steps}}",
       "stepsCount_other": "tarkaanfiiwwan {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "Eeyyama ofumaan",
+      "description": "Gaaffii hayyama seesshinii kanaaf ofumaan eeyyami. Itti aansuun meeshaaleen gaaffii malee hojjetu.",
+      "unavailable": "Seesshiniin kun gaaffii hayyama fudhachuu hin danda'u."
     },
     "prBadge": {
       "open": "gaaffii walitti makuu bani",

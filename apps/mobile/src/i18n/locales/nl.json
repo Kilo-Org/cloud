@@ -231,6 +231,8 @@
     "voiceInput": "Spraakinvoer",
     "autoExpandThinking": "Gedachtegang automatisch uitvouwen",
     "autoExpandThinkingSubtitle": "Toon de volledige gedachtegang van de agent zodra die klaar is met nadenken.",
+    "hideThinking": "Details van gedachtegang verbergen",
+    "hideThinkingSubtitle": "Toon de gedachtegang van de agent niet op de sessiepagina.",
     "keepScreenOn": "Scherm aanhouden op de sessiepagina",
     "keepScreenOnSubtitle": "Houd het scherm aan zolang de sessie actief is.",
     "appearance": "Weergave",
@@ -2023,6 +2025,11 @@
       "stepsCount": "{{steps}} stappen",
       "stepsCount_other": "{{steps}} stappen",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "Automatisch goedkeuren",
+      "description": "Keur toestemmingsverzoeken voor deze sessie automatisch goed. Tools worden daarna zonder prompt uitgevoerd.",
+      "unavailable": "Deze sessie kan geen toestemmingsverzoeken ontvangen."
     },
     "prBadge": {
       "open": "pR openen",

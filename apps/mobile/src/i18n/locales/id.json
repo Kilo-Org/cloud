@@ -231,6 +231,8 @@
     "voiceInput": "Input suara",
     "autoExpandThinking": "Tampilkan pemikiran secara otomatis",
     "autoExpandThinkingSubtitle": "Buka bagian pemikiran agen secara otomatis setelah agen selesai berpikir.",
+    "hideThinking": "Sembunyikan detail pemikiran",
+    "hideThinkingSubtitle": "Jangan tampilkan pemikiran agen di halaman sesi.",
     "keepScreenOn": "Biarkan layar tetap menyala di halaman sesi",
     "keepScreenOnSubtitle": "Biarkan layar tetap menyala saat sesi berjalan.",
     "appearance": "Tampilan",
@@ -2023,6 +2025,11 @@
       "stepsCount": "{{steps}} langkah",
       "stepsCount_other": "{{steps}} langkah",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "Setujui otomatis",
+      "description": "Setujui permintaan izin untuk sesi ini secara otomatis. Alat kemudian berjalan tanpa perintah.",
+      "unavailable": "Sesi ini tidak dapat menerima permintaan izin."
     },
     "prBadge": {
       "open": "buka PR",

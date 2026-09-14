@@ -231,6 +231,8 @@
     "voiceInput": "හඬ ආදානය",
     "autoExpandThinking": "සිතීමේ විස්තර ස්වයංක්‍රීයව විහිදුවන්න",
     "autoExpandThinkingSubtitle": "නියෝජිතයා සිතීම අවසන් කළ විට එහි විස්තර විහිදුවා පෙන්වන්න.",
+    "hideThinking": "සිතීමේ විස්තර සඟවන්න",
+    "hideThinkingSubtitle": "සැසි පිටුවේ නියෝජිතයාගේ සිතීම නොපෙන්වන්න.",
     "keepScreenOn": "සැසි පිටුවේ සිටින විට තිරය දැල්වී තබන්න",
     "keepScreenOnSubtitle": "සැසිය ක්‍රියාත්මක වන අතරතුර තිරය දැල්වී තබන්න.",
     "appearance": "පෙනුම",
@@ -2457,6 +2459,11 @@
       "stepsCount": "පියවර {{steps}}ක්",
       "stepsCount_other": "පියවර {{steps}}ක්",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "autoApprove": {
+      "title": "ස්වයංක්‍රීය අනුමැතිය",
+      "description": "මෙම සැසිය සඳහා අවසර ඉල්ලීම් ස්වයංක්‍රීයව අනුමත කරන්න. පසුව මෙවලම් විමසුමකින් තොරව ක්‍රියාත්මක වේ.",
+      "unavailable": "මෙම සැසියට අවසර ඉල්ලීම් ලබා ගත නොහැක."
     },
     "prBadge": {
       "open": "විවෘත PR",

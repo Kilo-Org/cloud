@@ -8,16 +8,20 @@ import {
   kilocode_users,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { assertGitHubAutomationCanBeEnabled } from '../github/sharing-compatibility';
 import {
+  bindGitHubIntegrationToCanonicalInstallation,
+  claimGitHubInstallationDelivery,
+  completeGitHubInstallationDelivery,
   connectVerifiedGitHubInstallation,
   getGitHubInstallationDeliveryStatus,
   materializeGitHubInstallationIdentity,
   disconnectGitHubInstallation,
   observeGitHubInstallationLifecycle,
   recordCompletedGitHubInstallationDelivery,
+  releaseGitHubInstallationDelivery,
   uninstallExclusiveGitHubInstallation,
   updateGitHubInstallationRepositories,
   updateGitHubInstallationAccountIdentity,
@@ -141,6 +145,136 @@ describe('GitHub installation persistence', () => {
       })
     ).resolves.toBe('completed');
     await expect(db.select().from(github_installation_webhook_receipts)).resolves.toHaveLength(1);
+  });
+
+  test('claims a shared delivery exactly once until it completes', async () => {
+    await materializeGitHubInstallationIdentity({ installationId: '910001', appType: 'standard' });
+    const input = {
+      installationId: '910001',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-claim',
+      eventType: 'installation.deleted',
+    };
+    const delivered = {
+      installationId: '910001',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-claim',
+    };
+
+    const first = await claimGitHubInstallationDelivery(input);
+    expect(first).toEqual({ status: 'claimed', githubInstallationId: expect.any(String) });
+    if (first.status !== 'claimed') throw new Error('Expected first claim to win');
+    await expect(getGitHubInstallationDeliveryStatus(delivered)).resolves.toBe('processing');
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({
+      status: 'processing',
+    });
+
+    await completeGitHubInstallationDelivery({
+      githubInstallationId: first.githubInstallationId,
+      deliveryId: 'delivery-claim',
+    });
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({ status: 'completed' });
+    await expect(getGitHubInstallationDeliveryStatus(delivered)).resolves.toBe('completed');
+    await expect(db.select().from(github_installation_webhook_receipts)).resolves.toHaveLength(1);
+  });
+
+  test('releases a failed claim so redelivery can reprocess', async () => {
+    await materializeGitHubInstallationIdentity({ installationId: '910002', appType: 'standard' });
+    const input = {
+      installationId: '910002',
+      appType: 'standard' as const,
+      deliveryId: 'delivery-release',
+      eventType: 'installation.deleted',
+    };
+
+    const first = await claimGitHubInstallationDelivery(input);
+    if (first.status !== 'claimed') throw new Error('Expected first claim to win');
+    await releaseGitHubInstallationDelivery({
+      githubInstallationId: first.githubInstallationId,
+      deliveryId: 'delivery-release',
+    });
+
+    await expect(
+      getGitHubInstallationDeliveryStatus({
+        installationId: '910002',
+        appType: 'standard',
+        deliveryId: 'delivery-release',
+      })
+    ).resolves.toBe('not_completed');
+    await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({
+      status: 'claimed',
+      githubInstallationId: first.githubInstallationId,
+    });
+  });
+
+  test('refuses to bind an association to a non-active canonical installation', async () => {
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('773003')
+    );
+    if (!connected.ok) throw new Error('Expected canonical connection');
+    await observeGitHubInstallationLifecycle({
+      installationId: '773003',
+      appType: 'standard',
+      state: 'suspended',
+    });
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, 'github'),
+          eq(platform_integrations.platform_installation_id, '773003')
+        )
+      )
+      .limit(1);
+    if (!integration) throw new Error('Expected GitHub association');
+
+    await expect(
+      bindGitHubIntegrationToCanonicalInstallation({
+        integrationId: integration.id,
+        installationId: '773003',
+        appType: 'standard',
+      })
+    ).rejects.toThrow('Canonical GitHub installation is not active');
+  });
+
+  test('treats a malformed persisted repository cache as empty during webhook updates', async () => {
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('773004')
+    );
+    if (!connected.ok) throw new Error('Expected canonical connection');
+    const [canonical] = await db
+      .select()
+      .from(github_app_installations)
+      .where(
+        and(
+          eq(github_app_installations.github_app_type, 'standard'),
+          eq(github_app_installations.installation_id, '773004')
+        )
+      )
+      .limit(1);
+    if (!canonical) throw new Error('Expected canonical installation');
+    await db
+      .update(github_app_installations)
+      .set({ repositories: { not: 'an array' } as never })
+      .where(eq(github_app_installations.id, canonical.id));
+
+    await expect(
+      updateGitHubInstallationRepositories({
+        installationId: '773004',
+        appType: 'standard',
+        repositoriesAdded: [{ id: 5, name: 'ok', full_name: 'acme/ok', private: true }],
+      })
+    ).resolves.toBeUndefined();
+    const [refreshed] = await db
+      .select()
+      .from(github_app_installations)
+      .where(eq(github_app_installations.id, canonical.id));
+    expect(refreshed.repositories).toEqual([
+      { id: 5, name: 'ok', full_name: 'acme/ok', private: true },
+    ]);
   });
 
   test('serializes shared attach commit before a concurrent agent enable recheck', async () => {

@@ -2,20 +2,8 @@ import { type Owner, type PlatformRepository } from '@/lib/integrations/core/typ
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
+import { PlatformRepositoryCacheSchema } from '@/lib/integrations/core/schemas';
 import { captureException } from '@sentry/nextjs';
-import { z } from 'zod';
-
-const GitHubRepositoryCacheSchema = z
-  .array(
-    z.object({
-      id: z.number().int(),
-      name: z.string(),
-      full_name: z.string(),
-      private: z.boolean(),
-      default_branch: z.string().optional(),
-    })
-  )
-  .nullable();
 
 export type GitHubRepositoryContext = {
   repositories: GitHubRepositoryChoice[] | null;
@@ -37,7 +25,7 @@ export async function getGitHubRepositoryContext(owner: Owner): Promise<GitHubRe
       return [];
     }
 
-    const parsedRepositories = GitHubRepositoryCacheSchema.safeParse(
+    const parsedRepositories = PlatformRepositoryCacheSchema.safeParse(
       integration.repositories ?? null
     );
     if (!parsedRepositories.success) {

@@ -17,6 +17,7 @@ import {
 } from '@/lib/integrations/github/multiple-installations';
 import { evaluateGitHubSharingCompatibility } from '@/lib/integrations/github/sharing-compatibility';
 import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-attempts';
+import { parsePlatformRepositoryCache } from '@/lib/integrations/core/schemas';
 
 export type DbTransaction = DrizzleTransaction;
 
@@ -658,11 +659,11 @@ export async function updateGitHubInstallationRepositories(input: {
         .for('update');
       for (const integration of legacy) {
         const removed = new Set(input.repositoryIdsRemoved ?? []);
-        const current = (integration.repositories ?? []).filter(
-          repository => !removed.has(Number(repository.id))
+        const current = parsePlatformRepositoryCache(integration.repositories).filter(
+          repository => !removed.has(repository.id)
         );
         const additions = (input.repositoriesAdded ?? []).filter(
-          repository => !removed.has(Number(repository.id))
+          repository => !removed.has(repository.id)
         );
         const repositories = [
           ...current.filter(
@@ -686,8 +687,10 @@ export async function updateGitHubInstallationRepositories(input: {
       return;
     }
     const removed = new Set(input.repositoryIdsRemoved ?? []);
-    const existing = (canonical.repositories ?? []).filter(repo => !removed.has(Number(repo.id)));
-    const additions = (input.repositoriesAdded ?? []).filter(repo => !removed.has(Number(repo.id)));
+    const existing = parsePlatformRepositoryCache(canonical.repositories).filter(
+      repo => !removed.has(repo.id)
+    );
+    const additions = (input.repositoriesAdded ?? []).filter(repo => !removed.has(repo.id));
     const repositories = [
       ...existing.filter(repo => !additions.some(addition => addition.id === repo.id)),
       ...additions,
@@ -816,7 +819,7 @@ export async function getGitHubInstallationDeliveryStatus(input: {
   installationId: string;
   appType: 'standard' | 'lite';
   deliveryId: string;
-}): Promise<'completed' | 'not_completed' | 'missing_canonical'> {
+}): Promise<'completed' | 'processing' | 'not_completed' | 'missing_canonical'> {
   const [installation] = await db
     .select({ id: github_app_installations.id })
     .from(github_app_installations)
@@ -829,7 +832,7 @@ export async function getGitHubInstallationDeliveryStatus(input: {
     .limit(1);
   if (!installation) return 'missing_canonical';
   const [receipt] = await db
-    .select({ id: github_installation_webhook_receipts.id })
+    .select({ status: github_installation_webhook_receipts.status })
     .from(github_installation_webhook_receipts)
     .where(
       and(
@@ -838,7 +841,93 @@ export async function getGitHubInstallationDeliveryStatus(input: {
       )
     )
     .limit(1);
-  return receipt ? 'completed' : 'not_completed';
+  if (!receipt) return 'not_completed';
+  return receipt.status === 'completed' ? 'completed' : 'processing';
+}
+
+export type GitHubInstallationDeliveryClaim =
+  | { status: 'claimed'; githubInstallationId: string }
+  | { status: 'completed' | 'processing' | 'missing_canonical' };
+
+export async function claimGitHubInstallationDelivery(input: {
+  installationId: string;
+  appType: 'standard' | 'lite';
+  deliveryId: string;
+  eventType: string;
+}): Promise<GitHubInstallationDeliveryClaim> {
+  const [installation] = await db
+    .select({ id: github_app_installations.id })
+    .from(github_app_installations)
+    .where(
+      and(
+        eq(github_app_installations.github_app_type, input.appType),
+        eq(github_app_installations.installation_id, input.installationId)
+      )
+    )
+    .limit(1);
+  if (!installation) return { status: 'missing_canonical' };
+
+  const claimed = await db
+    .insert(github_installation_webhook_receipts)
+    .values({
+      github_installation_id: installation.id,
+      delivery_id: input.deliveryId,
+      event_type: input.eventType,
+      status: 'processing',
+    })
+    .onConflictDoNothing({
+      target: [
+        github_installation_webhook_receipts.github_installation_id,
+        github_installation_webhook_receipts.delivery_id,
+      ],
+    })
+    .returning({ id: github_installation_webhook_receipts.id });
+  if (claimed.length === 1) {
+    return { status: 'claimed', githubInstallationId: installation.id };
+  }
+
+  const [receipt] = await db
+    .select({ status: github_installation_webhook_receipts.status })
+    .from(github_installation_webhook_receipts)
+    .where(
+      and(
+        eq(github_installation_webhook_receipts.github_installation_id, installation.id),
+        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId)
+      )
+    )
+    .limit(1);
+  return { status: receipt?.status === 'completed' ? 'completed' : 'processing' };
+}
+
+export async function completeGitHubInstallationDelivery(input: {
+  githubInstallationId: string;
+  deliveryId: string;
+}): Promise<void> {
+  await db
+    .update(github_installation_webhook_receipts)
+    .set({ status: 'completed' })
+    .where(
+      and(
+        eq(github_installation_webhook_receipts.github_installation_id, input.githubInstallationId),
+        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId),
+        eq(github_installation_webhook_receipts.status, 'processing')
+      )
+    );
+}
+
+export async function releaseGitHubInstallationDelivery(input: {
+  githubInstallationId: string;
+  deliveryId: string;
+}): Promise<void> {
+  await db
+    .delete(github_installation_webhook_receipts)
+    .where(
+      and(
+        eq(github_installation_webhook_receipts.github_installation_id, input.githubInstallationId),
+        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId),
+        eq(github_installation_webhook_receipts.status, 'processing')
+      )
+    );
 }
 
 export async function recordCompletedGitHubInstallationDelivery(input: {
@@ -864,6 +953,7 @@ export async function recordCompletedGitHubInstallationDelivery(input: {
       github_installation_id: installation.id,
       delivery_id: input.deliveryId,
       event_type: input.eventType,
+      status: 'completed',
     })
     .onConflictDoNothing({
       target: [
@@ -879,17 +969,21 @@ export async function bindGitHubIntegrationToCanonicalInstallation(input: {
   appType: 'standard' | 'lite';
 }) {
   await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`${input.appType}:${input.installationId}`}))`
+    );
     const [canonical] = await tx
       .select({ id: github_app_installations.id })
       .from(github_app_installations)
       .where(
         and(
           eq(github_app_installations.github_app_type, input.appType),
-          eq(github_app_installations.installation_id, input.installationId)
+          eq(github_app_installations.installation_id, input.installationId),
+          eq(github_app_installations.lifecycle_state, 'active')
         )
       )
-      .limit(1);
-    if (!canonical) throw new Error('Canonical GitHub installation not found');
+      .for('update');
+    if (!canonical) throw new Error('Canonical GitHub installation is not active');
     const bound = await tx
       .update(platform_integrations)
       .set({ github_installation_id: canonical.id, updated_at: new Date().toISOString() })

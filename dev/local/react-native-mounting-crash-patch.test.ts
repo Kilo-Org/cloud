@@ -20,13 +20,6 @@ const workspacePath = path.join(repoRoot, 'pnpm-workspace.yaml');
 const lockfilePath = path.join(repoRoot, 'pnpm-lock.yaml');
 const appConfigPath = path.join(mobileRoot, 'app.config.ts');
 
-// `createComponentViewWithComponentHandle:` stores the view class in a
-// protocol-qualified `Class<RCTComponentViewProtocol>` field. Sending `new` to
-// that field fails to compile ("class method 'new' not found"), so the fallback
-// must launder it through a plain `Class` first.
-const PLAIN_CLASS_NEW = /Class viewClass = fd\.viewClass;/;
-const PROTOCOL_CLASS_NEW = /\[fd\.viewClass new\]/;
-
 const mobileRequire = createRequire(path.join(mobileRoot, 'package.json'));
 const reactNativeRoot = path.dirname(mobileRequire.resolve('react-native/package.json'));
 
@@ -62,16 +55,6 @@ test('the react-native patch contains the registration-lock and fallback-guard h
     'patch must add the createComponentViewWithComponentHandle fallback view'
   );
   assert.match(patch, /@synchronized/, 'patch must synchronize the LegacyViewManagerInterop cache');
-  assert.match(
-    patch,
-    PLAIN_CLASS_NEW,
-    'patch must copy the fallback class into a plain Class before calling -new'
-  );
-  assert.doesNotMatch(
-    patch,
-    PROTOCOL_CLASS_NEW,
-    'patch must not send -new to the protocol-qualified Class field; clang fails with "class method new not found"'
-  );
 });
 
 test('the installed RCTComponentViewFactory takes the lock and guards a registration miss', () => {
@@ -83,37 +66,62 @@ test('the installed RCTComponentViewFactory takes the lock and guards a registra
     /RCTUnimplementedViewComponentView class/,
     'a missed component handle must mount the unimplemented fallback view instead of dereferencing end()'
   );
-  assert.match(
-    source,
-    PLAIN_CLASS_NEW,
-    'the installed fallback must instantiate its view through a plain Class (compile fix)'
-  );
+});
+
+// The iOS build failure this guards (CI runs 34766965172, 34767975981, 34769368771):
+//   RCTComponentViewFactory.mm:223:31: error: class method 'new' not found ; did you mean 'now'?
+// `RCTComponentViewClassDescriptor.viewClass` is `Class<RCTComponentViewProtocol>` and that
+// protocol declares no `+new`, so `[<descriptor>.viewClass new]` does not compile. React Native's
+// own construction copies the value into an untyped `Class` first, where `+new` resolves against
+// NSObject. The fallback added by this patch must do the same.
+const protocolQualifiedNewSend = /\[\s*[A-Za-z_][A-Za-z0-9_]*\.viewClass\s+new\s*\]/;
+
+test('RCTComponentViewProtocol declares no +new, so a protocol-qualified viewClass cannot be sent new', () => {
+  const protocol = readInstalledReactNative('React/Fabric/Mounting/RCTComponentViewProtocol.h');
   assert.doesNotMatch(
-    source,
-    PROTOCOL_CLASS_NEW,
-    'the installed fallback must not send -new to a protocol-qualified Class field'
+    protocol,
+    /^\s*\+\s*\([^)]*\)\s*new\b/m,
+    'the compile error relies on RCTComponentViewProtocol not declaring +new'
+  );
+
+  const descriptor = readInstalledReactNative(
+    'React/Fabric/Mounting/RCTComponentViewClassDescriptor.h'
+  );
+  assert.match(
+    descriptor,
+    /Class<RCTComponentViewProtocol>\s+viewClass;/,
+    'RCTComponentViewClassDescriptor.viewClass is protocol-qualified, which restricts +new lookup'
   );
 });
 
-test('pnpm-lock.yaml records the sha256 of the react-native patch', () => {
-  const lockfile = fs.readFileSync(lockfilePath, 'utf8');
-  const hash = createHash('sha256').update(fs.readFileSync(patchPath)).digest('hex');
+test('the installed fallback copies viewClass into an untyped Class before sending new', () => {
+  const source = readInstalledReactNative('React/Fabric/Mounting/RCTComponentViewFactory.mm');
 
-  assert.match(
-    lockfile,
-    new RegExp(`^ {2}react-native@0\\.86\\.3: ${hash}$`, 'm'),
-    'patchedDependencies must pin the patch file sha256 so pnpm applies the same patch CI installs'
+  assert.doesNotMatch(
+    source,
+    protocolQualifiedNewSend,
+    'no `[<descriptor>.viewClass new]` send may remain; it is the iOS compile error from CI'
   );
+  assert.match(
+    source,
+    /Class fallbackViewClass = fallbackDescriptor\.viewClass;/,
+    'the fallback must copy viewClass into an untyped Class before new, as the registered path does'
+  );
+});
 
-  const recorded = lockfile.match(/react-native@0\.86\.3\(patch_hash=[0-9a-f]+/g) ?? [];
-  assert.ok(recorded.length > 0, 'the lockfile must reference the patched react-native');
-  for (const entry of recorded) {
-    assert.equal(
-      entry,
-      `react-native@0.86.3(patch_hash=${hash}`,
-      'every locked react-native reference must use the current patch hash'
-    );
-  }
+test('the patch adds the untyped-Class fallback and no protocol-qualified new send', () => {
+  const patch = fs.readFileSync(patchPath, 'utf8');
+
+  assert.doesNotMatch(
+    patch,
+    protocolQualifiedNewSend,
+    'the patch must not add a protocol-qualified +new send'
+  );
+  assert.match(
+    patch,
+    /Class fallbackViewClass = fallbackDescriptor\.viewClass;/,
+    'the patch must add the untyped-Class fallback'
+  );
 });
 
 test('the installed LegacyViewManagerInterop cache is synchronized', () => {
@@ -136,4 +144,25 @@ test('iOS builds React Native core from source so the patch is compiled in', () 
     /buildReactNativeFromSource\s*:\s*true/,
     'expo-build-properties ios.buildReactNativeFromSource must be true'
   );
+});
+
+test('pnpm-lock.yaml records the sha256 of the react-native patch', () => {
+  const lockfile = fs.readFileSync(lockfilePath, 'utf8');
+  const hash = createHash('sha256').update(fs.readFileSync(patchPath)).digest('hex');
+
+  assert.match(
+    lockfile,
+    new RegExp(`^ {2}react-native@0\\.86\\.3: ${hash}$`, 'm'),
+    'patchedDependencies must pin the patch file sha256 so pnpm applies the same patch CI installs'
+  );
+
+  const recorded = lockfile.match(/react-native@0\.86\.3\(patch_hash=[0-9a-f]+/g) ?? [];
+  assert.ok(recorded.length > 0, 'the lockfile must reference the patched react-native');
+  for (const entry of recorded) {
+    assert.equal(
+      entry,
+      `react-native@0.86.3(patch_hash=${hash}`,
+      'every locked react-native reference must use the current patch hash'
+    );
+  }
 });

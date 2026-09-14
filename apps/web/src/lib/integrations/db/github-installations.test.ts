@@ -744,20 +744,117 @@ describe('GitHub installation persistence', () => {
     }
   );
 
-  test('reconnects the same association after local disconnect and rejects another owner', async () => {
+  test('rejects a new personal claimant while another personal owner is actively connected', async () => {
     const first = await connectVerifiedGitHubInstallation({ type: 'user', id: ownerId }, data());
     expect(first).toMatchObject({ ok: true });
     if (!first.ok) throw new Error('Expected initial connection');
-    await disconnectGitHubInstallation({ type: 'user', id: ownerId }, first.integrationId);
     await expect(
       connectVerifiedGitHubInstallation(
         { type: 'user', id: otherOwnerId },
         { ...data(), kiloUserId: otherOwnerId }
       )
     ).resolves.toEqual({ ok: false, reason: 'claimed_by_other_owner' });
+  });
+
+  test('reconnects the same personal association after local disconnect', async () => {
+    const first = await connectVerifiedGitHubInstallation({ type: 'user', id: ownerId }, data());
+    expect(first).toMatchObject({ ok: true });
+    if (!first.ok) throw new Error('Expected initial connection');
+    await disconnectGitHubInstallation({ type: 'user', id: ownerId }, first.integrationId);
     await expect(
       connectVerifiedGitHubInstallation({ type: 'user', id: ownerId }, data())
     ).resolves.toEqual({ ok: true, integrationId: first.integrationId });
+  });
+
+  test('lets an incumbent personal owner reconnect after another tenant attaches to their installation', async () => {
+    const organization = await createTestOrganization(
+      'Personal incumbent sharing org',
+      otherOwnerId,
+      0
+    );
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organization.id;
+
+    const incumbent = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('990101')
+    );
+    if (!incumbent.ok) {
+      throw new Error('Expected the personal owner to connect as the original tenant');
+    }
+
+    const shared = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      { ...data('990101'), kiloUserId: otherOwnerId }
+    );
+    expect(shared).toMatchObject({ ok: true });
+
+    const [canonical] = await db
+      .select({ sharingMode: github_app_installations.sharing_mode })
+      .from(github_app_installations)
+      .where(eq(github_app_installations.installation_id, '990101'));
+    expect(canonical?.sharingMode).toBe('web_cloud_agent');
+
+    // Regression: a tenant attaching afterwards must not lock the incumbent
+    // personal owner out of their own installation.
+    await expect(
+      connectVerifiedGitHubInstallation({ type: 'user', id: ownerId }, data('990101'))
+    ).resolves.toEqual({ ok: true, integrationId: incumbent.integrationId });
+  });
+
+  test('still rejects a new personal claimant while an organization is actively connected', async () => {
+    const organization = await createTestOrganization('Active org holds installation', ownerId, 0);
+    const incumbent = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      data('990103')
+    );
+    if (!incumbent.ok) throw new Error('Expected the organization incumbent to connect');
+    await expect(
+      connectVerifiedGitHubInstallation({ type: 'user', id: otherOwnerId }, data('990103'))
+    ).resolves.toEqual({ ok: false, reason: 'claimed_by_other_owner' });
+  });
+
+  test('lets a personal owner claim after the other owner fully disconnects', async () => {
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('990104')
+    );
+    if (!first.ok) throw new Error('Expected the first personal owner to connect');
+    await disconnectGitHubInstallation({ type: 'user', id: ownerId }, first.integrationId);
+
+    // A purely disconnected other-owner row has relinquished the
+    // installation, so it is not an active incumbent and must not force a
+    // claimed_by_other_owner rejection for a new personal claimant.
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: otherOwnerId },
+      { ...data('990104'), kiloUserId: otherOwnerId }
+    );
+    expect(second).toEqual({ ok: true, integrationId: expect.any(String) });
+    if (!second.ok) throw new Error('Expected the second personal owner to claim');
+    expect(second.integrationId).not.toBe(first.integrationId);
+  });
+
+  test('still requires sharing admission for an organization attaching as a new second tenant', async () => {
+    const organizationA = await createTestOrganization('Second tenant source org', ownerId, 0);
+    const organizationB = await createTestOrganization(
+      'Second tenant destination org',
+      otherOwnerId,
+      0
+    );
+    const incumbent = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data('990105')
+    );
+    if (!incumbent.ok) throw new Error('Expected the incumbent organization to connect');
+
+    // organizationB is not on the shared-installation allowlist, so a
+    // genuine new second-tenant org still goes through (and fails) the
+    // unchanged sharing-admission gate.
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationB.id },
+        { ...data('990105'), kiloUserId: otherOwnerId }
+      )
+    ).resolves.toEqual({ ok: false, reason: 'shared_installation_disabled' });
   });
 
   test('frees a non-allowlisted organization to connect a different installation after local disconnect', async () => {

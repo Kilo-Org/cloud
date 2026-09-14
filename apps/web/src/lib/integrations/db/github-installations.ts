@@ -246,23 +246,27 @@ export async function connectVerifiedGitHubInstallation(
       return { ok: false, reason: 'installation_unavailable' };
     }
 
-    // A personal (non-org) owner can never share an installation with
-    // another owner. This is unconditional: whether that other owner's own
-    // association happens to be locally disconnected right now doesn't
-    // change that a personal owner is not a valid destination for a
-    // second tenant.
-    if (otherOwnerAssociations.length > 0 && owner.type !== 'org') {
-      return { ok: false, reason: 'claimed_by_other_owner' };
-    }
-
     // A locally disconnected other-owner association has relinquished the
     // installation and is no longer an active incumbent tenant, so it must
-    // not force this org through sharing-admission on its own; only an
+    // not force a destination through sharing-admission on its own; only an
     // *actively connected* other owner represents real concurrent sharing
     // that needs approval and a compatibility check.
     const activeOtherOwnerAssociations = otherOwnerAssociations.filter(
       association => association.github_disconnected_at === null
     );
+
+    // A personal (non-org) owner can never become a NEW second tenant on an
+    // installation an active other owner already holds. Gate this on the
+    // caller having no association of its own: an incumbent personal owner
+    // reconnecting or refreshing their own existing association is not a
+    // new claim, and must not be locked out by another tenant that attached
+    // afterwards (see the sharing-admission branch below for how that other
+    // tenant was admitted). A purely disconnected other-owner row is not an
+    // active incumbent either, so it does not block a personal owner here.
+    if (!existing && activeOtherOwnerAssociations.length > 0 && owner.type !== 'org') {
+      return { ok: false, reason: 'claimed_by_other_owner' };
+    }
+
     const requiresSharingAdmission =
       activeOtherOwnerAssociations.length > 0 &&
       (!existing ||

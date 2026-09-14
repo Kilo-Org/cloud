@@ -3486,6 +3486,40 @@ describe('createSessionManager', () => {
       expect(readState()('child-streams')).toEqual({ status: 'idle' });
     });
 
+    it('drops a first-page load failure that settles after a live child chat event', async () => {
+      const childId = kiloId('child-race');
+      let rejectPage: ((error: Error) => void) | undefined;
+      const pendingPage = new Promise<SessionSnapshotPageOutcome | null>((_resolve, reject) => {
+        rejectPage = reject;
+      });
+      const fetchSnapshotPage = createPageFetchMock(async id =>
+        id === childId ? pendingPage : makePage({ kiloSessionId: id })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      const hydration = mgr.hydrateChildSession(childId);
+
+      const readState = () =>
+        atomValue<(childSessionId: string) => { status: string }>(
+          config.store,
+          mgr.atoms.childSessionHydrationState
+        );
+      expect(readState()('child-race')).toEqual({ status: 'loading' });
+
+      // The child starts producing output while the first-page request is still
+      // in flight. The request then fails: the stream already disproved the
+      // failure, so the manager must not store the error that would outlive it.
+      const liveMessage = createStoredMessage('msg-child-race', 'child-race', 'assistant');
+      mockSessionCallbacks.onEvent?.({ type: 'message.updated', info: liveMessage.info });
+
+      rejectPage?.(new Error('fetch failed'));
+      await hydration;
+
+      expect(readState()('child-race')).toEqual({ status: 'loading' });
+    });
+
     it('keeps a stored first-page hydration error while no child chat event arrives', async () => {
       const fetchSnapshotPage = createPageFetchMock(async () => ({
         kind: 'retryable_failure' as const,

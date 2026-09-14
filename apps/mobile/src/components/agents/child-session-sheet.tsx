@@ -87,6 +87,12 @@ export function ChildSessionSheet({
   // row. Drop it from the list so its padded wrapper cannot leave an empty row.
   const rowMessages = messages.filter(message => message.parts.some(partRendersContent));
   const state = getChildSessionSheetState(hydrationState, messages.length, sessionError);
+  // A streaming child is proof the subagent task is live, so a first-page load
+  // failure must not take over the sheet with the full-screen "could not load"
+  // state before the first live row lands. The manager drops the stored error
+  // on the next child chat event; this covers the gap before that event.
+  const streamOverridesLoadError =
+    isStreaming && state === 'error' && hydrationState.status === 'error';
   const modelLabel = getChildSessionModelLabel(messages, modelOptions ?? []);
   const { t } = useTranslation();
   // Hydration drops its error while retrying. Retain this child's copy so
@@ -112,7 +118,7 @@ export function ChildSessionSheet({
   const sheetBottomInset = Math.max(insets.bottom, 16);
   let content: ReactNode = null;
 
-  if (state === 'content') {
+  if (state === 'content' || streamOverridesLoadError) {
     content = (
       <View className="flex-1">
         {sessionError ? (

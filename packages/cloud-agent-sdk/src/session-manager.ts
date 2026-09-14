@@ -915,6 +915,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
   let childSessionHydrationGeneration = 0;
   const childSessionHydrationRequests = new Map<string, Promise<void>>();
+  /**
+   * Child sessions that have emitted a live chat event during the active root
+   * session. A live event is proof the child is producing output, so a
+   * first-page load that fails afterwards is stale and must not be stored.
+   * Cleared with the rest of the per-session state.
+   */
+  const childSessionsWithLiveEvents = new Set<string>();
   // Pagination state for `loadOlderMessages`. Reset on every switchSession.
   let olderMessagesCursor: string | null = null;
   // Monotonically increasing per-session generation; older-page results
@@ -998,6 +1005,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(fetchedSessionDataAtom, null);
     store.set(childSessionHydrationStatesAtom, new Map());
     store.set(childSessionErrorsAtom, new Map());
+    childSessionsWithLiveEvents.clear();
     store.set(chatUIAtom, { shouldAutoScroll: true });
     store.set(availableCommandsAtom, []);
     store.set(worktreeChangesRefreshAtom, null);
@@ -1026,13 +1034,27 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   /**
-   * Drop a stored first-page hydration failure for a child session once a live
-   * chat event for it arrives. The child is producing output, so "could not
-   * load subagent session" is no longer the truth and must not outlive the
-   * condition it reports. Only an `error` is cleared: a `ready` child has
-   * nothing to report, and an in-flight `loading` request owns its own outcome.
+   * Store a terminal first-page hydration failure for a child session, unless a
+   * live chat event already arrived for it. Such an event is proof the child is
+   * producing output, so the failure is stale and must not outlive the stream
+   * that disproved it — otherwise a load still in flight when the event landed
+   * would resurrect the banner once the child stops streaming.
+   */
+  function setChildSessionHydrationError(childSessionId: KiloSessionId, message: string): void {
+    if (childSessionsWithLiveEvents.has(childSessionId)) return;
+    setChildSessionHydrationState(childSessionId, { status: 'error', message });
+  }
+
+  /**
+   * Record a live chat event for a child session and drop any stored first-page
+   * hydration failure for it. The child is producing output, so "could not load
+   * subagent session" is no longer the truth and must not outlive the condition
+   * it reports. A `ready` child has nothing to report, and an in-flight
+   * `loading` request keeps no outcome: `childSessionsWithLiveEvents` makes its
+   * failure a no-op (see `setChildSessionHydrationError`).
    */
   function clearStaleChildSessionHydrationError(childSessionId: string): void {
+    childSessionsWithLiveEvents.add(childSessionId);
     const states = store.get(childSessionHydrationStatesAtom);
     if (states.get(childSessionId)?.status !== 'error') return;
     const next = new Map(states);
@@ -1100,17 +1122,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           // A null page (worker 404) or any typed failure on the first page is
           // a terminal hydration error for this child.
           if (page === null) {
-            setChildSessionHydrationState(childSessionId, {
-              status: 'error',
-              message: CHILD_SESSION_NOT_FOUND_MESSAGE,
-            });
+            setChildSessionHydrationError(childSessionId, CHILD_SESSION_NOT_FOUND_MESSAGE);
             return;
           }
           if (page.kind !== 'success') {
-            setChildSessionHydrationState(childSessionId, {
-              status: 'error',
-              message: formatError(page),
-            });
+            setChildSessionHydrationError(childSessionId, formatError(page));
             return;
           }
 
@@ -1141,10 +1157,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       } catch (err) {
         if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
-        setChildSessionHydrationState(childSessionId, {
-          status: 'error',
-          message: formatError(err),
-        });
+        setChildSessionHydrationError(childSessionId, formatError(err));
       }
     })();
 

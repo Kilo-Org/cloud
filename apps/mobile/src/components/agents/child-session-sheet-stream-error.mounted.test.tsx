@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildProps,
   createRecoverySource,
+  errorState,
   host,
   makeAssistantMessage,
   renderSheet,
@@ -122,5 +123,29 @@ describe('ChildSessionSheet streamed session load error', () => {
       i18n.t('agentChat.childSessionSheet.couldNotLoad')
     );
     expect(sheet.renderer.root.findAllByType(QueryError)).toHaveLength(1);
+  });
+
+  it('does not show the full-screen load error before the first row while the child streams', async () => {
+    // No child rows have landed yet, so the sheet would otherwise take the
+    // full-screen error state even though the subagent task is running.
+    const renderer = await renderSheet({
+      ...buildProps({ getChildMessages: () => [], hydrationState: errorState }),
+      isStreaming: true,
+    });
+
+    expect(renderer.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(textValues(renderer.root)).not.toContain(
+      i18n.t('agentChat.childSessionSheet.couldNotLoad')
+    );
+  });
+
+  it('shows the full-screen load error with Retry when the child is not streaming', async () => {
+    const renderer = await renderSheet({
+      ...buildProps({ getChildMessages: () => [], hydrationState: errorState }),
+    });
+
+    expect(renderer.root.findAllByType(QueryError)).toHaveLength(1);
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.childSessionSheet.couldNotLoad'));
+    expect(retryButton(renderer.root).props.disabled).toBe(false);
   });
 });

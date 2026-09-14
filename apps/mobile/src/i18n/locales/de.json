@@ -2147,7 +2147,10 @@
     "gatewayModelUnavailable": "Dieses Transkriptionsmodell ist nicht verfügbar. Wähle ein anderes in den Einstellungen.",
     "gatewayModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(transcriptionModel.title), um ein anderes zu wählen.",
     "gatewaySignInRequired": "Melde dich an, um die Gateway-Transkription zu nutzen.",
-    "gatewayNoModel": "Wähle zuerst in den Einstellungen ein Transkriptionsmodell."
+    "gatewayNoModel": "Wähle zuerst in den Einstellungen ein Transkriptionsmodell.",
+    "testTitle": "Spracheingabe testen",
+    "testPlaceholder": "Tippe auf das Mikrofon und sprich.",
+    "testClear": "Text löschen"
   },
   "share": {
     "title": "Mit Kilo teilen",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "Keine Transkriptionsmodelle",
     "emptyDescription": "Kilo Gateway bietet derzeit keine Transkriptionsmodelle.",
     "loadFailed": "Die Transkriptionsmodelle konnten nicht geladen werden."
+  },
+  "voiceLanguage": {
+    "title": "Sprache der Spracheingabe",
+    "automatic": "Automatisch",
+    "loadFailed": "Die von diesem Gerät unterstützten Sprachen konnten nicht geladen werden.",
+    "emptyTitle": "Keine unterstützten Sprachen",
+    "emptyDescription": "Die Spracherkennung dieses Geräts meldet keine unterstützten Sprachen."
   }
 }

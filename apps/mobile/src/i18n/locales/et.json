@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "Seda kõnetuvastuse mudelit pole saadaval. Vali Eelistustes mõni teine.",
     "gatewayModelUnavailableNotice": "Seda mudelit enam ei pakuta. Puuduta $t(transcriptionModel.title), et valida teine.",
     "gatewaySignInRequired": "Logi sisse, et kasutada Kilo Gateway kõnetuvastust.",
-    "gatewayNoModel": "Vali kõigepealt Eelistustes kõnetuvastuse mudel."
+    "gatewayNoModel": "Vali kõigepealt Eelistustes kõnetuvastuse mudel.",
+    "testTitle": "Testi häälsisestust",
+    "testPlaceholder": "Puuduta mikrofoni ja hakka rääkima.",
+    "testClear": "Tühjenda tekst"
   },
   "share": {
     "title": "Kilosse jagamine",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "Kõnetuvastuse mudelid puuduvad",
     "emptyDescription": "Kilo Gateway ei paku praegu ühtegi kõnetuvastuse mudelit.",
     "loadFailed": "Kõnetuvastuse mudeleid ei õnnestunud laadida."
+  },
+  "voiceLanguage": {
+    "title": "Häälsisestuse keel",
+    "automatic": "Automaatne",
+    "loadFailed": "Selle seadme toetatavaid keeli ei õnnestunud laadida.",
+    "emptyTitle": "Toetatud keeli pole",
+    "emptyDescription": "Selle seadme kõnetuvastus ei teata ühtegi toetatud keelt."
   }
 }

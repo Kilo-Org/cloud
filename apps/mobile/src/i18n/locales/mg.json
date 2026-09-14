@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "Tsy azo ampiasaina ity modely fanovana feo ho soratra ity. Safidio ny hafa ao amin'ny Safidy.",
     "gatewayModelUnavailableNotice": "Tsy atolotra intsony ity modely ity. Tsindrio $t(transcriptionModel.title) hisafidianana ny hafa.",
     "gatewaySignInRequired": "Midira mba hampiasa ny fanovana feo ho soratra amin'ny Kilo Gateway.",
-    "gatewayNoModel": "Safidio aloha ny modely fanovana feo ho soratra ao amin'ny Safidy."
+    "gatewayNoModel": "Safidio aloha ny modely fanovana feo ho soratra ao amin'ny Safidy.",
+    "testTitle": "Andramo ny fampidirana amin'ny feo",
+    "testPlaceholder": "Tsindrio ny mikrô ary manomboka miteny.",
+    "testClear": "Fafao ny soratra"
   },
   "share": {
     "title": "Fizarana amin'ny Kilo",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "Tsy misy modely fanovana feo ho soratra",
     "emptyDescription": "Tsy manome modely fanovana feo ho soratra amin'izao fotoana izao ny Kilo Gateway.",
     "loadFailed": "Tsy tafiditra ny modely fanovana feo ho soratra."
+  },
+  "voiceLanguage": {
+    "title": "Fitenin'ny fampidirana amin'ny feo",
+    "automatic": "Ho azy",
+    "loadFailed": "Tsy afaka naka ny fiteny tohanan'ity fitaovana ity.",
+    "emptyTitle": "Tsy misy fiteny tohana",
+    "emptyDescription": "Ny fanekena feo amin'ity fitaovana ity dia tsy mitatitra fiteny tohana."
   }
 }

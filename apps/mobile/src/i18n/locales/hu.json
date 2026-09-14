@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "Ez az átírási modell nem érhető el. Válassz egy másikat a Beállításokban.",
     "gatewayModelUnavailableNotice": "Ez a modell már nem elérhető. Koppints a $t(transcriptionModel.title) elemre egy másik kiválasztásához.",
     "gatewaySignInRequired": "Jelentkezz be a Kilo Gateway-es átírás használatához.",
-    "gatewayNoModel": "Először válassz egy átírási modellt a Beállításokban."
+    "gatewayNoModel": "Először válassz egy átírási modellt a Beállításokban.",
+    "testTitle": "Hangbevitel tesztelése",
+    "testPlaceholder": "Érintse meg a mikrofont, és kezdjen el beszélni.",
+    "testClear": "Szöveg törlése"
   },
   "share": {
     "title": "Megosztás a Kilo alkalmazással",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "Nincsenek átírási modellek",
     "emptyDescription": "A Kilo Gateway jelenleg nem kínál átírási modelleket.",
     "loadFailed": "Nem sikerült betölteni az átírási modelleket."
+  },
+  "voiceLanguage": {
+    "title": "Hangbevitel nyelve",
+    "automatic": "Automatikus",
+    "loadFailed": "Nem sikerült betölteni az eszköz által támogatott nyelveket.",
+    "emptyTitle": "Nincsenek támogatott nyelvek",
+    "emptyDescription": "Az eszköz beszédfelismerése nem jelez támogatott nyelvet."
   }
 }

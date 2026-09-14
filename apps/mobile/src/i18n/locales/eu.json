@@ -2581,7 +2581,10 @@
     "gatewayModelUnavailable": "Transkripzio-eredu hau ez dago erabilgarri. Hautatu besteren bat Hobespenetan.",
     "gatewayModelUnavailableNotice": "Eredu hau jada ez da eskaintzen. Sakatu $t(transcriptionModel.title) beste bat hautatzeko.",
     "gatewaySignInRequired": "Hasi saioa Kilo Gateway bidezko transkripzioa erabiltzeko.",
-    "gatewayNoModel": "Hautatu lehenik transkripzio-eredu bat Hobespenetan."
+    "gatewayNoModel": "Hautatu lehenik transkripzio-eredu bat Hobespenetan.",
+    "testTitle": "Probatu ahots-sarrera",
+    "testPlaceholder": "Sakatu mikrofonoa eta hasi hitz egiten.",
+    "testClear": "Garbitu testua"
   },
   "share": {
     "title": "Partekatu Kilo-n",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "Ez dago transkripzio-eredurik",
     "emptyDescription": "Kilo Gateway-k ez du transkripzio-eredurik eskaintzen oraintxe.",
     "loadFailed": "Ezin izan dira transkripzio-ereduak kargatu."
+  },
+  "voiceLanguage": {
+    "title": "Ahots-sarreraren hizkuntza",
+    "automatic": "Automatikoa",
+    "loadFailed": "Ezin izan dira gailu honek onartzen dituen hizkuntzak kargatu.",
+    "emptyTitle": "Ez dago hizkuntza onarturik",
+    "emptyDescription": "Gailu honen ahots-ezagutzak ez du onartutako hizkuntzarik jakinarazten."
   }
 }

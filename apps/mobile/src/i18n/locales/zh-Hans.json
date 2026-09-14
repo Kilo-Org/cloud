@@ -2147,7 +2147,10 @@
     "gatewayModelUnavailable": "此转写模型不可用。请在偏好设置中选择其他模型。",
     "gatewayModelUnavailableNotice": "此模型已不再提供。点按$t(transcriptionModel.title)选择其他模型。",
     "gatewaySignInRequired": "登录后可使用 Kilo Gateway 转写。",
-    "gatewayNoModel": "请先在偏好设置中选择转写模型。"
+    "gatewayNoModel": "请先在偏好设置中选择转写模型。",
+    "testTitle": "测试语音输入",
+    "testPlaceholder": "点按麦克风并开始说话。",
+    "testClear": "清除文本"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2970,5 +2973,12 @@
     "emptyTitle": "没有转写模型",
     "emptyDescription": "Kilo Gateway 当前没有提供转写模型。",
     "loadFailed": "无法加载转写模型。"
+  },
+  "voiceLanguage": {
+    "title": "语音输入语言",
+    "automatic": "自动",
+    "loadFailed": "无法加载此设备支持的语言。",
+    "emptyTitle": "没有支持的语言",
+    "emptyDescription": "此设备的语音识别未报告任何支持的语言。"
   }
 }

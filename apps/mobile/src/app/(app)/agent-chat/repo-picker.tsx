@@ -1,7 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Check, Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +24,9 @@ export default function RepoPickerScreen() {
   const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
+  // The input stays urgent; the filtered list trails behind so a typing burst
+  // on a large repository list does not filter/reconcile on every key.
+  const deferredSearch = useDeferredValue(search);
   const [bridge, setBridge] = useState(() => repoPickerSlot.get(UNFENCED_ROUTE_KEY));
 
   const bridgeRef = useRef(bridge);
@@ -48,15 +51,16 @@ export default function RepoPickerScreen() {
   );
 
   const filtered = useMemo(
-    () => filterRepoPickerOptions({ repositories: bridge?.repositories ?? [], search }),
-    [bridge, search]
+    () =>
+      filterRepoPickerOptions({ repositories: bridge?.repositories ?? [], search: deferredSearch }),
+    [bridge, deferredSearch]
   );
 
   // When the search box is empty, render grouped sections (Recently used, then
   // per-provider); when it is non-empty, render the flat filtered list exactly
   // as before.
   const listItems = useMemo<PickerListItem[]>(() => {
-    if (search.trim()) {
+    if (deferredSearch.trim()) {
       return filtered.map(repo => ({
         key: `${repo.platform}:${repo.fullName}`,
         kind: 'repo',
@@ -74,7 +78,7 @@ export default function RepoPickerScreen() {
       }
     }
     return items;
-  }, [bridge, filtered, search]);
+  }, [bridge, filtered, deferredSearch]);
 
   const handleSelect = useCallback(
     (repo: string) => {
@@ -123,14 +127,14 @@ export default function RepoPickerScreen() {
     >
       {listItems.length === 0 ? (
         <EmptyState
-          icon={search.trim() ? SearchX : Info}
+          icon={deferredSearch.trim() ? SearchX : Info}
           title={
-            search.trim()
+            deferredSearch.trim()
               ? t('agentChat.repoPicker.noMatches')
               : t('agentChat.repoPicker.noRepositories')
           }
           description={
-            search.trim()
+            deferredSearch.trim()
               ? t('agents.sessionList.tryDifferentSearch')
               : t('agentChat.repoPicker.noRepositoriesDescription')
           }

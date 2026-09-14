@@ -453,8 +453,11 @@ export async function unresolveThread(
 
 /**
  * Re-fetch the PR and compare the current head against the caller's fence.
- * A moved head is refused BEFORE any merge call, so a stale revision can
- * never merge another commit or be redirected.
+ * A head move visible before the merge call is refused BEFORE any merge
+ * call, so a stale revision is never redirected into a merge. Bitbucket
+ * Cloud exposes no server-side head precondition (see mergePullRequest), so
+ * a push landing between this read and the merge POST itself is a
+ * provider-level residual the preflight cannot close.
  */
 function requireHeadShaFence(
   pr: z.infer<typeof BitbucketPullRequestWriteSchema>,
@@ -468,8 +471,15 @@ function requireHeadShaFence(
 
 /**
  * Merge the pull request. The caller's `expectedHeadSha` is re-verified
- * against a fresh fetch BEFORE any merge call, so the merge can only land the
- * exact revision the reviewer saw. `closeSourceBranch` is honored.
+ * against a fresh fetch immediately before the merge call, so a head the
+ * reviewer did not see is refused, never redirected or merged. Bitbucket
+ * Cloud's merge endpoint carries no head/revision precondition the request
+ * itself can check (GitHub's `sha` parameter has no Bitbucket equivalent;
+ * the documented request body is only type/message/close_source_branch/
+ * merge_strategy), so a precondition field in the body would assert a server
+ * check that does not exist. The flow stays enabled because Bitbucket
+ * supports merging and this preflight is the strongest check it allows.
+ * `closeSourceBranch` is honored.
  */
 export async function mergePullRequest(
   target: BitbucketPrTarget & {

@@ -85,7 +85,9 @@ const config: ExpoConfig = {
   // descriptions. Expo's built-in `withLocales` writes a
   // `<tag>.lproj/InfoPlist.strings` per tag at prebuild; the plugin options
   // below stay as the base Info.plist value. `ios`-nested so Android's
-  // `withLocales` resolves each tag to nothing.
+  // `withLocales` resolves each tag to nothing. The location copy spells the
+  // app name out: `.lproj` strings are not build-expanded, so the upstream
+  // `$(PRODUCT_NAME)` would render literally there.
   locales: buildPermissionPromptLocales(PERMISSION_PROMPT_COPY),
   ios: {
     // iOS 18+ appearance variants. `light` is the existing icon unchanged; `dark` keeps the

@@ -11,14 +11,16 @@ import {
 const locales = buildPermissionPromptLocales(copy);
 
 // Mirrors the five plugin options in app.config.ts. The en override must match
-// them verbatim so the base Info.plist value and the .lproj string never drift.
+// the value the system resolves — including `$(PRODUCT_NAME)` expanded to the
+// product name — so the base Info.plist value and the .lproj string never
+// drift. `.lproj/InfoPlist.strings` is not build-expanded, so the location copy
+// spells the name out instead of keeping the variable.
 const ENGLISH_PROMPTS = {
   NSMicrophoneUsageDescription: 'Allow Kilo to use your microphone to turn speech into text.',
   NSSpeechRecognitionUsageDescription:
     'Allow Kilo to use speech recognition to turn your voice into text.',
   NSFaceIDUsageDescription: 'Allow Kilo to use Face ID to unlock the app.',
-  NSLocationWhenInUseUsageDescription:
-    'Allow $(PRODUCT_NAME) to use your location to set up local weather.',
+  NSLocationWhenInUseUsageDescription: 'Allow Kilo to use your location to set up local weather.',
   NSUserTrackingUsageDescription:
     'This identifier is used to measure the effectiveness of advertising campaigns.',
 };
@@ -40,8 +42,14 @@ describe('buildPermissionPromptLocales', () => {
     }
   });
 
-  it.each(SUPPORTED_LANGUAGES)('keeps $(PRODUCT_NAME) in %s', tag => {
-    expect(locales[tag].ios.NSLocationWhenInUseUsageDescription).toContain('$(PRODUCT_NAME)');
+  // `InfoPlist.strings` is compiled verbatim: Xcode expands `$(PRODUCT_NAME)`
+  // only in Info.plist. A value that kept the variable would be shown literally
+  // in the prompt, so the copy names the app directly.
+  it.each(SUPPORTED_LANGUAGES)('keeps no unexpanded build variable in %s', tag => {
+    for (const key of PERMISSION_PROMPT_PLIST_KEYS) {
+      expect(locales[tag].ios[key], `${tag}.${key}`).not.toContain('$(');
+    }
+    expect(locales[tag].ios.NSLocationWhenInUseUsageDescription, tag).toContain('Kilo');
   });
 
   it('keeps the English override equal to the base plugin options', () => {

@@ -5,14 +5,18 @@ import { fileURLToPath } from 'node:url';
 import { ENV_KEYS } from '../src/lib/env-keys.js';
 
 // Contract values mirrored from app.config.ts (bundle id, package, scheme,
-// orientation, associated domain, blocked permissions, and Sentry plugin). ENV_KEYS is
-// imported live from src/lib/env-keys.js. The script runs the full evaluated
-// config, so these must match the resolved build-time output, not the raw
-// app.config.ts source.
+// orientation, associated domain, app name, blocked permissions, and Sentry
+// plugin). ENV_KEYS is imported live from src/lib/env-keys.js. The script runs
+// the full evaluated config, so these must match the resolved build-time
+// output, not the raw app.config.ts source.
 const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
 const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
 const SCHEME = 'kiloapp';
 const ASSOCIATED_DOMAIN = 'applinks:app.kilo.ai';
+// The app name (app.config.ts `name`). `$(PRODUCT_NAME)` resolves to this in
+// the base Info.plist, but `.lproj/InfoPlist.strings` is compiled verbatim, so
+// the localized copy has to spell it out.
+const APP_NAME = 'Kilo';
 const BLOCKED_PERMISSIONS = [
   'android.permission.READ_MEDIA_IMAGES',
   'android.permission.READ_MEDIA_VIDEO',
@@ -111,9 +115,16 @@ for (const tag of localizations) {
       `locales["${tag}"].ios["${key}"] must be a non-empty string`
     );
   }
+  // `.lproj/InfoPlist.strings` is compiled verbatim — Xcode expands
+  // `$(PRODUCT_NAME)` only in Info.plist — so the localized copy must name the
+  // app instead of keeping the variable, or the prompt shows it literally.
   check(
-    locales[tag]?.ios?.NSLocationWhenInUseUsageDescription?.includes('$(PRODUCT_NAME)') === true,
-    `locales["${tag}"].ios.NSLocationWhenInUseUsageDescription must keep $(PRODUCT_NAME)`
+    locales[tag]?.ios?.NSLocationWhenInUseUsageDescription?.includes('$(PRODUCT_NAME)') === false,
+    `locales["${tag}"].ios.NSLocationWhenInUseUsageDescription must not keep $(PRODUCT_NAME)`
+  );
+  check(
+    locales[tag]?.ios?.NSLocationWhenInUseUsageDescription?.includes(APP_NAME) === true,
+    `locales["${tag}"].ios.NSLocationWhenInUseUsageDescription must name the app "${APP_NAME}"`
   );
 }
 

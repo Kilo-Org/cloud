@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Přepisujte diktování pomocí modelu Kilo Gateway místo rozpoznávání řeči ve vašem zařízení. Nahraný zvuk se odešle do Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Sbalit volání nástrojů",
-    "condenseToolCallsSubtitle": "Seskupte po sobě jdoucí volání nástrojů do jednoho řádku, který můžete otevřít."
+    "condenseToolCallsSubtitle": "Seskupte po sobě jdoucí volání nástrojů do jednoho řádku, který můžete otevřít.",
+    "toolSummaryTranslation": "Přeložit souhrny nástrojů",
+    "toolSummaryTranslationSubtitle": "Pošli každý souhrn nástroje modelu, aby jej přeložil do jazyka tvé aplikace. Pokud překlad selže, zobrazí se originál.",
+    "toolSummaryTranslationModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(common.model) vyberte jiný."
   },
   "prReview": {
     "pullRequestUnavailable": "PR není dostupný",

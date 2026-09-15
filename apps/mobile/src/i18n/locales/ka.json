@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "ხმოვანი შეყვანა აქციეთ ტექსტად Kilo Gateway-ის მოდელით, მოწყობილობის მეტყველების ამოცნობის ნაცვლად. თქვენი ჩანაწერი იგზავნება Kilo Gateway-ში.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "ინსტრუმენტის გამოძახებების შეკუმშვა",
-    "condenseToolCallsSubtitle": "დააჯგუფეთ ზედიზედ ინსტრუმენტის გამოძახებები ერთ რიგში, რომლის გახსნაც შეგიძლიათ."
+    "condenseToolCallsSubtitle": "დააჯგუფეთ ზედიზედ ინსტრუმენტის გამოძახებები ერთ რიგში, რომლის გახსნაც შეგიძლიათ.",
+    "toolSummaryTranslation": "ინსტრუმენტების შეჯამებების თარგმნა",
+    "toolSummaryTranslationSubtitle": "გაგზავნე ყოველი ინსტრუმენტის შეჯამება მოდელთან, რომ ის შენი აპის ენაზე ითარგმნოს. თარგმნის ვერ მოხერხდებისას ორიგინალი ჩანს.",
+    "toolSummaryTranslationModelUnavailableNotice": "ეს მოდელი აღარ არის ხელმისაწვდომი. სხვის ასარჩევად შეეხეთ $t(common.model)-ს."
   },
   "prReview": {
     "pullRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",

@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Kasuta häälsisestuse tekstiks teisendamiseks seadme kõnetuvastuse asemel Kilo Gateway mudelit. Sinu salvestus saadetakse Kilo Gateway'sse.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Tööriistakutsete koondamine",
-    "condenseToolCallsSubtitle": "Rühmita järjestikused tööriistakutsed ühte ritta, mille saad avada."
+    "condenseToolCallsSubtitle": "Rühmita järjestikused tööriistakutsed ühte ritta, mille saad avada.",
+    "toolSummaryTranslation": "Tõlgi tööriistade kokkuvõtted",
+    "toolSummaryTranslationSubtitle": "Saada iga tööriista kokkuvõte mudelile, et see sinu rakenduse keelde tõlkida. Tõlke ebaõnnestumisel kuvatakse originaal.",
+    "toolSummaryTranslationModelUnavailableNotice": "Seda mudelit enam ei pakuta. Puuduta $t(common.model), et valida teine."
   },
   "prReview": {
     "pullRequestUnavailable": "Tõmbetaotlus pole saadaval",

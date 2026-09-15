@@ -52,6 +52,7 @@ export default defineProject({
       'src/lib/pr-review/**/*.test.ts',
       'src/lib/query/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
+      'src/lib/tool-summary-translation/**/*.test.ts',
       'src/components/**/*.test.ts',
       'src/components/agents/**/!(*.mounted).test.tsx',
       'src/components/pr-review/**/!(*.mounted).test.tsx',

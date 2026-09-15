@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Transkribera röstinmatningen med en Kilo Gateway-modell i stället för enhetens taligenkänning. Din inspelning skickas till Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Komprimera verktygsanrop",
-    "condenseToolCallsSubtitle": "Gruppera på varandra följande verktygsanrop i en rad som du kan öppna."
+    "condenseToolCallsSubtitle": "Gruppera på varandra följande verktygsanrop i en rad som du kan öppna.",
+    "toolSummaryTranslation": "Översätt verktygssammanfattningar",
+    "toolSummaryTranslationSubtitle": "Skicka varje verktygssammanfattning till en modell för att översätta den till appens språk. Originalet visas om översättningen misslyckas.",
+    "toolSummaryTranslationModelUnavailableNotice": "Den här modellen erbjuds inte längre. Tryck på $t(common.model) för att välja en annan."
   },
   "prReview": {
     "pullRequestUnavailable": "PR:en är inte tillgänglig",

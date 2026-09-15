@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Ittraskrivi d-dħul bil-vuċi b'mudell ta' Kilo Gateway minflok ir-rikonoxximent tal-vuċi tal-apparat. Ir-reġistrazzjoni tiegħek tintbagħat lil Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Ikkondensa s-sejħiet tal-għodda",
-    "condenseToolCallsSubtitle": "Iġbor is-sejħiet tal-għodda konsekuttivi f'ringiela waħda li tista' tiftaħ."
+    "condenseToolCallsSubtitle": "Iġbor is-sejħiet tal-għodda konsekuttivi f'ringiela waħda li tista' tiftaħ.",
+    "toolSummaryTranslation": "Ittraduċi s-sommarji tal-għodod",
+    "toolSummaryTranslationSubtitle": "Ibgħat kull sommarju tal-għodda lil mudell biex jittraduċih fil-lingwa tal-app tiegħek. L-oriġinal jintwera jekk it-traduzzjoni tfalli.",
+    "toolSummaryTranslationModelUnavailableNotice": "Dan il-mudell m'għadux disponibbli. Agħfas $t(common.model) biex tagħżel ieħor."
   },
   "prReview": {
     "pullRequestUnavailable": "It-talba għall-għaqda mhix disponibbli",

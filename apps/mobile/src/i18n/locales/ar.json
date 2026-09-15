@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "حوّل الإدخال الصوتي إلى نص باستخدام أحد نماذج Kilo Gateway بدلاً من التعرف على الكلام في جهازك. يُرسل تسجيلك إلى Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "ضغط استدعاءات الأدوات",
-    "condenseToolCallsSubtitle": "جمّع استدعاءات الأدوات المتتالية في صف واحد يمكنك فتحه."
+    "condenseToolCallsSubtitle": "جمّع استدعاءات الأدوات المتتالية في صف واحد يمكنك فتحه.",
+    "toolSummaryTranslation": "ترجمة ملخصات الأدوات",
+    "toolSummaryTranslationSubtitle": "أرسل كل ملخص أداة إلى نموذج لترجمته إلى لغة تطبيقك. يظهر النص الأصلي إذا فشلت الترجمة.",
+    "toolSummaryTranslationModelUnavailableNotice": "لم يعد هذا النموذج معروضًا. اضغط على $t(common.model) لاختيار نموذج آخر."
   },
   "notifications": {
     "liveActivities": "الأنشطة المباشرة",

@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Codka ku beddel qoraal moodeelka Kilo Gateway adigoo aan isticmaalayn aqoonsiga hadalka ee qalabka. Duubistaada waxaa loo diraa Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Soo koob wicitaannada qalabka",
-    "condenseToolCallsSubtitle": "Koox koox u geli wicitaannada qalabka ee isxigxiga hal saf oo aad furi karto."
+    "condenseToolCallsSubtitle": "Koox koox u geli wicitaannada qalabka ee isxigxiga hal saf oo aad furi karto.",
+    "toolSummaryTranslation": "Turjun koobabka qalabka",
+    "toolSummaryTranslationSubtitle": "Dir koob kasta oo qalab ah moodel si uu ugu turjumo luqadda abkaaga. Waxaa la muujiyaa asalka haddii turjumaadda ay fashilanto.",
+    "toolSummaryTranslationModelUnavailableNotice": "Moodeelkan lama bixiyo mar dambe. Taabo $t(common.model) si aad u dooratid mid kale."
   },
   "prReview": {
     "pullRequestUnavailable": "Codsiga isku-darka lama heli karo",

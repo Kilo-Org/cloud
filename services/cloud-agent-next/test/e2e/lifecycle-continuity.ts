@@ -2646,14 +2646,16 @@ async function waitForActiveRouteReport(
         if (!isControlRecord(candidate) || candidate.diagnosticEvent !== 'heartbeat') return false;
         if (!matchesConnection(candidate, input.connection)) return false;
         return (
-          selectTargetHeartbeat([candidate], input.connection, input.kiloSessionId)?.sessionState ===
-          'active'
+          selectTargetHeartbeat([candidate], input.connection, input.kiloSessionId)
+            ?.sessionState === 'active'
         );
       },
     })
   );
   if (!record) {
-    throw new Error(`${input.label}: no identity-matched active heartbeat for ${input.kiloSessionId}`);
+    throw new Error(
+      `${input.label}: no identity-matched active heartbeat for ${input.kiloSessionId}`
+    );
   }
   const evidence = selectTargetHeartbeat([record], input.connection, input.kiloSessionId);
   if (!evidence) {
@@ -2755,10 +2757,7 @@ async function waitForRuntimeUnhealthyReconciliation(
   const record = await resources.within(input.label, () =>
     waitForWorkerLogEvidence({
       fromByte: input.fromByte,
-      budgetMs: Math.min(
-        WRAPPER_FREEZE_RECONCILE_BUDGET_MS,
-        remainingMs(resources, input.label)
-      ),
+      budgetMs: Math.min(WRAPPER_FREEZE_RECONCILE_BUDGET_MS, remainingMs(resources, input.label)),
       match: candidate =>
         isControlRecord(candidate) &&
         candidate.diagnosticEvent === 'accepted_reconciliation' &&
@@ -2783,7 +2782,8 @@ async function assertDistinctReplacement(
   const replacement = await resources.within(label, () =>
     findControlPlaneKiloRuntime(session.kiloSessionId)
   );
-  if (!replacement) throw new Error(`${label}: no replacement runtime for ${session.kiloSessionId}`);
+  if (!replacement)
+    throw new Error(`${label}: no replacement runtime for ${session.kiloSessionId}`);
   if (replacement.container.id === oldContainerId) {
     throw new Error(`${label}: replacement reused the reaped container ${oldContainerId}`);
   }
@@ -2826,9 +2826,7 @@ export async function lifecycleWrapperFreezeSettledReap(
   const startedAt = Date.now();
   const resources = createScenarioResources(
     args.config,
-    args.timeoutMs ??
-      CONTINUITY_SCENARIO_TIMEOUT_MS['wrapper-freeze-settled-reap'] ??
-      12 * 60_000
+    args.timeoutMs ?? CONTINUITY_SCENARIO_TIMEOUT_MS['wrapper-freeze-settled-reap'] ?? 12 * 60_000
   );
   let result = scenarioResult(
     'wrapper-freeze-settled-reap',
@@ -2979,9 +2977,7 @@ export async function lifecycleWrapperFreezeInflightReap(
   const startedAt = Date.now();
   const resources = createScenarioResources(
     args.config,
-    args.timeoutMs ??
-      CONTINUITY_SCENARIO_TIMEOUT_MS['wrapper-freeze-inflight-reap'] ??
-      12 * 60_000
+    args.timeoutMs ?? CONTINUITY_SCENARIO_TIMEOUT_MS['wrapper-freeze-inflight-reap'] ?? 12 * 60_000
   );
   let result = scenarioResult(
     'wrapper-freeze-inflight-reap',
@@ -3084,9 +3080,7 @@ export async function lifecycleWrapperFreezeInflightReap(
       label: 'runtime_unhealthy reconciliation',
     });
     record('messageTerminal=cloud.message.failed status=failed');
-    record(
-      `reconciliation=${describeRecord(unhealthy)} result=${String(unhealthy.result)}`
-    );
+    record(`reconciliation=${describeRecord(unhealthy)} result=${String(unhealthy.result)}`);
 
     const stopRecord = await waitForSettledReapStop(resources, {
       fromByte: freezeCursor.fromByte,
@@ -3133,10 +3127,7 @@ export async function lifecycleWrapperFreezeInflightReap(
       session,
       fakeDirective('echo', `freeze-inflight-follow-${runId}`),
       'same-session follow-up',
-      Math.min(
-        WRAPPER_FREEZE_FOLLOWUP_BUDGET_MS,
-        remainingMs(resources, 'same-session follow-up')
-      )
+      Math.min(WRAPPER_FREEZE_FOLLOWUP_BUDGET_MS, remainingMs(resources, 'same-session follow-up'))
     );
     const replacement = await assertDistinctReplacement(
       resources,

@@ -106,9 +106,9 @@ describe('matchesReconciliationIdentity', () => {
   });
 
   it('requires the exact message id and constrains retained session/wrapper identity', () => {
-    expect(
-      matchesReconciliationIdentity(control({ messageId: target.messageId }), target)
-    ).toBe(true);
+    expect(matchesReconciliationIdentity(control({ messageId: target.messageId }), target)).toBe(
+      true
+    );
     expect(
       matchesReconciliationIdentity(
         control({ messageId: target.messageId, sessionId: 'session-other' }),

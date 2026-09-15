@@ -51,3 +51,4 @@ export const r2Client = new S3Client({
 export const r2CliSessionsBucketName = R2_CLI_SESSIONS_BUCKET_NAME;
 export const r2CloudAgentAttachmentsBucketName = CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME;
 export const r2ExperimentPromptsBucketName = R2_EXPERIMENT_PROMPTS_BUCKET_NAME;
+export const r2ApiRequestLogBucketName = R2_EXPERIMENT_PROMPTS_BUCKET_NAME;

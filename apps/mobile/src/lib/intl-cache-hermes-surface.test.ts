@@ -21,10 +21,11 @@ describe('Hermes Intl surface', () => {
     vi.resetModules();
   });
 
-  // The formatters and i18next are imported inside the test, so their transform
-  // runs on the test clock: under the parallel full-suite load this body takes
-  // several seconds against the 5 s default (it formats all 86 languages), so
-  // it carries its own budget. Same sizing as auth-context.test.tsx.
+  // Every supported language runs the full polyfill path and loads its locale
+  // data. That is the point of the guard, and it costs seconds on a loaded CI
+  // box — well past the 5s default. The formatters and i18next are imported
+  // inside the test, so their transform runs on the test clock too: this body
+  // carries its own budget. Same sizing as auth-context.test.tsx.
   it(
     'formats every supported language and pluralizes for i18next',
     async () => {

@@ -76,6 +76,10 @@ function validateCheck(workflow, jobName) {
     const filterIndex = steps.findIndex(item => item.id === 'filter');
     assert.ok(filterIndex > checkIndex, 'changes: check before filtering');
   }
+  if (jobName === 'mobile-changes') {
+    const detectIndex = steps.findIndex(item => item.id === 'detect');
+    assert.ok(detectIndex > checkIndex, 'mobile-changes: check before change detection');
+  }
 }
 
 function validate(root, mobile) {
@@ -89,15 +93,19 @@ function validate(root, mobile) {
   }
   assert.equal(root.on.pull_request?.paths, undefined, 'root admission must not filter paths');
   assert.equal(root.on.pull_request?.['paths-ignore'], undefined);
+  assert.equal(
+    mobile.on.pull_request?.paths,
+    undefined,
+    'mobile admission must not filter paths: a required suite check must report on every PR'
+  );
+  assert.equal(mobile.on.pull_request?.['paths-ignore'], undefined);
   assert.deepEqual(root.permissions, { contents: 'read', 'pull-requests': 'read' });
   assert.deepEqual(mobile.permissions, { contents: 'read' });
   assert.ok('workflow_call' in mobile.on, 'mobile release caller must remain enabled');
-  for (const event of ['push', 'pull_request']) {
-    assert.deepEqual(mobile.on[event].paths, [...originalMobilePaths, rootPath, checkPath]);
-    assert.equal(mobile.on[event]['paths-ignore'], undefined);
-  }
+  assert.deepEqual(mobile.on.push.paths, [...originalMobilePaths, rootPath, checkPath]);
+  assert.equal(mobile.on.push['paths-ignore'], undefined);
   validateCheck(root, 'changes');
-  validateCheck(mobile, 'test');
+  validateCheck(mobile, 'mobile-changes');
 }
 
 test('both live workflows validate triggers and unconditional check invocations', () => {
@@ -114,16 +122,15 @@ for (const base of ['main', 'stack/level-one', 'arbitrary/parent-42']) {
   }
 }
 
-test('mobile keeps every existing path and main-only pushes', () => {
+test('mobile keeps every existing push path, admits every PR, and stays main-only on push', () => {
   const [root, mobile] = readWorkflows();
   for (const pattern of originalMobilePaths) {
     const file = pattern.replace('**', 'fixture.ts');
-    assert.equal(admits(mobile, 'pull_request', 'stack/parent', [file]), true);
     assert.equal(admits(mobile, 'push', 'main', [file]), true);
     assert.equal(admits(mobile, 'push', 'stack/parent', [file]), false);
   }
   assert.equal(admits(root, 'push', 'stack/parent', [rootPath]), false);
-  assert.equal(admits(mobile, 'pull_request', 'stack/parent', ['README.md']), false);
+  assert.equal(admits(mobile, 'pull_request', 'stack/parent', ['README.md']), true);
 });
 
 test('mobile catches an isolated root main-only regression on a stacked base', () => {
@@ -136,7 +143,7 @@ test('mobile catches an isolated root main-only regression on a stacked base', (
 
 for (const [index, jobName] of [
   [0, 'changes'],
-  [1, 'test'],
+  [1, 'mobile-changes'],
 ]) {
   for (const defect of [
     'missing',

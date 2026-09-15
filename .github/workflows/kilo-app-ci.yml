@@ -1,5 +1,12 @@
 name: kilo-app CI
 
+# The mobile suite jobs are required checks on main, so this workflow runs on
+# every PR (no pull_request path filter) and the `mobile-changes` job gates the
+# suite work. An unrelated PR still reports the suite checks as skipped (a
+# required check reports "skipping", which satisfies the ruleset) instead of
+# leaving them "Expected". Main pushes stay filtered to the suite's own paths;
+# the release workflow re-runs the suite through `workflow_call`.
+
 on:
   push:
     branches: [main]
@@ -18,20 +25,6 @@ on:
       - '.github/workflows/ci.yml'
       - 'scripts/stacked-ci.test.mjs'
   pull_request:
-    paths:
-      - 'apps/mobile/**'
-      - 'packages/trpc/**'
-      - 'apps/web/src/routers/**'
-      - 'packages/app-shared/**'
-      - 'packages/kilo-chat/**'
-      - 'packages/kilo-chat-hooks/**'
-      - 'packages/event-service/**'
-      - 'packages/notifications/**'
-      - 'packages/cloud-agent-sdk/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/kilo-app-ci.yml'
-      - '.github/workflows/ci.yml'
-      - 'scripts/stacked-ci.test.mjs'
   workflow_call:
 
 concurrency:
@@ -42,7 +35,62 @@ permissions:
   contents: read
 
 jobs:
+  # Always runs: the required suite checks must report on every PR. The
+  # detection step diffs against the PR's base sha; on a push or workflow_call
+  # there is no base, so the suite runs (a release must validate).
+  mobile-changes:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    outputs:
+      mobile: ${{ steps.detect.outputs.mobile }}
+    steps:
+      # Full history so the change-detection step can diff against the PR's
+      # base sha.
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install root dependencies
+        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
+
+      # The stacked-CI admission wiring must be checked on every PR, before the
+      # suite is gated.
+      - name: Check stacked CI admission
+        run: node --test scripts/stacked-ci.test.mjs
+
+      # The suite jobs always report (required checks); only the suite's own
+      # paths justify the heavy work. Keep the patterns in sync with the `push`
+      # filter.
+      - name: Detect mobile-relevant changes
+        id: detect
+        run: |
+          set -euo pipefail
+          # If the base object is unavailable, run the suite rather than skip
+          # it: a false "no changes" would break the required checks' promise,
+          # while a redundant run is harmless.
+          base="${{ github.event.pull_request.base.sha }}"
+          if ! git rev-parse --verify "${base}^{commit}" > /dev/null 2>&1; then
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$base" HEAD \
+            | grep -Eq '^apps/mobile/|^packages/trpc/|^apps/web/src/routers/|^packages/app-shared/|^packages/kilo-chat/|^packages/kilo-chat-hooks/|^packages/event-service/|^packages/notifications/|^packages/cloud-agent-sdk/|^pnpm-lock\.yaml$|^\.github/workflows/kilo-app-ci\.yml$|^\.github/workflows/ci\.yml$|^scripts/stacked-ci\.test\.mjs$'; then
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "mobile=false" >> "$GITHUB_OUTPUT"
+          fi
+
   typecheck:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.mobile == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -74,6 +122,8 @@ jobs:
         run: pnpm --filter kilo-app exec expo config --type public > /dev/null
 
   lint:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.mobile == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -100,6 +150,8 @@ jobs:
         run: pnpm --filter kilo-app run lint
 
   i18n-leftover:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.mobile == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -128,6 +180,8 @@ jobs:
         run: pnpm --filter kilo-app run check:classes
 
   format-check:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.mobile == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -155,6 +209,8 @@ jobs:
           }
 
   check-unused:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.mobile == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -178,6 +234,8 @@ jobs:
         run: pnpm --filter kilo-app run check:unused
 
   test:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.mobile == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -196,9 +254,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Check stacked CI admission
-        run: node --test scripts/stacked-ci.test.mjs
 
       - name: Build trpc types
         run: pnpm --filter @kilocode/trpc run build

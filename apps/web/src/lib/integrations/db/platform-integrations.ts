@@ -157,7 +157,10 @@ export async function findIntegrationByInstallationIdForOwner(
   owner: Owner,
   platform: (typeof PLATFORM)[keyof typeof PLATFORM],
   platformInstallationId: string,
-  githubAppType?: GitHubAppType
+  githubAppType?: GitHubAppType,
+  /** Run inside a caller-owned transaction, for example when the row was
+   *  written in the same transaction and must be read back before commit. */
+  transaction?: DrizzleTransaction
 ) {
   const appTypeCondition =
     githubAppType === 'standard'
@@ -168,7 +171,7 @@ export async function findIntegrationByInstallationIdForOwner(
       : githubAppType
         ? eq(platform_integrations.github_app_type, githubAppType)
         : undefined;
-  const [integration] = await db
+  const [integration] = await (transaction ?? db)
     .select()
     .from(platform_integrations)
     .where(
@@ -1159,7 +1162,11 @@ export async function upsertPlatformIntegrationForOwner(
     kiloUserId?: string;
     /** Verified GitHub user id that authorized this connection, when known. */
     githubUserId?: string;
-  }
+  },
+  /** Run the write inside a caller-owned transaction. The caller can then
+   *  make the write, the exclusivity guard, and the canonical bind one atomic
+   *  unit instead of leaving a committed unbound association behind. */
+  transaction?: DrizzleTransaction
 ): Promise<UpsertPlatformIntegrationResult> {
   const appType = data.githubAppType ?? 'standard';
   const now = new Date().toISOString();
@@ -1191,7 +1198,7 @@ export async function upsertPlatformIntegrationForOwner(
   // Preserve exclusive behavior for old callback/refresh paths after the
   // database-level global uniqueness constraint is removed.
   if (data.platform === 'github') {
-    return db.transaction(async tx => {
+    const execute = async (tx: DrizzleTransaction): Promise<UpsertPlatformIntegrationResult> => {
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${data.platformInstallationId}`}))`
       );
@@ -1278,7 +1285,8 @@ export async function upsertPlatformIntegrationForOwner(
         })
         .where(eq(platform_integrations.id, existing.id));
       return { ok: true };
-    });
+    };
+    return transaction ? execute(transaction) : db.transaction(execute);
   }
 
   // Non-GitHub platforms use the existing per-owner pattern.

@@ -23,9 +23,10 @@ import {
   platform_integrations,
   type GitHubInstallState,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import type { Owner } from '@/lib/integrations/core/types';
+import type * as PlatformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
 import {
   findGitHubBotLinkIntegrations,
   findIntegrationByInstallationId,
@@ -508,7 +509,8 @@ describe('GET /api/integrations/github/callback installation flow', () => {
         integrationType: 'app',
         platformInstallationId: INSTALLATION_ID,
         platformAccountLogin: 'securexg',
-      })
+      }),
+      expect.anything()
     );
   });
 });
@@ -582,7 +584,8 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
         platform: 'github',
         integrationType: 'app',
         platformInstallationId: INSTALLATION_ID,
-      })
+      }),
+      expect.anything()
     );
   });
 
@@ -722,6 +725,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledTimes(1);
       expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
         { type: 'user', id: initiatorId },
+        expect.anything(),
         expect.anything()
       );
       const replayed = await GET(makeRequest(callbackPath));
@@ -809,7 +813,8 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     // The owner always comes from the database row, never from token contents.
     expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
       { type: 'org', id: 'org-db-owner' },
-      expect.objectContaining({ platform: 'github' })
+      expect.objectContaining({ platform: 'github' }),
+      expect.anything()
     );
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
       expect.objectContaining({ user: expect.objectContaining({ id: USER_ID }) }),
@@ -1138,7 +1143,8 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     // No organizationId for user-scoped install.
     expectRedirectLocation(response, '/github-app?fromApp=1&github_install=success');
     expect(mockedObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
-      expect.objectContaining({ installationId: INSTALLATION_ID, state: 'active' })
+      expect.objectContaining({ installationId: INSTALLATION_ID, state: 'active' }),
+      expect.anything()
     );
     expect(mockedBindGitHubIntegrationToCanonicalInstallation).toHaveBeenCalledWith(
       {
@@ -1294,9 +1300,108 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       expect(response.status).toBe(307);
       expectRedirectLocation(response, '/github-app?error=installation_already_claimed');
       expect(mockedBindGitHubIntegrationToCanonicalInstallation).not.toHaveBeenCalled();
+      // The guard runs before the write, so nothing was committed for the
+      // caller either.
+      await expect(
+        db
+          .select()
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.owned_by_user_id, USER_ID),
+              eq(platform_integrations.platform_installation_id, INSTALLATION_ID)
+            )
+          )
+      ).resolves.toHaveLength(0);
     } finally {
       await db.delete(platform_integrations).where(eq(platform_integrations.id, competitor.id));
       await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+
+  test('rolls back the legacy write when the canonical bind fails', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
+    const actualPlatformIntegrations = jest.requireActual<typeof PlatformIntegrationsModule>(
+      '@/lib/integrations/db/platform-integrations'
+    );
+    mockedUpsertPlatformIntegrationForOwner.mockImplementation(
+      actualPlatformIntegrations.upsertPlatformIntegrationForOwner
+    );
+    mockedBindGitHubIntegrationToCanonicalInstallation.mockRejectedValueOnce(
+      new Error('bind failed')
+    );
+
+    const legacyOwnerId = `oauth/cb-legacy-bind-${randomUUID()}`;
+    await db.insert(kilocode_users).values({
+      id: legacyOwnerId,
+      google_user_email: `cb-legacy-bind-${randomUUID()}@example.com`,
+      google_user_name: 'Legacy Bind Owner',
+      google_user_image_url: '',
+      stripe_customer_id: 'cus_cb_legacy_bind',
+    });
+
+    try {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: {
+          id: legacyOwnerId,
+          google_user_email: 'cb-legacy-bind@example.com',
+          google_user_name: 'Legacy Bind Owner',
+        },
+        authFailedResponse: null,
+      } as never);
+      mockConsumedInstallState({
+        token: DB_TOKEN,
+        kilo_user_id: legacyOwnerId,
+        owner_type: 'user',
+        owner_id: legacyOwnerId,
+        github_app_type: 'standard',
+        return_to: '/github-app',
+        expires_at: new Date(Date.now() + 300_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
+        ) as never
+      );
+      // The failed bind surfaces through the callback's generic error path...
+      expect(response.status).toBe(307);
+      expectRedirectLocation(response, '/?error=installation_failed');
+      expect(mockedBindGitHubIntegrationToCanonicalInstallation).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything()
+      );
+
+      // The write ran inside the caller's transaction (not its own), which is
+      // what makes the rollback below possible.
+      expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ platformInstallationId: INSTALLATION_ID }),
+        expect.anything()
+      );
+
+      // The write and the bind share one transaction, so the failed bind
+      // leaves no committed active-but-unbound association behind.
+      await expect(
+        db
+          .select()
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.owned_by_user_id, legacyOwnerId),
+              eq(platform_integrations.platform_installation_id, INSTALLATION_ID)
+            )
+          )
+      ).resolves.toHaveLength(0);
+    } finally {
+      mockedUpsertPlatformIntegrationForOwner.mockImplementation(async () => ({ ok: true }));
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_user_id, legacyOwnerId));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, legacyOwnerId));
     }
   });
 });
@@ -1441,7 +1546,8 @@ describe('GET /api/integrations/github/callback admin proof', () => {
       expect.objectContaining({
         kiloUserId: USER_ID,
         githubUserId: GITHUB_USER_ID,
-      })
+      }),
+      expect.anything()
     );
   });
 

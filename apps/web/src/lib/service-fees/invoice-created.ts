@@ -25,6 +25,7 @@ import {
   SERVICE_FEE_FAILURE_APPLICATION,
 } from '@/lib/service-fees/checkout';
 import {
+  getInvoiceLineInvoiceItemId,
   isEligibleKiloPassInvoiceLine,
   isServiceFeeInvoiceLine,
   listAllInvoiceLineItems,
@@ -177,7 +178,9 @@ export async function handleKiloPassInvoiceCreated(params: {
         chargedFeeMinor: Math.max(0, existingFeeLine.amount),
         stripeIds: {
           ...stripeIds,
-          stripeInvoiceFeeLineItemId: existingFeeLine.id,
+          stripeInvoiceFeeItemId: getInvoiceLineInvoiceItemId(existingFeeLine),
+          stripeInvoiceFeeLineItemId:
+            params.invoice.status === 'draft' ? undefined : existingFeeLine.id,
         },
         now,
       });
@@ -242,7 +245,7 @@ export async function handleKiloPassInvoiceCreated(params: {
         chargedFeeMinor: decision.expectedFeeMinor,
         stripeIds: {
           ...stripeIds,
-          stripeInvoiceFeeLineItemId: item.id,
+          stripeInvoiceFeeItemId: item.id,
         },
         now,
       });

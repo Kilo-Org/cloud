@@ -233,7 +233,8 @@ describe('handleKiloPassInvoiceCreated', () => {
     expect(result.assessment).toMatchObject({
       outcome: 'charged',
       chargedFeeMinor: 245,
-      stripeInvoiceFeeLineItemId: 'ii_fee',
+      stripeInvoiceFeeItemId: 'ii_fee',
+      stripeInvoiceFeeLineItemId: null,
       eligibilityCreatedAt: new Date(ACTIVATION * 1000).toISOString(),
     });
     expect(create).toHaveBeenCalledTimes(1);
@@ -561,7 +562,8 @@ describe('handleKiloPassInvoiceCreated', () => {
       outcome: 'charged',
       chargedFeeMinor: 245,
       stripeInvoiceId: 'in_test',
-      stripeInvoiceFeeLineItemId: 'ii_fee',
+      stripeInvoiceFeeItemId: 'ii_fee',
+      stripeInvoiceFeeLineItemId: null,
     });
     expect(create).toHaveBeenCalledTimes(1);
   });

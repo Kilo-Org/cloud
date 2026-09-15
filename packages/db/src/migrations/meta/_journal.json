@@ -1709,6 +1709,13 @@
       "when": 1789395510978,
       "tag": "0243_ambiguous_namor",
       "breakpoints": true
+    },
+    {
+      "idx": 244,
+      "version": "7",
+      "when": 1789488522138,
+      "tag": "0244_many_vermin",
+      "breakpoints": true
     }
   ]
 }

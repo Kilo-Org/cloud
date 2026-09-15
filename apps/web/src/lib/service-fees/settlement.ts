@@ -24,6 +24,7 @@ import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@/lib/service-fees/constant
 import { createInvoiceServiceFeeAssessmentKey } from '@/lib/service-fees/checkout';
 import { applyDeferredServiceFeeRefunds } from '@/lib/service-fees/refunds';
 import {
+  getInvoiceLineInvoiceItemId,
   isServiceFeeInvoiceLine,
   listAllInvoiceLineItems,
   sumEligibleKiloPassSubtotalMinor,
@@ -167,6 +168,8 @@ export async function settleKiloPassInvoiceServiceFee(params: {
         chargedFeeMinor: observedFeeMinor,
         stripeIds: {
           ...stripeIds,
+          stripeInvoiceFeeItemId:
+            (feeLine && getInvoiceLineInvoiceItemId(feeLine)) ?? current.stripeInvoiceFeeItemId,
           stripeInvoiceFeeLineItemId: feeLine?.id ?? current.stripeInvoiceFeeLineItemId,
         },
         now,
@@ -191,6 +194,8 @@ export async function settleKiloPassInvoiceServiceFee(params: {
     chargedFeeMinor: current.outcome === 'charged' ? observedFeeMinor : 0,
     stripeIds: {
       ...stripeIds,
+      stripeInvoiceFeeItemId:
+        (feeLine && getInvoiceLineInvoiceItemId(feeLine)) ?? current.stripeInvoiceFeeItemId,
       stripeInvoiceFeeLineItemId: feeLine?.id ?? current.stripeInvoiceFeeLineItemId,
     },
     now,
@@ -306,12 +311,25 @@ function findFeeLine(
   );
   if (byAssessmentKey) return byAssessmentKey;
 
-  const byMetadata = lines.find(isServiceFeeInvoiceLine);
-  if (byMetadata) return byMetadata;
+  const invoiceItemId = nonempty(assessment.stripeInvoiceFeeItemId);
+  if (invoiceItemId) {
+    const byInvoiceItem = lines.find(line => getInvoiceLineInvoiceItemId(line) === invoiceItemId);
+    if (byInvoiceItem) return byInvoiceItem;
+  }
+
+  const invoiceLineItemId = nonempty(assessment.stripeInvoiceFeeLineItemId);
+  if (invoiceLineItemId) {
+    const byInvoiceLineItem = lines.find(line => line.id === invoiceLineItemId);
+    if (byInvoiceLineItem) return byInvoiceLineItem;
+  }
 
   const feePriceId = nonempty(assessment.stripeFeePriceId);
-  if (!feePriceId) return undefined;
-  return lines.find(line => invoiceLinePriceId(line) === feePriceId);
+  if (feePriceId) {
+    const byFeePrice = lines.find(line => invoiceLinePriceId(line) === feePriceId);
+    if (byFeePrice) return byFeePrice;
+  }
+
+  return lines.find(isServiceFeeInvoiceLine);
 }
 
 function invoiceLinePriceId(line: Stripe.InvoiceLineItem): string | null {

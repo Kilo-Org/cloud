@@ -11563,6 +11563,7 @@ export const stripe_service_fee_assessments = pgTable(
     stripe_charge_id: text(),
     stripe_fee_price_id: text(),
     stripe_checkout_fee_line_item_id: text(),
+    stripe_invoice_fee_item_id: text(),
     stripe_invoice_fee_line_item_id: text(),
     eligibility_created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     eligible_subtotal_minor: integer().notNull(),
@@ -11622,6 +11623,9 @@ export const stripe_service_fee_assessments = pgTable(
     uniqueIndex('UQ_stripe_service_fee_assessments_checkout_fee_line_item_id')
       .on(table.stripe_checkout_fee_line_item_id)
       .where(isNotNull(table.stripe_checkout_fee_line_item_id)),
+    uniqueIndex('UQ_stripe_service_fee_assessments_invoice_fee_item_id')
+      .on(table.stripe_invoice_fee_item_id)
+      .where(isNotNull(table.stripe_invoice_fee_item_id)),
     uniqueIndex('UQ_stripe_service_fee_assessments_invoice_fee_line_item_id')
       .on(table.stripe_invoice_fee_line_item_id)
       .where(isNotNull(table.stripe_invoice_fee_line_item_id)),
@@ -11676,7 +11680,8 @@ export const stripe_service_fee_assessments = pgTable(
       'stripe_service_fee_assessments_charged_check',
       sql`${table.outcome} <> 'charged' OR (
         (
-          ${table.stripe_invoice_fee_line_item_id} IS NOT NULL
+          ${table.stripe_invoice_fee_item_id} IS NOT NULL
+          OR ${table.stripe_invoice_fee_line_item_id} IS NOT NULL
           OR ${table.stripe_checkout_fee_line_item_id} IS NOT NULL
           OR ${table.settled_at} IS NOT NULL
         )

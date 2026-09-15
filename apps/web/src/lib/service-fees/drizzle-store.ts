@@ -276,6 +276,7 @@ function toAssessmentRecord(row: StripeServiceFeeAssessment): ServiceFeeAssessme
     stripeChargeId: row.stripe_charge_id,
     stripeFeePriceId: row.stripe_fee_price_id,
     stripeCheckoutFeeLineItemId: row.stripe_checkout_fee_line_item_id,
+    stripeInvoiceFeeItemId: row.stripe_invoice_fee_item_id,
     stripeInvoiceFeeLineItemId: row.stripe_invoice_fee_line_item_id,
     eligibilityCreatedAt: toServiceFeeTimestamp(row.eligibility_created_at),
     eligibleSubtotalMinor: row.eligible_subtotal_minor,
@@ -312,6 +313,7 @@ function toAssessmentInsert(record: ServiceFeeAssessmentRecord): NewStripeServic
     stripe_charge_id: nullableText(record.stripeChargeId),
     stripe_fee_price_id: nullableText(record.stripeFeePriceId),
     stripe_checkout_fee_line_item_id: nullableText(record.stripeCheckoutFeeLineItemId),
+    stripe_invoice_fee_item_id: nullableText(record.stripeInvoiceFeeItemId),
     stripe_invoice_fee_line_item_id: nullableText(record.stripeInvoiceFeeLineItemId),
     eligibility_created_at: record.eligibilityCreatedAt,
     eligible_subtotal_minor: record.eligibleSubtotalMinor,
@@ -365,6 +367,9 @@ function toAssessmentUpdate(
   }
   if (patch.stripeCheckoutFeeLineItemId !== undefined) {
     set.stripe_checkout_fee_line_item_id = nullableText(patch.stripeCheckoutFeeLineItemId);
+  }
+  if (patch.stripeInvoiceFeeItemId !== undefined) {
+    set.stripe_invoice_fee_item_id = nullableText(patch.stripeInvoiceFeeItemId);
   }
   if (patch.stripeInvoiceFeeLineItemId !== undefined) {
     set.stripe_invoice_fee_line_item_id = nullableText(patch.stripeInvoiceFeeLineItemId);
@@ -449,6 +454,11 @@ function assessmentUpdateGuard(assessmentKey: string, patch: Partial<ServiceFeeA
       /* allowNullToValue */ true
     ),
     immutableTextGuard(
+      stripe_service_fee_assessments.stripe_invoice_fee_item_id,
+      patch.stripeInvoiceFeeItemId,
+      /* allowNullToValue */ true
+    ),
+    immutableTextGuard(
       stripe_service_fee_assessments.stripe_invoice_fee_line_item_id,
       patch.stripeInvoiceFeeLineItemId,
       /* allowNullToValue */ true
@@ -467,6 +477,7 @@ function immutableTextGuard(
     | typeof stripe_service_fee_assessments.stripe_charge_id
     | typeof stripe_service_fee_assessments.stripe_fee_price_id
     | typeof stripe_service_fee_assessments.stripe_checkout_fee_line_item_id
+    | typeof stripe_service_fee_assessments.stripe_invoice_fee_item_id
     | typeof stripe_service_fee_assessments.stripe_invoice_fee_line_item_id,
   incoming: string | null | undefined,
   allowNullToValue: boolean

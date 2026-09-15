@@ -320,17 +320,27 @@ describe('service fee assessment transitions', () => {
     const linked = await linkServiceFeeAssessmentStripeIds({
       store,
       assessmentKey: pending.assessmentKey,
-      stripeIds: { stripeChargeId: 'ch_1', stripePaymentIntentId: 'pi_1' },
+      stripeIds: {
+        stripeChargeId: 'ch_1',
+        stripePaymentIntentId: 'pi_1',
+        stripeInvoiceFeeItemId: 'ii_fee',
+      },
     });
     const again = await linkServiceFeeAssessmentStripeIds({
       store,
       assessmentKey: pending.assessmentKey,
-      stripeIds: { stripeChargeId: 'ch_1', stripeInvoiceId: 'in_1' },
+      stripeIds: {
+        stripeChargeId: 'ch_1',
+        stripeInvoiceId: 'in_1',
+        stripeInvoiceFeeLineItemId: 'il_fee',
+      },
     });
 
     expect(again.stripeChargeId).toBe('ch_1');
     expect(again.stripePaymentIntentId).toBe('pi_1');
     expect(again.stripeInvoiceId).toBe('in_1');
+    expect(again.stripeInvoiceFeeItemId).toBe('ii_fee');
+    expect(again.stripeInvoiceFeeLineItemId).toBe('il_fee');
     expect(linked.assessmentKey).toBe(again.assessmentKey);
 
     await expect(
@@ -340,6 +350,14 @@ describe('service fee assessment transitions', () => {
         stripeIds: { stripeChargeId: 'ch_other' },
       })
     ).rejects.toMatchObject({ reason: 'stripe_id' });
+
+    await expect(
+      linkServiceFeeAssessmentStripeIds({
+        store,
+        assessmentKey: pending.assessmentKey,
+        stripeIds: { stripeInvoiceFeeItemId: 'ii_other' },
+      })
+    ).rejects.toMatchObject({ reason: 'stripe_id', field: 'stripeInvoiceFeeItemId' });
   });
 });
 

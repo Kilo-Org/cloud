@@ -645,7 +645,8 @@ describe('auto-top-up invoice fee attachment', () => {
     expect(charged).toMatchObject({
       outcome: 'charged',
       chargedFeeMinor: 2_500,
-      stripeInvoiceFeeLineItemId: 'ii_fee',
+      stripeInvoiceFeeItemId: 'ii_fee',
+      stripeInvoiceFeeLineItemId: null,
     });
   });
 });

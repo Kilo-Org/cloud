@@ -2494,7 +2494,8 @@ describe('organization Kilo Pass seat-capacity fee preparation', () => {
       outcome: 'charged',
       chargedFeeMinor: 150,
       stripeInvoiceId: 'in_actual',
-      stripeInvoiceFeeLineItemId: 'ii_fee',
+      stripeInvoiceFeeItemId: 'ii_fee',
+      stripeInvoiceFeeLineItemId: null,
     });
   });
 });

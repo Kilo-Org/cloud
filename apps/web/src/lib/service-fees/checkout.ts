@@ -536,7 +536,7 @@ export async function attachPreparedAutoTopUpInvoiceFee(params: {
       stripeIds: {
         stripeCustomerId: params.prepared.decision.stripeCustomerId,
         stripeInvoiceId: params.prepared.invoiceId,
-        stripeInvoiceFeeLineItemId: item.id,
+        stripeInvoiceFeeItemId: item.id,
       },
       now,
     });
@@ -1178,6 +1178,7 @@ function identifyFeeLine(lines: readonly Stripe.LineItem[]): FeeLineIdentity {
 function hasTrustedTopUpFeeLineIdentity(assessment: ServiceFeeAssessmentRecord): boolean {
   return Boolean(
     assessment.stripeCheckoutFeeLineItemId ||
+    assessment.stripeInvoiceFeeItemId ||
     assessment.stripeInvoiceFeeLineItemId ||
     assessment.stripeFeePriceId
   );

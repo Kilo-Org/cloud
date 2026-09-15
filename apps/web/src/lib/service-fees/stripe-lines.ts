@@ -88,6 +88,11 @@ export function isServiceFeeInvoiceLine(line: Stripe.InvoiceLineItem): boolean {
   return isServiceFeeMetadata(line.metadata);
 }
 
+export function getInvoiceLineInvoiceItemId(line: Stripe.InvoiceLineItem): string | null {
+  const invoiceItemId = line.parent?.invoice_item_details?.invoice_item;
+  return typeof invoiceItemId === 'string' && invoiceItemId.trim() ? invoiceItemId : null;
+}
+
 export function isServiceFeeCheckoutLine(line: CheckoutLineLike): boolean {
   if ('price_data' in line && isServiceFeeMetadata(line.price_data?.product_data?.metadata)) {
     return true;

@@ -14,6 +14,7 @@ import {
 } from '@/lib/service-fees/assessments';
 import { calculateCumulativeFeeRefundMinor } from '@/lib/service-fees/calculation';
 import {
+  getInvoiceLineInvoiceItemId,
   isKiloClawInvoiceLine,
   isSeatInvoiceLine,
   isServiceFeeInvoiceLine,
@@ -764,7 +765,13 @@ function classifyCreditNoteLine(
   if (!invoiceLine) {
     return assessment.stripeInvoiceFeeLineItemId ? 'product' : 'unknown';
   }
-  if (isServiceFeeInvoiceLine(invoiceLine)) return 'fee';
+  if (
+    isServiceFeeInvoiceLine(invoiceLine) ||
+    (assessment.stripeInvoiceFeeItemId !== null &&
+      getInvoiceLineInvoiceItemId(invoiceLine) === assessment.stripeInvoiceFeeItemId)
+  ) {
+    return 'fee';
+  }
   if (isSeatInvoiceLine(invoiceLine) || isKiloClawInvoiceLine(invoiceLine)) return 'ignored';
   return 'product';
 }

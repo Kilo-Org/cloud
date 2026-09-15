@@ -28,6 +28,7 @@ import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
 import { getEffectiveOrganizationServiceFeeExemption } from '@/lib/service-fees/organization-exemptions';
 import {
   buildServiceFeeCommercialMetadata,
+  getInvoiceLineInvoiceItemId,
   isEligibleKiloPassInvoiceLine,
   isServiceFeeInvoiceLine,
   isServiceFeeMetadata,
@@ -614,7 +615,10 @@ export async function attachPreparedOrganizationKiloPassServiceFee(input: {
         chargedFeeMinor: Math.max(0, existingFeeLine.amount),
         stripeIds: {
           ...stripeIds,
-          stripeInvoiceFeeLineItemId: existingFeeLine.id,
+          stripeInvoiceFeeItemId:
+            getInvoiceLineInvoiceItemId(existingFeeLine) ?? input.pendingInvoiceItemId,
+          stripeInvoiceFeeLineItemId:
+            input.invoice.status === 'draft' ? undefined : existingFeeLine.id,
         },
         now,
       });
@@ -652,7 +656,7 @@ export async function attachPreparedOrganizationKiloPassServiceFee(input: {
       chargedFeeMinor: prepared.expectedFeeMinor,
       stripeIds: {
         ...stripeIds,
-        stripeInvoiceFeeLineItemId: item.id,
+        stripeInvoiceFeeItemId: item.id,
       },
       now,
     });

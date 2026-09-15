@@ -122,7 +122,7 @@ describe('drizzle service fee assessment store', () => {
       store: assessments,
       assessmentKey,
       chargedFeeMinor: 400,
-      stripeIds: { stripeCheckoutFeeLineItemId: 'li_fee_discounted' },
+      stripeIds: { stripeInvoiceFeeItemId: 'ii_fee_discounted' },
     });
     expect(charged).toMatchObject({
       outcome: 'charged',
@@ -137,6 +137,7 @@ describe('drizzle service fee assessment store', () => {
       settledProductMinor: 8_000,
       grossPaidMinor: 8_400,
       chargedFeeMinor: 400,
+      stripeIds: { stripeInvoiceFeeLineItemId: 'il_fee_discounted' },
     });
     const refunded = await observeServiceFeeAssessmentRefunds({
       store: assessments,
@@ -152,6 +153,10 @@ describe('drizzle service fee assessment store', () => {
     });
 
     expect(settled.settledAt).toBe('2026-09-01T01:00:00.000Z');
+    expect(settled).toMatchObject({
+      stripeInvoiceFeeItemId: 'ii_fee_discounted',
+      stripeInvoiceFeeLineItemId: 'il_fee_discounted',
+    });
     expect(refunded).toMatchObject({
       refundedProductMinor: 2_000,
       refundedFeeMinor: 100,

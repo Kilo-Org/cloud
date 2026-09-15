@@ -14,6 +14,7 @@ import {
 import {
   buildServiceFeeLineMetadata,
   getEligibleKiloPassSubtotalMinor,
+  getInvoiceLineInvoiceItemId,
   isEligibleKiloPassInvoiceLine,
   isKiloClawInvoiceLine,
   isKnownKiloPassInvoiceLine,
@@ -100,6 +101,28 @@ function invoiceWithLines(
 }
 
 describe('service fee metadata and line classifiers', () => {
+  test('extracts only a backing InvoiceItem identity', () => {
+    expect(
+      getInvoiceLineInvoiceItemId(
+        invoiceLine({
+          parent: {
+            invoice_item_details: { invoice_item: 'ii_fee' },
+          } as Stripe.InvoiceLineItem['parent'],
+        })
+      )
+    ).toBe('ii_fee');
+    expect(getInvoiceLineInvoiceItemId(invoiceLine({ parent: null }))).toBeNull();
+    expect(
+      getInvoiceLineInvoiceItemId(
+        invoiceLine({
+          parent: {
+            subscription_item_details: { subscription_item: 'si_pass' },
+          } as Stripe.InvoiceLineItem['parent'],
+        })
+      )
+    ).toBeNull();
+  });
+
   test('recognizes namespaced fee metadata and ignores description-only lines', () => {
     const metadata = buildServiceFeeLineMetadata('checkout:abc');
     expect(metadata).toEqual({

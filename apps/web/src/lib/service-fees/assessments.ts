@@ -72,6 +72,7 @@ export type ServiceFeeStripeIds = {
   stripeChargeId?: string | null;
   stripeFeePriceId?: string | null;
   stripeCheckoutFeeLineItemId?: string | null;
+  stripeInvoiceFeeItemId?: string | null;
   stripeInvoiceFeeLineItemId?: string | null;
 };
 
@@ -83,6 +84,7 @@ const STRIPE_ID_FIELDS = [
   'stripeChargeId',
   'stripeFeePriceId',
   'stripeCheckoutFeeLineItemId',
+  'stripeInvoiceFeeItemId',
   'stripeInvoiceFeeLineItemId',
 ] as const satisfies readonly (keyof ServiceFeeStripeIds)[];
 
@@ -101,6 +103,7 @@ export type ServiceFeeAssessmentRecord = {
   stripeChargeId: string | null;
   stripeFeePriceId: string | null;
   stripeCheckoutFeeLineItemId: string | null;
+  stripeInvoiceFeeItemId: string | null;
   stripeInvoiceFeeLineItemId: string | null;
   eligibilityCreatedAt: string;
   eligibleSubtotalMinor: number;
@@ -299,6 +302,7 @@ function mergeStripeIds(
     stripeChargeId: existing.stripeChargeId,
     stripeFeePriceId: existing.stripeFeePriceId,
     stripeCheckoutFeeLineItemId: existing.stripeCheckoutFeeLineItemId,
+    stripeInvoiceFeeItemId: existing.stripeInvoiceFeeItemId,
     stripeInvoiceFeeLineItemId: existing.stripeInvoiceFeeLineItemId,
   };
 
@@ -464,6 +468,7 @@ function buildNewAssessmentRecord(params: {
     stripeChargeId: stripeIds.stripeChargeId ?? null,
     stripeFeePriceId: stripeIds.stripeFeePriceId ?? null,
     stripeCheckoutFeeLineItemId: stripeIds.stripeCheckoutFeeLineItemId ?? null,
+    stripeInvoiceFeeItemId: stripeIds.stripeInvoiceFeeItemId ?? null,
     stripeInvoiceFeeLineItemId: stripeIds.stripeInvoiceFeeLineItemId ?? null,
     eligibilityCreatedAt: params.decision.eligibilityCreatedAt,
     eligibleSubtotalMinor: params.decision.eligibleSubtotalMinor,

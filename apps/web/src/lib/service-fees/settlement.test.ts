@@ -190,6 +190,7 @@ async function persistCheckoutAssessment(
     eligibleSubtotalMinor: number;
     invoiceId?: string | null;
     chargedFeeMinor?: number;
+    invoiceFeeItemId?: string;
   }
 ) {
   const decision = await prepareServiceFeeAssessmentDecision({
@@ -208,6 +209,7 @@ async function persistCheckoutAssessment(
       stripeCustomerId: 'cus_1',
       stripeInvoiceId: input.invoiceId === undefined ? 'in_paid' : input.invoiceId,
       stripeCheckoutSessionId: 'cs_1',
+      stripeInvoiceFeeItemId: input.invoiceFeeItemId,
     },
   });
   if (input.chargedFeeMinor !== undefined) {
@@ -446,19 +448,25 @@ describe('settleKiloPassInvoiceServiceFee', () => {
     );
   });
 
-  test('links invoice, payment intent, and charge ids and is idempotent', async () => {
+  test('reconciles distinct InvoiceItem and finalized line identities idempotently', async () => {
     const store = createMemorySettlementStore();
     const assessmentKey = createInvoiceServiceFeeAssessmentKey('in_ids');
     await persistCheckoutAssessment(store, {
       assessmentKey,
       eligibleSubtotalMinor: 4_900,
       invoiceId: 'in_ids',
+      invoiceFeeItemId: 'ii_fee',
     });
 
     const invoice = paidInvoice(
       [
         pricedLine(KILO_PASS_PRICE_ID, 4_900, { id: 'il_pass' }),
-        feeLine(assessmentKey, 245, { id: 'il_fee' }),
+        feeLine(assessmentKey, 245, {
+          id: 'il_fee',
+          parent: {
+            invoice_item_details: { invoice_item: 'ii_fee' },
+          } as Stripe.InvoiceLineItem['parent'],
+        }),
       ],
       { id: 'in_ids', amount_paid: 5_145 }
     );
@@ -491,6 +499,7 @@ describe('settleKiloPassInvoiceServiceFee', () => {
       stripeInvoiceId: 'in_ids',
       stripePaymentIntentId: 'pi_1',
       stripeChargeId: 'ch_1',
+      stripeInvoiceFeeItemId: 'ii_fee',
       stripeInvoiceFeeLineItemId: 'il_fee',
       settledAt: new Date((ACTIVATION + 10) * 1000).toISOString(),
     });

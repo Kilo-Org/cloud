@@ -103,6 +103,7 @@ async function persistChargedAssessment(
     stripeChargeId?: string | null;
     stripePaymentIntentId?: string | null;
     stripeInvoiceId?: string | null;
+    stripeInvoiceFeeItemId?: string | null;
     stripeInvoiceFeeLineItemId?: string | null;
   } = {
     stripeChargeId: CHARGE_ID,
@@ -139,6 +140,7 @@ async function persistSettledAssessment(
     stripeChargeId?: string | null;
     stripePaymentIntentId?: string | null;
     stripeInvoiceId?: string | null;
+    stripeInvoiceFeeItemId?: string | null;
     stripeInvoiceFeeLineItemId?: string | null;
   } = {
     stripeChargeId: CHARGE_ID,
@@ -194,7 +196,12 @@ function charge(
   };
 }
 
-function invoiceLine(id: string, amount: number, fee: boolean): Stripe.InvoiceLineItem {
+function invoiceLine(
+  id: string,
+  amount: number,
+  fee: boolean,
+  invoiceItemId?: string
+): Stripe.InvoiceLineItem {
   return {
     id,
     object: 'line_item',
@@ -214,7 +221,11 @@ function invoiceLine(id: string, amount: number, fee: boolean): Stripe.InvoiceLi
           serviceFeeRateBasisPoints: String(SERVICE_FEE_RATE_BASIS_POINTS),
         }
       : {},
-    parent: null,
+    parent: invoiceItemId
+      ? ({
+          invoice_item_details: { invoice_item: invoiceItemId },
+        } as Stripe.InvoiceLineItem['parent'])
+      : null,
     period: { start: 1, end: 2 },
     pretax_credit_amounts: null,
     pricing: null,
@@ -633,7 +644,13 @@ describe('observeServiceFeeChargeRefunded', () => {
 
   test('uses credit-note line allocation to resolve a previously unresolved partial refund', async () => {
     const store = createMemoryRefundStore();
-    await persistSettledAssessment(store);
+    await persistSettledAssessment(store, {
+      stripeChargeId: CHARGE_ID,
+      stripePaymentIntentId: PAYMENT_INTENT_ID,
+      stripeInvoiceId: INVOICE_ID,
+      stripeInvoiceFeeItemId: 'ii_fee_1',
+      stripeInvoiceFeeLineItemId: FEE_LINE_ID,
+    });
     const sendAlert = jest.fn(
       async (_input: UnresolvedServiceFeeRefundAllocationAlertInput) => undefined
     );
@@ -674,6 +691,8 @@ describe('observeServiceFeeChargeRefunded', () => {
       refundedProductMinor: 2_000,
       refundedFeeMinor: 100,
       refundedGrossMinor: 2_100,
+      stripeInvoiceFeeItemId: 'ii_fee_1',
+      stripeInvoiceFeeLineItemId: FEE_LINE_ID,
       metadata: {},
     });
 
@@ -685,6 +704,39 @@ describe('observeServiceFeeChargeRefunded', () => {
     expect(retry.assessment).toMatchObject({
       refundedProductMinor: 2_000,
       refundedFeeMinor: 100,
+    });
+  });
+
+  test('classifies a fee line by its backing InvoiceItem when line metadata is absent', async () => {
+    const store = createMemoryRefundStore();
+    await persistSettledAssessment(store, {
+      stripeChargeId: CHARGE_ID,
+      stripePaymentIntentId: PAYMENT_INTENT_ID,
+      stripeInvoiceId: INVOICE_ID,
+      stripeInvoiceFeeItemId: 'ii_fee_1',
+    });
+    const note = creditNote({
+      id: 'cn_invoice_item',
+      lines: [
+        creditNoteLine('cnli_product', PRODUCT_LINE_ID, 2_000),
+        creditNoteLine('cnli_fee', FEE_LINE_ID, 100),
+      ],
+    });
+    const stripe = createStripeMock({
+      creditNotes: [note],
+      invoiceLines: [
+        invoiceLine(PRODUCT_LINE_ID, 10_000, false),
+        invoiceLine(FEE_LINE_ID, 500, false, 'ii_fee_1'),
+      ],
+    });
+
+    const allocated = await observeServiceFeeCreditNote({ store, creditNote: note, stripe });
+
+    expect(allocated.assessment).toMatchObject({
+      refundedProductMinor: 2_000,
+      refundedFeeMinor: 100,
+      stripeInvoiceFeeItemId: 'ii_fee_1',
+      stripeInvoiceFeeLineItemId: null,
     });
   });
 

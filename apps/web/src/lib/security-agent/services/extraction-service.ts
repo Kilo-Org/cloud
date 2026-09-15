@@ -15,8 +15,6 @@ import type { SecurityFinding } from '@kilocode/db/schema';
 import type { SecurityFindingSandboxAnalysis, SandboxSuggestedAction } from '../core/types';
 import { addBreadcrumb, captureException, startSpan } from '@sentry/nextjs';
 import { sentryLogger } from '@/lib/utils.server';
-import { emitApiMetrics } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { O11Y_KILO_GATEWAY_CLIENT_SECRET } from '@/lib/config.server';
 import { DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL } from '../core/constants';
 
 const VALID_SUGGESTED_ACTIONS: SandboxSuggestedAction[] = [
@@ -266,7 +264,6 @@ function createFallbackExtraction(
  * @param options.authToken - Auth token for the LLM proxy
  * @param options.model - Model to use for extraction (defaults to DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL)
  * @param options.correlationId - Correlation ID for tracing across the analysis pipeline
- * @param options.userId - User ID for metrics tracking
  * @param options.organizationId - Optional organization ID for usage tracking
  */
 export async function extractSandboxAnalysis(options: {
@@ -275,7 +272,6 @@ export async function extractSandboxAnalysis(options: {
   authToken: string;
   model?: string;
   correlationId?: string;
-  userId?: string;
   organizationId?: string;
 }): Promise<SecurityFindingSandboxAnalysis> {
   const {
@@ -284,7 +280,6 @@ export async function extractSandboxAnalysis(options: {
     authToken,
     model = DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
     correlationId = '',
-    userId = '',
     organizationId,
   } = options;
   log('Starting extraction', { correlationId, findingId: finding.id });
@@ -361,37 +356,6 @@ export async function extractSandboxAnalysis(options: {
         if (usage) {
           span.setAttribute('security_agent.input_tokens', usage.prompt_tokens);
           span.setAttribute('security_agent.output_tokens', usage.completion_tokens);
-        }
-
-        // Emit API metrics (only if o11y client secret is configured)
-        if (usage && userId && O11Y_KILO_GATEWAY_CLIENT_SECRET) {
-          const responseToolCalls = result.data.choices?.[0]?.message?.tool_calls ?? [];
-          const toolsUsed = responseToolCalls
-            .filter(tc => tc.type === 'function')
-            .map(tc => `function:${tc.function.name}`);
-
-          emitApiMetrics({
-            clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
-            kiloUserId: userId,
-            organizationId,
-            isAnonymous: false,
-            isStreaming: false,
-            userByok: false,
-            mode: 'security-agent-extraction',
-            provider: 'anthropic',
-            requestedModel: model,
-            resolvedModel: model,
-            toolsAvailable: ['function:submit_analysis_extraction'],
-            toolsUsed,
-            ttfbMs: durationMs,
-            completeRequestMs: durationMs,
-            statusCode: 200,
-            tokens: {
-              inputTokens: usage.prompt_tokens,
-              outputTokens: usage.completion_tokens,
-              totalTokens: usage.total_tokens,
-            },
-          });
         }
 
         const choice = result.data.choices?.[0];

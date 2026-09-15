@@ -26,8 +26,6 @@ import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openro
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
   extractTranscriptionPromptInfo,
@@ -334,25 +332,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;
   usageContext.status_code = response.status;
-
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: false,
-      isStreaming: false,
-      userByok: !!userByok,
-      provider: provider.id,
-      requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(requestedModelLowerCased),
-      toolsAvailable: [],
-      toolsUsed: [],
-      ttfbMs,
-      statusCode: response.status,
-    },
-    response.clone(),
-    requestStartedAt
-  );
 
   if (response.status === 402 && !userByok) {
     await captureProxyError({

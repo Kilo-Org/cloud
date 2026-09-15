@@ -16,7 +16,6 @@ import {
   getOpenRouterModelsFromDatabase,
   isValidOpenRouterModelId,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { redisClient } from '@/lib/redis';
 import { ReasoningDetailsTransform, type Provider } from '@/lib/ai-gateway/providers/types';
@@ -85,11 +84,6 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache');
 jest.mock('@/lib/redis', () => ({
   redisClient: { get: jest.fn(), set: jest.fn() },
 }));
-jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
-  emitApiMetricsForResponse: jest.fn(),
-  getToolsAvailable: jest.fn(() => false),
-  getToolsUsed: jest.fn(() => false),
-}));
 jest.mock('@/lib/ai-gateway/rewriteModelResponse', () => {
   const actual = jest.requireActual('@/lib/ai-gateway/rewriteModelResponse');
   const { wrapInSafeNextResponse } = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
@@ -140,7 +134,6 @@ const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
 const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
-const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 const mockedRedisGet = jest.mocked(redisClient.get);
 const mockedRedisSet = jest.mocked(redisClient.set);
@@ -329,7 +322,6 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       type: 'success',
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
-    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
   });
 
@@ -504,7 +496,6 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
       type: 'success',
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
-    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
   });
 
@@ -1037,7 +1028,6 @@ describe('kilo-auto/efficient classifier billing', () => {
         choices: [],
       }),
     });
-    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
     mockedLogMicrodollarUsage.mockResolvedValue(null);
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
@@ -1489,7 +1479,6 @@ describe('auto-routing shadow classifier', () => {
       type: 'success',
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
-    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
     mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
       if (opts.efficientDecision) await opts.efficientDecision();
@@ -1530,7 +1519,6 @@ describe('percentage-routed partner fallback', () => {
     mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
-    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
   });
 
@@ -1593,11 +1581,6 @@ describe('percentage-routed partner fallback', () => {
           status_code: partnerStatus,
           body: 'partner failed',
         }
-      );
-      expect(mockedEmitApiMetricsForResponse).toHaveBeenCalledWith(
-        expect.objectContaining({ provider: sourceProvider.id, statusCode: 200 }),
-        expect.any(Response),
-        expect.any(Number)
       );
       expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
         provider: sourceProvider.id,

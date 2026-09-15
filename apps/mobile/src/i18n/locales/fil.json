@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Gamitin ang modelong Kilo Gateway sa pagsasalin ng boses sa teksto imbes na ang pagkilala sa tinig ng device. Ipinapadala sa Kilo Gateway ang iyong recording.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Pagsama-samahin ang tawag ng kagamitan",
-    "condenseToolCallsSubtitle": "Pagsama-samahin ang magkakasunod na tawag ng kagamitan sa isang hilera na mabubuksan mo."
+    "condenseToolCallsSubtitle": "Pagsama-samahin ang magkakasunod na tawag ng kagamitan sa isang hilera na mabubuksan mo.",
+    "toolSummaryTranslation": "Isalin ang mga buod ng kasangkapan",
+    "toolSummaryTranslationSubtitle": "Ipadala ang bawat buod ng kasangkapan sa isang modelo upang isalin ito sa wika ng iyong app. Ipinapakita ang orihinal kung mabigo ang pagsasalin.",
+    "toolSummaryTranslationModelUnavailableNotice": "Hindi na inaalok ang modelong ito. I-tap ang $t(common.model) para pumili ng iba."
   },
   "prReview": {
     "pullRequestUnavailable": "Hindi mabuksan ang pull request",

@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Transcribe o ditado cun modelo de Kilo Gateway no canto do recoñecemento de voz do dispositivo. A túa gravación envíaselle a Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Comprimir chamadas de ferramentas",
-    "condenseToolCallsSubtitle": "Agrupa as chamadas de ferramentas consecutivas nunha fila que poidas abrir."
+    "condenseToolCallsSubtitle": "Agrupa as chamadas de ferramentas consecutivas nunha fila que poidas abrir.",
+    "toolSummaryTranslation": "Traduce os resumos de ferramentas",
+    "toolSummaryTranslationSubtitle": "Envía cada resumo de ferramenta a un modelo para traducilo á lingua da túa aplicación. Móstrase o orixinal se a tradución falla.",
+    "toolSummaryTranslationModelUnavailableNotice": "Este modelo xa non se ofrece. Toca $t(common.model) para escoller outro."
   },
   "prReview": {
     "pullRequestUnavailable": "Solicitude de integración non dispoñible",

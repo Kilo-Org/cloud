@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "यन्त्रको वाणी पहिचानको सट्टा Kilo Gateway मोडेल प्रयोग गरेर भ्वाइस इनपुटलाई पाठमा रूपान्तरण गर्नुहोस्। तपाईंको रेकर्डिङ Kilo Gateway मा पठाइन्छ।",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "उपकरण कलहरू संक्षिप्त गर्नुहोस्",
-    "condenseToolCallsSubtitle": "लगातार उपकरण कलहरूलाई तपाईंले खोल्न सक्ने एउटा पङ्क्तिमा समूहबद्ध गर्नुहोस्।"
+    "condenseToolCallsSubtitle": "लगातार उपकरण कलहरूलाई तपाईंले खोल्न सक्ने एउटा पङ्क्तिमा समूहबद्ध गर्नुहोस्।",
+    "toolSummaryTranslation": "उपकरण सारांश अनुवाद गर्नुहोस्",
+    "toolSummaryTranslationSubtitle": "प्रत्येक उपकरण सारांशलाई तपाईंको एपको भाषामा अनुवाद गर्न मोडेलमा पठाउनुहोस्। अनुवाद असफल भएमा मूल देखाइन्छ।",
+    "toolSummaryTranslationModelUnavailableNotice": "यो मोडेल अब उपलब्ध छैन। अर्को छान्न $t(common.model) मा ट्याप गर्नुहोस्।"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट उपलब्ध छैन",

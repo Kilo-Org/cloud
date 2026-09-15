@@ -103,26 +103,32 @@ describe('getPartDetailTitle', () => {
     getToolDisplay.mockReset();
   });
 
-  it('combines the display title and subtitle for tools', () => {
-    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: 'echo hi' });
-    expect(getPartDetailTitle(makeToolPart())).toBe('bash: echo hi');
+  it('combines the display title and subtitle for tools and carries its translatable provenance', () => {
+    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: 'echo hi', translatable: true });
+    expect(getPartDetailTitle(makeToolPart())).toEqual({
+      title: 'bash: echo hi',
+      translatable: true,
+    });
   });
 
   it('uses the display title alone when the tool has no subtitle', () => {
-    getToolDisplay.mockReturnValue({ title: 'glob' });
-    expect(getPartDetailTitle(makeToolPart({ tool: 'glob' }))).toBe('glob');
+    getToolDisplay.mockReturnValue({ title: 'glob', translatable: false });
+    expect(getPartDetailTitle(makeToolPart({ tool: 'glob' }))).toEqual({
+      title: 'glob',
+      translatable: false,
+    });
   });
 
-  it('labels streaming reasoning as Thinking', () => {
-    expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toBe('Thinking');
-  });
-
-  it('labels completed reasoning as Thought', () => {
-    expect(getPartDetailTitle(makeReasoningPart('reasoning', true))).toBe('Thought');
-  });
-
-  it('falls back to Details for other part types', () => {
-    expect(getPartDetailTitle(makeTextPart())).toBe('Details');
+  it('never marks reasoning or other part types translatable', () => {
+    expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toEqual({
+      title: 'Thinking',
+      translatable: false,
+    });
+    expect(getPartDetailTitle(makeReasoningPart('reasoning', true))).toEqual({
+      title: 'Thought',
+      translatable: false,
+    });
+    expect(getPartDetailTitle(makeTextPart())).toEqual({ title: 'Details', translatable: false });
   });
 });
 

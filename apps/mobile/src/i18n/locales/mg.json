@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Aova ho soratra amin'ny modely Kilo Gateway ny fampidirana amin'ny feo fa tsy ny famantarana ny feon'ny fitaovana. Alefa amin'ny Kilo Gateway ny rakitra nosoronanao.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Atambatra ny antson'ny fitaovana",
-    "condenseToolCallsSubtitle": "Vondrono ho andalana iray azo sokafana ny antson'ny fitaovana mifanesy."
+    "condenseToolCallsSubtitle": "Vondrono ho andalana iray azo sokafana ny antson'ny fitaovana mifanesy.",
+    "toolSummaryTranslation": "Adikao ny famintinana fitaovana",
+    "toolSummaryTranslationSubtitle": "Alefaso any amin'ny maodely ny famintinana fitaovana tsirairay mba hadika azy amin'ny fitenin'ny rindranasa. Asehoy ny voalohany raha tsy mahomby ny fandikana.",
+    "toolSummaryTranslationModelUnavailableNotice": "Tsy atolotra intsony ity modely ity. Tsindrio $t(common.model) hisafidianana ny hafa."
   },
   "prReview": {
     "pullRequestUnavailable": "Tsy azo sokafana ny fangatahana fampiraisana",

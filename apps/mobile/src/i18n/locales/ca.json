@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Transcriu el dictat amb un model de Kilo Gateway en lloc del reconeixement de veu del dispositiu. Enviarem la teva gravació a Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Condensa les crides d'eines",
-    "condenseToolCallsSubtitle": "Agrupa les crides d'eines consecutives en una fila que puguis obrir."
+    "condenseToolCallsSubtitle": "Agrupa les crides d'eines consecutives en una fila que puguis obrir.",
+    "toolSummaryTranslation": "Tradueix els resums d'eines",
+    "toolSummaryTranslationSubtitle": "Envia cada resum d'eina a un model perquè el tradueixi a la llengua de la teva aplicació. Es mostra l'original si la traducció falla.",
+    "toolSummaryTranslationModelUnavailableNotice": "Aquest model ja no s'ofereix. Toca $t(common.model) per triar-ne un altre."
   },
   "prReview": {
     "pullRequestUnavailable": "Sol·licitud d'integració no disponible",

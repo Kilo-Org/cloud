@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Транскрибирај го гласовниот внес со модел на Kilo Gateway наместо со препознавањето на говор на уредот. Снимката се испраќа до Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Згусни ги повиците на алатките",
-    "condenseToolCallsSubtitle": "Групирај ги последователните повици на алатките во еден ред што можеш да го отвориш."
+    "condenseToolCallsSubtitle": "Групирај ги последователните повици на алатките во еден ред што можеш да го отвориш.",
+    "toolSummaryTranslation": "Преведи резимеа на алатки",
+    "toolSummaryTranslationSubtitle": "Испрати го секое резиме на алатка до модел за да го преведе на јазикот на твојата апликација. Ако преводот не успее, се прикажува оригиналот.",
+    "toolSummaryTranslationModelUnavailableNotice": "Овој модел веќе не се нуди. Допрете $t(common.model) за да изберете друг."
   },
   "prReview": {
     "pullRequestUnavailable": "Барањето за спојување е недостапно",

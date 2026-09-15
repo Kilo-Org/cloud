@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Qurilmaning nutqni tanishining o'rniga Kilo Gateway modeli yordamida ovozli kiritishni matnga aylantiring. Yozuvingiz Kilo Gatewayga yuboriladi.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Vosita chaqiruvlarini siqish",
-    "condenseToolCallsSubtitle": "Ketma-ket vosita chaqiruvlarini ochishingiz mumkin bo'lgan bitta qatorga guruhlang."
+    "condenseToolCallsSubtitle": "Ketma-ket vosita chaqiruvlarini ochishingiz mumkin bo'lgan bitta qatorga guruhlang.",
+    "toolSummaryTranslation": "Vosita xulosalarini tarjima qilish",
+    "toolSummaryTranslationSubtitle": "Har bir vosita xulosasini ilova tilingizga tarjima qilish uchun modelga yuboring. Tarjima muvaffaqiyatsiz bo'lsa, asl nusxa ko'rsatiladi.",
+    "toolSummaryTranslationModelUnavailableNotice": "Bu model endi taklif etilmaydi. Boshqasini tanlash uchun $t(common.model) ga teging."
   },
   "prReview": {
     "pullRequestUnavailable": "PR mavjud emas",

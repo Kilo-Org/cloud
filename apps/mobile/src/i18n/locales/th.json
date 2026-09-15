@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "ถอดเสียงจากการพิมพ์ด้วยเสียงด้วยโมเดลของ Kilo Gateway แทนการรู้จำเสียงของอุปกรณ์ ระบบจะส่งการบันทึกเสียงของคุณไปยัง Kilo Gateway",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "ย่อการเรียกเครื่องมือ",
-    "condenseToolCallsSubtitle": "จัดกลุ่มการเรียกเครื่องมือที่ต่อเนื่องกันเป็นแถวเดียวที่คุณเปิดได้"
+    "condenseToolCallsSubtitle": "จัดกลุ่มการเรียกเครื่องมือที่ต่อเนื่องกันเป็นแถวเดียวที่คุณเปิดได้",
+    "toolSummaryTranslation": "แปลสรุปเครื่องมือ",
+    "toolSummaryTranslationSubtitle": "ส่งสรุปเครื่องมือแต่ละรายการไปยังโมเดลเพื่อแปลเป็นภาษาของแอปคุณ หากการแปลล้มเหลว จะแสดงต้นฉบับ",
+    "toolSummaryTranslationModelUnavailableNotice": "โมเดลนี้ไม่ให้บริการแล้ว แตะ $t(common.model) เพื่อเลือกโมเดลอื่น"
   },
   "prReview": {
     "pullRequestUnavailable": "เปิด PR ไม่ได้",

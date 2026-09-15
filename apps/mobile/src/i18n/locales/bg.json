@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Преобразувай гласовото въвеждане с модел на Kilo Gateway вместо разпознаването на реч на устройството. Записът ти се изпраща до Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Свиване на извиквания на инструменти",
-    "condenseToolCallsSubtitle": "Групирайте последователни извиквания на инструменти в един ред, който можете да отворите."
+    "condenseToolCallsSubtitle": "Групирайте последователни извиквания на инструменти в един ред, който можете да отворите.",
+    "toolSummaryTranslation": "Преведи обобщенията на инструментите",
+    "toolSummaryTranslationSubtitle": "Изпращай всяко обобщение на инструмент към модел, за да го преведе на езика на приложението ти. Ако преводът се провали, се показва оригиналът.",
+    "toolSummaryTranslationModelUnavailableNotice": "Този модел вече не се предлага. Докосни $t(common.model), за да избереш друг."
   },
   "prReview": {
     "pullRequestUnavailable": "Недостъпна заявка за обединяване",

@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Transkribeer steminvoer met 'n Kilo Gateway-model in plaas van die toestel se spraakherkenning. Jou opname word na die Kilo Gateway gestuur.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Kondenseer nutsmiddel-oproepe",
-    "condenseToolCallsSubtitle": "Groepeer opeenvolgende nutsmiddel-oproepe in een ry wat jy kan oopmaak."
+    "condenseToolCallsSubtitle": "Groepeer opeenvolgende nutsmiddel-oproepe in een ry wat jy kan oopmaak.",
+    "toolSummaryTranslation": "Vertaal hulpmiddelopsommings",
+    "toolSummaryTranslationSubtitle": "Stuur elke hulpmiddelopsomming na 'n model om dit in jou app-taal te vertaal. Die oorspronklike word gewys as die vertaling misluk.",
+    "toolSummaryTranslationModelUnavailableNotice": "Hierdie model word nie meer aangebied nie. Tik op $t(common.model) om 'n ander een te kies."
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",

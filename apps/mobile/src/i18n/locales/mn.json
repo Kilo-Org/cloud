@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Төхөөрөмжийн яриа танихын оронд Kilo Gateway загвар ашиглан дуугаар оруулж буй зүйлээ бичвэр болгоно уу. Таны бичлэг Kilo Gateway руу илгээгдэнэ.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Хэрэгслийн дуудлагыг шахах",
-    "condenseToolCallsSubtitle": "Дараалсан хэрэгслийн дуудлагыг нээж болох нэг мөрөнд бүлэглэнэ."
+    "condenseToolCallsSubtitle": "Дараалсан хэрэгслийн дуудлагыг нээж болох нэг мөрөнд бүлэглэнэ.",
+    "toolSummaryTranslation": "Хэрэгслийн хураангуйг орчуулах",
+    "toolSummaryTranslationSubtitle": "Хэрэгсэл бүрийн хураангуйг аппынхаа хэл рүү орчуулахын тулд загвар руу илгээ. Орчуулга бүтэлгүйтвэл эх хувийг харуулна.",
+    "toolSummaryTranslationModelUnavailableNotice": "Энэ загварыг цаашид санал болгохгүй. Өөр загвар сонгохын тулд $t(common.model)-г товшино уу."
   },
   "prReview": {
     "pullRequestUnavailable": "Нэгтгэх хүсэлтийг нээх боломжгүй",

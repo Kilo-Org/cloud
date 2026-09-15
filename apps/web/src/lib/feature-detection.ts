@@ -45,6 +45,7 @@ export const FEATURE_VALUES = [
   'openclaw-embedding',
   'gastown',
   'mobile-voice-input',
+  'tool-summary-translation',
 ] as const;
 
 const featureSchema = z.enum(FEATURE_VALUES);

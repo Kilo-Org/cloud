@@ -2086,7 +2086,10 @@
     "gatewayTranscriptionSubtitle": "Trascrivi la dettatura con un modello Kilo Gateway anziché con il riconoscimento vocale del dispositivo. La registrazione viene inviata a Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Comprimi le chiamate degli strumenti",
-    "condenseToolCallsSubtitle": "Raggruppa le chiamate degli strumenti consecutive in una riga che puoi aprire."
+    "condenseToolCallsSubtitle": "Raggruppa le chiamate degli strumenti consecutive in una riga che puoi aprire.",
+    "toolSummaryTranslation": "Traduci i riepiloghi degli strumenti",
+    "toolSummaryTranslationSubtitle": "Invia ogni riepilogo di strumento a un modello per tradurlo nella lingua della tua app. Se la traduzione non riesce, viene mostrato l'originale.",
+    "toolSummaryTranslationModelUnavailableNotice": "Questo modello non è più offerto. Tocca $t(common.model) per sceglierne un altro."
   },
   "addCredits": {
     "cta": "Aggiungi crediti",

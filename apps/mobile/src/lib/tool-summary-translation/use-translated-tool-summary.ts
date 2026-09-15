@@ -13,6 +13,11 @@ import {
  * it resolves. The subscription also carries the preference that decides
  * whether to translate at all.
  *
+ * Translation is keyed by the part's persistent `itemId` plus the source text:
+ * a row without an id is never translated, two tool calls with the same text
+ * never share an entry, and a changed source gets its own entry instead of
+ * evicting the string another surface still shows.
+ *
  * Both the config and the cache read go through `useSyncExternalStore` rather
  * than plain render expressions. With React Compiler enabled
  * (`reactCompiler: true`) a plain `getTranslation(...)` call is memoized on its
@@ -22,20 +27,20 @@ import {
  * reactive value, so the row re-renders when it lands. `FixedPartRow` is
  * single-line, so the swap cannot shift layout.
  */
-export function useTranslatedToolSummary(text: string, enabled = true): string {
+export function useTranslatedToolSummary(text: string, enabled = true, itemId?: string): string {
   const { i18n } = useTranslation();
   const language = i18n.language;
   const config = useSyncExternalStore(subscribe, getConfig, getConfig);
-  const active = enabled && config.enabled && text !== '';
+  const active = enabled && config.enabled && itemId !== undefined && text !== '';
   const getSnapshot = (): string =>
-    active ? (getTranslation(text, language, config.model.id) ?? text) : text;
+    active ? (getTranslation(itemId, text, language, config.model.id) ?? text) : text;
   const shown = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   useEffect(() => {
     if (active) {
-      ensureTranslation({ text, language, model: config.model });
+      ensureTranslation({ itemId, text, language, model: config.model });
     }
-  }, [active, text, language, config.model]);
+  }, [active, itemId, text, language, config.model]);
 
   return shown;
 }

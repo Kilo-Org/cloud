@@ -9,7 +9,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
 
-import { useIsToolSummaryRow } from './tool-summary-translation-scope';
+import { useToolSummaryItemId } from './tool-summary-translation-scope';
 
 import { useMessageLongPress } from './message-long-press-context';
 
@@ -62,8 +62,8 @@ export function FixedPartRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const messageLongPress = useMessageLongPress();
-  const isToolSummaryRow = useIsToolSummaryRow();
-  const shownLabel = useTranslatedToolSummary(label, isToolSummaryRow && translatable);
+  const itemId = useToolSummaryItemId();
+  const shownLabel = useTranslatedToolSummary(label, translatable, itemId ?? undefined);
   // Keep the spoken summary in step with the visible one without a second
   // translation request: only the embedded label changes.
   const shownAccessibilityLabel =

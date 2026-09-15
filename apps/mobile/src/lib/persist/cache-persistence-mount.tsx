@@ -13,6 +13,7 @@ import {
   shouldPersistReadCacheQuery,
   takeOverColdStartRestore,
 } from '@/lib/persist/read-cache';
+import { clearToolSummaryTranslationsForSignOut } from '@/lib/persist/tool-summary-translation-cache';
 import { queryClient } from '@/lib/query-client';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
@@ -41,14 +42,16 @@ export function CachePersistenceMount() {
       return undefined;
     }
 
-    // Account change: drop the previous account's read-cache scope. The
-    // sign-out path already clears the scope, so this only fires on a direct
-    // switch where the sign-out cleanup never ran. Best effort: the helper
-    // swallows a storage failure, and a redundant clear only costs a future
-    // warm start.
+    // Account change: drop the previous account's read-cache scope and offline
+    // translation cache. The sign-out path clears both, so this only fires on a
+    // direct switch where the sign-out cleanup never ran. The translation cache
+    // holds the previous account's tool text, so it must go too. Best effort:
+    // both helpers swallow a storage failure, and a redundant clear only costs
+    // a future warm start.
     const previousUserId = previousUserIdRef.current;
     if (previousUserId !== null && previousUserId !== userId) {
       void clearCacheScopeForSignOut(previousUserId);
+      void clearToolSummaryTranslationsForSignOut();
     }
     previousUserIdRef.current = userId;
 

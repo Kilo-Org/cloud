@@ -15,9 +15,11 @@ const mockFindPreviousCompletedReview = jest.fn();
 const mockUpdatePreviousReviewSummary = jest.fn();
 const mockUpdateRepositoryReviewInstructionsMetadata = jest.fn();
 const mockGenerateReviewPrompt = jest.fn();
+const mockResolveReviewSmallModel = jest.fn();
 
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import type * as CodeReviewsDb from '@/lib/code-reviews/db/code-reviews';
+import type * as ModelSelection from '@/lib/code-reviews/core/model-selection';
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   generateGitHubInstallationToken: (...args: unknown[]) =>
@@ -61,6 +63,16 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => {
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
+
+jest.mock('@/lib/code-reviews/core/model-selection', () => {
+  const actual = jest.requireActual<typeof ModelSelection>(
+    '@/lib/code-reviews/core/model-selection'
+  );
+  return {
+    ...actual,
+    resolveReviewSmallModel: (...args: unknown[]) => mockResolveReviewSmallModel(...args),
+  };
+});
 
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -249,6 +261,8 @@ describe('prepareReviewPayload', () => {
     mockUpdatePreviousReviewSummary.mockReset();
     mockUpdateRepositoryReviewInstructionsMetadata.mockReset();
     mockGenerateReviewPrompt.mockReset();
+    mockResolveReviewSmallModel.mockReset();
+    mockResolveReviewSmallModel.mockResolvedValue(undefined);
   });
 
   afterAll(async () => {
@@ -978,5 +992,40 @@ describe('prepareReviewPayload', () => {
       platform: 'github',
       upstreamBranch: 'refs/pull/1235/head',
     });
+  });
+
+  it('includes resolved smallModel on GitHub session input when present', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    mockResolveReviewSmallModel.mockResolvedValueOnce('anthropic/claude-haiku-4.5');
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'github',
+    });
+
+    expect(mockResolveReviewSmallModel).toHaveBeenCalledWith('test-model');
+    expect(payload.sessionInput.smallModel).toBe('anthropic/claude-haiku-4.5');
+  });
+
+  it('omits smallModel from session input when no cheap sibling is resolved', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: baseAgentConfig },
+      platform: 'github',
+    });
+
+    expect(mockResolveReviewSmallModel).toHaveBeenCalledWith('test-model');
+    expect(payload.sessionInput).not.toHaveProperty('smallModel');
   });
 });

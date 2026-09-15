@@ -179,6 +179,32 @@ describe('SessionService.buildRuntimeEnv', () => {
     expect(runtimeEnv.GIT_CONFIG_GLOBAL).toBeUndefined();
     expect(runtimeEnv.GIT_CONFIG_NOSYSTEM).toBeUndefined();
   });
+
+  it('materializes code-review small_model from the smallModel option', () => {
+    const service = new SessionService();
+    const context = service.buildContext({
+      sandboxId: 'usr-test',
+      userId: 'user_test',
+      sessionId: 'agent_test',
+    });
+    const smallModel = 'anthropic/claude-haiku-4.5';
+
+    const runtimeEnv = service.buildRuntimeEnv({
+      context,
+      env: createEnv(),
+      kiloCapability: 'kilo-token',
+      kilocodeModel: 'anthropic/claude-sonnet-4.6',
+      smallModel,
+      createdOnPlatform: 'code-review',
+    });
+
+    const config = JSON.parse(runtimeEnv.KILO_CONFIG_CONTENT) as {
+      small_model?: string;
+      agent?: { title?: { model?: string } };
+    };
+    expect(config.small_model).toBe(`kilo/${smallModel}`);
+    expect(config.agent?.title?.model).toBe(`kilo/${smallModel}`);
+  });
 });
 
 describe('code-review command guard policy', () => {
@@ -2444,6 +2470,140 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       } satisfies FencedWrapperDispatchRequest,
     });
   }
+
+  it('pins code-review KILO_CONFIG small_model to the dispatched smallModel', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+    const primaryModel = 'anthropic/claude-sonnet-4.6';
+    const smallModel = 'anthropic/claude-haiku-4.5';
+
+    const build = (args: {
+      messageId: string;
+      wrapperRunId: string;
+      metadata: CloudAgentSessionState;
+      agent: { mode: 'code'; model: string; smallModel?: string };
+    }) =>
+      service.buildWrapperSessionReadyAndPromptRequests({
+        env,
+        plan: {
+          scope: { sessionId: 'agent_test', userId: 'user_test' },
+          turn: { type: 'prompt', messageId: args.messageId, prompt: 'Review the PR' },
+          agent: args.agent,
+          workspace: {
+            sandboxId: args.metadata.workspace?.sandboxId ?? 'ses-abcdef',
+            metadata: args.metadata,
+          },
+          wrapper: {
+            fence: {
+              wrapperRunId: args.wrapperRunId,
+              wrapperGeneration: 1,
+              wrapperConnectionId: `conn_${args.wrapperRunId}`,
+            },
+          },
+        } satisfies FencedWrapperDispatchRequest,
+      });
+
+    const readConfig = (result: Awaited<ReturnType<typeof build>>) =>
+      JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+        model?: string;
+        small_model?: string;
+        agent?: { title?: { model?: string } };
+      };
+
+    const codeReview = readConfig(
+      await build({
+        messageId: 'msg_018f1e2d3c4bSmallModelAAAA',
+        wrapperRunId: 'wr_small_model',
+        metadata: createMetadata({ createdOnPlatform: 'code-review' }),
+        agent: { mode: 'code', model: primaryModel, smallModel },
+      })
+    );
+    expect(codeReview.model).toBe(`kilo/${primaryModel}`);
+    expect(codeReview.small_model).toBe(`kilo/${smallModel}`);
+    expect(codeReview.agent?.title?.model).toBe(`kilo/${smallModel}`);
+
+    const unset = readConfig(
+      await build({
+        messageId: 'msg_018f1e2d3c4bSmallModelNone',
+        wrapperRunId: 'wr_small_model_unset',
+        metadata: createMetadata({ createdOnPlatform: 'code-review' }),
+        agent: { mode: 'code', model: primaryModel },
+      })
+    );
+    expect(unset.model).toBe(`kilo/${primaryModel}`);
+    expect(unset.small_model).toBeUndefined();
+    expect(unset.agent?.title).toBeUndefined();
+
+    const web = readConfig(
+      await build({
+        messageId: 'msg_018f1e2d3c4bSmallModelBBBB',
+        wrapperRunId: 'wr_small_model_web',
+        metadata: createMetadata({ createdOnPlatform: 'cloud-agent-web' }),
+        agent: { mode: 'code', model: primaryModel, smallModel },
+      })
+    );
+    expect(web.model).toBe(`kilo/${primaryModel}`);
+    expect(web.small_model).toBeUndefined();
+    expect(web.agent?.title).toBeUndefined();
+
+    // Production code-review sessions persist smallModel in metadata; the plan
+    // agent does not carry it, so this exercises the metadata fallback.
+    const baseMetadata = createMetadata({ createdOnPlatform: 'code-review' });
+    const fromMetadata = readConfig(
+      await build({
+        messageId: 'msg_018f1e2d3c4bSmallModelCCCC',
+        wrapperRunId: 'wr_small_model_metadata',
+        metadata: { ...baseMetadata, agent: { ...baseMetadata.agent, smallModel } },
+        agent: { mode: 'code', model: primaryModel },
+      })
+    );
+    expect(fromMetadata.model).toBe(`kilo/${primaryModel}`);
+    expect(fromMetadata.small_model).toBe(`kilo/${smallModel}`);
+    expect(fromMetadata.agent?.title?.model).toBe(`kilo/${smallModel}`);
+  });
+
+  it('sets Bitbucket code-review small_model without injecting agent.title', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+    const primaryModel = 'anthropic/claude-sonnet-4.6';
+    const smallModel = 'anthropic/claude-haiku-4.5';
+    const metadata = createBitbucketMetadata(true);
+
+    const result = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: { sessionId: 'agent_test', userId: 'user_test' },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bSmallModelBBBB',
+          prompt: 'Review the PR',
+        },
+        agent: { mode: 'code', model: primaryModel, smallModel },
+        workspace: {
+          sandboxId: metadata.workspace?.sandboxId ?? 'ses-abcdef',
+          metadata,
+        },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_bb_small_model',
+            wrapperGeneration: 1,
+            wrapperConnectionId: 'conn_bb_small_model',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+
+    const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      model?: string;
+      small_model?: string;
+      agent?: { title?: { model?: string } };
+    };
+    expect(config.model).toBe(`kilo/${primaryModel}`);
+    expect(config.small_model).toBe(`kilo/${smallModel}`);
+    expect(config.agent?.title).toBeUndefined();
+  });
 
   it('uses the persisted shared checkout when constructing wrapper requests', async () => {
     const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';

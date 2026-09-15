@@ -2,7 +2,7 @@ import { createInstance } from 'i18next';
 import { describe, expect, it } from 'vitest';
 
 import { CATALOG_LOADERS } from './catalogs';
-import { SUPPORTED_LANGUAGES } from './languages';
+import { SUPPORTED_LANGUAGES, type SupportedLanguage } from './languages';
 import ar from './locales/ar.json';
 import en from './locales/en.json';
 import sr from './locales/sr.json';
@@ -18,6 +18,11 @@ const MESSAGE_KEYS = [
   'authErrors.admissionRequired',
 ] as const;
 const LABEL_KEY = 'login.moreSignInOptions';
+
+/** The category a language's own rules assign, the same rules i18next uses. */
+function category(tag: SupportedLanguage, count: number): string {
+  return new Intl.PluralRules(tag).select(count);
+}
 
 const i18n = createInstance();
 await i18n.init({
@@ -176,5 +181,72 @@ describe('plural forms', () => {
 
     expect(i18n.t('agents.sessionRow.cent', { count: 1 })).toBe(ar.agents.sessionRow.cent_one);
     expect(i18n.t('agents.sessionRow.cent', { count: 2 })).toBe(ar.agents.sessionRow.cent_two);
+  });
+
+  /**
+   * The owner's acceptance rows: 1, 2, 5 and 21 for Serbian and for two more
+   * languages whose rules differ from English. `exactUsedKey` proves which
+   * category i18next picked, and the expected string is read back out of the
+   * loaded catalog so the test never restates a translation.
+   */
+  const COUNTED_LANGUAGES = ['sr', 'ru', 'pl'] as const;
+  const COUNTS = [1, 2, 5, 21] as const;
+  const TOOL_RUN_KEY = 'agentChat.toolRun.condensedLabel';
+
+  function render(tag: SupportedLanguage, key: string, count: number) {
+    return i18n.t(key, {
+      lng: tag,
+      count,
+      itemCount: count,
+      displayCount: String(count),
+      last: 'Read',
+      returnDetails: true,
+    }) as unknown as { res: string; exactUsedKey: string };
+  }
+
+  /**
+   * The catalog's own template for `key`, with the row's values in place —
+   * the expected string comes from the catalog, never from this test, and
+   * the comparison is against the interpolated row the user reads.
+   */
+  function catalogForm(tag: SupportedLanguage, key: string, count: number): string {
+    const value = i18n.getResource(tag, 'translation', key);
+    if (typeof value !== 'string') {
+      throw new TypeError(`${tag} declares no ${key}`);
+    }
+    return value
+      .replaceAll('{{itemCount}}', String(count))
+      .replaceAll('{{displayCount}}', String(count))
+      .replaceAll('{{last}}', 'Read');
+  }
+
+  it.each(COUNTED_LANGUAGES)('selects the count form for a condensed tool run in %s', tag => {
+    for (const count of COUNTS) {
+      const details = render(tag, TOOL_RUN_KEY, count);
+      const expected = `${TOOL_RUN_KEY}_${category(tag, count)}`;
+      expect(details.exactUsedKey, `${tag} ${count}`).toBe(expected);
+      expect(details.res, `${tag} ${count}`).toBe(catalogForm(tag, expected, count));
+    }
+  });
+
+  it('selects the Serbian one-form for the overdue and check-count rows', () => {
+    for (const key of [
+      'securityAgent.dashboard.daysOverdue',
+      'prReview.checks.checksCount',
+    ] as const) {
+      const details = render('sr', key, 1);
+      expect(details.exactUsedKey, key).toBe(`${key}_one`);
+      expect(details.res, key).toBe(catalogForm('sr', `${key}_one`, 1));
+    }
+  });
+
+  it.each(COUNTED_LANGUAGES)('renders more than one form across 1, 2, 5 and 21 in %s', tag => {
+    // The count itself interpolates into the row, so mask it before
+    // comparing: the defect was one form for every count, and the four
+    // unmasked rows differ by the number alone.
+    const forms = COUNTS.map(count =>
+      render(tag, TOOL_RUN_KEY, count).res.replaceAll(String(count), '')
+    );
+    expect(new Set(forms).size, tag).toBeGreaterThan(1);
   });
 });

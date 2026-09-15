@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as screen-header.mounted.test.tsx) */
 // The module-mock harness and render helpers live in
 // pr-review-discussion-tab.test-helpers. That import MUST stay first: the
 // helpers register the module mocks while they are evaluated.
@@ -14,7 +13,7 @@ import {
   replyScrollFns,
   resetState,
 } from './pr-review-discussion-tab.test-helpers';
-import { act, type ReactTestRenderer } from 'react-test-renderer';
+import { act, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';

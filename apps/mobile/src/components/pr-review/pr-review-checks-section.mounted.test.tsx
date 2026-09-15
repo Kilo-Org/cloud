@@ -1,9 +1,8 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the repository's native-free mounted test tool. */
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only theme-token guard, runs in node, never bundled into the app
 import { readFileSync } from 'node:fs';
 
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SpinningIcon } from '@/components/ui/spinning-icon';

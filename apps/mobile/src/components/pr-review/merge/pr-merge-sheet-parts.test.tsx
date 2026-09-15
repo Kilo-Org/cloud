@@ -1,11 +1,10 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/pr-review/pending-review-provider.mounted.test.tsx */
 // MergeSheetFormBody field contract (s6f): the Bitbucket merge arm passes
 // showTitle=false because the provider merge takes only the message — no
 // commit-title input may exist on that arm whose value would be silently
 // dropped on submit. The GitLab and GitHub arms keep the field.
 
 import * as React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';

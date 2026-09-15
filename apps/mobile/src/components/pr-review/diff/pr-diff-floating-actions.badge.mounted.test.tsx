@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as pr-diff-file-list.test.tsx) */
 // Spot check e1-select-line / e1-line1-comment: the Finish review count badge
 // rode the label's top-right corner (`absolute -right-2.5 -top-2.5`), so the
 // opaque pill drew over the last glyphs of the label. The earlier repairs
@@ -12,7 +11,7 @@
 // no node in the whole tree is absolute, and a two-digit count behaves the
 // same. Mutation-inversion gate: re-wrapping the label in a `relative` View
 // with an `absolute` badge must fail tests 1–3.
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';

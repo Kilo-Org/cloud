@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free hook mount, same fixture as the sibling *.mounted tests. */
 import { act, createElement } from 'react';
-import TestRenderer from 'react-test-renderer';
+import { TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {

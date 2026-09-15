@@ -551,7 +551,6 @@ describe('api routes', () => {
     expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
     expect(env.INGEST_QUEUE.send).toHaveBeenCalledTimes(1);
 
-    // Verify queue message shape
     const queueMsg = env.INGEST_QUEUE.send.mock.calls[0][0] as Record<string, unknown>;
     expect(queueMsg).toMatchObject({
       kiloUserId: 'usr_test',
@@ -1623,7 +1622,6 @@ describe('api routes', () => {
       organizationId: null,
       cloudAgentSessionScopeId: 'cloud-agent-session-scope-1',
     });
-    // Recursive CTE
     fns.executeResult.mockResolvedValueOnce({
       rows: [
         { session_id: childSessionId, has_access: true },
@@ -2453,10 +2451,6 @@ describe('api routes', () => {
       expiresAt: 1_700_000_060_000,
     });
   });
-
-  // -------------------------------------------------------------------------
-  // GET /api/instances/active (W3)
-  // -------------------------------------------------------------------------
 
   describe('GET /instances/active', () => {
     it('returns connected instances from the UserConnectionDO', async () => {

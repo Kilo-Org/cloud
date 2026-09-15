@@ -1,6 +1,6 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest; max-lines holds the focus and foreground refetch tests beside the existing render-branch assertions in one mount test. */
+/* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest; max-lines holds the focus and foreground refetch tests beside the existing render-branch assertions in one mount test. */
 import { createElement, type ReactElement } from 'react';
-import { act, type default as TestRenderer } from 'react-test-renderer';
+import { act, type TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -23,13 +23,14 @@ const listState = vi.hoisted(() => ({
   storedSessions: [] as MockStoredSession[],
   isSearching: false,
   isError: false,
-  organization: { organizationId: null as string | null, isLoaded: true },
   // Mirrors the real hook's stored-query flags so the screen's loading
   // decision can be exercised on the first render, before the request
   // settles (isFetching false, isPending true).
   storedIsPending: false,
   storedIsFetching: false,
+  storedFetchedSinceMount: true,
   storedLoadedPageCount: 1,
+  organization: { organizationId: null as string | null, isLoaded: true },
   storedQuery: vi.fn<(options: Parameters<typeof useAgentSessions>[0]) => void>(),
   searchQuery: vi.fn<(options: Parameters<typeof useAgentSessionSearch>[0]) => void>(),
   repositoryQuery: vi.fn<(options: Parameters<typeof useRecentAgentRepositories>[0]) => void>(),
@@ -143,6 +144,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         storedIsError: listState.isError,
         storedIsPending: listState.storedIsPending,
         storedIsFetching: listState.storedIsFetching,
+        storedFetchedSinceMount: listState.storedFetchedSinceMount,
         storedLoadedPageCount: listState.storedLoadedPageCount,
         hasNextPage: false,
         isFetchingNextPage: false,
@@ -267,6 +269,7 @@ describe('SessionHistoryScreen', () => {
     listState.isError = false;
     listState.storedIsPending = false;
     listState.storedIsFetching = false;
+    listState.storedFetchedSinceMount = true;
     listState.storedLoadedPageCount = 1;
     Object.assign(listState.organization, { organizationId: null, isLoaded: true });
     listState.storedQuery.mockClear();
@@ -352,7 +355,7 @@ describe('SessionHistoryScreen', () => {
       expect(findNodeByType(renderer, 'SessionListSearchHeader')).toBe(searchHeader);
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
-        tree.children?.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
+        tree.children.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
       ).toEqual(['ScreenHeader', 'SessionListSearchHeader', 'View']);
     }
   });
@@ -544,6 +547,19 @@ describe('SessionHistoryScreen', () => {
     const renderer = await renderScreen();
 
     expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(0);
+  });
+
+  it('reserves the search header while the first stored page loads', async () => {
+    // Cold open: no rows yet, first page in flight. The header must occupy its
+    // final space now so the loading skeletons sit where the rows will land
+    // instead of shifting down when the header appears with the rows. The
+    // merged loading decision keys "no data yet" off `storedIsPending`.
+    listState.storedIsPending = true;
+    listState.storedLoadedPageCount = 0;
+    const renderer = await renderScreen();
+
+    expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(1);
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isLoading).toBe(true);
   });
 
   it('mounts the search header once stored rows exist', async () => {

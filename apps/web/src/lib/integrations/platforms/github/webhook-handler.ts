@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubWebhookSignature } from '@/lib/integrations/platforms/github/adapter';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
   InstallationCreatedPayloadSchema,
   InstallationDeletedWebhookPayloadSchema,
@@ -54,15 +55,38 @@ import {
   releaseGitHubInstallationDelivery,
 } from '@/lib/integrations/db/github-installations';
 
+/**
+ * A retained but unhealthy association (locally disconnected, suspended, or
+ * auth-invalid) must never route a webhook. After a tenant disconnects, its
+ * row is kept for history while a healthy sibling may still own the
+ * installation; `findIntegrationByInstallationId` can return either, so the
+ * selected row is validated before it is used as the delivery's owner.
+ */
+function isRoutableGitHubIntegration(
+  integration: {
+    integration_status: string | null;
+    suspended_at: string | null;
+    auth_invalid_at: string | null;
+    github_disconnected_at?: string | null;
+  } | null
+): boolean {
+  return isPlatformIntegrationHealthy(integration);
+}
+
 async function isAvailableForDeferredGitHubDispatch(integration: {
+  id: string;
   platform_installation_id: string | null;
   github_app_type: GitHubAppType | null;
 }): Promise<boolean> {
   if (!integration.platform_installation_id) return false;
   try {
+    // Pass the exact selected association: installation-wide authorization
+    // must never authorize deferred work that carries a different
+    // association's identity.
     await assertGitHubInstallationRuntimeAuthorized(
       integration.platform_installation_id,
-      integration.github_app_type ?? 'standard'
+      integration.github_app_type ?? 'standard',
+      integration.id
     );
     return true;
   } catch (error) {
@@ -307,6 +331,11 @@ export async function handleGitHubWebhook(
           appType
         );
 
+        if (integration && !isRoutableGitHubIntegration(integration)) {
+          logExceptInTest(`Integration unavailable, skipping event${logSuffix}`);
+          return NextResponse.json({ message: 'Integration unavailable' }, { status: 200 });
+        }
+
         if (integration) {
           const logResult = await logWebhook(integration, action);
           if (logResult.isDuplicate) {
@@ -358,6 +387,11 @@ export async function handleGitHubWebhook(
           installationId,
           appType
         );
+
+        if (integration && !isRoutableGitHubIntegration(integration)) {
+          logExceptInTest(`Integration unavailable, skipping event${logSuffix}`);
+          return NextResponse.json({ message: 'Integration unavailable' }, { status: 200 });
+        }
 
         if (integration) {
           const logResult = await logWebhook(integration, action);
@@ -429,6 +463,11 @@ export async function handleGitHubWebhook(
         return NextResponse.json({ message: 'Integration not found' }, { status: 404 });
       }
 
+      if (!isRoutableGitHubIntegration(integration)) {
+        logExceptInTest(`Integration unavailable, skipping event${logSuffix}`);
+        return NextResponse.json({ message: 'Integration unavailable' }, { status: 200 });
+      }
+
       // Identity synchronization is idempotent and must finish before delivery deduplication;
       // otherwise GitHub redelivery after a transient API or database failure cannot repair metadata.
       const result = await handleInstallationTargetRenamed(parseResult.data, appType);
@@ -488,6 +527,11 @@ export async function handleGitHubWebhook(
         return NextResponse.json({ message: 'Integration not found' }, { status: 404 });
       }
 
+      if (!isRoutableGitHubIntegration(integration)) {
+        logExceptInTest(`Integration unavailable, skipping event${logSuffix}`);
+        return NextResponse.json({ message: 'Integration unavailable' }, { status: 200 });
+      }
+
       const logResult = await logWebhook(integration, action);
       if (logResult.isDuplicate) {
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
@@ -537,6 +581,11 @@ export async function handleGitHubWebhook(
     if (!integration) {
       console.warn(`Integration not found for installation${logSuffix}:`, installationId);
       return NextResponse.json({ message: 'Integration not found' }, { status: 404 });
+    }
+
+    if (!isRoutableGitHubIntegration(integration)) {
+      logExceptInTest(`Integration unavailable, skipping event${logSuffix}`);
+      return NextResponse.json({ message: 'Integration unavailable' }, { status: 200 });
     }
 
     if (!(await isAvailableForDeferredGitHubDispatch(integration))) {

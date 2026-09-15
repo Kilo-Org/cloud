@@ -61,8 +61,11 @@ jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
       super(message);
     }
   },
-  assertGitHubInstallationRuntimeAuthorized: (installationId: string, appType: string) =>
-    mockAssertGitHubInstallationRuntimeAuthorized(installationId, appType),
+  assertGitHubInstallationRuntimeAuthorized: (
+    installationId: string,
+    appType: string,
+    expectedIntegrationId?: string
+  ) => mockAssertGitHubInstallationRuntimeAuthorized(installationId, appType, expectedIntegrationId),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
@@ -120,7 +123,11 @@ const integration = {
   owned_by_organization_id: 'org_1',
   owned_by_user_id: null,
   platform_installation_id: '98765',
+  github_app_type: 'standard',
+  integration_status: 'active',
   suspended_at: null,
+  auth_invalid_at: null,
+  github_disconnected_at: null,
 };
 
 function signedGitHubRequest(eventType: string, payload: unknown): NextRequest {
@@ -276,6 +283,48 @@ describe('handleGitHubWebhook', () => {
     expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
     expect(mockLogWebhookEvent).not.toHaveBeenCalled();
     expect(mockHandlePullRequest).not.toHaveBeenCalled();
+  });
+
+  it('must not route an active sibling installation webhook to a disconnected tenant', async () => {
+    const disconnected = {
+      ...integration,
+      integration_status: 'suspended',
+      github_disconnected_at: '2026-09-14T00:00:00.000Z',
+      suspended_by: 'local_disconnect',
+    };
+    mockFindIntegrationByInstallationId.mockResolvedValue(disconnected);
+    mockGetIntegrationForOrganization.mockResolvedValue(disconnected);
+    // The real unscoped runtime resolver succeeds on the remaining active sibling.
+    mockAssertGitHubInstallationRuntimeAuthorized.mockResolvedValue(undefined);
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect({
+      logged: mockLogWebhookEvent.mock.calls.length,
+      dispatched: mockHandlePullRequest.mock.calls.length,
+    }).toEqual({ logged: 0, dispatched: 0 });
+    expect(mockAssertGitHubInstallationRuntimeAuthorized).not.toHaveBeenCalled();
+  });
+
+  it('validates deferred dispatch against the exact routed association', async () => {
+    mockAssertGitHubInstallationRuntimeAuthorized.mockResolvedValue(undefined);
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await waitForAfterTask();
+    expect(mockAssertGitHubInstallationRuntimeAuthorized).toHaveBeenCalledWith(
+      '98765',
+      'standard',
+      'pi_github'
+    );
   });
 
   it('routes installation_target renamed events through authoritative login synchronization', async () => {

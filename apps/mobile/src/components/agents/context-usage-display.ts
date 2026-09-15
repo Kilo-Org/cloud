@@ -229,8 +229,11 @@ export type ContextSheetIdentity = {
 
 /**
  * Controls when the native Modal is mounted and when it is visible. Keeping
- * the sheet mounted while usage or permission controls are available lets
- * `visible` transition from true → false for native dismissal. Permission
+ * the sheet mounted after it has been opened lets `visible` transition from
+ * true → false for native dismissal. The sheet is the session's own
+ * context/permission surface — it always has the session identity and the
+ * auto-approve row to show — so an open request mounts it even before usage is
+ * reported or permission controls are known to be available. Permission
  * controls belong to the session, not the model reporting the latest usage.
  */
 export function getContextSheetMountState(
@@ -238,11 +241,12 @@ export function getContextSheetMountState(
   openIdentity: ContextSheetIdentity | null,
   { sessionId, autoApproveAvailable = false }: { sessionId: string; autoApproveAvailable?: boolean }
 ): SheetMountState {
-  if (!info && !autoApproveAvailable) {
+  const openedForSession = openIdentity?.sessionId === sessionId;
+  if (!info && !autoApproveAvailable && !openedForSession) {
     return { mounted: false };
   }
   const visible =
-    openIdentity?.sessionId === sessionId &&
+    openedForSession &&
     (autoApproveAvailable ||
       (openIdentity.providerID === info?.providerID && openIdentity.modelID === info?.modelID));
   return { mounted: true, visible, info };

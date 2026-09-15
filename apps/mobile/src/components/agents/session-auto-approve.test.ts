@@ -23,11 +23,18 @@ describe('canAutoApprovePermissions', () => {
     );
   });
 
-  it('rejects the read-only transport and an unresolved transport', () => {
+  it('rejects the read-only transport', () => {
     expect(canAutoApprovePermissions({ activeSessionType: 'read-only', isReadOnly: false })).toBe(
       false
     );
-    expect(canAutoApprovePermissions({ activeSessionType: null, isReadOnly: false })).toBe(false);
+  });
+
+  // The toggle is a client-side per-session preference: the transport resolves
+  // only after the metadata and transcript, so the settings must stay usable
+  // while the session is still opening (or has failed to open). Only a session
+  // known to be read-only is excluded.
+  it('allows an unresolved transport so the session settings stay reachable', () => {
+    expect(canAutoApprovePermissions({ activeSessionType: null, isReadOnly: false })).toBe(true);
   });
 
   it('rejects every transport when the session is read-only', () => {

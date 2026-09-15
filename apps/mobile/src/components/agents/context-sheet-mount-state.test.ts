@@ -40,31 +40,30 @@ describe('getContextSheetMountState', () => {
     ).toEqual({ mounted: true, visible: false, info: undefined });
   });
 
-  it('unmounts the no-usage sheet when permission controls become unavailable', () => {
+  it('keeps an opened no-usage sheet mounted for a session without permission controls', () => {
     expect(
       getContextSheetMountState(
         undefined,
         { sessionId: 'current-session' },
         { sessionId: 'current-session', autoApproveAvailable: false }
       )
-    ).toEqual({ mounted: false });
+    ).toEqual({ mounted: true, visible: true, info: undefined });
   });
 
-  it('unmounts when there is no context info regardless of open state', () => {
-    expect(getContextSheetMountState(undefined, null, { sessionId: 'current-session' })).toEqual({
-      mounted: false,
-    });
+  it('does not open an unmounted sheet for another session', () => {
     expect(
       getContextSheetMountState(
         undefined,
-        {
-          sessionId: 'current-session',
-          providerID: currentInfo.providerID,
-          modelID: currentInfo.modelID,
-        },
+        { sessionId: 'previous-session' },
         { sessionId: 'current-session' }
       )
     ).toEqual({ mounted: false });
+  });
+
+  it('unmounts when there is no context info and the sheet was never opened', () => {
+    expect(getContextSheetMountState(undefined, null, { sessionId: 'current-session' })).toEqual({
+      mounted: false,
+    });
   });
 
   it('mounts visible when context info exists and its identity is open', () => {

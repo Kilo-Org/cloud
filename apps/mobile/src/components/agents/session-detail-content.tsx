@@ -1369,17 +1369,17 @@ export function SessionDetailContent({
         hasMessages={messages.length > 0}
         autoApproveAvailable={autoApproveAvailable}
         loading={shouldShowLoading}
-        onPress={
-          contextInfo || autoApproveAvailable
-            ? () => {
-                setOpenContextSheetIdentity({
-                  sessionId,
-                  providerID: contextInfo?.providerID,
-                  modelID: contextInfo?.modelID,
-                });
-              }
-            : undefined
-        }
+        // The sheet is the session's own context/permission surface, so the
+        // control opens it in every state of this screen — including while the
+        // transcript is still loading and after a failed open. A state that
+        // hides the control locks the user out of the settings behind it.
+        onPress={() => {
+          setOpenContextSheetIdentity({
+            sessionId,
+            providerID: contextInfo?.providerID,
+            modelID: contextInfo?.modelID,
+          });
+        }}
       />
     </View>
   );

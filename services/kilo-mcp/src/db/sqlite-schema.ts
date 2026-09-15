@@ -35,6 +35,13 @@ export const oauthPendingAuthorizations = sqliteTable(
     organization_id: text('organization_id'),
     /** Kilo API token from the approved pairing (s6); never logged. */
     kilo_token: text('kilo_token'),
+    /**
+     * The client redirect minted by `completeAuthorization` once the org is
+     * chosen. Persisted so the browser tab the client opened (which may not be
+     * the tab that submitted the picker) can still deliver the code, and so a
+     * repeat submit replays instead of stranding the request. Null until then.
+     */
+    redirect_to: text('redirect_to'),
     created_at: text('created_at').notNull(),
     expires_at: text('expires_at').notNull(),
   },

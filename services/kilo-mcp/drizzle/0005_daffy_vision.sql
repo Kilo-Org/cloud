@@ -1,0 +1,1 @@
+ALTER TABLE `oauth_pending_authorizations` ADD `redirect_to` text;

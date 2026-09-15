@@ -40,10 +40,6 @@ import { PERSONAL_ORG_ID, consentPage, orgPickerPage, type OrgOption } from './p
 /** Pending records are short-lived: 10 minutes to complete sign-in. */
 export const PENDING_TTL_SECONDS = 600;
 
-/** Operator-facing copy for a record that can no longer be acted on. */
-const STALE_REQUEST_MESSAGE =
-  'This request is no longer valid. Close this tab and retry from your MCP client.';
-
 export type ConsentDeps = {
   store: OAuthStoreApi;
   /** apps/web base URL — the user-identity provider. */
@@ -58,6 +54,7 @@ export type ConsentDeps = {
 export type PairingStatus =
   | { status: 'pending' }
   | { status: 'needs_org'; picker_url: string }
+  | { status: 'approved'; redirect_url: string }
   | { status: 'denied' }
   | { status: 'expired' }
   | { status: 'unknown' };
@@ -93,6 +90,29 @@ function needsOrg(id: string): Response {
   return authJsonResponse({
     status: 'needs_org',
     picker_url: `${AUTH_PATHS.orgPicker}?id=${encodeURIComponent(id)}`,
+  } satisfies PairingStatus);
+}
+
+/** The private status poll URL both browser pages watch for completion. */
+function pickerStatusUrl(id: string): string {
+  return `${AUTH_PATHS.pairingStatus}?id=${encodeURIComponent(id)}`;
+}
+
+/** The client redirect the library minted for a completed authorization. */
+function clientRedirect(redirectTo: string): Response {
+  // Plain 302 (not Response.redirect) so withAuthCors can extend the headers.
+  return withAuthCors(new Response(null, { status: 302, headers: { Location: redirectTo } }));
+}
+
+/**
+ * The completion answer the consent and picker pages poll for: the tab the
+ * client opened must be able to deliver the code even when the org was chosen
+ * in a different tab.
+ */
+function approvedStatus(redirectTo: string): Response {
+  return authJsonResponse({
+    status: 'approved',
+    redirect_url: redirectTo,
   } satisfies PairingStatus);
 }
 
@@ -237,7 +257,7 @@ async function handlePairingStatus(request: Request, deps: ConsentDeps): Promise
   const now = deps.now?.() ?? new Date();
   const nowIso = now.toISOString();
   const record = await deps.store.getPendingAuthorization(id);
-  if (!record || record.expiresAt <= nowIso || record.status === 'completed') {
+  if (!record || record.expiresAt <= nowIso) {
     return authJsonResponse({ status: 'unknown' } satisfies PairingStatus);
   }
   const clientId = record.authRequest.clientId;
@@ -249,10 +269,17 @@ async function handlePairingStatus(request: Request, deps: ConsentDeps): Promise
   if (record.status === 'expired') {
     return authJsonResponse({ status: 'expired' } satisfies PairingStatus);
   }
-  if (record.status === 'approved') {
-    // The org was chosen and /authorize/org owns the redirect; a status poll
-    // past this point must not send the browser back to the picker.
-    return authJsonResponse({ status: 'unknown' } satisfies PairingStatus);
+  if (record.status === 'completed' && record.redirectTo) {
+    // The org was chosen (here or in another tab). This tab can finish the flow
+    // by following the client redirect, so a client whose callback must land in
+    // this very window does not hang waiting for a redirect it never sees.
+    return approvedStatus(record.redirectTo);
+  }
+  if (record.status === 'approved' || record.status === 'completed') {
+    // A completion is in flight (or finished without a redirect to replay, which
+    // the store never writes): keep the page waiting rather than telling it the
+    // request is dead.
+    return authJsonResponse({ status: 'pending' } satisfies PairingStatus);
   }
   // The pairing is approved but the org is not chosen (status stays 'pending'
   // until /authorize/org): send the page to the picker.
@@ -308,7 +335,12 @@ async function handlePairingStatus(request: Request, deps: ConsentDeps): Promise
       if (updated?.status === 'denied') {
         return authJsonResponse({ status: 'denied' } satisfies PairingStatus);
       }
-      return authJsonResponse({ status: 'unknown' } satisfies PairingStatus);
+      if (updated?.status === 'expired') {
+        return authJsonResponse({ status: 'expired' } satisfies PairingStatus);
+      }
+      // The record changed under us (a concurrent completion or denial): keep
+      // the page waiting for the next poll instead of declaring it dead.
+      return authJsonResponse({ status: 'pending' } satisfies PairingStatus);
     }
   }
 }
@@ -326,15 +358,50 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
   const now = deps.now?.() ?? new Date();
   const nowIso = now.toISOString();
   const record = await deps.store.getPendingAuthorization(id);
-  if (
-    !record ||
-    record.expiresAt <= nowIso ||
-    record.status === 'denied' ||
-    record.status === 'expired' ||
-    record.status === 'completed' ||
-    record.status === 'approved'
-  ) {
-    return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
+  // Every terminal state names itself: a failed flow must not cost a support
+  // round trip to learn which step (id, expiry, denial, org choice) broke.
+  if (!record) {
+    return errorPage(
+      'invalid_request',
+      'No pending sign-in request matches this link (it is unknown or already purged). Start sign-in again from your MCP client.'
+    );
+  }
+  if (record.status === 'completed' && record.redirectTo) {
+    // The account was already chosen — here or in another browser tab. Replay
+    // the same client redirect so this tab finishes the flow instead of
+    // stranding it (and so a reload or a second tab is idempotent).
+    return clientRedirect(record.redirectTo);
+  }
+  if (record.expiresAt <= nowIso) {
+    return errorPage(
+      'invalid_request',
+      'The Kilo sign-in request expired before an account was chosen. Start sign-in again from your MCP client.'
+    );
+  }
+  if (record.status === 'denied') {
+    return errorPage(
+      'access_denied',
+      'Kilo sign-in was denied for this request, so no account can be chosen. Start sign-in again from your MCP client.'
+    );
+  }
+  if (record.status === 'expired') {
+    return errorPage(
+      'invalid_request',
+      'The Kilo sign-in request expired before an account was chosen. Start sign-in again from your MCP client.'
+    );
+  }
+  if (request.method === 'GET' && (record.status === 'approved' || record.status === 'completed')) {
+    // A concurrent submit won the store's guard and is minting the code right
+    // now: do not start a second completion. A navigation is told to reload
+    // rather than declaring the request dead. A POST falls through instead, so
+    // `approveAndRedirect` re-reads the record and re-renders this tab's picker
+    // with its status poll — the tab that submitted keeps following the
+    // winner's redirect rather than being stranded without a poll.
+    return errorPage(
+      'temporarily_unavailable',
+      'This connection is finishing in another tab. Reload this page in a moment.',
+      409
+    );
   }
 
   const client: ClientInfo | null = await env.OAUTH_PROVIDER.lookupClient(
@@ -342,6 +409,7 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
   );
   const clientName = client?.clientName ?? 'your MCP client';
   const actionUrl = `${AUTH_PATHS.orgPicker}?id=${encodeURIComponent(id)}`;
+  const statusUrl = pickerStatusUrl(id);
 
   if (!isPaired(record)) {
     // Kilo sign-in not finished for this record: send the user back through
@@ -350,7 +418,7 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
       clientName,
       scope: MCP_SCOPE,
       webSignInUrl: `${deps.webBaseUrl.replace(/\/$/, '')}/device-auth?code=${encodeURIComponent(record.deviceAuthCode)}`,
-      statusUrl: `${AUTH_PATHS.pairingStatus}?id=${encodeURIComponent(id)}`,
+      statusUrl,
       restartUrl: restartAuthorizeUrl(record.authRequest, url.origin),
     });
   }
@@ -363,6 +431,7 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
       actionUrl,
       options: [{ id: PERSONAL_ORG_ID, name: 'Personal account' }],
       error,
+      statusUrl,
     });
 
   /** Bind the chosen context and complete the authorize; stops on a lost race. */
@@ -376,10 +445,33 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
       nowIso
     );
     if (!approved) {
-      // Lost the race to a concurrent submit or an expiry: stop, do not
-      // complete. The store's pending->approved guard makes a re-completion
-      // impossible.
-      return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
+      // Lost the pending -> approved guard to a concurrent submit or an expiry.
+      // The winner may still be inside `completeAuthorization` (the record stays
+      // 'approved' until it persists the redirect), or it may have released the
+      // record back to retryable 'pending' after a failed completion. Replay a
+      // persisted redirect when there is one; otherwise re-render this tab's
+      // picker, whose status poll follows that redirect as soon as it lands (and
+      // which lets the user retry). Never strand the tab on a terminal page.
+      const current = await deps.store.getPendingAuthorization(id);
+      if (current?.status === 'completed' && current.redirectTo) {
+        return clientRedirect(current.redirectTo);
+      }
+      if (current && current.expiresAt > nowIso) {
+        if (current.status === 'approved') {
+          return renderRetry(
+            'This connection is finishing in another tab. This page continues automatically.'
+          );
+        }
+        if (current.status === 'pending') {
+          return renderRetry(
+            'Could not finish connecting to Kilo right now. Choose the account again to retry.'
+          );
+        }
+      }
+      return errorPage(
+        'invalid_request',
+        'This sign-in request already finished or expired before the account choice was saved. Start sign-in again from your MCP client.'
+      );
     }
     let redirectTo: string;
     try {
@@ -406,14 +498,25 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
         ? renderRetry(
             'Could not finish connecting to Kilo right now. Choose the account again to retry.'
           )
-        : errorPage('invalid_request', STALE_REQUEST_MESSAGE);
+        : errorPage(
+            'invalid_request',
+            'This sign-in request already finished or expired. Start sign-in again from your MCP client.'
+          );
     }
-    const completed = await deps.store.completePendingAuthorization(id, nowIso);
+    const completed = await deps.store.completePendingAuthorization(id, redirectTo, nowIso);
     if (!completed) {
-      // The terminal transition (approved -> completed) was rejected: the
-      // record expired or a concurrent submit completed it first. Never
-      // redirect or emit a success event for a transition that did not happen.
-      return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
+      // The terminal transition (approved -> completed) was rejected: a
+      // concurrent submit completed it first, or the record expired. Never
+      // redirect or emit a success event for a transition that did not happen;
+      // replay a concurrent completion's redirect when there is one.
+      const current = await deps.store.getPendingAuthorization(id);
+      if (current?.status === 'completed' && current.redirectTo) {
+        return clientRedirect(current.redirectTo);
+      }
+      return errorPage(
+        'invalid_request',
+        'The Kilo sign-in request expired before the account choice was saved. Start sign-in again from your MCP client.'
+      );
     }
     // The library owns the token endpoint, so its tokenExchangeCallback hook
     // runs without deps and cannot see this per-request emitter (index.ts wires
@@ -424,8 +527,7 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
       identity: { kiloUserId: record.kiloUserId, organizationId },
       clientId: record.authRequest.clientId,
     });
-    // Plain 302 (not Response.redirect) so withAuthCors can extend the headers.
-    return withAuthCors(new Response(null, { status: 302, headers: { Location: redirectTo } }));
+    return clientRedirect(redirectTo);
   };
 
   if (request.method === 'GET') {
@@ -439,7 +541,7 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
         'Could not load your organizations right now — only the personal account is offered. Choose it, or retry.'
       );
     }
-    return orgPickerPage({ clientName, actionUrl, options, error: null });
+    return orgPickerPage({ clientName, actionUrl, options, error: null, statusUrl });
   }
 
   // POST. The personal context is always valid for an approved Kilo login, so
@@ -458,7 +560,13 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
       options = null;
     }
     return options
-      ? orgPickerPage({ clientName, actionUrl, options, error: 'Choose an account to continue.' })
+      ? orgPickerPage({
+          clientName,
+          actionUrl,
+          options,
+          error: 'Choose an account to continue.',
+          statusUrl,
+        })
       : personalOnlyPage('Choose an account to continue.');
   }
   const submitted = parsedForm.data.organization_id;
@@ -482,10 +590,11 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
       actionUrl,
       options,
       error: 'That organization is not available for this account.',
+      statusUrl,
     });
   }
   return approveAndRedirect(chosen.id === PERSONAL_ORG_ID ? null : chosen.id, message =>
-    orgPickerPage({ clientName, actionUrl, options, error: message })
+    orgPickerPage({ clientName, actionUrl, options, error: message, statusUrl })
   );
 }
 

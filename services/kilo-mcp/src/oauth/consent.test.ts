@@ -101,6 +101,7 @@ function createFakeStore(): OAuthStoreApi & { pending: Map<string, PendingAuthor
         kiloUserId: null,
         organizationId: null,
         kiloToken: null,
+        redirectTo: null,
         createdAt: input.createdAt,
         expiresAt: input.expiresAt,
       });
@@ -153,16 +154,16 @@ function createFakeStore(): OAuthStoreApi & { pending: Map<string, PendingAuthor
       }
       return false;
     },
-    completePendingAuthorization: async (id, nowIso) => {
+    completePendingAuthorization: async (id, redirectTo, nowIso) => {
       const record = pending.get(id);
       if (!record || record.status !== 'approved' || record.expiresAt <= nowIso) return false;
-      pending.set(id, { ...record, status: 'completed' });
+      pending.set(id, { ...record, status: 'completed', redirectTo });
       return true;
     },
     releasePendingAuthorization: async (id, nowIso) => {
       const record = pending.get(id);
       if (!record || record.status !== 'approved' || record.expiresAt <= nowIso) return false;
-      pending.set(id, { ...record, status: 'pending', organizationId: null });
+      pending.set(id, { ...record, status: 'pending', organizationId: null, redirectTo: null });
       return true;
     },
     purgeExpired: unused,
@@ -556,22 +557,61 @@ describe('GET /authorize/status', () => {
     ).resolves.toEqual({ status: 'unknown' });
   });
 
-  it('answers unknown once the org is chosen (the POST owns the redirect)', async () => {
+  it('answers pending while the org is being chosen, then the client redirect once completed', async () => {
     const store = createFakeStore();
     const id = await seedPaired(store);
+    const handler = createDefaultHandler(deps(store, flowFetch()));
+    const env = envWith(fakeHelpers({}).helpers);
     await store.approvePendingAuthorization(
       'PAIR-1',
       { kiloUserId: 'u-1', organizationId: 'org-1' },
       iso(0)
     );
-    const handler = createDefaultHandler(deps(store, flowFetch()));
+    // Mid-completion: the tab the client opened keeps waiting, never quits.
     await expect(
-      run(
-        handler,
-        new Request(`${ISSUER}/authorize/status?id=${id}`),
-        envWith(fakeHelpers({}).helpers)
-      ).then(r => r.json())
-    ).resolves.toEqual({ status: 'unknown' });
+      run(handler, new Request(`${ISSUER}/authorize/status?id=${id}`), env).then(r => r.json())
+    ).resolves.toEqual({ status: 'pending' });
+    // Completed: the poll hands the client redirect to whichever tab is watching.
+    const redirectTo = `${REDIRECT}?code=lib-code&state=${STATE}`;
+    await store.completePendingAuthorization(id, redirectTo, iso(0));
+    await expect(
+      run(handler, new Request(`${ISSUER}/authorize/status?id=${id}`), env).then(r => r.json())
+    ).resolves.toEqual({ status: 'approved', redirect_url: redirectTo });
+  });
+
+  it('lets the tab that opened /authorize finish when the org is chosen in a separate tab', async () => {
+    // The reported failure: consent in one tab, the org picked in another. The
+    // client's tab can only complete if the status poll hands it the redirect.
+    const store = createFakeStore();
+    await seedPending(store);
+    const id = [...store.pending.keys()][0]!;
+    const handler = createDefaultHandler(deps(store, flowFetch()));
+    const env = envWith(fakeHelpers({ client: clientInfo() }).helpers);
+
+    // Tab A (the client's tab) polls: sign-in is approved, so it moves to the picker.
+    await expect(
+      run(handler, new Request(`${ISSUER}/authorize/status?id=${id}`), env).then(r => r.json())
+    ).resolves.toEqual({ status: 'needs_org', picker_url: `/authorize/org?id=${id}` });
+
+    // Tab B (a separate tab) picks the org and completes the authorization.
+    const redirectTo = `${REDIRECT}?code=lib-code&state=${STATE}`;
+    const submitted = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+      }),
+      envWith(fakeHelpers({ client: clientInfo(), redirectTo }).helpers)
+    );
+    expect(submitted.status).toBe(302);
+    expect(submitted.headers.get('Location')).toBe(redirectTo);
+
+    // Tab A's next poll must deliver the same client redirect, so tab A (which
+    // may be the client's launch window) still finishes the flow.
+    await expect(
+      run(handler, new Request(`${ISSUER}/authorize/status?id=${id}`), env).then(r => r.json())
+    ).resolves.toEqual({ status: 'approved', redirect_url: redirectTo });
   });
 
   it('rejects non-GET', async () => {
@@ -779,10 +819,11 @@ describe('GET/POST /authorize/org', () => {
     expect(store.pending.get(id)?.status).toBe('pending');
   });
 
-  it('guards a double complete: the second submit cannot complete twice', async () => {
+  it('replays the same client redirect for a second submit instead of stranding it', async () => {
     const store = createFakeStore();
     const id = await seedPaired(store);
-    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const redirectTo = `${REDIRECT}?code=lib-code&state=${STATE}`;
+    const { helpers, completes } = fakeHelpers({ client: clientInfo(), redirectTo });
     const { analytics, calls } = fakeAnalytics();
     const handler = createDefaultHandler(deps(store, flowFetch(), { analytics }));
     const env = envWith(helpers);
@@ -798,13 +839,128 @@ describe('GET/POST /authorize/org', () => {
       );
     const first = await post();
     expect(first.status).toBe(302);
+    expect(first.headers.get('Location')).toBe(redirectTo);
+    // The same tab reloaded, or a second tab, is idempotent: it gets the same
+    // redirect the library already minted and no second authorization.
     const second = await post();
-    expect(second.status).toBe(400);
+    expect(second.status).toBe(302);
+    expect(second.headers.get('Location')).toBe(redirectTo);
     expect(completes).toHaveLength(1);
     expect(store.pending.get(id)?.status).toBe('completed');
-    // The success event fires once, after the approved guard: the lost second
+    expect(store.pending.get(id)?.redirectTo).toBe(redirectTo);
+    // The success event fires once, after the approved guard: the replayed
     // submit emits nothing.
     expect(calls.filter(call => call.phase === 'succeeded')).toHaveLength(1);
+  });
+
+  it('keeps a losing submit polling while the winning tab is still minting the code', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    // The other tab already won the pending -> approved guard and is inside
+    // completeAuthorization: this tab's submit can only lose that guard, and the
+    // redirect it must follow has not been persisted yet.
+    await store.approvePendingAuthorization(
+      'PAIR-1',
+      { kiloUserId: 'u-1', organizationId: 'org-2' },
+      iso(0)
+    );
+    const handler = createDefaultHandler(deps(store, flowFetch()));
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    // Retryable, not a dead end: the tab keeps the status poll that follows the
+    // winner's redirect as soon as the record completes.
+    expect(html).toMatch(/finishing in another tab/);
+    expect(html).toContain(`/authorize/status?id=${id}`);
+    expect(html).toContain('location.replace(j.redirect_url)');
+    // The losing submit never mints a second authorization.
+    expect(completes).toHaveLength(0);
+    expect(store.pending.get(id)?.status).toBe('approved');
+  });
+
+  it('re-offers the picker when a concurrent submit rolled the record back to pending', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    // The winning tab's provider call failed and released the record back to
+    // retryable 'pending' after this submit had already lost the guard.
+    store.approvePendingAuthorization = async () => false;
+    const handler = createDefaultHandler(deps(store, flowFetch()));
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toMatch(/Could not finish connecting/);
+    expect(html).toContain(`/authorize/status?id=${id}`);
+    expect(completes).toHaveLength(0);
+    expect(store.pending.get(id)?.status).toBe('pending');
+  });
+
+  it('re-offers the picker when the guard is lost mid-flight (record still approved)', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    // The submit read the record as pending, but a concurrent tab wins the
+    // pending -> approved guard before this submit runs: the record is left
+    // 'approved' while that tab is inside completeAuthorization.
+    const approve = store.approvePendingAuthorization.bind(store);
+    store.approvePendingAuthorization = async (deviceAuthCode, identity, nowIso) => {
+      await approve(deviceAuthCode, identity, nowIso);
+      return false;
+    };
+    const handler = createDefaultHandler(deps(store, flowFetch()));
+    const { helpers, completes } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'org-2' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toMatch(/finishing in another tab/);
+    expect(html).toContain(`/authorize/status?id=${id}`);
+    expect(html).toContain('location.replace(j.redirect_url)');
+    expect(completes).toHaveLength(0);
+    expect(store.pending.get(id)?.status).toBe('approved');
+  });
+
+  it('replays the client redirect for a GET of an already-completed record', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const redirectTo = `${REDIRECT}?code=lib-code`;
+    await store.approvePendingAuthorization(
+      'PAIR-1',
+      { kiloUserId: 'u-1', organizationId: null },
+      iso(0)
+    );
+    await store.completePendingAuthorization(id, redirectTo, iso(0));
+    const handler = createDefaultHandler(deps(store, flowFetch()));
+    const response = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${id}`),
+      envWith(fakeHelpers({ client: clientInfo() }).helpers)
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe(redirectTo);
   });
 
   it('reverts an approved record to pending when the provider completion fails (retryable)', async () => {
@@ -874,21 +1030,58 @@ describe('GET/POST /authorize/org', () => {
     expect(calls.filter(call => call.phase === 'succeeded')).toHaveLength(0);
   });
 
-  it('rejects unknown/expired/denied records with an error page', async () => {
+  it('names what failed for unknown/denied/expired/already-finished records', async () => {
     const store = createFakeStore();
     const handler = createDefaultHandler(deps(store, flowFetch()));
     const env = envWith(fakeHelpers({ client: clientInfo() }).helpers);
-    await expect(
-      run(handler, new Request(`${ISSUER}/authorize/org?id=ghost`), env).then(r => r.status)
-    ).resolves.toBe(400);
-    const id = await seedPending(store);
-    store.pending.set(id, { ...store.pending.get(id)!, status: 'denied' });
-    await expect(
-      run(handler, new Request(`${ISSUER}/authorize/org?id=${id}`), env).then(r => r.status)
-    ).resolves.toBe(400);
-    await expect(
-      run(handler, new Request(`${ISSUER}/authorize/org?id=`), env).then(r => r.status)
-    ).resolves.toBe(400);
+    const ghost = await run(handler, new Request(`${ISSUER}/authorize/org?id=ghost`), env);
+    expect(ghost.status).toBe(400);
+    expect(await ghost.text()).toMatch(/No pending sign-in request matches this link/);
+
+    const missing = await run(handler, new Request(`${ISSUER}/authorize/org?id=`), env);
+    expect(missing.status).toBe(400);
+    expect(await missing.text()).toMatch(/Missing authorization id/);
+
+    const deniedId = await seedPending(store, {
+      id: 'pa-denied',
+      deviceAuthCode: 'PAIR-DENIED',
+    });
+    store.pending.set(deniedId, { ...store.pending.get(deniedId)!, status: 'denied' });
+    const denied = await run(handler, new Request(`${ISSUER}/authorize/org?id=${deniedId}`), env);
+    expect(denied.status).toBe(400);
+    expect(await denied.text()).toMatch(/Kilo sign-in was denied/);
+
+    const expiredId = await seedPending(store, {
+      id: 'pa-exp',
+      deviceAuthCode: 'PAIR-EXP',
+      expiresAt: iso(-1),
+    });
+    const expired = await run(handler, new Request(`${ISSUER}/authorize/org?id=${expiredId}`), env);
+    expect(expired.status).toBe(400);
+    expect(await expired.text()).toMatch(/expired before an account was chosen/);
+
+    // Mid-completion (another tab is minting the code): retryable, not a dead end.
+    const approvedId = await seedPending(store, {
+      id: 'pa-appr',
+      deviceAuthCode: 'PAIR-APPR',
+    });
+    await store.recordPairingApproval(
+      'PAIR-APPR',
+      { kiloUserId: 'u-1', kiloToken: 'kilo-tok-1' },
+      iso(0)
+    );
+    await store.approvePendingAuthorization(
+      'PAIR-APPR',
+      { kiloUserId: 'u-1', organizationId: 'org-1' },
+      iso(0)
+    );
+    const approved = await run(
+      handler,
+      new Request(`${ISSUER}/authorize/org?id=${approvedId}`),
+      env
+    );
+    expect(approved.status).toBe(409);
+    expect(await approved.text()).toMatch(/finishing in another tab/);
   });
 });
 

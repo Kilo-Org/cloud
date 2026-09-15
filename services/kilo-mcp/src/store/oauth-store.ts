@@ -55,6 +55,12 @@ export type PendingAuthorization = {
   organizationId: string | null;
   /** Kilo API token from the approved pairing; never log it. */
   kiloToken: string | null;
+  /**
+   * The client redirect minted once the library issued the code, or null until
+   * /authorize/org completes. Replayed to any tab that finishes the flow so a
+   * second tab does not strand the authorization.
+   */
+  redirectTo: string | null;
   createdAt: string;
   expiresAt: string;
 };
@@ -101,7 +107,7 @@ export interface OAuthStoreApi {
     nowIso: string
   ): Promise<boolean>;
   /** Terminal transition: approved -> completed once the library issues the code (s2). */
-  completePendingAuthorization(id: string, nowIso: string): Promise<boolean>;
+  completePendingAuthorization(id: string, redirectTo: string, nowIso: string): Promise<boolean>;
   /**
    * approved -> pending after the library's `completeAuthorization` failed:
    * releases the record so the user can retry the picker instead of being
@@ -128,6 +134,7 @@ function rowToPendingAuthorization(
     kiloUserId: row.kilo_user_id,
     organizationId: row.organization_id,
     kiloToken: row.kilo_token,
+    redirectTo: row.redirect_to,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
   };
@@ -253,10 +260,14 @@ export class KiloMcpOAuthStore
     return row !== undefined;
   }
 
-  async completePendingAuthorization(id: string, nowIso: string): Promise<boolean> {
+  async completePendingAuthorization(
+    id: string,
+    redirectTo: string,
+    nowIso: string
+  ): Promise<boolean> {
     const row = this.db
       .update(oauthPendingAuthorizations)
-      .set({ status: 'completed' })
+      .set({ status: 'completed', redirect_to: redirectTo })
       .where(
         and(
           eq(oauthPendingAuthorizations.id, id),
@@ -272,7 +283,7 @@ export class KiloMcpOAuthStore
   async releasePendingAuthorization(id: string, nowIso: string): Promise<boolean> {
     const row = this.db
       .update(oauthPendingAuthorizations)
-      .set({ status: 'pending', organization_id: null })
+      .set({ status: 'pending', organization_id: null, redirect_to: null })
       .where(
         and(
           eq(oauthPendingAuthorizations.id, id),

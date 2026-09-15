@@ -116,7 +116,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       const applied = db.prepare('SELECT COUNT(*) AS n FROM __drizzle_migrations').get() as {
         n: number;
       };
-      expect(applied.n).toBe(5);
+      expect(applied.n).toBe(6);
     });
 
     it('a second DO instance over the same storage does not re-apply the migration', async () => {
@@ -124,7 +124,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       const applied = db.prepare('SELECT COUNT(*) AS n FROM __drizzle_migrations').get() as {
         n: number;
       };
-      expect(applied.n).toBe(5);
+      expect(applied.n).toBe(6);
     });
   });
 
@@ -210,6 +210,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         kiloUserId: null,
         organizationId: null,
         kiloToken: null,
+        redirectTo: null,
         createdAt: NOW,
         expiresAt: LATER,
       });
@@ -297,17 +298,25 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       ).toBe(false);
     });
 
-    it('completes only an approved, live authorization, exactly once', async () => {
-      expect(await store.completePendingAuthorization('pa-not-approved', NOW)).toBe(false);
+    it('completes only an approved, live authorization, exactly once, storing the client redirect', async () => {
+      const redirectTo = 'https://a.test/cb?code=lib-code&state=st';
+      expect(await store.completePendingAuthorization('pa-not-approved', redirectTo, NOW)).toBe(
+        false
+      );
       await store.createPendingAuthorization(
         pendingInput({ id: 'pa-not-approved', deviceAuthCode: 'PAIR-PA-NA' })
       );
-      expect(await store.completePendingAuthorization('pa-not-approved', NOW)).toBe(false);
+      expect(await store.completePendingAuthorization('pa-not-approved', redirectTo, NOW)).toBe(
+        false
+      );
 
-      expect(await store.completePendingAuthorization('pa-1', NOW)).toBe(true);
-      expect(await store.completePendingAuthorization('pa-1', NOW)).toBe(false);
-      expect((await store.getPendingAuthorization('pa-1'))?.status).toBe('completed');
-      expect(await store.completePendingAuthorization('pa-ghost', NOW)).toBe(false);
+      expect(await store.completePendingAuthorization('pa-1', redirectTo, NOW)).toBe(true);
+      expect(await store.completePendingAuthorization('pa-1', redirectTo, NOW)).toBe(false);
+      const completed = await store.getPendingAuthorization('pa-1');
+      expect(completed?.status).toBe('completed');
+      // The minted redirect is persisted so another tab can replay it.
+      expect(completed?.redirectTo).toBe(redirectTo);
+      expect(await store.completePendingAuthorization('pa-ghost', redirectTo, NOW)).toBe(false);
     });
 
     it('refuses to complete an approved authorization after expiry', async () => {
@@ -319,7 +328,9 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         { kiloUserId: 'u', organizationId: null },
         NOW
       );
-      expect(await store.completePendingAuthorization('pa-complete-exp', LATER)).toBe(false);
+      expect(
+        await store.completePendingAuthorization('pa-complete-exp', 'https://a.test/cb', LATER)
+      ).toBe(false);
       expect((await store.getPendingAuthorization('pa-complete-exp'))?.status).toBe('approved');
     });
 
@@ -343,6 +354,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         status: 'pending',
         kiloUserId: 'u-rel',
         organizationId: null,
+        redirectTo: null,
       });
       expect(await store.releasePendingAuthorization('pa-release', NOW)).toBe(false);
       expect(await store.releasePendingAuthorization('pa-ghost', NOW)).toBe(false);

@@ -24,6 +24,12 @@ export const PERSONAL_ORG_ID = 'personal';
  * (the page had to be reopened from the MCP client). A background tab keeps
  * polling; the browser may throttle it while hidden, and it catches up when
  * this tab regains focus.
+ *
+ * The `approved` branch keeps this tab able to finish the flow: once the org is
+ * chosen — in this tab's picker or in another tab — the poll navigates to the
+ * client redirect. That is what lets a client whose redirect must land in this
+ * very window (an extension's `identity.launchWebAuthFlow`) complete when the
+ * org was selected in a separate tab.
  */
 export function consentPage(input: {
   clientName: string;
@@ -47,6 +53,7 @@ export function consentPage(input: {
     `var restart=document.getElementById('restart');` +
     `function fail(msg){el.textContent=msg;restart.hidden=false;}` +
     `async function poll(){try{var r=await fetch(u,{credentials:'omit'});var j=await r.json();` +
+    `if(j.status==='approved'){location.replace(j.redirect_url);return;}` +
     `if(j.status==='needs_org'){location.replace(j.picker_url);return;}` +
     `if(j.status==='denied'){fail('Kilo sign-in was denied. Start sign-in again to retry, or close this tab.');return;}` +
     `if(j.status==='expired'){fail('The Kilo sign-in request expired. Start sign-in again to try once more.');return;}` +
@@ -64,12 +71,21 @@ const PICKER_STYLE =
   '.org input{accent-color:var(--primary);margin:0}' +
   '.err{color:var(--danger)}';
 
-/** The picker HTML: one radio per selectable context + a Connect button. */
+/**
+ * The picker HTML: one radio per selectable context + a Connect button.
+ *
+ * `statusUrl` makes the page finish the flow even when the org is submitted in
+ * a different tab: the poll navigates this tab to the client redirect as soon
+ * as the record completes. The client's own tab (an extension's
+ * `launchWebAuthFlow` window, or the tab that opened /authorize) can therefore
+ * deliver the code even though another tab performed the selection.
+ */
 export function orgPickerPage(input: {
   clientName: string;
   actionUrl: string;
   options: OrgOption[];
   error: string | null;
+  statusUrl?: string;
 }): Response {
   const optionsHtml = input.options
     .map(
@@ -81,6 +97,13 @@ export function orgPickerPage(input: {
   const errorHtml = input.error
     ? `<p id="error" role="alert" class="err">${escapeHtml(input.error)}</p>`
     : '';
+  const pollScript = input.statusUrl
+    ? `<script>(function(){var u=${JSON.stringify(input.statusUrl)};` +
+      `async function poll(){try{var r=await fetch(u,{credentials:'omit'});var j=await r.json();` +
+      `if(j.status==='approved'){location.replace(j.redirect_url);return;}` +
+      `if(j.status==='denied'||j.status==='expired'||j.status==='unknown'){return;}}` +
+      `catch(e){}setTimeout(poll,${PAIRING_POLL_INTERVAL_MS});}poll();})();</script>`
+    : '';
   const body =
     `<h1>Choose a Kilo organization</h1>` +
     `<p><strong>${escapeHtml(input.clientName)}</strong> is connecting to Kilo MCP. ` +
@@ -89,7 +112,8 @@ export function orgPickerPage(input: {
     `<form method="post" action="${escapeHtml(input.actionUrl)}">` +
     `<div class="orgs">${optionsHtml}</div>` +
     `<button class="cta" type="submit">Connect</button>` +
-    `</form>`;
+    `</form>` +
+    pollScript;
   const page = authPage('Choose a Kilo organization', body);
   // The picker needs radio-list layout the shared shell does not carry.
   return htmlResponse(page.replace('</head>', `<style>${PICKER_STYLE}</style></head>`));

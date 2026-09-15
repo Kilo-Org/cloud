@@ -38,10 +38,11 @@ describe('consentPage', () => {
     expect(html).toContain("j.status==='expired'");
     expect(html).toContain("j.status==='unknown'");
     expect(html).toContain('location.replace(j.picker_url)');
-    // /authorize/org owns the post-consent client redirect; a status poll can
-    // never answer 'approved', so the page carries no approved branch.
-    expect(html).not.toContain("j.status==='approved'");
-    expect(html).not.toContain('redirect_url');
+    // Once the org is chosen (here or in another tab) this tab follows the
+    // client redirect, so a client whose callback must land in this very window
+    // still completes.
+    expect(html).toContain("j.status==='approved'");
+    expect(html).toContain('location.replace(j.redirect_url)');
   });
 
   it('keeps the restart CTA hidden until the poll fails and opens sign-in in a new tab', async () => {
@@ -88,5 +89,31 @@ describe('orgPickerPage', () => {
     expect(html).toContain('role="alert"');
     expect(html).toContain('&lt;img src=x onerror=1&gt;');
     expect(html).not.toContain('<img src=x onerror=1>');
+  });
+
+  it('finishes the flow from the picker tab when the org was chosen elsewhere', async () => {
+    const html = await orgPickerPage({
+      clientName: 'c',
+      actionUrl: '/authorize/org?id=pa-1',
+      options: [{ id: PERSONAL_ORG_ID, name: 'Personal account' }],
+      error: null,
+      statusUrl: '/authorize/status?id=pa-1',
+    }).text();
+    // The picker watches the same private status url: if another tab completes
+    // the flow, this tab follows the client redirect instead of sitting idle.
+    expect(html).toContain('"/authorize/status?id=pa-1"');
+    expect(html).toContain("j.status==='approved'");
+    expect(html).toContain('location.replace(j.redirect_url)');
+  });
+
+  it('carries no completion poll when no status url is given', async () => {
+    const html = await orgPickerPage({
+      clientName: 'c',
+      actionUrl: '/authorize/org?id=pa-1',
+      options: [{ id: PERSONAL_ORG_ID, name: 'Personal account' }],
+      error: null,
+    }).text();
+    expect(html).not.toContain('redirect_url');
+    expect(html).not.toContain('<script>');
   });
 });

@@ -4,6 +4,7 @@ import m0001 from './0001_cynical_karen_page.sql';
 import m0002 from './0002_square_the_spike.sql';
 import m0003 from './0003_wandering_colleen_wing.sql';
 import m0004 from './0004_refresh_token_history.sql';
+import m0005 from './0005_daffy_vision.sql';
 
 export default {
   journal,
@@ -13,5 +14,6 @@ export default {
     m0002,
     m0003,
     m0004,
+    m0005,
   },
 };

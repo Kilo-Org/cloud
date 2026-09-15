@@ -18,6 +18,7 @@ import {
   GitHubAppAuthorizationRevokedPayloadSchema,
 } from '@/lib/integrations/platforms/github/webhook-schemas';
 import {
+  findConnectedIntegrationByInstallationId,
   findIntegrationByInstallationId,
   getIntegrationForOrganization,
 } from '@/lib/integrations/db/platform-integrations';
@@ -71,19 +72,6 @@ function isRoutableGitHubIntegration(
   } | null
 ): boolean {
   return isPlatformIntegrationHealthy(integration);
-}
-
-/**
- * Unsuspend is a recovery event: the selected association is *expected* to be
- * suspended (that is the state the handler exists to clear), so it must stay
- * routable even though it is unhealthy. Only a locally disconnected former
- * tenant is excluded — that row no longer owns the installation and must not
- * be the association an unsuspend is applied to.
- */
-function isRecoverableGitHubIntegration(
-  integration: { github_disconnected_at?: string | null } | null
-): boolean {
-  return integration !== null && integration.github_disconnected_at == null;
 }
 
 async function isAvailableForDeferredGitHubDispatch(integration: {
@@ -395,16 +383,15 @@ export async function handleGitHubWebhook(
             handleInstallationUnsuspend(parseResult.data, appType)
           );
         }
-        const integration = await findIntegrationByInstallationId(
+        // Unsuspend is a recovery event: the association is expected to be
+        // suspended. Resolve the connected tenant directly, because the
+        // unfiltered lookup can return a retained disconnected former tenant
+        // and dropping the event there leaves the live tenant suspended.
+        const integration = await findConnectedIntegrationByInstallationId(
           PLATFORM.GITHUB,
           installationId,
           appType
         );
-
-        if (integration && !isRecoverableGitHubIntegration(integration)) {
-          logExceptInTest(`Integration unavailable, skipping event${logSuffix}`);
-          return NextResponse.json({ message: 'Integration unavailable' }, { status: 200 });
-        }
 
         if (integration) {
           const logResult = await logWebhook(integration, action);

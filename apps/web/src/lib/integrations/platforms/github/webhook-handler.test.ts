@@ -10,6 +10,7 @@ const mockVerifyGitHubWebhookSignature = jest.fn(
   (_payload: string, _signature: string, _appType: string) => true
 );
 const mockFindIntegrationByInstallationId = jest.fn();
+const mockFindConnectedIntegrationByInstallationId = jest.fn();
 const mockGetIntegrationForOrganization = jest.fn();
 const mockLogWebhookEvent = jest.fn();
 const mockUpdateWebhookEvent = jest.fn();
@@ -40,6 +41,11 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     installationId: string | undefined,
     githubAppType?: string
   ) => mockFindIntegrationByInstallationId(platform, installationId, githubAppType),
+  findConnectedIntegrationByInstallationId: (
+    platform: string,
+    installationId: string | undefined,
+    githubAppType?: string
+  ) => mockFindConnectedIntegrationByInstallationId(platform, installationId, githubAppType),
   getIntegrationForOrganization: (organizationId: string, platform: string) =>
     mockGetIntegrationForOrganization(organizationId, platform),
 }));
@@ -238,6 +244,7 @@ describe('handleGitHubWebhook', () => {
     mockGetIntegrationForOrganization.mockResolvedValue(integration);
     mockVerifyGitHubWebhookSignature.mockReturnValue(true);
     mockFindIntegrationByInstallationId.mockResolvedValue(integration);
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(integration);
     mockIsSharedGitHubInstallation.mockResolvedValue(false);
     mockClaimSharedGitHubInstallationDelivery.mockResolvedValue({
       status: 'claimed',
@@ -792,7 +799,11 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
+    expect(mockFindConnectedIntegrationByInstallationId).toHaveBeenCalledWith(
+      'github',
+      '98765',
+      'lite'
+    );
     expect(mockHandleInstallationUnsuspend).toHaveBeenCalledWith(
       expect.objectContaining(payload),
       'lite'
@@ -800,7 +811,7 @@ describe('handleGitHubWebhook', () => {
   });
 
   it('processes installation.unsuspend for a suspended association instead of dropping it', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue({
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue({
       ...integration,
       integration_status: 'suspended',
       suspended_at: '2026-09-15T00:00:00.000Z',
@@ -821,11 +832,11 @@ describe('handleGitHubWebhook', () => {
     );
   });
 
-  it('still refuses to route installation.unsuspend for a locally disconnected association', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue({
-      ...integration,
-      github_disconnected_at: '2026-09-15T00:00:00.000Z',
-    });
+  it('does not log installation.unsuspend when only a disconnected former tenant remains', async () => {
+    // The connected-tenant lookup ignores retained disconnected rows, so the
+    // delivery is not recorded against a tenant that no longer owns the
+    // installation. Canonical state is still reconciled by the handler.
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(null);
 
     const payload = { action: 'unsuspend', installation: { id: 98765 } };
     const response = await handleGitHubWebhook(
@@ -834,8 +845,7 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ message: 'Integration unavailable' });
-    expect(mockHandleInstallationUnsuspend).not.toHaveBeenCalled();
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
   });
 
   it('routes installation_repositories to the handler with the webhook app type', async () => {

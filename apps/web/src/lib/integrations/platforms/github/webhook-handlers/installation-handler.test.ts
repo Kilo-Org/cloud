@@ -26,6 +26,14 @@ const mockFindIntegrationByInstallationId =
       appType: GitHubAppType
     ) => Promise<GitHubIntegrationRow | null>
   >();
+const mockFindConnectedIntegrationByInstallationId =
+  jest.fn<
+    (
+      platform: string,
+      installationId: string,
+      appType: GitHubAppType
+    ) => Promise<GitHubIntegrationRow | null>
+  >();
 const mockDeleteGitHubInstallationRecords =
   jest.fn<(installationId: string, appType: GitHubAppType) => Promise<void>>();
 const mockSuspendIntegration =
@@ -118,6 +126,11 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     installationId: string,
     appType: GitHubAppType
   ) => mockFindIntegrationByInstallationId(platform, installationId, appType),
+  findConnectedIntegrationByInstallationId: (
+    platform: string,
+    installationId: string,
+    appType: GitHubAppType
+  ) => mockFindConnectedIntegrationByInstallationId(platform, installationId, appType),
   autoCompleteInstallation: (...args: unknown[]) => mockAutoCompleteInstallation(...args),
   deleteGitHubInstallationRecords: (installationId: string, appType: GitHubAppType) =>
     mockDeleteGitHubInstallationRecords(installationId, appType),
@@ -416,7 +429,7 @@ describe('handleInstallationSuspend', () => {
   });
 
   it('passes the webhook app type to the organization suspend helper', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue(orgIntegration);
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(orgIntegration);
 
     const response = await handleInstallationSuspend(suspendPayload, 'standard');
 
@@ -434,7 +447,7 @@ describe('handleInstallationSuspend', () => {
   });
 
   it('passes the webhook app type to the user suspend helper', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue(userIntegration);
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(userIntegration);
 
     const response = await handleInstallationSuspend(suspendPayload, 'lite');
 
@@ -454,7 +467,7 @@ describe('handleInstallationUnsuspend', () => {
   });
 
   it('passes the webhook app type to the organization unsuspend helper', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue(orgIntegration);
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(orgIntegration);
 
     const response = await handleInstallationUnsuspend(unsuspendPayload, 'lite');
 
@@ -468,7 +481,7 @@ describe('handleInstallationUnsuspend', () => {
   });
 
   it('passes the webhook app type to the user unsuspend helper', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue(userIntegration);
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(userIntegration);
 
     const response = await handleInstallationUnsuspend(unsuspendPayload, 'standard');
 

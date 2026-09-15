@@ -11,7 +11,7 @@ import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import {
   autoCompleteInstallation,
   deleteGitHubInstallationRecords,
-  findIntegrationByInstallationId,
+  findConnectedIntegrationByInstallationId,
   suspendIntegration,
   suspendIntegrationForOwner,
   unsuspendIntegration,
@@ -40,34 +40,6 @@ import type { GitHubAppType } from '../app-selector';
  * GitHub Installation Event Handlers
  * Handles: created, deleted, suspend, unsuspend
  */
-
-/**
- * Resolves the tenant association a canonical lifecycle event (suspend,
- * unsuspend) should be applied to. `findIntegrationByInstallationId` returns an
- * arbitrary row for the installation, so after one tenant disconnects and
- * another stays connected it can return the retained disconnected row — and
- * dropping the event there leaves the connected tenant stuck forever. Canonical
- * state is updated separately by observeGitHubInstallationLifecycle; this only
- * picks the association for the tenant-facing action, and a locally
- * disconnected former tenant is never returned.
- */
-async function findLifecycleIntegration(installationId: string, appType: GitHubAppType) {
-  const resolved = await findIntegrationByInstallationId(PLATFORM.GITHUB, installationId, appType);
-  if (!resolved || resolved.github_disconnected_at == null) return resolved;
-  const [connected] = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.GITHUB),
-        effectiveAppTypeCondition(appType),
-        eq(platform_integrations.platform_installation_id, installationId),
-        isNull(platform_integrations.github_disconnected_at)
-      )
-    )
-    .limit(1);
-  return connected ?? null;
-}
 
 export async function handleInstallationCreated(
   payload: InstallationCreatedPayload,
@@ -262,7 +234,11 @@ export async function handleInstallationSuspend(
   appType: GitHubAppType
 ) {
   const installationIdStr = payload.installation.id.toString();
-  const integration = await findLifecycleIntegration(installationIdStr, appType);
+  const integration = await findConnectedIntegrationByInstallationId(
+    PLATFORM.GITHUB,
+    installationIdStr,
+    appType
+  );
   await observeGitHubInstallationLifecycle({
     installationId: installationIdStr,
     appType,
@@ -298,7 +274,11 @@ export async function handleInstallationUnsuspend(
   appType: GitHubAppType
 ) {
   const installationIdStr = payload.installation.id.toString();
-  const integration = await findLifecycleIntegration(installationIdStr, appType);
+  const integration = await findConnectedIntegrationByInstallationId(
+    PLATFORM.GITHUB,
+    installationIdStr,
+    appType
+  );
   await observeGitHubInstallationLifecycle({
     installationId: installationIdStr,
     appType,

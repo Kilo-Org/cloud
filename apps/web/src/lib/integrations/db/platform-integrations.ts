@@ -30,13 +30,11 @@ import { canOrganizationUseMultipleGitHubInstallations } from '../github/multipl
  * the correct row. Callers without an app type (e.g. legacy bot-link states)
  * keep the unscoped lookup, which preserves legacy behavior.
  */
-export async function findIntegrationByInstallationId(
+function installationLookupConditions(
   platform: string,
-  installationId: string | undefined,
+  installationId: string,
   githubAppType?: GitHubAppType
 ) {
-  if (!installationId) return null;
-
   const conditions = [
     eq(platform_integrations.platform, platform),
     eq(platform_integrations.platform_installation_id, installationId),
@@ -51,11 +49,47 @@ export async function findIntegrationByInstallationId(
         : eq(platform_integrations.github_app_type, githubAppType);
     if (appTypeCondition) conditions.push(appTypeCondition);
   }
+  return conditions;
+}
+
+export async function findIntegrationByInstallationId(
+  platform: string,
+  installationId: string | undefined,
+  githubAppType?: GitHubAppType
+) {
+  if (!installationId) return null;
 
   const [integration] = await db
     .select()
     .from(platform_integrations)
-    .where(and(...conditions))
+    .where(and(...installationLookupConditions(platform, installationId, githubAppType)))
+    .limit(1);
+
+  return integration || null;
+}
+
+/**
+ * Resolves the connected (non-locally-disconnected) association for an
+ * installation. `findIntegrationByInstallationId` has no health filter and no
+ * ordering, so after one tenant disconnects it can return the retained
+ * disconnected row ahead of the tenant that still owns the installation.
+ */
+export async function findConnectedIntegrationByInstallationId(
+  platform: string,
+  installationId: string | undefined,
+  githubAppType?: GitHubAppType
+) {
+  if (!installationId) return null;
+
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        ...installationLookupConditions(platform, installationId, githubAppType),
+        isNull(platform_integrations.github_disconnected_at)
+      )
+    )
     .limit(1);
 
   return integration || null;

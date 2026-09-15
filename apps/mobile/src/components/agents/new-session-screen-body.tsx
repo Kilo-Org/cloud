@@ -254,8 +254,8 @@ export function NewSessionScreenBody() {
 
   // The sandbox selection is owned here, not by the form: the route's scope is
   // this screen's, and the picked allocation resets with it inside the hook.
-  // The pick is submitted by the create call (s2), so this slice only renders
-  // the control and reports the two non-retryable picks.
+  // The pick rides the create call below, and a settled capabilities verdict
+  // that the pick is unavailable blocks Start.
   const sandboxSelection = useSandboxSelection(organizationId);
   const sandboxError = resolveSandboxSelectionError({
     capabilities: sandboxSelection.capabilities,
@@ -425,6 +425,7 @@ export function NewSessionScreenBody() {
     variant: displayVariant,
     autoCommit,
     profileId,
+    sandboxAllocation: sandboxSelection.allocation,
   });
 
   // Seed the route-owned prompt state from the restored draft once the load
@@ -671,6 +672,11 @@ export function NewSessionScreenBody() {
       selectedRepo,
       selectedRepositoryResolved: selectedRepository !== null,
       isProfileLoading,
+      // Only a settled capabilities verdict blocks: with the query errored or
+      // still loading the pick cannot be checked, so Start stays enabled and
+      // the server arbitrates the pick (a rejection surfaces as the inline
+      // create error). Nothing picked means the backend default applies.
+      sandboxUnavailable: sandboxSelection.status === 'ready' && sandboxError !== undefined,
     });
   }
 

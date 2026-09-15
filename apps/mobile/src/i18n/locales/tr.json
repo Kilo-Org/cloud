@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Sesli girişi cihazın konuşma tanıması yerine bir Kilo Gateway modeliyle metne dönüştürün. Kaydınız Kilo Gateway'e gönderilir.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Araç çağrılarını daralt",
-    "condenseToolCallsSubtitle": "Ardışık araç çağrılarını açabileceğin tek bir satırda grupla."
+    "condenseToolCallsSubtitle": "Ardışık araç çağrılarını açabileceğin tek bir satırda grupla.",
+    "toolSummaryTranslation": "Araç özetlerini çevir",
+    "toolSummaryTranslationSubtitle": "Her araç özetini uygulama dilinize çevirmesi için bir modele gönderin. Çeviri başarısız olursa özgün metin gösterilir.",
+    "toolSummaryTranslationModelUnavailableNotice": "Bu model artık sunulmuyor. Başka bir tane seçmek için $t(common.model) öğesine dokun."
   },
   "notifications": {
     "liveActivities": "Canlı etkinlikler",

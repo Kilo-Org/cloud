@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "ຖອດການປ້ອນຂໍ້ຄວາມດ້ວຍສຽງເປັນຂໍ້ຄວາມດ້ວຍໂມເດວ Kilo Gateway ແທນການຈຳລາສຽງພາຍໃນອຸປະກອນ. ໄຟລ໌ບັນທຶກສຽງຂອງທ່ານຈະຖືກສົ່ງໄປ Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "ຫຍໍ້ການເອີ້ນເຄື່ອງມື",
-    "condenseToolCallsSubtitle": "ຈັດກຸ່ມການເອີ້ນເຄື່ອງມືຕິດຕໍ່ກັນໃສ່ແຖວດຽວທີ່ທ່ານສາມາດເປີດໄດ້."
+    "condenseToolCallsSubtitle": "ຈັດກຸ່ມການເອີ້ນເຄື່ອງມືຕິດຕໍ່ກັນໃສ່ແຖວດຽວທີ່ທ່ານສາມາດເປີດໄດ້.",
+    "toolSummaryTranslation": "ແປບົດສະຫຼຸບເຄື່ອງມື",
+    "toolSummaryTranslationSubtitle": "ສົ່ງບົດສະຫຼຸບເຄື່ອງມືແຕ່ລະອັນໄປຫາຕົວແບບເພື່ອແປມັນເປັນພາສາແອັບຂອງທ່ານ. ຖ້າການແປລົ້ມເຫຼວ ຕົ້ນສະບັບຈະຖືກສະແດງ.",
+    "toolSummaryTranslationModelUnavailableNotice": "ໂມເດວນີ້ບໍ່ໄດ້ສະເໜີອີກຕໍ່ໄປ. ແຕະ $t(common.model) ເພື່ອເລືອກອັນອື່ນ."
   },
   "prReview": {
     "pullRequestUnavailable": "ບໍ່ສາມາດເປີດຄຳຂໍລວມໂຄດ",

@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Transkripsikan masukan suara dengan model Kilo Gateway alih-alih pengenalan bicara perangkat. Rekaman Anda dikirim ke Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Padatkan panggilan alat",
-    "condenseToolCallsSubtitle": "Kelompokkan panggilan alat yang berurutan ke dalam satu baris yang dapat Anda buka."
+    "condenseToolCallsSubtitle": "Kelompokkan panggilan alat yang berurutan ke dalam satu baris yang dapat Anda buka.",
+    "toolSummaryTranslation": "Terjemahkan ringkasan alat",
+    "toolSummaryTranslationSubtitle": "Kirim setiap ringkasan alat ke model untuk diterjemahkan ke bahasa aplikasi Anda. Teks asli ditampilkan jika terjemahan gagal.",
+    "toolSummaryTranslationModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketuk $t(common.model) untuk memilih yang lain."
   },
   "notifications": {
     "liveActivities": "Aktivitas langsung",

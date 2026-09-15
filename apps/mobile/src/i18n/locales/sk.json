@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Prepisujte hlasový vstup modelom Kilo Gateway namiesto rozpoznávania reči v zariadení. Nahrávka sa odošle do Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Zbaliť volania nástrojov",
-    "condenseToolCallsSubtitle": "Zoskupte po sebe idúce volania nástrojov do jedného riadka, ktorý môžete otvoriť."
+    "condenseToolCallsSubtitle": "Zoskupte po sebe idúce volania nástrojov do jedného riadka, ktorý môžete otvoriť.",
+    "toolSummaryTranslation": "Preložiť súhrny nástrojov",
+    "toolSummaryTranslationSubtitle": "Pošli každý súhrn nástroja modelu, aby ho preložil do jazyka tvojej aplikácie. Ak preklad zlyhá, zobrazí sa originál.",
+    "toolSummaryTranslationModelUnavailableNotice": "Tento model sa už neponúka. Klepnutím na $t(common.model) vyberte iný."
   },
   "prReview": {
     "pullRequestUnavailable": "Žiadosť o zlúčenie nie je dostupná",

@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Mayar da shigar da murya zuwa rubutu da samfurin Kilo Gateway maimakon gane magana na na'urar. Ana aika rikodinka zuwa Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Haɗa kiran kayan aiki",
-    "condenseToolCallsSubtitle": "Haɗa kiran kayan aiki a jere cikin layi ɗaya da za ka iya buɗewa."
+    "condenseToolCallsSubtitle": "Haɗa kiran kayan aiki a jere cikin layi ɗaya da za ka iya buɗewa.",
+    "toolSummaryTranslation": "Fassara taƙaitaccen bayanin kayan aiki",
+    "toolSummaryTranslationSubtitle": "Aika kowane taƙaitaccen bayanin kayan aiki zuwa ga samfuri don fassara shi zuwa harshen manhajar ka. Ana nuna na asali idan fassarar ta kasa.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ba a ƙara ba da wannan samfuri ba. Matsa $t(common.model) don zaɓar wani."
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",

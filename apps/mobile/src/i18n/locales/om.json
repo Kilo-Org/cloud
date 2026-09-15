@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Sagalee galchuu mallattoo sagalee meeshaa irraa haa ta'u moodeela Kilo Gateway'ttiin barreeffamatti jijjiiri. Sagaleen kee Kilo Gateway'tti ergama.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Waamicha meeshaa walitti qabi",
-    "condenseToolCallsSubtitle": "Waamicha meeshaa walduraa duubaan karaa tokko keessa kan banuu dandeessu walitti qabi."
+    "condenseToolCallsSubtitle": "Waamicha meeshaa walduraa duubaan karaa tokko keessa kan banuu dandeessu walitti qabi.",
+    "toolSummaryTranslation": "Hiiki cuunfaa meeshaalee",
+    "toolSummaryTranslationSubtitle": "Cuunfaa meeshaa tokkoon tokkoon isaa gara moodelaatti ergi akka inni afaan appii keetiitti hiiku. Yoo hiikkaan hin milkoofne kan jalqabaa ni mul'ata.",
+    "toolSummaryTranslationModelUnavailableNotice": "Moodeeli kun hin dhiyaatu. Kan biraa filachuuf $t(common.model) tuqi."
   },
   "prReview": {
     "pullRequestUnavailable": "Gaaffiin walitti makuu hin argamu",

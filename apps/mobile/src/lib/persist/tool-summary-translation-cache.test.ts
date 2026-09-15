@@ -1,0 +1,167 @@
+/* eslint-disable require-await, @typescript-eslint/require-await -- the in-memory KV fake settles without await */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// The translation cache stores through the encrypted-kv module; the mock below
+// is an in-memory per-scope store with the real map semantics, keeping the
+// native SQLCipher chain out of this node suite.
+const kvMock = vi.hoisted(() => {
+  const scopes = new Map<string, Map<string, { v: string; updatedAt: number }>>();
+  let clock = 0;
+  return {
+    scopes,
+    getItem: vi.fn<(scope: string, k: string) => Promise<string | null>>(
+      async (scope, k) => scopes.get(scope)?.get(k)?.v ?? null
+    ),
+    setItem: vi.fn(async (scope: string, k: string, v: string) => {
+      clock += 1;
+      let bucket = scopes.get(scope);
+      if (!bucket) {
+        bucket = new Map();
+        scopes.set(scope, bucket);
+      }
+      bucket.set(k, { v, updatedAt: clock });
+    }),
+    removeItem: vi.fn(async (scope: string, k: string) => {
+      scopes.get(scope)?.delete(k);
+    }),
+    listEntries: vi.fn(async (scope: string) =>
+      [...(scopes.get(scope)?.entries() ?? [])]
+        .map(([k, entry]) => ({ k, updatedAt: entry.updatedAt }))
+        .sort((a, b) => a.updatedAt - b.updatedAt)
+    ),
+  };
+});
+
+vi.mock('@/lib/persist/encrypted-kv', () => ({
+  getItem: kvMock.getItem,
+  setItem: kvMock.setItem,
+  removeItem: kvMock.removeItem,
+  listEntries: kvMock.listEntries,
+}));
+
+/* eslint-disable import/first */
+import { TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE } from '@/lib/storage-keys';
+import {
+  type CachedToolSummaryTranslation,
+  readToolSummaryTranslations,
+  TOOL_SUMMARY_TRANSLATION_CACHE_CAP,
+  writeToolSummaryTranslation,
+} from './tool-summary-translation-cache';
+/* eslint-enable import/first */
+
+const SCOPE = TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE;
+const ITEM_KEY = 'tt:de:kilo-auto/small:item-1';
+
+function makeEntry(
+  overrides: Partial<CachedToolSummaryTranslation> = {}
+): CachedToolSummaryTranslation {
+  return {
+    itemId: 'item-1',
+    language: 'de',
+    modelId: 'kilo-auto/small',
+    text: 'Ran the tests',
+    translation: 'Tests ausgeführt',
+    storedAt: 1_700_000_000_000,
+    ...overrides,
+  };
+}
+
+function seed(entries: [string, string][]): void {
+  kvMock.scopes.set(SCOPE, new Map(entries.map(([k, v], index) => [k, { v, updatedAt: index + 1 }])));
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  kvMock.scopes.clear();
+});
+
+describe('tool summary translation cache', () => {
+  it('round-trips an entry under its item id key', async () => {
+    const entry = makeEntry();
+
+    await writeToolSummaryTranslation(entry);
+
+    await expect(readToolSummaryTranslations()).resolves.toEqual([entry]);
+    expect(kvMock.setItem).toHaveBeenCalledWith(SCOPE, ITEM_KEY, JSON.stringify(entry));
+  });
+
+  it('reads an empty scope as no entries', async () => {
+    await expect(readToolSummaryTranslations()).resolves.toEqual([]);
+  });
+
+  it('drops malformed values and keeps the valid ones', async () => {
+    seed([
+      [ITEM_KEY, JSON.stringify(makeEntry())],
+      ['tt:de:kilo-auto/small:item-not-json', 'not-json'],
+      ['tt:de:kilo-auto/small:item-wrong-shape', '{"itemId":"item-wrong-shape"}'],
+      [
+        'tt:de:kilo-auto/small:item-bad-time',
+        JSON.stringify({ ...makeEntry(), itemId: 'item-bad-time', storedAt: null }),
+      ],
+    ]);
+
+    await expect(readToolSummaryTranslations()).resolves.toEqual([makeEntry()]);
+  });
+
+  it('swallows a KV read failure', async () => {
+    seed([[ITEM_KEY, JSON.stringify(makeEntry())]]);
+    kvMock.getItem.mockRejectedValueOnce(new Error('kv down'));
+
+    await expect(readToolSummaryTranslations()).resolves.toEqual([]);
+  });
+
+  it('swallows a KV list failure', async () => {
+    kvMock.listEntries.mockRejectedValueOnce(new Error('kv down'));
+
+    await expect(readToolSummaryTranslations()).resolves.toEqual([]);
+  });
+
+  it('swallows a KV write failure', async () => {
+    kvMock.setItem.mockRejectedValueOnce(new Error('kv down'));
+
+    await expect(writeToolSummaryTranslation(makeEntry())).resolves.toBeUndefined();
+    await expect(readToolSummaryTranslations()).resolves.toEqual([]);
+  });
+
+  it('ignores an entry that fails validation', async () => {
+    await writeToolSummaryTranslation({ ...makeEntry(), storedAt: Number.NaN });
+
+    expect(kvMock.setItem).not.toHaveBeenCalled();
+    await expect(readToolSummaryTranslations()).resolves.toEqual([]);
+  });
+
+  it('evicts the oldest entries beyond the cap and keeps the newest', async () => {
+    const total = TOOL_SUMMARY_TRANSLATION_CACHE_CAP + 2;
+    for (let index = 0; index < total; index += 1) {
+      // Sequential writes keep `updated_at` strictly increasing so the evicted
+      // entries are deterministic.
+      // eslint-disable-next-line no-await-in-loop -- eviction order depends on write order.
+      await writeToolSummaryTranslation(makeEntry({ itemId: `item-${index}` }));
+    }
+
+    const keys = [...(kvMock.scopes.get(SCOPE)?.keys() ?? [])];
+    expect(keys).toHaveLength(TOOL_SUMMARY_TRANSLATION_CACHE_CAP);
+    expect(keys).not.toContain('tt:de:kilo-auto/small:item-0');
+    expect(keys).not.toContain('tt:de:kilo-auto/small:item-1');
+    expect(keys).toContain(`tt:de:kilo-auto/small:item-${total - 1}`);
+  });
+
+  it('keeps two entries apart that share the text but not the item id', async () => {
+    await writeToolSummaryTranslation(makeEntry({ itemId: 'item-1' }));
+    await writeToolSummaryTranslation(makeEntry({ itemId: 'item-2' }));
+
+    const entries = await readToolSummaryTranslations();
+    expect(entries).toHaveLength(2);
+    expect(entries.map(entry => entry.itemId).toSorted()).toEqual(['item-1', 'item-2']);
+    expect(kvMock.setItem).toHaveBeenCalledWith(
+      SCOPE,
+      'tt:de:kilo-auto/small:item-1',
+      JSON.stringify(makeEntry({ itemId: 'item-1' }))
+    );
+    expect(kvMock.setItem).toHaveBeenCalledWith(
+      SCOPE,
+      'tt:de:kilo-auto/small:item-2',
+      JSON.stringify(makeEntry({ itemId: 'item-2' }))
+    );
+  });
+});

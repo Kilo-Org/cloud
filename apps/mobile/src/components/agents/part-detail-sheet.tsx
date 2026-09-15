@@ -129,7 +129,12 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
 
   return (
     <SessionPageSheet visible={visible} onClose={onClose}>
-      <SheetHeader title={shownTitle} onDone={onClose} doneLabel={t('common.done')} />
+      <SheetHeader
+        title={shownTitle}
+        onDone={onClose}
+        doneLabel={t('common.done')}
+        topInset="ios-page-sheet"
+      />
 
       {monoCount > 0 ? (
         <View className="px-4 pb-2 pt-3">

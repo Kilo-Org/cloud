@@ -30,7 +30,7 @@ export function ReviewSpectatorSheet(props: Readonly<ComponentProps<typeof Revie
         </Button>
       </View>
       <SessionPageSheet visible={visible} onClose={handleClose}>
-        <SheetHeader title={title} onDone={handleClose} />
+        <SheetHeader title={title} onDone={handleClose} topInset="ios-page-sheet" />
         <ReviewSpectator {...props} />
       </SessionPageSheet>
     </>

@@ -439,7 +439,7 @@ export function createWrapperKiloClient(
           projectID: project.id,
           slug: sessionId.slice(0, 24),
           title: 'New session - ' + new Date(now).toISOString(),
-          version: '7.4.20',
+          version: '7.6.2',
           timeCreated: now,
           timeUpdated: now,
         },

@@ -358,6 +358,7 @@ export function PrReviewChecksSection({
         <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
           <Text variant="muted" className="text-xs">
             {t('prReview.checks.checksCount', {
+              count: runList.length,
               displayCount: formatNumber(runList.length, i18n.language),
             })}
           </Text>

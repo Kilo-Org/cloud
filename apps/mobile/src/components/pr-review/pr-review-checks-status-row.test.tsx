@@ -23,10 +23,13 @@ vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    // Carry the count through, so the label assertion proves displayCount is
-    // passed to the reused status key.
+    // Carry both counts through, so the label assertion proves displayCount is
+    // passed to the reused status key and that `count` rides along for a locale
+    // that inflects.
     t: (key: string, options?: Record<string, unknown>) =>
-      options && 'displayCount' in options ? `${key}=${String(options.displayCount)}` : key,
+      options && 'displayCount' in options
+        ? `${key}=${String(options.displayCount)}${'count' in options ? `/${String(options.count)}` : ''}`
+        : key,
   }),
 }));
 vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: (key: string) => key } }));
@@ -43,25 +46,25 @@ const STATUSES = ['success', 'failure', 'pending', 'skipped'] as const;
 
 const EXPECTED = {
   success: {
-    label: 'prReview.checks.passed=3',
+    label: 'prReview.checks.passed=3/3',
     icon: 'CheckCircle2',
     spinning: false,
     color: 'green',
   },
   failure: {
-    label: 'prReview.checks.failed=3',
+    label: 'prReview.checks.failed=3/3',
     icon: 'XCircle',
     spinning: false,
     color: 'red',
   },
   pending: {
-    label: 'prReview.checks.pending=3',
+    label: 'prReview.checks.pending=3/3',
     icon: 'Loader2',
     spinning: true,
     color: 'gray',
   },
   skipped: {
-    label: 'prReview.checks.skipped=3',
+    label: 'prReview.checks.skipped=3/3',
     icon: 'MinusCircle',
     spinning: false,
     color: 'gray',
@@ -149,7 +152,7 @@ describe('PrReviewChecksStatusRow', () => {
   it('announces the label with the count through the accessibility label', () => {
     const renderer = mountRow('pending', 12);
 
-    expect(header(renderer).props.accessibilityLabel).toBe('prReview.checks.pending=12');
+    expect(header(renderer).props.accessibilityLabel).toBe('prReview.checks.pending=12/12');
   });
 
   it('draws the hairline only when it is not the last group row', () => {

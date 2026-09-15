@@ -71,6 +71,9 @@ export function PrReviewChecksStatusRow({
   const Icon = STATUS_ICON[status];
   const iconColor = colors[STATUS_COLOR[status]];
   const label = t(STATUS_LABEL_KEY[status], {
+    // count lets a locale that inflects select its own form; displayCount is
+    // the formatted total.
+    count,
     displayCount: formatNumber(count, i18n.language),
   });
   const Chevron = expanded ? ChevronUp : ChevronDown;

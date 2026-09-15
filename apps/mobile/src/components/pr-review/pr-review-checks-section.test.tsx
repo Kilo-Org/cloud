@@ -42,8 +42,12 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     // Mirror the real argument flow: a count-bearing key resolves to its
     // displayCount, so a test can tell the header total from a status label.
+    // `count` rides along and is spelled out, so the test proves the call
+    // hands i18next the number it needs to pick a plural form.
     t: (key: string, options?: Record<string, unknown>) =>
-      options && 'displayCount' in options ? `${key}=${String(options.displayCount)}` : key,
+      options && 'displayCount' in options
+        ? `${key}=${String(options.displayCount)}${'count' in options ? `/${String(options.count)}` : ''}`
+        : key,
   }),
 }));
 // The section is tested for which rows it renders and with what counts; the
@@ -197,7 +201,15 @@ describe('PrReviewChecksSection status groups', () => {
     ]);
     const renderer = mount();
 
-    expect(textNodes(renderer, 'prReview.checks.checksCount=3')).toHaveLength(1);
+    // count picks the plural form; displayCount is the formatted total.
+    expect(textNodes(renderer, 'prReview.checks.checksCount=3/3')).toHaveLength(1);
+  });
+
+  it('gives the header the raw total so a one-check PR selects the singular', () => {
+    setRuns([run('passed', 'completed', 'success')]);
+    const renderer = mount();
+
+    expect(textNodes(renderer, 'prReview.checks.checksCount=1/1')).toHaveLength(1);
   });
 });
 

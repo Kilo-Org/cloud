@@ -191,4 +191,25 @@ describe('useTranslatedToolSummary', () => {
     expect(writtenIds).toEqual(['part-a', 'part-b']);
     unmount();
   });
+
+  it('gives two probes with the same id and different texts their own translations', async () => {
+    // The row and the detail sheet resolve different source strings under the
+    // same part id: each must show its own translation, not evict the other.
+    requestMock.mockImplementation(
+      // eslint-disable-next-line typescript-eslint/require-await -- the mock answers the batch synchronously
+      async ({ texts }: { texts: readonly string[] }) => texts.map(text => `de:${text}`)
+    );
+    setConfig({ enabled: true, model: MODEL });
+    const { latest, unmount } = mountProbes([
+      { text: 'Row label', itemId: 'part-1' },
+      { text: 'Sheet text', itemId: 'part-1' },
+    ]);
+
+    await settle();
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(latest(0)).toBe('de:Row label');
+    expect(latest(1)).toBe('de:Sheet text');
+    unmount();
+  });
 });

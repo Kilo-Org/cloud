@@ -13,8 +13,10 @@ import {
  * it resolves. The subscription also carries the preference that decides
  * whether to translate at all.
  *
- * Translation is keyed by the part's persistent `itemId`; a row without one is
- * never translated, so two tool calls with the same text never share an entry.
+ * Translation is keyed by the part's persistent `itemId` plus the source text:
+ * a row without an id is never translated, two tool calls with the same text
+ * never share an entry, and a changed source gets its own entry instead of
+ * evicting the string another surface still shows.
  *
  * Both the config and the cache read go through `useSyncExternalStore` rather
  * than plain render expressions. With React Compiler enabled

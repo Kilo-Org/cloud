@@ -37,8 +37,10 @@ type QueueItem = {
   key: string;
   /**
    * The part's persistent id (`ToolPart.id`). It survives an app restart
-   * because the transcript is refetched with it, so two tool calls with the
-   * same text never share an entry.
+   * because the transcript is refetched with it. There is one entry per (part
+   * id, source text) pair, so two tool calls with the same text never share an
+   * entry, while the row and the detail sheet share one entry while they show
+   * the same string.
    */
   itemId: string;
   text: string;
@@ -58,7 +60,12 @@ type FlushBatch = {
   items: QueueItem[];
 };
 
-/** One memory-cache entry: the translation and the source it was made from. */
+/**
+ * One memory-cache entry: one source string of one part, in one language and
+ * model. The source text is part of the key, so a changed source and a second
+ * surface resolving a different string each get their own entry instead of
+ * evicting each other.
+ */
 type CacheEntry = {
   translation: string;
   /** The source text the translation was made from: a changed source is a miss. */
@@ -118,8 +125,20 @@ function emit(): void {
   }
 }
 
-function translationKey(language: string, modelId: string, itemId: string): string {
-  return `${language}\u0000${modelId}\u0000${itemId}`;
+/**
+ * The translation identity: the persistent part id plus the source string it
+ * was made from, under one language and model. The part id keeps two tool calls
+ * with the same text apart; the source string lets a changed source and a
+ * second surface each resolve on their own entry instead of evicting the other.
+ */
+// eslint-disable-next-line max-params -- the language, model, part id and source text form the key
+function translationKey(
+  language: string,
+  modelId: string,
+  itemId: string,
+  text: string
+): string {
+  return `${language}\u0000${modelId}\u0000${itemId}\u0000${text}`;
 }
 
 /** Makes room for one more entry by dropping the oldest (insertion order). */
@@ -164,7 +183,12 @@ function startHydration(): void {
       let seeded = false;
       for (const stored of entries) {
         const expiresAt = stored.storedAt + TOOL_SUMMARY_TRANSLATION_TTL_MS;
-        const key = translationKey(stored.language, stored.modelId, stored.itemId);
+        const key = translationKey(
+          stored.language,
+          stored.modelId,
+          stored.itemId,
+          stored.text
+        );
         if (expiresAt > now && !cache.has(key)) {
           makeCacheRoom();
           cache.set(key, { translation: stored.translation, text: stored.text, expiresAt });
@@ -229,14 +253,14 @@ export function setConfig(next: ToolSummaryTranslationConfig): void {
   emit();
 }
 
-// eslint-disable-next-line max-params -- the item id, source text, language and model are the lookup key
+// eslint-disable-next-line max-params -- the part id, source text, language and model are the lookup key
 export function getTranslation(
   itemId: string,
   text: string,
   language: string,
   modelId: string
 ): string | undefined {
-  const entry = cache.get(translationKey(language, modelId, itemId));
+  const entry = cache.get(translationKey(language, modelId, itemId, text));
   if (entry === undefined || entry.text !== text || entry.expiresAt <= Date.now()) {
     return undefined;
   }
@@ -401,9 +425,10 @@ function scheduleFlush(): void {
 
 /**
  * Request a translation for one summary. No-op for blank text, keys whose
- * cached translation still matches its source (and is unexpired) and keys
- * already in flight, so N rows with the same summary make one call. The row
- * does not send: the batch window collects the commit's rows first.
+ * translation is cached and unexpired, and keys already in flight, so N rows
+ * with the same summary make one call. A changed source resolves on its own key
+ * rather than being dropped by the in-flight guard. The row does not send: the
+ * batch window collects the commit's rows first.
  */
 export function ensureTranslation(input: {
   itemId: string;
@@ -418,7 +443,7 @@ export function ensureTranslation(input: {
   // Start the disk read now, before the batch window closes, so a hydrated
   // summary is known by the time the flush runs.
   startHydration();
-  const key = translationKey(language, model.id, itemId);
+  const key = translationKey(language, model.id, itemId, text);
   if (isFreshCacheEntry(key, text, Date.now()) || inFlight.has(key)) {
     return;
   }

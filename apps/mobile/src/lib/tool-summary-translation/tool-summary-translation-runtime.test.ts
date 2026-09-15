@@ -171,6 +171,49 @@ describe('tool summary translation runtime', () => {
     });
   });
 
+  it('keeps the row label when a second surface resolves a different source', async () => {
+    const mod = await loadRuntime();
+    echoBatch();
+
+    // The transcript row resolves its label first. Then the detail sheet asks
+    // for a different source string under the same part id.
+    mod.ensureTranslation({ itemId: 'p1', text: 'row label', language: 'de', model: MODEL });
+    await waitForTranslations(mod, [{ itemId: 'p1', text: 'row label' }]);
+    mod.ensureTranslation({ itemId: 'p1', text: 'sheet text', language: 'de', model: MODEL });
+    await waitForTranslations(mod, [{ itemId: 'p1', text: 'sheet text' }]);
+
+    // Each source owns its own entry: the second resolve must not evict the
+    // first, so the row keeps its translated label.
+    expect(mod.getTranslation('p1', 'row label', 'de', MODEL.id)).toBe('de:row label');
+    expect(mod.getTranslation('p1', 'sheet text', 'de', MODEL.id)).toBe('de:sheet text');
+  });
+
+  it('requests a source that changes while its own batch is in flight', async () => {
+    const mod = await loadRuntime();
+    const resolvers = pendingBatches();
+
+    mod.ensureTranslation({ itemId: 'p1', text: 'partial', language: 'de', model: MODEL });
+    await vi.waitFor(() => {
+      expect(requestMock).toHaveBeenCalledTimes(1);
+    });
+
+    // The source changes while the first batch is still in flight. It must be
+    // queued on its own key instead of dropped by the in-flight guard.
+    mod.ensureTranslation({ itemId: 'p1', text: 'final', language: 'de', model: MODEL });
+    resolvers[0]?.(['translated-partial']);
+
+    await vi.waitFor(() => {
+      expect(requestMock).toHaveBeenCalledTimes(2);
+    });
+    expect(requestCalls()[1]?.texts).toEqual(['final']);
+    resolvers[1]?.(['translated-final']);
+
+    await vi.waitFor(() => {
+      expect(mod.getTranslation('p1', 'final', 'de', MODEL.id)).toBe('translated-final');
+    });
+    expect(mod.getTranslation('p1', 'partial', 'de', MODEL.id)).toBe('translated-partial');
+  });
+
   it('carries the same item and text once in the batch', async () => {
     const mod = await loadRuntime();
     echoBatch();

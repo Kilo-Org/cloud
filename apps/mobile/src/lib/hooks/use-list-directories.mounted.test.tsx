@@ -1,11 +1,13 @@
 import { createElement } from 'react';
-import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   listDirectoriesOnConnection,
   type ListDirectoriesResult,
 } from '@kilocode/cloud-agent-sdk/list-directories';
+
+import { act } from '@/test/renderer';
+import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 import { useListDirectories, type UseListDirectoriesResult } from './use-list-directories';
 
@@ -18,168 +20,213 @@ vi.mock('@kilocode/cloud-agent-sdk/list-directories', () => ({
   listDirectoriesOnConnection: vi.fn(),
 }));
 
-function Harness({
-  connectionId,
-  onRender,
-}: {
-  connectionId: string;
-  onRender: (api: UseListDirectoriesResult) => void;
-}) {
-  const api = useListDirectories(connectionId);
-  onRender(api);
+type Probe = { current: UseListDirectoriesResult | null };
+
+function Harness({ connectionId, probe }: { connectionId: string | null; probe: Probe }) {
+  probe.current = useListDirectories(connectionId);
   return null;
 }
 
-/** Mount the hook and expose the latest render's API. */
-function mount(connectionId: string): {
-  latest: () => UseListDirectoriesResult;
-  unmount: () => void;
-} {
-  let current: UseListDirectoriesResult | undefined = undefined;
-  let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
-  act(() => {
-    renderer = TestRenderer.create(
-      createElement(Harness, {
-        connectionId,
-        onRender: api => {
-          current = api;
-        },
-      })
-    );
-  });
+/** Mount the hook inside the app's QueryClientProvider and expose the latest API. */
+async function mount(connectionId: string | null = 'conn-1') {
+  const probe: Probe = { current: null };
+  const rendered = await renderWithProviders(createElement(Harness, { connectionId, probe }));
   return {
-    latest: () => {
-      if (!current) {
+    ...rendered,
+    api: () => {
+      if (probe.current === null) {
         throw new Error('hook has not rendered yet');
       }
-      return current;
-    },
-    unmount: () => {
-      act(() => {
-        renderer?.unmount();
-      });
+      return probe.current;
     },
   };
 }
 
-/** Flush pending promise callbacks inside an act scope. */
-async function flush(): Promise<void> {
-  await act(async () => {
-    await Promise.resolve();
-  });
-}
-
 const listFn = vi.mocked(listDirectoriesOnConnection);
+const src = { name: 'src', path: 'src' };
+const server = { name: 'server', path: 'src/server' };
 
 describe('useListDirectories', () => {
   beforeEach(() => {
     listFn.mockReset();
   });
 
-  it('lists a level into the ready state', async () => {
-    listFn.mockResolvedValueOnce({
-      ok: true,
-      path: '',
-      directories: [{ name: 'src', path: 'src' }],
-    });
-    const { latest, unmount } = mount('conn-1');
+  it('lists the launch path into the ready state', async () => {
+    listFn.mockResolvedValueOnce({ ok: true, path: '', directories: [src] });
+    const { api, unmount } = await mount('conn-1');
+
+    // Nothing requested yet: the picker renders its skeleton branch.
+    expect(api().state).toBeNull();
 
     act(() => {
-      latest().list('');
+      api().list('');
     });
-    await flush();
+    expect(api().state).toEqual({ phase: 'skeleton', path: '' });
+    expect(listFn).toHaveBeenCalledTimes(1);
+    expect(listFn).toHaveBeenCalledWith(connection, 'conn-1', undefined);
 
-    expect(latest().state).toEqual({
-      phase: 'ready',
-      path: '',
-      directories: [{ name: 'src', path: 'src' }],
-    });
+    await waitFor(() => api().state?.phase === 'ready');
+    expect(api().state).toEqual({ phase: 'ready', path: '', directories: [src] });
     unmount();
   });
 
   it('keeps an empty listing in the ready state (empty picker body)', async () => {
     listFn.mockResolvedValueOnce({ ok: true, path: '', directories: [] });
-    const { latest, unmount } = mount('conn-1');
+    const { api, unmount } = await mount('conn-1');
 
     act(() => {
-      latest().list('');
+      api().list('');
     });
-    await flush();
-
-    expect(latest().state).toEqual({ phase: 'ready', path: '', directories: [] });
+    await waitFor(() => api().state?.phase === 'ready');
+    expect(api().state).toEqual({ phase: 'ready', path: '', directories: [] });
     unmount();
   });
 
-  it('maps a transport failure to the retryable state', async () => {
-    listFn.mockResolvedValueOnce({ ok: false, reason: 'transport' });
-    const { latest, unmount } = mount('conn-1');
+  it('serves a previously listed path from cache with no second SDK call', async () => {
+    listFn.mockResolvedValueOnce({ ok: true, path: '', directories: [src] });
+    listFn.mockResolvedValueOnce({ ok: true, path: 'src', directories: [server] });
+    const { api, unmount } = await mount('conn-1');
 
     act(() => {
-      latest().list('src');
+      api().list('');
     });
-    await flush();
+    await waitFor(() => api().state?.phase === 'ready');
 
-    expect(latest().state).toEqual({ phase: 'retryable', path: 'src' });
+    act(() => {
+      api().list('src');
+    });
+    expect(api().state).toEqual({ phase: 'skeleton', path: 'src' });
+    await waitFor(() => api().state?.phase === 'ready');
+    expect(api().state).toEqual({ phase: 'ready', path: 'src', directories: [server] });
+
+    // Back: the launch path is served from its cached query, so no skeleton and
+    // no network wait.
+    act(() => {
+      api().list('');
+    });
+    expect(api().state).toEqual({ phase: 'ready', path: '', directories: [src] });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(listFn).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+
+  it('keeps list referentially stable so the picker mount effect runs once', async () => {
+    listFn.mockResolvedValueOnce({ ok: true, path: '', directories: [src] });
+    const { api, unmount } = await mount('conn-1');
+
+    const list = api().list;
+    act(() => {
+      api().list('');
+    });
+    await waitFor(() => api().state?.phase === 'ready');
+    expect(api().list).toBe(list);
+    unmount();
+  });
+
+  it('resets a transport failure to the skeleton on retry, then recovers', async () => {
+    listFn.mockResolvedValueOnce({ ok: false, reason: 'transport' });
+    const { api, unmount } = await mount('conn-1');
+
+    act(() => {
+      api().list('src');
+    });
+    await waitFor(() => api().state?.phase === 'retryable');
+    expect(api().state).toEqual({ phase: 'retryable', path: 'src' });
+
+    // The Retry CTA repeats the path on screen: the refetch drops the query
+    // back to pending and clears the error before the retry lands. Keep the
+    // retry in flight so the pending phase it produces is observable.
+    let resolveRetry: ((result: ListDirectoriesResult) => void) | undefined = undefined;
+    const retry = new Promise<ListDirectoriesResult>(resolve => {
+      resolveRetry = resolve;
+    });
+    listFn.mockReturnValueOnce(retry);
+    act(() => {
+      api().list('src');
+    });
+    await waitFor(() => api().state?.phase === 'skeleton');
+    expect(api().state).toEqual({ phase: 'skeleton', path: 'src' });
+
+    await act(async () => {
+      resolveRetry?.({ ok: true, path: 'src', directories: [server] });
+      await Promise.resolve();
+    });
+    await waitFor(() => api().state?.phase === 'ready');
+    expect(api().state).toEqual({ phase: 'ready', path: 'src', directories: [server] });
+    expect(listFn).toHaveBeenCalledTimes(2);
     unmount();
   });
 
   it('maps unsupported and invalid results to the permanent unsupported state', async () => {
     listFn.mockResolvedValueOnce({ ok: false, reason: 'unsupported' });
-    const first = mount('conn-1');
+    const first = await mount('conn-1');
     act(() => {
-      first.latest().list('src');
+      first.api().list('src');
     });
-    await flush();
-    expect(first.latest().state).toEqual({ phase: 'unsupported', path: 'src' });
+    await waitFor(() => first.api().state?.phase === 'unsupported');
+    expect(first.api().state).toEqual({ phase: 'unsupported', path: 'src' });
     first.unmount();
 
     listFn.mockResolvedValueOnce({ ok: false, reason: 'invalid' });
-    const second = mount('conn-1');
+    const second = await mount('conn-1');
     act(() => {
-      second.latest().list('src');
+      second.api().list('src');
     });
-    await flush();
-    expect(second.latest().state).toEqual({ phase: 'unsupported', path: 'src' });
+    await waitFor(() => second.api().state?.phase === 'unsupported');
+    expect(second.api().state).toEqual({ phase: 'unsupported', path: 'src' });
     second.unmount();
   });
 
-  it('ignores a late child listing after Back restores the cached parent', async () => {
-    const root = { name: 'src', path: 'src' };
-    const child = { name: 'server', path: 'src/server' };
-    listFn.mockResolvedValueOnce({ ok: true, path: '', directories: [root] });
+  it('stays on the skeleton and never calls the SDK without a connection', async () => {
+    const { api, unmount } = await mount(null);
 
-    const { latest, unmount } = mount('conn-1');
-
-    // List the launch path to completion.
     act(() => {
-      latest().list('');
+      api().list('');
     });
-    await flush();
-    expect(latest().state).toEqual({ phase: 'ready', path: '', directories: [root] });
+    expect(api().state).toEqual({ phase: 'skeleton', path: '' });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(listFn).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('ignores a late child listing after Back restores the cached parent', async () => {
+    listFn.mockResolvedValueOnce({ ok: true, path: '', directories: [src] });
+    const { api, unmount } = await mount('conn-1');
+
+    act(() => {
+      api().list('');
+    });
+    await waitFor(() => api().state?.phase === 'ready');
 
     // Drill into the child, but keep that listing in flight.
-    let resolveDrill: ((value: ListDirectoriesResult) => void) | undefined = undefined;
-    const drillPromise = new Promise<ListDirectoriesResult>(resolve => {
+    let resolveDrill: ((result: ListDirectoriesResult) => void) | undefined = undefined;
+    const drill = new Promise<ListDirectoriesResult>(resolve => {
       resolveDrill = resolve;
     });
-    listFn.mockReturnValueOnce(drillPromise);
+    listFn.mockReturnValueOnce(drill);
     act(() => {
-      latest().list('src');
+      api().list('src');
     });
-    expect(latest().state).toEqual({ phase: 'skeleton', path: 'src' });
+    expect(api().state).toEqual({ phase: 'skeleton', path: 'src' });
 
-    // Back restores the cached parent and advances the generation.
+    // Back restores the cached parent while the child listing is still pending.
     act(() => {
-      latest().list('');
+      api().list('');
     });
-    expect(latest().state).toEqual({ phase: 'ready', path: '', directories: [root] });
+    expect(api().state).toEqual({ phase: 'ready', path: '', directories: [src] });
 
     // The child listing resolves late; it must not replace the restored parent.
     await act(async () => {
-      resolveDrill?.({ ok: true, path: 'src', directories: [child] });
+      resolveDrill?.({ ok: true, path: 'src', directories: [server] });
       await Promise.resolve();
     });
-    expect(latest().state).toEqual({ phase: 'ready', path: '', directories: [root] });
+    expect(api().state).toEqual({ phase: 'ready', path: '', directories: [src] });
     unmount();
   });
 });

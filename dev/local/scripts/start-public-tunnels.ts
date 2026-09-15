@@ -3,6 +3,14 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// The fake LLM's `/test/*` admin credential. Imported from the fake's own
+// module so the dev tunnel, the local Node server and the E2E driver cannot
+// disagree about the token name or the insecure development default.
+import {
+  LOCAL_FAKE_LLM_ADMIN_TOKEN,
+  resolveFakeAdminToken,
+} from '../../../services/cloud-agent-next/test/e2e/fake-llm-admin';
+
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
 const cloudAgentDevVarsPath = path.join(repoRoot, 'services/cloud-agent-next/.dev.vars');
 const TRYCLOUDFLARE_URL = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
@@ -13,6 +21,83 @@ export type PublicTunnelSpec = {
   key: string;
   suffix?: string;
 };
+
+export type FakeTunnelGuardResult = { allow: true } | { allow: false; reason: string };
+
+export type FakeTunnelGuardInput = {
+  /** Host-side fake LLM port. Absent means no fake-llm tunnel is published. */
+  fakeLlmPort?: string;
+  /** The token the tunnel's clients and the local fake are configured with. */
+  adminToken: string;
+  /** `GET /test/requests` with the configured token; true only on HTTP 200. */
+  probeConfiguredToken: (port: string) => Promise<boolean>;
+  /** The same probe with the insecure development default token. */
+  probeDevDefaultToken: (port: string) => Promise<boolean>;
+};
+
+/**
+ * Decide whether the fake LLM may be published publicly.
+ *
+ * The local fake binds `0.0.0.0`, so publishing it puts its `/test/*` control
+ * endpoints on the public internet. The gate is the admin token:
+ *
+ *   1. the configured token must exist and not be the development default;
+ *   2. the running server must accept it;
+ *   3. the running server must NOT still accept the development default.
+ *
+ * Deliberately no length heuristic: rejecting an operator's short token is
+ * invented policy, and the checks above already cover the documented weak
+ * values.
+ */
+export async function evaluateFakeTunnelGuard(
+  input: FakeTunnelGuardInput
+): Promise<FakeTunnelGuardResult> {
+  if (!input.fakeLlmPort) return { allow: true };
+
+  if (!input.adminToken) {
+    return {
+      allow: false,
+      reason: 'FAKE_LLM_ADMIN_TOKEN is unset or empty',
+    };
+  }
+  if (input.adminToken === LOCAL_FAKE_LLM_ADMIN_TOKEN) {
+    return {
+      allow: false,
+      reason: `FAKE_LLM_ADMIN_TOKEN is the insecure development default (${LOCAL_FAKE_LLM_ADMIN_TOKEN})`,
+    };
+  }
+  if (!(await input.probeConfiguredToken(input.fakeLlmPort))) {
+    return {
+      allow: false,
+      reason: `the fake LLM on port ${input.fakeLlmPort} rejected the configured admin token — is it running with FAKE_LLM_ADMIN_TOKEN set?`,
+    };
+  }
+  if (await input.probeDevDefaultToken(input.fakeLlmPort)) {
+    return {
+      allow: false,
+      reason: `the fake LLM on port ${input.fakeLlmPort} still accepts the development default token`,
+    };
+  }
+
+  return { allow: true };
+}
+
+/**
+ * The concrete probe the guard runs: `GET /test/requests` on the host-side fake
+ * port, true only for an HTTP 200. Exported so a test can point it at a real
+ * fake server.
+ */
+export async function probeFakeControlRoute(port: string, token: string): Promise<boolean> {
+  try {
+    const response = await fetch(`http://localhost:${port}/test/requests`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    await response.text();
+    return response.status === 200;
+  } catch {
+    return false;
+  }
+}
 
 export function parsePublicTunnelPorts(argv: string[]): {
   workerPort: string;
@@ -85,7 +170,7 @@ export function updateEnvValue(filePath: string, key: string, value: string): vo
   fs.writeFileSync(filePath, content);
 }
 
-function main(): void {
+async function main(): Promise<void> {
   if (spawnSync('cloudflared', ['version'], { stdio: 'ignore' }).error) {
     console.error(
       'cloudflared not found on PATH. Install it:\n  https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/\n  brew install cloudflared'
@@ -93,7 +178,23 @@ function main(): void {
     process.exit(1);
   }
 
-  const specs = publicTunnelSpecs(parsePublicTunnelPorts(process.argv.slice(2)));
+  const ports = parsePublicTunnelPorts(process.argv.slice(2));
+
+  // Refuse to publish the fake LLM before spawning any tunnel: its `/test/*`
+  // control endpoints must never be reachable with the development default.
+  const adminToken = resolveFakeAdminToken();
+  const guard = await evaluateFakeTunnelGuard({
+    ...(ports.fakeLlmPort ? { fakeLlmPort: ports.fakeLlmPort } : {}),
+    adminToken,
+    probeConfiguredToken: port => probeFakeControlRoute(port, adminToken),
+    probeDevDefaultToken: port => probeFakeControlRoute(port, LOCAL_FAKE_LLM_ADMIN_TOKEN),
+  });
+  if (!guard.allow) {
+    console.error(`Refusing to publish the fake LLM tunnel: ${guard.reason}`);
+    process.exit(1);
+  }
+
+  const specs = publicTunnelSpecs(ports);
   const children: Array<{ label: string; child: ReturnType<typeof spawn> }> = [];
   let exiting = false;
 
@@ -157,5 +258,8 @@ if (
   process.argv[1] !== undefined &&
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1])
 ) {
-  main();
+  main().catch(error => {
+    console.error(error);
+    process.exit(1);
+  });
 }

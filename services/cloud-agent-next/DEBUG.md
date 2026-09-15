@@ -224,8 +224,10 @@ Wrapper `control.request` records for `session.sync` separate status, question, 
     Docker contention: leftover stopped containers, a competing dev session
     also running Cloud Agent sandboxes, or stale DO alarm timers from
     previous sessions. Confirm the fake LLM was never reached with
-    `curl -s $FAKE_LLM_URL/test/requests` — a flat `chatCompletions` count
-    proves the stall is upstream of kilo inference.
+    `curl -s -H "Authorization: Bearer ${FAKE_LLM_ADMIN_TOKEN:-local-fake-llm-admin}" $FAKE_LLM_URL/test/requests` —
+    a flat `chatCompletions` count
+    proves the stall is upstream of kilo inference. A 401 means the admin token
+    differs from the one the fake was started with.
 - Wrapper log reaches bootstrap/import, then repeats:
   - inspect import metadata, import exit code, and post-import `getSession()` lookup.
 - Wrapper ingest connects, but UI stays stale:

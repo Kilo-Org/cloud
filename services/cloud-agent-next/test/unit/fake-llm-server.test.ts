@@ -24,6 +24,7 @@ import {
   stripKiloPromptWrapping,
   type FakeLlmServerHandle,
 } from '../e2e/fake-llm-server.js';
+import { LOCAL_FAKE_LLM_ADMIN_TOKEN, resolveFakeAdminToken } from '../e2e/fake-llm-admin.js';
 import {
   findControlPlaneKiloRuntime,
   stopOwnedControlPlaneSandbox,
@@ -370,13 +371,13 @@ describe('fake-llm-server HTTP', () => {
 
   it('reports chat completion and transcription request counts for fail-fast assertions', async () => {
     const h = await start();
-    const before = await fetch(`${h.url}/test/requests`);
+    const before = await h.adminFetch(`/test/requests`);
     await expect(before.json()).resolves.toEqual({ chatCompletions: 0, transcriptions: 0 });
 
     const response = await postChat(h.url, '__fake__:echo:hello');
     expect(response.status).toBe(200);
 
-    const after = await fetch(`${h.url}/test/requests`);
+    const after = await h.adminFetch(`/test/requests`);
     await expect(after.json()).resolves.toEqual({ chatCompletions: 1, transcriptions: 0 });
   });
 
@@ -418,7 +419,7 @@ describe('fake-llm-server HTTP', () => {
     const res = await postMultipartTranscription(h.url, 'fake-transcribe');
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ text: 'Gateway transcription online' });
-    const counts = await fetch(`${h.url}/test/requests`);
+    const counts = await h.adminFetch(`/test/requests`);
     await expect(counts.json()).resolves.toEqual({ chatCompletions: 0, transcriptions: 1 });
   });
 
@@ -686,7 +687,7 @@ describe('fake-llm-server HTTP', () => {
     // time fetch() resolves with a response the gate is registered.
     await new Promise(r => setTimeout(r, 50));
 
-    const releaseRes = await fetch(`${h.url}/test/release?tag=t1`, { method: 'POST' });
+    const releaseRes = await h.adminFetch(`/test/release?tag=t1`, { method: 'POST' });
     expect(releaseRes.status).toBe(204);
 
     const chunks = await chatPromise;
@@ -705,7 +706,7 @@ describe('fake-llm-server HTTP', () => {
       '__fake__:gate:attributed:root_a_complete<environment_details>private context</environment_details>'
     );
     expect(response.status).toBe(200);
-    const release = await fetch(`${h.url}/test/release?tag=attributed`, { method: 'POST' });
+    const release = await h.adminFetch(`/test/release?tag=attributed`, { method: 'POST' });
     expect(release.status).toBe(204);
     const chunks = await parseSse(response);
     expect(chunks[0]?.choices).toEqual([
@@ -722,21 +723,21 @@ describe('fake-llm-server HTTP', () => {
       postChat(h.url, '__fake__:gate:root_b:only_root_b'),
     ]);
     const [statusA, statusB] = await Promise.all([
-      fetch(`${h.url}/test/gate-status?tag=root_a`),
-      fetch(`${h.url}/test/gate-status?tag=root_b`),
+      h.adminFetch(`/test/gate-status?tag=root_a`),
+      h.adminFetch(`/test/gate-status?tag=root_b`),
     ]);
     await expect(statusA.json()).resolves.toMatchObject({ engaged: true });
     await expect(statusB.json()).resolves.toMatchObject({ engaged: true });
 
-    expect((await fetch(`${h.url}/test/release?tag=root_b`, { method: 'POST' })).status).toBe(204);
+    expect((await h.adminFetch(`/test/release?tag=root_b`, { method: 'POST' })).status).toBe(204);
     const completedB = await parseSse(rootB);
     expect(completedB[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'only_root_b' } }),
     ]);
-    const stillGatedA = await fetch(`${h.url}/test/gate-status?tag=root_a`);
+    const stillGatedA = await h.adminFetch(`/test/gate-status?tag=root_a`);
     await expect(stillGatedA.json()).resolves.toMatchObject({ engaged: true });
 
-    expect((await fetch(`${h.url}/test/release?tag=root_a`, { method: 'POST' })).status).toBe(204);
+    expect((await h.adminFetch(`/test/release?tag=root_a`, { method: 'POST' })).status).toBe(204);
     const completedA = await parseSse(rootA);
     expect(completedA[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'only_root_a' } }),
@@ -759,7 +760,7 @@ describe('fake-llm-server HTTP', () => {
       { role: 'assistant', tool_calls: [{ id: call.id }] },
       { role: 'tool', tool_call_id: call.id, content: 'File written successfully' },
     ]);
-    const statusResponse = await fetch(`${h.url}/test/scenario-status?tag=writer`);
+    const statusResponse = await h.adminFetch(`/test/scenario-status?tag=writer`);
     const status = await statusResponse.json();
     expect(status).toEqual({
       tag: 'writer',
@@ -770,9 +771,9 @@ describe('fake-llm-server HTTP', () => {
     });
     expect(JSON.stringify(status)).not.toContain('private-content');
 
-    const gate = await fetch(`${h.url}/test/gate-status?tag=writer`);
+    const gate = await h.adminFetch(`/test/gate-status?tag=writer`);
     await expect(gate.json()).resolves.toEqual({ tag: 'writer', engaged: true });
-    expect((await fetch(`${h.url}/test/release?tag=writer`, { method: 'POST' })).status).toBe(204);
+    expect((await h.adminFetch(`/test/release?tag=writer`, { method: 'POST' })).status).toBe(204);
     const completed = await parseSse(followup);
     expect(completed[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-writer' } }),
@@ -837,12 +838,12 @@ describe('fake-llm-server HTTP', () => {
       { role: 'assistant', tool_calls: [{ id: editCall.id }] },
       { role: 'tool', tool_call_id: editCall.id, content: 'Edited successfully' },
     ]);
-    const status = await fetch(`${h.url}/test/scenario-status?tag=reader`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=reader`);
     await expect(status.json()).resolves.toMatchObject({
       toolCalls: { write: 0, read: 1, edit: 1, question: 0 },
       toolResults: { write: 0, read: 1, edit: 1, question: 0 },
     });
-    expect((await fetch(`${h.url}/test/release?tag=reader`, { method: 'POST' })).status).toBe(204);
+    expect((await h.adminFetch(`/test/release?tag=reader`, { method: 'POST' })).status).toBe(204);
     const completed = await parseSse(gated);
     expect(completed[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-reader' } }),
@@ -877,7 +878,7 @@ describe('fake-llm-server HTTP', () => {
       { role: 'assistant', tool_calls: [{ id: writeCall.id }] },
       { role: 'tool', tool_call_id: writeCall.id, content: 'File written successfully' },
     ]);
-    const status = await fetch(`${h.url}/test/scenario-status?tag=carrier`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=carrier`);
     await expect(status.json()).resolves.toEqual({
       tag: 'carrier',
       requests: 3,
@@ -885,9 +886,9 @@ describe('fake-llm-server HTTP', () => {
       toolResults: { write: 1, read: 1, edit: 0, question: 0 },
       unsupportedToolSchema: false,
     });
-    const gate = await fetch(`${h.url}/test/gate-status?tag=carrier`);
+    const gate = await h.adminFetch(`/test/gate-status?tag=carrier`);
     await expect(gate.json()).resolves.toEqual({ tag: 'carrier', engaged: true });
-    expect((await fetch(`${h.url}/test/release?tag=carrier`, { method: 'POST' })).status).toBe(204);
+    expect((await h.adminFetch(`/test/release?tag=carrier`, { method: 'POST' })).status).toBe(204);
     const completed = await parseSse(gated);
     expect(completed[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-carrier' } }),
@@ -965,7 +966,7 @@ describe('fake-llm-server HTTP', () => {
     expect(chunks[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-title' } }),
     ]);
-    const status = await fetch(`${h.url}/test/scenario-status?tag=title`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=title`);
     await expect(status.json()).resolves.toMatchObject({
       toolCalls: { write: 0, read: 0, edit: 0, question: 0 },
       toolResults: { write: 0, read: 0, edit: 0, question: 0 },
@@ -1003,7 +1004,7 @@ describe('fake-llm-server HTTP', () => {
     expect(completed[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-streamer' } }),
     ]);
-    const status = await fetch(`${h.url}/test/scenario-status?tag=streamer`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=streamer`);
     await expect(status.json()).resolves.toMatchObject({
       toolCalls: { write: 0, read: 1, edit: 0, question: 0 },
       toolResults: { write: 0, read: 1, edit: 0, question: 0 },
@@ -1060,7 +1061,7 @@ describe('fake-llm-server HTTP', () => {
     expect(completed[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-asker' } }),
     ]);
-    const status = await fetch(`${h.url}/test/scenario-status?tag=asker`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=asker`);
     await expect(status.json()).resolves.toMatchObject({
       toolCalls: { write: 0, read: 0, edit: 0, question: 1 },
       toolResults: { write: 0, read: 0, edit: 0, question: 1 },
@@ -1076,7 +1077,7 @@ describe('fake-llm-server HTTP', () => {
     expect(chunks[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-title' } }),
     ]);
-    const status = await fetch(`${h.url}/test/scenario-status?tag=title`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=title`);
     await expect(status.json()).resolves.toMatchObject({
       toolCalls: { write: 0, read: 0, edit: 0, question: 0 },
       unsupportedToolSchema: false,
@@ -1107,7 +1108,7 @@ describe('fake-llm-server HTTP', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { message: 'unsupported write tool schema', type: 'unsupported_tool_schema' },
     });
-    const status = await fetch(`${h.url}/test/scenario-status?tag=unsupported`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=unsupported`);
     await expect(status.json()).resolves.toMatchObject({ unsupportedToolSchema: true });
   });
 
@@ -1176,7 +1177,7 @@ describe('fake-llm-server HTTP', () => {
     let waiterCount = 0;
     for (let i = 0; i < 40; i++) {
       await new Promise(r => setTimeout(r, 25));
-      const snap = await fetch(`${h.url}/test/waiters`);
+      const snap = await h.adminFetch(`/test/waiters`);
       const body = (await snap.json()) as { tags: Array<{ tag: string; count: number }> };
       const entry = body.tags.find(t => t.tag === 'shared');
       waiterCount = entry?.count ?? 0;
@@ -1185,7 +1186,7 @@ describe('fake-llm-server HTTP', () => {
     expect(waiterCount).toBe(2);
 
     // One release drains both.
-    const releaseRes = await fetch(`${h.url}/test/release?tag=shared`, { method: 'POST' });
+    const releaseRes = await h.adminFetch(`/test/release?tag=shared`, { method: 'POST' });
     expect(releaseRes.status).toBe(204);
 
     const drain = async (p: Promise<Response>): Promise<void> => {
@@ -1198,7 +1199,7 @@ describe('fake-llm-server HTTP', () => {
     };
     await Promise.all([drain(bareChatP), drain(contaminatedChatP)]);
 
-    const after = (await (await fetch(`${h.url}/test/waiters`)).json()) as {
+    const after = (await (await h.adminFetch(`/test/waiters`)).json()) as {
       tags: Array<{ tag: string; count: number }>;
     };
     expect(after.tags.find(t => t.tag === 'shared')).toBeUndefined();
@@ -1214,7 +1215,7 @@ describe('fake-llm-server HTTP', () => {
     });
 
     await new Promise(r => setTimeout(r, 50));
-    const releaseRes = await fetch(`${h.url}/test/release?tag=sequential`, { method: 'POST' });
+    const releaseRes = await h.adminFetch(`/test/release?tag=sequential`, { method: 'POST' });
     expect(releaseRes.status).toBe(204);
     await firstGate;
 
@@ -1230,7 +1231,7 @@ describe('fake-llm-server HTTP', () => {
     ]);
 
     expect(lateChunks[lateChunks.length - 1].data).toBe('[DONE]');
-    const after = (await (await fetch(`${h.url}/test/waiters`)).json()) as {
+    const after = (await (await h.adminFetch(`/test/waiters`)).json()) as {
       tags: Array<{ tag: string; count: number }>;
     };
     expect(after.tags.find(t => t.tag === 'sequential')).toBeUndefined();
@@ -1238,7 +1239,7 @@ describe('fake-llm-server HTTP', () => {
 
   it('POST /test/release without a tag returns 400', async () => {
     const h = await start();
-    const res = await fetch(`${h.url}/test/release`, { method: 'POST' });
+    const res = await h.adminFetch(`/test/release`, { method: 'POST' });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe('tag query param required');
@@ -1246,7 +1247,7 @@ describe('fake-llm-server HTTP', () => {
 
   it('POST /test/release with unknown tag returns 404', async () => {
     const h = await start();
-    const res = await fetch(`${h.url}/test/release?tag=nope`, { method: 'POST' });
+    const res = await h.adminFetch(`/test/release?tag=nope`, { method: 'POST' });
     expect(res.status).toBe(404);
   });
 
@@ -1254,7 +1255,7 @@ describe('fake-llm-server HTTP', () => {
     const h = await start();
 
     // Before any gate request: not engaged.
-    const beforeRes = await fetch(`${h.url}/test/gate-status?tag=status1`);
+    const beforeRes = await h.adminFetch(`/test/gate-status?tag=status1`);
     expect(beforeRes.status).toBe(200);
     const beforeBody = (await beforeRes.json()) as { tag: string; engaged: boolean };
     expect(beforeBody).toEqual({ tag: 'status1', engaged: false });
@@ -1269,7 +1270,7 @@ describe('fake-llm-server HTTP', () => {
     let engaged = false;
     for (let i = 0; i < 20; i++) {
       await new Promise(r => setTimeout(r, 25));
-      const statusRes = await fetch(`${h.url}/test/gate-status?tag=status1`);
+      const statusRes = await h.adminFetch(`/test/gate-status?tag=status1`);
       const statusBody = (await statusRes.json()) as { engaged: boolean };
       if (statusBody.engaged) {
         engaged = true;
@@ -1279,19 +1280,19 @@ describe('fake-llm-server HTTP', () => {
     expect(engaged).toBe(true);
 
     // Release it and confirm the status flips back.
-    const releaseRes = await fetch(`${h.url}/test/release?tag=status1`, { method: 'POST' });
+    const releaseRes = await h.adminFetch(`/test/release?tag=status1`, { method: 'POST' });
     expect(releaseRes.status).toBe(204);
 
     await chatPromise;
 
-    const afterRes = await fetch(`${h.url}/test/gate-status?tag=status1`);
+    const afterRes = await h.adminFetch(`/test/gate-status?tag=status1`);
     const afterBody = (await afterRes.json()) as { engaged: boolean };
     expect(afterBody.engaged).toBe(false);
   });
 
   it('GET /test/gate-status without tag returns 400', async () => {
     const h = await start();
-    const res = await fetch(`${h.url}/test/gate-status`);
+    const res = await h.adminFetch(`/test/gate-status`);
     expect(res.status).toBe(400);
   });
 
@@ -1326,7 +1327,7 @@ describe('fake-llm-server HTTP', () => {
     const h = await start();
 
     // No activity: empty snapshot.
-    const before = await fetch(`${h.url}/test/waiters`);
+    const before = await h.adminFetch(`/test/waiters`);
     expect(before.status).toBe(200);
     const beforeBody = (await before.json()) as {
       tags: Array<{ tag: string; count: number }>;
@@ -1352,7 +1353,7 @@ describe('fake-llm-server HTTP', () => {
     let engaged = false;
     for (let i = 0; i < 20; i++) {
       await new Promise(r => setTimeout(r, 25));
-      const snap = await fetch(`${h.url}/test/waiters`);
+      const snap = await h.adminFetch(`/test/waiters`);
       const body = (await snap.json()) as { tags: Array<{ tag: string; count: number }> };
       const entry = body.tags.find(t => t.tag === 'waiters-test');
       if (entry && entry.count === 1) {
@@ -1363,10 +1364,10 @@ describe('fake-llm-server HTTP', () => {
     expect(engaged).toBe(true);
 
     // Release and confirm snapshot drains.
-    await fetch(`${h.url}/test/release?tag=waiters-test`, { method: 'POST' });
+    await h.adminFetch(`/test/release?tag=waiters-test`, { method: 'POST' });
     await gatePromise.then(r => r.body?.cancel()).catch(() => undefined);
 
-    const after = await fetch(`${h.url}/test/waiters`);
+    const after = await h.adminFetch(`/test/waiters`);
     const afterBody = (await after.json()) as {
       tags: Array<{ tag: string; count: number }>;
     };
@@ -1432,7 +1433,7 @@ describe('fake-llm-server HTTP', () => {
     let parked = false;
     for (let i = 0; i < 20; i++) {
       await new Promise(r => setTimeout(r, 25));
-      const snap = await fetch(`${h.url}/test/waiters`);
+      const snap = await h.adminFetch(`/test/waiters`);
       const body = (await snap.json()) as { liveResponses: number };
       if (body.liveResponses === 1) {
         parked = true;
@@ -1822,5 +1823,119 @@ describe('strict harness stream events', () => {
     { ...event, data: [] },
   ])('rejects malformed stream envelopes', invalid => {
     expect(streamEventSchema.safeParse(invalid).success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// /test/* admin guard
+// ---------------------------------------------------------------------------
+
+const CONTROL_ROUTES: Array<{ label: string; path: string; init?: RequestInit }> = [
+  { label: 'POST /test/release', path: '/test/release?tag=guard', init: { method: 'POST' } },
+  { label: 'GET /test/gate-status', path: '/test/gate-status?tag=guard' },
+  { label: 'GET /test/waiters', path: '/test/waiters' },
+  { label: 'GET /test/requests', path: '/test/requests' },
+  { label: 'GET /test/scenario-status', path: '/test/scenario-status?tag=guard' },
+];
+
+const MODEL_CREDENTIAL = 'eyJhbGciOiJIUzI1NiJ9.eyJ2ZXJzaW9uIjozfQ.signature';
+
+describe('fake-llm-server /test/* admin guard', () => {
+  it('resolves the admin token the driver and the server share', async () => {
+    // The development-default assertion is only meaningful with
+    // FAKE_LLM_ADMIN_TOKEN absent, so make the test independent of the
+    // operator's ambient environment.
+    const previous = process.env.FAKE_LLM_ADMIN_TOKEN;
+    delete process.env.FAKE_LLM_ADMIN_TOKEN;
+    try {
+      const h = await start();
+      expect(h.adminToken).toBe(resolveFakeAdminToken());
+      expect(h.adminToken).toBe(LOCAL_FAKE_LLM_ADMIN_TOKEN);
+    } finally {
+      if (previous === undefined) delete process.env.FAKE_LLM_ADMIN_TOKEN;
+      else process.env.FAKE_LLM_ADMIN_TOKEN = previous;
+    }
+  });
+
+  it('accepts the resolved admin bearer on every /test/* route', async () => {
+    const h = await start();
+    for (const route of CONTROL_ROUTES) {
+      const res = await h.adminFetch(route.path, route.init);
+      expect(res.status, `${route.label} with the admin bearer`).not.toBe(401);
+    }
+    const counts = await h.adminFetch('/test/requests');
+    await expect(counts.json()).resolves.toEqual({ chatCompletions: 0, transcriptions: 0 });
+  });
+
+  it('rejects a missing admin bearer on every /test/* route', async () => {
+    const h = await start();
+    for (const route of CONTROL_ROUTES) {
+      const res = await fetch(`${h.url}${route.path}`, route.init);
+      expect(res.status, `${route.label} without a bearer`).toBe(401);
+      await expect(res.json()).resolves.toEqual({ error: 'admin authorization required' });
+    }
+  });
+
+  it('rejects a wrong bearer, a malformed bearer and the model credential', async () => {
+    const h = await start();
+    const credentials = [
+      'Bearer not-the-admin-token',
+      `Bearer ${MODEL_CREDENTIAL}`,
+      'Bearer ',
+      'Basic dXNlcjpwYXNz',
+      LOCAL_FAKE_LLM_ADMIN_TOKEN,
+    ];
+    for (const route of CONTROL_ROUTES) {
+      for (const Authorization of credentials) {
+        const res = await fetch(`${h.url}${route.path}`, {
+          ...route.init,
+          headers: { Authorization },
+        });
+        expect(res.status, `${route.label} with "${Authorization}"`).toBe(401);
+      }
+    }
+  });
+
+  it('guards unsupported methods on /test/* before method dispatch', async () => {
+    const h = await start();
+    const unauthenticated = await fetch(`${h.url}/test/requests`, { method: 'DELETE' });
+    expect(unauthenticated.status).toBe(401);
+
+    const authenticated = await h.adminFetch('/test/requests', { method: 'DELETE' });
+    expect(authenticated.status).toBe(404);
+    await expect(authenticated.json()).resolves.toEqual({
+      error: 'not found: DELETE /test/requests',
+    });
+  });
+
+  it('keeps the local model routes open while /test/* stays guarded', async () => {
+    const h = await start();
+
+    const models = await fetch(`${h.url}/api/openrouter/models`);
+    expect(models.status).toBe(200);
+
+    // The Next.js gateway dials the model routes with the static local
+    // credential; the local adapter deliberately does not verify it.
+    const chat = await fetch(`${h.url}/api/openrouter/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${MODEL_CREDENTIAL}` },
+      body: JSON.stringify({
+        model: 'kilo/fake-deterministic',
+        messages: [{ role: 'user', content: '__fake__:echo:open' }],
+        stream: true,
+      }),
+    });
+    expect(chat.status).toBe(200);
+    await parseSse(chat);
+
+    const control = await fetch(`${h.url}/test/requests`);
+    expect(control.status).toBe(401);
+  });
+
+  it('answers the public health route without a credential', async () => {
+    const h = await start();
+    const res = await fetch(`${h.url}/health`);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ status: 'ok', service: 'fake-llm' });
   });
 });

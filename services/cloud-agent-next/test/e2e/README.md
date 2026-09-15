@@ -249,7 +249,9 @@ chat admission and wake-up are tested exclusively through `promptAsync()`.
 A conversation directive is embedded in the user-visible prompt as
 `__fake__:<scenario>[:<arg1>[:<arg2>...]]`. The fake LLM gateway parses it
 from the last user message and dispatches the matching scenario. The
-source of directive truth is `test/e2e/fake-llm-server.ts`.
+source of directive truth is `test/e2e/fake-llm-core.ts`, shared by the local
+Node server (`fake-llm-server.ts`) and the deployed Worker + Durable Object
+(`fake-llm-worker.ts`).
 
 | Directive | Behavior |
 |---|---|
@@ -270,7 +272,9 @@ A prompt with no `__fake__:` prefix echoes instead.
 ### Side channels
 
 The fake LLM server exposes four helper endpoints for driver code (not used
-by kilo):
+by kilo). Every one of them requires `Authorization: Bearer <admin token>`,
+where the token is `FAKE_LLM_ADMIN_TOKEN` or, for a zero-config local stack,
+the insecure development default `local-fake-llm-admin`:
 
 - `POST /test/release?tag=<tag>` — release a parked `gate:<tag>` turn. 204
   on hit, 404 if no waiter is parked for that tag.
@@ -283,7 +287,14 @@ by kilo):
   preflight scenarios can prove that rejected models did not reach dispatch.
 
 These are wrapped by `releaseGate()`, `waitForGateEngaged()`,
-`fetchFakeWaiters()`, and `fetchFakeRequests()` in `client.ts`.
+`fetchFakeWaiters()`, and `fetchFakeRequests()` in `client.ts`, which attach the
+bearer from `fakeControlHeaders()` in the same module. The token comes from
+`resolveFakeAdminToken()` in `fake-llm-admin.ts` — the same resolver the local
+Node server uses — so a non-default `FAKE_LLM_ADMIN_TOKEN` reaches both ends
+without further configuration. Set it when the fake is reachable beyond
+localhost: the fake binds `0.0.0.0`, and the public tunnel refuses to publish
+the development default. The deployed Worker requires the token as a Worker
+secret; see `deploy/README.md`.
 
 ## Lifecycle scenarios
 
@@ -357,10 +368,15 @@ the newer `start` / `send` procedures. `prepareSession` requires
 - **`waitForGateEngaged` timed out** — kilo never reached the fake LLM. Most
   common cause: the session used a real model, `FAKE_LLM_URL` is missing from
   Next.js, or the fake service is not running. Confirm with
-  `curl -s $FAKE_LLM_URL/test/requests` (expect a rising `chatCompletions`
-  count as kilo dials the fake) and `tail -f dev/logs/fake-llm.log` — a
+  `curl -s -H "Authorization: Bearer ${FAKE_LLM_ADMIN_TOKEN:-local-fake-llm-admin}" $FAKE_LLM_URL/test/requests`
+  (expect a rising `chatCompletions` count as kilo dials the fake) and
+  `tail -f dev/logs/fake-llm.log` — a
   stream that stays empty while a turn is "preparing" means the wrapper
-  never started, not a fake-LLM problem.
+  never started, not a fake-LLM problem. A 401 here means the token in your
+  shell differs from the one the fake was started with.
+- **`/test/*` side channels return 401** — the driver and the fake disagree on
+  `FAKE_LLM_ADMIN_TOKEN`. Both read `resolveFakeAdminToken()`; restart the fake
+  after changing the variable so the running process and the driver match.
 - **`Worker "git-token-service-dev" not found` in `cloud-agent-next.log`** —
   the `GIT_TOKEN_SERVICE` service binding could not resolve. The Worker log
   shows the failure as `Failed to issue Kilo session capability` and the turn

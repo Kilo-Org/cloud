@@ -1730,6 +1730,13 @@
       "when": 1789417016103,
       "tag": "0246_clean_the_renegades",
       "breakpoints": true
+    },
+    {
+      "idx": 247,
+      "version": "7",
+      "when": 1789419681029,
+      "tag": "0247_groovy_agent_zero",
+      "breakpoints": true
     }
   ]
 }

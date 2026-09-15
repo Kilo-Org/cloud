@@ -4417,12 +4417,17 @@ export const github_installation_webhook_receipts = pgTable(
       .references(() => github_app_installations.id, { onDelete: 'cascade' }),
     delivery_id: text().notNull(),
     event_type: text().notNull(),
+    status: text().$type<'processing' | 'completed'>().notNull().default('completed'),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
     uniqueIndex('UQ_github_installation_webhook_receipts_delivery').on(
       table.github_installation_id,
       table.delivery_id
+    ),
+    check(
+      'github_installation_webhook_receipts_status_check',
+      sql`${table.status} IN ('processing', 'completed')`
     ),
   ]
 );

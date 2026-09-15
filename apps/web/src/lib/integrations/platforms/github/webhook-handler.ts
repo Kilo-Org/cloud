@@ -47,10 +47,11 @@ import {
   GitHubRuntimeAuthorizationError,
 } from '@/lib/integrations/github/runtime-authorization';
 import {
-  getGitHubInstallationDeliveryStatus,
+  claimGitHubInstallationDelivery,
+  completeGitHubInstallationDelivery,
   isSharedGitHubInstallation,
   materializeGitHubInstallationIdentity,
-  recordCompletedGitHubInstallationDelivery,
+  releaseGitHubInstallationDelivery,
 } from '@/lib/integrations/db/github-installations';
 
 async function isAvailableForDeferredGitHubDispatch(integration: {
@@ -172,22 +173,39 @@ export async function handleGitHubWebhook(
       action: string,
       dispatch: () => Promise<Response>
     ): Promise<Response> => {
-      const receipt = await getGitHubInstallationDeliveryStatus({
+      const claim = await claimGitHubInstallationDelivery({
         installationId,
         appType,
         deliveryId: eventSignature,
+        eventType: `${eventType}.${action}`,
       });
-      if (receipt === 'completed') {
+      if (claim.status === 'completed' || claim.status === 'processing') {
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
       }
-      const response = await dispatch();
-      if (receipt !== 'missing_canonical' && response.ok) {
-        await recordCompletedGitHubInstallationDelivery({
-          installationId,
-          appType,
-          deliveryId: eventSignature,
-          eventType: `${eventType}.${action}`,
-        });
+      let response: Response;
+      try {
+        response = await dispatch();
+      } catch (error) {
+        if (claim.status === 'claimed') {
+          await releaseGitHubInstallationDelivery({
+            githubInstallationId: claim.githubInstallationId,
+            deliveryId: eventSignature,
+          });
+        }
+        throw error;
+      }
+      if (claim.status === 'claimed') {
+        if (response.ok) {
+          await completeGitHubInstallationDelivery({
+            githubInstallationId: claim.githubInstallationId,
+            deliveryId: eventSignature,
+          });
+        } else {
+          await releaseGitHubInstallationDelivery({
+            githubInstallationId: claim.githubInstallationId,
+            deliveryId: eventSignature,
+          });
+        }
       }
       return response;
     };

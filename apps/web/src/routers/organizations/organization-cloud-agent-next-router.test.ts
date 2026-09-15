@@ -1091,6 +1091,39 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
     }
   );
 
+  it('preserves the GitHub app type in organization repository listings', async () => {
+    mockFetchGitHubRepositoriesForOrganization.mockResolvedValue({
+      repositories: [
+        {
+          id: 1,
+          name: 'repo',
+          fullName: 'acme/repo',
+          private: true,
+          platformIntegrationId: '11111111-1111-4111-8111-111111111111',
+          platformAccountLogin: 'acme',
+          githubAppType: 'lite',
+        },
+      ],
+      integrationInstalled: true,
+      syncedAt: null,
+    });
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+    await expect(
+      caller.listGitHubRepositories({ organizationId: ORGANIZATION_ID, forceRefresh: false })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        repositories: [
+          expect.objectContaining({
+            fullName: 'acme/repo',
+            platformIntegrationId: '11111111-1111-4111-8111-111111111111',
+            githubAppType: 'lite',
+          }),
+        ],
+      })
+    );
+  });
+
   it('rejects organization repository listing before ranking when membership is denied', async () => {
     mockEnsureOrganizationAccess.mockImplementation(() => {
       throw new TRPCError({

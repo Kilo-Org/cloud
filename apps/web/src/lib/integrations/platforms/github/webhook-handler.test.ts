@@ -24,8 +24,9 @@ const mockHandleInstallationUnsuspend = jest.fn();
 const mockHandleInstallationRepositories = jest.fn();
 const mockAssertGitHubInstallationRuntimeAuthorized = jest.fn();
 const mockIsSharedGitHubInstallation = jest.fn();
-const mockRecordSharedGitHubInstallationDelivery = jest.fn();
+const mockClaimSharedGitHubInstallationDelivery = jest.fn();
 const mockCompleteSharedGitHubInstallationDelivery = jest.fn();
+const mockReleaseSharedGitHubInstallationDelivery = jest.fn();
 const mockMaterializeGitHubInstallationIdentity = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
@@ -89,10 +90,12 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
 jest.mock('@/lib/integrations/db/github-installations', () => ({
   isSharedGitHubInstallation: (installationId: string, appType: string) =>
     mockIsSharedGitHubInstallation(installationId, appType),
-  getGitHubInstallationDeliveryStatus: (input: unknown) =>
-    mockRecordSharedGitHubInstallationDelivery(input),
-  recordCompletedGitHubInstallationDelivery: (input: unknown) =>
+  claimGitHubInstallationDelivery: (input: unknown) =>
+    mockClaimSharedGitHubInstallationDelivery(input),
+  completeGitHubInstallationDelivery: (input: unknown) =>
     mockCompleteSharedGitHubInstallationDelivery(input),
+  releaseGitHubInstallationDelivery: (input: unknown) =>
+    mockReleaseSharedGitHubInstallationDelivery(input),
   materializeGitHubInstallationIdentity: (input: unknown) =>
     mockMaterializeGitHubInstallationIdentity(input),
 }));
@@ -228,7 +231,10 @@ describe('handleGitHubWebhook', () => {
     mockVerifyGitHubWebhookSignature.mockReturnValue(true);
     mockFindIntegrationByInstallationId.mockResolvedValue(integration);
     mockIsSharedGitHubInstallation.mockResolvedValue(false);
-    mockRecordSharedGitHubInstallationDelivery.mockResolvedValue('not_completed');
+    mockClaimSharedGitHubInstallationDelivery.mockResolvedValue({
+      status: 'claimed',
+      githubInstallationId: 'canonical-installation',
+    });
     mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: false });
     mockUpdateWebhookEvent.mockResolvedValue(undefined);
     mockHandlePullRequest.mockResolvedValue(Response.json({ message: 'review queued' }));
@@ -548,7 +554,7 @@ describe('handleGitHubWebhook', () => {
   );
 
   it('preserves duplicate installation.deleted handling', async () => {
-    mockRecordSharedGitHubInstallationDelivery.mockResolvedValue('completed');
+    mockClaimSharedGitHubInstallationDelivery.mockResolvedValue({ status: 'completed' });
 
     const response = await handleGitHubWebhook(
       signedGitHubRequest('installation', { action: 'deleted', installation: { id: 98765 } }),
@@ -563,12 +569,14 @@ describe('handleGitHubWebhook', () => {
     expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
   });
 
-  it('allows concurrent lifecycle cleanup before either delivery records completion', async () => {
+  it('dispatches a duplicate shared delivery exactly once while a claim is held', async () => {
     mockIsSharedGitHubInstallation.mockResolvedValue(true);
-    mockRecordSharedGitHubInstallationDelivery.mockResolvedValue('not_completed');
-    mockHandleInstallationDeleted
-      .mockResolvedValueOnce(Response.json({ message: 'Installation removed' }))
-      .mockResolvedValueOnce(Response.json({ message: 'Installation removed' }));
+    mockClaimSharedGitHubInstallationDelivery
+      .mockResolvedValueOnce({ status: 'claimed', githubInstallationId: 'canonical-installation' })
+      .mockResolvedValueOnce({ status: 'processing' });
+    mockHandleInstallationDeleted.mockResolvedValue(
+      Response.json({ message: 'Installation removed' })
+    );
     const payload = { action: 'deleted', installation: { id: 98765 } };
 
     const first = await handleGitHubWebhook(
@@ -581,13 +589,14 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(await first.json()).toEqual({ message: 'Installation removed' });
-    expect(await duplicate.json()).toEqual({ message: 'Installation removed' });
-    expect(mockHandleInstallationDeleted).toHaveBeenCalledTimes(2);
-    expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(2);
-    expect(mockRecordSharedGitHubInstallationDelivery).toHaveBeenCalledWith({
+    expect(await duplicate.json()).toEqual({ message: 'Duplicate event' });
+    expect(mockHandleInstallationDeleted).toHaveBeenCalledTimes(1);
+    expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
+    expect(mockClaimSharedGitHubInstallationDelivery).toHaveBeenCalledWith({
       installationId: '98765',
       appType: 'standard',
       deliveryId: 'delivery-installation',
+      eventType: 'installation.deleted',
     });
   });
 
@@ -609,6 +618,7 @@ describe('handleGitHubWebhook', () => {
     expect(await retried.json()).toEqual({ message: 'Installation removed' });
     expect(mockHandleInstallationDeleted).toHaveBeenCalledTimes(2);
     expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
+    expect(mockReleaseSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
   });
 
   it('does not record a completion receipt when the dispatched response is not ok', async () => {
@@ -631,6 +641,7 @@ describe('handleGitHubWebhook', () => {
     expect(await retried.json()).toEqual({ message: 'Installation removed' });
     expect(mockHandleInstallationDeleted).toHaveBeenCalledTimes(2);
     expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
+    expect(mockReleaseSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
   });
 
   it('records a completion receipt when the dispatched response is ok', async () => {
@@ -651,7 +662,7 @@ describe('handleGitHubWebhook', () => {
 
   it('dispatches lifecycle when a canonical receipt cannot be resolved', async () => {
     mockIsSharedGitHubInstallation.mockResolvedValue(true);
-    mockRecordSharedGitHubInstallationDelivery.mockResolvedValue('missing_canonical');
+    mockClaimSharedGitHubInstallationDelivery.mockResolvedValue({ status: 'missing_canonical' });
     const payload = { action: 'deleted', installation: { id: 98765 } };
 
     const response = await handleGitHubWebhook(
@@ -692,7 +703,7 @@ describe('handleGitHubWebhook', () => {
       appType: 'lite',
     });
     expect(mockMaterializeGitHubInstallationIdentity.mock.invocationCallOrder[0]).toBeLessThan(
-      mockRecordSharedGitHubInstallationDelivery.mock.invocationCallOrder[0]!
+      mockClaimSharedGitHubInstallationDelivery.mock.invocationCallOrder[0]!
     );
     expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
     expect(mockHandleInstallationDeleted).toHaveBeenCalledWith(
@@ -701,10 +712,8 @@ describe('handleGitHubWebhook', () => {
     );
     expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
     expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledWith({
-      installationId: '98765',
-      appType: 'lite',
+      githubInstallationId: 'canonical-installation',
       deliveryId: 'delivery-installation',
-      eventType: 'installation.deleted',
     });
   });
 

@@ -117,11 +117,7 @@ export async function evaluateGitHubSharingCompatibility(
     .where(
       and(
         or(...slackOwnerConditions),
-        inArray(platform_integrations.platform, [
-          PLATFORM.SLACK,
-          PLATFORM.DISCORD,
-          PLATFORM.LINEAR,
-        ]),
+        inArray(platform_integrations.platform, [PLATFORM.DISCORD, PLATFORM.LINEAR]),
         eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE),
         isNull(platform_integrations.suspended_at),
         isNull(platform_integrations.auth_invalid_at)

@@ -54,11 +54,6 @@ export function injectExtraProviderModels(
             pricing: endpoint.pricing ?? { prompt: '0', completion: '0' },
           },
         };
-        console.warn(
-          '[injectExtraProviderModels] Adding missing model to provider %s: %s',
-          providerData.provider.name,
-          m.name
-        );
         providerData.models.push(m);
       }
     }

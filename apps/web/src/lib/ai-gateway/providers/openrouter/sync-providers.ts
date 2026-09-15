@@ -93,14 +93,11 @@ async function fetchGatewayModels(gateway: Provider) {
   if (count < 100) {
     throw new Error(`Suspicious: total number of ${gateway.id} models is ${count} < 100`);
   }
-  console.debug(`[fetchGatewayModels] fetched ${count} models from ${gateway.id}`);
 
   return result;
 }
 
 async function fetchProviders(): Promise<OpenRouterProvider[]> {
-  console.log('Fetching OpenRouter providers from frontend endpoint...');
-
   const response = await fetch(`https://openrouter.ai/api/frontend/v1/all-providers`, {
     method: 'GET',
     headers: ATTRIBUTION_HEADERS,
@@ -113,16 +110,10 @@ async function fetchProviders(): Promise<OpenRouterProvider[]> {
   }
 
   const rawData = await response.json();
-  console.log(
-    'Raw response structure:',
-    JSON.stringify(rawData, null, 2).substring(0, 500) + '...'
-  );
-
   const parsedData = OpenRouterProvidersResponse.parse(rawData);
 
   // Handle both response formats
   const providers = Array.isArray(parsedData) ? parsedData : parsedData.data;
-  console.log(`Found ${providers.length} providers from endpoint`);
 
   return providers;
 }
@@ -137,20 +128,12 @@ async function syncProviders(
 
   // Limit concurrent requests to 3
   const limit = pLimit(3);
-  let processedCount = 0;
-
-  console.log('Fetching models for all providers...');
 
   // Fetch models for each provider and collect relationships
   const providerModelData = await Promise.all(
     providers.map(provider =>
       limit(async () => {
         const models = await fetchModelsForProvider(provider);
-
-        processedCount++;
-        if (processedCount % 10 === 0) {
-          console.log(`Processed ${processedCount}/${providers.length} providers...`);
-        }
 
         return {
           provider,
@@ -205,9 +188,6 @@ async function syncProviders(
       data => data.provider.slug === extraModel.provider.slug
     );
     if (providerData) {
-      console.log(
-        `Found existing ${extraModel.provider.slug} provider from OpenRouter, adding extra model ${extraModel.model.slug}`
-      );
       providerData.models.splice(0, 0, extraModel.model);
     }
   }
@@ -391,7 +371,6 @@ export async function syncAndStoreProviders() {
   });
 
   const direct_byok_model_counts = await syncDirectByokModels();
-  console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);
 
   const completed_at = await db.transaction(async tx => {
     await tx.insert(ai_gateway_sync_providers_state).values({ id: 1 }).onConflictDoNothing();
@@ -408,6 +387,15 @@ export async function syncAndStoreProviders() {
       .set({ last_completed_at: completedAt })
       .where(eq(ai_gateway_sync_providers_state.id, 1));
     return completedAt;
+  });
+
+  console.info('[sync-providers] sync summary', {
+    openrouter_gateway_models: Object.keys(openrouter_data).length,
+    vercel_gateway_models: Object.keys(vercel_data).length,
+    openrouter_providers: openrouterProviders.length,
+    total_providers: result.data.total_providers,
+    total_models: result.data.total_models,
+    direct_byok_model_counts,
   });
 
   return {

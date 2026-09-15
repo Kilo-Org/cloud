@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
+
 import { useCancelSecurityRemediation } from './use-security-remediation';
+import { REMEDIATION_UNAVAILABLE_COPY } from '@kilocode/app-shared/security-agent';
 import { i18n } from '@/i18n';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
 
@@ -50,7 +53,8 @@ vi.mock('sonner-native', () => ({
   },
 }));
 
-vi.mock('@kilocode/app-shared/security-agent', () => ({
+vi.mock('@kilocode/app-shared/security-agent', async importOriginal => ({
+  ...(await importOriginal<typeof SecurityAgentModule>()),
   isPersonalSecurityScope: (scope: string) => scope === 'personal',
 }));
 
@@ -189,36 +193,12 @@ describe('useCancelSecurityRemediation (generation guard)', () => {
   });
 });
 
-// Mirrors REMEDIATION_UNAVAILABLE_COPY in
-// packages/app-shared/src/security-agent/presentation.ts. Pinning the table
-// here fails when a reason is added there without a mobile catalog key.
-const REMEDIATION_UNAVAILABLE_KEY_FIXTURE = {
-  finding_not_found: 'securityAgent.remediationUnavailable.findingNotFound',
-  approval_required: 'securityAgent.remediationUnavailable.approvalRequired',
-  finding_not_open: 'securityAgent.remediationUnavailable.findingNotOpen',
-  repo_not_in_scope: 'securityAgent.remediationUnavailable.repoNotInScope',
-  analysis_required: 'securityAgent.remediationUnavailable.analysisRequired',
-  sandbox_analysis_required: 'securityAgent.remediationUnavailable.analysisRequired',
-  stale_analysis: 'securityAgent.remediationUnavailable.staleAnalysis',
-  not_exploitable: 'securityAgent.remediationUnavailable.notExploitable',
-  exploitability_unknown: 'securityAgent.remediationUnavailable.exploitabilityUnknown',
-  manual_review_required: 'securityAgent.remediationUnavailable.manualReviewRequired',
-  monitor_required: 'securityAgent.remediationUnavailable.monitorRequired',
-  triage_only: 'securityAgent.remediationUnavailable.triageOnly',
-  action_not_concrete: 'securityAgent.remediationUnavailable.actionNotConcrete',
-  remediation_active: 'securityAgent.remediationUnavailable.remediationActive',
-  pr_already_opened: 'securityAgent.remediationUnavailable.prAlreadyOpened',
-  duplicate_analysis_result: 'securityAgent.remediationUnavailable.duplicateAnalysisResult',
-  retry_not_allowed: 'securityAgent.remediationUnavailable.retryNotAllowed',
-  security_agent_disabled: 'securityAgent.remediationUnavailable.securityAgentDisabled',
-  auto_remediation_disabled: 'securityAgent.remediationUnavailable.autoRemediationDisabled',
-  include_existing_disabled: 'securityAgent.remediationUnavailable.includeExistingDisabled',
-  below_threshold: 'securityAgent.remediationUnavailable.belowThreshold',
-  before_enablement: 'securityAgent.remediationUnavailable.beforeEnablement',
-} as const;
-
 const REMEDIATION_FALLBACK_KEY = 'securityAgent.remediation.unavailable';
 
+// The expected reason → catalog-key mapping is read from the shared table in
+// packages/app-shared instead of a hand-maintained fixture: a reason added
+// there makes the lookup fall back to the generic copy and fails this test
+// until the mobile map and its catalog key exist.
 describe('getRemediationUnavailableKey', () => {
   it('returns null for an absent or eligible reason', () => {
     expect(getRemediationUnavailableKey(null)).toBeNull();
@@ -227,19 +207,16 @@ describe('getRemediationUnavailableKey', () => {
     expect(getRemediationUnavailableKey('eligible')).toBeNull();
   });
 
-  it.each(Object.entries(REMEDIATION_UNAVAILABLE_KEY_FIXTURE))(
-    'maps %s to %s',
-    (reason, catalogKey) => {
-      expect(getRemediationUnavailableKey(reason)).toBe(catalogKey);
+  it.each(Object.entries(REMEDIATION_UNAVAILABLE_COPY))(
+    'maps %s to a catalog key holding the shared copy',
+    (reason, copy) => {
+      // A reason missing from the mobile map resolves to the generic key,
+      // which fails the assertion below.
+      const catalogKey = getRemediationUnavailableKey(reason) ?? REMEDIATION_FALLBACK_KEY;
+      expect(catalogKey).not.toBe(REMEDIATION_FALLBACK_KEY);
+      expect(i18n.t(catalogKey)).toBe(copy);
     }
   );
-
-  it('maps every reason to a key the English catalog defines', () => {
-    for (const catalogKey of Object.values(REMEDIATION_UNAVAILABLE_KEY_FIXTURE)) {
-      expect(i18n.t(catalogKey)).not.toBe(catalogKey);
-      expect(i18n.t(catalogKey)).not.toBe('');
-    }
-  });
 
   it('falls back to the generic key for an unknown or inherited name', () => {
     expect(getRemediationUnavailableKey('not_a_reason')).toBe(REMEDIATION_FALLBACK_KEY);

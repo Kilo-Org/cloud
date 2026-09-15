@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CodeBlock } from './code-block';
 import { tokenizeCodeLines } from './code-block-model';
@@ -10,10 +10,11 @@ import { type MonoScrollTextMode } from './mono-scroll-block-model';
 import { tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
 import '@/i18n';
 
-const { useMonoScrollSheetMock } = vi.hoisted(() => ({
+const { useMonoScrollSheetMock, useColorSchemeMock } = vi.hoisted(() => ({
   useMonoScrollSheetMock: vi.fn<() => { mode: MonoScrollTextMode; track: () => () => void } | null>(
     () => null
   ),
+  useColorSchemeMock: vi.fn<() => 'dark' | 'light'>(() => 'light'),
 }));
 
 // RNGH ships Flow source that the node project cannot parse, so the horizontal
@@ -22,6 +23,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
   Text: 'RNText',
+  useColorScheme: useColorSchemeMock,
 }));
 vi.mock('react-native-gesture-handler', () => ({
   ScrollView: 'ScrollView',
@@ -165,6 +167,11 @@ function blockElement(props?: Partial<BlockProps>): React.ReactElement {
   return React.createElement(CodeBlock, { code: 'const x = 1;', language: 'typescript', ...props });
 }
 
+/** The style.color of every colored run, in render order. */
+function runColorValues(root: TestRenderer.ReactTestInstance): string[] {
+  return colorRuns(root).map(run => (propOf(run, 'style') as { color: string }).color);
+}
+
 function withSheet(
   mode: MonoScrollTextMode,
   track: () => () => void,
@@ -173,6 +180,12 @@ function withSheet(
   useMonoScrollSheetMock.mockReturnValue({ mode, track });
   return block;
 }
+
+// The light palette is the baseline for the suites that assert concrete token
+// colors; the theme suite overrides it per test.
+beforeEach(() => {
+  useColorSchemeMock.mockReturnValue('light');
+});
 
 describe('CodeBlock', () => {
   it('renders one nested RNText per token run', async () => {
@@ -270,6 +283,47 @@ describe('CodeBlock', () => {
     const parent = codeParent(renderer.root);
     expect(parent).toBeDefined();
     expect(propOf(parent, 'selectable')).toBe(false);
+    await unmount(renderer);
+  });
+});
+
+describe('CodeBlock syntax palette follows the color scheme', () => {
+  // The palette must come from the color scheme, not from comparing a theme
+  // token (e.g. `background`) to a hex literal: the generated palette is free
+  // to change and the tokens would silently flip against their surface.
+  it('picks the dark token palette on a dark color scheme', async () => {
+    useColorSchemeMock.mockReturnValue('dark');
+    const renderer = await mount(blockElement());
+    const colors = runColorValues(renderer.root);
+
+    expect(colors).toContain(tokenColorFor('keyword', true));
+    expect(colors).toContain(tokenColorFor('number', true));
+    expect(colors).not.toContain(tokenColorFor('keyword', false));
+    await unmount(renderer);
+  });
+
+  it('picks the light token palette on a light color scheme', async () => {
+    useColorSchemeMock.mockReturnValue('light');
+    const renderer = await mount(blockElement());
+    const colors = runColorValues(renderer.root);
+
+    expect(colors).toContain(tokenColorFor('keyword', false));
+    expect(colors).toContain(tokenColorFor('number', false));
+    expect(colors).not.toContain(tokenColorFor('keyword', true));
+    await unmount(renderer);
+  });
+
+  it('reads the scheme again on a later render instead of caching the palette', async () => {
+    useColorSchemeMock.mockReturnValue('light');
+    const renderer = await mount(blockElement());
+    expect(runColorValues(renderer.root)).toContain(tokenColorFor('keyword', false));
+
+    useColorSchemeMock.mockReturnValue('dark');
+    act(() => {
+      renderer.update(blockElement({ code: 'let y = 2;' }));
+    });
+
+    expect(runColorValues(renderer.root)).toContain(tokenColorFor('keyword', true));
     await unmount(renderer);
   });
 });

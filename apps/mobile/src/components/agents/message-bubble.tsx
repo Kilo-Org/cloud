@@ -17,10 +17,11 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { InMessageBubbleContext } from './bubble-text-selection-context';
 import { ChatMarkdownText } from './chat-markdown-text';
 import { CompactionSeparator } from './compaction-separator';
-import { collectCopyableText } from './collect-copyable-text';
+import { hasCopyableText } from './collect-copyable-text';
 import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 import { MessageErrorBoundary } from './message-error-boundary';
+import { MessageLongPressProvider } from './message-long-press-context';
 import { selectMessageFailure } from './message-failure-state';
 import { partRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
@@ -93,7 +94,7 @@ function MessageBubbleImpl({
   const { copyMessage } = useMessageCopy();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const canCopy = collectCopyableText(message).length > 0;
+  const canCopy = hasCopyableText(message);
   const a11y = buildAgentMessageBubbleAccessibilityProps({
     isUser,
     canCopy,
@@ -308,19 +309,21 @@ function MessageBubbleImpl({
     <View>
       <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
         <InMessageBubbleContext.Provider value>
-          <View className="gap-2">
-            {condenseToolCalls
-              ? groupMessageParts(parts, { condense: true }).map(group =>
-                  group.kind === 'tool-run' ? (
-                    <MessageErrorBoundary key={group.parts[0]?.id}>
-                      <CondensedToolRunRow parts={group.parts} />
-                    </MessageErrorBoundary>
-                  ) : (
-                    group.parts.map(renderPart)
+          <MessageLongPressProvider message={message} onLongPressDetails={onLongPressDetails}>
+            <View className="gap-2">
+              {condenseToolCalls
+                ? groupMessageParts(parts, { condense: true }).map(group =>
+                    group.kind === 'tool-run' ? (
+                      <MessageErrorBoundary key={group.parts[0]?.id}>
+                        <CondensedToolRunRow parts={group.parts} />
+                      </MessageErrorBoundary>
+                    ) : (
+                      group.parts.map(renderPart)
+                    )
                   )
-                )
-              : parts.map(part => renderPart(part))}
-          </View>
+                : parts.map(part => renderPart(part))}
+            </View>
+          </MessageLongPressProvider>
         </InMessageBubbleContext.Provider>
         {a11y.accessibilityActions.length > 0 ? (
           <View

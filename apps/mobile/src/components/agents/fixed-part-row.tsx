@@ -11,6 +11,8 @@ import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-tra
 
 import { useIsToolSummaryRow } from './tool-summary-translation-scope';
 
+import { useMessageLongPress } from './message-long-press-context';
+
 type FixedPartRowProps = {
   /** Tool icon, shown in the completed slot. Never passed for reasoning rows. */
   icon?: LucideIcon;
@@ -39,6 +41,12 @@ type FixedPartRowProps = {
  * and single-line: the row never expands inline and never changes height from
  * streaming state transitions. A completed row without an `icon` renders no
  * leading element (a valid no-op, never an undefined component).
+ *
+ * A long press opens the message-details sheet through
+ * `MessageLongPressContext`: the row's tap responder would otherwise swallow
+ * the bubble's long-press contract on the row's surface. When no handler is
+ * mounted (rows outside a message bubble) the pressable keeps tap-only
+ * behavior; a disabled row already falls through to the bubble pressable.
  */
 export function FixedPartRow({
   icon: Icon,
@@ -53,6 +61,7 @@ export function FixedPartRow({
 }: Readonly<FixedPartRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const messageLongPress = useMessageLongPress();
   const isToolSummaryRow = useIsToolSummaryRow();
   const shownLabel = useTranslatedToolSummary(label, isToolSummaryRow && translatable);
   // Keep the spoken summary in step with the visible one without a second
@@ -73,6 +82,7 @@ export function FixedPartRow({
       <Pressable
         className="flex-row items-center gap-2 px-3 py-2 active:bg-secondary"
         onPress={onPress}
+        onLongPress={messageLongPress ?? undefined}
         disabled={!onPress}
         accessibilityRole="button"
         accessibilityLabel={shownAccessibilityLabel}

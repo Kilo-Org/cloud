@@ -12,21 +12,26 @@ import {
   type WorktreeKiloRuntimes,
 } from './worktree-runtime';
 import type { NativeRetirement } from './session-operation-cleanup';
-import type { OwnedProcessScope } from './owned-processes';
+import { classifyDirectProcessState, type OwnedProcessScope } from './owned-processes';
 import {
-  SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS,
   SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS,
   SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
   sessionMessageOutcomeSchema,
   type SessionEventIdentity,
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol';
+import { KILO_FEED_RECOVERY_MAX_ATTEMPTS } from './sandbox-control-runtime';
 import {
   buildHeartbeatPayload,
   createControlHandlerDeps,
   handleControlRequest,
   type HandlerDeps,
 } from './sandbox-control-handlers';
+import {
+  controlLogBatchSchema,
+  createControlDiagnosticRecord,
+  type ControlDiagnosticFields,
+} from '../../../src/shared/control-diagnostics';
 import type { WrapperKiloClient } from '../kilo-api';
 import {
   ControlTerminalRuntimeError,
@@ -506,7 +511,7 @@ describe('retirement report ownership', () => {
     const retiredRuntimeId = runtime.runtimeId;
     try {
       expect(
-        await harness.registry.retireRuntimeIfUnshared?.(
+        await harness.registry.deferRuntimeRetirementIfShared?.(
           directory,
           { runtimeId: retiredRuntimeId, client: runtime.kiloClient },
           firstIdentity.kiloSessionId,
@@ -859,16 +864,18 @@ describe('worktree Kilo runtime registry', () => {
     }
   });
 
-  it.each(['stream-error', 'feed-end', 'reconnect'] as const)(
-    'retires real SDK SSE %s only after bounded observer recovery fails',
+  it.each(['stream-error', 'feed-end'] as const)(
+    'retires real SDK SSE %s only after the connection recovery budget',
     async failure => {
-      const connected = 'data: {"payload":{"type":"server.connected","properties":{}}}\n\n';
       const encoder = new TextEncoder();
       const opened = Promise.withResolvers<ReadableStreamDefaultController<Uint8Array>>();
       const response = new Response(
         new ReadableStream<Uint8Array>({
           start(controller) {
-            controller.enqueue(encoder.encode(connected));
+            controller.enqueue(encoder.encode('retry: 0\n\n'));
+            controller.enqueue(
+              encoder.encode('data: {"payload":{"type":"server.connected","properties":{}}}\n\n')
+            );
             opened.resolve(controller);
           },
         }),
@@ -885,21 +892,18 @@ describe('worktree Kilo runtime registry', () => {
       const failures: unknown[] = [];
       const harness = createRegistry({ onUnexpectedClose: error => failures.push(error) });
       try {
-        const runtime = await harness.registry.ensure(path.join(tmpDir, 'worktree-sse'), auth);
+        const runtime = await harness.registry.ensure(
+          path.join(tmpDir, `worktree-sse-${failure}`),
+          auth
+        );
         const stream = await opened.promise;
         if (failure === 'stream-error') stream.error(new Error('private-stream-credential'));
-        else if (failure === 'feed-end') stream.close();
-        else stream.enqueue(encoder.encode(connected));
+        else stream.close();
         await waitUntil(() => failures.length > 0);
         expect(failures).toEqual([
           expect.objectContaining({
             directory: runtime.directory,
-            reason:
-              failure === 'stream-error'
-                ? 'feed_failed'
-                : failure === 'feed-end'
-                  ? 'feed_ended'
-                  : 'feed_reconnected',
+            reason: failure === 'stream-error' ? 'feed_failed' : 'feed_ended',
             cleanup: 'confirmed',
             runtimeId: expect.any(String),
           }),
@@ -912,13 +916,57 @@ describe('worktree Kilo runtime registry', () => {
             ([request]) =>
               request instanceof Request && new URL(request.url).pathname === '/global/event'
           )
-        ).toHaveLength(1 + SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS);
+        ).toHaveLength(1 + KILO_FEED_RECOVERY_MAX_ATTEMPTS);
       } finally {
         harness.registry.shutdown();
         fetchSpy.mockRestore();
       }
     }
   );
+
+  it('keeps a real SDK SSE reconnect healthy instead of retiring the runtime', async () => {
+    const encoder = new TextEncoder();
+    const opened = Promise.withResolvers<ReadableStreamDefaultController<Uint8Array>>();
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode('data: {"payload":{"type":"server.connected","properties":{}}}\n\n')
+          );
+          opened.resolve(controller);
+        },
+      }),
+      { headers: { 'Content-Type': 'text/event-stream' } }
+    );
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async request => {
+        const url = request instanceof Request ? request.url : String(request);
+        return new URL(url).pathname === '/global/health'
+          ? Response.json({ healthy: true, version: '7.4.20' })
+          : response;
+      })
+    );
+    const failures: unknown[] = [];
+    const harness = createRegistry({ onUnexpectedClose: error => failures.push(error) });
+    try {
+      const runtime = await harness.registry.ensure(
+        path.join(tmpDir, 'worktree-sse-reconnect'),
+        auth
+      );
+      const stream = await opened.promise;
+      stream.enqueue(
+        encoder.encode('data: {"payload":{"type":"server.connected","properties":{}}}\n\n')
+      );
+      await Bun.sleep(50);
+      expect(failures).toEqual([]);
+      expect(runtime.signal.aborted).toBe(false);
+      expect(harness.registry.isHealthy()).toBe(true);
+      expect(harness.registry.get(runtime.directory)).toBe(runtime);
+    } finally {
+      harness.registry.shutdown();
+      fetchSpy.mockRestore();
+    }
+  });
 
   it('refreshes direct credentials only for their identity after intentional old-process shutdown', async () => {
     const received: string[] = [];
@@ -988,6 +1036,176 @@ describe('worktree Kilo runtime registry', () => {
     expect(harness.registry.isHealthy()).toBe(true);
     expect(harness.registry.get(identity)).toBe(refreshed);
     expect(harness.unexpectedCloses).toBe(0);
+  });
+
+  it('reuses the live runtime when a new sibling root joins with changed credentials', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createSharedRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        const stopped = Promise.withResolvers<void>();
+        proveOwnedProcesses(options, stopped.promise);
+        return {
+          url: server.url,
+          stopped: stopped.promise,
+          close: () => {
+            server.endFeeds();
+            stopped.resolve();
+          },
+        };
+      },
+      onDiagnostic: (_event, fields) => {
+        diagnostics.push(fields);
+      },
+    });
+    const directAuth = { ...auth, containmentEnabled: false };
+    const directory = path.join(tmpDir, 'shared');
+    const first = harness.registry.attach(rootIdentity(directory), directAuth);
+    const runtime = await first.ready;
+    first.commit();
+    const originalRuntimeId = runtime.runtimeId;
+    const originalClient = runtime.kiloClient;
+    expect(servers).toHaveLength(1);
+
+    const sibling = harness.registry.attach(
+      rootIdentity(directory, 'sibling'),
+      { ...directAuth, token: 'rotated-token' },
+      { GH_TOKEN: 'rotated-github-token' },
+      () => true
+    );
+    const reused = await sibling.ready;
+
+    expect(reused).toBe(runtime);
+    expect(reused.runtimeId).toBe(originalRuntimeId);
+    expect(reused.kiloClient).toBe(originalClient);
+    expect(servers).toHaveLength(1);
+    expect(harness.closes).toBe(0);
+
+    const decision = diagnostics.find(
+      fields => fields.operation === 'session.attach' && fields.kiloSessionId === 'root_sibling'
+    );
+    expect(decision?.reason).toBe('reuse:live_entry');
+    expect(decision?.detail).toContain('newRoot=1');
+    expect(decision?.detail).toContain('tc=1');
+    expect(diagnostics.some(fields => fields.reason === 'refresh:allocated')).toBe(false);
+
+    sibling.commit();
+    sibling.release();
+    first.release();
+    expect(harness.registry.get(directory)).toBe(runtime);
+    expect(harness.unexpectedCloses).toBe(0);
+  });
+
+  it('closes retained root publication counters under the old native runtime on credential refresh', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        const stopped = Promise.withResolvers<void>();
+        proveOwnedProcesses(options, stopped.promise);
+        return {
+          url: server.url,
+          stopped: stopped.promise,
+          close: () => {
+            server.endFeeds();
+            stopped.resolve();
+          },
+        };
+      },
+      onDiagnostic: (_event, fields) => {
+        diagnostics.push(fields);
+      },
+    });
+    const directAuth = { ...auth, containmentEnabled: false };
+    const identity = rootIdentity(path.join(tmpDir, 'publication-refresh'));
+    const attachment = harness.registry.attach(identity, directAuth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+
+    const firstRuntimeId = runtime.runtimeId;
+    const firstReceiptId = 'receipt_n1';
+    const firstRequestId = 'request_n1';
+    const firstSentAt = Date.now();
+    const firstPreparedAt = firstSentAt;
+    expect(
+      harness.registry.recordRootPublicationDiagnostic?.(
+        {
+          directory: identity.directory,
+          kiloSessionId: identity.kiloSessionId,
+          rootKiloSessionId: identity.kiloSessionId,
+          nativeRuntimeId: firstRuntimeId,
+        },
+        {
+          phase: 'publication_failed',
+          failureReason: 'rejected',
+          outcome: 'rejected',
+          receiptId: firstReceiptId,
+          requestId: firstRequestId,
+          sequence: 1,
+          sentAt: firstSentAt,
+          preparedAt: firstPreparedAt,
+        }
+      )
+    ).toBe(true);
+
+    const refresh = harness.registry.attach(
+      identity,
+      { ...directAuth, token: 'rotated-token' },
+      undefined,
+      () => true
+    );
+    const refreshed = await refresh.ready;
+    expect(refreshed).toBe(runtime);
+    const secondRuntimeId = refreshed.runtimeId;
+    expect(secondRuntimeId).not.toBe(firstRuntimeId);
+    refresh.commit();
+    refresh.release();
+
+    expect(
+      harness.registry.recordRootPublicationDiagnostic?.(
+        {
+          directory: identity.directory,
+          kiloSessionId: identity.kiloSessionId,
+          rootKiloSessionId: identity.kiloSessionId,
+          nativeRuntimeId: secondRuntimeId,
+        },
+        {
+          phase: 'publication_receipt',
+          outcome: 'timed_out',
+          receiptId: 'receipt_n2',
+          requestId: 'request_n2',
+          sequence: 2,
+        }
+      )
+    ).toBe(true);
+
+    harness.registry.snapshotRootPublicationDiagnostics?.();
+    const summaries = diagnostics.filter(entry => entry.phase === 'publication_summary');
+    const secondSummary = summaries.find(entry => entry.nativeRuntimeId === secondRuntimeId);
+    expect(secondSummary).toMatchObject({
+      phase: 'publication_summary',
+      nativeRuntimeId: secondRuntimeId,
+      timeoutCount: 1,
+    });
+    expect(secondSummary?.receiptId).not.toBe(firstReceiptId);
+    expect(secondSummary?.requestId).not.toBe(firstRequestId);
+    expect(secondSummary?.sequence).not.toBe(1);
+    expect(secondSummary?.sentAt).not.toBe(firstSentAt);
+    expect(secondSummary?.preparedAt).not.toBe(firstPreparedAt);
+    const firstSummary = summaries.find(entry => entry.nativeRuntimeId === firstRuntimeId);
+    expect(firstSummary).toMatchObject({
+      phase: 'publication_summary',
+      nativeRuntimeId: firstRuntimeId,
+      failureCount: 1,
+      receiptId: firstReceiptId,
+      requestId: firstRequestId,
+      sequence: 1,
+      sentAt: firstSentAt,
+      preparedAt: firstPreparedAt,
+    });
   });
 
   it('isolates different worktrees with separate servers, homes, auth files, and event clients', async () => {
@@ -1825,7 +2043,7 @@ describe('worktree Kilo runtime registry', () => {
       ).toEqual({
         ok: false,
         error: {
-          code: 'not_ready',
+          code: 'session_busy',
           message: 'Native feed recovery is in progress',
           retryable: true,
           admission: 'not-admitted',
@@ -1869,6 +2087,504 @@ describe('worktree Kilo runtime registry', () => {
       server.releasePrompts(identity.kiloSessionId);
       timers.mockRestore();
     }
+  });
+
+  it('retains the first root publication failure and reports accurate burst totals', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => {
+        diagnostics.push(fields);
+      },
+    });
+    const directory = path.join(tmpDir, 'publication-burst');
+    const attachment = harness.registry.attach(rootIdentity(directory, 'root'), auth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+    const identity = {
+      directory,
+      kiloSessionId: 'root_root',
+      rootKiloSessionId: 'root_root',
+      nativeRuntimeId: runtime.runtimeId,
+    };
+    const failure = (sequence: number, receiptId: string) => ({
+      phase: 'publication_failed' as const,
+      failureReason: 'rejected',
+      outcome: 'rejected',
+      receiptId,
+      sequence,
+    });
+    const firstReceiptId = crypto.randomUUID();
+    expect(
+      harness.registry.recordRootPublicationDiagnostic?.(identity, failure(1, firstReceiptId))
+    ).toBe(true);
+    for (let index = 2; index <= 5; index += 1)
+      harness.registry.recordRootPublicationDiagnostic?.(identity, {
+        phase: 'publication_receipt',
+        outcome: 'rejected',
+        receiptId: `receipt_${index}`,
+        sequence: index,
+      });
+    for (let index = 0; index < 3; index += 1)
+      harness.registry.recordRootPublicationDiagnostic?.(identity, {
+        phase: 'publication_receipt',
+        outcome: 'acknowledged',
+        receiptId: `ack_${index}`,
+        sequence: 100 + index,
+      });
+
+    const failures = diagnostics.filter(entry => entry.receiptId === firstReceiptId);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatchObject({ receiptId: firstReceiptId, sequence: 1 });
+
+    const firstRecord = createControlDiagnosticRecord('control.event', failures[0]!, 1_000);
+    if (!firstRecord) throw new Error('First failure did not serialize');
+    expect(firstRecord.fields).toMatchObject({
+      phase: 'publication_failed',
+      failureReason: 'rejected',
+      receiptId: firstReceiptId,
+      sequence: 1,
+    });
+    expect(
+      controlLogBatchSchema.safeParse({
+        version: 1,
+        sequence: 0,
+        droppedRecords: 0,
+        records: [firstRecord],
+      }).success
+    ).toBe(true);
+
+    harness.registry.snapshotRootPublicationDiagnostics?.();
+    const summaries = diagnostics.filter(entry => entry.phase === 'publication_summary');
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).toMatchObject({
+      phase: 'publication_summary',
+      failureCount: 1,
+      rejectedCount: 4,
+      acknowledgedCount: 3,
+      receiptId: firstReceiptId,
+      sequence: 1,
+    });
+    const summaryRecord = createControlDiagnosticRecord('control.event', summaries[0]!, 1_000);
+    if (!summaryRecord) throw new Error('Publication summary did not serialize');
+    expect(summaryRecord.fields).toMatchObject({
+      phase: 'publication_summary',
+      failureCount: 1,
+      receiptId: firstReceiptId,
+      sequence: 1,
+    });
+    expect(
+      controlLogBatchSchema.safeParse({
+        version: 1,
+        sequence: 1,
+        droppedRecords: 0,
+        records: [summaryRecord],
+      }).success
+    ).toBe(true);
+  });
+
+  it('keeps outbox depth and ACK-tracking size distinct in the root publication summary', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => {
+        diagnostics.push(fields);
+      },
+    });
+    const directory = path.join(tmpDir, 'publication-pending');
+    const attachment = harness.registry.attach(rootIdentity(directory, 'root'), auth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+    const identity = {
+      directory,
+      kiloSessionId: 'root_root',
+      rootKiloSessionId: 'root_root',
+      nativeRuntimeId: runtime.runtimeId,
+    };
+    harness.registry.recordRootPublicationDiagnostic?.(identity, {
+      phase: 'publication_failed',
+      failureReason: 'socket_overflow',
+      pendingCount: 3,
+      pendingBytes: 300,
+    });
+    harness.registry.recordRootPublicationDiagnostic?.(identity, {
+      phase: 'publication_receipt',
+      outcome: 'acknowledged',
+      pendingCount: 7,
+      pendingBytes: 700,
+      outstandingEventAcks: 7,
+    });
+
+    harness.registry.snapshotRootPublicationDiagnostics?.();
+    const summary = diagnostics.filter(entry => entry.phase === 'publication_summary').at(-1);
+    expect(summary).toMatchObject({
+      phase: 'publication_summary',
+      pendingCount: 3,
+      pendingBytes: 300,
+      outstandingEventAcks: 7,
+    });
+  });
+
+  it('attributes a cross-directory child publication to its attached root and rejects an unresolved child', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => {
+        diagnostics.push(fields);
+      },
+    });
+    const rootDirectory = path.join(tmpDir, 'attribution-root');
+    const childDirectory = path.join(tmpDir, 'attribution-child');
+    const attachment = harness.registry.attach(rootIdentity(rootDirectory, 'root'), auth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+    rememberChildSession({
+      childId: 'child_child',
+      parentId: 'root_root',
+      directory: childDirectory,
+    });
+
+    expect(
+      harness.registry.recordRootPublicationDiagnostic?.(
+        {
+          directory: childDirectory,
+          kiloSessionId: 'child_unresolved',
+          rootKiloSessionId: 'root_root',
+          nativeRuntimeId: runtime.runtimeId,
+        },
+        {
+          phase: 'publication_failed',
+          failureReason: 'rejected',
+          outcome: 'rejected',
+          receiptId: 'receipt_unresolved',
+          sequence: 99,
+        }
+      )
+    ).toBe(false);
+
+    const receiptId = crypto.randomUUID();
+    expect(
+      harness.registry.recordRootPublicationDiagnostic?.(
+        {
+          directory: childDirectory,
+          kiloSessionId: 'child_child',
+          rootKiloSessionId: 'root_root',
+          nativeRuntimeId: runtime.runtimeId,
+        },
+        {
+          phase: 'publication_failed',
+          failureReason: 'rejected',
+          outcome: 'rejected',
+          receiptId,
+          sequence: 1,
+        }
+      )
+    ).toBe(true);
+
+    const failure = diagnostics.find(entry => entry.receiptId === receiptId);
+    if (!failure) throw new Error('Cross-directory child failure was not reported');
+    const record = createControlDiagnosticRecord('control.event', failure, 1_000);
+    if (!record) throw new Error('Cross-directory child failure did not serialize');
+    expect(
+      controlLogBatchSchema.safeParse({
+        version: 1,
+        sequence: 0,
+        droppedRecords: 0,
+        records: [record],
+      }).success
+    ).toBe(true);
+
+    harness.registry.snapshotRootPublicationDiagnostics?.();
+    expect(diagnostics.filter(entry => entry.phase === 'publication_summary')).toEqual([
+      expect.objectContaining({
+        phase: 'publication_summary',
+        failureCount: 1,
+        receiptId,
+        sequence: 1,
+      }),
+    ]);
+  });
+});
+
+describe('worktree attach decision diagnostics', () => {
+  function decisionRecords(diagnostics: ControlDiagnosticFields[]): ControlDiagnosticFields[] {
+    return diagnostics.filter(
+      fields =>
+        fields.operation === 'session.attach' &&
+        fields.phase === 'started' &&
+        fields.stage === 'runtime_attach'
+    );
+  }
+
+  // Credential refresh requires a stoppable owned process scope and a client that
+  // answers the idle probe; the default stub harness omits both.
+  function createRefreshHarness(
+    diagnostics: ControlDiagnosticFields[],
+    isolation: 'per-session' | 'directory-shared' = 'per-session'
+  ) {
+    return createRegistry(
+      {
+        onDiagnostic: (_event, fields) => diagnostics.push(fields),
+        startServer: async options => {
+          const server = createKiloStub();
+          servers.push(server);
+          const stopped = Promise.withResolvers<void>();
+          proveOwnedProcesses(options, stopped.promise);
+          return {
+            url: server.url,
+            stopped: stopped.promise,
+            close: () => {
+              server.endFeeds();
+              stopped.resolve();
+            },
+          };
+        },
+      },
+      isolation
+    );
+  }
+
+  it('reports joining an existing live entry as reuse:live_entry', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createSharedRegistry({
+      onDiagnostic: (_event, fields) => diagnostics.push(fields),
+    });
+    const directory = path.join(tmpDir, 'reuse-live');
+    const first = harness.registry.attach(rootIdentity(directory, 'first'), auth);
+    const firstRuntime = await first.ready;
+    first.commit();
+    first.release();
+
+    const sibling = harness.registry.attach(rootIdentity(directory, 'sibling'), auth);
+    await sibling.ready;
+    sibling.commit();
+    sibling.release();
+
+    const decision = decisionRecords(diagnostics).find(
+      fields => fields.reason === 'reuse:live_entry'
+    );
+    expect(decision).toMatchObject({
+      operation: 'session.attach',
+      phase: 'started',
+      stage: 'runtime_attach',
+      reason: 'reuse:live_entry',
+      kiloSessionId: 'root_sibling',
+      nativeRuntimeId: firstRuntime.runtimeId,
+      sessionCount: 1,
+      pendingCount: 0,
+    });
+    expect(decision?.detail).toContain('newRoot=1');
+    expect(decision?.detail).toContain('prev=1');
+    expect(decision?.detail).toContain('tc=0');
+    expect(harness.launches).toHaveLength(1);
+  });
+
+  it('reports minting with no entry as mint:no_entry and logs the allocated id', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({ onDiagnostic: (_event, fields) => diagnostics.push(fields) });
+    const directory = path.join(tmpDir, 'mint-empty');
+    const attachment = harness.registry.attach(rootIdentity(directory), auth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+
+    const decision = decisionRecords(diagnostics).find(fields => fields.reason === 'mint:no_entry');
+    expect(decision).toMatchObject({
+      reason: 'mint:no_entry',
+      kiloSessionId: 'root_mint-empty',
+      sessionCount: 0,
+      pendingCount: 0,
+    });
+    expect(decision?.nativeRuntimeId).toBeUndefined();
+    expect(decision?.detail).toContain('newRoot=1');
+    expect(decision?.detail).toContain('prev=0');
+    expect(decision?.detail).toContain('tc=0');
+
+    const allocation = decisionRecords(diagnostics).find(
+      fields => fields.reason === 'mint:allocated'
+    );
+    expect(allocation).toMatchObject({
+      operation: 'session.attach',
+      reason: 'mint:allocated',
+      kiloSessionId: 'root_mint-empty',
+      nativeRuntimeId: runtime.runtimeId,
+      detail: 'previousRuntimeId=none',
+    });
+  });
+
+  it('reports an env-changed sibling join as reuse:live_entry without rotating the runtime', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRefreshHarness(diagnostics, 'directory-shared');
+    const directory = path.join(tmpDir, 'refresh-sibling');
+    const directAuth = { ...auth, containmentEnabled: false };
+    const first = harness.registry.attach(rootIdentity(directory, 'first'), directAuth);
+    const firstRuntime = await first.ready;
+    const originalRuntimeId = firstRuntime.runtimeId;
+    first.commit();
+    first.release();
+
+    const sibling = harness.registry.attach(
+      rootIdentity(directory, 'sibling'),
+      { ...directAuth, token: 'rotated-sibling-token' },
+      undefined,
+      () => true
+    );
+    const reused = await sibling.ready;
+    sibling.commit();
+    sibling.release();
+
+    const decision = decisionRecords(diagnostics).find(
+      fields => fields.reason === 'reuse:live_entry' && fields.kiloSessionId === 'root_sibling'
+    );
+    expect(decision).toMatchObject({
+      reason: 'reuse:live_entry',
+      kiloSessionId: 'root_sibling',
+      nativeRuntimeId: originalRuntimeId,
+      sessionCount: 1,
+    });
+    expect(decision?.detail).toContain('newRoot=1');
+    expect(decision?.detail).toContain('tc=1');
+    expect(String(decision?.detail)).toContain('KILOCODE_TOKEN');
+    expect(JSON.stringify(decision)).not.toContain('rotated-sibling-token');
+
+    // The joining sibling must not rotate the fenced directory incarnation.
+    expect(reused.runtimeId).toBe(originalRuntimeId);
+    expect(servers).toHaveLength(1);
+    expect(decisionRecords(diagnostics).some(fields => fields.reason === 'refresh:allocated')).toBe(
+      false
+    );
+  });
+
+  it('reports an env-changed existing-root re-attach as refresh:existing_root_env_changed', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRefreshHarness(diagnostics);
+    const directory = path.join(tmpDir, 'refresh-sole');
+    const directAuth = { ...auth, containmentEnabled: false };
+    const identity = rootIdentity(directory);
+    const first = harness.registry.attach(identity, directAuth);
+    const firstRuntime = await first.ready;
+    const originalRuntimeId = firstRuntime.runtimeId;
+    first.commit();
+    first.release();
+
+    const refresh = harness.registry.attach(
+      identity,
+      { ...directAuth, token: 'rotated-sole-token' },
+      undefined,
+      () => true
+    );
+    await refresh.ready;
+    refresh.commit();
+    refresh.release();
+
+    const decision = decisionRecords(diagnostics).find(
+      fields => fields.reason === 'refresh:existing_root_env_changed'
+    );
+    expect(decision).toMatchObject({
+      reason: 'refresh:existing_root_env_changed',
+      kiloSessionId: identity.kiloSessionId,
+      nativeRuntimeId: originalRuntimeId,
+    });
+    expect(decision?.detail).toContain('newRoot=0');
+    expect(decision?.detail).toContain('tc=1');
+  });
+
+  it('logs abort state and untruncated changed keys without credential values', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRefreshHarness(diagnostics);
+    const directory = path.join(tmpDir, 'refresh-log-decision');
+    const directAuth = { ...auth, containmentEnabled: false };
+    const identity = rootIdentity(directory);
+    const first = harness.registry.attach(identity, directAuth);
+    await first.ready;
+    first.commit();
+    first.release();
+
+    const longKeys = [
+      `CUSTOM_CHANGED_KEY_ALPHA_${'a'.repeat(40)}`,
+      `CUSTOM_CHANGED_KEY_BETA_${'b'.repeat(40)}`,
+      `CUSTOM_CHANGED_KEY_GAMMA_${'c'.repeat(40)}`,
+    ];
+    const environment: Record<string, string> = {
+      ...Object.fromEntries(longKeys.map(key => [key, 'changed-value'])),
+      GH_TOKEN: 'rotated-log-secret',
+    };
+    const logPath = path.join(tmpDir, 'refresh-log-decision.log');
+    const previousLogPath = process.env.WRAPPER_LOG_PATH;
+    process.env.WRAPPER_LOG_PATH = logPath;
+    try {
+      const refresh = harness.registry.attach(identity, directAuth, environment, () => true);
+      await refresh.ready;
+      refresh.commit();
+      refresh.release();
+    } finally {
+      if (previousLogPath === undefined) delete process.env.WRAPPER_LOG_PATH;
+      else process.env.WRAPPER_LOG_PATH = previousLogPath;
+    }
+
+    const decisionLine = fs
+      .readFileSync(logPath, 'utf8')
+      .split('\n')
+      .find(
+        line =>
+          line.includes('worktree runtime attach decision') &&
+          line.includes('reason=existing_root_env_changed')
+      );
+    if (!decisionLine) throw new Error('Attach decision line was not logged');
+    expect(decisionLine).toContain('aborted=0');
+    for (const key of longKeys) expect(decisionLine).toContain(key);
+    expect(decisionLine).not.toContain('rotated-log-secret');
+    expect(decisionLine).not.toContain(directAuth.token);
+    expect(decisionLine).not.toContain('actual-managed');
+  });
+
+  it('reports a retiring-but-unconfirmed predecessor as mint:retiring, not confirmed retirement', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const stopGate = Promise.withResolvers<boolean>();
+    const harness = createSharedRegistry({
+      onDiagnostic: (_event, fields) => diagnostics.push(fields),
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async () => {
+            await stopGate.promise;
+            return true;
+          },
+        } as unknown as OwnedProcessScope);
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'retiring-mint');
+    const identity = rootIdentity(directory);
+    const first = harness.registry.attach(identity, auth);
+    await first.ready;
+    first.commit();
+    first.release();
+
+    expect(harness.registry.detach(identity)).toBe(true);
+    expect(harness.registry.getEntryRuntimeId?.(directory)).toBeDefined();
+
+    const sibling = harness.registry.attach(rootIdentity(directory, 'sibling'), auth);
+    const decision = decisionRecords(diagnostics).find(fields => fields.reason === 'mint:retiring');
+    expect(decision).toMatchObject({
+      reason: 'mint:retiring',
+      kiloSessionId: 'root_sibling',
+      sessionCount: 0,
+      pendingCount: 0,
+    });
+    expect(decision?.detail).toContain('prev=1');
+    expect(decision?.detail).toContain('ret=1');
+    expect(decision?.detail).toContain('unconf=0');
+    expect(JSON.stringify(decision)).not.toContain('retired');
+    expect(
+      decisionRecords(diagnostics).some(
+        fields => typeof fields.reason === 'string' && fields.reason.includes('retired')
+      )
+    ).toBe(false);
+
+    stopGate.resolve(true);
+    await sibling.ready.catch(() => undefined);
   });
 });
 
@@ -2639,6 +3355,8 @@ setInterval(() => {}, 1000);
           captureBaseline: async () => {},
           stop: async () => true,
           verify: async () => true,
+          observeChild: () => undefined,
+          releaseAbandoned: () => {},
         });
         return { url: server.url, close: () => {} };
       },
@@ -2742,7 +3460,6 @@ setInterval(() => {}, 1000);
   });
 
   it('re-observes an unconfirmed runtime only for an authorized attach demand', async () => {
-    const absent = Promise.withResolvers<boolean>();
     const exited = Promise.withResolvers<void>();
     let launches = 0;
     let observations = 0;
@@ -2751,13 +3468,14 @@ setInterval(() => {}, 1000);
         const server = createKiloStub();
         servers.push(server);
         const first = launches++ === 0;
-        options.onProcessScope?.({
-          stop: async () => false,
-          verify: async () => {
-            observations += 1;
-            return first ? absent.promise : true;
-          },
-        } as unknown as OwnedProcessScope);
+        options.onProcessScope?.({ stop: async () => false } as unknown as OwnedProcessScope);
+        if (first)
+          options.onProcessObserver?.({
+            observe: async () => {
+              observations += 1;
+              return observations === 1 ? ('alive' as const) : ('absent' as const);
+            },
+          });
         return {
           url: server.url,
           close: () => {},
@@ -2768,7 +3486,7 @@ setInterval(() => {}, 1000);
     const directory = path.join(tmpDir, 'demand-attach');
     const runtime = await harness.registry.ensure(directory, auth);
     exited.resolve();
-    await waitUntil(() => harness.registry.isHealthy() === false);
+    await waitUntil(() => observations === 1);
 
     expect(() =>
       harness.registry.attach(rootIdentity(directory, 'unauthorized'), {
@@ -2776,20 +3494,246 @@ setInterval(() => {}, 1000);
         token: 'wrong-token',
       })
     ).toThrow('Kilo worktree auth context mismatch');
-    expect(observations).toBe(0);
+    expect(observations).toBe(1);
+    expect(harness.registry.getRetained?.(directory)).toBe(runtime);
 
     expect(() => harness.registry.attach(rootIdentity(directory, 'retry'), auth)).toThrow(
       'Native runtime retirement is unconfirmed'
     );
-    await waitUntil(() => observations === 1);
-    absent.resolve(true);
+    await waitUntil(() => observations === 2);
     await waitUntil(() => harness.registry.getRetained?.(directory) === undefined);
-    expect(harness.registry.isHealthy()).toBe(true);
 
     const replacement = harness.registry.attach(rootIdentity(directory, 'replacement'), auth);
     expect(await replacement.ready).not.toBe(runtime);
     replacement.commit();
     replacement.release();
+  });
+
+  it('reports unavailable direct observation when no observer can prove safety', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => diagnostics.push(fields),
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async () => false,
+          verify: async () => false,
+        } as unknown as OwnedProcessScope);
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'unavailable-observation');
+    const runtime = await harness.registry.ensure(directory, auth);
+
+    expect(
+      await harness.registry.retireRuntime?.(directory, Date.now() + 1_000, {
+        runtimeId: runtime.runtimeId,
+        client: runtime.kiloClient,
+      })
+    ).toBe('unconfirmed');
+    expect(harness.registry.getRetained?.(directory)).toBe(runtime);
+    expect(
+      diagnostics.some(fields => fields.detail === 'direct process observation unavailable')
+    ).toBe(true);
+    expect(diagnostics.some(fields => fields.detail === 'direct process is still alive')).toBe(
+      false
+    );
+  });
+
+  it('replaces a native runtime on direct process absence without descendant proof', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => diagnostics.push(fields),
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({ stop: async () => false } as unknown as OwnedProcessScope);
+        options.onProcessObserver?.({ observe: async () => 'absent' as const });
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'relaxed-replacement');
+    const runtime = await harness.registry.ensure(directory, auth);
+
+    expect(
+      await harness.registry.retireRuntime?.(directory, Date.now() + 1_000, {
+        runtimeId: runtime.runtimeId,
+        client: runtime.kiloClient,
+      })
+    ).toBe('retired');
+    expect(harness.registry.get(directory)).toBeUndefined();
+    expect(
+      diagnostics.some(fields => fields.detail === 'direct process absent; descendants unverified')
+    ).toBe(true);
+  });
+
+  it('keeps a directory fenced when direct process identity is unknown', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => diagnostics.push(fields),
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({ stop: async () => false } as unknown as OwnedProcessScope);
+        options.onProcessObserver?.({ observe: async () => 'unknown' as const });
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'unknown-identity');
+    const runtime = await harness.registry.ensure(directory, auth);
+
+    expect(
+      await harness.registry.retireRuntime?.(directory, Date.now() + 1_000, {
+        runtimeId: runtime.runtimeId,
+        client: runtime.kiloClient,
+      })
+    ).toBe('unconfirmed');
+    expect(harness.registry.getRetained?.(directory)).toBe(runtime);
+    expect(
+      diagnostics.some(fields => fields.detail === 'direct process identity unavailable')
+    ).toBe(true);
+  });
+
+  it('replaces a native runtime when the stored PID start identity changed', async () => {
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const storedIdentity = '4321:111';
+    const harness = createRegistry({
+      onDiagnostic: (_event, fields) => diagnostics.push(fields),
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({ stop: async () => false } as unknown as OwnedProcessScope);
+        options.onProcessObserver?.({
+          observe: async () =>
+            classifyDirectProcessState({
+              exited: false,
+              pid: 4321,
+              platform: 'linux',
+              storedIdentity,
+              statText: '4321 (kilo) S 1 4321 4321 0 -1 4194304 100 0 0 0 1 2 0 0 20 0 1 0 222 0 0',
+            }),
+        });
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'reused-identity');
+    const runtime = await harness.registry.ensure(directory, auth);
+
+    expect(
+      await harness.registry.retireRuntime?.(directory, Date.now() + 1_000, {
+        runtimeId: runtime.runtimeId,
+        client: runtime.kiloClient,
+      })
+    ).toBe('retired');
+    expect(
+      diagnostics.some(
+        fields =>
+          fields.detail === 'direct process absent; descendants unverified' &&
+          fields.reason === 'pid_identity_reused'
+      )
+    ).toBe(true);
+  });
+
+  it('reports incomplete physical cleanup when replacement follows direct process absence', async () => {
+    const exits = Promise.withResolvers<void>();
+    const failures: unknown[] = [];
+    const harness = createRegistry({
+      onUnexpectedClose: failure => {
+        failures.push(failure);
+      },
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({ stop: async () => false } as unknown as OwnedProcessScope);
+        options.onProcessObserver?.({ observe: async () => 'absent' as const });
+        return { url: server.url, close: () => {}, exited: exits.promise };
+      },
+    });
+    const directory = path.join(tmpDir, 'unverified-cleanup-report');
+    await harness.registry.ensure(directory, auth);
+    exits.resolve();
+    await waitUntil(() => failures.length === 1);
+    expect(failures[0]).toMatchObject({
+      directory,
+      reason: 'process_exited',
+      cleanup: 'unconfirmed',
+    });
+  });
+
+  it('refreshes credentials without waiting for the old child close', async () => {
+    const harness = createRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({ stop: async () => true } as unknown as OwnedProcessScope);
+        return { url: server.url, stopped: new Promise<void>(() => {}), close: () => {} };
+      },
+    });
+    const directAuth = { ...auth, containmentEnabled: false };
+    const identity = rootIdentity(path.join(tmpDir, 'refresh-without-close'));
+    const attachment = harness.registry.attach(identity, directAuth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+    const runtimeId = runtime.runtimeId;
+
+    const refresh = harness.registry.attach(
+      identity,
+      { ...directAuth, token: 'rotated-token' },
+      undefined,
+      () => true
+    );
+    const refreshed = await refresh.ready;
+    expect(refreshed).toBe(runtime);
+    expect(refreshed.runtimeId).not.toBe(runtimeId);
+    refresh.commit();
+    refresh.release();
+  });
+
+  it('reserves direct-observation time when the bounded tree stop does not settle', async () => {
+    let stopDeadlineAt = 0;
+    let observeDeadlineAt = 0;
+    const harness = createRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async (deadlineAt: number) => {
+            stopDeadlineAt = deadlineAt;
+            return false;
+          },
+        } as unknown as OwnedProcessScope);
+        options.onProcessObserver?.({
+          observe: async (deadlineAt = 0) => {
+            observeDeadlineAt = deadlineAt;
+            return deadlineAt > stopDeadlineAt ? ('absent' as const) : ('unknown' as const);
+          },
+        });
+        return { url: server.url, stopped: new Promise<void>(() => {}), close: () => {} };
+      },
+    });
+    const directAuth = { ...auth, containmentEnabled: false };
+    const identity = rootIdentity(path.join(tmpDir, 'refresh-observation-budget'));
+    const attachment = harness.registry.attach(identity, directAuth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+    attachment.release();
+    const runtimeId = runtime.runtimeId;
+
+    const refresh = harness.registry.attach(
+      identity,
+      { ...directAuth, token: 'rotated-token' },
+      undefined,
+      () => true
+    );
+    const refreshed = await refresh.ready;
+    expect(refreshed).toBe(runtime);
+    expect(refreshed.runtimeId).not.toBe(runtimeId);
+    expect(stopDeadlineAt).toBeGreaterThan(0);
+    expect(observeDeadlineAt).toBeGreaterThan(stopDeadlineAt);
+    refresh.commit();
+    refresh.release();
   });
 
   it('awaits the same bounded observation when deleting an unconfirmed runtime', async () => {
@@ -2927,7 +3871,7 @@ setInterval(() => {}, 1000);
 
     const originalDeadline = Date.now() - 1;
     expect(
-      await registry.retireRuntimeIfUnshared?.(
+      await registry.deferRuntimeRetirementIfShared?.(
         directory,
         { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
         'root_first',
@@ -3012,7 +3956,7 @@ setInterval(() => {}, 1000);
     sibling.release();
     const currentTarget = { runtimeId: runtime.runtimeId, client: runtime.kiloClient };
     expect(
-      await registry.retireRuntimeIfUnshared?.(
+      await registry.deferRuntimeRetirementIfShared?.(
         directory,
         currentTarget,
         'root_first',
@@ -3059,7 +4003,7 @@ setInterval(() => {}, 1000);
     first.release();
     sibling.release();
     expect(
-      await harness.registry.retireRuntimeIfUnshared?.(
+      await harness.registry.deferRuntimeRetirementIfShared?.(
         directory,
         { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
         'root_first',
@@ -3130,7 +4074,7 @@ setInterval(() => {}, 1000);
       second.release();
       const target = { runtimeId: runtime.runtimeId, client: runtime.kiloClient };
       expect(
-        await registry.retireRuntimeIfUnshared?.(
+        await registry.deferRuntimeRetirementIfShared?.(
           directory,
           target,
           'root_first',
@@ -3139,7 +4083,7 @@ setInterval(() => {}, 1000);
         )
       ).toBe('shared');
       expect(
-        await registry.retireRuntimeIfUnshared?.(
+        await registry.deferRuntimeRetirementIfShared?.(
           directory,
           target,
           'root_second',
@@ -3213,7 +4157,7 @@ describe('runtime-to-registry root settlement', () => {
     expect(() => harness.registry.attach(identityA, { ...auth, token: 'unauthorized' })).toThrow(
       'Kilo worktree auth context mismatch'
     );
-    expect(observations).toBe(0);
+    expect(observations).toBe(1);
     absent = true;
     expect(() => harness.registry.attach(identityA, auth)).toThrow(
       'Native runtime retirement is unconfirmed'
@@ -3398,7 +4342,7 @@ describe('runtime-to-registry root settlement', () => {
     }
   });
 
-  it('detaches A before returning a failed non-scoped abort so A can reattach', async () => {
+  it('does not let a publication failure block a non-scoped abort so A can reattach', async () => {
     const harness = createSharedRegistry({
       startServer: async options => {
         const server = createKiloStub();
@@ -3446,8 +4390,8 @@ describe('runtime-to-registry root settlement', () => {
           handlerDeps
         )
       ).toEqual({
-        ok: false,
-        error: { code: 'not_ready', message: 'Session outcome delivery failed', retryable: false },
+        ok: true,
+        result: { status: 'aborted' },
       });
       expect(
         server.requests.some(
@@ -3973,7 +4917,7 @@ describe('runtime-to-registry root settlement', () => {
     ).toBe('continue');
   });
 
-  it('preserves a non-deferred scoped record when failRuntime retirement is unconfirmed', async () => {
+  it('admits fresh work after an unconfirmed publication retirement', async () => {
     const exited = Promise.withResolvers<void>();
     const server = createKiloStub();
     servers.push(server);
@@ -4011,6 +4955,6 @@ describe('runtime-to-registry root settlement', () => {
     rememberAttachedRoot(sessionA.kiloSessionId, directory);
     expect(
       integrated.handlerDeps.operations.admission('session.prompt', sessionA, undefined).kind
-    ).toBe('reply');
+    ).toBe('continue');
   });
 });

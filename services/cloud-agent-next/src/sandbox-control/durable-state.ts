@@ -167,6 +167,13 @@ export async function loadRouteTable(storage: ControlStorage): Promise<Map<strin
   return new Map(rows.map(route => [route.sessionId, route]));
 }
 
+export function loadRouteTableSync(storage: {
+  get<T = unknown>(key: string): T | undefined;
+}): Map<string, SessionRoute> {
+  const rows = storage.get<SessionRoute[]>(ROUTES_KEY) ?? [];
+  return new Map(rows.map(route => [route.sessionId, route]));
+}
+
 export async function saveRouteTable(
   storage: ControlStorage,
   table: Map<string, SessionRoute>

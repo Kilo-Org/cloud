@@ -8,14 +8,6 @@
 import { execFile } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
-import {
-  and,
-  cli_sessions_v2,
-  computeDatabaseUrl,
-  createDrizzleClient,
-  eq,
-  inArray,
-} from '@kilocode/db';
 import { createKiloClient, type Message, type Part } from '@kilocode/sdk/v2';
 import {
   answerQuestion,
@@ -43,10 +35,26 @@ import {
 } from './client.js';
 import { mintApiToken } from './auth.js';
 import { startCallbackServer, type CallbackServerHandle } from './callback-server.js';
+import {
+  openConnectedStream,
+  readWorktreeOwnership,
+  requireWorktreeSessionIdentity,
+  requireWorktreeGate,
+  waitForOwnedCompletion,
+} from './worktree-support.js';
+import {
+  addCleanupReport,
+  lifecycleColdResume,
+  lifecycleLongSession,
+  lifecycleMultiSessionCollab,
+  type CleanupResult,
+} from './lifecycle-file-state.js';
+import { CONTINUITY_SCENARIOS } from './lifecycle-continuity.js';
 import { createMessageId } from '../../src/session/message-id.js';
 import { generateKiloSessionId } from '../../src/utils/kilo-session-id.js';
 import {
   controlPlaneKiloRootExists,
+  findControlPlaneKiloRuntime,
   importControlPlaneKiloRoot,
   inspectControlPlaneKiloRoot,
   inspectControlPlaneQuestions,
@@ -64,9 +72,32 @@ import {
   waitForControlPlaneKiloRuntime,
   waitForNewSandboxPresent,
   waitForSandboxFamilyGone,
-  type ControlPlaneKiloRuntime,
+  type DockerCommandExecutor,
   type SandboxContainer,
 } from './sandbox-control.js';
+
+/**
+ * Lifecycle scenarios that accept `--timeout-ms` and need a body budget beyond
+ * the default 120s. Enrolled the same way as `long-session` /
+ * `recover-same-session`: `run.ts` spreads this map into its long-running
+ * allowlist and passes the default through `LifecycleArgs.timeoutMs`.
+ */
+export const LIFECYCLE_SCENARIO_TIMEOUT_MS: Record<string, number> = {
+  'external-kill': 12 * 60_000,
+  'kill-mid-flight': 12 * 60_000,
+};
+
+/**
+ * Upper bound for a post-kill message that must await replacement recovery.
+ * The DO's prepare path can legitimately spend the full create-settle window
+ * before a replacement is ready, so a fixed 120s is too short; this caps each
+ * such wait below the whole scenario deadline. Local-docker replacement
+ * recovery has been observed at ~230s with variance past 300s (the wrapper
+ * readiness deadline is re-armed per prepare attempt), so 5 min was flaky;
+ * 8 min keeps a bound while leaving headroom under the 12 min scenario
+ * deadline.
+ */
+export const RECOVERY_BUDGET_MS = 8 * 60_000;
 
 const execFileAsync = promisify(execFile);
 
@@ -123,17 +154,21 @@ function hasPreparationForMessage(events: StreamEvent[], messageId: string): boo
   );
 }
 
-async function openConnectedStream(config: DriverConfig, sessionId: string, replay = true) {
-  const stream = openStream(config, sessionId, { replay });
-  const connected = await stream.waitFor(event => event.streamEventType === 'connected', 10_000);
-  if (!connected) {
-    stream.close();
-    throw new Error(`Stream did not connect for ${sessionId}`);
+/**
+ * Presence probe for a control-plane primary. Root presence is NOT exclusive
+ * ownership: the wrapper restore paths no longer emit `session.attach ready
+ * directory=`, so discovery now goes through the live Kilo root. Callers that
+ * need exclusivity (kill, pause) must use the `exclusive` operation instead.
+ */
+async function sandboxOwnsSession(
+  containerId: string,
+  sessionId: string,
+  kiloSessionId?: string
+): Promise<boolean> {
+  if (sessionId.startsWith('workspace_') && kiloSessionId !== undefined) {
+    const runtime = await findControlPlaneKiloRuntime(kiloSessionId).catch(() => null);
+    return runtime?.container.id === containerId;
   }
-  return stream;
-}
-
-async function sandboxOwnsSession(containerId: string, sessionId: string): Promise<boolean> {
   const probe = `
     const fs = require('node:fs');
     const sessionId = process.argv.at(-1);
@@ -159,26 +194,31 @@ async function sandboxOwnsSession(containerId: string, sessionId: string): Promi
   }
 }
 
-async function findOwnedSandboxes(sessionId: string, knownIds: Set<string>) {
+async function findOwnedSandboxes(
+  sessionId: string,
+  kiloSessionId: string | undefined,
+  knownIds: Set<string>
+) {
   const candidates = sessionId.startsWith('workspace_')
     ? await listSandboxContainers()
     : await listSandboxesForAgentSession(sessionId);
   const matches: SandboxContainer[] = [];
   for (const container of candidates) {
     if (container.isProxy || knownIds.has(container.id)) continue;
-    if (await sandboxOwnsSession(container.id, sessionId)) matches.push(container);
+    if (await sandboxOwnsSession(container.id, sessionId, kiloSessionId)) matches.push(container);
   }
   return matches;
 }
 
 async function waitForOwnedSandbox(
   sessionId: string,
+  kiloSessionId: string,
   knownIds: Set<string>,
   timeoutMs: number
 ): Promise<SandboxContainer | null> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const matches = await findOwnedSandboxes(sessionId, knownIds);
+    const matches = await findOwnedSandboxes(sessionId, kiloSessionId, knownIds);
     if (matches.length > 1) {
       throw new Error(`Multiple containers match ${sessionId}; refusing ambiguous ownership`);
     }
@@ -188,18 +228,57 @@ async function waitForOwnedSandbox(
   return null;
 }
 
-async function stopOwnedSandboxFamily(sandbox: SandboxContainer, sessionId: string) {
-  const current = (await listSandboxContainers()).find(
+export type StopOwnedSandboxFamilyOptions = {
+  executeDocker?: DockerCommandExecutor;
+  familyGoneTimeoutMs?: number;
+  /**
+   * Worktree directories the scenario created for this root's prior
+   * incarnations, captured while each was exclusively owned. Passing them lets
+   * cleanup stop a live replacement whose parent also holds the retired
+   * worktree, without weakening the exclusive-ownership proof.
+   */
+  allowedDirectories?: readonly string[];
+};
+
+export async function stopOwnedSandboxFamily(
+  sandbox: SandboxContainer,
+  sessionId: string,
+  kiloSessionId?: string,
+  options: StopOwnedSandboxFamilyOptions = {}
+) {
+  const { executeDocker, allowedDirectories = [] } = options;
+  const familyGoneTimeoutMs = options.familyGoneTimeoutMs ?? 30_000;
+  const current = (await listSandboxContainers(executeDocker)).find(
     container => container.name === sandbox.name
   );
-  if (current) {
-    if (current.id !== sandbox.id)
-      throw new Error(`Container identity changed for ${sandbox.name}`);
-    const owned = await sandboxOwnsSession(current.id, sessionId);
-    if (!owned) throw new Error(`Cannot prove exclusive ownership of ${sandbox.name}`);
+  if (current && current.id !== sandbox.id)
+    throw new Error(`Container identity changed for ${sandbox.name}`);
+  let killed: string[];
+  if (current && sessionId.startsWith('workspace_') && kiloSessionId !== undefined) {
+    // Root presence is not exclusive ownership; the control-plane stop proves
+    // the `exclusive` operation before it kills. The proof can fail merely
+    // because the runtime was retired or replaced while the container was
+    // winding down, so re-check the family before treating that as failure.
+    try {
+      killed = await stopOwnedControlPlaneSandbox(
+        sandbox,
+        kiloSessionId,
+        executeDocker,
+        allowedDirectories
+      );
+    } catch (error) {
+      if (!(await waitForSandboxFamilyGone(sandbox, familyGoneTimeoutMs, executeDocker)))
+        throw error;
+      return [];
+    }
+  } else {
+    if (current) {
+      const owned = await sandboxOwnsSession(current.id, sessionId, kiloSessionId);
+      if (!owned) throw new Error(`Cannot prove exclusive ownership of ${sandbox.name}`);
+    }
+    killed = await killSandboxFamily(sandbox, executeDocker);
   }
-  const killed = await killSandboxFamily(sandbox);
-  if (!(await waitForSandboxFamilyGone(sandbox, 30_000))) {
+  if (!(await waitForSandboxFamilyGone(sandbox, familyGoneTimeoutMs, executeDocker))) {
     throw new Error(`Owned sandbox family ${sandbox.name} is still running after cleanup`);
   }
   return killed;
@@ -207,9 +286,53 @@ async function stopOwnedSandboxFamily(sandbox: SandboxContainer, sessionId: stri
 
 /** Only tear down sandboxes whose exclusive session ownership can be proven. */
 export async function stopOwnedSessionSandboxes(sessionId: string): Promise<void> {
-  for (const sandbox of await findOwnedSandboxes(sessionId, new Set())) {
+  for (const sandbox of await findOwnedSandboxes(sessionId, undefined, new Set())) {
     await stopOwnedSandboxFamily(sandbox, sessionId);
   }
+}
+
+/**
+ * Discover and stop every sandbox this scenario owns without letting a cleanup
+ * failure replace the scenario result. The exclusive-ownership proof in
+ * `stopOwnedSandboxFamily` is unchanged; a discovery or stop failure is
+ * collected so the caller can report it beside the scenario outcome instead of
+ * throwing over it.
+ */
+async function cleanupOwnedSandboxFamilies(input: {
+  config: DriverConfig;
+  sessionId: string;
+  kiloSessionId: string;
+  knownSandboxIds: Set<string>;
+  ownedFamilies: Map<string, SandboxContainer>;
+  allowedDirectories: readonly string[];
+}): Promise<CleanupResult> {
+  const failures: string[] = [];
+  await interruptSession(input.config, input.sessionId).catch(() => {});
+  try {
+    for (const sandbox of await findOwnedSandboxes(
+      input.sessionId,
+      input.kiloSessionId,
+      input.knownSandboxIds
+    )) {
+      input.ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
+    }
+  } catch (error) {
+    failures.push(
+      `discover-owned-sandboxes: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  for (const sandbox of input.ownedFamilies.values()) {
+    try {
+      await stopOwnedSandboxFamily(sandbox, input.sessionId, input.kiloSessionId, {
+        allowedDirectories: input.allowedDirectories,
+      });
+    } catch (error) {
+      failures.push(
+        `stop-owned-sandbox(${sandbox.name}): ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+  return { failures, uncleanedResource: failures.length > 0 };
 }
 
 async function sendRecoveryTurn(
@@ -421,96 +544,9 @@ export async function lifecycleGateZero(args: LifecycleArgs): Promise<LifecycleR
   }
 }
 
-type WorktreeOwnershipRow = {
-  sessionId: string;
-  userId: string;
-  organizationId: string | null;
-  parentSessionId: string | null;
-  cloudAgentSessionId: string | null;
-  cloudAgentSessionScopeId: string | null;
-  worktreeId: string | null;
-};
-
 type PublicTranscriptEntry = { info: Message; parts: Part[] };
 
 type PublicKiloClient = ReturnType<typeof createKiloClient>;
-
-async function readWorktreeOwnership(
-  config: DriverConfig,
-  kiloSessionIds: string[]
-): Promise<WorktreeOwnershipRow[]> {
-  const driver = createDrizzleClient({
-    connectionString: process.env.DATABASE_URL ?? computeDatabaseUrl(),
-    poolConfig: { application_name: 'cloud-agent-next-worktree-e2e', max: 1 },
-  });
-  try {
-    return await driver.db
-      .select({
-        sessionId: cli_sessions_v2.session_id,
-        userId: cli_sessions_v2.kilo_user_id,
-        organizationId: cli_sessions_v2.organization_id,
-        parentSessionId: cli_sessions_v2.parent_session_id,
-        cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
-        cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
-        worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
-      })
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.kilo_user_id, config.user.id),
-          inArray(cli_sessions_v2.session_id, kiloSessionIds)
-        )
-      );
-  } finally {
-    await driver.pool.end();
-  }
-}
-
-function requireWorktreeSessionIdentity(session: WorktreeSessionResult, label: string): void {
-  if (!/^workspace_[0-9a-f-]{36}$/i.test(session.cloudAgentSessionId)) {
-    throw new Error(`${label} did not receive a control-plane workspace_* identity`);
-  }
-  if (!/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/.test(session.kiloSessionId)) {
-    throw new Error(`${label} did not receive a valid root ses_* identity`);
-  }
-}
-
-async function requireWorktreeGate(
-  config: DriverConfig,
-  tag: string,
-  timeoutMs: number,
-  stream?: StreamConnection
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  const firstEvent = stream?.events.length ?? 0;
-  while (Date.now() < deadline) {
-    const [engaged, status] = await Promise.all([
-      waitForGateEngaged(config, tag, 200, 50),
-      fetchFakeScenarioStatus(config.fakeLlmUrl, tag),
-    ]);
-    if (status.unsupportedToolSchema) {
-      throw new Error(`unsupported real Kilo tool schema for fake directive ${tag}`);
-    }
-    if (engaged) return;
-    const failure = stream?.events
-      .slice(firstEvent)
-      .find(event =>
-        ['error', 'interrupted', 'cloud.message.failed'].includes(event.streamEventType)
-      );
-    if (failure) {
-      throw new Error(
-        `fake directive ${tag} terminated as ${failure.streamEventType} before gating`
-      );
-    }
-  }
-  const status = await fetchFakeScenarioStatus(config.fakeLlmUrl, tag);
-  if (status.requests > 0 && Object.values(status.toolCalls).every(count => count === 0)) {
-    throw new Error(`required real Kilo tool schema was not advertised for fake directive ${tag}`);
-  }
-  throw new Error(
-    `fake directive ${tag} did not engage within ${timeoutMs}ms; requests=${status.requests}; toolCalls=${JSON.stringify(status.toolCalls)}; toolResults=${JSON.stringify(status.toolResults)}`
-  );
-}
 
 async function requirePublicSessionProjection(
   client: PublicKiloClient,
@@ -607,21 +643,6 @@ async function waitForWorktreeQuestion(
   const status = await fetchFakeScenarioStatus(config.fakeLlmUrl, tag);
   if (status.toolCalls.question === 0) return 'unsupported';
   throw new Error(`root-scoped question ${tag} did not reach its owning stream`);
-}
-
-async function waitForOwnedCompletion(
-  runtime: ControlPlaneKiloRuntime,
-  session: WorktreeSessionResult,
-  messageId: string,
-  marker: string,
-  timeoutMs = 15_000
-): Promise<void> {
-  await waitForControlPlaneKiloCompletion(runtime, {
-    kiloSessionId: session.kiloSessionId,
-    messageId,
-    expectedText: marker,
-    timeoutMs,
-  });
 }
 
 export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<LifecycleResult> {
@@ -726,6 +747,7 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
       kiloSessionId: rootA.kiloSessionId,
       filePath: filename,
     });
+    if (writtenFile.unavailable) throw new Error(writtenFile.reason);
     if (!writtenFile.exists || writtenFile.contents !== originalContents || !writtenFile.dirty) {
       throw new Error('first chat did not create the dirty shared file through its real Kilo tool');
     }
@@ -874,6 +896,7 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
         filePath: filename,
       }),
     ]);
+    if (editedFile.unavailable) throw new Error(editedFile.reason);
     if (
       activeA.execution?.status !== 'running' ||
       activeB.execution?.status !== 'running' ||
@@ -1104,6 +1127,7 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
       kiloSessionId: rootA.kiloSessionId,
       filePath: filename,
     });
+    if (finalFile.unavailable) throw new Error(finalFile.reason);
     if (
       finalFile.contents !== replacementContents ||
       !finalFile.dirty ||
@@ -1194,6 +1218,7 @@ export async function lifecycleCold(args: LifecycleArgs): Promise<LifecycleResul
     const stream = await openConnectedStream(config, sessionResult.cloudAgentSessionId);
     const sandbox = await waitForOwnedSandbox(
       sessionResult.cloudAgentSessionId,
+      sessionResult.kiloSessionId,
       knownSandboxIds,
       timeoutMs
     );
@@ -1285,6 +1310,7 @@ export async function lifecycleHot(args: LifecycleArgs): Promise<LifecycleResult
     const warmupStream = await openConnectedStream(config, session.cloudAgentSessionId);
     const warmupSandbox = await waitForOwnedSandbox(
       session.cloudAgentSessionId,
+      session.kiloSessionId,
       knownSandboxIds,
       timeoutMs
     );
@@ -1401,6 +1427,7 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
     const coldStream = await openConnectedStream(config, session.cloudAgentSessionId);
     const sandbox = await waitForOwnedSandbox(
       session.cloudAgentSessionId,
+      session.kiloSessionId,
       knownSandboxIds,
       timeoutMs
     );
@@ -1492,21 +1519,40 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
 
 export async function lifecycleExternalKill(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
+  const {
+    config,
+    conversation,
+    timeoutMs = LIFECYCLE_SCENARIO_TIMEOUT_MS['external-kill'],
+    api = 'unified',
+  } = args;
+  // The post-kill message is the one that must wait for a replacement to be
+  // prepared; warmup/gate/discovery keep the scenario deadline.
+  const recoveryBudgetMs = Math.min(timeoutMs, RECOVERY_BUDGET_MS);
   const events: StreamEvent[] = [];
   const streams: ReturnType<typeof openStream>[] = [];
   const ownedFamilies = new Map<string, SandboxContainer>();
+  const ownedDirectories = new Set<string>();
   let knownSandboxIds = new Set<string>();
   let sessionId: string | undefined;
+  let kiloSessionId: string | undefined;
+  let result: LifecycleResult;
   try {
     knownSandboxIds = await snapshotSandboxIds();
     const session = await startSession(config, { prompt: fakeDirective('echo:warmup') }, api);
     sessionId = session.cloudAgentSessionId;
+    kiloSessionId = session.kiloSessionId;
     const firstStream = await openConnectedStream(config, sessionId);
     streams.push(firstStream);
-    const firstSandbox = await waitForOwnedSandbox(sessionId, knownSandboxIds, timeoutMs);
+    const firstSandbox = await waitForOwnedSandbox(
+      sessionId,
+      session.kiloSessionId,
+      knownSandboxIds,
+      timeoutMs
+    );
     if (!firstSandbox) throw new Error('Could not identify an exclusively owned warmup sandbox');
     ownedFamilies.set(sandboxFamilyKey(firstSandbox), firstSandbox);
+    const firstRuntime = await findControlPlaneKiloRuntime(session.kiloSessionId);
+    if (firstRuntime) ownedDirectories.add(firstRuntime.directory);
     const warmup = await collectUntilTerminal(firstStream, session.messageId, timeoutMs);
     events.push(...warmup.events);
     firstStream.close();
@@ -1514,7 +1560,7 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
       throw new Error(`Warmup message ${session.messageId} did not complete successfully`);
     }
 
-    const killed = await stopOwnedSandboxFamily(firstSandbox, sessionId);
+    const killed = await stopOwnedSandboxFamily(firstSandbox, sessionId, session.kiloSessionId);
     if (!killed.includes(firstSandbox.name))
       throw new Error('Fault did not kill the owned primary');
     const beforeRecovery = await snapshotSandboxIds();
@@ -1525,7 +1571,7 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
       { cloudAgentSessionId: sessionId, prompt: fakeDirective(conversation) },
       api
     );
-    const affectedTurn = await collectUntilTerminal(stream, affected.messageId, timeoutMs);
+    const affectedTurn = await collectUntilTerminal(stream, affected.messageId, recoveryBudgetMs);
     events.push(...affectedTurn.events);
     stream.close();
     const affectedResult = await getMessageResult(config, sessionId, affected.messageId);
@@ -1537,19 +1583,28 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
         isMessageCompleted(affectedTurn.terminal, affected.messageId)
     ) {
       throw new Error(
-        `Post-kill message ${affected.messageId} has no matching durable terminal outcome`
+        `Post-kill message ${affected.messageId} has no matching durable terminal outcome within ${recoveryBudgetMs}ms: ` +
+          `terminal=${affectedTurn.terminal?.streamEventType ?? 'none'}; durable=${affectedResult.status}`
       );
     }
 
-    const recovery = await sendRecoveryTurn(config, sessionId, api, timeoutMs);
+    const recovery = await sendRecoveryTurn(config, sessionId, api, recoveryBudgetMs);
     events.push(...recovery.events);
     if (
       !isMessageCompleted(recovery.terminal, recovery.messageId) ||
       recovery.status !== 'completed'
     ) {
-      throw new Error(`Recovery message ${recovery.messageId} did not complete in ${sessionId}`);
+      throw new Error(
+        `Recovery message ${recovery.messageId} did not complete in ${sessionId} within ${recoveryBudgetMs}ms: ` +
+          `terminal=${recovery.terminal?.streamEventType ?? 'none'}; durable=${recovery.status}`
+      );
     }
-    const replacement = await waitForOwnedSandbox(sessionId, beforeRecovery, timeoutMs);
+    const replacement = await waitForOwnedSandbox(
+      sessionId,
+      session.kiloSessionId,
+      beforeRecovery,
+      timeoutMs
+    );
     if (!replacement) throw new Error('Could not identify the owned replacement sandbox');
     ownedFamilies.set(sandboxFamilyKey(replacement), replacement);
     if (
@@ -1559,7 +1614,7 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
     ) {
       throw new Error('Recovery reused the retired physical sandbox');
     }
-    return {
+    result = {
       name: 'external-kill',
       conversation,
       ok: true,
@@ -1568,7 +1623,7 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
       durationMs: Date.now() - start,
     };
   } catch (err) {
-    return {
+    result = {
       name: 'external-kill',
       conversation,
       ok: false,
@@ -1576,36 +1631,57 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
       events,
       durationMs: Date.now() - start,
     };
-  } finally {
-    for (const stream of streams) stream.close();
-    if (sessionId) {
-      await interruptSession(config, sessionId).catch(() => {});
-      for (const sandbox of await findOwnedSandboxes(sessionId, knownSandboxIds)) {
-        ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
-      }
-      for (const sandbox of ownedFamilies.values())
-        await stopOwnedSandboxFamily(sandbox, sessionId);
-    }
   }
+  for (const stream of streams) stream.close();
+  if (sessionId && kiloSessionId) {
+    const cleanup = await cleanupOwnedSandboxFamilies({
+      config,
+      sessionId,
+      kiloSessionId,
+      knownSandboxIds,
+      ownedFamilies,
+      allowedDirectories: [...ownedDirectories],
+    });
+    result = addCleanupReport(result, cleanup);
+  }
+  return result;
 }
 
 export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
+  const {
+    config,
+    conversation,
+    timeoutMs = LIFECYCLE_SCENARIO_TIMEOUT_MS['kill-mid-flight'],
+    api = 'unified',
+  } = args;
+  // The recovery turn is the one that can await a replacement allocation.
+  const recoveryBudgetMs = Math.min(timeoutMs, RECOVERY_BUDGET_MS);
   const gateTag = `killmid-${crypto.randomUUID()}`;
   const events: StreamEvent[] = [];
   const ownedFamilies = new Map<string, SandboxContainer>();
+  const ownedDirectories = new Set<string>();
   let knownSandboxIds = new Set<string>();
   let sessionId: string | undefined;
+  let kiloSessionId: string | undefined;
   let stream: ReturnType<typeof openStream> | undefined;
+  let result: LifecycleResult;
   try {
     knownSandboxIds = await snapshotSandboxIds();
     const session = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
     sessionId = session.cloudAgentSessionId;
+    kiloSessionId = session.kiloSessionId;
     stream = await openConnectedStream(config, sessionId);
-    const sandbox = await waitForOwnedSandbox(sessionId, knownSandboxIds, timeoutMs);
+    const sandbox = await waitForOwnedSandbox(
+      sessionId,
+      session.kiloSessionId,
+      knownSandboxIds,
+      timeoutMs
+    );
     if (!sandbox) throw new Error('Could not identify an exclusively owned active sandbox');
     ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
+    const firstRuntime = await findControlPlaneKiloRuntime(session.kiloSessionId);
+    if (firstRuntime) ownedDirectories.add(firstRuntime.directory);
     if (!(await waitForGateEngaged(config, gateTag, timeoutMs))) {
       throw new Error(`Gate ${gateTag} did not engage before fault injection`);
     }
@@ -1619,7 +1695,7 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
     if (!accepted || active.status !== 'running')
       throw new Error(`Message ${session.messageId} is not running`);
 
-    const killed = await stopOwnedSandboxFamily(sandbox, sessionId);
+    const killed = await stopOwnedSandboxFamily(sandbox, sessionId, session.kiloSessionId);
     if (!killed.includes(sandbox.name)) throw new Error('Fault did not kill the owned primary');
     const terminal = await stream.waitForTerminal(timeoutMs, session.messageId);
     events.push(...stream.events);
@@ -1633,15 +1709,23 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
     }
 
     const beforeRecovery = await snapshotSandboxIds();
-    const recovery = await sendRecoveryTurn(config, sessionId, api, timeoutMs);
+    const recovery = await sendRecoveryTurn(config, sessionId, api, recoveryBudgetMs);
     events.push(...recovery.events);
     if (
       !isMessageCompleted(recovery.terminal, recovery.messageId) ||
       recovery.status !== 'completed'
     ) {
-      throw new Error(`Recovery message ${recovery.messageId} did not complete in ${sessionId}`);
+      throw new Error(
+        `Recovery message ${recovery.messageId} did not complete in ${sessionId} within ${recoveryBudgetMs}ms: ` +
+          `terminal=${recovery.terminal?.streamEventType ?? 'none'}; durable=${recovery.status}`
+      );
     }
-    const replacement = await waitForOwnedSandbox(sessionId, beforeRecovery, timeoutMs);
+    const replacement = await waitForOwnedSandbox(
+      sessionId,
+      session.kiloSessionId,
+      beforeRecovery,
+      timeoutMs
+    );
     if (!replacement) throw new Error('Could not identify the owned replacement sandbox');
     ownedFamilies.set(sandboxFamilyKey(replacement), replacement);
     if (
@@ -1651,7 +1735,7 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
     ) {
       throw new Error('Recovery reused the retired physical sandbox');
     }
-    return {
+    result = {
       name: 'kill-mid-flight',
       conversation,
       ok: true,
@@ -1660,7 +1744,7 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
       durationMs: Date.now() - start,
     };
   } catch (err) {
-    return {
+    result = {
       name: 'kill-mid-flight',
       conversation,
       ok: false,
@@ -1668,18 +1752,21 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
       events: events.length ? events : [...(stream?.events ?? [])],
       durationMs: Date.now() - start,
     };
-  } finally {
-    stream?.close();
-    await releaseGate(config.fakeLlmUrl, gateTag).catch(() => {});
-    if (sessionId) {
-      await interruptSession(config, sessionId).catch(() => {});
-      for (const sandbox of await findOwnedSandboxes(sessionId, knownSandboxIds)) {
-        ownedFamilies.set(sandboxFamilyKey(sandbox), sandbox);
-      }
-      for (const sandbox of ownedFamilies.values())
-        await stopOwnedSandboxFamily(sandbox, sessionId);
-    }
   }
+  stream?.close();
+  await releaseGate(config.fakeLlmUrl, gateTag).catch(() => {});
+  if (sessionId && kiloSessionId) {
+    const cleanup = await cleanupOwnedSandboxFamilies({
+      config,
+      sessionId,
+      kiloSessionId,
+      knownSandboxIds,
+      ownedFamilies,
+      allowedDirectories: [...ownedDirectories],
+    });
+    result = addCleanupReport(result, cleanup);
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -1767,7 +1854,12 @@ export async function lifecycleQueueWhileBusy(args: LifecycleArgs): Promise<Life
     const gate = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
     cleanupSessionId = gate.cloudAgentSessionId;
     const stream = await openConnectedStream(config, gate.cloudAgentSessionId);
-    const sandbox = await waitForOwnedSandbox(gate.cloudAgentSessionId, knownSandboxIds, timeoutMs);
+    const sandbox = await waitForOwnedSandbox(
+      gate.cloudAgentSessionId,
+      gate.kiloSessionId,
+      knownSandboxIds,
+      timeoutMs
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -2214,30 +2306,41 @@ export async function lifecycleQueueInterruptClears(args: LifecycleArgs): Promis
 // Single-turn scenarios driving specific fake-LLM directives
 // ---------------------------------------------------------------------------
 
+function isRetryStatusEvent(event: StreamEvent): boolean {
+  if (event.streamEventType !== 'kilocode') return false;
+  const data = event.data as
+    | { type?: string; properties?: { status?: { type?: string } } }
+    | undefined;
+  return data?.type === 'session.status' && data.properties?.status?.type === 'retry';
+}
+
 /**
- * llm-error: drives `__fake__:error-terminal:<msg>` so the fake returns HTTP 400
- * with an OpenAI-shape error body. The gateway converts upstream 402 to retryable
- * 503 for non-BYOK requests. Assert the worker terminalizes with a failure
- * (not `complete`), and the sandbox doesn't hang indefinitely.
+ * llm-error: drives `__fake__:error:<msg>` so the fake returns HTTP 402 with
+ * an OpenAI-shape error body. The wrapper surfaces the provider failure as a
+ * retry. Prove Stop ends that retry (the continuation path the product already
+ * owns) instead of waiting for the five-minute inactivity bound:
+ *
+ * 1. The retry status MUST be visible on the stream.
+ * 2. `interruptSession` MUST surface `cloud.message.failed reason=interrupted`
+ *    for that exact message and a durable `interrupted` status.
+ * 3. A follow-up MUST complete on the SAME `cloudAgentSessionId` and the SAME
+ *    container.
  *
  * Conversation arg is the error message (e.g. `llm-error boom`).
  */
 export async function lifecycleLlmError(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 60_000, api = 'unified' } = args;
+  const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
   const errorMsg = conversation || 'simulated-error';
+  let stream: StreamConnection | undefined;
+  let session: Awaited<ReturnType<typeof startSession>> | undefined;
   try {
     const knownSandboxIds = await snapshotSandboxIds();
-    const session = await startSession(
-      config,
-      { prompt: fakeDirective(`error-terminal:${errorMsg}`) },
-      api
-    );
-    const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
+    session = await startSession(config, { prompt: fakeDirective(`error:${errorMsg}`) }, api);
+    stream = openStream(config, session.cloudAgentSessionId, { replay: false });
 
     const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
     if (!sandbox) {
-      stream.close();
       return {
         name: 'llm-error',
         conversation,
@@ -2248,21 +2351,95 @@ export async function lifecycleLlmError(args: LifecycleArgs): Promise<LifecycleR
       };
     }
 
-    const terminal = await stream.waitForTerminal(timeoutMs, session.messageId);
-    const events = [...stream.events];
-    stream.close();
+    const retry = await stream.waitFor(isRetryStatusEvent, timeoutMs);
+    if (!retry) {
+      return {
+        name: 'llm-error',
+        conversation,
+        ok: false,
+        message: `retry status was not visible within ${timeoutMs}ms`,
+        events: [...stream.events],
+        durationMs: Date.now() - start,
+      };
+    }
 
-    const isFailure =
-      terminal?.streamEventType === 'cloud.message.failed' || terminal?.streamEventType === 'error';
+    const before = await findControlPlaneKiloRuntime(session.kiloSessionId).catch(() => null);
+    await interruptSession(config, session.cloudAgentSessionId);
 
+    const failed = await stream.waitFor(
+      event =>
+        event.streamEventType === 'cloud.message.failed' &&
+        messageIdFromEvent(event) === session?.messageId &&
+        ((event.data as { reason?: string; payload?: { reason?: string } }).reason ??
+          (event.data as { payload?: { reason?: string } }).payload?.reason) === 'interrupted',
+      timeoutMs
+    );
+    if (!failed) {
+      return {
+        name: 'llm-error',
+        conversation,
+        ok: false,
+        message: 'no interrupted cloud.message.failed after Stop',
+        events: [...stream.events],
+        durationMs: Date.now() - start,
+      };
+    }
+
+    const interruptedStatus = await getMessageResult(
+      config,
+      session.cloudAgentSessionId,
+      session.messageId
+    );
+    if (interruptedStatus.status !== 'interrupted') {
+      return {
+        name: 'llm-error',
+        conversation,
+        ok: false,
+        message: `durable status=${interruptedStatus.status} after Stop`,
+        events: [...stream.events],
+        durationMs: Date.now() - start,
+      };
+    }
+
+    const followUp = await sendMessage(
+      config,
+      {
+        cloudAgentSessionId: session.cloudAgentSessionId,
+        prompt: fakeDirective('echo:after-interrupt'),
+      },
+      api
+    );
+    const followTerminal = await stream.waitForTerminal(timeoutMs, followUp.messageId);
+    const followStatus = await getMessageResult(
+      config,
+      session.cloudAgentSessionId,
+      followUp.messageId
+    );
+    if (
+      !isMessageCompleted(followTerminal, followUp.messageId) ||
+      followStatus.status !== 'completed'
+    ) {
+      return {
+        name: 'llm-error',
+        conversation,
+        ok: false,
+        message: `follow-up stream=${followTerminal?.streamEventType ?? 'none'} durable=${followStatus.status}`,
+        events: [...stream.events],
+        durationMs: Date.now() - start,
+      };
+    }
+
+    const after = await findControlPlaneKiloRuntime(session.kiloSessionId).catch(() => null);
+    const sameContainer =
+      before !== null && after !== null && before.container.id === after.container.id;
     return {
       name: 'llm-error',
       conversation,
-      ok: !!terminal && isFailure,
-      message: terminal
-        ? `terminal=${terminal.streamEventType}${isFailure ? '' : ' (expected failure)'}`
-        : `no terminal event within ${timeoutMs}ms`,
-      events,
+      ok: sameContainer,
+      message: sameContainer
+        ? `retryVisible=true; interrupted=true; followUp=completed; container=${after.container.id}`
+        : `container changed or missing: before=${before?.container.id ?? 'none'}; after=${after?.container.id ?? 'none'}`,
+      events: [...stream.events],
       durationMs: Date.now() - start,
     };
   } catch (err) {
@@ -2272,9 +2449,14 @@ export async function lifecycleLlmError(args: LifecycleArgs): Promise<LifecycleR
       conversation,
       ok: false,
       message: `threw: ${msg}`,
-      events: [],
+      events: stream ? [...stream.events] : [],
       durationMs: Date.now() - start,
     };
+  } finally {
+    if (session) await interruptSession(config, session.cloudAgentSessionId).catch(() => {});
+    try {
+      stream?.close();
+    } catch {}
   }
 }
 
@@ -2409,38 +2591,37 @@ export async function lifecycleEmptyResponse(args: LifecycleArgs): Promise<Lifec
  */
 export async function lifecycleInterruptMidStream(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 60_000, api = 'unified' } = args;
-  const gateTag = 'intactive';
+  const { config, conversation, timeoutMs = 180_000, api = 'unified' } = args;
+  const gateTag = `intactive-${randomUUID()}`;
+  const deadlineAt = start + timeoutMs;
+  let stream: StreamConnection | undefined;
   try {
     const knownSandboxIds = await snapshotSandboxIds();
     const session = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
-    const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
+    stream = openStream(config, session.cloudAgentSessionId, { replay: false });
 
     const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
     if (!sandbox) {
-      stream.close();
       return {
         name: 'interrupt-mid-stream',
         conversation,
         ok: false,
         message: 'sandbox did not appear',
-        events: [],
-        durationMs: Date.now() - start,
-      };
-    }
-
-    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
-    if (!engaged) {
-      stream.close();
-      return {
-        name: 'interrupt-mid-stream',
-        conversation,
-        ok: false,
-        message: `gate:${gateTag} did not engage within 90s`,
         events: [...stream.events],
         durationMs: Date.now() - start,
       };
     }
+
+    // Pass this message's id so a `cloud.message.failed` received during
+    // sandbox discovery (before this wait) still fails fast instead of being
+    // missed by the gate window.
+    await requireWorktreeGate(
+      config,
+      gateTag,
+      Math.max(1, deadlineAt - Date.now()),
+      stream,
+      session.messageId
+    );
 
     await interruptSession(config, session.cloudAgentSessionId);
 
@@ -2450,7 +2631,6 @@ export async function lifecycleInterruptMidStream(args: LifecycleArgs): Promise<
       timeoutMs
     );
     const events = [...stream.events];
-    stream.close();
 
     if (!failed) {
       return {
@@ -2485,10 +2665,13 @@ export async function lifecycleInterruptMidStream(args: LifecycleArgs): Promise<
       conversation,
       ok: false,
       message: `threw: ${msg}`,
-      events: [],
+      events: stream ? [...stream.events] : [],
       durationMs: Date.now() - start,
     };
   } finally {
+    try {
+      stream?.close();
+    } catch {}
     await releaseGate(config.fakeLlmUrl, gateTag).catch(() => {});
   }
 }
@@ -2645,6 +2828,24 @@ function callbackPayloadsForSession(
 }
 
 /**
+ * Diagnostic detail for a gate that never engaged. The boolean wait alone
+ * cannot distinguish "the model request was never sent" (requests=0, a sandbox
+ * or startup stall) from "the model answered without running the gate tool"
+ * (requests>0), so report the fake-server counters too.
+ */
+async function gateEngagementDetail(
+  config: DriverConfig,
+  tag: string,
+  timeoutMs: number
+): Promise<string> {
+  const status = await fetchFakeScenarioStatus(config.fakeLlmUrl, tag).catch(() => null);
+  const detail = status
+    ? `requests=${status.requests}; toolCalls=${JSON.stringify(status.toolCalls)}; toolResults=${JSON.stringify(status.toolResults)}`
+    : 'fake scenario status unavailable';
+  return `gate:${tag} did not engage within ${timeoutMs}ms; ${detail}`;
+}
+
+/**
  * callback-completion: exercise the `callbackTarget` path end-to-end.
  *
  * 1. Spin up a local HTTP sink on an ephemeral port.
@@ -2766,7 +2967,7 @@ export async function lifecycleCallbackBatchFollowup(
   const start = Date.now();
   const { config, timeoutMs = 120_000, api = 'unified' } = args;
   const scenarioName = 'callback-batch-followup';
-  const gateTag = 'callback-batch';
+  const gateTag = `callback-batch-${randomUUID()}`;
   let sink: CallbackServerHandle | null = null;
   let cleanupSessionId: string | undefined;
   let batchCompleted = false;
@@ -2797,7 +2998,8 @@ export async function lifecycleCallbackBatchFollowup(
       };
     }
 
-    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
+    const gateWaitMs = 120_000;
+    const engaged = await waitForGateEngaged(config, gateTag, gateWaitMs);
     if (!engaged) {
       const events = [...stream.events];
       stream.close();
@@ -2805,7 +3007,7 @@ export async function lifecycleCallbackBatchFollowup(
         name: scenarioName,
         conversation: `gate:${gateTag}`,
         ok: false,
-        message: `gate:${gateTag} did not engage within 90s`,
+        message: await gateEngagementDetail(config, gateTag, gateWaitMs),
         events,
         durationMs: Date.now() - start,
       };
@@ -3011,7 +3213,7 @@ export async function lifecycleCallbackInterrupt(args: LifecycleArgs): Promise<L
   const start = Date.now();
   const { config, timeoutMs = 120_000, api = 'unified' } = args;
   const scenarioName = 'callback-interrupt';
-  const gateTag = 'callback-interrupt';
+  const gateTag = `callback-interrupt-${randomUUID()}`;
   let sink: CallbackServerHandle | null = null;
   try {
     sink = await startCallbackServer();
@@ -3039,14 +3241,15 @@ export async function lifecycleCallbackInterrupt(args: LifecycleArgs): Promise<L
       };
     }
 
-    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
+    const gateWaitMs = 120_000;
+    const engaged = await waitForGateEngaged(config, gateTag, gateWaitMs);
     if (!engaged) {
       stream.close();
       return {
         name: scenarioName,
         conversation: `gate:${gateTag}`,
         ok: false,
-        message: `gate:${gateTag} did not engage within 90s`,
+        message: await gateEngagementDetail(config, gateTag, gateWaitMs),
         events: [...stream.events],
         durationMs: Date.now() - start,
       };
@@ -3120,6 +3323,9 @@ export const LIFECYCLE_SCENARIOS: Record<
 > = {
   'gate-0': lifecycleGateZero,
   'worktree-shared': lifecycleWorktreeShared,
+  'long-session': lifecycleLongSession,
+  'cold-resume': lifecycleColdResume,
+  'multi-session-collab': lifecycleMultiSessionCollab,
   cold: lifecycleCold,
   hot: lifecycleHot,
   followup: lifecycleFollowup,
@@ -3139,4 +3345,5 @@ export const LIFECYCLE_SCENARIOS: Record<
   'callback-completion': lifecycleCallbackCompletion,
   'callback-batch-followup': lifecycleCallbackBatchFollowup,
   'callback-interrupt': lifecycleCallbackInterrupt,
+  ...CONTINUITY_SCENARIOS,
 };

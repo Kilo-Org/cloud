@@ -93,7 +93,6 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
     }
     const target = resolveSessionPrTapTarget({
       url: pr.url,
-      number: pr.number,
     });
     if (target.kind === 'in-app') {
       router.push(target.href);

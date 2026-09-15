@@ -102,10 +102,14 @@ function findSafeAreaWrapper(root: TestRenderer.ReactTestInstance): TestRenderer
 }
 
 /**
- * Mounts a bottom-form-sheet header with a resolved top inset under `os` and
- * returns the inset wrapper's style, so the test can compare platforms.
+ * Mounts a sheet header with a resolved top inset under `os` and the given
+ * top-inset mode, and returns the inset wrapper's style, so the test can
+ * compare platforms.
  */
-async function bottomFormSheetTopInsetStyle(os: string): Promise<unknown> {
+async function sheetHeaderTopInsetStyle(
+  os: string,
+  topInset: 'bottom-form-sheet' | 'ios-page-sheet'
+): Promise<unknown> {
   rn.os = os;
   rn.statusHeight = 48;
   safeArea.top = 59;
@@ -113,7 +117,7 @@ async function bottomFormSheetTopInsetStyle(os: string): Promise<unknown> {
     title: 'Voice language',
     onDone: () => undefined,
     onCancel: () => undefined,
-    topInset: 'bottom-form-sheet',
+    topInset,
   });
   const style = findSafeAreaWrapper(renderer.root).props.style;
   renderer.unmount();
@@ -517,8 +521,8 @@ describe('SheetHeader', () => {
     // Regression for the removed platform fork: with a resolved top inset the
     // old iOS branch kept 59 while Android dropped it. One implementation now
     // drops it under identical inputs on both OS values.
-    const iosStyle = await bottomFormSheetTopInsetStyle('ios');
-    const androidStyle = await bottomFormSheetTopInsetStyle('android');
+    const iosStyle = await sheetHeaderTopInsetStyle('ios', 'bottom-form-sheet');
+    const androidStyle = await sheetHeaderTopInsetStyle('android', 'bottom-form-sheet');
 
     expect(iosStyle).toBeUndefined();
     expect(androidStyle).toBe(iosStyle);
@@ -567,6 +571,62 @@ describe('SheetHeader', () => {
       // className-less shell, or this assertion is vacuous.
       expect(pressablesByLabel(renderer.root, 'Done')[0]?.parent?.parent).toBe(wrapper);
       expect(wrapper.props.style).toBeUndefined();
+
+      renderer.unmount();
+    }
+  );
+
+  it.each(['ios', 'android'])(
+    'drops the top clearance for a pageSheet header on both platforms (%s)',
+    async os => {
+      // The SessionPageSheet surface owns the top of the window on both
+      // platforms: the native iOS pageSheet presents below the status bar and
+      // the Android full-window Modal pads its own top inset, so the window
+      // inset the header still reads would be a dead band above the title.
+      rn.os = os;
+      rn.statusHeight = 48;
+      safeArea.top = 24;
+      const renderer = await mount({
+        title: 'bash: Search projects and config for the mint secret',
+        onDone: () => undefined,
+        topInset: 'ios-page-sheet',
+      });
+
+      expect(findSafeAreaWrapper(renderer.root).props.style).toBeUndefined();
+
+      renderer.unmount();
+    }
+  );
+
+  it('reserves the same pageSheet top clearance regardless of Platform.OS', async () => {
+    // Regression for the removed platform fork: the old iOS branch dropped the
+    // resolved inset while Android kept it. One implementation now drops it
+    // under identical inputs on both OS values.
+    const iosStyle = await sheetHeaderTopInsetStyle('ios', 'ios-page-sheet');
+    const androidStyle = await sheetHeaderTopInsetStyle('android', 'ios-page-sheet');
+
+    expect(iosStyle).toBeUndefined();
+    expect(androidStyle).toBe(iosStyle);
+  });
+
+  it.each(['ios', 'android'])(
+    'keeps landscape side insets for a pageSheet header while dropping the top clearance (%s)',
+    async os => {
+      rn.os = os;
+      rn.statusHeight = 48;
+      safeArea.top = 24;
+      safeArea.left = 47;
+      safeArea.right = 59;
+      const renderer = await mount({
+        title: 'bash: Search projects and config for the mint secret',
+        onDone: () => undefined,
+        topInset: 'ios-page-sheet',
+      });
+
+      expect(findSafeAreaWrapper(renderer.root).props.style).toEqual({
+        paddingLeft: 47,
+        paddingRight: 59,
+      });
 
       renderer.unmount();
     }

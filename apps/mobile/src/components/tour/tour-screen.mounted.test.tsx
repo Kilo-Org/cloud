@@ -113,6 +113,10 @@ vi.mock('@/lib/tour/tour-completion', () => ({
   }),
 }));
 
+// Mocked to a host string so the fork-body assertion below can actually match
+// it: an unmocked component is a function, and `findAllByType` by string never
+// finds it, so the check would pass no matter what the shell rendered.
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));

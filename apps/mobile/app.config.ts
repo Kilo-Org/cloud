@@ -182,6 +182,10 @@ const config: ExpoConfig = {
         },
         ios: {
           ccacheEnabled: true,
+          // iOS consumes React Native Core prebuilt by default, so the pnpm patch
+          // over RCTComponentViewFactory.mm would never compile into the app.
+          // The Expo Podfile maps this to ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
+          // (KILO-APP-6H; react/react-native#58299).
           // Compile React Native from the patched source instead of linking the
           // prebuilt core. The App Store core ships with assertions enabled
           // (react/react-native#57454), so the Fabric unmount assert must carry

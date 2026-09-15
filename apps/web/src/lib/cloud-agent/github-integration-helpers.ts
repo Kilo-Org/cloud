@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { logExceptInTest } from '@/lib/utils.server';
 import {
   getIntegrationsByOrganization,
   getIntegrationForOrganization,
@@ -60,6 +61,12 @@ const missingIntegrationResponse = (message: string): GitHubRepositoriesResult =
   syncedAt: null,
   errorMessage: message,
 });
+
+const getUpstreamStatus = (error: unknown): number | null => {
+  if (typeof error !== 'object' || error === null) return null;
+  const status = (error as { status?: unknown }).status;
+  return typeof status === 'number' ? status : null;
+};
 
 /**
  * A repository can be reachable from more than one installation. Keep the
@@ -323,7 +330,12 @@ export async function fetchGitHubRepositoriesForUser(
       repositories: mapRepositories(cachedRepositories),
       syncedAt: integration.repositories_synced_at,
     };
-  } catch (_error) {
+  } catch (error) {
+    logExceptInTest('[fetchGitHubRepositoriesForUser] GitHub repository fetch failed', {
+      errorKind: error instanceof Error ? 'Error' : typeof error,
+      status: getUpstreamStatus(error),
+    });
+
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to fetch GitHub repositories',

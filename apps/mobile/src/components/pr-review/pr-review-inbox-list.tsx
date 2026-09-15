@@ -64,12 +64,12 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
       inbox.firstPageErrorState ?? (reconnectOnly ? { kind: 'reconnect' } : null),
     laterPageError: inbox.laterPageError,
   });
-  // A provider outage while the merged list happens to be empty is still a
-  // retryable failure, not "no review requests": keep the footer retry so the
-  // failing provider has a CTA the empty state itself must not carry.
+  // A provider outage that left the merged list empty is the retryable view
+  // itself (`selectPrInboxView`), so the empty state can no longer sit beside
+  // this footer. Only the reconnect notice stays a first-page state: a provider
+  // that also failed beside it keeps the inline retry for its own page.
   const showLoadMoreRetry =
-    view.showLoadMoreRetry ||
-    ((view.kind === 'empty' || view.kind === 'reconnect') && inbox.laterPageError);
+    view.showLoadMoreRetry || (view.kind === 'reconnect' && inbox.laterPageError);
 
   // Landscape: side insets keep inbox rows and the px-6 header/footer
   // content clear of the sensor housing; portrait insets are zero, so the

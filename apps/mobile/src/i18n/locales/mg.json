@@ -3012,5 +3012,33 @@
     "loadFailed": "Tsy afaka naka ny fiteny tohanan'ity fitaovana ity.",
     "emptyTitle": "Tsy misy fiteny tohana",
     "emptyDescription": "Ny fanekena feo amin'ity fitaovana ity dia tsy mitatitra fiteny tohana."
+  },
+  "tour": {
+    "eyebrow": "Fitetezana haingana",
+    "forkTitle": "Aiza no tianao halefa ny Kilo?",
+    "forkSubtitle": "Safidio toerana hampiasanao ny Kilo amin'ny fotoam-piasana voalohananao.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Alefaso amin'ny sehatra cloud voasarona ny Kilo, tsy misy ampiana.",
+    "remoteOptionTitle": "Ny solosainao",
+    "remoteOptionBody": "Alefaso amin'ny solosainao manokana ny Kilo amin'ny alalan'ny CLI `kilo remote`.",
+    "skip": "Ahalavala ny fitetezana",
+    "tutorialLabel": "Torolàlana",
+    "cloudTitle": "Atombohy ny fotoam-piasana cloud voalohananao",
+    "cloudBody": "Mamorona fotoam-piasana vaovao, dia alefan'ny Kilo amin'ny cloud.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Miandry ny hanombohana ny fotoam-piasana cloud…",
+    "cloudCheck": "Mandeha ny fotoam-piasana cloud voalohananao.",
+    "remoteTitle": "Atombohy ny fotoam-piasana lava vahany voalohananao",
+    "remoteBody": "Aampakao ny solosainao, dia atomboho eto ny fotoam-piasana.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Manomboka fotoam-piasana amin'ny solosainao",
+    "remoteWaiting": "Miandry ny hanombokan'ny solosainao ny fotoam-piasana…",
+    "remoteCheck": "Mandeha ny fotoam-piasana lava vahany voalohananao.",
+    "remoteEmptyTitle": "Tsy mbola misy solosaina mifandray",
+    "remoteEmptyBody": "Mba hampifandray azy dia alefaso `kilo remote` amin'ny solosainao.",
+    "remoteFound": "Mifandray ny solosaina",
+    "checkAgain": "Hamarino indray",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

@@ -3012,5 +3012,33 @@
     "loadFailed": "Enweghị ike ibudata asụsụ ngwaọrụ a na-akwado.",
     "emptyTitle": "Enweghị asụsụ akwadoro",
     "emptyDescription": "Nchọpụta okwu nke ngwaọrụ a anaghị ekwupụta asụsụ ọ bụla akwadoro."
+  },
+  "tour": {
+    "eyebrow": "Njegharị ọsọ",
+    "forkTitle": "Ebe ịchọrọ ịgba Kilo?",
+    "forkSubtitle": "Họrọ ebe Kilo ga-agba nnọkọ mbụ gị.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Gbaa Kilo n'ime gburugburu cloud a kapịrị iche n'ejighị ihe ọbụla ịwụnye.",
+    "remoteOptionTitle": "Kọmputa gị",
+    "remoteOptionBody": "Gbaa Kilo na igwe gị site na CLI nke `kilo remote`.",
+    "skip": "Kwụsị njem",
+    "tutorialLabel": "Ntuziaka",
+    "cloudTitle": "Malite nnọkọ cloud mbụ gị",
+    "cloudBody": "Mepụta nnọkọ ọhụrụ ma Kilo ga-agba ya na cloud.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Na-eche ka nnọkọ cloud gị malite…",
+    "cloudCheck": "Nnọkọ cloud mbụ gị na-arụ ọrụ.",
+    "remoteTitle": "Malite nnọkọ remote mbụ gị",
+    "remoteBody": "Jikọta kọmputa gị, mesịa malitee nnọkọ ahụ site ebe a.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Malite nnọkọ na kọmputa gị",
+    "remoteWaiting": "Na-eche ka kọmputa gị malitee nnọkọ ahụ…",
+    "remoteCheck": "Nnọkọ remote mbụ gị na-arụ ọrụ.",
+    "remoteEmptyTitle": "Onweghị kọmputa jikọrọ ruo ugbu a",
+    "remoteEmptyBody": "Iji jikọta ya, gbaa `kilo remote` na kọmputa gị.",
+    "remoteFound": "Ejikọrọ kọmputa",
+    "checkAgain": "Lelee ọzọ",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

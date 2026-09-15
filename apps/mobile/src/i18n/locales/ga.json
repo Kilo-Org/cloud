@@ -3078,5 +3078,33 @@
     "loadFailed": "Níorbh fhéidir na teangacha a thacaíonn an gléas seo a lódáil.",
     "emptyTitle": "Níl aon teanga thacaithe ann",
     "emptyDescription": "Ní thuairiscíonn aithint cainte an ghléis seo aon teanga thacaithe."
+  },
+  "tour": {
+    "eyebrow": "Turas gairid",
+    "forkTitle": "Cén áit ar mian leat Kilo a rith?",
+    "forkSubtitle": "Roghnaigh cá rithfidh Kilo do chéad seisiún.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Rith Kilo i gcomhshaol scamall bosca, gan aon rud le suiteáil.",
+    "remoteOptionTitle": "Do ríomhaire",
+    "remoteOptionBody": "Rith Kilo ar do mheicín féin tríd an CLI `kilo remote`.",
+    "skip": "Scipeáil an turas",
+    "tutorialLabel": "Treoir",
+    "cloudTitle": "Tosaigh do chéad seisiún scamall",
+    "cloudBody": "Cruthaigh seisiún nua agus rithfidh Kilo sa scamall é.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Ag fanacht le do sheisiún scamall…",
+    "cloudCheck": "Tá do chéad seisiún scamall ar siúl.",
+    "remoteTitle": "Tosaigh do chéad seisiún ciar",
+    "remoteBody": "Ceangail do ríomhaire, ansin tosaigh an seisiún anseo.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Tosaigh seisiún ar do ríomhaire",
+    "remoteWaiting": "Ag fanacht go dtosóidh do ríomhaire an seisiún…",
+    "remoteCheck": "Tá do chéad seisiún ciar ar siúl.",
+    "remoteEmptyTitle": "Níl ríomhaire ceangailte fós",
+    "remoteEmptyBody": "Chun é a cheangal, rith `kilo remote` ar do ríomhaire.",
+    "remoteFound": "Ríomhaire ceangailte",
+    "checkAgain": "Seiceáil arís",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

@@ -3012,5 +3012,33 @@
     "loadFailed": "اس ڈیوائس کے معاون زبانوں کو لوڈ نہیں کیا جا سکا۔",
     "emptyTitle": "کوئی معاون زبان نہیں",
     "emptyDescription": "اس ڈیوائس کی تقریر کی شناخت کسی معاون زبان کی اطلاع نہیں دیتی۔"
+  },
+  "tour": {
+    "eyebrow": "فوری ٹور",
+    "forkTitle": "آپ Kilo کہاں چلانا چاہیں گے؟",
+    "forkSubtitle": "اپنے پہلے سیشن کے لیے منتخب کریں کہ Kilo کہاں چلے۔",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "کچھ بھی انسٹال کیے بغیر Kilo کو الگ تھلگ کلاؤڈ ماحول میں چلائیں۔",
+    "remoteOptionTitle": "آپ کا کمپیوٹر",
+    "remoteOptionBody": "اپنے کمپیوٹر پر `kilo remote` CLI کے ذریعے Kilo چلائیں۔",
+    "skip": "ٹور چھوڑیں",
+    "tutorialLabel": "ٹیوٹوریل",
+    "cloudTitle": "اپنا پہلا کلاؤڈ سیشن شروع کریں",
+    "cloudBody": "ایک نیا سیشن بنائیں اور Kilo اسے کلاؤڈ میں چلائے گا۔",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "آپ کے کلاؤڈ سیشن کے شروع ہونے کا انتظار ہے…",
+    "cloudCheck": "آپ کا پہلا کلاؤڈ سیشن چل رہا ہے۔",
+    "remoteTitle": "اپنا پہلا ریموٹ سیشن شروع کریں",
+    "remoteBody": "اپنا کمپیوٹر منسلک کریں، پھر یہاں سے سیشن شروع کریں۔",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "اپنے کمپیوٹر پر سیشن شروع کریں",
+    "remoteWaiting": "آپ کے کمپیوٹر کے سیشن شروع کرنے کا انتظار…",
+    "remoteCheck": "آپ کا پہلا ریموٹ سیشن چل رہا ہے۔",
+    "remoteEmptyTitle": "ابھی کوئی کمپیوٹر منسلک نہیں ہوا",
+    "remoteEmptyBody": "اسے منسلک کرنے کے لیے اپنے کمپیوٹر پر `kilo remote` چلائیں۔",
+    "remoteFound": "کمپیوٹر منسلک ہو گیا",
+    "checkAgain": "دوبارہ جانچیں",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

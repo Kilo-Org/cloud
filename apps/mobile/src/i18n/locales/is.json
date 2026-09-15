@@ -2124,7 +2124,20 @@
       "continueFrom": "Haldið er áfram með {{title}}.",
       "importingSession": "Flytur lotuna inn",
       "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
-      "importFailed": "Ekki tókst að flytja inn þessa lotu."
+      "importFailed": "Ekki tókst að flytja inn þessa lotu.",
+      "sandbox": "Sandkassi",
+      "sandboxAccessibility": "Sandkassi: {{label}}",
+      "sandboxDefaultWithDestination": "Sjálfgefið · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Lítið",
+      "sandboxInstanceShared": "Deilt",
+      "sandboxInstanceLarge": "Stórt",
+      "sandboxInstanceDevcontainer": "Dev-konteiner",
+      "sandboxInstanceProviderDefault": "Sjálfgefið hjá veitanda",
+      "sandboxCouldNotLoad": "Ekki tókst að hlaða valkostum sandkassans",
+      "sandboxUnavailable": "Þessi sandkassi er ekki tiltækur. Veldu annan sandkassa eða Sjálfgefið.",
+      "sandboxUseDefault": "Nota Sjálfgefið"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} skrá var uppfærð.",

@@ -1656,7 +1656,20 @@
       "continueFrom": "Kontynuujesz sesję {{title}}.",
       "importingSession": "Importowanie sesji",
       "cliCannotContinue": "Ta instancja CLI nie obsługuje kontynuowania sesji. Wybierz Cloud Agent lub inną instancję CLI.",
-      "importFailed": "Nie udało się zaimportować tej sesji."
+      "importFailed": "Nie udało się zaimportować tej sesji.",
+      "sandbox": "Środowisko izolowane",
+      "sandboxAccessibility": "Środowisko izolowane: {{label}}",
+      "sandboxDefaultWithDestination": "Domyślne · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Małe",
+      "sandboxInstanceShared": "Współdzielone",
+      "sandboxInstanceLarge": "Duże",
+      "sandboxInstanceDevcontainer": "Kontener deweloperski",
+      "sandboxInstanceProviderDefault": "Domyślne dostawcy",
+      "sandboxCouldNotLoad": "Nie udało się wczytać opcji środowiska izolowanego",
+      "sandboxUnavailable": "To środowisko izolowane jest niedostępne. Wybierz inne środowisko lub Domyślne.",
+      "sandboxUseDefault": "Użyj Domyślnego"
     },
     "partRenderer": {
       "updatedFileCount_one": "Zaktualizowano {{displayCount}} plik.",

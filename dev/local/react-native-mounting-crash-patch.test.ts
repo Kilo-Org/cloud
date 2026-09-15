@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -29,9 +30,57 @@ const PROTOCOL_CLASS_NEW = /\[fd\.viewClass new\]/;
 
 const mobileRequire = createRequire(path.join(mobileRoot, 'package.json'));
 const reactNativeRoot = path.dirname(mobileRequire.resolve('react-native/package.json'));
+const expoCliPath = mobileRequire.resolve('expo/bin/cli');
+const expoPackageRoot = path.dirname(mobileRequire.resolve('expo/package.json'));
 
 function readInstalledReactNative(relativePath: string): string {
   return fs.readFileSync(path.join(reactNativeRoot, relativePath), 'utf8');
+}
+
+// Runs Expo's own config step in introspection mode. `expo config --type
+// introspect` resolves app.config.ts and executes every config plugin's mods in
+// memory, emitting the native files a prebuild would write without touching the
+// tree. Reading the generated `ios/Podfile.properties.json` proves the
+// expo-build-properties plugin still maps our option, so an Expo plugin/config
+// API change cannot silently leave the ObjC patch inert.
+function readIntrospectedIosPodfileProperties(): Record<string, string> {
+  let stdout: string;
+  try {
+    stdout = execFileSync(
+      process.execPath,
+      [expoCliPath, 'config', '--type', 'introspect', '--json'],
+      {
+        cwd: mobileRoot,
+        encoding: 'utf8',
+        maxBuffer: 32 * 1024 * 1024,
+        // GITHUB_ACTIONS mirrors CI: a checkout without the committed
+        // apps/mobile/.env warns instead of throwing, so the check still
+        // reaches the plugin mapping it guards.
+        env: { ...process.env, EXPO_NO_TELEMETRY: '1', GITHUB_ACTIONS: '1' },
+      }
+    );
+  } catch (error) {
+    const stderr = (error as { stderr?: string }).stderr ?? '';
+    throw new Error(`\`expo config --type introspect\` failed:\n${stderr || String(error)}`);
+  }
+  const config = JSON.parse(stdout) as {
+    _internal?: { modResults?: { ios?: { podfileProperties?: Record<string, string> } } };
+  };
+  const podfileProperties = config._internal?.modResults?.ios?.podfileProperties;
+  assert.ok(
+    podfileProperties,
+    '`expo config --type introspect` must expose the generated ios/Podfile.properties.json'
+  );
+  return podfileProperties;
+}
+
+// The prebuild template that turns `ios/Podfile.properties.json` into the
+// generated `ios/Podfile`. `expo prebuild` unpacks `expo/template.tgz`;
+// resolving it here exercises the same artifact without writing to the tree.
+function readExpoIosPodfileTemplate(): string {
+  const templateTgz = path.join(expoPackageRoot, 'template.tgz');
+  assert.ok(fs.existsSync(templateTgz), 'expo/template.tgz must ship the iOS prebuild template');
+  return execFileSync('tar', ['-xzOf', templateTgz, 'package/ios/Podfile'], { encoding: 'utf8' });
 }
 
 test('pnpm-workspace.yaml registers the react-native 0.86.3 patch', () => {
@@ -135,5 +184,21 @@ test('iOS builds React Native core from source so the patch is compiled in', () 
     appConfig,
     /buildReactNativeFromSource\s*:\s*true/,
     'expo-build-properties ios.buildReactNativeFromSource must be true'
+  );
+});
+
+test("Expo's generated iOS project selects source-built React Native", () => {
+  const podfileProperties = readIntrospectedIosPodfileProperties();
+
+  assert.equal(
+    podfileProperties['ios.buildReactNativeFromSource'],
+    'true',
+    'the generated ios/Podfile.properties.json must set ios.buildReactNativeFromSource to "true"; a renamed or dropped expo-build-properties option would leave the ObjC patch unbuilt'
+  );
+
+  assert.match(
+    readExpoIosPodfileTemplate(),
+    /ENV\['RCT_USE_PREBUILT_RNCORE'\]\s*\|\|=\s*podfile_properties\['ios\.buildReactNativeFromSource'\]\s*==\s*'true'\s*\?\s*'0'\s*:\s*'1'/,
+    'the generated ios/Podfile must export RCT_USE_PREBUILT_RNCORE=0 when ios.buildReactNativeFromSource is true so the patched ObjC compiles'
   );
 });

@@ -12,7 +12,7 @@ export type SandboxSelectionCapabilities =
   inferRouterOutputs<MobileRouter>['cloudAgentNext']['getSandboxSelectionOptions'];
 
 /** One allocation row the backend offers. */
-export type SandboxAllocationOption = SandboxSelectionCapabilities['options'][number];
+type SandboxAllocationOption = SandboxSelectionCapabilities['options'][number];
 
 /** The allocation a session requests (the shape a picker row carries). */
 export type SandboxAllocation = SandboxAllocationOption['allocation'];

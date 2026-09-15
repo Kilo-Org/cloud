@@ -73,6 +73,19 @@ function isRoutableGitHubIntegration(
   return isPlatformIntegrationHealthy(integration);
 }
 
+/**
+ * Unsuspend is a recovery event: the selected association is *expected* to be
+ * suspended (that is the state the handler exists to clear), so it must stay
+ * routable even though it is unhealthy. Only a locally disconnected former
+ * tenant is excluded — that row no longer owns the installation and must not
+ * be the association an unsuspend is applied to.
+ */
+function isRecoverableGitHubIntegration(
+  integration: { github_disconnected_at?: string | null } | null
+): boolean {
+  return integration !== null && integration.github_disconnected_at == null;
+}
+
 async function isAvailableForDeferredGitHubDispatch(integration: {
   id: string;
   platform_installation_id: string | null;
@@ -388,7 +401,7 @@ export async function handleGitHubWebhook(
           appType
         );
 
-        if (integration && !isRoutableGitHubIntegration(integration)) {
+        if (integration && !isRecoverableGitHubIntegration(integration)) {
           logExceptInTest(`Integration unavailable, skipping event${logSuffix}`);
           return NextResponse.json({ message: 'Integration unavailable' }, { status: 200 });
         }

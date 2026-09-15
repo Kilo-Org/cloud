@@ -11,7 +11,7 @@ import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-
 import type * as GitHubInstallationsModule from '@/lib/integrations/db/github-installations';
 import type * as PlatformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
 import type { InstallationCreatedPayload } from '../webhook-schemas';
-import { handleInstallationCreated } from './installation-handler';
+import { handleInstallationCreated, handleInstallationUnsuspend } from './installation-handler';
 
 jest.mock('../adapter', () => ({
   fetchGitHubRepositories: jest.fn(async () => []),
@@ -304,6 +304,85 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
       integration_status: 'pending',
       platform_installation_id: null,
       github_installation_id: null,
+    });
+  });
+
+  test('recovers a suspended association when GitHub delivers installation.unsuspend', async () => {
+    const organization = await createTestOrganization('Handler DB Unsuspend', ownerId, 0);
+    const installationId = '545454';
+
+    const inserted = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        github_app_type: 'standard',
+        platform_account_id: String(ACCOUNT_ID),
+        platform_account_login: ACCOUNT_LOGIN,
+        integration_status: 'suspended',
+        suspended_at: new Date().toISOString(),
+        suspended_by: 'github_suspend',
+        repository_access: 'all',
+      })
+      .returning();
+    const suspended = inserted[0];
+    if (!suspended) throw new Error('Expected the suspended association');
+
+    const response = await handleInstallationUnsuspend(
+      { action: 'unsuspend', installation: { id: Number(installationId) } } as never,
+      'standard'
+    );
+
+    await expect(response.json()).resolves.toEqual({ message: 'Installation unsuspended' });
+    const [recovered] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, suspended.id));
+    expect(recovered).toMatchObject({ integration_status: 'active', suspended_at: null });
+  });
+
+  test('does not unsuspend a locally disconnected former tenant', async () => {
+    const organization = await createTestOrganization(
+      'Handler DB Unsuspend Disconnected',
+      ownerId,
+      0
+    );
+    const installationId = '565656';
+
+    const inserted = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        github_app_type: 'standard',
+        platform_account_id: String(ACCOUNT_ID),
+        platform_account_login: ACCOUNT_LOGIN,
+        integration_status: 'suspended',
+        suspended_at: new Date().toISOString(),
+        suspended_by: 'local_disconnect',
+        github_disconnected_at: new Date().toISOString(),
+        repository_access: 'all',
+      })
+      .returning();
+    const disconnected = inserted[0];
+    if (!disconnected) throw new Error('Expected the disconnected association');
+
+    await handleInstallationUnsuspend(
+      { action: 'unsuspend', installation: { id: Number(installationId) } } as never,
+      'standard'
+    );
+
+    const [unchanged] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, disconnected.id));
+    expect(unchanged).toMatchObject({
+      github_disconnected_at: expect.any(String),
+      integration_status: 'suspended',
     });
   });
 });

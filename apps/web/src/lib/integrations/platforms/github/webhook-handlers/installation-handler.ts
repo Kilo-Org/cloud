@@ -269,11 +269,19 @@ export async function handleInstallationUnsuspend(
   appType: GitHubAppType
 ) {
   const installationIdStr = payload.installation.id.toString();
-  const integration = await findIntegrationByInstallationId(
+  const resolvedIntegration = await findIntegrationByInstallationId(
     PLATFORM.GITHUB,
     installationIdStr,
     appType
   );
+  // A locally disconnected former tenant no longer owns this installation, so
+  // it must never be the association an unsuspend is applied to. A merely
+  // *suspended* row is exactly the state this handler clears, so it remains
+  // eligible.
+  const integration =
+    resolvedIntegration && resolvedIntegration.github_disconnected_at == null
+      ? resolvedIntegration
+      : undefined;
   await observeGitHubInstallationLifecycle({
     installationId: installationIdStr,
     appType,

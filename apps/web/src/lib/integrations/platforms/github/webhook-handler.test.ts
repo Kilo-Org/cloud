@@ -799,6 +799,45 @@ describe('handleGitHubWebhook', () => {
     );
   });
 
+  it('processes installation.unsuspend for a suspended association instead of dropping it', async () => {
+    mockFindIntegrationByInstallationId.mockResolvedValue({
+      ...integration,
+      integration_status: 'suspended',
+      suspended_at: '2026-09-15T00:00:00.000Z',
+      suspended_by: 'github_suspend',
+    });
+
+    const payload = { action: 'unsuspend', installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ message: 'Installation unsuspended' });
+    expect(mockHandleInstallationUnsuspend).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      'standard'
+    );
+  });
+
+  it('still refuses to route installation.unsuspend for a locally disconnected association', async () => {
+    mockFindIntegrationByInstallationId.mockResolvedValue({
+      ...integration,
+      github_disconnected_at: '2026-09-15T00:00:00.000Z',
+    });
+
+    const payload = { action: 'unsuspend', installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ message: 'Integration unavailable' });
+    expect(mockHandleInstallationUnsuspend).not.toHaveBeenCalled();
+  });
+
   it('routes installation_repositories to the handler with the webhook app type', async () => {
     const payload = {
       action: 'added',

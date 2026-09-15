@@ -63,6 +63,8 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 import { db } from '@/lib/drizzle';
+import { captureException } from '@sentry/nextjs';
+import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   cloud_agent_code_reviews,
@@ -317,6 +319,91 @@ describe('prepareReviewPayload', () => {
     });
     expect(mockUpdateRepositoryReviewInstructionsMetadata.mock.invocationCallOrder[0]).toBeLessThan(
       mockGenerateReviewPrompt.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('reports the GitHub authorization denial reason as a bounded capture tag', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    const authorizationError = new GitHubRuntimeAuthorizationError('unhealthy_integration');
+    mockGenerateGitHubInstallationToken.mockRejectedValueOnce(authorizationError);
+    const captureMock = captureException as jest.Mock;
+    captureMock.mockClear();
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'github',
+      })
+    ).rejects.toBe(authorizationError);
+
+    expect(captureMock).toHaveBeenCalledWith(
+      authorizationError,
+      expect.objectContaining({
+        tags: {
+          operation: 'prepareReviewPayload',
+          github_runtime_authorization_reason: 'unhealthy_integration',
+        },
+      })
+    );
+  });
+
+  it('reports authorization failures that need investigation with the same bounded tag', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    const authorizationError = new GitHubRuntimeAuthorizationError('ambiguous_association');
+    mockGenerateGitHubInstallationToken.mockRejectedValueOnce(authorizationError);
+    const captureMock = captureException as jest.Mock;
+    captureMock.mockClear();
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'github',
+      })
+    ).rejects.toBe(authorizationError);
+
+    expect(captureMock).toHaveBeenCalledWith(
+      authorizationError,
+      expect.objectContaining({
+        tags: {
+          operation: 'prepareReviewPayload',
+          github_runtime_authorization_reason: 'ambiguous_association',
+        },
+      })
+    );
+  });
+
+  it('still reports unexpected payload failures without an authorization reason tag', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    const unexpectedError = new Error('unexpected payload failure');
+    mockGenerateGitHubInstallationToken.mockRejectedValueOnce(unexpectedError);
+    const captureMock = captureException as jest.Mock;
+    captureMock.mockClear();
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'github',
+      })
+    ).rejects.toBe(unexpectedError);
+
+    expect(captureMock).toHaveBeenCalledWith(
+      unexpectedError,
+      expect.objectContaining({ tags: { operation: 'prepareReviewPayload' } })
     );
   });
 

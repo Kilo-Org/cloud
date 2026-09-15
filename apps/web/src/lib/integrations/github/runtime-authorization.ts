@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { db } from '@/lib/drizzle';
-import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import {
@@ -12,10 +12,19 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, isNull, or } from 'drizzle-orm';
 
+export type GitHubRuntimeAuthorizationDenialReason =
+  | 'missing_association'
+  | 'ambiguous_association'
+  | 'invalid_owner'
+  | 'unhealthy_integration';
+
 export class GitHubRuntimeAuthorizationError extends Error {
-  constructor() {
+  readonly reason: GitHubRuntimeAuthorizationDenialReason;
+
+  constructor(reason: GitHubRuntimeAuthorizationDenialReason) {
     super('GitHub installation is unavailable for runtime use');
     this.name = 'GitHubRuntimeAuthorizationError';
+    this.reason = reason;
   }
 }
 
@@ -49,10 +58,10 @@ type RuntimeAssociation = {
   userBlockedReason: string | null;
 };
 
-export function isGitHubRuntimeAssociationAuthorized(
+export function getGitHubRuntimeAssociationDenialReason(
   association: RuntimeAssociation | null | undefined
-): boolean {
-  if (!association) return false;
+): GitHubRuntimeAuthorizationDenialReason | null {
+  if (!association) return 'missing_association';
 
   const { integration, organizationDeletedAt, userRecordId, userBlockedReason } = association;
   const hasValidOwner =
@@ -63,10 +72,25 @@ export function isGitHubRuntimeAssociationAuthorized(
     (integration.owned_by_user_id === null &&
       integration.owned_by_organization_id !== null &&
       organizationDeletedAt === null);
+  if (!hasValidOwner) return 'invalid_owner';
+  if (!isPlatformIntegrationHealthy(integration)) return 'unhealthy_integration';
+  return null;
+}
+
+export function isGitHubRuntimeAssociationAuthorized(
+  association: RuntimeAssociation | null | undefined
+): boolean {
+  return getGitHubRuntimeAssociationDenialReason(association) === null;
+}
+
+export function isUnexpectedGitHubRuntimeAuthorizationDenial(
+  error: unknown
+): error is GitHubRuntimeAuthorizationError {
   return (
-    hasValidOwner &&
-    isPlatformIntegrationHealthy(integration) &&
-    integration.integration_status === INTEGRATION_STATUS.ACTIVE
+    error instanceof GitHubRuntimeAuthorizationError &&
+    (error.reason === 'ambiguous_association' ||
+      error.reason === 'invalid_owner' ||
+      error.reason === 'unhealthy_integration')
   );
 }
 
@@ -98,12 +122,10 @@ export async function assertGitHubInstallationRuntimeAuthorized(
     )
     .limit(2);
 
-  if (associations.length !== 1) throw new GitHubRuntimeAuthorizationError();
+  if (associations.length === 0) throw new GitHubRuntimeAuthorizationError('missing_association');
+  if (associations.length > 1) throw new GitHubRuntimeAuthorizationError('ambiguous_association');
 
   const [association] = associations;
-  if (!association) throw new GitHubRuntimeAuthorizationError();
-
-  if (!isGitHubRuntimeAssociationAuthorized(association)) {
-    throw new GitHubRuntimeAuthorizationError();
-  }
+  const denialReason = getGitHubRuntimeAssociationDenialReason(association);
+  if (denialReason) throw new GitHubRuntimeAuthorizationError(denialReason);
 }

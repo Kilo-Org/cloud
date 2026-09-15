@@ -93,6 +93,9 @@ describe('GitHub installation persistence', () => {
     await expect(assertGitHubInstallationRuntimeAuthorized('123456', 'standard')).rejects.toThrow(
       'GitHub installation is unavailable for runtime use'
     );
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('123456', 'standard')
+    ).rejects.toMatchObject({ reason: 'unhealthy_integration' });
   });
 
   test('rejects the real runtime authorization query for a blocked personal owner', async () => {
@@ -108,6 +111,39 @@ describe('GitHub installation persistence', () => {
     await expect(assertGitHubInstallationRuntimeAuthorized('123456', 'standard')).rejects.toThrow(
       'GitHub installation is unavailable for runtime use'
     );
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('123456', 'standard')
+    ).rejects.toMatchObject({ reason: 'invalid_owner' });
+  });
+
+  test('reports a missing association for an unknown installation', async () => {
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('999999', 'standard')
+    ).rejects.toMatchObject({ reason: 'missing_association' });
+  });
+
+  test('reports an ambiguous association when a legacy null peer shadows a standard installation', async () => {
+    await db.insert(platform_integrations).values([
+      {
+        owned_by_user_id: ownerId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '424242',
+        github_app_type: null,
+        integration_status: 'active',
+      },
+      {
+        owned_by_user_id: otherOwnerId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '424242',
+        github_app_type: 'standard',
+        integration_status: 'active',
+      },
+    ]);
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('424242', 'standard')
+    ).rejects.toMatchObject({ reason: 'ambiguous_association' });
   });
 
   test('finds legacy Standard installations whose app type is null', async () => {

@@ -27,12 +27,21 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handler', () => ({
     mockHandleGitHubWebhook(request, appType),
 }));
 
-jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
-  GitHubRuntimeAuthorizationError: class GitHubRuntimeAuthorizationError extends Error {},
-  assertGitHubInstallationRuntimeAuthorized: (installationId: string, appType: string) =>
-    mockAssertRuntimeAuthorized(installationId, appType),
+jest.mock('@/lib/integrations/github/runtime-authorization', () => {
+  const actual = jest.requireActual('@/lib/integrations/github/runtime-authorization');
+  return {
+    ...actual,
+    assertGitHubInstallationRuntimeAuthorized: (installationId: string, appType: string) =>
+      mockAssertRuntimeAuthorized(installationId, appType),
+  };
+});
+
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
 }));
 
+import { captureMessage } from '@sentry/nextjs';
 import { POST } from './route';
 import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 
@@ -124,14 +133,59 @@ describe('GitHub webhook route', () => {
     expect(mockGithubWebhook).toHaveBeenCalledTimes(1);
   });
 
-  it('suppresses only expected local disconnect denial', async () => {
-    mockAssertRuntimeAuthorized.mockRejectedValue(new GitHubRuntimeAuthorizationError());
+  it('acknowledges a missing association denial without a diagnostic', async () => {
+    mockAssertRuntimeAuthorized.mockRejectedValue(
+      new GitHubRuntimeAuthorizationError('missing_association')
+    );
     const response = await POST(
       githubRequest('issue_comment', { installation: { id: 98765 } }) as never
     );
     await flushAfterCallbacks();
     expect(response.status).toBe(200);
     expect(mockGithubWebhook).not.toHaveBeenCalled();
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges an unhealthy integration denial and reports a bounded reason tag', async () => {
+    mockAssertRuntimeAuthorized.mockRejectedValue(
+      new GitHubRuntimeAuthorizationError('unhealthy_integration')
+    );
+    const response = await POST(
+      githubRequest('issue_comment', { installation: { id: 98765 } }) as never
+    );
+    await flushAfterCallbacks();
+    expect(response.status).toBe(200);
+    expect(mockGithubWebhook).not.toHaveBeenCalled();
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        level: 'warning',
+        tags: expect.objectContaining({
+          github_runtime_authorization_reason: 'unhealthy_integration',
+        }),
+      })
+    );
+  });
+
+  it('acknowledges an unexpected denial and reports it with a bounded reason tag', async () => {
+    mockAssertRuntimeAuthorized.mockRejectedValue(
+      new GitHubRuntimeAuthorizationError('ambiguous_association')
+    );
+    const response = await POST(
+      githubRequest('issue_comment', { installation: { id: 98765 } }) as never
+    );
+    await flushAfterCallbacks();
+    expect(response.status).toBe(200);
+    expect(mockGithubWebhook).not.toHaveBeenCalled();
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        level: 'warning',
+        tags: expect.objectContaining({
+          github_runtime_authorization_reason: 'ambiguous_association',
+        }),
+      })
+    );
   });
 
   it('returns retryable failure when Chat authorization infrastructure fails', async () => {

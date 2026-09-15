@@ -52,6 +52,7 @@ import type {
   GitLabDiffContext,
 } from '../prompts/generate-prompt';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 import {
   getCodeReviewById,
   findPreviousCompletedReview,
@@ -912,7 +913,12 @@ export async function prepareReviewPayload(
   } catch (error) {
     errorExceptInTest('[prepareReviewPayload] Error preparing payload:', error);
     captureException(error, {
-      tags: { operation: 'prepareReviewPayload' },
+      tags: {
+        operation: 'prepareReviewPayload',
+        ...(error instanceof GitHubRuntimeAuthorizationError
+          ? { github_runtime_authorization_reason: error.reason }
+          : {}),
+      },
       extra: { reviewId, owner, platform },
     });
     throw error;

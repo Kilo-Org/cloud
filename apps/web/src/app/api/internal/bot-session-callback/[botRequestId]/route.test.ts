@@ -80,15 +80,20 @@ jest.mock('@/lib/bot/platforms', () => ({
 }));
 jest.mock('@/lib/bot/agent-runner', () => ({ runBotAgent: jest.fn() }));
 jest.mock('@/lib/user', () => ({ findUserById: jest.fn() }));
-jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}));
 
 import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
+import { captureMessage } from '@sentry/nextjs';
 
 beforeEach(() => {
   afterCallbacks.length = 0;
   mockUpdateValues.length = 0;
   mockMarkTerminal.mockClear();
   mockBotInitialize.mockClear();
+  jest.mocked(captureMessage).mockClear();
   platformIntegrationId = '00000000-0000-4000-8000-000000000002';
   mockGetPlatformIntegration.mockRejectedValue(
     new MockPlatformIntegrationUnavailableError('disconnected')
@@ -132,7 +137,9 @@ test('finalizes when disconnect is detected by the processing indicator after he
     id: platformIntegrationId,
     platform: 'github',
   });
-  mockStartProcessingIndicator.mockRejectedValue(new GitHubRuntimeAuthorizationError());
+  mockStartProcessingIndicator.mockRejectedValue(
+    new GitHubRuntimeAuthorizationError('unhealthy_integration')
+  );
   const botRequestId = '00000000-0000-4000-8000-000000000001';
   const token = createHmac('sha256', 'callback-secret')
     .update(`bot-callback:${botRequestId}`)
@@ -150,6 +157,53 @@ test('finalizes when disconnect is detected by the processing indicator after he
     expect.objectContaining({
       status: 'error',
       error_message: 'Platform connection was disconnected before callback publication.',
+    })
+  );
+  expect(captureMessage).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({
+      level: 'warning',
+      tags: expect.objectContaining({
+        github_runtime_authorization_reason: 'unhealthy_integration',
+      }),
+    })
+  );
+});
+
+test('reports an unexpected denial reason and keeps the terminal callback outcome', async () => {
+  mockGetPlatformIntegration.mockResolvedValue({
+    id: platformIntegrationId,
+    platform: 'github',
+  });
+  mockStartProcessingIndicator.mockRejectedValue(
+    new GitHubRuntimeAuthorizationError('ambiguous_association')
+  );
+  const botRequestId = '00000000-0000-4000-8000-000000000001';
+  const token = createHmac('sha256', 'callback-secret')
+    .update(`bot-callback:${botRequestId}`)
+    .digest('hex');
+  const request = new NextRequest('http://localhost/callback?currentStep=1', {
+    method: 'POST',
+    headers: { 'X-Bot-Callback-Token': token, 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'completed', cloudAgentSessionId: 'session-1' }),
+  });
+  const { POST } = await import('./route');
+  await POST(request, { params: Promise.resolve({ botRequestId }) });
+  await Promise.all(afterCallbacks.splice(0).map(callback => callback()));
+  expect(mockMarkTerminal).toHaveBeenCalled();
+  expect(mockUpdateValues).toContainEqual(
+    expect.objectContaining({
+      status: 'error',
+      error_message: 'Platform connection was disconnected before callback publication.',
+    })
+  );
+  expect(captureMessage).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({
+      level: 'warning',
+      tags: expect.objectContaining({
+        github_runtime_authorization_reason: 'ambiguous_association',
+      }),
     })
   );
 });

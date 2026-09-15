@@ -34,6 +34,7 @@ export function ToolRunSheet({ visible, parts, onClose, onOpenPart }: Readonly<T
         title={t('agentChat.toolRun.sheetTitle')}
         onDone={onClose}
         doneLabel={t('common.done')}
+        topInset="ios-page-sheet"
       />
 
       {parts.length === 0 ? (

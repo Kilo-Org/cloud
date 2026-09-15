@@ -188,6 +188,25 @@ function spinningIcons(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root.findAllByType(SpinningIcon);
 }
 
+function tokens(node: TestRenderer.ReactTestInstance) {
+  return String(node.props.className ?? '').split(/\s+/);
+}
+
+/** The row shell the loaded group rows use, shared with the placeholders. */
+function rowShells(card: TestRenderer.ReactTestInstance) {
+  return card.findAll(node => {
+    const classes = tokens(node);
+    return (
+      classes.includes('min-h-11') &&
+      classes.includes('flex-row') &&
+      classes.includes('items-center') &&
+      classes.includes('gap-3') &&
+      classes.includes('px-4') &&
+      classes.includes('py-3')
+    );
+  });
+}
+
 beforeEach(() => {
   query.isLoading = false;
   query.isError = false;
@@ -350,14 +369,15 @@ describe('PrReviewChecksSection view-on-provider link', () => {
 // was in the loading state, and the state was invisible: the skeleton bars
 // carried `bg-muted` inside a `bg-secondary` card, and `--muted` equals
 // `--secondary` in BOTH themes (apps/mobile/src/global.css), so the bars
-// painted the card's own colour. This test pins the fixed render path: the
-// card holds three shared Skeleton bars in `bg-muted-soft` — the one gray
-// that differs from the card in both themes — and no bar keeps the
-// collision token. The CSS guard below proves the collision is real
-// (`--muted` == `--secondary`) and that the token the bars now use is not
-// the collision token, so a future theme change that reintroduces the
-// collision fails here instead of shipping another empty gray block.
-describe('PrReviewChecksSection loading state is visible on the card', () => {
+// painted the card's own colour. This suite pins the fixed render path: the
+// card reserves the loaded card's shape — a header strip plus one placeholder
+// row per status the card can show — and every bar keeps `bg-muted-soft`, the
+// one gray that differs from the card in both themes. The CSS guard below
+// proves the collision is real (`--muted` == `--secondary`) and that the token
+// the bars now use is not the collision token, so a future theme change that
+// reintroduces the collision fails here instead of shipping another empty gray
+// block.
+describe('PrReviewChecksSection loading state reserves the loaded card', () => {
   const previous = { isLoading: false };
 
   beforeEach(() => {
@@ -404,17 +424,16 @@ describe('PrReviewChecksSection loading state is visible on the card', () => {
     return card;
   }
 
-  it('paints three animated skeleton bars in a colour distinct from the card', () => {
+  it('paints every skeleton bar in a colour distinct from the card', () => {
     const renderer = mountLoading();
     const card = findCard(renderer);
 
     // The shared Skeleton component — the app's loading indicator (pulse +
     // shimmer), not a static block.
     const bars = card.findAll(node => String(node.type) === 'Skeleton');
-    expect(bars).toHaveLength(3);
+    expect(bars.length).toBeGreaterThan(0);
     for (const bar of bars) {
-      const className = String(bar.props.className ?? '');
-      expect(className.split(/\s+/)).toContain('bg-muted-soft');
+      expect(tokens(bar)).toContain('bg-muted-soft');
     }
 
     // The defect itself: no node in the card may keep the bare `bg-muted`
@@ -433,6 +452,49 @@ describe('PrReviewChecksSection loading state is visible on the card', () => {
     act(() => {
       renderer.unmount();
     });
+  });
+
+  it('mirrors the loaded card: a header strip plus one row per status', () => {
+    const renderer = mountLoading();
+    const card = findCard(renderer);
+
+    const headerStrips = card.findAll(
+      node =>
+        tokens(node).includes('border-b-[0.5px]') &&
+        tokens(node).includes('px-4') &&
+        tokens(node).includes('py-2')
+    );
+    expect(headerStrips).toHaveLength(1);
+    const headerStrip = headerStrips[0];
+    if (!headerStrip) {
+      throw new Error('the header strip did not render');
+    }
+    expect(headerStrip.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(1);
+
+    expect(rowShells(card)).toHaveLength(4);
+
+    // The card hairline sits between rows, never after the last one: the
+    // header strip's own border plus one between each pair of four rows.
+    const hairlines = card.findAll(node => tokens(node).includes('border-b-[0.5px]'));
+    expect(hairlines).toHaveLength(4);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('reserves as many placeholder rows as the loaded card can show', () => {
+    const loadingRenderer = mountLoading();
+    const reserved = rowShells(findCard(loadingRenderer)).length;
+    act(() => {
+      loadingRenderer.unmount();
+    });
+
+    // The loaded card can never exceed one row per status; the fixture spans
+    // all four, so it settles into exactly the reserved rows.
+    query.isLoading = false;
+    const loaded = mountSection();
+    expect(groupRows(loaded)).toHaveLength(reserved);
   });
 
   it('keeps the CHECKS heading rendered while loading, so the block is labelled', () => {

@@ -19,6 +19,8 @@ import {
 import { disconnectGitHubInstallation } from '@/lib/integrations/db/github-installations';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchGitHubInstallationDetails: jest.fn(),
   fetchGitHubRepositoriesForMaintenance: jest.fn(),
@@ -219,6 +221,55 @@ describe('GitHub connection attempt persistence', () => {
       .where(eq(platform_integrations.id, completed.integrationId));
     expect(row?.repositories).toHaveLength(1);
     expect(row?.repository_access).toBe('all');
+  });
+
+  test('a failing inventory listing does not block an all-repositories attach', async () => {
+    mockedFetchInstallation.mockResolvedValue({
+      id: 123,
+      account: { id: 456, login: 'acme', type: 'Organization' },
+      permissions: { contents: 'read' },
+      events: ['push'],
+      repository_selection: 'all',
+      created_at: '2026-09-07T00:00:00.000Z',
+    } as never);
+    mockedFetchRepositories.mockRejectedValueOnce(new Error('rate limited'));
+
+    const organization = await createTestOrganization('Attach inventory failure org', userId, 0);
+    const attemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'org', id: organization.id },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [candidate],
+    });
+    await selectGitHubConnectionInstallation({
+      attemptId,
+      userId,
+      installationId: candidate.installationId,
+    });
+
+    // The inventory sync is best-effort for all-repositories installs: a
+    // transient listing failure must not abort the connection.
+    const completed = await completeGitHubConnectionAttempt({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidate,
+      authorizeOwner: async () => {},
+    });
+    if (!completed.ok) throw new Error('Expected completion');
+
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, completed.integrationId));
+    expect(row).toMatchObject({ integration_status: 'active', repository_access: 'all' });
+    expect(row?.repositories).toBeNull();
   });
 
   test('atomically writes, consumes, and idempotently replays a verified completion', async () => {

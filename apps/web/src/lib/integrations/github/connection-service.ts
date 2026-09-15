@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -161,12 +162,27 @@ export async function completeGitHubConnectionAttempt(input: {
   // `selected`. A newly attached shared association starts with
   // repositories=null, and discovery/Slack read the cached list, so an
   // all-repositories shared attach would otherwise look repository-less on
-  // first use. The pending-install completion path already syncs the same
-  // inventory this way.
-  const repositories = await fetchGitHubRepositoriesForMaintenance(
-    input.candidate.installationId,
-    initialAttempt.github_app_type
-  );
+  // first use.
+  //
+  // For `all` installs this sync is best-effort: a transient listing failure
+  // (rate limit, 5xx, timeout) must not block connecting, and the cache can
+  // be populated later — the pending-install completion path treats the same
+  // call the same way. A `selected` install keeps surfacing the failure
+  // because that listing is the user's own selection.
+  const fetchInventory = () =>
+    fetchGitHubRepositoriesForMaintenance(
+      input.candidate.installationId,
+      initialAttempt.github_app_type
+    );
+  const repositories =
+    details.repository_selection === 'selected'
+      ? await fetchInventory()
+      : await fetchInventory().catch(error => {
+          captureException(error, {
+            tags: { operation: 'github-connect-attach-repository-sync' },
+          });
+          return null;
+        });
   return db.transaction(async tx => {
     const [attempt] = await tx
       .select()

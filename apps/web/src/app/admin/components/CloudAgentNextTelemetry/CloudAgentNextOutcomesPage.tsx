@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useState } from 'react';
-import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
   useCloudAgentNextHealthErrorSessions,
@@ -260,6 +260,7 @@ function ErrorSessionsDialog({
 }) {
   const sessions = useCloudAgentNextHealthErrorSessions(interval, error);
   const [diagnosticCheckTime, setDiagnosticCheckTime] = useState(Date.now);
+  const [expandedSessions, setExpandedSessions] = useState<Set<string>>(() => new Set());
   const now = Date.now();
   const rows = (sessions.data?.rows ?? []).map(row => {
     const retained = row.diagnosticExpiresAt && new Date(row.diagnosticExpiresAt).getTime() > now;
@@ -272,6 +273,15 @@ function ErrorSessionsDialog({
     const expiry = row.diagnosticExpiresAt ? new Date(row.diagnosticExpiresAt).getTime() : 0;
     return row.diagnostic && expiry > diagnosticCheckTime ? Math.min(next, expiry) : next;
   }, Infinity);
+
+  function toggleSession(cloudAgentSessionId: string) {
+    setExpandedSessions(previous => {
+      const next = new Set(previous);
+      if (next.has(cloudAgentSessionId)) next.delete(cloudAgentSessionId);
+      else next.add(cloudAgentSessionId);
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!Number.isFinite(nextDiagnosticExpiry)) return;
@@ -350,6 +360,9 @@ function ErrorSessionsDialog({
                 </TableCaption>
                 <TableHeader className="bg-card sticky top-0 z-10">
                   <TableRow>
+                    <TableHead className="w-10 px-1">
+                      <span className="sr-only">Details</span>
+                    </TableHead>
                     <TableHead>Kilo session ID</TableHead>
                     <TableHead>Cloud Agent ID</TableHead>
                     <TableHead>Last seen (UTC)</TableHead>
@@ -357,67 +370,96 @@ function ErrorSessionsDialog({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map(row => (
-                    <Fragment key={row.cloudAgentSessionId}>
-                      <TableRow className="border-b-0">
-                        <TableCell className="font-mono text-xs">
-                          <span className="flex items-center gap-1">
-                            {row.kiloSessionId}
-                            <CopyButton text={row.kiloSessionId} label="Kilo session ID" />
-                          </span>
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          <span className="flex items-center gap-1">
-                            {row.cloudAgentSessionId}
-                            <CopyButton text={row.cloudAgentSessionId} label="Cloud Agent ID" />
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground font-mono text-xs whitespace-nowrap">
-                          {row.lastSeen ? (
-                            <time dateTime={row.lastSeen} title={row.lastSeen}>
-                              {utcLongLabel.format(new Date(row.lastSeen))} UTC
-                            </time>
-                          ) : (
-                            '--'
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums">
-                          {row.matchingEvents.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell colSpan={4} className="pt-0">
-                          <dl className="grid gap-3 text-xs sm:grid-cols-3">
-                            {[
-                              { label: 'Sandbox ID', value: row.sandboxId },
-                              {
-                                label:
-                                  error.source === 'setup' ? 'Initial message ID' : 'Message ID',
-                                value: row.messageId,
-                              },
-                              { label: 'Wrapper run ID', value: row.wrapperRunId },
-                            ].map(({ label, value }) => (
-                              <div key={label} className="min-w-0">
-                                <dt className="text-muted-foreground">{label}</dt>
-                                <dd className="flex items-center gap-1 font-mono">
-                                  <span className="break-all">{value ?? 'Not recorded'}</span>
-                                  {value && (
-                                    <CopyButton text={value} label={label} className="shrink-0" />
-                                  )}
-                                </dd>
-                              </div>
-                            ))}
-                            <div className="sm:col-span-3">
-                              <dt className="text-muted-foreground">Stored diagnostic</dt>
-                              <dd className="mt-1 wrap-anywhere whitespace-pre-wrap">
-                                {row.diagnostic || 'Not available (missing or expired)'}
-                              </dd>
-                            </div>
-                          </dl>
-                        </TableCell>
-                      </TableRow>
-                    </Fragment>
-                  ))}
+                  {rows.map(row => {
+                    const expanded = expandedSessions.has(row.cloudAgentSessionId);
+                    const detailId = `health-error-session-details-${row.cloudAgentSessionId}`;
+                    return (
+                      <Fragment key={row.cloudAgentSessionId}>
+                        <TableRow className={expanded ? 'border-b-0' : undefined}>
+                          <TableCell className="w-10 px-1 py-0">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-expanded={expanded}
+                              aria-controls={detailId}
+                              aria-label={`${expanded ? 'Hide' : 'Show'} details for ${row.kiloSessionId}`}
+                              onClick={() => toggleSession(row.cloudAgentSessionId)}
+                            >
+                              {expanded ? (
+                                <ChevronDown className="size-4" />
+                              ) : (
+                                <ChevronRight className="size-4" />
+                              )}
+                            </Button>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            <span className="flex items-center gap-1">
+                              {row.kiloSessionId}
+                              <CopyButton text={row.kiloSessionId} label="Kilo session ID" />
+                            </span>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            <span className="flex items-center gap-1">
+                              {row.cloudAgentSessionId}
+                              <CopyButton text={row.cloudAgentSessionId} label="Cloud Agent ID" />
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground font-mono text-xs whitespace-nowrap">
+                            {row.lastSeen ? (
+                              <time dateTime={row.lastSeen} title={row.lastSeen}>
+                                {utcLongLabel.format(new Date(row.lastSeen))} UTC
+                              </time>
+                            ) : (
+                              '--'
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono tabular-nums">
+                            {row.matchingEvents.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                        {expanded && (
+                          <TableRow>
+                            <TableCell className="py-0" />
+                            <TableCell id={detailId} colSpan={4} className="pt-0">
+                              <dl className="grid gap-3 text-xs sm:grid-cols-3">
+                                {[
+                                  { label: 'Sandbox ID', value: row.sandboxId },
+                                  {
+                                    label:
+                                      error.source === 'setup'
+                                        ? 'Initial message ID'
+                                        : 'Message ID',
+                                    value: row.messageId,
+                                  },
+                                  { label: 'Wrapper run ID', value: row.wrapperRunId },
+                                ].map(({ label, value }) => (
+                                  <div key={label} className="min-w-0">
+                                    <dt className="text-muted-foreground">{label}</dt>
+                                    <dd className="flex items-center gap-1 font-mono">
+                                      <span className="break-all">{value ?? 'Not recorded'}</span>
+                                      {value && (
+                                        <CopyButton
+                                          text={value}
+                                          label={label}
+                                          className="shrink-0"
+                                        />
+                                      )}
+                                    </dd>
+                                  </div>
+                                ))}
+                                <div className="sm:col-span-3">
+                                  <dt className="text-muted-foreground">Stored diagnostic</dt>
+                                  <dd className="mt-1 wrap-anywhere whitespace-pre-wrap">
+                                    {row.diagnostic || 'Not available (missing or expired)'}
+                                  </dd>
+                                </div>
+                              </dl>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -518,44 +560,61 @@ function TopErrors({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {errors.map(error => (
-                  <TableRow
-                    key={`${error.responsibility}:${error.reason}:${error.source}:${error.stage}:${error.code}`}
-                  >
-                    <TableCell>{responsibilityBadge(error.responsibility)}</TableCell>
-                    <TableCell className="p-1">
-                      <Button
-                        variant="ghost"
-                        className="h-auto w-full justify-start px-2 py-2 text-left"
-                        aria-label={`View affected sessions for ${RESPONSIBILITY_LABELS[error.responsibility]} ${failureReasonLabel(error.reason)}, ${error.count.toLocaleString()} events`}
-                        onClick={event => setSelectedError({ error, trigger: event.currentTarget })}
-                      >
-                        <span className="flex min-w-0 flex-col gap-0.5">
-                          <span className="text-sm">{failureReasonLabel(error.reason)}</span>
-                          <span className="text-muted-foreground font-mono text-xs">
-                            {error.stage} / {error.code}
+                {errors.map(error => {
+                  const diagnosticId = `health-top-error-diagnostic-${error.source}-${error.stage}-${error.code}-${error.responsibility}-${error.reason}`;
+                  return (
+                    <TableRow
+                      key={`${error.responsibility}:${error.reason}:${error.source}:${error.stage}:${error.code}`}
+                    >
+                      <TableCell>{responsibilityBadge(error.responsibility)}</TableCell>
+                      <TableCell className="p-1">
+                        <Button
+                          variant="ghost"
+                          className="h-auto w-full justify-start px-2 py-2 text-left"
+                          aria-label={`View affected sessions for ${RESPONSIBILITY_LABELS[error.responsibility]} ${failureReasonLabel(error.reason)}, ${error.count.toLocaleString()} events`}
+                          aria-describedby={diagnosticId}
+                          onClick={event =>
+                            setSelectedError({ error, trigger: event.currentTarget })
+                          }
+                        >
+                          <span className="flex min-w-0 flex-col gap-0.5">
+                            <span className="text-sm">{failureReasonLabel(error.reason)}</span>
+                            <span
+                              id={diagnosticId}
+                              className="text-muted-foreground max-w-xs truncate text-xs"
+                              title={
+                                error.latestDiagnostic
+                                  ? `${error.stage} / ${error.code} / ${error.latestDiagnostic}`
+                                  : `${error.stage} / ${error.code}`
+                              }
+                            >
+                              <span className="font-mono">
+                                {error.stage} / {error.code}
+                              </span>
+                              {error.latestDiagnostic ? ` / ${error.latestDiagnostic}` : ''}
+                            </span>
                           </span>
-                        </span>
-                      </Button>
-                    </TableCell>
-                    <TableCell>{errorSourceBadge(error.source)}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">
-                      {error.count.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">
-                      {error.affectedSessions.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      <span className="font-mono">{error.knownSandboxes.toLocaleString()}</span>
-                      {error.sessionsWithoutSandbox > 0 && (
-                        <p className="text-muted-foreground text-xs">
-                          {error.sessionsWithoutSandbox.toLocaleString()}{' '}
-                          {error.sessionsWithoutSandbox === 1 ? 'session' : 'sessions'} without ID
-                        </p>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        </Button>
+                      </TableCell>
+                      <TableCell>{errorSourceBadge(error.source)}</TableCell>
+                      <TableCell className="text-right font-mono tabular-nums">
+                        {error.count.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-mono tabular-nums">
+                        {error.affectedSessions.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        <span className="font-mono">{error.knownSandboxes.toLocaleString()}</span>
+                        {error.sessionsWithoutSandbox > 0 && (
+                          <p className="text-muted-foreground text-xs">
+                            {error.sessionsWithoutSandbox.toLocaleString()}{' '}
+                            {error.sessionsWithoutSandbox === 1 ? 'session' : 'sessions'} without ID
+                          </p>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

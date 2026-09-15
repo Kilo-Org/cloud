@@ -103,7 +103,18 @@ export function findPartById(messages: readonly StoredMessage[], partId: string)
 
 /** Sheet header title plus the projection's translation provenance. */
 export type PartDetailTitle = {
-  title: string;
+  /**
+   * The already-localized label the header renders before `text` (`"read: "`
+   * for a read tool), or null when the text stands alone. Never translated:
+   * the projection's title is app copy or a raw tool id.
+   */
+  prefix: string | null;
+  /**
+   * The label the header translates. For a tool this is exactly the row's
+   * `display.subtitle ?? display.title`, so the row's cached translation is the
+   * header's and the sheet opens already translated.
+   */
+  text: string;
   translatable: boolean;
 };
 
@@ -112,15 +123,16 @@ export type PartDetailTitle = {
  * fixed row uses so the title updates live with the part. Reasoning shows the
  * stream state; anything else is an unreachable fallback.
  *
- * `translatable` carries the projection's provenance: the title is built from
- * the tool label plus its content, so a row the projection marks non-translatable
- * (an already-localized fallback label or a raw tool id) must not be sent to the
+ * `translatable` carries the projection's provenance: the text is the row's
+ * projected label, so a row the projection marks non-translatable (an
+ * already-localized fallback label or a raw tool id) must not be sent to the
  * gateway either.
  */
 export function getPartDetailTitle(part: Part): PartDetailTitle {
   if (isReasoningPart(part)) {
     return {
-      title: isPartStreaming(part)
+      prefix: null,
+      text: isPartStreaming(part)
         ? i18n.t('agentChat.partDetail.thinking')
         : i18n.t('agentChat.partDetail.thought'),
       translatable: false,
@@ -129,11 +141,12 @@ export function getPartDetailTitle(part: Part): PartDetailTitle {
   if (isToolPart(part)) {
     const display = getToolDisplay(part);
     return {
-      title: display.subtitle ? `${display.title}: ${display.subtitle}` : display.title,
+      prefix: display.subtitle ? display.title : null,
+      text: display.subtitle ?? display.title,
       translatable: display.translatable,
     };
   }
-  return { title: i18n.t('common.details'), translatable: false };
+  return { prefix: null, text: i18n.t('common.details'), translatable: false };
 }
 
 /**

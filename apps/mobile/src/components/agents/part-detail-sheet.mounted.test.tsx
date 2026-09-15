@@ -776,7 +776,7 @@ describe('PartDetailSheet tool-summary translation gate', () => {
     await unmount(renderer);
   });
 
-  it('requests a translation for a content-bearing tool header', async () => {
+  it('requests a translation for the row subtitle under the content-bearing tool header', async () => {
     requestMock.mockResolvedValue(['lire : app.ts']);
     setConfig({ enabled: true, model: TRANSLATION_MODEL });
 
@@ -785,9 +785,39 @@ describe('PartDetailSheet tool-summary translation gate', () => {
     );
     await settleTranslation();
 
+    // The header asks for the row's own labelled text (`app.ts`), not the
+    // composed `read: app.ts`, so it shares the row's cached entry.
     expect(requestMock).toHaveBeenCalledWith(
-      expect.objectContaining({ texts: ['read: app.ts'], model: TRANSLATION_MODEL.id })
+      expect.objectContaining({ texts: ['app.ts'], model: TRANSLATION_MODEL.id })
     );
     await unmount(renderer);
+  });
+
+  it('opens the header on the row translation cached under the part id, with no new request', async () => {
+    requestMock.mockResolvedValue(['Fichier cache-me.ts']);
+    setConfig({ enabled: true, model: TRANSLATION_MODEL });
+
+    // A part id this suite does not otherwise use: the runtime caches by item
+    // id and only a test's own entry may serve it.
+    const cachedPart = (): ToolPart =>
+      makeToolPartWithInput('read-cache-1', 'read', { filePath: 'src/cache-me.ts' });
+
+    // First open: the row and the header share the part id, so the one request
+    // resolves the subtitle and the runtime caches it under `read-cache-1`.
+    const first = await mountSheet(cachedPart());
+    await settleTranslation();
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    await unmount(first);
+
+    requestMock.mockClear();
+
+    const second = await mountSheet(cachedPart());
+    await settleTranslation();
+
+    expect(requestMock).not.toHaveBeenCalled();
+    const headers = findByType(second.root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(propOf(headers[0], 'title')).toBe('read: Fichier cache-me.ts');
+    await unmount(second);
   });
 });

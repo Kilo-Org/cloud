@@ -3089,22 +3089,13 @@
     "remoteOptionBody": "Ħaddem Kilo fuq il-magna tiegħek permezz tal-CLI `kilo remote`.",
     "skip": "Aqbeż it-tour",
     "tutorialLabel": "Tutorial",
-    "cloudTitle": "Ibda l-ewwel sessjoni cloud tiegħek",
-    "cloudBody": "Ħolloq sessjoni ġdida u Kilo se ħaddimha fil-cloud.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Qed nistennew biex tibda s-sessjoni cloud…",
-    "cloudCheck": "L-ewwel sessjoni cloud tiegħek qed taħdem.",
     "remoteTitle": "Ibda l-ewwel sessjoni remota tiegħek",
     "remoteBody": "Ikkonetta l-kompjuter tiegħek, imbagħad ibda s-sessjoni minn hawn.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Ibda sessjoni fuq il-kompjuter tiegħek",
-    "remoteWaiting": "Qed nistennew biex il-kompjuter tiegħek jibda s-sessjoni…",
-    "remoteCheck": "L-ewwel sessjoni remota tiegħek qed taħdem.",
     "remoteEmptyTitle": "Għad m'hemmx kompjuter konness",
     "remoteEmptyBody": "Biex tikkonnettjah, ħaddem `kilo remote` fuq il-kompjuter tiegħek.",
     "remoteFound": "Kompjuter konness",
     "checkAgain": "Iċċekkja mill-ġdid",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

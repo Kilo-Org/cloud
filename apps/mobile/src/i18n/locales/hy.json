@@ -3023,22 +3023,13 @@
     "remoteOptionBody": "Գործարկիր Kilo-ն քո սեփական համակարգչում՝ `kilo remote` CLI-ի միջոցով։",
     "skip": "Բաց թողնել ուղեցույցը",
     "tutorialLabel": "Ուղեցույց",
-    "cloudTitle": "Սկսիր քո առաջին ամպային աշխատաշրջանը",
-    "cloudBody": "Ստեղծիր նոր աշխատաշրջան, և Kilo-ն այն կգործարկի ամպում։",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Սպասում ենք, որ քո ամպային աշխատաշրջանը սկսվի…",
-    "cloudCheck": "Քո առաջին ամպային աշխատաշրջանը աշխատում է։",
     "remoteTitle": "Սկսիր քո առաջին հեռակա աշխատաշրջանը",
     "remoteBody": "Միացրու քո համակարգիչը, ապա աշխատաշրջանը սկսիր այստեղից։",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Սկսիր աշխատաշրջան քո համակարգչում",
-    "remoteWaiting": "Սպասում ենք, որ քո համակարգիչը սկսի աշխատաշրջանը…",
-    "remoteCheck": "Քո առաջին հեռակա աշխատաշրջանը աշխատում է։",
     "remoteEmptyTitle": "Քո համակարգիչը դեռ միացված չէ",
     "remoteEmptyBody": "Կատարիր `kilo remote` քո համակարգչում՝ այն միացնելու համար։",
     "remoteFound": "Համակարգիչը միացված է",
     "checkAgain": "Կրկին ստուգիր",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

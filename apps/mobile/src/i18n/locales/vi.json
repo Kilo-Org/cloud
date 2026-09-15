@@ -3023,22 +3023,13 @@
     "remoteOptionBody": "Chạy Kilo trên máy của bạn qua CLI `kilo remote`.",
     "skip": "Bỏ qua tour",
     "tutorialLabel": "Hướng dẫn",
-    "cloudTitle": "Bắt đầu phiên đám mây đầu tiên của bạn",
-    "cloudBody": "Tạo một phiên mới và Kilo sẽ chạy nó trên đám mây.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Đang chờ phiên đám mây của bạn bắt đầu…",
-    "cloudCheck": "Phiên đám mây đầu tiên của bạn đang chạy.",
     "remoteTitle": "Bắt đầu phiên từ xa đầu tiên của bạn",
     "remoteBody": "Kết nối máy tính của bạn, sau đó bắt đầu phiên từ đây.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Bắt đầu phiên trên máy tính của bạn",
-    "remoteWaiting": "Đang chờ máy tính của bạn bắt đầu phiên…",
-    "remoteCheck": "Phiên từ xa đầu tiên của bạn đang chạy.",
     "remoteEmptyTitle": "Chưa có máy tính nào được kết nối",
     "remoteEmptyBody": "Để kết nối, hãy chạy `kilo remote` trên máy tính của bạn.",
     "remoteFound": "Đã kết nối máy tính",
     "checkAgain": "Kiểm tra lại",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

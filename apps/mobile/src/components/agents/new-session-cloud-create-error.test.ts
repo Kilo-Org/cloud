@@ -46,6 +46,10 @@ function findElementByType(node: Node, typeName: string): Record<string, unknown
 }
 
 const GENERIC = 'Failed to create session';
+// A retryable server reason that is deliberately not the generic copy: with the
+// generic copy the assertion below would pass even if the suppression were
+// keyed on the message text instead of on `retryable`.
+const RETRYABLE_REASON = 'The agent is still starting up';
 
 function failure(over: Partial<CloudCreateFailure>): CloudCreateFailure {
   return { retryable: false, message: GENERIC, ...over };
@@ -77,7 +81,7 @@ describe('NewSessionCloudCreateError', () => {
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = NewSessionCloudCreateError({
-      failure: failure({ retryable: true }),
+      failure: failure({ retryable: true, message: RETRYABLE_REASON }),
       onRetry,
       isRetryDisabled: false,
     }) as Node;
@@ -89,7 +93,7 @@ describe('NewSessionCloudCreateError', () => {
       accessibilityLabel: 'Retry',
     });
     // A retryable rejection speaks through the retry control, not a second
-    // copy of the server message.
+    // copy of the server message: the distinct `RETRYABLE_REASON` never renders.
     expect(messages(element)).toEqual([GENERIC]);
   });
 

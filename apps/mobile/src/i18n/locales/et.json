@@ -3023,22 +3023,13 @@
     "remoteOptionBody": "Käivita Kilo omas arvutis `kilo remote` CLI kaudu.",
     "skip": "Jäta tiivustus vahele",
     "tutorialLabel": "Õpetus",
-    "cloudTitle": "Alusta oma esimest pilveseanssi",
-    "cloudBody": "Loo uus seanss ja Kilo käivitab selle pilves.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Ootan, kuni sinu pilveseanss käivitub…",
-    "cloudCheck": "Sinu esimene pilveseanss töötab.",
     "remoteTitle": "Alusta oma esimest kaugseanssi",
     "remoteBody": "Ühenda oma arvuti ja käivita seejärel seanss siit.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Alusta seanssi sinu arvutis",
-    "remoteWaiting": "Ootan, kuni sinu arvuti seansi käivitab…",
-    "remoteCheck": "Sinu esimene kaugseanss töötab.",
     "remoteEmptyTitle": "Ühtegi arvutit veel ühendatud pole",
     "remoteEmptyBody": "Selle ühendamiseks käivita oma arvutis `kilo remote`.",
     "remoteFound": "Arvuti ühendatud",
     "checkAgain": "Kontrolli uuesti",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

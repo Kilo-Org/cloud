@@ -3045,22 +3045,13 @@
     "remoteOptionBody": "Rulează Kilo pe propria ta mașină prin CLI-ul `kilo remote`.",
     "skip": "Sari peste tur",
     "tutorialLabel": "Tutorial",
-    "cloudTitle": "Pornește prima ta sesiune cloud",
-    "cloudBody": "Creează o sesiune nouă și Kilo o va rula în cloud.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Așteptăm pornirea sesiunii cloud…",
-    "cloudCheck": "Prima ta sesiune cloud rulează.",
     "remoteTitle": "Pornește prima ta sesiune la distanță",
     "remoteBody": "Conectează computerul și apoi pornește sesiunea de aici.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Pornește o sesiune pe computerul tău",
-    "remoteWaiting": "Așteptăm ca computerul tău să pornească sesiunea…",
-    "remoteCheck": "Prima ta sesiune la distanță rulează.",
     "remoteEmptyTitle": "Niciun computer conectat încă",
     "remoteEmptyBody": "Pentru a-l conecta, rulează `kilo remote` pe computerul tău.",
     "remoteFound": "Computer conectat",
     "checkAgain": "Verifică din nou",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

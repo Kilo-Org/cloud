@@ -3023,22 +3023,13 @@
     "remoteOptionBody": "Ku socodsii Kilo kombiyuutarkaaga adigoo isticmaalaya CLI-da `kilo remote`.",
     "skip": "Ka bood safarka",
     "tutorialLabel": "Barasho",
-    "cloudTitle": "Bilow kalfadhigaaga koowaad ee daruurka",
-    "cloudBody": "Abuur kalfadhi cusub, Kilona wuu ku socodsiiyaa daruurka.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Waa la sugayaa in kalfadhiga daruurku bilaabmo…",
-    "cloudCheck": "Kalfadhigaaga koowaad ee daruurku wuu socdaa.",
     "remoteTitle": "Bilow kalfadhigaaga koowaad ee fog",
     "remoteBody": "Xirir kombiyuutarkaaga, kadibna kalfadhiga ka bilow halkan.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Bilow kalfadhi kombiyuutarkaaga",
-    "remoteWaiting": "Waa la sugayaa in kombiyuutarkaagu bilaabo kalfadhiga…",
-    "remoteCheck": "Kalfadhigaaga koowaad ee fog wuu socdaa.",
     "remoteEmptyTitle": "Wali kombiyuutar aan la xidhirin ma jiro",
     "remoteEmptyBody": "Si aad u xirirto, ku socodsii `kilo remote` kombiyuutarkaaga.",
     "remoteFound": "Kombiyuutarka la xidhay",
     "checkAgain": "Mar kale hubi",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

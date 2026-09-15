@@ -395,67 +395,70 @@ export type RigOverrideConfig = z.infer<typeof RigOverrideConfigSchema>;
  * .default() during parsing, injecting phantom values (e.g. merge_strategy:
  * 'direct') that overwrite existing config on partial updates.
  */
-export const TownConfigUpdateSchema = z.object({
-  env_vars: z.record(z.string(), z.string()).optional(),
-  git_auth: z
-    .object({
-      github_token: z.string().optional(),
-      gitlab_token: z.string().optional(),
-      gitlab_instance_url: z.string().optional(),
-      platform_integration_id: z.string().optional(),
-    })
-    .optional(),
-  owner_user_id: z.string().optional(),
-  owner_type: z.enum(['user', 'org']).optional(),
-  owner_id: z.string().optional(),
-  created_by_user_id: z.string().optional(),
-  organization_id: z.string().optional(),
-  kilocode_token: z.string().optional(),
-  default_model: z.string().optional(),
-  role_models: z
-    .object({
-      mayor: z.string().optional(),
-      refinery: z.string().optional(),
-      polecat: z.string().optional(),
-    })
-    .optional(),
-  small_model: z.string().optional(),
-  max_polecats_per_rig: z.number().int().min(1).max(50).optional(),
-  merge_strategy: MergeStrategy.optional(),
-  refinery: z
-    .object({
-      gates: z.array(z.string()).optional(),
-      auto_merge: z.boolean().optional(),
-      require_clean_merge: z.boolean().optional(),
-      code_review: z.boolean().optional(),
-      review_mode: z.enum(['rework', 'comments']).optional(),
-      auto_resolve_pr_feedback: z.boolean().optional(),
-      auto_resolve_merge_conflicts: z.boolean().optional(),
-      auto_merge_delay_minutes: z.number().int().min(0).nullable().optional(),
-    })
-    .optional(),
-  alarm_interval_active: z.number().int().min(5).max(600).optional(),
-  alarm_interval_idle: z.number().int().min(30).max(3600).optional(),
-  container: z
-    .object({
-      sleep_after_minutes: z.number().int().min(5).max(120).optional(),
-    })
-    .optional(),
-  staged_convoys_default: z.boolean().optional(),
-  convoy_merge_mode: z.enum(['review-then-land', 'review-and-merge']).optional(),
-  github_cli_pat: z.string().optional(),
-  git_author_name: z.string().optional(),
-  git_author_email: z.string().optional(),
-  disable_ai_coauthor: z.boolean().optional(),
-  custom_instructions: z
-    .object({
-      polecat: z.string().max(2000).optional(),
-      refinery: z.string().max(2000).optional(),
-      mayor: z.string().max(2000).optional(),
-    })
-    .optional(),
-});
-export type TownConfigUpdate = z.infer<typeof TownConfigUpdateSchema>;
+export const TownConfigUpdateSchema = z
+  .object({
+    env_vars: z.record(z.string(), z.string()).optional(),
+    git_auth: z
+      .object({
+        github_token: z.string().optional(),
+        gitlab_token: z.string().optional(),
+        gitlab_instance_url: z.string().optional(),
+        platform_integration_id: z.string().optional(),
+      })
+      .optional(),
+    kilocode_token: z.string().optional(),
+    default_model: z.string().optional(),
+    role_models: z
+      .object({
+        mayor: z.string().optional(),
+        refinery: z.string().optional(),
+        polecat: z.string().optional(),
+      })
+      .optional(),
+    small_model: z.string().optional(),
+    max_polecats_per_rig: z.number().int().min(1).max(50).optional(),
+    merge_strategy: MergeStrategy.optional(),
+    refinery: z
+      .object({
+        gates: z.array(z.string()).optional(),
+        auto_merge: z.boolean().optional(),
+        require_clean_merge: z.boolean().optional(),
+        code_review: z.boolean().optional(),
+        review_mode: z.enum(['rework', 'comments']).optional(),
+        auto_resolve_pr_feedback: z.boolean().optional(),
+        auto_resolve_merge_conflicts: z.boolean().optional(),
+        auto_merge_delay_minutes: z.number().int().min(0).nullable().optional(),
+      })
+      .optional(),
+    alarm_interval_active: z.number().int().min(5).max(600).optional(),
+    alarm_interval_idle: z.number().int().min(30).max(3600).optional(),
+    container: z
+      .object({
+        sleep_after_minutes: z.number().int().min(5).max(120).optional(),
+      })
+      .optional(),
+    staged_convoys_default: z.boolean().optional(),
+    convoy_merge_mode: z.enum(['review-then-land', 'review-and-merge']).optional(),
+    github_cli_pat: z.string().optional(),
+    git_author_name: z.string().optional(),
+    git_author_email: z.string().optional(),
+    disable_ai_coauthor: z.boolean().optional(),
+    custom_instructions: z
+      .object({
+        polecat: z.string().max(2000).optional(),
+        refinery: z.string().max(2000).optional(),
+        mayor: z.string().max(2000).optional(),
+      })
+      .optional(),
+  })
+  .strict();
+export type TownConfigUpdate = z.infer<typeof TownConfigUpdateSchema> &
+  Partial<
+    Pick<
+      TownConfig,
+      'owner_user_id' | 'owner_type' | 'owner_id' | 'created_by_user_id' | 'organization_id'
+    >
+  >;
 
 /** Agent-level config overrides (merged on top of town config) */
 export const AgentConfigOverridesSchema = z.object({

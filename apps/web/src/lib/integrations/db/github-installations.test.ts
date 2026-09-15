@@ -1800,6 +1800,40 @@ describe('GitHub installation persistence', () => {
     ).rejects.toThrow('GitHub installation is unavailable for runtime use');
   });
 
+  test('treats an empty exact-association id as the generic exclusive-only path', async () => {
+    const organizationA = await createTestOrganization('Empty id shared A', ownerId, 0);
+    const organizationB = await createTestOrganization('Empty id shared B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data('883883')
+    );
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data('883883'), kiloUserId: otherOwnerId }
+    );
+    if (!first.ok || !second.ok) throw new Error('Expected shared connections');
+
+    // Leave exactly one healthy association on a shared installation, with an
+    // unhealthy sibling, so only an exact-id lookup could legitimately pick it.
+    await db
+      .update(platform_integrations)
+      .set({ suspended_at: new Date().toISOString() })
+      .where(eq(platform_integrations.id, first.integrationId));
+
+    // An empty string must behave like the generic path (exclusive-only), not
+    // like a genuine exact association.
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('883883', 'standard', '')
+    ).rejects.toThrow('GitHub installation is unavailable for runtime use');
+
+    // The real exact id still resolves.
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('883883', 'standard', second.integrationId)
+    ).resolves.toBeUndefined();
+  });
+
   test('routes the same numeric GitHub installation ID by app identity', async () => {
     await db.insert(platform_integrations).values([
       {

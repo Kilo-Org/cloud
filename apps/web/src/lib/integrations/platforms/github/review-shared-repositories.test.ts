@@ -40,19 +40,17 @@ jest.mock('@octokit/auth-app', () => ({
   createAppAuth: () => async () => ({ token: 'test-installation-token' }),
 }));
 jest.mock('@octokit/rest', () => ({
-  Octokit: jest
-    .fn()
-    .mockImplementation(() => ({
-      apps: {
-        listReposAccessibleToInstallation: async () => ({
-          data: {
-            repositories: [
-              { id: 1, name: 'repo', full_name: 'acme/repo', private: true, archived: false },
-            ],
-          },
-        }),
-      },
-    })),
+  Octokit: jest.fn().mockImplementation(() => ({
+    apps: {
+      listReposAccessibleToInstallation: async () => ({
+        data: {
+          repositories: [
+            { id: 1, name: 'repo', full_name: 'acme/repo', private: true, archived: false },
+          ],
+        },
+      }),
+    },
+  })),
 }));
 import { fetchGitHubRepositories } from './adapter';
 test('REVIEW: fetch repository inventory for an exact healthy shared association', async () => {

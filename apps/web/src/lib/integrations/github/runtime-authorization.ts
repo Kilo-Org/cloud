@@ -95,14 +95,19 @@ export async function assertGitHubInstallationRuntimeAuthorized(
   appType: GitHubAppType,
   expectedIntegrationId?: string
 ): Promise<void> {
-  // An exact expectedIntegrationId means the caller already resolved the
+  // A non-empty expectedIntegrationId means the caller already resolved the
   // tenant association it is about to act as. That association still has to
   // pass ownership (org membership / user ownership) and local + canonical
   // health below; only the sharing-mode requirement relaxes so a legitimately
-  // attached shared association can read its own inventory. Without an exact
-  // id (the generic, installation-wide path) shared installations stay
-  // rejected.
-  const allowShared = expectedIntegrationId !== undefined;
+  // attached shared association can read its own inventory. Without one (the
+  // generic, installation-wide path) shared installations stay rejected.
+  //
+  // This single normalized value drives the id predicate, the row limit, and
+  // the sharing-mode carve-out so they can never diverge: an empty-string id
+  // is the generic path, not an exact association.
+  const exactAssociationId =
+    expectedIntegrationId && expectedIntegrationId.length > 0 ? expectedIntegrationId : undefined;
+  const allowShared = exactAssociationId !== undefined;
   const associations = await db
     .select({
       integration: platform_integrations,
@@ -125,7 +130,9 @@ export async function assertGitHubInstallationRuntimeAuthorized(
         isNull(platform_integrations.github_disconnected_at),
         isNull(platform_integrations.suspended_at),
         isNull(platform_integrations.auth_invalid_at),
-        expectedIntegrationId ? eq(platform_integrations.id, expectedIntegrationId) : undefined,
+        exactAssociationId !== undefined
+          ? eq(platform_integrations.id, exactAssociationId)
+          : undefined,
         eq(platform_integrations.platform_installation_id, installationId),
         effectiveAppTypeCondition(appType),
         or(
@@ -160,7 +167,7 @@ export async function assertGitHubInstallationRuntimeAuthorized(
         )
       )
     )
-    .limit(expectedIntegrationId ? 1 : 2);
+    .limit(exactAssociationId !== undefined ? 1 : 2);
 
   if (associations.length !== 1) throw new GitHubRuntimeAuthorizationError();
 

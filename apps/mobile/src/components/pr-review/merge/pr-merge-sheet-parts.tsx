@@ -205,6 +205,12 @@ export function MergeSheetFormBody(props: {
   titleRef: RefObject<string>;
   titleInputRef: RefObject<TextInput | null>;
   titlePlaceholder: string;
+  /**
+   * False on the Bitbucket merge arm (s6f): the provider merge takes only
+   * the message, so no commit-title input exists whose value would be
+   * silently dropped on submit.
+   */
+  showTitle: boolean;
   messageRef: RefObject<string>;
   messageInputRef: RefObject<TextInput | null>;
   isHalfDetent: boolean;
@@ -226,6 +232,7 @@ export function MergeSheetFormBody(props: {
     titleRef,
     titleInputRef,
     titlePlaceholder,
+    showTitle,
     messageRef,
     messageInputRef,
     isHalfDetent,
@@ -260,12 +267,14 @@ export function MergeSheetFormBody(props: {
             onChange={onMethodChange}
           />
         )}
-        <CommitTitleField
-          titleRef={titleRef}
-          inputRef={titleInputRef}
-          placeholder={titlePlaceholder}
-          isDisabled={isMutating}
-        />
+        {showTitle ? (
+          <CommitTitleField
+            titleRef={titleRef}
+            inputRef={titleInputRef}
+            placeholder={titlePlaceholder}
+            isDisabled={isMutating}
+          />
+        ) : null}
         <CommitMessageField
           messageRef={messageRef}
           inputRef={messageInputRef}

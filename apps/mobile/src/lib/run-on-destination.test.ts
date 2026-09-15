@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   parseStoredRunOnDestination,
+  readPreselectRunOn,
   resolvePersistedRunOn,
   shouldRestorePersistedRunOn,
 } from './run-on-destination';
@@ -17,6 +18,22 @@ describe('parseStoredRunOnDestination', () => {
 
   it('returns a stored connection id', () => {
     expect(parseStoredRunOnDestination('cli-1')).toBe('cli-1');
+  });
+});
+
+describe('readPreselectRunOn', () => {
+  it('treats a missing or empty preselect as no preselect', () => {
+    expect(readPreselectRunOn(undefined)).toBeNull();
+    expect(readPreselectRunOn('')).toBeNull();
+    expect(readPreselectRunOn([])).toBeNull();
+  });
+
+  it('returns the Cloud Agent sentinel', () => {
+    expect(readPreselectRunOn('cloud')).toBe('cloud');
+  });
+
+  it('returns the first element of a repeated param', () => {
+    expect(readPreselectRunOn(['cli-1'])).toBe('cli-1');
   });
 });
 
@@ -36,14 +53,15 @@ describe('resolvePersistedRunOn', () => {
 });
 
 describe('shouldRestorePersistedRunOn', () => {
-  it('restores the stored preference for every ordinary entry', () => {
+  it('restores the stored preference for an ordinary entry', () => {
     expect(shouldRestorePersistedRunOn(undefined)).toBe(true);
     expect(shouldRestorePersistedRunOn('')).toBe(true);
-    expect(shouldRestorePersistedRunOn('cli-1')).toBe(true);
   });
 
-  it('skips the restore when the tour asks for Cloud Agent', () => {
+  it('skips the restore when the route preselects any target', () => {
     expect(shouldRestorePersistedRunOn('cloud')).toBe(false);
     expect(shouldRestorePersistedRunOn(['cloud'])).toBe(false);
+    expect(shouldRestorePersistedRunOn('cli-1')).toBe(false);
+    expect(shouldRestorePersistedRunOn(['cli-1'])).toBe(false);
   });
 });

@@ -7,6 +7,7 @@ export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider
   z
     .object({ provider: z.literal('vercel'), resources: vercelSandboxResourcesSchema.optional() })
     .strict(),
+  z.object({ provider: z.literal('cloudflare-containers') }).strict(),
 ]);
 
 export type SandboxProviderConfiguration = z.infer<typeof sandboxProviderConfigurationSchema>;

@@ -16,7 +16,7 @@ import type {
   SandboxTerminalAccessResult,
 } from '../sandbox-control/terminal-billing.js';
 import type { SessionOperationAuthorization } from '../shared/sandbox-control-protocol.js';
-import type { Env } from '../types.js';
+import type { AgentSandboxProvider, Env } from '../types.js';
 import type {
   ControlRuntimeCredentialProxyFence,
   RuntimeQuarantineResult,
@@ -35,7 +35,7 @@ type SandboxControlRpc = {
   ensureReady(input: {
     ownerId: string;
     sessionId: string;
-    provider?: 'cloudflare' | 'vercel';
+    provider?: AgentSandboxProvider;
     resources?: VercelSandboxResources;
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;

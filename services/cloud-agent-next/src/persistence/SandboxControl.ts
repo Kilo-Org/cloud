@@ -233,6 +233,10 @@ import {
   decodeCloudflareProviderRef,
 } from '../sandbox-control/cloudflare-provider.js';
 import {
+  createCloudflareContainersProviderAdapter,
+  CONTAINERS_MVP_INSTANCE,
+} from '../sandbox-control/cloudflare-containers-provider.js';
+import {
   createVercelProviderAdapter,
   decodeVercelProviderRef,
   vercelProviderLocatorSchema,
@@ -261,7 +265,7 @@ import {
   type SandboxTerminalAccessInput,
   type SandboxTerminalAccessResult,
 } from '../sandbox-control/terminal-billing.js';
-import type { AgentSandboxProvider } from '../types.js';
+import { agentSandboxProviderSchema, type AgentSandboxProvider } from '../types.js';
 import {
   safeSandboxRuntimeVersion,
   type SandboxRuntimeMetadata,
@@ -2856,7 +2860,7 @@ export class SandboxControl extends DurableObject<Env> {
     const matches =
       ownerId !== null &&
       ownerId === input.ownerId &&
-      (provider === 'cloudflare' || provider === 'vercel') &&
+      agentSandboxProviderSchema.safeParse(provider).success &&
       provider === input.provider;
     return projectSandboxStatus({
       stored: matches ? stored : { physical: null, deadlines: null, routes: null },
@@ -3302,6 +3306,14 @@ export class SandboxControl extends DurableObject<Env> {
       return createVercelProviderAdapter({
         sandboxName: allocationName,
         config: config && locator ? { ...config, teamId: locator.teamId } : config,
+      });
+    }
+    if (kind === 'cloudflare-containers') {
+      return createCloudflareContainersProviderAdapter({
+        logicalSandboxId: this.sandboxId,
+        allocationName,
+        instance: CONTAINERS_MVP_INSTANCE,
+        getContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
       });
     }
     return createCloudflareProviderAdapter({

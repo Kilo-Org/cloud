@@ -134,7 +134,9 @@ export type SandboxId =
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
 
-export type AgentSandboxProvider = 'cloudflare' | 'vercel';
+export const agentSandboxProviderSchema = z.enum(['cloudflare', 'vercel', 'cloudflare-containers']);
+
+export type AgentSandboxProvider = z.infer<typeof agentSandboxProviderSchema>;
 
 /** Unique identifier for a session within a sandbox */
 export type SessionId = `agent_${string}` | `workspace_${string}`;

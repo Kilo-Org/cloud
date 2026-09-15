@@ -20,7 +20,7 @@ import {
 import { sessionPlaneFromId } from '../session-plane.js';
 import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
-import { type AgentSandboxProvider, type SandboxId } from '../types.js';
+import { agentSandboxProviderSchema, type AgentSandboxProvider, type SandboxId } from '../types.js';
 import {
   AttachmentsSchema,
   branchNameSchema,
@@ -40,7 +40,7 @@ const SharedSandboxIdSchema = z
   .transform(s => s as SandboxId);
 
 const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
-const SandboxProviderSchema = z.enum(['cloudflare', 'vercel']);
+const SandboxProviderSchema = agentSandboxProviderSchema;
 
 const VercelProviderRuntimeSchema = z
   .object({
@@ -328,6 +328,12 @@ const MetadataWorkspaceSchema = z
   )
   .refine(
     workspace =>
+      workspace.sandboxProvider !== 'cloudflare-containers' ||
+      workspace.sandboxId?.startsWith('ses-') === true,
+    'Cloudflare containers sandbox metadata requires an isolated ses-* sandbox'
+  )
+  .refine(
+    workspace =>
       PROVIDER_CAPABILITIES[workspace.sandboxProvider ?? 'cloudflare'].devcontainer ||
       workspace.devcontainerRequested !== true,
     'Sandbox provider does not support devcontainers'
@@ -408,6 +414,12 @@ export const CurrentSessionMetadataSchema = z
       !sandboxAllocationRequiresControlPlane(metadata.workspace?.sandboxAllocation) ||
       sessionPlaneFromId(metadata.identity.sessionId) === 'control',
     'Vercel sandbox allocations require a control-plane session'
+  )
+  .refine(
+    metadata =>
+      metadata.workspace?.sandboxProvider !== 'cloudflare-containers' ||
+      sessionPlaneFromId(metadata.identity.sessionId) === 'control',
+    'Cloudflare containers sandbox metadata requires a control-plane session'
   );
 
 export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;

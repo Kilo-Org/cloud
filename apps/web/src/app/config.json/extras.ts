@@ -56,8 +56,14 @@ export const kiloExtras = {
       type: 'boolean',
     },
     auto_collapse_reasoning: {
-      description: 'Automatically collapse reasoning blocks after the agent finishes writing them',
+      description:
+        "@deprecated Use 'reasoning_display' field instead. Automatically collapse reasoning blocks after the agent finishes writing them",
       type: 'boolean',
+    },
+    reasoning_display: {
+      description: 'Controls how reasoning blocks are displayed in the VS Code chat UI',
+      type: 'string',
+      enum: ['expanded', 'preview', 'headline'],
     },
     terminal_command_display: {
       description:

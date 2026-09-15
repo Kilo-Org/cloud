@@ -48,6 +48,9 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 44, left: 0, right: 0 }),
+}));
 
 // ── sub-components ─────────────────────────────────────────────────
 vi.mock('@/components/agents/new-session-prompt', () => ({
@@ -128,6 +131,26 @@ function findElementByType(node: Node, typeName: string): Record<string, unknown
   for (const child of Array.isArray(children) ? children : [children]) {
     const found = findElementByType(child as Node, typeName);
     if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+/** Height of the first node carrying an explicit `style.height` (the clearance spacer). */
+function findElementHeight(node: Node): number | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const props = node.props ?? {};
+  const style = props.style as { height?: unknown } | undefined;
+  if (typeof style?.height === 'number') {
+    return style.height;
+  }
+  const children = props.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findElementHeight(child as Node);
+    if (found !== null) {
       return found;
     }
   }
@@ -658,6 +681,17 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+  });
+
+  // ── Case 14: bottom navigation-bar clearance ──
+  it('reserves the bottom safe-area inset so the Start action clears the navigation bar', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // The mocked inset is 44; the helper floors at 16 and adds 16.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm(defaultProps()) as Node;
+
+    expect(findElementHeight(element)).toBe(60);
   });
 
   // ── Case 13: reorder wiring lock ──

@@ -16,12 +16,40 @@ import {
   type PrOverviewDto,
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 
-export function TerminalChip({ state }: Readonly<{ state: PrOverviewDto['state'] }>) {
+// Mid-sentence lowercase noun (common.*) vs the capitalized standalone
+// label (prReview.terms.*) — see providerPrTermKey.
+// i18n-dup-ok: one copy, two senses: mid-sentence lowercase noun vs
+// capitalized standalone label; languages case-decline them apart.
+type TerminalNounKey = 'common.mergeRequest' | 'common.pullRequest';
+
+function terminalLabelKey(
+  state: PrOverviewDto['state'],
+  nounKey: TerminalNounKey
+):
+  | 'prReview.merge.terminal.alreadyMerged'
+  | 'prReview.merge.terminal.closedMergeRequest'
+  | 'prReview.merge.terminal.closed' {
+  if (state === 'merged') {
+    return 'prReview.merge.terminal.alreadyMerged';
+  }
+  return nounKey === 'common.mergeRequest'
+    ? 'prReview.merge.terminal.closedMergeRequest'
+    : 'prReview.merge.terminal.closed';
+}
+
+export function TerminalChip({
+  state,
+  nounKey = 'common.pullRequest',
+}: Readonly<{
+  state: PrOverviewDto['state'];
+  /**
+   * The provider's own noun for the closed sentence (s6): a GitLab merge
+   * request says "merge request", GitHub and Bitbucket say "pull request".
+   */
+  nounKey?: TerminalNounKey;
+}>) {
   const { t } = useTranslation();
-  const label =
-    state === 'merged'
-      ? t('prReview.merge.terminal.alreadyMerged')
-      : t('prReview.merge.terminal.closed');
+  const label = t(terminalLabelKey(state, nounKey));
   return (
     <View className="gap-2">
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">

@@ -189,3 +189,138 @@ export function detectRepositoryPlatform(
   }
   return undefined;
 }
+
+// ── Branch selection state ───────────────────────────────────────────
+
+/**
+ * The full identity of one repository row: provider, path, and (Bitbucket
+ * only) the workspace/repository uuids. Two same-named rows on two providers,
+ * or two same-named Bitbucket rows in renamed workspaces, never share a key,
+ * so a branch chosen for one can never be read back for the other.
+ */
+export function repositoryIdentityKey(repository: NewSessionRepository): string {
+  return [
+    repository.platform,
+    repository.fullName,
+    repository.workspaceUuid ?? '',
+    repository.repositoryUuid ?? '',
+  ].join('\n');
+}
+
+/**
+ * New-session branch state, shared by the repository section (which owns the
+ * picker) and `useNewSessionCreator` (which sends the checkout branch).
+ *
+ * It is a module store rather than props because the two files between them —
+ * `new-session-configure-form.tsx` and `new-session-screen-body.tsx` — are not
+ * part of this change. The store holds nothing durable: the section clears it
+ * on mount and on unmount, so a branch never outlives the screen that chose it.
+ *
+ * `overrides` only ever holds a *non-default* branch, keyed by
+ * `repositoryIdentityKey`. Reading with another repository's key yields
+ * `null` — that is the identity rule: a branch that belongs to one repository
+ * can never survive a repository change onto another.
+ *
+ * `organizationId` is the new-session route's organization scope, published by
+ * `useNewSessionRepos` (the hook the route already hands it to). `isScopeReady`
+ * stays false until that first publish, so a branch query never runs against
+ * the wrong scope — `undefined` is a real value (a personal session), not a
+ * "not yet known".
+ */
+export type NewSessionBranchSnapshot = {
+  isScopeReady: boolean;
+  organizationId: string | undefined;
+  overrides: ReadonlyMap<string, string>;
+};
+
+const EMPTY_OVERRIDES: ReadonlyMap<string, string> = new Map();
+
+let branchSnapshot: NewSessionBranchSnapshot = {
+  isScopeReady: false,
+  organizationId: undefined,
+  overrides: EMPTY_OVERRIDES,
+};
+
+const branchListeners = new Set<() => void>();
+
+function publishBranchSnapshot(next: NewSessionBranchSnapshot): void {
+  branchSnapshot = next;
+  for (const listener of branchListeners) {
+    listener();
+  }
+}
+
+export function subscribeNewSessionBranchState(listener: () => void): () => void {
+  branchListeners.add(listener);
+  return () => {
+    branchListeners.delete(listener);
+  };
+}
+
+/** Stable between mutations, so `useSyncExternalStore` never loops. */
+export function getNewSessionBranchState(): NewSessionBranchSnapshot {
+  return branchSnapshot;
+}
+
+/** Publish the route's organization scope for the branch queries. */
+export function setNewSessionBranchScope(organizationId: string | undefined): void {
+  if (branchSnapshot.isScopeReady && branchSnapshot.organizationId === organizationId) {
+    return;
+  }
+  publishBranchSnapshot({ ...branchSnapshot, isScopeReady: true, organizationId });
+}
+
+/**
+ * Drop the published scope when the new-session screen goes away. Without
+ * this, a remount reads the previous screen's organization on its first
+ * render — before the publishing effect runs — and a branch query for the
+ * already-selected repository fires against an organization the user has
+ * left. Going back to "not ready" (rather than publishing a personal scope)
+ * keeps both directions safe: the next screen's first render queries nothing
+ * until its own scope is published.
+ */
+export function resetNewSessionBranchScope(): void {
+  if (!branchSnapshot.isScopeReady) {
+    return;
+  }
+  publishBranchSnapshot({ ...branchSnapshot, isScopeReady: false, organizationId: undefined });
+}
+
+/**
+ * Record the branch override for one repository. `null` (the provider default
+ * was chosen) drops the entry, so the create body carries no `upstreamBranch`
+ * and the server checks out the provider's own default.
+ */
+export function setSelectedBranchOverride(
+  repository: NewSessionRepository,
+  branch: string | null
+): void {
+  const key = repositoryIdentityKey(repository);
+  const current = branchSnapshot.overrides.get(key) ?? null;
+  if (current === branch) {
+    return;
+  }
+  const overrides = new Map(branchSnapshot.overrides);
+  if (branch === null) {
+    overrides.delete(key);
+  } else {
+    overrides.set(key, branch);
+  }
+  publishBranchSnapshot({ ...branchSnapshot, overrides });
+}
+
+/** The non-default branch chosen for exactly this repository, or `null`. */
+export function getSelectedBranchOverride(repository: NewSessionRepository | null): string | null {
+  if (!repository) {
+    return null;
+  }
+  return branchSnapshot.overrides.get(repositoryIdentityKey(repository)) ?? null;
+}
+
+/** Drop every override (screen mount/unmount), keeping the published scope. */
+export function resetSelectedBranchOverrides(): void {
+  if (branchSnapshot.overrides.size === 0) {
+    return;
+  }
+  publishBranchSnapshot({ ...branchSnapshot, overrides: EMPTY_OVERRIDES });
+}

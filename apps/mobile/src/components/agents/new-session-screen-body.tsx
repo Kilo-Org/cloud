@@ -694,6 +694,7 @@ export function NewSessionScreenBody() {
         onChangeRepo={setSelectedRepo}
         onConnectProvider={openIntegration}
         onRefreshRepos={() => void refreshReposForceFresh()}
+        organizationId={organizationId}
         repositories={repositories}
         recents={recents}
         selectedRepo={selectedRepo}

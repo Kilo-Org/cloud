@@ -207,6 +207,7 @@ function defaultProps() {
     onChangeRepo: vi.fn(),
     onConnectProvider: vi.fn(),
     onRefreshRepos: vi.fn(),
+    organizationId: undefined as string | undefined,
     repositories: [] as NewSessionRepository[],
     recents: [] as NewSessionRepository[],
     selectedRepo: '',
@@ -308,7 +309,24 @@ describe('NewSessionConfigureForm', () => {
     expect(section!.repositories).toEqual(orderedRepositories);
   });
 
-  // ── Case 1c: recents pass through unchanged ──
+  // ── Case 1c: organization scope passes through unchanged ──
+  it('passes the current organization scope into NewSessionRepositorySection', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      organizationId: 'org-9',
+    }) as Node;
+
+    const section = findElementByType(element, 'NewSessionRepositorySection');
+    expect(section).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(section!.organizationId).toBe('org-9');
+  });
+
+  // ── Case 1d: recents pass through unchanged ──
   it('passes the recents array unchanged into NewSessionRepositorySection', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 

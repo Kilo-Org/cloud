@@ -991,6 +991,46 @@ describe('mergePullRequest', () => {
     });
   });
 
+  it('refuses a head that moved between the loaded detail and the merge call', async () => {
+    // The reviewer loaded the pull request at HEAD_SHA, then the source branch
+    // moved. The merge call's fresh fence read sees the new head and refuses
+    // with the exact reason before any merge request is sent.
+    const movedHead = 'fed9876543210fed9876543210fed9876543210f';
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({
+          status: 'available',
+          token: 'at-mock-token',
+          workspace: WORKSPACE,
+        });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname.endsWith('/pullrequests/12')) {
+        return jsonResponse({
+          id: 12,
+          state: 'OPEN',
+          source: { commit: { hash: movedHead } },
+        });
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const error = await captureRejection(
+      mergePullRequest({
+        owner: ORG_OWNER,
+        workspace: 'acme',
+        repoSlug: 'repo',
+        prId: 12,
+        expectedHeadSha: HEAD_SHA,
+      })
+    );
+
+    expect(error.kind).toBe('stale_head');
+    expect(error.message).toBe(BITBUCKET_STALE_HEAD_REASON);
+    expect(bitbucketCalls().some(call => call.url.pathname.endsWith('/merge'))).toBe(false);
+  });
+
   it('refuses a stale revision with the exact reason and never merges', async () => {
     const error = await captureRejection(
       mergePullRequest({

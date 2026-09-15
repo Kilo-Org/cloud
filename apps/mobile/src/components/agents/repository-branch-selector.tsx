@@ -22,6 +22,8 @@ import { cn } from '@/lib/utils';
 type RepositoryBranchSelectorProps = {
   /** The resolved selected repository row; `null` renders nothing. */
   repository: NewSessionRepository | null;
+  /** The screen's current organization scope (`undefined` = personal). */
+  organizationId: string | undefined;
   disabled: boolean;
 };
 
@@ -53,12 +55,13 @@ const NOTE_MIN_HEIGHT = 'min-h-12';
  */
 export function RepositoryBranchSelector({
   repository,
+  organizationId,
   disabled,
 }: Readonly<RepositoryBranchSelectorProps>) {
   const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
-  const branches = useRepositoryBranches(repository);
+  const branches = useRepositoryBranches(repository, organizationId);
   const branchState = useSyncExternalStore(
     subscribeNewSessionBranchState,
     getNewSessionBranchState

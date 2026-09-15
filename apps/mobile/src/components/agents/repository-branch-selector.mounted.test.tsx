@@ -82,7 +82,7 @@ function mountSelector(
   const renderer: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
   act(() => {
     renderer.current = TestRenderer.create(
-      createElement(RepositoryBranchSelector, { repository, disabled })
+      createElement(RepositoryBranchSelector, { repository, organizationId: 'org-1', disabled })
     );
   });
   const created = renderer.current;
@@ -250,7 +250,11 @@ describe('RepositoryBranchSelector', () => {
     vi.mocked(useRepositoryBranches).mockReturnValue(branchesState());
     act(() => {
       renderer.update(
-        createElement(RepositoryBranchSelector, { repository: githubRow, disabled: false })
+        createElement(RepositoryBranchSelector, {
+          repository: githubRow,
+          organizationId: 'org-1',
+          disabled: false,
+        })
       );
     });
 

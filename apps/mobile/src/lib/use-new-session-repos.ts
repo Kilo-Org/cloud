@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- One hook wires the GitHub, GitLab, and Bitbucket provider queries, recents resolution, and connect/refresh flows end-to-end. */
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
@@ -7,18 +7,14 @@ import { toast } from 'sonner-native';
 import {
   dedupeRepositoriesByPlatformAndFullName,
   detectRepositoryPlatform,
-  getNewSessionBranchState,
   type NewSessionRepository,
   type RepositoryGroup,
   type RepositoryGroups,
   repositoryIdentityKey,
   type RepositoryPlatform,
-  resetNewSessionBranchScope,
   resolveBitbucketStatus,
   resolveProviderStatus,
   resolveRepositoryGroups,
-  setNewSessionBranchScope,
-  subscribeNewSessionBranchState,
 } from '@/components/agents/new-session-repository-state';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
@@ -53,19 +49,6 @@ export function useNewSessionRepos({
 }: UseNewSessionReposArgs): UseNewSessionReposResult {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-
-  // Publish the route's organization scope for the branch queries. The route
-  // hands this hook the scope already, and `useRepositoryBranches` reads it
-  // from the shared new-session branch state rather than from props the
-  // repository section is not given.
-  //
-  // Publish on mount and drop it on unmount (and on a scope change): a remount
-  // must not read the previous screen's organization on its first render,
-  // before this effect runs, and issue a branch query under the wrong scope.
-  useEffect(() => {
-    setNewSessionBranchScope(organizationId);
-    return resetNewSessionBranchScope;
-  }, [organizationId]);
 
   const githubQuery = useQuery(
     organizationId
@@ -415,6 +398,14 @@ export type RepositoryBranchesState = {
  * `listRepositoryBranches` procedures (organization variant when the
  * new-session route carries an organization).
  *
+ * `organizationId` is the route's CURRENT scope, taken as a render-time prop —
+ * never read from a store a passive effect publishes. An in-place organization
+ * change (a share re-targeting the already-focused new-session screen) then
+ * re-keys the query in the same render the prop changes, so a branch query can
+ * never run under the organization the user left. `undefined` is a real scope
+ * (a personal session), not a "not yet known" — the screen always knows its
+ * scope on the first render.
+ *
  * The query runs only when a repository is selected. Bitbucket is
  * organization-only, so a personal Bitbucket row never issues a request — the
  * server would refuse it with the org-only message, and the section explains
@@ -427,21 +418,15 @@ export type RepositoryBranchesState = {
  * branches out of the cache.
  */
 export function useRepositoryBranches(
-  repository: NewSessionRepository | null
+  repository: NewSessionRepository | null,
+  organizationId: string | undefined
 ): RepositoryBranchesState {
   const trpc = useTRPC();
-  const { isScopeReady, organizationId } = useSyncExternalStore(
-    subscribeNewSessionBranchState,
-    getNewSessionBranchState
-  );
 
   const platform: RepositoryPlatform = repository?.platform ?? 'github';
   const fullName = repository?.fullName ?? '';
   const isEnabled =
-    repository !== null &&
-    isScopeReady &&
-    fullName !== '' &&
-    !(platform === 'bitbucket' && !organizationId);
+    repository !== null && fullName !== '' && !(platform === 'bitbucket' && !organizationId);
 
   const personalInput = { platform, repository: { fullName } };
   const organizationInput = { organizationId: organizationId ?? '', ...personalInput };

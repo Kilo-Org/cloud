@@ -83,6 +83,8 @@ type NewSessionConfigureFormProps = {
   onChangeRepo: (fullName: string) => void;
   onConnectProvider: (platform: RepositoryPlatform) => void;
   onRefreshRepos: () => void;
+  /** The screen's current organization scope (`undefined` = personal). */
+  organizationId: string | undefined;
   repositories: NewSessionRepository[];
   /** Recently used rows, threaded to the picker's "Recently used" section. */
   recents: NewSessionRepository[];
@@ -150,6 +152,7 @@ export function NewSessionConfigureForm({
   onChangeRepo,
   onConnectProvider,
   onRefreshRepos,
+  organizationId,
   repositories,
   recents,
   selectedRepo,
@@ -278,6 +281,7 @@ export function NewSessionConfigureForm({
           onChange={onChangeRepo}
           onConnect={onConnectProvider}
           onRefreshRepos={onRefreshRepos}
+          organizationId={organizationId}
           repositories={repositories}
           recents={recents}
           value={selectedRepo}

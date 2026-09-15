@@ -23,6 +23,8 @@ type NewSessionRepositorySectionProps = {
   onChange: (fullName: string) => void;
   onConnect: (platform: RepositoryPlatform) => void;
   onRefreshRepos: () => void;
+  /** The screen's current organization scope (`undefined` = personal). */
+  organizationId: string | undefined;
   repositories: NewSessionRepository[];
   /** Recently used rows for the picker's "Recently used" section. */
   recents: NewSessionRepository[];
@@ -88,6 +90,7 @@ export function NewSessionRepositorySection({
   onChange,
   onConnect,
   onRefreshRepos,
+  organizationId,
   repositories,
   recents,
   groups,
@@ -132,7 +135,11 @@ export function NewSessionRepositorySection({
         />
       )}
 
-      <RepositoryBranchSelector repository={selectedRepository} disabled={disabled} />
+      <RepositoryBranchSelector
+        repository={selectedRepository}
+        organizationId={organizationId}
+        disabled={disabled}
+      />
 
       {groups.map(group => (
         <Fragment key={group.key}>{renderGroupCard(group.key, group.status)}</Fragment>

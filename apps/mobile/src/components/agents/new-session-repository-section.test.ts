@@ -63,6 +63,7 @@ function mountSection(overrides: {
         onChange: vi.fn(() => undefined),
         onConnect: vi.fn(() => undefined),
         onRefreshRepos: vi.fn(() => undefined),
+        organizationId: 'org-1',
         repositories: overrides.repositories ?? [githubRow, gitlabRow],
         recents: [],
         groups: overrides.groups ?? [group('github', 'repos'), group('gitlab', 'repos')],
@@ -80,6 +81,7 @@ function mountSection(overrides: {
 function branchSelectorProps(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root.findAllByType('RepositoryBranchSelector' as never)[0]?.props as {
     repository: NewSessionRepository | null;
+    organizationId: string | undefined;
     disabled: boolean;
   };
 }
@@ -100,6 +102,12 @@ describe('NewSessionRepositorySection branch row', () => {
     const renderer = mountSection({ value: 'github:owner/repo' });
 
     expect(branchSelectorProps(renderer).repository).toEqual(githubRow);
+  });
+
+  it('hands the branch selector the current organization scope, not a stored one', () => {
+    const renderer = mountSection({ value: 'github:owner/repo' });
+
+    expect(branchSelectorProps(renderer).organizationId).toBe('org-1');
   });
 
   it('keeps same-named rows on two providers distinct', () => {

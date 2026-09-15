@@ -11,6 +11,7 @@
 
 import crypto from 'crypto';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { getErrorMessage } from '@kilocode/worker-utils';
 import {
   cloud_agent_code_reviews,
   kilocode_users,
@@ -101,10 +102,6 @@ class CodeReviewActionRequiredDispatchError extends Error {
     this.name = 'CodeReviewActionRequiredDispatchError';
     this.reason = reason;
   }
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 /**

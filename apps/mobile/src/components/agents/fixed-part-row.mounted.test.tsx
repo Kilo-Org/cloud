@@ -8,6 +8,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 
 import { FixedPartRow } from './fixed-part-row';
+import {
+  findContentRow,
+  findHost,
+  renderRow,
+  textWithContent,
+} from './fixed-part-row.mounted.test-helpers';
 import { ToolSummaryTranslationScope } from './tool-summary-translation-scope';
 
 const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
@@ -39,49 +45,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 type RowProps = Parameters<typeof FixedPartRow>[0];
-
-async function renderRow(props: RowProps): Promise<TestRenderer.ReactTestRenderer> {
-  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
-    current: undefined,
-  };
-  await act(async () => {
-    await Promise.resolve();
-    rendererRef.current = TestRenderer.create(createElement(FixedPartRow, props));
-  });
-  const renderer = rendererRef.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
-
-function findHost(
-  root: TestRenderer.ReactTestInstance,
-  type: string
-): TestRenderer.ReactTestInstance[] {
-  return root.findAll(node => node.type === type);
-}
-
-/** The inner row that carries the label and, when present, the badge. */
-function findContentRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
-  const row = findHost(root, 'View').find(
-    node =>
-      typeof node.props.className === 'string' &&
-      node.props.className.includes('flex-1') &&
-      node.props.className.includes('flex-row')
-  );
-  if (!row) {
-    throw new Error('label/badge content row not found');
-  }
-  return row;
-}
-
-function textWithContent(
-  root: TestRenderer.ReactTestInstance,
-  content: string
-): TestRenderer.ReactTestInstance[] {
-  return findHost(root, 'Text').filter(node => node.props.children === content);
-}
 
 describe('FixedPartRow mounted', () => {
   it('renders a pressable row with a details hint and chevron when onPress is set', async () => {
@@ -189,6 +152,52 @@ describe('FixedPartRow mounted', () => {
     expect(findHost(renderer.root, 'ActivityIndicator')).toHaveLength(0);
     const labels = findHost(renderer.root, 'Text');
     expect(labels.some(node => node.props.children === 'app.ts')).toBe(true);
+  });
+
+  it('forwards a long press to the message-details handler through the context', async () => {
+    const onPress = vi.fn(() => undefined);
+    const messageLongPress = vi.fn(() => undefined);
+    const renderer = await renderRow(
+      {
+        label: 'Thinking',
+        labelKind: 'eyebrow',
+        variant: 'dashed',
+        onPress,
+        accessibilityLabel: 'Thinking',
+      },
+      messageLongPress
+    );
+
+    const pressable = findHost(renderer.root, 'Pressable')[0];
+    expect(pressable).toBeDefined();
+    if (!pressable) {
+      throw new Error('pressable not found');
+    }
+    expect(pressable.props.onLongPress).toBe(messageLongPress);
+
+    // The row stays enabled for taps: long-press opens the message details,
+    // a plain tap still opens the part detail.
+    expect(pressable.props.disabled).toBe(false);
+    expect(pressable.props.onPress).toBe(onPress);
+  });
+
+  it('keeps tap-only behavior when no message long-press is mounted', async () => {
+    const onPress = vi.fn(() => undefined);
+    const renderer = await renderRow({
+      label: 'Thinking',
+      labelKind: 'eyebrow',
+      variant: 'dashed',
+      onPress,
+      accessibilityLabel: 'Thinking',
+    });
+
+    const pressable = findHost(renderer.root, 'Pressable')[0];
+    expect(pressable).toBeDefined();
+    if (!pressable) {
+      throw new Error('pressable not found');
+    }
+    expect(pressable.props.onLongPress).toBeUndefined();
+    expect(pressable.props.onPress).toBe(onPress);
   });
 
   it('renders no leading slot at all when status is absent (reasoning rows)', async () => {

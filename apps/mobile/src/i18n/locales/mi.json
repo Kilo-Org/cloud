@@ -3012,5 +3012,24 @@
     "loadFailed": "Kāore i taea ngā reo e tautokona ana e tēnei pūrere te uta.",
     "emptyTitle": "Kāore he reo e tautokona ana",
     "emptyDescription": "Kāore te āhukahuka reo o tēnei pūrere e pūrongo i tētahi reo e tautokona ana."
+  },
+  "tour": {
+    "eyebrow": "Haere poto",
+    "forkTitle": "Ki hea koe e hiahia ana whakahaere i a Kilo?",
+    "forkSubtitle": "Kōwhiria ki hea e rere ai a Kilo mō tō wātū tuatahi.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Whakahaere i te Kilo i roto i tētahi taiao kapua motumotu, kāore he mea hei tāuta.",
+    "remoteOptionTitle": "Tō rorohiko",
+    "remoteOptionBody": "Whakahaere i te Kilo ki tō ake mīhini mā te CLI `kilo remote`.",
+    "skip": "Waiho te haere",
+    "tutorialLabel": "Akoranga",
+    "remoteTitle": "Tīmata tō wātū tawhiti tuatahi",
+    "remoteBody": "Honoa tō rorohiko, kātahi ka tīmata te wātū mai i konei.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Kāore anō kia honoa he rorohiko",
+    "remoteEmptyBody": "Hei hono i a ia, whakahaeretia `kilo remote` ki tō rorohiko.",
+    "remoteFound": "Kua honoa te rorohiko",
+    "checkAgain": "Tirohia anō",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

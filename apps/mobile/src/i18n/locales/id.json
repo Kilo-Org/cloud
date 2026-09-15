@@ -3012,5 +3012,24 @@
     "loadFailed": "Tidak dapat memuat bahasa yang didukung perangkat ini.",
     "emptyTitle": "Tidak ada bahasa yang didukung",
     "emptyDescription": "Pengenalan suara perangkat ini tidak melaporkan bahasa yang didukung."
+  },
+  "tour": {
+    "eyebrow": "Tur singkat",
+    "forkTitle": "Di mana Anda ingin menjalankan Kilo?",
+    "forkSubtitle": "Pilih tempat Kilo menjalankan sesi pertama Anda.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Jalankan Kilo di lingkungan cloud terisolasi tanpa perlu menginstal apa pun.",
+    "remoteOptionTitle": "Komputer Anda",
+    "remoteOptionBody": "Jalankan Kilo di mesin Anda sendiri melalui CLI `kilo remote`.",
+    "skip": "Lewati tur",
+    "tutorialLabel": "Tutorial",
+    "remoteTitle": "Mulai sesi remote pertama Anda",
+    "remoteBody": "Hubungkan komputer Anda, lalu mulai sesi dari sini.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Belum ada komputer yang terhubung",
+    "remoteEmptyBody": "Untuk menghubungkannya, jalankan `kilo remote` di komputer Anda.",
+    "remoteFound": "Komputer terhubung",
+    "checkAgain": "Periksa lagi",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

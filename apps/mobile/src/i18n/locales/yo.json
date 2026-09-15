@@ -3012,5 +3012,24 @@
     "loadFailed": "A kò lè gbé àwọn èdè tí ẹ̀rọ yìí ń ṣe àtìlẹ́yìn fún.",
     "emptyTitle": "Kò sí èdè tí a ṣe àtìlẹ́yìn fún",
     "emptyDescription": "Ìdánimọ̀ ọ̀rọ̀-ẹnu ti ẹ̀rọ yìí kò sọ èdè tí a ṣe àtìlẹ́yìn fún kankan."
+  },
+  "tour": {
+    "eyebrow": "Ìrìn àjò ìyára",
+    "forkTitle": "Níbo ni o fẹ́ ṣiṣẹ́ Kilo?",
+    "forkSubtitle": "Yan ibi tí Kilo yóò ṣiṣẹ́ fún ìgbà iṣẹ́ àkọ́kọ́ rẹ.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Ṣiṣẹ́ Kilo nínú àyè ìkùsọ tí a yà sọ́tọ̀ láì fi nkankan sí i.",
+    "remoteOptionTitle": "Kọ̀ǹpútà rẹ",
+    "remoteOptionBody": "Ṣiṣẹ́ Kilo lórí ẹ̀rọ tirẹ pẹ̀lú CLI `kilo remote`.",
+    "skip": "Fo ìrìn àjò sí",
+    "tutorialLabel": "Ìtọ́sọ́nà",
+    "remoteTitle": "Bẹ̀rẹ̀ ìgbà iṣẹ́ ìjìnnà àkọ́kọ́ rẹ",
+    "remoteBody": "So kọ̀ǹpútà rẹ pọ̀, lẹ́yìn náà bẹ̀rẹ̀ ìgbà iṣẹ́ láti ibí yìí.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Kò sí kọ̀ǹpútà tí a so pọ̀ sí báyìí",
+    "remoteEmptyBody": "Láti so ó pọ̀, ṣiṣẹ́ `kilo remote` lórí kọ̀ǹpútà rẹ.",
+    "remoteFound": "Kọ̀ǹpútà ti so pọ̀",
+    "checkAgain": "Tún ṣe àyẹ̀wò",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

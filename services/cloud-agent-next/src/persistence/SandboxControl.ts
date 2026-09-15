@@ -469,6 +469,7 @@ export class SandboxControl extends DurableObject<Env> {
         this.nativeRetirementConnection(
           this.socketHandler.getConnectionIdentity() ?? this.activeConnection
         ),
+      isConnectionReady: () => this.readyWrapperRuntime() !== null,
       supportsTargetedRetirement: () => this.supportsNativeRuntimeRetirement(),
       persistPhysical: (from, to, reason) => this.persistPhysicalState(from, to, reason),
       onPhysicalStop: async (from, to, reason) => {

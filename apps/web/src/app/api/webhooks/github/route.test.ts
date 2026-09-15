@@ -146,9 +146,9 @@ describe('GitHub webhook route', () => {
     expect(captureMessage).not.toHaveBeenCalled();
   });
 
-  it('acknowledges an unhealthy integration denial and reports a bounded reason tag', async () => {
+  it('acknowledges a disconnected integration denial and reports a bounded reason tag', async () => {
     mockAssertRuntimeAuthorized.mockRejectedValue(
-      new GitHubRuntimeAuthorizationError('unhealthy_integration')
+      new GitHubRuntimeAuthorizationError('disconnected')
     );
     const response = await POST(
       githubRequest('issue_comment', { installation: { id: 98765 } }) as never
@@ -161,7 +161,7 @@ describe('GitHub webhook route', () => {
       expect.objectContaining({
         level: 'warning',
         tags: expect.objectContaining({
-          github_runtime_authorization_reason: 'unhealthy_integration',
+          github_runtime_authorization_reason: 'disconnected',
         }),
       })
     );

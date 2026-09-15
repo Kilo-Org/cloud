@@ -23,6 +23,13 @@
  *   and container stay alive, and require the feed to recover plus a follow-up
  *   in each of the two chats on the same runtime without a feed_stale
  *   retirement.
+ * - `wrapper-freeze-settled-reap` (D6) freeze only the control-wrapper Bun
+ *   process after a completed turn and require recovery exhaustion to reap the
+ *   allocation with the settled-reap cause plus a distinct replacement.
+ * - `wrapper-freeze-inflight-reap` (D7) freeze the control-wrapper Bun process
+ *   while a gated turn is still held and require the original message to
+ *   terminalise `runtime_unhealthy`, the route to stay stale-active, and a
+ *   follow-up on the SAME session to complete on a replacement.
  *
  * Shared helpers live in `lifecycle-file-state.ts`; worker-log framing lives
  * in `idle-stop-evidence.ts`. This module does not touch production code.
@@ -73,11 +80,13 @@ import {
 import { toolCallId } from './fake-llm-server.js';
 import {
   ControlPlaneContainerUnavailableError,
+  captureControlWrapperProcess,
   findControlPlaneKiloRuntime,
   inspectControlPlaneHistory,
   inspectControlPlaneKiloRoot,
   inspectControlPlaneQuestions,
   inspectControlPlaneWorkspaceFile,
+  isDockerContainerGoneError,
   listSandboxContainers,
   pauseOwnedPrimary,
   readControlWrapperLog,
@@ -97,6 +106,7 @@ import {
   waitForOwnedCompletion,
 } from './worktree-support.js';
 import { DEADLINE_MS } from '../../src/sandbox-control/deadlines.js';
+import { RECOVERY_SETTLED_REAP_REASON } from '../../src/sandbox-control/recovery-cleanup.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 
 export const CONTINUITY_SCENARIO_TIMEOUT_MS: Record<string, number> = {
@@ -107,6 +117,8 @@ export const CONTINUITY_SCENARIO_TIMEOUT_MS: Record<string, number> = {
   'large-stream': 10 * 60_000,
   'concurrent-chats': 15 * 60_000,
   'feed-stale-recovery': 10 * 60_000,
+  'wrapper-freeze-settled-reap': 12 * 60_000,
+  'wrapper-freeze-inflight-reap': 12 * 60_000,
 };
 
 const COLD_IDLE_BUDGET_MS = 8 * 60_000;
@@ -151,6 +163,17 @@ const FEED_LOG_POLL_MS = 2_000;
 const FEED_STALE_DETECTION_BUDGET_MS = 75_000;
 const FEED_RECOVERY_BUDGET_MS = 90_000;
 const FEED_FOLLOWUP_TURN_BUDGET_MS = 90_000;
+
+/**
+ * `wrapper-freeze-*` bounds. The freeze only stops the control wrapper, so
+ * recovery advances through the worker's own heartbeat-expiry deadline
+ * (90s) and bounded attempts; these waits observe those transitions and never
+ * trigger them.
+ */
+const WRAPPER_FREEZE_ACTIVE_ROUTE_BUDGET_MS = 60_000;
+const WRAPPER_FREEZE_TERMINAL_BUDGET_MS = 3 * 60_000;
+const WRAPPER_FREEZE_RECONCILE_BUDGET_MS = 4 * 60_000;
+const WRAPPER_FREEZE_FOLLOWUP_BUDGET_MS = 8 * 60_000;
 
 const CONTROL_LOG_TAG = 'sandbox_control';
 
@@ -890,6 +913,21 @@ function selectTargetHeartbeat(
     };
   }
   return undefined;
+}
+
+/**
+ * True when one heartbeat record moves the target session's route off `active`.
+ * A heartbeat that carries no evidence for this exact session (neither an exact
+ * `kiloSessionId` nor a packed `sessionReport` entry for it) is unrelated and
+ * ignored rather than counted as a state change.
+ */
+export function heartbeatMovedRouteOffActive(
+  record: LogRecord,
+  identity: ConnectionIdentity,
+  kiloSessionId: string
+): boolean {
+  const evidence = selectTargetHeartbeat([record], identity, kiloSessionId);
+  return evidence !== undefined && evidence.sessionState !== 'active';
 }
 
 // ---------------------------------------------------------------------------
@@ -2474,6 +2512,717 @@ export async function lifecycleFeedStaleRecovery(args: LifecycleArgs): Promise<L
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// wrapper-freeze settled/inflight reap (D6/D7)
+// ---------------------------------------------------------------------------
+
+async function captureAndFreezeControlWrapper(
+  resources: ScenarioResources,
+  containerId: string
+): Promise<KiloServerProcessHandle> {
+  const handle = await resources.within('capture control wrapper process', () =>
+    captureControlWrapperProcess(containerId)
+  );
+  await resources.within('freeze control wrapper process', () =>
+    signalKiloServerProcess(handle, 'STOP')
+  );
+  return handle;
+}
+
+async function assertSandboxContainerAlive(
+  resources: ScenarioResources,
+  containerId: string
+): Promise<void> {
+  const containers = await resources.within('container alive after wrapper freeze', () =>
+    listSandboxContainers()
+  );
+  if (!containers.some(container => container.id === containerId)) {
+    throw new Error('sandbox container disappeared after freezing only the control wrapper');
+  }
+}
+
+/**
+ * Require the identity-matched heartbeat-expiry chain before the stop: a
+ * `deadline_fired deadlineId=heartbeatExpiry` followed by a
+ * `recovery_outcome cause=heartbeat_expired outcome=started`. Any other
+ * classification (disconnect, none, inconclusive) fails the scenario.
+ */
+async function requireHeartbeatExpiryFault(
+  resources: ScenarioResources,
+  input: { connection: ConnectionIdentity; fromByte: number; label: string }
+): Promise<FaultClassification> {
+  const fault = await waitForEngagedFault(resources, {
+    connection: input.connection,
+    fromByte: input.fromByte,
+  });
+  if (fault.kind !== 'heartbeat_expiry') {
+    throw new Error(
+      `${input.label} did not engage heartbeat-expiry recovery: kind=${fault.kind}; ${fault.summary}`
+    );
+  }
+  return fault;
+}
+
+/**
+ * The one record that proves a settled reap for this sandbox: the
+ * `running -> stopping` `physical_committed` transition, with the tombstone
+ * reason in BOTH `cause` and `stopCause`. A later `stop_attempt` does not
+ * re-state it.
+ */
+export function isSettledReapStopRecord(record: LogRecord, sandboxId: string): boolean {
+  return (
+    isControlRecord(record) &&
+    record.diagnosticEvent === 'physical_committed' &&
+    record.sandboxId === sandboxId &&
+    record.fromState === 'running' &&
+    record.toState === 'stopping' &&
+    record.cause === RECOVERY_SETTLED_REAP_REASON &&
+    record.stopCause === RECOVERY_SETTLED_REAP_REASON
+  );
+}
+
+/**
+ * Wait for the settled-reap stop commit for this exact durable sandbox.
+ */
+async function waitForSettledReapStop(
+  resources: ScenarioResources,
+  input: { fromByte: number; sandboxId: string; label: string }
+): Promise<LogRecord> {
+  const record = await resources.within(input.label, () =>
+    waitForWorkerLogEvidence({
+      fromByte: input.fromByte,
+      budgetMs: remainingMs(resources, input.label),
+      match: candidate => isSettledReapStopRecord(candidate, input.sandboxId),
+    })
+  );
+  if (!record) {
+    throw new Error(
+      `${input.label}: no physical_committed cause/stopCause=${RECOVERY_SETTLED_REAP_REASON} for sandbox ${input.sandboxId}`
+    );
+  }
+  return record;
+}
+
+/**
+ * Match the wrapper incarnation of a captured connection (`sandboxId` +
+ * `wrapperInstanceId`), not its `connectionId`. The readiness veto uses
+ * `sameRuntime` (provider + wrapper incarnation), so a re-ready frame on a
+ * reconnected socket still counts as the same ready runtime.
+ */
+function matchesWrapperIncarnation(record: LogRecord, identity: ConnectionIdentity): boolean {
+  if (record.sandboxId !== identity.sandboxId) return false;
+  const values = [record.wrapperInstanceId, record.observationWrapperInstanceId].filter(
+    (value): value is string => typeof value === 'string'
+  );
+  return values.includes(identity.wrapperInstanceId);
+}
+
+/**
+ * A `wrapper_ready` frame for the captured wrapper incarnation after the freeze
+ * means the runtime recovered (or was never frozen), so the settled stop would
+ * have been vetoed. The scenario must not report such a run as a reap.
+ */
+async function assertNoWrapperReadyAfterFreeze(input: {
+  fromByte: number;
+  connection: ConnectionIdentity;
+  label: string;
+}): Promise<void> {
+  const records = await readWorkerLogSnapshot({
+    fromByte: input.fromByte,
+    match: record =>
+      isControlRecord(record) &&
+      record.diagnosticEvent === 'wrapper_ready' &&
+      matchesWrapperIncarnation(record, input.connection),
+  });
+  if (records.length > 0) {
+    throw new Error(
+      `${input.label}: wrapper became ready after the freeze (${describeRecord(records[0])}); a re-readied wrapper is a vetoed run, not a settled stop`
+    );
+  }
+}
+
+async function waitForActiveRouteReport(
+  resources: ScenarioResources,
+  input: {
+    fromByte: number;
+    connection: ConnectionIdentity;
+    kiloSessionId: string;
+    label: string;
+  }
+): Promise<TargetHeartbeatEvidence> {
+  const record = await resources.within(input.label, () =>
+    waitForWorkerLogEvidence({
+      fromByte: input.fromByte,
+      budgetMs: Math.min(
+        WRAPPER_FREEZE_ACTIVE_ROUTE_BUDGET_MS,
+        remainingMs(resources, input.label)
+      ),
+      match: candidate => {
+        if (!isControlRecord(candidate) || candidate.diagnosticEvent !== 'heartbeat') return false;
+        if (!matchesConnection(candidate, input.connection)) return false;
+        return (
+          selectTargetHeartbeat([candidate], input.connection, input.kiloSessionId)
+            ?.sessionState === 'active'
+        );
+      },
+    })
+  );
+  if (!record) {
+    throw new Error(
+      `${input.label}: no identity-matched active heartbeat for ${input.kiloSessionId}`
+    );
+  }
+  const evidence = selectTargetHeartbeat([record], input.connection, input.kiloSessionId);
+  if (!evidence) {
+    throw new Error(
+      `${input.label}: matched heartbeat carried no session state for ${input.kiloSessionId}`
+    );
+  }
+  return evidence;
+}
+
+/**
+ * Prove the route stayed stale-active: the last identity-matched heartbeat for
+ * the target reports `active`, and no heartbeat after the freeze changes it.
+ * The freeze makes it stale — heartbeats stop, so the worker keeps the last
+ * `active` state with an aging `lastStateAt`.
+ */
+async function readStaleActiveRoute(
+  resources: ScenarioResources,
+  input: {
+    fromByte: number;
+    postFreezeByte: number;
+    connection: ConnectionIdentity;
+    kiloSessionId: string;
+    label: string;
+  }
+): Promise<TargetHeartbeatEvidence & { heartbeatsAfterFreeze: number }> {
+  const records = await resources.within(input.label, () =>
+    readWorkerLogSnapshot({ fromByte: input.fromByte, match: isControlRecord })
+  );
+  const latest = selectTargetHeartbeat(records, input.connection, input.kiloSessionId);
+  if (!latest) {
+    throw new Error(`${input.label}: no heartbeat evidence for ${input.kiloSessionId}`);
+  }
+  if (latest.sessionState !== 'active') {
+    throw new Error(
+      `${input.label}: route did not stay active (last sessionState=${String(latest.sessionState)})`
+    );
+  }
+  const afterFreeze = await resources.within(`${input.label} post-freeze`, () =>
+    readWorkerLogSnapshot({
+      fromByte: input.postFreezeByte,
+      match: record =>
+        isControlRecord(record) &&
+        record.diagnosticEvent === 'heartbeat' &&
+        matchesConnection(record, input.connection),
+    })
+  );
+  const changed = afterFreeze.filter(record =>
+    heartbeatMovedRouteOffActive(record, input.connection, input.kiloSessionId)
+  );
+  if (changed.length > 0) {
+    throw new Error(
+      `${input.label}: a heartbeat after the freeze changed the route away from active (${describeRecord(changed[0])})`
+    );
+  }
+  return { ...latest, heartbeatsAfterFreeze: afterFreeze.length };
+}
+
+/**
+ * Match an accepted-message reconciliation record to the exact message turn.
+ * `messageId` is required: a record without it is not this message's evidence,
+ * so a wrong-cause failure in another session cannot satisfy the scenario. When
+ * the local log format retained them, the emitting session and expected wrapper
+ * incarnation are also constrained.
+ */
+export function matchesReconciliationIdentity(
+  record: LogRecord,
+  input: { messageId: string; sessionId: string; wrapperInstanceId: string }
+): boolean {
+  if (record.messageId !== input.messageId) return false;
+  if (record.sessionId !== undefined && record.sessionId !== input.sessionId) return false;
+  if (
+    record.expectedWrapperInstanceId !== undefined &&
+    record.expectedWrapperInstanceId !== input.wrapperInstanceId
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Wait for the accepted-message watchdog to terminalise the message
+ * `runtime_unhealthy`. The record's `messageId` is required and matched
+ * exactly, and its session/wrapper identity is constrained when retained, so
+ * only this turn's terminalisation can satisfy the scenario.
+ */
+async function waitForRuntimeUnhealthyReconciliation(
+  resources: ScenarioResources,
+  input: {
+    fromByte: number;
+    messageId: string;
+    sessionId: string;
+    wrapperInstanceId: string;
+    label: string;
+  }
+): Promise<LogRecord> {
+  const record = await resources.within(input.label, () =>
+    waitForWorkerLogEvidence({
+      fromByte: input.fromByte,
+      budgetMs: Math.min(WRAPPER_FREEZE_RECONCILE_BUDGET_MS, remainingMs(resources, input.label)),
+      match: candidate =>
+        isControlRecord(candidate) &&
+        candidate.diagnosticEvent === 'accepted_reconciliation' &&
+        candidate.result === 'runtime_unhealthy' &&
+        matchesReconciliationIdentity(candidate, input),
+    })
+  );
+  if (!record) {
+    throw new Error(
+      `${input.label}: no identity-matched accepted_reconciliation result=runtime_unhealthy for message ${input.messageId}`
+    );
+  }
+  return record;
+}
+
+async function assertDistinctReplacement(
+  resources: ScenarioResources,
+  session: WorktreeSessionResult,
+  oldContainerId: string,
+  label: string
+): Promise<ControlPlaneKiloRuntime> {
+  const replacement = await resources.within(label, () =>
+    findControlPlaneKiloRuntime(session.kiloSessionId)
+  );
+  if (!replacement)
+    throw new Error(`${label}: no replacement runtime for ${session.kiloSessionId}`);
+  if (replacement.container.id === oldContainerId) {
+    throw new Error(`${label}: replacement reused the reaped container ${oldContainerId}`);
+  }
+  recordOwnedRuntime(resources, session.kiloSessionId, replacement.container);
+  return replacement;
+}
+
+/**
+ * Identity-checked `CONT` for the captured freeze handle. A destroyed container
+ * is expected after a reap and is reported, not thrown: the captured identity
+ * is the only safe target, and there is nothing left to release once it is gone.
+ */
+async function releaseFrozenControlWrapper(
+  result: LifecycleResult,
+  frozen: KiloServerProcessHandle
+): Promise<LifecycleResult> {
+  let release: string;
+  try {
+    await signalKiloServerProcess(frozen, 'CONT');
+    release = `cont@${Date.now()}`;
+  } catch (error) {
+    release = isDockerContainerGoneError(error)
+      ? 'container-gone'
+      : `cont-failed:${errorMessage(error)}`;
+  }
+  return {
+    ...result,
+    message: `${result.message}; frozenRelease=${release}; frozenContainer=${frozen.containerId}; frozenWrapperPid=${frozen.processId}`,
+  };
+}
+
+/**
+ * Freeze only the control-wrapper Bun process after a completed turn. Recovery
+ * must exhaust without a re-ready runtime and reap the allocation with the
+ * settled cause, then a distinct replacement must serve the same session.
+ */
+export async function lifecycleWrapperFreezeSettledReap(
+  args: LifecycleArgs
+): Promise<LifecycleResult> {
+  const startedAt = Date.now();
+  const resources = createScenarioResources(
+    args.config,
+    args.timeoutMs ?? CONTINUITY_SCENARIO_TIMEOUT_MS['wrapper-freeze-settled-reap'] ?? 12 * 60_000
+  );
+  let result = scenarioResult(
+    'wrapper-freeze-settled-reap',
+    args,
+    startedAt,
+    resources.events,
+    false,
+    'scenario did not start'
+  );
+  const evidence: string[] = [];
+  const record = (line: string): void => {
+    evidence.push(line);
+  };
+  let frozen: KiloServerProcessHandle | undefined;
+  try {
+    assertScenarioPreconditions(args.config, args.api);
+    const runId = randomUUID();
+    const bootCursor = await captureLogCursor();
+    const { session, runtime, sandboxId } = await bootSession(resources, {
+      runId,
+      operation: createScenarioOperation('continuity-recover'),
+    });
+    record(`session=${session.cloudAgentSessionId}`);
+    record(`sandbox=${sandboxId}`);
+    record(`kiloRoot=${session.kiloSessionId}`);
+    record(`reapedContainer=${runtime.container.id}`);
+
+    const workTag = `freeze-settled-work-${runId}`;
+    const workFile = `freeze-settled-${runId}.txt`;
+    const workContents = `freeze-settled-${runId}`;
+    const work = await runGatedFileTurn(resources, {
+      session,
+      runtime,
+      prompt: fakeDirective('write-then-gate', workTag, workFile, workContents),
+      gateTag: workTag,
+      expectedFile: { path: workFile, contents: workContents },
+      expectTool: 'write',
+      engageTimeoutMs: remainingMs(resources, 'settled work gate'),
+    });
+    record(`workMessage=${work.messageId}`);
+
+    const connection = await captureConnectionIdentity(bootCursor.fromByte, sandboxId);
+    record(connectionSummary(connection));
+
+    const freezeCursor = await captureLogCursor();
+    record(`freezeLogCursor=${freezeCursor.fromByte}`);
+    frozen = await captureAndFreezeControlWrapper(resources, runtime.container.id);
+    record(
+      `frozenContainer=${frozen.containerId}; frozenWrapperPid=${frozen.processId}; frozenAt=${Date.now()}`
+    );
+    await assertSandboxContainerAlive(resources, runtime.container.id);
+    record('containerAliveAfterFreeze=true');
+
+    const fault = await requireHeartbeatExpiryFault(resources, {
+      connection,
+      fromByte: freezeCursor.fromByte,
+      label: 'settled freeze',
+    });
+    record(`fault=${fault.kind}`);
+    record(`faultEvidence=${fault.summary.replace(/\s+/g, ' ')}`);
+
+    const stopRecord = await waitForSettledReapStop(resources, {
+      fromByte: freezeCursor.fromByte,
+      sandboxId,
+      label: 'settled reap stop',
+    });
+    record(`stopEvidence=${describeRecord(stopRecord)}`);
+
+    // No re-ready runtime at the stop decision: the frozen wrapper never sent a
+    // ready frame, so the settled stop was not a vetoed run.
+    await assertNoWrapperReadyAfterFreeze({
+      fromByte: freezeCursor.fromByte,
+      connection,
+      label: 'wrapper-freeze-settled-reap',
+    });
+    record('wrapperReadyAfterFreeze=false');
+
+    const gone = await resources.within('reaped primary gone', () =>
+      waitForSandboxPrimaryGone(runtime.container, remainingMs(resources, 'reaped primary gone'))
+    );
+    if (!gone) {
+      throw new Error(
+        `reaped container ${runtime.container.id} is still listed after the settled stop`
+      );
+    }
+    record('reapedPrimaryGone=true');
+
+    let replacementMessageId: string | undefined;
+    let replacementLifecycle: string | undefined;
+    let replacementRuntime: ControlPlaneKiloRuntime | undefined;
+    try {
+      const follow = await sendAndAwaitCompletion(
+        resources,
+        session,
+        fakeDirective('echo', `freeze-settled-follow-${runId}`),
+        'settled replacement',
+        Math.min(WRAPPER_FREEZE_FOLLOWUP_BUDGET_MS, remainingMs(resources, 'settled replacement'))
+      );
+      replacementMessageId = follow.messageId;
+      replacementLifecycle = follow.lifecycle;
+      replacementRuntime = await assertDistinctReplacement(
+        resources,
+        session,
+        runtime.container.id,
+        'settled replacement runtime'
+      );
+    } finally {
+      // The replacement is created by the follow-up turn. Claim whatever now
+      // owns the session even when that turn or the distinctness assertion
+      // failed, so cleanup stops it instead of leaking the container.
+      const claimed = await recordRecoveryRuntime(
+        resources,
+        session.kiloSessionId,
+        'settled replacement runtime'
+      );
+      if (claimed) replacementRuntime = claimed;
+    }
+    record(`replacementMessage=${replacementMessageId}; lifecycle=${replacementLifecycle}`);
+    record(`replacementContainer=${replacementRuntime?.container.id ?? 'none'}`);
+
+    result = scenarioResult(
+      'wrapper-freeze-settled-reap',
+      args,
+      startedAt,
+      resources.events,
+      true,
+      [
+        ...evidence,
+        `cause=${RECOVERY_SETTLED_REAP_REASON}`,
+        'settledReap=true',
+        'wrapperFrozenThroughCleanupDeadline=true',
+      ].join('; ')
+    );
+  } catch (error) {
+    result = scenarioResult(
+      'wrapper-freeze-settled-reap',
+      args,
+      startedAt,
+      resources.events,
+      false,
+      [errorMessage(error), ...evidence].join('; ')
+    );
+  } finally {
+    if (frozen) {
+      const frozenHandle = frozen;
+      frozen = undefined;
+      result = await releaseFrozenControlWrapper(result, frozenHandle);
+    }
+    const cleanup = await cleanupScenario(resources);
+    result = addCleanupReport(result, cleanup);
+  }
+  return result;
+}
+
+/**
+ * Freeze only the control-wrapper Bun process while a gated turn is still held
+ * (the production incident shape). The original message must terminalise
+ * `runtime_unhealthy`, the route must stay stale-active, recovery must exhaust
+ * and reap the allocation with the settled cause, and a follow-up on the SAME
+ * session must complete on a distinct replacement.
+ */
+export async function lifecycleWrapperFreezeInflightReap(
+  args: LifecycleArgs
+): Promise<LifecycleResult> {
+  const startedAt = Date.now();
+  const resources = createScenarioResources(
+    args.config,
+    args.timeoutMs ?? CONTINUITY_SCENARIO_TIMEOUT_MS['wrapper-freeze-inflight-reap'] ?? 12 * 60_000
+  );
+  let result = scenarioResult(
+    'wrapper-freeze-inflight-reap',
+    args,
+    startedAt,
+    resources.events,
+    false,
+    'scenario did not start'
+  );
+  const evidence: string[] = [];
+  const record = (line: string): void => {
+    evidence.push(line);
+  };
+  let frozen: KiloServerProcessHandle | undefined;
+  try {
+    assertScenarioPreconditions(args.config, args.api);
+    const runId = randomUUID();
+    const bootCursor = await captureLogCursor();
+    const { session, runtime, sandboxId } = await bootSession(resources, {
+      runId,
+      operation: createScenarioOperation('continuity-recover'),
+    });
+    record(`session=${session.cloudAgentSessionId}`);
+    record(`sandbox=${sandboxId}`);
+    record(`kiloRoot=${session.kiloSessionId}`);
+    record(`reapedContainer=${runtime.container.id}`);
+
+    const tag = `freeze-inflight-${runId}`;
+    const stream = await resources.connect(session.cloudAgentSessionId, false);
+    resources.ownedGateTags.add(tag);
+    const sent = await resources.within(`send ${tag}`, signal =>
+      sendMessage(resources.kiloConfig, {
+        cloudAgentSessionId: session.cloudAgentSessionId,
+        prompt: fakeDirective('gate', tag, `done-${tag}`),
+        signal,
+      })
+    );
+    await resources.within(`gate ${tag}`, () =>
+      requireWorktreeGate(
+        resources.config,
+        tag,
+        remainingMs(resources, `gate ${tag}`),
+        stream,
+        sent.messageId
+      )
+    );
+    record(`inflightMessage=${sent.messageId}`);
+
+    const connection = await captureConnectionIdentity(bootCursor.fromByte, sandboxId);
+    record(connectionSummary(connection));
+
+    const activeReport = await waitForActiveRouteReport(resources, {
+      fromByte: bootCursor.fromByte,
+      connection,
+      kiloSessionId: session.kiloSessionId,
+      label: 'active route report',
+    });
+    record(`activeRouteReport=${activeReport.summary}`);
+
+    const freezeCursor = await captureLogCursor();
+    record(`freezeLogCursor=${freezeCursor.fromByte}`);
+    frozen = await captureAndFreezeControlWrapper(resources, runtime.container.id);
+    record(
+      `frozenContainer=${frozen.containerId}; frozenWrapperPid=${frozen.processId}; frozenAt=${Date.now()}`
+    );
+    await assertSandboxContainerAlive(resources, runtime.container.id);
+    record('containerAliveAfterFreeze=true');
+
+    const fault = await requireHeartbeatExpiryFault(resources, {
+      connection,
+      fromByte: freezeCursor.fromByte,
+      label: 'inflight freeze',
+    });
+    record(`fault=${fault.kind}`);
+    record(`faultEvidence=${fault.summary.replace(/\s+/g, ' ')}`);
+
+    const failed = await resources.within('original message terminal', () =>
+      stream.waitFor(
+        event =>
+          event.streamEventType === 'cloud.message.failed' &&
+          messageIdFromEvent(event) === sent.messageId,
+        Math.min(
+          WRAPPER_FREEZE_TERMINAL_BUDGET_MS,
+          remainingMs(resources, 'original message terminal')
+        )
+      )
+    );
+    if (!failed) {
+      throw new Error(`gated message ${sent.messageId} did not terminalise`);
+    }
+    const terminalStatus = typeof failed.data.status === 'string' ? failed.data.status : 'none';
+    if (terminalStatus !== 'failed') {
+      throw new Error(`gated message ${sent.messageId} terminal status=${terminalStatus}`);
+    }
+    const unhealthy = await waitForRuntimeUnhealthyReconciliation(resources, {
+      fromByte: freezeCursor.fromByte,
+      messageId: sent.messageId,
+      sessionId: session.cloudAgentSessionId,
+      wrapperInstanceId: connection.wrapperInstanceId,
+      label: 'runtime_unhealthy reconciliation',
+    });
+    record('messageTerminal=cloud.message.failed status=failed');
+    record(`reconciliation=${describeRecord(unhealthy)} result=${String(unhealthy.result)}`);
+
+    const stopRecord = await waitForSettledReapStop(resources, {
+      fromByte: freezeCursor.fromByte,
+      sandboxId,
+      label: 'inflight settled reap stop',
+    });
+    record(`stopEvidence=${describeRecord(stopRecord)}`);
+
+    await assertNoWrapperReadyAfterFreeze({
+      fromByte: freezeCursor.fromByte,
+      connection,
+      label: 'wrapper-freeze-inflight-reap',
+    });
+    record('wrapperReadyAfterFreeze=false');
+
+    const staleRoute = await readStaleActiveRoute(resources, {
+      fromByte: bootCursor.fromByte,
+      postFreezeByte: freezeCursor.fromByte,
+      connection,
+      kiloSessionId: session.kiloSessionId,
+      label: 'stale active route',
+    });
+    record(
+      `staleActiveRoute=${staleRoute.summary}; heartbeatsAfterFreeze=${staleRoute.heartbeatsAfterFreeze}`
+    );
+
+    const gone = await resources.within('reaped primary gone', () =>
+      waitForSandboxPrimaryGone(runtime.container, remainingMs(resources, 'reaped primary gone'))
+    );
+    if (!gone) {
+      throw new Error(
+        `reaped container ${runtime.container.id} is still listed after the settled stop`
+      );
+    }
+    record('reapedPrimaryGone=true');
+
+    await resources.within('release inflight gate', signal =>
+      releaseGate(resources.config.fakeLlmUrl, tag, signal).catch(() => undefined)
+    );
+    resources.ownedGateTags.delete(tag);
+
+    let followUpMessageId: string | undefined;
+    let followUpLifecycle: string | undefined;
+    let replacementRuntime: ControlPlaneKiloRuntime | undefined;
+    try {
+      const follow = await sendAndAwaitCompletion(
+        resources,
+        session,
+        fakeDirective('echo', `freeze-inflight-follow-${runId}`),
+        'same-session follow-up',
+        Math.min(
+          WRAPPER_FREEZE_FOLLOWUP_BUDGET_MS,
+          remainingMs(resources, 'same-session follow-up')
+        )
+      );
+      followUpMessageId = follow.messageId;
+      followUpLifecycle = follow.lifecycle;
+      replacementRuntime = await assertDistinctReplacement(
+        resources,
+        session,
+        runtime.container.id,
+        'same-session replacement runtime'
+      );
+    } finally {
+      // The replacement is created by the follow-up turn. Claim whatever now
+      // owns the session even when that turn or the distinctness assertion
+      // failed, so cleanup stops it instead of leaking the container.
+      const claimed = await recordRecoveryRuntime(
+        resources,
+        session.kiloSessionId,
+        'same-session replacement runtime'
+      );
+      if (claimed) replacementRuntime = claimed;
+    }
+    record(`followUpMessage=${followUpMessageId}; lifecycle=${followUpLifecycle}`);
+    record(`replacementContainer=${replacementRuntime?.container.id ?? 'none'}`);
+
+    result = scenarioResult(
+      'wrapper-freeze-inflight-reap',
+      args,
+      startedAt,
+      resources.events,
+      true,
+      [
+        ...evidence,
+        `cause=${RECOVERY_SETTLED_REAP_REASON}`,
+        'runtimeUnhealthy=true',
+        'routeStaleActive=true',
+        'sameSessionFollowUp=true',
+      ].join('; ')
+    );
+  } catch (error) {
+    result = scenarioResult(
+      'wrapper-freeze-inflight-reap',
+      args,
+      startedAt,
+      resources.events,
+      false,
+      [errorMessage(error), ...evidence].join('; ')
+    );
+  } finally {
+    if (frozen) {
+      const frozenHandle = frozen;
+      frozen = undefined;
+      result = await releaseFrozenControlWrapper(result, frozenHandle);
+    }
+    const cleanup = await cleanupScenario(resources);
+    result = addCleanupReport(result, cleanup);
+  }
+  return result;
+}
+
 export const CONTINUITY_SCENARIOS: Record<
   string,
   (args: LifecycleArgs) => Promise<LifecycleResult>
@@ -2485,4 +3234,6 @@ export const CONTINUITY_SCENARIOS: Record<
   'large-stream': lifecycleLargeStream,
   'concurrent-chats': lifecycleConcurrentChats,
   'feed-stale-recovery': lifecycleFeedStaleRecovery,
+  'wrapper-freeze-settled-reap': lifecycleWrapperFreezeSettledReap,
+  'wrapper-freeze-inflight-reap': lifecycleWrapperFreezeInflightReap,
 };

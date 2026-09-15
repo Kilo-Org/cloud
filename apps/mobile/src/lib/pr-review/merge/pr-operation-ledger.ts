@@ -19,6 +19,7 @@ export type PrMutationSurface =
   | 'create-comment'
   | 'submit-review'
   | 'reply'
+  | 'resolve'
   | 'merge'
   | 'pr-comment';
 
@@ -29,6 +30,11 @@ const PR_SURFACE_RETRYABLE_COPY = {
   'create-comment': 'prReview.mutationError.couldNotPostComment',
   'submit-review': 'prReview.mutationError.couldNotSubmitReview',
   reply: 'prReview.operation.couldNotReply',
+  // A resolve/unresolve toggle is not a reply: a duplicate operation must not
+  // tell the reader the thread reply failed. The generic action-failure copy
+  // is the existing resolution-neutral string — a new resolution-specific key
+  // would need its 86 translations, which belong to the translation slice.
+  resolve: 'prReview.operation.couldNotCompleteAction',
   merge: 'prReview.merge.couldNotMerge',
   'pr-comment': 'prReview.mutationError.couldNotPostComment',
 } satisfies Record<PrMutationSurface, string>;

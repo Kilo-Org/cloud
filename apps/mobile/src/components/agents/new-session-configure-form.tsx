@@ -31,6 +31,7 @@ import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 type NewSessionConfigureFormProps = {
   // Prompt / model / attachments (Cloud Agent only).
@@ -88,6 +89,8 @@ type NewSessionConfigureFormProps = {
   /** Recently used rows, threaded to the picker's "Recently used" section. */
   recents: NewSessionRepository[];
   selectedRepo: string;
+  /** The route's organization scope; `undefined` is a personal session. */
+  organizationId: string | undefined;
   // Environment profile (Cloud Agent only).
   profile: EffectiveAgentProfile | null;
   isProfileLoading: boolean;
@@ -158,6 +161,7 @@ export function NewSessionConfigureForm({
   repositories,
   recents,
   selectedRepo,
+  organizationId,
   profile,
   isProfileLoading,
   isProfileError,
@@ -171,6 +175,10 @@ export function NewSessionConfigureForm({
   onRetryCloudCreate,
 }: Readonly<NewSessionConfigureFormProps>) {
   const { t } = useTranslation();
+  // Clears the system navigation bar under the scroll content. Without it the
+  // primary Start action can sit in the bar's translucent region a formSheet
+  // leaves exposed below itself (the picker's bottom strip showed its sliver).
+  const bottomClearance = useDetailScreenBottomPadding();
   // The form is edge-to-edge and the window never resizes for the IME on
   // either platform, so the scroll body needs two floors: the navigation-bar
   // inset, and the keyboard height — the composer auto-focuses on open, and
@@ -195,9 +203,10 @@ export function NewSessionConfigureForm({
   const body = (
     <ScrollView
       className="flex-1"
-      contentContainerClassName="flex-grow px-4 pb-8 pt-4"
+      contentContainerClassName="flex-grow px-4 pt-4"
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="on-drag"
     >
       <NewSessionPrompt
         attachments={attachments}
@@ -266,6 +275,8 @@ export function NewSessionConfigureForm({
           repositories={repositories}
           recents={recents}
           value={selectedRepo}
+          organizationId={organizationId}
+          isCloneEntry={isCloneEntry}
         />
       ) : null}
 
@@ -316,6 +327,8 @@ export function NewSessionConfigureForm({
         isStarting={isStarting}
         onStartSession={onStartSession}
       />
+
+      <View style={{ height: bottomClearance }} pointerEvents="none" />
     </ScrollView>
   );
 

@@ -138,7 +138,7 @@ test('finalizes when disconnect is detected by the processing indicator after he
     platform: 'github',
   });
   mockStartProcessingIndicator.mockRejectedValue(
-    new GitHubRuntimeAuthorizationError('unhealthy_integration')
+    new GitHubRuntimeAuthorizationError('disconnected')
   );
   const botRequestId = '00000000-0000-4000-8000-000000000001';
   const token = createHmac('sha256', 'callback-secret')
@@ -164,7 +164,7 @@ test('finalizes when disconnect is detected by the processing indicator after he
     expect.objectContaining({
       level: 'warning',
       tags: expect.objectContaining({
-        github_runtime_authorization_reason: 'unhealthy_integration',
+        github_runtime_authorization_reason: 'disconnected',
       }),
     })
   );

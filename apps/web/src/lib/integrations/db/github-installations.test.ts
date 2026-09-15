@@ -95,7 +95,7 @@ describe('GitHub installation persistence', () => {
     );
     await expect(
       assertGitHubInstallationRuntimeAuthorized('123456', 'standard')
-    ).rejects.toMatchObject({ reason: 'unhealthy_integration' });
+    ).rejects.toMatchObject({ reason: 'integration_status' });
   });
 
   test('rejects the real runtime authorization query for a blocked personal owner', async () => {
@@ -113,7 +113,7 @@ describe('GitHub installation persistence', () => {
     );
     await expect(
       assertGitHubInstallationRuntimeAuthorized('123456', 'standard')
-    ).rejects.toMatchObject({ reason: 'invalid_owner' });
+    ).rejects.toMatchObject({ reason: 'blocked_personal_owner' });
   });
 
   test('reports a missing association for an unknown installation', async () => {

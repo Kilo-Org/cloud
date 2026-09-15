@@ -1,12 +1,17 @@
 import {
+  assertGitHubInstallationRuntimeAuthorized,
+  getGitHubRuntimeAssociationRejectionReason,
   GitHubRuntimeAuthorizationError,
-  getGitHubRuntimeAssociationDenialReason,
   isGitHubRuntimeAssociationAuthorized,
   isUnexpectedGitHubRuntimeAuthorizationDenial,
 } from './runtime-authorization';
+import { db } from '@/lib/drizzle';
+
+jest.mock('@/lib/drizzle', () => ({ db: { select: jest.fn() } }));
 
 const association = {
   integration: {
+    id: 'integration-1',
     owned_by_user_id: 'user-1',
     owned_by_organization_id: null,
     integration_status: 'active',
@@ -70,91 +75,182 @@ describe('isGitHubRuntimeAssociationAuthorized', () => {
   });
 });
 
-describe('getGitHubRuntimeAssociationDenialReason', () => {
-  it('returns no reason for an authorized association', () => {
-    expect(getGitHubRuntimeAssociationDenialReason(association)).toBeNull();
+const rejectionCases = [
+  ['missing_association', null],
+  [
+    'malformed_owner',
+    { ...association, integration: { ...association.integration, owned_by_user_id: null } },
+  ],
+  [
+    'malformed_owner',
+    {
+      ...association,
+      integration: { ...association.integration, owned_by_organization_id: 'org-1' },
+    },
+  ],
+  ['missing_personal_owner', { ...association, userRecordId: null }],
+  ['missing_personal_owner', { ...association, userRecordId: 'different-user' }],
+  ['blocked_personal_owner', { ...association, userBlockedReason: 'sensitive blocked reason' }],
+  [
+    'deleted_organization',
+    {
+      ...association,
+      integration: {
+        ...association.integration,
+        owned_by_user_id: null,
+        owned_by_organization_id: 'org-1',
+      },
+      organizationDeletedAt: '2026-09-04',
+    },
+  ],
+  [
+    'integration_status',
+    { ...association, integration: { ...association.integration, integration_status: null } },
+  ],
+  [
+    'integration_status',
+    {
+      ...association,
+      integration: { ...association.integration, integration_status: 'suspended' },
+    },
+  ],
+  [
+    'suspended',
+    { ...association, integration: { ...association.integration, suspended_at: '2026-09-04' } },
+  ],
+  [
+    'auth_invalid',
+    { ...association, integration: { ...association.integration, auth_invalid_at: '2026-09-04' } },
+  ],
+  [
+    'disconnected',
+    {
+      ...association,
+      integration: { ...association.integration, github_disconnected_at: '2026-09-04' },
+    },
+  ],
+] as const;
+
+describe('runtime rejection diagnostics', () => {
+  it.each(rejectionCases)('explains %s without changing rejection', (reason, candidate) => {
+    expect(getGitHubRuntimeAssociationRejectionReason(candidate)).toBe(reason);
+    expect(isGitHubRuntimeAssociationAuthorized(candidate)).toBe(false);
   });
 
-  it('reports a missing association', () => {
-    expect(getGitHubRuntimeAssociationDenialReason(null)).toBe('missing_association');
-    expect(getGitHubRuntimeAssociationDenialReason(undefined)).toBe('missing_association');
+  it.each([
+    ['suspended_at', false],
+    ['auth_invalid_at', false],
+    ['github_disconnected_at', true],
+  ] as const)('preserves undefined semantics for %s', (field, accepted) => {
+    const candidate = {
+      ...association,
+      integration: { ...association.integration, [field]: undefined },
+    };
+    expect(isGitHubRuntimeAssociationAuthorized(candidate)).toBe(accepted);
   });
 
-  it('reports an invalid owner', () => {
+  it('preserves org acceptance when the left join has no deletion timestamp', () => {
     expect(
-      getGitHubRuntimeAssociationDenialReason({ ...association, userRecordId: 'other-user' })
-    ).toBe('invalid_owner');
-    expect(
-      getGitHubRuntimeAssociationDenialReason({ ...association, userBlockedReason: 'blocked' })
-    ).toBe('invalid_owner');
-    expect(
-      getGitHubRuntimeAssociationDenialReason({
+      isGitHubRuntimeAssociationAuthorized({
         ...association,
         integration: {
           ...association.integration,
           owned_by_user_id: null,
           owned_by_organization_id: 'org-1',
         },
-        organizationDeletedAt: '2026-09-04T00:00:00.000Z',
+        userRecordId: null,
       })
-    ).toBe('invalid_owner');
+    ).toBe(true);
   });
 
-  it('reports an unhealthy integration for every health signal', () => {
-    expect(
-      getGitHubRuntimeAssociationDenialReason({
-        ...association,
-        integration: { ...association.integration, integration_status: 'suspended' },
-      })
-    ).toBe('unhealthy_integration');
-    expect(
-      getGitHubRuntimeAssociationDenialReason({
-        ...association,
-        integration: {
-          ...association.integration,
-          github_disconnected_at: '2026-09-04T00:00:00.000Z',
-        },
-      })
-    ).toBe('unhealthy_integration');
-    expect(
-      getGitHubRuntimeAssociationDenialReason({
-        ...association,
-        integration: { ...association.integration, suspended_at: '2026-09-04T00:00:00.000Z' },
-      })
-    ).toBe('unhealthy_integration');
-    expect(
-      getGitHubRuntimeAssociationDenialReason({
-        ...association,
-        integration: { ...association.integration, auth_invalid_at: '2026-09-04T00:00:00.000Z' },
-      })
-    ).toBe('unhealthy_integration');
+  it.each(['unknown', 'active', 'suspended', 'deleted'] as const)(
+    'ignores canonical %s lifecycle and health markers',
+    lifecycle_state => {
+      expect(
+        isGitHubRuntimeAssociationAuthorized({
+          ...association,
+          installation: {
+            lifecycle_state,
+            suspended_at: '2026-09-04',
+            deleted_at: '2026-09-04',
+            auth_invalid_at: '2026-09-04',
+          },
+        })
+      ).toBe(true);
+    }
+  );
+
+  it.each([
+    ...rejectionCases.map(([reason, candidate]) => [reason, candidate ? [candidate] : []] as const),
+    [
+      'ambiguous_association',
+      [
+        association,
+        { ...association, integration: { ...association.integration, id: 'integration-2' } },
+      ],
+    ] as const,
+  ])('rejects %s with safe context using one bounded query', async (reason, rows) => {
+    const limit = jest.fn().mockResolvedValue(rows);
+    const query = {
+      from: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit,
+    };
+    jest
+      .mocked(db.select)
+      .mockClear()
+      .mockReturnValue(query as never);
+    const result = assertGitHubInstallationRuntimeAuthorized('installation-1', 'lite');
+    await expect(result).rejects.toBeInstanceOf(GitHubRuntimeAuthorizationError);
+    await expect(result).rejects.toMatchObject({
+      message: 'GitHub installation is unavailable for runtime use',
+      reason,
+      diagnostics: {
+        installationId: 'installation-1',
+        appType: 'lite',
+        integrationIds: rows.map(row => row.integration.id),
+      },
+    });
+    await result.catch(error => {
+      expect(Object.keys(error.diagnostics).sort()).toEqual([
+        'appType',
+        'installationId',
+        'integrationIds',
+      ]);
+      expect(JSON.stringify(error)).not.toContain('sensitive blocked reason');
+    });
+    expect(db.select).toHaveBeenCalledTimes(1);
+    expect(limit).toHaveBeenCalledTimes(1);
+    expect(limit).toHaveBeenCalledWith(2);
   });
 });
 
 describe('isUnexpectedGitHubRuntimeAuthorizationDenial', () => {
-  it('flags denial reasons that need investigation', () => {
+  it.each([
+    'ambiguous_association',
+    'malformed_owner',
+    'missing_personal_owner',
+    'blocked_personal_owner',
+    'deleted_organization',
+    'integration_status',
+    'suspended',
+    'auth_invalid',
+    'disconnected',
+  ] as const)('reports %s', reason => {
     expect(
-      isUnexpectedGitHubRuntimeAuthorizationDenial(
-        new GitHubRuntimeAuthorizationError('ambiguous_association')
-      )
-    ).toBe(true);
-    expect(
-      isUnexpectedGitHubRuntimeAuthorizationDenial(
-        new GitHubRuntimeAuthorizationError('invalid_owner')
-      )
-    ).toBe(true);
-    expect(
-      isUnexpectedGitHubRuntimeAuthorizationDenial(
-        new GitHubRuntimeAuthorizationError('unhealthy_integration')
-      )
+      isUnexpectedGitHubRuntimeAuthorizationDenial(new GitHubRuntimeAuthorizationError(reason))
     ).toBe(true);
   });
 
-  it('does not flag a missing association or unrelated errors', () => {
+  it('does not report a missing association, an unclassified denial, or unrelated errors', () => {
     expect(
       isUnexpectedGitHubRuntimeAuthorizationDenial(
         new GitHubRuntimeAuthorizationError('missing_association')
       )
+    ).toBe(false);
+    expect(
+      isUnexpectedGitHubRuntimeAuthorizationDenial(new GitHubRuntimeAuthorizationError())
     ).toBe(false);
     expect(isUnexpectedGitHubRuntimeAuthorizationDenial(new Error('other'))).toBe(false);
     expect(isUnexpectedGitHubRuntimeAuthorizationDenial(null)).toBe(false);

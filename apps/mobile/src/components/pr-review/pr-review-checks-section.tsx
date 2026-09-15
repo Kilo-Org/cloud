@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the section owns every CHECKS state in one file: the card shell, the tone/rollup helpers and the rows share one surface, and splitting the visible-loading fix away from the states it must match scatters it across callers. */
 import { useQuery } from '@tanstack/react-query';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import {
@@ -9,19 +10,21 @@ import {
   MinusCircle,
   XCircle,
 } from '@/components/ui/icons';
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { formatList, formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
-import { useTRPC } from '@/lib/trpc';
+import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
+import { providerPrTermKey, providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
 import { cn } from '@/lib/utils';
 import { openExternalUrl } from '@/lib/external-link';
 
@@ -175,30 +178,36 @@ export function PrReviewChecksSection({
   number,
   headSha,
 }: PrReviewChecksSectionProps) {
-  const trpc = useTRPC();
+  const queries = useProviderPrQueries({ owner, repo, number });
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const prUrl = useMemo(
-    () => `https://github.com/${owner}/${repo}/pull/${number}`,
-    [owner, repo, number]
-  );
+  // Null on a GitLab ref with no instance hint: no host, so no link out.
+  const prUrl = providerPrWebUrl(queries.ref);
 
-  const checks = useQuery(
-    trpc.githubPrReview.listChecks.queryOptions({ owner, repo, ref: headSha })
-  );
+  const checks = useQuery(queries.checksOptions(headSha));
 
   // Loading (first time, no cached data): show three skeleton rows in a
   // card so the section matches the final dimensions once the data lands.
+  // The bars must NOT be `bg-muted` here: `--muted` and `--secondary` are
+  // the same colour in both themes (apps/mobile/src/global.css), so a
+  // `bg-muted` bar inside this `bg-secondary` card paints nothing and the
+  // section reads as an empty gray block (spot check e1-nav-mr). The shared
+  // Skeleton gives the pulse + shimmer, and `bg-muted-soft` is the one gray
+  // that contrasts with the card in both themes.
   if (checks.isLoading) {
     return (
       <View className="gap-2">
         <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
           {t('prReview.checks.title')}
         </Text>
-        <View className="gap-2 rounded-lg bg-secondary p-4">
-          <View className="h-3 w-40 rounded bg-muted" />
-          <View className="h-3 w-32 rounded bg-muted" />
-          <View className="h-3 w-44 rounded bg-muted" />
+        <View
+          className="gap-2 rounded-lg bg-secondary p-4"
+          accessibilityRole="progressbar"
+          accessibilityLabel={t('common.loading')}
+        >
+          <Skeleton className="h-3 w-40 bg-muted-soft" />
+          <Skeleton className="h-3 w-32 bg-muted-soft" />
+          <Skeleton className="h-3 w-44 bg-muted-soft" />
         </View>
       </View>
     );
@@ -269,6 +278,11 @@ export function PrReviewChecksSection({
     );
   }
 
+  const viewOnProviderLabel =
+    queries.platform === 'github'
+      ? t('prReview.checks.viewOnGitHub')
+      : t('prReview.terms.viewOnProvider', { provider: reviewerPlatformLabel(queries.platform) });
+
   const data = checks.data;
   const runList = data?.checkRuns ?? [];
   const rollup = data?.rollup ?? { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 };
@@ -282,18 +296,20 @@ export function PrReviewChecksSection({
         </Text>
         <View className="gap-3 rounded-lg bg-secondary p-4">
           <Text className="text-sm text-muted-foreground">{rollupLine}</Text>
-          <Button
-            variant="outline"
-            onPress={() => {
-              void openExternalUrl(prUrl, { label: t('common.pullRequest') });
-            }}
-            accessibilityLabel={t('prReview.checks.viewOnGitHub')}
-          >
-            <View className="flex-row items-center gap-2">
-              <ExternalLink size={14} color={colors.foreground} />
-              <Text>{t('prReview.checks.viewOnGitHub')}</Text>
-            </View>
-          </Button>
+          {prUrl ? (
+            <Button
+              variant="outline"
+              onPress={() => {
+                void openExternalUrl(prUrl, { label: t(providerPrTermKey(queries.platform)) });
+              }}
+              accessibilityLabel={viewOnProviderLabel}
+            >
+              <View className="flex-row items-center gap-2">
+                <ExternalLink size={14} color={colors.foreground} />
+                <Text>{viewOnProviderLabel}</Text>
+              </View>
+            </Button>
+          ) : null}
         </View>
       </View>
     );

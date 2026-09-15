@@ -394,7 +394,7 @@ describe('handleGitHubWebhook', () => {
   it('skips deferred GitHub work when the association disconnects after receipt', async () => {
     jest.mocked(captureMessage).mockClear();
     mockAssertGitHubInstallationRuntimeAuthorized.mockRejectedValueOnce(
-      new GitHubRuntimeAuthorizationError('unhealthy_integration')
+      new GitHubRuntimeAuthorizationError('disconnected')
     );
 
     const response = await handleGitHubWebhook(
@@ -410,7 +410,7 @@ describe('handleGitHubWebhook', () => {
       expect.objectContaining({
         level: 'warning',
         tags: expect.objectContaining({
-          github_runtime_authorization_reason: 'unhealthy_integration',
+          github_runtime_authorization_reason: 'disconnected',
         }),
       })
     );

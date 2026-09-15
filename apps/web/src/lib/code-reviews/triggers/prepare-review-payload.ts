@@ -8,6 +8,7 @@
  */
 
 import { captureException } from '@sentry/nextjs';
+import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 import { z } from 'zod';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
@@ -52,7 +53,6 @@ import type {
   GitLabDiffContext,
 } from '../prompts/generate-prompt';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
-import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 import {
   getCodeReviewById,
   findPreviousCompletedReview,
@@ -915,11 +915,18 @@ export async function prepareReviewPayload(
     captureException(error, {
       tags: {
         operation: 'prepareReviewPayload',
-        ...(error instanceof GitHubRuntimeAuthorizationError
-          ? { github_runtime_authorization_reason: error.reason }
-          : {}),
+        ...(error instanceof GitHubRuntimeAuthorizationError && {
+          githubRuntimeAuthorizationReason: error.reason,
+        }),
       },
-      extra: { reviewId, owner, platform },
+      extra: {
+        reviewId,
+        owner,
+        platform,
+        ...(error instanceof GitHubRuntimeAuthorizationError && {
+          githubRuntimeAuthorization: { reason: error.reason, ...error.diagnostics },
+        }),
+      },
     });
     throw error;
   }

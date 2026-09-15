@@ -86,6 +86,7 @@ describe('kilo config.json schema merge', () => {
     expect(props.remote_control).toBeDefined();
     expect(props.auto_expand_history).toBeDefined();
     expect(props.auto_collapse_reasoning).toBeDefined();
+    expect(props.reasoning_display).toBeDefined();
     expect(props.terminal_command_display).toBeDefined();
     expect(props.code_edit_display).toBeDefined();
     expect(props.hide_prompt_training_models).toBeDefined();
@@ -114,6 +115,12 @@ describe('kilo config.json schema merge', () => {
     const ced = props.code_edit_display as { type: string; enum: string[] };
     expect(ced.type).toBe('string');
     expect(ced.enum).toEqual(['expanded', 'collapsed']);
+  });
+
+  test('reasoning_display is an enum of expanded/preview/headline', () => {
+    const rd = props.reasoning_display as { type: string; enum: string[] };
+    expect(rd.type).toBe('string');
+    expect(rd.enum).toEqual(['expanded', 'preview', 'headline']);
   });
 
   test('commit_message has a prompt string property', () => {

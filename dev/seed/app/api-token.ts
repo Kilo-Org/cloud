@@ -10,13 +10,15 @@ import type { SeedResult } from '../index';
 export const usage = '<email> [options]';
 
 // Five years, matching generateApiToken()'s default in
-// apps/web/src/lib/tokens.ts (FIVE_YEARS_IN_SECONDS). The resource-delegation
-// policy only accepts legacy five-year API tokens for credential exchange
+// apps/web/src/lib/tokens.ts (FIVE_YEARS_IN_SECONDS) and
+// apps/web TOKEN_EXPIRY.default. The resource-delegation policy
+// (createControlTokenForRequest → isKiloCredentialExchangeEligible) only
+// accepts legacy five-year API tokens for credential exchange
 // (LEGACY_API_TOKEN_LIFETIMES_SECONDS in @kilocode/worker-utils), so a token
 // with any other lifetime is rejected by control-token routes such as
 // cloudAgentNext.prepareSession with 403 "Unsupported legacy credential
-// context".
-export const DEFAULT_EXPIRES_DAYS = 1825;
+// context". Exported so callers and tests can pin the default.
+export const DEFAULT_EXPIRES_DAYS = 5 * 365;
 const SECONDS_PER_DAY = 24 * 60 * 60;
 
 /**

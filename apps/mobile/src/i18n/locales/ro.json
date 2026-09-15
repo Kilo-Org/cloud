@@ -3034,5 +3034,24 @@
     "loadFailed": "Limbile acceptate de acest dispozitiv nu au putut fi încărcate.",
     "emptyTitle": "Nicio limbă acceptată",
     "emptyDescription": "Recunoașterea vocală a acestui dispozitiv nu raportează nicio limbă acceptată."
+  },
+  "tour": {
+    "eyebrow": "Tur rapid",
+    "forkTitle": "Unde vrei să rulezi Kilo?",
+    "forkSubtitle": "Alege unde rulează Kilo pentru prima ta sesiune.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Rulează Kilo într-un mediu cloud izolat, fără nimic de instalat.",
+    "remoteOptionTitle": "Computerul tău",
+    "remoteOptionBody": "Rulează Kilo pe propria ta mașină prin CLI-ul `kilo remote`.",
+    "skip": "Sari peste tur",
+    "tutorialLabel": "Tutorial",
+    "remoteTitle": "Pornește prima ta sesiune la distanță",
+    "remoteBody": "Conectează computerul și apoi pornește sesiunea de aici.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Niciun computer conectat încă",
+    "remoteEmptyBody": "Pentru a-l conecta, rulează `kilo remote` pe computerul tău.",
+    "remoteFound": "Computer conectat",
+    "checkAgain": "Verifică din nou",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

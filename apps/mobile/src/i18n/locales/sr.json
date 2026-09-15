@@ -3034,5 +3034,24 @@
     "loadFailed": "Nije bilo moguće učitati jezike koje ovaj uređaj podržava.",
     "emptyTitle": "Nema podržanih jezika",
     "emptyDescription": "Prepoznavanje govora na ovom uređaju ne prijavljuje nijedan podržani jezik."
+  },
+  "tour": {
+    "eyebrow": "Brza tura",
+    "forkTitle": "Gde želiš da pokreneš Kilo?",
+    "forkSubtitle": "Izaberi gde će Kilo pokrenuti tvoju prvu sesiju.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Pokreni Kilo u izolovanom cloud okruženju, bez ičega za instaliranje.",
+    "remoteOptionTitle": "Tvoj računar",
+    "remoteOptionBody": "Pokreni Kilo na sopstvenoj mašini preko `kilo remote` CLI-ja.",
+    "skip": "Preskoči turu",
+    "tutorialLabel": "Tutorijal",
+    "remoteTitle": "Pokreni svoju prvu udaljenu sesiju",
+    "remoteBody": "Poveži svoj računar, zatim pokreni sesiju odavde.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Još nema povezanog računara",
+    "remoteEmptyBody": "Da ga povežeš, pokreni `kilo remote` na računaru.",
+    "remoteFound": "Računar povezan",
+    "checkAgain": "Proveri ponovo",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

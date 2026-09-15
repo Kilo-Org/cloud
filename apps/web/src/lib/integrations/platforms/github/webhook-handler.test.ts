@@ -65,7 +65,8 @@ jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
     installationId: string,
     appType: string,
     expectedIntegrationId?: string
-  ) => mockAssertGitHubInstallationRuntimeAuthorized(installationId, appType, expectedIntegrationId),
+  ) =>
+    mockAssertGitHubInstallationRuntimeAuthorized(installationId, appType, expectedIntegrationId),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({

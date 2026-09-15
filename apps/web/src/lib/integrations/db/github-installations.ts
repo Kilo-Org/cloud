@@ -35,9 +35,7 @@ export async function lockGitHubInstallationIdentity(
   appType: 'standard' | 'lite',
   installationId: string
 ): Promise<void> {
-  await tx.execute(
-    sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${installationId}`}))`
-  );
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${installationId}`}))`);
 }
 
 export type VerifiedGitHubInstallationData = {

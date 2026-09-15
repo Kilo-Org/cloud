@@ -36,10 +36,9 @@ const autoCompleteGateState: {
 } = { gate: null, entered: null, release: null, markEntered: null, failBind: false };
 
 jest.mock('@/lib/integrations/db/github-installations', () => {
-  const actual =
-    jest.requireActual<typeof GitHubInstallationsModule>(
-      '@/lib/integrations/db/github-installations'
-    );
+  const actual = jest.requireActual<typeof GitHubInstallationsModule>(
+    '@/lib/integrations/db/github-installations'
+  );
   return {
     ...actual,
     bindGitHubIntegrationToCanonicalInstallation: async (
@@ -52,10 +51,9 @@ jest.mock('@/lib/integrations/db/github-installations', () => {
 });
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => {
-  const actual =
-    jest.requireActual<typeof PlatformIntegrationsModule>(
-      '@/lib/integrations/db/platform-integrations'
-    );
+  const actual = jest.requireActual<typeof PlatformIntegrationsModule>(
+    '@/lib/integrations/db/platform-integrations'
+  );
   return {
     ...actual,
     autoCompleteInstallation: async (

@@ -3,8 +3,9 @@ import { type ComponentProps, createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
 import { ScreenHeader } from './screen-header';
-import { OFFLINE_BANNER_HEIGHT, OfflineBannerSpaceProvider } from './offline-banner-space';
+import { OfflineBannerSpaceProvider } from './offline-banner-space';
 
 const routerState = vi.hoisted(() => ({
   routes: ['previous-screen', 'session-detail'],

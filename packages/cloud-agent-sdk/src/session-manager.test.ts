@@ -3815,8 +3815,12 @@ describe('createSessionManager', () => {
       expect(readState()('child-streams')).toEqual(expect.objectContaining({ status: 'error' }));
 
       // A live child message reaches the manager as a chat event carrying the
-      // child's session id: the load failure is stale, so it must be dropped.
+      // child's session id. The session's chat processor writes the row into
+      // storage before the manager sees the event, so the event is proof the
+      // child has rows and the load failure is stale.
       const liveMessage = createStoredMessage('msg-child-streams', 'child-streams', 'assistant');
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(liveMessage.info);
       mockSessionCallbacks.onEvent?.({ type: 'message.updated', info: liveMessage.info });
 
       expect(readState()('child-streams')).toEqual({ status: 'idle' });
@@ -3841,6 +3845,49 @@ describe('createSessionManager', () => {
         mgr.atoms.childSessionHydrationState
       );
       expect(state('child-silent')).toEqual(expect.objectContaining({ status: 'error' }));
+    });
+
+    it('keeps a stored first-page hydration error when only a part for the child arrives', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () => ({
+        kind: 'retryable_failure' as const,
+      }));
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-part-only'));
+
+      const readState = () =>
+        atomValue<(childSessionId: string) => { status: string }>(
+          config.store,
+          mgr.atoms.childSessionHydrationState
+        );
+      expect(readState()('child-part-only')).toEqual(expect.objectContaining({ status: 'error' }));
+
+      // A part without its `message.updated` info writes no message row —
+      // `getChildMessages` only sees ids with stored info. Dropping the stored
+      // failure here would leave the sheet with no rows, no error, and no retry
+      // path, so the clear requires the same row proof the failure store does.
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertPart(
+        'msg-child-part-only',
+        stubTextPart({
+          id: 'part-child-part-only',
+          sessionID: 'child-part-only',
+          messageID: 'msg-child-part-only',
+          text: 'streaming',
+        })
+      );
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.part.delta',
+        sessionId: 'child-part-only',
+        messageId: 'msg-child-part-only',
+        partId: 'part-child-part-only',
+        field: 'text',
+        delta: 'streaming',
+      });
+
+      expect(readState()('child-part-only')).toEqual(expect.objectContaining({ status: 'error' }));
     });
 
     it('does not store a first-page hydration error once the child already streamed rows', async () => {

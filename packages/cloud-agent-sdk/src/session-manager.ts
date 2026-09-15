@@ -32,6 +32,7 @@ import type { CloudAgentSession } from './session';
 import { createChatProcessor } from './chat-processor';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
+import type { SessionStorage } from './storage/types';
 import type { CloudAgentApi, CloudAgentStreamTicketResult } from './transport';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import type {
@@ -1064,14 +1065,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   /**
    * Drop a stored first-page hydration failure for a child session once a live
-   * chat event for it arrives. The child is producing output, so "could not
-   * load subagent session" is no longer the truth and must not outlive the
-   * condition it reports. Only an `error` is cleared: a `ready` child has
-   * nothing to report, and an in-flight `loading` request owns its own outcome.
+   * chat event for it arrives and the child has rows in storage. The rows are
+   * the same proof `storeChildHydrationFailure` requires to keep the failure in
+   * the first place, so the pair stays symmetric: a part-only event writes no
+   * message row, and clearing on it would leave the sheet with nothing to
+   * render, no error, and no retry path. Only an `error` is cleared: a `ready`
+   * child has nothing to report, and an in-flight `loading` request owns its
+   * own outcome.
    */
-  function clearStaleChildSessionHydrationError(childSessionId: string): void {
+  function clearStaleChildSessionHydrationError(
+    storage: SessionStorage,
+    childSessionId: string
+  ): void {
     const states = store.get(childSessionHydrationStatesAtom);
     if (states.get(childSessionId)?.status !== 'error') return;
+    if (!childHasStoredMessages(storage, childSessionId)) return;
     const next = new Map(states);
     next.delete(childSessionId);
     store.set(childSessionHydrationStatesAtom, next);
@@ -1082,7 +1090,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * child row is proof the session loaded — the same truth a live chat
    * event's clear relies on.
    */
-  function childHasStoredMessages(storage: JotaiSessionStorage, childSessionId: string): boolean {
+  function childHasStoredMessages(storage: SessionStorage, childSessionId: string): boolean {
     for (const id of storage.getMessageIds()) {
       if (storage.getMessageInfo(id)?.sessionID === childSessionId) return true;
     }
@@ -2039,7 +2047,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       onEvent: event => {
         if (expectedGeneration !== switchGeneration) return;
         const eventSessionId = chatEventSessionId(event);
-        if (eventSessionId !== null) clearStaleChildSessionHydrationError(eventSessionId);
+        if (eventSessionId !== null) {
+          clearStaleChildSessionHydrationError(session.storage, eventSessionId);
+        }
         if (event.type === 'worktree.changes.ready' || event.type === 'connected') {
           const cloudSessionId = store.get(sessionIdAtom);
           if (!cloudSessionId || event.cloudSessionId !== cloudSessionId) return;

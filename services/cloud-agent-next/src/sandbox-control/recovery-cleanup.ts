@@ -151,15 +151,6 @@ export function recoveryCleanupEligibility(
     : null;
 }
 
-export function ownsRecoveryCleanupAllocation(
-  decision: recovery.SandboxRecoveryDecision,
-  physical: PhysicalRecord,
-  routes: Map<string, SessionRoute>,
-  now: number
-): boolean {
-  return recoveryCleanupEligibility(decision, physical, routes, now) !== null;
-}
-
 export function canRecoveryRetirementStopAllocation(
   receipt: NativeRuntimeRetirementReceipt,
   decisions: recovery.SandboxRecoveryDecision[],
@@ -178,7 +169,7 @@ export function canRecoveryRetirementStopAllocation(
       receipt.allocation.createIntentId === decision.authority?.allocation.createIntentId &&
       receipt.allocation.providerRef === decision.providerInstanceId &&
       receipt.connection.wrapperInstanceId === decision.wrapperInstanceId &&
-      ownsRecoveryCleanupAllocation(decision, physical, routes, now)
+      recoveryCleanupEligibility(decision, physical, routes, now) === 'targeted'
   );
 }
 
@@ -338,9 +329,10 @@ export function createRecoveryCleanup(input: {
         input.isConnectionReady();
       const reason =
         eligibility === 'settled' ? RECOVERY_SETTLED_REAP_REASON : RECOVERY_CLEANUP_REASON;
+      const vetoed = eligibility === 'settled' && runtimeReady;
       const canStop =
         (!connection || recovery.sameRuntime(connection, current)) &&
-        !(eligibility === 'settled' && runtimeReady) &&
+        !vetoed &&
         current.cleanupState !== 'unconfirmed' &&
         current.cleanupState !== 'completed' &&
         current.cleanupDeadlineAt !== undefined &&
@@ -352,7 +344,7 @@ export function createRecoveryCleanup(input: {
           ? beginStop(physical, reason, now(), current.wrapperInstanceId)
           : undefined;
       if (next) await input.persistPhysical(physical, next, reason);
-      const state = next || stopping ? 'physical_fallback' : 'unconfirmed';
+      const state = next || stopping ? 'physical_fallback' : vetoed ? 'pending' : 'unconfirmed';
       if (state === 'unconfirmed') {
         await saveNativeRuntimeRetirements(
           tx,
@@ -374,7 +366,9 @@ export function createRecoveryCleanup(input: {
             ? recovery.updateRecoveryCleanup(
                 item,
                 state,
-                state === 'physical_fallback' ? now() + DEADLINE_MS.reconciliation : undefined
+                state === 'physical_fallback' || state === 'pending'
+                  ? now() + DEADLINE_MS.reconciliation
+                  : undefined
               )
             : item
         )

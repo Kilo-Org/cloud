@@ -73,10 +73,10 @@ full contract | `PLANNED` not written | `BLOCKED` needs an enabler.
 
 `wrapper-freeze-settled-reap`/`wrapper-freeze-inflight-reap` must NOT report a
 stop when the frozen wrapper sends a `wrapper_ready` frame after the freeze: the
-readiness veto deliberately retains such an allocation, so a re-readied run is a
-*vetoed* run, not a settled reap. Both scenarios therefore assert no
-identity-matched `wrapper_ready` after the freeze before accepting the
-settled-reap cause.
+readiness veto defers the settled reap with a retained five-minute retry, so a
+re-readied run is *deferred*, not terminalised, and must not be asserted to stop.
+Both scenarios therefore assert no identity-matched `wrapper_ready` after the
+freeze before accepting the settled-reap cause.
 
 ### E. Delivery correctness
 

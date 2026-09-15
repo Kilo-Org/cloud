@@ -22,9 +22,9 @@ import type { SessionRoute } from './session-routes.js';
 import {
   canRecoveryRetirementStopAllocation,
   createRecoveryCleanup,
-  ownsRecoveryCleanupAllocation,
   RECOVERY_CLEANUP_REASON,
   RECOVERY_SETTLED_REAP_REASON,
+  recoveryCleanupEligibility,
   selectRecoveryCleanupRoots,
 } from './recovery-cleanup.js';
 
@@ -490,21 +490,21 @@ describe('recovery physical fallback', () => {
       )
     ).toBe(false);
     expect(
-      ownsRecoveryCleanupAllocation(
+      recoveryCleanupEligibility(
         decision,
         { ...physical, createIntent: { intentId: 'replacement', createdAt: 250 } },
         routes,
         300
       )
-    ).toBe(false);
+    ).toBeNull();
     expect(
-      ownsRecoveryCleanupAllocation(
+      recoveryCleanupEligibility(
         { ...decision, authority: { ...authority, roots: [{ ...root, observation: 'unknown' }] } },
         physical,
         routes,
         300
       )
-    ).toBe(false);
+    ).toBeNull();
   });
 
   const readyRoot: RecoveryRoot = { ...root, observation: 'idle', decision: 'ready' };
@@ -694,7 +694,8 @@ describe('recovery physical fallback', () => {
       await f.cleanup.reconcile();
       if (ready) {
         expect((await loadPhysicalRecord(f.storage)).stopTombstone).toBeNull();
-        expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('unconfirmed');
+        expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('pending');
+        expect((await loadDeadlines(f.storage)).recoveryRetry).toBeGreaterThan(settledNow);
         expect(f.onPhysicalStop).not.toHaveBeenCalled();
       } else {
         expect((await loadPhysicalRecord(f.storage)).stopTombstone).toMatchObject({
@@ -704,6 +705,71 @@ describe('recovery physical fallback', () => {
       }
     }
   );
+
+  it('defers a settled reap with a retained retry while its matching runtime is ready', async () => {
+    const f = await fixture({ ...decision, authority: settledAuthority([readyRoot]) });
+    await saveNativeRuntimeRetirements(f.storage, [retirement()]);
+    f.setTime(settledNow);
+    f.setReady(true);
+    await f.cleanup.reconcile();
+    expect((await loadPhysicalRecord(f.storage)).stopTombstone).toBeNull();
+    expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('pending');
+    expect(f.onPhysicalStop).not.toHaveBeenCalled();
+    const retry = (await loadDeadlines(f.storage)).recoveryRetry;
+    expect(retry).toBeDefined();
+    expect(retry).toBeGreaterThan(settledNow);
+    expect((await loadNativeRuntimeRetirements(f.storage))[0]?.state).toBe('pending');
+  });
+
+  it('reaps on the retained retry once the matching runtime is no longer ready', async () => {
+    const f = await fixture({ ...decision, authority: settledAuthority([readyRoot]) });
+    await saveNativeRuntimeRetirements(f.storage, [retirement()]);
+    f.setTime(settledNow);
+    f.setReady(true);
+    await f.cleanup.reconcile();
+    const retry = (await loadDeadlines(f.storage)).recoveryRetry;
+    if (retry === undefined) throw new Error('Expected a retained recoveryRetry deadline');
+    f.setReady(false);
+    f.setTime(retry);
+    await f.cleanup.reconcile();
+    expect((await loadPhysicalRecord(f.storage)).stopTombstone).toMatchObject({
+      reason: RECOVERY_SETTLED_REAP_REASON,
+    });
+    expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('physical_fallback');
+    expect(f.onPhysicalStop).toHaveBeenCalledOnce();
+  });
+
+  it('stops a settled allocation when its matching connection is absent', async () => {
+    const f = await fixture({ ...decision, authority: settledAuthority([readyRoot]) });
+    f.setTime(settledNow);
+    f.setConnection(undefined);
+    f.setReady(true);
+    await f.cleanup.reconcile();
+    expect((await loadPhysicalRecord(f.storage)).stopTombstone).toMatchObject({
+      reason: RECOVERY_SETTLED_REAP_REASON,
+    });
+    expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('physical_fallback');
+    expect(f.onPhysicalStop).toHaveBeenCalledOnce();
+  });
+
+  it('does not escalate a settled allocation through the native-retirement stop path', () => {
+    const routes = new Map([[route.sessionId, staleActiveModelRoute]]);
+    const settled = {
+      ...decision,
+      cleanupDeadlineAt: settledNow,
+      authority: settledAuthority([readyRoot]),
+    };
+    expect(recoveryCleanupEligibility(settled, physical, routes, settledNow)).toBe('settled');
+    expect(
+      canRecoveryRetirementStopAllocation(
+        retirement({ cleanupDeadlineAt: settledNow }),
+        [settled],
+        physical,
+        routes,
+        settledNow
+      )
+    ).toBe(false);
+  });
 
   it('keeps a settled allocation unconfirmed when a root has no route', async () => {
     const siblingRoot: RecoveryRoot = {

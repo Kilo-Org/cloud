@@ -6,6 +6,7 @@ import {
   github_connection_attempts,
   github_installation_webhook_receipts,
   kilocode_users,
+  organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
@@ -677,6 +678,90 @@ describe('GitHub installation persistence', () => {
         { ...data(), kiloUserId: ownerId }
       )
     ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+  });
+
+  test('allows an exact shared association for inventory reads but keeps the generic path exclusive-only', async () => {
+    const organizationA = await createTestOrganization('Shared runtime A', ownerId, 0);
+    const organizationB = await createTestOrganization('Shared runtime B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data('881881')
+    );
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data('881881'), kiloUserId: otherOwnerId }
+    );
+    if (!first.ok || !second.ok) throw new Error('Expected shared connections');
+    const [sharedCanonical] = await db
+      .select({ sharingMode: github_app_installations.sharing_mode })
+      .from(github_app_installations)
+      .where(eq(github_app_installations.installation_id, '881881'));
+    expect(sharedCanonical?.sharingMode).toBe('web_cloud_agent');
+
+    // Generic, installation-wide authorization stays exclusive-only.
+    await expect(assertGitHubInstallationRuntimeAuthorized('881881', 'standard')).rejects.toThrow(
+      'GitHub installation is unavailable for runtime use'
+    );
+
+    // An exact association is authorized for inventory reads even when shared.
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('881881', 'standard', first.integrationId)
+    ).resolves.toBeUndefined();
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('881881', 'standard', second.integrationId)
+    ).resolves.toBeUndefined();
+
+    // An unknown association id is still rejected.
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('881881', 'standard', crypto.randomUUID())
+    ).rejects.toThrow('GitHub installation is unavailable for runtime use');
+
+    // An empty-string id must behave exactly like the generic exclusive-only path (F3): it must
+    // not enable the shared carve-out just because it's technically "supplied".
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('881881', 'standard', '')
+    ).rejects.toThrow('GitHub installation is unavailable for runtime use');
+
+    // Local health is still enforced on the exact-id path.
+    await db
+      .update(platform_integrations)
+      .set({ suspended_at: new Date().toISOString() })
+      .where(eq(platform_integrations.id, second.integrationId));
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('881881', 'standard', second.integrationId)
+    ).rejects.toThrow('GitHub installation is unavailable for runtime use');
+
+    // Owner validity is still enforced on the exact-id path.
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, organizationA.id));
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('881881', 'standard', first.integrationId)
+    ).rejects.toThrow('GitHub installation is unavailable for runtime use');
+  });
+
+  test('rejects an exact association whose canonical installation is unhealthy', async () => {
+    const organization = await createTestOrganization('Shared runtime canonical A', ownerId, 0);
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      data('882882')
+    );
+    if (!connected.ok) throw new Error('Expected initial connection');
+
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('882882', 'standard', connected.integrationId)
+    ).resolves.toBeUndefined();
+
+    await db
+      .update(github_app_installations)
+      .set({ auth_invalid_at: new Date().toISOString() })
+      .where(eq(github_app_installations.installation_id, '882882'));
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('882882', 'standard', connected.integrationId)
+    ).rejects.toThrow('GitHub installation is unavailable for runtime use');
   });
 
   test('serializes distinct installations for a non-allowlisted organization', async () => {

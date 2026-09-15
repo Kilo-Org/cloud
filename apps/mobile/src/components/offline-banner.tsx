@@ -5,19 +5,12 @@ import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  OFFLINE_BANNER_HEIGHT,
-  OfflineBannerSpaceProvider,
-} from '@/components/offline-banner-space';
+import { OfflineBannerSpaceProvider } from '@/components/offline-banner-space';
 import { Text } from '@/components/ui/text';
 import { announceForA11y } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
-
-// Re-exported for existing callers/tests; the constant is defined in the leaf
-// `offline-banner-space` module so `ScreenHeader` can reserve the height
-// without loading this component's dependencies.
-export { OFFLINE_BANNER_HEIGHT };
+import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
 
 /**
  * Publishes the banner's visibility to every pinned `ScreenHeader`. Mounted by
@@ -33,7 +26,8 @@ export function OfflineBannerSpaceGate({ children }: Readonly<{ children: ReactN
  * App-wide offline banner. Absolute overlay, so app content keeps its layout
  * position; `pointerEvents="none"` passes every touch to the header below.
  * Surfaces with a pinned top header reserve `OFFLINE_BANNER_HEIGHT` above the
- * header while the banner is visible so it never covers the title.
+ * header while the banner is visible so it never covers the title (see
+ * `offlineHeaderReservation`).
  */
 export function OfflineBanner() {
   const isOffline = useOfflineBannerState();

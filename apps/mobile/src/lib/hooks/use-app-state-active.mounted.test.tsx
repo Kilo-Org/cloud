@@ -152,4 +152,23 @@ describe('useAppStateActive mounted', () => {
     });
     expect(textChildren(second)).toEqual(['true']);
   });
+
+  it('seeds the first mount from the live state after a launch-time transition', () => {
+    // Cold start: the module-level store was built while `currentState` was
+    // null, so `active` is stale. Leave it stale and unsubscribed...
+    const before = mountProbe();
+    act(() => {
+      appState.emit('background');
+    });
+    unmountProbe(before);
+    expect(appState.listeners.size).toBe(0);
+
+    // ...then the OS foregrounds the app while no source listener exists, so
+    // nobody observes the inactive -> active edge. The first mount must seed
+    // from the live value, or the chat provider stays gated off.
+    appState.currentState = 'active';
+
+    const after = mountProbe();
+    expect(textChildren(after)).toEqual(['true']);
+  });
 });

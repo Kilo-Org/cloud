@@ -70,6 +70,43 @@ describe('createAppStateStore', () => {
     expect(store.isActive()).toBe(true);
   });
 
+  it('re-reads the live seed when the first listener subscribes', () => {
+    // Cold start: the store is constructed at module evaluation with the app
+    // not yet active, so the seed captured then is stale. The app reaches
+    // `active` before the first consumer mounts; the source listener is only
+    // registered now, so the inactive -> active edge was observed by nobody.
+    // The first subscribe must re-read the live seed, or that consumer reads
+    // `false` for the whole session.
+    const source = createFakeSource();
+    let live = false;
+    const store = createAppStateStore(source, () => live);
+    expect(store.isActive()).toBe(false);
+
+    live = true;
+    const unsubscribe = store.subscribe(() => undefined);
+    expect(store.isActive()).toBe(true);
+
+    unsubscribe();
+  });
+
+  it('does not re-read the live seed for a subscriber after the first', () => {
+    // Only the first subscribe re-seeds: the store's own source listener is
+    // already live for a second subscriber, so its snapshot must not jump.
+    const source = createFakeSource();
+    let live = true;
+    const store = createAppStateStore(source, () => live);
+    const first = store.subscribe(() => undefined);
+    source.emit('background');
+    expect(store.isActive()).toBe(false);
+
+    live = true;
+    const second = store.subscribe(() => undefined);
+    expect(store.isActive()).toBe(false);
+
+    first();
+    second();
+  });
+
   it('tracks background and inactive as not active, and notifies', () => {
     const source = createFakeSource();
     const store = createAppStateStore(source);

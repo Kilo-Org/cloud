@@ -2,9 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import {
   classifyFault,
+  heartbeatMovedRouteOffActive,
+  isSettledReapStopRecord,
   matchesConnection,
+  matchesReconciliationIdentity,
   type ConnectionIdentity,
 } from '../../e2e/lifecycle-continuity.js';
+import {
+  RECOVERY_CLEANUP_REASON,
+  RECOVERY_SETTLED_REAP_REASON,
+} from '../../../src/sandbox-control/recovery-cleanup.js';
 import type { LogRecord } from '../../e2e/idle-stop-evidence.js';
 
 const TARGET: ConnectionIdentity = {
@@ -63,6 +70,149 @@ describe('matchesConnection', () => {
         TARGET
       )
     ).toBe(true);
+  });
+});
+
+describe('heartbeatMovedRouteOffActive', () => {
+  const targetSession = 'kilo_root_target';
+
+  function sessionHeartbeat(kiloSessionId: string, sessionState: string): LogRecord {
+    return control({
+      diagnosticEvent: 'heartbeat',
+      sandboxId: TARGET.sandboxId,
+      connectionId: TARGET.connectionId,
+      wrapperInstanceId: TARGET.wrapperInstanceId,
+      kiloSessionId,
+      sessionState,
+    });
+  }
+
+  it('ignores a heartbeat that does not resolve to the target session', () => {
+    // Identity-matched to the captured connection but reporting another root
+    // with no packed entry for the target: unrelated, so not a route change.
+    expect(
+      heartbeatMovedRouteOffActive(
+        sessionHeartbeat('kilo_root_other', 'stopped'),
+        TARGET,
+        targetSession
+      )
+    ).toBe(false);
+  });
+
+  it('detects the target session moving off active', () => {
+    expect(
+      heartbeatMovedRouteOffActive(
+        sessionHeartbeat(targetSession, 'stopped'),
+        TARGET,
+        targetSession
+      )
+    ).toBe(true);
+  });
+
+  it('treats a still-active target heartbeat as no change', () => {
+    expect(
+      heartbeatMovedRouteOffActive(sessionHeartbeat(targetSession, 'active'), TARGET, targetSession)
+    ).toBe(false);
+  });
+});
+
+describe('matchesReconciliationIdentity', () => {
+  const target = {
+    messageId: 'message-target',
+    sessionId: 'session-target',
+    wrapperInstanceId: 'wrapper-target',
+  };
+
+  it('rejects a record whose message id is absent', () => {
+    expect(
+      matchesReconciliationIdentity(
+        control({
+          diagnosticEvent: 'accepted_reconciliation',
+          sessionId: target.sessionId,
+          expectedWrapperInstanceId: target.wrapperInstanceId,
+        }),
+        target
+      )
+    ).toBe(false);
+  });
+
+  it('rejects another session record for a different message id', () => {
+    expect(
+      matchesReconciliationIdentity(
+        control({
+          messageId: 'message-other',
+          sessionId: 'session-other',
+          expectedWrapperInstanceId: 'wrapper-other',
+        }),
+        target
+      )
+    ).toBe(false);
+  });
+
+  it('requires the exact message id and constrains retained session/wrapper identity', () => {
+    expect(matchesReconciliationIdentity(control({ messageId: target.messageId }), target)).toBe(
+      true
+    );
+    expect(
+      matchesReconciliationIdentity(
+        control({ messageId: target.messageId, sessionId: 'session-other' }),
+        target
+      )
+    ).toBe(false);
+    expect(
+      matchesReconciliationIdentity(
+        control({ messageId: target.messageId, expectedWrapperInstanceId: 'wrapper-other' }),
+        target
+      )
+    ).toBe(false);
+    expect(
+      matchesReconciliationIdentity(
+        control({
+          messageId: target.messageId,
+          sessionId: target.sessionId,
+          expectedWrapperInstanceId: target.wrapperInstanceId,
+        }),
+        target
+      )
+    ).toBe(true);
+  });
+});
+
+describe('isSettledReapStopRecord', () => {
+  const sandboxId = 'ses_target';
+  const settledStop = (overrides: LogRecord = {}): LogRecord =>
+    control({
+      diagnosticEvent: 'physical_committed',
+      sandboxId,
+      fromState: 'running',
+      toState: 'stopping',
+      cause: RECOVERY_SETTLED_REAP_REASON,
+      stopCause: RECOVERY_SETTLED_REAP_REASON,
+      ...overrides,
+    });
+
+  it('requires the tombstone reason in both cause and stopCause', () => {
+    expect(isSettledReapStopRecord(settledStop(), sandboxId)).toBe(true);
+    expect(isSettledReapStopRecord(settledStop({ stopCause: undefined }), sandboxId)).toBe(false);
+    expect(isSettledReapStopRecord(settledStop({ cause: undefined }), sandboxId)).toBe(false);
+    expect(
+      isSettledReapStopRecord(settledStop({ cause: RECOVERY_CLEANUP_REASON }), sandboxId)
+    ).toBe(false);
+  });
+
+  it('requires the running -> stopping transition for this sandbox', () => {
+    expect(isSettledReapStopRecord(settledStop({ fromState: 'stopping' }), sandboxId)).toBe(false);
+    expect(isSettledReapStopRecord(settledStop({ sandboxId: 'ses_other' }), sandboxId)).toBe(false);
+    expect(
+      isSettledReapStopRecord(
+        control({
+          diagnosticEvent: 'stop_attempt',
+          sandboxId,
+          stopCause: RECOVERY_SETTLED_REAP_REASON,
+        }),
+        sandboxId
+      )
+    ).toBe(false);
   });
 });
 

@@ -22,8 +22,9 @@ import type { SessionRoute } from './session-routes.js';
 import {
   canRecoveryRetirementStopAllocation,
   createRecoveryCleanup,
-  ownsRecoveryCleanupAllocation,
   RECOVERY_CLEANUP_REASON,
+  RECOVERY_SETTLED_REAP_REASON,
+  recoveryCleanupEligibility,
   selectRecoveryCleanupRoots,
 } from './recovery-cleanup.js';
 
@@ -124,6 +125,7 @@ async function fixture(record: SandboxRecoveryDecision = decision) {
   const storage = store as unknown as Parameters<typeof createRecoveryCleanup>[0]['storage'];
   let time = 250;
   let currentConnection: typeof connection | undefined = connection;
+  let ready = false;
   const retire = vi
     .fn<Parameters<typeof createRecoveryCleanup>[0]['retirement']['retire']>()
     .mockResolvedValue('pending');
@@ -135,6 +137,7 @@ async function fixture(record: SandboxRecoveryDecision = decision) {
     storage,
     retirement: { retire },
     getConnection: () => currentConnection,
+    isConnectionReady: () => ready,
     supportsTargetedRetirement: () => true,
     persistPhysical: (_from, to) => savePhysicalRecord(storage, to),
     onPhysicalStop,
@@ -155,6 +158,9 @@ async function fixture(record: SandboxRecoveryDecision = decision) {
     },
     setConnection: (value: typeof connection | undefined) => {
       currentConnection = value;
+    },
+    setReady: (value: boolean) => {
+      ready = value;
     },
   };
 }
@@ -484,21 +490,303 @@ describe('recovery physical fallback', () => {
       )
     ).toBe(false);
     expect(
-      ownsRecoveryCleanupAllocation(
+      recoveryCleanupEligibility(
         decision,
         { ...physical, createIntent: { intentId: 'replacement', createdAt: 250 } },
         routes,
         300
       )
-    ).toBe(false);
+    ).toBeNull();
     expect(
-      ownsRecoveryCleanupAllocation(
+      recoveryCleanupEligibility(
         { ...decision, authority: { ...authority, roots: [{ ...root, observation: 'unknown' }] } },
         physical,
         routes,
         300
       )
+    ).toBeNull();
+  });
+
+  const readyRoot: RecoveryRoot = { ...root, observation: 'idle', decision: 'ready' };
+  const operationUnknownRoot: RecoveryRoot = {
+    ...root,
+    observation: 'known',
+    decision: 'operation_unknown',
+  };
+  const staleActiveModelRoute: SessionRoute = { ...route, lastState: 'active', waitingOn: 'model' };
+  const settledNow = 90_002;
+
+  function settledAuthority(
+    roots: RecoveryRoot[],
+    wholeAllocation = true,
+    scopes: RecoveryAuthority['scopes'] = []
+  ): RecoveryAuthority {
+    return { ...authority, roots, scopes, wholeAllocation };
+  }
+
+  it('reaps a settled allocation whose only route is stale', async () => {
+    const f = await fixture({ ...decision, authority: settledAuthority([readyRoot]) });
+    f.setTime(settledNow);
+    await f.cleanup.reconcile();
+    expect((await loadPhysicalRecord(f.storage)).stopTombstone).toMatchObject({
+      reason: RECOVERY_SETTLED_REAP_REASON,
+      attempts: 0,
+    });
+    expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('physical_fallback');
+    expect(f.onPhysicalStop).toHaveBeenCalledOnce();
+    expect(f.onPhysicalStop.mock.calls[0]?.[2]).toBe(RECOVERY_SETTLED_REAP_REASON);
+    await f.cleanup.reconcile();
+    expect(f.onPhysicalStop).toHaveBeenCalledOnce();
+  });
+
+  it('reaps a settled operation_unknown root without an expired operation scope', async () => {
+    const proofAuthority = settledAuthority([operationUnknownRoot]);
+    const f = await fixture({ ...decision, authority: proofAuthority });
+    f.setTime(settledNow);
+    expect(selectRecoveryCleanupRoots(proofAuthority, settledNow)).toHaveLength(0);
+    await f.cleanup.reconcile();
+    expect((await loadPhysicalRecord(f.storage)).stopTombstone).toMatchObject({
+      reason: RECOVERY_SETTLED_REAP_REASON,
+    });
+    expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('physical_fallback');
+    expect(f.onPhysicalStop).toHaveBeenCalledOnce();
+  });
+
+  // Mirrors the operation scope produced by `recovery-authority.ts` for a
+  // pending target: present and identity-matched, with a live (or absent)
+  // execution deadline. `selectRecoveryCleanupRoots` must not treat an
+  // unexpired operation as a targeted cleanup root.
+  const operationScope = (executionDeadlineAt?: number): RecoveryAuthority['scopes'][number] => ({
+    sessionId: operationUnknownRoot.sessionId,
+    kiloSessionId: operationUnknownRoot.kiloSessionId,
+    directory: operationUnknownRoot.directory,
+    messageId: 'message-1',
+    wrapperInstanceId: connection.wrapperInstanceId,
+    nativeRuntimeId,
+    ...(executionDeadlineAt !== undefined ? { executionDeadlineAt } : {}),
+  });
+
+  it.each([
+    { name: 'without an execution deadline', executionDeadlineAt: undefined },
+    { name: 'with a future execution deadline', executionDeadlineAt: settledNow + 1_000 },
+  ])(
+    'reaps a settled operation_unknown root with a matching unexpired operation scope $name',
+    async ({ executionDeadlineAt }) => {
+      const proofAuthority = settledAuthority([operationUnknownRoot], true, [
+        operationScope(executionDeadlineAt),
+      ]);
+      const f = await fixture({ ...decision, authority: proofAuthority });
+      f.setTime(settledNow);
+      expect(selectRecoveryCleanupRoots(proofAuthority, settledNow)).toHaveLength(0);
+      await f.cleanup.reconcile();
+      expect((await loadPhysicalRecord(f.storage)).stopTombstone).toMatchObject({
+        reason: RECOVERY_SETTLED_REAP_REASON,
+      });
+      expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('physical_fallback');
+      expect(f.onPhysicalStop).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('reaps when a sibling route is active but its heartbeat expired', async () => {
+    const siblingRoot: RecoveryRoot = {
+      ...readyRoot,
+      sessionId: 'session-2',
+      kiloSessionId: 'kilo-2',
+      directory: '/workspace/b',
+    };
+    const siblingRoute: SessionRoute = {
+      ...staleActiveModelRoute,
+      sessionId: 'session-2',
+      kiloSessionId: 'kilo-2',
+      directory: '/workspace/b',
+      waitingOn: 'tool',
+    };
+    const f = await fixture({
+      ...decision,
+      authority: settledAuthority([readyRoot, siblingRoot]),
+    });
+    await saveRouteTable(
+      f.storage,
+      new Map([
+        [route.sessionId, staleActiveModelRoute],
+        [siblingRoute.sessionId, siblingRoute],
+      ])
+    );
+    f.setTime(settledNow);
+    await f.cleanup.reconcile();
+    expect((await loadPhysicalRecord(f.storage)).stopTombstone).toMatchObject({
+      reason: RECOVERY_SETTLED_REAP_REASON,
+    });
+    expect(f.onPhysicalStop).toHaveBeenCalledOnce();
+  });
+
+  it('retains a settled allocation while a sibling route is freshly pinning', async () => {
+    const siblingRoot: RecoveryRoot = {
+      ...readyRoot,
+      sessionId: 'session-2',
+      kiloSessionId: 'kilo-2',
+      directory: '/workspace/b',
+    };
+    const siblingRoute: SessionRoute = {
+      ...staleActiveModelRoute,
+      sessionId: 'session-2',
+      kiloSessionId: 'kilo-2',
+      directory: '/workspace/b',
+      waitingOn: 'tool',
+      lastStateAt: settledNow - 1,
+    };
+    const f = await fixture({
+      ...decision,
+      authority: settledAuthority([readyRoot, siblingRoot]),
+    });
+    await saveRouteTable(
+      f.storage,
+      new Map([
+        [route.sessionId, staleActiveModelRoute],
+        [siblingRoute.sessionId, siblingRoute],
+      ])
+    );
+    f.setTime(settledNow);
+    await f.cleanup.reconcile();
+    expect((await loadPhysicalRecord(f.storage)).stopTombstone).toBeNull();
+    expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('unconfirmed');
+    expect(f.onPhysicalStop).not.toHaveBeenCalled();
+  });
+
+  it('treats the exact heartbeat expiry boundary as expired', async () => {
+    const f = await fixture({ ...decision, authority: settledAuthority([readyRoot]) });
+    f.setTime(route.lastStateAt! + 90_000);
+    await f.cleanup.reconcile();
+    expect((await loadPhysicalRecord(f.storage)).stopTombstone).toMatchObject({
+      reason: RECOVERY_SETTLED_REAP_REASON,
+    });
+    expect(f.onPhysicalStop).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    {
+      name: 'unknown observation',
+      root: { ...readyRoot, observation: 'unknown' as const },
+      wholeAllocation: true,
+    },
+    { name: 'unsettled allocation ownership', root: readyRoot, wholeAllocation: false },
+  ])(
+    'keeps a settled allocation unconfirmed with $name',
+    async ({ root: candidate, wholeAllocation }) => {
+      const f = await fixture({
+        ...decision,
+        authority: settledAuthority([candidate], wholeAllocation),
+      });
+      f.setTime(settledNow);
+      await f.cleanup.reconcile();
+      expect((await loadPhysicalRecord(f.storage)).stopTombstone).toBeNull();
+      expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('unconfirmed');
+      expect(f.onPhysicalStop).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([true, false])(
+    'only reaps a settled allocation when its matching runtime is not ready: %s',
+    async ready => {
+      const f = await fixture({ ...decision, authority: settledAuthority([readyRoot]) });
+      f.setTime(settledNow);
+      f.setReady(ready);
+      await f.cleanup.reconcile();
+      if (ready) {
+        expect((await loadPhysicalRecord(f.storage)).stopTombstone).toBeNull();
+        expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('pending');
+        expect((await loadDeadlines(f.storage)).recoveryRetry).toBeGreaterThan(settledNow);
+        expect(f.onPhysicalStop).not.toHaveBeenCalled();
+      } else {
+        expect((await loadPhysicalRecord(f.storage)).stopTombstone).toMatchObject({
+          reason: RECOVERY_SETTLED_REAP_REASON,
+        });
+        expect(f.onPhysicalStop).toHaveBeenCalledOnce();
+      }
+    }
+  );
+
+  it('defers a settled reap with a retained retry while its matching runtime is ready', async () => {
+    const f = await fixture({ ...decision, authority: settledAuthority([readyRoot]) });
+    await saveNativeRuntimeRetirements(f.storage, [retirement()]);
+    f.setTime(settledNow);
+    f.setReady(true);
+    await f.cleanup.reconcile();
+    expect((await loadPhysicalRecord(f.storage)).stopTombstone).toBeNull();
+    expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('pending');
+    expect(f.onPhysicalStop).not.toHaveBeenCalled();
+    const retry = (await loadDeadlines(f.storage)).recoveryRetry;
+    expect(retry).toBeDefined();
+    expect(retry).toBeGreaterThan(settledNow);
+    expect((await loadNativeRuntimeRetirements(f.storage))[0]?.state).toBe('pending');
+  });
+
+  it('reaps on the retained retry once the matching runtime is no longer ready', async () => {
+    const f = await fixture({ ...decision, authority: settledAuthority([readyRoot]) });
+    await saveNativeRuntimeRetirements(f.storage, [retirement()]);
+    f.setTime(settledNow);
+    f.setReady(true);
+    await f.cleanup.reconcile();
+    const retry = (await loadDeadlines(f.storage)).recoveryRetry;
+    if (retry === undefined) throw new Error('Expected a retained recoveryRetry deadline');
+    f.setReady(false);
+    f.setTime(retry);
+    await f.cleanup.reconcile();
+    expect((await loadPhysicalRecord(f.storage)).stopTombstone).toMatchObject({
+      reason: RECOVERY_SETTLED_REAP_REASON,
+    });
+    expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('physical_fallback');
+    expect(f.onPhysicalStop).toHaveBeenCalledOnce();
+  });
+
+  it('stops a settled allocation when its matching connection is absent', async () => {
+    const f = await fixture({ ...decision, authority: settledAuthority([readyRoot]) });
+    f.setTime(settledNow);
+    f.setConnection(undefined);
+    f.setReady(true);
+    await f.cleanup.reconcile();
+    expect((await loadPhysicalRecord(f.storage)).stopTombstone).toMatchObject({
+      reason: RECOVERY_SETTLED_REAP_REASON,
+    });
+    expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('physical_fallback');
+    expect(f.onPhysicalStop).toHaveBeenCalledOnce();
+  });
+
+  it('does not escalate a settled allocation through the native-retirement stop path', () => {
+    const routes = new Map([[route.sessionId, staleActiveModelRoute]]);
+    const settled = {
+      ...decision,
+      cleanupDeadlineAt: settledNow,
+      authority: settledAuthority([readyRoot]),
+    };
+    expect(recoveryCleanupEligibility(settled, physical, routes, settledNow)).toBe('settled');
+    expect(
+      canRecoveryRetirementStopAllocation(
+        retirement({ cleanupDeadlineAt: settledNow }),
+        [settled],
+        physical,
+        routes,
+        settledNow
+      )
     ).toBe(false);
+  });
+
+  it('keeps a settled allocation unconfirmed when a root has no route', async () => {
+    const siblingRoot: RecoveryRoot = {
+      ...readyRoot,
+      sessionId: 'session-2',
+      kiloSessionId: 'kilo-2',
+      directory: '/workspace/b',
+    };
+    const f = await fixture({
+      ...decision,
+      authority: settledAuthority([readyRoot, siblingRoot]),
+    });
+    f.setTime(settledNow);
+    await f.cleanup.reconcile();
+    expect((await loadPhysicalRecord(f.storage)).stopTombstone).toBeNull();
+    expect((await loadRecoveryDecisions(f.storage))[0]?.cleanupState).toBe('unconfirmed');
+    expect(f.onPhysicalStop).not.toHaveBeenCalled();
   });
 });
 

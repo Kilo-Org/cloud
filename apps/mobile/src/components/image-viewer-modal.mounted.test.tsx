@@ -279,6 +279,20 @@ describe('ImageViewerModal mounted', () => {
     renderer.unmount();
   });
 
+  it('pads the header by the window top inset so an overlay opened from a sheet keeps the status-bar clearance', async () => {
+    // The session page sheet drops its own top clearance but does not rewrite
+    // the safe-area context (session-page-sheet-header-inset.mounted.test.tsx
+    // asserts the subtree still sees the window insets), so a full-screen
+    // viewer opened from sheet content must keep padding the status-bar inset.
+    safeArea.top = 59;
+    const renderer = await mountViewer({ onShare: () => undefined });
+
+    const header = findHeaderContainer(renderer.root);
+    expect(header.props.style).toEqual({ paddingTop: 59, height: 115 });
+
+    renderer.unmount();
+  });
+
   it('supports landscape so a full-screen modal is never portrait-locked', async () => {
     const renderer = await mountViewer({ onShare: () => undefined });
 

@@ -14,18 +14,39 @@ export function parseStoredRunOnDestination(raw: string | null): string | null {
 }
 
 /**
+ * The new-session route's explicit Run-on preselection, normalised to a single
+ * value. `null` means the route named no target (absent or empty), so the form
+ * restores the stored preference; any other value is either the Cloud Agent
+ * sentinel or a connection id to preselect. Expo Router hands a repeated param
+ * over as an array, so the first element wins.
+ */
+export function readPreselectRunOn(raw: string | string[] | undefined): string | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) {
+    return null;
+  }
+  return value;
+}
+
+/**
  * Whether the new-session form should restore the persisted run-on
- * destination. An explicit Cloud Agent preselect (the tour's cloud path)
- * starts with no remote target and leaves the stored preference untouched;
- * every other entry keeps the existing restore behaviour.
+ * destination. Any explicit preselect — the tour's Cloud Agent path or a
+ * connected computer — starts on the named target and leaves the stored
+ * preference untouched; an ordinary entry (no preselect) keeps the existing
+ * restore behaviour.
  */
 export function shouldRestorePersistedRunOn(
   preselectRunOn: string | string[] | undefined
 ): boolean {
-  const value = Array.isArray(preselectRunOn) ? preselectRunOn[0] : preselectRunOn;
-  return value !== PRESELECT_CLOUD_RUN_ON;
+  return readPreselectRunOn(preselectRunOn) === null;
 }
 
+/**
+ * Resolves a stored or preselected connection id against the live instance
+ * list so the form binds the real row (with its capabilities) or falls back to
+ * Cloud Agent when the computer is disconnected. The connection preselect and
+ * the stored-preference restore both resolve through here.
+ */
 export function resolvePersistedRunOn<T extends { connectionId: string }>(
   storedConnectionId: string | null,
   instances: readonly T[]

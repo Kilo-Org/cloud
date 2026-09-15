@@ -19,6 +19,8 @@ import { db } from '@/lib/drizzle';
 import {
   github_install_states,
   kilocode_users,
+  organizations,
+  platform_integrations,
   type GitHubInstallState,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -1183,6 +1185,119 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       response,
       `/github-app?fromApp=1&github_pending_approval=true&organizationId=${ORG_ID}`
     );
+  });
+
+  test('does not block a management-enabled install when a shared tenant already owns the installation', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+    const competitorId = `oauth/cb-shared-competitor-${randomUUID()}`;
+    await db.insert(kilocode_users).values({
+      id: competitorId,
+      google_user_email: `cb-shared-competitor-${randomUUID()}@example.com`,
+      google_user_name: 'Shared Competitor',
+      google_user_image_url: '',
+      stripe_customer_id: 'cus_cb_shared_competitor',
+    });
+    const inserted = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: competitorId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: INSTALLATION_ID,
+        github_app_type: 'standard',
+        integration_status: 'active',
+        repository_access: 'all',
+      })
+      .returning();
+    const competitor = inserted[0];
+    if (!competitor) throw new Error('Expected the competing association');
+
+    try {
+      mockConsumedInstallState({
+        token: DB_TOKEN,
+        kilo_user_id: USER_ID,
+        owner_type: 'user',
+        owner_id: USER_ID,
+        github_app_type: 'standard',
+        return_to: '/github-app',
+        expires_at: new Date(Date.now() + 300_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+      // The verified writer already admitted this association (including
+      // sharing admission), so the legacy competing-tenant guard must not
+      // run and report the connection as already claimed.
+      mockedConnectVerifiedGitHubInstallation.mockResolvedValue({
+        ok: true,
+        integrationId: '00000000-0000-4000-8000-0000000000aa',
+      });
+
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
+        ) as never
+      );
+
+      expect(response.status).toBe(307);
+      expectRedirectLocation(response, '/github-app?github_install=success');
+    } finally {
+      await db.delete(platform_integrations).where(eq(platform_integrations.id, competitor.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, competitorId));
+    }
+  });
+
+  test('refuses the legacy bind when a competitor of the other owner type owns the installation', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
+    const organizationRows = await db
+      .insert(organizations)
+      .values({ name: `Callback guard org ${randomUUID()}` })
+      .returning();
+    const organization = organizationRows[0];
+    if (!organization) throw new Error('Expected the competing organization');
+    const inserted = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: INSTALLATION_ID,
+        github_app_type: 'standard',
+        integration_status: 'active',
+        repository_access: 'all',
+      })
+      .returning();
+    const competitor = inserted[0];
+    if (!competitor) throw new Error('Expected the competing association');
+
+    try {
+      mockConsumedInstallState({
+        token: DB_TOKEN,
+        kilo_user_id: USER_ID,
+        owner_type: 'user',
+        owner_id: USER_ID,
+        github_app_type: 'standard',
+        return_to: '/github-app',
+        expires_at: new Date(Date.now() + 300_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+      mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
+
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
+        ) as never
+      );
+
+      expect(response.status).toBe(307);
+      expectRedirectLocation(response, '/github-app?error=installation_already_claimed');
+      expect(mockedBindGitHubIntegrationToCanonicalInstallation).not.toHaveBeenCalled();
+    } finally {
+      await db.delete(platform_integrations).where(eq(platform_integrations.id, competitor.id));
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
   });
 });
 

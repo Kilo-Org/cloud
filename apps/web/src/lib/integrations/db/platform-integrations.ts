@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   github_app_installations,
   repository_customizations,
@@ -30,13 +30,11 @@ import { canOrganizationUseMultipleGitHubInstallations } from '../github/multipl
  * the correct row. Callers without an app type (e.g. legacy bot-link states)
  * keep the unscoped lookup, which preserves legacy behavior.
  */
-export async function findIntegrationByInstallationId(
+function installationLookupConditions(
   platform: string,
-  installationId: string | undefined,
+  installationId: string,
   githubAppType?: GitHubAppType
 ) {
-  if (!installationId) return null;
-
   const conditions = [
     eq(platform_integrations.platform, platform),
     eq(platform_integrations.platform_installation_id, installationId),
@@ -51,11 +49,47 @@ export async function findIntegrationByInstallationId(
         : eq(platform_integrations.github_app_type, githubAppType);
     if (appTypeCondition) conditions.push(appTypeCondition);
   }
+  return conditions;
+}
+
+export async function findIntegrationByInstallationId(
+  platform: string,
+  installationId: string | undefined,
+  githubAppType?: GitHubAppType
+) {
+  if (!installationId) return null;
 
   const [integration] = await db
     .select()
     .from(platform_integrations)
-    .where(and(...conditions))
+    .where(and(...installationLookupConditions(platform, installationId, githubAppType)))
+    .limit(1);
+
+  return integration || null;
+}
+
+/**
+ * Resolves the connected (non-locally-disconnected) association for an
+ * installation. `findIntegrationByInstallationId` has no health filter and no
+ * ordering, so after one tenant disconnects it can return the retained
+ * disconnected row ahead of the tenant that still owns the installation.
+ */
+export async function findConnectedIntegrationByInstallationId(
+  platform: string,
+  installationId: string | undefined,
+  githubAppType?: GitHubAppType
+) {
+  if (!installationId) return null;
+
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        ...installationLookupConditions(platform, installationId, githubAppType),
+        isNull(platform_integrations.github_disconnected_at)
+      )
+    )
     .limit(1);
 
   return integration || null;
@@ -123,7 +157,10 @@ export async function findIntegrationByInstallationIdForOwner(
   owner: Owner,
   platform: (typeof PLATFORM)[keyof typeof PLATFORM],
   platformInstallationId: string,
-  githubAppType?: GitHubAppType
+  githubAppType?: GitHubAppType,
+  /** Run inside a caller-owned transaction, for example when the row was
+   *  written in the same transaction and must be read back before commit. */
+  transaction?: DrizzleTransaction
 ) {
   const appTypeCondition =
     githubAppType === 'standard'
@@ -134,7 +171,7 @@ export async function findIntegrationByInstallationIdForOwner(
       : githubAppType
         ? eq(platform_integrations.github_app_type, githubAppType)
         : undefined;
-  const [integration] = await db
+  const [integration] = await (transaction ?? db)
     .select()
     .from(platform_integrations)
     .where(
@@ -839,25 +876,56 @@ export async function findPendingInstallationByKiloUserId(kiloUserId: string) {
 }
 
 /**
+ * Builds the `github_authorized_*` provenance columns for a
+ * `platform_integrations` row, or an empty object if either identity is
+ * missing. Shared by every writer that records who authorized a GitHub
+ * connection, so the shape can't drift between them.
+ */
+function buildGitHubAuthorizationProvenance(
+  kiloUserId: string | undefined,
+  githubUserId: string | undefined,
+  authorizedAt: string = new Date().toISOString()
+):
+  | {
+      github_authorized_by_user_id: string;
+      github_authorized_user_id: string;
+      github_authorized_at: string;
+    }
+  | Record<string, never> {
+  if (!kiloUserId || !githubUserId) return {};
+  return {
+    github_authorized_by_user_id: kiloUserId,
+    github_authorized_user_id: githubUserId,
+    github_authorized_at: authorizedAt,
+  };
+}
+
+/**
  * Auto-complete a pending installation
  */
-export async function autoCompleteInstallation({
-  integrationId,
-  installationData,
-  existingMetadata,
-}: {
-  integrationId: string;
-  installationData: {
-    installation_id: string;
-    account_id: string;
-    account_login: string;
-    repository_selection: string;
-    permissions: Record<string, unknown>;
-    events: string[];
-    created_at: string;
-  };
-  existingMetadata: Record<string, unknown>;
-}) {
+export async function autoCompleteInstallation(
+  {
+    integrationId,
+    installationData,
+    existingMetadata,
+  }: {
+    integrationId: string;
+    installationData: {
+      installation_id: string;
+      account_id: string;
+      account_login: string;
+      repository_selection: string;
+      permissions: Record<string, unknown>;
+      events: string[];
+      created_at: string;
+    };
+    existingMetadata: Record<string, unknown>;
+  },
+  /** Run the completion inside a caller-owned transaction (for example
+   *  alongside the installation exclusivity check and canonical binding, so
+   *  the whole decision is serialized under the installation lock). */
+  transaction?: DrizzleTransaction
+) {
   // Keep requester info for historical purposes, but clear pending_approval since it's complete
   // Use Zod to safely parse the existing metadata
   const parseResult = PendingInstallationMetadataWrapperSchema.safeParse(existingMetadata);
@@ -871,7 +939,20 @@ export async function autoCompleteInstallation({
     },
   };
 
-  await db
+  // The webhook that completes a pending request carries no live OAuth
+  // session, so there is no independently verified identity for whoever
+  // clicked "Install" on GitHub. The original requester's identity was
+  // already verified via OAuth when the request was created (see
+  // createPendingIntegration), so record it as the authorizing identity
+  // rather than leaving provenance null. This can misattribute completion
+  // if a different GitHub org admin approves someone else's request; there
+  // is no stronger identity available on this path to resolve that.
+  const authorizationProvenance = buildGitHubAuthorizationProvenance(
+    pendingApproval?.requester?.kilo_user_id,
+    pendingApproval?.github_requester?.id
+  );
+
+  await (transaction ?? db)
     .update(platform_integrations)
     .set({
       platform_installation_id: installationData.installation_id,
@@ -885,6 +966,7 @@ export async function autoCompleteInstallation({
       metadata: completedMetadata,
       auth_invalid_at: null,
       auth_invalid_reason: null,
+      ...authorizationProvenance,
       updated_at: new Date().toISOString(),
     })
     .where(eq(platform_integrations.id, integrationId));
@@ -1073,9 +1155,26 @@ export async function upsertPlatformIntegrationForOwner(
     repositories?: PlatformRepository[] | null;
     installedAt?: string;
     githubAppType?: GitHubAppType;
-  }
+    /** Kilo user id that authorized this connection, when known. Callers
+     *  with a verified GitHub OAuth identity should always pass this and
+     *  `githubUserId` so authorization provenance stays consistent with
+     *  `connectVerifiedGitHubInstallation`. */
+    kiloUserId?: string;
+    /** Verified GitHub user id that authorized this connection, when known. */
+    githubUserId?: string;
+  },
+  /** Run the write inside a caller-owned transaction. The caller can then
+   *  make the write, the exclusivity guard, and the canonical bind one atomic
+   *  unit instead of leaving a committed unbound association behind. */
+  transaction?: DrizzleTransaction
 ): Promise<UpsertPlatformIntegrationResult> {
   const appType = data.githubAppType ?? 'standard';
+  const now = new Date().toISOString();
+  const authorizationProvenance = buildGitHubAuthorizationProvenance(
+    data.kiloUserId,
+    data.githubUserId,
+    now
+  );
 
   // Build values object used for both insert paths.
   const values = {
@@ -1093,12 +1192,13 @@ export async function upsertPlatformIntegrationForOwner(
     repositories: data.repositories || null,
     installed_at: data.installedAt || new Date().toISOString(),
     github_app_type: appType,
+    ...authorizationProvenance,
   };
 
   // Preserve exclusive behavior for old callback/refresh paths after the
   // database-level global uniqueness constraint is removed.
   if (data.platform === 'github') {
-    return db.transaction(async tx => {
+    const execute = async (tx: DrizzleTransaction): Promise<UpsertPlatformIntegrationResult> => {
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${data.platformInstallationId}`}))`
       );
@@ -1145,7 +1245,11 @@ export async function upsertPlatformIntegrationForOwner(
           .where(
             and(
               eq(platform_integrations.owned_by_organization_id, owner.id),
-              eq(platform_integrations.platform, PLATFORM.GITHUB)
+              eq(platform_integrations.platform, PLATFORM.GITHUB),
+              // A locally disconnected connection has relinquished its slot;
+              // it must not block attaching a different installation. Matches
+              // the equivalent guard in connectVerifiedGitHubInstallation.
+              isNull(platform_integrations.github_disconnected_at)
             )
           );
         if (
@@ -1176,11 +1280,13 @@ export async function upsertPlatformIntegrationForOwner(
           github_app_type: appType,
           auth_invalid_at: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_at} END`,
           auth_invalid_reason: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_reason} END`,
+          ...authorizationProvenance,
           updated_at: new Date().toISOString(),
         })
         .where(eq(platform_integrations.id, existing.id));
       return { ok: true };
-    });
+    };
+    return transaction ? execute(transaction) : db.transaction(execute);
   }
 
   // Non-GitHub platforms use the existing per-owner pattern.

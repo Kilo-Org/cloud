@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ContainerUsageAdmissionError, ContainerUsageClient } from './client';
+import {
+  ContainerUsageAdmissionError,
+  ContainerUsageClient,
+  isNonRetryableSkuAdmissionError,
+} from './client';
 import type { ContainerUsageRpcMethods } from './contracts';
 
 function binding(overrides: Partial<ContainerUsageRpcMethods> = {}): ContainerUsageRpcMethods {
@@ -197,5 +201,33 @@ describe('ContainerUsageClient', () => {
       minimumRequiredMicrodollars: 10_000_000,
     });
     expect(recordStart).toHaveBeenCalledOnce();
+  });
+});
+
+describe('isNonRetryableSkuAdmissionError', () => {
+  const skuCodes = ['sku_not_found', 'sku_unit_mismatch', 'sku_not_accepting_new_usage'] as const;
+
+  it.each(skuCodes)('returns true and narrows the code for %s', code => {
+    const error = new ContainerUsageAdmissionError(code, 'Billing SKU rejected');
+
+    expect(isNonRetryableSkuAdmissionError(error)).toBe(true);
+    if (!isNonRetryableSkuAdmissionError(error)) {
+      throw new Error('Expected a non-retryable SKU admission error');
+    }
+    const narrowed: (typeof skuCodes)[number] = error.code;
+    expect(narrowed).toBe(code);
+    // @ts-expect-error insufficient_credits is excluded from the narrowed code type
+    const budgetCode: 'insufficient_credits' = error.code;
+    void budgetCode;
+  });
+
+  it('returns false for insufficient_credits', () => {
+    const error = new ContainerUsageAdmissionError('insufficient_credits', 'Low balance');
+    expect(isNonRetryableSkuAdmissionError(error)).toBe(false);
+  });
+
+  it('returns false for a plain error and a non-error', () => {
+    expect(isNonRetryableSkuAdmissionError(new Error('meter unavailable'))).toBe(false);
+    expect(isNonRetryableSkuAdmissionError('meter unavailable')).toBe(false);
   });
 });

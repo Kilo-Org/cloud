@@ -3029,7 +3029,7 @@
     "cloudWaiting": "Waiting for your cloud session to start…",
     "cloudCheck": "Your first cloud session is running.",
     "remoteTitle": "Start your first remote session",
-    "remoteBody": "Connect your computer, then start the session from here.",
+    "remoteBody": "Connect your computer, then choose it below to start a new session.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
     "remoteStart": "Start a session on your computer",
     "remoteWaiting": "Waiting for your computer to start the session…",

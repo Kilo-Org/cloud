@@ -1,44 +1,37 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
+import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
 import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
 import { TourStepHeader } from '@/components/tour/tour-step-header';
 import { Button } from '@/components/ui/button';
-import { Check, CircleCheck, Server } from '@/components/ui/icons';
+import { ChevronRight, Server } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useActiveSessions } from '@/lib/active-sessions-live-sync-mount';
-import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dedupeInstanceLabels } from '@/lib/instance-picker-rows';
-import { useHoistedOperationKey } from '@/lib/operation-key';
-import { captureSessionBaseline, hasNewSession } from '@/lib/tour/session-detection';
 import { useTRPC } from '@/lib/trpc';
-import { cn } from '@/lib/utils';
 
 const POLL_INTERVAL_MS = 10_000;
 const SKELETON_ROW_COUNT = 3;
 
 type TourRemoteStepProps = {
-  onCompletedChange: (completed: boolean) => void;
+  onChooseComputer: (connectionId: string) => void;
 };
 
 /**
- * The computer / `kilo remote` path of the first-sign-in tour.
+ * The computer path of the first-sign-in tour.
  *
- * The step discovers connected computers from the same `listInstances` source
- * the instance picker reads, and the check is gated on a REAL remote session:
- * it captures the active-session ids present when the live list first resolves
- * and only a remote row that appears afterwards, on the started computer's
- * connection, satisfies it. The session the start action itself created is
- * exempt from that baseline: the capture can land after the create (the list
- * was still unresolved at press time) and would otherwise absorb it. A
- * connected computer with no session never completes the path.
+ * The step shows how to connect a computer and lists each one the
+ * `listInstances` source (the same one the instance picker reads) discovers.
+ * A tap hands the connection id to the shell, which opens the new-session page
+ * with that computer preselected — the hand-off completes the tour. The step
+ * never starts a session itself.
  */
-export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepProps>) {
+export function TourRemoteStep({ onChooseComputer }: Readonly<TourRemoteStepProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const trpc = useTRPC();
@@ -68,114 +61,64 @@ export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepPro
     [instancesData]
   );
 
-  // The step presents one "the computer" at a time; the first discovered
-  // connection is the default and tapping another row switches the target.
-  const [preferredConnectionId, setPreferredConnectionId] = useState<string | null>(null);
-  const selected =
-    computers.find(computer => computer.connectionId === preferredConnectionId) ??
-    computers[0] ??
-    null;
-
-  // The tour's remote path is personal-scoped, exactly like the cloud path it
-  // forks from (that form opens with no organization param) and the personal
-  // `listInstances` source that discovers the computer. Pin the spawn to
-  // personal (`null`); inheriting the live org context here would attribute the
-  // session to the organization, which this step's personal `useActiveSessions`
-  // never reads, so the check could not appear while an org is active.
-  const { status: spawnStatus, spawn } = useRemoteInstanceSpawn(null);
-  const [hasStarted, setHasStarted] = useState(false);
-  // The connection the start action actually targeted, frozen at press time.
-  // Detection must follow this, not the mutable `selected` row: switching the
-  // highlighted computer after starting must not move the check to a machine
-  // that was never started.
-  const [startedConnectionId, setStartedConnectionId] = useState<string | null>(null);
-  // The session the tour's own start action created, when the spawn reported
-  // it. Detection exempts this id from the baseline below: the baseline is
-  // captured on the live list's first data, and when that list was still
-  // unresolved at press time the capture can land after the create and absorb
-  // the tour's own row — which must still count as the proof it is.
-  const [spawnedSessionId, setSpawnedSessionId] = useState<string | null>(null);
-  // One operation key per start intent: a retry of the same connection keeps
-  // the key so the relay dedupes it instead of spawning a second session.
-  const { getKey, rotateKey } = useHoistedOperationKey();
-
-  const handleStart = useCallback(() => {
-    if (selected === null) {
-      return;
-    }
-    const connectionId = selected.connectionId;
-    setHasStarted(true);
-    setStartedConnectionId(connectionId);
-    const operationKey = getKey(connectionId);
-    void (async () => {
-      const outcome = await spawn(connectionId, undefined, { operationKey });
-      if (outcome.status === 'ready') {
-        setSpawnedSessionId(outcome.sessionID);
-      }
-      // A retryable failure keeps the intent (and its key) alive for the retry;
-      // a fresh session or a terminal rejection ends it.
-      if (outcome.status !== 'retryable') {
-        rotateKey();
-      }
-    })();
-  }, [selected, spawn, getKey, rotateKey]);
-
-  // Baseline: the ids known the first time the live list resolves. Capturing
-  // it on the first data (not on the empty mount) keeps a row that already
-  // existed before the tour from counting as new. The error/retry members are
-  // read too: this detection query is what makes the ✓ land, so its failure
-  // must surface a retry rather than leaving Done disabled forever.
-  const {
-    data: sessionsData,
-    isError: isSessionsError,
-    isFetching: isSessionsFetching,
-    refetch: refetchSessions,
-  } = useActiveSessions();
-  const sessions = sessionsData?.sessions;
-  const [baselineIds, setBaselineIds] = useState<ReadonlySet<string> | null>(null);
-  useEffect(() => {
-    if (baselineIds === null && sessions !== undefined) {
-      setBaselineIds(captureSessionBaseline(sessions));
-    }
-  }, [baselineIds, sessions]);
-
-  const detected =
-    baselineIds !== null &&
-    sessions !== undefined &&
-    startedConnectionId !== null &&
-    hasNewSession({
-      sessions,
-      baselineIds,
-      kind: 'remote',
-      connectionId: startedConnectionId,
-      ownSessionId: spawnedSessionId ?? undefined,
-    });
-
-  // Completion is sticky: once the check lands, a later poll failure or a
-  // disconnected computer must not take it back and re-disable the tour's Done
-  // control.
-  const [completed, setCompleted] = useState(false);
-  useEffect(() => {
-    if (detected) {
-      setCompleted(true);
-    }
-  }, [detected]);
-
-  // Report only on a real change so a re-render never re-notifies the shell.
-  const reportedRef = useRef<boolean | null>(null);
-  useEffect(() => {
-    if (reportedRef.current !== completed) {
-      reportedRef.current = completed;
-      onCompletedChange(completed);
-    }
-  }, [completed, onCompletedChange]);
-
   let content: ReactNode = null;
-  if (isInstancesError && !completed) {
-    // Retryable list failure: a real network error, distinct from the
-    // successful zero-computer response below. Keep the step chrome mounted
-    // and render the error into the reserved content slot, so a mid-tour
-    // failure never blanks the chosen path and Retry restores it in place.
+  if (computers.length > 0) {
+    // Detected: one hand-off row per computer, plus the start instructions so
+    // the person can connect another machine while they decide. The list owns
+    // the slot whenever it has rows: TanStack Query keeps `data` on a failed
+    // background refetch (`status: 'error'`, `hasData: true`), so a 10s poll
+    // that drops mid-tour must keep the detected computers tappable rather
+    // than replace them with the full-slot network-error screen.
+    content = (
+      <View className="w-full gap-4">
+        <View className="w-full gap-2">
+          {computers.map(computer => (
+            <Pressable
+              key={computer.connectionId}
+              testID={computer.testID}
+              accessibilityRole="button"
+              accessibilityLabel={computer.name}
+              className="flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 active:bg-secondary"
+              onPress={() => {
+                onChooseComputer(computer.connectionId);
+              }}
+            >
+              <Server size={18} color={colors.foreground} />
+              <View className="flex-1">
+                <Text className="text-base text-foreground">{computer.name}</Text>
+                <Text variant="muted" className="text-sm">
+                  {t('tour.remoteFound')}
+                </Text>
+              </View>
+              <ChevronRight size={18} color={colors.mutedForeground} />
+            </Pressable>
+          ))}
+        </View>
+        {
+          // Reserved status line: a refresh failure that arrives while the
+          // rows are on screen fills this space instead of pushing the list or
+          // the hint, and a failed poll never blanks what is already detected.
+          // `busy` stays false so a background poll cannot hide the inline
+          // error (the empty and full-error branches own their own loading).
+        }
+        <View className="min-h-5">
+          <SessionListRefreshStatus
+            busy={false}
+            failed={isInstancesError}
+            onRetry={() => {
+              void refetchInstances();
+            }}
+          />
+        </View>
+        <Text variant="mono" className="text-center">
+          {t('tour.remoteRunHint')}
+        </Text>
+      </View>
+    );
+  } else if (isInstancesError) {
+    // Nothing to show and the list failed: only here does the error replace the
+    // reserved slot. Keep the step chrome mounted and render the error into the
+    // slot, so Retry restores the path in place.
     content = (
       <QueryError
         placement="top"
@@ -186,30 +129,6 @@ export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepPro
         }}
         isRetrying={isRefetching}
       />
-    );
-  } else if (isSessionsError && !completed) {
-    // The detection query failed even though the computer list may be fine:
-    // no new `kilo remote` session can be observed, so the ✓ would never land
-    // and Done would stay disabled with no way forward. Surface the same
-    // retryable error in the reserved slot so Retry re-runs detection in
-    // place, and never offer Start while completion cannot be detected.
-    content = (
-      <QueryError
-        placement="top"
-        className="pt-0"
-        message={t('tour.networkError')}
-        onRetry={() => {
-          void refetchSessions();
-        }}
-        isRetrying={isSessionsFetching}
-      />
-    );
-  } else if (completed) {
-    content = (
-      <View className="flex-row items-center justify-center gap-2">
-        <CircleCheck size={18} color={colors.good} />
-        <Text className="text-sm font-semibold">{t('tour.remoteCheck')}</Text>
-      </View>
     );
   } else if (isLoadingInstances) {
     // Content-shaped skeleton rows sized like the discovered-computer list, so
@@ -224,9 +143,9 @@ export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepPro
         ))}
       </View>
     );
-  } else if (computers.length === 0) {
-    // Discovered nothing: a successful empty response, not an error. No Start,
-    // no check — just the CLI hint and a refetch.
+  } else {
+    // Discovered nothing: a successful empty response, not an error. Show the
+    // start instructions and a refetch, never a dead end.
     content = (
       <View className="items-center gap-4">
         <View className="items-center gap-1">
@@ -251,93 +170,6 @@ export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepPro
         </Button>
       </View>
     );
-  } else {
-    const spawnRetryable = spawnStatus.status === 'retryable';
-    const spawnNonRetryable = spawnStatus.status === 'nonRetryable';
-    const isSpawning = spawnStatus.status === 'inFlight';
-
-    let outcome: ReactNode = null;
-    if (spawnRetryable) {
-      // Retryable: the computer may have disconnected. The retry re-runs the
-      // tour's own start action on the still-selected connection.
-      outcome = (
-        <View className="items-center gap-3">
-          <Text variant="muted" className="text-center">
-            {t('agents.remoteSpawnRetryable')}
-          </Text>
-          <Button variant="outline" onPress={handleStart}>
-            <Text>{t('tour.retry')}</Text>
-          </Button>
-        </View>
-      );
-    } else if (spawnNonRetryable) {
-      // Non-retryable: the CLI refused for a structural reason. Say so and keep
-      // the start control as the re-entry point.
-      outcome = (
-        <View className="items-center gap-3">
-          <Text variant="muted" className="text-center">
-            {t('agents.remoteSpawnNonRetryable')}
-          </Text>
-          <Button size="lg" className="w-full" onPress={handleStart}>
-            <Text className="text-base">{t('tour.remoteStart')}</Text>
-          </Button>
-        </View>
-      );
-    } else if (isSpawning || hasStarted) {
-      // The session is being created (or was accepted) but the live list has
-      // not seen it yet. Keep waiting; the check only lands on a real row.
-      outcome = (
-        <View className="items-center gap-2">
-          <Text variant="muted">{t('tour.remoteWaiting')}</Text>
-          <View className="h-5 flex-row items-center gap-2">
-            <Skeleton className="h-[18px] w-[18px] rounded-full" />
-            <Skeleton className="h-4 w-52" />
-          </View>
-        </View>
-      );
-    } else {
-      outcome = (
-        <Button size="lg" className="w-full" onPress={handleStart}>
-          <Text className="text-base">{t('tour.remoteStart')}</Text>
-        </Button>
-      );
-    }
-
-    content = (
-      <View className="w-full gap-4">
-        <View className="w-full gap-2">
-          {computers.map(computer => {
-            const isSelected = computer.connectionId === selected?.connectionId;
-            return (
-              <Pressable
-                key={computer.connectionId}
-                testID={computer.testID}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: isSelected }}
-                accessibilityLabel={computer.name}
-                className={cn(
-                  'flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 active:bg-secondary',
-                  isSelected && 'border-primary'
-                )}
-                onPress={() => {
-                  setPreferredConnectionId(computer.connectionId);
-                }}
-              >
-                <Server size={18} color={colors.foreground} />
-                <View className="flex-1">
-                  <Text className="text-base text-foreground">{computer.name}</Text>
-                  <Text variant="muted" className="text-sm">
-                    {t('tour.remoteFound')}
-                  </Text>
-                </View>
-                {isSelected ? <Check size={18} color={colors.primary} /> : null}
-              </Pressable>
-            );
-          })}
-        </View>
-        {outcome}
-      </View>
-    );
   }
 
   return (
@@ -346,7 +178,7 @@ export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepPro
           every connected machine, and on a short screen or a large system font
           the fixed content slot plus that list exceeded the space between the
           header and the action bar. Without a scroll container the overflow
-          covered the Start control and the Skip/Done bar. */}
+          covered the Skip bar. */}
       <View className="items-center gap-6 px-6">
         <TourStepHeader
           icon={<Server size={36} color={colors.foreground} />}
@@ -355,9 +187,9 @@ export function TourRemoteStep({ onCompletedChange }: Readonly<TourRemoteStepPro
         />
 
         {
-          // One reserved content slot: the skeleton, the empty card, the start
-          // control, the check and the retryable error all render into the same
-          // space, so no load, retry or error swap moves the header.
+          // One reserved content slot: the skeleton, the empty card, the error
+          // and the computer list all render into the same space, so no load,
+          // retry or state swap moves the header above it.
         }
         <View className="min-h-[240px] w-full items-stretch justify-center">{content}</View>
       </View>

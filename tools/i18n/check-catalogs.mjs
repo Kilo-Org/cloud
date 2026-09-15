@@ -116,6 +116,11 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'prReview.terms.mergeRequestNumber',
   'securityAgent.auditReport.periodUtc',
   'preferences.transcriptionModel',
+  // Pure $t() references in the tour: they name another key's label, so every
+  // locale resolves them to its own translation through i18next nesting.
+  'tour.cloudOptionTitle',
+  'tour.remoteRunHint',
+  'tour.networkError',
 ]);
 
 /** The supported tags, read from the one source of truth. */

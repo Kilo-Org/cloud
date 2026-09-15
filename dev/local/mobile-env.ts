@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { detectLanIp, isUsableIpv4 } from './lan-ip';
+import { detectLanIp, isUsableDevHost, isUsableIpv4 } from './lan-ip';
 import { services } from './services';
 
 const MOBILE_ENV_REL_PATH = 'apps/mobile/.env.local';
@@ -152,8 +152,10 @@ function ensureRootEnv(repoRoot: string, worktreePaths?: string[]): void {
 }
 
 function prepareMobileEnvironment(repoRoot: string, host: string): PreparedMobileEnvironment {
-  if (!isUsableIpv4(host)) {
-    throw new Error(`Invalid mobile development host: ${host}`);
+  if (!isUsableDevHost(host)) {
+    throw new Error(
+      `Invalid mobile development host: ${host} (expected an IPv4 address or localhost)`
+    );
   }
   ensureRootEnv(repoRoot);
   writeMobileEnv(repoRoot, host);
@@ -189,9 +191,9 @@ function findRepoRoot(): string {
 function main(): void {
   const { host: hostArg } = parseArgs(process.argv.slice(2));
   const host = hostArg ?? detectLanIp();
-  if (!isUsableIpv4(host)) {
+  if (!isUsableDevHost(host)) {
     throw new Error(
-      'Could not detect LAN IP. Pass one explicitly: pnpm dev:env:mobile -- --host 192.168.x.x'
+      'Could not detect LAN IP. Pass one explicitly: pnpm dev:env:mobile -- --host 192.168.x.x (or --host localhost for an emulator or simulator on this machine)'
     );
   }
 
@@ -222,6 +224,7 @@ export {
   buildMobileEnvValues,
   detectLanIp,
   ensureRootEnv,
+  isUsableDevHost,
   isUsableIpv4,
   prepareMobileEnvironment,
   serviceUrl,

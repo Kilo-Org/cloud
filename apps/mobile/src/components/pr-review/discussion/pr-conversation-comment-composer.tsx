@@ -32,6 +32,11 @@ import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
+import {
+  type ProviderPrRef,
+  providerPrRefKey,
+  providerPrRefLabel,
+} from '@/lib/pr-review/provider-pr-ref';
 import { useAddPrCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import { i18n } from '@/i18n';
 
@@ -39,6 +44,13 @@ type PrConversationCommentComposerProps = Readonly<{
   owner: string;
   repo: string;
   number: number;
+  /**
+   * Present on the provider route: the comment posts through the provider
+   * seam and the draft keys on the collision-free ref, so a GitLab MR and a
+   * same-named GitHub PR never share text. Absent, the GitHub behavior is
+   * byte-identical.
+   */
+  prRef?: ProviderPrRef;
   onDismiss: () => void;
 }>;
 
@@ -46,15 +58,19 @@ export function PrConversationCommentComposer({
   owner,
   repo,
   number,
+  prRef,
   onDismiss,
 }: PrConversationCommentComposerProps) {
   const { t } = useTranslation();
-  const addComment = useAddPrCommentMutation();
+  const addComment = useAddPrCommentMutation(prRef);
 
   // Durable comment draft, keyed by account and PR. Nothing is saved or
   // restored while the user id is unknown.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
-  const commentDraftKey = prConversationCommentDraftKey(owner, repo, number);
+  const positionDraftKey = prConversationCommentDraftKey(owner, repo, number);
+  const commentDraftKey = prRef
+    ? `${positionDraftKey}@${providerPrRefKey(prRef)}`
+    : positionDraftKey;
   const draft = useFencedDraftLoad({ userId, isIdentityLoading, entityKey: commentDraftKey });
   useDraftFlushOnBackground(userId, commentDraftKey, true);
 
@@ -325,7 +341,7 @@ export function PrConversationCommentComposer({
     <>
       <PrFormSheetHeader
         title={t('prReview.composer.addTitle')}
-        eyebrow={`${owner}/${repo}#${number}`}
+        eyebrow={prRef ? providerPrRefLabel(prRef) : `${owner}/${repo}#${number}`}
         onBack={handleCancel}
       />
       <ScrollView

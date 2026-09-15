@@ -9,6 +9,7 @@ import { toast } from 'sonner-native';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
+import { resetSelectedBranchOverrides } from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
 import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
@@ -228,6 +229,16 @@ export function NewSessionScreenBody() {
     models,
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
   });
+
+  // The branch pick belongs to THIS screen, not to the repository section: the
+  // section unmounts when the run target becomes a remote instance, and
+  // clearing there would silently drop the user's pick while the repository
+  // selection (owned by this screen) survives the toggle. Clear on the
+  // screen's mount and unmount instead, so a branch never outlives the draft.
+  useEffect(() => {
+    resetSelectedBranchOverrides();
+    return resetSelectedBranchOverrides;
+  }, []);
 
   // The picker reports a `platform:fullName` key; resolve it to the full row so
   // the creator can send the platform-specific repository field. The prefill
@@ -697,6 +708,7 @@ export function NewSessionScreenBody() {
         repositories={repositories}
         recents={recents}
         selectedRepo={selectedRepo}
+        organizationId={organizationId}
         profile={profile}
         isProfileLoading={isProfileLoading}
         isProfileError={isProfileError}

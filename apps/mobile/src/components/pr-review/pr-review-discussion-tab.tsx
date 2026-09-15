@@ -7,7 +7,11 @@
 //                   the entire loaded set on every update (R4: a
 //                   later page can insert rows mid-list).
 //   - loading:      first page in flight; render `Skeleton`
-//                   placeholders matching the row dimensions.
+//                   placeholders matching the row dimensions. A first
+//                   page that is pending but PAUSED (offline, or a fetch
+//                   that will never start) is not "in flight": it falls
+//                   to the retryable state below so the tab never sits
+//                   on a skeleton with no escape (spot check e7).
 //   - retryable:    first page failed with a transient error;
 //                   render `QueryError` with the standard Retry
 //                   CTA wired to `refetch()`.
@@ -58,6 +62,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
 import { PrCommentCta } from '@/components/pr-review/discussion/pr-comment-cta';
+import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
@@ -80,6 +85,7 @@ import {
   toggleThreadExpanded,
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
+import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
@@ -114,6 +120,11 @@ export function PrReviewDiscussionTab({
     });
 
   const { t } = useTranslation();
+  // GitLab calls this a merge request; GitHub and Bitbucket both say pull
+  // request, so the three provider-named strings below switch on that term
+  // alone rather than forking the tab per provider.
+  const { ref } = useProviderPrScope({ owner, repo, number });
+  const isMergeRequest = ref.platform === 'gitlab';
   const router = useRouter();
 
   const [expansion, setExpansion] = useState<Record<string, boolean>>({});
@@ -250,10 +261,22 @@ export function PrReviewDiscussionTab({
   const view = selectDiscussionTabView({
     firstPageErrorState: retainedContentError ? null : firstPageErrorState,
     isPending: query.isPending && isEmpty,
+    // A pending page whose fetch is paused (offline, or a fetch that will
+    // never start) has no end — the retryable state, not the skeleton (spot
+    // check e7).
+    isPaused: query.isPaused,
     isEmpty,
   });
 
   const openConversationComment = () => {
+    // The provider route registers its own `conversation-comment` sheet: the
+    // GitHub literal would leave the provider scope and mount the GitHub
+    // layout with the GitHub-shaped triple (a GitLab project path has no
+    // `owner`/`repo` split).
+    if (ref.platform !== 'github') {
+      router.push(providerPrSheetHref(ref, 'conversation-comment'));
+      return;
+    }
     const href: Href = {
       pathname: CONVERSATION_COMMENT_PATH,
       params: { owner, repo, number },
@@ -273,7 +296,14 @@ export function PrReviewDiscussionTab({
 
   if (view.kind === 'permission') {
     return (
-      <QueryError variant="permission" message={t('prReview.discussion.accessDeniedMessage')} />
+      <QueryError
+        variant="permission"
+        message={
+          isMergeRequest
+            ? t('prReview.terms.discussionAccessDenied')
+            : t('prReview.discussion.accessDeniedMessage')
+        }
+      />
     );
   }
   if (view.kind === 'not-found') {
@@ -281,7 +311,11 @@ export function PrReviewDiscussionTab({
       <QueryError
         variant="not-found"
         title={t('prReview.discussion.unavailable')}
-        message={t('prReview.discussion.unavailableMessage')}
+        message={
+          isMergeRequest
+            ? t('prReview.terms.discussionUnavailableMessage')
+            : t('prReview.discussion.unavailableMessage')
+        }
       />
     );
   }
@@ -336,7 +370,11 @@ export function PrReviewDiscussionTab({
       <EmptyState
         icon={MessageSquarePlus}
         title={t('prReview.discussion.noDiscussion')}
-        description={t('prReview.discussion.noDiscussionDescription')}
+        description={
+          isMergeRequest
+            ? t('prReview.terms.noDiscussionDescription')
+            : t('prReview.discussion.noDiscussionDescription')
+        }
         action={
           onRequestFiles ? (
             <Button

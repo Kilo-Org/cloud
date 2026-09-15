@@ -232,6 +232,7 @@ describe('adminCloudAgentNextRouter', () => {
           affectedSessions: 1,
           knownSandboxes: 1,
           sessionsWithoutSandbox: 0,
+          latestDiagnostic: 'Initial admission failed',
         },
         {
           source: 'setup',
@@ -243,6 +244,7 @@ describe('adminCloudAgentNextRouter', () => {
           affectedSessions: 1,
           knownSandboxes: 0,
           sessionsWithoutSandbox: 1,
+          latestDiagnostic: null,
         },
         {
           source: 'run',
@@ -254,6 +256,7 @@ describe('adminCloudAgentNextRouter', () => {
           affectedSessions: 1,
           knownSandboxes: 1,
           sessionsWithoutSandbox: 0,
+          latestDiagnostic: 'Sandbox connection failed',
         },
         {
           source: 'run',
@@ -265,6 +268,7 @@ describe('adminCloudAgentNextRouter', () => {
           affectedSessions: 1,
           knownSandboxes: 1,
           sessionsWithoutSandbox: 0,
+          latestDiagnostic: null,
         },
       ])
     );
@@ -303,6 +307,7 @@ describe('adminCloudAgentNextRouter', () => {
           affectedSessions: 4,
           knownSandboxes: 1,
           sessionsWithoutSandbox: 2,
+          latestDiagnostic: 'Sandbox connection failed',
         },
         expect.objectContaining({
           source: 'setup',
@@ -352,12 +357,36 @@ describe('adminCloudAgentNextRouter', () => {
   });
 
   it.each([
-    { responsibility: 'platform', events: 1, groups: 1 },
-    { responsibility: 'user', events: 2, groups: 2 },
-    { responsibility: 'unknown', events: 1, groups: 1 },
+    {
+      responsibility: 'platform',
+      events: 1,
+      groups: 1,
+      diagnostics: {
+        'run:pre_dispatch:sandbox_connect_failed:platform:sandbox_connectivity':
+          'Sandbox connection failed',
+      },
+    },
+    {
+      responsibility: 'user',
+      events: 2,
+      groups: 2,
+      diagnostics: {
+        'setup:initial_admission:invalid_initial_intent:user:initial_request_invalid': null,
+        'run:agent_activity:payment_required:user:insufficient_credits': null,
+      },
+    },
+    {
+      responsibility: 'unknown',
+      events: 1,
+      groups: 1,
+      diagnostics: {
+        'setup:initial_admission:initial_admission_rejected:unknown:initial_admission_unknown':
+          'Initial admission failed',
+      },
+    },
   ] as const)(
     'filters top errors by $responsibility without changing the global summary',
-    async ({ responsibility, events, groups }) => {
+    async ({ responsibility, events, groups, diagnostics }) => {
       const caller = await createCallerForUser(adminUser.id);
       const allHealth = await caller.admin.cloudAgentNext.getHealthOverview(interval());
       const health = await caller.admin.cloudAgentNext.getHealthOverview({
@@ -369,6 +398,14 @@ describe('adminCloudAgentNextRouter', () => {
       expect(health.topErrors).toEqual(
         allHealth.topErrors.filter(error => error.responsibility === responsibility)
       );
+      expect(
+        Object.fromEntries(
+          health.topErrors.map(error => [
+            `${error.source}:${error.stage}:${error.code}:${error.responsibility}:${error.reason}`,
+            error.latestDiagnostic,
+          ])
+        )
+      ).toEqual(diagnostics);
       expect(health.errorTotals).toEqual({ events, groups });
       expect(allHealth.errorTotals).toEqual({ events: 4, groups: 4 });
     }
@@ -462,6 +499,7 @@ describe('adminCloudAgentNextRouter', () => {
       affectedSessions: 1,
       knownSandboxes: 1,
       sessionsWithoutSandbox: 0,
+      latestDiagnostic: 'Sandbox connection failed',
     });
     expect(health.summary.setupFailures).toBe(1);
     expect(sessions.rows).toEqual([
@@ -490,6 +528,8 @@ describe('adminCloudAgentNextRouter', () => {
           failure_code: storedCode,
           failure_responsibility: null,
           failure_reason: null,
+          error_message_redacted: 'Partial classification latest diagnostic',
+          error_expires_at: DIAGNOSTIC_EXPIRES_AT,
         },
         {
           ...matchingRun,
@@ -500,6 +540,8 @@ describe('adminCloudAgentNextRouter', () => {
           failure_code: code,
           failure_responsibility: 'unknown',
           failure_reason: 'unclassified',
+          error_message_redacted: 'Partial classification earlier diagnostic',
+          error_expires_at: DIAGNOSTIC_EXPIRES_AT,
         },
       ]);
       const caller = await createCallerForUser(adminUser.id);
@@ -522,6 +564,7 @@ describe('adminCloudAgentNextRouter', () => {
         affectedSessions: 1,
         knownSandboxes: 0,
         sessionsWithoutSandbox: 1,
+        latestDiagnostic: 'Partial classification latest diagnostic',
       });
       expect(sessions).toMatchObject({
         totalSessions: 1,
@@ -700,7 +743,9 @@ describe('adminCloudAgentNextRouter', () => {
         affectedSessions: 1,
         knownSandboxes: 1,
         sessionsWithoutSandbox: 0,
+        latestDiagnostic: 'Sandbox connection failed',
       });
+      expect(JSON.stringify(health.topErrors)).not.toContain('Expired run diagnostic');
       expect(health.summary.failedRuns).toBe(3);
     }
   );
@@ -760,8 +805,14 @@ describe('adminCloudAgentNextRouter', () => {
       expect(JSON.stringify(sessions)).not.toContain('Expired setup diagnostic');
       expect(health.summary.setupFailures).toBe(2);
       expect(health.topErrors).toContainEqual(
-        expect.objectContaining({ source: 'setup', reason: 'initial_admission_unknown', count: 1 })
+        expect.objectContaining({
+          source: 'setup',
+          reason: 'initial_admission_unknown',
+          count: 1,
+          latestDiagnostic: null,
+        })
       );
+      expect(JSON.stringify(health.topErrors)).not.toContain('Expired setup diagnostic');
     }
   );
 
@@ -898,5 +949,136 @@ describe('adminCloudAgentNextRouter', () => {
       rows: [expect.objectContaining({ cloudAgentSessionId: ids.mapped, matchingEvents: 1 })],
     });
     expect(JSON.stringify(managedProviderSessions)).not.toContain(ids.unmapped);
+  });
+
+  it('prefers the later retained setup diagnostic within a normalized group', async () => {
+    await db
+      .update(cloud_agent_sessions)
+      .set({
+        failure_code: 'initial_admission_rejected',
+        failure_responsibility: 'unknown',
+        failure_reason: 'initial_admission_unknown',
+        error_message_redacted: 'Later setup diagnostic',
+        error_expires_at: DIAGNOSTIC_EXPIRES_AT,
+      })
+      .where(eq(cloud_agent_sessions.cloud_agent_session_id, ids.setupFailedLater));
+    const caller = await createCallerForUser(adminUser.id);
+    const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
+
+    expect(health.topErrors).toContainEqual(
+      expect.objectContaining({
+        source: 'setup',
+        stage: 'initial_admission',
+        code: 'initial_admission_rejected',
+        responsibility: 'unknown',
+        reason: 'initial_admission_unknown',
+        count: 2,
+        latestDiagnostic: 'Later setup diagnostic',
+      })
+    );
+    expect(JSON.stringify(health.topErrors)).not.toContain('Initial admission failed');
+  });
+
+  it('prefers the later retained run diagnostic within a normalized group', async () => {
+    await db.insert(cloud_agent_session_runs).values([
+      {
+        ...matchingRun,
+        message_id: 'msg_run_diag_earlier',
+        terminal_at: at(7),
+        error_message_redacted: 'Earlier run diagnostic',
+        error_expires_at: DIAGNOSTIC_EXPIRES_AT,
+      },
+      {
+        ...matchingRun,
+        message_id: 'msg_run_diag_later',
+        terminal_at: at(9),
+        error_message_redacted: 'Later run diagnostic',
+        error_expires_at: DIAGNOSTIC_EXPIRES_AT,
+      },
+    ]);
+    const caller = await createCallerForUser(adminUser.id);
+    const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
+
+    expect(health.topErrors).toContainEqual(
+      expect.objectContaining({
+        ...matchingError,
+        count: 3,
+        latestDiagnostic: 'Later run diagnostic',
+      })
+    );
+    expect(JSON.stringify(health.topErrors)).not.toContain('Earlier run diagnostic');
+  });
+
+  it('breaks run diagnostic terminal-time ties by message ID', async () => {
+    await db.insert(cloud_agent_session_runs).values([
+      {
+        ...matchingRun,
+        message_id: 'msg_tie_alpha',
+        error_message_redacted: 'Alpha tie diagnostic',
+        error_expires_at: DIAGNOSTIC_EXPIRES_AT,
+      },
+      {
+        ...matchingRun,
+        message_id: 'msg_tie_beta',
+        error_message_redacted: 'Beta tie diagnostic',
+        error_expires_at: DIAGNOSTIC_EXPIRES_AT,
+      },
+    ]);
+    const caller = await createCallerForUser(adminUser.id);
+    const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
+
+    expect(health.topErrors).toContainEqual(
+      expect.objectContaining({ ...matchingError, latestDiagnostic: 'Beta tie diagnostic' })
+    );
+    expect(JSON.stringify(health.topErrors)).not.toContain('Alpha tie diagnostic');
+  });
+
+  it('breaks run diagnostic terminal-time and message ID ties by Cloud Agent session ID', async () => {
+    await db.insert(cloud_agent_session_runs).values([
+      {
+        ...matchingRun,
+        cloud_agent_session_id: ids.mapped,
+        message_id: 'msg_cross_tie',
+        error_message_redacted: 'Mapped session diagnostic',
+        error_expires_at: DIAGNOSTIC_EXPIRES_AT,
+      },
+      {
+        ...matchingRun,
+        cloud_agent_session_id: ids.setupFailed,
+        message_id: 'msg_cross_tie',
+        error_message_redacted: 'Setup session diagnostic',
+        error_expires_at: DIAGNOSTIC_EXPIRES_AT,
+      },
+    ]);
+    const caller = await createCallerForUser(adminUser.id);
+    const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
+
+    expect(health.topErrors).toContainEqual(
+      expect.objectContaining({ ...matchingError, latestDiagnostic: 'Setup session diagnostic' })
+    );
+    expect(JSON.stringify(health.topErrors)).not.toContain('Mapped session diagnostic');
+  });
+
+  it('returns no diagnostic when every run in a group has an expired or missing diagnostic', async () => {
+    await db
+      .update(cloud_agent_session_runs)
+      .set({
+        error_message_redacted: 'Expired only diagnostic',
+        error_expires_at: '2000-01-01T00:00:00.000Z',
+      })
+      .where(
+        and(
+          eq(cloud_agent_session_runs.cloud_agent_session_id, ids.mapped),
+          eq(cloud_agent_session_runs.message_id, 'msg_admin_failed_predispatch')
+        )
+      );
+    const caller = await createCallerForUser(adminUser.id);
+    const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
+
+    expect(health.topErrors).toContainEqual(
+      expect.objectContaining({ ...matchingError, count: 1, latestDiagnostic: null })
+    );
+    expect(JSON.stringify(health.topErrors)).not.toContain('Expired only diagnostic');
+    expect(JSON.stringify(health.topErrors)).not.toContain('Sandbox connection failed');
   });
 });

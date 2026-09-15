@@ -593,9 +593,17 @@ describe.each([
         expect(await h.control.getStatus()).toMatchObject({ connection: 'connected' });
         await expect(h.control.request(request())).resolves.toEqual(response({ success: true }));
         expect(h.sendRequest).toHaveBeenLastCalledWith(request());
-        await expect(h.control.request(prompt(authorization(rootA)))).rejects.toThrow(
-          'Sandbox runtime is not ready'
+        const refused = await h.control.request(prompt(authorization(rootA))).then(
+          value => value,
+          error => error
         );
+        expect(refused).toMatchObject({
+          code: 'not_ready',
+          message: 'Sandbox runtime is not ready',
+          retryable: true,
+          admission: 'not-admitted',
+        });
+        expect((refused as { rejectionReceived?: unknown }).rejectionReceived).toBeUndefined();
       }
       expect(h.sendRequest).toHaveBeenCalledTimes(2);
       expect(await retained(h)).toEqual(recovery);
@@ -873,11 +881,21 @@ describe('SandboxControl production recovery hooks', () => {
       const pendingActivation = await retained(h);
       expect(pendingActivation.connectionId).not.toBe(exhausted.connectionId);
       expect(pendingActivation.activationAcknowledgedAt).toBeUndefined();
-      await expect(
-        h.control.request(
+      const pendingPrompt = await h.control
+        .request(
           prompt({ ...authorization(rootB, 'before_ack'), dispatchDeadlineAt: Date.now() + 5_000 })
         )
-      ).rejects.toThrow('Sandbox runtime is not ready');
+        .then(
+          value => value,
+          error => error
+        );
+      expect(pendingPrompt).toMatchObject({
+        code: 'not_ready',
+        message: 'Sandbox runtime is not ready',
+        retryable: true,
+        admission: 'not-admitted',
+      });
+      expect((pendingPrompt as { rejectionReceived?: unknown }).rejectionReceived).toBeUndefined();
       await h.reconstruct();
       await h.hooks.onReady?.(h.connection);
       await h.flush();

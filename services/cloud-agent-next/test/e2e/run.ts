@@ -2,7 +2,7 @@
  * CLI entrypoint for running a single lifecycle × conversation pair.
  *
  * Usage:
- *   tsx test/e2e/run.ts [--api=unified|legacy] <lifecycle> <conversation>
+ *   tsx test/e2e/run.ts [--api=unified|legacy] [--timeout-ms=<n>] <lifecycle> <conversation>
  *
  * Examples:
  *   tsx test/e2e/run.ts cold echo:hi
@@ -12,6 +12,7 @@
  *   tsx test/e2e/run.ts queue-while-busy gate1
  *   tsx test/e2e/run.ts queue-overflow _
  *   tsx test/e2e/run.ts callback-completion echo:done
+ *   tsx test/e2e/run.ts feed-stale-recovery _
  *   tsx test/e2e/run.ts --api=legacy hot echo:hi
  *
  * The stack must be running (`pnpm dev:start cloud-agent`). Leave
@@ -32,14 +33,27 @@ import {
 } from './auth.js';
 import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
 import { isControlPlaneOwner, isWorktreeOwner } from '../../src/session-plane.js';
-import { LIFECYCLE_SCENARIOS, type LifecycleResult } from './lifecycle.js';
+import {
+  LIFECYCLE_SCENARIOS,
+  LIFECYCLE_SCENARIO_TIMEOUT_MS,
+  type LifecycleResult,
+} from './lifecycle.js';
+import { FILE_STATE_SCENARIO_TIMEOUT_MS } from './lifecycle-file-state.js';
+import { CONTINUITY_SCENARIO_TIMEOUT_MS } from './lifecycle-continuity.js';
+
+/** Every scenario that accepts an explicit `--timeout-ms` and runs long. */
+const LONG_RUNNING_SCENARIO_TIMEOUT_MS: Record<string, number> = {
+  ...LIFECYCLE_SCENARIO_TIMEOUT_MS,
+  ...FILE_STATE_SCENARIO_TIMEOUT_MS,
+  ...CONTINUITY_SCENARIO_TIMEOUT_MS,
+};
 
 const SERVICE_PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 function printUsage(): void {
   const scenarios = Object.keys(LIFECYCLE_SCENARIOS).join('|');
   console.error(
-    `Usage: tsx test/e2e/run.ts [--api=unified|legacy] [--verbose] <${scenarios}> <conversation>`
+    `Usage: tsx test/e2e/run.ts [--api=unified|legacy] [--verbose] [--timeout-ms=<n>] <${scenarios}> <conversation>`
   );
   console.error('');
   console.error('conversation format: <scenario>[:<arg1>[:<arg2>...]]');
@@ -48,20 +62,23 @@ function printUsage(): void {
   console.error('queue flows ignore <conversation> for their directive; pass `_` as placeholder.');
   console.error('');
   console.error('--verbose  dump every received stream event (type + compact data)');
+  console.error('--timeout-ms=<n>  overall positive integer scenario deadline');
 }
 
 /**
- * Parse `[--api=...] [--verbose] <lifecycle> <conversation>` from argv.
+ * Parse `[--api=...] [--verbose] [--timeout-ms=...] <lifecycle> <conversation>` from argv.
  * Returns null on malformed input so the caller can print usage and exit.
  */
-function parseArgs(argv: string[]): {
+export function parseArgs(argv: string[]): {
   api: ApiVersion;
   lifecycle: string;
   conversation: string;
   verbose: boolean;
+  timeoutMs?: number;
 } | null {
   let api: ApiVersion = 'unified';
   let verbose = false;
+  let timeoutMs: number | undefined;
   const positional: string[] = [];
   for (const arg of argv) {
     if (arg.startsWith('--api=')) {
@@ -77,11 +94,32 @@ function parseArgs(argv: string[]): {
       verbose = true;
       continue;
     }
+    if (arg.startsWith('--timeout-ms=')) {
+      const value = Number(arg.slice('--timeout-ms='.length));
+      if (!Number.isFinite(value) || !Number.isInteger(value) || value <= 0) {
+        console.error(`invalid --timeout-ms value: ${arg.slice('--timeout-ms='.length)}`);
+        return null;
+      }
+      timeoutMs = value;
+      continue;
+    }
     positional.push(arg);
   }
   const [lifecycle, conversation] = positional;
   if (!lifecycle || !conversation) return null;
-  return { api, lifecycle, conversation, verbose };
+  if (timeoutMs !== undefined && LONG_RUNNING_SCENARIO_TIMEOUT_MS[lifecycle] === undefined) {
+    console.error(
+      `--timeout-ms is only supported for: ${Object.keys(LONG_RUNNING_SCENARIO_TIMEOUT_MS).join(', ')}`
+    );
+    return null;
+  }
+  return {
+    api,
+    lifecycle,
+    conversation,
+    verbose,
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+  };
 }
 
 /**
@@ -144,7 +182,7 @@ async function main(): Promise<void> {
     printUsage();
     process.exit(2);
   }
-  const { api, lifecycle, conversation, verbose } = parsed;
+  const { api, lifecycle, conversation, verbose, timeoutMs: requestedTimeoutMs } = parsed;
   const scenario = LIFECYCLE_SCENARIOS[lifecycle];
   if (!scenario) {
     console.error(`Unknown lifecycle: ${lifecycle}`);
@@ -166,13 +204,17 @@ async function main(): Promise<void> {
           funded: process.env.E2E_FUNDED === '1',
         });
   const expectControlPlane = Boolean(devVars.CONTROL_PLANE_IDS?.trim());
+  const requiresWorktreeEnrollment = new Set([
+    'worktree-shared',
+    ...Object.keys(LONG_RUNNING_SCENARIO_TIMEOUT_MS),
+  ]).has(lifecycle);
   if (
-    lifecycle === 'worktree-shared' &&
+    requiresWorktreeEnrollment &&
     (!isControlPlaneOwner(devVars, { userId: user.id }) ||
       !isWorktreeOwner(devVars, { userId: user.id }))
   ) {
     throw new Error(
-      'worktree-shared requires the E2E user to be enrolled in CONTROL_PLANE_IDS and WORKTREE_CREATION_ENABLED_IDS ' +
+      `${lifecycle} requires the E2E user to be enrolled in CONTROL_PLANE_IDS and WORKTREE_CREATION_ENABLED_IDS ` +
         'in the Worker .dev.vars; no session was started'
     );
   }
@@ -201,6 +243,11 @@ async function main(): Promise<void> {
     config,
     conversation,
     api,
+    ...(requestedTimeoutMs !== undefined
+      ? { timeoutMs: requestedTimeoutMs }
+      : LONG_RUNNING_SCENARIO_TIMEOUT_MS[lifecycle] !== undefined
+        ? { timeoutMs: LONG_RUNNING_SCENARIO_TIMEOUT_MS[lifecycle] }
+        : {}),
   });
   printResult(result, { verbose });
   process.exit(result.ok ? 0 : 1);

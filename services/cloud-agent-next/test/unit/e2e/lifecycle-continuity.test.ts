@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   classifyFault,
+  heartbeatMovedRouteOffActive,
   isSettledReapStopRecord,
   matchesConnection,
   matchesReconciliationIdentity,
@@ -69,6 +70,49 @@ describe('matchesConnection', () => {
         TARGET
       )
     ).toBe(true);
+  });
+});
+
+describe('heartbeatMovedRouteOffActive', () => {
+  const targetSession = 'kilo_root_target';
+
+  function sessionHeartbeat(kiloSessionId: string, sessionState: string): LogRecord {
+    return control({
+      diagnosticEvent: 'heartbeat',
+      sandboxId: TARGET.sandboxId,
+      connectionId: TARGET.connectionId,
+      wrapperInstanceId: TARGET.wrapperInstanceId,
+      kiloSessionId,
+      sessionState,
+    });
+  }
+
+  it('ignores a heartbeat that does not resolve to the target session', () => {
+    // Identity-matched to the captured connection but reporting another root
+    // with no packed entry for the target: unrelated, so not a route change.
+    expect(
+      heartbeatMovedRouteOffActive(
+        sessionHeartbeat('kilo_root_other', 'stopped'),
+        TARGET,
+        targetSession
+      )
+    ).toBe(false);
+  });
+
+  it('detects the target session moving off active', () => {
+    expect(
+      heartbeatMovedRouteOffActive(
+        sessionHeartbeat(targetSession, 'stopped'),
+        TARGET,
+        targetSession
+      )
+    ).toBe(true);
+  });
+
+  it('treats a still-active target heartbeat as no change', () => {
+    expect(
+      heartbeatMovedRouteOffActive(sessionHeartbeat(targetSession, 'active'), TARGET, targetSession)
+    ).toBe(false);
   });
 });
 

@@ -915,6 +915,21 @@ function selectTargetHeartbeat(
   return undefined;
 }
 
+/**
+ * True when one heartbeat record moves the target session's route off `active`.
+ * A heartbeat that carries no evidence for this exact session (neither an exact
+ * `kiloSessionId` nor a packed `sessionReport` entry for it) is unrelated and
+ * ignored rather than counted as a state change.
+ */
+export function heartbeatMovedRouteOffActive(
+  record: LogRecord,
+  identity: ConnectionIdentity,
+  kiloSessionId: string
+): boolean {
+  const evidence = selectTargetHeartbeat([record], identity, kiloSessionId);
+  return evidence !== undefined && evidence.sessionState !== 'active';
+}
+
 // ---------------------------------------------------------------------------
 // recover-same-session (A5 / D4)
 // ---------------------------------------------------------------------------
@@ -2703,10 +2718,8 @@ async function readStaleActiveRoute(
         matchesConnection(record, input.connection),
     })
   );
-  const changed = afterFreeze.filter(
-    record =>
-      selectTargetHeartbeat([record], input.connection, input.kiloSessionId)?.sessionState !==
-      'active'
+  const changed = afterFreeze.filter(record =>
+    heartbeatMovedRouteOffActive(record, input.connection, input.kiloSessionId)
   );
   if (changed.length > 0) {
     throw new Error(
@@ -2914,21 +2927,38 @@ export async function lifecycleWrapperFreezeSettledReap(
     }
     record('reapedPrimaryGone=true');
 
-    const follow = await sendAndAwaitCompletion(
-      resources,
-      session,
-      fakeDirective('echo', `freeze-settled-follow-${runId}`),
-      'settled replacement',
-      Math.min(WRAPPER_FREEZE_FOLLOWUP_BUDGET_MS, remainingMs(resources, 'settled replacement'))
-    );
-    const replacement = await assertDistinctReplacement(
-      resources,
-      session,
-      runtime.container.id,
-      'settled replacement runtime'
-    );
-    record(`replacementMessage=${follow.messageId}; lifecycle=${follow.lifecycle}`);
-    record(`replacementContainer=${replacement.container.id}`);
+    let replacementMessageId: string | undefined;
+    let replacementLifecycle: string | undefined;
+    let replacementRuntime: ControlPlaneKiloRuntime | undefined;
+    try {
+      const follow = await sendAndAwaitCompletion(
+        resources,
+        session,
+        fakeDirective('echo', `freeze-settled-follow-${runId}`),
+        'settled replacement',
+        Math.min(WRAPPER_FREEZE_FOLLOWUP_BUDGET_MS, remainingMs(resources, 'settled replacement'))
+      );
+      replacementMessageId = follow.messageId;
+      replacementLifecycle = follow.lifecycle;
+      replacementRuntime = await assertDistinctReplacement(
+        resources,
+        session,
+        runtime.container.id,
+        'settled replacement runtime'
+      );
+    } finally {
+      // The replacement is created by the follow-up turn. Claim whatever now
+      // owns the session even when that turn or the distinctness assertion
+      // failed, so cleanup stops it instead of leaking the container.
+      const claimed = await recordRecoveryRuntime(
+        resources,
+        session.kiloSessionId,
+        'settled replacement runtime'
+      );
+      if (claimed) replacementRuntime = claimed;
+    }
+    record(`replacementMessage=${replacementMessageId}; lifecycle=${replacementLifecycle}`);
+    record(`replacementContainer=${replacementRuntime?.container.id ?? 'none'}`);
 
     result = scenarioResult(
       'wrapper-freeze-settled-reap',
@@ -3122,21 +3152,41 @@ export async function lifecycleWrapperFreezeInflightReap(
     );
     resources.ownedGateTags.delete(tag);
 
-    const follow = await sendAndAwaitCompletion(
-      resources,
-      session,
-      fakeDirective('echo', `freeze-inflight-follow-${runId}`),
-      'same-session follow-up',
-      Math.min(WRAPPER_FREEZE_FOLLOWUP_BUDGET_MS, remainingMs(resources, 'same-session follow-up'))
-    );
-    const replacement = await assertDistinctReplacement(
-      resources,
-      session,
-      runtime.container.id,
-      'same-session replacement runtime'
-    );
-    record(`followUpMessage=${follow.messageId}; lifecycle=${follow.lifecycle}`);
-    record(`replacementContainer=${replacement.container.id}`);
+    let followUpMessageId: string | undefined;
+    let followUpLifecycle: string | undefined;
+    let replacementRuntime: ControlPlaneKiloRuntime | undefined;
+    try {
+      const follow = await sendAndAwaitCompletion(
+        resources,
+        session,
+        fakeDirective('echo', `freeze-inflight-follow-${runId}`),
+        'same-session follow-up',
+        Math.min(
+          WRAPPER_FREEZE_FOLLOWUP_BUDGET_MS,
+          remainingMs(resources, 'same-session follow-up')
+        )
+      );
+      followUpMessageId = follow.messageId;
+      followUpLifecycle = follow.lifecycle;
+      replacementRuntime = await assertDistinctReplacement(
+        resources,
+        session,
+        runtime.container.id,
+        'same-session replacement runtime'
+      );
+    } finally {
+      // The replacement is created by the follow-up turn. Claim whatever now
+      // owns the session even when that turn or the distinctness assertion
+      // failed, so cleanup stops it instead of leaking the container.
+      const claimed = await recordRecoveryRuntime(
+        resources,
+        session.kiloSessionId,
+        'same-session replacement runtime'
+      );
+      if (claimed) replacementRuntime = claimed;
+    }
+    record(`followUpMessage=${followUpMessageId}; lifecycle=${followUpLifecycle}`);
+    record(`replacementContainer=${replacementRuntime?.container.id ?? 'none'}`);
 
     result = scenarioResult(
       'wrapper-freeze-inflight-reap',

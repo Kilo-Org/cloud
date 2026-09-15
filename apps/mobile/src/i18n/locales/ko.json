@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "기기의 음성 인식 대신 Kilo Gateway 모델로 음성 입력을 텍스트로 변환합니다. 녹음 내용은 Kilo Gateway로 전송됩니다.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "도구 호출 압축",
-    "condenseToolCallsSubtitle": "연속된 도구 호출을 열 수 있는 하나의 행으로 그룹화합니다."
+    "condenseToolCallsSubtitle": "연속된 도구 호출을 열 수 있는 하나의 행으로 그룹화합니다.",
+    "toolSummaryTranslation": "도구 요약 번역",
+    "toolSummaryTranslationSubtitle": "각 도구 요약을 모델로 보내 앱 언어로 번역합니다. 번역에 실패하면 원본이 표시됩니다.",
+    "toolSummaryTranslationModelUnavailableNotice": "이 모델은 더 이상 제공되지 않습니다. 다른 모델을 선택하려면 $t(common.model)을 탭하세요."
   },
   "notifications": {
     "liveActivities": "실시간 활동",

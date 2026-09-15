@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Trawsgrifiwch fewnbwn llais â model Kilo Gateway yn lle adnabod lleferydd y ddyfais. Anfonir eich recordiad i Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Crynhoi galwadau offer",
-    "condenseToolCallsSubtitle": "Grwpio galwadau offer yn olynol i un rhes y gallwch ei hagor."
+    "condenseToolCallsSubtitle": "Grwpio galwadau offer yn olynol i un rhes y gallwch ei hagor.",
+    "toolSummaryTranslation": "Cyfieithu crynodebau offer",
+    "toolSummaryTranslationSubtitle": "Anfonwch bob crynodeb offer at fodel i'w gyfieithu i iaith eich ap. Dangosir y gwreiddiol os bydd'r cyfieithiad yn methu.",
+    "toolSummaryTranslationModelUnavailableNotice": "Nid yw'r model hwn yn cael ei gynnig mwyach. Tapiwch $t(common.model) i ddewis un arall."
   },
   "prReview": {
     "pullRequestUnavailable": "Cais tynnu ddim ar gael",

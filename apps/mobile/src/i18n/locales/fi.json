@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Muodosta äänisyötteestä teksti Kilo Gateway -mallilla laitteen puheentunnistuksen sijaan. Äänitteesi lähetetään Kilo Gatewayhin.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Tiivistä työkalukutsut",
-    "condenseToolCallsSubtitle": "Ryhmittele peräkkäiset työkalukutsut yhdelle riville, jonka voit avata."
+    "condenseToolCallsSubtitle": "Ryhmittele peräkkäiset työkalukutsut yhdelle riville, jonka voit avata.",
+    "toolSummaryTranslation": "Käännä työkalujen yhteenvedot",
+    "toolSummaryTranslationSubtitle": "Lähetä jokainen työkalun yhteenveto mallille käännettäväksi sovelluksesi kielelle. Alkuperäinen näytetään, jos käännös epäonnistuu.",
+    "toolSummaryTranslationModelUnavailableNotice": "Tätä mallia ei enää tarjota. Valitse toinen napauttamalla $t(common.model)."
   },
   "prReview": {
     "pullRequestUnavailable": "Muutospyyntö ei ole käytettävissä",

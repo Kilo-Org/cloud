@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Ejila njirimaka okwu nke ngwaọrụ ahụ; jiri ihe nlereanya Kilo Gateway tụgharịa ntinye olu ka ọ bụrụ ederede. A na-eziga ndekọ gị na Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Chịkọta oku ngwá ọrụ",
-    "condenseToolCallsSubtitle": "Chịkọta oku ngwá ọrụ so n'usoro n'otu ahịrị ị nwere ike imeghe."
+    "condenseToolCallsSubtitle": "Chịkọta oku ngwá ọrụ so n'usoro n'otu ahịrị ị nwere ike imeghe.",
+    "toolSummaryTranslation": "Tụgharịa nchịkọta ngwa ọrụ",
+    "toolSummaryTranslationSubtitle": "Zipu nchịkọta ngwa ọrụ ọ bụla na ihe nlereanya ka ọ tụgharịa ya n'asụsụ ngwa gị. A na-egosi nke mbụ ma ọ bụrụ na ntụgharị ahụ daa.",
+    "toolSummaryTranslationModelUnavailableNotice": "A naghịzi enye ihe nlereanya a. Pịa $t(common.model) iji họrọ ọzọ."
   },
   "prReview": {
     "pullRequestUnavailable": "Arịrịọ njikọta adịghị",

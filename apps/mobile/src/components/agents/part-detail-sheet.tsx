@@ -10,6 +10,7 @@ import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
 
 import { MONO_SCROLL_TEXT_MODE_OPTIONS, type MonoScrollTextMode } from './mono-scroll-block-model';
 import { MonoScrollSheetProvider } from './mono-scroll-block';
@@ -78,6 +79,11 @@ function renderPartContent(part: Part | null): ReactNode {
 export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const detailTitle = part ? getPartDetailTitle(part) : null;
+  const shownTitle = useTranslatedToolSummary(
+    detailTitle?.title ?? t('common.details'),
+    detailTitle?.translatable ?? false
+  );
   const [textMode, setTextMode] = useState<MonoScrollTextMode>('wrap');
   const [monoCount, setMonoCount] = useState(0);
   const [failedImage, setFailedImage] = useState<{ partId: string; uri: string } | null>(null);
@@ -123,11 +129,7 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
 
   return (
     <SessionPageSheet visible={visible} onClose={onClose}>
-      <SheetHeader
-        title={part ? getPartDetailTitle(part) : t('common.details')}
-        onDone={onClose}
-        doneLabel={t('common.done')}
-      />
+      <SheetHeader title={shownTitle} onDone={onClose} doneLabel={t('common.done')} />
 
       {monoCount > 0 ? (
         <View className="px-4 pb-2 pt-3">

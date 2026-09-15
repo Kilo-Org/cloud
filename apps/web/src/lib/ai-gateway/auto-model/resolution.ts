@@ -39,7 +39,7 @@ import {
 } from '@/lib/organizations/organization-auto-model';
 import { getModelVariants } from '@/lib/ai-gateway/providers/model-settings';
 import type { OpenCodeVariant } from '@kilocode/db/schema-types';
-import { warnExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -51,6 +51,7 @@ type ResolveAutoModelParams = {
   isAutoFreeCandidateAllowed: ((modelId: string) => Promise<boolean>) | null;
   // Lazily fetches the auto-routing worker's decision (route.ts owns the request-body capture).
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
+  isOrganizationAutoTarget?: boolean;
   organizationContext?: Promise<{
     organizationId?: string;
     settings?: OrganizationSettings;
@@ -138,6 +139,7 @@ export type ResolveAutoModelResult =
 
 type PrimaryDefaultFallbackCause =
   | 'decision_resolver_unavailable'
+  | 'organization_auto_static_fallback'
   | 'no_decision_returned'
   | 'virtual_auto_model_returned'
   | 'decision_variant_unavailable';
@@ -147,7 +149,9 @@ function fallBackToPrimaryDefault(
   cause: PrimaryDefaultFallbackCause,
   decision?: { model: string; variant?: string | null }
 ): ResolveAutoModelResult {
-  warnExceptInTest('Kilo Auto model falling back to primary default', {
+  const logFallback =
+    cause === 'organization_auto_static_fallback' ? logExceptInTest : warnExceptInTest;
+  logFallback('Kilo Auto model falling back to primary default', {
     cause,
     requestedModel: params.model,
     fallbackModel: PRIMARY_DEFAULT_MODEL,
@@ -237,6 +241,7 @@ async function resolveOrganizationAutoModel(
       {
         ...params,
         model: validation.modelId,
+        isOrganizationAutoTarget: true,
       },
       userPromise,
       balancePromise
@@ -345,7 +350,12 @@ export async function resolveAutoModel(
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
     if (!params.efficientDecision) {
-      return fallBackToPrimaryDefault(params, 'decision_resolver_unavailable');
+      return fallBackToPrimaryDefault(
+        params,
+        params.isOrganizationAutoTarget
+          ? 'organization_auto_static_fallback'
+          : 'decision_resolver_unavailable'
+      );
     }
     const decision = await params.efficientDecision();
     if (!decision) {

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 const mockedWarnExceptInTest = jest.fn();
+const mockedLogExceptInTest = jest.fn();
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   ...jest.requireActual<typeof GatewayModelsCache>(
@@ -11,6 +12,7 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
 }));
 
 jest.mock('@/lib/utils.server', () => ({
+  logExceptInTest: (...args: unknown[]) => mockedLogExceptInTest(...args),
   warnExceptInTest: (...args: unknown[]) => mockedWarnExceptInTest(...args),
 }));
 
@@ -511,6 +513,11 @@ describe('resolveAutoModel — kilo-auto/free branch', () => {
 });
 
 describe('resolveAutoModel — Organization Auto branch', () => {
+  beforeEach(() => {
+    mockedLogExceptInTest.mockClear();
+    mockedWarnExceptInTest.mockClear();
+  });
+
   it('uses exact built-in alias routes before canonical fallback routes', async () => {
     const result = await resolveAutoModel(
       {
@@ -714,6 +721,16 @@ describe('resolveAutoModel — Organization Auto branch', () => {
       resolved: primaryDefaultFallback,
       routingTarget: 'kilo-auto/balanced',
     });
+    expect(mockedLogExceptInTest).toHaveBeenCalledWith(
+      'Kilo Auto model falling back to primary default',
+      {
+        cause: 'organization_auto_static_fallback',
+        requestedModel: KILO_AUTO_BALANCED_MODEL.id,
+        fallbackModel: PRIMARY_DEFAULT_MODEL,
+        apiKind: 'chat_completions',
+      }
+    );
+    expect(mockedWarnExceptInTest).not.toHaveBeenCalled();
   });
 
   it('rejects Organization Auto without an organization context', async () => {

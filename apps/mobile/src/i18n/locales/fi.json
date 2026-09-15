@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Muodosta äänisyötteestä teksti Kilo Gateway -mallilla laitteen puheentunnistuksen sijaan. Äänitteesi lähetetään Kilo Gatewayhin.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Tiivistä työkalukutsut",
-    "condenseToolCallsSubtitle": "Ryhmittele peräkkäiset työkalukutsut yhdelle riville, jonka voit avata."
+    "condenseToolCallsSubtitle": "Ryhmittele peräkkäiset työkalukutsut yhdelle riville, jonka voit avata.",
+    "toolSummaryTranslation": "Käännä työkalujen yhteenvedot",
+    "toolSummaryTranslationSubtitle": "Lähetä jokainen työkalun yhteenveto mallille käännettäväksi sovelluksesi kielelle. Alkuperäinen näytetään, jos käännös epäonnistuu.",
+    "toolSummaryTranslationModelUnavailableNotice": "Tätä mallia ei enää tarjota. Valitse toinen napauttamalla $t(common.model)."
   },
   "prReview": {
     "pullRequestUnavailable": "Muutospyyntö ei ole käytettävissä",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Tämän laitteen tukemia kieliä ei voitu ladata.",
     "emptyTitle": "Ei tuettuja kieliä",
     "emptyDescription": "Tämän laitteen puheentunnistus ei ilmoita tuettuja kieliä."
+  },
+  "tour": {
+    "eyebrow": "Nopea esittely",
+    "forkTitle": "Missä haluat suorittaa Kilon?",
+    "forkSubtitle": "Valitse, missä Kilo suorittaa ensimmäisen istuntosi.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Suorita Kilo eristetyssä pilviympäristössä ilman asennuksia.",
+    "remoteOptionTitle": "Tietokoneesi",
+    "remoteOptionBody": "Suorita Kilo omalla koneellasi `kilo remote` -CLI:n kautta.",
+    "skip": "Ohita esittely",
+    "tutorialLabel": "Käyttöopas",
+    "remoteTitle": "Aloita ensimmäinen etäistuntosi",
+    "remoteBody": "Yhdistä tietokoneesi ja käynnistä istunto täältä.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Tietokonetta ei ole vielä yhdistetty",
+    "remoteEmptyBody": "Yhdistääksesi sen, suorita `kilo remote` tietokoneellasi.",
+    "remoteFound": "Tietokone yhdistetty",
+    "checkAgain": "Tarkista uudelleen",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

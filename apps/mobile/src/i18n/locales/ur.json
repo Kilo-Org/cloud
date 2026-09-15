@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "ڈیوائس کی آواز کی پہچان کے بجائے Kilo Gateway ماڈل کے ذریعے آواز سے لکھنے کو متن میں بدلیں۔ آپ کی ریکارڈنگ Kilo Gateway کو بھیجی جاتی ہے۔",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "ٹول کالز کو مختصر کریں",
-    "condenseToolCallsSubtitle": "مسلسل ٹول کالز کو ایک قطار میں گروپ کریں جسے آپ کھول سکتے ہیں۔"
+    "condenseToolCallsSubtitle": "مسلسل ٹول کالز کو ایک قطار میں گروپ کریں جسے آپ کھول سکتے ہیں۔",
+    "toolSummaryTranslation": "ٹول خلاصے ترجمہ کریں",
+    "toolSummaryTranslationSubtitle": "ہر ٹول خلاصہ کو ایک ماڈل کو بھیجیں تاکہ اسے آپ کی ایپ کی زبان میں ترجمہ کر سکے۔ ترجمہ ناکام ہونے پر اصل دکھایا جاتا ہے۔",
+    "toolSummaryTranslationModelUnavailableNotice": "یہ ماڈل اب پیش نہیں کیا جاتا۔ کوئی دوسرا منتخب کرنے کے لیے $t(common.model) پر ٹیپ کریں۔"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
@@ -3009,5 +3012,24 @@
     "loadFailed": "اس ڈیوائس کے معاون زبانوں کو لوڈ نہیں کیا جا سکا۔",
     "emptyTitle": "کوئی معاون زبان نہیں",
     "emptyDescription": "اس ڈیوائس کی تقریر کی شناخت کسی معاون زبان کی اطلاع نہیں دیتی۔"
+  },
+  "tour": {
+    "eyebrow": "فوری ٹور",
+    "forkTitle": "آپ Kilo کہاں چلانا چاہیں گے؟",
+    "forkSubtitle": "اپنے پہلے سیشن کے لیے منتخب کریں کہ Kilo کہاں چلے۔",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "کچھ بھی انسٹال کیے بغیر Kilo کو الگ تھلگ کلاؤڈ ماحول میں چلائیں۔",
+    "remoteOptionTitle": "آپ کا کمپیوٹر",
+    "remoteOptionBody": "اپنے کمپیوٹر پر `kilo remote` CLI کے ذریعے Kilo چلائیں۔",
+    "skip": "ٹور چھوڑیں",
+    "tutorialLabel": "ٹیوٹوریل",
+    "remoteTitle": "اپنا پہلا ریموٹ سیشن شروع کریں",
+    "remoteBody": "اپنا کمپیوٹر منسلک کریں، پھر یہاں سے سیشن شروع کریں۔",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "ابھی کوئی کمپیوٹر منسلک نہیں ہوا",
+    "remoteEmptyBody": "اسے منسلک کرنے کے لیے اپنے کمپیوٹر پر `kilo remote` چلائیں۔",
+    "remoteFound": "کمپیوٹر منسلک ہو گیا",
+    "checkAgain": "دوبارہ جانچیں",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

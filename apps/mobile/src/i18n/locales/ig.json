@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Ejila njirimaka okwu nke ngwaọrụ ahụ; jiri ihe nlereanya Kilo Gateway tụgharịa ntinye olu ka ọ bụrụ ederede. A na-eziga ndekọ gị na Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Chịkọta oku ngwá ọrụ",
-    "condenseToolCallsSubtitle": "Chịkọta oku ngwá ọrụ so n'usoro n'otu ahịrị ị nwere ike imeghe."
+    "condenseToolCallsSubtitle": "Chịkọta oku ngwá ọrụ so n'usoro n'otu ahịrị ị nwere ike imeghe.",
+    "toolSummaryTranslation": "Tụgharịa nchịkọta ngwa ọrụ",
+    "toolSummaryTranslationSubtitle": "Zipu nchịkọta ngwa ọrụ ọ bụla na ihe nlereanya ka ọ tụgharịa ya n'asụsụ ngwa gị. A na-egosi nke mbụ ma ọ bụrụ na ntụgharị ahụ daa.",
+    "toolSummaryTranslationModelUnavailableNotice": "A naghịzi enye ihe nlereanya a. Pịa $t(common.model) iji họrọ ọzọ."
   },
   "prReview": {
     "pullRequestUnavailable": "Arịrịọ njikọta adịghị",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Enweghị ike ibudata asụsụ ngwaọrụ a na-akwado.",
     "emptyTitle": "Enweghị asụsụ akwadoro",
     "emptyDescription": "Nchọpụta okwu nke ngwaọrụ a anaghị ekwupụta asụsụ ọ bụla akwadoro."
+  },
+  "tour": {
+    "eyebrow": "Njegharị ọsọ",
+    "forkTitle": "Ebe ịchọrọ ịgba Kilo?",
+    "forkSubtitle": "Họrọ ebe Kilo ga-agba nnọkọ mbụ gị.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Gbaa Kilo n'ime gburugburu cloud a kapịrị iche n'ejighị ihe ọbụla ịwụnye.",
+    "remoteOptionTitle": "Kọmputa gị",
+    "remoteOptionBody": "Gbaa Kilo na igwe gị site na CLI nke `kilo remote`.",
+    "skip": "Kwụsị njem",
+    "tutorialLabel": "Ntuziaka",
+    "remoteTitle": "Malite nnọkọ remote mbụ gị",
+    "remoteBody": "Jikọta kọmputa gị, mesịa malitee nnọkọ ahụ site ebe a.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Onweghị kọmputa jikọrọ ruo ugbu a",
+    "remoteEmptyBody": "Iji jikọta ya, gbaa `kilo remote` na kọmputa gị.",
+    "remoteFound": "Ejikọrọ kọmputa",
+    "checkAgain": "Lelee ọzọ",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

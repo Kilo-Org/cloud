@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "បម្លែងការបញ្ចូលដោយសំឡេងទៅជាអត្ថបទដោយប្រើម៉ូដែល Kilo Gateway ជំនួសឱ្យការចាប់សម្ដីរបស់ឧបករណ៍។ ការថតរបស់អ្នកត្រូវបានផ្ញើទៅ Kilo Gateway។",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "បង្រួមការហៅឧបករណ៍",
-    "condenseToolCallsSubtitle": "ដាក់ការហៅឧបករណ៍ជាបន្តបន្ទាប់ចូលក្នុងជួរតែមួយដែលអ្នកអាចបើកបាន។"
+    "condenseToolCallsSubtitle": "ដាក់ការហៅឧបករណ៍ជាបន្តបន្ទាប់ចូលក្នុងជួរតែមួយដែលអ្នកអាចបើកបាន។",
+    "toolSummaryTranslation": "បកប្រែសេចក្តីសង្ខេបឧបករណ៍",
+    "toolSummaryTranslationSubtitle": "ផ្ញើសេចក្តីសង្ខេបឧបករណ៍នីមួយៗទៅម៉ូដែលដើម្បីបកប្រែវាទៅជាភាសាកម្មវិធីរបស់អ្នក។ អត្ថបទដើមត្រូវបានបង្ហាញប្រសិនបើការបកប្រែបរាជ័យ។",
+    "toolSummaryTranslationModelUnavailableNotice": "ម៉ូដែលនេះលែងផ្តល់ជូនទៀតទេ។ ចុច $t(common.model) ដើម្បីជ្រើសរើសមួយផ្សេងទៀត។"
   },
   "prReview": {
     "pullRequestUnavailable": "មិនអាចបើកសំណើបញ្ចូលកូដបាន",
@@ -3009,5 +3012,24 @@
     "loadFailed": "មិនអាចផ្ទុកភាសាដែលឧបករណ៍នេះគាំទ្របានទេ។",
     "emptyTitle": "គ្មានភាសាដែលគាំទ្រ",
     "emptyDescription": "ការស្គាល់សំឡេងនៃឧបករណ៍នេះមិនរាយការណ៍ភាសាដែលគាំទ្រណាមួយទេ។"
+  },
+  "tour": {
+    "eyebrow": "ដំណើរខ្លី",
+    "forkTitle": "តើអ្នកចង់ដំណើរការ Kilo នៅឯណា?",
+    "forkSubtitle": "ជ្រើសរើសទីកន្លែងដែល Kilo នឹងដំណើរការវគ្គដំបូងរបស់អ្នក។",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "ដំណើរការ Kilo ក្នុងបរិយាកាសមេឃដែលបិទជិត ដោយមិនចាំបាច់ដំឡើងអ្វីឡើយ។",
+    "remoteOptionTitle": "កុំព្យូទ័ររបស់អ្នក",
+    "remoteOptionBody": "ដំណើរការ Kilo លើម៉ាស៊ីនរបស់អ្នកតាមរយៈ CLI `kilo remote`។",
+    "skip": "រំលងដំណើរ",
+    "tutorialLabel": "ការណែនាំ",
+    "remoteTitle": "ចាប់ផ្តើមវគ្គចម្ងាយដំបូងរបស់អ្នក",
+    "remoteBody": "ភ្ជាប់កុំព្យូទ័ររបស់អ្នក បន្ទាប់មកចាប់ផ្តើមវគ្គពីទីនេះ។",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "មិនទាន់មានកុំព្យូទ័របានភ្ជាប់ទេ",
+    "remoteEmptyBody": "ដើម្បីភ្ជាប់វា ចូលដំណើរការ `kilo remote` លើកុំព្យូទ័ររបស់អ្នក។",
+    "remoteFound": "បានភ្ជាប់កុំព្យូទ័រ",
+    "checkAgain": "ពិនិត្យម្តងទៀត",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

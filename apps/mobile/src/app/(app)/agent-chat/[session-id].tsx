@@ -3,7 +3,7 @@ import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { hashKey, useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSyncExternalStore } from 'react';
+import { useRef, useSyncExternalStore } from 'react';
 
 import {
   getAuthenticatedOwner,
@@ -79,6 +79,15 @@ export default function SessionDetailScreen() {
   const trpc = useTRPC();
   const router = useRouter();
   const { t } = useTranslation();
+  // The open's clock starts at route mount — before the metadata query and
+  // the transcript screen — so the slow-load threshold measures from when
+  // the user tapped, not from when SessionDetailContent happens to mount.
+  // Keyed on the session id: a reused route instance opening a different
+  // session restarts the clock.
+  const openStart = useRef({ sessionId: rawSessionId, startedAt: Date.now() });
+  if (openStart.current.sessionId !== rawSessionId) {
+    openStart.current = { sessionId: rawSessionId, startedAt: Date.now() };
+  }
   useRouteForegroundRefresh([[['cliSessionsV2']], [['modelPreferences']]]);
   const sessionQuery = useQuery({
     ...trpc.cliSessionsV2.get.queryOptions(
@@ -158,14 +167,27 @@ export default function SessionDetailScreen() {
     );
   }
 
-  if (identityFailed || (routeOrganizationId === undefined && sessionQuery.isError)) {
-    // A NOT_FOUND (e.g. the stored session was deleted) or UNAUTHORIZED
-    // (org-access denial) can't be recovered by retrying — show a permanent
-    // state with no Retry. Other errors stay transient and retriable. All
-    // get Back and Copy.
+  const metadataErrorCode = sessionQuery.error?.data?.code;
+  const metadataAccessDenied =
+    metadataErrorCode === 'NOT_FOUND' ||
+    metadataErrorCode === 'UNAUTHORIZED' ||
+    metadataErrorCode === 'FORBIDDEN';
+  // A failed background refresh does not invalidate owner-scoped cached
+  // metadata. Keep its provider mounted; only an authoritative denial retires it.
+  // A retryable metadata failure must not blank a session either: the device may
+  // still hold its persisted transcript, so mount the session and let the SDK
+  // paint the cached content and surface the retryable failure in place. Only a
+  // denial (deleted session / lost access) replaces the screen with the error.
+  if (
+    identityFailed ||
+    (routeOrganizationId === undefined && sessionQuery.isError && metadataAccessDenied)
+  ) {
+    // An identity failure stays retriable. An authoritative metadata denial
+    // (NOT_FOUND / UNAUTHORIZED / FORBIDDEN) can't be recovered by retrying, so
+    // it shows a permanent state with no Retry. Both get Back and Copy.
     const errorCode = identityFailed ? undefined : sessionQuery.error?.data?.code;
     const notFound = errorCode === 'NOT_FOUND';
-    const unauthorized = errorCode === 'UNAUTHORIZED';
+    const unauthorized = errorCode === 'UNAUTHORIZED' || errorCode === 'FORBIDDEN';
     let title = t(
       identityFailed ? 'bootstrap.couldNotLoadAccount' : 'agentChat.session.couldNotLoad'
     );
@@ -241,11 +263,13 @@ export default function SessionDetailScreen() {
     >
       <SessionDetailContent
         sessionId={sessionId as KiloSessionId}
+        cachedTitle={sessionQuery.data?.title ?? undefined}
         displayScope={displayScope}
         openedVia={via === 'push' ? 'push' : 'app'}
         shareId={shareId}
         autoSend={autoSendParam === '1'}
         spawnedMode={spawnedMode}
+        openStartedAt={openStart.current.startedAt}
       />
     </AgentSessionProvider>
   );

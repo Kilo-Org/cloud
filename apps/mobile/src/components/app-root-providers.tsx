@@ -15,6 +15,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { OrganizationProvider } from '@/lib/organization-context';
 import { queryClient } from '@/lib/query-client';
 import { QueryClientNativeLifecycle } from '@/lib/query-client-lifecycle';
+import { ToolSummaryTranslationRuntimeBootstrap } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
 export function AppRootProviders({
@@ -41,6 +42,7 @@ export function AppRootProviders({
             >
               {languageReady ? <AppUnlockAnnouncements /> : null}
               <OrganizationProvider>
+                <ToolSummaryTranslationRuntimeBootstrap />
                 <ActionSheetProvider>
                   <>
                     {children}

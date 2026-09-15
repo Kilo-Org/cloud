@@ -52,6 +52,7 @@ export default defineProject({
       'src/lib/pr-review/**/*.test.ts',
       'src/lib/query/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
+      'src/lib/tool-summary-translation/**/*.test.ts',
       'src/components/**/*.test.ts',
       'src/components/agents/**/!(*.mounted).test.tsx',
       'src/components/pr-review/**/!(*.mounted).test.tsx',
@@ -59,6 +60,7 @@ export default defineProject({
       // this directory holds both kinds, and a file in both projects runs twice.
       'src/components/kiloclaw/**/!(*.mounted).test.tsx',
       'src/lib/telemetry/**/*.test.ts',
+      'src/lib/tour/**/*.test.ts',
       'modules/kilo-surface-geometry/*.test.ts',
     ],
   },

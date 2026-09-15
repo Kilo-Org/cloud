@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "기기의 음성 인식 대신 Kilo Gateway 모델로 음성 입력을 텍스트로 변환합니다. 녹음 내용은 Kilo Gateway로 전송됩니다.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "도구 호출 압축",
-    "condenseToolCallsSubtitle": "연속된 도구 호출을 열 수 있는 하나의 행으로 그룹화합니다."
+    "condenseToolCallsSubtitle": "연속된 도구 호출을 열 수 있는 하나의 행으로 그룹화합니다.",
+    "toolSummaryTranslation": "도구 요약 번역",
+    "toolSummaryTranslationSubtitle": "각 도구 요약을 모델로 보내 앱 언어로 번역합니다. 번역에 실패하면 원본이 표시됩니다.",
+    "toolSummaryTranslationModelUnavailableNotice": "이 모델은 더 이상 제공되지 않습니다. 다른 모델을 선택하려면 $t(common.model)을 탭하세요."
   },
   "notifications": {
     "liveActivities": "실시간 활동",
@@ -3009,5 +3012,24 @@
     "loadFailed": "이 기기가 지원하는 언어를 로드하지 못했습니다.",
     "emptyTitle": "지원하는 언어 없음",
     "emptyDescription": "이 기기의 음성 인식은 지원하는 언어를 보고하지 않습니다."
+  },
+  "tour": {
+    "eyebrow": "빠른 둘러보기",
+    "forkTitle": "Kilo를 어디서 실행하시겠어요?",
+    "forkSubtitle": "첫 세션을 실행할 위치를 선택하세요.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "설치 없이 격리된 클라우드 환경에서 Kilo를 실행하세요.",
+    "remoteOptionTitle": "내 컴퓨터",
+    "remoteOptionBody": "`kilo remote` CLI로 내 컴퓨터에서 Kilo를 실행하세요.",
+    "skip": "투어 건너뛰기",
+    "tutorialLabel": "튜토리얼",
+    "remoteTitle": "첫 리모트 세션 시작하기",
+    "remoteBody": "컴퓨터를 연결한 뒤 여기서 세션을 시작하세요.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "연결된 컴퓨터가 없습니다",
+    "remoteEmptyBody": "연결하려면 컴퓨터에서 `kilo remote`를 실행하세요.",
+    "remoteFound": "컴퓨터 연결됨",
+    "checkAgain": "다시 확인",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

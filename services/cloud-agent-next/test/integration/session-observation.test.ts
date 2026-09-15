@@ -346,31 +346,27 @@ describe('Session observation wiring', () => {
     });
   });
 
-  it('does not retarget a watchdog when the accepted message changes during alarm setup', async () => {
+  it('does not fail a replacement accepted message that changes during an overdue check', async () => {
     const stub = env.SANDBOX_SESSION.getByName(`user_observation:workspace_${crypto.randomUUID()}`);
     await runInDurableObject(stub, async (instance, state) => {
       const f = await fixture(instance, state);
-      const setup = Promise.withResolvers<void>();
-      const originalGetAlarm = state.storage.getAlarm.bind(state.storage);
-      let alarmSetupStarted = 0;
-      state.storage.getAlarm = async () => {
-        alarmSetupStarted += 1;
-        await setup.promise;
-        return originalGetAlarm();
-      };
+      const refresh = vi.spyOn(instance['interactionRefresh'], 'refresh');
       try {
         const alarm = instance.alarm();
-        await vi.waitFor(() => expect(alarmSetupStarted).toBeGreaterThan(0));
+        await vi.waitFor(() =>
+          expect(refresh).toHaveBeenCalledWith(expect.anything(), 'accepted_alarm')
+        );
+        await vi.waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(1));
         const nextMessage = { ...f.message, messageId: 'msg_new' };
         state.storage.kv.put('session_messages', [nextMessage]);
-        setup.resolve();
+        f.pending.resolve(response(busy));
         await alarm;
-        expect(f.control.getStatus).not.toHaveBeenCalled();
-        expect(f.control.request).not.toHaveBeenCalled();
+        expect(f.control.getStatus).toHaveBeenCalledTimes(1);
+        expect(f.control.request).toHaveBeenCalledTimes(1);
         expect(state.storage.kv.get('session_messages')).toEqual([nextMessage]);
       } finally {
-        setup.resolve();
-        state.storage.getAlarm = originalGetAlarm;
+        f.pending.resolve(response(busy));
+        refresh.mockRestore();
         await f.cleanup();
       }
     });

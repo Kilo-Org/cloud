@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Transkribér diktering med en Kilo Gateway-modell i stedet for enhetens stemmgjenkjenning. Opptaket ditt sendes til Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Komprimer verktøykall",
-    "condenseToolCallsSubtitle": "Grupper påfølgende verktøykall i én rad du kan åpne."
+    "condenseToolCallsSubtitle": "Grupper påfølgende verktøykall i én rad du kan åpne.",
+    "toolSummaryTranslation": "Oversett verktøysammendrag",
+    "toolSummaryTranslationSubtitle": "Send hvert verktøysammendrag til en modell for å oversette det til appens språk. Originalen vises hvis oversettelsen mislykkes.",
+    "toolSummaryTranslationModelUnavailableNotice": "Denne modellen tilbys ikke lenger. Trykk på $t(common.model) for å velge en annen."
   },
   "prReview": {
     "pullRequestUnavailable": "PR-en er utilgjengelig",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Kunne ikke laste inn språkene denne enheten støtter.",
     "emptyTitle": "Ingen støttede språk",
     "emptyDescription": "Talegjenkjenningen på denne enheten rapporterer ingen støttede språk."
+  },
+  "tour": {
+    "eyebrow": "Hurtigomvisning",
+    "forkTitle": "Hvor vil du kjøre Kilo?",
+    "forkSubtitle": "Velg hvor Kilo kjører den første økten din.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Kjør Kilo i et isolert sky-miljø uten at du trenger å installere noe.",
+    "remoteOptionTitle": "Datamaskinen din",
+    "remoteOptionBody": "Kjør Kilo på din egen maskin via `kilo remote`-CLI-en.",
+    "skip": "Hopp over omvisning",
+    "tutorialLabel": "Opplæring",
+    "remoteTitle": "Start din første remote-økt",
+    "remoteBody": "Koble til datamaskinen din, og start økten herfra.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Ingen datamaskin er koblet til ennå",
+    "remoteEmptyBody": "For å koble den til, kjør `kilo remote` på datamaskinen din.",
+    "remoteFound": "Datamaskin tilkoblet",
+    "checkAgain": "Sjekk igjen",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

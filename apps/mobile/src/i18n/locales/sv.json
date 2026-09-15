@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Transkribera röstinmatningen med en Kilo Gateway-modell i stället för enhetens taligenkänning. Din inspelning skickas till Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Komprimera verktygsanrop",
-    "condenseToolCallsSubtitle": "Gruppera på varandra följande verktygsanrop i en rad som du kan öppna."
+    "condenseToolCallsSubtitle": "Gruppera på varandra följande verktygsanrop i en rad som du kan öppna.",
+    "toolSummaryTranslation": "Översätt verktygssammanfattningar",
+    "toolSummaryTranslationSubtitle": "Skicka varje verktygssammanfattning till en modell för att översätta den till appens språk. Originalet visas om översättningen misslyckas.",
+    "toolSummaryTranslationModelUnavailableNotice": "Den här modellen erbjuds inte längre. Tryck på $t(common.model) för att välja en annan."
   },
   "prReview": {
     "pullRequestUnavailable": "PR:en är inte tillgänglig",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Det gick inte att läsa in språken som den här enheten stöder.",
     "emptyTitle": "Inga språk som stöds",
     "emptyDescription": "Den här enhetens taligenkänning rapporterar inga språk som stöds."
+  },
+  "tour": {
+    "eyebrow": "Snabbguide",
+    "forkTitle": "Var vill du köra Kilo?",
+    "forkSubtitle": "Välj var Kilo kör din första session.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Kör Kilo i en isolerad molnmiljö utan att behöva installera något.",
+    "remoteOptionTitle": "Din dator",
+    "remoteOptionBody": "Kör Kilo på din egen maskin via `kilo remote`-CLI:n.",
+    "skip": "Hoppa över guiden",
+    "tutorialLabel": "Handledning",
+    "remoteTitle": "Starta din första distanssession",
+    "remoteBody": "Anslut din dator och starta sessionen härifrån.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Ingen dator är ansluten ännu",
+    "remoteEmptyBody": "För att ansluta den, kör `kilo remote` på din dator.",
+    "remoteFound": "Dator ansluten",
+    "checkAgain": "Kontrollera igen",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Transkribuok balso įvestį Kilo Gateway modeliu vietoj įrenginio kalbos atpažinimo. Įrašas siunčiamas į Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Sutraukti įrankių iškvietimus",
-    "condenseToolCallsSubtitle": "Sugrupuokite vienas po kito einančius įrankių iškvietimus į vieną eilutę, kurią galite atidaryti."
+    "condenseToolCallsSubtitle": "Sugrupuokite vienas po kito einančius įrankių iškvietimus į vieną eilutę, kurią galite atidaryti.",
+    "toolSummaryTranslation": "Išversti įrankių suvestines",
+    "toolSummaryTranslationSubtitle": "Siųsk kiekvieną įrankio suvestinę modeliui, kad ji būtų išversta į tavo programėlės kalbą. Jei vertimas nepavyksta, rodomas originalas.",
+    "toolSummaryTranslationModelUnavailableNotice": "Šis modelis nebeteikiamas. Palieskite $t(common.model), kad pasirinktumėte kitą."
   },
   "prReview": {
     "pullRequestUnavailable": "Pakeitimų užklausa nepasiekiama",
@@ -3053,5 +3056,24 @@
     "loadFailed": "Nepavyko įkelti šio įrenginio palaikomų kalbų.",
     "emptyTitle": "Nėra palaikomų kalbų",
     "emptyDescription": "Šio įrenginio kalbos atpažinimas nepraneša jokių palaikomų kalbų."
+  },
+  "tour": {
+    "eyebrow": "Greita apžvalga",
+    "forkTitle": "Kur norite paleisti Kilo?",
+    "forkSubtitle": "Pasirinkite, kur Kilo vykdys pirmąją sesiją.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Paleiskite Kilo izoliuotoje debesų aplinkoje nieko neįdiegdami.",
+    "remoteOptionTitle": "Jūsų kompiuteris",
+    "remoteOptionBody": "Paleiskite Kilo savo kompiuteryje per `kilo remote` CLI.",
+    "skip": "Praleisti apžvalgą",
+    "tutorialLabel": "Pamoka",
+    "remoteTitle": "Pradėkite pirmąją nuotolinę sesiją",
+    "remoteBody": "Prijunkite savo kompiuterį, tada pradėkite sesiją čia.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Dar nėra prijungto kompiuterio",
+    "remoteEmptyBody": "Norėdami prijungti, kompiuteryje vykdykite `kilo remote`.",
+    "remoteFound": "Kompiuteris prijungtas",
+    "checkAgain": "Kartoti patikrinimą",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

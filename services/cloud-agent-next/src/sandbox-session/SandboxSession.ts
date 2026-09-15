@@ -1,3 +1,7 @@
+import {
+  logRuntimeAuthorizationDiagnostic,
+  runtimeAuthorizationRecoveryDenied,
+} from '../session/runtime-authorization-diagnostics.js';
 import jwt from 'jsonwebtoken';
 import { DurableObject } from 'cloudflare:workers';
 import type {
@@ -1266,6 +1270,12 @@ export class SandboxSession extends DurableObject<Env> {
           authorization,
           secret,
           connectionString: this.env.HYPERDRIVE.connectionString,
+          onBindingRejected: reason =>
+            logRuntimeAuthorizationDiagnostic(
+              metadata?.identity.sessionId,
+              'binding_check',
+              reason
+            ),
         }),
     });
   }
@@ -1306,9 +1316,12 @@ export class SandboxSession extends DurableObject<Env> {
     runtimeToken: string;
   }): Promise<{ status: 'recovered' | 'not-needed' | 'denied' | 'busy' | 'retry' }> {
     const metadata = await this.getMetadata();
-    if (!metadata || metadata.identity.userId !== input.ownerId) return { status: 'denied' };
+    const denied = (reason: Parameters<typeof runtimeAuthorizationRecoveryDenied>[1]) =>
+      runtimeAuthorizationRecoveryDenied(metadata?.identity.sessionId ?? this.sessionId, reason);
+    if (!metadata) return denied('metadata_unavailable');
+    if (metadata.identity.userId !== input.ownerId) return denied('owner_mismatch');
     const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) return { status: 'denied' };
+    if (!secret) return denied('missing_secret');
     let fresh: RuntimeAuthorization;
     try {
       fresh = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
@@ -1318,14 +1331,14 @@ export class SandboxSession extends DurableObject<Env> {
         organizationId: metadata.identity.orgId,
       });
     } catch {
-      return { status: 'denied' };
+      return denied('invalid_seal');
     }
-    if (fresh.state !== 'active') return { status: 'denied' };
-    if (!metadata.auth.kiloSessionId) return { status: 'denied' };
+    if (fresh.state !== 'active') return denied('fresh_authorization_inactive');
+    if (!metadata.auth.kiloSessionId) return denied('kilo_session_missing');
     const current = await this.getRuntimeAuthorizationRecoveryState();
     if (current.state === 'legacy' || current.state === 'active') return { status: 'not-needed' };
     if (current.state !== 'expired' || current.id !== input.expectedOldId)
-      return { status: 'denied' };
+      return denied('authorization_state_changed');
     if (
       this.loadMessages().some(
         message => message.state === 'accepted' || message.state === 'queued'

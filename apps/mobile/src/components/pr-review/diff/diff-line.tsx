@@ -31,7 +31,14 @@
 
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
+import {
+  Pressable,
+  Text as RNText,
+  type TextStyle,
+  useColorScheme,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlight';
@@ -97,7 +104,8 @@ function markerColorFor(
 function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLineProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const isDark = colors.background === '#0E0E10';
+  // Same signal `useThemeColors` reads; never a background-token equality.
+  const isDark = useColorScheme() === 'dark';
   const metrics = useDiffFontMetrics();
 
   const tokens = useMemo<HighlightToken[]>(

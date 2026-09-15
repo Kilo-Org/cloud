@@ -15,7 +15,7 @@
 
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
+import { Text as RNText, type TextStyle, useColorScheme, View, type ViewStyle } from 'react-native';
 
 import { type TFunction } from 'i18next';
 import { Text } from '@/components/ui/text';
@@ -208,7 +208,8 @@ function SideBySideRowImpl({ row, language, rowKeyId }: Readonly<SideBySideRowPr
   const colors = useThemeColors();
   const { t } = useTranslation();
   const metrics = useDiffFontMetrics();
-  const isDark = colors.background === '#0E0E10';
+  // Same signal `useThemeColors` reads; never a background-token equality.
+  const isDark = useColorScheme() === 'dark';
   const leftLine = row.left?.line ?? null;
   const rightLine = row.right?.line ?? null;
   const rowStyle: ViewStyle = { minHeight: metrics.rowMinHeight };

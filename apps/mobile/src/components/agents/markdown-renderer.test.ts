@@ -27,6 +27,8 @@ const rnStub = {
   ScrollView: 'ScrollView',
   TouchableHighlight: 'TouchableHighlight',
   Image: 'Image',
+  // CodeBlock reads the color scheme to pick its syntax palette.
+  useColorScheme: () => 'light',
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
     hairlineWidth: 1,

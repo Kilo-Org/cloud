@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts the native tree without a DOM. */
 import { createElement, Fragment } from 'react';
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildProps,

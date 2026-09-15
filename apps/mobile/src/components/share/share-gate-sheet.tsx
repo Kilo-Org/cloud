@@ -23,7 +23,7 @@ import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useHoistedOperationKey } from '@/lib/operation-key';
-import { getPrReviewPath } from '@/lib/profile-agent-navigation';
+import { providerPrRoutePath, providerPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
 import {
@@ -218,7 +218,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     }
     void Haptics.selectionAsync();
     setPendingShareNavigation({
-      href: getPrReviewPath(reviewPr.owner, reviewPr.repo, reviewPr.number) as string,
+      href: providerPrRoutePath(reviewPr) as string,
       shareId: null,
     });
     dismiss();
@@ -409,11 +409,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         <DestinationOptionRow
           icon={GitPullRequest}
           title={t('common.reviewPr')}
-          subtitle={t('share.reviewPrSubtitle', {
-            owner: reviewPr.owner,
-            repo: reviewPr.repo,
-            number: reviewPr.number,
-          })}
+          subtitle={t('share.reviewPrSubtitle', providerPrTriple(reviewPr))}
           accessibilityLabel={t('common.reviewPr')}
           onPress={handleReviewPr}
         />

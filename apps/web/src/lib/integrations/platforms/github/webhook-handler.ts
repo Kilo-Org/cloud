@@ -326,16 +326,17 @@ export async function handleGitHubWebhook(
             handleInstallationSuspend(parseResult.data, appType)
           );
         }
-        const integration = await findIntegrationByInstallationId(
+        // Suspend is a canonical lifecycle event: resolve the connected tenant
+        // for logging/dispatch (the unfiltered lookup can return a retained
+        // disconnected former tenant), and never drop the delivery just
+        // because the selected row is unhealthy — the handler updates
+        // canonical state unconditionally and restricts the tenant-facing
+        // action to the connected, non-disconnected association.
+        const integration = await findConnectedIntegrationByInstallationId(
           PLATFORM.GITHUB,
           installationId,
           appType
         );
-
-        if (integration && !isRoutableGitHubIntegration(integration)) {
-          logExceptInTest(`Integration unavailable, skipping event${logSuffix}`);
-          return NextResponse.json({ message: 'Integration unavailable' }, { status: 200 });
-        }
 
         if (integration) {
           const logResult = await logWebhook(integration, action);

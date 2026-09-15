@@ -783,7 +783,54 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
+    expect(mockFindConnectedIntegrationByInstallationId).toHaveBeenCalledWith(
+      'github',
+      '98765',
+      'standard'
+    );
+    expect(mockHandleInstallationSuspend).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      'standard'
+    );
+  });
+
+  it('dispatches installation.suspend for the connected tenant when a disconnected former tenant exists', async () => {
+    // The unfiltered lookup would return the retained disconnected row; the
+    // route must not use it (and must not drop the delivery), so the handler
+    // still runs and canonical state is reconciled.
+    mockFindIntegrationByInstallationId.mockResolvedValue({
+      ...integration,
+      github_disconnected_at: '2026-09-15T00:00:00.000Z',
+    });
+
+    const payload = { action: 'suspend', installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+    expect(mockLogWebhookEvent).toHaveBeenCalledTimes(1);
+    expect(mockHandleInstallationSuspend).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      'standard'
+    );
+  });
+
+  it('still dispatches installation.suspend when only a disconnected former tenant remains', async () => {
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(null);
+
+    const payload = { action: 'suspend', installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    // Canonical state is still reconciled by the handler; nothing is logged
+    // against the disconnected tenant.
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
     expect(mockHandleInstallationSuspend).toHaveBeenCalledWith(
       expect.objectContaining(payload),
       'standard'

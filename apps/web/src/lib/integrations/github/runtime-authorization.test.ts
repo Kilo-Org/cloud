@@ -3,6 +3,7 @@ import {
   getGitHubRuntimeAssociationRejectionReason,
   GitHubRuntimeAuthorizationError,
   isGitHubRuntimeAssociationAuthorized,
+  isUnexpectedGitHubRuntimeAuthorizationDenial,
 } from './runtime-authorization';
 import { db } from '@/lib/drizzle';
 
@@ -222,5 +223,36 @@ describe('runtime rejection diagnostics', () => {
     expect(db.select).toHaveBeenCalledTimes(1);
     expect(limit).toHaveBeenCalledTimes(1);
     expect(limit).toHaveBeenCalledWith(2);
+  });
+});
+
+describe('isUnexpectedGitHubRuntimeAuthorizationDenial', () => {
+  it.each([
+    'ambiguous_association',
+    'malformed_owner',
+    'missing_personal_owner',
+    'blocked_personal_owner',
+    'deleted_organization',
+    'integration_status',
+    'suspended',
+    'auth_invalid',
+    'disconnected',
+  ] as const)('reports %s', reason => {
+    expect(
+      isUnexpectedGitHubRuntimeAuthorizationDenial(new GitHubRuntimeAuthorizationError(reason))
+    ).toBe(true);
+  });
+
+  it('does not report a missing association, an unclassified denial, or unrelated errors', () => {
+    expect(
+      isUnexpectedGitHubRuntimeAuthorizationDenial(
+        new GitHubRuntimeAuthorizationError('missing_association')
+      )
+    ).toBe(false);
+    expect(
+      isUnexpectedGitHubRuntimeAuthorizationDenial(new GitHubRuntimeAuthorizationError())
+    ).toBe(false);
+    expect(isUnexpectedGitHubRuntimeAuthorizationDenial(new Error('other'))).toBe(false);
+    expect(isUnexpectedGitHubRuntimeAuthorizationDenial(null)).toBe(false);
   });
 });

@@ -50,15 +50,14 @@ jest.mock('@/lib/integrations/platforms/github/user-authorization', () => ({
     mockRevokeStoredGitHubUserAuthorization(githubUserId, appType, reason),
 }));
 
-jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
-  GitHubRuntimeAuthorizationError: class GitHubRuntimeAuthorizationError extends Error {
-    constructor(message: string) {
-      super(message);
-    }
-  },
-  assertGitHubInstallationRuntimeAuthorized: (installationId: string, appType: string) =>
-    mockAssertGitHubInstallationRuntimeAuthorized(installationId, appType),
-}));
+jest.mock('@/lib/integrations/github/runtime-authorization', () => {
+  const actual = jest.requireActual('@/lib/integrations/github/runtime-authorization');
+  return {
+    ...actual,
+    assertGitHubInstallationRuntimeAuthorized: (installationId: string, appType: string) =>
+      mockAssertGitHubInstallationRuntimeAuthorized(installationId, appType),
+  };
+});
 
 jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
   handleInstallationCreated: jest.fn(),
@@ -375,9 +374,10 @@ describe('handleGitHubWebhook', () => {
     );
   });
 
-  it('skips deferred GitHub work when the association disconnects after receipt', async () => {
+  it('skips deferred GitHub work for a missing association without a diagnostic', async () => {
+    jest.mocked(captureMessage).mockClear();
     mockAssertGitHubInstallationRuntimeAuthorized.mockRejectedValueOnce(
-      new GitHubRuntimeAuthorizationError()
+      new GitHubRuntimeAuthorizationError('missing_association')
     );
 
     const response = await handleGitHubWebhook(
@@ -388,6 +388,57 @@ describe('handleGitHubWebhook', () => {
     expect(response.status).toBe(200);
     await waitForAfterTask();
     expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('skips deferred GitHub work when the association disconnects after receipt', async () => {
+    jest.mocked(captureMessage).mockClear();
+    mockAssertGitHubInstallationRuntimeAuthorized.mockRejectedValueOnce(
+      new GitHubRuntimeAuthorizationError('disconnected')
+    );
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request_review_comment', reviewCommentPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await waitForAfterTask();
+    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        level: 'warning',
+        tags: expect.objectContaining({
+          github_runtime_authorization_reason: 'disconnected',
+        }),
+      })
+    );
+  });
+
+  it('skips deferred GitHub work and reports an unexpected denial reason', async () => {
+    jest.mocked(captureMessage).mockClear();
+    mockAssertGitHubInstallationRuntimeAuthorized.mockRejectedValueOnce(
+      new GitHubRuntimeAuthorizationError('ambiguous_association')
+    );
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request_review_comment', reviewCommentPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await waitForAfterTask();
+    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        level: 'warning',
+        tags: expect.objectContaining({
+          github_runtime_authorization_reason: 'ambiguous_association',
+        }),
+      })
+    );
   });
 
   it('returns 500 when the runtime availability query fails unexpectedly', async () => {

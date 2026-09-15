@@ -99,6 +99,29 @@ export function isGitHubRuntimeAssociationAuthorized(
   return getGitHubRuntimeAssociationRejectionReason(association) === null;
 }
 
+const REPORTED_GITHUB_RUNTIME_AUTHORIZATION_REASONS: ReadonlySet<GitHubRuntimeAuthorizationRejectionReason> =
+  new Set([
+    'ambiguous_association',
+    'malformed_owner',
+    'missing_personal_owner',
+    'blocked_personal_owner',
+    'deleted_organization',
+    'integration_status',
+    'suspended',
+    'auth_invalid',
+    'disconnected',
+  ]);
+
+export function isUnexpectedGitHubRuntimeAuthorizationDenial(
+  error: unknown
+): error is GitHubRuntimeAuthorizationError {
+  return (
+    error instanceof GitHubRuntimeAuthorizationError &&
+    error.reason !== undefined &&
+    REPORTED_GITHUB_RUNTIME_AUTHORIZATION_REASONS.has(error.reason)
+  );
+}
+
 export async function assertGitHubInstallationRuntimeAuthorized(
   installationId: string,
   appType: GitHubAppType

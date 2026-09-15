@@ -9,7 +9,7 @@ import {
   type PlatformIntegration,
 } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { captureException } from '@sentry/nextjs';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import { bot } from '@/lib/bot';
 import { MAX_ITERATIONS } from '@/lib/bot/constants';
 import {
@@ -32,7 +32,10 @@ import {
 } from '@/lib/bot/platform-helpers';
 import { findUserById } from '@/lib/user';
 import type { Thread } from 'chat';
-import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
+import {
+  GitHubRuntimeAuthorizationError,
+  isUnexpectedGitHubRuntimeAuthorizationDenial,
+} from '@/lib/integrations/github/runtime-authorization';
 
 type ExecutionCallbackPayload = {
   sessionId: string;
@@ -1019,6 +1022,15 @@ export async function POST(
           await stopIndicator({ handedOff: !workComplete });
         }
       } catch (error) {
+        if (isUnexpectedGitHubRuntimeAuthorizationDenial(error)) {
+          captureMessage('Unexpected GitHub runtime authorization denial', {
+            level: 'warning',
+            tags: {
+              source: 'bot-session-callback-api',
+              github_runtime_authorization_reason: error.reason,
+            },
+          });
+        }
         if (
           error instanceof PlatformIntegrationUnavailableError ||
           error instanceof PlatformIntegrationNotFoundError ||

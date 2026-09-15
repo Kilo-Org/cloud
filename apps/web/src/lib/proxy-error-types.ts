@@ -26,7 +26,6 @@ export const proxyErrorTypeSchema = z.enum([
   'byok_key_required',
   'upstream_error',
   'no_free_models_available',
-  'abuse_blocked',
   'organization_auto_configuration',
   'upstream_disconnect',
   'client_disconnect',

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { User } from '@kilocode/db/schema';
 import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@/lib/user/server';
@@ -9,7 +9,6 @@ import {
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { classifyAbuse } from '@/lib/ai-gateway/abuse-service';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import {
@@ -18,7 +17,6 @@ import {
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
-import { redisClient } from '@/lib/redis';
 import { ReasoningDetailsTransform, type Provider } from '@/lib/ai-gateway/providers/types';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
 import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
@@ -68,13 +66,6 @@ jest.mock('@/lib/organizations/effective-model-access.server', () => ({
   evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
   getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
 }));
-jest.mock('@/lib/ai-gateway/abuse-service', () => {
-  const actual = jest.requireActual('@/lib/ai-gateway/abuse-service');
-  return {
-    ...actual,
-    classifyAbuse: jest.fn(),
-  };
-});
 jest.mock('@/lib/ai-gateway/providers/get-provider');
 jest.mock('@/lib/ai-gateway/providers/partner/routing');
 jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
@@ -82,9 +73,6 @@ jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
 }));
 jest.mock('@/lib/ai-gateway/providers/upstream-request');
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache');
-jest.mock('@/lib/redis', () => ({
-  redisClient: { get: jest.fn(), set: jest.fn() },
-}));
 jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
   getToolsAvailable: jest.fn(() => false),
@@ -135,15 +123,12 @@ jest.mock('@/lib/ai-gateway/auto-model/resolution', () => {
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
-const mockedClassifyAbuse = jest.mocked(classifyAbuse);
 const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
 const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
-const mockedRedisGet = jest.mocked(redisClient.get);
-const mockedRedisSet = jest.mocked(redisClient.set);
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
 const mockedCollectDeniedAutoRoutingModelIds = jest.mocked(collectDeniedAutoRoutingModelIds);
 const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
@@ -237,36 +222,6 @@ function setUserAuth() {
   });
 }
 
-function classifyResult(
-  action: 'block' | 'rate-limit' | 'quarantine-1' | 'quarantine-2' | 'quarantine-3' | 'log' | null
-) {
-  return {
-    verdict: 'ALLOW' as const,
-    risk_score: 0,
-    signals: [],
-    action_metadata: {},
-    context: {
-      identity_key: 'user:user-123',
-      current_spend_1h: 0,
-      is_new_user: false,
-      requests_per_second: 0,
-    },
-    request_id: 123,
-    rules_engine: {
-      matches: action ? [{}] : [],
-      sus_score: action ? 0.9 : 0,
-      resolved_action: action,
-      matched_abuse_rule_ids: action ? ['rule-1'] : [],
-    },
-  };
-}
-
-function cachedRulesEngineAction(
-  action: NonNullable<ReturnType<typeof classifyResult>['rules_engine']['resolved_action']>
-) {
-  return action;
-}
-
 function upstreamJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -320,9 +275,6 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       userByok: null,
       bypassAccessCheck: false,
     });
-    mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
-    mockedRedisGet.mockResolvedValue(null);
-    mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
@@ -374,15 +326,6 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
     expect(providerInput).not.toHaveProperty('tokenSource');
     expect(providerInput).not.toHaveProperty('balance');
     expect(providerInput).not.toHaveProperty('userByok');
-    expect(mockedClassifyAbuse).toHaveBeenCalledWith(
-      expect.any(Request),
-      expect.anything(),
-      expect.objectContaining({
-        kiloUserId: 'anon:127.0.0.1',
-        organizationId: undefined,
-        isByok: false,
-      })
-    );
     expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -437,15 +380,6 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
     expect(mockedGetProvider).toHaveBeenCalledWith(
       expect.objectContaining({ user: authenticatedUser, organizationId: 'org-123' })
     );
-    expect(mockedClassifyAbuse).toHaveBeenCalledWith(
-      expect.any(Request),
-      expect.anything(),
-      expect.objectContaining({
-        kiloUserId: 'user-123',
-        organizationId: 'org-123',
-        isByok: true,
-      })
-    );
     expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -485,7 +419,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
   });
 });
 
-describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => {
+describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setUserAuth();
@@ -495,9 +429,6 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
       userByok: null,
       bypassAccessCheck: false,
     });
-    mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
-    mockedRedisGet.mockResolvedValue(null);
-    mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
@@ -506,10 +437,6 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
-  });
-
-  afterEach(() => {
-    jest.useRealTimers();
   });
 
   it('rejects providerOptions and directs clients to provider', async () => {
@@ -526,48 +453,6 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     });
     expect(mockedGetProvider).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
-
-  it('blocks request-local rules-engine block actions before upstream', async () => {
-    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('block'));
-    mockedClassifyAbuse.mockResolvedValue(classifyResult('block'));
-
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeBody()) as never);
-
-    expect(response.status).toBe(403);
-    expect(await response.json()).toMatchObject({
-      error_type: 'abuse_blocked',
-      message: 'Request blocked by abuse prevention rules.',
-    });
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
-
-  it('uses cached blocking action when blocking abuse refresh fails', async () => {
-    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('block'));
-    mockedClassifyAbuse.mockResolvedValue(null);
-
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeBody()) as never);
-
-    expect(response.status).toBe(403);
-    expect(await response.json()).toMatchObject({ error_type: 'abuse_blocked' });
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
-
-  it('does not block upstream on fresh blocking classifications when cache is nonblocking', async () => {
-    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('log'));
-    mockedClassifyAbuse.mockResolvedValue(classifyResult('block'));
-
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeBody()) as never);
-
-    expect(response.status).toBe(200);
-    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
-    expect(mockedRedisSet).toHaveBeenCalledWith(
-      expect.stringContaining('ai-gateway.abuse-rules:last-classification:user:user-123'),
-      'block'
-    );
   });
 
   it('passes the Vercel request ID to request logging', async () => {
@@ -801,21 +686,6 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('rate limits rules-engine rate-limit actions before upstream', async () => {
-    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('rate-limit'));
-    mockedClassifyAbuse.mockResolvedValue(classifyResult('rate-limit'));
-
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeBody()) as never);
-
-    expect(response.status).toBe(429);
-    expect(await response.json()).toMatchObject({
-      error_type: 'rate_limit_exceeded',
-      message: 'Rate limit exceeded. Please try again later.',
-    });
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
-
   it('applies free-model rate limiting to flagged Kilo-exclusive models', async () => {
     mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: false, requestCount: 200 });
 
@@ -854,162 +724,6 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedLogFreeModelRequest).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
-
-  it('adds latency and rewrites quarantine-3 non-BYOK requests to a free model', async () => {
-    jest.useFakeTimers();
-    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-3'));
-    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-3'));
-
-    const { POST } = await import('./route');
-    const responsePromise = POST(makeRequest(makeBody()) as never);
-
-    await jest.advanceTimersByTimeAsync(5999);
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-
-    await jest.advanceTimersByTimeAsync(1);
-    const response = await responsePromise;
-
-    expect(response.status).toBe(200);
-    expect(mockedGetProvider).toHaveBeenCalledTimes(2);
-    expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe('poolside/laguna-s-2.1:free');
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('poolside/laguna-s-2.1:free');
-    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
-      abuse_delay: 6000,
-      abuse_downgraded_from: 'openai/gpt-4o',
-    });
-  });
-
-  it('applies quarantine-1 latency without model rewrite', async () => {
-    jest.useFakeTimers();
-    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-1'));
-    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-1'));
-
-    const { POST } = await import('./route');
-    const responsePromise = POST(makeRequest(makeBody()) as never);
-
-    await jest.advanceTimersByTimeAsync(1999);
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-
-    await jest.advanceTimersByTimeAsync(1);
-    const response = await responsePromise;
-
-    expect(response.status).toBe(200);
-    expect(mockedGetProvider).toHaveBeenCalledTimes(1);
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('openai/gpt-4o');
-    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
-      abuse_delay: 2000,
-      abuse_downgraded_from: null,
-    });
-  });
-
-  it('applies quarantine-2 latency without model rewrite', async () => {
-    jest.useFakeTimers();
-    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-2'));
-    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-2'));
-
-    const { POST } = await import('./route');
-    const responsePromise = POST(makeRequest(makeBody()) as never);
-
-    await jest.advanceTimersByTimeAsync(5999);
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-
-    await jest.advanceTimersByTimeAsync(1);
-    const response = await responsePromise;
-
-    expect(response.status).toBe(200);
-    expect(mockedGetProvider).toHaveBeenCalledTimes(1);
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('openai/gpt-4o');
-    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
-      abuse_delay: 6000,
-      abuse_downgraded_from: null,
-    });
-  });
-
-  it('applies delay before returning error when quarantine-3 model-override provider fails', async () => {
-    jest.useFakeTimers();
-    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-3'));
-    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-3'));
-    mockedGetProvider
-      .mockResolvedValueOnce({
-        kind: 'provider',
-        provider,
-        userByok: null,
-        bypassAccessCheck: false,
-      })
-      .mockResolvedValueOnce({ kind: 'not-found' });
-
-    const { POST } = await import('./route');
-    const responsePromise = POST(makeRequest(makeBody()) as never);
-
-    await jest.advanceTimersByTimeAsync(5999);
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-
-    await jest.advanceTimersByTimeAsync(1);
-    const response = await responsePromise;
-
-    expect(response.status).toBe(404);
-    expect(mockedGetProvider).toHaveBeenCalledTimes(2);
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
-
-  it('applies delay before returning error when quarantine-3 override API kind is unsupported', async () => {
-    jest.useFakeTimers();
-    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-3'));
-    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-3'));
-    mockedGetProvider
-      .mockResolvedValueOnce({
-        kind: 'provider',
-        provider,
-        userByok: null,
-        bypassAccessCheck: false,
-      })
-      .mockResolvedValueOnce({
-        kind: 'provider',
-        provider: { ...provider, supportedChatApis: ['responses'] },
-        userByok: null,
-        bypassAccessCheck: false,
-      });
-
-    const { POST } = await import('./route');
-    const responsePromise = POST(makeRequest(makeBody()) as never);
-
-    await jest.advanceTimersByTimeAsync(5999);
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-
-    await jest.advanceTimersByTimeAsync(1);
-    const response = await responsePromise;
-
-    expect(response.status).toBe(400);
-    expect(mockedGetProvider).toHaveBeenCalledTimes(2);
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
-
-  it('adds latency without rewriting quarantine-3 BYOK requests', async () => {
-    jest.useFakeTimers();
-    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-3'));
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: [
-        {
-          decryptedAPIKey: 'byok-key',
-          providerId: 'openai',
-        },
-      ],
-      bypassAccessCheck: false,
-    });
-    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-3'));
-
-    const { POST } = await import('./route');
-    const responsePromise = POST(makeRequest(makeBody()) as never);
-
-    await jest.advanceTimersByTimeAsync(6000);
-    const response = await responsePromise;
-
-    expect(response.status).toBe(200);
-    expect(mockedGetProvider).toHaveBeenCalledTimes(1);
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('openai/gpt-4o');
-  });
 });
 
 describe('kilo-auto/efficient classifier billing', () => {
@@ -1024,9 +738,6 @@ describe('kilo-auto/efficient classifier billing', () => {
       userByok: null,
       bypassAccessCheck: false,
     });
-    mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
-    mockedRedisGet.mockResolvedValue(null);
-    mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
@@ -1274,11 +985,15 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
   });
 
-  it('bills the classifier even when the request is rejected downstream (abuse block)', async () => {
+  it('bills the classifier even when the provider does not support the request API', async () => {
     // Exit-safe billing: the classifier already spent on Kilo's credential, so
-    // the row must persist even though the request is blocked before upstream.
-    mockedRedisGet.mockResolvedValue('block');
-    mockedClassifyAbuse.mockResolvedValue(classifyResult('block'));
+    // the row must persist even though the request is rejected before upstream.
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: { ...provider, supportedChatApis: ['responses'] },
+      userByok: null,
+      bypassAccessCheck: false,
+    });
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
         model: 'anthropic/claude-haiku-4',
@@ -1294,7 +1009,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     const { POST } = await import('./route');
     const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(400);
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     await Promise.resolve();
     await Promise.resolve();
@@ -1480,9 +1195,6 @@ describe('auto-routing shadow classifier', () => {
       userByok: null,
       bypassAccessCheck: false,
     });
-    mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
-    mockedRedisGet.mockResolvedValue(null);
-    mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
@@ -1525,9 +1237,6 @@ describe('percentage-routed partner fallback', () => {
       bypassAccessCheck: false,
     });
     mockedGetPercentageRoutedPartnerProvider.mockResolvedValue(partnerProvider);
-    mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
-    mockedRedisGet.mockResolvedValue(null);
-    mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);

@@ -121,6 +121,7 @@ import { getPreparationSnapshots } from '../../src/session/preparation-history.j
 import { createEventQueries } from '../../src/session/queries/index.js';
 import { throwAdmissionError } from '../../src/session/queue-message.js';
 import {
+  isSandboxAcquisitionLostError,
   requestFrameSchema,
   responseFrameSchema,
   sessionOperationAckSchema,
@@ -430,6 +431,7 @@ async function completeHello(
           sessionOperationResults: true,
           scopedStopAbort: true,
           nativeRuntimeRetirement: true,
+          eventBatches: true,
         },
       },
     })
@@ -5716,9 +5718,18 @@ describe('SandboxControl acquisition receipts', () => {
         expect(await state.storage.get('acquisition_receipts')).toEqual(receipts);
         expect(await state.storage.getAlarm()).toBeNull();
       });
-      await expect(
-        Promise.resolve(control.ensureReady({ ...input, allowCreate: true }))
-      ).rejects.toThrow('Sandbox acquisition no longer owns this allocation');
+      const lostReason = await Promise.resolve(
+        control.ensureReady({ ...input, allowCreate: true })
+      ).then(
+        () => new Error('Expected a lost acquisition rejection'),
+        (error: unknown) => error
+      );
+      expect(isSandboxAcquisitionLostError(lostReason)).toBe(true);
+      expect(Object.prototype.hasOwnProperty.call(lostReason, 'name')).toBe(true);
+      expect(lostReason).toMatchObject({
+        name: 'SandboxAcquisitionLostError',
+        message: 'Sandbox acquisition no longer owns this allocation',
+      });
       await expect(
         Promise.resolve(
           control.ensureReady({
@@ -9005,6 +9016,147 @@ describe('SandboxSession control-plane regressions', () => {
     );
   }
 
+  it('rotates a lost acquisition and completes the queued message on a replacement runtime', async () => {
+    const { fixture, session } = messageFixture();
+    const { control, socket, provider, allocations } = await initializeTerminalRuntime(fixture);
+    const messageId = 'msg_aaaaaaaaaaaa00000000000001';
+    let replacement: WebSocket | undefined;
+    try {
+      await expect(
+        session.createSessionWithInitialAdmission({
+          identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+          auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+          agent: agentA,
+          workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+          message: {
+            initialTurn: {
+              type: 'prompt',
+              messageId,
+              prompt: 'recover this message',
+            },
+          },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+
+      const firstDispatch = runInDurableObject(session, instance => instance.alarm());
+      await firstDispatch;
+      await vi.waitFor(async () => {
+        const state = await admissionState(session);
+        expect(state.messages[0]).toMatchObject({
+          messageId,
+          state: 'queued',
+          preparationAttemptId: expect.any(String),
+          deliveryDeadlineAt: expect.any(Number),
+        });
+        expect(state.messages[0]?.unresolvedDispatch).toBeUndefined();
+        expect(state.messages[0]?.operations).toBeUndefined();
+      });
+      const firstState = await admissionState(session);
+      const firstMessage = firstState.messages.find(message => message.messageId === messageId);
+      if (!firstMessage?.preparationAttemptId || firstMessage.deliveryDeadlineAt === undefined)
+        throw new Error('Missing first acquisition');
+      const firstAttemptId = firstMessage.preparationAttemptId;
+      const deadlineAt = firstMessage.deliveryDeadlineAt;
+      const physical = await control.getPhysicalRecord();
+      expect(physical).toMatchObject({ state: 'running', providerRef: expect.any(String) });
+      await expect(
+        runInDurableObject(control, (_instance, state) =>
+          state.storage.get<Array<{ id: string; allocation: unknown }>>('acquisition_receipts')
+        )
+      ).resolves.toEqual([
+        expect.objectContaining({ id: firstAttemptId, allocation: expect.anything() }),
+      ]);
+
+      await control.beginStop('external_kill');
+      await fireControlDeadline(control, 'stopAttempt');
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'stopped',
+        providerRef: null,
+        createIntent: null,
+      });
+
+      const acquisitions: Parameters<typeof control.ensureReady>[0][] = [];
+      await runInDurableObject(control, instance => {
+        const prototype = Object.getPrototypeOf(instance) as typeof instance;
+        const ensureReady = instance.ensureReady.bind(instance);
+        vi.spyOn(prototype, 'ensureReady').mockImplementation(input => {
+          acquisitions.push(input);
+          return ensureReady(input);
+        });
+      });
+
+      const beforeClock = Date.now();
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(beforeClock + 5_001);
+      try {
+        await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+        const afterLoss = await admissionState(session);
+        expect(afterLoss.messages[0]).toMatchObject({
+          messageId,
+          state: 'queued',
+          deliveryDeadlineAt: deadlineAt,
+        });
+        expect(afterLoss.messages[0]?.preparationAttemptId).toBeUndefined();
+        const retryAt = await runInDurableObject(session, (_instance, state) =>
+          state.storage.getAlarm()
+        );
+        if (retryAt === null) throw new Error('Missing replacement retry alarm');
+        expect(retryAt).toBeLessThanOrEqual(deadlineAt);
+        clock.mockReturnValue(retryAt);
+
+        await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+        expect(acquisitions).toHaveLength(2);
+        const firstAcquisition = acquisitions[0]?.acquisition;
+        const secondAcquisition = acquisitions[1]?.acquisition;
+        expect(firstAcquisition).toMatchObject({ id: firstAttemptId, deadlineAt });
+        expect(secondAcquisition).toMatchObject({ id: expect.any(String), deadlineAt });
+        expect(secondAcquisition?.id).not.toBe(firstAttemptId);
+        expect(provider.create).toHaveBeenCalledTimes(1);
+        const launch = provider.launch.mock.calls.at(-1);
+        if (!launch) throw new Error('Expected replacement wrapper launch');
+        const replacementWrapperInstanceId = crypto.randomUUID();
+        replacement = await connect(launch[1].SANDBOX_CONTROL_CREDENTIAL, fixture.sandboxId);
+        await completeHello(replacement, 'hello_lost_acquisition_replacement', {
+          providerInstanceId: launch[0],
+          wrapperInstanceId: replacementWrapperInstanceId,
+        });
+        const replacementRequests = captureAndAcceptControlRequests(replacement);
+        signalWrapperReady(replacement);
+        await waitForWrapperReady({ ...fixture, wrapperInstanceId: replacementWrapperInstanceId });
+        expect(allocations).toContain(launch[0]);
+
+        const readyRetryAt = await runInDurableObject(session, (_instance, state) =>
+          state.storage.getAlarm()
+        );
+        if (readyRetryAt === null) throw new Error('Missing ready retry alarm');
+        clock.mockReturnValue(readyRetryAt);
+        await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+        await waitForAccepted(session, messageId);
+        expect(replacementRequests.map(request => request.operation)).toEqual([
+          'session.attach',
+          'session.prompt',
+        ]);
+        sendOutcome(replacement, messageId);
+        await vi.waitFor(async () => {
+          await expect(session.getMessageResult(messageId)).resolves.toMatchObject({
+            type: 'found',
+            result: { status: 'completed' },
+          });
+        });
+        const completed = await admissionState(session);
+        expect(completed.messages[0]).toMatchObject({
+          state: 'completed',
+          preparationAttemptId: secondAcquisition?.id,
+          deliveryDeadlineAt: deadlineAt,
+        });
+      } finally {
+        clock.mockRestore();
+      }
+    } finally {
+      socket.close();
+      replacement?.close();
+    }
+  });
+
   it('settles cancelled preparation and delivers B with its original acquisition after failed cleanup transfer and reset', async () => {
     const { fixture, session: originalSession } = messageFixture();
     let session = originalSession;
@@ -9129,6 +9281,49 @@ describe('SandboxSession control-plane regressions', () => {
         throw new Error('Expected bounded acquisition B');
       const acquisitionB = { id: b.preparationAttemptId, deadlineAt: b.deliveryDeadlineAt };
       expect(b.deliveryDeadlineAt).toBeGreaterThanOrEqual(admittedAt + SESSION_DELIVERY_TIMEOUT_MS);
+      const snapshotAttemptId = (snapshot: Record<string, unknown>): string | undefined =>
+        typeof snapshot.attemptId === 'string' ? snapshot.attemptId : undefined;
+      const snapshotNestedAttemptTrigger = (snapshot: Record<string, unknown>): unknown => {
+        const attempt = snapshot.attempt;
+        return attempt !== null && typeof attempt === 'object'
+          ? (attempt as Record<string, unknown>).triggerMessageId
+          : undefined;
+      };
+      const contradictsBOwnership = (snapshot: Record<string, unknown>): boolean => {
+        const nestedTrigger = snapshotNestedAttemptTrigger(snapshot);
+        return (
+          snapshotAttemptId(snapshot) !== b.preparationAttemptId ||
+          snapshot.triggerMessageId !== 'msg_after_cancel_b' ||
+          (nestedTrigger !== undefined && nestedTrigger !== 'msg_after_cancel_b')
+        );
+      };
+      const expectOnlyBOwnedExtras = (snapshots: Record<string, unknown>[]) => {
+        expect(
+          snapshots.filter(
+            snapshot => snapshotAttemptId(snapshot) === preparing.preparationAttemptId
+          )
+        ).toEqual(cancelled);
+        const extras = snapshots.filter(
+          snapshot => snapshotAttemptId(snapshot) !== preparing.preparationAttemptId
+        );
+        const bSnapshot = extras.find(
+          snapshot =>
+            snapshot.action === 'attempt_snapshot' &&
+            snapshotAttemptId(snapshot) === b.preparationAttemptId
+        );
+        expect(bSnapshot).toBeDefined();
+        expect(bSnapshot).toMatchObject({
+          attemptId: b.preparationAttemptId,
+          triggerMessageId: 'msg_after_cancel_b',
+          action: 'attempt_snapshot',
+          attempt: {
+            id: b.preparationAttemptId,
+            triggerMessageId: 'msg_after_cancel_b',
+            status: 'running',
+          },
+        });
+        expect(extras.filter(contradictsBOwnership)).toEqual([]);
+      };
       expect(acquisitions.map(input => input.acquisition?.id)).toEqual([
         preparing.preparationAttemptId,
       ]);
@@ -9145,7 +9340,7 @@ describe('SandboxSession control-plane regressions', () => {
       ).rejects.toThrow('cleanup continuation reset');
       session = env.SANDBOX_SESSION.getByName(`${fixture.ownerId}:${fixture.sessionId}`);
       expect(await admissionState(session)).toEqual(beforeReset);
-      expect(await preparationSnapshots(session)).toEqual(cancelled);
+      expectOnlyBOwnedExtras(await preparationSnapshots(session));
       await runInDurableObject(session, (_instance, state) => {
         expect(state.storage.kv.get('pending_runtime_cleanup')).toEqual(cleanup);
       });
@@ -9163,7 +9358,7 @@ describe('SandboxSession control-plane regressions', () => {
           action: 'attempt_completed',
         },
       });
-      expect(await preparationSnapshots(session)).toEqual(cancelled);
+      expectOnlyBOwnedExtras(await preparationSnapshots(session));
       const response = await SELF.fetch(
         `http://worker.test/stream?sessionId=${fixture.sessionId}&userId=${fixture.ownerId}&replay=false`,
         { headers: { Upgrade: 'websocket' } }
@@ -9176,9 +9371,11 @@ describe('SandboxSession control-plane regressions', () => {
       });
       stream.accept();
       await vi.waitFor(() => {
-        expect(
-          events.filter(event => event.streamEventType === 'preparing').map(event => event.data)
-        ).toEqual(cancelled);
+        expectOnlyBOwnedExtras(
+          events
+            .filter(event => event.streamEventType === 'preparing')
+            .map(event => event.data as Record<string, unknown>)
+        );
       });
       stream.close();
 
@@ -11314,7 +11511,6 @@ describe('SandboxSession control-plane regressions', () => {
         } satisfies SessionMessageRecord;
         await state.storage.put('session_messages', [accepted, queued]);
 
-        const observedAt = Date.now();
         await expect(
           instance.receiveSandboxControlEvent({
             identity: {
@@ -11328,8 +11524,8 @@ describe('SandboxSession control-plane regressions', () => {
         ).resolves.toEqual({ applied: true });
 
         const messages = await state.storage.get<SessionMessageRecord[]>('session_messages');
-        expect(messages).toEqual([{ ...accepted, lastActivityAt: expect.any(Number) }, queued]);
-        expect(messages?.[0]?.lastActivityAt).toBeGreaterThanOrEqual(observedAt);
+        expect(messages).toEqual([accepted, queued]);
+        expect(messages?.[0]?.lastActivityAt).toBe(accepted.lastActivityAt);
         await expect(instance.getCurrentMessageWork()).resolves.toEqual({
           messageId: accepted.messageId,
           status: 'running',

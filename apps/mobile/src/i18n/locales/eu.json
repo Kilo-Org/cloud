@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Transkribatu ahots-sarrera gailuaren hitz-sorgailuaren ordez Kilo Gateway eredu batekin. Zure grabaketa Kilo Gatewayra bidaltzen da.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Tresna-deiak txikitu",
-    "condenseToolCallsSubtitle": "Elkartu jarraian dauden tresna-deiak ireki dezakezun errenkada batean."
+    "condenseToolCallsSubtitle": "Elkartu jarraian dauden tresna-deiak ireki dezakezun errenkada batean.",
+    "toolSummaryTranslation": "Itzuli tresnen laburpenak",
+    "toolSummaryTranslationSubtitle": "Bidali tresna-laburpen bakoitza eredu batera zure aplikazioaren hizkuntzara itzultzeko. Jatorrizkoa erakutsiko da itzulpenak huts eginez gero.",
+    "toolSummaryTranslationModelUnavailableNotice": "Eredu hau jada ez da eskaintzen. Sakatu $t(common.model) beste bat hautatzeko."
   },
   "prReview": {
     "pullRequestUnavailable": "Bateratze-eskaera ez dago eskuragarri",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Ezin izan dira gailu honek onartzen dituen hizkuntzak kargatu.",
     "emptyTitle": "Ez dago hizkuntza onarturik",
     "emptyDescription": "Gailu honen ahots-ezagutzak ez du onartutako hizkuntzarik jakinarazten."
+  },
+  "tour": {
+    "eyebrow": "Bira azkarra",
+    "forkTitle": "Non nahi duzu Kilo exekutatu?",
+    "forkSubtitle": "Aukeratu Kilo non exekutatuko den zure lehen saioan.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Exekutatu Kilo isolatutako hodei-ingurune batean, ezer instalatu gabe.",
+    "remoteOptionTitle": "Zure ordenagailua",
+    "remoteOptionBody": "Exekutatu Kilo zure makinean `kilo remote` CLIaren bidez.",
+    "skip": "Baztertu bira",
+    "tutorialLabel": "Tutorial-a",
+    "remoteTitle": "Hasi zure lehen urruneko saioa",
+    "remoteBody": "Konektatu zure ordenagailua, eta gero hasi saioa hemendik.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Oraindik ez dago ordenagailurik konektatuta",
+    "remoteEmptyBody": "Konektatzeko, exekutatu `kilo remote` zure ordenagailuan.",
+    "remoteFound": "Ordenagailua konektatuta",
+    "checkAgain": "Egiaztatu berriro",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

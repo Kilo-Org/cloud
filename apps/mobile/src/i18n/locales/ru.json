@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Распознавайте голосовой ввод с помощью модели Kilo Gateway вместо распознавания речи на устройстве. Запись отправляется в Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Сжимать вызовы инструментов",
-    "condenseToolCallsSubtitle": "Объединяйте последовательные вызовы инструментов в одну строку, которую можно открыть."
+    "condenseToolCallsSubtitle": "Объединяйте последовательные вызовы инструментов в одну строку, которую можно открыть.",
+    "toolSummaryTranslation": "Переводить сводки инструментов",
+    "toolSummaryTranslationSubtitle": "Отправляйте каждый обзор инструмента модели, чтобы перевести его на язык вашего приложения. Если перевод не удался, показывается оригинал.",
+    "toolSummaryTranslationModelUnavailableNotice": "Эта модель больше не предлагается. Нажмите $t(common.model), чтобы выбрать другую."
   },
   "notifications": {
     "liveActivities": "Эфир активности",
@@ -3053,5 +3056,24 @@
     "loadFailed": "Не удалось загрузить языки, поддерживаемые этим устройством.",
     "emptyTitle": "Нет поддерживаемых языков",
     "emptyDescription": "Распознавание речи этого устройства не сообщает о поддерживаемых языках."
+  },
+  "tour": {
+    "eyebrow": "Быстрый тур",
+    "forkTitle": "Где вы хотите запустить Kilo?",
+    "forkSubtitle": "Выберите, где Kilo запустит ваш первый сеанс.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Запустите Kilo в изолированном облачном окружении, не устанавливая ничего.",
+    "remoteOptionTitle": "Ваш компьютер",
+    "remoteOptionBody": "Запустите Kilo на своём компьютере через CLI `kilo remote`.",
+    "skip": "Пропустить тур",
+    "tutorialLabel": "Обучение",
+    "remoteTitle": "Запустите свой первый удалённый сеанс",
+    "remoteBody": "Подключите свой компьютер, а затем запустите сеанс отсюда.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Компьютер ещё не подключён",
+    "remoteEmptyBody": "Чтобы подключить его, выполните `kilo remote` на своём компьютере.",
+    "remoteFound": "Компьютер подключён",
+    "checkAgain": "Проверить ещё раз",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

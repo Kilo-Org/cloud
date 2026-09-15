@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Mayar da shigar da murya zuwa rubutu da samfurin Kilo Gateway maimakon gane magana na na'urar. Ana aika rikodinka zuwa Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Haɗa kiran kayan aiki",
-    "condenseToolCallsSubtitle": "Haɗa kiran kayan aiki a jere cikin layi ɗaya da za ka iya buɗewa."
+    "condenseToolCallsSubtitle": "Haɗa kiran kayan aiki a jere cikin layi ɗaya da za ka iya buɗewa.",
+    "toolSummaryTranslation": "Fassara taƙaitaccen bayanin kayan aiki",
+    "toolSummaryTranslationSubtitle": "Aika kowane taƙaitaccen bayanin kayan aiki zuwa ga samfuri don fassara shi zuwa harshen manhajar ka. Ana nuna na asali idan fassarar ta kasa.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ba a ƙara ba da wannan samfuri ba. Matsa $t(common.model) don zaɓar wani."
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
@@ -3009,5 +3012,24 @@
     "loadFailed": "An kasa loda harsunan da wannan na'urar ke goyan baya.",
     "emptyTitle": "Babu harsunan da ake goyan baya",
     "emptyDescription": "Fahimtar magana ta wannan na'urar ba ta bayar da wani harshe da ake goyan baya ba."
+  },
+  "tour": {
+    "eyebrow": "Kaita gajere",
+    "forkTitle": "Ina kake son ka gudanar da Kilo?",
+    "forkSubtitle": "Zaɓi inda Kilo zai gudanar da zaman ka na farko.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Gudanar da Kilo a cikin yanarin gajimare mai keɓe ba tare da shigar da komai ba.",
+    "remoteOptionTitle": "Kwamfutarka",
+    "remoteOptionBody": "Gudanar da Kilo a na'urarka ta hanyar CLI na `kilo remote`.",
+    "skip": "Tsallake kaita",
+    "tutorialLabel": "Koyarwa",
+    "remoteTitle": "Fara zaman nesa na farko",
+    "remoteBody": "Haɗa kwamfutarka, sai ka fara zaman daga nan.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Babu kwamfuta da aka haɗa tukuna",
+    "remoteEmptyBody": "Don haɗa shi, gudanar da `kilo remote` a kwamfutarka.",
+    "remoteFound": "An haɗa kwamfuta",
+    "checkAgain": "Sake dubawa",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

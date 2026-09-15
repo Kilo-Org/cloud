@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "यन्त्रको वाणी पहिचानको सट्टा Kilo Gateway मोडेल प्रयोग गरेर भ्वाइस इनपुटलाई पाठमा रूपान्तरण गर्नुहोस्। तपाईंको रेकर्डिङ Kilo Gateway मा पठाइन्छ।",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "उपकरण कलहरू संक्षिप्त गर्नुहोस्",
-    "condenseToolCallsSubtitle": "लगातार उपकरण कलहरूलाई तपाईंले खोल्न सक्ने एउटा पङ्क्तिमा समूहबद्ध गर्नुहोस्।"
+    "condenseToolCallsSubtitle": "लगातार उपकरण कलहरूलाई तपाईंले खोल्न सक्ने एउटा पङ्क्तिमा समूहबद्ध गर्नुहोस्।",
+    "toolSummaryTranslation": "उपकरण सारांश अनुवाद गर्नुहोस्",
+    "toolSummaryTranslationSubtitle": "प्रत्येक उपकरण सारांशलाई तपाईंको एपको भाषामा अनुवाद गर्न मोडेलमा पठाउनुहोस्। अनुवाद असफल भएमा मूल देखाइन्छ।",
+    "toolSummaryTranslationModelUnavailableNotice": "यो मोडेल अब उपलब्ध छैन। अर्को छान्न $t(common.model) मा ट्याप गर्नुहोस्।"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट उपलब्ध छैन",
@@ -3009,5 +3012,24 @@
     "loadFailed": "यो यन्त्रले समर्थन गर्ने भाषाहरू लोड गर्न सकिएन।",
     "emptyTitle": "कुनै समर्थित भाषा छैन",
     "emptyDescription": "यो यन्त्रको वाणी पहिचानले कुनै समर्थित भाषा जानकारी दिँदैन।"
+  },
+  "tour": {
+    "eyebrow": "द्रुत भ्रमण",
+    "forkTitle": "तपाईं Kilo कहाँ चलाउन चाहनुहुन्छ?",
+    "forkSubtitle": "तपाईंको पहिलो सत्रका लागि Kilo कहाँ चल्छ भन्ने रोज्नुहोस्।",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "केही पनि इन्स्टल नगरी Kilo लाई आइसोलेटेड क्लाउड वातावरणमा चलाउनुहोस्।",
+    "remoteOptionTitle": "तपाईंको कम्प्युटर",
+    "remoteOptionBody": "आफ्नो मेसिनमा `kilo remote` CLI मार्फत Kilo चलाउनुहोस्।",
+    "skip": "भ्रमण छोड्नुहोस्",
+    "tutorialLabel": "ट्युटोरियल",
+    "remoteTitle": "तपाईंको पहिलो रिमोट सत्र सुरु गर्नुहोस्",
+    "remoteBody": "तपाईंको कम्प्युटर जोड्नुहोस्, त्यसपछि यहाँबाट सत्र सुरु गर्नुहोस्।",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "अहिलेसम्म कुनै कम्प्युटर जडान भएको छैन",
+    "remoteEmptyBody": "यसलाई जोड्न तपाईंको कम्प्युटरमा `kilo remote` चलाउनुहोस्।",
+    "remoteFound": "कम्प्युटर जडान भयो",
+    "checkAgain": "फेरि जाँच गर्नुहोस्",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

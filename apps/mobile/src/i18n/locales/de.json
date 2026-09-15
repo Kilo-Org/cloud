@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Transkribiere die Spracheingabe mit einem Kilo-Gateway-Modell statt mit der Spracherkennung des Geräts. Deine Aufnahme wird an das Kilo Gateway gesendet.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Tool-Aufrufe komprimieren",
-    "condenseToolCallsSubtitle": "Aufeinanderfolgende Tool-Aufrufe in einer Zeile zusammenfassen, die sich öffnen lässt."
+    "condenseToolCallsSubtitle": "Aufeinanderfolgende Tool-Aufrufe in einer Zeile zusammenfassen, die sich öffnen lässt.",
+    "toolSummaryTranslation": "Werkzeugzusammenfassungen übersetzen",
+    "toolSummaryTranslationSubtitle": "Sende jede Werkzeugzusammenfassung an ein Modell, um sie in deine App-Sprache zu übersetzen. Wenn die Übersetzung fehlschlägt, wird das Original angezeigt.",
+    "toolSummaryTranslationModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(common.model), um ein anderes zu wählen."
   },
   "notifications": {
     "liveActivities": "Live-Aktivitäten",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Die von diesem Gerät unterstützten Sprachen konnten nicht geladen werden.",
     "emptyTitle": "Keine unterstützten Sprachen",
     "emptyDescription": "Die Spracherkennung dieses Geräts meldet keine unterstützten Sprachen."
+  },
+  "tour": {
+    "eyebrow": "Schnelltour",
+    "forkTitle": "Wo möchtest du Kilo ausführen?",
+    "forkSubtitle": "Wähle aus, wo Kilo für deine erste Sitzung läuft.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Führe Kilo in einer isolierten Cloud-Umgebung aus, ohne etwas installieren zu müssen.",
+    "remoteOptionTitle": "Dein Computer",
+    "remoteOptionBody": "Führe Kilo über die `kilo remote`-CLI auf deinem eigenen Rechner aus.",
+    "skip": "Tour überspringen",
+    "tutorialLabel": "Tutorial",
+    "remoteTitle": "Starte deine erste Remote-Sitzung",
+    "remoteBody": "Verbinde deinen Computer und starte die Sitzung dann von hier.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Noch kein Computer verbunden",
+    "remoteEmptyBody": "Um ihn zu verbinden, führe `kilo remote` auf deinem Computer aus.",
+    "remoteFound": "Computer verbunden",
+    "checkAgain": "Erneut prüfen",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Преобразувай гласовото въвеждане с модел на Kilo Gateway вместо разпознаването на реч на устройството. Записът ти се изпраща до Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Свиване на извиквания на инструменти",
-    "condenseToolCallsSubtitle": "Групирайте последователни извиквания на инструменти в един ред, който можете да отворите."
+    "condenseToolCallsSubtitle": "Групирайте последователни извиквания на инструменти в един ред, който можете да отворите.",
+    "toolSummaryTranslation": "Преведи обобщенията на инструментите",
+    "toolSummaryTranslationSubtitle": "Изпращай всяко обобщение на инструмент към модел, за да го преведе на езика на приложението ти. Ако преводът се провали, се показва оригиналът.",
+    "toolSummaryTranslationModelUnavailableNotice": "Този модел вече не се предлага. Докосни $t(common.model), за да избереш друг."
   },
   "prReview": {
     "pullRequestUnavailable": "Недостъпна заявка за обединяване",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Езиците, поддържани от това устройство, не можаха да се заредят.",
     "emptyTitle": "Няма поддържани езици",
     "emptyDescription": "Разпознаването на реч на това устройство не отчита поддържани езици."
+  },
+  "tour": {
+    "eyebrow": "Бърз тур",
+    "forkTitle": "Къде искаш да стартираш Kilo?",
+    "forkSubtitle": "Избери къде да работи Kilo за първата ти сесия.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Стартирай Kilo в изолирана облачна среда, без нищо за инсталиране.",
+    "remoteOptionTitle": "Компютърът ти",
+    "remoteOptionBody": "Стартирай Kilo на собствената си машина през `kilo remote` CLI.",
+    "skip": "Пропусни тура",
+    "tutorialLabel": "Ръководство",
+    "remoteTitle": "Стартирай първата си отдалечена сесия",
+    "remoteBody": "Свържи компютъра си, после стартирай сесията оттук.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Все още няма свързан компютър",
+    "remoteEmptyBody": "За да го свържеш, изпълни `kilo remote` на компютъра си.",
+    "remoteFound": "Компютърът е свързан",
+    "checkAgain": "Провери отново",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Transkripte dikte a ak yon modèl Kilo Gateway olye rekonesans vokal aparèy la. Yo voye anrejistrman ou a bay Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Kondanse apèl zouti yo",
-    "condenseToolCallsSubtitle": "Gwoupe apèl zouti youn apre lòt nan yon sèl liy ou ka louvri."
+    "condenseToolCallsSubtitle": "Gwoupe apèl zouti youn apre lòt nan yon sèl liy ou ka louvri.",
+    "toolSummaryTranslation": "Tradui rezime zouti yo",
+    "toolSummaryTranslationSubtitle": "Voye chak rezime zouti bay yon modèl pou tradui li nan lang aplikasyon w lan. Yo montre orijinal la si tradiksyon an echwe.",
+    "toolSummaryTranslationModelUnavailableNotice": "Modèl sa a pa ofri ankò. Tape sou $t(common.model) pou chwazi yon lòt."
   },
   "prReview": {
     "pullRequestUnavailable": "Demann fizyon an pa disponib",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Pa t kapab chaje lang aparèy sa a sipòte yo.",
     "emptyTitle": "Pa gen lang ki sipòte",
     "emptyDescription": "Rekonesans vwa aparèy sa a pa rapòte okenn lang ki sipòte."
+  },
+  "tour": {
+    "eyebrow": "Vizit rapid",
+    "forkTitle": "Kote ou vle egzekite Kilo?",
+    "forkSubtitle": "Chwazi kote Kilo ap egzekite premye sesyon ou a.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Egzekite Kilo nan yon anviwònman nyaj izole, san ou pa enste anyen.",
+    "remoteOptionTitle": "Òdinatè ou",
+    "remoteOptionBody": "Egzekite Kilo sou pwòp machin ou a nan atravè CLI `kilo remote` la.",
+    "skip": "Pase vizit la",
+    "tutorialLabel": "Gid",
+    "remoteTitle": "Kòmanse premye sesyon distans ou a",
+    "remoteBody": "Konekte òdinatè ou a, epi kòmanse sesyon an soti isit la.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Okenn òdinatè konekte pou kounye a",
+    "remoteEmptyBody": "Pou konekte l, egzekite `kilo remote` sou òdinatè ou a.",
+    "remoteFound": "Òdinatè konekte",
+    "checkAgain": "Tcheke ankò",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

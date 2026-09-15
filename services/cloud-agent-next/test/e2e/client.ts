@@ -135,7 +135,7 @@ export async function trpcCall<T>(
   config: DriverConfig,
   procedure: string,
   input: unknown,
-  opts?: { internalApiSecret?: string; method?: 'GET' | 'POST' }
+  opts?: { internalApiSecret?: string; method?: 'GET' | 'POST'; signal?: AbortSignal }
 ): Promise<T> {
   const method = opts?.method ?? 'POST';
   const url = new URL(`/trpc/${procedure}`, config.workerUrl);
@@ -149,7 +149,7 @@ export async function trpcCall<T>(
   if (opts?.internalApiSecret) {
     headers['x-internal-api-key'] = opts.internalApiSecret;
   }
-  const fetchOpts: RequestInit = { method, headers };
+  const fetchOpts: RequestInit = { method, headers, signal: opts?.signal };
   if (method === 'POST') {
     fetchOpts.body = JSON.stringify(input);
   } else {
@@ -329,7 +329,8 @@ export type WorktreeSessionResult = {
 
 export async function prepareBrowserSession(
   config: DriverConfig,
-  input: { prompt: string; operationKey?: string; autoCommit?: boolean }
+  input: { prompt: string; operationKey?: string; autoCommit?: boolean },
+  signal?: AbortSignal
 ): Promise<WorktreeSessionResult> {
   if (!config.internalApiSecret) {
     throw new Error('browser-equivalent prepareSession requires INTERNAL_API_SECRET');
@@ -352,7 +353,7 @@ export async function prepareBrowserSession(
         ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
         : {}),
     },
-    { internalApiSecret: config.internalApiSecret }
+    { internalApiSecret: config.internalApiSecret, signal }
   );
 }
 
@@ -362,7 +363,8 @@ export async function createWorktreeChat(
     sourceKiloSessionId: string;
     sourceCloudAgentSessionId: string;
     operationKey?: string;
-  }
+  },
+  signal?: AbortSignal
 ): Promise<WorktreeSessionResult> {
   if (!config.internalApiSecret) {
     throw new Error('createWorktreeChat requires INTERNAL_API_SECRET');
@@ -379,7 +381,7 @@ export async function createWorktreeChat(
         ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
         : {}),
     },
-    { internalApiSecret: config.internalApiSecret }
+    { internalApiSecret: config.internalApiSecret, signal }
   );
 }
 
@@ -424,6 +426,7 @@ export type SendMessageArgs = {
   prompt: string;
   mode?: string;
   messageId?: string;
+  signal?: AbortSignal;
 };
 
 export async function sendMessage(
@@ -432,25 +435,35 @@ export async function sendMessage(
   api: ApiVersion = 'unified'
 ): Promise<SendMessageResult> {
   if (api === 'legacy') {
-    return trpcCall<SendMessageResult>(config, 'sendMessageV2', {
-      cloudAgentSessionId: args.cloudAgentSessionId,
-      prompt: args.prompt,
-      mode: args.mode ?? 'code',
-      model: config.model,
-      ...(args.messageId ? { messageId: args.messageId } : {}),
-    });
+    return trpcCall<SendMessageResult>(
+      config,
+      'sendMessageV2',
+      {
+        cloudAgentSessionId: args.cloudAgentSessionId,
+        prompt: args.prompt,
+        mode: args.mode ?? 'code',
+        model: config.model,
+        ...(args.messageId ? { messageId: args.messageId } : {}),
+      },
+      { signal: args.signal }
+    );
   }
-  return trpcCall<SendMessageResult>(config, 'send', {
-    cloudAgentSessionId: args.cloudAgentSessionId,
-    message: {
-      prompt: args.prompt,
-      ...(args.messageId ? { id: args.messageId } : {}),
+  return trpcCall<SendMessageResult>(
+    config,
+    'send',
+    {
+      cloudAgentSessionId: args.cloudAgentSessionId,
+      message: {
+        prompt: args.prompt,
+        ...(args.messageId ? { id: args.messageId } : {}),
+      },
+      agent: {
+        mode: args.mode ?? 'code',
+        model: config.model,
+      },
     },
-    agent: {
-      mode: args.mode ?? 'code',
-      model: config.model,
-    },
-  });
+    { signal: args.signal }
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -486,9 +499,10 @@ export type InterruptResult = {
 
 export async function interruptSession(
   config: DriverConfig,
-  sessionId: string
+  sessionId: string,
+  signal?: AbortSignal
 ): Promise<InterruptResult> {
-  return trpcCall<InterruptResult>(config, 'interruptSession', { sessionId });
+  return trpcCall<InterruptResult>(config, 'interruptSession', { sessionId }, { signal });
 }
 
 export async function answerPermission(
@@ -533,9 +547,13 @@ export async function deleteSession(
  * uses this to unblock a turn that's been holding the wrapper busy, typically
  * after queueing follow-up messages.
  */
-export async function releaseGate(fakeLlmUrl: string, tag: string): Promise<void> {
+export async function releaseGate(
+  fakeLlmUrl: string,
+  tag: string,
+  signal?: AbortSignal
+): Promise<void> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/release?tag=${encodeURIComponent(tag)}`;
-  const res = await fetch(url, { method: 'POST' });
+  const res = await fetch(url, { method: 'POST', signal });
   if (!res.ok) {
     throw new Error(`releaseGate(${tag}) failed: ${res.status} ${res.statusText}`);
   }
@@ -647,6 +665,7 @@ export type StreamConnection = {
 export type StreamOptions = {
   replay?: boolean;
   onEvent?: (event: StreamEvent) => void;
+  signal?: AbortSignal;
 };
 
 /** Event types we treat as terminal for scenario purposes. */
@@ -702,6 +721,7 @@ export function openStream(
 
   const ws = new WebSocket(url.toString());
   const events: StreamEvent[] = [];
+  let abortListener: (() => void) | undefined;
   let closed = false;
   const listeners: Array<{
     predicate: (event: StreamEvent) => boolean;
@@ -734,6 +754,7 @@ export function openStream(
   });
 
   ws.on('close', () => {
+    detachAbortListener();
     closed = true;
     for (const listener of listeners.splice(0)) {
       listener.resolve(null);
@@ -745,6 +766,7 @@ export function openStream(
   });
 
   function close(): void {
+    detachAbortListener();
     if (closed) return;
     try {
       ws.close();
@@ -752,6 +774,19 @@ export function openStream(
       /* ignore */
     }
     closed = true;
+  }
+
+  function detachAbortListener(): void {
+    if (abortListener === undefined) return;
+    options.signal?.removeEventListener('abort', abortListener);
+    abortListener = undefined;
+  }
+
+  if (options.signal?.aborted) {
+    close();
+  } else {
+    abortListener = close;
+    options.signal?.addEventListener('abort', abortListener, { once: true });
   }
 
   function waitFor(

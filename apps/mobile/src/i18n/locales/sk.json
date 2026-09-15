@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Prepisujte hlasový vstup modelom Kilo Gateway namiesto rozpoznávania reči v zariadení. Nahrávka sa odošle do Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Zbaliť volania nástrojov",
-    "condenseToolCallsSubtitle": "Zoskupte po sebe idúce volania nástrojov do jedného riadka, ktorý môžete otvoriť."
+    "condenseToolCallsSubtitle": "Zoskupte po sebe idúce volania nástrojov do jedného riadka, ktorý môžete otvoriť.",
+    "toolSummaryTranslation": "Preložiť súhrny nástrojov",
+    "toolSummaryTranslationSubtitle": "Pošli každý súhrn nástroja modelu, aby ho preložil do jazyka tvojej aplikácie. Ak preklad zlyhá, zobrazí sa originál.",
+    "toolSummaryTranslationModelUnavailableNotice": "Tento model sa už neponúka. Klepnutím na $t(common.model) vyberte iný."
   },
   "prReview": {
     "pullRequestUnavailable": "Žiadosť o zlúčenie nie je dostupná",
@@ -3053,5 +3056,24 @@
     "loadFailed": "Nepodarilo sa načítať jazyky, ktoré toto zariadenie podporuje.",
     "emptyTitle": "Žiadne podporované jazyky",
     "emptyDescription": "Rozpoznávanie reči tohto zariadenia nehlási žiadne podporované jazyky."
+  },
+  "tour": {
+    "eyebrow": "Rýchla prehliadka",
+    "forkTitle": "Kde chceš spustiť Kilo?",
+    "forkSubtitle": "Vyber, kde má Kilo bežať pre tvoju prvú reláciu.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Spusti Kilo v izolovanom cloudovom prostredí, bez nutnosti niečo inštalovať.",
+    "remoteOptionTitle": "Tvoj počítač",
+    "remoteOptionBody": "Spusti Kilo na vlastnom stroji cez CLI `kilo remote`.",
+    "skip": "Preskočiť prehliadku",
+    "tutorialLabel": "Sprievodca",
+    "remoteTitle": "Spusti svoju prvú vzdialenú reláciu",
+    "remoteBody": "Pripoj svoj počítač a potom spusti reláciu odtiaľto.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Zatiaľ žiadny pripojený počítač",
+    "remoteEmptyBody": "Na pripojenie spusti `kilo remote` na počítači.",
+    "remoteFound": "Počítač pripojený",
+    "checkAgain": "Skontrolovať znova",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

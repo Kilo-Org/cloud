@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Írd át a hangbevitelt egy Kilo Gateway-modell segítségével az eszköz beszédfelismerése helyett. A felvételt elküldjük a Kilo Gateway-nek.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Eszközhívások tömörítése",
-    "condenseToolCallsSubtitle": "Csoportosítsd az egymást követő eszközhívásokat egy sorba, amelyet megnyithatsz."
+    "condenseToolCallsSubtitle": "Csoportosítsd az egymást követő eszközhívásokat egy sorba, amelyet megnyithatsz.",
+    "toolSummaryTranslation": "Eszközösszefoglalók fordítása",
+    "toolSummaryTranslationSubtitle": "Küldd el az egyes eszközösszefoglalókat egy modellnek, hogy lefordítsa őket az alkalmazásod nyelvére. Ha a fordítás nem sikerül, az eredeti jelenik meg.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ez a modell már nem elérhető. Koppints a $t(common.model) elemre egy másik kiválasztásához."
   },
   "prReview": {
     "pullRequestUnavailable": "A módosítási kérelem nem érhető el",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Nem sikerült betölteni az eszköz által támogatott nyelveket.",
     "emptyTitle": "Nincsenek támogatott nyelvek",
     "emptyDescription": "Az eszköz beszédfelismerése nem jelez támogatott nyelvet."
+  },
+  "tour": {
+    "eyebrow": "Gyors bemutató",
+    "forkTitle": "Hol szeretnéd futtatni a Kilót?",
+    "forkSubtitle": "Válaszd ki, hol fusson a Kilo az első munkamenetedhez.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Futtasd a Kilót egy elszigetelt felhőkörnyezetben, telepítés nélkül.",
+    "remoteOptionTitle": "A számítógéped",
+    "remoteOptionBody": "Futtasd a Kilót a saját gépeden a `kilo remote` CLI-n keresztül.",
+    "skip": "Bemutató kihagyása",
+    "tutorialLabel": "Oktatóprogram",
+    "remoteTitle": "Indítsd el az első távoli munkameneted",
+    "remoteBody": "Csatlakoztasd a számítógéped, majd indítsd innen a munkamenetet.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Még nincs számítógép csatlakoztatva",
+    "remoteEmptyBody": "A csatlakoztatáshoz futtasd a `kilo remote` parancsot a számítógépeden.",
+    "remoteFound": "Számítógép csatlakoztatva",
+    "checkAgain": "Ellenőrzés újra",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

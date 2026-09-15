@@ -3100,5 +3100,33 @@
     "loadFailed": "تعذّر تحميل اللغات التي يدعمها هذا الجهاز.",
     "emptyTitle": "لا توجد لغات مدعومة",
     "emptyDescription": "لا يفيد التعرّف على الكلام في هذا الجهاز بأي لغة مدعومة."
+  },
+  "tour": {
+    "eyebrow": "جولة سريعة",
+    "forkTitle": "أين تودّ تشغيل Kilo؟",
+    "forkSubtitle": "اختر مكان تشغيل Kilo لجلستك الأولى.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "شغّل Kilo في بيئة سحابية معزولة دون الحاجة إلى تثبيت أي شيء.",
+    "remoteOptionTitle": "حاسوبك",
+    "remoteOptionBody": "شغّل Kilo على جهازك نفسه عبر واجهة سطر الأوامر `kilo remote`.",
+    "skip": "تخطي الجولة",
+    "tutorialLabel": "برنامج تعليمي",
+    "cloudTitle": "ابدأ جلستك السحابية الأولى",
+    "cloudBody": "أنشئ جلسة جديدة وسيشغّلها Kilo في السحابة.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "جارٍ انتظار بدء جلستك السحابية…",
+    "cloudCheck": "جلستك السحابية الأولى تعمل الآن.",
+    "remoteTitle": "ابدأ جلستك عن بُعد الأولى",
+    "remoteBody": "قم بتوصيل حاسوبك، ثم ابدأ الجلسة من هنا.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "ابدأ جلسة على حاسوبك",
+    "remoteWaiting": "جارٍ انتظار بدء حاسوبك للجلسة…",
+    "remoteCheck": "جلستك عن بُعد الأولى تعمل الآن.",
+    "remoteEmptyTitle": "لا يوجد حاسوب متصل بعد",
+    "remoteEmptyBody": "شغّل `kilo remote` على حاسوبك لتوصيله.",
+    "remoteFound": "تم توصيل الحاسوب",
+    "checkAgain": "تحقق مرة أخرى",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

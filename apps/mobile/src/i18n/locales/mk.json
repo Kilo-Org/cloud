@@ -3012,5 +3012,33 @@
     "loadFailed": "Не можеа да се вчитаат јазиците што ги поддржува овој уред.",
     "emptyTitle": "Нема поддржани јазици",
     "emptyDescription": "Препознавањето говор на овој уред не пријавува поддржани јазици."
+  },
+  "tour": {
+    "eyebrow": "Брза тура",
+    "forkTitle": "Каде сакаш да го стартуваш Kilo?",
+    "forkSubtitle": "Избери каде Kilo ќе работи за твојата прва сесија.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Стартувај го Kilo во изолирана облачна средина, без ништо за инсталирање.",
+    "remoteOptionTitle": "Твојот компјутер",
+    "remoteOptionBody": "Стартувај го Kilo на сопствената машина преку `kilo remote` CLI.",
+    "skip": "Прескокни тура",
+    "tutorialLabel": "Водич",
+    "cloudTitle": "Започни ја твојата прва облачна сесија",
+    "cloudBody": "Создај нова сесија и Kilo ќе ја стартува во облак.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Се чека твојата облачна сесија да стартува…",
+    "cloudCheck": "Твојата прва облачна сесија работи.",
+    "remoteTitle": "Започни ја твојата прва оддалечена сесија",
+    "remoteBody": "Поврзи го компјутерот, потоа стартувај ја сесијата оттука.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Стартувај сесија на твојот компјутер",
+    "remoteWaiting": "Се чека компјутерот да ја стартува сесијата…",
+    "remoteCheck": "Твојата прва оддалечена сесија работи.",
+    "remoteEmptyTitle": "Сè уште нема поврзан компјутер",
+    "remoteEmptyBody": "За да го поврзеш, изврши `kilo remote` на компјутерот.",
+    "remoteFound": "Компјутерот е поврзан",
+    "checkAgain": "Провери повторно",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

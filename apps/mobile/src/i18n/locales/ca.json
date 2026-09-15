@@ -3034,5 +3034,33 @@
     "loadFailed": "No s'han pogut carregar els idiomes que admet aquest dispositiu.",
     "emptyTitle": "Cap idioma admès",
     "emptyDescription": "El reconeixement de veu d'aquest dispositiu no indica cap idioma admès."
+  },
+  "tour": {
+    "eyebrow": "Tour ràpid",
+    "forkTitle": "On vols executar el Kilo?",
+    "forkSubtitle": "Tria on s'executarà el Kilo per a la teva primera sessió.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Executa el Kilo en un entorn de núvol aïllat, sense res per instal·lar.",
+    "remoteOptionTitle": "El teu ordinador",
+    "remoteOptionBody": "Executa el Kilo a la teva pròpia màquina mitjançant el CLI `kilo remote`.",
+    "skip": "Salta el tour",
+    "tutorialLabel": "Tutorial",
+    "cloudTitle": "Inicia la teva primera sessió al núvol",
+    "cloudBody": "Crea una sessió nova i el Kilo l'executa al núvol.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "S'està esperant que la teva sessió al núvol comenci…",
+    "cloudCheck": "La teva primera sessió al núvol s'està executant.",
+    "remoteTitle": "Inicia la teva primera sessió remota",
+    "remoteBody": "Connecta el teu ordinador i després inicia la sessió des d'aquí.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Inicia una sessió al teu ordinador",
+    "remoteWaiting": "S'està esperant que l'ordinador iniciï la sessió…",
+    "remoteCheck": "La teva primera sessió remota s'està executant.",
+    "remoteEmptyTitle": "Encara no hi ha cap ordinador connectat",
+    "remoteEmptyBody": "Per connectar-lo, executa `kilo remote` al teu ordinador.",
+    "remoteFound": "Ordinador connectat",
+    "checkAgain": "Torna-ho a comprovar",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

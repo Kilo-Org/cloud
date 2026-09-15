@@ -1118,6 +1118,79 @@ export async function signalKiloServerProcess(
   await executeDocker(['exec', handle.containerId, 'kill', `-${signal}`, String(handle.processId)]);
 }
 
+/**
+ * The control wrapper is launched as
+ * `bun run /usr/local/bin/kilocode-control-wrapper.js`
+ * (`src/sandbox-control/cloudflare-provider.ts`). Its basename differs from the
+ * per-worktree agent wrapper (`kilocode-wrapper.js`), so requiring both a Bun
+ * argv element and the exact control-wrapper basename selects the control
+ * wrapper's Bun process and never the Kilo server (`kilo serve`).
+ */
+const CONTROL_WRAPPER_PROCESS_SCRIPT = String.raw`
+import fs from 'node:fs';
+import path from 'node:path';
+
+const CONTROL_WRAPPER_BASENAME = 'kilocode-control-wrapper.js';
+
+function isControlWrapperArgv(argv) {
+  return (
+    argv.some(arg => path.basename(arg) === 'bun') &&
+    argv.some(arg => path.basename(arg) === CONTROL_WRAPPER_BASENAME)
+  );
+}
+
+const pids = [];
+for (const pid of fs.readdirSync('/proc')) {
+  if (!/^\d+$/.test(pid)) continue;
+  let argv;
+  try {
+    argv = fs.readFileSync('/proc/' + pid + '/cmdline', 'utf8').split('\0');
+  } catch {
+    continue;
+  }
+  if (isControlWrapperArgv(argv)) pids.push(Number(pid));
+}
+process.stdout.write(JSON.stringify({ pids }));
+`;
+
+/**
+ * Capture the control-wrapper Bun process for one container in a single
+ * `docker exec`. The captured identity is the only safe handle for `STOP`/`CONT`:
+ * a frozen process cannot answer a discovery request. Exactly one match is
+ * required; zero or several matches is an ambiguous identity and throws.
+ */
+export async function captureControlWrapperProcess(
+  containerId: string,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<KiloServerProcessHandle> {
+  const { stdout } = await executeDocker([
+    'exec',
+    containerId,
+    'bun',
+    '-e',
+    CONTROL_WRAPPER_PROCESS_SCRIPT,
+  ]);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout.trim());
+  } catch {
+    throw new Error(`control-wrapper capture for ${containerId} returned unreadable output`);
+  }
+  const pids =
+    isRecord(parsed) && Array.isArray(parsed.pids)
+      ? parsed.pids.filter(
+          (pid): pid is number => typeof pid === 'number' && Number.isSafeInteger(pid) && pid > 0
+        )
+      : [];
+  const [processId] = pids;
+  if (pids.length !== 1 || processId === undefined) {
+    throw new Error(
+      `control-wrapper capture for ${containerId} expected exactly one process, found ${pids.length}`
+    );
+  }
+  return { containerId, processId };
+}
+
 export async function waitForControlPlaneKiloRuntime(
   kiloSessionId: string,
   timeoutMs: number,

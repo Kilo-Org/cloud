@@ -64,6 +64,12 @@ const LOG_FIELD_KEYS = [
   'sandboxId',
   'wrapperInstanceId',
   'connectionId',
+  // Accepted-reconciliation identity emitted by the accepted-alarm diagnostic
+  // (`SandboxSession` accepted-message watchdog): the emitting `sessionId`,
+  // `messageId`, and `expectedWrapperInstanceId`.
+  'messageId',
+  'sessionId',
+  'expectedWrapperInstanceId',
   'fromState',
   'toState',
   'cause',

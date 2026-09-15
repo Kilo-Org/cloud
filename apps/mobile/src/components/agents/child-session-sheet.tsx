@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -59,6 +59,15 @@ type ChildSessionSheetProps = {
   modelOptions?: SessionModelOption[];
 };
 
+/**
+ * Cadence for re-issuing a child's failed first-page load while the sheet
+ * holds the loading state for a streaming child. The child is live, so its
+ * first-page failure is transient; without the retry the sheet would spin on
+ * "Loading subagent session" forever and the rows a later fetch returns would
+ * never land.
+ */
+export const HELD_CHILD_LOAD_RETRY_MS = 2000;
+
 export function ChildSessionSheet({
   visible,
   sessionId,
@@ -86,7 +95,39 @@ export function ChildSessionSheet({
   // the content state and the footer spinner reads "Thinking", but it renders no
   // row. Drop it from the list so its padded wrapper cannot leave an empty row.
   const rowMessages = messages.filter(message => message.parts.some(partRendersContent));
-  const state = getChildSessionSheetState(hydrationState, messages.length, sessionError);
+  const sheetState = getChildSessionSheetState(hydrationState, messages.length, sessionError);
+  // A streaming child is proof the session is live: its first rows are in
+  // flight, so the stored first-page failure must not render — not as the
+  // banner above rows (guarded below) and not full-screen before the first row
+  // lands. Hold the loading state and re-issue the load below, so the rows land
+  // when the fetch recovers.
+  const state =
+    sheetState === 'error' && isStreaming && hydrationState.status === 'error'
+      ? 'loading'
+      : sheetState;
+  // The held loading state only resolves when the first page lands. A stream
+  // event clears the stored error, but a dropped connection delivers no event
+  // while the child keeps running, so the sheet must re-issue the load itself.
+  // Retry on a cadence while the sheet is visible; the effect stops the moment
+  // the state leaves the held loading state (the load succeeds, a row lands,
+  // or the child stops streaming).
+  const heldFailedLoad = state === 'loading' && hydrationState.status === 'error' && visible;
+  const onRetryRef = useRef(onRetry);
+  useEffect(() => {
+    onRetryRef.current = onRetry;
+  }, [onRetry]);
+  useEffect(() => {
+    const timer = heldFailedLoad
+      ? setTimeout(() => {
+          onRetryRef.current();
+        }, HELD_CHILD_LOAD_RETRY_MS)
+      : null;
+    return () => {
+      if (timer !== null) {
+        clearTimeout(timer);
+      }
+    };
+  }, [heldFailedLoad]);
   const modelLabel = getChildSessionModelLabel(messages, modelOptions ?? []);
   const { t } = useTranslation();
   // Hydration drops its error while retrying. Retain this child's copy so
@@ -120,7 +161,11 @@ export function ChildSessionSheet({
             indicator={{ type: 'error', message: sessionError, timestamp: 0 }}
           />
         ) : null}
-        {hydrationError !== null ? (
+        {hydrationError !== null && !isStreaming ? (
+          // A streaming child is proof the session loaded; its rows are the
+          // live truth, so a stale first-page load failure must not sit above
+          // them. The manager drops the stored error on the next child chat
+          // event; this guard covers the gap before that event arrives.
           <QueryError
             title={t('agentChat.childSessionSheet.couldNotLoad')}
             message={hydrationError}
@@ -197,7 +242,7 @@ export function ChildSessionSheet({
 
   return (
     <SessionPageSheet visible={visible} onClose={onClose} onDismiss={onDismiss}>
-      <SheetHeader title={title} onDone={onClose} />
+      <SheetHeader title={title} onDone={onClose} topInset="ios-page-sheet" />
       {modelLabel ? (
         <View className="border-b border-border px-4 py-2">
           <ChildSessionModelLabel modelLabel={modelLabel} />

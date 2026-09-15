@@ -18,6 +18,7 @@ import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 import { PrReviewScreen } from './pr-review-screen';
 import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
+import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -43,6 +44,9 @@ vi.mock('react', async () => {
       <T,>(initial: T) => [initial, vi.fn() as () => void] as [T, (value: T) => void]
     ),
     useMemo: vi.fn(<T,>(factory: () => T) => factory()),
+    // The provider scope context is only mounted by the provider route; the
+    // GitHub route reads the fallback triple, which a null context selects.
+    useContext: vi.fn(() => null),
     useRef: vi.fn(<T,>(initial: T) => {
       const ref: React.RefObject<T> = { current: initial };
       return ref;
@@ -84,8 +88,11 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@/components/ui/icons', () => ({
   Check: () => null,
+  GitPullRequest: () => null,
   Share: () => null,
 }));
+
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
@@ -98,8 +105,13 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     githubPrReview: {
-      getPullRequest: { queryOptions: () => ({}), queryKey: () => [] },
-      listChecks: { queryKey: () => [] },
+      getPullRequest: { queryOptions: () => ({ queryKey: [] }) },
+      listChecks: { queryOptions: () => ({ queryKey: [] }) },
+    },
+    providerReview: {
+      getPullRequest: { queryOptions: () => ({ queryKey: [] }) },
+      listChecks: { queryOptions: () => ({ queryKey: [] }) },
+      getMergeState: { queryOptions: () => ({ queryKey: [] }) },
     },
     githubApps: { getUserAuthorization: { queryKey: () => [] } },
   }),
@@ -111,6 +123,7 @@ vi.mock('@/lib/pr-review/merge/merge-result-banner-store', () => ({
 
 vi.mock('@/lib/pr-review/recent-prs', () => ({
   upsertRecentPr: vi.fn(),
+  markRecentPrFailed: vi.fn(),
 }));
 
 vi.mock('@/components/screen-header', () => {
@@ -372,5 +385,118 @@ describe('PrReviewScreen Overview scrolling', () => {
     const refresh = (overview.props as { refreshControl: React.ReactElement }).refreshControl;
     expect(refresh.type).toBe('RefreshControl');
     expect((refresh.props as { onRefresh: unknown }).onRefresh).toEqual(expect.any(Function));
+  });
+});
+
+// The recents store is keyed on `owner/repo#number` and its rows navigate to
+// the GitHub route, so only a GitHub pull request may be written there — a
+// GitLab MR filed under that key would send the user to a GitHub PR on the
+// way back. This describe is the only one that runs effects: the rest of the
+// file asserts render output, where the recents backfill is noise.
+describe('PrReviewScreen recents backfill per provider', () => {
+  const GITLAB_SCOPE = {
+    ref: { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 },
+    organizationId: null,
+  };
+
+  beforeEach(() => {
+    vi.mocked(upsertRecentPr).mockClear();
+    vi.mocked(markRecentPrFailed).mockClear();
+    vi.mocked(React.useEffect).mockImplementation((effect: React.EffectCallback) => {
+      effect();
+    });
+  });
+
+  afterEach(() => {
+    vi.mocked(React.useEffect).mockImplementation(() => undefined);
+    vi.mocked(React.useContext).mockReturnValue(null);
+  });
+
+  it('writes a recents entry for a loaded GitHub pull request', () => {
+    prQueryResult = {
+      data: { title: 'Fix the thing' },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    expect(upsertRecentPr).toHaveBeenCalledWith(
+      expect.objectContaining({ owner: 'octocat', repo: 'hello', number: 7, lastResult: 'ok' })
+    );
+  });
+
+  it('marks the GitHub entry failed when the load errors', () => {
+    prQueryResult = { data: undefined, isLoading: false, isError: true, isFetching: false };
+    // eslint-disable-next-line new-cap
+    PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    expect(markRecentPrFailed).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 7,
+      platform: 'github',
+    });
+  });
+
+  it('files a loaded GitLab merge request under its GitLab identity, never a GitHub triple', () => {
+    vi.mocked(React.useContext).mockReturnValue(GITLAB_SCOPE);
+    prQueryResult = {
+      data: { title: 'Bump the dep' },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    PrReviewScreen({ owner: 'group/sub', repo: 'repo', number: 12 });
+    expect(upsertRecentPr).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'group/sub',
+        repo: 'repo',
+        number: 12,
+        platform: 'gitlab',
+        title: 'Bump the dep',
+        lastResult: 'ok',
+      })
+    );
+    const written = vi.mocked(upsertRecentPr).mock.calls[0]?.[0];
+    expect(written?.platform).toBe('gitlab');
+    // No instance hint on the scope: no hint key on the entry.
+    expect(written && 'instanceHint' in written).toBe(false);
+  });
+
+  it('keeps the GitLab instance hint on the entry for identity and recents', () => {
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: {
+        platform: 'gitlab',
+        projectPath: 'group/sub/repo',
+        mrIid: 12,
+        instanceHint: 'https://gl.acme.dev',
+      },
+      organizationId: null,
+    });
+    prQueryResult = {
+      data: { title: 'Bump the dep' },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    PrReviewScreen({ owner: 'group/sub', repo: 'repo', number: 12 });
+    expect(upsertRecentPr).toHaveBeenCalledWith(
+      expect.objectContaining({ platform: 'gitlab', instanceHint: 'https://gl.acme.dev' })
+    );
+  });
+
+  it('marks a GitLab merge request failed on its own row, not the GitHub twin', () => {
+    vi.mocked(React.useContext).mockReturnValue(GITLAB_SCOPE);
+    prQueryResult = { data: undefined, isLoading: false, isError: true, isFetching: false };
+    // eslint-disable-next-line new-cap
+    PrReviewScreen({ owner: 'group/sub', repo: 'repo', number: 12 });
+    expect(markRecentPrFailed).toHaveBeenCalledWith({
+      owner: 'group/sub',
+      repo: 'repo',
+      number: 12,
+      platform: 'gitlab',
+    });
   });
 });

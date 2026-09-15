@@ -113,6 +113,51 @@ describe('callCatalogEndpoint', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it('validates input without code generation, so calls work on Cloudflare Workers', async () => {
+    // Workerd forbids `new Function` (code generation from strings), which is
+    // exactly what AJV needs to compile a schema. The fresh schema object
+    // bypasses the validator cache while the Function constructor is
+    // unavailable; the fetch fake returns a plain object because stubbing
+    // Function also breaks undici's Response constructor.
+    const catalog: Catalog = {
+      'cliSessions.search': {
+        path: 'cliSessions.search',
+        kind: 'query',
+        summary: 'Search the user CLI sessions by keyword.',
+        inputSchema: {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: { query: { type: 'string', minLength: 1 } },
+          required: ['query'],
+        },
+        tags: ['clisessions'],
+        searchBlob:
+          'cliSessions.search Search the user CLI sessions by keyword. clisessions search query limit',
+      },
+    };
+    vi.stubGlobal('Function', function () {
+      throw new Error('code generation from strings is forbidden on Workerd');
+    });
+    try {
+      const fetchImpl = vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ result: { data: { sessions: [] } } }),
+      }));
+      const outcome = await callCatalogEndpoint({
+        catalog,
+        path: 'cliSessions.search',
+        input: { query: 'deploy' },
+        auth,
+        webBaseUrl: WEB_BASE_URL,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      });
+      expect(outcome).toEqual({ text: '{"sessions":[]}', truncated: false });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('forwards a valid call as a GET to the tRPC endpoint with auth passthrough', async () => {
     const fetchImpl = vi.fn(async () => upstreamResponse({ result: { data: { sessions: [] } } }));
     const outcome = await callCatalogEndpoint({

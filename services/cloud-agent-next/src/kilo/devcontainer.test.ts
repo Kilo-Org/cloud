@@ -92,6 +92,7 @@ describe('sandbox image versions', () => {
     expect(wrapperPackageJson.dependencies['@kilocode/sdk']).toBe(
       packageJson.devDependencies['@kilocode/sdk']
     );
+    expect(wrapperPackageJson.dependencies['@kilocode/sdk']).toBe(KILO_CLI_VERSION);
     expect(dockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
     expect(devDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
     expect(dindDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);

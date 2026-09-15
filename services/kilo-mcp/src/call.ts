@@ -1,5 +1,4 @@
-import Ajv2020, { type ValidateFunction } from 'ajv/dist/2020.js';
-import addFormats from 'ajv-formats';
+import { Validator, type OutputUnit, type Schema, type SchemaDraft } from '@cfworker/json-schema';
 import { ORGANIZATION_ID_HEADER } from './auth';
 import { JsonRpcFailure, type Catalog, type ForwardedAuth } from './types';
 
@@ -11,39 +10,43 @@ const INTERNAL_ERROR = -32000;
 export const MAX_RESULT_BYTES = 16 * 1024;
 export const TRUNCATION_MARKER = '[truncated]';
 
-const ajv = new Ajv2020({ strict: true, allErrors: true });
-addFormats(ajv);
+/**
+ * Validators, cached per schema object (the schema is the cache key).
+ *
+ * Validation uses @cfworker/json-schema, never AJV: AJV compiles schemas with
+ * `new Function`, which the Workers runtime forbids (Workerd disallows code
+ * generation from strings). @cfworker/json-schema evaluates schemas without
+ * code generation, so the worker can validate input on the network.
+ */
+const validatorCache = new WeakMap<object, Validator>();
 
-/** Compiled validators, cached per schema object (the schema is the cache key). */
-const validatorCache = new WeakMap<object, ValidateFunction>();
+function draftFor(inputSchema: Record<string, unknown>): SchemaDraft {
+  const declared = inputSchema['$schema'];
+  if (typeof declared === 'string') {
+    if (declared.includes('2020-12')) return '2020-12';
+    if (declared.includes('2019-09')) return '2019-09';
+    if (declared.includes('draft-07')) return '7';
+    if (declared.includes('draft-04')) return '4';
+  }
+  return '2020-12';
+}
 
-function validatorFor(inputSchema: Record<string, unknown>): ValidateFunction {
+function validatorFor(inputSchema: Record<string, unknown>): Validator {
   const cached = validatorCache.get(inputSchema);
   if (cached) return cached;
-  let validate: ValidateFunction;
-  try {
-    validate = ajv.compile(inputSchema);
-  } catch (error) {
-    throw new JsonRpcFailure(
-      INTERNAL_ERROR,
-      `The published input schema for this endpoint is not a valid JSON Schema: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-  }
-  validatorCache.set(inputSchema, validate);
-  return validate;
+  const validator = new Validator(inputSchema as Schema, draftFor(inputSchema), false);
+  validatorCache.set(inputSchema, validator);
+  return validator;
 }
 
 function isNoInputSchema(inputSchema: Record<string, unknown>): boolean {
   return Object.keys(inputSchema).filter(key => key !== '$schema').length === 0;
 }
 
-function describeViolations(validate: ValidateFunction): string[] {
-  return (validate.errors ?? []).map(error => {
-    const missing = (error.params as { missingProperty?: unknown }).missingProperty;
-    const where = error.instancePath || (typeof missing === 'string' ? missing : '') || '(root)';
-    return `${where} (${error.keyword}): ${error.message ?? 'invalid'}`;
+function describeViolations(errors: OutputUnit[]): string[] {
+  return errors.map(error => {
+    const where = error.instanceLocation !== '#' ? error.instanceLocation : '(root)';
+    return `${where} (${error.keyword}): ${error.error}`;
   });
 }
 
@@ -149,9 +152,9 @@ export async function callCatalogEndpoint(options: {
     );
   }
   if (sendInput && !schemaIsEmpty) {
-    const validate = validatorFor(row.inputSchema);
-    if (!validate(input)) {
-      const violations = describeViolations(validate);
+    const { valid, errors } = validatorFor(row.inputSchema).validate(input);
+    if (!valid) {
+      const violations = describeViolations(errors);
       throw new JsonRpcFailure(
         INVALID_PARAMS,
         `Input does not match the published schema for "${path}": ${violations.join('; ')}`,

@@ -81,9 +81,12 @@ class MemoryStorage {
   failWrites = false;
   hangReads = false;
   clearOnDestroy = false;
+  beforeGet?: (key: string) => Promise<void> | void;
+  beforeDelete?: (key: string) => Promise<void> | void;
 
   async get<T>(key: string): Promise<T | undefined> {
     if (this.hangReads) return await new Promise(() => undefined);
+    if (this.beforeGet) await this.beforeGet(key);
     return this.values.get(key) as T | undefined;
   }
 
@@ -93,6 +96,7 @@ class MemoryStorage {
   }
 
   async delete(key: string): Promise<boolean> {
+    if (this.beforeDelete) await this.beforeDelete(key);
     return this.values.delete(key);
   }
 
@@ -1255,5 +1259,132 @@ describe('MeteredSandbox', () => {
     await expect(sandbox.onActivityExpired()).resolves.toBeUndefined();
 
     expect(sandbox.superActivityExpired).toBe(true);
+  });
+
+  it('terminalizes a non-retryable SKU start failure without starting a replacement generation', async () => {
+    const rpc = createRpc();
+    vi.mocked(rpc.recordStart).mockResolvedValue({
+      success: false,
+      error: { code: 'sku_not_found', message: 'Billing SKU not found' },
+    });
+    const { sandbox, container, storage, flushShadowTasks } = createSandbox(rpc);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const active = await getBillingContext(storage);
+    if (!active) throw new Error('Expected active billing context');
+
+    sandbox.schedules.length = 0;
+    vi.mocked(rpc.recordStart).mockClear();
+
+    await expect(sandbox.billingHeartbeatTick(active.generation)).resolves.toBeUndefined();
+    const startsAfterTick = vi.mocked(rpc.recordStart).mock.calls.length;
+    await flushShadowTasks();
+
+    expect(await getBillingContext(storage)).toBeUndefined();
+    expect(await storage.get('container-usage:pending-attribution:v1')).toBeUndefined();
+    expect(sandbox.schedules).toEqual([]);
+    expect(vi.mocked(rpc.recordStart).mock.calls.length).toBe(startsAfterTick);
+    expect(container.running).toBe(true);
+  });
+
+  it('runs terminal attribution cleanup before a later onStart can observe it', async () => {
+    const rpc = createRpc();
+    vi.mocked(rpc.recordStart).mockResolvedValue({
+      success: false,
+      error: { code: 'sku_not_found', message: 'Billing SKU not found' },
+    });
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const active = await getBillingContext(storage);
+    if (!active) throw new Error('Expected active billing context');
+
+    let attributionReads = 0;
+    const deleteStarted = Promise.withResolvers<void>();
+    const deleteRelease = Promise.withResolvers<void>();
+    storage.beforeGet = key => {
+      if (key === 'container-usage:pending-attribution:v1') attributionReads += 1;
+    };
+    storage.beforeDelete = async key => {
+      if (key === 'container-usage:pending-attribution:v1') {
+        deleteStarted.resolve();
+        await deleteRelease.promise;
+      }
+    };
+
+    await expect(sandbox.billingHeartbeatTick(active.generation)).resolves.toBeUndefined();
+    await deleteStarted.promise;
+    expect(await getBillingContext(storage)).toBeUndefined();
+    expect(await storage.get('container-usage:pending-attribution:v1')).not.toBeUndefined();
+    attributionReads = 0;
+
+    const startsBeforeOnStart = vi.mocked(rpc.recordStart).mock.calls.length;
+    await sandbox.onStart();
+    expect(attributionReads).toBe(0);
+    expect(vi.mocked(rpc.recordStart).mock.calls.length).toBe(startsBeforeOnStart);
+
+    deleteRelease.resolve();
+    await flushShadowTasks();
+
+    expect(attributionReads).toBeGreaterThan(0);
+    expect(vi.mocked(rpc.recordStart).mock.calls.length).toBe(startsBeforeOnStart);
+    expect(await getBillingContext(storage)).toBeUndefined();
+    expect(await storage.get('container-usage:pending-attribution:v1')).toBeUndefined();
+  });
+
+  it('allows one already-active onStart replacement to terminalize on its next tick', async () => {
+    const rpc = createRpc();
+    vi.mocked(rpc.recordStart).mockResolvedValue({
+      success: false,
+      error: { code: 'sku_not_found', message: 'Billing SKU not found' },
+    });
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const first = await getBillingContext(storage);
+    if (!first) throw new Error('Expected active billing context');
+
+    const blockReadStarted = Promise.withResolvers<void>();
+    const blockRelease = Promise.withResolvers<void>();
+    let blockReads = 0;
+    storage.beforeGet = async key => {
+      if (key === 'container-usage:budget-block:v1') {
+        blockReads += 1;
+        if (blockReads === 1) {
+          blockReadStarted.resolve();
+          await blockRelease.promise;
+        }
+      }
+    };
+
+    const startsBeforeTick = vi.mocked(rpc.recordStart).mock.calls.length;
+    const starting = sandbox.onStart();
+    await blockReadStarted.promise;
+
+    await expect(sandbox.billingHeartbeatTick(first.generation)).resolves.toBeUndefined();
+    expect(await getBillingContext(storage)).toBeUndefined();
+
+    blockRelease.resolve();
+    await starting;
+    await flushShadowTasks();
+
+    const replacement = await getBillingContext(storage);
+    if (!replacement) throw new Error('Expected replacement billing context');
+    expect(replacement.generation).not.toBe(first.generation);
+    expect(vi.mocked(rpc.recordStart).mock.calls.length).toBeGreaterThan(startsBeforeTick);
+    expect(await storage.get('container-usage:pending-attribution:v1')).toBeUndefined();
+
+    await expect(sandbox.billingHeartbeatTick(replacement.generation)).resolves.toBeUndefined();
+    await flushShadowTasks();
+
+    expect(await getBillingContext(storage)).toBeUndefined();
+    expect(sandbox.schedules).toEqual([]);
+    expect(await storage.get('container-usage:pending-attribution:v1')).toBeUndefined();
   });
 });

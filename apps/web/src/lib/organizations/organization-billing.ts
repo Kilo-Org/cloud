@@ -385,7 +385,6 @@ export async function processTopupForOrganization(
       return false;
     }
 
-    // Update organization balance
     await tx
       .update(organizations)
       .set({

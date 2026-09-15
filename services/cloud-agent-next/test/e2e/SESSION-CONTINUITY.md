@@ -68,6 +68,15 @@ full contract | `PLANNED` not written | `BLOCKED` needs an enabler.
 | D3 | `long-slow-turn` | one long streamed turn; heartbeat keeps flowing; turn completes | PARTIAL -- `interrupt-mid-stream`/`hang` cover abort, not sustained length |
 | D4 | `stall-injection` | deterministically stall the wrapper; the worker recovers the SAME session | PARTIAL -- `recover-same-session` freezes the owned primary with `docker pause` and requires the identity-matched heartbeat-expiry recovery chain; a generic `control_disconnected` outcome proves same-session recovery, not heartbeat-lapse coverage |
 | D5 | `feed-stale-recovery` | freeze only the Kilo server of a SHARED worktree runtime so its inbound `/global/event` feed goes silent; the wrapper/container stay alive and the feed recovers without retiring the runtime | PASS (observed) -- `feed-stale-recovery` opens two chats in one worktree, asserts the sibling attached with `reuse reason=live_entry` to the shared Kilo process, `kill -STOP`s only that PID (never the container), observes `phase=stale`/`phase=recovering reason=feed_stale`, verifies the outbound wrapper heartbeat still advances while the feed is silent, releases before the 120s episode deadline, then requires no `Kilo worktree retired reason=feed_stale`, a `phase=recovered` feed line carrying the ORIGINAL native runtime id, chat A's follow-up on that surviving runtime, and chat B's follow-up plus convergence of both roots on one worktree runtime in the original container. In local dev (credential containment off) the sibling re-attach refreshes its session credentials and rotates the shared entry's native runtime; the scenario treats that refresh as an orthogonal product action, not a feed-stale retirement. On pre-change code the retirement is logged ~30-40s in and the scenario fails fast on the `Kilo worktree retired` line |
+| D6 | `wrapper-freeze-settled-reap` | freeze ONLY the control-wrapper Bun process (`bun run ...kilocode-control-wrapper.js`) after a completed turn; recovery exhausts without a re-ready runtime and reaps the allocation with the settled-reap cause, then a distinct replacement serves the same session | PARTIAL -- `wrapper-freeze-settled-reap` boots, completes a real gated turn, captures the target connection by `sandboxId` + connection/wrapper identity, captures the control-wrapper Bun PID in one `docker exec` scanning `/proc/*/cmdline` (exactly one argv carrying both `bun` and `kilocode-control-wrapper.js`; zero/ambiguous throws; never the Kilo PID), `SIGSTOP`s only that PID, and proves the container is still listed. It then requires the identity-matched `deadline_fired deadlineId=heartbeatExpiry` followed by `recovery_outcome cause=heartbeat_expired outcome=started`, asserts no identity-matched `wrapper_ready` after the freeze (the freeze plus a silent readiness log is the "no ready runtime at the stop decision" proof), requires the `physical_committed` `running -> stopping` tombstone with `cause`/`stopCause` equal to `RECOVERY_SETTLED_REAP_REASON`, the old primary absent, and a completed follow-up on a DISTINCT replacement container. The freeze is held until that stop commit, which proves the cleanup deadline elapsed. Not proven: the production provider's `forceDestroy` latency and the platform idle timer, native-retirement escalation, and sibling-work protection (unit-tested only) |
+| D7 | `wrapper-freeze-inflight-reap` | the incident shape: freeze the control-wrapper Bun process while a gated turn is still held; the original message terminalises `runtime_unhealthy`, the route stays stale-active, recovery exhausts and reaps with the settled cause, and the SAME `workspace_*` session continues on a replacement | PARTIAL -- `wrapper-freeze-inflight-reap` sends a real gated turn, confirms an identity-matched active route report from the captured connection, freezes ONLY the control-wrapper PID while the gate is held, and requires: an exact `cloud.message.failed status=failed` terminal for the message id; an `accepted_reconciliation result=runtime_unhealthy` record whose `messageId` exactly matches the sent message and whose retained `sessionId`/`expectedWrapperInstanceId` match the captured session and wrapper (a record without `messageId` does not match, so a wrong-cause failure in another session cannot satisfy the scenario); the last identity-matched heartbeat reports `active` and no post-freeze heartbeat changes it (stale-active); the same `deadline_fired`/`recovery_outcome` chain and settled `physical_committed` cause as D6; the old primary absent; and a completed follow-up on the SAME `workspace_*` session with a DISTINCT replacement. Not proven: production timings/provider, and sibling-work protection |
+
+`wrapper-freeze-settled-reap`/`wrapper-freeze-inflight-reap` must NOT report a
+stop when the frozen wrapper sends a `wrapper_ready` frame after the freeze: the
+readiness veto deliberately retains such an allocation, so a re-readied run is a
+*vetoed* run, not a settled reap. Both scenarios therefore assert no
+identity-matched `wrapper_ready` after the freeze before accepting the
+settled-reap cause.
 
 ### E. Delivery correctness
 
@@ -101,11 +110,17 @@ fails the scenario when the sentinel is missing.
 2. **Fault injection (test-only seams)**
    - `pauseOwnedPrimary`/`unpauseOwnedPrimary` (chunk 2) freeze and unfreeze the
      exact owned primary; `recover-same-session` uses this to lapse heartbeats.
-   - `signalKiloServerProcess` freezes/unfreezes the exact in-container Kilo
-     server PID with `docker exec kill -STOP`/`kill -CONT` while the container
-     and wrapper stay alive; `feed-stale-recovery` uses this to silence only the
-     inbound `/global/event` feed.
-   - Force a wrapper process exit / reconnect (A5) -- still uses existing kill paths.
+    - `signalKiloServerProcess` freezes/unfreezes the exact in-container Kilo
+      server PID with `docker exec kill -STOP`/`kill -CONT` while the container
+      and wrapper stay alive; `feed-stale-recovery` uses this to silence only the
+      inbound `/global/event` feed.
+    - `captureControlWrapperProcess` captures the exact control-wrapper Bun
+      process (`bun run ...kilocode-control-wrapper.js`) in one `docker exec`
+      scanning `/proc/*/cmdline`; the `wrapper-freeze-*` scenarios pair it with
+      `signalKiloServerProcess` to `SIGSTOP`/`SIGCONT` only that PID. This is a
+      process freeze, not a wrapper exit/reconnect, so it does NOT satisfy the
+      A5 wrapper-exit/reconnect enabler below.
+    - Force a wrapper process exit / reconnect (A5) -- still uses existing kill paths.
    - Reuse existing `external-kill` / `kill-mid-flight` loss paths, but fix their
      cleanup ownership probe first (it currently throws on restore paths).
 3. **Observability (needed to root-cause, not just detect)**
@@ -156,17 +171,18 @@ concurrent chats) on the run, and never treat "a fresh run passed" as recovery.
 `callback-batch-followup`, `callback-interrupt`, `gate-0`, plus the continuity
 scenarios: `recover-same-session`, `interrupt-then-continue`,
 `warm-cold-cycles`, `question-idle-resume`, `large-stream`, `concurrent-chats`,
-`feed-stale-recovery`.
+`feed-stale-recovery`, `wrapper-freeze-settled-reap`,
+`wrapper-freeze-inflight-reap`.
 
 Continuity scenario default timeouts (`CONTINUITY_SCENARIO_TIMEOUT_MS` in
-`lifecycle-continuity.ts`): 8, 6, 25, 20, 10, 15, and 10 minutes in the order
-above. All seven require the unified API, `kilo/fake-deterministic`, and
+`lifecycle-continuity.ts`): 8, 6, 25, 20, 10, 15, 10, 12, and 12 minutes in the
+order above. All nine require the unified API, `kilo/fake-deterministic`, and
 control-plane + worktree enrollment, like the file-state scenarios.
 
-Status gaps: the seven continuity scenarios exercise the same-session recovery
-core (A3/A4/A5/C2/D1/D2/D4) plus the silent-feed recovery path (D5), but A5/D4
-remain PARTIAL: a run attributed to `heartbeat_expiry` proves heartbeat-lapse
+Status gaps: the nine continuity scenarios exercise the same-session recovery
+core (A3/A4/A5/C2/D1/D2/D4/D6/D7) plus the silent-feed recovery path (D5), but
+A5/D4 remain PARTIAL: a run attributed to `heartbeat_expiry` proves heartbeat-lapse
 recovery for the captured connection, while a `control_disconnected` run proves
-only generic same-session recovery. A3/A4/A5/C2/D1/D2/D4/D5 are not a live pass
-claim until the scenario is run and observed green; that result is recorded per
-run, not asserted here. Remaining gaps are E1/E3 and repeat/flake counts.
+only generic same-session recovery. D6/D7 are new and are not a live pass claim
+until run and observed green; that result is recorded per run, not asserted here.
+Remaining gaps are E1/E3 and repeat/flake counts.

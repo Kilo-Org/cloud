@@ -128,7 +128,7 @@ describe('getAiSdkProvider', () => {
   );
 
   test('uses Chat Completions for MiniMax models from other direct providers', () => {
-    expect(getAiSdkProvider('minimax/minimax-m2.5', 'crofai')).toBeUndefined();
+    expect(getAiSdkProvider('minimax/minimax-m2.5', 'chutes-byok')).toBeUndefined();
   });
 
   test('uses OpenAI-compatible Chat Completions for Morph direct BYOK models', () => {

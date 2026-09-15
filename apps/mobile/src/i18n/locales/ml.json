@@ -3012,5 +3012,24 @@
     "loadFailed": "ഈ ഉപകരണം പിന്തുണയ്ക്കുന്ന ഭാഷകൾ ലോഡ് ചെയ്യാനായില്ല.",
     "emptyTitle": "പിന്തുണയ്ക്കുന്ന ഭാഷകളില്ല",
     "emptyDescription": "ഈ ഉപകരണത്തിന്റെ ശബ്ദ തിരിച്ചറിയൽ പിന്തുണയ്ക്കുന്ന ഭാഷകളൊന്നും റിപ്പോർട്ട് ചെയ്യുന്നില്ല."
+  },
+  "tour": {
+    "eyebrow": "ക്വിക്ക് ടൂർ",
+    "forkTitle": "എവിടെയാണ് Kilo പ്രവർത്തിപ്പിക്കേണ്ടത്?",
+    "forkSubtitle": "നിങ്ങളുടെ ആദ്യ സെഷനായി Kilo എവിടെ പ്രവർത്തിക്കും എന്ന് തിരഞ്ഞെടുക്കുക.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "ഒന്നും ഇൻസ്റ്റാൾ ചെയ്യാതെ, വേർതിരിച്ച ക്ലൗഡ് പരിസ്ഥിതിയിൽ Kilo പ്രവർത്തിപ്പിക്കുക.",
+    "remoteOptionTitle": "നിങ്ങളുടെ കമ്പ്യൂട്ടർ",
+    "remoteOptionBody": "നിങ്ങളുടെ സ്വന്തം മെഷീനിൽ `kilo remote` CLI വഴി Kilo പ്രവർത്തിപ്പിക്കുക.",
+    "skip": "ടൂർ ഒഴിവാക്കുക",
+    "tutorialLabel": "ട്യുടോറിയൽ",
+    "remoteTitle": "നിങ്ങളുടെ ആദ്യ റിമോട്ട് സെഷൻ ആരംഭിക്കുക",
+    "remoteBody": "നിങ്ങളുടെ കമ്പ്യൂട്ടർ കണക്റ്റ് ചെയ്ത് ഇവിടെ നിന്ന് സെഷൻ ആരംഭിക്കുക.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "ഇതുവരെ കമ്പ്യൂട്ടർ കണക്റ്റ് ചെയ്തിട്ടില്ല",
+    "remoteEmptyBody": "അത് കണക്റ്റ് ചെയ്യാൻ നിങ്ങളുടെ കമ്പ്യൂട്ടറിൽ `kilo remote` പ്രവർത്തിപ്പിക്കുക.",
+    "remoteFound": "കമ്പ്യൂട്ടർ കണക്റ്റ് ചെയ്തു",
+    "checkAgain": "വീണ്ടും പരിശോധിക്കുക",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

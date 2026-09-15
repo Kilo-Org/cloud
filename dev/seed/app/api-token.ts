@@ -9,7 +9,13 @@ import type { SeedResult } from '../index';
 
 export const usage = '<email> [options]';
 
-const DEFAULT_EXPIRES_DAYS = 7;
+// The platform's own user API bearer tokens are five-year tokens
+// (apps/web TOKEN_EXPIRY.default), and resource-delegation
+// (createControlTokenForRequest → isKiloCredentialExchangeEligible) only
+// accepts that lifetime for legacy credentials. A shorter default minted
+// tokens every delegation-protected mutation rejected, e.g. the
+// cloudAgentNext.prepareSession probe (2026-09-12).
+const DEFAULT_EXPIRES_DAYS = 5 * 365;
 const SECONDS_PER_DAY = 24 * 60 * 60;
 
 function printUsage(): void {

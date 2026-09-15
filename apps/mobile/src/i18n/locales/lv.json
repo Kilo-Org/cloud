@@ -3034,5 +3034,24 @@
     "loadFailed": "Neizdevās ielādēt šīs ierīces atbalstītās valodas.",
     "emptyTitle": "Nav atbalstītu valodu",
     "emptyDescription": "Šīs ierīces runas atpazīšana nenorāda nevienu atbalstītu valodu."
+  },
+  "tour": {
+    "eyebrow": "Ātra apskate",
+    "forkTitle": "Kur vēlaties palaist Kilo?",
+    "forkSubtitle": "Izvēlies, kur Kilo darbosies tavā pirmajā sesijā.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Palaid Kilo izolētā mākoņu vidē, neko neinstalējot.",
+    "remoteOptionTitle": "Tavs dators",
+    "remoteOptionBody": "Palaid Kilo savā datorā, izmantojot `kilo remote` CLI.",
+    "skip": "Izlaist apskati",
+    "tutorialLabel": "Apmācība",
+    "remoteTitle": "Sāc savu pirmo attālināto sesiju",
+    "remoteBody": "Pievieno datoru un tad sāc sesiju šeit.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Vēl nav pievienota datora",
+    "remoteEmptyBody": "Lai to pievienotu, palaid `kilo remote` savā datorā.",
+    "remoteFound": "Dators pievienots",
+    "checkAgain": "Pārbaudīt vēlreiz",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

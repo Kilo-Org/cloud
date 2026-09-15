@@ -389,6 +389,15 @@ export async function syncAndStoreProviders() {
     return completedAt;
   });
 
+  console.info('[sync-providers] sync summary', {
+    openrouter_gateway_models: Object.keys(openrouter_data).length,
+    vercel_gateway_models: Object.keys(vercel_data).length,
+    openrouter_providers: openrouterProviders.length,
+    total_providers: result.data.total_providers,
+    total_models: result.data.total_models,
+    direct_byok_model_counts,
+  });
+
   return {
     id: result.id,
     generated_at: result.data.generated_at,

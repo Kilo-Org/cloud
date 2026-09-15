@@ -776,6 +776,21 @@ describe('PartDetailSheet tool-summary translation gate', () => {
     await unmount(renderer);
   });
 
+  it('shows the tool name in the header when the row subtitle is empty', async () => {
+    setConfig({ enabled: true, model: TRANSLATION_MODEL });
+
+    // A bash call whose `description` is '' projects an empty subtitle; the
+    // header must fall back to the tool name, never a blank title.
+    const renderer = await mountSheet(makeToolPartWithInput('bash-1', 'bash', { description: '' }));
+    await settleTranslation();
+
+    const headers = findByType(renderer.root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(propOf(headers[0], 'title')).toBe('bash');
+    expect(requestMock).not.toHaveBeenCalled();
+    await unmount(renderer);
+  });
+
   it('requests a translation for the row subtitle under the content-bearing tool header', async () => {
     requestMock.mockResolvedValue(['lire : app.ts']);
     setConfig({ enabled: true, model: TRANSLATION_MODEL });

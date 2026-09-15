@@ -120,6 +120,13 @@ describe('getPartDetailTitle', () => {
     expect(getPartDetailTitle(makeToolPart({ tool: 'glob' }))).toEqual(untranslated('glob'));
   });
 
+  it('falls back to the tool title when the row subtitle is empty', () => {
+    // A bash call whose `description` is '' projects an empty subtitle; the
+    // header must show the tool title rather than a blank.
+    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: '', translatable: true });
+    expect(getPartDetailTitle(makeToolPart())).toEqual(untranslated('bash'));
+  });
+
   it('never marks reasoning or other part types translatable', () => {
     expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toEqual(
       untranslated('Thinking')

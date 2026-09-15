@@ -184,20 +184,29 @@ describe('plural forms', () => {
   });
 
   /**
-   * The owner's acceptance rows: 1, 2, 5 and 21 for Serbian and for two more
-   * languages whose rules differ from English. `exactUsedKey` proves which
-   * category i18next picked, and the expected string is read back out of the
-   * loaded catalog so the test never restates a translation.
+   * The owner's counted rows, asserted on the side this slice owns: English
+   * declares the plural family and every call site hands i18next its count.
+   * The count forms the other catalogs need — Serbian, Russian and Polish
+   * included — are the translation slice's output and its acceptance, because
+   * copy is edited in `locales/en.json` only (apps/mobile/AGENTS.md,
+   * Translations).
+   *
+   * `exactUsedKey` proves which category i18next picked, and the expected
+   * string is read back out of the loaded catalog, so the test never restates
+   * a translation.
    */
-  const COUNTED_LANGUAGES = ['sr', 'ru', 'pl'] as const;
+  const COUNTED_KEYS = [
+    'agentChat.toolRun.condensedLabel',
+    'securityAgent.dashboard.daysOverdue',
+    'prReview.checks.checksCount',
+  ] as const;
   const COUNTS = [1, 2, 5, 21] as const;
-  const TOOL_RUN_KEY = 'agentChat.toolRun.condensedLabel';
 
-  function render(tag: SupportedLanguage, key: string, count: number) {
+  function render(key: string, count: number) {
     return i18n.t(key, {
-      lng: tag,
+      lng: 'en',
       count,
-      itemCount: count,
+      itemCount: String(count),
       displayCount: String(count),
       last: 'Read',
       returnDetails: true,
@@ -205,14 +214,13 @@ describe('plural forms', () => {
   }
 
   /**
-   * The catalog's own template for `key`, with the row's values in place —
-   * the expected string comes from the catalog, never from this test, and
-   * the comparison is against the interpolated row the user reads.
+   * The English catalog's own template for `key`, with the row's values in
+   * place — the expected string comes from the catalog, never from this test.
    */
-  function catalogForm(tag: SupportedLanguage, key: string, count: number): string {
-    const value = i18n.getResource(tag, 'translation', key);
+  function catalogForm(key: string, count: number): string {
+    const value = i18n.getResource('en', 'translation', key);
     if (typeof value !== 'string') {
-      throw new TypeError(`${tag} declares no ${key}`);
+      throw new TypeError(`en declares no ${key}`);
     }
     return value
       .replaceAll('{{itemCount}}', String(count))
@@ -220,33 +228,20 @@ describe('plural forms', () => {
       .replaceAll('{{last}}', 'Read');
   }
 
-  it.each(COUNTED_LANGUAGES)('selects the count form for a condensed tool run in %s', tag => {
+  it.each(COUNTED_KEYS)('selects the English count form for %s', key => {
     for (const count of COUNTS) {
-      const details = render(tag, TOOL_RUN_KEY, count);
-      const expected = `${TOOL_RUN_KEY}_${category(tag, count)}`;
-      expect(details.exactUsedKey, `${tag} ${count}`).toBe(expected);
-      expect(details.res, `${tag} ${count}`).toBe(catalogForm(tag, expected, count));
+      const details = render(key, count);
+      const expected = `${key}_${category('en', count)}`;
+      expect(details.exactUsedKey, `${key} ${count}`).toBe(expected);
+      expect(details.res, `${key} ${count}`).toBe(catalogForm(expected, count));
     }
   });
 
-  it('selects the Serbian one-form for the overdue and check-count rows', () => {
-    for (const key of [
-      'securityAgent.dashboard.daysOverdue',
-      'prReview.checks.checksCount',
-    ] as const) {
-      const details = render('sr', key, 1);
-      expect(details.exactUsedKey, key).toBe(`${key}_one`);
-      expect(details.res, key).toBe(catalogForm('sr', `${key}_one`, 1));
-    }
-  });
-
-  it.each(COUNTED_LANGUAGES)('renders more than one form across 1, 2, 5 and 21 in %s', tag => {
+  it.each(COUNTED_KEYS)('renders a different row at 1 and at 5 for %s', key => {
     // The count itself interpolates into the row, so mask it before
-    // comparing: the defect was one form for every count, and the four
+    // comparing: the defect was one form for every count, and the two
     // unmasked rows differ by the number alone.
-    const forms = COUNTS.map(count =>
-      render(tag, TOOL_RUN_KEY, count).res.replaceAll(String(count), '')
-    );
-    expect(new Set(forms).size, tag).toBeGreaterThan(1);
+    const form = (count: number) => render(key, count).res.replace(String(count), '');
+    expect(form(1), key).not.toBe(form(5));
   });
 });

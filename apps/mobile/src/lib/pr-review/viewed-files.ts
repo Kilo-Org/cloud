@@ -50,7 +50,12 @@ type ViewedFilePrRef = {
  */
 export type ViewedFilesRef = ProviderPrRef | ViewedFilePrRef;
 
-function viewedFilesKey(ref: ViewedFilesRef): string {
+/**
+ * The durable-map key for a ref: the provider-scoped identity (rule 17) the
+ * viewed set is stored under. Exported so the `useSyncExternalStore` mirror
+ * keys its snapshots by exactly the same bytes the durable map uses.
+ */
+export function viewedFilesKey(ref: ViewedFilesRef): string {
   if ('platform' in ref) {
     const triple = providerPrTriple(ref);
     const legacy = `${triple.owner.toLowerCase()}/${triple.repo.toLowerCase()}#${triple.number}`;

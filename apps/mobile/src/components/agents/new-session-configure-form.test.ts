@@ -51,12 +51,11 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
-
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
 
-const insetsState = vi.hoisted(() => ({ bottom: 0 }));
+const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insetsState,
@@ -155,6 +154,26 @@ function findElementByType(node: Node, typeName: string): Record<string, unknown
   return null;
 }
 
+/** Height of the first node carrying an explicit `style.height` (the clearance spacer). */
+function findElementHeight(node: Node): number | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const props = node.props ?? {};
+  const style = props.style as { height?: unknown } | undefined;
+  if (typeof style?.height === 'number') {
+    return style.height;
+  }
+  const children = props.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findElementHeight(child as Node);
+    if (found !== null) {
+      return found;
+    }
+  }
+  return null;
+}
+
 const INSTANCE: InstancePickerInstance = {
   connectionId: 'conn-abc',
   name: 'laptop',
@@ -208,6 +227,7 @@ function defaultProps() {
     repositories: [] as NewSessionRepository[],
     recents: [] as NewSessionRepository[],
     selectedRepo: '',
+    organizationId: undefined as string | undefined,
     profile: null as {
       id: string;
       name: string;
@@ -701,6 +721,22 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+  });
+
+  // ── Case 14: bottom navigation-bar clearance ──
+  it('reserves the bottom safe-area inset so the Start action clears the navigation bar', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    insetsState.bottom = 44;
+    try {
+      // The inset is 44; the helper floors at 16 and adds 16.
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      const element = NewSessionConfigureForm(defaultProps()) as Node;
+
+      expect(findElementHeight(element)).toBe(60);
+    } finally {
+      insetsState.bottom = 0;
+    }
   });
 
   // ── Case 13: reorder wiring lock ──

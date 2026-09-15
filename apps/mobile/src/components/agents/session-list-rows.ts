@@ -23,8 +23,8 @@ export const SESSION_LIST_SKELETON_COUNT = 8;
 /**
  * Reserved cold-open loading rows, rendered in the list data itself instead
  * of `ListEmptyComponent`. FlashList mis-lays-out the empty → populated
- * transition (a sticky header plus one stray row over a blank gap until the
- * next data commit), so the loading phase must keep the list populated: the
+ * transition (one stray row over a blank gap until a later data commit), so
+ * the loading phase must keep the list populated: the
  * swap to real rows is then a plain populated → populated data update that
  * reuses the reserved space in place. Keys are unique per slot.
  */
@@ -59,20 +59,4 @@ export function flattenSessionSections(
     }
   }
   return rows;
-}
-
-/**
- * Layout indices of the `section-header` rows for FlashList
- * `stickyHeaderIndices`. The replaced `SectionList` pinned date-section
- * headers by default on iOS (`stickySectionHeadersEnabled`), so the flattened
- * model must name those rows explicitly to keep the same pinning.
- */
-export function stickySessionHeaderIndices(rows: readonly SessionListRow[]): number[] {
-  const indices: number[] = [];
-  for (let i = 0; i < rows.length; i += 1) {
-    if (rows[i]?.kind === 'section-header') {
-      indices.push(i);
-    }
-  }
-  return indices;
 }

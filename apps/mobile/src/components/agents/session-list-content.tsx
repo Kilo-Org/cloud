@@ -18,7 +18,6 @@ import {
   flattenSessionSections,
   type SessionListRow,
   skeletonSessionRows,
-  stickySessionHeaderIndices,
 } from '@/components/agents/session-list-rows';
 import { shouldResetScrollOnCommittedQuery } from '@/components/agents/session-list-scroll-reset';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
@@ -158,11 +157,7 @@ export function AgentSessionListContent({
 
   // The landscape side insets keep row text clear of the sensor housing
   // (portrait insets are 0, keeping the geometry unchanged). They live on a
-  // wrapper around the list, NOT on `contentContainerStyle`: FlashList renders
-  // pinned sticky headers in an absolutely positioned overlay (`left:0;
-  // right:0`), so content-container padding insets the in-flow rows but not
-  // the pinned copy, and the header would jump horizontally by the side inset
-  // the moment it pins. The wrapper insets both from the same origin.
+  // wrapper around the list rather than on `contentContainerStyle`.
   const landscapeSideInsetStyle = useMemo(
     () => ({ paddingLeft: left, paddingRight: right }),
     [left, right]
@@ -208,13 +203,6 @@ export function AgentSessionListContent({
     }, [])
   );
 
-  // The data index FlashList currently pins. FlashList renders that header row
-  // twice — in flow and in its absolutely positioned sticky overlay — and both
-  // copies are announced by a screen reader. `renderItem` below hides the
-  // in-flow copy while this index is pinned, so each pinned date is announced
-  // once. Updated only when the pinned header changes (section boundaries).
-  const [pinnedHeaderIndex, setPinnedHeaderIndex] = useState(-1);
-
   // Screen-reader status for the in-flight pull on the non-list surfaces:
   // those already carry their own Retry (QueryError / BodyEmpty), so the pull
   // only announces Updating here (same contract as the live Agents tab). The
@@ -231,8 +219,8 @@ export function AgentSessionListContent({
   // Flatten the date sections into a single row array for the recycling list.
   // While the first page loads with nothing to show, reserved skeleton rows
   // render in the data itself — not `ListEmptyComponent`: FlashList
-  // mis-lays-out the empty → populated transition (sticky header plus one
-  // stray row over a blank gap until a later commit), while a populated →
+  // mis-lays-out the empty → populated transition (one stray row over a blank
+  // gap until a later commit), while a populated →
   // populated swap reuses the reserved space in place. The `sections.length`
   // guard keeps the old `ListEmptyComponent` semantics: rows already on
   // screen (e.g. stale search results while a new query is pending) are never
@@ -247,13 +235,9 @@ export function AgentSessionListContent({
         : flattenSessionSections(sections),
     [showLoadingSkeletons, sections]
   );
-  // `SectionList` pinned iOS date-section headers by default; FlashList needs
-  // those row indices named explicitly to keep them pinned. Derived from the
-  // same `rows` array so header order stays identical.
-  const stickyHeaderIndices = useMemo(() => stickySessionHeaderIndices(rows), [rows]);
 
   const renderItem = useCallback(
-    ({ item, index, target }: ListRenderItemInfo<SessionListRow>) => {
+    ({ item }: ListRenderItemInfo<SessionListRow>) => {
       if (item.kind === 'skeleton') {
         // Reserved cold-open slot. The pitch must equal the stored session-row
         // pitch (SessionRow: py-[13px] + eyebrow/title ≈ 61dp) so the rows
@@ -266,16 +250,7 @@ export function AgentSessionListContent({
         );
       }
       if (item.kind === 'section-header') {
-        // Hide the in-flow header from the accessibility tree while FlashList
-        // pins that same row: the sticky overlay spells it once already.
-        const pinnedInFlow = target !== 'StickyHeader' && index === pinnedHeaderIndex;
-        return (
-          <SessionListSectionHeader
-            title={item.title}
-            count={item.count}
-            hiddenFromA11y={pinnedInFlow}
-          />
-        );
+        return <SessionListSectionHeader title={item.title} count={item.count} />;
       }
       return (
         <StoredSessionRow
@@ -304,14 +279,7 @@ export function AgentSessionListContent({
         />
       );
     },
-    [
-      activeSessionIds,
-      onSessionPress,
-      deleteSession,
-      renameSession,
-      searchInputRef,
-      pinnedHeaderIndex,
-    ]
+    [activeSessionIds, onSessionPress, deleteSession, renameSession, searchInputRef]
   );
 
   const keyExtractor = useCallback((row: SessionListRow) => row.key, []);
@@ -399,7 +367,6 @@ export function AgentSessionListContent({
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           getItemType={getItemType}
-          stickyHeaderIndices={stickyHeaderIndices}
           extraData={attentionFocusRevision}
           ListFooterComponent={
             isFetchingNextPage ? (
@@ -414,7 +381,6 @@ export function AgentSessionListContent({
           onEndReachedThreshold={0.5}
           refreshControl={refreshControl}
           maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
-          onChangeStickyIndex={setPinnedHeaderIndex}
         />
       </View>
     </Animated.View>

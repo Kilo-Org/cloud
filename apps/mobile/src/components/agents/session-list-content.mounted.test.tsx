@@ -28,7 +28,6 @@ type ListProps = {
   }>;
   extraData: number;
   onEndReached: () => void;
-  onChangeStickyIndex?: (index: number) => void;
 };
 const controls = vi.hoisted(() => ({
   scrollResets: 0,
@@ -467,8 +466,7 @@ describe('AgentSessionListContent liveness', () => {
     expect(rows(renderer)).toEqual([]);
     // The skeleton rows ride in the list data: an empty-data loading state
     // would force the FlashList empty → populated transition that
-    // mis-lays-out the swap to real rows (sticky header plus one stray row
-    // over a blank gap).
+    // mis-lays-out the swap to real rows (one stray row over a blank gap).
     // The mocked FlashList function component sits between the 'FlashList'
     // host and the content wrapper; it carries the `data` prop.
     const host = renderer.root.find(node => isHost(node, 'FlashList'));
@@ -533,13 +531,10 @@ describe('AgentSessionListContent liveness', () => {
       platform: 'ios',
       fontScale: 1,
     });
-    // Only the bottom tab-bar clearance stays on the content container. Side
-    // padding here would shift the in-flow rows but not FlashList's absolutely
-    // positioned sticky-header overlay.
+    // Only the bottom tab-bar clearance stays on the content container.
     expect(contentStyle()).toEqual({ paddingBottom: tabClearance });
 
-    // The landscape side insets live on the wrapper so the in-flow rows and the
-    // pinned header share the same horizontal origin.
+    // The landscape side insets live on the wrapper around the list.
     expect(wrapperStyle()).toEqual({ paddingLeft: 0, paddingRight: 0 });
 
     // Rotation pads only the sides; the tab-bar clearance is unchanged.
@@ -552,41 +547,12 @@ describe('AgentSessionListContent liveness', () => {
     expect(wrapperStyle()).toEqual({ paddingLeft: 47, paddingRight: 59 });
   });
 
-  it('pins every flattened date-section header for FlashList', () => {
+  it('renders date-section headers as ordinary in-flow rows', () => {
     const sections = [
       { title: 'Today', data: [session('a'), session('b')] },
       { title: 'Older', data: [session('c')] },
     ];
     const renderer = mount(contentProps({ sections }));
-    const list = renderer.root.find(node => isHost(node, 'FlashList'));
-    expect((list.props as { stickyHeaderIndices: number[] }).stickyHeaderIndices).toEqual([0, 3]);
     expect(hosts(renderer, 'SessionListSectionHeader')).toHaveLength(2);
-  });
-
-  it('hides the in-flow header copy from a11y while FlashList pins that same row', () => {
-    const sections = [
-      { title: 'Today', data: [session('a'), session('b')] },
-      { title: 'Older', data: [session('c')] },
-    ];
-    const renderer = mount(contentProps({ sections }));
-    const list = renderer.root.find(node => isHost(node, 'FlashList'));
-    const hidden = () =>
-      hosts(renderer, 'SessionListSectionHeader').map(
-        node => (node.props as { hiddenFromA11y?: boolean }).hiddenFromA11y
-      );
-    // Before a pin, both in-flow copies are announced.
-    expect(hidden()).toEqual([false, false]);
-
-    act(() => {
-      (list.props as ListProps).onChangeStickyIndex?.(0);
-    });
-    // The pinned 'Today' row drops out of the tree; the sticky overlay spells it.
-    expect(hidden()).toEqual([true, false]);
-
-    act(() => {
-      (list.props as ListProps).onChangeStickyIndex?.(3);
-    });
-    // The pin moved to 'Older': the previously pinned row is in flow again.
-    expect(hidden()).toEqual([false, true]);
   });
 });

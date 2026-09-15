@@ -314,19 +314,45 @@ export type AddPrCommentInput = {
 // retry is ledger-deduped if the original write eventually lands.
 const PR_COMMENT_UI_DEADLINE_MS = 15_000;
 
-export function useAddPrCommentMutation() {
+export function useAddPrCommentMutation(ref?: ProviderPrRef) {
   const queryClient = useQueryClient();
-  const keys = useGithubDiscussionKeys();
+  const scope = useDiscussionScope(ref);
+  const keys = useDiscussionKeys(scope);
   const { getKey, rotateKey } = useHoistedOperationKey();
 
   return useMutation({
     mutationFn: async (input: AddPrCommentInput) => {
       try {
+        if (scope.ref.platform === 'github') {
+          const result = await withUiDeadline(
+            trpcClient.githubPrReview.addIssueComment.mutate({
+              ...input,
+              operationKey: getKey(prIntentFingerprint('add_pr_comment', input)),
+            }),
+            PR_COMMENT_UI_DEADLINE_MS
+          );
+          rotateKey();
+          return result;
+        }
+        // A provider conversation comment is a top-level MR/PR note: no
+        // anchor, so the server posts a plain note (see `addComment` in
+        // gitlab-write.ts / bitbucket-write.ts). The provider write is
+        // ledgered under the server's own `create_review_comment` intent
+        // (the router folds the no-anchor body into the same fingerprint the
+        // anchored inline comment uses, which is provider-split), so a retry
+        // dedupes on the same key.
+        const addCommentInput = {
+          ...providerWriteIdentity(scope),
+          body: input.body,
+          operationKey: getKey(
+            prIntentFingerprint(
+              'create_review_comment',
+              providerFingerprintInput(scope.ref, { body: input.body })
+            )
+          ),
+        };
         const result = await withUiDeadline(
-          trpcClient.githubPrReview.addIssueComment.mutate({
-            ...input,
-            operationKey: getKey(prIntentFingerprint('add_pr_comment', input)),
-          }),
+          trpcClient.providerReview.addComment.mutate(addCommentInput),
           PR_COMMENT_UI_DEADLINE_MS
         );
         rotateKey();

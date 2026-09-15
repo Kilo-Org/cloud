@@ -84,7 +84,7 @@ import {
   toggleThreadExpanded,
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
-import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { providerPrChildRoutePath, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
@@ -102,6 +102,10 @@ type PrReviewDiscussionTabProps = {
 
 const SKELETON_ROW_COUNT = 4;
 
+// The GitHub conversation-comment formSheet. GitLab and Bitbucket reach their
+// own sibling route inside the provider layout (providerPrChildRoutePath) so
+// the sheet mounts under the live provider scope; GitHub keeps the exact
+// object-form push it shipped with (PR 6023).
 const CONVERSATION_COMMENT_PATH =
   '/(app)/pr-review/[owner]/[repo]/[number]/conversation-comment' as const;
 
@@ -268,11 +272,19 @@ export function PrReviewDiscussionTab({
   });
 
   const openConversationComment = () => {
-    const href: Href = {
-      pathname: CONVERSATION_COMMENT_PATH,
-      params: { owner, repo, number },
-    };
-    router.push(href);
+    // Route by provider: a GitLab MR / Bitbucket PR opens the sheet on its own
+    // route inside the provider layout, where the provider scope is published,
+    // so the mutation posts the plain note to the right provider. GitHub keeps
+    // the exact object-form push PR 6023 shipped.
+    if (ref.platform === 'github') {
+      const href: Href = {
+        pathname: CONVERSATION_COMMENT_PATH,
+        params: { owner, repo, number },
+      };
+      router.push(href);
+      return;
+    }
+    router.push(providerPrChildRoutePath(ref, 'conversation-comment'));
   };
 
   // The bottom CTA bar is static chrome for the two content-bearing views

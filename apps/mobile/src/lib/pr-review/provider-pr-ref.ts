@@ -153,12 +153,13 @@ export function providerPrRoutePath(ref: ProviderPrRef): Href {
 }
 
 /**
- * A screen that lives INSIDE the ref's own layout — today the file-navigator
- * sheet. It must be reached through the ref's own route: the provider scope
- * is published by the provider layout, so pushing the GitHub sibling from a
- * GitLab MR would leave that scope and query the wrong provider.
+ * A screen that lives INSIDE the ref's own layout — the file-navigator sheet
+ * and the conversation-comment formSheet. It must be reached through the
+ * ref's own route: the provider scope is published by the provider layout, so
+ * pushing the GitHub sibling from a GitLab MR would leave that scope and
+ * query the wrong provider.
  */
-type ProviderPrChildRoute = 'file-navigator';
+type ProviderPrChildRoute = 'file-navigator' | 'conversation-comment';
 
 export function providerPrChildRoutePath(ref: ProviderPrRef, child: ProviderPrChildRoute): Href {
   return providerPrHref(ref, `/${child}`);

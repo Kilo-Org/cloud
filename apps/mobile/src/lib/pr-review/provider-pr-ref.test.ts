@@ -187,6 +187,28 @@ describe('providerPrChildRoutePath', () => {
       )
     ).toBe('/(app)/pr-review/bitbucket/acme/api/42/file-navigator');
   });
+
+  it('routes the conversation-comment sheet through the provider layout', () => {
+    // The Discussion tab CTA opens the same sheet the GitHub PR 6023 route
+    // mounts; a GitLab MR must stay on its own route so the provider scope is
+    // published and the post goes to the right provider. GitHub keeps the
+    // legacy three-segment path.
+    expect(
+      providerPrChildRoutePath(githubPrRef('octocat', 'hello', 7), 'conversation-comment')
+    ).toBe('/(app)/pr-review/octocat/hello/7/conversation-comment');
+    expect(
+      providerPrChildRoutePath(
+        { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 },
+        'conversation-comment'
+      )
+    ).toBe('/(app)/pr-review/gitlab/group/sub/repo/12/conversation-comment');
+    expect(
+      providerPrChildRoutePath(
+        { platform: 'bitbucket', workspace: 'acme', repoSlug: 'api', prId: 42 },
+        'conversation-comment'
+      )
+    ).toBe('/(app)/pr-review/bitbucket/acme/api/42/conversation-comment');
+  });
 });
 
 describe('labels and keys', () => {

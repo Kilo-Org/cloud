@@ -7,7 +7,10 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import {
+  bindGitHubIntegrationToCanonicalInstallation,
+  connectVerifiedGitHubInstallation,
+} from '@/lib/integrations/db/github-installations';
 import type * as GitHubInstallationsModule from '@/lib/integrations/db/github-installations';
 import type * as PlatformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
 import type { InstallationCreatedPayload } from '../webhook-schemas';
@@ -305,6 +308,66 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
       platform_installation_id: null,
       github_installation_id: null,
     });
+  });
+
+  test('does not auto-attach a second tenant while legacy associations are committed but unbound', async () => {
+    const legacyOwner = await createTestOrganization('Handler DB Legacy Unbound', otherOwnerId, 0);
+    const otherLegacyOwner = await createTestOrganization(
+      'Handler DB Legacy Unbound Two',
+      otherOwnerId,
+      0
+    );
+    const requester = await createTestOrganization('Handler DB Legacy Pending', ownerId, 0);
+    const installationId = '575757';
+
+    // The legacy (management-disabled) callback commits its association for
+    // this installation and binds it in a separate step. Two such rows exist
+    // here, so the active-unbound repair path does not converge them before
+    // the pending completion runs.
+    const legacyRows = await db
+      .insert(platform_integrations)
+      .values(
+        [legacyOwner.id, otherLegacyOwner.id].map(organizationId => ({
+          owned_by_organization_id: organizationId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: installationId,
+          github_app_type: 'standard' as const,
+          platform_account_id: String(ACCOUNT_ID),
+          platform_account_login: ACCOUNT_LOGIN,
+          integration_status: 'active' as const,
+          repository_access: 'all',
+        }))
+      )
+      .returning();
+    const legacy = legacyRows[0];
+    if (!legacy) throw new Error('Expected a legacy association');
+
+    const pending = await insertPendingRequest(requester.id);
+
+    await handleInstallationCreated(createdPayload(installationId), 'standard');
+
+    // The pending request must not become a second tenant on this installation
+    // just because the legacy peer is not bound yet.
+    const [pendingAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, pending.id));
+    expect(pendingAfter).toMatchObject({
+      integration_status: 'pending',
+      github_installation_id: null,
+    });
+
+    // The legacy path then completes its own bind, as the callback does.
+    await bindGitHubIntegrationToCanonicalInstallation({
+      integrationId: legacy.id,
+      installationId,
+      appType: 'standard',
+    });
+
+    // Invariant: never two live tenants on one installation.
+    const bound = await boundAssociations(installationId);
+    expect(bound.length).toBeLessThanOrEqual(1);
   });
 
   test('recovers a suspended association when GitHub delivers installation.unsuspend', async () => {

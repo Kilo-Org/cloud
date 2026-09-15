@@ -161,6 +161,7 @@ jest.mock('@/lib/integrations/db/github-installations', () => ({
     mockObserveGitHubInstallationLifecycle(...args),
   bindGitHubIntegrationToCanonicalInstallation: (...args: unknown[]) => mockBindCanonical(...args),
   lockGitHubInstallationIdentity: jest.fn(async () => undefined),
+  effectiveAppTypeCondition: jest.fn(() => undefined),
   updateGitHubInstallationRepositories: (...args: unknown[]) =>
     mockUpdateGitHubInstallationRepositories(...args),
 }));

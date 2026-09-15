@@ -18,6 +18,8 @@ import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/m
 import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-installations';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
+  effectiveAppTypeCondition,
+  lockGitHubInstallationIdentity,
   observeGitHubInstallationLifecycle,
   updateGitHubInstallationRepositories,
 } from '@/lib/integrations/db/github-installations';
@@ -34,13 +36,13 @@ import type {
   Owner,
 } from '@/lib/integrations/core/types';
 import { db } from '@/lib/drizzle';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
-import { PLATFORM } from '@/lib/integrations/core/constants';
+import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { APP_URL } from '@/lib/constants';
 import {
   consumeInstallState,
@@ -735,11 +737,58 @@ async function handleCoreInstallFlow(params: {
     if (!writtenIntegration) {
       throw new Error('GitHub integration writer did not resolve to the verified destination');
     }
-    await bindGitHubIntegrationToCanonicalInstallation({
-      integrationId: writtenIntegration.id,
-      installationId,
-      appType: githubAppType,
+    // The legacy (management-disabled) path commits this association unbound
+    // and binds it in a separate step, so a concurrent pending-install
+    // completion could otherwise attach a second tenant to the same
+    // installation. Take the same installation lock as that completion and
+    // refuse to bind when another live association already owns it.
+    const bound = await db.transaction(async tx => {
+      await lockGitHubInstallationIdentity(tx, githubAppType, installationId);
+      const [competingAssociation] = await tx
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.GITHUB),
+            effectiveAppTypeCondition(githubAppType),
+            eq(platform_integrations.platform_installation_id, installationId),
+            ne(platform_integrations.id, writtenIntegration.id),
+            isNull(platform_integrations.github_disconnected_at),
+            inArray(platform_integrations.integration_status, [
+              INTEGRATION_STATUS.PENDING,
+              INTEGRATION_STATUS.ACTIVE,
+            ]),
+            writtenIntegration.owned_by_organization_id
+              ? ne(
+                  platform_integrations.owned_by_organization_id,
+                  writtenIntegration.owned_by_organization_id
+                )
+              : ne(
+                  platform_integrations.owned_by_user_id,
+                  writtenIntegration.owned_by_user_id ?? ''
+                )
+          )
+        );
+      if (competingAssociation) return false;
+      await bindGitHubIntegrationToCanonicalInstallation(
+        {
+          integrationId: writtenIntegration.id,
+          installationId,
+          appType: githubAppType,
+        },
+        tx
+      );
+      return true;
     });
+    if (!bound) {
+      const error = 'installation_already_claimed';
+      if (isAppInitiated) {
+        return NextResponse.redirect(new URL(appFallbackPath(`error=${error}`), APP_URL));
+      }
+      return NextResponse.redirect(
+        new URL(appendQueryParam(redirectPath, `error=${error}`), APP_URL)
+      );
+    }
     if (repositories?.length) {
       await updateGitHubInstallationRepositories({
         installationId,

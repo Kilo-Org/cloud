@@ -77,7 +77,7 @@ function ownerCondition(owner: Owner) {
     : eq(platform_integrations.owned_by_organization_id, owner.id);
 }
 
-function effectiveAppTypeCondition(appType: 'standard' | 'lite') {
+export function effectiveAppTypeCondition(appType: 'standard' | 'lite') {
   return appType === 'standard'
     ? or(
         eq(platform_integrations.github_app_type, 'standard'),

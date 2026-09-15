@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
+  effectiveAppTypeCondition,
   lockGitHubInstallationIdentity,
   observeGitHubInstallationLifecycle,
 } from '@/lib/integrations/db/github-installations';
 import { db } from '@/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
-import { and, eq, isNotNull, isNull, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import {
   autoCompleteInstallation,
   deleteGitHubInstallationRecords,
@@ -49,13 +50,7 @@ export async function handleInstallationCreated(
 
   // Build installation data using helper function
   const installationData = buildInstallationData(installation);
-  const appTypeCondition =
-    appType === 'standard'
-      ? or(
-          eq(platform_integrations.github_app_type, 'standard'),
-          isNull(platform_integrations.github_app_type)
-        )
-      : eq(platform_integrations.github_app_type, 'lite');
+  const appTypeCondition = effectiveAppTypeCondition(appType);
 
   logExceptInTest('GitHub App installation created:', {
     installation_id: installationData.installation_id,
@@ -135,7 +130,12 @@ export async function handleInstallationCreated(
     // take on the installation identity, so both paths serialize here.
     const completed = await db.transaction(async tx => {
       await lockGitHubInstallationIdentity(tx, appType, installationData.installation_id);
-      const [existingAssociation] = await tx
+      // Count every OTHER live association for this installation, not only
+      // those already bound to a canonical row. With connection management
+      // disabled the legacy callback commits an unbound association and binds
+      // it in a separate step, so a bound-only check would miss that peer and
+      // auto-attach a second tenant to the same installation.
+      const [competingAssociation] = await tx
         .select({ id: platform_integrations.id })
         .from(platform_integrations)
         .where(
@@ -143,10 +143,15 @@ export async function handleInstallationCreated(
             eq(platform_integrations.platform, PLATFORM.GITHUB),
             appTypeCondition,
             eq(platform_integrations.platform_installation_id, installationData.installation_id),
-            isNotNull(platform_integrations.github_installation_id)
+            ne(platform_integrations.id, pending.id),
+            isNull(platform_integrations.github_disconnected_at),
+            inArray(platform_integrations.integration_status, [
+              INTEGRATION_STATUS.PENDING,
+              INTEGRATION_STATUS.ACTIVE,
+            ])
           )
         );
-      if (existingAssociation) return false;
+      if (competingAssociation) return false;
       await autoCompleteInstallation(
         {
           integrationId: pending.id,

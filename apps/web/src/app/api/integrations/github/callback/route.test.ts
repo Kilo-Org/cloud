@@ -98,6 +98,8 @@ jest.mock('@/lib/integrations/db/github-installations', () => ({
   observeGitHubInstallationLifecycle: jest.fn(),
   bindGitHubIntegrationToCanonicalInstallation: jest.fn(),
   updateGitHubInstallationRepositories: jest.fn(),
+  lockGitHubInstallationIdentity: jest.fn(async () => undefined),
+  effectiveAppTypeCondition: jest.fn(() => undefined),
 }));
 jest.mock('@/lib/organizations/organizations', () => ({
   isOrganizationMember: jest.fn(),
@@ -1136,11 +1138,14 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     expect(mockedObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
       expect.objectContaining({ installationId: INSTALLATION_ID, state: 'active' })
     );
-    expect(mockedBindGitHubIntegrationToCanonicalInstallation).toHaveBeenCalledWith({
-      integrationId: '00000000-0000-4000-8000-000000000099',
-      installationId: INSTALLATION_ID,
-      appType: 'standard',
-    });
+    expect(mockedBindGitHubIntegrationToCanonicalInstallation).toHaveBeenCalledWith(
+      {
+        integrationId: '00000000-0000-4000-8000-000000000099',
+        installationId: INSTALLATION_ID,
+        appType: 'standard',
+      },
+      expect.anything()
+    );
   });
 
   test('app-initiated org pending approval preserves organizationId', async () => {

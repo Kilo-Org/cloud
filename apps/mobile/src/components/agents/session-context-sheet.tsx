@@ -144,7 +144,11 @@ export function SessionContextSheet({
 
   return (
     <SessionPageSheet visible={visible} onClose={onClose}>
-      <SheetHeader title={t('agentChat.contextUsage.title')} onDone={onClose} />
+      <SheetHeader
+        title={t('agentChat.contextUsage.title')}
+        onDone={onClose}
+        topInset="ios-page-sheet"
+      />
 
       {/* First row of the sheet body, outside the ScrollView so it stays
           visible while the context details scroll. */}

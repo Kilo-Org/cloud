@@ -15,6 +15,7 @@ import {
   sandboxControlSocketAttachmentSchema,
   sandboxControlObservationSchema,
   sandboxEventPublicationPayloadSchema,
+  sandboxEventBatchPayloadSchema,
   sessionNativeRuntimeRetirementPayloadSchema,
   sessionOperationAuthorizationSchema,
   sessionOperationDeliverySchema,
@@ -24,6 +25,8 @@ import {
   type RequestFrame,
   type ResponseFrame,
   type SandboxControlSocketAttachment,
+  type SandboxEventBatchPayload,
+  type SandboxEventBatchResult,
   type SandboxHeartbeatPayload,
   type SessionEventIdentity,
   type SessionEventPayload,
@@ -102,6 +105,10 @@ export type SandboxControlSocketHooks = {
     receiptId?: string,
     sequence?: number
   ): void | SandboxControlEventResult | Promise<void | SandboxControlEventResult | undefined>;
+  onSessionEventBatch?(
+    payload: SandboxEventBatchPayload,
+    identity: SandboxControlConnectionIdentity
+  ): SandboxEventBatchResult | Promise<SandboxEventBatchResult | undefined> | undefined;
   onOperationResult?(
     session: SessionRequestIdentity,
     delivery: SessionOperationDelivery,
@@ -133,6 +140,8 @@ export type SandboxControlSocketHandler = {
   supportsConnectionRecovery(): boolean;
   getConnectionIdentity(): SandboxControlConnectionIdentity | null;
   getReadySocket(): WebSocket | null;
+  /** Current-isolate outstanding control-RPC waiters. */
+  pendingControlRequests(): number;
   closeProvisionalSockets(): void;
 };
 
@@ -409,6 +418,10 @@ export function createSandboxControlSocketHandler(
       return ws && readAttachment(ws)?.kiloReady === true ? ws : null;
     },
 
+    pendingControlRequests(): number {
+      return waiters.pendingCount();
+    },
+
     closeProvisionalSockets(): void {
       for (const ws of state.getWebSockets(SANDBOX_CONTROL_WS_TAG)) {
         const attachment = readAttachment(ws);
@@ -620,6 +633,7 @@ export function createSandboxControlSocketHandler(
             helloResult({
               connectionRecovery: payload.capabilities?.connectionRecovery === true,
               eventReceipts: payload.capabilities?.eventReceipts === true,
+              eventBatches: true,
               scopedCleanupResult: payload.capabilities?.scopedCleanupResult === true,
             })
           )
@@ -771,6 +785,54 @@ export function createSandboxControlSocketHandler(
             sendJson(
               ws,
               errorResponse(frame.requestId, 'not_ready', 'Sandbox event publication failed', true)
+            );
+        }
+        return;
+      }
+
+      if (frame.operation === 'sandbox.event.publishBatch') {
+        const capabilities = readAttachment(ws)?.capabilities;
+        if (capabilities?.eventBatches !== true || capabilities.eventReceipts !== true) {
+          sendJson(
+            ws,
+            errorResponse(
+              frame.requestId,
+              'protocol_error',
+              'Event batching is not negotiated',
+              false
+            )
+          );
+          return;
+        }
+        const batch = sandboxEventBatchPayloadSchema.safeParse(frame.payload);
+        if (!batch.success) {
+          sendJson(
+            ws,
+            errorResponse(frame.requestId, 'protocol_error', 'Invalid sandbox event batch', false)
+          );
+          return;
+        }
+        try {
+          const result = await hooks.onSessionEventBatch?.(batch.data, identity);
+          if (!isCurrentConnection(state, ws, identity)) return;
+          if (!result) {
+            sendJson(
+              ws,
+              errorResponse(
+                frame.requestId,
+                'not_ready',
+                'Sandbox event batch was not applied',
+                true
+              )
+            );
+            return;
+          }
+          sendJson(ws, okResponse(frame.requestId, result));
+        } catch {
+          if (isCurrentConnection(state, ws, identity))
+            sendJson(
+              ws,
+              errorResponse(frame.requestId, 'not_ready', 'Sandbox event batch failed', true)
             );
         }
         return;

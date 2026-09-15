@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gatewaya umjesto prepoznavanja govora na uređaju. Snimka se šalje na Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Sažmi pozive alata",
-    "condenseToolCallsSubtitle": "Grupiši uzastopne pozive alata u jedan red koji možeš otvoriti."
+    "condenseToolCallsSubtitle": "Grupiši uzastopne pozive alata u jedan red koji možeš otvoriti.",
+    "toolSummaryTranslation": "Prevedi sažetke alata",
+    "toolSummaryTranslationSubtitle": "Pošalji svaki sažetak alata modelu da ga prevede na jezik tvoje aplikacije. Ako prijevod ne uspije, prikazuje se original.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ovaj model se više ne nudi. Dodirni $t(common.model) da odabereš drugi."
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtjev za spajanje nije dostupan",
@@ -3031,5 +3034,24 @@
     "loadFailed": "Nije bilo moguće učitati jezike koje ovaj uređaj podržava.",
     "emptyTitle": "Nema podržanih jezika",
     "emptyDescription": "Prepoznavanje govora na ovom uređaju ne prijavljuje nijedan podržani jezik."
+  },
+  "tour": {
+    "eyebrow": "Brzi obilazak",
+    "forkTitle": "Gdje želiš pokrenuti Kilo?",
+    "forkSubtitle": "Odaberi gdje Kilo radi za tvoju prvu sesiju.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Pokreni Kilo u izolovanom cloud okruženju bez potrebe za instaliranjem.",
+    "remoteOptionTitle": "Tvoj računar",
+    "remoteOptionBody": "Pokreni Kilo na vlastitoj mašini putem `kilo remote` CLI-ja.",
+    "skip": "Preskoči obilazak",
+    "tutorialLabel": "Vodič",
+    "remoteTitle": "Pokreni svoju prvu udaljenu sesiju",
+    "remoteBody": "Poveži svoj računar, zatim pokreni sesiju odavde.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Još nema povezanog računara",
+    "remoteEmptyBody": "Da ga povežeš, pokreni `kilo remote` na računaru.",
+    "remoteFound": "Računar povezan",
+    "checkAgain": "Provjeri ponovo",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

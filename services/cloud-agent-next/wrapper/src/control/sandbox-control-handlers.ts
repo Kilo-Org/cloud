@@ -81,7 +81,11 @@ import {
 } from './delete-worktree';
 import { collectWorktreeChanges, collectWorktreeSnapshot } from './worktree-changes';
 import { createNativeObservations, type NativeObservations } from './native-observations.js';
-import type { NativeOperationTarget } from './session-operation-cleanup.js';
+import type {
+  NativeOperationTarget,
+  NativeRetirement,
+  RetireDirectoryResult,
+} from './session-operation-cleanup.js';
 
 export type { ControlHandlerResult } from './control-handler-result.js';
 export type { SessionOperation as OwnedSessionTask } from './session-operation.js';
@@ -267,6 +271,10 @@ function supportsScopedCleanupResult(deps: HandlerDeps): boolean {
     : deps.scopedCleanupResult === true;
 }
 
+function nativeRetirementOf(retirement: RetireDirectoryResult): NativeRetirement {
+  return retirement === 'operation_process_stop_unconfirmed' ? 'unconfirmed' : retirement;
+}
+
 function resultForPublicationDisposition(
   disposition: RootPublicationDisposition,
   nativeRuntimeId: string,
@@ -390,8 +398,8 @@ export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>)
                 input.kiloRuntimes?.getEntryRuntimeId?.(directory, root),
             }
           : {}),
-        getRetained: (directory, runtimeId) =>
-          input.kiloRuntimes?.getRetained?.(directory, runtimeId),
+        getRetained: (identity, runtimeId) =>
+          input.kiloRuntimes?.getRetained?.(identity, runtimeId),
         prepareForNewWork: directory => input.kiloRuntimes?.prepareForNewWork?.(directory) ?? true,
         retireRuntime: (directory, deadlineAt, target) =>
           input.kiloRuntimes?.retireRuntime?.(directory, deadlineAt, target) ??
@@ -409,6 +417,24 @@ export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>)
             return Promise.resolve<'shared'>('shared');
           return Promise.resolve<'unconfirmed'>('unconfirmed');
         },
+        ...(input.kiloRuntimes?.deferRuntimeRetirementIfShared
+          ? {
+              deferRuntimeRetirementIfShared: (
+                directory: string,
+                target: NativeOperationTarget,
+                retiringRoot: string,
+                deadlineAt: number,
+                reason?: string
+              ) =>
+                input.kiloRuntimes?.deferRuntimeRetirementIfShared?.(
+                  directory,
+                  target,
+                  retiringRoot,
+                  deadlineAt,
+                  reason
+                ) ?? Promise.resolve<'unconfirmed'>('unconfirmed'),
+            }
+          : {}),
         ...(rootRetirementScope ? { rootRetirementScope } : {}),
         verifyQuiescence: (directory, target, deadlineAt) =>
           input.kiloRuntimes?.verifyQuiescence?.(directory, target, deadlineAt) ??
@@ -580,11 +606,19 @@ export async function handleControlRequest(
   if (operation === 'session.operation.ack') return deps.operations.acknowledge(session, payload);
   const admission = deps.operations.admission(operation, session, payload, authorization);
   if (admission.kind === 'reply') return admission.result;
-  if (
-    (operation === 'session.prompt' || operation === 'session.terminal.create') &&
-    deps.kiloRuntimes?.prepareForNewWork?.(session.directory) === false
-  ) {
-    return rejectBeforeAdmission('not_ready', 'Native feed recovery is in progress', true);
+  if (operation === 'session.prompt' || operation === 'session.terminal.create') {
+    if (
+      operation === 'session.prompt' &&
+      deps.kiloRuntimes?.feedRecovering?.(session.directory) === true
+    ) {
+      // A feed-recovery deferral must not count against the worker's prompt-failure
+      // budget: the worker retries `session_busy` without counting until the head
+      // deadline. A genuinely unavailable runtime keeps the established `not_ready`.
+      return rejectBeforeAdmission('session_busy', 'Native feed recovery is in progress', true);
+    }
+    if (deps.kiloRuntimes?.prepareForNewWork?.(session.directory) === false) {
+      return rejectBeforeAdmission('not_ready', 'Kilo worktree is not available', true);
+    }
   }
   if (
     (deps.signal?.aborted ||
@@ -733,8 +767,7 @@ function currentRuntimeMatchesTarget(
 ): boolean {
   if (!target) return false;
   const runtime =
-    deps.kiloRuntimes?.getRetained?.(session.directory, target.runtimeId) ??
-    deps.kiloRuntimes?.get(session);
+    deps.kiloRuntimes?.getRetained?.(session, target.runtimeId) ?? deps.kiloRuntimes?.get(session);
   return (
     runtime !== undefined &&
     runtime.runtimeId === target.runtimeId &&
@@ -1093,10 +1126,7 @@ async function handleAbort(
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
   const scopedCleanupResultGranted = supportsScopedCleanupResult(deps);
   if (parsed.data.nativeRuntimeId) {
-    const runtime = deps.kiloRuntimes?.getRetained?.(
-      session.directory,
-      parsed.data.nativeRuntimeId
-    );
+    const runtime = deps.kiloRuntimes?.getRetained?.(session, parsed.data.nativeRuntimeId);
     if (!runtime || runtime.runtimeId !== parsed.data.nativeRuntimeId) {
       return ok({
         status: 'aborted',
@@ -1107,11 +1137,13 @@ async function handleAbort(
     }
     const deadlineAt =
       parsed.data.cleanupDeadlineAt ?? Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS;
-    const retirement = await deps.operations.retireDirectory(
-      session.directory,
-      'Native runtime retirement requested',
-      deadlineAt,
-      { runtimeId: parsed.data.nativeRuntimeId, client: runtime.kiloClient }
+    const retirement = nativeRetirementOf(
+      await deps.operations.retireDirectory(
+        session.directory,
+        'Native runtime retirement requested',
+        deadlineAt,
+        { runtimeId: parsed.data.nativeRuntimeId, client: runtime.kiloClient }
+      )
     );
     if (retirement === 'retired') {
       const terminalError = await detachAbortedTerminal(session, deps);
@@ -1290,10 +1322,11 @@ async function handleAbort(
         deadlineAt,
         target
       );
-      runtimeRetired = retirement === 'retired';
+      const nativeRetirement = nativeRetirementOf(retirement);
+      runtimeRetired = nativeRetirement === 'retired';
       if (runtimeRetired) nativeRuntimeId = target.runtimeId;
-      quiescent = task.confirmCleanup(retirement !== 'unconfirmed', deadlineAt);
-      if (retirement === 'unconfirmed') deps.retireRuntime(retirementReason);
+      quiescent = task.confirmCleanup(nativeRetirement !== 'unconfirmed', deadlineAt);
+      if (retirement === 'operation_process_stop_unconfirmed') deps.retireRuntime(retirementReason);
     } else if (!quiescent) {
       task.requestRetirement('Kilo cancellation failed', deadlineAt);
     }

@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Sử dụng mô hình Kilo Gateway để chuyển nội dung nhập bằng giọng nói thành văn bản thay vì nhận dạng giọng nói của thiết bị. Bản ghi của bạn được gửi tới Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Nén các lệnh gọi công cụ",
-    "condenseToolCallsSubtitle": "Nhóm các lệnh gọi công cụ liên tiếp vào một hàng mà bạn có thể mở."
+    "condenseToolCallsSubtitle": "Nhóm các lệnh gọi công cụ liên tiếp vào một hàng mà bạn có thể mở.",
+    "toolSummaryTranslation": "Dịch tóm tắt công cụ",
+    "toolSummaryTranslationSubtitle": "Gửi từng tóm tắt công cụ đến một mô hình để dịch sang ngôn ngữ ứng dụng của bạn. Bản gốc sẽ hiển thị nếu dịch thất bại.",
+    "toolSummaryTranslationModelUnavailableNotice": "Mô hình này không còn được cung cấp nữa. Nhấn $t(common.model) để chọn mô hình khác."
   },
   "notifications": {
     "liveActivities": "Hoạt động trực tiếp",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Không thể tải các ngôn ngữ mà thiết bị này hỗ trợ.",
     "emptyTitle": "Không có ngôn ngữ được hỗ trợ",
     "emptyDescription": "Tính năng nhận dạng giọng nói của thiết bị này không báo cáo ngôn ngữ được hỗ trợ nào."
+  },
+  "tour": {
+    "eyebrow": "Tour nhanh",
+    "forkTitle": "Bạn muốn chạy Kilo ở đâu?",
+    "forkSubtitle": "Chọn nơi Kilo chạy phiên đầu tiên của bạn.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Chạy Kilo trong môi trường đám mây biệt lập mà không cần cài đặt gì.",
+    "remoteOptionTitle": "Máy tính của bạn",
+    "remoteOptionBody": "Chạy Kilo trên máy của bạn qua CLI `kilo remote`.",
+    "skip": "Bỏ qua tour",
+    "tutorialLabel": "Hướng dẫn",
+    "remoteTitle": "Bắt đầu phiên từ xa đầu tiên của bạn",
+    "remoteBody": "Kết nối máy tính của bạn, sau đó bắt đầu phiên từ đây.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Chưa có máy tính nào được kết nối",
+    "remoteEmptyBody": "Để kết nối, hãy chạy `kilo remote` trên máy tính của bạn.",
+    "remoteFound": "Đã kết nối máy tính",
+    "checkAgain": "Kiểm tra lại",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

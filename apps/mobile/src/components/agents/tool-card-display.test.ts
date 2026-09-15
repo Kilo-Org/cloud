@@ -18,12 +18,8 @@ import {
   Terminal,
 } from '@/components/ui/icons';
 
-import {
-  getToolDisplay,
-  getToolRowIcon,
-  type ToolDisplay,
-  toolPartHasDetails,
-} from './tool-card-display';
+import { getToolDisplay, type ToolDisplay, toolPartHasDetails } from './tool-card-display';
+import { getToolRowIcon } from './tool-row-icon';
 
 // tool-card-display imports the Lucide icon components; the pure project cannot
 // parse the Flow-sourced react-native runtime, so stub the module with distinct
@@ -89,9 +85,14 @@ function makeAttachment(mime: string): FilePart {
   };
 }
 
-/** Typed read of the projection — pins the exported `ToolDisplay` shape. */
-function getDisplay(part: ToolPart): ToolDisplay {
-  return getToolDisplay(part);
+/**
+ * Typed read of the visible projection. The `translatable` provenance flag has
+ * its own suite below, so it is dropped here to keep the title/subtitle/badge
+ * assertions exact.
+ */
+function getDisplay(part: ToolPart): Omit<ToolDisplay, 'translatable'> {
+  const display = getToolDisplay(part);
+  return { title: display.title, subtitle: display.subtitle, badge: display.badge };
 }
 
 describe('getToolDisplay mapping', () => {
@@ -465,6 +466,100 @@ describe('getToolDisplay badge rules — live CLI shapes', () => {
     expect(getDisplay(makeToolPart('grep', completed({ pattern: 'foo' }, output))).badge).toBe(
       '2 matches'
     );
+  });
+});
+
+describe('getToolDisplay translatable provenance', () => {
+  it('keeps the fallback read/edit/write label out of translation', () => {
+    expect(getToolDisplay(makeToolPart('read', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('edit', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('write', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('read', completed({ filePath: 'a.ts' }))).translatable).toBe(
+      true
+    );
+  });
+
+  it('keeps the fallback bash/glob/grep/list/patch labels out of translation', () => {
+    expect(getToolDisplay(makeToolPart('bash', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('bash', completed({ command: 'ls' }))).translatable).toBe(
+      true
+    );
+    expect(
+      getToolDisplay(makeToolPart('bash', completed({ description: 'List files' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('glob', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('glob', completed({ pattern: '**/*.ts' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('grep', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('grep', completed({ pattern: 'foo' }))).translatable).toBe(
+      true
+    );
+    expect(getToolDisplay(makeToolPart('list', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('list', completed({ path: '/repo/src' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('patch', completed())).translatable).toBe(false);
+  });
+
+  it('keeps the raw websearch/codesearch/webfetch ids out of translation', () => {
+    expect(getToolDisplay(makeToolPart('websearch', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('websearch', completed({ query: 'search terms' }))).translatable
+    ).toBe(true);
+    expect(
+      getToolDisplay(makeToolPart('websearch', completed({ url: 'https://example.com' })))
+        .translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('codesearch', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('webfetch', completed())).translatable).toBe(false);
+  });
+
+  it('never translates the todo read/write UI copy', () => {
+    expect(getToolDisplay(makeToolPart('todoread', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('todowrite', running())).translatable).toBe(false);
+  });
+
+  it('keeps the task and suggestion fallbacks out of translation', () => {
+    expect(getToolDisplay(makeToolPart('task', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('task', completed({ description: 'Do the thing' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('suggest', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('suggest', completed({ suggest: 'Review?' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('suggest', errorState())).translatable).toBe(false);
+  });
+
+  it('keeps a multi-file patch count and generic raw ids out of translation', () => {
+    const multi =
+      '*** Begin Patch\n*** Update File: src/a.ts\n@@\n-a\n+b\n*** Add File: src/b.ts\n+x\n*** End Patch';
+    expect(
+      getToolDisplay(makeToolPart('apply_patch', completed({ patchText: multi }))).translatable
+    ).toBe(false);
+    expect(getToolDisplay(makeToolPart('unknown-tool', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(
+        makeToolPart('mcp', completed({ server_name: 'filesystem', tool_name: 'read_file' }))
+      ).translatable
+    ).toBe(false);
+  });
+
+  it('translates the generic state title the tool summarized', () => {
+    expect(
+      getToolDisplay({
+        ...makeToolPart('mcp', completed()),
+        state: {
+          status: 'completed',
+          input: {},
+          output: '',
+          title: 'Custom title',
+          metadata: {},
+          time: { start: 0, end: 1 },
+        },
+      }).translatable
+    ).toBe(true);
   });
 });
 

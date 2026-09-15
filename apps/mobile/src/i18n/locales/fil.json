@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Gamitin ang modelong Kilo Gateway sa pagsasalin ng boses sa teksto imbes na ang pagkilala sa tinig ng device. Ipinapadala sa Kilo Gateway ang iyong recording.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Pagsama-samahin ang tawag ng kagamitan",
-    "condenseToolCallsSubtitle": "Pagsama-samahin ang magkakasunod na tawag ng kagamitan sa isang hilera na mabubuksan mo."
+    "condenseToolCallsSubtitle": "Pagsama-samahin ang magkakasunod na tawag ng kagamitan sa isang hilera na mabubuksan mo.",
+    "toolSummaryTranslation": "Isalin ang mga buod ng kasangkapan",
+    "toolSummaryTranslationSubtitle": "Ipadala ang bawat buod ng kasangkapan sa isang modelo upang isalin ito sa wika ng iyong app. Ipinapakita ang orihinal kung mabigo ang pagsasalin.",
+    "toolSummaryTranslationModelUnavailableNotice": "Hindi na inaalok ang modelong ito. I-tap ang $t(common.model) para pumili ng iba."
   },
   "prReview": {
     "pullRequestUnavailable": "Hindi mabuksan ang pull request",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Hindi ma-load ang mga wikang sinusuportahan ng device na ito.",
     "emptyTitle": "Walang sinusuportahang wika",
     "emptyDescription": "Walang sinusuportahang wikang iniuulat ng pagkilala sa pagsasalita ng device na ito."
+  },
+  "tour": {
+    "eyebrow": "Mabilisang tour",
+    "forkTitle": "Saan mo gustong patakbuhin ang Kilo?",
+    "forkSubtitle": "Piliin kung saan tatakbo ang Kilo para sa iyong unang sesyon.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Patakbuhin ang Kilo sa isang isolated na cloud environment nang walang dapat i-install.",
+    "remoteOptionTitle": "Iyong computer",
+    "remoteOptionBody": "Patakbuhin ang Kilo sa iyong sariling machine gamit ang `kilo remote` CLI.",
+    "skip": "Laktawan ang tour",
+    "tutorialLabel": "Tutorial",
+    "remoteTitle": "Simulan ang iyong unang remote session",
+    "remoteBody": "Ikonekta ang iyong computer, pagkatapos simulan ang sesyon mula rito.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Walang konektadong computer pa",
+    "remoteEmptyBody": "Para ikonekta ito, patakbuhin ang `kilo remote` sa iyong computer.",
+    "remoteFound": "Konektado ang computer",
+    "checkAgain": "Tingnan muli",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

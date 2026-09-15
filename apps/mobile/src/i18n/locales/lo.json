@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "ຖອດການປ້ອນຂໍ້ຄວາມດ້ວຍສຽງເປັນຂໍ້ຄວາມດ້ວຍໂມເດວ Kilo Gateway ແທນການຈຳລາສຽງພາຍໃນອຸປະກອນ. ໄຟລ໌ບັນທຶກສຽງຂອງທ່ານຈະຖືກສົ່ງໄປ Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "ຫຍໍ້ການເອີ້ນເຄື່ອງມື",
-    "condenseToolCallsSubtitle": "ຈັດກຸ່ມການເອີ້ນເຄື່ອງມືຕິດຕໍ່ກັນໃສ່ແຖວດຽວທີ່ທ່ານສາມາດເປີດໄດ້."
+    "condenseToolCallsSubtitle": "ຈັດກຸ່ມການເອີ້ນເຄື່ອງມືຕິດຕໍ່ກັນໃສ່ແຖວດຽວທີ່ທ່ານສາມາດເປີດໄດ້.",
+    "toolSummaryTranslation": "ແປບົດສະຫຼຸບເຄື່ອງມື",
+    "toolSummaryTranslationSubtitle": "ສົ່ງບົດສະຫຼຸບເຄື່ອງມືແຕ່ລະອັນໄປຫາຕົວແບບເພື່ອແປມັນເປັນພາສາແອັບຂອງທ່ານ. ຖ້າການແປລົ້ມເຫຼວ ຕົ້ນສະບັບຈະຖືກສະແດງ.",
+    "toolSummaryTranslationModelUnavailableNotice": "ໂມເດວນີ້ບໍ່ໄດ້ສະເໜີອີກຕໍ່ໄປ. ແຕະ $t(common.model) ເພື່ອເລືອກອັນອື່ນ."
   },
   "prReview": {
     "pullRequestUnavailable": "ບໍ່ສາມາດເປີດຄຳຂໍລວມໂຄດ",
@@ -3009,5 +3012,24 @@
     "loadFailed": "ບໍ່ສາມາດໂຫຼດພາສາທີ່ອຸປະກອນນີ້ຮອງຮັບໄດ້.",
     "emptyTitle": "ບໍ່ມີພາສາທີ່ຮອງຮັບ",
     "emptyDescription": "ການຮັບຮູ້ສຽງເວົ້າຂອງອຸປະກອນນີ້ບໍ່ລາຍງານພາສາທີ່ຮອງຮັບໃດໆ."
+  },
+  "tour": {
+    "eyebrow": "ການທ່ອງທ່ຽວສັ້ນ",
+    "forkTitle": "ທ່ານຕ້ອງການແລ່ນ Kilo ຢູ່ໃສ?",
+    "forkSubtitle": "ເລືອກສະຖານທີ່ທີ່ Kilo ຈະແລ່ນເຊດຊັນທຳອິດຂອງທ່ານ.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "ແລ່ນ Kilo ໃນສະພາບແວດລ້ອມເມກທີ່ແຍກຕ່າງຫາກ ໂດຍບໍ່ຕ້ອງຕິດຕັ້ງຫຍັງ.",
+    "remoteOptionTitle": "ຄອມພິວເຕີຂອງທ່ານ",
+    "remoteOptionBody": "ແລ່ນ Kilo ໃນເຄື່ອງຂອງທ່ານເອງຜ່ານ CLI `kilo remote`.",
+    "skip": "ຂ້າມການທ່ອງທ່ຽວ",
+    "tutorialLabel": "ຄູ່ມື",
+    "remoteTitle": "ເລີ່ມເຊດຊັນໄກທຳອິດຂອງທ່ານ",
+    "remoteBody": "ເຊື່ອມຕໍ່ຄອມພິວເຕີຂອງທ່ານ, ແລ້ວເລີ່ມເຊດຊັນຈາກທີ່ນີ້.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "ຍັງບໍ່ມີຄອມພິວເຕີເຊື່ອມຕໍ່",
+    "remoteEmptyBody": "ເພື່ອເຊື່ອມຕໍ່ມັນ, ໃຫ້ແລ່ນ `kilo remote` ໃນຄອມພິວເຕີຂອງທ່ານ.",
+    "remoteFound": "ຄອມພິວເຕີເຊື່ອມຕໍ່ແລ້ວ",
+    "checkAgain": "ກວດສອບອີກຄັ້ງ",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

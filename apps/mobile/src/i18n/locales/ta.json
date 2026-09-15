@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "சாதனத்தின் பேச்சு அடையாளப்படுத்தலுக்குப் பதிலாக Kilo Gateway மாதிரியைப் பயன்படுத்தி குரல் உள்ளீட்டை உரையாக்குங்கள். உங்கள் பதிவு Kilo Gateway-க்கு அனுப்பப்படுகிறது.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "கருவி அழைப்புகளைச் சுருக்கு",
-    "condenseToolCallsSubtitle": "தொடர்ச்சியான கருவி அழைப்புகளை நீங்கள் திறக்கக்கூடிய ஒரு வரிசையில் தொகுக்கவும்."
+    "condenseToolCallsSubtitle": "தொடர்ச்சியான கருவி அழைப்புகளை நீங்கள் திறக்கக்கூடிய ஒரு வரிசையில் தொகுக்கவும்.",
+    "toolSummaryTranslation": "கருவி சுருக்கங்களை மொழிபெயர்க்கவும்",
+    "toolSummaryTranslationSubtitle": "ஒவ்வொரு கருவி சுருக்கத்தையும் உங்கள் ஆப் மொழிக்கு மொழிபெயர்க்க ஒரு மாதிரிக்கு அனுப்பவும். மொழிபெயர்ப்பு தோல்வியடைந்தால் மூலம் காட்டப்படும்.",
+    "toolSummaryTranslationModelUnavailableNotice": "இந்த மாதிரி இனி வழங்கப்படாது. வேறொன்றைத் தேர்ந்தெடுக்க $t(common.model) தட்டவும்."
   },
   "prReview": {
     "pullRequestUnavailable": "இணைப்புக் கோரிக்கை கிடைக்கவில்லை",
@@ -3009,5 +3012,24 @@
     "loadFailed": "இந்தச் சாதனம் ஆதரிக்கும் மொழிகளை ஏற்ற முடியவில்லை.",
     "emptyTitle": "ஆதரிக்கப்படும் மொழிகள் இல்லை",
     "emptyDescription": "இந்தச் சாதனத்தின் பேச்சு அறிதல் ஆதரிக்கப்படும் மொழிகள் எதையும் தெரிவிக்கவில்லை."
+  },
+  "tour": {
+    "eyebrow": "விரைவு மேலோட்டம்",
+    "forkTitle": "Kilo-ஐ எங்கு இயக்க விரும்புகிறீர்கள்?",
+    "forkSubtitle": "உங்கள் முதல் அமர்வுக்காக Kilo எங்கு இயங்கும் என்பதைத் தேர்ந்தெடுக்கவும்.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "எதையும் நிறுவாமல், தனிமைப்படுத்தப்பட்ட மேகச் சூழலில் Kilo-ஐ இயக்கவும்.",
+    "remoteOptionTitle": "உங்கள் கணினி",
+    "remoteOptionBody": "உங்கள் சொந்த இயந்திரத்தில் `kilo remote` CLI மூலம் Kilo-ஐ இயக்கவும்.",
+    "skip": "சுற்றுலாவைத் தவிர்",
+    "tutorialLabel": "பயிற்சி",
+    "remoteTitle": "உங்கள் முதல் தொலை அமர்வைத் தொடங்கு",
+    "remoteBody": "உங்கள் கணினியை இணைத்து, பின்னர் இங்கிருந்து அமர்வைத் தொடங்கு.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "இதுவரை எந்தக் கணினியும் இணைக்கப்படவில்லை",
+    "remoteEmptyBody": "அதை இணைக்க உங்கள் கணினியில் `kilo remote`-ஐ இயக்கவும்.",
+    "remoteFound": "கணினி இணைக்கப்பட்டது",
+    "checkAgain": "மீண்டும் சரிபார்",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

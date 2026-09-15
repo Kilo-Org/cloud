@@ -6,7 +6,8 @@ import { FixedPartRow } from './fixed-part-row';
 import { useOpenPartDetail } from './open-part-detail-context';
 import { useOpenToolRun } from './open-tool-run-context';
 import { buildToolRunLabel, buildToolRunRows } from './session-tool-run';
-import { getToolDisplay, getToolRowIcon } from './tool-card-display';
+import { getToolDisplay } from './tool-card-display';
+import { getToolRowIcon } from './tool-row-icon';
 
 /**
  * One-line rendering of a single tool part: the same `FixedPartRow` chrome the

@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Sagalee galchuu mallattoo sagalee meeshaa irraa haa ta'u moodeela Kilo Gateway'ttiin barreeffamatti jijjiiri. Sagaleen kee Kilo Gateway'tti ergama.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Waamicha meeshaa walitti qabi",
-    "condenseToolCallsSubtitle": "Waamicha meeshaa walduraa duubaan karaa tokko keessa kan banuu dandeessu walitti qabi."
+    "condenseToolCallsSubtitle": "Waamicha meeshaa walduraa duubaan karaa tokko keessa kan banuu dandeessu walitti qabi.",
+    "toolSummaryTranslation": "Hiiki cuunfaa meeshaalee",
+    "toolSummaryTranslationSubtitle": "Cuunfaa meeshaa tokkoon tokkoon isaa gara moodelaatti ergi akka inni afaan appii keetiitti hiiku. Yoo hiikkaan hin milkoofne kan jalqabaa ni mul'ata.",
+    "toolSummaryTranslationModelUnavailableNotice": "Moodeeli kun hin dhiyaatu. Kan biraa filachuuf $t(common.model) tuqi."
   },
   "prReview": {
     "pullRequestUnavailable": "Gaaffiin walitti makuu hin argamu",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Afaan meeshaan kun deeggartu fe'amuu hin dandeenye.",
     "emptyTitle": "Afaan deeggarame hin jiru",
     "emptyDescription": "Meeshaan kun beekumsa sagalee afaan deeggarame hin ibsu."
+  },
+  "tour": {
+    "eyebrow": "Daawannoo gabaabaa",
+    "forkTitle": "Kilo irratti hojjachuu barbaaddi?",
+    "forkSubtitle": "Turtii kee jalqabaauf Kilo eessa akka hojjetu filadhu.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Waan hin barbaachifne fe'uun Kilo naannoo duumessa adda bahe keessatti hojjechisi.",
+    "remoteOptionTitle": "Kompiitara kee",
+    "remoteOptionBody": "Kilo kompiitara kee irratti `kilo remote` CLI'n hojjechisi.",
+    "skip": "Daawannoo darbi",
+    "tutorialLabel": "Barnoota",
+    "remoteTitle": "Turtii fageenya jalqabaa kee eegaladhu",
+    "remoteBody": "Kompiitara kee walqunnamsiisi, itti aanse turtii kana as irraa eegaladhu.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Amma kompiitaraan hin walqabate",
+    "remoteEmptyBody": "Walqunnamuuf, kompiitara kee irratti `kilo remote` raawwadhu.",
+    "remoteFound": "Kompiitaraan walqabate",
+    "checkAgain": "Irra deebi'ii ilaali",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

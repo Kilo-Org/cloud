@@ -1493,7 +1493,7 @@ describe('rewriteModelResponse', () => {
     await callback();
 
     expect(mockedPutApiRequestLogPayload).toHaveBeenCalledWith({
-      request: { body: {} },
+      request: {},
       response: JSON.stringify({ output: 'stored' }),
     });
     expect(mockedValues).toHaveBeenCalledWith(
@@ -1521,7 +1521,7 @@ describe('rewriteModelResponse', () => {
     expect(mockedValues).toHaveBeenCalledWith(
       expect.objectContaining({
         payload_object_key: null,
-        request: { body: {} },
+        request: {},
         response: JSON.stringify({ output: 'inline' }),
       })
     );
@@ -1544,7 +1544,7 @@ describe('rewriteModelResponse', () => {
     expect(mockedValues).toHaveBeenCalledWith(
       expect.objectContaining({
         payload_object_key: 'api-request-logs/v1/payload.json.gz',
-        request: { body: {} },
+        request: {},
         response: JSON.stringify({ output: 'dual' }),
       })
     );
@@ -1567,7 +1567,7 @@ describe('rewriteModelResponse', () => {
     expect(mockedValues).toHaveBeenCalledWith(
       expect.objectContaining({
         payload_object_key: null,
-        request: { body: {} },
+        request: {},
         response: JSON.stringify({ output: 'inline-only' }),
       })
     );

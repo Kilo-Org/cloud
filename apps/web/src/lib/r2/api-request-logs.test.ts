@@ -1,11 +1,10 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { DeleteObjectsCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { r2Client } from './client';
-import {
-  deleteApiRequestLogPayloads,
-  getApiRequestLogPayload,
-  putApiRequestLogPayload,
+import type {
+  deleteApiRequestLogPayloads as DeleteApiRequestLogPayloads,
+  getApiRequestLogPayload as GetApiRequestLogPayload,
+  putApiRequestLogPayload as PutApiRequestLogPayload,
 } from './api-request-logs';
 
 jest.mock('./client', () => ({
@@ -15,7 +14,10 @@ jest.mock('./client', () => ({
 
 type MockR2Send = (command: { input: Record<string, unknown> }) => Promise<Record<string, unknown>>;
 
-const mockSend = r2Client.send as unknown as jest.Mock<MockR2Send>;
+let mockSend: jest.Mock<MockR2Send>;
+let deleteApiRequestLogPayloads: typeof DeleteApiRequestLogPayloads;
+let getApiRequestLogPayload: typeof GetApiRequestLogPayload;
+let putApiRequestLogPayload: typeof PutApiRequestLogPayload;
 
 function objectKey(index = 0): string {
   const uuid = `${index.toString(16).padStart(8, '0')}-0000-4000-8000-000000000000`;
@@ -23,6 +25,15 @@ function objectKey(index = 0): string {
 }
 
 describe('API request log R2 storage', () => {
+  beforeAll(async () => {
+    const client = await import('./client');
+    const storage = await import('./api-request-logs');
+    mockSend = client.r2Client.send as unknown as jest.Mock<MockR2Send>;
+    deleteApiRequestLogPayloads = storage.deleteApiRequestLogPayloads;
+    getApiRequestLogPayload = storage.getApiRequestLogPayload;
+    putApiRequestLogPayload = storage.putApiRequestLogPayload;
+  });
+
   beforeEach(() => {
     mockSend.mockReset();
   });

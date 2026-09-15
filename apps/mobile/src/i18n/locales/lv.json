@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Transkribē balss ievadi, izmantojot Kilo Gateway modeli, nevis ierīces runas atpazīšanu. Ieraksts tiek nosūtīts uz Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Saspiest rīku izsaukumus",
-    "condenseToolCallsSubtitle": "Grupējiet secīgus rīku izsaukumus vienā rindā, ko varat atvērt."
+    "condenseToolCallsSubtitle": "Grupējiet secīgus rīku izsaukumus vienā rindā, ko varat atvērt.",
+    "toolSummaryTranslation": "Tulkot rīku kopsavilkumus",
+    "toolSummaryTranslationSubtitle": "Sūti katru rīka kopsavilkumu modelim, lai to iztulkotu tavas lietotnes valodā. Ja tulkošana neizdodas, tiek rādīts oriģināls.",
+    "toolSummaryTranslationModelUnavailableNotice": "Šis modelis vairs netiek piedāvāts. Pieskaries $t(common.model), lai izvēlētos citu."
   },
   "prReview": {
     "pullRequestUnavailable": "Izmaiņu pieprasījums nav pieejams",

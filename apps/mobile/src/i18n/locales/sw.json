@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Badilisha uingizaji wa sauti kuwa maandishi kwa modeli ya Kilo Gateway badala ya utambuzi wa sauti wa kifaa. Rekodi yako imetumwa kwa Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Finyaza miito ya zana",
-    "condenseToolCallsSubtitle": "Kusanya miito ya zana inayofuatana katika safu moja unayoweza kufungua."
+    "condenseToolCallsSubtitle": "Kusanya miito ya zana inayofuatana katika safu moja unayoweza kufungua.",
+    "toolSummaryTranslation": "Tafsiri muhtasari wa zana",
+    "toolSummaryTranslationSubtitle": "Tuma muhtasari wa kila zana kwa modeli ili kuutafsiri katika lugha ya programu yako. Ikiwa tafsiri itashindwa, asili itaonyeshwa.",
+    "toolSummaryTranslationModelUnavailableNotice": "Modeli hii haitolewi tena. Gusa $t(common.model) kuchagua nyingine."
   },
   "prReview": {
     "pullRequestUnavailable": "Ombi la kuunganisha halipatikani",

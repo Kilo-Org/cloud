@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Дауыстық енгізуді құрылғының сөзді тануының орнына Kilo Gateway моделі арқылы мәтінге айналдырыңыз. Жазбаңыз Kilo Gateway-ге жіберіледі.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Құрал шақыруларын жинақтау",
-    "condenseToolCallsSubtitle": "Тізбектелген құрал шақыруларын аша алатын бір жолға топтаңыз."
+    "condenseToolCallsSubtitle": "Тізбектелген құрал шақыруларын аша алатын бір жолға топтаңыз.",
+    "toolSummaryTranslation": "Құралдар қорытындыларын аудару",
+    "toolSummaryTranslationSubtitle": "Әрбір құрал қорытындысын қолданба тіліне аудару үшін модельге жіберіңіз. Аудару сәтсіз болса, түпнұсқа көрсетіледі.",
+    "toolSummaryTranslationModelUnavailableNotice": "Бұл модель енді ұсынылмайды. Басқасын таңдау үшін $t(common.model) түртіңіз."
   },
   "prReview": {
     "pullRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",

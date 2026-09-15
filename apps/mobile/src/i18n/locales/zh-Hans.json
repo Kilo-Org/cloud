@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型转写语音输入，而不使用设备上的语音识别。您的录音将发送至 Kilo Gateway。",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "精简工具调用",
-    "condenseToolCallsSubtitle": "将连续的工具调用合并为一行，点击即可打开。"
+    "condenseToolCallsSubtitle": "将连续的工具调用合并为一行，点击即可打开。",
+    "toolSummaryTranslation": "翻译工具摘要",
+    "toolSummaryTranslationSubtitle": "将每个工具摘要发送给模型，翻译成你的应用语言。翻译失败时将显示原文。",
+    "toolSummaryTranslationModelUnavailableNotice": "此模型已不再提供。点按$t(common.model)选择其他模型。"
   },
   "notifications": {
     "liveActivities": "实时活动",

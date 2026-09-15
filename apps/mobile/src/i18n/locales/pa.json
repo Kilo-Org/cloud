@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "ਡਿਵਾਈਸ ਦੀ ਸਪੀਚ ਰੈਕਗਨੀਸ਼ਨ ਦੀ ਥਾਂ Kilo Gateway ਮਾਡਲ ਨਾਲ ਵੌਇਸ ਇਨਪੁਟ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲੋ। ਤੁਹਾਡੀ ਰਿਕਾਰਡਿੰਗ Kilo Gateway ਨੂੰ ਭੇਜੀ ਜਾਂਦੀ ਹੈ।",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "ਟੂਲ ਕਾਲਾਂ ਨੂੰ ਸੰਘਣਾ ਕਰੋ",
-    "condenseToolCallsSubtitle": "ਲਗਾਤਾਰ ਟੂਲ ਕਾਲਾਂ ਨੂੰ ਇੱਕ ਕਤਾਰ ਵਿੱਚ ਸਮੂਹਬੱਧ ਕਰੋ ਜਿਸਨੂੰ ਤੁਸੀਂ ਖੋਲ੍ਹ ਸਕਦੇ ਹੋ।"
+    "condenseToolCallsSubtitle": "ਲਗਾਤਾਰ ਟੂਲ ਕਾਲਾਂ ਨੂੰ ਇੱਕ ਕਤਾਰ ਵਿੱਚ ਸਮੂਹਬੱਧ ਕਰੋ ਜਿਸਨੂੰ ਤੁਸੀਂ ਖੋਲ੍ਹ ਸਕਦੇ ਹੋ।",
+    "toolSummaryTranslation": "ਟੂਲ ਸਾਰਾਂਸ਼ਾਂ ਦਾ ਅਨੁਵਾਦ ਕਰੋ",
+    "toolSummaryTranslationSubtitle": "ਹਰ ਟੂਲ ਸਾਰਾਂਸ਼ ਨੂੰ ਤੁਹਾਡੀ ਐਪ ਦੀ ਭਾਸ਼ਾ ਵਿੱਚ ਅਨੁਵਾਦ ਕਰਨ ਲਈ ਮਾਡਲ ਨੂੰ ਭੇਜੋ। ਜੇ ਅਨੁਵਾਦ ਅਸਫਲ ਹੋਵੇ ਤਾਂ ਅਸਲ ਦਿਖਾਇਆ ਜਾਂਦਾ ਹੈ।",
+    "toolSummaryTranslationModelUnavailableNotice": "ਇਹ ਮਾਡਲ ਹੁਣ ਪੇਸ਼ ਨਹੀਂ ਕੀਤਾ ਜਾਂਦਾ। ਹੋਰ ਚੁਣਨ ਲਈ $t(common.model) 'ਤੇ ਟੈਪ ਕਰੋ।"
   },
   "prReview": {
     "pullRequestUnavailable": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",

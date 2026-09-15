@@ -111,7 +111,7 @@ export function buildToolRunRows(parts: readonly ToolPart[]): ToolRunRow[] {
 export function buildToolRunLabel(rows: readonly ToolRunRow[], t: TFunction): string {
   return t('agentChat.toolRun.condensedLabel', {
     count: rows.length,
-    displayCount: formatNumber(rows.length, i18n.language),
+    itemCount: formatNumber(rows.length, i18n.language),
     last: rows.at(-1)?.label ?? '',
   });
 }

@@ -25,7 +25,7 @@ function resolveKey(key: string, options: Record<string, unknown>) {
 const PRE_FIX_ROWS: { key: string; options: Record<string, unknown> }[] = [
   {
     key: 'agentChat.toolRun.condensedLabel',
-    options: { count: 1, displayCount: '1', last: 'Grep' },
+    options: { count: 1, itemCount: '1', last: 'Grep' },
   },
   { key: 'agentChat.toolCard.linesBadge', options: { count: 1, displayCount: '1' } },
   { key: 'prReview.checks.checksCount', options: { count: 1, displayCount: '1' } },
@@ -46,12 +46,12 @@ describe('plural families', () => {
   });
 
   it('selects the count form for a condensed tool run in English', () => {
-    expect(
-      t('agentChat.toolRun.condensedLabel', { count: 1, displayCount: '1', last: 'Grep' })
-    ).toBe('1 item; Grep');
-    expect(
-      t('agentChat.toolRun.condensedLabel', { count: 2, displayCount: '2', last: 'Grep' })
-    ).toBe('2 items; Grep');
+    expect(t('agentChat.toolRun.condensedLabel', { count: 1, itemCount: '1', last: 'Grep' })).toBe(
+      '1 item; Grep'
+    );
+    expect(t('agentChat.toolRun.condensedLabel', { count: 2, itemCount: '2', last: 'Grep' })).toBe(
+      '2 items; Grep'
+    );
   });
 
   it('resolves a plural family for each counted row that shipped one form', () => {

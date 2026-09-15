@@ -2606,9 +2606,9 @@
     },
     "toolRun": {
       "sheetTitle": "Tool calls",
-      "condensedLabel_one": "{{displayCount}} item; {{last}}",
-      "condensedLabel": "{{displayCount}} items; {{last}}",
-      "condensedLabel_other": "{{displayCount}} items; {{last}}"
+      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel": "{{itemCount}} items; {{last}}",
+      "condensedLabel_other": "{{itemCount}} items; {{last}}"
     }
   },
   "bootstrap": {

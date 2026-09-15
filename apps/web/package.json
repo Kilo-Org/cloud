@@ -171,7 +171,6 @@
     "tldts": "7.0.30",
     "ulid": "catalog:",
     "uuid": "11.1.1",
-    "vaul": "1.1.2",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -19,9 +19,9 @@ export type ApiRequestLogPayloadDeleteResult = {
   failedKeys: string[];
 };
 
-function getBucketName(): string | null {
+function requireBucketName(): string {
   if (!r2ApiRequestLogBucketName) {
-    return null;
+    throw new Error('R2_EXPERIMENT_PROMPTS_BUCKET_NAME is not configured');
   }
   return r2ApiRequestLogBucketName;
 }
@@ -40,10 +40,8 @@ function createObjectKey(now: Date): string {
 
 export async function putApiRequestLogPayload(
   payload: Omit<ApiRequestLogPayload, 'version'>
-): Promise<string | null> {
-  const bucket = getBucketName();
-  if (!bucket) return null;
-
+): Promise<string> {
+  const bucket = requireBucketName();
   const key = createObjectKey(new Date());
   const body = gzipSync(JSON.stringify({ version: 1, ...payload } satisfies ApiRequestLogPayload));
 
@@ -52,8 +50,7 @@ export async function putApiRequestLogPayload(
       Bucket: bucket,
       Key: key,
       Body: body,
-      ContentType: 'application/json; charset=utf-8',
-      ContentEncoding: 'gzip',
+      ContentType: 'application/gzip',
     }),
     { abortSignal: AbortSignal.timeout(R2_REQUEST_TIMEOUT_MS) }
   );
@@ -62,8 +59,7 @@ export async function putApiRequestLogPayload(
 }
 
 export async function getApiRequestLogPayload(key: string): Promise<ApiRequestLogPayload> {
-  const bucket = getBucketName();
-  if (!bucket) throw new Error('R2_EXPERIMENT_PROMPTS_BUCKET_NAME is not configured');
+  const bucket = requireBucketName();
 
   const object = await r2Client.send(
     new GetObjectCommand({
@@ -84,8 +80,7 @@ export async function getApiRequestLogPayload(key: string): Promise<ApiRequestLo
 export async function deleteApiRequestLogPayloads(
   keys: string[]
 ): Promise<ApiRequestLogPayloadDeleteResult> {
-  const bucket = getBucketName();
-  if (!bucket) throw new Error('R2_EXPERIMENT_PROMPTS_BUCKET_NAME is not configured');
+  const bucket = requireBucketName();
   const validatedKeys = keys.map(requireObjectKey);
   const deletedKeys: string[] = [];
   const failedKeys: string[] = [];

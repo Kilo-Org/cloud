@@ -11,6 +11,8 @@ import { asc, inArray, lt } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 import { deleteApiRequestLogPayloads } from '@/lib/r2/api-request-logs';
 
+export const maxDuration = 300;
+
 const RETENTION_DAYS = 7;
 const BATCH_SIZE = 10_000;
 

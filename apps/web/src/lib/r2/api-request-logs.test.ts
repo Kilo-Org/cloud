@@ -34,8 +34,6 @@ describe('API request log R2 storage', () => {
       request: { messages: [{ role: 'user', content: 'hello' }] },
       response: '{"ok":true}',
     });
-    if (!key) throw new Error('Expected an R2 object key');
-
     expect(key).toMatch(/^api-request-logs\/v1\/\d{4}\/\d{2}\/\d{2}\/[0-9a-f-]+\.json\.gz$/);
     const command = mockSend.mock.calls[0]?.[0];
     if (!command) throw new Error('Expected an R2 put command');
@@ -43,8 +41,7 @@ describe('API request log R2 storage', () => {
     expect(command.input).toMatchObject({
       Bucket: 'api-log-bucket',
       Key: key,
-      ContentType: 'application/json; charset=utf-8',
-      ContentEncoding: 'gzip',
+      ContentType: 'application/gzip',
     });
     const stored = JSON.parse(gunzipSync(command.input.Body as Uint8Array).toString('utf8'));
     expect(stored).toEqual({

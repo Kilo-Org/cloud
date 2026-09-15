@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { after } from 'next/server';
 import {
   rewriteModelResponse_ChatCompletions,
@@ -52,6 +52,7 @@ const mockedDbInsert = jest.mocked(db.insert);
 const mockedDeleteApiRequestLogPayloads = jest.mocked(deleteApiRequestLogPayloads);
 const mockedPutApiRequestLogPayload = jest.mocked(putApiRequestLogPayload);
 let mockedValues: jest.Mock;
+const originalApiRequestLogStorageMode = process.env.API_REQUEST_LOG_STORAGE_MODE;
 
 beforeEach(() => {
   mockedOptIn.mockClear();
@@ -65,6 +66,14 @@ beforeEach(() => {
     returning: jest.fn().mockResolvedValue([{ id: BigInt(1) }]),
   });
   mockedDbInsert.mockReturnValue({ values: mockedValues } as never);
+});
+
+afterEach(() => {
+  if (originalApiRequestLogStorageMode === undefined) {
+    delete process.env.API_REQUEST_LOG_STORAGE_MODE;
+  } else {
+    process.env.API_REQUEST_LOG_STORAGE_MODE = originalApiRequestLogStorageMode;
+  }
 });
 
 function jsonResponse(body: unknown, status = 200): Response {

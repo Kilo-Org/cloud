@@ -4,7 +4,6 @@ import { type TFunction } from 'i18next';
 
 import { SandboxSelector } from '@/components/agents/sandbox-selector';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
   type SandboxAllocation,
@@ -36,12 +35,17 @@ type RenderSandboxSectionArgs = NewSessionSandboxState & {
  * The empty state (feature off, nothing picked) renders no section at all:
  * there is nothing to choose between and no recovery to offer. With a settled
  * error the pick may still be set, so the section stays to show the reason and
- * the way out. Loading and the retryable failure render in the field's own
- * slot so the sections below never move.
+ * the way out. While the capabilities load nothing renders (matching
+ * renderProfileRow): most owners get a settled disabled verdict, so reserving
+ * the slot first would paint space that then collapses and moves the sections
+ * below. The retryable failure renders in the field's own slot once settled.
  * Lives in this module so the configure form stays under its line limit.
  */
 export function renderSandboxSection(args: Readonly<RenderSandboxSectionArgs>): ReactNode {
   const { t, status, capabilities, error } = args;
+  if (status === 'loading') {
+    return null;
+  }
   if (status === 'ready' && capabilities?.enabled !== true && !error) {
     return null;
   }
@@ -67,9 +71,6 @@ function renderSandboxField({
   onRetry,
   onUseDefault,
 }: Readonly<RenderSandboxSectionArgs>): ReactNode {
-  if (status === 'loading') {
-    return <Skeleton className="h-[50px] w-full rounded-lg" />;
-  }
   if (status === 'error') {
     return (
       <View className="min-h-[50px] flex-row items-center gap-2">

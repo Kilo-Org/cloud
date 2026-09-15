@@ -877,12 +877,16 @@ describe('NewSessionConfigureForm sandbox section', () => {
     expect(findElementByType(element, 'SandboxSelector')?.disabled).toBe(true);
   });
 
-  it('reserves the same slot with a field-sized skeleton while capabilities load', async () => {
+  it('renders nothing while capabilities load so placeholder space never collapses', async () => {
     const element = await renderForm({
       sandbox: sandboxState({ status: 'loading', capabilities: undefined }),
     });
-    expect(findTextContent(element, text => text === 'Sandbox')).toBe(true);
-    expect(findElementByType(element, 'Skeleton')?.className).toBe('h-[50px] w-full rounded-lg');
+    // Most owners get a settled disabled verdict, so a loading skeleton would
+    // paint reserved space that then collapses and moves the sections below.
+    // Until the verdict is known the section renders nothing (as
+    // renderProfileRow does); the retryable failure still renders once settled.
+    expect(findTextContent(element, text => text === 'Sandbox')).toBe(false);
+    expect(findElementByType(element, 'Skeleton')).toBeNull();
     expect(findElementByType(element, 'SandboxSelector')).toBeNull();
     expect(findTextContent(element, text => text === 'Retry')).toBe(false);
   });

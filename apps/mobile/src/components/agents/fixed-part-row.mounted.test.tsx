@@ -16,10 +16,20 @@ import {
 } from './fixed-part-row.mounted.test-helpers';
 import { ToolSummaryTranslationScope } from './tool-summary-translation-scope';
 
-const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
+const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
+  requestMock: vi.fn(),
+  readMock: vi.fn(),
+  writeMock: vi.fn(),
+}));
 
 vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
   requestToolSummaryTranslations: requestMock,
+}));
+// The encrypted-KV cache is a native module, loaded by the runtime's dynamic
+// import; mock it the same way as the client so this suite stays native-free.
+vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
+  readToolSummaryTranslations: readMock,
+  writeToolSummaryTranslation: writeMock,
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -275,7 +285,10 @@ function renderScopedRowSync(props: RowProps): TestRenderer.ReactTestRenderer {
   };
   act(() => {
     rendererRef.current = TestRenderer.create(
-      createElement(ToolSummaryTranslationScope, null, createElement(FixedPartRow, props))
+      createElement(ToolSummaryTranslationScope, {
+        itemId: 'part-1',
+        children: createElement(FixedPartRow, props),
+      })
     );
   });
   const renderer = rendererRef.current;
@@ -299,6 +312,10 @@ async function settleTranslation(): Promise<void> {
 describe('FixedPartRow tool-summary translation', () => {
   beforeEach(() => {
     requestMock.mockReset();
+    readMock.mockReset();
+    writeMock.mockReset();
+    readMock.mockResolvedValue([]);
+    writeMock.mockResolvedValue(undefined);
     setConfig({ enabled: false, model: MODEL });
   });
 

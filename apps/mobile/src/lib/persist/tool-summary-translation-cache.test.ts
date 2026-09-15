@@ -67,7 +67,10 @@ function makeEntry(
 }
 
 function seed(entries: [string, string][]): void {
-  kvMock.scopes.set(SCOPE, new Map(entries.map(([k, v], index) => [k, { v, updatedAt: index + 1 }])));
+  kvMock.scopes.set(
+    SCOPE,
+    new Map(entries.map(([k, v], index) => [k, { v, updatedAt: index + 1 }]))
+  );
 }
 
 beforeEach(() => {

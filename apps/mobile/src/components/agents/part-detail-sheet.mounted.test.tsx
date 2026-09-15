@@ -23,10 +23,20 @@ import { PartDetailSheetHost } from './part-detail-sheet-host';
 import { useOpenPartDetail } from './open-part-detail-context';
 import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 
-const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
+const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
+  requestMock: vi.fn(),
+  readMock: vi.fn(),
+  writeMock: vi.fn(),
+}));
 
 vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
   requestToolSummaryTranslations: requestMock,
+}));
+// The encrypted-KV cache is a native module, loaded by the runtime's dynamic
+// import; mock it the same way as the client so this suite stays native-free.
+vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
+  readToolSummaryTranslations: readMock,
+  writeToolSummaryTranslation: writeMock,
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -748,6 +758,10 @@ async function settleTranslation(): Promise<void> {
 describe('PartDetailSheet tool-summary translation gate', () => {
   beforeEach(() => {
     requestMock.mockReset();
+    readMock.mockReset();
+    writeMock.mockReset();
+    readMock.mockResolvedValue([]);
+    writeMock.mockResolvedValue(undefined);
     setConfig({ enabled: false, model: TRANSLATION_MODEL });
   });
 

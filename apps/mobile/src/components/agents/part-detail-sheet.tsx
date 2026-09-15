@@ -82,7 +82,8 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
   const detailTitle = part ? getPartDetailTitle(part) : null;
   const shownTitle = useTranslatedToolSummary(
     detailTitle?.title ?? t('common.details'),
-    detailTitle?.translatable ?? false
+    detailTitle?.translatable ?? false,
+    part?.id
   );
   const [textMode, setTextMode] = useState<MonoScrollTextMode>('wrap');
   const [monoCount, setMonoCount] = useState(0);

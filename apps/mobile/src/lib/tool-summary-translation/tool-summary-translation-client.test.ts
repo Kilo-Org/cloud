@@ -124,9 +124,7 @@ describe('requestToolSummaryTranslations', () => {
   });
 
   it('parses a fenced JSON array', async () => {
-    fetchMock.mockResolvedValue(
-      contentResponse('```json\n["Hallo Welt", "Zweiter Satz"]\n```')
-    );
+    fetchMock.mockResolvedValue(contentResponse('```json\n["Hallo Welt", "Zweiter Satz"]\n```'));
 
     const result = await requestToolSummaryTranslations({
       ...INPUT,
@@ -144,18 +142,20 @@ describe('requestToolSummaryTranslations', () => {
   it('returns one null per text without calling the gateway when there is no token', async () => {
     getAuthTokenForRequest.mockResolvedValue(null);
 
-    expect(
-      await requestToolSummaryTranslations({ ...INPUT, texts: ['a', 'b'] })
-    ).toEqual([null, null]);
+    expect(await requestToolSummaryTranslations({ ...INPUT, texts: ['a', 'b'] })).toEqual([
+      null,
+      null,
+    ]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('returns one null per text on a non-2xx response', async () => {
     fetchMock.mockResolvedValue(new Response('nope', { status: 500 }));
 
-    expect(
-      await requestToolSummaryTranslations({ ...INPUT, texts: ['a', 'b'] })
-    ).toEqual([null, null]);
+    expect(await requestToolSummaryTranslations({ ...INPUT, texts: ['a', 'b'] })).toEqual([
+      null,
+      null,
+    ]);
   });
 
   it('returns one null per text on a malformed body', async () => {
@@ -173,33 +173,38 @@ describe('requestToolSummaryTranslations', () => {
   it('returns one null per text when the content is not a JSON array', async () => {
     fetchMock.mockResolvedValue(contentResponse('{"translation":"Hallo"}'));
 
-    expect(
-      await requestToolSummaryTranslations({ ...INPUT, texts: ['a', 'b'] })
-    ).toEqual([null, null]);
+    expect(await requestToolSummaryTranslations({ ...INPUT, texts: ['a', 'b'] })).toEqual([
+      null,
+      null,
+    ]);
   });
 
   it('returns one null per text when the array length does not match the batch', async () => {
     fetchMock.mockResolvedValue(arrayContent(['Hallo']));
 
-    expect(
-      await requestToolSummaryTranslations({ ...INPUT, texts: ['a', 'b'] })
-    ).toEqual([null, null]);
+    expect(await requestToolSummaryTranslations({ ...INPUT, texts: ['a', 'b'] })).toEqual([
+      null,
+      null,
+    ]);
   });
 
   it('returns null at a position whose entry is not a string', async () => {
     fetchMock.mockResolvedValue(contentResponse('["eins", 2, "drei"]'));
 
-    expect(
-      await requestToolSummaryTranslations({ ...INPUT, texts: ['a', 'b', 'c'] })
-    ).toEqual(['eins', null, 'drei']);
+    expect(await requestToolSummaryTranslations({ ...INPUT, texts: ['a', 'b', 'c'] })).toEqual([
+      'eins',
+      null,
+      'drei',
+    ]);
   });
 
   it('returns null at a position whose entry is blank', async () => {
     fetchMock.mockResolvedValue(contentResponse('["eins", "   " ]'));
 
-    expect(
-      await requestToolSummaryTranslations({ ...INPUT, texts: ['a', 'b'] })
-    ).toEqual(['eins', null]);
+    expect(await requestToolSummaryTranslations({ ...INPUT, texts: ['a', 'b'] })).toEqual([
+      'eins',
+      null,
+    ]);
   });
 
   it('returns one null per text on empty content', async () => {

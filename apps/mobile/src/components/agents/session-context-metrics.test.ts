@@ -114,15 +114,86 @@ describe('SessionContextMetrics', () => {
     expect(onPress).toHaveBeenCalledOnce();
   });
 
-  it('does not expose permission controls while the session is loading', () => {
+  // The header control is the only way to the session's permission settings,
+  // so it must register a tap while the page is still loading instead of
+  // rendering a dead, invisible reserved box.
+  it('keeps the context control tappable while the session page loads', () => {
+    const onPress = vi.fn<() => void>();
+    const root = render({
+      info: undefined,
+      totalCostMicrodollars: null,
+      hasMessages: false,
+      autoApproveAvailable: true,
+      loading: true,
+      onPress,
+    });
+    expect(root.type).toBe('Pressable');
+    const props = root.props as {
+      accessibilityRole?: string;
+      onPress?: () => void;
+      className?: string;
+    };
+    expect(props.accessibilityRole).toBe('button');
+    expect(props.className ?? '').not.toContain('opacity-0');
+    props.onPress?.();
+    expect(onPress).toHaveBeenCalledOnce();
+  });
+
+  // Usage is already known, so the control must be live instead of an invisible
+  // zero-size hit area.
+  it('keeps the context control tappable for an empty session that reports usage', () => {
+    const onPress = vi.fn<() => void>();
+    const root = render({
+      info: info(),
+      totalCostMicrodollars: 150_000,
+      hasMessages: false,
+      onPress,
+    });
+    expect(root.type).toBe('Pressable');
+    const props = root.props as {
+      accessibilityRole?: string;
+      onPress?: () => void;
+      className?: string;
+    };
+    expect(props.accessibilityRole).toBe('button');
+    expect(props.className ?? '').not.toContain('opacity-0');
+    props.onPress?.();
+    expect(onPress).toHaveBeenCalledOnce();
+  });
+
+  // Usage and permission controls are both still unknown while a session
+  // opens (or after a failed open), but the parent can still open the sheet,
+  // so the control must register a tap instead of a dead reserved box.
+  it('keeps the context control tappable with no usage and no permission controls', () => {
+    const onPress = vi.fn<() => void>();
+    const root = render({
+      info: undefined,
+      totalCostMicrodollars: null,
+      hasMessages: false,
+      autoApproveAvailable: false,
+      onPress,
+    });
+    expect(root.type).toBe('Pressable');
+    const props = root.props as {
+      accessibilityRole?: string;
+      accessibilityLabel?: string;
+      onPress?: () => void;
+      className?: string;
+    };
+    expect(props.accessibilityRole).toBe('button');
+    expect(props.accessibilityLabel).toContain('Tap to view context details.');
+    expect(props.className ?? '').not.toContain('opacity-0');
+    props.onPress?.();
+    expect(onPress).toHaveBeenCalledOnce();
+  });
+
+  it('does not expose permission controls while the session is loading and no sheet can open', () => {
     expectHiddenReservedBox(
       render({
         info: undefined,
         totalCostMicrodollars: null,
-        hasMessages: true,
-        autoApproveAvailable: true,
+        hasMessages: false,
         loading: true,
-        onPress: vi.fn<() => void>(),
       })
     );
   });
@@ -249,22 +320,5 @@ describe('SessionContextMetrics', () => {
       throw new Error('expected ContextUsageRing');
     }
     expect((ring.props as { arcFraction?: number }).arcFraction).toBe(0);
-  });
-
-  it('empty session with interactive info and onPress stays a hidden reserved view', () => {
-    const onPress = vi.fn(() => undefined);
-    const root = render({
-      hasMessages: false,
-      info: info(),
-      totalCostMicrodollars: 150_000,
-      onPress,
-    });
-    expectHiddenReservedBox(root);
-    const props = root.props as {
-      onPress?: () => void;
-      accessibilityRole?: string;
-    };
-    expect(props.onPress).toBeUndefined();
-    expect(props.accessibilityRole).not.toBe('button');
   });
 });

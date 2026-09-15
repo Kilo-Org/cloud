@@ -61,23 +61,6 @@ const missingIntegrationResponse = (message: string): GitHubRepositoriesResult =
   errorMessage: message,
 });
 
-/**
- * A repository can be reachable from more than one installation. Keep the
- * first occurrence: integrations arrive oldest-first, matching the primary
- * installation a session resolves by default.
- */
-const dedupeRepositories = (
-  repositories: GitHubRepositoriesResult['repositories']
-): GitHubRepositoriesResult['repositories'] => {
-  const seen = new Set<string>();
-  return repositories.filter(repo => {
-    const key = repo.fullName.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-};
-
 export async function getGitHubTokenForOrganization(
   organizationId: string
 ): Promise<string | undefined> {
@@ -214,6 +197,42 @@ export async function fetchAllGitHubRepositoriesForOrganization(
     await getIntegrationsByOrganization(organizationId, PLATFORM.GITHUB)
   ).filter(isPlatformIntegrationHealthy);
   return fetchRepositoriesForIntegrations(integrations, forceRefresh);
+}
+
+const repositoryOwner = (fullName: string) => {
+  const slash = fullName.indexOf('/');
+  return slash === -1 ? fullName : fullName.slice(0, slash);
+};
+
+/**
+ * Keeps a single entry per repository when the same repo is reachable through
+ * more than one GitHub installation (for example the app is installed on two
+ * accounts that share a repo, or a reinstall left two active installation rows
+ * for the same account). Prefer the installation whose GitHub account owns the
+ * repository so sessions run against the canonical write identity. Otherwise
+ * keep the first entry: `getIntegrationsByOrganization` returns installations
+ * oldest-first, matching the primary installation a session resolves to by
+ * default.
+ */
+function dedupeRepositories(
+  repositories: GitHubRepositoriesResult['repositories']
+): GitHubRepositoriesResult['repositories'] {
+  const byFullName = new Map<string, GitHubRepositoriesResult['repositories'][number]>();
+  for (const repo of repositories) {
+    const key = repo.fullName.toLowerCase();
+    const existing = byFullName.get(key);
+    if (!existing) {
+      byFullName.set(key, repo);
+      continue;
+    }
+    const owner = repositoryOwner(existing.fullName).toLowerCase();
+    const existingIsOwner = (existing.platformAccountLogin ?? '').toLowerCase() === owner;
+    const candidateIsOwner = (repo.platformAccountLogin ?? '').toLowerCase() === owner;
+    if (candidateIsOwner && !existingIsOwner) {
+      byFullName.set(key, repo);
+    }
+  }
+  return [...byFullName.values()];
 }
 
 async function fetchRepositoriesForIntegrations(

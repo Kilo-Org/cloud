@@ -232,7 +232,7 @@ describe('github-integration-helpers', () => {
       ]);
     });
 
-    it('lists a repository shared by two installations exactly once, from the primary installation', async () => {
+    it('lists a repository shared by two installations exactly once, preferring the owning installation', async () => {
       mockGetIntegrationsByOrganization.mockResolvedValue([
         buildIntegration({
           id: 'integration-1',
@@ -261,14 +261,101 @@ describe('github-integration-helpers', () => {
         expect.objectContaining({
           fullName: 'acme-core/api',
           platformIntegrationId: 'integration-1',
+          platformAccountLogin: 'acme-core',
         }),
         expect.objectContaining({
           fullName: 'acme-core/shared',
           platformIntegrationId: 'integration-1',
+          platformAccountLogin: 'acme-core',
         }),
         expect.objectContaining({
           fullName: 'acme-labs/scanner',
           platformIntegrationId: 'integration-2',
+          platformAccountLogin: 'acme-labs',
+        }),
+      ]);
+    });
+
+    it('deduplicates a repository reachable through multiple installations, preferring the owning account', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          platform_installation_id: 'installation-1',
+          platform_account_login: 'alice',
+          repositories: [
+            { id: 1, name: 'api', full_name: 'acme/api', private: true },
+            { id: 2, name: 'docs', full_name: 'acme/docs', private: false },
+          ],
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          platform_account_login: 'acme',
+          repositories: [
+            { id: 1, name: 'api', full_name: 'acme/api', private: true },
+            { id: 3, name: 'scanner', full_name: 'acme/scanner', private: true },
+          ],
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme/api',
+          platformIntegrationId: 'integration-2',
+          platformAccountLogin: 'acme',
+        }),
+        expect.objectContaining({
+          fullName: 'acme/docs',
+          platformIntegrationId: 'integration-1',
+          platformAccountLogin: 'alice',
+        }),
+        expect.objectContaining({
+          fullName: 'acme/scanner',
+          platformIntegrationId: 'integration-2',
+          platformAccountLogin: 'acme',
+        }),
+      ]);
+    });
+
+    it('deduplicates repositories across multiple active installations of the same account, keeping the primary', async () => {
+      // getIntegrationsByOrganization returns installations oldest-first, so the
+      // first entry is the primary installation a session resolves by default.
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-primary',
+          platform_installation_id: 'installation-1',
+          platform_account_login: 'acme',
+          repositories: [
+            { id: 1, name: 'api', full_name: 'acme/api', private: true },
+            { id: 2, name: 'docs', full_name: 'acme/docs', private: false },
+          ],
+        }),
+        buildIntegration({
+          id: 'integration-newer',
+          platform_installation_id: 'installation-2',
+          platform_account_login: 'acme',
+          repositories: [{ id: 1, name: 'api', full_name: 'acme/api', private: true }],
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme/api',
+          platformIntegrationId: 'integration-primary',
+          platformAccountLogin: 'acme',
+        }),
+        expect.objectContaining({
+          fullName: 'acme/docs',
+          platformIntegrationId: 'integration-primary',
+          platformAccountLogin: 'acme',
         }),
       ]);
     });

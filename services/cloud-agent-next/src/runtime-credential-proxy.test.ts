@@ -29,10 +29,8 @@ describe('runtime credential proxy', () => {
       kiloSessionId: 'kilo_1',
       userId: 'user_1',
       mode: 'contained',
-      generation: 1,
       allocationId: 'allocation_1',
-      wrapperRunId: 'run_1',
-      wrapperConnectionId: 'connection_1',
+      instanceGeneration: 1,
       leaseExpiresAt: now + 60_000,
       state: 'active',
     });
@@ -50,7 +48,9 @@ describe('runtime credential proxy', () => {
       exp: Math.floor(grant.leaseExpiresAt / 1000),
     });
     expect(claims?.iat).toBeGreaterThan(0);
-    if (grant.plane !== 'legacy') throw new Error('Expected legacy grant');
+    if (grant.plane !== 'legacy' || grant.version !== 3) {
+      throw new Error('Expected legacy v3 grant');
+    }
     expect(
       claims &&
         matchesRuntimeProxyGrant(grant, claims, {
@@ -60,10 +60,8 @@ describe('runtime credential proxy', () => {
           userId: grant.userId,
           fence: {
             plane: 'legacy',
-            generation: grant.generation,
             allocationId: grant.allocationId,
-            wrapperRunId: grant.wrapperRunId,
-            wrapperConnectionId: grant.wrapperConnectionId,
+            instanceGeneration: grant.instanceGeneration,
           },
           now,
         })
@@ -80,10 +78,8 @@ describe('runtime credential proxy', () => {
       kiloSessionId: 'kilo_1',
       userId: 'user_1',
       mode: 'direct',
-      generation: 1,
       allocationId: 'allocation_1',
-      wrapperRunId: 'run_1',
-      wrapperConnectionId: 'connection_1',
+      instanceGeneration: 1,
       leaseExpiresAt: Date.now() - 1,
       state: 'active',
     });
@@ -156,10 +152,8 @@ describe('runtime credential proxy', () => {
           userId: control.userId,
           fence: {
             plane: 'legacy',
-            generation: 1,
             allocationId: control.allocationId,
-            wrapperRunId: 'run_1',
-            wrapperConnectionId: 'connection_1',
+            instanceGeneration: 1,
           },
           now,
         })
@@ -179,6 +173,53 @@ describe('runtime credential proxy', () => {
       wrapperConnectionId: 'connection_1',
     });
     expect(legacyV1.plane).toBe('legacy');
+  });
+
+  it('matches a readable legacy v2 grant against a physical-only fence by allocation', async () => {
+    const env = { NEXTAUTH_SECRET: 'test-secret' } as never;
+    const now = Date.now();
+    const legacyV2 = runtimeProxyGrantSchema.parse({
+      version: 2,
+      plane: 'legacy',
+      grantId: '33333333-3333-4333-8333-333333333333',
+      authorizationId: '11111111-1111-4111-8111-111111111111',
+      sessionId: 'agent_1',
+      kiloSessionId: 'kilo_1',
+      userId: 'user_1',
+      nonce: 'a'.repeat(43),
+      mode: 'contained',
+      allocationId: 'allocation_1',
+      generation: 5,
+      wrapperRunId: 'run_1',
+      wrapperConnectionId: 'connection_1',
+      leaseExpiresAt: now + 60_000,
+      state: 'active',
+      issuedAt: now,
+    });
+    const claims = await verifyRuntimeCredentialProxyHandle(
+      env,
+      await issueRuntimeCredentialProxyHandle(env, legacyV2)
+    );
+    if (!claims) throw new Error('Expected legacy v2 handle claims');
+    const context = {
+      authorizationId: legacyV2.authorizationId,
+      sessionId: legacyV2.sessionId,
+      kiloSessionId: legacyV2.kiloSessionId,
+      userId: legacyV2.userId,
+      now,
+    };
+    expect(
+      matchesRuntimeProxyGrant(legacyV2, claims, {
+        ...context,
+        fence: { plane: 'legacy', allocationId: 'allocation_1', instanceGeneration: 5 },
+      })
+    ).toBe(true);
+    expect(
+      matchesRuntimeProxyGrant(legacyV2, claims, {
+        ...context,
+        fence: { plane: 'legacy', allocationId: 'allocation_2', instanceGeneration: 5 },
+      })
+    ).toBe(false);
   });
 
   it('maps only exact method-scoped provider, backend, and ingest routes', () => {

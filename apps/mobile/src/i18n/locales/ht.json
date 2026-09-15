@@ -3023,22 +3023,13 @@
     "remoteOptionBody": "Egzekite Kilo sou pwòp machin ou a nan atravè CLI `kilo remote` la.",
     "skip": "Pase vizit la",
     "tutorialLabel": "Gid",
-    "cloudTitle": "Kòmanse premye sesyon nyaj ou a",
-    "cloudBody": "Kreye yon nouvo sesyon epi Kilo ap egzekite l nan nyaj la.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "N ap tann sesyon nyaj ou a kòmanse…",
-    "cloudCheck": "Premye sesyon nyaj ou a ap egzekite.",
     "remoteTitle": "Kòmanse premye sesyon distans ou a",
     "remoteBody": "Konekte òdinatè ou a, epi kòmanse sesyon an soti isit la.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Kòmanse yon sesyon sou òdinatè ou",
-    "remoteWaiting": "N ap tann òdinatè ou a kòmanse sesyon an…",
-    "remoteCheck": "Premye sesyon distans ou a ap egzekite.",
     "remoteEmptyTitle": "Okenn òdinatè konekte pou kounye a",
     "remoteEmptyBody": "Pou konekte l, egzekite `kilo remote` sou òdinatè ou a.",
     "remoteFound": "Òdinatè konekte",
     "checkAgain": "Tcheke ankò",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

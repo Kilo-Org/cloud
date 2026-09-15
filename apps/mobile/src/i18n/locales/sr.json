@@ -3045,22 +3045,13 @@
     "remoteOptionBody": "Pokreni Kilo na sopstvenoj mašini preko `kilo remote` CLI-ja.",
     "skip": "Preskoči turu",
     "tutorialLabel": "Tutorijal",
-    "cloudTitle": "Pokreni svoju prvu cloud sesiju",
-    "cloudBody": "Napravi novu sesiju i Kilo će je pokrenuti u cloudu.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Čekam da tvoja cloud sesija počne…",
-    "cloudCheck": "Tvoja prva cloud sesija radi.",
     "remoteTitle": "Pokreni svoju prvu udaljenu sesiju",
     "remoteBody": "Poveži svoj računar, zatim pokreni sesiju odavde.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Pokreni sesiju na svom računaru",
-    "remoteWaiting": "Čekam da tvoj računar pokrene sesiju…",
-    "remoteCheck": "Tvoja prva udaljena sesija radi.",
     "remoteEmptyTitle": "Još nema povezanog računara",
     "remoteEmptyBody": "Da ga povežeš, pokreni `kilo remote` na računaru.",
     "remoteFound": "Računar povezan",
     "checkAgain": "Proveri ponovo",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

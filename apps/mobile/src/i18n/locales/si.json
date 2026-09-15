@@ -3023,22 +3023,13 @@
     "remoteOptionBody": "ඔබේම යන්ත්‍රයේ `kilo remote` CLI මගින් Kilo ධාවනය කරන්න.",
     "skip": "සංචාරය මඟහරින්න",
     "tutorialLabel": "ඉගෙනුම් මාර්ගෝපදේශය",
-    "cloudTitle": "ඔබේ පළමු වලාකුළු සැසිය අරඹන්න",
-    "cloudBody": "නව සැසියක් සාදන්න, Kilo එය වලාකුළේ ධාවනය කරයි.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "ඔබේ වලාකුළු සැසිය අරඹන තෙක් බලා සිටී…",
-    "cloudCheck": "ඔබේ පළමු වලාකුළු සැසිය ක්‍රියාත්මක වේ.",
     "remoteTitle": "ඔබේ පළමු දුරස්ථ සැසිය අරඹන්න",
     "remoteBody": "ඔබේ පරිගණකය සම්බන්ධ කර, පසුව සැසිය මෙතැනින් අරඹන්න.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "ඔබේ පරිගණකයේ සැසියක් අරින්න",
-    "remoteWaiting": "ඔබේ පරිගණකය සැසිය අරඹන තෙක් බලා සිටී…",
-    "remoteCheck": "ඔබේ පළමු දුරස්ථ සැසිය ක්‍රියාත්මක වේ.",
     "remoteEmptyTitle": "තවම පරිගණකයක් සම්බන්ධ වී නැත",
     "remoteEmptyBody": "එය සම්බන්ධ කිරීමට ඔබේ පරිගණකයේ `kilo remote` ධාවනය කරන්න.",
     "remoteFound": "පරිගණකය සම්බන්ධ විය",
     "checkAgain": "නැවත පරීක්ෂා කරන්න",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

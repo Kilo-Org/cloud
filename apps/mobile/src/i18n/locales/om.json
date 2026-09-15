@@ -3023,22 +3023,13 @@
     "remoteOptionBody": "Kilo kompiitara kee irratti `kilo remote` CLI'n hojjechisi.",
     "skip": "Daawannoo darbi",
     "tutorialLabel": "Barnoota",
-    "cloudTitle": "Turtii duumessa jalqabaa kee eegaladhu",
-    "cloudBody": "Turtii haaraa uumi; Kilo'n isaa duumessa keessatti hojjetsa.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Turtiin duumessa kee akka jalqabu eegamaa jira…",
-    "cloudCheck": "Turtiin duumessa kee jalqabaa hojjechaa jira.",
     "remoteTitle": "Turtii fageenya jalqabaa kee eegaladhu",
     "remoteBody": "Kompiitara kee walqunnamsiisi, itti aanse turtii kana as irraa eegaladhu.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Turtii kompiitara kee irratti eegaladhu",
-    "remoteWaiting": "Kompiitarni kee turticha eegalutti eegamaa jira…",
-    "remoteCheck": "Turtiin fageenya jalqabaa kee hojjechaa jira.",
     "remoteEmptyTitle": "Amma kompiitaraan hin walqabate",
     "remoteEmptyBody": "Walqunnamuuf, kompiitara kee irratti `kilo remote` raawwadhu.",
     "remoteFound": "Kompiitaraan walqabate",
     "checkAgain": "Irra deebi'ii ilaali",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

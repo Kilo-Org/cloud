@@ -3067,22 +3067,13 @@
     "remoteOptionBody": "Paleiskite Kilo savo kompiuteryje per `kilo remote` CLI.",
     "skip": "Praleisti apžvalgą",
     "tutorialLabel": "Pamoka",
-    "cloudTitle": "Pradėkite pirmąją debesų sesiją",
-    "cloudBody": "Sukurkite naują sesiją, o Kilo ją paleis danguje.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Laukiama, kol prasidės jūsų debesų sesija…",
-    "cloudCheck": "Pirmoji jūsų debesų sesija veikia.",
     "remoteTitle": "Pradėkite pirmąją nuotolinę sesiją",
     "remoteBody": "Prijunkite savo kompiuterį, tada pradėkite sesiją čia.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Pradėti sesiją kompiuteryje",
-    "remoteWaiting": "Laukiama, kol kompiuteris pradės sesiją…",
-    "remoteCheck": "Pirmoji nuotolinė sesija veikia.",
     "remoteEmptyTitle": "Dar nėra prijungto kompiuterio",
     "remoteEmptyBody": "Norėdami prijungti, kompiuteryje vykdykite `kilo remote`.",
     "remoteFound": "Kompiuteris prijungtas",
     "checkAgain": "Kartoti patikrinimą",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

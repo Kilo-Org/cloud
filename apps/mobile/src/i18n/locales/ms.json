@@ -3023,22 +3023,13 @@
     "remoteOptionBody": "Jalankan Kilo pada mesin anda sendiri melalui CLI `kilo remote`.",
     "skip": "Langkau lawatan",
     "tutorialLabel": "Tutorial",
-    "cloudTitle": "Mulakan sesi cloud pertama anda",
-    "cloudBody": "Buat sesi baharu dan Kilo akan menjalankannya dalam cloud.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Menunggu sesi cloud anda bermula…",
-    "cloudCheck": "Sesi cloud pertama anda sedang berjalan.",
     "remoteTitle": "Mulakan sesi remote pertama anda",
     "remoteBody": "Sambungkan komputer anda, kemudian mulakan sesi dari sini.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Mulakan sesi pada komputer anda",
-    "remoteWaiting": "Menunggu komputer anda memulakan sesi…",
-    "remoteCheck": "Sesi remote pertama anda sedang berjalan.",
     "remoteEmptyTitle": "Tiada komputer bersambung lagi",
     "remoteEmptyBody": "Untuk menyambungkannya, jalankan `kilo remote` pada komputer anda.",
     "remoteFound": "Komputer bersambung",
     "checkAgain": "Semak semula",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

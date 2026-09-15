@@ -3023,22 +3023,13 @@
     "remoteOptionBody": "Voer Kilo op jou eie masjien uit deur die `kilo remote`-CLI.",
     "skip": "Slaan toer oor",
     "tutorialLabel": "Tutorial",
-    "cloudTitle": "Begin jou eerste wolksessie",
-    "cloudBody": "Skep 'n nuwe sessie en Kilo voer dit in die wolk uit.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Wag vir jou wolksessie om te begin…",
-    "cloudCheck": "Jou eerste wolksessie loop.",
     "remoteTitle": "Begin jou eerste afstandsessie",
     "remoteBody": "Koppel jou rekenaar en begin dan die sessie van hier af.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Begin 'n sessie op jou rekenaar",
-    "remoteWaiting": "Wag vir jou rekenaar om die sessie te begin…",
-    "remoteCheck": "Jou eerste afstandsessie loop.",
     "remoteEmptyTitle": "Nog geen rekenaar gekoppel nie",
     "remoteEmptyBody": "Voer `kilo remote` op jou rekenaar uit om dit te koppel.",
     "remoteFound": "Rekenaar gekoppel",
     "checkAgain": "Kontroleer weer",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

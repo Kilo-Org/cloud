@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as use-fetch-to-completion.mounted.test.tsx) */
 // s6 (identity rule 17): the viewed-files hook is provider-scoped end to
 // end. The store folds `providerPrRefKey` into the durable key only when it
 // receives the ref, so a GitLab MR and a same-numbered GitHub PR — or one
@@ -7,11 +6,11 @@
 // `viewed-files.test.ts`.
 
 import { createElement } from 'react';
-import { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { usePrReviewViewedFiles } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
+import { act } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 vi.mock('@/lib/trpc', () => ({

@@ -228,6 +228,26 @@ export type ContextSheetIdentity = {
 };
 
 /**
+ * Whether an open request still matches the model usage currently reports.
+ *
+ * An open request recorded before the first usage report carries no model, and
+ * must keep matching whatever model usage later names — otherwise the sheet
+ * dismisses itself on arrival of the very report it was opened to read. An
+ * open request that did record a model stops matching once usage names another.
+ */
+function isOpenIdentityForModel(
+  info: SessionContextInfo | undefined,
+  openIdentity: ContextSheetIdentity | null
+): boolean {
+  const providerID = openIdentity?.providerID;
+  const modelID = openIdentity?.modelID;
+  if (providerID === undefined || modelID === undefined) {
+    return true;
+  }
+  return providerID === info?.providerID && modelID === info.modelID;
+}
+
+/**
  * Controls when the native Modal is mounted and when it is visible. Keeping
  * the sheet mounted after it has been opened lets `visible` transition from
  * true → false for native dismissal. The sheet is the session's own
@@ -246,8 +266,6 @@ export function getContextSheetMountState(
     return { mounted: false };
   }
   const visible =
-    openedForSession &&
-    (autoApproveAvailable ||
-      (openIdentity.providerID === info?.providerID && openIdentity.modelID === info?.modelID));
+    openedForSession && (autoApproveAvailable || isOpenIdentityForModel(info, openIdentity));
   return { mounted: true, visible, info };
 }

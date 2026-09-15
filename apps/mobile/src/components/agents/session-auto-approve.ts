@@ -40,6 +40,21 @@ export function canAutoApprovePermissions(input: {
   return input.activeSessionType !== 'read-only';
 }
 
+/**
+ * Whether the session can actually answer a permission ask, which is what
+ * makes an auto-reply eligible.
+ *
+ * Distinct from {@link canAutoApprovePermissions}: the settings row must stay
+ * reachable while the transport is unresolved, but an unresolved transport
+ * cannot deliver an ask, so it must never make an auto-reply eligible.
+ */
+export function canAutoApproveReply(input: {
+  activeSessionType: SessionAutoApproveSessionType;
+  isReadOnly: boolean;
+}): boolean {
+  return input.activeSessionType !== null && canAutoApprovePermissions(input);
+}
+
 /** Resolve the row state: unavailable wins over the stored enabled flag. */
 export function resolveSessionAutoApproveState(input: {
   enabled: boolean;

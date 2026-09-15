@@ -50,6 +50,16 @@ describe('getContextSheetMountState', () => {
     ).toEqual({ mounted: true, visible: true, info: undefined });
   });
 
+  it('stays open when usage arrives after opening a session without permission controls', () => {
+    const session = { sessionId: 'current-session', autoApproveAvailable: false };
+    expect(getContextSheetMountState(undefined, { sessionId: 'current-session' }, session)).toEqual(
+      { mounted: true, visible: true, info: undefined }
+    );
+    expect(
+      getContextSheetMountState(currentInfo, { sessionId: 'current-session' }, session)
+    ).toEqual({ mounted: true, visible: true, info: currentInfo });
+  });
+
   it('does not open an unmounted sheet for another session', () => {
     expect(
       getContextSheetMountState(

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canAutoApprovePermissions,
+  canAutoApproveReply,
   clearSessionAutoApprove,
   getSessionAutoApproveEnabled,
   MAX_REMEMBERED_REQUEST_IDS,
@@ -48,6 +49,27 @@ describe('canAutoApprovePermissions', () => {
       false
     );
     expect(canAutoApprovePermissions({ activeSessionType: null, isReadOnly: true })).toBe(false);
+  });
+});
+
+describe('canAutoApproveReply', () => {
+  it('allows a resolved remote or cloud-agent transport', () => {
+    expect(canAutoApproveReply({ activeSessionType: 'remote', isReadOnly: false })).toBe(true);
+    expect(canAutoApproveReply({ activeSessionType: 'cloud-agent', isReadOnly: false })).toBe(true);
+  });
+
+  // The settings row stays reachable while the transport is unresolved, but an
+  // unresolved transport cannot deliver a permission ask, so it must not make
+  // an auto-reply eligible.
+  it('rejects an unresolved transport even though its settings stay reachable', () => {
+    expect(canAutoApprovePermissions({ activeSessionType: null, isReadOnly: false })).toBe(true);
+    expect(canAutoApproveReply({ activeSessionType: null, isReadOnly: false })).toBe(false);
+  });
+
+  it('rejects a read-only session', () => {
+    expect(canAutoApproveReply({ activeSessionType: 'read-only', isReadOnly: false })).toBe(false);
+    expect(canAutoApproveReply({ activeSessionType: 'remote', isReadOnly: true })).toBe(false);
+    expect(canAutoApproveReply({ activeSessionType: null, isReadOnly: true })).toBe(false);
   });
 });
 

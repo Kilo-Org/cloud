@@ -20,6 +20,12 @@ type ConfigureRowProps = {
   title: string;
   subtitle?: string;
   /**
+   * Line cap for the subtitle. A subtitle that is one unbreakable token (an
+   * email address, a host name) cannot wrap on Android and is hard-clipped at
+   * the row edge with no ellipsis; `1` makes it ellipsize cleanly instead.
+   */
+  subtitleNumberOfLines?: number;
+  /**
    * Semantic tone override (good / warn / danger). When omitted the tile
    * tint is hashed from `title` so consistent titles stay on the same hue
    * without any explicit mapping.
@@ -38,6 +44,7 @@ export function ConfigureRow({
   icon: Icon,
   title,
   subtitle,
+  subtitleNumberOfLines,
   tone,
   onPress,
   disabled,
@@ -72,7 +79,14 @@ export function ConfigureRow({
   const textBlock = (
     <View className={cn('min-w-0', stack ? 'w-full' : 'flex-1')}>
       <Text className="text-sm font-medium text-foreground">{title}</Text>
-      {subtitle ? <Text className="mt-0.5 text-xs text-muted-foreground">{subtitle}</Text> : null}
+      {subtitle ? (
+        <Text
+          numberOfLines={subtitleNumberOfLines}
+          className="mt-0.5 text-xs text-muted-foreground"
+        >
+          {subtitle}
+        </Text>
+      ) : null}
     </View>
   );
 

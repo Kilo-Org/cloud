@@ -156,6 +156,7 @@ export function MessageDetailsSheet({
             title={t('agentChat.messageDetails.title')}
             onDone={onClose}
             doneLabel={t('common.done')}
+            topInset="ios-page-sheet"
           />
 
           {content ? (

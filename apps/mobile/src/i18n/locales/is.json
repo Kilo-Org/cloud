@@ -3012,5 +3012,24 @@
     "loadFailed": "Ekki tókst að hlaða tungumálunum sem þetta tæki styður.",
     "emptyTitle": "Engin studd tungumál",
     "emptyDescription": "Talgreining þessa tækis tilkynnir engin studd tungumál."
+  },
+  "tour": {
+    "eyebrow": "Fljótleg kynning",
+    "forkTitle": "Hvar viltu keyra Kilo?",
+    "forkSubtitle": "Veldu hvar Kilo keyrir fyrstu lotuna þína.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Keyrðu Kilo í einangruðu skýjumhverfi án þess að innsetja eitthvað.",
+    "remoteOptionTitle": "Tölvan þín",
+    "remoteOptionBody": "Keyrðu Kilo á eigin tölvu í gegnum `kilo remote` CLI-ið.",
+    "skip": "Sleppa kynningu",
+    "tutorialLabel": "Leiðbeiningar",
+    "remoteTitle": "Hafðu uppi fyrstu fjarlotu þína",
+    "remoteBody": "Tengdu tölvuna þína og vertu svo að byrja lotuna héðan.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Engin tölva tengd ennþá",
+    "remoteEmptyBody": "Til að tengja hana skaltu keyra `kilo remote` á tölvunni þinni.",
+    "remoteFound": "Tölva tengd",
+    "checkAgain": "Athuga aftur",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

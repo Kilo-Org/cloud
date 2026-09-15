@@ -24,6 +24,16 @@ import {
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
+/**
+ * A cloud `prepareSession` rejection, classified for the form's inline error.
+ * `retryable` keeps the same `operationKey` and offers a retry control;
+ * `message` is the server's reason, or the generic copy when it carries none.
+ */
+export type CloudCreateFailure = {
+  retryable: boolean;
+  message: string;
+};
+
 type UseNewSessionCreatorInput = {
   attachments: ReturnType<typeof useAgentAttachmentUpload>;
   mode: AgentMode;
@@ -31,6 +41,12 @@ type UseNewSessionCreatorInput = {
   organizationId?: string;
   /** Invoked on the success path before navigation; failures never fire it. */
   onCreated?: () => void;
+  /**
+   * Invoked with a classified cloud-create rejection. When supplied, the form
+   * owns the failure feedback (a persistent inline error) and the hook does not
+   * also toast, so the person never gets two copies of the same failure.
+   */
+  onCreateError?: (failure: CloudCreateFailure) => void;
   selectedRepository: NewSessionRepository | null;
   setIsCreating: (value: boolean) => void;
   variant: string;
@@ -75,6 +91,7 @@ export function useNewSessionCreator({
   model,
   organizationId,
   onCreated,
+  onCreateError,
   selectedRepository,
   setIsCreating,
   variant,
@@ -264,11 +281,20 @@ export function useNewSessionCreator({
       }
     } catch (error) {
       // Only `prepareSession` errors reach here; UI failures are swallowed.
+      const retryable = isCloudPrepareRetryableError(error);
       const message =
-        error instanceof Error ? error.message : i18n.t('agentChat.newSession.failedToCreate');
-      toast.error(message);
+        error instanceof Error && error.message
+          ? error.message
+          : i18n.t('agentChat.newSession.failedToCreate');
+      // One feedback channel: the form's inline error when it accepts the
+      // callback, the toast otherwise. Never both for the same rejection.
+      if (onCreateError) {
+        onCreateError({ retryable, message });
+      } else {
+        toast.error(message);
+      }
       // A typed terminal rejection ends the intent; a retryable one keeps the key.
-      if (!isCloudPrepareRetryableError(error)) {
+      if (!retryable) {
         rotateKey();
         await removeOutboxRow(intentFingerprint);
       }
@@ -295,6 +321,7 @@ export function useNewSessionCreator({
     removeOutboxRow,
     whenLoaded,
     onCreated,
+    onCreateError,
   ]);
 
   return { createSessionFromDraft, promptRef };

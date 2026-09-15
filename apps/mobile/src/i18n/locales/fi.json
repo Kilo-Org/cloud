@@ -3012,5 +3012,24 @@
     "loadFailed": "Tämän laitteen tukemia kieliä ei voitu ladata.",
     "emptyTitle": "Ei tuettuja kieliä",
     "emptyDescription": "Tämän laitteen puheentunnistus ei ilmoita tuettuja kieliä."
+  },
+  "tour": {
+    "eyebrow": "Nopea esittely",
+    "forkTitle": "Missä haluat suorittaa Kilon?",
+    "forkSubtitle": "Valitse, missä Kilo suorittaa ensimmäisen istuntosi.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Suorita Kilo eristetyssä pilviympäristössä ilman asennuksia.",
+    "remoteOptionTitle": "Tietokoneesi",
+    "remoteOptionBody": "Suorita Kilo omalla koneellasi `kilo remote` -CLI:n kautta.",
+    "skip": "Ohita esittely",
+    "tutorialLabel": "Käyttöopas",
+    "remoteTitle": "Aloita ensimmäinen etäistuntosi",
+    "remoteBody": "Yhdistä tietokoneesi ja käynnistä istunto täältä.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Tietokonetta ei ole vielä yhdistetty",
+    "remoteEmptyBody": "Yhdistääksesi sen, suorita `kilo remote` tietokoneellasi.",
+    "remoteFound": "Tietokone yhdistetty",
+    "checkAgain": "Tarkista uudelleen",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

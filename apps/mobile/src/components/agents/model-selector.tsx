@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, type ImperativeRouter, useRouter } from 'expo-router';
 import { BookOpenCheck, Brain, Check, ChevronDown, Star } from '@/components/ui/icons';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
@@ -105,6 +105,12 @@ export function openModelPicker(
       onSelect(selection.option.id, selection.variant, selection);
     },
   });
+  // The sheet anchors over the keyboard only at its first layout and never
+  // re-anchors when the keyboard hides afterwards: opened while the composer
+  // holds the IME up, it keeps the keyboard-height bottom inset and exposes a
+  // strip of the screen behind it below the sheet. Dismiss the keyboard first
+  // so the sheet anchors at the window bottom (e1 spot check).
+  Keyboard.dismiss();
   router.push(`/(app)/agent-chat/model-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
 }
 

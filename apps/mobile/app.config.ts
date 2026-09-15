@@ -174,6 +174,13 @@ const config: ExpoConfig = {
         },
         ios: {
           ccacheEnabled: true,
+          // Compile React Native from the patched source instead of linking the
+          // prebuilt core. The App Store core ships with assertions enabled
+          // (react/react-native#57454), so the Fabric unmount assert must carry
+          // the bounds guard from react/react-native#57865 or a stale child
+          // index SIGABRTs release builds (Kilo-Org/kilocode#14065; see
+          // patches/react-native@0.86.3.patch).
+          buildReactNativeFromSource: true,
           // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop
           // (pulled transitively alongside expo-iap's AppCheckCore); those pods don't define
           // modules, so pod install fails unless we force module maps on them. Unconditional

@@ -30,11 +30,7 @@ const backHandler = vi.hoisted(() => {
     handlers,
     add: (handler: () => boolean) => {
       handlers.add(handler);
-      return {
-        remove: () => {
-          handlers.delete(handler);
-        },
-      };
+      return { remove: () => handlers.delete(handler) };
     },
     press: () => {
       let handled = false;
@@ -55,6 +51,7 @@ const focusState = vi.hoisted(() => ({ active: true }));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
   BackHandler: {
     addEventListener: (_event: string, handler: () => boolean) => backHandler.add(handler),
   },
@@ -117,7 +114,6 @@ vi.mock('@/lib/tour/tour-completion', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -146,20 +142,12 @@ function hasText(renderer: Renderer, value: string): boolean {
     .some(node => childValues(node).includes(value));
 }
 
-function findControl(
-  renderer: Renderer,
-  type: string,
-  label: string
-): ReactTestInstance | undefined {
-  return renderer.root
-    .findAllByType(type as ElementType)
-    .find(control =>
-      control.findAllByType('Text' as ElementType).some(node => childValues(node).includes(label))
-    );
-}
-
 function requireControl(renderer: Renderer, type: string, label: string): ReactTestInstance {
-  const control = findControl(renderer, type, label);
+  const control = renderer.root
+    .findAllByType(type as ElementType)
+    .find(node =>
+      node.findAllByType('Text' as ElementType).some(entry => childValues(entry).includes(label))
+    );
   if (!control) {
     throw new Error(`control not found: ${type} "${label}"`);
   }
@@ -171,6 +159,14 @@ function pressControl(renderer: Renderer, type: string, label: string): void {
   act(() => {
     (control.props as { onPress?: () => void }).onPress?.();
   });
+}
+
+/** Opening a step or going back is not a decision: never record or navigate. */
+function expectNoTourDecision(): void {
+  expect(recordCompleted).not.toHaveBeenCalled();
+  expect(stackSafeReplace).not.toHaveBeenCalled();
+  expect(routerReplace).not.toHaveBeenCalled();
+  expect(routerBack).not.toHaveBeenCalled();
 }
 
 /** Drive the computer step's hand-off the way a row tap does. */
@@ -224,13 +220,45 @@ describe('TourScreen', () => {
     unmount();
   });
 
-  it('renders the fork body inside a scroll container so it stays above the action bar', async () => {
+  it('starts the fork body under the header in one top-aligned scroll container', async () => {
     const { renderer, unmount } = await mountTour();
 
-    // The header and the Skip bar are outside the step's scroll area; the fork
-    // body must live in the scrolling CenteredState so a short screen or a
-    // large system font scrolls instead of covering them.
-    expect(renderer.root.findAllByType('CenteredState' as ElementType)).toHaveLength(1);
+    // The body begins directly under the header — it is not vertically centred
+    // in the band between the header and the Skip bar (the empty band the owner
+    // reported). One ScrollView owns it, top-aligned with the app's own
+    // first-run rhythm.
+    const scroller = renderer.root.findByType('ScrollView' as ElementType);
+    expect(scroller.props.contentContainerClassName).toBe('gap-8 px-6 pt-4 pb-6');
+    expect(renderer.root.findAllByType('CenteredState' as ElementType)).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('returns to the fork from the computer step without recording, by the header control and by hardware Back', async () => {
+    const { renderer, unmount } = await mountTour();
+    pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
+
+    // The computer step carries the app's own back control, wired to the fork.
+    const header = renderer.root.findByProps({ showBackButton: true });
+    act(() => {
+      (header.props as { onBack: () => void }).onBack();
+    });
+    // The fork is back, with no decision recorded and no navigation.
+    expect(hasText(renderer, 'tour.forkTitle')).toBe(true);
+    expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(0);
+    expectNoTourDecision();
+
+    // Android hardware Back agrees with the visible control instead of
+    // dismissing the whole tour.
+    pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
+    let handled = false;
+    act(() => {
+      handled = backHandler.press();
+    });
+    expect(handled).toBe(true);
+    expect(hasText(renderer, 'tour.forkTitle')).toBe(true);
+    expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(0);
+    expectNoTourDecision();
 
     unmount();
   });
@@ -263,10 +291,7 @@ describe('TourScreen', () => {
     expect(hasText(renderer, 'tour.forkTitle')).toBe(false);
     // Opening the page is not a decision: nothing is recorded until a
     // computer is tapped or the person skips.
-    expect(recordCompleted).not.toHaveBeenCalled();
-    expect(stackSafeReplace).not.toHaveBeenCalled();
-    expect(routerReplace).not.toHaveBeenCalled();
-    expect(routerBack).not.toHaveBeenCalled();
+    expectNoTourDecision();
 
     unmount();
   });

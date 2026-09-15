@@ -3100,5 +3100,24 @@
     "loadFailed": "Methwyd llwytho'r ieithoedd y mae'r ddyfais hon yn eu cefnogi.",
     "emptyTitle": "Dim ieithoedd wedi'u cefnogi",
     "emptyDescription": "Nid yw adnabyddiaeth lafar y ddyfais hon yn nodi unrhyw iaith a gefnogir."
+  },
+  "tour": {
+    "eyebrow": "Taith gyflym",
+    "forkTitle": "Ble yr hoffech chi redeg Kilo?",
+    "forkSubtitle": "Dewiswch ble mae Kilo yn rhedeg ar gyfer eich sesiwn gyntaf.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Rhedwch Kilo mewn amgylchedd cwmwl bocsys, heb dim i'w osod.",
+    "remoteOptionTitle": "Eich cyfrifiadur",
+    "remoteOptionBody": "Rhedwch Kilo ar eich peiriant eich hun drwy'r CLI `kilo remote`.",
+    "skip": "Hepgor y daith",
+    "tutorialLabel": "Tiwtorial",
+    "remoteTitle": "Dechreuwch eich sesiwn hirhoedlog gyntaf",
+    "remoteBody": "Cysylltwch eich cyfrifiadur, yna dechreuwch y sesiwn o'r fan hon.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Dim cyfrifiadur wedi'i gysylltu eto",
+    "remoteEmptyBody": "I'w gysylltu, rhedwch `kilo remote` ar eich cyfrifiadur.",
+    "remoteFound": "Cyfrifiadur wedi'i gysylltu",
+    "checkAgain": "Gwirio eto",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

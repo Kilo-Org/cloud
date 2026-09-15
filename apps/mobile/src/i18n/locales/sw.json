@@ -3012,5 +3012,24 @@
     "loadFailed": "Imeshindwa kupakia lugha zinazoauniwa na kifaa hiki.",
     "emptyTitle": "Hakuna lugha zinazoauniwa",
     "emptyDescription": "Utambuzi wa usemi wa kifaa hiki hauripoti lugha yoyote inayoauniwa."
+  },
+  "tour": {
+    "eyebrow": "Ziara ya haraka",
+    "forkTitle": "Ungependa kuanzisha Kilo wapi?",
+    "forkSubtitle": "Chagua Kilo itakapoendesha kikao chako cha kwanza.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Endesha Kilo kwenye mazingira ya wingu lililotengwa bila kusanikisha chochote.",
+    "remoteOptionTitle": "Kompyuta yako",
+    "remoteOptionBody": "Endesha Kilo kwenye kompyuta yako mwenyewe kupitia CLI ya `kilo remote`.",
+    "skip": "Ruka ziara",
+    "tutorialLabel": "Mafunzo",
+    "remoteTitle": "Anza kikao chako cha kwanza cha mbali",
+    "remoteBody": "Unganisha kompyuta yako, kisha anza kikao hapa.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Hakuna kompyuta iliyounganishwa bado",
+    "remoteEmptyBody": "Ili kuiunganisha, endesha `kilo remote` kwenye kompyuta yako.",
+    "remoteFound": "Kompyuta imeunganishwa",
+    "checkAgain": "Angalia tena",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

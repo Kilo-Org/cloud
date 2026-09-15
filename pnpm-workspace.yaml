@@ -16,6 +16,10 @@ catalog:
   # and zod schemas in the same change.
   '@cloudflare/workers-oauth-provider': 0.10.3
   '@cloudflare/workers-types': 4.20260605.1
+  # Workers-compatible JSON Schema validator for the kilo-mcp call tool.
+  # AJV cannot run on Workerd: it compiles schemas with `new Function`, which
+  # the Workers runtime forbids. Pinned exactly.
+  '@cfworker/json-schema': 4.1.1
   '@octokit/auth-app': 8.2.0
   # Only for packages that shell out to the `sentry-cli` binary directly (Workers,
   # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume

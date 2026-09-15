@@ -3034,5 +3034,24 @@
     "loadFailed": "Impossibile caricare le lingue supportate da questo dispositivo.",
     "emptyTitle": "Nessuna lingua supportata",
     "emptyDescription": "Il riconoscimento vocale di questo dispositivo non segnala lingue supportate."
+  },
+  "tour": {
+    "eyebrow": "Tour rapido",
+    "forkTitle": "Dove vuoi eseguire Kilo?",
+    "forkSubtitle": "Scegli dove Kilo eseguirà la tua prima sessione.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Esegui Kilo in un ambiente cloud isolato, senza nulla da installare.",
+    "remoteOptionTitle": "Il tuo computer",
+    "remoteOptionBody": "Esegui Kilo sulla tua macchina tramite la CLI `kilo remote`.",
+    "skip": "Salta tour",
+    "tutorialLabel": "Tutorial",
+    "remoteTitle": "Avvia la tua prima sessione remota",
+    "remoteBody": "Collega il tuo computer e poi avvia la sessione da qui.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Nessun computer ancora connesso",
+    "remoteEmptyBody": "Per connetterlo, esegui `kilo remote` sul tuo computer.",
+    "remoteFound": "Computer connesso",
+    "checkAgain": "Controlla di nuovo",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

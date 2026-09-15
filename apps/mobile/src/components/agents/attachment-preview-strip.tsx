@@ -482,6 +482,7 @@ function AttachmentChip({
               setTextPreview(null);
             }}
             doneLabel={t('common.done')}
+            topInset="ios-page-sheet"
           />
           {textPreview.text === '' ? (
             <CenteredState>

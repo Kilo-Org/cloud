@@ -120,7 +120,6 @@ export async function updateOrganizationMode(
 
     return mode ? { ...mode, config: mergeToSatisfy(mode.config) } : null;
   } catch (error) {
-    // Check if it's a unique constraint violation
     if (error instanceof Error && error.message.includes(ORGANIZATION_MODES_ORG_SLUG_CONSTRAINT)) {
       return null;
     }

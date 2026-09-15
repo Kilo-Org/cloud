@@ -595,7 +595,7 @@ describe('createWrapperKiloClient session initialization', () => {
       slug: 'kilo_sess',
       directory: workspacePath,
       title: 'New session - ' + new Date(body.timeCreated).toISOString(),
-      version: '7.4.20',
+      version: '7.6.2',
       timeCreated: expect.any(Number),
       timeUpdated: body.timeCreated,
     });

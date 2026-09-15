@@ -9,6 +9,7 @@ import { performRefresh, REFRESH_MARGIN_MS } from '@/lib/auth/credentials';
 import { buildAuthHeaders } from '@/lib/auth/auth-header';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import { shouldRefreshBeforeRequest } from '@/lib/auth/native-auth-contract';
+import { createNetworkErrorFetch, readTrpcResponseError } from '@/lib/telemetry/network-errors';
 import {
   getActiveToken,
   getActiveTokenSnapshot,
@@ -85,6 +86,16 @@ export const deadlineFetch: typeof fetch = async (url, init) => {
   return response;
 };
 
+// Reports every failed (or >=400) tRPC request once at warning level. The
+// global fetch wrapper skips `/api/trpc` URLs so this is the only reporter.
+// A batched call answers 207 when it mixes results and errors; the body is
+// parsed (via a clone) so the failing procedure's code is reported.
+const observedFetch = createNetworkErrorFetch(deadlineFetch, {
+  source: 'trpc',
+  isResponseError: status => status >= 400 || status === 207,
+  readResponseError: readTrpcResponseError,
+});
+
 async function getAuthHeaders() {
   const token = await getAuthTokenForRequest();
   if (!token) {
@@ -131,14 +142,14 @@ async function getAuthHeaders() {
 const singleLink = httpLink({
   url: trpcUrl,
   headers: getAuthHeaders,
-  fetch: deadlineFetch,
+  fetch: observedFetch,
   methodOverride: 'POST',
 });
 
 const batchLink = httpBatchLink({
   url: trpcUrl,
   headers: getAuthHeaders,
-  fetch: deadlineFetch,
+  fetch: observedFetch,
   methodOverride: 'POST',
 });
 

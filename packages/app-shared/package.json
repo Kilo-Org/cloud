@@ -18,6 +18,7 @@
     "./analytics": "./src/analytics/index.ts",
     "./app-version": "./src/app-version.ts",
     "./pr-review": "./src/pr-review/index.ts",
+    "./provider-review": "./src/provider-review/index.ts",
     "./commerce": "./src/commerce/index.ts",
     "./moderation": "./src/moderation/index.ts",
     "./glanceable-agents-snapshot": "./src/glanceable-agents-snapshot.ts"

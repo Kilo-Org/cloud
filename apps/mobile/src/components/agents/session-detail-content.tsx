@@ -4,13 +4,14 @@ import {
   type MessageDeliveryState,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Haptics from 'expo-haptics';
-import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -31,11 +32,16 @@ import {
   resolvePinnedAgentModel,
 } from '@/components/agents/mode-normalize';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
-import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
+import {
+  exitRemoteSessionWithFeedback,
+  type RetryableExitFailure,
+} from '@/components/agents/exit-remote-session-with-feedback';
+import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
+import { MessageErrorBoundary } from '@/components/agents/message-error-boundary';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
@@ -47,13 +53,27 @@ import {
 } from '@/components/agents/context-usage-display';
 import { resolveSessionComposerDisabled } from '@/components/agents/session-composer-disabled';
 import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
+import {
+  type GoalAction,
+  goalClearsBlockingAfterSend,
+  goalCommandArguments,
+  resolveGoalActions,
+  selectVisibleGoal,
+} from '@/components/agents/session-goal-actions';
+import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import {
+  canAutoApprovePermissions,
+  resolveSessionAutoApproveState,
+  setSessionAutoApproveEnabled,
+  useSessionAutoApproveEnabled,
+} from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
-import { firstHumanText, isFilePart } from './part-types';
+import { firstHumanText, isFilePart, withoutReasoningParts } from './part-types';
 import {
   buildRemoteAttachmentPartsWithRetryableFeedback,
   resolveSendAttachmentKind,
@@ -83,15 +103,22 @@ import {
   useCliSessionPresence,
 } from '@/components/kilo-chat/hooks/use-cli-session-presence';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
+import { useSessionAutoApprove } from '@/components/agents/use-session-auto-approve';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import {
+  SESSION_SLOW_LOAD_MS,
+  useSessionSlowLoadPhase,
+} from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
+  condenseTranscriptToolRuns,
   getSessionTranscriptItemKey,
   getSessionTranscriptItemType,
   mergeSessionTranscript,
   type SessionTranscriptItem,
 } from '@/components/agents/session-transcript';
+import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
@@ -104,6 +131,8 @@ import {
 } from '@/components/agents/child-session-sheet-state';
 import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { PartRenderer } from '@/components/agents/part-renderer';
+import { CondensedToolRunRow } from '@/components/agents/tool-run-rows';
+import { ToolRunSheetHost } from '@/components/agents/tool-run-sheet-host';
 import {
   buildTerminalErrorCopyText,
   resolveSessionTerminalError,
@@ -131,7 +160,9 @@ import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
+import { useHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
+import { useCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
 import {
   createRemoteModelOverride,
   revalidateLegacyGatewayOverride,
@@ -150,6 +181,13 @@ import {
 import { trpcClient } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
+const GOAL_ACTION_LABEL_KEY = {
+  edit: 'agentChat.goal.edit',
+  pause: 'agentChat.goal.pause',
+  resume: 'agentChat.goal.resume',
+  remove: 'agentChat.goal.remove',
+} as const satisfies Record<GoalAction, string>;
+
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
   displayScope: ContextDisplayScope;
@@ -162,6 +200,8 @@ type SessionDetailContentProps = {
   spawnedMode?: string;
   /** Title the route read from the session-list cache, so the header never blinks to a generic label. */
   cachedTitle?: string;
+  /** Epoch ms the route mounted this open; anchors the slow-load threshold. */
+  openStartedAt?: number;
 };
 
 type CancelQueuedStatus = {
@@ -180,6 +220,7 @@ export function SessionDetailContent({
   autoSend,
   spawnedMode,
   cachedTitle,
+  openStartedAt,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const { t } = useTranslation();
@@ -229,11 +270,18 @@ export function SessionDetailContent({
   const getChildSessionError = useAtomValue(manager.atoms.childSessionError);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
+  // Per-session auto-approve lives in an in-memory store keyed by session id.
+  // Availability follows the transport (and the read-only flag); an unresolved
+  // transport is unavailable, so the row shows disabled without a fetch.
+  const autoApproveEnabled = useSessionAutoApproveEnabled(sessionId);
+  const autoApproveAvailable = canAutoApprovePermissions({ activeSessionType, isReadOnly });
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
   const cloudAgentModelOverride = useAtomValue(manager.atoms.cloudAgentModelOverride);
   const availableCommands = useAtomValue(manager.atoms.availableCommands);
+  const sessionInfo = useAtomValue(manager.atoms.sessionInfo);
+  const sessionGoal = selectVisibleGoal(sessionInfo, isReadOnly);
   const remoteCommandState = useAtomValue(manager.atoms.remoteCommandState);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
   const hasOlderMessages = useAtomValue(manager.atoms.hasOlderMessages);
@@ -244,8 +292,10 @@ export function SessionDetailContent({
     useState<ContextSheetIdentity | null>(null);
   const [detailsMessageId, setDetailsMessageId] = useState<string | null>(null);
   const detailsMessageIdRef = useRef<string | null>(null);
+  const [isGoalEditOpen, setIsGoalEditOpen] = useState(false);
 
   const { bottom } = useSafeAreaInsets();
+  const { showActionSheetWithOptions } = useActionSheet();
 
   // Durable composer draft. The composer renders immediately — typing must
   // never wait on the `user.getMe` query — and the draft load settles behind
@@ -300,6 +350,22 @@ export function SessionDetailContent({
     surface: analyticsSurface,
   });
 
+  const autoApproveState = resolveSessionAutoApproveState({
+    enabled: autoApproveEnabled,
+    available: autoApproveAvailable,
+  });
+  // Per-ask auto-reply for the head permission. Only permission request ids
+  // reach the hook, so a clarification question is never auto-answered.
+  const { suppressedRequestId } = useSessionAutoApprove({
+    enabled: autoApproveState === 'on',
+    available: autoApproveAvailable,
+    requestId: activePermission?.requestId ?? null,
+    respond: async () => {
+      const outcome = await handleRespondToPermission('once');
+      return outcome;
+    },
+  });
+
   const organizationId = fetchedData?.organizationId ?? undefined;
 
   const presenceSessionId = resolveLoadedCliSessionPresenceId(
@@ -311,7 +377,9 @@ export function SessionDetailContent({
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
   const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
+  const { hideThinking, hasLoaded: hideThinkingLoaded } = useHideThinkingPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
+  const { condenseToolCalls } = useCondenseToolCallsPreference();
   const { models: gatewayModels, isLoading: gatewayModelsLoading } =
     useAvailableModels(organizationId);
   const sessionModels = useSessionModelOptions({
@@ -347,11 +415,11 @@ export function SessionDetailContent({
         (contextInfo.providerID === 'kilo' ? 'Kilo' : contextInfo.providerID),
     };
   }, [contextInfo, sessionModels.options]);
-  const sheetMountState = getContextSheetMountState(
-    contextInfo,
-    openContextSheetIdentity,
-    sessionId
-  );
+  const sheetMountState = getContextSheetMountState(contextInfo, openContextSheetIdentity, {
+    sessionId,
+    autoApproveAvailable,
+  });
+  const contextSheetVisible = sheetMountState.mounted && sheetMountState.visible;
   const catalogGenerationIdentity =
     remoteModelState.protocol === 'v1' ? (remoteModelState.catalog ?? null) : gatewayModels;
   const modelPickerSelectionScope = useMemo<ModelPickerSelectionScope>(
@@ -565,19 +633,10 @@ export function SessionDetailContent({
   );
 
   useEffect(() => {
-    setOpenContextSheetIdentity(openIdentity => {
-      if (
-        !openIdentity ||
-        (contextInfo &&
-          openIdentity.sessionId === sessionId &&
-          openIdentity.providerID === contextInfo.providerID &&
-          openIdentity.modelID === contextInfo.modelID)
-      ) {
-        return openIdentity;
-      }
-      return null;
-    });
-  }, [contextInfo, sessionId]);
+    if (!contextSheetVisible) {
+      setOpenContextSheetIdentity(null);
+    }
+  }, [contextSheetVisible]);
 
   useEffect(() => {
     if (
@@ -660,6 +719,11 @@ export function SessionDetailContent({
   const cancelQueuedAttemptRef = useRef(0);
   const cancelingQueuedIdsRef = useRef(new Set<string>());
   const [cancelingQueuedIds, setCancelingQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  // A retryable exit transport failure that must stay actionable while the
+  // transport recovers. The transient toast the helper falls back to is gone
+  // long before connectivity returns, so the host owns the durable retry row.
+  const [exitFailure, setExitFailure] = useState<RetryableExitFailure | null>(null);
+  const [isRetryingExit, setIsRetryingExit] = useState(false);
   // Successful drops stay guarded before React commits and after Restore removes a retained row.
   const canceledQueuedIdsRef = useRef(new Set<string>());
   // The SDK owner ID changes when a replacement CLI connection takes over.
@@ -736,7 +800,8 @@ export function SessionDetailContent({
     if (kept.length === 0) {
       return base;
     }
-    return [...base, ...kept].toSorted((a, b) => {
+    // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; the spread already copies so nothing shared is mutated
+    return [...base, ...kept].sort((a, b) => {
       if (a.info.id < b.info.id) {
         return -1;
       }
@@ -747,7 +812,29 @@ export function SessionDetailContent({
     });
   }, [messages, droppedQueuedIds, canceledQueuedMessages]);
 
-  const detailsMessage = visibleMessages.find(message => message.info.id === detailsMessageId);
+  // Visibility-only strip for the "Hide thinking details" option. Applied once
+  // here so the transcript, the message-details sheet, and the subagent views
+  // all lose their thinking rows/text from the same list.
+  // Until the persisted value resolves, reason optimistically that thinking is
+  // hidden: on a cold start with the option on, painting the rows first and
+  // stripping them when the disk read lands would flash the hidden thinking.
+  const hideReasoningRows = !hideThinkingLoaded || hideThinking;
+  const displayedMessages = useMemo(
+    () => (hideReasoningRows ? withoutReasoningParts(visibleMessages) : visibleMessages),
+    [visibleMessages, hideReasoningRows]
+  );
+
+  // Subagent transcript views resolve their rows through this callback, so the
+  // same option hides thinking inside an opened child session.
+  const getDisplayedChildMessages = useCallback(
+    (childSessionId: string) => {
+      const child = getChildMessages(childSessionId);
+      return hideReasoningRows ? withoutReasoningParts(child) : child;
+    },
+    [getChildMessages, hideReasoningRows]
+  );
+
+  const detailsMessage = displayedMessages.find(message => message.info.id === detailsMessageId);
   const detailsDelivery =
     detailsMessageId === null ? undefined : pendingMessages.get(detailsMessageId);
   const detailsBusy = detailsMessageId !== null && cancelingQueuedIds.has(detailsMessageId);
@@ -759,10 +846,36 @@ export function SessionDetailContent({
   const isCancelingSelected =
     detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
 
-  const transcript = useMemo(
-    () => mergeSessionTranscript(visibleMessages, preparationAttempts, pendingMessages),
-    [visibleMessages, preparationAttempts, pendingMessages]
+  const baseTranscript = useMemo(
+    () => mergeSessionTranscript(displayedMessages, preparationAttempts, pendingMessages),
+    [displayedMessages, preparationAttempts, pendingMessages]
   );
+  // Condensing is opt-in: with the preference off the derived transcript is the
+  // same array identity, so nothing below re-renders differently.
+  const transcript = useMemo(
+    () => (condenseToolCalls ? condenseTranscriptToolRuns(baseTranscript) : baseTranscript),
+    [condenseToolCalls, baseTranscript]
+  );
+
+  // The list branch must never mount with zero items: a zero-item FlashList
+  // paints blank dead space with no loading and no empty state (mobile-app
+  // spot check, e2-open). `mergeSessionTranscript` drops messages whose parts
+  // render no content, so the branch reads the merged item count.
+  const transcriptView = resolveSessionTranscriptView({
+    transcriptItemCount: transcript.length,
+    hasStatusIndicator: statusIndicator !== null,
+    hasOlderMessages,
+    olderMessagesError,
+  });
+
+  // A zero-item transcript with a live older-page cursor is transient: page
+  // until renderable content arrives or the cursor ends. The manager dedupes
+  // in-flight loads and stops on terminal errors, so this cannot loop.
+  useEffect(() => {
+    if (transcriptView === 'older-loading' && !isLoadingOlderMessages) {
+      void manager.loadOlderMessages();
+    }
+  }, [transcriptView, isLoadingOlderMessages, manager]);
 
   // Render-phase state adjustment: hold queued ids across queue → dequeue
   // transitions while streaming so the badge row never unmounts and bubble
@@ -782,6 +895,8 @@ export function SessionDetailContent({
     setCancelingQueuedIds(EMPTY_IDS);
     canceledQueuedIdsRef.current = new Set();
     cancelQueuedUpgradeRequiredRef.current = null;
+    setExitFailure(null);
+    setIsRetryingExit(false);
   } else {
     const next = nextHeldQueuedIds(heldQueuedIds, pendingMessages, isStreaming);
     if (next !== heldQueuedIds) {
@@ -1043,6 +1158,17 @@ export function SessionDetailContent({
       if (item.type === 'time') {
         return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
       }
+      if (item.type === 'tool-run') {
+        // Match the inset and row rhythm of a message row so the condensed row
+        // sits flush with its neighbours rather than full-bleed.
+        return (
+          <View className="px-4 py-1">
+            <MessageErrorBoundary>
+              <CondensedToolRunRow parts={item.parts} />
+            </MessageErrorBoundary>
+          </View>
+        );
+      }
       // Delivery events can lag a successful drop. The retained row must expose Restore immediately.
       const deliveryState =
         item.message.info.role === 'user' && !canceledQueuedMessages.has(item.message.info.id)
@@ -1053,8 +1179,14 @@ export function SessionDetailContent({
       return (
         <MessageBubble
           message={item.message}
+          {...(item.parts ? { partsOverride: item.parts } : {})}
           isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
           isSessionStreaming={isStreaming}
+          // Raw child messages: the in-transcript task card derives its activity
+          // label from the child's latest part (child-session-card-state.ts:94-106),
+          // so feeding it the stripped list would turn a reasoning stream into a
+          // stale activity or "Waiting for activity" instead of "Thinking".
+          // The card renders no child rows, so nothing thinking-related leaks.
           getChildMessages={getChildMessages}
           modelOptions={modelOptions}
           defaultReasoningExpanded={reasoningDefaultExpanded}
@@ -1067,6 +1199,7 @@ export function SessionDetailContent({
           onRestoreQueued={
             canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
           }
+          condenseToolCalls={condenseToolCalls}
         />
       );
     },
@@ -1085,6 +1218,7 @@ export function SessionDetailContent({
       handleOpenDetails,
       handleRestoreQueued,
       canceledQueuedMessages,
+      condenseToolCalls,
     ]
   );
 
@@ -1141,10 +1275,47 @@ export function SessionDetailContent({
   );
 
   const shouldShowLoading =
-    isLoading ||
-    (fetchedData === null && !statusIndicator && !error) ||
-    (fetchedData !== null && fetchedData.kiloSessionId !== sessionId);
+    messages.length === 0 &&
+    (isLoading ||
+      (fetchedData === null && !statusIndicator && !error) ||
+      (fetchedData !== null && fetchedData.kiloSessionId !== sessionId));
+  const cachedMetadataRefresh = messages.length > 0 && fetchedData === null;
   const shouldBlockMessages = shouldShowLoading;
+  // A stalled open (the skeleton still up, nothing to show, no error and no
+  // progress indicator to watch) must stop looking like progress after the
+  // threshold: the slow phase swaps the skeleton for a message plus Retry.
+  // The threshold is anchored to the route's open, so a slow metadata round
+  // trip before this screen mounts does not restart the clock.
+  const sessionLoadPhase = useSessionSlowLoadPhase({
+    isLoading: shouldShowLoading,
+    hasContent: messages.length > 0,
+    hasError: error !== null,
+    hasStatusIndicator: statusIndicator !== null,
+    openStartedAt,
+  });
+  // Acknowledge a Retry tap from the slow card immediately: while the retry
+  // is in flight the button shows its spinner and is disabled, so the tap
+  // reads as accepted before any content or error arrives. Leaving the slow
+  // state (content, error, or a settled empty) ends the acknowledgment.
+  //
+  // The acknowledgment is also bounded by the slow-load threshold. Once the
+  // initial threshold has passed the phase stays `slow` on its own, so a
+  // retried open that stalls again would otherwise leave the button disabled
+  // with a spinner forever; after one threshold the user gets the Retry
+  // action back.
+  const [slowRetryPending, setSlowRetryPending] = useState(false);
+  useEffect(() => {
+    if (sessionLoadPhase !== 'slow' || !slowRetryPending) {
+      setSlowRetryPending(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setSlowRetryPending(false);
+    }, SESSION_SLOW_LOAD_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [sessionLoadPhase, slowRetryPending]);
   // Failed delivery entries must not count as in-flight: after a terminal
   // delivery failure the working spinner and wake lock would otherwise stay on.
   const inFlightMessageCount = useMemo(
@@ -1156,7 +1327,8 @@ export function SessionDetailContent({
     pendingMessageCount: inFlightMessageCount,
   });
   const hasFooterStatusIndicator =
-    statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready');
+    (!cachedMetadataRefresh && statusIndicator !== null) ||
+    (cloudStatus !== null && cloudStatus.type !== 'ready');
   const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
     isAgentWorking: shouldShowWorkingIndicator,
     hasStatusIndicator: hasFooterStatusIndicator,
@@ -1172,7 +1344,7 @@ export function SessionDetailContent({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
-    hasStatusIndicator: statusIndicator !== null,
+    hasStatusIndicator: !cachedMetadataRefresh && statusIndicator !== null,
     messageCount: messages.length,
   });
 
@@ -1195,14 +1367,15 @@ export function SessionDetailContent({
         info={contextInfo}
         totalCostMicrodollars={totalMicrodollars}
         hasMessages={messages.length > 0}
+        autoApproveAvailable={autoApproveAvailable}
         loading={shouldShowLoading}
         onPress={
-          contextInfo
+          contextInfo || autoApproveAvailable
             ? () => {
                 setOpenContextSheetIdentity({
                   sessionId,
-                  providerID: contextInfo.providerID,
-                  modelID: contextInfo.modelID,
+                  providerID: contextInfo?.providerID,
+                  modelID: contextInfo?.modelID,
                 });
               }
             : undefined
@@ -1211,7 +1384,15 @@ export function SessionDetailContent({
     </View>
   );
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
-  const hasBlockingInteraction = blockingInteraction !== 'none';
+  // A pending permission ask that the auto-reply is already answering is
+  // suppressed: the card is gated out below (`suppressedRequestId`). Blocking
+  // the composer on that same ask would blank both the card and the input for
+  // the whole reply round trip, so only the actually-rendered card counts as
+  // blocking — the composer (and its in-flight progress) stays put while the
+  // auto-reply resolves.
+  const permissionSuppressed =
+    blockingInteraction === 'permission' && activePermission?.requestId === suppressedRequestId;
+  const hasBlockingInteraction = blockingInteraction !== 'none' && !permissionSuppressed;
   // One number for both kinds: the user must see every waiting request, not
   // only the ones of the kind currently on screen.
   const blockingRequestCount = pendingQuestions.length + pendingPermissions.length;
@@ -1287,6 +1468,136 @@ export function SessionDetailContent({
     [manager]
   );
 
+  // Goal controls ride the same `manager.send()` command pipeline as the
+  // composer's slash commands. The manager is the sole transport-toast owner,
+  // so a failed send surfaces exactly one error toast from `onSendFailed` and
+  // this helper never adds a second. Edit throws instead, so the RenameModal
+  // shows the failure inline and the user can correct the objective. One
+  // helper keeps the `/goal` payload shape in one place.
+  const sendGoalAction = useCallback(
+    async (action: GoalAction, objective = ''): Promise<boolean> => {
+      const sent = await manager.send({
+        payload: {
+          type: 'command',
+          command: 'goal',
+          arguments: goalCommandArguments(action, objective),
+        },
+      });
+      return sent;
+    },
+    [manager]
+  );
+
+  // The CLI rejects `/goal resume` and `/goal <objective>` while a question or
+  // permission is pending, and it records a *rejected* request as a blocked
+  // goal while a goal is running. Pause and clear are accepted while a request
+  // is pending, so they clear it after the goal stops (the stopped goal no
+  // longer observes the rejection); resume and edit clear it before sending.
+  // Without this a paused goal's pending request is stranded and Resume
+  // silently no-ops. The interaction handlers own their own failure toast, so
+  // a failed clear only aborts the goal command.
+  const clearGoalBlockingInteraction = useCallback(async (): Promise<boolean> => {
+    if (blockingInteraction === 'question') {
+      const cleared = await handleRejectQuestion();
+      return cleared;
+    }
+    if (blockingInteraction === 'permission') {
+      // The permission handler reports a tri-state transport outcome; the goal
+      // flow only needs to know whether the request was cleared, which is the
+      // "ok" reply. A retryable or terminal failure leaves it pending.
+      const outcome = await handleRespondToPermission('reject');
+      return outcome === 'ok';
+    }
+    return true;
+  }, [blockingInteraction, handleRejectQuestion, handleRespondToPermission]);
+
+  const runGoalAction = useCallback(
+    async (action: GoalAction) => {
+      if (!hasBlockingInteraction) {
+        await sendGoalAction(action);
+        return;
+      }
+      if (goalClearsBlockingAfterSend(action)) {
+        // Pause/clear first: the CLI accepts them while a request is pending,
+        // and stopping the goal keeps the later rejection from marking it
+        // blocked.
+        const sent = await sendGoalAction(action);
+        if (sent) {
+          await clearGoalBlockingInteraction();
+        }
+        return;
+      }
+      // Resume/edit are rejected until the request is cleared.
+      if (!(await clearGoalBlockingInteraction())) {
+        return;
+      }
+      await sendGoalAction(action);
+    },
+    [hasBlockingInteraction, clearGoalBlockingInteraction, sendGoalAction]
+  );
+
+  const handleOpenGoalActions = useCallback(() => {
+    if (!sessionGoal) {
+      return;
+    }
+    const actions = resolveGoalActions(sessionGoal);
+    const options = [
+      ...actions.map(action => t(GOAL_ACTION_LABEL_KEY[action])),
+      t('common.cancel'),
+    ];
+    const removeIndex = actions.indexOf('remove');
+    showActionSheetWithOptions(
+      {
+        title: t('agentChat.goal.title'),
+        options,
+        cancelButtonIndex: options.length - 1,
+        destructiveButtonIndex: removeIndex === -1 ? undefined : removeIndex,
+        containerStyle: { paddingBottom: bottom },
+      },
+      index => {
+        const action = index === undefined ? undefined : actions[index];
+        if (!action) {
+          return;
+        }
+        if (action === 'edit') {
+          setIsGoalEditOpen(true);
+          return;
+        }
+        if (action === 'remove') {
+          Alert.alert(
+            t('agentChat.goal.removeConfirmTitle'),
+            t('agentChat.goal.removeConfirmMessage'),
+            [
+              { text: t('common.cancel'), style: 'cancel' },
+              {
+                text: t('agentChat.goal.remove'),
+                style: 'destructive',
+                onPress: () => {
+                  void runGoalAction('remove');
+                },
+              },
+            ]
+          );
+          return;
+        }
+        void runGoalAction(action);
+      }
+    );
+  }, [sessionGoal, t, showActionSheetWithOptions, bottom, runGoalAction]);
+
+  const handleGoalEditSave = useCallback(
+    async (objective: string) => {
+      if (!(await clearGoalBlockingInteraction())) {
+        throw new Error(t('agentChat.goal.updateFailed'));
+      }
+      const sent = await sendGoalAction('edit', objective);
+      if (!sent) {
+        throw new Error(t('agentChat.goal.updateFailed'));
+      }
+    },
+    [clearGoalBlockingInteraction, sendGoalAction, t]
+  );
+
   const handleCreateSession = useCallback(async () => {
     // The orchestrator surfaces exactly one actionable toast on failure and
     // calls `router.replace` to the new session route on success — the
@@ -1328,16 +1639,42 @@ export function SessionDetailContent({
       lock: { current: boolean },
       settleVoiceInput: () => Promise<boolean>
     ) => {
+      // A fresh exit attempt supersedes any failure row the last one left.
+      setExitFailure(null);
+      setIsRetryingExit(false);
       await exitRemoteSessionWithFeedback({
         exit: manager.exitRemoteSession.bind(manager),
-        onAccepted,
+        onAccepted: () => {
+          setExitFailure(null);
+          onAccepted();
+        },
         router,
         lock,
         settleVoiceInput,
+        onRetryableFailure: setExitFailure,
+        onNonRetryableFailure: () => {
+          setExitFailure(null);
+        },
       });
     },
     [manager, router]
   );
+
+  const handleRetryExit = useCallback(() => {
+    if (!exitFailure) {
+      return;
+    }
+    // Keep the row mounted while the retry runs so the spinner replaces the
+    // label instead of the row disappearing and jumping the composer.
+    setIsRetryingExit(true);
+    void (async () => {
+      try {
+        await exitFailure.retry();
+      } finally {
+        setIsRetryingExit(false);
+      }
+    })();
+  }, [exitFailure]);
 
   const handleContinueInNewSession = useCallback(() => {
     router.push(
@@ -1391,124 +1728,172 @@ export function SessionDetailContent({
 
   return (
     <PartDetailSheetHost messages={messages}>
-      <View className="flex-1 bg-background">
-        <ScreenHeader
-          title={rename.title}
-          reserveTitleSpace
-          backFallback="/(app)/(tabs)/(2_agents)"
-          headerRight={headerRight}
-          {...(rename.isTitleInteractive
-            ? {
-                onTitlePress: rename.openModal,
-                onTitlePressAccessibilityLabel: t('agentChat.session.renameAccessibility', {
-                  title: rename.title,
-                }),
-              }
-            : {})}
-        />
-        <SessionConnectionIndicator
-          activeSessionType={activeSessionType}
-          agentStatusType={agentStatus.type}
-        />
-        {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
+      <ToolRunSheetHost messages={messages}>
+        <View className="flex-1 bg-background">
+          <ScreenHeader
+            title={rename.title}
+            reserveTitleSpace
+            backFallback="/(app)/(tabs)/(2_agents)"
+            headerRight={headerRight}
+            {...(rename.isTitleInteractive
+              ? {
+                  onTitlePress: rename.openModal,
+                  onTitlePressAccessibilityLabel: t('agentChat.session.renameAccessibility', {
+                    title: rename.title,
+                  }),
+                }
+              : {})}
+          />
+          <SessionConnectionIndicator
+            sessionRefresh={
+              cachedMetadataRefresh
+                ? {
+                    isLoading: statusIndicator === null,
+                    onRetry: () => {
+                      void manager.switchSession(sessionId);
+                    },
+                  }
+                : undefined
+            }
+            activeSessionType={activeSessionType}
+            agentStatusType={agentStatus.type}
+          />
+          {sessionGoal ? (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              layout={LinearTransition.duration(150)}
+            >
+              <SessionGoalSection goal={sessionGoal} onPress={handleOpenGoalActions} />
+            </Animated.View>
+          ) : null}
+          {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
-        {keyboardContainerKind === 'app-aware-padding' ? (
-          <AppAwareKeyboardPaddingView className="flex-1">
-            {renderKeyboardBody()}
-          </AppAwareKeyboardPaddingView>
-        ) : (
-          <KeyboardAvoidingView className="flex-1" behavior="padding">
-            {renderKeyboardBody()}
-          </KeyboardAvoidingView>
-        )}
+          {keyboardContainerKind === 'app-aware-padding' ? (
+            <AppAwareKeyboardPaddingView className="flex-1">
+              {renderKeyboardBody()}
+            </AppAwareKeyboardPaddingView>
+          ) : (
+            <KeyboardAvoidingView className="flex-1" behavior="padding">
+              {renderKeyboardBody()}
+            </KeyboardAvoidingView>
+          )}
 
-        {isComposerVisible ? (
-          <BlurBar className="border-t-0">
-            <View style={{ height: bottom }} />
-          </BlurBar>
-        ) : (
-          <View style={{ height: bottom }} className="bg-background" />
-        )}
+          {isComposerVisible ? (
+            <BlurBar className="border-t-0">
+              <View style={{ height: bottom }} />
+            </BlurBar>
+          ) : (
+            <View style={{ height: bottom }} className="bg-background" />
+          )}
 
-        {sheetMountState.mounted ? (
-          <SessionContextSheet
-            visible={sheetMountState.visible}
-            info={sheetMountState.info}
-            modelDisplay={contextModelAndProvider.model}
-            providerDisplay={contextModelAndProvider.provider}
-            totalCostMicrodollars={totalMicrodollars}
-            breakdownCostUsd={breakdownCostUsd}
-            messages={messages}
+          {sheetMountState.mounted ? (
+            <SessionContextSheet
+              visible={sheetMountState.visible}
+              info={sheetMountState.info}
+              sessionId={sessionId}
+              sessionTitle={rename.title}
+              activeSessionType={activeSessionType}
+              ownerConnectionId={remoteModelState.ownerConnectionId}
+              modelDisplay={contextModelAndProvider.model}
+              providerDisplay={contextModelAndProvider.provider}
+              totalCostMicrodollars={totalMicrodollars}
+              breakdownCostUsd={breakdownCostUsd}
+              messages={messages}
+              modelOptions={modelOptions}
+              autoApproveState={autoApproveState}
+              onAutoApproveChange={enabled => {
+                // Selection haptic for the commit: a capability iOS and Android
+                // both have, served here by the one cross-platform call.
+                void Haptics.selectionAsync();
+                setSessionAutoApproveEnabled(sessionId, enabled);
+              }}
+              onClose={() => {
+                setOpenContextSheetIdentity(null);
+              }}
+            />
+          ) : null}
+
+          <MessageDetailsSheet
+            visible={detailsMessageId !== null}
+            message={detailsMessage ?? null}
             modelOptions={modelOptions}
-            onClose={() => {
-              setOpenContextSheetIdentity(null);
-            }}
+            onClose={handleCloseDetails}
+            canCancelQueued={canCancelSelected}
+            isCancelingQueued={isCancelingSelected}
+            onCancelQueued={handleCancelQueued}
+            cancelQueuedFeedback={
+              cancelQueuedSheetStatus?.messageId === detailsMessageId
+                ? cancelQueuedSheetStatus
+                : null
+            }
+            cancelQueuedGuidance={
+              isQueuedCancellationUnsupported() &&
+              detailsMessage?.info.role === 'user' &&
+              detailsDelivery?.status === 'queued'
+                ? t('agentChat.session.cancelQueuedUpgradeRequired')
+                : null
+            }
           />
-        ) : null}
 
-        <MessageDetailsSheet
-          visible={detailsMessageId !== null}
-          message={detailsMessage ?? null}
-          modelOptions={modelOptions}
-          onClose={handleCloseDetails}
-          canCancelQueued={canCancelSelected}
-          isCancelingQueued={isCancelingSelected}
-          onCancelQueued={handleCancelQueued}
-          cancelQueuedFeedback={
-            cancelQueuedSheetStatus?.messageId === detailsMessageId ? cancelQueuedSheetStatus : null
-          }
-          cancelQueuedGuidance={
-            isQueuedCancellationUnsupported() &&
-            detailsMessage?.info.role === 'user' &&
-            detailsDelivery?.status === 'queued'
-              ? t('agentChat.session.cancelQueuedUpgradeRequired')
-              : null
-          }
-        />
+          {childSessionSheet.sheet ? (
+            <ChildSessionSheet
+              visible={childSessionSheet.visible}
+              sessionId={childSessionSheet.sheet.sessionId}
+              title={childSessionSheet.sheet.title}
+              getChildMessages={getDisplayedChildMessages}
+              getIndicatorMessages={getChildMessages}
+              hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
+              sessionError={getChildSessionError(childSessionSheet.sheet.sessionId)}
+              isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
+              hasOlderMessages={childHasOlderMessages}
+              isLoadingOlderMessages={childIsLoadingOlderMessages}
+              olderMessagesError={childOlderMessagesError}
+              olderMessagesOmittedItemCount={childOlderMessagesOmittedItemCount}
+              onLoadOlderMessages={() => {
+                if (openChildSessionId !== null) {
+                  void manager.loadOlderChildMessages(openChildSessionId);
+                }
+              }}
+              renderPart={props => <PartRenderer {...props} />}
+              onOpenChildSession={handleOpenChildSession}
+              onRetry={() => {
+                const openSheet = childSessionSheet.sheet;
+                if (!openSheet) {
+                  return;
+                }
+                void manager.hydrateChildSession(openSheet.sessionId);
+              }}
+              onClose={handleCloseChildSession}
+              onDismiss={handleChildSheetDismiss}
+              modelOptions={modelOptions}
+            />
+          ) : null}
 
-        {childSessionSheet.sheet ? (
-          <ChildSessionSheet
-            visible={childSessionSheet.visible}
-            sessionId={childSessionSheet.sheet.sessionId}
-            title={childSessionSheet.sheet.title}
-            getChildMessages={getChildMessages}
-            hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
-            sessionError={getChildSessionError(childSessionSheet.sheet.sessionId)}
-            isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
-            hasOlderMessages={childHasOlderMessages}
-            isLoadingOlderMessages={childIsLoadingOlderMessages}
-            olderMessagesError={childOlderMessagesError}
-            olderMessagesOmittedItemCount={childOlderMessagesOmittedItemCount}
-            onLoadOlderMessages={() => {
-              if (openChildSessionId !== null) {
-                void manager.loadOlderChildMessages(openChildSessionId);
-              }
-            }}
-            renderPart={props => <PartRenderer {...props} />}
-            onOpenChildSession={handleOpenChildSession}
-            onRetry={() => {
-              const openSheet = childSessionSheet.sheet;
-              if (!openSheet) {
-                return;
-              }
-              void manager.hydrateChildSession(openSheet.sessionId);
-            }}
-            onClose={handleCloseChildSession}
-            onDismiss={handleChildSheetDismiss}
-            modelOptions={modelOptions}
-          />
-        ) : null}
+          {rename.isTitleInteractive && rename.isModalOpen ? (
+            <RenameModal
+              title={t('agentChat.session.renameSession')}
+              placeholder={t('agentChat.session.renamePlaceholder')}
+              initialValue={rename.modalInitialValue}
+              onSave={handleRenameSave}
+              onClose={handleRenameClose}
+            />
+          ) : null}
 
-        {rename.isTitleInteractive && rename.isModalOpen ? (
-          <RenameModal
-            title={t('agentChat.session.renameSession')}
-            placeholder={t('agentChat.session.renamePlaceholder')}
-            initialValue={rename.modalInitialValue}
-            onSave={handleRenameSave}
-            onClose={handleRenameClose}
-          />
-        ) : null}
-      </View>
+          {sessionGoal && isGoalEditOpen ? (
+            <RenameModal
+              title={t('agentChat.goal.edit')}
+              placeholder={t('agentChat.goal.editPlaceholder')}
+              initialValue={sessionGoal.text}
+              maxLength={500}
+              onSave={handleGoalEditSave}
+              onClose={() => {
+                setIsGoalEditOpen(false);
+              }}
+            />
+          ) : null}
+        </View>
+      </ToolRunSheetHost>
     </PartDetailSheetHost>
   );
 
@@ -1545,6 +1930,11 @@ export function SessionDetailContent({
             exiting={FadeOut.duration(150)}
             layout={LinearTransition.duration(150)}
           >
+            {/* Raw list on purpose: working-indicator.tsx:50-59 derives the
+                label from the last assistant part, and compute-status.ts:33-35
+                maps a reasoning part to agentChat.partDetail.thinking, so the
+                spinner reads Thinking during a reasoning stream in both modes.
+                Feeding it displayedMessages would drop that label. */}
             <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
             {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
           </Animated.View>
@@ -1567,7 +1957,9 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        {blockingInteraction === 'permission' && activePermission ? (
+        {blockingInteraction === 'permission' &&
+        activePermission &&
+        activePermission.requestId !== suppressedRequestId ? (
           <PermissionCard
             key={activePermission.requestId}
             permission={activePermission.permission}
@@ -1605,6 +1997,19 @@ export function SessionDetailContent({
             accessibilityElementsHidden={hasBlockingInteraction}
             importantForAccessibility={hasBlockingInteraction ? 'no-hide-descendants' : 'auto'}
           >
+            {exitFailure ? (
+              <Animated.View
+                entering={FadeIn.duration(200)}
+                exiting={FadeOut.duration(150)}
+                layout={LinearTransition.duration(150)}
+              >
+                <RemoteSessionExitFailure
+                  message={exitFailure.message}
+                  onRetry={handleRetryExit}
+                  isRetrying={isRetryingExit}
+                />
+              </Animated.View>
+            ) : null}
             <ModelPickerSelectionScopeProvider
               selectionScope={modelPickerSelectionScope}
               isSelectionCurrent={isModelPickerSelectionCurrent}
@@ -1704,17 +2109,75 @@ export function SessionDetailContent({
         </CenteredState>
       );
     }
-    if (shouldBlockMessages) {
+    if (sessionLoadPhase === 'slow') {
+      // The skeleton has outlived the threshold with nothing to show. Occupy
+      // the same flex-1 region (CenteredState) so the header and composer do
+      // not move, and give the user the only useful action: retry.
+      return (
+        <CenteredState>
+          <View className="items-center gap-3 px-6">
+            <Text className="text-center text-sm text-muted-foreground">
+              {t('common.takingLonger')}
+            </Text>
+            <Button
+              variant="outline"
+              accessibilityLabel={t('common.retry')}
+              loading={slowRetryPending}
+              onPress={() => {
+                setSlowRetryPending(true);
+                void manager.switchSession(sessionId);
+              }}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        </CenteredState>
+      );
+    }
+    if (shouldBlockMessages || transcriptView === 'older-loading') {
       return <SessionSkeletonMessages sessionId={sessionId} />;
     }
-    if (visibleMessages.length === 0) {
-      if (statusIndicator) {
+    if (transcriptView !== 'list') {
+      if (transcriptView === 'status' && statusIndicator !== null) {
         return (
           <CenteredState>
             <View className="items-center px-6">
               <SessionStatusIndicator indicator={statusIndicator} />
             </View>
           </CenteredState>
+        );
+      }
+      if (transcriptView === 'older-error') {
+        // A retryable older-page failure is a retryable state, not the empty
+        // state: the history load can be reattempted, so the body mounts the
+        // same pagination Retry the list header carries (mobile-app gate r3,
+        // session-transcript-view finding). Terminal older-page errors keep
+        // the action-less empty state below.
+        return (
+          <EmptyState
+            icon={MessageSquare}
+            title={t('agentChat.session.emptyTitle')}
+            description={
+              <AccessibleStatus
+                message={t('agentChat.olderMessages.couldNotLoad')}
+                tone="status"
+                className="text-center text-sm"
+              />
+            }
+            action={
+              <Button
+                variant="outline"
+                onPress={() => {
+                  void manager.loadOlderMessages();
+                }}
+                loading={isLoadingOlderMessages}
+                accessibilityLabel={t('common.retry')}
+                accessibilityHint={t('agentChat.olderMessages.retryHint')}
+              >
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            }
+          />
         );
       }
       return (

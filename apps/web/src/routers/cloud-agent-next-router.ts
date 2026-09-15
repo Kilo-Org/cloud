@@ -1,5 +1,6 @@
 import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { sandboxSelectionCapabilitiesSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   createCloudAgentNextClient,
   createCloudAgentNextClientForModel,
@@ -18,6 +19,11 @@ import {
   fetchGitLabRepositoriesForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
+import {
+  listProviderRepositoryBranches,
+  ProviderBranchListingSchema,
+  repositoryFullNameSchema,
+} from '@/lib/cloud-agent/provider-branch-listing';
 import {
   personalPrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
@@ -145,6 +151,16 @@ async function createCloudAgentControlToken(user: User, headersList?: Headers): 
  * separately via WebSocket connection.
  */
 export const cloudAgentNextRouter = createTRPCRouter({
+  getSandboxSelectionOptions: baseProcedure
+    .input(z.object({ devcontainer: z.boolean().optional() }))
+    .output(sandboxSelectionCapabilitiesSchema)
+    .query(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({
+        ...(input.devcontainer !== undefined ? { devcontainer: input.devcontainer } : {}),
+      });
+    }),
+
   /**
    * Prepare a new cloud agent session.
    *
@@ -696,4 +712,30 @@ export const cloudAgentNextRouter = createTRPCRouter({
         errorMessage: result.errorMessage,
       };
     }),
+
+  /**
+   * List the branches of one repository for the new-session flow (personal
+   * context). GitHub and GitLab run against the user's own connection; the
+   * integration and credentials are resolved server-side, never supplied
+   * here. A Bitbucket call returns the explicit org-only unavailable state
+   * (FORBIDDEN) — never an empty success. `organizationId` is not an
+   * accepted field: the org endpoint owns that context.
+   */
+  listRepositoryBranches: baseProcedure
+    .input(
+      z
+        .object({
+          platform: z.enum(['github', 'gitlab', 'bitbucket']),
+          repository: z.object({ fullName: repositoryFullNameSchema }).strict(),
+        })
+        .strict()
+    )
+    .output(ProviderBranchListingSchema)
+    .query(async ({ ctx, input }) =>
+      listProviderRepositoryBranches({
+        platform: input.platform,
+        userId: ctx.user.id,
+        repositoryFullName: input.repository.fullName,
+      })
+    ),
 });

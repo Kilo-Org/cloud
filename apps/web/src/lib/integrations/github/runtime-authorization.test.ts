@@ -1,7 +1,16 @@
-import { isGitHubRuntimeAssociationAuthorized } from './runtime-authorization';
+import {
+  assertGitHubInstallationRuntimeAuthorized,
+  getGitHubRuntimeAssociationRejectionReason,
+  GitHubRuntimeAuthorizationError,
+  isGitHubRuntimeAssociationAuthorized,
+} from './runtime-authorization';
+import { db } from '@/lib/drizzle';
+
+jest.mock('@/lib/drizzle', () => ({ db: { select: jest.fn() } }));
 
 const association = {
   integration: {
+    id: 'integration-1',
     owned_by_user_id: 'user-1',
     owned_by_organization_id: null,
     integration_status: 'active',
@@ -91,5 +100,213 @@ describe('isGitHubRuntimeAssociationAuthorized', () => {
         },
       })
     ).toBe(false);
+  });
+});
+
+const rejectionCases = [
+  ['missing_association', null],
+  [
+    'malformed_owner',
+    { ...association, integration: { ...association.integration, owned_by_user_id: null } },
+  ],
+  [
+    'malformed_owner',
+    {
+      ...association,
+      integration: { ...association.integration, owned_by_organization_id: 'org-1' },
+    },
+  ],
+  ['missing_personal_owner', { ...association, userRecordId: null }],
+  ['missing_personal_owner', { ...association, userRecordId: 'different-user' }],
+  ['blocked_personal_owner', { ...association, userBlockedReason: 'sensitive blocked reason' }],
+  [
+    'deleted_organization',
+    {
+      ...association,
+      integration: {
+        ...association.integration,
+        owned_by_user_id: null,
+        owned_by_organization_id: 'org-1',
+      },
+      organizationDeletedAt: '2026-09-04',
+    },
+  ],
+  [
+    'integration_status',
+    { ...association, integration: { ...association.integration, integration_status: null } },
+  ],
+  [
+    'integration_status',
+    {
+      ...association,
+      integration: { ...association.integration, integration_status: 'suspended' },
+    },
+  ],
+  [
+    'suspended',
+    { ...association, integration: { ...association.integration, suspended_at: '2026-09-04' } },
+  ],
+  [
+    'auth_invalid',
+    { ...association, integration: { ...association.integration, auth_invalid_at: '2026-09-04' } },
+  ],
+  [
+    'disconnected',
+    {
+      ...association,
+      integration: { ...association.integration, github_disconnected_at: '2026-09-04' },
+    },
+  ],
+  ['installation_unavailable', { ...association, installation: null }],
+  [
+    'installation_unavailable',
+    {
+      ...association,
+      installation: { ...association.installation, lifecycle_state: 'suspended' },
+    },
+  ],
+  [
+    'sharing_not_allowed',
+    {
+      ...association,
+      installation: { ...association.installation, sharing_mode: 'web_cloud_agent' },
+    },
+  ],
+] as const;
+
+describe('runtime rejection diagnostics', () => {
+  it.each(rejectionCases)('explains %s without changing rejection', (reason, candidate) => {
+    expect(getGitHubRuntimeAssociationRejectionReason(candidate)).toBe(reason);
+    expect(isGitHubRuntimeAssociationAuthorized(candidate)).toBe(false);
+  });
+
+  it.each([
+    ['suspended_at', false],
+    ['auth_invalid_at', false],
+    ['github_disconnected_at', true],
+  ] as const)('preserves undefined semantics for %s', (field, accepted) => {
+    const candidate = {
+      ...association,
+      integration: { ...association.integration, [field]: undefined },
+    };
+    expect(isGitHubRuntimeAssociationAuthorized(candidate)).toBe(accepted);
+  });
+
+  it('preserves org acceptance when the left join has no deletion timestamp', () => {
+    expect(
+      isGitHubRuntimeAssociationAuthorized({
+        ...association,
+        integration: {
+          ...association.integration,
+          owned_by_user_id: null,
+          owned_by_organization_id: 'org-1',
+        },
+        userRecordId: null,
+      })
+    ).toBe(true);
+  });
+
+  it.each(['unknown', 'active', 'suspended', 'deleted'] as const)(
+    'rejects an unhealthy canonical installation regardless of %s lifecycle state',
+    lifecycle_state => {
+      expect(
+        isGitHubRuntimeAssociationAuthorized({
+          ...association,
+          installation: {
+            lifecycle_state,
+            sharing_mode: 'exclusive',
+            suspended_at: '2026-09-04',
+            deleted_at: '2026-09-04',
+            auth_invalid_at: '2026-09-04',
+          },
+        })
+      ).toBe(false);
+    }
+  );
+
+  it.each([
+    ...rejectionCases.map(([reason, candidate]) => [reason, candidate ? [candidate] : []] as const),
+    [
+      'ambiguous_association',
+      [
+        association,
+        { ...association, integration: { ...association.integration, id: 'integration-2' } },
+      ],
+    ] as const,
+  ])('rejects %s with safe context using a bounded query', async (reason, rows) => {
+    const limit = jest.fn().mockResolvedValue(rows);
+    const query = {
+      from: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit,
+    };
+    jest
+      .mocked(db.select)
+      .mockClear()
+      .mockReturnValue(query as never);
+    const result = assertGitHubInstallationRuntimeAuthorized('installation-1', 'lite');
+    await expect(result).rejects.toBeInstanceOf(GitHubRuntimeAuthorizationError);
+    await expect(result).rejects.toMatchObject({
+      message: 'GitHub installation is unavailable for runtime use',
+      reason,
+      diagnostics: {
+        installationId: 'installation-1',
+        appType: 'lite',
+        integrationIds: rows.map(row => row.integration.id),
+      },
+    });
+    await result.catch(error => {
+      expect(Object.keys(error.diagnostics).sort()).toEqual([
+        'appType',
+        'installationId',
+        'integrationIds',
+      ]);
+      expect(JSON.stringify(error)).not.toContain('sensitive blocked reason');
+    });
+    // Called twice: once for the outer association query, once for the notExists
+    // canonical-installation subquery that guards unbound associations against shadowing an
+    // already-canonicalized installation.
+    expect(db.select).toHaveBeenCalledTimes(2);
+    expect(limit).toHaveBeenCalledTimes(1);
+    expect(limit).toHaveBeenCalledWith(2);
+  });
+
+  it('narrows to a single candidate row when an exact expectedIntegrationId is supplied', async () => {
+    const limit = jest.fn().mockResolvedValue([association]);
+    const query = {
+      from: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit,
+    };
+    jest
+      .mocked(db.select)
+      .mockClear()
+      .mockReturnValue(query as never);
+
+    await assertGitHubInstallationRuntimeAuthorized('installation-1', 'lite', 'integration-1');
+
+    expect(limit).toHaveBeenCalledWith(1);
+  });
+
+  it('treats an empty-string expectedIntegrationId as the generic, non-exact path', async () => {
+    const limit = jest.fn().mockResolvedValue([association]);
+    const query = {
+      from: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit,
+    };
+    jest
+      .mocked(db.select)
+      .mockClear()
+      .mockReturnValue(query as never);
+
+    await assertGitHubInstallationRuntimeAuthorized('installation-1', 'lite', '');
+
+    // An empty string is falsy, so it must behave exactly like "no expectedIntegrationId"
+    // (the generic, exclusive-only path) rather than being treated as an exact id to match.
+    expect(limit).toHaveBeenCalledWith(2);
   });
 });

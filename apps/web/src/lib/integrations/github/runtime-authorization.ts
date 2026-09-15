@@ -2,7 +2,6 @@ import 'server-only';
 
 import { db } from '@/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
-import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import {
   github_app_installations,
@@ -12,8 +11,31 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, isNull, notExists, or } from 'drizzle-orm';
 
+export type GitHubRuntimeAuthorizationRejectionReason =
+  | 'missing_association'
+  | 'ambiguous_association'
+  | 'malformed_owner'
+  | 'missing_personal_owner'
+  | 'blocked_personal_owner'
+  | 'deleted_organization'
+  | 'integration_status'
+  | 'suspended'
+  | 'auth_invalid'
+  | 'disconnected'
+  | 'installation_unavailable'
+  | 'sharing_not_allowed';
+
+type GitHubRuntimeAuthorizationDiagnostics = {
+  installationId: string;
+  appType: GitHubAppType;
+  integrationIds: string[];
+};
+
 export class GitHubRuntimeAuthorizationError extends Error {
-  constructor() {
+  constructor(
+    readonly reason?: GitHubRuntimeAuthorizationRejectionReason,
+    readonly diagnostics?: GitHubRuntimeAuthorizationDiagnostics
+  ) {
     super('GitHub installation is unavailable for runtime use');
     this.name = 'GitHubRuntimeAuthorizationError';
   }
@@ -50,35 +72,53 @@ type RuntimeAssociation = {
   userBlockedReason: string | null;
 };
 
-export function isGitHubRuntimeAssociationAuthorized(
+export function getGitHubRuntimeAssociationRejectionReason(
   association: RuntimeAssociation | null | undefined
-): boolean {
-  if (!association) return false;
+): GitHubRuntimeAuthorizationRejectionReason | null {
+  if (!association) return 'missing_association';
 
   const { integration, installation, organizationDeletedAt, userRecordId, userBlockedReason } =
     association;
-  const hasValidOwner =
-    (integration.owned_by_user_id !== null &&
-      integration.owned_by_organization_id === null &&
-      userRecordId === integration.owned_by_user_id &&
-      userBlockedReason === null) ||
-    (integration.owned_by_user_id === null &&
-      integration.owned_by_organization_id !== null &&
-      organizationDeletedAt === null);
-  const hasAvailableInstallation =
-    integration.github_installation_id === null
-      ? installation === null
-      : installation?.lifecycle_state === 'active' &&
-        installation.sharing_mode === 'exclusive' &&
-        installation.suspended_at === null &&
-        installation.deleted_at === null &&
-        installation.auth_invalid_at === null;
-  return (
-    hasValidOwner &&
-    hasAvailableInstallation &&
-    isPlatformIntegrationHealthy(integration) &&
-    integration.integration_status === INTEGRATION_STATUS.ACTIVE
-  );
+  const hasUserOwner = integration.owned_by_user_id !== null;
+  const hasOrganizationOwner = integration.owned_by_organization_id !== null;
+  if (hasUserOwner === hasOrganizationOwner) return 'malformed_owner';
+  if (hasUserOwner) {
+    if (userRecordId !== integration.owned_by_user_id) return 'missing_personal_owner';
+    if (userBlockedReason !== null) return 'blocked_personal_owner';
+  } else if (organizationDeletedAt !== null) {
+    return 'deleted_organization';
+  }
+
+  // Preserve the legacy health contract; canonical installation data remains shadow state.
+  if (integration.integration_status !== INTEGRATION_STATUS.ACTIVE) return 'integration_status';
+  if (integration.suspended_at !== null) return 'suspended';
+  if (integration.auth_invalid_at !== null) return 'auth_invalid';
+  if (integration.github_disconnected_at != null) return 'disconnected';
+
+  // An association bound to a canonical installation must have that installation active, not
+  // suspended/deleted/auth-invalid, and (shared installations are not authorized on this
+  // generic runtime path) exclusively owned. An association with no canonical binding yet
+  // (github_installation_id is null) has nothing further to check here.
+  if (integration.github_installation_id !== null) {
+    if (
+      installation === null ||
+      installation.lifecycle_state !== 'active' ||
+      installation.suspended_at !== null ||
+      installation.deleted_at !== null ||
+      installation.auth_invalid_at !== null
+    ) {
+      return 'installation_unavailable';
+    }
+    if (installation.sharing_mode !== 'exclusive') return 'sharing_not_allowed';
+  }
+
+  return null;
+}
+
+export function isGitHubRuntimeAssociationAuthorized(
+  association: RuntimeAssociation | null | undefined
+): boolean {
+  return getGitHubRuntimeAssociationRejectionReason(association) === null;
 }
 
 export async function assertGitHubInstallationRuntimeAuthorized(
@@ -111,9 +151,18 @@ export async function assertGitHubInstallationRuntimeAuthorized(
         expectedIntegrationId ? eq(platform_integrations.id, expectedIntegrationId) : undefined,
         eq(platform_integrations.platform_installation_id, installationId),
         effectiveAppTypeCondition(appType),
+        // Candidacy for THIS query: an unhealthy row must not count toward ambiguous-association
+        // detection or be returned as a false candidate alongside a legitimate one (for example,
+        // a disconnected former owner's stale row must not make a still-healthy owner's row look
+        // ambiguous). getGitHubRuntimeAssociationRejectionReason below still re-checks the same
+        // association-level health fields so it stays correct for callers that fetch an
+        // association through a different, unfiltered path (for example prepare-review-payload).
         or(
           and(
             isNull(platform_integrations.github_installation_id),
+            // An unbound association must not be shadowing an already-canonicalized
+            // installation for this same raw installationId+appType; if one exists, this row
+            // is stale and must not be treated as a valid candidate.
             notExists(
               db
                 .select({ id: github_app_installations.id })
@@ -140,12 +189,15 @@ export async function assertGitHubInstallationRuntimeAuthorized(
     )
     .limit(expectedIntegrationId ? 1 : 2);
 
-  if (associations.length !== 1) throw new GitHubRuntimeAuthorizationError();
-
-  const [association] = associations;
-  if (!association) throw new GitHubRuntimeAuthorizationError();
-
-  if (!isGitHubRuntimeAssociationAuthorized(association)) {
-    throw new GitHubRuntimeAuthorizationError();
+  const reason =
+    associations.length > 1
+      ? 'ambiguous_association'
+      : getGitHubRuntimeAssociationRejectionReason(associations[0]);
+  if (reason) {
+    throw new GitHubRuntimeAuthorizationError(reason, {
+      installationId,
+      appType,
+      integrationIds: associations.map(({ integration }) => integration.id),
+    });
   }
 }

@@ -3074,5 +3074,24 @@
     "loadFailed": "Энэ төхөөрөмжийн дэмждэг хэлүүдийг ачаалж чадсангүй.",
     "emptyTitle": "Дэмжигддэг хэл байхгүй",
     "emptyDescription": "Энэ төхөөрөмжийн яриа таних нь дэмжигддэг хэл гэж мэдээлэхгүй."
+  },
+  "tour": {
+    "eyebrow": "Хурдан танилцуулга",
+    "forkTitle": "Kilo-г хаана ажиллуулахыг хүсч байна?",
+    "forkSubtitle": "Эхний сессид Kilo хаана ажиллахыг сонгоно уу.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Юу ч суулгахгүйгээр Kilo-г тусгаарлагдсан үүлсийн орчинд ажиллуул.",
+    "remoteOptionTitle": "Таны компьютер",
+    "remoteOptionBody": "Өөрийн машинаасаа `kilo remote` CLI-ээр Kilo-г ажиллуул.",
+    "skip": "Танилцуулгыг алгасах",
+    "tutorialLabel": "Заавар",
+    "remoteTitle": "Эхний зайн сессээ эхлүүл",
+    "remoteBody": "Компьютерээ холбоод, эндээс сессээ эхлүүлээрэй.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Одоогоор компьютер холбогдоогүй байна",
+    "remoteEmptyBody": "Холбохын тулд компьютер дээрээ `kilo remote` командыг ажиллуулна уу.",
+    "remoteFound": "Компьютер холбогдлоо",
+    "checkAgain": "Дахин шалгах",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

@@ -3120,5 +3120,24 @@
     "loadFailed": "Jezikov, ki jih podpira ta naprava, ni bilo mogoče naložiti.",
     "emptyTitle": "Ni podprtih jezikov",
     "emptyDescription": "Prepoznavanje govora te naprave ne poroča o podprtih jezikih."
+  },
+  "tour": {
+    "eyebrow": "Hitri ogled",
+    "forkTitle": "Kje želite pognati Kilo?",
+    "forkSubtitle": "Izberi, kje bo Kilo pognal tvojo prvo sejo.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Zaženi Kilo v izoliranem oblačnem okolju, brez namestitve.",
+    "remoteOptionTitle": "Vaš računalnik",
+    "remoteOptionBody": "Zaženi Kilo na svojem računalniku prek CLI-ja `kilo remote`.",
+    "skip": "Preskoči ogled",
+    "tutorialLabel": "Vodič",
+    "remoteTitle": "Zaženite svojo prvo oddaljeno sejo",
+    "remoteBody": "Poveži svoj računalnik, nato pa tu zaženi sejo.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Še ni povezanega računalnika",
+    "remoteEmptyBody": "Če ga želite povezati, zaženite `kilo remote` na svojem računalniku.",
+    "remoteFound": "Računalnik povezan",
+    "checkAgain": "Preveri znova",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

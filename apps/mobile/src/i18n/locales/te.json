@@ -3074,5 +3074,24 @@
     "loadFailed": "ఈ పరికరం మద్దతిచ్చే భాషలను లోడ్ చేయలేకపోయాము.",
     "emptyTitle": "మద్దతిచ్చే భాషలు లేవు",
     "emptyDescription": "ఈ పరికరం యొక్క ప్రసంగ గుర్తింపు మద్దతిచ్చే భాషలను నివేదించదు."
+  },
+  "tour": {
+    "eyebrow": "త్వరిత పర్యటన",
+    "forkTitle": "Kilo ని ఎక్కడ అమలు చేయాలనుకుంటున్నారు?",
+    "forkSubtitle": "మీ మొదటి సెషన్ కోసం Kilo ఎక్కడ నడుస్తుందో ఎంచుకోండి.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "ఏదీ ఇన్‌స్టాల్ చేయకుండా, వేరు చేయబడిన క్లౌడ్ వాతావరణంలో Kilo ని అమలు చేయండి.",
+    "remoteOptionTitle": "మీ కంప్యూటర్",
+    "remoteOptionBody": "మీ సొంత యంత్రంలో `kilo remote` CLI ద్వారా Kilo ని అమలు చేయండి.",
+    "skip": "పర్యటన వదిలేయండి",
+    "tutorialLabel": "ట్యుటోరియల్",
+    "remoteTitle": "మీ మొదటి రిమోట్ సెషన్‌ను ప్రారంభించండి",
+    "remoteBody": "మీ కంప్యూటర్‌ను కనెక్ట్ చేసి, ఆపై ఇక్కడి నుండి సెషన్ ప్రారంభించండి.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "ఇంకా ఏ కంప్యూటర్ కూడా కనెక్ట్ కాలేదు",
+    "remoteEmptyBody": "దాన్ని కనెక్ట్ చేయడానికి మీ కంప్యూటర్‌లో `kilo remote` అమలు చేయండి.",
+    "remoteFound": "కంప్యూటర్ కనెక్ట్ అయింది",
+    "checkAgain": "మళ్లీ తనిఖీ చేయండి",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

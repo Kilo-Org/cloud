@@ -3074,5 +3074,24 @@
     "loadFailed": "Bu cihazın desteklediği diller yüklenemedi.",
     "emptyTitle": "Desteklenen dil yok",
     "emptyDescription": "Bu cihazın konuşma tanıması desteklenen bir dil bildirmiyor."
+  },
+  "tour": {
+    "eyebrow": "Hızlı tur",
+    "forkTitle": "Kilo'yu nerede çalıştırmak istersin?",
+    "forkSubtitle": "İlk oturumun için Kilo'nun nerede çalışacağını seç.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Hiçbir şey yüklemeden Kilo'yu yalıtılmış bir bulut ortamında çalıştır.",
+    "remoteOptionTitle": "Bilgisayarın",
+    "remoteOptionBody": "Kilo'yu kendi makinende `kilo remote` CLI'si üzerinden çalıştır.",
+    "skip": "Turu atla",
+    "tutorialLabel": "Eğitim",
+    "remoteTitle": "İlk uzak oturumunu başlat",
+    "remoteBody": "Bilgisayarını bağla, ardından oturumu buradan başlat.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Henüz bağlı bir bilgisayar yok",
+    "remoteEmptyBody": "Bağlamak için bilgisayarında `kilo remote` komutunu çalıştır.",
+    "remoteFound": "Bilgisayar bağlandı",
+    "checkAgain": "Tekrar kontrol et",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

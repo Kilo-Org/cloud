@@ -3074,5 +3074,24 @@
     "loadFailed": "Kunne ikke indlæse de sprog, denne enhed understøtter.",
     "emptyTitle": "Ingen understøttede sprog",
     "emptyDescription": "Denne enheds talegenkendelse rapporterer ingen understøttede sprog."
+  },
+  "tour": {
+    "eyebrow": "Hurtig omvisning",
+    "forkTitle": "Hvor vil du køre Kilo?",
+    "forkSubtitle": "Vælg hvor Kilo kører for din første session.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Kør Kilo i et isoleret cloud-miljø uden at du skal installere noget.",
+    "remoteOptionTitle": "Din computer",
+    "remoteOptionBody": "Kør Kilo på din egen maskin via `kilo remote`-CLI'en.",
+    "skip": "Spring omvisning over",
+    "tutorialLabel": "Vejledning",
+    "remoteTitle": "Start din første remote-session",
+    "remoteBody": "Tilslut din computer, og start derefter sessionen herfra.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Ingen computer tilsluttet endnu",
+    "remoteEmptyBody": "For at tilslutte den, kør `kilo remote` på din computer.",
+    "remoteFound": "Computer tilsluttet",
+    "checkAgain": "Tjek igen",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

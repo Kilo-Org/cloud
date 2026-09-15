@@ -3074,5 +3074,24 @@
     "loadFailed": "Izilimi ezisekelwa yile divayisi azikwazanga ukulayishwa.",
     "emptyTitle": "Azikho izilimi ezisekelwayo",
     "emptyDescription": "Ukubona inkulumo kwale divayisi akubiki zilimi ezisekelwayo."
+  },
+  "tour": {
+    "eyebrow": "Uhambo olusheshayo",
+    "forkTitle": "Ufuna ukusebenzisa i-Kilo kuphi?",
+    "forkSubtitle": "Khetha ukuthi i-Kilo izosebenza kuphi eseshini yakho yokuqala.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Sebenzisa i-Kilo endaweni yefu ehlukanisiwe ngaphandle kokufaka lutho.",
+    "remoteOptionTitle": "Ikhompyutha yakho",
+    "remoteOptionBody": "Sebenzisa i-Kilo ekhompyutheni yakho ngokusebenzisa i-CLI ethi `kilo remote`.",
+    "skip": "Qeda uhambo",
+    "tutorialLabel": "Uqeqesho",
+    "remoteTitle": "Qala iseshini yakho yokuqala ekude",
+    "remoteBody": "Xhuma ikhompyutha yakho, bese uqala iseshini lapha.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Akukho khompyutha exhunyiwe okwamanje",
+    "remoteEmptyBody": "Ukuze uyixhume, qalisa `kilo remote` ekhompyutheni yakho.",
+    "remoteFound": "Ikhompyutha ixhunyiwe",
+    "checkAgain": "Phinda uhlole",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

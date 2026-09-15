@@ -3166,5 +3166,24 @@
     "loadFailed": "تعذّر تحميل اللغات التي يدعمها هذا الجهاز.",
     "emptyTitle": "لا توجد لغات مدعومة",
     "emptyDescription": "لا يفيد التعرّف على الكلام في هذا الجهاز بأي لغة مدعومة."
+  },
+  "tour": {
+    "eyebrow": "جولة سريعة",
+    "forkTitle": "أين تودّ تشغيل Kilo؟",
+    "forkSubtitle": "اختر مكان تشغيل Kilo لجلستك الأولى.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "شغّل Kilo في بيئة سحابية معزولة دون الحاجة إلى تثبيت أي شيء.",
+    "remoteOptionTitle": "حاسوبك",
+    "remoteOptionBody": "شغّل Kilo على جهازك نفسه عبر واجهة سطر الأوامر `kilo remote`.",
+    "skip": "تخطي الجولة",
+    "tutorialLabel": "برنامج تعليمي",
+    "remoteTitle": "ابدأ جلستك عن بُعد الأولى",
+    "remoteBody": "قم بتوصيل حاسوبك، ثم ابدأ الجلسة من هنا.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "لا يوجد حاسوب متصل بعد",
+    "remoteEmptyBody": "شغّل `kilo remote` على حاسوبك لتوصيله.",
+    "remoteFound": "تم توصيل الحاسوب",
+    "checkAgain": "تحقق مرة أخرى",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

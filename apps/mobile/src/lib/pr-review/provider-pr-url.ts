@@ -75,21 +75,34 @@ function parseNumberSegment(segment: string | undefined): number | null {
  * `https://<host>/<project>/merge_requests/<n>`, on ANY host — gitlab.com
  * and self-managed instances alike. The project path is the FULL nested
  * path; trailing subpaths (`/diffs`, `/review-notes`) are tolerated.
+ *
+ * A project path may itself contain the segment `merge_requests`, so the
+ * FIRST match is not necessarily the marker. Prefer a modern
+ * `<path>/-/merge_requests/<n>` marker; among markers of equal precedence the
+ * LAST one wins, which is the trailing marker of the real URL.
  */
 function parseGitLabMrUrl(url: SplitUrl): ProviderPrRef | null {
   if (NON_GITLAB_HOSTS.has(url.host)) {
     return null;
   }
   const { segments } = url;
+  let best: ProviderPrRef | null = null;
+  let bestIsModern = false;
   for (let i = 1; i < segments.length; i += 1) {
     if (segments[i] === MERGE_REQUESTS_SEGMENT) {
       const ref = gitLabRefAtMarker(url, segments, i);
       if (ref) {
-        return ref;
+        // The `-/` separator is GitLab's own marker; a match without it is
+        // the legacy shape and must never override a modern one.
+        const isModern = segments[i - 1] === '-';
+        if (best === null || isModern || isModern === bestIsModern) {
+          best = ref;
+          bestIsModern = isModern;
+        }
       }
     }
   }
-  return null;
+  return best;
 }
 
 /** The ref named by `merge_requests/<n>` at `segments[markerAt]`, or null. */

@@ -54,11 +54,8 @@ const model: SessionModelOption = {
   showGatewayMetadata: false,
 };
 const repo: RepoOption = { platform: 'github', fullName: 'org/repo', isPrivate: false };
-const organization = vi.hoisted(() => ({ organizationId: null as string | null }));
-vi.mock('@/lib/organization-context', () => ({ useOrganization: () => organization }));
 
 beforeEach(() => {
-  organization.organizationId = null;
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   modelPickerSlot.set(UNFENCED_ROUTE_KEY, {
     options: [model],
@@ -76,6 +73,9 @@ beforeEach(() => {
   repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
     repositories: [repo],
     sections: [{ key: 'github', titleKey: 'common.github', repos: [repo] }],
+    // The picker keys its Bitbucket note on the scope the ROWS were loaded
+    // under, not on the app's global organization selection.
+    organizationId: null,
     currentValue: '',
     onSelect: vi.fn<() => void>(),
   });
@@ -93,23 +93,28 @@ describe('repository picker Bitbucket scope note', () => {
   it.each(['recents', 'no-bitbucket-rows'] as const)(
     'does not claim Bitbucket is unavailable to an organization with %s',
     async kind => {
-      organization.organizationId = 'org-1';
       const onSelect = vi.fn<() => void>();
-      if (kind === 'recents') {
-        const bitbucket: RepoOption = {
-          platform: 'bitbucket',
-          fullName: 'workspace/repo',
-          isPrivate: true,
-        };
-        repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
-          repositories: [bitbucket],
-          sections: [
-            { key: 'recents', titleKey: 'agentChat.newSession.recentlyUsed', repos: [bitbucket] },
-          ],
-          currentValue: '',
-          onSelect,
-        });
-      }
+      const repositories: RepoOption[] =
+        kind === 'recents'
+          ? [{ platform: 'bitbucket', fullName: 'workspace/repo', isPrivate: true }]
+          : [repo];
+      const sections =
+        kind === 'recents'
+          ? [
+              {
+                key: 'recents' as const,
+                titleKey: 'agentChat.newSession.recentlyUsed',
+                repos: repositories,
+              },
+            ]
+          : [{ key: 'github' as const, titleKey: 'common.github', repos: repositories }];
+      repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
+        repositories,
+        sections,
+        organizationId: 'org-1',
+        currentValue: '',
+        onSelect,
+      });
       const renderer = await mount(RepoPickerScreen);
       expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(false);
       expect(hosts(renderer, 'Pressable')).toHaveLength(1);

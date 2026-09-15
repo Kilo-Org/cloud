@@ -323,36 +323,32 @@ export function useAddPrCommentMutation(ref?: ProviderPrRef) {
   return useMutation({
     mutationFn: async (input: AddPrCommentInput) => {
       try {
-        if (scope.ref.platform === 'github') {
+        if (scope.ref.platform !== 'github') {
+          // The provider arm posts an unanchored top-level note: a
+          // conversation comment is not pinned to a diff position, so no
+          // `anchor` rides the input or the fingerprint.
+          const identity = providerWriteIdentity(scope);
           const result = await withUiDeadline(
-            trpcClient.githubPrReview.addIssueComment.mutate({
-              ...input,
-              operationKey: getKey(prIntentFingerprint('add_pr_comment', input)),
+            trpcClient.providerReview.addComment.mutate({
+              ...identity,
+              body: input.body,
+              operationKey: getKey(
+                prIntentFingerprint(
+                  'create_review_comment',
+                  providerFingerprintInput(scope.ref, { body: input.body })
+                )
+              ),
             }),
             PR_COMMENT_UI_DEADLINE_MS
           );
           rotateKey();
           return result;
         }
-        // A provider conversation comment is a top-level MR/PR note: no
-        // anchor, so the server posts a plain note (see `addComment` in
-        // gitlab-write.ts / bitbucket-write.ts). The provider write is
-        // ledgered under the server's own `create_review_comment` intent
-        // (the router folds the no-anchor body into the same fingerprint the
-        // anchored inline comment uses, which is provider-split), so a retry
-        // dedupes on the same key.
-        const addCommentInput = {
-          ...providerWriteIdentity(scope),
-          body: input.body,
-          operationKey: getKey(
-            prIntentFingerprint(
-              'create_review_comment',
-              providerFingerprintInput(scope.ref, { body: input.body })
-            )
-          ),
-        };
         const result = await withUiDeadline(
-          trpcClient.providerReview.addComment.mutate(addCommentInput),
+          trpcClient.githubPrReview.addIssueComment.mutate({
+            ...input,
+            operationKey: getKey(prIntentFingerprint('add_pr_comment', input)),
+          }),
           PR_COMMENT_UI_DEADLINE_MS
         );
         rotateKey();
@@ -426,7 +422,9 @@ function useResolveToggleMutation(
             if (!isPrMutationRetryable(error)) {
               rotateKey();
             }
-            throw mapPrOperationError(error, 'reply');
+            // Not 'reply': the ledger's `operation_in_progress` copy must name
+            // the resolve/unresolve the user just repeated, not a reply.
+            throw mapPrOperationError(error, 'resolve');
           }
         }
       ),

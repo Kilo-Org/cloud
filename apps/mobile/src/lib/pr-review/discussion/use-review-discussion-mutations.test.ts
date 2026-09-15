@@ -26,6 +26,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as OperationKeyModule from '@/lib/operation-key';
+import { OPERATION_IN_PROGRESS_MESSAGE } from '@/lib/operation-key';
 import type * as ReactQuery from '@tanstack/react-query';
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
 import type * as ProviderPrRefModule from '@/lib/pr-review/provider-pr-ref';
@@ -869,6 +870,18 @@ describe('useResolveThreadMutation / useUnresolveThreadMutation (s6 provider arm
     await lastCapturedOptions?.onSettled?.();
 
     expect(invalidateQueriesMock).toHaveBeenCalledWith(['providerReview', 'listDiscussions']);
+  });
+
+  it('maps a duplicate resolve onto the resolution copy, never the reply copy', async () => {
+    // `operation_in_progress` means the user repeated the resolve/unresolve;
+    // the toast must name that thread action rather than "Could not reply".
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    providerResolveMutateMock.mockRejectedValueOnce(new Error(OPERATION_IN_PROGRESS_MESSAGE));
+    useResolveThreadMutation(GITLAB_REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.({ threadId: 'd-1' })).rejects.toMatchObject({
+      message: 'Could not complete this action.',
+    });
   });
 });
 

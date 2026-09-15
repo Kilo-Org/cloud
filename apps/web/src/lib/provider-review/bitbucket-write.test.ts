@@ -1007,6 +1007,48 @@ describe('mergePullRequest', () => {
     expect(bitbucketCalls().some(call => call.url.pathname.endsWith('/merge'))).toBe(false);
   });
 
+  it('surfaces a ref change Bitbucket detects while merging as stale_head', async () => {
+    // The preflight read still shows the reviewed head, but the source moved
+    // before Bitbucket resolved the merge: its merge endpoint answers 409
+    // ("one of the refs involved changed while attempting to merge"). That is
+    // the only revision check Bitbucket Cloud offers — it accepts no head
+    // field — so the layer must report it as a stale head, never as a merge of
+    // the reviewed revision.
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({
+          status: 'available',
+          token: 'at-mock-token',
+          workspace: WORKSPACE,
+        });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname.endsWith('/pullrequests/12/merge')) {
+        return jsonResponse(
+          { type: 'error', error: { message: 'one of the refs involved changed' } },
+          409
+        );
+      }
+      if (parsed.pathname.endsWith('/pullrequests/12')) return jsonResponse(openPr);
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const error = await captureRejection(
+      mergePullRequest({
+        owner: ORG_OWNER,
+        workspace: 'acme',
+        repoSlug: 'repo',
+        prId: 12,
+        expectedHeadSha: HEAD_SHA,
+      })
+    );
+
+    expect(error.kind).toBe('stale_head');
+    expect(error.message).toBe(BITBUCKET_STALE_HEAD_REASON);
+    expect(bitbucketCalls().some(call => call.url.pathname.endsWith('/merge'))).toBe(true);
+  });
+
   it('reports replayed when the PR is already merged', async () => {
     fetchMock.mockImplementation(async (url: string | URL) => {
       const full = url.toString();

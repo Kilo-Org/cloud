@@ -62,6 +62,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
 import { PrCommentCta } from '@/components/pr-review/discussion/pr-comment-cta';
+import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
@@ -84,7 +85,7 @@ import {
   toggleThreadExpanded,
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
-import { providerPrChildRoutePath, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
@@ -103,7 +104,7 @@ type PrReviewDiscussionTabProps = {
 const SKELETON_ROW_COUNT = 4;
 
 // The GitHub conversation-comment formSheet. GitLab and Bitbucket reach their
-// own sibling route inside the provider layout (providerPrChildRoutePath) so
+// own sibling route inside the provider layout (providerPrSheetHref) so
 // the sheet mounts under the live provider scope; GitHub keeps the exact
 // object-form push it shipped with (PR 6023).
 const CONVERSATION_COMMENT_PATH =
@@ -272,19 +273,19 @@ export function PrReviewDiscussionTab({
   });
 
   const openConversationComment = () => {
-    // Route by provider: a GitLab MR / Bitbucket PR opens the sheet on its own
-    // route inside the provider layout, where the provider scope is published,
-    // so the mutation posts the plain note to the right provider. GitHub keeps
-    // the exact object-form push PR 6023 shipped.
-    if (ref.platform === 'github') {
-      const href: Href = {
-        pathname: CONVERSATION_COMMENT_PATH,
-        params: { owner, repo, number },
-      };
-      router.push(href);
+    // The provider route registers its own `conversation-comment` sheet: the
+    // GitHub literal would leave the provider scope and mount the GitHub
+    // layout with the GitHub-shaped triple (a GitLab project path has no
+    // `owner`/`repo` split).
+    if (ref.platform !== 'github') {
+      router.push(providerPrSheetHref(ref, 'conversation-comment'));
       return;
     }
-    router.push(providerPrChildRoutePath(ref, 'conversation-comment'));
+    const href: Href = {
+      pathname: CONVERSATION_COMMENT_PATH,
+      params: { owner, repo, number },
+    };
+    router.push(href);
   };
 
   // The bottom CTA bar is static chrome for the two content-bearing views

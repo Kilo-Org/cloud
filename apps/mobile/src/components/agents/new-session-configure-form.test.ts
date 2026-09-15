@@ -210,6 +210,7 @@ function defaultProps() {
     repositories: [] as NewSessionRepository[],
     recents: [] as NewSessionRepository[],
     selectedRepo: '',
+    organizationId: undefined as string | undefined,
     profile: null as {
       id: string;
       name: string;

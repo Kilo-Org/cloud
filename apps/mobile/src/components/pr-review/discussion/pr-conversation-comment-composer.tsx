@@ -32,7 +32,11 @@ import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
-import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
+import {
+  type ProviderPrRef,
+  providerPrRefKey,
+  providerPrRefLabel,
+} from '@/lib/pr-review/provider-pr-ref';
 import { useAddPrCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import { i18n } from '@/i18n';
 
@@ -43,8 +47,9 @@ type PrConversationCommentComposerProps = Readonly<{
   /**
    * The provider ref when this composer is opened from a GitLab/Bitbucket
    * surface; absent on the GitHub route. It routes the post through
-   * `providerReview.addComment` and keeps the durable draft keyed per ref so
-   * a same-named GitHub PR and GitLab MR never share one draft.
+   * `providerReview.addComment`, keys the durable draft per ref so a
+   * same-named GitHub PR and GitLab MR never share one, and supplies the
+   * provider-native header label when no explicit `eyebrow` is given.
    */
   prRef?: ProviderPrRef;
   /**
@@ -342,7 +347,7 @@ export function PrConversationCommentComposer({
     <>
       <PrFormSheetHeader
         title={t('prReview.composer.addTitle')}
-        eyebrow={eyebrow ?? `${owner}/${repo}#${number}`}
+        eyebrow={eyebrow ?? (prRef ? providerPrRefLabel(prRef) : `${owner}/${repo}#${number}`)}
         onBack={handleCancel}
       />
       <ScrollView

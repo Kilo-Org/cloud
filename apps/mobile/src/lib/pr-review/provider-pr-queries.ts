@@ -102,21 +102,47 @@ const ROLLUP_BUCKETS = new Map<string, 'success' | 'failure' | 'skipped'>([
   ['skipped', 'skipped'],
 ]);
 
+// A provider's terminal run states. `conclusion` is only set for the verdicts
+// the read layer maps, so GitLab's finished `skipped` and `manual` pipelines
+// arrive with `conclusion: null` and would otherwise read as still running.
+const COMPLETED_PROVIDER_CHECK_STATUSES = new Set([
+  'completed',
+  'success',
+  'failed',
+  'canceled',
+  'cancelled',
+  'skipped',
+  'manual',
+]);
+
 export function normalizeProviderChecks(result: ProviderPrChecksResult): PrChecksModel {
-  const checkRuns = result.checks.map(check => ({
-    name: check.name,
-    // A provider reports its own run states; the rollup and the row icons
-    // read GitHub's, where `conclusion` is set only once a run completed.
-    status: check.conclusion === null ? 'in_progress' : 'completed',
-    conclusion: normalizeConclusion(check.conclusion),
-    detailsUrl: check.detailsUrl,
-    appName: null,
-  }));
+  const checkRuns = result.checks.map(check => {
+    const completed =
+      check.conclusion !== null || COMPLETED_PROVIDER_CHECK_STATUSES.has(check.status);
+    const conclusion = normalizeConclusion(check.conclusion);
+    return {
+      name: check.name,
+      // The rollup and the row icons read GitHub's run states, and a provider
+      // reports its own; `conclusion === null` alone cannot say a finished run
+      // is done.
+      status: completed ? 'completed' : 'in_progress',
+      // GitLab finishes a `skipped` pipeline without a verdict the read layer
+      // maps; GitHub's own `skipped` conclusion is its equivalent, and it is
+      // what the row tone and the rollup bucket key on.
+      conclusion: conclusion ?? (check.status === 'skipped' ? 'skipped' : null),
+      detailsUrl: check.detailsUrl,
+      appName: null,
+    };
+  });
   const rollup = { total: checkRuns.length, success: 0, failure: 0, pending: 0, skipped: 0 };
   for (const run of checkRuns) {
-    const bucket = run.conclusion === null ? 'pending' : ROLLUP_BUCKETS.get(run.conclusion);
-    if (bucket) {
-      rollup[bucket] += 1;
+    if (run.status !== 'completed') {
+      rollup.pending += 1;
+    } else {
+      const bucket = run.conclusion === null ? undefined : ROLLUP_BUCKETS.get(run.conclusion);
+      if (bucket) {
+        rollup[bucket] += 1;
+      }
     }
   }
   return { checkRuns, rollup };

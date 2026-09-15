@@ -1296,8 +1296,11 @@ export const providerReviewRouter = createTRPCRouter({
   /**
    * Merge a PR/MR. `expectedHeadSha` is the optimistic-concurrency fence: the
    * write layer re-fetches the authoritative head and refuses a moved head
-   * with the exact stale-head reason BEFORE any merge call, so a stale
-   * revision can never merge another commit.
+   * with the exact stale-head reason BEFORE any merge call. GitLab sends it as
+   * the merge call's `sha`, so the merge itself is conditional; Bitbucket
+   * Cloud's merge endpoint accepts no revision, so there the fence is a
+   * preflight and Bitbucket's own ref re-validation (409 → stale_head) is the
+   * merge-time check.
    */
   mergePullRequest: baseProcedure.input(MergePullRequestInput).mutation(async ({ ctx, input }) => {
     const ref = providerRef(input);

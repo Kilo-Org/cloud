@@ -53,6 +53,8 @@ function mountSection(overrides: {
   value?: string;
   repositories?: NewSessionRepository[];
   groups?: RepositoryGroup[];
+  organizationId?: string | undefined;
+  isCloneEntry?: boolean;
 }) {
   const renderer: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
   act(() => {
@@ -67,6 +69,8 @@ function mountSection(overrides: {
         recents: [],
         groups: overrides.groups ?? [group('github', 'repos'), group('gitlab', 'repos')],
         value: overrides.value ?? '',
+        organizationId: overrides.organizationId,
+        isCloneEntry: overrides.isCloneEntry ?? false,
       })
     );
   });
@@ -78,10 +82,13 @@ function mountSection(overrides: {
 }
 
 function branchSelectorProps(renderer: TestRenderer.ReactTestRenderer) {
-  return renderer.root.findAllByType('RepositoryBranchSelector' as never)[0]?.props as {
-    repository: NewSessionRepository | null;
-    disabled: boolean;
-  };
+  return renderer.root.findAllByType('RepositoryBranchSelector' as never)[0]?.props as
+    | {
+        repository: NewSessionRepository | null;
+        organizationId: string | undefined;
+        disabled: boolean;
+      }
+    | undefined;
 }
 
 function renderedText(renderer: TestRenderer.ReactTestRenderer): string[] {
@@ -99,30 +106,31 @@ describe('NewSessionRepositorySection branch row', () => {
   it('hands the branch selector the resolved repository row', () => {
     const renderer = mountSection({ value: 'github:owner/repo' });
 
-    expect(branchSelectorProps(renderer).repository).toEqual(githubRow);
+    expect(branchSelectorProps(renderer)?.repository).toEqual(githubRow);
   });
 
   it('keeps same-named rows on two providers distinct', () => {
     const renderer = mountSection({ value: 'gitlab:owner/repo' });
 
-    expect(branchSelectorProps(renderer).repository).toEqual(gitlabRow);
+    expect(branchSelectorProps(renderer)?.repository).toEqual(gitlabRow);
   });
 
   it('offers no branch row until a repository is selected', () => {
     const renderer = mountSection({ value: '' });
 
-    expect(branchSelectorProps(renderer).repository).toBeNull();
+    expect(branchSelectorProps(renderer)?.repository).toBeNull();
   });
 
-  it('clears a stale branch override when the section mounts', () => {
-    setSelectedBranchOverride(githubRow, 'release/2.0');
+  it('hands the branch selector the route organization scope', () => {
+    const renderer = mountSection({ value: 'github:owner/repo', organizationId: 'org-1' });
 
-    mountSection({ value: 'github:owner/repo' });
-
-    expect(getSelectedBranchOverride(githubRow)).toBeNull();
+    expect(branchSelectorProps(renderer)?.organizationId).toBe('org-1');
   });
 
-  it('clears the branch override when the section unmounts', () => {
+  it('keeps a chosen branch when the run target toggle unmounts the section', () => {
+    // Toggling the run target to a remote instance unmounts only this section;
+    // the branch override belongs to the screen and must survive, otherwise
+    // switching back silently reverts to the provider default.
     const renderer = mountSection({ value: 'github:owner/repo' });
     setSelectedBranchOverride(githubRow, 'release/2.0');
 
@@ -130,7 +138,15 @@ describe('NewSessionRepositorySection branch row', () => {
       renderer.unmount();
     });
 
-    expect(getSelectedBranchOverride(githubRow)).toBeNull();
+    expect(getSelectedBranchOverride(githubRow)).toBe('release/2.0');
+  });
+
+  it('offers no branch row on the Continue clone entry', () => {
+    // The clone submit path has no `upstreamBranch` field, so a branch row
+    // there would show a choice the submit silently drops.
+    const renderer = mountSection({ value: 'github:owner/repo', isCloneEntry: true });
+
+    expect(renderer.root.findAllByType('RepositoryBranchSelector' as never)).toHaveLength(0);
   });
 });
 

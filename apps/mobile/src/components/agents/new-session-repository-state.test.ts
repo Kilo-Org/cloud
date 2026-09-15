@@ -7,12 +7,10 @@ import {
   type NewSessionRepository,
   type RepositoryGroup,
   repositoryIdentityKey,
-  resetNewSessionBranchScope,
   resetSelectedBranchOverrides,
   resolveBitbucketStatus,
   resolveProviderStatus,
   resolveRepositoryGroups,
-  setNewSessionBranchScope,
   setSelectedBranchOverride,
   subscribeNewSessionBranchState,
 } from './new-session-repository-state';
@@ -295,33 +293,5 @@ describe('new-session branch state', () => {
     expect(second).not.toBe(first);
     setSelectedBranchOverride(github('owner/repo'), 'release/2.0');
     expect(getNewSessionBranchState()).toBe(second);
-  });
-
-  it('marks the organization scope ready, including a personal (undefined) scope', () => {
-    setNewSessionBranchScope(undefined);
-    expect(getNewSessionBranchState()).toMatchObject({
-      isScopeReady: true,
-      organizationId: undefined,
-    });
-    setNewSessionBranchScope('org-1');
-    expect(getNewSessionBranchState().organizationId).toBe('org-1');
-  });
-
-  it('drops the scope on reset so a remount starts unknown, not on the old organization', () => {
-    setNewSessionBranchScope('org-1');
-    const listener = vi.fn(() => undefined);
-    const unsubscribe = subscribeNewSessionBranchState(listener);
-
-    resetNewSessionBranchScope();
-
-    expect(getNewSessionBranchState()).toMatchObject({
-      isScopeReady: false,
-      organizationId: undefined,
-    });
-    expect(listener).toHaveBeenCalledTimes(1);
-    // A second reset is a no-op: the store is already un-scoped.
-    resetNewSessionBranchScope();
-    expect(listener).toHaveBeenCalledTimes(1);
-    unsubscribe();
   });
 });

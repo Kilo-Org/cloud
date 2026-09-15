@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite for the tab's body states, the provider CTA sheet routing, and the keyboard-lift wiring */
 // The module-mock harness and render helpers live in
 // pr-review-discussion-tab.test-helpers. That import MUST stay first: the
 // helpers register the module mocks while they are evaluated.
@@ -188,6 +189,22 @@ describe('PrReviewDiscussionTab full-body states', () => {
       pathname: '/(app)/pr-review/[owner]/[repo]/[number]/conversation-comment',
       params: { owner: 'octocat', repo: 'hello-world', number: 7 },
     });
+  });
+
+  it('opens the provider conversation-comment sheet under a GitLab scope', () => {
+    // The provider route tree registers `conversation-comment`, not the
+    // GitHub literal: pushing the GitHub route would leave the provider scope
+    // and mount the GitHub layout with a GitHub-shaped triple (a GitLab
+    // project path has no owner/repo split).
+    const renderer = mountTab(GITLAB_REF);
+    expectCtaPresence(renderer, true);
+    act(() => {
+      const cta = renderer.root.find(node => String(node.type) === 'PrCommentCta');
+      (cta.props.onPress as () => void)();
+    });
+    expect(pushMock).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/group/sub/repo/12/conversation-comment'
+    );
   });
 });
 

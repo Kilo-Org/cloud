@@ -43,12 +43,15 @@ async function mountRecovery(messages = [makeAssistantMessage()]) {
       storage.upsertPart(message.info.id, part);
     }
   }
+  const childId = 'child-1' as KiloSessionId;
+  // Hydrate before rows land: with rows already in storage the manager treats
+  // the stream as the truth and keeps the load in-flight instead of storing
+  // the failure.
+  let pending = manager.hydrateChildSession(childId);
+  await pending;
   for (const message of messages) {
     receive(message);
   }
-  const childId = 'child-1' as KiloSessionId;
-  let pending = manager.hydrateChildSession(childId);
-  await pending;
   const props = {
     ...buildProps({
       getChildMessages: store.get(manager.atoms.childMessages),
@@ -99,9 +102,20 @@ async function mountRecovery(messages = [makeAssistantMessage()]) {
 }
 
 describe('ChildSessionSheet recovery', () => {
-  it('keeps rows, Retry, and the viewport through pending duplicates, another failure, and a deduplicated success', async () => {
-    const sheet = await mountRecovery();
-    const { renderer, fetchPage } = sheet;
+  it('keeps Retry through pending duplicates, drops the banner once streamed rows land, and recovers on a deduplicated reopen', async () => {
+    // Storage starts empty so the settled failures keep owning the outcome:
+    // with rows already in storage the manager drops the error instead.
+    const sheet = await mountRecovery([]);
+    const { renderer, fetchPage, manager } = sheet;
+    const failure = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
+    fetchPage.mockReturnValueOnce(failure.promise);
+    // Both presses arrive before React commits the disabled state.
+    await sheet.retry(2);
+
+    // A live child row lands while the retry is in flight: the banner and the
+    // busy Retry persist — the in-flight request still owns the outcome.
+    sheet.receive(makeAssistantMessage('m2', 'Live arrival'));
+    await sheet.sync();
     const list = host(renderer.root, 'FlashList');
     const button = retryButton(renderer.root);
     const listProps = list.props as FlashListProps<StoredMessage>;
@@ -119,47 +133,41 @@ describe('ChildSessionSheet recovery', () => {
       listProps.onScrollEndDrag?.(event);
       await vi.advanceTimersByTimeAsync(1000);
     });
-    const failure = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
-    fetchPage.mockReturnValueOnce(failure.promise);
-    // Both presses arrive before React commits the disabled state.
-    await sheet.retry(2);
-    expect(retryButton(renderer.root)).toBe(button);
-    expect(button.props.disabled).toBe(true);
     expect(button.props.accessibilityState).toEqual({ disabled: true, busy: true });
-    expect(textValues(renderer.root)).toContain('Connection failed. Please retry in a moment.');
-    sheet.receive(makeAssistantMessage('m2', 'Live arrival'));
-    await sheet.sync();
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
-    });
-    expect(button.props.accessibilityState).toEqual({ disabled: true, busy: true });
-    expect(textValues(list)).toEqual(['child text', 'Live arrival']);
-    expect(host(renderer.root, 'FlashList')).toBe(list);
+    expect(textValues(list)).toEqual(['Live arrival']);
     expect(viewport.offset).toBe(320);
+
     failure.reject(new Error('fetch failed'));
     await sheet.settle();
-    expect(textValues(renderer.root)).toContain('Connection lost. Please retry in a moment.');
-    expect(button.props.accessibilityState).toEqual({ disabled: false, busy: false });
+    // The landed rows are the truth: the settled failure must not resurface as
+    // "could not load" — the banner and Retry go away instead.
+    expect(textValues(renderer.root)).not.toContain('Connection lost. Please retry in a moment.');
+    expect(textValues(renderer.root)).not.toContain('Connection failed. Please retry in a moment.');
+    expect(renderer.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(textValues(list)).toEqual(['Live arrival']);
     expect(host(renderer.root, 'FlashList')).toBe(list);
     expect(viewport.offset).toBe(320);
 
+    // Reopening the sheet re-issues the load; overlapping opens dedupe to one
+    // request and the recovered page lands above the live row.
     const success = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
     fetchPage.mockReturnValueOnce(success.promise);
-    await sheet.retry();
-    expect(retryButton(renderer.root)).toBe(button);
-    expect(button.props.accessibilityState).toEqual({ disabled: true, busy: true });
-    expect(textValues(renderer.root)).toContain('Connection lost. Please retry in a moment.');
+    const reopen = manager.hydrateChildSession('child-1' as KiloSessionId);
+    const duplicate = manager.hydrateChildSession('child-1' as KiloSessionId);
     success.resolve(
       historyPage([
         makeAssistantMessage('m0', 'Older history'),
         makeAssistantMessage('m1', 'Complete child text'),
       ])
     );
+    await reopen;
+    await duplicate;
     await sheet.settle();
     expect(textValues(list)).toEqual(['Older history', 'Complete child text', 'Live arrival']);
     expect(renderer.root.findAllByType(QueryError)).toHaveLength(0);
     expect(host(renderer.root, 'FlashList')).toBe(list);
     expect(viewport.offset).toBe(320);
+    expect(fetchPage).toHaveBeenCalledTimes(3);
   });
 
   it('allows dismissal during Retry without reopening on a late success', async () => {

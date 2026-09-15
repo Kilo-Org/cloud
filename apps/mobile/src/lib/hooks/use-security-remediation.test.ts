@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
+
 import { useCancelSecurityRemediation } from './use-security-remediation';
+import { REMEDIATION_UNAVAILABLE_COPY } from '@kilocode/app-shared/security-agent';
+import { i18n } from '@/i18n';
+import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
 
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
@@ -48,9 +53,9 @@ vi.mock('sonner-native', () => ({
   },
 }));
 
-vi.mock('@kilocode/app-shared/security-agent', () => ({
+vi.mock('@kilocode/app-shared/security-agent', async importOriginal => ({
+  ...(await importOriginal<typeof SecurityAgentModule>()),
   isPersonalSecurityScope: (scope: string) => scope === 'personal',
-  getRemediationUnavailableCopy: () => null,
 }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -185,5 +190,39 @@ describe('useCancelSecurityRemediation (generation guard)', () => {
       organizationId: ORG_ID,
       attemptId: 'a1',
     });
+  });
+});
+
+const REMEDIATION_FALLBACK_KEY = 'securityAgent.remediation.unavailable';
+
+// The expected reason → catalog-key mapping is read from the shared table in
+// packages/app-shared instead of a hand-maintained fixture: a reason added
+// there makes the lookup fall back to the generic copy and fails this test
+// until the mobile map and its catalog key exist.
+describe('getRemediationUnavailableKey', () => {
+  it('returns null for an absent or eligible reason', () => {
+    expect(getRemediationUnavailableKey(null)).toBeNull();
+    expect(getRemediationUnavailableKey(undefined)).toBeNull();
+    expect(getRemediationUnavailableKey('')).toBeNull();
+    expect(getRemediationUnavailableKey('eligible')).toBeNull();
+  });
+
+  it.each(Object.entries(REMEDIATION_UNAVAILABLE_COPY))(
+    'maps %s to a catalog key holding the shared copy',
+    (reason, copy) => {
+      // A reason missing from the mobile map resolves to the generic key,
+      // which fails the assertion below.
+      const catalogKey = getRemediationUnavailableKey(reason) ?? REMEDIATION_FALLBACK_KEY;
+      expect(catalogKey).not.toBe(REMEDIATION_FALLBACK_KEY);
+      expect(i18n.t(catalogKey)).toBe(copy);
+    }
+  );
+
+  it('falls back to the generic key for an unknown or inherited name', () => {
+    expect(getRemediationUnavailableKey('not_a_reason')).toBe(REMEDIATION_FALLBACK_KEY);
+    // Object.hasOwn, not `in`: inherited prototype members must not leak.
+    expect(getRemediationUnavailableKey('constructor')).toBe(REMEDIATION_FALLBACK_KEY);
+    expect(getRemediationUnavailableKey('toString')).toBe(REMEDIATION_FALLBACK_KEY);
+    expect(i18n.t(REMEDIATION_FALLBACK_KEY)).not.toBe(REMEDIATION_FALLBACK_KEY);
   });
 });

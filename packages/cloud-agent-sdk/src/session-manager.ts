@@ -20,6 +20,7 @@ import type {
   RemoteModelState,
 } from './remote-model-catalog';
 import type { RemoteCommandState } from './remote-command-catalog';
+import type { NormalizedEvent } from './normalizer';
 import { atom } from 'jotai';
 import type { Atom, WritableAtom } from 'jotai';
 import {
@@ -31,6 +32,7 @@ import type { CloudAgentSession } from './session';
 import { createChatProcessor } from './chat-processor';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
+import type { SessionStorage } from './storage/types';
 import type { CloudAgentApi, CloudAgentStreamTicketResult } from './transport';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import type {
@@ -212,6 +214,25 @@ function computeCreateRemoteSessionInheritance(args: {
     input.orgId = args.organizationId;
   }
   return input;
+}
+
+/**
+ * The session id a chat event belongs to, or null for a service event. A live
+ * chat event for a child session is proof the child is producing output, which
+ * is what makes a stored "could not load" hydration failure stale.
+ */
+function chatEventSessionId(event: NormalizedEvent): string | null {
+  switch (event.type) {
+    case 'message.updated':
+      return event.info.sessionID;
+    case 'message.part.updated':
+      return event.part.sessionID;
+    case 'message.part.delta':
+    case 'message.part.removed':
+      return event.sessionId;
+    default:
+      return null;
+  }
 }
 
 type AssociatedPrData = {
@@ -1042,6 +1063,63 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(childSessionHydrationStatesAtom, next);
   }
 
+  /**
+   * Drop a stored first-page hydration failure for a child session once a live
+   * chat event for it arrives and the child has rows in storage. The rows are
+   * the same proof `storeChildHydrationFailure` requires to keep the failure in
+   * the first place, so the pair stays symmetric: a part-only event writes no
+   * message row, and clearing on it would leave the sheet with nothing to
+   * render, no error, and no retry path. Only an `error` is cleared: a `ready`
+   * child has nothing to report, and an in-flight `loading` request owns its
+   * own outcome.
+   */
+  function clearStaleChildSessionHydrationError(
+    storage: SessionStorage,
+    childSessionId: string
+  ): void {
+    const states = store.get(childSessionHydrationStatesAtom);
+    if (states.get(childSessionId)?.status !== 'error') return;
+    if (!childHasStoredMessages(storage, childSessionId)) return;
+    const next = new Map(states);
+    next.delete(childSessionId);
+    store.set(childSessionHydrationStatesAtom, next);
+  }
+
+  /**
+   * Whether the child already has messages in the active storage. A stored
+   * child row is proof the session loaded — the same truth a live chat
+   * event's clear relies on.
+   */
+  function childHasStoredMessages(storage: SessionStorage, childSessionId: string): boolean {
+    for (const id of storage.getMessageIds()) {
+      if (storage.getMessageInfo(id)?.sessionID === childSessionId) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Store a first-page hydration failure unless the child already streamed
+   * rows into storage. The clear above only fires when an event arrives after
+   * the failure, so a load settling after the last child event (the child
+   * stops streaming) would store an error nothing clears, and the "could not
+   * load" banner would reappear over a transcript the stream already
+   * delivered. The rows are the truth: the entry (this request's `loading`)
+   * is dropped, the next sheet open retries the load.
+   */
+  function storeChildHydrationFailure(
+    storage: JotaiSessionStorage,
+    childSessionId: KiloSessionId,
+    message: string
+  ): void {
+    if (childHasStoredMessages(storage, childSessionId)) {
+      const next = new Map(store.get(childSessionHydrationStatesAtom));
+      next.delete(childSessionId);
+      store.set(childSessionHydrationStatesAtom, next);
+      return;
+    }
+    setChildSessionHydrationState(childSessionId, { status: 'error', message });
+  }
+
   function isCurrentChildSessionHydration(
     generation: number,
     rootSessionId: KiloSessionId,
@@ -1102,17 +1180,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           // A null page (worker 404) or any typed failure on the first page is
           // a terminal hydration error for this child.
           if (page === null) {
-            setChildSessionHydrationState(childSessionId, {
-              status: 'error',
-              message: CHILD_SESSION_NOT_FOUND_MESSAGE,
-            });
+            storeChildHydrationFailure(storage, childSessionId, CHILD_SESSION_NOT_FOUND_MESSAGE);
             return;
           }
           if (page.kind !== 'success') {
-            setChildSessionHydrationState(childSessionId, {
-              status: 'error',
-              message: formatError(page),
-            });
+            storeChildHydrationFailure(storage, childSessionId, formatError(page));
             return;
           }
 
@@ -1143,10 +1215,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       } catch (err) {
         if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
-        setChildSessionHydrationState(childSessionId, {
-          status: 'error',
-          message: formatError(err),
-        });
+        storeChildHydrationFailure(storage, childSessionId, formatError(err));
       }
     })();
 
@@ -1977,6 +2046,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onEvent: event => {
         if (expectedGeneration !== switchGeneration) return;
+        const eventSessionId = chatEventSessionId(event);
+        if (eventSessionId !== null) {
+          clearStaleChildSessionHydrationError(session.storage, eventSessionId);
+        }
         if (event.type === 'worktree.changes.ready' || event.type === 'connected') {
           const cloudSessionId = store.get(sessionIdAtom);
           if (!cloudSessionId || event.cloudSessionId !== cloudSessionId) return;

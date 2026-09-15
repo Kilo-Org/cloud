@@ -44,6 +44,7 @@ import { useLaunchFolder } from '@/lib/hooks/use-launch-folder';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { usePersistedRunOnDestination } from '@/lib/hooks/use-persisted-run-on-destination';
+import { useSandboxSelection } from '@/lib/hooks/use-sandbox-selection';
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
 import {
   resolveContinueStartDisabled,
@@ -65,6 +66,10 @@ import {
   resolvePersistedRunOn,
   shouldRestorePersistedRunOn,
 } from '@/lib/run-on-destination';
+import {
+  resolveSandboxSelectionError,
+  type SandboxAllocation,
+} from '@/lib/sandbox-allocation-label';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { peekSharePayload } from '@/lib/share-payload';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
@@ -246,6 +251,26 @@ export function NewSessionScreenBody() {
     models,
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
   });
+
+  // The sandbox selection is owned here, not by the form: the route's scope is
+  // this screen's, and the picked allocation resets with it inside the hook.
+  // The pick is submitted by the create call (s2), so this slice only renders
+  // the control and reports the two non-retryable picks.
+  const sandboxSelection = useSandboxSelection(organizationId);
+  const sandboxError = resolveSandboxSelectionError({
+    capabilities: sandboxSelection.capabilities,
+    allocation: sandboxSelection.allocation,
+  });
+  const setSandboxAllocation = sandboxSelection.setAllocation;
+  const handleSandboxChange = (next: SandboxAllocation | undefined) => {
+    setSandboxAllocation(next);
+  };
+  const handleRetrySandbox = () => {
+    sandboxSelection.refetch();
+  };
+  const handleUseDefaultSandbox = () => {
+    setSandboxAllocation(undefined);
+  };
 
   // The branch pick belongs to THIS screen, not to the repository section: the
   // section unmounts when the run target becomes a remote instance, and
@@ -767,6 +792,16 @@ export function NewSessionScreenBody() {
         recents={recents}
         selectedRepo={selectedRepo}
         organizationId={organizationId}
+        sandbox={{
+          status: sandboxSelection.status,
+          capabilities: sandboxSelection.capabilities,
+          value: sandboxSelection.allocation,
+          error: sandboxError,
+          organizationId,
+          onChange: handleSandboxChange,
+          onRetry: handleRetrySandbox,
+          onUseDefault: handleUseDefaultSandbox,
+        }}
         profile={profile}
         isProfileLoading={isProfileLoading}
         isProfileError={isProfileError}

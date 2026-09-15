@@ -3,12 +3,17 @@ import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { type NewSessionSandboxState } from '@/components/agents/new-session-sandbox-section';
 import {
   type NewSessionRepository,
   type RepositoryGroup,
 } from '@/components/agents/new-session-repository-state';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+import {
+  type SandboxAllocation,
+  type SandboxSelectionCapabilities,
+} from '@/lib/sandbox-allocation-label';
 
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
@@ -69,6 +74,12 @@ vi.mock('@/components/agents/new-session-prompt', () => ({
 vi.mock('@/components/agents/instance-selector', () => ({
   InstanceSelector: 'InstanceSelector',
 }));
+
+vi.mock('@/components/agents/sandbox-selector', () => ({
+  SandboxSelector: 'SandboxSelector',
+}));
+
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/agents/new-session-repository-section', () => ({
   NewSessionRepositorySection: 'NewSessionRepositorySection',
@@ -183,6 +194,42 @@ const INSTANCE: InstancePickerInstance = {
   gitBranch: null,
 };
 
+const SANDBOX_CAPABILITIES: SandboxSelectionCapabilities = {
+  enabled: true,
+  defaultDestination: {
+    provider: { id: 'cloudflare', account: 'kilo' },
+    instanceType: 'single',
+  },
+  options: [
+    {
+      allocation: {
+        provider: { id: 'cloudflare', account: 'kilo' },
+        instanceType: 'single',
+      },
+    },
+    {
+      allocation: {
+        provider: { id: 'vercel', account: 'kilo' },
+        instanceType: 'large',
+      },
+    },
+  ],
+};
+
+function sandboxState(overrides: Partial<NewSessionSandboxState> = {}): NewSessionSandboxState {
+  return {
+    status: 'ready',
+    capabilities: SANDBOX_CAPABILITIES,
+    value: undefined,
+    error: undefined,
+    organizationId: undefined,
+    onChange: vi.fn<(next: SandboxAllocation | undefined) => void>(),
+    onRetry: vi.fn<() => void>(),
+    onUseDefault: vi.fn<() => void>(),
+    ...overrides,
+  };
+}
+
 function defaultProps() {
   const voiceInputSettlerRef: React.RefObject<(() => Promise<boolean>) | null> = {
     current: null,
@@ -228,6 +275,7 @@ function defaultProps() {
     recents: [] as NewSessionRepository[],
     selectedRepo: '',
     organizationId: undefined as string | undefined,
+    sandbox: sandboxState(),
     profile: null as {
       id: string;
       name: string;
@@ -781,5 +829,94 @@ describe('NewSessionConfigureForm', () => {
       cloudCreateError,
     }) as Node;
     expect(findElementByType(remote, 'NewSessionCloudCreateError')).toBeNull();
+  });
+});
+describe('NewSessionConfigureForm sandbox section', () => {
+  async function renderForm(overrides: Partial<ReturnType<typeof defaultProps>> = {}) {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    return NewSessionConfigureForm({ ...defaultProps(), ...overrides }) as Node;
+  }
+
+  it('renders the backend sandbox field as the happy state', async () => {
+    const element = await renderForm();
+    expect(findTextContent(element, text => text === 'Sandbox')).toBe(true);
+    expect(findElementByType(element, 'Skeleton')).toBeNull();
+    expect(findElementByType(element, 'SandboxSelector')).toMatchObject({
+      value: undefined,
+      capabilities: SANDBOX_CAPABILITIES,
+      organizationId: undefined,
+      disabled: false,
+    });
+  });
+
+  it('disables the sandbox field while the session is starting', async () => {
+    const element = await renderForm({ isCreating: true });
+    expect(findElementByType(element, 'SandboxSelector')?.disabled).toBe(true);
+  });
+
+  it('reserves the same slot with a field-sized skeleton while capabilities load', async () => {
+    const element = await renderForm({
+      sandbox: sandboxState({ status: 'loading', capabilities: undefined }),
+    });
+    expect(findTextContent(element, text => text === 'Sandbox')).toBe(true);
+    expect(findElementByType(element, 'Skeleton')?.className).toBe('h-[50px] w-full rounded-lg');
+    expect(findElementByType(element, 'SandboxSelector')).toBeNull();
+    expect(findTextContent(element, text => text === 'Retry')).toBe(false);
+  });
+
+  it('renders the retryable capabilities failure with Retry in the same slot', async () => {
+    const onRetry = vi.fn<() => void>();
+    const element = await renderForm({
+      sandbox: sandboxState({ status: 'error', capabilities: undefined, onRetry }),
+    });
+    expect(findTextContent(element, text => text === "Couldn't load sandbox options")).toBe(true);
+    expect(findTextContent(element, text => text === 'Retry')).toBe(true);
+    expect(findElementByType(element, 'SandboxSelector')).toBeNull();
+    const retry = findElementByType(element, 'Button');
+    expect(retry?.onPress).toBe(onRetry);
+    expect(retry?.disabled).toBe(undefined);
+  });
+
+  it('renders a picked-but-unavailable sandbox with Use Default and no generic retry', async () => {
+    const onUseDefault = vi.fn<() => void>();
+    const element = await renderForm({
+      sandbox: sandboxState({ error: 'not-offered', onUseDefault }),
+    });
+    expect(
+      findTextContent(
+        element,
+        text => text === 'This sandbox is unavailable. Choose another sandbox or Default.'
+      )
+    ).toBe(true);
+    expect(findTextContent(element, text => text === 'Use Default')).toBe(true);
+    expect(findTextContent(element, text => text === 'Retry')).toBe(false);
+    expect(findElementByType(element, 'SandboxSelector')).toBeNull();
+    expect(findElementByType(element, 'Button')?.onPress).toBe(onUseDefault);
+  });
+
+  it('disables Use Default while the session is starting', async () => {
+    const element = await renderForm({
+      sandbox: sandboxState({ error: 'selection-unavailable' }),
+      isCreating: true,
+    });
+    expect(findElementByType(element, 'Button')?.disabled).toBe(true);
+  });
+
+  it('renders nothing at all when the capabilities are disabled', async () => {
+    const element = await renderForm({
+      sandbox: sandboxState({ capabilities: { enabled: false, options: [] } }),
+    });
+    expect(findTextContent(element, text => text === 'Sandbox')).toBe(false);
+    expect(findTextContent(element, text => text === 'Use Default')).toBe(false);
+    expect(findElementByType(element, 'SandboxSelector')).toBeNull();
+    expect(findElementByType(element, 'Button')).toBeNull();
+  });
+
+  it('hides the sandbox section entirely for a remote run target', async () => {
+    const element = await renderForm({ runOnInstance: INSTANCE });
+    expect(findTextContent(element, text => text === 'Sandbox')).toBe(false);
+    expect(findElementByType(element, 'SandboxSelector')).toBeNull();
+    expect(findElementByType(element, 'Skeleton')).toBeNull();
   });
 });

@@ -18,6 +18,7 @@ export function shouldShowTruncationBanner(changedFiles: number): boolean {
 
 export function truncationBannerCopy(changedFiles: number): string {
   return i18n.t('prReview.diff.truncationBanner', {
+    count: changedFiles,
     limit: formatNumber(PR_REVIEW_TRUNCATION_BANNER_THRESHOLD, i18n.language),
     total: formatNumber(changedFiles, i18n.language),
   });

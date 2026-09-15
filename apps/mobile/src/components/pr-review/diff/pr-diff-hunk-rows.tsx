@@ -222,6 +222,7 @@ export function PaginationRow({
       <View className="flex-row items-center justify-center gap-3 py-4">
         <Text variant="muted" className="text-xs">
           {t('prReview.hunkRows.loadedOfTotalFiles', {
+            count: loadedFiles,
             loaded: formatNumber(loadedFiles, i18n.language),
             total: totalFiles == null ? '?' : formatNumber(totalFiles, i18n.language),
           })}

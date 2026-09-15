@@ -1,6 +1,8 @@
 import { type Part, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { type TFunction } from 'i18next';
 
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { partRendersContent } from './message-visibility';
 import { isToolPart } from './part-types';
 import { getToolDisplay } from './tool-card-display';
@@ -108,7 +110,8 @@ export function buildToolRunRows(parts: readonly ToolPart[]): ToolRunRow[] {
 /** The condensed row label: item count plus the last tool call's own label. */
 export function buildToolRunLabel(rows: readonly ToolRunRow[], t: TFunction): string {
   return t('agentChat.toolRun.condensedLabel', {
-    itemCount: rows.length,
+    count: rows.length,
+    displayCount: formatNumber(rows.length, i18n.language),
     last: rows.at(-1)?.label ?? '',
   });
 }

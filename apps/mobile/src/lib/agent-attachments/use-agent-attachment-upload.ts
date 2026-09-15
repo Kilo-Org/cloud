@@ -440,6 +440,7 @@ export function useAgentAttachmentUpload(
       if (limit.truncated) {
         toast.warning(
           i18n.t('agentChat.attachmentPicker.onlyAddingFiles', {
+            count: limit.acceptedCount,
             accepted: formatNumber(limit.acceptedCount, i18n.language),
             total: formatNumber(candidates.length, i18n.language),
             max: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),

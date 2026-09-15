@@ -370,6 +370,64 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
     expect(bound.length).toBeLessThanOrEqual(1);
   });
 
+  test('recovers the connected tenant when a disconnected former tenant is also present', async () => {
+    const disconnectedOwner = await createTestOrganization(
+      'Handler DB Unsuspend Former Tenant',
+      otherOwnerId,
+      0
+    );
+    const connectedOwner = await createTestOrganization('Handler DB Unsuspend Live Tenant', ownerId, 0);
+    const installationId = '585858';
+
+    const inserted = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_organization_id: disconnectedOwner.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: installationId,
+          github_app_type: 'standard',
+          platform_account_id: String(ACCOUNT_ID),
+          platform_account_login: ACCOUNT_LOGIN,
+          integration_status: 'suspended',
+          suspended_at: new Date().toISOString(),
+          suspended_by: 'local_disconnect',
+          github_disconnected_at: new Date().toISOString(),
+          repository_access: 'all',
+        },
+        {
+          owned_by_organization_id: connectedOwner.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: installationId,
+          github_app_type: 'standard',
+          platform_account_id: String(ACCOUNT_ID),
+          platform_account_login: ACCOUNT_LOGIN,
+          integration_status: 'suspended',
+          suspended_at: new Date().toISOString(),
+          suspended_by: 'github_suspend',
+          repository_access: 'all',
+        },
+      ])
+      .returning();
+    const live = inserted[1];
+    if (!live) throw new Error('Expected the connected association');
+
+    await handleInstallationUnsuspend(
+      { action: 'unsuspend', installation: { id: Number(installationId) } } as never,
+      'standard'
+    );
+
+    // The connected tenant must recover even though an arbitrary lookup can
+    // return the retained disconnected row first.
+    const [recovered] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, live.id));
+    expect(recovered).toMatchObject({ integration_status: 'active', suspended_at: null });
+  });
+
   test('recovers a suspended association when GitHub delivers installation.unsuspend', async () => {
     const organization = await createTestOrganization('Handler DB Unsuspend', ownerId, 0);
     const installationId = '545454';

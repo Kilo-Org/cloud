@@ -51,15 +51,11 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 44, left: 0, right: 0 }),
-}));
-
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
 
-const insetsState = vi.hoisted(() => ({ bottom: 0 }));
+const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insetsState,
@@ -731,11 +727,16 @@ describe('NewSessionConfigureForm', () => {
   it('reserves the bottom safe-area inset so the Start action clears the navigation bar', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
-    // The mocked inset is 44; the helper floors at 16 and adds 16.
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm(defaultProps()) as Node;
+    insetsState.bottom = 44;
+    try {
+      // The inset is 44; the helper floors at 16 and adds 16.
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      const element = NewSessionConfigureForm(defaultProps()) as Node;
 
-    expect(findElementHeight(element)).toBe(60);
+      expect(findElementHeight(element)).toBe(60);
+    } finally {
+      insetsState.bottom = 0;
+    }
   });
 
   // ── Case 13: reorder wiring lock ──

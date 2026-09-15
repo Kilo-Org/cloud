@@ -118,6 +118,7 @@ import {
   mergeSessionTranscript,
   type SessionTranscriptItem,
 } from '@/components/agents/session-transcript';
+import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
@@ -855,6 +856,26 @@ export function SessionDetailContent({
     () => (condenseToolCalls ? condenseTranscriptToolRuns(baseTranscript) : baseTranscript),
     [condenseToolCalls, baseTranscript]
   );
+
+  // The list branch must never mount with zero items: a zero-item FlashList
+  // paints blank dead space with no loading and no empty state (mobile-app
+  // spot check, e2-open). `mergeSessionTranscript` drops messages whose parts
+  // render no content, so the branch reads the merged item count.
+  const transcriptView = resolveSessionTranscriptView({
+    transcriptItemCount: transcript.length,
+    hasStatusIndicator: statusIndicator !== null,
+    hasOlderMessages,
+    olderMessagesError,
+  });
+
+  // A zero-item transcript with a live older-page cursor is transient: page
+  // until renderable content arrives or the cursor ends. The manager dedupes
+  // in-flight loads and stops on terminal errors, so this cannot loop.
+  useEffect(() => {
+    if (transcriptView === 'older-loading' && !isLoadingOlderMessages) {
+      void manager.loadOlderMessages();
+    }
+  }, [transcriptView, isLoadingOlderMessages, manager]);
 
   // Render-phase state adjustment: hold queued ids across queue → dequeue
   // transitions while streaming so the badge row never unmounts and bubble
@@ -2113,17 +2134,50 @@ export function SessionDetailContent({
         </CenteredState>
       );
     }
-    if (shouldBlockMessages) {
+    if (shouldBlockMessages || transcriptView === 'older-loading') {
       return <SessionSkeletonMessages sessionId={sessionId} />;
     }
-    if (visibleMessages.length === 0) {
-      if (statusIndicator) {
+    if (transcriptView !== 'list') {
+      if (transcriptView === 'status' && statusIndicator !== null) {
         return (
           <CenteredState>
             <View className="items-center px-6">
               <SessionStatusIndicator indicator={statusIndicator} />
             </View>
           </CenteredState>
+        );
+      }
+      if (transcriptView === 'older-error') {
+        // A retryable older-page failure is a retryable state, not the empty
+        // state: the history load can be reattempted, so the body mounts the
+        // same pagination Retry the list header carries (mobile-app gate r3,
+        // session-transcript-view finding). Terminal older-page errors keep
+        // the action-less empty state below.
+        return (
+          <EmptyState
+            icon={MessageSquare}
+            title={t('agentChat.session.emptyTitle')}
+            description={
+              <AccessibleStatus
+                message={t('agentChat.olderMessages.couldNotLoad')}
+                tone="status"
+                className="text-center text-sm"
+              />
+            }
+            action={
+              <Button
+                variant="outline"
+                onPress={() => {
+                  void manager.loadOlderMessages();
+                }}
+                loading={isLoadingOlderMessages}
+                accessibilityLabel={t('common.retry')}
+                accessibilityHint={t('agentChat.olderMessages.retryHint')}
+              >
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            }
+          />
         );
       }
       return (

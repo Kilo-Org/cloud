@@ -3,6 +3,27 @@ import { type ConnectivityState, connectivityStatus } from '@/lib/connectivity-o
 /** Wait out transient NetInfo reports before confirming offline with a probe. */
 const OFFLINE_BANNER_SHOW_DELAY_MS = 5000;
 
+/**
+ * Fixed height of the offline banner row. The banner is an absolute overlay
+ * pinned at `top: insets.top`, so a surface whose header starts at the
+ * safe-area top must reserve this height while the banner is visible or the
+ * overlay covers the header title (uxs2 spot check, e6-offline-hang; mobile-app
+ * spot check, e2). `OfflineBanner` imports this constant and paints the row at
+ * exactly this height (no vertical padding), and `ScreenHeader` reserves it via
+ * `offlineHeaderReservation`, so the painted row and the reserved space cannot
+ * drift. This is the single source of truth for that height.
+ */
+export const OFFLINE_BANNER_HEIGHT = 36;
+
+/**
+ * Top padding a pinned-header surface must reserve above its header for the
+ * offline banner overlay: `OFFLINE_BANNER_HEIGHT` while the banner is visible,
+ * 0 while online so the header keeps its natural position.
+ */
+export function offlineHeaderReservation(isOffline: boolean): number {
+  return isOffline ? OFFLINE_BANNER_HEIGHT : 0;
+}
+
 export type OfflineBannerTimer = {
   set(callback: () => void, delayMs: number): { cancel(): void };
 };

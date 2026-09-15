@@ -209,6 +209,10 @@ patchedDependencies:
   # KILO-APP-6H; react/react-native#58299). Also synchronizes the
   # LegacyViewManagerInterop cache. iOS needs buildReactNativeFromSource to
   # compile this in — see apps/mobile/app.config.ts.
+  # Bounds-guard the unmountChildComponentView assert message. Without it a
+  # stale Fabric child index throws NSRangeException while the assert is being
+  # formatted, which SIGABRTs release builds that link the assert-enabled
+  # prebuilt React core (Kilo-Org/kilocode#14065; react/react-native#57865).
   react-native@0.86.3: patches/react-native@0.86.3.patch
 publicHoistPattern:
   - '@types/*'

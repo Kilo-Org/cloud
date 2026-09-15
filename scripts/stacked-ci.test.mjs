@@ -25,7 +25,9 @@ const mobilePathFragments = [
   /packages\/cloud-agent-sdk\//,
   /pnpm-lock\\?\.yaml/,
   /kilo-app-ci\\?\.yml/,
-  /ci\\?\.yml/,
+  // Path-qualified: a bare `/ci\\?\.yml/` also matches the `kilo-app-ci.yml`
+  // alternative above, so dropping the root-workflow family would go unnoticed.
+  /\.github\/workflows\/ci\\?\.yml/,
   /stacked-ci\\?\.test\\?\.mjs/,
 ];
 
@@ -185,3 +187,13 @@ for (const [index, jobName] of [
     });
   }
 }
+
+test('mobile change detection pins the root workflow path family', () => {
+  const workflows = readWorkflows();
+  const detect = workflows[1].jobs['mobile-changes'].steps.find(step => step.id === 'detect');
+  // The root-workflow family must be pinned by its own path: a bare `ci.yml`
+  // fragment also matches the `kilo-app-ci.yml` alternative, so its removal
+  // would otherwise pass.
+  detect.run = detect.run.replace('|^\\.github/workflows/ci\\.yml$', '');
+  assert.throws(() => validate(...workflows), /must recognise/);
+});

@@ -66,7 +66,7 @@ describe('quarantine releases unadmitted queued messages', () => {
     expect(failedIds).toEqual(['accepted']);
   });
 
-  it('does not release a queued message with a committed attach', () => {
+  it('releases a completed attach with no prompt and retires the proof', () => {
     const attachProof = {
       authorization: {},
       dispatched: true,
@@ -74,11 +74,22 @@ describe('quarantine releases unadmitted queued messages', () => {
       attachmentEpoch: 1,
     } as SessionOperationProof;
     const messages: SessionMessageRecord[] = [
-      queued('attached', { operations: { attach: attachProof } }),
+      queued('attached', { operations: { attach: attachProof }, deliveryDeadlineAt: 7_000 }),
     ];
 
-    const { releasedIds } = releaseUnadmittedWaitingMessages(messages, wrapperA);
-    expect(releasedIds).toEqual([]);
+    const { releasedIds, messages: released } = releaseUnadmittedWaitingMessages(
+      messages,
+      wrapperA
+    );
+    expect(releasedIds).toEqual(['attached']);
+    expect(released[0]).toMatchObject({
+      state: 'queued',
+      wrapperInstanceId: undefined,
+      preparationAttemptId: undefined,
+      deliveryDeadlineAt: 7_000,
+      operations: { retiredAttach: attachProof },
+    });
+    expect(released[0].operations?.attach).toBeUndefined();
   });
 
   it('does not release a queued message that has a prompt operation', () => {
@@ -157,7 +168,7 @@ describe('quarantine releases unadmitted queued messages', () => {
     });
   });
 
-  it('clears preparationAttemptId and deliveryDeadlineAt on release', () => {
+  it('clears preparationAttemptId but preserves deliveryDeadlineAt on release', () => {
     const messages: SessionMessageRecord[] = [
       queued('unadmitted', {
         preparationAttemptId: 'attempt-1',
@@ -168,7 +179,8 @@ describe('quarantine releases unadmitted queued messages', () => {
 
     const { messages: released } = releaseUnadmittedWaitingMessages(messages, wrapperA);
     expect(released[0].preparationAttemptId).toBeUndefined();
-    expect(released[0].deliveryDeadlineAt).toBeUndefined();
+    // The head keeps its original preparation bound across release.
+    expect(released[0].deliveryDeadlineAt).toBe(999_999);
   });
 
   it('drops incomplete attach proofs on release', () => {

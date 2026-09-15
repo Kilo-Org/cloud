@@ -114,7 +114,20 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       deferBudgetStopFinalSettlement: true,
       beforeHeartbeatDelivery: context => this.ensureStartAcknowledged(context),
       beforeStopDelivery: context => this.ensureStartAcknowledged(context),
-      onGenerationClosed: () => this.schedulePendingGenerationIfRunning(),
+      onGenerationClosed: (_context, cause) => {
+        if (cause?.nonRetryableSkuAdmissionCode) {
+          // The stored attribution cannot start on this SKU. Drop it on the
+          // billing queue instead of immediately starting a replacement
+          // generation that would fail the same way. Serializing the delete
+          // keeps a write ordered before this close from surviving as a new
+          // generation.
+          this.runShadowTask('terminal SKU admission cleanup', async () => {
+            await this.ctx.storage.delete(PENDING_ATTRIBUTION_STORAGE_KEY);
+          });
+          return;
+        }
+        this.schedulePendingGenerationIfRunning();
+      },
       onBudgetWarning: budget => this.logBudgetWarning(budget),
       enforceBudgetStop: (budget, expected) => this.enforceBudgetStop(budget, expected),
     });

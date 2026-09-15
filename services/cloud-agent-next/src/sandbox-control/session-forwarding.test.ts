@@ -117,4 +117,21 @@ describe('createSessionForwarding', () => {
     ).resolves.toBe('acknowledged');
     expect(forwarding.stats()).toMatchObject({ waiting: 0, inFlight: 0, bufferedBytes: 0 });
   });
+
+  it('keeps a detached lane until admitted work settles', async () => {
+    const forwarding = createSessionForwarding();
+    const release = Promise.withResolvers<void>();
+    const first = forwarding.enqueue('workspace_1', async () => release.promise);
+    await Promise.resolve();
+    forwarding.delete('workspace_1');
+    const secondForward = vi.fn(async () => 'second');
+    const second = forwarding.enqueue('workspace_1', secondForward);
+    await Promise.resolve();
+    expect(secondForward).not.toHaveBeenCalled();
+    release.resolve();
+    await expect(first).resolves.toBeUndefined();
+    await expect(second).resolves.toBe('second');
+    expect(secondForward).toHaveBeenCalledTimes(1);
+    expect(forwarding.get('workspace_1')).toBeUndefined();
+  });
 });

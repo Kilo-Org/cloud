@@ -17,6 +17,7 @@ import {
   fetchGitHubRepositoriesForMaintenance,
 } from '@/lib/integrations/platforms/github/adapter';
 import { disconnectGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchGitHubInstallationDetails: jest.fn(),
@@ -160,6 +161,64 @@ describe('GitHub connection attempt persistence', () => {
     await expect(
       selectGitHubConnectionInstallation({ attemptId, userId, installationId: stored.selected })
     ).resolves.toMatchObject({ selected_installation_id: stored.selected });
+  });
+
+  test('caches the repository inventory for an all-repositories attach so first-use discovery works', async () => {
+    mockedFetchInstallation.mockResolvedValue({
+      id: 123,
+      account: { id: 456, login: 'acme', type: 'Organization' },
+      permissions: { contents: 'read' },
+      events: ['push'],
+      repository_selection: 'all',
+      created_at: '2026-09-07T00:00:00.000Z',
+    } as never);
+    mockedFetchRepositories.mockResolvedValue([
+      {
+        id: 1,
+        name: 'repo',
+        full_name: 'acme/repo',
+        private: false,
+        created_at: '2026-09-07T00:00:00.000Z',
+      },
+    ] as never);
+
+    const organization = await createTestOrganization('Attach inventory org', userId, 0);
+    const attemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'org', id: organization.id },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [candidate],
+    });
+    await selectGitHubConnectionInstallation({
+      attemptId,
+      userId,
+      installationId: candidate.installationId,
+    });
+
+    const completed = await completeGitHubConnectionAttempt({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidate,
+      authorizeOwner: async () => {},
+    });
+    if (!completed.ok) throw new Error('Expected completion');
+
+    // The installation exposes all repositories, so the attach must still
+    // populate the cache rather than leaving repositories=null.
+    expect(mockedFetchRepositories).toHaveBeenCalledWith(candidate.installationId, 'standard');
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, completed.integrationId));
+    expect(row?.repositories).toHaveLength(1);
+    expect(row?.repository_access).toBe('all');
   });
 
   test('atomically writes, consumes, and idempotently replays a verified completion', async () => {

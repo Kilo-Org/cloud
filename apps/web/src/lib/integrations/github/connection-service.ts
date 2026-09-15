@@ -157,13 +157,16 @@ export async function completeGitHubConnectionAttempt(input: {
     details.account.login !== input.candidate.accountLogin
   )
     return { ok: false as const, reason: 'installation_unavailable' as const };
-  const repositories =
-    details.repository_selection === 'selected'
-      ? await fetchGitHubRepositoriesForMaintenance(
-          input.candidate.installationId,
-          initialAttempt.github_app_type
-        )
-      : null;
+  // Cache the repository inventory for both selections, not only
+  // `selected`. A newly attached shared association starts with
+  // repositories=null, and discovery/Slack read the cached list, so an
+  // all-repositories shared attach would otherwise look repository-less on
+  // first use. The pending-install completion path already syncs the same
+  // inventory this way.
+  const repositories = await fetchGitHubRepositoriesForMaintenance(
+    input.candidate.installationId,
+    initialAttempt.github_app_type
+  );
   return db.transaction(async tx => {
     const [attempt] = await tx
       .select()

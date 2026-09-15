@@ -376,7 +376,11 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
       otherOwnerId,
       0
     );
-    const connectedOwner = await createTestOrganization('Handler DB Unsuspend Live Tenant', ownerId, 0);
+    const connectedOwner = await createTestOrganization(
+      'Handler DB Unsuspend Live Tenant',
+      ownerId,
+      0
+    );
     const installationId = '585858';
 
     const inserted = await db

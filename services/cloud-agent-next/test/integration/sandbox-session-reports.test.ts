@@ -260,15 +260,43 @@ describe('control-plane run-state reporting', () => {
     const messageId = 'msg_018f1e2d3c4bPrepTimeoutAB';
     const captured: CloudAgentQueueReport[] = [];
 
-    await runInDurableObject(sessionStub(id), async (instance, state) => {
-      injectReportQueue(instance, captured);
-      suppressDispatch(instance);
-      await register(instance, id);
-      await admit(instance, messageId);
-      await instance.failWaitingMessages('preparation_timeout');
-      await instance.alarm();
-    });
+    const { policyState, policyFailedReports } = await runInDurableObject(
+      sessionStub(id),
+      async (instance, state) => {
+        injectReportQueue(instance, captured);
+        suppressDispatch(instance);
+        await register(instance, id);
+        await admit(instance, messageId);
 
+        // Recoverable runtime invalidation is queue-wide: never-dispatched queued
+        // work stays queued and emits no failed report.
+        await instance.failWaitingMessages('preparation_timeout');
+        await instance.alarm();
+        const policy = readMessages(state).find(message => message.messageId === messageId);
+        const policyState = policy?.state;
+        const policyFailedReports = captured.filter(
+          report => report.run.status === 'failed'
+        ).length;
+
+        // Drive a genuine terminal preparation-timeout commit through the same
+        // `failDelivery` path the dispatch loop uses, with an explicit scope.
+        await (
+          instance as unknown as {
+            failDelivery: (
+              messageId: string,
+              reason: string,
+              wrapperInstanceId?: string,
+              scope?: 'message' | 'runtime'
+            ) => Promise<void>;
+          }
+        ).failDelivery(messageId, 'preparation_timeout', policy?.wrapperInstanceId, 'message');
+        await instance.alarm();
+        return { policyState, policyFailedReports };
+      }
+    );
+
+    expect(policyState).toBe('queued');
+    expect(policyFailedReports).toBe(0);
     const failed = captured.find(report => report.run.status === 'failed');
     expect(failed?.run).toMatchObject({
       messageId,

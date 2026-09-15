@@ -30,6 +30,7 @@ describe('validateFeatureHeader', () => {
     'scheduled',
     'quick-chat',
     'mobile-chat',
+    'tool-summary-translation',
   ])('accepts emitted feature %s', feature => {
     expect(validateFeatureHeader(feature)).toBe(feature);
   });

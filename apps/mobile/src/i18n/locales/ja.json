@@ -2979,14 +2979,6 @@
     "revoke": "{{host}}を信頼済みホストから削除",
     "backToPreferences": "設定に戻る"
   },
-  "quickChat": {
-    "empty": {
-      "title": "チャットを開始",
-      "description": "モデルと話すにはメッセージを送信してください。"
-    },
-    "historyRetry": "チャット履歴を読み込めませんでした。",
-    "sendError": "メッセージを送信できませんでした。もう一度お試しください。"
-  },
   "glanceable": {
     "waiting": "エージェントの状態を更新中",
     "empty": "進行中の作業はありません",
@@ -3031,5 +3023,18 @@
     "remoteFound": "コンピューターが接続されました",
     "checkAgain": "再チェック",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "チャットを開始",
+      "description": "モデルと話すにはメッセージを送信してください。"
+    },
+    "list": {
+      "loadFailed": "チャット履歴を読み込めませんでした。",
+      "new": "新しいチャット",
+      "openHint": "チャットを開きます。長押しで削除します。",
+      "deleteTitle": "このチャットを削除しますか？"
+    },
+    "beta": "ベータ"
   }
 }

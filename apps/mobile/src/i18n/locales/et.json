@@ -2979,14 +2979,6 @@
     "revoke": "Lõpeta hosti {{host}} usaldamine",
     "backToPreferences": "Tagasi eelistuste juurde"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Alusta vestlust",
-      "description": "Mudeliga vestlemiseks saada sõnum."
-    },
-    "historyRetry": "Vestluse ajaloo laadimine ei õnnestunud.",
-    "sendError": "Sõnumi saatmine ebaõnnestus. Proovi uuesti."
-  },
   "glanceable": {
     "waiting": "Agentide oleku värskendamine",
     "empty": "Ühtegi tööd pole pooleli",
@@ -3031,5 +3023,18 @@
     "remoteFound": "Arvuti ühendatud",
     "checkAgain": "Kontrolli uuesti",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Alusta vestlust",
+      "description": "Mudeliga vestlemiseks saada sõnum."
+    },
+    "list": {
+      "loadFailed": "Vestluse ajaloo laadimine ei õnnestunud.",
+      "new": "Uus vestlus",
+      "openHint": "Avab vestluse. Kustutamiseks hoia all.",
+      "deleteTitle": "Kas kustutada see vestlus?"
+    },
+    "beta": "Beeta"
   }
 }

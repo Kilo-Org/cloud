@@ -2979,14 +2979,6 @@
     "revoke": "Bỏ tin cậy {{host}}",
     "backToPreferences": "Quay lại cài đặt"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Bắt đầu trò chuyện",
-      "description": "Gửi tin nhắn để trò chuyện với mô hình AI."
-    },
-    "historyRetry": "Không thể tải lịch sử trò chuyện.",
-    "sendError": "Không thể gửi tin nhắn. Vui lòng thử lại."
-  },
   "glanceable": {
     "waiting": "Đang cập nhật tác nhân",
     "empty": "Không có tác vụ đang chạy",
@@ -3031,5 +3023,18 @@
     "remoteFound": "Đã kết nối máy tính",
     "checkAgain": "Kiểm tra lại",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Bắt đầu trò chuyện",
+      "description": "Gửi tin nhắn để trò chuyện với mô hình."
+    },
+    "list": {
+      "loadFailed": "Không thể tải lịch sử trò chuyện.",
+      "new": "Cuộc trò chuyện mới",
+      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để xóa.",
+      "deleteTitle": "Xóa cuộc trò chuyện này?"
+    },
+    "beta": "Beta"
   }
 }

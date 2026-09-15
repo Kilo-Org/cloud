@@ -2668,7 +2668,7 @@
     "legalConnectorPrivacy": " болон ",
     "manageFailed": "App Store захиалгын удирдлагыг нээж чадсангүй.",
     "kiloPassSetup": "Kilo Pass-ын тохиргоо",
-    "subscriptionHeaderDescription": "Kilo App-д.",
+    "subscriptionHeaderDescription": "Kilo App-д хиймэл оюун ухаан ашиглан код бичих сесс явуулахад зориулж Kilo үлдэгдэлд сар бүр кредит нэмэх захиалга юм.",
     "tierDescription": "Kilo App ашиглахад зориулж сар бүр {{price}}-тай тэнцэх төлбөртэй кредит нэмнэ.",
     "subscribe": "Захиалах",
     "subscribeDescription": "Сар бүрийн кредит, урамшууллын ахиц",
@@ -2979,14 +2979,6 @@
     "revoke": "{{host}} хостын итгэмжлэлийг цуцлах",
     "backToPreferences": "Тохиргоо руу буцах"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Чат эхлүүлэх",
-      "description": "Загвартай ярилцахын тулд мессеж илгээнэ үү."
-    },
-    "historyRetry": "Чатын түүхийг ачаалж чадсангүй.",
-    "sendError": "Мессежийг илгээж чадсангүй. Дахин оролдоно уу."
-  },
   "glanceable": {
     "waiting": "Агентуудын мэдээллийг шинэчилж байна",
     "empty": "Гүйцэтгэж буй ажил алга",
@@ -3031,5 +3023,18 @@
     "remoteFound": "Компьютер холбогдлоо",
     "checkAgain": "Дахин шалгах",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Чат эхлүүлэх",
+      "description": "Загвартай ярилцахын тулд мессеж илгээнэ үү."
+    },
+    "list": {
+      "loadFailed": "Чат түүхийг ачаалж чадсангүй.",
+      "new": "Шинэ чат",
+      "openHint": "Чатыг нээнэ. Устгахын тулд удаан дарна уу.",
+      "deleteTitle": "Энэ чатыг устгах уу?"
+    },
+    "beta": "Бета"
   }
 }

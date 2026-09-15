@@ -2979,14 +2979,6 @@
     "revoke": "Amanamummaa {{host}} haqi",
     "backToPreferences": "Gara filannoowwaniitti deebi'i"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Marii jalqabi",
-      "description": "Moodeela waliin haasa'uuf ergaa ergi."
-    },
-    "historyRetry": "Seenaa marii fe'uun hin danda'amne.",
-    "sendError": "Ergaa erguun hin danda'amne. Irra deebi'ii yaali."
-  },
   "glanceable": {
     "waiting": "Eejentoota haaromsaa jira",
     "empty": "Hojiin hojjetamaa jiru hin jiru",
@@ -3031,5 +3023,18 @@
     "remoteFound": "Kompiitaraan walqabate",
     "checkAgain": "Irra deebi'ii ilaali",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Chaat jalqabi",
+      "description": "Modeelii wajjin haasa'uuf ergaa ergi."
+    },
+    "list": {
+      "loadFailed": "Seenaa chaat fudhachuu hin dandeenye.",
+      "new": "Marii haaraa",
+      "openHint": "Marii ni bana. Haquuf cuqaasii dheeraa godhi.",
+      "deleteTitle": "Marii kana haquuf?"
+    },
+    "beta": "Beetaa"
   }
 }

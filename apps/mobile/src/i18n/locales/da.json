@@ -2979,14 +2979,6 @@
     "revoke": "Fjern tillid til {{host}}",
     "backToPreferences": "Tilbage til indstillinger"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Start en chat",
-      "description": "Send en besked for at tale med en model."
-    },
-    "historyRetry": "Chathistorikken kunne ikke indlæses.",
-    "sendError": "Kunne ikke sende beskeden. Prøv igen."
-  },
   "glanceable": {
     "waiting": "Opdaterer agenter",
     "empty": "Intet arbejde i gang",
@@ -3031,5 +3023,18 @@
     "remoteFound": "Computer tilsluttet",
     "checkAgain": "Tjek igen",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Start en chat",
+      "description": "Send en besked for at tale med en model."
+    },
+    "list": {
+      "loadFailed": "Kunne ikke indlæse chathistorik.",
+      "new": "Ny chat",
+      "openHint": "Åbner chatten. Tryk og hold for at slette.",
+      "deleteTitle": "Slet denne chat?"
+    },
+    "beta": "Beta"
   }
 }

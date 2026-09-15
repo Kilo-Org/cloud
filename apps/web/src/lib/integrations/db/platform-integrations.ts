@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   github_app_installations,
   repository_customizations,
@@ -866,23 +866,29 @@ function buildGitHubAuthorizationProvenance(
 /**
  * Auto-complete a pending installation
  */
-export async function autoCompleteInstallation({
-  integrationId,
-  installationData,
-  existingMetadata,
-}: {
-  integrationId: string;
-  installationData: {
-    installation_id: string;
-    account_id: string;
-    account_login: string;
-    repository_selection: string;
-    permissions: Record<string, unknown>;
-    events: string[];
-    created_at: string;
-  };
-  existingMetadata: Record<string, unknown>;
-}) {
+export async function autoCompleteInstallation(
+  {
+    integrationId,
+    installationData,
+    existingMetadata,
+  }: {
+    integrationId: string;
+    installationData: {
+      installation_id: string;
+      account_id: string;
+      account_login: string;
+      repository_selection: string;
+      permissions: Record<string, unknown>;
+      events: string[];
+      created_at: string;
+    };
+    existingMetadata: Record<string, unknown>;
+  },
+  /** Run the completion inside a caller-owned transaction (for example
+   *  alongside the installation exclusivity check and canonical binding, so
+   *  the whole decision is serialized under the installation lock). */
+  transaction?: DrizzleTransaction
+) {
   // Keep requester info for historical purposes, but clear pending_approval since it's complete
   // Use Zod to safely parse the existing metadata
   const parseResult = PendingInstallationMetadataWrapperSchema.safeParse(existingMetadata);
@@ -1260,9 +1266,9 @@ export async function upsertPlatformIntegrationForOwner(
     .limit(1);
 
   if (existing) {
-    await db
-      .update(platform_integrations)
-      .set({
+  await (transaction ?? db)
+    .update(platform_integrations)
+    .set({
         platform_account_id: values.platform_account_id,
         platform_account_login: values.platform_account_login,
         permissions: values.permissions,

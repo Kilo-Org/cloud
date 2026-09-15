@@ -25,6 +25,21 @@ import {
 
 export type DbTransaction = DrizzleTransaction;
 
+/**
+ * Serializes every writer that must reason about the full set of tenant
+ * associations for one GitHub App installation identity. Callers must run
+ * inside a transaction; the lock is released at commit/rollback.
+ */
+export async function lockGitHubInstallationIdentity(
+  tx: DbTransaction,
+  appType: 'standard' | 'lite',
+  installationId: string
+): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${installationId}`}))`
+  );
+}
+
 export type VerifiedGitHubInstallationData = {
   platformInstallationId: string;
   platformAccountId: string;
@@ -1054,15 +1069,16 @@ export async function recordCompletedGitHubInstallationDelivery(input: {
     });
 }
 
-export async function bindGitHubIntegrationToCanonicalInstallation(input: {
-  integrationId: string;
-  installationId: string;
-  appType: 'standard' | 'lite';
-}) {
-  await db.transaction(async tx => {
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtext(${`${input.appType}:${input.installationId}`}))`
-    );
+export async function bindGitHubIntegrationToCanonicalInstallation(
+  input: {
+    integrationId: string;
+    installationId: string;
+    appType: 'standard' | 'lite';
+  },
+  transaction?: DbTransaction
+) {
+  const execute = async (tx: DbTransaction) => {
+    await lockGitHubInstallationIdentity(tx, input.appType, input.installationId);
     const [canonical] = await tx
       .select({ id: github_app_installations.id })
       .from(github_app_installations)
@@ -1089,5 +1105,6 @@ export async function bindGitHubIntegrationToCanonicalInstallation(input: {
       )
       .returning({ id: platform_integrations.id });
     if (bound.length !== 1) throw new Error('GitHub integration could not be bound');
-  });
+  };
+  return transaction ? execute(transaction) : db.transaction(execute);
 }

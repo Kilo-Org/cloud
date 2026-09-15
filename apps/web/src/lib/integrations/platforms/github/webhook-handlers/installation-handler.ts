@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
+  lockGitHubInstallationIdentity,
   observeGitHubInstallationLifecycle,
 } from '@/lib/integrations/db/github-installations';
 import { db } from '@/lib/drizzle';
@@ -124,33 +125,55 @@ export async function handleInstallationCreated(
     if (legacyMatches.length === 1) pending = legacyMatches[0];
   }
   if (pending) {
-    const [existingAssociation] = await db
-      .select({ id: platform_integrations.id })
-      .from(platform_integrations)
-      .where(
-        and(
-          eq(platform_integrations.platform, PLATFORM.GITHUB),
-          appTypeCondition,
-          eq(platform_integrations.platform_installation_id, installationData.installation_id),
-          isNotNull(platform_integrations.github_installation_id)
-        )
+    // The exclusivity decision, the pending-row completion, and the canonical
+    // binding must be one serialized unit. Otherwise a competing verified
+    // connection can commit between the check and the bind and leave two
+    // active tenant associations on one canonical installation while
+    // sharing_mode stays exclusive — i.e. the pending request bypasses
+    // sharing admission entirely. The advisory lock is the same one
+    // connectVerifiedGitHubInstallation/bindGitHubIntegrationToCanonicalInstallation
+    // take on the installation identity, so both paths serialize here.
+    const completed = await db.transaction(async tx => {
+      await lockGitHubInstallationIdentity(tx, appType, installationData.installation_id);
+      const [existingAssociation] = await tx
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.GITHUB),
+            appTypeCondition,
+            eq(platform_integrations.platform_installation_id, installationData.installation_id),
+            isNotNull(platform_integrations.github_installation_id)
+          )
+        );
+      if (existingAssociation) return false;
+      await autoCompleteInstallation(
+        {
+          integrationId: pending.id,
+          installationData,
+          existingMetadata: (pending.metadata as Record<string, unknown> | null) ?? {},
+        },
+        tx
       );
-    if (existingAssociation) {
+      await bindGitHubIntegrationToCanonicalInstallation(
+        {
+          integrationId: pending.id,
+          installationId: installationData.installation_id,
+          appType,
+        },
+        tx
+      );
+      return true;
+    });
+    if (!completed) {
+      // Another tenant already owns this installation: the pending request
+      // must not be auto-activated. Leave it pending so it goes through
+      // verified sharing admission on the connect-existing path.
       return NextResponse.json(
         { message: 'Installation association requires verified connection confirmation' },
         { status: 200 }
       );
     }
-    await autoCompleteInstallation({
-      integrationId: pending.id,
-      installationData,
-      existingMetadata: (pending.metadata as Record<string, unknown> | null) ?? {},
-    });
-    await bindGitHubIntegrationToCanonicalInstallation({
-      integrationId: pending.id,
-      installationId: installationData.installation_id,
-      appType,
-    });
     try {
       const repositories = await fetchGitHubRepositories(installationData.installation_id, appType);
       await updateRepositoriesForIntegration(pending.id, repositories);

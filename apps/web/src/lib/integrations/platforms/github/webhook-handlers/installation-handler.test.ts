@@ -94,6 +94,13 @@ jest.mock('@/lib/drizzle', () => ({
     select: () => ({
       from: () => ({ where: async () => selectResults.shift() ?? [] }),
     }),
+    transaction: async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({
+        select: () => ({
+          from: () => ({ where: async () => selectResults.shift() ?? [] }),
+        }),
+        execute: async () => undefined,
+      }),
   },
 }));
 
@@ -153,6 +160,7 @@ jest.mock('@/lib/integrations/db/github-installations', () => ({
   observeGitHubInstallationLifecycle: (...args: unknown[]) =>
     mockObserveGitHubInstallationLifecycle(...args),
   bindGitHubIntegrationToCanonicalInstallation: (...args: unknown[]) => mockBindCanonical(...args),
+  lockGitHubInstallationIdentity: jest.fn(async () => undefined),
   updateGitHubInstallationRepositories: (...args: unknown[]) =>
     mockUpdateGitHubInstallationRepositories(...args),
 }));
@@ -257,13 +265,17 @@ describe('handleInstallationCreated', () => {
       );
       expect(response.status).toBe(200);
       expect(mockAutoCompleteInstallation).toHaveBeenCalledWith(
-        expect.objectContaining({ integrationId: 'pi_org' })
+        expect.objectContaining({ integrationId: 'pi_org' }),
+        expect.anything()
       );
-      expect(mockBindCanonical).toHaveBeenCalledWith({
-        integrationId: 'pi_org',
-        installationId: '98765',
-        appType: 'standard',
-      });
+      expect(mockBindCanonical).toHaveBeenCalledWith(
+        {
+          integrationId: 'pi_org',
+          installationId: '98765',
+          appType: 'standard',
+        },
+        expect.anything()
+      );
     }
   );
 

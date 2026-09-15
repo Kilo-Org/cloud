@@ -145,7 +145,7 @@ type PrimaryDefaultFallbackCause =
 function fallBackToPrimaryDefault(
   params: ResolveAutoModelParams,
   cause: PrimaryDefaultFallbackCause,
-  decision?: { model: string; variant?: string }
+  decision?: { model: string; variant?: string | null }
 ): ResolveAutoModelResult {
   warnExceptInTest('Kilo Auto model falling back to primary default', {
     cause,
